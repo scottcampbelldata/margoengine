@@ -3,7 +3,7 @@ import { createServer } from 'vite';
 import { mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 
-export async function openBrowser({ browserName = 'chromium', channel = 'msedge', args = process.env.BROWSER_ARGS ? JSON.parse(process.env.BROWSER_ARGS) : [], powerPreference = process.env.GPU_POWER ?? 'high-performance', firefoxUserPrefs = {}, startPath = '/tests/modern.html', aliases = {} } = {}) {
+export async function openBrowser({ browserName = 'chromium', channel = process.env.BROWSER_CHANNEL ?? 'msedge', args = process.env.BROWSER_ARGS ? JSON.parse(process.env.BROWSER_ARGS) : [], powerPreference = process.env.GPU_POWER ?? 'high-performance', firefoxUserPrefs = {}, startPath = '/tests/modern.html', aliases = {} } = {}) {
   await mkdir('test-results', { recursive: true });
   const server = await createServer({ resolve: {alias:aliases}, server: { host: '127.0.0.1', port: 5193, strictPort: true }, logLevel: 'error' }); await server.listen();
   let browser;

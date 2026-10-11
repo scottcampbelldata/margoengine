@@ -7,7 +7,7 @@ const percentile=(values,p)=>values.toSorted((a,b)=>a-b)[Math.ceil(values.length
 const profileConstructors=process.argv.includes('--constructors'),profileAllocations=process.argv.includes('--allocations');
 assert.ok(!(profileConstructors&&profileAllocations),'Run instrumentation and sampling separately');
 const output=profileConstructors?'modern-conveyor-constructors':profileAllocations?'modern-conveyor-allocations':'modern-conveyor-checks',trace=`test-results/${output}-trace.json`;
-const browser=await openBrowser({channel:'chrome',startPath:'/tests/modern.html'}),{page,hardware}=browser,errors=[],checks=[];
+const browser=await openBrowser({channel:process.env.BROWSER_CHANNEL ?? 'chrome',startPath:'/tests/modern.html'}),{page,hardware}=browser,errors=[],checks=[];
 page.on('pageerror',error=>errors.push(error.message));
 page.on('console',message=>{if(message.type()==='error'||/ValidationError|Invalid .*Pipeline/.test(message.text()))errors.push(message.text());});
 try {
