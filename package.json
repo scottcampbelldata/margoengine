@@ -1,0 +1,42 @@
+{
+  "name": "vexel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "workspaces": [
+    "packages/core",
+    "packages/gltf",
+    "packages/react",
+    "packages/machinery",
+    "packages/creative",
+    "examples/vite",
+    "examples/next"
+  ],
+  "scripts": {
+    "modern:build": "node scripts/build-modern.js",
+    "modern:test": "node --test tests/modern*.test.js",
+    "modern:test:browser": "node scripts/modern-browser-tests.js",
+    "modern:test:domains": "node scripts/modern-domain-tests.js",
+    "modern:test:finalization": "node scripts/modern-finalization-tests.js",
+    "modern:check:conveyor": "node scripts/modern-conveyor-checks.js",
+    "modern:test:packages": "node scripts/modern-package-tests.js",
+    "modern:dev": "npm run dev --workspace @vexel/starter-vite",
+    "modern:build:starters": "npm run build --workspace @vexel/starter-vite && npm run build --workspace @vexel/starter-next",
+    "predev": "node scripts/build-modern.js --precompiled",
+    "dev": "npm run modern:dev",
+    "build": "node scripts/build-modern.js --precompiled && npm run modern:build:starters",
+    "pretest": "node scripts/build-modern.js --precompiled",
+    "test": "npm run modern:test",
+    "test:browser": "node scripts/modern-browser-tests.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "binaryen": "132.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4"
+  }
+}

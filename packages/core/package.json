@@ -1,0 +1,10 @@
+{
+  "name": "@vexel/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "sideEffects": false,
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }, "./extension":{"types":"./dist/extension.d.ts","import":"./dist/extension.js"} },
+  "files": ["dist"]
+}

@@ -1,0 +1,16 @@
+node_modules/
+dist/
+test-results/
+*.log
+packages/*/target/
+examples/next/.next/
+examples/next/next-env.d.ts
+*.tsbuildinfo
+
+# Local hardware captures and recovery evidence; portable summaries are versioned.
+benchmarks/validation-*/
+*.heapprofile
+*.heapsnapshot
+.env
+.env.*
+!.env.example

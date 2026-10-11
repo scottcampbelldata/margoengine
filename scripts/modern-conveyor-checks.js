@@ -1,0 +1,78 @@
+import assert from 'node:assert/strict';
+import {writeFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {openBrowser} from './browser.js';
+
+const percentile=(values,p)=>values.toSorted((a,b)=>a-b)[Math.ceil(values.length*p)-1];
+const profileConstructors=process.argv.includes('--constructors'),profileAllocations=process.argv.includes('--allocations');
+assert.ok(!(profileConstructors&&profileAllocations),'Run instrumentation and sampling separately');
+const output=profileConstructors?'modern-conveyor-constructors':profileAllocations?'modern-conveyor-allocations':'modern-conveyor-checks',trace=`test-results/${output}-trace.json`;
+const browser=await openBrowser({channel:'chrome',startPath:'/tests/modern.html'}),{page,hardware}=browser,errors=[],checks=[];
+page.on('pageerror',error=>errors.push(error.message));
+page.on('console',message=>{if(message.type()==='error'||/ValidationError|Invalid .*Pipeline/.test(message.text()))errors.push(message.text());});
+try {
+  await page.goto('http://127.0.0.1:5173/');await page.waitForFunction(()=>document.querySelector('.badge')?.textContent.includes('webgpu'));
+  await page.evaluate(async()=>{const url=performance.getEntriesByType('resource').map(e=>e.name).find(n=>/\/core\/dist\/engine\.js/.test(n)),{Engine}=await import(url),render=Engine.prototype.render;Engine.prototype.render=function(...args){window.conveyorEngine=this;Engine.prototype.render=render;return render.apply(this,args);};});
+  await page.getByText('Domain tools',{exact:true}).click();
+  for(const count of [20,200,240]) {
+    await page.getByLabel('Roller count (reload assembly)').fill(String(count));await page.getByRole('button',{name:'Load conveyor assembly',exact:true}).click();await page.waitForFunction(count=>window.conveyorEngine?.meshes.size===4*count+16,count);
+    const result=await page.evaluate(async count=>{
+      const e=window.conveyorEngine;e.stop();e.camera.cancelFit();e.camera.position=[6,4,9];e.camera.target=[0,.5,0];e.camera.near=.001;e.camera.far=10000;
+      const shafts=[...e.meshes.values()].filter(m=>/^Roller_\d+$/.test(m.name)),k=e.plugins.get('kinematics'),drive=e.plugins.get('conveyor-drive'),original=GPURenderPassEncoder.prototype.drawIndexedIndirect,draws=[];
+      const write=GPUQueue.prototype.writeBuffer,instanceBuffers=[...e.renderer.resources.values()].map(r=>r.instance),uploads=[];
+      GPURenderPassEncoder.prototype.drawIndexedIndirect=function(buffer,offset){const r=[...e.renderer.resources.values()].find(r=>r.indirect===buffer);draws.push({offset,command:[...r.command]});return original.call(this,buffer,offset);};
+      GPUQueue.prototype.writeBuffer=function(buffer,destination,data,source=0,size){if(instanceBuffers.includes(buffer))uploads.push({destinationByteOffset:destination,sourceByteOffset:data.byteOffset+source*data.BYTES_PER_ELEMENT,byteLength:size*data.BYTES_PER_ELEMENT});return write.call(this,buffer,destination,data,source,size);};
+      try{e.render({culling:false,delta:1/60});await e.gpu.queue.onSubmittedWorkDone();}finally{GPURenderPassEncoder.prototype.drawIndexedIndirect=original;GPUQueue.prototype.writeBuffer=write;}
+      const times=[],windows=[];let windowStart=0;for(let i=0;i<420;i++){const start=performance.now();if(i%10===0)windowStart=start;drive.onPreUpdate(1/60);k.onPreUpdate(1/60);e.store.tick(false);if(i>=120){times.push(performance.now()-start);if(i%10===9)windows.push((performance.now()-windowStart)/10);}}
+      const motor=[...e.meshes.values()].find(m=>m.name==='Motor'),angle=motor.rotation.z,coupled=shafts.every(m=>Math.abs(m.rotation.z-angle)<1e-6&&Math.abs(m.matrix[0]/.18-Math.cos(angle))<1e-5),boltsStatic=[...e.meshes.values()].filter(m=>m.name.startsWith('Mount_Bolt')).every(m=>m.rotation.z===0);
+      drive.rpm=-60;drive.onPreUpdate(1/60);k.onPreUpdate(1/60);e.store.tick(false);const reverse=shafts.every(m=>Math.abs(m.rotation.z-motor.rotation.z)<1e-6);drive.rpm=60;
+      const api=e.store.api,frameOptions={culling:false,delta:1/60};let t1=0,t2=0,jsPre=0,wasm=0,jsPost=0;
+      e.store.api={...api,kernel_tick(handle,culling){t1=performance.now();const error=api.kernel_tick(handle,culling);t2=performance.now();return error;}};
+      try{for(let i=0;i<180;i++){const t0=performance.now();e.render(frameOptions);const t3=performance.now();jsPre+=t1-t0;wasm+=t2-t1;jsPost+=t3-t2;await e.gpu.queue.onSubmittedWorkDone();}}finally{e.store.api=api;}
+      return {rollers:shafts.length,entities:e.meshes.size,draws,batches:e.stats.drawCalls,coupled,reverse,boltsStatic,wasmViews:shafts.every(m=>m.euler.buffer===e.store.rotations.buffer),times,windows,alignment:{wasmMatrixByteOffset:e.store.matrices.byteOffset,instanceStrideBytes:24*4,uploads},boundary:{samples:180,jsPreTickMeanMs:jsPre/180,wasmMeanMs:wasm/180,jsPostTickMeanMs:jsPost/180,jsTotalMeanMs:(jsPre+jsPost)/180,note:'Actual frame: JS before export, raw Wasm export, then JS scene collection/encoding/uploads/submission. GPU completion wait is outside measurement; timers have browser precision limits.'}};
+    },count);
+    assert.equal(result.rollers,count);assert.equal(result.draws.length,2);assert.ok(result.draws.some(d=>d.command[1]===count*3+3));assert.ok(result.coupled&&result.reverse&&result.boltsStatic&&result.wasmViews);
+    assert.equal(result.alignment.uploads.length,2);assert.equal(result.alignment.wasmMatrixByteOffset%16,0);assert.equal(result.alignment.instanceStrideBytes%16,0);for(const upload of result.alignment.uploads)for(const value of Object.values(upload))assert.equal(value%16,0);
+    const {times,windows,...report}=result;checks.push({name:'Captured indexed indirect batches and complete motor/coupling/Wasm transform tick',...report,samples:times.length,windowTicks:10,windowMedianMs:percentile(windows,.5),windowP95Ms:percentile(windows,.95),meanMs:windows.reduce((s,v)=>s+v,0)/windows.length,medianMs:percentile(times,.5),p95Ms:percentile(times,.95),maxMs:Math.max(...times),p95UnderHalfMs:percentile(times,.95)<.5});
+  }
+  // Click the rendered centers, then exercise the real pointer handlers around the selected pivot.
+  const picks=[];
+  for(const name of ['Motor','Drive_Cover','Linear_Carriage','Mount_Bolt_239_1.17']) {
+    const target=await page.evaluate(name=>{const e=window.conveyorEngine,m=[...e.meshes.values()].find(m=>m.name===name),p=[m.matrix[12],m.matrix[13],m.matrix[14]];e.camera.position=[p[0],p[1]+.01,p[2]+1.5];e.camera.target=[p[0]+.03,p[1],p[2]];e.render({culling:false});const r=e.canvas.getBoundingClientRect(),mvp=e.camera.matrix,w=mvp[3]*p[0]+mvp[7]*p[1]+mvp[11]*p[2]+mvp[15],x=(mvp[0]*p[0]+mvp[4]*p[1]+mvp[8]*p[2]+mvp[12])/w,y=(mvp[1]*p[0]+mvp[5]*p[1]+mvp[9]*p[2]+mvp[13])/w;window.pickTiming=[];const pick=e.pick;e.pick=async function(...args){const t=performance.now(),pending=pick.apply(this,args),sync=performance.now()-t;const mesh=await pending;window.pickTiming.push({expected:m.id,actual:mesh?.id,name:mesh?.name,syncMs:sync,totalMs:performance.now()-t});return mesh;};window.originalPick=pick;return {x:r.x+(x+1)*r.width/2,y:r.y+(1-y)*r.height/2};},name);
+    await page.keyboard.down('Control');await page.mouse.click(target.x,target.y);await page.keyboard.up('Control');await page.waitForFunction(()=>window.pickTiming.length===1);
+    const pick=await page.evaluate(()=>{const e=window.conveyorEngine;e.pick=window.originalPick;const t=e.camera.target,pivot=[...t],position=[...e.camera.position];return {...window.pickTiming[0],pivot,position};});assert.equal(pick.actual,pick.expected,JSON.stringify(pick));picks.push(pick);
+    if(name==='Motor'){
+      await page.mouse.move(target.x,target.y);await page.mouse.down();await page.mouse.move(target.x+55,target.y+18,{steps:8});await page.mouse.up();
+      const orbit=await page.evaluate(()=>({pivot:[...window.conveyorEngine.camera.target],position:[...window.conveyorEngine.camera.position]}));assert.deepEqual(orbit.pivot,pick.pivot);assert.notDeepEqual(orbit.position,pick.position);assert.ok(Math.abs(Math.hypot(...orbit.position.map((v,i)=>v-orbit.pivot[i]))-Math.hypot(...pick.position.map((v,i)=>v-pick.pivot[i])))<1e-9);checks.push({name:'Ctrl-click and real pointer orbit preserve the selected motor pivot',pivot:orbit.pivot});
+    }
+  }
+  checks.push({name:'Live click selection: exact integer entity ID and readback latency',picks});
+  const precision=await page.evaluate(async()=>{
+    const e=window.conveyorEngine,round=[...e.meshes.values()].find(m=>m.name==='Motor').geometry,url=performance.getEntriesByType('resource').map(e=>e.name).find(n=>/\/core\/dist\/geometry\.js/.test(n)),{PbrMaterial}=await import(url),pin=e.createMesh().setGeometry(round).setScale([.0004,.0004,.0004]).setPosition([1,.55,1.1753]).setMaterial(new PbrMaterial({color:'#00ff00'}));pin.name='0.4 mm fitting / 0.1 mm rail gap';e.camera.near=.000001;e.camera.far=10000;const ids=[];for(const angle of [0,45,80,85]){const a=angle*Math.PI/180;e.camera.target=[1,.55,1.1755];e.camera.position=[1+Math.sin(a)*.002,.55001,1.1755+Math.cos(a)*.002];for(let frame=0;frame<10;frame++){e.render({culling:false});const hit=await e.pick(e.canvas.clientWidth/2,e.canvas.clientHeight/2);ids.push({angle,frame,id:hit?.id,expected:pin.id});}}window.precisionPin=pin;return {samples:ids.length,angles:[0,45,80,85],allExact:ids.every(s=>s.id===s.expected),ids};
+  });assert.ok(precision.allExact,JSON.stringify(precision));checks.push({name:'0.4 mm fitting against 6.5 m rail: 0.1 mm gap, stable depth/ID at shallow angles',...precision});await page.locator('canvas').screenshot({path:'test-results/modern-conveyor-closeup.png'});
+  await page.evaluate(()=>{const e=window.conveyorEngine;window.precisionPin.dispose();e.camera.position=[6,4,9];e.camera.target=[0,.5,0];e.camera.near=.001;e.render();e.start();});
+  await page.getByLabel('Assembly explode',{exact:true}).scrollIntoViewIfNeeded();
+  const cdp=await page.context().newCDPSession(page),events=[];
+  await cdp.send('Performance.enable');await cdp.send('HeapProfiler.collectGarbage');
+  if(profileConstructors)await cdp.send('HeapProfiler.startTrackingHeapObjects',{trackAllocations:true});
+  if(profileAllocations)await cdp.send('HeapProfiler.startSampling',{samplingInterval:4096,includeObjectsCollectedByMinorGC:true,includeObjectsCollectedByMajorGC:true});
+  await cdp.send('Tracing.start',{categories:'devtools.timeline,disabled-by-default-devtools.timeline,v8,disabled-by-default-v8.gc,disabled-by-default-devtools.timeline.frame,blink.user_timing,disabled-by-default-devtools.timeline.memory',options:'record-as-much-as-possible',transferMode:'ReportEvents'});
+  cdp.on('Tracing.dataCollected',({value})=>events.push(...value));
+  const heap=[],timer=setInterval(async()=>{try{const usage=await cdp.send('Runtime.getHeapUsage');heap.push({at:Date.now(),used:usage.usedSize,total:usage.totalSize});}catch{}},250);
+  let scrub;
+  const slider=await page.getByLabel('Assembly explode',{exact:true}).boundingBox();
+  await page.evaluate(()=>{window.scrubInputs=0;window.scrubFrames=0;document.getElementById('conveyor-explode').addEventListener('input',()=>window.scrubInputs++);window.removeScrubFrame=window.conveyorEngine.onFrame(()=>window.scrubFrames++);});
+  const started=performance.now();
+  try{
+    await cdp.send('Input.dispatchMouseEvent',{type:'mousePressed',x:slider.x+slider.width/2,y:slider.y+slider.height/2,button:'left',buttons:1,clickCount:1});
+    while(performance.now()-started<15000){const fraction=.5+.46*Math.sin((performance.now()-started)/350);await cdp.send('Input.dispatchMouseEvent',{type:'mouseMoved',x:slider.x+8+(slider.width-16)*fraction,y:slider.y+slider.height/2,button:'left',buttons:1});await new Promise(resolve=>setTimeout(resolve,16));}
+    await cdp.send('Input.dispatchMouseEvent',{type:'mouseReleased',x:slider.x+slider.width/2,y:slider.y+slider.height/2,button:'left',buttons:0,clickCount:1});scrub=await page.evaluate(()=>{window.removeScrubFrame();return {inputs:window.scrubInputs,frames:window.scrubFrames,amount:window.conveyorEngine.plugins.get('exploded-view').amount,rafAlive:window.conveyorEngine.running};});scrub.durationMs=performance.now()-started;
+  }finally{clearInterval(timer);const completed=new Promise(resolve=>cdp.once('Tracing.tracingComplete',resolve));await cdp.send('Tracing.end');await completed;}
+  if(profileConstructors){const chunks=[];cdp.on('HeapProfiler.addHeapSnapshotChunk',({chunk})=>chunks.push(chunk));await cdp.send('HeapProfiler.stopTrackingHeapObjects',{});const snapshot=JSON.parse(chunks.join(''));await writeFile('test-results/modern-conveyor-constructor-profile.heapsnapshot',chunks.join(''));const fields=snapshot.snapshot.meta.node_fields,types=snapshot.snapshot.meta.node_types[fields.indexOf('type')],constructors=new Map();for(let i=0;i<snapshot.nodes.length;i+=fields.length){if(!snapshot.nodes[i+fields.indexOf('trace_node_id')])continue;const type=types[snapshot.nodes[i+fields.indexOf('type')]],name=snapshot.strings[snapshot.nodes[i+fields.indexOf('name')]],key=type+': '+name,row=constructors.get(key)??{type,name,count:0,bytes:0};row.count++;row.bytes+=snapshot.nodes[i+fields.indexOf('self_size')];constructors.set(key,row);}const rows=[...constructors.values()].toSorted((a,b)=>b.bytes-a.bytes);checks.push({name:'Allocation instrumentation: retained constructors allocated during drag',note:'Heap snapshot performs GC: transient or already collected objects are excluded; this is not a total allocation count.',rows:rows.slice(0,30),gpuAndDOM:rows.filter(r=>(r.type==='native'||r.type==='object')&&/GPU|Event|Float32Array|ArrayBuffer/.test(r.name)),snapshot:resolve('test-results/modern-conveyor-constructor-profile.heapsnapshot')});console.log(JSON.stringify({retainedConstructors:rows.slice(0,15)},null,2));}
+  if(profileAllocations){const {profile}=await cdp.send('HeapProfiler.stopSampling');await writeFile('test-results/modern-conveyor-allocations.heapprofile',JSON.stringify(profile));const sites=[];function visit(node){if(node.selfSize)sites.push({bytes:node.selfSize,...node.callFrame});for(const child of node.children)visit(child);}visit(profile.head);const allocations=sites.toSorted((a,b)=>b.bytes-a.bytes).slice(0,20);checks.push({name:'Allocation sampling including collected objects',samplingIntervalBytes:4096,sites:allocations,profile:resolve('test-results/modern-conveyor-allocations.heapprofile')});console.log(JSON.stringify({allocations},null,2));}
+  await writeFile(trace,JSON.stringify({traceEvents:events}));
+  const collections=events.filter(e=>e.ph==='X'&&/^(MinorGC|MajorGC)$/.test(e.name)),longTasks=events.filter(e=>e.name==='RunTask'&&e.ph==='X'&&e.dur>50000),heapSizes=heap.map(s=>s.used);
+  assert.ok(scrub.durationMs>=15000&&scrub.inputs>100&&scrub.rafAlive&&scrub.amount>0&&scrub.amount<1);assert.ok(heap.length>20);
+  checks.push({name:'15-second trusted pointer drag of native input in React page: DevTools Performance trace and heap sampling',instrumentation:profileConstructors?'allocation tracking (forces GC)':profileAllocations?'allocation sampling':'none',...scrub,heapSamples:heap.length,heapMinBytes:Math.min(...heapSizes),heapMaxBytes:Math.max(...heapSizes),gcSweeps:collections.length,minorGCSweeps:collections.filter(e=>e.name==='MinorGC').length,majorGCSweeps:collections.filter(e=>e.name==='MajorGC').length,gcDurationMs:collections.reduce((sum,e)=>sum+e.dur/1000,0),longTasksOver50Ms:longTasks.length,zeroGC:collections.length===0,trace:resolve(trace),heap});
+  assert.deepEqual(errors,[]);await writeFile(`test-results/${output}.json`,JSON.stringify({hardware,checks,errors},null,2));console.log(JSON.stringify({hardware,checks:checks.map(({heap,ids,...check})=>check),errors},null,2));
+}finally{await browser.close();}
