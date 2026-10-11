@@ -15,6 +15,16 @@ Vexel is a small Rust/Wasm engine for web applications with optional domain pack
 
 Rust owns transforms and culling. TypeScript owns asset orchestration and browser GPU commands. Numeric Wasm exports keep `wasm-bindgen`, `web-sys` and their glue unnecessary for this kernel. Consumers need no Rust installation or Wasm URL configuration. SIMD and browser DecompressionStream gzip support are required; decompression happens once before cached module compilation.
 
+## Install from npm
+
+All five libraries are published publicly at version `0.1.0`: [core](https://www.npmjs.com/package/@scottcampbelldata/vexel-core), [gltf](https://www.npmjs.com/package/@scottcampbelldata/vexel-gltf), [react](https://www.npmjs.com/package/@scottcampbelldata/vexel-react), [machinery](https://www.npmjs.com/package/@scottcampbelldata/vexel-machinery), [creative](https://www.npmjs.com/package/@scottcampbelldata/vexel-creative). Install all five with React 19:
+
+```sh
+npm install @scottcampbelldata/vexel-core@0.1.0 @scottcampbelldata/vexel-gltf@0.1.0 @scottcampbelldata/vexel-react@0.1.0 @scottcampbelldata/vexel-machinery@0.1.0 @scottcampbelldata/vexel-creative@0.1.0 react@^19 react-dom@^19
+```
+
+The React adapter also supports React 18. See [package choices and individual install commands](README.md#install-from-npm).
+
 ## Run and build
 
 Use Node.js 22.12+ or 24+ and a browser with WebGL2. TypeScript consumers need TypeScript 7+ with the DOM library; extension GPU types use its native declarations. WebGPU needs a supported browser on localhost or HTTPS.
@@ -46,7 +56,7 @@ cargo test --manifest-path packages/kernel/Cargo.toml
 
 The release profile uses speed optimization, fat LTO, one codegen unit, stripped symbols and aborting panics. The no-std Wasm build reserves its memory once without a general allocator. Kernel rebuilds use the pinned Binaryen pipeline below; consumers use the precompiled optimized kernel. A build fails if the Wasm exceeds 30 KiB raw, the core exceeds 20 KiB gzip, or core plus glTF exceeds 30 KiB gzip.
 
-Consumers import the scoped packages below; the root package manages the workspace and its commands. The five libraries are version 0.1.0, [MIT licensed](LICENSE) and configured for public npm publication; the root and starters remain private. Packages have not been published to npm. Each library's `prepack` hook builds the workspace using the checked-in Wasm, removes stale distribution files and includes a package README and a copy of the root license. `npm run pack:packages` writes all five archives to `test-results/`. The [benchmark summary](benchmarks/README.md) records the locked core and verification results. Raw captures and recovery archives remain local.
+Consumers import the scoped packages below; the root package manages the workspace and its commands. The five libraries are published publicly on npm at version `0.1.0` and [MIT licensed](LICENSE); the root and starters remain private. Each library's `prepack` hook builds the workspace using the checked-in Wasm, removes stale distribution files and includes a package README and a copy of the root license. `npm run pack:packages` writes all five archives to `test-results/`. The [benchmark summary](benchmarks/README.md) records the locked core and verification results. Raw captures and recovery archives remain local.
 
 ## Plain TypeScript
 
@@ -265,7 +275,7 @@ AMD Radeon integrated graphics (RDNA 2, device 13C0, driver 32.0.21043.5001) als
 | Machinery | Native STEP/IGES/B-Rep solids, CAD materials/UVs, generalized rigid-body/contact dynamics and large-import worker streaming. The listed minimal domain features are implemented above. |
 | Creative | Mesh/fluid wind solvers, physical volumetric scattering, HDR environment-map import, optical bokeh and continuity of GPU-only particle state after device loss. The listed minimal domain features are implemented above. |
 | Renderer/assets | Clustered Forward+ multi-light shading, shadows/IBL/textures, GPU culling/skinning, animation/morphs/compression, spatial indexing, dynamic geometry and measured memory budgets across hardware. |
-| Distribution/validation | npm publication and release policy, wider browser/GPU/React version coverage, performance comparisons with matched workloads and image quality. |
+| Distribution/validation | Release policy, wider browser/GPU/React version coverage, performance comparisons with matched workloads and image quality. |
 
 The remaining rows describe future work; current domain features have working implementations and bounded limits documented above. Linear sphere culling and cached hierarchy composition are intentional minimal implementations; optimize against measured scenes. This delivery makes no universal performance, full parity or commercial-readiness claim.
 

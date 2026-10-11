@@ -2,8 +2,10 @@
 
 WebGPU rendering with WebGL2 fallback, a deterministic Rust/Wasm transform kernel, instanced PBR, reversed float depth, picking and CAD camera controls.
 
+[Published on npm](https://www.npmjs.com/package/@scottcampbelldata/vexel-core) as version `0.1.0`.
+
 ```sh
-npm install @scottcampbelldata/vexel-core
+npm install @scottcampbelldata/vexel-core@0.1.0
 ```
 
 ```ts

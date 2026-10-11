@@ -2,9 +2,33 @@
 
 A small Rust/Wasm engine for web apps, with WebGPU rendering, WebGL2 fallback, ordinary React components and optional domain packs.
 
-The implementation lives in `packages/`, with Vite and Next.js starters in `examples/`. Small internal helpers shared by the optional packs live in `packages/shared/`. Source is available in the public [Vexel repository](https://github.com/scottcampbelldata/vexel). Packages have not been published to npm.
+The implementation lives in `packages/`, with Vite and Next.js starters in `examples/`. Small internal helpers shared by the optional packs live in `packages/shared/`. Source is available in the public [Vexel repository](https://github.com/scottcampbelldata/vexel). All five libraries are published on npm as version `0.1.0`; package links and install commands are below.
 
-## Start
+## Install from npm
+
+For a React application:
+
+```sh
+npm install @scottcampbelldata/vexel-core@0.1.0 @scottcampbelldata/vexel-react@0.1.0 react@^19 react-dom@^19
+```
+
+For plain TypeScript:
+
+```sh
+npm install @scottcampbelldata/vexel-core@0.1.0
+```
+
+Add optional packs as needed:
+
+```sh
+npm install @scottcampbelldata/vexel-gltf@0.1.0
+npm install @scottcampbelldata/vexel-machinery@0.1.0
+npm install @scottcampbelldata/vexel-creative@0.1.0
+```
+
+The optional packs and React adapter require core 0.1.0. The React adapter supports React 18 and 19; the command above selects React 19.
+
+## Run starters from source
 
 ```sh
 git clone https://github.com/scottcampbelldata/vexel.git
@@ -30,15 +54,15 @@ npm run dev --workspace @vexel/starter-next
 
 ## Packages
 
-The five libraries use the npm account scope `@scottcampbelldata`. npm publication remains pending.
+The five published libraries use the npm account scope `@scottcampbelldata` and are available at version `0.1.0`.
 
 | Package | Includes |
 | --- | --- |
-| `@scottcampbelldata/vexel-core` | Wasm transform memory, hierarchy/culling, reversed float depth, uint picking, CAD camera controls, instanced PBR, backends and plugin/pass lifecycle |
-| `@scottcampbelldata/vexel-gltf` | Lazy static glTF/GLB loading, named nodes and shared primitive geometry |
-| `@scottcampbelldata/vexel-react` | `Canvas`, `Mesh`, `BoxGeometry`, `GeometryResource`, `PbrMaterial`, `useFrame` |
-| `@scottcampbelldata/vexel-machinery` | Revolute/prismatic joints, gear/piston couplings, bounded IK, sections/caps, dimensions, welded STL/OBJ, assembly queries/visibility, metrology and industrial presets |
-| `@scottcampbelldata/vexel-creative` | Textured/sorted GPU particles, wind obstacles, sky/fog/scattering, toon, HDR and compute post-processing |
+| [`@scottcampbelldata/vexel-core`](https://www.npmjs.com/package/@scottcampbelldata/vexel-core) | Wasm transform memory, hierarchy/culling, reversed float depth, uint picking, CAD camera controls, instanced PBR, backends and plugin/pass lifecycle |
+| [`@scottcampbelldata/vexel-gltf`](https://www.npmjs.com/package/@scottcampbelldata/vexel-gltf) | Lazy static glTF/GLB loading, named nodes and shared primitive geometry |
+| [`@scottcampbelldata/vexel-react`](https://www.npmjs.com/package/@scottcampbelldata/vexel-react) | `Canvas`, `Mesh`, `BoxGeometry`, `GeometryResource`, `PbrMaterial`, `useFrame` |
+| [`@scottcampbelldata/vexel-machinery`](https://www.npmjs.com/package/@scottcampbelldata/vexel-machinery) | Revolute/prismatic joints, gear/piston couplings, bounded IK, sections/caps, dimensions, welded STL/OBJ, assembly queries/visibility, metrology and industrial presets |
+| [`@scottcampbelldata/vexel-creative`](https://www.npmjs.com/package/@scottcampbelldata/vexel-creative) | Textured/sorted GPU particles, wind obstacles, sky/fog/scattering, toon, HDR and compute post-processing |
 
 Core measures **19.41 KiB gzip**, including embedded Wasm and both backends. Core plus glTF measures **24.28 KiB gzip**. The Wasm binary is **11.76 KiB raw**. React/framework/application code is additional. The build enforces 20/30 KiB gzip budgets and a 30 KiB raw Wasm budget.
 
@@ -63,9 +87,9 @@ export default function App() {
 
 [MODERN-ENGINE.md](MODERN-ENGINE.md) contains the architecture, API examples, lifecycle rules, size evidence, supported loader subset, verification and remaining domain features. Thirty-one JavaScript tests, four Rust checks and 32 browser check groups passed after the modern-only cleanup, including production Vite/Next rendering, actual particle storage readback, packed consumers and React 18/19 lifecycle checks. Chrome conveyor captures verify UI picking/orbit, instanced draws, coupled timing and 15-second GC/allocation traces; the observed collections do not establish zero-GC. AMD Radeon integrated graphics and NVIDIA baseline measurements are recorded in the [benchmark summary](benchmarks/README.md). Raw captures and recovery archives remain local. Firefox/Safari and mobile GPU hardware remain unverified.
 
-Node.js 22.12+ or 24+ is required; TypeScript consumers need TypeScript 7+ with DOM types; Wasm initialization uses SIMD and DecompressionStream gzip. WebGPU uses HTTPS/localhost; basic scenes fall back to WebGL2. GPU particles, sections and creative rendering require WebGPU; solid caps also require depth32float-stencil8 support; CPU machinery/CAD/annotations work with either backend. The five libraries are version 0.1.0, [MIT licensed](LICENSE) and configured for public npm publication. The workspace root and starter apps remain private; packages have not been published to npm.
+Node.js 22.12+ or 24+ is required; TypeScript consumers need TypeScript 7+ with DOM types; Wasm initialization uses SIMD and DecompressionStream gzip. WebGPU uses HTTPS/localhost; basic scenes fall back to WebGL2. GPU particles, sections and creative rendering require WebGPU; solid caps also require depth32float-stencil8 support; CPU machinery/CAD/annotations work with either backend. The five libraries are published on npm at version `0.1.0` and [MIT licensed](LICENSE). The workspace root and starter apps remain private.
 
-`npm run build:packages` uses the checked-in Wasm, emits ESM and TypeScript declarations, removes stale distribution files, copies the root license into each package and enforces the existing size/isolation budgets. Each library's `prepack` hook runs that same workspace build before `npm pack` or `npm publish`. Tarballs contain only built files, package metadata, a package README and the MIT license. To try a local package before publication, install its tarball from `test-results/`; optional packs require the matching core tarball. Existing `modern:*` commands remain available, including `modern:build` for rebuilding the Rust kernel.
+`npm run build:packages` uses the checked-in Wasm, emits ESM and TypeScript declarations, removes stale distribution files, copies the root license into each package and enforces the existing size/isolation budgets. Each library's `prepack` hook runs that same workspace build before `npm pack` or `npm publish`. Tarballs contain only built files, package metadata, a package README and the MIT license. To try local changes, install a rebuilt tarball from `test-results/`; optional packs require the matching core tarball. Existing `modern:*` commands remain available, including `modern:build` for rebuilding the Rust kernel.
 
 Import the scoped packages listed above. Native STEP/IGES solids and heavier renderer/physics features remain deferred; implemented domain features and their limits are documented in MODERN-ENGINE.md. The public repository contains the modern modular engine; the earlier renderer and recovery archives are excluded.
 

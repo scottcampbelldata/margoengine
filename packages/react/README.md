@@ -2,8 +2,10 @@
 
 React 18/19 components for Vexel, with stable mesh refs, nested transforms and frame callbacks.
 
+[Published on npm](https://www.npmjs.com/package/@scottcampbelldata/vexel-react) as version `0.1.0`.
+
 ```sh
-npm install @scottcampbelldata/vexel-core @scottcampbelldata/vexel-react react react-dom
+npm install @scottcampbelldata/vexel-core@0.1.0 @scottcampbelldata/vexel-react@0.1.0 react@^19 react-dom@^19
 ```
 
 ```tsx

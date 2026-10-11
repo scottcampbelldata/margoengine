@@ -2,8 +2,10 @@
 
 Lazy static glTF/GLB loading, named nodes and shared primitive geometry for Vexel.
 
+[Published on npm](https://www.npmjs.com/package/@scottcampbelldata/vexel-gltf) as version `0.1.0`.
+
 ```sh
-npm install @scottcampbelldata/vexel-core @scottcampbelldata/vexel-gltf
+npm install @scottcampbelldata/vexel-core@0.1.0 @scottcampbelldata/vexel-gltf@0.1.0
 ```
 
 ```ts

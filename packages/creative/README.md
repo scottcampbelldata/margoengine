@@ -2,8 +2,10 @@
 
 WebGPU particles, wind obstacles, procedural atmosphere, toon shading, HDR targets and post-processing for Vexel.
 
+[Published on npm](https://www.npmjs.com/package/@scottcampbelldata/vexel-creative) as version `0.1.0`.
+
 ```sh
-npm install @scottcampbelldata/vexel-core @scottcampbelldata/vexel-creative
+npm install @scottcampbelldata/vexel-core@0.1.0 @scottcampbelldata/vexel-creative@0.1.0
 ```
 
 ```ts

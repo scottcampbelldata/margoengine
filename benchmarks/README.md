@@ -6,6 +6,8 @@ The locked core measures **19,874 bytes gzip**, leaving **606 bytes** below its 
 
 The Vexel rename passed 31 JavaScript tests, four Rust tests, eight AMD browser groups and four standalone package/React 18 groups. A fresh checkout passed `npm ci`, `npm test` and both production builds. All 37 fingerprinted core source/distribution and Rust source files remained byte-for-byte unchanged, as did 120 installed dependency versions. Full stress benchmarks were not repeated for the rename.
 
+The five libraries were published publicly as version `0.1.0` on 11 October 2026. Registry downloads matched the audited tarballs; a clean registry installation passed all package imports, embedded Wasm initialization and React 18.3.1 SSR. See [npm packages and install commands](../README.md#install-from-npm).
+
 After removal of the earlier renderer, 31 JavaScript tests, four Rust tests, production Vite/Next builds and 32 browser check groups passed on physical AMD Radeon integrated graphics. The browser groups cover React 18/19, standalone packed consumers, WebGPU and WebGL2, integer picking, caps, particles/effects, resize, both device-destruction scenarios and conveyor stress.
 
 | Workload | AMD Radeon integrated RDNA 2 | NVIDIA RTX A6000 |

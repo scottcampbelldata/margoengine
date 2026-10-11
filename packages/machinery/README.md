@@ -2,8 +2,10 @@
 
 Revolute/prismatic joints, gear and piston couplings, bounded IK, STL/OBJ ingestion, exploded views, sections, metrology and industrial material presets for Vexel.
 
+[Published on npm](https://www.npmjs.com/package/@scottcampbelldata/vexel-machinery) as version `0.1.0`.
+
 ```sh
-npm install @scottcampbelldata/vexel-core @scottcampbelldata/vexel-machinery
+npm install @scottcampbelldata/vexel-core@0.1.0 @scottcampbelldata/vexel-machinery@0.1.0
 ```
 
 ```ts
