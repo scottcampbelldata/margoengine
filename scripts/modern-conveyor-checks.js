@@ -4,8 +4,9 @@ import {resolve} from 'node:path';
 import {openBrowser} from './browser.js';
 
 const percentile=(values,p)=>values.toSorted((a,b)=>a-b)[Math.ceil(values.length*p)-1];
-const profileConstructors=process.argv.includes('--constructors'),profileAllocations=process.argv.includes('--allocations');
+const profileConstructors=process.argv.includes('--constructors'),profileAllocations=process.argv.includes('--allocations'),timingOnly=process.argv.includes('--timing-only');
 assert.ok(!(profileConstructors&&profileAllocations),'Run instrumentation and sampling separately');
+assert.ok(!(timingOnly&&(profileConstructors||profileAllocations)),'--timing-only skips the drag trace; run profiling without it');
 const output=profileConstructors?'modern-conveyor-constructors':profileAllocations?'modern-conveyor-allocations':'modern-conveyor-checks',trace=`test-results/${output}-trace.json`;
 const browser=await openBrowser({channel:process.env.BROWSER_CHANNEL ?? 'chrome',startPath:'/tests/modern.html'}),{page,hardware}=browser,errors=[],checks=[];
 page.on('pageerror',error=>errors.push(error.message));
@@ -35,6 +36,8 @@ try {
     assert.equal(result.alignment.uploads.length,2);assert.equal(result.alignment.wasmMatrixByteOffset%16,0);assert.equal(result.alignment.instanceStrideBytes%16,0);for(const upload of result.alignment.uploads)for(const value of Object.values(upload))assert.equal(value%16,0);
     const {times,windows,...report}=result;checks.push({name:'Captured indexed indirect batches and complete motor/coupling/Wasm transform tick',...report,samples:times.length,windowTicks:10,windowMedianMs:percentile(windows,.5),windowP95Ms:percentile(windows,.95),meanMs:windows.reduce((s,v)=>s+v,0)/windows.length,medianMs:percentile(times,.5),p95Ms:percentile(times,.95),maxMs:Math.max(...times),p95UnderHalfMs:percentile(times,.95)<.5});
   }
+  // --timing-only stops after the tick and frame measurements; picking and the drag trace need a hardware GPU to be meaningful.
+  if(timingOnly){assert.deepEqual(errors,[]);await writeFile('test-results/modern-conveyor-timing.json',JSON.stringify({hardware,checks,errors},null,2));console.log(JSON.stringify({hardware,checks:checks.map(({times,windows,...check})=>check),errors},null,2));}else{
   // Click the rendered centers, then exercise the real pointer handlers around the selected pivot.
   const picks=[];
   for(const name of ['Motor','Drive_Cover','Linear_Carriage','Mount_Bolt_239_1.17']) {
@@ -75,4 +78,5 @@ try {
   assert.ok(scrub.durationMs>=15000&&scrub.inputs>100&&scrub.rafAlive&&scrub.amount>0&&scrub.amount<1);assert.ok(heap.length>20);
   checks.push({name:'15-second trusted pointer drag of native input in React page: DevTools Performance trace and heap sampling',instrumentation:profileConstructors?'allocation tracking (forces GC)':profileAllocations?'allocation sampling':'none',...scrub,heapSamples:heap.length,heapMinBytes:Math.min(...heapSizes),heapMaxBytes:Math.max(...heapSizes),gcSweeps:collections.length,minorGCSweeps:collections.filter(e=>e.name==='MinorGC').length,majorGCSweeps:collections.filter(e=>e.name==='MajorGC').length,gcDurationMs:collections.reduce((sum,e)=>sum+e.dur/1000,0),longTasksOver50Ms:longTasks.length,zeroGC:collections.length===0,trace:resolve(trace),heap});
   assert.deepEqual(errors,[]);await writeFile(`test-results/${output}.json`,JSON.stringify({hardware,checks,errors},null,2));console.log(JSON.stringify({hardware,checks:checks.map(({heap,ids,...check})=>check),errors},null,2));
+  }
 }finally{await browser.close();}
