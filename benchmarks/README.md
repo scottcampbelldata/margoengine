@@ -4,6 +4,8 @@ These measurements were captured on 11 October 2026 before the Vexel rename. His
 
 The locked core measures **19,874 bytes gzip**, leaving **606 bytes** below its 20 KiB budget. Its embedded Wasm is **12,046 bytes raw**, with SHA-256 `c9fade2492bc1af53dfd33ece4086e34e634634ea4fea3dec28491c162327fed`. The rename preserves the core implementation and embedded Wasm.
 
+The Vexel rename passed 31 JavaScript tests, four Rust tests, eight AMD browser groups and four standalone package/React 18 groups. A fresh checkout passed `npm ci`, `npm test` and both production builds. All 37 fingerprinted core source/distribution and Rust source files remained byte-for-byte unchanged, as did 120 installed dependency versions. Full stress benchmarks were not repeated for the rename.
+
 After removal of the earlier renderer, 31 JavaScript tests, four Rust tests, production Vite/Next builds and 32 browser check groups passed on physical AMD Radeon integrated graphics. The browser groups cover React 18/19, standalone packed consumers, WebGPU and WebGL2, integer picking, caps, particles/effects, resize, both device-destruction scenarios and conveyor stress.
 
 | Workload | AMD Radeon integrated RDNA 2 | NVIDIA RTX A6000 |
