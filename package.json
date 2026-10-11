@@ -15,6 +15,7 @@
     "examples/next"
   ],
   "scripts": {
+    "catalog": "node scripts/serve-catalog.js",
     "build:packages": "node scripts/build-modern.js --precompiled",
     "pack:packages": "npm run build:packages && npm pack --workspace packages --ignore-scripts --pack-destination test-results",
     "modern:build": "node scripts/build-modern.js",

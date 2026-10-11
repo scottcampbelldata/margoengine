@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f7f9">
+  <meta name="description" content="Find Vexel modules, copy their install commands and imports, and try working examples of all five published packages.">
+  <title>Modules · Vexel</title>
+  <link rel="stylesheet" href="./catalog.css">
+  <script src="./catalog.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#modules">Skip to modules</a>
+  <header class="masthead">
+    <a class="brand" href="./" translate="no">VEXEL <span>MODULES</span></a>
+    <nav aria-label="Resources">
+      <a href="https://github.com/scottcampbelldata/vexel#install-from-npm">Get started</a>
+      <a href="https://github.com/scottcampbelldata/vexel">GitHub ↗</a>
+    </nav>
+  </header>
+  <main>
+    <section class="intro" aria-labelledby="title">
+      <p class="eyebrow">5 PUBLISHED PACKAGES · VERSION 0.1.0</p>
+      <h1 id="title">Find what you want to build.</h1>
+      <p class="lede">Search a feature, copy its install command and import, then try a working example. Your app loads the packages you import and their dependencies.</p>
+      <form role="search" id="search-form">
+        <label for="search">Search modules and API names</label>
+        <div class="search-row">
+          <input id="search" name="q" type="search" placeholder="Try conveyor, particles, React, or SectionPlanes…" autocomplete="off" spellcheck="false" aria-describedby="result-count" disabled>
+          <button id="clear" type="button">Clear search</button>
+        </div>
+      </form>
+      <p id="result-count" role="status">Loading catalog…</p>
+    </section>
+    <section id="modules" aria-label="Available modules" tabindex="-1"></section>
+    <p id="empty" hidden>No matching modules. Try “joints,” “model,” “particles,” or a package name.</p>
+    <noscript><p>Enable JavaScript to search and copy commands. You can also read the <a href="https://github.com/scottcampbelldata/vexel#packages">package list</a> and open examples for <a href="./examples/core.html">core</a>, <a href="./examples/gltf.html">glTF</a>, <a href="./examples/react.html">React</a>, <a href="./examples/machinery.html">machinery</a>, and <a href="./examples/creative.html">creative</a>.</p></noscript>
+    <aside class="help" aria-labelledby="using">
+      <h2 id="using">Use a module in your project</h2>
+      <p>Run its install command in your project, then copy the import into your JavaScript or TypeScript file. Your editor can suggest exported API names after installation.</p>
+      <p>Each example is a complete HTML file you can copy and serve on localhost or HTTPS. Examples use pinned npm packages through jsDelivr; the React example also uses esm.sh. Opening an example loads its selected libraries. The catalog itself loads no engine packages.</p>
+      <p>Already using Vexel? Keep core and optional packs on the same version. For lifecycle rules and supported formats, see the <a href="https://github.com/scottcampbelldata/vexel/blob/main/MODERN-ENGINE.md">API guide</a>.</p>
+    </aside>
+  </main>
+  <footer>Vexel is MIT licensed. <a href="https://github.com/scottcampbelldata/vexel/tree/main/docs">Catalog source</a></footer>
+  <p id="copy-status" class="copy-status" role="status"></p>
+  <template id="module-template">
+    <article class="module">
+      <div class="module-heading"><h2></h2><span class="badge">Published · 0.1.0</span></div>
+      <p class="package" translate="no"></p>
+      <p class="description"></p>
+      <p class="requirements"></p>
+      <div class="code-heading"><h3>Install</h3><button type="button" data-copy="install">Copy install</button></div>
+      <pre tabindex="0"><code class="install" translate="no"></code></pre>
+      <div class="code-heading"><h3>Import</h3><button type="button" data-copy="imports">Copy imports</button></div>
+      <pre tabindex="0"><code class="imports" translate="no"></code></pre>
+      <details class="exports"><summary></summary><p>Select an API name to copy its import.</p><div class="export-list"></div></details>
+      <div class="example-heading"><h3 class="example-title"></h3><a class="run" target="_blank" rel="noopener">Run example ↗<span class="sr-only"> (opens in a new tab)</span></a></div>
+      <p class="example-note"></p>
+      <details class="source"><summary>Example source</summary><div class="code-heading"><span>Complete HTML file</span><button type="button" data-copy="example">Copy example</button></div><pre tabindex="0"><code class="example-code" translate="no">Loading example…</code></pre></details>
+      <p class="links"><a class="npm">npm package ↗</a><a class="readme">Package guide ↗</a><a class="permalink">Link to module</a></p>
+    </article>
+  </template>
+</body>
+</html>

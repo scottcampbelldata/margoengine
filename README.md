@@ -12,6 +12,8 @@ Vexel keeps transforms, hierarchy and culling in a Rust kernel of 12 KB of Wasm,
 
 ## Install from npm
 
+[Browse the searchable module catalog](https://scottcampbelldata.github.io/vexel/) for available features, copyable install commands and imports, and runnable examples of all five published packages. [Preview it locally](docs/README.md).
+
 For a React application:
 
 ```sh

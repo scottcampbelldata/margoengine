@@ -1,0 +1,52 @@
+[
+  {
+    "id": "core", "title": "Scenes & rendering", "package": "@scottcampbelldata/vexel-core",
+    "description": "Create meshes, materials and cameras with WebGPU rendering and a WebGL2 fallback. Includes the embedded Rust/Wasm transform kernel.",
+    "requirements": "WebGPU or WebGL2 · Wasm SIMD and DecompressionStream gzip · no Rust installation",
+    "keywords": "base engine cube box geometry pbr instancing picking orbit camera controls transforms hierarchy",
+    "install": "npm install @scottcampbelldata/vexel-core@0.1.0",
+    "imports": "import { Engine, box, PbrMaterial } from '@scottcampbelldata/vexel-core';",
+    "exports": ["Engine", "EngineKernel", "Geometry", "PbrMaterial", "box", "Camera", "CADCameraControls"],
+    "example": "./examples/core.html", "exampleTitle": "A rotating cube", "exampleNote": "Create a mesh, give it a material and animate its rotation. Falls back to WebGL2 when needed."
+  },
+  {
+    "id": "machinery", "title": "Machinery & CAD", "package": "@scottcampbelldata/vexel-machinery",
+    "description": "Add joints, gear and piston couplings, exploded views, section cuts, dimensions and STL/OBJ ingestion to your assemblies.",
+    "requirements": "Requires core 0.1.0 · joints and CAD tools support both backends · section rendering needs WebGPU",
+    "keywords": "conveyor rollers motor gears piston robot arm industrial kinematics revolute prismatic ik stl obj cad metrology measurements cutting caps annotations assembly",
+    "install": "npm install @scottcampbelldata/vexel-core@0.1.0 @scottcampbelldata/vexel-machinery@0.1.0",
+    "imports": "import { Engine, box, PbrMaterial } from '@scottcampbelldata/vexel-core';\nimport { Kinematics } from '@scottcampbelldata/vexel-machinery';",
+    "exports": ["Kinematics", "parseCAD", "loadCAD", "deduplicateParts", "PartInstancer", "SectionPlanes", "boxSection", "AssemblyIndex", "vertexAnchor", "faceAnchor", "holeAnchor", "snapAnchor", "measureDistance", "industrialMaterials", "industrialMaterial", "EngineeringAnnotations", "worldAnchor", "projectAnnotation", "ExplodedView"],
+    "example": "./examples/machinery.html", "exampleTitle": "Drive a bounded joint", "exampleNote": "Animate a revolute joint with Kinematics. Version 0.1.0 supplies machinery tools; a ready-made conveyor factory and STEP/IGES import are not included."
+  },
+  {
+    "id": "gltf", "title": "3D model loading", "package": "@scottcampbelldata/vexel-gltf",
+    "description": "Load static glTF and GLB models, preserve named nodes and share primitive geometry.",
+    "requirements": "Requires core 0.1.0 · static, uncompressed models · skins, animation and required extensions are unsupported",
+    "keywords": "model asset import loader gltf glb 3d file mesh parse download",
+    "install": "npm install @scottcampbelldata/vexel-core@0.1.0 @scottcampbelldata/vexel-gltf@0.1.0",
+    "imports": "import { Engine } from '@scottcampbelldata/vexel-core';\nimport { loadGLTF, parseGLTF } from '@scottcampbelldata/vexel-gltf';",
+    "exports": ["loadGLTF", "parseGLTF"],
+    "example": "./examples/gltf.html", "exampleTitle": "Load a glTF triangle", "exampleNote": "Parse a tiny built-in glTF model without downloading an asset. For your own file, use loadGLTF(engine, '/model.glb')."
+  },
+  {
+    "id": "creative", "title": "Particles & effects", "package": "@scottcampbelldata/vexel-creative",
+    "description": "Add GPU particles, wind obstacles, toon shading, procedural atmosphere, HDR targets and post-processing.",
+    "requirements": "Requires core 0.1.0 · WebGPU hardware · HTTPS or localhost",
+    "keywords": "leaves sparks particles wind atmosphere sky fog scattering bloom grain bokeh toon hdr postprocessing effects vfx",
+    "install": "npm install @scottcampbelldata/vexel-core@0.1.0 @scottcampbelldata/vexel-creative@0.1.0",
+    "imports": "import { Engine } from '@scottcampbelldata/vexel-core';\nimport { GPUParticles } from '@scottcampbelldata/vexel-creative';",
+    "exports": ["GPUParticles", "HDRRenderTarget", "ToonShading", "PostProcessing"],
+    "example": "./examples/creative.html", "exampleTitle": "A field of GPU particles", "exampleNote": "Run 2,000 particles with wind and curl. This example requires WebGPU; it explains how to proceed when WebGPU is unavailable."
+  },
+  {
+    "id": "react", "title": "React components", "package": "@scottcampbelldata/vexel-react",
+    "description": "Build scenes with Canvas, meshes, geometry and materials. Use stable refs and useFrame to animate without React state updates.",
+    "requirements": "Requires core 0.1.0 · React 18 or 19 · Canvas manages engine setup and disposal",
+    "keywords": "react jsx tsx components canvas useframe hooks ref next nextjs vite ui",
+    "install": "npm install @scottcampbelldata/vexel-core@0.1.0 @scottcampbelldata/vexel-react@0.1.0 react@19.3.0 react-dom@19.3.0",
+    "imports": "import { Canvas, Mesh, BoxGeometry, PbrMaterial, useFrame } from '@scottcampbelldata/vexel-react';",
+    "exports": ["Canvas", "Mesh", "BoxGeometry", "GeometryResource", "PbrMaterial", "useFrame"],
+    "example": "./examples/react.html", "exampleTitle": "A React cube", "exampleNote": "Render and animate a cube with Canvas and useFrame. Uses React.createElement so the complete HTML example runs without a JSX build step."
+  }
+]
