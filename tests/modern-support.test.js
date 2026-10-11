@@ -39,7 +39,9 @@ test('workspace exposes scoped modern packages and retains no legacy root or com
   const lock = JSON.parse(await readFile(new URL('../package-lock.json', import.meta.url), 'utf8'));
   for (const workspace of manifest.workspaces) {
     const pkg = JSON.parse(await readFile(new URL(`../${workspace}/package.json`, import.meta.url), 'utf8'));
-    assert(pkg.name.startsWith('@vexel/')); assert.equal(lock.packages[workspace].name, pkg.name);
+    if (workspace.startsWith('packages/')) assert.equal(pkg.name, `@scottcampbelldata/vexel-${workspace.split('/')[1]}`);
+    else assert.equal(pkg.private, true);
+    assert.equal(lock.packages[workspace].name, pkg.name);
     for (const name of Object.keys(pkg.dependencies ?? {})) assert(!name.startsWith('@strata/'));
   }
   assert.equal(manifest.exports, undefined); assert.equal(manifest.types, undefined);

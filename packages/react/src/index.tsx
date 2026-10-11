@@ -1,7 +1,7 @@
 'use client';
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useImperativeHandle, forwardRef, type ReactNode, type CSSProperties } from 'react';
-import { Engine, Mesh as EngineMesh, box, PbrMaterial as Material, type EngineOptions, type Vec3, type Geometry } from '@vexel/core/extension';
-import type {EngineKernel,Mesh as MeshHandle,FrameCallback} from '@vexel/core';
+import { Engine, Mesh as EngineMesh, box, PbrMaterial as Material, type EngineOptions, type Vec3, type Geometry } from '@scottcampbelldata/vexel-core/extension';
+import type {EngineKernel,Mesh as MeshHandle,FrameCallback} from '@scottcampbelldata/vexel-core';
 
 interface Registry {
   current: EngineMesh|null;

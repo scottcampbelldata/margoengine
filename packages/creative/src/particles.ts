@@ -1,4 +1,4 @@
-import type {Engine,EnginePlugin,FrameGraph,PassContext,Vec3} from '@vexel/core/extension';
+import type {Engine,EnginePlugin,FrameGraph,PassContext,Vec3} from '@scottcampbelldata/vexel-core/extension';
 declare const GPUBufferUsage:{STORAGE:number;COPY_SRC:number;COPY_DST:number;UNIFORM:number};
 declare const GPUTextureUsage:{COPY_DST:number;TEXTURE_BINDING:number};
 type Context=Extract<PassContext,{backend:'webgpu'}>;

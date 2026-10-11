@@ -20,12 +20,12 @@ for(const name of ['core','gltf','react','machinery','creative']){
 for(const name of ['core','react'])execFileSync(process.execPath,['node_modules/typescript/bin/tsc','-p',`packages/${name}/tsconfig.json`],{stdio:'inherit'});
 for(const name of ['gltf','machinery','creative']){
  const output=resolve(`packages/${name}/dist`);assert.ok(output.startsWith(resolve(`packages/${name}`)+'/')||output.startsWith(resolve(`packages/${name}`)+'\\'),'Output escaped its package');
- await build({configFile:false,publicDir:false,logLevel:'warn',build:{outDir:output,emptyOutDir:true,target:'es2022',lib:{entry:`packages/${name}/src/index.ts`,formats:['es'],fileName:'index'},rollupOptions:{external:['@vexel/core','@vexel/core/extension']}}});
+ await build({configFile:false,publicDir:false,logLevel:'warn',build:{outDir:output,emptyOutDir:true,target:'es2022',lib:{entry:`packages/${name}/src/index.ts`,formats:['es'],fileName:'index'},rollupOptions:{external:['@scottcampbelldata/vexel-core','@scottcampbelldata/vexel-core/extension']}}});
  execFileSync(process.execPath,['node_modules/typescript/bin/tsc','-p',`packages/${name}/tsconfig.json`],{stdio:'inherit'});
 }
 const sizes={kernel:{raw:wasm.length,gzip:gzipSync(wasm).length}};
 for(const name of ['core','gltf','react','machinery','creative']){
-  let output=await build({configFile:false,publicDir:false,logLevel:'silent',build:{write:false,minify:true,target:'es2022',lib:{entry:`packages/${name}/dist/index.js`,formats:['es']},rollupOptions:{external:['@vexel/core','@vexel/core/extension','react','react/jsx-runtime']}}});
+  let output=await build({configFile:false,publicDir:false,logLevel:'silent',build:{write:false,minify:true,target:'es2022',lib:{entry:`packages/${name}/dist/index.js`,formats:['es']},rollupOptions:{external:['@scottcampbelldata/vexel-core','@scottcampbelldata/vexel-core/extension','react','react/jsx-runtime']}}});
   output=Array.isArray(output)?output[0]:output;
   const chunks=output.output.filter(item=>item.type==='chunk'),code=chunks.map(chunk=>chunk.code).join('\n');
   assert.ok(chunks.every(chunk=>Object.keys(chunk.modules).every(id=>!id.includes('/src/scene.js')&&!id.includes('/src/engine.js'))),'Legacy scene/engine leaked into modern packages');
@@ -34,7 +34,7 @@ for(const name of ['core','gltf','react','machinery','creative']){
 }
 assert.ok(sizes.core.gzip<20*1024,'Core exceeds 20 KiB gzip');
 assert.ok(sizes.core.gzip+sizes.gltf.gzip<30*1024,'Core + glTF exceed 30 KiB gzip');
-const shake=await build({configFile:false,publicDir:false,logLevel:'silent',build:{write:false,minify:true,target:'es2022',lib:{entry:'tests/modern-particle-consumer.js',formats:['es']},rollupOptions:{external:['@vexel/core','@vexel/core/extension']}}});
+const shake=await build({configFile:false,publicDir:false,logLevel:'silent',build:{write:false,minify:true,target:'es2022',lib:{entry:'tests/modern-particle-consumer.js',formats:['es']},rollupOptions:{external:['@scottcampbelldata/vexel-core','@scottcampbelldata/vexel-core/extension']}}});
 const shaken=(Array.isArray(shake)?shake[0]:shake).output.filter(item=>item.type==='chunk').map(chunk=>chunk.code).join('\n');assert.ok(!shaken.includes('post-processing')&&!shaken.includes('toon-shading')&&!shaken.includes('rgba16float'),'Unused creative effects leaked into a particle-only consumer');sizes.particlesOnly={raw:Buffer.byteLength(shaken),gzip:gzipSync(shaken).length};
 await mkdir('test-results',{recursive:true});await writeFile('test-results/modern-bundle-sizes.json',JSON.stringify(sizes,null,2));
 const isolation=await build({configFile:false,publicDir:false,logLevel:'silent',build:{write:false,target:'es2022',lib:{entry:'tests/modern-machinery-consumer.js',formats:['es']}}});

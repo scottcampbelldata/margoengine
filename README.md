@@ -30,19 +30,21 @@ npm run dev --workspace @vexel/starter-next
 
 ## Packages
 
+The five libraries use the npm account scope `@scottcampbelldata`. npm publication remains pending.
+
 | Package | Includes |
 | --- | --- |
-| `@vexel/core` | Wasm transform memory, hierarchy/culling, reversed float depth, uint picking, CAD camera controls, instanced PBR, backends and plugin/pass lifecycle |
-| `@vexel/gltf` | Lazy static glTF/GLB loading, named nodes and shared primitive geometry |
-| `@vexel/react` | `Canvas`, `Mesh`, `BoxGeometry`, `GeometryResource`, `PbrMaterial`, `useFrame` |
-| `@vexel/machinery` | Revolute/prismatic joints, gear/piston couplings, bounded IK, sections/caps, dimensions, welded STL/OBJ, assembly queries/visibility, metrology and industrial presets |
-| `@vexel/creative` | Textured/sorted GPU particles, wind obstacles, sky/fog/scattering, toon, HDR and compute post-processing |
+| `@scottcampbelldata/vexel-core` | Wasm transform memory, hierarchy/culling, reversed float depth, uint picking, CAD camera controls, instanced PBR, backends and plugin/pass lifecycle |
+| `@scottcampbelldata/vexel-gltf` | Lazy static glTF/GLB loading, named nodes and shared primitive geometry |
+| `@scottcampbelldata/vexel-react` | `Canvas`, `Mesh`, `BoxGeometry`, `GeometryResource`, `PbrMaterial`, `useFrame` |
+| `@scottcampbelldata/vexel-machinery` | Revolute/prismatic joints, gear/piston couplings, bounded IK, sections/caps, dimensions, welded STL/OBJ, assembly queries/visibility, metrology and industrial presets |
+| `@scottcampbelldata/vexel-creative` | Textured/sorted GPU particles, wind obstacles, sky/fog/scattering, toon, HDR and compute post-processing |
 
-Core measures **19.41 KiB gzip**, including embedded Wasm and both backends. Core plus glTF measures **24.27 KiB gzip**. The Wasm binary is **11.76 KiB raw**. React/framework/application code is additional. The build enforces 20/30 KiB gzip budgets and a 30 KiB raw Wasm budget.
+Core measures **19.41 KiB gzip**, including embedded Wasm and both backends. Core plus glTF measures **24.28 KiB gzip**. The Wasm binary is **11.76 KiB raw**. React/framework/application code is additional. The build enforces 20/30 KiB gzip budgets and a 30 KiB raw Wasm budget.
 
 ```tsx
 import { useRef } from 'react';
-import { Canvas, Mesh, BoxGeometry, PbrMaterial, useFrame, type MeshRef } from '@vexel/react';
+import { Canvas, Mesh, BoxGeometry, PbrMaterial, useFrame, type MeshRef } from '@scottcampbelldata/vexel-react';
 
 function Cube() {
   const mesh = useRef<MeshRef>(null);
@@ -57,7 +59,7 @@ export default function App() {
 }
 ```
 
-`EngineKernel`/`Engine`, Canvas callbacks and React mesh refs expose the frozen portable TypeScript API; raw Wasm/GPU state is available only through the explicit `@vexel/core/extension` entry. Entity creation occurs in effects. Nested components register upward to support child-first commit order. Frame callbacks mutate stable refs without scheduling React renders.
+`EngineKernel`/`Engine`, Canvas callbacks and React mesh refs expose the frozen portable TypeScript API; raw Wasm/GPU state is available only through the explicit `@scottcampbelldata/vexel-core/extension` entry. Entity creation occurs in effects. Nested components register upward to support child-first commit order. Frame callbacks mutate stable refs without scheduling React renders.
 
 [MODERN-ENGINE.md](MODERN-ENGINE.md) contains the architecture, API examples, lifecycle rules, size evidence, supported loader subset, verification and remaining domain features. Thirty-one JavaScript tests, four Rust checks and 32 browser check groups passed after the modern-only cleanup, including production Vite/Next rendering, actual particle storage readback, packed consumers and React 18/19 lifecycle checks. Chrome conveyor captures verify UI picking/orbit, instanced draws, coupled timing and 15-second GC/allocation traces; the observed collections do not establish zero-GC. AMD Radeon integrated graphics and NVIDIA baseline measurements are recorded in the [benchmark summary](benchmarks/README.md). Raw captures and recovery archives remain local. Firefox/Safari and mobile GPU hardware remain unverified.
 

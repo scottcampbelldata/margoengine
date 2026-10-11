@@ -1,6 +1,6 @@
-import {engineRuntime,meshRuntime} from '@vexel/core/extension';
-import type {EngineKernel,Mesh as MeshHandle} from '@vexel/core';
-import {Geometry,PbrMaterial,type Engine,type Mesh,type EnginePlugin,type FrameGraph} from '@vexel/core/extension';
+import {engineRuntime,meshRuntime} from '@scottcampbelldata/vexel-core/extension';
+import type {EngineKernel,Mesh as MeshHandle} from '@scottcampbelldata/vexel-core';
+import {Geometry,PbrMaterial,type Engine,type Mesh,type EnginePlugin,type FrameGraph} from '@scottcampbelldata/vexel-core/extension';
 import {readResponse} from '../../shared/loading.js';
 import {triangulatePolygon} from '../../shared/polygon.js';
 const maxBytes=64*1024*1024,maxVertices=1_000_000,maxIndices=3_000_000;

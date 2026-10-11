@@ -1,6 +1,6 @@
-import {engineRuntime} from '@vexel/core/extension';
-import type {EngineKernel,Mesh as MeshHandle} from '@vexel/core';
-import { Engine, Geometry, PbrMaterial, type Mesh } from '@vexel/core/extension';
+import {engineRuntime} from '@scottcampbelldata/vexel-core/extension';
+import type {EngineKernel,Mesh as MeshHandle} from '@scottcampbelldata/vexel-core';
+import { Engine, Geometry, PbrMaterial, type Mesh } from '@scottcampbelldata/vexel-core/extension';
 import { readResponse } from '../../shared/loading.js';
 
 const limit=64*1024*1024;

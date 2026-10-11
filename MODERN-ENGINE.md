@@ -51,7 +51,7 @@ Consumers import the scoped packages below; the root package manages the workspa
 ## Plain TypeScript
 
 ```ts
-import { Engine, box, PbrMaterial } from '@vexel/core';
+import { Engine, box, PbrMaterial } from '@scottcampbelldata/vexel-core';
 
 const engine = await Engine.create(canvas, {
   capacity: 1024,
@@ -76,10 +76,10 @@ Shared `Geometry` identity produces one instanced draw even when material parame
 
 ## Frozen portable API, picking and CAD navigation
 
-`EngineKernel` and `Engine` are aliases of the same asynchronous factory. The portable TypeScript surface exposes mesh handles, camera, frame lifecycle, plugin attachment, statistics, rendering, picking and reboot. `Canvas.onCreated`, `useFrame` and React `MeshRef` share that surface. Wasm slot IDs, matrix views, storage and raw GPU state are omitted. Runtime export snapshots and packed strict consumer checks guard the contract, including expected type errors for accessing hidden internals. Advanced plugin authors explicitly import `@vexel/core/extension` for `EnginePlugin`, `FrameGraph`, `PassContext`, `TransformStore`, and `engineRuntime`/`meshRuntime`. This is an API boundary, not a JavaScript security membrane. Prior direct storage/device imports must migrate to that entry.
+`EngineKernel` and `Engine` are aliases of the same asynchronous factory. The portable TypeScript surface exposes mesh handles, camera, frame lifecycle, plugin attachment, statistics, rendering, picking and reboot. `Canvas.onCreated`, `useFrame` and React `MeshRef` share that surface. Wasm slot IDs, matrix views, storage and raw GPU state are omitted. Runtime export snapshots and packed strict consumer checks guard the contract, including expected type errors for accessing hidden internals. Advanced plugin authors explicitly import `@scottcampbelldata/vexel-core/extension` for `EnginePlugin`, `FrameGraph`, `PassContext`, `TransformStore`, and `engineRuntime`/`meshRuntime`. This is an API boundary, not a JavaScript security membrane. Prior direct storage/device imports must migrate to that entry.
 
 ```ts
-import { EngineKernel, CADCameraControls } from '@vexel/core';
+import { EngineKernel, CADCameraControls } from '@scottcampbelldata/vexel-core';
 const engine = await EngineKernel.create(canvas, { backend: 'webgpu' });
 const controls = new CADCameraControls(engine.camera, canvas);
 const unsubscribe = engine.onFrame((_, delta) => controls.update(delta));
@@ -103,7 +103,7 @@ WebGPU uses reversed Z: near=1, far=0, clear=0 and `greater-equal` with `depth32
 ```tsx
 import { useRef } from 'react';
 import { Canvas, Mesh, BoxGeometry, PbrMaterial, useFrame,
-  type MeshRef } from '@vexel/react';
+  type MeshRef } from '@scottcampbelldata/vexel-react';
 
 function Cube() {
   const ref = useRef<MeshRef>(null);
@@ -126,11 +126,11 @@ The package declares React 18/19 peers; browser verification used React 19.3.0 a
 ## glTF and machinery
 
 ```ts
-const { loadGLTF } = await import('@vexel/gltf');
+const { loadGLTF } = await import('@scottcampbelldata/vexel-gltf');
 const model = await loadGLTF(engine, '/machine.glb', { signal });
 const axis = model.nodes.find(node => node.name === 'Axis_1');
 if (!axis) throw new Error('Model is missing Axis_1');
-const { Kinematics, ExplodedView } = await import('@vexel/machinery');
+const { Kinematics, ExplodedView } = await import('@scottcampbelldata/vexel-machinery');
 const joints = new Kinematics([{ node: axis, axis: 'y', min: -1, max: 1 }]);
 engine.use(joints);
 joints.setAngle(0, 0.5);
@@ -153,7 +153,7 @@ The loader supports glTF 2.0 JSON/GLB, embedded or external buffers, static tria
 
 ```ts
 const { parseCAD, PartInstancer, SectionPlanes, EngineeringAnnotations } =
-  await import('@vexel/machinery');
+  await import('@scottcampbelldata/vexel-machinery');
 const model = parseCAD(engine, await file.arrayBuffer(), 'stl');
 engine.use(new PartInstancer());
 const plane = [0, 0, -1, 0]; // keeps dot(normal, worldPosition) + offset >= 0
@@ -187,7 +187,7 @@ The Vite demo's **Domain tools → Load conveyor assembly** loads an optional pr
 ## Creative and pass injection
 
 ```ts
-const { GPUParticles, PostProcessing, ToonShading } = await import('@vexel/creative');
+const { GPUParticles, PostProcessing, ToonShading } = await import('@scottcampbelldata/vexel-creative');
 if (engine.backend === 'webgpu') {
   engine.use(new GPUParticles({ count: 50_000, gravity: [0, -0.5, 0], wind: [1.2, 0, 0.4],
     curl: 0.2, sort: true,
@@ -227,13 +227,13 @@ Current measurements from [modern-bundle-sizes.json](benchmarks/README.md), gene
 | --- | ---: | ---: |
 | Rust Wasm kernel, after Binaryen | 12,046 | 5,064 |
 | Core, including embedded Wasm and both backends | 53,073 | 19,874 |
-| glTF, excluding its core peer | 13,486 | 4,979 |
-| React adapter, excluding React/core peers | 4,726 | 1,844 |
-| Machinery, excluding core peer | 45,352 | 14,513 |
+| glTF, excluding its core peer | 13,503 | 4,993 |
+| React adapter, excluding React/core peers | 4,743 | 1,857 |
+| Machinery, excluding core peer | 45,368 | 14,527 |
 | Creative, excluding core peer | 32,671 | 9,563 |
 | Particle-only consumer, excluding core peer | 13,744 | 4,638 |
 
-The 20/30 KiB JavaScript budgets are **gzip transfer budgets**, not raw-source budgets. Core plus glTF sums to 24,853 gzip bytes. React/ReactDOM and application code are additional; the complete Vite starter entry is about 89.4 KiB gzip. Optional packages have separate dynamic chunks, verified not to be fetched at initial load. Core has 606 gzip bytes of headroom below its strict 20 KiB limit. The build asserts no legacy scene/engine inclusion. There is no competitor runtime dependency in these packages.
+The 20/30 KiB JavaScript budgets are **gzip transfer budgets**, not raw-source budgets. Core plus glTF sums to 24,867 gzip bytes. React/ReactDOM and application code are additional; the complete Vite starter entry is about 90.2 KiB gzip. Optional packages have separate dynamic chunks, verified not to be fetched at initial load. Core has 606 gzip bytes of headroom below its strict 20 KiB limit. The build asserts no legacy scene/engine inclusion. There is no competitor runtime dependency in these packages.
 
 Release compilation explicitly freezes `opt-level=3`, `lto="fat"`, `codegen-units=1`, `panic="abort"`, `overflow-checks=false` and `strip="symbols"`. The root `rust-toolchain.toml` pins Rust 1.99.0 and the Wasm target; Binaryen 132.0.0 is pinned in package.json/package-lock.json. Use `npm ci` for locked dependencies. `modern:build` sets SIMD128 and a fixed Cargo output directory, then runs `wasm-opt -O3 --enable-simd --enable-bulk-memory --enable-bulk-memory-opt --enable-nontrapping-float-to-int --strip-debug --strip-producers --strip-target-features --converge` to a separate output. Cargo’s input artifact remains intact. A fresh isolated build reproduced both raw and optimized Wasm byte-for-byte, matching the embedded blueprint; name, producer and target-feature sections are absent. [Reproducibility evidence](benchmarks/README.md). Consumers use the checked-in optimized Wasm and need no Rust or Binaryen.
 

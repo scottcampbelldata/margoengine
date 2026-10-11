@@ -1,6 +1,6 @@
-import {meshRuntime} from '@vexel/core/extension';
-import type {Mesh as MeshHandle} from '@vexel/core';
-import type {Engine,EnginePlugin,Mesh,Vec3} from '@vexel/core/extension';
+import {meshRuntime} from '@scottcampbelldata/vexel-core/extension';
+import type {Mesh as MeshHandle} from '@scottcampbelldata/vexel-core';
+import type {Engine,EnginePlugin,Mesh,Vec3} from '@scottcampbelldata/vexel-core/extension';
 export interface Joint {node:MeshHandle;axis:'x'|'y'|'z';kind?:'revolute'|'prismatic';min:number;max:number;velocity?:number}
 export interface GearCoupling {source:number;target:number;ratio:number;offset?:number}
 export interface PistonCoupling {source:number;target:number;radius:number;rodLength:number;phase?:number;offset?:number}

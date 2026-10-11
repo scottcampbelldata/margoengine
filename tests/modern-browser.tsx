@@ -1,9 +1,9 @@
 import React,{StrictMode,Suspense,useRef} from 'react';
 import {createRoot,type Root} from 'react-dom/client';
-import {Engine,box,PbrMaterial, type Mesh as CoreMesh} from '@vexel/core/extension';
-import {Canvas,Mesh,BoxGeometry,PbrMaterial as ReactMaterial,useFrame} from '@vexel/react';
-import {GPUParticles,PostProcessing,ToonShading} from '@vexel/creative';
-import {SectionPlanes,EngineeringAnnotations,PartInstancer} from '@vexel/machinery';
+import {Engine,box,PbrMaterial, type Mesh as CoreMesh} from '@scottcampbelldata/vexel-core/extension';
+import {Canvas,Mesh,BoxGeometry,PbrMaterial as ReactMaterial,useFrame} from '@scottcampbelldata/vexel-react';
+import {GPUParticles,PostProcessing,ToonShading} from '@scottcampbelldata/vexel-creative';
+import {SectionPlanes,EngineeringAnnotations,PartInstancer} from '@scottcampbelldata/vexel-machinery';
 const state:{core?:Engine;react?:Engine;root?:Root;host?:HTMLDivElement;parent:CoreMesh|null;child:CoreMesh|null;renders:number;errors:string[];frames:number}={parent:null,child:null,renders:0,errors:[],frames:0};
 function Cube({position=1}:{position?:number}){
   state.renders++;const mesh=useRef<CoreMesh>(null);

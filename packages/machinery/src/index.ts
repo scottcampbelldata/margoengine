@@ -1,6 +1,6 @@
-import {meshRuntime} from '@vexel/core/extension';
-import type {Mesh as MeshHandle} from '@vexel/core';
-import type {Engine,EnginePlugin,Mesh,Vec3} from '@vexel/core/extension';
+import {meshRuntime} from '@scottcampbelldata/vexel-core/extension';
+import type {Mesh as MeshHandle} from '@scottcampbelldata/vexel-core';
+import type {Engine,EnginePlugin,Mesh,Vec3} from '@scottcampbelldata/vexel-core/extension';
 export {Kinematics} from './kinematics.js';
 export type {Joint,GearCoupling,PistonCoupling,IKTarget,DistanceConstraint,KinematicOptions} from './kinematics.js';
 export {parseCAD,loadCAD,deduplicateParts,PartInstancer} from './cad.js';

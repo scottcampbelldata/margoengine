@@ -1,6 +1,6 @@
-import {meshRuntime} from '@vexel/core/extension';
-import type {Mesh as MeshHandle} from '@vexel/core';
-import type {Engine,EnginePlugin,FrameGraph,Mesh,Vec3,Camera} from '@vexel/core/extension';
+import {meshRuntime} from '@scottcampbelldata/vexel-core/extension';
+import type {Mesh as MeshHandle} from '@scottcampbelldata/vexel-core';
+import type {Engine,EnginePlugin,FrameGraph,Mesh,Vec3,Camera} from '@scottcampbelldata/vexel-core/extension';
 export interface Anchor {point:Vec3;node?:MeshHandle}
 export interface Dimension {a:Anchor;b:Anchor;offset?:readonly [number,number];label?:string}
 export interface Callout {anchor:Anchor;label:string;offset?:readonly [number,number]}

@@ -1,1 +1,1 @@
-export * from '@vexel/machinery';
+export * from '@scottcampbelldata/vexel-machinery';

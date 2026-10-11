@@ -1,5 +1,5 @@
-import {box,Geometry,type Engine,type Mesh} from '@vexel/core/extension';
-import {AssemblyIndex,Kinematics,ExplodedView,PartInstancer,industrialMaterial} from '@vexel/machinery';
+import {box,Geometry,type Engine,type Mesh} from '@scottcampbelldata/vexel-core/extension';
+import {AssemblyIndex,Kinematics,ExplodedView,PartInstancer,industrialMaterial} from '@scottcampbelldata/vexel-machinery';
 function cylinder():Geometry {const p:number[]=[],n:number[]=[],indices:number[]=[];for(let i=0;i<24;i++){const a=i*Math.PI/12,b=(i+1)*Math.PI/12,start=p.length/3;for(const [angle,z] of [[a,-0.5],[b,-0.5],[b,0.5],[a,0.5]]){p.push(Math.cos(angle),Math.sin(angle),z);n.push(Math.cos(angle),Math.sin(angle),0);}indices.push(start,start+1,start+2,start,start+2,start+3);for(const z of [-0.5,0.5]){const at=p.length/3;for(const [x,y] of [[0,0],[Math.cos(a),Math.sin(a)],[Math.cos(b),Math.sin(b)]]){p.push(x,y,z);n.push(0,0,Math.sign(z));}indices.push(...(z>0?[at,at+1,at+2]:[at,at+2,at+1]));}}return new Geometry(p,n,indices);}
 export function createConveyor(engine:Engine,rollers=20) {
   if(!Number.isSafeInteger(rollers)||rollers<2||rollers>1000)throw new RangeError('Conveyor rollers must be 2..1000');const root=engine.createMesh();root.name='Conveyor_Assembly';const nodes:Mesh[]=[root],cube=box(),round=cylinder(),steel=industrialMaterial('machinedSteel'),coat=industrialMaterial('powderCoat'),rubber=industrialMaterial('neoprene');

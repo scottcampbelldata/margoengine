@@ -11,30 +11,30 @@ const archives=resolve('test-results/modern-packages');await mkdir(archives,{rec
 const dependencies={react:'18.3.1','react-dom':'18.3.1','@types/react':'^18.3.0','@types/react-dom':'^18.3.0'};
 for(const name of ['core','react'])await writeFile(`packages/${name}/dist/__stale-package-test.js`,'throw new Error("Stale build artifact");');
 for(const name of names){
-  const [pack]=JSON.parse(execFileSync(process.execPath,[npm,'pack','--workspace',`@vexel/${name}`,'--pack-destination',archives,'--json'],{encoding:'utf8'})),files=new Set(pack.files.map(file=>file.path));
+  const [pack]=JSON.parse(execFileSync(process.execPath,[npm,'pack','--workspace',`@scottcampbelldata/vexel-${name}`,'--pack-destination',archives,'--json'],{encoding:'utf8'})),files=new Set(pack.files.map(file=>file.path));
   assert.ok(pack.files.every(file=>['package.json','README.md','LICENSE'].includes(file.path)||file.path.startsWith('dist/')));
   assert.ok(files.has('README.md')&&files.has('LICENSE'));assert.ok(!files.has('dist/__stale-package-test.js'));
   const manifest=JSON.parse(await readFile(`packages/${name}/package.json`,'utf8'));
   assert.notEqual(manifest.private,true);assert.equal(manifest.license,'MIT');assert.equal(manifest.publishConfig.access,'public');
   for(const entry of Object.values(manifest.exports))for(const target of Object.values(entry))assert.ok(files.has(target.slice(2)),`Missing packed export: ${manifest.name} ${target}`);
-  dependencies[`@vexel/${name}`]=`file:${join(archives,pack.filename).replaceAll('\\','/')}`;
+  dependencies[`@scottcampbelldata/vexel-${name}`]=`file:${join(archives,pack.filename).replaceAll('\\','/')}`;
 }
 const fixture=await mkdtemp(join(tmpdir(),'vexel-consumer-'));let browser;
 try{
   await writeFile(join(fixture,'package.json'),JSON.stringify({private:true,type:'module',dependencies}));
   execFileSync(process.execPath,[npm,'install','--ignore-scripts','--no-audit','--no-fund'],{cwd:fixture,stdio:'inherit'});
   for(const name of names){
-    assert.equal(await readFile(join(fixture,`node_modules/@vexel/${name}/LICENSE`),'utf8'),await readFile('LICENSE','utf8'));
-    const markdown=await readFile(join(fixture,`node_modules/@vexel/${name}/README.md`),'utf8');
+    assert.equal(await readFile(join(fixture,`node_modules/@scottcampbelldata/vexel-${name}/LICENSE`),'utf8'),await readFile('LICENSE','utf8'));
+    const markdown=await readFile(join(fixture,`node_modules/@scottcampbelldata/vexel-${name}/README.md`),'utf8');
     await writeFile(join(fixture,`${name}-readme.tsx`),[...markdown.matchAll(/```tsx?\r?\n([\s\S]*?)```/g)].map(match=>match[1]).join('\n'));
   }
   await writeFile(join(fixture,'tsconfig.json'),JSON.stringify({compilerOptions:{strict:true,target:'ES2022',module:'NodeNext',moduleResolution:'NodeNext',jsx:'react-jsx',types:[],lib:['ES2022','DOM'],outDir:'out'},include:['consumer.tsx','*-readme.tsx']}));
-  await writeFile(join(fixture,'consumer.tsx'),`import {TransformStore,type PassContext} from '@vexel/core/extension';
-import {EngineKernel,type Mesh as MeshHandle} from '@vexel/core';
-import {loadGLTF} from '@vexel/gltf';
-import {Canvas,Mesh,BoxGeometry,PbrMaterial,type MeshRef} from '@vexel/react';
-import {Kinematics,ExplodedView,SectionPlanes,EngineeringAnnotations,PartInstancer,parseCAD,loadCAD,deduplicateParts} from '@vexel/machinery';
-import {GPUParticles,PostProcessing,ToonShading,HDRRenderTarget} from '@vexel/creative';
+  await writeFile(join(fixture,'consumer.tsx'),`import {TransformStore,type PassContext} from '@scottcampbelldata/vexel-core/extension';
+import {EngineKernel,type Mesh as MeshHandle} from '@scottcampbelldata/vexel-core';
+import {loadGLTF} from '@scottcampbelldata/vexel-gltf';
+import {Canvas,Mesh,BoxGeometry,PbrMaterial,type MeshRef} from '@scottcampbelldata/vexel-react';
+import {Kinematics,ExplodedView,SectionPlanes,EngineeringAnnotations,PartInstancer,parseCAD,loadCAD,deduplicateParts} from '@scottcampbelldata/vexel-machinery';
+import {GPUParticles,PostProcessing,ToonShading,HDRRenderTarget} from '@scottcampbelldata/vexel-creative';
 import {renderToString} from 'react-dom/server';
 const device=(pass:PassContext)=>pass.backend==='webgpu'?pass.device:null;
 const store=await TransformStore.create(3);store.dispose();
@@ -42,7 +42,7 @@ const html=renderToString(<Canvas><Mesh><BoxGeometry/><PbrMaterial/></Mesh></Can
 if(!html.includes('<canvas')||typeof loadGLTF!=='function'||!Kinematics||!ExplodedView||new GPUParticles({count:32}).count!==32)throw new Error('Consumer failed');
 new SectionPlanes({planes:[[0,0,1,0]]});new EngineeringAnnotations();new PartInstancer();new ToonShading();new PostProcessing({atmosphere:{sky:true},bloom:0.5});
 if(typeof parseCAD!=='function'||typeof loadCAD!=='function'||typeof deduplicateParts!=='function'||!HDRRenderTarget)throw new Error('Domain exports failed');
-function refs(engine:import('@vexel/core').EngineKernel,node:MeshRef){
+function refs(engine:import('@scottcampbelldata/vexel-core').EngineKernel,node:MeshRef){
 // @ts-expect-error Canvas onCreated uses the portable engine surface
 engine.frameGraph;
 // @ts-expect-error React mesh refs hide Wasm slot indices
@@ -71,9 +71,9 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
 `);
   execFileSync(process.execPath,[resolve('node_modules/typescript/bin/tsc'),'-p',join(fixture,'tsconfig.json')],{stdio:'inherit'});
   execFileSync(process.execPath,[join(fixture,'out/consumer.js')],{cwd:fixture,stdio:'inherit'});
-  const aliases={'@vexel/core/extension':join(fixture,'node_modules/@vexel/core/dist/extension.js'),react:join(fixture,'node_modules/react'),'react-dom':join(fixture,'node_modules/react-dom')};
-  aliases['@vexel/core/extension']=join(fixture,'node_modules/@vexel/core/dist/extension.js');
-  for(const name of names)aliases[`@vexel/${name}`]=join(fixture,`node_modules/@vexel/${name}/dist/index.js`);
+  const aliases={'@scottcampbelldata/vexel-core/extension':join(fixture,'node_modules/@scottcampbelldata/vexel-core/dist/extension.js'),react:join(fixture,'node_modules/react'),'react-dom':join(fixture,'node_modules/react-dom')};
+  aliases['@scottcampbelldata/vexel-core/extension']=join(fixture,'node_modules/@scottcampbelldata/vexel-core/dist/extension.js');
+  for(const name of names)aliases[`@scottcampbelldata/vexel-${name}`]=join(fixture,`node_modules/@scottcampbelldata/vexel-${name}/dist/index.js`);
   browser=await openBrowser({startPath:'/tests/modern.html',aliases});const {page}=browser,errors=[];
   page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
   await page.waitForFunction(()=>window.modern);await page.evaluate(()=>window.modern.mount());
@@ -87,7 +87,7 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
   await page.evaluate(()=>window.modern.unmount());assert.ok(await page.evaluate(()=>window.modern.state.react.disposed));assert.equal(await page.evaluate(()=>window.modern.state.react.meshes.size),0);
   assert.deepEqual(await page.evaluate(()=>window.modern.state.errors),[]);assert.deepEqual(errors,[]);
   const react=JSON.parse(await readFile(join(fixture,'node_modules/react/package.json'),'utf8')).version;
-  await writeFile('test-results/modern-packages.json',JSON.stringify({hardware:browser.hardware,packages:names.map(name=>`@vexel/${name}`),react,checks:['standalone imports and Wasm','strict consumer declarations without workspace ambient types','React 18 SSR','React 18 StrictMode, nested refs, props, RAF, Suspense and teardown']},null,2));
+  await writeFile('test-results/modern-packages.json',JSON.stringify({hardware:browser.hardware,packages:names.map(name=>`@scottcampbelldata/vexel-${name}`),react,checks:['standalone imports and Wasm','strict consumer declarations without workspace ambient types','React 18 SSR','React 18 StrictMode, nested refs, props, RAF, Suspense and teardown']},null,2));
   console.log(`React ${react} packaged browser lifecycle passes`);
 }finally{
   await browser?.close();

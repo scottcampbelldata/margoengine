@@ -1,9 +1,9 @@
 {
-  "name": "@vexel/machinery", "version": "0.1.0", "type": "module", "license": "MIT",
+  "name": "@scottcampbelldata/vexel-machinery", "version": "0.1.0", "type": "module", "license": "MIT",
   "description": "Kinematics, polygonal CAD ingestion, sections and metrology for Vexel.",
   "repository": { "type": "git", "url": "git+https://github.com/scottcampbelldata/vexel.git", "directory": "packages/machinery" },
   "publishConfig": { "access": "public" },
   "scripts": { "prepack": "npm --prefix ../.. run build:packages" },
   "sideEffects": false, "exports": {".": {"types": "./dist/index.d.ts", "import": "./dist/index.js"}},
-  "files": ["dist"], "peerDependencies": {"@vexel/core": "0.1.0"}
+  "files": ["dist"], "peerDependencies": {"@scottcampbelldata/vexel-core": "0.1.0"}
 }

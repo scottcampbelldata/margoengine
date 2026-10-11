@@ -1,4 +1,4 @@
-import type {Engine,EnginePlugin,FrameGraph,PassContext,Vec3} from '@vexel/core/extension';
+import type {Engine,EnginePlugin,FrameGraph,PassContext,Vec3} from '@scottcampbelldata/vexel-core/extension';
 import {invert} from '../../shared/math.js';
 import {HDRRenderTarget} from './targets.js';
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};

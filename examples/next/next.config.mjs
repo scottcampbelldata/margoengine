@@ -1,1 +1,1 @@
-export default {transpilePackages:['@vexel/core','@vexel/react']};
+export default {transpilePackages:['@scottcampbelldata/vexel-core','@scottcampbelldata/vexel-react']};

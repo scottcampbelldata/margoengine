@@ -1,4 +1,4 @@
-import {PbrMaterial,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type DrawOptions} from '@vexel/core/extension';
+import {PbrMaterial,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type DrawOptions} from '@scottcampbelldata/vexel-core/extension';
 import {invert} from '../../shared/math.js';
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
 type GPUContext=Extract<PassContext,{backend:'webgpu'}>;

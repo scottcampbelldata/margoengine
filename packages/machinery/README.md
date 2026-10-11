@@ -1,14 +1,14 @@
-# @vexel/machinery
+# @scottcampbelldata/vexel-machinery
 
 Revolute/prismatic joints, gear and piston couplings, bounded IK, STL/OBJ ingestion, exploded views, sections, metrology and industrial material presets for Vexel.
 
 ```sh
-npm install @vexel/core @vexel/machinery
+npm install @scottcampbelldata/vexel-core @scottcampbelldata/vexel-machinery
 ```
 
 ```ts
-import { Engine, box } from '@vexel/core';
-import { Kinematics, industrialMaterial } from '@vexel/machinery';
+import { Engine, box } from '@scottcampbelldata/vexel-core';
+import { Kinematics, industrialMaterial } from '@scottcampbelldata/vexel-machinery';
 
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const engine = await Engine.create(canvas);
@@ -28,6 +28,6 @@ engine.start();
 
 Call `engine.dispose()` on teardown. Joints are configured through `Kinematics`; CAD files use `loadCAD` or `parseCAD`. Native STEP/IGES import is deferred. CPU machinery tools work with either backend; section rendering requires WebGPU, and solid caps require depth32float-stencil8 plus closed, consistently oriented meshes.
 
-This ESM package includes TypeScript declarations and requires `@vexel/core` 0.1.0. See the [API and supported geometry guide](https://github.com/scottcampbelldata/vexel/blob/main/MODERN-ENGINE.md).
+This ESM package includes TypeScript declarations and requires `@scottcampbelldata/vexel-core` 0.1.0. See the [API and supported geometry guide](https://github.com/scottcampbelldata/vexel/blob/main/MODERN-ENGINE.md).
 
 MIT licensed.
