@@ -14,6 +14,9 @@ The files in [swiftshader/](swiftshader/) were recorded on 11 October 2026 at co
 | --- | --- |
 | `bench-tick-b3987dd-run1.json` to `run3.json` | Three runs of the roller assembly tick and frame timing at 20, 200 and 240 rollers |
 | `modern-finalization.json` | The finalization suite, including the 12,014 entity stress scene |
+| `modern-browser.json` | The browser suite: 8 check groups for both backends and both starters |
+| `modern-domains.json` | The domain suite: 8 check groups for caps, effects, particle sorting and device loss |
+| `modern-packages.json` | The packed package suite: standalone imports, strict consumer types and React 18 |
 | `conveyor-check-picking-failure.txt` | Output of the full `modern:check:conveyor` run, which fails at its live picking step on SwiftShader (the absolute checkout path is shortened) |
 
 ### Setup
@@ -39,6 +42,16 @@ npm run modern:check:conveyor -- --timing-only
 This loads the demo roller assembly at 20, 200 and 240 rollers. For each size it times 300 ticks of the motor drive, gear couplings and Wasm transform update after 120 warm up ticks, then times 180 rendered frames split into JavaScript before the tick, the Wasm export, and scene collection, encoding and upload. It writes `test-results/modern-conveyor-timing.json` and skips the picking and drag trace steps. The browser timer resolves 0.1 ms, so the summary uses means over 10 tick windows.
 
 The three committed runs were recorded with a copy of the same timing section before the `--timing-only` flag existed; a later run with the flag gave results in the same range.
+
+### Other suites
+
+```sh
+npm run modern:test:browser
+npm run modern:test:domains
+npm run modern:test:packages
+```
+
+Each writes the matching JSON file to `test-results/`. The browser suite file in this folder was recorded after the `BROWSER_CHANNEL` change to the test scripts; the engine code is the same as at b3987dd.
 
 ### Stress scene
 
