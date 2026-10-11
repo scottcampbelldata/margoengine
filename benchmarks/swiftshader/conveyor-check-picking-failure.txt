@@ -1,0 +1,22 @@
+
+> vexel@0.1.0 modern:check:conveyor
+> node scripts/modern-conveyor-checks.js
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: {"expected":968,"actual":960,"name":"Mount_Bolt_237_1.17","syncMs":0.800000011920929,"totalMs":157.20000000298023,"pivot":[2.9497907161712646,0.6499999761581421,1.1699999570846558],"position":[3,0.6599999761581421,2.6699999570846558]}
+
+960 !== 968
+
+    at file:///.../vexel/scripts/modern-conveyor-checks.js:43:225 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 960,
+  expected: 968,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.21.0
