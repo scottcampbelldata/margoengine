@@ -1,5 +1,6 @@
 node_modules/
 dist/
+packages/*/LICENSE
 test-results/
 *.log
 packages/*/target/

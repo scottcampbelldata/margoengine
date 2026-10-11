@@ -9,12 +9,26 @@ const names=['core','gltf','react','machinery','creative'],npm=process.env.npm_e
 assert.ok(npm,'Run this check through npm run modern:test:packages');
 const archives=resolve('test-results/modern-packages');await mkdir(archives,{recursive:true});
 const dependencies={react:'18.3.1','react-dom':'18.3.1','@types/react':'^18.3.0','@types/react-dom':'^18.3.0'};
-for(const name of names){const [pack]=JSON.parse(execFileSync(process.execPath,[npm,'pack','--workspace',`@vexel/${name}`,'--pack-destination',archives,'--json'],{encoding:'utf8'}));assert.ok(pack.files.every(file=>file.path==='package.json'||file.path.startsWith('dist/')));dependencies[`@vexel/${name}`]=`file:${join(archives,pack.filename).replaceAll('\\','/')}`;}
+for(const name of ['core','react'])await writeFile(`packages/${name}/dist/__stale-package-test.js`,'throw new Error("Stale build artifact");');
+for(const name of names){
+  const [pack]=JSON.parse(execFileSync(process.execPath,[npm,'pack','--workspace',`@vexel/${name}`,'--pack-destination',archives,'--json'],{encoding:'utf8'})),files=new Set(pack.files.map(file=>file.path));
+  assert.ok(pack.files.every(file=>['package.json','README.md','LICENSE'].includes(file.path)||file.path.startsWith('dist/')));
+  assert.ok(files.has('README.md')&&files.has('LICENSE'));assert.ok(!files.has('dist/__stale-package-test.js'));
+  const manifest=JSON.parse(await readFile(`packages/${name}/package.json`,'utf8'));
+  assert.notEqual(manifest.private,true);assert.equal(manifest.license,'MIT');assert.equal(manifest.publishConfig.access,'public');
+  for(const entry of Object.values(manifest.exports))for(const target of Object.values(entry))assert.ok(files.has(target.slice(2)),`Missing packed export: ${manifest.name} ${target}`);
+  dependencies[`@vexel/${name}`]=`file:${join(archives,pack.filename).replaceAll('\\','/')}`;
+}
 const fixture=await mkdtemp(join(tmpdir(),'vexel-consumer-'));let browser;
 try{
   await writeFile(join(fixture,'package.json'),JSON.stringify({private:true,type:'module',dependencies}));
   execFileSync(process.execPath,[npm,'install','--ignore-scripts','--no-audit','--no-fund'],{cwd:fixture,stdio:'inherit'});
-  await writeFile(join(fixture,'tsconfig.json'),JSON.stringify({compilerOptions:{strict:true,target:'ES2022',module:'NodeNext',moduleResolution:'NodeNext',jsx:'react-jsx',types:[],lib:['ES2022','DOM'],outDir:'out'},include:['consumer.tsx']}));
+  for(const name of names){
+    assert.equal(await readFile(join(fixture,`node_modules/@vexel/${name}/LICENSE`),'utf8'),await readFile('LICENSE','utf8'));
+    const markdown=await readFile(join(fixture,`node_modules/@vexel/${name}/README.md`),'utf8');
+    await writeFile(join(fixture,`${name}-readme.tsx`),[...markdown.matchAll(/```tsx?\r?\n([\s\S]*?)```/g)].map(match=>match[1]).join('\n'));
+  }
+  await writeFile(join(fixture,'tsconfig.json'),JSON.stringify({compilerOptions:{strict:true,target:'ES2022',module:'NodeNext',moduleResolution:'NodeNext',jsx:'react-jsx',types:[],lib:['ES2022','DOM'],outDir:'out'},include:['consumer.tsx','*-readme.tsx']}));
   await writeFile(join(fixture,'consumer.tsx'),`import {TransformStore,type PassContext} from '@vexel/core/extension';
 import {EngineKernel,type Mesh as MeshHandle} from '@vexel/core';
 import {loadGLTF} from '@vexel/gltf';

@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "MIT",
+  "engines": { "node": ">=22.12.0" },
   "workspaces": [
     "packages/core",
     "packages/gltf",
@@ -14,6 +15,8 @@
     "examples/next"
   ],
   "scripts": {
+    "build:packages": "node scripts/build-modern.js --precompiled",
+    "pack:packages": "npm run build:packages && npm pack --workspace packages --ignore-scripts --pack-destination test-results",
     "modern:build": "node scripts/build-modern.js",
     "modern:test": "node --test tests/modern*.test.js",
     "modern:test:browser": "node scripts/modern-browser-tests.js",
@@ -23,10 +26,10 @@
     "modern:test:packages": "node scripts/modern-package-tests.js",
     "modern:dev": "npm run dev --workspace @vexel/starter-vite",
     "modern:build:starters": "npm run build --workspace @vexel/starter-vite && npm run build --workspace @vexel/starter-next",
-    "predev": "node scripts/build-modern.js --precompiled",
+    "predev": "npm run build:packages",
     "dev": "npm run modern:dev",
-    "build": "node scripts/build-modern.js --precompiled && npm run modern:build:starters",
-    "pretest": "node scripts/build-modern.js --precompiled",
+    "build": "npm run build:packages && npm run modern:build:starters",
+    "pretest": "npm run build:packages",
     "test": "npm run modern:test",
     "test:browser": "node scripts/modern-browser-tests.js"
   },

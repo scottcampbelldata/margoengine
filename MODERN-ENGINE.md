@@ -23,7 +23,9 @@ Use Node.js 22.12+ or 24+ and a browser with WebGL2. TypeScript consumers need T
 npm ci
 npm run dev                           # new Vite starter; compiles packages first
 npm test                              # compiles packages; runs 31 focused unit checks
+npm run build:packages                # all five libraries; precompiled Wasm, no Rust
 npm run build                         # builds packages and both production starters
+npm run pack:packages                 # rebuilds and packs only the five libraries
 npm run modern:test:browser            # after build: real GPU + both production starters
 npm run modern:test:domains            # caps, FX, sorting, depth readback and loss races
 npm run modern:test:packages           # frozen public exports/types + React 18 fixture
@@ -44,7 +46,7 @@ cargo test --manifest-path packages/kernel/Cargo.toml
 
 The release profile uses speed optimization, fat LTO, one codegen unit, stripped symbols and aborting panics. The no-std Wasm build reserves its memory once without a general allocator. Kernel rebuilds use the pinned Binaryen pipeline below; consumers use the precompiled optimized kernel. A build fails if the Wasm exceeds 30 KiB raw, the core exceeds 20 KiB gzip, or core plus glTF exceeds 30 KiB gzip.
 
-Consumers import the scoped packages below; the root package manages the workspace and its commands. Workspaces are private, version 0.1.0 and UNLICENSED; packages have not been published to npm. The [benchmark summary](benchmarks/README.md) records the locked core and verification results. Raw captures and recovery archives remain local.
+Consumers import the scoped packages below; the root package manages the workspace and its commands. The five libraries are version 0.1.0, [MIT licensed](LICENSE) and configured for public npm publication; the root and starters remain private. Packages have not been published to npm. Each library's `prepack` hook builds the workspace using the checked-in Wasm, removes stale distribution files and includes a package README and a copy of the root license. `npm run pack:packages` writes all five archives to `test-results/`. The [benchmark summary](benchmarks/README.md) records the locked core and verification results. Raw captures and recovery archives remain local.
 
 ## Plain TypeScript
 
@@ -263,7 +265,7 @@ AMD Radeon integrated graphics (RDNA 2, device 13C0, driver 32.0.21043.5001) als
 | Machinery | Native STEP/IGES/B-Rep solids, CAD materials/UVs, generalized rigid-body/contact dynamics and large-import worker streaming. The listed minimal domain features are implemented above. |
 | Creative | Mesh/fluid wind solvers, physical volumetric scattering, HDR environment-map import, optical bokeh and continuity of GPU-only particle state after device loss. The listed minimal domain features are implemented above. |
 | Renderer/assets | Clustered Forward+ multi-light shading, shadows/IBL/textures, GPU culling/skinning, animation/morphs/compression, spatial indexing, dynamic geometry and measured memory budgets across hardware. |
-| Distribution/validation | Public packaging/license/release policy, wider browser/GPU/React version coverage, performance comparisons with matched workloads and image quality. |
+| Distribution/validation | npm publication and release policy, wider browser/GPU/React version coverage, performance comparisons with matched workloads and image quality. |
 
 The remaining rows describe future work; current domain features have working implementations and bounded limits documented above. Linear sphere culling and cached hierarchy composition are intentional minimal implementations; optimize against measured scenes. This delivery makes no universal performance, full parity or commercial-readiness claim.
 

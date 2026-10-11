@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, copyFile, rm } from 'node:fs/promises';
 import { build } from 'vite';
-import { resolve } from 'node:path';
+import { resolve, dirname } from 'node:path';
 import assert from 'node:assert/strict';
 import { gzipSync,gunzipSync } from 'node:zlib';
 
@@ -13,6 +13,10 @@ const wasm=precompiled?gunzipSync(Buffer.from(/wasmBase64(?::\s*string)?\s*=\s*'
 assert.ok(wasm.length<30*1024,`Kernel exceeds 30 KiB: ${wasm.length}`);
 assert.ok(WebAssembly.validate(wasm),'Invalid Wasm artifact');
 if(!precompiled)await writeFile('packages/core/src/wasm.ts',`// Generated gzip blueprint; consumers need no Rust toolchain.\nexport const wasmBase64: string = '${gzipSync(wasm).toString('base64')}';\n`);
+for(const name of ['core','gltf','react','machinery','creative']){
+ const output=resolve(`packages/${name}/dist`);assert.equal(dirname(output),resolve(`packages/${name}`),'Output escaped its package');
+ await rm(output,{recursive:true,force:true});await copyFile('LICENSE',`packages/${name}/LICENSE`);
+}
 for(const name of ['core','react'])execFileSync(process.execPath,['node_modules/typescript/bin/tsc','-p',`packages/${name}/tsconfig.json`],{stdio:'inherit'});
 for(const name of ['gltf','machinery','creative']){
  const output=resolve(`packages/${name}/dist`);assert.ok(output.startsWith(resolve(`packages/${name}`)+'/')||output.startsWith(resolve(`packages/${name}`)+'\\'),'Output escaped its package');
@@ -35,5 +39,5 @@ const shaken=(Array.isArray(shake)?shake[0]:shake).output.filter(item=>item.type
 await mkdir('test-results',{recursive:true});await writeFile('test-results/modern-bundle-sizes.json',JSON.stringify(sizes,null,2));
 const isolation=await build({configFile:false,publicDir:false,logLevel:'silent',build:{write:false,target:'es2022',lib:{entry:'tests/modern-machinery-consumer.js',formats:['es']}}});
 for(const chunk of (Array.isArray(isolation)?isolation[0]:isolation).output.filter(item=>item.type==='chunk'))assert.ok(Object.keys(chunk.modules).every(id=>!id.includes('/creative/')),'Creative code leaked into a machinery consumer');
-console.log(JSON.stringify(sizes,null,2));
+console.error(JSON.stringify(sizes,null,2));
 

@@ -17,7 +17,9 @@ Open the localhost URL printed by Vite. The demo contains nested rotating geomet
 
 ```sh
 npm test                      # builds packages and runs modern unit checks
+npm run build:packages        # builds all five libraries with precompiled Wasm
 npm run build                 # builds packages, Vite and Next.js starters
+npm run pack:packages         # rebuilds and writes five npm tarballs to test-results/
 npm run modern:test:browser   # after build: GPU checks and production starter flows
 npm run modern:test:domains   # caps, sorting, FX and real GPU-loss recovery
 npm run modern:test:packages  # frozen exports/types and React 18 lifecycle
@@ -59,7 +61,9 @@ export default function App() {
 
 [MODERN-ENGINE.md](MODERN-ENGINE.md) contains the architecture, API examples, lifecycle rules, size evidence, supported loader subset, verification and remaining domain features. Thirty-one JavaScript tests, four Rust checks and 32 browser check groups passed after the modern-only cleanup, including production Vite/Next rendering, actual particle storage readback, packed consumers and React 18/19 lifecycle checks. Chrome conveyor captures verify UI picking/orbit, instanced draws, coupled timing and 15-second GC/allocation traces; the observed collections do not establish zero-GC. AMD Radeon integrated graphics and NVIDIA baseline measurements are recorded in the [benchmark summary](benchmarks/README.md). Raw captures and recovery archives remain local. Firefox/Safari and mobile GPU hardware remain unverified.
 
-Node.js 22.12+ or 24+ is required; TypeScript consumers need TypeScript 7+ with DOM types; Wasm initialization uses SIMD and DecompressionStream gzip. WebGPU uses HTTPS/localhost; basic scenes fall back to WebGL2. GPU particles, sections and creative rendering require WebGPU; solid caps also require depth32float-stencil8 support; CPU machinery/CAD/annotations work with either backend. Packages are private, version 0.1.0 and UNLICENSED.
+Node.js 22.12+ or 24+ is required; TypeScript consumers need TypeScript 7+ with DOM types; Wasm initialization uses SIMD and DecompressionStream gzip. WebGPU uses HTTPS/localhost; basic scenes fall back to WebGL2. GPU particles, sections and creative rendering require WebGPU; solid caps also require depth32float-stencil8 support; CPU machinery/CAD/annotations work with either backend. The five libraries are version 0.1.0, [MIT licensed](LICENSE) and configured for public npm publication. The workspace root and starter apps remain private; packages have not been published to npm.
+
+`npm run build:packages` uses the checked-in Wasm, emits ESM and TypeScript declarations, removes stale distribution files, copies the root license into each package and enforces the existing size/isolation budgets. Each library's `prepack` hook runs that same workspace build before `npm pack` or `npm publish`. Tarballs contain only built files, package metadata, a package README and the MIT license. To try a local package before publication, install its tarball from `test-results/`; optional packs require the matching core tarball. Existing `modern:*` commands remain available, including `modern:build` for rebuilding the Rust kernel.
 
 Import the scoped packages listed above. Native STEP/IGES solids and heavier renderer/physics features remain deferred; implemented domain features and their limits are documented in MODERN-ENGINE.md. The public repository contains the modern modular engine; the earlier renderer and recovery archives are excluded.
 
