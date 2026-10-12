@@ -5,10 +5,14 @@ test('retained reflection lights track actual sun and moon directions through du
  const sky=new Sky({hours:17.9,timeScale:0,lighting:{intensity:6,color:[1,0.8,0.54],moon:{intensity:0.6,color:[0.25,0.45,0.75]}}});h.engine.use(sky);
  const lights=sky.lights;h.frame();
  assert.ok(Math.hypot(...sky.sun.map((v,i)=>v-h.engine.lighting.direction[i]))>0.1,'Dusk exercises the former blended-direction drift');
- for(const hours of [12,17.7,17.9,18,18.3,21,0,5.9,6.1]){
+ for(const hours of [12,17+49/60,17.7,17.9,18,18.1,18.3,21,0,5.9,6.1]){
   sky.options.hours=hours;h.frame();assert.equal(sky.lights,lights);
   assert.deepEqual(lights[0].direction.slice(0,3),sky.sun);assert.deepEqual(lights[1].direction.slice(0,3),sky.moon);
-  assert.equal(lights[0].direction[3],Math.fround(Math.max(0,sky.sun[1])*6));assert.ok(Math.abs(lights[1].direction[3]-sky.nightFactor*0.6)<1e-6);
+  assert.equal(lights[0].direction[3],Math.fround(Math.max(0,sky.sun[1])*6));
+  const values=new Float32Array(h.resources.find(r=>!r.destroyed&&r.size===160).data);assert.equal(lights[1].direction[3],values[31],'Moon disc, environment and direct glints share one strength');
+  if(sky.sun[1]>=0)assert.equal(lights[1].direction[3],0,'No moon reflection before sunset');
+  else if(sky.sun[1]<=-0.12)assert.equal(lights[1].direction[3],Math.fround(0.6));
+  else assert.ok(lights[1].direction[3]>0&&lights[1].direction[3]<0.6);
   const before=lights.map(l=>l.direction.slice());for(let i=0;i<20;i++)h.frame();lights.forEach((l,i)=>assert.deepEqual(l.direction,before[i]));
  }
  sky.onDeviceRestored(h.engine);h.frame();assert.equal(sky.lights,lights);assert.deepEqual(lights[0].direction.slice(0,3),sky.sun);
@@ -19,6 +23,31 @@ test('clock and sky models reuse four-order scattering tables until turbidity ch
  const h=optionalGPU(),effect=new Sky({model:'bruneton',hours:12,timeScale:1}),frame=h.frame;h.engine.use(effect);frame();assert.equal(h.counts.compute,11);const reflection=effect.reflectionTexture;assert.ok(reflection);assert.ok(Math.abs(effect.options.hours-12.1)<1e-8);frame();assert.equal(h.counts.compute,12);assert.equal(effect.reflectionTexture,reflection);effect.options.turbidity=3;frame();assert.equal(h.counts.compute,24);
  effect.options.model='preetham';frame();assert.ok([...sunDirection(12)].every(Number.isFinite));assert.ok(Math.abs(sunDirection(6)[1])<1e-6);assert.ok(sunDirection(0)[1]<-0.99);assert.throws(()=>new Sky({turbidity:0}),/options/);
  effect.onDeviceRestored(h.engine);frame();effect.dispose();assert.ok(h.resources.every(r=>r.destroyed));
+});
+
+test('optional sunset tint follows elevation in both scene lighting and water light records',()=>{
+ const h=optionalGPU();h.engine.lighting={direction:new Float32Array(4),radiance:new Float32Array(4)};
+ const sky=new Sky({hours:12,timeScale:0,lighting:{intensity:6,color:[1,0.97,0.92],sunset:[1,0.69,0.36]}});h.engine.use(sky);
+ h.frame();assert.deepEqual([...sky.lights[0].radiance],[1,0.97,0.92].map(Math.fround));assert.deepEqual(h.engine.lighting.radiance.slice(0,3),sky.lights[0].radiance);
+ sky.options.hours=17.9;h.frame();assert.deepEqual([...sky.lights[0].radiance],[1,0.69,0.36].map(Math.fround));assert.deepEqual(h.engine.lighting.radiance.slice(0,3),sky.lights[0].radiance);
+ sky.options.hours=6.1;h.frame();assert.deepEqual([...sky.lights[0].radiance],[1,0.69,0.36].map(Math.fround));sky.dispose();
+ for(const sunset of [[-1,0,0],[1,NaN,1],[1,1]])assert.throws(()=>new Sky({lighting:{sunset}}),/Sky|sky/);
+});
+
+test('distance fog borrows scene depth, caches resources and rebinds after resize/restoration',()=>{
+ const h=optionalGPU();let depth;
+ const create=(samples=1)=>Object.assign(h.engine.gpu.createTexture({size:[128,96],format:'depth32float',sampleCount:samples,usage:GPUTextureUsage.TEXTURE_BINDING}),{depthOrArrayLayers:1});
+ const sky=new Sky({fog:{depth:()=>depth,density:0.008,start:45}});h.engine.use(sky);h.frame();
+ const before={...h.counts};depth=create();h.frame();assert.equal(h.counts.render,before.render+2);
+ const fog=()=>h.pipelines.findLast(p=>p.fragment?.entryPoint==='fogFragment');assert.match(fog().fragment.module.code,/if\(d<=0.0\)\{discard;/);
+ assert.equal(fog().fragment.targets[0].blend.color.dstFactor,'one-minus-src-alpha');
+ const cached={...h.counts};for(let i=0;i<20;i++)h.frame();assert.equal(h.counts.groups,cached.groups);assert.equal(h.counts.textures,cached.textures);assert.equal(h.counts.buffers,cached.buffers);
+ const old=depth;depth=create(4);h.frame();assert.match(fog().fragment.module.code,/texture_depth_multisampled_2d/);assert.match(fog().fragment.module.code,/@builtin\(sample_index\)/);assert.equal(old.destroyed,false);
+ sky.onDeviceRestored(h.engine);h.frame();assert.ok(h.groups.at(-1).entries.some(e=>e.binding===3&&e.resource.texture===depth));
+ depth.width=64;assert.throws(h.frame,/matching sampleable scene depth/);depth.width=128;
+ sky.options.fog.density=0;const rendered=h.counts.render;h.frame();assert.equal(h.counts.render,rendered+1);
+ sky.dispose();assert.equal(depth.destroyed,false);old.destroy();depth.destroy();assert.ok(h.resources.every(r=>r.destroyed));
+ for(const fog of [null,{}, {depth:0},{depth:()=>undefined,density:-1},{depth:()=>undefined,density:NaN},{depth:()=>undefined,start:Infinity},{depth:()=>undefined,start:-1}])assert.throws(()=>new Sky({fog}),/fog/);
 });
 
 test('moonlight, ambient color and the reflected night sky share a continuous clock and restore',()=>{

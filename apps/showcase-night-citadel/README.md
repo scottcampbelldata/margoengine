@@ -1,32 +1,31 @@
 # Night Citadel
 
-A standalone, asset-free WebGPU showcase of Margo Engine core geometry/camera, creative's `HDRRenderTarget`, and scenery's `SkyMoonPass`. Scenery remains a separate optional package, as in the Vite starter's machinery/scenery toggles. This app uses a custom recorded render loop rather than `Engine.start()` to retain its camera math, uniform staging, descriptors and instanced draw bundles.
+An asset-free WebGPU scenery study using the engine and its optional rendering packages. Core and the stage facade remain unchanged.
+
+The fortress still contains 548 solid instances. `ScatterInstances` groups them into 10 PBR batches, preserving the procedural towers, spires, buttresses, crag and ridges. Its 95 emissive windows now illuminate nearby masonry with `Clustered` point lights instead of additive wash quads. `Shadows` supplies four cascades with PCSS filtering and cached static casters. `Bloom` owns the HDR capture and AgX presentation. `Water` adds Gerstner waves, scene refraction, shoreline foam and moon glints below the crag. `VFX` simulates drifting amber embers on the GPU.
+
+Scenery's `SkyMoonPass` retains the original azimuth, elevation, phase, twinkle and moon glow controls. The app's atmosphere pass composites height-dependent haze over masonry and water, reading the matching 4× or 1× depth texture. Moon direction and phase drive the sky, directional lighting, cascades and water glints together. The opening moon is at azimuth 215° and elevation 24°.
+
+Desktop scenes inherit the engine's **4× MSAA**. Phones inherit its **1× sampling** and canvas DPR cap of 2, with no 4× textures or pipelines. Phone shadows use 512² cascades rather than 1024²; the water grid uses 64 rather than 128 segments; embers use 512 rather than 2,048 particles. The panel shows the active quality setting. It also adds window intensity, wave height, bloom and exposure controls.
+
+The water grid concentrates those segments into a 160 m patch around the crag, with the existing horizon extension covering distant water. This keeps nearby waves resolved on desktop and phone grids. Wave height sets the largest wave train's amplitude in meters; zero flattens its displacement.
+
+Drag, wheel, pinch and keyboard inputs retain the inertial orbit controls. Reset restores the opening view. Auto-orbit and environmental animation respect reduced motion, including changes made while the app is open. Collapse **Direct the night** on small screens. Page exit releases effects, GPU resources and listeners; initialization and device errors appear in an accessible alert.
+
+The 60/120 selector caps submitted frames while preserving the timing deadline across faster or jittery animation callbacks. It renders every available callback on slower clocks. Telemetry reports actual rendered FPS separately from the measured browser callback cadence, and explains when the browser supplies fewer callbacks than the selected target. A 120 FPS target requires sufficient display refresh, browser cadence and GPU throughput; a timer cannot create additional displayed frames.
+
+The custom GPU renderer, single shadow map and ACES presentation have been replaced by the existing engine packages. The app retains camera/timing arrays and render options. Steady frames allocate no additional GPU buffers, textures, bind groups or pipelines after warmup. Resize replaces viewport targets and bind groups, including depth resolve pipelines; scene pipelines and geometry stay retained. WebGPU command wrappers, browser internals, package code and telemetry can allocate JavaScript objects; zero heap allocation is not promised.
 
 From the repository root:
 
 ```sh
 npm ci
-npm run dev
-```
-
-Open Vite's localhost URL. `npm run modern:dev` opens the original starter with its lazy scenery toggle. `npm run modern:build:showcase` builds this app into `dist/`; `npm run build` includes it alongside both starters. WebGPU requires localhost or HTTPS and a supported browser/GPU; initialization and device-loss errors appear in the scene overlay.
-
-The six solid batches contain 548 instances: masonry, octagonal towers, conical spires/shards, curved flying buttresses, a fractured foundation crag, and distant ridges. A seventh batch adds 95 small lantern-wash quads, for 643 instances and 15 total draw calls. Core `Geometry` packs `[px, py, pz, nx, ny, nz]` into 24-byte vertices. Static instance buffers use core's 96-byte matrix/color/material layout. No models, images, fonts, textures or UI libraries are downloaded.
-
-Each frame renders a 2048² moon-aligned depth shadow map, then `SkyMoonPass` followed by moonlit geometry and lantern wash into creative's HDR target, then a fullscreen tone-mapped presentation. All depth clears use zero and all depth comparisons use `greater-equal`. The background triangle does not write depth. Four diffuse bands, cool ambient fill, a restrained Fresnel rim, amber window emissives and height-dependent fog give the fortress its night palette. Lantern wash uses a smooth radial falloff with additive blending and fog attenuation; it tests depth without writing depth or casting shadows. The moon direction is shared directly by sky, lighting and the shadow projection. The opening view places the lunar disc above the keep at azimuth 215° and elevation 24°; free orbit can move it out of view.
-
-Azimuth, elevation, phase, haze, twinkle amplitude and glow update on input events. Stars appear above 15° with a soft elevation fade. Drag, wheel, pinch and keyboard controls use inertial scalar camera state; auto-orbit respects reduced-motion preferences at startup. Collapse **Direct the night** to expose more of the scene on small screens. Resize replaces and destroys the two HDR textures and updates the presentation bind group; pipelines, shadow map, geometry and uniform buffers remain retained. Page exit disposes GPU resources and input/resize listeners.
-
-The animation callback constructs no matrices, vectors, arrays, objects, strings or closures. Uniform arrays, inverse workspace, transform buffers, pass descriptors, command submission array and render bundles are allocated at startup. Telemetry reuses preformatted strings. Input events and resize may allocate. WebGPU creates command encoder/pass/buffer and swapchain-view wrappers during submission, and browser internals can allocate and collect; **total zero heap allocation is not a claim this app can make**.
-
-The 60/120 selector preserves the frame deadline across faster or bursty `requestAnimationFrame` callbacks. Near-native clocks bypass the timing gate, so small VSync jitter cannot skip alternate frames. Long stalls reset the deadline without replaying missed frames. The selector is a cadence target, not a hardware guarantee; actual FPS is shown in the HUD. Display refresh, browser throttling and GPU load can limit it. Pixel ratio is capped at 1.5 and texture dimensions at 4096 to bound fill rate and resize memory.
-
-Scenery reconstructs the view ray at the fullscreen triangle's three vertices and interpolates it across the screen. Lunar angular sine/cosine are computed only when configuration changes. The 160-byte staging array, pipeline and bind group stay retained. These optimizations apply to every `SkyMoonPass` consumer. Core remains unchanged at 19,874 bytes gzip; optional modules have no 20 KiB ceiling.
-
-```sh
-npm test
+npm run modern:dev:showcase
+npm run modern:build:showcase
+node --test tests/modern-frame-timing.test.js tests/modern-night-citadel.test.js
 npm run modern:test:citadel
-npm run modern:bench:sky
 ```
 
-The browser check reads actual HDR/depth pixels to verify lunar phases, synchronized lighting, crisp shadows, haze, twinkle and the 15° star cutoff. It exercises drag, wheel, pinch, keyboard controls, resize, teardown and a 15-second continuous-orbit heap/GC profile including collected allocations. For pacing measurements it disables Chromium's headless compositor frame limiter; those measurements do not establish a physical display's presentation rate. Reports, screenshots, allocation profile and performance trace are saved under `test-results/night-citadel*`.
+The browser check verifies HDR output, lunar and atmosphere controls, actual window lighting, PCSS shadows, twinkle, bloom, exposure, waves and visible embers. A GPU probe of the water vertex shader checks flat, default and maximum wave heights against the actual desktop and phone mesh spacing. It exercises orbit, zoom, keyboard, pinch, reduced motion, resize and resource cleanup. An emulated phone verifies 1× rendering, DPR and layout. An uncapped headless compositor measures the 60/120 pacer; a separate native-clock run verifies that 120 cannot exceed browser cadence. Neither run certifies presentation on a physical 120 Hz monitor. Screenshots and the GPU report are saved under `test-results/night-citadel*`.
+
+No models, textures, images, fonts or UI libraries are downloaded by this scene.

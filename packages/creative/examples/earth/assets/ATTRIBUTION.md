@@ -1,7 +1,7 @@
 # Earth demo textures
 
 The demo serves these files locally; it makes no external texture requests at runtime.
-All maps are equirectangular, 2048 × 1024 pixels. These assets depict static composites,
+The original maps are equirectangular, 2048 × 1024 pixels. These assets depict static composites,
 not live weather or current city-light data.
 
 | File | Creator / source | Changes |
@@ -32,3 +32,10 @@ NASA permits educational/informational graphical simulations under its
 No endorsement by NASA is implied.
 
 The procedural stars contain no external image assets.
+
+Phone views use the five `earth-*-mobile.webp` derivatives, resized to 1024 × 512
+with Lanczos. Day, night and cloud images use WebP quality 85; the normal and
+specular/roughness maps use lossless WebP after resizing. Together they total
+381,276 bytes, compared with 2,275,024 bytes for the original five maps. These
+derivatives retain their respective source credits and licenses above.
+Regenerate them with `node scripts/optimize-demo-assets.js` from the repository root.

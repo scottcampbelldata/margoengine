@@ -27,3 +27,13 @@ export function frameDue(clock, now, targetRate) {
   clock[0] = Math.max(clock[0] + interval, now - interval);
   return true;
 }
+/** Report the measured browser callback cadence separately from the requested render cap. */
+export function frameStatus(targetRate, callbackRate, fps) {
+  if (!callbackRate) return 'Measuring browser cadence…';
+  const rate = Math.round(callbackRate);
+  if (targetRate > callbackRate * 1.15)
+    return `${targetRate} FPS target · browser supplies ~${rate} Hz. Check display refresh and browser power settings.`;
+  if (fps < targetRate * 0.85)
+    return `${targetRate} FPS target · rendering ~${Math.round(fps)} FPS; browser cadence ~${rate} Hz.`;
+  return `${targetRate} FPS target · browser cadence ~${rate} Hz.`;
+}

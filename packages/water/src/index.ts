@@ -191,6 +191,8 @@ export class Water implements EnginePlugin {
  static attach(engine:EngineKernel,options:WaterOptions={}):Water {const effect=new Water(options);engineRuntime(engine).use(effect);return effect;}
  /** Borrowed coastal state; R is water depth in meters. Undefined before simulation or after restoration. */
  get coastalDepthTexture():GPUTexture|undefined {return this.coastal?.states[this.coastal.current];}
+ /** Borrowed scene depth including the water surface; changes on resize/restoration. */
+ get depthTexture():GPUTexture|undefined {return this.surfaceDepth;}
  /** Scales the wave spectrum so its largest configured train has this amplitude in meters. */
  setWaveHeight(height:number):this {
   if(this.disposed||!Number.isFinite(height)||height<0||height>100||!this.maxWaveHeight&&height>0)throw new RangeError('Invalid water wave height');

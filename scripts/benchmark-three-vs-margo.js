@@ -292,7 +292,7 @@ export async function runBenchmark() {
           `| ${r.engine} (${r.backend}) | ${r.entities} | ${r.gzipBytes} | ${r.transferBytes} | ${r.heapDelta} | ${r.minorGCs} / ${r.majorGCs} | ${r.cadence.mean.toFixed(2)} | ${r.cadence.p95.toFixed(2)} | ${r.cadence.p99.toFixed(2)} | ${r.drawMean.toFixed(0)} | ${r.actualCalls.join(" / ")} | ${(r.cadence.duration / 1000).toFixed(2)} |`,
       ),
       "",
-      "Both consume the same 12,014-node hierarchy and cylinder buffers, camera, animation and uncullled geometry. Three uses shared geometry/materials with ordinary Mesh objects; Margo performs its native batching. Three InstancedMesh is a separate optimization and is not evaluated. Lighting and tone mapping differ. This compares WebGPU Margo with WebGL2 Three, not identical render backends.",
+      "Both consume the same 12,014-node hierarchy and cylinder buffers, camera, animation and uncullled geometry. Three uses shared geometry/materials with ordinary Mesh objects; Margo performs its native batching. Three InstancedMesh is a separate optimization and is not evaluated. Both rasterize scene geometry with 4x MSAA; Three resolves through an OutputPass. Lighting and tone mapping differ. This compares WebGPU Margo with WebGL2 Three, not identical render backends.",
       "",
       "Gzip payload and actual transfer come from Resource Timing with cache disabled and gzipped production bundles served by Vite. Heap delta is retained/temporary heap change after a forced baseline GC, not total allocated bytes. GC counts are completed MinorGC/MajorGC trace events. Tracing and draw-call instrumentation add overhead. Software GPU results are validation data, not hardware performance claims.",
       "",

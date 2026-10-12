@@ -1,4 +1,4 @@
-import {boxGeometry, cylinderGeometry, geometryData, mergeGeometries, computeTangents, applyMatrix4, type GeometryData} from '@margoengine/geometry';
+import {boxGeometry, cylinderGeometry, extrudeGeometry, Shape, mergeGeometries, computeTangents, applyMatrix4, type GeometryData} from '@margoengine/geometry';
 
 export type HeightField = (x: number, z: number) => number;
 export const ROOF_PITCH = 35 * Math.PI / 180;
@@ -55,9 +55,11 @@ export function generateCabinMesh(height: HeightField, position: readonly [numbe
   for (const side of [-1, 1]) wall(8, side*3, 0, side*Math.PI/2, [[-1.8,1.85,0.9,1.1,false],[1.8,1.85,0.9,1.1,false]]);
   for (const x of [-3,3]) for (const z of [-4,4]) block(timber,x,1.5,z,0.28,3,0.28);
   const rise = 3 * Math.tan(ROOF_PITCH);
+  // Solid gables meet both siding faces and overlap the roof underside to close oblique sightlines.
+  const peak=3+rise+0.03,base=peak-3.12*Math.tan(ROOF_PITCH);
+  const gable=extrudeGeometry(new Shape([[-3.12,base],[3.12,base],[0,peak]]),{depth:0.22,bevelEnabled:false});
   for (const side of [-1, 1]) {
-    const gable = geometryData([-3,3,side*4, 3,3,side*4, 0,3+rise,side*4], [0,0,side, 0,0,side, 0,0,side], [0,0, 1,0, 0.5,1], side > 0 ? [0,1,2] : [0,2,1]);
-    timber.push(gable);
+    timber.push(placed(gable,0,0,side*4-0.11));
     // Overlapping courses give the roof a shingle silhouette without a texture download.
     for (let row = 0; row < 12; row++) {
       const u = (row+0.5)*3.55/12;
@@ -70,12 +72,17 @@ export function generateCabinMesh(height: HeightField, position: readonly [numbe
   block(timber, 0, -0.04, 0, 5.85, 0.16, 7.85);
   block(stone, 0, -0.34, 0, 6.4, 0.6, 8.4);
   block(timber, 0.9, -0.02, 5, 2.5, 0.2, 2);
+  const porchPitch=Math.PI/18,porchCos=Math.cos(porchPitch);
+  const porchRoofAtBeam=2.73-(5.9-5.05)*Math.tan(porchPitch);
+  // Buried overlaps close the pitched beam joint and the flat post caps without raster cracks.
+  const beamCenter=porchRoofAtBeam-(0.10+0.16)/2/porchCos+0.002;
+  const postTop=beamCenter-0.16/2/porchCos+0.02;
   for (const x of [-0.15,1.95]) {
     const bottom = sample(cx+x,cz+5.9)-floor-0.25;
-    timber.push(placed(cylinderGeometry(0.10,0.13,2.58-bottom,8),x,(2.58+bottom)/2,5.9));
+    timber.push(placed(cylinderGeometry(0.10,0.13,postTop-bottom,8),x,(postTop+bottom)/2,5.9));
   }
-  block(timber,0.9,2.58,5.9,2.5,0.16,0.18);
-  block(slate,0.9,2.73,5.05,2.4/Math.cos(Math.PI/18),0.10,2.9,Math.PI/2,Math.PI/18);
+  block(timber,0.9,beamCenter,5.9,0.18/porchCos,0.16,2.5,Math.PI/2,porchPitch);
+  block(slate,0.9,2.73,5.05,2.4/porchCos,0.10,2.9,Math.PI/2,porchPitch);
   for (let z = -4; z <= 4; z += 1) for (const x of [-3, 3]) {
     const bottom = sample(cx+x, cz+z)-floor-0.45;
     block(stone, x, bottom/2-0.08, z, 0.55, -bottom, 1.02);

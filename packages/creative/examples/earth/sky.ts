@@ -6,13 +6,14 @@ declare const GPUBufferUsage: {UNIFORM: number; COPY_DST: number};
 declare const GPUShaderStage: {VERTEX: number};
 
 export class Stars implements EnginePlugin {
+  enabled = true;
   readonly name = 'earth-demo:stars';
   private buffer?: GPUBuffer;
   private layout?: GPUBindGroupLayout;
   private bindings?: GPUBindGroup;
   private module?: GPUShaderModule;
   private depthFormat?: GPUTextureFormat;
-  private readonly pipelines = new Map<GPUTextureFormat, GPURenderPipeline>();
+  private readonly pipelines = new Map<string, GPURenderPipeline>();
   private readonly data = new Float32Array(20);
   private readonly inverse = new Float32Array(16);
   private readonly workspace = new Float64Array(52);
@@ -37,7 +38,7 @@ export class Stars implements EnginePlugin {
   }
 
   private readonly execute = (context: PassContext): void => {
-    if (context.backend !== 'webgpu') return;
+    if (context.backend !== 'webgpu' || !this.enabled) return;
     if (!invert(this.inverse, context.camera.matrix, 0, this.workspace)) throw new Error('Invalid starfield camera');
     let pipeline = this.pipelines.get(context.format+':'+context.descriptor.multisample?.count);
     if (!pipeline) {

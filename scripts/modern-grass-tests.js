@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import {writeFile} from 'node:fs/promises';
 import {openBrowser} from './browser.js';
+import {build} from 'vite';
+
+await build({configFile:false,logLevel:'silent',build:{write:false,target:'es2022',rollupOptions:{input:'examples/windy-meadow.html'}}});
 
 const browser=await openBrowser(),errors=[];
 browser.page.on('pageerror',error=>errors.push(error.message));
-browser.page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
+browser.page.on('console',message=>{if(message.type()==='error'||/Error while parsing|Invalid .*Pipeline|ValidationError/.test(message.text()))errors.push(message.text());});
 try {
   const result=await browser.page.evaluate(async()=>{
     const {GrassField,PostProcessing}=await import('/packages/creative/dist/index.js');
@@ -45,7 +48,8 @@ try {
     GPUCommandEncoder.prototype.beginRenderPass=function(descriptor){descriptors.push(descriptor);return begin.call(this,descriptor);};
     try {for(let i=0;i<5;i++){field.windSpeed=i*0.3;engine.render({delta:0.1});await device.queue.onSubmittedWorkDone();}}
     finally {for(let i=0;i<names.length;i++)device[names[i]]=originals[i];GPUCommandEncoder.prototype.beginRenderPass=begin;}
-    assert(allocations===0&&descriptors.length===15&&descriptors.every((d,i)=>d===descriptors[i%3]),'Steady frames created resources or descriptors');
+    const grassDescriptors=descriptors.filter(d=>d===field.pass||d===field.sporePass);
+    assert(allocations===0&&grassDescriptors.length===10,'Steady grass frames created resources or replaced their pass descriptors');
     const picked=await engine.pick(160,120);assert(picked!==null,'Grass broke core mesh picking');
 
     const renderSource=modules.find(record=>record.label==='grass:render').code;
@@ -75,7 +79,7 @@ try {
       field.windTime=time;engine.camera.update(1,true);
       const encoder=device.createCommandEncoder(),colorView=color.createView(),depthView=depth.createView();
       const clear=encoder.beginRenderPass({colorAttachments:[{view:colorView,loadOp:'clear',storeOp:'store',clearValue:[0,0,0,1]}],depthStencilAttachment:{view:depthView,depthLoadOp:'clear',depthStoreOp:'store',depthClearValue:clearDepth,stencilReadOnly:true}});clear.end();
-      const context={backend:'webgpu',device,encoder,camera:engine.camera,delta:0,format,color:colorView,depth:depthView};
+      const context={backend:'webgpu',device,encoder,camera:engine.camera,delta:0,format,color:colorView,depth:depthView,descriptor:{multisample:{count:1}}};
       field.update(context);field.draw(context);if(spores)field.drawSpores(context);
       encoder.copyTextureToBuffer({texture:color},{buffer:pixels,bytesPerRow:size*4},[size,size]);device.queue.submit([encoder.finish()]);await pixels.mapAsync(GPUMapMode.READ);
       const data=new Uint8Array(pixels.getMappedRange()).slice();pixels.unmap();return data;
@@ -135,19 +139,96 @@ try {
     const teardownValidation=await engine.gpu.popErrorScope();assert(!teardownValidation,'GPU teardown validation failed: '+teardownValidation?.message);engine.dispose();
     return {potential:field.blades,near:visible[1],far:visible[5],outside:[outside[1],outside[5]],greenPixels:green,windChangedPixels:windChanged,sporeChangedPixels:sporeChanged,nonFiniteHDRPixels,performance,diagnostics,steadyFrameResourceAllocations:allocations,postDestroyGrassDispatches,checks:['non-workgroup-multiple blade count','six-plane and distance culling','two LOD lists without duplicates','poisoned GPU counter reset','portable indirect commands','pinned roots, retained segment lengths and unit curved normals','grass, wind, spore and depth pixel readback','captured grass/bloom regression frame','Stage integration and mesh picking','HDR, resize, device restoration and destruction during ongoing animation']};
   });
-  await browser.page.goto('http://127.0.0.1:5193/examples/windy-meadow.html');
-  await browser.page.getByRole('status').filter({hasText:'100,000 blades'}).waitFor();
-  await browser.page.getByRole('button',{name:'Pause motion'}).click();
-  await browser.page.locator('#speed').fill('2.1');await browser.page.locator('#strength').fill('0.6');
-  assert.equal(await browser.page.locator('#speed-value').textContent(),'2.1');
-  await browser.page.screenshot({path:'test-results/modern-windy-meadow.png'});
-  await browser.page.emulateMedia({reducedMotion:'reduce'});await browser.page.reload();
-  await browser.page.getByRole('button',{name:'Resume motion'}).waitFor();
-  assert.equal(await browser.page.getByRole('button',{name:'Resume motion'}).getAttribute('aria-pressed'),'true');
-  const before=await browser.page.locator('canvas').screenshot();
-  await browser.page.locator('canvas').focus();await browser.page.keyboard.press('ArrowLeft');await browser.page.keyboard.press('+');
-  const after=await browser.page.locator('canvas').screenshot();assert.notDeepEqual(before,after,'Keyboard navigation did not render while motion was paused');
-  assert.equal(await browser.page.locator('#error').textContent(),'');
+  const instrument=()=>{
+    window.meadowAudit={live:new Set(),textures:[],samples:[],boundSamples:new Set(),created:0,frames:0,grass:[]};
+    const pipelines=new WeakMap();
+    for(const name of ['createBuffer','createTexture','createRenderPipeline','createBindGroup']){
+      const original=GPUDevice.prototype[name];
+      GPUDevice.prototype[name]=function(desc){
+        const audit=window.meadowAudit,result=original.call(this,desc);audit.created++;
+        if(name==='createRenderPipeline'){const samples=desc.multisample?.count??1;pipelines.set(result,samples);audit.samples.push(samples);}
+        if(name==='createTexture')audit.textures.push(desc.sampleCount??1);
+        if(name==='createBuffer'||name==='createTexture'){audit.live.add(result);const destroy=result.destroy.bind(result);result.destroy=()=>{audit.live.delete(result);destroy();};}
+        return result;
+      };
+    }
+    const set=GPURenderPassEncoder.prototype.setPipeline;
+    GPURenderPassEncoder.prototype.setPipeline=function(pipeline){window.meadowAudit.boundSamples.add(pipelines.get(pipeline));return set.call(this,pipeline);};
+    const write=GPUQueue.prototype.writeBuffer;
+    GPUQueue.prototype.writeBuffer=function(buffer,offset,data,...rest){if(buffer.label==='grass:frame'){window.meadowAudit.grass=Array.from(data);window.meadowAudit.frames++;}return write.call(this,buffer,offset,data,...rest);};
+  };
+  const {page}=browser;
+  await page.addInitScript(instrument);await page.setViewportSize({width:1280,height:800});
+  await page.goto('http://127.0.0.1:5193/examples/windy-meadow.html');
+  await page.locator('#viewport[data-ready=true]').waitFor();
+  await page.waitForFunction(()=>meadowAudit.frames>5);
+  assert(await page.evaluate(()=>meadowAudit.textures.includes(4)&&meadowAudit.boundSamples.has(4)),'Desktop did not draw with 4× MSAA');
+  assert.equal(await page.locator('#density').inputValue(),'100000');
+  await page.getByRole('button',{name:'Pause motion'}).click();
+  const initial=await page.evaluate(()=>({time:meadowAudit.grass[59],camera:meadowAudit.grass.slice(40,43),live:meadowAudit.live.size}));
+  await page.locator('#speed').fill('2.1');await page.locator('#strength').fill('0.6');
+  assert.equal(await page.locator('#speed-value').textContent(),'2.1');
+  const image=()=>page.evaluate(()=>document.querySelector('canvas').toDataURL());
+  const day=await image();await page.locator('#hours').fill('22');
+  assert.notDeepEqual(day,await image(),'Day/night lighting did not change');
+  await page.locator('#hours').fill('17.5');assert.equal(await page.locator('#hours-value').textContent(),'17:30');
+  await page.locator('#hours').fill('16');
+  for(const [id,value] of [['clouds','0'],['bloom','1'],['exposure','1']]){
+    const previous=await page.locator('#'+id).inputValue(),before=await image();
+    await page.locator('#'+id).fill(value);assert.notDeepEqual(before,await image(),id+' did not change the rendered scene');
+    await page.locator('#'+id).fill(previous);
+  }
+  const withSeeds=await image();await page.locator('#seeds').uncheck();
+  assert.notDeepEqual(withSeeds,await image(),'Seed toggle did not change the rendered scene');
+  assert(!(await page.locator('#status').textContent()).includes('240 seeds'));
+  for(const count of ['35000','200000','100000']){
+    await page.locator('#density').selectOption(count);
+    assert.equal(await page.evaluate(()=>meadowAudit.grass[61]),Number(count));
+    assert.equal(await page.evaluate(()=>meadowAudit.live.size),initial.live,'Density changes leaked GPU resources');
+  }
+  await page.locator('#seeds').check();
+  const settings=await page.evaluate(()=>meadowAudit.grass);
+  assert(Math.abs(settings[54]-2.1)<1e-6&&Math.abs(settings[55]-0.6)<1e-6&&settings[59]===initial.time&&settings[62]===1,'Density/seed changes lost wind settings, paused time or linear HDR');
+  const before=await image();await page.locator('canvas').focus();await page.keyboard.press('ArrowLeft');await page.keyboard.press('+');
+  assert.notDeepEqual(before,await image(),'Keyboard navigation did not render while motion was paused');
+  await page.locator('#reset-view').click();
+  assert.deepEqual(await page.evaluate(()=>meadowAudit.grass.slice(40,43)),initial.camera);
+  const paused=await page.evaluate(()=>({frames:meadowAudit.frames,created:meadowAudit.created}));
+  await page.waitForTimeout(200);
+  assert.equal(await page.evaluate(()=>meadowAudit.frames),paused.frames,'Paused meadow kept rendering');
+  await page.locator('#pause').click();await page.waitForFunction(time=>meadowAudit.grass[59]>time,initial.time);
+  await page.locator('#pause').click();
+  assert.equal(await page.evaluate(()=>meadowAudit.created),paused.created,'Steady frames allocated GPU resources');
+  await page.locator('#speed').fill('1.2');await page.locator('#strength').fill('0.45');
+  await page.evaluate(()=>{document.getElementById('settings').scrollTop=0;});
+  await page.screenshot({path:'test-results/modern-windy-meadow.png'});
+  await page.emulateMedia({reducedMotion:'reduce'});await page.reload();await page.locator('#viewport[data-ready=true]').waitFor();
+  assert.equal(await page.getByRole('button',{name:'Resume motion'}).getAttribute('aria-pressed'),'true');
+  assert.equal(await page.evaluate(()=>meadowAudit.grass[59]),0);
+  await page.evaluate(()=>dispatchEvent(new PageTransitionEvent('pagehide')));
+  assert.equal(await page.evaluate(()=>meadowAudit.live.size),0,'Desktop teardown leaked GPU resources');
+
+  const mobileContext=await page.context().browser().newContext({viewport:{width:390,height:844},deviceScaleFactor:3,isMobile:true,hasTouch:true,userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1',reducedMotion:'reduce'});
+  try{
+    await mobileContext.addInitScript(instrument);const mobile=await mobileContext.newPage();
+    mobile.on('pageerror',e=>errors.push(e.message));mobile.on('console',m=>{if(m.type()==='error'||/ValidationError|Invalid .*Pipeline/.test(m.text()))errors.push(m.text());});
+    await mobile.goto('http://127.0.0.1:5193/examples/windy-meadow.html');await mobile.locator('#viewport[data-ready=true]').waitFor();
+    const quality=await mobile.evaluate(()=>({textures:meadowAudit.textures,samples:meadowAudit.samples,blades:meadowAudit.grass[61],open:document.getElementById('settings').open,dpr:document.querySelector('canvas').width/innerWidth,overflow:document.documentElement.scrollWidth>innerWidth,panel:document.querySelector('aside').getBoundingClientRect().height}));
+    assert.equal(quality.blades,35000);assert(!quality.open&&!quality.overflow&&quality.panel<844/2);
+    assert(!quality.textures.includes(4)&&!quality.samples.includes(4));assert.equal(quality.dpr,2);
+    await mobile.getByText('Shape the meadow',{exact:true}).click();await mobile.locator('#density').selectOption('100000');
+    assert.equal(await mobile.evaluate(()=>meadowAudit.grass[61]),100000);
+    await mobile.locator('#density').selectOption('35000');
+    await mobile.getByText('Shape the meadow',{exact:true}).click();await mobile.screenshot({path:'test-results/modern-windy-meadow-mobile.png'});
+    const before=await mobile.evaluate(()=>document.querySelector('canvas').toDataURL()),cdp=await mobileContext.newCDPSession(mobile);
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:125,y:600},{x:255,y:600}]});
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:95,y:600},{x:285,y:600}]});
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    assert.notEqual(before,await mobile.evaluate(()=>document.querySelector('canvas').toDataURL()),'Pinch did not render while paused');
+    await mobile.evaluate(()=>dispatchEvent(new PageTransitionEvent('pagehide')));assert.equal(await mobile.evaluate(()=>meadowAudit.live.size),0);
+    result.demo={desktopSamples:4,mobile:quality,checks:['day/night, clouds, bloom, exposure and seeds change pixels','wind settings and time survive density changes','paused keyboard/pinch and reset','reduced motion stops animation','zero steady GPU allocations and clean teardown']};
+  }finally{await mobileContext.close();}
+  assert.equal(await page.locator('#error').textContent(),'');
   assert.deepEqual(errors,[]);
   const output={hardware:browser.hardware,...result};
   await writeFile('test-results/modern-grass.json',JSON.stringify(output,null,2));console.log(JSON.stringify(output,null,2));

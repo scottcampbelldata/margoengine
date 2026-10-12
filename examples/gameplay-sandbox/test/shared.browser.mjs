@@ -13,7 +13,8 @@ const browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL??'msedg
 const page=await browser.newPage({viewport:{width:1280,height:800}}),errors=[],report={checks:[],errors};
 page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 const population=(target=page)=>target.evaluate(async()=>{
- const app=window.sandbox,device=app.engine.gpu,state=app.particles.gpuState;
+ const app=window.sandbox;if(!app.particles)return 0;
+ const device=app.engine.gpu,state=app.particles.gpuState;
  const buffer=device.createBuffer({size:20,usage:GPUBufferUsage.MAP_READ|GPUBufferUsage.COPY_DST}),encoder=device.createCommandEncoder();
  encoder.copyBufferToBuffer(state.indirect,0,buffer,0,20);device.queue.submit([encoder.finish()]);await buffer.mapAsync(GPUMapMode.READ);
  const count=new Uint32Array(buffer.getMappedRange())[1];buffer.unmap();buffer.destroy();return count;
@@ -56,8 +57,10 @@ try{
   report.mobile=await mobile.evaluate(()=>{const canvas=document.querySelector('canvas'),audit=window.msaaAudit;return {css:[canvas.clientWidth,canvas.clientHeight],buffer:[canvas.width,canvas.height],dpr:devicePixelRatio,effectiveDpr:canvas.width/canvas.clientWidth,multisampledTextures:audit.textures.filter(n=>n!==1).length,multisampledPipelines:audit.pipelines.filter(n=>n!==1).length,resolves:audit.passes.flat().filter(a=>a?.resolve).length,discardedColors:audit.passes.flat().filter(a=>a?.store!=='store').length};});
   assert.equal(report.mobile.dpr,3);assert.equal(report.mobile.effectiveDpr,2);assert.deepEqual(report.mobile.buffer,report.mobile.css.map(n=>n*2));
   for(const key of ['multisampledTextures','multisampledPipelines','resolves','discardedColors'])assert.equal(report.mobile[key],0,key);
+  assert.equal(await mobile.locator('#particles').inputValue(),'100000');
+  assert.equal(await population(mobile),100_000,'Phone starts with the lighter particle tier');
   report.checks.push('iPhone UA at DPR 3 uses DPR 2 buffers, only 1x textures/pipelines, stored color and zero resolves');
-  for(const count of [100_000,500_000,1_000_000]){
+  for(const count of [0,100_000,500_000,1_000_000]){
    await mobile.locator('#particles').selectOption(String(count));
    await mobile.evaluate(()=>window.sandbox.engine.gpu.queue.onSubmittedWorkDone());assert.equal(await population(mobile),count);
   }
@@ -81,6 +84,25 @@ try{
  report.hardware=await page.evaluate(async()=>{const a=await navigator.gpu.requestAdapter();return {description:a.info.description,vendor:a.info.vendor,fallback:a.info.isFallbackAdapter};});
  assert.equal(report.hardware.fallback,false);
  assert.equal(await population(),1_000_000);report.checks.push('Initial particle population: 1,000,000');
+ const off=await page.locator('#particles').evaluate(select=>{
+  const app=window.sandbox,previous=app.particles,state=previous.gpuState,destroy=GPUBuffer.prototype.destroy;
+  let released=0;
+  GPUBuffer.prototype.destroy=function(){if(this===state.particles||this===state.indirect)released++;return destroy.call(this);};
+  try{
+   select.value='0';select.dispatchEvent(new Event('change',{bubbles:true}));
+   app.engine.render({delta:0});
+   return {detached:!app.engine.hasPlugin(previous.name),off:app.particles===undefined,released};
+  }finally{GPUBuffer.prototype.destroy=destroy;}
+ });
+ assert.deepEqual(off,{detached:true,off:true,released:2});assert.equal(await population(),0);
+ await page.evaluate(async()=>{const app=window.sandbox;await app.engine.rebootDevice();app.engine.render({delta:0});await app.engine.gpu.queue.onSubmittedWorkDone();});
+ assert.equal(await population(),0,'Device restoration re-enabled disabled particles');
+ await page.locator('#particles').selectOption('100000');assert.equal(await population(),100_000);
+ await page.locator('#particles').selectOption('1000000');assert.equal(await population(),1_000_000);
+ report.checks.push('Off removes particle passes and GPU buffers, survives restoration, and allows particles to be re-enabled');
+ assert.ok(Math.abs(await page.evaluate(()=>window.sandbox.sky.options.hours)-17.57)<1e-8);
+ await page.waitForFunction(()=>document.getElementById('sun-value').value==='17:34');
+ await page.screenshot({path:resolve(output,'golden-hour.png')});report.checks.push('Initial shared lighting and atmosphere open at 17:34 golden hour');
  const visibleMoon=await page.evaluate(async()=>{
   const app=window.sandbox;app.sky.options.hours=0;app.sky.options.timeScale=0;app.engine.render({delta:0});await app.engine.gpu.queue.onSubmittedWorkDone();
   const c=app.engine.camera,m=c.matrix,p=Array.from(c.position,(v,i)=>v+app.sky.moon[i]*50);
@@ -116,16 +138,17 @@ try{
  report.clock=clock;report.checks.push('Paused full-day slider reaches midnight and 23:59, labels sun/moon, and fades shared emission/local lights together');
  const lighting=await page.evaluate(async()=>{
   const app=window.sandbox,result=[];app.engine.stop();app.sky.options.timeScale=0;
-  for(const hours of [12,17.9,18+28/60,21,0,6]){app.sky.options.hours=hours;app.engine.render({delta:0});await app.engine.gpu.queue.onSubmittedWorkDone();result.push({hours,sun:Array.from(app.sky.sun),moon:Array.from(app.sky.moon),light:Array.from(app.engine.lighting.direction),radiance:Array.from(app.engine.lighting.radiance),waterLights:Array.from(app.water.values.slice(112))});}
-  app.sky.options.hours=17.5;app.engine.render({delta:0});return result;
+  for(const hours of [12,17+49/60,17.9,18,18.2,18+28/60,21,0,6]){app.sky.options.hours=hours;app.engine.render({delta:0});await app.engine.gpu.queue.onSubmittedWorkDone();result.push({hours,sun:Array.from(app.sky.sun),moon:Array.from(app.sky.moon),light:Array.from(app.engine.lighting.direction),radiance:Array.from(app.engine.lighting.radiance),waterLights:Array.from(app.water.values.slice(112)),moonStrength:app.sky.values[31]});}
+  app.sky.options.hours=17.57;app.engine.render({delta:0});return result;
  });
  for(const x of lighting){
   if(x.hours===12){assert.deepEqual(x.light.slice(0,3),x.sun);assert.equal(x.light[3],6);}
-  else {assert.ok(x.light[1]>(x.hours===17.9?0:0.15));assert.ok(x.light[3]>0);}
+  else {assert.ok(x.light[1]>(x.hours<18?0:0.15));assert.ok(x.light[3]>0);}
   for(let i=0;i<3;i++){assert.ok(Math.abs(x.waterLights[i]-x.sun[i])<1e-6);assert.ok(Math.abs(x.waterLights[8+i]-x.moon[i])<1e-6);}
+  assert.equal(x.waterLights[11],x.moonStrength);if(x.sun[1]>=0)assert.equal(x.moonStrength,0,'No moon disc or reflection while the sun is above the horizon');
   if(x.hours===0||x.hours===21){assert.deepEqual(x.light.slice(0,3),x.moon);assert.ok(Math.abs(x.light[3]-0.6)<1e-6);assert.deepEqual(x.radiance.slice(0,3),[0.25,0.45,0.75].map(Math.fround));assert.equal(x.radiance[3],Math.fround(0.09));}
  }
- report.lighting=lighting;report.checks.push('Sun/moon water glints keep separate celestial directions through dusk while PCSS retains its blended light');
+ report.lighting=lighting;report.checks.push('Separate sun/moon glints share disc strength and stay off before sunset while PCSS retains its twilight blend');
  const moonCascades=await page.evaluate(async()=>{
   const app=window.sandbox,draw=app.procedural.drawShadow,cascades=[0,0,0,0];
   app.procedural.drawShadow=function(context){cascades[context.cascade]++;return draw.call(this,context);};
@@ -157,8 +180,8 @@ try{
  report.checks.push('Day/night cabin light switching survives device restoration');
  await page.screenshot({path:resolve(output,'night-restored.png')});
  assert.equal(await finiteScene(),0,'Restored HDR contains NaN or infinity');
- await page.evaluate(async()=>{const app=window.sandbox;app.sky.options.hours=17.5;app.engine.render({delta:0});await app.engine.gpu.queue.onSubmittedWorkDone();});
- await page.waitForFunction(()=>document.getElementById('sun-value').value==='17:30');
+ await page.evaluate(async()=>{const app=window.sandbox;app.sky.options.hours=17.57;app.engine.render({delta:0});await app.engine.gpu.queue.onSubmittedWorkDone();});
+ await page.waitForFunction(()=>document.getElementById('sun-value').value==='17:34');
  await page.screenshot({path:resolve(output,'scene.png')});
  await page.evaluate(()=>{const app=window.sandbox;app.camera.dispose();app.sky.options.hours=18.1;document.getElementById('particles').value='100000';document.getElementById('particles').dispatchEvent(new Event('change'));});
  await page.waitForFunction(()=>document.getElementById('sun-value').value==='18:06');
@@ -191,6 +214,32 @@ try{
   assert.equal(await finiteScene(),0,`${name} cabin HDR contains NaN or infinity`);
  }
  report.checks.push('Closed cabin seams and ambient-only occlusion render in day/night with detail wind and restored shadows');
+ const fogSamples=await page.evaluate(async()=>{
+  const app=window.sandbox,d=app.engine.gpu,fog=app.sky.options.fog,density=fog.density;
+  app.engine.camera.position=[-12,8,31];app.engine.camera.target=[-12,1,52];
+  const texture=app.engine.plugins.get('bloom').sceneTexture,ys=[140,170,220,400],result=[];
+  const half=n=>{const exponent=(n>>10)&31,mantissa=n&1023;return (n&32768?-1:1)*(exponent?(1+mantissa/1024)*2**(exponent-15):mantissa*2**-24);};
+  try{for(const hours of [12,17.57,0]){
+   app.sky.options.hours=hours;const samples=[];
+   for(const amount of [0,density,1]){
+    fog.density=amount;app.engine.render({delta:0});
+    const buffer=d.createBuffer({size:ys.length*256,usage:GPUBufferUsage.MAP_READ|GPUBufferUsage.COPY_DST}),encoder=d.createCommandEncoder();
+    try{ys.forEach((y,i)=>encoder.copyTextureToBuffer({texture,origin:[680,y]},{buffer,offset:i*256,bytesPerRow:256},[1,1]));d.queue.submit([encoder.finish()]);await buffer.mapAsync(GPUMapMode.READ);const bits=new Uint16Array(buffer.getMappedRange());samples.push(ys.map((_,i)=>Array.from(bits.slice(i*128,i*128+3),half)));buffer.unmap();}finally{buffer.destroy();}
+   }
+   result.push({hours,samples});
+  }}finally{fog.density=density;app.engine.render({delta:0});}
+  return result;
+ });
+ report.fog=fogSamples;
+ for(const {samples:[clear,haze,opaque]} of fogSamples){
+  for(const i of [0,3])assert.deepEqual(haze[i],clear[i],'Fog must preserve the clear sky and nearby shore');
+  const change=clear[1].reduce((sum,v,k)=>sum+Math.abs(v-opaque[1][k]),0);assert.ok(change>0.001,'Probe must see a distinct distant water colour');
+  const error=haze[1].reduce((sum,v,k)=>sum+Math.abs(v-opaque[1][k]),0);assert.ok(error/change<0.025,'Distant water must converge to sky radiance');
+  const delta=opaque[2].map((v,k)=>v-clear[2][k]),factor=delta.reduce((sum,v,k)=>sum+v*(haze[2][k]-clear[2][k]),0)/delta.reduce((sum,v)=>sum+v*v,0);
+  assert.ok(factor>0.1&&factor<0.4,'Mid-distance haze must remain a partial blend as waves move');
+  for(let k=0;k<3;k++)assert.ok(Math.abs(haze[2][k]-(clear[2][k]+delta[k]*factor))<0.003,'Mid-distance haze must blend smoothly in linear HDR');
+ }
+ report.checks.push('Day/golden/night GPU fog preserves nearby shores and sky, blends HDR smoothly and fades distant water into sky radiance');
  assert.deepEqual(errors,[]);report.checks.push('All four offshore views render coastal blending and the ocean horizon at 100k particles');
  report.checks.push('Terrain/PBR/shadow shaders render without WebGPU errors');console.log(JSON.stringify(report));
 }finally{

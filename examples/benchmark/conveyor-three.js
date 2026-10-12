@@ -1,6 +1,7 @@
 import {
   Scene,
   WebGLRenderer,
+  WebGLRenderTarget,
   PerspectiveCamera,
   Mesh,
   Object3D,
@@ -11,8 +12,12 @@ import {
   DirectionalLight,
   AmbientLight,
 } from "three";
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
 import { conveyorScene } from "./conveyor-scene.js";
 import { installBenchmark } from "./frame-runner.js";
+import {sceneSamples} from '../../packages/shared/quality.js';
 try {
   const definition = conveyorScene(),
     canvas = document.querySelector("canvas"),
@@ -57,6 +62,9 @@ try {
   const sun = new DirectionalLight(0xffffff, 1);
   sun.position.set(3, 5, 4);
   scene.add(sun, new AmbientLight(0xffffff, 0.15));
+  const samples=sceneSamples(),composer=new EffectComposer(renderer,new WebGLRenderTarget(innerWidth,innerHeight,{samples:samples===4?4:0}));
+  composer.addPass(new RenderPass(scene,camera));composer.addPass(new OutputPass());
+  renderer.info.autoReset=false;
   let angle = 0;
   installBenchmark(
     (delta, counts, offset) => {
@@ -64,12 +72,13 @@ try {
       nodes[definition.motor].rotation.z = angle;
       for (let i = 0; i < definition.shafts.length; i++)
         nodes[definition.shafts[i]].rotation.z = angle;
-      renderer.render(scene, camera);
+      renderer.info.reset();composer.render();
       counts[offset] = renderer.info.render.calls;
     },
     {
       engine: "Three.js 0.186.1",
       backend: "webgl2",
+      msaaSamples:samples,
       entities: nodes.length,
       renderable: definition.nodes.filter((part) => part.geometry).length,
     },
@@ -79,7 +88,7 @@ try {
     () => {
       for (const geometry of Object.values(geometries)) geometry.dispose();
       for (const material of materials) material.dispose();
-      renderer.dispose();
+      for(const pass of composer.passes)pass.dispose();composer.dispose();renderer.dispose();
     },
     { once: true },
   );

@@ -399,8 +399,10 @@ export class PointsPlugin implements EnginePlugin {
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const gpu = this.gpu!, module = count === 1 ? gpu.edlModule : this.device!.createShaderModule({code:
-        edlShader.replace('texture_2d<f32>', 'texture_multisampled_2d<f32>').replace(/textureLoad\(depths,([pq]),0\)\.r/g, 'depth($1)') +
-        '\nfn depth(p:vec2i)->f32{return (textureLoad(depths,p,0).r+textureLoad(depths,p,1).r+textureLoad(depths,p,2).r+textureLoad(depths,p,3).r)/4;}'});
+        // Compare matching coverage samples; averaging empty samples invents depth steps.
+        edlShader.replace('texture_2d<f32>', 'texture_multisampled_2d<f32>')
+          .replace('position:vec4f)', 'position:vec4f,@builtin(sample_index) sample:u32)')
+          .replace(/textureLoad\(depths,([pq]),0\)/g, 'textureLoad(depths,$1,i32(sample))')});
       pipeline = this.device!.createRenderPipeline({
         layout: count === 1 ? gpu.edlPipelineLayout : 'auto',
         vertex: {module, entryPoint: 'vertex'},

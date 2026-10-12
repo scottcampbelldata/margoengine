@@ -113,7 +113,7 @@ export class Planet implements EnginePlugin {
 
   private async load(signal: AbortSignal): Promise<void> {
     let decodedBytes = 0;
-    for (const [name, url] of this.sources) {
+    const loading = this.sources.map(async ([name, url]) => {
       signal.throwIfAborted();
       const response = await fetch(url, {signal});
       const bytes = await readResponse(response, {maxBytes: 32 * 1024 * 1024, signal, label: `Planet ${name} map`});
@@ -125,6 +125,12 @@ export class Planet implements EnginePlugin {
         if (image.width < 1 || image.height < 1 || image.width > limit || image.height > limit || decodedBytes > 256 * 1024 * 1024) throw new RangeError('Planet maps exceed GPU dimensions or 256 MiB decoded budget');
         this.images[name] = image;
       } catch (error) {image.close(); throw error;}
+    });
+    try {await Promise.all(loading);}
+    catch (error) {
+      this.controller.abort(error);
+      await Promise.allSettled(loading);
+      throw error;
     }
     signal.throwIfAborted(); this.check();
     const device = this.engine!.gpu!;

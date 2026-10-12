@@ -29,16 +29,19 @@ async function boot(): Promise<void> {
   window.addEventListener('pagehide', dispose, {signal});
   if (import.meta.hot) import.meta.hot.dispose(dispose);
   try {
+    const mobile = /Mobi|Android/.test(navigator.userAgent);
     engine.onError = error => {engine.stop(); fail(error);};
     runtime.gpu!.addEventListener('uncapturederror', event => engine.onError((event as GPUUncapturedErrorEvent).error), {signal});
-    const post = Bloom.attach(engine, {strength: 0.25, threshold: 1.2, exposure: 0.65});
-    const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.45}, hours: 17.5, timeScale: 1/120, turbidity: 2.8, exposure: -0.6, lighting: {intensity: 6, color: [1,0.8,0.54], moon: {intensity: 0.6, color: [0.25,0.45,0.75]}, ambient: {day: [0.18,0.18,0.18], night: [0.02,0.04,0.09]}}});
-    const shadows = Shadows.attach(engine, {resolution: 1024, distance: 115, lambda: 0.7, lightSize: 0.018, normalBias: 0.055, casterMargin: 65});
+    const post = Bloom.attach(engine, {strength: 0.2, threshold: 1.2, exposure: 0.45});
+    let water: Water;
+    const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.38}, fog: {depth: () => water?.depthTexture ?? post.depthTexture, density: 0.008, start: 45}, hours: 17.57, timeScale: 1/120, turbidity: 3.2, exposure: -0.35, lighting: {intensity: 6, color: [1,0.97,0.92], sunset: [1,0.69,0.36], moon: {intensity: 0.6, color: [0.25,0.45,0.75]}, ambient: {day: [0.14,0.19,0.24], night: [0.02,0.04,0.09]}}});
+    // Compile the sky and its LUT while the CPU builds the island.
+    engine.render({delta: 0});
+    const shadows = Shadows.attach(engine, {resolution: mobile ? 512 : 1024, distance: 115, lambda: 0.7, lightSize: 0.018, normalBias: 0.055, casterMargin: 65});
     const settlement = createProceduralSettlement(engine, shadows, terrainHeight), procedural = settlement.scatter;
     const lights = Clustered.attach(engine, {grid: [8,4,16]});
     procedural.emissiveIntensity = lights.intensityScale = () => sky.nightFactor;
     lights.setLights([{position: settlement.porchLightPosition, range: 6, color: [1,0.8,0.4], intensity: 18}]);
-    let water: Water;
     const landscape = createLandscape(engine, shadows, settlement.exclusions, () => water?.coastalDepthTexture), character = createCharacter(engine, shadows);
     const state = new Float32Array([-12, terrainHeight(-12, 37), 37, Math.PI, 0, 0.18, 0, 0]);
     const cameraDistance = 14;
@@ -46,14 +49,17 @@ async function boot(): Promise<void> {
     const locomotion: LocomotionOptions = {bounds: [-69,69,-69,69], minHeight: 0.45};
     const position = state.subarray(0, 3), emptyPads: readonly Gamepad[] = [];
     const camera = Cinematic.attach(engine, {offset: [4, 3.5, cameraDistance], damping: 5, lookDamping: 7, ground: terrainHeight, clearance: 0.65}); camera.follow(character.focus); const cameraDelta = camera.offset;
-    water = Water.attach(engine, {size: [400, 400], segments: 256, horizon: true, height: 0, foamDistance: 1.8, color: [0.006, 0.022, 0.05], depth: () => post.depthTexture, sceneColor: () => post.sceneTexture, reflection: () => sky.reflectionTexture, lights: sky.lights, spray: true, terrain: {heightmap: landscape.heightmap, origin: [-80,-80], size: [160,160]}, waves: [{direction: [1, 0.37], amplitude: 0.35, wavelength: 17.37, steepness: 0.3, phase: 0.43}, {direction: [0.87, 0.55], amplitude: 0.18, wavelength: 11.19, steepness: 0.3, phase: 2.17}, {direction: [1, 0.13], amplitude: 0.09, wavelength: 7.73, steepness: 0.25, phase: 4.91}]});
-    let particles: VFX;
+    water = Water.attach(engine, {size: [400, 400], segments: mobile ? 64 : 256, horizon: true, height: 0, foamDistance: 1.8, color: [0.006, 0.022, 0.05], depth: () => post.depthTexture, sceneColor: () => post.sceneTexture, reflection: () => sky.reflectionTexture, lights: sky.lights, spray: true, terrain: {heightmap: landscape.heightmap, origin: [-80,-80], size: [160,160]}, waves: [{direction: [1, 0.37], amplitude: 0.35, wavelength: 17.37, steepness: 0.3, phase: 0.43}, {direction: [0.87, 0.55], amplitude: 0.18, wavelength: 11.19, steepness: 0.3, phase: 2.17}, {direction: [1, 0.13], amplitude: 0.09, wavelength: 7.73, steepness: 0.25, phase: 4.91}]});
+    let particles: VFX | undefined;
     const selectParticles = (capacity: number) => {
-      if (![100_000, 500_000, 1_000_000].includes(capacity)) throw new RangeError('Unknown particle tier');
+      if (![0, 100_000, 500_000, 1_000_000].includes(capacity)) throw new RangeError('Unknown particle tier');
       particles?.dispose();
+      particles = undefined;
+      if (capacity === 0) return;
       particles = VFX.attach(engine, {capacity, initialCount: capacity, rate: capacity / 20, position: [0, 4, 0], emissionExtent: [80, 3, 80], velocity: [0, 0.03, 0], gravity: [0, 0, 0], spread: 0.08, lifetime: [25, 45], size: 0.01, ground: 0.35, turbulence: 0.035, frequency: 0.22, color: [1, 0.85, 0.4, 0.5], intensity: 5});
     };
-    selectParticles(1_000_000);
+    countSelect.value = mobile ? '100000' : '1000000';
+    selectParticles(Number(countSelect.value));
     input = new Input({
       strafe: [{type: 'key', code: 'KeyD'}, {type: 'key', code: 'ArrowRight'}, {type: 'key', code: 'KeyA', scale: -1}, {type: 'key', code: 'ArrowLeft', scale: -1}, {type: 'touch', id: 'move', axis: 'x'}],
       forward: [{type: 'key', code: 'KeyW'}, {type: 'key', code: 'ArrowUp'}, {type: 'key', code: 'KeyS', scale: -1}, {type: 'key', code: 'ArrowDown', scale: -1}, {type: 'touch', id: 'move', axis: 'y', scale: -1}],

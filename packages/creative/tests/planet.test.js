@@ -145,6 +145,38 @@ test('engine teardown aborts an in-flight fetch and removes loading passes', asy
   assert.equal(engine.meshes.size, 0); assert.equal(engine.plugins.size, 0);
 });
 
+test('maps download concurrently and a failed map aborts siblings before rollback', async t => {
+  const {engine, state} = fixture(t), requests = [];
+  let fail;
+  globals(t, {fetch: (url, {signal}) => new Promise((resolve, reject) => {
+    requests.push({url, signal});
+    if (url === '/day.png') fail = () => resolve(new Response(null, {status: 503}));
+    signal.addEventListener('abort', () => reject(signal.reason), {once: true});
+  })});
+  const loading = Planet.create(engine, {dayMap: '/day.png', nightMap: '/night.png', clouds: '/clouds.png'});
+  assert.deepEqual(requests.map(request => request.url), ['/day.png', '/night.png', '/clouds.png']);
+  fail();
+  await assert.rejects(loading, /503/);
+  assert.ok(requests.every(request => request.signal.aborted));
+  assert.equal(engine.plugins.size, 0); assert.equal(engine.meshes.size, 0);
+  assert.ok(state.bitmaps.every(image => image.closed === 1));
+});
+
+test('a sibling image decoded after a failed map is closed before create rejects', async t => {
+  const {engine} = fixture(t);
+  let decoded, started, fail;
+  const decoding = new Promise(resolve => {started = resolve;});
+  const image = {width: 16, height: 8, closed: 0, close() {this.closed++;}};
+  globals(t, {
+    fetch: (url) => url === '/night.png' ? new Promise(resolve => {fail = () => resolve(new Response(null, {status: 503}));}) : Promise.resolve(new Response(new Uint8Array([1]))),
+    createImageBitmap: () => new Promise(resolve => {decoded = resolve; started();}),
+  });
+  const loading = Planet.create(engine, {dayMap: '/day.png', nightMap: '/night.png'});
+  await decoding; fail(); await new Promise(resolve => setImmediate(resolve)); decoded(image);
+  await assert.rejects(loading, /503/);
+  assert.equal(image.closed, 1); assert.equal(engine.plugins.size, 0); assert.equal(engine.meshes.size, 0);
+});
+
 test('caller cancellation closes an image decoded after teardown', async t => {
   const {engine} = fixture(t);
   let decoded, started;

@@ -322,6 +322,33 @@ export function createCitadel() {
   }));
 }
 
+/** Convert the study's fixed geometry to the engine's optional PBR instance/light packages.
+ * @returns {{batches: import('@margoengine/scatter').ScatterBatch[], lights: import('@margoengine/clustered').PointLight[]}}
+ */
+export function createCitadelPBR(scene = createCitadel()) {
+  const batches = [], lights = [];
+  for (const source of scene) {
+    if (source.glow) continue;
+    const vertices = new Float32Array(source.geometry.vertices.length / 6 * 20);
+    for (let i = 0; i < source.geometry.vertices.length / 6; i++) {
+      vertices.set(source.geometry.vertices.subarray(i*6,i*6+3),i*20);
+      vertices.set(source.geometry.vertices.subarray(i*6+3,i*6+6),i*20+4);
+      vertices.fill(1,i*20+16,i*20+20);
+    }
+    const groups = new Map();
+    for (let offset=0; offset<source.instances.length; offset+=24) {
+      const color = source.instances.slice(offset+16,offset+19), emission = source.instances[offset+20];
+      const key = [...color,emission].join(',');
+      let group = groups.get(key);
+      if (!group) {group={color,emission,transforms:[]};groups.set(key,group);}
+      group.transforms.push(...source.instances.subarray(offset,offset+16));
+      if (emission>0) lights.push({position:[source.instances[offset+12],source.instances[offset+13],source.instances[offset+14]],range:4,color:[1,0.65,0.25],intensity:7});
+    }
+    for (const group of groups.values()) batches.push({name:source.name,vertices,indices:source.geometry.indices,transforms:new Float32Array(group.transforms),material:new PbrMaterial({color:Array.from(group.color),roughness:0.82,doubleSided:true}),emissive:Array.from(group.color,v=>v*group.emission*5)});
+  }
+  return {batches,lights};
+}
+
 /** @param {[number,number,number]} out @param {number} azimuth @param {number} elevation */
 export function moonDirection(out, azimuth, elevation) {
   if (

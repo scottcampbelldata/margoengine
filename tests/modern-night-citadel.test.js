@@ -2,9 +2,28 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createCitadel,
+  createCitadelPBR,
   moonDirection,
   moonShadowMatrix,
 } from '../apps/showcase-night-citadel/src/scene.js';
+
+test('PBR conversion preserves every solid instance and assigns actual HDR window lights', () => {
+  const scene=createCitadel(), converted=createCitadelPBR(scene);
+  assert.equal(converted.batches.reduce((sum,b)=>sum+b.transforms.length/16,0),548);
+  assert.equal(converted.lights.length,95);
+  assert.equal(converted.batches.filter(b=>b.emissive.some(v=>v>0)).reduce((sum,b)=>sum+b.transforms.length/16,0),95);
+  for(const batch of converted.batches){
+    assert.equal(batch.vertices.length%20,0);
+    assert(batch.vertices.every(Number.isFinite)&&batch.transforms.every(Number.isFinite));
+    for(let i=0;i<batch.vertices.length;i+=20){assert.equal(batch.vertices[i+19],1);assert(Math.abs(Math.hypot(...batch.vertices.subarray(i+4,i+7))-1)<1e-6);}
+    assert(batch.emissive.every(v=>v>=0));
+    assert(batch.indices.every(i=>i<batch.vertices.length/20));
+  }
+  const expected=scene[0].instances;
+  const positions=[];
+  for(let i=0;i<expected.length;i+=24)if(expected[i+20]>0)positions.push(Array.from(expected.subarray(i+12,i+15)));
+  assert.deepEqual(converted.lights.map(light=>light.position),positions);
+});
 
 test('citadel produces deterministic instanced six-float geometry with finite unit normals', () => {
   const scene = createCitadel(),

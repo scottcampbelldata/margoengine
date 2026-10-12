@@ -18,7 +18,17 @@ cascades, procedural terrain, grass/rock scatter with three indirect LOD rings,
 Gerstner ocean waves with terrain-coupled coastal flow, breaking foam and spray, up to one million GPU particles, a jointed
 procedural explorer, damped third-person camera, HDR bloom and AgX presentation.
 The character, landscape, coastal cabin, ten trees, spaced shrubs and fern crowns are generated
-locally; first launch fetches no assets. The scene starts at 17:30.
+locally; first launch fetches no assets. The scene starts at 17:34 golden hour.
+Phones start with 100k particles, 25k grass instances, a 96-cell terrain mesh,
+a 128-cell heightmap, 64 water segments and 512-pixel shadows. Desktop defaults
+retain the full scene. The particle control still offers every tier up to one million.
+The sky's first GPU submission overlaps procedural scene construction.
+Shared `Sky` warms low sunlight from a neutral daytime tint to amber at dusk,
+with cool ambient fill, lighter procedural cloud coverage and restrained bloom.
+Its optional distance fog reads `Water.depthTexture` and fades the distant ocean
+into the current sky radiance. Haze starts at 45 m, preserving nearby shores,
+while skyward horizon sampling removes the dark ground strip. The same settings
+follow the full clock into blue moonlit nights with warm cabin lighting.
 
 After sunset, shared `Sky` blends in blue moonlight at 10% of daytime intensity,
 keeps four PCSS shadow cascades active, and supplies a navy RGB ambient floor and
@@ -102,7 +112,7 @@ npm run test:browser --workspace examples/gameplay-sandbox
 WASD / arrows move, Shift runs, drag looks, double-click captures the mouse, and
 Escape releases it. Touch devices expose movement and look sticks. The control
 pill adjusts the full 00:00–23:59 clock with Sun/day and Moon/night labels,
-actual particle capacity, terrain wireframe and wave
+actual particle capacity (Off, 100k, 500k or 1M), terrain wireframe and wave
 height. Reduced motion starts paused. WebGPU support is required and failures
 appear in the shell. Canvas size, texture resources and device restoration are
 handled by the engine and optional plugins.

@@ -61,6 +61,11 @@ transitions, HTML occlusion, video and combined/debug rendering. Phone DOF +
 tonemap + TAA, SSAO + TAA, creative post + TAA, standalone tonemap and Bloom also
 recorded zero multisampled textures, pipelines or resolve targets.
 
+Line, text and point-cloud browser suites pass in both 1× and 4× modes, including
+readback captures, depth tests, restoration and galleries. Point EDL compares
+matching MSAA coverage samples so partially covered pixels do not invent depth
+steps or darken flat surfaces.
+
 The combined core + stage measurement is 19,998 gzip bytes. CI rejects 20,000
 bytes or more. Real XR headsets and the complete browser/device matrix were not
 tested.

@@ -19,11 +19,11 @@ test('cabin samples its supplied world position and validates every foundation s
 
 test('cabin plank seams are closed and roof/corner surfaces do not share depth planes',()=>{
  const cabin=generateCabinMesh(()=>0),p=cabin.siding.positions;
- const frontDepths=(x,y)=>{
+ const frontDepths=(x,y,side=1)=>{
   const depths=[];
   for(let t=0;t<cabin.siding.indices.length;t+=3){
    const [a,b,c]=cabin.siding.indices.subarray(t,t+3).map(v=>v*3);
-   if(cabin.siding.normals[a+2]<0.99)continue;
+   if(cabin.siding.normals[a+2]*side<0.99)continue;
    const determinant=(p[b+1]-p[c+1])*(p[a]-p[c])+(p[c]-p[b])*(p[a+1]-p[c+1]);
    if(Math.abs(determinant)<1e-10)continue;
    const u=((p[b+1]-p[c+1])*(x-p[c])+(p[c]-p[b])*(y-p[c+1]))/determinant;
@@ -35,6 +35,10 @@ test('cabin plank seams are closed and roof/corner surfaces do not share depth p
  for(let row=1;row<15;row++)for(const y of [row*0.2-0.0015,row*0.2])assert.ok(frontDepths(-2.2,y).some(z=>Math.abs(z-4.11)<1e-5),'Light must not leak through plank seams');
  assert.ok(!frontDepths(-1.5,1.85).some(z=>z>4.1),'Window opening stays recessed');
  assert.ok(Math.abs(Math.max(...frontDepths(0.345,1.1))-4.11)<1e-5,'Flush door trim overlaps the opening edge without thin protruding caps');
+ for(const side of [-1,1])for(const x of [-3.05,-2.98,-1.5,0,1.5,2.98,3.05]){
+  const roofLine=3+3*Math.tan(35*Math.PI/180)-Math.abs(x)*Math.tan(35*Math.PI/180);
+  for(const y of [2.99,3,3.005,roofLine+0.015])if(y<=roofLine+0.015)assert.ok(frontDepths(x,y,side).some(z=>Math.abs(z-side*4.11)<1e-5),'Both gables must close the outer siding-to-roof joint');
+ }
  const corner=frontDepths(-2.92,1.1);assert.ok(Math.max(...corner)>4.13,'Corner trim stands clear of the siding');
  for(let t=0;t<cabin.siding.indices.length;t+=3){
   const ids=cabin.siding.indices.subarray(t,t+3),x=ids.reduce((sum,v)=>sum+p[v*3]/3,0),y=ids.reduce((sum,v)=>sum+p[v*3+1]/3,0),z=ids.reduce((sum,v)=>sum+p[v*3+2]/3,0);
@@ -43,6 +47,22 @@ test('cabin plank seams are closed and roof/corner surfaces do not share depth p
  const planes=new Set(),roof=cabin.roof;
  for(let v=0;v<roof.positions.length/3;v++)if(roof.normals[v*3]>0.5&&roof.normals[v*3+1]>0.8)planes.add(Math.round((roof.normals[v*3]*roof.positions[v*3]+roof.normals[v*3+1]*roof.positions[v*3+1])*10000));
  assert.equal(planes.size,12,'Overlapping roof courses must have distinct planes');
+});
+
+test('porch beam follows the roof underside and both posts stay below it on sloping ground',()=>{
+ for(const height of [()=>0,(x,z)=>2+x*0.02+z*0.01]){
+  const cabin=generateCabinMesh(height,[30,-20]),roof=cabin.roof,siding=cabin.siding;
+  const v=Array.from({length:roof.positions.length/3},(_,i)=>i).find(i=>roof.normals[i*3+1]<-0.95&&roof.positions[i*3+1]>2&&roof.positions[i*3+1]<3);
+  assert.notEqual(v,undefined);const n=roof.normals.subarray(v*3,v*3+3),p=roof.positions.subarray(v*3,v*3+3),plane=n.reduce((sum,a,i)=>sum+a*p[i],0);
+  let beamVertices=0;const posts=[false,false];
+  for(let i=0;i<siding.positions.length;i+=3){
+   const [x,y,z]=siding.positions.subarray(i,i+3);if(z<5.7||z>6.1||y<2)continue;
+   const underside=(plane-n[0]*x-n[2]*z)/n[1];assert.ok(y<=underside+0.003,'Porch supports must not protrude through the canopy');
+   if(Math.abs(y-underside)<0.003)beamVertices++;
+   if(y<underside-0.1)for(let post=0;post<2;post++)if(Math.abs(x-[-0.15,1.95][post])<0.14)posts[post]=true;
+  }
+  assert.ok(beamVertices>=4,'Beam top follows the actual sloped underside');assert.deepEqual(posts,[true,true]);
+ }
 });
 
 test('shared island preset is deterministic and grass supports all three scatter LODs', () => {
