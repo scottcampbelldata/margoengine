@@ -23,15 +23,15 @@ export type MeshOptions = NonNullable<ConstructorParameters<typeof PbrMaterial>[
 export interface LoadOptions extends CADImportOptions {format?: 'gltf' | 'glb' | CADFormat; fit?: boolean}
 
 export function sphere(radius = 1, segments = 32): Geometry {
-  if (typeof radius !== 'number' || !Number.isFinite(Math.fround(radius)) || Math.fround(radius) <= 0) throw new RangeError('Sphere radius must be positive and finite');
-  if (!Number.isInteger(segments) || segments < 3 || segments > 256) throw new RangeError('Sphere segments must be 3..256');
+  if (typeof radius !== 'number' || !Number.isFinite(Math.fround(radius)) || Math.fround(radius) <= 0) throw new RangeError('Sphere radius');
+  if (!Number.isInteger(segments) || segments < 3 || segments > 256) throw new RangeError('Sphere segments');
   const rings = Math.ceil(segments / 2), positions: number[] = [], normals: number[] = [], indices: number[] = [];
   for (let ring = 0; ring <= rings; ring++) {
     const latitude = ring * Math.PI / rings;
     for (let segment = 0; segment <= segments; segment++) {
       const longitude = segment * Math.PI * 2 / segments;
-      const x = Math.sin(latitude) * Math.cos(longitude), y = Math.cos(latitude), z = Math.sin(latitude) * Math.sin(longitude);
-      positions.push(x * radius, y * radius, z * radius); normals.push(x, y, z);
+      const normal = [Math.sin(latitude) * Math.cos(longitude), Math.cos(latitude), Math.sin(latitude) * Math.sin(longitude)];
+      positions.push(...normal.map(value => value * radius)); normals.push(...normal);
       if (ring < rings && segment < segments) {
         const a = ring * (segments + 1) + segment, b = a + segments + 1;
         if (ring > 0) indices.push(a, a + 1, b);
@@ -67,7 +67,7 @@ export class Stage {
   }
 
   box({size = [1, 1, 1], ...options}: MeshOptions & {size?: Vec3} = {}): Mesh {
-    if (size.length !== 3) throw new TypeError('Box size needs 3 values');
+    if (size.length !== 3) throw new TypeError('Box: 3 values');
     return this.mesh(box(...size), options);
   }
 
@@ -81,10 +81,10 @@ export class Stage {
   }
 
   async load(url: string | URL, {format, fit = true, signal, ...options}: LoadOptions = {}): Promise<LoadedModel> {
-    if (typeof fit !== 'boolean') throw new TypeError('fit must be boolean');
+    if (typeof fit !== 'boolean') throw new TypeError('Invalid fit');
     const target = new URL(url, globalThis.location?.href), extension = target.pathname.toLowerCase().split('.').at(-1);
     const kind = format ?? (extension === 'stp' ? 'step' : extension === 'igs' ? 'iges' : extension);
-    if (!['gltf', 'glb', 'stl', 'obj', 'step', 'iges'].includes(kind ?? '')) throw new TypeError('Specify glTF, GLB, STL, OBJ, STEP or IGES format');
+    if (!['gltf', 'glb', 'stl', 'obj', 'step', 'iges'].includes(kind ?? '')) throw new TypeError('Specify format');
     const abort = signal ? AbortSignal.any([signal, this.imports.signal]) : this.imports.signal;
     abort.throwIfAborted();
     const model = kind === 'gltf' || kind === 'glb'
@@ -105,10 +105,10 @@ export class Stage {
 }
 
 export async function createStage(target: string | HTMLElement, {controls = true, autoStart = true, label = 'Interactive 3D scene', onError, ...options}: StageOptions = {}): Promise<Stage> {
-  if (typeof controls !== 'boolean' || typeof autoStart !== 'boolean') throw new TypeError('controls and autoStart must be boolean');
-  if (typeof label !== 'string' || onError !== undefined && typeof onError !== 'function') throw new TypeError('Expected a text label and error callback');
+  if (typeof controls !== 'boolean' || typeof autoStart !== 'boolean') throw new TypeError('Invalid controls');
+  if (typeof label !== 'string' || onError !== undefined && typeof onError !== 'function') throw new TypeError('Invalid label/onError');
   const element = typeof target === 'string' ? document.querySelector<HTMLElement>(target) : target;
-  if (!element || !element.ownerDocument?.defaultView || !(element instanceof element.ownerDocument.defaultView.HTMLElement)) throw new TypeError('Expected a canvas, container or matching selector');
+  if (!element || !element.ownerDocument?.defaultView || !(element instanceof element.ownerDocument.defaultView.HTMLElement)) throw new TypeError('Expected HTMLElement');
   const owned = element.tagName !== 'CANVAS', canvas = owned ? element.ownerDocument.createElement('canvas') : element as HTMLCanvasElement;
   let engine: EngineKernel | undefined;
   try {

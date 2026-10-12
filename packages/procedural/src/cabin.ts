@@ -23,30 +23,37 @@ export function generateCabinMesh(height: HeightField, position: readonly [numbe
   // Openings are cut through the siding; inner panels sit behind the jambs, not on the wall surface.
   const wall = (width: number, x: number, z: number, yaw: number, holes: readonly (readonly [number, number, number, number, boolean])[]) => {
     const c = Math.cos(yaw), s = Math.sin(yaw);
-    const piece = (list: GeometryData[], u: number, y: number, depth: number, w: number, h: number, d: number) => block(list, x+c*u+s*depth, y, z-s*u+c*depth, w, h, d, yaw);
+    const piece = (list: GeometryData[], u: number, y: number, depth: number, w: number, h: number, d: number, cladding = false) => {
+      // Overlap identical wall faces to cover raster cracks at T-junctions.
+      const overlap=cladding?0.002:0,data=boxGeometry(w+overlap,h+overlap,d);
+      // shortcut: trim closes cladding edges; add interior wall returns for enterable cabins.
+      if(cladding)data.indices=data.indices.filter(v=>Math.abs(data.normals[v*3+2])>0.99);
+      list.push(placed(data,x+c*u+s*depth,y,z-s*u+c*depth,1,1,1,yaw));
+    };
     for (let row = 0; row < 15; row++) {
-      const bottom = row * 0.2, top = bottom + 0.197; let start = -width/2;
+      const bottom = row * 0.2, top = (row+1)*0.2; let start = -width/2;
       for (const [u, v, w, h] of holes) {
         const left = u-w/2, right = u+w/2;
-        if (left > start) piece(timber, (start+left)/2, (bottom+top)/2, 0, left-start, top-bottom, 0.22);
+        if (left > start) piece(timber, (start+left)/2, (bottom+top)/2, 0, left-start, top-bottom, 0.22, true);
         const low = Math.min(top, v-h/2), high = Math.max(bottom, v+h/2);
-        if (low > bottom) piece(timber, u, (bottom+low)/2, 0, w, low-bottom, 0.22);
-        if (high < top) piece(timber, u, (high+top)/2, 0, w, top-high, 0.22);
+        if (low > bottom) piece(timber, u, (bottom+low)/2, 0, w, low-bottom, 0.22, true);
+        if (high < top) piece(timber, u, (high+top)/2, 0, w, top-high, 0.22, true);
         start = right;
       }
-      if (start < width/2) piece(timber, (start+width/2)/2, (bottom+top)/2, 0, width/2-start, top-bottom, 0.22);
+      if (start < width/2) piece(timber, (start+width/2)/2, (bottom+top)/2, 0, width/2-start, top-bottom, 0.22, true);
     }
     for (const [u, v, w, h, door] of holes) {
       const trim = door ? 0.075 : 0.05;
-      for (const side of [-1, 1]) piece(timber, u+side*(w/2-trim/2), v, 0.02, trim, h, 0.2);
-      for (const side of [-1, 1]) piece(timber, u, v+side*(h/2-trim/2), 0.02, w, trim, 0.2);
-      piece(door ? timber : glass, u, v, door ? -0.08 : 0.02, w-trim*2, h-trim*2, 0.02);
+      // Flush exterior casings avoid subpixel dark edges; panes remain recessed.
+      for (const side of [-1, 1]) piece(timber, u+side*w/2, v, 0.01, trim, h+trim, 0.2);
+      for (const side of [-1, 1]) piece(timber, u, v+side*h/2, 0.01, w-trim, trim, 0.2);
+      piece(door ? timber : glass, u, v, door ? -0.08 : 0.02, w-trim, h-trim, 0.02);
     }
   };
   wall(6, 0, 4, 0, [[-1.5,1.85,0.9,1.1,false],[0.9,1.15,1.15,2.3,true]]);
   wall(6, 0, -4, Math.PI, [[0,1.85,0.9,1.1,false]]);
   for (const side of [-1, 1]) wall(8, side*3, 0, side*Math.PI/2, [[-1.8,1.85,0.9,1.1,false],[1.8,1.85,0.9,1.1,false]]);
-  for (const x of [-3,3]) for (const z of [-4,4]) block(timber,x,1.5,z,0.22,3,0.22);
+  for (const x of [-3,3]) for (const z of [-4,4]) block(timber,x,1.5,z,0.28,3,0.28);
   const rise = 3 * Math.tan(ROOF_PITCH);
   for (const side of [-1, 1]) {
     const gable = geometryData([-3,3,side*4, 3,3,side*4, 0,3+rise,side*4], [0,0,side, 0,0,side, 0,0,side], [0,0, 1,0, 0.5,1], side > 0 ? [0,1,2] : [0,2,1]);
@@ -54,7 +61,7 @@ export function generateCabinMesh(height: HeightField, position: readonly [numbe
     // Overlapping courses give the roof a shingle silhouette without a texture download.
     for (let row = 0; row < 12; row++) {
       const u = (row+0.5)*3.55/12;
-      block(slate, side*u, 3+rise-u*Math.tan(ROOF_PITCH)+0.05, 0, 3.55/12/Math.cos(ROOF_PITCH)+0.035, 0.1, 9.1, 0, -side*ROOF_PITCH);
+      block(slate, side*u, 3+rise-u*Math.tan(ROOF_PITCH)+0.05+(12-row)*0.002, 0, 3.55/12/Math.cos(ROOF_PITCH)+0.035, 0.1, 9.1, 0, -side*ROOF_PITCH);
     }
     block(timber, side*3.55, 3+rise-3.55*Math.tan(ROOF_PITCH)-0.07, 0, 0.14, 0.18, 9.1);
     for (const z of [-4.54,4.54]) block(timber,side*1.775,3+rise-1.775*Math.tan(ROOF_PITCH)-0.02,z,3.55/Math.cos(ROOF_PITCH),0.17,0.14,0,-side*ROOF_PITCH);

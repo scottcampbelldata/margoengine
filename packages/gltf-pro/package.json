@@ -6,7 +6,7 @@
   "description": "Opt-in glTF 2.0 metallic-roughness rendering for Margo Engine WebGPU.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/vexel.git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/gltf-pro"
   },
   "publishConfig": {
@@ -27,5 +27,6 @@
   ],
   "peerDependencies": {
     "@margoengine/core": "0.1.0"
-  }
+  },
+  "homepage": "https://margoengine.com"
 }

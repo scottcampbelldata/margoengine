@@ -9,7 +9,10 @@ page.on('pageerror',error=>errors.push(error.message));
 page.on('console',message=>{if(message.type()==='error'||/ValidationError|Error while parsing|Invalid .*Pipeline/.test(message.text()))errors.push(message.text());});
 try {
  await page.waitForFunction(()=>window.modern);
- const report=await page.evaluate(async()=>{
+ const reports=[];
+ for(const samples of [1,4])reports.push(await page.evaluate(async samples=>{
+  const agent=Object.getOwnPropertyDescriptor(navigator,'userAgent');if(samples===1)Object.defineProperty(navigator,'userAgent',{configurable:true,value:'iPhone Mobile'});
+  const cached=samples===1,expectedPasses=cached?0:1;
   const {Engine,Geometry,box,PbrMaterial}=await import('/packages/core/dist/extension.js'),{Picking,Selection}=await import('/packages/selection/dist/index.js');
   const assert=(ok,message)=>{if(!ok)throw new Error(message);};
   const canvas=document.createElement('canvas');canvas.style.cssText='width:128px;height:128px';document.body.append(canvas);
@@ -33,8 +36,8 @@ try {
    for(let y=0;y<25;y++)for(let x=0;x<25;x++)if(Math.abs(x-12)>2||Math.abs(y-12)>2)e.createMesh().setGeometry(geometry).setScale([.025,.025,.025]).setPosition([(x-12)*.15,(y-12)*.15,0]);
    reset();assert(await e.pick(64,64)===target,'First pick before rendering failed');assert(passes===1&&instances<5,'Micro pass did not cull individual shared-geometry instances');assert(sourceSize[0]===3,'Micro pass was not 3x3');
    checks.push({name:'Micro-frustum culling before the first color frame',sceneInstances:e.meshes.size,pickInstances:instances,passes});
-   e.render();reset();assert(await e.pick(64,64)===target,'MRT cached pick failed');assert(passes===0&&copies===1,'Cached pick redrew the scene');assert(sourceSize[0]===128,'Cached pick did not read the viewport ID texture');
-   checks.push({name:'Forward PBR MRT: slot zero selected with no pick draw calls',passes,copies});
+   e.render();reset();assert(await e.pick(64,64)===target,'Forward scene pick failed');assert(passes===expectedPasses&&copies===1,'Unexpected pick pass count');assert(sourceSize[0]===(cached?128:3),'Picking used the wrong ID target');
+   checks.push({name:cached?'1x forward MRT: cached ID readback':'4x beauty: culled 1x integer micro pass',passes,copies});
    target.position.x=.3;reset();assert(await e.pick(64,64)===null,'Moved mesh left a stale cached hit');assert(passes===1,'Transform change did not invalidate the cache');
    target.position.x=0;target.visible=false;assert(await e.pick(64,64)===null,'Hidden mesh remained pickable');target.visible=true;e.render();
    e.camera.target=[.3,0,0];reset();await e.pick(64,64);assert(passes===1,'Camera change did not invalidate the cache');e.camera.target=[0,0,0];
@@ -44,7 +47,7 @@ try {
    for(const mesh of [...e.meshes.values()])mesh.dispose();
    e.camera.position=[0,0,2];e.camera.target=[0,0,0];e.camera.fov=90;
    const quad=(left,bottom,right,top)=>new Geometry([left,bottom,0,right,bottom,0,right,top,0,left,top,0],Array.from({length:4},()=>[0,0,1]).flat(),[0,1,2,0,2,3]);
-   const left=e.createMesh().setGeometry(quad(-.5,-.5,0,.5));e.render();reset();assert(await e.pick(64,64)===left,'Orthogonal silhouette neighbor was missed');assert(passes===0,'Orthogonal resolve missed the MRT path');
+   const left=e.createMesh().setGeometry(quad(-.5,-.5,0,.5));e.render();reset();assert(await e.pick(64,64)===left,'Orthogonal silhouette neighbor was missed');assert(passes===expectedPasses,'Orthogonal resolve used the wrong picking path');
    left.setGeometry(quad(-.5,0,0,.5));e.render();assert(await e.pick(64,64)===left,'Diagonal silhouette neighbor was missed');assert(await e.pick(66,66)===null,'Neighborhood expanded beyond one pixel');
    const right=e.createMesh().setGeometry(quad(0,-.5,.5,.5));e.render();assert(await e.pick(64,64)===right,'Neighbor overrode the center ID');right.visible=false;left.visible=false;
    assert(await e.pick(64,64)===null,'Micro pass failed to clear an empty footprint');left.visible=true;
@@ -59,13 +62,13 @@ try {
    const root=e.createMesh().setScale([2,1,.5]);front.setParent(root).setScale([-1,1,1]).setRotation([0,0,.4]);assert(await e.pick(64,64)===front,'Mirrored/sheared hierarchy was culled incorrectly');
    const outline=Selection.attach(e,{algorithm:'morphological'});outline.set([front]);e.render();assert(await e.pick(64,64)===front,'Outline replay corrupted MRT IDs');
    checks.push({name:'Occlusion, mutable section clipping, mirrored/sheared transforms and outline integration'});
-   const {StudioShading}=await import('/examples/conveyor-simulator/src/shading.js');e.use(new StudioShading());e.render();reset();assert(await e.pick(64,64)===front&&passes===0,'Conveyor PBR shader did not preserve cached MRT IDs');
+   const {StudioShading}=await import('/examples/conveyor-simulator/src/shading.js');e.use(new StudioShading());e.render();reset();assert(await e.pick(64,64)===front&&passes===expectedPasses,'Conveyor PBR shader lost picking IDs');
    checks.push({name:'Conveyor source shader composes with the MRT attachment'});
-   await e.rebootDevice();instrument();assert(await e.pick(64,64)===front,'Picking did not recover before a restored color frame');e.render();reset();assert(await e.pick(64,64)===front&&passes===0,'Restored MRT did not recover');
+   await e.rebootDevice();instrument();assert(await e.pick(64,64)===front,'Picking did not recover before a restored color frame');e.render();reset();assert(await e.pick(64,64)===front&&passes===expectedPasses,'Restored picking did not recover');
    checks.push({name:'Device restoration recreates micro targets and cached MRT'});
    await e.gpu.queue.onSubmittedWorkDone();assert(gpuErrors.length===0,JSON.stringify(gpuErrors));picking.dispose();assert(!e.hasPlugin('picking'),'Picking did not detach');assert(await e.pick(64,64)===front,'Core picking stopped working after detachment');
-   return {checks,gpuErrors};
-  } finally {e.dispose();canvas.remove();}
- });
- assert.deepEqual(errors,[]);await writeFile('test-results/selection-picking.json',JSON.stringify({hardware,...report},null,2));console.log(JSON.stringify({hardware,...report},null,2));
+   return {samples,checks,gpuErrors};
+  } finally {e.dispose();canvas.remove();if(samples===1){if(agent)Object.defineProperty(navigator,'userAgent',agent);else delete navigator.userAgent;}}
+ },samples));
+ assert.deepEqual(errors,[]);await writeFile('test-results/selection-picking.json',JSON.stringify({hardware,reports},null,2));console.log(JSON.stringify({hardware,reports},null,2));
 } finally {await browser.close();}

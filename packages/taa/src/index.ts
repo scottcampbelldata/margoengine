@@ -1,8 +1,9 @@
+import {SceneTarget,resolveMSAA,sceneTarget} from '../../shared/msaa.js';
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type Mesh} from '@margoengine/core/extension';
 import {invert} from '../../shared/math.js';
 import {jitterProjection} from './jitter.js';
-import {cameraVelocity,objectVelocity,snapshot,resolve,present} from './shader.js';
+import {fullscreen,cameraVelocity,objectVelocity,snapshot,resolve,present} from './shader.js';
 export {halton,jitterProjection} from './jitter.js';
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number;STORAGE:number};
 declare const GPUTextureUsage:{RENDER_ATTACHMENT:number;TEXTURE_BINDING:number;STORAGE_BINDING:number;COPY_SRC:number};
@@ -14,9 +15,11 @@ interface Draw {uniform:GPUBuffer;values:Float32Array;previous:Float32Array;vert
 export class TAA implements EnginePlugin {
   readonly name='taa';
   private engine?:Engine;private device?:GPUDevice;private uniform?:GPUBuffer;private cameraPipeline?:GPURenderPipeline;private snapshotPipeline?:GPUComputePipeline;private resolvePipeline?:GPUComputePipeline;private presentPipeline?:GPURenderPipeline;
+  private captureTarget?:SceneTarget;
   private textures:GPUTexture[]=[];private scene?:GPUTexture;private depth?:GPUTexture;private velocity?:GPUTexture;private expected?:GPUTexture;private histories:GPUTexture[]=[];private historyDepths:GPUTexture[]=[];
   private colorView?:GPUTextureView;private depthView?:GPUTextureView;private sampledDepth?:GPUTextureView;private velocityView?:GPUTextureView;private expectedView?:GPUTextureView;private original?:GPUTextureView;
   private cameraGroup?:GPUBindGroup;private resolveGroups:GPUBindGroup[]=[];private presentGroups:GPUBindGroup[]=[];private depthSource?:GPUTexture;
+  private motionViews:GPUTextureView[]=[];private motionResolve?:GPURenderPipeline;private motionGroup?:GPUBindGroup;private motionDepth?:GPUTextureView;
   private objectPipelines=new Map<string,GPURenderPipeline>();private draws=new Map<Mesh,Map<GPUBuffer,Draw>>();private sources=new Set<VelocitySource>();
   private readonly values=new Float32Array(52);private readonly unjittered=new Float32Array(16);private readonly previous=new Float32Array(16);private readonly workspace=new Float64Array(52);
   private frame=0;private front=0;private valid=false;private disposed=false;private projection='';private format?:GPUTextureFormat;
@@ -32,7 +35,6 @@ export class TAA implements EnginePlugin {
   setup(engine:Engine):void {
     if(this.disposed||!engine.gpu)throw new Error('TAA requires WebGPU and a live effect');this.engine=engine;this.device=engine.gpu;
     this.uniform=this.device.createBuffer({size:208,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
-    const module=this.device.createShaderModule({code:cameraVelocity});this.cameraPipeline=this.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:'rg16float'},{format:'r32float'}]}});
     const compute=(code:string)=>this.device!.createComputePipeline({layout:'auto',compute:{module:this.device!.createShaderModule({code}),entryPoint:'main'}});
     this.snapshotPipeline=compute(snapshot);this.resolvePipeline=compute(resolve);this.reset();
   }
@@ -42,7 +44,7 @@ export class TAA implements EnginePlugin {
     graph.add({name:'taa:resolve',order:40,execute:c=>{if(c.backend==='webgpu')this.finish(c);}});
   }
   private capture(c:Context):void {
-    this.validate();this.resize(c);this.original=c.color;c.color=this.colorView!;c.depth=this.depthView!;
+    this.validate();this.resize(c);this.original=c.color;this.captureTarget!.begin(c);
     this.unjittered.set(c.camera.matrix);jitterProjection(c.camera.matrix,this.unjittered,this.frame,c.width,c.height);
     const projection=[c.camera.fov,c.camera.near,c.camera.far].join(':');if(projection!==this.projection){this.reset();this.projection=projection;}
     this.values.set(c.camera.matrix);this.values.set(this.valid?this.previous:c.camera.matrix,16);
@@ -54,35 +56,57 @@ export class TAA implements EnginePlugin {
   }
   private resize(c:Context):void {
     if(this.scene?.width===c.width&&this.scene.height===c.height&&this.format===c.format)return;
-    for(const t of this.textures)t.destroy();this.textures=[];this.histories=[];this.historyDepths=[];this.format=c.format;
+    this.captureTarget?.dispose();for(const t of this.textures)t.destroy();this.textures=[];this.histories=[];this.historyDepths=[];this.format=c.format;
     const texture=(format:GPUTextureFormat,usage:number)=>{const t=c.device.createTexture({size:[c.width,c.height],format,usage:usage|GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_SRC});this.textures.push(t);return t;};
     this.scene=texture(c.format,GPUTextureUsage.RENDER_ATTACHMENT);this.depth=texture(c.descriptor.depthStencil!.format,GPUTextureUsage.RENDER_ATTACHMENT);
     this.velocity=texture('rg16float',GPUTextureUsage.RENDER_ATTACHMENT);this.expected=texture('r32float',GPUTextureUsage.RENDER_ATTACHMENT);
     for(let i=0;i<2;i++){this.histories.push(texture('rgba16float',GPUTextureUsage.STORAGE_BINDING));this.historyDepths.push(texture('r32float',GPUTextureUsage.STORAGE_BINDING));}
+    this.captureTarget=new SceneTarget(c.device,this.scene,this.depth,c.descriptor.multisample?.count??4);
     this.colorView=this.scene.createView();this.depthView=this.depth.createView();this.velocityView=this.velocity.createView();this.expectedView=this.expected.createView();
-    const module=c.device.createShaderModule({code:present});this.presentPipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]}});
+    this.motionViews=[];this.motionGroup=undefined;this.motionDepth=undefined;
+    const cameraModule=c.device.createShaderModule({code:cameraVelocity});this.cameraPipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module:cameraModule,entryPoint:'vertex'},fragment:{module:cameraModule,entryPoint:'fragment',targets:[{format:'rg16float'},{format:'r32float'}]},multisample:c.descriptor.multisample});
+    if(this.captureTarget.samples===4){
+      for(const format of ['rg16float','r32float'] as GPUTextureFormat[]){const t=c.device.createTexture({size:[c.width,c.height],format,sampleCount:4,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});this.textures.push(t);this.motionViews.push(t.createView());}
+      const module=c.device.createShaderModule({code:fullscreen+`
+@group(0) @binding(0) var velocity:texture_multisampled_2d<f32>;
+@group(0) @binding(1) var expected:texture_multisampled_2d<f32>;
+@group(0) @binding(2) var depth:texture_depth_multisampled_2d;
+struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
+@fragment fn fragment(i:Fullscreen)->Motion {let p=vec2i(i.clip.xy);var sample=0;var nearest=textureLoad(depth,p,0);
+ for(var n=1;n<4;n++){let d=textureLoad(depth,p,n);if(d>nearest){nearest=d;sample=n;}}
+ var o:Motion;o.velocity=textureLoad(velocity,p,sample).xy;o.depth=textureLoad(expected,p,sample).r;return o;}`});
+      this.motionResolve=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:'rg16float'},{format:'r32float'}]}});
+    }
+    const module=c.device.createShaderModule({code:present});this.presentPipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]},multisample:c.descriptor.multisample});
     this.presentGroups=this.histories.map(t=>c.device.createBindGroup({layout:this.presentPipeline!.getBindGroupLayout(0),entries:[{binding:0,resource:t.createView()}]}));
     this.depthSource=undefined;this.reset();
   }
   private motion(c:Context):void {
-    const depth=c.depth===this.depthView?this.depth:this.options.depth?.();
+    resolveMSAA(c);
+    const depth=c.depth===this.captureTarget!.depth?this.depth:this.options.depth?.();
     if(!depth||depth.width!==c.width||depth.height!==c.height||!(depth.usage&GPUTextureUsage.TEXTURE_BINDING)||!depth.format.startsWith('depth'))throw new Error('TAA needs the current sampleable scene depth; provide options.depth for an HDR/SSAO capture');
     if(depth!==this.depthSource){this.depthSource=depth;this.sampledDepth=depth.createView({aspect:'depth-only'});
       const group=(p:GPUComputePipeline|GPURenderPipeline,resources:(GPUTextureView|GPUBufferBinding)[])=>c.device.createBindGroup({layout:p.getBindGroupLayout(0),entries:resources.map((resource,binding)=>({binding,resource}))});
       this.cameraGroup=group(this.cameraPipeline!,[{buffer:this.uniform!},this.sampledDepth]);
       this.resolveGroups=[0,1].map(i=>group(this.resolvePipeline!,[{buffer:this.uniform!},this.colorView!,this.velocityView!,this.expectedView!,this.sampledDepth!,this.histories[i].createView(),this.historyDepths[i].createView(),this.histories[1-i].createView(),this.historyDepths[1-i].createView()]));
     }
-    const attachments=[this.velocityView!,this.expectedView!].map(view=>({view,loadOp:'clear' as const,storeOp:'store' as const}));
+    const views=this.motionViews.length?this.motionViews:[this.velocityView!,this.expectedView!];
+    const attachments=views.map(view=>({view,loadOp:'clear' as const,storeOp:'store' as const}));
     const camera=c.encoder.beginRenderPass({colorAttachments:attachments});camera.setPipeline(this.cameraPipeline!);camera.setBindGroup(0,this.cameraGroup!);camera.draw(3);camera.end();
     for(const mesh of this.engine!.meshes.values())if(mesh.geometry&&this.engine!.store.visible[mesh.id]){const buffers=this.engine!.geometryBuffers(mesh.geometry)!;this.drawMotion(c,{node:mesh,...buffers,count:mesh.geometry.indices.length,stride:24});}
     for(const source of this.sources){if(source.disposed){this.sources.delete(source);continue;}for(const primitive of source.shadowPrimitives)this.drawMotion(c,primitive);}
+    if(this.motionViews.length){
+      const depth=sceneTarget(c)!.depthSource!;
+      if(this.motionDepth!==depth){this.motionDepth=depth;this.motionGroup=c.device.createBindGroup({layout:this.motionResolve!.getBindGroupLayout(0),entries:[...this.motionViews,depth].map((resource,binding)=>({binding,resource}))});}
+      const pass=c.encoder.beginRenderPass({colorAttachments:[this.velocityView!,this.expectedView!].map(view=>({view,loadOp:'clear',storeOp:'store'}))});pass.setPipeline(this.motionResolve!);pass.setBindGroup(0,this.motionGroup!);pass.draw(3);pass.end();
+    }
     for(const [mesh,records] of this.draws)for(const [index,r] of records)if(r.frame!==this.frame){r.uniform.destroy();r.vertices?.destroy();records.delete(index);if(!records.size)this.draws.delete(mesh);}
   }
   private drawMotion(c:Context,p:VelocityPrimitive):void {
     p.node.check();if(p.node.engine!==this.engine||![24,80].includes(p.stride))throw new Error('Invalid TAA velocity primitive');
     for(let id=p.node.id;id!==-1;id=this.engine!.store.parents[id])if(this.engine!.store.hidden[id])return;
-    const pbr=p.stride===80,key=p.stride+':'+c.descriptor.depthStencil!.format;let pipeline=this.objectPipelines.get(key);
-    if(!pipeline){const module=c.device.createShaderModule({code:objectVelocity(pbr)});pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:p.stride,attributes:pbr?[{shaderLocation:0,offset:0,format:'float32x4'},{shaderLocation:1,offset:48,format:'float32x4'},{shaderLocation:2,offset:64,format:'float32x4'}]:[{shaderLocation:0,offset:0,format:'float32x3'}]}]},fragment:{module,entryPoint:'fragment',targets:[{format:'rg16float'},{format:'r32float'}]},primitive:{cullMode:'none'},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:false,depthCompare:'equal'}});this.objectPipelines.set(key,pipeline);}
+    const pbr=p.stride===80,key=p.stride+':'+c.descriptor.depthStencil!.format+':'+c.descriptor.multisample?.count;let pipeline=this.objectPipelines.get(key);
+    if(!pipeline){const module=c.device.createShaderModule({code:objectVelocity(pbr)});pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:p.stride,attributes:pbr?[{shaderLocation:0,offset:0,format:'float32x4'},{shaderLocation:1,offset:48,format:'float32x4'},{shaderLocation:2,offset:64,format:'float32x4'}]:[{shaderLocation:0,offset:0,format:'float32x3'}]}]},fragment:{module,entryPoint:'fragment',targets:[{format:'rg16float'},{format:'r32float'}]},primitive:{cullMode:'none'},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:false,depthCompare:'equal'},multisample:c.descriptor.multisample});this.objectPipelines.set(key,pipeline);}
     let records=this.draws.get(p.node);if(!records){records=new Map();this.draws.set(p.node,records);}let r=records.get(p.index);
     if(!r||r.vertex!==p.vertex||r.alpha!==p.alphaTexture||r.sampler!==p.alphaSampler){r?.uniform.destroy();r?.vertices?.destroy();const uniform=c.device.createBuffer({size:288,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
       r={uniform,values:new Float32Array(72),previous:p.node.matrix.slice(),group:undefined!,vertex:p.vertex,alpha:p.alphaTexture,sampler:p.alphaSampler,frame:-2};records.set(p.index,r);
@@ -91,19 +115,19 @@ export class TAA implements EnginePlugin {
     }
     r.values.set(c.camera.matrix);r.values.set(this.valid?this.previous:c.camera.matrix,16);r.values.set(p.node.matrix,32);r.values.set(r.previous,48);
     r.values.set([c.width,c.height,+(this.valid&&r.frame===this.frame-1),0,p.alpha??1,p.cutoff??0,p.texCoord??0,0],64);c.device.queue.writeBuffer(r.uniform,0,r.values as Float32Array<ArrayBuffer>);
-    const pass=c.encoder.beginRenderPass({colorAttachments:[this.velocityView!,this.expectedView!].map(view=>({view,loadOp:'load',storeOp:'store'})),depthStencilAttachment:{view:c.depth,depthReadOnly:true,...(c.descriptor.depthStencil!.format.includes('stencil')?{stencilReadOnly:true}:{})}});
+    const pass=c.encoder.beginRenderPass({colorAttachments:(this.motionViews.length?this.motionViews:[this.velocityView!,this.expectedView!]).map(view=>({view,loadOp:'load',storeOp:'store'})),depthStencilAttachment:{view:c.depth,depthReadOnly:true,...(c.descriptor.depthStencil!.format.includes('stencil')?{stencilReadOnly:true}:{})}});
     pass.setPipeline(pipeline);pass.setBindGroup(0,r.group);pass.setVertexBuffer(0,p.vertex);pass.setIndexBuffer(p.index,'uint32');pass.drawIndexed(p.count);pass.end();
     r.previous.set(p.node.matrix);r.frame=this.frame;
     if(r.snapshot){const copy=c.encoder.beginComputePass();copy.setPipeline(this.snapshotPipeline!);copy.setBindGroup(0,r.snapshot);copy.dispatchWorkgroups(Math.ceil(p.vertex.size/16/256));copy.end();}
   }
   private finish(c:Context):void {
-    try{const compute=c.encoder.beginComputePass();compute.setPipeline(this.resolvePipeline!);compute.setBindGroup(0,this.resolveGroups[this.front]);compute.dispatchWorkgroups(Math.ceil(c.width/8),Math.ceil(c.height/8));compute.end();this.front=1-this.front;
+    try{this.captureTarget!.resolve(c.encoder,true);const compute=c.encoder.beginComputePass();compute.setPipeline(this.resolvePipeline!);compute.setBindGroup(0,this.resolveGroups[this.front]);compute.dispatchWorkgroups(Math.ceil(c.width/8),Math.ceil(c.height/8));compute.end();this.front=1-this.front;
       const pass=c.encoder.beginRenderPass({colorAttachments:[{view:this.original!,loadOp:'clear',storeOp:'store'}]});pass.setPipeline(this.presentPipeline!);pass.setBindGroup(0,this.presentGroups[this.front]);pass.draw(3);pass.end();
-      this.previous.set(c.camera.matrix);this.valid=true;this.frame++;c.color=this.original!;c.format=this.format!;
+      this.previous.set(c.camera.matrix);this.valid=true;this.frame++;this.captureTarget!.restore(c);
     }finally{c.camera.matrix.set(this.unjittered);}
   }
   get gpuState():{velocity:GPUTexture;history:GPUTexture;depth:GPUTexture} {if(!this.velocity||!this.histories.length)throw new Error('TAA is not rendered');return {velocity:this.velocity,history:this.histories[this.front],depth:this.historyDepths[this.front]};}
-  private release():void {for(const t of this.textures)t.destroy();for(const records of this.draws.values())for(const r of records.values()){r.uniform.destroy();r.vertices?.destroy();}this.uniform?.destroy();this.textures=[];this.histories=[];this.historyDepths=[];this.draws.clear();this.objectPipelines.clear();this.scene=this.depth=this.velocity=this.expected=undefined;this.uniform=undefined;this.depthSource=undefined;this.cameraPipeline=this.presentPipeline=undefined;this.snapshotPipeline=this.resolvePipeline=undefined;this.cameraGroup=undefined;this.resolveGroups=[];this.presentGroups=[];this.colorView=this.depthView=this.sampledDepth=this.velocityView=this.expectedView=this.original=undefined;this.format=undefined;this.frame=this.front=0;this.reset();}
+  private release():void {this.motionViews=[];this.motionResolve=undefined;this.motionGroup=undefined;this.motionDepth=undefined;this.captureTarget?.dispose();this.captureTarget=undefined;for(const t of this.textures)t.destroy();for(const records of this.draws.values())for(const r of records.values()){r.uniform.destroy();r.vertices?.destroy();}this.uniform?.destroy();this.textures=[];this.histories=[];this.historyDepths=[];this.draws.clear();this.objectPipelines.clear();this.scene=this.depth=this.velocity=this.expected=undefined;this.uniform=undefined;this.depthSource=undefined;this.cameraPipeline=this.presentPipeline=undefined;this.snapshotPipeline=this.resolvePipeline=undefined;this.cameraGroup=undefined;this.resolveGroups=[];this.presentGroups=[];this.colorView=this.depthView=this.sampledDepth=this.velocityView=this.expectedView=this.original=undefined;this.format=undefined;this.frame=this.front=0;this.reset();}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.sources.clear();this.engine=this.device=undefined;}
   destroy():void {this.dispose();}

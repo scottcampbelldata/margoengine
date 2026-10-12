@@ -4,13 +4,14 @@
 contiguous line-position stream with an optional vertical lift for terrain debug views.
 
 `pbrVertexStream(data, occlusion?)` packs the 80-byte PBR vertex layout used by
-`ScatterInstances`, retaining normals, tangents, both UV slots and baked RGB
-occlusion. Tangents must be present; occlusion callbacks must return finite 0..1.
+`ScatterInstances`, retaining normals, tangents and both UV slots. RGB defaults to
+white tint; alpha stores baked ambient occlusion, independently of albedo and
+opacity. Tangents must be present; occlusion callbacks must return finite 0..1.
 `footprintRadius(data)` measures the maximum local XZ distance from the origin.
 
 Pure-CPU, tree-shakable geometry for Margo Engine: Three.js-compatible primitives, curves, shapes, extrusion, triangulation and mesh utilities.
 
-Not yet published to npm. Build from source with `npm run build` in `packages/geometry`.
+Build from source with `npm run build` in `packages/geometry`.
 
 ```ts
 import {Engine, PbrMaterial} from '@margoengine/core';

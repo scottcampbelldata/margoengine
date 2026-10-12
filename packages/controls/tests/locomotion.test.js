@@ -2,6 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {stepLocomotion} from '../dist/index.js';
 
+test('camera pitch crosses the horizon for upward look and stops short of the poles',()=>{
+ const state=new Float32Array([0,2,0,0,0,0.18,0,0]),actions=new Float32Array([0,0,0,-0.4,0]);
+ stepLocomotion(state,actions,1/60,()=>2);assert.ok(state[5]<0);assert.deepEqual(Array.from(state.slice(0,3)),[0,2,0]);
+ actions[3]=-20;stepLocomotion(state,actions,1/60,()=>2);assert.equal(state[5],Math.fround(-1.4));
+ actions[3]=20;stepLocomotion(state,actions,1/60,()=>2);assert.equal(state[5],Math.fround(0.9));
+});
+
 test('ground locomotion normalizes diagonal speed and turns across the heading seam',()=>{
  const a=new Float32Array(8),b=new Float32Array(8),forward=new Float32Array([0,1,0,0,0]),diagonal=new Float32Array([1,1,0,0,0]);
  const ground=(x,z)=>2+x*0.02+z*0.01;

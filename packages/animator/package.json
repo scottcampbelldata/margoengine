@@ -6,7 +6,7 @@
   "description": "Blend trees, additive layers, animation states and foot IK.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/vexel.git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/animator"
   },
   "publishConfig": {
@@ -29,5 +29,6 @@
     "@margoengine/core": "0.1.0",
     "@margoengine/animation": "0.1.0",
     "@margoengine/gltf-pro": "0.1.0"
-  }
+  },
+  "homepage": "https://margoengine.com"
 }

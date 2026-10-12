@@ -19,6 +19,6 @@ engine.start();
 // On teardown: model.dispose(); engine.dispose();
 ```
 
-This ESM package includes TypeScript declarations and requires `@margoengine/core` 0.1.0. See the [supported glTF subset and lifecycle guide](https://github.com/scottcampbelldata/vexel/blob/main/MODERN-ENGINE.md) before importing assets.
+This ESM package includes TypeScript declarations and requires `@margoengine/core` 0.1.0. See the [supported glTF subset and lifecycle guide](https://github.com/scottcampbelldata/margoengine/blob/main/MODERN-ENGINE.md) before importing assets.
 
 MIT licensed.

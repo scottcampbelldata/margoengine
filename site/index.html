@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Margo Engine: a small WebGPU engine for web apps</title>
+  <meta name="description" content="Margo Engine is an MIT-licensed 3D engine for the web: a Rust and Wasm kernel, WebGPU rendering with a WebGL2 fallback, and optional packs for glTF, machinery, React and effects.">
+  <link rel="canonical" href="https://margoengine.com/">
+  <meta name="theme-color" content="#0b1020">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Margo Engine">
+  <meta property="og:description" content="A small Rust and Wasm 3D engine for web apps, with WebGPU rendering, a WebGL2 fallback and optional packs.">
+  <meta property="og:url" content="https://margoengine.com/">
+  <meta property="og:image" content="https://margoengine.com/images/night-citadel.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="./favicon.ico" sizes="32x32">
+  <link rel="stylesheet" href="./site.css">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Margo Engine","description":"A small Rust and Wasm 3D engine for web apps, with WebGPU rendering, a WebGL2 fallback and optional domain packs.","url":"https://margoengine.com/","codeRepository":"https://github.com/scottcampbelldata/margoengine","programmingLanguage":["TypeScript","Rust","WGSL"],"license":"https://opensource.org/license/mit","author":{"@type":"Person","name":"Scott Campbell"}}</script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="nav">
+    <a class="brand" href="./" translate="no">Margo Engine</a>
+    <nav aria-label="Primary">
+      <a href="#start">Get started</a>
+      <a href="#packages">Packages</a>
+      <a href="./catalog/">Catalog</a>
+      <a href="https://github.com/scottcampbelldata/margoengine">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="hero-copy">
+        <h1>A 3D engine for the web that starts at 20&nbsp;KB.</h1>
+        <p class="lede">A Rust and Wasm kernel with WebGPU rendering, a WebGL2 fallback, and optional packs you load only when needed.</p>
+        <p class="actions">
+          <a class="button primary" href="#start">Get started</a>
+          <a class="button" href="./night-citadel/">Open the live demo</a>
+        </p>
+      </div>
+      <a class="hero-shot" href="./night-citadel/">
+        <img src="./images/night-citadel.jpg" width="1280" height="800" alt="Night Citadel, a procedural castle under a moon, rendered live by Margo Engine" fetchpriority="high">
+      </a>
+    </section>
+
+    <section id="start" class="start">
+      <h2>Five lines to a rendered scene</h2>
+      <p class="section-lede">The <code>margoengine</code> facade mounts a canvas, enables orbit controls and starts rendering.</p>
+      <pre tabindex="0"><code>import {createStage} from 'margoengine';
+const app = await createStage('#scene');
+const orb = app.sphere({color: '#84d6bd', roughness: 0.25});
+app.onTick(delta => {orb.rotation.z += delta;});
+window.addEventListener('pagehide', () => app.dispose(), {once: true});</code></pre>
+      <div class="two">
+        <div>
+          <h3>Run it from source today</h3>
+          <pre tabindex="0"><code>git clone https://github.com/scottcampbelldata/margoengine.git margoengine
+cd margoengine
+npm ci
+npm run dev</code></pre>
+          <p>Needs Node.js 22.12 or newer. The Wasm kernel is checked in, so no Rust toolchain is required.</p>
+        </div>
+        <div>
+          <h3>What is on npm right now</h3>
+          <p>The Margo release includes 60 packages under <code>@margoengine</code> and the <code>margoengine</code> stage facade. npm publication is pending. Once published, install the core in your app:</p>
+          <pre tabindex="0"><code>npm install @margoengine/core</code></pre>
+          <p><a href="./catalog/">Browse all packages, npm availability and runnable examples</a></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="core">
+      <h2>What the core gives you</h2>
+      <dl>
+        <div><dt>About 20 KB gzip</dt><dd>Core plus the stage facade, embedded Wasm and both backends included. CI rejects any build at 20,000 bytes gzip or above.</dd></div>
+        <div><dt>Transforms in Wasm memory</dt><dd>Hierarchy, culling and world matrices run in a Rust kernel over flat typed arrays, up to 100,000 entities per engine.</dd></div>
+        <div><dt>Instancing by default</dt><dd>Meshes that share a geometry are drawn in one instanced call, even when their materials differ.</dd></div>
+        <div><dt>WebGPU first, WebGL2 fallback</dt><dd>Reversed float depth, GPU picking and automatic device-loss recovery on WebGPU. Basic scenes still render on WebGL2.</dd></div>
+        <div><dt>Plugins, not a monolith</dt><dd>Frame-graph passes and shader hooks let optional packs add features without growing the base bundle.</dd></div>
+      </dl>
+    </section>
+
+    <section id="packages" class="packages">
+      <h2>Optional packs</h2>
+      <p class="section-lede">Each pack is a separate, tree-shakable package. Your app loads only the ones it imports.</p>
+      <div class="groups">
+        <div>
+          <h3>Assets</h3>
+          <p><code>gltf</code> and <code>gltf-pro</code> for static and textured glTF, <code>blender</code> for prepacked <code>.margo</code> exports, plus loaders for STL, OBJ, PLY, 3MF, USDZ and IFC.</p>
+        </div>
+        <div>
+          <h3>Rendering</h3>
+          <p><code>environment</code> for HDR image-based lighting, <code>shadows</code>, <code>clustered</code> lights, <code>post</code> for SSAO, <code>taa</code>, <code>tonemap</code> and <code>lines</code>.</p>
+        </div>
+        <div>
+          <h3>Interaction</h3>
+          <p><code>controls</code> for orbit, fly and transform gizmos, <code>selection</code> for outlines and picking, and <code>react</code> for ordinary React 18 and 19 components.</p>
+        </div>
+        <div>
+          <h3>Domains</h3>
+          <p><code>machinery</code> for joints, sections, dimensions and CAD import, <code>creative</code> and <code>vfx</code> for particles and post effects, <code>scenery</code>, <code>terrain</code> and <code>splats</code>.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="demos">
+      <h2>See it running</h2>
+      <p class="section-lede">Every demo below runs live in your browser. They need WebGPU, so use a current Chrome or Edge on desktop.</p>
+      <div class="tiles">
+        <a class="tile wide" href="./night-citadel/">
+          <img src="./images/night-citadel.jpg" width="1280" height="800" alt="" loading="lazy">
+          <span><strong>Night Citadel</strong> Procedural architecture, a moving moon, stars and shadows, with live controls.</span>
+        </a>
+        <a class="tile" href="./gameplay-sandbox/">
+          <img src="./images/gameplay-sandbox.jpg" width="1280" height="800" alt="" loading="lazy">
+          <span><strong>Gameplay sandbox</strong> Terrain, water, scattered foliage, lights and effects in one real-time scene.</span>
+        </a>
+        <a class="tile" href="./demos/damaged-helmet.html">
+          <img src="./images/damaged-helmet.jpg" width="1280" height="800" alt="" loading="lazy">
+          <span><strong>Damaged helmet</strong> Textured PBR with an ambient occlusion toggle.</span>
+        </a>
+        <a class="tile" href="./demos/character-animation.html">
+          <img src="./images/character-animation.jpg" width="1280" height="800" alt="" loading="lazy">
+          <span><strong>Character study</strong> A walking robot with animation clips and facial morph sliders.</span>
+        </a>
+        <a class="tile" href="./demos/windy-meadow.html">
+          <img src="./images/windy-meadow.jpg" width="1280" height="800" alt="" loading="lazy">
+          <span><strong>Windy meadow</strong> 100,000 blades of grass moving in a breeze you control.</span>
+        </a>
+      </div>
+      <p class="more"><a href="./catalog/">Browse the published packages and their runnable examples</a></p>
+    </section>
+
+    <section class="status">
+      <h2>Where it stands</h2>
+      <p>Margo Engine is at version 0.1.0 and MIT licensed. WebGPU needs a supporting browser on HTTPS or localhost. Particles, sections, image-based lighting and the scenery pack require WebGPU; CPU-side machinery and CAD tools work on either backend. It has been verified in Chrome and Edge on desktop. Firefox, Safari and mobile GPUs are not yet verified.</p>
+    </section>
+  </main>
+
+  <footer>
+    <p>Margo Engine is dedicated to Margie.</p>
+    <p><a href="https://github.com/scottcampbelldata/margoengine">Source on GitHub</a> <a href="https://github.com/scottcampbelldata/margoengine/blob/main/LICENSE">MIT license</a> <a href="./catalog/">Catalog</a></p>
+  </footer>
+</body>
+</html>

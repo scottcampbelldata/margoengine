@@ -1,5 +1,6 @@
 import type {PassContext, Vec3} from '@margoengine/core/extension';
 import {finiteVector} from '../../shared/math.js';
+import {sceneSamples} from '../../shared/quality.js';
 import surfaceSource from './shaders/planet_surface.wgsl?raw';
 import atmosphereSource from './shaders/planet_atmosphere.wgsl?raw';
 
@@ -85,7 +86,7 @@ export class PlanetPass {
       const views = [texture(images.day, true, [255,255,255,255]), texture(images.night, true, [0,0,0,255]), texture(images.specular, false, [0,255,0,255]), texture(images.normal, false, [128,128,255,255]), texture(images.clouds, false, [0,0,0,255])];
       const sampler = device.createSampler({addressModeU: 'repeat', addressModeV: 'clamp-to-edge', minFilter: 'linear', magFilter: 'linear'});
       const surfaceModule = device.createShaderModule({code: surfaceSource}), shellModule = device.createShaderModule({code: atmosphereSource});
-      for (const target of new Set([format, 'rgba16float' as GPUTextureFormat])) for(const count of [1,4]) {
+      for (const target of new Set([format, 'rgba16float' as GPUTextureFormat])) for(const count of sceneSamples()===1?[1]:[1,4]) {
         const pipeline = (module: GPUShaderModule, shell: boolean) => device.createRenderPipeline({
           layout: 'auto', vertex: {module, entryPoint: 'vs_main', buffers: [{arrayStride: 12, attributes: [{shaderLocation: 0, offset: 0, format: 'float32x3'}]}]},
           fragment: {module, entryPoint: 'fs_main', constants: {outputHdr: +(target === 'rgba16float')}, targets: [{format: target, blend: shell ? {color: {srcFactor: 'one', dstFactor: 'one-minus-src-alpha'}, alpha: {srcFactor: 'one', dstFactor: 'one-minus-src-alpha'}} : undefined}]},

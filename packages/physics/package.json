@@ -6,7 +6,7 @@
   "description": "Rigid-body physics for Margo Engine on Rapier: fixed-step engine plugin with interpolation, colliders, joints, queries, events and a character controller.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/vexel.git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/physics"
   },
   "publishConfig": {
@@ -36,5 +36,6 @@
     "@dimforge/rapier3d-compat": {
       "optional": true
     }
-  }
+  },
+  "homepage": "https://margoengine.com"
 }

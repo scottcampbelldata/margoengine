@@ -11,9 +11,11 @@ export interface ClusteredOptions {grid?:readonly [number,number,number]}
 export interface ClusteredReceiver {addLighting(effect:Clustered):()=>void}
 export class Clustered implements EnginePlugin {
   readonly name='clustered';readonly grid:readonly [number,number,number];
+  /** Multiplies all local lights; a callback is sampled each render. */
+  intensityScale:number|(()=>number)=1;
   private engine?:Engine;private device?:GPUDevice;private uniform?:GPUBuffer;private lights?:GPUBuffer;private pipeline?:GPUComputePipeline;private group?:GPUBindGroup;
   private counts?:GPUBuffer;private indices?:GPUBuffer;private entries:GPUBindGroupEntry[]=[];private receivers=new Map<ClusteredReceiver,()=>void>();
-  private readonly values=new Float32Array(28);private readonly ints=new Uint32Array(this.values.buffer);private readonly data=new Float32Array(1024*16);private lightCount=0;private dirty=true;private disposed=false;
+  private readonly values=new Float32Array(32);private readonly ints=new Uint32Array(this.values.buffer);private readonly data=new Float32Array(1024*16);private lightCount=0;private dirty=true;private disposed=false;
   constructor(options:ClusteredOptions={}) {const grid=options.grid??[16,9,24];if(grid.length!==3||grid.some(v=>!Number.isInteger(v)||v<1||v>128)||grid.reduce((a,b)=>a*b,1)>32768)throw new RangeError('Invalid cluster grid');this.grid=[...grid] as [number,number,number];}
   get owner():Engine|undefined {return this.engine;}
   static attach(instance:EngineKernel,options:ClusteredOptions={}):Clustered {const effect=new Clustered(options);engineRuntime(instance).use(effect);return effect;}
@@ -40,14 +42,16 @@ export class Clustered implements EnginePlugin {
     const count=this.grid[0]*this.grid[1]*this.grid[2],bytes=count*1024*4;
     if(bytes>this.device.limits.maxStorageBufferBindingSize||bytes>this.device.limits.maxBufferSize)throw new RangeError('Cluster index list exceeds device limit');
     const buffer=(size:number,usage:number)=>this.device!.createBuffer({size,usage:usage|GPUBufferUsage.COPY_DST});
-    this.uniform=buffer(112,GPUBufferUsage.UNIFORM);this.lights=buffer(this.data.byteLength,GPUBufferUsage.STORAGE);this.counts=buffer(count*4,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC);this.indices=buffer(bytes,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC);
+    this.uniform=buffer(128,GPUBufferUsage.UNIFORM);this.lights=buffer(this.data.byteLength,GPUBufferUsage.STORAGE);this.counts=buffer(count*4,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC);this.indices=buffer(bytes,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC);
     this.pipeline=this.device.createComputePipeline({layout:'auto',compute:{module:this.device.createShaderModule({code:cullingShader}),entryPoint:'main'}});
     this.entries=[this.uniform,this.lights,this.counts,this.indices].map((buffer,i)=>({binding:i+4,resource:{buffer}}));this.group=this.device.createBindGroup({layout:this.pipeline.getBindGroupLayout(0),entries:this.entries});this.dirty=true;
   }
   registerPasses(graph:FrameGraph):void {graph.add({name:this.name,order:-3,execute:c=>{if(c.backend!=='webgpu')return;
+    const intensity=typeof this.intensityScale==='function'?this.intensityScale():this.intensityScale;
+    if(typeof intensity!=='number'||!Number.isFinite(Math.fround(intensity))||intensity<0)throw new RangeError('Invalid clustered intensity scale');
     for(const [receiver,remove] of this.receivers)if('disposed' in receiver&&receiver.disposed){remove();this.receivers.delete(receiver);}
     if(this.dirty){if(this.lightCount)c.device.queue.writeBuffer(this.lights!,0,this.data as Float32Array<ArrayBuffer>,0,this.lightCount*16);this.dirty=false;}
-    viewMatrix(this.values.subarray(0,16),c.camera);this.ints.set([...this.grid,this.lightCount],16);this.values.set([c.width,c.height,Math.tan(c.camera.fov*Math.PI/360),c.width/c.height,c.camera.near,c.camera.far,0,0],20);
+    viewMatrix(this.values.subarray(0,16),c.camera);this.ints.set([...this.grid,intensity===0?0:this.lightCount],16);this.values.set([c.width,c.height,Math.tan(c.camera.fov*Math.PI/360),c.width/c.height,c.camera.near,c.camera.far,0,0],20);this.values[28]=intensity;
     // Map jittered fragments back to the unjittered culling grid using the projection's screen offset.
     const m=c.camera.matrix,v=this.values;v[26]=-0.5*(m[0]*v[2]+m[4]*v[6]+m[8]*v[10]);v[27]=0.5*(m[1]*v[2]+m[5]*v[6]+m[9]*v[10]);c.device.queue.writeBuffer(this.uniform!,0,v as Float32Array<ArrayBuffer>);
     const pass=c.encoder.beginComputePass();pass.setPipeline(this.pipeline!);pass.setBindGroup(0,this.group!);pass.dispatchWorkgroups(Math.ceil(this.grid[0]*this.grid[1]*this.grid[2]/64));pass.end();c.shader=this.shader(c.shader);c.bindings.push(...this.bindings());

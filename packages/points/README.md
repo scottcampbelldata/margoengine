@@ -2,7 +2,7 @@
 
 Large point clouds and instanced sprites for Margo Engine, WebGPU: the counterparts of Three.js `Points`, `PointsMaterial`, `Sprite` and `SpriteMaterial`, built for millions of points.
 
-Not yet published to npm. Build from source with `npm run build` in `packages/points`.
+Build from source with `npm run build` in `packages/points`.
 
 ```ts
 import {Engine} from '@margoengine/core';

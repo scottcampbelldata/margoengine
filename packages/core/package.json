@@ -4,10 +4,30 @@
   "description": "Lean WebGPU/WebGL2 rendering with a deterministic Rust/Wasm transform kernel.",
   "type": "module",
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/scottcampbelldata/vexel.git", "directory": "packages/core" },
-  "publishConfig": { "access": "public" },
-  "scripts": { "prepack": "npm --prefix ../.. run build:packages" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/core"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prepack": "npm --prefix ../.. run build:packages"
+  },
   "sideEffects": false,
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }, "./extension":{"types":"./dist/extension.d.ts","import":"./dist/extension.js"} },
-  "files": ["dist"]
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./extension": {
+      "types": "./dist/extension.d.ts",
+      "import": "./dist/extension.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "homepage": "https://margoengine.com"
 }

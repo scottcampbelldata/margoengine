@@ -2,7 +2,7 @@
 
 Crisp GPU text for Margo Engine: signed distance field glyphs generated at runtime from any browser font, with wrapping, alignment, anchors, outlines, soft shadows and billboards, as a WebGPU engine plugin.
 
-Not yet published to npm. Build from source with `npm run build` in `packages/text`.
+Build from source with `npm run build` in `packages/text`.
 
 Replaces troika-three-text's `Text` and the label and signage use cases of the three.js `TextGeometry` add-on.
 

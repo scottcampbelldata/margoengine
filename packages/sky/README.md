@@ -8,6 +8,14 @@ const sky = Sky.attach(engine, {model: 'bruneton', hours: 12, timeScale: 1 / 360
 sky.options.hours = 18;
 ```
 
+The procedural sun and moon use prominent stylized discs (angular radii 0.014
+and 0.018 radians), bright HDR cores and localized soft halos. Disc edges are
+filtered by pixel footprint, including the coarse borrowed sky reflection.
+Atmospheric transmittance tints the sun; clouds continue to occlude both bodies.
+The moon uses a lower radiance and tighter halo to keep its antialiased limb
+readable through HDR bloom. Moon appearance follows the optional moon lighting
+described below; caller exposure and bloom strength still affect its glow.
+
 Set `clouds: {coverage: 0.45, speed: 8, height: 1500}` for an optional animated
 procedural cloud layer. Coverage is 0–1, speed is signed world meters per second
 along a fixed XZ wind direction, and height is 100–10,000 world meters. Defaults
@@ -25,6 +33,12 @@ for optional water reflection. Reading the getter enables its GPU refresh on
 subsequent frames; it uses the existing atmospheric tables. The texture changes
 on device restoration and must not be destroyed by its consumer.
 
+`sky.lights` exposes two retained sun/moon records updated before rendering. Each
+holds `direction` (XYZ plus intensity) and RGB `radiance`. Pass these to
+`Water.attach(engine, {lights: sky.lights})` for separate reflection paths during
+dusk. The engine's single blended light still drives scene lighting and shadows.
+With no `lighting` options, both direct reflection intensities are zero.
+
 The clock and sun update before rendering, so shadows and scene lighting can use
 the same frame's direction. Set `lighting: {intensity: 6, minimum: 0.15}` to copy
 the sun direction into engine lighting and scale direct intensity by sun elevation.
@@ -41,14 +55,19 @@ Sky.attach(engine, {hours: 18.5, lighting: {
 }});
 ```
 
-The moon defaults to 10% of sun intensity and a cool blue color. It stays high
-in the sky; sunset/sunrise blend one directional source for existing PCSS shadows
+The moon defaults to 10% of sun intensity and a cool blue color. Its visual preset
+sits about 12° above the horizon; sunset/sunrise blend one directional source for existing PCSS shadows
 and water specular lighting. The atmospheric background and borrowed reflection
 texture share the same night fade. This is a visual preset, with no lunar orbit
 or phase calculation. RGB ambient patches the standard scene shader (including
 scatter and mesh terrain) at group 0, binding 8, and composes with shadows and
 clustered lights. Custom renderers using their own shaders need their own ambient
 integration. The background fades to night even when scene moon lighting is omitted.
+
+`sky.nightFactor` exposes the same dusk/dawn blend: 0 in daylight and 1 at night.
+It updates before rendering, including paused manual renders. To switch local
+lights and emissive batches together, set `lights.intensityScale =
+instances.emissiveIntensity = () => sky.nightFactor` using clustered and scatter.
 
 This is a compact atmospheric approximation, not a reference-quality reproduction of the original planetary renderer: no ozone spectrum, ground-albedo irradiance feedback, terrain light shafts or aerial perspective. Coarse horizon/angular sampling can band. Preetham is a daytime model with a night fade.
 

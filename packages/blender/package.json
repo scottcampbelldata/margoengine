@@ -5,9 +5,31 @@
   "license": "MIT",
   "description": "Optional offline Blender .margo assets using Margo's WebGPU PBR renderer.",
   "sideEffects": false,
-  "files": ["dist", "FORMAT.md"],
-  "exports": {".": {"types": "./dist/index.d.ts", "import": "./dist/index.js"}},
-  "scripts": {"test": "node --test tests/*.test.js", "prepack": "npm --prefix ../.. run build:packages"},
-  "peerDependencies": {"@margoengine/core": "^0.1.0 || ^1.0.0", "@margoengine/gltf-pro": "^0.1.0 || ^1.0.0"},
-  "publishConfig": {"access": "public"}
+  "files": [
+    "dist",
+    "FORMAT.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "prepack": "npm --prefix ../.. run build:packages"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^0.1.0 || ^1.0.0",
+    "@margoengine/gltf-pro": "^0.1.0 || ^1.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "homepage": "https://margoengine.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/blender"
+  }
 }

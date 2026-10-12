@@ -4,7 +4,7 @@ import {pathToFileURL} from 'node:url';
 import {resolve} from 'node:path';
 import {checkCoreBudget, CORE_STAGE_GZIP_LIMIT} from './core-budget.js';
 
-export const compactOutput = {minify: {codegen: true}, comments: {annotation: true}};
+export const compactOutput = {minify: {compress: {dropDebugger: true}, mangle: true, codegen: true}, comments: {annotation: true}};
 export const external = ['@margoengine/core', '@margoengine/core/extension', '@margoengine/animation', '@margoengine/gltf-pro', '@margoengine/blender', '@margoengine/gltf', '@margoengine/machinery', '@margoengine/creative', '@margoengine/scenery', '@margoengine/environment', '@margoengine/controls', '@margoengine/shadows', 'margoengine', 'react', 'react/jsx-runtime'];
 
 export async function measureCoreStage() {

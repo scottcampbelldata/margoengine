@@ -52,7 +52,12 @@ the deformation. Grass LODs use identical motion; fixed instance shadows use the
 same bend and clock in every cascade. Use `shadows.add(instances)` for moving
 vegetation, without the static-shadow option. Cull bounds include wind movement.
 Use upright vegetation whose local origin is its ground root. This is a lightweight
-whole-plant bend, without branch joints, leaf simulation or collision deformation.
+whole-plant bend. Fixed `ScatterBatch` can additionally set `windDetail: 1` (0–1)
+for faster branch/foliage ripple. Radial stiffness anchors the trunk and plant
+center, while two detail frequencies vary across each plant. Normals use the
+deformation's analytic inverse Jacobian, and all shadow cascades share the same
+deformation. Omit detail for the original sway. This approximation has no branch
+skeletons, individual leaf simulation or collision deformation.
 
 For fixed placement with the engine's PBR lighting and PCSS shadows, use the
 separate `ScatterInstances` export:
@@ -65,8 +70,11 @@ shadows.add(instances, {static: true});
 
 Each `ScatterBatch` supplies an 80-byte `vertices` stream, Uint32 `indices`,
 column-major affine `transforms` (16 floats per instance), a `PbrMaterial`, and
-a diagnostic `name`. Vertex RGB at byte offset 64 multiplies the instance albedo,
-supporting baked contact/ambient occlusion. The factory runs at initialization and device restoration.
+a diagnostic `name`. Vertex RGB at byte offset 64 multiplies the instance albedo;
+vertex alpha at byte offset 76 controls ambient occlusion, independently of direct
+light, emission and opacity. `pbrVertexStream(data, occlusion)` from geometry packs
+this layout. Old manually packed RGB occlusion must move to alpha to retain the
+intended ambient-only effect. The factory runs at initialization and device restoration.
 Geometry and transforms are uploaded and not retained on the JavaScript heap;
 the factory must regenerate them instead of closing over large arrays. Each
 material batch uses one indexed indirect draw, including in every shadow cascade.
@@ -128,6 +136,10 @@ Fixed `ScatterInstances` batches accept `emissive: [r, g, b]` in linear HDR.
 Emission defaults to zero and is added after PBR lighting, shadows and baked
 occlusion; for example `[3, 2.16, 0.9]` makes a warm window bloom with optional
 `@margoengine/post`. Emission uploads with the batch and survives device restoration.
+`instances.emissiveIntensity` multiplies every batch's emission without replacing
+geometry or transforms. It defaults to 1 and accepts a nonnegative finite number
+or a callback sampled each render, such as `() => sky.nightFactor` for night lights.
+The value must fit a GPU float; the callback remains installed after restoration.
 
 Real WebGPU LOD, diffuse/PBR fade-mask and device-restoration checks:
 `npm run test:browser --workspace @margoengine/scatter` (build geometry/core first).

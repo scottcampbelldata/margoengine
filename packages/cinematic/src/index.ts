@@ -70,6 +70,8 @@ export class Cinematic implements EnginePlugin {
     const dy = this.cameraPosition[1] - this.lookAt[1];
     const lift = this.groundOffset(this.lookAt, this.cameraPosition[0] - this.lookAt[0], dy, this.cameraPosition[2] - this.lookAt[2]) - dy;
     if (lift > 0) {this.cameraPosition[1] += lift; this.position[1] += lift; this.velocity[1] = Math.max(0, this.velocity[1]);}
+    // Preserve upward look when terrain clearance lifts a requested below-target orbit.
+    if (this.options.ground && this.offset[1] < 0) this.cameraTarget[1] += Math.max(0, this.cameraPosition[1] - this.lookAt[1] - this.offset[1]);
     if (this.engine) {this.engine.camera.position = this.cameraPosition as unknown as Vec3; this.engine.camera.target = this.cameraTarget as unknown as Vec3;}
   }
   private validateGround(): void {

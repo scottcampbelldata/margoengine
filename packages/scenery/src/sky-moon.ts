@@ -24,7 +24,8 @@ export interface SkyMoonConfig {
 
 export class SkyMoonPass {
   private readonly pipeline: GPURenderPipeline;
-  private readonly msaaPipeline: GPURenderPipeline;
+  private msaaPipeline?: GPURenderPipeline;
+  private readonly descriptor: GPURenderPipelineDescriptor;
   private readonly uniformBuffer: GPUBuffer;
   private readonly bindGroup: GPUBindGroup;
   // 160 bytes; color padding retains twinkle, haze, and the precomputed moon sine.
@@ -84,7 +85,7 @@ export class SkyMoonPass {
           : undefined,
       };
       this.pipeline = device.createRenderPipeline(descriptor);
-      this.msaaPipeline = device.createRenderPipeline({...descriptor, multisample: {count: 4}});
+      this.descriptor = descriptor;
     } catch (error) {
       this.uniformBuffer.destroy();
       throw error;
@@ -183,9 +184,9 @@ export class SkyMoonPass {
     this.device.queue.writeBuffer(this.uniformBuffer, 0, data);
   }
 
-  /** Records a background triangle into a pass with matching color/depth formats (sample count 1). */
+  /** Records a background triangle with the scene's sample count. */
   record(passEncoder: GPURenderPassEncoder, sampleCount = 1): void {
-    passEncoder.setPipeline(sampleCount === 4 ? this.msaaPipeline : this.pipeline);
+    passEncoder.setPipeline(sampleCount === 4 ? this.msaaPipeline??=this.device.createRenderPipeline({...this.descriptor,multisample:{count:4}}) : this.pipeline);
     passEncoder.setBindGroup(0, this.bindGroup);
     passEncoder.draw(3, 1, 0, 0);
   }

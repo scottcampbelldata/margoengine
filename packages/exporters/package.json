@@ -6,7 +6,7 @@
   "description": "glTF/GLB, STL, OBJ and PLY exporters for Margo Engine scenes and geometry data.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/vexel.git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/exporters"
   },
   "publishConfig": {
@@ -30,5 +30,6 @@
   ],
   "peerDependencies": {
     "@margoengine/core": "^0.1.0 || ^1.0.0"
-  }
+  },
+  "homepage": "https://margoengine.com"
 }

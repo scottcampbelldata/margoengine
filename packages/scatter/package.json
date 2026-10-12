@@ -25,5 +25,12 @@
     "test": "npm run build && node --test test/*.test.js",
     "test:browser": "npm run build && node test/lod.browser.mjs",
     "prepack": "npm run build"
-  }
+  },
+  "homepage": "https://margoengine.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/scatter"
+  },
+  "description": "Seeded instancing, distance-based LOD and procedural wind."
 }

@@ -4,7 +4,8 @@ declare const GPUTextureUsage:{TEXTURE_BINDING:number;STORAGE_BINDING:number;COP
 declare const GPUBufferUsage:{STORAGE:number;COPY_SRC:number};
 export const waterFrame=`
 struct Wave {wave:vec4f,shape:vec4f}
-struct Frame {camera:mat4x4f,eye:vec4f,settings:vec4f,color:vec4f,cameraData:vec4f,waves:array<Wave,8>,coast:vec4f,flow:vec4f,sun:vec4f,radiance:vec4f}
+struct Light {direction:vec4f,radiance:vec4f}
+struct Frame {camera:mat4x4f,eye:vec4f,settings:vec4f,color:vec4f,cameraData:vec4f,waves:array<Wave,8>,coast:vec4f,flow:vec4f,sun:vec4f,radiance:vec4f,lights:array<Light,2>}
 @group(0) @binding(0) var<uniform> frame:Frame;
 `;
 export const oceanWaves=`
@@ -47,7 +48,11 @@ fn root(index:u32)->u32 {
  loop {let next=atomicLoad(&connected[p]);if(next==p){return p;}atomicMin(&connected[p],atomicLoad(&connected[next]));p=next;}
 }
 fn join(a:u32,b:u32){
- loop {let x=root(a);let y=root(b);if(x==y){return;}let high=max(x,y);if(atomicCompareExchangeWeak(&connected[high],high,min(x,y)).exchanged){return;}}
+ var x=a;var y=b;
+ loop {x=root(x);y=root(y);if(x==y){return;}let high=max(x,y);let low=min(x,y);let previous=atomicMin(&connected[high],low);if(previous==high){return;}
+  // Retry the displaced parent too, preserving its component when another thread links the root first.
+  x=previous;y=low;
+ }
 }
 @compute @workgroup_size(8,8) fn connect(@builtin(global_invocation_id) id:vec3u){
  let size=textureDimensions(terrain);if(any(id.xy>=size)){return;}let index=id.y*size.x+id.x+1u;if(atomicLoad(&connected[index])==0xffffffffu){return;}

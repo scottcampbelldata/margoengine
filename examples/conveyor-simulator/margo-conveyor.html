@@ -25,7 +25,7 @@
 <main aria-label="Margo conveyor benchmark viewer">
   <canvas id="canvas" width="920" height="652" tabindex="0" aria-label="Conveyor assembly. Drag to rotate, right drag to pan, scroll to zoom."></canvas>
   <section class="hud" aria-label="Rendering statistics">
-    <h1>Margo · WebGPU · no MSAA</h1>
+    <h1>Margo · WebGPU · 4× MSAA</h1>
     <dl><div><dt>FPS</dt><dd id="fps">—</dd></div><div><dt>Frame ms</dt><dd id="ms">—</dd></div><div><dt>Draws</dt><dd id="draws">—</dd></div><div><dt>Parts</dt><dd id="parts">—</dd></div></dl>
   </section>
   <section class="tools" aria-label="Benchmark controls">
@@ -108,16 +108,13 @@ addEventListener('pagehide',event=>{if(!event.persisted){cancelAnimationFrame(ra
 
 try{
   const [{Engine,Geometry,PbrMaterial,CADCameraControls},{engineRuntime,meshRuntime},{decodeMargo}]=await Promise.all([import('@margoengine/core'),import('@margoengine/core/extension'),import('@margoengine/blender')]);
-  // Engine.create requests the high-performance WebGPU adapter; no WebGL fallback or MSAA.
+  // Engine.create requests the high-performance WebGPU adapter and 4× MSAA.
   engine=api.engine=await Engine.create(canvas,{backend:'webgpu',capacity:1024,camera:{fov:38}});
   api.camera=engine.camera;
   engine.onError=fail;
   const runtime=engineRuntime(engine);runtime.lighting.direction.set([-30,100,75,2.3]);runtime.lighting.radiance.set([1,0.93011,0.8388,0.282095]);
-  let source='',shader='',depth=null,depthView=null;
-  engine.use({name:'conveyor-aces',setup(){},dispose(){depth?.destroy();},onDeviceRestored(){depth?.destroy();depth=depthView=null;},registerPasses(graph){graph.add({name:'conveyor-aces',order:-25,execute(context){
-    // Own a single-sample depth target so a workspace MSAA default cannot change this benchmark.
-    if(!depth){depth=context.device.createTexture({size:[920,652],sampleCount:1,format:context.descriptor.depthStencil.format,usage:GPUTextureUsage.RENDER_ATTACHMENT});depthView=depth.createView();}
-    context.depth=depthView;
+  let source='',shader='';
+  engine.use({name:'conveyor-aces',setup(){},registerPasses(graph){graph.add({name:'conveyor-aces',order:-25,execute(context){
     if(context.shader!==source){source=context.shader;shader=source.replace('let mapped=linear/(1.0+linear);','let mapped=conveyorACES(linear);')+`
 fn conveyorACES(color:vec3f)->vec3f {
   let x=mat3x3f(0.59719,0.07600,0.02840,0.35458,0.90834,0.13383,0.04823,0.01566,0.83777)*(color*(1.08/0.6));

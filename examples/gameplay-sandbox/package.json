@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "dev:lan": "node serve-lan.mjs",
     "build": "tsc --noEmit && vite build",
     "test": "node --test test/*.test.js",
     "test:browser": "node test/shared.browser.mjs",

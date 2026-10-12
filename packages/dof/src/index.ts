@@ -1,3 +1,4 @@
+import {SceneTarget} from '../../shared/msaa.js';
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext} from '@margoengine/core/extension';
 import {cocShader, bokehShader, presentShader} from './shaders.js';
@@ -40,6 +41,7 @@ export class DOF implements EnginePlugin {
   private readonly shaders=new Map<string,string>();
   private readonly attachment:GPURenderPassColorAttachment={view:undefined!,loadOp:'clear',storeOp:'store'};
   private readonly presentation:GPURenderPassDescriptor={colorAttachments:[this.attachment]};
+  private captureTarget?:SceneTarget;
   private disposed=false;
 
   constructor(readonly options:DOFOptions={}){this.validate();}
@@ -79,7 +81,7 @@ export class DOF implements EnginePlugin {
       if(shader===c.shader)throw new Error('DOF requires the standard core lighting shader');
       this.shaders.set(c.shader,shader);
     }
-    c.shader=shader;c.color=this.sceneView!;c.depth=this.depthView!;c.format='rgba16float';
+    c.shader=shader;this.captureTarget!.begin(c);
     const o=this.options,v=this.values;v[0]=o.focalDistance??5;v[1]=o.focalLength??0.05;v[2]=o.aperture??2.8;v[3]=o.maxRadius??16;
     v[4]=c.camera.near;v[5]=c.camera.far;
     v[6]=v[1]*c.height/(4*v[2]*(v[0]-v[1])*Math.tan(c.camera.fov*Math.PI/360));v[7]=+this.enabled;
@@ -95,23 +97,25 @@ export class DOF implements EnginePlugin {
     this.depth=c.device.createTexture({size:[c.width,c.height],format:depthFormat,usage:sampled|GPUTextureUsage.RENDER_ATTACHMENT});
     this.coc=c.device.createTexture({size:[c.width,c.height],format:'rg32float',usage:storage});
     this.output=c.device.createTexture({size:[c.width,c.height],format:'rgba16float',usage:storage|GPUTextureUsage.COPY_SRC});
+    this.captureTarget=new SceneTarget(c.device,this.scene,this.depth,c.descriptor.multisample?.count??4);
     this.sceneView=this.scene.createView();this.depthView=this.depth.createView();
     const cocView=this.coc.createView(),outputView=this.output.createView();
     const module=c.device.createShaderModule({code:presentShader});
-    this.presentPipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]}});
+    this.presentPipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]},multisample:c.descriptor.multisample});
     this.groups=[c.device.createBindGroup({layout:this.cocPipeline!.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform!}},{binding:1,resource:this.depth.createView({aspect:'depth-only'})},{binding:2,resource:cocView}]}),
       c.device.createBindGroup({layout:this.bokehPipeline!.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform!}},{binding:1,resource:this.sceneView},{binding:2,resource:cocView},{binding:3,resource:outputView}]}),
       c.device.createBindGroup({layout:this.presentPipeline.getBindGroupLayout(0),entries:[{binding:0,resource:outputView}]})];
   }
   private dispatch(c:Context,pipeline:GPUComputePipeline,group:GPUBindGroup):void {
+    if(pipeline===this.cocPipeline)this.captureTarget!.resolve(c.encoder,true);
     const pass=c.encoder.beginComputePass();pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.dispatchWorkgroups(Math.ceil(c.width/8),Math.ceil(c.height/8));pass.end();
   }
   private present(c:Context):void {
     this.attachment.view=this.originalColor!;
     const pass=c.encoder.beginRenderPass(this.presentation);pass.setPipeline(this.presentPipeline!);pass.setBindGroup(0,this.groups[2]);pass.draw(3);pass.end();
-    c.color=this.originalColor!;c.depth=this.originalDepth!;c.format=this.format!;
+    this.captureTarget!.restore(c);
   }
-  private releaseTextures():void {this.scene?.destroy();this.depth?.destroy();this.coc?.destroy();this.output?.destroy();this.scene=this.depth=this.coc=this.output=undefined;this.sceneView=this.depthView=undefined;this.groups=[];this.presentPipeline=undefined;}
+  private releaseTextures():void {this.captureTarget?.dispose();this.captureTarget=undefined;this.scene?.destroy();this.depth?.destroy();this.coc?.destroy();this.output?.destroy();this.scene=this.depth=this.coc=this.output=undefined;this.sceneView=this.depthView=undefined;this.groups=[];this.presentPipeline=undefined;}
   private release():void {this.releaseTextures();this.uniform?.destroy();this.uniform=undefined;this.cocPipeline=this.bokehPipeline=undefined;this.originalColor=this.originalDepth=undefined;this.shaders.clear();}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.engine=undefined;}
