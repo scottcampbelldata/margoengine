@@ -15,6 +15,7 @@ import './style.css';
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = element<HTMLCanvasElement>('scene'), status = element<HTMLParagraphElement>('status');
 const orbit = element<HTMLInputElement>('orbit'), cadence = element<HTMLSelectElement>('cadence');
+document.querySelector<HTMLDetailsElement>('.panel details')!.open = !matchMedia('(max-width: 700px), (max-height: 500px) and (pointer: coarse)').matches;
 const controls = ['azimuth','elevation','phase','haze','stars','glow','windows','waves','bloom','exposure'].map(id => element<HTMLInputElement>(id));
 const values = controls.map(input => element<HTMLOutputElement>(input.id+'-value'));
 const fpsText = element<HTMLOutputElement>('fps').firstChild as Text, deltaText = element<HTMLOutputElement>('delta').firstChild as Text;

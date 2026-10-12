@@ -72,13 +72,13 @@ async function waveHeights(page){
 }
 async function moonFraming(page){
   const frame=await page.evaluate(()=>{
-    const a=nightCitadel,m=a.camera.matrix,d=a.moon;
+    const a=nightCitadel,m=a.camera.matrix,d=a.moon,r=document.querySelector('#scene').getBoundingClientRect();
     const cw=m[3]*d[0]+m[7]*d[1]+m[11]*d[2];
-    const x=((m[0]*d[0]+m[4]*d[1]+m[8]*d[2])/cw*0.5+0.5)*innerWidth;
-    const y=(0.5-(m[1]*d[0]+m[5]*d[1]+m[9]*d[2])/cw*0.5)*innerHeight;
-    const radius=Math.tan(Math.asin(a.sky.uniformData[35]))*innerHeight/(2*Math.tan(a.camera.fov*Math.PI/360)*cw);
+    const x=r.left+((m[0]*d[0]+m[4]*d[1]+m[8]*d[2])/cw*0.5+0.5)*r.width;
+    const y=r.top+(0.5-(m[1]*d[0]+m[5]*d[1]+m[9]*d[2])/cw*0.5)*r.height;
+    const radius=Math.tan(Math.asin(a.sky.uniformData[35]))*r.height/(2*Math.tan(a.camera.fov*Math.PI/360)*cw);
     const covered=['.title','.panel'].some(selector=>{const r=document.querySelector(selector).getBoundingClientRect();return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom;});
-    return {x,y,radius,covered,width:innerWidth,height:innerHeight};
+    return {x,y,radius,covered,width:r.right,height:r.bottom};
   });
   assert(frame.x>frame.radius&&frame.x+frame.radius<frame.width&&frame.y>frame.radius&&frame.y+frame.radius<frame.height&&!frame.covered,'Opening moon is clipped or covered: '+JSON.stringify(frame));
   return frame;
@@ -203,9 +203,30 @@ try{
   const quality=await mobile.evaluate(()=>({samples:nightCitadel.stats.samples,textures:gpuAudit.textures.filter(t=>t.samples===4).length,pipelines:gpuAudit.pipelines.filter(s=>s===4).length,dpr:document.querySelector('canvas').width/innerWidth,overflow:document.documentElement.scrollWidth>innerWidth}));
   assert.deepEqual(quality,{samples:1,textures:0,pipelines:0,dpr:2,overflow:false});
   report.mobile=quality;
+  assert.equal(await mobile.locator('.panel details').getAttribute('open'),null,'Phone settings cover the opening scene');
+  await mobile.locator('summary').click();
+  await mobile.waitForFunction(()=>{const c=document.querySelector('#scene');return Math.abs(c.height-c.clientHeight*2)<=2;});
+  const drawerLayout=async()=>{
+    const layout=await mobile.evaluate(()=>{
+      const scene=document.querySelector('#scene').getBoundingClientRect(),panel=document.querySelector('.panel').getBoundingClientRect(),handle=document.querySelector('summary').getBoundingClientRect();
+      return {sceneBottom:scene.bottom,panelTop:panel.top,panelBottom:panel.bottom,handleTop:handle.top,handleBottom:handle.bottom,height:innerHeight,overflow:document.documentElement.scrollHeight>innerHeight+1};
+    });
+    assert(layout.sceneBottom<=layout.panelTop+1&&Math.abs(layout.panelBottom-layout.height)<1&&!layout.overflow,'Settings overlap the castle viewport: '+JSON.stringify(layout));
+    assert(layout.handleTop>=layout.panelTop&&layout.handleBottom<=layout.panelBottom,'Drawer close handle scrolled out of view: '+JSON.stringify(layout));
+    return layout;
+  };
+  report.mobileDrawer=await drawerLayout();
   report.waveHeights.mobile=await waveHeights(mobile);
   await mobile.locator('#orbit').uncheck();await mobile.locator('#reset').click();
-  await mobile.locator('summary').click();await mobile.screenshot({path:'test-results/night-citadel-mobile.png'});
+  await drawerLayout();
+  await mobile.screenshot({path:'test-results/night-citadel-mobile-settings.png'});
+  report.framing.push(await moonFraming(mobile));
+  for(const size of [{width:320,height:568},{width:844,height:390}]){
+    await mobile.setViewportSize(size);await mobile.waitForTimeout(150);await drawerLayout();
+  }
+  await mobile.setViewportSize({width:390,height:844});
+  await mobile.locator('summary').click();await mobile.waitForTimeout(150);
+  await mobile.screenshot({path:'test-results/night-citadel-mobile.png'});
   report.framing.push(await moonFraming(mobile));
   const oldRadius=await mobile.evaluate(()=>nightCitadel.motion[2]);
   const touch=await context.newCDPSession(mobile);
