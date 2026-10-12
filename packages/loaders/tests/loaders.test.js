@@ -167,7 +167,7 @@ test('PLY: real three.js dolphins (ascii, big-endian binary, colored) agree with
   const a = parsePLY(ascii), b = parsePLY(big), c = parsePLY(colored);
   assert.equal(a.positions.length / 3, 855); assert.equal(a.indices.length / 3, 1689);
   // Independent read of the ascii body.
-  const lines = new TextDecoder().decode(ascii).split('\n'), start = lines.indexOf('end_header') + 1;
+  const lines = new TextDecoder().decode(ascii).split(/\r?\n/), start = lines.indexOf('end_header') + 1;
   const expected = lines.slice(start, start + 855).flatMap(line => line.trim().split(/\s+/).map(Number));
   closeArray(a.positions, expected, 1e-6, 'dolphins ascii');
   const faces = lines.slice(start + 855, start + 855 + 1689).flatMap(line => line.trim().split(/\s+/).slice(1).map(Number));
@@ -175,7 +175,7 @@ test('PLY: real three.js dolphins (ascii, big-endian binary, colored) agree with
   closeArray(b.positions, a.positions, 1e-6, 'big-endian vs ascii');
   assert.deepEqual([...b.indices], [...a.indices]);
   closeArray(c.positions, a.positions, 1e-6, 'colored positions');
-  const coloredLines = new TextDecoder().decode(colored).split('\n'), colorStart = coloredLines.indexOf('end_header') + 1;
+  const coloredLines = new TextDecoder().decode(colored).split(/\r?\n/), colorStart = coloredLines.indexOf('end_header') + 1;
   const expectedColors = coloredLines.slice(colorStart, colorStart + 855).flatMap(line => line.trim().split(/\s+/).slice(3, 6).map(v => Number(v) / 255));
   closeArray(c.colors, expectedColors, 1e-6, 'dolphin colors');
   assert.ok(new Set(expectedColors).size > 2, 'fixture has several colors');
