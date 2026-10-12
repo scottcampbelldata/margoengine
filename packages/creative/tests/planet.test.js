@@ -177,6 +177,17 @@ test('a sibling image decoded after a failed map is closed before create rejects
   assert.equal(image.closed, 1); assert.equal(engine.plugins.size, 0); assert.equal(engine.meshes.size, 0);
 });
 
+test('concurrent decodes retain the combined image memory budget and close every bitmap', async t => {
+  const {engine, state} = fixture(t);
+  globals(t, {createImageBitmap: async () => {
+    const image = {width: 8192, height: 8192, closed: 0, close() {this.closed++;}};
+    state.bitmaps.push(image); return image;
+  }});
+  await assert.rejects(Planet.create(engine, {dayMap: '/day.png', nightMap: '/night.png'}), /256 MiB/);
+  assert.equal(state.bitmaps.length, 2); assert.ok(state.bitmaps.every(image => image.closed === 1));
+  assert.equal(state.uploads, 0); assert.equal(engine.plugins.size, 0); assert.equal(engine.meshes.size, 0);
+});
+
 test('caller cancellation closes an image decoded after teardown', async t => {
   const {engine} = fixture(t);
   let decoded, started;
