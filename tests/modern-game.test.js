@@ -9,6 +9,8 @@ import {VFX} from '../packages/vfx/dist/index.js';
 import {Animator,blend1D,blend2D,solveTwoBoneIK} from '../packages/animator/dist/index.js';
 import {Terrain,clipmapGrid} from '../packages/terrain/dist/index.js';
 import {animatedTriangle} from './support/gltf-pro-fixture.js';
+import {optionalGPU} from './support/optional-gpu.js';
+import {wgsl} from '../packages/core/src/shaders.ts';
 
 test('four practical cascades cover their frustum slices and snap small camera motion',()=>{
   assert.deepEqual([...cascadeSplits(1,100,0)],[25.75,50.5,75.25,100]);
@@ -43,6 +45,23 @@ test('game modules reject bad inputs before allocating GPU resources',()=>{
   assert.throws(()=>new Clustered({grid:[0,9,24]}),/grid/);const lights=new Clustered();assert.throws(()=>lights.setLights([{position:[0,0,0],range:0}]),/range/);assert.throws(()=>lights.setLights([{position:[0,0,0],range:1,direction:[0,0,0],outerAngle:0.2}]),/cone/);assert.throws(()=>lights.setLights(Array(1025).fill({position:[0,0,0],range:1})),/1,024/);
   for(const options of [{capacity:1000001},{lifetime:[0,1]},{bounce:2},{gravity:[NaN,0,0]},{emissionExtent:[-1,0,0]},{emissionExtent:[0,NaN,0]},{intensity:17}])assert.throws(()=>new VFX(options));assert.throws(()=>new VFX({capacity:10}).burst(11),/burst/);
   assert.throws(()=>new Terrain({textures(){},layers:[],size:[100,100]}),/options/);
+});
+
+test('clustered light intensity fades without changing authored lights and disables daylight lists',()=>{
+  const h=optionalGPU(),lights=new Clustered({grid:[2,2,2]});let scale=0,sampled=0;
+  lights.setLights([{position:[0,2,1],range:6,intensity:18}]);h.engine.use(lights);
+  const render=()=>{h.context.shader=wgsl;h.context.bindings=[];h.engine.frameGraph.execute(h.context);};
+  const uniform=()=>lights.bindings()[0].resource.buffer;
+  render();assert.equal(uniform().size,128);assert.equal(new Float32Array(uniform().data)[28],1);
+  const authored=new Float32Array(lights.bindings()[1].resource.buffer.data).slice(),created={...h.counts};
+  lights.intensityScale=()=>{sampled++;return scale;};
+  for(scale of [0,0.5,1]){render();assert.equal(new Float32Array(uniform().data)[28],scale);assert.equal(new Uint32Array(uniform().data)[19],scale===0?0:1);}
+  assert.equal(sampled,3);assert.equal(h.counts.buffers,created.buffers);assert.equal(h.counts.groups,created.groups);
+  assert.deepEqual(new Float32Array(lights.bindings()[1].resource.buffer.data),authored);assert.match(h.context.shader,/return result\*clusterFrame.intensity.x/);
+  scale=0.25;lights.onDeviceRestored(h.engine);render();assert.equal(new Float32Array(uniform().data)[28],scale);
+  assert.deepEqual(new Float32Array(lights.bindings()[1].resource.buffer.data),authored);
+  for(const invalid of [-1,NaN,Infinity,1e40,'1'])for(const value of [invalid,()=>invalid]){lights.intensityScale=value;assert.throws(render,/intensity scale/);}
+  lights.dispose();assert.ok(h.resources.every(r=>r.destroyed));
 });
 
 test('animator blends transforms/morphs, masks additive layers and switches gameplay states',async()=>{

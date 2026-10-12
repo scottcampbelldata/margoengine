@@ -2,7 +2,7 @@
 
 glTF 2.0 / GLB, STL, OBJ (with MTL), PLY and static USDZ export for Margo Engine scenes and plain geometry data.
 
-Not yet published to npm. Build from source with `npm run build` in `packages/exporters`.
+Build from source with `npm run build` in `packages/exporters`.
 
 ```ts
 import {exportGLB, exportGLTF, exportSTL, exportOBJ, exportPLY} from '@margoengine/exporters';

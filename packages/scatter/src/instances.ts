@@ -15,17 +15,19 @@ export interface ScatterBatch {
   /** Linear HDR emission, added after lighting and baked occlusion. */
   emissive?: readonly [number, number, number];
   wind?: ScatterWind;
+  /** Branch/foliage ripple, 0–1, layered over rooted wind. Defaults to 0. */
+  windDetail?: number;
 }
 interface Batch {vertex: GPUBuffer; index: GPUBuffer; instance: GPUBuffer; command: GPUBuffer}
 const vertexLayouts: GPUVertexBufferLayout[] = [
   {arrayStride: 80, attributes: [{shaderLocation: 0, offset: 0, format: 'float32x3'}, {shaderLocation: 1, offset: 16, format: 'float32x3'}, {shaderLocation: 8, offset: 64, format: 'float32x4'}]},
-  {arrayStride: 128, stepMode: 'instance', attributes: [...Array.from({length: 6}, (_, i) => ({shaderLocation: i + 2, offset: i * 16, format: 'float32x4' as const})), {shaderLocation: 9, offset: 96, format: 'float32x3'}, {shaderLocation: 10, offset: 112, format: 'float32x3'}]},
+  {arrayStride: 128, stepMode: 'instance', attributes: [...Array.from({length: 6}, (_, i) => ({shaderLocation: i + 2, offset: i * 16, format: 'float32x4' as const})), {shaderLocation: 9, offset: 96, format: 'float32x3'}, {shaderLocation: 10, offset: 112, format: 'float32x4'}]},
 ];
 const shadowShader = windShader+`
 struct ShadowFrame {camera:mat4x4f,time:vec4f}
 @group(0) @binding(0) var<uniform> frame:ShadowFrame;
-struct Input {@location(0) p:vec3f,@location(2) a:vec4f,@location(3) b:vec4f,@location(4) c:vec4f,@location(5) d:vec4f,@location(10) wind:vec3f}
-@vertex fn vertex(i:Input)->@builtin(position) vec4f {var p=mat4x4f(i.a,i.b,i.c,i.d)*vec4f(i.p,1);let bend=windBend(p.y-i.d.y,i.d.xz,vec4f(i.wind,frame.time.x));p=vec4f(p.x+bend.x,p.y,p.z+bend.y,1);return frame.camera*p;}
+struct Input {@location(0) p:vec3f,@location(2) a:vec4f,@location(3) b:vec4f,@location(4) c:vec4f,@location(5) d:vec4f,@location(10) wind:vec4f}
+@vertex fn vertex(i:Input)->@builtin(position) vec4f {var p=mat4x4f(i.a,i.b,i.c,i.d)*vec4f(i.p,1);let bend=windDeformation(p.xyz,i.d.xyz,vec4f(i.wind.xyz,frame.time.x),i.wind.w);p=vec4f(p.x+bend.offset.x,p.y,p.z+bend.offset.y,1);return frame.camera*p;}
 `;
 let serial = 0;
 
@@ -34,6 +36,8 @@ export class ScatterInstances implements EnginePlugin {
   readonly name = 'scatter:instances:' + ++serial;
   readonly batches: {name: string; vertices: number; indices: number; instances: number}[] = [];
   disposed = false;
+  /** Multiplies all batch emission; a callback is sampled each render. */
+  emissiveIntensity: number | (() => number) = 1;
   private engine?: Engine;
   private resources: Batch[] = [];
   private uniform?: GPUBuffer;
@@ -74,6 +78,7 @@ export class ScatterInstances implements EnginePlugin {
         if (!(b.vertices instanceof Float32Array) || !(b.indices instanceof Uint32Array) || !(b.transforms instanceof Float32Array) || !(b.material instanceof PbrMaterial) || !Number.isInteger(count) || count < 3 || count > 1_000_000 || !Number.isInteger(instances) || instances < 1 || instances > 1_000_000 || !b.indices.length || b.indices.length % 3 || b.indices.some(i => i >= count) || b.vertices.some(v => !Number.isFinite(v)) || b.transforms.some(v => !Number.isFinite(v))) throw new RangeError('Invalid PBR scatter batch');
         if (b.emissive !== undefined && (b.emissive.length !== 3 || [0,1,2].some(i => !Number.isFinite(Math.fround(b.emissive![i])) || b.emissive![i] < 0))) throw new RangeError('Invalid scatter emission');
         const windLength = b.wind ? validateWind(b.wind) : 1;
+        if (b.windDetail !== undefined && (!b.wind || !Number.isFinite(b.windDetail) || b.windDetail < 0 || b.windDetail > 1)) throw new RangeError('Invalid scatter wind detail');
         const wind = b.wind ? [b.wind[0]/windLength,b.wind[1]/windLength,b.wind[2]] : undefined;
         const packed = new Float32Array(instances * 32);
         for (let i = 0; i < instances; i++) {
@@ -84,6 +89,7 @@ export class ScatterInstances implements EnginePlugin {
           packed[i * 32 + 23] = -1; // Fixed batches have no core mesh ID.
           if (b.emissive) packed.set(b.emissive, i * 32 + 24);
           if (wind) packed.set(wind, i * 32 + 28);
+          packed[i * 32 + 31] = b.windDetail ?? 0;
         }
         const buffers: GPUBuffer[] = [];
         try {
@@ -109,15 +115,17 @@ export class ScatterInstances implements EnginePlugin {
     this.time = this.time + delta;
   }
   private draw(c: Context): void {
+    const intensity = typeof this.emissiveIntensity === 'function' ? this.emissiveIntensity() : this.emissiveIntensity;
+    if (typeof intensity !== 'number' || !Number.isFinite(Math.fround(intensity)) || intensity < 0) throw new RangeError('Invalid scatter emissive intensity');
     let changed = this.bindings.length !== c.bindings.length;
     for (let i = 0; !changed && i < this.bindings.length; i++) changed = this.bindings[i].resource !== c.bindings[i].resource;
     if (this.shader !== c.shader || this.format !== c.format + ':' + c.descriptor.multisample?.count || changed) {
       const code = windShader+c.shader.replace(/struct Frame \{[^}]+\}/, frame => frame.replace('}', ',windTime:vec4f }'))
-        .replace(/struct Input \{[^}]+\}/, input => input.replace('}', ',@location(8) vertexColor:vec4f,@location(9) emissive:vec3f,@location(10) wind:vec3f }'))
-        .replace(/struct Output \{[^}]+\}/, output => output.replace('}', ',@location(4) emissive:vec3f }'))
-        .replace('let p=model*vec4f(i.position,1);', 'var p=model*vec4f(i.position,1);let wind=vec4f(i.wind,frame.windTime.x);let bend=windBend(p.y-i.m3.y,i.m3.xz,wind);p=vec4f(p.x+bend.x,p.y,p.z+bend.y,1);')
-        .replace('o.color=i.color.rgb;', 'o.normal=windNormal(o.normal,bend,wind);o.color=i.color.rgb;')
-        .replace('o.color=i.color.rgb;', 'o.color=i.color.rgb*i.vertexColor.rgb;o.emissive=i.emissive;')
+        .replace(/struct Input \{[^}]+\}/, input => input.replace('}', ',@location(8) vertexColor:vec4f,@location(9) emissive:vec3f,@location(10) wind:vec4f }'))
+        .replace(/struct Output \{[^}]+\}/, output => output.replace('}', ',@location(4) emissive:vec3f,@location(5) occlusion:f32 }'))
+        .replace('let p=model*vec4f(i.position,1);', 'var p=model*vec4f(i.position,1);let wind=vec4f(i.wind.xyz,frame.windTime.x);let bend=windDeformation(p.xyz,i.m3.xyz,wind,i.wind.w);p=vec4f(p.x+bend.offset.x,p.y,p.z+bend.offset.y,1);')
+        .replace('o.color=i.color.rgb;', 'o.normal=windDetailNormal(o.normal,bend,wind);o.color=i.color.rgb*i.vertexColor.rgb;o.emissive=i.emissive*frame.windTime.y;o.occlusion=clamp(i.vertexColor.a,0.0,1.0);')
+        .replace('i.color*(1.0-i.material.y)*', 'i.color*(1.0-i.material.y)*i.occlusion*')
         .replace(/let linear=([^;]+);/, 'let linear=$1+i.emissive;');
       const module = c.device.createShaderModule({code});
       this.pipeline = c.device.createRenderPipeline({layout: 'auto', vertex: {module, entryPoint: 'vertex', buffers: vertexLayouts}, fragment: {module, entryPoint: 'fragment', targets: [{format: c.format}]}, multisample: c.descriptor.multisample, depthStencil: {...c.descriptor.depthStencil!, depthWriteEnabled: true, depthCompare: 'greater-equal'}});
@@ -126,7 +134,7 @@ export class ScatterInstances implements EnginePlugin {
     }
     this.values.set(c.camera.matrix); this.values.set(c.camera.position, 16);
     this.values.set(this.engine!.lighting.direction, 20); this.values.set(this.engine!.lighting.radiance, 24);
-    this.values[28] = this.time;
+    this.values[28] = this.time; this.values[29] = intensity;
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     this.color.view = c.color; this.depth.view = c.depth;
     const pass = c.encoder.beginRenderPass(this.presentation); pass.setPipeline(this.pipeline!); pass.setBindGroup(0, this.group!); this.drawBatches(pass); pass.end();

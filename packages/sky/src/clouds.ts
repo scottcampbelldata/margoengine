@@ -12,7 +12,7 @@ fn cloudSky(color:vec3f,ray:vec3f,angularFootprint:f32)->vec3f {
  if(frame.clouds.x<=0.0||ray.y<=0.05||frame.eye.y>=frame.clouds.z){return color;}
  // Clamping the intersection angle stretches distant cloud edges into vertical columns.
  let height=frame.clouds.z-frame.eye.y;
- var p=(frame.eye.xz+ray.xz*height/ray.y)*0.001+vec2f(1,0.35)*frame.clouds.y*0.0006;
+ var p=(frame.eye.xz+ray.xz*height/ray.y)*0.001+normalize(vec2f(1,0.35))*frame.clouds.y*0.001;
  var footprint=angularFootprint*height*0.001/(ray.y*ray.y);
  var density=0.0;var weight=0.5;
  for(var octave=0;octave<4;octave++){density+=mix(cloudNoise(p),0.5,smoothstep(0.35,1.0,footprint))*weight;p=p*2.03+vec2f(17,29);weight*=0.5;footprint*=2.03;}

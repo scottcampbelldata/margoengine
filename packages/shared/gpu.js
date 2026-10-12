@@ -1,3 +1,4 @@
+import {SceneTarget,sceneTarget} from './msaa.js';
 export const fullscreen = `
 struct Vertex { @builtin(position) position:vec4f,@location(0) uv:vec2f }
 @vertex fn vertex(@builtin(vertex_index) index:u32)->Vertex {
@@ -23,19 +24,26 @@ export function acquireDepth(engine){
  if(engine.hasPlugin('ssao')||engine.hasPlugin('dof'))throw new Error('Supply the depth texture of the effect that owns scene capture');
  let value=engine[key];
  if(!value){
-  value={name:'optional:scene-depth',references:0,texture:undefined,view:undefined,original:undefined,
+  value={name:'optional:scene-depth',references:0,texture:undefined,color:undefined,target:undefined,borrowed:false,
    setup(){},registerPasses(graph){graph.add({name:this.name+':capture',order:-15,execute:c=>{
     if(c.backend!=='webgpu')return;
     if(engine.hasPlugin('ssao')||engine.hasPlugin('dof'))throw new Error('Supply the depth texture of the effect that owns scene capture');
-    if(this.texture?.width!==c.width||this.texture?.height!==c.height||this.texture?.format!==c.descriptor.depthStencil.format){
-     this.texture?.destroy();this.texture=c.device.createTexture({size:[c.width,c.height],format:c.descriptor.depthStencil.format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});
-     this.view=this.texture.createView();
-    }this.original=c.depth;c.depth=this.view;
-   }});graph.add({name:this.name+':restore',order:10000,execute:c=>{if(c.backend==='webgpu')c.depth=this.original;}});},
-   onDeviceRestored(){this.texture?.destroy();this.texture=undefined;this.view=undefined;},
-   dispose(){this.texture?.destroy();this.texture=undefined;this.view=undefined;delete engine[key];}
+    const existing=sceneTarget(c);this.borrowed=!!existing;
+    if(existing){this.borrowedDepth=existing.resolvedDepth;return;}
+    if(c.descriptor.multisample?.count===1){
+     if(this.texture?.width!==c.width||this.texture?.height!==c.height||this.texture?.format!==c.descriptor.depthStencil.format){this.onDeviceRestored();this.texture=c.device.createTexture({size:[c.width,c.height],format:c.descriptor.depthStencil.format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});this.depthView=this.texture.createView();}
+     c.depth=this.depthView;return;
+    }
+    if(this.texture?.width!==c.width||this.texture?.height!==c.height||this.texture?.format!==c.descriptor.depthStencil.format||this.color?.format!==c.format){
+     this.onDeviceRestored();this.texture=c.device.createTexture({size:[c.width,c.height],format:c.descriptor.depthStencil.format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});
+     this.color=c.device.createTexture({size:[c.width,c.height],format:c.format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});
+     this.target=new SceneTarget(c.device,this.color,this.texture,c.descriptor.multisample?.count??4);
+    }this.target.begin(c);
+   }});graph.add({name:this.name+':restore',order:10000,execute:c=>{if(c.backend==='webgpu'&&!this.borrowed&&c.descriptor.multisample?.count!==1)this.target.present(c);}});},
+   onDeviceRestored(){this.target?.dispose();this.texture?.destroy();this.color?.destroy();this.target=this.texture=this.color=this.depthView=undefined;},
+   dispose(){this.onDeviceRestored();delete engine[key];}
   };engine.use(value);engine[key]=value;
  }
  value.references++;let released=false;
- return {texture:()=>value.texture,release(){if(released)return;released=true;if(--value.references===0)engine.removePlugin(value.name);}};
+ return {texture:()=>value.borrowed?value.borrowedDepth:value.texture,release(){if(released)return;released=true;if(--value.references===0)engine.removePlugin(value.name);}};
 }

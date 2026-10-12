@@ -6,6 +6,11 @@ is the world XZ origin used for terrain sampling. It returns `floor`, `siding`,
 `roof`, `foundation` and `glass`; geometry remains local to that origin and floor.
 Supply your own PBR materials and instance transform. Every terrain sample is
 validated, and split architectural normals and UV-derived tangents are preserved.
+Plank seams are closed, exterior window/door casings sit flush with the siding,
+corner trim stands clear and overlapping roof courses have separate depth planes,
+avoiding pinholes, fragmented thin edges and z-fighting. Hidden
+plank caps are omitted; trim closes the wall skin. Enterable cabin interiors would
+need dedicated wall returns.
 
 `createIslandHeight(seed = 731)` returns the coastal island preset's world-height
 sampler. `generateGrassMesh(blades = 3)` returns crossed, tapered grass ribbons;
@@ -25,7 +30,9 @@ across split vertices while preserving UV seams and tangent frames.
 double-sided material. Both return `GeometryData` and are deterministic.
 `contactAO(y, groundY)` gives bounded ground-contact occlusion, and
 `radialAO(x,y,z,center,radius)` shades enclosed canopy volumes. Use their output
-with `pbrVertexStream()` from geometry to bake vertex colors at initialization.
+with `pbrVertexStream()` from geometry to bake ambient occlusion into vertex alpha
+at initialization. `ScatterInstances` applies it to ambient lighting; direct light
+and material albedo remain independent.
 
 Seeded 3D simplex, gradient Perlin and exact nearest-feature Worley noise, CPU Marching Cubes geometry, and standalone tree/shrub generators.
 

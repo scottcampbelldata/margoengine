@@ -14,12 +14,12 @@ export interface LoadedModel extends Pick<Mesh, 'position' | 'rotation' | 'scale
 
 export function worldBounds(instance: EngineKernel, meshes: Iterable<Mesh>, output: Float32Array, visibleOnly = false): Float32Array {
   const engine = engineRuntime(instance);
-  if (engine.disposed) throw new Error('Engine is disposed');
+  if (engine.disposed) throw new Error('Engine disposed');
   engine.store.tick(false); output.fill(Infinity, 0, 3); output.fill(-Infinity, 3);
   // shortcut: bounds scan vertices on access, cache local bounds if queried every frame.
   for (const handle of meshes) {
     const mesh = meshRuntime(handle); mesh.check();
-    if (mesh.engine !== engine) throw new TypeError('Mesh belongs to another engine');
+    if (mesh.engine !== engine) throw new TypeError('Mesh from another engine');
     if (!mesh.geometry || visibleOnly && !engine.store.visible[mesh.id]) continue;
     const vertices = mesh.geometry.vertices, m = mesh.matrix;
     for (let offset = 0; offset < vertices.length; offset += 6) {

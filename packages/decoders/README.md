@@ -2,7 +2,7 @@
 
 Worker-pooled Draco geometry decoding, KTX2/Basis Universal texture transcoding and EXT_meshopt_compression decoding for Margo Engine.
 
-Not yet published to npm. Build from source with `npm run build` in `packages/decoders`.
+Build from source with `npm run build` in `packages/decoders`.
 
 ```ts
 import {DracoDecoder, KTX2Decoder} from '@margoengine/decoders';

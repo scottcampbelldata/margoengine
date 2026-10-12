@@ -6,7 +6,7 @@
   "description": "WebGPU clustered forward point and spot lighting.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/vexel.git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/clustered"
   },
   "publishConfig": {
@@ -27,5 +27,6 @@
   ],
   "peerDependencies": {
     "@margoengine/core": "0.1.0"
-  }
+  },
+  "homepage": "https://margoengine.com"
 }

@@ -75,7 +75,7 @@ test('cabin has hard face normals, UV-derived tangent frames, recessed openings 
 test('settlement uploads baked AO and calibrated materials, registers shadows and adds no frame callback', () => {
   const h = optionalGPU(), casters = [];
   const {scatter, exclusions, porchLightPosition} = createProceduralSettlement(h.engine,{add:(source,options)=>casters.push({source,options})},terrainHeight);
-  assert.equal(scatter.batches.length,12); assert.deepEqual(casters,[{source:scatter,options:{static:true}}]);
+  assert.equal(scatter.batches.length,12); assert.deepEqual(casters,[{source:scatter,options:undefined}]);
   assert.deepEqual(porchLightPosition,[CABIN_POSITION[0]+0.9,generateCabinMesh(terrainHeight,CABIN_POSITION).floor+2.35,CABIN_POSITION[1]+5.3]);
   assert.ok(exclusions.length>30,'Landscape rocks reserve the building and plant footprints');
   assert.equal(scatter.batches.find(b=>b.name.includes('fern crowns')).instances,8);
@@ -85,16 +85,16 @@ test('settlement uploads baked AO and calibrated materials, registers shadows an
     if (buffer.usage!==40) continue;
     const values = new Float32Array(buffer.data);
     if (buffer.size%80===0 && scatter.batches.some(b=>b.vertices*80===buffer.size)) {
-      for (let i = 16; i < values.length; i += 20) colors.push(values[i]);
+      for (let i = 19; i < values.length; i += 20) colors.push(values[i]);
     }
     if (buffer.size===128) materials.push(Array.from(values.subarray(16,24)));
   }
   assert.ok(colors.every(ao=>ao>=0.19&&ao<=1)); assert.ok(colors.some(ao=>ao<0.3)); assert.ok(colors.some(ao=>ao===1));
   const glass = materials.find(m=>Math.abs(m[4]-0.15)<1e-6);
-  assert.deepEqual(glass.slice(0,3),MATERIALS.glass.color.map(Math.fround)); assert.equal(glass[5],Math.fround(0.2));
+  assert.deepEqual(glass.slice(0,3),MATERIALS.glass.color.map(Math.fround)); assert.equal(glass[5],0);
   const uploads=h.resources.filter(b=>b.usage===40);
-  assert.deepEqual(Array.from(new Float32Array(uploads[7].data).subarray(24,27)),[3,2.16,0.9].map(Math.fround));
-  assert.deepEqual(Array.from(new Float32Array(uploads[9].data).subarray(24,27)),[3,2.4,1.2].map(Math.fround));
+  assert.deepEqual(Array.from(new Float32Array(uploads[7].data).subarray(24,27)),[1.5,1.08,0.45].map(Math.fround));
+  assert.deepEqual(Array.from(new Float32Array(uploads[9].data).subarray(24,27)),[2,1.6,0.8].map(Math.fround));
   const fern = scatter.batches.findIndex(b=>b.name.includes('fern crowns'));
   const transformBuffer = h.resources.filter(b=>b.usage===40)[fern*2+1];
   assert.equal(new Float32Array(transformBuffer.data)[22],1,'Ribbon fronds are double sided');
@@ -109,8 +109,8 @@ test('ferns curve and taper, fieldstones deform, and vertex colors bake contact 
   assert.ok(p[31]-p[25]<p[7]-p[1],'Parabolic sag reduces upward slope towards tip');
   assert.equal(contactAO(-1,0),0.2); assert.equal(contactAO(0,0),0.2); assert.equal(contactAO(0.6,0),1);
   const vertices = vertexStream(fern,(_x,y)=>contactAO(y,0));
-  assert.equal(vertices[16],Math.fround(0.2)); assert.equal(vertices[19],1);
-  assert.ok(vertices.some((v,i)=>i%20===16&&v>0.8));
+  assert.equal(vertices[16],1); assert.equal(vertices[19],Math.fround(0.2));
+  assert.ok(vertices.some((v,i)=>i%20===19&&v>0.8));
   assert.throws(()=>vertexStream(fern,()=>NaN),/occlusion/);
   const radii = [];
   for (let i = 0; i < rock.positions.length; i += 3) radii.push(Math.hypot(rock.positions[i]/1.15,rock.positions[i+1]/0.72,rock.positions[i+2]/0.82));

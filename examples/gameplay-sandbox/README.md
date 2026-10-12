@@ -8,7 +8,8 @@ material palettes, module composition and UI/input wiring. A boundary test rejec
 custom GPU resources, geometry generators and camera math in its source.
 
 The scene enables the shared sky's procedural cloud layer and scatter's GPU wind
-for grass, trees, shrubs and ferns. Moving trees use dynamic PCSS shadows; cloud
+for grass, trees, shrubs and ferns, with shared branch/foliage ripple on the fixed
+vegetation batches. Moving trees use dynamic PCSS shadows; cloud
 motion also appears in the sky environment sampled by water. These effects live
 in the optional packages, with no sandbox shader overrides.
 
@@ -21,11 +22,20 @@ locally; first launch fetches no assets. The scene starts at 17:30.
 
 After sunset, shared `Sky` blends in blue moonlight at 10% of daytime intensity,
 keeps four PCSS shadow cascades active, and supplies a navy RGB ambient floor and
-matching sky/water reflections. Shared scatter batches give the recessed windows
+matching sky/water reflections. The shared moon preset sits about 12° above the
+horizon. Water uses the shared `Sky.lights` records to reflect the actual sun and
+moon separately, so dusk blending does not steer either bright path away from its
+disc. Waves still shimmer along each path. Drag upward or push the
+right touch stick upward to look at the sky; shared controls allow negative camera
+pitch and the cinematic rig preserves upward aim while keeping the camera above terrain.
+Shared scatter batches give the recessed windows
 and porch lantern warm HDR emission for bloom; existing `Clustered` lighting adds
 a 6 m porch light. Water foam and spray follow directional radiance, and warm
-HDR fireflies stand out against the darker scene. The porch light and windows stay
-on during the day; point lights use the clustered module's existing unshadowed path.
+HDR fireflies stand out against the darker scene. Shared `Sky.nightFactor` drives
+scatter emission and clustered light intensity together: off in daylight,
+fading on at dusk and off at dawn. Calibrated emission and restrained bloom keep
+window frames and the lantern visible. Point lights use the clustered module's
+existing unshadowed path.
 
 The ocean enables shared water horizon mode. Shoreline flow blends into offshore
 wave displacement, normals and optical depth at the terrain boundary; stretched
@@ -42,7 +52,7 @@ broadleaf trees combine fifteen noise-deformed geodesic lobes on three limbs.
 Pine support branches stay enclosed by their foliage. Pine normals radiate from each tier; all broadleaf normals radiate from one
 collective canopy centroid. Architectural corners retain split face normals.
 The existing geometry tangent helper computes UV-derived MikkTSpace-compatible
-frames. All streams use the 80-byte PBR layout with baked vertex-color occlusion
+frames. All streams use the 80-byte PBR layout with ambient occlusion in vertex alpha
 at ground contacts, wall eaves and inner canopies. Materials use subdued linear
 albedos with separate pine, broadleaf and semi-gloss glass settings.
 
@@ -69,7 +79,10 @@ simulation work.
 The coast exchanges water between heightmap cells on the GPU. Waves enter from
 the open ocean; water drains through channels and stays behind raised outlet
 sills instead of animating isolated dips with an independent ocean wave. Foam
-tracks moving shallow water, and the beach darkens towards the wet shoreline.
+tracks moving shallow water. Shared `TerrainColors` reads the water module's
+coastal depth to darken only low wet sand; grass/dirt colors and placement stay
+fixed to terrain height. Wetness follows the current surf without erosion or a
+long drying simulation.
 Water reflects the live atmospheric sky, refracts a retained HDR scene snapshot,
 absorbs light by depth and catches the directional sun. Coherent wind-aligned
 swells and micro-ripples reduce repeating interference grids. Water's own depth
@@ -88,10 +101,24 @@ npm run test:browser --workspace examples/gameplay-sandbox
 
 WASD / arrows move, Shift runs, drag looks, double-click captures the mouse, and
 Escape releases it. Touch devices expose movement and look sticks. The control
-pill adjusts the sun clock, actual particle capacity, terrain wireframe and wave
+pill adjusts the full 00:00–23:59 clock with Sun/day and Moon/night labels,
+actual particle capacity, terrain wireframe and wave
 height. Reduced motion starts paused. WebGPU support is required and failures
 appear in the shell. Canvas size, texture resources and device restoration are
 handled by the engine and optional plugins.
+
+To test Afterlight on other PCs on your local network, run
+`npm run dev:lan --workspace examples/gameplay-sandbox` from the repository root.
+This starts HTTPS on port 5200 at the first private IPv4 address and prints the
+URL. WebGPU requires a secure context on remote PCs. Download the public
+`afterlight.cer` from the printed HTTP address on port 5201. On each Windows test
+PC, open the certificate, choose **Install Certificate → Current User → Place all
+certificates in the following store → Trusted Root Certification Authorities**,
+then open the HTTPS URL in a WebGPU-capable browser. The certificate expires after
+90 days; the runner renews it when necessary or when the host IP changes, after
+which test PCs need the new certificate. Git's bundled OpenSSL or an `openssl`
+executable on PATH is required to generate it. The private key stays outside the
+workspace in the user's local application data. The server runs until stopped.
 
 Vite and TypeScript resolve the packages through their public distribution exports,
 without source aliases. Run `npm run build:packages` before standalone workspace

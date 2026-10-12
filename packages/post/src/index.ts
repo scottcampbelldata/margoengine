@@ -1,8 +1,10 @@
+import {SceneTarget} from '../../shared/msaa.js';
 import type {EngineKernel} from '@margoengine/core';
 export {Bloom, type BloomOptions} from './bloom.js';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
 import {invert} from '../../shared/math.js';
 import {viewMatrix} from '../../shared/view.js';
+import {fullscreen} from '../../shared/gpu.js';
 import {extractShader,ssaoShader,blurShader,compositeShader} from './shaders.js';
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number;STORAGE:number};
 declare const GPUTextureUsage:{RENDER_ATTACHMENT:number;TEXTURE_BINDING:number;STORAGE_BINDING:number;COPY_DST:number};
@@ -18,9 +20,11 @@ export class SSAO implements EnginePlugin {
   readonly name='ssao';
   private engine?:Engine;private device?:GPUDevice;private uniform?:GPUBuffer;private samples?:GPUBuffer;private noise?:GPUTexture;
   private extract?:GPUComputePipeline;private occlusion?:GPUComputePipeline;private blur?:GPUComputePipeline;private composite?:GPURenderPipeline;
+  private captureTarget?:SceneTarget;
   private textures:GPUTexture[]=[];private directions:GPUBuffer[]=[];private groups:GPUBindGroup[]=[];
   private width=0;private height=0;private original?:GPUTextureView;private originalFormat?:GPUTextureFormat;private scene?:GPUTextureView;private depth?:GPUTextureView;private gbuffer?:GPUTextureView;private ambient?:GPUTextureView;
   private ambientPipeline?:GPURenderPipeline;private ambientShader='';private readonly sources=new Set<SSAOSource>();
+  private replayViews:GPUTextureView[]=[];private replayCopy?:GPURenderPipeline;private replayGroup?:GPUBindGroup;
   private disposed=false;
   private readonly values=new Float32Array(56);private readonly inverseWorkspace=new Float64Array(52);
   private readonly inverse=this.values.subarray(0,16);private readonly view=this.values.subarray(16,32);
@@ -51,7 +55,7 @@ export class SSAO implements EnginePlugin {
   registerPasses(graph:FrameGraph):void {
     graph.add({name:'ssao:capture',order:-60,execute:c=>{if(c.backend!=='webgpu')return;
       this.validate();if(this.engine!.hasPlugin('post-processing')||this.engine!.hasPlugin('bloom'))throw new Error('SSAO cannot share the output target with another post effect');
-      this.resize(c);this.original=c.color;this.originalFormat=c.format;c.color=this.scene!;c.depth=this.depth!;c.format='rgba16float';
+      this.resize(c);this.original=c.color;this.originalFormat=c.format;this.captureTarget!.begin(c);
       c.shader=c.shader.replace(/let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/,'return vec4f(linear,1);');
       if(!invert(this.inverse,c.camera.matrix,0,this.inverseWorkspace))throw new Error('Invalid SSAO camera');
       viewMatrix(this.view,c.camera);
@@ -67,21 +71,29 @@ export class SSAO implements EnginePlugin {
     graph.add({name:'ssao:composite',order:30,execute:c=>{if(c.backend!=='webgpu')return;
       const pass=c.encoder.beginRenderPass({colorAttachments:[{view:this.original!,loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:1}}]});
       pass.setPipeline(this.composite!);pass.setBindGroup(0,this.groups[4]);pass.draw(3);pass.end();
-      c.color=this.original!;c.format=this.originalFormat!;
+      this.captureTarget!.restore(c);
     }});
   }
   private resize(c:Context):void {
     if(this.width===c.width&&this.height===c.height)return;
-    for(const t of this.textures)t.destroy();this.textures=[];this.width=c.width;this.height=c.height;
+    this.captureTarget?.dispose();for(const t of this.textures)t.destroy();this.textures=[];this.width=c.width;this.height=c.height;
     const texture=(format:GPUTextureFormat,usage:number)=>{const t=c.device.createTexture({size:[c.width,c.height],format,usage});this.textures.push(t);return t;};
     const sampled=GPUTextureUsage.TEXTURE_BINDING,render=sampled|GPUTextureUsage.RENDER_ATTACHMENT,storage=sampled|GPUTextureUsage.STORAGE_BINDING;
     this.scene=texture('rgba16float',render).createView();const depth=texture(c.descriptor.depthStencil!.format,render);
+    this.captureTarget=new SceneTarget(c.device,this.textures[0],depth,c.descriptor.multisample?.count??4);
     this.depth=depth.createView();const depthOnly=depth.createView({aspect:'depth-only'});
     // shortcut: linear depth fits 65,504 scene units, use a separate r32float target for larger scenes.
     this.gbuffer=texture('rgba16float',storage|GPUTextureUsage.RENDER_ATTACHMENT).createView();this.ambient=texture('rgba16float',render).createView();
     const raw=texture('r32float',storage).createView(),x=texture('r32float',storage).createView(),y=texture('r32float',storage).createView();
+    this.replayViews=[];
+    if(this.captureTarget.samples===4){
+      for(let i=0;i<2;i++){const t=c.device.createTexture({size:[c.width,c.height],format:'rgba16float',sampleCount:4,usage:GPUTextureUsage.RENDER_ATTACHMENT});this.textures.push(t);this.replayViews.push(t.createView());}
+      const module=c.device.createShaderModule({code:fullscreen+'@group(0) @binding(0) var source:texture_2d<f32>;@fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f{return textureLoad(source,vec2i(p.xy),0);}'});
+      this.replayCopy=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:'rgba16float'}]},multisample:c.descriptor.multisample});
+      this.replayGroup=c.device.createBindGroup({layout:this.replayCopy.getBindGroupLayout(0),entries:[{binding:0,resource:this.gbuffer}]});
+    }
     const group=(p:GPUComputePipeline|GPURenderPipeline,resources:(GPUTextureView|GPUBufferBinding)[])=>c.device.createBindGroup({layout:p.getBindGroupLayout(0),entries:resources.map((resource,binding)=>({binding,resource}))});
-    const module=c.device.createShaderModule({code:compositeShader});this.composite=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:navigator.gpu.getPreferredCanvasFormat()}]}});
+    const module=c.device.createShaderModule({code:compositeShader});this.composite=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]},multisample:c.descriptor.multisample});
     this.groups=[group(this.extract!,[{buffer:this.uniform!},depthOnly,this.gbuffer]),
       group(this.occlusion!,[{buffer:this.uniform!},depthOnly,this.gbuffer,this.noise!.createView(),{buffer:this.samples!},raw]),
       group(this.blur!,[raw,this.gbuffer,x,{buffer:this.directions[0]}]),group(this.blur!,[x,this.gbuffer,y,{buffer:this.directions[1]}]),
@@ -92,9 +104,13 @@ export class SSAO implements EnginePlugin {
     const pass=c.encoder.beginComputePass();pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.dispatchWorkgroups(Math.ceil(c.width/8),Math.ceil(c.height/8));pass.end();
   }
   private extractScene(c:Context):void {
+    this.captureTarget!.resolve(c.encoder);
     this.dispatch(c,this.extract!,this.groups[0]);
-    for(const source of this.sources)source.draw(c,'gbuffer',this.gbuffer!,this.depth!);
-    const clear=c.encoder.beginRenderPass({colorAttachments:[{view:this.ambient!,loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:0}}]});clear.end();
+    const gbuffer=this.replayViews[0]??this.gbuffer!,ambient=this.replayViews[1]??this.ambient!;
+    // Replays must test the same coverage samples as the scene; their sampled outputs stay 1x.
+    if(this.replayCopy){const pass=c.encoder.beginRenderPass({colorAttachments:[{view:gbuffer,loadOp:'clear',storeOp:'store'}]});pass.setPipeline(this.replayCopy);pass.setBindGroup(0,this.replayGroup!);pass.draw(3);pass.end();}
+    for(const source of this.sources)source.draw(c,'gbuffer',gbuffer,c.depth);
+    const clear=c.encoder.beginRenderPass({colorAttachments:[{view:ambient,loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:0}}]});clear.end();
     const code=c.shader.replace(/let direct=[\s\S]*return vec4f\([^\n]+\);/,'return vec4f(i.color*(1.0-i.material.y)*frame.radiance.w,1);');
     if(!this.ambientPipeline||this.ambientShader!==code) {
       if(code===c.shader)throw new Error('SSAO requires the standard core lighting shader');
@@ -103,15 +119,18 @@ export class SSAO implements EnginePlugin {
         fragment:{module,entryPoint:'fragment',targets:[{format:'rgba16float'}]},depthStencil:{...c.descriptor.depthStencil!,depthWriteEnabled:false,depthCompare:'equal'}});
       this.ambientShader=code;
     }
-    const color=c.color;c.color=this.ambient!;
+    const color=c.color;c.color=ambient;
     // Ambient replay still needs TAA's vertex camera override, while its fragment lighting bindings are unused.
     try{c.draw({pipeline:this.ambientPipeline,clear:false,bindings:c.bindings.filter(entry=>entry.binding===8)});}finally{c.color=color;}
-    for(const source of this.sources)source.draw(c,'ambient',this.ambient!,this.depth!);
+    for(const source of this.sources)source.draw(c,'ambient',ambient,c.depth);
+    if(this.replayViews.length)c.encoder.beginRenderPass({colorAttachments:this.replayViews.map((view,i)=>({view,resolveTarget:i===0?this.gbuffer!:this.ambient!,loadOp:'load',storeOp:'discard'}))}).end();
+    this.captureTarget!.resolve(c.encoder,true);
   }
-  private release():void {
+  private release():void {this.captureTarget?.dispose();this.captureTarget=undefined;
     for(const t of this.textures)t.destroy();for(const b of this.directions)b.destroy();this.uniform?.destroy();this.samples?.destroy();this.noise?.destroy();
     this.textures=[];this.directions=[];this.groups=[];this.width=this.height=0;this.uniform=this.samples=undefined;this.noise=undefined;this.extract=this.occlusion=this.blur=undefined;this.composite=this.ambientPipeline=undefined;
     this.original=this.scene=this.depth=this.gbuffer=this.ambient=undefined;this.originalFormat=undefined;
+    this.replayViews=[];this.replayCopy=undefined;this.replayGroup=undefined;
   }
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.sources.clear();this.engine=this.device=undefined;}

@@ -15,7 +15,8 @@ test('PBR streams preserve tangent and UV attributes and pack bounded baked occl
  assert.deepEqual(stream.slice(0,3),data.positions.slice(0,3));assert.equal(stream[3],1);
  assert.deepEqual(stream.slice(8,12),data.tangents.slice(0,4));
  assert.deepEqual(stream.slice(12,14),data.uvs.slice(0,2));assert.deepEqual(stream.slice(14,16),data.uvs.slice(0,2));
- assert.equal(stream[19],1);assert.ok(stream.some((v,i)=>i%20===16&&Math.abs(v-0.2)<1e-6));
+ assert.ok(stream.every((v,i)=>i%20<16||i%20===19||v===1));
+ assert.ok(stream.some((v,i)=>i%20===19&&Math.abs(v-0.2)<1e-6));
  assert.equal(footprintRadius(data),Math.hypot(1,3));
  for(const ao of [NaN,-1,2])assert.throws(()=>pbrVertexStream(data,()=>ao),/occlusion/);
  assert.throws(()=>pbrVertexStream({...data,tangents:undefined}),/attributes/);

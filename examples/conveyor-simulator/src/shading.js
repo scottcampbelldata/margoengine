@@ -76,7 +76,7 @@ export class StudioShading {
       const key = first + context.shader;
       let shader = this.#shaders.get(key);
       if (!shader) {
-        const at = context.shader.indexOf('  let n=normalize(i.normal)');
+        const at = context.shader.indexOf('let n=normalize(i.normal)');
         if (at < 0) throw new Error('Core fragment shader changed; update the conveyor shading patch');
         shader = (environment ? iblDeclarations(first) : '') + shared + context.shader.slice(0, at) + body(!!environment);
         this.#shaders.set(key, shader);
@@ -89,12 +89,12 @@ export class StudioShading {
     }});
     graph.add({name: 'conveyor:backdrop', order: 1, execute: context => {
       if (context.backend !== 'webgpu' || !this.#uniform) return;
-      const depthFormat = context.descriptor.depthStencil.format, key = context.format + depthFormat;
+      const depthFormat = context.descriptor.depthStencil.format, key = context.format + depthFormat + context.descriptor.multisample?.count;
       let pipeline = this.#pipelines.get(key);
       if (!pipeline) {
         const module = context.device.createShaderModule({code: backdrop});
         pipeline = context.device.createRenderPipeline({layout: 'auto', vertex: {module, entryPoint: 'vertex'}, fragment: {module, entryPoint: 'fragment', targets: [{format: context.format}]},
-          depthStencil: {format: depthFormat, depthWriteEnabled: false, depthCompare: 'greater-equal'}});
+          multisample: context.descriptor.multisample, depthStencil: {format: depthFormat, depthWriteEnabled: false, depthCompare: 'greater-equal'}});
         this.#pipelines.set(key, pipeline);
         this.#group = context.device.createBindGroup({layout: pipeline.getBindGroupLayout(0), entries: [{binding: 0, resource: {buffer: this.#uniform}}]});
       }

@@ -24,5 +24,12 @@
     "build": "node ../../scripts/build-optional.js transitions",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  }
+  },
+  "homepage": "https://margoengine.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/transitions"
+  },
+  "description": "WebGPU scene wipes, noise dissolves and chromatic displacement."
 }

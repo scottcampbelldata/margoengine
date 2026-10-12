@@ -11,7 +11,10 @@ export function createProceduralSettlement(engine: EngineKernel, shadows: Shadow
   const porchLightPosition: [number,number,number] = [0,0,0];
   const scatter = ScatterInstances.attach(engine, () => {
     const batches: ScatterBatch[] = [];
-    const add = (name: string, data: GeometryData, transforms: Float32Array, material: keyof typeof MATERIALS, occlusion?: (x: number, y: number, z: number) => number, doubleSided = false) => batches.push({name, wind: material==='bark'||material==='pine'||material==='foliage' ? [1,0.35,0.045] : undefined, vertices: pbrVertexStream(data,occlusion), indices: data.indices, transforms, material: new PbrMaterial({...MATERIALS[material],doubleSided})});
+    const add = (name: string, data: GeometryData, transforms: Float32Array, material: keyof typeof MATERIALS, occlusion?: (x: number, y: number, z: number) => number, doubleSided = false) => {
+      const vegetation=material==='bark'||material==='pine'||material==='foliage';
+      batches.push({name, wind: vegetation ? [1,0.35,0.045] : undefined, windDetail: vegetation ? 1 : undefined, vertices: pbrVertexStream(data,occlusion), indices: data.indices, transforms, material: new PbrMaterial({...MATERIALS[material],doubleSided})});
+    };
     const cabin = generateCabinMesh(height,CABIN_POSITION), [cx,cz] = CABIN_POSITION;
     porchLightPosition[0]=cx+0.9;porchLightPosition[1]=cabin.floor+2.35;porchLightPosition[2]=cz+5.3;
     const foundation = instanceTransforms([[cx,cabin.floor,cz,1,0]]);
@@ -20,9 +23,9 @@ export function createProceduralSettlement(engine: EngineKernel, shadows: Shadow
     add('Cabin 35 degree slate roof',cabin.roof,foundation,'roof');
     add('Cabin terrain-sunk stone foundation and porch',cabin.foundation,foundation,'foundation',groundContact);
     add('Cabin recessed glass panes',cabin.glass,foundation,'glass');
-    batches[batches.length-1].emissive=[3,2.16,0.9];
+    batches[batches.length-1].emissive=[1.5,1.08,0.45];
     add('Warm porch lantern',computeTangents(boxGeometry(0.12,0.22,0.12)),instanceTransforms([[...porchLightPosition,1,0]]),'glass');
-    batches[batches.length-1].emissive=[3,2.4,1.2];
+    batches[batches.length-1].emissive=[2,1.6,0.8];
     for (let variant = 0; variant < 2; variant++) {
       const kind = variant ? 'broadleaf' : 'conifer', tree = generateTreeMesh(kind), placements: GroundPlacement[] = [];
       for (let i = variant; i < TREE_POSITIONS.length; i += 2) {

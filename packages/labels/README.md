@@ -2,7 +2,7 @@
 
 HTML labels and CSS 3D objects kept in register with a Margo Engine canvas. Replaces THREE.CSS2DRenderer/CSS2DObject and THREE.CSS3DRenderer/CSS3DObject.
 
-Not yet published to npm. Build from source with `npm run build` in `packages/labels`.
+Build from source with `npm run build` in `packages/labels`.
 
 ```ts
 import {LabelRenderer} from '@margoengine/labels';

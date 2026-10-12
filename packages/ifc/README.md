@@ -28,4 +28,4 @@ Opened models are closed in `finally`, including geometry/limit failures. Arrays
 
 Tessellation is synchronous; aborts are checked before opening and between callbacks, and cannot interrupt native tessellation. Use a worker for large files. Property sets, relationships, editable native models and BIM navigation UI are not retained. Colors follow web-ifc geometry styles; core does not render transparent IFC surfaces.
 
-`npm test` passes a real IFC4 millimeter wall through Wasm and checks units, placement, triangles, names/IDs, mesh disposal, limits and model closure after failures. Build with root `npm run build:packages` or local `npm run build`. The package is local and has not been published.
+`npm test` passes a real IFC4 millimeter wall through Wasm and checks units, placement, triangles, names/IDs, mesh disposal, limits and model closure after failures. Build with root `npm run build:packages` or local `npm run build`.

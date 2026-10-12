@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101b2c">
-  <title>Drive a bounded joint · Vexel</title>
+  <title>Drive a bounded joint · Margo Engine</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <style>
     :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101b2c; color: #e4edf8; }
@@ -17,9 +17,9 @@
   </style>
   <script type="importmap">{
   "imports": {
-    "@scottcampbelldata/vexel-core": "https://cdn.jsdelivr.net/npm/@scottcampbelldata/vexel-core@0.1.0/dist/index.js",
-    "@scottcampbelldata/vexel-core/extension": "https://cdn.jsdelivr.net/npm/@scottcampbelldata/vexel-core@0.1.0/dist/extension.js",
-    "@scottcampbelldata/vexel-machinery": "https://cdn.jsdelivr.net/npm/@scottcampbelldata/vexel-machinery@0.1.0/dist/index.js"
+    "@margoengine/core": "https://cdn.jsdelivr.net/npm/@margoengine/core@0.1.0/dist/index.js",
+    "@margoengine/core/extension": "https://cdn.jsdelivr.net/npm/@margoengine/core@0.1.0/dist/extension.js",
+    "@margoengine/machinery": "https://cdn.jsdelivr.net/npm/@margoengine/machinery@0.1.0/dist/index.js"
   }
 }</script>
 </head>
@@ -29,7 +29,7 @@
   <canvas id="scene" role="img" aria-label="Drive a bounded joint">This example needs a browser with WebGPU or WebGL2.</canvas>
   <p id="status" role="status">Loading published packages…</p>
   <button id="play" type="button" disabled>Pause</button>
-  <footer>Published packages · 0.1.0 · <a href="https://scottcampbelldata.github.io/vexel/#machinery">Module catalog</a></footer>
+  <footer>Published packages · 0.1.0 · <a href="https://margoengine.com/catalog/#machinery">Module catalog</a></footer>
   <script>
 let current, cleanup = () => {}, playing = false;
 const button = document.querySelector('#play');
@@ -62,8 +62,8 @@ addEventListener('unhandledrejection', event => report(event.reason));
 addEventListener('pagehide', () => { try { cleanup(); } finally { current?.dispose(); } });
   </script>
   <script type="module">
-import { Engine, box, PbrMaterial } from '@scottcampbelldata/vexel-core';
-import { Kinematics } from '@scottcampbelldata/vexel-machinery';
+import { Engine, box, PbrMaterial } from '@margoengine/core';
+import { Kinematics } from '@margoengine/machinery';
 
 const engine = await Engine.create(document.querySelector('canvas'));
 engine.createMesh().setGeometry(box()).setScale([2, 0.3, 1])

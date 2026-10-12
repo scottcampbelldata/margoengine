@@ -6,7 +6,7 @@
   "description": "PLY, 3MF, PCD, OFF, XYZ, legacy VTK and static USDA/USDZ loaders for Margo Engine.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/vexel.git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/loaders"
   },
   "publishConfig": {
@@ -31,5 +31,6 @@
   ],
   "peerDependencies": {
     "@margoengine/core": "^0.1.0 || ^1.0.0"
-  }
+  },
+  "homepage": "https://margoengine.com"
 }

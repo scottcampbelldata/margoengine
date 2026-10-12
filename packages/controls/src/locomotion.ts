@@ -7,7 +7,7 @@ export function stepLocomotion(state: Float32Array, actions: Float32Array, delta
   const speed = actions[4] > 0 ? options.runSpeed ?? 7 : options.walkSpeed ?? 3.4, bounds = options.bounds;
   if (state.length !== 8 || actions.length !== 5 || !state.every(Number.isFinite) || !actions.every(Number.isFinite) || !Number.isFinite(delta) || delta < 0 || typeof height !== 'function' || !Number.isFinite(options.walkSpeed ?? 3.4) || (options.walkSpeed ?? 3.4) < 0 || !Number.isFinite(options.runSpeed ?? 7) || (options.runSpeed ?? 7) < 0 || options.minHeight !== undefined && !Number.isFinite(options.minHeight) || bounds && (bounds.length !== 4 || !Number.isFinite(bounds[0]) || !Number.isFinite(bounds[1]) || !Number.isFinite(bounds[2]) || !Number.isFinite(bounds[3]) || bounds[0] >= bounds[1] || bounds[2] >= bounds[3])) throw new RangeError('Invalid locomotion inputs');
   const dt = Math.min(0.05, delta);
-  const yaw = state[4] - actions[2], pitch = Math.max(0.08, Math.min(0.9, state[5] + actions[3]));
+  const yaw = state[4] - actions[2], pitch = Math.max(-1.4, Math.min(0.9, state[5] + actions[3]));
   const length = Math.max(1, Math.hypot(actions[0], actions[1]));
   const dx = (actions[0] * Math.cos(yaw) - actions[1] * Math.sin(yaw)) / length;
   const dz = (-actions[0] * Math.sin(yaw) - actions[1] * Math.cos(yaw)) / length;

@@ -6,7 +6,7 @@
   "description": "GPU particle simulation and indirect billboards.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/vexel.git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/vfx"
   },
   "publishConfig": {
@@ -29,5 +29,6 @@
   ],
   "peerDependencies": {
     "@margoengine/core": "0.1.0"
-  }
+  },
+  "homepage": "https://margoengine.com"
 }

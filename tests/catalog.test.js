@@ -2,16 +2,37 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { request } from 'node:http';
+import { readFile, readdir } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import { server } from '../scripts/serve-catalog.js';
 
 let url;
+const entries = JSON.parse(await readFile(new URL('../docs/catalog.json', import.meta.url), 'utf8'));
 before(async () => {
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   url = `http://127.0.0.1:${server.address().port}`;
 });
 after(() => new Promise(resolve => server.close(resolve)));
+
+test('catalog covers every public package with matching versions, imports and repository links', async () => {
+  for (const id of await readdir(new URL('../packages/', import.meta.url))) {
+    let manifest;
+    try { manifest = JSON.parse(await readFile(new URL(`../packages/${id}/package.json`, import.meta.url), 'utf8')); }
+    catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+    if (manifest.private) continue;
+    const entry = entries.find(entry => entry.id === id);
+    assert.ok(entry, `${id} missing from catalog`);
+    assert.equal(entry.package, manifest.name);
+    assert.equal(entry.version, manifest.version);
+    assert.equal(typeof entry.published, 'boolean');
+    assert.ok(entry.install.includes(`${manifest.name}@${manifest.version}`));
+    const runtime = await import(new URL(`../packages/${id}/dist/index.js`, import.meta.url));
+    assert.deepEqual(entry.exports, Object.keys(runtime).sort());
+    assert.ok(manifest.repository.url.endsWith('/margoengine.git'));
+  }
+  assert.equal(new Set(entries.map(entry => entry.package)).size, entries.length);
+});
 
 test('preview serves static files and rejects escaped paths and unsupported methods', async () => {
   const page = await fetch(url);
@@ -43,11 +64,10 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
     page.on('request', request => requests.push(request.url()));
     await page.goto(url);
     await page.waitForFunction(() => !document.querySelector('#search').disabled);
-    assert.equal(await page.locator('.module:visible').count(), 5);
+    assert.equal(await page.locator('.module:visible').count(), entries.length);
     for (const [term, id] of [['conveyor', 'machinery'], ['SectionPlanes', 'machinery'], ['loadGLTF', 'gltf'], ['particle', 'creative'], ['useFrame', 'react'], ['Camera', 'core']]) {
       await page.getByLabel('Search modules and API names').fill(term);
-      assert.equal(await page.locator('.module:visible').count(), 1, term);
-      assert.equal(await page.locator('.module:visible').getAttribute('id'), id);
+      assert.equal(await page.locator(`#${id}`).isVisible(), true, term);
     }
     await page.reload();
     await page.waitForFunction(() => !document.querySelector('#search').disabled);
@@ -56,13 +76,14 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
     assert.equal(await page.locator('.module:visible').count(), 0);
     assert.equal(await page.locator('#empty').isVisible(), true);
     await page.getByRole('button', { name: 'Clear search', exact: true }).click();
-    assert.equal(await page.locator('.module:visible').count(), 5);
+    assert.equal(await page.locator('.module:visible').count(), entries.length);
     assert.equal(await page.locator('#search').evaluate(element => element === document.activeElement), true);
     for (const card of await page.locator('.module').all()) {
       for (const kind of ['install', 'imports']) {
         await card.locator(`[data-copy="${kind}"]`).click();
         assert.equal(await clipboard(), await card.locator(`.${kind}`).textContent());
       }
+      if (!await card.locator('.source').isVisible()) continue;
       await card.locator('.source summary').click();
       await card.locator('[data-copy="example"]').click();
       const example = await clipboard();
@@ -73,10 +94,10 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
     }
     await page.locator('#machinery .exports summary').click();
     await page.getByRole('button', { name: 'Copy import for Kinematics', exact: true }).click();
-    assert.equal(await clipboard(), "import { Kinematics } from '@scottcampbelldata/vexel-machinery';");
+    assert.equal(await clipboard(), "import { Kinematics } from '@margoengine/machinery';");
     await page.evaluate(() => { navigator.clipboard.writeText = async () => { throw new Error('Denied'); }; });
     await page.getByRole('button', { name: 'Copy import for SectionPlanes', exact: true }).click();
-    assert.equal(await page.evaluate(() => window.getSelection().toString()), "import { SectionPlanes } from '@scottcampbelldata/vexel-machinery';");
+    assert.equal(await page.evaluate(() => window.getSelection().toString()), "import { SectionPlanes } from '@margoengine/machinery';");
     assert.match(await page.locator('#copy-status').textContent(), /Ctrl\+C/);
     for (const width of [375, 1440]) {
       await page.setViewportSize({ width, height: 900 });

@@ -2,6 +2,7 @@ import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type FrameGraph,type PassContext} from '@margoengine/core/extension';
 import {LabelRenderer,Label,type CSS3DObject,type LabelRendererOptions,type LabelOptions} from '@margoengine/labels';
 import {acquireDepth,compute,group,dispatch} from '../../shared/gpu.js';
+import {resolveMSAA} from '../../shared/msaa.js';
 export {Label,CSS3DObject,projectPoint} from '@margoengine/labels';
 export type {LabelOptions,CSS3DOptions,LabelInfo} from '@margoengine/labels';
 declare const GPUBufferUsage:{STORAGE:number;COPY_DST:number;COPY_SRC:number;MAP_READ:number};
@@ -49,6 +50,7 @@ export class HTML extends LabelRenderer {
  }
  override registerPasses(graph:FrameGraph):void {super.registerPasses(graph);graph.add({name:this.name+':depth',order:1001,execute:c=>{if(c.backend==='webgpu'&&this.pipeline&&!this.pending)this.sample(c);}});}
  private sample(c:Extract<PassContext,{backend:'webgpu'}>):void {
+  resolveMSAA(c);
   const depth=this.source!();if(!depth||depth.width!==c.width||depth.height!==c.height||!depth.format.startsWith('depth'))throw new Error('HTML requires viewport-sized scene depth');
   for(let i=0;i<this.capacity;i++)if(!this.slots[i]||!this.slots[i]!.label.visible||!this.slots[i]!.label.screen.inFrustum)this.values.set([-1,-1,0,0],i*4);
   c.device.queue.writeBuffer(this.input!,0,this.values as Float32Array<ArrayBuffer>);

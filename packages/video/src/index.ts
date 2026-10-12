@@ -44,7 +44,8 @@ export class Video implements EnginePlugin {
  setup(engine:Engine):void {if(this.disposed||!engine.gpu)throw new Error('Video requires WebGPU');this.engine=engine;this.uniform=engine.gpu.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});engine.gpu.queue.writeBuffer(this.uniform,0,this.rectangle as Float32Array<ArrayBuffer>);this.sampler=engine.gpu.createSampler({minFilter:'linear',magFilter:'linear'});}
  registerPasses(graph:FrameGraph):void {graph.add({name:this.name+':frame',order:60,execute:c=>{
   if(c.backend!=='webgpu')return;const texture=this.import(c.device);this.sampleFrequency();if(!texture)return;
-  if(this.format!==c.format){this.pipeline=render(c.device,shader,c.format);this.format=c.format;}
+  const format=c.format+':'+c.descriptor.multisample?.count;
+  if(this.format!==format){this.pipeline=render(c.device,shader,c.format,{multisample:c.descriptor.multisample});this.format=format;}
   const bind=group(c.device,this.pipeline!,[texture,this.sampler!,{buffer:this.uniform!}]);
   const pass=c.encoder.beginRenderPass({colorAttachments:[{view:c.color,loadOp:'load',storeOp:'store'}]});pass.setPipeline(this.pipeline!);pass.setBindGroup(0,bind);pass.draw(6);pass.end();
  }});}

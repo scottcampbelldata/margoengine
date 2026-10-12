@@ -17,6 +17,34 @@ test('cabin samples its supplied world position and validates every foundation s
   assert.throws(()=>generateCabinMesh((x,z)=>x===0.9&&z===6.15?NaN:0),/terrain/);
 });
 
+test('cabin plank seams are closed and roof/corner surfaces do not share depth planes',()=>{
+ const cabin=generateCabinMesh(()=>0),p=cabin.siding.positions;
+ const frontDepths=(x,y)=>{
+  const depths=[];
+  for(let t=0;t<cabin.siding.indices.length;t+=3){
+   const [a,b,c]=cabin.siding.indices.subarray(t,t+3).map(v=>v*3);
+   if(cabin.siding.normals[a+2]<0.99)continue;
+   const determinant=(p[b+1]-p[c+1])*(p[a]-p[c])+(p[c]-p[b])*(p[a+1]-p[c+1]);
+   if(Math.abs(determinant)<1e-10)continue;
+   const u=((p[b+1]-p[c+1])*(x-p[c])+(p[c]-p[b])*(y-p[c+1]))/determinant;
+   const v=((p[c+1]-p[a+1])*(x-p[c])+(p[a]-p[c])*(y-p[c+1]))/determinant;
+   if(u>=-1e-6&&v>=-1e-6&&u+v<=1+1e-6)depths.push(u*p[a+2]+v*p[b+2]+(1-u-v)*p[c+2]);
+  }
+  return depths;
+ };
+ for(let row=1;row<15;row++)for(const y of [row*0.2-0.0015,row*0.2])assert.ok(frontDepths(-2.2,y).some(z=>Math.abs(z-4.11)<1e-5),'Light must not leak through plank seams');
+ assert.ok(!frontDepths(-1.5,1.85).some(z=>z>4.1),'Window opening stays recessed');
+ assert.ok(Math.abs(Math.max(...frontDepths(0.345,1.1))-4.11)<1e-5,'Flush door trim overlaps the opening edge without thin protruding caps');
+ const corner=frontDepths(-2.92,1.1);assert.ok(Math.max(...corner)>4.13,'Corner trim stands clear of the siding');
+ for(let t=0;t<cabin.siding.indices.length;t+=3){
+  const ids=cabin.siding.indices.subarray(t,t+3),x=ids.reduce((sum,v)=>sum+p[v*3]/3,0),y=ids.reduce((sum,v)=>sum+p[v*3+1]/3,0),z=ids.reduce((sum,v)=>sum+p[v*3+2]/3,0);
+  if(x>-2.8&&x<-2.1&&y>0.1&&y<2.9&&z>3.88&&z<4.12)assert.ok(Math.abs(cabin.siding.normals[ids[0]*3+1])<0.99,'Internal plank caps must not rasterize through the wall');
+ }
+ const planes=new Set(),roof=cabin.roof;
+ for(let v=0;v<roof.positions.length/3;v++)if(roof.normals[v*3]>0.5&&roof.normals[v*3+1]>0.8)planes.add(Math.round((roof.normals[v*3]*roof.positions[v*3]+roof.normals[v*3+1]*roof.positions[v*3+1])*10000));
+ assert.equal(planes.size,12,'Overlapping roof courses must have distinct planes');
+});
+
 test('shared island preset is deterministic and grass supports all three scatter LODs', () => {
   const a = createIslandHeight(731), b = createIslandHeight(731), c = createIslandHeight(732);
   assert.ok(a(0,0)>1&&a(0,0)<5);
