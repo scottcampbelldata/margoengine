@@ -10,15 +10,15 @@
   <main id="viewport" aria-label="Animated robot with facial expressions"></main>
   <aside aria-label="Scene controls">
     <h1>Character study</h1>
-    <p>A walking robot in a softly lit studio. Pick an expression or blend your own.</p>
-    <label for="clip">Animation</label><select id="clip" disabled></select>
-    <button id="pause" type="button" aria-pressed="false" disabled>Pause animation</button>
-    <label for="speed">Playback speed <output id="speed-value" for="speed">1×</output></label>
-    <input id="speed" type="range" min="0.25" max="2" step="0.25" value="1" disabled>
+    <p class="description">A walking robot in a softly lit studio. Pick an expression or blend your own.</p>
     <fieldset id="morphs"><legend>Facial expressions</legend>
       <label for="expression">Expression preset</label>
       <select id="expression" disabled><option value="neutral">Neutral</option><option value="custom" disabled>Custom blend</option></select>
     </fieldset>
+    <label for="clip">Animation</label><select id="clip" disabled></select>
+    <button id="pause" type="button" aria-pressed="false" disabled>Pause animation</button>
+    <label for="speed">Playback speed <output id="speed-value" for="speed">1×</output></label>
+    <input id="speed" type="range" min="0.25" max="2" step="0.25" value="1" disabled>
     <button id="reset-view" type="button" disabled>Reset view</button>
     <p id="status" role="status">Loading model…</p><p id="error" role="alert"></p>
     <small>Drag to orbit; scroll to zoom. On touch, pinch to zoom. Focus the scene: arrow keys orbit, + / − zoom.</small>

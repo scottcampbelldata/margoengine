@@ -351,35 +351,67 @@ footer {
     display: none;
   }
 }
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) and (pointer: coarse) {
+  #scene {
+    height: calc(100dvh - 60px - env(safe-area-inset-bottom));
+  }
+  body:has(.panel details[open]) #scene {
+    height: 58dvh;
+  }
   .masthead {
-    inset: 20px 20px auto;
+    inset: 16px 16px auto;
+  }
+  .masthead a span {
+    display: none;
   }
   .title {
-    left: 20px;
-    top: 78px;
+    left: 16px;
+    top: 54px;
   }
   .title h1 {
-    font-size: 57px;
+    font-size: 36px;
   }
   .eyebrow {
-    font-size: 8px;
-    margin-bottom: 16px;
+    display: none;
   }
   .description {
     display: none;
   }
   .panel {
     top: auto;
-    bottom: 95px;
-    left: 20px;
-    right: 20px;
+    bottom: 0;
+    left: 0;
+    right: 0;
     width: auto;
-    max-height: 45dvh;
+    height: calc(60px + env(safe-area-inset-bottom));
+    max-height: 42dvh;
+    border-radius: 16px 16px 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: #0b1022;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+  .panel:has(details[open]) {
+    height: 42dvh;
   }
   summary {
-    padding: 15px 18px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    min-height: 58px;
+    padding: 18px;
+    background: #0b1022;
     font-size: 19px;
+  }
+  .panel-mark {
+    display: none;
+  }
+  summary::after {
+    content: '⌃';
+    color: var(--accent);
+  }
+  details[open] summary::after {
+    content: '⌄';
   }
   .controls {
     padding: 0 18px 18px;
@@ -387,7 +419,11 @@ footer {
   footer {
     left: 20px;
     right: 20px;
-    bottom: 20px;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    pointer-events: none;
+  }
+  body:has(.panel details[open]) footer {
+    bottom: calc(42dvh + 12px);
   }
   .gesture-hint {
     display: none;
@@ -397,7 +433,7 @@ footer {
     justify-content: space-between;
   }
   .telemetry output {
-    font-size: 20px;
+    font-size: 16px;
   }
 }
 @media (prefers-reduced-transparency: reduce) {

@@ -16,6 +16,13 @@ for(const [name,url] of Object.entries(urls)) {
   const path='test-results/'+name+'.glb';try{assets[name]=await readFile(path);}catch(error){if(error.code!=='ENOENT')throw error;const bytes=await readResponse(await fetch(url),{maxBytes:64*1024*1024,label:name+' asset'});assets[name]=Buffer.from(bytes);await writeFile(path,assets[name]);}
 }
 const demos={helmet:'damaged-helmet',robot:'robot-expressive',character:'character-animation'};
+async function assertRobotMobileLayout(page){
+  const layout=await page.evaluate(()=>{
+    const scene=document.querySelector('#viewport').getBoundingClientRect(),controls=document.querySelector('aside').getBoundingClientRect();
+    return {sceneTop:scene.top,sceneBottom:scene.bottom,controlsTop:controls.top,controlsBottom:controls.bottom,height:innerHeight,pageScroll:scrollY,overflowX:document.documentElement.scrollWidth>innerWidth,overflowY:document.documentElement.scrollHeight>innerHeight+1};
+  });
+  assert(layout.sceneTop===0&&layout.sceneBottom>0&&layout.sceneBottom<=layout.controlsTop+1&&layout.controlsBottom<=layout.height+1&&!layout.overflowX&&!layout.overflowY&&layout.pageScroll===0,'Robot and settings must stay on screen: '+JSON.stringify(layout));
+}
 for(const demo of Object.values(demos)) {
   const output=await build({configFile:false,logLevel:'silent',build:{write:false,target:'es2022',rollupOptions:{input:'examples/'+demo+'.html'}}});
   assert.ok(output.output.some(chunk=>chunk.type==='chunk'&&chunk.isEntry),'Demo build failed');
@@ -149,6 +156,7 @@ try {
     await page.setViewportSize({width:600,height:800});await page.waitForTimeout(100);assert.equal(await page.locator('#error').innerText(),'');
     if(name!=='helmet') {
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Robot controls overflow on mobile');
+      await assertRobotMobileLayout(page);
       await page.locator('#expression').selectOption('neutral');
       await page.screenshot({path:'test-results/'+name+'-mobile.png',fullPage:true});
     }
@@ -158,13 +166,34 @@ try {
   const mobileContext=await page.context().browser().newContext({viewport:{width:390,height:844},deviceScaleFactor:3,isMobile:true,hasTouch:true,userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1'});
   const mobile=await mobileContext.newPage();mobile.on('pageerror',e=>errors.push(e.message));
   await mobile.addInitScript(samplingAudit);
+  await mobile.addInitScript(()=>{const raf=window.requestAnimationFrame.bind(window);window.requestAnimationFrame=callback=>raf(()=>callback(1000));});
   await mobile.route(urls.robot,route=>route.fulfill({body:assets.robot,contentType:'model/gltf-binary'}));
   await mobile.goto('http://127.0.0.1:5193/examples/character-animation.html');await mobile.waitForFunction(()=>document.querySelector('#status')?.textContent==='Ready');
   assert.equal(await mobile.locator('#error').innerText(),'');
   assert.ok(await mobile.evaluate(()=>!samplingAudit.textures.includes(4)&&!samplingAudit.pipelines.includes(4)),'Mobile robot allocated 4× resources');
   assert.ok(await mobile.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile robot controls overflow');
+  await assertRobotMobileLayout(mobile);
+  await mobile.locator('#clip').selectOption({label:'Idle'});
+  await mobile.locator('#pause').click();
+  const sceneBefore=await mobile.locator('#viewport').boundingBox();
+  await mobile.locator('aside').evaluate(controls=>controls.scrollTop=controls.scrollHeight);
+  await assertRobotMobileLayout(mobile);
+  assert.deepEqual(await mobile.locator('#viewport').boundingBox(),sceneBefore,'Scrolling controls moved the robot');
+  await mobile.locator('aside').evaluate(controls=>controls.scrollTop=0);
+  const neutralPhone=await decodePNG(await mobile.locator('canvas').screenshot());
+  await mobile.locator('#expression').selectOption({label:'Sad'});
+  await mobile.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  const sadPhone=await decodePNG(await mobile.locator('canvas').screenshot());
+  let phoneExpressionPixels=0;
+  for(let i=0;i<neutralPhone.data.length;i+=4)if(Math.abs(neutralPhone.data[i]-sadPhone.data[i])+Math.abs(neutralPhone.data[i+1]-sadPhone.data[i+1])+Math.abs(neutralPhone.data[i+2]-sadPhone.data[i+2])>12)phoneExpressionPixels++;
+  assert(phoneExpressionPixels>100,'Phone expression did not visibly change while controls were on screen');
+  await assertRobotMobileLayout(mobile);
+  for(const size of [{width:320,height:568},{width:360,height:667}]){
+    await mobile.setViewportSize(size);await mobile.waitForTimeout(150);await assertRobotMobileLayout(mobile);
+  }
+  await mobile.setViewportSize({width:390,height:844});await mobile.waitForTimeout(150);
   await mobile.screenshot({path:'test-results/robot-phone.png',fullPage:true});await mobileContext.close();
   assert.deepEqual(errors,[]);
-  await writeFile('test-results/modern-extensions.json',JSON.stringify({hardware,...result,ssaoChangedPixels:changed,ssaoDarkening:darker},null,2));
+  await writeFile('test-results/modern-extensions.json',JSON.stringify({hardware,...result,ssaoChangedPixels:changed,ssaoDarkening:darker,phoneExpressionPixels},null,2));
   console.log(JSON.stringify({...result,ssaoChangedPixels:changed,hardware},null,2));
 } finally {await browser.close();}
