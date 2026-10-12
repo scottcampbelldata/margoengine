@@ -4,10 +4,10 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { deflateRawSync, deflateSync } from "node:zlib";
 import { crc32 } from "@margoengine/loaders";
 import { parseUSDA, parseUSDC, parseUSDZ } from "../dist/index.js";
-const source = await readFile(
+const source = (await readFile(
   new URL("./fixtures/triangle.usda", import.meta.url),
   "utf8",
-);
+)).replace(/\r\n/g, "\n");
 function png(r, g, b) {
   const header = Buffer.alloc(13);
   header.writeUInt32BE(1, 0);
