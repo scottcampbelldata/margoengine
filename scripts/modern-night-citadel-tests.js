@@ -209,9 +209,9 @@ try{
   const drawerLayout=async()=>{
     const layout=await mobile.evaluate(()=>{
       const scene=document.querySelector('#scene').getBoundingClientRect(),panel=document.querySelector('.panel').getBoundingClientRect(),handle=document.querySelector('summary').getBoundingClientRect();
-      return {sceneBottom:scene.bottom,panelTop:panel.top,panelBottom:panel.bottom,handleTop:handle.top,handleBottom:handle.bottom,height:innerHeight,overflow:document.documentElement.scrollHeight>innerHeight+1};
+      return {sceneBottom:scene.bottom,sceneRight:scene.right,panelTop:panel.top,panelLeft:panel.left,panelBottom:panel.bottom,handleTop:handle.top,handleBottom:handle.bottom,height:innerHeight,overflow:document.documentElement.scrollHeight>innerHeight+1||document.documentElement.scrollWidth>innerWidth};
     });
-    assert(layout.sceneBottom<=layout.panelTop+1&&Math.abs(layout.panelBottom-layout.height)<1&&!layout.overflow,'Settings overlap the castle viewport: '+JSON.stringify(layout));
+    assert((layout.sceneBottom<=layout.panelTop+1||layout.sceneRight<=layout.panelLeft+1)&&Math.abs(layout.panelBottom-layout.height)<1&&!layout.overflow,'Settings overlap the castle viewport: '+JSON.stringify(layout));
     assert(layout.handleTop>=layout.panelTop&&layout.handleBottom<=layout.panelBottom,'Drawer close handle scrolled out of view: '+JSON.stringify(layout));
     return layout;
   };
@@ -221,19 +221,55 @@ try{
   await drawerLayout();
   await mobile.screenshot({path:'test-results/night-citadel-mobile-settings.png'});
   report.framing.push(await moonFraming(mobile));
-  for(const size of [{width:320,height:568},{width:844,height:390}]){
-    await mobile.setViewportSize(size);await mobile.waitForTimeout(150);await drawerLayout();
+  const touch=await context.newCDPSession(mobile);
+  const pinch=async()=>{
+    const scene=await mobile.locator('#scene').boundingBox(),x=scene.x+scene.width/2,y=scene.y+scene.height/2;
+    await mobile.evaluate(()=>{nightCitadel.motion[2]=82;nightCitadel.motion[3]=nightCitadel.motion[4]=nightCitadel.motion[5]=0;window.touchDefaults=[];});
+    const before=await mobile.evaluate(()=>({yaw:nightCitadel.motion[0],pitch:nightCitadel.motion[1],scale:visualViewport.scale}));
+    await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:x-30,y,id:1}]});
+    await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:x-30,y,id:1},{x:x+30,y,id:2}]});
+    await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x-50,y,id:1},{x:x+50,y,id:2}]});
+    await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    const zoomed=await mobile.evaluate(()=>({radius:nightCitadel.motion[2],yaw:nightCitadel.motion[0],pitch:nightCitadel.motion[1],scale:visualViewport.scale,defaults:touchDefaults}));
+    assert(Math.abs(zoomed.radius-49.2)<0.01,'Pinch must zoom the scene once: '+JSON.stringify(zoomed));
+    assert.equal(zoomed.yaw,before.yaw);assert.equal(zoomed.pitch,before.pitch);assert.equal(zoomed.scale,before.scale);
+    assert(zoomed.defaults.includes('touchmove')&&zoomed.defaults.includes('touchstart'),'Native page gestures were not cancelled');
+    await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:x-50,y,id:1},{x:x+50,y,id:2}]});
+    await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x-30,y,id:1},{x:x+30,y,id:2}]});
+    await touch.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});
+    assert(Math.abs(await mobile.evaluate(()=>nightCitadel.motion[2])-82)<0.01,'Pinching inward did not zoom out');
+    assert.deepEqual(await mobile.evaluate(()=>[nightCitadel.pointers[0],nightCitadel.pointers[3],nightCitadel.pointers[6]]),[-1,-1,0],'Cancelled pinch left stale fingers');
+  };
+  await mobile.evaluate(()=>{for(const type of ['touchstart','touchmove'])document.addEventListener(type,e=>{if(e.target.id==='scene'&&e.defaultPrevented)window.touchDefaults.push(type);},{passive:true});});
+  report.mobileGestures=[];
+  for(const size of [{width:320,height:568},{width:667,height:375},{width:844,height:390},{width:932,height:430},{width:1024,height:600},{width:568,height:270}]){
+    await mobile.setViewportSize(size);await mobile.waitForTimeout(150);await drawerLayout();await pinch();
+    if(size.width>size.height){
+      const boxes=await mobile.evaluate(()=>['.masthead','.title','footer','.panel'].map(selector=>({selector,...document.querySelector(selector).getBoundingClientRect().toJSON()})));
+      for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++)assert(boxes[i].right<=boxes[j].left||boxes[j].right<=boxes[i].left||boxes[i].bottom<=boxes[j].top||boxes[j].bottom<=boxes[i].top,'Landscape text overlaps: '+JSON.stringify([boxes[i],boxes[j]]));
+      report.mobileGestures.push(size);
+      await mobile.screenshot({path:'test-results/night-citadel-landscape-'+size.width+'.png'});
+    }
   }
+  const sceneBox=await mobile.locator('#scene').boundingBox(),sceneX=sceneBox.width/2,sceneY=sceneBox.height/2;
+  const dragYaw=await mobile.evaluate(()=>nightCitadel.motion[0]);
+  await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:sceneX,y:sceneY,id:1}]});
+  await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:sceneX+30,y:sceneY,id:1}]});
+  await mobile.waitForTimeout(100);
+  await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  assert(await mobile.evaluate(y=>nightCitadel.motion[0]<y,dragYaw),'Single-finger orbit stopped working');
+  await mobile.locator('.panel').evaluate(panel=>panel.scrollTop=0);
+  const panelBox=await mobile.locator('.panel').boundingBox(),panelX=panelBox.x+8;
+  await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:panelX,y:220,id:1}]});
+  await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:panelX,y:100,id:1}]});
+  await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  await mobile.waitForFunction(()=>document.querySelector('.panel').scrollTop>0);
+  await drawerLayout();
   await mobile.setViewportSize({width:390,height:844});
   await mobile.locator('summary').click();await mobile.waitForTimeout(150);
   await mobile.screenshot({path:'test-results/night-citadel-mobile.png'});
   report.framing.push(await moonFraming(mobile));
-  const oldRadius=await mobile.evaluate(()=>nightCitadel.motion[2]);
-  const touch=await context.newCDPSession(mobile);
-  await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:140,y:350,id:1},{x:240,y:350,id:2}]});
-  await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:90,y:350,id:1},{x:290,y:350,id:2}]});
-  await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-  assert(await mobile.evaluate(r=>nightCitadel.motion[2]<r,oldRadius));
+  await pinch();
   await mobile.evaluate(()=>nightCitadel.dispose());assert.equal(await mobile.evaluate(()=>gpuAudit.live.size),0,'Mobile leaked GPU resources');
   await context.close();
   assert.deepEqual(errors,[]);
