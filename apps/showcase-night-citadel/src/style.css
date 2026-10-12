@@ -351,7 +351,7 @@ footer {
     display: none;
   }
 }
-@media (max-width: 700px), (max-height: 500px) and (pointer: coarse) {
+@media (max-width: 700px), (max-height: 600px) and (pointer: coarse) {
   #scene {
     height: calc(100dvh - 60px - env(safe-area-inset-bottom));
   }
@@ -362,6 +362,9 @@ footer {
     inset: 16px 16px auto;
   }
   .masthead a span {
+    display: none;
+  }
+  .engine-label {
     display: none;
   }
   .title {
@@ -434,6 +437,75 @@ footer {
   }
   .telemetry output {
     font-size: 16px;
+  }
+}
+@media (orientation: landscape) and (max-height: 600px) and (pointer: coarse), (orientation: landscape) and (max-width: 700px) {
+  :root {
+    --drawer-width: clamp(240px, 32vw, 300px);
+  }
+  #scene,
+  body:has(.panel details[open]) #scene {
+    height: 100dvh;
+  }
+  body:has(.panel details[open]) #scene {
+    width: calc(100% - var(--drawer-width));
+  }
+  .masthead {
+    inset: 14px auto auto max(16px, env(safe-area-inset-left));
+    font-size: 10px;
+  }
+  .title {
+    left: max(16px, env(safe-area-inset-left));
+    top: 38px;
+  }
+  .title h1 {
+    display: flex;
+    gap: 7px;
+    align-items: baseline;
+    font-size: 24px;
+    line-height: 1.1;
+  }
+  .title br {
+    display: none;
+  }
+  .panel {
+    left: auto;
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    width: var(--drawer-width);
+    max-height: 100dvh;
+    border-radius: 12px;
+  }
+  .panel:has(details[open]) {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    height: 100dvh;
+    border-radius: 12px 0 0 12px;
+    padding-right: env(safe-area-inset-right);
+  }
+  footer,
+  body:has(.panel details[open]) footer {
+    left: max(16px, env(safe-area-inset-left));
+    right: calc(var(--drawer-width) + 16px);
+    bottom: max(12px, env(safe-area-inset-bottom));
+  }
+  .telemetry {
+    width: auto;
+    gap: 18px;
+  }
+  .telemetry div {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 5px;
+    white-space: nowrap;
+  }
+  .telemetry output {
+    font-size: 14px;
+  }
+  .telemetry span {
+    font-size: 7px;
+    letter-spacing: 0;
   }
 }
 @media (prefers-reduced-transparency: reduce) {

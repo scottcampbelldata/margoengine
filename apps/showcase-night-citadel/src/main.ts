@@ -15,7 +15,7 @@ import './style.css';
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = element<HTMLCanvasElement>('scene'), status = element<HTMLParagraphElement>('status');
 const orbit = element<HTMLInputElement>('orbit'), cadence = element<HTMLSelectElement>('cadence');
-document.querySelector<HTMLDetailsElement>('.panel details')!.open = !matchMedia('(max-width: 700px), (max-height: 500px) and (pointer: coarse)').matches;
+document.querySelector<HTMLDetailsElement>('.panel details')!.open = !matchMedia('(max-width: 700px), (max-height: 600px) and (pointer: coarse)').matches;
 const controls = ['azimuth','elevation','phase','haze','stars','glow','windows','waves','bloom','exposure'].map(id => element<HTMLInputElement>(id));
 const values = controls.map(input => element<HTMLOutputElement>(input.id+'-value'));
 const fpsText = element<HTMLOutputElement>('fps').firstChild as Text, deltaText = element<HTMLOutputElement>('delta').firstChild as Text;
@@ -80,6 +80,13 @@ export class NightCitadel {
     canvas.addEventListener('pointerup',this.pointerUp,options);
     canvas.addEventListener('pointercancel',this.pointerUp,options);
     canvas.addEventListener('lostpointercapture',this.pointerUp,options);
+    // Handle both contacts together and cancel native page zoom on iPhone browsers.
+    canvas.addEventListener('touchstart',this.touchState,{...options,passive:false});
+    canvas.addEventListener('touchmove',this.touchMove,{...options,passive:false});
+    canvas.addEventListener('touchend',this.touchState,{...options,passive:false});
+    canvas.addEventListener('touchcancel',this.touchState,{...options,passive:false});
+    window.addEventListener('resize',this.cancelGesture,options);
+    window.addEventListener('blur',this.cancelGesture,options);
     canvas.addEventListener('wheel',this.wheel,{...options,passive:false});
     canvas.addEventListener('keydown',this.keyDown,options);
     element('reset').addEventListener('click',this.reset,options);
@@ -160,7 +167,7 @@ export class NightCitadel {
     this.motion[3] = this.motion[4] = this.motion[5] = 0;
   };
   private readonly pointerDown = (e: PointerEvent): void => {
-    if (e.button !== 0) return;
+    if (e.pointerType === 'touch' || e.button !== 0) return;
     const p = this.pointers,
       slot = p[0] < 0 ? 0 : p[3] < 0 ? 3 : -1;
     if (slot < 0) return;
@@ -172,6 +179,7 @@ export class NightCitadel {
     p[6] = p[0] >= 0 && p[3] >= 0 ? Math.hypot(p[1] - p[4], p[2] - p[5]) : 0;
   };
   private readonly pointerMove = (e: PointerEvent): void => {
+    if (e.pointerType === 'touch') return;
     const p = this.pointers,
       slot = p[0] === e.pointerId ? 0 : p[3] === e.pointerId ? 3 : -1;
     if (slot < 0) return;
@@ -194,10 +202,43 @@ export class NightCitadel {
     }
   };
   private readonly pointerUp = (e: PointerEvent): void => {
+    if (e.pointerType === 'touch') return;
     const p = this.pointers;
     if (p[0] === e.pointerId) p[0] = -1;
     if (p[3] === e.pointerId) p[3] = -1;
     p[6] = 0;
+  };
+  private readonly touchState = (e: TouchEvent): void => {
+    if (e.cancelable) e.preventDefault();
+    const a=e.targetTouches[0],b=e.targetTouches[1],p=this.pointers;
+    if(e.type==='touchstart'||b||p[3]>=0)this.motion[3]=this.motion[4]=0;
+    this.motion[5]=0;
+    p[0]=a?.identifier??-1;p[1]=a?.clientX??0;p[2]=a?.clientY??0;
+    p[3]=b?.identifier??-1;p[4]=b?.clientX??0;p[5]=b?.clientY??0;
+    p[6]=a&&b?Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY):0;
+    if(a)orbit.checked=false;
+  };
+  private readonly touchMove = (e: TouchEvent): void => {
+    if (e.cancelable) e.preventDefault();
+    const a=e.targetTouches[0],b=e.targetTouches[1],p=this.pointers;
+    if(!a)return;
+    if(p[0]!==a.identifier||p[3]!== (b?.identifier??-1)){this.touchState(e);return;}
+    if(b){
+      const length=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+      if(p[6]>0&&length>=1)this.motion[2]=Math.max(42,Math.min(140,this.motion[2]*p[6]/length));
+      p[6]=length;p[4]=b.clientX;p[5]=b.clientY;
+      this.motion[3]=this.motion[4]=this.motion[5]=0;
+    }else{
+      this.motion[3]=-(a.clientX-p[1])*0.16;
+      this.motion[4]=(a.clientY-p[2])*0.13;
+    }
+    p[1]=a.clientX;p[2]=a.clientY;
+  };
+  private readonly cancelGesture = (): void => {
+    const p=this.pointers;
+    for(const slot of [0,3])if(p[slot]>=0&&canvas.hasPointerCapture(p[slot]))canvas.releasePointerCapture(p[slot]);
+    p[0]=p[3]=-1;p[6]=0;
+    this.motion[3]=this.motion[4]=this.motion[5]=0;
   };
   private readonly wheel = (e: WheelEvent): void => {
     e.preventDefault();
