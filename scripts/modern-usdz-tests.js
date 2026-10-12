@@ -14,7 +14,8 @@ try {
   const result = await page.evaluate(async (data) => {
     const { Engine } = await import("/packages/core/dist/index.js"),
       { engineRuntime } = await import("/packages/core/dist/extension.js"),
-      { parseUSDZ } = await import("/packages/usdz/dist/index.js");
+      { parseUSDZ } = await import("/packages/usdz/dist/index.js"),
+      { SceneTarget } = await import("/packages/shared/msaa.js");
     const canvas = document.createElement("canvas");
     canvas.style.cssText = "width:256px;height:256px";
     document.body.append(canvas);
@@ -43,10 +44,10 @@ try {
     const color = gpu.createTexture({
         size: [256, 256],
         format: "rgba8unorm",
-        usage: 17,
+        usage: 21,
       }),
-      read = gpu.createBuffer({ size: 256 * 256 * 4, usage: 9 }),
-      view = color.createView();
+      read = gpu.createBuffer({ size: 256 * 256 * 4, usage: 9 });
+    let target, depth;
     engineRuntime(engine).use({
       name: "usdz-readback",
       setup() {},
@@ -55,14 +56,18 @@ try {
           name: "usdz-target",
           order: -1000,
           execute(context) {
-            context.color = view;
-            context.format = "rgba8unorm";
+            if (!target) {
+              depth = gpu.createTexture({size: [256, 256], format: context.descriptor.depthStencil.format, usage: 20});
+              target = new SceneTarget(gpu, color, depth, context.descriptor.multisample.count);
+            }
+            target.begin(context);
           },
         });
         graph.add({
           name: "usdz-capture",
           order: 1000000,
           execute(context) {
+            target.present(context);
             context.encoder.copyTextureToBuffer(
               { texture: color },
               { buffer: read, bytesPerRow: 1024 },
@@ -72,6 +77,8 @@ try {
         });
       },
       dispose() {
+        target?.dispose();
+        depth?.destroy();
         color.destroy();
         read.destroy();
       },

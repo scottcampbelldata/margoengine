@@ -2,6 +2,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import {Engine, PbrMaterial, box} from '@margoengine/core';
 import {engineRuntime, meshRuntime} from '@margoengine/core/extension';
 import {Physics} from '@margoengine/physics';
+import {SceneTarget} from '../../shared/msaa.js';
 
 const assert = (condition, message) => {if (!condition) throw new Error(message);};
 const SIZE = 256;
@@ -14,17 +15,19 @@ class Capture {
     graph.add({name: 'capture:redirect', order: -100, execute: context => {
       if (!this.texture) {
         this.format = context.format;
-        this.texture = this.device.createTexture({size: [context.width, context.height], format: context.format, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC});
+        this.texture = this.device.createTexture({size: [context.width, context.height], format: context.format, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC | GPUTextureUsage.TEXTURE_BINDING});
+        this.depth = this.device.createTexture({size: [context.width, context.height], format: context.descriptor.depthStencil.format, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING});
+        this.target = new SceneTarget(this.device, this.texture, this.depth, context.descriptor.multisample.count);
         this.buffer = this.device.createBuffer({size: context.width * context.height * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ});
-        this.view = this.texture.createView();
       }
-      context.color = this.view;
+      this.target.begin(context);
     }});
     graph.add({name: 'capture:copy', order: 900, execute: context => {
+      this.target.present(context);
       context.encoder.copyTextureToBuffer({texture: this.texture}, {buffer: this.buffer, bytesPerRow: context.width * 4}, [context.width, context.height]);
     }});
   }
-  dispose() {this.texture?.destroy(); this.buffer?.destroy(); this.texture = this.buffer = undefined;}
+  dispose() {this.target?.dispose(); this.depth?.destroy(); this.texture?.destroy(); this.buffer?.destroy(); this.target = this.depth = this.texture = this.buffer = undefined;}
   async read() {
     await this.buffer.mapAsync(GPUMapMode.READ);
     const bytes = new Uint8Array(this.buffer.getMappedRange()).slice(); this.buffer.unmap();
