@@ -295,3 +295,14 @@ export function wireframe(data: GeometryData): Uint32Array {
   }
   return Uint32Array.from(out);
 }
+
+/** Expands distinct triangle edges for line rendering with a vertical lift. */
+export function wireframePositions(data: GeometryData, offsetY = 0): Float32Array {
+  if (!Number.isFinite(offsetY)) throw new RangeError('Invalid wireframe offset');
+  const edges = wireframe(data), positions = new Float32Array(edges.length*3);
+  for (let i = 0; i < edges.length; i++) {
+    const source = edges[i]*3;
+    positions[i*3] = data.positions[source]; positions[i*3+1] = data.positions[source+1]+offsetY; positions[i*3+2] = data.positions[source+2];
+  }
+  return positions;
+}

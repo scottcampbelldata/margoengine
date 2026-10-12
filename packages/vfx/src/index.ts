@@ -6,7 +6,7 @@ import {simulationShader,billboardShader} from './shader.js';
 declare const GPUBufferUsage:{UNIFORM:number;STORAGE:number;INDIRECT:number;INDEX:number;COPY_DST:number;COPY_SRC:number};
 type Context=Extract<PassContext,{backend:'webgpu'}>;
 const defaultPosition:Vec3=[0,1,0],defaultVelocity:Vec3=[0,3,0],defaultGravity:Vec3=[0,-9.81,0],defaultColor:readonly [number,number,number,number]=[1,0.5,0.1,1],defaultLife:readonly [number,number]=[1,3];
-export interface VFXOptions {capacity?:number;rate?:number;position?:Vec3;velocity?:Vec3;spread?:number;gravity?:Vec3;color?:readonly [number,number,number,number];size?:number;lifetime?:readonly [number,number];ground?:number;bounce?:number;turbulence?:number;frequency?:number;angularVelocity?:number;emissionExtent?:Vec3;intensity?:number}
+export interface VFXOptions {capacity?:number;initialCount?:number;rate?:number;position?:Vec3;velocity?:Vec3;spread?:number;gravity?:Vec3;color?:readonly [number,number,number,number];size?:number;lifetime?:readonly [number,number];ground?:number;bounce?:number;turbulence?:number;frequency?:number;angularVelocity?:number;emissionExtent?:Vec3;intensity?:number}
 let nextId=0;
 export class VFX implements EnginePlugin {
   private readonly attachment:GPURenderPassColorAttachment={view:undefined!,loadOp:'load',storeOp:'store'};
@@ -20,6 +20,7 @@ export class VFX implements EnginePlugin {
   constructor(readonly options:VFXOptions={}) {this.capacity=options.capacity??1_000_000;this.validate();}
   static attach(instance:EngineKernel,options:VFXOptions={}):VFX {const effect=new VFX(options);engineRuntime(instance).use(effect);return effect;}
   private validate():void {const o=this.options;
+    if(!Number.isInteger(o.initialCount??0)||(o.initialCount??0)<0||(o.initialCount??0)>this.capacity)throw new RangeError('Invalid initial particle count');
     if(o.emissionExtent){finiteVector(o.emissionExtent,3,'Emission extent');for(let i=0;i<3;i++)if(o.emissionExtent[i]<0)throw new RangeError('Emission extent must be nonnegative');}
     if(!Number.isFinite(o.intensity??1)||(o.intensity??1)<0||(o.intensity??1)>16)throw new RangeError('Invalid particle intensity');
     if(!Number.isInteger(this.capacity)||this.capacity<1||this.capacity>1_000_000||o.capacity!==undefined&&o.capacity!==this.capacity||!Number.isFinite(o.rate??this.capacity/2)||(o.rate??this.capacity/2)<0||!Number.isFinite(Math.fround(o.ground??0))||!Number.isFinite(Math.fround(o.angularVelocity??0))||!Number.isFinite(o.bounce??0.3)||(o.bounce??0.3)<0||(o.bounce??0.3)>1||!Number.isFinite(Math.fround(o.size??0.1))||(o.size??0.1)<=0)throw new RangeError('Invalid VFX options');
@@ -36,6 +37,7 @@ export class VFX implements EnginePlugin {
     this.device.queue.writeBuffer(this.indirect,0,new Uint32Array([6,0,0,0,0]));this.device.queue.writeBuffer(this.index,0,new Uint32Array([0,1,2,2,1,3]));
     this.simulation=this.device.createComputePipeline({layout:'auto',compute:{module:this.device.createShaderModule({code:simulationShader}),entryPoint:'main'}});
     this.computeGroups=[0,1].map(i=>this.device!.createBindGroup({layout:this.simulation!.getBindGroupLayout(0),entries:[this.uniform!,this.states[i],this.states[1-i],this.alive!,this.indirect!,this.respawn!].map((buffer,binding)=>({binding,resource:{buffer}}))}));this.front=0;
+    this.burst(this.options.initialCount??0);
   }
   registerPasses(graph:FrameGraph):void {
     graph.add({name:this.name+':simulate',order:-8,execute:c=>{if(c.backend==='webgpu')this.simulate(c);}});
@@ -51,8 +53,8 @@ export class VFX implements EnginePlugin {
   }
   private draw(c:Context):void {
     if(this.renderFormat!==c.format||this.renderDepth!==c.descriptor.depthStencil!.format){this.renderFormat=c.format;this.renderDepth=c.descriptor.depthStencil!.format;this.renderKey=this.renderFormat+':'+this.renderDepth;}
-    const key=this.renderKey;let pipeline=this.renders.get(key);
-    if(!pipeline){const module=c.device.createShaderModule({code:billboardShader});pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format,blend:{color:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}}]},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:false,depthCompare:'greater-equal'}});this.renders.set(key,pipeline);}
+    const key=this.renderKey+':'+c.descriptor.multisample?.count;let pipeline=this.renders.get(key);
+    if(!pipeline){const module=c.device.createShaderModule({code:billboardShader});pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format,blend:{color:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}}]},multisample:c.descriptor.multisample,depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:false,depthCompare:'greater-equal'}});this.renders.set(key,pipeline);}
     // Auto layouts are pipeline-specific, including output format variants.
     let groups=this.renderGroups.get(pipeline);if(!groups){groups=[0,1].map(i=>c.device.createBindGroup({layout:pipeline!.getBindGroupLayout(0),entries:[this.uniform!,this.states[i],this.alive!].map((buffer,binding)=>({binding,resource:{buffer}}))}));this.renderGroups.set(pipeline,groups);}const group=groups[this.front];
     this.attachment.view=c.color;this.depthAttachment.view=c.depth;this.depthAttachment.stencilReadOnly=c.descriptor.depthStencil!.format.includes('stencil')?true:undefined;

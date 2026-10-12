@@ -13,6 +13,8 @@
     "access": "public"
   },
   "scripts": {
+    "build": "node ../../scripts/build-optional.js terrain",
+    "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm --prefix ../.. run build:packages"
   },
   "sideEffects": false,
@@ -27,5 +29,8 @@
   ],
   "peerDependencies": {
     "@margoengine/core": "0.1.0"
+  },
+  "dependencies": {
+    "@margoengine/geometry": "0.1.0"
   }
 }

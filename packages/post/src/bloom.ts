@@ -141,7 +141,7 @@ export class Bloom implements EnginePlugin {
     this.attachment.view = this.original!;
     const pass = c.encoder.beginRenderPass(this.presentation);
     pass.setPipeline(this.present!); pass.setBindGroup(0, this.groups[2]); pass.draw(3); pass.end();
-    c.color = this.original!; c.depth = this.originalDepth!; c.format = this.originalFormat!; c.draw = this.originalDraw!;
+    c.color = this.original!; c.depth = this.depth!; c.format = this.originalFormat!; c.draw = this.originalDraw!;
   }
   private release(): void {
     this.uniform?.destroy(); for (const buffer of this.kernels) buffer.destroy(); for (const texture of this.textures) texture.destroy();

@@ -184,7 +184,7 @@ fn smithG1(x: f32, a2: f32) -> f32 { return 2.0 * x / (x + sqrt(a2 + (1.0 - a2) 
   let samples = params.x;
   for (var i = 0u; i < samples; i++) {
     let h = importanceGGX(hammersley(i, samples), alpha);
-    let vh = dot(v, h);
+    let vh = clamp(dot(v, h), 0.0, 1.0);
     let l = 2.0 * vh * h - v;
     if (l.z > 0.0 && vh > 0.0) {
       let g = smithG1(nv, a2) * smithG1(l.z, a2);

@@ -1,5 +1,13 @@
 # @margoengine/geometry
 
+`wireframePositions(data, offsetY = 0)` expands distinct triangle edges into a
+contiguous line-position stream with an optional vertical lift for terrain debug views.
+
+`pbrVertexStream(data, occlusion?)` packs the 80-byte PBR vertex layout used by
+`ScatterInstances`, retaining normals, tangents, both UV slots and baked RGB
+occlusion. Tangents must be present; occlusion callbacks must return finite 0..1.
+`footprintRadius(data)` measures the maximum local XZ distance from the origin.
+
 Pure-CPU, tree-shakable geometry for Margo Engine: Three.js-compatible primitives, curves, shapes, extrusion, triangulation and mesh utilities.
 
 Not yet published to npm. Build from source with `npm run build` in `packages/geometry`.
@@ -51,6 +59,13 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 - **Pure and SSR safe.** No globals, no GPU, no DOM; every function returns new arrays and leaves its input untouched. `"sideEffects": false` with one module-level export per feature, so bundlers keep only what you import: `boxGeometry` plus `toGeometry` is under 1 KiB gzip.
 
 ## Options
+
+The polyhedron primitives accept `smooth` as an optional third argument, and
+`polyhedronGeometry(vertices, indices, radius, detail, smooth)` accepts it fifth.
+By default, detail 0 uses flat face normals and higher detail uses smooth radial
+normals. Pass `true` at every detail to keep procedural rock LOD shading consistent,
+for example `icosahedronGeometry(0.65, 0, true)`. This changes only normals; use
+the same radius and local origin for every LOD to avoid size changes.
 
 `extrudeGeometry(shapes, options)`:
 

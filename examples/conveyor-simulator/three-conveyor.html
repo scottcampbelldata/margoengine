@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>Three.js conveyor benchmark</title>
+  <style>
+    :root{color-scheme:dark;font:13px/1.4 system-ui,sans-serif;background:#090d14;color:#e8edf5}
+    *{box-sizing:border-box}body{margin:0;min-width:952px;min-height:684px;display:grid;place-items:center;height:100vh}
+    main{position:relative;width:922px;height:654px;background:#111722;border:1px solid #293343;border-radius:12px;overflow:hidden}
+    canvas{display:block;width:920px;height:652px;outline:none}canvas:focus-visible{outline:2px solid #77b9ff;outline-offset:-3px}
+    .hud,.tools{position:absolute;background:#0b101be8;border:1px solid #344155;border-radius:9px;padding:12px;backdrop-filter:blur(8px)}
+    .hud{top:14px;left:14px;width:310px;pointer-events:none}h1{font-size:15px;margin:0 0 8px}dl{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0}dt{font-size:10px;color:#9caec3}dd{margin:2px 0 0;font:600 17px/1.2 ui-monospace,monospace;font-variant-numeric:tabular-nums}
+    .tools{left:14px;right:14px;bottom:14px;height:108px}.row{display:flex;align-items:center;gap:12px;height:34px}label{white-space:nowrap}input{flex:1;min-width:80px;accent-color:#7cbaff}output{width:42px;text-align:right;font-variant-numeric:tabular-nums}
+    button{font:600 12px system-ui,sans-serif;height:34px;padding:0 14px;border:1px solid #6587aa;border-radius:6px;background:#173552;color:#eff7ff;cursor:pointer}button:disabled{opacity:.5;cursor:default}button:focus-visible,input:focus-visible{outline:2px solid #9bceff;outline-offset:2px}
+    #result{height:20px;margin:6px 0 0;color:#c7dcf1;font:12px ui-monospace,monospace}.hint{font-size:11px;color:#9caec3;margin:5px 0 0}.loading{position:absolute;inset:0;display:grid;place-items:center;background:#111722d9;padding:80px;text-align:center;z-index:2}.loading[hidden]{display:none}
+  </style>
+  <script>Object.defineProperty(window,'devicePixelRatio',{value:1,configurable:true});</script>
+  <script type="importmap">
+    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"}}
+  </script>
+</head>
+<body>
+<main aria-label="Three.js conveyor benchmark viewer">
+  <canvas id="canvas" width="920" height="652" tabindex="0" aria-label="Conveyor assembly. Drag to rotate, right drag to pan, scroll to zoom."></canvas>
+  <section class="hud" aria-label="Rendering statistics">
+    <h1>Three.js · WebGL2 · MSAA</h1>
+    <dl><div><dt>FPS</dt><dd id="fps">—</dd></div><div><dt>Frame ms</dt><dd id="ms">—</dd></div><div><dt>Draws</dt><dd id="draws">—</dd></div><div><dt>Parts</dt><dd id="parts">—</dd></div></dl>
+  </section>
+  <section class="tools" aria-label="Benchmark controls">
+    <div class="row"><label for="explode">Explode sweep</label><input id="explode" type="range" min="0" max="100" step="1" value="0" disabled><output id="percent" for="explode">0%</output><button id="run" type="button" disabled>Run 660-frame Uncapped Benchmark</button></div>
+    <p id="result" role="status" aria-live="polite">60 warmup + 600 measured frames · orbit + explode sweep</p>
+    <p class="hint">Left drag: rotate · middle/right/Shift-drag: pan · wheel: zoom. Uncapped pacing requires browser launch flags.</p>
+  </section>
+  <div id="loading" class="loading" role="status">Loading Untitled.glb…</div>
+</main>
+<script type="module">
+const canvas=document.querySelector('#canvas'),slider=document.querySelector('#explode'),button=document.querySelector('#run');
+const hud=Object.fromEntries(['fps','ms','draws','parts','percent','result','loading'].map(id=>[id,document.getElementById(id)]));
+const parts=[],bounds=new Float64Array([Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity]),center=new Float64Array(3),home=new Float64Array(3);
+const intervals=new Float64Array(600),savedPosition=new Float64Array(3),savedTarget=new Float64Array(3);
+let renderer,scene,camera,controls,raf=0,explode=0,step=-60,running=false,previous=0,hudTime=0,hudFrames=0,savedExplode=0,last=0;
+const batches=[];
+const api=window.conveyorBenchmark={ready:false,error:null,parts,renderer:null,lastResult:null,setExplode,startBenchmark};
+
+function setExplode(value){
+  if(!Number.isFinite(value)||value<0||value>1)throw new RangeError('Explode must be between 0 and 1');
+  explode=value;
+  for(let i=0;i<parts.length;i++){const p=parts[i],m=p.batch.instanceMatrix.array,at=p.index*16;m[at+12]=p.base[0]+p.offset[0]*value;m[at+13]=p.base[1]+p.offset[1]*value;m[at+14]=p.base[2]+p.offset[2]*value;}
+  for(let i=0;i<batches.length;i++)batches[i].instanceMatrix.needsUpdate=true;
+}
+function prepareAssembly(){
+  for(let a=0;a<3;a++)center[a]=(bounds[a]+bounds[a+3])/2;
+  const diagonal=Math.hypot(bounds[3]-bounds[0],bounds[4]-bounds[1],bounds[5]-bounds[2]);
+  if(!Number.isFinite(diagonal)||diagonal<=0)throw new Error('Conveyor bounds are empty or invalid');
+  const reach=diagonal*0.115;
+  for(let i=0;i<parts.length;i++){
+    const p=parts[i];let x=p.center[0]-center[0],y=(p.center[1]-center[1])*1.8,z=p.center[2]-center[2];
+    let length=Math.hypot(x,y,z);if(length<1e-8){x=0;y=1;z=0;length=1;}
+    p.offset[0]=x/length*reach;p.offset[1]=y/length*reach;p.offset[2]=z/length*reach;
+  }
+  const distance=diagonal*0.5*1.22/Math.sin(38*Math.PI/360),direction=Math.hypot(1,0.67,1.08);
+  for(let a=0;a<3;a++)home[a]=center[a]+[1,0.67,1.08][a]/direction*distance;
+  camera.position.set(...home);controls.target.set(...center);
+  camera.near=Math.max(diagonal/10000,0.001);camera.far=diagonal*30;
+}
+function startBenchmark(){
+  if(!api.ready||running)return;
+  camera.position.toArray(savedPosition);controls.target.toArray(savedTarget);savedExplode=explode;
+  api.lastResult=null;
+  controls.target.set(...center);
+  running=true;step=-60;previous=0;controls.enabled=false;button.disabled=slider.disabled=true;canvas.style.pointerEvents='none';
+  hud.result.textContent='Running 60 warmup + 600 measured frames…';
+}
+function finishBenchmark(result,message){
+  running=false;setExplode(savedExplode);camera.position.set(...savedPosition);
+  controls.target.set(...savedTarget);controls.enabled=true;controls.update();
+  button.disabled=slider.disabled=false;canvas.style.pointerEvents='';
+  slider.value=String(Math.round(savedExplode*100));hud.percent.textContent=slider.value+'%';
+  hud.result.textContent=message;api.lastResult=result;
+  if(result){console.info('Three.js conveyor benchmark: browser pacing is controlled by launch flags.');console.table(result);}
+}
+function frame(time){
+  try{
+    const delta=last?Math.min((time-last)/1000,0.1):0;last=time;
+    if(running){
+      const angle=step/600*Math.PI*2,x=home[0]-center[0],z=home[2]-center[2];
+      camera.position.set(center[0]+x*Math.cos(angle)+z*Math.sin(angle),home[1],center[2]-x*Math.sin(angle)+z*Math.cos(angle));camera.lookAt(center[0],center[1],center[2]);
+      setExplode(0.5-0.5*Math.cos(angle));
+      if(step>=0)intervals[step]=time-previous;previous=time;
+    }else controls.update();
+    renderer.render(scene,camera);
+    if(hudTime===0)hudTime=time;hudFrames++;
+    if(time-hudTime>=250){const ms=(time-hudTime)/hudFrames;hud.fps.textContent=(1000/ms).toFixed(1);hud.ms.textContent=ms.toFixed(2);hud.draws.textContent=renderer.info.render.calls;hudFrames=0;hudTime=time;}
+    if(running&&++step===600){
+      intervals.sort();let sum=0;for(let i=0;i<600;i++)sum+=intervals[i];
+      const result={warmup:60,frames:600,medianMs:(intervals[299]+intervals[300])/2,p95Ms:intervals[569],meanMs:sum/600,fps:600000/sum,drawCalls:renderer.info.render.calls,parts:parts.length};
+      finishBenchmark(result,`Median ${result.medianMs.toFixed(3)} ms · p95 ${result.p95Ms.toFixed(3)} ms · ${result.fps.toFixed(0)} FPS`);
+    }
+    raf=requestAnimationFrame(frame);
+  }catch(error){fail(error);}
+}
+function fail(error){api.ready=false;api.error=String(error.message??error);console.error(error);cancelAnimationFrame(raf);hud.loading.hidden=false;hud.loading.textContent=api.error;button.disabled=slider.disabled=true;}
+slider.addEventListener('input',()=>{setExplode(slider.valueAsNumber/100);hud.percent.textContent=slider.value+'%';});
+button.addEventListener('click',startBenchmark);
+document.addEventListener('visibilitychange',()=>{last=hudTime=hudFrames=0;if(document.hidden&&running)finishBenchmark(null,'Benchmark cancelled: tab lost visibility.');});
+addEventListener('pagehide',event=>{if(!event.persisted){cancelAnimationFrame(raf);controls?.dispose();for(const batch of batches)batch.dispose();renderer?.dispose();}},{once:true});
+
+try{
+  const [THREE,{OrbitControls},{GLTFLoader}]=await Promise.all([import('three'),import('three/addons/controls/OrbitControls.js'),import('three/addons/loaders/GLTFLoader.js')]);
+  const gl=canvas.getContext('webgl2',{antialias:true,alpha:false,powerPreference:'high-performance'});
+  if(!gl)throw new Error('WebGL2 is unavailable');
+  renderer=api.renderer=new THREE.WebGLRenderer({canvas,context:gl,antialias:true,alpha:false,powerPreference:'high-performance'});
+  renderer.setPixelRatio(1);renderer.setSize(920,652,false);renderer.setClearColor(0x050609);
+  renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;
+  const samples=gl.getParameter(gl.SAMPLES);document.querySelector('h1').textContent=`Three.js · WebGL2 · ${samples}× MSAA`;
+  scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(38,920/652,0.01,10000);
+  api.camera=camera;
+  controls=new OrbitControls(camera,canvas);controls.enableDamping=false;controls.screenSpacePanning=true;
+  controls.mouseButtons.MIDDLE=THREE.MOUSE.PAN;controls.mouseButtons.RIGHT=THREE.MOUSE.PAN;
+  const key=new THREE.DirectionalLight(0xfff7ec,2.3);key.position.set(-30,100,75);scene.add(key);
+  const probe=new THREE.LightProbe();probe.sh.coefficients[0].set(1,1,1);scene.add(probe);
+  const gltf=await new GLTFLoader().loadAsync('./Untitled.glb');gltf.scene.updateMatrixWorld(true);
+  const grouped=new Map(),box=new THREE.Box3(),worldBox=new THREE.Box3();
+  gltf.scene.traverse(mesh=>{
+    if(!mesh.isMesh||mesh.name==='Cube')return;
+    if(mesh.isSkinnedMesh||mesh.isInstancedMesh)throw new Error('Expected static CAD mesh nodes');
+    let materials=grouped.get(mesh.geometry);if(!materials){materials=new Map();grouped.set(mesh.geometry,materials);}
+    let group=materials.get(mesh.material);if(!group){group={geometry:mesh.geometry,material:mesh.material,parts:[]};materials.set(mesh.material,group);}
+    if(!mesh.geometry.boundingBox)mesh.geometry.computeBoundingBox();box.copy(mesh.geometry.boundingBox);worldBox.copy(box).applyMatrix4(mesh.matrixWorld);
+    const matrix=new Float32Array(mesh.matrixWorld.elements),base=new Float64Array([matrix[12],matrix[13],matrix[14]]),partCenter=new Float64Array(3);
+    for(let a=0;a<3;a++){const axis=['x','y','z'][a],min=worldBox.min[axis],max=worldBox.max[axis];partCenter[a]=(min+max)/2;bounds[a]=Math.min(bounds[a],min);bounds[a+3]=Math.max(bounds[a+3],max);}
+    const part={name:mesh.userData.name??mesh.name,base,offset:new Float64Array(3),center:partCenter,matrix,batch:null,index:group.parts.length};
+    parts.push(part);group.parts.push(part);
+  });
+  if(!parts.length)throw new Error('No conveyor parts found');
+  for(const materials of grouped.values())for(const group of materials.values()){
+    const batch=new THREE.InstancedMesh(group.geometry,group.material,group.parts.length);
+    batch.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    // All parts stay active during the sweep; avoid stale instance bounds after translations.
+    batch.frustumCulled=false;
+    for(const part of group.parts){batch.instanceMatrix.array.set(part.matrix,part.index*16);part.batch=batch;}
+    batch.instanceMatrix.needsUpdate=true;scene.add(batch);batches.push(batch);
+  }
+  prepareAssembly();camera.updateProjectionMatrix();controls.update();
+  hud.parts.textContent=parts.length;hud.draws.textContent=batches.length;hud.loading.hidden=true;button.disabled=slider.disabled=false;api.ready=true;
+  canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();fail(new Error('WebGL context lost. Reload to restart the benchmark.'));});
+  raf=requestAnimationFrame(frame);
+}catch(error){fail(error);}
+</script>
+</body>
+</html>

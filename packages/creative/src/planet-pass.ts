@@ -15,7 +15,7 @@ export class PlanetPass {
   private readonly uniformData = new Float32Array(48);
   private readonly buffers: GPUBuffer[] = [];
   private readonly textures: GPUTexture[] = [];
-  private readonly variants = new Map<GPUTextureFormat, Variant>();
+  private readonly variants = new Map<string, Variant>();
   private readonly uniform: GPUBuffer;
   private readonly vertex: GPUBuffer;
   private readonly index: GPUBuffer;
@@ -85,16 +85,16 @@ export class PlanetPass {
       const views = [texture(images.day, true, [255,255,255,255]), texture(images.night, true, [0,0,0,255]), texture(images.specular, false, [0,255,0,255]), texture(images.normal, false, [128,128,255,255]), texture(images.clouds, false, [0,0,0,255])];
       const sampler = device.createSampler({addressModeU: 'repeat', addressModeV: 'clamp-to-edge', minFilter: 'linear', magFilter: 'linear'});
       const surfaceModule = device.createShaderModule({code: surfaceSource}), shellModule = device.createShaderModule({code: atmosphereSource});
-      for (const target of new Set([format, 'rgba16float' as GPUTextureFormat])) {
+      for (const target of new Set([format, 'rgba16float' as GPUTextureFormat])) for(const count of [1,4]) {
         const pipeline = (module: GPUShaderModule, shell: boolean) => device.createRenderPipeline({
           layout: 'auto', vertex: {module, entryPoint: 'vs_main', buffers: [{arrayStride: 12, attributes: [{shaderLocation: 0, offset: 0, format: 'float32x3'}]}]},
           fragment: {module, entryPoint: 'fs_main', constants: {outputHdr: +(target === 'rgba16float')}, targets: [{format: target, blend: shell ? {color: {srcFactor: 'one', dstFactor: 'one-minus-src-alpha'}, alpha: {srcFactor: 'one', dstFactor: 'one-minus-src-alpha'}} : undefined}]},
-          primitive: {topology: 'triangle-list', cullMode: 'back'}, depthStencil: {format: depthFormat, depthWriteEnabled: !shell, depthCompare: 'greater-equal'},
+          primitive: {topology: 'triangle-list', cullMode: 'back'}, multisample: {count}, depthStencil: {format: depthFormat, depthWriteEnabled: !shell, depthCompare: 'greater-equal'},
         });
         const surface = pipeline(surfaceModule, false), shell = pipeline(shellModule, true);
         const surfaceGroup = device.createBindGroup({layout: surface.getBindGroupLayout(0), entries: [{binding: 0, resource: {buffer: this.uniform}}, {binding: 1, resource: sampler}, ...views.slice(0, 4).map((resource, index) => ({binding: index + 2, resource}))]});
         const shellGroup = device.createBindGroup({layout: shell.getBindGroupLayout(0), entries: [{binding: 0, resource: {buffer: this.uniform}}, {binding: 1, resource: sampler}, {binding: 2, resource: views[4]}]});
-        this.variants.set(target, {surface, shell, surfaceGroup, shellGroup});
+        this.variants.set(target+':'+count, {surface, shell, surfaceGroup, shellGroup});
       }
     } catch (error) {this.dispose(); throw error;}
   }
@@ -114,7 +114,7 @@ export class PlanetPass {
 
   record(context: Context, shell: boolean): void {
     if (this.disposed) throw new Error('Planet pass is disposed');
-    const variant = this.variants.get(context.format);
+    const variant = this.variants.get(context.format+':'+(context.descriptor.multisample?.count??1));
     if (!variant || context.device !== this.device) throw new Error('Unsupported planet target or device');
     this.color.view = context.color; this.surfaceDepth.view = this.shellDepth.view = context.depth;
     const pass = context.encoder.beginRenderPass(shell ? this.shellDescriptor : this.surfaceDescriptor);

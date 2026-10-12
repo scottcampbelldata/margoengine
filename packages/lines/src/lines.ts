@@ -94,8 +94,8 @@ export class Lines implements EnginePlugin {
 
   registerPasses(graph: FrameGraph): void {graph.add({name: `${this.name}:draw`, order: this.order, execute: this.execute});}
 
-  private pipeline(format: GPUTextureFormat, depthFormat: GPUTextureFormat, onTop: boolean): GPURenderPipeline {
-    const key = `${format}|${depthFormat}|${onTop}`;
+  private pipeline(format: GPUTextureFormat, depthFormat: GPUTextureFormat, onTop: boolean, count: number): GPURenderPipeline {
+    const key = `${format}|${depthFormat}|${onTop}|${count}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const module = this.module!;
@@ -106,6 +106,7 @@ export class Lines implements EnginePlugin {
           color: {srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add'},
           alpha: {srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add'}}}]},
         primitive: {topology: 'triangle-list', cullMode: 'none'},
+        multisample: {count},
         depthStencil: {format: depthFormat, depthWriteEnabled: false, depthCompare: onTop ? 'always' : 'greater-equal'},
       });
       this.pipelines.set(key, pipeline);
@@ -187,7 +188,7 @@ export class Lines implements EnginePlugin {
     pass.setBindGroup(0, this.frameGroup!);
     for (const [list, onTop] of [[this.depthLines, false], [this.topLines, true]] as const) {
       if (!list.length) continue;
-      pass.setPipeline(this.pipeline(context.format, depthFormat, onTop));
+      pass.setPipeline(this.pipeline(context.format, depthFormat, onTop, context.descriptor.multisample?.count ?? 1));
       for (const [line, r] of list) {pass.setBindGroup(1, r.group); pass.draw(VERTICES_PER_SEGMENT, line.segmentCount); this.stats.drawCalls++;}
     }
     pass.end();

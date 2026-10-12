@@ -39,8 +39,8 @@ fn terrainColor(position:vec3f,normal:vec3f)->vec3f {
   return select(fallback,color/max(total,0.00001),total>0.00001);
 }
 @fragment fn fragment(i:Output)->@location(0) vec4f {
-  let n=normalize(i.normal);let base=terrainColor(i.position,n);let v=normalize(frame.eye.xyz-i.position);let l=normalize(frame.light.xyz);let h=normalize(v+l);
-  let nl=max(dot(n,l),0.0);let nv=max(dot(n,v),0.0001);let nh=max(dot(n,h),0.0);let vh=max(dot(v,h),0.0);let a=i.material.x*i.material.x;let a2=a*a;
+  let n=normalize(i.normal);let base=terrainColor(i.position,n);let v=normalize(frame.eye.xyz-i.position);let l=normalize(frame.light.xyz);let h=(v+l)/max(length(v+l),0.0001);
+  let nl=clamp(dot(n,l),0.0,1.0);let nv=clamp(dot(n,v),0.0001,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);let a=i.material.x*i.material.x;let a2=a*a;
   let d=a2/(3.14159265*pow(nh*nh*(a2-1)+1,2.0));let g=2*nv/(nv+sqrt(a2+(1-a2)*nv*nv))*2*nl/max(nl+sqrt(a2+(1-a2)*nl*nl),0.0001);let fresnel=vec3f(0.04)+vec3f(0.96)*pow(1-vh,5.0);
   let direct=((1-fresnel)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl;
   let linear=direct*frame.radiance.xyz*frame.light.w+base*frame.radiance.w;

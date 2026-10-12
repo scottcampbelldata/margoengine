@@ -101,7 +101,7 @@ export class PointsPlugin implements EnginePlugin {
     frame: GPUBuffer; frameGroup: GPUBindGroup; dummy: GPUBuffer; white: GPUTexture; whiteView: GPUTextureView;
     linear: GPUSampler; nearest: GPUSampler; edlParams: GPUBuffer;
   };
-  private edl?: {texture: GPUTexture; view: GPUTextureView; group: GPUBindGroup; width: number; height: number};
+  private edl?: {pipeline: GPURenderPipeline; texture: GPUTexture; view: GPUTextureView; group: GPUBindGroup; width: number; height: number};
   private readonly frameData = new Float32Array(FRAME_BYTES / 4);
   private readonly edlData = new Float32Array(4);
   private readonly lastViewProj = new Float32Array(16);
@@ -356,7 +356,7 @@ export class PointsPlugin implements EnginePlugin {
 
   private pointPipeline(context: GpuContext, material: PointsMaterial, edl: boolean): GPURenderPipeline {
     const depthFormat = context.descriptor.depthStencil!.format, sphere = material.shading === 'sphere';
-    const key = `p|${context.format}|${depthFormat}|${edl}|${sphere}|${material.writesDepth}|${material.depthTest}|${material.blending}`;
+    const key = `p|${context.descriptor.multisample?.count}|${context.format}|${depthFormat}|${edl}|${sphere}|${material.writesDepth}|${material.depthTest}|${material.blending}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const gpu = this.gpu!, module = gpu.pointModule;
@@ -367,6 +367,7 @@ export class PointsPlugin implements EnginePlugin {
         vertex: {module, entryPoint: 'vertex'},
         fragment: {module, entryPoint: `fragment${sphere ? 'Sphere' : ''}${edl ? 'Edl' : ''}`, targets},
         primitive: {topology: 'triangle-strip', cullMode: 'none'},
+        multisample: context.descriptor.multisample,
         depthStencil: {format: depthFormat, depthWriteEnabled: material.writesDepth, depthCompare: material.depthTest ? 'greater-equal' : 'always'},
       });
       this.pipelines.set(key, pipeline);
@@ -376,7 +377,7 @@ export class PointsPlugin implements EnginePlugin {
 
   private spritePipeline(context: GpuContext, material: SpriteMaterial): GPURenderPipeline {
     const depthFormat = context.descriptor.depthStencil!.format;
-    const key = `s|${context.format}|${depthFormat}|${material.writesDepth}|${material.depthTest}|${material.blending}`;
+    const key = `s|${context.descriptor.multisample?.count}|${context.format}|${depthFormat}|${material.writesDepth}|${material.depthTest}|${material.blending}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const gpu = this.gpu!, module = gpu.spriteModule;
@@ -385,6 +386,7 @@ export class PointsPlugin implements EnginePlugin {
         vertex: {module, entryPoint: 'vertex'},
         fragment: {module, entryPoint: 'fragment', targets: [{format: context.format, blend: this.blend(material.blending)}]},
         primitive: {topology: 'triangle-strip', cullMode: 'none'},
+        multisample: context.descriptor.multisample,
         depthStencil: {format: depthFormat, depthWriteEnabled: material.writesDepth, depthCompare: material.depthTest ? 'greater-equal' : 'always'},
       });
       this.pipelines.set(key, pipeline);
@@ -392,31 +394,34 @@ export class PointsPlugin implements EnginePlugin {
     return pipeline;
   }
 
-  private edlPipeline(format: GPUTextureFormat): GPURenderPipeline {
-    const key = `e|${format}`;
+  private edlPipeline(format: GPUTextureFormat, count: number): GPURenderPipeline {
+    const key = `e|${format}|${count}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      const gpu = this.gpu!, module = gpu.edlModule;
+      const gpu = this.gpu!, module = count === 1 ? gpu.edlModule : this.device!.createShaderModule({code:
+        edlShader.replace('texture_2d<f32>', 'texture_multisampled_2d<f32>').replace(/textureLoad\(depths,([pq]),0\)\.r/g, 'depth($1)') +
+        '\nfn depth(p:vec2i)->f32{return (textureLoad(depths,p,0).r+textureLoad(depths,p,1).r+textureLoad(depths,p,2).r+textureLoad(depths,p,3).r)/4;}'});
       pipeline = this.device!.createRenderPipeline({
-        layout: gpu.edlPipelineLayout,
+        layout: count === 1 ? gpu.edlPipelineLayout : 'auto',
         vertex: {module, entryPoint: 'vertex'},
         fragment: {module, entryPoint: 'fragment', targets: [{format, blend: {
           color: {srcFactor: 'zero', dstFactor: 'src', operation: 'add'}, alpha: {srcFactor: 'zero', dstFactor: 'one', operation: 'add'}}}]},
         primitive: {topology: 'triangle-list'},
+        multisample: {count},
       });
       this.pipelines.set(key, pipeline);
     }
     return pipeline;
   }
 
-  private edlTarget(width: number, height: number): NonNullable<PointsPlugin['edl']> {
-    if (this.edl && this.edl.width === width && this.edl.height === height) return this.edl;
+  private edlTarget(width: number, height: number, sampleCount: number, pipeline: GPURenderPipeline): NonNullable<PointsPlugin['edl']> {
+    if (this.edl && this.edl.width === width && this.edl.height === height && this.edl.pipeline === pipeline) return this.edl;
     this.edl?.texture.destroy();
     const device = this.device!, gpu = this.gpu!;
-    const texture = device.createTexture({size: [width, height], format: 'r32float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING});
+    const texture = device.createTexture({size: [width, height], sampleCount, format: 'r32float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING});
     const view = texture.createView();
-    const group = device.createBindGroup({layout: gpu.edlLayout, entries: [{binding: 0, resource: view}, {binding: 1, resource: {buffer: gpu.edlParams}}]});
-    return this.edl = {texture, view, group, width, height};
+    const group = device.createBindGroup({layout: pipeline.getBindGroupLayout(0), entries: [{binding: 0, resource: view}, {binding: 1, resource: {buffer: gpu.edlParams}}]});
+    return this.edl = {texture, view, group, width, height, pipeline};
   }
 
   // ---- Frame --------------------------------------------------------------------------------------------
@@ -529,7 +534,8 @@ export class PointsPlugin implements EnginePlugin {
       const depthFormat = context.descriptor.depthStencil!.format;
       const colorAttachments: GPURenderPassColorAttachment[] = [{view: context.color, loadOp: 'load', storeOp: 'store'}];
       if (edlUsed) {
-        const target = this.edlTarget(context.width, context.height);
+        const count = context.descriptor.multisample?.count ?? 1;
+        const target = this.edlTarget(context.width, context.height, count, this.edlPipeline(context.format, count));
         colorAttachments.push({view: target.view, loadOp: 'clear', storeOp: 'store', clearValue: {r: 0, g: 0, b: 0, a: 0}});
       }
       const depthAttachment: GPURenderPassDepthStencilAttachment = {view: context.depth, depthLoadOp: 'load', depthStoreOp: 'store'};
@@ -555,7 +561,7 @@ export class PointsPlugin implements EnginePlugin {
         this.edlData[0] = this.edlStrength; this.edlData[1] = this.edlRadius;
         device.queue.writeBuffer(gpu.edlParams, 0, this.edlData);
         const edlPass = context.encoder.beginRenderPass({colorAttachments: [{view: context.color, loadOp: 'load', storeOp: 'store'}]});
-        edlPass.setPipeline(this.edlPipeline(context.format));
+        edlPass.setPipeline(this.edlPipeline(context.format, context.descriptor.multisample?.count ?? 1));
         edlPass.setBindGroup(0, this.edl.group);
         edlPass.draw(3);
         edlPass.end();

@@ -23,6 +23,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js scatter",
     "test": "npm run build && node --test test/*.test.js",
+    "test:browser": "npm run build && node test/lod.browser.mjs",
     "prepack": "npm run build"
   }
 }

@@ -12,7 +12,7 @@ export class StereoRenderer {
   configure(context:Extract<PassContext,{backend:'webgpu'}>,format:GPUTextureFormat):void {
     this.dispose();
     const module=this.device.createShaderModule({code:context.shader});
-    this.pipeline=this.device.createRenderPipeline({...context.descriptor,vertex:{...context.descriptor.vertex,module},fragment:{module,entryPoint:'fragment',targets:[{format}]},depthStencil:{format:'depth24plus',depthWriteEnabled:true,depthCompare:'less-equal'}});
+    this.pipeline=this.device.createRenderPipeline({...context.descriptor,multisample:{count:1},vertex:{...context.descriptor.vertex,module},fragment:{module,entryPoint:'fragment',targets:[{format}]},depthStencil:{format:'depth24plus',depthWriteEnabled:true,depthCompare:'less-equal'}});
   }
   render(engine:Engine,binding:XRBinding,layer:XRProjectionLayer,viewer:XRViewerPose,transparent:boolean):void {
     const device=this.device,pipeline=this.pipeline!;

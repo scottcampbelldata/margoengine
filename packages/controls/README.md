@@ -1,5 +1,14 @@
 # @margoengine/controls
 
+`stepLocomotion(state, actions, delta, height, options?)` provides ground-following
+character movement with normalized diagonals, damped speed and heading, and a
+50 ms movement-step limit. Retained state is `[x,y,z,heading,cameraYaw,cameraPitch,
+gaitPhase,speed]`; actions are `[strafe,forward,lookX,lookY,sprint]`.
+Options include `bounds: [minX,maxX,minZ,maxZ]`, `minHeight`, `walkSpeed` (3.4),
+and `runSpeed` (7). Bounds and minimum height are omitted by default. Look values
+are angular deltas; pitch stays between 0.08 and 0.9 radians. Height samples must
+be finite. The caller owns input bindings, character meshes and gait animation.
+
 Orbit, map, trackball, fly, first-person and pointer-lock camera controls plus an interactive transform gizmo for Margo Engine, each tree-shakable on its own.
 
 Not yet published to npm. Build from source with `npm run build` in `packages/controls`.

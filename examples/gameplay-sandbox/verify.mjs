@@ -9,7 +9,8 @@ import {build, preview} from 'vite';
 const root=fileURLToPath(new URL('.',import.meta.url)), output=resolve(root,'../../test-results/gameplay-sandbox');
 await mkdir(output,{recursive:true});
 await build({root,configFile:resolve(root,'vite.config.ts'),build:{sourcemap:true},logLevel:'error'});
-const server=await preview({root,configFile:resolve(root,'vite.config.ts'),preview:{port:5198,strictPort:true},logLevel:'error'});
+const server=await preview({root,configFile:resolve(root,'vite.config.ts'),preview:{port:0,strictPort:true},logLevel:'error'});
+const origin=new URL(server.resolvedUrls.local[0]).origin;
 const browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL??'msedge',headless:true,args:process.env.BROWSER_ARGS?JSON.parse(process.env.BROWSER_ARGS):['--enable-unsafe-webgpu','--disable-background-timer-throttling','--disable-renderer-backgrounding']});
 const page=await browser.newPage({viewport:{width:1440,height:900},deviceScaleFactor:1}), errors=[], report={mode:'production',launchArgs:process.env.BROWSER_ARGS?JSON.parse(process.env.BROWSER_ARGS):[],checks:[],profiles:[],errors};
 page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
@@ -62,7 +63,8 @@ async function captureMemory(label, allocations=false) {
  return memory;
 }
 try {
- await page.goto('http://127.0.0.1:5198');await page.waitForFunction(()=>window.sandbox||document.body.classList.contains('failed'),null,{timeout:60000});
+ await page.route('**/*',route=>route.request().url().startsWith(origin+'/')?route.continue():route.abort());
+ await page.goto(origin);await page.waitForFunction(()=>window.sandbox||document.body.classList.contains('failed'),null,{timeout:60000});
  assert.ok(await page.evaluate(()=>!!window.sandbox),await page.locator('#status').textContent());
  await cdp.send('Emulation.setFocusEmulationEnabled',{enabled:true});
  report.hardware=await page.evaluate(async()=>{const adapter=await navigator.gpu.requestAdapter({powerPreference:'high-performance'});return {vendor:adapter.info.vendor,architecture:adapter.info.architecture,description:adapter.info.description,fallback:adapter.info.isFallbackAdapter,backend:window.sandbox.engine.backend,userAgent:navigator.userAgent};});
@@ -70,7 +72,28 @@ try {
  if(process.env.GPU_VENDOR)assert.equal(report.hardware.vendor,process.env.GPU_VENDOR);
  await page.waitForFunction(()=>window.sandbox.stats.sampleCount===120);
  assert.equal(await readIndirect(),1_000_000);report.checks.push('One million live GPU particles in the indirect draw');
- await page.screenshot({path:resolve(output,'desktop.png')});
+ report.procedural=await page.evaluate(()=>window.sandbox.procedural.batches);
+ assert.equal(report.procedural.length,12);
+ assert.equal(report.procedural.filter(b=>b.name.includes('trunks')).reduce((sum,b)=>sum+b.instances,0),10);
+ const shrubCount=report.procedural.find(b=>b.name.includes('shrubs')).instances;
+ assert.ok(shrubCount>=15&&shrubCount<=45);
+  assert.equal(report.procedural.find(b=>b.name.includes('fern crowns')).instances,8);
+  assert.equal(report.procedural.find(b=>b.name.includes('fieldstones')).instances,2);
+  report.checks.push(`Layered cabin, ten trees, ${shrubCount} spaced shrubs, eight ferns and two fieldstones in twelve indirect PBR batches`);
+ report.proceduralShadows=await page.evaluate(async()=>{
+  const app=window.sandbox;app.engine.stop();
+  const draw=app.procedural.drawShadow,cascades=new Uint32Array(4),light=app.engine.lighting.direction.slice();
+  const hours=app.sky.options.hours;app.sky.options.hours=17.5;
+  app.engine.lighting.direction[0]=Math.cos(11.5*Math.PI/12);app.engine.lighting.direction[1]=Math.sin(11.5*Math.PI/12);app.engine.lighting.direction[2]=0;
+  app.procedural.drawShadow=function(context){cascades[context.cascade]++;draw.call(this,context);};
+  try {app.shadows.invalidate();app.engine.render({delta:0});await app.engine.gpu.queue.onSubmittedWorkDone();
+   return {cascades:Array.from(cascades),sun:Array.from(app.engine.lighting.direction.slice(0,3))};
+  } finally {app.procedural.drawShadow=draw;app.sky.options.hours=hours;app.engine.lighting.direction.set(light);app.engine.start();}
+ });
+ assert.deepEqual(report.proceduralShadows.cascades,[1,1,1,1]);
+ assert.ok(Math.abs(report.proceduralShadows.sun[0]+0.9914448614)<1e-6&&Math.abs(report.proceduralShadows.sun[1]-0.1305261922)<1e-6);
+ report.checks.push('All procedural batches cast into four PCSS cascades with the 17:30 sun vector');
+ await page.screenshot({path:resolve(output,'startup.png')});
  await page.locator('#explore').click();
  const before=await page.evaluate(()=>Array.from(window.sandbox.state));
  await page.keyboard.down('KeyW');await page.waitForTimeout(700);await page.keyboard.up('KeyW');
@@ -82,7 +105,7 @@ try {
  await page.locator('#wave').fill('0.6');await page.locator('#sun').fill('18.5');
  await page.waitForTimeout(250);assert.equal(await page.locator('#wave-value').textContent(),'0.60 m');
  report.checks.push('Wireframe, sun clock and wave-height controls');
- await page.locator('#wave').fill('0.35');await page.locator('#sun').fill('17');
+ await page.locator('#wave').fill('0.35');await page.locator('#sun').fill('17.5');
  await page.keyboard.press('Escape');
  for(const count of process.argv.includes('--memory-only')?[]:[100000,500000,1000000]) {
   await page.locator('#particles').selectOption(String(count));await page.waitForTimeout(2000);assert.equal(await readIndirect(),count);
@@ -103,6 +126,10 @@ try {
   report.profiles.push(profile);console.log(JSON.stringify({...profile,samples:undefined}));
   await writeFile(resolve(output,`particles-${count}.trace.json`),JSON.stringify({traceEvents:events}));
  }
+ // Short runs need the warmup that the three tier benchmarks normally provide, to exclude V8 startup compilation.
+ if(process.argv.includes('--memory-only'))await page.evaluate(()=>new Promise(resolve=>{
+  let remaining=1200;const remove=window.sandbox.engine.onFrame(()=>{if(--remaining===0){remove();resolve();}});
+ }));
  report.memory600=await captureMemory('memory-600',process.argv.includes('--allocations'));
  report.memory600.criteria={maximumRetainedHeapDeltaBytes:131072,maximumMinorGC:1,maximumMajorGC:0};
  report.memory600.note='Matched full-GC endpoints measure retained heap, not total allocation. Endpoint collections are excluded. No input is dispatched during capture; browser WebGPU wrappers and 150ms DOM refreshes remain.';
@@ -121,12 +148,12 @@ try {
  report.checks.push('Pause/resume, mobile layout and reduced-motion startup');
  await page.locator('#explore').click();
  await page.evaluate(async()=>{await window.sandbox.engine.rebootDevice();});await page.waitForTimeout(1500);
+ assert.deepEqual(await page.evaluate(()=>window.sandbox.procedural.batches),report.procedural);
  assert.equal(await readIndirect(),1_000_000);report.checks.push('Device restoration and borrowed terrain/depth resources');
- await page.route('**/*',route=>{const url=route.request().url();return url.startsWith('http://127.0.0.1:5198')?route.continue():route.abort();});
  await page.reload();await page.waitForFunction(()=>window.sandbox);report.checks.push('First launch with all external asset requests blocked');
  await page.evaluate(()=>{window.sandbox.dispose();Object.defineProperty(navigator,'gpu',{value:undefined,configurable:true});});await page.reload();
  // Reload restores navigator.gpu; explicitly exercise fallback in a fresh context.
- const unsupported=await browser.newPage();await unsupported.addInitScript(()=>Object.defineProperty(navigator,'gpu',{value:undefined,configurable:true}));await unsupported.goto('http://127.0.0.1:5198');
+ const unsupported=await browser.newPage();await unsupported.addInitScript(()=>Object.defineProperty(navigator,'gpu',{value:undefined,configurable:true}));await unsupported.goto(origin);
  await unsupported.waitForFunction(()=>document.body.classList.contains('failed'));assert.match(await unsupported.locator('#status').textContent(),/WebGPU/);await unsupported.close();report.checks.push('Readable unsupported-WebGPU state');
  assert.deepEqual(errors,[]);
  report.meets60FPS=report.profiles.every(p=>p.effectiveFPS>=59.5)&&report.memory600.gpuCompletionFPS>=59.5;

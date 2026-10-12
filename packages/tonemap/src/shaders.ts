@@ -1,5 +1,6 @@
 // Color transforms adapted from the references and licenses in ../NOTICE.md.
 import {agxShader} from '../../shared/agx.js';
+import {acesShader} from '../../shared/aces.js';
 export const tonemapShader = `
 struct Params {grade:vec4f,domainMin:vec4f,domainMax:vec4f,settings:vec4f}
 @group(0) @binding(0) var<uniform> p:Params;
@@ -8,11 +9,7 @@ struct Params {grade:vec4f,domainMin:vec4f,domainMax:vec4f,settings:vec4f}
 fn acescgToSRGB(v:vec3f)->vec3f {
   return mat3x3f(vec3f(1.705051,-0.130257,-0.024003),vec3f(-0.621792,1.140805,-0.128969),vec3f(-0.083259,-0.010548,1.152972))*v;
 }
-fn aces(v:vec3f)->vec3f {
-  let x=mat3x3f(vec3f(0.59719,0.07600,0.02840),vec3f(0.35458,0.90834,0.13383),vec3f(0.04823,0.01566,0.83777))*v;
-  let fit=(x*(x+0.0245786)-0.000090537)/(x*(0.983729*x+0.4329510)+0.238081);
-  return clamp(mat3x3f(vec3f(1.60475,-0.10208,-0.00327),vec3f(-0.53108,1.10813,-0.07276),vec3f(-0.07367,-0.00605,1.07602))*fit,vec3f(0),vec3f(1));
-}
+${acesShader}
 ${agxShader}
 fn neutral(input:vec3f)->vec3f {
   let x=min(input.r,min(input.g,input.b));let offset=select(0.04,x-6.25*x*x,x<0.08);var color=input-offset;

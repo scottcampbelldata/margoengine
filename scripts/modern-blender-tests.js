@@ -9,7 +9,7 @@ import {decodeMargo} from '../packages/blender/dist/index.js';
 import {GLTFAsset} from '../packages/gltf-pro/dist/index.js';
 
 await mkdir('test-results/blender',{recursive:true});
-const fixtures=[await readFile('packages/blender/tests/fixtures/triangle.margo')];
+const fixtures=[await readFile('packages/blender/tests/fixtures/triangle.margo'),await readFile('packages/blender/tests/fixtures/cad-triangle.margo')];
 if(process.env.MARGO_BLENDER){
   execFileSync('python',['tools/blender-addon/package_addon.py'],{stdio:'inherit'});
   execFileSync(process.env.MARGO_BLENDER,['--background','--factory-startup','--python-exit-code','1','--python','tools/blender-addon/tests/blender_install.py','--','dist/margo-blender-addon-v1.0.0.zip'],{stdio:'inherit',env:{...process.env,BLENDER_USER_RESOURCES:resolve('test-results/blender/install-profile')}});
@@ -42,6 +42,11 @@ if(process.env.MARGO_BLENDER){
   const centimeters=decodeMargo(await readFile('test-results/blender/centimeters.margo'));
   assert.ok(Math.abs(centimeters.geometry[0][0].vertices[0]+0.006)<1e-7,'Geometry units were not converted to meters');
   assert.ok(Math.abs(centimeters.document.nodes.find(n=>n.name==='Mirrored').translation[0]-0.02)<1e-7,'Transform units were not converted to meters');
+  const cad=decodeMargo(await readFile('test-results/blender/cad-instances.margo'));
+  assert.equal(cad.document.nodes.length,100);assert.equal(cad.geometry.length,1);
+  assert.equal(cad.geometry[0][0].vertices.length,60);
+  const overrides=decodeMargo(await readFile('test-results/blender/cad-overrides.margo'));
+  assert.equal(overrides.geometry.length,2);
   fixtures.push(exported);
 }
 const demo=await build({configFile:false,logLevel:'silent',build:{write:false,rollupOptions:{input:'examples/blender-loader/index.html'}}});

@@ -23,7 +23,7 @@ try{
   for(const connected of [false,true]){
    ground.fill(2);
    for(let y=0;y<32;y++)for(let x=0;x<32;x++)if(x<2||y<2||x>=30||y>=30)ground[y*32+x]=-1;
-   for(let y=12;y<20;y++)for(let x=6;x<13;x++)ground[y*32+x]=-0.2;
+   for(let y=12;y<20;y++)for(let x=6;x<13;x++)ground[y*32+x]=connected?-0.2:-3;
    if(connected)for(let y=14;y<18;y++)for(let x=2;x<6;x++)ground[y*32+x]=0.1;
    device.queue.writeTexture({texture},ground,{bytesPerRow:128},[32,32]);
    const water=Water.attach(engine,{size:[32,32],segments:32,spray:true,terrain:{heightmap:()=>texture,origin:[-16,-16],size:[32,32]},waves:[{direction:[1,0],amplitude:0.8,wavelength:100,steepness:0.1}]});
@@ -39,6 +39,16 @@ try{
    }
    results.push({connected,initialVolume,floodedVolume,retainedVolume,maxDryDepth,minimumDepth,liveSpray,basinSpray});water.dispose();
   }
+  for(let z=0;z<32;z++)for(let x=0;x<32;x++)ground[z*32+x]=2.5-0.36*Math.hypot(x-15.5,z-15.5);
+  device.queue.writeTexture({texture},ground,{bytesPerRow:128},[32,32]);
+  const island=Water.attach(engine,{size:[32,32],segments:64,terrain:{heightmap:()=>texture,origin:[-16,-16],size:[32,32]},waves:[{direction:[1,0.37],amplitude:0.8,wavelength:12,steepness:0.1}]});
+  engine.render({delta:0});const initial=await capture(island),beaches=[[22,16],[9,16],[16,22],[16,9]],peakDepths=[0,0,0,0],lowDepths=[Infinity,Infinity,Infinity,Infinity];
+  for(const [x,z] of beaches)if(initial[(z*32+x)*4]!==0)throw new Error('Shore regression must start dry');
+  const maskRead=device.createBuffer({size:island.coastal.connected.size,usage:GPUBufferUsage.MAP_READ|GPUBufferUsage.COPY_DST}),maskEncoder=device.createCommandEncoder();
+  maskEncoder.copyBufferToBuffer(island.coastal.connected,0,maskRead,0,maskRead.size);device.queue.submit([maskEncoder.finish()]);await maskRead.mapAsync(GPUMapMode.READ);
+  const mask=new Uint32Array(maskRead.getMappedRange());for(let i=0;i<ground.length;i++)if(mask[i+1]!== (ground[i]<0?0:0xffffffff))throw new Error('Ocean connectivity does not follow the island coast');maskRead.unmap();maskRead.destroy();
+  for(let frame=0;frame<24;frame++){await advance(15);const state=await capture(island);for(let i=0;i<beaches.length;i++){const [x,z]=beaches[i],depth=state[(z*32+x)*4];peakDepths[i]=Math.max(peakDepths[i],depth);lowDepths[i]=Math.min(lowDepths[i],depth);}}
+  results.push({shoreDirections:['east','west','south','north'],peakDepths,lowDepths});island.dispose();
   const standalone=Water.attach(engine,{size:[32,32],segments:8});engine.render({delta:0.1});await device.queue.onSubmittedWorkDone();standalone.dispose();
   const validation=await device.popErrorScope();read.destroy();texture.destroy();engine.dispose();
   if(validation)throw new Error(validation.message);return results;
@@ -50,6 +60,7 @@ try{
  assert.ok(connected.retainedVolume>connected.initialVolume+0.1,'Basin did not retain water behind its outlet sill');
  assert.ok(connected.retainedVolume<connected.floodedVolume-0.1,'Basin did not drain back towards the sea');
  assert.equal(isolated.basinSpray,0,'A calm enclosed basin generated breaking spray');assert.ok(connected.basinSpray>0,'Breaking channel flow did not generate GPU spray');
- for(const result of basins){assert.equal(result.maxDryDepth,0,'Water crossed high ground');assert.ok(result.minimumDepth>=0,'Negative water depth');}
+ for(const result of basins.slice(0,2)){assert.equal(result.maxDryDepth,0,'Water crossed high ground');assert.ok(result.minimumDepth>=0,'Negative water depth');}
+ for(let i=0;i<4;i++){assert.ok(basins[2].peakDepths[i]>0.015,`Surf never washed onto the ${basins[2].shoreDirections[i]} beach`);assert.ok(basins[2].peakDepths[i]-basins[2].lowDepths[i]>0.01,`Surf on the ${basins[2].shoreDirections[i]} beach did not advance and recede`);}
  assert.deepEqual(errors,[]);await writeFile(`test-results/water-flow-${hardware.webgpu.vendor}.json`,JSON.stringify({hardware,basins,errors},null,2));console.log(JSON.stringify({hardware,basins,errors},null,2));
 }finally{await browser.close();}

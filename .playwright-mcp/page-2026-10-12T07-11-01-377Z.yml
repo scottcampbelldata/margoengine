@@ -1,0 +1,63 @@
+- main [ref=e2]:
+  - 'heading "Conveyor: Margo and Three.js" [level=1] [ref=e3]'
+  - paragraph [ref=e4]: NVIDIA RTX A6000 · Edge 155.0.4283.45 · 920×652 canvas · device pixel ratio 1 · dedicated NVIDIA adapter, no software fallback
+  - table [ref=e5]:
+    - rowgroup [ref=e6]:
+      - row [ref=e7]:
+        - columnheader "Motion" [ref=e8]
+        - columnheader "Margo (WebGPU)" [ref=e9]
+        - columnheader "Three.js (WebGL2)" [ref=e10]
+    - rowgroup [ref=e11]:
+      - row [ref=e12]:
+        - 'rowheader "Normal display pacing: orbit" [ref=e13]'
+        - cell "60.0 FPS / 16.67 ms" [ref=e14]
+        - cell "60.0 FPS / 16.67 ms" [ref=e15]
+      - row [ref=e16]:
+        - rowheader "Uncapped orbit" [ref=e17]
+        - cell "1,379 FPS / 0.73 ms" [ref=e18]
+        - cell "1,086 FPS / 0.92 ms" [ref=e19]
+      - row [ref=e20]:
+        - 'rowheader "Uncapped orbit: p95 interval" [ref=e21]'
+        - cell "1.90 ms" [ref=e22]
+        - cell "1.30 ms" [ref=e23]
+      - row [ref=e24]:
+        - rowheader "Uncapped explode sweep" [ref=e25]
+        - cell "1,296 FPS / 0.77 ms" [ref=e26]
+        - cell "555 FPS / 1.80 ms" [ref=e27]
+      - row [ref=e28]:
+        - 'rowheader "Uncapped explode: p95 interval" [ref=e29]'
+        - cell "1.00 ms" [ref=e30]
+        - cell "2.50 ms" [ref=e31]
+      - row [ref=e32]:
+        - rowheader "Draw calls per rendered frame" [ref=e33]
+        - cell "217" [ref=e34]
+        - cell "282" [ref=e35]
+      - row [ref=e36]:
+        - 'rowheader "CPU time inside render(): orbit" [ref=e37]'
+        - cell "0.466 ms" [ref=e38]
+        - cell "0.665 ms" [ref=e39]
+  - paragraph [ref=e40]: Uncapped results are medians of three interleaved runs, each with 60 warm-up frames and 600 measured frames. Frame time is requestAnimationFrame cadence under GPU back-pressure; it is not a GPU timestamp measurement. Profiling traces were recorded separately from the timed runs.
+  - paragraph [ref=e41]: "Margo uses 217 GPU draws per frame: 215 mesh batches plus line and backdrop draws. Repeated parts are instanced, but distinct geometry/material pairs still require separate batches. The single-digit draw-call target is not met."
+  - group "Compare rendered views" [ref=e42]:
+    - button "Roller shading" [pressed] [ref=e43] [cursor=pointer]
+    - button "Full assembly" [ref=e44] [cursor=pointer]
+  - generic [ref=e45]:
+    - figure "Three.js baseline" [ref=e46]:
+      - img "Three.js take-up idler roller shading" [ref=e48]
+    - figure "Margo" [ref=e49]:
+      - img "Margo take-up idler roller shading" [ref=e51]
+  - paragraph [ref=e52]: The roller geometry and highlight placement are similar. Margo's outer surface is brighter and its front face is darker. Shading is not a pixel match. Three.js uses 4× MSAA; Margo uses no multisampling. Margo has 570 parts, including the extra Blender Cube; the baseline has 569.
+  - paragraph [ref=e53]:
+    - link "Open Margo simulator" [ref=e54] [cursor=pointer]:
+      - /url: index.html
+    - link "Open Three.js baseline" [ref=e55] [cursor=pointer]:
+      - /url: three.html
+    - link "Download Margo profiler trace" [ref=e56] [cursor=pointer]:
+      - /url: margo-performance-trace.json
+    - link "Download Three.js profiler trace" [ref=e57] [cursor=pointer]:
+      - /url: three-performance-trace.json
+    - link "Raw uncapped measurements" [ref=e58] [cursor=pointer]:
+      - /url: performance.json
+    - link "Raw display-paced measurements" [ref=e59] [cursor=pointer]:
+      - /url: display-performance.json
+  - text: "Captured 10/12/2026, 3:07:26 AM EDT. Uncapped runs: headless browser. Display-paced run: visible browser, vsync enabled."

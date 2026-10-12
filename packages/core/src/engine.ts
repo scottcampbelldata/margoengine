@@ -161,6 +161,10 @@ export class Engine {
     }
   };
   render({culling=true,delta=0}: {culling?:boolean;delta?:number}={}):void {
+    this.update(culling,delta);
+    if(!this.recovery)this.renderer.render(this.camera,this.lighting,this.batches.values(),this.frameGraph,delta);
+  }
+  private update(culling:boolean,delta:number):void {
     if(this.disposed||this.disposing)throw new Error('Engine is disposed');
     if(!Number.isFinite(delta)||delta<0||delta>1)throw new RangeError('Frame delta must be 0..1 seconds');
     for(const plugin of this.plugins.values())plugin.onPreUpdate?.(delta);
@@ -172,12 +176,12 @@ export class Engine {
     if(!Math.hypot(this.lighting.direction[0],this.lighting.direction[1],this.lighting.direction[2])||this.lighting.direction[3]<0||this.lighting.radiance.some(v=>v<0))throw new RangeError('Invalid lighting');
     this.meshes.forEach(this.collect);
     for(const batch of this.batches.values())if(batch.count)this.stats.drawCalls++;
-    if(!this.recovery)this.renderer.render(this.camera,this.lighting,this.batches.values(),this.frameGraph,delta);
   }
   async pick(x:number,y:number):Promise<Mesh|null> {
     if(![x,y].every(Number.isFinite))throw new RangeError('Invalid pick coordinates');if(this.disposed||this.disposing)throw new Error('Engine is disposed');if(this.backend!=='webgpu')throw new Error('GPU picking requires WebGPU');if(x<0||y<0||x>=this.canvas.clientWidth||y>=this.canvas.clientHeight||this.recovery)return null;
-    this.render();const renderer=this.renderer as GPURenderer,revision=this.revision,id=await renderer.pick(this.camera,this.lighting,this.batches.values(),this.frameGraph,x*this.canvas.width/this.canvas.clientWidth,y*this.canvas.height/this.canvas.clientHeight);
-    return id!==null&&this.renderer===renderer&&this.revision===revision?this.meshes.get(id)??null:null;
+    this.update(true,0);const renderer=this.renderer as GPURenderer,revision=this.revision,picker=[...this.plugins.values()].find(plugin=>plugin.onPick);
+    const mesh=picker?await picker.onPick!(x,y):this.meshes.get(await renderer.pick(this.camera,this.lighting,this.batches.values(),this.frameGraph,x*this.canvas.width/this.canvas.clientWidth,y*this.canvas.height/this.canvas.clientHeight)??-1)??null;
+    return this.renderer===renderer&&this.revision===revision?mesh:null;
   }
   onFrame(callback:FrameCallback):()=>void {this.callbacks.add(callback);return()=>{this.callbacks.delete(callback);};}
   start():void {if(this.disposed||this.disposing)throw new Error('Engine is disposed');if(this.running)return;this.running=true;this.last=0;this.raf=requestAnimationFrame(this.frame);}

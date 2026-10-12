@@ -79,7 +79,8 @@ export class OverlayRenderer {
   private drawGPU(ctx: Extract<PassContext, {backend: 'webgpu'}>, vertices: Float32Array): void {
     const device = ctx.device;
     if (device !== this.device) {this.release(); this.device = device;}
-    let pipeline = this.pipelines.get(ctx.format);
+    const key = ctx.format + ':' + ctx.descriptor.multisample?.count;
+    let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const module = device.createShaderModule({code: WGSL});
       pipeline = device.createRenderPipeline({
@@ -87,8 +88,9 @@ export class OverlayRenderer {
         vertex: {module, entryPoint: 'vs', buffers: [{arrayStride: FLOATS * 4, attributes: [{shaderLocation: 0, offset: 0, format: 'float32x4'}, {shaderLocation: 1, offset: 16, format: 'float32x4'}]}]},
         fragment: {module, entryPoint: 'fs', targets: [{format: ctx.format, blend: {color: {srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha'}, alpha: {srcFactor: 'one', dstFactor: 'one-minus-src-alpha'}}}]},
         primitive: {topology: 'triangle-list', cullMode: 'none'},
+        multisample: ctx.descriptor.multisample,
       });
-      this.pipelines.set(ctx.format, pipeline);
+      this.pipelines.set(key, pipeline);
     }
     if (vertices.byteLength > this.capacity) {
       this.buffer?.destroy();
