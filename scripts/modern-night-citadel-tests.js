@@ -261,11 +261,15 @@ try{
   await mobile.locator('.panel').evaluate(panel=>panel.scrollTop=0);
   const panelBox=await mobile.locator('.panel').boundingBox(),panelX=panelBox.x+8;
   await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:panelX,y:220,id:1}]});
-  await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:panelX,y:100,id:1}]});
+  for(const y of [200,180,160,140,120,100]){
+    await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:panelX,y,id:1}]});
+    await mobile.waitForTimeout(30);
+  }
   await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await mobile.waitForFunction(()=>document.querySelector('.panel').scrollTop>0);
   await drawerLayout();
   await mobile.setViewportSize({width:390,height:844});
+  await mobile.locator('#reset').click();
   await mobile.locator('summary').click();await mobile.waitForTimeout(150);
   await mobile.screenshot({path:'test-results/night-citadel-mobile.png'});
   report.framing.push(await moonFraming(mobile));
