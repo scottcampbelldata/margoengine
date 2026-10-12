@@ -1,0 +1,13 @@
+schema_version = "1.0.0"
+id = "margo_export"
+version = "1.0.0"
+name = "Margo Engine Exporter"
+tagline = "Export evaluated meshes and PBR materials to .margo"
+maintainer = "Margo Engine Team"
+type = "add-on"
+blender_version_min = "4.2.0"
+license = ["SPDX:MIT"]
+tags = ["Import-Export"]
+
+[permissions]
+files = "Read textures and export .margo scenes"

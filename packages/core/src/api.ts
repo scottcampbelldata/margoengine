@@ -2,7 +2,7 @@ import {Engine as Runtime} from './engine.js';
 import type {EngineOptions} from './engine.js';
 import type {Camera,Vec3} from './camera.js';
 import type {Geometry,PbrMaterial} from './geometry.js';
-export interface VectorRef {x:number;y:number;z:number}
+export interface VectorRef {x:number;y:number;z:number;set(x:number,y:number,z:number):this;setAll(value:number):this}
 export interface Mesh {
   name:string;visible:boolean;readonly position:VectorRef;readonly rotation:VectorRef;readonly scale:VectorRef;readonly geometry:Geometry|null;readonly material:PbrMaterial;
   check():void;setPosition(value:Vec3):this;setScale(value:Vec3):this;setRotation(value:Vec3):this;setQuaternion(value:readonly number[]):this;setParent(parent:Mesh|null):this;setGeometry(value:Geometry|null):this;setMaterial(value:PbrMaterial):this;dispose():void;

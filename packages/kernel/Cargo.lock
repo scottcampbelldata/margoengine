@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "vexel-kernel"
+name = "margoengine-kernel"
 version = "0.1.0"

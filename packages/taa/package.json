@@ -1,0 +1,14 @@
+{
+  "name": "@margoengine/taa",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Optional temporal anti-aliasing with motion vectors and YCoCg history clamping.",
+  "repository": {"type":"git","url":"git+https://github.com/scottcampbelldata/vexel.git","directory":"packages/taa"},
+  "publishConfig": {"access":"public"},
+  "scripts": {"prepack":"npm --prefix ../.. run build:packages"},
+  "sideEffects": false,
+  "exports": {".":{"types":"./dist/index.d.ts","import":"./dist/index.js"}},
+  "files": ["dist"],
+  "peerDependencies": {"@margoengine/core":"0.1.0"}
+}

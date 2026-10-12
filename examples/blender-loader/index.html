@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Margo Blender viewer</title>
+<style>body{margin:0;background:#121820;color:#eef2f6;font:16px system-ui}header{padding:1rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap}h1{font-size:1.2rem;margin:0}canvas{display:block;width:100%;height:calc(100vh - 100px)}#status{padding:0 1rem}</style></head>
+<body><header><h1>Blender → Margo</h1><label>Open exported scene <input id="file" type="file" accept=".margo" disabled></label></header>
+<p id="status" role="status">Choose a .margo file exported from Blender.</p><canvas id="viewport" aria-label="Exported Blender scene"></canvas>
+<script type="module" src="./main.ts"></script></body>
+</html>

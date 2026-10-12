@@ -1,6 +1,6 @@
-# Vexel micro-kernel
+# Margo Engine micro-kernel
 
-Vexel is a small Rust/Wasm engine for web applications with optional domain packages. This delivery implements the four-phase minimal engine plus an extensible core and working machinery/creative packs. The workspace contains the modular packages, starters and their tests and validation evidence.
+Margo Engine is a small Rust/Wasm engine for web applications with optional domain packages. This delivery implements the four-phase minimal engine plus an extensible core and working machinery/creative packs. The workspace contains the modular packages, starters and their tests and validation evidence.
 
 ## Implemented scope
 
@@ -8,19 +8,20 @@ Vexel is a small Rust/Wasm engine for web applications with optional domain pack
 | --- | --- |
 | Rust math and buffers | Dependency-free Rust kernel; fixed-capacity SoA transform views in Wasm memory; hierarchy composition; SIMD sphere/frustum culling; native joint-limit clamping and inherited visibility masks; atomic validation before publishing matrices. |
 | Rendering | WebGPU adapter/device negotiation, cached pipeline and geometry buffers, instanced indexed drawing, ordered GPU passes, directional GGX PBR, WebGL2 fallback, reversed float depth, 1×1 uint picking, native CAD navigation, canvas/depth resize and disposal. |
-| TypeScript/packages | Explicit ESM exports and declarations; `sideEffects: false`; precompiled gzip-embedded Wasm; independent core, glTF, React, machinery and creative packages. |
-| React/starters | `Canvas`, `Mesh`, `BoxGeometry`, `GeometryResource`, `PbrMaterial`, `useFrame`; nested hierarchy and stable refs; entity/resource creation in effects; Vite and Next.js starters. |
-| Machinery pack | Revolute/prismatic joints, gear/slider-crank couplings, bounded IK/distance constraints, exploded views, GPU sections/stencil caps, SVG dimensions/callouts, welded STL/OBJ, part instancing, indexed assembly queries, metrology snapping and industrial material presets. |
+| TypeScript/packages | Explicit ESM exports and declarations; `sideEffects: false`; precompiled gzip-embedded Wasm; independent core, glTF, React, machinery, creative and scenery packages. |
+| React/starters | `MargoCanvas` (`Canvas` alias), `useMargoStage`, `useFrame`, mesh components; SSR-safe setup, ResizeObserver and stable refs; Vite and Next.js starters. |
+| Machinery pack | Revolute/prismatic joints, gear/slider-crank couplings, bounded IK/distance constraints, exploded views, GPU sections/stencil caps, SVG dimensions/callouts, worker STL/OBJ/STEP/IGES, Wasm surface transport and telemetry, part instancing, assembly BVH picking, metrology snapping and industrial material presets. |
 | Creative pack | Textured/sorted GPU particles, curl wind/obstacles, procedural sky/scattering/fog/god rays, toon shading, HDR targets, compute bloom/grading/DOF/grain and ACES presentation. |
+| Scenery pack | Optional `SkyMoon` engine plugin and low-level `SkyMoonPass`; procedural moonlit atmosphere, lunar phases, stars, glow and horizon haze with Reversed-Z background depth. See [usage and limits](packages/scenery/README.md). |
 
 Rust owns transforms and culling. TypeScript owns asset orchestration and browser GPU commands. Numeric Wasm exports keep `wasm-bindgen`, `web-sys` and their glue unnecessary for this kernel. Consumers need no Rust installation or Wasm URL configuration. SIMD and browser DecompressionStream gzip support are required; decompression happens once before cached module compilation.
 
 ## Install from npm
 
-All five libraries are published publicly at version `0.1.0`: [core](https://www.npmjs.com/package/@scottcampbelldata/vexel-core), [gltf](https://www.npmjs.com/package/@scottcampbelldata/vexel-gltf), [react](https://www.npmjs.com/package/@scottcampbelldata/vexel-react), [machinery](https://www.npmjs.com/package/@scottcampbelldata/vexel-machinery), [creative](https://www.npmjs.com/package/@scottcampbelldata/vexel-creative). Install all five with React 19:
+The renamed libraries use `@margoengine/*` at version `0.1.0`, with `margoengine` as the meta-package. Build from source or install local tarballs until the renamed packages are published. Package names for a React 19 application:
 
 ```sh
-npm install @scottcampbelldata/vexel-core@0.1.0 @scottcampbelldata/vexel-gltf@0.1.0 @scottcampbelldata/vexel-react@0.1.0 @scottcampbelldata/vexel-machinery@0.1.0 @scottcampbelldata/vexel-creative@0.1.0 react@^19 react-dom@^19
+npm install @margoengine/core@0.1.0 @margoengine/gltf@0.1.0 @margoengine/react@0.1.0 @margoengine/machinery@0.1.0 @margoengine/creative@0.1.0 react@^19 react-dom@^19
 ```
 
 The React adapter also supports React 18. See [package choices and individual install commands](README.md#install-from-npm).
@@ -32,18 +33,19 @@ Use Node.js 22.12+ or 24+ and a browser with WebGL2. TypeScript consumers need T
 ```sh
 npm ci
 npm run dev                           # new Vite starter; compiles packages first
-npm test                              # compiles packages; runs 31 focused unit checks
-npm run build:packages                # all five libraries; precompiled Wasm, no Rust
+npm test                              # compiles packages; runs 40 focused unit checks
+npm run build:packages                # all seven libraries; precompiled Wasm, no Rust
 npm run build                         # builds packages and both production starters
-npm run pack:packages                 # rebuilds and packs only the five libraries
+npm run pack:packages                 # rebuilds and packs only the seven libraries
 npm run modern:test:browser            # after build: real GPU + both production starters
 npm run modern:test:domains            # caps, FX, sorting, depth readback and loss races
+npm run modern:test:sky                # scenery phases, depth, stars and plugin lifecycle
 npm run modern:test:packages           # frozen public exports/types + React 18 fixture
 npm run modern:test:finalization       # picking/depth/conveyor UI + 12k-entity stress; dev server required
 npm run modern:check:conveyor          # live picking/pivot, coupled tick and 15s Chrome drag trace
 npm run modern:check:conveyor -- --allocations  # sampling, including collected objects
 npm run modern:check:conveyor -- --constructors # retained constructor breakdown
-npm run dev --workspace @vexel/starter-next
+npm run dev --workspace @margoengine/starter-next
 ```
 
 `npm run build`, `npm test` and `npm run dev` use the checked-in precompiled Wasm. To change the kernel:
@@ -56,12 +58,12 @@ cargo test --manifest-path packages/kernel/Cargo.toml
 
 The release profile uses speed optimization, fat LTO, one codegen unit, stripped symbols and aborting panics. The no-std Wasm build reserves its memory once without a general allocator. Kernel rebuilds use the pinned Binaryen pipeline below; consumers use the precompiled optimized kernel. A build fails if the Wasm exceeds 30 KiB raw, the core exceeds 20 KiB gzip, or core plus glTF exceeds 30 KiB gzip.
 
-Consumers import the scoped packages below; the root package manages the workspace and its commands. The five libraries are published publicly on npm at version `0.1.0` and [MIT licensed](LICENSE); the root and starters remain private. Each library's `prepack` hook builds the workspace using the checked-in Wasm, removes stale distribution files and includes a package README and a copy of the root license. `npm run pack:packages` writes all five archives to `test-results/`. The [benchmark summary](benchmarks/README.md) records the locked core and verification results. Raw captures and recovery archives remain local.
+Consumers import the scoped packages below; the root package manages the workspace and its commands. The libraries remain at version `0.1.0` and are [MIT licensed](LICENSE); the root and starters remain private. Each library's `prepack` hook builds the workspace using the checked-in Wasm, removes stale distribution files and includes a package README and a copy of the root license. `npm run pack:packages` writes all six archives to `test-results/`. The [benchmark summary](benchmarks/README.md) records the locked core and verification results. Raw captures and recovery archives remain local.
 
 ## Plain TypeScript
 
 ```ts
-import { Engine, box, PbrMaterial } from '@scottcampbelldata/vexel-core';
+import { Engine, box, PbrMaterial } from '@margoengine/core';
 
 const engine = await Engine.create(canvas, {
   capacity: 1024,
@@ -86,10 +88,10 @@ Shared `Geometry` identity produces one instanced draw even when material parame
 
 ## Frozen portable API, picking and CAD navigation
 
-`EngineKernel` and `Engine` are aliases of the same asynchronous factory. The portable TypeScript surface exposes mesh handles, camera, frame lifecycle, plugin attachment, statistics, rendering, picking and reboot. `Canvas.onCreated`, `useFrame` and React `MeshRef` share that surface. Wasm slot IDs, matrix views, storage and raw GPU state are omitted. Runtime export snapshots and packed strict consumer checks guard the contract, including expected type errors for accessing hidden internals. Advanced plugin authors explicitly import `@scottcampbelldata/vexel-core/extension` for `EnginePlugin`, `FrameGraph`, `PassContext`, `TransformStore`, and `engineRuntime`/`meshRuntime`. This is an API boundary, not a JavaScript security membrane. Prior direct storage/device imports must migrate to that entry.
+`EngineKernel` and `Engine` are aliases of the same asynchronous factory. The portable TypeScript surface exposes mesh handles, camera, frame lifecycle, plugin attachment, statistics, rendering, picking and reboot. `useMargoStage`, `useFrame` and React `MeshRef` share that surface. `Canvas.onCreated` receives a `Stage` facade with the portable engine at `stage.engine`. Wasm slot IDs, matrix views, storage and raw GPU state are omitted. Runtime export snapshots and packed strict consumer checks guard the contract, including expected type errors for accessing hidden internals. Advanced plugin authors explicitly import `@margoengine/core/extension` for `EnginePlugin`, `FrameGraph`, `PassContext`, `TransformStore`, and `engineRuntime`/`meshRuntime`. This is an API boundary, not a JavaScript security membrane. Prior direct storage/device imports must migrate to that entry.
 
 ```ts
-import { EngineKernel, CADCameraControls } from '@scottcampbelldata/vexel-core';
+import { EngineKernel, CADCameraControls } from '@margoengine/core';
 const engine = await EngineKernel.create(canvas, { backend: 'webgpu' });
 const controls = new CADCameraControls(engine.camera, canvas);
 const unsubscribe = engine.onFrame((_, delta) => controls.update(delta));
@@ -102,7 +104,7 @@ if (hit) hit.visible = false;
 // unsubscribe(); controls.dispose(); engine.dispose();
 ```
 
-Picking is WebGPU-only, asynchronous and interaction-driven: it rasterizes retained visible geometry into a 1×1 `r32uint` target, uses the current instance slot as the integer ID, and copies/maps exactly four bytes. There is no CPU triangle raycast. Coordinates are canvas-local CSS pixels; backing-store scaling is applied internally. Occlusion, section fragment clipping, misses, hidden subtrees, recycled slots and device replacement are verified. One pick may be pending per renderer; topology changes during readback cancel its result. Synthetic stencil caps and creative particles are not independent pickable entities; cap-only regions with no surviving mesh surface can return a miss. GPU readback latency prevents an instantaneous-selection guarantee.
+Picking is WebGPU-only, asynchronous and interaction-driven: it rasterizes retained visible geometry into a 1×1 `r32uint` target, uses the current instance slot as the integer ID, and copies/maps exactly four bytes. `AssemblyBVH` in the machinery pack provides a separate CPU/Wasm triangle-raycast path. Coordinates are canvas-local CSS pixels; backing-store scaling is applied internally. Occlusion, section fragment clipping, misses, hidden subtrees, recycled slots and device replacement are verified. One pick may be pending per renderer; topology changes during readback cancel its result. Synthetic stencil caps and creative particles are not independent pickable entities; cap-only regions with no surviving mesh surface can return a miss. GPU readback latency prevents an instantaneous-selection guarantee.
 
 WebGPU uses reversed Z: near=1, far=0, clear=0 and `greater-equal` with `depth32float`. When the adapter exposes the optional `depth32float-stencil8` feature, it is requested and the same float depth precision is combined with stencil; solid machinery caps require this feature. Without it, float depth, picking and shader-only sections still work. HDR, cap, particle and sky passes use the same convention. WebGL2 retains its conventional -1..1 projection/depth path. Finite positive near/far planes still apply; float depth does not make Float32 world transforms infinitely precise. A real GPU check resolves surfaces 0.1 mm apart at 500 m with near=1 mm and far=10 km, even when the farther red surface is drawn last.
 
@@ -113,7 +115,7 @@ WebGPU uses reversed Z: near=1, far=0, clear=0 and `greater-equal` with `depth32
 ```tsx
 import { useRef } from 'react';
 import { Canvas, Mesh, BoxGeometry, PbrMaterial, useFrame,
-  type MeshRef } from '@scottcampbelldata/vexel-react';
+  type MeshRef } from '@margoengine/react';
 
 function Cube() {
   const ref = useRef<MeshRef>(null);
@@ -136,11 +138,11 @@ The package declares React 18/19 peers; browser verification used React 19.3.0 a
 ## glTF and machinery
 
 ```ts
-const { loadGLTF } = await import('@scottcampbelldata/vexel-gltf');
+const { loadGLTF } = await import('@margoengine/gltf');
 const model = await loadGLTF(engine, '/machine.glb', { signal });
 const axis = model.nodes.find(node => node.name === 'Axis_1');
 if (!axis) throw new Error('Model is missing Axis_1');
-const { Kinematics, ExplodedView } = await import('@scottcampbelldata/vexel-machinery');
+const { Kinematics, ExplodedView } = await import('@margoengine/machinery');
 const joints = new Kinematics([{ node: axis, axis: 'y', min: -1, max: 1 }]);
 engine.use(joints);
 joints.setAngle(0, 0.5);
@@ -163,7 +165,7 @@ The loader supports glTF 2.0 JSON/GLB, embedded or external buffers, static tria
 
 ```ts
 const { parseCAD, PartInstancer, SectionPlanes, EngineeringAnnotations } =
-  await import('@scottcampbelldata/vexel-machinery');
+  await import('@margoengine/machinery');
 const model = parseCAD(engine, await file.arrayBuffer(), 'stl');
 engine.use(new PartInstancer());
 const plane = [0, 0, -1, 0]; // keeps dot(normal, worldPosition) + offset >= 0
@@ -176,19 +178,28 @@ engine.use(new EngineeringAnnotations({
 }));
 ```
 
-`parseCAD(engine, input, 'stl' | 'obj')` accepts text, ArrayBuffer or a view; `loadCAD(engine, url, { format?, signal? })` adds bounded HTTP(S) loading/cancellation. ASCII/binary STL and planar OBJ polygon faces, object/group names and negative indices are supported. Surface normals are regenerated from face winding. OBJ materials, UVs and supplied normals are ignored; external material files are never fetched. Native STEP/IGES solids are deferred. Units follow input coordinates.
+`parseCAD(engine, input, 'stl' | 'obj')` accepts text, ArrayBuffer or a view. `parseCADAsync(engine, ownedBuffer, 'stl'|'obj'|'step'|'iges', {signal?,onProgress?,smoothing?})` transfers and detaches its input into an owned worker. `loadCAD(engine, url, options)` adds bounded HTTP(S) loading and uses the worker in browsers, with synchronous STL/OBJ fallback when Worker is unavailable. ASCII/binary STL and planar OBJ polygon faces, object/group names and negative indices are supported. Surface normals are regenerated from face winding. OBJ materials, UVs and supplied normals are ignored; external material files are never fetched. STEP/IGES are tessellated by occt-import-js 0.0.23 in the worker, with output in meters; original B-Rep topology and native materials are not retained. STL/OBJ units follow input coordinates. The importer JS/Wasm and LGPL-2.1 notices are separate packaged assets; they are downloaded only for B-Rep import. Parts bind as they arrive and remain hidden until the complete import succeeds; a late error rolls them all back. Production Vite asset URLs and the starter file picker are verified.
 
-Limits: 64 MiB input, one million unique vertices per geometry, three million expanded indices across the import, 4096 vertices per OBJ face, 100,000 OBJ group records and ten million polygon-work units. Core entity capacity also applies. Invalid input/capacity exhaustion rolls back the import. Parsing is synchronous and retains temporary arrays; large inputs can need substantially more RAM than their file size.
+Limits: 64 MiB input, one million unique vertices per geometry, three million expanded indices across the import, 4096 vertices per OBJ face, 100,000 OBJ group records and ten million polygon-work units. Core entity capacity also applies. Invalid input/capacity exhaustion rolls back the import. Synchronous parseCAD and worker parsers retain temporary arrays; large inputs can need substantially more RAM than their file size. Worker output is validated there, deduplicated, and transferred as the actual 24-byte core vertex layout (position/normal) plus uint32 indices and bounds. Main-thread binding adopts those views without attribute remapping or fingerprinting. Optimized parts stream to the main thread individually; duplicate parts reference already bound geometry. Single-body STL remains one packed mesh rather than triangle chunks. GPU allocation/upload still costs main-thread time. The promise resolves with the complete model; cancellation or any later failure also retires parts already streamed. Parsing/optimization progress is incremental for STL/OBJ and stage-based for OCCT. Abort terminates the worker and failed binding rolls back created meshes.
 
-Positions and face normals are quantized at 1e-5 for welding, preserving hard edges. Triangles collapsing at that tolerance reject. Indices use core's uint32 format. Deduplication canonicalizes triangle order and cyclic vertex order, hashes positions/normals with CRC32, then compares full data to guard collisions. Identical parts share geometry/GPU allocations and a core instanced batch. `deduplicateParts(meshes)` handles existing meshes; `PartInstancer` deduplicates at setup and enables indexed indirect draws per unique geometry on WebGPU. New parts require another deduplication call. Instance data uploads once per batch/frame even when cap passes replay draws.
+Positions and face normals are quantized at 1e-5 for welding, preserving hard edges in synchronous imports. Worker imports optionally weld positions and generate area × corner-angle weighted smooth normals (default); smoothing false retains hard faces. Coincident opposing surfaces remain importable, but normal cancellation uses a contributing face normal and does not repair winding. The weld grid is 1e-5 scene units, not an exact CAD tolerance. Triangles collapsing at that tolerance reject. Indices use core's uint32 format. Deduplication canonicalizes triangle order and cyclic vertex order, hashes positions/normals with CRC32, then compares full data to guard collisions. Identical parts share geometry/GPU allocations and a core instanced batch. `deduplicateParts(meshes)` handles existing meshes; `PartInstancer` deduplicates at setup and enables indexed indirect draws per unique geometry on WebGPU. New parts require another deduplication call. Instance data uploads once per batch/frame even when cap passes replay draws.
 
-`boxSection(min,max)` returns the six inward planes of an orthogonal box. `SectionPlanes` supports 1–6 global world-space planes on WebGPU. Reusable uniforms drive fragment clipping; vertices are never sliced and no CPU cap meshes are generated. Separate stencil passes count logical back/front faces with wrapping increments/decrements, then shade plane intersections where stencil is nonzero. Face selection handles mirrored instances. Cap passes preserve existing depth and write the cap plane's depth; each plane begins with cleared stencil. Solid caps require depth32float-stencil8 support and closed, consistently oriented meshes. Open/nonmanifold meshes have no well-defined interior, and the eight-bit winding count wraps at 256 overlapping layers. Plane count is fixed on attachment; mutate normals/offsets between frames. A fullscreen triangle reconstructs plane intersections, restricted by stencil and other planes. Clipping, hatching and stencil pipelines live in machinery. Native stencil semantics follow [WebGPU](https://www.w3.org/TR/webgpu/#enumdef-gpustenciloperation).
+`boxSection(min,max)` returns the six inward planes of an orthogonal box. `SectionPlanes` supports 1–6 global world-space planes on WebGPU. Reusable uniforms drive fragment clipping; vertices are never sliced and no CPU cap meshes are generated. A dedicated depth32float-stencil8 target is initialized with each cut plane's depth. Separate passes count logical back/front faces with wrapping increments/decrements on reversed-Z greater-equal depth failure. A nonzero-stencil mask is then composited against the beauty depth; geometry is never reconstructed. Face selection handles mirrored instances. Cap passes preserve existing depth and write the cap plane's depth; each plane begins with cleared stencil. Solid caps require depth32float-stencil8 support and closed, consistently oriented meshes. Open/nonmanifold or inconsistently wound meshes have no inferable solid interior; use cap:false for clipping alone. A manifold flag cannot repair that topology. The eight-bit winding count wraps at 256 overlapping layers. Plane count is fixed on attachment; mutate normals/offsets between frames. A fullscreen triangle reconstructs plane intersections, restricted by stencil and other planes. Clipping, hatching and stencil pipelines live in machinery. Native stencil semantics follow [WebGPU](https://www.w3.org/TR/webgpu/#enumdef-gpustenciloperation).
 
-`EngineeringAnnotations` projects world anchors into a canvas-aligned SVG on either backend. Dimension labels rotate along their dimension vector and measure world distance with optional `unit`, `scale` and `decimals`; callouts use text content and pixel offsets. Behind-camera anchors hide. Limit: 1000 annotations. The plugin owns/removes its SVG and creates no 3D text geometry.
+`EngineeringAnnotations` projects world anchors into a canvas-aligned SVG on either backend. Default dimension offsets are perpendicular to the projected dimension vector, in the camera image plane; explicit pixel offsets remain available. Dimension labels rotate along their dimension vector and measure world distance with optional `unit`, `scale` and `decimals`; callouts use text content and pixel offsets. Behind-camera anchors hide. Limit: 1000 annotations. The plugin owns/removes its SVG and creates no 3D text geometry.
 
 `AssemblyIndex(engine)` indexes current names and optional tags. `findChildrenByName("Roller_Assembly_*", root?)` supports literal names and `*` glob matching; `tag`, `untag`, and `findByTag` manage tag lookups. Call `refresh()` after importing, renaming or disposing nodes. `setSubtreeVisible(root, visible)` writes the parent's visibility bit; the next contiguous Rust entity sweep resolves inherited visibility while retaining each descendant's own hidden bit. Transform state continues updating for hidden nodes. The measured toggle time excludes that deferred frame work and is not a universal <0.01 ms hierarchy-update guarantee.
 
 `vertexAnchor(node,index)` and `faceAnchor(node,triangle)` produce local snap anchors. `holeAnchor(node,ringIndices,tolerance?)` solves a circular, coplanar supplied ring's center and rejects degenerate/noncircular rings; STL/OBJ provide no semantic hole labels, so arbitrary hole recognition is not inferred. `snapAnchor(node,worldPoint,{kind,holes,maxDistance})` finds the closest requested vertex, triangle midpoint or supplied hole center on the selected mesh. This bounded search runs on demand, not per frame. `measureDistance(a,b,'mm'|'in'|'m',sceneToMeters=1)` transforms anchors using current Wasm matrices and returns their Euclidean distance. Call render after transform edits before measurement. Calculations use JS doubles over stored Float32 geometry/matrices, not exact original CAD/B-Rep coordinates.
+
+
+`SurfacePhysics.create(parts,carriers,{gravity?})` prepares a separate fixed-capacity machinery Wasm instance; attach it with engine.use. A carrier supplies a mesh, mutable world-space velocity/angularVelocity and contactOffset. Target velocity is linear velocity + omega cross offset, projected onto the contact plane. Each part supplies a root mesh, carrier index, lane ID, unit travel axis, halfLength and optional friction/mass/contactNormal. The SoA block retains position, velocity, target velocity, mass, friction, carrier/contact data and scratch. Acceleration is bounded by mu × gravity; mass cancels in this supported Coulomb model. Lane sorting and accumulation happen in Wasm with no runtime allocation. Neighbor order follows actual velocity through deceleration and reversal; stationary parts constrain incoming items, including parts on different carriers in the same lane. Contact clamps predicted separation and trailing speed, with tolerance for Float32 rounding. `setCarrier(partIndex,carrierIndex)` transfers support without resetting velocity. Half lengths may include desired air clearance. Parent transforms, conflicting prismatic joints, invalid/overlapping input and stale handles reject. Lane axes/extents remain fixed; there is no gravity fall, general 3D collision, automatic contact discovery or automatic shaft-speed inference. Attach kinematics before surface physics when driving carriers; applications provide carrier velocities. This is a machinery Wasm update separate from the core transform tick, retaining core size/isolation.
+
+`TelemetryChannel.create(kinematics,{delay?:100,onError?})` prepares a two-state Wasm Hermite ring. Attach after Kinematics. `push(buffer,receivedAt=performance.now())` accepts exact little-endian `u32 timestampMs, u16 count, [u16 jointIndex, f32 target] * count` frames, including sparse updates. DataView is required because six-byte records alternate float alignment. Entire packets validate before ring mutation; malformed lengths, IDs, duplicates, non-finite values and physical-limit violations reject. Coupled targets cannot be directly driven. Duplicate/backward timestamps return false, unsigned clock rollover is supported, and `reset()` deliberately starts a new timeline after PLC restarts. Sampling delays playback, estimates bounded tangents and clamps to interval endpoints when packets stop. This smooths a valid bracket; it cannot guarantee jitter-free motion across arbitrary network gaps with only two states. Attaching telemetry suspends autonomous velocity/IK updates; removing it restores them. Kinematics applies the sampled vector and its couplings atomically. `connect(webSocket)` selects binary ArrayBuffer delivery and detaches any previous socket listener; the application owns socket lifetime. Supply onError for rejected message handling. No MQTT client or network polling is added.
+
+`AssemblyBVH.create(meshes)` builds a median-partition triangle BVH directly in a separate Wasm instance, bounded at one million triangles / 256 MiB linear memory. Double-precision ray tests operate on world-space Float32 snapshots and handle reflected meshes. `raycast(origin,direction,maxDistance?)` returns node/triangle/distance/world point or null. `snap(hit,{kind:'vertex'|'edge'|'centerline',rings?,maxDistance?})` selects hit-triangle corners/midpoints or centers of explicitly supplied circular rings. Mesh semantics such as native cylinder axes are not inferred from tessellation; internal triangulation diagonals are also edges. Frustum culling does not remove pick targets; inherited visibility does. Render after transform edits and call rebuild after transforms/visibility change; recreate the BVH after geometry changes or disposal. Dispose it separately from the engine. Failed rebuilds invalidate queries until rebuilt successfully.
+
+`edgeAnchor(node,a,b)` measures an endpoint midpoint. `measureClearance(a,b,'obb'|'aabb'='obb')` derives component bounds, uses separating axes for overlap and vertex/face/edge closest points for Euclidean box clearance. Returns distance, interfering, pointA and pointB; touching boxes have distance zero without interference. OBBs require orthogonal transforms; AABB works with shear. Overlapping bounding boxes do not prove actual mesh interference. These measures inherit Float32 scene accuracy and do not recover original B-Rep precision.
 
 `industrialMaterials` is a frozen dictionary; `industrialMaterial(name,color?)` creates a material. Keys: machinedSteel (0.25 roughness/1 metalness), carbonSteel (0.35/1), galvanizedZinc (0.45/0.95), anodizedAluminum and coloredAnodizedAluminum (0.20/0.90), neoprene (0.85/0), powderCoat (0.30/0). These implement the requested nominal factory presets; colors/roughness are starting values rather than lab calibration for a particular manufactured finish.
 
@@ -197,7 +208,7 @@ The Vite demo's **Domain tools → Load conveyor assembly** loads an optional pr
 ## Creative and pass injection
 
 ```ts
-const { GPUParticles, PostProcessing, ToonShading } = await import('@scottcampbelldata/vexel-creative');
+const { GPUParticles, PostProcessing, ToonShading } = await import('@margoengine/creative');
 if (engine.backend === 'webgpu') {
   engine.use(new GPUParticles({ count: 50_000, gravity: [0, -0.5, 0], wind: [1.2, 0, 0.4],
     curl: 0.2, sort: true,
@@ -270,11 +281,15 @@ AMD Radeon integrated graphics (RDNA 2, device 13C0, driver 32.0.21043.5001) als
 
 ## Remaining domain features
 
+XR and asset interop are optional packages. `@margoengine/xr` implements WebGPU session negotiation, target/grip poses and stereo core-mesh rendering on a separate compatible device. `@margoengine/ifc` uses web-ifc for native geometry, placement, units and BIM identifiers. Loaders accept static USDA-backed USDZ; exporters write aligned static USDZ with PreviewSurface materials. Core and stage remain at 20,053 bytes gzip.
+
+`npm run modern:test:interop` checks sessions, poses, cleanup, a native IFC4 fixture and USDZ round trips. `npm run modern:test:xr:browser` verifies stereo pixel readback with simulated sessions and a real WebGPU device. Official OpenUSD validation is available through `packages/exporters/tests/validate-usdz.py`. Physical XR sessions and Apple Quick Look presentation remain unverified. Binary USDC, composed USD stages and XR rendering of advanced effects/textured/skinned extension meshes remain unsupported; see the package READMEs.
+
 | Area | Remaining work |
 | --- | --- |
-| Machinery | Native STEP/IGES/B-Rep solids, CAD materials/UVs, generalized rigid-body/contact dynamics and large-import worker streaming. The listed minimal domain features are implemented above. |
+| Machinery | Original B-Rep topology/materials/UVs, generalized rigid-body/contact dynamics, automatic contact/feature recognition and triangle-chunk streaming within single bodies. Worker STEP/IGES tessellation, 1D transport, telemetry and assembly BVH picking are implemented above. The listed minimal domain features are implemented above. |
 | Creative | Mesh/fluid wind solvers, physical volumetric scattering, HDR environment-map import, optical bokeh and continuity of GPU-only particle state after device loss. The listed minimal domain features are implemented above. |
-| Renderer/assets | Clustered Forward+ multi-light shading, shadows/IBL/textures, GPU culling/skinning, animation/morphs/compression, spatial indexing, dynamic geometry and measured memory budgets across hardware. |
+| Renderer/assets | Clustered Forward+ multi-light shading, shadows/IBL/textures, GPU culling/skinning, animation/morphs/compression, renderer spatial culling, dynamic geometry and measured memory budgets across hardware. |
 | Distribution/validation | Release policy, wider browser/GPU/React version coverage, performance comparisons with matched workloads and image quality. |
 
 The remaining rows describe future work; current domain features have working implementations and bounded limits documented above. Linear sphere culling and cached hierarchy composition are intentional minimal implementations; optimize against measured scenes. This delivery makes no universal performance, full parity or commercial-readiness claim.

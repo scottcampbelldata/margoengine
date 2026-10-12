@@ -1,0 +1,112 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  packages:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build Margo Engine packages and enforce core + stage gzip ceiling
+        run: npm run build:packages
+      - name: Build and test the offline gameplay sandbox
+        run: |
+          npm run build --workspace examples/gameplay-sandbox
+          npm run test --workspace examples/gameplay-sandbox
+      - run: npm run test:all
+      - run: npm run modern:test:react
+      - run: npm run modern:test:usdz
+      - name: Verify Python .margo writer fixtures
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python tools/blender-addon/tests/test_format.py
+      - run: python tools/blender-addon/tests/test_package.py
+      - run: npm run package:blender
+      - uses: actions/upload-artifact@v4
+        with:
+          name: margo-blender-addon
+          path: dist/margo-blender-addon-v*.zip
+      - name: Verify XR sessions, IFC geometry and USDZ interop
+        run: npm run modern:test:interop
+      - name: Verify standalone packed interop exports and TypeScript consumers
+        run: npm run modern:test:interop:packages
+      - name: Verify packed game modules and standalone TypeScript examples
+        run: npm run modern:test:game:packages
+      - name: Verify packed DOF and tonemapping exports and strict declarations
+        run: npm run modern:test:postfx:packages
+      - name: Verify all 37 packed Margo modules and strict TypeScript consumers
+        run: npm run test:modules:packages
+      - run: npx playwright install chromium
+      - name: Stress minimum limits, device loss, rollback and lifecycle cleanup
+        timeout-minutes: 10
+        run: npm run modern:test:stress -- --sessions=22 --frames=24 --cycles=3
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader"]'
+      - name: Verify stereo pixels with simulated XR sessions and real WebGPU
+        run: npm run modern:test:xr:browser
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader"]'
+      - name: Verify USDZ PBR texture packing and file-picker demo
+        run: npm run modern:test:usdz:browser
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader"]'
+      - name: Verify extensions and demos in WebGPU
+        run: npm run modern:test:extensions
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader"]'
+      - name: Verify offline .margo PBR, textures and device restoration
+        run: npm run modern:test:blender
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader"]'
+      - name: Verify optional game modules in WebGPU
+        run: npm run modern:test:game
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader"]'
+      - name: Verify DOF and tonemapping pixels, LUTs and device restoration
+        run: npm run modern:test:postfx:browser
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader"]'
+      - name: Verify Margo module shaders, pixels, overlays and device restoration
+        run: npm run test:modules:browser
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader"]'
+      - name: Verify real Rapier simulation and rendered transform synchronization
+        run: npm run test:browser --workspace @margoengine/physics
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader"]'
+      - name: Build standalone DOF and tonemapping demos
+        run: |
+          npm --prefix packages/dof run build:demo
+          npm --prefix packages/tonemap run build:demo
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bundle-sizes
+          path: |
+            test-results/stress/
+            test-results/modern-bundle-sizes.json
+            test-results/modern-game.json
+            test-results/modern-temporal.json
+            test-results/modern-xr.json
+            test-results/modern-usdz.json
+            test-results/modern-blender.json
+            test-results/blender/render-*.png
+            test-results/modern-postfx.json
+            test-results/margo-modules.json
+            test-results/margo-debug-mobile.png
+            test-results/dof-demo.png
+            test-results/tonemap-demo.png
+            test-results/temporal-splats.png

@@ -1,0 +1,21 @@
+{
+  "name": "margoengine",
+  "homepage": "https://margoengine.com",
+  "version": "0.1.0",
+  "description": "Five-line setup for Margo Engine and its domain packs.",
+  "type": "module",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/scottcampbelldata/vexel.git", "directory": "packages/margoengine" },
+  "publishConfig": { "access": "public" },
+  "scripts": { "prepack": "npm --prefix ../.. run build:packages" },
+  "sideEffects": false,
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "files": ["dist"],
+  "dependencies": {
+    "@margoengine/core": "0.1.0",
+    "@margoengine/gltf": "0.1.0",
+    "@margoengine/machinery": "0.1.0",
+    "@margoengine/creative": "0.1.0",
+    "@margoengine/scenery": "0.1.0"
+  }
+}

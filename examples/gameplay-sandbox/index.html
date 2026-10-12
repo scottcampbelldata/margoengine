@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101a1c">
+  <meta name="description" content="Explore an offline procedural island powered by concurrent Margo WebGPU systems.">
+  <title>Afterlight · Margo gameplay sandbox</title>
+  <link rel="icon" href="data:,">
+</head>
+<body>
+  <main>
+    <canvas id="scene" tabindex="0" aria-label="Interactive island. WASD or arrow keys move, drag to look, Shift runs. Escape releases the mouse."></canvas>
+    <div class="vignette" aria-hidden="true"></div>
+    <header class="masthead"><a href="#" aria-label="Margo gameplay sandbox">margo<span class="brand-dot">.</span></a><span>REALTIME WORLDS / 001</span></header>
+    <aside id="telemetry" aria-label="Live rendering performance"></aside>
+    <section class="intro" aria-labelledby="title">
+      <p class="eyebrow"><span></span> A living compute playground</p>
+      <h1 id="title">Afterlight</h1>
+      <p class="description">One island. A million points of light.<br>A world in motion, built on Margo.</p>
+      <button id="explore" disabled>Preparing your world <span aria-hidden="true">↗</span></button>
+      <p id="status" role="status">Initializing WebGPU and procedural terrain…</p>
+    </section>
+    <div class="world-label" aria-hidden="true"><span>THE AMBER COAST</span><small>Procedural terrain / golden hour</small></div>
+    <fieldset class="controls" id="controls" disabled>
+      <legend class="sr-only">World controls</legend>
+      <label class="slider">Sun position <output id="sun-value" for="sun">17:00</output><input id="sun" type="range" min="6" max="20" step="0.01" value="17"></label>
+      <label>Particle field<select id="particles"><option value="100000">100k particles</option><option value="500000">500k particles</option><option value="1000000" selected>1M particles</option></select></label>
+      <label class="toggle"><input id="wireframe" type="checkbox"><span>Terrain wireframe</span></label>
+      <label class="slider">Wave height <output id="wave-value" for="wave">0.35 m</output><input id="wave" type="range" min="0" max="0.7" step="0.01" value="0.35"></label>
+      <button id="pause" type="button" aria-pressed="false">Pause</button>
+    </fieldset>
+    <footer><p><kbd>W A S D</kbd> move <span>·</span> <kbd>DRAG</kbd> look <span>·</span> <kbd>SHIFT</kbd> run</p><span>WEBGPU <i></i> ALL SYSTEMS CONCURRENT</span></footer>
+    <div id="touch-controls" aria-label="Touch movement and camera controls"></div>
+    <noscript>This interactive showcase needs JavaScript and a WebGPU-capable browser.</noscript>
+  </main>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

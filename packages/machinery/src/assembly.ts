@@ -1,6 +1,6 @@
-import {engineRuntime,meshRuntime} from '@scottcampbelldata/vexel-core/extension';
-import type {EngineKernel,Mesh as MeshHandle} from '@scottcampbelldata/vexel-core';
-import type {Engine,Mesh} from '@scottcampbelldata/vexel-core/extension';
+import {engineRuntime,meshRuntime} from '@margoengine/core/extension';
+import type {EngineKernel,Mesh as MeshHandle} from '@margoengine/core';
+import type {Engine,Mesh} from '@margoengine/core/extension';
 export class AssemblyIndex {
   private readonly names=new Map<string,Set<Mesh>>();
   private readonly tags=new Map<string,Set<Mesh>>();

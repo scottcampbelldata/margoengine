@@ -1,9 +1,15 @@
 {
-  "name": "@scottcampbelldata/vexel-creative", "version": "0.1.0", "type": "module", "license": "MIT",
-  "description": "WebGPU particles, atmosphere, toon shading and post-processing for Vexel.",
+  "name": "@margoengine/creative", "version": "0.1.0", "type": "module", "license": "MIT",
+  "description": "WebGPU particles, atmosphere, toon shading and post-processing for Margo Engine.",
   "repository": { "type": "git", "url": "git+https://github.com/scottcampbelldata/vexel.git", "directory": "packages/creative" },
   "publishConfig": { "access": "public" },
-  "scripts": { "prepack": "npm --prefix ../.. run build:packages" },
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "npm run build && node --test tests/planet.test.js",
+    "test:browser": "npm run build && node scripts/test-browser.js",
+    "dev": "vite --config vite.config.js",
+    "prepack": "npm run build"
+  },
   "sideEffects": false, "exports": {".": {"types": "./dist/index.d.ts", "import": "./dist/index.js"}},
-  "files": ["dist"], "peerDependencies": {"@scottcampbelldata/vexel-core": "0.1.0"}
+  "files": ["dist"], "peerDependencies": {"@margoengine/core": "0.1.0"}
 }

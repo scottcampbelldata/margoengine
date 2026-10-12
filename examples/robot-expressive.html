@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Character study · Margo Engine</title>
+  <link rel="stylesheet" href="./extension-demo.css">
+</head>
+<body data-demo="robot">
+  <main id="viewport" aria-label="Animated robot with facial expressions"></main>
+  <aside aria-label="Scene controls">
+    <h1>Character study</h1>
+    <p>A walking robot, with expressions you can shape. Drag to orbit; scroll to zoom.</p>
+    <label for="clip">Animation</label><select id="clip" disabled></select><button id="pause" type="button" aria-pressed="false" disabled>Pause animation</button><fieldset id="morphs"><legend>Facial expressions</legend></fieldset>
+    <p id="status" role="status">Loading model…</p><p id="error" role="alert"></p>
+    <small>Focus the scene: arrow keys orbit, + / − zoom.</small>
+    <small>Robot by Tomás Laulhé; facial morphs by Don McCurdy. <a href="https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/RobotExpressive/README.md">CC0 asset credits</a>.</small>
+  </aside>
+  <script type="module" src="./extension-demo.ts"></script>
+</body>
+</html>

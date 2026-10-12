@@ -1,7 +1,7 @@
 import { TransformStore } from './kernel.js';
 import { Camera, type CameraOptions, type Vec3 } from './camera.js';
 import { Geometry, PbrMaterial, finite } from './geometry.js';
-import { GPURenderer, GLRenderer, type Renderer, type Batch } from './renderer.js';
+import { GPURenderer, GLRenderer, type Renderer, type Batch, type GeometryBuffers } from './renderer.js';
 import { FrameGraph, type EnginePlugin } from './plugin.js';
 
 export interface EngineOptions { capacity?: number; backend?: 'auto'|'webgpu'|'webgl2'; camera?: CameraOptions }
@@ -15,14 +15,22 @@ export class VectorRef {
     this.mesh.check();
     return this.kind==='rotation'?this.mesh.euler[axis]:this.mesh.engine.store.transforms[(this.kind==='scale'?scaleFields:positionFields)[axis]][this.mesh.id];
   }
-  private set(axis: number, value: number): void {
-    this.mesh.check(); if(typeof value!=='number'||!Number.isFinite(Math.fround(value)) || this.kind==='scale' && Math.fround(value)===0)throw new RangeError('Invalid transform value');
+  private validate(value:number):void {if(typeof value!=='number'||!Number.isFinite(Math.fround(value)) || this.kind==='scale' && Math.fround(value)===0)throw new RangeError('Invalid transform value');}
+  private write(axis: number, value: number): void {
+    this.mesh.check();this.validate(value);
     if(this.kind==='rotation'){this.mesh.euler[axis]=value;this.mesh.syncRotation();}
     else this.mesh.engine.store.transforms[(this.kind==='scale'?scaleFields:positionFields)[axis]][this.mesh.id]=value;
   }
-  get x():number{return this.get(0);} set x(v:number){this.set(0,v);}
-  get y():number{return this.get(1);} set y(v:number){this.set(1,v);}
-  get z():number{return this.get(2);} set z(v:number){this.set(2,v);}
+  set(x:number,y:number,z:number):this {
+    this.mesh.check();this.validate(x);this.validate(y);this.validate(z);
+    const fields=this.kind==='scale'?scaleFields:positionFields,t=this.mesh.engine.store.transforms,id=this.mesh.id;
+    for(let axis=0;axis<3;axis++){const value=axis===0?x:axis===1?y:z;if(this.kind==='rotation')this.mesh.euler[axis]=value;else t[fields[axis]][id]=value;}
+    if(this.kind==='rotation')this.mesh.syncRotation();return this;
+  }
+  setAll(value:number):this {return this.set(value,value,value);}
+  get x():number{return this.get(0);} set x(v:number){this.write(0,v);}
+  get y():number{return this.get(1);} set y(v:number){this.write(1,v);}
+  get z():number{return this.get(2);} set z(v:number){this.write(2,v);}
 }
 
 export class Mesh {
@@ -38,9 +46,9 @@ export class Mesh {
   get visible():boolean {this.check();return this.engine.store.hidden[this.id]===0;}
   set visible(value:boolean){this.check();if(typeof value!=='boolean')throw new TypeError('Visibility must be boolean');this.engine.store.hidden[this.id]=+!value;}
   check():void { if(this.engine.disposed||this.engine.meshes.get(this.id)!==this)throw new Error('Mesh is disposed'); }
-  setPosition(value: Vec3):this {this.check();finite(value,3,'Position');this.position.x=value[0];this.position.y=value[1];this.position.z=value[2];return this;}
-  setScale(value: Vec3):this {this.check();finite(value,3,'Scale');if(value.some(v=>Math.fround(v)===0))throw new RangeError('Scale must be nonzero');this.scale.x=value[0];this.scale.y=value[1];this.scale.z=value[2];return this;}
-  setRotation(value: Vec3):this {this.check();finite(value,3,'Rotation');for(let i=0;i<3;i++)this.euler[i]=value[i];this.syncRotation();return this;}
+  setPosition(value: Vec3):this {this.check();finite(value,3,'Position');this.position.set(value[0],value[1],value[2]);return this;}
+  setScale(value: Vec3):this {this.check();finite(value,3,'Scale');if(value.some(v=>Math.fround(v)===0))throw new RangeError('Scale must be nonzero');this.scale.set(value[0],value[1],value[2]);return this;}
+  setRotation(value: Vec3):this {this.check();finite(value,3,'Rotation');this.rotation.set(value[0],value[1],value[2]);return this;}
   syncRotation():void {
     const sx=Math.sin(this.euler[0]/2),cx=Math.cos(this.euler[0]/2),sy=Math.sin(this.euler[1]/2),cy=Math.cos(this.euler[1]/2),sz=Math.sin(this.euler[2]/2),cz=Math.cos(this.euler[2]/2),t=this.engine.store.transforms,id=this.id;
     t.qx[id]=sx*cy*cz+cx*sy*sz;t.qy[id]=cx*sy*cz-sx*cy*sz;t.qz[id]=cx*cy*sz+sx*sy*cz;t.qw[id]=cx*cy*cz-sx*sy*sz;
@@ -117,6 +125,7 @@ export class Engine {
   }
   get backend():'webgpu'|'webgl2'{return this.renderer.backend;}
   get gpu():GPUDevice|null{return this.renderer.gpu??null;}
+  geometryBuffers(geometry:Geometry):GeometryBuffers|null {if(this.disposed||this.disposing||this.recovery)throw new Error('Geometry buffers are unavailable');return this.renderer.geometryBuffers?.(geometry)??null;}
   hasPlugin(name:string):boolean{return this.plugins.has(name);}
   use(plugin:EnginePlugin):this {
     if(this.disposed||this.disposing)throw new Error('Engine is disposed');

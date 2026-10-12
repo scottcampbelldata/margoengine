@@ -15,6 +15,23 @@ test('rejected attachment removes the overlay and stops its refresh timer',()=>{
  finally{dom.window.close();}
 });
 
+test('DOM refresh is scheduled at 150 ms and numeric sampling stays independent', t => {
+  let interval;
+  const previous=globalThis.setInterval;
+  globalThis.setInterval=(callback, milliseconds)=>{interval=milliseconds;return previous(callback,milliseconds);};
+  try {const stats=overlay(t);assert.equal(interval,150);stats.tick(16);assert.equal(stats.sampleCount,1);}
+  finally {globalThis.setInterval=previous;}
+});
+
+test('a zero-delta restart excludes paused time from rolling frame samples',t=>{
+  const stats=overlay(t);let now=16,sample;
+  t.mock.method(performance,'now',()=>now);
+  stats.registerPasses({add(pass){if(pass.name==='stats:sample')sample=pass.execute;}});
+  const context={backend:'webgpu',delta:0.016};sample(context);now=32;sample(context);
+  const count=stats.sampleCount;now=10000;context.delta=0;sample(context);assert.equal(stats.sampleCount,count);
+  now=10016;context.delta=0.016;sample(context);assert.equal(stats.frameTime,16);
+});
+
 test('rolling samples wrap, reject bad input atomically and tick never touches the DOM', t => {
   const stats = overlay(t, {samples: 3}), samples = stats.samples, buffer = samples.buffer;
   stats.tick(10, 2, 3); stats.tick(20, 4, 5); stats.tick(30, 6, 7); stats.tick(40, 8, 9);
@@ -26,6 +43,8 @@ test('rolling samples wrap, reject bad input atomically and tick never touches t
   for (let i = 0; i < 20_000; i++) stats.tick(16, 1, 2);
   assert.equal(stats.samples, samples); assert.equal(stats.samples.buffer, buffer); assert.equal(stats.element.textContent, text);
   stats.refresh(); assert.match(stats.element.textContent, /63 FPS.*16\.00 ms/); assert.match(stats.element.textContent, /1 draws  2 dispatches/);
+  assert.match(stats.element.textContent, /GPU timing unavailable/);
+  stats.gpuTime = 2.5; stats.refresh(); assert.match(stats.element.textContent, /GPU timing 2\.50 ms/);
   stats.dispose(); assert.equal(stats.element.isConnected, false); assert.throws(() => stats.tick(1), /disposed/);
 });
 
@@ -40,6 +59,9 @@ test('encoder instrumentation preserves arguments and receivers, counts all dire
   c.dispatchWorkgroups(8); c.dispatchWorkgroupsIndirect(buffer, 64);
   assert.equal(stats.drawCalls, 4); assert.equal(stats.dispatches, 2); assert.equal(encoder.finish(), 42);
   assert.deepEqual(calls, [['draw', [3, 1, 0, 0]], ['drawIndexed', [6, 2, 3, -1, 4]], ['drawIndirect', [buffer, 16]], ['drawIndexedIndirect', [buffer, 32]], ['dispatch', [8, 1, 1]], ['dispatchIndirect', [buffer, 64]]]);
+  const next={beginRenderPass(){return render;},beginComputePass(){return compute;},finish(){return 42;}};
+  stats.track(next);
+  assert.equal(next.beginRenderPass,encoder.beginRenderPass);assert.equal(next.beginComputePass,encoder.beginComputePass);assert.equal(next.finish,encoder.finish);
 });
 
 function gpu(t) {
@@ -50,6 +72,16 @@ function gpu(t) {
   const encoder = {resolveQuerySet(...args) {assert.equal(args[2], 4);}, copyBufferToBuffer(...args) {assert.equal(args[4], 32);}};
   return {device, encoder, resources};
 }
+
+test('Stats requests timestamps only once every 15 tracked frames', t => {
+  const stats=overlay(t),{device}=gpu(t);stats.enableGPUProfiling(device);
+  let sampled=0;
+  for(let i=0;i<20;i++){
+    const encoder={beginRenderPass(descriptor){if(descriptor.timestampWrites)sampled++;return {draw(){},drawIndexed(){},drawIndirect(){},drawIndexedIndirect(){}};},beginComputePass(){},finish(){}};
+    stats.track(encoder);encoder.beginRenderPass({colorAttachments:[]});
+  }
+  assert.equal(sampled,1);
+});
 
 test('timestamp queries sum pass nanoseconds, skip frames during readback and release resources', async t => {
   const {device, encoder, resources} = gpu(t), profiler = new GPUProfiler(device);

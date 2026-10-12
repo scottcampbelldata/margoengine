@@ -1,9 +1,9 @@
 import React,{StrictMode,Suspense,useRef} from 'react';
 import {createRoot,type Root} from 'react-dom/client';
-import {Engine,box,PbrMaterial, type Mesh as CoreMesh} from '@scottcampbelldata/vexel-core/extension';
-import {Canvas,Mesh,BoxGeometry,PbrMaterial as ReactMaterial,useFrame} from '@scottcampbelldata/vexel-react';
-import {GPUParticles,PostProcessing,ToonShading} from '@scottcampbelldata/vexel-creative';
-import {SectionPlanes,EngineeringAnnotations,PartInstancer} from '@scottcampbelldata/vexel-machinery';
+import {Engine,box,PbrMaterial, type Mesh as CoreMesh} from '@margoengine/core/extension';
+import {Canvas,Mesh,BoxGeometry,PbrMaterial as ReactMaterial,useFrame} from '@margoengine/react';
+import {GPUParticles,PostProcessing,ToonShading} from '@margoengine/creative';
+import {SectionPlanes,EngineeringAnnotations,PartInstancer} from '@margoengine/machinery';
 const state:{core?:Engine;react?:Engine;root?:Root;host?:HTMLDivElement;parent:CoreMesh|null;child:CoreMesh|null;renders:number;errors:string[];frames:number}={parent:null,child:null,renders:0,errors:[],frames:0};
 function Cube({position=1}:{position?:number}){
   state.renders++;const mesh=useRef<CoreMesh>(null);
@@ -13,7 +13,7 @@ function Cube({position=1}:{position?:number}){
 const pending=new Promise<never>(()=>{});
 function Suspended():never{throw pending;}
 function App({position=1,show=true,suspend=false}:{position?:number;show?:boolean;suspend?:boolean}){
-  return <StrictMode><Canvas backend="webgl2" capacity={8} onCreated={engine=>{state.react=engine as unknown as Engine;}} onError={error=>state.errors.push(String(error))}>{show&&(suspend?<Suspense fallback={null}><Cube position={position}/><Suspended/></Suspense>:<Cube position={position}/>)}</Canvas></StrictMode>;
+  return <StrictMode><Canvas backend="webgl2" capacity={8} onCreated={stage=>{state.react=stage.engine as unknown as Engine;}} onError={error=>state.errors.push(String(error))}>{show&&(suspend?<Suspense fallback={null}><Cube position={position}/><Suspended/></Suspense>:<Cube position={position}/>)}</Canvas></StrictMode>;
 }
 const harness={
   state,

@@ -1,0 +1,32 @@
+{
+  "name": "@margoengine/animation",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Storage-buffer skinning and compute morph targets for Margo Engine.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/vexel.git",
+    "directory": "packages/animation"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prepack": "npm --prefix ../.. run build:packages"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "@margoengine/core": "0.1.0",
+    "@margoengine/gltf-pro": "0.1.0"
+  }
+}

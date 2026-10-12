@@ -4,3 +4,4 @@
 details{margin:16px 0;max-width:320px}summary{cursor:pointer;color:#8fd8c0;margin-bottom:14px;font-size:14px}details label{margin-top:16px}input[type=file]{width:100%;font-size:12px}
 
 input[type=checkbox]{width:auto;margin:0 8px 0 0;vertical-align:middle}
+button[aria-pressed=true]{background:#29463f}button:disabled{opacity:.6;cursor:wait}

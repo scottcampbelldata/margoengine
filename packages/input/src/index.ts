@@ -7,6 +7,7 @@ export interface InputOptions {target?: EventTarget; gamepads?: () => readonly (
 /** Semantic action state is reused; sample once per simulation tick. */
 export class Input {
   private readonly states = new Map<string, ActionState>();
+  private readonly samples: {name: string; state: ActionState}[] = [];
   private readonly keys = new Set<string>();
   private buttons = 0;
   private readonly motion = {x: 0, y: 0, wheel: 0};
@@ -27,6 +28,7 @@ export class Input {
           binding.type === 'pointer' && !['x', 'y', 'wheel'].includes(binding.axis) || binding.type === 'touch' && (!binding.id || binding.axis !== undefined && binding.axis !== 'x' && binding.axis !== 'y')) throw new TypeError('Invalid action binding');
       }
       this.states.set(name, {value: 0, down: false, pressed: false, released: false});
+      this.samples.push({name, state: this.states.get(name)!});
     }
     this.listen(target, 'keydown', event => {const e = event as KeyboardEvent, node = e.composedPath()[0] as Element; if (!node?.closest?.('input,textarea,select,[contenteditable=true]')) this.keys.add(e.code);});
     this.listen(target, 'keyup', event => this.keys.delete((event as KeyboardEvent).code));
@@ -44,9 +46,12 @@ export class Input {
   update(): void {
     if (this.disposed) throw new Error('Input is disposed');
     const pads = this.gamepads();
-    for (const [name, state] of this.states) {
+    for (let i = 0; i < this.samples.length; i++) {
+      const sample = this.samples[i], name = sample.name, state = sample.state;
       let value = 0;
-      for (const binding of this.actions[name]) {
+      const bindings = this.actions[name];
+      for (let j = 0; j < bindings.length; j++) {
+        const binding = bindings[j];
         let sample = 0;
         switch (binding.type) {
           case 'key': sample = +this.keys.has(binding.code); break;

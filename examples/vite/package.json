@@ -1,6 +1,6 @@
 {
-  "name": "@vexel/starter-vite", "version": "0.1.0", "private": true, "type": "module",
+  "name": "@margoengine/starter-vite", "version": "0.1.0", "private": true, "type": "module",
   "scripts": {"dev": "vite --host 127.0.0.1", "build": "tsc -p tsconfig.json && vite build --manifest"},
-  "dependencies": {"@scottcampbelldata/vexel-core": "0.1.0", "@scottcampbelldata/vexel-react": "0.1.0", "@scottcampbelldata/vexel-gltf": "0.1.0", "@scottcampbelldata/vexel-machinery":"0.1.0", "@scottcampbelldata/vexel-creative":"0.1.0", "react": "19.3.0", "react-dom": "19.3.0"},
+  "dependencies": {"margoengine": "0.1.0", "@margoengine/core": "0.1.0", "@margoengine/react": "0.1.0", "@margoengine/gltf": "0.1.0", "@margoengine/machinery":"0.1.0", "@margoengine/creative":"0.1.0", "@margoengine/scenery":"0.1.0", "react": "19.3.0", "react-dom": "19.3.0"},
   "devDependencies": {"vite": "^8.3.4"}
 }

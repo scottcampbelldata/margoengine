@@ -4,6 +4,7 @@ import {group,compute,dispatch} from '../../shared/gpu.js';
 declare const GPUBufferUsage:{VERTEX:number;INDEX:number;STORAGE:number;INDIRECT:number;UNIFORM:number;COPY_DST:number};
 declare const GPUTextureUsage:{TEXTURE_BINDING:number;COPY_DST:number};
 type Context=Extract<PassContext,{backend:'webgpu'}>;
+const heightFormats=['r32float','r16float','rgba32float','rgba16float','r8unorm'];
 export interface ScatterOptions {count?:number;area?:readonly [number,number];center?:readonly [number,number,number];density?:number;minHeight?:number;maxHeight?:number;maxSlope?:number;scale?:readonly [number,number];lod?:readonly [number,number,number];seed?:number;color?:readonly [number,number,number];heightmap?:()=>GPUTexture|undefined}
 const frame=`
 struct Frame {camera:mat4x4f,eye:vec4f,area:vec4f,rules:vec4f,scale:vec4f,lod:vec4f,ids:vec4u,color:vec4f,planes:array<vec4f,6>}
@@ -46,6 +47,10 @@ struct Output {@builtin(position) clip:vec4f,@location(0) normal:vec3f}
 let serial=0;
 export class Scatter implements EnginePlugin {
  readonly name='scatter:'+ ++serial;private engine?:Engine;private uniform?:GPUBuffer;private instances:GPUBuffer[]=[];private vertices:GPUBuffer[]=[];private indices:GPUBuffer[]=[];private commands?:GPUBuffer;private fallback?:GPUTexture;private compute?:GPUComputePipeline;private pipelines=new Map<string,GPURenderPipeline>();private readonly values=new Float32Array(68);private readonly meta=new Uint32Array(this.values.buffer);private readonly geometries:readonly Geometry[];private disposed=false;readonly count:number;
+ private terrain?:GPUTexture;private computeGroup?:GPUBindGroup;private readonly renderGroups=new Map<GPURenderPipeline,GPUBindGroup[]>();
+ private readonly attachment:GPURenderPassColorAttachment={view:undefined!,loadOp:'load',storeOp:'store'};
+ private readonly depthAttachment:GPURenderPassDepthStencilAttachment={view:undefined!,depthLoadOp:'load',depthStoreOp:'store',stencilReadOnly:true};
+ private readonly presentation:GPURenderPassDescriptor={colorAttachments:[this.attachment],depthStencilAttachment:this.depthAttachment};
  constructor(geometry:Geometry|readonly [Geometry,Geometry,Geometry],private readonly options:ScatterOptions={}){
   this.geometries=geometry instanceof Geometry?[geometry,geometry,geometry]:[...geometry];
   const {count=10000,area=[50,50],center=[0,0,0],density=1,minHeight=-10000,maxHeight=10000,maxSlope=45,scale=[0.7,1.3],lod=[20,50,100],seed=1,color=[0.12,0.35,0.08]}=options;
@@ -69,19 +74,21 @@ export class Scatter implements EnginePlugin {
  registerPasses(graph:FrameGraph):void {
   graph.add({name:this.name+':distribute',order:-10,execute:c=>{if(c.backend!=='webgpu')return;
    const terrain=this.options.heightmap?.()??this.fallback!;
-   if(!['r32float','r16float','rgba32float','rgba16float','r8unorm'].includes(terrain.format)||!(terrain.usage&GPUTextureUsage.TEXTURE_BINDING))throw new Error('Scatter needs a sampleable floating-height texture');
+   if(!heightFormats.includes(terrain.format)||!(terrain.usage&GPUTextureUsage.TEXTURE_BINDING))throw new Error('Scatter needs a sampleable floating-height texture');
    this.values.set(c.camera.matrix);this.values.set(c.camera.position,16);this.values.set(c.camera.planes,44);this.values[43]=+(c.format==='rgba16float');c.device.queue.writeBuffer(this.uniform!,0,this.values as Float32Array<ArrayBuffer>);
    for(let i=0;i<3;i++)c.encoder.clearBuffer(this.commands!,i*20+4,4);
-   dispatch(c,this.compute!,group(c.device,this.compute!,[{buffer:this.uniform!},terrain.createView(),...this.instances.map(buffer=>({buffer})),{buffer:this.commands!}]),Math.ceil(this.count/64));
+   if(this.terrain!==terrain||!this.computeGroup){this.computeGroup=group(c.device,this.compute!,[{buffer:this.uniform!},terrain.createView(),...this.instances.map(buffer=>({buffer})),{buffer:this.commands!}]);this.terrain=terrain;}
+   dispatch(c,this.compute!,this.computeGroup,Math.ceil(this.count/64));
   }});
   graph.add({name:this.name+':lod',order:5,execute:c=>{if(c.backend==='webgpu')this.draw(c);}});
  }
  private draw(c:Context):void {
   let pipeline=this.pipelines.get(c.format);if(!pipeline){const module=c.device.createShaderModule({code:renderCode});pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:24,attributes:[{shaderLocation:0,offset:0,format:'float32x3'},{shaderLocation:1,offset:12,format:'float32x3'}]}]},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:true,depthCompare:'greater-equal'}});this.pipelines.set(c.format,pipeline);}
-  const pass=c.encoder.beginRenderPass({colorAttachments:[{view:c.color,loadOp:'load',storeOp:'store'}],depthStencilAttachment:{view:c.depth,depthLoadOp:'load',depthStoreOp:'store',stencilReadOnly:true}});
-  pass.setPipeline(pipeline);for(let i=0;i<3;i++){pass.setBindGroup(0,group(c.device,pipeline,[{buffer:this.uniform!},{buffer:this.instances[i]}]));pass.setVertexBuffer(0,this.vertices[i]);pass.setIndexBuffer(this.indices[i],'uint32');pass.drawIndexedIndirect(this.commands!,i*20);}pass.end();
+  let groups=this.renderGroups.get(pipeline);if(!groups){groups=this.instances.map(buffer=>group(c.device,pipeline!,[{buffer:this.uniform!},{buffer}]));this.renderGroups.set(pipeline,groups);}
+  this.attachment.view=c.color;this.depthAttachment.view=c.depth;const pass=c.encoder.beginRenderPass(this.presentation);
+  pass.setPipeline(pipeline);for(let i=0;i<3;i++){pass.setBindGroup(0,groups[i]);pass.setVertexBuffer(0,this.vertices[i]);pass.setIndexBuffer(this.indices[i],'uint32');pass.drawIndexedIndirect(this.commands!,i*20);}pass.end();
  }
- private release():void {for(const b of [...this.instances,...this.vertices,...this.indices])b.destroy();this.instances=[];this.vertices=[];this.indices=[];this.uniform?.destroy();this.commands?.destroy();this.fallback?.destroy();this.uniform=this.commands=undefined;this.fallback=undefined;this.compute=undefined;this.pipelines.clear();}
+ private release():void {for(const b of [...this.instances,...this.vertices,...this.indices])b.destroy();this.instances=[];this.vertices=[];this.indices=[];this.uniform?.destroy();this.commands?.destroy();this.fallback?.destroy();this.uniform=this.commands=undefined;this.fallback=undefined;this.compute=undefined;this.pipelines.clear();this.terrain=undefined;this.computeGroup=undefined;this.renderGroups.clear();}
  onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
  dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.engine=undefined;}
 }

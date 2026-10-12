@@ -3,7 +3,7 @@ import type { Geometry } from './geometry.js';
 import { glVertex, glFragment, wgsl } from './shaders.js';
 import type { FrameGraph, PassContext, DrawOptions } from './plugin.js';
 // TypeScript's DOM library omits WebGPU flag namespaces and the canvas overload.
-declare const GPUBufferUsage:{COPY_DST:number;COPY_SRC:number;MAP_READ:number;INDEX:number;VERTEX:number;UNIFORM:number;INDIRECT:number};
+declare const GPUBufferUsage:{COPY_DST:number;COPY_SRC:number;MAP_READ:number;INDEX:number;VERTEX:number;UNIFORM:number;INDIRECT:number;STORAGE:number};
 declare const GPUTextureUsage:{RENDER_ATTACHMENT:number;COPY_SRC:number};
 declare const GPUMapMode:{READ:number};
 
@@ -11,12 +11,14 @@ const defaultDraw:DrawOptions={};
 
 export interface Batch { geometry: Geometry; instances: Float32Array; count: number }
 export interface Lighting { direction: Float32Array; radiance: Float32Array }
+export interface GeometryBuffers {readonly vertex:GPUBuffer;readonly index:GPUBuffer;readonly instance:GPUBuffer}
 export interface Renderer {
   readonly backend: 'webgpu'|'webgl2';
   readonly gpu?:GPUDevice;
   onLost?:(error:Error)=>void;
   add(geometry: Geometry, capacity: number): void;
   remove(geometry: Geometry): void;
+  geometryBuffers?(geometry:Geometry):GeometryBuffers;
   render(camera: Camera, lighting: Lighting, batches: Iterable<Batch>,graph:FrameGraph,delta:number): void;
   dispose(unconfigure?:boolean): void;
 }
@@ -82,9 +84,9 @@ export class GPURenderer implements Renderer {
         const buffer=this.device.createBuffer({size:data.byteLength,usage:usage|GPUBufferUsage.COPY_DST}); buffers.push(buffer);
         this.device.queue.writeBuffer(buffer,0,data as Float32Array<ArrayBuffer>); return buffer;
       };
-      const vertex=upload(geometry.vertices,GPUBufferUsage.VERTEX),index=upload(geometry.indices,GPUBufferUsage.INDEX);
+      const vertex=upload(geometry.vertices,GPUBufferUsage.VERTEX|GPUBufferUsage.STORAGE),index=upload(geometry.indices,GPUBufferUsage.INDEX|GPUBufferUsage.STORAGE);
       if(capacity*96>this.device.limits.maxBufferSize)throw new RangeError('Instances exceed GPU buffer limit');
-      const instance=this.device.createBuffer({size:capacity*96,usage:GPUBufferUsage.VERTEX|GPUBufferUsage.COPY_DST}); buffers.push(instance);
+      const instance=this.device.createBuffer({size:capacity*96,usage:GPUBufferUsage.VERTEX|GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}); buffers.push(instance);
       this.resources.set(geometry,{vertex,index,instance,frame:-1});
     } catch(error) { for(const buffer of buffers)buffer.destroy(); throw error; }
   }
@@ -92,6 +94,7 @@ export class GPURenderer implements Renderer {
     const resource=this.resources.get(geometry); if(!resource)return;
     resource.vertex.destroy(); resource.index.destroy(); resource.instance.destroy();resource.indirect?.destroy(); this.resources.delete(geometry);
   }
+  geometryBuffers(geometry:Geometry):GeometryBuffers {const resource=this.resources.get(geometry);if(this.disposed||this.deviceLost||!resource)throw new Error('Geometry buffers are unavailable');return resource;}
   render(camera: Camera, lighting: Lighting, batches: Iterable<Batch>,graph:FrameGraph,delta:number): void {
     if(this.deviceLost||this.disposed)return;
     try{this.renderFrame(camera,lighting,batches,graph,delta);}catch(error){

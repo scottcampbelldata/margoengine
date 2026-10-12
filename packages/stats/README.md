@@ -2,7 +2,7 @@
 
 Zero runtime dependencies. Frame sampling uses a fixed Float64Array ring.
 `tick(milliseconds, drawCalls?, dispatches?)` performs numeric updates only;
-DOM strings and canvas drawing refresh separately at 4 Hz. Encoder/pass wrappers
+DOM strings and canvas drawing refresh separately every 150 ms. Encoder/pass wrappers
 and asynchronous GPU readback allocate outside `tick`.
 
 ```ts
@@ -18,7 +18,8 @@ and dispatch commands in its frame graph. Render bundle contents and commands
 recorded on other encoders are outside these counters. For a custom encoder,
 call `stats.track(encoder)` before recording and `stats.tick(deltaMs)` once per
 frame. Submit immediately after `encoder.finish()`; timestamp readback starts
-in the next microtask.
+in the next microtask. The Stats plugin profiles one frame out of every 15;
+draw/dispatch counting and numeric ring sampling continue every frame.
 
 GPU timing is the sum of profiled pass durations, not presentation latency.
 It requires `timestamp-query` enabled when requesting the device. Frozen core

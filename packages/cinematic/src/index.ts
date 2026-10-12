@@ -12,8 +12,8 @@ export class Cinematic implements EnginePlugin {
   readonly lookAt = new Float64Array(3);
   private readonly velocity = new Float64Array(6);
   private readonly target = new Float64Array(3);
-  private readonly cameraPosition: [number, number, number] = [0, 0, 0];
-  private readonly cameraTarget: [number, number, number] = [0, 0, 0];
+  private readonly cameraPosition = new Float32Array(3);
+  private readonly cameraTarget = new Float32Array(3);
   private engine?: Engine;
   private mesh?: Mesh;
   private amplitude = 0;
@@ -57,7 +57,7 @@ export class Cinematic implements EnginePlugin {
     this.initialized = true; this.time += delta; this.remaining = Math.max(0, this.remaining - delta);
     const shake = this.amplitude * (this.remaining / this.shakeDuration) ** 2;
     for (let i = 0; i < 3; i++) {this.cameraPosition[i] = this.position[i] + Math.sin(this.time * this.frequency * (1 + i * 0.37) + i * 2) * shake; this.cameraTarget[i] = this.lookAt[i];}
-    if (this.engine) {this.engine.camera.position = this.cameraPosition; this.engine.camera.target = this.cameraTarget;}
+    if (this.engine) {this.engine.camera.position = this.cameraPosition as unknown as Vec3; this.engine.camera.target = this.cameraTarget as unknown as Vec3;}
   }
   setup(engine: Engine): void {
     if (this.engine) throw new Error('Camera rig already attached');

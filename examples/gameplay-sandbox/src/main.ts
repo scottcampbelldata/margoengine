@@ -1,0 +1,128 @@
+import {EngineKernel, type Vec3} from '@margoengine/core';
+import {engineRuntime} from '@margoengine/core/extension';
+import {Sky, sunDirection} from '@margoengine/sky';
+import {Shadows} from '@margoengine/shadows';
+import {Water} from '@margoengine/water';
+import {VFX} from '@margoengine/vfx';
+import {Input} from '@margoengine/input';
+import {Cinematic} from '@margoengine/cinematic';
+import {Bloom} from '@margoengine/post';
+import {Stats} from '@margoengine/stats';
+import {createCharacter, createLandscape, terrainHeight} from './scene.js';
+import {stepLocomotion} from './motion.js';
+import './style.css';
+
+const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+const canvas = element<HTMLCanvasElement>('scene'), status = element('status'), controls = element<HTMLFieldSetElement>('controls');
+const sunSlider = element<HTMLInputElement>('sun'), waveSlider = element<HTMLInputElement>('wave'), countSelect = element<HTMLSelectElement>('particles');
+const explore = element<HTMLButtonElement>('explore'), pause = element<HTMLButtonElement>('pause');
+
+async function boot(): Promise<void> {
+  if (!navigator.gpu) throw new Error('WebGPU is unavailable. Open this local demo in a WebGPU-enabled browser.');
+  const engine = await EngineKernel.create(canvas, {backend: 'webgpu', capacity: 256, camera: {position: [8, 7, 25], target: [0, 2, 0], near: 0.15, far: 300, fov: 58}});
+  const runtime = engineRuntime(engine), events = new AbortController(), signal = events.signal;
+  let input: Input | undefined, disposed = false, playing = !matchMedia('(prefers-reduced-motion: reduce)').matches, timer: ReturnType<typeof setInterval> | undefined;
+  const dispose = () => {if (disposed) return; disposed = true; events.abort(); clearInterval(timer); input?.dispose(); engine.dispose();};
+  window.addEventListener('pagehide', dispose, {signal});
+  if (import.meta.hot) import.meta.hot.dispose(dispose);
+  try {
+    engine.onError = error => {engine.stop(); fail(error);};
+    runtime.gpu!.addEventListener('uncapturederror', event => engine.onError((event as GPUUncapturedErrorEvent).error), {signal});
+    const post = Bloom.attach(engine, {strength: 0.75, threshold: 0.7, exposure: 0.65});
+    const sky = Sky.attach(engine, {model: 'bruneton', hours: 17, timeScale: 0, turbidity: 2.8, exposure: -0.6});
+    const shadows = Shadows.attach(engine, {resolution: 1024, distance: 115, lambda: 0.7, lightSize: 0.018, normalBias: 0.055, casterMargin: 65});
+    const landscape = createLandscape(engine, shadows), character = createCharacter(engine, shadows);
+    const state = new Float32Array([-12, terrainHeight(-12, 37), 37, Math.PI, 1.15, 0.32, 0, 0]);
+    const actions = new Float32Array(5), cameraDelta = new Float32Array(3), sunlight = new Float32Array(3);
+    const position = state.subarray(0, 3), emptyPads: readonly Gamepad[] = [];
+    const camera = Cinematic.attach(engine, {offset: [4, 3.5, 10], damping: 5, lookDamping: 7}); camera.follow(character.focus);
+    const water = Water.attach(engine, {size: [400, 400], segments: 256, height: 0, foamDistance: 1.8, color: [0.016, 0.13, 0.14], depth: () => post.depthTexture, sceneColor: () => post.sceneTexture, reflection: () => sky.reflectionTexture, spray: true, terrain: {heightmap: landscape.heightmap, origin: [-80,-80], size: [160,160]}, waves: [{direction: [1, 0.37], amplitude: 0.35, wavelength: 17.37, steepness: 0.3, phase: 0.43}, {direction: [0.87, 0.55], amplitude: 0.18, wavelength: 11.19, steepness: 0.3, phase: 2.17}, {direction: [1, 0.13], amplitude: 0.09, wavelength: 7.73, steepness: 0.25, phase: 4.91}]});
+    let particles: VFX;
+    const selectParticles = (capacity: number) => {
+      if (![100_000, 500_000, 1_000_000].includes(capacity)) throw new RangeError('Unknown particle tier');
+      particles?.dispose();
+      particles = VFX.attach(engine, {capacity, rate: capacity / 20, position: [0, 4, 0], emissionExtent: [80, 3, 80], velocity: [0, 0.03, 0], gravity: [0, 0, 0], spread: 0.08, lifetime: [25, 45], size: 0.01, ground: 0.35, turbulence: 0.035, frequency: 0.22, color: [1, 0.78, 0.24, 0.5], intensity: 4});
+      particles.burst(capacity);
+    };
+    selectParticles(1_000_000);
+    input = new Input({
+      strafe: [{type: 'key', code: 'KeyD'}, {type: 'key', code: 'ArrowRight'}, {type: 'key', code: 'KeyA', scale: -1}, {type: 'key', code: 'ArrowLeft', scale: -1}, {type: 'touch', id: 'move', axis: 'x'}],
+      forward: [{type: 'key', code: 'KeyW'}, {type: 'key', code: 'ArrowUp'}, {type: 'key', code: 'KeyS', scale: -1}, {type: 'key', code: 'ArrowDown', scale: -1}, {type: 'touch', id: 'move', axis: 'y', scale: -1}],
+      lookX: [{type: 'pointer', axis: 'x', scale: 0.004}], lookY: [{type: 'pointer', axis: 'y', scale: 0.004}],
+      touchX: [{type: 'touch', id: 'look', axis: 'x'}], touchY: [{type: 'touch', id: 'look', axis: 'y'}],
+      sprint: [{type: 'key', code: 'ShiftLeft'}, {type: 'key', code: 'ShiftRight'}],
+    }, {target: window, gamepads: () => emptyPads});
+    input.createStick(element('touch-controls'), 'move'); input.createStick(element('touch-controls'), 'look');
+    const strafe = input.state('strafe'), forward = input.state('forward'), lookX = input.state('lookX'), lookY = input.state('lookY'), sprint = input.state('sprint'), touchX = input.state('touchX'), touchY = input.state('touchY');
+    let dragging = false;
+    const timing = new Float32Array(2);
+    engine.onFrame((_engine, delta) => {
+      input!.update(); timing[0] = delta;
+      actions[0] = strafe.value; actions[1] = forward.value; actions[4] = sprint.value;
+      actions[2] = ((dragging || document.pointerLockElement === canvas) ? lookX.value : 0) + touchX.value * delta * 1.5;
+      actions[3] = ((dragging || document.pointerLockElement === canvas) ? lookY.value : 0) + touchY.value * delta;
+      stepLocomotion(state, actions, timing[0], terrainHeight);
+      character.root.position.set(position[0], position[1], position[2]); character.root.rotation.y = state[3];
+      for (let i = 0; i < 4; i++) {
+        const swing = Math.sin(state[6] + (i % 2 ? Math.PI : 0)) * Math.min(0.65, state[7] * 0.13);
+        character.joints[i].rotation.x = i < 2 ? swing : -swing;
+        character.knees[i].rotation.x = i < 2 ? Math.max(0, -swing) * 1.2 : -0.18;
+      }
+      character.root.position.y = position[1] + Math.sin(state[6]*2) * Math.min(0.035, state[7]*0.007);
+      cameraDelta[0] = Math.sin(state[4]) * Math.cos(state[5]) * 10;
+      cameraDelta[2] = Math.cos(state[4]) * Math.cos(state[5]) * 10;
+      cameraDelta[1] = Math.sin(state[5]) * 10 + 0.8;
+      // Keep the spring arm above the sampled terrain along its entire length.
+      for (let i = 1; i <= 6; i++) {
+        const t = i / 6, ground = terrainHeight(position[0]+cameraDelta[0]*t, position[2]+cameraDelta[2]*t);
+        cameraDelta[1] = Math.max(cameraDelta[1], (ground+0.65-position[1]-1.5)/t);
+      }
+      camera.offset.set(cameraDelta);
+      sky.options.hours = (sky.options.hours! + delta / 120) % 24;
+      sunDirection(sky.options.hours, sunlight); runtime.lighting.direction.set(sunlight);
+      runtime.lighting.direction[3] = Math.max(0.15, sunlight[1]*6);
+      runtime.lighting.radiance[0] = 1; runtime.lighting.radiance[1] = 0.8; runtime.lighting.radiance[2] = 0.54; runtime.lighting.radiance[3] = 0.18;
+      timing[1]++;
+    });
+    const stats = Stats.attach(engine, {parent: element('telemetry'), samples: 120});
+    engine.use({name: 'sandbox:restore-particles', setup() {}, onDeviceRestored() {particles.burst(particles.capacity);}});
+    const renderStill = () => {if (!playing) engine.render({delta: 0});};
+    sunSlider.addEventListener('input', () => {sky.options.hours = sunSlider.valueAsNumber; sunDirection(sky.options.hours, sunlight); runtime.lighting.direction.set(sunlight); renderStill();}, {signal});
+    waveSlider.addEventListener('input', () => {water.setWaveHeight(waveSlider.valueAsNumber); element<HTMLOutputElement>('wave-value').value = `${waveSlider.valueAsNumber.toFixed(2)} m`; renderStill();}, {signal});
+    countSelect.addEventListener('change', () => {selectParticles(Number(countSelect.value)); renderStill();}, {signal});
+    element<HTMLInputElement>('wireframe').addEventListener('change', event => {landscape.wireframe.visible = (event.target as HTMLInputElement).checked; renderStill();}, {signal});
+    canvas.addEventListener('pointerdown', event => {dragging = true; canvas.focus(); canvas.setPointerCapture(event.pointerId);}, {signal});
+    const release = () => {dragging = false;};
+    canvas.addEventListener('pointerup', release, {signal}); canvas.addEventListener('pointercancel', release, {signal}); canvas.addEventListener('lostpointercapture', release, {signal});
+    window.addEventListener('blur', () => {dragging = false; input!.reset();}, {signal});
+    canvas.addEventListener('dblclick', () => {void canvas.requestPointerLock()?.catch(error => {status.textContent = `Mouse capture unavailable: ${String(error)}. Drag to look.`;});}, {signal});
+    window.addEventListener('keydown', event => {
+      if (event.code === 'Escape') {document.exitPointerLock(); document.body.classList.remove('exploring');}
+      if (document.activeElement === canvas && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) event.preventDefault();
+    }, {signal});
+    const setPlaying = (value: boolean) => {playing = value; pause.textContent = playing ? 'Pause' : 'Resume'; pause.setAttribute('aria-pressed', String(!playing)); status.textContent = playing ? 'All systems online. No assets to download.' : 'World paused. Resume or explore when ready.'; if (playing && !document.hidden) engine.start(); else engine.stop();};
+    pause.addEventListener('click', () => setPlaying(!playing), {signal});
+    document.addEventListener('visibilitychange', () => {input!.reset(); if (document.hidden) engine.stop(); else if (playing) engine.start();}, {signal});
+    explore.addEventListener('click', () => {document.body.classList.add('exploring'); setPlaying(true); canvas.focus();}, {signal});
+    character.root.position.set(position[0],position[1],position[2]);
+    cameraDelta[0]=Math.sin(state[4])*10;cameraDelta[1]=3.5;cameraDelta[2]=Math.cos(state[4])*10;camera.offset.set(cameraDelta);
+    sunDirection(sky.options.hours!, sunlight); runtime.lighting.direction.set(sunlight);
+    // Warm pipelines and the one-time atmospheric LUT before measuring cadence.
+    engine.render({delta: 0}); await runtime.gpu!.queue.onSubmittedWorkDone();
+    controls.disabled = false; explore.disabled = false; explore.innerHTML = 'Explore the island <span aria-hidden="true">↗</span>';
+    setPlaying(playing);
+    timer = setInterval(() => {
+      const hours = sky.options.hours!, minutes = Math.floor((hours % 1) * 60);
+      element<HTMLOutputElement>('sun-value').value = `${String(Math.floor(hours)).padStart(2,'0')}:${String(minutes).padStart(2,'0')}`;
+      if (document.activeElement !== sunSlider) sunSlider.value = String(hours);
+    }, 500);
+    Object.assign(window, {sandbox: {engine, stats, state, actions, cameraDelta, timing, sky, water, shadows, get particles() {return particles;}, dispose}});
+  } catch (error) {dispose(); throw error;}
+}
+
+function fail(error: unknown): void {
+  document.body.classList.add('failed'); controls.disabled = true; explore.disabled = true;
+  const message = error && typeof error === 'object' && 'message' in error ? String(error.message) : String(error);
+  explore.textContent = 'World unavailable'; status.textContent = message; console.error(message);
+}
+void boot().catch(fail);

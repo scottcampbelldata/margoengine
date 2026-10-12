@@ -1,0 +1,8 @@
+{
+  "name": "@margoengine/ifc", "version": "0.1.0", "type": "module", "license": "MIT",
+  "description": "IFC geometry and BIM identifiers for Margo Engine, using an initialized web-ifc runtime.",
+  "publishConfig": {"access": "public"},
+  "scripts": {"build": "node scripts/build.js", "test": "npm run build && node --test tests/ifc.test.js", "prepack": "npm run build"},
+  "sideEffects": false, "exports": {".": {"types": "./dist/index.d.ts", "import": "./dist/index.js"}},
+  "files": ["dist"], "peerDependencies": {"@margoengine/loaders": "0.1.0", "web-ifc": "^0.0.78"}
+}

@@ -1,4 +1,4 @@
-import {PbrMaterial} from '@scottcampbelldata/vexel-core/extension';
+import {PbrMaterial} from '@margoengine/core/extension';
 export const industrialMaterials=Object.freeze({
   machinedSteel:Object.freeze({color:'#a9b0b6',roughness:0.25,metalness:1}),carbonSteel:Object.freeze({color:'#727b83',roughness:0.35,metalness:1}),
   galvanizedZinc:Object.freeze({color:'#b9c2c8',roughness:0.45,metalness:0.95}),anodizedAluminum:Object.freeze({color:'#c7ccd0',roughness:0.2,metalness:0.9}),coloredAnodizedAluminum:Object.freeze({color:'#46749a',roughness:0.2,metalness:0.9}),

@@ -2,6 +2,19 @@ import type {EngineKernel} from '@margoengine/core';
 import type {Engine, EnginePlugin, FrameGraph} from '@margoengine/core/extension';
 import {GPUProfiler} from './profiler.js';
 export {GPUProfiler};
+const owner = Symbol('stats owner'), rawDraw = Symbol('draw'), rawIndexed = Symbol('indexed'), rawIndirect = Symbol('indirect'), rawIndexedIndirect = Symbol('indexed indirect'), rawDispatch = Symbol('dispatch'), rawDispatchIndirect = Symbol('dispatch indirect');
+type Render = GPURenderPassEncoder & {[owner]: Stats; [rawDraw]: GPURenderPassEncoder['draw']; [rawIndexed]: GPURenderPassEncoder['drawIndexed']; [rawIndirect]: GPURenderPassEncoder['drawIndirect']; [rawIndexedIndirect]: GPURenderPassEncoder['drawIndexedIndirect']};
+type Compute = GPUComputePassEncoder & {[owner]: Stats; [rawDispatch]: GPUComputePassEncoder['dispatchWorkgroups']; [rawDispatchIndirect]: GPUComputePassEncoder['dispatchWorkgroupsIndirect']};
+// Shared wrappers preserve the native receiver without creating closures for every pass.
+function countDraw(this: Render, v: number, n = 1, first = 0, instance = 0): void {this[owner].drawCalls++; (this[rawDraw]??Object.getPrototypeOf(this).draw).call(this,v,n,first,instance);}
+function countIndexed(this: Render, v: number, n = 1, first = 0, base = 0, instance = 0): void {this[owner].drawCalls++; (this[rawIndexed]??Object.getPrototypeOf(this).drawIndexed).call(this,v,n,first,base,instance);}
+function countIndirect(this: Render, buffer: GPUBuffer, offset: number): void {this[owner].drawCalls++; (this[rawIndirect]??Object.getPrototypeOf(this).drawIndirect).call(this,buffer,offset);}
+function countIndexedIndirect(this: Render, buffer: GPUBuffer, offset: number): void {this[owner].drawCalls++; (this[rawIndexedIndirect]??Object.getPrototypeOf(this).drawIndexedIndirect).call(this,buffer,offset);}
+function countDispatch(this: Compute, x: number, y = 1, z = 1): void {this[owner].dispatches++; (this[rawDispatch]??Object.getPrototypeOf(this).dispatchWorkgroups).call(this,x,y,z);}
+function countDispatchIndirect(this: Compute, buffer: GPUBuffer, offset: number): void {this[owner].dispatches++; (this[rawDispatchIndirect]??Object.getPrototypeOf(this).dispatchWorkgroupsIndirect).call(this,buffer,offset);}
+const emptyCompute: GPUComputePassDescriptor = {};
+const rawRender = Symbol('render pass'), rawCompute = Symbol('compute pass'), rawFinish = Symbol('finish'), frameProfiler = Symbol('frame profiler');
+type Encoder = GPUCommandEncoder & {[owner]: Stats; [rawRender]: GPUCommandEncoder['beginRenderPass']; [rawCompute]: GPUCommandEncoder['beginComputePass']; [rawFinish]: GPUCommandEncoder['finish']; [frameProfiler]?: GPUProfiler};
 
 export interface StatsOptions {
   parent?: HTMLElement;
@@ -33,6 +46,7 @@ export class Stats implements EnginePlugin {
   private readonly tracked = new WeakSet<GPUCommandEncoder>();
   private disposed = false;
   private readonly profiling: boolean;
+  private profileFrame = 0;
 
   constructor({parent = document.body, samples = 120, profiling = false}: StatsOptions = {}) {
     if (!Number.isInteger(samples) || samples < 2 || samples > 4096) throw new RangeError('Sample count must be 2..4096');
@@ -47,7 +61,7 @@ export class Stats implements EnginePlugin {
     this.graph.setAttribute('role', 'img'); this.graph.setAttribute('aria-label', 'Rolling frame time in milliseconds');
     this.context = this.graph.getContext('2d');
     this.element.append(this.text, this.graph); parent.append(this.element);
-    this.refresh(); this.timer = setInterval(() => this.refresh(), 250);
+    this.refresh(); this.timer = setInterval(() => this.refresh(), 150);
   }
 
   static attach(engine: EngineKernel, options: StatsOptions = {}): Stats {
@@ -69,7 +83,7 @@ export class Stats implements EnginePlugin {
 
   enableGPUProfiling(device: GPUDevice): boolean {
     if (this.disposed) throw new Error('Stats is disposed');
-    this.profiler?.dispose(); this.profiler = new GPUProfiler(device); this.gpuTime = null;
+    this.profiler?.dispose(); this.profiler = new GPUProfiler(device); this.gpuTime = null; this.profileFrame = 0;
     return this.profiler.supported;
   }
 
@@ -78,34 +92,42 @@ export class Stats implements EnginePlugin {
     if (this.disposed) throw new Error('Stats is disposed');
     if (this.tracked.has(encoder)) return;
     this.tracked.add(encoder); this.drawCalls = this.dispatches = 0;
-    const stats = this, profiler = this.profiler;
+    this.profileFrame = (this.profileFrame + 1) % 15;
+    const profiler = this.profileFrame === 0 ? this.profiler : undefined, tracked = encoder as Encoder;
     profiler?.beginFrame();
-    const render = encoder.beginRenderPass, compute = encoder.beginComputePass, finish = encoder.finish;
-    encoder.beginRenderPass = function(descriptor) {
-      const writes = descriptor.timestampWrites ? undefined : profiler?.timestampWrites();
-      const pass = render.call(this, writes ? {...descriptor, timestampWrites: writes} : descriptor);
-      const draw = pass.draw, indexed = pass.drawIndexed, indirect = pass.drawIndirect, indexedIndirect = pass.drawIndexedIndirect;
-      pass.draw = function(v, n = 1, first = 0, instance = 0) {stats.drawCalls++; draw.call(this, v, n, first, instance);};
-      pass.drawIndexed = function(v, n = 1, first = 0, base = 0, instance = 0) {stats.drawCalls++; indexed.call(this, v, n, first, base, instance);};
-      pass.drawIndirect = function(buffer, offset) {stats.drawCalls++; indirect.call(this, buffer, offset);};
-      pass.drawIndexedIndirect = function(buffer, offset) {stats.drawCalls++; indexedIndirect.call(this, buffer, offset);};
+    tracked[owner]=this; tracked[frameProfiler]=profiler;
+    tracked[rawRender]=encoder.beginRenderPass; tracked[rawCompute]=encoder.beginComputePass; tracked[rawFinish]=encoder.finish;
+    encoder.beginRenderPass=Stats.beginRender; encoder.beginComputePass=Stats.beginCompute; encoder.finish=Stats.finish;
+  }
+
+  private static beginRender(this: Encoder, descriptor: GPURenderPassDescriptor): GPURenderPassEncoder {
+      const writes = descriptor.timestampWrites ? undefined : this[frameProfiler]?.timestampWrites();
+      const pass = this[rawRender].call(this, writes ? {...descriptor, timestampWrites: writes} : descriptor) as Render;
+      if (!pass[owner]) {
+        // Native methods already live on the prototype; retain only caller overrides.
+        const prototype=Object.getPrototypeOf(pass);
+        if(pass.draw!==prototype.draw)pass[rawDraw]=pass.draw;
+        if(pass.drawIndexed!==prototype.drawIndexed)pass[rawIndexed]=pass.drawIndexed;
+        if(pass.drawIndirect!==prototype.drawIndirect)pass[rawIndirect]=pass.drawIndirect;
+        if(pass.drawIndexedIndirect!==prototype.drawIndexedIndirect)pass[rawIndexedIndirect]=pass.drawIndexedIndirect;
+      }
+      pass[owner]=this[owner];
+      pass.draw=countDraw; pass.drawIndexed=countIndexed; pass.drawIndirect=countIndirect; pass.drawIndexedIndirect=countIndexedIndirect;
       return pass;
-    };
-    encoder.beginComputePass = function(descriptor = {}) {
-      const writes = descriptor.timestampWrites ? undefined : profiler?.timestampWrites();
-      const pass = compute.call(this, writes ? {...descriptor, timestampWrites: writes} : descriptor);
-      const dispatch = pass.dispatchWorkgroups, indirect = pass.dispatchWorkgroupsIndirect;
-      pass.dispatchWorkgroups = function(x, y = 1, z = 1) {stats.dispatches++; dispatch.call(this, x, y, z);};
-      pass.dispatchWorkgroupsIndirect = function(buffer, offset) {stats.dispatches++; indirect.call(this, buffer, offset);};
+  }
+  private static beginCompute(this: Encoder, descriptor: GPUComputePassDescriptor = emptyCompute): GPUComputePassEncoder {
+      const writes = descriptor.timestampWrites ? undefined : this[frameProfiler]?.timestampWrites();
+      const pass = this[rawCompute].call(this, writes ? {...descriptor, timestampWrites: writes} : descriptor) as Compute;
+      if (!pass[owner]) {const prototype=Object.getPrototypeOf(pass);if(pass.dispatchWorkgroups!==prototype.dispatchWorkgroups)pass[rawDispatch]=pass.dispatchWorkgroups;if(pass.dispatchWorkgroupsIndirect!==prototype.dispatchWorkgroupsIndirect)pass[rawDispatchIndirect]=pass.dispatchWorkgroupsIndirect;}
+      pass[owner]=this[owner]; pass.dispatchWorkgroups=countDispatch; pass.dispatchWorkgroupsIndirect=countDispatchIndirect;
       return pass;
-    };
-    encoder.finish = function(descriptor) {
-      const resolved = profiler?.resolve(this), result = finish.call(this, descriptor);
+  }
+  private static finish(this: Encoder, descriptor?: GPUCommandBufferDescriptor): GPUCommandBuffer {
+      const stats=this[owner], profiler=this[frameProfiler], resolved = profiler?.resolve(this), result = this[rawFinish].call(this, descriptor);
       if (resolved) queueMicrotask(() => {
         void profiler!.read().then(value => {if (!stats.disposed && stats.profiler === profiler && value !== null) stats.gpuTime = value;}, error => stats.engine?.onError(error));
       });
       return result;
-    };
   }
 
   setup(engine: Engine): void {
@@ -117,7 +139,7 @@ export class Stats implements EnginePlugin {
   registerPasses(graph: FrameGraph): void {
     graph.add({name: 'stats:begin', order: -Number.MAX_VALUE, execute: context => {if (context.backend === 'webgpu') this.track(context.encoder);}});
     graph.add({name: 'stats:sample', order: Number.MAX_VALUE, execute: context => {
-      const now = performance.now(), milliseconds = this.last ? now - this.last : context.delta * 1000;
+      const now = performance.now(), milliseconds = context.delta > 0 ? (this.last ? now - this.last : context.delta * 1000) : 0;
       this.last = now;
       if (milliseconds > 0) this.tick(milliseconds, context.backend === 'webgpu' ? this.drawCalls : this.engine!.stats.drawCalls, this.dispatches);
     }});
@@ -125,7 +147,7 @@ export class Stats implements EnginePlugin {
 
   refresh(): void {
     if (this.disposed) return;
-    this.text.textContent = `${this.fps.toFixed(0)} FPS  ${this.frameTime.toFixed(2)} ms\n${this.drawCalls} draws  ${this.dispatches} dispatches\nGPU ${this.gpuTime === null ? 'unavailable' : this.gpuTime.toFixed(2) + ' ms'}`;
+    this.text.textContent = `${this.fps.toFixed(0)} FPS  ${this.frameTime.toFixed(2)} ms\n${this.drawCalls} draws  ${this.dispatches} dispatches\nGPU timing ${this.gpuTime === null ? 'unavailable' : this.gpuTime.toFixed(2) + ' ms'}`;
     const c = this.context;
     if (!c) return;
     const width = this.graph.width, height = this.graph.height;

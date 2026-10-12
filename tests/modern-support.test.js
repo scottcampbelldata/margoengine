@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, access } from 'node:fs/promises';
+import { readFile, access, glob } from 'node:fs/promises';
+import { basename, dirname } from 'node:path';
 import { readBytes, readResponse } from '../packages/shared/loading.js';
 import { invert, finiteVector } from '../packages/shared/math.js';
 import { triangulatePolygon } from '../packages/shared/polygon.js';
@@ -26,6 +27,20 @@ test('shared inversion retains affine precision, alias safety and unchanged outp
   assert.throws(() => finiteVector([0, Infinity], 2, 'CAD vertex'), /finite/);
 });
 
+test('finite vector bounds agree with Float32 rounding at overflow and subnormal boundaries', () => {
+  const overflow = (2 - 2 ** -24) * 2 ** 127;
+  for (const value of [
+    0, -0, 1e-50, -1e-50, 2 ** -149, 1e38, -1e38,
+    overflow - 2 ** 75, overflow, overflow + 2 ** 75,
+    -overflow + 2 ** 75, -overflow, -overflow - 2 ** 75,
+    NaN, Infinity, -Infinity, '1', null, undefined,
+  ]) {
+    const valid = typeof value === 'number' && Number.isFinite(Math.fround(value));
+    if (valid) assert.doesNotThrow(() => finiteVector([value], 1, 'Boundary'));
+    else assert.throws(() => finiteVector([value], 1, 'Boundary'), /finite/);
+  }
+});
+
 test('shared CAD triangulation retains holes, invalid-contour rejection and output budgets', () => {
   const contour = [[0, 0], [4, 0], [4, 4], [0, 4]], hole = [[1, 1], [1, 2], [2, 2], [2, 1]];
   const result = triangulatePolygon(contour, [hole]); assert.equal(result.area, 15); assert(result.indices.length > 0);
@@ -33,19 +48,27 @@ test('shared CAD triangulation retains holes, invalid-contour rejection and outp
   assert.throws(() => triangulatePolygon([[0, 0], [2, 2], [0, 2], [2, 0]]), /zero area|cross/);
 });
 
-test('workspace exposes scoped modern packages and retains no legacy root or competitor dependencies', async () => {
+test('workspace exposes scoped packages and keeps benchmark dependencies out of runtime packages', async () => {
   const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-  assert.equal(manifest.name, 'vexel');
+  assert.equal(manifest.name, 'margoengine');
   const lock = JSON.parse(await readFile(new URL('../package-lock.json', import.meta.url), 'utf8'));
+  assert.equal(lock.name, manifest.name);
+  for await (const path of glob('packages/*/package.json')) {
+    const pkg = JSON.parse(await readFile(path, 'utf8')), name = basename(dirname(path));
+    assert.equal(pkg.name, name === 'margoengine' ? 'margoengine' : `@margoengine/${name}`);
+  }
+  assert.equal((await import('margoengine')).Engine, (await import('@margoengine/core')).Engine);
   for (const workspace of manifest.workspaces) {
     const pkg = JSON.parse(await readFile(new URL(`../${workspace}/package.json`, import.meta.url), 'utf8'));
-    if (workspace.startsWith('packages/')) assert.equal(pkg.name, `@scottcampbelldata/vexel-${workspace.split('/')[1]}`);
+    if (workspace.startsWith('packages/')) assert.equal(pkg.name, workspace === 'packages/margoengine' ? 'margoengine' : `@margoengine/${workspace.split('/')[1]}`);
     else assert.equal(pkg.private, true);
-    assert.equal(lock.packages[workspace].name, pkg.name);
+    assert.equal(lock.packages[workspace].name ?? basename(workspace), pkg.name);
+    assert.equal(lock.packages[`node_modules/${pkg.name}`].resolved, workspace);
     for (const name of Object.keys(pkg.dependencies ?? {})) assert(!name.startsWith('@strata/'));
   }
   assert.equal(manifest.exports, undefined); assert.equal(manifest.types, undefined);
-  assert.equal(manifest.devDependencies.three, undefined); assert.equal(manifest.devDependencies['@babylonjs/core'], undefined);
+  assert.equal(manifest.devDependencies.three, '0.186.1'); assert.equal(manifest.devDependencies['@babylonjs/core'], undefined);
+  for(const workspace of manifest.workspaces.filter(name=>name.startsWith('packages/'))){const pkg=JSON.parse(await readFile(new URL(`../${workspace}/package.json`,import.meta.url),'utf8'));assert.equal(pkg.dependencies?.three,workspace==='packages/fbx'?'^0.186.1':undefined);}
   assert(!Object.keys(manifest.scripts).some(name => name.startsWith('legacy:')));
   for (const path of ['src', 'lab', 'reviews', 'LEGACY-README.md', 'group2.html']) await assert.rejects(access(new URL(`../${path}`, import.meta.url)), { code: 'ENOENT' });
 });

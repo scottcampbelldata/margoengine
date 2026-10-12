@@ -4,9 +4,11 @@ packages/*/LICENSE
 test-results/
 *.log
 packages/*/target/
+packages/machinery/kernel/target/
 examples/next/.next/
 examples/next/next-env.d.ts
 *.tsbuildinfo
+__pycache__/
 
 # Local hardware captures and recovery evidence; portable summaries are versioned.
 benchmarks/validation-*/

@@ -1,0 +1,14 @@
+{
+  "name": "@margoengine/splats",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Optional Gaussian splats with GPU covariance projection and stable compute radix sorting.",
+  "repository": {"type":"git","url":"git+https://github.com/scottcampbelldata/vexel.git","directory":"packages/splats"},
+  "publishConfig": {"access":"public"},
+  "scripts": {"prepack":"npm --prefix ../.. run build:packages"},
+  "sideEffects": false,
+  "exports": {".":{"types":"./dist/index.d.ts","import":"./dist/index.js"}},
+  "files": ["dist"],
+  "peerDependencies": {"@margoengine/core":"0.1.0"}
+}

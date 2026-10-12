@@ -1,0 +1,27 @@
+{
+  "name": "@margoengine/gameplay-sandbox",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "test": "node --test test/*.test.js",
+    "verify": "node verify.mjs"
+  },
+  "dependencies": {
+    "@margoengine/core": "0.1.0",
+    "@margoengine/sky": "0.1.0",
+    "@margoengine/shadows": "0.1.0",
+    "@margoengine/geometry": "0.1.0",
+    "@margoengine/procedural": "0.1.0",
+    "@margoengine/scatter": "0.1.0",
+    "@margoengine/water": "0.1.0",
+    "@margoengine/vfx": "0.1.0",
+    "@margoengine/input": "0.1.0",
+    "@margoengine/cinematic": "0.1.0",
+    "@margoengine/post": "0.1.0",
+    "@margoengine/stats": "0.1.0",
+    "@margoengine/lines": "0.1.0"
+  }
+}

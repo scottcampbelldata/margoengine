@@ -1,0 +1,10 @@
+import {execFileSync} from 'node:child_process';
+import {copyFile,readFile,writeFile} from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
+import {resolve} from 'node:path';
+import {build} from 'vite';
+const root=fileURLToPath(new URL('..',import.meta.url)),repository=resolve(root,'../..');
+await copyFile(resolve(repository,'LICENSE'),resolve(root,'LICENSE'));
+await writeFile(resolve(root,'THIRD-PARTY-NOTICES.txt'),'Includes standalone USDA/USDC parsers from Three.js 0.186.1; no Three.js renderer.\n\n'+await readFile(resolve(repository,'node_modules/three/LICENSE'),'utf8'));
+await build({root,configFile:false,publicDir:false,logLevel:'warn',build:{outDir:resolve(root,'dist'),emptyOutDir:true,target:'es2022',lib:{entry:resolve(root,'src/index.ts'),formats:['es'],fileName:'index'},rollupOptions:{external:['@margoengine/core','@margoengine/gltf-pro','@margoengine/loaders']}}});
+execFileSync(process.execPath,[resolve(repository,'node_modules/typescript/bin/tsc'),'-p',resolve(root,'tsconfig.json')],{stdio:'inherit'});

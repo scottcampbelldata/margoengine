@@ -1,5 +1,5 @@
 {
-  "name": "@scottcampbelldata/vexel-core",
+  "name": "@margoengine/core",
   "version": "0.1.0",
   "description": "Lean WebGPU/WebGL2 rendering with a deterministic Rust/Wasm transform kernel.",
   "type": "module",

@@ -1,6 +1,6 @@
-import {meshRuntime} from '@scottcampbelldata/vexel-core/extension';
-import type {Mesh as MeshHandle} from '@scottcampbelldata/vexel-core';
-import type {Engine,EnginePlugin,Mesh,Vec3} from '@scottcampbelldata/vexel-core/extension';
+import {meshRuntime} from '@margoengine/core/extension';
+import type {Mesh as MeshHandle} from '@margoengine/core';
+import type {Engine,EnginePlugin,Mesh,Vec3} from '@margoengine/core/extension';
 export interface Joint {node:MeshHandle;axis:'x'|'y'|'z';kind?:'revolute'|'prismatic';min:number;max:number;velocity?:number}
 export interface GearCoupling {source:number;target:number;ratio:number;offset?:number}
 export interface PistonCoupling {source:number;target:number;radius:number;rodLength:number;phase?:number;offset?:number}
@@ -14,7 +14,7 @@ function point(node:MeshHandle,p:Vec3):number[]{node.check();vector(p);const m=m
 
 export class Kinematics implements EnginePlugin {
   readonly name='kinematics';readonly result={converged:true,error:0,iterations:0};
-  private engine?:Engine;private origins:number[]=[];private driven=new Set<number>();private order:Array<GearCoupling|PistonCoupling>=[];
+  private engine?:Engine;private external=false;private origins:number[]=[];private driven=new Set<number>();private order:Array<GearCoupling|PistonCoupling>=[];
   private readonly iterations:number;private readonly tolerance:number;private readonly damping:number;
   private readonly joints:readonly (Omit<Joint,'node'>&{node:Mesh})[];
   private readonly previous:Float64Array;
@@ -41,11 +41,18 @@ export class Kinematics implements EnginePlugin {
     this.joints.forEach((joint,i)=>{const axis='xyz'.indexOf(joint.axis)+(joint.kind==='prismatic'?0:3),id=joint.node.id,offset=joint.kind==='prismatic'?this.origins[i]:0;engine.store.limits.set([joint.min+offset,joint.max+offset],id*12+axis*2);engine.store.constrained[id]|=1<<axis;});
   }
   value(index:number):number {const joint=this.joints[index];if(!joint||!this.engine)throw new Error('Joint is not attached');joint.node.check();return this.values[index][this.offsets[index]]-(joint.kind==='prismatic'?this.origins[index]:0);}
+  get jointCount():number {return this.joints.length;}
+  attachedTo(engine:Engine):boolean {return this.engine===engine;}
+  setExternalControl(engine:Engine|null):void {if(engine&&this.engine!==engine)throw new Error('Kinematics belongs to another engine');this.external=engine!==null;}
+  isDriven(index:number):boolean {return this.driven.has(index);}
+  checkValue(index:number,value:number):void {const joint=this.joints[index];if(!Number.isSafeInteger(index)||!joint||!this.engine||!finite(value)||value<joint.min||value>joint.max||this.driven.has(index))throw new RangeError('Joint value exceeds limits or is coupled');joint.node.check();}
+  setValues(values:ArrayLike<number>):void {if(values.length!==this.joints.length)throw new RangeError('Joint count mismatch');for(let i=0;i<values.length;i++)if(!this.driven.has(i))this.checkValue(i,values[i]);this.snapshot();try{for(let i=0;i<values.length;i++)if(!this.driven.has(i))this.write(i,values[i]);this.couple();}catch(error){this.restore();throw error;}}
+  validateValues(values:ArrayLike<number>):void {this.setValues(values);this.restore();}
   private assign(index:number,value:number):void {const joint=this.joints[index];joint.node.check();const stored=value+(joint.kind==='prismatic'?this.origins[index]:0);if(!finite(stored))throw new RangeError('Invalid joint value');this.values[index][this.offsets[index]]=stored;}
   private write(index:number,value:number):void {const joint=this.joints[index];this.assign(index,Math.max(joint.min,Math.min(joint.max,value)));}
   private snapshot():void {for(let i=0;i<this.joints.length;i++){const joint=this.joints[i];joint.node.check();this.previous[i]=this.values[i][this.offsets[i]]-(joint.kind==='prismatic'?this.origins[i]:0);}}
   private restore():void {for(let i=0;i<this.joints.length;i++)this.assign(i,this.previous[i]);}
-  setValue(index:number,value:number):void {const joint=this.joints[index];if(!joint||!this.engine||!finite(value)||value<joint.min||value>joint.max||this.driven.has(index))throw new RangeError('Joint value exceeds limits or is coupled');this.snapshot();try{this.write(index,value);this.couple();}catch(error){this.restore();throw error;}}
+  setValue(index:number,value:number):void {this.checkValue(index,value);this.snapshot();try{this.write(index,value);this.couple();}catch(error){this.restore();throw error;}}
   setAngle(index:number,angle:number):void {if(this.joints[index]?.kind==='prismatic')throw new TypeError('Prismatic joints use setValue');this.setValue(index,angle);}
   private couple():void {for(let i=0;i<this.order.length;i++){const c=this.order[i],source=this.values[c.source][this.offsets[c.source]]-(this.joints[c.source].kind==='prismatic'?this.origins[c.source]:0),value='ratio'in c?source*c.ratio+(c.offset??0):c.radius*Math.cos(source+(c.phase??0))+Math.sqrt(c.rodLength**2-c.radius**2*Math.sin(source+(c.phase??0))**2)+(c.offset??0);
     if(value<this.joints[c.target].min-1e-6||value>this.joints[c.target].max+1e-6)throw new RangeError('Coupling exceeds target joint limits');this.write(c.target,value);}}
@@ -69,6 +76,6 @@ export class Kinematics implements EnginePlugin {
     }
     Object.assign(this.result,{converged:error<=this.tolerance,error,iterations:iteration});return this.result;
   }
-  onPreUpdate(delta:number):void {if(!Number.isFinite(delta)||delta<0||delta>1)throw new RangeError('Frame delta must be 0..1 seconds');this.snapshot();try{for(let i=0;i<this.joints.length;i++)if(!this.driven.has(i))this.write(i,this.previous[i]+(this.joints[i].velocity??0)*delta);this.couple();}catch(error){this.restore();throw error;}if(this.options.targets?.length||this.options.distances?.length)this.solve();}
-  dispose():void {if(this.engine&&!this.engine.disposed)for(const joint of this.joints)if(this.engine.meshes.get(joint.node.id)===joint.node)this.engine.store.constrained[joint.node.id]&=~(1<<('xyz'.indexOf(joint.axis)+(joint.kind==='prismatic'?0:3)));this.engine=undefined;this.origins=[];this.values=[];this.order=[];this.driven.clear();}
+  onPreUpdate(delta:number):void {if(!Number.isFinite(delta)||delta<0||delta>1)throw new RangeError('Frame delta must be 0..1 seconds');if(this.external)return;this.snapshot();try{for(let i=0;i<this.joints.length;i++)if(!this.driven.has(i))this.write(i,this.previous[i]+(this.joints[i].velocity??0)*delta);this.couple();}catch(error){this.restore();throw error;}if(this.options.targets?.length||this.options.distances?.length)this.solve();}
+  dispose():void {if(this.engine&&!this.engine.disposed)for(const joint of this.joints)if(this.engine.meshes.get(joint.node.id)===joint.node)this.engine.store.constrained[joint.node.id]&=~(1<<('xyz'.indexOf(joint.axis)+(joint.kind==='prismatic'?0:3)));this.engine=undefined;this.external=false;this.origins=[];this.values=[];this.order=[];this.driven.clear();}
 }

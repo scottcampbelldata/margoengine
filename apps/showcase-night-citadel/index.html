@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#020512" />
+    <meta
+      name="description"
+      content="A procedural moonlit fortress. An interactive Margo Engine WebGPU scenery study."
+    />
+    <link rel="icon" href="data:," />
+    <title>Night Citadel — Margo Engine scenery study</title>
+  </head>
+  <body>
+    <canvas
+      id="scene"
+      aria-label="Procedural gothic citadel under a moving moon. Drag to orbit; scroll or pinch to zoom."
+      tabindex="0"
+    ></canvas>
+    <header class="masthead">
+      <a href="#controls">MARGOENGINE <span>/ SCENERY STUDY 01</span></a
+      ><span class="engine-label">PROCEDURAL · WEBGPU</span>
+    </header>
+    <div class="title">
+      <p class="eyebrow">AFTER THE LAST LIGHT</p>
+      <h1>Night<br /><em>Citadel</em></h1>
+      <p class="description">
+        Stone, starlight, and a wandering moon.<br />Every silhouette built from
+        geometry.
+      </p>
+    </div>
+    <main class="panel" id="controls" aria-label="Scene controls">
+      <details open>
+        <summary>
+          <span>Direct the night</span
+          ><span class="panel-mark" aria-hidden="true">✦</span>
+        </summary>
+        <div class="controls">
+          <fieldset>
+            <legend>01 <span>Moon & light</span></legend>
+            <label for="azimuth"
+              >Azimuth
+              <output id="azimuth-value" for="azimuth">215°</output></label
+            ><input
+              id="azimuth"
+              type="range"
+              min="0"
+              max="360"
+              step="1"
+              value="215"
+            />
+            <label for="elevation"
+              >Elevation
+              <output id="elevation-value" for="elevation">24°</output></label
+            ><input
+              id="elevation"
+              type="range"
+              min="5"
+              max="85"
+              step="1"
+              value="24"
+            />
+            <label for="phase"
+              >Lunar phase
+              <output id="phase-value" for="phase">0.85</output></label
+            ><input
+              id="phase"
+              type="range"
+              min="-1"
+              max="1"
+              step="0.01"
+              value="0.85"
+            />
+            <div class="range-notes">
+              <span>NEW</span><span>HALF</span><span>FULL</span>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>02 <span>Atmosphere</span></legend>
+            <label for="haze"
+              >Horizon haze
+              <output id="haze-value" for="haze">0.35</output></label
+            ><input
+              id="haze"
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value="0.35"
+            />
+            <label for="stars"
+              >Star twinkle
+              <output id="stars-value" for="stars">0.80</output></label
+            ><input
+              id="stars"
+              type="range"
+              min="0"
+              max="2"
+              step="0.01"
+              value="0.8"
+            />
+            <label for="glow"
+              >Moon glow <output id="glow-value" for="glow">0.65</output></label
+            ><input
+              id="glow"
+              type="range"
+              min="0"
+              max="3"
+              step="0.01"
+              value="0.65"
+            />
+          </fieldset>
+          <div class="orbit-control">
+            <label for="orbit">Auto-cinematic orbit</label
+            ><input id="orbit" type="checkbox" role="switch" checked />
+          </div>
+          <div class="cadence">
+            <label for="cadence">Frame target</label
+            ><select id="cadence">
+              <option value="60">60 FPS</option>
+              <option value="120">120 FPS</option>
+            </select>
+          </div>
+          <p class="refresh-note">Paced to your display’s refresh rate.</p>
+          <button id="reset" type="button">
+            Reset the view <span aria-hidden="true">↺</span>
+          </button>
+        </div>
+      </details>
+    </main>
+    <footer>
+      <p class="gesture-hint">
+        DRAG TO ORBIT <span>·</span> SCROLL / PINCH TO ZOOM <span>·</span> ARROW
+        KEYS TO ROTATE
+      </p>
+      <div class="telemetry" aria-label="Live rendering telemetry">
+        <div><output id="fps">—</output><span>FPS</span></div>
+        <div><output id="delta">—</output><span>MS / FRAME</span></div>
+        <div><output id="draws">—</output><span>DRAW CALLS</span></div>
+      </div>
+    </footer>
+    <p id="status" class="status" role="status">Preparing the citadel…</p>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

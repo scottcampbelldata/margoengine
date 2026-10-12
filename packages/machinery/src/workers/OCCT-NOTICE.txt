@@ -1,0 +1,11 @@
+The separately loaded occt-import-js.js and occt-import-js.wasm assets are
+unmodified files from occt-import-js 0.0.23, distributed under LGPL-2.1.
+See OCCT-LICENSE.txt. Margo Engine's own source remains MIT licensed.
+
+Importer source, OpenCascade submodule revision, build scripts and notices:
+https://github.com/kovacsv/occt-import-js
+https://www.npmjs.com/package/occt-import-js/v/0.0.23
+
+The loader resolves these as separate worker assets so applications can
+replace them with a compatible build. OpenCascade is used only to tessellate
+STEP/IGES input; no original B-Rep is retained in the returned Margo Engine model.

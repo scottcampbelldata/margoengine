@@ -1,4 +1,4 @@
-import type {Engine,EnginePlugin,FrameGraph} from '@scottcampbelldata/vexel-core/extension';
+import type {Engine,EnginePlugin,FrameGraph} from '@margoengine/core/extension';
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
 export interface ToonOptions {bands?:number;rim?:number}
 export class ToonShading implements EnginePlugin {

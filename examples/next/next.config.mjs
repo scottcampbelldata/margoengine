@@ -1,1 +1,1 @@
-export default {transpilePackages:['@scottcampbelldata/vexel-core','@scottcampbelldata/vexel-react']};
+export default {transpilePackages:['@margoengine/core','@margoengine/react']};

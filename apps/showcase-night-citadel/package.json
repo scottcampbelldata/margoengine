@@ -1,0 +1,15 @@
+{
+  "name": "@margoengine/showcase-night-citadel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -p tsconfig.json && vite build"
+  },
+  "dependencies": {
+    "@margoengine/core": "0.1.0",
+    "@margoengine/creative": "0.1.0",
+    "@margoengine/scenery": "0.1.0"
+  }
+}

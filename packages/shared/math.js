@@ -21,7 +21,13 @@ export function invert(out, m, offset = 0, workspace) {
   return true;
 }
 
+// Halfway from the largest Float32 to infinity; rounding at this boundary overflows.
+const float32Overflow = (2 - 2 ** -24) * 2 ** 127;
+
 export function finiteVector(v, size, name) {
   if (!v || v.length !== size) throw new TypeError(`${name} must contain ${size} finite numbers`);
-  for (let i = 0; i < size; i++) if (!Number.isFinite(v[i]) || !Number.isFinite(Math.fround(v[i]))) throw new TypeError(`${name} must contain ${size} finite Float32 numbers`);
+  for (let i = 0; i < size; i++) {
+    const value = v[i];
+    if (typeof value !== 'number' || !(value > -float32Overflow && value < float32Overflow)) throw new TypeError(`${name} must contain ${size} finite Float32 numbers`);
+  }
 }

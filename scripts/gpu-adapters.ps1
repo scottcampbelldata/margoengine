@@ -1,7 +1,7 @@
 Add-Type @'
 using System;
 using System.Runtime.InteropServices;
-public static class VexelAdapters {
+public static class MargoEngineAdapters {
   [DllImport("dxgi.dll")] static extern int CreateDXGIFactory1(ref Guid id, out IntPtr factory);
   [UnmanagedFunctionPointer(CallingConvention.StdCall)] delegate int EnumAdapter(IntPtr self, uint index, out IntPtr adapter);
   [UnmanagedFunctionPointer(CallingConvention.StdCall)] delegate int GetDescription(IntPtr self, out Description description);
@@ -23,4 +23,4 @@ public static class VexelAdapters {
   }
 }
 '@
-[VexelAdapters]::Print()
+[MargoEngineAdapters]::Print()

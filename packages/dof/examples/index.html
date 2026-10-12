@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Margo · Depth of field</title>
+<style>
+  :root{color-scheme:dark;font:16px system-ui;background:#10141c;color:#edf2fa}body{margin:0;padding:24px;max-width:1100px;margin-inline:auto}h1{font-size:28px;margin:0 0 8px}p{color:#b4c2d6}canvas{display:block;width:100%;height:60vh;min-height:300px;border-radius:12px;background:#080c12}fieldset{display:flex;flex-wrap:wrap;gap:24px;border:1px solid #394963;border-radius:12px;margin-top:20px;padding:18px}label{display:grid;gap:8px}input{accent-color:#75c5ff}input[type=range]{width:220px}:focus-visible{outline:3px solid #ffd885;outline-offset:4px}output{font-variant-numeric:tabular-nums}#status{min-height:24px}
+</style></head>
+<body>
+<h1>Circular bokeh</h1><p>Move the focus plane through three rows. Wide apertures soften the near and far objects independently.</p>
+<canvas id="viewport" aria-label="Three rows of colored spheres demonstrating depth of field"></canvas>
+<fieldset><legend>Lens</legend>
+<label for="focus">Focus distance <output id="focus-value">8.1 m</output><input id="focus" type="range" min="3" max="16" step="0.1" value="8.1"></label>
+<label for="length">Focal length <output id="length-value">160 mm</output><input id="length" type="range" min="20" max="200" step="1" value="160"></label>
+<label for="aperture">Aperture <output id="aperture-value">f/0.7</output><input id="aperture" type="range" min="0.5" max="16" step="0.1" value="0.7"></label>
+<label for="enabled">Depth of field<input id="enabled" type="checkbox" checked></label>
+</fieldset><p id="status" role="status">Starting WebGPU…</p>
+<script type="module" src="./main.ts"></script>
+</body></html>

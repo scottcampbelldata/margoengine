@@ -23,16 +23,17 @@ export function acquireDepth(engine){
  if(engine.hasPlugin('ssao')||engine.hasPlugin('dof'))throw new Error('Supply the depth texture of the effect that owns scene capture');
  let value=engine[key];
  if(!value){
-  value={name:'optional:scene-depth',references:0,texture:undefined,original:undefined,
+  value={name:'optional:scene-depth',references:0,texture:undefined,view:undefined,original:undefined,
    setup(){},registerPasses(graph){graph.add({name:this.name+':capture',order:-15,execute:c=>{
     if(c.backend!=='webgpu')return;
     if(engine.hasPlugin('ssao')||engine.hasPlugin('dof'))throw new Error('Supply the depth texture of the effect that owns scene capture');
     if(this.texture?.width!==c.width||this.texture?.height!==c.height||this.texture?.format!==c.descriptor.depthStencil.format){
      this.texture?.destroy();this.texture=c.device.createTexture({size:[c.width,c.height],format:c.descriptor.depthStencil.format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});
-    }this.original=c.depth;c.depth=this.texture.createView();
+     this.view=this.texture.createView();
+    }this.original=c.depth;c.depth=this.view;
    }});graph.add({name:this.name+':restore',order:10000,execute:c=>{if(c.backend==='webgpu')c.depth=this.original;}});},
-   onDeviceRestored(){this.texture?.destroy();this.texture=undefined;},
-   dispose(){this.texture?.destroy();this.texture=undefined;delete engine[key];}
+   onDeviceRestored(){this.texture?.destroy();this.texture=undefined;this.view=undefined;},
+   dispose(){this.texture?.destroy();this.texture=undefined;this.view=undefined;delete engine[key];}
   };engine.use(value);engine[key]=value;
  }
  value.references++;let released=false;

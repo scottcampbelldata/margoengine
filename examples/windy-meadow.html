@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#15231c">
+  <title>Windy meadow · Margo Engine</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#15231c;color:#edf2e7;font:16px/1.5 system-ui,sans-serif}
+    #viewport{height:100svh;min-height:440px}canvas{outline-offset:-4px}
+    aside{position:absolute;top:24px;left:24px;width:min(320px,calc(100% - 48px));padding:24px;background:#14221eea;border:1px solid #718373;border-radius:12px}
+    h1{font-size:28px;line-height:1.1;margin:0 0 12px}p{color:#c1cdbd;margin:0 0 20px}
+    label{display:block;margin-top:16px}input[type=range]{display:block;width:100%;margin:10px 0;accent-color:#b7d878}
+    output{float:right;font-variant-numeric:tabular-nums}button{margin-top:20px;padding:9px 18px;border:1px solid #b7d878;border-radius:6px;background:#b7d878;color:#14221e;font:inherit;cursor:pointer}
+    :focus-visible{outline:3px solid #eafaba;outline-offset:4px}#error{color:#ffd9b5}small{display:block;margin-top:16px;color:#c1cdbd}
+    @media(max-width:600px){aside{top:16px;left:16px;padding:16px;width:calc(100% - 32px)}h1{font-size:24px}#viewport{height:100svh;min-height:650px}}
+  </style>
+</head>
+<body>
+  <main id="viewport" aria-label="Interactive wind-blown meadow"></main>
+  <aside aria-label="Meadow controls">
+    <h1>Windy meadow</h1>
+    <p>100,000 blades. A passing breeze.<br>Drag to orbit; scroll to explore.</p>
+    <label for="speed">Wind speed <output id="speed-value" for="speed">1.2</output></label>
+    <input id="speed" type="range" min="0" max="3" step="0.1" value="1.2">
+    <label for="strength">Wind strength <output id="strength-value" for="strength">0.45</output></label>
+    <input id="strength" type="range" min="0" max="1" step="0.05" value="0.45">
+    <button id="pause" type="button" aria-pressed="false">Pause motion</button>
+    <small id="navigation-help">Focus the scene: arrow keys orbit, + / − zoom.</small>
+    <small id="status" role="status">Starting WebGPU…</small>
+    <p id="error" role="alert"></p>
+  </aside>
+  <script type="module" src="./windy-meadow.ts"></script>
+</body>
+</html>

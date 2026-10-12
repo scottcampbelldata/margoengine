@@ -1,1 +1,1 @@
-export * from '@scottcampbelldata/vexel-machinery';
+export * from '@margoengine/machinery';
