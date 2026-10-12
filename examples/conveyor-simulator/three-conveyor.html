@@ -40,7 +40,7 @@ const canvas=document.querySelector('#canvas'),slider=document.querySelector('#e
 const hud=Object.fromEntries(['fps','ms','draws','parts','percent','result','loading'].map(id=>[id,document.getElementById(id)]));
 const parts=[],bounds=new Float64Array([Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity]),center=new Float64Array(3),home=new Float64Array(3);
 const intervals=new Float64Array(600),savedPosition=new Float64Array(3),savedTarget=new Float64Array(3);
-let renderer,scene,camera,controls,raf=0,explode=0,step=-60,running=false,previous=0,hudTime=0,hudFrames=0,savedExplode=0,last=0;
+let renderer,composer,scene,camera,controls,raf=0,explode=0,step=-60,running=false,previous=0,hudTime=0,hudFrames=0,savedExplode=0,last=0;
 const batches=[];
 const api=window.conveyorBenchmark={ready:false,error:null,parts,renderer:null,lastResult:null,setExplode,startBenchmark};
 
@@ -90,7 +90,7 @@ function frame(time){
       setExplode(0.5-0.5*Math.cos(angle));
       if(step>=0)intervals[step]=time-previous;previous=time;
     }else controls.update();
-    renderer.render(scene,camera);
+    renderer.info.reset();composer.render();
     if(hudTime===0)hudTime=time;hudFrames++;
     if(time-hudTime>=250){const ms=(time-hudTime)/hudFrames;hud.fps.textContent=(1000/ms).toFixed(1);hud.ms.textContent=ms.toFixed(2);hud.draws.textContent=renderer.info.render.calls;hudFrames=0;hudTime=time;}
     if(running&&++step===600){
@@ -105,18 +105,22 @@ function fail(error){api.ready=false;api.error=String(error.message??error);cons
 slider.addEventListener('input',()=>{setExplode(slider.valueAsNumber/100);hud.percent.textContent=slider.value+'%';});
 button.addEventListener('click',startBenchmark);
 document.addEventListener('visibilitychange',()=>{last=hudTime=hudFrames=0;if(document.hidden&&running)finishBenchmark(null,'Benchmark cancelled: tab lost visibility.');});
-addEventListener('pagehide',event=>{if(!event.persisted){cancelAnimationFrame(raf);controls?.dispose();for(const batch of batches)batch.dispose();renderer?.dispose();}},{once:true});
+addEventListener('pagehide',event=>{if(!event.persisted){cancelAnimationFrame(raf);controls?.dispose();for(const batch of batches)batch.dispose();for(const pass of composer?.passes??[])pass.dispose();composer?.dispose();renderer?.dispose();}},{once:true});
 
 try{
-  const [THREE,{OrbitControls},{GLTFLoader}]=await Promise.all([import('three'),import('three/addons/controls/OrbitControls.js'),import('three/addons/loaders/GLTFLoader.js')]);
-  const gl=canvas.getContext('webgl2',{antialias:true,alpha:false,powerPreference:'high-performance'});
+  const [THREE,{OrbitControls},{GLTFLoader},{EffectComposer},{RenderPass},{OutputPass}]=await Promise.all([import('three'),import('three/addons/controls/OrbitControls.js'),import('three/addons/loaders/GLTFLoader.js'),import('three/addons/postprocessing/EffectComposer.js'),import('three/addons/postprocessing/RenderPass.js'),import('three/addons/postprocessing/OutputPass.js')]);
+  const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});
   if(!gl)throw new Error('WebGL2 is unavailable');
-  renderer=api.renderer=new THREE.WebGLRenderer({canvas,context:gl,antialias:true,alpha:false,powerPreference:'high-performance'});
+  renderer=api.renderer=new THREE.WebGLRenderer({canvas,context:gl,antialias:false,alpha:false,powerPreference:'high-performance'});
   renderer.setPixelRatio(1);renderer.setSize(920,652,false);renderer.setClearColor(0x050609);
   renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;
-  const samples=gl.getParameter(gl.SAMPLES);document.querySelector('h1').textContent=`Three.js · WebGL2 · ${samples}× MSAA`;
+  const {sceneSamples}=await import('../../packages/shared/quality.js'),samples=sceneSamples();
+  document.querySelector('h1').textContent=`Three.js · WebGL2 · ${samples}× samples`;
   scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(38,920/652,0.01,10000);
   api.camera=camera;
+  composer=api.composer=new EffectComposer(renderer,new THREE.WebGLRenderTarget(920,652,{samples:samples===4?4:0}));
+  composer.addPass(new RenderPass(scene,camera));composer.addPass(new OutputPass());
+  renderer.info.autoReset=false;api.msaaSamples=samples;
   controls=new OrbitControls(camera,canvas);controls.enableDamping=false;controls.screenSpacePanning=true;
   controls.mouseButtons.MIDDLE=THREE.MOUSE.PAN;controls.mouseButtons.RIGHT=THREE.MOUSE.PAN;
   const key=new THREE.DirectionalLight(0xfff7ec,2.3);key.position.set(-30,100,75);scene.add(key);

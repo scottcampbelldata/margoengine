@@ -15,6 +15,7 @@ try{
       window.layoutShifts=0;new PerformanceObserver(list=>{for(const e of list.getEntries())if(!e.hadRecentInput)window.layoutShifts+=e.value;}).observe({type:'layout-shift',buffered:true});
       window.adapterRequests=[];if(navigator.gpu){const request=navigator.gpu.requestAdapter.bind(navigator.gpu);navigator.gpu.requestAdapter=options=>{window.adapterRequests.push(options);return request(options);};}
       window.pipelineSamples=new WeakMap();window.drawSamples=0;
+      window.glDrawSamples=0;for(const name of ['drawArrays','drawElements','drawArraysInstanced','drawElementsInstanced']){const original=WebGL2RenderingContext.prototype[name];WebGL2RenderingContext.prototype[name]=function(...args){window.glDrawSamples=Math.max(window.glDrawSamples,this.getParameter(this.SAMPLES));return original.apply(this,args);};}
       if(globalThis.GPUDevice){for(const name of ['createRenderPipeline','createRenderPipelineAsync']){const original=GPUDevice.prototype[name];GPUDevice.prototype[name]=function(descriptor){const result=original.call(this,descriptor);if(result?.then)return result.then(pipeline=>{window.pipelineSamples.set(pipeline,descriptor.multisample?.count??1);return pipeline;});window.pipelineSamples.set(result,descriptor.multisample?.count??1);return result;};}const original=GPURenderPassEncoder.prototype.setPipeline;GPURenderPassEncoder.prototype.setPipeline=function(pipeline){window.drawSamples=window.pipelineSamples.get(pipeline);return original.call(this,pipeline);};}
     });
     console.log(name+': loading');await page.goto(base+name+'-conveyor.html');
@@ -25,16 +26,16 @@ try{
       const v=window.conveyorBenchmark,c=document.querySelector('canvas');
       window.originalTransforms=v.parts.map(p=>p.position??p.batch.instanceMatrix.array);
       const gl=v.renderer?.getContext(),ext=gl?.getExtension('WEBGL_debug_renderer_info'),info=v.engine?.gpu?.adapterInfo;
-      return {parts:v.parts.length,cube:v.parts.some(p=>p.name==='Cube'),dpr:devicePixelRatio,width:c.width,height:c.height,cls:window.layoutShifts,requests:window.adapterRequests,draws:Number(document.querySelector('#draws').textContent),samples:gl?.getParameter(gl.SAMPLES)??window.drawSamples,hardware:gl?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):{vendor:info.vendor,architecture:info.architecture,fallback:info.isFallbackAdapter}};
+      return {parts:v.parts.length,cube:v.parts.some(p=>p.name==='Cube'),dpr:devicePixelRatio,width:c.width,height:c.height,cls:window.layoutShifts,requests:window.adapterRequests,draws:Number(document.querySelector('#draws').textContent),samples:gl?window.glDrawSamples:window.drawSamples,hardware:gl?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):{vendor:info.vendor,architecture:info.architecture,fallback:info.isFallbackAdapter}};
     });
     assert.equal(initial.parts,569);assert.equal(initial.cube,false);assert.equal(initial.dpr,1);assert.equal(initial.width,920);assert.equal(initial.height,652);assert.equal(initial.cls,0);
-    if(name==='margo'){assert.ok(initial.requests.some(r=>r?.powerPreference==='high-performance'));assert.equal(initial.samples,1);assert.equal(initial.hardware.vendor,'nvidia');assert.equal(initial.hardware.fallback,false);}else{assert.equal(initial.samples,4);assert.match(initial.hardware,/NVIDIA/);}
+    if(name==='margo'){assert.ok(initial.requests.some(r=>r?.powerPreference==='high-performance'));assert.equal(initial.samples,4);assert.equal(initial.hardware.vendor,'nvidia');assert.equal(initial.hardware.fallback,false);}else{assert.equal(initial.samples,4);assert.match(initial.hardware,/NVIDIA/);}
     await page.evaluate(()=>{
       window.gpuDraws=0;window.lastGPUCalls=0;
       const v=window.conveyorBenchmark,proto=v.engine?GPURenderPassEncoder.prototype:WebGL2RenderingContext.prototype;
       const methods=v.engine?['draw','drawIndexed','drawIndirect','drawIndexedIndirect']:['drawArrays','drawElements','drawArraysInstanced','drawElementsInstanced'];
       for(const name of methods){const original=proto[name];proto[name]=function(...args){window.gpuDraws++;return original.apply(this,args);};}
-      const owner=v.engine??v.renderer,render=owner.render;
+      const owner=v.engine??v.composer,render=owner.render;
       owner.render=function(...args){window.gpuDraws=0;const result=render.apply(this,args);window.lastGPUCalls=window.gpuDraws;if(document.querySelector('#run').disabled)window.countBenchmarkFrames++;return result;};
     });
     await page.waitForTimeout(100);
