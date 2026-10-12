@@ -1,5 +1,6 @@
 import {Engine, PbrMaterial, box} from '@margoengine/core';
 import {engineRuntime} from '@margoengine/core/extension';
+import {SceneTarget} from '../../shared/msaa.js';
 import {
   Lines, Line, GridHelper, PolarGridHelper, AxesHelper, Box3Helper, BoxHelper, ArrowHelper, CameraHelper, PlaneHelper, VertexNormalsHelper,
 } from '@margoengine/lines';
@@ -16,18 +17,20 @@ class Capture {
     graph.add({name: 'capture:redirect', order: -100, execute: context => {
       if (!this.texture) {
         this.format = context.format;
-        this.texture = this.device.createTexture({size: [context.width, context.height], format: context.format, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC});
+        this.texture = this.device.createTexture({size: [context.width, context.height], format: context.format, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC | GPUTextureUsage.TEXTURE_BINDING});
+        this.depth = this.device.createTexture({size: [context.width, context.height], format: context.descriptor.depthStencil.format, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING});
+        this.target = new SceneTarget(this.device, this.texture, this.depth, context.descriptor.multisample.count);
         this.buffer = this.device.createBuffer({size: context.width * context.height * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ});
-        this.view = this.texture.createView();
       }
-      context.color = this.view;
+      this.target.begin(context);
     }});
     graph.add({name: 'capture:copy', order: 900, execute: context => {
+      this.target.present(context);
       context.encoder.copyTextureToBuffer({texture: this.texture}, {buffer: this.buffer, bytesPerRow: context.width * 4}, [context.width, context.height]);
     }});
   }
   onDeviceRestored(engine) {this.dispose(); this.setup(engine);}
-  dispose() {this.texture?.destroy(); this.buffer?.destroy(); this.texture = this.buffer = undefined;}
+  dispose() {this.target?.dispose(); this.depth?.destroy(); this.texture?.destroy(); this.buffer?.destroy(); this.target = this.depth = this.texture = this.buffer = undefined;}
   async read() {
     await this.buffer.mapAsync(GPUMapMode.READ);
     const bytes = new Uint8Array(this.buffer.getMappedRange()).slice(); this.buffer.unmap();
@@ -56,7 +59,7 @@ window.runLineTests = async () => {
   watch(runtime.gpu);
   const capture = new Capture(), lines = new Lines();
   engine.use(capture).use(lines);
-  const frame = async () => {engine.render(); return capture.read();};
+  const frame = async () => {engine.render(); report.samples = capture.target.samples; return capture.read();};
   const bright = ([r, g, b]) => r + g + b > 300;
   const column = (image, x, test = bright) => {let n = 0; for (let y = 0; y < SIZE; y++) if (test(image.at(x, y))) n++; return n;};
 
@@ -86,7 +89,8 @@ window.runLineTests = async () => {
   assert(edge > 20 && edge < 235 && inner > 250, `Antialiased edge ramp missing: edge ${edge}, inner ${inner}`);
   line.material.antialias = false; image = await frame();
   const hard = image.at(128, 123)[0];
-  assert(hard < 20 || hard > 235, `Non-antialiased edge should be hard: ${hard}`);
+  // Disabling shader smoothing retains hardware MSAA at the geometric edge.
+  assert(report.samples === 4 ? hard > 100 && hard < 160 : hard < 20 || hard > 235, `Unexpected geometric edge coverage: ${hard}`);
   line.material.antialias = true;
   report.checks.push('Pixel and world-unit widths, antialiased edge ramp');
 

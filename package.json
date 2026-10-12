@@ -108,6 +108,7 @@
     "modern:test:usdz": "node --test packages/usdz/tests/*.test.js",
     "modern:test:usdz:browser": "node scripts/modern-usdz-tests.js",
     "benchmark:three-vs-margo": "node scripts/benchmark-three-vs-margo.js",
+    "benchmark:demo-loads": "node scripts/benchmark-demo-loads.js",
     "modern:test:interop:packages": "node scripts/modern-interop-packages.js",
     "modern:dev": "npm run dev --workspace @margoengine/starter-vite",
     "modern:dev:extensions": "npm run build:packages && vite --host 127.0.0.1",

@@ -29,6 +29,12 @@ Water.attach(engine, {
 
 The borrowed sky texture must be a sampleable single-layer `rgba16float` 2D texture. The borrowed scene color must be a viewport-sized single-layer `rgba16float` texture with `COPY_SRC` usage. Water retains one GPU snapshot for depth-rejected screen refraction and seabed attenuation. Without these providers, it uses a sky gradient and an approximate seabed color. Reflections represent the atmosphere, not nearby objects.
 
+`water.depthTexture` exposes borrowed viewport depth including opaque geometry and
+the water surface for subsequent effects, such as `Sky` distance fog. It is
+undefined before the first draw and after disposal/restoration until drawing
+resumes. Its 1x/4x sample count follows scene quality, and the texture changes on
+resize or device restoration. Consumers must re-read it and must not destroy it.
+
 `lights: sky.lights` keeps sun and moon glints aligned with their separate visible
 directions through dusk, instead of reflecting the engine's blended shadow light.
 Waves still break the paths into moving highlights. Custom callers can supply up

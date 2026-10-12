@@ -39,6 +39,33 @@ holds `direction` (XYZ plus intensity) and RGB `radiance`. Pass these to
 dusk. The engine's single blended light still drives scene lighting and shadows.
 With no `lighting` options, both direct reflection intensities are zero.
 
+Set `lighting.sunset: [1, 0.69, 0.36]` alongside a daylight `color` such as
+`[1, 0.97, 0.92]` to warm sunlight continuously near dawn and dusk. The blend uses
+sun elevation, reaching the sunset tint below roughly 5° and the daylight tint
+above 30°. Scene lighting and the separate water light record share that tint.
+Omitting `sunset` keeps the configured colour constant.
+
+For lightweight distance haze, provide sampleable reversed-Z scene depth:
+
+```ts
+sky.options.fog = {depth: () => water.depthTexture, start: 45, density: 0.008};
+```
+
+`start` is a clear distance in world meters (default 40); `density` is inverse
+meters (default 0.01, range 0–1). Visibility is
+`exp(-((max(0, distance - start) * density) ** 2))`; zero density disables the pass.
+Fog uses the sky model's direction-dependent radiance, exposure and night fade,
+with the same horizon sampling as the background and borrowed water environment.
+It composites after opaque surfaces and water, before VFX and tone mapping,
+without another colour target or blur. Clear sky pixels are untouched, preserving
+sun/moon discs. Both 1x and 4x depth work; multisampled depth must match the scene's
+sample count. The texture must match the viewport, have `TEXTURE_BINDING` usage
+and stay owned by its provider. With no water, use your post effect's scene depth.
+Re-read the provider after resize/device restoration. Omit `fog` to retain the
+existing rendering. This is homogeneous distance haze, without height fog,
+volumetric light shafts or particle-depth fog; large scenes need a suitable
+camera far plane.
+
 The clock and sun update before rendering, so shadows and scene lighting can use
 the same frame's direction. Set `lighting: {intensity: 6, minimum: 0.15}` to copy
 the sun direction into engine lighting and scale direct intensity by sun elevation.
@@ -56,9 +83,12 @@ Sky.attach(engine, {hours: 18.5, lighting: {
 ```
 
 The moon defaults to 10% of sun intensity and a cool blue color. Its visual preset
-sits about 12° above the horizon; sunset/sunrise blend one directional source for existing PCSS shadows
-and water specular lighting. The atmospheric background and borrowed reflection
-texture share the same night fade. This is a visual preset, with no lunar orbit
+sits about 12° above the horizon. Its disc, borrowed environment and separate water
+glint use one fade, starting when the sun drops below the horizon and reaching full
+strength with the sun about 7° below the horizon (about 18:28 on this clock). They fade
+out together before sunrise; there is no daytime moon glint. Scene lighting and
+existing PCSS shadows retain a single smoothly blended twilight light. The
+atmospheric background has its own earlier twilight fade. This is a visual preset, with no lunar orbit
 or phase calculation. RGB ambient patches the standard scene shader (including
 scatter and mesh terrain) at group 0, binding 8, and composes with shadows and
 clustered lights. Custom renderers using their own shaders need their own ambient
@@ -69,7 +99,7 @@ It updates before rendering, including paused manual renders. To switch local
 lights and emissive batches together, set `lights.intensityScale =
 instances.emissiveIntensity = () => sky.nightFactor` using clustered and scatter.
 
-This is a compact atmospheric approximation, not a reference-quality reproduction of the original planetary renderer: no ozone spectrum, ground-albedo irradiance feedback, terrain light shafts or aerial perspective. Coarse horizon/angular sampling can band. Preetham is a daytime model with a night fade.
+This is a compact atmospheric approximation, not a reference-quality reproduction of the original planetary renderer: no ozone spectrum, ground-albedo irradiance feedback, terrain light shafts or physical aerial perspective. Coarse angular sampling can band; the visible horizon uses a skyward sample to avoid a dark ground strip. Preetham is a daytime model with a night fade.
 
 Models: [Preetham daylight notes](https://renderwonk.com/publications/s2003-course/preetham/notes-preetham.pdf), [Bruneton scattering equations](https://ebruneton.github.io/precomputed_atmospheric_scattering/atmosphere/functions.glsl.html).
 

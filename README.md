@@ -2,7 +2,7 @@
 
 A small Rust/Wasm engine for web apps, with WebGPU rendering, WebGL2 fallback, ordinary React components and optional domain packs.
 
-Official website: [margoengine.com](https://margoengine.com). Margo Engine is dedicated to Margie.
+Official website: [margoengine.com](https://margoengine.com). Built with precision, named with love. For Margie.
 
 The implementation lives in `packages/`, with Vite and Next.js starters in `examples/`. Small internal helpers shared by the optional packs live in `packages/shared/`. Source is available in the public [Margo Engine repository](https://github.com/scottcampbelldata/margoengine). The renamed packages use `@margoengine/*`, with `margoengine` as the meta-package. Build from source or install local tarballs until the renamed packages are published.
 

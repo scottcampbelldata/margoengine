@@ -5,22 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%2363a8f5'/%3E%3C/svg%3E" />
     <title>Earth orbit · Margo Engine Creative</title>
+    <link rel="preload" as="fetch" href="./assets/earth-day-mobile.webp" crossorigin media="(pointer: coarse)" />
+    <link rel="preload" as="fetch" href="./assets/earth-night-mobile.webp" crossorigin media="(pointer: coarse)" />
+    <link rel="preload" as="fetch" href="./assets/earth-clouds-mobile.webp" crossorigin media="(pointer: coarse)" />
+    <link rel="preload" as="fetch" href="./assets/earth-normal-mobile.webp" crossorigin media="(pointer: coarse)" />
+    <link rel="preload" as="fetch" href="./assets/earth-specular-mobile.webp" crossorigin media="(pointer: coarse)" />
     <style>
       :root { color-scheme: dark; font: 16px/1.5 system-ui, sans-serif; background: #03060d; color: #edf3fb; }
       * { box-sizing: border-box; }
       body { margin: 0; }
       main { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; min-height: 100svh; }
-      #viewport { min-height: 34rem; height: 100svh; }
+      #viewport { min-height: 0; height: 100svh; }
       #viewport canvas { outline-offset: -5px; }
-      aside { padding: 2.5rem 1.8rem; border-left: 1px solid #1e2b3f; background: #090e18; }
+      aside { padding: 2rem 1.8rem; border-left: 1px solid #1e2b3f; background: #090e18; height: 100svh; overflow: auto; scrollbar-gutter: stable; }
       .eyebrow { margin: 0 0 .6rem; color: #92b9e6; font-size: .75rem; letter-spacing: .16em; text-transform: uppercase; }
       h1 { font-size: 2.6rem; line-height: 1.1; font-weight: 500; margin: 0 0 1rem; }
       p { color: #b8c7db; }
-      fieldset { border: 0; padding: 0; margin: 2rem 0; }
+      fieldset { border: 0; padding: 0; margin: 1.5rem 0; min-width: 0; }
       legend { margin-bottom: 1rem; font-weight: 600; }
       label { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1.2rem; }
       output { color: #c5ddff; font-variant-numeric: tabular-nums; }
       input[type=range] { display: block; width: 100%; margin: .65rem 0; accent-color: #91bdff; }
+      input[type=checkbox] { accent-color: #91bdff; }summary { cursor: pointer; font-weight: 600; margin: .6rem 0; }#quality { color: #c5ddff; font-size: .75rem; }
       button { width: 100%; font: inherit; background: #192941; color: #edf3fb; border: 1px solid #536e92; padding: .65rem; border-radius: .4rem; cursor: pointer; margin-bottom: .6rem; }
       button:hover { background: #233856; }
       button:disabled { opacity: .6; cursor: wait; }
@@ -29,7 +35,7 @@
       #status { min-height: 3rem; color: #c5ddff; }
       #error { color: #ffb6b6; white-space: pre-wrap; }
       a { color: #aad0ff; }
-      @media (max-width: 760px) { main { grid-template-columns: 1fr; } #viewport { height: 65svh; min-height: 20rem; } aside { border-left: 0; border-top: 1px solid #1e2b3f; padding: 1.5rem; } }
+      @media (max-width: 760px) { main { grid-template-columns: 1fr; } #viewport { height: 65svh; min-height: 20rem; } aside { height: auto; border-left: 0; border-top: 1px solid #1e2b3f; padding: 1.5rem; } }
     </style>
   </head>
   <body>
@@ -38,17 +44,27 @@
       <aside aria-label="Earth controls">
         <p class="eyebrow">Margo Engine Creative / orbital study</p>
         <h1>Earth</h1>
-        <p>Follow the edge of daylight. City lights emerge after sunset; clouds drift above the surface.</p>
+        <p>Follow the edge of daylight. City lights glow through HDR bloom; clouds drift above oceans and terrain.</p>
         <fieldset id="controls" disabled>
           <legend>Explore the planet</legend>
           <button id="pause" type="button" aria-pressed="false">Pause rotation</button>
           <button id="reset" type="button">Reset view</button>
+          <details id="settings" open><summary>Light &amp; motion</summary>
           <label for="rotation">Rotation speed <output id="rotation-value" for="rotation">1.0×</output></label>
           <input id="rotation" type="range" min="0" max="3" step="0.1" value="1" />
           <label for="sun">Sun direction <output id="sun-value" for="sun">−110°</output></label>
           <input id="sun" type="range" min="-180" max="180" step="1" value="-110" />
+          <label for="cloud-speed">Cloud drift <output id="cloud-speed-value" for="cloud-speed">1.0×</output></label>
+          <input id="cloud-speed" type="range" min="0" max="3" step="0.1" value="1" />
+          <label for="bloom">Bloom <output id="bloom-value" for="bloom">0.25</output></label>
+          <input id="bloom" type="range" min="0" max="1" step="0.05" value="0.25" />
+          <label for="exposure">Exposure <output id="exposure-value" for="exposure">0.6</output></label>
+          <input id="exposure" type="range" min="-2" max="2" step="0.1" value="0.6" />
+          <label for="stars">Show stars <input id="stars" type="checkbox" checked /></label>
+          </details>
         </fieldset>
-        <p class="help" id="navigation-help">Drag to orbit and scroll to zoom. With the view focused, use arrow keys to orbit, + / − to zoom, and Home to reset.</p>
+        <p id="quality"></p>
+        <p class="help" id="navigation-help">Drag to orbit; scroll or pinch to zoom. With the view focused, use arrow keys to orbit, + / − to zoom, and Home to reset.</p>
         <p id="status" role="status">Loading Earth textures…</p>
         <p id="error" role="alert" hidden></p>
         <footer>Day imagery: <a href="https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-map/">NASA Blue Marble</a>.<br />Other maps: <a href="https://www.solarsystemscope.com/textures/">Solar System Scope</a>, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.</footer>

@@ -54,7 +54,7 @@ The compute pass culls conservative blade bounds against all six camera planes a
 
 Instance data, uniforms, pipelines, bind groups and pass descriptors are allocated at creation and reused each frame. There is no production CPU visibility readback. Frame rate depends on hardware, resolution and visible density; 60 FPS is a target, not a guarantee. Grass is not a core mesh and does not participate in mesh picking, Stage fitting, section clipping or shadows.
 
-Run `npx vite --host 127.0.0.1` from the repository root and open `/examples/windy-meadow.html` for orbit controls and wind sliders. Run `node --test tests/modern-grass.test.js` and `node scripts/modern-grass-tests.js` after building the creative package for the unit and GPU checks.
+Run `npx vite --host 127.0.0.1` from the repository root and open `/examples/windy-meadow.html` for wind, density and seed controls, the optional Sky package's daylight/moonlight and moving clouds, and Bloom's HDR/AgX presentation. The demo uses the shared 4× MSAA desktop default; mobile uses 1× MSAA, a DPR cap of 2 and 35,000 blades, with collapsible settings. Orbit, pinch, keyboard navigation and reset remain available while motion is paused; reduced motion pauses the grass, seeds and clouds. Run `node --test tests/modern-grass.test.js` and `node scripts/modern-grass-tests.js` after building the creative, sky and post packages for the unit and GPU checks.
 
 ## Planet
 
@@ -103,7 +103,7 @@ npm run test --workspace @margoengine/creative
 npm run test:browser --workspace @margoengine/creative
 ```
 
-The demo includes a third procedural-starfield draw, local 2k Earth textures, orbit/zoom, sun direction and animation controls. Reduced-motion preferences pause rotation initially; keyboard navigation is described beside the view. [Texture attribution and licenses](examples/earth/assets/ATTRIBUTION.md) travel with the example.
+The demo combines Planet's linear HDR surface/cloud/rim output with optional Bloom and AgX tone mapping. It uses local 2k Earth textures, damped OrbitControls with exterior zoom limits, a switchable procedural starfield, sun direction, independent rotation/cloud speeds, bloom and exposure controls. Desktop uses the shared 4× MSAA default; mobile uses 1× MSAA, a DPR cap of 2 and collapsible settings. Reduced-motion preferences pause rotation and cloud drift and disable navigation damping; keyboard and pinch navigation remain available. [Texture attribution and licenses](examples/earth/assets/ATTRIBUTION.md) travel with the example.
 
 The build and prepack commands write only this package's `dist` and license copy. Checks and screenshots write to this package's `test-results`; they use existing core artifacts without rebuilding the base. The browser check uses Edge by default (or installed Playwright Chromium as a fallback); set `BROWSER_CHANNEL` to choose another installed Chromium channel. The unit checks cover loading, lifecycle, validation, resource retention and bundle isolation. The WebGPU checks cover shaders, rendered pixels, depth, HDR and device restoration.
 

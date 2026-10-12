@@ -1,3 +1,5 @@
+// Margo Engine kernel.
+// Built with precision, named with love. For Margie.
 #![cfg_attr(target_arch = "wasm32", no_std)]
 
 #[cfg(target_arch = "wasm32")]

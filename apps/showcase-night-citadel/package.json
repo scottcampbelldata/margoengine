@@ -9,7 +9,12 @@
   },
   "dependencies": {
     "@margoengine/core": "0.1.0",
-    "@margoengine/creative": "0.1.0",
-    "@margoengine/scenery": "0.1.0"
+    "@margoengine/scenery": "0.1.0",
+    "@margoengine/post": "0.1.0",
+    "@margoengine/shadows": "0.1.0",
+    "@margoengine/scatter": "0.1.0",
+    "@margoengine/clustered": "0.1.0",
+    "@margoengine/water": "0.1.0",
+    "@margoengine/vfx": "0.1.0"
   }
 }

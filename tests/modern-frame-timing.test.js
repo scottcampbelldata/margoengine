@@ -1,6 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { frameDue } from '../apps/showcase-night-citadel/src/frame-timing.js';
+import { frameDue, frameStatus } from '../apps/showcase-night-citadel/src/frame-timing.js';
+
+test('120 target uses every callback at 60 Hz and explains the observed limit', () => {
+  const clock = new Float64Array(3);
+  for (let i=1;i<=120;i++) assert(frameDue(clock,100+i*1000/60,120));
+  assert.match(frameStatus(120,60,60), /120 FPS target.*browser supplies ~60 Hz/);
+  assert.match(frameStatus(120,144,120), /browser cadence ~144 Hz/);
+  assert.match(frameStatus(120,144,75), /rendering ~75 FPS/);
+  assert.equal(frameStatus(120,0,0), 'Measuring browser cadence…');
+});
 
 test('native 60 Hz jitter never skips every other animation callback', () => {
   const clock = new Float64Array(3),

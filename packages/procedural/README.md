@@ -8,9 +8,13 @@ Supply your own PBR materials and instance transform. Every terrain sample is
 validated, and split architectural normals and UV-derived tangents are preserved.
 Plank seams are closed, exterior window/door casings sit flush with the siding,
 corner trim stands clear and overlapping roof courses have separate depth planes,
-avoiding pinholes, fragmented thin edges and z-fighting. Hidden
+avoiding pinholes, fragmented thin edges and z-fighting. Solid gables meet the
+siding faces and overlap the roof underside, closing the joint from elevated and
+oblique views at both ends. Hidden
 plank caps are omitted; trim closes the wall skin. Enterable cabin interiors would
 need dedicated wall returns.
+Porch post heights and the pitched crossbeam derive from the canopy underside,
+keeping the supports below the roof while their bases follow terrain.
 
 `createIslandHeight(seed = 731)` returns the coastal island preset's world-height
 sampler. `generateGrassMesh(blades = 3)` returns crossed, tapered grass ribbons;

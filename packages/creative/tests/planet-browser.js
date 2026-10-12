@@ -45,7 +45,7 @@ window.runPlanetTests = async () => {
     pass.updateFrame(camera.matrix, identity(), camera.position, sun, offset);
     const encoder = device.createCommandEncoder(), colorView = target.createView(), depthView = depth.createView();
     const clear = encoder.beginRenderPass({colorAttachments: [{view: colorView, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 1]}], depthStencilAttachment: {view: depthView, depthLoadOp: 'clear', depthStoreOp: 'store', depthClearValue: depthValue}}); clear.end();
-    const context = {backend: 'webgpu', device, encoder, color: colorView, depth: depthView, format};
+    const context = {backend: 'webgpu', device, encoder, color: colorView, depth: depthView, format, descriptor: {multisample: {count: 1}}};
     pass.record(context, false); if (shell) pass.record(context, true);
     encoder.copyTextureToBuffer({texture: target}, {buffer: output, bytesPerRow: size * bytesPerPixel}, [size, size]);
     encoder.copyTextureToBuffer({texture: depth, aspect: 'depth-only'}, {buffer: depthOutput, bytesPerRow: size * 4}, [size, size]);
@@ -122,7 +122,8 @@ window.runPlanetTests = async () => {
   try {for (let i = 0; i < 8; i++) {planet.rotation.y += 0.01; planet.clouds.offsetU += 0.01; engine.render({delta: 1 / 60}); await runtime.gpu.queue.onSubmittedWorkDone();}}
   finally {for (let i = 0; i < methods.length; i++) runtime.gpu[methods[i]] = originals[i]; GPUCommandEncoder.prototype.beginRenderPass = begin; GPURenderPassEncoder.prototype.drawIndexed = draw;}
   assert(allocations === 0 && draws === 16, `Planet steady frames: ${allocations} resource creations, ${draws} draws`);
-  assert(descriptors.length === 24 && descriptors.every((value, index) => value === descriptors[index % 3]), 'Planet replaced steady-frame descriptors');
+  const planetDescriptors = descriptors.filter(value => value === planet.pass.surfaceDescriptor || value === planet.pass.shellDescriptor);
+  assert(planetDescriptors.length === 16, 'Planet replaced steady-frame descriptors');
 
   const blocker = engine.createMesh().setGeometry(box(1, 1, 0.1)).setMaterial(new PbrMaterial({color: '#ffffff'})).setPosition([0, 0, 2]);
   const effects = new PostProcessing({bloom: 0.2, atmosphere: {sky: false}}); engine.use(effects);

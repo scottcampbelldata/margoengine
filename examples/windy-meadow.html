@@ -6,26 +6,50 @@
   <meta name="theme-color" content="#15231c">
   <title>Windy meadow · Margo Engine</title>
   <style>
-    *{box-sizing:border-box}body{margin:0;background:#15231c;color:#edf2e7;font:16px/1.5 system-ui,sans-serif}
-    #viewport{height:100svh;min-height:440px}canvas{outline-offset:-4px}
-    aside{position:absolute;top:24px;left:24px;width:min(320px,calc(100% - 48px));padding:24px;background:#14221eea;border:1px solid #718373;border-radius:12px}
-    h1{font-size:28px;line-height:1.1;margin:0 0 12px}p{color:#c1cdbd;margin:0 0 20px}
-    label{display:block;margin-top:16px}input[type=range]{display:block;width:100%;margin:10px 0;accent-color:#b7d878}
-    output{float:right;font-variant-numeric:tabular-nums}button{margin-top:20px;padding:9px 18px;border:1px solid #b7d878;border-radius:6px;background:#b7d878;color:#14221e;font:inherit;cursor:pointer}
-    :focus-visible{outline:3px solid #eafaba;outline-offset:4px}#error{color:#ffd9b5}small{display:block;margin-top:16px;color:#c1cdbd}
-    @media(max-width:600px){aside{top:16px;left:16px;padding:16px;width:calc(100% - 32px)}h1{font-size:24px}#viewport{height:100svh;min-height:650px}}
+    *{box-sizing:border-box}body{margin:0;background:#15231c;color:#edf2e7;font:14px/1.5 system-ui,sans-serif}
+    #viewport{height:100svh;min-height:440px}canvas{outline-offset:-4px;touch-action:none}
+    aside{position:absolute;top:24px;left:24px;width:min(344px,calc(100% - 48px));max-height:calc(100svh - 48px);display:flex;flex-direction:column;overflow:hidden;padding:24px;background:#14221eed;border:1px solid #718373;border-radius:12px;backdrop-filter:blur(12px)}aside>:not(details){flex-shrink:0}details{min-height:0;overflow:auto;scrollbar-gutter:stable;padding-right:12px}
+    h1{font-size:28px;line-height:1.1;margin:6px 0 12px}.eyebrow{color:#cbe68e;font-size:10px;letter-spacing:2px;text-transform:uppercase}p{color:#c1cdbd;margin:0 0 18px}
+    summary{font-weight:600;cursor:pointer;padding:8px 0;color:#e2efcf}fieldset{border:0;border-top:1px solid #526052;padding:8px 0 0;margin:14px 0}legend{color:#cbe68e;font-size:11px;letter-spacing:1px;text-transform:uppercase;padding-right:12px}
+    label{display:block;margin-top:12px}input[type=range]{display:block;width:100%;margin:8px 0;accent-color:#b7d878}input[type=checkbox]{accent-color:#b7d878}
+    output{float:right;font-variant-numeric:tabular-nums}select{width:100%;padding:7px;margin-top:7px;background:#24372d;color:#edf2e7;border:1px solid #718373;border-radius:4px;font:inherit}
+    .buttons{display:flex;gap:8px;margin-top:18px}button{flex:1;min-height:42px;padding:8px;border:1px solid #b7d878;border-radius:6px;background:#b7d878;color:#14221e;font:inherit;cursor:pointer}#reset-view{background:transparent;color:#e2efcf}
+    :focus-visible{outline:3px solid #eafaba;outline-offset:4px}#error{color:#ffd9b5;margin:10px 0 0}#error:empty{display:none}small{display:block;margin-top:12px;color:#c1cdbd;font-size:11px}#quality{color:#d9edb1}
+    @media(max-width:600px){aside{top:14px;left:14px;padding:14px 18px;width:calc(100% - 28px);max-height:55svh}h1{font-size:24px}p{margin-bottom:4px}#viewport{min-height:440px}.eyebrow{font-size:9px}small{margin-top:8px}}
   </style>
 </head>
 <body>
   <main id="viewport" aria-label="Interactive wind-blown meadow"></main>
   <aside aria-label="Meadow controls">
+    <span class="eyebrow">Margo Engine · Living landscapes</span>
     <h1>Windy meadow</h1>
-    <p>100,000 blades. A passing breeze.<br>Drag to orbit; scroll to explore.</p>
-    <label for="speed">Wind speed <output id="speed-value" for="speed">1.2</output></label>
-    <input id="speed" type="range" min="0" max="3" step="0.1" value="1.2">
-    <label for="strength">Wind strength <output id="strength-value" for="strength">0.45</output></label>
-    <input id="strength" type="range" min="0" max="1" step="0.05" value="0.45">
-    <button id="pause" type="button" aria-pressed="false">Pause motion</button>
+    <p>A passing breeze beneath a changing sky.<br>Drag to orbit; scroll or pinch to explore.</p>
+    <details id="settings" open>
+      <summary>Shape the meadow</summary>
+      <fieldset>
+        <legend>Wind &amp; grass</legend>
+        <label for="speed">Wind speed <output id="speed-value" for="speed">1.2</output></label>
+        <input id="speed" type="range" min="0" max="3" step="0.1" value="1.2">
+        <label for="strength">Wind strength <output id="strength-value" for="strength">0.45</output></label>
+        <input id="strength" type="range" min="0" max="1" step="0.05" value="0.45">
+        <label for="density">Grass density</label>
+        <select id="density"><option value="35000">35,000 blades · mobile</option><option value="100000" selected>100,000 blades · desktop</option><option value="200000">200,000 blades · dense</option></select>
+        <label><input id="seeds" type="checkbox" checked> Floating seeds</label>
+      </fieldset>
+      <fieldset>
+        <legend>Sky &amp; light</legend>
+        <label for="hours">Time of day <output id="hours-value" for="hours">16:00</output></label>
+        <input id="hours" type="range" min="0" max="23.5" step="0.5" value="16">
+        <label for="clouds">Cloud coverage <output id="clouds-value" for="clouds">0.38</output></label>
+        <input id="clouds" type="range" min="0" max="1" step="0.01" value="0.38">
+        <label for="bloom">Bloom <output id="bloom-value" for="bloom">0.15</output></label>
+        <input id="bloom" type="range" min="0" max="1" step="0.05" value="0.15">
+        <label for="exposure">Exposure <output id="exposure-value" for="exposure">0</output></label>
+        <input id="exposure" type="range" min="-2" max="2" step="0.1" value="0">
+      </fieldset>
+    </details>
+    <div class="buttons"><button id="pause" type="button" aria-pressed="false">Pause motion</button><button id="reset-view" type="button">Reset view</button></div>
+    <small id="quality"></small>
     <small id="navigation-help">Focus the scene: arrow keys orbit, + / − zoom.</small>
     <small id="status" role="status">Starting WebGPU…</small>
     <p id="error" role="alert"></p>
