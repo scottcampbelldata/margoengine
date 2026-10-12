@@ -296,3 +296,21 @@ The remaining rows describe future work; current domain features have working im
 
 
 
+
+## Historical SwiftShader validation
+
+Committed results, recorded on 11 October 2026 at b3987dd on SwiftShader (software WebGPU and WebGL2, no GPU); setup and machine details are in [benchmarks/README.md](benchmarks/README.md#swiftshader-runs-no-gpu):
+
+- `npm test`: 31 JavaScript tests. `cargo test`: four Rust tests. Strict package declarations and successful Vite/Next production builds.
+- Packed standalone ESM/Wasm imports, strict TypeScript consumer declarations and React 18.3.1 SSR/browser lifecycle: [modern-packages.json](benchmarks/swiftshader/modern-packages.json). The fixture is removed after testing; tarballs remain in `test-results/modern-packages/`.
+- Eight browser check groups: both API pixels and instancing/culling; actual GPU storage readback for 100,000 particles; React Strict Mode/nesting/Suspense/teardown/no frame re-renders; automatic fallback; Vite domain controls; Vite production/lazy imports/controls/mobile layout; Next SSR/hydration/rendered geometry: [modern-browser.json](benchmarks/swiftshader/modern-browser.json).
+- Eight domain GPU groups: stencil caps with mirrored instances, real device destruction with preserved Wasm references, textured particle sorting/obstacles, independent image changes for each FX feature, cap depth preservation, retained pass descriptors and bind groups with one canvas view per frame, and destruction mid-encoding and after submission with continued CPU/RAF updates: [modern-domains.json](benchmarks/swiftshader/modern-domains.json).
+- Five finalization groups: integer picking, depth precision (near=1 mm, far=10 km, 0.1 mm separation at 500 m), six-plane caps, the conveyor UI and the 12,014-entity stress scene with reboot. The stress scene kept three batches and 5,373,952 bytes of Wasm memory; its 60 frames measured CPU median 4.7 ms / p95 7.0 ms. GPU completion times on SwiftShader do not describe hardware: [modern-finalization.json](benchmarks/swiftshader/modern-finalization.json).
+- Conveyor timing at 20, 200 and 240 rollers (`npm run modern:check:conveyor -- --timing-only`): two instanced geometry batches at every size, shafts coupled to the motor in both directions, static bolts, Wasm-backed Euler views, and 16-byte aligned instance uploads with a 96-byte stride. At 240 rollers (976 entities) the tick mean was 0.108 to 0.120 ms across three runs: [run 1](benchmarks/swiftshader/bench-tick-b3987dd-run1.json), [run 2](benchmarks/swiftshader/bench-tick-b3987dd-run2.json), [run 3](benchmarks/swiftshader/bench-tick-b3987dd-run3.json).
+- The full `modern:check:conveyor` run fails at its live picking step on SwiftShader, so its picking latency, drag trace and allocation reports have no committed results: [conveyor-check-picking-failure.txt](benchmarks/swiftshader/conveyor-check-picking-failure.txt).
+- Core size, machinery/creative isolation, export snapshots and particle-only tree shaking are enforced by the build and tests; domain packages are absent from core.
+
+Mobile coverage changes desktop viewport dimensions; it is not testing mobile GPU hardware. No committed results cover hardware GPUs, Firefox/Safari, physical driver reset/OOM recovery, allocation or GC behaviour, or comparative performance.
+
+Arbitrary capacities can produce only four-byte-aligned source views, which remain valid under [WebAssembly memory semantics](https://webassembly.github.io/spec/core/exec/instructions.html#memory-instructions).
+

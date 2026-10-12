@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101b2c">
+  <title>A React cube · Vexel</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="preconnect" href="https://esm.sh">
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101b2c; color: #e4edf8; }
+    * { box-sizing: border-box; } body { max-width: 1000px; margin: auto; padding: 24px; }
+    h1 { font-size: clamp(25px, 4vw, 36px); margin-bottom: 8px; } p { line-height: 1.6; }
+    a { color: #a8cffd; text-underline-offset: 3px; } #scene { display: block; width: 100%; height: min(65vh, 540px); border: 1px solid #42536b; border-radius: 8px; }
+    button { font: inherit; min-height: 44px; padding: 8px 20px; background: #dceaff; color: #17395f; border: 1px solid #a8cffd; border-radius: 6px; cursor: pointer; touch-action: manipulation; }
+    button:hover { background: white; } button:disabled { opacity: .6; cursor: wait; } :focus-visible { outline: 3px solid #8fc4ff; outline-offset: 4px; }
+    #status { min-height: 26px; overflow-wrap: anywhere; } footer { font-size: 13px; color: #b1c2d8; margin-top: 24px; }
+  </style>
+  <script type="importmap">{
+  "imports": {
+    "@scottcampbelldata/vexel-core": "https://cdn.jsdelivr.net/npm/@scottcampbelldata/vexel-core@0.1.0/dist/index.js",
+    "@scottcampbelldata/vexel-core/extension": "https://cdn.jsdelivr.net/npm/@scottcampbelldata/vexel-core@0.1.0/dist/extension.js",
+    "@scottcampbelldata/vexel-react": "https://cdn.jsdelivr.net/npm/@scottcampbelldata/vexel-react@0.1.0/dist/index.js",
+    "react": "https://esm.sh/react@19.3.0",
+    "react/jsx-runtime": "https://esm.sh/react@19.3.0/jsx-runtime?external=react",
+    "react-dom/client": "https://esm.sh/react-dom@19.3.0/client?external=react"
+  }
+}</script>
+</head>
+<body>
+  <h1>A React cube</h1>
+  <p>Canvas and useFrame with React 19; no JSX build step needed.</p>
+  <div id="scene"></div>
+  <p id="status" role="status">Loading published packages…</p>
+  <button id="play" type="button" disabled>Pause</button>
+  <footer>Published packages · 0.1.0 · <a href="https://scottcampbelldata.github.io/vexel/#react">Module catalog</a></footer>
+  <script>
+let current, cleanup = () => {}, playing = false;
+const button = document.querySelector('#play');
+const status = document.querySelector('#status');
+const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+function report(error) {
+  current?.stop();
+  button.disabled = true;
+  status.textContent = 'Could not start this example. Serve it on localhost or HTTPS and check browser GPU support. ' + (error?.message || String(error));
+  status.setAttribute('role', 'alert');
+}
+function setPlaying(value) {
+  playing = value;
+  if (playing) current.start();
+  else { current.stop(); current.render(); }
+  button.textContent = playing ? 'Pause' : 'Play';
+  status.textContent = (playing ? 'Running' : 'Paused') + ' · ' + current.backend;
+}
+function attach(engine, dispose = () => {}) {
+  current = engine;
+  cleanup = dispose;
+  current.onError = report;
+  setPlaying(!reduced.matches);
+  button.disabled = false;
+}
+button.addEventListener('click', () => setPlaying(!playing));
+reduced.addEventListener('change', event => { if (event.matches && current) setPlaying(false); });
+addEventListener('error', event => report(event.error || event.message));
+addEventListener('unhandledrejection', event => report(event.reason));
+addEventListener('pagehide', () => { try { cleanup(); } finally { current?.dispose(); } });
+  </script>
+  <script type="module">
+import React, { useRef } from 'react';
+import { createRoot } from 'react-dom/client';
+import { Canvas, Mesh, BoxGeometry, PbrMaterial, useFrame } from '@scottcampbelldata/vexel-react';
+
+function Cube() {
+  const mesh = useRef(null);
+  useFrame((_, delta) => { if (mesh.current) mesh.current.rotation.y += delta; });
+  return React.createElement(Mesh, { ref: mesh },
+    React.createElement(BoxGeometry),
+    React.createElement(PbrMaterial, { color: '#84d6bd', roughness: 0.3 }));
+}
+const root = createRoot(document.querySelector('#scene'));
+root.render(React.createElement(Canvas, {
+  label: 'A rotating mint cube', style: { height: '100%' }, onError: report,
+  onCreated: engine => requestAnimationFrame(() => attach(engine, () => root.unmount())),
+}, React.createElement(Cube)));
+  </script>
+</body>
+</html>

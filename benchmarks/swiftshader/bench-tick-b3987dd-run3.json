@@ -1,0 +1,223 @@
+{
+ "hardware": {
+  "webglRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+  "webgpu": {
+   "vendor": "google",
+   "architecture": "swiftshader",
+   "device": "",
+   "description": "",
+   "fallback": true
+  },
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+  "browserName": "chromium",
+  "browserVersion": "156.0.8078.4",
+  "requestedChannel": "bundled",
+  "launchArgs": [
+   "--enable-unsafe-webgpu",
+   "--enable-features=Vulkan",
+   "--use-vulkan=swiftshader",
+   "--use-webgpu-adapter=swiftshader",
+   "--use-angle=swiftshader",
+   "--enable-unsafe-swiftshader"
+  ],
+  "powerPreference": "high-performance",
+  "hostPlatform": "linux"
+ },
+ "checks": [
+  {
+   "name": "Captured indexed indirect batches and complete motor/coupling/Wasm transform tick",
+   "rollers": 20,
+   "entities": 96,
+   "draws": [
+    {
+     "offset": 0,
+     "command": [
+      36,
+      9,
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "offset": 0,
+     "command": [
+      288,
+      63,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "batches": 2,
+   "coupled": true,
+   "reverse": true,
+   "boltsStatic": true,
+   "wasmViews": true,
+   "alignment": {
+    "wasmMatrixByteOffset": 1094848,
+    "instanceStrideBytes": 96,
+    "uploads": [
+     {
+      "destinationByteOffset": 0,
+      "sourceByteOffset": 0,
+      "byteLength": 864
+     },
+     {
+      "destinationByteOffset": 0,
+      "sourceByteOffset": 0,
+      "byteLength": 6048
+     }
+    ]
+   },
+   "boundary": {
+    "samples": 180,
+    "jsPreTickMeanMs": 0.03722222207321061,
+    "wasmMeanMs": 0.02666666598783599,
+    "jsPostTickMeanMs": 0.09111111114422481,
+    "jsTotalMeanMs": 0.12833333321743542,
+    "note": "Actual frame: JS before export, raw Wasm export, then JS scene collection/encoding/uploads/submission. GPU completion wait is outside measurement; timers have browser precision limits."
+   },
+   "samples": 300,
+   "windowTicks": 10,
+   "windowMedianMs": 0.020000000298023225,
+   "windowP95Ms": 0.030000001192092896,
+   "meanMs": 0.021333333353201544,
+   "medianMs": 0,
+   "p95Ms": 0.10000000894069672,
+   "maxMs": 0.10000000894069672,
+   "p95UnderHalfMs": true
+  },
+  {
+   "name": "Captured indexed indirect batches and complete motor/coupling/Wasm transform tick",
+   "rollers": 200,
+   "entities": 816,
+   "draws": [
+    {
+     "offset": 0,
+     "command": [
+      36,
+      9,
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "offset": 0,
+     "command": [
+      288,
+      603,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "batches": 2,
+   "coupled": true,
+   "reverse": true,
+   "boltsStatic": true,
+   "wasmViews": true,
+   "alignment": {
+    "wasmMatrixByteOffset": 1094848,
+    "instanceStrideBytes": 96,
+    "uploads": [
+     {
+      "destinationByteOffset": 0,
+      "sourceByteOffset": 0,
+      "byteLength": 864
+     },
+     {
+      "destinationByteOffset": 0,
+      "sourceByteOffset": 0,
+      "byteLength": 57888
+     }
+    ]
+   },
+   "boundary": {
+    "samples": 180,
+    "jsPreTickMeanMs": 0.08666666704747412,
+    "wasmMeanMs": 0.11111111086275842,
+    "jsPostTickMeanMs": 0.26777777787711887,
+    "jsTotalMeanMs": 0.354444444924593,
+    "note": "Actual frame: JS before export, raw Wasm export, then JS scene collection/encoding/uploads/submission. GPU completion wait is outside measurement; timers have browser precision limits."
+   },
+   "samples": 300,
+   "windowTicks": 10,
+   "windowMedianMs": 0.09000000059604644,
+   "windowP95Ms": 0.11000000089406967,
+   "meanMs": 0.09466666663686435,
+   "medianMs": 0.09999999403953552,
+   "p95Ms": 0.20000000298023224,
+   "maxMs": 0.20000000298023224,
+   "p95UnderHalfMs": true
+  },
+  {
+   "name": "Captured indexed indirect batches and complete motor/coupling/Wasm transform tick",
+   "rollers": 240,
+   "entities": 976,
+   "draws": [
+    {
+     "offset": 0,
+     "command": [
+      36,
+      9,
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "offset": 0,
+     "command": [
+      288,
+      723,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "batches": 2,
+   "coupled": true,
+   "reverse": true,
+   "boltsStatic": true,
+   "wasmViews": true,
+   "alignment": {
+    "wasmMatrixByteOffset": 1094848,
+    "instanceStrideBytes": 96,
+    "uploads": [
+     {
+      "destinationByteOffset": 0,
+      "sourceByteOffset": 0,
+      "byteLength": 864
+     },
+     {
+      "destinationByteOffset": 0,
+      "sourceByteOffset": 0,
+      "byteLength": 69408
+     }
+    ]
+   },
+   "boundary": {
+    "samples": 180,
+    "jsPreTickMeanMs": 0.09611111183961232,
+    "wasmMeanMs": 0.13666666630241606,
+    "jsPostTickMeanMs": 0.36333333344923124,
+    "jsTotalMeanMs": 0.4594444452888436,
+    "note": "Actual frame: JS before export, raw Wasm export, then JS scene collection/encoding/uploads/submission. GPU completion wait is outside measurement; timers have browser precision limits."
+   },
+   "samples": 300,
+   "windowTicks": 10,
+   "windowMedianMs": 0.10999999940395355,
+   "windowP95Ms": 0.15,
+   "meanMs": 0.11499999999999999,
+   "medianMs": 0.10000000894069672,
+   "p95Ms": 0.20000000298023224,
+   "maxMs": 0.29999999701976776,
+   "p95UnderHalfMs": true
+  }
+ ]
+}

@@ -17,3 +17,10 @@ benchmarks/validation-*/
 .env
 .env.*
 !.env.example
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

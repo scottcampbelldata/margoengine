@@ -78,7 +78,8 @@ export function createLandscape(engine: EngineKernel, shadows: Shadows) {
     device.queue.writeTexture({texture: heightmap}, heights, {bytesPerRow: 256*4}, [256, 256]);
   }, onDeviceRestored(runtime) {heightmap?.destroy(); this.setup(runtime);}, dispose() {heightmap?.destroy(); heightmap = undefined;}});
   Scatter.attach(engine, [grass(3), grass(2), grass(1)], {count: 110_000, area: [ISLAND_SIZE, ISLAND_SIZE], minHeight: 0.9, maxHeight: 13, maxSlope: 32, density: 0.86, scale: [0.6, 1.3], lod: [18, 42, 105], color: [0.19, 0.28, 0.09], seed: 37, heightmap: () => heightmap});
-  Scatter.attach(engine, [toGeometry(icosahedronGeometry(0.65, 1)), toGeometry(icosahedronGeometry(0.65, 0)), toGeometry(icosahedronGeometry(0.42, 0))], {count: 950, area: [ISLAND_SIZE, ISLAND_SIZE], minHeight: 0.25, maxSlope: 55, scale: [0.3, 1.6], lod: [24, 55, 130], color: [0.22, 0.25, 0.21], seed: 9, heightmap: () => heightmap});
+  // Reuse the smooth 80-triangle rock in every ring so its shading, silhouette and size stay consistent.
+  Scatter.attach(engine, toGeometry(icosahedronGeometry(0.65, 1)), {count: 950, area: [ISLAND_SIZE, ISLAND_SIZE], minHeight: 0.25, maxSlope: 55, scale: [0.3, 1.6], lod: [24, 55, 130], color: [0.22, 0.25, 0.21], seed: 9, heightmap: () => heightmap});
   return {wireframe: terrainWireframe, heightmap: () => heightmap};
 }
 

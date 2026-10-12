@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101b2c">
+  <title>Load a glTF triangle · Vexel</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101b2c; color: #e4edf8; }
+    * { box-sizing: border-box; } body { max-width: 1000px; margin: auto; padding: 24px; }
+    h1 { font-size: clamp(25px, 4vw, 36px); margin-bottom: 8px; } p { line-height: 1.6; }
+    a { color: #a8cffd; text-underline-offset: 3px; } #scene { display: block; width: 100%; height: min(65vh, 540px); border: 1px solid #42536b; border-radius: 8px; }
+    button { font: inherit; min-height: 44px; padding: 8px 20px; background: #dceaff; color: #17395f; border: 1px solid #a8cffd; border-radius: 6px; cursor: pointer; touch-action: manipulation; }
+    button:hover { background: white; } button:disabled { opacity: .6; cursor: wait; } :focus-visible { outline: 3px solid #8fc4ff; outline-offset: 4px; }
+    #status { min-height: 26px; overflow-wrap: anywhere; } footer { font-size: 13px; color: #b1c2d8; margin-top: 24px; }
+  </style>
+  <script type="importmap">{
+  "imports": {
+    "@scottcampbelldata/vexel-core": "https://cdn.jsdelivr.net/npm/@scottcampbelldata/vexel-core@0.1.0/dist/index.js",
+    "@scottcampbelldata/vexel-core/extension": "https://cdn.jsdelivr.net/npm/@scottcampbelldata/vexel-core@0.1.0/dist/extension.js",
+    "@scottcampbelldata/vexel-gltf": "https://cdn.jsdelivr.net/npm/@scottcampbelldata/vexel-gltf@0.1.0/dist/index.js"
+  }
+}</script>
+</head>
+<body>
+  <h1>Load a glTF triangle</h1>
+  <p>A complete static glTF model built into the example.</p>
+  <canvas id="scene" role="img" aria-label="Load a glTF triangle">This example needs a browser with WebGPU or WebGL2.</canvas>
+  <p id="status" role="status">Loading published packages…</p>
+  <button id="play" type="button" disabled>Pause</button>
+  <footer>Published packages · 0.1.0 · <a href="https://scottcampbelldata.github.io/vexel/#gltf">Module catalog</a></footer>
+  <script>
+let current, cleanup = () => {}, playing = false;
+const button = document.querySelector('#play');
+const status = document.querySelector('#status');
+const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+function report(error) {
+  current?.stop();
+  button.disabled = true;
+  status.textContent = 'Could not start this example. Serve it on localhost or HTTPS and check browser GPU support. ' + (error?.message || String(error));
+  status.setAttribute('role', 'alert');
+}
+function setPlaying(value) {
+  playing = value;
+  if (playing) current.start();
+  else { current.stop(); current.render(); }
+  button.textContent = playing ? 'Pause' : 'Play';
+  status.textContent = (playing ? 'Running' : 'Paused') + ' · ' + current.backend;
+}
+function attach(engine, dispose = () => {}) {
+  current = engine;
+  cleanup = dispose;
+  current.onError = report;
+  setPlaying(!reduced.matches);
+  button.disabled = false;
+}
+button.addEventListener('click', () => setPlaying(!playing));
+reduced.addEventListener('change', event => { if (event.matches && current) setPlaying(false); });
+addEventListener('error', event => report(event.error || event.message));
+addEventListener('unhandledrejection', event => report(event.reason));
+addEventListener('pagehide', () => { try { cleanup(); } finally { current?.dispose(); } });
+  </script>
+  <script type="module">
+import { Engine } from '@scottcampbelldata/vexel-core';
+import { parseGLTF } from '@scottcampbelldata/vexel-gltf';
+
+const engine = await Engine.create(document.querySelector('canvas'));
+const data = new Float32Array([
+  -1, -1, 0, 1, -1, 0, 0, 1, 0,
+   0,  0, 1, 0,  0, 1, 0, 0, 1,
+]);
+const gltf = {
+  asset: { version: '2.0' },
+  buffers: [{ byteLength: data.byteLength }],
+  bufferViews: [{ buffer: 0, byteLength: 36 }, { buffer: 0, byteOffset: 36, byteLength: 36 }],
+  accessors: [0, 1].map(bufferView => ({ bufferView, componentType: 5126, count: 3, type: 'VEC3' })),
+  meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, material: 0 }] }],
+  materials: [{ doubleSided: true, pbrMetallicRoughness: { baseColorFactor: [0.95, 0.36, 0.12, 1] } }],
+  nodes: [{ mesh: 0, name: 'Triangle' }],
+  scenes: [{ nodes: [0] }], scene: 0,
+};
+const model = parseGLTF(engine, gltf, [data]);
+engine.onFrame((_, delta) => { model.root.rotation.y += delta * 0.5; });
+attach(engine, () => model.dispose());
+// For your own static glTF/GLB file, import loadGLTF and use:
+// const model = await loadGLTF(engine, '/model.glb');
+  </script>
+</body>
+</html>

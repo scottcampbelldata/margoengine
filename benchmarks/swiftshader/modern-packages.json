@@ -1,0 +1,40 @@
+{
+  "hardware": {
+    "webglRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "webgpu": {
+      "vendor": "google",
+      "architecture": "swiftshader",
+      "device": "",
+      "description": "",
+      "fallback": true
+    },
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+    "browserName": "chromium",
+    "browserVersion": "156.0.8078.4",
+    "requestedChannel": "bundled",
+    "launchArgs": [
+      "--enable-unsafe-webgpu",
+      "--enable-features=Vulkan",
+      "--use-vulkan=swiftshader",
+      "--use-webgpu-adapter=swiftshader",
+      "--use-angle=swiftshader",
+      "--enable-unsafe-swiftshader"
+    ],
+    "powerPreference": "high-performance",
+    "hostPlatform": "linux"
+  },
+  "packages": [
+    "@scottcampbelldata/vexel-core",
+    "@scottcampbelldata/vexel-gltf",
+    "@scottcampbelldata/vexel-react",
+    "@scottcampbelldata/vexel-machinery",
+    "@scottcampbelldata/vexel-creative"
+  ],
+  "react": "18.3.1",
+  "checks": [
+    "standalone imports and Wasm",
+    "strict consumer declarations without workspace ambient types",
+    "React 18 SSR",
+    "React 18 StrictMode, nested refs, props, RAF, Suspense and teardown"
+  ]
+}

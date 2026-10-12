@@ -1,0 +1,89 @@
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { once } from 'node:events';
+import { request } from 'node:http';
+import { chromium } from '@playwright/test';
+import { server } from '../scripts/serve-catalog.js';
+
+let url;
+before(async () => {
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  url = `http://127.0.0.1:${server.address().port}`;
+});
+after(() => new Promise(resolve => server.close(resolve)));
+
+test('preview serves static files and rejects escaped paths and unsupported methods', async () => {
+  const page = await fetch(url);
+  assert.equal(page.status, 200);
+  assert.match(page.headers.get('content-type'), /text\/html/);
+  assert.match(await page.text(), /Find what you want to build/);
+  assert.equal((await fetch(`${url}/catalog.json`, { method: 'HEAD' })).status, 200);
+  assert.equal((await fetch(url, { method: 'POST' })).status, 405);
+  assert.equal((await fetch(`${url}/missing.html`)).status, 404);
+  for (const [path, expected] of [['/%ZZ', 400], ['/..%2fpackage.json', 404], ['/%5c..%5cpackage.json', 404]]) {
+    const status = await new Promise((resolve, reject) => {
+      request(`${url}${path}`, response => { response.resume(); resolve(response.statusCode); }).on('error', reject).end();
+    });
+    assert.equal(status, expected, path);
+  }
+});
+
+test('catalog searches, copies exact text, links examples, and handles clipboard denial', async () => {
+  let browser;
+  try { browser = await chromium.launch({ channel: 'msedge', headless: true }); }
+  catch { browser = await chromium.launch({ headless: true }); }
+  try {
+    const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+    const page = await context.newPage();
+    const clipboard = async () => (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');
+    const errors = [];
+    const requests = [];
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('request', request => requests.push(request.url()));
+    await page.goto(url);
+    await page.waitForFunction(() => !document.querySelector('#search').disabled);
+    assert.equal(await page.locator('.module:visible').count(), 5);
+    for (const [term, id] of [['conveyor', 'machinery'], ['SectionPlanes', 'machinery'], ['loadGLTF', 'gltf'], ['particle', 'creative'], ['useFrame', 'react'], ['Camera', 'core']]) {
+      await page.getByLabel('Search modules and API names').fill(term);
+      assert.equal(await page.locator('.module:visible').count(), 1, term);
+      assert.equal(await page.locator('.module:visible').getAttribute('id'), id);
+    }
+    await page.reload();
+    await page.waitForFunction(() => !document.querySelector('#search').disabled);
+    assert.equal(await page.locator('#search').inputValue(), 'Camera');
+    await page.getByLabel('Search modules and API names').fill('<img src=x onerror=alert(1)>');
+    assert.equal(await page.locator('.module:visible').count(), 0);
+    assert.equal(await page.locator('#empty').isVisible(), true);
+    await page.getByRole('button', { name: 'Clear search', exact: true }).click();
+    assert.equal(await page.locator('.module:visible').count(), 5);
+    assert.equal(await page.locator('#search').evaluate(element => element === document.activeElement), true);
+    for (const card of await page.locator('.module').all()) {
+      for (const kind of ['install', 'imports']) {
+        await card.locator(`[data-copy="${kind}"]`).click();
+        assert.equal(await clipboard(), await card.locator(`.${kind}`).textContent());
+      }
+      await card.locator('.source summary').click();
+      await card.locator('[data-copy="example"]').click();
+      const example = await clipboard();
+      const response = await fetch(new URL(await card.locator('.run').getAttribute('href'), url));
+      assert.equal(example, (await response.text()).replace(/\r\n/g, '\n'));
+      assert.match(example, /^<!doctype html>/);
+      await card.locator('.source summary').click();
+    }
+    await page.locator('#machinery .exports summary').click();
+    await page.getByRole('button', { name: 'Copy import for Kinematics', exact: true }).click();
+    assert.equal(await clipboard(), "import { Kinematics } from '@scottcampbelldata/vexel-machinery';");
+    await page.evaluate(() => { navigator.clipboard.writeText = async () => { throw new Error('Denied'); }; });
+    await page.getByRole('button', { name: 'Copy import for SectionPlanes', exact: true }).click();
+    assert.equal(await page.evaluate(() => window.getSelection().toString()), "import { SectionPlanes } from '@scottcampbelldata/vexel-machinery';");
+    assert.match(await page.locator('#copy-status').textContent(), /Ctrl\+C/);
+    for (const width of [375, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `overflow at ${width}px`);
+    }
+    assert.deepEqual(errors, []);
+    assert.equal(requests.some(request => /cdn\.jsdelivr|esm\.sh/.test(request)), false, 'catalog must not load engine packages');
+    await context.close();
+  } finally { await browser.close(); }
+});

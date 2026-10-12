@@ -1,0 +1,116 @@
+{
+  "hardware": {
+    "webglRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "webgpu": {
+      "vendor": "google",
+      "architecture": "swiftshader",
+      "device": "",
+      "description": "",
+      "fallback": true
+    },
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+    "browserName": "chromium",
+    "browserVersion": "156.0.8078.4",
+    "requestedChannel": "bundled",
+    "launchArgs": [
+      "--enable-unsafe-webgpu",
+      "--enable-features=Vulkan",
+      "--use-vulkan=swiftshader",
+      "--use-webgpu-adapter=swiftshader",
+      "--use-angle=swiftshader",
+      "--enable-unsafe-swiftshader"
+    ],
+    "powerPreference": "high-performance",
+    "hostPlatform": "linux"
+  },
+  "checks": [
+    {
+      "name": "Indirect instancing, shader/stencil caps, mirrored transforms, SVG dimensions, actual device.destroy recovery",
+      "cap": [
+        0,
+        186,
+        0
+      ],
+      "recovery": {
+        "store": true,
+        "memory": true,
+        "mesh": true,
+        "matrix": [
+          -1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "name": "257 textured GPU particles sort back to front, sphere/box wind obstacles, padded sort indices",
+      "count": 257
+    },
+    {
+      "name": "Each creative effect produces independently measured image changes",
+      "changedPixels": {
+        "bloom": 13312,
+        "grading": 76800,
+        "dof": 1100,
+        "grain": 50885,
+        "sky": 73200,
+        "fog": 76800,
+        "godRays": 26504
+      }
+    },
+    {
+      "name": "Cap writes plane depth; particle/sky/bloom/fog passes preserve it",
+      "actual": 0.02490249089896679,
+      "expected": 0.02490249089896679
+    },
+    {
+      "name": "Combined packs retain pass descriptors, bind groups and offscreen views; one canvas view per frame",
+      "frames": 5,
+      "groups": 0,
+      "views": 5,
+      "passesPerFrame": 7,
+      "reused": true
+    },
+    {
+      "name": "Combined passes: mid-encoding destruction preserves RAF, Wasm and replaces buffers, textures, bind groups and pipelines",
+      "frames": 20,
+      "recoveryFrames": 7,
+      "errors": [],
+      "state": true,
+      "recreated": true
+    },
+    {
+      "name": "Combined passes: post-submit destruction preserves RAF, Wasm and replaces buffers, textures, bind groups and pipelines",
+      "frames": 20,
+      "recoveryFrames": 7,
+      "errors": [],
+      "state": true,
+      "recreated": true
+    },
+    {
+      "name": "HDR compute bloom/blur, ACES, grading, DOF, grain, sky/scattering/fog/shafts, toon, combined packs, reboot and resize",
+      "hdr": [
+        230,
+        202,
+        204
+      ],
+      "restored": {
+        "newDevice": true,
+        "meshes": 2
+      }
+    }
+  ]
+}

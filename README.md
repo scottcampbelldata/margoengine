@@ -136,3 +136,9 @@ Import the scoped packages listed above. Native STEP/IGES solids and heavier ren
 Run `npm run modern:dev:extensions`, then open `/examples/damaged-helmet.html` for PBR and the SSAO toggle or `/examples/robot-expressive.html` for clip playback and facial morph sliders. The demos download credited sample assets. The three extension packages are local workspace packages and have not been published. Their READMEs document supported glTF features and limits. `npm run modern:test:extensions` checks GPU deformation readback, a 1,001-joint skin, ambient-only SSAO, resize/device recovery, and both demos; `npm run modern:test:packages` checks standalone tarballs and TypeScript consumers.
 
 
+
+## Published-package catalog and historical validation
+
+Run `npm run catalog` to preview the [searchable catalog](docs/README.md) for the original Vexel 0.1.0 npm packages. The catalog retains those published package names; the newer Margo packages are documented above.
+
+[Committed SwiftShader results](benchmarks/README.md#swiftshader-runs-no-gpu) include repeat commands and the [historical conveyor picking failure](benchmarks/swiftshader/conveyor-check-picking-failure.txt). Software-renderer timings do not establish physical GPU performance.

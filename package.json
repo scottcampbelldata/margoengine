@@ -75,6 +75,7 @@
     "apps/showcase-night-citadel"
   ],
   "scripts": {
+    "catalog": "node scripts/serve-catalog.js",
     "dev:sandbox": "vite examples/gameplay-sandbox",
     "build:packages": "node scripts/build-modern.js --precompiled && npm run build --workspace packages --if-present",
     "measure:size": "node scripts/measure-size.js",
