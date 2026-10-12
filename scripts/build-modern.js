@@ -30,7 +30,7 @@ if(!precompiled){
  execFileSync(process.execPath,['node_modules/binaryen/bin/wasm-opt',machineryPath,'-O3','--enable-simd','--enable-bulk-memory','--enable-nontrapping-float-to-int','--strip-debug','--strip-producers','-o',machineryPath+'.optimized'],{stdio:'inherit'});
  await writeFile('packages/machinery/src/wasm.ts',`// Generated machinery kernel; consumers need no Rust toolchain.\nexport const machineryWasm: string = '${gzipSync(await readFile(machineryPath+'.optimized')).toString('base64')}';\n`);
 }
-const featurePackages=['gltf-pro','blender','animation','post','shadows','clustered','vfx','animator','taa','splats','terrain','xr','ifc','usdz','dof','tonemap','lines','stats','inspector','environment','controls'];
+const featurePackages=['gltf-pro','blender','animation','post','shadows','clustered','vfx','animator','taa','splats','geometry','terrain','xr','ifc','usdz','dof','tonemap','lines','stats','inspector','environment','controls'];
 const packages=['core','gltf','react','loaders','exporters','machinery','creative','scenery',...featurePackages,'margoengine'];
 for(const name of packages){
  const output=resolve(`packages/${name}/dist`);assert.equal(dirname(output),resolve(`packages/${name}`),'Output escaped its package');
