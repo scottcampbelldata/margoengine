@@ -224,13 +224,13 @@ export class PBRModel implements EnginePlugin {
       c.device.queue.writeBuffer(r.uniform,0,v as Float32Array<ArrayBuffer>);
       let code=pbrShader;
       if(mode==='beauty')for(const effect of this.lighting)code=effect.shader(code,2);
-      const blend=m.settings[0]===2,key=mode+':'+c.format+':'+blend+':'+c.descriptor.depthStencil!.format+code;
+      const blend=m.settings[0]===2,key=mode+':'+c.format+':'+blend+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+code;
       let pipeline=this.pipelines.get(key);
       if(!pipeline) {
         const module=c.device.createShaderModule({code}),format=mode==='beauty'?c.format:'rgba16float';
         pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:80,attributes:Array.from({length:5},(_,i)=>({shaderLocation:i,offset:i*16,format:'float32x4' as const}))}]},
           fragment:{module,entryPoint:mode==='beauty'?'fragment':mode==='gbuffer'?'gbuffer':'ambientFragment',targets:[{format,blend:blend&&mode!=='gbuffer'?{color:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
-          primitive:{topology:'triangle-list',cullMode:'none'},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:mode==='beauty'&&!blend,depthCompare:mode==='beauty'?'greater-equal':'equal'}});
+          multisample:c.descriptor.multisample,primitive:{topology:'triangle-list',cullMode:'none'},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:mode==='beauty'&&!blend,depthCompare:mode==='beauty'?'greater-equal':'equal'}});
         this.pipelines.set(key,pipeline);
       }
       let groups=r.groups.get(pipeline);

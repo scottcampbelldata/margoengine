@@ -1,0 +1,41 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e10]:
+      - heading "Conveyor assembly" [level=1] [ref=e11]
+      - paragraph [ref=e12]: Individual saved parts · Dimensions in mm
+    - status [ref=e15]: Loading assembly…
+  - generic [ref=e16]:
+    - main "Interactive conveyor assembly" [ref=e17]:
+      - generic "3D conveyor. Drag to rotate, right-drag or choose Pan to move the view, scroll or pinch to zoom. Arrow keys pan, plus and minus zoom, F shows the full assembly. Click a part to select it." [ref=e18]
+      - generic "Connection locations"
+      - navigation "Camera controls" [ref=e19]:
+        - button "Full" [ref=e20] [cursor=pointer]
+        - button "Top" [ref=e21] [cursor=pointer]
+        - button "Side" [ref=e22] [cursor=pointer]
+        - button "Drive" [ref=e23] [cursor=pointer]
+        - button "Under" [ref=e24] [cursor=pointer]
+        - button "Rotate" [pressed] [ref=e25] [cursor=pointer]
+        - button "Pan" [ref=e26] [cursor=pointer]
+        - button "Zoom in" [ref=e27] [cursor=pointer]: +
+        - button "Zoom out" [ref=e28] [cursor=pointer]: −
+      - generic: Drag to rotate · Right-drag or choose Pan to move · Scroll to zoom · F for full view
+      - generic "Assembly controls" [ref=e29]:
+        - generic [ref=e30]:
+          - button "Remove long cover" [pressed] [ref=e31] [cursor=pointer]
+          - button "Remove small cover" [pressed] [ref=e32] [cursor=pointer]
+        - generic [ref=e33]:
+          - generic [ref=e34]: Explode
+          - slider "Exploded assembly amount" [ref=e35]: "0"
+          - button "Restore" [ref=e36] [cursor=pointer]
+      - generic [ref=e38]:
+        - strong [ref=e40]: Loading saved parts
+        - paragraph [ref=e41]: Preparing the assembly for inspection.
+    - complementary "Parts and fit review" [ref=e42]:
+      - generic [ref=e43]:
+        - heading "Choose a part" [level=2] [ref=e44]
+        - generic [ref=e45]: Click the model, or use the parts list.
+      - tablist "Inspection lists" [ref=e46]:
+        - tab "Parts" [selected] [ref=e47] [cursor=pointer]
+        - tab "Fit review" [ref=e48] [cursor=pointer]
+      - tabpanel "Parts" [ref=e50]:
+        - searchbox "Find a saved part" [ref=e51]

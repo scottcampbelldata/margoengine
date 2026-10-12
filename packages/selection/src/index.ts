@@ -1,4 +1,5 @@
 import type {EngineKernel,Mesh} from '@margoengine/core';
+export {Picking} from './picking.js';
 import {engineRuntime,meshRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
 import {fullscreen,meshVertex,group,compute,render,dispatch,draw} from '../../shared/gpu.js';
 declare const GPUBufferUsage:{STORAGE:number;UNIFORM:number;COPY_DST:number};
@@ -30,7 +31,7 @@ const composite=fullscreen+`
 }`;
 export class Selection implements EnginePlugin {
  readonly name='selection';private engine?:Engine;private selected=new Set<Mesh>();private flags=new Uint32Array(0);private buffer?:GPUBuffer;private uniform?:GPUBuffer;
- private mask?:GPUTexture;private fields:GPUTexture[]=[];private steps:GPUBuffer[]=[];private jumps:GPUBindGroup[]=[];private seed?:GPUComputePipeline;private jump?:GPUComputePipeline;private seedGroup?:GPUBindGroup;
+ private mask?:GPUTexture;private msaaMask?:GPUTexture;private sampleCount=1;private fields:GPUTexture[]=[];private steps:GPUBuffer[]=[];private jumps:GPUBindGroup[]=[];private seed?:GPUComputePipeline;private jump?:GPUComputePipeline;private seedGroup?:GPUBindGroup;
  private maskPipeline?:GPURenderPipeline;private composite?:GPURenderPipeline;private bind?:GPUBindGroup;private format='';private depthFormat='';private readonly values=new Float32Array(8);private disposed=false;
  constructor(readonly options:SelectionOptions={}){this.validate();}
  static attach(engine:EngineKernel,options:SelectionOptions={}):Selection {const effect=new Selection(options);engineRuntime(engine).use(effect);return effect;}
@@ -46,9 +47,10 @@ export class Selection implements EnginePlugin {
  }
  registerPasses(graph:FrameGraph):void {graph.add({name:'selection:outline',order:40,execute:c=>{if(c.backend==='webgpu')this.draw(c);}});}
  private resize(c:Context):void {
-  if(this.mask?.width===c.width&&this.mask.height===c.height&&this.format===c.format&&this.depthFormat===c.descriptor.depthStencil!.format)return;
-  this.releaseTargets();this.format=c.format;this.depthFormat=c.descriptor.depthStencil!.format;
+  if(this.mask?.width===c.width&&this.mask.height===c.height&&this.format===c.format&&this.depthFormat===c.descriptor.depthStencil!.format&&this.sampleCount===(c.descriptor.multisample?.count??1))return;
+  this.releaseTargets();this.format=c.format;this.depthFormat=c.descriptor.depthStencil!.format;this.sampleCount=c.descriptor.multisample?.count??1;
   this.mask=c.device.createTexture({size:[c.width,c.height],format:'r8unorm',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});
+  if(this.sampleCount>1)this.msaaMask=c.device.createTexture({size:[c.width,c.height],sampleCount:this.sampleCount,format:'r8unorm',usage:GPUTextureUsage.RENDER_ATTACHMENT});
   this.fields=[0,1].map(()=>c.device.createTexture({size:[c.width,c.height],format:'rg32sint',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.STORAGE_BINDING}));
   this.seedGroup=group(c.device,this.seed!,[this.mask.createView(),this.fields[0].createView()]);
   let step=2**Math.ceil(Math.log2(Math.max(c.width,c.height)))/2,index=0;
@@ -59,18 +61,20 @@ export class Selection implements EnginePlugin {
   const code=meshVertex+'@group(0) @binding(1) var<storage,read> selected:array<u32>; @fragment fn fragment(i:Output)->@location(0) vec4f{return vec4f(f32(selected[i.id]),0,0,1);}';
   const module=c.device.createShaderModule({code});
   this.maskPipeline=c.device.createRenderPipeline({...c.descriptor,layout:'auto',vertex:{...c.descriptor.vertex,module},fragment:{module,entryPoint:'fragment',targets:[{format:'r8unorm'}]},depthStencil:{...c.descriptor.depthStencil!,depthWriteEnabled:false,depthCompare:'equal'}});
-  this.composite=render(c.device,composite,c.format);this.bind=group(c.device,this.composite,[{buffer:this.uniform!},this.mask.createView(),this.fields[index%2].createView()]);
+  this.composite=render(c.device,composite,c.format,{multisample:c.descriptor.multisample});this.bind=group(c.device,this.composite,[{buffer:this.uniform!},this.mask.createView(),this.fields[index%2].createView()]);
  }
  private draw(c:Context):void {
+  if(!this.selected.size)return;
   this.validate();this.resize(c);this.flags.fill(0);for(const mesh of this.selected){const id=meshRuntime(mesh).id;if(this.engine!.meshes.get(id)===mesh)this.flags[id]=1;}
   c.device.queue.writeBuffer(this.buffer!,0,this.flags as Uint32Array<ArrayBuffer>);this.values[0]=this.options.width??3;this.values[1]=+(this.options.algorithm==='morphological');this.values.set(this.options.color??[1,0.5,0],4);c.device.queue.writeBuffer(this.uniform!,0,this.values as Float32Array<ArrayBuffer>);
-  const color=c.color;c.color=this.mask!.createView();
+  const color=c.color;c.color=(this.msaaMask??this.mask)!.createView();
   try{const clear=c.encoder.beginRenderPass({colorAttachments:[{view:c.color,clearValue:{r:0,g:0,b:0,a:0},loadOp:'clear',storeOp:'store'}]});clear.end();c.draw({pipeline:this.maskPipeline!,clear:false,bindings:[{binding:1,resource:{buffer:this.buffer!}}]});}
   finally{c.color=color;}
+  if(this.msaaMask)c.encoder.beginRenderPass({colorAttachments:[{view:this.msaaMask.createView(),resolveTarget:this.mask!.createView(),loadOp:'load',storeOp:'discard'}]}).end();
   if(this.options.algorithm!=='morphological'){dispatch(c,this.seed!,this.seedGroup!,Math.ceil(c.width/8),Math.ceil(c.height/8));for(const bind of this.jumps)dispatch(c,this.jump!,bind,Math.ceil(c.width/8),Math.ceil(c.height/8));}
   draw(c,this.composite!,this.bind!);
  }
- private releaseTargets():void {this.mask?.destroy();for(const t of this.fields)t.destroy();for(const b of this.steps)b.destroy();this.mask=undefined;this.fields=[];this.steps=[];this.jumps=[];this.bind=this.seedGroup=undefined;this.maskPipeline=this.composite=undefined;}
+ private releaseTargets():void {this.mask?.destroy();this.msaaMask?.destroy();this.msaaMask=undefined;for(const t of this.fields)t.destroy();for(const b of this.steps)b.destroy();this.mask=undefined;this.fields=[];this.steps=[];this.jumps=[];this.bind=this.seedGroup=undefined;this.maskPipeline=this.composite=undefined;}
  private release():void {this.releaseTargets();this.buffer?.destroy();this.uniform?.destroy();this.buffer=this.uniform=undefined;this.seed=this.jump=undefined;}
  onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
  dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.selected.clear();this.engine=undefined;}

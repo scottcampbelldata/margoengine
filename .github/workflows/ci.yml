@@ -38,7 +38,7 @@ jobs:
         run: npm run modern:test:game:packages
       - name: Verify packed DOF and tonemapping exports and strict declarations
         run: npm run modern:test:postfx:packages
-      - name: Verify all 37 packed Margo modules and strict TypeScript consumers
+      - name: Verify every packed package and strict TypeScript consumers
         run: npm run test:modules:packages
       - run: npx playwright install chromium
       - name: Stress minimum limits, device loss, rollback and lifecycle cleanup
@@ -82,6 +82,16 @@ jobs:
         env:
           BROWSER_CHANNEL: chromium
           BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader"]'
+      - name: Verify MRT picking, micro-frustum culling, neighborhood resolve and device restoration
+        run: npm run test:browser --workspace @margoengine/selection
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader"]'
+      - name: Verify procedural wind, clouds and finite grazing-angle lighting
+        run: node tests/nature.browser.mjs
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader"]'
       - name: Verify real Rapier simulation and rendered transform synchronization
         run: npm run test:browser --workspace @margoengine/physics
         env:
@@ -106,7 +116,9 @@ jobs:
             test-results/blender/render-*.png
             test-results/modern-postfx.json
             test-results/margo-modules.json
+            test-results/selection-picking.json
             test-results/margo-debug-mobile.png
             test-results/dof-demo.png
             test-results/tonemap-demo.png
+            test-results/nature-*.json
             test-results/temporal-splats.png

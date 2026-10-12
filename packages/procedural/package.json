@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
-  "description": "Marching Cubes surfaces and 3D simplex, Perlin and Worley noise.",
+  "description": "Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces and seeded 3D noise.",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -19,6 +19,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@margoengine/geometry": "0.1.0",
     "isosurface": "1.0.0",
     "simplex-noise": "4.0.3"
   },

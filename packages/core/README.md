@@ -2,6 +2,10 @@
 
 WebGPU rendering with WebGL2 fallback, a deterministic Rust/Wasm transform kernel, instanced PBR, reversed float depth, picking and CAD camera controls.
 
+The WebGPU canvas path uses 4× MSAA with color and depth targets that follow canvas resize. Offscreen capture effects keep their single-sample targets.
+
+`engine.pick(x, y)` updates scene state without forcing a color frame. For cached forward-pass IDs, instance culling in a 3×3 micro frustum and neighbor resolution, attach the optional `Picking` plugin from `@margoengine/selection`.
+
 Package name: `@margoengine/core`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
 
 ```sh

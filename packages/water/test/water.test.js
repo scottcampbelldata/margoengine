@@ -3,6 +3,14 @@ test('water validates nonfolding waves, samples shared scene depth, accumulates 
  const h=optionalGPU(),effect=new Water({segments:4});h.engine.use(effect);h.frame();h.frame();assert.equal(h.counts.indexed,2);assert.equal(h.engine.hasPlugin('optional:scene-depth'),true);h.context.width=64;h.frame();effect.onDeviceRestored(h.engine);h.frame();effect.dispose();assert.equal(h.engine.hasPlugin('optional:scene-depth'),false);assert.ok(h.resources.every(r=>r.destroyed));
  assert.throws(()=>new Water({waves:[{direction:[1,0],amplitude:10,wavelength:1}]}),/fold/);assert.throws(()=>new Water({size:[0,1]}),/options/);
 });
+
+test('moon radiance drives wave glints, foam and the water ambient floor',()=>{
+ const h=optionalGPU();h.engine.lighting={direction:new Float32Array([0.2,0.95,-0.3,0.6]),radiance:new Float32Array([0.25,0.45,0.75,0.09])};
+ const water=new Water({segments:4});h.engine.use(water);h.frame();const uniform=h.resources.find(r=>r.size===448),values=new Float32Array(uniform.data);
+ assert.deepEqual(Array.from(values.subarray(104,108)),Array.from(h.engine.lighting.direction));assert.deepEqual(Array.from(values.subarray(108,111)),Array.from(h.engine.lighting.radiance.subarray(0,3)));assert.equal(values[19],Math.fround(0.09));
+ h.engine.lighting.direction[3]=0;h.engine.lighting.radiance[3]=0;h.frame();assert.equal(values[107],0);assert.equal(values[19],0);
+ water.onDeviceRestored(h.engine);h.frame();water.dispose();assert.ok(h.resources.every(r=>r.destroyed));
+});
 test('wave height adjusts the existing spectrum atomically and rejects folded surfaces',()=>{
  const h=optionalGPU(),effect=new Water({segments:4,waves:[{direction:[1,0],amplitude:0.3,wavelength:12},{direction:[0,1],amplitude:0.15,wavelength:7}]});h.engine.use(effect);
  effect.setWaveHeight(0.6);h.frame();const uniform=h.resources.find(r=>r.size===448),values=new Float32Array(uniform.data);
@@ -58,4 +66,18 @@ test('coastal flow reuses its resources and borrows terrain across resize and re
  assert.equal(terrain.destroyed,false);terrain.destroy();assert.ok(h.resources.every(r=>r.destroyed));
  assert.throws(()=>new Water({terrain:{heightmap:()=>terrain,origin:[0,0],size:[0,1]}}),/terrain/);
  const bad=new Water({terrain:{heightmap:()=>undefined,origin:[0,0],size:[16,16]}});h.engine.use(bad);assert.throws(()=>h.frame(),/heightmap/);bad.dispose();
+});
+
+test('ocean horizon retains the central grid and supplies larger sample footprints offshore',()=>{
+ const bounded=new Water({size:[160,160],segments:32}),ocean=new Water({size:[160,160],segments:32,horizon:true});
+ assert.equal(ocean.positions.length,bounded.positions.length);assert.deepEqual(ocean.triangles,bounded.triangles);
+ for(let i=0;i<bounded.positions.length;i+=3){
+  const x=bounded.positions[i],z=bounded.positions[i+1];
+  if(Math.abs(x)<55&&Math.abs(z)<55)assert.deepEqual(ocean.positions.subarray(i,i+3),bounded.positions.subarray(i,i+3));
+  assert.ok(ocean.positions[i+2]>=bounded.positions[i+2]);
+ }
+ assert.equal(bounded.positions[0],-80);assert.ok(ocean.positions[0]<-10000);assert.ok(ocean.positions[2]>1000);
+ const h=optionalGPU();h.engine.use(ocean);h.frame();const pipeline=h.pipelines.find(p=>p.fragment?.targets.length===2);
+ assert.equal(pipeline.vertex.buffers[0].arrayStride,12);assert.match(pipeline.vertex.module.code,/const HORIZON=true;/);
+ ocean.dispose();bounded.dispose();assert.ok(h.resources.every(r=>r.destroyed));assert.throws(()=>new Water({horizon:'yes'}),/options/);
 });

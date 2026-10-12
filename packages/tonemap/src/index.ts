@@ -92,10 +92,11 @@ export class Tonemap implements EnginePlugin {
     if(!texture||texture.width!==c.width||texture.height!==c.height||texture.dimension!=='2d'||texture.sampleCount!==1||
       texture.format!=='rgba16float'&&texture.format!=='rgba32float'||!(texture.usage&GPUTextureUsage.TEXTURE_BINDING))throw new Error('Tonemap requires a viewport-sized, sampleable linear HDR texture');
     const format=this.source?c.format:this.format!;
-    if(!this.pipeline||this.pipelineFormat!==format){
+    const key=format+':'+c.descriptor.multisample?.count;
+    if(!this.pipeline||this.pipelineFormat!==key){
       const module=c.device.createShaderModule({code:tonemapShader});
-      this.pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format}]}});
-      this.pipelineFormat=format;this.group=undefined;
+      this.pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format}]},multisample:c.descriptor.multisample});
+      this.pipelineFormat=key;this.group=undefined;
     }
     if(!this.group||this.sourceTexture!==texture){
       this.group=c.device.createBindGroup({layout:this.pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform!}},
@@ -108,7 +109,7 @@ export class Tonemap implements EnginePlugin {
     const pass=c.encoder.beginRenderPass(this.presentation);pass.setPipeline(this.pipeline);pass.setBindGroup(0,this.group);pass.draw(3);pass.end();
     if(!this.source){c.color=this.original!;c.format=format;}
   }
-  private pipelineFormat?:GPUTextureFormat;
+  private pipelineFormat?:string;
   private release():void {this.uniform?.destroy();this.scene?.destroy();this.lutTexture?.destroy();this.uniform=undefined;this.scene=undefined;this.sceneView=undefined;this.lutTexture=undefined;this.sourceTexture=undefined;this.pipeline=undefined;this.group=undefined;this.original=undefined;this.shaders.clear();}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.lut=undefined;this.engine=undefined;}

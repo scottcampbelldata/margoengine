@@ -1,15 +1,24 @@
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
 import {fullscreen,group,compute,dispatch} from '../../shared/gpu.js';
-import {invert} from '../../shared/math.js';
+import {invert,finiteVector} from '../../shared/math.js';
+import {cloudShader} from './clouds.js';
 import {atmosphere,transmittance,single,density,multiple,add} from './atmosphere.js';
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
 declare const GPUTextureUsage:{STORAGE_BINDING:number;TEXTURE_BINDING:number};
-export interface SkyOptions {model?:'preetham'|'bruneton';hours?:number;timeScale?:number;turbidity?:number;exposure?:number}
+type Color=readonly [number,number,number];
+const moonColor:Color=[0.25,0.45,0.75];
+export interface SkyLightingOptions {intensity?:number;minimum?:number;color?:Color;moon?:{intensity?:number;color?:Color};ambient?:{day:Color;night:Color}}
+export interface SkyCloudOptions {coverage?:number;speed?:number;height?:number}
+export interface SkyOptions {clouds?:SkyCloudOptions;model?:'preetham'|'bruneton';hours?:number;timeScale?:number;turbidity?:number;exposure?:number;lighting?:SkyLightingOptions}
 export function sunDirection(hours:number,out=new Float32Array(3)):Float32Array {if(!Number.isFinite(hours)||out.length!==3)throw new RangeError('Invalid sun clock');const angle=(hours%24-6)*Math.PI/12;out[0]=Math.cos(angle);out[1]=Math.sin(angle);out[2]=0;return out;}
-const code=fullscreen+atmosphere+`
+const code=fullscreen+atmosphere+cloudShader+`
 @group(0) @binding(1) var scattering:texture_2d<f32>;
 @group(0) @binding(2) var transmission:texture_2d<f32>;
+fn nightSky(w:vec3f)->vec3f {
+ let alignment=max(0.0,dot(w,frame.moon.xyz));let disk=smoothstep(cos(0.0047),cos(0.0045),alignment);
+ return mix(vec3f(0.012,0.019,0.038),vec3f(0.003,0.006,0.02),sqrt(max(0.0,w.y)))+frame.moonColor.rgb*frame.moon.w*(0.03*pow(alignment,32.0)+disk*4.0);
+}
 fn perez(theta:f32,gamma:f32,a:f32,b:f32,c:f32,d:f32,e:f32)->f32{return (1.0+a*exp(b/max(0.01,cos(theta))))*(1.0+c*exp(d*gamma)+e*cos(gamma)*cos(gamma));}
 fn preetham(w:vec3f,s:vec3f)->vec3f {
  let t=frame.settings.z;let theta=acos(clamp(w.y,0.01,1.0));let gamma=acos(clamp(dot(w,s),-1.0,1.0));let z=acos(clamp(s.y,0.01,1.0));let z2=z*z;let z3=z2*z;
@@ -26,7 +35,8 @@ fn preetham(w:vec3f,s:vec3f)->vec3f {
  let p=frame.inverse*vec4f(i.uv.x*2.0-1.0,1.0-i.uv.y*2.0,0.000001,1);let w=normalize(p.xyz/p.w-frame.eye.xyz);let s=frame.sun.xyz;
  var color=vec3f(0);if(frame.settings.x<0.5){color=preetham(w,s);}else{let r=R+clamp(frame.eye.w,0.001,99.9);color=lookup(scattering,r,w.y,s.y,dot(w,s));}
  let disk=smoothstep(cos(0.0047),cos(0.0045),dot(w,s));color+=disk*trans(transmission,R+clamp(frame.eye.w,0.001,99.9),s.y)*20.0;
- color*=exp2(frame.settings.y);if(frame.settings.w<0.5){color=pow(color/(1.0+color),vec3f(1.0/2.2));}return vec4f(color,1);
+ color=mix(color,nightSky(w),frame.sun.w);
+ color=cloudSky(color,w,max(length(dpdx(w)),length(dpdy(w))));color*=exp2(frame.settings.y);if(frame.settings.w<0.5){color=pow(color/(1.0+color),vec3f(1.0/2.2));}return vec4f(color,1);
 }`;
 const reflection=code+`
 @group(0) @binding(3) var reflectionMap:texture_storage_2d<rgba16float,write>;
@@ -37,22 +47,33 @@ const reflection=code+`
  let ray=normalize(vec3f(w.x,max(0.001,w.y),w.z));var color=vec3f(0);
  if(frame.settings.x<0.5){color=preetham(ray,s);}else{color=lookup(scattering,R+clamp(frame.eye.w,0.001,99.9),ray.y,s.y,dot(ray,s));}
  color=mix(vec3f(0.015,0.018,0.012),color,smoothstep(-0.2,0.02,w.y));
+ color=mix(color,nightSky(w),frame.sun.w);
+ color=cloudSky(color,w,0.1);
  textureStore(reflectionMap,vec2i(id.xy),vec4f(color*exp2(frame.settings.y),1));
 }`;
 export class Sky implements EnginePlugin {
  private readonly attachment:GPURenderPassColorAttachment={view:undefined!,loadOp:'load',storeOp:'store'};
  private readonly depthAttachment:GPURenderPassDepthStencilAttachment={view:undefined!,depthReadOnly:true,stencilReadOnly:true};
  private readonly presentation:GPURenderPassDescriptor={colorAttachments:[this.attachment],depthStencilAttachment:this.depthAttachment};
- readonly name='sky';private engine?:Engine;private uniform?:GPUBuffer;private textures:GPUTexture[]=[];private pipelines:GPUComputePipeline[]=[];private groups:GPUBindGroup[]=[];private render?:GPURenderPipeline;private bind?:GPUBindGroup;private format='';private computedT=NaN;private readonly values=new Float32Array(28);private readonly inverse=this.values.subarray(0,16);private readonly scratch=new Float64Array(52);readonly sun=new Float32Array(3);private disposed=false;
+ readonly name='sky';private engine?:Engine;private uniform?:GPUBuffer;private textures:GPUTexture[]=[];private pipelines:GPUComputePipeline[]=[];private groups:GPUBindGroup[]=[];private render?:GPURenderPipeline;private bind?:GPUBindGroup;private format='';private computedT=NaN;private readonly values=new Float32Array(40);private readonly inverse=this.values.subarray(0,16);private readonly scratch=new Float64Array(52);readonly sun=new Float32Array(3);readonly moon=Float32Array.from([-0.3,0.9,-0.2],v=>v/Math.hypot(0.3,0.9,0.2));private disposed=false;
+ private cloudTime=0;private ambient?:GPUBuffer;private ambientEntry?:GPUBindGroupEntry;private readonly ambientValues=new Float32Array(4);private source='';private litShader='';
  private reflectionPipeline?:GPUComputePipeline;private reflectionGroup?:GPUBindGroup;private reflectionRequested=false;private readonly reflectionPass:GPUComputePassDescriptor={};
  /** Borrowed linear HDR sky environment; rebuilt on device restoration. */
  get reflectionTexture():GPUTexture|undefined{this.reflectionRequested=true;return this.textures[6];}
  constructor(readonly options:SkyOptions={}){this.validate();}
- private validate():void {const o=this.options;if(o.model!==undefined&&o.model!=='preetham'&&o.model!=='bruneton'||!Number.isFinite(o.hours??12)||!Number.isFinite(o.timeScale??1/3600)||Math.abs(o.timeScale??1/3600)>24||!Number.isFinite(o.turbidity??2)||(o.turbidity??2)<1||(o.turbidity??2)>10||!Number.isFinite(o.exposure??0)||Math.abs(o.exposure??0)>16)throw new RangeError('Invalid sky options');}
+ private validate():void {
+  const o=this.options;if(o.model!==undefined&&o.model!=='preetham'&&o.model!=='bruneton'||!Number.isFinite(o.hours??12)||!Number.isFinite(o.timeScale??1/3600)||Math.abs(o.timeScale??1/3600)>24||!Number.isFinite(o.turbidity??2)||(o.turbidity??2)<1||(o.turbidity??2)>10||!Number.isFinite(o.exposure??0)||Math.abs(o.exposure??0)>16||o.lighting!==undefined&&(typeof o.lighting!=='object'||o.lighting===null||!Number.isFinite(Math.fround(o.lighting.intensity??1))||(o.lighting.intensity??1)<0||!Number.isFinite(Math.fround(o.lighting.minimum??0))||(o.lighting.minimum??0)<0))throw new RangeError('Invalid sky options');
+  const clouds=o.clouds;if(clouds!==undefined&&(typeof clouds!=='object'||clouds===null||!Number.isFinite(clouds.coverage??0.45)||(clouds.coverage??0.45)<0||(clouds.coverage??0.45)>1||!Number.isFinite(clouds.speed??8)||Math.abs(clouds.speed??8)>100||!Number.isFinite(clouds.height??1500)||(clouds.height??1500)<100||(clouds.height??1500)>10000))throw new RangeError('Invalid sky clouds');
+  const l=o.lighting;if(!l)return;
+  if(l.moon!==undefined&&(typeof l.moon!=='object'||l.moon===null||!Number.isFinite(Math.fround(l.moon.intensity??(l.intensity??1)*0.1))||(l.moon.intensity??0)<0)||l.ambient!==undefined&&(typeof l.ambient!=='object'||l.ambient===null))throw new RangeError('Invalid sky night options');
+  for(const color of [l.color,l.moon?.color,l.ambient?.day,l.ambient?.night])if(color!==undefined){finiteVector(color,3,'Sky color');if(color.some(v=>v<0))throw new RangeError('Invalid sky color');}
+  if(l.ambient&&(!l.ambient.day||!l.ambient.night))throw new RangeError('Invalid sky ambient colors');
+ }
  static attach(engine:EngineKernel,options:SkyOptions={}):Sky {const effect=new Sky(options);engineRuntime(engine).use(effect);return effect;}
  setup(engine:Engine):void {
   if(this.disposed||!engine.gpu)throw new Error('Sky requires WebGPU');this.engine=engine;const d=engine.gpu;
-  this.uniform=d.createBuffer({size:112,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+  this.uniform=d.createBuffer({size:160,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+  this.ambient=d.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});this.ambientEntry={binding:8,resource:{buffer:this.ambient}};
   this.textures=[d.createTexture({size:[128,32],format:'rgba16float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.STORAGE_BINDING}),...[0,1,2,3,4].map(()=>d.createTexture({size:[128,256],format:'rgba16float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.STORAGE_BINDING}))];
   this.pipelines=[transmittance,single,density,multiple,add].map(s=>compute(d,s));const t=this.textures.map(t=>t.createView()),u={buffer:this.uniform};
   this.groups=[group(d,this.pipelines[0],[u,t[0]]),group(d,this.pipelines[1],[u,t[0],t[1],t[3]])];
@@ -61,18 +82,40 @@ export class Sky implements EnginePlugin {
   }
   const reflected=d.createTexture({size:[64,32],format:'rgba16float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.STORAGE_BINDING});this.textures.push(reflected);this.reflectionPipeline=compute(d,reflection,'reflectSky');this.reflectionGroup=d.createBindGroup({layout:this.reflectionPipeline.getBindGroupLayout(0),entries:[{binding:0,resource:u},{binding:1,resource:t[4]},{binding:3,resource:reflected.createView()}]});
  }
- registerPasses(graph:FrameGraph):void {graph.add({name:'sky:atmosphere',order:2,execute:c=>{if(c.backend==='webgpu')this.draw(c);}});}
+ registerPasses(graph:FrameGraph):void {
+  graph.add({name:'sky:lighting',order:-6,execute:c=>{
+   if(c.backend!=='webgpu'||!this.options.lighting?.ambient)return;
+   if(this.source!==c.shader){const patched=c.shader.replace('frame.radiance.w','skyAmbient.rgb');if(patched===c.shader)throw new Error('Sky ambient requires the standard PBR shader');this.source=c.shader;this.litShader='@group(0) @binding(8) var<uniform> skyAmbient:vec4f;\n'+patched;}
+   c.device.queue.writeBuffer(this.ambient!,0,this.ambientValues as Float32Array<ArrayBuffer>);c.shader=this.litShader;c.bindings.push(this.ambientEntry!);
+  }});
+  graph.add({name:'sky:atmosphere',order:2,execute:c=>{if(c.backend==='webgpu')this.draw(c);}});
+ }
+ onPreUpdate(delta:number):void {
+  this.validate();if(!Number.isFinite(delta)||delta<0)throw new RangeError('Invalid sky delta');
+  this.cloudTime+=delta*(this.options.clouds?.speed??8);
+  this.options.hours=(((this.options.hours??12)+delta*(this.options.timeScale??1/3600))%24+24)%24;sunDirection(this.options.hours,this.sun);
+  const l=this.options.lighting,t=Math.max(0,Math.min(1,(this.sun[1]+0.12)/0.2)),night=1-t*t*(3-2*t);
+  this.values[23]=night;this.values.set(this.moon,28);this.values[31]=l?.moon?(l.moon.intensity??(l.intensity??1)*0.1)*night:0;this.values.set(l?.moon?.color??moonColor,32);
+  if(l&&this.engine){
+   const {direction,radiance}=this.engine.lighting,solar=Math.max(0,this.sun[1])*(l.intensity??1),lunar=this.values[31],weight=solar+lunar>0?solar/(solar+lunar):1;
+   // shortcut: one blended directional source shares PCSS, use separate shadow maps for simultaneous sun/moon shadows.
+   direction.set(this.sun);if(l.moon){for(let i=0;i<3;i++)direction[i]=this.sun[i]*weight+this.moon[i]*(1-weight);const norm=Math.hypot(direction[0],direction[1],direction[2]);for(let i=0;i<3;i++)direction[i]/=norm;}
+   direction[3]=Math.max(l.minimum??0,solar+lunar);
+   if(l.color||l.moon)for(let i=0;i<3;i++)radiance[i]=(l.color?.[i]??1)*weight+(l.moon?.color?.[i]??moonColor[i])*(1-weight);
+   if(l.ambient){for(let i=0;i<3;i++)this.ambientValues[i]=l.ambient.day[i]*(1-night)+l.ambient.night[i]*night;radiance[3]=Math.max(...this.ambientValues);}
+  }
+ }
  private draw(c:Extract<PassContext,{backend:'webgpu'}>):void {
-  this.validate();this.options.hours=((this.options.hours??12)+c.delta*(this.options.timeScale??1/3600)+24)%24;sunDirection(this.options.hours,this.sun);
-  if(!invert(this.inverse,c.camera.matrix,0,this.scratch))throw new Error('Invalid sky camera');this.values.set(c.camera.position,16);this.values[19]=Math.max(0.001,c.camera.position[1]/1000);this.values.set(this.sun,20);this.values[24]=+(this.options.model==='bruneton');this.values[25]=this.options.exposure??0;this.values[26]=this.options.turbidity??2;this.values[27]=+(c.format==='rgba16float');c.device.queue.writeBuffer(this.uniform!,0,this.values as Float32Array<ArrayBuffer>);
+  this.validate();
+  if(!invert(this.inverse,c.camera.matrix,0,this.scratch))throw new Error('Invalid sky camera');this.values.set(c.camera.position,16);this.values[19]=Math.max(0.001,c.camera.position[1]/1000);this.values.set(this.sun,20);this.values[24]=+(this.options.model==='bruneton');this.values[25]=this.options.exposure??0;this.values[26]=this.options.turbidity??2;this.values[36]=this.options.clouds?(this.options.clouds.coverage??0.45):0;this.values[37]=this.cloudTime;this.values[38]=this.options.clouds?.height??1500;this.values[27]=+(c.format==='rgba16float');c.device.queue.writeBuffer(this.uniform!,0,this.values as Float32Array<ArrayBuffer>);
   if(this.computedT!==(this.options.turbidity??2)){dispatch(c,this.pipelines[0],this.groups[0],16,4);dispatch(c,this.pipelines[1],this.groups[1],16,32);
    for(let i=0;i<3;i++){dispatch(c,this.pipelines[2],this.groups[2+i*3],16,32);dispatch(c,this.pipelines[3],this.groups[3+i*3],16,32);dispatch(c,this.pipelines[4],this.groups[4+i*3],16,32);}this.computedT=this.options.turbidity??2;
   }
   if(this.reflectionRequested){const reflected=c.encoder.beginComputePass(this.reflectionPass);reflected.setPipeline(this.reflectionPipeline!);reflected.setBindGroup(0,this.reflectionGroup!);reflected.dispatchWorkgroups(8,4);reflected.end();}
-  if(this.format!==c.format){const module=c.device.createShaderModule({code});this.render=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]},depthStencil:{format:c.descriptor.depthStencil!.format,depthCompare:'greater-equal',depthWriteEnabled:false}});this.bind=group(c.device,this.render,[{buffer:this.uniform!},this.textures[4].createView(),this.textures[0].createView()]);this.format=c.format;}
+  if(this.format!==c.format+':'+c.descriptor.multisample?.count){const module=c.device.createShaderModule({code});this.render=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]},multisample:c.descriptor.multisample,depthStencil:{format:c.descriptor.depthStencil!.format,depthCompare:'greater-equal',depthWriteEnabled:false}});this.bind=group(c.device,this.render,[{buffer:this.uniform!},this.textures[4].createView(),this.textures[0].createView()]);this.format=c.format+':'+c.descriptor.multisample?.count;}
   this.attachment.view=c.color;this.depthAttachment.view=c.depth;const pass=c.encoder.beginRenderPass(this.presentation);pass.setPipeline(this.render!);pass.setBindGroup(0,this.bind!);pass.draw(3);pass.end();
  }
- private release():void {this.uniform?.destroy();for(const t of this.textures)t.destroy();this.uniform=undefined;this.textures=[];this.pipelines=[];this.groups=[];this.render=undefined;this.bind=undefined;this.reflectionPipeline=undefined;this.reflectionGroup=undefined;this.format='';this.computedT=NaN;}
+ private release():void {this.uniform?.destroy();this.ambient?.destroy();this.ambient=undefined;this.ambientEntry=undefined;this.source=this.litShader='';for(const t of this.textures)t.destroy();this.uniform=undefined;this.textures=[];this.pipelines=[];this.groups=[];this.render=undefined;this.bind=undefined;this.reflectionPipeline=undefined;this.reflectionGroup=undefined;this.format='';this.computedT=NaN;}
  onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
  dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.engine=undefined;}
 }

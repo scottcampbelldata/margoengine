@@ -23,4 +23,10 @@ around `position` (default zero). `intensity` multiplies RGB for HDR emission,
 
 One million particles use 128 MB for state plus 4 MB for live indices, regardless of the live count. Per-frame CPU work is bounded uniform updates and pass submission; there is no JavaScript object/array per particle. GPU performance still depends on capacity, fill rate and hardware. This package does not replace the smaller textured/weather particles in `margoengine-creative`.
 
-`gpuState` exposes the current particle and indirect buffers for tests/custom integrations. Particle records are 16 floats (64 bytes); indirect arguments are five 32-bit words. `dispose()`/`destroy()` releases owned buffers. Device restoration recreates simulation resources and starts with dead particles. Attach multiple emitters independently; none enter the core/stage bundle.
+`initialCount` queues an initial burst on attachment and again after device
+restoration. It defaults to 0 and must be an integer from 0 through capacity.
+For a continuously populated field, use `initialCount: capacity`; this replaces
+application restoration hooks. Restoration reseeds particles rather than preserving
+their previous positions and ages.
+
+`gpuState` exposes the current particle and indirect buffers for tests/custom integrations. Particle records are 16 floats (64 bytes); indirect arguments are five 32-bit words. `dispose()`/`destroy()` releases owned buffers. Device restoration recreates simulation resources. Attach multiple emitters independently; none enter the core/stage bundle.

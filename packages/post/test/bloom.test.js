@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {Bloom, SSAO} from '../dist/index.js';
 import {optionalGPU} from '../../../tests/support/optional-gpu.js';
 
-test('Bloom captures HDR, borrows depth, caches GPU resources, resizes and restores without leaks', () => {
+test('Bloom captures HDR, preserves scene depth for later overlays, resizes and restores without leaks', () => {
   const h=optionalGPU(), effect=new Bloom(); h.engine.use(effect);h.frame();
-  assert.equal(effect.depthTexture.width,128); assert.equal(h.context.color,h.originalColor);assert.equal(h.context.depth,h.originalDepth);
+  assert.equal(effect.depthTexture.width,128); assert.equal(h.context.color,h.originalColor);assert.equal(h.context.depth.texture,effect.depthTexture);
   const scene=effect.sceneTexture;assert.equal(scene.format,'rgba16float');assert.ok(scene.usage&GPUTextureUsage.COPY_SRC);
   const groups=h.counts.groups,textures=h.counts.textures,descriptors=[];
   const render=h.context.encoder.beginRenderPass;h.context.encoder.beginRenderPass=descriptor=>{descriptors.push(descriptor);return render(descriptor);};

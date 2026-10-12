@@ -28,8 +28,11 @@ export class GPURenderer implements Renderer {
   get gpu():GPUDevice{return this.device;}
   readonly backend = 'webgpu';
   private readonly frame = new Float32Array(28);
-  private depth?: GPUTexture;
-  private depthView?:GPUTextureView;
+  private targets:GPUTexture[]=[];
+  private views:GPUTextureView[]=[];
+  private resolveTarget?:GPUTextureView;
+  private preserveMSAA=false;
+  private readonly singleSampleDescriptor:GPURenderPipelineDescriptor;
   private passDescriptor?:GPURenderPassDescriptor;
   private readonly drawBatches:Batch[]=[];
   private readonly commands:GPUCommandBuffer[]=[];
@@ -60,7 +63,7 @@ export class GPURenderer implements Renderer {
           {arrayStride:24,attributes:[{shaderLocation:0,offset:0,format:'float32x3'},{shaderLocation:1,offset:12,format:'float32x3'}]},
           {arrayStride:96,stepMode:'instance',attributes:Array.from({length:6},(_,i)=>({shaderLocation:i+2,offset:i*16,format:'float32x4' as const}))}
         ]}, fragment:{module,entryPoint:'fragment',targets:[{format}]}, primitive:{topology:'triangle-list',cullMode:'none'},
-        depthStencil:{format:device.features.has('depth32float-stencil8')?'depth32float-stencil8':'depth32float',depthWriteEnabled:true,depthCompare:'greater-equal'}
+        depthStencil:{format:device.features.has('depth32float-stencil8')?'depth32float-stencil8':'depth32float',depthWriteEnabled:true,depthCompare:'greater-equal'},multisample:{count:4}
       };
       const pipeline=await device.createRenderPipelineAsync(descriptor);
       const context = canvas.getContext('webgpu') as GPUCanvasContext|null; if (!context) throw new Error('WebGPU canvas unavailable');
@@ -69,6 +72,7 @@ export class GPURenderer implements Renderer {
   }
 
   private constructor(private readonly canvas: HTMLCanvasElement, private readonly device: GPUDevice, private readonly context: GPUCanvasContext, private readonly format: GPUTextureFormat, private readonly pipeline: GPURenderPipeline,private readonly descriptor:GPURenderPipelineDescriptor) {
+    this.singleSampleDescriptor={...descriptor,multisample:{count:1}};
     this.uniform=device.createBuffer({size:112,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
     this.bindGroup=device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform}}]});
     try { context.configure({device,format,alphaMode:'opaque'}); } catch(error) { this.uniform.destroy(); throw error; }
@@ -105,21 +109,25 @@ export class GPURenderer implements Renderer {
     if(this.lost)throw this.lost;
     const {width,height}=this.canvas;
     if(width!==this.width||height!==this.height) {
-      const depth=this.device.createTexture({size:[width,height],format:this.descriptor.depthStencil!.format,usage:GPUTextureUsage.RENDER_ATTACHMENT});
-      this.depth?.destroy(); this.depth=depth;this.depthView=depth.createView(); this.width=width; this.height=height;
+      for(const target of this.targets)target.destroy();this.targets=[];this.views=[];
+      // Capture passes can replace only color, so retain a single-sample depth target.
+      for(const format of [this.descriptor.depthStencil!.format,this.format,this.descriptor.depthStencil!.format]){const target=this.device.createTexture({size:[width,height],sampleCount:this.targets.length?4:1,format,usage:GPUTextureUsage.RENDER_ATTACHMENT});this.targets.push(target);this.views.push(target.createView());}
+      this.width=width;this.height=height;
     }
     this.frame.set(camera.matrix); this.frame.set(camera.position,16); this.frame.set(lighting.direction,20); this.frame.set(lighting.radiance,24);
     this.device.queue.writeBuffer(this.uniform,0,this.frame);
     const encoder=this.device.createCommandEncoder();
     this.frameId++;
     const drawBatches=this.drawBatches;let count=0;for(const batch of batches)drawBatches[count++]=batch;drawBatches.length=count;
-    const color=this.context.getCurrentTexture().createView(),depth=this.depthView!;
+    const color=this.resolveTarget=this.context.getCurrentTexture().createView(),depth=this.views[0];
+    this.preserveMSAA=graph.revision!==0;
     const context=this.passContext??={backend:'webgpu',draw:(options:DrawOptions=defaultDraw)=>{
     const context=this.passContext!;
+    if(context.color===this.resolveTarget&&context.depth===this.views[0]){context.color=this.views[1];context.depth=this.views[2];context.descriptor=this.descriptor;}
     let pipeline=options.pipeline??this.pipeline;const bindings=options.bindings??context.bindings;
-    if(!options.pipeline&&(context.shader!==wgsl||context.format!==this.format)){
-      const key=context.format+context.shader;let cached=this.variants.get(key);
-      if(!cached){if(this.variants.size>=64)throw new RangeError('Too many shader variants');const module=this.device.createShaderModule({code:context.shader});cached=this.device.createRenderPipeline({...this.descriptor,vertex:{...this.descriptor.vertex,module},fragment:{...this.descriptor.fragment!,module,targets:[{format:context.format}]}});this.variants.set(key,cached);}pipeline=cached;
+    if(!options.pipeline&&(context.shader!==wgsl||context.format!==this.format||context.descriptor!==this.descriptor)){
+      const key=context.descriptor.multisample?.count+context.format+context.shader;let cached=this.variants.get(key);
+      if(!cached){if(this.variants.size>=64)throw new RangeError('Too many shader variants');const module=this.device.createShaderModule({code:context.shader});cached=this.device.createRenderPipeline({...context.descriptor,vertex:{...this.descriptor.vertex,module},fragment:{...this.descriptor.fragment!,module,targets:[{format:context.format}]}});this.variants.set(key,cached);}pipeline=cached;
     }
     let group=this.bindGroup;
     if(pipeline!==this.pipeline||bindings.length){let cached=this.groups.get(pipeline);if(!cached||cached.bindings.length!==bindings.length||bindings.some((entry,i)=>entry.resource!==cached!.bindings[i].resource)){
@@ -127,7 +135,11 @@ export class GPURenderer implements Renderer {
     const clear=options.clear??true;
     const descriptor=this.passDescriptor??={colorAttachments:[{view:context.color,clearValue:{r:0.018,g:0.023,b:0.035,a:1},loadOp:'clear',storeOp:'store'}],depthStencilAttachment:{view:context.depth,depthClearValue:0,depthLoadOp:'clear',depthStoreOp:'store'}};
     const attachment=(descriptor.colorAttachments as GPURenderPassColorAttachment[])[0],depth=descriptor.depthStencilAttachment!;attachment.view=context.color;attachment.loadOp=clear?'clear':'load';depth.view=context.depth;depth.depthLoadOp=attachment.loadOp;
-    if(this.descriptor.depthStencil!.format.includes('stencil')){depth.stencilClearValue=options.stencilClear??0;depth.stencilLoadOp=clear||options.stencilClear!==undefined?'clear':'load';depth.stencilStoreOp='store';}
+    attachment.resolveTarget=context.color===this.views[1]?this.resolveTarget:undefined;
+    // Later scene passes load MSAA color and depth until the final resolve.
+    attachment.storeOp=depth.depthStoreOp=attachment.resolveTarget&&!this.preserveMSAA?'discard':'store';
+    descriptor.colorAttachments=[attachment,...options.colorAttachments??[]];
+    if(this.descriptor.depthStencil!.format.includes('stencil')){depth.stencilClearValue=options.stencilClear??0;depth.stencilLoadOp=clear||options.stencilClear!==undefined?'clear':'load';depth.stencilStoreOp=depth.depthStoreOp;}
     const pass=context.encoder.beginRenderPass(descriptor);
     pass.setPipeline(pipeline); pass.setBindGroup(0,group);
     for(const batch of drawBatches) if(batch.count) {
@@ -137,8 +149,8 @@ export class GPURenderer implements Renderer {
       if(options.indirect??context.indirect){resource.indirect??=this.device.createBuffer({size:20,usage:GPUBufferUsage.INDIRECT|GPUBufferUsage.COPY_DST});resource.command??=new Uint32Array([batch.geometry.indices.length,0,0,0,0]);if(resource.command[1]!==batch.count){resource.command[1]=batch.count;this.device.queue.writeBuffer(resource.indirect,0,resource.command as Uint32Array<ArrayBuffer>);}pass.drawIndexedIndirect(resource.indirect,0);}else pass.drawIndexed(batch.geometry.indices.length,batch.count);
     }
     pass.end();}} as Extract<PassContext,{backend:'webgpu'}>;
-    context.draw=this.draw??=context.draw;context.descriptor=this.descriptor;context.device=this.device;context.encoder=encoder;context.color=color;context.depth=depth;context.camera=camera;context.width=width;context.height=height;context.delta=delta;context.format=this.format;context.shader=wgsl;context.bindings=this.bindings;this.bindings.length=0;context.indirect=false;
-    graph.execute(context);if(!this.deviceLost&&!this.disposed){this.commands[0]=encoder.finish();this.device.queue.submit(this.commands);}
+    context.draw=this.draw??=context.draw;context.descriptor=this.singleSampleDescriptor;context.device=this.device;context.encoder=encoder;context.color=color;context.depth=depth;context.camera=camera;context.width=width;context.height=height;context.delta=delta;context.format=this.format;context.shader=wgsl;context.bindings=this.bindings;this.bindings.length=0;context.indirect=false;
+    graph.execute(context);if(!this.deviceLost&&!this.disposed){if(context.descriptor===this.descriptor&&this.preserveMSAA)encoder.beginRenderPass({colorAttachments:[{view:this.views[1],resolveTarget:color,loadOp:'load',storeOp:'discard'}],depthStencilAttachment:{view:this.views[2],depthLoadOp:'load',depthStoreOp:'discard',stencilReadOnly:true}}).end();this.commands[0]=encoder.finish();this.device.queue.submit(this.commands);}
   }
   async pick(camera:Camera,lighting:Lighting,batches:Iterable<Batch>,graph:FrameGraph,x:number,y:number):Promise<number|null> {
     if(this.deviceLost||this.disposed)return null;if(this.picking)throw new Error('A pick is already pending');this.picking=true;
@@ -152,7 +164,7 @@ export class GPURenderer implements Renderer {
       const encoder=device.createCommandEncoder(),context:Extract<PassContext,{backend:'webgpu'}>={backend:'webgpu',device,encoder,color:color.createView(),depth:depth.createView(),camera,width:this.canvas.width,height:this.canvas.height,delta:0,format:this.format,shader:wgsl,bindings:[],indirect:false,descriptor:this.descriptor,draw:()=>{}};
       graph.prepare(context);
       const code=context.shader.replace('@location(3) material:vec4f','@location(3) material:vec4f,@location(4) @interpolate(flat) id:u32').replace('o.color=i.color.rgb','o.id=u32(i.factors.w);o.color=i.color.rgb').replace('->@location(0) vec4f {','->@location(0) u32 {').replace(/  let n=normalize\(i.normal\)[\s\S]*$/,'  return i.id;\n}');
-      const module=device.createShaderModule({code}),pipeline=device.createRenderPipeline({...this.descriptor,vertex:{...this.descriptor.vertex,module},fragment:{module,entryPoint:'fragment',targets:[{format:'r32uint'}]},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'greater-equal'}}),group=device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:uniform}},...context.bindings]});
+      const module=device.createShaderModule({code}),pipeline=device.createRenderPipeline({...this.singleSampleDescriptor,vertex:{...this.descriptor.vertex,module},fragment:{module,entryPoint:'fragment',targets:[{format:'r32uint'}]},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'greater-equal'}}),group=device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:uniform}},...context.bindings]});
       const pass=encoder.beginRenderPass({colorAttachments:[{view:color.createView(),clearValue:{r:4294967295,g:0,b:0,a:0},loadOp:'clear',storeOp:'store'}],depthStencilAttachment:{view:depth.createView(),depthClearValue:0,depthLoadOp:'clear',depthStoreOp:'store'}});pass.setPipeline(pipeline);pass.setBindGroup(0,group);
       for(const batch of batches)if(batch.count){const r=this.resources.get(batch.geometry)!;device.queue.writeBuffer(r.instance,0,batch.instances as Float32Array<ArrayBuffer>,0,batch.count*24);r.frame=-1;pass.setVertexBuffer(0,r.vertex);pass.setVertexBuffer(1,r.instance);pass.setIndexBuffer(r.index,'uint32');pass.drawIndexed(batch.geometry.indices.length,batch.count);}pass.end();
       if(this.deviceLost||this.disposed)return null;encoder.copyTextureToBuffer({texture:color},{buffer:read},[1,1]);device.queue.submit([encoder.finish()]);await read.mapAsync(GPUMapMode.READ);const id=new Uint32Array(read.getMappedRange())[0];read.unmap();return id===4294967295?null:id;
@@ -161,7 +173,7 @@ export class GPURenderer implements Renderer {
   dispose(unconfigure=true): void {
     if(this.disposed)return; this.disposed=true;
     for(const geometry of this.resources.keys())this.remove(geometry);
-    this.depth?.destroy(); this.uniform.destroy(); if(unconfigure)this.context.unconfigure(); this.device.destroy();
+    for(const target of this.targets)target.destroy();this.uniform.destroy(); if(unconfigure)this.context.unconfigure(); this.device.destroy();
   }
 }
 

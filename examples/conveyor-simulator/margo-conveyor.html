@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>Margo conveyor benchmark</title>
+  <style>
+    :root{color-scheme:dark;font:13px/1.4 system-ui,sans-serif;background:#090d14;color:#e8edf5}
+    *{box-sizing:border-box}body{margin:0;min-width:952px;min-height:684px;display:grid;place-items:center;height:100vh}
+    main{position:relative;width:922px;height:654px;background:#111722;border:1px solid #293343;border-radius:12px;overflow:hidden}
+    canvas{display:block;width:920px;height:652px;outline:none}canvas:focus-visible{outline:2px solid #77b9ff;outline-offset:-3px}
+    .hud,.tools{position:absolute;background:#0b101be8;border:1px solid #344155;border-radius:9px;padding:12px;backdrop-filter:blur(8px)}
+    .hud{top:14px;left:14px;width:310px;pointer-events:none}h1{font-size:15px;margin:0 0 8px}dl{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0}dt{font-size:10px;color:#9caec3}dd{margin:2px 0 0;font:600 17px/1.2 ui-monospace,monospace;font-variant-numeric:tabular-nums}
+    .tools{left:14px;right:14px;bottom:14px;height:108px}.row{display:flex;align-items:center;gap:12px;height:34px}label{white-space:nowrap}input{flex:1;min-width:80px;accent-color:#7cbaff}output{width:42px;text-align:right;font-variant-numeric:tabular-nums}
+    button{font:600 12px system-ui,sans-serif;height:34px;padding:0 14px;border:1px solid #6587aa;border-radius:6px;background:#173552;color:#eff7ff;cursor:pointer}button:disabled{opacity:.5;cursor:default}button:focus-visible,input:focus-visible{outline:2px solid #9bceff;outline-offset:2px}
+    #result{height:20px;margin:6px 0 0;color:#c7dcf1;font:12px ui-monospace,monospace}.hint{font-size:11px;color:#9caec3;margin:5px 0 0}.loading{position:absolute;inset:0;display:grid;place-items:center;background:#111722d9;padding:80px;text-align:center;z-index:2}.loading[hidden]{display:none}
+  </style>
+  <script>Object.defineProperty(window,'devicePixelRatio',{value:1,configurable:true});</script>
+  <script type="importmap">
+    {"imports":{"@margoengine/core":"../../packages/core/dist/index.js","@margoengine/core/extension":"../../packages/core/dist/extension.js","@margoengine/blender":"../../packages/blender/dist/index.js","@margoengine/gltf-pro":"../../packages/gltf-pro/dist/index.js"}}
+  </script>
+</head>
+<body>
+<main aria-label="Margo conveyor benchmark viewer">
+  <canvas id="canvas" width="920" height="652" tabindex="0" aria-label="Conveyor assembly. Drag to rotate, right drag to pan, scroll to zoom."></canvas>
+  <section class="hud" aria-label="Rendering statistics">
+    <h1>Margo · WebGPU · no MSAA</h1>
+    <dl><div><dt>FPS</dt><dd id="fps">—</dd></div><div><dt>Frame ms</dt><dd id="ms">—</dd></div><div><dt>Draws</dt><dd id="draws">—</dd></div><div><dt>Parts</dt><dd id="parts">—</dd></div></dl>
+  </section>
+  <section class="tools" aria-label="Benchmark controls">
+    <div class="row"><label for="explode">Explode sweep</label><input id="explode" type="range" min="0" max="100" step="1" value="0" disabled><output id="percent" for="explode">0%</output><button id="run" type="button" disabled>Run 660-frame Uncapped Benchmark</button></div>
+    <p id="result" role="status" aria-live="polite">60 warmup + 600 measured frames · orbit + explode sweep</p>
+    <p class="hint">Left drag: rotate · middle/right/Shift-drag: pan · wheel: zoom. Uncapped pacing requires browser launch flags.</p>
+  </section>
+  <div id="loading" class="loading" role="status">Loading conveyor.margo…</div>
+</main>
+<script type="module">
+const canvas=document.querySelector('#canvas'),slider=document.querySelector('#explode'),button=document.querySelector('#run');
+const hud=Object.fromEntries(['fps','ms','draws','parts','percent','result','loading'].map(id=>[id,document.getElementById(id)]));
+const parts=[],bounds=new Float64Array([Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity]),center=new Float64Array(3),home=new Float64Array(3);
+const intervals=new Float64Array(600),savedPosition=new Float64Array(3),savedTarget=new Float64Array(3);
+let engine,controls,raf=0,explode=0,step=-60,running=false,previous=0,hudTime=0,hudFrames=0,savedExplode=0,last=0;
+const renderOptions={culling:false,delta:0};
+const api=window.conveyorBenchmark={ready:false,error:null,parts,engine:null,lastResult:null,setExplode,startBenchmark};
+
+function setExplode(value){
+  if(!Number.isFinite(value)||value<0||value>1)throw new RangeError('Explode must be between 0 and 1');
+  explode=value;
+  for(let i=0;i<parts.length;i++){const p=parts[i];p.position.set(p.base[0]+p.offset[0]*value,p.base[1]+p.offset[1]*value,p.base[2]+p.offset[2]*value);}
+}
+function prepareAssembly(){
+  for(let a=0;a<3;a++)center[a]=(bounds[a]+bounds[a+3])/2;
+  const diagonal=Math.hypot(bounds[3]-bounds[0],bounds[4]-bounds[1],bounds[5]-bounds[2]);
+  if(!Number.isFinite(diagonal)||diagonal<=0)throw new Error('Conveyor bounds are empty or invalid');
+  const reach=diagonal*0.115;
+  for(let i=0;i<parts.length;i++){
+    const p=parts[i];let x=p.center[0]-center[0],y=(p.center[1]-center[1])*1.8,z=p.center[2]-center[2];
+    let length=Math.hypot(x,y,z);if(length<1e-8){x=0;y=1;z=0;length=1;}
+    p.offset[0]=x/length*reach;p.offset[1]=y/length*reach;p.offset[2]=z/length*reach;
+  }
+  const distance=diagonal*0.5*1.22/Math.sin(38*Math.PI/360),direction=Math.hypot(1,0.67,1.08);
+  for(let a=0;a<3;a++)home[a]=center[a]+[1,0.67,1.08][a]/direction*distance;
+  engine.camera.position=Array.from(home);engine.camera.target=Array.from(center);
+  engine.camera.near=Math.max(diagonal/10000,0.001);engine.camera.far=diagonal*30;
+}
+function startBenchmark(){
+  if(!api.ready||running)return;
+  savedPosition.set(engine.camera.position);savedTarget.set(engine.camera.target);savedExplode=explode;
+  api.lastResult=null;
+  engine.camera.target[0]=center[0];engine.camera.target[1]=center[1];engine.camera.target[2]=center[2];
+  running=true;step=-60;previous=0;button.disabled=slider.disabled=true;canvas.style.pointerEvents='none';
+  hud.result.textContent='Running 60 warmup + 600 measured frames…';
+}
+function finishBenchmark(result,message){
+  running=false;setExplode(savedExplode);engine.camera.position[0]=savedPosition[0];engine.camera.position[1]=savedPosition[1];engine.camera.position[2]=savedPosition[2];
+  engine.camera.target[0]=savedTarget[0];engine.camera.target[1]=savedTarget[1];engine.camera.target[2]=savedTarget[2];
+  button.disabled=slider.disabled=false;canvas.style.pointerEvents='';
+  slider.value=String(Math.round(savedExplode*100));hud.percent.textContent=slider.value+'%';
+  hud.result.textContent=message;api.lastResult=result;
+  if(result){console.info('Margo conveyor benchmark: browser pacing is controlled by launch flags.');console.table(result);}
+}
+function frame(time){
+  try{
+    const delta=last?Math.min((time-last)/1000,0.1):0;last=time;
+    if(running){
+      const angle=step/600*Math.PI*2,x=home[0]-center[0],z=home[2]-center[2];
+      engine.camera.position[0]=center[0]+x*Math.cos(angle)+z*Math.sin(angle);engine.camera.position[1]=home[1];engine.camera.position[2]=center[2]-x*Math.sin(angle)+z*Math.cos(angle);
+      setExplode(0.5-0.5*Math.cos(angle));
+      if(step>=0)intervals[step]=time-previous;previous=time;
+    }else controls.update(delta);
+    renderOptions.delta=delta;engine.render(renderOptions);
+    if(hudTime===0)hudTime=time;hudFrames++;
+    if(time-hudTime>=250){const ms=(time-hudTime)/hudFrames;hud.fps.textContent=(1000/ms).toFixed(1);hud.ms.textContent=ms.toFixed(2);hud.draws.textContent=engine.stats.drawCalls;hudFrames=0;hudTime=time;}
+    if(running&&++step===600){
+      intervals.sort();let sum=0;for(let i=0;i<600;i++)sum+=intervals[i];
+      const result={warmup:60,frames:600,medianMs:(intervals[299]+intervals[300])/2,p95Ms:intervals[569],meanMs:sum/600,fps:600000/sum,drawCalls:engine.stats.drawCalls,parts:parts.length};
+      finishBenchmark(result,`Median ${result.medianMs.toFixed(3)} ms · p95 ${result.p95Ms.toFixed(3)} ms · ${result.fps.toFixed(0)} FPS`);
+    }
+    raf=requestAnimationFrame(frame);
+  }catch(error){fail(error);}
+}
+function fail(error){api.ready=false;api.error=String(error.message??error);console.error(error);cancelAnimationFrame(raf);hud.loading.hidden=false;hud.loading.textContent=api.error;button.disabled=slider.disabled=true;}
+slider.addEventListener('input',()=>{setExplode(slider.valueAsNumber/100);hud.percent.textContent=slider.value+'%';});
+button.addEventListener('click',startBenchmark);
+document.addEventListener('visibilitychange',()=>{last=hudTime=hudFrames=0;if(document.hidden&&running)finishBenchmark(null,'Benchmark cancelled: tab lost visibility.');});
+addEventListener('pagehide',event=>{if(!event.persisted){cancelAnimationFrame(raf);controls?.dispose();engine?.dispose();}},{once:true});
+
+try{
+  const [{Engine,Geometry,PbrMaterial,CADCameraControls},{engineRuntime,meshRuntime},{decodeMargo}]=await Promise.all([import('@margoengine/core'),import('@margoengine/core/extension'),import('@margoengine/blender')]);
+  // Engine.create requests the high-performance WebGPU adapter; no WebGL fallback or MSAA.
+  engine=api.engine=await Engine.create(canvas,{backend:'webgpu',capacity:1024,camera:{fov:38}});
+  api.camera=engine.camera;
+  engine.onError=fail;
+  const runtime=engineRuntime(engine);runtime.lighting.direction.set([-30,100,75,2.3]);runtime.lighting.radiance.set([1,0.93011,0.8388,0.282095]);
+  let source='',shader='',depth=null,depthView=null;
+  engine.use({name:'conveyor-aces',setup(){},dispose(){depth?.destroy();},onDeviceRestored(){depth?.destroy();depth=depthView=null;},registerPasses(graph){graph.add({name:'conveyor-aces',order:-25,execute(context){
+    // Own a single-sample depth target so a workspace MSAA default cannot change this benchmark.
+    if(!depth){depth=context.device.createTexture({size:[920,652],sampleCount:1,format:context.descriptor.depthStencil.format,usage:GPUTextureUsage.RENDER_ATTACHMENT});depthView=depth.createView();}
+    context.depth=depthView;
+    if(context.shader!==source){source=context.shader;shader=source.replace('let mapped=linear/(1.0+linear);','let mapped=conveyorACES(linear);')+`
+fn conveyorACES(color:vec3f)->vec3f {
+  let x=mat3x3f(0.59719,0.07600,0.02840,0.35458,0.90834,0.13383,0.04823,0.01566,0.83777)*(color*(1.08/0.6));
+  let fit=(x*(x+0.0245786)-0.000090537)/(x*(0.983729*x+0.4329510)+0.238081);
+  return clamp(mat3x3f(1.60475,-0.10208,-0.00327,-0.53108,1.10813,-0.07276,-0.07367,-0.00605,1.07602)*fit,vec3f(0),vec3f(1));
+}`;}context.shader=shader;
+  }});}});
+  const response=await fetch('./conveyor.margo');if(!response.ok)throw new Error(`conveyor.margo: HTTP ${response.status}`);
+  const asset=decodeMargo(await response.arrayBuffer()),doc=asset.document,geometries=new Map();
+  const materials=(doc.materials??[]).map(m=>{const p=m.pbrMetallicRoughness??{};if(p.baseColorTexture||m.normalTexture)throw new Error('This CAD benchmark requires untextured materials');return new PbrMaterial({color:(p.baseColorFactor??[0.8,0.8,0.8]).slice(0,3),metalness:p.metallicFactor??1,roughness:p.roughnessFactor??1,doubleSided:m.doubleSided??false});});
+  for(const index of doc.scenes[doc.scene??0].nodes){
+    const node=doc.nodes[index];if(node.mesh===undefined||node.name==='Cube')continue;
+    if(node.matrix||node.children?.length||asset.geometry[node.mesh].length!==1)throw new Error('Expected a flat CAD assembly with one primitive per mesh');
+    let geometry=geometries.get(node.mesh);
+    if(!geometry){
+      const p=asset.geometry[node.mesh][0],count=p.vertices.length/20,positions=new Float32Array(count*3),normals=new Float32Array(count*3);
+      for(let i=0;i<count;i++)for(let a=0;a<3;a++){positions[i*3+a]=p.vertices[i*20+a];normals[i*3+a]=p.vertices[i*20+4+a];}
+      geometry=new Geometry(positions,normals,p.indices);geometries.set(node.mesh,geometry);
+    }
+    const definition=doc.meshes[node.mesh].primitives[0],mesh=engine.createMesh().setGeometry(geometry).setMaterial(materials[definition.material]).setPosition(node.translation??[0,0,0]).setQuaternion(node.rotation??[0,0,0,1]).setScale(node.scale??[1,1,1]);
+    mesh.name=node.name??'';parts.push({name:mesh.name,mesh,position:mesh.position,base:new Float64Array(node.translation??[0,0,0]),offset:new Float64Array(3),center:new Float64Array(3),bounds:definition.bounds});
+  }
+  if(!parts.length)throw new Error('No conveyor parts found');
+  engine.render(renderOptions);
+  for(const p of parts){
+    const m=meshRuntime(p.mesh).matrix,b=p.bounds,min=new Float64Array([Infinity,Infinity,Infinity]),max=new Float64Array([-Infinity,-Infinity,-Infinity]);
+    for(let corner=0;corner<8;corner++){const x=b[corner&1?3:0],y=b[corner&2?4:1],z=b[corner&4?5:2];for(let a=0;a<3;a++){const v=m[a]*x+m[4+a]*y+m[8+a]*z+m[12+a];min[a]=Math.min(min[a],v);max[a]=Math.max(max[a],v);}}
+    for(let a=0;a<3;a++){p.center[a]=(min[a]+max[a])/2;bounds[a]=Math.min(bounds[a],min[a]);bounds[a+3]=Math.max(bounds[a+3],max[a]);}
+  }
+  prepareAssembly();controls=new CADCameraControls(engine.camera,canvas);
+  hud.parts.textContent=parts.length;hud.draws.textContent=geometries.size;hud.loading.hidden=true;button.disabled=slider.disabled=false;api.ready=true;
+  raf=requestAnimationFrame(frame);
+}catch(error){fail(error);}
+</script>
+</body>
+</html>

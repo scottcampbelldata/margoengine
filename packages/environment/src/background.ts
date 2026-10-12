@@ -118,7 +118,7 @@ export class EnvironmentBackground {
     if (this.disposed || environment.disposed || environment.device !== context.device) return;
     const state = this.stateFor(context.device);
     const depthFormat = context.descriptor.depthStencil?.format ?? 'depth32float';
-    const pipeline = this.pipelineFor(state, context.format, depthFormat);
+    const pipeline = this.pipelineFor(state, context.format, depthFormat, context.descriptor.multisample?.count ?? 1);
     if (!state.group || state.groupVersion !== environment.version) {
       const equirect = environment.equirectView;
       state.fallback ??= context.device.createTexture({size: [1, 1], format: 'rgba16float', usage: GPUTextureUsage.TEXTURE_BINDING});
@@ -170,8 +170,8 @@ export class EnvironmentBackground {
     return this.state;
   }
 
-  private pipelineFor(state: DeviceState, format: GPUTextureFormat, depthFormat: GPUTextureFormat): GPURenderPipeline {
-    const key = `${format}|${depthFormat}`;
+  private pipelineFor(state: DeviceState, format: GPUTextureFormat, depthFormat: GPUTextureFormat, count: number): GPURenderPipeline {
+    const key = `${format}|${depthFormat}|${count}`;
     let pipeline = state.pipelines.get(key);
     if (!pipeline) {
       pipeline = state.device.createRenderPipeline({
@@ -179,6 +179,7 @@ export class EnvironmentBackground {
         vertex: {module: state.module, entryPoint: 'vertexMain'},
         fragment: {module: state.module, entryPoint: 'fragmentMain', targets: [{format}], constants: {outputHdr: format === 'rgba16float' || format === 'rgba32float' ? 1 : 0}},
         primitive: {topology: 'triangle-list', cullMode: 'none'},
+        multisample: {count},
         depthStencil: {format: depthFormat, depthWriteEnabled: false, depthCompare: 'greater-equal'},
       });
       state.pipelines.set(key, pipeline);

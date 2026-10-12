@@ -20,6 +20,6 @@ export function gpuHarness() {
   const originalColor={},originalDepth={},shader='let linear=vec3f(1);\nlet mapped=linear/(1.0+linear); return vec4f(mapped,1);';
   const context={backend:'webgpu',device,encoder:{beginComputePass(){counts.compute++;return pass;},beginRenderPass(descriptor){counts.render++;context.presentation=descriptor;return pass;}},
     color:originalColor,depth:originalDepth,format:'bgra8unorm',width:128,height:96,camera:{near:0.1,far:100,fov:60},shader,bindings:[],descriptor:{depthStencil:{format:'depth32float'}},draw(){},delta:0};
-  function frame(){context.color=originalColor;context.depth=originalDepth;context.format='bgra8unorm';context.shader=shader;graph.execute(context);}
+  function frame(){for(const plugin of plugins.values())plugin.onPreUpdate?.(context.delta);context.color=originalColor;context.depth=originalDepth;context.format='bgra8unorm';context.shader=shader;graph.execute(context);}
   return {engine,context,frame,counts,resources,pipelines,groups,writes,originalColor,originalDepth};
 }

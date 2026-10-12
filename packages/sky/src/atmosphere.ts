@@ -1,7 +1,7 @@
 // Earth, kilometer units. Coarse four-dimensional tables keep this optional pass lightweight.
 export const atmosphere=`
 const R=6360.0;const TOP=6460.0;const BETA_R=vec3f(0.005802,0.013558,0.033100);
-struct Frame {inverse:mat4x4f,eye:vec4f,sun:vec4f,settings:vec4f}
+struct Frame {inverse:mat4x4f,eye:vec4f,sun:vec4f,settings:vec4f,moon:vec4f,moonColor:vec4f,clouds:vec4f}
 @group(0) @binding(0) var<uniform> frame:Frame;
 fn mie()->f32{return 0.003996*max(0.25,(frame.settings.z-1.0)*0.5);}
 fn densities(r:f32)->vec2f{return exp(-max(0.0,r-R)/vec2f(8.0,1.2));}

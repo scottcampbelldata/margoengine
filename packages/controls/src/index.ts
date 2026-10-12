@@ -10,3 +10,4 @@ export type {TransformControlsOptions, TransformSpace, TransformMode, HandleName
 export {buildGizmo, pickHandle} from './gizmo.js';
 export type {GizmoFrame, Handle, Prim} from './gizmo.js';
 export {tessellate} from './overlay.js';
+export {stepLocomotion, type HeightField, type LocomotionOptions} from './locomotion.js';

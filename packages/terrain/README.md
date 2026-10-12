@@ -1,5 +1,23 @@
 # @margoengine/terrain
 
+`heightfieldGeometry(height, {size, origin?, resolution?})` generates a Y-up mesh
+with recomputed slope normals. `origin` is the minimum world XZ corner; it defaults
+to a centered rectangle, and mesh resolution defaults to 192 segments.
+`TerrainHeightmap.attach(engine, height, {size, origin?, resolution?})` owns an
+`r32float` texture sampled at cell centers, exposed as `.texture` for scatter and
+water. Texture resolution defaults to 256. Resolutions are integers in 1..1024.
+The module validates finite samples and device limits, regenerates the texture
+on device restoration, and destroys it on disposal. Sampling arrays are released
+after upload; there is no per-frame CPU sampling or allocation.
+
+`TerrainColors.attach(engine, mesh, options)` applies height/slope colors and wet
+shoreline darkening to one ordinary terrain mesh using its mesh ID. It preserves
+the existing PBR/shadow shader and caches the patch. Options are captured at
+attachment: `sand`, two `meadow` colors, `stone`, height ranges `shore`,
+`meadowHeight`, `stoneHeight`, `wetHeight`, plus `stoneNormal` (normal Y in 0..1),
+`wetDarkening` (0..1), and optional `variation` (0..1, default 0). Ranges must be
+increasing; colors are linear RGB in 0..1. Other meshes keep their materials.
+
 Optional geometry clipmaps with vertex texture height/normal sampling and 4–8 terrain layers. Fixed grids form a center and concentric rings. Uniform origins follow the camera, inner ring edges follow the finer grid, and outer-edge vertices collapse onto the next coarser lattice to close seams. Height sampling uses bilinear `textureLoad`, including non-filterable `r32float` maps. Cliff faces use triplanar splatting; normalized slope/height weights blend an sRGB texture array.
 
 ```ts

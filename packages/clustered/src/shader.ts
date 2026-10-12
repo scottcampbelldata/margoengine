@@ -42,11 +42,11 @@ fn clusterLighting(pixel:vec2f,position:vec3f,n:vec3f,eye:vec3f,base:vec3f,rough
   let xy=min(vec2u(max(screenPixel,vec2f(0))/clusterFrame.screen.xy*vec2f(grid.xy)),grid.xy-vec2u(1));
   let z=min(u32(max(0.0,log(depth/clusterFrame.depth.x)/log(clusterFrame.depth.y/clusterFrame.depth.x)*f32(grid.z))),grid.z-1);
   let cell=xy.x+grid.x*(xy.y+grid.y*z);let count=clusterCounts[cell];var result=vec3f(0);
-  let v=normalize(eye-position);let nv=max(dot(n,v),0.0001);let a=max(roughness,0.045)*max(roughness,0.045);let a2=a*a;
+  let v=normalize(eye-position);let nv=clamp(dot(n,v),0.0001,1.0);let a=max(roughness,0.045)*max(roughness,0.045);let a2=a*a;
   for(var j=0u;j<count;j++){
     let light=clusterLights[clusterIndices[cell*1024u+j]];let delta=light.positionRange.xyz-position;let distance=length(delta);
     if(distance>=light.positionRange.w){continue;}let l=delta/max(distance,0.0001);let h=(v+l)/max(length(v+l),0.0001);
-    let nl=max(dot(n,l),0.0);let nh=max(dot(n,h),0.0);let vh=max(dot(v,h),0.0);
+    let nl=clamp(dot(n,l),0.0,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
     let d=a2/(3.14159265*pow(nh*nh*(a2-1)+1,2.0));
     let g=2*nv/(nv+sqrt(a2+(1-a2)*nv*nv))*2*nl/max(nl+sqrt(a2+(1-a2)*nl*nl),0.0001);
     let f0=mix(vec3f(0.04),base,metal);let fresnel=f0+(1-f0)*pow(1-vh,5.0);

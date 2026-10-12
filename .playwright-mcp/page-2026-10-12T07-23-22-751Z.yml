@@ -1,0 +1,26 @@
+- main "Margo conveyor benchmark viewer" [ref=f18e2]:
+  - generic "Conveyor assembly. Drag to rotate, right drag to pan, scroll to zoom." [ref=f18e3]
+  - region "Rendering statistics":
+    - heading "Margo · WebGPU · no MSAA" [level=1]
+    - generic:
+      - generic:
+        - term: FPS
+        - definition: —
+      - generic:
+        - term: Frame ms
+        - definition: —
+      - generic:
+        - term: Draws
+        - definition: —
+      - generic:
+        - term: Parts
+        - definition: —
+  - region "Benchmark controls" [ref=f18e4]:
+    - generic [ref=f18e5]:
+      - generic [ref=f18e6]: Explode sweep
+      - slider "Explode sweep" [disabled] [ref=f18e7]: "0"
+      - status [ref=f18e8]: 0%
+      - button "Run 660-frame Uncapped Benchmark" [disabled] [ref=f18e9]
+    - status [ref=f18e10]: 60 warmup + 600 measured frames · orbit + explode sweep
+    - paragraph [ref=f18e11]: "Left drag: rotate · middle/right/Shift-drag: pan · wheel: zoom. Uncapped pacing requires browser launch flags."
+  - status [ref=f18e12]: Loading conveyor.margo…

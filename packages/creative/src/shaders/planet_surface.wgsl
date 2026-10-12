@@ -58,7 +58,7 @@ fn encodeColor(linear: vec3f) -> vec3f {
     let view = normalize(frame.eyeRadius.xyz - input.world);
     let geometricLight = dot(geometricNormal, light);
     let diffuse = max(dot(shadingNormal, light), 0.0);
-    let nightWeight = smoothstep(0.05, -0.15, geometricLight);
+    let nightWeight = 1.0 - smoothstep(-0.15, 0.05, geometricLight);
     let shininess = mix(256.0, 8.0, mask.g);
     let glint = pow(max(dot(reflect(-light, shadingNormal), view), 0.0), shininess) * mask.r * max(geometricLight, 0.0);
     let color = day * diffuse + night * frame.settings.z * nightWeight + vec3f(glint);

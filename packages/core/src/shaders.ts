@@ -18,8 +18,8 @@ uniform vec3 eye; uniform vec4 light; uniform vec4 radiance; out vec4 outputColo
 void main() {
   bool front=gl_FrontFacing==(material.w>0.0);if(!front&&material.z<0.5)discard;
   vec3 n=normalize(worldNormal); if(!front)n=-n;
-  vec3 v=normalize(eye-worldPosition),l=normalize(light.xyz),h=normalize(v+l);
-  float nl=max(dot(n,l),0.0),nv=max(dot(n,v),0.0001),nh=max(dot(n,h),0.0),vh=max(dot(v,h),0.0);
+  vec3 v=normalize(eye-worldPosition),l=normalize(light.xyz),h=(v+l)/max(length(v+l),0.0001);
+  float nl=clamp(dot(n,l),0.0,1.0),nv=clamp(dot(n,v),0.0001,1.0),nh=clamp(dot(n,h),0.0,1.0),vh=clamp(dot(v,h),0.0,1.0);
   float a=material.x*material.x,a2=a*a,d=a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0));
   float g=2.0*nv/(nv+sqrt(a2+(1.0-a2)*nv*nv))*2.0*nl/max(nl+sqrt(a2+(1.0-a2)*nl*nl),0.0001);
   vec3 f0=mix(vec3(0.04),base,material.y),f=f0+(1.0-f0)*pow(1.0-vh,5.0);
@@ -41,8 +41,8 @@ struct Output { @builtin(position) clip:vec4f,@location(0) position:vec3f,@locat
 }
 @fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->@location(0) vec4f {
   let facing=front==(i.material.w>0.0);if(!facing&&i.material.z<0.5){discard;}
-  let n=normalize(i.normal)*select(-1.0,1.0,facing); let v=normalize(frame.eye.xyz-i.position); let l=normalize(frame.light.xyz); let h=normalize(v+l);
-  let nl=max(dot(n,l),0.0); let nv=max(dot(n,v),0.0001); let nh=max(dot(n,h),0.0); let vh=max(dot(v,h),0.0);
+  let n=normalize(i.normal)*select(-1.0,1.0,facing); let v=normalize(frame.eye.xyz-i.position); let l=normalize(frame.light.xyz); let h=(v+l)/max(length(v+l),0.0001);
+  let nl=clamp(dot(n,l),0.0,1.0); let nv=clamp(dot(n,v),0.0001,1.0); let nh=clamp(dot(n,h),0.0,1.0); let vh=clamp(dot(v,h),0.0,1.0);
   let a=i.material.x*i.material.x; let a2=a*a; let d=a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0));
   let g=2.0*nv/(nv+sqrt(a2+(1.0-a2)*nv*nv))*2.0*nl/max(nl+sqrt(a2+(1.0-a2)*nl*nl),0.0001);
   let f0=mix(vec3f(0.04),i.color,i.material.y); let f=f0+(1.0-f0)*pow(1.0-vh,5.0);

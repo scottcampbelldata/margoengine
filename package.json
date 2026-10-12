@@ -125,7 +125,8 @@
     "modern:test:game:packages": "node scripts/modern-game-package-tests.js",
     "modern:test:postfx": "node --test packages/dof/tests/*.test.js packages/tonemap/tests/*.test.js",
     "modern:test:postfx:packages": "node scripts/modern-postfx-packages.js",
-    "modern:test:postfx:browser": "node scripts/modern-postfx-tests.js"
+    "modern:test:postfx:browser": "node scripts/modern-postfx-tests.js",
+    "predev:sandbox": "npm run build:packages"
   },
   "devDependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",

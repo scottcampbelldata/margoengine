@@ -1,0 +1,280 @@
+- generic [ref=f3e2]:
+  - banner [ref=f3e3]:
+    - generic [ref=f3e10]:
+      - heading "Conveyor assembly" [level=1] [ref=f3e11]
+      - paragraph [ref=f3e12]: Individual saved parts · Dimensions in mm
+    - status [ref=f3e15]: 569 parts · 40 saved sources
+  - generic [ref=f3e16]:
+    - main "Interactive conveyor assembly" [ref=f3e17]:
+      - generic "3D conveyor. Drag to rotate, right-drag or choose Pan to move the view, scroll or pinch to zoom. Arrow keys pan, plus and minus zoom, F shows the full assembly. Click a part to select it." [ref=f3e18]
+      - generic "Connection locations"
+      - navigation "Camera controls" [ref=f3e19]:
+        - button "Full" [ref=f3e20] [cursor=pointer]
+        - button "Top" [ref=f3e21] [cursor=pointer]
+        - button "Side" [ref=f3e22] [cursor=pointer]
+        - button "Drive" [ref=f3e23] [cursor=pointer]
+        - button "Under" [ref=f3e24] [cursor=pointer]
+        - button "Rotate" [pressed] [ref=f3e25] [cursor=pointer]
+        - button "Pan" [ref=f3e26] [cursor=pointer]
+        - button "Zoom in" [ref=f3e27] [cursor=pointer]: +
+        - button "Zoom out" [ref=f3e28] [cursor=pointer]: −
+      - generic: Drag to rotate · Right-drag or choose Pan to move · Scroll to zoom · F for full view
+      - generic "Assembly controls" [ref=f3e29]:
+        - generic [ref=f3e30]:
+          - button "Remove long cover" [pressed] [ref=f3e31] [cursor=pointer]
+          - button "Remove small cover" [pressed] [ref=f3e32] [cursor=pointer]
+        - generic [ref=f3e33]:
+          - generic [ref=f3e34]: Explode
+          - slider "Exploded assembly amount" [ref=f3e35]: "0"
+          - button "Restore" [ref=f3e36] [cursor=pointer]
+    - complementary "Parts and fit review" [ref=f3e37]:
+      - generic [ref=f3e38]:
+        - heading "Choose a part" [level=2] [ref=f3e39]
+        - generic [ref=f3e40]: Click the model, or use the parts list.
+      - tablist "Inspection lists" [ref=f3e41]:
+        - tab "Parts" [selected] [ref=f3e42] [cursor=pointer]
+        - tab "Fit review (5)" [ref=f3e43] [cursor=pointer]
+      - tabpanel "Parts" [ref=f3e45]:
+        - searchbox "Find a saved part" [ref=f3e46]
+        - generic [ref=f3e47]:
+          - generic [ref=f3e48]: 569 parts · refine search to see more
+          - button "Bearing 01 rear mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e49] [cursor=pointer]:
+            - text: Bearing 01 rear mounting 1 washer
+            - generic [ref=f3e51]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 01 rear mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e52] [cursor=pointer]:
+            - text: Bearing 01 rear mounting 1 bolt
+            - generic [ref=f3e54]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 01 rear mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e55] [cursor=pointer]:
+            - text: Bearing 01 rear mounting 2 washer
+            - generic [ref=f3e57]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 01 rear mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e58] [cursor=pointer]:
+            - text: Bearing 01 rear mounting 2 bolt
+            - generic [ref=f3e60]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 02 rear mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e61] [cursor=pointer]:
+            - text: Bearing 02 rear mounting 1 washer
+            - generic [ref=f3e63]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 02 rear mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e64] [cursor=pointer]:
+            - text: Bearing 02 rear mounting 1 bolt
+            - generic [ref=f3e66]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 02 rear mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e67] [cursor=pointer]:
+            - text: Bearing 02 rear mounting 2 washer
+            - generic [ref=f3e69]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 02 rear mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e70] [cursor=pointer]:
+            - text: Bearing 02 rear mounting 2 bolt
+            - generic [ref=f3e72]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 03 rear mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e73] [cursor=pointer]:
+            - text: Bearing 03 rear mounting 1 washer
+            - generic [ref=f3e75]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 03 rear mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e76] [cursor=pointer]:
+            - text: Bearing 03 rear mounting 1 bolt
+            - generic [ref=f3e78]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 03 rear mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e79] [cursor=pointer]:
+            - text: Bearing 03 rear mounting 2 washer
+            - generic [ref=f3e81]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 03 rear mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e82] [cursor=pointer]:
+            - text: Bearing 03 rear mounting 2 bolt
+            - generic [ref=f3e84]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 04 rear mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e85] [cursor=pointer]:
+            - text: Bearing 04 rear mounting 1 washer
+            - generic [ref=f3e87]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 04 rear mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e88] [cursor=pointer]:
+            - text: Bearing 04 rear mounting 1 bolt
+            - generic [ref=f3e90]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 04 rear mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e91] [cursor=pointer]:
+            - text: Bearing 04 rear mounting 2 washer
+            - generic [ref=f3e93]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 04 rear mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e94] [cursor=pointer]:
+            - text: Bearing 04 rear mounting 2 bolt
+            - generic [ref=f3e96]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 05 rear mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e97] [cursor=pointer]:
+            - text: Bearing 05 rear mounting 1 washer
+            - generic [ref=f3e99]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 05 rear mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e100] [cursor=pointer]:
+            - text: Bearing 05 rear mounting 1 bolt
+            - generic [ref=f3e102]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 05 rear mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e103] [cursor=pointer]:
+            - text: Bearing 05 rear mounting 2 washer
+            - generic [ref=f3e105]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 05 rear mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e106] [cursor=pointer]:
+            - text: Bearing 05 rear mounting 2 bolt
+            - generic [ref=f3e108]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 06 rear mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e109] [cursor=pointer]:
+            - text: Bearing 06 rear mounting 1 washer
+            - generic [ref=f3e111]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 06 rear mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e112] [cursor=pointer]:
+            - text: Bearing 06 rear mounting 1 bolt
+            - generic [ref=f3e114]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 06 rear mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e115] [cursor=pointer]:
+            - text: Bearing 06 rear mounting 2 washer
+            - generic [ref=f3e117]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 06 rear mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e118] [cursor=pointer]:
+            - text: Bearing 06 rear mounting 2 bolt
+            - generic [ref=f3e120]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 07 rear mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e121] [cursor=pointer]:
+            - text: Bearing 07 rear mounting 1 washer
+            - generic [ref=f3e123]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 07 rear mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e124] [cursor=pointer]:
+            - text: Bearing 07 rear mounting 1 bolt
+            - generic [ref=f3e126]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 07 rear mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e127] [cursor=pointer]:
+            - text: Bearing 07 rear mounting 2 washer
+            - generic [ref=f3e129]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 07 rear mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e130] [cursor=pointer]:
+            - text: Bearing 07 rear mounting 2 bolt
+            - generic [ref=f3e132]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 01 front mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e133] [cursor=pointer]:
+            - text: Bearing 01 front mounting 1 washer
+            - generic [ref=f3e135]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 01 front mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e136] [cursor=pointer]:
+            - text: Bearing 01 front mounting 1 bolt
+            - generic [ref=f3e138]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 01 front mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e139] [cursor=pointer]:
+            - text: Bearing 01 front mounting 2 washer
+            - generic [ref=f3e141]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 01 front mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e142] [cursor=pointer]:
+            - text: Bearing 01 front mounting 2 bolt
+            - generic [ref=f3e144]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 02 front mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e145] [cursor=pointer]:
+            - text: Bearing 02 front mounting 1 washer
+            - generic [ref=f3e147]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 02 front mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e148] [cursor=pointer]:
+            - text: Bearing 02 front mounting 1 bolt
+            - generic [ref=f3e150]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 02 front mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e151] [cursor=pointer]:
+            - text: Bearing 02 front mounting 2 washer
+            - generic [ref=f3e153]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 02 front mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e154] [cursor=pointer]:
+            - text: Bearing 02 front mounting 2 bolt
+            - generic [ref=f3e156]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 03 front mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e157] [cursor=pointer]:
+            - text: Bearing 03 front mounting 1 washer
+            - generic [ref=f3e159]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 03 front mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e160] [cursor=pointer]:
+            - text: Bearing 03 front mounting 1 bolt
+            - generic [ref=f3e162]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 03 front mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e163] [cursor=pointer]:
+            - text: Bearing 03 front mounting 2 washer
+            - generic [ref=f3e165]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 03 front mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e166] [cursor=pointer]:
+            - text: Bearing 03 front mounting 2 bolt
+            - generic [ref=f3e168]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 04 front mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e169] [cursor=pointer]:
+            - text: Bearing 04 front mounting 1 washer
+            - generic [ref=f3e171]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 04 front mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e172] [cursor=pointer]:
+            - text: Bearing 04 front mounting 1 bolt
+            - generic [ref=f3e174]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 04 front mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e175] [cursor=pointer]:
+            - text: Bearing 04 front mounting 2 washer
+            - generic [ref=f3e177]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 04 front mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e178] [cursor=pointer]:
+            - text: Bearing 04 front mounting 2 bolt
+            - generic [ref=f3e180]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 05 front mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e181] [cursor=pointer]:
+            - text: Bearing 05 front mounting 1 washer
+            - generic [ref=f3e183]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 05 front mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e184] [cursor=pointer]:
+            - text: Bearing 05 front mounting 1 bolt
+            - generic [ref=f3e186]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 05 front mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e187] [cursor=pointer]:
+            - text: Bearing 05 front mounting 2 washer
+            - generic [ref=f3e189]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 05 front mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e190] [cursor=pointer]:
+            - text: Bearing 05 front mounting 2 bolt
+            - generic [ref=f3e192]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 06 front mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e193] [cursor=pointer]:
+            - text: Bearing 06 front mounting 1 washer
+            - generic [ref=f3e195]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 06 front mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e196] [cursor=pointer]:
+            - text: Bearing 06 front mounting 1 bolt
+            - generic [ref=f3e198]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 06 front mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e199] [cursor=pointer]:
+            - text: Bearing 06 front mounting 2 washer
+            - generic [ref=f3e201]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 06 front mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e202] [cursor=pointer]:
+            - text: Bearing 06 front mounting 2 bolt
+            - generic [ref=f3e204]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 07 front mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e205] [cursor=pointer]:
+            - text: Bearing 07 front mounting 1 washer
+            - generic [ref=f3e207]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 07 front mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e208] [cursor=pointer]:
+            - text: Bearing 07 front mounting 1 bolt
+            - generic [ref=f3e210]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Bearing 07 front mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e211] [cursor=pointer]:
+            - text: Bearing 07 front mounting 2 washer
+            - generic [ref=f3e213]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Bearing 07 front mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e214] [cursor=pointer]:
+            - text: Bearing 07 front mounting 2 bolt
+            - generic [ref=f3e216]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Center bearing 01 mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e217] [cursor=pointer]:
+            - text: Center bearing 01 mounting 1 washer
+            - generic [ref=f3e219]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Center bearing 01 mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e220] [cursor=pointer]:
+            - text: Center bearing 01 mounting 1 bolt
+            - generic [ref=f3e222]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Center bearing 01 mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e223] [cursor=pointer]:
+            - text: Center bearing 01 mounting 2 washer
+            - generic [ref=f3e225]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Center bearing 01 mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e226] [cursor=pointer]:
+            - text: Center bearing 01 mounting 2 bolt
+            - generic [ref=f3e228]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Center bearing 02 mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e229] [cursor=pointer]:
+            - text: Center bearing 02 mounting 1 washer
+            - generic [ref=f3e231]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Center bearing 02 mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e232] [cursor=pointer]:
+            - text: Center bearing 02 mounting 1 bolt
+            - generic [ref=f3e234]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Center bearing 02 mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e235] [cursor=pointer]:
+            - text: Center bearing 02 mounting 2 washer
+            - generic [ref=f3e237]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Center bearing 02 mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e238] [cursor=pointer]:
+            - text: Center bearing 02 mounting 2 bolt
+            - generic [ref=f3e240]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Center bearing 03 mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e241] [cursor=pointer]:
+            - text: Center bearing 03 mounting 1 washer
+            - generic [ref=f3e243]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Center bearing 03 mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e244] [cursor=pointer]:
+            - text: Center bearing 03 mounting 1 bolt
+            - generic [ref=f3e246]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Center bearing 03 mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e247] [cursor=pointer]:
+            - text: Center bearing 03 mounting 2 washer
+            - generic [ref=f3e249]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Center bearing 03 mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e250] [cursor=pointer]:
+            - text: Center bearing 03 mounting 2 bolt
+            - generic [ref=f3e252]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Center bearing 04 mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e253] [cursor=pointer]:
+            - text: Center bearing 04 mounting 1 washer
+            - generic [ref=f3e255]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Center bearing 04 mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e256] [cursor=pointer]:
+            - text: Center bearing 04 mounting 1 bolt
+            - generic [ref=f3e258]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Center bearing 04 mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e259] [cursor=pointer]:
+            - text: Center bearing 04 mounting 2 washer
+            - generic [ref=f3e261]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Center bearing 04 mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e262] [cursor=pointer]:
+            - text: Center bearing 04 mounting 2 bolt
+            - generic [ref=f3e264]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Center bearing 05 mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e265] [cursor=pointer]:
+            - text: Center bearing 05 mounting 1 washer
+            - generic [ref=f3e267]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Center bearing 05 mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e268] [cursor=pointer]:
+            - text: Center bearing 05 mounting 1 bolt
+            - generic [ref=f3e270]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Center bearing 05 mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e271] [cursor=pointer]:
+            - text: Center bearing 05 mounting 2 washer
+            - generic [ref=f3e273]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Center bearing 05 mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e274] [cursor=pointer]:
+            - text: Center bearing 05 mounting 2 bolt
+            - generic [ref=f3e276]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Center bearing 06 mounting 1 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e277] [cursor=pointer]:
+            - text: Center bearing 06 mounting 1 washer
+            - generic [ref=f3e279]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Center bearing 06 mounting 1 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e280] [cursor=pointer]:
+            - text: Center bearing 06 mounting 1 bolt
+            - generic [ref=f3e282]: Bearing bolt - 9.79 x 36.50 mm
+          - button "Center bearing 06 mounting 2 washer Bearing washer - 22.75 x 10.57 x 2.54 mm" [ref=f3e283] [cursor=pointer]:
+            - text: Center bearing 06 mounting 2 washer
+            - generic [ref=f3e285]: Bearing washer - 22.75 x 10.57 x 2.54 mm
+          - button "Center bearing 06 mounting 2 bolt Bearing bolt - 9.79 x 36.50 mm" [ref=f3e286] [cursor=pointer]:
+            - text: Center bearing 06 mounting 2 bolt
+            - generic [ref=f3e288]: Bearing bolt - 9.79 x 36.50 mm

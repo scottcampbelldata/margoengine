@@ -159,6 +159,27 @@ test('polyhedra counts follow faces * (detail + 1)^2 * 3 non-indexed vertices', 
   }
 });
 
+test('polyhedron LODs can share smooth normals while preserving default shading and geometry', () => {
+  for (const fn of [tetrahedronGeometry, octahedronGeometry, icosahedronGeometry, dodecahedronGeometry]) {
+    for (const detail of [0, 1]) {
+      const original = fn(0.65, detail), smooth = fn(0.65, detail, true), flat = fn(0.65, detail, false);
+      for (const key of ['positions', 'uvs', 'indices']) assert.deepEqual(smooth[key], original[key]);
+      assert.deepEqual(original.normals, detail ? smooth.normals : flat.normals);
+      assert.notDeepEqual(flat.normals, smooth.normals);
+      for (let i = 0; i < smooth.positions.length; i += 3) {
+        const length = Math.hypot(...smooth.positions.subarray(i, i + 3));
+        close(length, 0.65, 1e-6);
+        for (let k = 0; k < 3; k++) close(smooth.normals[i + k], smooth.positions[i + k] / length, 1e-6);
+      }
+      for (let i = 0; i < flat.normals.length; i += 9) {
+        assert.deepEqual(flat.normals.slice(i, i + 3), flat.normals.slice(i + 3, i + 6));
+        assert.deepEqual(flat.normals.slice(i, i + 3), flat.normals.slice(i + 6, i + 9));
+      }
+    }
+    assert.throws(() => fn(1, 0, 'smooth'), /smoothing/);
+  }
+});
+
 test('lathe and tube counts match Three.js', () => {
   const pts = Array.from({length: 7}, (_, i) => [Math.sin(i / 6 * Math.PI) + 0.1, i / 6 - 0.5]);
   const l = latheGeometry(pts, 20);

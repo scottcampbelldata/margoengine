@@ -46,7 +46,7 @@ fn linear(d:f32)->f32{return frame.cameraData.x*frame.cameraData.y/(frame.camera
  let radius=dot(i.uv,i.uv);if(radius>1){discard;}
  let gap=max(0.0,linear(textureLoad(surface,vec2i(i.clip.xy),0))-linear(i.clip.z));
  let alpha=(1.0-smoothstep(0.25,1.0,radius))*i.alpha*min(1.0,gap*12.0)*0.65;
- let color=vec3f(0.78,0.84,0.85)*(0.08+smoothstep(-0.04,0.12,frame.sun.y)*0.92);
+ let color=vec3f(0.78,0.84,0.85)*(vec3f(0.05)+frame.radiance.rgb*min(1.0,frame.sun.w));
  return vec4f(color*alpha,alpha);
 }`;
 

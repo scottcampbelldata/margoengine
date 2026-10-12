@@ -136,8 +136,8 @@ export class TextRenderer implements EnginePlugin {
 
   registerPasses(graph: FrameGraph): void {graph.add({name: `${this.name}:draw`, order: this.order, execute: this.execute});}
 
-  private pipeline(format: GPUTextureFormat, depthFormat: GPUTextureFormat, onTop: boolean): GPURenderPipeline {
-    const key = `${format}|${depthFormat}|${onTop}`;
+  private pipeline(format: GPUTextureFormat, depthFormat: GPUTextureFormat, onTop: boolean, count: number): GPURenderPipeline {
+    const key = `${format}|${depthFormat}|${onTop}|${count}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const module = this.module!, blend: GPUBlendComponent = {srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add'};
@@ -146,6 +146,7 @@ export class TextRenderer implements EnginePlugin {
         vertex: {module, entryPoint: 'vertex'},
         fragment: {module, entryPoint: 'fragment', targets: [{format, blend: {color: blend, alpha: blend}}]},
         primitive: {topology: 'triangle-list', cullMode: 'none'},
+        multisample: {count},
         depthStencil: {format: depthFormat, depthWriteEnabled: false, depthCompare: onTop ? 'always' : 'greater-equal'},
       });
       this.pipelines.set(key, pipeline);
@@ -269,7 +270,7 @@ export class TextRenderer implements EnginePlugin {
     for (const [list, onTop] of [[this.depthTexts, false], [this.topTexts, true]] as const) {
       if (!list.length) continue;
       list.sort((a, b) => b[1].depth - a[1].depth);
-      pass.setPipeline(this.pipeline(context.format, depthFormat, onTop));
+      pass.setPipeline(this.pipeline(context.format, depthFormat, onTop, context.descriptor.multisample?.count ?? 1));
       for (const [, r] of list) {pass.setBindGroup(1, r.group); pass.draw(6, r.count * r.uints[33]); this.stats.drawCalls++;}
     }
     pass.end();
