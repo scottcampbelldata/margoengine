@@ -1,0 +1,32 @@
+{
+  "name": "@margoengine/gizmo",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Transform manipulators using the existing controls implementation.",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^0.1.0 || ^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js gizmo",
+    "test": "npm run build && node --test test/*.test.js",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@margoengine/controls": "0.1.0"
+  }
+}

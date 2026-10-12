@@ -1,0 +1,14 @@
+{
+  "name": "@margoengine/text", "version": "0.1.0", "type": "module", "license": "MIT",
+  "description": "GPU signed distance field text for Margo Engine: runtime glyph atlases from any browser font, wrapping, alignment, outlines and shadows, WebGPU.",
+  "repository": { "type": "git", "url": "git+https://github.com/scottcampbelldata/vexel.git", "directory": "packages/text" },
+  "publishConfig": { "access": "public" },
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "npm run build && node --test tests/text.test.js",
+    "test:browser": "npm run build && node scripts/test-browser.js",
+    "prepack": "npm run build"
+  },
+  "sideEffects": false, "exports": {".": {"types": "./dist/index.d.ts", "import": "./dist/index.js"}},
+  "files": ["dist"], "peerDependencies": {"@margoengine/core": "^0.1.0 || ^1.0.0"}
+}

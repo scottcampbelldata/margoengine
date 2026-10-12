@@ -1,0 +1,8 @@
+Real-world fixtures, downloaded by scripts/fetch-fixtures.js (each under 1 MB).
+
+three.js examples/models (MIT, https://github.com/mrdoob/three.js):
+  dolphins.ply, dolphins_be.ply, dolphins_colored.ply, cube_gears.3mf (model CC BY-SA, Emmett Lalish),
+  facecolors.3mf, vertexcolors.3mf (3MF Consortium samples), simple.pcd, pcl_logo.pcd, helix_201.xyz
+Point Cloud Library test data (BSD-3-Clause, https://github.com/PointCloudLibrary/pcl): bunny.pcd
+libigl tutorial data (https://github.com/libigl/libigl-tutorial-data): cube.off, decimated-knight.off
+PyVista vtk-data (https://github.com/pyvista/vtk-data): fran_cut.vtk, polyEx.vtk

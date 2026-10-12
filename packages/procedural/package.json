@@ -1,0 +1,33 @@
+{
+  "name": "@margoengine/procedural",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Marching Cubes surfaces and 3D simplex, Perlin and Worley noise.",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "isosurface": "1.0.0",
+    "simplex-noise": "4.0.3"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^0.1.0 || ^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js procedural",
+    "test": "npm run build && node --test test/*.test.js",
+    "prepack": "npm run build"
+  }
+}

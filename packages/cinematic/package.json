@@ -1,0 +1,29 @@
+{
+  "name": "@margoengine/cinematic",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Critically damped camera follow, look-at and screen shake.",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^0.1.0 || ^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js cinematic",
+    "test": "npm run build && node --test test/*.test.js",
+    "prepack": "npm run build"
+  }
+}

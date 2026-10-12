@@ -1,0 +1,29 @@
+{
+  "name": "@margoengine/ecs",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Typed-array packed sparse-set entity component storage.",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^0.1.0 || ^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js ecs",
+    "test": "npm run build && node --test test/*.test.js",
+    "prepack": "npm run build"
+  }
+}

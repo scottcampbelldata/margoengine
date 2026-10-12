@@ -1,0 +1,61 @@
+import * as module0 from '@margoengine/input';
+import * as module1 from '@margoengine/ecs';
+import * as module2 from '@margoengine/fsm';
+import * as module3 from '@margoengine/navmesh';
+import * as module4 from '@margoengine/cinematic';
+import * as module5 from '@margoengine/splines';
+import * as module6 from '@margoengine/transitions';
+import * as module7 from '@margoengine/toon';
+import * as module8 from '@margoengine/water';
+import * as module9 from '@margoengine/sky';
+import * as module10 from '@margoengine/selection';
+import * as module11 from '@margoengine/wfc';
+import * as module12 from '@margoengine/procedural';
+import * as module13 from '@margoengine/road';
+import * as module14 from '@margoengine/scatter';
+import * as module15 from '@margoengine/html';
+import * as module16 from '@margoengine/video';
+import * as module17 from '@margoengine/net';
+import * as module18 from '@margoengine/stats';
+import * as module19 from '@margoengine/inspector';
+import * as module20 from '@margoengine/navigation';
+import * as module21 from '@margoengine/tween';
+import * as module22 from '@margoengine/fbx';
+import * as module23 from '@margoengine/usdz-export';
+import * as module24 from '@margoengine/bvh';
+import * as module25 from '@margoengine/lines';
+import * as module26 from '@margoengine/environment';
+import * as module27 from '@margoengine/geometry';
+import * as module28 from '@margoengine/loaders';
+import * as module29 from '@margoengine/exporters';
+import * as module30 from '@margoengine/decoders';
+import * as module31 from '@margoengine/text';
+import * as module32 from '@margoengine/controls';
+import * as module33 from '@margoengine/gizmo';
+import * as module34 from '@margoengine/points';
+import * as module35 from '@margoengine/audio';
+import * as module36 from '@margoengine/physics';
+import type {EngineKernel} from '@margoengine/core';
+export const modules = [module0,module1,module2,module3,module4,module5,module6,module7,module8,module9,module10,module11,module12,module13,module14,module15,module16,module17,module18,module19,module20,module21,module22,module23,module24,module25,module26,module27,module28,module29,module30,module31,module32,module33,module34,module35,module36];
+export function example(engine:EngineKernel){
+ const world=new module1.World(64),position=world.component({x:Float32Array});
+ position.add(world.create(),{x:1});
+ const curve=new module5.Spline([[0,0,0],[0,0,10]]);
+ const path=new module3.NavMesh([[0,0,0],[1,0,0],[0,0,1]],[[0,1,2]]).path([0.1,0,0.1],[0.2,0,0.2]);
+ const input=new module0.Input({jump:[{type:'key',code:'Space'}]});
+ const road=module13.road(curve);
+ module6.Transitions.attach(engine).start('radial',1);
+ module7.Toon.attach(engine);
+ module8.Water.attach(engine,{waves:[{direction:[1,0],amplitude:0.1,wavelength:10}]});
+ module9.Sky.attach(engine,{model:'bruneton'});
+ const selected=module10.Selection.attach(engine);selected.set([engine.createMesh().setGeometry(road.geometry)]);
+ module15.HTML.attach(engine).add(document.createElement('span'),{position:[0,1,0]});
+ const snapshot=module17.createSnapshot();new module17.SnapshotBuffer().sample(1,snapshot);
+ return {world,path,input};
+}
+export async function navigation(){
+ const nav=await module20.Navigation.create([0,0,0,1,0,0,0,0,1],[0,2,1]);
+ const points=nav.path({x:0,y:0,z:0},{x:1,y:0,z:1});
+ nav.dispose();return points;
+}
+

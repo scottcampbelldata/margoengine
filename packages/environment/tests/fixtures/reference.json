@@ -1,0 +1,20 @@
+{
+  "BrightRings.exr": {
+    "width": 800,
+    "height": 800,
+    "compression": "ZIP",
+    "sha256": "6dcd443feed1227b03b75837c9168d78ebbd169b966a91c90d0e109921aa6d6b"
+  },
+  "AllHalfValues.exr": {
+    "width": 256,
+    "height": 256,
+    "compression": "PIZ",
+    "sha256": "2bc183e65c8146294457b6bf5a840e90576ddd41d1dc90971a6ff156b03061bc"
+  },
+  "spot1Lux.hdr": {
+    "width": 1024,
+    "height": 512,
+    "sha256": "607f9db9d5753519ca0c08599786938f1f8f07b62f33c2db0db22051f715e85b",
+    "max": 26368.0
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "@margoengine/bvh",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Triangle BVH, spatial queries and an engine Raycaster for Margo Engine (three-mesh-bvh and THREE.Raycaster counterparts).",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/vexel.git",
+    "directory": "packages/bvh"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "npm run build && node --test tests/bvh.test.js",
+    "test:browser": "npm run build && node scripts/test-browser.js",
+    "bench": "npm run build && node scripts/bench.js",
+    "prepack": "npm run build"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "@margoengine/core": "^0.1.0 || ^1.0.0"
+  }
+}

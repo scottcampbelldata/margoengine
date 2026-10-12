@@ -1,0 +1,35 @@
+{
+  "name": "@margoengine/loaders",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "PLY, 3MF, PCD, OFF, XYZ, legacy VTK and static USDA/USDZ loaders for Margo Engine.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/vexel.git",
+    "directory": "packages/loaders"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "npm run build && node --test tests/loaders.test.js",
+    "test:browser": "npm run build && node scripts/test-browser.js",
+    "fixtures": "node scripts/fetch-fixtures.js",
+    "prepack": "npm run build"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "@margoengine/core": "^0.1.0 || ^1.0.0"
+  }
+}

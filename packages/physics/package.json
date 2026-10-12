@@ -1,0 +1,40 @@
+{
+  "name": "@margoengine/physics",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Rigid-body physics for Margo Engine on Rapier: fixed-step engine plugin with interpolation, colliders, joints, queries, events and a character controller.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/vexel.git",
+    "directory": "packages/physics"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "npm run build && node --test tests/physics.test.js",
+    "test:browser": "npm run build && node scripts/test-browser.js",
+    "prepack": "npm run build"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "@margoengine/core": "^0.1.0 || ^1.0.0",
+    "@dimforge/rapier3d-compat": ">=0.14.0 <1"
+  },
+  "peerDependenciesMeta": {
+    "@dimforge/rapier3d-compat": {
+      "optional": true
+    }
+  }
+}
