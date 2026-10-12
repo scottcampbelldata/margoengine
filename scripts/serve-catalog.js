@@ -34,5 +34,5 @@ export const server = createServer(async (request, response) => {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   server.on('error', error => { console.error('Could not start the catalog:', error.message); process.exitCode = 1; });
-  server.listen(5184, '127.0.0.1', () => console.log('Vexel module catalog: http://127.0.0.1:5184'));
+  server.listen(5184, '127.0.0.1', () => console.log('Margo Engine module catalog: http://127.0.0.1:5184'));
 }

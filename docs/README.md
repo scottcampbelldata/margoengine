@@ -1,8 +1,8 @@
-# Vexel module catalog
+# Margo Engine module catalog
 
-[Browse the searchable catalog](https://scottcampbelldata.github.io/vexel/).
+[Browse the searchable catalog](https://scottcampbelldata.github.io/margoengine/).
 
-Search by task, package name or public runtime export. Each of the five published `0.1.0` packages includes copy buttons for installation, imports and a complete runnable HTML example. Selecting an export name copies its individual import. The examples use the published npm packages, not workspace source.
+Search all 61 packages by task, package name or public runtime export. Copy installation commands and imports, open each package guide, and try the five standalone HTML examples. The catalog marks exact versions available on npm; packages marked Source can be built from the repository until publication.
 
 To preview a checkout, use Node.js 22.12+ and run this command from the repository root:
 
@@ -12,9 +12,9 @@ npm run catalog
 
 Open [localhost:5184](http://127.0.0.1:5184). No dependency installation or package build is needed for the catalog. Stop the preview with Ctrl+C.
 
-The catalog uses plain HTML, CSS, JavaScript and `catalog.json`. It loads no engine packages. Examples fetch pinned distribution files from jsDelivr; React also uses esm.sh. Serve copied examples over localhost or HTTPS rather than opening them with `file://`. Examples include pause/play controls, respect reduced-motion preferences and dispose resources when the page closes. Creative rendering requires WebGPU.
+The catalog uses plain HTML, CSS, JavaScript and `catalog.json`. It loads no engine packages. Examples fetch pinned distribution files from jsDelivr; React also uses esm.sh. Serve copied examples over localhost or HTTPS rather than opening them with `file://`. Examples include pause/play controls, respect reduced-motion preferences and dispose resources when the page closes. Creative rendering requires WebGPU. CDN examples need their Margo packages to be published first.
 
-GitHub Pages serves this directory from `main` at `/vexel/`; `.nojekyll` keeps it a static site. To add or update a package, update its `catalog.json` entry and example together. List APIs that exist in the named published version; TypeScript-only types and the advanced core `/extension` entry are covered in the [API guide](../MODERN-ENGINE.md).
+GitHub Pages serves this directory from `main` at `/margoengine/`; the website build also copies it into `/catalog/`. Run `npm run build:packages` and `npm run catalog:build` to refresh package names, versions, runtime exports and exact-version registry availability. Add runnable examples to the matching `catalog.json` entry; the generator retains that metadata. TypeScript-only types and the advanced core `/extension` entry are covered in the [API guide](../MODERN-ENGINE.md).
 
 Run the catalog checks after installing workspace development dependencies:
 

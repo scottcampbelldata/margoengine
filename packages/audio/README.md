@@ -2,7 +2,7 @@
 
 Web Audio listener, global and positional sounds and a frequency analyser for Margo Engine. Replaces THREE.AudioListener, THREE.Audio, THREE.PositionalAudio, THREE.AudioAnalyser and THREE.AudioLoader.
 
-Not yet published to npm. Build from source with `npm run build` in `packages/audio`.
+Build from source with `npm run build` in `packages/audio`.
 
 ```ts
 import {AudioListener, Audio, PositionalAudio, AudioAnalyser} from '@margoengine/audio';

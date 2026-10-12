@@ -2,7 +2,7 @@
 
 PLY, 3MF, PCD, OFF, XYZ, legacy VTK and static USDA/USDZ loaders for Margo Engine, each tree-shakable on its own.
 
-Not yet published to npm. Build from source with `npm run build` in `packages/loaders`.
+Build from source with `npm run build` in `packages/loaders`.
 
 ```ts
 import {Engine} from '@margoengine/core';

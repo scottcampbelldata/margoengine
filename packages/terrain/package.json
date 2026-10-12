@@ -6,7 +6,7 @@
   "description": "Geometry clipmaps and triplanar terrain layers.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/vexel.git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/terrain"
   },
   "publishConfig": {
@@ -32,5 +32,6 @@
   },
   "dependencies": {
     "@margoengine/geometry": "0.1.0"
-  }
+  },
+  "homepage": "https://margoengine.com"
 }

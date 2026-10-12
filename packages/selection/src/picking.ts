@@ -74,6 +74,8 @@ export class Picking implements EnginePlugin {
  }
  private capture(c:Context):void {
   this.captured=false;this.context=c;
+  // Integer IDs cannot be resolved; retain the existing single-sample micro pass under MSAA.
+  if((c.descriptor.multisample?.count??1)>1)return;
   if(this.ids?.width!==c.width||this.ids.height!==c.height){this.ids?.destroy();this.ids=c.device.createTexture({size:[c.width,c.height],format:'r32uint',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});this.idsView=this.ids.createView();}
   this.original=c.draw;const original=c.draw;
   c.draw=(options:DrawOptions={})=>{

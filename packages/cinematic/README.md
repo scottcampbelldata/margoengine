@@ -18,6 +18,8 @@ follow accepts a live mesh from the attached engine or a world-position tuple. M
 Set `ground: (x,z) => height` to keep the camera arm above a CPU heightfield.
 `clearance` defaults to 0.65 world units. The rig checks both its desired arm and
 the resulting damped/shaken camera, without changing your requested `offset`.
+For a below-target orbit, it raises the rendered aim point with the camera so
+terrain clearance preserves upward look instead of forcing the view back down.
 Six samples along each arm suit broad terrain; narrow ridges and buildings need
 collision geometry. Heights must be finite. Ground handling is disabled by default.
 

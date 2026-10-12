@@ -235,3 +235,10 @@ test('SkyMoonPass releases its buffer if pipeline construction fails', (t) => {
   assert.equal(state.destroyed, 1);
   pass.dispose();
 });
+
+test('SkyMoonPass allocates its 4x pipeline only when a 4x scene records it',t=>{
+  const {pass,state,encoder}=fixture(t),resources=state.resources;
+  assert.equal(state.pipeline.multisample,undefined);pass.record(encoder,1);assert.equal(state.resources,resources);
+  pass.record(encoder,4);assert.equal(state.resources,resources+1);assert.equal(state.pipeline.multisample.count,4);
+  pass.record(encoder,4);assert.equal(state.resources,resources+1);pass.dispose();
+});

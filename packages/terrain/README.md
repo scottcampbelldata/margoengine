@@ -18,6 +18,23 @@ attachment: `sand`, two `meadow` colors, `stone`, height ranges `shore`,
 `wetDarkening` (0..1), and optional `variation` (0..1, default 0). Ranges must be
 increasing; colors are linear RGB in 0..1. Other meshes keep their materials.
 
+For a moving wet-sand band, add `wetness: {texture: () => water.coastalDepthTexture,
+origin: [-80,-80], size: [160,160]}` using the same world bounds as water's terrain.
+The borrowed texture's red channel contains water depth in meters; it must be a
+single-layer, single-sample 2D `r32float`, `rgba32float` or `rgba16float` texture
+with `COPY_SRC`. Undefined uses dry sand while water initializes or restores.
+The module keeps a stable GPU snapshot so flow ping-pong does not rebuild scene
+or vegetation bindings each frame. A 256 × 256 `rgba32float` snapshot costs 1 MiB
+and one GPU copy per frame. Terrain owns that snapshot, not the provider texture.
+
+Wetness samples world XZ per fragment and darkens only the sand portion below
+`wetHeight[1]`. Meadow/stone blends and geometry stay fixed to terrain height and
+slope. The mask follows current water depth; it does not simulate erosion or
+retain a drying history after recession. It uses group 0 binding 9 and flat output
+location 6 in the standard PBR shader. No core changes are required.
+Physical WebGPU regression: `node packages/terrain/test/wetness.browser.mjs` from
+the repository root after building the packages.
+
 Optional geometry clipmaps with vertex texture height/normal sampling and 4–8 terrain layers. Fixed grids form a center and concentric rings. Uniform origins follow the camera, inner ring edges follow the finer grid, and outer-edge vertices collapse onto the next coarser lattice to close seams. Height sampling uses bilinear `textureLoad`, including non-filterable `r32float` maps. Cliff faces use triplanar splatting; normalized slope/height weights blend an sRGB texture array.
 
 ```ts

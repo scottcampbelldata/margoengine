@@ -2,7 +2,7 @@
 
 Fat lines with joins, caps, dashes and antialiasing, plus the debug helpers, as a WebGPU engine plugin for Margo Engine.
 
-Not yet published to npm. Build from source with `npm run build` in `packages/lines`.
+Build from source with `npm run build` in `packages/lines`.
 
 Replaces the three.js `Line2`, `LineSegments2`, `LineGeometry`, `LineSegmentsGeometry` and `LineMaterial` add-ons, and `GridHelper`, `PolarGridHelper`, `AxesHelper`, `BoxHelper`, `Box3Helper`, `ArrowHelper`, `CameraHelper`, `PlaneHelper` and `VertexNormalsHelper`.
 

@@ -107,6 +107,6 @@ The demo includes a third procedural-starfield draw, local 2k Earth textures, or
 
 The build and prepack commands write only this package's `dist` and license copy. Checks and screenshots write to this package's `test-results`; they use existing core artifacts without rebuilding the base. The browser check uses Edge by default (or installed Playwright Chromium as a fallback); set `BROWSER_CHANNEL` to choose another installed Chromium channel. The unit checks cover loading, lifecycle, validation, resource retention and bundle isolation. The WebGPU checks cover shaders, rendered pixels, depth, HDR and device restoration.
 
-This ESM package includes TypeScript declarations and requires `@margoengine/core` 0.1.0. See the [effect options and limitations](https://github.com/scottcampbelldata/vexel/blob/main/MODERN-ENGINE.md).
+This ESM package includes TypeScript declarations and requires `@margoengine/core` 0.1.0. See the [effect options and limitations](https://github.com/scottcampbelldata/margoengine/blob/main/MODERN-ENGINE.md).
 
 MIT licensed.

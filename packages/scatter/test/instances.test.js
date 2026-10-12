@@ -31,18 +31,19 @@ test('fixed PBR scatter uploads once, uses flat transforms and indirect draws in
   scatter.dispose(); assert.ok(h.resources.every(r=>r.destroyed));
 });
 
-test('fixed PBR scatter multiplies baked vertex occlusion without replacing shadow lighting', () => {
+test('fixed PBR scatter applies alpha occlusion only to ambient lighting and preserves albedo and direct shadows', () => {
   const h = optionalGPU(); h.engine.lighting = {direction:new Float32Array([-1,0.13,0,1]),radiance:new Float32Array([1,0.8,0.54,0.18])};
   h.context.shader = wgsl.replace('let linear=direct*','let linear=direct*0.75*');
   h.context.bindings = [{binding:1,resource:{buffer:{}}}];
-  const b = batch(); b.vertices.fill(0.25,16,19);
+  const b = batch(); b.vertices[19]=0.25;
   const scatter = new ScatterInstances(()=>[b]); h.engine.use(scatter); h.engine.frameGraph.execute(h.context);
   const render = h.pipelines.find(p=>p.fragment), code = render.vertex.module.code;
   assert.match(code,/@location\(8\) vertexColor:vec4f/); assert.match(code,/o.color=i.color.rgb\*i.vertexColor.rgb;/);
   assert.match(code,/let linear=direct\*0\.75\*/);
+  assert.match(code,/i.color\*\(1.0-i.material.y\)\*i.occlusion\*frame.radiance.w/);
   assert.deepEqual(render.vertex.buffers[0].attributes[2],{shaderLocation:8,offset:64,format:'float32x4'});
   const vertex = h.resources.find(r=>r.size===240);
-  assert.deepEqual(Array.from(new Float32Array(vertex.data).subarray(16,20)),[0.25,0.25,0.25,1]);
+  assert.deepEqual(Array.from(new Float32Array(vertex.data).subarray(16,20)),[1,1,1,0.25]);
   assert.ok(h.groups.some(g=>g.entries.some(e=>e.resource===h.context.bindings[0].resource)));
   const created = {...h.counts}; for (let i = 0; i < 600; i++) h.engine.frameGraph.execute(h.context);
   assert.equal(h.counts.buffers,created.buffers); assert.equal(h.counts.groups,created.groups); scatter.dispose();
@@ -72,15 +73,37 @@ test('HDR batch emission survives occlusion, direct shadows and device restorati
   scatter.dispose();assert.ok(h.resources.every(r=>r.destroyed));
 });
 
+test('emission fades each render without replacing batch data and survives restoration',()=>{
+  const h=optionalGPU();h.engine.lighting={direction:new Float32Array([0,1,0,1]),radiance:new Float32Array([1,1,1,0.1])};
+  let generated=0,scale=0,sampled=0;const b=batch();b.emissive=[3,2.16,0.9];
+  const scatter=new ScatterInstances(()=>{generated++;return [b];});h.engine.use(scatter);
+  const render=()=>{h.context.shader=wgsl;h.context.bindings=[];h.engine.frameGraph.execute(h.context);};
+  const uniform=()=>h.resources.find(r=>!r.destroyed&&r.size===128&&r.usage===72);
+  render();assert.equal(new Float32Array(uniform().data)[29],1);
+  scatter.emissiveIntensity=()=>{sampled++;return scale;};const created={...h.counts};
+  for(scale of [0,0.5,1]){render();assert.equal(new Float32Array(uniform().data)[29],scale);}
+  assert.equal(sampled,3);assert.equal(generated,1);assert.equal(h.counts.buffers,created.buffers);assert.equal(h.counts.groups,created.groups);
+  assert.deepEqual(Array.from(new Float32Array(h.resources.find(r=>r.size===128&&r.usage===40).data).subarray(24,27)),b.emissive.map(Math.fround));
+  assert.match(h.pipelines.find(p=>p.fragment).vertex.module.code,/o.emissive=i.emissive\*frame.windTime.y/);
+  scale=0.25;scatter.onDeviceRestored(h.engine);render();assert.equal(generated,2);assert.equal(new Float32Array(uniform().data)[29],scale);
+  for(const invalid of [-1,NaN,Infinity,1e40,'1'])for(const value of [invalid,()=>invalid]){scatter.emissiveIntensity=value;assert.throws(render,/emissive intensity/);}
+  scatter.dispose();assert.ok(h.resources.every(r=>r.destroyed));
+});
+
 test('wind uploads a single clock to the color pass and every shadow cascade, with bounded validation',()=>{
   const h=optionalGPU();h.engine.lighting={direction:new Float32Array([0,1,0,1]),radiance:new Float32Array([1,1,1,0.1])};
-  const b=batch();b.wind=[1,0.35,0.1];const scatter=new ScatterInstances(()=>[b]);h.engine.use(scatter);h.frame();
+  const b=batch();b.wind=[1,0.35,0.1];b.windDetail=1;const scatter=new ScatterInstances(()=>[b]);h.engine.use(scatter);h.frame();
   const instance=h.resources.find(r=>r.size===128&&r.usage===40);
   assert.deepEqual(Array.from(new Float32Array(instance.data).subarray(28,31)),[1/Math.hypot(1,0.35),0.35/Math.hypot(1,0.35),0.1].map(Math.fround));
+  assert.equal(new Float32Array(instance.data)[31],1);
+  h.context.shader=wgsl;h.engine.frameGraph.execute(h.context);
+  for(const pipeline of [h.pipelines[0],h.pipelines.at(-1)])assert.match(pipeline.vertex.module.code,/windDeformation\(p.xyz,i.(?:d|m3).xyz/);
   const uniform=h.resources.find(r=>r.size===128&&r.usage===72),time=new Float32Array(uniform.data)[28];assert.ok(time>0);
   const pass=h.context.encoder.beginRenderPass({});for(let cascade=0;cascade<4;cascade++)scatter.drawShadow({context:h.context,pass,matrix:h.context.camera.matrix,cascade});
   for(const shadow of h.resources.filter(r=>r.size===80))assert.equal(new Float32Array(shadow.data)[16],time);
   for(const delta of [-1,NaN,Infinity])assert.throws(()=>scatter.onPreUpdate(delta),/delta/);
   scatter.dispose();
   for(const wind of [[0,0,0.1],[1,0,-1],[1,0,1.1],[1,0,NaN],[1e40,0,0.1],[1e-50,0,0.1]]){const bad=batch();bad.wind=wind;assert.throws(()=>new ScatterInstances(()=>[bad]).setup(h.engine),/wind/);}
+  for(const detail of [-1,1.1,NaN,Infinity]){const bad=batch();bad.wind=[1,0,0.1];bad.windDetail=detail;assert.throws(()=>new ScatterInstances(()=>[bad]).setup(h.engine),/wind detail/);}
+  const bad=batch();bad.windDetail=1;assert.throws(()=>new ScatterInstances(()=>[bad]).setup(h.engine),/wind detail/);
 });

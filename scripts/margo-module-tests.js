@@ -15,7 +15,7 @@ async function pixels(){
 try{
  await page.waitForFunction(()=>window.margoModules);const results={};
  for(const name of ['baseline','toon','water','preetham','bruneton','jfa','morphological','scatter','transitions','html','video','combined','debug']){
-  results[name]=await page.evaluate(name=>window.margoModules.setup(name),name);
+  results[name]=await page.evaluate(name=>window.margoModules.setup(name),name).catch(error=>{throw new Error(name+': '+error.message);});
   await page.screenshot({path:`test-results/margo-${name}.png`});
   results[name].state=await page.evaluate(()=>window.margoModules.state());
   results[name].pixels=await pixels();
@@ -38,5 +38,20 @@ try{
   results.fbx={...asset,before,after};await page.screenshot({path:'test-results/margo-fbx.png'});
  }
  assert.deepEqual(await page.evaluate(()=>window.margoModules.errors),[]);assert.deepEqual(errors,[]);
- await page.evaluate(()=>window.margoModules.dispose());await writeFile('test-results/margo-modules.json',JSON.stringify({hardware,results,layout,timestamps},null,2));console.log(JSON.stringify({hardware,results,layout,timestamps},null,2));
+ const phone=await page.context().browser().newPage({viewport:{width:390,height:664},deviceScaleFactor:3,isMobile:true,hasTouch:true,userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1'});
+ let mobile;
+ try{
+  phone.on('pageerror',error=>errors.push(error.message));phone.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
+  await phone.addInitScript(()=>{
+   const audit=window.msaaAudit={textures:0,pipelines:0,resolves:0};
+   for(const name of ['createTexture','createRenderPipeline','createRenderPipelineAsync']){const create=GPUDevice.prototype[name];GPUDevice.prototype[name]=function(d){if((d.sampleCount??d.multisample?.count??1)>1)audit[name==='createTexture'?'textures':'pipelines']++;return create.call(this,d);};}
+   const begin=GPUCommandEncoder.prototype.beginRenderPass;GPUCommandEncoder.prototype.beginRenderPass=function(d){for(const a of d.colorAttachments)if(a?.resolveTarget)audit.resolves++;return begin.call(this,d);};
+  });
+  await phone.goto('http://127.0.0.1:5193/tests/margo-modules.html');await phone.waitForFunction(()=>window.margoModules);
+  for(const name of Object.keys(results))if(name!=='fbx')await phone.evaluate(name=>window.margoModules.setup(name),name);
+  mobile=await phone.evaluate(()=>({...window.msaaAudit,errors:window.margoModules.errors}));
+  assert.deepEqual(mobile,{textures:0,pipelines:0,resolves:0,errors:[]});assert.deepEqual(errors,[]);
+  await phone.evaluate(()=>window.margoModules.dispose());
+ }finally{await phone.close();}
+ await page.evaluate(()=>window.margoModules.dispose());await writeFile('test-results/margo-modules.json',JSON.stringify({hardware,results,layout,timestamps,mobile},null,2));console.log(JSON.stringify({hardware,results,layout,timestamps,mobile},null,2));
 }finally{await browser.close();}

@@ -43,7 +43,7 @@ test('DOF HDR chaining works on resize/restoration and rejects missing or invali
 
 test('optional manifests preserve the frozen core peer contract and tree shaking',()=>{
   for(const name of ['dof','tonemap']){const pkg=JSON.parse(readFileSync(new URL(`../../${name}/package.json`,import.meta.url),'utf8'));
-    assert.deepEqual(pkg.peerDependencies,{'@margoengine/core':'^1.0.0'});assert.equal(pkg.dependencies,undefined);assert.equal(pkg.sideEffects,false);
+    assert.deepEqual(pkg.peerDependencies,{'@margoengine/core':'^0.1.0 || ^1.0.0'});assert.equal(pkg.dependencies,undefined);assert.equal(pkg.sideEffects,false);
     const code=readFileSync(new URL(`../../${name}/dist/index.js`,import.meta.url),'utf8');assert.match(code,/@margoengine\/core\/extension/);assert.doesNotMatch(code,/wasmBase64|class TransformStore/);
   }
 });

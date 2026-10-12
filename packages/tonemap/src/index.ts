@@ -1,3 +1,4 @@
+import {SceneTarget} from '../../shared/msaa.js';
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext} from '@margoengine/core/extension';
 import {parseCube,validateLUT,type CubeLUT} from './cube.js';
@@ -79,15 +80,18 @@ export class Tonemap implements EnginePlugin {
     if(this.engine!.hasPlugin('dof')||this.engine!.hasPlugin('ssao')||this.engine!.hasPlugin('post-processing'))throw new Error('Tonemap cannot share scene capture without an HDR source');
     this.original=c.color;
     if(this.scene?.width!==c.width||this.scene.height!==c.height){
-      this.scene?.destroy();this.scene=c.device.createTexture({size:[c.width,c.height],format:'rgba16float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.RENDER_ATTACHMENT});
+      this.captureTarget?.dispose();this.depth?.destroy();this.scene?.destroy();this.scene=c.device.createTexture({size:[c.width,c.height],format:'rgba16float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.RENDER_ATTACHMENT});
       this.sceneView=this.scene.createView();
+      this.depth=c.device.createTexture({size:[c.width,c.height],format:c.descriptor.depthStencil!.format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});
+      this.captureTarget=new SceneTarget(c.device,this.scene,this.depth,c.descriptor.multisample?.count??4);
     }
     let shader=this.shaders.get(c.shader);
     if(shader===undefined){shader=c.shader.replace(/let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/,'return vec4f(linear,1);');
       if(shader===c.shader)throw new Error('Tonemap requires the standard core lighting shader');this.shaders.set(c.shader,shader);}
-    c.shader=shader;this.format=c.format;c.color=this.sceneView!;c.format='rgba16float';
+    c.shader=shader;this.format=c.format;this.captureTarget!.begin(c);
   }
   private grade(c:Context):void {
+    if(!this.source)this.captureTarget!.resolve(c.encoder,true);
     const texture=this.source?this.source():this.scene;
     if(!texture||texture.width!==c.width||texture.height!==c.height||texture.dimension!=='2d'||texture.sampleCount!==1||
       texture.format!=='rgba16float'&&texture.format!=='rgba32float'||!(texture.usage&GPUTextureUsage.TEXTURE_BINDING))throw new Error('Tonemap requires a viewport-sized, sampleable linear HDR texture');
@@ -107,10 +111,11 @@ export class Tonemap implements EnginePlugin {
     v[12]=+(o.inputColorSpace==='acescg');c.device.queue.writeBuffer(this.uniform!,0,v as Float32Array<ArrayBuffer>);
     this.attachment.view=this.source?c.color:this.original!;
     const pass=c.encoder.beginRenderPass(this.presentation);pass.setPipeline(this.pipeline);pass.setBindGroup(0,this.group);pass.draw(3);pass.end();
-    if(!this.source){c.color=this.original!;c.format=format;}
+    if(!this.source)this.captureTarget!.restore(c);
   }
+  private captureTarget?:SceneTarget;private depth?:GPUTexture;
   private pipelineFormat?:string;
-  private release():void {this.uniform?.destroy();this.scene?.destroy();this.lutTexture?.destroy();this.uniform=undefined;this.scene=undefined;this.sceneView=undefined;this.lutTexture=undefined;this.sourceTexture=undefined;this.pipeline=undefined;this.group=undefined;this.original=undefined;this.shaders.clear();}
+  private release():void {this.captureTarget?.dispose();this.captureTarget=undefined;this.depth?.destroy();this.depth=undefined;this.uniform?.destroy();this.scene?.destroy();this.lutTexture?.destroy();this.uniform=undefined;this.scene=undefined;this.sceneView=undefined;this.lutTexture=undefined;this.sourceTexture=undefined;this.pipeline=undefined;this.group=undefined;this.original=undefined;this.shaders.clear();}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.lut=undefined;this.engine=undefined;}
   destroy():void {this.dispose();}

@@ -566,7 +566,7 @@ try {
   });
   assert.deepEqual(resize.counts, {
     createBuffer: 0,
-    createTexture: 2,
+    createTexture: 4,
     createBindGroup: 1,
     createRenderPipeline: 0,
   });

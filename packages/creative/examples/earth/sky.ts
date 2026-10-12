@@ -39,16 +39,17 @@ export class Stars implements EnginePlugin {
   private readonly execute = (context: PassContext): void => {
     if (context.backend !== 'webgpu') return;
     if (!invert(this.inverse, context.camera.matrix, 0, this.workspace)) throw new Error('Invalid starfield camera');
-    let pipeline = this.pipelines.get(context.format);
+    let pipeline = this.pipelines.get(context.format+':'+context.descriptor.multisample?.count);
     if (!pipeline) {
       pipeline = context.device.createRenderPipeline({
         layout: context.device.createPipelineLayout({bindGroupLayouts: [this.layout!]}),
         vertex: {module: this.module!, entryPoint: 'vs_main'},
         fragment: {module: this.module!, entryPoint: 'fs_main', targets: [{format: context.format}]},
         primitive: {topology: 'triangle-list'},
+        multisample:context.descriptor.multisample,
         depthStencil: {format: this.depthFormat!, depthWriteEnabled: false, depthCompare: 'greater-equal'},
       });
-      this.pipelines.set(context.format, pipeline);
+      this.pipelines.set(context.format+':'+context.descriptor.multisample?.count, pipeline);
     }
     this.data.set(this.inverse);
     this.data.set(context.camera.position, 16);

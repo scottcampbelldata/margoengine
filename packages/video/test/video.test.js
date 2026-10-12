@@ -8,6 +8,16 @@ test('video imports external frames without uploads and reuses frequency bins',(
  assert.throws(()=>new Video(source,{fftSize:17}),/FFT/);
  }finally{globalThis.HTMLVideoElement=old;dom.window.close();}
 });
+test('video overlays follow the scene sample count when the render target changes',()=>{
+ const h=optionalGPU(),dom=new JSDOM('<video></video>'),old=globalThis.HTMLVideoElement;globalThis.HTMLVideoElement=dom.window.HTMLVideoElement;
+ try{
+  const source=dom.window.document.querySelector('video');Object.defineProperties(source,{videoWidth:{value:8},readyState:{value:2}});
+  const descriptors=[],create=h.engine.gpu.createRenderPipeline;h.engine.gpu.createRenderPipeline=descriptor=>{descriptors.push(descriptor);return create(descriptor);};
+  const video=new Video(source);h.engine.use(video);
+  for(const count of [1,4,4,1]){h.context.descriptor.multisample={count};h.frame();}
+  assert.deepEqual(descriptors.map(d=>d.multisample.count),[1,4,1]);video.dispose();assert.ok(h.resources.every(r=>r.destroyed));
+ }finally{globalThis.HTMLVideoElement=old;dom.window.close();}
+});
 test('multiple overlays share one audible media route and release only their own analysis branch',()=>{
  const dom=new JSDOM('<video></video>'),old=globalThis.HTMLVideoElement;globalThis.HTMLVideoElement=dom.window.HTMLVideoElement;
  try{

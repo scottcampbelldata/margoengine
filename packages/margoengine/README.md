@@ -2,9 +2,9 @@
 
 High-level setup for Margo Engine. Mount a canvas, enable orbit/pan/zoom, start rendering and create a spinning orb in five lines. Core selects WebGPU with WebGL2 fallback, handles resize and automatically recovers WebGPU device loss. WebGL2 context loss reports through `onError` and stops rendering; dispose and recreate the stage to resume.
 
-This package is built from source alongside the engine; it has not been published to npm yet. Run `npm run build:packages` in the repository, or install its local tarball and the matching engine packages. Dependencies install the packs together, while dynamic imports keep their runtime code out of the initial scene.
+This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and the matching engine packages. Dependencies install the packs together, while dynamic imports keep their runtime code out of the initial scene.
 
-The combined core and wrapper library measures 20,053 bytes gzip (19.58 KiB), 12 bytes below the 20,065-byte baseline before the rename, with every base export retained. The build enforces a 20,480-byte combined budget and writes measurements to `test-results/modern-bundle-sizes.json`; `npm run measure:size` repeats the gate against the built artifacts. Lazy domain packs and application bootstrap/chunk overhead are measured separately; this is not the complete page download size.
+The combined core and stage facade measures 19,993 bytes gzip, with every base export retained. The build requires this bundle to stay strictly below 20,000 bytes and writes measurements to `test-results/modern-bundle-sizes.json`; `npm run measure:size` repeats the gate against the built artifacts. Lazy domain packs and application bootstrap/chunk overhead are measured separately; this is not the complete page download size.
 
 Give the container a height, for example `<div id="scene" style="height:400px"></div>`:
 

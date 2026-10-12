@@ -1,6 +1,7 @@
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext} from '@margoengine/core/extension';
 import {finiteVector} from '../../shared/math.js';
+import {sceneSamples} from '../../shared/quality.js';
 import frameShader from './shaders/grass-frame.wgsl?raw';
 import cullShader from './shaders/grass-cull.wgsl?raw';
 import grassShader from './shaders/grass.wgsl?raw';
@@ -109,7 +110,7 @@ export class GrassField implements EnginePlugin {
     this.computeGroup=device.createBindGroup({layout:this.compute.getBindGroupLayout(0),entries:[...entries,{binding:3,resource:{buffer:this.indirect}}]});
     const module=device.createShaderModule({label:'grass:render',code:frameShader+grassShader});
     const depthFormat=device.features.has('depth32float-stencil8')?'depth32float-stencil8':'depth32float';
-    for (const format of [navigator.gpu.getPreferredCanvasFormat(),'rgba16float'] as GPUTextureFormat[]) for(const count of [1,4]) {
+    for (const format of [navigator.gpu.getPreferredCanvasFormat(),'rgba16float'] as GPUTextureFormat[]) for(const count of sceneSamples()===1?[1]:[1,4]) {
       const buffers: GPUVertexBufferLayout[]=[{arrayStride:20,attributes:[{shaderLocation:0,offset:0,format:'float32x3'},{shaderLocation:1,offset:12,format:'float32x2'}]}];
       // Explicit shared layout lets both LOD pipelines reuse one bind group.
       const layout=device.createBindGroupLayout({entries:[

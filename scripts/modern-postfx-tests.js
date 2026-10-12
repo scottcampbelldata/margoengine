@@ -99,5 +99,39 @@ try {
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     await page.screenshot({path:`test-results/${name}-demo.png`});
   }
-  assert.deepEqual(errors,[]);await writeFile('test-results/modern-postfx.json',JSON.stringify({hardware,pixels,integration},null,2));console.log(JSON.stringify({hardware,pixels,integration},null,2));
+  const phone=await page.context().browser().newPage({viewport:{width:390,height:664},deviceScaleFactor:3,isMobile:true,hasTouch:true,userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1'});
+  let mobile;
+  try{
+    phone.on('pageerror',error=>errors.push(error.message));phone.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
+    await phone.addInitScript(()=>{
+      const audit=window.msaaAudit={textures:0,pipelines:0,resolves:0};
+      for(const name of ['createTexture','createRenderPipeline','createRenderPipelineAsync']){const create=GPUDevice.prototype[name];GPUDevice.prototype[name]=function(d){if((d.sampleCount??d.multisample?.count??1)>1)audit[name==='createTexture'?'textures':'pipelines']++;return create.call(this,d);};}
+      const begin=GPUCommandEncoder.prototype.beginRenderPass;GPUCommandEncoder.prototype.beginRenderPass=function(d){for(const a of d.colorAttachments)if(a?.resolveTarget)audit.resolves++;return begin.call(this,d);};
+    });
+    await phone.goto('http://127.0.0.1:5193/tests/modern-game.html');
+    mobile=await phone.evaluate(async()=>{
+      const {Engine,box,PbrMaterial}=await import('/packages/core/dist/index.js');
+      const {DOF}=await import('/packages/dof/dist/index.js'),{Tonemap}=await import('/packages/tonemap/dist/index.js'),{TAA}=await import('/packages/taa/dist/index.js');
+      const {SSAO,Bloom}=await import('/packages/post/dist/index.js'),{PostProcessing}=await import('/packages/creative/dist/index.js');
+      const checked=[];
+      for(const name of ['dof-tone-taa','ssao-taa','creative-taa','tonemap','bloom']){
+        const canvas=document.createElement('canvas');canvas.style.cssText='width:128px;height:96px';document.body.append(canvas);
+        const engine=await Engine.create(canvas,{backend:'webgpu'}),device=engine.gpu;device.pushErrorScope('validation');
+        try{
+          engine.createMesh().setGeometry(box()).setRotation([0.2,0.4,0]).setMaterial(new PbrMaterial({color:[1,0.2,0.1]}));
+          if(name==='dof-tone-taa'){const dof=DOF.attach(engine);Tonemap.attach(engine,{source:()=>dof.outputTexture});TAA.attach(engine,{depth:()=>dof.depthTexture});}
+          if(name==='ssao-taa'){const ssao=SSAO.attach(engine);TAA.attach(engine,{depth:()=>ssao.depthTexture});}
+          if(name==='creative-taa'){const post=new PostProcessing({bloom:0.1});engine.use(post);TAA.attach(engine,{depth:()=>post.target?.depth});}
+          if(name==='tonemap')Tonemap.attach(engine);if(name==='bloom')engine.use(new Bloom());
+          for(let i=0;i<3;i++)engine.render();canvas.style.width='96px';engine.render();await device.queue.onSubmittedWorkDone();
+          const error=await device.popErrorScope();if(error)throw new Error(name+': '+error.message);
+          if(canvas.width!==canvas.clientWidth*2||canvas.height!==canvas.clientHeight*2)throw new Error(name+': incorrect phone DPR');
+          checked.push(name);
+        }finally{engine.dispose();canvas.remove();}
+      }
+      return {...window.msaaAudit,checked};
+    });
+    assert.equal(mobile.textures,0);assert.equal(mobile.pipelines,0);assert.equal(mobile.resolves,0);
+  }finally{await phone.close();}
+  assert.deepEqual(errors,[]);await writeFile('test-results/modern-postfx.json',JSON.stringify({hardware,pixels,integration,mobile},null,2));console.log(JSON.stringify({hardware,pixels,integration,mobile},null,2));
 } finally {await browser.close();}

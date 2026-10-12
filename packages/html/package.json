@@ -27,5 +27,12 @@
     "build": "node ../../scripts/build-optional.js html",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  }
+  },
+  "homepage": "https://margoengine.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/html"
+  },
+  "description": "World-space DOM anchors, CSS3D placement and scene-depth occlusion."
 }

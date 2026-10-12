@@ -19,6 +19,8 @@
     "packages/clustered",
     "packages/vfx",
     "packages/animator",
+    "packages/dof",
+    "packages/tonemap",
     "packages/taa",
     "packages/splats",
     "packages/terrain",
@@ -126,7 +128,11 @@
     "modern:test:postfx": "node --test packages/dof/tests/*.test.js packages/tonemap/tests/*.test.js",
     "modern:test:postfx:packages": "node scripts/modern-postfx-packages.js",
     "modern:test:postfx:browser": "node scripts/modern-postfx-tests.js",
-    "predev:sandbox": "npm run build:packages"
+    "predev:sandbox": "npm run build:packages",
+    "release:check": "npm run test:all && npm run measure:size && npm run test:modules:packages && npm run modern:test:postfx:packages",
+    "publish:packages": "npm run release:check && npm publish --workspace packages --ignore-scripts --access public",
+    "catalog:build": "node scripts/build-catalog.js",
+    "build:site": "npm run catalog:build && node scripts/build-site.js"
   },
   "devDependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",

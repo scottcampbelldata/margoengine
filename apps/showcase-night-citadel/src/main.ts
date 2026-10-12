@@ -202,6 +202,7 @@ export class NightCitadel {
       },
     });
     const beautyPipeline = device.createRenderPipeline({
+      multisample:{count:this.target.samples},
       layout: device.createPipelineLayout({ bindGroupLayouts: [beautyLayout] }),
       vertex: {
         module: this.geometryModule,
@@ -221,6 +222,7 @@ export class NightCitadel {
       },
     });
     const lanternPipeline = device.createRenderPipeline({
+      multisample:{count:this.target.samples},
       layout: device.createPipelineLayout({ bindGroupLayouts: [beautyLayout] }),
       vertex: {
         module: this.geometryModule,
@@ -253,6 +255,7 @@ export class NightCitadel {
       }),
       beautyBundle = device.createRenderBundleEncoder({
         colorFormats: ['rgba16float'],
+        sampleCount:this.target.samples,
         depthStencilFormat: this.target.depth.format,
       });
     shadowBundle.setPipeline(shadowPipeline);
@@ -304,14 +307,14 @@ export class NightCitadel {
     this.beautyDescriptor = {
       colorAttachments: [
         {
-          view: this.target.color.createView(),
+          view: this.target.scene.color,
           clearValue: { r: 0, g: 0, b: 0, a: 1 },
           loadOp: 'clear',
           storeOp: 'store',
         },
       ],
       depthStencilAttachment: {
-        view: this.target.depth.createView(),
+        view: this.target.scene.depth,
         depthClearValue: 0,
         depthLoadOp: 'clear',
         depthStoreOp: 'store',
@@ -418,9 +421,9 @@ export class NightCitadel {
     this.projectionShift = canvas.clientWidth > 700 ? 0.12 : 0;
     (
       this.beautyDescriptor.colorAttachments as GPURenderPassColorAttachment[]
-    )[0].view = this.target.color.createView();
+    )[0].view = this.target.scene.color;
     this.beautyDescriptor.depthStencilAttachment!.view =
-      this.target.depth.createView();
+      this.target.scene.depth;
     this.presentGroup = this.device.createBindGroup({
       layout: this.presentPipeline.getBindGroupLayout(0),
       entries: [{ binding: 0, resource: this.target.color.createView() }],
@@ -470,9 +473,10 @@ export class NightCitadel {
     shadow.executeBundles(this.shadowBundles);
     shadow.end();
     const beauty = encoder.beginRenderPass(this.beautyDescriptor);
-    this.sky.record(beauty);
+    this.sky.record(beauty,this.target.samples);
     beauty.executeBundles(this.beautyBundles);
     beauty.end();
+    this.target.scene.resolve(encoder,true);
     this.presentAttachment.view = this.context.getCurrentTexture().createView();
     const present = encoder.beginRenderPass(this.presentDescriptor);
     present.setPipeline(this.presentPipeline);

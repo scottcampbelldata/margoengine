@@ -20,6 +20,35 @@ try{
    await read.mapAsync(GPUMapMode.READ);const data=new Float32Array(read.getMappedRange()).slice();read.unmap();return data;
   }
   async function advance(frames){for(let i=0;i<frames;i++){engine.render({delta:1/60});if(i%60===59)await device.queue.onSubmittedWorkDone();}}
+  for(let pattern=0;pattern<12;pattern++){
+   let seed=pattern;
+   for(let y=0;y<32;y++)for(let x=0;x<32;x++){
+    seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+    const wet=pattern===0||pattern===1&&x>0&&y>0&&x<31&&y<31||pattern===2&&(x+y)%2===0||pattern===3&&(x%4===1||y%5===1)||pattern>=4&&seed/4294967296<0.65;
+    ground[y*32+x]=wet?-1:2;
+   }
+   // Independent flood fill checks every component, including isolated ponds and the shared ocean root.
+   const expected=new Uint32Array(1025).fill(0xffffffff),seen=new Set();expected[0]=0;
+   for(let i=0;i<ground.length;i++)if(ground[i]<0&&!seen.has(i)){
+    const cells=[i];seen.add(i);let label=i+1;
+    for(let cursor=0;cursor<cells.length;cursor++){
+     const cell=cells[cursor],x=cell%32,y=Math.floor(cell/32);label=Math.min(label,cell+1);
+     if(x===0||y===0||x===31||y===31)label=0;
+     for(const neighbor of [x>0?cell-1:-1,x<31?cell+1:-1,y>0?cell-32:-1,y<31?cell+32:-1])if(neighbor>=0&&ground[neighbor]<0&&!seen.has(neighbor)){seen.add(neighbor);cells.push(neighbor);}
+    }
+    for(const cell of cells)expected[cell+1]=label;
+   }
+   device.queue.writeTexture({texture},ground,{bytesPerRow:128},[32,32]);
+   for(let repeat=0;repeat<3;repeat++){
+    const water=Water.attach(engine,{segments:4,terrain:{heightmap:()=>texture,origin:[-16,-16],size:[32,32]}});
+    try{
+     engine.render({delta:0});const encoder=device.createCommandEncoder();encoder.copyBufferToBuffer(water.coastal.connected,0,read,0,expected.byteLength);device.queue.submit([encoder.finish()]);await read.mapAsync(GPUMapMode.READ);
+     const actual=new Uint32Array(read.getMappedRange(),0,expected.length);
+     for(let i=0;i<expected.length;i++)if(actual[i]!==expected[i])throw new Error(`Coastal connectivity mismatch: pattern ${pattern}, repeat ${repeat}, cell ${i}`);
+     read.unmap();
+    }finally{water.dispose();}
+   }
+  }
   for(const connected of [false,true]){
    ground.fill(2);
    for(let y=0;y<32;y++)for(let x=0;x<32;x++)if(x<2||y<2||x>=30||y>=30)ground[y*32+x]=-1;

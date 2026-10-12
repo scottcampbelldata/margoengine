@@ -25,5 +25,11 @@
     "build": "node ../../scripts/build-optional.js net",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
+  },
+  "homepage": "https://margoengine.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/net"
   }
 }

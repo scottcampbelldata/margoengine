@@ -6,7 +6,7 @@
   "description": "Web Audio listener, global and positional sounds and an analyser for Margo Engine (THREE.AudioListener, Audio, PositionalAudio and AudioAnalyser counterparts).",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/vexel.git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/audio"
   },
   "publishConfig": {
@@ -30,5 +30,6 @@
   ],
   "peerDependencies": {
     "@margoengine/core": "^0.1.0 || ^1.0.0"
-  }
+  },
+  "homepage": "https://margoengine.com"
 }

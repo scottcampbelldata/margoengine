@@ -5,8 +5,8 @@ import {wgsl} from '../../core/dist/shaders.js';
 import {box} from '../../core/dist/extension.js';
 import {optionalGPU} from '../../../tests/support/optional-gpu.js';
 
-function harness(){
- const h=optionalGPU(),e=h.engine,c=h.context;e.canvas={width:128,height:96,clientWidth:128,clientHeight:96};e.store.visible=new Uint8Array(16).fill(1);
+function harness(samples=4){
+ const h=optionalGPU(),e=h.engine,c=h.context;c.descriptor.multisample={count:samples};e.canvas={width:128,height:96,clientWidth:128,clientHeight:96};e.store.visible=new Uint8Array(16).fill(1);
  e.lighting={direction:new Float32Array([0,1,0,1]),radiance:new Float32Array([1,1,1,.1])};
  const geometry=box(.01,.01,.01),mesh={id:0,geometry,matrix:new Float32Array(c.camera.matrix),material:{data:new Float32Array([1,1,1,1,.5,0,1,0])}};mesh.matrix[14]=.5;e.meshes.set(0,mesh);
  c.shader=wgsl;c.descriptor.vertex={buffers:[]};e.geometryBuffers=()=>({vertex:{},index:{},instance:e.gpu.createBuffer({size:1536})});
@@ -20,7 +20,7 @@ function harness(){
  return {...h,mesh,effect,frame,copies,instances,setPixels:value=>{pixels=value;}};
 }
 test('Picking reuses MRT and readback, resolves center before orthogonal and diagonal neighbors, and clips canvas edges',async()=>{
- const h=harness();h.frame();const buffers=h.counts.buffers,textures=h.counts.textures;
+ const h=harness(1);h.frame();const buffers=h.counts.buffers,textures=h.counts.textures;
  h.setPixels([[1,1,1],[0,1,5]]);assert.equal(await h.effect.onPick(64,48),h.mesh);assert.equal(h.copies.at(-1).source.texture.width,128);assert.equal(h.instances.length,0);
  const other={...h.mesh,id:4};h.engine.meshes.set(4,other);h.frame();h.setPixels([[0,1,5],[0,0,1]]);assert.equal(await h.effect.onPick(64,48),other);
  h.setPixels([[2,2,1]]);assert.equal(await h.effect.onPick(64,48),h.mesh);
@@ -39,3 +39,5 @@ test('Picking culls individual instances in the micro frustum and invalidates ca
  const pending=h.effect.onPick(64,48);await assert.rejects(h.effect.onPick(64,48),/pending/);h.engine.meshes.set(0,{...h.mesh});finish();assert.equal(await pending,null);
  h.effect.dispose();h.cleanup();
 });
+
+test('MSAA keeps beauty at 4x and uses single-sample integer micro picking',async()=>{const h=harness();h.frame();assert.equal(h.context.descriptor.multisample.count,4);assert.equal(h.effect.captured,false);h.setPixels([[1,1,1]]);assert.equal(await h.effect.onPick(64,48),h.mesh);assert.equal(h.copies.at(-1).source.texture.width,3);assert.equal(h.copies.at(-1).source.texture.sampleCount,1);h.effect.dispose();h.cleanup();});

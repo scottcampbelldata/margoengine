@@ -2,7 +2,7 @@
 
 HDR and EXR loading, GPU image-based lighting (prefiltered specular, spherical-harmonic irradiance, BRDF LUT) and environment backgrounds for Margo Engine on WebGPU.
 
-Not yet published to npm. Build from source with `npm run build` in `packages/environment`.
+Build from source with `npm run build` in `packages/environment`.
 
 Replaces Three.js `RGBELoader`, `EXRLoader`, `PMREMGenerator`, `scene.environment` and `scene.background` (with `backgroundIntensity`, `backgroundRotation` and `backgroundBlurriness`).
 

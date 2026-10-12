@@ -17,10 +17,19 @@ engine.start();
 
 Positions and directions are world space; cone angles are radians below π/2. Light radiance uses smooth range attenuation, inverse-square distance attenuation, and smooth inner/outer spot cones. `setLights()` replaces the list, validates all entries before changing it, and uploads only when called. Animate lights by calling it before rendering. Camera transformations and culling happen on the GPU.
 
+`lights.intensityScale` multiplies all local light radiance and defaults to 1.
+Set a nonnegative finite GPU-float value or a callback sampled each render, such
+as `() => sky.nightFactor` for automatic night lights. Zero clears the GPU cluster
+lists; authored intensities remain unchanged. The setting survives restoration.
+
 Core meshes receive local lighting automatically. Call `lights.add(pbrModel)` or `lights.add(terrain)` for optional renderers; the returned function unregisters the receiver. Directional shadows compose with local lighting in either registration order. Local lights themselves do not cast shadows.
 
 Fragment lookup removes camera projection jitter before selecting the unjittered compute cluster. This keeps TAA from dropping small lights at fractional tile boundaries; the uniform's previously unused depth.zw fields carry the screen offset, without a dependency on TAA.
 
 Each cluster reserves 1,024 indices, preventing silent truncation when many lights overlap. The default grid uses 13.5 MiB for indices. An optional `grid:[x,y,z]` is checked against storage limits at attachment. `lightLists` exposes GPU counts/indices for diagnostics or custom forward materials; ordinary rendering needs no readback. `clusteredSampling(group)` exports WGSL for custom materials. Frame rate depends on light overlap, materials, resolution and hardware; no locked FPS is promised.
+
+Custom code reproducing `ClusterFrame` must include the trailing `intensity:vec4f`
+at byte 112, making the uniform 128 bytes. Its X component is the radiance scale.
+Consumers of `clusteredSampling()` and `bindings()` receive this layout automatically.
 
 `dispose()`/`destroy()` releases resources and receiver hooks. Device restoration recreates buffers and reuploads the light list. The package stays separate from core, stage and PBR assets.

@@ -25,5 +25,12 @@
     "test": "npm run build && node --test test/*.test.js",
     "test:browser": "node test/picking.browser.mjs",
     "prepack": "npm run build"
-  }
+  },
+  "homepage": "https://margoengine.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/selection"
+  },
+  "description": "GPU picking and visible mesh selection outlines."
 }

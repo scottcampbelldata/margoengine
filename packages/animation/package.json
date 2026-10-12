@@ -6,7 +6,7 @@
   "description": "Storage-buffer skinning and compute morph targets for Margo Engine.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/vexel.git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/animation"
   },
   "publishConfig": {
@@ -28,5 +28,6 @@
   "peerDependencies": {
     "@margoengine/core": "0.1.0",
     "@margoengine/gltf-pro": "0.1.0"
-  }
+  },
+  "homepage": "https://margoengine.com"
 }

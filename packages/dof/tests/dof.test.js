@@ -10,7 +10,7 @@ test('DOF validates the thin lens at float32 precision and rejects WebGL',()=>{
 
 test('DOF runs two compute passes, restores attachments, and reuses all steady-state resources',()=>{
   const h=gpuHarness(),dof=DOF.attach(h.engine,{focalDistance:5,focalLength:0.05,aperture:2});h.frame();
-  assert.equal(h.counts.compute,2);assert.equal(h.counts.render,1);assert.equal(h.context.color,h.originalColor);assert.equal(h.context.depth,h.originalDepth);assert.equal(h.context.format,'bgra8unorm');
+  assert.equal(h.counts.compute,2);assert.equal(h.counts.render,4);assert.equal(h.context.color,h.originalColor);assert.equal(h.context.depth,h.originalDepth);assert.equal(h.context.format,'bgra8unorm');
   assert.equal(dof.outputTexture.format,'rgba16float');assert.equal(dof.depthTexture.format,'depth32float');
   const scale=0.05*96/(4*2*(5-0.05)*Math.tan(Math.PI/6));assert.ok(Math.abs(h.writes[6]-scale)<1e-6);
   assert.ok(scale*(1-5/3)<0);assert.equal(scale*(1-5/5),0);assert.ok(scale*(1-5/10)>0);

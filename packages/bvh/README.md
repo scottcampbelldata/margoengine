@@ -2,7 +2,7 @@
 
 Triangle bounding volume hierarchy, spatial queries and a CPU `Raycaster` for Margo Engine. It covers what three-mesh-bvh (`MeshBVH`, `shapecast`, `intersectsGeometry`) and `THREE.Raycaster` do for Three.js.
 
-Not yet published to npm. Build from source with `npm run build` in `packages/bvh`.
+Build from source with `npm run build` in `packages/bvh`.
 
 ```ts
 import {Engine, box} from '@margoengine/core';

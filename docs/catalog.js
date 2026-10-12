@@ -13,7 +13,7 @@ function filter() {
     element.hidden = !terms.every(term => text.includes(term));
     if (!element.hidden) visible++;
   }
-  count.textContent = `${visible} of ${cards.length} published packages`;
+  count.textContent = `${visible} of ${cards.length} packages`;
   document.querySelector('#empty').hidden = visible !== 0;
   const url = new URL(location.href);
   if (search.value.trim()) url.searchParams.set('q', search.value.trim());
@@ -68,20 +68,32 @@ async function load() {
     const response = await fetch('./catalog.json');
     if (!response.ok) throw new Error('Catalog unavailable');
     const entries = await response.json();
+    const published = entries.filter(entry => entry.published).length;
+    document.querySelector('.eyebrow').textContent = `${entries.length} PACKAGES · ${published} ON NPM`;
+    document.querySelector('#publication-note').textContent = published === entries.length
+      ? 'All packages are available on npm.'
+      : `${entries.length - published} packages await npm publication. Build packages marked Source from the repository; their install commands and CDN examples will work after publication.`;
     for (const entry of entries) {
       const card = document.querySelector('#module-template').content.firstElementChild.cloneNode(true);
       card.id = entry.id;
       card.querySelector('h2').textContent = entry.title;
+      card.querySelector('.badge').textContent = `${entry.published ? 'npm' : 'Source'} · ${entry.version}`;
+      card.querySelector('.install-heading').textContent = entry.published ? 'Install' : 'Install after publication';
       card.querySelector('.package').textContent = entry.package;
       card.querySelector('.description').textContent = entry.description;
       card.querySelector('.requirements').textContent = entry.requirements;
       card.querySelector('.install').textContent = entry.install;
       card.querySelector('.imports').textContent = entry.imports;
-      card.querySelector('.example-title').textContent = entry.exampleTitle;
-      card.querySelector('.example-note').textContent = entry.exampleNote;
-      card.querySelector('.run').href = entry.example;
+      if (entry.example) {
+        card.querySelector('.example-title').textContent = entry.exampleTitle;
+        card.querySelector('.example-note').textContent = entry.exampleNote;
+        card.querySelector('.run').href = entry.example;
+      } else {
+        for (const selector of ['.example-heading', '.example-note', '.source']) card.querySelector(selector).hidden = true;
+      }
       card.querySelector('.npm').href = `https://www.npmjs.com/package/${entry.package}`;
-      card.querySelector('.readme').href = `https://github.com/scottcampbelldata/vexel/blob/main/packages/${entry.id}/README.md`;
+      card.querySelector('.npm').hidden = !entry.published;
+      card.querySelector('.readme').href = `https://github.com/scottcampbelldata/margoengine/blob/main/packages/${entry.id}/README.md`;
       card.querySelector('.permalink').href = `./#${entry.id}`;
       card.querySelector('.exports summary').textContent = `Browse ${entry.exports.length} public exports`;
       for (const name of entry.exports) {
