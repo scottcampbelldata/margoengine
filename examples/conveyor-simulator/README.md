@@ -1,5 +1,7 @@
 # Standalone conveyor benchmarks
 
+The three conveyor model assets are stored with Git LFS. Install Git LFS, then run `git lfs install` and `git lfs pull` after cloning to download them before serving the viewers.
+
 Serve the repository root over HTTP; no viewer bundler or Vite server is needed:
 
 ```sh
