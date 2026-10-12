@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101b2c">
-  <title>A React cube · Vexel</title>
+  <title>A React cube · Margo Engine</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="preconnect" href="https://esm.sh">
   <style>
@@ -18,9 +18,14 @@
   </style>
   <script type="importmap">{
   "imports": {
-    "@scottcampbelldata/vexel-core": "https://cdn.jsdelivr.net/npm/@scottcampbelldata/vexel-core@0.1.0/dist/index.js",
-    "@scottcampbelldata/vexel-core/extension": "https://cdn.jsdelivr.net/npm/@scottcampbelldata/vexel-core@0.1.0/dist/extension.js",
-    "@scottcampbelldata/vexel-react": "https://cdn.jsdelivr.net/npm/@scottcampbelldata/vexel-react@0.1.0/dist/index.js",
+    "@margoengine/core": "https://cdn.jsdelivr.net/npm/@margoengine/core@0.1.0/dist/index.js",
+    "@margoengine/core/extension": "https://cdn.jsdelivr.net/npm/@margoengine/core@0.1.0/dist/extension.js",
+    "margoengine": "https://cdn.jsdelivr.net/npm/margoengine@0.1.0/dist/index.js",
+    "@margoengine/gltf": "https://cdn.jsdelivr.net/npm/@margoengine/gltf@0.1.0/dist/index.js",
+    "@margoengine/machinery": "https://cdn.jsdelivr.net/npm/@margoengine/machinery@0.1.0/dist/index.js",
+    "@margoengine/creative": "https://cdn.jsdelivr.net/npm/@margoengine/creative@0.1.0/dist/index.js",
+    "@margoengine/scenery": "https://cdn.jsdelivr.net/npm/@margoengine/scenery@0.1.0/dist/index.js",
+    "@margoengine/react": "https://cdn.jsdelivr.net/npm/@margoengine/react@0.1.0/dist/index.js",
     "react": "https://esm.sh/react@19.3.0",
     "react/jsx-runtime": "https://esm.sh/react@19.3.0/jsx-runtime?external=react",
     "react-dom/client": "https://esm.sh/react-dom@19.3.0/client?external=react"
@@ -33,7 +38,7 @@
   <div id="scene"></div>
   <p id="status" role="status">Loading published packages…</p>
   <button id="play" type="button" disabled>Pause</button>
-  <footer>Published packages · 0.1.0 · <a href="https://scottcampbelldata.github.io/vexel/#react">Module catalog</a></footer>
+  <footer>Published packages · 0.1.0 · <a href="https://margoengine.com/catalog/#react">Module catalog</a></footer>
   <script>
 let current, cleanup = () => {}, playing = false;
 const button = document.querySelector('#play');
@@ -68,7 +73,7 @@ addEventListener('pagehide', () => { try { cleanup(); } finally { current?.dispo
   <script type="module">
 import React, { useRef } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Canvas, Mesh, BoxGeometry, PbrMaterial, useFrame } from '@scottcampbelldata/vexel-react';
+import { Canvas, Mesh, BoxGeometry, PbrMaterial, useFrame } from '@margoengine/react';
 
 function Cube() {
   const mesh = useRef(null);

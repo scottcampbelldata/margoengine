@@ -6,7 +6,7 @@
   "description": "Triangle BVH, spatial queries and an engine Raycaster for Margo Engine (three-mesh-bvh and THREE.Raycaster counterparts).",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/vexel.git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/bvh"
   },
   "publishConfig": {
@@ -31,5 +31,6 @@
   ],
   "peerDependencies": {
     "@margoengine/core": "^0.1.0 || ^1.0.0"
-  }
+  },
+  "homepage": "https://margoengine.com"
 }

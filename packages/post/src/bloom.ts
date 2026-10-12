@@ -1,3 +1,4 @@
+import {SceneTarget} from '../../shared/msaa.js';
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext, type DrawOptions} from '@margoengine/core/extension';
 import {agxShader} from '../../shared/agx.js';
@@ -46,6 +47,7 @@ export class Bloom implements EnginePlugin {
   private groups: GPUBindGroup[] = [];
   private blur?: GPUComputePipeline;
   private present?: GPURenderPipeline;
+  private capture?: SceneTarget;
   private scene?: GPUTextureView;
   private depth?: GPUTextureView;
   private original?: GPUTextureView;
@@ -92,7 +94,7 @@ export class Bloom implements EnginePlugin {
       if (this.engine!.hasPlugin('ssao') || this.engine!.hasPlugin('post-processing') || this.engine!.hasPlugin('tonemap')) throw new Error('Bloom cannot share its output target');
       this.resize(c);
       this.original = c.color; this.originalDepth = c.depth; this.originalFormat = c.format;
-      c.color = this.scene!; c.depth = this.depth!; c.format = 'rgba16float';
+      this.capture!.begin(c);
       if (this.sourceShader !== c.shader) {
         this.sourceShader = c.shader;
         this.linearShader = c.shader.replace(/let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');
@@ -115,20 +117,22 @@ export class Bloom implements EnginePlugin {
   }
   private resize(c: Context): void {
     if (this.textures[0]?.width === c.width && this.textures[0]?.height === c.height && this.originalFormat === c.format) return;
-    for (const texture of this.textures) texture.destroy();
+    this.capture?.dispose();for (const texture of this.textures) texture.destroy();
     const device = c.device, width = Math.max(1, Math.ceil(c.width / 2)), height = Math.max(1, Math.ceil(c.height / 2));
     this.textures = [
       device.createTexture({size: [c.width, c.height], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC}),
       device.createTexture({size: [c.width, c.height], format: c.descriptor.depthStencil!.format, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING}),
       ...[0, 1].map(() => device.createTexture({size: [width, height], format: 'rgba16float', usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING})),
     ];
+    this.capture=new SceneTarget(device,this.textures[0],this.textures[1],c.descriptor.multisample?.count??4);
     this.scene = this.textures[0].createView(); this.depth = this.textures[1].createView();
     const a = this.textures[2].createView(), b = this.textures[3].createView(), module = device.createShaderModule({code: composite});
-    this.present = device.createRenderPipeline({layout: 'auto', vertex: {module, entryPoint: 'vertex'}, fragment: {module, entryPoint: 'fragment', targets: [{format: c.format}]}});
+    this.present = device.createRenderPipeline({layout: 'auto', vertex: {module, entryPoint: 'vertex'}, fragment: {module, entryPoint: 'fragment', targets: [{format: c.format}]},multisample:c.descriptor.multisample});
     const group = (pipeline: GPUComputePipeline | GPURenderPipeline, resources: GPUBindingResource[]) => device.createBindGroup({layout: pipeline.getBindGroupLayout(0), entries: resources.map((resource, binding) => ({binding, resource}))});
     this.groups = [group(this.blur!, [this.scene, a, {buffer: this.kernels[0]}]), group(this.blur!, [a, b, {buffer: this.kernels[1]}]), group(this.present, [this.scene, b, {buffer: this.uniform!}])];
   }
   private draw(c: Context): void {
+    this.capture!.resolve(c.encoder,true);
     this.values[0] = this.options.strength ?? 0.8; this.values[1] = this.options.exposure ?? 0;
     this.horizontal[3] = this.options.threshold ?? 1;
     c.device.queue.writeBuffer(this.uniform!, 0, this.values);
@@ -141,9 +145,10 @@ export class Bloom implements EnginePlugin {
     this.attachment.view = this.original!;
     const pass = c.encoder.beginRenderPass(this.presentation);
     pass.setPipeline(this.present!); pass.setBindGroup(0, this.groups[2]); pass.draw(3); pass.end();
-    c.color = this.original!; c.depth = this.depth!; c.format = this.originalFormat!; c.draw = this.originalDraw!;
+    this.capture!.restore(c); c.draw = this.originalDraw!;
   }
   private release(): void {
+    this.capture?.dispose();this.capture=undefined;
     this.uniform?.destroy(); for (const buffer of this.kernels) buffer.destroy(); for (const texture of this.textures) texture.destroy();
     this.uniform = undefined; this.kernels = []; this.textures = []; this.groups = [];
     this.blur = this.present = undefined; this.scene = this.depth = this.original = this.originalDepth = undefined; this.originalFormat = undefined;

@@ -23,10 +23,19 @@ Water.attach(engine, {
   depth: () => bloom.depthTexture,
   sceneColor: () => bloom.sceneTexture,
   reflection: () => sky.reflectionTexture,
+  lights: sky.lights,
 });
 ```
 
-The borrowed sky texture must be a sampleable single-layer `rgba16float` 2D texture. The borrowed scene color must be a viewport-sized single-layer `rgba16float` texture with `COPY_SRC` usage. Water retains one GPU snapshot for depth-rejected screen refraction and seabed attenuation. Without these providers, it uses a sky gradient and an approximate seabed color. Reflections represent the atmosphere, not nearby objects. Direct glints use the existing engine lighting direction and radiance; the application must synchronize them with its sun clock.
+The borrowed sky texture must be a sampleable single-layer `rgba16float` 2D texture. The borrowed scene color must be a viewport-sized single-layer `rgba16float` texture with `COPY_SRC` usage. Water retains one GPU snapshot for depth-rejected screen refraction and seabed attenuation. Without these providers, it uses a sky gradient and an approximate seabed color. Reflections represent the atmosphere, not nearby objects.
+
+`lights: sky.lights` keeps sun and moon glints aligned with their separate visible
+directions through dusk, instead of reflecting the engine's blended shadow light.
+Waves still break the paths into moving highlights. Custom callers can supply up
+to two retained lights with `direction` (four numbers: XYZ and nonnegative intensity)
+and `radiance` (three nonnegative RGB numbers), updated before each render. An empty
+array disables direct glints. Omitting `lights` retains engine lighting behavior;
+the application must synchronize that direction with its sun clock.
 
 For beaches and inland dips, supply `terrain: {heightmap: () => texture,
 origin: [-80,-80], size: [160,160]}`. The borrowed heightmap must contain world-space
@@ -62,6 +71,14 @@ very small cells require more substeps.
 `water.setWaveHeight(meters)` scales the existing spectrum to that largest configured train
 amplitude without recreating geometry. It validates the complete spectrum before
 changing any amplitude, rejecting heights that would fold the surface.
+
+`water.coastalDepthTexture` exposes the borrowed current coastal state for optional
+terrain wetness and diagnostics. Its `rgba32float` channels hold water depth (R),
+ground height (G), foam (B) and breaker intensity (A), with `COPY_SRC` usage. It is
+undefined before the first simulation frame, after disposal and during device
+restoration. It alternates between the flow's retained textures; sample the getter
+each frame and never destroy its result. `TerrainColors` can use it to animate wet
+sand while keeping the grass/dirt blend anchored to ground height.
 
 Waves fade smoothly between two and four grid-diagonal lengths and are omitted
 below two, preventing short waves from exposing the triangle pattern. Increase

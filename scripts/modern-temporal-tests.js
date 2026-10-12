@@ -31,7 +31,7 @@ try{
       if(!patternPipeline){const module=device.createShaderModule({code:`@group(0) @binding(0) var<uniform> mode:vec4f;
         @vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {let p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));return vec4f(p[i],0,1);}
         @fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f {if(mode.x<0.5){return vec4f(vec3f(0.1+0.8*p.x/128),1);}if(mode.x<1.5){return vec4f(vec3f(select(0.0,1.0,(u32(p.x)+u32(p.y))%2==0)),1);}return vec4f(0,1,0,1);}`});
-        patternPipeline=device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]}});patternGroup=device.createBindGroup({layout:patternPipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:pattern}}]});}
+        patternPipeline=device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]},multisample:c.descriptor.multisample});patternGroup=device.createBindGroup({layout:patternPipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:pattern}}]});}
       const pass=c.encoder.beginRenderPass({colorAttachments:[{view:c.color,loadOp:'load',storeOp:'store'}]});pass.setPipeline(patternPipeline);pass.setBindGroup(0,patternGroup);pass.draw(3);pass.end();
     }});
     device.queue.writeBuffer(pattern,0,new Float32Array([0,0,0,0]));taa.reset();await render();const old=await readTexture(taa.gpuState.history,8);

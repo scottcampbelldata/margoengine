@@ -10,11 +10,11 @@ import {CABIN_EXCLUSIONS} from './procedural/placement.ts';
 export const ISLAND_SIZE = 160;
 export const terrainHeight = createIslandHeight(731);
 
-export function createLandscape(engine: EngineKernel, shadows: Shadows, exclusions: readonly GroundBounds[]) {
+export function createLandscape(engine: EngineKernel, shadows: Shadows, exclusions: readonly GroundBounds[], wetDepth?: () => GPUTexture | undefined) {
   const data = heightfieldGeometry(terrainHeight,{size: [ISLAND_SIZE,ISLAND_SIZE], resolution: 192});
   const mesh = engine.createMesh().setGeometry(toGeometry(data)).setMaterial(new PbrMaterial({color: '#536b49', roughness: 0.95}));
   mesh.name = 'Island terrain'; shadows.add(mesh, {static: true});
-  TerrainColors.attach(engine,mesh,{sand: [0.44,0.36,0.23], meadow: [[0.10,0.18,0.055],[0.19,0.26,0.09]], stone: [0.28,0.30,0.23], shore: [0.4,1.7], meadowHeight: [3,12], stoneHeight: [13,20], stoneNormal: [0.58,0.85], wetHeight: [0,0.65], wetDarkening: 0.55, variation: 0.06});
+  TerrainColors.attach(engine,mesh,{sand: [0.44,0.36,0.23], meadow: [[0.10,0.18,0.055],[0.19,0.26,0.09]], stone: [0.28,0.30,0.23], shore: [0.4,1.7], meadowHeight: [3,12], stoneHeight: [13,20], stoneNormal: [0.58,0.85], wetHeight: [0,0.65], wetDarkening: 0.55, variation: 0.06, wetness: wetDepth ? {texture: wetDepth, origin: [-80,-80], size: [ISLAND_SIZE,ISLAND_SIZE]} : undefined});
   const linePositions = wireframePositions(heightfieldGeometry(terrainHeight,{size: [ISLAND_SIZE,ISLAND_SIZE], resolution: 64}),0.035);
   const lines = new Lines(); engine.use(lines);
   const terrainWireframe = lines.add(new Line({positions: linePositions, mode: 'segments', color: '#daf6aa', width: 0.8, opacity: 0.65, visible: false, join: 'miter', cap: 'butt'}));

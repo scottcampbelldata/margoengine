@@ -3,21 +3,22 @@ import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassCon
 import {fullscreen,group,compute,dispatch} from '../../shared/gpu.js';
 import {invert,finiteVector} from '../../shared/math.js';
 import {cloudShader} from './clouds.js';
+import {celestialShader} from './celestial.js';
 import {atmosphere,transmittance,single,density,multiple,add} from './atmosphere.js';
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
 declare const GPUTextureUsage:{STORAGE_BINDING:number;TEXTURE_BINDING:number};
 type Color=readonly [number,number,number];
 const moonColor:Color=[0.25,0.45,0.75];
+const sunColor:Color=[1,1,1];
 export interface SkyLightingOptions {intensity?:number;minimum?:number;color?:Color;moon?:{intensity?:number;color?:Color};ambient?:{day:Color;night:Color}}
 export interface SkyCloudOptions {coverage?:number;speed?:number;height?:number}
 export interface SkyOptions {clouds?:SkyCloudOptions;model?:'preetham'|'bruneton';hours?:number;timeScale?:number;turbidity?:number;exposure?:number;lighting?:SkyLightingOptions}
 export function sunDirection(hours:number,out=new Float32Array(3)):Float32Array {if(!Number.isFinite(hours)||out.length!==3)throw new RangeError('Invalid sun clock');const angle=(hours%24-6)*Math.PI/12;out[0]=Math.cos(angle);out[1]=Math.sin(angle);out[2]=0;return out;}
-const code=fullscreen+atmosphere+cloudShader+`
+const code=fullscreen+atmosphere+cloudShader+celestialShader+`
 @group(0) @binding(1) var scattering:texture_2d<f32>;
 @group(0) @binding(2) var transmission:texture_2d<f32>;
-fn nightSky(w:vec3f)->vec3f {
- let alignment=max(0.0,dot(w,frame.moon.xyz));let disk=smoothstep(cos(0.0047),cos(0.0045),alignment);
- return mix(vec3f(0.012,0.019,0.038),vec3f(0.003,0.006,0.02),sqrt(max(0.0,w.y)))+frame.moonColor.rgb*frame.moon.w*(0.03*pow(alignment,32.0)+disk*4.0);
+fn nightSky(w:vec3f,angularFootprint:f32)->vec3f {
+ return mix(vec3f(0.012,0.019,0.038),vec3f(0.003,0.006,0.02),sqrt(max(0.0,w.y)))+frame.moonColor.rgb*frame.moon.w*moonRadiance(w,frame.moon.xyz,angularFootprint);
 }
 fn perez(theta:f32,gamma:f32,a:f32,b:f32,c:f32,d:f32,e:f32)->f32{return (1.0+a*exp(b/max(0.01,cos(theta))))*(1.0+c*exp(d*gamma)+e*cos(gamma)*cos(gamma));}
 fn preetham(w:vec3f,s:vec3f)->vec3f {
@@ -34,9 +35,10 @@ fn preetham(w:vec3f,s:vec3f)->vec3f {
 @fragment fn fragment(i:Vertex)->@location(0) vec4f {
  let p=frame.inverse*vec4f(i.uv.x*2.0-1.0,1.0-i.uv.y*2.0,0.000001,1);let w=normalize(p.xyz/p.w-frame.eye.xyz);let s=frame.sun.xyz;
  var color=vec3f(0);if(frame.settings.x<0.5){color=preetham(w,s);}else{let r=R+clamp(frame.eye.w,0.001,99.9);color=lookup(scattering,r,w.y,s.y,dot(w,s));}
- let disk=smoothstep(cos(0.0047),cos(0.0045),dot(w,s));color+=disk*trans(transmission,R+clamp(frame.eye.w,0.001,99.9),s.y)*20.0;
- color=mix(color,nightSky(w),frame.sun.w);
- color=cloudSky(color,w,max(length(dpdx(w)),length(dpdy(w))));color*=exp2(frame.settings.y);if(frame.settings.w<0.5){color=pow(color/(1.0+color),vec3f(1.0/2.2));}return vec4f(color,1);
+ let footprint=max(length(dpdx(w)),length(dpdy(w)));let sun=celestialProfile(w,s,SUN_RADIUS,footprint);
+ color+=(sun.x*60.0+sun.y*0.8)*trans(transmission,R+clamp(frame.eye.w,0.001,99.9),s.y);
+ color=mix(color,nightSky(w,footprint),frame.sun.w);
+ color=cloudSky(color,w,footprint);color*=exp2(frame.settings.y);if(frame.settings.w<0.5){color=pow(color/(1.0+color),vec3f(1.0/2.2));}return vec4f(color,1);
 }`;
 const reflection=code+`
 @group(0) @binding(3) var reflectionMap:texture_storage_2d<rgba16float,write>;
@@ -47,7 +49,7 @@ const reflection=code+`
  let ray=normalize(vec3f(w.x,max(0.001,w.y),w.z));var color=vec3f(0);
  if(frame.settings.x<0.5){color=preetham(ray,s);}else{color=lookup(scattering,R+clamp(frame.eye.w,0.001,99.9),ray.y,s.y,dot(ray,s));}
  color=mix(vec3f(0.015,0.018,0.012),color,smoothstep(-0.2,0.02,w.y));
- color=mix(color,nightSky(w),frame.sun.w);
+ color=mix(color,nightSky(w,0.1),frame.sun.w);
  color=cloudSky(color,w,0.1);
  textureStore(reflectionMap,vec2i(id.xy),vec4f(color*exp2(frame.settings.y),1));
 }`;
@@ -55,11 +57,15 @@ export class Sky implements EnginePlugin {
  private readonly attachment:GPURenderPassColorAttachment={view:undefined!,loadOp:'load',storeOp:'store'};
  private readonly depthAttachment:GPURenderPassDepthStencilAttachment={view:undefined!,depthReadOnly:true,stencilReadOnly:true};
  private readonly presentation:GPURenderPassDescriptor={colorAttachments:[this.attachment],depthStencilAttachment:this.depthAttachment};
- readonly name='sky';private engine?:Engine;private uniform?:GPUBuffer;private textures:GPUTexture[]=[];private pipelines:GPUComputePipeline[]=[];private groups:GPUBindGroup[]=[];private render?:GPURenderPipeline;private bind?:GPUBindGroup;private format='';private computedT=NaN;private readonly values=new Float32Array(40);private readonly inverse=this.values.subarray(0,16);private readonly scratch=new Float64Array(52);readonly sun=new Float32Array(3);readonly moon=Float32Array.from([-0.3,0.9,-0.2],v=>v/Math.hypot(0.3,0.9,0.2));private disposed=false;
+ readonly name='sky';private engine?:Engine;private uniform?:GPUBuffer;private textures:GPUTexture[]=[];private pipelines:GPUComputePipeline[]=[];private groups:GPUBindGroup[]=[];private render?:GPURenderPipeline;private bind?:GPUBindGroup;private format='';private computedT=NaN;private readonly values=new Float32Array(40);private readonly inverse=this.values.subarray(0,16);private readonly scratch=new Float64Array(52);readonly sun=new Float32Array(3);readonly moon=Float32Array.from([-0.3,0.22,-1],v=>v/Math.hypot(0.3,0.22,1));private disposed=false;
  private cloudTime=0;private ambient?:GPUBuffer;private ambientEntry?:GPUBindGroupEntry;private readonly ambientValues=new Float32Array(4);private source='';private litShader='';
  private reflectionPipeline?:GPUComputePipeline;private reflectionGroup?:GPUBindGroup;private reflectionRequested=false;private readonly reflectionPass:GPUComputePassDescriptor={};
  /** Borrowed linear HDR sky environment; rebuilt on device restoration. */
  get reflectionTexture():GPUTexture|undefined{this.reflectionRequested=true;return this.textures[6];}
+ /** Dusk/dawn blend, 0 in daylight and 1 at night, updated before rendering. */
+ get nightFactor():number{return this.values[23];}
+ /** Retained sun/moon directions (XYZ, intensity) and RGB radiance for direct reflections. */
+ readonly lights=[{direction:new Float32Array([1,0,0,0]),radiance:new Float32Array(3)},{direction:new Float32Array([...this.moon,0]),radiance:new Float32Array(3)}] as const;
  constructor(readonly options:SkyOptions={}){this.validate();}
  private validate():void {
   const o=this.options;if(o.model!==undefined&&o.model!=='preetham'&&o.model!=='bruneton'||!Number.isFinite(o.hours??12)||!Number.isFinite(o.timeScale??1/3600)||Math.abs(o.timeScale??1/3600)>24||!Number.isFinite(o.turbidity??2)||(o.turbidity??2)<1||(o.turbidity??2)>10||!Number.isFinite(o.exposure??0)||Math.abs(o.exposure??0)>16||o.lighting!==undefined&&(typeof o.lighting!=='object'||o.lighting===null||!Number.isFinite(Math.fround(o.lighting.intensity??1))||(o.lighting.intensity??1)<0||!Number.isFinite(Math.fround(o.lighting.minimum??0))||(o.lighting.minimum??0)<0))throw new RangeError('Invalid sky options');
@@ -96,6 +102,8 @@ export class Sky implements EnginePlugin {
   this.options.hours=(((this.options.hours??12)+delta*(this.options.timeScale??1/3600))%24+24)%24;sunDirection(this.options.hours,this.sun);
   const l=this.options.lighting,t=Math.max(0,Math.min(1,(this.sun[1]+0.12)/0.2)),night=1-t*t*(3-2*t);
   this.values[23]=night;this.values.set(this.moon,28);this.values[31]=l?.moon?(l.moon.intensity??(l.intensity??1)*0.1)*night:0;this.values.set(l?.moon?.color??moonColor,32);
+  this.lights[0].direction.set(this.sun);this.lights[0].direction[3]=Math.max(0,this.sun[1])*(l?.intensity??0);
+  this.lights[0].radiance.set(l?.color??sunColor);this.lights[1].direction.set(this.moon);this.lights[1].direction[3]=this.values[31];this.lights[1].radiance.set(l?.moon?.color??moonColor);
   if(l&&this.engine){
    const {direction,radiance}=this.engine.lighting,solar=Math.max(0,this.sun[1])*(l.intensity??1),lunar=this.values[31],weight=solar+lunar>0?solar/(solar+lunar):1;
    // shortcut: one blended directional source shares PCSS, use separate shadow maps for simultaneous sun/moon shadows.

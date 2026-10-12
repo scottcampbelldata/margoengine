@@ -28,4 +28,4 @@ npm --prefix packages/dof run dev
 npm --prefix packages/dof run build:demo
 ```
 
-The Vite HTML demo is `examples/index.html`. Run `npm run build:packages` once for core/stage artifacts. This package targets the core `^1.0.0` peer contract. The checkout's core still reports `0.1.0`, so DOF stays outside npm's workspace dependency resolution until that release; local builds use the existing compatible extension API. `scripts/build-modern.js` includes it in builds and isolation checks. No dependencies are bundled from core.
+The Vite HTML demo is `examples/index.html`. Run `npm run build:packages` once for core/stage artifacts. This package supports core `^0.1.0 || ^1.0.0` through the existing extension API and is included in workspace builds and release checks. No dependencies are bundled from core.

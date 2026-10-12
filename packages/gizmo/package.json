@@ -28,5 +28,11 @@
   },
   "dependencies": {
     "@margoengine/controls": "0.1.0"
+  },
+  "homepage": "https://margoengine.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/gizmo"
   }
 }

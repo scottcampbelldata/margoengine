@@ -25,7 +25,7 @@ export class TransformStore {
   private handle: number;
 
   static async create(capacity = 1024): Promise<TransformStore> {
-    if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > 100_000) throw new RangeError('Capacity must be 1..100000');
+    if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > 100_000) throw new RangeError('Capacity: 1..100000');
     compiled ??= (async()=>{const bytes=Uint8Array.from(atob(wasmBase64),c=>c.charCodeAt(0));return WebAssembly.compile(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());})().catch(error => { compiled = undefined; throw error; });
     const instance = await WebAssembly.instantiate(await compiled);
     return new TransformStore(instance.exports as Exports, capacity);
@@ -33,7 +33,7 @@ export class TransformStore {
 
   private constructor(private readonly api: Exports, readonly capacity: number) {
     this.handle = api.kernel_new(capacity);
-    if (!this.handle) throw new Error('Could not allocate transform storage');
+    if (!this.handle) throw new Error('Transform storage allocation');
     const offset = api.kernel_data(this.handle), buffer = api.memory.buffer;
     const keys = ['x','y','z','qx','qy','qz','qw','sx','sy','sz'] as const;
     this.transforms = Object.fromEntries(keys.map((key, field) => [key, new Float32Array(buffer, offset + field*capacity*4, capacity)])) as typeof this.transforms;
@@ -51,9 +51,9 @@ export class TransformStore {
   }
 
   tick(culling = true): void {
-    if (!this.handle) throw new Error('Transform store is disposed');
+    if (!this.handle) throw new Error('Transform store disposed');
     const error = this.api.kernel_tick(this.handle, +culling);
-    if (error) throw new RangeError(error > this.capacity ? 'Invalid frustum planes' : `Invalid transform or bounds at slot ${error-1}`);
+    if (error) throw new RangeError(error > this.capacity ? 'Invalid frustum planes' : `Invalid transform/bounds at slot ${error-1}`);
   }
 
   dispose(): void {

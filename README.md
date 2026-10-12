@@ -4,7 +4,7 @@ A small Rust/Wasm engine for web apps, with WebGPU rendering, WebGL2 fallback, o
 
 Official website: [margoengine.com](https://margoengine.com). Margo Engine is dedicated to Margie.
 
-The implementation lives in `packages/`, with Vite and Next.js starters in `examples/`. Small internal helpers shared by the optional packs live in `packages/shared/`. Source is available in the public [Margo Engine repository](https://github.com/scottcampbelldata/vexel). The renamed packages use `@margoengine/*`, with `margoengine` as the meta-package. Build from source or install local tarballs until the renamed packages are published.
+The implementation lives in `packages/`, with Vite and Next.js starters in `examples/`. Small internal helpers shared by the optional packs live in `packages/shared/`. Source is available in the public [Margo Engine repository](https://github.com/scottcampbelldata/margoengine). The renamed packages use `@margoengine/*`, with `margoengine` as the meta-package. Build from source or install local tarballs until the renamed packages are published.
 
 ## Use Margo Engine
 
@@ -45,7 +45,7 @@ The optional packs and React adapter require core 0.1.0. The React adapter suppo
 ## Run from source
 
 ```sh
-git clone https://github.com/scottcampbelldata/vexel.git margoengine
+git clone https://github.com/scottcampbelldata/margoengine.git margoengine
 cd margoengine
 npm ci
 npm run dev
@@ -74,7 +74,7 @@ npm run dev --workspace @margoengine/starter-next
 
 ## Packages
 
-Libraries use the npm scope `@margoengine`; the meta-package is `margoengine`. Package versions remain `0.1.0`. This repository rename does not publish packages to npm.
+Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. The release contains 61 packages: most at `0.1.0`, with DOF and tonemapping at `1.0.0`. The [catalog](docs/README.md) lists every package, runtime export and npm publication status.
 
 | Package | Includes |
 | --- | --- |
@@ -102,7 +102,7 @@ Libraries use the npm scope `@margoengine`; the meta-package is `margoengine`. P
 | [`@margoengine/splats`](packages/splats/README.md) | GPU radix sorting, covariance ellipses, degree-3 SH and binary Gaussian captures |
 | [`@margoengine/terrain`](packages/terrain/README.md) | Fixed geometry clipmaps, GPU height/normal sampling and triplanar texture layers |
 
-Core plus the stage facade measures **20,053 bytes gzip**, including embedded Wasm and both backends, 12 bytes below the 20,065-byte baseline before the rename. The base is feature-frozen for v1.0.0; every push and pull request runs a CI build that rejects a combined size above **20,480 bytes gzip** and checks package isolation. Optional PBR, animation and SSAO packages use the existing extension hooks and do not enter the base bundle. The build also retains the 30 KiB combined core/static-glTF budget and 30 KiB raw Wasm budget. React/framework/application code is additional; domain packages have no 20 KiB ceiling.
+Core plus the stage facade measures **19,998 bytes gzip**, including embedded Wasm and both backends. The base is feature-frozen for v1.0.0; every push and pull request runs a CI build that rejects a combined size of **20,000 bytes gzip or above** and checks package isolation. Optional PBR, animation and SSAO packages use the existing extension hooks and do not enter the base bundle. The build also retains the 30 KiB combined core/static-glTF budget and 30 KiB raw Wasm budget. React/framework/application code is additional; domain packages have no 20 KiB ceiling.
 
 The six requested game modules (shadows, clustered, animator, TAA, VFX and splats), plus terrain, use those hooks. Build with `npm run build:packages`; run `npm run modern:test:game` for their combined WebGPU rendering/culling/cache/IK/particle checks, temporal reprojection/clamping, skinned motion, stable radix sorting and ellipse blending. `npm run modern:test:game:packages` checks ten packed packages and seven standalone README TypeScript examples. The normal sort test covers 66,049 splats across hierarchical scan blocks; set `SPLAT_STRESS=1` for the additional three-million-splat capacity/sort check. Million-particle, three-million-splat and 1,024-light execution tests validate correctness separately from FPS claims. These source packages have not been published by this change.
 
@@ -137,8 +137,10 @@ Run `npm run modern:dev:extensions`, then open `/examples/damaged-helmet.html` f
 
 
 
-## Published-package catalog and historical validation
+## Package catalog and release
 
-Run `npm run catalog` to preview the [searchable catalog](docs/README.md) for the original Vexel 0.1.0 npm packages. The catalog retains those published package names; the newer Margo packages are documented above.
+Run `npm run catalog` to preview the [searchable Margo catalog](docs/README.md). All 61 packages use their Margo names. `npm run catalog:build` refreshes the catalog from built runtime exports and checks exact-version availability on npm.
+
+`npm run release:check` builds and tests the engine, enforces the 20,000-byte core + stage ceiling, and verifies every tarball's exports, TypeScript declarations and internal dependency versions. After signing into npm with access to the `@margoengine` scope, `npm run publish:packages` runs those checks and publishes the public library workspaces. Starter apps and showcases are private. Refresh the catalog after publishing and run `npm run build:site` to assemble the website.
 
 [Committed SwiftShader results](benchmarks/README.md#swiftshader-runs-no-gpu) include repeat commands and the [historical conveyor picking failure](benchmarks/swiftshader/conveyor-check-picking-failure.txt). Software-renderer timings do not establish physical GPU performance.

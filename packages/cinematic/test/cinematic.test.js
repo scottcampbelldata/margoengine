@@ -1,6 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Cinematic} from '../dist/index.js';
+test('upward orbit survives terrain clearance without putting the camera underground',()=>{
+ const engine={camera:{},removePlugin(){}},rig=new Cinematic({ground:()=>0,clearance:0.65});
+ rig.setup(engine);rig.follow([0,1.6,0]);rig.setOrbitOffset(0,-0.7,14,0.8);rig.update(0);
+ assert.ok(engine.camera.position[1]>=0.65-1e-6);
+ assert.ok(engine.camera.target[1]>engine.camera.position[1]+7);
+ assert.ok(Math.abs(engine.camera.target[1]-engine.camera.position[1]+rig.offset[1])<1e-6);
+ const requested=rig.offset.slice();rig.shake(0.2,1);rig.update(1/60);
+ assert.ok(engine.camera.position[1]>=0.65-1e-6);assert.ok(engine.camera.target[1]>engine.camera.position[1]);assert.deepEqual(rig.offset,requested);
+});
 test('orbit offsets update the retained camera arm without scene-side trigonometry', () => {
   const rig = new Cinematic(), offset = rig.offset;
   rig.setOrbitOffset(Math.PI/2,Math.PI/6,10,0.8);

@@ -42,7 +42,7 @@ export function footprintRadius(data: GeometryData): number {
   return radius;
 }
 
-/** Five vec4s per vertex: position, normal, tangent, UV0/UV1, and baked RGB occlusion. */
+/** Five vec4s per vertex: position, normal, tangent, UV0/UV1, and RGB tint / alpha ambient occlusion. */
 export function pbrVertexStream(data: GeometryData, occlusion?: (x: number, y: number, z: number) => number): Float32Array {
   const count = data.positions.length / 3;
   if (!Number.isInteger(count) || data.normals.length !== count*3 || data.uvs.length !== count*2 || data.tangents?.length !== count*4 || occlusion !== undefined && typeof occlusion !== 'function') throw new RangeError('Invalid PBR vertex attributes');
@@ -55,7 +55,7 @@ export function pbrVertexStream(data: GeometryData, occlusion?: (x: number, y: n
     vertices.set(data.uvs.subarray(i*2,i*2+2),i*20+14);
     const ao = occlusion ? occlusion(data.positions[i*3],data.positions[i*3+1],data.positions[i*3+2]) : 1;
     if (!Number.isFinite(ao) || ao<0 || ao>1) throw new RangeError('Invalid baked vertex occlusion');
-    vertices.fill(ao,i*20+16,i*20+19); vertices[i*20+19] = 1;
+    vertices.fill(1,i*20+16,i*20+19); vertices[i*20+19] = ao;
   }
   if (vertices.some(v => !Number.isFinite(v))) throw new RangeError('PBR vertex attributes must be finite');
   return vertices;

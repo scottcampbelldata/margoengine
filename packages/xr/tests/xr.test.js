@@ -16,29 +16,30 @@ class Session extends EventTarget {
   tick(time,viewer){const callbacks=[...this.handles.values()];this.handles.clear();for(const fn of callbacks)fn(time,{session:this,getViewerPose:()=>viewer,getPose:space=>space.grip?null:pose(1)});}
 }
 async function fixture(t) {
-  const saved=new Map(['navigator','XRGPUBinding','GPUBufferUsage'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
-  const buffers=[],writes=[],passes=[],requests=[],devices=[];let session=new Session(),rejectSpace=false,resolveLost;
+  const saved=new Map(['navigator','XRGPUBinding','GPUBufferUsage','GPUTextureUsage'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
+  const buffers=[],textures=[],writes=[],passes=[],requests=[],devices=[];let session=new Session(),rejectSpace=false,resolveLost;
   const device=new EventTarget();device.limits={maxBufferSize:16*1024*1024};device.destroyed=0;device.destroy=()=>device.destroyed++;
   device.lost=new Promise(resolve=>{resolveLost=resolve;});
   device.createBuffer=descriptor=>{const buffer={descriptor,destroyed:0,destroy(){this.destroyed++;}};buffers.push(buffer);return buffer;};
   device.queue={writeBuffer(buffer,offset,data,start=0,count=data.length){writes.push({buffer,data:Array.from(data).slice(start,start+count)});},submit(commands){device.submitted=(device.submitted??0)+commands.length;}};
-  device.createShaderModule=descriptor=>descriptor;device.createRenderPipeline=descriptor=>{device.pipeline=descriptor;return {getBindGroupLayout:()=>({})};};device.createBindGroup=descriptor=>descriptor;
-  device.createCommandEncoder=()=>({beginRenderPass(descriptor){const pass={descriptor,draws:0,setViewport(...args){this.viewport=args;},setPipeline(){},setBindGroup(index,group){this.group=group;},setVertexBuffer(){},setIndexBuffer(){},drawIndexed(){this.draws++;},end(){}};passes.push(pass);return pass;},finish(){return {};}});
+  device.createTexture=descriptor=>{const texture={...descriptor,width:descriptor.size[0],height:descriptor.size[1],destroyed:0,destroy(){this.destroyed++;},createView(){return {texture};}};textures.push(texture);return texture;};
+  device.pipelines=[];device.createShaderModule=descriptor=>descriptor;device.createRenderPipeline=descriptor=>{device.pipelines.push(descriptor);device.pipeline??=descriptor;return {getBindGroupLayout:()=>({})};};device.createBindGroup=descriptor=>descriptor;
+  device.createCommandEncoder=()=>({beginRenderPass(descriptor){const pass={descriptor,draws:0,setViewport(...args){this.viewport=args;},setPipeline(){},setBindGroup(index,group){this.group=group;},setVertexBuffer(){},setIndexBuffer(){},drawIndexed(){this.draws++;},draw(){this.draws++;},end(){}};passes.push(pass);return pass;},finish(){return {};}});
   class Binding {
     constructor(native,gpu){assert.equal(gpu,device);this.session=native;}
     getPreferredColorFormat(){return 'rgba8unorm';}
     createProjectionLayer(init){this.layer={init,destroyed:0,destroy(){this.destroyed++;}};return this.layer;}
-    getViewSubImage(layer,view){const texture={createView:descriptor=>({descriptor})};return {colorTexture:texture,depthStencilTexture:texture,viewport:{x:0,y:0,width:128,height:128},getViewDescriptor:()=>({dimension:'2d',baseArrayLayer:view.eye==='right'?1:0,arrayLayerCount:1})};}
+    getViewSubImage(layer,view){const texture={width:128,height:128,format:'rgba8unorm',createView:descriptor=>({descriptor})};return {colorTexture:texture,depthStencilTexture:texture,viewport:{x:0,y:0,width:128,height:128},getViewDescriptor:()=>({dimension:'2d',baseArrayLayer:view.eye==='right'?1:0,arrayLayerCount:1})};}
   }
   const native={isSessionSupported:async mode=>mode==='immersive-vr',async requestSession(mode,init){requests.push({mode,init});if(rejectSpace)session.requestReferenceSpace=async()=>{throw new Error('reference space failure');};return session;}};
   Object.defineProperty(globalThis,'navigator',{configurable:true,value:{xr:native,gpu:{async requestAdapter(options){devices.push(options);return {requestDevice:async()=>device};}}}});
-  Object.defineProperty(globalThis,'XRGPUBinding',{configurable:true,value:Binding});Object.defineProperty(globalThis,'GPUBufferUsage',{configurable:true,value:{VERTEX:32,INDEX:16,UNIFORM:64,COPY_DST:8}});
+  Object.defineProperty(globalThis,'XRGPUBinding',{configurable:true,value:Binding});Object.defineProperty(globalThis,'GPUTextureUsage',{configurable:true,value:{RENDER_ATTACHMENT:16,TEXTURE_BINDING:4}});Object.defineProperty(globalThis,'GPUBufferUsage',{configurable:true,value:{VERTEX:32,INDEX:16,UNIFORM:64,COPY_DST:8}});
   const store=await TransformStore.create(4),context={backend:'webgpu',shader:wgsl,descriptor:{vertex:{entryPoint:'vertex',buffers:[]}},draw(){}};
   const engine=new Engine({width:1,height:1,getContext(){}},store,{backend:'webgpu',add(){},remove(){},dispose(){},render(camera,light,batches,graph){graph.execute(context);}},undefined,null),errors=[];engine.onError=error=>errors.push(error);
   engine.starts=0;engine.start=()=>engine.starts++;
   const mesh=engine.createMesh().setGeometry(box());
   t.after(()=>{engine.dispose();for(const [key,descriptor] of saved)descriptor?Object.defineProperty(globalThis,key,descriptor):delete globalThis[key];});
-  return {engine,mesh,device,buffers,writes,passes,requests,devices,errors,get session(){return session;},nextSession(){return session=new Session();},rejectSpace(){rejectSpace=true;},lose(){resolveLost({message:'test loss'});}};
+  return {engine,mesh,device,buffers,textures,writes,passes,requests,devices,errors,get session(){return session;},nextSession(){return session=new Session();},rejectSpace(){rejectSpace=true;},lose(){resolveLost({message:'test loss'});}};
 }
 test('XR negotiates webgpu and reference space, reads input poses, and renders distinct eye buffers',async t=>{
   const f=await fixture(t);assert.equal(await XR.isSupported(),true);assert.equal(await XR.isSupported('immersive-ar'),false);
@@ -47,12 +48,13 @@ test('XR negotiates webgpu and reference space, reads input poses, and renders d
   assert.deepEqual(f.requests[0].init.requiredFeatures,['webgpu','local-floor']);assert.equal(f.session.state.depthNear,f.engine.camera.near);
   const viewer={...pose(0),views:[{eye:'left',projectionMatrix:identity(),transform:pose(-0.03).transform},{eye:'right',projectionMatrix:identity(),transform:pose(0.03).transform}]};
   f.session.tick(100,viewer);assert.equal(state.delta,0);assert.equal(state.inputs[0].grip,null);assert.equal(state.inputs[0].targetRay.transform.position.x,1);
-  assert.equal(f.passes.length,2);assert.ok(f.passes.every(pass=>pass.draws===1));assert.equal(f.passes[0].descriptor.colorAttachments[0].clearValue.a,0);
-  assert.equal(f.passes[1].descriptor.colorAttachments[0].view.descriptor.baseArrayLayer,1);assert.equal(f.device.pipeline.depthStencil.depthCompare,'less-equal');
-  const eyeWrites=f.writes.filter(write=>write.buffer.descriptor.size===112);assert.equal(eyeWrites.length,2);assert.notEqual(eyeWrites[0].buffer,eyeWrites[1].buffer);assert.ok(eyeWrites[0].data[16]<0&&eyeWrites[1].data[16]>0);
-  f.session.tick(120,viewer);assert.equal(state.delta,0.02);
+  assert.equal(f.passes.length,6);assert.ok(f.passes.filter((_,i)=>i%3!==2).every(pass=>pass.draws===1));assert.equal(f.passes[0].descriptor.colorAttachments[0].clearValue.a,0);
+  assert.equal(f.passes[3].descriptor.colorAttachments[0].resolveTarget.descriptor.baseArrayLayer,1);assert.equal(f.device.pipeline.depthStencil.depthCompare,'less-equal');assert.equal(f.device.pipeline.multisample.count,4);assert.equal(f.textures.length,4);assert.ok(f.textures.every(t=>t.sampleCount===4));assert.ok(f.passes.filter((_,i)=>i%3===0).every(p=>p.descriptor.colorAttachments[0].storeOp==='discard'));assert.ok(f.passes.filter((_,i)=>i%3===2).every(p=>p.descriptor.depthStencilAttachment.depthStoreOp==='discard'));assert.equal(f.passes[4].descriptor.depthStencilAttachment.view.descriptor.baseArrayLayer,1);
+  const left=f.textures[0];f.session.tick(110,viewer);assert.equal(f.textures.length,4);assert.equal(f.textures[0],left);
+  const eyeWrites=f.writes.filter(write=>write.buffer.descriptor.size===112);assert.equal(eyeWrites.length,4);assert.notEqual(eyeWrites[0].buffer,eyeWrites[1].buffer);assert.ok(eyeWrites[0].data[16]<0&&eyeWrites[1].data[16]>0);
+  f.session.tick(120,viewer);assert.ok(Math.abs(state.delta-0.01)<1e-8);
   f.mesh.dispose();f.session.tick(140,null);assert.equal(state.viewer,null);
-  const layer=f.session.state.layers[0];await xr.end();assert.equal(xr.session,null);assert.equal(layer.destroyed,1);assert.equal(f.session.handles.size,0);assert.ok(f.buffers.every(buffer=>buffer.destroyed===1));
+  const layer=f.session.state.layers[0];await xr.end();assert.equal(xr.session,null);assert.equal(layer.destroyed,1);assert.equal(f.session.handles.size,0);assert.ok(f.buffers.every(buffer=>buffer.destroyed===1));assert.ok(f.textures.every(t=>t.destroyed===1));
   assert.equal(f.engine.starts,1);
   xr.dispose();assert.equal(f.engine.hasPlugin('xr'),false);assert.equal(f.device.destroyed,1);assert.deepEqual(f.errors,[]);
 });

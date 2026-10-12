@@ -6,10 +6,12 @@
   "description": "Worker-pooled Draco geometry and KTX2/Basis texture decoding for Margo Engine.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/vexel.git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/decoders"
   },
-  "peerDependencies": {"@margoengine/core": "^0.1.0 || ^1.0.0"},
+  "peerDependencies": {
+    "@margoengine/core": "^0.1.0 || ^1.0.0"
+  },
   "publishConfig": {
     "access": "public"
   },
@@ -28,5 +30,6 @@
   },
   "files": [
     "dist"
-  ]
+  ],
+  "homepage": "https://margoengine.com"
 }

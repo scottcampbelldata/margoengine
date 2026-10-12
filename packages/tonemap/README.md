@@ -32,4 +32,4 @@ npm --prefix packages/tonemap run dev
 npm --prefix packages/tonemap run build:demo
 ```
 
-The standalone Vite demo at `examples/index.html` has exposure/contrast sliders, curve selection and a .cube file input. Run `npm run build:packages` first for core/stage. This package declares only core `^1.0.0` as a peer; while this checkout still declares core `0.1.0`, it is built outside npm workspace dependency resolution. The repository build includes it without changing core or stage. No runtime dependencies are added.
+The standalone Vite demo at `examples/index.html` has exposure/contrast sliders, curve selection and a .cube file input. Run `npm run build:packages` first for core/stage. This package supports core `^0.1.0 || ^1.0.0` through the existing extension API and is included in workspace builds and release checks. No runtime dependencies are added.

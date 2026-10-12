@@ -9,7 +9,7 @@ const reviewed = {
   Engine: 'batches checkedMaterials materialFrame free next revision callbacks raf last frameOptions disposing watchDevice collect frame update',
   TransformStore: 'handle api',
   FrameGraph: 'passes owner executing',
-  GPURenderer: 'frame targets views resolveTarget preserveMSAA singleSampleDescriptor passDescriptor drawBatches commands draw bindings width height frameId lost deviceLost variants groups uniform bindGroup disposed picking canvas device context format pipeline descriptor renderFrame',
+  GPURenderer: 'frame targets views resolveTarget preserveMSAA passDescriptor passContext drawBatches commands draw bindings width height frameId lost deviceLost resources variants groups uniform bindGroup disposed picking canvas device context format pipeline descriptor renderFrame',
   GLRenderer: 'gl program camera eye light radiance resources canvas',
   Stage: 'imports',
 };

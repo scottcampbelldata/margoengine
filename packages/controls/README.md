@@ -6,12 +6,13 @@ character movement with normalized diagonals, damped speed and heading, and a
 gaitPhase,speed]`; actions are `[strafe,forward,lookX,lookY,sprint]`.
 Options include `bounds: [minX,maxX,minZ,maxZ]`, `minHeight`, `walkSpeed` (3.4),
 and `runSpeed` (7). Bounds and minimum height are omitted by default. Look values
-are angular deltas; pitch stays between 0.08 and 0.9 radians. Height samples must
+are angular deltas; pitch stays between -1.4 (look up) and 0.9 radians (look down).
+Use `Cinematic` ground clearance to keep upward-looking cameras above terrain. Height samples must
 be finite. The caller owns input bindings, character meshes and gait animation.
 
 Orbit, map, trackball, fly, first-person and pointer-lock camera controls plus an interactive transform gizmo for Margo Engine, each tree-shakable on its own.
 
-Not yet published to npm. Build from source with `npm run build` in `packages/controls`.
+Build from source with `npm run build` in `packages/controls`.
 
 ```ts
 import {Engine, box} from '@margoengine/core';

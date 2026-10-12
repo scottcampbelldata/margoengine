@@ -5,15 +5,34 @@
   "license": "MIT",
   "description": "Optional AgX, ACES fitted and Khronos PBR Neutral color grading with 33-cube LUTs.",
   "sideEffects": false,
-  "exports": {".": {"types": "./dist/index.d.ts", "import": "./dist/index.js"}},
-  "files": ["dist", "LICENSE", "NOTICE.md"],
-  "publishConfig": {"access": "public"},
-  "peerDependencies": {"@margoengine/core": "^1.0.0"},
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^0.1.0 || ^1.0.0"
+  },
   "scripts": {
     "build": "node ../../scripts/build-postfx.js tonemap",
     "prepack": "npm run build",
     "test": "node --test tests/*.test.js",
     "dev": "vite --config vite.config.js --open /examples/index.html",
     "build:demo": "vite build --config vite.config.js"
+  },
+  "homepage": "https://margoengine.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/tonemap"
   }
 }

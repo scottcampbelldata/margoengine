@@ -6,7 +6,7 @@
   "description": "HDR/EXR loading, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT) and environment backgrounds for Margo Engine on WebGPU.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/vexel.git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/environment"
   },
   "publishConfig": {
@@ -30,5 +30,6 @@
   ],
   "peerDependencies": {
     "@margoengine/core": "^0.1.0 || ^1.0.0"
-  }
+  },
+  "homepage": "https://margoengine.com"
 }

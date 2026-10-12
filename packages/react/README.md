@@ -55,6 +55,6 @@ SSR emits an accessible canvas without accessing GPU APIs. The ESM output preser
 
 Run `npm run build:packages` followed by `npm run modern:test:react` for React Testing Library/JSDOM lifecycle tests. Run `npm run dev --workspace @margoengine/react-viewer` for the resizable Vite example with declarative and imperative workflows; its entry point disposes its React root during HMR. The adapter uses standard hooks, never `react-reconciler`. Frame dispatch forwards `(engine, deltaSeconds)` directly without building per-frame state objects or callback arrays. Allocations inside user callbacks and underlying render plugins are outside the adapter's frame dispatch contract.
 
-See the [React API and lifecycle guide](https://github.com/scottcampbelldata/vexel/blob/main/MODERN-ENGINE.md).
+See the [React API and lifecycle guide](https://github.com/scottcampbelldata/margoengine/blob/main/MODERN-ENGINE.md).
 
 MIT licensed.

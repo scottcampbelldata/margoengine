@@ -37,6 +37,7 @@ try{
 @group(0) @binding(9) var<storage,read_write> results:array<vec4f>;
 @compute @workgroup_size(32) fn probe(@builtin(global_invocation_id) id:vec3u){
  if(id.x>=arrayLength(&queries)){return;}let q=queries[id.x];
+ if(q.w>2){let v=vec3f(-cos(q.x)*cos(q.y),sin(q.y),-sin(q.x)*cos(q.y));results[id.x*2u]=vec4f(directionalGlint(frame.lights[0],vec3f(0,1,0),v,0.12),1);results[id.x*2u+1u]=vec4f(directionalGlint(frame.lights[1],vec3f(0,1,0),v,0.12),1);return;}
  if(q.w>1){results[id.x*2u]=vec4f(fresnel(q.x),0,0,1);results[id.x*2u+1u]=vec4f(reflectionRay(vec3f(1,q.y,0.5)),1);return;}
  if(q.w>0){results[id.x*2u]=vec4f(noise(q.xy),0);results[id.x*2u+1u]=vec4f(0);return;}
  let v=surface(q.xy,q.z);
@@ -95,5 +96,17 @@ try{
  const optics=await page.evaluate(()=>window.coastTest.probe([[1.00000012,-0.8,0,2],[-0.00000012,-0.01,0,2],[0.5,0.8,0,2]]));
  assert.ok(Math.abs(optics[0].position[0]-0.02)<1e-6,'Fresnel roundoff exceeded one');assert.equal(optics[1].position[0],1);assert.ok(Math.abs(optics[2].position[0]-0.050625)<1e-6);
  for(const sample of optics){assert.ok(sample.position.every(Number.isFinite)&&sample.normal.every(Number.isFinite));assert.ok(sample.normal[1]>0,'Open-water reflection sampled ground');}
- const report={hardware,refractedPixels,samples,optics,crestHeightRange:Math.max(...heights)-Math.min(...heights),errors};await writeFile(`test-results/water-coast-${hardware.webgpu.vendor}.json`,JSON.stringify(report,null,2));console.log(JSON.stringify({vendor:hardware.webgpu.vendor,refractedPixels,checks:['Four continuous coastal edges','Depth-based shore blend normals','Curved crests across the wind','Analytical curved swell normals','Ripple height-field gradients','No folds near the accepted height limit','Zero amplitude flattens the spectrum','Ocean waves continue inside the map','Coarse horizon waves filtered','Sky rejected as seabed','Submerged refraction retained','Device restoration','Fresnel roundoff remains finite','Open-water reflection stays above the horizon']}));
+ const alignment=[];
+ for(const intensity of [[1,0],[0.25,0.75],[0,1]]){
+  await page.evaluate(async intensity=>{const {water,engine}=window.coastTest;water.options.lights=[[-0.45,0.22],[0.55,0.36]].map(([azimuth,elevation],i)=>({direction:[Math.cos(azimuth)*Math.cos(elevation),Math.sin(elevation),Math.sin(azimuth)*Math.cos(elevation),intensity[i]],radiance:[1,1,1]}));engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();},intensity);
+  for(let light=0;light<2;light++){
+   const azimuth=light?0.55:-0.45,elevation=light?0.36:0.22,angles=Array.from({length:201},(_,i)=>azimuth-0.5+i*0.005);
+   const values=await page.evaluate(points=>window.coastTest.probe(points),angles.map(angle=>[angle,elevation,0,3]));
+   const glints=values.map(v=>(light?v.normal:v.position)[0]);assert.ok(glints.every(v=>Number.isFinite(v)&&v>=0));
+   if(intensity[light]===0){assert.ok(glints.every(v=>v===0));continue;}
+   const peak=glints.indexOf(Math.max(...glints));assert.ok(Math.abs(angles[peak]-azimuth)<0.006,'Reflection drifts away from its light as dusk intensity changes');alignment.push({intensity,light,azimuth,peak:angles[peak]});
+  }
+ }
+ assert.deepEqual(errors,[]);
+ const report={hardware,refractedPixels,samples,optics,alignment,crestHeightRange:Math.max(...heights)-Math.min(...heights),errors};await writeFile(`test-results/water-coast-${hardware.webgpu.vendor}.json`,JSON.stringify(report,null,2));console.log(JSON.stringify({vendor:hardware.webgpu.vendor,refractedPixels,checks:['Four continuous coastal edges','Depth-based shore blend normals','Curved crests across the wind','Analytical curved swell normals','Ripple height-field gradients','No folds near the accepted height limit','Zero amplitude flattens the spectrum','Ocean waves continue inside the map','Coarse horizon waves filtered','Sky rejected as seabed','Submerged refraction retained','Device restoration','Fresnel roundoff remains finite','Open-water reflection stays above the horizon','Sun/moon reflection alignment through changing intensities']}));
 }finally{await page.evaluate(()=>window.coastTest?.dispose());await browser.close();}

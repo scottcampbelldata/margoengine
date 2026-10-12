@@ -31,20 +31,22 @@ async function boot(): Promise<void> {
   try {
     engine.onError = error => {engine.stop(); fail(error);};
     runtime.gpu!.addEventListener('uncapturederror', event => engine.onError((event as GPUUncapturedErrorEvent).error), {signal});
-    const post = Bloom.attach(engine, {strength: 0.75, threshold: 0.7, exposure: 0.65});
+    const post = Bloom.attach(engine, {strength: 0.25, threshold: 1.2, exposure: 0.65});
     const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.45}, hours: 17.5, timeScale: 1/120, turbidity: 2.8, exposure: -0.6, lighting: {intensity: 6, color: [1,0.8,0.54], moon: {intensity: 0.6, color: [0.25,0.45,0.75]}, ambient: {day: [0.18,0.18,0.18], night: [0.02,0.04,0.09]}}});
     const shadows = Shadows.attach(engine, {resolution: 1024, distance: 115, lambda: 0.7, lightSize: 0.018, normalBias: 0.055, casterMargin: 65});
     const settlement = createProceduralSettlement(engine, shadows, terrainHeight), procedural = settlement.scatter;
     const lights = Clustered.attach(engine, {grid: [8,4,16]});
+    procedural.emissiveIntensity = lights.intensityScale = () => sky.nightFactor;
     lights.setLights([{position: settlement.porchLightPosition, range: 6, color: [1,0.8,0.4], intensity: 18}]);
-    const landscape = createLandscape(engine, shadows, settlement.exclusions), character = createCharacter(engine, shadows);
+    let water: Water;
+    const landscape = createLandscape(engine, shadows, settlement.exclusions, () => water?.coastalDepthTexture), character = createCharacter(engine, shadows);
     const state = new Float32Array([-12, terrainHeight(-12, 37), 37, Math.PI, 0, 0.18, 0, 0]);
     const cameraDistance = 14;
     const actions = new Float32Array(5);
     const locomotion: LocomotionOptions = {bounds: [-69,69,-69,69], minHeight: 0.45};
     const position = state.subarray(0, 3), emptyPads: readonly Gamepad[] = [];
     const camera = Cinematic.attach(engine, {offset: [4, 3.5, cameraDistance], damping: 5, lookDamping: 7, ground: terrainHeight, clearance: 0.65}); camera.follow(character.focus); const cameraDelta = camera.offset;
-    const water = Water.attach(engine, {size: [400, 400], segments: 256, horizon: true, height: 0, foamDistance: 1.8, color: [0.006, 0.022, 0.05], depth: () => post.depthTexture, sceneColor: () => post.sceneTexture, reflection: () => sky.reflectionTexture, spray: true, terrain: {heightmap: landscape.heightmap, origin: [-80,-80], size: [160,160]}, waves: [{direction: [1, 0.37], amplitude: 0.35, wavelength: 17.37, steepness: 0.3, phase: 0.43}, {direction: [0.87, 0.55], amplitude: 0.18, wavelength: 11.19, steepness: 0.3, phase: 2.17}, {direction: [1, 0.13], amplitude: 0.09, wavelength: 7.73, steepness: 0.25, phase: 4.91}]});
+    water = Water.attach(engine, {size: [400, 400], segments: 256, horizon: true, height: 0, foamDistance: 1.8, color: [0.006, 0.022, 0.05], depth: () => post.depthTexture, sceneColor: () => post.sceneTexture, reflection: () => sky.reflectionTexture, lights: sky.lights, spray: true, terrain: {heightmap: landscape.heightmap, origin: [-80,-80], size: [160,160]}, waves: [{direction: [1, 0.37], amplitude: 0.35, wavelength: 17.37, steepness: 0.3, phase: 0.43}, {direction: [0.87, 0.55], amplitude: 0.18, wavelength: 11.19, steepness: 0.3, phase: 2.17}, {direction: [1, 0.13], amplitude: 0.09, wavelength: 7.73, steepness: 0.25, phase: 4.91}]});
     let particles: VFX;
     const selectParticles = (capacity: number) => {
       if (![100_000, 500_000, 1_000_000].includes(capacity)) throw new RangeError('Unknown particle tier');
@@ -101,6 +103,8 @@ async function boot(): Promise<void> {
     timer = setInterval(() => {
       const hours = sky.options.hours!, minutes = Math.floor((hours % 1) * 60);
       element<HTMLOutputElement>('sun-value').value = `${String(Math.floor(hours)).padStart(2,'0')}:${String(minutes).padStart(2,'0')}`;
+      element('time-label').textContent = sky.nightFactor > 0.5 ? 'Moon / night' : 'Sun / day';
+      sunSlider.setAttribute('aria-valuetext', `${element<HTMLOutputElement>('sun-value').value}, ${sky.nightFactor > 0.5 ? 'night' : 'day'}`);
       if (document.activeElement !== sunSlider) sunSlider.value = String(hours);
     }, 500);
     Object.assign(window, {sandbox: {engine, stats, state, actions, camera, cameraDelta, timing, sky, water, shadows, lights, procedural, get particles() {return particles;}, dispose}});
@@ -110,6 +114,9 @@ async function boot(): Promise<void> {
 function fail(error: unknown): void {
   document.body.classList.add('failed'); controls.disabled = true; explore.disabled = true;
   const message = error && typeof error === 'object' && 'message' in error ? String(error.message) : String(error);
-  explore.textContent = 'World unavailable'; status.textContent = message; console.error(message);
+  explore.textContent = 'World unavailable';
+  status.textContent = message.includes('generated metal:') ? 'A GPU shader could not compile. Open technical error details below.' : message;
+  element('error-message').textContent = message; element('error-details').hidden = false;
+  console.error(message);
 }
 void boot().catch(fail);
