@@ -1,5 +1,5 @@
 import {Engine, CADCameraControls, Geometry, PbrMaterial, box, type EngineKernel, type EngineOptions, type EnginePlugin, type Mesh, type Vec3} from '@margoengine/core';
-import {engineRuntime} from '@margoengine/core/extension';
+import type {Engine as RuntimeEngine} from '@margoengine/core/extension';
 import type {CADFormat, CADImportOptions} from '@margoengine/machinery';
 import type {ParticleOptions, PostOptions} from '@margoengine/creative';
 import type {SkyMoonConfig} from '@margoengine/scenery';
@@ -27,11 +27,11 @@ export function sphere(radius = 1, segments = 32): Geometry {
   if (!Number.isInteger(segments) || segments < 3 || segments > 256) throw new RangeError('Sphere segments');
   const rings = Math.ceil(segments / 2), positions: number[] = [], normals: number[] = [], indices: number[] = [];
   for (let ring = 0; ring <= rings; ring++) {
-    const latitude = ring * Math.PI / rings;
+    const latitude = ring * Math.PI / rings, height = Math.cos(latitude), extent = Math.sin(latitude);
     for (let segment = 0; segment <= segments; segment++) {
       const longitude = segment * Math.PI * 2 / segments;
-      const normal = [Math.sin(latitude) * Math.cos(longitude), Math.cos(latitude), Math.sin(latitude) * Math.sin(longitude)];
-      positions.push(...normal.map(value => value * radius)); normals.push(...normal);
+      const x = extent * Math.cos(longitude), z = extent * Math.sin(longitude);
+      positions.push(x * radius, height * radius, z * radius); normals.push(x, height, z);
       if (ring < rings && segment < segments) {
         const a = ring * (segments + 1) + segment, b = a + segments + 1;
         if (ring > 0) indices.push(a, a + 1, b);
@@ -75,7 +75,7 @@ export class Stage {
     return this.mesh(sphere(radius, segments), options);
   }
 
-  fit(meshes: Iterable<Mesh> = engineRuntime(this.engine).meshes.values()): void {
+  fit(meshes: Iterable<Mesh> = (this.engine as unknown as RuntimeEngine).meshes.values()): void {
     const b = worldBounds(this.engine, meshes, new Float32Array(6), true);
     this.engine.camera.fitToBoundingBox([b[0], b[1], b[2]], [b[3], b[4], b[5]], {aspect: Math.max(1, this.canvas.clientWidth) / Math.max(1, this.canvas.clientHeight)});
   }
@@ -89,7 +89,7 @@ export class Stage {
     abort.throwIfAborted();
     const model = kind === 'gltf' || kind === 'glb'
       ? await (await this.gltf()).loadGLTF(this.engine, target, {signal: abort})
-      : await (await this.machinery()).loadCAD(this.engine, target, {...options, format: kind as CADFormat, signal: abort});
+      : await (await import('@margoengine/machinery/cad')).loadCAD(this.engine, target, {...options, format: kind as CADFormat, signal: abort});
     try {abort.throwIfAborted(); if (fit) this.fit(model.meshes); return loadedModel(this.engine, model);}
     catch (error) {model.dispose(); throw error;}
   }
@@ -99,17 +99,30 @@ export class Stage {
   creative(): Promise<typeof import('@margoengine/creative')> {return import('@margoengine/creative');}
   scenery(): Promise<typeof import('@margoengine/scenery')> {return import('@margoengine/scenery');}
 
-  async sky(options: SkyMoonConfig = {}) {return this.use(new (await this.scenery()).SkyMoon(options));}
-  async particles(options: ParticleOptions = {}) {return this.use(new (await this.creative()).GPUParticles(options));}
-  async effects(options: PostOptions = {}) {return this.use(new (await this.creative()).PostProcessing(options));}
+  async sky(options: SkyMoonConfig = {}) {
+    const {SkyMoon} = await import('@margoengine/scenery/sky');
+    this.imports.signal.throwIfAborted();
+    return this.use(new SkyMoon(options));
+  }
+  async particles(options: ParticleOptions = {}) {
+    const {GPUParticles} = await import('@margoengine/creative/particles');
+    this.imports.signal.throwIfAborted();
+    return this.use(new GPUParticles(options));
+  }
+  async effects(options: PostOptions = {}) {
+    const {PostProcessing} = await import('@margoengine/creative/post');
+    this.imports.signal.throwIfAborted();
+    return this.use(new PostProcessing(options));
+  }
 }
 
 export async function createStage(target: string | HTMLElement, {controls = true, autoStart = true, label = 'Interactive 3D scene', onError, ...options}: StageOptions = {}): Promise<Stage> {
-  if (typeof controls !== 'boolean' || typeof autoStart !== 'boolean') throw new TypeError('Invalid controls');
-  if (typeof label !== 'string' || onError !== undefined && typeof onError !== 'function') throw new TypeError('Invalid label/onError');
+  if (typeof controls !== 'boolean' || typeof autoStart !== 'boolean') throw new TypeError('Invalid stage options');
+  if (typeof label !== 'string' || onError !== undefined && typeof onError !== 'function') throw new TypeError('Invalid stage options');
   const element = typeof target === 'string' ? document.querySelector<HTMLElement>(target) : target;
-  if (!element || !element.ownerDocument?.defaultView || !(element instanceof element.ownerDocument.defaultView.HTMLElement)) throw new TypeError('Expected HTMLElement');
-  const owned = element.tagName !== 'CANVAS', canvas = owned ? element.ownerDocument.createElement('canvas') : element as HTMLCanvasElement;
+  const owner = element?.ownerDocument;
+  if (!element || !owner?.defaultView || !(element instanceof owner.defaultView.HTMLElement)) throw new TypeError('Expected element');
+  const owned = element.tagName !== 'CANVAS', canvas = owned ? owner.createElement('canvas') : element as HTMLCanvasElement;
   let engine: EngineKernel | undefined;
   try {
     if (owned) {

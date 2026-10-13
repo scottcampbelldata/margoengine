@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Tween, easeInOutCubic} from '../dist/index.js';
+
+test('opposite finite extreme endpoints interpolate and complete exactly', () => {
+  for (const duration of [0, 1]) {
+    const tween = new Tween(), target = {x: 1e308}; let completed = 0;
+    tween.to(target, 'x', -1e308, {duration, onComplete() {completed++; assert.equal(target.x, -1e308);}});
+    if (duration) {tween.update(0); assert.equal(target.x, 1e308); tween.update(0.25); assert.equal(target.x, 5e307); tween.update(0.25); assert.equal(target.x, 0);}
+    tween.update(duration ? 0.5 : 0); assert.equal(target.x, -1e308); assert.equal(completed, 1);
+    tween.update(1); assert.equal(completed, 1);
+  }
+});
 test('delay, easing, overwrite, cancellation and completion produce bounded numeric properties', () => {
   const timeline = new Tween(), target = {x: 0}; let completed = 0;
   timeline.to(target, 'x', 10, {duration: 1, delay: 0.5, easing: easeInOutCubic, onComplete: () => completed++});

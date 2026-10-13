@@ -48,11 +48,10 @@ export function pbrVertexStream(data: GeometryData, occlusion?: (x: number, y: n
   if (!Number.isInteger(count) || data.normals.length !== count*3 || data.uvs.length !== count*2 || data.tangents?.length !== count*4 || occlusion !== undefined && typeof occlusion !== 'function') throw new RangeError('Invalid PBR vertex attributes');
   const vertices = new Float32Array(count*20);
   for (let i = 0; i < count; i++) {
-    vertices.set(data.positions.subarray(i*3,i*3+3),i*20); vertices[i*20+3] = 1;
-    vertices.set(data.normals.subarray(i*3,i*3+3),i*20+4);
-    vertices.set(data.tangents!.subarray(i*4,i*4+4),i*20+8);
-    vertices.set(data.uvs.subarray(i*2,i*2+2),i*20+12);
-    vertices.set(data.uvs.subarray(i*2,i*2+2),i*20+14);
+    for (let k = 0; k < 3; k++) {vertices[i*20+k] = data.positions[i*3+k]; vertices[i*20+4+k] = data.normals[i*3+k];}
+    vertices[i*20+3] = 1;
+    for (let k = 0; k < 4; k++) vertices[i*20+8+k] = data.tangents![i*4+k];
+    for (let k = 0; k < 2; k++) vertices[i*20+12+k] = vertices[i*20+14+k] = data.uvs[i*2+k];
     const ao = occlusion ? occlusion(data.positions[i*3],data.positions[i*3+1],data.positions[i*3+2]) : 1;
     if (!Number.isFinite(ao) || ao<0 || ao>1) throw new RangeError('Invalid baked vertex occlusion');
     vertices.fill(1,i*20+16,i*20+19); vertices[i*20+19] = ao;

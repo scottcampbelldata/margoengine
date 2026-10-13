@@ -8,6 +8,7 @@ export class WFC {
   readonly cells: Uint32Array;
   private readonly allowed: Uint32Array;
   private readonly weights: Float64Array;
+  private readonly weightedLogs: Float64Array;
   private readonly queue: Uint32Array;
   private readonly queued: Uint8Array;
   private randomState = 1;
@@ -18,11 +19,11 @@ export class WFC {
     if (dimensions.length !== 3 || dimensions.some(n => !Number.isInteger(n) || n < 1) || dimensions[0] * dimensions[1] * dimensions[2] > 1_000_000 || tiles.length < 1 || tiles.length > 32) throw new RangeError('Invalid WFC dimensions or tile count');
     this.dimensions = [...dimensions]; this.full = tiles.length === 32 ? 0xffffffff : (1 << tiles.length) - 1;
     this.cells = new Uint32Array(dimensions[0] * dimensions[1] * dimensions[2]); this.queue = new Uint32Array(this.cells.length); this.queued = new Uint8Array(this.cells.length);
-    this.weights = new Float64Array(tiles.length); this.allowed = new Uint32Array(tiles.length * 6);
+    this.weights = new Float64Array(tiles.length); this.weightedLogs = new Float64Array(tiles.length); this.allowed = new Uint32Array(tiles.length * 6);
     for (let tile = 0; tile < tiles.length; tile++) {
       const def = tiles[tile], weight = def.weight ?? 1;
       if (!Number.isFinite(weight) || weight <= 0 || def.neighbors.length !== 6) throw new TypeError('Tile needs positive weight and six neighbor lists');
-      this.weights[tile] = weight;
+      this.weights[tile] = weight; this.weightedLogs[tile] = weight * Math.log(weight);
       for (let direction = 0; direction < 6; direction++) for (const neighbor of def.neighbors[direction]) {
         if (!Number.isInteger(neighbor) || neighbor < 0 || neighbor >= tiles.length || !tiles[neighbor].neighbors[direction ^ 1]?.includes(tile)) throw new TypeError('WFC adjacency must be valid and reciprocal');
         this.allowed[tile * 6 + direction] |= 1 << neighbor;
@@ -65,7 +66,7 @@ export class WFC {
         for (let i = 0; i < this.cells.length; i++) {
           const mask = this.cells[i]; if (bits(mask) < 2) continue;
           let sum = 0, log = 0;
-          for (let tile = 0; tile < this.tiles.length; tile++) if (mask & (1 << tile)) {const weight = this.weights[tile]; sum += weight; log += weight * Math.log(weight);}
+          for (let tile = 0; tile < this.tiles.length; tile++) if (mask & (1 << tile)) {sum += this.weights[tile]; log += this.weightedLogs[tile];}
           const value = Math.log(sum) - log / sum + this.random() * 1e-8; if (value < entropy) {selected = i; entropy = value;}
         }
         if (selected < 0) {const result = new Uint8Array(this.cells.length); for (let i = 0; i < result.length; i++) result[i] = 31 - Math.clz32(this.cells[i]); return result;}

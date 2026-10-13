@@ -89,3 +89,97 @@ test('missing immersive bindings permit inline tracking and leave the desktop lo
   const xr=await XRManager.create(f.engine);assert.equal(f.devices[0].xrCompatible,false);await assert.rejects(xr.requestSession(),/bindings are unavailable/);
   await xr.requestSession('inline');f.session.tick(0,null);await xr.end();assert.equal(f.engine.starts,0);assert.deepEqual(f.errors,[]);
 });
+
+
+test('late completion of a prior end preserves a newly active session', async t => {
+  for (const rejected of [false, true]) await t.test(rejected ? 'rejected end' : 'resolved end', async t => {
+    const f = await fixture(t), xr = await XR.create(f.engine);
+    await xr.requestSession('inline');
+    const previous = f.session, error = new Error('previous end failed');
+    let resolveEnd, rejectEnd;
+    previous.end = () => {
+      previous.dispatchEvent(new Event('end'));
+      return new Promise((resolve, reject) => {resolveEnd = resolve; rejectEnd = reject;});
+    };
+    const pending = xr.end();
+    const session = f.nextSession();
+    await xr.requestSession('inline');
+    const controller = xr.controllers[0];
+    assert.equal(xr.session, session);
+    if (rejected) {rejectEnd(error); await assert.rejects(pending, value => value === error);}
+    else {resolveEnd(); await pending;}
+    assert.equal(xr.session, session);
+    assert.equal(session.handles.size, 1);
+    assert.equal(xr.controllers[0], controller);
+    await xr.end();
+    assert.equal(session.handles.size, 0);
+    assert.deepEqual(f.errors, []);
+  });
+});
+
+
+test('XR reuses owned multisample views for stable frames and invalidates them on resize and a new session', async t => {
+  const f=await fixture(t),xr=await XR.create(f.engine),createTexture=f.device.createTexture;
+  let viewCreates=0;
+  f.device.createTexture=descriptor=>{
+    const texture=createTexture(descriptor),createView=texture.createView;
+    texture.createView=function(...args){viewCreates++;return createView.apply(this,args);};
+    return texture;
+  };
+  let width=128,format='rgba8unorm';
+  const Binding=globalThis.XRGPUBinding,getImage=Binding.prototype.getViewSubImage;
+  Binding.prototype.getPreferredColorFormat=()=>format;
+  Binding.prototype.getViewSubImage=function(...args){const image=getImage.apply(this,args);image.colorTexture.width=width;image.depthStencilTexture.width=width;image.colorTexture.format=format;return image;};
+  const viewer={...pose(0),views:[{eye:'left',projectionMatrix:identity(),transform:pose(-0.03).transform},{eye:'right',projectionMatrix:identity(),transform:pose(0.03).transform}]};
+  await xr.requestSession();f.session.tick(0,viewer);
+  const firstViews=f.passes.slice(0,6),firstTextures=f.textures.slice();
+  const warmViews=viewCreates;
+  for(let i=1;i<=120;i++)f.session.tick(i*10,viewer);
+  assert.equal(viewCreates,warmViews,'stable eye attachments must reuse their native views');
+  const last=f.passes.slice(-6);
+  for(const eye of [0,3]){
+    assert.equal(last[eye].descriptor.colorAttachments[0].view,firstViews[eye].descriptor.colorAttachments[0].view);
+    assert.equal(last[eye].descriptor.depthStencilAttachment.view,firstViews[eye].descriptor.depthStencilAttachment.view);
+    assert.equal(last[eye+2].descriptor.depthStencilAttachment.view,last[eye].descriptor.depthStencilAttachment.view);
+  }
+  width=256;f.session.tick(1220,viewer);
+  assert.equal(viewCreates,warmViews+4);assert.ok(firstTextures.every(texture=>texture.destroyed===1));
+  assert.ok(f.textures.slice(-4).every(texture=>texture.width===256&&texture.sampleCount===4));
+  const resized=f.passes.slice(-6);
+  assert.notEqual(resized[0].descriptor.colorAttachments[0].view,last[0].descriptor.colorAttachments[0].view);
+  await xr.end();assert.ok(f.textures.every(texture=>texture.destroyed===1));
+  f.nextSession();format='bgra8unorm';await xr.requestSession();f.session.tick(0,viewer);
+  assert.ok(f.textures.slice(-4).filter(texture=>texture.format===format).length===2);
+  assert.notEqual(f.passes.at(-6).descriptor.colorAttachments[0].view,resized[0].descriptor.colorAttachments[0].view);
+  const restoredViews=viewCreates;f.session.tick(10,viewer);assert.equal(viewCreates,restoredViews);
+  await xr.end();assert.ok(f.textures.every(texture=>texture.destroyed===1));assert.deepEqual(f.errors,[]);
+});
+
+test('XR destroys every eye attachment when native view creation fails and a new session can retry', async t => {
+  const f=await fixture(t),xr=await XR.create(f.engine),createTexture=f.device.createTexture,error=new Error('native view failure');
+  const viewer={...pose(0),views:[{eye:'left',projectionMatrix:identity(),transform:pose(-0.03).transform}]};
+  let fail=true;
+  f.device.createTexture=descriptor=>{
+    const texture=createTexture(descriptor),createView=texture.createView;
+    texture.createView=function(...args){if(fail&&descriptor.format==='depth24plus')throw error;return createView.apply(this,args);};
+    return texture;
+  };
+  await xr.requestSession();f.session.tick(0,viewer);await Promise.resolve();
+  assert.equal(xr.session,null);assert.equal(f.errors[0],error);
+  assert.ok(f.textures.every(texture=>texture.destroyed===1));assert.ok(f.buffers.every(buffer=>buffer.destroyed===1));
+  fail=false;f.nextSession();await xr.requestSession();f.session.tick(0,viewer);
+  assert.ok(f.passes.some(pass=>pass.draws===1));await xr.end();
+  assert.ok(f.textures.every(texture=>texture.destroyed===1));assert.ok(f.buffers.every(buffer=>buffer.destroyed===1));
+});
+
+
+test('device loss releases cached eye views and prevents reuse of the lost manager', async t => {
+  const f=await fixture(t),xr=await XR.create(f.engine);
+  const viewer={...pose(0),views:[{eye:'left',projectionMatrix:identity(),transform:pose(-0.03).transform}]};
+  await xr.requestSession();f.session.tick(0,viewer);
+  assert.equal(f.textures.length,2);assert.ok(f.textures.every(texture=>texture.destroyed===0));
+  f.lose();await Promise.resolve();await Promise.resolve();
+  assert.equal(xr.session,null);assert.ok(f.textures.every(texture=>texture.destroyed===1));
+  assert.ok(f.buffers.every(buffer=>buffer.destroyed===1));
+  await assert.rejects(xr.requestSession(),/lost/);assert.ok(f.errors.some(error=>/test loss/.test(error.message)));
+});

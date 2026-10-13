@@ -93,9 +93,11 @@ export class OverlayRenderer {
       this.pipelines.set(key, pipeline);
     }
     if (vertices.byteLength > this.capacity) {
+      const capacity = Math.max(4096, 2 ** Math.ceil(Math.log2(vertices.byteLength)));
+      const buffer = device.createBuffer({size: capacity, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST});
       this.buffer?.destroy();
-      this.capacity = Math.max(4096, 2 ** Math.ceil(Math.log2(vertices.byteLength)));
-      this.buffer = device.createBuffer({size: this.capacity, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST});
+      this.capacity = capacity;
+      this.buffer = buffer;
     }
     device.queue.writeBuffer(this.buffer!, 0, vertices as Float32Array<ArrayBuffer>);
     this.attachment.view = ctx.color;

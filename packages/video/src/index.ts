@@ -29,8 +29,15 @@ export class Video implements EnginePlugin {
    const element=source as HTMLVideoElement,existing=sources.get(element);
    if(existing&&existing.context!==options.audio)throw new Error('Video is already connected to a different AudioContext');
    const shared=existing??{context:options.audio,node:options.audio.createMediaElementSource(element),users:0};
-   this.analyser=options.audio.createAnalyser();this.analyser.fftSize=fft;
-   if(!shared.users)shared.node.connect(options.audio.destination);shared.node.connect(this.analyser);shared.users++;sources.set(element,shared);this.audioSource=shared.node;
+   sources.set(element,shared);
+   try{
+    this.analyser=options.audio.createAnalyser();this.analyser.fftSize=fft;
+    if(!shared.users)shared.node.connect(options.audio.destination);shared.node.connect(this.analyser);shared.users++;this.audioSource=shared.node;
+   }catch(error){
+    if(this.analyser){try{shared.node.disconnect(this.analyser);}catch{}this.analyser.disconnect();}
+    if(!shared.users)try{shared.node.disconnect(options.audio.destination);}catch{}
+    throw error;
+   }
   }
  }
  static attach(engine:EngineKernel,source:HTMLVideoElement|VideoFrame,options:VideoOptions={}):Video {const video=new Video(source,options);try{engineRuntime(engine).use(video);return video;}catch(error){video.dispose();throw error;}}

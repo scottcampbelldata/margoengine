@@ -116,7 +116,7 @@ MARGOENGINE_RAPIER=/tmp/rapier/node_modules/@dimforge/rapier3d-compat npm test
 MARGOENGINE_RAPIER=/tmp/rapier/node_modules/@dimforge/rapier3d-compat npm run test:browser
 ```
 
-`npm test` runs 24 Node checks against real Rapier, a minimal fake mesh and core's real transform storage: resting boxes, restitution, deterministic irregular frame times, accumulator and interpolation, slerped rotation, joints and motors, sensor events, scene queries, triangle meshes and heightfields, mass and collision filters, forces and CCD, kinematic bodies, character movement and slopes, root-only validation, debug buffers, buffer reuse during synchronization, and complete disposal.
+`npm test` runs 29 Node checks against real Rapier, a minimal fake mesh and core's real transform storage: resting boxes, restitution, deterministic irregular frame times, accumulator and interpolation, slerped rotation, joints and motors, sensor events, scene queries, triangle meshes and heightfields, mass and collision filters, forces and CCD, kinematic bodies, character movement and slopes, root-only validation, debug buffers, buffer reuse during synchronization, and complete disposal.
 
 `npm run test:browser` uses a real WebGPU engine in Chromium (`BROWSER_CHANNEL`, `BROWSER_EXECUTABLE`, `BROWSER_ARGS` as in the other packages): a stack of five boxes falls and settles, rendered world matrices match the interpolated physics poses while falling with variable frame times, readback pixels at the projected box centers match each box's color, a raycast from the camera returns the middle box mesh, there are zero WebGPU validation errors, and `engine.dispose()` frees the world.
 

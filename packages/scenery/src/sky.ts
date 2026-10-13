@@ -39,7 +39,9 @@ export class SkyMoon implements EnginePlugin {
     sky.updateFrame(this.inverse, context.camera.position, this.time);
     this.color.view = context.color; this.depth.view = context.depth;
     const pass = context.encoder.beginRenderPass(this.descriptor);
-    sky.record(pass, context.descriptor.multisample?.count); pass.end();
+    try {sky.record(pass, context.descriptor.multisample?.count, context.descriptor.depthStencil?.format);}
+    catch (error) {try {pass.end();} catch {} throw error;}
+    pass.end();
   };
 
   onDeviceRestored(engine: Engine): void {this.dispose(); this.setup(engine);}

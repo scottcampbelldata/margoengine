@@ -16,6 +16,8 @@ export class Clustered implements EnginePlugin {
   private engine?:Engine;private device?:GPUDevice;private uniform?:GPUBuffer;private lights?:GPUBuffer;private pipeline?:GPUComputePipeline;private group?:GPUBindGroup;
   private counts?:GPUBuffer;private indices?:GPUBuffer;private entries:GPUBindGroupEntry[]=[];private receivers=new Map<ClusteredReceiver,()=>void>();
   private readonly values=new Float32Array(32);private readonly ints=new Uint32Array(this.values.buffer);private readonly data=new Float32Array(1024*16);private lightCount=0;private dirty=true;private disposed=false;
+  private readonly view=this.values.subarray(0,16);
+  private readonly shaders=new Map<number,Map<string,string>>();
   constructor(options:ClusteredOptions={}) {const grid=options.grid??[16,9,24];if(grid.length!==3||grid.some(v=>!Number.isInteger(v)||v<1||v>128)||grid.reduce((a,b)=>a*b,1)>32768)throw new RangeError('Invalid cluster grid');this.grid=[...grid] as [number,number,number];}
   get owner():Engine|undefined {return this.engine;}
   static attach(instance:EngineKernel,options:ClusteredOptions={}):Clustered {const effect=new Clustered(options);engineRuntime(instance).use(effect);return effect;}
@@ -32,10 +34,11 @@ export class Clustered implements EnginePlugin {
   add(receiver:ClusteredReceiver):()=>void {if(this.disposed||!receiver||typeof receiver.addLighting!=='function'||this.receivers.has(receiver))throw new TypeError('Invalid or duplicate clustered receiver');const remove=receiver.addLighting(this);this.receivers.set(receiver,remove);return()=>{if(this.receivers.delete(receiver))remove();};}
   bindings():GPUBindGroupEntry[] {if(!this.uniform||this.disposed)throw new Error('Clustered lighting is not attached');return this.entries;}
   shader(source:string,group=0):string {
+    let cache=this.shaders.get(group);const cached=cache?.get(source);if(cached)return cached;
     const base=source.includes('let base=terrainColor')?'base':'i.color';
     let code=source.replace(/let linear=([^;]+);/,`let linear=$1+clusterLighting(i.clip.xy,i.position,n,frame.eye.xyz,${base},i.material.x,i.material.y);`);
     if(code===source)code=source.replace('var color=','var color=clusterLighting(i.clip.xy,i.position,s.n,f.eye.xyz,s.base.rgb,s.roughness,s.metal)+');
-    if(code===source)throw new Error('Clustered lighting requires the standard PBR shader');return clusteredSampling(group)+code;
+    if(code===source)throw new Error('Clustered lighting requires the standard PBR shader');const output=clusteredSampling(group)+code;if(!cache){cache=new Map();this.shaders.set(group,cache);}cache.set(source,output);return output;
   }
   setup(engine:Engine):void {
     if(this.disposed||!engine.gpu)throw new Error('Clustered lighting requires WebGPU and a live effect');this.engine=engine;this.device=engine.gpu;
@@ -51,14 +54,15 @@ export class Clustered implements EnginePlugin {
     if(typeof intensity!=='number'||!Number.isFinite(Math.fround(intensity))||intensity<0)throw new RangeError('Invalid clustered intensity scale');
     for(const [receiver,remove] of this.receivers)if('disposed' in receiver&&receiver.disposed){remove();this.receivers.delete(receiver);}
     if(this.dirty){if(this.lightCount)c.device.queue.writeBuffer(this.lights!,0,this.data as Float32Array<ArrayBuffer>,0,this.lightCount*16);this.dirty=false;}
-    viewMatrix(this.values.subarray(0,16),c.camera);this.ints.set([...this.grid,intensity===0?0:this.lightCount],16);this.values.set([c.width,c.height,Math.tan(c.camera.fov*Math.PI/360),c.width/c.height,c.camera.near,c.camera.far,0,0],20);this.values[28]=intensity;
+    viewMatrix(this.view,c.camera);for(let i=0;i<3;i++)this.ints[16+i]=this.grid[i];this.ints[19]=intensity===0?0:this.lightCount;
+    const values=this.values;values[20]=c.width;values[21]=c.height;values[22]=Math.tan(c.camera.fov*Math.PI/360);values[23]=c.width/c.height;values[24]=c.camera.near;values[25]=c.camera.far;values[26]=values[27]=0;values[28]=intensity;
     // Map jittered fragments back to the unjittered culling grid using the projection's screen offset.
     const m=c.camera.matrix,v=this.values;v[26]=-0.5*(m[0]*v[2]+m[4]*v[6]+m[8]*v[10]);v[27]=0.5*(m[1]*v[2]+m[5]*v[6]+m[9]*v[10]);c.device.queue.writeBuffer(this.uniform!,0,v as Float32Array<ArrayBuffer>);
     const pass=c.encoder.beginComputePass();pass.setPipeline(this.pipeline!);pass.setBindGroup(0,this.group!);pass.dispatchWorkgroups(Math.ceil(this.grid[0]*this.grid[1]*this.grid[2]/64));pass.end();c.shader=this.shader(c.shader);c.bindings.push(...this.bindings());
   }});}
   /** GPU buffers for diagnostics and custom forward materials; no production readback. */
   get lightLists():{counts:GPUBuffer;indices:GPUBuffer} {if(!this.counts||!this.indices)throw new Error('Clustered lighting is not attached');return {counts:this.counts,indices:this.indices};}
-  private release():void {for(const buffer of [this.uniform,this.lights,this.counts,this.indices])buffer?.destroy();this.uniform=this.lights=this.counts=this.indices=undefined;this.pipeline=undefined;this.group=undefined;this.entries=[];}
+  private release():void {for(const buffer of [this.uniform,this.lights,this.counts,this.indices])buffer?.destroy();this.uniform=this.lights=this.counts=this.indices=undefined;this.pipeline=undefined;this.group=undefined;this.entries=[];this.shaders.clear();}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);for(const remove of this.receivers.values())remove();this.receivers.clear();this.release();this.engine=this.device=undefined;}
   destroy():void {this.dispose();}

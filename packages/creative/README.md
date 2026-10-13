@@ -10,7 +10,7 @@ npm install @margoengine/core@0.1.0 @margoengine/creative@0.1.0
 
 ```ts
 import { Engine } from '@margoengine/core';
-import { GPUParticles } from '@margoengine/creative';
+import { GPUParticles } from '@margoengine/creative/particles';
 
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const engine = await Engine.create(canvas, { backend: 'webgpu' });
@@ -18,13 +18,30 @@ engine.use(new GPUParticles({ count: 5000, sort: true, curl: 0.2 }));
 engine.start();
 ```
 
-Call `engine.dispose()` on teardown. Creative rendering requires supported WebGPU hardware on HTTPS or localhost. Import individual effects to let your bundler remove unused features.
+Call `engine.dispose()` on teardown. Creative rendering requires supported WebGPU hardware on HTTPS or localhost.
+
+Use a feature subpath for a static import or an on-demand `import()`:
+
+| Subpath | Feature |
+| --- | --- |
+| `@margoengine/creative/particles` | `GPUParticles` and particle option types |
+| `@margoengine/creative/targets` | `HDRRenderTarget` |
+| `@margoengine/creative/toon` | `ToonShading` and toon option types |
+| `@margoengine/creative/post` | `PostProcessing` and atmosphere/post option types |
+| `@margoengine/creative/grass` | `GrassField` and grass option types |
+| `@margoengine/creative/planet` | `Planet` and planet option types |
+
+```ts
+const {GPUParticles} = await import('@margoengine/creative/particles');
+```
+
+Each subpath loads that feature and its dependencies. Existing named imports from `@margoengine/creative` remain available and can be tree-shaken by a bundler. `await stage.creative()` intentionally loads the complete pack namespace; use a subpath when loading one feature independently.
 
 Attach a grass field directly to an existing Stage, without extending the facade:
 
 ```ts
 import {createStage} from 'margoengine';
-import {GrassField} from '@margoengine/creative';
+import {GrassField} from '@margoengine/creative/grass';
 
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const meadow = new GrassField(stage, {
@@ -52,7 +69,7 @@ meadow.destroy();
 
 The compute pass culls conservative blade bounds against all six camera planes and distance, then compacts two GPU instance lists. Indirect draws use seven-vertex near blades and three-vertex far blades, with stable density thinning beyond 70% of draw distance. The three near segments preserve their lengths during wind bending. Curved normals, root-to-tip color, wrap lighting and backlight transmission use the engine's existing lighting. Grass writes Reversed-Z depth; spores blend additively without writing depth. Both canvas and HDR/post-processing targets are supported.
 
-Instance data, uniforms, pipelines, bind groups and pass descriptors are allocated at creation and reused each frame. There is no production CPU visibility readback. Frame rate depends on hardware, resolution and visible density; 60 FPS is a target, not a guarantee. Grass is not a core mesh and does not participate in mesh picking, Stage fitting, section clipping or shadows.
+Instance data, uniforms, bind groups and pass descriptors are allocated at creation. The initial pipeline variant is built during setup; additional supported target variants are cached on first use. Stable frames reuse these resources. There is no production CPU visibility readback. Frame rate depends on hardware, resolution and visible density; 60 FPS is a target, not a guarantee. Grass is not a core mesh and does not participate in mesh picking, Stage fitting, section clipping or shadows.
 
 Run `npx vite --host 127.0.0.1` from the repository root and open `/examples/windy-meadow.html` for wind, density and seed controls, the optional Sky package's daylight/moonlight and moving clouds, and Bloom's HDR/AgX presentation. The demo uses the shared 4× MSAA desktop default; mobile uses 1× MSAA, a DPR cap of 2 and 35,000 blades, with collapsible settings. Orbit, pinch, keyboard navigation and reset remain available while motion is paused; reduced motion pauses the grass, seeds and clouds. Run `node --test tests/modern-grass.test.js` and `node scripts/modern-grass-tests.js` after building the creative, sky and post packages for the unit and GPU checks.
 
@@ -62,7 +79,7 @@ The source checkout also exports `Planet` and `PlanetOptions`. Planet is an opt-
 
 ```ts
 import {createStage} from 'margoengine';
-import {Planet} from '@margoengine/creative';
+import {Planet} from '@margoengine/creative/planet';
 
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const earth = await Planet.create(stage.engine, {
@@ -88,7 +105,7 @@ Only `dayMap` is required. All maps accept a URL or string, including relative U
 
 Radius defaults to 1, tilt to 23.4 degrees, sun direction to `[-1, 0.2, 0.5]`, and atmosphere color/intensity to `[0.3, 0.6, 1]` / 1.2. `earth.rotation` uses the existing stable transform accessors in radians. `earth.clouds.offsetU` is finite and wraps to `[0, 1)`. `setSunDirection` normalizes a nonzero world-space vector. GPU restoration preserves spin, drift and decoded maps; full disposal closes those images.
 
-Rendering adds two indexed draws: a surface with depth writes, then a front-facing cloud/rim shell at `radius * 1.01` that tests scene depth without writing it. Both share retained sphere buffers and use reversed depth. The shell produces geometric cloud parallax; UV drift animates it independently. The atmospheric rim is an analytical Fresnel approximation. Clouds and glow share one altitude, and the camera must remain outside the shell. Textures currently use linear filtering without mipmaps, so distant views can alias. Canvas and HDR variants are built during initialization; existing post-processing works with the same attachments.
+Rendering adds two indexed draws: a surface with depth writes, then a front-facing cloud/rim shell at `radius * 1.01` that tests scene depth without writing it. Both share retained sphere buffers and use reversed depth. The shell produces geometric cloud parallax; UV drift animates it independently. The atmospheric rim is an analytical Fresnel approximation. Clouds and glow share one altitude, and the camera must remain outside the shell. Textures currently use linear filtering without mipmaps, so distant views can alias. The initial pipeline variant is built during setup; additional supported canvas and HDR target variants are cached on first use. Stable frames reuse these resources, and existing post-processing works with the same attachments.
 
 Planet-owned arrays, GPU resources and render-pass descriptors are retained across steady frames. Browser/WebGPU command objects and the rest of the engine can still allocate, and actual FPS depends on the browser, display and GPU. Custom planet draws do not participate in the base `pick()`, `stats.drawCalls`, or `Stage.fit()` APIs; position the camera explicitly and inspect recorded commands for draw counts.
 

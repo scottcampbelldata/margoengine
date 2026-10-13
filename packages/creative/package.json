@@ -24,6 +24,30 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./particles": {
+      "types": "./dist/particles.d.ts",
+      "import": "./dist/particles.js"
+    },
+    "./targets": {
+      "types": "./dist/targets.d.ts",
+      "import": "./dist/targets.js"
+    },
+    "./toon": {
+      "types": "./dist/toon.d.ts",
+      "import": "./dist/toon.js"
+    },
+    "./post": {
+      "types": "./dist/post.d.ts",
+      "import": "./dist/post.js"
+    },
+    "./grass": {
+      "types": "./dist/grass.d.ts",
+      "import": "./dist/grass.js"
+    },
+    "./planet": {
+      "types": "./dist/planet.d.ts",
+      "import": "./dist/planet.js"
     }
   },
   "files": [

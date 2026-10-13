@@ -102,14 +102,17 @@ export class TransformControls extends EventDispatcher {
       onDeviceRestored: () => this.overlay.release(),
       dispose: () => this.dispose(),
     } as Parameters<EngineKernel['use']>[0]);
-    this.connect(options.element ?? engine.canvas as unknown as ControlElement);
+    try {this.connect(options.element ?? engine.canvas as unknown as ControlElement);} catch (error) {this.dispose(); throw error;}
   }
 
   connect(element: ControlElement): void {
+    if (this.disposed) throw new Error('Controls are disposed');
     this.disconnect(); this.element = element;
+    try {
     element.addEventListener('pointerdown', this.onDown); element.addEventListener('pointermove', this.onMove);
     element.addEventListener('pointerup', this.onUp); element.addEventListener('pointercancel', this.onUp);
     element.addEventListener('pointerleave', this.onLeave);
+    } catch (error) {this.disconnect(); throw error;}
   }
   disconnect(): void {
     const element = this.element; if (!element) return;

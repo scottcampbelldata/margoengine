@@ -54,13 +54,13 @@ test('Cached hierarchy preserves late-error atomicity and rejects deep cached pa
 test('Both camera depth conventions project near/far correctly and agree on visibility',()=>{
   const camera=new Camera({position:[0,0,5],near:1,far:10});
   for(const gpu of [false,true]){camera.update(1,gpu);const m=camera.matrix,project=z=>(m[10]*z+m[14])/(m[11]*z+m[15]);assert.ok(Math.abs(project(4)-(gpu?1:-1))<1e-6);assert.ok(Math.abs(project(-5)-(gpu?0:1))<1e-6);}
-  camera.position=[0,0,0];assert.throws(()=>camera.update(1,false),/equals target/);
+  camera.position=[0,0,0];assert.throws(()=>camera.update(1,false),/at target/);
 });
 test('Geometry validates indices and box winding; material colors use linear RGB',()=>{
   const geometry=box(2,4,6);assert.equal(geometry.indices.length,36);assert.ok(Math.abs(geometry.bounds[3]-Math.sqrt(14))<1e-6);
   for(let i=0;i<36;i+=3){const [a,b,c]=geometry.indices.slice(i,i+3),v=geometry.vertices;const ux=v[b*6]-v[a*6],uy=v[b*6+1]-v[a*6+1],uz=v[b*6+2]-v[a*6+2],vx=v[c*6]-v[a*6],vy=v[c*6+1]-v[a*6+1],vz=v[c*6+2]-v[a*6+2];assert.ok((uy*vz-uz*vy)*v[a*6+3]+(uz*vx-ux*vz)*v[a*6+4]+(ux*vy-uy*vx)*v[a*6+5]>0);}
-  assert.throws(()=>new Geometry([0,0,0,1,0,0,0,1,0],[0,0,1,0,0,1,0,0,1],[0,1,3]),/Index/);
-  assert.throws(()=>box(-1),/positive/);assert.throws(()=>new PbrMaterial({roughness:NaN}),/Material/);
+  assert.throws(()=>new Geometry([0,0,0,1,0,0,0,1,0],[0,0,1,0,0,1,0,0,1],[0,1,3]),{name:'RangeError',message:'Invalid geometry'});
+  assert.throws(()=>box(-1),/positive/);assert.throws(()=>new PbrMaterial({roughness:NaN}),{name:'RangeError',message:'Invalid material'});
   assert.ok(Math.abs(new PbrMaterial({color:'#808080'}).data[0]-0.21586)<1e-4);
 });
 
@@ -121,10 +121,10 @@ test('Frame graph orders passes, prevents edits during execution, and releases p
   const graph=new FrameGraph(),order=[],context={draw:()=>order.push('main')};
   graph.withOwner('custom',()=>{graph.add({name:'late',order:10,execute:()=>order.push('late')});graph.add({name:'early',order:-10,execute:()=>order.push('early')});});
   graph.execute(context);assert.deepEqual(order,['early','main','late']);graph.removeOwner('custom');order.length=0;graph.execute(context);assert.deepEqual(order,['main']);
-  const remove=graph.add({name:'bad',order:5,execute:()=>graph.add({name:'nested',order:0,execute(){}})});assert.throws(()=>graph.execute(context),/Frame graph executing/);remove();
+  const remove=graph.add({name:'bad',order:5,execute:()=>graph.add({name:'nested',order:0,execute(){}})});assert.throws(()=>graph.execute(context),/Graph executing/);remove();
   const {engine}=await headlessEngine();let cleaned=0;
   try{assert.throws(()=>engine.use({name:'bad',setup(){},registerPasses(g){g.add({name:'incomplete',order:1,execute(){}});throw new Error('setup failure');},dispose(){cleaned++;}}),/setup failure/);assert.equal(cleaned,1);engine.frameGraph.add({name:'incomplete',order:1,execute(){}});
-    const plugin={name:'owned',setup(){},dispose(){cleaned++;}};engine.use(plugin);assert.throws(()=>engine.use(plugin),/attached/);engine.removePlugin('owned');assert.equal(cleaned,2);
+    const plugin={name:'owned',setup(){},dispose(){cleaned++;}};engine.use(plugin);assert.throws(()=>engine.use(plugin),/Invalid plugin/);engine.removePlugin('owned');assert.equal(cleaned,2);
   }finally{engine.dispose();}
 });
 test('Machinery pack enforces limits and controls explode positions; particles validate and require WebGPU',async()=>{
@@ -162,7 +162,7 @@ test('240 coupled shafts write flat Wasm Euler state and retain atomic rollback 
   }finally{engine.dispose();}
 });
 test('Overlay projection follows world hierarchy; GPU extension boundaries validate before attachment',async()=>{
-  const {engine}=await headlessEngine();try{const parent=engine.createMesh().setPosition([1,0,0]),node=engine.createMesh(parent).setPosition([0,1,0]);engine.render();assert.deepEqual(worldAnchor({node,point:[0,0,0]}),[1,1,0]);const camera=new Camera({position:[0,0,4]});camera.update(1,true);assert.deepEqual(projectAnnotation(camera,[0,0,0],200,200),[100,100]);assert.equal(projectAnnotation(camera,[0,0,5],200,200),null);assert.throws(()=>new SectionPlanes({planes:[[0,0,0,1]]}),/plane/);assert.throws(()=>engine.use(new SectionPlanes({planes:[[0,0,1,0]]})),/WebGPU/);assert.throws(()=>new GPUParticles({obstacles:[{kind:'sphere',center:[0,0,0],radius:-1}]}),/obstacle/);assert.throws(()=>new GPUParticles({texture:{width:1,height:1,data:new Uint8Array(3)}}),/texture/);assert.throws(()=>new ToonShading({bands:1}),/toon/);assert.throws(()=>new PostProcessing({bloom:-1}),/post/);assert.throws(()=>new HDRRenderTarget({limits:{maxTextureDimension2D:4096}},0,1),/size/);}finally{engine.dispose();}
+  const {engine}=await headlessEngine();try{const parent=engine.createMesh().setPosition([1,0,0]),node=engine.createMesh(parent).setPosition([0,1,0]);engine.render();assert.deepEqual(worldAnchor({node,point:[0,0,0]}),[1,1,0]);const camera=new Camera({position:[0,0,4]});camera.update(1,true);assert.deepEqual(projectAnnotation(camera,[0,0,0],200,200),[100,100]);assert.equal(projectAnnotation(camera,[0,0,5],200,200),null);assert.throws(()=>new SectionPlanes({planes:[[0,0,0,1]]}),/plane/);assert.throws(()=>engine.use(new SectionPlanes({planes:[[0,0,1,0]]})),/WebGPU/);assert.throws(()=>new GPUParticles({obstacles:[{kind:'sphere',center:[0,0,0],radius:-1}]}),/obstacle/);assert.throws(()=>new GPUParticles({texture:{width:1,height:1,data:new Uint8Array(3)}}),/texture/);assert.throws(()=>new ToonShading({bands:1}),/toon/);assert.throws(()=>new PostProcessing({bloom:-1}),/post/);assert.throws(()=>new HDRRenderTarget({features:new Set(),limits:{maxTextureDimension2D:4096}},0,1),/size/);}finally{engine.dispose();}
 });
 
 test('Interrupted GPU encoding skips submission and future canvas acquisition; unrelated errors remain visible',()=>{

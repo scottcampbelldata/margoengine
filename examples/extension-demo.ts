@@ -5,7 +5,7 @@ import {sceneSamples} from '../packages/shared/quality.js';
 const status=document.querySelector<HTMLElement>('#status')!,error=document.querySelector<HTMLElement>('#error')!,robot=document.body.dataset.demo==='robot';
 const abort=new AbortController();let dispose:(()=>void)|undefined;
 try {
-  const extras=robot?Promise.all([import('@margoengine/animation'),import('@margoengine/shadows'),import('@margoengine/tonemap'),import('@margoengine/core/extension')]):import('@margoengine/post');
+  const extras=robot?Promise.all([import('@margoengine/animation'),import('@margoengine/shadows'),import('@margoengine/tonemap'),import('@margoengine/core/extension')]):import('@margoengine/post/ssao').then(({SSAO})=>({SSAO}));
   // Imports overlap engine startup; the scene's catch reports a later import failure.
   extras.catch(()=>{});
   const stage=await createStage('#viewport',{backend:'webgpu',autoStart:false,controls:false,capacity:2048,
@@ -55,7 +55,7 @@ try {
     }
     preset.disabled=false;preset.addEventListener('change',()=>{const value=preset.value;for(const input of inputs){input.value=input.id===value?'1':'0';input.dispatchEvent(new Event('input'));}preset.value=value;});
   } else {
-    const {SSAO}=await extras as typeof import('@margoengine/post'),ssao=SSAO.attach(stage.engine,{radius:0.25,bias:0.01,samples:32});
+    const {SSAO}=await extras as typeof import('@margoengine/post/ssao'),ssao=SSAO.attach(stage.engine,{radius:0.25,bias:0.01,samples:32});
     ssao.add(model);const toggle=document.querySelector<HTMLInputElement>('#ssao')!;toggle.disabled=false;toggle.addEventListener('change',()=>{ssao.enabled=toggle.checked;});
   }
   stage.engine.render();stage.engine.start();document.querySelector<HTMLElement>('#viewport')!.dataset.ready='true';status.textContent='Ready';

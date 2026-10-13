@@ -45,6 +45,7 @@ export interface PositionalAudioOptions extends AudioOptions {
 }
 
 type SourceKind = 'buffer' | 'media' | 'stream' | 'node' | null;
+const defaultDirection: Vec3 = [0, 0, 1];
 const mediaSources = new WeakMap<BaseAudioContext, WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>>();
 const disconnect = (node: AudioNode | null | undefined, destination?: AudioNode): void => {
   if (!node) return;
@@ -366,14 +367,16 @@ export class PositionalAudio extends Audio {
   muteWhenHidden: boolean;
   private meshValue: Mesh | null = null;
   private readonly localDirection = new Float64Array([0, 0, 1]);
+  private readonly directionScratch = new Float64Array(3);
   private written = false;
 
   constructor(listener: AudioListener, options: PositionalAudioOptions = {}) {
     const panner = listener.context.createPanner();
     super(listener, {...options, filters: undefined});
+    this.panner = panner;
+    try {
     this.gain.connect(panner);
     panner.connect(listener.input);
-    this.panner = panner;
     panner.panningModel = options.panningModel ?? 'HRTF';
     this.distanceModel = options.distanceModel ?? 'inverse';
     this.refDistance = options.refDistance ?? 1;
@@ -385,6 +388,7 @@ export class PositionalAudio extends Audio {
     if (options.filters?.length) this.setFilters(options.filters);
     if (options.mesh) this.attach(options.mesh);
     this.writePose();
+    } catch (error) {this.dispose(); throw error;}
   }
 
   override getOutput(): AudioNode {return this.panner ?? this.gain;}
@@ -419,15 +423,16 @@ export class PositionalAudio extends Audio {
   detach(): this {return this.attach(null);}
   /** Places the sound at a world position and stops following any mesh. */
   setPosition(x: number, y: number, z: number): this {
+    checkFinite(x, 'x'); checkFinite(y, 'y'); checkFinite(z, 'z');
     this.meshValue = null;
-    this.worldPosition[0] = checkFinite(x, 'x'); this.worldPosition[1] = checkFinite(y, 'y'); this.worldPosition[2] = checkFinite(z, 'z');
+    this.worldPosition[0] = x; this.worldPosition[1] = y; this.worldPosition[2] = z;
     this.writePose();
     return this;
   }
   /** World direction of the cone when not following a mesh; the local axis when following one. */
   setDirection(direction: Vec3): this {
-    const out = [0, 0, 1];
-    if (!normalize(direction[0], direction[1], direction[2], out, [0, 0, 1])) throw new RangeError('Direction must be nonzero');
+    const out = this.directionScratch;
+    if (!normalize(direction[0], direction[1], direction[2], out, defaultDirection)) throw new RangeError('Direction must be nonzero');
     this.localDirection.set(out);
     if (!this.meshValue) {this.worldDirection.set(out); if (this.panner) this.writePose();}
     return this;
@@ -441,11 +446,10 @@ export class PositionalAudio extends Audio {
     if (runtime.meshes.get(id) !== mesh) return;
     const store = runtime.store, m = store.matrices, o = id * 16;
     const [dx, dy, dz] = this.localDirection;
-    const position = [m[o + 12], m[o + 13], m[o + 14]];
-    const direction = [0, 0, 1];
-    normalize(m[o] * dx + m[o + 4] * dy + m[o + 8] * dz, m[o + 1] * dx + m[o + 5] * dy + m[o + 9] * dz, m[o + 2] * dx + m[o + 6] * dy + m[o + 10] * dz, direction, [0, 0, 1]);
-    if (position.every(Number.isFinite) && (position.some((v, i) => v !== this.worldPosition[i]) || direction.some((v, i) => v !== this.worldDirection[i]))) {
-      this.worldPosition.set(position); this.worldDirection.set(direction);
+    const x=m[o+12], y=m[o+13], z=m[o+14], direction=this.directionScratch;
+    normalize(m[o] * dx + m[o + 4] * dy + m[o + 8] * dz, m[o + 1] * dx + m[o + 5] * dy + m[o + 9] * dz, m[o + 2] * dx + m[o + 6] * dy + m[o + 10] * dz, direction, defaultDirection);
+    if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z) && (x!==this.worldPosition[0] || y!==this.worldPosition[1] || z!==this.worldPosition[2] || direction[0]!==this.worldDirection[0] || direction[1]!==this.worldDirection[1] || direction[2]!==this.worldDirection[2])) {
+      this.worldPosition[0]=x; this.worldPosition[1]=y; this.worldPosition[2]=z; this.worldDirection.set(direction);
       this.writePose();
     }
     let hidden = false;

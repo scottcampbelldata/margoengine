@@ -4,8 +4,11 @@ import {cp, mkdir, mkdtemp, rm, writeFile} from 'node:fs/promises';
 import {resolve, sep} from 'node:path';
 import {chromium} from '@playwright/test';
 import {preview} from 'vite';
+import {installDemoLoadAudit} from './demo-load-audit.js';
 
-const demos=['/night-citadel/','/gameplay-sandbox/','/demos/damaged-helmet.html','/demos/character-animation.html','/demos/robot-expressive.html','/demos/windy-meadow.html','/demos/earth/'];
+const allDemos=['/night-citadel/','/gameplay-sandbox/','/demos/damaged-helmet.html','/demos/character-animation.html','/demos/robot-expressive.html','/demos/windy-meadow.html','/demos/earth/'];
+const demos=process.argv.length>2?process.argv.slice(2):allDemos;
+assert.ok(demos.every(path=>allDemos.includes(path)),'Pass demo paths from the production site');
 const profile={viewport:{width:390,height:844},deviceScaleFactor:3,cpuSlowdown:4,latencyMs:40,downloadMbps:10,samples:3};
 await mkdir('test-results',{recursive:true});
 // Other chats can rebuild site/dist while a page is fetching its hashed assets.
@@ -24,27 +27,7 @@ try {
         const page=await context.newPage(),errors=[];
         page.on('pageerror',error=>errors.push(error.message));
         page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
-        await page.addInitScript(()=>{
-          const load=window.demoLoad={draws:0,submitted:0,firstFrame:0,ready:0};
-          for(const method of ['draw','drawIndexed','drawIndirect','drawIndexedIndirect']){
-            const original=GPURenderPassEncoder.prototype[method];
-            GPURenderPassEncoder.prototype[method]=function(...args){load.draws++;return original.apply(this,args);};
-          }
-          const submit=GPUQueue.prototype.submit;
-          GPUQueue.prototype.submit=function(...args){
-            const result=submit.apply(this,args);
-            if(load.draws&&!load.submitted){
-              load.submitted=performance.now();
-              this.onSubmittedWorkDone().then(()=>requestAnimationFrame(()=>requestAnimationFrame(()=>{load.firstFrame=performance.now();})));
-            }
-            return result;
-          };
-          const ready=()=>{
-            if(document.body?.dataset.ready==='true'||document.querySelector('#viewport')?.dataset.ready==='true'||window.sandbox||window.nightCitadel?.stats.frames>0)load.ready=performance.now();
-            else requestAnimationFrame(ready);
-          };
-          requestAnimationFrame(ready);
-        });
+        await page.addInitScript(installDemoLoadAudit);
         const cdp=await context.newCDPSession(page);
         await cdp.send('Emulation.setCPUThrottlingRate',{rate:profile.cpuSlowdown});
         await cdp.send('Network.enable');await cdp.send('Network.setCacheDisabled',{cacheDisabled:true});
@@ -68,7 +51,7 @@ try {
     const interactive=samples.map(sample=>Math.max(sample.firstFrame,sample.ready)).sort((a,b)=>a-b);
     const result={path,medianMs:Math.round(frames[1]),worstMs:Math.round(frames.at(-1)),readyMedianMs:Math.round(ready[1]),sceneReadyMedianMs:Math.round(interactive[1]),sceneReadyWorstMs:Math.round(interactive.at(-1)),underOneSecond:interactive.at(-1)<=1000,samples};
     results.push(result);
-    console.log(`${path}: first frame median ${result.medianMs} ms, worst ${result.worstMs} ms; controls ready median ${result.readyMedianMs} ms`);
+    console.log(`${path}: first frame median ${result.medianMs} ms, worst ${result.worstMs} ms; full scene ready median ${result.sceneReadyMedianMs} ms`);
   }
-  await writeFile('test-results/demo-loads.json',JSON.stringify({profile,browser:'Chromium / '+(process.env.BROWSER_CHANNEL??'msedge'),results},null,2)+'\n');
+  await writeFile(demos===allDemos?'test-results/demo-loads.json':'test-results/demo-loads-focused.json',JSON.stringify({profile,browser:'Chromium / '+(process.env.BROWSER_CHANNEL??'msedge'),results},null,2)+'\n');
 }finally{await new Promise(resolve=>server.httpServer.close(resolve));await rm(snapshot,{recursive:true,force:true});}

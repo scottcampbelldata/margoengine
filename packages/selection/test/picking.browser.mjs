@@ -54,7 +54,7 @@ try {
    reset();assert(await e.pick(64,64)===left,'Micro and MRT diagonal resolve disagree');assert(sourceSize[0]===3,'Stale silhouette did not use micro pass');
    checks.push({name:'3x3 center priority, orthogonal and diagonal edges, and bounded tolerance'});
    left.setGeometry(quad(-2,1.5,-1.5,2));e.render();assert(await e.pick(0,0)===left,'Canvas corner missed');assert(lastSize[0]===2&&lastSize[1]===2,'Canvas corner read was not clipped');
-   left.setGeometry(quad(-.5,0,0,.5));canvas.style.cssText='width:64px;height:64px';Object.defineProperty(window,'devicePixelRatio',{value:2,configurable:true});e.render();assert(e.canvas.width===128,'DPR resize did not apply');assert(await e.pick(32,32)===left,'CSS/device pixel conversion missed the diagonal');
+   left.setGeometry(quad(-.5,0,0,.5));canvas.style.cssText='width:64px;height:64px';Object.defineProperty(window,'devicePixelRatio',{value:2,configurable:true});e.render();assert(e.canvas.width===(samples===1?128:64)&&e.canvas.height===(samples===1?128:64),'Sampling-aware DPR resize did not apply');assert(await e.pick(32,32)===left,'CSS/device pixel conversion missed the diagonal');
    checks.push({name:'Clipped canvas corners, DPR conversion and ID-target resize'});
    for(const mesh of [...e.meshes.values()])mesh.dispose();canvas.style.cssText='width:128px;height:128px';Object.defineProperty(window,'devicePixelRatio',{value:1,configurable:true});e.camera.fov=60;e.camera.position=[0,0,4];
    const back=e.createMesh().setGeometry(geometry),front=e.createMesh().setGeometry(geometry).setPosition([0,0,1]);e.render();assert(await e.pick(64,64)===front,'MRT lost depth occlusion');

@@ -15,13 +15,13 @@ export class FrameGraph {
   private owner?:string;
   private executing=false;
   add(pass:FramePass):()=>void {
-    if(this.executing)throw new Error('Frame graph executing');
+    if(this.executing)throw new Error('Graph executing');
     if(!pass.name||!Number.isFinite(pass.order)||typeof pass.execute!=='function'||this.passes.some(p=>p.name===pass.name))throw new TypeError('Invalid pass');
     const record={...pass,owner:this.owner};this.passes.push(record);this.passes.sort((a,b)=>a.order-b.order);this.revision++;
-    return()=>{if(this.executing)throw new Error('Frame graph executing');this.passes=this.passes.filter(p=>p!==record);this.revision++;};
+    return()=>{if(this.executing)throw new Error('Graph executing');this.passes=this.passes.filter(p=>p!==record);this.revision++;};
   }
   withOwner(owner:string,register:()=>void):void {const previous=this.owner;this.owner=owner;try{register();}finally{this.owner=previous;}}
-  removeOwner(owner:string):void {if(this.executing)throw new Error('Frame graph executing');this.passes=this.passes.filter(p=>p.owner!==owner);this.revision++;}
-  execute(context:PassContext):void {if(this.executing)throw new Error('Recursive graph');this.executing=true;try{for(const pass of this.passes)pass.execute(context);}finally{this.executing=false;}}
-  prepare(context:PassContext):void {if(this.executing)throw new Error('Recursive graph');this.executing=true;try{for(const pass of this.passes)pass.prepare?.(context);}finally{this.executing=false;}}
+  removeOwner(owner:string):void {if(this.executing)throw new Error('Graph executing');this.passes=this.passes.filter(p=>p.owner!==owner);this.revision++;}
+  execute(context:PassContext):void {if(this.executing)throw new Error('Graph recursion');this.executing=true;try{for(const pass of this.passes)pass.execute(context);}finally{this.executing=false;}}
+  prepare(context:PassContext):void {if(this.executing)throw new Error('Graph recursion');this.executing=true;try{for(const pass of this.passes)pass.prepare?.(context);}finally{this.executing=false;}}
 }

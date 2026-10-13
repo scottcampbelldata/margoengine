@@ -10,7 +10,8 @@ npm install @margoengine/core@0.1.0 @margoengine/machinery@0.1.0
 
 ```ts
 import { Engine, box } from '@margoengine/core';
-import { Kinematics, industrialMaterial } from '@margoengine/machinery';
+import { Kinematics } from '@margoengine/machinery/kinematics';
+import { industrialMaterial } from '@margoengine/machinery/materials';
 
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const engine = await Engine.create(canvas);
@@ -29,6 +30,26 @@ engine.start();
 ```
 
 Call `engine.dispose()` on teardown. `loadCAD` uses a worker in browsers; `parseCADAsync` transfers and detaches an owned ArrayBuffer. Both support STL/OBJ/STEP/IGES. Synchronous `parseCAD` retains STL/OBJ support. STEP/IGES tessellation loads separate OpenCascade assets only when needed and returns meters; STL/OBJ retain their input units. Worker imports smooth welded normals by default; use `{ smoothing: false }` to retain hard faces.
+
+Use `@margoengine/machinery/cad` for `loadCAD`, `parseCAD`, `deduplicateParts` and `PartInstancer`, or `@margoengine/machinery/cad-async` for `parseCADAsync` and its option types. These entries exclude unrelated machinery systems and share module identity with the existing package root. CAD worker assets remain in `dist/workers` and resolve relative to the shipped JavaScript; retain that directory when copying the package directly.
+
+Import individual systems from these subpaths to keep unrelated code out of direct browser imports and lazy-loaded modules. Each entry includes its associated TypeScript types. Existing imports from `@margoengine/machinery` remain supported and use the same classes and functions.
+
+| Subpath | Public system |
+| --- | --- |
+| `/kinematics` | `Kinematics` joints, couplings and constraints |
+| `/surface` | `SurfacePhysics` transport |
+| `/telemetry` | `TelemetryChannel` binary playback |
+| `/section` | `SectionPlanes`, `boxSection` |
+| `/assembly` | `AssemblyIndex` |
+| `/metrology` | Vertex, edge, face, hole and snap anchors; `measureDistance` |
+| `/spatial` | `AssemblyBVH` picking |
+| `/clearance` | `measureClearance` |
+| `/materials` | `industrialMaterials`, `industrialMaterial` |
+| `/overlays` | `EngineeringAnnotations`, `worldAnchor`, `projectAnnotation` |
+| `/exploded` | `ExplodedView` |
+
+Required dependencies remain shared: telemetry uses kinematics, and BVH picking uses its Wasm spatial kernel. Importing materials or exploded views does not load those systems. Retain the JavaScript and shared chunks in the package's `dist` directory when serving these entry points directly.
 
 `SurfacePhysics.create(parts, carriers)` and `TelemetryChannel.create(kinematics)` asynchronously prepare fixed Wasm storage before `engine.use`. Surface transport uses world-space carrier velocity or angular velocity × contact offset, friction bounded by μg, and lanes with fixed unit axes and supplied part half lengths. It supports reverse travel, stopped parts and carrier transfer. Parts must be root meshes without prismatic joints. This is supported surface transport with 1D accumulation, not general rigid-body physics.
 

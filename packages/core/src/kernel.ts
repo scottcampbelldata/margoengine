@@ -33,7 +33,7 @@ export class TransformStore {
 
   private constructor(private readonly api: Exports, readonly capacity: number) {
     this.handle = api.kernel_new(capacity);
-    if (!this.handle) throw new Error('Transform storage allocation');
+    if (!this.handle) throw new Error('Transform allocation');
     const offset = api.kernel_data(this.handle), buffer = api.memory.buffer;
     const keys = ['x','y','z','qx','qy','qz','qw','sx','sy','sz'] as const;
     this.transforms = Object.fromEntries(keys.map((key, field) => [key, new Float32Array(buffer, offset + field*capacity*4, capacity)])) as typeof this.transforms;
@@ -51,9 +51,9 @@ export class TransformStore {
   }
 
   tick(culling = true): void {
-    if (!this.handle) throw new Error('Transform store disposed');
+    if (!this.handle) throw new Error('Transforms disposed');
     const error = this.api.kernel_tick(this.handle, +culling);
-    if (error) throw new RangeError(error > this.capacity ? 'Invalid frustum planes' : `Invalid transform/bounds at slot ${error-1}`);
+    if (error) throw new RangeError(error > this.capacity ? 'Invalid frustum' : `Invalid transform/bounds: ${error-1}`);
   }
 
   dispose(): void {

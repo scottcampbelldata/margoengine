@@ -1,6 +1,7 @@
 # Scene sampling audit
 
-Desktop WebGPU scenes use 4× MSAA. Phone scenes use 1× sampling and cap canvas
+Desktop WebGPU scenes use 4× MSAA and cap canvas DPR at 1, avoiding an additional
+fourfold pixel cost on HiDPI displays. Phone scenes use 1× sampling and cap canvas
 DPR at 2. The phone path allocates no multisampled attachments, creates no 4×
 scene pipelines, and omits resolve targets. WebGL fallback also disables canvas
 antialiasing on phones. Desktop WebGL requests antialiasing; its actual sample
@@ -66,6 +67,6 @@ readback captures, depth tests, restoration and galleries. Point EDL compares
 matching MSAA coverage samples so partially covered pixels do not invent depth
 steps or darken flat surfaces.
 
-The combined core + stage measurement is 19,998 gzip bytes. CI rejects 20,000
+The combined core + stage measurement is 19,988 gzip bytes. CI rejects 20,000
 bytes or more. Real XR headsets and the complete browser/device matrix were not
 tested.

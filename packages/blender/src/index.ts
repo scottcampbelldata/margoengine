@@ -52,8 +52,8 @@ export function decodeMargo(input:ArrayBuffer|ArrayBufferView):MargoAsset {
         if(stride===24){
           const expanded=new Float32Array(count*20);
           for(let i=0;i<count;i++){
-            expanded.set(packed.subarray(i*6,i*6+3),i*20);expanded[i*20+3]=1;
-            expanded.set(packed.subarray(i*6+3,i*6+6),i*20+4);expanded.fill(1,i*20+16,i*20+20);
+            for(let axis=0;axis<3;axis++){expanded[i*20+axis]=packed[i*6+axis];expanded[i*20+4+axis]=packed[i*6+3+axis];}
+            expanded[i*20+3]=1;expanded.fill(1,i*20+16,i*20+20);
           }
           packed=expanded;
         }

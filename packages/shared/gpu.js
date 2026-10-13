@@ -30,15 +30,18 @@ export function acquireDepth(engine){
     if(engine.hasPlugin('ssao')||engine.hasPlugin('dof'))throw new Error('Supply the depth texture of the effect that owns scene capture');
     const existing=sceneTarget(c);this.borrowed=!!existing;
     if(existing){this.borrowedDepth=existing.resolvedDepth;return;}
-    if(c.descriptor.multisample?.count===1){
-     if(this.texture?.width!==c.width||this.texture?.height!==c.height||this.texture?.format!==c.descriptor.depthStencil.format){this.onDeviceRestored();this.texture=c.device.createTexture({size:[c.width,c.height],format:c.descriptor.depthStencil.format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});this.depthView=this.texture.createView();}
+    const samples=c.descriptor.multisample?.count??4;
+    try{
+    if(samples===1){
+     if(!this.depthView||this.texture?.width!==c.width||this.texture?.height!==c.height||this.texture?.format!==c.descriptor.depthStencil.format){this.onDeviceRestored();this.texture=c.device.createTexture({size:[c.width,c.height],format:c.descriptor.depthStencil.format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});this.depthView=this.texture.createView();}
      c.depth=this.depthView;return;
     }
-    if(this.texture?.width!==c.width||this.texture?.height!==c.height||this.texture?.format!==c.descriptor.depthStencil.format||this.color?.format!==c.format){
+    if(this.target?.samples!==samples||this.texture?.width!==c.width||this.texture?.height!==c.height||this.texture?.format!==c.descriptor.depthStencil.format||this.color?.format!==c.format){
      this.onDeviceRestored();this.texture=c.device.createTexture({size:[c.width,c.height],format:c.descriptor.depthStencil.format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});
      this.color=c.device.createTexture({size:[c.width,c.height],format:c.format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});
-     this.target=new SceneTarget(c.device,this.color,this.texture,c.descriptor.multisample?.count??4);
+     this.target=new SceneTarget(c.device,this.color,this.texture,samples);
     }this.target.begin(c);
+    }catch(error){this.onDeviceRestored();throw error;}
    }});graph.add({name:this.name+':restore',order:10000,execute:c=>{if(c.backend==='webgpu'&&!this.borrowed&&c.descriptor.multisample?.count!==1)this.target.present(c);}});},
    onDeviceRestored(){this.target?.dispose();this.texture?.destroy();this.color?.destroy();this.target=this.texture=this.color=this.depthView=undefined;},
    dispose(){this.onDeviceRestored();delete engine[key];}

@@ -2,6 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {JSDOM} from 'jsdom';
 import {Input} from '../dist/index.js';
+
+test('constructor failure removes every listener installed before the failure', () => {
+  for (let failAt = 1; failAt <= 8; failAt++) {
+    const target = new EventTarget(), active = new Set(), failure = new Error(`listener ${failAt}`);
+    const add = target.addEventListener.bind(target), remove = target.removeEventListener.bind(target); let calls = 0;
+    target.addEventListener = (type, listener) => {if (++calls === failAt) throw failure; add(type, listener); active.add(listener);};
+    target.removeEventListener = (type, listener) => {remove(type, listener); active.delete(listener);};
+    assert.throws(() => new Input({jump: [{type: 'key', code: 'Space'}]}, {target, gamepads: () => []}), error => error === failure);
+    assert.equal(active.size, 0, `listener failure ${failAt} retained callbacks`);
+  }
+});
 test('semantic edges, opposite keys, gamepad deadzone and editable fields behave predictably', t => {
   const dom = new JSDOM('<body><input></body>'), pad = {axes: [0.1], buttons: [{value: 1}]}; t.after(() => dom.window.close());
   const input = new Input({move: [{type: 'key', code: 'KeyD'}, {type: 'key', code: 'KeyA', scale: -1}, {type: 'gamepad-axis', index: 0}], jump: [{type: 'gamepad-button', index: 0}]}, {target: dom.window, gamepads: () => [pad]}); t.after(() => input.dispose());

@@ -20,6 +20,18 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./bloom": {
+      "types": "./dist/bloom.d.ts",
+      "import": "./dist/bloom.js"
+    },
+    "./ssao": {
+      "types": "./dist/ssao.d.ts",
+      "import": "./dist/ssao.js"
+    },
+    "./scene-fade": {
+      "types": "./dist/scene-fade.d.ts",
+      "import": "./dist/scene-fade.js"
     }
   },
   "files": [

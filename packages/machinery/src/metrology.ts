@@ -1,5 +1,5 @@
 import type {Mesh,Vec3} from '@margoengine/core';
-import {worldAnchor,type Anchor} from './overlays.js';
+import {worldAnchor,type Anchor} from './anchors.js';
 const sub=(a:Vec3,b:Vec3):Vec3=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
 const dot=(a:Vec3,b:Vec3)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const cross=(a:Vec3,b:Vec3):Vec3=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];

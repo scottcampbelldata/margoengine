@@ -57,8 +57,7 @@ export function toGeometry(loaded: LoadedGeometry, options: ToGeometryOptions = 
   const positions = new Float32Array(used * 3), indices = new Uint32Array(triangles.length);
   for (let v = 0; v < vertexCount; v++) {const r = remap[v]; if (r >= 0) {positions[r * 3] = source[v * 3]; positions[r * 3 + 1] = source[v * 3 + 1]; positions[r * 3 + 2] = source[v * 3 + 2];}}
   for (let i = 0; i < triangles.length; i++) indices[i] = remap[triangles[i]];
-  const smooth = computeVertexNormals(positions, indices);
-  let normals = smooth;
+  let smooth: Float32Array | undefined, normals: Float32Array;
   if (mode === 'auto' && loaded.normals) {
     normals = new Float32Array(used * 3);
     for (let v = 0; v < vertexCount; v++) {
@@ -66,9 +65,12 @@ export function toGeometry(loaded: LoadedGeometry, options: ToGeometryOptions = 
       if (r < 0) continue;
       const x = loaded.normals[v * 3], y = loaded.normals[v * 3 + 1], z = loaded.normals[v * 3 + 2], length = Math.hypot(x, y, z);
       if (length > 0 && Number.isFinite(length)) {normals[r * 3] = x / length; normals[r * 3 + 1] = y / length; normals[r * 3 + 2] = z / length;}
-      else normals.set(smooth.subarray(r * 3, r * 3 + 3), r * 3);
+      else {
+        smooth ??= computeVertexNormals(positions, indices);
+        normals.set(smooth.subarray(r * 3, r * 3 + 3), r * 3);
+      }
     }
-  }
+  } else normals = computeVertexNormals(positions, indices);
   return build(positions, normals, indices);
 }
 

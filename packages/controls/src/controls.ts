@@ -74,7 +74,10 @@ export abstract class Controls extends EventDispatcher {
   }
   private pending: ControlElement | null;
   /** Subclasses call this at the end of their constructor, once their listener fields exist. */
-  protected init(): void {const element = this.pending; this.pending = null; if (element) this.connect(element);}
+  protected init(): void {
+    const element = this.pending; this.pending = null;
+    try {if (element) this.connect(element);} catch (error) {this.dispose(); throw error;}
+  }
 
   /** Short name used in plugin names. */
   protected get kind(): string {return 'controls';}
@@ -86,7 +89,9 @@ export abstract class Controls extends EventDispatcher {
     if (this.disposed) throw new Error('Controls are disposed');
     this.disconnect();
     this.element = element;
-    for (const [target, type, listener, options] of this.bind(element)) {target.addEventListener(type, listener, options); this.bindings.push([target, type, listener, options]);}
+    try {
+      for (const [target, type, listener, options] of this.bind(element)) {target.addEventListener(type, listener, options); this.bindings.push([target, type, listener, options]);}
+    } catch (error) {this.disconnect(); throw error;}
   }
   disconnect(): void {
     this.onDisconnect();

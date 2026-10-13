@@ -1,6 +1,6 @@
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph} from '@margoengine/core/extension';
-import {ToonShading,type ToonOptions} from '@margoengine/creative';
+import {ToonShading,type ToonOptions} from '@margoengine/creative/toon';
 import {meshVertex} from '../../shared/gpu.js';
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
 export {ToonShading};
@@ -16,10 +16,11 @@ export class Toon implements EnginePlugin {
  registerPasses(graph:FrameGraph):void {
   this.shading.registerPasses(graph);
   graph.add({name:'toon:hull',order:1,execute:c=>{if(c.backend!=='webgpu'||!this.values[3])return;
-   if(this.format!==c.format){const code=meshVertex.replace('let p=model*vec4f(i.position,1);',
+   const format=c.format+':'+(c.descriptor.multisample?.count??1)+':'+c.descriptor.depthStencil!.format;
+   if(this.format!==format){const code=meshVertex.replace('let p=model*vec4f(i.position,1);',
     'let normal=normalize(mat3x3f(cross(i.m1.xyz,i.m2.xyz),cross(i.m2.xyz,i.m0.xyz),cross(i.m0.xyz,i.m1.xyz))*i.normal*sign(dot(i.m0.xyz,cross(i.m1.xyz,i.m2.xyz))));let p=model*vec4f(i.position,1)+vec4f(normal*outline.w,0);')+
     '@group(0) @binding(1) var<uniform> outline:vec4f; @fragment fn fragment(i:Output)->@location(0) vec4f{return vec4f(outline.rgb,1);}';
-    const module=c.device.createShaderModule({code});this.pipeline=c.device.createRenderPipeline({...c.descriptor,layout:'auto',vertex:{...c.descriptor.vertex,module},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]},primitive:{...c.descriptor.primitive,cullMode:'front'},depthStencil:{...c.descriptor.depthStencil!,depthWriteEnabled:false}});this.format=c.format;
+    const module=c.device.createShaderModule({code});this.pipeline=c.device.createRenderPipeline({...c.descriptor,layout:'auto',vertex:{...c.descriptor.vertex,module},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]},primitive:{...c.descriptor.primitive,cullMode:'front'},depthStencil:{...c.descriptor.depthStencil!,depthWriteEnabled:false}});this.format=format;
    }
    c.draw({pipeline:this.pipeline!,clear:false,bindings:[{binding:1,resource:{buffer:this.buffer!}}]});
   }});

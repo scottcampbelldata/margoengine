@@ -42,7 +42,7 @@ export class Animator implements EnginePlugin {
     let pose:Pose|undefined,total=0;
     for(let i=0;i<clips.length;i++)if(weights[i]>0){const sampled=this.sample(clips[i],this.time);total+=weights[i];pose=pose?this.mix(pose,sampled,weights[i]/total):sampled;}
     if(!pose)pose=clone(this.rest);
-    if(this.fade){const f=this.fade;f.elapsed+=delta;pose=this.mix(f.pose,pose,Math.min(1,f.elapsed/f.duration));if(f.elapsed>=f.duration)this.fade=undefined;}
+    if(this.fade){const f=this.fade;f.elapsed+=delta;pose=this.mix(clone(f.pose),pose,Math.min(1,f.elapsed/f.duration));if(f.elapsed>=f.duration)this.fade=undefined;}
     for(const layer of this.layers){this.validateLayer(layer);const sample=this.sample(layer.clip,this.time),reference=this.sample(layer.clip,layer.referenceTime??0,false);
       for(const i of layer.mask){for(let c=0;c<3;c++){pose.position[i][c]+=(sample.position[i][c]-reference.position[i][c])*layer.weight;pose.scale[i][c]*=1+(sample.scale[i][c]/reference.scale[i][c]-1)*layer.weight;}
         const weights=pose.weights.get(i),sampleWeights=sample.weights.get(i),referenceWeights=reference.weights.get(i);if(weights&&sampleWeights&&referenceWeights)for(let j=0;j<weights.length;j++)weights[j]+=(sampleWeights[j]-referenceWeights[j])*layer.weight;
@@ -60,7 +60,7 @@ export class Animator implements EnginePlugin {
     return pose;
   }
   private mix(a:Pose,b:Pose,weight:number):Pose {
-    const out=clone(a);for(let i=0;i<out.position.length;i++){for(let c=0;c<3;c++){out.position[i][c]=a.position[i][c]*(1-weight)+b.position[i][c]*weight;out.scale[i][c]=a.scale[i][c]*(1-weight)+b.scale[i][c]*weight;}out.rotation[i]=quaternionBlend(a.rotation[i],b.rotation[i],weight);}
+    const out=a;for(let i=0;i<out.position.length;i++){for(let c=0;c<3;c++){out.position[i][c]=a.position[i][c]*(1-weight)+b.position[i][c]*weight;out.scale[i][c]=a.scale[i][c]*(1-weight)+b.scale[i][c]*weight;}out.rotation[i]=quaternionBlend(a.rotation[i],b.rotation[i],weight);}
     for(const [id,values] of out.weights){const other=b.weights.get(id);if(other)for(let i=0;i<values.length;i++)values[i]=values[i]*(1-weight)+other[i]*weight;}return out;
   }
   private worldRotation(node:Mesh):number[] {const t=node.engine.store.transforms,parents=node.engine.store.parents;let q=[0,0,0,1];const chain:number[]=[];for(let id=node.id;id!==-1;id=parents[id])chain.push(id);for(const id of chain.reverse()){

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {Camera, Geometry} from '@margoengine/core';
+import {Camera, Geometry, box} from '@margoengine/core';
 import {MeshBVH, Raycaster, buildAsync, buildBVH, frustumPlanes, multiplyMatrices, invertMatrix, getGeometryBVH, setGeometryBVH, setMeshLayers, CONTAINED, INTERSECTED, NOT_INTERSECTED} from '../dist/index.js';
 import {closestPointTriangle, transformPoint} from '../dist/math.js';
 import {bruteBox, bruteClosest, bruteFrustum, bruteMeshMesh, bruteRay, bruteSphere, bumpySphere, parseObj, randomMatrix, randomRay, rng, soup} from './reference.js';
@@ -317,6 +317,17 @@ test('buildAsync falls back to a synchronous build without Worker and validates 
   assert.ok(data.nodes instanceof ArrayBuffer && data.index instanceof Uint32Array && data.triangles instanceof Uint32Array);
 });
 
+test('buildAsync cancellation before the SSR microtask avoids reading or building geometry', async () => {
+  assert.equal(typeof Worker, 'undefined');
+  const controller = new AbortController(), reason = new Error('cancelled before building');
+  let reads = 0;
+  const source = {get positions() {reads++; return meshes.cow.positions;}, indices: meshes.cow.indices};
+  const pending = buildAsync(source, {signal: controller.signal});
+  controller.abort(reason);
+  await assert.rejects(pending, error => error === reason);
+  assert.equal(reads, 0, 'a cancelled fallback must not normalize or build large geometry');
+});
+
 test('importing the package touches no browser globals (SSR safe)', () => {
   const script = `for (const name of ['window','document','navigator','Worker','GPUBufferUsage','requestAnimationFrame']) Object.defineProperty(globalThis, name, {get() {throw new Error('touched ' + name);}, configurable: true});
     const m = await import(${JSON.stringify(new URL('../dist/index.js', import.meta.url).href)}); new m.Raycaster(); console.log('ok');`;
@@ -429,4 +440,36 @@ test('Raycaster.setFromCamera inverts the reversed-Z WebGPU and the WebGL view-p
   assert.ok(Math.abs(raycaster.direction[2] + 1) < 1e-6);
   const inverse = invertMatrix([2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 4, 0, 1, 2, 3, 1]);
   assert.ok(Math.abs(inverse[0] - 0.5) < 1e-12 && Math.abs(inverse[12] + 0.5) < 1e-12);
+});
+
+test('Raycaster sphere pruning remains conservative under shear and mirrored shear', () => {
+  const geometry = box(), raycaster = new Raycaster();
+  for (const sign of [1, -1]) {
+    const engine = mockEngine(), matrix = new Float32Array([sign, 0, 0, 0, sign, .2, 0, 0, sign, 0, .2, 0, 0, 0, 0, 1]);
+    const mesh = engine.add(geometry, matrix), positions = new Float64Array(geometry.vertices.length / 2);
+    for (let v = 0; v < positions.length / 3; v++) transformPoint(matrix, ...geometry.vertices.subarray(v * 6, v * 6 + 3), positions, v * 3);
+    const origin = [sign * 1.3, .09, 2], direction = [0, 0, -1], reference = bruteRay({positions, indices: geometry.indices}, {origin, direction});
+    assert.ok(reference.length, 'The ray intersects the sheared box outside the longest-column sphere');
+    raycaster.set(origin, direction);
+    for (const firstHitOnly of [false, true]) {
+      raycaster.firstHitOnly = firstHitOnly;
+      const hits = raycaster.intersectEngine(engine);
+      assert.equal(hits.length, firstHitOnly ? 1 : reference.length);
+      assert.ok(close(hits[0].distance, reference[0].distance, 1e-6));
+      assert.equal(hits[0].mesh, mesh);
+    }
+  }
+});
+
+test('MeshBVH.build converts each plain attribute stream once without changing storage or queries', () => {
+  const source = {positions: Array.from(meshes.sphere.positions), normals: Array.from(meshes.sphere.normals), indices: Array.from(meshes.sphere.indices)};
+  const from = Float32Array.from, conversions = new Map();
+  let bvh;
+  Float32Array.from = function(input, ...args) {conversions.set(input, (conversions.get(input) ?? 0) + 1); return from.call(this, input, ...args);};
+  try {bvh = MeshBVH.build(source);} finally {Float32Array.from = from;}
+  assert.equal(conversions.get(source.positions), 1, 'Do not copy positions while extracting indices or wrapping the built BVH');
+  assert.equal(conversions.get(source.normals), 1, 'Do not repeat normal stream conversion');
+  const typed = MeshBVH.build(meshes.sphere);
+  assert.deepEqual(bvh.serialize(), typed.serialize());
+  assert.deepEqual(bvh.raycast({origin: [0, 0, 3], direction: [0, 0, -1]}), typed.raycast({origin: [0, 0, 3], direction: [0, 0, -1]}));
 });

@@ -20,6 +20,58 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./cad": {
+      "types": "./dist/cad.d.ts",
+      "import": "./dist/cad.js"
+    },
+    "./cad-async": {
+      "types": "./dist/cad-async.d.ts",
+      "import": "./dist/cad-async.js"
+    },
+    "./kinematics": {
+      "types": "./dist/kinematics.d.ts",
+      "import": "./dist/kinematics.js"
+    },
+    "./surface": {
+      "types": "./dist/surface.d.ts",
+      "import": "./dist/surface.js"
+    },
+    "./telemetry": {
+      "types": "./dist/telemetry.d.ts",
+      "import": "./dist/telemetry.js"
+    },
+    "./section": {
+      "types": "./dist/section.d.ts",
+      "import": "./dist/section.js"
+    },
+    "./assembly": {
+      "types": "./dist/assembly.d.ts",
+      "import": "./dist/assembly.js"
+    },
+    "./metrology": {
+      "types": "./dist/metrology.d.ts",
+      "import": "./dist/metrology.js"
+    },
+    "./spatial": {
+      "types": "./dist/spatial.d.ts",
+      "import": "./dist/spatial.js"
+    },
+    "./clearance": {
+      "types": "./dist/clearance.d.ts",
+      "import": "./dist/clearance.js"
+    },
+    "./materials": {
+      "types": "./dist/materials.d.ts",
+      "import": "./dist/materials.js"
+    },
+    "./overlays": {
+      "types": "./dist/overlays.d.ts",
+      "import": "./dist/overlays.js"
+    },
+    "./exploded": {
+      "types": "./dist/exploded.d.ts",
+      "import": "./dist/exploded.js"
     }
   },
   "files": [

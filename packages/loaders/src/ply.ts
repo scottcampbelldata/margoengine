@@ -99,7 +99,7 @@ export function parsePLY(input: BinaryInput, options: PLYOptions = {}): LoadedGe
   const colorScale = hasColors ? [cr, cg, cb].map(i => UNIT[props[i].type] ?? 1) : [1, 1, 1];
   const indices = uints(faceElement ? faceElement.count * 3 : 0);
   const row = new Float64Array(Math.max(1, ...header.elements.map(e => e.properties.length)));
-  const polygon = new Float64Array(MAX_POLYGON);
+  let polygon = new Float64Array(0);
   const storeVertex = (i: number): void => {
     positions[i * 3] = row[px]; positions[i * 3 + 1] = row[py]; positions[i * 3 + 2] = row[pz];
     if (normals) {normals[i * 3] = row[nx]; normals[i * 3 + 1] = row[ny]; normals[i * 3 + 2] = row[nz];}
@@ -111,6 +111,7 @@ export function parsePLY(input: BinaryInput, options: PLYOptions = {}): LoadedGe
   const at = (corner: number): number => polygon[corner];
   const checkCorners = (count: number): void => {
     if (!Number.isSafeInteger(count) || count < 0 || count > MAX_POLYGON) throw new LoaderError(F, 'range', `invalid list length ${count}`);
+    if (count > polygon.length) polygon = new Float64Array(Math.min(MAX_POLYGON, Math.max(count, polygon.length * 2, 16)));
   };
 
   if (header.format === 'ascii') {

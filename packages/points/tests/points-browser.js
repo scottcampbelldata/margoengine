@@ -159,6 +159,8 @@ window.runPointTests = async () => {
   assert(green(image.at(...lifted)) && !green(image.at(128, 128)), 'Attached cloud did not follow the mesh');
   anchor.visible = false; image = await frame();
   assert(!green(image.at(...lifted)), 'Cloud attached to a hidden mesh still draws');
+  anchor.visible=true;const parent=engine.createMesh();anchor.setParent(parent);parent.visible=false;image=await frame();
+  assert(!green(image.at(...lifted)), 'Cloud attached below a hidden ancestor still draws');parent.visible=true;image=await frame();assert(green(image.at(...lifted)), 'Cloud did not return when its ancestor became visible');
   marker.dispose(); anchor.dispose();
   await settle(runtime.gpu);
   report.checks.push('Points behind a mesh are hidden (greater-equal), opaque points occlude each other, attached clouds follow the mesh');

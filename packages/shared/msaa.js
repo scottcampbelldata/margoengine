@@ -28,18 +28,19 @@ export class SceneTarget {
  begin(c){
   Object.assign(this.original??={},{color:c.color,depth:c.depth,format:c.format,descriptor:c.descriptor,owner:sceneTarget(c)});
   c.color=this.color;c.depth=this.depth;c.format=this.resolvedColor.format;
-  if(this.baseDescriptor!==c.descriptor){this.baseDescriptor=c.descriptor;this.descriptor={...c.descriptor,multisample:{count:this.samples}};}
+  if(this.baseDescriptor!==c.descriptor){this.baseDescriptor=c.descriptor;this.descriptor={...c.descriptor,depthStencil:{...c.descriptor.depthStencil,format:this.resolvedDepth.format},multisample:{count:this.samples}};}
   c.descriptor=this.descriptor;c[owner]=this;
   this.retired=false;
  }
- copyDepth(encoder,view,count){
-  let cached=this.pipelines.get(count);
+ copyDepth(encoder,view,count,format=this.resolvedDepth.format){
+  let formats=this.pipelines.get(count);if(!formats)this.pipelines.set(count,formats=new Map());
+  let cached=formats.get(format);
   if(!cached){
    // Preserve each reversed-Z coverage sample when returning to an outer scene.
    const code=count===4?depthShader.replace('p:vec4f)','p:vec4f,@builtin(sample_index) sample:u32)').replace(/return max[^;]+;/,'return textureLoad(source,q,i32(sample));'):depthShader;
    const module=this.device.createShaderModule({code});
-   const pipeline=this.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[]},depthStencil:{format:this.resolvedDepth.format,depthWriteEnabled:true,depthCompare:'always'},multisample:{count}});
-   cached={pipeline,group:group(this.device,pipeline,this.depthSource),descriptor:{colorAttachments:[],depthStencilAttachment:{view,depthLoadOp:'clear',depthClearValue:0,depthStoreOp:'store',stencilReadOnly:true}}};this.pipelines.set(count,cached);
+   const pipeline=this.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[]},depthStencil:{format,depthWriteEnabled:true,depthCompare:'always'},multisample:{count}});
+   cached={pipeline,group:group(this.device,pipeline,this.depthSource),descriptor:{colorAttachments:[],depthStencilAttachment:{view,depthLoadOp:'clear',depthClearValue:0,depthStoreOp:'store',stencilReadOnly:true}}};formats.set(format,cached);
   }
   cached.descriptor.depthStencilAttachment.view=view;const pass=encoder.beginRenderPass(cached.descriptor);
   pass.setPipeline(cached.pipeline);pass.setBindGroup(0,cached.group);pass.draw(3);pass.end();
@@ -47,21 +48,22 @@ export class SceneTarget {
  resolve(encoder,final=false){
   if(this.samples===1)return;
   this.copyDepth(encoder,this.resolvedDepthView,1);
-  if(final){if(this.original)this.copyDepth(encoder,this.original.depth,this.original.descriptor.multisample?.count??1);this.retired=true;}
+  if(final){if(this.original)this.copyDepth(encoder,this.original.depth,this.original.descriptor.multisample?.count??1,this.original.descriptor.depthStencil.format);this.retired=true;}
   encoder.beginRenderPass(final?this.finalResolution:this.resolution).end();
  }
  restore(c){
   const original=this.original;
-  if(this.samples===1){Object.assign(c,{color:original.color,format:original.format,descriptor:original.descriptor});c[owner]=original.owner;return;}
-  if(!this.retired)this.copyDepth(c.encoder,original.depth,original.descriptor.multisample?.count??1);
+  if(this.samples===1){Object.assign(c,{color:original.color,depth:original.depth,format:original.format,descriptor:original.descriptor});c[owner]=original.owner;return;}
+  if(!this.retired)this.copyDepth(c.encoder,original.depth,original.descriptor.multisample?.count??1,original.descriptor.depthStencil.format);
   Object.assign(c,{color:original.color,depth:original.depth,format:original.format,descriptor:original.descriptor});c[owner]=original.owner;
  }
  present(c){
   this.resolve(c.encoder,true);this.restore(c);
-  if(!this.presentation||this.presentationFormat!==c.format){
+  const samples=c.descriptor.multisample?.count??1;
+  if(!this.presentation||this.presentationFormat!==c.format||this.presentationSamples!==samples){
    const module=this.device.createShaderModule({code:fullscreen+'@group(0) @binding(0) var source:texture_2d<f32>;@fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f{return textureLoad(source,vec2i(p.xy),0);}'});
    this.presentation=this.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]},multisample:c.descriptor.multisample});
-   this.presentationGroup=group(this.device,this.presentation,this.resolvedColor.createView());this.presentationFormat=c.format;
+   this.presentationGroup=group(this.device,this.presentation,this.resolvedColor.createView());this.presentationFormat=c.format;this.presentationSamples=samples;
   }
   const descriptor=this.presentationPass??={colorAttachments:[{view:c.color,loadOp:'clear',storeOp:'store'}]};descriptor.colorAttachments[0].view=c.color;
   const pass=c.encoder.beginRenderPass(descriptor);pass.setPipeline(this.presentation);pass.setBindGroup(0,this.presentationGroup);pass.draw(3);pass.end();

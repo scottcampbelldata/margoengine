@@ -20,6 +20,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./asset": {
+      "types": "./dist/asset-entry.d.ts",
+      "import": "./dist/asset-entry.js"
     }
   },
   "files": [

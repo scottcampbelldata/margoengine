@@ -2,7 +2,7 @@ import {meshRuntime} from '@margoengine/core/extension';
 import type {Mesh,Vec3} from '@margoengine/core';
 import {machineryMemory} from './runtime.js';
 import {vertexAnchor,holeAnchor,edgeAnchor} from './metrology.js';
-import {worldAnchor,type Anchor} from './overlays.js';
+import {worldAnchor,type Anchor} from './anchors.js';
 export interface RayHit {node:Mesh;triangle:number;distance:number;point:Vec3}
 export class AssemblyBVH {
   private disposed=false;private valid=false;private readonly triangles:Float32Array;private readonly result:Float64Array;

@@ -83,8 +83,11 @@ function attributes(source: GeometryLike | TriangleSource): Attributes {
 /** Triangle source description handed to the build worker. */
 export function sourceArrays(source: GeometryLike | TriangleSource): {positions: Float32Array; stride: number; indices: Uint32Array | null} {
   const a = attributes(source);
-  const indices = isGeometry(source) ? source.indices : source.indices ? source.indices instanceof Uint32Array ? source.indices : Uint32Array.from(source.indices) : null;
-  return {positions: a.positions, stride: a.stride, indices};
+  return {positions: a.positions, stride: a.stride, indices: sourceIndices(source)};
+}
+
+function sourceIndices(source: GeometryLike | TriangleSource): Uint32Array | null {
+  return isGeometry(source) ? source.indices : source.indices ? source.indices instanceof Uint32Array ? source.indices : Uint32Array.from(source.indices) : null;
 }
 
 /**
@@ -115,8 +118,9 @@ export class MeshBVH {
 
   /** Builds a BVH synchronously from a Geometry or raw positions and indices. */
   static build(source: GeometryLike | TriangleSource, options?: BVHBuildOptions): MeshBVH {
-    const a = attributes(source), {indices} = sourceArrays(source);
-    return new MeshBVH(buildBVH(a.positions, a.stride, indices, options), source);
+    const a = attributes(source), indices = sourceIndices(source);
+    // Preserve geometry identity and reuse already converted raw attributes when wrapping the result.
+    return new MeshBVH(buildBVH(a.positions, a.stride, indices, options), isGeometry(source) ? source : {positions: a.positions, stride: a.stride, normals: a.normals});
   }
 
   /** Restores a BVH from `serialize()` output. The source supplies positions (and normals); its indices are not needed. */

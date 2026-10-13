@@ -6,7 +6,7 @@ import {Water} from '@margoengine/water';
 import {VFX} from '@margoengine/vfx';
 import {Input} from '@margoengine/input';
 import {Cinematic} from '@margoengine/cinematic';
-import {Bloom} from '@margoengine/post';
+import {Bloom} from '@margoengine/post/bloom';
 import {Stats} from '@margoengine/stats';
 import {poseHumanoid} from '@margoengine/procedural';
 import {Clustered} from '@margoengine/clustered';

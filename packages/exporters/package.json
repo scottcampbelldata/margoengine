@@ -23,6 +23,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./usdz": {
+      "types": "./dist/usdz.d.ts",
+      "import": "./dist/usdz.js"
     }
   },
   "files": [

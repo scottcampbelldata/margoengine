@@ -1,4 +1,5 @@
 import {geometryData, sequentialIndices, type GeometryData} from './data.js';
+import {finiteNumber} from './math.js';
 
 type V3 = [number, number, number];
 
@@ -10,7 +11,7 @@ type V3 = [number, number, number];
  */
 export function polyhedronGeometry(vertices: readonly number[], indices: readonly number[], radius = 1, detail = 0, smooth = detail >= 1): GeometryData {
   if (typeof smooth !== 'boolean') throw new TypeError('Expected boolean polyhedron smoothing');
-  const cols = Math.max(0, Math.floor(detail)) + 1, out: number[] = [];
+  const cols = Math.max(0, Math.floor(finiteNumber(detail))) + 1, out: number[] = [];
   const at = (i: number): V3 => [vertices[i * 3], vertices[i * 3 + 1], vertices[i * 3 + 2]];
   const mix = (a: V3, b: V3, t: number): V3 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
   for (let f = 0; f < indices.length; f += 3) {

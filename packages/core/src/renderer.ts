@@ -97,7 +97,7 @@ export class GPURenderer implements Renderer {
     const resource=this.resources.get(geometry); if(!resource)return;
     resource.vertex.destroy(); resource.index.destroy(); resource.instance.destroy();resource.indirect?.destroy(); this.resources.delete(geometry);
   }
-  geometryBuffers(geometry:Geometry):GeometryBuffers {const resource=this.resources.get(geometry);if(this.disposed||this.deviceLost||!resource)throw new Error('Geometry buffers unavailable');return resource;}
+  geometryBuffers(geometry:Geometry):GeometryBuffers {const resource=this.resources.get(geometry);if(this.disposed||this.deviceLost||!resource)throw new Error('Geometry unavailable');return resource;}
   render(camera: Camera, lighting: Lighting, batches: Iterable<Batch>,graph:FrameGraph,delta:number): void {
     if(this.deviceLost||this.disposed)return;
     try{this.renderFrame(camera,lighting,batches,graph,delta);}catch(error){
@@ -123,20 +123,24 @@ export class GPURenderer implements Renderer {
     const context=this.passContext!;
     let pipeline=options.pipeline??this.pipeline;const bindings=options.bindings??context.bindings;
     if(!options.pipeline&&(context.shader!==wgsl||context.format!==this.format||context.descriptor!==this.descriptor)){
-      const key=context.descriptor.multisample?.count+context.format+context.shader;let cached=this.variants.get(key);
-      if(!cached){if(this.variants.size>=64)throw new RangeError('Shader variant limit');const module=this.device.createShaderModule({code:context.shader});cached=this.device.createRenderPipeline({...context.descriptor,vertex:{...this.descriptor.vertex,module},fragment:{...this.descriptor.fragment!,module,targets:[{format:context.format}]}});this.variants.set(key,cached);}pipeline=cached;
+      const key=context.descriptor.multisample?.count+context.format+context.descriptor.depthStencil?.format+context.shader;let cached=this.variants.get(key);
+      if(!cached){if(this.variants.size>=64)throw new RangeError('Shader limit: 64');const module=this.device.createShaderModule({code:context.shader});cached=this.device.createRenderPipeline({...context.descriptor,vertex:{...this.descriptor.vertex,module},fragment:{...this.descriptor.fragment!,module,targets:[{format:context.format}]}});this.variants.set(key,cached);}pipeline=cached;
     }
     let group=this.bindGroup;
-    if(pipeline!==this.pipeline||bindings.length){let cached=this.groups.get(pipeline);if(!cached||cached.bindings.length!==bindings.length||bindings.some((entry,i)=>entry.resource!==cached!.bindings[i].resource)){
-      cached={bindings:bindings.slice(),group:this.device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform}},...bindings]})};this.groups.set(pipeline,cached);}group=cached.group;}
+    if(pipeline!==this.pipeline||bindings.length){let cached=this.groups.get(pipeline);if(!cached||cached.bindings.length!==bindings.length||bindings.some((entry,i)=>{
+      const previous=cached!.bindings[i],resource=entry.resource as GPUBufferBinding,old=previous.resource as GPUBufferBinding;
+      return entry.binding!==previous.binding||(resource.buffer?resource.buffer!==old.buffer||resource.offset!==old.offset||resource.size!==old.size:resource!==old);
+    })){
+      const group=this.device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform}},...bindings]});
+      cached={bindings:bindings.map(({binding,resource})=>({binding,resource:(resource as GPUBufferBinding).buffer?{...resource}:resource})),group};this.groups.set(pipeline,cached);}group=cached.group;}
     const clear=options.clear??true;
     const descriptor=this.passDescriptor??={colorAttachments:[{view:context.color,clearValue:[0.018,0.023,0.035,1],loadOp:'clear',storeOp:'store'}],depthStencilAttachment:{view:context.depth,depthClearValue:0,depthLoadOp:'clear',depthStoreOp:'store'}};
-    const attachment=(descriptor.colorAttachments as GPURenderPassColorAttachment[])[0],depth=descriptor.depthStencilAttachment!;attachment.view=context.color;attachment.loadOp=clear?'clear':'load';depth.view=context.depth;depth.depthLoadOp=attachment.loadOp;
+    const attachments=descriptor.colorAttachments as GPURenderPassColorAttachment[],attachment=attachments[0],depth=descriptor.depthStencilAttachment!;attachment.view=context.color;attachment.loadOp=clear?'clear':'load';depth.view=context.depth;depth.depthLoadOp=attachment.loadOp;
     attachment.resolveTarget=context.color===this.views[0]?this.resolveTarget:undefined;
     // Later scene passes load MSAA color and depth until the final resolve.
     attachment.storeOp=depth.depthStoreOp=attachment.resolveTarget&&!this.preserveMSAA?'discard':'store';
-    descriptor.colorAttachments=[attachment,...options.colorAttachments??[]];
-    if(this.descriptor.depthStencil!.format.includes('stencil')){depth.stencilClearValue=options.stencilClear??0;depth.stencilLoadOp=clear||options.stencilClear!==undefined?'clear':'load';depth.stencilStoreOp=depth.depthStoreOp;}
+    attachments.length=1;if(options.colorAttachments)attachments.push(...options.colorAttachments);
+    const stencil=context.descriptor.depthStencil!.format.includes('stencil');depth.stencilClearValue=stencil?options.stencilClear??0:undefined;depth.stencilLoadOp=stencil?(clear||options.stencilClear!==undefined?'clear':'load'):undefined;depth.stencilStoreOp=stencil?depth.depthStoreOp:undefined;
     const pass=context.encoder.beginRenderPass(descriptor);
     pass.setPipeline(pipeline); pass.setBindGroup(0,group);
     for(const batch of drawBatches) if(batch.count) {
@@ -151,12 +155,14 @@ export class GPURenderer implements Renderer {
   }
   async pick(camera:Camera,lighting:Lighting,batches:Iterable<Batch>,graph:FrameGraph,x:number,y:number):Promise<number|null> {
     if(this.deviceLost||this.disposed)return null;if(this.picking)throw new Error('Pick pending');this.picking=true;
-    const device=this.device,color=device.createTexture({size:[1,1],format:'r32uint',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC}),depth=device.createTexture({size:[1,1],format:'depth32float',usage:GPUTextureUsage.RENDER_ATTACHMENT}),read=device.createBuffer({size:4,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+    let color:GPUTexture|undefined,depth:GPUTexture|undefined,read:GPUBuffer|undefined,uniform:GPUBuffer|undefined;
+    try {
+    const device=this.device;
+    color=device.createTexture({size:[1,1],format:'r32uint',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});depth=device.createTexture({size:[1,1],format:'depth32float',usage:GPUTextureUsage.RENDER_ATTACHMENT});read=device.createBuffer({size:4,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
     const matrix=camera.matrix.slice(),nx=2*(Math.floor(x)+0.5)/this.canvas.width-1,ny=1-2*(Math.floor(y)+0.5)/this.canvas.height;
     for(let c=0;c<4;c++){matrix[c*4]=(camera.matrix[c*4]-nx*camera.matrix[c*4+3])*this.canvas.width;matrix[c*4+1]=(camera.matrix[c*4+1]-ny*camera.matrix[c*4+3])*this.canvas.height;}
     const frame=new Float32Array(28);frame.set(matrix);frame.set(camera.position,16);frame.set(lighting.direction,20);frame.set(lighting.radiance,24);
-    const uniform=device.createBuffer({size:112,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});device.queue.writeBuffer(uniform,0,frame);
-    try {
+    uniform=device.createBuffer({size:112,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});device.queue.writeBuffer(uniform,0,frame);
       // Reuse shader pass hooks for fragment clipping; caps and FX draws are suppressed.
       const encoder=device.createCommandEncoder(),context:Extract<PassContext,{backend:'webgpu'}>={backend:'webgpu',device,encoder,color:color.createView(),depth:depth.createView(),camera,width:this.canvas.width,height:this.canvas.height,delta:0,format:this.format,shader:wgsl,bindings:[],indirect:false,descriptor:this.descriptor,draw:()=>{}};
       graph.prepare(context);
@@ -165,7 +171,7 @@ export class GPURenderer implements Renderer {
       const pass=encoder.beginRenderPass({colorAttachments:[{view:color.createView(),clearValue:[4294967295,0,0,0],loadOp:'clear',storeOp:'store'}],depthStencilAttachment:{view:depth.createView(),depthClearValue:0,depthLoadOp:'clear',depthStoreOp:'store'}});pass.setPipeline(pipeline);pass.setBindGroup(0,group);
       for(const batch of batches)if(batch.count){const r=this.resources.get(batch.geometry)!;device.queue.writeBuffer(r.instance,0,batch.instances as Float32Array<ArrayBuffer>,0,batch.count*24);r.frame=-1;pass.setVertexBuffer(0,r.vertex);pass.setVertexBuffer(1,r.instance);pass.setIndexBuffer(r.index,'uint32');pass.drawIndexed(batch.geometry.indices.length,batch.count);}pass.end();
       if(this.deviceLost||this.disposed)return null;encoder.copyTextureToBuffer({texture:color},{buffer:read},[1,1]);device.queue.submit([encoder.finish()]);await read.mapAsync(GPUMapMode.READ);const id=new Uint32Array(read.getMappedRange())[0];read.unmap();return id===4294967295?null:id;
-    }finally{uniform.destroy();color.destroy();depth.destroy();read.destroy();this.picking=false;}
+    }finally{uniform?.destroy();color?.destroy();depth?.destroy();read?.destroy();this.picking=false;}
   }
   dispose(unconfigure=true): void {
     if(this.disposed)return; this.disposed=true;
@@ -200,7 +206,7 @@ export class GLRenderer implements Renderer {
     this.program=program; this.camera=gl.getUniformLocation(program,'camera'); this.eye=gl.getUniformLocation(program,'eye'); this.light=gl.getUniformLocation(program,'light'); this.radiance=gl.getUniformLocation(program,'radiance');
   }
   add(geometry: Geometry, capacity: number): void {
-    const gl=this.gl,buffers:WebGLBuffer[]=[]; const vao=gl.createVertexArray(); if(!vao)throw new Error('GL vertex array');
+    const gl=this.gl,buffers:WebGLBuffer[]=[]; const vao=gl.createVertexArray(); if(!vao)throw new Error('GL VAO');
     try {
       gl.bindVertexArray(vao);
       const upload=(target:number,data:Float32Array|Uint32Array|number) => { const buffer=gl.createBuffer(); if(!buffer)throw new Error('GL buffer'); buffers.push(buffer); gl.bindBuffer(target,buffer); if(typeof data==='number')gl.bufferData(target,data,gl.DYNAMIC_DRAW);else gl.bufferData(target,data,gl.STATIC_DRAW);return buffer; };

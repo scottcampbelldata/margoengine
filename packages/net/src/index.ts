@@ -18,11 +18,15 @@ export class SnapshotBuffer {
   /** Timestamp and velocity use seconds. Duplicate/out-of-order packets are ignored. */
   push(time: number, position: ArrayLike<number>, rotation: ArrayLike<number> = identity, velocity: ArrayLike<number> = zero): boolean {
     if (!Number.isFinite(time)) throw new RangeError('Invalid snapshot timestamp'); valid(position, 3); valid(rotation, 4); valid(velocity, 3);
-    const length = Math.hypot(rotation[0], rotation[1], rotation[2], rotation[3]); if (!length) throw new RangeError('Zero snapshot quaternion');
+    let length = Math.hypot(rotation[0], rotation[1], rotation[2], rotation[3]); if (!length) throw new RangeError('Zero snapshot quaternion');
+    // Keep ordinary normalization exact; scale only overflowing or subnormal magnitudes.
+    const scale = Number.isFinite(length) && length >= 2.2250738585072014e-308 ? 1 : Math.max(Math.abs(rotation[0]), Math.abs(rotation[1]), Math.abs(rotation[2]), Math.abs(rotation[3]));
+    if (scale !== 1) length = Math.hypot(rotation[0] / scale, rotation[1] / scale, rotation[2] / scale, rotation[3] / scale);
     if (this.count && time <= this.samples[((this.head - 1 + this.capacity) % this.capacity) * 11]) return false;
     const offset = this.head * 11; this.samples[offset] = time;
     for (let i = 0; i < 3; i++) {this.samples[offset + 1 + i] = position[i]; this.samples[offset + 8 + i] = velocity[i];}
-    for (let i = 0; i < 4; i++) this.samples[offset + 4 + i] = rotation[i] / length;
+    if (scale === 1) for (let i = 0; i < 4; i++) this.samples[offset + 4 + i] = rotation[i] / length;
+    else for (let i = 0; i < 4; i++) this.samples[offset + 4 + i] = rotation[i] / scale / length;
     this.head = (this.head + 1) % this.capacity; this.count = Math.min(this.capacity, this.count + 1); return true;
   }
   sample(time: number, output: Snapshot = this.output): Snapshot | null {

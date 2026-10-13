@@ -135,6 +135,28 @@ test('PLY: point clouds without faces in every encoding', () => {
   }
 });
 
+test('PLY: polygon scratch grows with input instead of allocating the full polygon limit', () => {
+  const Native = globalThis.Float64Array, allocations = [];
+  globalThis.Float64Array = new Proxy(Native, {construct(target, args) {allocations.push(args[0]); return Reflect.construct(target, args, target);}});
+  try {
+    for (const format of ['ascii', 'binary_little_endian', 'binary_big_endian']) {
+      for (const faces of [false, true]) {
+        allocations.length = 0;
+        const {elements} = plyCube({faces, extra: false});
+        checkPLYCube(parsePLY(writePLY(format, elements)), {faces});
+        assert.ok(allocations.every(size => size <= 16), 'Small files must not allocate a 512 KiB polygon workspace');
+      }
+      allocations.length = 0;
+      const {elements} = plyCube({faces: false, extra: false}), polygon = Array.from({length: 300}, (_, i) => i % 8);
+      elements.push({name: 'face', properties: [{name: 'vertex_indices', list: ['ushort', 'uint']}], rows: [[polygon]]});
+      const loaded = parsePLY(writePLY(format, elements));
+      assert.equal(loaded.indices.length, 298 * 3);
+      assert.deepEqual([...loaded.indices.subarray(-3)], [0, polygon[298], polygon[299]]);
+      assert.ok(allocations.some(size => size >= polygon.length && size < 65536));
+    }
+  } finally {globalThis.Float64Array = Native;}
+});
+
 test('PLY: malformed headers, truncated data and limits', () => {
   const {elements} = plyCube();
   const good = writePLY('binary_little_endian', elements);
@@ -462,6 +484,8 @@ test('VTK: errors', () => {
   rejects(() => parseVTK(text(header + 'POINTS 3 float\n0 0 0 1 0 0 0 1 0\n')), 'header', /DATASET/);
   const binary = vtkBinary();
   rejects(() => parseVTK(binary.subarray(0, 120)), 'truncated');
+  const fractionalOffset = new TextDecoder().decode(vtkAscii('5.1')).replace('0 4 7\n', '0 4 6.5\n');
+  rejects(() => parseVTK(text(fractionalOffset)), 'range', /offsets/);
 });
 
 test('VTK: real pyvista polydata files', t => {
@@ -515,6 +539,44 @@ function writeZip(entries) {
   for (const part of [...locals, ...centrals, end]) {out.set(part, o); o += part.length;}
   return out;
 }
+
+test('ZIP: pre-aborted reads stop before decompression and invalid limits cannot bypass budgets', async () => {
+  const archive = writeZip([{name: 'stored', data: 'hello', method: 0}, {name: 'deflated', data: 'hello'.repeat(100), method: 8}]);
+  const entries = readZipDirectory(archive), signal = AbortSignal.abort();
+  const NativeDecompressionStream = globalThis.DecompressionStream;
+  let streams = 0;
+  globalThis.DecompressionStream = new Proxy(NativeDecompressionStream, {construct(target, args) {streams++; return Reflect.construct(target, args);}});
+  try {
+    rejects(() => readZipDirectory(archive, {signal}), 'aborted');
+    for (const entry of entries) await rejectsAsync(readZipEntry(archive, entry, {signal}), 'aborted');
+    assert.equal(streams, 0, 'pre-aborted compressed reads must not create a stream');
+    rejects(() => readZipDirectory(archive, {maxEntries: NaN}), 'range', /maxEntries/);
+    await rejectsAsync(readZipEntry(archive, entries[0], {maxEntryBytes: NaN}), 'range', /maxEntryBytes/);
+    assert.equal(readZipDirectory(archive, {maxEntries: Infinity}).length, 2);
+    assert.equal((await readZipEntry(archive, entries[0], {maxEntryBytes: Infinity})).length, 5);
+    assert.deepEqual(readZipDirectory(writeZip([]), {maxEntries: 0}), []);
+    const empty = writeZip([{name: 'empty', data: '', method: 0}]);
+    assert.equal((await readZipEntry(empty, readZipDirectory(empty)[0], {maxEntryBytes: 0})).length, 0);
+  } finally {globalThis.DecompressionStream = NativeDecompressionStream;}
+});
+
+test('ZIP: central-directory extra fields and comments must fit inside the declared directory', () => {
+  const archive = writeZip([{name: 'x', data: 'payload', method: 0}]);
+  const cdOffset = new DataView(archive.buffer).getUint32(archive.length - 6, true);
+  for (const field of [30, 32]) {
+    const invalid = archive.slice();
+    new DataView(invalid.buffer).setUint16(cdOffset + field, 1, true);
+    rejects(() => readZipDirectory(invalid), 'zip', /overflows/);
+  }
+  const extra = new Uint8Array(archive.length + 5);
+  extra.set(archive.subarray(0, archive.length - 22));
+  extra.set([1, 0, 0, 0, 65], archive.length - 22);
+  extra.set(archive.subarray(archive.length - 22), archive.length - 17);
+  const view = new DataView(extra.buffer);
+  view.setUint16(cdOffset + 30, 4, true); view.setUint16(cdOffset + 32, 1, true);
+  view.setUint32(extra.length - 10, view.getUint32(extra.length - 10, true) + 5, true);
+  assert.deepEqual(readZipDirectory(extra), readZipDirectory(archive), 'valid extra fields and comments remain supported');
+});
 
 test('ZIP: stored and deflate entries, CRC-32, corrupt and hostile archives', async () => {
   const big = 'abc'.repeat(5000);
@@ -652,6 +714,15 @@ test('3MF: malformed packages and models are rejected with clear errors', async 
   await rejectsAsync(parse3MF(wrap('<item objectid="1"/>'), {signal: controller.signal}), 'aborted');
 });
 
+test('3MF: invalid component depth budgets reject without bypassing traversal limits', async () => {
+  const archive=package3MF(modelXML({items:'<item objectid="3"/>'}));
+  for(const maxDepth of [NaN,Infinity,-1,0.5])await rejectsAsync(parse3MF(archive,{maxDepth}),'range',/maxDepth/);
+  await rejectsAsync(parse3MF(archive,{maxDepth:0}),'limit',/deeper/);
+  const direct=package3MF(modelXML({items:'<item objectid="1"/>'}));
+  assert.equal((await parse3MF(direct,{maxDepth:0})).indices.length,12,'zero depth still supports direct build items');
+  assert.equal((await parse3MF(archive,{maxDepth:64})).indices.length,24,'valid larger budgets preserve component output');
+});
+
 test('3MF: real three.js packages agree with an independent zlib + regex read', async t => {
   const gears = fixture('cube_gears.3mf'), faces = fixture('facecolors.3mf'), vertex = fixture('vertexcolors.3mf');
   if (!gears || !faces || !vertex) return t.skip('fixtures missing');
@@ -688,6 +759,25 @@ test('3MF: real three.js packages agree with an independent zlib + regex read', 
 });
 
 // ---------------------------------------------------------------- geometry, detection, fetch
+
+test('toGeometry avoids generating unused smooth normals and keeps invalid-normal fallback', () => {
+  const loaded = {kind: 'mesh', positions: Float32Array.of(0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0), indices: Uint32Array.of(0, 1, 2, 0, 2, 3), normals: Float32Array.of(0, 2, 0, 0, 2, 0, 0, 2, 0, 0, 2, 0)};
+  const Native = globalThis.Float64Array, allocations = [];
+  globalThis.Float64Array = new Proxy(Native, {construct(target, args) {allocations.push(args[0]); return Reflect.construct(target, args, target);}});
+  try {
+    const valid = toGeometry(loaded);
+    assert.deepEqual(allocations, [], 'Valid file normals need no smooth-normal accumulation buffer or triangle traversal');
+    for (let i = 0; i < 4; i++) assert.deepEqual([...valid.vertices.subarray(i * 6 + 3, i * 6 + 6)], [0, 1, 0]);
+    loaded.normals.fill(0, 3, 9);
+    const fallback = toGeometry(loaded);
+    assert.deepEqual(allocations, [12], 'Multiple invalid normals share one fallback computation');
+    assert.deepEqual([...fallback.vertices.subarray(9, 12)], [0, 0, 1]);
+    assert.deepEqual([...fallback.vertices.subarray(15, 18)], [0, 0, 1]);
+    assert.deepEqual([...fallback.vertices.subarray(3, 6)], [0, 1, 0]);
+    toGeometry(loaded, {normals: 'smooth'});
+    assert.deepEqual(allocations, [12, 12], 'Explicit smooth mode still computes normals');
+  } finally {globalThis.Float64Array = Native;}
+});
 
 test('toGeometry: smooth, flat, file normals, groups, compaction and errors', () => {
   const quad = {kind: 'mesh', positions: Float32Array.of(0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 5, 5, 5), indices: Uint32Array.of(0, 1, 2, 0, 2, 3)};

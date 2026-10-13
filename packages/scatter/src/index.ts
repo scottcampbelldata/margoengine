@@ -3,6 +3,7 @@ export {ScatterInstances, type ScatterBatch} from './instances.js';
 export {randomPlacements, radialPlacements} from './candidates.js';
 export {PlacementLayout, spacePlacements, clearPlacements, placementBounds, instanceTransforms, groundTransforms, type GroundPlacement, type GroundBounds, type GroundCircle, type Placement} from './placement.js';
 import {windShader,validateWind,type ScatterWind} from './wind.js';
+import {sameBindings,snapshotBindings} from './bindings.js';
 export type {ScatterWind} from './wind.js';
 import {validateExclusions, type GroundBounds} from './placement.js';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
@@ -119,8 +120,9 @@ export class Scatter implements EnginePlugin {
   if(this.options.material){this.pbrUniform=d.createBuffer({size:112,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});this.materialUniform=d.createBuffer({size:48,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});this.materialValues.set(this.options.material.data);}
   this.commands=d.createBuffer({size:60,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.INDIRECT|GPUBufferUsage.COPY_DST});
   const commands=new Uint32Array(15);for(let i=0;i<3;i++){const g=this.geometries[i];commands[i*5]=g.indices.length;
-   const v=d.createBuffer({size:g.vertices.byteLength,usage:GPUBufferUsage.VERTEX|GPUBufferUsage.COPY_DST}),index=d.createBuffer({size:g.indices.byteLength,usage:GPUBufferUsage.INDEX|GPUBufferUsage.COPY_DST});
-   this.vertices.push(v);this.indices.push(index);d.queue.writeBuffer(v,0,g.vertices as Float32Array<ArrayBuffer>);d.queue.writeBuffer(index,0,g.indices as Uint32Array<ArrayBuffer>);
+   const v=d.createBuffer({size:g.vertices.byteLength,usage:GPUBufferUsage.VERTEX|GPUBufferUsage.COPY_DST});this.vertices.push(v);
+   const index=d.createBuffer({size:g.indices.byteLength,usage:GPUBufferUsage.INDEX|GPUBufferUsage.COPY_DST});this.indices.push(index);
+   d.queue.writeBuffer(v,0,g.vertices as Float32Array<ArrayBuffer>);d.queue.writeBuffer(index,0,g.indices as Uint32Array<ArrayBuffer>);
    this.instances.push(d.createBuffer({size:this.count*32,usage:GPUBufferUsage.STORAGE}));
   }d.queue.writeBuffer(this.commands,0,commands);
   this.fallback=d.createTexture({size:[1,1],format:'r32float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});d.queue.writeTexture({texture:this.fallback},new Float32Array(1),{bytesPerRow:4},[1,1]);this.compute=compute(d,cull);
@@ -143,11 +145,10 @@ export class Scatter implements EnginePlugin {
   if(lit){
    this.materialValues.set(this.options.material!.data);this.materialValues.set(this.values.subarray(68,72),8);c.device.queue.writeBuffer(this.materialUniform!,0,this.materialValues as Float32Array<ArrayBuffer>);
    if(this.pbrShader!==c.shader){this.pipelines.clear();this.renderGroups.clear();this.pbrGroups.clear();this.pbrShader=c.shader;}
-   let changed=this.pbrBindings.length!==c.bindings.length;for(let i=0;!changed&&i<this.pbrBindings.length;i++)changed=this.pbrBindings[i].resource!==c.bindings[i].resource;
-   if(changed){this.pbrGroups.clear();this.pbrBindings=c.bindings.slice();}
+   if(!sameBindings(this.pbrBindings,c.bindings)){this.pbrGroups.clear();this.pbrBindings=snapshotBindings(c.bindings);}
    this.pbrValues.set(c.camera.matrix);this.pbrValues.set(c.camera.position,16);this.pbrValues.set(this.engine!.lighting.direction,20);this.pbrValues.set(this.engine!.lighting.radiance,24);c.device.queue.writeBuffer(this.pbrUniform!,0,this.pbrValues as Float32Array<ArrayBuffer>);
   }
-  const key=c.format+':'+c.descriptor.multisample?.count;let pipeline=this.pipelines.get(key);if(!pipeline){const code=lit?c.shader.replace(/struct Input \{[^}]+\}/,'').replace('@location(3) material:vec4f','@location(3) material:vec4f,@location(4) @interpolate(flat) lodFade:vec2f').replace(/@vertex fn vertex\([\s\S]*?(?=@fragment)/,pbrVertex).replace(/(@fragment fn fragment[^{]+\{)/,'$1\n if(!lodVisible(i.clip.xy,i.lodFade)){discard;}')+fadeCode:renderCode;const module=c.device.createShaderModule({code});pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:24,attributes:[{shaderLocation:0,offset:0,format:'float32x3'},{shaderLocation:1,offset:12,format:'float32x3'}]}]},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]},multisample:c.descriptor.multisample,depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:true,depthCompare:'greater-equal'}});this.pipelines.set(key,pipeline);}
+  const key=c.format+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format;let pipeline=this.pipelines.get(key);if(!pipeline){const code=lit?c.shader.replace(/struct Input \{[^}]+\}/,'').replace('@location(3) material:vec4f','@location(3) material:vec4f,@location(4) @interpolate(flat) lodFade:vec2f').replace(/@vertex fn vertex\([\s\S]*?(?=@fragment)/,pbrVertex).replace(/(@fragment fn fragment[^{]+\{)/,'$1\n if(!lodVisible(i.clip.xy,i.lodFade)){discard;}')+fadeCode:renderCode;const module=c.device.createShaderModule({code});pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:24,attributes:[{shaderLocation:0,offset:0,format:'float32x3'},{shaderLocation:1,offset:12,format:'float32x3'}]}]},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]},multisample:c.descriptor.multisample,depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:true,depthCompare:'greater-equal'}});this.pipelines.set(key,pipeline);}
   let groups=this.renderGroups.get(pipeline);if(!groups){groups=this.instances.map(buffer=>lit?c.device.createBindGroup({layout:pipeline!.getBindGroupLayout(1),entries:[{binding:0,resource:{buffer}},{binding:1,resource:{buffer:this.materialUniform!}}]}):group(c.device,pipeline!,[{buffer:this.uniform!},{buffer}]));this.renderGroups.set(pipeline,groups);}
   let lighting=this.pbrGroups.get(pipeline);if(lit&&!lighting){lighting=c.device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.pbrUniform!}},...c.bindings]});this.pbrGroups.set(pipeline,lighting);}
   this.attachment.view=c.color;this.depthAttachment.view=c.depth;const pass=c.encoder.beginRenderPass(this.presentation);

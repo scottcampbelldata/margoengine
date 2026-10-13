@@ -148,7 +148,7 @@ export function parseVTK(input: BinaryInput, options: VTKOptions = {}): LoadedGe
         const connectivity = reader.values(connectivityLine[1] ?? 'vtktypeint64', size, `${key} connectivity`);
         for (let c = 0; c + 1 < cells; c++) {
           const start = offsets[c], end = offsets[c + 1];
-          if (!(start >= 0 && end >= start && end <= size)) throw new LoaderError(F, 'range', `${key} offsets are not increasing within the connectivity array`);
+          if (!(Number.isSafeInteger(start) && Number.isSafeInteger(end) && start >= 0 && end >= start && end <= size)) throw new LoaderError(F, 'range', `${key} offsets are not increasing within the connectivity array`);
           emitCell(key, connectivity, start, end - start);
         }
       } else {

@@ -24,7 +24,7 @@ export interface SkyMoonConfig {
 
 export class SkyMoonPass {
   private readonly pipeline: GPURenderPipeline;
-  private msaaPipeline?: GPURenderPipeline;
+  private readonly pipelines = new Map<string, GPURenderPipeline>();
   private readonly descriptor: GPURenderPipelineDescriptor;
   private readonly uniformBuffer: GPUBuffer;
   private readonly bindGroup: GPUBindGroup;
@@ -185,13 +185,25 @@ export class SkyMoonPass {
   }
 
   /** Records a background triangle with the scene's sample count. */
-  record(passEncoder: GPURenderPassEncoder, sampleCount = 1): void {
-    passEncoder.setPipeline(sampleCount === 4 ? this.msaaPipeline??=this.device.createRenderPipeline({...this.descriptor,multisample:{count:4}}) : this.pipeline);
+  record(passEncoder: GPURenderPassEncoder, sampleCount = 1, depthFormat = this.descriptor.depthStencil?.format): void {
+    const count = sampleCount === 4 ? 4 : 1;
+    let pipeline = count === 1 && depthFormat === this.descriptor.depthStencil?.format ? this.pipeline : undefined;
+    if (!pipeline) {
+      const key = count + ':' + depthFormat;
+      pipeline = this.pipelines.get(key);
+      if (!pipeline) {
+        pipeline = this.device.createRenderPipeline({...this.descriptor, multisample: {count},
+          depthStencil: depthFormat === undefined ? undefined : {depthWriteEnabled: false, depthCompare: 'greater-equal', ...this.descriptor.depthStencil, format: depthFormat}});
+        this.pipelines.set(key, pipeline);
+      }
+    }
+    passEncoder.setPipeline(pipeline);
     passEncoder.setBindGroup(0, this.bindGroup);
     passEncoder.draw(3, 1, 0, 0);
   }
 
   dispose(): void {
     this.uniformBuffer.destroy();
+    this.pipelines.clear();
   }
 }

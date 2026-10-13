@@ -13,17 +13,19 @@ import {Engine} from '@margoengine/core';
 
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
-const {SkyMoon} = await import('@margoengine/scenery');
+const {SkyMoon} = await import('@margoengine/scenery/sky');
 engine.use(new SkyMoon({moonDirection: [0.45, 0, -1], moonPhase: 0.85}));
 engine.start();
 ```
+
+`@margoengine/scenery/sky` exports the `SkyMoon` engine plugin and includes its low-level pass dependency. Use `@margoengine/scenery/sky-moon` for `SkyMoonPass` and `SkyMoonConfig` in custom rendering. Both subpaths support static imports and on-demand `import()`. Existing root exports remain available and can be tree-shaken by a bundler; `await stage.scenery()` intentionally loads the complete scenery pack namespace.
 
 `SkyMoon` registers a background pass after opaque geometry. It loads the color/depth attachments and tests at Reversed-Z depth 0 without writing depth. Canvas and HDR (`rgba16float`) pipelines are constructed during setup; frame recording reuses its uniform arrays, matrix inversion workspace and render-pass descriptor. Resize changes the attachment views without rebuilding resources. Core restores the plugin on device replacement and disposes it on `engine.dispose()`; remove it with `engine.removePlugin('sky-moon')`. Options are applied during setup; remove/re-add the plugin to change them. When combining with `PostProcessing`, leave `atmosphere.sky` disabled so the post stack does not replace this backdrop.
 
 For custom rendering, use the low-level pass:
 
 ```ts
-import {SkyMoonPass, type SkyMoonConfig} from '@margoengine/scenery';
+import {SkyMoonPass, type SkyMoonConfig} from '@margoengine/scenery/sky-moon';
 
 function createSky(device: GPUDevice, format: GPUTextureFormat) {
   const sky = new SkyMoonPass(device, format, 'depth32float');
@@ -33,7 +35,7 @@ function createSky(device: GPUDevice, format: GPUTextureFormat) {
 }
 ```
 
-Retain the pass, inverse view-projection matrix, camera position and render-pass descriptor across frames. Call `sky.updateFrame(inverseViewProjection, cameraPosition, timeSeconds)` before `sky.record(passEncoder, sampleCount)`. Match the constructor's color/depth formats and sample count to the attachments: 4 for desktop scenes, 1 for phone scenes and resolved outputs. Clear Reversed-Z depth to 0. Omit the depth format only for a pass without a depth attachment. The 4× pipeline is created on its first use; subsequent `updateFrame` and `record` calls reuse resources. Browser GPU command encoding may allocate internally.
+Retain the pass, inverse view-projection matrix, camera position and render-pass descriptor across frames. Call `sky.updateFrame(inverseViewProjection, cameraPosition, timeSeconds)` before `sky.record(passEncoder, sampleCount, depthFormat)`. The depth format defaults to the constructor's format; the engine plugin supplies its current scene format. Match the color format and sample count to the attachments: 4 for desktop scenes, 1 for phone scenes and resolved outputs. Clear Reversed-Z depth to 0. Omit the depth format only for a pass without a depth attachment. Pipelines for changed depth formats or 4× sampling are created on first use and retained; subsequent `updateFrame` and `record` calls reuse resources. Browser GPU command encoding may allocate internally.
 
 The uniforms occupy 160 bytes with 16-byte alignment. Colors are non-negative linear RGB. Moon direction must be finite and nonzero and is normalized on configuration; angular radius defaults to 0.038 radians and must be between 0 and PI / 2. Phase clamps to [-1, 1] (new, half, full), and glow/star intensities clamp to zero or above. `starTwinkleIntensity` defaults to 1; zero keeps stars steady. Stars fade in above 15° elevation. `hazeDensity` defaults to 1; zero removes the horizon haze gradient and larger values thicken it. Both controls clamp to zero or above and use existing uniform padding, keeping the 160-byte layout. Invalid inputs throw before changing the staged uniforms. The perspective ray reconstruction supports finite and infinite Reversed-Z projections, runs at the triangle's three vertices and interpolates across the screen. Lunar angular sine/cosine are computed only on configuration changes. Recreate a low-level pass when the device or attachment formats change, and call `sky.dispose()` on teardown.
 

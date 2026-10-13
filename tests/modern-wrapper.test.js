@@ -42,13 +42,13 @@ test('facade preserves real mesh handles, hierarchy and rollback after bad trans
     const count = engine.meshes.size, allocated = resources.size;
     assert.throws(() => app.box({scale: [1, 0, 1]}), /nonzero/);
     assert.throws(() => app.box({size: [1, 2]}), /3 values/);
-    assert.throws(() => app.sphere({roughness: NaN}), /Material/);
+    assert.throws(() => app.sphere({roughness: NaN}), {name:'RangeError',message:'Invalid material'});
     assert.equal(engine.meshes.size, count); assert.equal(resources.size, allocated);
     let captured; engine.camera.fitToBoundingBox = (min, max) => {captured = {min, max};};
     app.fit([orb]); assert.ok(captured.min[0] < 2.01 && captured.max[0] > 3.99);
     orb.visible = false; assert.throws(() => app.fit([orb]), /No geometry/);
     const other = await scene();
-    try {assert.throws(() => app.fit([other.app.box()]), /another engine/);} finally {other.app.dispose();}
+    try {assert.throws(() => app.fit([other.app.box()]), /Foreign mesh/);} finally {other.app.dispose();}
   } finally {app.dispose();}
   assert.equal(engine.meshes.size, 0); assert.equal(resources.size, 0); app.dispose();
   assert.throws(() => app.sphere(), /disposed/);

@@ -41,10 +41,16 @@ await compactPackage('core');
 for(const name of ['loaders','exporters'])execFileSync(process.execPath,['node_modules/typescript/bin/tsc','-p',`packages/${name}/tsconfig.json`],{stdio:'inherit'});
 for(const name of ['gltf','machinery','creative','scenery',...featurePackages]){
  const output=resolve(`packages/${name}/dist`);assert.ok(output.startsWith(resolve(`packages/${name}`)+'/')||output.startsWith(resolve(`packages/${name}`)+'\\'),'Output escaped its package');
- await build({configFile:false,publicDir:false,logLevel:'warn',build:{outDir:output,emptyOutDir:true,target:'es2022',lib:{entry:`packages/${name}/src/index.ts`,formats:['es'],fileName:'index'},rollupOptions:{external:['@margoengine/core','@margoengine/core/extension','@margoengine/animation','@margoengine/gltf-pro','@margoengine/loaders','@margoengine/lines'],output:compactOutput}}});
+ const manifest=JSON.parse(await readFile(`packages/${name}/package.json`,'utf8'));
+ const entry=Object.fromEntries(Object.values(manifest.exports).map(({import:target})=>{
+  assert.ok(/^\.\/dist\/[\w-]+\.js$/.test(target),'Unsupported package entry: '+target);
+  const module=target.slice('./dist/'.length,-'.js'.length);
+  return [module,`packages/${name}/src/${module}.ts`];
+ }));
+ await build({configFile:false,publicDir:false,logLevel:'warn',build:{outDir:output,emptyOutDir:true,target:'es2022',lib:{entry,formats:['es'],fileName:(_,entryName)=>entryName+'.js'},rollupOptions:{external:['@margoengine/core','@margoengine/core/extension','@margoengine/animation','@margoengine/gltf-pro','@margoengine/loaders','@margoengine/lines'],output:compactOutput}}});
  if(name==='machinery'){
   // Retain analyzable asset URLs for the consuming app's bundler.
-  const entry=resolve(output,'index.js');await writeFile(entry,(await readFile(entry,'utf8')).replace(/(?:''|""|``)\s*\+\s*import\.meta\.url/g,'import.meta.url'));
+  for(const file of (await readdir(output)).filter(file=>file.endsWith('.js'))){const entry=resolve(output,file);await writeFile(entry,(await readFile(entry,'utf8')).replace(/(?:''|""|``)\s*\+\s*import\.meta\.url/g,'import.meta.url'));}
   await build({configFile:false,publicDir:false,logLevel:'warn',build:{outDir:resolve(output,'workers'),emptyOutDir:true,target:'es2022',lib:{entry:'packages/machinery/src/workers/cad-worker.ts',name:'CADWorker',formats:['iife'],fileName:()=> 'cad-runtime.js'}}});
   for(const file of ['occt-import-js.js','occt-import-js.wasm'])await copyFile(`node_modules/occt-import-js/dist/${file}`,resolve(output,'workers',file));
   await copyFile('node_modules/occt-import-js/LICENSE.md',resolve(output,'workers/OCCT-LICENSE.txt'));

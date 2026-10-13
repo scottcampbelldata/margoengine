@@ -1,5 +1,5 @@
 import {Curve} from './curve.js';
-import {lerp, normalize, sub, type Vec, type Vec2, type Vec3} from './math.js';
+import {finiteNumber, lerp, normalize, sub, type Vec, type Vec2, type Vec3} from './math.js';
 
 const quadratic = (t: number, p0: number, p1: number, p2: number) => {const k = 1 - t; return k * k * p0 + 2 * k * t * p1 + t * t * p2;};
 const cubic = (t: number, p0: number, p1: number, p2: number, p3: number) => {const k = 1 - t; return k * k * k * p0 + 3 * k * k * t * p1 + 3 * k * t * t * p2 + t * t * t * p3;};
@@ -48,10 +48,11 @@ export class EllipseCurve extends Curve<Vec2> {
   constructor(public aX = 0, public aY = 0, public xRadius = 1, public yRadius = 1, public aStartAngle = 0, public aEndAngle = Math.PI * 2, public aClockwise = false, public aRotation = 0) {super();}
   getPoint(t: number): Vec2 {
     const twoPi = Math.PI * 2;
-    let delta = this.aEndAngle - this.aStartAngle;
+    let delta = finiteNumber(this.aEndAngle - this.aStartAngle);
     const samePoints = Math.abs(delta) < Number.EPSILON;
-    while (delta < 0) delta += twoPi;
-    while (delta > twoPi) delta -= twoPi;
+    // Reduce full turns once: repeated subtraction can stop making progress for large finite angles.
+    if (delta < 0 || delta > twoPi) delta %= twoPi;
+    if (delta < 0) delta += twoPi;
     if (delta < Number.EPSILON) delta = samePoints ? 0 : twoPi;
     if (this.aClockwise && !samePoints) delta = delta === twoPi ? -twoPi : delta - twoPi;
     const angle = this.aStartAngle + t * delta;

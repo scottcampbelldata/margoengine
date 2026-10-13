@@ -89,14 +89,23 @@ try {
 
     await window.modern.core('webgpu');
     const engine = window.modern.state.core, plugin = new SkyMoon(); engine.use(plugin); engine.render(); await engine.gpu.queue.onSubmittedWorkDone();
-    const resources = ['createBuffer', 'createBindGroup', 'createBindGroupLayout', 'createShaderModule', 'createPipelineLayout', 'createRenderPipeline'];
+    const resources = ['createTexture', 'createSampler', 'createBuffer', 'createBindGroup', 'createBindGroupLayout', 'createShaderModule', 'createPipelineLayout', 'createRenderPipeline'];
     const originals = resources.map(name => engine.gpu[name]), begin = GPUCommandEncoder.prototype.beginRenderPass;
-    const descriptors = []; let allocations = 0;
+    const descriptors = [], snapshots = []; let allocations = 0;
     for (let i = 0; i < resources.length; i++) engine.gpu[resources[i]] = function (...args) {allocations++; return originals[i].apply(this, args);};
-    GPUCommandEncoder.prototype.beginRenderPass = function (descriptor) {descriptors.push(descriptor); return begin.call(this, descriptor);};
+    GPUCommandEncoder.prototype.beginRenderPass = function (descriptor) {descriptors.push(descriptor); snapshots.push({color: {...descriptor.colorAttachments[0]}, depth: {...descriptor.depthStencilAttachment}}); return begin.call(this, descriptor);};
     try {for (let frame = 0; frame < 5; frame++) {engine.render({delta: 0.1}); await engine.gpu.queue.onSubmittedWorkDone();}}
     finally {for (let i = 0; i < resources.length; i++) engine.gpu[resources[i]] = originals[i]; GPUCommandEncoder.prototype.beginRenderPass = begin;}
-    assert(allocations === 0 && descriptors.length === 10 && descriptors.every((descriptor, i) => descriptor === descriptors[i % 2]), 'Plugin allocated resources or replaced descriptors during steady frames');
+    assert(allocations === 0, 'Plugin allocated native resources during steady frames');
+    assert(descriptors.length === 15, 'Expected scene, sky and final MSAA resolve per frame');
+    for (let frame = 0; frame < 5; frame++) {
+      const offset = frame * 3, scene = snapshots[offset], skyPass = snapshots[offset + 1], final = snapshots[offset + 2];
+      assert(descriptors[offset] === descriptors[0] && descriptors[offset + 1] === descriptors[1], 'Scene or sky descriptor was replaced during steady frames');
+      assert(scene.color.loadOp === 'clear' && scene.color.storeOp === 'store' && scene.depth.depthLoadOp === 'clear' && scene.depth.depthStoreOp === 'store', 'Scene did not preserve MSAA attachments');
+      assert(skyPass.color.view === scene.color.view && skyPass.color.loadOp === 'load' && skyPass.color.storeOp === 'store' && skyPass.depth.view === scene.depth.view && skyPass.depth.depthReadOnly === true && skyPass.depth.stencilReadOnly === true, 'Sky did not load preserved scene attachments');
+      assert(final.color.view === scene.color.view && final.color.resolveTarget === scene.color.resolveTarget && final.color.resolveTarget !== undefined && final.color.loadOp === 'load' && final.color.storeOp === 'discard', 'Final MSAA color resolve changed');
+      assert(final.depth.view === scene.depth.view && final.depth.depthLoadOp === 'load' && final.depth.depthStoreOp === 'discard' && final.depth.stencilReadOnly === true, 'Final MSAA depth semantics changed');
+    }
     const picked = await engine.pick(160, 120); assert(picked !== null, 'Scenery broke core picking');
     window.modern.creative({bloom: 0.3, atmosphere: {sky: false}}); await engine.gpu.queue.onSubmittedWorkDone();
     engine.canvas.style.width = '400px'; engine.canvas.style.height = '300px'; engine.render(); await engine.gpu.queue.onSubmittedWorkDone();

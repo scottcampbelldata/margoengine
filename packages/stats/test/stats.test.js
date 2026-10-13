@@ -110,3 +110,29 @@ test('failed setup and disposal during a pending map release every created resou
   let release; resources.at(-1).mapAsync = () => new Promise(resolve => {release = resolve;});
   const pending = profiler.read(); profiler.dispose(); release(); assert.equal(await pending, null); assert.ok(resources.every(r => r.destroyed));
 });
+
+
+test("a sampled encoder cannot join another encoder's recording profile", async t => {
+  const stats=overlay(t), {device, resources}=gpu(t);
+  stats.enableGPUProfiling(device);
+  resources.at(-1).getMappedRange=()=>new BigUint64Array([1_000_000n,3_000_000n]).buffer;
+  const descriptors=[],resolved=[];
+  const encoder=()=>({
+    beginRenderPass(descriptor){descriptors.push(descriptor);return {draw(){},drawIndexed(){},drawIndirect(){},drawIndexedIndirect(){}};},
+    beginComputePass(){},
+    resolveQuerySet(query,first,count){resolved.push(count);},
+    copyBufferToBuffer(){},
+    finish(){return {};}
+  });
+  let first,second;
+  for(let frame=1;frame<=30;frame++){
+    const next=encoder();stats.track(next);
+    if(frame===15){first=next;next.beginRenderPass({colorAttachments:[]});}
+    if(frame===30){second=next;next.beginRenderPass({colorAttachments:[]});}
+  }
+  assert.equal(descriptors[0].timestampWrites.beginningOfPassWriteIndex,0);
+  assert.equal(descriptors[1].timestampWrites,undefined,'busy samples must remain outside the existing profile');
+  second.finish();first.finish();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(resolved,[2]);assert.equal(stats.gpuTime,2);
+});

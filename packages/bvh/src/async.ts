@@ -55,7 +55,10 @@ export function buildAsync(source: GeometryLike | TriangleSource, options: Async
   const {transfer = false, signal, ...buildOptions} = options;
   try { resolveOptions(buildOptions); } catch (error) { return Promise.reject(error); }
   if (signal?.aborted) return Promise.reject(signal.reason ?? new Error('Aborted'));
-  if (typeof Worker === 'undefined') return Promise.resolve().then(() => MeshBVH.build(source, buildOptions));
+  if (typeof Worker === 'undefined') return Promise.resolve().then(() => {
+    if (signal?.aborted) throw signal.reason ?? new Error('Aborted');
+    return MeshBVH.build(source, buildOptions);
+  });
   let arrays: ReturnType<typeof sourceArrays>;
   try { arrays = sourceArrays(source); } catch (error) { return Promise.reject(error); }
   const isGeometry = arrays.stride === 6 && (source as GeometryLike).vertices === arrays.positions;

@@ -72,8 +72,8 @@ const positive = (value: unknown, label: string): number => {
 export function geometryPositions(source: GeometryLike, scale: Vec3 = [1, 1, 1]): Float32Array {
   const vertices = source.vertices;
   // A core Geometry interleaves position and normal (stride 6); raw sources default to packed xyz.
-  const stride = ('stride' in source && source.stride) || ('bounds' in source ? 6 : 3);
-  if (stride < 3 || vertices.length % stride) throw new RangeError('Vertex array length is not a multiple of its stride');
+  const stride = ('stride' in source ? source.stride : undefined) ?? ('bounds' in source ? 6 : 3);
+  if (!Number.isInteger(stride) || stride < 3 || vertices.length % stride) throw new RangeError('Vertex array length is not a multiple of its stride');
   const count = vertices.length / stride, out = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) for (let a = 0; a < 3; a++) out[i * 3 + a] = vertices[i * stride + a] * scale[a];
   return out;
@@ -137,9 +137,9 @@ export function createColliderDesc(R: RapierModule, options: ShapeOptions, fit?:
       const vertices = options.vertices ? Float32Array.from(options.vertices) : source ? geometryPositions(source, fit?.scale) : fitted();
       const indexSource = options.indices ?? source?.indices;
       if (!indexSource) throw new TypeError('A trimesh needs indices');
+      if (!indexSource.length || indexSource.length % 3 || vertices.length % 3) throw new RangeError('A trimesh needs whole triangles');
+      for (let i = 0; i < indexSource.length; i++) if (!Number.isInteger(indexSource[i]) || indexSource[i] < 0 || indexSource[i] >= vertices.length / 3) throw new RangeError('Trimesh index exceeds vertices');
       const indices = Uint32Array.from(indexSource);
-      if (!indices.length || indices.length % 3 || vertices.length % 3) throw new RangeError('A trimesh needs whole triangles');
-      for (let i = 0; i < indices.length; i++) if (indices[i] >= vertices.length / 3) throw new RangeError('Trimesh index exceeds vertices');
       desc = R.ColliderDesc.trimesh(vertices, indices);
       break;
     }

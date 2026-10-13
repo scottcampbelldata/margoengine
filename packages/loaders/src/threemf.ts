@@ -152,6 +152,7 @@ const normalizePath = (path: string): string => path.replace(/\\/g, '/').replace
  */
 export async function parse3MF(input: BinaryInput, options: ThreeMFOptions = {}): Promise<ThreeMFResult> {
   const bytes = toBytes(input, F), limit = limits(options, F), maxDepth = options.maxDepth ?? 32;
+  if (!Number.isSafeInteger(maxDepth) || maxDepth < 0) throw new LoaderError(F, 'range', 'maxDepth must be a non-negative integer');
   if (options.units !== undefined && options.units !== 'meters' && options.units !== 'file') throw new LoaderError(F, 'range', `units must be "meters" or "file"`);
   if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) throw new LoaderError(F, 'header', 'not a ZIP package (missing PK signature)');
   const entries = readZipDirectory(bytes, options);

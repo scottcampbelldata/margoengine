@@ -197,6 +197,15 @@ test('squared distance transform matches brute force on binary and sampled grids
   assert.throws(() => squaredDistanceTransform(new Float64Array(3), 2, 2), RangeError);
 });
 
+test('distance transform retains indices above 65535 in both axes', () => {
+  const length=65537;
+  for(const [width,height] of [[length,1],[1,length]]){
+    const grid=new Float64Array(length).fill(1e20);grid[length-1]=0;
+    assert.equal(squaredDistanceTransform(grid,width,height),grid);
+    for(let i=0;i<length;i++)assert.equal(grid[i],(length-1-i)**2,`distance at ${i} in ${width}x${height}`);
+  }
+});
+
 test('alphaToSdf matches a brute-force TinySDF reference on antialiased bitmaps', () => {
   const rand = random(42);
   for (const [width, height] of [[9, 9], [14, 10], [20, 17]]) {
@@ -291,4 +300,32 @@ test('layout of a Text object is cached until a layout field changes', () => {
   assert.notEqual(second, first); assert.equal(second.lines.length, 2); assert.equal(text.layoutVersion, version + 1);
   text.text = 'ab'; assert.equal(text.layout.lines.length, 1);
   assert.equal(text.hitTest(0.4, -0.5), 1); assert.equal(text.caretRect(2).x, 1);
+});
+
+test('cached Text layouts skip snapshot array construction and retain all invalidation keys', () => {
+  const font = Object.assign(Object.create(Font.prototype), {revision: 0, advance: mock.advance, kerning: mock.kerning, metrics: mock.metrics});
+  const text = new Text({text: 'ab cd', font});
+  let layout = text.layout;
+  const map = Array.prototype.map;
+  let maps = 0;
+  Array.prototype.map = function (...args) {maps++; return map.apply(this, args);};
+  try {for (let i = 0; i < 120; i++) assert.equal(text.layout, layout);}
+  finally {Array.prototype.map = map;}
+  assert.equal(maps, 0, 'cached reads do not construct mapped snapshot arrays');
+  const updates = {
+    fontSize: 2, lineHeight: 1.5, letterSpacing: 0.1, maxWidth: 3, textAlign: 'center', anchorX: 'center',
+    anchorY: 'middle', direction: 'rtl', whiteSpace: 'nowrap', overflowWrap: 'normal', text: 'different',
+  };
+  for (const [key, value] of Object.entries(updates)) {
+    text[key] = value;
+    const next = text.layout;
+    assert.notEqual(next, layout, `${key} invalidates layout`);
+    assert.equal(text.layout, next);
+    layout = next;
+  }
+  font.revision++;
+  assert.notEqual(text.layout, layout, 'font revision invalidates layout');
+  layout = text.layout;
+  text.font = Object.assign(Object.create(Font.prototype), {revision: font.revision, advance: mock.advance, kerning: mock.kerning, metrics: mock.metrics});
+  assert.notEqual(text.layout, layout, 'different font identity invalidates layout');
 });

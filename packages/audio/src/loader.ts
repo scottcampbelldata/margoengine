@@ -38,7 +38,8 @@ export function loadAudioBuffer(context: BaseAudioContext, url: string, options:
     const created: Entry = {controller, waiters: 0, settled: false, promise: (async () => {
       const response = await fetcher(key, {signal: controller.signal});
       if (!response.ok) throw new Error(`HTTP ${response.status} loading ${key}`);
-      return decodeAudio(context, await response.arrayBuffer());
+      const bytes = await response.arrayBuffer();controller.signal.throwIfAborted();
+      return decodeAudio(context, bytes);
     })()};
     created.promise.then(() => {created.settled = true;}, () => {created.settled = true; if (map!.get(key) === created) map!.delete(key);});
     if (cache) map.set(key, created);

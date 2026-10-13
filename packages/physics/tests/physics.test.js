@@ -5,7 +5,7 @@ import {resolve} from 'node:path';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 import {Geometry, box} from '@margoengine/core';
 import {Engine,TransformStore} from '@margoengine/core/extension';
-import {Physics, collisionGroups, eulerToQuat, geometryPositions} from '../dist/index.js';
+import {Physics, CharacterController, collisionGroups, eulerToQuat, geometryPositions} from '../dist/index.js';
 
 // Consumers keep Rapier optional; the monorepo installs it as a test dependency.
 const rapierDir = process.env.MARGOENGINE_RAPIER ? resolve(process.env.MARGOENGINE_RAPIER) : fileURLToPath(new URL('../../../node_modules/@dimforge/rapier3d-compat/',import.meta.url));
@@ -48,6 +48,27 @@ test('requires an initialized Rapier module and is SSR safe', () => {
   assert.throws(() => new Physics(null, {rapier: {}}), /initialized Rapier module/);
 });
 
+test('rejected plugin attachment releases the new world and event queue', () => {
+  const freed = [], failure = new TypeError('Invalid/attached plugin');
+  const rapier = {ColliderDesc: {}, World: class {free() {freed.push('world');}}, EventQueue: class {free() {freed.push('queue');}}};
+  assert.throws(() => new Physics({use() {throw failure;}}, {rapier}), error => error === failure);
+  assert.deepEqual(freed, ['queue', 'world']);
+});
+
+test('failed event queue creation releases its already allocated native world', () => {
+  const freed = [], failure = new Error('EventQueue allocation failed');
+  const rapier = {ColliderDesc: {}, World: class {free() {freed.push('world');}}, EventQueue: class {constructor() {throw failure;}}};
+  assert.throws(() => new Physics(null, {rapier}), error => error === failure);
+  assert.deepEqual(freed, ['world']);
+});
+
+test('invalid character setup releases the native controller before rethrowing', () => {
+  const raw = {}, removed = [], body = {type: 'kinematicPosition', colliders: [{}]};
+  const owner = {world: {createCharacterController() {return raw;}, removeCharacterController(value) {removed.push(value);}}, removeController() {throw new Error('Unregistered controller');}};
+  assert.throws(() => new CharacterController(owner, body, {up: [NaN, 1, 0]}), /Up must be three finite numbers/);
+  assert.deepEqual(removed, [raw]);
+});
+
 test('collisionGroups packs memberships and filters', () => {
   assert.equal(collisionGroups([0], [1, 2]), (1 << 16 | 0b110) >>> 0);
   assert.equal(collisionGroups(0xffff, 0xffff), 0xffffffff);
@@ -60,6 +81,21 @@ test('geometryPositions reads stride-6 core geometry and packed raw arrays', () 
   assert.equal(points.length, geometry.vertices.length / 2);
   assert.deepEqual([Math.max(...points.filter((_, i) => i % 3 === 0)), Math.max(...points.filter((_, i) => i % 3 === 1)), Math.max(...points.filter((_, i) => i % 3 === 2))], [1, 1, 6]);
   assert.deepEqual([...geometryPositions({vertices: [1, 2, 3, 4, 5, 6]})], [1, 2, 3, 4, 5, 6]);
+});
+
+rtest('trimesh indices reject fractional or wrapped values before native construction', () => {
+  const physics=create(),vertices=[0,0,0,1,0,0,0,1,0];
+  try{
+    for(const invalid of [0.5,NaN,Infinity,-4294967296,4294967296]){
+      assert.throws(()=>physics.addBody(null,{type:'fixed',colliders:{shape:'trimesh',vertices,indices:[0,1,invalid]}}),/Trimesh index/);
+      assert.equal(physics.bodyCount,0,'Rejected collider must roll back its body');
+    }
+    const body=physics.addBody(null,{type:'fixed',colliders:{shape:'trimesh',vertices,indices:[0,1,2]}});assert.equal(body.colliders.length,1);
+  }finally{physics.dispose();}
+});
+
+test('geometry positions reject fractional or nonfinite strides', () => {
+  for(const stride of [3.5,0,Infinity,NaN])assert.throws(()=>geometryPositions({vertices:new Float32Array(stride===3.5?7:6),stride}),/stride/);
 });
 
 rtest('a dropped box comes to rest on the ground at the right height and the mesh follows', () => {

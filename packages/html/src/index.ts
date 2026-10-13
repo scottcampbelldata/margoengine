@@ -22,6 +22,7 @@ interface Record {label:Label;index:number;hidden:boolean;x:number;y:number;z:nu
 export class HTML extends LabelRenderer {
  private runtime?:Engine;private readonly records=new Map<Label,Record>();private slots:(Record|undefined)[];private readonly values:Float32Array;private readonly capacity:number;
  private shared?:ReturnType<typeof acquireDepth>;private source?:()=>GPUTexture|undefined;private input?:GPUBuffer;private output?:GPUBuffer;private read?:GPUBuffer;private pipeline?:GPUComputePipeline;private pending=false;private generation=0;private disposed=false;
+ private sampledDepth?:GPUTexture;private depthGroup?:GPUBindGroup;
  constructor(private readonly settings:HTMLOptions={}){
   super({...settings,name:settings.name??'html',order:1000});
   const capacity=settings.capacity??1024,bias=settings.depthBias??0.0001;
@@ -34,7 +35,7 @@ export class HTML extends LabelRenderer {
   if(index<0)throw new RangeError('HTML anchor capacity exceeded');
   const label=super.add(element,{...options,occlude:(item,info)=>{
    const record=this.records.get(item)!;record.x=info.x;record.y=info.y;record.z=1-info.depth;
-   const canvas=this.runtime?.canvas;if(canvas){const scaleX=canvas.width/(canvas.clientWidth||canvas.width),scaleY=canvas.height/(canvas.clientHeight||canvas.height);this.values.set([info.x*scaleX,info.y*scaleY,record.z,this.settings.depthBias??0.0001],index*4);}
+   const canvas=this.runtime?.canvas;if(canvas){const scaleX=canvas.width/(canvas.clientWidth||canvas.width),scaleY=canvas.height/(canvas.clientHeight||canvas.height),at=index*4;this.values[at]=info.x*scaleX;this.values[at+1]=info.y*scaleY;this.values[at+2]=record.z;this.values[at+3]=this.settings.depthBias??0.0001;}
    return !!(options.occlude??this.settings.occlude)?.(item,info)||record.hidden;
   }});
   const record={label,index,hidden:false,x:0,y:0,z:0};this.records.set(label,record);this.slots[index]=record;return label;
@@ -52,9 +53,11 @@ export class HTML extends LabelRenderer {
  private sample(c:Extract<PassContext,{backend:'webgpu'}>):void {
   resolveMSAA(c);
   const depth=this.source!();if(!depth||depth.width!==c.width||depth.height!==c.height||!depth.format.startsWith('depth'))throw new Error('HTML requires viewport-sized scene depth');
-  for(let i=0;i<this.capacity;i++)if(!this.slots[i]||!this.slots[i]!.label.visible||!this.slots[i]!.label.screen.inFrustum)this.values.set([-1,-1,0,0],i*4);
+  if(!this.records.size)return;
+  for(let i=0;i<this.capacity;i++)if(!this.slots[i]||!this.slots[i]!.label.visible||!this.slots[i]!.label.screen.inFrustum){const at=i*4;this.values[at]=this.values[at+1]=-1;this.values[at+2]=this.values[at+3]=0;}
   c.device.queue.writeBuffer(this.input!,0,this.values as Float32Array<ArrayBuffer>);
-  dispatch(c,this.pipeline!,group(c.device,this.pipeline!,[depth.createView({aspect:'depth-only'}),{buffer:this.input!},{buffer:this.output!}]),Math.ceil(this.capacity/64));
+  if(!this.depthGroup||depth!==this.sampledDepth){this.depthGroup=group(c.device,this.pipeline!,[depth.createView({aspect:'depth-only'}),{buffer:this.input!},{buffer:this.output!}]);this.sampledDepth=depth;}
+  dispatch(c,this.pipeline!,this.depthGroup,Math.ceil(this.capacity/64));
   const read=this.read!,generation=this.generation,requests=this.slots.map(record=>record?{record,x:record.x,y:record.y,z:record.z}:undefined);
   c.encoder.copyBufferToBuffer(this.output!,0,read,0,this.capacity*4);this.pending=true;
   queueMicrotask(async()=>{try{
@@ -64,7 +67,7 @@ export class HTML extends LabelRenderer {
   }catch{for(const record of this.records.values())record.hidden=false;}
   finally{if(read.mapState==='mapped')read.unmap();if(generation===this.generation)this.pending=false;}});
  }
- private release():void {this.generation++;this.pending=false;this.shared?.release();this.shared=undefined;this.input?.destroy();this.output?.destroy();this.read?.destroy();this.input=this.output=this.read=undefined;this.pipeline=undefined;}
+ private release():void {this.generation++;this.pending=false;this.shared?.release();this.shared=undefined;this.input?.destroy();this.output?.destroy();this.read?.destroy();this.input=this.output=this.read=undefined;this.pipeline=undefined;this.sampledDepth=this.depthGroup=undefined;}
  onDeviceRestored():void {this.release();for(const record of this.records.values())record.hidden=false;this.setupGPU();}
  override dispose():void {if(this.disposed)return;this.disposed=true;this.runtime?.removePlugin(this.name);this.release();super.dispose();this.records.clear();this.slots.fill(undefined);this.runtime=undefined;}
 }

@@ -93,8 +93,7 @@ export class Stats implements EnginePlugin {
     if (this.tracked.has(encoder)) return;
     this.tracked.add(encoder); this.drawCalls = this.dispatches = 0;
     this.profileFrame = (this.profileFrame + 1) % 15;
-    const profiler = this.profileFrame === 0 ? this.profiler : undefined, tracked = encoder as Encoder;
-    profiler?.beginFrame();
+    const profiler = this.profileFrame === 0 && this.profiler?.beginFrame() ? this.profiler : undefined, tracked = encoder as Encoder;
     tracked[owner]=this; tracked[frameProfiler]=profiler;
     tracked[rawRender]=encoder.beginRenderPass; tracked[rawCompute]=encoder.beginComputePass; tracked[rawFinish]=encoder.finish;
     encoder.beginRenderPass=Stats.beginRender; encoder.beginComputePass=Stats.beginCompute; encoder.finish=Stats.finish;

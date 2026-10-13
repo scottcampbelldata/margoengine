@@ -82,6 +82,7 @@ export class KTX2Decoder {
   transcode(data: ArrayBuffer | ArrayBufferView, options: KTX2DecodeOptions = {}): Promise<TranscodedKTX2Result> {
     try {
       requireWorkers('KTX2Decoder');
+      if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('Aborted', 'AbortError');
       const buffer = payload(data, options.transfer ?? false);
       this.pool ??= new WorkerPool(this.workerLimit);
       return this.pool.run<TranscodedKTX2Result>({type: 'ktx2', buffer, target: this.target, ...this.urls()}, [buffer], options.signal);

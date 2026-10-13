@@ -27,8 +27,10 @@ export class PlanetPass {
   private readonly surfaceDescriptor: GPURenderPassDescriptor;
   private readonly shellDescriptor: GPURenderPassDescriptor;
   private disposed = false;
+  private readonly samples=sceneSamples();
+  private views:GPUTextureView[]=[];private sampler?:GPUSampler;private surfaceModule?:GPUShaderModule;private shellModule?:GPUShaderModule;
 
-  constructor(private readonly device: GPUDevice, images: PlanetImages, format: GPUTextureFormat, depthFormat: GPUTextureFormat, config: PlanetPassConfig) {
+  constructor(private readonly device: GPUDevice, images: PlanetImages, private readonly format: GPUTextureFormat, private readonly depthFormat: GPUTextureFormat, config: PlanetPassConfig) {
     finiteVector(config.atmosphereColor, 3, 'Planet atmosphere color');
     if (!Number.isFinite(Math.fround(config.radius)) || Math.fround(config.radius) <= 0 || !Number.isFinite(Math.fround(config.radius * 1.01))) throw new RangeError('Planet radius must be positive and finite');
     if (!Number.isFinite(Math.fround(config.atmosphereIntensity)) || config.atmosphereIntensity < 0 || config.atmosphereColor.some(value => value < 0)) throw new RangeError('Planet atmosphere must be non-negative and finite');
@@ -59,12 +61,12 @@ export class PlanetPass {
       const indices = new Uint32Array(segments * (rings - 1) * 6);
       let offset = 0;
       for (let ring = 0; ring <= rings; ring++) {
-        const latitude = ring * Math.PI / rings;
+        const latitude = ring * Math.PI / rings, extent=Math.sin(latitude), height=Math.cos(latitude);
         for (let segment = 0; segment <= segments; segment++) {
           const longitude = segment * Math.PI * 2 / segments, vertex = (ring * (segments + 1) + segment) * 3;
-          positions[vertex] = Math.sin(latitude) * Math.cos(longitude);
-          positions[vertex + 1] = Math.cos(latitude);
-          positions[vertex + 2] = Math.sin(latitude) * Math.sin(longitude);
+          positions[vertex] = extent * Math.cos(longitude);
+          positions[vertex + 1] = height;
+          positions[vertex + 2] = extent * Math.sin(longitude);
           if (ring < rings && segment < segments) {
             const a = ring * (segments + 1) + segment, b = a + segments + 1;
             if (ring > 0) {indices[offset++] = a; indices[offset++] = a + 1; indices[offset++] = b;}
@@ -83,21 +85,25 @@ export class PlanetPass {
         else device.queue.writeTexture({texture: resource}, new Uint8Array(fallback), {bytesPerRow: 4}, [1, 1]);
         return resource.createView();
       };
-      const views = [texture(images.day, true, [255,255,255,255]), texture(images.night, true, [0,0,0,255]), texture(images.specular, false, [0,255,0,255]), texture(images.normal, false, [128,128,255,255]), texture(images.clouds, false, [0,0,0,255])];
-      const sampler = device.createSampler({addressModeU: 'repeat', addressModeV: 'clamp-to-edge', minFilter: 'linear', magFilter: 'linear'});
-      const surfaceModule = device.createShaderModule({code: surfaceSource}), shellModule = device.createShaderModule({code: atmosphereSource});
-      for (const target of new Set([format, 'rgba16float' as GPUTextureFormat])) for(const count of sceneSamples()===1?[1]:[1,4]) {
-        const pipeline = (module: GPUShaderModule, shell: boolean) => device.createRenderPipeline({
+      this.views = [texture(images.day, true, [255,255,255,255]), texture(images.night, true, [0,0,0,255]), texture(images.specular, false, [0,255,0,255]), texture(images.normal, false, [128,128,255,255]), texture(images.clouds, false, [0,0,0,255])];
+      this.sampler = device.createSampler({addressModeU: 'repeat', addressModeV: 'clamp-to-edge', minFilter: 'linear', magFilter: 'linear'});
+      this.surfaceModule = device.createShaderModule({code: surfaceSource});this.shellModule = device.createShaderModule({code: atmosphereSource});
+      this.variant(format,this.samples,depthFormat);
+    } catch (error) {this.dispose(); throw error;}
+  }
+
+  private variant(target:GPUTextureFormat,count:number,depthFormat:GPUTextureFormat):Variant {
+    if((target!==this.format&&target!=='rgba16float')||(count!==1&&count!==this.samples))throw new Error('Unsupported planet target or device');
+    const key=target+':'+count+':'+depthFormat,cached=this.variants.get(key);if(cached)return cached;
+        const pipeline = (module: GPUShaderModule, shell: boolean) => this.device.createRenderPipeline({
           layout: 'auto', vertex: {module, entryPoint: 'vs_main', buffers: [{arrayStride: 12, attributes: [{shaderLocation: 0, offset: 0, format: 'float32x3'}]}]},
           fragment: {module, entryPoint: 'fs_main', constants: {outputHdr: +(target === 'rgba16float')}, targets: [{format: target, blend: shell ? {color: {srcFactor: 'one', dstFactor: 'one-minus-src-alpha'}, alpha: {srcFactor: 'one', dstFactor: 'one-minus-src-alpha'}} : undefined}]},
           primitive: {topology: 'triangle-list', cullMode: 'back'}, multisample: {count}, depthStencil: {format: depthFormat, depthWriteEnabled: !shell, depthCompare: 'greater-equal'},
         });
-        const surface = pipeline(surfaceModule, false), shell = pipeline(shellModule, true);
-        const surfaceGroup = device.createBindGroup({layout: surface.getBindGroupLayout(0), entries: [{binding: 0, resource: {buffer: this.uniform}}, {binding: 1, resource: sampler}, ...views.slice(0, 4).map((resource, index) => ({binding: index + 2, resource}))]});
-        const shellGroup = device.createBindGroup({layout: shell.getBindGroupLayout(0), entries: [{binding: 0, resource: {buffer: this.uniform}}, {binding: 1, resource: sampler}, {binding: 2, resource: views[4]}]});
-        this.variants.set(target+':'+count, {surface, shell, surfaceGroup, shellGroup});
-      }
-    } catch (error) {this.dispose(); throw error;}
+        const surface = pipeline(this.surfaceModule!, false), shell = pipeline(this.shellModule!, true);
+        const surfaceGroup = this.device.createBindGroup({layout: surface.getBindGroupLayout(0), entries: [{binding: 0, resource: {buffer: this.uniform}}, {binding: 1, resource: this.sampler!}, ...this.views.slice(0, 4).map((resource, index) => ({binding: index + 2, resource}))]});
+        const shellGroup = this.device.createBindGroup({layout: shell.getBindGroupLayout(0), entries: [{binding: 0, resource: {buffer: this.uniform}}, {binding: 1, resource: this.sampler!}, {binding: 2, resource: this.views[4]}]});
+        const variant={surface,shell,surfaceGroup,shellGroup};this.variants.set(key,variant);return variant;
   }
 
   updateFrame(cameraMatrix: Float32Array, modelMatrix: Float32Array, cameraPosition: Vec3, sunDirection: ArrayLike<number>, cloudOffsetU: number): void {
@@ -115,8 +121,9 @@ export class PlanetPass {
 
   record(context: Context, shell: boolean): void {
     if (this.disposed) throw new Error('Planet pass is disposed');
-    const variant = this.variants.get(context.format+':'+(context.descriptor.multisample?.count??1));
-    if (!variant || context.device !== this.device) throw new Error('Unsupported planet target or device');
+    if(context.device!==this.device)throw new Error('Unsupported planet target or device');
+    const depthFormat=context.descriptor.depthStencil?.format??this.depthFormat,variant=this.variant(context.format,context.descriptor.multisample?.count??1,depthFormat);
+    this.surfaceDepth.stencilReadOnly=this.shellDepth.stencilReadOnly=depthFormat.includes('stencil')||undefined;
     this.color.view = context.color; this.surfaceDepth.view = this.shellDepth.view = context.depth;
     const pass = context.encoder.beginRenderPass(shell ? this.shellDescriptor : this.surfaceDescriptor);
     pass.setPipeline(shell ? variant.shell : variant.surface); pass.setBindGroup(0, shell ? variant.shellGroup : variant.surfaceGroup);
@@ -128,6 +135,6 @@ export class PlanetPass {
     this.disposed = true;
     for (const buffer of this.buffers) buffer.destroy();
     for (const texture of this.textures) texture.destroy();
-    this.buffers.length = this.textures.length = 0; this.variants.clear();
+    this.buffers.length = this.textures.length = this.views.length = 0; this.variants.clear();this.sampler=undefined;this.surfaceModule=this.shellModule=undefined;
   }
 }

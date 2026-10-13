@@ -35,6 +35,10 @@ export class GrassField implements EnginePlugin {
   private uniform?: GPUBuffer;
   private compute?: GPUComputePipeline;
   private computeGroup?: GPUBindGroup;
+  private module?: GPUShaderModule;
+  private pipelineLayout?: GPUPipelineLayout;
+  private group?: GPUBindGroup;
+  private canvasFormat?: GPUTextureFormat;
   private readonly variants = new Map<string, Variant>();
   private readonly frame = new Float32Array(72);
   private time = 0;
@@ -108,25 +112,18 @@ export class GrassField implements EnginePlugin {
     this.compute=device.createComputePipeline({layout:'auto',compute:{module:computeModule,entryPoint:'cull'}});
     const entries=[{binding:0,resource:{buffer:this.uniform}},{binding:1,resource:{buffer:this.instances}},{binding:2,resource:{buffer:this.visible}}];
     this.computeGroup=device.createBindGroup({layout:this.compute.getBindGroupLayout(0),entries:[...entries,{binding:3,resource:{buffer:this.indirect}}]});
-    const module=device.createShaderModule({label:'grass:render',code:frameShader+grassShader});
+    this.module=device.createShaderModule({label:'grass:render',code:frameShader+grassShader});
+    this.canvasFormat=navigator.gpu.getPreferredCanvasFormat();
+    // Explicit shared layout lets all LOD variants reuse one bind group.
+    const layout=device.createBindGroupLayout({entries:[
+      {binding:0,visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT,buffer:{type:'uniform'}},
+      {binding:1,visibility:GPUShaderStage.VERTEX,buffer:{type:'read-only-storage'}},
+      {binding:2,visibility:GPUShaderStage.VERTEX,buffer:{type:'read-only-storage'}},
+    ]});
+    this.pipelineLayout=device.createPipelineLayout({bindGroupLayouts:[layout]});
+    this.group=device.createBindGroup({layout,entries});
     const depthFormat=device.features.has('depth32float-stencil8')?'depth32float-stencil8':'depth32float';
-    for (const format of [navigator.gpu.getPreferredCanvasFormat(),'rgba16float'] as GPUTextureFormat[]) for(const count of sceneSamples()===1?[1]:[1,4]) {
-      const buffers: GPUVertexBufferLayout[]=[{arrayStride:20,attributes:[{shaderLocation:0,offset:0,format:'float32x3'},{shaderLocation:1,offset:12,format:'float32x2'}]}];
-      // Explicit shared layout lets both LOD pipelines reuse one bind group.
-      const layout=device.createBindGroupLayout({entries:[
-        {binding:0,visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT,buffer:{type:'uniform'}},
-        {binding:1,visibility:GPUShaderStage.VERTEX,buffer:{type:'read-only-storage'}},
-        {binding:2,visibility:GPUShaderStage.VERTEX,buffer:{type:'read-only-storage'}},
-      ]});
-      const pipelineLayout=device.createPipelineLayout({bindGroupLayouts:[layout]});
-      const pipeline=(entryPoint:string)=>device.createRenderPipeline({layout:pipelineLayout,vertex:{module,entryPoint,buffers},fragment:{module,entryPoint:'fragment',targets:[{format}]},primitive:{topology:'triangle-strip',cullMode:'none'},multisample:{count},depthStencil:{format:depthFormat,depthWriteEnabled:true,depthCompare:'greater-equal'}});
-      const variant: Variant={near:pipeline('nearVertex'),far:pipeline('farVertex'),group:device.createBindGroup({layout,entries})};
-      if (this.spores) {
-        variant.spores=device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'sporeVertex'},fragment:{module,entryPoint:'sporeFragment',targets:[{format,blend:{color:{srcFactor:'src-alpha',dstFactor:'one'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}}]},multisample:{count},depthStencil:{format:depthFormat,depthWriteEnabled:false,depthCompare:'greater-equal'}});
-        variant.sporeGroup=device.createBindGroup({layout:variant.spores.getBindGroupLayout(0),entries:[entries[0]]});
-      }
-      this.variants.set(format+':'+count,variant);
-    }
+    this.variant(this.canvasFormat,sceneSamples(),depthFormat);
   }
 
   registerPasses(graph: FrameGraph): void {
@@ -151,7 +148,7 @@ export class GrassField implements EnginePlugin {
   };
   private readonly draw = (c: PassContext): void => {
     if (c.backend!=='webgpu') return;
-    const variant=this.variant(c);
+    const variant=this.variant(c.format,c.descriptor.multisample?.count??1,c.descriptor.depthStencil?.format);
     this.color.view=c.color; this.depth.view=c.depth;
     const pass=c.encoder.beginRenderPass(this.pass);
     pass.setBindGroup(0,variant.group); pass.setVertexBuffer(0,this.vertices!);
@@ -160,20 +157,31 @@ export class GrassField implements EnginePlugin {
   };
   private readonly drawSpores = (c: PassContext): void => {
     if (c.backend!=='webgpu') return;
-    const variant=this.variant(c);
+    const variant=this.variant(c.format,c.descriptor.multisample?.count??1,c.descriptor.depthStencil?.format);
     this.color.view=c.color; this.sporeDepth.view=c.depth;
     const pass=c.encoder.beginRenderPass(this.sporePass);
     pass.setPipeline(variant.spores!); pass.setBindGroup(0,variant.sporeGroup!); pass.draw(6,240); pass.end();
   };
-  private variant(c: Context): Variant {
-    const variant=this.variants.get(c.format+':'+(c.descriptor.multisample?.count??1));
-    if (!variant) throw new Error('Unsupported grass target format');
+  private variant(format:GPUTextureFormat,count:number,depthFormat:GPUTextureFormat=this.device!.features.has('depth32float-stencil8')?'depth32float-stencil8':'depth32float'): Variant {
+    if(format!==this.canvasFormat&&format!=='rgba16float'||count!==1&&(count!==4||sceneSamples()===1))throw new Error('Unsupported grass target format');
+    const key=format+':'+count+':'+depthFormat;
+    let variant=this.variants.get(key);
+    if(variant)return variant;
+    const device=this.device!,module=this.module!,buffers:GPUVertexBufferLayout[]=[{arrayStride:20,attributes:[{shaderLocation:0,offset:0,format:'float32x3'},{shaderLocation:1,offset:12,format:'float32x2'}]}];
+    const pipeline=(entryPoint:string)=>device.createRenderPipeline({layout:this.pipelineLayout!,vertex:{module,entryPoint,buffers},fragment:{module,entryPoint:'fragment',targets:[{format}]},primitive:{topology:'triangle-strip',cullMode:'none'},multisample:{count},depthStencil:{format:depthFormat,depthWriteEnabled:true,depthCompare:'greater-equal'}});
+    variant={near:pipeline('nearVertex'),far:pipeline('farVertex'),group:this.group!};
+    if(this.spores){
+      variant.spores=device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'sporeVertex'},fragment:{module,entryPoint:'sporeFragment',targets:[{format,blend:{color:{srcFactor:'src-alpha',dstFactor:'one'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}}]},multisample:{count},depthStencil:{format:depthFormat,depthWriteEnabled:false,depthCompare:'greater-equal'}});
+      variant.sporeGroup=device.createBindGroup({layout:variant.spores.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform!}}]});
+    }
+    this.variants.set(key,variant);
     return variant;
   }
   private release(): void {
     this.instances?.destroy(); this.visible?.destroy(); this.indirect?.destroy(); this.vertices?.destroy(); this.uniform?.destroy();
     this.instances=this.visible=this.indirect=this.vertices=this.uniform=undefined;
     this.device=undefined; this.compute=undefined; this.computeGroup=undefined; this.variants.clear();
+    this.module=this.pipelineLayout=this.group=undefined;this.canvasFormat=undefined;
   }
   onDeviceRestored(engine: Engine): void {this.release(); try {this.setup(engine);} catch (error) {this.release(); throw error;}}
   destroy(): void {this.dispose();}

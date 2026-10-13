@@ -39,3 +39,15 @@ test('ground clearance covers the damped and shaken arm without changing the req
   assert.throws(()=>new Cinematic({clearance:-1}),/clearance/);
   assert.throws(()=>new Cinematic({ground:()=>NaN}).update(0),/finite/);
 });
+
+test('camera springs reuse each decay across all three axes and resample mutable damping each tick',()=>{
+  const options={damping:5,lookDamping:7},rig=new Cinematic(options),exp=Math.exp,calls=[];
+  rig.update(0);rig.follow([10,2,-5]);
+  Math.exp=value=>{calls.push(value);return exp(value);};
+  try {
+    rig.update(0.125);assert.deepEqual(calls,[-0.625,-0.875]);
+    options.damping=9;options.lookDamping=13;calls.length=0;
+    rig.update(0.25);assert.deepEqual(calls,[-2.25,-3.25]);
+    assert.ok(rig.position.every(Number.isFinite));assert.ok(rig.lookAt.every(Number.isFinite));
+  } finally {Math.exp=exp;}
+});

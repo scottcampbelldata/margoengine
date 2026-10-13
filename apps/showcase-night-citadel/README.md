@@ -6,7 +6,7 @@ The fortress still contains 548 solid instances. `ScatterInstances` groups them 
 
 Scenery's `SkyMoonPass` retains the original azimuth, elevation, phase, twinkle and moon glow controls. The app's atmosphere pass composites height-dependent haze over masonry and water, reading the matching 4× or 1× depth texture. Moon direction and phase drive the sky, directional lighting, cascades and water glints together. The opening moon is at azimuth 215° and elevation 24°.
 
-Desktop scenes inherit the engine's **4× MSAA**. Phones inherit its **1× sampling** and canvas DPR cap of 2, with no 4× textures or pipelines. Phone shadows use 512² cascades rather than 1024²; the water grid uses 64 rather than 128 segments; embers use 512 rather than 2,048 particles. The panel shows the active quality setting. It also adds window intensity, wave height, bloom and exposure controls.
+Desktop scenes inherit the engine's **4× MSAA** with canvas DPR capped at 1 to avoid extra HiDPI supersampling. Phones inherit its **1× sampling** and canvas DPR cap of 2, with no 4× textures or pipelines. Phone shadows use 512² cascades rather than 1024²; the water grid uses 64 rather than 128 segments; embers use 512 rather than 2,048 particles. The panel shows the active quality setting. It also adds window intensity, wave height, bloom and exposure controls.
 
 The water grid concentrates those segments into a 160 m patch around the crag, with the existing horizon extension covering distant water. This keeps nearby waves resolved on desktop and phone grids. Wave height sets the largest wave train's amplitude in meters; zero flattens its displacement.
 

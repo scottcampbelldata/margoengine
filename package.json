@@ -84,7 +84,7 @@
     "pack:packages": "npm run build:packages && npm pack --workspace packages --ignore-scripts --pack-destination test-results",
     "package:blender": "python tools/blender-addon/package_addon.py",
     "modern:build": "node scripts/build-modern.js",
-    "modern:test": "node --test tests/modern*.test.js",
+    "modern:test": "node --experimental-test-module-mocks --test tests/modern*.test.js",
     "modern:test:browser": "node scripts/modern-browser-tests.js",
     "modern:test:domains": "node scripts/modern-domain-tests.js",
     "modern:test:sky": "node scripts/modern-sky-moon-tests.js",

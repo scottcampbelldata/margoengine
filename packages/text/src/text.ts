@@ -144,12 +144,15 @@ export class Text {
    * the font, so it needs a browser (OffscreenCanvas or a DOM canvas).
    */
   get layout(): TextLayout {
-    const snapshot = this.snapshot, values = [this.text, this.font, this.font.revision, ...LAYOUT_KEYS.map(key => this[key])];
-    if (!this.cached || values.some((value, i) => !Object.is(value, snapshot[i]))) {
+    const snapshot = this.snapshot;
+    let changed = !this.cached || !Object.is(this.text, snapshot[0]) || !Object.is(this.font, snapshot[1]) || !Object.is(this.font.revision, snapshot[2]);
+    if (!changed) for (let i = 0; i < LAYOUT_KEYS.length; i++) if (!Object.is(this[LAYOUT_KEYS[i]], snapshot[i + 3])) {changed = true; break;}
+    if (changed) {
+      const values = [this.text, this.font, this.font.revision, ...LAYOUT_KEYS.map(key => this[key])];
       this.cached = layoutText(this.text, this, this.font);
       snapshot.length = 0; snapshot.push(...values); this.layoutRevision++;
     }
-    return this.cached;
+    return this.cached!;
   }
 
   /** UTF-16 caret offset nearest to a local point. */

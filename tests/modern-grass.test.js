@@ -37,6 +37,7 @@ function fixture(t, options = {}, limits = {}) {
 
 test('GrassField packs rooted six-float instances, a seven-vertex strip and two portable indirect commands', t=>{
   const {field,state,graph,context}=fixture(t,{area:[60,40],spores:true});
+  graph.execute(context);
   const byLabel=name=>state.buffers.find(b=>b.descriptor.label==='grass:'+name);
   const instances=new Float32Array(byLabel('instances').bytes.buffer);
   assert.equal(instances.length,257*6);
@@ -54,7 +55,6 @@ test('GrassField packs rooted six-float instances, a seven-vertex strip and two 
     assert.equal(descriptor.primitive.topology,'triangle-strip');assert.equal(descriptor.primitive.cullMode,'none');
     assert.equal(descriptor.depthStencil.depthCompare,'greater-equal');assert.equal(descriptor.depthStencil.depthWriteEnabled,true);
   }
-  graph.execute(context);
   assert.deepEqual(state.commands,['clear:4','clear:20','compute','dispatch:5','end','render','indirect:0','indirect:16','end','render','spores','end']);
   assert.equal(state.dispatch,5);assert.deepEqual(state.clears.map(c=>[c.offset,c.size]),[[4,4],[20,4]]);
   assert.deepEqual(state.draws.map(d=>d.offset??[d.vertices,d.instances]),[0,16,[6,240]]);
@@ -79,7 +79,8 @@ test('GrassField.destroy removes compute and both render passes before releasing
 
 test('GrassField reuses staging, descriptors and all resources for canvas and HDR frames', t=>{
   const {field,state,device,context,graph}=fixture(t,{spores:true});
-  graph.execute(context);const data=state.writes.at(-1).data,grassPass=state.passes[0],sporePass=state.passes[1],resources=state.resources;
+  graph.execute(context);context.format='rgba16float';graph.execute(context);
+  const data=state.writes.at(-1).data,grassPass=state.passes[0],sporePass=state.passes[1],resources=state.resources;
   for(const name of Object.keys(device))if(name.startsWith('create'))device[name]=()=>assert.fail('Allocated '+name);
   for(let i=0;i<20;i++) {context.format=i%2?'rgba16float':'rgba8unorm';graph.execute(context);assert.equal(state.writes.at(-1).data,data);}
   assert.equal(state.resources,resources);
@@ -111,4 +112,31 @@ test('GrassField handles independent fields, direct disposal, restoration and fa
   device.createRenderPipeline=()=>{throw new Error('Pipeline failed');};
   const before=state.buffers.length;assert.throws(()=>new GrassField(stage,{blades:1}),/Pipeline failed/);
   assert.ok(state.buffers.slice(before).every(b=>b.destroyed===1));
+});
+
+test('GrassField builds only its initial variant, warms changed targets once, and retries failed variants', t=>{
+  const {field,state,device,context,graph}=fixture(t,{spores:true});
+  const renders=()=>state.pipelines.filter(p=>p.vertex);
+  assert.equal(renders().length,3,'Unused canvas/HDR and sampling variants must not compile during setup');
+  context.descriptor.multisample={count:4};graph.execute(context);
+  assert.equal(renders().length,3);
+  context.format='rgba16float';graph.execute(context);
+  assert.equal(renders().length,6);
+  context.descriptor.multisample.count=1;graph.execute(context);
+  assert.equal(renders().length,9);
+  context.descriptor.depthStencil.format='depth24plus';graph.execute(context);
+  assert.equal(renders().length,12);
+  assert.ok(renders().slice(-3).every(p=>p.depthStencil.format==='depth24plus'));
+  const resources=state.resources;
+  for(let i=0;i<120;i++)graph.execute(context);
+  assert.equal(state.resources,resources,'Stable frames must retain pipelines, layouts and groups');
+  const create=device.createRenderPipeline, failure=new Error('Variant failed');
+  device.createRenderPipeline=()=>{throw failure;};
+  context.descriptor.depthStencil.format='depth32float';context.format='rgba8unorm';context.descriptor.multisample.count=1;
+  assert.throws(()=>graph.execute(context),error=>error===failure);
+  device.createRenderPipeline=create;graph.execute(context);
+  assert.ok(renders().slice(-3).every(p=>p.depthStencil.format==='depth32float'&&p.multisample.count===1));
+  context.format='r32uint';assert.throws(()=>graph.execute(context),/Unsupported grass/);
+  context.format='rgba8unorm';context.descriptor.multisample.count=2;assert.throws(()=>graph.execute(context),/Unsupported grass/);
+  field.dispose();assert.equal(field.variants.size,0);
 });

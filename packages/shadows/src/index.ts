@@ -12,7 +12,7 @@ export interface ShadowContext {context:Context;pass:GPURenderPassEncoder;matrix
 export interface ShadowPrimitive {node:Mesh;vertex:GPUBuffer;index:GPUBuffer;count:number;stride:number;alphaTexture?:GPUTextureView;alphaSampler?:GPUSampler;alpha?:number;cutoff?:number;texCoord?:number}
 export interface ShadowSource {shadowPrimitives?:readonly ShadowPrimitive[];shadowVersion?:number;drawShadow?(context:ShadowContext):void;addLighting?(effect:Shadows):()=>void;disposed?:boolean}
 interface Source {source:ShadowSource|Mesh;static:boolean;version:number;removeLighting?:()=>void;meshPrimitive?:ShadowPrimitive[]}
-interface Draw {uniforms:GPUBuffer[];groups:GPUBindGroup[];values:Float32Array;vertex:GPUBuffer;index:GPUBuffer}
+interface Draw {uniforms:GPUBuffer[];groups:GPUBindGroup[];values:Float32Array;vertex:GPUBuffer;index:GPUBuffer;pipeline:GPURenderPipeline;alpha?:GPUTextureView;sampler?:GPUSampler}
 const emptyPrimitives:readonly ShadowPrimitive[]=[];
 export class Shadows implements EnginePlugin {
   readonly name='shadows';readonly matrices=new Float32Array(64);readonly splits=new Float32Array(4);
@@ -21,6 +21,7 @@ export class Shadows implements EnginePlugin {
   private views:GPUTextureView[]=[];private cachedViews:GPUTextureView[]=[];private entries:GPUBindGroupEntry[]=[];private pipelines=new Map<number,GPURenderPipeline>();private draws=new Map<Mesh,Map<GPUBuffer,Draw>>();private sources:Source[]=[];
   private readonly values=new Float32Array(92);private readonly ranges=this.values.subarray(84,88);private readonly previous=new Float32Array(64);private readonly view=this.values.subarray(64,80);
   private dirty=true;private disposed=false;
+  private whiteView?:GPUTextureView;
   private readonly light=new Float32Array(3);
   private readonly fitted={matrices:this.matrices,ranges:this.ranges};
   private readonly cascadeMatrices=Array.from({length:4},(_,i)=>this.matrices.subarray(i*16,i*16+16));
@@ -63,6 +64,7 @@ export class Shadows implements EnginePlugin {
     this.cached=texture();this.combined=texture();this.views=Array.from({length:4},(_,baseArrayLayer)=>this.combined!.createView({dimension:'2d',baseArrayLayer,arrayLayerCount:1}));this.cachedViews=Array.from({length:4},(_,baseArrayLayer)=>this.cached!.createView({dimension:'2d',baseArrayLayer,arrayLayerCount:1}));
     this.uniform=this.device.createBuffer({size:368,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});this.sampler=this.device.createSampler({compare:'less-equal',magFilter:'linear',minFilter:'linear'});this.alphaSampler=this.device.createSampler();
     this.white=this.device.createTexture({size:[1,1],format:'rgba8unorm',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});this.device.queue.writeTexture({texture:this.white},new Uint8Array([255,255,255,255]),{bytesPerRow:4},[1,1]);
+    this.whiteView=this.white.createView();
     this.entries=[{binding:1,resource:{buffer:this.uniform}},{binding:2,resource:this.combined.createView({dimension:'2d-array'})},{binding:3,resource:this.sampler}];this.dirty=true;
   }
   registerPasses(graph:FrameGraph):void {graph.add({name:this.name,order:-5,execute:c=>{if(c.backend!=='webgpu')return;this.render(c);c.shader=this.shader(c.shader);c.bindings.push(...this.bindings());}});}
@@ -72,16 +74,17 @@ export class Shadows implements EnginePlugin {
     fitCascades(c.camera,c.width/c.height,this.light as unknown as [number,number,number],this.options.resolution??2048,this.splits,this.matrices,this.ranges,this.options.casterMargin??100,this.fitted);
     for(let i=0;i<64;i++)if(this.matrices[i]!==this.previous[i])this.dirty=true;
     for(let i=this.sources.length-1;i>=0;i--){const r=this.sources[i];if('disposed' in r.source&&r.source.disposed||'id' in r.source&&this.engine!.meshes.get(r.source.id)!==r.source){this.sources.splice(i,1);r.removeLighting?.();this.clearDraws();this.dirty=true;}}
-    for(let i=0;i<this.sources.length;i++){const r=this.sources[i];if(r.static&&'shadowVersion' in r.source&&r.version!==r.source.shadowVersion){r.version=r.source.shadowVersion??0;this.dirty=true;}}
+    let dynamic=false;
+    for(let i=0;i<this.sources.length;i++){const r=this.sources[i];if(!r.static)dynamic=true;else if('shadowVersion' in r.source&&r.version!==r.source.shadowVersion){r.version=r.source.shadowVersion??0;this.dirty=true;}}
     this.values.set(this.matrices);viewMatrix(this.view,c.camera);this.values.set(this.splits,80);this.values[88]=this.options.lightSize??0.02;this.values[89]=this.options.bias??0.0005;this.values[90]=this.options.normalBias??0.02;c.device.queue.writeBuffer(this.uniform!,0,this.values as Float32Array<ArrayBuffer>);
     this.stats.staticDraws=this.stats.dynamicDraws=0;
     if(this.dirty){for(let cascade=0;cascade<4;cascade++)this.depth(c,cascade,true);this.previous.set(this.matrices);this.dirty=false;}else this.stats.cacheHits++;
     this.copySource.texture=this.cached!;this.copyDestination.texture=this.combined!;this.copySize.width=this.copySize.height=this.options.resolution??2048;c.encoder.copyTextureToTexture(this.copySource,this.copyDestination,this.copySize);
-    for(let cascade=0;cascade<4;cascade++)this.depth(c,cascade,false);
+    if(dynamic)for(let cascade=0;cascade<4;cascade++)this.depth(c,cascade,false);
   }
   private depth(c:Context,cascade:number,cached:boolean):void {
     this.depthAttachment.view=(cached?this.cachedViews:this.views)[cascade];this.depthAttachment.depthLoadOp=cached?'clear':'load';const pass=c.encoder.beginRenderPass(this.depthPass),matrix=this.cascadeMatrices[cascade];
-    for(let i=0;i<this.sources.length;i++){const r=this.sources[i];if(r.static!==cached||'disposed' in r.source&&r.source.disposed)continue;
+    try{for(let i=0;i<this.sources.length;i++){const r=this.sources[i];if(r.static!==cached||'disposed' in r.source&&r.source.disposed)continue;
       if('drawShadow' in r.source&&r.source.drawShadow){const shadow=this.shadowContexts[cascade];shadow.context=c;shadow.pass=pass;r.source.drawShadow(shadow);continue;}
       let primitives:readonly ShadowPrimitive[];
       if('id' in r.source){const node=r.source;if(this.engine!.meshes.get(node.id)!==node||!node.geometry)continue;const buffers=this.engine!.geometryBuffers(node.geometry);if(!buffers)continue;if(!r.meshPrimitive)r.meshPrimitive=[{node,vertex:buffers.vertex,index:buffers.index,count:node.geometry.indices.length,stride:24}];const primitive=r.meshPrimitive[0];primitive.vertex=buffers.vertex;primitive.index=buffers.index;primitive.count=node.geometry.indices.length;primitives=r.meshPrimitive;}
@@ -90,19 +93,27 @@ export class Shadows implements EnginePlugin {
         for(let id=node.id;id!==-1;id=this.engine!.store.parents[id])if(this.engine!.store.hidden[id])visible=false;if(!visible)continue;
         this.draw(pass,primitive,matrix,cascade);if(cached)this.stats.staticDraws++;else this.stats.dynamicDraws++;
       }
-    }pass.end();
+    }}catch(error){try{pass.end();}catch{}throw error;}pass.end();
   }
   private draw(pass:GPURenderPassEncoder,p:ShadowPrimitive,matrix:Float32Array,cascade:number):void {
     let pipeline=this.pipelines.get(p.stride);
     if(!pipeline){if(![24,80].includes(p.stride))throw new RangeError('Unsupported shadow vertex stride');const module=this.device!.createShaderModule({code:shadowDepth(p.stride===80)});pipeline=this.device!.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:p.stride,attributes:p.stride===80?[{shaderLocation:0,offset:0,format:'float32x4'},{shaderLocation:3,offset:48,format:'float32x4'},{shaderLocation:4,offset:64,format:'float32x4'}]:[{shaderLocation:0,offset:0,format:'float32x3'}]}]},fragment:{module,entryPoint:'fragment',targets:[]},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'less-equal'}});this.pipelines.set(p.stride,pipeline);}
     // Primitives sharing a node can have different alpha maps and geometry.
     let records=this.draws.get(p.node);if(!records){records=new Map();this.draws.set(p.node,records);}let record=records.get(p.index);
-    if(!record||record.vertex!==p.vertex||record.index!==p.index){if(record)for(const b of record.uniforms)b.destroy();const uniforms=Array.from({length:4},()=>this.device!.createBuffer({size:144,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}));record={uniforms,groups:uniforms.map(buffer=>this.device!.createBindGroup({layout:pipeline!.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer}},{binding:1,resource:p.alphaTexture??this.white!.createView()},{binding:2,resource:p.alphaSampler??this.alphaSampler!}]})),values:new Float32Array(36),vertex:p.vertex,index:p.index};records.set(p.index,record);}
+    if(!record||record.vertex!==p.vertex||record.pipeline!==pipeline||record.alpha!==p.alphaTexture||record.sampler!==p.alphaSampler){
+      if(record)for(const b of record.uniforms)b.destroy();records.delete(p.index);
+      const uniforms:GPUBuffer[]=[],groups:GPUBindGroup[]=[];
+      try{for(let i=0;i<4;i++){
+        const buffer=this.device!.createBuffer({size:144,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});uniforms.push(buffer);
+        groups.push(this.device!.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer}},{binding:1,resource:p.alphaTexture??this.whiteView!},{binding:2,resource:p.alphaSampler??this.alphaSampler!}]}));
+      }}catch(error){for(const buffer of uniforms)buffer.destroy();throw error;}
+      record={uniforms,groups,values:new Float32Array(36),vertex:p.vertex,index:p.index,pipeline,alpha:p.alphaTexture,sampler:p.alphaSampler};records.set(p.index,record);
+    }
     record.values.set(matrix);record.values.set(p.node.matrix,16);record.values[32]=p.alpha??1;record.values[33]=p.cutoff??0;record.values[34]=p.texCoord??0;this.device!.queue.writeBuffer(record.uniforms[cascade],0,record.values as Float32Array<ArrayBuffer>);
     pass.setPipeline(pipeline);pass.setBindGroup(0,record.groups[cascade]);pass.setVertexBuffer(0,p.vertex);pass.setIndexBuffer(p.index,'uint32');pass.drawIndexed(p.count);
   }
   private clearDraws():void {for(const records of this.draws.values())for(const r of records.values())for(const b of r.uniforms)b.destroy();this.draws.clear();}
-  private release():void {this.clearDraws();for(const texture of [this.cached,this.combined,this.white])texture?.destroy();this.uniform?.destroy();this.cached=this.combined=this.white=undefined;this.uniform=undefined;this.views=[];this.cachedViews=[];this.entries=[];this.pipelines.clear();this.shaders.clear();for(const shadow of this.shadowContexts){shadow.context=undefined!;shadow.pass=undefined!;}}
+  private release():void {this.clearDraws();for(const texture of [this.cached,this.combined,this.white])texture?.destroy();this.uniform?.destroy();this.cached=this.combined=this.white=undefined;this.whiteView=undefined;this.uniform=undefined;this.views=[];this.cachedViews=[];this.entries=[];this.pipelines.clear();this.shaders.clear();for(const shadow of this.shadowContexts){shadow.context=undefined!;shadow.pass=undefined!;}}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);for(const r of this.sources)r.removeLighting?.();this.sources.length=0;this.release();this.engine=this.device=undefined;}
   destroy():void {this.dispose();}

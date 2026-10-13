@@ -193,6 +193,13 @@ function leftmost(start: Node): Node {
  * counter-clockwise (positive area in a y-up frame). Ring orientation in the input does not matter.
  */
 export function triangulate(data: ArrayLike<number>, holeIndices: ArrayLike<number> = [], dim = 2): number[] {
+  if (!Number.isSafeInteger(dim) || dim < 2) throw new RangeError('Invalid triangulation dimension');
+  let previousHole = 0;
+  for (let i = 0; i < holeIndices.length; i++) {
+    const hole = holeIndices[i];
+    if (!Number.isSafeInteger(hole) || hole < previousHole || hole * dim > data.length) throw new RangeError('Invalid triangulation hole boundary');
+    previousHole = hole;
+  }
   const outerLength = holeIndices.length ? holeIndices[0] * dim : data.length;
   let outer = linkedList(data, 0, outerLength, dim, true);
   const triangles: number[] = [];

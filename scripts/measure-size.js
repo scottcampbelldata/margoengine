@@ -5,7 +5,7 @@ import {resolve} from 'node:path';
 import {checkCoreBudget, CORE_STAGE_GZIP_LIMIT} from './core-budget.js';
 
 export const compactOutput = {minify: {compress: {dropDebugger: true}, mangle: true, codegen: true}, comments: {annotation: true}};
-export const external = ['@margoengine/core', '@margoengine/core/extension', '@margoengine/animation', '@margoengine/gltf-pro', '@margoengine/blender', '@margoengine/gltf', '@margoengine/machinery', '@margoengine/creative', '@margoengine/scenery', '@margoengine/environment', '@margoengine/controls', '@margoengine/shadows', 'margoengine', 'react', 'react/jsx-runtime'];
+export const external = ['@margoengine/core', '@margoengine/core/extension', '@margoengine/animation', '@margoengine/gltf-pro', '@margoengine/blender', '@margoengine/gltf', '@margoengine/machinery', '@margoengine/creative', '@margoengine/scenery', '@margoengine/environment', '@margoengine/controls', '@margoengine/shadows', 'margoengine', 'react', 'react/jsx-runtime', '@margoengine/machinery/cad', '@margoengine/creative/particles', '@margoengine/creative/post', '@margoengine/scenery/sky'];
 
 export async function measureCoreStage() {
   const output = await build({configFile: false, publicDir: false, logLevel: 'silent', build: {

@@ -38,6 +38,8 @@ function walkThis(node, visit) {
   }
 }
 const body = member => member.type === 'MethodDefinition' ? member.value.body : member.value;
+// Gzip-tested order; only explicitly reviewed private members use these aliases.
+const aliases = 'efghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZabcd';
 
 export function compactInternals(source, javascript) {
   const classes = new Map(), edits = new Map();
@@ -56,7 +58,7 @@ export function compactInternals(source, javascript) {
       if (child.type === 'MemberExpression' && child.object.type === 'ThisExpression' && !child.computed && frequency.has(child.property.name)) frequency.set(child.property.name, frequency.get(child.property.name) + 1);
     });
     names.sort((a, b) => frequency.get(b) - frequency.get(a) || a.localeCompare(b));
-    const mapping = new Map(names.map((name, index) => [name, String.fromCharCode(97 + index % 26) + (index >= 26 ? Math.floor(index / 26) : '')]));
+    const mapping = new Map(names.map((name, index) => [name, aliases[index % aliases.length] + (index >= aliases.length ? Math.floor(index / aliases.length) : '')]));
     classes.set(node.id.name, mapping);
   });
   walk(parse('output.js', javascript), node => {

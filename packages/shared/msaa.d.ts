@@ -8,7 +8,8 @@ export class SceneTarget {
  readonly depthSource?:GPUTextureView;
  begin(context:Context):void;
  resolve(encoder:GPUCommandEncoder,final?:boolean):void;
- copyDepth(encoder:GPUCommandEncoder,view:GPUTextureView,count:number):void;
+ /** Copies reversed-Z depth; format defaults to the capture depth format. */
+ copyDepth(encoder:GPUCommandEncoder,view:GPUTextureView,count:number,format?:GPUTextureFormat):void;
  restore(context:Context):void;
  present(context:Context):void;
  dispose():void;

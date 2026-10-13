@@ -54,13 +54,13 @@ export class Cinematic implements EnginePlugin {
       const mesh = meshRuntime(this.mesh); mesh.check(); mesh.engine.store.tick(false);
       this.target[0] = mesh.matrix[12]; this.target[1] = mesh.matrix[13]; this.target[2] = mesh.matrix[14];
     }
-    const offsetY = this.groundOffset(this.target, this.offset[0], this.offset[1], this.offset[2]);
+    const offsetY = this.groundOffset(this.target, this.offset[0], this.offset[1], this.offset[2]), followDecay = Math.exp(-follow * delta), lookDecay = Math.exp(-look * delta);
     for (let i = 0; i < 3; i++) {
       const offset = i === 1 ? offsetY : this.offset[i];
       if (!this.initialized) {this.position[i] = this.target[i] + offset; this.lookAt[i] = this.target[i];}
       for (let kind = 0; kind < 2; kind++) {
         const values = kind ? this.lookAt : this.position, goal = this.target[i] + (kind ? 0 : offset), omega = kind ? look : follow, j = kind * 3 + i;
-        const error = values[i] - goal, derivative = this.velocity[j] + omega * error, decay = Math.exp(-omega * delta);
+        const error = values[i] - goal, derivative = this.velocity[j] + omega * error, decay = kind ? lookDecay : followDecay;
         values[i] = goal + (error + derivative * delta) * decay; this.velocity[j] = (this.velocity[j] - omega * derivative * delta) * decay;
       }
     }

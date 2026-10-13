@@ -35,7 +35,7 @@ export class Transitions implements EnginePlugin {
  setup(engine:Engine):void {if(this.disposed||!engine.gpu)throw new Error('Transitions requires WebGPU');this.engine=engine;this.uniform=engine.gpu.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});}
  registerPasses(graph:FrameGraph):void {
   graph.add({name:'transitions:capture',order:-80,execute:c=>{if(c.backend!=='webgpu')return;
-   if(this.scene?.width!==c.width||this.scene?.height!==c.height||this.format!==c.format){
+   if(this.scene?.width!==c.width||this.scene?.height!==c.height||this.format!==c.format||this.depth?.format!==c.descriptor.depthStencil!.format||this.capture?.samples!==(c.descriptor.multisample?.count??1)){
     this.capture?.dispose();this.depth?.destroy();this.scene?.destroy();this.previous?.destroy();this.format=c.format;
     this.scene=c.device.createTexture({size:[c.width,c.height],format:c.format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_SRC});
     this.previous=c.device.createTexture({size:[c.width,c.height],format:c.format,usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});

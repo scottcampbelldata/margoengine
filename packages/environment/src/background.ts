@@ -165,8 +165,9 @@ export class EnvironmentBackground {
       {binding: 4, visibility: GPUShaderStage.FRAGMENT, texture: texture('cube')},
     ]});
     const uniform = device.createBuffer({label: 'environment background', size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST});
-    this.state = {device, layout, pipelineLayout: device.createPipelineLayout({bindGroupLayouts: [layout]}), module: device.createShaderModule({code: backgroundShader}), uniform, pipelines: new Map(), groupVersion: -1,
-      sampler: device.createSampler({label: 'environment background', magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', addressModeU: 'repeat'})};
+    try{this.state = {device, layout, pipelineLayout: device.createPipelineLayout({bindGroupLayouts: [layout]}), module: device.createShaderModule({code: backgroundShader}), uniform, pipelines: new Map(), groupVersion: -1,
+      sampler: device.createSampler({label: 'environment background', magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', addressModeU: 'repeat'})};}
+    catch(error){uniform.destroy();throw error;}
     return this.state;
   }
 

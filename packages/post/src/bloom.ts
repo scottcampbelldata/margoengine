@@ -83,7 +83,7 @@ export class Bloom implements EnginePlugin {
     this.uniform = device.createBuffer({size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST});
     for (const data of [this.horizontal, new Float32Array([0, 1, 0, 0])]) {
       const buffer = device.createBuffer({size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST});
-      device.queue.writeBuffer(buffer, 0, data); this.kernels.push(buffer);
+      this.kernels.push(buffer); device.queue.writeBuffer(buffer, 0, data);
     }
     this.blur = device.createComputePipeline({layout: 'auto', compute: {module: device.createShaderModule({code: filter}), entryPoint: 'main'}});
   }
@@ -116,14 +116,13 @@ export class Bloom implements EnginePlugin {
     graph.add({name: 'bloom:AgX', order: 30, execute: c => {if (c.backend === 'webgpu') this.draw(c);}});
   }
   private resize(c: Context): void {
-    if (this.textures[0]?.width === c.width && this.textures[0]?.height === c.height && this.originalFormat === c.format) return;
-    this.capture?.dispose();for (const texture of this.textures) texture.destroy();
+    if (this.textures[0]?.width === c.width && this.textures[0]?.height === c.height && this.originalFormat === c.format && this.textures[1]?.format === c.descriptor.depthStencil!.format && this.capture?.samples === (c.descriptor.multisample?.count ?? 4)) return;
+    if(this.textures[1]?.format!==c.descriptor.depthStencil!.format||this.capture?.samples!==(c.descriptor.multisample?.count??4))this.scenePipelines.clear();
+    this.capture?.dispose();this.capture=undefined;for (const texture of this.textures) texture.destroy();this.textures=[];
     const device = c.device, width = Math.max(1, Math.ceil(c.width / 2)), height = Math.max(1, Math.ceil(c.height / 2));
-    this.textures = [
-      device.createTexture({size: [c.width, c.height], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC}),
-      device.createTexture({size: [c.width, c.height], format: c.descriptor.depthStencil!.format, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING}),
-      ...[0, 1].map(() => device.createTexture({size: [width, height], format: 'rgba16float', usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING})),
-    ];
+    this.textures.push(device.createTexture({size: [c.width, c.height], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC}));
+    this.textures.push(device.createTexture({size: [c.width, c.height], format: c.descriptor.depthStencil!.format, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING}));
+    for(let i=0;i<2;i++)this.textures.push(device.createTexture({size: [width, height], format: 'rgba16float', usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING}));
     this.capture=new SceneTarget(device,this.textures[0],this.textures[1],c.descriptor.multisample?.count??4);
     this.scene = this.textures[0].createView(); this.depth = this.textures[1].createView();
     const a = this.textures[2].createView(), b = this.textures[3].createView(), module = device.createShaderModule({code: composite});

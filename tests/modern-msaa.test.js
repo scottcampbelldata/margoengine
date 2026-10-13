@@ -121,7 +121,7 @@ test('single-sample optional captures allocate no intermediates and never resolv
   const target=new SceneTarget(h.engine.gpu,color,depth,1);assert.equal(h.counts.textures,count);
   assert.throws(()=>new SceneTarget(h.engine.gpu,color,depth,2),/1 or 4/);
   h.context.descriptor.multisample.count=1;target.begin(h.context);target.resolve(h.context.encoder,true);target.restore(h.context);
-  assert.equal(h.counts.render,0);assert.equal(h.pipelines.length,0);assert.equal(h.context.color,h.originalColor);assert.equal(h.context.depth,target.depth);
+  assert.equal(h.counts.render,0);assert.equal(h.pipelines.length,0);assert.equal(h.context.color,h.originalColor);assert.equal(h.context.depth,h.originalDepth);
   target.dispose();assert.equal(color.destroyed,false);assert.equal(depth.destroyed,false);color.destroy();depth.destroy();
 });
 

@@ -29,3 +29,16 @@ test('multiple overlays share one audible media route and release only their own
   const third=new Video(source,{audio});assert.equal(created,1);assert.equal(connections.filter(v=>v===destination).length,2);third.dispose();
  }finally{globalThis.HTMLVideoElement=old;dom.window.close();}
 });
+
+test('failed audio analysis setup retains the media source and removes only its new connections',()=>{
+ const dom=new JSDOM('<video></video>'),old=globalThis.HTMLVideoElement;globalThis.HTMLVideoElement=dom.window.HTMLVideoElement;
+ try{
+  for(const stage of ['create','connect']){
+   const source=dom.window.document.createElement('video'),failure=new Error('analysis failed'),destination={},outputs=new Set();let created=0,fail=true,analyses=0;
+   const node={connect(target){if(target!==destination&&fail&&stage==='connect')throw failure;outputs.add(target);},disconnect(target){outputs.delete(target);}};
+   const audio={destination,createMediaElementSource(){assert.equal(created++,0,'Browser media sources cannot be recreated');return node;},createAnalyser(){if(fail&&stage==='create')throw failure;analyses++;return {disconnect(){},getByteFrequencyData(){}};}};
+   assert.throws(()=>new Video(source,{audio}),error=>error===failure);assert.equal(outputs.size,0,'Failed setup left an audible route');
+   fail=false;const video=new Video(source,{audio});assert.equal(created,1);assert.equal(outputs.size,2);video.dispose();assert.equal(outputs.size,0);assert.ok(analyses>=1);
+  }
+ }finally{globalThis.HTMLVideoElement=old;dom.window.close();}
+});

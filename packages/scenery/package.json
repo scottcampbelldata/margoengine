@@ -20,6 +20,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./sky": {
+      "types": "./dist/sky.d.ts",
+      "import": "./dist/sky.js"
+    },
+    "./sky-moon": {
+      "types": "./dist/sky-moon.d.ts",
+      "import": "./dist/sky-moon.js"
     }
   },
   "files": [

@@ -16,10 +16,10 @@ export interface SdfParams {
 /** Defaults: 48 px glyphs, a 10 px range with a quarter of it inside the shape. */
 export const SDF_DEFAULTS = {size: 48, buffer: 8, radius: 10, cutoff: 0.25} as const;
 
-interface Scratch {f: Float64Array; v: Uint16Array; z: Float64Array}
+interface Scratch {f: Float64Array; v: Uint32Array; z: Float64Array}
 let scratch: Scratch | undefined;
 const workspace = (length: number): Scratch => {
-  if (!scratch || scratch.f.length < length) scratch = {f: new Float64Array(length), v: new Uint16Array(length), z: new Float64Array(length + 1)};
+  if (!scratch || scratch.f.length < length) scratch = {f: new Float64Array(length), v: new Uint32Array(length), z: new Float64Array(length + 1)};
   return scratch;
 };
 
