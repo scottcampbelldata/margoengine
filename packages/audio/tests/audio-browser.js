@@ -4,6 +4,13 @@ import {AudioListener, Audio, PositionalAudio, AudioAnalyser, loadAudioBuffer, d
 const assert = (condition, message) => {if (!condition) throw new Error(message);};
 const near = (a, b, tolerance) => Math.abs(a - b) <= tolerance;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const waitAudioTime = async (context, seconds) => {
+  const until = context.currentTime + seconds, deadline = performance.now() + 4000;
+  while (context.currentTime < until) {
+    assert(performance.now() < deadline, `Audio clock did not advance to ${until}: ${context.currentTime} (${context.state})`);
+    await sleep(10);
+  }
+};
 const rate = 48000;
 
 function noise(context, seconds) {
@@ -164,7 +171,7 @@ window.runEngineTests = async () => {
   mesh.setPosition([-1, 2, 4]);
   engine.render();
   assert([...listener.position].join() === '6,3,0' && [...listener.forward].join() === '-1,0,0', 'Listener did not take the new camera pose this frame');
-  await sleep(250);
+  await waitAudioTime(context, 0.25);
   pose = read();
   assert(pose.position.every((v, i) => near(v, [6, 3, 0][i], 1e-3)) && pose.forward.every((v, i) => near(v, [-1, 0, 0][i], 1e-3)), `Listener did not follow the camera ${JSON.stringify(pose)}`);
   const p = audio.panner;
@@ -173,11 +180,11 @@ window.runEngineTests = async () => {
   assert(analyser.getFloatWaveformData().some(v => Math.abs(v) > 1e-3), 'Positional sound is silent before hiding');
   mesh.visible = false;
   engine.render();
-  await sleep(200);
+  await waitAudioTime(context, 0.2);
   assert(audio.isMuted && audio.gain.gain.value < 1e-3 && analyser.getFloatWaveformData().every(v => Math.abs(v) < 1e-3), `Hidden mesh did not mute: ${audio.gain.gain.value}`);
   mesh.visible = true;
   engine.render();
-  await sleep(200);
+  await waitAudioTime(context, 0.2);
   assert(!audio.isMuted && near(audio.gain.gain.value, 1, 1e-3), 'Showing the mesh did not unmute');
   checks.push('muteWhenHidden silences the sound smoothly while the mesh is hidden');
 

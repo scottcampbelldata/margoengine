@@ -9,7 +9,7 @@ export class StereoRenderer {
   private pipeline?:GPURenderPipeline;
   private depthPipeline?:GPURenderPipeline;
   private readonly resources=new Map<Geometry,Resource>();
-  private readonly eyes:Array<{uniform:GPUBuffer;group:GPUBindGroup;data:Float32Array;color?:GPUTexture;depth?:GPUTexture;depthGroup?:GPUBindGroup}>=[];
+  private readonly eyes:Array<{uniform:GPUBuffer;group:GPUBindGroup;data:Float32Array;color?:GPUTexture;depth?:GPUTexture;colorView?:GPUTextureView;depthView?:GPUTextureView;depthGroup?:GPUBindGroup}>=[];
   private readonly used=new Set<Geometry>();
   constructor(private readonly device:GPUDevice){}
   configure(context:Extract<PassContext,{backend:'webgpu'}>,format:GPUTextureFormat):void {
@@ -62,11 +62,11 @@ export class StereoRenderer {
       device.queue.writeBuffer(frame.uniform,0,data as Float32Array<ArrayBuffer>);
       if(!image.depthStencilTexture)throw new Error('XR projection layer has no depth texture');
       if(frame.color?.width!==image.colorTexture.width||frame.color?.height!==image.colorTexture.height||frame.color?.format!==image.colorTexture.format){
-        frame.color?.destroy();frame.depth?.destroy();frame.color=undefined;frame.depth=undefined;
-        try{frame.color=device.createTexture({size:[image.colorTexture.width,image.colorTexture.height],format:image.colorTexture.format,sampleCount:4,usage:GPUTextureUsage.RENDER_ATTACHMENT});frame.depth=device.createTexture({size:[image.colorTexture.width,image.colorTexture.height],format:'depth24plus',sampleCount:4,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});frame.depthGroup=device.createBindGroup({layout:this.depthPipeline!.getBindGroupLayout(0),entries:[{binding:0,resource:frame.depth.createView()}]});}
-        catch(error){frame.color?.destroy();frame.color=undefined;throw error;}
+        frame.color?.destroy();frame.depth?.destroy();frame.color=undefined;frame.depth=undefined;frame.colorView=frame.depthView=frame.depthGroup=undefined;
+        try{frame.color=device.createTexture({size:[image.colorTexture.width,image.colorTexture.height],format:image.colorTexture.format,sampleCount:4,usage:GPUTextureUsage.RENDER_ATTACHMENT});frame.depth=device.createTexture({size:[image.colorTexture.width,image.colorTexture.height],format:'depth24plus',sampleCount:4,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});frame.colorView=frame.color.createView();frame.depthView=frame.depth.createView();frame.depthGroup=device.createBindGroup({layout:this.depthPipeline!.getBindGroupLayout(0),entries:[{binding:0,resource:frame.depthView}]});}
+        catch(error){frame.color?.destroy();frame.depth?.destroy();frame.color=frame.depth=undefined;frame.colorView=frame.depthView=frame.depthGroup=undefined;throw error;}
       }
-      const pass=encoder.beginRenderPass({colorAttachments:[{view:frame.color!.createView(),resolveTarget:image.colorTexture.createView(descriptor),loadOp:'clear',storeOp:'discard',clearValue:{r:0,g:0,b:0,a:transparent?0:1}}],depthStencilAttachment:{view:frame.depth!.createView(),depthLoadOp:'clear',depthStoreOp:'store',depthClearValue:1}});
+      const pass=encoder.beginRenderPass({colorAttachments:[{view:frame.colorView!,resolveTarget:image.colorTexture.createView(descriptor),loadOp:'clear',storeOp:'discard',clearValue:{r:0,g:0,b:0,a:transparent?0:1}}],depthStencilAttachment:{view:frame.depthView!,depthLoadOp:'clear',depthStoreOp:'store',depthClearValue:1}});
       const viewport=image.viewport;pass.setViewport(viewport.x,viewport.y,viewport.width,viewport.height,0,1);
       pass.setPipeline(pipeline);pass.setBindGroup(0,frame.group);
       for(const [geometry,resource] of this.resources)if(resource.count) {
@@ -76,7 +76,7 @@ export class StereoRenderer {
       // XR projection matrices use forward Z; populate the compositor's 1x depth layer.
       const depthPass=encoder.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:image.depthStencilTexture.createView(descriptor),depthLoadOp:'clear',depthStoreOp:'store',depthClearValue:1}});
       depthPass.setViewport(viewport.x,viewport.y,viewport.width,viewport.height,0,1);depthPass.setPipeline(this.depthPipeline!);depthPass.setBindGroup(0,frame.depthGroup!);depthPass.draw(3);depthPass.end();
-      encoder.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:frame.depth!.createView(),depthLoadOp:'load',depthStoreOp:'discard'}}).end();
+      encoder.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:frame.depthView!,depthLoadOp:'load',depthStoreOp:'discard'}}).end();
     }
     device.queue.submit([encoder.finish()]);
   }

@@ -76,8 +76,9 @@ export class SpriteBatch {
       grown.set(this.data);
       this.data = grown; this.structure++;
     }
-    const index = this.used++;
+    const index = this.used;
     this.write(index, sprite, true);
+    this.used++;
     return index;
   }
 

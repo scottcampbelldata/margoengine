@@ -267,6 +267,22 @@ test('SpriteBatch stores instances, grows, and removes by swapping', () => {
   assert.throws(() => batch.add({size: -1}), RangeError);
 });
 
+test('failed sprite additions preserve the active instances and next index', () => {
+  const batch = new SpriteBatch({capacity: 1});
+  assert.equal(batch.add({position: [1, 2, 3]}), 0);
+  const first = batch.data.slice(0, SPRITE_STRIDE), dirty = batch.dirty.map(range => [...range]);
+  for (const invalid of [{size: -1}, {position: [0, NaN, 0]}, {color: 'invalid'}, {opacity: 2}]) {
+    assert.throws(() => batch.add(invalid));
+    assert.equal(batch.count, 1, 'invalid sprite does not consume an active slot');
+    assert.deepEqual(batch.data.slice(0, SPRITE_STRIDE), first);
+    assert.deepEqual(batch.dirty, dirty);
+  }
+  assert.equal(batch.add({position: [4, 5, 6]}), 1);
+  assert.equal(batch.count, 2);
+  assert.equal(batch.remove(0), 1);
+  assert.deepEqual([...batch.data.subarray(0, 3)], [4, 5, 6]);
+});
+
 test('materials validate and expose Three.js aliases', () => {
   const m = new PointsMaterial({size: 3, sizeAttenuation: true, color: '#ff0000'});
   assert.equal(m.sizeUnits, 'world');

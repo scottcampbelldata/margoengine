@@ -22,6 +22,7 @@ export interface AudioListenerOptions {
 export interface ListenerSource {update(engine: EngineKernel | null): void; dispose(): void}
 
 const gestures = ['pointerdown', 'mousedown', 'keydown', 'touchend'] as const;
+const defaultForward: Vec3 = [0, 0, -1], defaultUp: Vec3 = [0, 1, 0];
 const audioContextClass = (): (new () => AudioContext) => {
   const scope = globalThis as unknown as {AudioContext?: new () => AudioContext; webkitAudioContext?: new () => AudioContext};
   const constructor = scope.AudioContext ?? scope.webkitAudioContext;
@@ -52,6 +53,9 @@ export class AudioListener implements EnginePlugin {
   private readonly sources = new Set<ListenerSource>();
   private gestureTarget?: EventTarget;
   private written = false;
+  private readonly cameraForward: [number, number, number] = [0, 0, -1];
+  private readonly forwardScratch = new Float64Array(3);
+  private readonly upScratch = new Float64Array(3);
   private readonly onGesture = (): void => {
     const context = this.audioContext;
     if (!context) return;
@@ -140,19 +144,21 @@ export class AudioListener implements EnginePlugin {
 
   private followCamera(engine: EngineKernel): void {
     const camera = engine.camera, p = camera.position, t = camera.target;
-    this.setPose(p, [t[0] - p[0], t[1] - p[1], t[2] - p[2]]);
+    const forward = this.cameraForward;
+    forward[0] = t[0] - p[0]; forward[1] = t[1] - p[1]; forward[2] = t[2] - p[2];
+    this.setPose(p, forward);
   }
 
   /** Sets the listener pose directly (world position, forward direction, up direction). */
-  setPose(position: Vec3, forward: Vec3, up: Vec3 = [0, 1, 0]): this {
-    const f: number[] = [0, 0, -1], u: number[] = [0, 1, 0];
-    normalize(forward[0], forward[1], forward[2], f, [0, 0, -1]);
-    normalize(up[0], up[1], up[2], u, [0, 1, 0]);
-    const next = [position[0], position[1], position[2], f[0], f[1], f[2], u[0], u[1], u[2]];
-    if (!next.every(Number.isFinite)) throw new RangeError('Listener pose must be finite');
-    const previous = [...this.position, ...this.forward, ...this.up];
-    const changed = !this.written || next.some((value, index) => value !== previous[index]);
-    this.position.set(next.slice(0, 3)); this.forward.set(next.slice(3, 6)); this.up.set(next.slice(6, 9));
+  setPose(position: Vec3, forward: Vec3, up: Vec3 = defaultUp): this {
+    const f = this.forwardScratch, u = this.upScratch;
+    normalize(forward[0], forward[1], forward[2], f, defaultForward);
+    normalize(up[0], up[1], up[2], u, defaultUp);
+    if (!Number.isFinite(position[0]) || !Number.isFinite(position[1]) || !Number.isFinite(position[2])) throw new RangeError('Listener pose must be finite');
+    let changed = !this.written;
+    for (let i = 0; i < 3; i++) if (position[i] !== this.position[i] || f[i] !== this.forward[i] || u[i] !== this.up[i]) changed = true;
+    for (let i = 0; i < 3; i++) this.position[i] = position[i];
+    this.forward.set(f); this.up.set(u);
     if (changed && this.audioContext) this.writePose();
     return this;
   }
@@ -162,8 +168,9 @@ export class AudioListener implements EnginePlugin {
     this.written = true;
     const [px, py, pz] = this.position, [fx, fy, fz] = this.forward, [ux, uy, uz] = this.up;
     if (listener.positionX) {
-      const values: Array<[AudioParam, number]> = [[listener.positionX, px], [listener.positionY, py], [listener.positionZ, pz], [listener.forwardX, fx], [listener.forwardY, fy], [listener.forwardZ, fz], [listener.upX, ux], [listener.upY, uy], [listener.upZ, uz]];
-      for (const [param, value] of values) smoothParam(param, value, context, this.smoothing, immediate);
+      smoothParam(listener.positionX, px, context, this.smoothing, immediate); smoothParam(listener.positionY, py, context, this.smoothing, immediate); smoothParam(listener.positionZ, pz, context, this.smoothing, immediate);
+      smoothParam(listener.forwardX, fx, context, this.smoothing, immediate); smoothParam(listener.forwardY, fy, context, this.smoothing, immediate); smoothParam(listener.forwardZ, fz, context, this.smoothing, immediate);
+      smoothParam(listener.upX, ux, context, this.smoothing, immediate); smoothParam(listener.upY, uy, context, this.smoothing, immediate); smoothParam(listener.upZ, uz, context, this.smoothing, immediate);
     } else {
       listener.setPosition(px, py, pz);
       listener.setOrientation(fx, fy, fz, ux, uy, uz);

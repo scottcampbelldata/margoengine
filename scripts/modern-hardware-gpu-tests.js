@@ -59,7 +59,7 @@ try{
   const resize=[];
   for(const factor of [1,1.5,2])for(const [width,height] of [[321,213],[900,450],[211,601],[1,1],[800,600]]){
    await cdp.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:factor,mobile:false});
-   await page.waitForFunction(({width,height,factor})=>{const c=window.hardwareScene.app.canvas;return c.width===Math.round(width*factor)&&c.height===Math.round(height*factor);},{width,height,factor});
+   await page.waitForFunction(({width,height,factor})=>{const c=window.hardwareScene.app.canvas,dpr=Math.min(factor,1);return c.width===Math.round(width*dpr)&&c.height===Math.round(height*dpr);},{width,height,factor});
    const sample=await page.evaluate(()=>{const {app}=window.hardwareScene,c=app.canvas,m=app.engine.camera.matrix;return {css:[c.clientWidth,c.clientHeight],pixels:[c.width,c.height],dpr:devicePixelRatio,projectionAspect:m[5]/m[0],depth:{...window.depthCounts}};});
    assert.ok(Math.abs(sample.projectionAspect-sample.pixels[0]/sample.pixels[1])<1e-4);
    assert.equal(sample.depth.invalid,0);assert.ok(sample.depth.alive<=1);resize.push(sample);

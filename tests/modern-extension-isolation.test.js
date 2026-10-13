@@ -33,3 +33,9 @@ test('game math helpers discard GPU renderers and shaders',async()=>{
   const code=result[0].output.filter(c=>c.type==='chunk').map(c=>c.code).join('\n');
   assert.ok(!code.includes('@fragment')&&!code.includes('@compute')&&!code.includes('createBuffer')&&!code.includes('@margoengine/animation'),'Unused GPU/gameplay code leaked into math-only imports');
 });
+
+test('scene fade subpath does not load SSAO or Bloom',async()=>{
+  const result=await build({configFile:false,publicDir:false,logLevel:'silent',build:{write:false,lib:{entry:'packages/post/dist/scene-fade.js',formats:['es']},rollupOptions:{external:['@margoengine/core','@margoengine/core/extension']}}});
+  const code=result[0].output.filter(chunk=>chunk.type==='chunk').map(chunk=>chunk.code).join('\n');
+  assert.ok(!code.includes('ssao:capture')&&!code.includes('bloom:capture')&&!code.includes('@compute'),'Scene fade retained the effects it defers');
+});

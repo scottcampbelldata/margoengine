@@ -30,6 +30,7 @@ export class Input {
       this.states.set(name, {value: 0, down: false, pressed: false, released: false});
       this.samples.push({name, state: this.states.get(name)!});
     }
+    try {
     this.listen(target, 'keydown', event => {const e = event as KeyboardEvent, node = e.composedPath()[0] as Element; if (!node?.closest?.('input,textarea,select,[contenteditable=true]')) this.keys.add(e.code);});
     this.listen(target, 'keyup', event => this.keys.delete((event as KeyboardEvent).code));
     this.listen(target, 'pointerdown', event => {if ((event as PointerEvent).pointerType !== 'touch') this.buttons |= 1 << (event as PointerEvent).button;});
@@ -38,6 +39,7 @@ export class Input {
     this.listen(target, 'wheel', event => {this.motion.wheel += (event as WheelEvent).deltaY;});
     this.listen(target, 'blur', () => this.reset());
     this.listen(target, 'pointercancel', () => this.reset());
+    } catch (error) {this.dispose(); throw error;}
   }
   private listen(target: EventTarget, type: string, listener: EventListener): void {
     target.addEventListener(type, listener); this.cleanups.push(() => target.removeEventListener(type, listener));

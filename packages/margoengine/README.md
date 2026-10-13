@@ -4,7 +4,9 @@ High-level setup for Margo Engine. Mount a canvas, enable orbit/pan/zoom, start 
 
 This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and the matching engine packages. Dependencies install the packs together, while dynamic imports keep their runtime code out of the initial scene.
 
-The combined core and stage facade measures 19,993 bytes gzip, with every base export retained. The build requires this bundle to stay strictly below 20,000 bytes and writes measurements to `test-results/modern-bundle-sizes.json`; `npm run measure:size` repeats the gate against the built artifacts. Lazy domain packs and application bootstrap/chunk overhead are measured separately; this is not the complete page download size.
+Apps using Stage load this facade and its shared core, then only the feature entries they use and those features' required dependencies. Apps using the Engine API directly can load core without Stage. Choose specific feature imports and load heavier features on demand; keep one matching core version across the app.
+
+The build requires the combined core and stage facade, with every base export retained, to stay strictly below 20,000 bytes gzip. It writes measurements to `test-results/modern-bundle-sizes.json`; `npm run measure:size` repeats the gate against the built artifacts. Lazy features and application bootstrap/chunk overhead are measured separately; this is not the complete page download size.
 
 Give the container a height, for example `<div id="scene" style="height:400px"></div>`:
 
@@ -28,14 +30,16 @@ Use a selector, an HTMLElement container or an existing canvas. The wrapper appe
 | `await app.load(url, options)` | Loads glTF/GLB/STL/OBJ/STEP/IGES, exposes root transforms and fits the imported meshes |
 | `app.onTick(delta => { ... })` | Runs once per frame with delta in seconds; returns an unsubscribe function |
 | `app.fit()` / `app.fit(model.meshes)` | Fits visible geometry, including world transforms and hierarchy |
-| `await app.sky(options)` | Attaches the scenery SkyMoon plugin |
-| `await app.particles(options)` | Attaches GPU particles |
-| `await app.effects(options)` | Attaches post-processing/atmosphere |
+| `await app.sky(options)` | Loads the scenery `/sky` entry and attaches SkyMoon |
+| `await app.particles(options)` | Loads creative `/particles` and attaches GPU particles |
+| `await app.effects(options)` | Loads creative `/post` and attaches post-processing/atmosphere |
 | `app.use(plugin)` | Attaches an existing plugin and returns it |
 | `await app.gltf()` / `app.machinery()` / `app.creative()` / `app.scenery()` | Loads the full corresponding pack on demand |
 | `app.engine` | Existing core API: camera, picking, plugins, manual render, start/stop and recovery |
 
 Loading infers format from the URL pathname, including `.stp` and `.igs`; set `format` for extensionless endpoints. Use `fit: false` to preserve camera framing, `signal` to cancel, and CAD `onProgress`/`smoothing` options as needed. Fits use the world-space AABB of transformed vertices. A failed fit retires the imported model. Existing loader byte limits, rollback and supported model subsets apply: glTF supports static opaque constant-color geometry, without textures, skinning or animation.
+
+Feature helpers load their entry and its required dependencies rather than the entire domain pack. CAD loading uses `@margoengine/machinery/cad`, without kinematics, surface transport or telemetry. Explicit pack accessors keep their complete namespaces for compatibility. A helper whose import finishes after stage disposal rejects with `AbortError` before constructing its plugin; active attached plugins remain owned by the engine and are disposed with it.
 
 `load()` returns the exported `LoadedModel` type:
 

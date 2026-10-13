@@ -9,6 +9,20 @@ import {exportGLB, exportGLTF, exportOBJ, exportPLY, exportSTL} from '../dist/in
 import {accessor, headlessEngine, parseASCIISTL, parseMTL, parseOBJ, parsePLY, readGLB, transformPoint, validate, validator} from './helpers.js';
 
 const fixture = async name => new Uint8Array(await readFile(new URL(`./fixtures/${name}`, import.meta.url)));
+
+test('non-finite alpha cutoffs reject instead of serializing as JSON null', () => {
+  const geometry = {positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1], indices: [0, 1, 2]};
+  for (const alphaCutoff of [Infinity, -Infinity, NaN]) {
+    const scene = {nodes: [{geometry, material: {alphaMode: 'MASK', alphaCutoff}}]};
+    assert.throws(() => exportGLB(scene), RangeError);
+    assert.throws(() => exportGLTF(scene), RangeError);
+  }
+  for (const alphaCutoff of [0, 0.5, 2]) {
+    const scene = {nodes: [{geometry, material: {alphaMode: 'MASK', alphaCutoff}}]};
+    assert.equal(readGLB(exportGLB(scene)).json.materials[0].alphaCutoff, alphaCutoff);
+    assert.equal(exportGLTF(scene).json.materials[0].alphaCutoff, alphaCutoff);
+  }
+});
 const close = (a, b, epsilon = 1e-5, label = 'value') => {
   assert.equal(a.length, b.length, `${label} length`);
   for (let i = 0; i < a.length; i++) assert.ok(Math.abs(a[i]-b[i]) <= epsilon, `${label}[${i}]: ${a[i]} vs ${b[i]}`);

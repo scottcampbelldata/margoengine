@@ -97,6 +97,7 @@ export class Line {
   private owner?: Owner;
   private distancesFor = new Float32Array(16).fill(NaN);
   private distanceVersion = -1;
+  private distanceMode?: LineMode;
 
   constructor(options: LineOptions = {}) {
     const {positions, colors, mode = 'strip', material, mesh = null, matrix, visible = true, ...style} = options;
@@ -169,10 +170,11 @@ export class Line {
   /** Called by the plugin each frame before drawing; helpers override it to follow their targets. Return false to skip this frame. */
   update(_engine: EngineKernel): boolean | void {}
 
-  /** Recomputes dash distances when the points or the model matrix changed. */
+  /** Recomputes dash distances when the points, mode or model matrix changed. */
   updateDistances(model: Mat4): void {
-    if (!copyIfChanged(this.distancesFor, model) && this.distanceVersion === this.version) return;
+    if (!copyIfChanged(this.distancesFor, model) && this.distanceVersion === this.version && this.distanceMode === this.mode) return;
     this.totalDistance = computeLineDistances(this.points, this.pointCount, this.mode, model);
+    this.distanceMode = this.mode;
     this.distanceVersion = this.version; this.version++; this.distanceVersion = this.version;
   }
 

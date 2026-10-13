@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {convertFBX} from '../dist/index.js';
+import {convertFBX,parseFBX} from '../dist/index.js';
+import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';
+import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
+import {MeshStandardMaterial} from 'three';
 import validator from 'gltf-validator';
 // Browser FileReader adapter for the upstream exporter; production uses the native API.
 globalThis.FileReader=class {async readAsArrayBuffer(blob){this.result=await blob.arrayBuffer();this.onloadend?.();}};
@@ -52,3 +55,40 @@ test('FBX animation curves survive as timed glTF translation channels',async()=>
  assert.deepEqual([...accessor(sampler.input)],[0,1]);assert.deepEqual([...accessor(sampler.output)],[0,0,0,2,0,0]);
  const report=await validator.validateBytes(new Uint8Array(result));assert.equal(report.issues.numErrors,0,JSON.stringify(report.issues));
 });
+
+async function textureConversion(count,run){
+ const parse=FBXLoader.prototype.parse,exportGLB=GLTFExporter.prototype.parseAsync,bitmap=globalThis.createImageBitmap;
+ const doc={images:Array.from({length:count},(_,i)=>({bufferView:i,mimeType:'image/png'})),bufferViews:Array.from({length:count},(_,i)=>({byteOffset:i,byteLength:1}))};
+ const text=JSON.stringify(doc),padded=text.padEnd(Math.ceil(text.length/4)*4),json=new TextEncoder().encode(padded),glb=new ArrayBuffer(28+json.length+count),view=new DataView(glb);
+ view.setUint32(12,json.length,true);new Uint8Array(glb,20,json.length).set(json);
+ FBXLoader.prototype.parse=()=>{
+  const mesh={isMesh:true,geometry:{getAttribute:()=>({count:3}),dispose(){}},material:new MeshStandardMaterial()};
+  return {animations:[],traverse(callback){callback(mesh);}};
+ };
+ GLTFExporter.prototype.parseAsync=async()=>glb;
+ try{await run();}finally{FBXLoader.prototype.parse=parse;GLTFExporter.prototype.parseAsync=exportGLB;globalThis.createImageBitmap=bitmap;}
+}
+
+test('FBX texture pixel accounting reads each decoded image once',async()=>textureConversion(12,async()=>{
+ const controller=new AbortController(),reason=new Error('stop before PBR attachment');let decoded=0,dimensionReads=0,closed=0;
+ globalThis.createImageBitmap=async()=>{
+  if(++decoded===12)controller.abort(reason);
+  return {get width(){dimensionReads++;return 2;},get height(){dimensionReads++;return 3;},close(){closed++;}};
+ };
+ await assert.rejects(parseFBX({},new ArrayBuffer(32),{signal:controller.signal}),error=>error===reason);
+ assert.equal(decoded,12);assert.equal(dimensionReads,24,'Pixel budgets must use linear per-image accounting');assert.equal(closed,12);
+}));
+
+test('FBX cancellation stops before decoding another image and closes the completed image',async()=>textureConversion(4,async()=>{
+ const controller=new AbortController(),reason=new Error('cancel texture decoding');let decoded=0,closed=0;
+ globalThis.createImageBitmap=async()=>{decoded++;controller.abort(reason);return {width:2,height:3,close(){closed++;}};};
+ await assert.rejects(parseFBX({},new ArrayBuffer(32),{signal:controller.signal}),error=>error===reason);
+ assert.equal(decoded,1);assert.equal(closed,1);
+}));
+
+test('FBX cumulative texture pixel limits still reject and close every decoded image',async()=>textureConversion(3,async()=>{
+ let decoded=0,closed=0;
+ globalThis.createImageBitmap=async()=>({width:8_000_000+(decoded++?1:0),height:1,close(){closed++;}});
+ await assert.rejects(parseFBX({},new ArrayBuffer(32)),/texture pixel budget/);
+ assert.equal(decoded,2);assert.equal(closed,2);
+}));

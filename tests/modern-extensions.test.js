@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {GLTFAsset,PBRModel,parseGLTF} from '../packages/gltf-pro/dist/index.js';
 import {Animation} from '../packages/animation/dist/index.js';
 import {SSAO} from '../packages/post/dist/index.js';
+import {SceneFade} from '../packages/post/dist/scene-fade.js';
 import {sampleTrack,multiplyMatrices} from '../packages/animation/src/sampling.ts';
 import {Engine,TransformStore} from '../packages/core/dist/extension.js';
 import {animatedTriangle} from './support/gltf-pro-fixture.js';
@@ -51,4 +52,12 @@ test('SSAO validates radius, bias, samples and toggles before GPU allocation',as
   for(const options of [{radius:0},{radius:NaN},{bias:-1},{bias:1,radius:0.5},{samples:33},{samples:2.5},{enabled:'yes'}])assert.throws(()=>new SSAO(options),/options/);
   const effect=new SSAO();effect.enabled=false;assert.equal(effect.enabled,false);assert.throws(()=>{effect.enabled=1;},/boolean/);
   const engine=await headless();try{assert.throws(()=>SSAO.attach(engine),/WebGPU/);assert.equal(engine.hasPlugin('ssao'),false);}finally{engine.dispose();}
+});
+
+test('scene fade validates timing and rejects invalid capture/warm ordering',async()=>{
+  for(const duration of [-1,NaN,Infinity,1001])assert.throws(()=>new SceneFade(duration),/duration/);
+  const effect=new SceneFade();assert.throws(()=>effect.capture(),/live scene/);
+  await assert.rejects(effect.warm(),/Capture/);assert.throws(()=>effect.start(),/Warm/);
+  effect.dispose();await effect.finished;effect.dispose();
+  const engine=await headless();try{assert.throws(()=>SceneFade.attach(engine),/WebGPU/);assert.equal(engine.hasPlugin('post:scene-fade'),false);}finally{engine.dispose();}
 });

@@ -22,3 +22,8 @@ export function rotateAxis(v: Vec3, axis: Vec3, angle: number): Vec3 {
   const c = Math.cos(angle), s = Math.sin(angle), k = cross(axis, v), d = dot(axis, v) * (1 - c);
   return [v[0] * c + k[0] * s + axis[0] * d, v[1] * c + k[1] * s + axis[1] * d, v[2] * c + k[2] * s + axis[2] * d];
 }
+/** Reject non-finite loop bounds before sampling or tessellation allocates geometry. */
+export function finiteNumber(value: number): number {
+  if (!Number.isFinite(value)) throw new RangeError('Expected a finite number');
+  return value;
+}

@@ -28,6 +28,10 @@ to the sea. This sheet has no cloud shadows or volumetric flight-through renderi
 
 timeScale is clock hours per real second. Sun direction is exposed in the reused sun buffer. The sky draws only where the reversed-Z scene depth is clear. Bruneton precomputation includes transmittance, single scattering, scattering density and orders 2..4, cached until turbidity changes. Tables interpolate four dimensions (radius, view zenith, sun zenith, view/sun angle), with 8 x 32 x 16 x 8 samples; angular and ray integration use 32 samples. Camera Y is meters above Earth; atmosphere math is kilometers.
 
+The default Preetham model computes the shared sun transmittance table. Scattering
+tables are computed when Bruneton is first rendered, including after a model
+switch or device restoration; changes to turbidity refresh the tables each model uses.
+
 `reflectionTexture` exposes a borrowed 64 × 32 linear HDR equirectangular environment
 for optional water reflection. Reading the getter enables its GPU refresh on
 subsequent frames; it uses the existing atmospheric tables. The texture changes

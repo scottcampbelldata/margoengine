@@ -1,7 +1,7 @@
 import {createStage, type Stage} from 'margoengine';
-import {Planet} from '@margoengine/creative';
+import {Planet} from '@margoengine/creative/planet';
 import {OrbitControls} from '@margoengine/controls';
-import {Bloom} from '@margoengine/post';
+import {Bloom} from '@margoengine/post/bloom';
 import {sceneSamples} from '../../../shared/quality.js';
 import {Stars} from './sky.js';
 

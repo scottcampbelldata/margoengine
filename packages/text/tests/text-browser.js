@@ -168,7 +168,9 @@ window.runTextTests = async () => {
   assert(Math.abs(shift - 2 * PX) <= 1.5, `Attached text moved ${shift} px, expected ${2 * PX}`);
   anchor.visible = false; image = await frame();
   assert(ink(image).count === 0, 'Text attached to a hidden mesh still draws');
-  anchor.visible = true; label.attach(null);
+  anchor.visible = true;const parent=engine.createMesh();anchor.setParent(parent);parent.visible=false;image=await frame();
+  assert(ink(image).count===0, 'Text attached below a hidden ancestor still draws');parent.visible=true;image=await frame();assert(ink(image).count>0, 'Text did not return when its ancestor became visible');
+  label.attach(null);
   report.checks.push('Text attached to a mesh follows its world matrix and hides with it');
 
   // 6. String updates of similar length reuse the GPU buffers; one draw call per block.

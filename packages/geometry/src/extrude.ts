@@ -1,6 +1,6 @@
 import {geometryData, sequentialIndices, type GeometryData} from './data.js';
 import type {Curve} from './curve.js';
-import type {Vec2, Vec3} from './math.js';
+import {finiteNumber, type Vec2, type Vec3} from './math.js';
 import type {Shape} from './path.js';
 import {isClockWise, mergeOverlappingPoints, triangulateShape} from './triangulate.js';
 
@@ -82,7 +82,7 @@ export function extrudeGeometry(shapes: Shape | readonly Shape[], options: Extru
 }
 
 function build(shape: Shape, options: ExtrudeOptions, out: number[], uvOut: number[], groups: {start: number; count: number; materialIndex: number}[]): void {
-  const curveSegments = options.curveSegments ?? 12, steps = Math.max(1, Math.floor(options.steps ?? 1)), depth = options.depth ?? 1;
+  const curveSegments = options.curveSegments ?? 12, steps = Math.max(1, Math.floor(finiteNumber(options.steps ?? 1))), depth = options.depth ?? 1;
   let bevelEnabled = options.bevelEnabled ?? true;
   const bevelThickness = options.bevelThickness ?? 0.2, bevelSize = options.bevelSize ?? bevelThickness - 0.1, bevelOffset = options.bevelOffset ?? 0;
   let bevelSegments = Math.floor(options.bevelSegments ?? 3);
@@ -90,6 +90,7 @@ function build(shape: Shape, options: ExtrudeOptions, out: number[], uvOut: numb
   let pathPoints: Vec3[] = [], frames: ReturnType<Curve<Vec3>['computeFrenetFrames']> | null = null;
   if (path) {pathPoints = path.getSpacedPoints(steps); frames = path.computeFrenetFrames(steps, false); bevelEnabled = false;}
   if (!bevelEnabled) bevelSegments = 0;
+  finiteNumber(bevelSegments);
 
   const extracted = shape.extractPoints(curveSegments);
   // Three.js convention: outer contour clockwise, holes counter-clockwise. Normalized for any input orientation.

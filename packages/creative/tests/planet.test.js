@@ -81,7 +81,7 @@ function fixture(t) {
     encoder: {beginRenderPass(descriptor) {state.descriptors.push(descriptor); return {setPipeline() {}, setBindGroup() {}, setVertexBuffer() {}, setIndexBuffer() {}, drawIndexed(...args) {state.draws.push(args);}, end() {}};}},
   });
   const frame = () => {for (const pass of graph.passes) pass.execute(context());};
-  return {engine, state, device, frame, graph};
+  return {engine, state, device, frame, graph, context};
 }
 
 test('Planet owns two transform nodes, two draws, retained uploads and detachable resources', async t => {
@@ -269,4 +269,20 @@ test('Planet remains optional in core and particle consumer bundles', async () =
     assert.ok(!code.includes('cloudOffset') && !code.includes('Planet requires WebGPU'), `Planet code leaked into ${kind} bundle`);
     if (kind === 'core') assert.ok(gzipSync(code).length < 20 * 1024, 'Existing core bundle exceeds its 20 KiB gzip budget');
   }
+});
+
+test('Planet builds only initial pipelines, retains exact geometry and caches target variants', async t => {
+ const {engine,state,device,graph,context}=fixture(t),sin=Math.sin,cos=Math.cos;let sins=0,cosines=0;
+ Math.sin=value=>{sins++;return sin(value);};Math.cos=value=>{cosines++;return cos(value);};
+ let planet;try{planet=await Planet.create(engine,{dayMap:'/day.png'});}finally{Math.sin=sin;Math.cos=cos;}
+ const pipelines=()=>state.resources.filter(value=>value.kind==='pipeline');assert.equal(pipelines().length,2);assert.equal(sins,8450);assert.equal(cosines,8450);
+ const upload=state.writes.find(value=>value.buffer.descriptor.usage&GPUBufferUsage.VERTEX).data,expected=new Float32Array(upload.length);
+ for(let ring=0;ring<=64;ring++)for(let segment=0;segment<=128;segment++){const latitude=ring*Math.PI/64,longitude=segment*Math.PI*2/128,i=(ring*129+segment)*3;expected[i]=sin(latitude)*cos(longitude);expected[i+1]=cos(latitude);expected[i+2]=sin(latitude)*sin(longitude);}
+ assert.deepEqual(Buffer.from(upload.buffer),Buffer.from(expected.buffer));
+ const run=(format='bgra8unorm',count=4,depth='depth32float')=>{const c=context();c.format=format;c.descriptor={multisample:{count},depthStencil:{format:depth}};for(const pass of graph.passes)pass.execute(c);};
+ run();assert.equal(pipelines().length,2);run('rgba16float');assert.equal(pipelines().length,4);run('rgba16float',1);assert.equal(pipelines().length,6);run('rgba16float',1,'depth24plus');assert.equal(pipelines().length,8);
+ const allocated=state.allocations;for(let i=0;i<120;i++){run();run('rgba16float');run('rgba16float',1);run('rgba16float',1,'depth24plus');}assert.equal(state.allocations,allocated);
+ state.failPipeline=true;assert.throws(()=>run('rgba16float',4,'depth24plus'),/Pipeline failed/);state.failPipeline=false;run('rgba16float',4,'depth24plus');assert.equal(pipelines().length,10);
+ assert.throws(()=>run('r32float'),/Unsupported planet target/);assert.throws(()=>run('bgra8unorm',2),/Unsupported planet target/);
+ const old=state.resources.filter(value=>['buffer','texture'].includes(value.kind));engine.gpu={...device};planet.onDeviceRestored(engine);assert.ok(old.every(value=>value.destroyed===1));planet.dispose();
 });

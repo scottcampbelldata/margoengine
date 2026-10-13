@@ -76,7 +76,7 @@ export class Sky implements EnginePlugin {
  private readonly attachment:GPURenderPassColorAttachment={view:undefined!,loadOp:'load',storeOp:'store'};
  private readonly depthAttachment:GPURenderPassDepthStencilAttachment={view:undefined!,depthReadOnly:true,stencilReadOnly:true};
  private readonly presentation:GPURenderPassDescriptor={colorAttachments:[this.attachment],depthStencilAttachment:this.depthAttachment};
- readonly name='sky';private engine?:Engine;private uniform?:GPUBuffer;private textures:GPUTexture[]=[];private pipelines:GPUComputePipeline[]=[];private groups:GPUBindGroup[]=[];private render?:GPURenderPipeline;private bind?:GPUBindGroup;private format='';private computedT=NaN;private readonly values=new Float32Array(40);private readonly inverse=this.values.subarray(0,16);private readonly scratch=new Float64Array(52);readonly sun=new Float32Array(3);readonly moon=Float32Array.from([-0.3,0.22,-1],v=>v/Math.hypot(0.3,0.22,1));private disposed=false;
+ readonly name='sky';private engine?:Engine;private uniform?:GPUBuffer;private textures:GPUTexture[]=[];private pipelines:GPUComputePipeline[]=[];private groups:GPUBindGroup[]=[];private render?:GPURenderPipeline;private bind?:GPUBindGroup;private format='';private computedT=NaN;private scatteringT=NaN;private readonly values=new Float32Array(40);private readonly inverse=this.values.subarray(0,16);private readonly scratch=new Float64Array(52);readonly sun=new Float32Array(3);readonly moon=Float32Array.from([-0.3,0.22,-1],v=>v/Math.hypot(0.3,0.22,1));private disposed=false;
  private cloudTime=0;private ambient?:GPUBuffer;private ambientEntry?:GPUBindGroupEntry;private readonly ambientValues=new Float32Array(4);private source='';private litShader='';
  private reflectionPipeline?:GPUComputePipeline;private reflectionGroup?:GPUBindGroup;private reflectionRequested=false;private readonly reflectionPass:GPUComputePassDescriptor={};
  private fogUniform?:GPUBuffer;private fogPipeline?:GPURenderPipeline;private fogGroup?:GPUBindGroup;private fogDepth?:GPUTexture;private fogFormat='';private readonly fogValues=new Float32Array(4);
@@ -102,7 +102,8 @@ export class Sky implements EnginePlugin {
   if(this.disposed||!engine.gpu)throw new Error('Sky requires WebGPU');this.engine=engine;const d=engine.gpu;
   this.uniform=d.createBuffer({size:160,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
   this.ambient=d.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});this.ambientEntry={binding:8,resource:{buffer:this.ambient}};
-  this.textures=[d.createTexture({size:[128,32],format:'rgba16float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.STORAGE_BINDING}),...[0,1,2,3,4].map(()=>d.createTexture({size:[128,256],format:'rgba16float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.STORAGE_BINDING}))];
+  this.textures.push(d.createTexture({size:[128,32],format:'rgba16float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.STORAGE_BINDING}));
+  for(let i=0;i<5;i++)this.textures.push(d.createTexture({size:[128,256],format:'rgba16float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.STORAGE_BINDING}));
   this.pipelines=[transmittance,single,density,multiple,add].map(s=>compute(d,s));const t=this.textures.map(t=>t.createView()),u={buffer:this.uniform};
   this.groups=[group(d,this.pipelines[0],[u,t[0]]),group(d,this.pipelines[1],[u,t[0],t[1],t[3]])];
   for(let order=0;order<3;order++){const previous=order%2,next=1-previous;
@@ -156,14 +157,18 @@ export class Sky implements EnginePlugin {
  private draw(c:Extract<PassContext,{backend:'webgpu'}>):void {
   this.validate();
   if(!invert(this.inverse,c.camera.matrix,0,this.scratch))throw new Error('Invalid sky camera');this.values.set(c.camera.position,16);this.values[19]=Math.max(0.001,c.camera.position[1]/1000);this.values.set(this.sun,20);this.values[24]=+(this.options.model==='bruneton');this.values[25]=this.options.exposure??0;this.values[26]=this.options.turbidity??2;this.values[36]=this.options.clouds?(this.options.clouds.coverage??0.45):0;this.values[37]=this.cloudTime;this.values[38]=this.options.clouds?.height??1500;this.values[27]=+(c.format==='rgba16float');c.device.queue.writeBuffer(this.uniform!,0,this.values as Float32Array<ArrayBuffer>);
-  if(this.computedT!==(this.options.turbidity??2)){dispatch(c,this.pipelines[0],this.groups[0],16,4);dispatch(c,this.pipelines[1],this.groups[1],16,32);
-   for(let i=0;i<3;i++){dispatch(c,this.pipelines[2],this.groups[2+i*3],16,32);dispatch(c,this.pipelines[3],this.groups[3+i*3],16,32);dispatch(c,this.pipelines[4],this.groups[4+i*3],16,32);}this.computedT=this.options.turbidity??2;
+  const turbidity=this.options.turbidity??2;
+  if(this.computedT!==turbidity)dispatch(c,this.pipelines[0],this.groups[0],16,4);
+  if(this.options.model==='bruneton'&&this.scatteringT!==turbidity){dispatch(c,this.pipelines[1],this.groups[1],16,32);
+   for(let i=0;i<3;i++){dispatch(c,this.pipelines[2],this.groups[2+i*3],16,32);dispatch(c,this.pipelines[3],this.groups[3+i*3],16,32);dispatch(c,this.pipelines[4],this.groups[4+i*3],16,32);}this.scatteringT=turbidity;
   }
+  this.computedT=turbidity;
   if(this.reflectionRequested){const reflected=c.encoder.beginComputePass(this.reflectionPass);reflected.setPipeline(this.reflectionPipeline!);reflected.setBindGroup(0,this.reflectionGroup!);reflected.dispatchWorkgroups(8,4);reflected.end();}
-  if(this.format!==c.format+':'+c.descriptor.multisample?.count){const module=c.device.createShaderModule({code});this.render=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]},multisample:c.descriptor.multisample,depthStencil:{format:c.descriptor.depthStencil!.format,depthCompare:'greater-equal',depthWriteEnabled:false}});this.bind=group(c.device,this.render,[{buffer:this.uniform!},this.textures[4].createView(),this.textures[0].createView()]);this.format=c.format+':'+c.descriptor.multisample?.count;}
+  const format=c.format+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format;
+  if(this.format!==format){const module=c.device.createShaderModule({code});this.render=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]},multisample:c.descriptor.multisample,depthStencil:{format:c.descriptor.depthStencil!.format,depthCompare:'greater-equal',depthWriteEnabled:false}});this.bind=group(c.device,this.render,[{buffer:this.uniform!},this.textures[4].createView(),this.textures[0].createView()]);this.format=format;}
   this.attachment.view=c.color;this.depthAttachment.view=c.depth;const pass=c.encoder.beginRenderPass(this.presentation);pass.setPipeline(this.render!);pass.setBindGroup(0,this.bind!);pass.draw(3);pass.end();
  }
- private release():void {this.uniform?.destroy();this.ambient?.destroy();this.fogUniform?.destroy();this.fogUniform=undefined;this.fogPipeline=undefined;this.fogGroup=undefined;this.fogDepth=undefined;this.fogFormat='';this.ambient=undefined;this.ambientEntry=undefined;this.source=this.litShader='';for(const t of this.textures)t.destroy();this.uniform=undefined;this.textures=[];this.pipelines=[];this.groups=[];this.render=undefined;this.bind=undefined;this.reflectionPipeline=undefined;this.reflectionGroup=undefined;this.format='';this.computedT=NaN;}
+ private release():void {this.uniform?.destroy();this.ambient?.destroy();this.fogUniform?.destroy();this.fogUniform=undefined;this.fogPipeline=undefined;this.fogGroup=undefined;this.fogDepth=undefined;this.fogFormat='';this.ambient=undefined;this.ambientEntry=undefined;this.source=this.litShader='';for(const t of this.textures)t.destroy();this.uniform=undefined;this.textures=[];this.pipelines=[];this.groups=[];this.render=undefined;this.bind=undefined;this.reflectionPipeline=undefined;this.reflectionGroup=undefined;this.format='';this.computedT=this.scatteringT=NaN;}
  onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
  dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.engine=undefined;}
 }

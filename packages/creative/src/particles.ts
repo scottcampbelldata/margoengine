@@ -2,6 +2,7 @@ import type {Engine,EnginePlugin,FrameGraph,PassContext,Vec3} from '@margoengine
 declare const GPUBufferUsage:{STORAGE:number;COPY_SRC:number;COPY_DST:number;UNIFORM:number};
 declare const GPUTextureUsage:{COPY_DST:number;TEXTURE_BINDING:number};
 type Context=Extract<PassContext,{backend:'webgpu'}>;
+const noObstacles:readonly WindObstacle[]=[];
 const declarations=`struct Particle {position:vec4f,velocity:vec4f}
 struct Obstacle {center:vec4f,extent:vec4f}
 struct Frame {camera:mat4x4f,gravity:vec4f,wind:vec4f,settings:vec4f,right:vec4f,up:vec4f,eye:vec4f,forward:vec4f,params:vec4f,obstacles:array<Obstacle,64>}
@@ -51,12 +52,21 @@ export class GPUParticles implements EnginePlugin {
   this.count=count;this.capacity=2**Math.ceil(Math.log2(count));this.frame.set(gravity,16);this.frame.set(wind,20);this.frame[25]=size;this.frame[26]=count;this.frame[44]=curl;this.frame[46]=+(options.sort??false);this.frame[47]=this.capacity;this.obstacles();
   const data=new Uint8Array(8*8*4);for(let y=0;y<8;y++)for(let x=0;x<8;x++){const i=(y*8+x)*4;data.set([255,255,255,Math.abs((x-3.5)/3.5)+Math.abs((y-3.5)/3.5)<1.1?255:0],i);}this.sprite={width:8,height:8,data};if(options.texture)this.setTexture(options.texture);
  }
- private obstacles():void {const list=this.options.obstacles??[];if(list.length>64)throw new RangeError('Obstacle limit is 64');this.frame[45]=list.length;
-  list.forEach((o,i)=>{if(!['sphere','box'].includes(o.kind)||o.center.length!==3||!o.center.every(v=>Number.isFinite(Math.fround(v))))throw new RangeError('Invalid wind obstacle');const extent=o.kind==='sphere'?[o.radius,o.radius,o.radius]:o.halfSize;
-   if(extent.length!==3||!extent.every(v=>Number.isFinite(Math.fround(v))&&v>0))throw new RangeError('Invalid wind obstacle extent');this.frame.set([...o.center,+(o.kind==='box'),...extent,0],48+i*8);});
+ private obstacles():void {
+  const list=this.options.obstacles??noObstacles,count=list.length,f=this.frame;
+  if(count>64)throw new RangeError('Obstacle limit is 64');f[45]=count;
+  for(let i=0;i<count;i++){
+   const o=list[i],center=o.center,x=center[0],y=center[1],z=center[2];
+   if(o.kind!=='sphere'&&o.kind!=='box'||center.length!==3||!Number.isFinite(Math.fround(x))||!Number.isFinite(Math.fround(y))||!Number.isFinite(Math.fround(z)))throw new RangeError('Invalid wind obstacle');
+   let ex:number,ey:number,ez:number;
+   if(o.kind==='sphere')ex=ey=ez=o.radius;
+   else{const extent=o.halfSize;if(extent.length!==3)throw new RangeError('Invalid wind obstacle extent');ex=extent[0];ey=extent[1];ez=extent[2];}
+   if(!Number.isFinite(Math.fround(ex))||ex<=0||!Number.isFinite(Math.fround(ey))||ey<=0||!Number.isFinite(Math.fround(ez))||ez<=0)throw new RangeError('Invalid wind obstacle extent');
+   const at=48+i*8;f[at]=x;f[at+1]=y;f[at+2]=z;f[at+3]=+(o.kind==='box');f[at+4]=ex;f[at+5]=ey;f[at+6]=ez;f[at+7]=0;
+  }
  }
- setTexture(source:ParticleTexture):void {if(!Number.isSafeInteger(source.width)||!Number.isSafeInteger(source.height)||Math.min(source.width,source.height)<1||Math.max(source.width,source.height)>4096||!(source.data instanceof Uint8Array||source.data instanceof Uint8ClampedArray)||source.data.length!==source.width*source.height*4)throw new RangeError('Invalid RGBA particle texture');this.sprite={width:source.width,height:source.height,data:Uint8Array.from(source.data)};if(this.device)this.uploadTexture();}
- private uploadTexture():void {const d=this.device!,s=this.sprite;const texture=d.createTexture({size:[s.width,s.height],format:'rgba8unorm-srgb',usage:GPUTextureUsage.COPY_DST|GPUTextureUsage.TEXTURE_BINDING});d.queue.writeTexture({texture},s.data as Uint8Array<ArrayBuffer>,{bytesPerRow:s.width*4},[s.width,s.height]);this.texture?.destroy();this.texture=texture;this.variants.clear();}
+ setTexture(source:ParticleTexture):void {if(!Number.isSafeInteger(source.width)||!Number.isSafeInteger(source.height)||Math.min(source.width,source.height)<1||Math.max(source.width,source.height)>4096||!(source.data instanceof Uint8Array||source.data instanceof Uint8ClampedArray)||source.data.length!==source.width*source.height*4)throw new RangeError('Invalid RGBA particle texture');const sprite={width:source.width,height:source.height,data:Uint8Array.from(source.data)};if(this.device)this.uploadTexture(sprite);this.sprite=sprite;}
+ private uploadTexture(s=this.sprite):void {const d=this.device!,texture=d.createTexture({size:[s.width,s.height],format:'rgba8unorm-srgb',usage:GPUTextureUsage.COPY_DST|GPUTextureUsage.TEXTURE_BINDING});try{d.queue.writeTexture({texture},s.data as Uint8Array<ArrayBuffer>,{bytesPerRow:s.width*4},[s.width,s.height]);}catch(error){texture.destroy();throw error;}this.texture?.destroy();this.texture=texture;this.variants.clear();}
  setup(engine:Engine):void {
   if(this.device)throw new Error('Particles already attached');const device=engine.gpu;if(!device)throw new Error('GPUParticles requires WebGPU; the base engine supports WebGL2');this.device=device;
   if(this.count*32>device.limits.maxStorageBufferBindingSize)throw new RangeError('Particle storage exceeds GPU limit');this.particles=device.createBuffer({size:this.count*32,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST|GPUBufferUsage.COPY_SRC});this.uniform=device.createBuffer({size:2240,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
@@ -64,20 +74,23 @@ export class GPUParticles implements EnginePlugin {
   const data=new Float32Array(this.count*8);let seed=0x12345678;const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};for(let i=0;i<this.count;i++){data[i*8]=random()*6-3;data[i*8+1]=random()*6-3;data[i*8+2]=random()*4-2;data[i*8+3]=random();}device.queue.writeBuffer(this.particles,0,data);
   this.compute=device.createComputePipeline({layout:'auto',compute:{module:device.createShaderModule({code:shader}),entryPoint:'update'}});const entries=[{binding:0,resource:{buffer:this.particles}},{binding:1,resource:{buffer:this.uniform}}];this.computeGroup=device.createBindGroup({layout:this.compute.getBindGroupLayout(0),entries});
   if(this.options.sort){const module=device.createShaderModule({code:sorter});this.initialize=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'initialize'}});this.sort=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'sort'}});this.initializeGroup=device.createBindGroup({layout:this.initialize.getBindGroupLayout(0),entries:[entries[1],{binding:2,resource:{buffer:this.indices}}]});
-   for(let k=2;k<=this.capacity;k*=2)for(let j=k/2;j>=1;j/=2){const buffer=device.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});device.queue.writeBuffer(buffer,0,new Uint32Array([j,k,0,0]));const group=device.createBindGroup({layout:this.sort.getBindGroupLayout(0),entries:[...entries,{binding:2,resource:{buffer:this.indices}},{binding:3,resource:{buffer}}]});this.stages.push({buffer,group});}}
+   for(let k=2;k<=this.capacity;k*=2)for(let j=k/2;j>=1;j/=2){const buffer=device.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});try{device.queue.writeBuffer(buffer,0,new Uint32Array([j,k,0,0]));const group=device.createBindGroup({layout:this.sort.getBindGroupLayout(0),entries:[...entries,{binding:2,resource:{buffer:this.indices}},{binding:3,resource:{buffer}}]});this.stages.push({buffer,group});}catch(error){buffer.destroy();throw error;}}}
  }
  registerPasses(graph:FrameGraph):void {graph.add({name:'particles:update',order:-10,execute:context=>this.update(context)});graph.add({name:'particles:draw',order:10,execute:context=>{if(context.backend!=='webgpu')throw new Error('Particles require WebGPU');this.draw(context);}});}
  private update(context:PassContext):void {if(context.backend!=='webgpu')throw new Error('Particles require WebGPU');this.obstacles();this.time+=context.delta;const f=this.frame;f.set(context.camera.matrix);f[24]=context.delta;f[27]=this.time;
-  const [x,y,z]=context.camera.position,[tx,ty,tz]=context.camera.target;const length=Math.hypot(tx-x,ty-y,tz-z);const forward=[(tx-x)/length,(ty-y)/length,(tz-z)/length],up=[0,1,0];let right=[forward[1]*up[2]-forward[2]*up[1],forward[2]*up[0]-forward[0]*up[2],forward[0]*up[1]-forward[1]*up[0]];const rl=Math.hypot(...right);right=right.map(v=>v/rl);f.set([...right,0],28);f.set([right[1]*forward[2]-right[2]*forward[1],right[2]*forward[0]-right[0]*forward[2],right[0]*forward[1]-right[1]*forward[0],0],32);f.set([x,y,z,0],36);f.set([...forward,0],40);this.device!.queue.writeBuffer(this.uniform!,0,f);
-  const pass=context.encoder.beginComputePass();pass.setPipeline(this.compute!);pass.setBindGroup(0,this.computeGroup!);pass.dispatchWorkgroups(Math.ceil(this.count/64));
-  if(this.initialize){pass.setPipeline(this.initialize);pass.setBindGroup(0,this.initializeGroup!);pass.dispatchWorkgroups(Math.ceil(this.capacity/64));pass.setPipeline(this.sort!);for(const stage of this.stages){pass.setBindGroup(0,stage.group);pass.dispatchWorkgroups(Math.ceil(this.capacity/64));}}pass.end();
+  const [x,y,z]=context.camera.position,[tx,ty,tz]=context.camera.target,length=Math.hypot(tx-x,ty-y,tz-z),fx=(tx-x)/length,fy=(ty-y)/length,fz=(tz-z)/length;
+  let rx=fy*0-fz,ry=fz*0-fx*0,rz=fx-fy*0;const rl=Math.hypot(rx,ry,rz);rx/=rl;ry/=rl;rz/=rl;
+  f[28]=rx;f[29]=ry;f[30]=rz;f[31]=0;f[32]=ry*fz-rz*fy;f[33]=rz*fx-rx*fz;f[34]=rx*fy-ry*fx;f[35]=0;
+  f[36]=x;f[37]=y;f[38]=z;f[39]=0;f[40]=fx;f[41]=fy;f[42]=fz;f[43]=0;this.device!.queue.writeBuffer(this.uniform!,0,f);
+  const pass=context.encoder.beginComputePass();try{pass.setPipeline(this.compute!);pass.setBindGroup(0,this.computeGroup!);pass.dispatchWorkgroups(Math.ceil(this.count/64));
+  if(this.initialize){pass.setPipeline(this.initialize);pass.setBindGroup(0,this.initializeGroup!);pass.dispatchWorkgroups(Math.ceil(this.capacity/64));pass.setPipeline(this.sort!);for(const stage of this.stages){pass.setBindGroup(0,stage.group);pass.dispatchWorkgroups(Math.ceil(this.capacity/64));}}}finally{pass.end();}
  }
- private draw(c:Context):void {const key=c.format+':'+c.descriptor.multisample?.count;let variant=this.variants.get(key);if(!variant){const module=c.device.createShaderModule({code:drawShader});const pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format,blend:{color:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}}]},primitive:{topology:'triangle-list'},multisample:c.descriptor.multisample,depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:false,depthCompare:'greater-equal'}});
+ private draw(c:Context):void {const key=c.format+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format;let variant=this.variants.get(key);if(!variant){const module=c.device.createShaderModule({code:drawShader});const pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format,blend:{color:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}}]},primitive:{topology:'triangle-list'},multisample:c.descriptor.multisample,depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:false,depthCompare:'greater-equal'}});
    variant={pipeline,group:c.device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.particles!}},{binding:1,resource:{buffer:this.uniform!}},{binding:2,resource:this.texture!.createView()},{binding:3,resource:this.sampler!},{binding:4,resource:{buffer:this.indices!}}]})};this.variants.set(key,variant);}
   const descriptor=this.pass??={colorAttachments:[{view:c.color,loadOp:'load',storeOp:'store'}],depthStencilAttachment:{view:c.depth,depthReadOnly:true,stencilReadOnly:true}};(descriptor.colorAttachments as GPURenderPassColorAttachment[])[0].view=c.color;descriptor.depthStencilAttachment!.view=c.depth;
-  const pass=c.encoder.beginRenderPass(descriptor);pass.setPipeline(variant.pipeline);pass.setBindGroup(0,variant.group);pass.draw(6,this.count);pass.end();
+  const pass=c.encoder.beginRenderPass(descriptor);try{pass.setPipeline(variant.pipeline);pass.setBindGroup(0,variant.group);pass.draw(6,this.count);}finally{pass.end();}
  }
- onDeviceRestored(engine:Engine):void {const time=this.time;this.dispose();this.setup(engine);this.time=time;}
+ onDeviceRestored(engine:Engine):void {const time=this.time;this.dispose();try{this.setup(engine);this.time=time;}catch(error){this.dispose();throw error;}}
  dispose():void {this.particles?.destroy();this.uniform?.destroy();this.indices?.destroy();this.texture?.destroy();for(const s of this.stages)s.buffer.destroy();this.stages=[];this.variants.clear();this.particles=undefined;this.uniform=undefined;this.indices=undefined;this.texture=undefined;this.device=undefined;this.time=0;this.initialize=undefined;this.sort=undefined;this.compute=undefined;this.computeGroup=undefined;this.initializeGroup=undefined;this.sampler=undefined;this.pass=undefined;}
 }
 

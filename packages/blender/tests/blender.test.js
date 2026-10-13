@@ -46,6 +46,23 @@ test('CAD sections expand positions/normals with PBR defaults and retain shared 
   assert.deepEqual(decodeMargo(padded.subarray(4,4+input.length)).geometry[0][0].vertices,p.vertices);
 });
 
+test('CAD expansion preserves every packed byte without temporary position or normal views',()=>{
+  const input=Uint8Array.from(cadSource),view=new DataView(input.buffer),offset=view.getUint32(84,true);
+  view.setFloat32(offset,-0,true);
+  const source=new Float32Array(input.buffer,offset,view.getUint32(88,true)/4),expected=new Float32Array(source.length/6*20);
+  for(let i=0;i<source.length/6;i++){
+    for(let axis=0;axis<3;axis++){expected[i*20+axis]=source[i*6+axis];expected[i*20+4+axis]=source[i*6+3+axis];}
+    expected[i*20+3]=1;expected.fill(1,i*20+16,i*20+20);
+  }
+  const subarray=Float32Array.prototype.subarray;let views=0;
+  Float32Array.prototype.subarray=function(...args){if(this.buffer===input.buffer)views++;return subarray.apply(this,args);};
+  let result;
+  try{result=decodeMargo(input).geometry[0][0];}finally{Float32Array.prototype.subarray=subarray;}
+  assert.deepEqual(new Uint8Array(result.vertices.buffer),new Uint8Array(expected.buffer));
+  assert.ok(Object.is(result.vertices[0],-0));
+  assert.equal(views,0,'expansion must not create two temporary views per CAD vertex');
+});
+
 test('CAD flags, lengths, indices and normals are validated before rendering',()=>{
   const vertexEntry=80,indexEntry=96;
   for(const [offset,value] of [[vertexEntry+12,2],[indexEntry+12,3],[indexEntry+12,2],[vertexEntry+8,71]]){

@@ -1,5 +1,9 @@
 # Margo Engine glTF Pro
 
+Use `import {GLTFAsset} from '@margoengine/gltf-pro/asset'` for accessor decoding
+without loading PBR rendering or its shaders. The root export retains the same
+constructor; `GLTFDocument` is available as a type from either entry.
+
 Optional WebGPU glTF 2.0 metallic-roughness rendering, separate from the frozen core and stage. The public npm name follows this repository's scope: `@margoengine/gltf-pro`.
 
 ```ts

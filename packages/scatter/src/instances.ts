@@ -1,6 +1,7 @@
 import {PbrMaterial, type EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext} from '@margoengine/core/extension';
 import {windShader, validateWind, type ScatterWind} from './wind.js';
+import {sameBindings, snapshotBindings} from './bindings.js';
 
 declare const GPUBufferUsage: {VERTEX: number; INDEX: number; INDIRECT: number; UNIFORM: number; COPY_DST: number};
 type Context = Extract<PassContext, {backend: 'webgpu'}>;
@@ -117,9 +118,9 @@ export class ScatterInstances implements EnginePlugin {
   private draw(c: Context): void {
     const intensity = typeof this.emissiveIntensity === 'function' ? this.emissiveIntensity() : this.emissiveIntensity;
     if (typeof intensity !== 'number' || !Number.isFinite(Math.fround(intensity)) || intensity < 0) throw new RangeError('Invalid scatter emissive intensity');
-    let changed = this.bindings.length !== c.bindings.length;
-    for (let i = 0; !changed && i < this.bindings.length; i++) changed = this.bindings[i].resource !== c.bindings[i].resource;
-    if (this.shader !== c.shader || this.format !== c.format + ':' + c.descriptor.multisample?.count || changed) {
+    const changed = !sameBindings(this.bindings, c.bindings);
+    const format = c.format + ':' + c.descriptor.multisample?.count + ':' + c.descriptor.depthStencil!.format;
+    if (this.shader !== c.shader || this.format !== format) {
       const code = windShader+c.shader.replace(/struct Frame \{[^}]+\}/, frame => frame.replace('}', ',windTime:vec4f }'))
         .replace(/struct Input \{[^}]+\}/, input => input.replace('}', ',@location(8) vertexColor:vec4f,@location(9) emissive:vec3f,@location(10) wind:vec4f }'))
         .replace(/struct Output \{[^}]+\}/, output => output.replace('}', ',@location(4) emissive:vec3f,@location(5) occlusion:f32 }'))
@@ -129,8 +130,12 @@ export class ScatterInstances implements EnginePlugin {
         .replace(/let linear=([^;]+);/, 'let linear=$1+i.emissive;');
       const module = c.device.createShaderModule({code});
       this.pipeline = c.device.createRenderPipeline({layout: 'auto', vertex: {module, entryPoint: 'vertex', buffers: vertexLayouts}, fragment: {module, entryPoint: 'fragment', targets: [{format: c.format}]}, multisample: c.descriptor.multisample, depthStencil: {...c.descriptor.depthStencil!, depthWriteEnabled: true, depthCompare: 'greater-equal'}});
-      this.group = c.device.createBindGroup({layout: this.pipeline.getBindGroupLayout(0), entries: [{binding: 0, resource: {buffer: this.uniform!}}, ...c.bindings]});
-      this.shader = c.shader; this.format = c.format + ':' + c.descriptor.multisample?.count; this.bindings = c.bindings.slice();
+      this.group = undefined;
+      this.shader = c.shader; this.format = format;
+    }
+    if (!this.group || changed) {
+      this.group = c.device.createBindGroup({layout: this.pipeline!.getBindGroupLayout(0), entries: [{binding: 0, resource: {buffer: this.uniform!}}, ...c.bindings]});
+      this.bindings = snapshotBindings(c.bindings);
     }
     this.values.set(c.camera.matrix); this.values.set(c.camera.position, 16);
     this.values.set(this.engine!.lighting.direction, 20); this.values.set(this.engine!.lighting.radiance, 24);

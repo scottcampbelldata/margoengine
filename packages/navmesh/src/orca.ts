@@ -26,7 +26,8 @@ function linear2(lines: Line[], radius: number, vx: number, vy: number, directio
 function validate(agent: Agent): void {
   if (!Number.isSafeInteger(agent.id) || agent.position.length !== 2 || agent.velocity.length !== 2 || agent.preferred.length !== 2 ||
     !Number.isFinite(agent.radius) || agent.radius < 0 || !Number.isFinite(agent.maxSpeed) || agent.maxSpeed < 0 ||
-    [...agent.position, ...agent.velocity, ...agent.preferred].some(v => !Number.isFinite(v))) throw new RangeError('Invalid ORCA agent');
+    !Number.isFinite(agent.position[0]) || !Number.isFinite(agent.position[1]) || !Number.isFinite(agent.velocity[0]) || !Number.isFinite(agent.velocity[1]) ||
+    !Number.isFinite(agent.preferred[0]) || !Number.isFinite(agent.preferred[1])) throw new RangeError('Invalid ORCA agent');
 }
 
 /** Reciprocal velocity-obstacle half-planes in XZ; returns a velocity within maxSpeed. */

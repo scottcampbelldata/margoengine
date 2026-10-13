@@ -1,6 +1,6 @@
 import {EngineKernel, PbrMaterial} from '@margoengine/core';
 import {engineRuntime} from '@margoengine/core/extension';
-import {Bloom} from '@margoengine/post';
+import {Bloom} from '@margoengine/post/bloom';
 import {Shadows} from '@margoengine/shadows';
 import {ScatterInstances} from '@margoengine/scatter';
 import {Clustered} from '@margoengine/clustered';
@@ -64,7 +64,7 @@ export class NightCitadel {
     this.stats.instances = this.instances.batches.reduce((sum,b)=>sum+b.instances,0);
     this.stats.batches = this.instances.batches.length;
     element('draws').textContent = String(this.stats.batches);
-    element('quality').textContent = this.stats.samples===4?'Desktop · 4× MSAA':'Mobile · 1× sampling';
+    element('quality').textContent = this.stats.samples===4?'Desktop · 4× MSAA · DPR capped at 1':'Mobile · 1× sampling';
     // Resolve the nearby swells on both grids; horizon:true extends the distant ocean.
     this.water = Water.attach(engine,{size:[160,160],segments:this.stats.samples===4?128:64,height:-27,horizon:true,depth:()=>this.post.depthTexture,sceneColor:()=>this.post.sceneTexture,lights:[{direction:runtime.lighting.direction,radiance:runtime.lighting.radiance.subarray(0,3)}],color:[0.004,0.009,0.022],foamDistance:1.2,waves:[{direction:[1,0.37],amplitude:0.35,wavelength:17.37,steepness:0.3,phase:0.43},{direction:[0.87,0.55],amplitude:0.18,wavelength:11.19,steepness:0.3,phase:2.17}]});
     const capacity = this.stats.samples===4?2048:512;

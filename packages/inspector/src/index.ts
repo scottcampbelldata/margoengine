@@ -140,6 +140,7 @@ export class Inspector implements EnginePlugin {
 
   private syncDebug(): void {
     const engine = this.engine!;
+    if (!this.helpers.size && !this.debug.wireframe && !this.debug.normals && !this.debug.bounds) return;
     for (const [mesh, helpers] of this.helpers) if (engine.meshes.get(mesh.id) !== mesh || mesh.geometry !== helpers.geometry) {
       helpers.wireframe?.dispose(); helpers.normals?.dispose(); helpers.bounds?.dispose(); this.helpers.delete(mesh);
     }

@@ -858,7 +858,8 @@
     "imports": "import { Bloom } from '@margoengine/post';",
     "exports": [
       "Bloom",
-      "SSAO"
+      "SSAO",
+      "SceneFade"
     ]
   },
   {

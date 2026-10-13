@@ -25,3 +25,20 @@ test('ORCA agents avoid head-on collision, remain speed bounded and handle overl
   b.position=[...a.position];assert.ok([...avoid(a,[b])].every(Number.isFinite));
   assert.throws(()=>avoid(a,[b],0),/timestep/);
 });
+test('ORCA validates component values without spreading vectors on stable ticks',()=>{
+  let iterations=0;
+  const vector=values=>Object.defineProperty(values,Symbol.iterator,{value:function*(){iterations++;yield this[0];yield this[1];}});
+  const a={id:1,position:vector([-2,0]),velocity:vector([1,0]),preferred:vector([1,0]),radius:0.4,maxSpeed:1};
+  const b={id:2,position:vector([2,0]),velocity:vector([-1,0]),preferred:vector([-1,0]),radius:0.4,maxSpeed:1};
+  const output=new Float64Array(2),neighbors=[b];
+  for(let i=0;i<120;i++){
+    assert.equal(avoid(a,neighbors,1/60,2,output),output);
+    assert.deepEqual(Array.from(output),[0.96,-0.19595917942265426]);
+  }
+  assert.equal(iterations,0,'validation must not allocate a six-component spread array for each agent');
+  for(const field of ['position','velocity','preferred'])for(const axis of [0,1])for(const invalid of [NaN,Infinity,-Infinity]){
+    const previous=a[field][axis];a[field][axis]=invalid;
+    assert.throws(()=>avoid(a,neighbors,1/60,2,output),/Invalid ORCA agent/);a[field][axis]=previous;
+  }
+  for(const field of ['position','velocity','preferred'])assert.throws(()=>avoid({...a,[field]:[0]},neighbors),/Invalid ORCA agent/);
+});

@@ -196,6 +196,14 @@ try{
   assert.equal(await page.evaluate(()=>gpuAudit.live.size),0,'Desktop leaked GPU buffers/textures');
   const stopped=await page.evaluate(()=>nightCitadel.stats.frames);await page.waitForTimeout(100);
   assert.equal(await page.evaluate(()=>nightCitadel.stats.frames),stopped,'Disposed app kept rendering');
+  const desktopContext=await page.context().browser().newContext({viewport:{width:1440,height:900},deviceScaleFactor:2});
+  const desktop=await desktopContext.newPage();desktop.on('pageerror',e=>errors.push(e.message));await desktop.addInitScript(instrument);
+  await desktop.goto('http://127.0.0.1:5193'+path);await desktop.waitForFunction(()=>window.nightCitadel?.stats.frames>10);
+  report.desktopDensity=await desktop.evaluate(()=>({deviceDpr:devicePixelRatio,effectiveDpr:document.querySelector('canvas').width/innerWidth,samples:nightCitadel.stats.samples,multisampledTextures:gpuAudit.textures.filter(t=>t.samples===4).length}));
+  assert.equal(report.desktopDensity.deviceDpr,2);assert.equal(report.desktopDensity.effectiveDpr,1);assert.equal(report.desktopDensity.samples,4);
+  assert(report.desktopDensity.multisampledTextures>0,'Desktop lost its 4x MSAA attachments');
+  await desktop.evaluate(()=>nightCitadel.dispose());assert.equal(await desktop.evaluate(()=>gpuAudit.live.size),0,'HiDPI desktop leaked GPU buffers/textures');
+  await desktopContext.close();
   const context=await page.context().browser().newContext({viewport:{width:390,height:844},deviceScaleFactor:3,isMobile:true,hasTouch:true,userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1'});
   const mobile=await context.newPage();mobile.on('pageerror',e=>errors.push(e.message));await mobile.addInitScript(instrument);
   await mobile.goto('http://127.0.0.1:5193'+path);await mobile.waitForFunction(()=>window.nightCitadel?.stats.frames>10);

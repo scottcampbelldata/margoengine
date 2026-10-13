@@ -68,7 +68,8 @@ export class Tonemap implements EnginePlugin {
   private uploadLUT():void {
     const device=this.engine!.gpu!,previous=this.lutTexture;
     const texture=device.createTexture({dimension:'3d',size:[33,33,33],format:'rgba32float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});
-    if(this.lut)device.queue.writeTexture({texture},this.lut.data as Float32Array<ArrayBuffer>,{bytesPerRow:33*16,rowsPerImage:33},[33,33,33]);
+    try{if(this.lut)device.queue.writeTexture({texture},this.lut.data as Float32Array<ArrayBuffer>,{bytesPerRow:33*16,rowsPerImage:33},[33,33,33]);}
+    catch(error){texture.destroy();throw error;}
     this.lutTexture=texture;this.group=undefined;previous?.destroy();
   }
   registerPasses(graph:FrameGraph):void {
@@ -79,7 +80,7 @@ export class Tonemap implements EnginePlugin {
     this.validate();if(this.source)return;
     if(this.engine!.hasPlugin('dof')||this.engine!.hasPlugin('ssao')||this.engine!.hasPlugin('post-processing'))throw new Error('Tonemap cannot share scene capture without an HDR source');
     this.original=c.color;
-    if(this.scene?.width!==c.width||this.scene.height!==c.height){
+    if(this.scene?.width!==c.width||this.scene.height!==c.height||this.depth?.format!==c.descriptor.depthStencil!.format||this.captureTarget?.samples!==(c.descriptor.multisample?.count??4)){
       this.captureTarget?.dispose();this.depth?.destroy();this.scene?.destroy();this.scene=c.device.createTexture({size:[c.width,c.height],format:'rgba16float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.RENDER_ATTACHMENT});
       this.sceneView=this.scene.createView();
       this.depth=c.device.createTexture({size:[c.width,c.height],format:c.descriptor.depthStencil!.format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});

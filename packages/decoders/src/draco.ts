@@ -29,6 +29,7 @@ export class DracoDecoder {
   decode(data: ArrayBuffer | ArrayBufferView, options: DracoDecodeOptions = {}): Promise<DecodedDracoGeometry> {
     try {
       requireWorkers('DracoDecoder');
+      if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('Aborted', 'AbortError');
       const buffer = payload(data, options.transfer ?? false), {attributeIds, componentTypes} = options;
       this.pool ??= new WorkerPool(this.workerLimit);
       return this.pool.run<DecodedDracoGeometry>({type: 'draco', buffer, request: {attributeIds, componentTypes}, ...this.urls()}, [buffer], options.signal);

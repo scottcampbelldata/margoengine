@@ -7,7 +7,7 @@ export {sampleTrack,multiplyMatrices,type Interpolation} from './sampling.js';
 declare const GPUBufferUsage:{STORAGE:number;VERTEX:number;COPY_DST:number;COPY_SRC:number;UNIFORM:number};
 interface Track {node:number;path:'translation'|'rotation'|'scale'|'weights';times:Float32Array;values:Float32Array;width:number;interpolation:Interpolation}
 interface Clip {name:string;duration:number;tracks:Track[]}
-interface Deformation {primitive:PBRPrimitive;buffers:GPUBuffer[];group:GPUBindGroup;output:GPUBuffer;weights:GPUBuffer;bones:GPUBuffer;palette:Float32Array;joints:number[];inverseBind:Float32Array}
+interface Deformation {primitive:PBRPrimitive;buffers:GPUBuffer[];group:GPUBindGroup;output:GPUBuffer;weights:GPUBuffer;bones:GPUBuffer;palette:Float32Array;joints:number[];inverseBind:Float32Array[]}
 export interface AnimationOptions {loop?:boolean;speed?:number}
 const identity=new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);
 export class Animation implements EnginePlugin {
@@ -81,7 +81,7 @@ export class Animation implements EnginePlugin {
       const targets=p.definition.targets??[],skinId=doc.nodes[p.nodeIndex].skin,skin=skinId===undefined?null:doc.skins?.[skinId];
       if(skinId!==undefined&&(!Number.isInteger(skinId)||skinId<0||!skin))throw new TypeError('Missing glTF skin');
       if(!targets.length&&!skin)continue;
-      const count=p.vertices.length/20,buffers:GPUBuffer[]=[],record:Deformation={primitive:p,buffers,group:undefined!,output:undefined!,weights:undefined!,bones:undefined!,palette:new Float32Array(),joints:[],inverseBind:new Float32Array()};
+      const count=p.vertices.length/20,buffers:GPUBuffer[]=[],record:Deformation={primitive:p,buffers,group:undefined!,output:undefined!,weights:undefined!,bones:undefined!,palette:new Float32Array(),joints:[],inverseBind:[]};
       this.resources.push(record);
       const upload=(data:Float32Array|Uint32Array,usage=GPUBufferUsage.STORAGE)=>{
         const size=Math.max(16,data.byteLength);
@@ -112,7 +112,7 @@ export class Animation implements EnginePlugin {
           for(let c=0;c<4;c++){const at=i*4+c;if(!Number.isInteger(ids[at])||ids[at]>=joints.length||weights[at]<0)throw new RangeError('Invalid skin joint/weight');jointIds[i*8+c]=ids[at];influenceFloats[i*8+4+c]=weights[at]/sum;}
         }
       }
-      record.joints=joints;record.inverseBind=inverseBind;record.palette=Float32Array.from(joints.length?joints.flatMap(()=>Array.from(identity)):identity);
+      record.joints=joints;record.inverseBind=joints.map((_,i)=>inverseBind.subarray(i*16,i*16+16));record.palette=Float32Array.from(joints.length?joints.flatMap(()=>Array.from(identity)):identity);
       const source=upload(p.vertices),output=upload(p.vertices,GPUBufferUsage.STORAGE|GPUBufferUsage.VERTEX|GPUBufferUsage.COPY_SRC),morph=upload(deltas),weights=upload(p.weights),bones=upload(record.palette),influences=upload(jointIds),counts=upload(new Uint32Array([count,targets.length,joints.length,0]),GPUBufferUsage.UNIFORM);
       record.output=output;record.weights=weights;record.bones=bones;
       record.group=this.device.createBindGroup({layout:this.pipeline.getBindGroupLayout(0),entries:[source,output,morph,weights,bones,influences,counts].map((buffer,binding)=>({binding,resource:{buffer}}))});
@@ -132,7 +132,7 @@ export class Animation implements EnginePlugin {
       if(r.joints.length) {
         if(!invert(this.inverse,r.primitive.node.matrix,0,this.workspace))throw new Error('Singular skinned mesh transform');
         for(let i=0;i<r.joints.length;i++){
-          multiplyMatrices(this.joint,this.model.nodes[r.joints[i]].matrix,r.inverseBind.subarray(i*16,i*16+16));
+          multiplyMatrices(this.joint,this.model.nodes[r.joints[i]].matrix,r.inverseBind[i]);
           multiplyMatrices(this.product,this.inverse,this.joint);r.palette.set(this.product,i*16);
         }
         if(r.palette.some(v=>!Number.isFinite(v)))throw new RangeError('Skin matrix overflow');

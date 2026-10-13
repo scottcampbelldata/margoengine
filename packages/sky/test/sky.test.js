@@ -25,6 +25,44 @@ test('clock and sky models reuse four-order scattering tables until turbidity ch
  effect.onDeviceRestored(h.engine);frame();effect.dispose();assert.ok(h.resources.every(r=>r.destroyed));
 });
 
+test('Preetham retains sun transmission and lazily builds scattering when switching to Bruneton',()=>{
+ const h=optionalGPU(),sky=new Sky({hours:12,timeScale:0});h.engine.use(sky);
+ const computeFrame=()=>{const before=h.counts.compute;h.frame();return h.counts.compute-before;};
+ try{
+  assert.equal(computeFrame(),1,'Default sky computes the sun transmission table without unused scattering');
+  assert.equal(computeFrame(),0,'Unchanged transmission is retained');
+  const reflected=sky.reflectionTexture;assert.ok(reflected);
+  assert.equal(computeFrame(),1,'Requested Preetham reflection still updates');
+  sky.options.turbidity=3;assert.equal(computeFrame(),2,'Turbidity refreshes transmission and the requested reflection');
+  assert.equal(sky.reflectionTexture,reflected);
+  sky.options.model='bruneton';assert.equal(computeFrame(),11,'Switching at unchanged turbidity builds all four scattering orders before reflection');
+  assert.equal(computeFrame(),1,'Bruneton tables are retained');
+  sky.options.model='preetham';assert.equal(computeFrame(),1);
+  sky.options.turbidity=4;assert.equal(computeFrame(),2);
+  sky.options.model='bruneton';assert.equal(computeFrame(),11,'A model switch cannot reuse scattering computed for an older turbidity');
+  sky.options.model='preetham';sky.onDeviceRestored(h.engine);
+  assert.notEqual(sky.reflectionTexture,reflected,'Restoration replaces the borrowed reflection texture');
+  assert.equal(computeFrame(),2,'Restored default sky rebuilds transmission and reflection');
+  sky.options.model='bruneton';assert.equal(computeFrame(),11,'Restoration also invalidates deferred scattering');
+  sky.options.turbidity=5;assert.equal(computeFrame(),12,'Active Bruneton turbidity changes rebuild transmission and all scattering orders');
+ }finally{sky.dispose();}
+ assert.ok(h.resources.every(resource=>resource.destroyed));
+});
+
+test('interrupted Bruneton precomputation retains the original error and retries changed tables',()=>{
+ const h=optionalGPU(),sky=new Sky({timeScale:0});h.engine.use(sky);h.frame();
+ sky.options.model='bruneton';sky.options.turbidity=3;
+ const failure=new Error('Compute encoding failed'),begin=h.context.encoder.beginComputePass;let attempts=0;
+ h.context.encoder.beginComputePass=function(...args){if(++attempts===2)throw failure;return begin.apply(this,args);};
+ try{
+  assert.throws(h.frame,error=>error===failure);
+  h.context.encoder.beginComputePass=begin;
+  const before=h.counts.compute;h.frame();assert.equal(h.counts.compute-before,11,'Retry recomputes transmission and all four scattering orders');
+  const cached=h.counts.compute;h.frame();assert.equal(h.counts.compute,cached);
+ }finally{h.context.encoder.beginComputePass=begin;sky.dispose();}
+ assert.ok(h.resources.every(resource=>resource.destroyed));
+});
+
 test('optional sunset tint follows elevation in both scene lighting and water light records',()=>{
  const h=optionalGPU();h.engine.lighting={direction:new Float32Array(4),radiance:new Float32Array(4)};
  const sky=new Sky({hours:12,timeScale:0,lighting:{intensity:6,color:[1,0.97,0.92],sunset:[1,0.69,0.36]}});h.engine.use(sky);

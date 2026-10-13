@@ -8,6 +8,29 @@ import {
 
 const close = (actual, expected, epsilon = 1e-4, message = '') => assert.ok(Math.abs(actual - expected) <= epsilon, `${message} expected ${expected}, got ${actual}`);
 const fanArea = (radius, sweep, triangles = 10) => 0.5 * triangles * radius * radius * Math.sin(sweep / triangles);
+test('dash distances follow mutable line modes without reallocating stable geometry', () => {
+  const line = new Line({positions: [0, 0, 0, 3, 0, 0, 3, 4, 0], dashed: true});
+  const points = line.points, capacity = line.capacityVersion;
+  line.updateDistances(line.matrix);
+  assert.equal(line.totalDistance, 7);
+  const version = line.version;
+  for (let i = 0; i < 120; i++) line.updateDistances(line.matrix);
+  assert.equal(line.version, version, 'unchanged mode, points and matrix retain cached distances');
+  line.mode = 'loop'; line.updateDistances(line.matrix);
+  assert.equal(line.totalDistance, 12, 'loop includes its closing segment');
+  line.mode = 'segments'; line.updateDistances(line.matrix);
+  assert.equal(line.totalDistance, 3);
+  assert.deepEqual([line.points[3], line.points[7], line.points[11]], [0, 3, 3]);
+  line.mode = 'strip'; line.updateDistances(line.matrix);
+  assert.equal(line.totalDistance, 7);
+  assert.deepEqual([line.points[3], line.points[7], line.points[11]], [0, 3, 7]);
+  line.matrix[0] = line.matrix[5] = 2; line.updateDistances(line.matrix);
+  assert.equal(line.totalDistance, 14);
+  line.mode = 'loop'; line.updateDistances(line.matrix);
+  assert.equal(line.totalDistance, 24);
+  assert.equal(line.points, points);
+  assert.equal(line.capacityVersion, capacity);
+});
 const bounds = vertices => {
   const b = [Infinity, Infinity, -Infinity, -Infinity];
   for (let i = 0; i < vertices.length; i += 3) {b[0] = Math.min(b[0], vertices[i]); b[1] = Math.min(b[1], vertices[i + 1]); b[2] = Math.max(b[2], vertices[i]); b[3] = Math.max(b[3], vertices[i + 1]);}

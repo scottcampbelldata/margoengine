@@ -86,7 +86,7 @@ export class XR implements EnginePlugin {
       this.renderer.configure(this.context,colorFormat);
       this.engine.stop();this.resume=true;this.last=null;this.handle=session.requestAnimationFrame(this.frame);
       return session;
-    }catch(error){if(session){try{await session.end();}catch{}finally{this.ended();}}throw error;}
+    }catch(error){if(session){try{await session.end();}catch{}finally{if(this.session===session)this.ended();}}throw error;}
     finally{this.pending=false;}
   }
   private readonly frame=(time:number,frame:XRNativeFrame):void=>{
@@ -117,7 +117,7 @@ export class XR implements EnginePlugin {
     this.layer?.destroy();this.layer=undefined;this.renderer.dispose();
     if(this.resume){this.resume=false;if(!this.disposed&&!this.engine.disposed)this.engine.start();}
   };
-  async end():Promise<void> {const session=this.session;if(session){try{await session.end();}finally{this.ended();}}}
+  async end():Promise<void> {const session=this.session;if(session){try{await session.end();}finally{if(this.session===session)this.ended();}}}
   dispose():void {
     if(this.disposed)return;this.disposed=true;
     const session=this.session;this.ended();this.device.removeEventListener('uncapturederror',this.uncaptured);this.device.destroy();

@@ -57,10 +57,13 @@ export async function parseFBX(engine: EngineKernel, input: ArrayBuffer | ArrayB
   const glb = await convertFBX(input, options), view = new DataView(glb), jsonLength = view.getUint32(12, true), doc = JSON.parse(new TextDecoder().decode(new Uint8Array(glb, 20, jsonLength))), images: ImageBitmap[] = [];
   const binaryStart = 28 + jsonLength;
   try {
+    let pixels = 0;
     for (const image of doc.images ?? []) {
+      options.signal?.throwIfAborted();
       const source = doc.bufferViews[image.bufferView];
       const bitmap = await createImageBitmap(new Blob([new Uint8Array(glb, binaryStart + (source.byteOffset ?? 0), source.byteLength)], {type: image.mimeType}), {colorSpaceConversion: 'none', premultiplyAlpha: 'none'});
-      images.push(bitmap); if (images.reduce((sum, item) => sum + item.width * item.height, 0) > 16_000_000) throw new RangeError('FBX texture pixel budget exceeded');
+      images.push(bitmap); pixels += bitmap.width * bitmap.height;
+      if (pixels > 16_000_000) throw new RangeError('FBX texture pixel budget exceeded');
     }
     options.signal?.throwIfAborted(); return parseGLTF(engine, glb, [], images);
   } catch (error) {for (const image of images) image.close(); throw error;}

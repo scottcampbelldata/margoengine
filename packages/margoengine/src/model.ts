@@ -1,5 +1,5 @@
 import type {EngineKernel, Mesh} from '@margoengine/core';
-import {engineRuntime, meshRuntime, type GeometryBuffers} from '@margoengine/core/extension';
+import type {Engine as RuntimeEngine, Mesh as RuntimeMesh, GeometryBuffers} from '@margoengine/core/extension';
 import type {Model} from '@margoengine/gltf';
 import type {CADModel} from '@margoengine/machinery';
 
@@ -13,13 +13,13 @@ export interface LoadedModel extends Pick<Mesh, 'position' | 'rotation' | 'scale
 }
 
 export function worldBounds(instance: EngineKernel, meshes: Iterable<Mesh>, output: Float32Array, visibleOnly = false): Float32Array {
-  const engine = engineRuntime(instance);
+  const engine = instance as unknown as RuntimeEngine;
   if (engine.disposed) throw new Error('Engine disposed');
   engine.store.tick(false); output.fill(Infinity, 0, 3); output.fill(-Infinity, 3);
   // shortcut: bounds scan vertices on access, cache local bounds if queried every frame.
   for (const handle of meshes) {
-    const mesh = meshRuntime(handle); mesh.check();
-    if (mesh.engine !== engine) throw new TypeError('Mesh from another engine');
+    const mesh = handle as unknown as RuntimeMesh; mesh.check();
+    if (mesh.engine !== engine) throw new TypeError('Foreign mesh');
     if (!mesh.geometry || visibleOnly && !engine.store.visible[mesh.id]) continue;
     const vertices = mesh.geometry.vertices, m = mesh.matrix;
     for (let offset = 0; offset < vertices.length; offset += 6) {
@@ -30,7 +30,7 @@ export function worldBounds(instance: EngineKernel, meshes: Iterable<Mesh>, outp
       }
     }
   }
-  if (!Number.isFinite(output[0])) throw new Error('No geometry to bound');
+  if (!Number.isFinite(output[0])) throw new Error('No geometry');
   return output;
 }
 
@@ -46,7 +46,7 @@ export function loadedModel(engine: EngineKernel, model: Model | CADModel): Load
       model.root.check();
       if (engine.backend !== 'webgpu') return null;
       const buffers = new Set<GeometryBuffers>();
-      for (const mesh of model.meshes) {mesh.check(); if (mesh.geometry) buffers.add(engineRuntime(engine).geometryBuffers(mesh.geometry)!);}
+      for (const mesh of model.meshes) {mesh.check(); if (mesh.geometry) buffers.add((engine as unknown as RuntimeEngine).geometryBuffers(mesh.geometry)!);}
       return [...buffers];
     },
     destroy() {model.dispose();},

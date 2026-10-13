@@ -72,6 +72,8 @@ MIT licensed.
 
 `exportUSDZ(engineOrDataScene, sceneOptions)` returns a `Uint8Array`: a static USDA root in an uncompressed ZIP with 64-byte-aligned entries. World-space positions, normals and reflected winding use the existing validated scene collector. Names are kept as display names; hidden descendants are skipped. The stage has a default prim, Y up, meter units, mesh extents and UsdPreviewSurface color/roughness/metalness/emission/opacity materials.
 
+Import `exportUSDZ` from `@margoengine/exporters/usdz` to load only USDZ serialization and its shared scene collector in direct ESM applications. The existing package root uses the same function and remains supported.
+
 Save as `.usdz`. A supported Apple device can open `<a rel="ar" href="model.usdz"><img src="preview.png" alt="View the model in AR"></a>`. No headset is required to generate or validate the file.
 
 Hierarchy is baked into world-space meshes. Textures, vertex colors and alpha masks are rejected; animation, skins and morphs are not exported. Quick Look presentation remains untested on Apple hardware. `node --test tests/usdz.test.js` checks ZIP layout and loader round trips. Install the official `usd-core` wheel and run `python tests/validate-usdz.py model.usdz` for independent metadata, topology and available OpenUSD package/material validators.

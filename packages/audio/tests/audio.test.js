@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {FakeAudioContext, FakeMediaElement, FakeNode, chain, fakeEngine} from './fake-web-audio.js';
+import {FakeAudioContext, FakeMediaElement, FakeNode, FakeParam, chain, fakeEngine} from './fake-web-audio.js';
 
 globalThis.AudioContext = FakeAudioContext;
 const created = FakeAudioContext.created;
@@ -40,6 +40,26 @@ test('listener follows the engine camera every frame: position, forward toward t
   const before = context.listener.positionX.events.length;
   engine.frame();
   assert.equal(context.listener.positionX.events.length, before, 'unchanged pose must not schedule automation');
+  listener.dispose();
+});
+
+test('listener camera following avoids per-frame pose slices and rejects invalid poses atomically', () => {
+  const engine = fakeEngine(), listener = new AudioListener({autoResume: false});
+  listener.setup(engine);
+  const slice = Array.prototype.slice; let slices = 0;
+  try {
+    Array.prototype.slice = function (...args) {slices++; return slice.apply(this, args);};
+    for (let i = 0; i < 120; i++) listener.update();
+  } finally {Array.prototype.slice = slice;}
+  assert.equal(slices, 0, 'steady camera poses should use retained storage');
+  listener.setPose([1, 2, 3], [0, 0, -2], [0, 3, 0]);
+  assert.deepEqual([...listener.position], [1, 2, 3]);
+  assert.deepEqual([...listener.forward], [0, 0, -1]);
+  assert.deepEqual([...listener.up], [0, 1, 0]);
+  assert.throws(() => listener.setPose([9, NaN, 8], [1, 0, 0], [0, 0, 1]), /Listener pose must be finite/);
+  assert.deepEqual([...listener.position], [1, 2, 3]);
+  assert.deepEqual([...listener.forward], [0, 0, -1]);
+  assert.deepEqual([...listener.up], [0, 1, 0]);
   listener.dispose();
 });
 
@@ -385,4 +405,50 @@ test('listener dispose stops and disconnects every sound and closes only a conte
   const shared = new FakeAudioContext(), borrowed = new AudioListener({context: shared});
   new Audio(borrowed); borrowed.dispose();
   assert.notEqual(shared.state, 'closed');
+});
+
+test('moving listener writes avoid temporary parameter pair arrays over 120 frames', () => {
+  const context = new FakeAudioContext({state: 'running'}), listener = new AudioListener({context, autoResume: false, smoothing: 0.05});
+  const iterator = Array.prototype[Symbol.iterator]; let pairs = 0;
+  try {
+    Array.prototype[Symbol.iterator] = function () {if (this.length === 2 && this[0] instanceof FakeParam) pairs++; return iterator.call(this);};
+    for (let i = 0; i < 120; i++) {context.currentTime = i / 60; listener.setPose([i, 2, 3], [0, 0, -1]);}
+  } finally {Array.prototype[Symbol.iterator] = iterator;}
+  assert.equal(pairs, 0);assert.deepEqual(context.listener.positionX.last(), ['target', 119, 119 / 60, 0.05]);
+  listener.dispose();
+});
+
+test('positional input errors preserve the previous complete pose and followed mesh', () => {
+  const listener = new AudioListener({context: new FakeAudioContext()}), sound = new PositionalAudio(listener), mesh = {};
+  sound.setPosition(1, 2, 3).attach(mesh);
+  assert.throws(() => sound.setPosition(9, NaN, 8), /y must/);
+  assert.deepEqual([...sound.worldPosition], [1, 2, 3]);assert.equal(sound.mesh, mesh);listener.dispose();
+});
+
+test('invalid positional setup unregisters the sound and disconnects all created nodes', () => {
+  const context = new FakeAudioContext(), listener = new AudioListener({context}), created = [];
+  for (const method of ['createGain', 'createPanner']) {const create = context[method]; context[method] = function () {const node = create.call(this);created.push(node);return node;};}
+  assert.throws(() => new PositionalAudio(listener, {maxDistance: 0}), /maxDistance must/);
+  assert.equal(listener.sources.size, 0);assert.ok(created.filter(node => node !== listener.input).every(node => node.outputs.size === 0));listener.dispose();
+});
+
+test('cancellation after downloading bytes prevents abandoned audio decoding', async () => {
+  const context = new FakeAudioContext(), controller = new AbortController(), reason = new Error('caller cancelled');let release;
+  const bytes = new Promise(resolve => {release = resolve;});
+  const promise = loadAudioBuffer(context, '/abandoned.wav', {signal: controller.signal, fetch: async () => ({ok: true, arrayBuffer: () => bytes})});
+  await new Promise(resolve => setImmediate(resolve));controller.abort(reason);await assert.rejects(promise, error => error === reason);release(new ArrayBuffer(8));await new Promise(resolve => setImmediate(resolve));
+  assert.equal(context.calls.filter(call => call === 'decode').length, 0);
+});
+
+test('positional mesh updates reuse direction storage across 120 frames and preserve finite poses', () => {
+  const engine=fakeEngine(),context=new FakeAudioContext(),listener=new AudioListener({context}),mesh=engine.createMesh(),sound=new PositionalAudio(listener,{mesh});
+  engine.store.matrices.set([4,5,6],12);const every=Array.prototype.every;let positions=0;
+  try{Array.prototype.every=function(...args){if(this.length===3&&this[0]===4&&this[1]===5&&this[2]===6)positions++;return every.apply(this,args);};for(let i=0;i<120;i++)sound.update(engine);}
+  finally{Array.prototype.every=every;}
+  try{
+    assert.equal(positions,0);assert.deepEqual([...sound.worldPosition],[4,5,6]);assert.deepEqual([...sound.worldDirection],[0,0,1]);
+    engine.store.matrices[12]=NaN;sound.update(engine);assert.deepEqual([...sound.worldPosition],[4,5,6]);
+    engine.store.matrices[12]=7;engine.store.matrices[10]=0;sound.update(engine);assert.deepEqual([...sound.worldPosition],[7,5,6]);assert.deepEqual([...sound.worldDirection],[0,0,1]);
+    sound.detach().setDirection([2,0,0]);assert.deepEqual([...sound.worldDirection],[1,0,0]);assert.throws(()=>sound.setDirection([0,0,0]),/nonzero/);assert.deepEqual([...sound.worldDirection],[1,0,0]);
+  }finally{listener.dispose();}
 });

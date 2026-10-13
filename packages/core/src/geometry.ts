@@ -1,6 +1,6 @@
 export function finite(values: ArrayLike<number>, size: number, label: string): void {
-  if (values.length !== size) throw new TypeError(`${label} needs ${size} values`);
-  for (let i = 0; i < size; i++) {const value=values[i];if (typeof value !== 'number' || !Number.isFinite(Math.fround(value))) throw new RangeError(`${label} needs finite values`);}
+  if (values.length !== size) throw new TypeError(`${label}: ${size} values`);
+  for (let i = 0; i < size; i++) {const value=values[i];if (typeof value !== 'number' || !Number.isFinite(Math.fround(value))) throw new RangeError(`${label}: finite values`);}
 }
 
 export class Geometry {
@@ -12,7 +12,7 @@ export class Geometry {
     const count = positions.length/3;
     if (!Number.isInteger(count) || count < 3 || count > 1_000_000 || !indices.length || indices.length % 3) throw new RangeError('Invalid geometry');
     finite(positions, count*3, 'Positions'); finite(normals, count*3, 'Normals');
-    for (let i = 0; i < indices.length; i++) if (!Number.isInteger(indices[i]) || indices[i] < 0 || indices[i] >= count) throw new RangeError('Invalid Index');
+    for (let i = 0; i < indices.length; i++) if (!Number.isInteger(indices[i]) || indices[i] < 0 || indices[i] >= count) throw new RangeError('Invalid geometry');
     this.vertices = new Float32Array(count*6);
     const min = [Infinity,Infinity,Infinity], max = [-Infinity,-Infinity,-Infinity];
     for (let i = 0; i < count; i++) for (let a = 0; a < 3; a++) {
@@ -28,16 +28,17 @@ export class Geometry {
 }
 
 export function box(width = 1, height = 1, depth = 1): Geometry {
-  finite([width,height,depth],3,'Box size');
+  const size=[width,height,depth];finite(size,3,'Box size');
   if (Math.min(width,height,depth) <= 0) throw new RangeError('Box size: positive');
   const positions: number[] = [], normals: number[] = [], indices: number[] = [];
   for (let axis = 0; axis < 3; axis++) for (const side of [-1,1]) {
-    const start = positions.length/3, u = (axis+1)%3, v = (axis+2)%3;
+    const start = positions.length/3, u = (axis+1)%3;
     for (const [a,b] of [[-1,-1],[1,-1],[1,1],[-1,1]]) {
-      const p = [0,0,0], n = [0,0,0]; p[axis]=side; p[u]=a; p[v]=b; n[axis]=side;
-      positions.push(p[0]*width/2,p[1]*height/2,p[2]*depth/2); normals.push(...n);
+      for(let component=0;component<3;component++){
+        positions.push((component===axis?side:component===u?a:b)*size[component]/2);normals.push(component===axis?side:0);
+      }
     }
-    indices.push(...(side > 0 ? [0,1,2,0,2,3] : [0,2,1,0,3,2]).map(i => start+i));
+    for(const i of side > 0 ? [0,1,2,0,2,3] : [0,2,1,0,3,2])indices.push(start+i);
   }
   return new Geometry(positions,normals,indices);
 }
@@ -45,11 +46,11 @@ export function box(width = 1, height = 1, depth = 1): Geometry {
 export class PbrMaterial {
   readonly data = new Float32Array(8);
   constructor({color = '#4f46e5', roughness = 0.5, metalness = 0, doubleSided=true}: {color?: string|readonly number[]; roughness?: number; metalness?: number;doubleSided?:boolean} = {}) {
-    const rgb = typeof color === 'string' ? /^#[0-9a-f]{6}$/i.test(color) ? [1,3,5].map(i => parseInt(color.slice(i,i+2),16)/255).map(v => v <= 0.04045 ? v/12.92 : ((v+0.055)/1.055)**2.4) : null : color;
+    const rgb = typeof color === 'string' ? /^#[0-9a-f]{6}$/i.test(color) ? [1,3,5].map(i => {const v=parseInt(color.slice(i,i+2),16)/255;return v <= 0.04045 ? v/12.92 : ((v+0.055)/1.055)**2.4;}) : null : color;
     if (!rgb) throw new TypeError('Invalid Color');
     finite(rgb,3,'Color');
-    if ([...rgb,roughness,metalness].some(v => !Number.isFinite(v) || v < 0 || v > 1)) throw new RangeError('Material: [0,1]');
-    if(typeof doubleSided!=='boolean')throw new TypeError('Invalid doubleSided');
+    if ([...rgb,roughness,metalness].some(v => !Number.isFinite(v) || v < 0 || v > 1)) throw new RangeError('Invalid material');
+    if(typeof doubleSided!=='boolean')throw new TypeError('Invalid material');
     this.data.set([...rgb,1,Math.max(0.045,roughness),metalness,+doubleSided,0]);
   }
 }

@@ -1,5 +1,5 @@
 import {LoaderError} from './types.js';
-import {toBytes, type BinaryInput} from './util.js';
+import {throwIfAborted, toBytes, type BinaryInput} from './util.js';
 
 const F = 'ZIP';
 
@@ -38,6 +38,8 @@ export function crc32(bytes: Uint8Array): number {
 /** Lists the entries of a ZIP archive from its central directory. ZIP64, encryption and multi-disk archives are rejected. */
 export function readZipDirectory(input: BinaryInput, options: ZipOptions = {}): ZipEntry[] {
   const bytes = toBytes(input, F), maxEntries = options.maxEntries ?? 10_000;
+  throwIfAborted(options.signal, F);
+  if (Number.isNaN(maxEntries)) throw new LoaderError(F, 'range', 'maxEntries must not be NaN');
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (bytes.length < 22) throw new LoaderError(F, 'truncated', 'file is too small to be a ZIP archive');
   let eocd = -1;
@@ -58,7 +60,7 @@ export function readZipDirectory(input: BinaryInput, options: ZipOptions = {}): 
     if (p + 46 > cdOffset + cdSize || view.getUint32(p, true) !== 0x02014b50) throw new LoaderError(F, 'zip', `central directory entry ${i} is corrupt`);
     const flags = view.getUint16(p + 8, true), method = view.getUint16(p + 10, true);
     const nameLength = view.getUint16(p + 28, true), extraLength = view.getUint16(p + 30, true), commentLength = view.getUint16(p + 32, true);
-    if (p + 46 + nameLength > cdOffset + cdSize) throw new LoaderError(F, 'zip', `central directory entry ${i} name overflows`);
+    if (p + 46 + nameLength + extraLength + commentLength > cdOffset + cdSize) throw new LoaderError(F, 'zip', `central directory entry ${i} name, extra field or comment overflows`);
     const entry: ZipEntry = {
       name: decoder.decode(bytes.subarray(p + 46, p + 46 + nameLength)), method,
       crc32: view.getUint32(p + 16, true), compressedSize: view.getUint32(p + 20, true), size: view.getUint32(p + 24, true),
@@ -98,6 +100,8 @@ async function inflate(data: Uint8Array, size: number, name: string, signal?: Ab
 /** Reads and verifies (size and CRC-32) one entry. Supports stored (0) and deflate (8) entries. */
 export async function readZipEntry(input: BinaryInput, entry: ZipEntry, options: ZipOptions = {}): Promise<Uint8Array> {
   const bytes = toBytes(input, F), maxBytes = options.maxEntryBytes ?? 512 * 1024 * 1024;
+  throwIfAborted(options.signal, F);
+  if (Number.isNaN(maxBytes)) throw new LoaderError(F, 'range', 'maxEntryBytes must not be NaN');
   if (entry.size > maxBytes) throw new LoaderError(F, 'limit', `entry "${entry.name}" is ${entry.size} bytes, more than the limit of ${maxBytes}`);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), p = entry.headerOffset;
   if (p + 30 > bytes.length || view.getUint32(p, true) !== 0x04034b50) throw new LoaderError(F, 'zip', `local header of "${entry.name}" is missing`);

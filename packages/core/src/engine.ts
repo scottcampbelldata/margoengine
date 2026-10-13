@@ -3,6 +3,7 @@ import { Camera, type CameraOptions, type Vec3 } from './camera.js';
 import { Geometry, PbrMaterial, finite } from './geometry.js';
 import { GPURenderer, GLRenderer, type Renderer, type Batch, type GeometryBuffers } from './renderer.js';
 import { FrameGraph, type EnginePlugin } from './plugin.js';
+import {sceneSamples} from './quality.js';
 
 export interface EngineOptions { capacity?: number; backend?: 'auto'|'webgpu'|'webgl2'; camera?: CameraOptions }
 export type FrameCallback = (engine: Engine, delta: number) => void;
@@ -61,19 +62,19 @@ export class Mesh {
     this.euler[0]=Math.atan2(2*(w*x-y*z),1-2*(x*x+y*y));this.euler[2]=Math.atan2(2*(w*z-x*y),1-2*(y*y+z*z));return this;
   }
   setParent(parent: Mesh|null):this {
-    this.check();parent?.check();if(parent&&parent.engine!==this.engine)throw new TypeError('Parent from another engine');
+    this.check();parent?.check();if(parent&&parent.engine!==this.engine)throw new TypeError('Foreign parent');
     let depth=0;
-    for(let id=parent?.id??-1;id!==-1;id=this.engine.store.parents[id]) { if(id===this.id)throw new Error('Hierarchy cycle');if(++depth>=64)throw new RangeError('Hierarchy: 64 levels'); }
+    for(let id=parent?.id??-1;id!==-1;id=this.engine.store.parents[id]) { if(id===this.id)throw new Error('Hierarchy cycle');if(++depth>=64)throw new RangeError('Parent depth: 64'); }
     this.engine.store.parents[this.id]=parent?.id??-1;return this;
   }
   setGeometry(geometry: Geometry|null):this {
-    this.check();if(geometry!==null&&!(geometry instanceof Geometry))throw new TypeError('Expected Geometry');if(geometry===this.geometry)return this;
+    this.check();if(geometry!==null&&!(geometry instanceof Geometry))throw new TypeError('Invalid geometry');if(geometry===this.geometry)return this;
     if(geometry)this.engine.retain(geometry);
     const previous=this.geometry;this.geometry=geometry;
     const bounds=this.engine.store.bounds;bounds.fill(0,this.id*4,this.id*4+4);if(geometry)bounds.set(geometry.bounds,this.id*4);
     if(previous)this.engine.release(previous);return this;
   }
-  setMaterial(material: PbrMaterial):this {this.check();if(!(material instanceof PbrMaterial))throw new TypeError('Expected PbrMaterial');this.material=material;return this;}
+  setMaterial(material: PbrMaterial):this {this.check();if(!(material instanceof PbrMaterial))throw new TypeError('Invalid material');this.material=material;return this;}
   dispose():void {if(this.engine.meshes.get(this.id)===this)this.engine.remove(this);}
 }
 
@@ -113,7 +114,7 @@ export class Engine {
   private watchDevice():void {this.renderer.onLost=()=>{if(!this.disposed&&!this.disposing)void this.rebootDevice().catch(error=>this.onError(error));};}
   rebootDevice():Promise<void> {
     if(this.disposed||this.disposing)return Promise.reject(new Error('Engine disposed'));
-    if(this.backend!=='webgpu')return Promise.reject(new Error('Reboot requires WebGPU'));
+    if(this.backend!=='webgpu')return Promise.reject(new Error('WebGPU required'));
     if(this.recovery)return this.recovery;
     this.recovery=(async()=>{const previous=this.renderer,next=await GPURenderer.create(this.canvas);
       if(this.disposed||this.disposing){next.dispose();return;}
@@ -125,17 +126,17 @@ export class Engine {
   }
   get backend():'webgpu'|'webgl2'{return this.renderer.backend;}
   get gpu():GPUDevice|null{return this.renderer.gpu??null;}
-  geometryBuffers(geometry:Geometry):GeometryBuffers|null {if(this.disposed||this.disposing||this.recovery)throw new Error('Geometry buffers unavailable');return this.renderer.geometryBuffers?.(geometry)??null;}
+  geometryBuffers(geometry:Geometry):GeometryBuffers|null {if(this.disposed||this.disposing||this.recovery)throw new Error('Geometry unavailable');return this.renderer.geometryBuffers?.(geometry)??null;}
   hasPlugin(name:string):boolean{return this.plugins.has(name);}
   use(plugin:EnginePlugin):this {
     if(this.disposed||this.disposing)throw new Error('Engine disposed');
-    if(!plugin.name||this.plugins.has(plugin.name)||owners.has(plugin)||typeof plugin.setup!=='function')throw new TypeError('Invalid/attached plugin');
+    if(!plugin.name||this.plugins.has(plugin.name)||owners.has(plugin)||typeof plugin.setup!=='function')throw new TypeError('Invalid plugin');
     try{this.frameGraph.withOwner(plugin.name,()=>{plugin.setup(this);plugin.registerPasses?.(this.frameGraph);});this.plugins.set(plugin.name,plugin);owners.set(plugin,this);}
     catch(error){this.frameGraph.removeOwner(plugin.name);try{plugin.dispose?.();}catch{}throw error;}return this;
   }
   removePlugin(name:string):void {const plugin=this.plugins.get(name);if(!plugin)return;this.frameGraph.removeOwner(name);this.plugins.delete(name);owners.delete(plugin);plugin.dispose?.();}
   createMesh(parent:Mesh|null=null):Mesh {
-    if(this.disposed||this.disposing)throw new Error('Engine disposed');parent?.check();if(parent&&parent.engine!==this)throw new TypeError('Parent from another engine');
+    if(this.disposed||this.disposing)throw new Error('Engine disposed');parent?.check();if(parent&&parent.engine!==this)throw new TypeError('Foreign parent');
     const id=this.free.pop()??this.next++;if(id>=this.store.capacity){this.next=this.store.capacity;throw new RangeError('Entity capacity');}
     const t=this.store.transforms;for(const key of ['x','y','z','qx','qy','qz'] as const)t[key][id]=0;for(const key of ['qw','sx','sy','sz'] as const)t[key][id]=1;
     this.store.parents[id]=-1;this.store.constrained[id]=0;this.store.hidden[id]=0;this.store.rotations.fill(0,id*3,id*3+3);const mesh=new Mesh(this,id);this.meshes.set(id,mesh);this.revision++;this.store.active[id]=1;
@@ -166,9 +167,10 @@ export class Engine {
   }
   private update(culling:boolean,delta:number):void {
     if(this.disposed||this.disposing)throw new Error('Engine disposed');
-    if(!Number.isFinite(delta)||delta<0||delta>1)throw new RangeError('Frame delta: 0..1');
+    if(!Number.isFinite(delta)||delta<0||delta>1)throw new RangeError('Invalid delta');
     for(const plugin of this.plugins.values())plugin.onPreUpdate?.(delta);
-    const dpr=Math.min(globalThis.devicePixelRatio??1,2),width=Math.max(1,Math.min(4096,Math.round(this.canvas.clientWidth*dpr)||this.canvas.width)),height=Math.max(1,Math.min(4096,Math.round(this.canvas.clientHeight*dpr)||this.canvas.height));
+    // Avoid multiplying desktop 4x MSAA by another 4x in HiDPI backing pixels.
+    const dpr=Math.min(globalThis.devicePixelRatio??1,2,4/sceneSamples()),width=Math.max(1,Math.min(4096,Math.round(this.canvas.clientWidth*dpr)||this.canvas.width)),height=Math.max(1,Math.min(4096,Math.round(this.canvas.clientHeight*dpr)||this.canvas.height));
     if(this.canvas.width!==width)this.canvas.width=width;if(this.canvas.height!==height)this.canvas.height=height;
     this.camera.advance(delta);this.camera.update(this.canvas.width/this.canvas.height,this.backend==='webgpu');this.store.planes.set(this.camera.planes);this.store.tick(culling);
     for(const batch of this.batches.values())batch.count=0;this.stats.visible=0;this.stats.drawCalls=0;
@@ -178,7 +180,7 @@ export class Engine {
     for(const batch of this.batches.values())if(batch.count)this.stats.drawCalls++;
   }
   async pick(x:number,y:number):Promise<Mesh|null> {
-    if(![x,y].every(Number.isFinite))throw new RangeError('Invalid pick coordinates');if(this.disposed||this.disposing)throw new Error('Engine disposed');if(this.backend!=='webgpu')throw new Error('Picking requires WebGPU');if(x<0||y<0||x>=this.canvas.clientWidth||y>=this.canvas.clientHeight||this.recovery)return null;
+    if(![x,y].every(Number.isFinite))throw new RangeError('Invalid pick');if(this.disposed||this.disposing)throw new Error('Engine disposed');if(this.backend!=='webgpu')throw new Error('WebGPU required');if(x<0||y<0||x>=this.canvas.clientWidth||y>=this.canvas.clientHeight||this.recovery)return null;
     this.update(true,0);const renderer=this.renderer as GPURenderer,revision=this.revision,picker=[...this.plugins.values()].find(plugin=>plugin.onPick);
     const mesh=picker?await picker.onPick!(x,y):this.meshes.get(await renderer.pick(this.camera,this.lighting,this.batches.values(),this.frameGraph,x*this.canvas.width/this.canvas.clientWidth,y*this.canvas.height/this.canvas.clientHeight)??-1)??null;
     return this.renderer===renderer&&this.revision===revision?mesh:null;

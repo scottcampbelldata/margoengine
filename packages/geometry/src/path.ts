@@ -1,6 +1,6 @@
 import {Curve} from './curve.js';
 import {CubicBezierCurve, EllipseCurve, LineCurve, QuadraticBezierCurve, SplineCurve} from './curves.js';
-import {equals, type Vec, type Vec2} from './math.js';
+import {equals, finiteNumber, type Vec, type Vec2} from './math.js';
 
 /** A chain of curves treated as one curve by arc length (Three.js `CurvePath`). */
 export class CurvePath<V extends Vec = Vec2> extends Curve<V> {
@@ -41,6 +41,7 @@ export class CurvePath<V extends Vec = Vec2> extends Curve<V> {
   }
 
   override getSpacedPoints(divisions = 40): V[] {
+    finiteNumber(divisions);
     // getPoint is already arc-length parameterized for a curve path.
     const points: V[] = [];
     for (let i = 0; i <= divisions; i++) points.push(this.getPoint(i / divisions));
@@ -53,6 +54,7 @@ export class CurvePath<V extends Vec = Vec2> extends Curve<V> {
    * `divisions * points`, everything else at `divisions`. Consecutive duplicates are dropped.
    */
   override getPoints(divisions = 12): V[] {
+    finiteNumber(divisions);
     const points: V[] = [];
     let last: V | undefined;
     for (const curve of this.curves) {

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {compactInternals} from '../scripts/compact-internals.js';
 import {compactOutput} from '../scripts/measure-size.js';
 import {minifySync} from 'rolldown/utils';
@@ -11,9 +12,9 @@ test('library compaction preserves public members and foreign this bindings',()=
  imports = 1;
  value() { return [this.imports, () => this.imports, function() { return this.imports; }, {run() { return this.imports; }}]; }
  }`);
- assert.ok(output.includes('a = 1'));
- assert.ok(output.includes('[this.a, () => this.a, function() { return this.imports; }, {run() { return this.imports; }}]'));
- assert.throws(()=>compactInternals(source,'class Stage { a = 2; imports = 1; }'),/collides/);
+ assert.ok(output.includes('e = 1'));
+ assert.ok(output.includes('[this.e, () => this.e, function() { return this.imports; }, {run() { return this.imports; }}]'));
+ assert.throws(()=>compactInternals(source,'class Stage { e = 2; imports = 1; }'),/collides/);
  assert.throws(()=>compactInternals(source,'class Stage { imports = 1; get() { return this["imports"]; } }'),/computed/);
  assert.throws(()=>compactInternals(source.replace('private','public'),'class Stage {}'),/Review Stage.imports/);
 });
@@ -22,6 +23,11 @@ test('production compaction drops debugger and preserves public exports',()=>{
  const {code}=minifySync('smoke.js','export function publicName(longArgument) { debugger; return longArgument; }',{module:true,...compactOutput.minify});
  assert.doesNotMatch(code,/debugger|longArgument/);
  assert.match(code,/publicName/);
+});
+
+test('extended private aliases reject collisions with public uppercase members',async()=>{
+ const source=await readFile(new URL('../packages/core/src/renderer.ts',import.meta.url),'utf8');
+ assert.throws(()=>compactInternals(source,'class GPURenderer { A = 1; }'),/Internal alias A collides/);
 });
 
 test('compacted WGSL preserves the optional shader injection boundaries',()=>{

@@ -321,6 +321,7 @@ test('module is SSR safe and validates without a GPU', async () => {
   assert.equal(iblLayoutEntries(3).at(-1).binding, 7);
   await assert.rejects(Environment.create({}, {width: 2, height: 1, data: new Float32Array(8)}), /WebGPU/);
   await assert.rejects(Environment.create({createTexture() {}}, {width: 2, height: 1, data: new Float32Array(4)}), TypeError);
+  for(const [width,height] of [[1.5,2],[2,1.5]])await assert.rejects(Environment.create({}, {width,height,data:new Float32Array(12)}), /Equirect FloatImage/);
   const fake = {rotation: 0, device: null, disposed: false, roughnessToLod: () => 0};
   const background = new EnvironmentBackground(fake, {exposure: 2, blur: 0.5});
   assert.equal(background.exposure, 2);

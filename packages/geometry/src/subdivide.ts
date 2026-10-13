@@ -1,5 +1,6 @@
 import {geometryData, type GeometryData} from './data.js';
 import {computeVertexNormals} from './utils.js';
+import {finiteNumber} from './math.js';
 
 /**
  * Loop subdivision. Each pass splits every triangle into four and smooths positions with Loop's weights (edge
@@ -9,6 +10,7 @@ import {computeVertexNormals} from './utils.js';
  * and seams are kept. Normals are recomputed (angle weighted); tangents and groups are dropped.
  */
 export function loopSubdivide(data: GeometryData, iterations = 1, tolerance = 1e-6): GeometryData {
+  finiteNumber(iterations);
   let current = data;
   for (let i = 0; i < Math.max(0, Math.floor(iterations)); i++) current = subdivideOnce(current, tolerance);
   return current;

@@ -91,7 +91,7 @@ function validateSource(source: EnvironmentSource): void {
   if (isCube(source)) {
     if (!isPowerOfTwo(source.size) || source.faces.length !== 6 || source.faces.some(face => !(face instanceof Float32Array) || face.length !== source.size * source.size * 4))
       throw new TypeError('CubeFaces needs a power-of-two size and six Float32Array RGBA faces of size*size*4');
-  } else if (!(source.data instanceof Float32Array) || !(source.width > 0 && source.height > 0) || source.data.length !== source.width * source.height * 4)
+  } else if (!(source.data instanceof Float32Array) || !Number.isSafeInteger(source.width) || !Number.isSafeInteger(source.height) || !(source.width > 0 && source.height > 0) || source.data.length !== source.width * source.height * 4)
     throw new TypeError('Equirect FloatImage needs width, height and RGBA Float32Array data of width*height*4');
 }
 

@@ -27,7 +27,8 @@ export class Tween {
       track.time += delta; if (track.time < track.delay) continue;
       const t = track.duration ? Math.min(1, (track.time - track.delay) / track.duration) : 1, eased = t === 1 ? 1 : track.easing(t);
       if (!Number.isFinite(eased)) throw new RangeError('Easing must return a finite value');
-      track.target[track.key] = track.from + (track.to - track.from) * eased;
+      const span = track.to - track.from;
+      track.target[track.key] = t === 1 ? track.to : Number.isFinite(span) ? track.from + span * eased : track.from * (1 - eased) + track.to * eased;
       if (t === 1) {track.active = false; track.complete?.();}
     }
     } finally {this.updating = false; this.compact();}

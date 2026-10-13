@@ -43,6 +43,13 @@ jobs:
       - name: Verify every packed package and strict TypeScript consumers
         run: npm run test:modules:packages
       - run: npx playwright install chromium
+      - name: Verify production demo build and visible-frame timing semantics
+        run: |
+          node scripts/build-site.js
+          node scripts/demo-subject-tests.js --audit-only
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
       - name: Stress minimum limits, device loss, rollback and lifecycle cleanup
         timeout-minutes: 10
         run: npm run modern:test:stress -- --sessions=22 --frames=24 --cycles=3

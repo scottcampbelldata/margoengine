@@ -66,9 +66,10 @@ let warnedTexture = false;
 
 /** World matrix of a live, visible core mesh after the latest transform tick, or null. */
 export function meshWorldMatrix(engine: EngineKernel, mesh: Mesh): Float32Array | null {
-  const runtime = engineRuntime(engine), id = meshRuntime(mesh).id;
-  if (runtime.disposed || runtime.meshes.get(id) !== (mesh as unknown) || runtime.store.hidden[id]) return null;
-  return runtime.store.matrices.subarray(id * 16, id * 16 + 16);
+  const runtime = engineRuntime(engine), object = meshRuntime(mesh), id = object.id;
+  if (runtime.disposed || runtime.meshes.get(id) !== (mesh as unknown)) return null;
+  for (let current=id,depth=0;current>=0&&depth<64;current=runtime.store.parents?.[current]??-1,depth++) if (runtime.store.hidden[current]) return null;
+  return object.matrix ?? runtime.store.matrices.subarray(id * 16, id * 16 + 16);
 }
 
 const isGpuTexture = (value: TextureSource): value is GPUTexture => typeof (value as GPUTexture).createView === 'function';
@@ -158,8 +159,12 @@ export class PointsPlugin implements EnginePlugin {
     const edlLayout = device.createBindGroupLayout({entries: [
       {binding: 0, visibility: F, texture: {sampleType: 'unfilterable-float'}}, {binding: 1, visibility: F, buffer: {type: 'uniform', minBindingSize: 16}},
     ]});
-    const frame = device.createBuffer({size: FRAME_BYTES, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST});
+    const created: Array<GPUBuffer|GPUTexture> = [];
+    const buffer = (size:number,usage:number):GPUBuffer => {const value=device.createBuffer({size,usage});created.push(value);return value;};
+    try {
+    const frame = buffer(FRAME_BYTES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
     const white = device.createTexture({size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST});
+    created.push(white);
     device.queue.writeTexture({texture: white}, new Uint8Array([255, 255, 255, 255]), {bytesPerRow: 4}, [1, 1]);
     this.gpu = {
       pointModule: device.createShaderModule({code: pointShader}), spriteModule: device.createShaderModule({code: spriteShader}), edlModule: device.createShaderModule({code: edlShader}),
@@ -168,12 +173,13 @@ export class PointsPlugin implements EnginePlugin {
       spritePipelineLayout: device.createPipelineLayout({bindGroupLayouts: [frameLayout, spriteLayout]}),
       edlPipelineLayout: device.createPipelineLayout({bindGroupLayouts: [edlLayout]}),
       frame, frameGroup: device.createBindGroup({layout: frameLayout, entries: [{binding: 0, resource: {buffer: frame}}]}),
-      dummy: device.createBuffer({size: 16, usage: GPUBufferUsage.STORAGE}),
+      dummy: buffer(16, GPUBufferUsage.STORAGE),
       white, whiteView: white.createView(),
       linear: device.createSampler({magFilter: 'linear', minFilter: 'linear'}),
       nearest: device.createSampler({magFilter: 'nearest', minFilter: 'nearest'}),
-      edlParams: device.createBuffer({size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST}),
+      edlParams: buffer(16, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST),
     };
+    } catch (error) {for (const resource of created) resource.destroy(); throw error;}
   }
 
   registerPasses(graph: FrameGraph): void {graph.add({name: `${this.name}:draw`, order: this.order, execute: this.execute});}
@@ -242,9 +248,11 @@ export class PointsPlugin implements EnginePlugin {
     const width = image.naturalWidth || image.videoWidth || image.width || 0, height = image.naturalHeight || image.videoHeight || image.height || 0;
     if (!width || !height) throw new RangeError('Texture source has no size');
     const texture = device.createTexture({size: [width, height], format: 'rgba8unorm-srgb', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT});
-    if (typeof ImageData !== 'undefined' && source instanceof ImageData) device.queue.writeTexture({texture}, source.data, {bytesPerRow: width * 4}, [width, height]);
-    else device.queue.copyExternalImageToTexture({source: source as GPUCopyExternalImageSource}, {texture}, [width, height]);
-    owned = {source, version: material.mapVersion, texture, view: texture.createView()};
+    try {
+      if (typeof ImageData !== 'undefined' && source instanceof ImageData) device.queue.writeTexture({texture}, source.data, {bytesPerRow: width * 4}, [width, height]);
+      else device.queue.copyExternalImageToTexture({source: source as GPUCopyExternalImageSource}, {texture}, [width, height]);
+      owned = {source, version: material.mapVersion, texture, view: texture.createView()};
+    } catch (error) {texture.destroy(); throw error;}
     this.owned.set(material, owned);
     return owned.view;
   }

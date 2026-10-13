@@ -141,11 +141,14 @@ export class Raycaster {
       if (!(getMeshLayers(handle) & this.layers)) continue;
       if (this.filter && !this.filter(handle)) continue;
       const m = store.matrices, o = mesh.id * 16, b = geometry.bounds;
-      // World bounding sphere: transformed center, radius scaled by the longest basis vector.
+      // World bounding sphere: the absolute row-sum bound of M^T M also covers hierarchy shear.
       const cx = m[o] * b[0] + m[o + 4] * b[1] + m[o + 8] * b[2] + m[o + 12] - ox;
       const cy = m[o + 1] * b[0] + m[o + 5] * b[1] + m[o + 9] * b[2] + m[o + 13] - oy;
       const cz = m[o + 2] * b[0] + m[o + 6] * b[1] + m[o + 10] * b[2] + m[o + 14] - oz;
-      const scale = Math.sqrt(Math.max(m[o] ** 2 + m[o + 1] ** 2 + m[o + 2] ** 2, m[o + 4] ** 2 + m[o + 5] ** 2 + m[o + 6] ** 2, m[o + 8] ** 2 + m[o + 9] ** 2 + m[o + 10] ** 2));
+      const xy = Math.abs(m[o] * m[o + 4] + m[o + 1] * m[o + 5] + m[o + 2] * m[o + 6]);
+      const xz = Math.abs(m[o] * m[o + 8] + m[o + 1] * m[o + 9] + m[o + 2] * m[o + 10]);
+      const yz = Math.abs(m[o + 4] * m[o + 8] + m[o + 5] * m[o + 9] + m[o + 6] * m[o + 10]);
+      const scale = Math.sqrt(Math.max(m[o] ** 2 + m[o + 1] ** 2 + m[o + 2] ** 2 + xy + xz, m[o + 4] ** 2 + m[o + 5] ** 2 + m[o + 6] ** 2 + xy + yz, m[o + 8] ** 2 + m[o + 9] ** 2 + m[o + 10] ** 2 + xz + yz));
       const radius = b[3] * scale * (1 + 1e-5) + 1e-6, along = cx * dx + cy * dy + cz * dz, offAxis = cx * cx + cy * cy + cz * cz - along * along;
       if (offAxis > radius * radius) continue;
       const half = Math.sqrt(radius * radius - Math.max(0, offAxis));

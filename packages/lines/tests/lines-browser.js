@@ -126,7 +126,9 @@ window.runLineTests = async () => {
   assert(green(image.at(128, lifted)) && !green(image.at(128, 127)), 'Attached line did not follow the mesh');
   anchor.visible = false; image = await frame();
   assert(!green(image.at(128, lifted)), 'Line attached to a hidden mesh still draws');
-  anchor.visible = true; line.attach(null);
+  anchor.visible = true;const parent=engine.createMesh();anchor.setParent(parent);parent.visible=false;image=await frame();
+  assert(!green(image.at(128,lifted)), 'Line attached below a hidden ancestor still draws');parent.visible=true;image=await frame();assert(green(image.at(128,lifted)), 'Line did not return when its ancestor became visible');
+  line.attach(null);
   report.checks.push('Lines attached to a mesh follow its world matrix and visibility');
 
   // 5. Dashes produce gaps: 0.5 on, 0.5 off over 6 world units gives 6 dashes.

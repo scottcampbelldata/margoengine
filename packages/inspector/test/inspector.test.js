@@ -28,7 +28,7 @@ test('hierarchy nests entities, escapes names and supports keyboard expansion an
 });
 test('duplicate attachment removes only the rejected overlay',async t=>{
  const {engine,inspector,dom}=await scene(t);
- assert.throws(()=>Inspector.attach(engine,{parent:dom.window.document.body}),{name:'TypeError',message:/Invalid\/attached plugin/});
+ assert.throws(()=>Inspector.attach(engine,{parent:dom.window.document.body}),{name:'TypeError',message:'Invalid plugin'});
  assert.equal(dom.window.document.querySelectorAll('[data-margo-inspector]').length,1);assert.equal(inspector.element.isConnected,true);
 });
 
@@ -54,4 +54,21 @@ test('entity disposal, slot reuse, foreign handles and teardown do not leave sta
   const foreign = {engine: {}, check() {}}; assert.throws(() => inspector.select(foreign), /another/);
   inspector.dispose(); inspector.dispose(); assert.equal(inspector.element.isConnected, false); assert.equal(engine.hasPlugin('inspector'), false);
   engine.render(); assert.throws(() => inspector.select(replacement), /not attached/);
+});
+
+test('disabled debug rendering skips the frame mesh scan and resumes it for live helpers', async t => {
+  const {engine, inspector} = await scene(t), mesh = engine.createMesh().setGeometry(box());
+  // Exercise the sync pass without a native device; the Lines draw pass remains inactive.
+  Object.defineProperty(engine, 'backend', {value: 'webgpu', configurable: true});
+  const original = engine.meshes.values; let scans = 0;
+  t.mock.method(engine.meshes, 'values', function () {scans++; return original.call(this);});
+  const frame = () => engine.frameGraph.execute({backend: 'webgpu', draw() {}});
+  for (let i = 0; i < 120; i++) frame();
+  assert.equal(scans, 0, 'an inspector with no debug helpers must not scan meshes each frame');
+  inspector.setDebug('bounds', true); frame(); assert.equal(scans, 1);
+  inspector.setDebug('bounds', false); frame(); assert.equal(scans, 2, 'retained helpers still synchronize visibility');
+  mesh.dispose(); frame();
+  const afterCleanup = scans;
+  for (let i = 0; i < 120; i++) frame();
+  assert.equal(scans, afterCleanup, 'disposed debug helpers must release the steady-frame scan');
 });

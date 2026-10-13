@@ -211,7 +211,7 @@ export function normalizeMaterial(data: PbrMaterial|MaterialData): Mat {
   if (m.doubleSided !== undefined && typeof m.doubleSided !== 'boolean') fail('doubleSided must be boolean');
   const alphaMode = m.alphaMode ?? 'OPAQUE';
   if (!['OPAQUE', 'MASK', 'BLEND'].includes(alphaMode)) fail('Unknown alphaMode');
-  if (m.alphaCutoff !== undefined && (alphaMode !== 'MASK' || typeof m.alphaCutoff !== 'number' || !(m.alphaCutoff >= 0))) throw new RangeError('alphaCutoff needs MASK mode and a value >= 0');
+  if (m.alphaCutoff !== undefined && (alphaMode !== 'MASK' || !Number.isFinite(m.alphaCutoff) || !(m.alphaCutoff >= 0))) throw new RangeError('alphaCutoff needs MASK mode and a value >= 0');
   return {
     name: m.name, color, emissive, alphaMode, alphaCutoff: m.alphaCutoff, doubleSided: m.doubleSided ?? false,
     roughness: unit(m.roughness, 'Roughness', 1), metalness: unit(m.metalness, 'Metalness', 0),

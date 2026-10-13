@@ -143,7 +143,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.worldRef = new R.World(vec(gravity));
     this.worldRef.timestep = this.fixedTimestep;
     if (options.solverIterations !== undefined) this.worldRef.numSolverIterations = options.solverIterations;
-    this.queue = new R.EventQueue(true);
+    try {this.queue = new R.EventQueue(true);} catch (error) {this.worldRef.free(); throw error;}
     const filter = options.contactFilter;
     if (filter) {
       const allow = (h1: number, h2: number): boolean => {const a = this.byCollider.get(h1), b = this.byCollider.get(h2); return !a || !b || filter(a, b) !== false;};
@@ -152,7 +152,7 @@ export class Physics implements EnginePlugin, BodyOwner {
         filterIntersectionPair: allow,
       };
     }
-    if (engine) engine.use(this);
+    if (engine) try {engine.use(this);} catch (error) {this.dispose(); throw error;}
   }
 
   /** The Rapier `World`. Use it for anything this wrapper does not cover. */

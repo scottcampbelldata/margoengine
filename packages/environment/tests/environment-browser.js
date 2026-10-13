@@ -351,18 +351,35 @@ window.runEnvironmentTests = async () => {
       return context.getImageData(0, 0, copy.width, copy.height).data;
     };
     engine.render(); const plain = capture();
+    // MSAA edges mix uncovered clear samples; a white fragment exposes their coverage.
+    let sceneSamples;
+    const coveragePlugin = {name: 'test:environment-coverage', setup() {}, registerPasses(graph) {
+      graph.add({name: 'test:environment-coverage', order: -1, execute(context) {
+        sceneSamples = context.descriptor.multisample?.count ?? 1;
+        context.shader = context.shader.replace(/let n=normalize\(i.normal\)[\s\S]*$/, 'return vec4f(1);\n}');
+      }});
+    }};
+    engine.use(coveragePlugin); engine.render(); const coverage = capture();
+    engine.removePlugin(coveragePlugin.name); engine.render(); const afterCoverage = capture();
+    assert(plain.every((value, i) => value === afterCoverage[i]), 'coverage probe changed the plain frame');
     const environment = await Environment.create(engine, codedImage, {size: 32, ...small});
     const background = new EnvironmentBackground(environment);
     engine.use(environment).use(background);
     engine.render(); const withBackground = capture();
     const width = canvas.width, height = canvas.height;
-    let meshPixels = 0, backgroundPixels = 0, worst = 0;
+    let meshPixels = 0, edgePixels = 0, backgroundPixels = 0, worst = 0, edgeWorst = 0;
     const background0 = plain.slice(0, 3);
     for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-      const i = (y * width + x) * 4, isBackground = plain[i] === background0[0] && plain[i + 1] === background0[1] && plain[i + 2] === background0[2];
-      if (!isBackground) {
+      const i = (y * width + x) * 4, covered = Math.round((coverage[i] - background0[0]) / (255 - background0[0]) * sceneSamples);
+      assert(covered >= 0 && covered <= sceneSamples, `invalid raster coverage at ${x},${y}`);
+      for (let k = 0; k < 3; k++) assert(Math.abs(coverage[i + k] - (background0[k] + (255 - background0[k]) * covered / sceneSamples)) <= 1, `invalid coverage mask at ${x},${y}`);
+      if (covered === sceneSamples) {
         meshPixels++;
         assert(plain[i] === withBackground[i] && plain[i + 1] === withBackground[i + 1] && plain[i + 2] === withBackground[i + 2], `background changed a mesh pixel at ${x},${y}`);
+      } else if (covered > 0) {
+        edgePixels++;
+        const expected = coded(directionAt(engine.camera, x, y, width, height)).map(tonemap), uncovered = 1 - covered / sceneSamples;
+        for (let k = 0; k < 3; k++) edgeWorst = Math.max(edgeWorst, Math.abs(withBackground[i + k] - (plain[i + k] + uncovered * (expected[k] - background0[k]))));
       } else if ((x + y) % 7 === 0) {
         backgroundPixels++;
         const expected = coded(directionAt(engine.camera, x, y, width, height)).map(tonemap);
@@ -370,7 +387,8 @@ window.runEnvironmentTests = async () => {
       }
     }
     assert(meshPixels > 200 && backgroundPixels > 200 && worst <= 3, `engine background: ${meshPixels} mesh px, ${backgroundPixels} sky px, worst ${worst}`);
-    report.engine = {canvas: [width, height], meshPixels, backgroundPixelsChecked: backgroundPixels, worstByteError: worst};
+    assert(edgeWorst <= 3 && (sceneSamples === 1 ? edgePixels === 0 : edgePixels > 0), `engine MSAA edges: ${edgePixels} pixels, worst ${edgeWorst}`);
+    report.engine = {canvas: [width, height], sceneSamples, meshPixels, edgePixels, backgroundPixelsChecked: backgroundPixels, worstByteError: worst, edgeWorstByteError: edgeWorst};
 
     // Steady frames allocate nothing and reuse their pass descriptors.
     const methods = ['createBuffer', 'createTexture', 'createBindGroup', 'createSampler', 'createShaderModule', 'createRenderPipeline'];

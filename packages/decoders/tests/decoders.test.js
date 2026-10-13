@@ -44,6 +44,37 @@ test('transcode target negotiation follows BC7, ASTC, ETC2, RGBA8', () => {
   assert.equal(new decoders.KTX2Decoder({device: device('texture-compression-astc')}).target, 'astc-4x4');
 });
 
+test('already aborted decoder jobs reject before copying input or starting workers', async () => {
+  const globals = ['window', 'Worker'].map(name => [name, Object.getOwnPropertyDescriptor(globalThis, name)]);
+  let copies = 0, workers = 0;
+  globalThis.window = {};
+  globalThis.Worker = class {constructor() {workers++; throw new Error('unexpected worker');}};
+  const source = new ArrayBuffer(1024), slice = source.slice.bind(source);
+  source.slice = (...args) => {copies++; return slice(...args);};
+  const controller = new AbortController(), reason = new Error('cancelled before decoding');
+  controller.abort(reason);
+  const draco = new decoders.DracoDecoder(), ktx2 = new decoders.KTX2Decoder();
+  try {
+    for (const [decoder, method] of [[draco, 'decode'], [ktx2, 'transcode']]) {
+      for (const input of [source, new Uint8Array(source, 128, 512)]) {
+        await assert.rejects(decoder[method](input, {signal: controller.signal}), error => error === reason);
+      }
+      assert.equal(copies, 0, 'cancelled jobs must not duplicate large compressed payloads');
+      assert.equal(workers, 0);
+      assert.equal(source.byteLength, 1024);
+      const nullReason = new AbortController();
+      nullReason.abort(null);
+      await assert.rejects(decoder[method](source, {signal: nullReason.signal, transfer: true}), error => error.name === 'AbortError');
+    }
+  } finally {
+    draco.dispose(); ktx2.dispose();
+    for (const [name, descriptor] of globals) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else delete globalThis[name];
+    }
+  }
+});
+
 test('bytesPerRow counts 4x4 blocks for compressed formats and pixels for RGBA8', () => {
   assert.equal(decoders.getBytesPerRow('bc7-rgba-unorm', 256), 1024);
   assert.equal(decoders.getBytesPerRow('astc-4x4-unorm-srgb', 2), 16);

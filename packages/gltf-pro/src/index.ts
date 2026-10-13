@@ -210,7 +210,8 @@ export class PBRModel implements EnginePlugin {
       const distance=(r:DrawResource)=>Math.hypot(...c.camera.position.map((v,i)=>v-r.primitive.node.matrix[12+i]));
       return blendA?distance(b)-distance(a):0;
     });
-    for(const r of resources) {
+    let pass:GPURenderPassEncoder|undefined;
+    try {for(const r of resources) {
       const p=r.primitive,m=p.material,node=p.node;node.check();let visible=true;
       for(let id=node.id;id!==-1;id=this.engine.store.parents[id])if(this.engine.store.hidden[id])visible=false;
       if(!visible)continue;
@@ -239,16 +240,26 @@ export class PBRModel implements EnginePlugin {
           c.device.createBindGroup({layout:pipeline.getBindGroupLayout(1),entries:r.views.flatMap((view,i)=>[{binding:i*2,resource:view},{binding:i*2+1,resource:r.samplers[i]}])})];
         r.groups.set(pipeline,groups);
       }
-      const pass=c.encoder.beginRenderPass({colorAttachments:[{view:color,loadOp:'load',storeOp:'store'}],depthStencilAttachment:{view:depth,depthLoadOp:'load',depthStoreOp:'store',...(c.descriptor.depthStencil!.format.includes('stencil')?{stencilLoadOp:'load',stencilStoreOp:'store'}:{})}});
+      // Retain transparent pass boundaries so attachment-store rounding stays unchanged.
+      if(blend&&mode!=='gbuffer'){pass?.end();pass=undefined;}
+      pass??=c.encoder.beginRenderPass({colorAttachments:[{view:color,loadOp:'load',storeOp:'store'}],depthStencilAttachment:{view:depth,depthLoadOp:'load',depthStoreOp:'store',...(c.descriptor.depthStencil!.format.includes('stencil')?{stencilLoadOp:'load',stencilStoreOp:'store'}:{})}});
       pass.setPipeline(pipeline);pass.setBindGroup(0,groups[0]);pass.setBindGroup(1,groups[1]);
       if(mode==='beauty'&&this.lighting.size){
         const entries=[...this.lighting].flatMap(effect=>effect.bindings());let cached=this.lightingGroups.get(pipeline);
-        if(!cached||entries.some((entry,i)=>entry.resource!==cached!.entries[i]?.resource)){cached={entries,group:c.device.createBindGroup({layout:pipeline.getBindGroupLayout(2),entries})};this.lightingGroups.set(pipeline,cached);}
+        if(!cached||entries.length!==cached.entries.length||entries.some((entry,i)=>{
+          const previous=cached!.entries[i],resource=entry.resource,old=previous.resource;
+          return entry.binding!==previous.binding||!(resource===old||'buffer' in resource&&'buffer' in old&&resource.buffer===old.buffer&&resource.offset===old.offset&&resource.size===old.size);
+        })){
+          const snapshot=entries.map(({binding,resource})=>({binding,resource:'buffer' in resource?{buffer:resource.buffer,offset:resource.offset,size:resource.size}:resource}));
+          const group=c.device.createBindGroup({layout:pipeline.getBindGroupLayout(2),entries});cached={entries:snapshot,group};this.lightingGroups.set(pipeline,cached);
+        }
         pass.setBindGroup(2,cached.group);
       }
-      pass.setVertexBuffer(0,p.deformed??r.vertex);pass.setIndexBuffer(r.index,'uint32');pass.drawIndexed(p.indices.length);pass.end();
+      pass.setVertexBuffer(0,p.deformed??r.vertex);pass.setIndexBuffer(r.index,'uint32');pass.drawIndexed(p.indices.length);
+      if(blend&&mode!=='gbuffer'){pass.end();pass=undefined;}
       if(mode==='beauty'){this.engine.stats.visible++;this.engine.stats.drawCalls++;}
-    }
+    }}catch(error){try{pass?.end();}catch{}throw error;}
+    pass?.end();
   }
   get bounds():Float32Array {
     this.engine.store.tick(false);const out=new Float32Array([Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity]);

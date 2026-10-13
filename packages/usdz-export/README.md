@@ -1,6 +1,6 @@
 # @margoengine/usdz-export
 
-The standalone USDZ exporter entry point reuses exporters' tested exportUSDZ implementation.
+The standalone USDZ exporter entry point reuses exporters' tested exportUSDZ implementation through `@margoengine/exporters/usdz`, so direct ESM imports load only the USDZ serializer and its shared scene collector.
 
 ```ts
 import {exportUSDZ} from '@margoengine/usdz-export';

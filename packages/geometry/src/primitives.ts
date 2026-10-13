@@ -1,9 +1,9 @@
 import {geometryData, type GeometryData, type GeometryGroup} from './data.js';
 import type {Curve} from './curve.js';
-import type {Vec, Vec2} from './math.js';
+import {finiteNumber, type Vec, type Vec2} from './math.js';
 
 const TAU = Math.PI * 2;
-const segments = (value: number, min: number) => Math.max(min, Math.floor(value));
+const segments = (value: number, min: number) => Math.max(min, Math.floor(finiteNumber(value)));
 
 class Builder {
   p: number[] = []; n: number[] = []; uv: number[] = []; idx: number[] = []; groups: GeometryGroup[] = [];
@@ -214,7 +214,7 @@ export function torusGeometry(radius = 1, tube = 0.4, radialSegments = 12, tubul
 
 /** Three.js `TorusKnotGeometry` for a (p, q) torus knot. */
 export function torusKnotGeometry(radius = 1, tube = 0.4, tubularSegments = 64, radialSegments = 8, p = 2, q = 3): GeometryData {
-  const b = new Builder(), ts = Math.floor(tubularSegments), rs = Math.floor(radialSegments);
+  const b = new Builder(), ts = Math.floor(finiteNumber(tubularSegments)), rs = Math.floor(finiteNumber(radialSegments));
   const knot = (u: number): [number, number, number] => {
     const cs = Math.cos(q / p * u);
     return [radius * (2 + cs) * 0.5 * Math.cos(u), radius * (2 + cs) * Math.sin(u) * 0.5, radius * Math.sin(q / p * u) * 0.5];
@@ -245,7 +245,7 @@ export function torusKnotGeometry(radius = 1, tube = 0.4, tubularSegments = 64, 
  */
 export function latheGeometry(points: readonly Vec2[] = [[0, -0.5], [0.5, 0], [0, 0.5]], segmentCount = 12, phiStart = 0, phiLength = TAU): GeometryData {
   if (points.length < 2) throw new RangeError('Lathe needs at least two points');
-  const b = new Builder(), n = Math.floor(segmentCount), last = points.length - 1;
+  const b = new Builder(), n = Math.floor(finiteNumber(segmentCount)), last = points.length - 1;
   phiLength = Math.min(Math.max(phiLength, 0), TAU);
   const profile: [number, number][] = [];
   let prev: [number, number] = [0, 0];
@@ -275,7 +275,7 @@ export function latheGeometry(points: readonly Vec2[] = [[0, -0.5], [0.5, 0], [0
  * `closed` reuses the first ring as the last so a closed curve gives a seamless tube.
  */
 export function tubeGeometry(path: Curve<Vec>, tubularSegments = 64, radius = 1, radialSegments = 8, closed = false): GeometryData {
-  const b = new Builder(), ts = Math.floor(tubularSegments), rs = Math.floor(radialSegments), frames = path.computeFrenetFrames(ts, closed);
+  const b = new Builder(), ts = Math.floor(finiteNumber(tubularSegments)), rs = Math.floor(finiteNumber(radialSegments)), frames = path.computeFrenetFrames(ts, closed);
   const ring = (i: number) => {
     const p = path.getPointAt(i / ts), N = frames.normals[i], B = frames.binormals[i], px = p[0], py = p[1], pz = p.length > 2 ? p[2]! : 0;
     for (let j = 0; j <= rs; j++) {

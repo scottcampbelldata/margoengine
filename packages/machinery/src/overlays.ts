@@ -1,12 +1,11 @@
 import {meshRuntime} from '@margoengine/core/extension';
-import type {Mesh as MeshHandle} from '@margoengine/core';
 import type {Engine,EnginePlugin,FrameGraph,Mesh,Vec3,Camera} from '@margoengine/core/extension';
-export interface Anchor {point:Vec3;node?:MeshHandle}
+import {worldAnchor,type Anchor} from './anchors.js';
+export {worldAnchor,type Anchor} from './anchors.js';
 export interface Dimension {a:Anchor;b:Anchor;offset?:readonly [number,number];label?:string}
 export interface Callout {anchor:Anchor;label:string;offset?:readonly [number,number]}
 export interface AnnotationOptions {dimensions?:readonly Dimension[];callouts?:readonly Callout[];unit?:string;scale?:number;decimals?:number}
 const ns='http://www.w3.org/2000/svg';
-export function worldAnchor(anchor:Anchor):Vec3 {const p=anchor.point;if(p.length!==3||!p.every(v=>typeof v==='number'&&Number.isFinite(Math.fround(v))))throw new TypeError('Invalid annotation anchor');if(!anchor.node)return p;anchor.node.check();const m=meshRuntime(anchor.node).matrix;return [m[0]*p[0]+m[4]*p[1]+m[8]*p[2]+m[12],m[1]*p[0]+m[5]*p[1]+m[9]*p[2]+m[13],m[2]*p[0]+m[6]*p[1]+m[10]*p[2]+m[14]];}
 export function projectAnnotation(camera:Camera,point:Vec3,width:number,height:number,gpu=true):readonly [number,number]|null {const m=camera.matrix,w=m[3]*point[0]+m[7]*point[1]+m[11]*point[2]+m[15],z=(m[2]*point[0]+m[6]*point[1]+m[10]*point[2]+m[14])/w;if(w<=0||z<(gpu?0:-1)||z>1)return null;return [((m[0]*point[0]+m[4]*point[1]+m[8]*point[2]+m[12])/w+1)*width/2,(1-(m[1]*point[0]+m[5]*point[1]+m[9]*point[2]+m[13])/w)*height/2];}
 export class EngineeringAnnotations implements EnginePlugin {
   readonly name='engineering-annotations';private engine?:Engine;private svg?:SVGSVGElement;private records:Array<{group:SVGGElement;path:SVGPathElement;text:SVGTextElement}>=[];

@@ -44,6 +44,15 @@ test('steady water frames reuse bind groups, views and their render descriptor',
  const perFrame=descriptors.length/100;assert.ok(perFrame>2);for(let i=perFrame;i<descriptors.length;i++)assert.equal(descriptors[i],descriptors[i%perFrame]);
  effect.dispose();
 });
+test('default reflection lights copy exact uniform bits without creating temporary typed-array views',()=>{
+ const h=optionalGPU(),water=new Water({segments:4});h.engine.use(water);h.frame();
+ const original=Float32Array.prototype.subarray;let views=0;
+ try{Float32Array.prototype.subarray=function(...args){views++;return original.apply(this,args);};for(let i=0;i<120;i++)h.frame();}
+ finally{Float32Array.prototype.subarray=original;}
+ assert.equal(views,0);const values=new Uint32Array(h.resources.find(r=>r.size===512).data);
+ assert.deepEqual(values.slice(112,116),values.slice(104,108));assert.deepEqual(values.slice(116,119),values.slice(108,111));
+ water.dispose();assert.ok(h.resources.every(r=>r.destroyed));
+});
 test('default swells share a wind cone and keep distinct wavelengths',()=>{
  const h=optionalGPU(),effect=new Water({segments:4});h.engine.use(effect);h.frame();const v=new Float32Array(h.resources.find(r=>r.size===512).data);
  assert.ok(v[32]*v[40]+v[33]*v[41]>Math.cos(25*Math.PI/180));assert.notEqual(v[35],v[43]);effect.dispose();

@@ -1,6 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {SnapshotBuffer, createSnapshot} from '../dist/index.js';
+
+test('finite extreme quaternion components normalize without overflow or subnormal loss', () => {
+  for (const magnitude of [1e308, Number.MIN_VALUE]) {
+    const buffer = new SnapshotBuffer();
+    assert.equal(buffer.push(0, [0, 0, 0], [magnitude, -magnitude, magnitude, -magnitude]), true);
+    assert.deepEqual([...buffer.sample(0).rotation], [0.5, -0.5, 0.5, -0.5]);
+    buffer.push(1, [0, 0, 0], [-magnitude, magnitude, -magnitude, magnitude]);
+    assert.ok(Math.abs(Math.hypot(...buffer.sample(0.5).rotation) - 1) < 1e-15);
+    assert.equal(buffer.push(0.5, [0, 0, 0], [magnitude, magnitude, magnitude, magnitude]), false);
+    assert.throws(() => buffer.push(2, [0, 0, 0], [0, 0, 0, 0]), /Zero/);
+  }
+});
+
+test('ordinary quaternion normalization retains its existing component values', () => {
+  const quaternion = [0.1234, -2.4567, 3.1234, 0.91], length = Math.hypot(...quaternion);
+  const buffer = new SnapshotBuffer(); buffer.push(0, [0, 0, 0], quaternion);
+  assert.deepEqual([...buffer.sample(0).rotation], quaternion.map(value => value / length));
+});
 test('Hermite positions, shortest-path slerp, packet ordering and bounded dead reckoning', () => {
   const buffer = new SnapshotBuffer(3, 0.25), output = createSnapshot(); assert.equal(buffer.sample(0), null);
   buffer.push(0, [0, 0, 0], [0, 0, 0, 1], [2, 0, 0]); buffer.push(1, [2, 0, 0], [0, 1, 0, 0], [2, 0, 0]);

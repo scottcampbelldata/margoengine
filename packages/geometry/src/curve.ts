@@ -1,4 +1,4 @@
-import {cross, distance, dot, normalize, rotateAxis, sub, to3, type Vec, type Vec3} from './math.js';
+import {cross, distance, dot, finiteNumber, normalize, rotateAxis, sub, to3, type Vec, type Vec3} from './math.js';
 
 /** Per-sample orthonormal frames along a curve. Arrays have `segments + 1` entries. */
 export interface FrenetFrames {tangents: Vec3[]; normals: Vec3[]; binormals: Vec3[]}
@@ -19,6 +19,7 @@ export abstract class Curve<V extends Vec> {
 
   /** `divisions + 1` points at evenly spaced `t`. */
   getPoints(divisions = 5): V[] {
+    finiteNumber(divisions);
     const points: V[] = [];
     for (let d = 0; d <= divisions; d++) points.push(this.getPoint(d / divisions));
     return points;
@@ -26,6 +27,7 @@ export abstract class Curve<V extends Vec> {
 
   /** `divisions + 1` points evenly spaced by arc length. */
   getSpacedPoints(divisions = 5): V[] {
+    finiteNumber(divisions);
     const points: V[] = [];
     for (let d = 0; d <= divisions; d++) points.push(this.getPointAt(d / divisions));
     return points;
@@ -35,6 +37,7 @@ export abstract class Curve<V extends Vec> {
 
   /** Cumulative chord lengths at `divisions + 1` evenly spaced `t` values. */
   getLengths(divisions = this.arcLengthDivisions): number[] {
+    finiteNumber(divisions);
     if (this.lengths && this.lengths.length === divisions + 1) return this.lengths;
     const lengths = [0];
     let last = this.getPoint(0), sum = 0;
@@ -78,6 +81,7 @@ export abstract class Curve<V extends Vec> {
    * `closed` spreads the twist between the first and last frame over the whole curve so a closed tube meets itself.
    */
   computeFrenetFrames(segments: number, closed = false): FrenetFrames {
+    finiteNumber(segments);
     const tangents: Vec3[] = [], normals: Vec3[] = [], binormals: Vec3[] = [];
     for (let i = 0; i <= segments; i++) tangents.push(normalize(to3(this.getTangentAt(i / segments))));
     const t0 = tangents[0], ax = Math.abs(t0[0]), ay = Math.abs(t0[1]), az = Math.abs(t0[2]);

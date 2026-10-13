@@ -1,5 +1,9 @@
 # @margoengine/splats
 
+Use `@margoengine/splats/data` for `parseSplat`, `validateSplats` and the
+`SplatData` type without loading GPU rendering or radix-sort shaders. Root
+exports retain the same functions for applications that also render splats.
+
 Optional WebGPU Gaussian rendering for 1–3,000,000 world-space splats, subject to adapter storage/memory limits. Compute projects each positive-definite 3D covariance through the camera Jacobian into a 2D ellipse with a 0.3-pixel variance floor. Instanced quads cover three standard deviations; the fragment shader evaluates Gaussian opacity and blends far to near against read-only reversed scene depth.
 
 ```ts

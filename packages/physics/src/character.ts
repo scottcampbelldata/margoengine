@@ -45,6 +45,7 @@ export class CharacterController {
     if (!body.colliders.length) throw new TypeError('A character controller body needs a collider');
     const raw = owner.world.createCharacterController(options.offset ?? 0.01);
     this.raw = raw;
+    try {
     if (options.up) {checkVec(options.up, 'Up'); raw.setUp(vec(options.up));}
     raw.setMaxSlopeClimbAngle(options.maxSlopeClimbAngle ?? Math.PI / 4);
     raw.setMinSlopeSlideAngle(options.minSlopeSlideAngle ?? Math.PI / 6);
@@ -55,6 +56,7 @@ export class CharacterController {
     raw.setSlideEnabled(options.slide ?? true);
     raw.setApplyImpulsesToDynamicBodies(options.applyImpulsesToDynamicBodies ?? false);
     if (options.characterMass !== undefined) raw.setCharacterMass(options.characterMass);
+    } catch (error) {owner.world.removeCharacterController(raw); throw error;}
   }
 
   get grounded(): boolean {return this.lastGrounded;}
