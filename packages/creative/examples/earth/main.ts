@@ -49,10 +49,10 @@ try {
     signal,
     radius: 1, tilt: 23.4,
     dayMap: mobile ? new URL('./assets/earth-day-mobile.webp', import.meta.url) : new URL('./assets/earth-day.jpg', import.meta.url),
-    nightMap: mobile ? new URL('./assets/earth-night-mobile.webp', import.meta.url) : new URL('./assets/2k_earth_nightmap.jpg', import.meta.url),
-    specularRoughnessMap: mobile ? new URL('./assets/earth-specular-mobile.webp', import.meta.url) : new URL('./assets/earth-specular-roughness.png', import.meta.url),
-    normalMap: mobile ? new URL('./assets/earth-normal-mobile.webp', import.meta.url) : new URL('./assets/earth-normal.png', import.meta.url),
-    clouds: mobile ? new URL('./assets/earth-clouds-mobile.webp', import.meta.url) : new URL('./assets/2k_earth_clouds.jpg', import.meta.url),
+    nightMap: mobile ? new URL('./assets/earth-night-mobile.webp', import.meta.url) : new URL('./assets/earth-night.webp', import.meta.url),
+    specularRoughnessMap: mobile ? new URL('./assets/earth-specular-mobile.webp', import.meta.url) : new URL('./assets/earth-specular.webp', import.meta.url),
+    normalMap: mobile ? new URL('./assets/earth-normal-mobile.webp', import.meta.url) : new URL('./assets/earth-normal.webp', import.meta.url),
+    clouds: mobile ? new URL('./assets/earth-clouds-mobile.webp', import.meta.url) : new URL('./assets/earth-clouds.webp', import.meta.url),
     atmosphere: {color: [0.3, 0.6, 1.0], intensity: 1.2},
   });
   const stars = new Stars(); stage.use(stars);

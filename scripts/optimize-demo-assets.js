@@ -1,4 +1,4 @@
-// Regenerate the checked-in phone assets with the installed sharp image tools.
+// Regenerate the checked-in desktop Earth and phone assets with installed sharp.
 import assert from 'node:assert/strict';
 import {readFile, writeFile} from 'node:fs/promises';
 import sharp from 'sharp';
@@ -6,16 +6,31 @@ import validator from 'gltf-validator';
 import {MeshoptSimplifier} from 'meshoptimizer';
 
 const earth='packages/creative/examples/earth/assets/';
-for(const [source,target,lossless] of [
-  ['earth-day.jpg','earth-day-mobile.webp',false],
-  ['2k_earth_nightmap.jpg','earth-night-mobile.webp',false],
-  ['2k_earth_clouds.jpg','earth-clouds-mobile.webp',false],
-  ['earth-normal.png','earth-normal-mobile.webp',true],
-  ['earth-specular-roughness.png','earth-specular-mobile.webp',true],
+for(const [source,target,lossless,desktopTarget] of [
+  ['earth-day.jpg','earth-day-mobile.webp',false,null],
+  ['2k_earth_nightmap.jpg','earth-night-mobile.webp',false,'earth-night.webp'],
+  ['2k_earth_clouds.jpg','earth-clouds-mobile.webp',false,'earth-clouds.webp'],
+  ['earth-normal.png','earth-normal-mobile.webp',true,'earth-normal.webp'],
+  ['earth-specular-roughness.png','earth-specular-mobile.webp',true,'earth-specular.webp'],
 ]) {
   await sharp(earth+source).resize(1024,512).webp({quality:85,lossless}).toFile(earth+target);
   const metadata=await sharp(earth+target).metadata();
   assert.equal(metadata.width,1024);assert.equal(metadata.height,512);
+  if(desktopTarget) {
+    // Data maps use raw channels; ICC conversion can alter them.
+    const input=await readFile(earth+source),desktop=await sharp(input,{ignoreIcc:true}).webp({quality:95,lossless,effort:6}).toBuffer();
+    const before=await sharp(input,{ignoreIcc:true}).ensureAlpha().raw().toBuffer({resolveWithObject:true}),after=await sharp(desktop).ensureAlpha().raw().toBuffer({resolveWithObject:true});
+    assert.equal(before.info.width,2048);assert.equal(before.info.height,1024);
+    assert.equal(after.info.width,before.info.width);assert.equal(after.info.height,before.info.height);
+    assert.ok(desktop.length<input.length,'Desktop derivative must be smaller');
+    if(lossless)assert.deepEqual(after.data,before.data,'Data-map pixels must be unchanged');
+    else {
+      let squaredError=0;for(let i=0;i<before.data.length;i++)if(i%4!==3)squaredError+=(before.data[i]-after.data[i])**2;
+      const mse=squaredError/(before.info.width*before.info.height*3);
+      assert.ok(mse===0||10*Math.log10(255**2/mse)>=40,'Color-map PSNR must remain at least 40 dB');
+    }
+    await writeFile(earth+desktopTarget,desktop);
+  }
 }
 
 const source=await readFile('examples/assets/damaged-helmet.glb');
