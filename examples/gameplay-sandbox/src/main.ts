@@ -20,6 +20,29 @@ const canvas = element<HTMLCanvasElement>('scene'), status = element('status'), 
 const sunSlider = element<HTMLInputElement>('sun'), waveSlider = element<HTMLInputElement>('wave'), countSelect = element<HTMLSelectElement>('particles');
 const explore = element<HTMLButtonElement>('explore'), pause = element<HTMLButtonElement>('pause');
 
+if (new URLSearchParams(location.search).has('diagnostics')) {
+  element('performance-diagnostics').hidden = false;
+  const button = element<HTMLButtonElement>('capture-performance'), output = element('capture-performance-status');
+  const target = window as Window & {margoPerformanceCapture?: Promise<{downloadError?: string; captureError?: string}> & {running?: boolean}};
+  button.addEventListener('click', async () => {
+    button.disabled = true; output.textContent = 'Recording for 20 seconds. Keep this page visible.';
+    const previous = target.margoPerformanceCapture, script = document.createElement('script');
+    script.src = new URL('../../../scripts/collect-performance.js', import.meta.url).href;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        script.onload = () => resolve(); script.onerror = () => reject(new Error('The performance script could not load. Try again.'));
+        document.head.append(script);
+      });
+      const capture = target.margoPerformanceCapture;
+      if (!capture || capture === previous && !capture.running) throw new Error('The performance capture did not start. Try again.');
+      const report = await capture;
+      output.textContent = report.downloadError ? 'Capture finished, but the report download failed.' :
+        report.captureError ? 'A partial performance report was saved.' : 'Performance report saved to your downloads.';
+    } catch (error) {output.textContent = error instanceof Error ? error.message : String(error);}
+    finally {script.onload = script.onerror = null; script.remove(); button.disabled = false;}
+  });
+}
+
 async function boot(): Promise<void> {
   if (!navigator.gpu) throw new Error('WebGPU is unavailable. Open this local demo in a WebGPU-enabled browser.');
   const engine = await EngineKernel.create(canvas, {backend: 'webgpu', capacity: 256, camera: {position: [8, 7, 25], target: [0, 2, 0], near: 0.15, far: 300, fov: 58}});

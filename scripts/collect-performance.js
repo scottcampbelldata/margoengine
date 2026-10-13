@@ -33,12 +33,15 @@
     removals.push(() => target.removeEventListener(type, callback));
   }
   function snapshot() {
-    const css = canvas?.getBoundingClientRect(), info = device?.adapterInfo, stats = window.nightCitadel?.stats ?? window.sandbox?.stats;
+    const css = canvas?.getBoundingClientRect(), info = device?.adapterInfo, stats = window.nightCitadel?.stats ?? window.sandbox?.stats, timing = window.sandbox?.timing;
     return {page: url(location.href), userAgent: navigator.userAgent, visibility: document.visibilityState,
       focused: document.hasFocus(), viewport: [innerWidth, innerHeight], deviceDpr: devicePixelRatio,
       reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? null,
       quality: document.querySelector('#quality')?.textContent?.trim().slice(0, 160) ?? null,
-      sceneStats: stats ? Object.fromEntries(['fps', 'frameTime', 'gpuTime', 'drawCalls', 'dispatches', 'samples']
+      pageStatus: message(document.querySelector('#status')?.textContent?.trim() ?? ''),
+      pageError: message(document.querySelector('#error, #error-message')?.textContent?.trim() ?? ''),
+      sceneTiming: timing ? {deltaSeconds: Number.isFinite(timing[0]) ? timing[0] : null, frames: Number.isFinite(timing[1]) ? timing[1] : null} : null,
+      sceneStats: stats ? Object.fromEntries(['fps', 'frameTime', 'gpuTime', 'drawCalls', 'dispatches', 'samples', 'frames']
         .filter(key => Number.isFinite(stats[key])).map(key => [key, stats[key]])) : null,
       visualScale: window.visualViewport?.scale ?? 1, hardwareConcurrency: navigator.hardwareConcurrency ?? null,
       canvas: canvas ? {css: [css.width, css.height], buffer: [canvas.width, canvas.height],
