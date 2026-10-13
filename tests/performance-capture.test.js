@@ -23,12 +23,15 @@ function browser({gpu = true, failObserver = false, failDownload = false, inheri
   class BrowserURL extends URL {static createObjectURL() {return 'blob:local';} static revokeObjectURL() {}}
   const request = callback => {frames.set(++serial, callback); return serial;}, cancel = id => frames.delete(id);
   const window = {...listen, requestAnimationFrame: request, cancelAnimationFrame: cancel,
-    matchMedia: () => ({matches: false}), nightCitadel: {stats: {fps: 60, samples: 4, privateValue: 999}}};
+    matchMedia: () => ({matches: false}), nightCitadel: {stats: {fps: 60, samples: 4, frames: 70, privateValue: 999}},
+    sandbox: {timing: new Float32Array([1/60, 123])}};
   if (inheritedRequest) {delete window.requestAnimationFrame; Object.setPrototypeOf(window, {requestAnimationFrame: request});}
   const globals = {window, GPUQueue, GPUCanvasContext, PerformanceObserver, URL: BrowserURL, Blob,
     console: {info() {}}, location: {href: 'https://margoengine.com/demo?secret=yes#private'},
     navigator: {userAgent: 'test', gpu: {requestAdapter() {assert.fail('Must inspect the active device');}}},
-    document: {...listen, visibilityState: 'visible', hasFocus: () => true, querySelector: selector => selector === '#quality' ? {textContent: 'Desktop 4x MSAA'} : canvas,
+    document: {...listen, visibilityState: 'visible', hasFocus: () => true, querySelector: selector => selector === '#quality' ? {textContent: 'Desktop 4x MSAA'} :
+      selector === '#status' ? {textContent: 'World paused https://margoengine.com/?secret=yes#private'} :
+      selector === '#error, #error-message' ? {textContent: 'GPU failed https://margoengine.com/shader?token=yes'} : canvas,
       scripts: [{src: '/assets/demo.js?secret=yes#private'}],
       createElement: () => ({click() {if (failDownload) throw new Error('Download failed'); clicked++;}})},
     innerWidth: 800, innerHeight: 600, devicePixelRatio: 2,
@@ -68,6 +71,8 @@ test('captures active device and counters, redacts URLs, preserves callbacks/can
   const report = await b.window.margoPerformanceCapture;
   assert.equal(report.initial.activeWebgpu.adapterInfo.vendor, 'actual-vendor');
   assert.equal(report.initial.sceneStats.fps, 60); assert.equal('privateValue' in report.initial.sceneStats, false);
+  assert.equal(report.initial.sceneStats.frames, 70); assert.equal(report.initial.sceneTiming.frames, 123);
+  assert.match(report.initial.pageStatus, /^World paused/); assert.match(report.initial.pageError, /^GPU failed/);
   assert.equal(report.initial.quality, 'Desktop 4x MSAA'); assert.equal(report.initial.reducedMotion, false);
   assert.equal(report.hiddenDuringCapture, true); assert.equal(report.stateChanges.length, 3);
   assert.equal(report.longAnimationFrames[0].scripts.length, 8); assert.equal(report.longAnimationFrames[0].scripts[0].sourceFunctionName, 'render');

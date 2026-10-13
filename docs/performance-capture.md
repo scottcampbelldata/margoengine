@@ -8,6 +8,12 @@ viewport. Keep the demo visible for 20 seconds. The script downloads
 Repeat on another slow demo or PC for comparison. Record whether each run used
 the physical screen or RDP and whether the laptop was plugged in.
 
+Afterlight also has a prepared opt-in `/gameplay-sandbox/?diagnostics` route.
+When that build is deployed, choose **Record performance** to capture from a
+phone without DevTools. Normal visits do not load the collector. The report
+includes visible scene errors and before/after frame counters, so a frozen FPS
+display can be distinguished from an actively rendering slow scene.
+
 The report contains the active WebGPU device, browser, canvas CSS/backing sizes,
 DPR, scene counters, callback intervals, CPU callback durations, queue submissions,
 canvas texture acquisitions, long-frame script attribution, errors and focus or
