@@ -1,0 +1,27 @@
+# Only fingerprinted build assets; HTML and unversioned credits keep revalidation.
+/night-citadel/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/gameplay-sandbox/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/demos/assets/*.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/demos/assets/*.css
+  Cache-Control: public, max-age=31536000, immutable
+
+/demos/assets/*.glb
+  Cache-Control: public, max-age=31536000, immutable
+
+/demos/earth/assets/*.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/demos/earth/assets/*.jpg
+  Cache-Control: public, max-age=31536000, immutable
+
+/demos/earth/assets/*.png
+  Cache-Control: public, max-age=31536000, immutable
+
+/demos/earth/assets/*.webp
+  Cache-Control: public, max-age=31536000, immutable

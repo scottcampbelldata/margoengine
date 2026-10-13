@@ -57,8 +57,14 @@ export class NightAtmosphere implements EnginePlugin {
       if(c.backend!=='webgpu')return;
       const depth=this.depthTexture();if(!depth)return;
       if(!this.pipeline){
-        // Fog follows each coverage sample so silhouettes keep their antialiasing.
-        const code=depth.sampleCount===4?fogShader.replace('texture_depth_2d','texture_depth_multisampled_2d').replace('p:vec4f)->','p:vec4f,@builtin(sample_index) sample:u32)->').replace('textureLoad(depth,vec2i(p.xy),0)','textureLoad(depth,vec2i(p.xy),i32(sample))'):fogShader;
+        // shortcut: covered samples share nearest-depth fog, use per-sample fog if subpixel depth layers need distinct haze.
+        const code=depth.sampleCount===4?fogShader.replace('texture_depth_2d','texture_depth_multisampled_2d')
+          .replace('@fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f {','struct FogOutput { @location(0) color:vec4f,@builtin(sample_mask) mask:u32 }\n@fragment fn fragment(@builtin(position) p:vec4f)->FogOutput {')
+          .replace('let d=textureLoad(depth,vec2i(p.xy),0);if(d<=0){discard;}',`let q=vec2i(p.xy);
+ let samples=vec4f(textureLoad(depth,q,0),textureLoad(depth,q,1),textureLoad(depth,q,2),textureLoad(depth,q,3));
+ let d=max(max(samples.x,samples.y),max(samples.z,samples.w));if(d<=0){discard;}
+ let mask=select(0u,1u,samples.x>0)|select(0u,2u,samples.y>0)|select(0u,4u,samples.z>0)|select(0u,8u,samples.w>0);`)
+          .replace('return vec4f(frame[5].rgb,1.0-exp(-length(frame[4].xyz-w)*density));','return FogOutput(vec4f(frame[5].rgb,1.0-exp(-length(frame[4].xyz-w)*density)),mask);'):fogShader;
         const module=c.device.createShaderModule({code});this.pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format,blend:{color:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}}]},multisample:c.descriptor.multisample});
       }
       if(this.sampled!==depth){this.sampled=depth;this.group=c.device.createBindGroup({layout:this.pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform!}},{binding:1,resource:depth.createView({aspect:'depth-only'})}]});}
