@@ -175,6 +175,8 @@ export class Fog extends ShaderEffect {
     set density(value: number);
     get heightFalloff(): number;
     set heightFalloff(value: number);
+    get enabled(): boolean;
+    set enabled(value: boolean);
     protected get device(): GPUDevice | undefined;
     protected entries(): GPUBindGroupEntry[];
     protected patch(source: string, group: number): string;

@@ -111,6 +111,19 @@ test('Fog validates options, uploads only when changed and rebuilds its uniform 
   fog.dispose(); assert.equal(buffer.destroyed, true); assert.deepEqual(fog.bindings(), []);
 });
 
+test('Fog.enabled switches by uniform: the patched shader stays, off uploads zero-fog parameters (no compile either way)', () => {
+  const gpu = mockGPU(), fog = new Fog({color: '#808080', near: 2, far: 20, density: 0.1}); fog.setup(fakeEngine(gpu.device));
+  const run = passes(fog), frame = context(gpu, {shader: coreShader, format: 'bgra8unorm'}), writes = i => gpu.record(() => {frame.begin(i); run(frame.c);}).filter(entry => entry[0] === 'writeBuffer').map(entry => hexFloats(entry[3]));
+  const on = writes(0), shader = frame.c.shader;
+  assert.equal(fog.enabled, true); fog.enabled = false;
+  const off = writes(1);
+  assert.equal(frame.c.shader, shader, 'same shader, same pipelines'); assert.equal(off.length, 1);
+  assert.deepEqual([...off[0]].slice(4, 7), [3.4028234663852886e38, 3.4028234663852886e38, 0], 'near = far = float max, density 0: fogAmount is 0');
+  assert.equal(writes(2).length, 0, 'no upload while unchanged');
+  fog.enabled = true; assert.deepEqual(writes(3), on, 'the live values come back');
+  fog.dispose();
+});
+
 async function model(materials) {
   const harness = optionalGPU(), device = harness.engine.gpu, store = await TransformStore.create(16);
   const renderer = {backend: 'webgpu', gpu: device, add() {}, remove() {}, render() {}, dispose() {}};

@@ -15,6 +15,7 @@ export interface SectionOptions {
 export class SectionPlanes implements EnginePlugin {
     readonly options: SectionOptions;
     readonly name = "section-planes";
+    enabled: boolean;
     constructor(options: SectionOptions);
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
