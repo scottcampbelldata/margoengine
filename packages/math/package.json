@@ -77,6 +77,10 @@
     "./validate": {
       "types": "./dist/validate.d.ts",
       "import": "./dist/validate.js"
+    },
+    "./quat": {
+      "types": "./dist/quat.d.ts",
+      "import": "./dist/quat.js"
     }
   },
   "files": [

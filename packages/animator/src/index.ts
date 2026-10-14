@@ -1,7 +1,8 @@
 import {Animation,sampleTrackInto} from '@margoengine/animation';
 import type {Engine,EnginePlugin,Mesh,Vec3} from '@margoengine/core/extension';
 import {finiteVector} from '@margoengine/math/validate';
-import {blend1D,blend2D,quaternionMultiply,quaternionBlend} from './blend.js';
+import {multiplyQuaternions as quaternionMultiply} from '@margoengine/math/quat';
+import {blend1D,blend2D,quaternionBlend} from './blend.js';
 import {solveTwoBoneIK,rotationBetween} from './ik.js';
 export {blend1D,blend2D} from './blend.js';export {solveTwoBoneIK} from './ik.js';
 export type BlendTree=string|{parameter:string;samples:readonly {value:number;clip:string}[]}|{parameters:readonly [string,string];samples:readonly {value:readonly [number,number];clip:string}[]};

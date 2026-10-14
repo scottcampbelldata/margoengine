@@ -157,6 +157,23 @@ families.push({name: 'mat4 compose', async verify() {
   return n;
 }});
 
+// --- quaternions: euler -> quaternion (physics, text), multiply (controls, animator) ---
+families.push({name: 'quat euler + multiply', async verify() {
+  const quat = await import('@margoengine/math/quat'), physics = await both('physics', 'src/math.ts'), text = (await both('text', 'src/math.ts')).baseline;
+  // controls' quatMul (not exported) has the same four expressions as animator's quaternionMultiply, which is run below.
+  const rows = code => {const start = code.indexOf('[a[3]*b[0]'); return code.slice(start, code.indexOf(']', code.lastIndexOf('a[2]*b[2]')) + 1).replace(/,\]$/, ']');};
+  assert.equal(rows(body('packages/controls/src/math.ts', 'quatMul')), rows(body('packages/animator/src/blend.ts', 'quaternionMultiply')));
+  const animator = (await both('animator', 'src/blend.ts')).baseline;
+  let n = 0;
+  for (let i = 0; i < 60000; i++) {
+    const [x, y, z] = [value(), value(), i % 3 ? value() : (random() - 0.5) * 20];
+    const expected = physics.baseline.eulerToQuat(x, y, z); assert.ok(same(quat.eulerToQuaternion(x, y, z), expected) && same(physics.candidate.eulerToQuat(x, y, z), expected) && same(text.eulerToQuaternion([x, y, z]), expected), 'euler');
+    const a = [value(), value(), value(), value()], b = [value(), value(), value(), value()];
+    assert.ok(same(quat.multiplyQuaternions(a, b), animator.quaternionMultiply(a, b)), 'multiply'); n += 4;
+  }
+  return n;
+}});
+
 const checked = {}, timings = [];
 for (const family of families) {
   if (timing) {if (family.bench) timings.push(...(await family.bench()).map(item => ({family: family.name, ...item})));}

@@ -357,7 +357,7 @@ export type Vec3 = readonly [number, number, number];
 
 export function collisionGroups(memberships: number | readonly number[], filter?: number | readonly number[]): number;
 
-export function eulerToQuat(x: number, y: number, z: number): [number, number, number, number];
+export const eulerToQuat: (x: number, y: number, z: number) => [number, number, number, number];
 
 export function geometryPositions(source: GeometryLike, scale?: Vec3): Float32Array;
 

@@ -20,12 +20,6 @@ export function rotateAxis(v: readonly number[], axis: readonly number[], angle:
 }
 
 export const quatAxis = (axis: readonly number[], angle: number): Q4 => {const s = Math.sin(angle / 2); return [axis[0] * s, axis[1] * s, axis[2] * s, Math.cos(angle / 2)];};
-export const quatMul = (a: readonly number[], b: readonly number[]): Q4 => [
-  a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
-  a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
-  a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
-  a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
-];
 export const quatConj = (q: readonly number[]): Q4 => [-q[0], -q[1], -q[2], q[3]];
 export function quatNormalize(q: readonly number[]): Q4 {const l = Math.hypot(q[0], q[1], q[2], q[3]) || 1; return [q[0] / l, q[1] / l, q[2] / l, q[3] / l];}
 export function quatRotate(q: readonly number[], v: readonly number[]): V3 {
