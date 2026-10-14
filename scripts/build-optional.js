@@ -4,6 +4,7 @@ import {copyFile, readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
 import {build} from 'vite';
+import {buildWorkers} from './build-workers.js';
 
 const name = process.argv[2];
 assert.ok(/^[a-z][a-z0-9-]*$/.test(name ?? ''), 'Expected an optional package name');
@@ -23,4 +24,5 @@ await build({root, configFile: false, publicDir: false, logLevel: 'warn', build:
   lib: {entry, formats: ['es'], fileName: (_, module) => `${module}.js`},
   rollupOptions: {external: id => peers.some(peer => id === peer || id.startsWith(peer + '/'))},
 }});
+await buildWorkers(root);
 execFileSync(process.execPath, [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', resolve(root, 'tsconfig.json')], {stdio: 'inherit'});

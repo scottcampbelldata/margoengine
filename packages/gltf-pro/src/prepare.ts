@@ -1,0 +1,30 @@
+import {loadAsset, type GLTFAsset, type GLTFDocument, type GLTFImage} from './asset.js';
+import {packPrimitive} from './pack.js';
+import type {PreparedGeometry} from './index.js';
+/** A glTF parsed off the main thread: everything PBRModel needs except GPU uploads. Every buffer is transferable. */
+export interface PreparedGLTF {
+  doc: GLTFDocument;
+  buffers: Uint8Array[];
+  images: GLTFImage[];
+  /** Packed geometry per mesh and primitive; null where packing failed (the main thread repeats it and reports the error). */
+  geometry: (PreparedGeometry | null)[][];
+  /** Decoded accessors by index (geometry, skins, morph targets, animation samplers, GPU instancing), as GLTFAsset caches them. */
+  accessors: [number, Float32Array][];
+}
+/** Decode what PBRModel and @margoengine/animation read from an asset: packed primitives and their accessors. */
+export function prepareAsset(asset: GLTFAsset, images: GLTFImage[]): PreparedGLTF {
+  const doc = asset.doc, ids: unknown[] = [], attempt = <T>(f: () => T) => {try {return f();} catch {return null;}};
+  const geometry = (doc.meshes ?? []).map((mesh: any) => (Array.isArray(mesh?.primitives) ? mesh.primitives : []).map((p: any) => attempt(() => packPrimitive(asset, p))));
+  for (const skin of doc.skins ?? []) ids.push(skin?.inverseBindMatrices);
+  for (const mesh of doc.meshes ?? []) for (const p of mesh?.primitives ?? []) {ids.push(p?.attributes?.JOINTS_0, p?.attributes?.WEIGHTS_0); for (const t of p?.targets ?? []) ids.push(t?.POSITION, t?.NORMAL);}
+  for (const animation of doc.animations ?? []) for (const s of animation?.samplers ?? []) ids.push(s?.input, s?.output);
+  for (const node of doc.nodes ?? []) ids.push(...Object.values(node?.extensions?.EXT_mesh_gpu_instancing?.attributes ?? {}));
+  for (const id of ids) if (id !== undefined) attempt(() => asset.accessor(id));
+  // GLTFAsset's accessor cache is private to the package; the worker entry seeds a fresh asset's cache with it.
+  return {doc, buffers: asset.buffers, images, geometry, accessors: [...asset['cache']]};
+}
+/** Fetch (url) or parse (input) and prepare a glTF; no decoders (Draco, meshopt, KTX2 need the main-thread path). */
+export async function prepareGLTF(url: string | URL | undefined, input?: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>): Promise<PreparedGLTF> {
+  const {asset, images} = await loadAsset(url, {buffers}, input);
+  return prepareAsset(asset, images);
+}

@@ -7,6 +7,7 @@ import { gzipSync,deflateRawSync,inflateRawSync } from 'node:zlib';
 import { compactInternals } from './compact-internals.js';
 import { compactOutput, external, measureCoreStage } from './measure-size.js';
 import { packageOrder } from './package-order.js';
+import { buildWorkers } from './build-workers.js';
 async function compactPackage(name){
  const root=`packages/${name}/dist`,files=(await readdir(root)).filter(file=>file.endsWith('.js'));
  for(const file of files)await writeFile(`${root}/${file}`,compactInternals(await readFile(`packages/${name}/src/${file.replace(/\.js$/,'.ts')}`,'utf8'),await readFile(`${root}/${file}`,'utf8')));
@@ -59,6 +60,7 @@ for(const name of packageOrder(manifests)){
   await copyFile('node_modules/occt-import-js/LICENSE.md',resolve(output,'workers/OCCT-LICENSE.txt'));
   await copyFile('packages/machinery/src/workers/OCCT-NOTICE.txt',resolve(output,'workers/OCCT-NOTICE.txt'));
  }
+ await buildWorkers(resolve(`packages/${name}`));
  tsc(name);
 }
 // Size records and leak checks only; build order comes from package.json above.

@@ -12,6 +12,9 @@ export class USDAsset {
     readonly buffers: ArrayBufferView[];
     readonly meshes: USDMesh[];
     constructor(document: Record<string, any>, buffers: ArrayBufferView[], meshes: USDMesh[], sources: ImageSource[], entries: Map<string, Uint8Array>);
+    images({ signal }?: {
+        signal?: AbortSignal;
+    }): Promise<ImageBitmap[]>;
     create(engine: EngineKernel, { signal }?: {
         signal?: AbortSignal;
     }): Promise<PBRModel>;

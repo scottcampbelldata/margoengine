@@ -192,10 +192,8 @@ export class USDAsset {
     private readonly sources: ImageSource[],
     private readonly entries: Map<string, Uint8Array>,
   ) {}
-  async create(
-    engine: EngineKernel,
-    { signal }: { signal?: AbortSignal } = {},
-  ): Promise<PBRModel> {
+  /** Decode the textures in the glTF document's image order (separate metallic/roughness maps packed into one). */
+  async images({ signal }: { signal?: AbortSignal } = {}): Promise<ImageBitmap[]> {
     const images: ImageBitmap[] = [];
     const decode = async (path: string) => {
       signal?.throwIfAborted();
@@ -250,6 +248,18 @@ export class USDAsset {
           }
         }
       }
+      return images;
+    } catch (error) {
+      for (const image of images) image.close();
+      throw error;
+    }
+  }
+  async create(
+    engine: EngineKernel,
+    { signal }: { signal?: AbortSignal } = {},
+  ): Promise<PBRModel> {
+    const images = await this.images({ signal });
+    try {
       signal?.throwIfAborted();
       return parseGLTF(engine, this.document, this.buffers, images);
     } catch (error) {
