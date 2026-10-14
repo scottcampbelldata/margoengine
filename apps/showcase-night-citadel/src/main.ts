@@ -1,12 +1,14 @@
 import {EngineKernel, PbrMaterial} from '@margoengine/core';
 import {engineRuntime} from '@margoengine/core/extension';
 import {Bloom} from '@margoengine/post/bloom';
+import {submitPrincipalScene} from '@margoengine/post/scene-fade';
 import {Shadows} from '@margoengine/shadows';
 import {ScatterInstances} from '@margoengine/scatter';
 import {Clustered} from '@margoengine/clustered';
 import {Water} from '@margoengine/water';
 import {VFX} from '@margoengine/vfx';
 import {sceneSamples} from '../../../packages/shared/quality.js';
+import {watchFrameRate} from '../../../packages/shared/auto-quality.js';
 import {createCitadelPBR, moonDirection} from './scene.js';
 import {frameDue, frameStatus} from './frame-timing.js';
 import {NightAtmosphere} from './atmosphere';
@@ -30,6 +32,7 @@ export class NightCitadel {
   private readonly renderOptions = {delta:0};
   readonly pointers = new Float64Array([-1,0,0,-1,0,0,0]);
   readonly stats = {frames:0,instances:0,batches:0,fps:0,delta:0,callbackRate:0,samples:sceneSamples()};
+  readiness: Awaited<ReturnType<typeof submitPrincipalScene>> | undefined;
   readonly post: Bloom;
   readonly shadows: Shadows;
   readonly instances: ScatterInstances;
@@ -130,7 +133,10 @@ export class NightCitadel {
     const horizontal=Math.cos(m[1])*m[2];
     this.eye[0]=Math.sin(m[0])*horizontal;this.eye[1]=12+Math.sin(m[1])*m[2];this.eye[2]=Math.cos(m[0])*horizontal;
     this.renderOptions.delta=this.reduced.matches?0:dt;
-    try{this.engine.render(this.renderOptions);}catch(error){this.fail(error instanceof Error?error:new Error(String(error)));return;}
+    try{
+      if(this.stats.frames)this.engine.render(this.renderOptions);
+      else void submitPrincipalScene(()=>this.engine.render(this.renderOptions),this.device.queue,{signal:this.events.signal}).then(value=>{this.readiness=value;},error=>{if(!this.disposed)this.fail(error instanceof Error?error:new Error(String(error)));});
+    }catch(error){this.fail(error instanceof Error?error:new Error(String(error)));return;}
     this.stats.frames++;m[7]++;m[8]+=elapsed;
     if(now-m[9]>=500){
       this.stats.delta=m[8]/m[7];this.stats.fps=1000/this.stats.delta;
@@ -269,7 +275,7 @@ async function boot():Promise<void> {
   try {
     if(!navigator.gpu)throw new Error('This showcase needs WebGPU. Open it in a WebGPU-enabled browser on localhost or HTTPS.');
     engine=await EngineKernel.create(canvas,{backend:'webgpu',capacity:1,camera:{position:[0,12,82],target:[0,12,0],fov:58,near:0.3,far:500}});
-    window.nightCitadel=new NightCitadel(engine);
+    window.nightCitadel=new NightCitadel(engine);watchFrameRate();
     status.hidden=true;
   } catch(error) {engine?.dispose();status.hidden=false;status.setAttribute('role','alert');status.textContent=error instanceof Error?error.message:String(error);}
 }

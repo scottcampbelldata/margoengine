@@ -2,7 +2,10 @@ import {createStage, type Stage} from 'margoengine';
 import {Planet} from '@margoengine/creative/planet';
 import {OrbitControls} from '@margoengine/controls';
 import {Bloom} from '@margoengine/post/bloom';
+import {submitPrincipalScene} from '@margoengine/post/scene-fade';
+import {engineRuntime} from '@margoengine/core/extension';
 import {sceneSamples} from '../../../shared/quality.js';
+import {watchFrameRate} from '../../../shared/auto-quality.js';
 import {Stars} from './sky.js';
 
 const controls = document.querySelector<HTMLFieldSetElement>('#controls')!;
@@ -48,11 +51,11 @@ try {
   const earth = await Planet.create(stage.engine, {
     signal,
     radius: 1, tilt: 23.4,
-    dayMap: mobile ? new URL('./assets/earth-day-mobile.webp', import.meta.url) : new URL('./assets/earth-day.jpg', import.meta.url),
-    nightMap: mobile ? new URL('./assets/earth-night-mobile.webp', import.meta.url) : new URL('./assets/earth-night.webp', import.meta.url),
-    specularRoughnessMap: mobile ? new URL('./assets/earth-specular-mobile.webp', import.meta.url) : new URL('./assets/earth-specular.webp', import.meta.url),
-    normalMap: mobile ? new URL('./assets/earth-normal-mobile.webp', import.meta.url) : new URL('./assets/earth-normal.webp', import.meta.url),
-    clouds: mobile ? new URL('./assets/earth-clouds-mobile.webp', import.meta.url) : new URL('./assets/earth-clouds.webp', import.meta.url),
+    dayMap: new URL('./assets/earth-day-mobile.webp', import.meta.url),
+    nightMap: new URL('./assets/earth-night-mobile.webp', import.meta.url),
+    specularRoughnessMap: new URL('./assets/earth-specular-mobile.webp', import.meta.url),
+    normalMap: new URL('./assets/earth-normal-mobile.webp', import.meta.url),
+    clouds: new URL('./assets/earth-clouds-mobile.webp', import.meta.url),
     atmosphere: {color: [0.3, 0.6, 1.0], intensity: 1.2},
   });
   const stars = new Stars(); stage.use(stars);
@@ -89,7 +92,7 @@ try {
     input.addEventListener('input', () => {change(input.valueAsNumber); output.value = id === 'cloud-speed' ? `${input.valueAsNumber.toFixed(1)}×` : input.value;}, {signal});
   }
   document.querySelector<HTMLInputElement>('#stars')!.addEventListener('change', event => {stars.enabled = (event.target as HTMLInputElement).checked;}, {signal});
-  document.querySelector<HTMLElement>('#quality')!.textContent = sceneSamples() === 4 ? 'Desktop · 4× MSAA · HDR / AgX' : 'Mobile · 1× MSAA · DPR capped at 2 · HDR / AgX';
+  document.querySelector<HTMLElement>('#quality')!.textContent = sceneSamples() === 4 ? 'Desktop · 4× MSAA · HDR / AgX' : 'Light · 1× MSAA · HDR / AgX';
   document.querySelector<HTMLDetailsElement>('#settings')!.open = !matchMedia('(max-width:760px)').matches;
   stage.canvas.addEventListener('keydown', event => {
     switch (event.key) {
@@ -110,11 +113,28 @@ try {
     earth.rotation.y += 0.05 * speed * delta;
     earth.clouds.offsetU += 0.01 * cloudSpeed * delta;
   });
+  const readiness = await submitPrincipalScene(() => stage!.engine.render(), engineRuntime(stage.engine).gpu!.queue, {signal});
+  const demo = {stage, earth, post, stars, readiness, quality: mobile ? 'mobile' : 'preview'};
+  Object.assign(window, {earthDemo: demo});
   controls.disabled = false;
-  status.textContent = 'Ready. Explore the day–night boundary with the sun control.';
+  status.textContent = mobile ? 'Ready. Explore the day–night boundary with the sun control.' : 'Ready. Full detail is loading.';
   document.body.dataset.ready = 'true';
-  stage.engine.render();
-  stage.engine.start();
+  stage.engine.start(); watchFrameRate();
+  if (!mobile) void earth.updateMaps({
+    signal,
+    dayMap: new URL('./assets/earth-day.jpg', import.meta.url),
+    nightMap: new URL('./assets/earth-night.webp', import.meta.url),
+    specularRoughnessMap: new URL('./assets/earth-specular.webp', import.meta.url),
+    normalMap: new URL('./assets/earth-normal.webp', import.meta.url),
+    clouds: new URL('./assets/earth-clouds.webp', import.meta.url),
+  }).then(() => {
+    if (signal.aborted) return;
+    demo.quality = 'full'; status.textContent = 'Ready. Explore the day–night boundary with the sun control.';
+  }, error => {
+    if (signal.aborted) return;
+    status.textContent = 'Ready. Full detail could not load.';
+    errorOutput.textContent = error instanceof Error ? error.message : String(error); errorOutput.hidden = false;
+  });
 } catch (error) {
   try {stage?.dispose();} catch {}
   if (!leaving) fail(error);

@@ -29,3 +29,11 @@ npm --prefix packages/dof run build:demo
 ```
 
 The Vite HTML demo is `examples/index.html`. Run `npm run build:packages` once for core/stage artifacts. This package supports core `^0.1.0 || ^1.0.0` through the existing extension API and is included in workspace builds and release checks. No dependencies are bundled from core.
+
+The package's `1.0.0` version does not require Engine 1.0. It works with the
+current Core/Stage 0.1.0. `node scripts/build-site.js` assembles its standalone
+demo at `/demos/dof/`; the package catalog links to that built route. The demo
+uses the published `dist` entry and marks readiness after the complete scene's
+GPU submission/completion and two later animation callbacks. npm publication
+is separate: use this repository's workspace or packed local archives until the
+package is published.

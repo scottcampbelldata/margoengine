@@ -2,6 +2,7 @@
 (() => {
   if (window.margoPerformanceCapture?.running) return console.info('A capture is already running.');
   const duration = 20000, limit = 4096, start = performance.now();
+  const downloadLocal = document.currentScript?.dataset.download !== 'false';
   const request = window.requestAnimationFrame, cancel = window.cancelAnimationFrame;
   const intervals = [], cpu = [], restores = [], observers = [], removals = [];
   let canvas, context, device, frame, timer, previous, first, last, active = true, resolve;
@@ -66,13 +67,13 @@
     for (const key of ['canvasTextureAcquisitions', 'queueSubmissions']) report[key + 'PerSecond'] = report[key] === null || report.durationMs <= 0 ? null : report[key] * 1000 / report.durationMs;
     try {report.final = snapshot();} catch (reason) {report.snapshotError = message(reason);}
     report.limits = 'Callback cadence and texture acquisitions are not displayed FPS. CPU callbacks include JS encoding, not GPU duration. No GPU timing or queue waits. Instrumentation and DevTools can affect results. Samples are bounded; startup errors are not captured.';
-    try {
+    if (downloadLocal) try {
       const link = document.createElement('a'), objectUrl = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], {type: 'application/json'}));
       link.href = objectUrl; link.download = 'margo-performance-' + Date.now() + '.json';
       try {link.click();} finally {setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);}
     } catch (reason) {report.downloadError = message(reason);}
     window.margoPerformanceReport = report; resolve(report);
-    console.info('Capture complete. JSON downloaded; also available as window.margoPerformanceReport.', report);
+    console.info(downloadLocal ? 'Capture complete. JSON downloaded; also available as window.margoPerformanceReport.' : 'Capture complete. Data available as window.margoPerformanceReport.', report);
   }
   try {
     canvas = document.querySelector('#scene, #viewport canvas') ?? [...document.querySelectorAll('canvas')].find(element => !element.closest('[data-margo-stats]'));

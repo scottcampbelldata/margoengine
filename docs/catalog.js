@@ -88,6 +88,7 @@ async function load() {
         card.querySelector('.example-title').textContent = entry.exampleTitle;
         card.querySelector('.example-note').textContent = entry.exampleNote;
         card.querySelector('.run').href = entry.example;
+        if (entry.exampleSource === false) card.querySelector('.source').hidden = true;
       } else {
         for (const selector of ['.example-heading', '.example-note', '.source']) card.querySelector(selector).hidden = true;
       }

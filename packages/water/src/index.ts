@@ -227,8 +227,15 @@ export class Water implements EnginePlugin {
   const scene=this.options.sceneColor?.();this.values[111]=+!!scene;
   if(this.options.sceneColor){
    if(!scene||scene.dimension!=='2d'||scene.sampleCount!==1||scene.depthOrArrayLayers>1||scene.width!==c.width||scene.height!==c.height||scene.format!=='rgba16float'||scene.format!==c.format||!(scene.usage&GPUTextureUsage.COPY_SRC))throw new Error('Water scene color needs a viewport-sized copyable HDR color texture');
-   if(this.captured?.width!==c.width||this.captured?.height!==c.height||this.captured?.format!==c.format){this.captured?.destroy();this.captured=c.device.createTexture({size:[c.width,c.height],format:c.format,usage:GPUTextureUsage.COPY_DST|GPUTextureUsage.TEXTURE_BINDING});this.capturedView=this.captured.createView();this.colorTarget.texture=this.captured;this.colorSize.width=c.width;this.colorSize.height=c.height;this.groups=[];}
-   this.colorSource.texture=scene;c.encoder.copyTextureToTexture(this.colorSource,this.colorTarget,this.colorSize);
+   const target=sceneTarget(c);
+   // The 1x opaque resolve is separate from our 4x color attachment and stays unchanged during this pass.
+   if(samples===4&&target?.samples===4&&scene===target.resolvedColor&&(scene.usage&GPUTextureUsage.TEXTURE_BINDING)){
+    if(this.colorSource.texture!==scene||!this.capturedView||this.captured){this.captured?.destroy();this.captured=undefined;this.capturedView=scene.createView();this.groups=[];}
+    this.colorSource.texture=scene;
+   }else{
+    if(this.captured?.width!==c.width||this.captured?.height!==c.height||this.captured?.format!==c.format){this.captured?.destroy();this.captured=c.device.createTexture({size:[c.width,c.height],format:c.format,usage:GPUTextureUsage.COPY_DST|GPUTextureUsage.TEXTURE_BINDING});this.capturedView=this.captured.createView();this.colorTarget.texture=this.captured;this.colorSize.width=c.width;this.colorSize.height=c.height;this.groups=[];}
+    this.colorSource.texture=scene;c.encoder.copyTextureToTexture(this.colorSource,this.colorTarget,this.colorSize);
+   }
   }
   if(this.surfaceDepth?.width!==c.width||this.surfaceDepth?.height!==c.height||this.surfaceDepth?.format!==depth.format||this.surfaceDepth?.sampleCount!==samples){
    const changed=this.surfaceDepth?.format!==depth.format||this.surfaceDepth?.sampleCount!==samples;this.surfaceDepth?.destroy();this.surfaceDepth=c.device.createTexture({size:[c.width,c.height],format:depth.format,sampleCount:samples,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});this.surfaceView=this.surfaceDepth.createView();this.copiedDepth.view=this.surfaceView;this.groups=[];

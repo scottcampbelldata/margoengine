@@ -1,6 +1,6 @@
 # @margoengine/vfx
 
-Optional GPU particle simulation and indirect billboard rendering, with capacity up to 1,000,000. Two storage buffers alternate particle position/life, velocity/size, color, rotation/angular velocity and initial lifetime. Workgroups of 256 integrate gravity, analytic curl turbulence and ground-plane collisions. Atomic counters respawn dead slots and compact live indices directly into the indexed indirect draw's instance count.
+Optional GPU particle simulation and indirect billboard rendering, with capacity up to 1,000,000. One storage buffer updates particle position/life, velocity/size, color, rotation/angular velocity and initial lifetime in place; each invocation owns one particle record. Workgroups of 256 integrate gravity, analytic curl turbulence and ground-plane collisions. Atomic counters respawn dead slots and compact live indices directly into the indexed indirect draw's instance count.
 
 ```ts
 import {EngineKernel} from '@margoengine/core';
@@ -21,7 +21,7 @@ engine.start();
 around `position` (default zero). `intensity` multiplies RGB for HDR emission,
 0..16 (default 1). Billboards draw at frame-graph order 6, after water and scatter.
 
-One million particles use 128 MB for state plus 4 MB for live indices, regardless of the live count. Per-frame CPU work is bounded uniform updates and pass submission; there is no JavaScript object/array per particle. GPU performance still depends on capacity, fill rate and hardware. This package does not replace the smaller textured/weather particles in `margoengine-creative`.
+One million particles use 64 MB for state plus 4 MB for live indices, regardless of the live count. Per-frame CPU work is bounded uniform updates and pass submission; there is no JavaScript object/array per particle. GPU performance still depends on capacity, fill rate and hardware. This package does not replace the smaller textured/weather particles in `margoengine-creative`.
 
 `initialCount` queues an initial burst on attachment and again after device
 restoration. It defaults to 0 and must be an integer from 0 through capacity.
@@ -29,4 +29,4 @@ For a continuously populated field, use `initialCount: capacity`; this replaces
 application restoration hooks. Restoration reseeds particles rather than preserving
 their previous positions and ages.
 
-`gpuState` exposes the current particle and indirect buffers for tests/custom integrations. Particle records are 16 floats (64 bytes); indirect arguments are five 32-bit words. `dispose()`/`destroy()` releases owned buffers. Device restoration recreates simulation resources. Attach multiple emitters independently; none enter the core/stage bundle.
+`gpuState` exposes the current particle and indirect buffers for tests/custom integrations. Particle records are 16 floats (64 bytes); indirect arguments are five 32-bit words. The current particle buffer is stable across frames and observes later updates; it is replaced after device restoration. `dispose()`/`destroy()` releases owned buffers. Device restoration recreates simulation resources. Attach multiple emitters independently; none enter the core/stage bundle.

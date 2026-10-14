@@ -4,6 +4,10 @@ import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
 const existing = JSON.parse(await readFile('docs/catalog.json', 'utf8'));
+const postfxExamples = {
+  dof: {example: '../demos/dof/', exampleTitle: 'Circular bokeh', exampleNote: 'Run the optional depth-of-field package with the current Core 0.1 engine. Focus, focal length, aperture and an effect toggle remain interactive.', exampleSource: false},
+  tonemap: {example: '../demos/tonemap/', exampleTitle: 'Highlights and color', exampleNote: 'Run the optional tonemapping package with the current Core 0.1 engine. Compare AgX, ACES fitted and Neutral, exposure, contrast and a local 33-cube LUT.', exampleSource: false}
+};
 const entries = [];
 for (const id of await readdir('packages')) {
   let manifest;
@@ -18,7 +22,7 @@ for (const id of await readdir('packages')) {
   const published = response.ok && !!(await response.json()).versions?.[manifest.version];
   const core = manifest.peerDependencies?.['@margoengine/core'];
   entries.push({
-    ...previous, id, title: previous?.title ?? (id === 'margoengine' ? 'Stage facade' : id[0].toUpperCase() + id.slice(1)),
+    ...previous, ...postfxExamples[id], id, title: previous?.title ?? (id === 'margoengine' ? 'Stage facade' : id[0].toUpperCase() + id.slice(1)),
     package: manifest.name, version: manifest.version, published,
     description: manifest.description,
     requirements: core ? `Core ${core} · see the package guide for browser and backend requirements` : 'See the package guide for requirements',

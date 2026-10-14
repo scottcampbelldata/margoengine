@@ -365,7 +365,11 @@
     "imports": "import { DOF } from '@margoengine/dof';",
     "exports": [
       "DOF"
-    ]
+    ],
+    "example": "../demos/dof/",
+    "exampleTitle": "Circular bokeh",
+    "exampleNote": "Run the optional depth-of-field package with the current Core 0.1 engine. Focus, focal length, aperture and an effect toggle remain interactive.",
+    "exampleSource": false
   },
   {
     "id": "ecs",
@@ -1123,7 +1127,11 @@
     "exports": [
       "Tonemap",
       "parseCube"
-    ]
+    ],
+    "example": "../demos/tonemap/",
+    "exampleTitle": "Highlights and color",
+    "exampleNote": "Run the optional tonemapping package with the current Core 0.1 engine. Compare AgX, ACES fitted and Neutral, exposure, contrast and a local 33-cube LUT.",
+    "exampleSource": false
   },
   {
     "id": "toon",

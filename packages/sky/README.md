@@ -111,3 +111,5 @@ MIT. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/sky
 
+GPU fog coverage and shader parity: node scripts/modern-sky-fog-tests.js
+

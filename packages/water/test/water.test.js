@@ -1,4 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {Water} from '../dist/index.js';import {optionalGPU} from '../../../tests/support/optional-gpu.js';
+import {SceneTarget} from '../../shared/msaa.js';
 test('water validates nonfolding waves, samples shared scene depth, accumulates foam and restores',()=>{
  const h=optionalGPU(),effect=new Water({segments:4});h.engine.use(effect);assert.equal(effect.depthTexture,undefined);h.frame();h.frame();assert.equal(h.counts.indexed,2);assert.equal(h.engine.hasPlugin('optional:scene-depth'),true);
  const depth=effect.depthTexture;assert.ok(depth);h.context.width=64;h.frame();assert.notEqual(effect.depthTexture,depth);assert.equal(effect.depthTexture.width,64);assert.equal(depth.destroyed,true);
@@ -70,6 +71,39 @@ test('borrowed HDR optics retain resources and copy descriptors between frames',
  scene.sampleCount=4;assert.throws(frame,/copyable HDR/);scene.sampleCount=1;sky.depthOrArrayLayers=2;assert.throws(frame,/sky texture/);sky.depthOrArrayLayers=1;
  effect.dispose();assert.equal(sky.destroyed,false);assert.equal(scene.destroyed,false);sky.destroy();scene.destroy();assert.ok(h.resources.every(r=>r.destroyed));
  assert.throws(()=>new Water({spray:true}),/spray/);assert.throws(()=>new Water({reflection:42}),/optics/);
+});
+
+for(const [samples,kind] of [[4,'resolved'],[1,'resolved'],[4,'external'],[4,'copy-only']])test(`refraction ${samples}x ${kind} uses a distinct sampled texture without steady allocations`,()=>{
+ const h=optionalGPU(),c=h.context,device=h.engine.gpu;
+ const texture=(format,usage)=>device.createTexture({size:[128,96],format,usage});
+ const color=texture('rgba16float',GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC|(kind==='copy-only'?0:GPUTextureUsage.TEXTURE_BINDING));
+ const depth=texture('depth32float',GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING),target=new SceneTarget(device,color,depth,samples);
+ const scene=kind==='external'?texture('rgba16float',GPUTextureUsage.COPY_SRC|GPUTextureUsage.TEXTURE_BINDING):color;
+ const water=new Water({segments:4,depth:()=>depth,sceneColor:()=>scene});h.engine.use(water);
+ const frame=()=>{c.color=h.originalColor;c.depth=h.originalDepth;c.format='rgba16float';c.descriptor.multisample.count=samples;target.begin(c);h.engine.frameGraph.execute(c);target.resolve(c.encoder,true);target.restore(c);};
+ try{
+  frame();const borrow=samples===4&&kind==='resolved',sampled=water.groups[0].entries.find(e=>e.binding===6).resource.texture;
+  assert.equal(sampled,borrow?scene:water.captured);assert.notEqual(sampled,water.presentation.colorAttachments[0].view.texture,'Refraction must not sample the active color attachment');
+  assert.equal(water.captured===undefined,borrow);assert.equal(h.counts.copies??0,borrow?0:1);
+  const warm={...h.counts};for(let i=0;i<120;i++)frame();
+  for(const name of ['textures','buffers','groups','views'])assert.equal(h.counts[name],warm[name]);
+  assert.equal(h.counts.copies??0,borrow?0:121);water.dispose();assert.equal(scene.destroyed,false);assert.equal(color.destroyed,false);
+ }finally{water.dispose();target.dispose();h.cleanup();}
+});
+
+test('4x refraction switches borrowed sources and survives restoration without destroying caller textures',()=>{
+ const h=optionalGPU(),c=h.context,device=h.engine.gpu,make=format=>device.createTexture({size:[128,96],format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC|GPUTextureUsage.TEXTURE_BINDING});
+ const color=make('rgba16float'),external=make('rgba16float'),depth=make('depth32float'),target=new SceneTarget(device,color,depth,4);let scene=color;
+ const water=new Water({segments:4,depth:()=>depth,sceneColor:()=>scene});h.engine.use(water);
+ const frame=()=>{c.color=h.originalColor;c.depth=h.originalDepth;c.format='rgba16float';target.begin(c);h.engine.frameGraph.execute(c);target.resolve(c.encoder,true);target.restore(c);};
+ const sampled=()=>water.groups[0].entries.find(e=>e.binding===6).resource.texture;
+ try{
+  frame();assert.equal(sampled(),color);assert.equal(h.counts.copies??0,0);
+  scene=external;frame();const copy=water.captured;assert.equal(sampled(),copy);assert.equal(h.counts.copies,1);
+  scene=color;frame();assert.equal(sampled(),color);assert.equal(copy.destroyed,true);assert.equal(h.counts.copies,1);
+  water.onDeviceRestored(h.engine);frame();assert.equal(sampled(),color);assert.equal(h.counts.copies,1);
+  water.dispose();assert.equal(color.destroyed,false);assert.equal(external.destroyed,false);
+ }finally{water.dispose();target.dispose();h.cleanup();}
 });
 test('mesh sampling fades short waves without changing their wavelength or height controls',()=>{
  const h=optionalGPU(),edge=Math.hypot(2,2),ratios=[1.5,2,3,4,8],weights=[0,0,0.5,1,1];

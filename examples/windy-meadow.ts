@@ -2,16 +2,21 @@ import {createStage} from 'margoengine';
 import {GrassField} from '@margoengine/creative/grass';
 import {OrbitControls} from '@margoengine/controls';
 import {Bloom} from '@margoengine/post/bloom';
+import {submitPrincipalScene} from '@margoengine/post/scene-fade';
+import {engineRuntime} from '@margoengine/core/extension';
 import {Sky} from '@margoengine/sky';
 import {sceneSamples} from '../packages/shared/quality.js';
+import {watchFrameRate} from '../packages/shared/auto-quality.js';
 
 const error=document.querySelector<HTMLElement>('#error')!,status=document.querySelector<HTMLElement>('#status')!;
-const abort=new AbortController();let dispose:(()=>void)|undefined;
+const abort=new AbortController();let dispose=()=>abort.abort();
+window.addEventListener('pagehide',()=>dispose(),{once:true});
 try {
   const stage=await createStage('#viewport',{backend:'webgpu',controls:false,autoStart:false,
     label:'Wind-blown meadow with adjustable daylight, clouds and floating seeds',
     camera:{position:[18,4,22],target:[0,1.2,0],far:300},onError:value=>{error.textContent=String(value);}});
   dispose=()=>stage.dispose();
+  if(abort.signal.aborted){stage.dispose();abort.signal.throwIfAborted();}
   const controls=new OrbitControls(stage.engine.camera,stage.canvas);
   controls.minDistance=3;controls.maxDistance=65;controls.maxPolarAngle=Math.PI/2-0.02;controls.saveState();
   stage.use({name:'meadow-controls',setup(){},dispose:()=>{controls.dispose();abort.abort();}});
@@ -22,7 +27,7 @@ try {
   stage.box({size:[60,0.12,60],position:[0,-0.07,0],color:'#34451f',roughness:1});
   const speed=document.querySelector<HTMLInputElement>('#speed')!,strength=document.querySelector<HTMLInputElement>('#strength')!;
   const density=document.querySelector<HTMLSelectElement>('#density')!,seeds=document.querySelector<HTMLInputElement>('#seeds')!;
-  const mobile=sceneSamples()===1;
+  const mobile=sceneSamples()===1;watchFrameRate();
   if(mobile)density.value='35000';
   document.querySelector<HTMLDetailsElement>('#settings')!.open=!matchMedia('(max-width:600px)').matches;
   document.querySelector<HTMLElement>('#quality')!.textContent=mobile?'Mobile · 1× MSAA · DPR capped at 2':'Desktop · 4× MSAA · DPR capped at 1';
@@ -62,7 +67,8 @@ try {
     else {controls.rotateLeft(event.key==='ArrowLeft'?0.1:event.key==='ArrowRight'?-0.1:0);controls.rotateUp(event.key==='ArrowUp'?0.1:event.key==='ArrowDown'?-0.1:0);controls.update();}
   },{signal:abort.signal});
   stage.canvas.tabIndex=0;stage.canvas.setAttribute('aria-describedby','navigation-help');
-  motion();document.querySelector<HTMLElement>('#viewport')!.dataset.ready='true';
-  window.addEventListener('pagehide',()=>stage.dispose(),{once:true,signal:abort.signal});
   if(import.meta.hot)import.meta.hot.dispose(()=>stage.dispose());
-}catch(value){dispose?.();status.textContent='Unable to start the meadow';error.textContent=String(value);}
+  const readiness=await submitPrincipalScene(render,engineRuntime(stage.engine).gpu!.queue,{signal:abort.signal});
+  Object.assign(window,{meadowDemo:{stage,get meadow(){return meadow;},readiness}});
+  motion();document.querySelector<HTMLElement>('#viewport')!.dataset.ready='true';
+}catch(value){const leaving=abort.signal.aborted;dispose();if(!leaving){status.textContent='Unable to start the meadow';error.textContent=String(value);}}

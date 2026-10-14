@@ -5,6 +5,7 @@ import {chromium} from '@playwright/test';
 import {preview} from 'vite';
 import {decodePNG} from '../tests/support/png.js';
 import {installDemoLoadAudit} from './demo-load-audit.js';
+import {submitPrincipalScene} from '../packages/shared/demo-frame.js';
 
 await mkdir('test-results',{recursive:true});
 const auditOnly=process.argv.includes('--audit-only');
@@ -42,8 +43,23 @@ try {
     pass.setPipeline(pipeline);pass.draw(3);pass.end();device.queue.submit([encoder.finish()]);
   });
   await audit.waitForFunction(()=>demoLoad.firstFrame>0);
+  assert.equal(await audit.evaluate(()=>demoLoad.principalScenePresentedOpportunity),null,'An early canvas frame was counted as the complete subject');
+  await audit.addScriptTag({content:submitPrincipalScene.toString()});
+  await audit.evaluate(async()=>{
+    const {device,context,pipeline}=auditFixture;
+    const readiness=await submitPrincipalScene(()=>{
+      const encoder=device.createCommandEncoder(),pass=encoder.beginRenderPass({colorAttachments:[{view:context.getCurrentTexture().createView(),loadOp:'clear',storeOp:'store'}]});
+      pass.setPipeline(pipeline);pass.draw(3);pass.end();device.queue.submit([encoder.finish()]);
+    },device.queue);
+    window.extensionDemo={readiness};
+  });
+  await audit.waitForFunction(()=>demoLoad.principalScenePresentedOpportunity>0);
+  const principal=await audit.evaluate(()=>({...demoLoad}));
+  assert.ok(principal.principalSceneSubmitted>principal.submitted);
+  assert.ok(principal.principalSceneGpuComplete>=principal.principalSceneSubmitted&&principal.principalScenePresentedOpportunity>=principal.principalSceneGpuComplete);
+  assert.equal(principal.principalSceneCorrelation,'identified-webgpu-submit');
   await audit.evaluate(()=>{auditFixture.offscreen.destroy();auditFixture.device.destroy();});await fixture.close();
-  console.log('Visible-frame audit rejects clear/offscreen submissions and accepts a canvas draw.');
+  console.log('Frame audit distinguishes offscreen work, an early canvas frame and the correlated complete subject.');
   for(const demo of auditOnly?[]:cases){
     const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:3,isMobile:true,hasTouch:true,userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1'});
     const page=await context.newPage(),errors=[];
@@ -62,7 +78,7 @@ try {
     });
     try {
       await page.goto(new URL(demo.path,server.resolvedUrls.local[0]).href,{waitUntil:'domcontentloaded'});
-      await page.waitForFunction(()=>demoLoad.firstFrame>0&&demoLoad.ready>0);
+      await page.waitForFunction(()=>demoLoad.principalScenePresentedOpportunity>0&&demoLoad.ready>0);
       if(demo.name==='helmet')assert(await page.locator('#ssao').isEnabled());
       else if(demo.name==='afterlight')assert(await page.locator('#explore').isEnabled());
       else assert(await page.locator('#status').isHidden());

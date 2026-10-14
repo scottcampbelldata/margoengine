@@ -7,12 +7,15 @@ import {VFX} from '@margoengine/vfx';
 import {Input} from '@margoengine/input';
 import {Cinematic} from '@margoengine/cinematic';
 import {Bloom} from '@margoengine/post/bloom';
+import {submitPrincipalScene} from '@margoengine/post/scene-fade';
 import {Stats} from '@margoengine/stats';
 import {poseHumanoid} from '@margoengine/procedural';
 import {Clustered} from '@margoengine/clustered';
 import {createCharacter, createLandscape, terrainHeight} from './scene.js';
 import {stepLocomotion, type LocomotionOptions} from '@margoengine/controls';
 import {createProceduralSettlement} from './procedural/index.js';
+import {sceneSamples} from '../../../packages/shared/quality.js';
+import {watchFrameRate} from '../../../packages/shared/auto-quality.js';
 import './style.css';
 
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -20,39 +23,19 @@ const canvas = element<HTMLCanvasElement>('scene'), status = element('status'), 
 const sunSlider = element<HTMLInputElement>('sun'), waveSlider = element<HTMLInputElement>('wave'), countSelect = element<HTMLSelectElement>('particles');
 const explore = element<HTMLButtonElement>('explore'), pause = element<HTMLButtonElement>('pause');
 
-if (new URLSearchParams(location.search).has('diagnostics')) {
-  element('performance-diagnostics').hidden = false;
-  const button = element<HTMLButtonElement>('capture-performance'), output = element('capture-performance-status');
-  const target = window as Window & {margoPerformanceCapture?: Promise<{downloadError?: string; captureError?: string}> & {running?: boolean}};
-  button.addEventListener('click', async () => {
-    button.disabled = true; output.textContent = 'Recording for 20 seconds. Keep this page visible.';
-    const previous = target.margoPerformanceCapture, script = document.createElement('script');
-    script.src = new URL('../../../scripts/collect-performance.js', import.meta.url).href;
-    try {
-      await new Promise<void>((resolve, reject) => {
-        script.onload = () => resolve(); script.onerror = () => reject(new Error('The performance script could not load. Try again.'));
-        document.head.append(script);
-      });
-      const capture = target.margoPerformanceCapture;
-      if (!capture || capture === previous && !capture.running) throw new Error('The performance capture did not start. Try again.');
-      const report = await capture;
-      output.textContent = report.downloadError ? 'Capture finished, but the report download failed.' :
-        report.captureError ? 'A partial performance report was saved.' : 'Performance report saved to your downloads.';
-    } catch (error) {output.textContent = error instanceof Error ? error.message : String(error);}
-    finally {script.onload = script.onerror = null; script.remove(); button.disabled = false;}
-  });
-}
-
 async function boot(): Promise<void> {
   if (!navigator.gpu) throw new Error('WebGPU is unavailable. Open this local demo in a WebGPU-enabled browser.');
+  const events = new AbortController(), signal = events.signal;
+  let dispose = () => events.abort();
+  window.addEventListener('pagehide', () => dispose(), {once: true});
   const engine = await EngineKernel.create(canvas, {backend: 'webgpu', capacity: 256, camera: {position: [8, 7, 25], target: [0, 2, 0], near: 0.15, far: 300, fov: 58}});
-  const runtime = engineRuntime(engine), events = new AbortController(), signal = events.signal;
-  let input: Input | undefined, disposed = false, playing = !matchMedia('(prefers-reduced-motion: reduce)').matches, timer: ReturnType<typeof setInterval> | undefined;
-  const dispose = () => {if (disposed) return; disposed = true; events.abort(); clearInterval(timer); input?.dispose(); engine.dispose();};
-  window.addEventListener('pagehide', dispose, {signal});
+  if (signal.aborted) {engine.dispose(); return;}
+  const runtime = engineRuntime(engine);
+  let input: Input | undefined, shadow: Shadows | undefined, disposed = false, playing = !matchMedia('(prefers-reduced-motion: reduce)').matches, timer: ReturnType<typeof setInterval> | undefined;
+  dispose = () => {if (disposed) return; disposed = true; events.abort(); clearInterval(timer); input?.dispose(); shadow?.dispose(); engine.dispose();};
   if (import.meta.hot) import.meta.hot.dispose(dispose);
   try {
-    const mobile = /Mobi|Android/.test(navigator.userAgent);
+    const mobile = sceneSamples() === 1;
     engine.onError = error => {engine.stop(); fail(error);};
     runtime.gpu!.addEventListener('uncapturederror', event => engine.onError((event as GPUUncapturedErrorEvent).error), {signal});
     const post = Bloom.attach(engine, {strength: 0.2, threshold: 1.2, exposure: 0.45});
@@ -60,12 +43,11 @@ async function boot(): Promise<void> {
     const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.38}, fog: {depth: () => water?.depthTexture ?? post.depthTexture, density: 0.008, start: 45}, hours: 17.57, timeScale: 1/120, turbidity: 3.2, exposure: -0.35, lighting: {intensity: 6, color: [1,0.97,0.92], sunset: [1,0.69,0.36], moon: {intensity: 0.6, color: [0.25,0.45,0.75]}, ambient: {day: [0.14,0.19,0.24], night: [0.02,0.04,0.09]}}});
     // Compile the sky and its LUT while the CPU builds the island.
     engine.render({delta: 0});
-    const shadows = Shadows.attach(engine, {resolution: mobile ? 512 : 1024, distance: 115, lambda: 0.7, lightSize: 0.018, normalBias: 0.055, casterMargin: 65});
+    const shadows = shadow = new Shadows({resolution: mobile ? 512 : 1024, distance: 115, lambda: 0.7, lightSize: 0.018, normalBias: 0.055, casterMargin: 65});
     const settlement = createProceduralSettlement(engine, shadows, terrainHeight), procedural = settlement.scatter;
-    const lights = Clustered.attach(engine, {grid: [8,4,16]});
-    procedural.emissiveIntensity = lights.intensityScale = () => sky.nightFactor;
-    lights.setLights([{position: settlement.porchLightPosition, range: 6, color: [1,0.8,0.4], intensity: 18}]);
-    const landscape = createLandscape(engine, shadows, settlement.exclusions, () => water?.coastalDepthTexture), character = createCharacter(engine, shadows);
+    procedural.emissiveIntensity = () => sky.nightFactor;
+    const landscape = createLandscape(engine, shadows, () => water?.coastalDepthTexture), character = createCharacter(engine, shadows);
+    let details: ReturnType<typeof import('./landscape-details.js').createLandscapeDetails> | undefined, lights: Clustered | undefined;
     const state = new Float32Array([-12, terrainHeight(-12, 37), 37, Math.PI, 0, 0.18, 0, 0]);
     const cameraDistance = 14;
     const actions = new Float32Array(5);
@@ -82,7 +64,6 @@ async function boot(): Promise<void> {
       particles = VFX.attach(engine, {capacity, initialCount: capacity, rate: capacity / 20, position: [0, 4, 0], emissionExtent: [80, 3, 80], velocity: [0, 0.03, 0], gravity: [0, 0, 0], spread: 0.08, lifetime: [25, 45], size: 0.01, ground: 0.35, turbulence: 0.035, frequency: 0.22, color: [1, 0.85, 0.4, 0.5], intensity: 5});
     };
     countSelect.value = mobile ? '100000' : '1000000';
-    selectParticles(Number(countSelect.value));
     input = new Input({
       strafe: [{type: 'key', code: 'KeyD'}, {type: 'key', code: 'ArrowRight'}, {type: 'key', code: 'KeyA', scale: -1}, {type: 'key', code: 'ArrowLeft', scale: -1}, {type: 'touch', id: 'move', axis: 'x'}],
       forward: [{type: 'key', code: 'KeyW'}, {type: 'key', code: 'ArrowUp'}, {type: 'key', code: 'KeyS', scale: -1}, {type: 'key', code: 'ArrowDown', scale: -1}, {type: 'touch', id: 'move', axis: 'y', scale: -1}],
@@ -104,12 +85,12 @@ async function boot(): Promise<void> {
       camera.setOrbitOffset(state[4],state[5],cameraDistance,0.8);
       timing[1]++;
     });
-    const stats = Stats.attach(engine, {parent: element('telemetry'), samples: 120});
+    const stats = Stats.attach(engine, {parent: element('telemetry'), samples: 120, profiling: new URLSearchParams(location.search).has('gpuTiming')});
     const renderStill = () => {if (!playing) engine.render({delta: 0});};
     sunSlider.addEventListener('input', () => {sky.options.hours = sunSlider.valueAsNumber; renderStill();}, {signal});
     waveSlider.addEventListener('input', () => {water.setWaveHeight(waveSlider.valueAsNumber); element<HTMLOutputElement>('wave-value').value = `${waveSlider.valueAsNumber.toFixed(2)} m`; renderStill();}, {signal});
-    countSelect.addEventListener('change', () => {selectParticles(Number(countSelect.value)); renderStill();}, {signal});
-    element<HTMLInputElement>('wireframe').addEventListener('change', event => {landscape.wireframe.visible = (event.target as HTMLInputElement).checked; renderStill();}, {signal});
+    countSelect.addEventListener('change', () => {if (details) selectParticles(Number(countSelect.value)); renderStill();}, {signal});
+    element<HTMLInputElement>('wireframe').addEventListener('change', event => {if (details) details.wireframe.visible = (event.target as HTMLInputElement).checked; renderStill();}, {signal});
     canvas.addEventListener('pointerdown', event => {dragging = true; canvas.focus(); canvas.setPointerCapture(event.pointerId);}, {signal});
     const release = () => {dragging = false;};
     canvas.addEventListener('pointerup', release, {signal}); canvas.addEventListener('pointercancel', release, {signal}); canvas.addEventListener('lostpointercapture', release, {signal});
@@ -125,10 +106,15 @@ async function boot(): Promise<void> {
     explore.addEventListener('click', () => {document.body.classList.add('exploring'); setPlaying(true); canvas.focus();}, {signal});
     poseHumanoid(character,position,state[3],state[6],state[7]);
     camera.setOrbitOffset(state[4],state[5],cameraDistance,0.8);
-    // Warm pipelines and the one-time atmospheric LUT before measuring cadence.
-    engine.render({delta: 0}); await runtime.gpu!.queue.onSubmittedWorkDone();
+    // Arm Sky's reflection pass before the first water draw consumes its texture.
+    void sky.reflectionTexture;
+    const readiness = await submitPrincipalScene(() => engine.render({delta: 0}), runtime.gpu!.queue, {signal});
+    if (disposed) return;
+    const startup = {engine, landscape, settlement, character, water, shadows, readiness, phase: 'principal', get details() {return details;}};
+    Object.assign(window, {afterlightStartup: startup});
     controls.disabled = false; explore.disabled = false; explore.innerHTML = 'Explore the island <span aria-hidden="true">↗</span>';
     setPlaying(playing);
+    status.textContent = 'World ready. Full detail is loading.';
     timer = setInterval(() => {
       const hours = sky.options.hours!, minutes = Math.floor((hours % 1) * 60);
       element<HTMLOutputElement>('sun-value').value = `${String(Math.floor(hours)).padStart(2,'0')}:${String(minutes).padStart(2,'0')}`;
@@ -136,7 +122,25 @@ async function boot(): Promise<void> {
       sunSlider.setAttribute('aria-valuetext', `${element<HTMLOutputElement>('sun-value').value}, ${sky.nightFactor > 0.5 ? 'night' : 'day'}`);
       if (document.activeElement !== sunSlider) sunSlider.value = String(hours);
     }, 500);
-    Object.assign(window, {sandbox: {engine, stats, state, actions, camera, cameraDelta, timing, sky, water, shadows, lights, procedural, get particles() {return particles;}, dispose}});
+    try {
+      const {createLandscapeDetails} = await import('./landscape-details.js');
+      if (disposed) return;
+      details = createLandscapeDetails(engine, settlement.exclusions, landscape.heightmap);
+      details.wireframe.visible = element<HTMLInputElement>('wireframe').checked;
+      engine.use(shadows);
+      lights = Clustered.attach(engine, {grid: [8,4,16]});
+      lights.intensityScale = () => sky.nightFactor;
+      lights.setLights([{position: settlement.porchLightPosition, range: 6, color: [1,0.8,0.4], intensity: 18}]);
+      selectParticles(Number(countSelect.value));
+      engine.render({delta: 0}); await runtime.gpu!.queue.onSubmittedWorkDone();
+      if (disposed) return;
+      startup.phase = 'complete'; setPlaying(playing);
+    } catch (error) {
+      if (disposed) return;
+      startup.phase = 'detail-failed'; status.textContent = `World ready. Extra detail could not load: ${String(error)}`;
+    }
+    Object.assign(window, {sandbox: {engine, stats, state, actions, camera, cameraDelta, timing, sky, water, shadows, lights, procedural, readiness, get particles() {return particles;}, dispose}});
+    watchFrameRate();
   } catch (error) {dispose(); throw error;}
 }
 
@@ -148,4 +152,4 @@ function fail(error: unknown): void {
   element('error-message').textContent = message; element('error-details').hidden = false;
   console.error(message);
 }
-void boot().catch(fail);
+void boot().catch(error => {if (!(error instanceof DOMException && error.name === 'AbortError')) fail(error);});

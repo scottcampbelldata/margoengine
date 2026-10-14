@@ -33,3 +33,10 @@ npm --prefix packages/tonemap run build:demo
 ```
 
 The standalone Vite demo at `examples/index.html` has exposure/contrast sliders, curve selection and a .cube file input. Run `npm run build:packages` first for core/stage. This package supports core `^0.1.0 || ^1.0.0` through the existing extension API and is included in workspace builds and release checks. No runtime dependencies are added.
+
+The package's `1.0.0` version does not require Engine 1.0. It works with the
+current Core/Stage 0.1.0. `node scripts/build-site.js` assembles its standalone
+demo at `/demos/tonemap/`; the package catalog links to that built route. The demo
+uses the published `dist` entry, preserves local LUT loading/controls, and marks
+the complete scene's correlated GPU readiness. npm publication is separate:
+use the workspace or packed local archives until the package is published.
