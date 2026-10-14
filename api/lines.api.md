@@ -96,6 +96,7 @@ export class Line {
     bind(owner: Owner | undefined): void;
     get attached(): boolean;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export type LineCap = 'butt' | 'round' | 'square';
@@ -160,6 +161,7 @@ export class Lines implements EnginePlugin {
         segments: number;
         drawCalls: number;
     };
+    static attach(engine: EngineKernel, options?: LinesOptions): Lines;
     constructor(options?: LinesOptions);
     get lines(): ReadonlySet<Line>;
     add<T extends Line>(line: T): T;
@@ -169,6 +171,7 @@ export class Lines implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface LinesOptions {

@@ -125,6 +125,7 @@ export class Texture {
     get isVideo(): boolean;
     update(): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
 }
 

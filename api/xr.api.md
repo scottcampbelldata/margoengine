@@ -11,6 +11,7 @@ export class XR implements EnginePlugin {
     session: XRNativeSession | null;
     readonly controllers: XRController[];
     static isSupported(mode?: XRMode): Promise<boolean>;
+    static attach(engine: EngineKernel): Promise<XR>;
     static create(engine: EngineKernel): Promise<XR>;
     private constructor();
     setup(engine: Engine): void;
@@ -18,6 +19,7 @@ export class XR implements EnginePlugin {
     requestSession(mode?: XRMode, options?: XRSessionOptions): Promise<XRNativeSession>;
     end(): Promise<void>;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface XRBinding {
@@ -75,6 +77,7 @@ class XR implements EnginePlugin {
     session: XRNativeSession | null;
     readonly controllers: XRController[];
     static isSupported(mode?: XRMode): Promise<boolean>;
+    static attach(engine: EngineKernel): Promise<XR>;
     static create(engine: EngineKernel): Promise<XR>;
     private constructor();
     setup(engine: Engine): void;
@@ -82,6 +85,7 @@ class XR implements EnginePlugin {
     requestSession(mode?: XRMode, options?: XRSessionOptions): Promise<XRNativeSession>;
     end(): Promise<void>;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export type XRMode = 'inline' | 'immersive-vr' | 'immersive-ar';

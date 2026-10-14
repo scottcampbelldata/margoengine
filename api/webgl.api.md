@@ -13,6 +13,7 @@ export class GLRenderer implements Renderer {
     remove(geometry: Geometry): void;
     render(camera: Camera, lighting: Lighting, batches: Iterable<Batch>, graph: FrameGraph, delta: number): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export const webglRenderer: (canvas: HTMLCanvasElement) => Renderer;

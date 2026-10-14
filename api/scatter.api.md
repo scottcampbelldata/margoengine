@@ -30,6 +30,7 @@ export class Scatter implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface ScatterBatch {
@@ -66,6 +67,7 @@ export class ScatterInstances implements EnginePlugin {
     }): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface ScatterOptions {

@@ -8,6 +8,7 @@ export class Navigation {
     static create(positions: ArrayLike<number>, indices: ArrayLike<number>, options?: NavigationOptions): Promise<Navigation>;
     path(start: Vector3, end: Vector3): Vector3[] | null;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface NavigationOptions {

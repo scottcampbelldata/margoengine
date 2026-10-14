@@ -54,6 +54,7 @@ export class Dimensions implements EnginePlugin {
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface LinearDimension {

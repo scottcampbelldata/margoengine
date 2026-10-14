@@ -17,6 +17,7 @@ export class Bloom implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface BloomOptions {
@@ -32,6 +33,7 @@ export class FXAA implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     destroy(): void;
 }
 
@@ -45,6 +47,7 @@ export class PostStack implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export class SSAO implements EnginePlugin {
@@ -60,6 +63,7 @@ export class SSAO implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     destroy(): void;
 }
 
@@ -87,6 +91,7 @@ export class SceneFade implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 // Not exported from this entry, but used by the exports above:

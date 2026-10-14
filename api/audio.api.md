@@ -54,6 +54,7 @@ export class Audio implements ListenerSource {
     get currentTime(): number;
     update(_engine: EngineKernel | null): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     protected get head(): AudioNode;
     protected setMuted(muted: boolean): void;
     get isMuted(): boolean;
@@ -71,6 +72,7 @@ export class AudioAnalyser {
     getAverageFrequency(): number;
     getDominantFrequency(): number;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface AudioAnalyserOptions {
@@ -87,6 +89,7 @@ export class AudioListener implements EnginePlugin {
     readonly up: Float64Array<ArrayBuffer>;
     smoothing: number;
     readonly autoResume: boolean;
+    static attach(engine: EngineKernel, options?: AudioListenerOptions): AudioListener;
     constructor(options?: AudioListenerOptions);
     get context(): BaseAudioContext;
     get hasContext(): boolean;
@@ -104,6 +107,7 @@ export class AudioListener implements EnginePlugin {
     addSource(source: ListenerSource): void;
     removeSource(source: ListenerSource): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface AudioListenerOptions {
@@ -163,6 +167,7 @@ export class PositionalAudio extends Audio {
     setDirection(direction: Vec3): this;
     update(engine: EngineKernel | null): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface PositionalAudioOptions extends AudioOptions {

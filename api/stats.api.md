@@ -18,6 +18,7 @@ export class GPUProfiler {
     resolve(encoder: GPUCommandEncoder): boolean;
     read(): Promise<number | null>;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export class Stats implements EnginePlugin {
@@ -45,6 +46,7 @@ export class Stats implements EnginePlugin {
     refresh(): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface StatsOptions {

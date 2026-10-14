@@ -17,6 +17,7 @@ export class AssemblyBVH {
         maxDistance?: number;
     }): Anchor | null;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface RayHit {

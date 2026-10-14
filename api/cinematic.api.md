@@ -21,6 +21,7 @@ export class Cinematic implements EnginePlugin {
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface CinematicOptions {

@@ -14,6 +14,7 @@ export interface CADModel {
 
 export class PartInstancer implements EnginePlugin {
     readonly name = "part-instancer";
+    static attach(engine: EngineKernel): PartInstancer;
     readonly stats: {
         parts: number;
         unique: number;

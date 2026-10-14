@@ -39,6 +39,7 @@ export abstract class Controls extends EventDispatcher {
     readonly engine: EngineKernel | null;
     element: ControlElement | null;
     enabled: boolean;
+    static attach<T extends Controls, A extends unknown[]>(this: new (engine: EngineKernel, ...args: A) => T, engine: EngineKernel, ...args: A): T;
     constructor(source: Camera | EngineKernel, element?: ControlElement | null, autoUpdate?: boolean);
     protected init(): void;
     protected get kind(): string;
@@ -48,6 +49,7 @@ export abstract class Controls extends EventDispatcher {
     disconnect(): void;
     abstract update(delta?: number): boolean;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     protected local(event: {
         clientX: number;
         clientY: number;
@@ -68,11 +70,13 @@ export class DragControls extends EventDispatcher {
     plane: 'view' | readonly [number, number, number];
     axis: readonly [number, number, number] | null;
     hovered: DragObject | null;
+    static attach(engine: EngineKernel, objects?: DragObject[], options?: DragControlsOptions): DragControls;
     constructor(engine: EngineKernel, objects?: DragObject[], options?: DragControlsOptions);
     get dragging(): DragObject | null;
     connect(element: ControlElement): void;
     disconnect(): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     intersect(x: number, y: number): {
         object: DragObject;
         hit: RaycasterHit;
@@ -359,6 +363,7 @@ export class TransformControls extends EventDispatcher {
     dragging: boolean;
     readonly overlay: OverlayRenderer;
     readonly pluginName: string;
+    static attach(engine: EngineKernel, options?: TransformControlsOptions): TransformControls;
     constructor(engine: EngineKernel, options?: TransformControlsOptions);
     connect(element: ControlElement): void;
     disconnect(): void;
@@ -376,6 +381,7 @@ export class TransformControls extends EventDispatcher {
     handles(): Handle[];
     pick(x: number, y: number): HandleName | null;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     pointerDown(x: number, y: number): void;
     pointerMove(x: number, y: number): void;
 }

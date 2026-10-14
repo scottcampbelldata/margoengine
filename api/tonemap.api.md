@@ -22,6 +22,7 @@ export class Tonemap implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     destroy(): void;
 }
 

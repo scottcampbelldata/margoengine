@@ -52,6 +52,7 @@ export class ComputePass implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export type Emit = (b: Builder, n: Node<any>) => string;
@@ -174,12 +175,14 @@ export class NodePass implements EnginePlugin {
     readonly name: string;
     readonly kind: 'hdr' | 'ldr';
     readonly program: Program;
+    static attach(engine: EngineKernel, node: Node<'vec3f' | 'vec4f'>, options?: NodePassOptions): NodePass;
     constructor(node: Node<'vec3f' | 'vec4f'>, { kind, name }?: NodePassOptions);
     code(encode?: boolean): string;
     setup(engine: Engine): void;
     registerPasses(): void;
     onDeviceRestored(): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface NodePassOptions {
@@ -263,6 +266,7 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
     atomicLoad(this: StorageBuffer<Atomic>, i: Index): Node<T>;
     atomicStore(this: StorageBuffer<Atomic>, i: Index, value: Input<T>): Store;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export type StorageType = 'f32' | 'i32' | 'u32' | 'vec2f' | 'vec2i' | 'vec2u' | 'vec4f' | 'vec4i' | 'vec4u';

@@ -22,6 +22,7 @@ export class TAA implements EnginePlugin {
     };
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     destroy(): void;
 }
 

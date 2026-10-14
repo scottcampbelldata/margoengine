@@ -9,6 +9,7 @@ import { FrameGraph, PassContext } from "@margoengine/core/extension";
 export class ColorBackground {
     readonly name: string;
     readonly order: number;
+    static attach(engine: EngineKernel, options?: ColorBackgroundOptions): ColorBackground;
     constructor(options?: ColorBackgroundOptions);
     get color(): [number, number, number];
     set color(value: ColorInput);
@@ -18,6 +19,7 @@ export class ColorBackground {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     record(context: GPUContext): void;
 }
 
@@ -57,6 +59,7 @@ export class Environment implements EnginePlugin {
     version: number;
     disposed: boolean;
     private constructor();
+    static attach(engine: EngineKernel, source: EnvironmentSource, options?: EnvironmentOptions): Promise<Environment>;
     static create(target: GPUDevice | EngineKernel, source: EnvironmentSource, options?: EnvironmentOptions): Promise<Environment>;
     private get live();
     get device(): GPUDevice | null;
@@ -89,6 +92,7 @@ export class Environment implements EnginePlugin {
     setup(engine: EngineKernel): void;
     onDeviceRestored(engine: EngineKernel): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export class EnvironmentBackground {
@@ -96,6 +100,7 @@ export class EnvironmentBackground {
     readonly name: string;
     readonly order: number;
     source: 'auto' | 'equirect' | 'cube';
+    static attach(engine: EngineKernel, environment: Environment, options?: EnvironmentBackgroundOptions): EnvironmentBackground;
     constructor(environment: Environment, options?: EnvironmentBackgroundOptions);
     get exposure(): number;
     set exposure(value: number);
@@ -107,6 +112,7 @@ export class EnvironmentBackground {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: EngineKernel): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     record(context: GPUContext): void;
 }
 
@@ -121,6 +127,7 @@ export interface EnvironmentBackgroundOptions {
 
 export class EnvironmentLighting extends ShaderEffect {
     readonly environment: Environment;
+    static attach(engine: EngineKernel, environment: Environment, options?: EnvironmentLightingOptions): EnvironmentLighting;
     constructor(environment: Environment, options?: EnvironmentLightingOptions);
     protected get device(): GPUDevice | null;
     protected entries(): GPUBindGroupEntry[];
@@ -161,6 +168,7 @@ export interface FloatImage {
 }
 
 export class Fog extends ShaderEffect {
+    static attach(engine: EngineKernel, options?: FogOptions): Fog;
     constructor(options?: FogOptions);
     get color(): ColorInput;
     set color(value: ColorInput);
@@ -238,6 +246,7 @@ class EnvironmentBackground {
     readonly name: string;
     readonly order: number;
     source: 'auto' | 'equirect' | 'cube';
+    static attach(engine: EngineKernel, environment: Environment, options?: EnvironmentBackgroundOptions): EnvironmentBackground;
     constructor(environment: Environment, options?: EnvironmentBackgroundOptions);
     get exposure(): number;
     set exposure(value: number);
@@ -249,6 +258,7 @@ class EnvironmentBackground {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: EngineKernel): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     record(context: GPUContext): void;
 }
 
@@ -325,9 +335,11 @@ abstract class ShaderEffect {
     pbr(group: number): PBRHooks | undefined;
     protected abstract hooks(group: number): PBRHooks;
     shader(source: string, group: number): string;
+    add(model: LightingTarget): () => void;
     applyTo(model: LightingTarget): () => void;
     setup(engine: EngineKernel): void;
     registerPasses(graph: FrameGraph): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 ```

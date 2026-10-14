@@ -20,6 +20,7 @@ export class HTML extends LabelRenderer {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface HTMLOptions extends LabelRendererOptions {

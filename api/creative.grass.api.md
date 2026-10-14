@@ -9,6 +9,7 @@ import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 export class GrassField implements EnginePlugin {
     readonly name: string;
     readonly blades: number;
+    static attach(engine: EngineKernel, options?: GrassOptions): GrassField;
     constructor(stage: {
         readonly engine: EngineKernel;
     }, options?: GrassOptions);
@@ -23,6 +24,7 @@ export class GrassField implements EnginePlugin {
     onDeviceRestored(engine: Engine): void;
     destroy(): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface GrassOptions {
