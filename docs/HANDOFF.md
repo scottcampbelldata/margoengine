@@ -212,11 +212,22 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       +26 bytes); Stats profiling works with it. Remaining: richer overlay in Stats (VRAM/buffer counts) if wanted.
    d. Contact shadows (ground-plane depth blur) in a new staging package; auto-framing exists already (core
       `camera.fitToBoundingBox` with duration and padding) - add orthographic support in @margoengine/cameras.
-   e. Outlines: selection already uses jump-flood outlines; add dashed x-ray outlines for hidden parts and glTF/model
-      support (after the picking worker merges).
-   f. Text: @margoengine/text is already GPU SDF text (not DOM). Upgrade to MSDF only if corner sharpness at large
+   e. [DONE] Outlines: selection already uses jump-flood outlines; add dashed x-ray outlines for hidden parts and glTF/model
+      support (after the picking worker merges). Done: `Selection` option `xray` (`true` or `{dash, opacity, color,
+      width}`; dash 0 = solid dimmer lines), mutable per frame; `name` option for one Selection per selection set. The
+      whole selection is marked again into the same mask without the depth test (core meshes via the draw hook,
+      gltf-pro/materials primitives via the model replay), jump-flooded and composited blended/dashed before the
+      visible outline; perspective and ortho alike. Off = byte-identical GPU calls to 46f9484
+      (`proofs/selection-xray-off.proof.js`, 10,586 calls at 1x/4x). Selection 9,504 -> 10,321 min+gzip (+817).
+      Real-GPU `node packages/selection/test/xray.browser.mjs`. Hidden lines trace the selection's silhouette only.
+   f. [DONE] Text: @margoengine/text is already GPU SDF text (not DOM). Upgrade to MSDF only if corner sharpness at large
       sizes needs it; add instanced dimension callouts that stay sharp at orthographic zoom, tied to machinery's
-      annotations.
+      annotations. Done: `@margoengine/machinery/dimensions` `Dimensions.attach(engine, options)`: linear (machinery
+      `Dimension`/anchors as is), angle and radius/diameter callouts, values from `measureDistance`; laid out in CSS
+      pixels per frame and placed in the view plane at each anchor's depth, so constant pixel size at any ortho zoom and
+      in perspective; all lines one `@margoengine/lines` segment list (one draw), labels one text block each. New entry
+      3,973 min+gzip (machinery root unchanged; lines + text added as machinery dependencies). Real-GPU
+      `node packages/machinery/test/dimensions-check.mjs`. MSDF not needed for this.
    g. [done: `@margoengine/viewcube` (DOM/CSS 3D, 2.8 kB gzip, real-browser click check); the gizmo was NOT constant-size
       in orthographic (sized and picked by camera distance): fixed in controls/view.ts + transform.ts, orbit pan too]
       ViewCube (snap to top/front/right/iso, perspective/orthographic toggle) - new; transform gizmos already exist in
