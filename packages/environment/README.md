@@ -1,26 +1,50 @@
 # @margoengine/environment
 
-HDR and EXR loading, GPU image-based lighting (prefiltered specular, spherical-harmonic irradiance, BRDF LUT) and environment backgrounds for Margo Engine on WebGPU.
+HDR, EXR and UltraHDR loading, GPU image-based lighting (prefiltered specular, spherical-harmonic irradiance, BRDF LUT) applied to meshes and glTF models, environment and color backgrounds, and scene-wide fog for Margo Engine on WebGPU.
 
 Build from source with `npm run build` in `packages/environment`.
 
-Replaces Three.js `RGBELoader`, `EXRLoader`, `PMREMGenerator`, `scene.environment` and `scene.background` (with `backgroundIntensity`, `backgroundRotation` and `backgroundBlurriness`).
+Replaces Three.js `RGBELoader`, `EXRLoader`, `UltraHDRLoader`, `PMREMGenerator`, `scene.environment`, `scene.background` (texture with `backgroundIntensity`, `backgroundRotation` and `backgroundBlurriness`, or a color) and `scene.fog` (`Fog`, `FogExp2`).
 
 ```ts
 import {Engine} from '@margoengine/core';
-import {Environment, EnvironmentBackground, loadEnvironmentImage} from '@margoengine/environment';
+import {loadGLTF} from '@margoengine/gltf-pro';
+import {Environment, EnvironmentBackground, EnvironmentLighting, loadEnvironmentImage} from '@margoengine/environment';
 
 const canvas = document.createElement('canvas');
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
-const image = await loadEnvironmentImage('/studio.hdr'); // .hdr or .exr, picked by signature
+const image = await loadEnvironmentImage('/studio.hdr'); // .hdr, .exr or UltraHDR .jpg, picked by signature
 const environment = await Environment.create(engine, image, {rotation: 0.5});
 engine.use(environment);                                       // rebuilds itself after a device loss
 engine.use(new EnvironmentBackground(environment, {exposure: 1, blur: 0}));
+const lighting = new EnvironmentLighting(environment);
+engine.use(lighting);                                          // core meshes: IBL replaces the constant ambient term
+lighting.applyTo(await loadGLTF(engine, '/helmet.glb'));       // glTF-pro models: same, scaled by occlusion maps
 engine.start();
-
-// A PBR package binds environment.specularView, sampler, brdfLutView, shBuffer and paramsBuffer (see below).
-// On teardown: engine.dispose() disposes both plugins.
+// On teardown: engine.dispose() disposes every plugin; lighting.dispose() also detaches it from models.
 ```
+
+A plain color (or vertical gradient) background and fog, without any environment map:
+
+```ts
+import {ColorBackground, Fog} from '@margoengine/environment';
+engine.use(new ColorBackground({color: '#bcd4e6'}));          // scene.background = new Color(...)
+const fog = new Fog({color: '#bcd4e6', near: 10, far: 80});    // or {density: 0.02} for FogExp2; heightFalloff for height fog
+engine.use(fog);                                               // fogs core meshes; required (owns the GPU uniform)
+fog.applyTo(model);                                            // glTF-pro models, opaque and blended
+fog.far = 120;                                                 // every option is a live property
+```
+
+## Scene lighting, fog and color backgrounds
+
+- **`EnvironmentLighting(environment)`** is an engine plugin and a glTF-pro `LightingEffect`. As a plugin it runs a pass at order -1 (after shadows, sky, clustered lights and the post-processing captures) that patches core's mesh shader through `PassContext.shader`, adding `iblShade(...)` to the `let linear=` term in place of the constant ambient `lighting.radiance[3]`; core itself is not changed. `applyTo(model)` (or `model.addLighting(lighting)`) does the same for glTF-pro's shader, replacing its hemisphere `ambient()` and multiplying IBL by the occlusion map. The five IBL bindings are 20 to 24 in core's group 0 and glTF-pro's group 2. While the environment is restoring or disposed, or lives on another device, nothing is patched and nothing is bound. Sky's ambient patch is kept and IBL adds to it; terrain wetness does not scale IBL. glTF-pro's physical variant (clearcoat, sheen, transmission, specular) is patched the same way, but its IBL term uses the plain metallic-roughness F0 and its clearcoat and sheen layers keep their hemisphere ambient; unlit materials ignore IBL. Post's SSAO still replays the constant ambient term (core `radiance[3]`, glTF-pro `ambient()`) as the light it occludes, so with IBL its occlusion is not yet derived from the IBL term.
+- **`Fog(options)`** computes `amount = linear (near, far)` or `1 - exp(-(density * d)^2)` from the camera distance, times `exp(-heightFalloff * max(y - height, 0))`, inside the mesh shaders (binding 25), so blended glTF primitives are fogged too, unlike sky's depth-based post fog. On the canvas it mixes after tone mapping, so a fully fogged pixel shows exactly `color` and matches a `ColorBackground` of the same color; on an rgba16float target (tonemap, ssao, dof, creative PostProcessing) it mixes linear radiance before their tone mapping. Height fog is the per-fragment factor, not an integral along the view ray. The background, particles, VFX, splats and other custom shaders are not fogged.
+- **`ColorBackground({color, bottom})`** draws a full-screen triangle at order 0.5 (after core's opaque meshes, before glTF-pro models so blended primitives composite over it) at reversed-Z depth 0 with a read-only `greater-equal` test, so it only fills pixels whose depth was never written. On the canvas it writes the sRGB bytes exactly (no tone mapping, as Three.js does for a background color); on an rgba16float target it writes the linear value. `bottom` makes a vertical screen-space gradient. Colors are `'#rgb'`, `'#rrggbb'`, `0xrrggbb` or sRGB `[r, g, b]` in 0..1. A transparent canvas (`alpha: true`) needs core to change its canvas `alphaMode` and clear alpha, which is frozen, so it is not offered.
+- All three allocate nothing in steady frames, patch each distinct shader string once (cached), rebuild their GPU state in `onDeviceRestored`, and throw on a shader they do not recognize instead of drawing wrong.
+
+## UltraHDR
+
+`decodeUltraHDR(bytes, {decode?, weight?})` reads gain-map JPEGs (Android UltraHDR, Adobe gain maps) with the `hdrgm` XMP metadata: `parseUltraHDR` walks the JPEG segments, takes the next JPEG stream after the primary image as the gain map, and reads `GainMapMin`, `GainMapMax`, `Gamma`, `OffsetSDR`, `OffsetHDR` and `HDRCapacityMin/Max` (single values or per-channel `rdf:Seq`) from either image's XMP. `applyGainMap` then computes `(sdr + offsetSdr) * 2^(weight * mix(min, max, gain^(1/gamma))) - offsetHdr` with the base image decoded from sRGB and the gain map bilinearly upsampled; `weight` defaults to 1 (full HDR, right for lighting). JPEG pixels come from `createImageBitmap` and `OffscreenCanvas` by default; in Node pass `decode`. `loadEnvironmentImage` picks it automatically for JPEG signatures; the synchronous `parseEnvironmentImage` cannot (JPEG decoding is asynchronous). Not supported: ISO 21496-1 binary-only metadata, HDR base renditions, and color-gamut conversion (Display P3 bases are treated as sRGB).
 
 The parsers also work on their own, in the browser or Node:
 
@@ -94,6 +118,12 @@ Five bindings, any group and binding numbers. `iblLayoutEntries(firstBinding)` a
 
 `EnvironmentBackground.record(context)` draws into any WebGPU pass context without an engine.
 
+| Class | Options (default) |
+| --- | --- |
+| `EnvironmentLighting(environment, options)` | `name` (`'environment:lighting'`). Intensity and rotation come from the environment |
+| `Fog(options)` | `color` (`'#ffffff'`), `near` (1), `far` (1000), `density` (0 = linear fog), `heightFalloff` (0 = off), `height` (0), `name` (`'fog'`) |
+| `ColorBackground(options)` | `color` (`'#000000'`), `bottom` (none), `order` (0.5, above 0), `name` (`'background'`); `record(context)` works without an engine |
+
 ## Limits
 
 WebGPU only: `EnvironmentBackground.setup` throws on the WebGL2 backend and `Environment.create` needs a device. EXR tiled, multi-part, deep and subsampled (chroma) images and PXR24, B44, B44A, DWAA, DWAB and HTJ2K compression are rejected with an error, as are Radiance `xyze` files and mirrored or transposed orientations. Huffman codes longer than 44 bits are rejected (OpenEXR writers do not produce them for normal images). `EXPOSURE` and `GAMMA` headers are reported, not applied. Equirects larger than the device's texture limit are box-downsampled on the CPU. The diffuse term is L2 SH (no ringing suppression), and the split sum ignores multiple scattering. Source and specular sizes must be powers of two.
@@ -102,8 +132,8 @@ Two portability measures are deliberate: the specular prefilter samples the cube
 
 ## Tests
 
-`npm test` in `packages/environment` runs Node checks: every binary16 value round trip; 20 EXR fixtures written by the reference OpenEXR library (NONE, RLE, ZIPS, ZIP and PIZ, each with HALF RGBA, FLOAT RGB, HALF Y and a mixed HALF/FLOAT/UINT layout) decoding bit-exactly; an independent in-test EXR writer (including raw-fallback chunks, decreasing Y and stored, fixed and dynamic deflate blocks); real files `BrightRings.exr` (ZIP) and `AllHalfValues.exr` (PIZ, every half value) from the OpenEXR test images and `spot1Lux.hdr` from the Three.js examples, matched against reference digests; HDR adaptive, flat and old-style runs in both orientations; truncation and random-corruption fuzzing; CPU SH; and SSR safety.
+`npm test` in `packages/environment` runs Node checks: every binary16 value round trip; 20 EXR fixtures written by the reference OpenEXR library (NONE, RLE, ZIPS, ZIP and PIZ, each with HALF RGBA, FLOAT RGB, HALF Y and a mixed HALF/FLOAT/UINT layout) decoding bit-exactly; an independent in-test EXR writer (including raw-fallback chunks, decreasing Y and stored, fixed and dynamic deflate blocks); real files `BrightRings.exr` (ZIP) and `AllHalfValues.exr` (PIZ, every half value) from the OpenEXR test images and `spot1Lux.hdr` from the Three.js examples, matched against reference digests; HDR adaptive, flat and old-style runs in both orientations; truncation and random-corruption fuzzing; CPU SH; and SSR safety. `tests/scene.test.js` checks the scene pieces on a mock GPU: `EnvironmentLighting` and `Fog` patch core's shader as left by shadows, sky, clustered and the HDR captures, leave it untouched when not ready, on another device or disposed, follow device restores and rebuild bind entries on `environment.version`; a real glTF-pro model gets lit and fogged pipelines for opaque and blended primitives and returns to the unpatched pipelines when removed; `ColorBackground` writes exact sRGB or linear values, allocates nothing in steady frames or on resize and releases its uniform; and UltraHDR parsing (attribute and element metadata, corruption fuzzing) and gain-map math against the formula.
 
-`npm run test:browser` runs Chromium WebGPU checks (set `BROWSER_CHANNEL`, `BROWSER_EXECUTABLE` and `BROWSER_ARGS` as in the repository brief): a constant environment gives constant values at every prefiltered mip and L0-only SH; a single bright direction gives SH matching both a CPU projection and the analytic delta projection, with no fireflies in the prefiltered mips; prefiltered mip 0 equals the source; the cube follows the documented face convention; GPU SH matches a CPU projection of the same cube texels; six `CubeFaces` give the same SH as the equirect; the BRDF LUT matches brute-force quadrature, the smooth-surface analytic limit and Karis's published mobile fit; the background renders the expected color in each direction (equirect, cube, rotation, exposure, blur, HDR and tone-mapped targets) and never draws over non-cleared depth; `IBL_WGSL` compiles against `iblLayoutEntries` and passes a white furnace test; a real `.hdr` goes through the whole pipeline; and in a real engine the background leaves every pixel of a core mesh untouched, matches core's tone mapping elsewhere, allocates nothing in steady frames and comes back after `engine.rebootDevice()`. Every check runs under WebGPU error scopes with zero validation errors. `tests/fixtures/generate.py` regenerates the synthetic fixtures (`pip install OpenEXR numpy`).
+`npm run test:browser` runs Chromium WebGPU checks (set `BROWSER_CHANNEL`, `BROWSER_EXECUTABLE` and `BROWSER_ARGS` as in the repository brief): a constant environment gives constant values at every prefiltered mip and L0-only SH; a single bright direction gives SH matching both a CPU projection and the analytic delta projection, with no fireflies in the prefiltered mips; prefiltered mip 0 equals the source; the cube follows the documented face convention; GPU SH matches a CPU projection of the same cube texels; six `CubeFaces` give the same SH as the equirect; the BRDF LUT matches brute-force quadrature, the smooth-surface analytic limit and Karis's published mobile fit; the background renders the expected color in each direction (equirect, cube, rotation, exposure, blur, HDR and tone-mapped targets) and never draws over non-cleared depth; `IBL_WGSL` compiles against `iblLayoutEntries` and passes a white furnace test; a real `.hdr` goes through the whole pipeline; and in a real engine the background leaves every pixel of a core mesh untouched, matches core's tone mapping elsewhere, allocates nothing in steady frames and comes back after `engine.rebootDevice()`; in a real engine `ColorBackground` writes exact bytes on cleared depth only, `EnvironmentLighting` lights a core mesh and a glTF-pro triangle with direct and ambient light off, full `Fog` turns the whole frame (including the blended triangle) into its color, and removing all three restores the original frame byte for byte; and an UltraHDR file assembled from two browser-encoded JPEGs decodes through `createImageBitmap`. Every check runs under WebGPU error scopes with zero validation errors. `tests/fixtures/generate.py` regenerates the synthetic fixtures (`pip install OpenEXR numpy`).
 
 MIT licensed. Test fixtures: see `tests/fixtures/NOTICE.md`.
