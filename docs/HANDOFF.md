@@ -97,6 +97,17 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
 1d. Orthographic follow-ups: SSAO, lines/points world widths, labels CSS perspective, clustered froxels, DOF and splats
    assume a perspective camera; fix each in its own package. Optional core hook (Camera.projection + up) would remove
    the cameras package's update replacement; only if Scott wants it.
+1e. CAD track (Scott, 2026-10-14: "the smallest, fastest, best CAD engine"; the visualization/interaction layer, not a
+   B-rep modelling kernel). Much already exists in @margoengine/machinery: SectionPlanes (with stencil caps),
+   ExplodedView, PartInstancer, AssemblyBVH, measurement, annotations, STEP/IGES/STL/OBJ via loadCAD. To do:
+   a. Audit and benchmark machinery at CAD scale on real hardware: 10k/50k/100k-part assemblies at 60 FPS, kernel tick
+      time per part count (a Node run measured about 12.8 ms per tick at 100,000 entities with 10-deep hierarchies and
+      culling, so "<0.5 ms for 50k" claims must be measured before use), pick latency, section-cap correctness.
+   b. Feature/crease edge lines: build dihedral-angle edges at import (geometry edgesGeometry exists), draw with
+      depth bias via lines, instanced per part, no z-fighting; silhouettes later.
+   c. Exploded view and isolation driven from GPU storage buffers (check what ExplodedView does today).
+   d. STEP/IGES load cost: measure the OCCT Wasm payload and init time; look for a lighter path.
+   e. A CAD launch demo (large assembly, sections, edges, measurement, ortho views) and an honest comparison page.
 2. Dedupe: two particle systems (creative GPUParticles vs vfx), two bloom paths (post Bloom vs creative
    PostProcessing), three sky implementations (sky, scenery, creative atmosphere).
 3. Replace three.js inside fbx and usdz with native parsers [running].
