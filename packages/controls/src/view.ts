@@ -1,5 +1,6 @@
 import type {Camera} from '@margoengine/core';
-import {EPS, cross, dot, madd, normalize, sub, type V3} from './math.js';
+import {EPS, madd, type V3} from './math.js';
+import {cross, dot, normalize, sub} from '@margoengine/math/vec3';
 
 /**
  * The camera frame Margo Engine renders with: forward from position to target, right from forward x world +Y, no roll.

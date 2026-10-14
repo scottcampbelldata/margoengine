@@ -1,6 +1,8 @@
 import type {Camera, EngineKernel} from '@margoengine/core';
 import {Controls, type ControlElement, type EventTargetLike} from './controls.js';
-import {EPS, add, clamp, cross, dot, madd, sub, type V3} from './math.js';
+import {EPS, madd, type V3} from './math.js';
+import {add, cross, dot, sub} from '@margoengine/math/vec3';
+import {clamp} from '@margoengine/math/mathutils';
 import {basis, intersectPlane, ray} from './view.js';
 
 /** Mouse button actions, as in three.js `MOUSE`. */

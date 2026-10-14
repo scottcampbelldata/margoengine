@@ -5,6 +5,7 @@ import {TextRenderer,Text,type Font,type FontOptions,type ColorInput} from '@mar
 import {viewMatrix} from '../../shared/view.js';
 import {worldAnchor,type Anchor} from './anchors.js';
 import {measureDistance} from './metrology.js';
+import {sub} from '@margoengine/math/vec3';
 export type {Anchor} from './anchors.js';
 
 /** Distance between two anchors; `offset` is the dimension line's distance from them in CSS pixels (signed, default 24) or a screen pixel vector, as `EngineeringAnnotations` dimensions. */
@@ -132,5 +133,4 @@ export class Dimensions implements EnginePlugin {
  /** Removes the dimensions, their lines and text from the engine and frees their GPU resources. */
  dispose():void {const e=this.engine;if(!e)return;this.engine=undefined;e.removePlugin(this.lines.name);e.removePlugin(this.text.name);e.removePlugin(this.name);}
 }
-const sub=(a:Vec3,b:Vec3):Vec3=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
 const sub2=(a:Point,b:Point):Point=>[a[0]-b[0],a[1]-b[1]];

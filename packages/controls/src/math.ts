@@ -1,17 +1,10 @@
-// Small allocation-light vector, quaternion and matrix helpers shared by every control.
+// Small allocation-light vector, quaternion and matrix helpers shared by every control (the plain vec3 ones are in @margoengine/math/vec3).
+import {add, cross, dot, scale} from '@margoengine/math/vec3';
 export type V3 = [number, number, number];
 export type Q4 = [number, number, number, number];
 
 export const EPS = 1e-6;
-export const add = (a: readonly number[], b: readonly number[]): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-export const sub = (a: readonly number[], b: readonly number[]): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-export const scale = (a: readonly number[], s: number): V3 => [a[0] * s, a[1] * s, a[2] * s];
 export const madd = (a: readonly number[], b: readonly number[], s: number): V3 => [a[0] + b[0] * s, a[1] + b[1] * s, a[2] + b[2] * s];
-export const dot = (a: readonly number[], b: readonly number[]): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-export const cross = (a: readonly number[], b: readonly number[]): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-export const length = (a: readonly number[]): number => Math.hypot(a[0], a[1], a[2]);
-export const normalize = (a: readonly number[]): V3 => {const l = length(a); return l ? [a[0] / l, a[1] / l, a[2] / l] : [0, 0, 0];};
-export const clamp = (v: number, min: number, max: number): number => Math.max(min, Math.min(max, v));
 
 /** Rotates `v` around unit `axis` by `angle` radians (Rodrigues). */
 export function rotateAxis(v: readonly number[], axis: readonly number[], angle: number): V3 {
