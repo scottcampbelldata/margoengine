@@ -11,8 +11,7 @@ import {Engine, box} from '@margoengine/core';
 import {TextRenderer, Text, Font} from '@margoengine/text';
 
 const engine = await Engine.create(canvas);
-const text = new TextRenderer();
-engine.use(text);
+const text = TextRenderer.attach(engine);
 
 // Any font the browser can render: a CSS family, or a FontFace that is loaded and registered for you.
 const inter = new Font({family: 'Inter, sans-serif', weight: 600});

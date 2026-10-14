@@ -12,8 +12,8 @@ const animation = Animation.attach(model);
 animation.play('Walking');
 animation.playing = false;
 animation.seek(0.5);
-animation.destroy();
-model.destroy();
+animation.dispose();
+model.dispose();
 stage.dispose();
 ```
 
@@ -38,10 +38,9 @@ declare function placement(i: number): Float32Array;                   // your 4
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const model = await loadGLTF(stage.engine, '/RobotExpressive.glb');
 const vat = bakeVAT(new Animation(model), {fps: 30, clips: ['Walking', 'Running']});
-model.destroy();                                                                    // the baked data stands alone
+model.dispose();                                                                    // the baked data stands alone
 const tints = packAtlas([red, blue, green]);
-const crowd = new VATCrowd(vat, {map: new Texture(tints.image), roughness: 0.6});
-stage.engine.use(crowd);
+const crowd = VATCrowd.attach(stage.engine, vat, {map: new Texture(tints.image), roughness: 0.6});
 for (let i = 0; i < 1000; i++) crowd.add({matrix: placement(i), clip: i % 2, offset: Math.random(), speed: 1, uvTransform: tints.regions[i % 3]});
 crowd.set(5, {clip: 0, offset: 0});                                                   // live; uploads only what changed
 ```

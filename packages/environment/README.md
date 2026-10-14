@@ -14,12 +14,10 @@ import {Environment, EnvironmentBackground, EnvironmentLighting, loadEnvironment
 const canvas = document.createElement('canvas');
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
 const image = await loadEnvironmentImage('/studio.hdr'); // .hdr, .exr or UltraHDR .jpg, picked by signature
-const environment = await Environment.create(engine, image, {rotation: 0.5});
-engine.use(environment);                                       // rebuilds itself after a device loss
-engine.use(new EnvironmentBackground(environment, {exposure: 1, blur: 0}));
-const lighting = new EnvironmentLighting(environment);
-engine.use(lighting);                                          // core meshes: IBL replaces the constant ambient term
-lighting.applyTo(await loadGLTF(engine, '/helmet.glb'));       // glTF-pro models: same, scaled by occlusion maps
+const environment = await Environment.attach(engine, image, {rotation: 0.5}); // rebuilds itself after a device loss
+EnvironmentBackground.attach(engine, environment, {exposure: 1, blur: 0});
+const lighting = EnvironmentLighting.attach(engine, environment);               // core meshes: IBL replaces the constant ambient term
+lighting.add(await loadGLTF(engine, '/helmet.glb'));       // glTF-pro models: same, scaled by occlusion maps
 engine.start();
 // On teardown: engine.dispose() disposes every plugin; lighting.dispose() also detaches it from models.
 ```
@@ -31,16 +29,15 @@ import {Engine} from '@margoengine/core';
 import {loadGLTF} from '@margoengine/gltf-pro';
 import {ColorBackground, Fog} from '@margoengine/environment';
 const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
-engine.use(new ColorBackground({color: '#bcd4e6'}));          // scene.background = new Color(...)
-const fog = new Fog({color: '#bcd4e6', near: 10, far: 80});    // or {density: 0.02} for FogExp2; heightFalloff for height fog
-engine.use(fog);                                               // fogs core meshes; required (owns the GPU uniform)
-fog.applyTo(await loadGLTF(engine, '/helmet.glb'));            // glTF-pro models, opaque and blended
+ColorBackground.attach(engine, {color: '#bcd4e6'});            // scene.background = new Color(...)
+const fog = Fog.attach(engine, {color: '#bcd4e6', near: 10, far: 80}); // fogs core meshes; {density: 0.02} for FogExp2; heightFalloff for height fog
+fog.add(await loadGLTF(engine, '/helmet.glb'));                // glTF-pro models, opaque and blended
 fog.far = 120;                                                 // every option is a live property
 ```
 
 ## Scene lighting, fog and color backgrounds
 
-- **`EnvironmentLighting(environment)`** is an engine plugin and a glTF-pro `LightingEffect`. As a plugin it runs a pass at order -1 (after shadows, sky, clustered lights and the post-processing captures) that patches core's mesh shader through `PassContext.shader`, adding `margoAmbient` (declared just before as `let margoAmbient=iblShade(...);`) to the `let linear=` term in place of the constant ambient `lighting.radiance[3]`; core itself is not changed. `applyTo(model)` (or `model.addLighting(lighting)`) does the same for glTF-pro's shader through its declared `ambient` lighting hook (glTF-pro README, "Lighting hooks"), replacing its hemisphere `ambient()` and multiplying IBL by the occlusion map. The five IBL bindings are 20 to 24 in core's group 0 and glTF-pro's group 2. While the environment is restoring or disposed, or lives on another device, nothing is patched and nothing is bound. Sky's ambient patch is kept and IBL adds to it; terrain wetness does not scale IBL. glTF-pro's physical variant (clearcoat, sheen, transmission, specular) is patched the same way, but its IBL term uses the plain metallic-roughness F0 and its clearcoat and sheen layers keep their hemisphere ambient; unlit materials ignore IBL. **Ambient occlusion**: in core's shader, naming the IBL term `margoAmbient` is a shader convention, not an import (listed in `tests/shader-contracts.test.js`); glTF-pro gets it through its `ambient` hook: post's SSAO (core meshes and registered glTF-pro models) replays `margoAmbient` as the light it occludes, so SSAO darkens IBL diffuse and specular in creases instead of the constant ambient term. Without SSAO the lit output is unchanged; specular occlusion uses the same AO factor as diffuse (an approximation, see post's README).
+- **`EnvironmentLighting(environment)`** is an engine plugin and a glTF-pro `LightingEffect`. As a plugin it runs a pass at order -1 (after shadows, sky, clustered lights and the post-processing captures) that patches core's mesh shader through `PassContext.shader`, adding `margoAmbient` (declared just before as `let margoAmbient=iblShade(...);`) to the `let linear=` term in place of the constant ambient `lighting.radiance[3]`; core itself is not changed. `add(model)` (or `model.addLighting(lighting)`; `applyTo(model)` is a deprecated alias) does the same for glTF-pro's shader through its declared `ambient` lighting hook (glTF-pro README, "Lighting hooks"), replacing its hemisphere `ambient()` and multiplying IBL by the occlusion map. The five IBL bindings are 20 to 24 in core's group 0 and glTF-pro's group 2. While the environment is restoring or disposed, or lives on another device, nothing is patched and nothing is bound. Sky's ambient patch is kept and IBL adds to it; terrain wetness does not scale IBL. glTF-pro's physical variant (clearcoat, sheen, transmission, specular) is patched the same way, but its IBL term uses the plain metallic-roughness F0 and its clearcoat and sheen layers keep their hemisphere ambient; unlit materials ignore IBL. **Ambient occlusion**: in core's shader, naming the IBL term `margoAmbient` is a shader convention, not an import (listed in `tests/shader-contracts.test.js`); glTF-pro gets it through its `ambient` hook: post's SSAO (core meshes and registered glTF-pro models) replays `margoAmbient` as the light it occludes, so SSAO darkens IBL diffuse and specular in creases instead of the constant ambient term. Without SSAO the lit output is unchanged; specular occlusion uses the same AO factor as diffuse (an approximation, see post's README).
 - **`Fog(options)`** computes `amount = linear (near, far)` or `1 - exp(-(density * d)^2)` from the camera distance, times `exp(-heightFalloff * max(y - height, 0))`, inside the mesh shaders (binding 25), so blended glTF primitives are fogged too (glTF-pro's `output` hook), unlike sky's depth-based post fog. On the canvas it mixes after tone mapping, so a fully fogged pixel shows exactly `color` and matches a `ColorBackground` of the same color; on an rgba16float target (tonemap, ssao, dof, creative PostProcessing) it mixes linear radiance before their tone mapping. Height fog is the per-fragment factor, not an integral along the view ray. The background, particles, VFX, splats and other custom shaders are not fogged. `fog.enabled = false` switches it off by uploading zero-fog parameters (near and far at the float maximum, density 0); the patched shaders and pipelines stay, so switching either way never compiles a shader (HANDOFF 1d''), and off renders the same pixels as no fog (checked on the real GPU). Adding or removing the plugin instead changes the shaders.
 - **`ColorBackground({color, bottom})`** draws a full-screen triangle at order 0.5 (after core's opaque meshes, before glTF-pro models so blended primitives composite over it) at reversed-Z depth 0 with a read-only `greater-equal` test, so it only fills pixels whose depth was never written. On the canvas it writes the sRGB bytes exactly (no tone mapping, as Three.js does for a background color); on an rgba16float target it writes the linear value. `bottom` makes a vertical screen-space gradient. Colors are `'#rgb'`, `'#rrggbb'`, `0xrrggbb` or sRGB `[r, g, b]` in 0..1. A transparent canvas (`alpha: true`) needs core to change its canvas `alphaMode` and clear alpha, which is frozen, so it is not offered.
 - All three allocate nothing in steady frames, patch each distinct shader string once (cached), rebuild their GPU state in `onDeviceRestored`, and throw on a shader they do not recognize instead of drawing wrong.
@@ -92,7 +89,7 @@ Five bindings, any group and binding numbers. `iblLayoutEntries(firstBinding)` a
 
 ## Options
 
-`Environment.create(engineOrDevice, source, options)`:
+`Environment.attach(engine, source, options)` resolves once the IBL is built and the environment is attached (it then rebuilds itself after a device loss); `Environment.create(engineOrDevice, source, options)` builds one without attaching it, for example on a bare `GPUDevice`. Options:
 
 | Option | Default |
 | --- | --- |
@@ -108,7 +105,7 @@ Five bindings, any group and binding numbers. `iblLayoutEntries(firstBinding)` a
 | `rotation`, `intensity` | 0 radians, 1 (also settable later) |
 | `name` | `'environment'` (plugin name) |
 
-`new EnvironmentBackground(environment, options)` (also exported as `Skybox`):
+`EnvironmentBackground.attach(engine, environment, options)` (the class is also exported as `Skybox`):
 
 | Option | Default |
 | --- | --- |

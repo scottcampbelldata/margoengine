@@ -489,6 +489,8 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       `[Symbol.dispose]()` alias costs bytes in every package, and `using` needs the symbol at runtime (Safari). Apps can
       already write `using s = new DisposableStack(); s.defer(() => model.destroy())`. Revisit at 1.x when Safari ships:
       add `[Symbol.dispose]` aliases to Engine, PBRModel and the attach() effects in one batch (core change, Scott).
+      [Superseded 2026-10-14: Scott approved `[Symbol.dispose]` for packages (not core); done with a guarded key, see
+      "Scott's decisions (2026-10-14, 17:10)".]
       (2) Float16Array: not zero-change, so not done. environment's `floatToHalf` rounds double -> float32 -> half (double
       rounding) where Float16Array rounds once, so some encodes would change; EXR HALF decode via a Float16Array view is
       exact but needs a fallback for Chrome 113-134 (more bytes, not fewer). Use it in new code with a feature check
@@ -712,6 +714,23 @@ Baselines are for the Arc 140V + Edge build recorded in the manifest; another GP
   Details and caveats in docs/cad-performance.md.
 - API: standardize on `X.attach(engine, options)` for features; `dispose()` is the primary cleanup name, `destroy()`
   stays as a deprecated alias until 1.0, and packages (not core) add `[Symbol.dispose]()` calling `dispose()`.
+  [DONE, packages only; core and the stage facade untouched] Every engine feature has `static attach(engine,
+  ...constructorArgs)` (`engine.use(new X(...))` in one call; constructors and `engine.use` still work). Async
+  features return a Promise: `Environment.attach(engine, source, options)` (create + use; `create` stays for a bare
+  GPUDevice), `Planet.attach`, `XR.attach`, `SurfacePhysics.attach`, `TelemetryChannel.attach`. Controls have one
+  generic `Controls.attach(engine, ...args)` typed from each subclass constructor (`OrbitControls.attach(engine)`; the
+  constructor stays for a bare Camera); DragControls, TransformControls, ViewCube, Physics (`new Physics(null, ...)`
+  stays for headless) and GrassField (`attach(engine, options)`) have attach too. GPUParticles and SkyMoon override
+  the attach they inherited from VFX/Sky, which built a plain VFX/Sky. `destroy()` is a JSDoc-`@deprecated` alias of
+  `dispose()` everywhere (text GlyphAtlas had only destroy; Animation and PBRModel destroy no longer call
+  removePlugin again). Every disposable package class has `[Symbol.dispose]()` (base classes carry it for
+  subclasses), written `declare [Symbol.dispose]: () => void; [(Symbol.dispose ?? Symbol()) as symbol]() {this.dispose();}`
+  so Safari (no Symbol.dispose) gets an unreachable key instead of a method named "undefined"; each such file starts
+  with `/// <reference lib="esnext.disposable" preserve="true" />`, kept in the d.ts so consumers on an ES2022 lib
+  still type-check. `ibl.add(model)` / `fog.add(model)` replace `applyTo` (deprecated alias). `tests/api-conventions.test.js`
+  walks every package's exported classes and fails on drift. Bytes (root entry min+gzip): most packages +15..+65 B,
+  controls +98, environment +124 (five attach methods, async attach, applyTo alias). Package benchmarks and proofs
+  (`examples/package-benchmarks`) keep the old forms on purpose: they also run against older refs.
 
 Second set (2026-10-14, evening), all APPROVED by Scott:
 - 1g.e/1h.d: reformat all TypeScript to conventional style with Biome (formatter + small lint rule set) once the core
@@ -728,21 +747,22 @@ Second set (2026-10-14, evening), all APPROVED by Scott:
 - Island light tier keeps 100k particles by default; add a `?particles=1m` URL switch (the menu already has 1M).
   Start after the visual-regression agent merges (it edits the sandbox).
 
-## API rough edges before 1.0 (found writing docs/from-threejs.md, 2026-10-14; not changed)
+## API rough edges before 1.0 (found writing docs/from-threejs.md, 2026-10-14; 2, 3 and 4 done since)
 
 1. The one directional light and the ambient term are only reachable through `@margoengine/core/extension`
    (`engineRuntime(engine).lighting.direction` = [x, y, z toward the light, intensity], `.radiance` = [r, g, b, ambient]);
    the public `EngineKernel` type has no lighting, and the packing is not in core's README. Same for `engine.gpu`:
    gltf-pro's README passes `stage.engine.gpu` to `KTX2Decoder`, which does not type-check against the public type.
-2. Four ways to add a feature: `X.attach(engine, options)` (Shadows, Clustered, Selection, Picking, SSAO, Bloom, FXAA,
+2. [DONE: `X.attach(engine, ...)` everywhere, see Scott's decisions above] Four ways to add a feature: `X.attach(engine, options)` (Shadows, Clustered, Selection, Picking, SSAO, Bloom, FXAA,
    PostStack, Tonemap, TAA, Sky, Stats, ComputePass), `engine.use(new X(options))` (Environment, EnvironmentLighting,
    Fog, ColorBackground, Lines, PointsPlugin, TextRenderer, LabelRenderer, LODSystem, CameraProjection, VATCrowd),
    constructors with side effects (`new OrbitControls(engine)`, `new ViewCube(engine)`) and free functions
    (`createMesh(engine, ...)`, `loadGLTF(engine, ...)`). Pick one primary form.
-3. Including a gltf-pro model in a feature uses different verbs: `shadows.add(model)`, `lights.add(model)`,
+3. [DONE: `add(model)` everywhere, `applyTo` is a deprecated alias] Including a gltf-pro model in a feature uses different verbs: `shadows.add(model)`, `lights.add(model)`,
    `ssao.add(model)`, but `ibl.applyTo(model)` and `fog.applyTo(model)`. Core meshes need none of them, so a three.js
    user's loaded model silently misses shadows/IBL/fog until each is called.
-4. `dispose()` and `destroy()` both exist (PBRModel, Animation, Tonemap, SSAO have both; READMEs use either). Option
+4. [DONE for dispose/destroy: `dispose()` primary, `destroy()` deprecated alias, READMEs use dispose; option edits
+   NOT changed] `dispose()` and `destroy()` both exist (PBRModel, Animation, Tonemap, SSAO have both; READMEs use either). Option
    edits differ too: `tonemap.options.exposure`, `sky.options.hours`, but `fog.far` and `glass.opacity` directly.
 5. Core `PbrMaterial` has no setters: recolouring means a new material and `setMaterial`, or writing the undocumented
    `material.data` array (math's README does). `@margoengine/materials` `Material` is live. Core meshes move with

@@ -13,7 +13,7 @@ import {Physics, collisionGroups} from '@margoengine/physics';
 
 await RAPIER.init();
 const engine = await Engine.create(canvas);
-const physics = new Physics(engine, {rapier: RAPIER}); // registers itself with engine.use()
+const physics = Physics.attach(engine, {rapier: RAPIER}); // engine.use(new Physics(engine, ...)) in one call
 
 const floor = engine.createMesh().setGeometry(box(20, 1, 20)).setPosition([0, -0.5, 0]);
 physics.addBody(floor, {type: 'fixed'});                 // box collider fitted to the geometry
@@ -45,7 +45,7 @@ engine.start(); // each frame's delta drives the accumulator
 
 ## How it works
 
-- **Optional peer dependency.** The package never imports Rapier; `new Physics(engine, {rapier})` takes the initialized module, so the 1.6 MB (gzip) Rapier bundle stays out of builds that do not use physics and you choose the Rapier version and loading strategy (`rapier3d-compat` inlines its Wasm, so it works in any bundler without asset configuration). Tested with `@dimforge/rapier3d-compat` 0.21.0.
+- **Optional peer dependency.** The package never imports Rapier; `Physics.attach(engine, {rapier})` takes the initialized module, so the 1.6 MB (gzip) Rapier bundle stays out of builds that do not use physics and you choose the Rapier version and loading strategy (`rapier3d-compat` inlines its Wasm, so it works in any bundler without asset configuration). Tested with `@dimforge/rapier3d-compat` 0.21.0.
 - **Fixed timestep with an accumulator.** `onPreUpdate(delta)` adds `delta * timeScale` to an accumulator and runs whole steps of `fixedTimestep` (default 1/60 s), at most `maxSubsteps` (default 4) per frame. Time beyond that is dropped so a long hitch cannot snowball. Each step is identical regardless of frame rate, so a given sequence of inputs replays bit for bit.
 - **Interpolation.** After each step the plugin stores the previous and current pose of every non-fixed body. Meshes get `lerp(previous, current, alpha)` for position and a shortest-arc slerp for rotation, where `alpha = accumulator / fixedTimestep`. Rendering therefore lags physics by less than one step and moves smoothly at any refresh rate. `interpolate: false` writes the latest step instead. Teleports (`body.setPosition`) reset both poses, so they do not streak.
 - **Mesh writes.** `sync()` reuses preallocated position and quaternion buffers. It uses `setPosition` and core's extension transform storage, avoiding the frozen core quaternion setter's temporary array. Sleeping or motionless bodies are written once and then skipped. Fixed bodies are written only when moved through the body API. Scale is never touched. Rapier stepping, events and scene queries are not allocation-free.
@@ -72,7 +72,7 @@ engine.start(); // each frame's delta drives the accumulator
 
 ## Options
 
-`new Physics(engine | null, options)`:
+`Physics.attach(engine, options)` (or `new Physics(engine | null, options)`; `null` runs headless):
 
 | Option | Default | Notes |
 | --- | --- | --- |

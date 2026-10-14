@@ -16,7 +16,7 @@ import { GPUParticles } from '@margoengine/creative/particles';
 
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const engine = await Engine.create(canvas, { backend: 'webgpu' });
-engine.use(new GPUParticles({ count: 5000, sort: true, curl: 0.2 }));
+GPUParticles.attach(engine, { count: 5000, sort: true, curl: 0.2 });
 engine.start();
 ```
 
@@ -59,17 +59,17 @@ import {createStage} from 'margoengine';
 import {GrassField} from '@margoengine/creative/grass';
 
 const stage = await createStage('#viewport', {backend: 'webgpu'});
-const meadow = new GrassField(stage, {
+const meadow = GrassField.attach(stage.engine, {
   blades: 100_000, area: [50, 50], bladeHeight: 1.2, windSpeed: 1.2, spores: true,
 });
 meadow.windStrength = 0.6;
 // Remove this field early, or let stage.dispose() release it with the scene.
-meadow.destroy();
+meadow.dispose();
 ```
 
-`GrassField` accepts any `{engine: EngineKernel}`, so core-only consumers can use `new GrassField({engine}, options)`. It attaches automatically, advances `windTime` by the frame delta, supports multiple fields, and rebuilds GPU resources after device restoration. Do not add a second time increment in `onTick`. All roots lie on Y=0 in a rectangle centered on the origin.
+`GrassField.attach(engine, options)` takes any core engine (`new GrassField({engine}, options)` is the older form). It advances `windTime` by the frame delta, supports multiple fields, and rebuilds GPU resources after device restoration. Do not add a second time increment in `onTick`. All roots lie on Y=0 in a rectangle centered on the origin.
 
-`meadow.destroy()` and `meadow.dispose()` perform the same idempotent teardown: remove the field's compute, grass and optional spore passes before destroying its GPU buffers. The field registers no tick listeners. Both indirect instance counters are cleared with `encoder.clearBuffer()` before each culling dispatch; the compute pass ends before the separate render passes read the compacted lists and indirect arguments.
+`meadow.dispose()` (and its deprecated alias `meadow.destroy()`) is an idempotent teardown: remove the field's compute, grass and optional spore passes before destroying its GPU buffers. The field registers no tick listeners. Both indirect instance counters are cleared with `encoder.clearBuffer()` before each culling dispatch; the compute pass ends before the separate render passes read the compacted lists and indirect arguments.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
@@ -97,7 +97,7 @@ import {createStage} from 'margoengine';
 import {Planet} from '@margoengine/creative/planet';
 
 const stage = await createStage('#viewport', {backend: 'webgpu'});
-const earth = await Planet.create(stage.engine, {
+const earth = await Planet.attach(stage.engine, {
   dayMap: '/earth_day.jpg',
   nightMap: '/earth_night.jpg',
   specularRoughnessMap: '/earth_oceans.png',

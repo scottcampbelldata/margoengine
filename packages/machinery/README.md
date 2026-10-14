@@ -17,10 +17,9 @@ const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const engine = await Engine.create(canvas);
 const arm = engine.createMesh().setGeometry(box()).setScale([0.3, 1.5, 0.3])
   .setMaterial(industrialMaterial('anodizedAluminum'));
-const kinematics = new Kinematics([
+const kinematics = Kinematics.attach(engine, [
   { node: arm, axis: 'y', kind: 'revolute', min: -Math.PI / 2, max: Math.PI / 2 },
 ]);
-engine.use(kinematics);
 let elapsed = 0;
 engine.onFrame((_, delta) => {
   elapsed += delta;

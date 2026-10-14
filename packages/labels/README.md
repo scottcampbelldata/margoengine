@@ -7,8 +7,7 @@ Build from source with `npm run build` in `packages/labels`.
 ```ts
 import {LabelRenderer} from '@margoengine/labels';
 
-const labels = new LabelRenderer();
-engine.use(labels);
+const labels = LabelRenderer.attach(engine);
 
 // A 2D label 0.8 units above a mesh origin (mesh-local offset, like a THREE child object).
 const name = document.createElement('div');

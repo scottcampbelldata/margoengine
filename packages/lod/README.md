@@ -7,8 +7,7 @@ three.js `LOD`, plus GPU-baked octahedral imposters for the farthest level. Core
 import {Engine, PbrMaterial} from '@margoengine/core';
 import {LODSystem, Imposter} from '@margoengine/lod';
 
-const lods = new LODSystem({hysteresis: 0.1});
-engine.use(lods);
+const lods = LODSystem.attach(engine, {hysteresis: 0.1});
 const imposter = Imposter.bake(engine, highGeometry, {material, frames: 12, frameSize: 128}); // once, at load
 for (const part of parts)                      // core meshes; the anchor's world transform drives the choice
   lods.add(part, [

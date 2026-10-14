@@ -16,7 +16,7 @@ try {
   const stage=await createStage('#viewport',{backend:'webgpu',autoStart:false,controls:false,capacity:2048,
     label:robot?'Animated robot with adjustable facial expressions':'Interactive damaged helmet',
     camera:{position:robot?[2,1.5,7]:[3,2,5],target:[0,0,0],near:0.01,far:500},onError:reason=>{error.textContent=String(reason);}});
-  dispose=()=>stage.dispose();if(abort.signal.aborted){stage.dispose();abort.signal.throwIfAborted();}paceEngine(stage.engine);const controls=new OrbitControls(stage.engine);controls.enableDamping=true;stage.canvas.tabIndex=0;
+  dispose=()=>stage.dispose();if(abort.signal.aborted){stage.dispose();abort.signal.throwIfAborted();}paceEngine(stage.engine);const controls=OrbitControls.attach(stage.engine);controls.enableDamping=true;stage.canvas.tabIndex=0;
   stage.canvas.addEventListener('keydown',event=>{
     if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','-'].includes(event.key))return;event.preventDefault();
     if(event.key==='+'||event.key==='-')stage.canvas.dispatchEvent(new WheelEvent('wheel',{deltaY:event.key==='+'?-100:100,cancelable:true}));
@@ -67,8 +67,8 @@ try {
     model.onDispose(ssao.add(model));const toggle=document.querySelector<HTMLInputElement>('#ssao')!;toggle.disabled=false;toggle.addEventListener('change',()=>{ssao.enabled=toggle.checked;});
     if(sceneSamples()===4)upgrade=async()=>{
       const full=await loadGLTF(stage.engine,new URL('./assets/damaged-helmet.glb',import.meta.url),{signal:abort.signal});
-      if(abort.signal.aborted){full.destroy();return;}
-      full.onDispose(ssao.add(full));model.destroy();model=full;demo.quality='full';status.textContent='Ready';
+      if(abort.signal.aborted){full.dispose();return;}
+      full.onDispose(ssao.add(full));model.dispose();model=full;demo.quality='full';status.textContent='Ready';
     };
   }
   if(robot)demo.readiness=await submitPrincipalScene(()=>stage.engine.render(),engineRuntime(stage.engine).gpu!.queue,{signal:abort.signal});else stage.engine.render();

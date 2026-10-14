@@ -9,8 +9,7 @@ import {Engine} from '@margoengine/core';
 import {PointsPlugin, PointCloud, SpriteBatch, atlasRect} from '@margoengine/points';
 
 const engine = await Engine.create(canvas);
-const points = new PointsPlugin({pointBudget: 2_000_000});
-engine.use(points);
+const points = PointsPlugin.attach(engine, {pointBudget: 2_000_000});
 
 // Any {positions, colors?, normals?} works, including the point-cloud output of @margoengine/loaders.
 const cloud = points.add(new PointCloud({

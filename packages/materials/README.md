@@ -15,7 +15,7 @@ const screen = createMesh(stage.engine, planeGeometry(1.6, 0.9), new Material({s
 const glass = new Material({color: '#88ccff', transparent: true, opacity: 0.4, doubleSided: true});
 createMesh(stage.engine, planeGeometry(2, 2), glass, {renderOrder: 1});
 glass.opacity = 0.6;                                                // live: color, emissive, scalars and map slots
-// crate.destroy() removes a mesh; map.dispose() frees the texture (meshes never dispose shared textures).
+// crate.dispose() removes a mesh; map.dispose() frees the texture (meshes never dispose shared textures).
 ```
 
 `createMesh` returns a `MaterialMesh`: the gltf-pro `PBRModel` plus `mesh.material`, the live `Material` it draws with (`@margoengine/exporters` `exportModel` reads its textures to write glTF).

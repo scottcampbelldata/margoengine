@@ -21,7 +21,7 @@ engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]], {duration:0})
 engine.start();
 // Local file: await parseMargo(engine, await file.arrayBuffer()).
 // Inspection without GPU: decodeMargo(bytes).
-// model.destroy() unloads the scene; engine.dispose() releases all plugins.
+// model.dispose() unloads the scene; engine.dispose() releases all plugins.
 void parseMargo; void decodeMargo;
 ```
 
@@ -53,7 +53,7 @@ stage.engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]], {durati
 window.addEventListener('pagehide', () => stage.dispose(), {once:true});
 ```
 
-`loadMargo` attaches the existing glTF Pro model plugin directly. `stage.dispose()` releases every imported GPU buffer/texture and decoded image; call it on application unmount. Use `model.destroy()` to unload an asset earlier. Loading/uploading and the existing PBR render loop allocate memory; zero steady-state heap churn has not been established.
+`loadMargo` attaches the existing glTF Pro model plugin directly. `stage.dispose()` releases every imported GPU buffer/texture and decoded image; call it on application unmount. Use `model.dispose()` to unload an asset earlier. Loading/uploading and the existing PBR render loop allocate memory; zero steady-state heap churn has not been established.
 
 The exporter uses Blender native bulk reads and bundled NumPy, with Python 3.11+ compatible code, to handle visible evaluated meshes, modifiers and mesh instances in Y-up meters. Parent transforms are flattened into world TRS. Negative scale is preserved; shear and singular transforms fail with an instruction to apply transforms. UV seams, corner normals and tangents are split correctly. Identical geometry/material combinations share a mesh record. Object names/library identity and instance paths determine repeatable asset IDs; renaming objects changes IDs. `margo:` scalar properties and numeric arrays up to 32 values are retained.
 

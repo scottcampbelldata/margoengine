@@ -11,8 +11,7 @@ import {Engine, box} from '@margoengine/core';
 import {Lines, Line, LineMaterial, GridHelper, AxesHelper, BoxHelper} from '@margoengine/lines';
 
 const engine = await Engine.create(canvas);
-const lines = new Lines();
-engine.use(lines);
+const lines = Lines.attach(engine);
 
 // A polyline 4 CSS pixels wide with round joins, red to blue.
 const path = lines.add(new Line({
@@ -73,7 +72,7 @@ dashed.dashOffset += 0.01;
 | `onTop` | `false` | Skip the depth test |
 | `antialias` | `true` | |
 
-`new Lines({name, order})` sets the plugin name (default `'lines'`) and pass order (default `20`). `lines.stats` reports lines, segments and draw calls of the last frame.
+`Lines.attach(engine, {name, order})` sets the plugin name (default `'lines'`) and pass order (default `20`). `lines.stats` reports lines, segments and draw calls of the last frame.
 
 Helpers are `Line` subclasses and take the material options too (they default to butt caps and miter joins): `GridHelper({size, divisions, color1, color2})`, `PolarGridHelper({radius, sectors, rings, divisions, color1, color2})`, `AxesHelper({size})`, `Box3Helper(min, max, {color})`, `BoxHelper(mesh, {color})` (world bounds every frame), `ArrowHelper({direction, origin, length, color, headLength, headWidth})`, `CameraHelper(camera, {aspect})` (unprojects `camera.matrix`), `PlaneHelper({normal, constant, size, color})` and `VertexNormalsHelper(mesh, {size, color})` (world space with the normal matrix).
 

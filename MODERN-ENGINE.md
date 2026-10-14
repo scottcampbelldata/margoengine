@@ -143,11 +143,9 @@ const model = await loadGLTF(engine, '/machine.glb', { signal });
 const axis = model.nodes.find(node => node.name === 'Axis_1');
 if (!axis) throw new Error('Model is missing Axis_1');
 const { Kinematics, ExplodedView } = await import('@margoengine/machinery');
-const joints = new Kinematics([{ node: axis, axis: 'y', min: -1, max: 1 }]);
-engine.use(joints);
+const joints = Kinematics.attach(engine, [{ node: axis, axis: 'y', min: -1, max: 1 }]);
 joints.setAngle(0, 0.5);
-const explode = new ExplodedView([{ node: axis, offset: [0, 1.5, 0] }]);
-engine.use(explode);
+const explode = ExplodedView.attach(engine, [{ node: axis, offset: [0, 1.5, 0] }]);
 explode.amount = 0.5;
 // To restore before removing: explode.amount = 0; engine.render();
 // engine.removePlugin(explode.name); engine.removePlugin(joints.name); model.dispose();
@@ -167,15 +165,15 @@ The loader supports glTF 2.0 JSON/GLB, embedded or external buffers, static tria
 const { parseCAD, PartInstancer, SectionPlanes, EngineeringAnnotations } =
   await import('@margoengine/machinery');
 const model = parseCAD(engine, await file.arrayBuffer(), 'stl');
-engine.use(new PartInstancer());
+PartInstancer.attach(engine);
 const plane = [0, 0, -1, 0]; // keeps dot(normal, worldPosition) + offset >= 0
-engine.use(new SectionPlanes({ planes: [plane], color: '#ffa76c', hatch: 8 }));
+SectionPlanes.attach(engine, { planes: [plane], color: '#ffa76c', hatch: 8 });
 plane[3] = 0.2; // between frames; geometry and Wasm transforms remain intact
-engine.use(new EngineeringAnnotations({
+EngineeringAnnotations.attach(engine, {
   dimensions: [{ a: { node: model.root, point: [0, 0, 0] },
                  b: { node: model.root, point: [1, 0, 0] } }],
   callouts: [{ anchor: { node: model.root, point: [0, 0, 0] }, label: 'Assembly' }],
-}));
+});
 ```
 
 `parseCAD(engine, input, 'stl' | 'obj')` accepts text, ArrayBuffer or a view. `parseCADAsync(engine, ownedBuffer, 'stl'|'obj'|'step'|'iges', {signal?,onProgress?,smoothing?})` transfers and detaches its input into an owned worker. `loadCAD(engine, url, options)` adds bounded HTTP(S) loading and uses the worker in browsers, with synchronous STL/OBJ fallback when Worker is unavailable. ASCII/binary STL and planar OBJ polygon faces, object/group names and negative indices are supported. Surface normals are regenerated from face winding. OBJ materials, UVs and supplied normals are ignored; external material files are never fetched. STEP/IGES are tessellated by occt-import-js 0.0.23 in the worker, with output in meters; original B-Rep topology and native materials are not retained. STL/OBJ units follow input coordinates. The importer JS/Wasm and LGPL-2.1 notices are separate packaged assets; they are downloaded only for B-Rep import. Parts bind as they arrive and remain hidden until the complete import succeeds; a late error rolls them all back. Production Vite asset URLs and the starter file picker are verified.
@@ -211,15 +209,15 @@ The Vite demo's **Domain tools → Load conveyor assembly** loads an optional pr
 const { GPUParticles, PostProcessing, ToonShading } = await import('@margoengine/creative');
 const { Bloom } = await import('@margoengine/post/bloom'), { PostStack } = await import('@margoengine/post/stack');
 if (engine.backend === 'webgpu') {
-  engine.use(new GPUParticles({ count: 50_000, gravity: [0, -0.5, 0], wind: [1.2, 0, 0.4],
+  GPUParticles.attach(engine, { count: 50_000, gravity: [0, -0.5, 0], wind: [1.2, 0, 0.4],
     curl: 0.2, sort: true,
     obstacles: [{ kind: 'sphere', center: [0, 0, 0], radius: 1 }],
-  }));
-  engine.use(new ToonShading({ bands: 4, rim: 0.15 }));
-  engine.use(new PostStack([new Bloom({ strength: 0.5, threshold: 0.8 }), new PostProcessing({ exposure: 0.3,
+  });
+  ToonShading.attach(engine, { bands: 4, rim: 0.15 });
+  PostStack.attach(engine, [new Bloom({ strength: 0.5, threshold: 0.8 }), new PostProcessing({ exposure: 0.3,
     focus: 5, aperture: 2, grain: 0.02,
     atmosphere: { density: 0.02, heightFalloff: 0.1, sun: [0.3, 0.6, -0.7], godRays: 0.3 },
-  })]));
+  })]);
 }
 // engine.removePlugin('gpu-particles');
 ```

@@ -12,10 +12,9 @@ import {OrbitControls} from '@margoengine/controls';
 import {ViewCube} from '@margoengine/viewcube';
 
 const engine = await Engine.create(canvas);           // the canvas needs a parent element; the cube is placed in it
-const projection = new CameraProjection({mode: 'perspective'});
-engine.use(projection);
-new OrbitControls(engine);                             // or core's CADCameraControls
-const cube = new ViewCube(engine, {projection});       // omit projection to hide the toggle
+const projection = CameraProjection.attach(engine, {mode: 'perspective'});
+OrbitControls.attach(engine);                             // or core's CADCameraControls
+const cube = ViewCube.attach(engine, {projection});       // omit projection to hide the toggle
 
 cube.view('top');                                      // 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right' | 'iso'
 cube.view([1, 1, 0]);                                  // any direction from the target toward the camera

@@ -83,8 +83,8 @@ const ssao = SSAO.attach(stage.engine, {radius:0.5,bias:0.025,samples:32});
 const remove = ssao.add(model);
 ssao.enabled = false;
 remove();
-ssao.destroy();
-model.destroy();
+ssao.dispose();
+model.dispose();
 stage.dispose();
 ```
 

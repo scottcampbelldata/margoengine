@@ -10,12 +10,11 @@ import {Engine, PbrMaterial} from '@margoengine/core';
 import {CulledInstances} from '@margoengine/culling';
 
 const engine = await Engine.create(canvas);
-const parts = new CulledInstances([
+const parts = CulledInstances.attach(engine, [
   // One batch per (geometry, material); transforms are column-major affine world matrices, 16 floats per part.
   {geometry: plate, material: new PbrMaterial({color: '#8d99a6', metalness: 0.6}), transforms: plateMatrices},
   {geometry: bolt, material: new PbrMaterial({color: '#c9ccd1', metalness: 0.9}), transforms: boltMatrices},
 ], {culling: 'occlusion'});
-engine.use(parts);
 engine.start();
 
 parts.setTransform(1, 12, matrix);   // batch 1, part 12: one 64-byte upload

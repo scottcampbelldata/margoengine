@@ -23,7 +23,7 @@ test('create-margo scaffolds the template and refuses a non-empty directory', t 
     assert.equal(range, `^${local.version}`, `${name} should track the workspace version`);
   }
   const main = readFileSync(join(app, 'src/main.ts'), 'utf8');
-  for (const call of ['applyQualityTier()', 'paceEngine(engine)', 'watchQuality()', 'new OrbitControls(engine)', 'Stats.attach(engine)', 'new EnvironmentLighting(']) assert.ok(main.includes(call), call);
+  for (const call of ['applyQualityTier()', 'paceEngine(engine)', 'watchQuality()', 'OrbitControls.attach(engine)', 'Stats.attach(engine)', 'EnvironmentLighting.attach(']) assert.ok(main.includes(call), call);
   assert.ok(main.indexOf('applyQualityTier()') < main.indexOf('Engine.create('), 'quality tier before the engine');
 
   writeFileSync(join(temp, 'taken.txt'), '');
