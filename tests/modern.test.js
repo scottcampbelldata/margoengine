@@ -196,6 +196,13 @@ test('Metrology snaps vertices, triangle midpoints and circular holes in transfo
 test('CAD controls orbit an arbitrary pivot, pan, smooth zoom, fit portrait bounds and release listeners',()=>{
  const listeners=new Map(),element={clientHeight:400,style:{touchAction:'auto'},addEventListener:(n,fn)=>listeners.set(n,fn),removeEventListener:n=>listeners.delete(n),hasPointerCapture:()=>false},camera=new Camera({position:[4,3,7],target:[2,1,3],near:0.001,far:10000}),controls=new CADCameraControls(camera,element);const distance=Math.hypot(...camera.position.map((v,i)=>v-camera.target[i]));controls.orbit(0.4,0.2);assert.ok(Math.abs(Math.hypot(...camera.position.map((v,i)=>v-camera.target[i]))-distance)<1e-10);controls.pan(0.1,-0.1);assert.ok(Math.abs(Math.hypot(...camera.position.map((v,i)=>v-camera.target[i]))-distance)<1e-10);listeners.get('wheel')({preventDefault(){},deltaY:100,deltaMode:0});controls.update(0.1);assert.ok(Math.hypot(...camera.position.map((v,i)=>v-camera.target[i]))>distance);camera.fitToBoundingBox([-3,-1,-1],[3,1,1],{aspect:0.5,duration:0.2});camera.advance(0.2);camera.update(0.5,true);for(const x of [-3,3])for(const y of [-1,1])for(const z of [-1,1]){const m=camera.matrix,w=m[3]*x+m[7]*y+m[11]*z+m[15];assert.ok(Math.abs((m[0]*x+m[4]*y+m[8]*z+m[12])/w)<1);assert.ok(Math.abs((m[1]*x+m[5]*y+m[9]*z+m[13])/w)<1);}controls.dispose();assert.equal(listeners.size,0);assert.equal(element.style.touchAction,'auto');
 });
+test('CAD controls: leaving an exact pole keeps the heading given by camera.up (ViewCube top view from the side)',()=>{
+ const element={clientHeight:400,style:{touchAction:'auto'},addEventListener(){},removeEventListener(){},hasPointerCapture:()=>false};
+ for(const [y,up,heading] of [[10,[-1,0,0],Math.PI/2],[-10,[1,0,0],Math.PI/2],[10,[0,0,-1],0]]){
+  const camera=new Camera({position:[0,y,0],target:[0,0,0]}),controls=new CADCameraControls(camera,element);camera.up=up;
+  controls.orbit(0,y>0?0.1:-0.1);assert.ok(Math.abs(Math.atan2(camera.position[0],camera.position[2])-heading)<1e-9,`azimuth after leaving the pole ${y} ${up}`);controls.dispose();
+ }
+});
 test('Reversed float depth separates sub-millimeter surfaces at industrial range; presets and six-plane boxes validate',()=>{
  const camera=new Camera({position:[0,0,0],target:[0,0,-1],near:0.001,far:10000});camera.update(1,true);const m=camera.matrix,depth=z=>Math.fround((m[10]*z+m[14])/-z);assert.notEqual(depth(-500),depth(-500.0001));assert.equal(boxSection([-1,-2,-3],[1,2,3]).length,6);assert.throws(()=>boxSection([1,0,0],[0,1,1]),/box/);assert.equal(industrialMaterials.neoprene.roughness,0.85);assert.equal(industrialMaterial('galvanizedZinc').data[5],Math.fround(0.95));assert.ok(Object.isFrozen(industrialMaterials.machinedSteel));
 });
