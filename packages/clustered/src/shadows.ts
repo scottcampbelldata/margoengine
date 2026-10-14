@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel,Mesh as MeshHandle} from '@margoengine/core';
 import {engineRuntime,meshRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type Mesh} from '@margoengine/core/extension';
 import {instanceLayout,instancedDepth} from '../../shared/instances.js';
@@ -213,5 +214,6 @@ export class LocalShadows implements EnginePlugin,ClusteredShadow {
   }
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.sources.length=0;this.release();this.engine=this.device=undefined;}
-  [Symbol.dispose]():void {this.dispose();}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }
