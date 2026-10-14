@@ -134,6 +134,25 @@ interface LightingEffect {
     bindings(): GPUBindGroupEntry[];
 }
 
+class PBRInstances {
+    readonly data: Float32Array;
+    readonly capacity: number;
+    constructor(capacity: number);
+    get count(): number;
+    set count(n: number);
+    get needsUpdate(): boolean;
+    set needsUpdate(v: boolean);
+    setMatrixAt(i: number, m: ArrayLike<number>): this;
+    getMatrixAt<T extends {
+        [k: number]: number;
+    } = Float32Array>(i: number, out?: T): T;
+    setColorAt(i: number, color: ArrayLike<number>): this;
+    setUVTransformAt(i: number, t: TextureTransform | null): this;
+    get mirrored(): boolean;
+    upload(device: GPUDevice): GPUBuffer;
+    dispose(): void;
+}
+
 interface PBRLighting {
     readonly declarations: string;
     direct?(direct: string): string;
@@ -166,6 +185,7 @@ class PBRModel implements EnginePlugin {
         alpha: any;
         cutoff: any;
         texCoord: any;
+        instances: PBRInstances | undefined;
     }[];
     draw(c: Context, mode: 'beauty' | 'gbuffer' | 'ambient', color: GPUTextureView, depth: GPUTextureView): void;
     get bounds(): Float32Array;
@@ -186,6 +206,7 @@ interface PBRPrimitive {
     weights: Float32Array;
     targetNames: string[];
     deformed?: GPUBuffer;
+    instances?: PBRInstances;
     buffers?: {
         vertex: GPUBuffer;
         index: GPUBuffer;
@@ -195,5 +216,11 @@ interface PBRPrimitive {
 interface PreparedGeometry {
     vertices: Float32Array;
     indices: Uint32Array;
+}
+
+interface TextureTransform {
+    offset?: readonly number[];
+    scale?: readonly number[];
+    rotation?: number;
 }
 ```

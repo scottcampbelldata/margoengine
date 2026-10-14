@@ -410,7 +410,8 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       `Engine.pick` use `const w=this.canvas.clientWidth||this.canvas.width,h=this.canvas.clientHeight||this.canvas.height`
       for the bounds check and the `x*this.canvas.width/w, y*this.canvas.height/h` scaling; core + stage 18,681 -> 18,689
       gzip (+8, measured on the built dist).
-      Sizes (min+gzip): roots gltf-pro 16,052 -> 16,075, usdz 11,333 -> 11,371, fbx/loaders unchanged; new entries (dist file
+      Sizes (min+gzip): roots gltf-pro 16,052 -> 16,075 before the instancing merge (17,866 with it), usdz 11,333 -> 11,371,
+      fbx/loaders unchanged; the worker pre-decodes EXT_mesh_gpu_instancing accessors too (equality case in the test); new entries (dist file
       gzip) gltf-pro/worker 1.3 kB, fbx/worker 1.2 kB, usdz/worker 1.3 kB, loaders/worker 1.6 kB; worker scripts (minified
       + gzip) gltf 5.5 kB, fbx 16.7 kB, usdz 25.9 kB, loaders usd 6.6 kB; core + stage 18,681 unchanged.
    k. [DONE] docs/from-threejs.md: side-by-side mapping of common three.js code to Margo. Linked from README and

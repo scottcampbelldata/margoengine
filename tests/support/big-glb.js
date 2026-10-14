@@ -1,6 +1,7 @@
 // A generated GLB for parse tests and benchmarks: `meshes` grids of segments x segments quads under one parent node,
 // float positions/normals/uvs with uint32 indices, and every other grid without normals (gltf-pro generates them).
-export function bigGLB({segments = 256, meshes = 2} = {}) {
+// `instances` > 0 draws each grid that many times through EXT_mesh_gpu_instancing (TRANSLATION + SCALE).
+export function bigGLB({segments = 256, meshes = 2, instances = 0} = {}) {
   const n = segments + 1, count = n * n, chunks = [], bufferViews = [], accessors = [], gltfMeshes = [];
   let length = 0;
   const add = (data, type, componentType, target, extra = {}) => {
@@ -19,7 +20,8 @@ export function bigGLB({segments = 256, meshes = 2} = {}) {
     if (m % 2 === 0) attributes.NORMAL = add(normals, 'VEC3', 5126, 34962);
     gltfMeshes.push({primitives: [{attributes, indices: add(indices, 'SCALAR', 5125, 34963), material: 0}]});
   }
-  const json = {asset: {version: '2.0'}, scene: 0, scenes: [{nodes: [0]}], nodes: [{name: 'root', children: gltfMeshes.map((_, i) => i + 1)}, ...gltfMeshes.map((_, i) => ({name: 'grid' + i, mesh: i, translation: [0, i * 0.01, 0]}))],
+  const instancing = i => instances ? {extensions: {EXT_mesh_gpu_instancing: {attributes: {TRANSLATION: add(Float32Array.from({length: instances * 3}, (_, k) => k % 3 === 1 ? 0 : (k + i) * 0.37), 'VEC3', 5126), SCALE: add(new Float32Array(instances * 3).fill(0.5 + i), 'VEC3', 5126)}}}} : {};
+  const json = {asset: {version: '2.0'}, ...instances ? {extensionsUsed: ['EXT_mesh_gpu_instancing']} : {}, scene: 0, scenes: [{nodes: [0]}], nodes: [{name: 'root', children: gltfMeshes.map((_, i) => i + 1)}, ...gltfMeshes.map((_, i) => ({name: 'grid' + i, mesh: i, translation: [0, i * 0.01, 0], ...instancing(i)}))],
     meshes: gltfMeshes, materials: [{pbrMetallicRoughness: {baseColorFactor: [0.8, 0.8, 0.85, 1], metallicFactor: 0.1, roughnessFactor: 0.6}}], accessors, bufferViews, buffers: [{byteLength: length}]};
   const text = new TextEncoder().encode(JSON.stringify(json)), pad = -text.length & 3, glb = new Uint8Array(12 + 8 + text.length + pad + 8 + length), view = new DataView(glb.buffer);
   view.setUint32(0, 0x46546c67, true); view.setUint32(4, 2, true); view.setUint32(8, glb.length, true);
