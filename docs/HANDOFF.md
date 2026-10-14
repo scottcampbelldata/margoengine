@@ -68,8 +68,8 @@ Five parallel workers reviewed 58 packages against baseline `f05414a`; Claude ve
 ## To do next, in order
 
 1. Done (see below): desktops start on the light tier and probe GPU time; no slow phase, no reload.
-2. Light tier looks jagged (1x at DPR 1 on HiDPI). Measure a render scale between 1 and 2 and the optional
-   TAA package; keep whichever holds 60.
+2. Light tier looks jagged (1x at DPR 1 on HiDPI). Switch built (`?scale=`); measure per the test plan. TAA
+   package as the alternative if no scale holds 60.
 3. Island at 60 FPS on the laptop with the full water. If short, test terrain mesh 192 -> 96 on the light tier
    (about 0.9 ms) and check the shoreline still lines up.
 4. GPU-side optimization (shaders, particles, passes). Must be measured on hardware one change at a time;
@@ -98,6 +98,22 @@ From package descriptions, not yet audited against code:
 - On the full tier, five consecutive seconds under 55 FPS store `'low'` and reload once.
 - Laptop result (Arc 140V, busy machine): stored `'low'`, light tier 53-61 FPS with 100k particles.
 - Reset: `localStorage.removeItem('margoQuality')` (the older `margoLow` key is still read as `'low'`).
+
+## Test plan for when the laptop is quiet (close other apps first)
+
+Built and deployed to the preview, not yet measured:
+
+1. Island light tier, full water: https://auto-quality.margoengine.pages.dev/gameplay-sandbox/?quality=low
+   (100k and 1M particles). Target: locked 60. If short, try terrain 192 -> 96 on the light tier.
+2. Sharper light tier: same page with `&scale=1.25`, `&scale=1.5`, `&scale=2`. Keep the highest scale that holds
+   60, then set it as the default (`scale` fallback in `packages/shared/auto-quality.js`).
+3. Full tier for comparison: `?quality=high`.
+4. three.js comparison (`examples/conveyor-simulator`, see its README; needs `git lfs pull` and a local HTTP
+   server): Margo page vs three page vs three page with `?renderer=webgpu`, with Chromium launched using
+   `--disable-gpu-vsync --disable-frame-rate-limit`. Not yet run since the WebGPU option was added.
+5. VFX workgroup compaction GPU timing (Codex's prepared harness, correctness already passed headless):
+   `node test-results/vfx-compaction-chain-timing.mjs --run --label=chain-v1`. Note: `test-results/` is git-ignored,
+   so this harness exists only on this laptop.
 
 ## Known issues and caveats
 
