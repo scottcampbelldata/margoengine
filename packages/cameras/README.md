@@ -25,7 +25,7 @@ projection.zoom = 2;
   the cursor exactly. Without `near`/`far` the depth range is `camera.far` deep and centred on the target (Blender's
   convention), so zooming in never clips a model at the eye.
 - **Depth** is reversed-Z on WebGPU (near 1, far 0) like core, and -1..1 on WebGL. Orthographic depth is linear.
-- **Vertical views**: core's `Camera.update` throws `Vertical camera` when looking straight up or down. With the plugin,
+- **Vertical views**: core's `Camera.update` throws `Vertical camera` when the view is parallel to `camera.up`, which with the default +Y up means looking straight up or down. With the plugin,
   such a view renders exactly vertical with screen up = `up` (default `[0, 0, -1]`, north up looking down; it needs a
   horizontal component). While attached, `camera.up` reads as `up` for such views (horizontal part at most 1e-9 of the
   distance) and as the world up (`[0, 1, 0]`) otherwise; assigning `camera.up` sets that world up. The position is
