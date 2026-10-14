@@ -125,13 +125,17 @@ test('textures upload once, are shared, honor color space and re-upload on updat
 test('materials draw opaque first, then transparent back to front, each by renderOrder, with render-state pipelines',async()=>{
   const s=await scene();
   try {
-    const order=[],mesh=(name,material,position,options)=>{const m=createMesh(s.engine,planeGeometry(1,1),material,options);m.root.setPosition(position);const draw=m.draw.bind(m);m.draw=(c,...rest)=>{order.push(name);return draw(c,...rest);};return m;};
+    const order=[],mesh=(name,material,position,options)=>{const m=createMesh(s.engine,planeGeometry(1,1),material,options);m.root.setPosition(position);const draw=m.draw.bind(m);m.draw=(c,...rest)=>{order.push(name);assert.equal(c.device,s.device,'no proxied device');return draw(c,...rest);};return m;};
     const glass=new Material({transparent:true,opacity:0.5}),glow=new Material({blending:'additive',depthWrite:false,transparent:true}),solid=new Material();
     const near=mesh('near',glass,[0,0,2]),far=mesh('far',glass,[0,0,-6]),late=mesh('late',solid,[0,0,0],{renderOrder:1}),early=mesh('early',solid,[0,0,0],{renderOrder:-1}),add=mesh('add',glow,[0,0,-1]);
     s.frame();assert.deepEqual(order,['early','late','far','add','near']);
     order.length=0;near.root.setPosition([0,0,-20]);glass.transparent=false;s.frame();assert.deepEqual(order,['early','near','far','late','add']);
     const additive=s.h.pipelines.filter(p=>p.fragment?.targets[0].blend?.color.dstFactor==='one');assert.equal(additive.length,1);assert.equal(additive[0].depthStencil.depthWriteEnabled,false);
     assert.ok(s.h.pipelines.filter(p=>p.fragment?.entryPoint==='fragment'&&!p.fragment.targets[0].blend).every(p=>p.depthStencil.depthWriteEnabled));
+    assert.deepEqual(add.primitives[0].material.renderState,{blend:additive[0].fragment.targets[0].blend,depthWrite:false,depthCompare:undefined},'gltf-pro renderState hook');
+    assert.equal(near.primitives[0].material.renderState,undefined,'default state leaves gltf-pro untouched');
+    const unsorted=createMesh(s.engine,planeGeometry(1,1),new Material({blending:'none',transparent:true,depthTest:false}));s.frame();
+    const none=s.h.pipelines.find(p=>p.fragment?.entryPoint==='fragment'&&p.depthStencil.depthCompare==='always');assert.ok(none&&!none.fragment.targets[0].blend,'blending none, depthTest false');unsorted.destroy();
     far.destroy();order.length=0;s.frame();assert.ok(!order.includes('far'));
     for(const m of [near,late,early,add])m.destroy();
   } finally {s.close();}

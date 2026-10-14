@@ -24,6 +24,12 @@ Attach animation with the separate animation package. Register this model with `
 
 Register with `shadows.add(model)` and `clustered.add(model)` for optional directional shadows and local PBR lights, including the current skinned vertex buffer. `addLighting()` accepts an optional shader/binding hook without importing these packages. `shadowPrimitives` exposes current opaque/masked GPU geometry to depth consumers; blended materials are omitted.
 
+Pipeline state hook: set `primitive.material.renderState` (type `PBRRenderState`) to override the beauty pipeline's
+`blend` (a `GPUBlendState`, or `null` for no blending), `depthWrite` and `depthCompare` for every primitive using that
+material; unset fields keep the defaults above. It is part of the pipeline cache key (replace the object rather than
+mutating it), the g-buffer and ambient passes ignore it, and draw order and pass splitting still follow `alphaMode`.
+Without it the pipelines are unchanged. `@margoengine/materials` uses it for `blending`, `depthWrite` and `depthTest`.
+
 ## Extensions and compressed files
 
 Supported glTF extensions: `KHR_mesh_quantization`, `KHR_texture_transform`, `KHR_materials_emissive_strength`, `KHR_materials_unlit`, `KHR_lights_punctual`, `KHR_materials_clearcoat`, `KHR_materials_transmission`, `KHR_materials_ior`, `KHR_materials_volume`, `KHR_materials_sheen`, `KHR_materials_specular`, `EXT_texture_webp`, `EXT_texture_avif`, plus `KHR_draco_mesh_compression`, `EXT_meshopt_compression` (and `KHR_meshopt_compression`) and `KHR_texture_basisu` when you pass the matching decoder. A file is rejected only when its `extensionsRequired` lists something still unsupported; the error names each one and the decoder it needs.

@@ -2,7 +2,7 @@
 
 Orthographic projection and exactly vertical (top-down and bottom-up) views for core's camera, for CAD, plans, maps
 and isometric views. Culling, `engine.pick`, selection, bvh rays, TAA and every pass that reads `camera.matrix` see the
-same view; core is unchanged.
+same view. It uses core's `camera.project` and `camera.up` hooks.
 
 ```ts
 import {Engine} from '@margoengine/core';
@@ -27,20 +27,21 @@ projection.zoom = 2;
 - **Depth** is reversed-Z on WebGPU (near 1, far 0) like core, and -1..1 on WebGL. Orthographic depth is linear.
 - **Vertical views**: core's `Camera.update` throws `Vertical camera` when looking straight up or down. With the plugin,
   such a view renders exactly vertical with screen up = `up` (default `[0, 0, -1]`, north up looking down; it needs a
-  horizontal component). The camera position is moved 1e-9 of the distance off vertical, on the side that gives the
-  same orientation, so code that rebuilds a view from `position`/`target` (shadows, SSAO, gltf-pro, controls) keeps
-  working. Orbit controls stay 1e-6 rad from the pole, so orbiting never snaps the roll.
-- **Culling** is exact and stays on: the plugin replaces the camera's `update` and writes the culling planes with
-  core's own extraction, and the engine copies them to the culling kernel right after. No `culling: false` and no
-  extra cost; the projection adds one 4×4 product per frame.
+  horizontal component). While attached, `camera.up` reads as `up` for such views (horizontal part at most 1e-9 of the
+  distance) and as the world up (`[0, 1, 0]`) otherwise; assigning `camera.up` sets that world up. The position is
+  not moved, and passes that rebuild the view (shadows, SSAO, gltf-pro) read `camera.up` too. Orbit controls stay
+  1e-6 rad from the pole, so orbiting never snaps the roll.
+- **Culling** is exact and stays on: core derives the culling planes from the matrix the `project` hook builds. No
+  `culling: false` and no extra cost.
 - **Detecting it**: `camera.matrix` is orthographic when entries 3, 7 and 11 are zero.
-- `attach(camera)` drives a camera without an engine; `dispose()` (or `engine.removePlugin('cameras')`) restores core.
+- `attach(camera)` drives a camera without an engine; `dispose()` (or `engine.removePlugin('cameras')`) restores core's
+  `project` (unset) and a plain `up` field. Attaching to a camera whose `project` is already set throws.
 
 Not orthographic-aware yet (they assume `fov`): SSAO's reconstruction, lines and points world-space sizes, labels'
 CSS perspective, clustered froxels, DOF and splats. Shadow cascades are fitted to the perspective frustum, which covers
 the default ortho view; a fixed small `height` far from the target wastes shadow resolution. Specular uses the camera
 position, not a parallel view direction.
 
-MIT. Optional, tree-shakable package, about 1.6 kB min+gzip; core peer: ^0.1.0 || ^1.0.0.
+MIT. Optional, tree-shakable package, about 1.1 kB min+gzip; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/cameras

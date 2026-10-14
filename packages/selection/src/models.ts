@@ -17,8 +17,7 @@ export class Models {
   for(let i=0;!stale&&i<this.list.length;i++)stale=!!this.list[i].disposed;
   if(!stale)return this.list;
   this.revision=e.frameGraph.revision;this.size=e.meshes.size;this.version++;this.list=[];this.starts=[];let start=0;
-  const plugins=(e as unknown as {plugins?:Map<string,unknown>}).plugins;
-  if(plugins)for(const plugin of plugins.values())if(isModel(plugin)&&!plugin.disposed){this.list.push(plugin);this.starts.push(start);start+=plugin.primitives.length;}
+  if(e.plugins)for(const plugin of e.plugins.values())if(isModel(plugin)&&!plugin.disposed){this.list.push(plugin);this.starts.push(start);start+=plugin.primitives.length;}
   return this.list;
  }
 }

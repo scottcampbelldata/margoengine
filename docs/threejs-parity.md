@@ -62,7 +62,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | three.js | Status | Margo | Notes |
 | --- | --- | --- | --- |
 | PerspectiveCamera | PARTIAL | core `Camera` (`packages/core/src/camera.ts`) | Defined by position and target, with no up vector or roll. `update()` throws `RangeError('Vertical camera')` when the view is exactly vertical, so straight top-down or bottom-up views fail. No `zoom`, `setViewOffset`, `focalLength` or `filmGauge`. `fitToBoundingBox` is a Margo extra. |
-| OrthographicCamera | COVERED | cameras `CameraProjection` (`packages/cameras/src/index.ts`) | Replaces the core camera's `update`, so culling, `engine.pick`, selection and bvh rays follow the ortho frustum; also renders exactly vertical views (perspective or ortho) with an explicit screen up. SSAO, lines/points sizes, labels, clustered, DOF and splats still assume `fov`. |
+| OrthographicCamera | COVERED | cameras `CameraProjection` (`packages/cameras/src/index.ts`) | Uses core's `camera.project` and `camera.up` hooks, so culling, `engine.pick`, selection and bvh rays follow the ortho frustum; also renders exactly vertical views (perspective or ortho) with an explicit screen up. SSAO, lines/points sizes, labels, clustered, DOF and splats still assume `fov`. |
 | ArrayCamera | PARTIAL | xr stereo renderer (`packages/xr/src/renderer.ts`) | Internal to XR, not a general multi-view camera. |
 | CubeCamera (dynamic environment maps) | MISSING | — | |
 | StereoCamera, AnaglyphEffect, ParallaxBarrierEffect | MISSING | — | |

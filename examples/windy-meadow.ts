@@ -6,7 +6,7 @@ import {submitPrincipalScene} from '@margoengine/post/scene-fade';
 import {engineRuntime} from '@margoengine/core/extension';
 import {Sky} from '@margoengine/sky';
 import {sceneSamples} from '../packages/shared/quality.js';
-import {applyQualityTier, watchQuality} from '@margoengine/quality';
+import {applyQualityTier, paceEngine, watchQuality} from '@margoengine/quality';
 applyQualityTier();
 
 const error=document.querySelector<HTMLElement>('#error')!,status=document.querySelector<HTMLElement>('#status')!;
@@ -18,6 +18,7 @@ try {
     camera:{position:[18,4,22],target:[0,1.2,0],far:300},onError:value=>{error.textContent=String(value);}});
   dispose=()=>stage.dispose();
   if(abort.signal.aborted){stage.dispose();abort.signal.throwIfAborted();}
+  paceEngine(stage.engine);
   const controls=new OrbitControls(stage.engine.camera,stage.canvas);
   controls.minDistance=3;controls.maxDistance=65;controls.maxPolarAngle=Math.PI/2-0.02;controls.saveState();
   stage.use({name:'meadow-controls',setup(){},dispose:()=>{controls.dispose();abort.abort();}});

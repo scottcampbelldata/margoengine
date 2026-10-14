@@ -5,7 +5,7 @@ import {Bloom} from '@margoengine/post/bloom';
 import {submitPrincipalScene} from '@margoengine/post/scene-fade';
 import {engineRuntime} from '@margoengine/core/extension';
 import {sceneSamples} from '../../../shared/quality.js';
-import {applyQualityTier, watchQuality} from '@margoengine/quality';
+import {applyQualityTier, paceEngine, watchQuality} from '@margoengine/quality';
 applyQualityTier();
 import {Stars} from '@margoengine/creative/stars';
 
@@ -47,6 +47,7 @@ try {
     onError: fail,
   });
   if (leaving) {stage.dispose(); throw new DOMException('Page closed', 'AbortError');}
+  paceEngine(stage.engine);
   const post = Bloom.attach(stage.engine, {strength: 0.25, threshold: 1, exposure: 0.6});
   const mobile = sceneSamples() === 1;
   const earth = await Planet.create(stage.engine, {

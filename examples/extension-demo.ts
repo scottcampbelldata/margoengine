@@ -2,7 +2,7 @@ import {createStage} from 'margoengine';
 import {loadGLTF} from '@margoengine/gltf-pro';
 import {OrbitControls} from '@margoengine/controls';
 import {sceneSamples} from '../packages/shared/quality.js';
-import {applyQualityTier, watchQuality} from '@margoengine/quality';
+import {applyQualityTier, paceEngine, watchQuality} from '@margoengine/quality';
 applyQualityTier();
 import {engineRuntime} from '@margoengine/core/extension';
 import {submitPrincipalScene} from '../packages/shared/demo-frame.js';
@@ -16,7 +16,7 @@ try {
   const stage=await createStage('#viewport',{backend:'webgpu',autoStart:false,controls:false,capacity:2048,
     label:robot?'Animated robot with adjustable facial expressions':'Interactive damaged helmet',
     camera:{position:robot?[2,1.5,7]:[3,2,5],target:[0,0,0],near:0.01,far:500},onError:reason=>{error.textContent=String(reason);}});
-  dispose=()=>stage.dispose();if(abort.signal.aborted){stage.dispose();abort.signal.throwIfAborted();}const controls=new OrbitControls(stage.engine);controls.enableDamping=true;stage.canvas.tabIndex=0;
+  dispose=()=>stage.dispose();if(abort.signal.aborted){stage.dispose();abort.signal.throwIfAborted();}paceEngine(stage.engine);const controls=new OrbitControls(stage.engine);controls.enableDamping=true;stage.canvas.tabIndex=0;
   stage.canvas.addEventListener('keydown',event=>{
     if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','-'].includes(event.key))return;event.preventDefault();
     if(event.key==='+'||event.key==='-')stage.canvas.dispatchEvent(new WheelEvent('wheel',{deltaY:event.key==='+'?-100:100,cancelable:true}));

@@ -312,7 +312,7 @@ export class LabelRenderer implements EnginePlugin {
     this.set(viewer, this.viewerCache, 'perspective', orthographic ? 'none' : px(perspective));
     this.set(cameraElement, this.cameraCache, 'width', px(width));
     this.set(cameraElement, this.cameraCache, 'height', px(height));
-    const view = orthographic ? this.view : lookAtView(camera.position, camera.target, this.view);
+    const view = orthographic ? this.view : lookAtView(camera.position, camera.target, this.view, camera.up);
     this.set(cameraElement, this.cameraCache, 'transform', orthographic ? orthographicCSSTransform(camera.matrix, width, height, backend) : cameraCSSTransform(view, perspective, width, height));
     for (const object of this.objects) {
       let show = object.visible;

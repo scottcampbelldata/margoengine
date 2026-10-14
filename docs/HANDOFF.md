@@ -197,8 +197,11 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       materials/index.ts, shader/node.ts, usdz/crate.ts).
    c. Replace WGSL string patching (shadows, tonemap, toon, environment, materials, shader) with override constants,
       specialized pipelines (1e.f) and shader nodes, so one renamed shader line cannot silently break another package.
-   d. [DECIDED: core hooks merged `571b2a0` (camera.up, camera.project, engine.pace, engine.plugins), +101 bytes;
-      package migration running] A small explicit set of core hooks (camera projection, frame pacing, plugin lookup,
+   d. [DONE: core hooks merged `571b2a0` (camera.up, camera.project, engine.pace, engine.plugins), +101 bytes;
+      packages migrated: cameras uses project/up (no update replacement, no off-vertical nudge; shared viewMatrix reads
+      camera.up, as do points' basis and labels' lookAtView), quality caps via engine.pace (`paceEngine(engine)`, no global rAF wrap), selection reads
+      engine.plugins (environment never read the map; bvh's raycaster still does, left for the bvh worker), materials
+      uses gltf-pro's new `material.renderState` pipeline hook (proxy deleted). Citadel keeps frameDue (own loop).] A small explicit set of core hooks (camera projection, frame pacing, plugin lookup,
       pipeline state) to replace today's workarounds: cameras replacing camera.update on the instance, quality/pacing
       wrapping requestAnimationFrame globally, environment and selection reading core's private plugin map, materials
       proxying createRenderPipeline. Costs core bytes; these become public API, so decide before launch.
