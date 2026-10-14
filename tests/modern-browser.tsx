@@ -4,6 +4,7 @@ import {Engine,box,PbrMaterial, type Mesh as CoreMesh} from '@margoengine/core/e
 import {Canvas,Mesh,BoxGeometry,PbrMaterial as ReactMaterial,useFrame} from '@margoengine/react';
 import {GPUParticles,PostProcessing,ToonShading} from '@margoengine/creative';
 import {SectionPlanes,EngineeringAnnotations,PartInstancer} from '@margoengine/machinery';
+import {webglRenderer} from '@margoengine/webgl';
 const state:{core?:Engine;react?:Engine;root?:Root;host?:HTMLDivElement;parent:CoreMesh|null;child:CoreMesh|null;renders:number;errors:string[];frames:number}={parent:null,child:null,renders:0,errors:[],frames:0};
 function Cube({position=1}:{position?:number}){
   state.renders++;const mesh=useRef<CoreMesh>(null);
@@ -13,13 +14,13 @@ function Cube({position=1}:{position?:number}){
 const pending=new Promise<never>(()=>{});
 function Suspended():never{throw pending;}
 function App({position=1,show=true,suspend=false}:{position?:number;show?:boolean;suspend?:boolean}){
-  return <StrictMode><Canvas backend="webgl2" capacity={8} onCreated={stage=>{state.react=stage.engine as unknown as Engine;}} onError={error=>state.errors.push(String(error))}>{show&&(suspend?<Suspense fallback={null}><Cube position={position}/><Suspended/></Suspense>:<Cube position={position}/>)}</Canvas></StrictMode>;
+  return <StrictMode><Canvas backend="webgl2" fallback={webglRenderer} capacity={8} onCreated={stage=>{state.react=stage.engine as unknown as Engine;}} onError={error=>state.errors.push(String(error))}>{show&&(suspend?<Suspense fallback={null}><Cube position={position}/><Suspended/></Suspense>:<Cube position={position}/>)}</Canvas></StrictMode>;
 }
 const harness={
   state,
   async core(backend:'webgpu'|'webgl2'|'auto'){
     state.core?.dispose();document.querySelector('[data-core]')?.remove();const canvas=document.createElement('canvas');canvas.dataset.core=backend;canvas.style.cssText='width:320px;height:240px;display:block';document.body.append(canvas);
-    const engine=await Engine.create(canvas,{backend,capacity:16,camera:{position:[0,0,4]}});state.core=engine;
+    const engine=await Engine.create(canvas,{backend,fallback:webglRenderer,capacity:16,camera:{position:[0,0,4]}});state.core=engine;
     const geometry=box(),mesh=engine.createMesh().setGeometry(geometry).setMaterial(new PbrMaterial({color:'#e45630',roughness:0.6}));
     engine.createMesh().setGeometry(geometry).setPosition([100,0,0]);engine.render();
     return {backend:engine.backend,fallbackReason:engine.fallbackReason,stats:{...engine.stats},mesh:mesh.id};

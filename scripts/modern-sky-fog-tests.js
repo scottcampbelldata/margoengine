@@ -33,6 +33,8 @@ try{
    const legacyModule=shader(singleShader.replace('sceneDepth:texture_depth_2d','sceneDepth:texture_depth_multisampled_2d').replace('fogFragment(i:Vertex)','fogFragment(i:Vertex,@builtin(sample_index) sample:u32)').replace('vec2i(i.position.xy),0','vec2i(i.position.xy),i32(sample)'));
    const blend={color:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha',operation:'add'},alpha:{srcFactor:'zero',dstFactor:'one',operation:'add'}};
    const legacy=d.createRenderPipeline({layout:'auto',vertex:{module:legacyModule,entryPoint:'vertex'},fragment:{module:legacyModule,entryPoint:'fogFragment',targets:[{format:'rgba16float',blend}]},multisample:{count:4}});
+   // The fog uniform is private to the fog feature since 3bab400; this is its packing for the options above (exp2, no colour).
+   const fogValues=buffer({size:32,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});d.queue.writeBuffer(fogValues,0,new Float32Array([0.008,45,0,0,0,0,0,0]));
    const render=async(samples,{reference=false,legacyFog=false,singleDepth=false}={})=>{
     const depthSamples=singleDepth?1:samples,color=texture({size:[width,1],format:'rgba16float',sampleCount:samples,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});
     borrowedDepth=texture({size:[width,1],format:'depth32float',sampleCount:depthSamples,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});
@@ -58,7 +60,7 @@ try{
     if(singleDepth){const pass=encoder.beginRenderPass({colorAttachments:[{view:color.createView(),loadOp:'clear',storeOp:'store',clearValue:[...background,1]}]});pass.end();}
     passes['sky:fog'].execute(context);
     if(legacyFog){
-     seed();const group=d.createBindGroup({layout:legacy.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:sky.uniform}},{binding:1,resource:sky.textures[4].createView()},{binding:3,resource:borrowedDepth.createView({aspect:'depth-only'})},{binding:4,resource:{buffer:sky.fogUniform}}]});
+     seed();const group=d.createBindGroup({layout:legacy.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:sky.uniform}},{binding:1,resource:sky.tables.view},{binding:3,resource:borrowedDepth.createView({aspect:'depth-only'})},{binding:4,resource:{buffer:fogValues}}]});
      const pass=encoder.beginRenderPass({colorAttachments:[{view:color.createView(),loadOp:'load',storeOp:'store'}]});pass.setPipeline(legacy);pass.setBindGroup(0,group);pass.draw(3);pass.end();
     }
     const pass=encoder.beginComputePass();pass.setPipeline(probe);pass.setBindGroup(0,probeGroup);pass.dispatchWorkgroups(width,samples);pass.end();

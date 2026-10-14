@@ -1,0 +1,443 @@
+{
+ "date": "2026-10-14T17:23:20.012Z",
+ "commit": "f9b2ad0",
+ "acPowerBefore": true,
+ "rounds": 8,
+ "frames": 120,
+ "scene": "DamagedHelmet + 11 core boxes, 1280x720 DPR 1, core 4x MSAA",
+ "visuals": {
+  "none": {
+   "blackFraction": 0,
+   "meanLuma": 84.41,
+   "vsFull": {
+    "meanAbsDiff": 12.924,
+    "changedFraction": 0.88192
+   }
+  },
+  "full": {
+   "blackFraction": 0,
+   "meanLuma": 91.28
+  },
+  "no-ssao": {
+   "blackFraction": 0,
+   "meanLuma": 96.44,
+   "vsFull": {
+    "meanAbsDiff": 5.336,
+    "changedFraction": 0.32337
+   }
+  },
+  "no-dof": {
+   "blackFraction": 0,
+   "meanLuma": 91.42,
+   "vsFull": {
+    "meanAbsDiff": 0.212,
+    "changedFraction": 0.01093
+   }
+  },
+  "no-bloom": {
+   "blackFraction": 0,
+   "meanLuma": 91.21,
+   "vsFull": {
+    "meanAbsDiff": 0.071,
+    "changedFraction": 0.0048
+   }
+  },
+  "no-tonemap": {
+   "blackFraction": 0,
+   "meanLuma": 106.55,
+   "vsFull": {
+    "meanAbsDiff": 15.115,
+    "changedFraction": 0.80294
+   }
+  },
+  "no-fxaa": {
+   "blackFraction": 0,
+   "meanLuma": 91.28,
+   "vsFull": {
+    "meanAbsDiff": 0.171,
+    "changedFraction": 0.01881
+   }
+  }
+ },
+ "timing": {
+  "none": {
+   "passes": [
+    3
+   ],
+   "cpuMs": {
+    "median": 0.1,
+    "p90": 0.3,
+    "min": 0
+   },
+   "spanMs": {
+    "median": 1.087,
+    "p90": 1.411,
+    "min": 0.751
+   },
+   "gpuMsMedian": 0.901,
+   "gpuMsPerRound": [
+    0.903,
+    0.672,
+    1.077,
+    0.62,
+    0.9,
+    0.646,
+    0.905,
+    0.902
+   ],
+   "ownerMsMedian": {
+    "scene": 0.901
+   },
+   "ownerMsPerRound": {
+    "scene": [
+     0.903,
+     0.672,
+     1.077,
+     0.62,
+     0.9,
+     0.646,
+     0.905,
+     0.902
+    ]
+   }
+  },
+  "full": {
+   "passes": [
+    25
+   ],
+   "cpuMs": {
+    "median": 0.4,
+    "p90": 0.9,
+    "min": 0.1
+   },
+   "spanMs": {
+    "median": 11.948,
+    "p90": 15.63,
+    "min": 8.875
+   },
+   "gpuMsMedian": 8.985,
+   "gpuMsPerRound": [
+    10.109,
+    8.899,
+    9.359,
+    9.382,
+    9.07,
+    8.078,
+    7.911,
+    7.112
+   ],
+   "ownerMsMedian": {
+    "scene": 0.711,
+    "ssao": 2.534,
+    "stack": 0.408,
+    "dof": 4.578,
+    "bloom": 0.265,
+    "tonemap": 0.084,
+    "fxaa": 0.147
+   },
+   "ownerMsPerRound": {
+    "scene": [
+     0.808,
+     0.72,
+     0.727,
+     0.702,
+     0.721,
+     0.642,
+     0.636,
+     0.566
+    ],
+    "ssao": [
+     2.766,
+     2.559,
+     2.589,
+     2.543,
+     2.526,
+     2.339,
+     2.302,
+     1.966
+    ],
+    "stack": [
+     0.447,
+     0.419,
+     0.419,
+     0.407,
+     0.41,
+     0.364,
+     0.358,
+     0.324
+    ],
+    "dof": [
+     4.934,
+     4.498,
+     4.919,
+     4.817,
+     4.657,
+     4.042,
+     4.049,
+     3.596
+    ],
+    "bloom": [
+     0.288,
+     0.262,
+     0.267,
+     0.284,
+     0.281,
+     0.239,
+     0.249,
+     0.235
+    ],
+    "tonemap": [
+     0.089,
+     0.084,
+     0.085,
+     0.094,
+     0.084,
+     0.076,
+     0.078,
+     0.072
+    ],
+    "fxaa": [
+     0.161,
+     0.153,
+     0.155,
+     0.147,
+     0.147,
+     0.138,
+     0.138,
+     0.12
+    ]
+   }
+  },
+  "alone:none": {
+   "passes": [
+    3
+   ],
+   "cpuMs": {
+    "median": 0.1,
+    "p90": 0.2,
+    "min": 0
+   },
+   "spanMs": {
+    "median": 0.735,
+    "p90": 0.947,
+    "min": 0.703
+   },
+   "gpuMsMedian": 0.611,
+   "gpuMsPerRound": [
+    0.603,
+    0.584,
+    0.966,
+    0.618,
+    0.815,
+    0.458,
+    0.654,
+    0.467
+   ],
+   "ownerMsMedian": {
+    "scene": 0.611
+   },
+   "ownerMsPerRound": {
+    "scene": [
+     0.603,
+     0.584,
+     0.966,
+     0.618,
+     0.815,
+     0.458,
+     0.654,
+     0.467
+    ]
+   }
+  },
+  "alone:ssao": {
+   "passes": [
+    19
+   ],
+   "cpuMs": {
+    "median": 0.2,
+    "p90": 0.4,
+    "min": 0
+   },
+   "spanMs": {
+    "median": 5.035,
+    "p90": 7.462,
+    "min": 3.844
+   },
+   "gpuMsMedian": 3.383,
+   "gpuMsPerRound": [
+    3.679,
+    3.531,
+    3.504,
+    3.345,
+    3.42,
+    2.934,
+    3.245,
+    2.842
+   ],
+   "ownerMsMedian": {
+    "scene": 0.607,
+    "ssao": 2.778
+   },
+   "ownerMsPerRound": {
+    "scene": [
+     0.675,
+     0.629,
+     0.622,
+     0.602,
+     0.611,
+     0.496,
+     0.577,
+     0.499
+    ],
+    "ssao": [
+     2.96,
+     2.874,
+     2.869,
+     2.751,
+     2.805,
+     2.404,
+     2.669,
+     2.325
+    ]
+   }
+  },
+  "alone:env": {
+   "passes": [
+    3
+   ],
+   "cpuMs": {
+    "median": 0.1,
+    "p90": 0.2,
+    "min": 0
+   },
+   "spanMs": {
+    "median": 1.089,
+    "p90": 1.425,
+    "min": 0.792
+   },
+   "gpuMsMedian": 0.917,
+   "gpuMsPerRound": [
+    0.917,
+    1.067,
+    1.075,
+    0.901,
+    1.075,
+    0.823,
+    0.916,
+    0.857
+   ],
+   "ownerMsMedian": {
+    "scene": 0.917
+   },
+   "ownerMsPerRound": {
+    "scene": [
+     0.917,
+     1.067,
+     1.075,
+     0.901,
+     1.075,
+     0.823,
+     0.916,
+     0.857
+    ]
+   }
+  },
+  "alone:env+ssao": {
+   "passes": [
+    19
+   ],
+   "cpuMs": {
+    "median": 0.2,
+    "p90": 0.5,
+    "min": 0
+   },
+   "spanMs": {
+    "median": 5.175,
+    "p90": 8.102,
+    "min": 4.127
+   },
+   "gpuMsMedian": 3.564,
+   "gpuMsPerRound": [
+    3.883,
+    3.93,
+    3.361,
+    3.582,
+    3.781,
+    3.547,
+    2.738,
+    3.311
+   ],
+   "ownerMsMedian": {
+    "scene": 0.671,
+    "ssao": 2.851
+   },
+   "ownerMsPerRound": {
+    "scene": [
+     0.742,
+     0.749,
+     0.661,
+     0.675,
+     0.71,
+     0.666,
+     0.504,
+     0.625
+    ],
+    "ssao": [
+     3.009,
+     3.122,
+     2.658,
+     2.885,
+     2.962,
+     2.818,
+     2.165,
+     2.681
+    ]
+   }
+  }
+ },
+ "effectCostMs": {
+  "ssao": 2.534,
+  "dof": 4.578,
+  "bloom": 0.265,
+  "tonemap": 0.084,
+  "fxaa": 0.147,
+  "stack": 0.408,
+  "postTotal": 8.016,
+  "sceneInFull": 0.711,
+  "frameFull": 8.985,
+  "frameNoPost": 0.901
+ },
+ "ssaoIbl": {
+  "ssaoWithoutIbl": 2.778,
+  "ssaoWithIbl": 2.851,
+  "replayExtraMs": 0.073,
+  "frames": {
+   "none": 0.611,
+   "ssao": 3.383,
+   "env": 0.917,
+   "envSsao": 3.564
+  }
+ },
+ "hardware": {
+  "webglRenderer": "ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (16GB) (0x000064A0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "webgpu": {
+   "vendor": "intel",
+   "architecture": "xe-2lpg",
+   "device": "0x64a0",
+   "description": "Intel(R) Arc(TM) 140V GPU (16GB)",
+   "fallback": false
+  },
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+  "browserName": "chromium",
+  "browserVersion": "155.0.4283.45",
+  "requestedChannel": "msedge",
+  "launchArgs": [
+   "--enable-webgpu-developer-features"
+  ],
+  "powerPreference": "high-performance",
+  "hostPlatform": "win32",
+  "headless": true
+ },
+ "zeroFrames": 0,
+ "acPowerAfter": true
+}

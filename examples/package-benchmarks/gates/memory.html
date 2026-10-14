@@ -1,0 +1,78 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Loader memory gate</title><style>body{margin:0;background:#000}canvas{width:960px;height:540px;display:block}</style></head><body><canvas></canvas>
+<script type="module">
+// Loads every model format through its package in a real browser, renders it, unloads it, and counts live GPU buffers and
+// textures through wrapped GPUDevice create/destroy calls (memory.mjs drives it).
+const live=new Map(),created={buffer:0,texture:0},destroyed={buffer:0,texture:0};
+const bpp=f=>/32float|32uint|32sint/.test(f)?(/^rgba/.test(f)?16:/^rg/.test(f)?8:4):/16float|16uint|16sint/.test(f)?(/^rgba/.test(f)?8:/^rg/.test(f)?4:2):/^(r8|stencil8)/.test(f)?1:/^rg8/.test(f)?2:4;
+const {createBuffer,createTexture}=GPUDevice.prototype,{destroy:destroyBuffer}=GPUBuffer.prototype,{destroy:destroyTexture}=GPUTexture.prototype;
+GPUDevice.prototype.createBuffer=function(d){const b=createBuffer.call(this,d);live.set(b,{kind:'buffer',bytes:d.size,label:d.label??''});created.buffer++;return b;};
+GPUDevice.prototype.createTexture=function(d){
+  const t=createTexture.call(this,d),[w,h=1,l=1]=Array.isArray(d.size)?d.size:[d.size.width,d.size.height,d.size.depthOrArrayLayers],mips=d.mipLevelCount??1;
+  live.set(t,{kind:'texture',bytes:Math.round(w*h*l*bpp(d.format)*(d.sampleCount??1)*(mips>1?4/3:1)),label:`${d.format} ${w}x${h}x${l}`});created.texture++;return t;
+};
+GPUBuffer.prototype.destroy=function(){if(live.delete(this))destroyed.buffer++;return destroyBuffer.call(this);};
+GPUTexture.prototype.destroy=function(){if(live.delete(this))destroyed.texture++;return destroyTexture.call(this);};
+
+import {Engine} from '/packages/core/dist/index.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {parseFBX} from '/packages/fbx/dist/index.js';
+import {parseUSDA,parseUSDC,parseUSDZ} from '/packages/usdz/dist/index.js';
+import {parse3MF,parsePLY,parseVTK,parsePCD,parseOFF,createMeshes} from '/packages/loaders/dist/index.js';
+import {exportUSDZ} from '/packages/exporters/dist/index.js';
+import {torusKnotGeometry,toGeometry} from '/packages/geometry/dist/index.js';
+
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',capacity:20000,camera:{position:[0,1,4],target:[0,0,0],near:0.01,far:1000}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const bytes=async url=>{const r=await fetch(url);if(!r.ok)throw new Error(`${url}: ${r.status}`);return new Uint8Array(await r.arrayBuffer());};
+const cache=new Map(),file=url=>{if(!cache.has(url))cache.set(url,bytes(url));return cache.get(url);};
+// A 50,000-triangle USDZ written by @margoengine/exporters (the repository's USD fixtures are single triangles).
+const knotUSDZ=exportUSDZ({nodes:[{geometry:toGeometry(torusKnotGeometry(1,0.3,500,50))}]});
+const model=m=>({bounds:m.bounds,dispose:()=>m.destroy()});
+// Bounds from the parsed positions (loaders' LoadedGeometry), meshes from createMeshes.
+const meshes=async parsed=>{
+  const loaded=await parsed,p=loaded.positions,b=[Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity];
+  for(let i=0;i<p.length;i+=3)for(let a=0;a<3;a++){b[a]=Math.min(b[a],p[i+a]);b[a+3]=Math.max(b[a+3],p[i+a]);}
+  const r=createMeshes(engine,loaded);return {bounds:b,dispose:()=>r.dispose(),triangles:loaded.indices?loaded.indices.length/3:0};
+};
+const usd=async asset=>model(await asset.create(engine));
+const sources={
+  'gltf-pro:damaged-helmet':async()=>model(await loadGLTF(engine,'/examples/assets/damaged-helmet.glb')),
+  'gltf-pro:robot-expressive':async()=>model(await loadGLTF(engine,'/examples/assets/robot-expressive.glb')),
+  'gltf-pro:box-textured':async()=>model(await loadGLTF(engine,'/packages/exporters/tests/fixtures/BoxTextured.glb')),
+  'fbx:triangle.fbx':async()=>model(await parseFBX(engine,await file('/examples/package-benchmarks/fixtures/triangle.fbx'))),
+  'fbx:rich-binary-zlib':async()=>model(await parseFBX(engine,await file('/test-results/gates-fbx-rich.fbx'))),
+  'usdz:triangle.usda':async()=>usd(parseUSDA(await file('/packages/usdz/tests/fixtures/triangle.usda'))),
+  'usdz:triangle.usdc':async()=>usd(parseUSDC(await file('/packages/usdz/tests/fixtures/triangle.usdc'))),
+  'usdz:knot-50k.usdz':async()=>usd(await parseUSDZ(knotUSDZ)),
+  'loaders:cube_gears.3mf':async()=>meshes(parse3MF(await file('/packages/loaders/tests/fixtures/cube_gears.3mf'))),
+  'loaders:dolphins.ply':async()=>meshes(parsePLY(await file('/packages/loaders/tests/fixtures/dolphins.ply'))),
+  'loaders:fran_cut.vtk':async()=>meshes(parseVTK(await file('/packages/loaders/tests/fixtures/fran_cut.vtk'))),
+  'loaders:bunny.pcd':async()=>meshes(parsePCD(await file('/packages/loaders/tests/fixtures/bunny.pcd'))),
+  'loaders:decimated-knight.off':async()=>meshes(parseOFF(await file('/packages/loaders/tests/fixtures/decimated-knight.off'))),
+};
+const frame=async(n=1)=>{for(let i=0;i<n;i++)engine.render();await device.queue.onSubmittedWorkDone();};
+let shown;
+window.audit={
+  names:Object.keys(sources),
+  snapshot(){
+    let buffers=0,textures=0,bufferBytes=0,textureBytes=0;for(const v of live.values())if(v.kind==='buffer'){buffers++;bufferBytes+=v.bytes;}else{textures++;textureBytes+=v.bytes;}
+    return {buffers,textures,bufferBytes,textureBytes,created:{...created},destroyed:{...destroyed},jsHeap:performance.memory?.usedJSHeapSize??null,errors:errors.splice(0)};
+  },
+  liveList:()=>[...live.values()].map(v=>`${v.kind} ${v.label} ${v.bytes}`),
+  async show(name){
+    if(shown){shown.dispose();shown=undefined;}
+    const t=performance.now(),m=await sources[name](),ms=performance.now()-t,b=m.bounds;
+    const r=Math.max(b[3]-b[0],b[4]-b[1],b[5]-b[2]);engine.camera.near=r*0.001;engine.camera.far=r*100;engine.camera.position=[(b[0]+b[3])/2+r*0.6,(b[1]+b[4])/2+r*0.5,(b[2]+b[5])/2+r*1.5];engine.camera.fitToBoundingBox([b[0],b[1],b[2]],[b[3],b[4],b[5]],{duration:0});
+    shown=m;await frame(3);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    return {name,loadMs:+ms.toFixed(1),bounds:[...b].map(v=>+v.toFixed(3)),triangles:m.triangles,errors:errors.splice(0)};
+  },
+  async hide(){shown?.dispose();shown=undefined;await frame(2);return {errors:errors.splice(0)};},
+  // One cycle: every model in turn is loaded, rendered and unloaded (each load replaces the previous model).
+  async cycle(){
+    for(const name of Object.keys(sources)){const m=await sources[name]();await frame(2);m.dispose();}
+    await frame(2);globalThis.gc?.();return window.audit.snapshot();
+  },
+};
+window.ready=true;
+</script></body></html>

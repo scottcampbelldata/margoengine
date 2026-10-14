@@ -93,14 +93,55 @@ checks and benchmarks run one at a time: take the lock with `mkdir C:\Dev\Projec
 `(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline` is True and record
 it with every number (on battery Windows throttles the CPU/GPU and may drop the display to 60 Hz).
 
-0. Verification gates (serial, idle GPU): shader `browser-check.mjs` re-run; LOD/imposter 2,500-object benchmark on a
-   quiet GPU; post full stack (SSAO+DOF+Bloom+Tonemap+FXAA) in a real scene, visuals and frame time; native FBX/USD in a
-   real browser plus a memory audit (models unloaded/switched destroy their GPU buffers, no leaks); `scripts/modern-postfx-tests.js`
-   fails its first DOF check ("Near CoC sign/clamp") after `a281ad2`; run it on `9c761d5` to confirm it predates SSAO, then fix;
-   GPU cost of the SSAO ambient replay with environment IBL on (now replays the full lit shader); helmet SSAO fixture
-   (`scripts/modern-extension-tests.js`) needs a local helmet copy. [Done: size
-   comparison is `npm run measure:threejs` (scripts/compare-threejs-size.js).] (Security review: later commit reviews in the
-   security log report clean; the one timeout was the service being busy.)
+0. [DONE 2026-10-14 on the math-consolidated tip, Arc 140V, AC power before and after every run, GPU lock held; scripts
+   and JSON in `examples/package-benchmarks/gates/` and `examples/package-benchmarks/results/gates-*.json`, screenshots
+   `test-results/gates-*.png`.] Verification gates:
+   - Every browser test once: `node examples/package-benchmarks/gates/run-browser-tests.mjs` (lock + AC per script,
+     builds the starters and the usdz fixture first). 39/41 pass (`gates-browser-tests.json`; before the fixes below
+     27/39, `gates-browser-tests-before-fixes.json`). Not passing: `modern-hardware-gpu-tests.js` needs a discrete
+     NVIDIA/AMD GPU (`GPU_VENDOR`), not applicable on this laptop; `modern-package-tests.js` now installs and packs, then
+     fails type-checking README snippets that are fragments (`engine`, `stage`, `model`, `part`, `water`... undeclared;
+     creative's README imports and redeclares `GPUParticles`) in animation, controls, creative, environment, gltf-pro,
+     machinery, post and sky READMEs. Docs-only; not fixed here.
+   - Stale tests fixed: postfx DOF uniform 32 -> 48 bytes (see below); WebGL2 paths now pass `fallback: webglRenderer`
+     (browser, wrapper, machinery runtime, stress; core needs the fallback since `1356787`); demos that need 4x MSAA or
+     unpaced frames load `?quality=high` (grass, extension); sky-fog test uses `sky.tables.view` and its own fog uniform
+     (sky internals since `3bab400`); Vite starter status text "Bloom, atmosphere and FX"; package tests parse
+     `npm pack --json` after prepack output, allow post's NOTICE.md and pack geometry/lines/text/bvh/math; extension
+     test reads the helmet and robot from `examples/assets` (no download).
+   - Real bugs fixed: `@margoengine/react` Canvas dropped the `fallback` option (so `backend="webgl2"` could never work);
+     the Vite starter had no WebGL fallback (blank on browsers without WebGPU) and now ships `@margoengine/webgl`;
+     vfx README sort snippet was not self-contained.
+   - Shader browser-check: pass. LOD 2,500 instances (`gates-lod-2500.json`): GPU median 23.2 ms LOD vs 226.9 ms full
+     detail (9.8x; empty 3.6 ms), image mean diff 1.72, coverage 0.99. Imposter check (`gates-lod-imposter-check.json`):
+     262/262 imposter pixels pick their anchor on GPU and CPU, 1128/1128 full-detail exact, GPU/CPU agree 99.9%; new
+     atlas rule has zero bleed at every level.
+   - postfx "Near CoC sign/clamp" (`gates-postfx-bisect.json`): fails at `9c761d5` and at `5cf148e`, shader checks pass
+     at `5cf148e~1`. Stale test, predates SSAO ortho: `5cf148e` grew the DOF uniform to 48 bytes, the test still bound
+     32, bind-group creation failed inside its error scope and the CoC texture read back zero. Test fixed; passes.
+   - Post full stack (`gates/post-stack.mjs`, `gates-post-stack.json`): DamagedHelmet + boxes, env IBL, 1280x720 DPR 1,
+     4x MSAA, PostStack [SSAO, DOF, Bloom, Tonemap neutral, FXAA]. No black/NaN pixels in any frame; removing each
+     effect changes the image (changed pixels: SSAO 32%, DOF 1.1%, Bloom 0.5%, Tonemap 80%, FXAA 1.9%). GPU per effect
+     (passes each effect begins, median of 8 alternating rounds x 120 frames): SSAO 2.53 ms, DOF 4.58, Bloom 0.27,
+     Tonemap 0.08, FXAA 0.15, stack capture/compose 0.41; post total 8.0 ms vs 0.9 ms for the whole frame without post.
+     DOF (64 taps, maxRadius 16, full res) is the cost to look at first. Tonemap 'agx' after Bloom is invisible by
+     design (Bloom alone already maps with AgX).
+   - SSAO with environment IBL (same JSON, `ssaoIbl`): SSAO passes 2.78 ms without IBL, 2.85 ms with it (+0.07 ms,
+     inside run-to-run noise): replaying the full lit shader costs nothing measurable here.
+     OPEN BUG: with IBL on, SSAO darkens the floor below a sharp horizontal line (`test-results/gates-post-full.png`
+     vs `gates-post-no-ssao.png`; also with radius 0.1 and bias 0.2, and SSAO alone + IBL; not without IBL) and the
+     metal cube shows hatching. Looks like the ambient replay (depthCompare 'equal' on a recompiled shader) or the IBL
+     replay disagreeing with the main pass; not diagnosed further.
+   - Loaders + memory (`gates/memory.mjs`, `gates-memory.json`, `test-results/gates-load-*.png`): gltf-pro (DamagedHelmet,
+     RobotExpressive, BoxTextured), native FBX (repo `triangle.fbx`; fbx test fixture as zlib binary with skin, blend
+     shape, clips), USDA/USDC (repo fixtures), a 50k-triangle USDZ written by exporters, loaders 3MF/PLY/VTK/PCD/OFF all
+     load and draw. 20 cycles of load -> render -> unload of all 13: live GPU objects return to the pre-load baseline
+     (1 buffer, 2 textures) every cycle, 147 buffers and 40 textures created and destroyed per cycle, zero growth in
+     count or bytes from cycle 2 to 20, JS heap -1.5 MB.
+   - Helmet SSAO fixture: `examples/assets/damaged-helmet.glb` (Khronos DamagedHelmet, in the repo) is used;
+     `modern-extension-tests.js` passes.
+   [Done earlier: size comparison is `npm run measure:threejs` (scripts/compare-threejs-size.js).] (Security review: later
+   commit reviews in the security log report clean; the one timeout was the service being busy.)
 
 Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (`c82e119`), WebGL renderer moved to
 `@margoengine/webgl` (`1356787`; core + stage 18,554 gzip), `@margoengine/math` (`88517f8`).

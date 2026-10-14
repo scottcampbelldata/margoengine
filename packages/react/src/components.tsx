@@ -32,7 +32,7 @@ export interface CanvasProps extends EngineOptions {
   shadows?:boolean;onCreated?:(stage:Stage)=>void; onError?:(error:unknown)=>void;
 }
 export type MargoCanvasProps=CanvasProps;
-export function MargoCanvas({children,style,className,label='Interactive 3D scene',capacity=1024,backend='auto',camera,shadows=false,onCreated,onError}:CanvasProps) {
+export function MargoCanvas({children,style,className,label='Interactive 3D scene',capacity=1024,backend='auto',fallback,camera,shadows=false,onCreated,onError}:CanvasProps) {
   const canvas=useRef<HTMLCanvasElement>(null),queue=useRef<Promise<void>>(Promise.resolve()),created=useRef(onCreated),errorHandler=useRef(onError);
   const [stage,setStage]=useState<Stage|null>(null),[error,setError]=useState<unknown>(null),[shadow,setShadow]=useState<Shadows|null>(null);
   const engine=stage?.engine as unknown as Engine|null;
@@ -43,7 +43,7 @@ export function MargoCanvas({children,style,className,label='Interactive 3D scen
     const report=(error:unknown)=>{if(!cancelled){setError(error);errorHandler.current?.(error);}};
     queue.current=queue.current.catch(()=>{}).then(async()=>{
       if(cancelled)return;
-      const instance=await Engine.create(element,{capacity,backend,camera:cameraOptions.current});
+      const instance=await Engine.create(element,{capacity,backend,fallback,camera:cameraOptions.current});
       if(cancelled){instance.dispose();return;}
       current=instance;instance.onError=report;
       try {
@@ -56,7 +56,7 @@ export function MargoCanvas({children,style,className,label='Interactive 3D scen
       }catch(error){observer?.disconnect();instance.dispose();setStage(null);throw error;}
     }).catch(report);
     return()=>{cancelled=true;observer?.disconnect();current?.dispose();};
-  },[capacity,backend]);
+  },[capacity,backend,fallback]);
   useCommit(()=>{if(engine&&camera)Object.assign(engine.camera,camera);},[engine,camera?.position?.[0],camera?.position?.[1],camera?.position?.[2],camera?.target?.[0],camera?.target?.[1],camera?.target?.[2],camera?.fov,camera?.near,camera?.far]);
   useEffect(()=>{
     setShadow(null);if(!engine||!shadows)return;

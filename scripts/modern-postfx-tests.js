@@ -38,7 +38,8 @@ try {
     const depthModule=await module(`@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{let xy=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));return vec4f(xy[i],0,1);}
       @fragment fn fragment(@builtin(position) p:vec4f)->@builtin(frag_depth) f32{var z=12.0;if(p.x<16.0){z=2.0;}else if(p.x<32.0){z=5.0;}return 0.1*(100.0-z)/(z*(100.0-0.1));}`);
     const depthPipeline=device.createRenderPipeline({layout:'auto',vertex:{module:depthModule,entryPoint:'vertex'},fragment:{module:depthModule,entryPoint:'fragment',targets:[]},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'always'}});
-    const uniform=buffer(32),params=new Float32Array([5,0.05,2.8,8,0.1,100,12,1]);device.queue.writeBuffer(uniform,0,params);
+    // Params is {lens,frame,ortho} (48 bytes) since 5cf148e; ortho.x=0 is perspective.
+    const uniform=buffer(48),params=new Float32Array([5,0.05,2.8,8,0.1,100,12,1,0,0,0,0]);device.queue.writeBuffer(uniform,0,params);
     const cocGroup=group(cocPipeline,[{buffer:uniform},depth.createView(),coc.createView()]),bokehGroup=group(bokehPipeline,[{buffer:uniform},scene.createView(),coc.createView(),output.createView()]);
     let encoder=device.createCommandEncoder(),pass=encoder.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:depth.createView(),depthClearValue:0,depthLoadOp:'clear',depthStoreOp:'store'}});
     pass.setPipeline(depthPipeline);pass.draw(3);pass.end();dispatch(encoder,cocPipeline,cocGroup,w,h);dispatch(encoder,bokehPipeline,bokehGroup,w,h);device.queue.submit([encoder.finish()]);

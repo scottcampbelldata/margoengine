@@ -12,13 +12,20 @@ const archives=resolve('test-results/modern-packages');await mkdir(archives,{rec
 const dependencies={react:'18.3.1','react-dom':'18.3.1','@types/react':'^18.3.0','@types/react-dom':'^18.3.0','@testing-library/react':'16.3.3',jsdom:'26.1.0'};
 for(const name of ['core','react'])await writeFile(`packages/${name}/dist/__stale-package-test.js`,'throw new Error("Stale build artifact");');
 for(const name of names){
-  const [pack]=JSON.parse(execFileSync(process.execPath,[npm,'pack','--workspace',packageName(name),'--pack-destination',archives,'--json'],{encoding:'utf8'})),files=new Set(pack.files.map(file=>file.path));
-  assert.ok(pack.files.every(file=>['package.json','README.md','LICENSE'].includes(file.path)||file.path.startsWith('dist/')));
+  // prepack (the package build) also prints to stdout; npm's JSON array is the last line starting with '['.
+  const packed=execFileSync(process.execPath,[npm,'pack','--workspace',packageName(name),'--pack-destination',archives,'--json'],{encoding:'utf8'}),[pack]=JSON.parse(packed.slice(packed.lastIndexOf('\n[')+1)),files=new Set(pack.files.map(file=>file.path));
+  assert.ok(pack.files.every(file=>['package.json','README.md','LICENSE','NOTICE.md'].includes(file.path)||file.path.startsWith('dist/')),`${name}: files outside dist`); // post ships NOTICE.md (AgX attribution)
   assert.ok(files.has('README.md')&&files.has('LICENSE'));assert.ok(!files.has('dist/__stale-package-test.js'));
   if(name==='machinery')for(const file of ['cad-runtime.js','occt-import-js.js','occt-import-js.wasm','OCCT-LICENSE.txt','OCCT-NOTICE.txt'])assert.ok(files.has('dist/workers/'+file),`Missing CAD worker asset: ${file}`);
   const manifest=JSON.parse(await readFile(`packages/${name}/package.json`,'utf8'));
   assert.notEqual(manifest.private,true);assert.equal(manifest.license,'MIT');assert.equal(manifest.publishConfig.access,'public');
   for(const entry of Object.values(manifest.exports))for(const target of Object.values(entry))assert.ok(files.has(target.slice(2)),`Missing packed export: ${manifest.name} ${target}`);
+  dependencies[packageName(name)]=`file:${join(archives,pack.filename).replaceAll('\\','/')}`;
+}
+// Required dependencies of the packages above (machinery, terrain, controls; math since the math consolidation) that are not on
+// npm yet; packed as built.
+for(const name of ['geometry','lines','text','bvh','math']){
+  const [pack]=JSON.parse(execFileSync(process.execPath,[npm,'pack','--workspace',packageName(name),'--ignore-scripts','--pack-destination',archives,'--json'],{encoding:'utf8'}));
   dependencies[packageName(name)]=`file:${join(archives,pack.filename).replaceAll('\\','/')}`;
 }
 const fixture=await mkdtemp(join(tmpdir(),'margoengine-consumer-'));let browser;

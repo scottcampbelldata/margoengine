@@ -35,7 +35,7 @@ export function GeometryResource({ geometry }: {
     geometry: Geometry;
 }): null;
 
-export function MargoCanvas({ children, style, className, label, capacity, backend, camera, shadows, onCreated, onError }: CanvasProps): import("react").JSX.Element;
+export function MargoCanvas({ children, style, className, label, capacity, backend, fallback, camera, shadows, onCreated, onError }: CanvasProps): import("react").JSX.Element;
 
 export type MargoCanvasProps = CanvasProps;
 

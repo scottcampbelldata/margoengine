@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/starter-vite", "version": "0.1.0", "private": true, "type": "module",
   "scripts": {"dev": "vite --host 127.0.0.1", "build": "tsc -p tsconfig.json && vite build --manifest"},
-  "dependencies": {"margoengine": "0.1.0", "@margoengine/core": "0.1.0", "@margoengine/react": "0.1.0", "@margoengine/gltf": "0.1.0", "@margoengine/machinery":"0.1.0", "@margoengine/creative":"0.1.0", "@margoengine/scenery":"0.1.0", "@margoengine/post":"0.1.0", "react": "19.3.0", "react-dom": "19.3.0"},
+  "dependencies": {"margoengine": "0.1.0", "@margoengine/core": "0.1.0", "@margoengine/react": "0.1.0", "@margoengine/gltf": "0.1.0", "@margoengine/machinery":"0.1.0", "@margoengine/creative":"0.1.0", "@margoengine/scenery":"0.1.0", "@margoengine/post":"0.1.0", "@margoengine/webgl":"0.1.0", "react": "19.3.0", "react-dom": "19.3.0"},
   "devDependencies": {"vite": "^8.3.4"}
 }

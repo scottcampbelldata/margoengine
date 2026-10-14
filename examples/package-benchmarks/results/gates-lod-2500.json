@@ -1,0 +1,77 @@
+{
+ "adapter": {
+  "vendor": "intel",
+  "architecture": "xe-2lpg",
+  "device": "",
+  "description": "",
+  "fallback": false
+ },
+ "browser": "155.0.4283.45",
+ "empty": {
+  "cpu": {
+   "median": 0.5,
+   "p90": 0.7
+  },
+  "gpu": {
+   "median": 3.6,
+   "p90": 5.2
+  },
+  "levels": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "drawCalls": 0,
+  "visible": 0
+ },
+ "lod": {
+  "cpu": {
+   "median": 0.8,
+   "p90": 1
+  },
+  "gpu": {
+   "median": 23.2,
+   "p90": 26.8
+  },
+  "levels": [
+   0,
+   122,
+   435,
+   1943
+  ],
+  "drawCalls": 2,
+  "visible": 417
+ },
+ "full": {
+  "cpu": {
+   "median": 0.7,
+   "p90": 0.9
+  },
+  "gpu": {
+   "median": 226.9,
+   "p90": 235.8
+  },
+  "levels": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "drawCalls": 1,
+  "visible": 2228
+ },
+ "scene": {
+  "instances": 2500,
+  "triangles": {
+   "high": 50000,
+   "mid": 3072,
+   "low": 576
+  },
+  "bakeMs": 164.20000000298023
+ },
+ "image": {
+  "meanAbsDiff": 1.72,
+  "coverage": 0.99
+ }
+}

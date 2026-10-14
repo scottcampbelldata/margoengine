@@ -12,8 +12,10 @@ const urls={
   robot:'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/RobotExpressive/RobotExpressive.glb'
 };
 const assets={};
+// The repository ships both models (examples/assets, see ATTRIBUTION.md); the URLs are only the fetch keys the page uses.
+const local={helmet:'examples/assets/damaged-helmet.glb',robot:'examples/assets/robot-expressive.glb'};
 for(const [name,url] of Object.entries(urls)) {
-  const path='test-results/'+name+'.glb';try{assets[name]=await readFile(path);}catch(error){if(error.code!=='ENOENT')throw error;const bytes=await readResponse(await fetch(url),{maxBytes:64*1024*1024,label:name+' asset'});assets[name]=Buffer.from(bytes);await writeFile(path,assets[name]);}
+  const path=local[name];try{assets[name]=await readFile(path);}catch(error){if(error.code!=='ENOENT')throw error;const bytes=await readResponse(await fetch(url),{maxBytes:64*1024*1024,label:name+' asset'});assets[name]=Buffer.from(bytes);await writeFile(path,assets[name]);}
 }
 const demos={helmet:'damaged-helmet',robot:'robot-expressive',character:'character-animation'};
 async function assertRobotMobileLayout(page){
@@ -102,7 +104,8 @@ try {
   };
   await page.addInitScript(samplingAudit);
   for(const [name,demo] of Object.entries(demos)) {
-    await page.goto('http://127.0.0.1:5193/examples/'+demo+'.html');
+    // Full tier: the light tier paces frames by rAF time, which this test freezes (window.demoTime).
+    await page.goto('http://127.0.0.1:5193/examples/'+demo+'.html?quality=high');
     await page.waitForFunction(()=>document.querySelector('#viewport').dataset.ready==='true'||document.querySelector('#error').textContent.length>0);
     assert.equal(await page.locator('#error').innerText(),'');
     if(name==='helmet') {await page.locator('#ssao').uncheck();await page.locator('#ssao').check();}
