@@ -13,7 +13,7 @@ import {CABIN_EXCLUSIONS} from './procedural/placement.ts';
 export function createLandscapeDetails(engine: EngineKernel, exclusions: readonly GroundBounds[], heightmap: () => GPUTexture | undefined) {
   const mobile = sceneSamples() === 1;
   const linePositions = wireframePositions(heightfieldGeometry(terrainHeight,{size: [ISLAND_SIZE,ISLAND_SIZE], resolution: 64}),0.035);
-  const lines = new Lines(); engine.use(lines);
+  const lines = Lines.attach(engine);
   const terrainWireframe = lines.add(new Line({positions: linePositions, mode: 'segments', color: '#daf6aa', width: 0.8, opacity: 0.65, visible: false, join: 'miter', cap: 'butt'}));
   const grass = Scatter.attach(engine, [toGeometry(generateGrassMesh(3)),toGeometry(generateGrassMesh(2)),toGeometry(generateGrassMesh(1))], {count: mobile ? 25_000 : 110_000, area: [ISLAND_SIZE, ISLAND_SIZE], minHeight: 0.9, maxHeight: 13, maxSlope: 32, density: 0.86, scale: [0.6, 1.3], lod: [18, 42, 105], material: new PbrMaterial({color: [0.19, 0.28, 0.09], roughness: 0.95, doubleSided: true}), wind: [1,0.35,0.2], seed: 37, exclusions: CABIN_EXCLUSIONS, heightmap});
   const rocks = applyMatrix4(generateRockMesh(),[0.65,0,0,0,0,0.65,0,0,0,0,0.65,0,0,0,0,1]);

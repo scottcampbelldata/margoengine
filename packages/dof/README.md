@@ -9,7 +9,7 @@ const stage = await createStage('#viewport', {backend:'webgpu'});
 const dof = DOF.attach(stage.engine, {focalDistance:5, focalLength:0.05, aperture:2.8});
 dof.options.focalDistance = 3;
 dof.enabled = false;
-dof.destroy();
+dof.dispose();
 stage.dispose();
 ```
 

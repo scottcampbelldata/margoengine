@@ -40,7 +40,7 @@ try {
   const render=()=>stage.engine.render({delta:0});
   const populate=()=>{
     const time=meadow?.windTime??0;meadow?.dispose();
-    meadow=new GrassField(stage,{blades:Number(density.value),area:[60,60],bladeHeight:1.2,
+    meadow=GrassField.attach(stage.engine,{blades:Number(density.value),area:[60,60],bladeHeight:1.2,
       windSpeed:speed.valueAsNumber,windStrength:strength.valueAsNumber,drawDistance:90,spores:seeds.checked});
     meadow.windTime=time;
     status.textContent=`WebGPU · ${meadow.blades.toLocaleString('en-US')} blades${seeds.checked?' · 240 seeds':''}`;

@@ -37,7 +37,9 @@ code that does the same job. Where Margo has no equivalent yet, the section says
   draws core meshes only (flat PBR, one light, no textures or effects). Most optional packages need WebGPU.
 - **No `Scene` object.** One `Engine` owns one canvas, one camera and one implicit scene. Meshes are created by the
   engine (`engine.createMesh()`), and features (shadows, lights, post effects, controls) are plugins you attach with
-  `engine.use(plugin)` or a static `X.attach(engine, options)`.
+  one form, `X.attach(engine, options)` (async ones such as `Environment.attach` return a Promise). A loaded model
+  joins a feature with `feature.add(model)`, and everything disposable has `dispose()` and `[Symbol.dispose]`
+  (`using`).
 - **Small core, optional packages.** Core plus the `margoengine` stage facade is under 20 kB gzip (18,681 bytes today;
   three.js is about 138 kB for WebGL and 229 kB for WebGPU, `npm run measure:threejs`). Everything else is a separate
   package that you install and import only when you use it.
@@ -340,18 +342,15 @@ scene.fog = new THREE.Fog('#bcd4e6', 10, 80);
 import {Environment, EnvironmentBackground, EnvironmentLighting, ColorBackground, Fog, loadEnvironmentImage} from '@margoengine/environment';
 
 const image = await loadEnvironmentImage('/studio.hdr'); // .hdr, .exr or UltraHDR .jpg
-const environment = await Environment.create(engine, image, {rotation: 0.5});
-engine.use(environment);
-engine.use(new EnvironmentBackground(environment, {blur: 0.2}));
-const ibl = new EnvironmentLighting(environment);
-engine.use(ibl);          // core meshes
-ibl.applyTo(model);       // gltf-pro models
+const environment = await Environment.attach(engine, image, {rotation: 0.5});
+EnvironmentBackground.attach(engine, environment, {blur: 0.2});
+const ibl = EnvironmentLighting.attach(engine, environment); // core meshes
+ibl.add(model);                                              // gltf-pro models
 
 // Or a plain colour and fog:
-engine.use(new ColorBackground({color: '#bcd4e6'}));
-const fog = new Fog({color: '#bcd4e6', near: 10, far: 80}); // {density: 0.02} for FogExp2
-engine.use(fog);
-fog.applyTo(model);
+ColorBackground.attach(engine, {color: '#bcd4e6'});
+const fog = Fog.attach(engine, {color: '#bcd4e6', near: 10, far: 80}); // {density: 0.02} for FogExp2
+fog.add(model);
 fog.far = 120;            // options are live properties
 ```
 
@@ -457,8 +456,7 @@ import {Animation} from '@margoengine/animation';
 import {bakeVAT, VATCrowd} from '@margoengine/animation/vat';
 
 const vat = bakeVAT(new Animation(model), {fps: 30, clips: ['Walking', 'Running']});
-const crowd = new VATCrowd(vat, {roughness: 0.6});
-engine.use(crowd);
+const crowd = VATCrowd.attach(engine, vat, {roughness: 0.6});
 for (let i = 0; i < 1000; i++) {
   crowd.add({matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, (i % 40) * 2, 0, Math.floor(i / 40) * 2, 1], clip: i % 2, offset: Math.random(), speed: 1});
 }
@@ -505,11 +503,11 @@ scene.add(gizmo.getHelper());
 ```ts
 import {OrbitControls, TransformControls, DragControls} from '@margoengine/controls';
 
-const drag = new DragControls(engine, [mesh, model]); // create before OrbitControls so a grab stops the orbit
+const drag = DragControls.attach(engine, [mesh, model]); // create before OrbitControls so a grab stops the orbit
 drag.plane = [0, 1, 0];                               // slide on the ground
-const orbit = new OrbitControls(engine);              // attaches to engine.canvas and updates before each render
+const orbit = OrbitControls.attach(engine);              // attaches to engine.canvas and updates before each render
 orbit.enableDamping = true;
-const gizmo = new TransformControls(engine, {mode: 'translate', translationSnap: 0.25});
+const gizmo = TransformControls.attach(engine, {mode: 'translate', translationSnap: 0.25});
 gizmo.attach(mesh);
 gizmo.addEventListener('dragging-changed', event => { orbit.enabled = !event.value; });
 ```
@@ -518,7 +516,7 @@ gizmo.addEventListener('dragging-changed', event => { orbit.enabled = !event.val
   option names. Core has `CADCameraControls` (orbit about a pivot, pan, smooth zoom), which the stage facade uses.
 - Without an engine, pass a camera and an element and call `update(delta)` yourself:
   `new FlyControls(engine.camera, canvas)`.
-- `new ViewCube(engine)` from `@margoengine/viewcube` replaces `ViewHelper` (click a face to turn the view).
+- `ViewCube.attach(engine)` from `@margoengine/viewcube` replaces `ViewHelper` (click a face to turn the view).
 - No `ArcballControls`. Controls do not roll the camera.
 
 ## Raycasting and picking
@@ -633,8 +631,7 @@ import {box, Geometry} from '@margoengine/core';
 import {LODSystem, Imposter} from '@margoengine/lod';
 
 const high: Geometry = box(), low: Geometry = box();
-const lods = new LODSystem({hysteresis: 0.1});
-engine.use(lods);
+const lods = LODSystem.attach(engine, {hysteresis: 0.1});
 const imposter = Imposter.bake(engine, model); // octahedral imposter, baked once on the GPU
 lods.add(mesh, [
   {object: high},                    // Geometry levels swap the mesh's geometry
@@ -757,8 +754,7 @@ camera.updateProjectionMatrix();
 import {CameraProjection} from '@margoengine/cameras';
 
 engine.camera.position = [0, 40, 0]; // exactly straight down
-const projection = new CameraProjection(); // orthographic, framed like the perspective view at the target
-engine.use(projection);
+const projection = CameraProjection.attach(engine); // orthographic, framed like the perspective view at the target
 projection.height = 12;                    // visible world height; or left/right/top/bottom like three.js
 projection.zoom = 2;
 projection.mode = 'perspective';           // toggle at any time
@@ -788,23 +784,19 @@ import {PointsPlugin, PointCloud} from '@margoengine/points';
 import {TextRenderer, Text} from '@margoengine/text';
 import {LabelRenderer} from '@margoengine/labels';
 
-const lines = new Lines();
-engine.use(lines);
+const lines = Lines.attach(engine);
 lines.add(new Line({positions: [-2, 0, 0, 0, 1, 0, 2, 0, 0], color: '#ffaa00', width: 4})); // CSS pixels; worldUnits: true for metres
 lines.add(new GridHelper({size: 10, divisions: 10}));
 lines.add(new AxesHelper({size: 2}));
 
-const points = new PointsPlugin({pointBudget: 2_000_000});
-engine.use(points);
+const points = PointsPlugin.attach(engine, {pointBudget: 2_000_000});
 const positions = new Float32Array([0, 0, 0, 1, 1, 1]);
 points.add(new PointCloud({positions, material: {size: 2, shape: 'round'}}));
 
-const text = new TextRenderer(); // GPU SDF text from any browser font
-engine.use(text);
+const text = TextRenderer.attach(engine); // GPU SDF text from any browser font
 text.add(new Text({text: 'Hello', fontSize: 0.5, anchorX: 'center', billboard: true, mesh, position: [0, 1, 0]}));
 
-const labels = new LabelRenderer(); // HTML labels, like CSS2DRenderer
-engine.use(labels);
+const labels = LabelRenderer.attach(engine); // HTML labels, like CSS2DRenderer
 const element = document.createElement('div');
 element.textContent = 'Pump 3';
 labels.add(element, {mesh, offset: [0, 0.8, 0]});
@@ -877,10 +869,11 @@ in the frame it changes.
 | --- | --- |
 | `geometry.dispose()`, `material.dispose()` | Core frees a `Geometry`'s GPU buffers when its last mesh is gone; `mesh.dispose()` |
 | `texture.dispose()` | `texture.dispose()` (materials never dispose shared textures) |
-| `scene.remove(gltf.scene)` + traverse and dispose | `model.destroy()` |
-| `mixer.uncacheRoot(...)` | `animation.destroy()` (or `model.destroy()`, which removes it) |
+| `scene.remove(gltf.scene)` + traverse and dispose | `model.dispose()` |
+| `mixer.uncacheRoot(...)` | `animation.dispose()` (or `model.dispose()`, which removes it) |
 | `composer.dispose()`, `pass.dispose()` | `stack.dispose()` (disposes its effects) |
 | `controls.dispose()` | `orbit.dispose()`, or nothing: `engine.dispose()` disposes attached controls |
+| none | every disposable Margo object has `[Symbol.dispose]`, so `using fog = Fog.attach(engine)` disposes it when the block ends |
 | `renderer.dispose()` | `engine.dispose()`: disposes every plugin (shadows, lights, effects, controls, models) |
 
 `engine.removePlugin(plugin.name)` removes one feature while the engine keeps running. After a GPU device loss the

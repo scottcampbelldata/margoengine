@@ -23,10 +23,10 @@ const engine = await Engine.create(canvas);
 const mesh = engine.createMesh().setGeometry(box());
 
 // Passing the engine attaches to engine.canvas and updates before every render.
-const orbit = new OrbitControls(engine);
+const orbit = OrbitControls.attach(engine);
 orbit.enableDamping = true;
 
-const gizmo = new TransformControls(engine, {mode: 'translate', translationSnap: 0.25});
+const gizmo = TransformControls.attach(engine, {mode: 'translate', translationSnap: 0.25});
 gizmo.attach(mesh);
 gizmo.addEventListener('dragging-changed', event => {orbit.enabled = !event.value;});
 addEventListener('keydown', event => {if (event.key === 'r') gizmo.setMode('rotate');});
@@ -47,8 +47,8 @@ import {loadGLTF} from '@margoengine/gltf-pro';
 const engine = await Engine.create(document.querySelector('canvas')!);
 const mesh = engine.createMesh().setGeometry(box());
 const part = await loadGLTF(engine, '/part.glb');
-const drag = new DragControls(engine, [mesh, part]);          // created before OrbitControls: a grab stops the orbit drag
-const orbit = new OrbitControls(engine);
+const drag = DragControls.attach(engine, [mesh, part]);          // created before OrbitControls: a grab stops the orbit drag
+const orbit = OrbitControls.attach(engine);
 drag.plane = [0, 1, 0];                                        // slide on the ground; default 'view' faces the camera
 drag.axis = [1, 0, 0];                                         // or only along world X
 drag.addEventListener('dragstart', event => console.log(event.object, event.hit)); // hit: a bvh RaycasterHit

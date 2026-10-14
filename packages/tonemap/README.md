@@ -11,7 +11,7 @@ tonemap.options.exposure = 1;
 tonemap.options.curve = 'neutral';
 tonemap.setLUT(await (await fetch('/grade.cube')).text());
 tonemap.setLUT(null);
-tonemap.destroy();
+tonemap.dispose();
 stage.dispose();
 ```
 

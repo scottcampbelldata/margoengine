@@ -6,7 +6,7 @@ import {Stats} from '@margoengine/stats';
 import {applyQualityTier, paceEngine, watchQuality} from '@margoengine/quality';
 
 // A small procedural studio (sky gradient, dark floor, two soft boxes) used for image-based lighting.
-// For a real HDR: Environment.create(engine, await loadEnvironmentImage('/studio.hdr')).
+// For a real HDR: Environment.attach(engine, await loadEnvironmentImage('/studio.hdr')).
 function studio(width = 128, height = 64) {
   const data = new Float32Array(width * height * 4);
   for (let y = 0; y < height; y++) {
@@ -28,10 +28,9 @@ async function start() {
   const engine = await Engine.create(canvas, {camera: {position: [0, 2.6, 6.2], target: [0, 0.6, 0], fov: 45}});
   paceEngine(engine); // steady ~60 FPS on the light tier, even on 120 Hz screens
 
-  const environment = await Environment.create(engine, studio());
-  engine.use(environment);
-  engine.use(new EnvironmentLighting(environment));
-  engine.use(new EnvironmentBackground(environment, {blur: 0.5, exposure: 0.45}));
+  const environment = await Environment.attach(engine, studio());
+  EnvironmentLighting.attach(engine, environment);
+  EnvironmentBackground.attach(engine, environment, {blur: 0.5, exposure: 0.45});
 
   const knot = engine.createMesh()
     .setGeometry(toGeometry(torusKnotGeometry(0.55, 0.18, 160, 24)))
@@ -50,7 +49,7 @@ async function start() {
     .setMaterial(new PbrMaterial({color: '#2a303a', roughness: 0.8}))
     .position.set(0, -0.05, 0);
 
-  const orbit = new OrbitControls(engine); // left drag orbits, right drag pans, wheel zooms
+  const orbit = OrbitControls.attach(engine); // left drag orbits, right drag pans, wheel zooms
   orbit.enableDamping = true;
   Stats.attach(engine); // FPS and frame-time overlay; remove for production
 

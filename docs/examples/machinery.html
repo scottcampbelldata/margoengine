@@ -70,8 +70,7 @@ engine.createMesh().setGeometry(box()).setScale([2, 0.3, 1])
   .setPosition([0, -1.2, 0]).setMaterial(new PbrMaterial({ color: '#6a7d96' }));
 const arm = engine.createMesh().setGeometry(box()).setScale([0.3, 2, 0.3])
   .setMaterial(new PbrMaterial({ color: '#e5b65c', metalness: 0.4 }));
-const joints = new Kinematics([{ node: arm, axis: 'z', min: -0.8, max: 0.8 }]);
-engine.use(joints);
+const joints = Kinematics.attach(engine, [{ node: arm, axis: 'z', min: -0.8, max: 0.8 }]);
 let elapsed = 0;
 engine.onFrame((_, delta) => {
   elapsed += delta;

@@ -509,7 +509,7 @@ async function load() {
     runtime.lighting.direction.set(KEY_LIGHT.direction); runtime.lighting.radiance.set(KEY_LIGHT.radiance);
     engine.use(shading);
     // Lines and outlines need WebGPU; the WebGL2 fallback keeps the model, camera and panel.
-    if (engine.backend === 'webgpu') {lines = new Lines; engine.use(lines); picking = api.picking = Picking.attach(engine, {capture: false}); selection = Selection.attach(engine, {width: 2, color: [0.09, 0.41, 0.62]});}
+    if (engine.backend === 'webgpu') {lines = Lines.attach(engine); picking = api.picking = Picking.attach(engine, {capture: false}); selection = Selection.attach(engine, {width: 2, color: [0.09, 0.41, 0.62]});}
     controls = new OrbitControls(engine.camera, canvas);
     controls.enableDamping = true; controls.dampingFactor = 0.085; controls.screenSpacePanning = true; controls.listenToKeyEvents(canvas);
     controls.addEventListener('start', () => {transition = null;});
@@ -531,8 +531,8 @@ async function load() {
 
     const hdr = embedded('environment-data');
     if (hdr && engine.backend === 'webgpu') try {
-      const environment = await Environment.create(engine, parseHDR(hdr));
-      engine.use(environment); shading.environment = environment; dirty = true;
+      const environment = await Environment.attach(engine, parseHDR(hdr));
+      shading.environment = environment; dirty = true;
     } catch (error) {state.environmentWarning = String(error);}
   } catch (error) {
     state.error = String(error?.message || error);

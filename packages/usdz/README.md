@@ -10,7 +10,7 @@ const canvas=document.createElement('canvas');document.body.append(canvas);
 const engine=await Engine.create(canvas,{backend:'webgpu',capacity:10000});
 const model=await loadUSDZ(engine,'/model.usdz');
 engine.start();
-// model.destroy() detaches its PBR plugin and frees meshes/textures.
+// model.dispose() detaches its PBR plugin and frees meshes/textures.
 ```
 
 `parseUSDA(textOrBytes)`, `parseUSDC(bytes)`, and async `parseUSDZ(bytes)` return a `USDAsset` with typed mesh streams, a glTF document/buffers, and async `create(engine)` to attach PBR rendering. `loadUSDZ` fetches with streaming byte bounds and creates the model. Options: `maxBytes`, `maxVertices`, `maxTriangles`, `maxDepth`, `signal`. Defaults: 64 MiB, one million expanded vertices/triangles, depth 32. The engine needs capacity for the hierarchy plus the PBR model root. Texture ownership passes to the PBR model and is released on destruction or failed setup.

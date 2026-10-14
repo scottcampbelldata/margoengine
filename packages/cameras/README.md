@@ -9,8 +9,7 @@ import {Engine} from '@margoengine/core';
 import {CameraProjection} from '@margoengine/cameras';
 
 const engine = await Engine.create(canvas, {camera: {position: [0, 40, 0], target: [0, 0, 0]}}); // straight down
-const projection = new CameraProjection();  // orthographic, framed like the perspective view at the target
-engine.use(projection);
+const projection = CameraProjection.attach(engine); // orthographic, framed like the perspective view at the target
 
 projection.mode = 'perspective';             // toggle at any time; vertical views keep working
 projection.mode = 'orthographic';

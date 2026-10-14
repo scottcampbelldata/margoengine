@@ -82,7 +82,7 @@ The compiler hash-conses the graph, so equal subexpressions built separately (th
 | `Fn(([a, b]) => ...)` | `Fn((a: Node<'vec3f'>, b: Node<'f32'>) => ...)` (positional, typed) |
 | `wgslFn('fn f(...) -> T {...}')` | same |
 | `varying(node)` / `vertexStage(node)` | `varying(node)` |
-| `pass(scene, camera)` + `postProcessing.outputNode` | `new NodePass(node)` in a `PostStack`; `inputColor()`, `inputDepth()` |
+| `pass(scene, camera)` + `postProcessing.outputNode` | `new NodePass(node)` in a `PostStack` (or `NodePass.attach(engine, node)` alone); `inputColor()`, `inputDepth()` |
 | `storage(attribute, 'vec4', n)`, `Fn(...)().compute(n)`, `renderer.compute(...)` | `storage(array, 'vec4f')`, `ComputePass.attach(engine, n, i => buf.store(i, value))` |
 | `instanceIndex` | `instanceIndex` (compute only) |
 | `Discard(cond)` inside `Fn` | `discard(cond, value)` around the value it guards |

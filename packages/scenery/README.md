@@ -16,14 +16,13 @@ import {Engine} from '@margoengine/core';
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
 const {SkyMoon} = await import('@margoengine/scenery/sky');
-const sky = new SkyMoon({moonDirection: [0.45, 0, -1], moonPhase: 0.85});
-engine.use(sky);
+const sky = SkyMoon.attach(engine, {moonDirection: [0.45, 0, -1], moonPhase: 0.85});
 engine.start();
 sky.config.moonPhase = 0.2; // read every frame
 ```
 
 `@margoengine/scenery/sky` and the root export `SkyMoon` and the `SkyMoonConfig` type (an alias of Sky's
-`SkyNightOptions`). `new SkyMoon(config)` is `new Sky({hours: 0, timeScale: 0, night: config}, {night})` from
+`SkyNightOptions`). `SkyMoon.attach(engine, config)` is `engine.use(new SkyMoon(config))`, and `new SkyMoon(config)` is `new Sky({hours: 0, timeScale: 0, night: config}, {night})` from
 `@margoengine/sky/base` with plugin name `sky-moon`: it loads only the stylized-night feature (6.1 kB min+gzip with
 Sky's base, against 10.2 kB for the full Sky), so it is not an `instanceof` the root `Sky`, and options that need
 other features (fog, clouds, a day model) throw; build a `Sky` with those features instead. `config` (also

@@ -10,7 +10,7 @@ const canvas=document.createElement('canvas');document.body.append(canvas);
 const engine=await Engine.create(canvas,{backend:'webgpu'});
 const cube=engine.createMesh().setGeometry(box());
 if(await XR.isSupported('immersive-vr')) {
-  const xr=await XR.create(engine); // prepare before the user gesture
+  const xr=await XR.attach(engine); // prepare before the user gesture
   const enter=document.createElement('button');enter.textContent='Enter VR';document.body.append(enter);
   enter.onclick=()=>{void xr.requestSession('immersive-vr',{
     onFrame({delta,inputs}) {

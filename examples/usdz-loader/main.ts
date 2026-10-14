@@ -28,10 +28,10 @@ try {
       });
       const next = await asset.create(engine!, { signal: controller.signal });
       if (controller.signal.aborted) {
-        next.destroy();
+        next.dispose();
         return;
       }
-      model?.destroy();
+      model?.dispose();
       model = next;
       status.textContent = `Loaded ${asset.meshes.length} meshes`;
     })().catch((error) => {

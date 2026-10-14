@@ -50,7 +50,7 @@ try {
   paceEngine(stage.engine);
   const post = Bloom.attach(stage.engine, {strength: 0.25, threshold: 1, exposure: 0.6});
   const mobile = sceneSamples() === 1;
-  const earth = await Planet.create(stage.engine, {
+  const earth = await Planet.attach(stage.engine, {
     signal,
     radius: 1, tilt: 23.4,
     dayMap: new URL('./assets/earth-day-mobile.webp', import.meta.url),
@@ -60,8 +60,8 @@ try {
     clouds: new URL('./assets/earth-clouds-mobile.webp', import.meta.url),
     atmosphere: {color: [0.3, 0.6, 1.0], intensity: 1.2},
   });
-  const stars = new Stars(); stage.use(stars);
-  const navigation = new OrbitControls(stage.engine);
+  const stars = Stars.attach(stage.engine);
+  const navigation = OrbitControls.attach(stage.engine);
   navigation.enableDamping = !reducedMotion.matches; navigation.enablePan = false;
   navigation.minDistance = 1.15; navigation.maxDistance = 12; navigation.saveState();
   stage.use({name: 'earth-demo:events', setup() {}, dispose: () => events.abort()});

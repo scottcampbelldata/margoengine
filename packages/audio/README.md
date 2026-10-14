@@ -7,8 +7,7 @@ Build from source with `npm run build` in `packages/audio`.
 ```ts
 import {AudioListener, Audio, PositionalAudio, AudioAnalyser} from '@margoengine/audio';
 
-const listener = new AudioListener({volume: 0.8});
-engine.use(listener); // follows engine.camera every frame; resumes on the first click or key press
+const listener = AudioListener.attach(engine, {volume: 0.8}); // follows engine.camera every frame; resumes on the first click or key press
 
 const engineSound = new PositionalAudio(listener, {
   mesh: truck, refDistance: 2, distanceModel: 'inverse', rolloffFactor: 1.2,
