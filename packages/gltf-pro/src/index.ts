@@ -272,8 +272,11 @@ export class PBRModel implements EnginePlugin {
       const a=node.matrix;v[97]=Math.sign(a[0]*(a[5]*a[10]-a[6]*a[9])-a[4]*(a[1]*a[10]-a[2]*a[9])+a[8]*(a[1]*a[6]-a[2]*a[5]));
       v.set(m.ext,100);v.set(m.uvt,104);if(m.physical)v.set(m.physical,208);
       c.device.queue.writeBuffer(r.uniform,0,v as Float32Array<ArrayBuffer>);
-      let code=m.physical?physicalShader():pbrShader;
-      if(mode==='beauty')for(const effect of this.lighting)code=effect.shader(code,2);
+      let code=m.physical?physicalShader():pbrShader,entry=mode==='beauty'?'fragment':mode==='gbuffer'?'gbuffer':'ambientFragment',lit=mode==='beauty';
+      if(mode!=='gbuffer'&&this.lighting.size){let patched=code;for(const effect of this.lighting)patched=effect.shader(patched,2);
+        // An effect that replaces the ambient light names it `let margoAmbient=` (environment IBL); SSAO's ambient replay then returns it
+        // from the lit fragment, `_=color` keeping every lighting binding in the layout. Unlit materials have no ambient.
+        if(lit)code=patched;else if(patched.includes('let margoAmbient=')){code=patched.replace('return vec4f(color,','_=color;return vec4f(select(margoAmbient,vec3f(0),f.ext.x>0.5),');entry='fragment';lit=true;}}
       // Keep the shader's original front-facing convention, including mirrored transforms.
       const cull:GPUCullMode=m.settings[2]<0.5?(v[97]>0?'back':'front'):'none';
       const state:PBRRenderState|undefined=mode==='beauty'?m.renderState:undefined;
@@ -282,7 +285,7 @@ export class PBRModel implements EnginePlugin {
       if(!pipeline) {
         const module=c.device.createShaderModule({code}),format=mode==='beauty'?c.format:'rgba16float';
         pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:80,attributes:Array.from({length:5},(_,i)=>({shaderLocation:i,offset:i*16,format:'float32x4' as const}))}]},
-          fragment:{module,entryPoint:mode==='beauty'?'fragment':mode==='gbuffer'?'gbuffer':'ambientFragment',targets:[{format,blend:state?.blend!==undefined?state.blend??undefined:blend&&mode!=='gbuffer'?{color:transmit?{srcFactor:'one',dstFactor:'constant'}:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
+          fragment:{module,entryPoint:entry,targets:[{format,blend:state?.blend!==undefined?state.blend??undefined:blend&&mode!=='gbuffer'?{color:transmit?{srcFactor:'one',dstFactor:'constant'}:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
           multisample:c.descriptor.multisample,primitive:{cullMode:cull},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:state?.depthWrite??(mode==='beauty'&&!blend),depthCompare:state?.depthCompare??(mode==='beauty'?'greater-equal':'equal')}});
         this.pipelines.set(key,pipeline);
       }
@@ -297,7 +300,7 @@ export class PBRModel implements EnginePlugin {
       pass??=c.encoder.beginRenderPass({colorAttachments:[{view:color,loadOp:'load',storeOp:'store'}],depthStencilAttachment:{view:depth,depthLoadOp:'load',depthStoreOp:'store',...(c.descriptor.depthStencil!.format.includes('stencil')?{stencilLoadOp:'load',stencilStoreOp:'store'}:{})}});
       pass.setPipeline(pipeline);pass.setBindGroup(0,groups[0]);pass.setBindGroup(1,groups[1]);
       if(transmit&&mode!=='gbuffer')pass.setBlendConstant([...m.tint,1]);
-      if(mode==='beauty'&&this.lighting.size){
+      if(lit&&this.lighting.size){
         const entries=[...this.lighting].flatMap(effect=>effect.bindings());let cached=this.lightingGroups.get(pipeline);
         if(!cached||entries.length!==cached.entries.length||entries.some((entry,i)=>{
           const previous=cached!.entries[i],resource=entry.resource,old=previous.resource;

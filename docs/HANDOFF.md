@@ -108,9 +108,8 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    instead of 1,000,000), then the billboard draw cost. Keep only measured wins; if 1M still misses 60, keep it as
    an option, not the light-tier default (already 100k).
 1. Top-10 parity gaps (non-core parts): materials package [done: `@margoengine/materials`], glTF extensions/decoders [done: decoder hooks, KHR extensions, physical materials (`c01eedd`)], post stack +
-   FXAA [done: `@margoengine/post/stack`, `@margoengine/post/fxaa`; SMAA not done], raycast/pick glTF models + DragControls [running], environment IBL apply + background colour + fog [done `269401e`: EnvironmentLighting, Fog, ColorBackground, UltraHDR; light probes (gap 44) and SSAO-on-IBL left],
-   orthographic/vertical cameras without core change [done: `@margoengine/cameras`; SSAO, lines/points widths, labels,
-   clustered, DOF and splats still assume perspective], WebGL beyond core (gap 8: scope with Scott first).
+   FXAA [done: `@margoengine/post/stack`, `@margoengine/post/fxaa`; SMAA not done], raycast/pick glTF models + DragControls [running], environment IBL apply + background colour + fog [done `269401e`: EnvironmentLighting, Fog, ColorBackground, UltraHDR; light probes (gap 44) left; SSAO-on-IBL done (1d''')],
+   orthographic/vertical cameras without core change [done: `@margoengine/cameras`; only lines' world widths still assume perspective], WebGL beyond core (gap 8: scope with Scott first).
 1b. [done `ed83cb6`; GPU check passed in the worker's tree, re-run on the merged branch pending] Composable shader nodes (`@margoengine/shader`, parity gap 19), moved up after Scott noted three.js's TSL /
    RenderPipeline node workflows (r183 RenderPipeline, r186 pipeline hooks): small typed nodes compiling to WGSL for
    materials and post effects, built on the materials package and the post stack once both APIs settle.
@@ -122,11 +121,14 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    the three nearest views has no snapping while rotating.
 1d''. Pipeline cache keyed by shader module + override-constant bitmask, with common permutations pre-warmed, so
    toggling a section plane or fog never stalls on a synchronous compile (pairs with 1e.f).
-1d'''. Ambient occlusion attenuates image-based lighting (environment IBL), not only the constant ambient term.
+1d'''. [DONE] Ambient occlusion attenuates image-based lighting (environment IBL), not only the constant ambient term.
+   Shader convention `let margoAmbient=` (no imports either way): EnvironmentLighting names its IBL term so; SSAO and
+   glTF-pro's ambient replay return it, IBL diffuse and specular occluded by the same AO (specular approximation).
+   Real-GPU: `node scripts/ssao-gpu-check.js` (creases darken vs IBL alone, open faces unchanged).
 1d. Imposter picking: once the glTF picking worker merges, let a raycast that reaches an object in its imposter level
    accept the bounding-sphere/box hit (distant cards have no triangles). LOD screen levels already follow orthographic
    zoom (done).
-1d. [points, labels, clustered, splats, DOF DONE `5cf148e`; SSAO and lines left] Orthographic follow-ups: SSAO, lines/points world widths, labels CSS perspective, clustered froxels, DOF and splats
+1d. [points, labels, clustered, splats, DOF DONE `5cf148e`; SSAO DONE (camera's own projection, signed depth; `scripts/ssao-gpu-check.js`); lines left] Orthographic follow-ups: SSAO, lines/points world widths, labels CSS perspective, clustered froxels, DOF and splats
    assume a perspective camera; fix each in its own package. Optional core hook (Camera.projection + up) would remove
    the cameras package's update replacement; only if Scott wants it.
 1e. [a-d done, see below] CAD track (Scott, 2026-10-14: "the smallest, fastest, best CAD engine"; the visualization/interaction layer, not a

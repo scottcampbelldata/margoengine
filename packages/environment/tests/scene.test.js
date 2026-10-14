@@ -38,7 +38,8 @@ test('EnvironmentLighting patches core meshes only while the environment is live
   const patched = frame.c.shader;
   assert.match(patched, /@group\(0\) @binding\(20\) var iblSpecular:texture_cube<f32>;/);
   assert.match(patched, /@group\(0\) @binding\(24\) var<uniform> iblParams:vec4f;/);
-  assert.match(fragment(patched), /\*0\.0\+iblShade\(iblSpecular,iblSampler,iblBrdf,iblSh,iblParams,n,v,i\.color,i\.material\.y,i\.material\.x\);/);
+  // The IBL term is named margoAmbient (the convention post's SSAO occludes) and added where the constant ambient was.
+  assert.match(fragment(patched), /let margoAmbient=iblShade\(iblSpecular,iblSampler,iblBrdf,iblSh,iblParams,n,v,i\.color,i\.material\.y,i\.material\.x\);let linear=direct\*frame\.radiance\.xyz\*frame\.light\.w\+i\.color\*\(1\.0-i\.material\.y\)\*0\.0\+margoAmbient;/);
   assert.doesNotMatch(fragment(patched), /frame\.radiance\.w/, 'IBL replaces the constant ambient term');
   assert.deepEqual(frame.c.bindings.map(entry => entry.binding), [20, 21, 22, 23, 24]);
   assert.equal(frame.c.bindings[0].resource, environment.specularView);
@@ -66,11 +67,11 @@ test('EnvironmentLighting and Fog compose with every known core shader variant a
   lighting.setup(engine); fog.setup(engine);
   for (const [name, shader] of Object.entries(variants)) {
     const lit = lighting.shader(shader, 0), both = fog.shader(lit, 0);
-    assert.match(fragment(lit), /\+iblShade\(/, name);
+    assert.match(fragment(lit), /let margoAmbient=iblShade\([^;]+;let linear=[^;]+\+margoAmbient;/, name);
     assert.match(both, /@group\(0\) @binding\(25\) var<uniform> margoFog:MargoFog;/, name);
     if (name === 'hdr') assert.match(fragment(both), /return vec4f\(mix\(linear,margoFog\.color\.rgb,fogAmount\(i\.position,frame\.eye\.xyz\)\),1\);/);
     else assert.match(fragment(both), /let mapped=mix\(linear\/\(1\.0\+linear\),margoFog\.color\.rgb,fogAmount\(i\.position,frame\.eye\.xyz\)\);/, name);
-    if (name === 'sky') assert.match(fragment(lit), /skyAmbient\.rgb\+iblShade/, 'sky ambient stays and IBL adds');
+    if (name === 'sky') assert.match(fragment(lit), /skyAmbient\.rgb\+margoAmbient;/, 'sky ambient stays and IBL adds');
     if (name === 'shadows') assert.match(fragment(lit), /shadowLit\(direct,i\.position,i\.normal\)/);
     assert.equal(fog.shader(lit, 0), both, 'cached');
   }
@@ -140,7 +141,7 @@ test('glTF-pro models: applyTo lights and fogs opaque and blended primitives in 
       const code = pipeline.vertex.module.code;
       assert.match(code, /@group\(2\) @binding\(20\) var iblSpecular/);
       assert.match(code, /fn ambient\(s:Surface\)->vec3f \{return vec3f\(0\);\}/);
-      assert.match(code, /\+s\.emissive\+iblShade\(iblSpecular,iblSampler,iblBrdf,iblSh,iblParams,s\.n,v,s\.base\.rgb,s\.metal,s\.roughness\)\*s\.occlusion;/);
+      assert.match(code, /let margoAmbient=iblShade\(iblSpecular,iblSampler,iblBrdf,iblSh,iblParams,s\.n,v,s\.base\.rgb,s\.metal,s\.roughness\)\*s\.occlusion;var color=direct\+ambient\(s\)\+s\.emissive\+margoAmbient;/);
       assert.match(code, /color=mix\(select\(color,aces\(max\(color,vec3f\(0\)\)\/0\.6\),f\.settings\.w<0\.5\),margoFog\.color\.rgb,fogAmount\(i\.position,f\.eye\.xyz\)\);if\(f\.settings\.w<0\.5\) \{/);
     }
     assert.ok(lit.pipelines.some(pipeline => pipeline.fragment.targets[0].blend), 'the blended primitive is fogged too');
@@ -153,6 +154,31 @@ test('glTF-pro models: applyTo lights and fogs opaque and blended primitives in 
     const back = draw();
     assert.equal(back.pipelines.length, 0, 'the unpatched pipelines are reused');
     fog.dispose();
+  } finally {engine.dispose();}
+});
+
+test('glTF-pro models: the SSAO ambient replay returns the IBL term (margoAmbient) only while environment lighting is applied', async () => {
+  const {engine, model: loaded, harness, context: c} = await model([{alphaMode: 'OPAQUE'}, {extensions: {KHR_materials_clearcoat: {clearcoatFactor: 1}}}]);
+  try {
+    const lighting = new EnvironmentLighting(fakeEnvironment(engine.gpu)), fog = new Fog({density: 0.1});
+    fog.setup(engine);
+    const draw = () => {const start = harness.pipelines.length, groups = harness.groups.length; loaded.draw(c, 'ambient', {}, {}); return {pipelines: harness.pipelines.slice(start), groups: harness.groups.slice(groups)};};
+    const plain = draw();
+    assert.equal(plain.pipelines.length, 2);
+    assert.ok(plain.pipelines.every(pipeline => pipeline.fragment.entryPoint === 'ambientFragment'));
+    fog.applyTo(loaded);
+    assert.equal(draw().pipelines.length, 0, 'an effect without margoAmbient leaves the ambient replay unchanged');
+    const remove = lighting.applyTo(loaded), lit = draw();
+    assert.equal(lit.pipelines.length, 2, 'both the standard and the physical variant');
+    for (const pipeline of lit.pipelines) {
+      assert.equal(pipeline.fragment.entryPoint, 'fragment'); assert.equal(pipeline.fragment.targets[0].format, 'rgba16float');
+      assert.match(pipeline.vertex.module.code, /_=color;return vec4f\(select\(margoAmbient,vec3f\(0\),f\.ext\.x>0\.5\),select\(1\.0,s\.base\.a,f\.settings\.x>1\.5\)\);/);
+    }
+    const group = lit.groups.find(descriptor => descriptor.entries.some(entry => entry.binding === 20));
+    assert.deepEqual(group.entries.map(entry => entry.binding).sort((a, b) => a - b), [20, 21, 22, 23, 24, 25], 'every lighting binding, as in the beauty pass');
+    remove();
+    assert.equal(draw().pipelines.length, 0, 'without the environment the plain ambient pipelines are reused');
+    fog.dispose(); lighting.dispose();
   } finally {engine.dispose();}
 });
 
