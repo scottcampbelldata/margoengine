@@ -42,7 +42,7 @@ export function frameStatus(targetRate: number, callbackRate: number, fps: numbe
 
 export function paceEngine(engine: Paced): void;
 
-export function sceneSamples():1|4;
+export const sceneSamples: () => 1 | 4;
 
 export function watchQuality({ request, queue, now, store, reload }?: WatchOptions): void;
 
