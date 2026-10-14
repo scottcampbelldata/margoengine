@@ -88,6 +88,17 @@ test('orbit: horizontal and vertical drags change azimuth and polar angles by 2*
   orbit.dispose();
 });
 
+test('orbit: leaving an exact pole keeps the heading given by camera.up (ViewCube top view from the side)', () => {
+  for (const [y, up, heading] of [[10, [-1, 0, 0], Math.PI / 2], [-10, [1, 0, 0], Math.PI / 2], [10, [0, 0, -1], 0]]) {
+    const cam = camera(), orbit = new OrbitControls(cam, new FakeElement());
+    cam.up = up; cam.position = [0, y, 0];
+    close(orbit.getAzimuthalAngle(), heading, 1e-12, `pole azimuth ${y} ${up}`);
+    orbit.rotateUp(y > 0 ? -0.1 : 0.1); orbit.update(0);
+    close(Math.atan2(cam.position[0], cam.position[2]), heading, 1e-9, `azimuth after leaving the pole ${y} ${up}`);
+    orbit.dispose();
+  }
+});
+
 test('orbit: polar and azimuth clamping, and the poles stay renderable', () => {
   const el = new FakeElement(), cam = camera(), orbit = new OrbitControls(cam, el);
   orbit.minPolarAngle = 1; orbit.maxPolarAngle = 2; orbit.minAzimuthAngle = -0.5; orbit.maxAzimuthAngle = 0.5;

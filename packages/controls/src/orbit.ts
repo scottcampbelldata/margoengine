@@ -78,7 +78,13 @@ export class OrbitControls extends Controls {
   stopListenToKeyEvents(): void {this.keyTarget?.removeEventListener('keydown', this.onKey); this.keyTarget = null;}
 
   getPolarAngle(): number {const o = this.offset(); return Math.acos(clamp(o[1] / Math.hypot(...o), -1, 1));}
-  getAzimuthalAngle(): number {const o = this.offset(); return Math.atan2(o[0], o[2]);}
+  getAzimuthalAngle(): number {const o = this.offset(); return this.heading(o[0], o[1], o[2]);}
+  /** Azimuth of an offset; on an exact pole (a ViewCube top or bottom view) it comes from `camera.up`, the screen up. */
+  private heading(x: number, y: number, z: number): number {
+    if (x || z) return Math.atan2(x, z);
+    const up = this.camera.up, s = y > 0 ? -1 : 1;
+    return Math.atan2(s * up[0], s * up[2]);
+  }
   getDistance(): number {return Math.hypot(...this.offset());}
   get target(): V3 {return [...this.camera.target] as V3;}
   set target(value: readonly number[]) {this.camera.target = [value[0], value[1], value[2]];}
@@ -110,7 +116,7 @@ export class OrbitControls extends Controls {
     if (this.autoRotate && this.state === 'none') this.rotateLeft(-TAU / 60 * this.autoRotateSpeed * delta);
     const f = this.enableDamping ? 1 - Math.pow(1 - clamp(this.dampingFactor, 0, 1), Math.max(0, delta) * 60) : 1;
     const ox = px - tx, oy = py - ty, oz = pz - tz, radius = Math.hypot(ox, oy, oz);
-    let theta = Math.atan2(ox, oz) + this.dTheta * f, phi = Math.acos(clamp(oy / radius, -1, 1)) + this.dPhi * f;
+    let theta = this.heading(ox, oy, oz) + this.dTheta * f, phi = Math.acos(clamp(oy / radius, -1, 1)) + this.dPhi * f;
     let min = this.minAzimuthAngle, max = this.maxAzimuthAngle;
     if (Number.isFinite(min) && Number.isFinite(max)) {
       if (min < -Math.PI) min += TAU; else if (min > Math.PI) min -= TAU;
