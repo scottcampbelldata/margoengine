@@ -3,11 +3,14 @@
 // and sample-count changes, a rejected frame, device restoration and disposal at 1x and 4x.
 // Run: node examples/package-benchmarks/proofs/post-stack.proof.js [ref]
 import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
 import {versions} from './compare.js';
 import {mockGPU, context} from './gpu-recorder.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
 
-const ref = process.argv[2] ?? 'd81a279';
+// Default baseline: the parent of the commit that added PostStack.
+const added = execFileSync('git', ['log', '--diff-filter=A', '--format=%h', '--', 'packages/post/src/stack.ts'], {cwd: import.meta.dirname, encoding: 'utf8'}).trim().split('\n').at(-1);
+const ref = process.argv[2] ?? (added ? added + '^' : 'HEAD');
 const post = await versions('post', ref), dof = await versions('dof', ref), tonemap = await versions('tonemap', ref), creative = await versions('creative', ref, 'src/post.ts');
 
 /** Runs `effects` (made by `make(gpu)`) with the core main pass for 24 frames, applying `edit(frame, effects, state)` first. */

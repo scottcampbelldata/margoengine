@@ -908,13 +908,15 @@
     "package": "@margoengine/post",
     "version": "0.1.0",
     "published": false,
-    "description": "HDR bloom, AgX tonemapping and frame-graph SSAO for Margo Engine WebGPU.",
+    "description": "HDR bloom, AgX tonemapping, frame-graph SSAO, FXAA and a shared-capture effect stack for Margo Engine WebGPU.",
     "requirements": "Core 0.1.0 · see the package guide for browser and backend requirements",
     "keywords": "post",
     "install": "npm install @margoengine/core@0.1.0 @margoengine/post@0.1.0",
     "imports": "import { Bloom } from '@margoengine/post';",
     "exports": [
       "Bloom",
+      "FXAA",
+      "PostStack",
       "SSAO",
       "SceneFade"
     ]
