@@ -43,7 +43,8 @@ for(const name of ['loaders','exporters'])execFileSync(process.execPath,['node_m
 // controls type-checks against @margoengine/bvh (DragControls), so bvh's own build must run first.
 execFileSync(process.execPath,['packages/bvh/scripts/build.js'],{stdio:'inherit'});
 // vfx and sky build before the creative and scenery wrappers that import their types.
-for(const name of ['gltf','machinery','vfx','sky','creative','scenery',...featurePackages]){
+// geometry first: machinery/edges imports it as an external package.
+for(const name of ['geometry','gltf','machinery','vfx','sky','creative','scenery',...featurePackages.filter(name=>name!=='geometry')]){
  const output=resolve(`packages/${name}/dist`);assert.ok(output.startsWith(resolve(`packages/${name}`)+'/')||output.startsWith(resolve(`packages/${name}`)+'\\'),'Output escaped its package');
  const manifest=JSON.parse(await readFile(`packages/${name}/package.json`,'utf8'));
  const entry=Object.fromEntries(Object.values(manifest.exports).map(({import:target})=>{
@@ -51,7 +52,7 @@ for(const name of ['gltf','machinery','vfx','sky','creative','scenery',...featur
   const module=target.slice('./dist/'.length,-'.js'.length);
   return [module,`packages/${name}/src/${module}.ts`];
  }));
- await build({configFile:false,publicDir:false,logLevel:'warn',build:{outDir:output,emptyOutDir:true,target:'es2022',lib:{entry,formats:['es'],fileName:(_,entryName)=>entryName+'.js'},rollupOptions:{external:['@margoengine/core','@margoengine/core/extension','@margoengine/animation','@margoengine/gltf-pro','@margoengine/loaders','@margoengine/lines','@margoengine/bvh','@margoengine/vfx','@margoengine/sky'],output:compactOutput}}});
+ await build({configFile:false,publicDir:false,logLevel:'warn',build:{outDir:output,emptyOutDir:true,target:'es2022',lib:{entry,formats:['es'],fileName:(_,entryName)=>entryName+'.js'},rollupOptions:{external:['@margoengine/core','@margoengine/core/extension','@margoengine/animation','@margoengine/gltf-pro','@margoengine/loaders','@margoengine/lines','@margoengine/bvh','@margoengine/vfx','@margoengine/sky','@margoengine/geometry'],output:compactOutput}}});
  if(name==='machinery'){
   // Retain analyzable asset URLs for the consuming app's bundler.
   for(const file of (await readdir(output)).filter(file=>file.endsWith('.js'))){const entry=resolve(output,file);await writeFile(entry,(await readFile(entry,'utf8')).replace(/(?:''|""|``)\s*\+\s*import\.meta\.url/g,'import.meta.url'));}

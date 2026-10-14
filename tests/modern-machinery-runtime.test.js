@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Engine,TransformStore,box,Geometry} from '../packages/core/dist/extension.js';
-import {SurfacePhysics,Kinematics,TelemetryChannel,AssemblyBVH,measureClearance,worldAnchor,edgeAnchor} from '../packages/machinery/dist/index.js';
+import {SurfacePhysics,Kinematics,TelemetryChannel,AssemblyBVH,measureClearance,worldAnchor,edgeAnchor,ExplodedView} from '../packages/machinery/dist/index.js';
 async function scene(capacity=16){return new Engine({width:200,height:200,clientWidth:200,clientHeight:200},await TransformStore.create(capacity),{backend:'webgl2',add(){},remove(){},render(){},dispose(){}},undefined,null);}
 const near=(a,b,tolerance=1e-5)=>assert.ok(Math.abs(a-b)<=tolerance,`${a} != ${b}`);
 function frame(time,entries){const data=new ArrayBuffer(6+entries.length*6),v=new DataView(data);v.setUint32(0,time,true);v.setUint16(4,entries.length,true);entries.forEach(([id,value],i)=>{v.setUint16(6+i*6,id,true);v.setFloat32(8+i*6,value,true);});return data;}
@@ -41,4 +41,23 @@ test('Clearance computes box Euclidean distance, touching and interference in wo
   const e=await scene();try{const a=e.createMesh().setGeometry(box()),b=e.createMesh().setGeometry(box()).setPosition([2,2,0]);e.render();near(measureClearance(a,b,'aabb').distance,Math.SQRT2);assert.equal(measureClearance(a,b).interfering,false);b.setPosition([1,0,0]);e.render();assert.deepEqual([measureClearance(a,b).distance,measureClearance(a,b).interfering],[0,false]);b.setPosition([0.5,0,0]);e.render();assert.equal(measureClearance(a,b).interfering,true);b.setPosition([3,0,0]).setRotation([0,0,Math.PI/4]);e.render();near(measureClearance(a,b).distance,2.5-Math.SQRT1_2);const anchor=edgeAnchor(a,0,1);assert.equal(anchor.node,a);assert.ok(anchor.point.every(Number.isFinite));
     const parent=e.createMesh().setScale([2,1,1]);b.setParent(parent);e.render();assert.throws(()=>measureClearance(a,b),/shear/);assert.ok(Number.isFinite(measureClearance(a,b,'aabb').distance));
   }finally{e.dispose();}
+});
+test('Feature edges keep creases and open boundaries, drop smooth facets, and validate options',async()=>{
+  const {featureEdges,FeatureEdges}=await import('../packages/machinery/dist/edges.js'),g=await import('../packages/geometry/dist/index.js');
+  assert.equal(featureEdges(box()).length,24);assert.equal(featureEdges(box(),100).length,0);
+  const cylinder=g.toGeometry(g.cylinderGeometry(1,1,1,16));assert.equal(featureEdges(cylinder,30).length/2,32);assert.equal(featureEdges(cylinder,20).length/2,48);
+  assert.equal(featureEdges(g.toGeometry(g.sphereGeometry(1,16,8)),30).length,0);assert.equal(featureEdges(g.toGeometry(g.planeGeometry(1,1,2,2))).length/2,8);
+  const pairs=featureEdges(box());assert.ok(pairs.every(v=>v<box().vertices.length/6));assert.throws(()=>featureEdges(box(),-1),/angle/);
+  for(const options of [{width:0},{angle:181},{depthBias:-1},{depthBias:0.5},{order:NaN}])assert.throws(()=>new FeatureEdges(options),/options/);
+  const e=await scene();try{assert.throws(()=>e.use(new FeatureEdges()),/WebGPU/);}finally{e.dispose();}
+});
+test('Exploded view writes positions only when the amount changes',async()=>{
+  const e=await scene();try{const node=e.createMesh(),view=new ExplodedView([{node,offset:[2,0,0]}]);e.use(view);view.amount=0.5;e.render();assert.equal(node.position.x,1);
+    node.position.x=7;e.render();assert.equal(node.position.x,7);view.amount=1;e.render();assert.equal(node.position.x,2);}finally{e.dispose();}
+});
+test('Assembly BVH shares local trees across instances beyond one million instanced triangles',async()=>{
+  const e=await scene(2100);try{const g=new Geometry(...(()=>{const p=[],n=[],f=[];for(let i=0;i<=20;i++)for(let j=0;j<=25;j++){p.push(i/20-0.5,j/25-0.5,0);n.push(0,0,1);}for(let i=0;i<20;i++)for(let j=0;j<25;j++){const a=i*26+j;f.push(a,a+26,a+1,a+1,a+26,a+27);}return [p,n,f];})());
+    const nodes=Array.from({length:2048},(_,i)=>e.createMesh().setGeometry(g).setPosition([i%64*2,Math.floor(i/64)*2,0]).setRotation([0,i%2?Math.PI:0,0]));e.render();assert.equal(g.indices.length/3*nodes.length,2_048_000);
+    const bvh=await AssemblyBVH.create(nodes);for(const i of [0,77,1023,2047]){const p=nodes[i].matrix,hit=bvh.raycast([p[12]+0.1,p[13]+0.2,5],[0,0,-1]);assert.equal(hit.node,nodes[i]);near(hit.distance,5);}
+    nodes[5].setScale([1,1,3]).setPosition([10,0,-2]);nodes[5].visible=true;e.render();bvh.rebuild();near(bvh.raycast([10.1,0.2,5],[0,0,-1]).distance,7);bvh.dispose();}finally{e.dispose();}
 });

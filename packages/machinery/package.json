@@ -72,11 +72,18 @@
     "./exploded": {
       "types": "./dist/exploded.d.ts",
       "import": "./dist/exploded.js"
+    },
+    "./edges": {
+      "types": "./dist/edges.d.ts",
+      "import": "./dist/edges.js"
     }
   },
   "files": [
     "dist"
   ],
+  "dependencies": {
+    "@margoengine/geometry": "0.1.0"
+  },
   "peerDependencies": {
     "@margoengine/core": "0.1.0"
   },

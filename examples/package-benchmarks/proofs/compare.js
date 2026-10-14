@@ -25,7 +25,7 @@ async function load(name, entry, ref) {
   assert.equal(chunks.length, 1, `${name} must build to one module for comparison`);
   // Written inside the repository so bare imports such as @margoengine/core resolve normally.
   const directory = resolve(root, 'test-results/proofs-tmp'); await mkdir(directory, {recursive: true});
-  const file = resolve(directory, `${name}-${ref ?? 'working'}-${process.pid}.mjs`); await writeFile(file, chunks[0].code);
+  const file = resolve(directory, `${name}-${entry.replace(/\W+/g, '_')}-${ref ?? 'working'}-${process.pid}.mjs`); await writeFile(file, chunks[0].code);
   return import(pathToFileURL(file).href);
 }
 
