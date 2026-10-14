@@ -18,7 +18,7 @@
   </style>
   <script>Object.defineProperty(window,'devicePixelRatio',{value:1,configurable:true});</script>
   <script type="importmap">
-    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"}}
+    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js","three/webgpu":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.webgpu.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"}}
   </script>
 </head>
 <body>
@@ -109,17 +109,27 @@ addEventListener('pagehide',event=>{if(!event.persisted){cancelAnimationFrame(ra
 
 try{
   const [THREE,{OrbitControls},{GLTFLoader},{EffectComposer},{RenderPass},{OutputPass}]=await Promise.all([import('three'),import('three/addons/controls/OrbitControls.js'),import('three/addons/loaders/GLTFLoader.js'),import('three/addons/postprocessing/EffectComposer.js'),import('three/addons/postprocessing/RenderPass.js'),import('three/addons/postprocessing/OutputPass.js')]);
-  const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});
-  if(!gl)throw new Error('WebGL2 is unavailable');
-  renderer=api.renderer=new THREE.WebGLRenderer({canvas,context:gl,antialias:false,alpha:false,powerPreference:'high-performance'});
+  const {sceneSamples}=await import('../../packages/shared/quality.js'),samples=sceneSamples();
+  // ?renderer=webgpu compares like for like with Margo's WebGPU backend; the default is the WebGL2 renderer most apps ship.
+  const webgpu=new URLSearchParams(location.search).get('renderer')==='webgpu';
+  if(webgpu){
+    if(!navigator.gpu)throw new Error('WebGPU is unavailable');
+    const {WebGPURenderer}=await import('three/webgpu');
+    renderer=api.renderer=new WebGPURenderer({canvas,antialias:samples===4,alpha:false,powerPreference:'high-performance'});await renderer.init();
+  }else{
+    const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});
+    if(!gl)throw new Error('WebGL2 is unavailable');
+    renderer=api.renderer=new THREE.WebGLRenderer({canvas,context:gl,antialias:false,alpha:false,powerPreference:'high-performance'});
+  }
   renderer.setPixelRatio(1);renderer.setSize(920,652,false);renderer.setClearColor(0x050609);
   renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;
-  const {sceneSamples}=await import('../../packages/shared/quality.js'),samples=sceneSamples();
-  document.querySelector('h1').textContent=`Three.js · WebGL2 · ${samples}× samples`;
+  document.querySelector('h1').textContent=`Three.js · ${webgpu?'WebGPU':'WebGL2'} · ${samples}× samples`;
   scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(38,920/652,0.01,10000);
-  api.camera=camera;
-  composer=api.composer=new EffectComposer(renderer,new THREE.WebGLRenderTarget(920,652,{samples:samples===4?4:0}));
-  composer.addPass(new RenderPass(scene,camera));composer.addPass(new OutputPass());
+  api.camera=camera;api.backend=webgpu?'webgpu':'webgl2';
+  // WebGPU: tone mapping and the MSAA resolve happen in the renderer's own output pass.
+  if(webgpu)composer=api.composer={passes:[],render:()=>renderer.render(scene,camera),dispose(){}};
+  else{composer=api.composer=new EffectComposer(renderer,new THREE.WebGLRenderTarget(920,652,{samples:samples===4?4:0}));
+  composer.addPass(new RenderPass(scene,camera));composer.addPass(new OutputPass());}
   renderer.info.autoReset=false;api.msaaSamples=samples;
   controls=new OrbitControls(camera,canvas);controls.enableDamping=false;controls.screenSpacePanning=true;
   controls.mouseButtons.MIDDLE=THREE.MOUSE.PAN;controls.mouseButtons.RIGHT=THREE.MOUSE.PAN;
@@ -149,7 +159,7 @@ try{
   }
   prepareAssembly();camera.updateProjectionMatrix();controls.update();
   hud.parts.textContent=parts.length;hud.draws.textContent=batches.length;hud.loading.hidden=true;button.disabled=slider.disabled=false;api.ready=true;
-  canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();fail(new Error('WebGL context lost. Reload to restart the benchmark.'));});
+  if(!webgpu)canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();fail(new Error('WebGL context lost. Reload to restart the benchmark.'));});
   raf=requestAnimationFrame(frame);
 }catch(error){fail(error);}
 </script>

@@ -9,7 +9,7 @@ python -m http.server 5308 --bind 127.0.0.1
 ```
 
 - [Margo viewer](http://127.0.0.1:5308/examples/conveyor-simulator/margo-conveyor.html) imports the workspace's built core and Blender packages and loads `conveyor.margo`.
-- [Three.js viewer](http://127.0.0.1:5308/examples/conveyor-simulator/three-conveyor.html) imports pinned Three.js r186.1, OrbitControls and GLTFLoader from jsDelivr and loads the existing `Untitled.glb`.
+- [Three.js viewer](http://127.0.0.1:5308/examples/conveyor-simulator/three-conveyor.html) imports pinned Three.js r186.1, OrbitControls and GLTFLoader from jsDelivr and loads the existing `Untitled.glb`. It uses the WebGL2 renderer by default; add [`?renderer=webgpu`](http://127.0.0.1:5308/examples/conveyor-simulator/three-conveyor.html?renderer=webgpu) for three's WebGPU renderer, the like-for-like comparison with Margo's WebGPU backend.
 
 Both pages keep a 920×652 canvas at DPR 1, exclude the Blender Cube, and instance repeated geometry. Left drag rotates, middle/right/Shift-drag pans, and the wheel zooms. The explode sweep uses the same bounds-based radial offsets in both viewers and writes retained transform storage in place. Directional lighting, diffuse probe strength, ACES exposure and camera framing use matching values. Both desktop scenes use explicit 4× MSAA; Three.js resolves its multisampled scene target before the output pass. Both phone paths use single-sampled scenes.
 

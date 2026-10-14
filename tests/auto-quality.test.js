@@ -51,6 +51,7 @@ test('the light tier renders HiDPI desktops single-sampled at DPR 1', async () =
   try {
     const {sceneSamples} = await import('../packages/core/dist/quality.js');
     engine.render(); assert.equal(sceneSamples(), 1); assert.deepEqual([canvas.width, canvas.height], [1440, 900]);
+    globalThis.margoLow = 1.5; engine.render(); assert.equal(sceneSamples(), 1); assert.deepEqual([canvas.width, canvas.height], [2160, 1350], 'margoLow is the light tier maximum pixel ratio');
   } finally {
     engine.dispose(); delete globalThis.margoLow;
     if (density) Object.defineProperty(globalThis, 'devicePixelRatio', density); else delete globalThis.devicePixelRatio;
