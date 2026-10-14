@@ -178,8 +178,27 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    f. Evaluate newer platform features: Float16Array for half-float data, Symbol.dispose / `using` for engine object
       cleanup, more parsing in workers + OffscreenCanvas (with 1f.j).
    g. Full read-only audit of all 68 packages listing each modernization finding with file and line, then fix in batches.
-2. Dedupe: two particle systems (creative GPUParticles vs vfx), two bloom paths (post Bloom vs creative
-   PostProcessing), three sky implementations (sky, scenery, creative atmosphere).
+1h. Less fragile (2026-10-14):
+   a. Derive the package build order from package.json dependencies (topological sort) instead of the hand-written
+      lists in scripts/build-modern.js (the controls-needs-bvh break came from that list).
+   b. Generate docs/catalog.json as part of build:packages so it can never be stale (it failed four times today
+      because it was regenerated before packages were rebuilt).
+   c. Public API snapshots per package (exported names AND type signatures, e.g. API Extractor-style .d.ts reports)
+      checked in CI, so accidental API changes fail the build and intended ones are reviewed; feeds the 1.0 API list.
+   d. Add a linter/formatter (Biome: one fast dev tool, no runtime cost) with a small rule set: no `any`, no unused
+      code, consistent imports. Pairs with the 1g.e reformat decision.
+   e. packages/shared is copied into every package bundle (e.g. sceneSamples, math, msaa, demo-frame); copies can drift
+      between packages in one app. Decide: publish it as an internal versioned package, or keep copying but test
+      that all copies in a build are identical.
+   f. Turn today's ad-hoc GPU screenshot diffs into a standing visual-regression suite for the site demos (serial,
+      under the GPU lock, with noise-calibrated tolerances like the dedupe worker used).
+   g. Changesets (or similar) for versioning and changelogs before the first npm publish; consistent peer ranges.
+   h. Consistent error types and messages across packages (one small error-code convention), documented.
+   i. Follow-ups from the dedupe merge: night-citadel browser test expects 4x MSAA but the page now starts on the light
+      tier: make the test pass `?quality=high`. Demos load more after dedupe (Citadel +7.5 KB, Afterlight +3.3 KB,
+      Meadow +2.3 KB gzip): split Sky day models and VFX optional features into separate entries to win it back.
+2. [DONE `aec1830` cherry-picked] Dedupe: particles -> vfx, bloom -> post Bloom, sky -> @margoengine/sky (API changes listed in
+   the commit message; -6,017 gzip across the five packages).
 3. Replace three.js inside fbx and usdz with native parsers [running].
 4. Every remaining PARTIAL/MISSING gap in docs/threejs-parity.md that does not need a core change.
 5. Math consolidation: fold the duplicated helpers into `@margoengine/math` (list from the math worker:
