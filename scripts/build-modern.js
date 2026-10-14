@@ -40,6 +40,8 @@ for(const name of packages){
 execFileSync(process.execPath,['node_modules/typescript/bin/tsc','-p','packages/core/tsconfig.json'],{stdio:'inherit'});
 await compactPackage('core');
 for(const name of ['loaders','exporters'])execFileSync(process.execPath,['node_modules/typescript/bin/tsc','-p',`packages/${name}/tsconfig.json`],{stdio:'inherit'});
+// controls type-checks against @margoengine/bvh (DragControls), so bvh's own build must run first.
+execFileSync(process.execPath,['packages/bvh/scripts/build.js'],{stdio:'inherit'});
 for(const name of ['gltf','machinery','creative','scenery',...featurePackages]){
  const output=resolve(`packages/${name}/dist`);assert.ok(output.startsWith(resolve(`packages/${name}`)+'/')||output.startsWith(resolve(`packages/${name}`)+'\\'),'Output escaped its package');
  const manifest=JSON.parse(await readFile(`packages/${name}/package.json`,'utf8'));
