@@ -1,0 +1,307 @@
+{
+ "date": "2026-10-14T18:39:36.772Z",
+ "commit": "5b9dbbd",
+ "dirty": true,
+ "baseline": "5b9dbbd",
+ "acPowerBefore": true,
+ "rounds": 4,
+ "frames": 60,
+ "scenes": {
+  "gate": {
+   "focalDistance": 3.4,
+   "aperture": 1.4,
+   "maxRadius": 16
+  },
+  "near": {
+   "focalDistance": 1.6,
+   "aperture": 1.4,
+   "maxRadius": 16
+  },
+  "far": {
+   "focalDistance": 12,
+   "aperture": 1.4,
+   "maxRadius": 16
+  },
+  "wide": {
+   "focalDistance": 2,
+   "aperture": 0.35,
+   "maxRadius": 32
+  }
+ },
+ "scene": "DamagedHelmet + 11 core boxes, env IBL, PostStack [DOF, Tonemap neutral], DPR 1",
+ "quality": {
+  "gate": {
+   "oldVsOff": {
+    "meanAbsDiff": 0.1988,
+    "maxAbsDiff": 135,
+    "changedFraction": 0.00799
+   },
+   "newVsOld": {
+    "meanAbsDiff": 0.0172,
+    "maxAbsDiff": 21,
+    "changedFraction": 0.00083
+   },
+   "exactVsOld": {
+    "meanAbsDiff": 0,
+    "maxAbsDiff": 0,
+    "changedFraction": 0
+   }
+  },
+  "near": {
+   "oldVsOff": {
+    "meanAbsDiff": 1.2219,
+    "maxAbsDiff": 251,
+    "changedFraction": 0.05222
+   },
+   "newVsOld": {
+    "meanAbsDiff": 0.0967,
+    "maxAbsDiff": 43,
+    "changedFraction": 0.00201
+   },
+   "exactVsOld": {
+    "meanAbsDiff": 0,
+    "maxAbsDiff": 1,
+    "changedFraction": 0
+   }
+  },
+  "far": {
+   "oldVsOff": {
+    "meanAbsDiff": 0.9178,
+    "maxAbsDiff": 226,
+    "changedFraction": 0.03961
+   },
+   "newVsOld": {
+    "meanAbsDiff": 0,
+    "maxAbsDiff": 0,
+    "changedFraction": 0
+   },
+   "exactVsOld": {
+    "meanAbsDiff": 0,
+    "maxAbsDiff": 0,
+    "changedFraction": 0
+   }
+  },
+  "wide": {
+   "oldVsOff": {
+    "meanAbsDiff": 2.6547,
+    "maxAbsDiff": 248,
+    "changedFraction": 0.09093
+   },
+   "newVsOld": {
+    "meanAbsDiff": 0.0003,
+    "maxAbsDiff": 1,
+    "changedFraction": 0
+   },
+   "exactVsOld": {
+    "meanAbsDiff": 0,
+    "maxAbsDiff": 0,
+    "changedFraction": 0
+   }
+  }
+ },
+ "flicker": {
+  "gate": {
+   "old": {
+    "meanFrameToFrame": 0.4201,
+    "maxFrameToFrame": 0.4235
+   },
+   "new": {
+    "meanFrameToFrame": 0.4202,
+    "maxFrameToFrame": 0.4235
+   },
+   "exact": {
+    "meanFrameToFrame": 0.4201,
+    "maxFrameToFrame": 0.4235
+   }
+  },
+  "near": {
+   "old": {
+    "meanFrameToFrame": 0.1996,
+    "maxFrameToFrame": 0.2022
+   },
+   "new": {
+    "meanFrameToFrame": 0.2002,
+    "maxFrameToFrame": 0.2025
+   },
+   "exact": {
+    "meanFrameToFrame": 0.1996,
+    "maxFrameToFrame": 0.2022
+   }
+  }
+ },
+ "timing": {
+  "gate 1280x720 4x": {
+   "old": {
+    "median": 3.864,
+    "min": 3.325,
+    "max": 4.246,
+    "rounds": [
+     3.8072,
+     3.92,
+     4.2464,
+     3.3254
+    ],
+    "speedup": 1
+   },
+   "new": {
+    "median": 1.761,
+    "min": 1.592,
+    "max": 2.029,
+    "rounds": [
+     1.6003,
+     1.5921,
+     1.9215,
+     2.0291
+    ],
+    "speedup": 2.19
+   },
+   "exact": {
+    "median": 2.085,
+    "min": 1.951,
+    "max": 2.186,
+    "rounds": [
+     1.9507,
+     2.0132,
+     2.186,
+     2.1569
+    ],
+    "speedup": 1.85
+   }
+  },
+  "near 1280x720 4x": {
+   "old": {
+    "median": 4.743,
+    "min": 4.567,
+    "max": 5.124,
+    "rounds": [
+     4.5672,
+     4.7273,
+     5.1239,
+     4.759
+    ],
+    "speedup": 1
+   },
+   "new": {
+    "median": 3.624,
+    "min": 2.903,
+    "max": 3.894,
+    "rounds": [
+     2.9034,
+     3.8943,
+     3.5588,
+     3.6885
+    ],
+    "speedup": 1.31
+   },
+   "exact": {
+    "median": 2.792,
+    "min": 2.586,
+    "max": 3.434,
+    "rounds": [
+     2.9034,
+     2.6803,
+     3.4338,
+     2.5863
+    ],
+    "speedup": 1.7
+   }
+  },
+  "far 1280x720 4x": {
+   "old": {
+    "median": 3.741,
+    "min": 3.643,
+    "max": 3.819,
+    "rounds": [
+     3.8167,
+     3.6655,
+     3.8188,
+     3.6428
+    ],
+    "speedup": 1
+   },
+   "new": {
+    "median": 1.481,
+    "min": 1.142,
+    "max": 1.538,
+    "rounds": [
+     1.5044,
+     1.4572,
+     1.538,
+     1.1423
+    ],
+    "speedup": 2.53
+   },
+   "exact": {
+    "median": 1.661,
+    "min": 1.375,
+    "max": 1.915,
+    "rounds": [
+     1.5934,
+     1.3753,
+     1.9154,
+     1.7283
+    ],
+    "speedup": 2.25
+   }
+  },
+  "wide 1280x720 4x": {
+   "old": {
+    "median": 4.794,
+    "min": 3.634,
+    "max": 5.2,
+    "rounds": [
+     5.0805,
+     4.5084,
+     3.6342,
+     5.1996
+    ],
+    "speedup": 1
+   },
+   "new": {
+    "median": 3.404,
+    "min": 2.784,
+    "max": 3.773,
+    "rounds": [
+     3.7729,
+     3.534,
+     3.2739,
+     2.7837
+    ],
+    "speedup": 1.41
+   },
+   "exact": {
+    "median": 2.752,
+    "min": 2.218,
+    "max": 3.424,
+    "rounds": [
+     3.4242,
+     2.8177,
+     2.2183,
+     2.6865
+    ],
+    "speedup": 1.74
+   }
+  }
+ },
+ "hardware": {
+  "webglRenderer": "ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (16GB) (0x000064A0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "webgpu": {
+   "vendor": "intel",
+   "architecture": "xe-2lpg",
+   "device": "0x64a0",
+   "description": "Intel(R) Arc(TM) 140V GPU (16GB)",
+   "fallback": false
+  },
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+  "browserName": "chromium",
+  "browserVersion": "155.0.4283.45",
+  "requestedChannel": "msedge",
+  "launchArgs": [
+   "--enable-webgpu-developer-features"
+  ],
+  "powerPreference": "high-performance",
+  "hostPlatform": "win32",
+  "headless": true
+ },
+ "acPowerAfter": true
+}

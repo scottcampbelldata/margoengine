@@ -34,7 +34,7 @@ test('Tonemap reuses resources, snapshots LUT data and releases/restores all own
 
 test('DOF HDR chaining works on resize/restoration and rejects missing or invalid source textures',()=>{
   const h=gpuHarness(),dof=DOF.attach(h.engine);assert.throws(()=>Tonemap.attach(h.engine),/HDR source/);
-  const grade=Tonemap.attach(h.engine,{source:()=>dof.outputTexture});h.frame();assert.equal(h.counts.compute,2);assert.equal(h.context.color,h.originalColor);
+  const grade=Tonemap.attach(h.engine,{source:()=>dof.outputTexture});h.frame();assert.equal(h.counts.compute,3);assert.equal(h.context.color,h.originalColor);
   h.context.width=256;h.frame();assert.equal(dof.outputTexture.width,256);
   dof.onDeviceRestored(h.engine);grade.onDeviceRestored(h.engine);h.frame();grade.destroy();dof.destroy();assert.ok(h.resources.every(r=>r.destroyed));
   const missing=gpuHarness(),invalid=Tonemap.attach(missing.engine,{source:()=>undefined});assert.throws(missing.frame,/HDR texture/);invalid.destroy();

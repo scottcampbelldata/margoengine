@@ -1,0 +1,751 @@
+{
+ "date": "2026-10-14T18:55:31.174Z",
+ "commit": "5bd9313",
+ "dirty": false,
+ "baseline": "5b9dbbd",
+ "acPowerBefore": true,
+ "rounds": 6,
+ "frames": 90,
+ "scenes": {
+  "gate": {
+   "focalDistance": 3.4,
+   "aperture": 1.4,
+   "maxRadius": 16
+  },
+  "near": {
+   "focalDistance": 1.6,
+   "aperture": 1.4,
+   "maxRadius": 16
+  },
+  "far": {
+   "focalDistance": 12,
+   "aperture": 1.4,
+   "maxRadius": 16
+  },
+  "wide": {
+   "focalDistance": 2,
+   "aperture": 0.35,
+   "maxRadius": 32
+  }
+ },
+ "scene": "DamagedHelmet + 11 core boxes, env IBL, PostStack [DOF, Tonemap neutral], DPR 1",
+ "quality": {
+  "gate": {
+   "oldVsOff": {
+    "meanAbsDiff": 0.1988,
+    "maxAbsDiff": 135,
+    "changedFraction": 0.00799
+   },
+   "newVsOld": {
+    "meanAbsDiff": 0.009,
+    "maxAbsDiff": 11,
+    "changedFraction": 0.00007
+   }
+  },
+  "near": {
+   "oldVsOff": {
+    "meanAbsDiff": 1.2219,
+    "maxAbsDiff": 251,
+    "changedFraction": 0.05222
+   },
+   "newVsOld": {
+    "meanAbsDiff": 0.1016,
+    "maxAbsDiff": 118,
+    "changedFraction": 0.00289
+   }
+  },
+  "far": {
+   "oldVsOff": {
+    "meanAbsDiff": 0.9178,
+    "maxAbsDiff": 226,
+    "changedFraction": 0.03961
+   },
+   "newVsOld": {
+    "meanAbsDiff": 0,
+    "maxAbsDiff": 0,
+    "changedFraction": 0
+   }
+  },
+  "wide": {
+   "oldVsOff": {
+    "meanAbsDiff": 2.6547,
+    "maxAbsDiff": 248,
+    "changedFraction": 0.09093
+   },
+   "newVsOld": {
+    "meanAbsDiff": 0.1093,
+    "maxAbsDiff": 89,
+    "changedFraction": 0.00266
+   }
+  }
+ },
+ "flicker": {
+  "gate": {
+   "old": {
+    "meanFrameToFrame": 0.4201,
+    "maxFrameToFrame": 0.4235
+   },
+   "new": {
+    "meanFrameToFrame": 0.4201,
+    "maxFrameToFrame": 0.4235
+   }
+  },
+  "near": {
+   "old": {
+    "meanFrameToFrame": 0.1996,
+    "maxFrameToFrame": 0.2022
+   },
+   "new": {
+    "meanFrameToFrame": 0.1912,
+    "maxFrameToFrame": 0.1947
+   }
+  }
+ },
+ "timing": {
+  "gate 1280x720 4x": {
+   "old": {
+    "median": 4.905,
+    "min": 4.475,
+    "max": 5.16,
+    "rounds": [
+     4.7129,
+     5.1303,
+     5.1597,
+     4.4751,
+     4.4892,
+     5.0976
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.079,
+     "dof:1": 4.686
+    }
+   },
+   "new": {
+    "median": 1.451,
+    "min": 1.34,
+    "max": 1.667,
+    "rounds": [
+     1.6669,
+     1.3399,
+     1.4512,
+     1.395,
+     1.6496,
+     1.4515
+    ],
+    "speedup": 3.38,
+    "passMedians": {
+     "dof:0": 0.114,
+     "dof:1": 0.839,
+     "dof:2": 0.477
+    }
+   }
+  },
+  "near 1280x720 4x": {
+   "old": {
+    "median": 5.148,
+    "min": 4.352,
+    "max": 5.565,
+    "rounds": [
+     4.8456,
+     5.4617,
+     5.3275,
+     4.3522,
+     4.9684,
+     5.5647
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.075,
+     "dof:1": 4.928
+    }
+   },
+   "new": {
+    "median": 2.231,
+    "min": 2.043,
+    "max": 2.496,
+    "rounds": [
+     2.0552,
+     2.0434,
+     2.4058,
+     2.4964,
+     2.4645,
+     2.0498
+    ],
+    "speedup": 2.31,
+    "passMedians": {
+     "dof:0": 0.11,
+     "dof:1": 1.449,
+     "dof:2": 0.582
+    }
+   }
+  },
+  "far 1280x720 4x": {
+   "old": {
+    "median": 3.803,
+    "min": 2.981,
+    "max": 4.556,
+    "rounds": [
+     4.5559,
+     3.643,
+     2.9809,
+     3.3979,
+     3.964,
+     4.2902
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.071,
+     "dof:1": 3.677
+    }
+   },
+   "new": {
+    "median": 0.864,
+    "min": 0.611,
+    "max": 1.006,
+    "rounds": [
+     0.9579,
+     0.6114,
+     1.0057,
+     0.8676,
+     0.8601,
+     0.8328
+    ],
+    "speedup": 4.4,
+    "passMedians": {
+     "dof:0": 0.133,
+     "dof:1": 0.06,
+     "dof:2": 0.654
+    }
+   }
+  },
+  "wide 1280x720 4x": {
+   "old": {
+    "median": 5.445,
+    "min": 4.295,
+    "max": 5.869,
+    "rounds": [
+     5.8687,
+     5.2953,
+     4.2949,
+     4.7231,
+     5.5956,
+     5.762
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.077,
+     "dof:1": 5.284
+    }
+   },
+   "new": {
+    "median": 2.345,
+    "min": 2.033,
+    "max": 2.617,
+    "rounds": [
+     2.617,
+     2.2298,
+     2.0879,
+     2.5356,
+     2.4598,
+     2.0333
+    ],
+    "speedup": 2.32,
+    "passMedians": {
+     "dof:0": 0.111,
+     "dof:1": 1.708,
+     "dof:2": 0.485
+    }
+   }
+  },
+  "gate 1280x720 1x": {
+   "old": {
+    "median": 3.355,
+    "min": 2.939,
+    "max": 4.074,
+    "rounds": [
+     4.074,
+     3.0773,
+     3.156,
+     3.5542,
+     3.5999,
+     2.9393
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.06,
+     "dof:1": 3.284
+    }
+   },
+   "new": {
+    "median": 1.769,
+    "min": 1.463,
+    "max": 2.082,
+    "rounds": [
+     1.4626,
+     1.5166,
+     2.0816,
+     1.769,
+     2.0674,
+     1.7693
+    ],
+    "speedup": 1.9,
+    "passMedians": {
+     "dof:0": 0.133,
+     "dof:1": 1.039,
+     "dof:2": 0.589
+    }
+   }
+  },
+  "near 1280x720 1x": {
+   "old": {
+    "median": 5.021,
+    "min": 4.088,
+    "max": 6.165,
+    "rounds": [
+     4.3138,
+     4.0878,
+     5.7552,
+     6.1648,
+     4.9551,
+     5.0874
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.073,
+     "dof:1": 4.914
+    }
+   },
+   "new": {
+    "median": 2.492,
+    "min": 2.299,
+    "max": 2.864,
+    "rounds": [
+     2.6537,
+     2.5264,
+     2.458,
+     2.8637,
+     2.3913,
+     2.2989
+    ],
+    "speedup": 2.01,
+    "passMedians": {
+     "dof:0": 0.12,
+     "dof:1": 1.708,
+     "dof:2": 0.63
+    }
+   }
+  },
+  "far 1280x720 1x": {
+   "old": {
+    "median": 3.89,
+    "min": 3.801,
+    "max": 4.501,
+    "rounds": [
+     3.9047,
+     3.8745,
+     3.8401,
+     3.8007,
+     4.1409,
+     4.5009
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.066,
+     "dof:1": 3.823
+    }
+   },
+   "new": {
+    "median": 0.863,
+    "min": 0.681,
+    "max": 1.019,
+    "rounds": [
+     0.6813,
+     0.6944,
+     0.8671,
+     1.0193,
+     0.8609,
+     0.8645
+    ],
+    "speedup": 4.51,
+    "passMedians": {
+     "dof:0": 0.132,
+     "dof:1": 0.057,
+     "dof:2": 0.669
+    }
+   }
+  },
+  "wide 1280x720 1x": {
+   "old": {
+    "median": 4.858,
+    "min": 4.228,
+    "max": 5.571,
+    "rounds": [
+     5.2653,
+     4.6745,
+     5.5711,
+     5.0415,
+     4.2275,
+     4.2627
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.069,
+     "dof:1": 4.764
+    }
+   },
+   "new": {
+    "median": 2.752,
+    "min": 2.393,
+    "max": 2.869,
+    "rounds": [
+     2.7323,
+     2.7879,
+     2.6174,
+     2.8695,
+     2.3927,
+     2.771
+    ],
+    "speedup": 1.77,
+    "passMedians": {
+     "dof:0": 0.114,
+     "dof:1": 2.011,
+     "dof:2": 0.522
+    }
+   }
+  },
+  "gate 1920x1080 4x": {
+   "old": {
+    "median": 8.685,
+    "min": 8.037,
+    "max": 10.236,
+    "rounds": [
+     8.5865,
+     8.9056,
+     8.7777,
+     10.2359,
+     8.5929,
+     8.0368
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.156,
+     "dof:1": 8.404
+    }
+   },
+   "new": {
+    "median": 3.259,
+    "min": 2.921,
+    "max": 3.962,
+    "rounds": [
+     3.9624,
+     3.2877,
+     3.3406,
+     2.9207,
+     3.045,
+     3.2294
+    ],
+    "speedup": 2.67,
+    "passMedians": {
+     "dof:0": 0.251,
+     "dof:1": 1.823,
+     "dof:2": 1.077
+    }
+   }
+  },
+  "near 1920x1080 4x": {
+   "old": {
+    "median": 10.059,
+    "min": 8.907,
+    "max": 11.233,
+    "rounds": [
+     11.2329,
+     8.9072,
+     9.5157,
+     9.6211,
+     10.4959,
+     11.0276
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.157,
+     "dof:1": 9.739
+    }
+   },
+   "new": {
+    "median": 4.275,
+    "min": 4.009,
+    "max": 5.2,
+    "rounds": [
+     4.5995,
+     4.0094,
+     4.2152,
+     4.2278,
+     4.3213,
+     5.1996
+    ],
+    "speedup": 2.35,
+    "passMedians": {
+     "dof:0": 0.214,
+     "dof:1": 3.156,
+     "dof:2": 0.794
+    }
+   }
+  },
+  "far 1920x1080 4x": {
+   "old": {
+    "median": 8.632,
+    "min": 8.372,
+    "max": 9.96,
+    "rounds": [
+     8.4817,
+     8.5012,
+     8.3718,
+     9.9602,
+     9.3841,
+     8.7629
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.164,
+     "dof:1": 8.318
+    }
+   },
+   "new": {
+    "median": 1.694,
+    "min": 1.462,
+    "max": 1.911,
+    "rounds": [
+     1.8704,
+     1.4623,
+     1.6255,
+     1.7615,
+     1.555,
+     1.9105
+    ],
+    "speedup": 5.1,
+    "passMedians": {
+     "dof:0": 0.224,
+     "dof:1": 0.126,
+     "dof:2": 1.272
+    }
+   }
+  },
+  "wide 1920x1080 4x": {
+   "old": {
+    "median": 10.523,
+    "min": 9.408,
+    "max": 12.375,
+    "rounds": [
+     10.2386,
+     12.3753,
+     10.8065,
+     9.4081,
+     9.8775,
+     11.6511
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.163,
+     "dof:1": 10.096
+    }
+   },
+   "new": {
+    "median": 4.837,
+    "min": 4.424,
+    "max": 6.012,
+    "rounds": [
+     4.7917,
+     5.3022,
+     4.8814,
+     6.0122,
+     4.6741,
+     4.4238
+    ],
+    "speedup": 2.18,
+    "passMedians": {
+     "dof:0": 0.238,
+     "dof:1": 3.478,
+     "dof:2": 0.885
+    }
+   }
+  },
+  "gate 1920x1080 1x": {
+   "old": {
+    "median": 10.2,
+    "min": 8.736,
+    "max": 11.031,
+    "rounds": [
+     11.0306,
+     10.6758,
+     8.7587,
+     9.725,
+     8.7355,
+     10.8575
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.169,
+     "dof:1": 9.98
+    }
+   },
+   "new": {
+    "median": 2.853,
+    "min": 2.553,
+    "max": 3.42,
+    "rounds": [
+     2.8037,
+     2.5525,
+     3.4201,
+     2.9121,
+     2.9016,
+     2.6179
+    ],
+    "speedup": 3.58,
+    "passMedians": {
+     "dof:0": 0.209,
+     "dof:1": 1.634,
+     "dof:2": 0.91
+    }
+   }
+  },
+  "near 1920x1080 1x": {
+   "old": {
+    "median": 10.675,
+    "min": 9.429,
+    "max": 11.853,
+    "rounds": [
+     10.807,
+     9.4291,
+     11.7006,
+     10.5421,
+     10.1163,
+     11.8533
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.172,
+     "dof:1": 10.414
+    }
+   },
+   "new": {
+    "median": 4.468,
+    "min": 4.026,
+    "max": 4.761,
+    "rounds": [
+     4.7606,
+     4.6366,
+     4.0262,
+     4.7582,
+     4.3,
+     4.2228
+    ],
+    "speedup": 2.39,
+    "passMedians": {
+     "dof:0": 0.215,
+     "dof:1": 3.366,
+     "dof:2": 0.812
+    }
+   }
+  },
+  "far 1920x1080 1x": {
+   "old": {
+    "median": 8.63,
+    "min": 7.616,
+    "max": 9.857,
+    "rounds": [
+     8.6242,
+     7.6157,
+     7.9272,
+     8.6366,
+     9.8575,
+     9.546
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.158,
+     "dof:1": 8.428
+    }
+   },
+   "new": {
+    "median": 1.846,
+    "min": 1.607,
+    "max": 2.14,
+    "rounds": [
+     2.1403,
+     2.1191,
+     1.6071,
+     1.7869,
+     1.6291,
+     1.9057
+    ],
+    "speedup": 4.67,
+    "passMedians": {
+     "dof:0": 0.219,
+     "dof:1": 0.13,
+     "dof:2": 1.376
+    }
+   }
+  },
+  "wide 1920x1080 1x": {
+   "old": {
+    "median": 11.217,
+    "min": 9.504,
+    "max": 13.092,
+    "rounds": [
+     10.1911,
+     9.5044,
+     11.9328,
+     10.5008,
+     13.092,
+     12.369
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.164,
+     "dof:1": 10.976
+    }
+   },
+   "new": {
+    "median": 4.901,
+    "min": 4.275,
+    "max": 5.475,
+    "rounds": [
+     5.4754,
+     4.5538,
+     5.1585,
+     4.6722,
+     4.2754,
+     5.1288
+    ],
+    "speedup": 2.29,
+    "passMedians": {
+     "dof:0": 0.223,
+     "dof:1": 3.611,
+     "dof:2": 0.886
+    }
+   }
+  }
+ },
+ "hardware": {
+  "webglRenderer": "ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (16GB) (0x000064A0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "webgpu": {
+   "vendor": "intel",
+   "architecture": "xe-2lpg",
+   "device": "0x64a0",
+   "description": "Intel(R) Arc(TM) 140V GPU (16GB)",
+   "fallback": false
+  },
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+  "browserName": "chromium",
+  "browserVersion": "155.0.4283.45",
+  "requestedChannel": "msedge",
+  "launchArgs": [
+   "--enable-webgpu-developer-features"
+  ],
+  "powerPreference": "high-performance",
+  "hostPlatform": "win32",
+  "headless": true
+ },
+ "acPowerAfter": true
+}
