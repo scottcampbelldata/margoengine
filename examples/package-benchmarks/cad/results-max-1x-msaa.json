@@ -1,6 +1,7 @@
 {
  "label": "max-1x-msaa",
- "date": "2026-10-14T11:18:57.410Z",
+ "date": "2026-10-14T11:56:22.352Z",
+ "acPowerAtStart": true,
  "host": {
   "cpu": "Intel(R) Core(TM) Ultra 7 258V",
   "cores": 8,
@@ -18,8 +19,8 @@
    "crossOriginIsolated": true,
    "msaa": 1,
    "view": "overview",
-   "engineCreateMs": 81.59999999403954,
-   "buildMs": 200.03500001132488,
+   "engineCreateMs": 292.9599999934435,
+   "buildMs": 231.47499999403954,
    "parts": 89883,
    "groups": 10093,
    "entities": 99976,
@@ -52,120 +53,120 @@
     }
    ],
    "triangles": 11571604,
-   "firstFrameMs": 118.79999999701977,
-   "loadToFirstFrameMs": 400.4350000023842,
+   "firstFrameMs": 128.9699999988079,
+   "loadToFirstFrameMs": 653.4049999862909,
    "kernel": {
     "tickCullMs": {
      "n": 60,
-     "median": 11.405,
-     "p95": 12.17,
-     "max": 12.605,
-     "mean": 11.4374
+     "median": 13.36,
+     "p95": 14.01,
+     "max": 14.725,
+     "mean": 13.3068
     },
     "tickNoCullMs": {
      "n": 60,
-     "median": 11.21,
-     "p95": 11.855,
-     "max": 12.005,
-     "mean": 11.2503
+     "median": 13.1,
+     "p95": 14.145,
+     "max": 14.32,
+     "mean": 13.0522
     },
-    "perPartNs": 114.1
+    "perPartNs": 133.6
    },
    "frame": {
     "cpuMs": {
      "n": 240,
-     "median": 24.26,
-     "p95": 26.47,
-     "max": 35.5,
-     "mean": 24.5202
+     "median": 30.87,
+     "p95": 34.265,
+     "max": 38.455,
+     "mean": 30.454
     },
     "kernelMs": {
      "n": 240,
-     "median": 13.105,
-     "p95": 14.18,
-     "max": 22.435,
-     "mean": 13.2219
+     "median": 16.87,
+     "p95": 18.61,
+     "max": 19.565,
+     "mean": 16.6879
     },
     "collectMs": {
      "n": 240,
-     "median": 6.58,
-     "p95": 8.03,
-     "max": 9.465,
-     "mean": 6.755
+     "median": 8.155,
+     "p95": 9.395,
+     "max": 11.945,
+     "mean": 8.1375
     },
     "submitMs": {
      "n": 240,
-     "median": 4.435,
-     "p95": 5.09,
-     "max": 12.415,
-     "mean": 4.5433
+     "median": 5.58,
+     "p95": 6.37,
+     "max": 12.52,
+     "mean": 5.6286
     },
     "intervalMs": {
      "n": 240,
-     "median": 24.965,
-     "p95": 26.795,
-     "max": 36.655,
-     "mean": 25.1766
+     "median": 31.605,
+     "p95": 34.96,
+     "max": 39.16,
+     "mean": 31.1756
     },
-    "fps": 40.1,
+    "fps": 31.6,
     "gpuMs": {
      "n": 17,
-     "median": 22.2822,
-     "p95": 23.5274,
-     "max": 23.5274,
-     "mean": 22.5559
+     "median": 24.7071,
+     "p95": 27.0008,
+     "max": 27.0008,
+     "mean": 25.1311
     },
     "drawCalls": 5,
-    "visible": 82320,
+    "visible": 80906,
     "edgesCpuMs": null,
     "gpuPassMedianMs": [
-     22.2822
+     24.7071
     ]
    },
    "edgesFirstDrawMs": null,
    "isolated": {
     "cpuMs": {
      "n": 30,
-     "median": 22.28,
-     "p95": 24.11,
-     "max": 24.99,
-     "mean": 22.451
+     "median": 26.035,
+     "p95": 28.24,
+     "max": 28.765,
+     "mean": 26.0933
     },
     "gpuTailMs": {
      "n": 30,
-     "median": 25.695,
-     "p95": 27.805,
-     "max": 27.99,
-     "mean": 25.7335
+     "median": 29.155,
+     "p95": 30.47,
+     "max": 30.58,
+     "mean": 28.9802
     },
     "frameMs": {
      "n": 30,
-     "median": 48.28,
-     "p95": 50.645,
-     "max": 52.98,
-     "mean": 48.1845
+     "median": 55.085,
+     "p95": 57.08,
+     "max": 57.205,
+     "mean": 55.0735
     }
    },
    "enginePick": {
     "ms": {
      "n": 10,
-     "median": 43.905,
-     "p95": 45.22,
-     "max": 45.22,
-     "mean": 43.995
+     "median": 52.39,
+     "p95": 53.83,
+     "max": 53.83,
+     "mean": 51.1995
     },
-    "first": 86.23499999940395,
-    "hits": 6
+    "first": 98.53500001132488,
+    "hits": 5
    },
    "memory": {
-    "jsHeapMB": 45.46,
+    "jsHeapMB": 45.72,
     "kernelWasmMB": 28.19,
     "instanceStagingMB": 10.12,
     "gpuInstanceMB": 10.12,
     "geometryMB": 0.07,
     "msaaTargetsMB": 0
    },
-   "removeOneMeshMs": 2.0799999982118607,
+   "removeOneMeshMs": 2.7549999952316284,
    "errors": [],
    "size": "max",
    "pageErrors": []
@@ -176,5 +177,6 @@
   "architecture": "xe-2lpg",
   "description": "",
   "timestamp": true
- }
+ },
+ "acPowerAtEnd": true
 }

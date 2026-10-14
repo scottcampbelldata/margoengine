@@ -2,48 +2,48 @@
   "package": "machinery-cad",
   "baseline": "7d5a5dd",
   "node": "v24.15.0",
-  "recordedAt": "2026-10-14T11:11:31.776Z",
+  "recordedAt": "2026-10-14T12:01:49.107Z",
   "outputsIdentical": true,
-  "notes": "Node, fake renderer; ExplodedView positions identical; BVH hit distances agree within 1e-4 relative (same node and triangle for 400/400 rays, the rest hit a coincident face at the same distance); largest error against the exact float64 distance: baseline 3.58e-5 m, candidate 2.30e-13 m.",
+  "notes": "AC power: true at start, true at end. Node, fake renderer; ExplodedView positions identical; BVH hit distances agree within 1e-4 relative (same node and triangle for 400/400 rays, the rest hit a coincident face at the same distance); largest error against the exact float64 distance: baseline 3.58e-5 m, candidate 2.30e-13 m.",
   "cases": [
     {
       "case": "ExplodedView.onPreUpdate at rest, 10017 parts",
-      "baselineMs": 0.6297,
-      "candidateMs": 0.001,
-      "speedup": 629.7,
-      "animatingBaselineMs": 0.5631,
-      "animatingCandidateMs": 0.6352
+      "baselineMs": 0.4577,
+      "candidateMs": 0.0008,
+      "speedup": 572.125,
+      "animatingBaselineMs": 0.5554,
+      "animatingCandidateMs": 0.5263
     },
     {
       "case": "ExplodedView.onPreUpdate at rest, 50004 parts",
-      "baselineMs": 2.6069,
+      "baselineMs": 3.0302,
       "candidateMs": 0.0015,
-      "speedup": 1737.933,
-      "animatingBaselineMs": 2.8362,
-      "animatingCandidateMs": 2.8471
+      "speedup": 2020.133,
+      "animatingBaselineMs": 3.2312,
+      "animatingCandidateMs": 3.1689
     },
     {
       "case": "AssemblyBVH.rebuild, 7560 parts, 973280 instanced triangles",
-      "baselineMs": 801.6726,
-      "candidateMs": 2.1594,
-      "speedup": 371.248,
-      "raycast100BaselineMs": 1.2593,
-      "raycast100CandidateMs": 2.5089
+      "baselineMs": 1399.9248,
+      "candidateMs": 3.4799,
+      "speedup": 402.289,
+      "raycast100BaselineMs": 1.5733,
+      "raycast100CandidateMs": 3.3883
     },
     {
       "case": "AssemblyBVH.create (once each)",
-      "baselineMs": 1154.2,
-      "candidateMs": 10.75,
-      "speedup": 107.3
+      "baselineMs": 1465.49,
+      "candidateMs": 18.91,
+      "speedup": 77.5
     },
     {
       "case": "AssemblyBVH 89883 parts, 11571604 instanced triangles (baseline refuses)",
       "baselineMs": null,
-      "candidateMs": 0.559,
+      "candidateMs": 0.595,
       "speedup": null,
-      "createMs": 80.4,
-      "rebuildMs": 34.553,
-      "raycastMs": 0.559
+      "createMs": 71.8,
+      "rebuildMs": 40.795,
+      "raycastMs": 0.595
     }
   ]
 }

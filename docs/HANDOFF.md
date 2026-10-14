@@ -142,9 +142,9 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    Done for a-d (see `docs/cad-performance.md`, raw JSON in `examples/package-benchmarks/cad/`): real-GPU numbers at
    10k/50k/90k parts; `@margoengine/machinery/edges` FeatureEdges (instanced, depth-biased, ortho + section aware, compute
    size culling); ExplodedView free at rest; AssemblyBVH two-level (no 1M instanced-triangle cap, rebuild 370x faster).
-   Core hot spots for Scott (not changed): kernel recomputes every entity every frame (109 ns each, 10.9 ms at 100k),
-   JS batch collection 7 ms at 82k visible, 10 MB instance upload per frame, engine.pick 44 ms at 90k, O(n) mesh removal,
-   100k entity cap. OCCT: 3.1 MB gzip Wasm, ~150 ms init, ~1 s parse for a 442 kB STEP.
+   Core hot spots for Scott (not changed): kernel recomputes every entity every frame (139-164 ns each, 16 ms at 100k on AC),
+   JS batch collection 11 ms at 81k visible, 10 MB instance upload per frame, engine.pick 64 ms at 90k, O(n) mesh removal,
+   100k entity cap. OCCT: 3.1 MB gzip Wasm, ~150 ms init, ~1.2-1.5 s parse for a 442 kB STEP.
    f. Specialized pipelines instead of uber-shaders. The cost of one do-everything shader is register pressure: the
       compiler reserves registers for the worst path, cutting how many threads an integrated GPU runs at once.
       (Branches on per-draw uniforms do not diverge; that part of the usual argument is wrong.) Plan: audit every

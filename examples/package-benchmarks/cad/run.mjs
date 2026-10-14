@@ -8,6 +8,7 @@ import {writeFile, stat} from 'node:fs/promises';
 import {gzipSync} from 'node:zlib';
 import {readFileSync} from 'node:fs';
 import {cpus, totalmem} from 'node:os';
+import {requireAC} from './power.mjs';
 
 const arg = (name, fallback) => process.argv.find(a => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
 const flag = name => process.argv.includes(`--${name}`);
@@ -17,7 +18,8 @@ const isolate = (_, res, next) => {res.setHeader('Cross-Origin-Opener-Policy', '
 const server = await createServer({configFile: false, logLevel: 'error', server: {host: '127.0.0.1', port, strictPort: true, fs: {strict: false}, hmr: false, watch: {ignored: ['**']}}, plugins: [{name: 'isolate', configureServer: s => {s.middlewares.use(isolate);}}]});
 await server.listen();
 const browser = await chromium.launch({channel: process.env.BROWSER_CHANNEL ?? 'msedge', headless: true, args: ['--disable-gpu-vsync', '--disable-frame-rate-limit', '--enable-precise-memory-info']});
-const out = {label, date: new Date().toISOString(), host: {cpu: cpus()[0].model, cores: cpus().length, memoryGB: Math.round(totalmem() / 2 ** 30), node: process.version, browser: browser.version()}, viewport: [1432, 768], runs: []};
+const acPowerAtStart = requireAC();
+const out = {label, date: new Date().toISOString(), acPowerAtStart, host: {cpu: cpus()[0].model, cores: cpus().length, memoryGB: Math.round(totalmem() / 2 ** 30), node: process.version, browser: browser.version()}, viewport: [1432, 768], runs: []};
 const open = async () => {const page = await browser.newPage({viewport: {width: 1432, height: 768}, deviceScaleFactor: 1});page.setDefaultTimeout(+(process.env.PAGE_TIMEOUT ?? 600_000));const errors = [];page.on('pageerror', e => errors.push(e.message));page.on('console', m => {if (process.env.DEBUG) console.log('page:', m.text());if (m.type() === 'error') errors.push(m.text());});await page.goto(`http://127.0.0.1:${port}/examples/package-benchmarks/cad/index.html`);await page.waitForFunction(() => window.ready);return {page, errors};};
 try {
   {const {page} = await open();out.adapter = await page.evaluate(async () => {const a = await navigator.gpu.requestAdapter({powerPreference: 'high-performance'});return {...a.info.toJSON?.() ?? {vendor: a.info.vendor, architecture: a.info.architecture, description: a.info.description}, timestamp: a.features.has('timestamp-query')};});await page.close();}
@@ -38,5 +40,6 @@ try {
     }
   }
 } finally {await browser.close();await server.close();}
+out.acPowerAtEnd = requireAC();
 await writeFile(new URL(`./results-${label}.json`, import.meta.url), JSON.stringify(out, null, 1));
 console.log('wrote', `examples/package-benchmarks/cad/results-${label}.json`);
