@@ -7,6 +7,8 @@ export interface Batch {
     geometry: Geometry;
     instances: Float32Array;
     count: number;
+    start?: number;
+    end?: number;
 }
 
 export class Camera {

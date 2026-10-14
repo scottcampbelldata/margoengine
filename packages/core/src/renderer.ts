@@ -10,7 +10,8 @@ declare const GPUMapMode:{READ:number};
 
 const defaultDraw:DrawOptions={};
 
-export interface Batch { geometry: Geometry; instances: Float32Array; count: number }
+/** `start`/`end`: float range of `instances` changed since the WebGPU renderer last uploaded it (absent: upload all). */
+export interface Batch { geometry: Geometry; instances: Float32Array; count: number; start?: number; end?: number }
 export interface Lighting { direction: Float32Array; radiance: Float32Array }
 export interface GeometryBuffers {readonly vertex:GPUBuffer;readonly index:GPUBuffer;readonly instance:GPUBuffer}
 export interface Renderer {
@@ -145,7 +146,8 @@ export class GPURenderer implements Renderer {
     pass.setPipeline(pipeline); pass.setBindGroup(0,group);
     for(const batch of drawBatches) if(batch.count) {
       const resource=this.resources.get(batch.geometry)!;
-      if(resource.frame!==this.frameId){this.device.queue.writeBuffer(resource.instance,0,batch.instances as Float32Array<ArrayBuffer>,0,batch.count*24);resource.frame=this.frameId;}
+      // Upload only the changed range, everything into a new buffer.
+      if(resource.frame!==this.frameId){const start=resource.frame<0?0:batch.start??0,end=Math.min(resource.frame<0?1/0:batch.end??1/0,batch.count*24);if(end>start)this.device.queue.writeBuffer(resource.instance,start*4,batch.instances as Float32Array<ArrayBuffer>,start,end-start);batch.start=1/0;batch.end=0;resource.frame=this.frameId;}
       pass.setVertexBuffer(0,resource.vertex); pass.setVertexBuffer(1,resource.instance); pass.setIndexBuffer(resource.index,'uint32');
       if(options.indirect??context.indirect){resource.indirect??=this.device.createBuffer({size:20,usage:GPUBufferUsage.INDIRECT|GPUBufferUsage.COPY_DST});resource.command??=new Uint32Array([batch.geometry.indices.length,0,0,0,0]);if(resource.command[1]!==batch.count){resource.command[1]=batch.count;this.device.queue.writeBuffer(resource.indirect,0,resource.command as Uint32Array<ArrayBuffer>);}pass.drawIndexedIndirect(resource.indirect,0);}else pass.drawIndexed(batch.geometry.indices.length,batch.count);
     }
