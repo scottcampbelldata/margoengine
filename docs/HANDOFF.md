@@ -94,6 +94,9 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    octahedral imposters, texture atlases (needs texture transforms in materials), vertex animation textures for
    GPU crowds. Imposters and LOD first; they serve CAD/simulator scenes and landing pages alike. Compute nodes belong
    in the 1b shader package.
+1d. Imposter picking: once the glTF picking worker merges, let a raycast that reaches an object in its imposter level
+   accept the bounding-sphere/box hit (distant cards have no triangles). LOD screen levels already follow orthographic
+   zoom (done).
 1d. Orthographic follow-ups: SSAO, lines/points world widths, labels CSS perspective, clustered froxels, DOF and splats
    assume a perspective camera; fix each in its own package. Optional core hook (Camera.projection + up) would remove
    the cameras package's update replacement; only if Scott wants it.

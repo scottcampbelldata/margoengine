@@ -136,3 +136,15 @@ test('mock GPU: bake renders every view through gltf-pro, restores the source, d
     lods.dispose();imposter.dispose();assert.ok(s.destroyed.includes(imposter.color??old)||imposter.color===undefined);assert.equal(imposter.ready(),false);
   } finally {s.close();}
 });
+
+test('screen-size levels follow orthographic zoom, not camera distance', async () => {
+  const {CameraProjection}=await import('../../cameras/dist/index.js');
+  const e=await plain(),projection=new CameraProjection(),lods=new LODSystem({hysteresis:0});e.use(projection);e.use(lods);
+  const m=e.createMesh().setPosition([0,0,-10]),g=box(2,2,2),lod=lods.add(m,[{object:g},{object:null,screen:0.25}]),r=g.bounds[3];
+  // Orthographic: screen = r / (height / 2), independent of distance. The switch is at height = 2r / 0.25.
+  const switchHeight=2*r/0.25;
+  projection.height=switchHeight*0.99;e.render();lods.update();assert.equal(lod.level,0,'zoomed in shows detail');
+  projection.height=switchHeight*1.01;e.render();lods.update();assert.equal(lod.level,1,'zoomed out switches');
+  m.setPosition([0,0,-1000]);projection.height=switchHeight*0.99;e.render();lods.update();assert.equal(lod.level,0,'distance does not matter in orthographic');
+  e.dispose();
+});

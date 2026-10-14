@@ -91,10 +91,12 @@ export class LODSystem implements EnginePlugin {
     const e=this.engine;if(!e)return;
     if(this.dirty){e.store.tick(false);this.dirty=false;}
     for(let s=0;s<this.atlases.length;s++)this.atlases[s].imposter.ready();
-    const m=e.store.matrices,p=e.camera.position,ex=p[0],ey=p[1],ez=p[2],tan=Math.tan(e.camera.fov*Math.PI/360),bias=this.bias,ids=this.ids,counts=this.counts,current=this.current,thresholds=this.thresholds,bands=this.bands;
+    // Screen levels use the camera's clip matrix: w is view depth in perspective and 1 in orthographic, and the y row's
+    // length is the projection's y scale, so orthographic zoom (e.g. @margoengine/cameras) changes levels as expected.
+    const m=e.store.matrices,p=e.camera.position,ex=p[0],ey=p[1],ez=p[2],c=e.camera.matrix,yScale=Math.hypot(c[1],c[5],c[9])||1/Math.tan(e.camera.fov*Math.PI/360),bias=this.bias,ids=this.ids,counts=this.counts,current=this.current,thresholds=this.thresholds,bands=this.bands;
     for(let i=0;i<this.count;i++){
       const o=ids[i]*16,dx=m[o+12]-ex,dy=m[o+13]-ey,dz=m[o+14]-ez;let v=Math.sqrt(dx*dx+dy*dy+dz*dz)*bias;
-      if(this.screen[i]){const sx=m[o]*m[o]+m[o+1]*m[o+1]+m[o+2]*m[o+2],sy=m[o+4]*m[o+4]+m[o+5]*m[o+5]+m[o+6]*m[o+6],sz=m[o+8]*m[o+8]+m[o+9]*m[o+9]+m[o+10]*m[o+10];v*=tan/(this.radius[i]*Math.sqrt(Math.max(sx,sy,sz)));}
+      if(this.screen[i]){const sx=m[o]*m[o]+m[o+1]*m[o+1]+m[o+2]*m[o+2],sy=m[o+4]*m[o+4]+m[o+5]*m[o+5]+m[o+6]*m[o+6],sz=m[o+8]*m[o+8]+m[o+9]*m[o+9]+m[o+10]*m[o+10];const w=c[3]||c[7]||c[11]||c[15]?Math.abs(c[3]*m[o+12]+c[7]*m[o+13]+c[11]*m[o+14]+c[15]):v/bias;v=bias*w/(yScale*this.radius[i]*Math.sqrt(Math.max(sx,sy,sz)));}
       // three.js LOD: the shown level's threshold drops by its hysteresis, so small camera moves never flip levels back and forth.
       const n=counts[i],shown=current[i],b=i*MAX_LEVELS;let next=0;
       for(let l=1;l<n;l++){let t=thresholds[b+l];if(l===shown)t-=t*bands[b+l];if(v>=t)next=l;else break;}

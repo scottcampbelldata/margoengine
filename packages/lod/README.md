@@ -70,8 +70,9 @@ Limits: an imposter shows the object as baked: per-instance material colours, an
 captured, and it receives no shadows and casts none (shadows and SSAO only see real meshes). Roughness and metalness
 are stored in 32 steps; normals are sampled without filtering. Imposters are not pickable (`engine.pick` and the
 bvh only see meshes) and assume the level's model sits at the anchor's origin. Selection reads the previous frame's
-world matrices, so a teleported object can show the old level for one frame. Distances are measured from the camera
-position (no orthographic zoom). Object removal swaps with the last entry, so `lods.add` order is not kept. WebGPU
+world matrices, so a teleported object can show the old level for one frame. `distance` levels are measured from the camera
+position; `screen` levels use the camera's projection, so they also follow orthographic zoom (use them with
+`@margoengine/cameras`). Object removal swaps with the last entry, so `lods.add` order is not kept. WebGPU
 for imposters; distance and screen selection also work on the WebGL2 backend.
 
 MIT. Optional, tree-shakable package, about 9.0 kB min+gzip (the WGSL is most of it); peers: core and gltf-pro
