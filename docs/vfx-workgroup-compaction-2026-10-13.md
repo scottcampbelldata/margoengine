@@ -1,5 +1,9 @@
 # Private VFX workgroup compaction preparation
 
+Result (2026-10-14, Arc 140V): measured and rejected. A 256-wide grouped variant left the simulate pass unchanged at
+1M particles and made the draw 0.3 ms slower; see `docs/HANDOFF.md` item 0b and
+`examples/package-benchmarks/results/vfx-gpu-c1-group-compaction.json`.
+
 The current production simulation uses 256-thread workgroups and performs one
 global `indirect.instanceCount` atomic increment for each live particle. The
 private candidate uses 64 threads, a workgroup-local live counter/ticket, and one

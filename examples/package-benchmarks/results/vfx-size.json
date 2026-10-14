@@ -1,0 +1,116 @@
+{
+ "baseline": "a5f1e94",
+ "head": "76af7a0",
+ "entries": {
+  "root": {
+   "before": {
+    "raw": 22123,
+    "gzip": 7260
+   },
+   "after": {
+    "raw": 23488,
+    "gzip": 7653
+   },
+   "gzipDelta": 393
+  },
+  "base": {
+   "before": {
+    "raw": 15752,
+    "gzip": 5311
+   },
+   "after": {
+    "raw": 17107,
+    "gzip": 5709
+   },
+   "gzipDelta": 398
+  },
+  "obstacles": {
+   "before": {
+    "raw": 3109,
+    "gzip": 1370
+   },
+   "after": {
+    "raw": 3108,
+    "gzip": 1366
+   },
+   "gzipDelta": -4
+  },
+  "base+obstacles": {
+   "before": {
+    "raw": 18097,
+    "gzip": 6080
+   },
+   "after": {
+    "raw": 19451,
+    "gzip": 6466
+   },
+   "gzipDelta": 386
+  },
+  "wrap": {
+   "before": {
+    "raw": 778,
+    "gzip": 439
+   },
+   "after": {
+    "raw": 777,
+    "gzip": 437
+   },
+   "gzipDelta": -2
+  },
+  "base+wrap": {
+   "before": {
+    "raw": 16123,
+    "gzip": 5432
+   },
+   "after": {
+    "raw": 17477,
+    "gzip": 5827
+   },
+   "gzipDelta": 395
+  },
+  "sort": {
+   "before": {
+    "raw": 2745,
+    "gzip": 1275
+   },
+   "after": {
+    "raw": 2731,
+    "gzip": 1272
+   },
+   "gzipDelta": -3
+  },
+  "base+sort": {
+   "before": {
+    "raw": 18042,
+    "gzip": 6019
+   },
+   "after": {
+    "raw": 19383,
+    "gzip": 6413
+   },
+   "gzipDelta": 394
+  },
+  "texture": {
+   "before": {
+    "raw": 1382,
+    "gzip": 735
+   },
+   "after": {
+    "raw": 1407,
+    "gzip": 750
+   },
+   "gzipDelta": 15
+  },
+  "base+texture": {
+   "before": {
+    "raw": 17068,
+    "gzip": 5756
+   },
+   "after": {
+    "raw": 18448,
+    "gzip": 6157
+   },
+   "gzipDelta": 401
+  }
+ }
+}

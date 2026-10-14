@@ -22,7 +22,7 @@ export function tracedGPU(){
  const write=d.queue.writeBuffer;d.queue.writeBuffer=(b,offset,v)=>{commands.push(['write',b,offset,sha(bytes(v))]);write(b,offset,v);};
  d.queue.writeTexture=(t,data)=>commands.push(['writeTexture',t.texture,sha(bytes(data))]);
  const pass={setPipeline:p=>commands.push(['setPipeline',p]),setBindGroup:(i,g)=>commands.push(['setBindGroup',i,g]),setIndexBuffer:b=>commands.push(['setIndexBuffer',b]),
-  dispatchWorkgroups:(...a)=>commands.push(['dispatch',...a]),draw:(...a)=>commands.push(['draw',...a]),drawIndexedIndirect:(b,o)=>commands.push(['drawIndexedIndirect',b,o]),end:()=>commands.push(['end'])};
+  dispatchWorkgroups:(...a)=>commands.push(['dispatch',...a]),draw:(...a)=>commands.push(['draw',...a]),drawIndexedIndirect:(b,o)=>commands.push(['drawIndexedIndirect',b,o]),drawIndirect:(b,o)=>commands.push(['drawIndirect',b,o]),end:()=>commands.push(['end'])};
  c.encoder.beginComputePass=()=>{commands.push(['computePass']);return pass;};
  c.encoder.beginRenderPass=x=>{commands.push(['renderPass',x.colorAttachments.map(a=>a.loadOp).join(),!!x.depthStencilAttachment]);return pass;};
  c.encoder.clearBuffer=(b,o,s)=>commands.push(['clearBuffer',b,o,s]);

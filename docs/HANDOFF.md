@@ -73,8 +73,8 @@ Five parallel workers reviewed 58 packages against baseline `f05414a`; Claude ve
 3. Island at 60 FPS on the laptop with the full water. If short, test terrain mesh 192 -> 96 on the light tier
    (about 0.9 ms) and check the shoreline still lines up.
 4. GPU-side optimization (shaders, particles, passes). Must be measured on hardware one change at a time;
-   Codex's notes list tried and rejected ideas. Untested lead: VFX does one shared atomic increment per live
-   particle (`docs/vfx-workgroup-compaction-2026-10-13.md`).
+   Codex's notes list tried and rejected ideas. VFX done (0b: about 2x less GPU time at 1M; the
+   workgroup-compaction lead measured no gain).
 5. Fair three.js benchmark: check `examples/conveyor-simulator` and `examples/benchmark` are like-for-like.
 6. Verified three.js parity matrix, then the feature gaps below.
 
@@ -105,11 +105,30 @@ it with every number (on battery Windows throttles the CPU/GPU and may drop the 
 Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (`c82e119`), WebGL renderer moved to
 `@margoengine/webgl` (`1356787`; core + stage 18,554 gzip), `@margoengine/math` (`88517f8`).
 
-0b. PRIORITY when the GPU is quiet: 1M particles on Scott's laptop light tier reads about 40 FPS (45 clean before the
-   workers; iPhone holds 60 at 1M). Re-baseline after the dedupe change to vfx, then GPU-time Codex's prepared
-   workgroup-compaction candidate (docs/vfx-workgroup-compaction-2026-10-13.md; ~15,625 global atomics per frame
-   instead of 1,000,000), then the billboard draw cost. Keep only measured wins; if 1M still misses 60, keep it as
-   an option, not the light-tier default (already 100k).
+0b. [DONE, see the vfx README "GPU cost"] 1M particles on the laptop light tier. Baseline (island demo, light tier,
+   Arc 140V, AC): frame GPU span 15.7 ms at 1M (10.2 ms with particles off), particle passes 5.7 ms: right at the
+   16.7 ms edge, hence 40-57 FPS on a 120 Hz panel. Isolated per pass at 1M/1x: simulate 1.6-2.2 ms, draw 2.1-2.8 ms.
+   Tried, each against the previous step, 16 alternating rounds (`examples/package-benchmarks/vfx-gpu.mjs`, JSON in
+   `examples/package-benchmarks/results/`):
+   - Codex's workgroup compaction (one global atomic per 256 particles): REJECTED. Compute unchanged (+0.01/+0.07 ms),
+     draw 0.3 ms slower (live-list order). The GPU already handles per-particle atomics well.
+   - Writing back only changed fields in the 64-byte record: REJECTED, no change (whole cache lines move either way).
+   - Non-instanced draw (3N vertices): REJECTED, no change.
+   - KEPT one triangle per billboard instead of a quad: draw -0.34 ms (1x) / -0.24 ms (4x) at 1M; fill-bound 4x
+     billboards much faster. At 4x MSAA a triangle covers more samples than the quad, so the fragment shader masks
+     to the quad's samples (`multisampled()` in shader.ts).
+   - KEPT compute-side frustum culling into a private draw list (`gpuState.visible`; `indirect[1]` still counts live
+     particles): draw -0.8/-0.9 ms at 1M, pixel-identical in id order.
+   - KEPT hot/cold split of the particle buffer with the angle derived from age: simulate 2.3 -> 1.1 ms at 1M.
+   Result at 1M, simulate+draw: 5.00 -> 2.46 ms (1x), 5.12 -> 2.40 ms (4x); 100k 0.28 -> 0.15/0.17 ms. Island demo
+   (`vfx-island.mjs`): light 1M span 15.7 -> 13.5 ms, particles 5.7 -> 2.6 ms, 56.7 -> 60 FPS (paced); full tier 1M
+   26.2 -> 22.9 ms (the full tier is ~20 ms with particles off, so it misses 60 on this laptop regardless).
+   Output: same particle state (angle within 5e-7 rad); in id order 1x pixels differ by at most 0.015 (mean 0.0005),
+   4x by at most 0.25 (mean 0.002, 0.11% darker in total), below the old renderer's own A/A blend-order noise (mean
+   0.003-0.004, max 0.08-0.10). Sizes (min+gzip, `vfx-size.mjs`): base 5,311 -> 5,709, root 7,260 -> 7,653,
+   features unchanged (obstacles 1,366, wrap 437, sort 1,272, texture 750). Particle buffer layout changed (README).
+   1M now fits the light tier's 60 FPS in this measurement with ~3 ms headroom; the light-tier default stays 100k
+   (Scott's call whether to raise it after checking on the laptop).
 1. Top-10 parity gaps (non-core parts): materials package [done: `@margoengine/materials`], glTF extensions/decoders [done: decoder hooks, KHR extensions, physical materials (`c01eedd`)], post stack +
    FXAA [done: `@margoengine/post/stack`, `@margoengine/post/fxaa`; SMAA not done], raycast/pick glTF models + DragControls [running], environment IBL apply + background colour + fog [done `269401e`: EnvironmentLighting, Fog, ColorBackground, UltraHDR; light probes (gap 44) left; SSAO-on-IBL done (1d''')],
    orthographic/vertical cameras without core change [done: `@margoengine/cameras`; lines' world widths too (1d)], WebGL beyond core (gap 8: scope with Scott first).
@@ -434,9 +453,7 @@ Built and deployed to the preview, not yet measured:
 4. three.js comparison (`examples/conveyor-simulator`, see its README; needs `git lfs pull` and a local HTTP
    server): Margo page vs three page vs three page with `?renderer=webgpu`, with Chromium launched using
    `--disable-gpu-vsync --disable-frame-rate-limit`. Not yet run since the WebGPU option was added.
-5. VFX workgroup compaction GPU timing (Codex's prepared harness, correctness already passed headless):
-   `node test-results/vfx-compaction-chain-timing.mjs --run --label=chain-v1`. Note: `test-results/` is git-ignored,
-   so this harness exists only on this laptop.
+5. [DONE, rejected: no compute gain, draw 0.3 ms slower; see 0b] VFX workgroup compaction GPU timing.
 6. UNCOMMITTED, written while the laptop was busy: `packages/geometry/src/subdivide.ts` (loopSubdivide without
    per-vertex strings, per-edge arrays or Sets). Prove it with
    `node examples/package-benchmarks/proofs/geometry-subdivide.proof.js` (baseline `bdb7521`), run

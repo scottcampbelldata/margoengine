@@ -269,3 +269,14 @@ Existing package unit tests cover entity generations, hierarchy invariants,
 callback mutation, Hermite interpolation and quaternion normalization separately.
 Native GPU/FPS acceptance must be recorded after browser testing; these examples
 do not establish a device performance guarantee.
+
+## VFX GPU timing (real GPU, take the GPU lock, AC power)
+
+- `vfx-gpu.mjs`: two @margoengine/vfx builds side by side on one device: simulate and draw pass timestamps over 16
+  alternating rounds, plus a particle-state and HDR pixel comparison (id order and atomic order, A/A and A/B).
+- `vfx-island.mjs`: the Afterlight island demo with each build swapped in; frame GPU span and particle passes from the
+  Stats profiler, light and full tier.
+- `vfx-size.mjs`: min+gzip of every vfx entry at a ref and now.
+
+Results (`results/vfx-*.json`) back the numbers in `packages/vfx/README.md` and `docs/HANDOFF.md` item 0b; the
+`vfx-gpu-<candidate>.json` files record each idea tried, kept or rejected.
