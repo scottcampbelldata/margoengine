@@ -110,6 +110,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | CompressedTexture (KTX2/Basis) | PARTIAL | decoders `KTX2Decoder.createTexture` (`packages/decoders/src/ktx2.ts`) | Returns a raw `GPUTexture` that no material or loader consumes. KTX2 cube maps, arrays and HDR are rejected. |
 | VideoTexture, VideoFrameTexture | PARTIAL | video `Video` (`packages/video/src/index.ts`) | Draws to a screen-space rectangle only; `import(device)` is offered for custom renderers. The README says it is "not a new core material slot". |
 | CanvasTexture | MISSING | — | |
+| Texture `offset` / `repeat` / `rotation` / `center`, texture atlases | COVERED † | materials `uvTransform`, `setUVTransform`, `packAtlas`, `transformUVs` (`packages/materials/src/index.ts`, `atlas.ts`); gltf-pro `KHR_texture_transform` | glTF `KHR_texture_transform` semantics (rotation about the UV origin, no `center`); per map slot on a `Material`, not per `Texture`. Atlas regions merge static meshes into one draw. Shader-node `texture()` reads raw UVs. |
 | DepthTexture | PARTIAL | `depthTexture` getters on post `Bloom` and `SSAO`, and on dof `DOF` | Borrowed from whichever effect owns the scene capture. |
 | Mipmaps, wrapping, filtering | PARTIAL | gltf-pro mip generation and glTF samplers (`packages/gltf-pro/src/index.ts`, `mip.ts`) | glTF assets only. No anisotropic filtering setting was found. |
 
@@ -189,6 +190,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | AnimationMixer, clip playback | COVERED | animation `Animation` (`packages/animation/src/index.ts`) | For glTF-pro models on WebGPU. One clip at a time unless animator is used. |
 | Cross-fade, blending, additive layers | COVERED | animator `Animator`, `blend1D`, `blend2D` (`packages/animator/src/index.ts`) | Also has blend trees and state transitions. |
 | SkinnedMesh, Skeleton, Bone | COVERED | animation compute skinning (`packages/animation/src/shader.ts`) | Four influences per vertex. Skins must come from glTF. |
+| Animated crowds (vertex animation textures; three.js has no built-in) | COVERED | animation `bakeVAT`, `VATCrowd` (`packages/animation/src/vat.ts`, entry `@margoengine/animation/vat`) | Clips baked on the CPU into an rgba32float texture; any number of instances in one instanced draw with per-instance matrix, clip, time offset, speed and atlas region. Opaque; no shadows, SSAO or IBL; no clip blending. |
 | Morph targets | COVERED | animation morph compute, `setMorph` | Position, normal and tangent morphs. |
 | KeyframeTrack, AnimationClip authored in code, PropertyBinding | PARTIAL | animation `sampleTrack`, `sampleTrackInto`; tween `Tween` | Clips come only from glTF node TRS and weights. No property tracks on arbitrary objects. |
 | SkeletonUtils (clone, retarget), AnimationObjectGroup | MISSING | — | |

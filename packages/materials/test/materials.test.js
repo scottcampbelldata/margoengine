@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Engine,TransformStore} from '../../core/dist/extension.js';
 import {boxGeometry,planeGeometry} from '../../geometry/dist/index.js';
-import {Texture,Material,createMesh,loadTexture,packGeometry,materialShader} from '../dist/index.js';
+import {Texture,Material,createMesh,loadTexture,packGeometry,materialShader,packAtlas,transformUVs} from '../dist/index.js';
 import {optionalGPU} from '../../../tests/support/optional-gpu.js';
 
 async function scene(){
@@ -153,3 +153,44 @@ test('loadTexture fetches into an owned ImageBitmap and enforces protocol and si
     new Texture({width:1,height:1}).dispose();assert.equal(closed.length,2,'caller-owned sources stay open');
   } finally {globalThis.fetch=fetchBefore;globalThis.createImageBitmap=bitmapBefore;}
 });
+
+test('uvTransform follows KHR_texture_transform, defaults to gltf-pro identity rows bit for bit and stays live per slot',async()=>{
+  const {textureTransform}=await import('../../gltf-pro/dist/index.js');
+  const plain=new Material(),t={offset:[0.5,0.25],rotation:Math.PI/2,scale:[2,3]};
+  assert.deepStrictEqual(plain.uvt,Array(5).fill(textureTransform()).flat(),'identity, including the -0 gltf-pro writes');
+  assert.deepStrictEqual(textureTransform(),[1,0,0,0,-0,1,0,0]);
+  const m=new Material({uvTransform:t});assert.deepStrictEqual(m.uvt.slice(32),textureTransform(t));
+  m.setUVTransform(null,'normalMap');assert.deepStrictEqual(m.uvt.slice(16,24),textureTransform());assert.deepStrictEqual(m.uvt.slice(0,8),textureTransform(t));
+  assert.throws(()=>m.setUVTransform(t,'matcap'),TypeError);assert.throws(()=>m.setUVTransform({scale:[1]}),TypeError);
+  // transformUVs bakes the same mapping into geometry: (1,0)->(0.5,-1.75), (0,1)->(3.5,0.25) as in gltf-pro's own test.
+  assert.deepEqual([...transformUVs([1,0,0,1],t)].map(v=>+v.toFixed(6)),[0.5,-1.75,3.5,0.25]);
+  const s=await scene();
+  try {
+    const material=new Material({uvTransform:{offset:[0.25,0.5],scale:[0.5,0.25]}}),model=createMesh(s.engine,boxGeometry(1,1,1),material);s.frame();
+    const uniform=s.h.resources.find(r=>r.size===880),rows=()=>[...new Float32Array(uniform.data,104*4,8)];
+    assert.deepEqual(rows(),[0.5,0,0.25,0,-0,0.25,0.5,0]);
+    material.setUVTransform({offset:[0.75,0]},'map');s.frame();assert.deepEqual(rows(),[1,0,0.75,0,-0,1,0,0],'live on the next frame');model.destroy();
+  } finally {s.close();}
+});
+
+test('packAtlas shelf-packs images with edge padding and returns regions that map each image back onto itself',()=>{
+  const image=(w,h,seed)=>({width:w,height:h,data:Uint8Array.from({length:w*h*4},(_,i)=>(i*seed+7)%251)});
+  const images=[image(5,3,3),image(16,9,5),image(1,1,11),new ImageDataLike(4,4,13)],atlas=packAtlas(images,{padding:2});
+  const {width:W,height:H,data}=atlas.image;assert.ok(Number.isInteger(Math.log2(W))&&H<=W*2&&data.length===W*H*4);
+  const texel=(u,v)=>{const x=Math.floor(u*W),y=Math.floor(v*H),o=(y*W+x)*4;return [...data.subarray(o,o+4)];};
+  images.forEach((img,k)=>{
+    const r=atlas.regions[k],at=(u,v)=>texel(r.offset[0]+u*r.scale[0],r.offset[1]+v*r.scale[1]);
+    for(let y=0;y<img.height;y++)for(let x=0;x<img.width;x++){const o=(y*img.width+x)*4;assert.deepEqual(at((x+0.5)/img.width,(y+0.5)/img.height),[...img.data.subarray(o,o+4)],`image ${k} texel ${x},${y}`);}
+    // The gutter repeats the edge: a texel just outside each corner reads that corner.
+    assert.deepEqual(at(-0.5/img.width,-0.5/img.height),[...img.data.subarray(0,4)]);
+    const last=(img.width*img.height-1)*4;assert.deepEqual(at(1+0.5/img.width,1+0.5/img.height),[...img.data.subarray(last,last+4)]);
+  });
+  // Drawable images are read through a 2D canvas and flipped so they keep Texture's flipY orientation.
+  globalThis.OffscreenCanvas=class{constructor(w,h){this.w=w;this.h=h;}getContext(){return {drawImage(){},getImageData:(x,y,w,h)=>({width:w,height:h,data:Uint8ClampedArray.from({length:w*h*4},(_,i)=>Math.floor(i/(w*4)))})};}};
+  try {
+    const flipped=packAtlas([{width:2,height:3}],{padding:0}),r=flipped.regions[0],{data:d,width:w}=flipped.image;
+    assert.deepEqual([d[0],d[w*4],d[w*8]],[2,1,0],'bottom image row first');assert.deepEqual(r.scale,[2/w,3/flipped.image.height]);
+  } finally {delete globalThis.OffscreenCanvas;}
+  assert.throws(()=>packAtlas([image(5000,1,1)]),RangeError);assert.throws(()=>packAtlas([]),RangeError);assert.throws(()=>packAtlas([{width:2,height:2,data:new Uint8Array(3)}]),RangeError);
+});
+class ImageDataLike {constructor(w,h,seed){this.width=w;this.height=h;this.data=Uint8ClampedArray.from({length:w*h*4},(_,i)=>(i*seed+1)%253);}}

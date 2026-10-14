@@ -1,0 +1,40 @@
+{
+  "proof": "materials-atlas",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T13:11:41.718Z",
+  "objects": 256,
+  "image": "32x32 RGBA each, atlas 1024x512 with 2-texel padding",
+  "results": {
+    "separate": {
+      "draws": 256,
+      "setBindGroup": 768,
+      "setPipeline": 256,
+      "uniformWrites": 256,
+      "texturesCreated": 1540,
+      "pipelinesCreated": 257,
+      "bindGroupsCreated": 2048,
+      "cpuMsPerFrame": 8.342
+    },
+    "shared": {
+      "draws": 256,
+      "setBindGroup": 768,
+      "setPipeline": 256,
+      "uniformWrites": 256,
+      "texturesCreated": 1285,
+      "pipelinesCreated": 257,
+      "bindGroupsCreated": 778,
+      "cpuMsPerFrame": 9.628
+    },
+    "merged": {
+      "draws": 1,
+      "setBindGroup": 3,
+      "setPipeline": 1,
+      "uniformWrites": 1,
+      "texturesCreated": 10,
+      "pipelinesCreated": 2,
+      "bindGroupsCreated": 13,
+      "cpuMsPerFrame": 0.052
+    }
+  },
+  "notes": "Counts are one steady frame on the recording mock GPU. gltf-pro draws one call per mesh and caches pipelines per model, so sharing a texture alone does not cut draws; merging atlas-mapped geometry does (static meshes only)."
+}
