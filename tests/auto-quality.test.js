@@ -6,8 +6,9 @@ import {TransformStore} from '../packages/core/dist/kernel.js';
 
 // Drive the watcher with synthetic frame timestamps; `gaps` lists [interval ms, frame count] runs.
 function run(gaps) {
-  const queue = [], calls = {store: 0, reload: 0};
-  watchFrameRate({request: callback => queue.push(callback), store: () => calls.store++, reload: () => calls.reload++});
+  const queue = [], calls = {store: 0, reload: 0}, light = globalThis.margoLow;
+  delete globalThis.margoLow; // the full tier is the one that watches frame rate
+  try {watchFrameRate({request: callback => queue.push(callback), store: () => calls.store++, reload: () => calls.reload++});} finally {if (light) globalThis.margoLow = light;}
   let now = 1000;
   for (const [interval, count] of gaps) for (let i = 0; i < count && queue.length; i++) queue.shift()(now += interval);
   return {...calls, watching: queue.length > 0};
@@ -17,9 +18,28 @@ test('sustained slow desktop frames switch to the light tier once; fast or inter
   assert.deepEqual(run([[25, 400]]), {store: 1, reload: 1, watching: false}, '40 FPS for ten seconds');
   assert.deepEqual(run([[1000 / 60, 3000]]), {store: 0, reload: 0, watching: false}, '60 FPS stops watching after 30 s');
   assert.deepEqual(run([[25, 150], [5000, 1], [1000 / 60, 300]]), {store: 0, reload: 0, watching: true}, 'a hidden-tab gap resets the count');
+});
+
+// Drive the light-tier probe: each rAF frame submits once and the GPU finishes `gpu` ms later.
+function probe(gpu) {
+  const frames = [], stored = [], pending = [];
+  let clock = 0, reloads = 0;
+  const queue = {submit() {}, onSubmittedWorkDone() {return new Promise(resolve => pending.push(() => {clock += gpu; resolve();}));}};
   globalThis.margoLow = 1;
-  try {assert.deepEqual(run([[25, 400]]), {store: 0, reload: 0, watching: false}, 'an already-light page never reloads');}
+  try {watchFrameRate({request: callback => frames.push(callback), queue, now: () => clock, store: value => stored.push(value), reload: () => reloads++});}
   finally {delete globalThis.margoLow;}
+  return {frames, pending, queue, stored, reloads};
+}
+test('the light tier remembers the full tier only when the GPU has clear headroom, and never reloads', async () => {
+  for (const [gpu, expected] of [[2, 'high'], [9, 'low']]) {
+    const run = probe(gpu), {submit} = run.queue;
+    for (let i = 0; i < 400 && run.frames.length; i++) {
+      run.frames.shift()(i * 16.7); run.queue.submit([]);
+      while (run.pending.length) {run.pending.shift()(); await null;}
+    }
+    await null;
+    assert.deepEqual(run.stored, [expected], `${gpu} ms`); assert.equal(run.reloads, 0); assert.notEqual(run.queue.submit, submit, 'the original submit is restored after measuring');
+  }
 });
 
 test('the light tier renders HiDPI desktops single-sampled at DPR 1', async () => {
