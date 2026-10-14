@@ -89,7 +89,10 @@ From package descriptions, not yet audited against code:
 - Scene utilities: decals, reflection probes and cube cameras, a level-of-detail object, an SVG loader.
 - Browser reach: most packages are WebGPU-only; three's WebGL renderer runs without WebGPU. State this openly.
 
-## Quality tiers as they work now (`packages/shared/auto-quality.js`)
+## Quality tiers as they work now (`@margoengine/quality`, `packages/quality`)
+
+Apps call `applyQualityTier()` before creating an engine and `watchQuality()` once rendering. Rule from Scott:
+engine behaviour belongs in packages, never only in demo code.
 
 - Phones (user agent `Mobi|Android`): 1x MSAA, DPR up to 2, phone scene settings. Unchanged.
 - Desktops start on the light tier (1x MSAA, DPR 1, capped at ~60 FPS) unless `localStorage.margoQuality` is
@@ -106,7 +109,7 @@ Built and deployed to the preview, not yet measured:
 1. Island light tier, full water: https://auto-quality.margoengine.pages.dev/gameplay-sandbox/?quality=low
    (100k and 1M particles). Target: locked 60. If short, try terrain 192 -> 96 on the light tier.
 2. Sharper light tier: same page with `&scale=1.25`, `&scale=1.5`, `&scale=2`. Keep the highest scale that holds
-   60, then set it as the default (`scale` fallback in `packages/shared/auto-quality.js`).
+   60, then set it as the default (`scale` fallback in `packages/quality/src/index.ts`).
 3. Full tier for comparison: `?quality=high`.
 4. three.js comparison (`examples/conveyor-simulator`, see its README; needs `git lfs pull` and a local HTTP
    server): Margo page vs three page vs three page with `?renderer=webgpu`, with Chromium launched using
@@ -120,8 +123,6 @@ Built and deployed to the preview, not yet measured:
    `npm run test:all`, then commit or revert. It type-checks; nothing else about it has been run.
 
 ## Known issues and caveats
-- The measuring helper (`packages/shared/auto-quality.js`) is internal and not published, so npm users only get the
-  documented `globalThis.margoLow` knob (core README). Consider shipping the watcher as a small optional package.
 
 - The measured tier is remembered per browser with no expiry and no on-page control yet.
 - A fast PC sees the light tier on its first page view only; the full tier starts from the next page load.

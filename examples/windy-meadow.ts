@@ -6,7 +6,8 @@ import {submitPrincipalScene} from '@margoengine/post/scene-fade';
 import {engineRuntime} from '@margoengine/core/extension';
 import {Sky} from '@margoengine/sky';
 import {sceneSamples} from '../packages/shared/quality.js';
-import {watchFrameRate} from '../packages/shared/auto-quality.js';
+import {applyQualityTier, watchQuality} from '@margoengine/quality';
+applyQualityTier();
 
 const error=document.querySelector<HTMLElement>('#error')!,status=document.querySelector<HTMLElement>('#status')!;
 const abort=new AbortController();let dispose=()=>abort.abort();
@@ -27,7 +28,7 @@ try {
   stage.box({size:[60,0.12,60],position:[0,-0.07,0],color:'#34451f',roughness:1});
   const speed=document.querySelector<HTMLInputElement>('#speed')!,strength=document.querySelector<HTMLInputElement>('#strength')!;
   const density=document.querySelector<HTMLSelectElement>('#density')!,seeds=document.querySelector<HTMLInputElement>('#seeds')!;
-  const mobile=sceneSamples()===1;watchFrameRate();
+  const mobile=sceneSamples()===1;watchQuality();
   if(mobile)density.value='35000';
   document.querySelector<HTMLDetailsElement>('#settings')!.open=!matchMedia('(max-width:600px)').matches;
   document.querySelector<HTMLElement>('#quality')!.textContent=mobile?'Mobile · 1× MSAA · DPR capped at 2':'Desktop · 4× MSAA · DPR capped at 1';

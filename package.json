@@ -50,6 +50,7 @@
     "packages/gizmo",
     "packages/usdz-export",
     "packages/tween",
+    "packages/quality",
     "packages/ecs",
     "packages/fsm",
     "packages/splines",

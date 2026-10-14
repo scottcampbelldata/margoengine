@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json && vite build"
   },
   "dependencies": {
+    "@margoengine/quality": "0.1.0",
     "@margoengine/core": "0.1.0",
     "@margoengine/scenery": "0.1.0",
     "@margoengine/post": "0.1.0",
