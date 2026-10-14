@@ -607,14 +607,29 @@ Before launch, in addition to the work queue:
 
 ## Feature gaps versus three.js (after optimization; each as an optional package)
 
-Verified matrix: `docs/threejs-parity.md`, re-tallied 2026-10-14 against 2c53227 (156 three.js features: 83 covered,
-41 partial, 32 missing (ShadowMaterial became partial with staging's ContactShadows); was 65 / 43 / 45 in its stale summary; read from source, not run). The first audit's top gaps
+Verified matrix: `docs/threejs-parity.md`, re-tallied 2026-10-14 against 2c53227 (156 three.js features: 84 covered,
+40 partial, 32 missing after textured instancing (InstancedMesh PARTIAL -> COVERED); ShadowMaterial became partial with staging's ContactShadows; was 65 / 43 / 45 in its stale summary; read from source, not run). The first audit's top gaps
 (materials, glTF extensions/decoders, picking models, IBL, background colour, post stack, ortho camera, math, FXAA) are
 closed. New top 10: WebGL2 beyond core, transparent canvas (core), multiple directional/coloured ambient/hemisphere
-lights, point and spot shadows, textured instancing (+ `EXT_mesh_gpu_instancing`), remaining glTF extensions
+lights, point and spot shadows, [DONE] textured instancing (+ `EXT_mesh_gpu_instancing`, see below), remaining glTF extensions
 (animation pointer, iridescence, anisotropy, dispersion, variants, refraction, cameras), physical materials on your own
 meshes, second UV set/groups/custom attributes, ShadowMaterial, glTF export with animation. `docs/from-threejs.md`'s
 "Not yet" table matches it. Several need core changes (freeze conflicts listed in the doc); those are Scott's decision.
+
+Textured instancing (gap 5, done 2026-10-14, core untouched): gltf-pro `PBRInstances` on `primitive.instances` (matrix in
+node space, RGBA tint, UV scale/offset per instance; `setMatrixAt`/`getMatrixAt`/`setColorAt`/`setUVTransformAt`, `count`,
+`needsUpdate`, dirty-row uploads) draws N instances in one draw; the instanced vertex patch (`gltf-pro/src/instances.ts`)
+is applied after lighting/material effects so shader `NodeMaterial` vertex nodes keep their anchor. `EXT_mesh_gpu_instancing`
+is read (T/R/S, normalized rotations). materials `createInstancedMesh(engine, geometry, material, capacity)`. Shadows and
+staging contact shadows draw instanced casters (`packages/shared/instances.js`); TAA skips them (camera motion only); bvh
+`Raycaster` and selection `Picking` report `instanceId`, outlines draw every instance in one draw. Proofs: non-instanced
+GPU calls byte-identical vs 6eeffab (`gltf-pro-lighting-hooks.proof.js 6eeffab`, `materials-uv-transform.proof.js 6eeffab`).
+Real GPU (Arc 140V, AC, lock held): instanced frames equal N meshes (max channel diff 1) for materials, glTF and NodeMaterial
+scenes under shadows/clustered/SSAO/IBL/fog; picking returns the right instance; 1k-10k textured boxes: CPU 9-70 ms ->
+0.5 ms, frame 63-562 ms -> 4 ms (`examples/package-benchmarks/textured-instancing-gpu.mjs`, `results/textured-instancing-gpu.json`;
+mock-GPU CPU sweep `textured-instancing.mjs`). Size (min+gzip): gltf-pro +1.9 kB, selection +0.38, bvh +0.31, shadows +0.31,
+staging +0.28, materials +0.08, taa +0.01. Left: per-instance frustum culling, transparent instance sorting, textured
+`ScatterInstances`, one-instance outlines.
 The older summary below predates the audit.
 
 From package descriptions, not yet audited against code:

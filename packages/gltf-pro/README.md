@@ -46,9 +46,29 @@ material; unset fields keep the defaults above. It is part of the pipeline cache
 mutating it), the g-buffer and ambient passes ignore it, and draw order and pass splitting still follow `alphaMode`.
 Without it the pipelines are unchanged. `@margoengine/materials` uses it for `blending`, `depthWrite` and `depthTest`.
 
+### Instancing
+
+`primitive.instances = new PBRInstances(capacity)` draws a primitive `count` times in one instanced draw (the counterpart of three.js `InstancedMesh`; `@margoengine/materials` `createInstancedMesh` wraps it). Instance matrices are in the primitive's node space (world = node matrix x instance matrix, as `EXT_mesh_gpu_instancing`), so for a model whose meshes sit on nodes with their own transforms, an instance matrix moves the node, not the model root. Primitives, also of different models, may share one `PBRInstances`; all primitives of a node share one when it comes from `EXT_mesh_gpu_instancing`.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF, PBRInstances} from '@margoengine/gltf-pro';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const tree = await loadGLTF(stage.engine, '/tree.glb');
+const forest = new PBRInstances(2000);
+for (let i = 0; i < 2000; i++) forest.setMatrixAt(i, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, Math.random() * 200, 0, Math.random() * 200, 1]);
+for (const primitive of tree.primitives) primitive.instances = forest;
+forest.count = 1500;                     // drawn instances (default and maximum: capacity)
+// forest.data: 24 floats per instance (matrix, tint, UV scale + offset); after writing it directly: forest.needsUpdate = true
+```
+
+`setMatrixAt(i, m)` (column-major affine), `getMatrixAt(i, out?)`, `setColorAt(i, [r, g, b(, a)])` (linear, multiplies the base colour like a vertex colour), `setUVTransformAt(i, {offset, scale})` (applied to both UV sets before the material's texture transforms, e.g. a `packAtlas` region; no rotation), `count`, `needsUpdate`, `dispose()` (frees the GPU buffer; it is recreated on the next draw). Setters upload only the changed rows on the next frame. Shadows and `@margoengine/staging` contact shadows cast every instance; clustered, IBL, fog and SSAO apply through the same lighting hooks (the instanced shader changes only the vertex stage); `model.bounds` covers every instance; bvh's `Raycaster` and selection's `Picking` report `instanceId`, and a selected model outlines every instance. A mirrored instance (negative determinant) turns off face culling for that primitive and discards back faces in the shader instead. The non-instanced draw makes the same GPU calls as before (`gltf-pro-lighting-hooks.proof.js`, `materials-uv-transform.proof.js` against the previous commit).
+
+Limits: no per-instance frustum culling (all `count` instances are drawn); transparent instances are not sorted among themselves; TAA gives instances camera motion only (static instances are exact, moving ones may ghost); instances are not seen by LOD imposter baking, and selection outlines all instances of a selected primitive rather than one; `ScatterInstances` keeps its own constant-colour path. Shadow caching (`shadows.add(model, {static: true})`) and static contact shadows do not see instance edits until invalidated.
+
 ## Extensions and compressed files
 
-Supported glTF extensions: `KHR_mesh_quantization`, `KHR_texture_transform`, `KHR_materials_emissive_strength`, `KHR_materials_unlit`, `KHR_lights_punctual`, `KHR_materials_clearcoat`, `KHR_materials_transmission`, `KHR_materials_ior`, `KHR_materials_volume`, `KHR_materials_sheen`, `KHR_materials_specular`, `EXT_texture_webp`, `EXT_texture_avif`, plus `KHR_draco_mesh_compression`, `EXT_meshopt_compression` (and `KHR_meshopt_compression`) and `KHR_texture_basisu` when you pass the matching decoder. A file is rejected only when its `extensionsRequired` lists something still unsupported; the error names each one and the decoder it needs.
+Supported glTF extensions: `KHR_mesh_quantization`, `KHR_texture_transform`, `KHR_materials_emissive_strength`, `KHR_materials_unlit`, `KHR_lights_punctual`, `KHR_materials_clearcoat`, `KHR_materials_transmission`, `KHR_materials_ior`, `KHR_materials_volume`, `KHR_materials_sheen`, `KHR_materials_specular`, `EXT_texture_webp`, `EXT_texture_avif`, `EXT_mesh_gpu_instancing` (`TRANSLATION`, `ROTATION` including normalized integers, `SCALE`; the node's primitives get one `PBRInstances`, see "Instancing"), plus `KHR_draco_mesh_compression`, `EXT_meshopt_compression` (and `KHR_meshopt_compression`) and `KHR_texture_basisu` when you pass the matching decoder. A file is rejected only when its `extensionsRequired` lists something still unsupported; the error names each one and the decoder it needs.
 
 This package does not import `@margoengine/decoders`. Pass decoders in, so files without compression pay nothing:
 

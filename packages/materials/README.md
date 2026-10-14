@@ -26,6 +26,25 @@ Texture transforms follow glTF `KHR_texture_transform` (uv' = offset x rotation 
 
 Atlases: `packAtlas(images, {padding: 2, maxSize: 4096})` shelf-packs RGBA8 data, ImageData, images, bitmaps or canvases into one `{data, width, height}` image (`new Texture(atlas.image)`) and returns each input's `uvTransform` in `atlas.regions`. Share one texture across materials with `uvTransform: atlas.regions[i]`, or bake the region into geometry with `transformUVs(uvs, region)` and merge static meshes (`@margoengine/geometry` `mergeGeometries`) into one draw: 256 textured boxes go from 256 draws and 8.3 ms CPU per frame to 1 draw and 0.05 ms (`proofs/materials-atlas.proof.js`). Padding repeats edge texels, so the first `log2(padding)` mip levels do not bleed; coarser mips do, and regions cannot `repeat`. Images and canvases are read back through a 2D canvas (premultiplied alpha loses precision at low alpha) and keep `Texture`'s flipY orientation. `@margoengine/animation/vat` crowds take atlas regions per instance.
 
+Instancing (three.js `InstancedMesh`): `createInstancedMesh(engine, geometry, material, capacity, {renderOrder})` is `createMesh` drawn as `capacity` copies in one draw call, with one engine entity. `mesh.instances` (gltf-pro `PBRInstances`) holds each copy's matrix relative to `mesh.root`, a linear RGB(A) tint that multiplies the base colour like a vertex colour, and a UV offset/scale applied before the material's `uvTransform` (an atlas region, so one material shows different images):
+
+```ts
+import {createStage} from 'margoengine';
+import {boxGeometry} from '@margoengine/geometry';
+import {Material, Texture, createInstancedMesh, packAtlas} from '@margoengine/materials';
+declare const images: ImageData[];
+const stage = await createStage('#viewport', {backend: 'webgpu'}), atlas = packAtlas(images);
+const crates = createInstancedMesh(stage.engine, boxGeometry(1, 1, 1), new Material({map: new Texture(atlas.image)}), 5000);
+for (let i = 0; i < 5000; i++) crates.instances
+  .setMatrixAt(i, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, i % 100, 0, Math.floor(i / 100), 1]) // column-major, e.g. Matrix4.elements
+  .setColorAt(i, [1, 0.9, 0.8])
+  .setUVTransformAt(i, atlas.regions[i % atlas.regions.length]);
+crates.instances.count = 3000;                // draw the first 3000; setters upload only the rows they changed
+// shadows.add(crates), ssao.add(crates) and the other effects see every instance, as for createMesh
+```
+
+5,000 textured boxes: 5,000 draws and 36 ms CPU per frame as separate meshes, 1 draw and 0.4 ms instanced (Arc 140V, `examples/package-benchmarks/results/textured-instancing-gpu.json`; the instanced frame equals the separate meshes' pixel for pixel). See gltf-pro's README for instancing limits.
+
 For node-based colour, normal, roughness, emissive, opacity and vertex offsets, `@margoengine/shader`'s `NodeMaterial` extends `Material` through its `shader(source, group)` and `bindings(device, engine)` methods, which subclasses may override.
 
 Sorting matches Three.js: all material meshes draw in one pass, opaque first, then transparent back to front, each group by `renderOrder`.
