@@ -1,9 +1,9 @@
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type Mesh,type Geometry,type EnginePlugin,type FrameGraph,type PassContext,type DrawOptions} from '@margoengine/core/extension';
 import {meshVertex} from '../../shared/gpu.js';
-import {Models,ModelDraws,modelCode,modelPipeline,sphere,hidden,type Model,type ModelPrimitive} from './models.js';
+import {Models,ModelDraws,modelCode,modelPipeline,sphere,hidden,isModel,proxies,type Model,type ModelPrimitive,type PickProxy} from './models.js';
 
-declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number;MAP_READ:number};
+declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number;MAP_READ:number;VERTEX:number;INDEX:number};
 declare const GPUTextureUsage:{RENDER_ATTACHMENT:number;COPY_SRC:number};
 declare const GPUMapMode:{READ:number};
 type Context=Extract<PassContext,{backend:'webgpu'}>;
@@ -28,8 +28,24 @@ struct PickPixel {@location(0) color:vec4f,@location(1) id:u32}
 }
 
 const idFragment=`@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) u32 {if(culled(i,front)){discard;}return i.info.x;}`;
-/** A pick result: the core mesh, or for gltf-pro models the glTF node with its model and primitive. */
-export interface PickHit {mesh:Mesh;model?:Model;primitive?:ModelPrimitive;primitiveIndex?:number}
+/** A pick result: the core mesh, or for gltf-pro models the glTF node with its model and primitive. `approximate`: a pick proxy (imposter level) hit through its bounding sphere; `mesh` is the LOD anchor. */
+export interface PickHit {mesh:Mesh;model?:Model;primitive?:ModelPrimitive;primitiveIndex?:number;approximate?:boolean}
+
+/** UV sphere scaled so its faces enclose the unit sphere (proxy picks cover at least the bounding sphere the bvh Raycaster tests), as 20-float gltf-pro vertices. */
+function proxySphere(device:GPUDevice):ModelPrimitive {
+ const rows=8,cols=16,p:number[]=[],index:number[]=[];
+ for(let i=0;i<=rows;i++)for(let j=0;j<=cols;j++){const a=Math.PI*i/rows,b=2*Math.PI*j/cols;p.push(Math.sin(a)*Math.cos(b),Math.cos(a),Math.sin(a)*Math.sin(b));}
+ for(let i=0;i<rows;i++)for(let j=0;j<cols;j++){const a=i*(cols+1)+j,b=a+cols+1;index.push(a,b,a+1,a+1,b,b+1);}
+ let near=1;
+ for(let t=0;t<index.length;t+=3){
+  const [a,b,c]=[0,1,2].map(k=>index[t+k]*3),u=[0,1,2].map(k=>p[b+k]-p[a+k]),v=[0,1,2].map(k=>p[c+k]-p[a+k]),n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]],l=Math.hypot(...n);
+  if(l>1e-9)near=Math.min(near,Math.abs(n[0]*p[a]+n[1]*p[a+1]+n[2]*p[a+2])/l);
+ }
+ const vertices=new Float32Array(p.length/3*20),indices=new Uint32Array(index);
+ for(let i=0;i<p.length/3;i++){for(let k=0;k<3;k++)vertices[i*20+k]=p[i*3+k]/near;vertices[i*20+3]=1;}
+ const buffer=(data:Float32Array|Uint32Array,usage:number)=>{const b=device.createBuffer({size:data.byteLength,usage:usage|GPUBufferUsage.COPY_DST});device.queue.writeBuffer(b,0,data as Float32Array<ArrayBuffer>);return b;};
+ return {node:undefined!,vertices,indices,material:{settings:[0,0,1]},buffers:{vertex:buffer(vertices,GPUBufferUsage.VERTEX),index:buffer(indices,GPUBufferUsage.INDEX)}};
+}
 
 function intersects(matrix:Float32Array,model:Float32Array,b:ArrayLike<number>,clip:Float64Array):boolean {
  for(let c=0;c<4;c++)for(let r=0;r<4;r++)clip[c*4+r]=matrix[r]*model[c*4]+matrix[4+r]*model[c*4+1]+matrix[8+r]*model[c*4+2]+matrix[12+r]*model[c*4+3];
@@ -45,7 +61,7 @@ function intersects(matrix:Float32Array,model:Float32Array,b:ArrayLike<number>,c
 /** Optional picking of core meshes (forward-pass IDs, or a culled 3x3 pass when the frame is stale) and gltf-pro models (always the 3x3 pass). */
 export class Picking implements EnginePlugin {
  readonly name='picking';private engine?:Engine;private device?:GPUDevice;private disposed=false;private pending=false;
- private readonly models=new Models();private readonly draws=new ModelDraws();private modelPipeline?:GPURenderPipeline;private last:PickHit|null=null;
+ private readonly models=new Models();private readonly draws=new ModelDraws();private modelPipeline?:GPURenderPipeline;private last:PickHit|null=null;private sphere?:ModelPrimitive;private readonly proxyMatrix=new Float32Array(16);
  private ids?:GPUTexture;private idsView?:GPUTextureView;private micro?:GPUTexture;private depth?:GPUTexture;private uniform?:GPUBuffer;private read?:GPUBuffer;
  private readonly pipelines=new Map<string,GPURenderPipeline>();private readonly groups=new Map<GPURenderPipeline,{entries:GPUBindGroupEntry[];group:GPUBindGroup}>();
  private readonly frame=new Float32Array(28);private readonly camera=new Float32Array(16);private readonly clip=new Float64Array(16);
@@ -117,13 +133,13 @@ export class Picking implements EnginePlugin {
   if(this.disposed||!this.engine)throw new Error('Picking is disposed');if(this.pending)throw new Error('A pick is already pending');
   if(![x,y].every(Number.isFinite))throw new RangeError('Invalid pick coordinates');
   if(x<0||y<0||x>=this.engine.canvas.clientWidth||y>=this.engine.canvas.clientHeight)return null;
-  this.pending=true;const e=this.engine,device=this.device!,read=this.read!,meshes=new Map(e.meshes),models=this.models.update(e),starts=this.models.starts,capacity=e.store.capacity;
+  this.pending=true;const e=this.engine,device=this.device!,read=this.read!,meshes=new Map(e.meshes),models=this.models.update(e),starts=this.models.starts,total=this.models.total,list=proxies(e),capacity=e.store.capacity;
   try {
    const px=Math.floor(x*e.canvas.width/e.canvas.clientWidth),py=Math.floor(y*e.canvas.height/e.canvas.clientHeight),x0=Math.max(0,px-1),y0=Math.max(0,py-1),width=Math.min(e.canvas.width,px+2)-x0,height=Math.min(e.canvas.height,py+2)-y0;
    const encoder=device.createCommandEncoder();let texture:GPUTexture,origin:number[];
-   // Model IDs are not in the forward pass (gltf-pro draws its own pipelines), so scenes with models use the micro pass.
-   if(!models.length&&this.fresh()){texture=this.ids!;origin=[x0,y0];}
-   else {this.renderMicro(encoder,px,py);texture=this.micro!;origin=[1+x0-px,1+y0-py];}
+   // Model and proxy IDs are not in the forward pass (gltf-pro and imposters draw their own pipelines), so those scenes use the micro pass.
+   if(!models.length&&!list.length&&this.fresh()){texture=this.ids!;origin=[x0,y0];}
+   else {this.renderMicro(encoder,px,py,list);texture=this.micro!;origin=[1+x0-px,1+y0-py];}
    encoder.copyTextureToBuffer({texture,origin},{buffer:read,bytesPerRow:256},[width,height]);device.queue.submit([encoder.finish()]);
    await read.mapAsync(GPUMapMode.READ);
    try {
@@ -132,7 +148,8 @@ export class Picking implements EnginePlugin {
      const nx=cx+dx,ny=cy+dy;if(nx>=0&&ny>=0&&nx<width&&ny<height&&data[ny*64+nx]){id=data[ny*64+nx];break;}
     }
     let hit:PickHit|null=null;
-    if(id>capacity){
+    if(id>capacity+total){const proxy=list[id-capacity-1-total];if(proxy)hit={mesh:proxy.anchor,...(isModel(proxy.model)?{model:proxy.model}:{}),approximate:true};}
+    else if(id>capacity){
      // Model slots follow the core slots: capacity + 1 + the model's first slot + primitive index.
      const slot=id-capacity-1;let m=models.length-1;while(m>0&&starts[m]>slot)m--;
      const model=models[m],primitiveIndex=slot-(starts[m]??0),primitive=model?.primitives[primitiveIndex];
@@ -144,7 +161,7 @@ export class Picking implements EnginePlugin {
   } catch(error){if(this.disposed||device!==this.device||e.gpu!==device)return null;throw error;}
   finally {this.pending=false;}
  }
- private renderMicro(encoder:GPUCommandEncoder,x:number,y:number):void {
+ private renderMicro(encoder:GPUCommandEncoder,x:number,y:number,list:readonly PickProxy[]):void {
   const e=this.engine!,device=this.device!,matrix=e.camera.matrix.slice(),nx=2*(x+0.5)/e.canvas.width-1,ny=1-2*(y+0.5)/e.canvas.height;
   for(let c=0;c<4;c++){matrix[c*4]=(matrix[c*4]-nx*matrix[c*4+3])*e.canvas.width/3;matrix[c*4+1]=(matrix[c*4+1]-ny*matrix[c*4+3])*e.canvas.height/3;}
   this.frame.set(matrix);this.frame.set(e.camera.position,16);this.frame.set(e.lighting.direction,20);this.frame.set(e.lighting.radiance,24);device.queue.writeBuffer(this.uniform!,0,this.frame as Float32Array<ArrayBuffer>);
@@ -167,12 +184,18 @@ export class Picking implements EnginePlugin {
    const model=models[m];if(model.disposed)continue;
    for(let i=0;i<model.primitives.length;i++){const p=model.primitives[i];if(p.buffers&&!hidden(e,p.node.id)&&intersects(matrix,p.node.matrix,sphere(p),this.clip))draws.add(p,e.store.capacity+1+starts[m]+i);}
   }
+  // Pick proxies (imposter levels): the enclosing sphere under the anchor's world matrix, slots after every model primitive.
+  for(let i=0;i<list.length;i++){
+   const {anchor,sphere:b}=list[i],m=anchor.matrix,k=this.proxyMatrix;if(e.meshes.get(anchor.id)!==anchor||hidden(e,anchor.id)||!intersects(matrix,m,b,this.clip))continue;
+   for(let c=0;c<3;c++)for(let r=0;r<4;r++)k[c*4+r]=m[c*4+r]*b[3];for(let r=0;r<4;r++)k[12+r]=m[r]*b[0]+m[4+r]*b[1]+m[8+r]*b[2]+m[12+r];
+   draws.add(this.sphere??=proxySphere(device),e.store.capacity+1+this.models.total+i,k);
+  }
   if(draws.count){this.modelPipeline??=modelPipeline(device,modelCode(idFragment),'r32uint',{format:'depth32float',depthWriteEnabled:true,depthCompare:'greater-equal'});draws.draw(device,pass,this.modelPipeline,matrix);}
   pass.end();
  }
  private release():void {
   for(const resource of [this.ids,this.micro,this.depth,this.uniform,this.read])resource?.destroy();
-  this.ids=this.micro=this.depth=undefined;this.idsView=undefined;this.uniform=this.read=undefined;this.pipelines.clear();this.draws.release();this.modelPipeline=undefined;this.groups.clear();this.snapshot.clear();this.captured=false;this.context=undefined;
+  this.ids=this.micro=this.depth=undefined;this.idsView=undefined;this.uniform=this.read=undefined;this.pipelines.clear();this.draws.release();this.sphere?.buffers?.vertex.destroy();this.sphere?.buffers?.index.destroy();this.sphere=undefined;this.modelPipeline=undefined;this.groups.clear();this.snapshot.clear();this.captured=false;this.context=undefined;
  }
  onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
  dispose():void {

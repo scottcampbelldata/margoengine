@@ -148,3 +148,30 @@ test('screen-size levels follow orthographic zoom, not camera distance', async (
   m.setPosition([0,0,-1000]);projection.height=switchHeight*0.99;e.render();lods.update();assert.equal(lod.level,0,'distance does not matter in orthographic');
   e.dispose();
 });
+
+test('pick proxies: imposter levels expose their bounding sphere; the bvh Raycaster hits them approximately', async () => {
+  const {Raycaster}=await import('../../bvh/dist/index.js');
+  const s=await gpu();
+  try {
+    const {engine}=s,imposter=Imposter.bake(engine,box(2,2,2),{frames:4,frameSize:16}),lods=new LODSystem();engine.use(lods);
+    const doc={asset:{version:'2.0'},nodes:[{mesh:0}],meshes:[{primitives:[{material:0}]}],materials:[{}]},v=new Float32Array(60);
+    for(const [k,p] of [[0,[-1,-1,0]],[1,[1,-1,0]],[2,[0,1,0]]]){v.set(p,k*20);v[k*20+3]=1;v[k*20+6]=1;v.fill(1,k*20+16,k*20+20);}
+    const anchor=engine.createMesh().setPosition([0,0,-30]).setScale([3,3,3]),model=new PBRModel(engine,new GLTFAsset(doc,[]),[],[[{vertices:v,indices:new Uint32Array([0,1,2])}]]);engine.use(model);model.root.setParent(anchor);
+    const lod=lods.add(anchor,[{object:model},{object:imposter,distance:20}]),other=engine.createMesh().setPosition([10,0,-30]),second=lods.add(other,[{object:box()},{object:imposter,distance:20}]);
+    const raycaster=new Raycaster();engine.camera.position=[0,0,10];lods.update();
+    assert.equal(lod.level,1);assert.equal(second.level,1);const proxies=lods.pickProxies();
+    const same=(a,b)=>a.length===b.length&&a.every((x,i)=>x===b[i]);
+    assert.ok(same(proxies,[lod,second]));assert.ok(lods.pickProxies()===proxies,'one reused array');assert.ok(lod.model===model&&second.model===null);
+    assert.deepEqual([...lod.sphere],[...imposter.center,imposter.radius]);assert.deepEqual([...second.sphere],[...lod.sphere]);
+    // Imposter level: no triangles anywhere, so the hit comes from the sphere (radius ~1.75 scaled by 3) and names the anchor and model.
+    let [hit]=raycaster.set([0,0,10],[0,0,-1]).intersectEngine(engine);
+    assert.ok(hit.approximate&&hit.mesh===anchor&&hit.model===model,'approximate imposter hit');assert.ok(Math.abs(hit.distance-(40-3*imposter.radius))<1e-4,`${hit.distance}`);
+    assert.ok(raycaster.set([10,0,10],[0,0,-1]).intersectEngine(engine)[0]?.mesh===other,'second anchor, unscaled');
+    assert.ok(raycaster.set([0,0,10],[0,0,-1]).intersectObjects(engine,[model])[0]?.mesh===anchor,'model selects its LOD proxy');
+    // Full detail: the model's own triangle, exact, and no proxy.
+    engine.camera.position=[0,0,-15];lods.update();assert.equal(lod.level,0);assert.ok(same(lods.pickProxies(),[second]),"only the far object stays an imposter");
+    [hit]=raycaster.set([0,0,-15],[0,0,-1]).intersectEngine(engine);assert.ok(hit&&!hit.approximate&&hit.model===model&&hit.primitive===model.primitives[0]&&Math.abs(hit.distance-15)<1e-4);
+    lod.remove();engine.camera.position=[0,0,10];lods.update();assert.ok(same(lods.pickProxies(),[second]));
+    lods.dispose();assert.equal(lods.pickProxies().length,0);imposter.dispose();
+  } finally {s.close();}
+});

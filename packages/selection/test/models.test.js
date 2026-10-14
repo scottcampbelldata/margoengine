@@ -96,3 +96,32 @@ test('selection outlines selected model primitives with an equal-depth mask, nod
   extra.dispose(); assert.equal(frame().length, 1, 'disposed models drop out'); assert.throws(() => selection.set([extra]), /Foreign or disposed/);
   selection.dispose(); assert.ok(!engine.hasPlugin('selection'));
 });
+
+test('pick proxies (LOD imposter levels) draw an enclosing sphere in the micro pass and resolve to the anchor, flagged approximate', async () => {
+  const w = await world(), {engine, draws} = w, list = [], picking = Picking.attach(engine), capacity = engine.store.capacity;
+  engine.use({name: 'lod-proxies', setup() {}, pickProxies: () => list});
+  const parent = engine.createMesh(), anchor = engine.createMesh(parent).setPosition([0.5, 0, 0]).setScale([2, 2, 2]), away = engine.createMesh().setPosition([500, 0, 0]), owner = quads(engine, [[0, 0, -30]]);
+  list.push({anchor: away, sphere: [0, 0, 0, 1], model: null}, {anchor, sphere: [0.25, 0, 0, 0.5], model: owner});
+  draws.length = 0; w.setPixel(capacity + 1 + 1 + 1);
+  const hit = await picking.pick(64, 48);
+  assert.ok(hit?.approximate && hit.mesh === anchor && hit.model === owner && !hit.primitive, 'proxy slots follow every model primitive');
+  const spheres = draws.filter(d => d.pipeline?.vertex?.buffers?.[0]?.arrayStride === 80 && d.count === 768);
+  assert.equal(spheres.length, 1, 'the off-screen proxy is culled'); assert.equal(spheres[0].firstInstance, 1, 'after the model draw');
+  const words = w.storage(), floats = new Float32Array(words.buffer), o = 20;
+  assert.equal(words[o + 16], capacity + 3); assert.equal(words[o + 17], 1, 'double sided');
+  assert.ok(Math.abs(floats[o] - 1) < 1e-6 && Math.abs(floats[o + 12] - 1) < 1e-6, 'scale 2 * radius 0.5, centre 0.5 + 2 * 0.25');
+  // The sphere's faces enclose the unit sphere (so the GPU never misses where the bvh sphere test hits) by at most a few percent.
+  const v = new Float32Array(spheres[0].vertex.data);
+  let inner = Infinity, outer = 0;
+  for (let k = 0; k < v.length; k += 20) outer = Math.max(outer, Math.hypot(v[k], v[k + 1], v[k + 2]));
+  for (let a = 0; a < 8; a++) for (let b = 0; b < 16; b++) {
+    const at = (r, c) => {const k = (r * 17 + c) * 20; return [v[k], v[k + 1], v[k + 2]];}, p = at(a, b), q = at(a + 1, b), s = at(a + 1, b + 1), u = q.map((x, k) => x - p[k]), t = s.map((x, k) => x - p[k]);
+    const n = [u[1] * t[2] - u[2] * t[1], u[2] * t[0] - u[0] * t[2], u[0] * t[1] - u[1] * t[0]], l = Math.hypot(...n);
+    if (l > 1e-6) inner = Math.min(inner, Math.abs(n[0] * p[0] + n[1] * p[1] + n[2] * p[2]) / l);
+  }
+  assert.ok(inner >= 1 - 1e-5 && outer < 1.05, `faces ${inner}, vertices ${outer}`);
+  parent.visible = false; assert.ok(await picking.pick(64, 48) === null, 'hidden anchors are not picked'); parent.visible = true;
+  w.setPixel(capacity + 1); assert.ok((await picking.pick(64, 48))?.model === owner, 'model slots unchanged');
+  list.length = 0; w.setPixel(capacity + 3); assert.ok(await picking.pick(64, 48) === null, 'stale proxy slot');
+  picking.dispose();
+});

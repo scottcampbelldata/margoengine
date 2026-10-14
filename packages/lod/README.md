@@ -41,10 +41,20 @@ const cached = Imposter.fromData(engine, data); // ... and skip the bake next lo
   GPU, through gltf-pro's own shader with an early return, so base-colour textures, vertex colours, normal maps,
   alpha masks and `@margoengine/materials` maps are all captured. The atlas stores albedo + coverage (RGBA8 sRGB, with
   mips) and normal + depth + roughness/metalness (RGBA16F). At runtime each instance is a camera-facing quad that
-  reprojects the pixel's ray onto the three nearest views, blends them, relights with the engine light (matching core
+  reprojects the pixel's ray onto the three nearest views (with one depth parallax step per view, so the views agree on
+  the surface), blends colour, normal, depth and roughness/metalness by the view weights, relights with the engine light (matching core
   or gltf-pro shading, whichever the source used) and writes per-pixel depth, so imposters occlude and are occluded
-  correctly. MSAA edges use alpha-to-coverage. Bounding-sphere frustum culling on the CPU, hidden anchors (or hidden
+  correctly. Where the views still disagree (silhouettes), coverage cross-fades over blended alpha 0.25-0.75
+  (alpha-to-coverage under MSAA, a fixed per-pixel dither at 1x) instead of a hard cut at 0.5. Each tile is sampled
+  with its mip level computed from the smooth coordinate and clamped half a texel of the coarser level read, so
+  trilinear filtering never reaches a neighbouring view. Bounding-sphere frustum culling on the CPU, hidden anchors (or hidden
   ancestors) are skipped, and all instances of one atlas are one instanced draw (order 1.5, after opaque meshes).
+- **Picking**: an imposter has no triangles, so `lods.pickProxies()` lists the objects showing an imposter level, each
+  `LOD` with `sphere` (the imposter's local bounding sphere) and `model` (the first gltf-pro model among its levels).
+  `@margoengine/bvh` (`Raycaster.intersectEngine`, `intersectObjects` with the anchor or that model) and
+  `@margoengine/selection` (`Picking`, `engine.pick`) find this hook on the engine themselves (neither imports lod) and
+  hit the sphere under the anchor's world matrix: the hit names the anchor and model and has `approximate: true`.
+  Objects on a mesh, model or Geometry level keep exact triangle hits.
 - **Device loss**: on a restored device each atlas is baked again from its source, or uploaded again from
   `fromData` data. If the source model was destroyed and there is no data, that atlas stops drawing.
 - `lod.level` reads the shown level, `lod.remove()` stops managing an object (the shown level stays shown),
@@ -61,22 +71,46 @@ atlas (baked in about 0.25 s), camera orbiting over the grid, median of 120 seri
 | full detail (2,228 visible) | 1.1 ms | 160-232 ms |
 | LOD + imposters (122 mid, 435 low, 1,943 imposters) | 1.1 ms | 11-25 ms |
 
-The LOD frame differs from the full-detail frame by 1.9/255 on average and covers 99% of its lit pixels. The range is
+The LOD frame differs from the full-detail frame by 1.7/255 on average and covers 99% of its lit pixels. The range is
 across runs on a machine shared with other GPU jobs; most of it is the foreground fill both modes pay. Rerun with
 `node packages/lod/test/browser-check.mjs`: it writes `test-results/lod-benchmark.json` and the screenshot pair
 `test-results/lod-full.png` / `test-results/lod-lod.png`.
 
+**Atlas seams** (`node packages/lod/test/imposter-check.mjs`, same laptop, 256×256 canvas, 12×12×128 atlas): the camera
+turns around one object in 0.5° steps (1° for small cards) and each step renders the full mesh and the imposter. Before
+the fixes above, the imposter's largest step-to-step change was 7.8-10× its median change (the full mesh's: 1.2-1.4×):
+whole regions flipped where the blend weights crossed the hard 0.5 coverage cut at view midpoints, and a thin disc
+jumped by 48/255 per silhouette pixel in one step. Mip bleed, measured on the exported atlas with the GPU mip chain and
+bilinear taps at the shader's clamp, reached 0.43 coverage from the neighbouring view at the 8-pixel mip (24-29% of
+tile-edge samples). Now:
+
+| 177 px card, knot | largest step / median | mean difference from full mesh | stray pixels |
+| --- | --- | --- | --- |
+| before, pitch 20° / -25° / 60° | 7.8 / 8.6 / 10.0 | 22.4 / 21.8 / 28.2 | 4.5% |
+| after | 2.6 / 2.3 / 2.4 | 13.8 / 12.7 / 19.8 | 1.2% |
+
+The disc's worst step fell from 48 to 12/255 (grazing views 18° apart on a 12×12 grid still differ), mip bleed is zero
+at every level, and the mean difference at 53 and 27 px cards fell from 13.0 and 12.5 to 8.7 and 9.3. Cost: three more
+texel loads per imposter pixel, about +2 ms GPU on the 2,500-instance benchmark (20.5-20.9 → 22.6-22.9 ms median,
+alternating runs, on AC power). The same script checks picking: every rendered imposter pixel picks its object through
+`Picking` and the bvh Raycaster, full-detail pixels stay exact, and 16,384 grid pixels agree between GPU and CPU
+within one pixel.
+
 Limits: an imposter shows the object as baked: per-instance material colours, animation and emissive are not
 captured, and it receives no shadows and casts none (shadows and SSAO only see real meshes). Roughness and metalness
-are stored in 32 steps; normals are sampled without filtering. Imposters are not pickable (`engine.pick` and the
-bvh only see meshes) and assume the level's model sits at the anchor's origin. Selection reads the previous frame's
+are stored in 32 steps; normals are sampled without filtering. Imposter picks are approximate: the bounding sphere is
+larger than the silhouette (a ray through the sphere's empty corners still hits, and the sphere can hide an object just
+behind it), and the GPU draws the sphere as a 256-triangle polyhedron that encloses it (up to 4% larger at its
+vertices). Selection outlines do not draw for objects on an imposter level. Imposters assume the level's model sits at
+the anchor's origin. Selection reads the previous frame's
 world matrices, so a teleported object can show the old level for one frame. `distance` levels are measured from the camera
 position; `screen` levels use the camera's projection, so they also follow orthographic zoom (use them with
 `@margoengine/cameras`). Object removal swaps with the last entry, so `lods.add` order is not kept. WebGPU
 for imposters; distance and screen selection also work on the WebGL2 backend.
 
-MIT. Optional, tree-shakable package, about 9.0 kB min+gzip (the WGSL is most of it); peers: core and gltf-pro
+MIT. Optional, tree-shakable package, about 10.8 kB min+gzip (the WGSL is most of it); peers: core and gltf-pro
 ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/lod. Browser check and benchmark on a real WebGPU adapter:
-`node packages/lod/test/browser-check.mjs`.
+`node packages/lod/test/browser-check.mjs`; picking and atlas seams: `node packages/lod/test/imposter-check.mjs` (writes
+`test-results/imposter-check-current.json` with every per-step series).
