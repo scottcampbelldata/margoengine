@@ -69,6 +69,10 @@
     "./mathutils": {
       "types": "./dist/mathutils.d.ts",
       "import": "./dist/mathutils.js"
+    },
+    "./mat4": {
+      "types": "./dist/mat4.d.ts",
+      "import": "./dist/mat4.js"
     }
   },
   "files": [

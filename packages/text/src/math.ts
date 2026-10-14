@@ -3,13 +3,6 @@ export type Mat4 = ArrayLike<number>;
 
 export const identity = (): Float32Array => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 
-/** out = a * b. `out` may not alias `a` or `b`. */
-export function multiply(out: Float32Array, a: Mat4, b: Mat4): Float32Array {
-  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++)
-    out[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
-  return out;
-}
-
 /** Writes translation * rotation(quaternion x, y, z, w) * scale into out. */
 export function compose(out: Float32Array, p: ArrayLike<number>, q: ArrayLike<number>, s: ArrayLike<number>): Float32Array {
   const [x, y, z, w] = [q[0], q[1], q[2], q[3]], x2 = x + x, y2 = y + y, z2 = z + z;

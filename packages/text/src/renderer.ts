@@ -4,7 +4,7 @@ import type {EngineKernel, Mesh} from '@margoengine/core';
 import {viewMatrix} from '../../shared/view.js';
 import {GlyphAtlas} from './atlas.js';
 import {encodeSrgb} from './color.js';
-import {multiply} from './math.js';
+import {multiplyMatrices} from '@margoengine/math/mat4';
 import {textShader} from './shader.js';
 import {Text} from './text.js';
 
@@ -230,7 +230,7 @@ export class TextRenderer implements EnginePlugin {
         r.written = version;
       }
       if (!r.count) continue;
-      const model = parent ? multiply(r.model, parent, text.matrix) : text.matrix;
+      const model = parent ? multiplyMatrices(parent, text.matrix, r.model) : text.matrix;
       const f = r.floats, u = r.uints, opacity = text.opacity, fontScale = text.font.size / text.fontSize;
       f.set(model, 0);
       f[16] = encode(text.color[0]); f[17] = encode(text.color[1]); f[18] = encode(text.color[2]); f[19] = opacity;

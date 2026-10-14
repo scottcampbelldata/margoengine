@@ -34,5 +34,8 @@
     "type": "git",
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/usdz"
+  },
+  "devDependencies": {
+    "@margoengine/math": "0.1.0"
   }
 }

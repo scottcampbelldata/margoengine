@@ -2,6 +2,7 @@
  * CPU side of the point renderer: spatial chunking into blocks, frustum culling, point budget allocation,
  * color packing and nearest-point picking. Everything here is pure and runs in Node.
  */
+import {multiplyMatrices} from '@margoengine/math/mat4';
 
 /** Marks a point that belongs to no block (non-finite position at build time). */
 export const NO_BLOCK = 0xffffffff;
@@ -230,12 +231,9 @@ export function allocateBudget(counts: ArrayLike<number>, weights: ArrayLike<num
   return sum;
 }
 
-/** Multiplies two column-major 4x4 matrices: `a * b`. */
+/** Multiplies two column-major 4x4 matrices: `a * b` (`@margoengine/math/mat4` multiplyMatrices). */
 export function multiply(a: ArrayLike<number>, b: ArrayLike<number>, out: Float64Array | Float32Array | number[] = new Float64Array(16)): Float64Array | Float32Array | number[] {
-  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
-    out[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
-  }
-  return out;
+  return multiplyMatrices(a, b, out);
 }
 
 /**

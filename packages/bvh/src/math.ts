@@ -1,5 +1,6 @@
 // Exact triangle predicates shared by the BVH queries and the brute-force references in the tests.
 // Every function works in float64 on float32 inputs, so the BVH and a linear scan agree bit for bit.
+import {multiplyMatrices} from '@margoengine/math/mat4';
 
 /** Ray side filter. Front faces wind counter-clockwise when seen from the ray origin, matching the engine. */
 export type Side = 'double' | 'front' | 'back';
@@ -187,12 +188,8 @@ export function invert(m: ArrayLike<number>, out: Float64Array = new Float64Arra
   return out;
 }
 
-/** Column-major a * b. */
-export function multiply(a: ArrayLike<number>, b: ArrayLike<number>, out: Float64Array = new Float64Array(16)): Float64Array {
-  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++)
-    out[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
-  return out;
-}
+/** Column-major a * b (`@margoengine/math/mat4` multiplyMatrices, into a new Float64Array by default). */
+export function multiply(a: ArrayLike<number>, b: ArrayLike<number>, out: Float64Array = new Float64Array(16)): Float64Array {return multiplyMatrices(a, b, out);}
 
 /**
  * Six normalized frustum planes (nx, ny, nz, d; inside when n.p + d >= 0) from a column-major view-projection

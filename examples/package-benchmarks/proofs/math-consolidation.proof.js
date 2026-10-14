@@ -1,0 +1,90 @@
+// Proof for the math consolidation (HANDOFF queue item 5): every helper that moved into @margoengine/math gives
+// bit-identical results to the package copy it replaced. The old copies are built from `ref` with the repo harness
+// (compare.js `versions`); copies that were not exported are first checked to be textually identical (whitespace and
+// types aside) to one that is. Inputs mix random values with ±0, NaN, ±Infinity, subnormals, huge values and singular
+// matrices; equality is Object.is per element, so -0 and NaN count.
+// Run after `npm run build:packages`:
+//   node examples/package-benchmarks/proofs/math-consolidation.proof.js [ref]          outputs
+//   node examples/package-benchmarks/proofs/math-consolidation.proof.js [ref] --time   hot-path timings (fresh process, so
+//     each side's type feedback is only its own, as in an app)
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {resolve} from 'node:path';
+import {versions, time} from './compare.js';
+import * as mat4 from '@margoengine/math/mat4';
+
+const timing = process.argv.includes('--time'), ref = process.argv.slice(2).find(arg => !arg.startsWith('--')) ?? '2484971';
+const root = resolve(import.meta.dirname, '../../..');
+/** {baseline, candidate}: one package file at `ref` and in the working tree (now using math). */
+const both = (name, entry) => versions(name, ref, entry);
+const source = file => execFileSync('git', ['show', `${ref}:${file}`], {cwd: root, encoding: 'utf8', maxBuffer: 1 << 26});
+/** Source of `function name(...) {...}` or `const name = ...;` in `file` at `ref`, without whitespace and simple type annotations. */
+function body(file, name) {
+  const text = source(file), start = text.search(new RegExp(`(function|const) ${name}\\b`));
+  assert.ok(start >= 0, `${name} not found in ${file}`);
+  let depth = 0, i = text.indexOf('{', start), end = i;
+  if (text.startsWith('const', start) && text.indexOf(';', start) < i) end = text.indexOf(';', start);
+  else for (; i < text.length; i++) {if (text[i] === '{') depth++; else if (text[i] === '}' && --depth === 0) {end = i; break;}}
+  return text.slice(start, end + 1).replace(/:\s*(Float64Array|Float32Array|number\[\]|number|Mat4|ArrayLike<number>)\b/g, '').replace(/<number>/g, '').replace(/\s+/g, '');
+}
+
+let seed = 7; const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
+const specials = [0, -0, NaN, Infinity, -Infinity, 1, -1, 5e-324, -5e-324, 2.2250738585072014e-308, 1e-310, 1e300, -1e300, 3.4028235677973366e38, 0.5, 1e-7];
+const value = () => {const r = random(); return r < 0.15 ? specials[Math.floor(random() * specials.length)] : r < 0.25 ? Math.round(random() * 8 - 4) : (random() * 2 - 1) * 10 ** (random() * 6 - 3);};
+function matrices(count) {
+  const out = [new Array(16).fill(0), [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], [1, 2, 3, 4, 2, 4, 6, 8, 0, 1, 0, 0, 0, 0, 1, 0], [1e-200, 0, 0, 0, 0, 1e-200, 0, 0, 0, 0, 1e-200, 0, 0, 0, 0, 1]];
+  for (let i = 0; i < count; i++) {
+    const m = Array.from({length: 16}, value);
+    if (i % 7 === 0) {m[3] = m[7] = m[11] = 0; m[15] = 1;} // affine
+    if (i % 11 === 0) for (let k = 0; k < 4; k++) m[8 + k] = m[k] * 2; // singular: dependent columns
+    out.push(i % 3 === 0 ? new Float32Array(m) : i % 3 === 1 ? new Float64Array(m) : m);
+  }
+  return out;
+}
+/** Plain random affine matrices (no specials) for timings. */
+const poses = count => Array.from({length: count}, () => {const m = Array.from({length: 16}, () => random() * 4 - 2); m[3] = m[7] = m[11] = 0; m[15] = 1; return new Float32Array(m);});
+const same = (a, b) => a === b || (a && b && a.length === b.length && Array.prototype.every.call(a, (v, i) => Object.is(v, b[i])));
+const families = [];
+
+// --- mat4 multiply: animation, bvh, points, text, exporters, loaders/usdz, usdz ---
+families.push({name: 'mat4 multiply', async verify() {
+  const M = matrices(4000), bvh = await both('bvh', 'src/math.ts'), points = await both('points', 'src/math.ts'), text = (await both('text', 'src/math.ts')).baseline;
+  const animation = await both('animation', 'src/sampling.ts'), exporters = (await both('exporters', 'src/scene.ts')).baseline;
+  // Same loops and the same element expression as bvh's; only how `out` is obtained and returned differs.
+  const core = code => /for\(letc=0;c<4;c\+\+\)for\(letr=0;r<4;r\+\+\)\{?(out\[c\*4\+r\]=[^;]+;)/.exec(code)?.[1], reference = core(body('packages/bvh/src/math.ts', 'multiply'));
+  assert.ok(reference);
+  for (const [file, name] of [['packages/points/src/math.ts', 'multiply'], ['packages/text/src/math.ts', 'multiply'], ['packages/animation/src/sampling.ts', 'multiplyMatrices'],
+    ['packages/exporters/src/scene.ts', 'multiply'], ['packages/loaders/src/usdz.ts', 'multiply'], ['packages/usdz/src/index.ts', 'multiply']]) assert.equal(core(body(file, name)), reference, `${file} ${name}`);
+  for (let i = 0; i + 1 < M.length; i++) {
+    const a = M[i], b = M[M.length - 1 - i];
+    for (const make of [() => new Float64Array(16), () => new Float32Array(16), () => new Array(16).fill(0)]) {
+      const expected = make(), actual = make(), p = make(), q = make();
+      bvh.baseline.multiply(a, b, expected); assert.equal(mat4.multiplyMatrices(a, b, actual), actual); assert.ok(same(actual, expected), `multiply ${i}`);
+      points.baseline.multiply(a, b, p); assert.equal(points.candidate.multiply(a, b, q), q); assert.ok(same(p, actual) && same(q, actual));
+    }
+    const t = new Float32Array(16), u = new Float32Array(16), s = new Float32Array(16), v = new Float32Array(16);
+    text.multiply(t, a, b); mat4.multiplyMatrices(a, b, u); assert.ok(same(t, u));
+    animation.baseline.multiplyMatrices(s, a, b); assert.equal(animation.candidate.multiplyMatrices(v, a, b), undefined); assert.ok(same(s, u) && same(v, u));
+    assert.ok(same(exporters.multiply(new Float64Array(a), new Float64Array(b)), mat4.multiplyMatrices(a, b, new Float64Array(16))));
+    for (const module of [bvh, points]) {const x = module.baseline.multiply(a, b), y = module.candidate.multiply(a, b); assert.ok(y instanceof Float64Array && same(x, y));}
+  }
+  return M.length * 12;
+}, async bench() {
+  const animation = await both('animation', 'src/sampling.ts'), text = (await both('text', 'src/math.ts')).baseline;
+  const joints = poses(64), palette = new Float32Array(16 * 64), joint = new Float32Array(16), old = animation.baseline.multiplyMatrices;
+  return [
+    {case: 'animation skinning palette (index.ts/vat.ts), 64 joints x 1,000 frames', ...time(
+      () => {for (let f = 0; f < 1000; f++) for (let j = 0; j < 64; j++) {old(joint, joints[j], joints[63 - j]); old(palette.subarray(j * 16, j * 16 + 16), joints[j], joint);}},
+      () => {for (let f = 0; f < 1000; f++) for (let j = 0; j < 64; j++) {mat4.multiplyMatrices(joints[j], joints[63 - j], joint); mat4.multiplyMatrices(joints[j], joint, palette.subarray(j * 16, j * 16 + 16));}})},
+    {case: 'text renderer parented model matrices, 100,000', ...time(
+      () => {for (let i = 0; i < 100000; i++) text.multiply(joint, joints[i & 63], joints[(i + 1) & 63]);},
+      () => {for (let i = 0; i < 100000; i++) mat4.multiplyMatrices(joints[i & 63], joints[(i + 1) & 63], joint);})},
+  ];
+}});
+
+const checked = {}, timings = [];
+for (const family of families) {
+  if (timing) {if (family.bench) timings.push(...(await family.bench()).map(item => ({family: family.name, ...item})));}
+  else checked[family.name] = await family.verify();
+}
+console.log(JSON.stringify(timing ? {ref, node: process.version, timings} : {ref, node: process.version, outputsIdentical: true, checked}, null, 1));
