@@ -26,7 +26,7 @@ export class TransformStore {
 
   static async create(capacity = 1024): Promise<TransformStore> {
     if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > 100_000) throw new RangeError('Capacity: 1..100000');
-    compiled ??= (async()=>{const bytes=Uint8Array.from(atob(wasmBase64),c=>c.charCodeAt(0));return WebAssembly.compile(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());})().catch(error => { compiled = undefined; throw error; });
+    compiled ??= (async()=>{const bytes=Uint8Array.from(atob(wasmBase64),c=>c.charCodeAt(0));return WebAssembly.compile(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());})().catch(error => { compiled = undefined; throw error; });
     const instance = await WebAssembly.instantiate(await compiled);
     return new TransformStore(instance.exports as Exports, capacity);
   }

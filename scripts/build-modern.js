@@ -3,7 +3,7 @@ import { readFile, writeFile, mkdir, copyFile, rm, readdir } from 'node:fs/promi
 import { build } from 'vite';
 import { resolve, dirname } from 'node:path';
 import assert from 'node:assert/strict';
-import { gzipSync,gunzipSync } from 'node:zlib';
+import { gzipSync,deflateRawSync,inflateRawSync } from 'node:zlib';
 import { compactInternals } from './compact-internals.js';
 import { compactOutput, external, measureCoreStage } from './measure-size.js';
 async function compactPackage(name){
@@ -17,13 +17,14 @@ async function compactPackage(name){
 const precompiled=process.argv.includes('--precompiled');
 const wasmPath='packages/kernel/target/wasm32-unknown-unknown/release/margoengine_kernel.wasm',optimizedPath=wasmPath.replace('.wasm','.optimized.wasm');
 if(!precompiled)execFileSync('cargo',['build','--manifest-path','packages/kernel/Cargo.toml','--target','wasm32-unknown-unknown','--release'],{stdio:'inherit',env:{...process.env,CARGO_TARGET_DIR:resolve('packages/kernel/target'),RUSTFLAGS:'-C target-feature=+simd128'}});
-if(!precompiled)execFileSync(process.execPath,['node_modules/binaryen/bin/wasm-opt',wasmPath,'-O3','--enable-simd','--enable-bulk-memory','--enable-bulk-memory-opt','--enable-nontrapping-float-to-int','--strip-debug','--strip-producers','--strip-target-features','--converge','-o',optimizedPath],{stdio:'inherit'});
-const wasm=precompiled?gunzipSync(Buffer.from(/wasmBase64(?::\s*string)?\s*=\s*'([^']+)'/.exec(await readFile('packages/core/src/wasm.ts','utf8'))[1],'base64')):await readFile(optimizedPath);
+if(!precompiled)execFileSync(process.execPath,['node_modules/binaryen/bin/wasm-opt',wasmPath,'-Oz','--enable-simd','--enable-bulk-memory','--enable-bulk-memory-opt','--enable-nontrapping-float-to-int','--strip-debug','--strip-producers','--strip-target-features','--converge','-o',optimizedPath],{stdio:'inherit'});
+const wasm=precompiled?inflateRawSync(Buffer.from(/wasmBase64(?::\s*string)?\s*=\s*'([^']+)'/.exec(await readFile('packages/core/src/wasm.ts','utf8'))[1],'base64')):await readFile(optimizedPath);
 assert.ok(wasm.length<30*1024,`Kernel exceeds 30 KiB: ${wasm.length}`);
 assert.ok(WebAssembly.validate(wasm),'Invalid Wasm artifact');
-const compressedWasm=gzipSync(wasm,{level:5,memLevel:6,windowBits:12});
-assert.deepEqual(gunzipSync(compressedWasm),wasm,'Kernel compression must be lossless');
-if(!precompiled)await writeFile('packages/core/src/wasm.ts',`// Generated gzip blueprint; consumers need no Rust toolchain.\nexport const wasmBase64: string = '${compressedWasm.toString('base64')}';\n`);
+// -Oz and raw deflate measured smallest for core + stage, with identical kernel output and speed (test-results/wasm-opt-bench.mjs).
+const compressedWasm=deflateRawSync(wasm,{level:9,memLevel:6,windowBits:12});
+assert.deepEqual(inflateRawSync(compressedWasm),wasm,'Kernel compression must be lossless');
+if(!precompiled)await writeFile('packages/core/src/wasm.ts',`// Generated raw-deflate blueprint; consumers need no Rust toolchain.\nexport const wasmBase64: string = '${compressedWasm.toString('base64')}';\n`);
 const machineryPath='packages/machinery/kernel/target/wasm32-unknown-unknown/release/margoengine_machinery_kernel.wasm';
 if(!precompiled){
  execFileSync('cargo',['build','--manifest-path','packages/machinery/kernel/Cargo.toml','--target','wasm32-unknown-unknown','--release'],{stdio:'inherit',env:{...process.env,CARGO_TARGET_DIR:resolve('packages/machinery/kernel/target'),RUSTFLAGS:'-C target-feature=+simd128'}});
