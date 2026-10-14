@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type Mesh,type Geometry,type EnginePlugin,type FrameGraph,type PassContext,type DrawOptions} from '@margoengine/core/extension';
 import {meshVertex} from '../../shared/gpu.js';
@@ -213,4 +214,6 @@ export class Picking implements EnginePlugin {
   if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);
   if(this.original&&this.context)this.context.draw=this.original;this.original=undefined;this.release();this.engine=undefined;
  }
+ declare [Symbol.dispose]: () => void;
+ [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

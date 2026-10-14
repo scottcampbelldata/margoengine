@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import {SceneTarget} from '../../shared/msaa.js';
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
@@ -77,5 +78,8 @@ export class FXAA implements EnginePlugin {
   private release():void {this.target?.dispose();this.color?.destroy();this.depth?.destroy();this.target=this.color=this.depth=this.view=this.input=undefined;}
   onDeviceRestored(engine:Engine):void {this.release();this.key='';this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.engine=this.sampler=this.pipeline=this.group=undefined;this.original=undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  /** @deprecated Use dispose(); kept as an alias until 1.0. */
   destroy():void {this.dispose();}
 }

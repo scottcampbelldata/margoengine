@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 declare const GPUBufferUsage: {QUERY_RESOLVE: number; COPY_SRC: number; COPY_DST: number; MAP_READ: number};
 declare const GPUMapMode: {READ: number};
 
@@ -81,4 +82,6 @@ export class GPUProfiler {
     this.disposed = true; this.state = 'disposed'; this.query?.destroy(); this.resolveBuffer?.destroy(); this.readBuffer?.destroy();
     this.query = this.resolveBuffer = this.readBuffer = undefined; this.clearSample();
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

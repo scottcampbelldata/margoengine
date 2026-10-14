@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
 import {fullscreen,group,compute,dispatch} from '../../shared/gpu.js';
@@ -149,4 +150,6 @@ export class Sky implements EnginePlugin {
  private release():void {this.uniform?.destroy();this.fogPass?.release();this.transmission?.destroy();for(const r of this.owned)r.destroy();this.owned=[];this.uniform=this.transmission=undefined;this.lit=this.fogPass=this.tables=this.reflection=undefined;this.pipeline=this.group=this.render=this.bind=undefined;this.entries=[];this.format='';this.computedT=this.scatteringT=NaN;}
  onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
  dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.engine=undefined;}
+ declare [Symbol.dispose]: () => void;
+ [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import {Geometry,PbrMaterial,type EngineKernel,type Mesh} from '@margoengine/core';
 import {engineRuntime,meshRuntime,type Engine} from '@margoengine/core/extension';
 import {GLTFAsset,PBRModel} from '@margoengine/gltf-pro';
@@ -144,6 +145,8 @@ export class Imposter {
   }
   private release():void {this.color?.destroy();this.normal?.destroy();this.uniform?.destroy();this.color=this.normal=this.uniform=undefined;this.device=undefined;}
   dispose():void {this.disposed=true;this.release();this.source=this.data=undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }
 
 /** Draws one atlas: camera-facing quads that reproject the three nearest views (one depth parallax step each), blend them, relight and write per-pixel depth. */

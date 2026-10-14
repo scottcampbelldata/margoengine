@@ -1,3 +1,5 @@
+/// <reference lib="esnext.disposable" preserve="true" />
+import type {EngineKernel} from '@margoengine/core';
 import {Geometry, PbrMaterial} from '@margoengine/core';
 import type {Engine, EnginePlugin, FrameGraph, PassContext} from '@margoengine/core/extension';
 import {computeShader, depthShader} from './shaders.js';
@@ -78,6 +80,8 @@ export class CulledInstances implements EnginePlugin {
   private readonly occluders: GPURenderPassDepthStencilAttachment = {view: undefined!, depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'store'};
   private readonly early: GPURenderPassDescriptor = {colorAttachments: [], depthStencilAttachment: this.occluders};
 
+  /** Same as `engine.use(new CulledInstances(...))`; returns the CulledInstances. */
+  static attach(engine: EngineKernel, batches: readonly CulledBatch[], options?: CulledInstancesOptions): CulledInstances {const value = new CulledInstances(batches, options); engine.use(value); return value;}
   constructor(batches: readonly CulledBatch[], {culling = 'frustum', occluderSize = 8}: CulledInstancesOptions = {}) {
     if (!Array.isArray(batches) || !batches.length) throw new TypeError('Expected culled batches');
     if (!modes.includes(culling)) throw new TypeError('Invalid culling mode');
@@ -262,6 +266,8 @@ export class CulledInstances implements EnginePlugin {
   }
   onDeviceRestored(engine: Engine): void {this.release();this.setup(engine);}
   dispose(): void {if (this.disposed) return;this.disposed = true;this.engine?.removePlugin(this.name);this.release();this.engine = undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }
 
 // Nearest sphere depth is exact when clip z depends on w alone (perspective: row 2 parallel to row 3) or w is constant

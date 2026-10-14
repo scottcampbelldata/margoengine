@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type FrameGraph,type PassContext} from '@margoengine/core/extension';
 import {LabelRenderer,Label,type CSS3DObject,type LabelRendererOptions,type LabelOptions} from '@margoengine/labels';
@@ -70,4 +71,6 @@ export class HTML extends LabelRenderer {
  private release():void {this.generation++;this.pending=false;this.shared?.release();this.shared=undefined;this.input?.destroy();this.output?.destroy();this.read?.destroy();this.input=this.output=this.read=undefined;this.pipeline=undefined;this.sampledDepth=this.depthGroup=undefined;}
  onDeviceRestored():void {this.release();for(const record of this.records.values())record.hidden=false;this.setupGPU();}
  override dispose():void {if(this.disposed)return;this.disposed=true;this.runtime?.removePlugin(this.name);this.release();super.dispose();this.records.clear();this.slots.fill(undefined);this.runtime=undefined;}
+ declare [Symbol.dispose]: () => void;
+ [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

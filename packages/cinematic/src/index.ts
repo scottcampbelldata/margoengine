@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel, Mesh, Vec3} from '@margoengine/core';
 import {engineRuntime, meshRuntime, type Engine, type EnginePlugin} from '@margoengine/core/extension';
 
@@ -96,4 +97,6 @@ export class Cinematic implements EnginePlugin {
   }
   onPreUpdate(delta: number): void {this.update(delta);}
   dispose(): void {const engine = this.engine; this.engine = undefined; this.mesh = undefined; engine?.removePlugin(this.name);}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

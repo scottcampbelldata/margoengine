@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext} from '@margoengine/core/extension';
 import {sceneSamples} from '../../shared/quality.js';
@@ -94,4 +95,6 @@ export class SceneFade implements EnginePlugin {
     this.snapshot?.destroy();this.uniform?.destroy();this.finish();
     this.snapshot=this.uniform=this.pipeline=this.group=this.context=this.device=this.engine=undefined;
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

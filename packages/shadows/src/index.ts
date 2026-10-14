@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel,Mesh as MeshHandle} from '@margoengine/core';
 import {engineRuntime,meshRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type Mesh} from '@margoengine/core/extension';
 import {viewMatrix} from '../../shared/view.js';
@@ -118,5 +119,8 @@ export class Shadows implements EnginePlugin {
   private release():void {this.clearDraws();for(const texture of [this.cached,this.combined,this.white])texture?.destroy();this.uniform?.destroy();this.cached=this.combined=this.white=undefined;this.whiteView=undefined;this.uniform=undefined;this.views=[];this.cachedViews=[];this.entries=[];this.pipelines.clear();this.shaders.clear();for(const shadow of this.shadowContexts){shadow.context=undefined!;shadow.pass=undefined!;}}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);for(const r of this.sources)r.removeLighting?.();this.sources.length=0;this.release();this.engine=this.device=undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  /** @deprecated Use dispose(); kept as an alias until 1.0. */
   destroy():void {this.dispose();}
 }

@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import {SceneTarget,resolveMSAA,sceneTarget} from '../../shared/msaa.js';
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type Mesh} from '@margoengine/core/extension';
@@ -152,5 +153,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
   private release():void {this.motionViews=[];this.motionResolve=undefined;this.motionGroup=undefined;this.motionDepth=undefined;this.captureTarget?.dispose();this.captureTarget=undefined;for(const t of this.textures)t.destroy();for(const records of this.draws.values())for(const r of records.values()){r.uniform.destroy();r.vertices?.destroy();}this.uniform?.destroy();this.textures=[];this.histories=[];this.historyDepths=[];this.draws.clear();this.objectPipelines.clear();this.plainPipeline=this.pbrPipeline=undefined;this.objectFormat=undefined;this.cameraPass=this.motionPass=this.objectPass=undefined;this.meshPrimitive.node=this.meshPrimitive.vertex=this.meshPrimitive.index=undefined!;this.shaderSource=undefined;this.shaderOutput='';this.scene=this.depth=this.velocity=this.expected=undefined;this.uniform=undefined;this.cameraBinding=undefined;this.depthSource=undefined;this.cameraPipeline=this.presentPipeline=undefined;this.snapshotPipeline=this.resolvePipeline=undefined;this.cameraGroup=undefined;this.resolveGroups=[];this.presentGroups=[];this.colorView=this.depthView=this.sampledDepth=this.velocityView=this.expectedView=this.original=undefined;this.originalCamera=this.cameraView=undefined;this.format=undefined;this.frame=this.front=0;this.reset();}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.sources.clear();this.engine=this.device=undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  /** @deprecated Use dispose(); kept as an alias until 1.0. */
   destroy():void {this.dispose();}
 }

@@ -1,3 +1,5 @@
+/// <reference lib="esnext.disposable" preserve="true" />
+import type {EngineKernel} from '@margoengine/core';
 import {Geometry,type Mesh} from '@margoengine/core';
 import {meshRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
 import {Imposter,imposterShader} from './imposter.js';
@@ -47,6 +49,8 @@ export class LODSystem implements EnginePlugin {
   private readonly color:GPURenderPassColorAttachment={view:undefined!,loadOp:'load',storeOp:'store'};
   private readonly depth:GPURenderPassDepthStencilAttachment={view:undefined!,depthLoadOp:'load',depthStoreOp:'store',stencilReadOnly:true};
   private readonly descriptor:GPURenderPassDescriptor={colorAttachments:[this.color],depthStencilAttachment:this.depth};
+  /** Same as `engine.use(new LODSystem(...))`; returns the LODSystem. */
+  static attach(engine: EngineKernel, options?: LODSystemOptions): LODSystem {const value = new LODSystem(options); engine.use(value); return value;}
   constructor({hysteresis=0.1,bias=1}:LODSystemOptions={}) {if(!(hysteresis>=0&&hysteresis<1)||!(bias>0&&bias<Infinity))throw new RangeError('Invalid LOD options');this.hysteresis=hysteresis;this.bias=bias;}
   setup(engine:Engine):void {this.engine=engine;}
   registerPasses(graph:FrameGraph):void {graph.add({name:this.name,order:1.5,execute:c=>{if(c.backend==='webgpu')this.draw(c);}});}
@@ -169,4 +173,6 @@ export class LODSystem implements EnginePlugin {
     this.release();for(const keeper of this.keepers.values())keeper.dispose();this.keepers.clear();
     for(const h of this.handles)h.index=-1;this.anchors=[];this.objects=[];this.handles=[];this.atlases=[];this.proxies.length=0;this.count=0;this.engine=undefined;
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

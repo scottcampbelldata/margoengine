@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
 import {viewMatrix} from '../../shared/view.js';
@@ -67,5 +68,8 @@ export class Splats implements EnginePlugin {
   private release():void {for(const b of this.buffers)b.destroy();this.buffers=[];this.keys=[];this.sortGroups=[];this.sortPipelines=[];this.renders.clear();this.record=undefined;this.uniform=this.index=this.projected=this.evaluated=undefined;this.projection=undefined;this.projectionGroup=undefined;}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.engine=this.device=undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  /** @deprecated Use dispose(); kept as an alias until 1.0. */
   destroy():void {this.dispose();}
 }

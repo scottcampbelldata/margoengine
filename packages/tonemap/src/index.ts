@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import {SceneTarget} from '../../shared/msaa.js';
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext} from '@margoengine/core/extension';
@@ -129,5 +130,8 @@ export class Tonemap implements EnginePlugin {
   private release():void {this.captureTarget?.dispose();this.captureTarget=undefined;this.depth?.destroy();this.depth=undefined;this.uniform?.destroy();this.scene?.destroy();this.lutTexture?.destroy();this.uniform=undefined;this.scene=undefined;this.sceneView=undefined;this.lutTexture=undefined;this.sourceTexture=undefined;this.pipeline=undefined;this.group=undefined;this.original=undefined;this.shaders.clear();}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.lut=undefined;this.engine=undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  /** @deprecated Use dispose(); kept as an alias until 1.0. */
   destroy():void {this.dispose();}
 }

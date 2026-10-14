@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import {SceneTarget} from '../../shared/msaa.js';
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
@@ -86,4 +87,6 @@ export class PostStack implements EnginePlugin {
     if(this.disposed)return;this.disposed=true;const engine=this.engine;this.engine=undefined;engine?.removePlugin(this.name);
     for(let i=0;i<this.attached;i++)if(engine?.hasPlugin(this.effects[i].name))engine.removePlugin(this.effects[i].name);this.release();
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

@@ -1,3 +1,5 @@
+/// <reference lib="esnext.disposable" preserve="true" />
+import type {EngineKernel} from '@margoengine/core';
 import type {Engine,EnginePlugin,PassContext} from '@margoengine/core/extension';
 import {fullscreen,render} from '../../shared/gpu.js';
 import {acesShader} from '../../shared/aces.js';
@@ -31,6 +33,8 @@ export class NodePass implements EnginePlugin {
   private readonly body:string;private readonly value:string;
   private host?:StackHost;private engine?:Engine;private disposed=false;private key='';private pipeline?:GPURenderPipeline;private group?:GPUBindGroup;private last:GPUBindGroupEntry[]=[];
   private sampler?:GPUSampler;private depthTexture?:GPUTexture;private depthView?:GPUTextureView;
+  /** Same as `engine.use(new NodePass(...))`; returns the NodePass. */
+  static attach(engine: EngineKernel, node: Node<'vec3f' | 'vec4f'>, options?: NodePassOptions): NodePass {const value = new NodePass(node, options); engine.use(value); return value;}
   constructor(readonly node:Node<'vec3f'|'vec4f'>,{kind='ldr',name='shader:pass:'+passes++}:NodePassOptions={}) {
     if(!(node instanceof Node)||node.type!=='vec3f'&&node.type!=='vec4f')throw new TypeError('NodePass needs a vec3f or vec4f node');
     if(kind!=='hdr'&&kind!=='ldr')throw new TypeError('NodePass kind is hdr or ldr');
@@ -63,4 +67,6 @@ export class NodePass implements EnginePlugin {
   }
   onDeviceRestored():void {this.key='';this.sampler=this.group=this.pipeline=this.depthTexture=this.depthView=undefined;}
   dispose():void {this.disposed=true;this.engine=undefined;this.onDeviceRestored();}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

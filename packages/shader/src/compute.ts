@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
 import {compute} from '../../shared/gpu.js';
@@ -59,6 +60,8 @@ export class StorageBuffer<T extends StorageType=StorageType> implements Resourc
   }
   /** Destroys the GPU copies; a later use uploads `data` again. */
   dispose():void {for(const b of this.buffers.values())b.buffer.destroy();this.buffers.clear();}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }
 /** `storage(new Float32Array(4 * n), 'vec4f')` or `storage(n, 'vec4f')` for zeros; `storage(1, 'u32', {atomic: true})` for a counter. */
 export function storage<T extends StorageType>(data:number|Float32Array|Int32Array|Uint32Array,type:T,{atomic=false}:{atomic?:boolean}={}):StorageBuffer<T> {
@@ -98,4 +101,6 @@ export class ComputePass implements EnginePlugin {
   }
   onDeviceRestored():void {this.pipeline=this.group=undefined;}
   dispose():void {const engine=this.engine;this.engine=undefined;this.onDeviceRestored();engine?.removePlugin(this.name);}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

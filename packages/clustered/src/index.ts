@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type Vec3} from '@margoengine/core/extension';
 import {finiteVector} from '@margoengine/math/validate';
@@ -76,5 +77,8 @@ export class Clustered implements EnginePlugin {
   private release():void {for(const buffer of [this.uniform,this.lights,this.counts,this.indices])buffer?.destroy();this.uniform=this.lights=this.counts=this.indices=undefined;this.pipeline=undefined;this.group=undefined;this.entries=[];this.shaders.clear();}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);for(const remove of this.receivers.values())remove();this.receivers.clear();this.release();this.engine=this.device=undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  /** @deprecated Use dispose(); kept as an alias until 1.0. */
   destroy():void {this.dispose();}
 }

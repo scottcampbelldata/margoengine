@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
 import {finiteVector} from '@margoengine/math/validate';
@@ -81,5 +82,8 @@ export class Terrain implements EnginePlugin {
   private release():void {for(const texture of new Set(this.textures?[this.textures.heightmap,this.textures.normalmap,this.textures.layers]:[]))texture?.destroy();for(const buffer of [this.vertex,this.center,this.ring,this.rules])buffer?.destroy();for(const r of this.rings)for(const buffer of [r.uniform,...r.shadowUniforms])buffer.destroy();this.textures=undefined;this.vertex=this.center=this.ring=this.rules=undefined;this.rings=[];this.pipelines.clear();this.last=undefined;this.lightingGroups.clear();this.shadowPipeline=undefined;this.layout=undefined;this.sampler=undefined;}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.lighting.clear();this.engine=this.device=undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  /** @deprecated Use dispose(); kept as an alias until 1.0. */
   destroy():void {this.dispose();}
 }

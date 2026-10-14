@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel,Mesh as MeshHandle} from '@margoengine/core';
 import {engineRuntime,meshRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type Mesh,type Vec3} from '@margoengine/core/extension';
 import {instanceLayout,instancedDepth} from '../../shared/instances.js';
@@ -186,4 +187,6 @@ export class ContactShadows implements EnginePlugin {
   private release():void {this.clearDraws();for(const t of [...this.textures,this.white])t?.destroy();this.blurUniform?.destroy();this.planeUniform?.destroy();this.textures=[];this.views=[];this.blurGroups=[];this.white=this.whiteView=this.blurUniform=this.planeUniform=this.planeGroup=this.blurPipeline=this.sampler=undefined;this.occluders.clear();this.planes.clear();}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.sources.length=0;this.release();this.engine=this.device=undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }
