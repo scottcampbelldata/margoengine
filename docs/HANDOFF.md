@@ -155,6 +155,13 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       instead of runtime branches or string patches. Measure GPU time per archetype on the 50k-part scene before and
       after; keep only what measures faster. Core's shader is frozen and already minimal.
    e. A CAD launch demo (large assembly, sections, edges, measurement, ortho views) and an honest comparison page.
+1e'. DECISION FOR SCOTT (CAD scale is CPU-bound in core; measured on AC, docs/cad-performance.md): at 50k parts the
+   frame is 20.9 ms CPU (45 FPS), at 90k 39.1 ms (25 FPS); kernel tick 7.7 / 16.4 ms and JS batch collection 6.2 /
+   11.3 ms dominate. Core hot spots: (1) kernel recomputes every entity every frame, even static ones (~150 ns each);
+   (2) JS batch collection walks every mesh every frame; (3) the whole instance buffer is uploaded every frame;
+   (4) engine.pick re-renders the scene and creates a pipeline per pick (63.5 ms at 90k); (5) removing a mesh scans
+   all meshes (disposing a 90k assembly takes minutes); (6) the 100,000-entity cap. A prototype of static-scene fast
+   paths in core is being measured on a scratch branch (bytes and FPS); nothing merges without Scott's approval.
 1f. Beat-three.js additions (Scott's list, 2026-10-14; checked against the code, modified where noted):
    a. GPU occlusion culling (Hi-Z depth pyramid + indirect draws) in a new optional package. Core's DrawOptions already
       accept `indirect` per batch, so start there; if a core hook turns out to be needed, bring it to Scott first.
