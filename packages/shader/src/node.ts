@@ -1,4 +1,5 @@
 // Typed shader nodes and the WGSL builder shared by the material, post and compute hosts.
+import {nested} from './effects.js';
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
 type N=2|3|4;
 export type Scalar='f32'|'i32'|'u32'|'bool';
@@ -135,6 +136,15 @@ export function select<T extends Type>(cond:Node<'bool'|`vec${N}<bool>`>|boolean
   const [t,f]=unify('select',[ifTrue,ifFalse]),c=cast(cond,sizeOf(cond instanceof Node?cond.type:'bool')===1?'bool':vecOf('bool',sizeOf(t.type)),'select condition');
   return call('select',[f,t,c],t.type as T);
 }
+/** Discards the fragment where `condition` holds and is `value` elsewhere: `colorNode: discard(texture(map).a.lessThan(0.5), texture(map))`.
+ * NodeMaterial fragment nodes and NodePass nodes only (a discarded NodePass pixel stays the cleared transparent black). */
+export function discard<T extends Type>(condition:Input<'bool'>|boolean,value:Input<T>):Node<T> {
+  const v=node(value) as Node<T>;
+  return new Node(v.type,'d',[cast(condition,'bool','discard condition'),v],(b,n)=>{
+    if(b.stage.kind!=='fragment'&&b.stage.kind!=='post')fail(`discard() is not available in ${b.stage.kind} nodes`);
+    b.line(`if (${b.expr(n.args[0])}) { discard; }`);const name=b.name();b.line(`let ${name} = ${b.expr(n.args[1])};`);return name;
+  },STMT);
+}
 function convert<T extends Type>(x:Input|boolean,type:T):Node<T> {
   if(!(x instanceof Node))return constant(x,type);
   if(x.type===type)return x as Node<T>;
@@ -211,7 +221,7 @@ export function varying<T extends Type>(x:Node<T>):Node<T> {
 const param=<T extends Type>(type:T):Node<T>=>new Node(type,'p'+unique(),[],(b,n)=>b.param(n),LEAF);
 /** A bounded fold: `loop(8, init, (i, acc) => next)` runs `acc = next` for i = 0..count-1 and returns the final `acc`. */
 export function loop<T extends Type>(count:Input<'i32'|'u32'>,init:Input<T>,body:(i:Node<'i32'>,acc:Node<T>)=>Input<T>):Node<T> {
-  const start=node(init) as Node<T>,i=param('i32'),acc=param(start.type),next=cast(body(i,acc),start.type,'loop body result');
+  const start=node(init) as Node<T>,i=param('i32'),acc=param(start.type),next=cast(nested(()=>body(i,acc)),start.type,'loop body result');
   const n=count instanceof Node?(count.type==='i32'?count:convert(count,'i32')):constant(count,'i32');
   return new Node(start.type,'r'+unique(),[n,start,next],(b,x)=>{
     const limit=b.expr(x.args[0]),first=b.expr(x.args[1]),a=b.name(),k=b.name();
@@ -227,7 +237,7 @@ export function Fn<P extends Type[],R extends Type>(body:(...args:{[K in keyof P
   const specs=new Map<string,Spec>();
   return (...input)=>{
     const args=input.map(a=>node(a as Input)),sig=args.map(a=>a.type).join();let spec=specs.get(sig);
-    if(!spec){const params=args.map(a=>param(a.type));spec={name,id:unique(),params,result:node((body as any)(...params))};specs.set(sig,spec);}
+    if(!spec){const params=args.map(a=>param(a.type));spec={name,id:unique(),params,result:node(nested(()=>(body as any)(...params)))};specs.set(sig,spec);}
     const s=spec;return new Node(s.result.type as R,'n'+s.id,args,(b,n)=>`${b.fn(s)}(${n.args.map(a=>b.expr(a)).join(', ')})`);
   };
 }

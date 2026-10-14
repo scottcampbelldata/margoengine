@@ -49,7 +49,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | MSAA | COVERED | core `sceneSamples()` (`packages/core/src/quality.ts`) | 4x on desktop. 1x on user-agent-detected phones and on the light quality tier. |
 | Reversed-Z / logarithmic depth | COVERED | core reversed-Z (`depthCompare:'greater-equal'`) | |
 | ShaderMaterial, RawShaderMaterial, onBeforeCompile | PARTIAL | `core/extension` `FrameGraph`, `DrawOptions.pipeline`, `PassContext.shader` (`packages/core/src/plugin.ts`) | Custom WGSL works per pass, or by string-patching the shared shader. There is no per-mesh material object or uniform abstraction. |
-| Node materials / TSL | PARTIAL | shader `NodeMaterial`, `NodePass`, `ComputePass` (`packages/shader/src`) | Typed nodes compile to WGSL with CSE and dead-code elimination; material slots (colour, normal, roughness, metalness, emissive, opacity, vertex position), PostStack effects and 1D compute over storage buffers. No statement-level If, atomics, light/shadow nodes or GLSL output (README limits). |
+| Node materials / TSL | PARTIAL | shader `NodeMaterial`, `NodePass`, `ComputePass` (`packages/shader/src`) | Typed nodes compile to WGSL with CSE and dead-code elimination; material slots (colour, normal, roughness, metalness, emissive, opacity, vertex position), PostStack effects and 1D compute over storage buffers. `discard(cond, value)` for cut-outs and slicing; atomics (add, max, min, load, store) on u32/i32 storage. No statement-level If, workgroup memory, light/shadow nodes or GLSL output (README limits). |
 | Compute (TSL compute, GPUComputationRenderer) | PARTIAL | raw `engine.gpu` via `core/extension` | No abstraction. Packages write raw WGSL compute. |
 | Render targets / render-to-texture | PARTIAL | creative `HDRRenderTarget` (`packages/creative/src/targets.ts`) | Captures the one scene from the one camera. There is no way to render a second camera or scene into a texture. |
 | Multiple render targets (MRT) | PARTIAL | `DrawOptions.colorAttachments` (`packages/core/src/plugin.ts`) | Low-level only. selection uses it for its ID buffer. |
@@ -235,6 +235,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | GridHelper, PolarGridHelper, AxesHelper, BoxHelper, Box3Helper, ArrowHelper, CameraHelper, PlaneHelper, VertexNormalsHelper | COVERED † | lines (`packages/lines/src/helpers.ts`) | WebGPU only. |
 | Light helpers (Directional, Point, Spot, Hemisphere, RectArea) | MISSING | — | |
 | SkeletonHelper | MISSING | — | |
+| ViewHelper (examples) | COVERED | viewcube `ViewCube` (`packages/viewcube/src`) | CAD view cube: clickable faces, edges and corners, animated views, keyboard and screen-reader labels, perspective/orthographic toggle with cameras. DOM/CSS, so WebGPU and WebGL2. |
 
 ### 16. Interaction and spatial queries
 

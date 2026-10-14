@@ -1,6 +1,7 @@
 // Real-adapter check (run from the repository root after building packages): node packages/shader/test/browser-check.mjs
 // Node WGSL must compile and render: material colour/texture/varying/position nodes, a live uniform, Fn + loop, a NodePass
-// reading colour and depth inside PostStack, and a ComputePass whose storage buffer is read back and drawn.
+// reading colour and depth inside PostStack, a ComputePass whose storage buffer is read back and drawn, discard() in a
+// NodeMaterial (the cut half shows the background) and a NodePass, and atomics (1000 invocations count, max, min, compact).
 import assert from 'node:assert/strict';
 import {openBrowser} from '../../../scripts/browser.js';
 import {decodePNG} from '../../../tests/support/png.js';
@@ -13,7 +14,7 @@ const expected={uniform:[255,128,0],texture:[0,255,0],varying:[188,188,255],move
 try {
   console.log('adapter',JSON.stringify(hardware.webgpu));
   await page.waitForFunction(()=>window.ready,null,{timeout:30000});
-  for(const name of ['uniform','gradient','texture','varying','moved','lit','loop','post','compute']){
+  for(const name of ['uniform','gradient','texture','varying','moved','lit','loop','discard','postDiscard','atomics','post','compute']){
     const result=await page.evaluate(n=>window.check.run(n),name),center=await pixel();
     assert.equal(result.error,null,name);assert.deepEqual(result.errors,[],name);
     if(expected[name])near(center,expected[name],name);
@@ -21,6 +22,9 @@ try {
     if(name==='gradient'){near(await pixel(0.3),[0,0,255],'uv.y > 0.5 at the top');near(await pixel(0.7),[255,0,0],'uv.y < 0.5 at the bottom');}
     if(name==='lit')assert.ok(center.some((v,i)=>Math.abs(v-background[i])>20),'lit node material drew nothing');
     if(name==='post')near(await pixel(0.05,0.05),[255,0,255],'depth reads the cleared far plane');
+    if(name==='discard'){near(await pixel(0.5,0.35),background,'discarded half shows the background');near(await pixel(0.5,0.65),[255,255,255],'kept half');}
+    if(name==='postDiscard'){near(await pixel(0.5,0.65),[255,255,255],'kept post half');assert.ok((await pixel(0.5,0.35)).some(v=>v<200),'discarded post half is not the scene');}
+    if(name==='atomics'){const r=await page.evaluate(()=>window.check.readAtomics());assert.deepEqual(r.counter,[1000,999,0,500],'atomic count, max, min, slots');assert.ok(r.evens,'compacted even indices');console.log('atomics',JSON.stringify(r.counter));}
     if(name==='compute')assert.deepEqual(await page.evaluate(()=>window.check.readField()),[0,2,0,1,1,2,0,1,2,2,0,1,3,2,0,1]);
     console.log('ok',name,center);
     await page.evaluate(()=>window.check.clear());

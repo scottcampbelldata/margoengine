@@ -390,6 +390,27 @@ test('transform: dragging the X arrow moves the mesh by the dragged world distan
   gizmo.dispose(); engine.dispose();
 });
 
+test('transform: constant screen size, picking and drags under an orthographic camera (@margoengine/cameras)', async () => {
+  const {CameraProjection} = await import('../../cameras/dist/index.js');
+  const {engine, canvas} = await engineWith(), projection = new CameraProjection({height: 4}); engine.use(projection);
+  const mesh = engine.createMesh().setGeometry(box()), gizmo = new TransformControls(engine);
+  gizmo.attach(mesh);
+  const arrowPixels = () => {engine.render(); const s = gizmo.frame().size, a = toPixel(engine.camera, mesh.position.x === undefined ? [0, 0, 0] : [mesh.position.x, mesh.position.y, mesh.position.z]), b = toPixel(engine.camera, [mesh.position.x + s, mesh.position.y, mesh.position.z]); return Math.hypot(b[0] - a[0], b[1] - a[1]);};
+  // Same on-screen size as the perspective gizmo: 1.9 / 8 of the view height.
+  close(arrowPixels(), 600 * 1.9 / 8, 1e-6, 'height 4');
+  projection.zoom = 2; close(arrowPixels(), 600 * 1.9 / 8, 1e-6, 'zoomed in');
+  mesh.setPosition([0, 0, 12]); close(arrowPixels(), 600 * 1.9 / 8, 1e-6, 'nearer than the eye (inside the orthographic depth range)');
+  assert.deepEqual(gizmo.frame().eye, [-0, -0, 1], 'parallel view: the eye direction is the view direction everywhere');
+  const s = gizmo.frame().size, grab = toPixel(engine.camera, [0.5 * s, 0, 12]);
+  assert.equal(gizmo.pick(grab[0], grab[1]), 'X');
+  drag(canvas, grab, [grab[0] + 90, grab[1] + 20]);
+  close(mesh.position.x, 90 / 300, 1e-6, '300 px per unit at half-height 1'); close(mesh.position.y, 0, 1e-9);
+  gizmo.dispose();
+  const orbit = new OrbitControls(engine); orbit.pan(90, 0); orbit.update(0);
+  close(engine.camera.target[0], -90 / 300, 1e-9, 'orbit pan follows the cursor at any orthographic zoom');
+  orbit.dispose(); engine.dispose();
+});
+
 test('transform: local versus world space for a rotated mesh', async () => {
   const {engine, canvas} = await engineWith({position: [6, 5, 9], target: [0, 0, 0]});
   const mesh = engine.createMesh().setGeometry(box()).setRotation([0, Math.PI / 2, 0]); // local X points along world -Z

@@ -181,6 +181,54 @@ test('ComputePass writes a storage buffer every frame and other nodes read it', 
   h.engine.removePlugin(pass.name); field.dispose(); h.cleanup();
 });
 
+test('discard() cuts out fragments in material and post nodes and is refused elsewhere', async () => {
+  const map = new Texture({data: new Uint8Array(16).fill(255), width: 2, height: 2}), cut = uniform(0.5, {name: 'cut'});
+  const m = new NodeMaterial({colorNode: S.discard(texture(map).a.lessThan(cut).or(S.positionWorld.y.greaterThan(1)), texture(map).rgb), roughnessNode: 0.5});
+  await snapshot('material-discard', m.fragmentCode);
+  assert.ok(m.fragmentCode.indexOf('{ discard; }') < m.fragmentCode.indexOf('s.base ='), 'discard runs before the slots are written');
+  assert.equal(m.fragmentCode.match(/textureSample/g).length, 1, 'condition and value share one sample');
+  const pass = new NodePass(S.discard(inputDepth().equal(0), inputColor()));
+  await snapshot('post-discard', pass.code());
+  assert.equal(new NodeMaterial({colorNode: S.discard(true, vec3(1))}).fragmentCode, new NodeMaterial({colorNode: S.discard(true, vec3(1))}).fragmentCode);
+  assert.throws(() => new NodeMaterial({positionNode: S.discard(true, positionLocal)}), /discard\(\) is not available in vertex nodes/);
+  assert.throws(() => new ComputePass(4, i => storage(4, 'f32').store(i, S.discard(true, float(1)))), /not available in compute nodes/);
+  assert.throws(() => S.discard(vec3(1), vec3(1)), /discard condition must be bool, got vec3f/);
+});
+
+test('atomics on u32/i32 storage: ordered read-modify-write, compaction and clear errors', async () => {
+  const h = optionalGPU(), counter = storage(4, 'u32', {atomic: true}), visible = storage(256, 'u32'), signed = storage(1, 'i32', {atomic: true});
+  const pass = new ComputePass(256, i => {
+    counter.atomicMax(1, i); counter.atomicMin(2, i); signed.atomicAdd(0, -1);
+    const keep = i.mod(2).equal(0), slot = counter.atomicAdd(0, select(keep, S.uint(1), S.uint(0)));
+    return [visible.store(select(keep, slot, 255), i), counter.atomicStore(3, counter.atomicLoad(0))];
+  }, {name: 'cull'});
+  await snapshot('compute-atomics', pass.code);
+  assert.match(pass.code, /var<storage, read_write> ndb0:array<atomic<u32>>;/);
+  assert.ok(pass.code.indexOf('atomicMax') < pass.code.indexOf('atomicMin') && pass.code.indexOf('atomicMin') < pass.code.indexOf('atomicAdd(&ndb1'), 'atomics run in the order they were made');
+  const count = new ComputePass(8, () => {counter.atomicAdd(0, 1);});
+  assert.match(count.code, /let nd0 = atomicAdd\(&ndb0\[0u\], 1u\);/, 'an unused atomic still runs');
+  assert.equal(new ComputePass(8, () => [counter.atomicAdd(0, 1), counter.atomicAdd(0, 1)]).code.match(/atomicAdd/g).length, 2, 'equal atomics are not merged');
+  const looped = new ComputePass(8, () => {counter.atomicAdd(0, loop(3, S.uint(0), (k, acc) => acc.add(counter.atomicAdd(1, 1))));});
+  assert.match(looped.code, /for \([^]*atomicAdd\(&ndb0\[1u\], 1u\)[^]*\}\n[^]*atomicAdd\(&ndb0\[0u\]/, 'an atomic inside a loop runs in the loop');
+  assert.match(new ComputePass(1, i => storage(1, 'u32').store(0, counter.element(i))).code, /atomicLoad\(&ndb\d\[gid\.x\]\)/, 'element() on atomic storage loads atomically');
+  const read = new NodeMaterial({colorNode: vec3(counter.element(0).toFloat())});
+  assert.match(read.program.declare(2), /var<storage, read> ndb0:array<u32>;/); assert.match(read.fragmentCode, /ndb0\[0u\]/);
+  assert.throws(() => storage(1, 'f32', {atomic: true}), /u32 or i32/);
+  assert.throws(() => storage(1, 'u32').atomicAdd(0, 1), /needs storage\(data, 'u32', \{atomic: true\}\)/);
+  assert.throws(() => new NodeMaterial({colorNode: vec3(counter.atomicAdd(0, 1).toFloat())}), /only available in ComputePass/);
+  assert.throws(() => counter.atomicAdd(0, 1.5), /not a valid u32/);
+  h.engine.use(pass); h.frame(); assert.equal(h.counts.compute, 1); h.engine.removePlugin(pass.name); h.cleanup();
+});
+
+test('atomic methods are typed for u32/i32 storage only', async () => {
+  const {execFileSync} = await import('node:child_process'), {rm} = await import('node:fs/promises');
+  const tsc = fileURLToPath(new URL('../../../node_modules/typescript/bin/tsc', import.meta.url)), file = fileURLToPath(new URL('../dist/__types-check.ts', import.meta.url));
+  // An unused @ts-expect-error is itself an error, so this fails if f32 storage ever accepts atomics.
+  await writeFile(file, `import {storage} from './index.js';\nstorage(1, 'u32', {atomic: true}).atomicAdd(0, 1);\nstorage(1, 'i32', {atomic: true}).atomicMin(0, -1);\n// @ts-expect-error f32 storage has no atomics\nstorage(1, 'f32').atomicAdd(0, 1);\n`);
+  try {execFileSync(process.execPath, [tsc, '--ignoreConfig', '--noEmit', '--strict', '--skipLibCheck', '--target', 'es2022', '--module', 'esnext', '--moduleResolution', 'bundler', '--types', 'node', file], {stdio: 'pipe'});}
+  catch (e) {assert.fail(String(e.stdout));} finally {await rm(file, {force: true});}
+});
+
 test('importing a colour node and NodeMaterial leaves post, compute and textures out of the bundle', async t => {
   const {build} = await import('vite'), {gzipSync} = await import('node:zlib'), {mkdtemp, writeFile: write, rm} = await import('node:fs/promises');
   const {tmpdir} = await import('node:os'), {join} = await import('node:path');

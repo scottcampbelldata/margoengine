@@ -96,7 +96,7 @@ export class OrbitControls extends Controls {
   /** Pans by a screen delta in CSS pixels. */
   pan(deltaX: number, deltaY: number): void {
     const element = this.element, height = Math.max(1, element?.clientHeight ?? 1);
-    const b = basis(this.camera), distance = b.distance * b.tanHalf;
+    const b = basis(this.camera), distance = b.ortho ?? b.distance * b.tanHalf;
     this.dPan = madd(this.dPan, b.right, -2 * deltaX * distance / height);
     const up = this.screenSpacePanning ? b.up : cross([0, 1, 0], b.right);
     this.dPan = madd(this.dPan, up, 2 * deltaY * distance / height);
