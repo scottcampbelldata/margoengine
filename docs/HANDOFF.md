@@ -86,6 +86,9 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
 1. Top-10 parity gaps (non-core parts): materials package [done: `@margoengine/materials`], glTF extensions/decoders [running], post stack +
    FXAA [running], raycast/pick glTF models + DragControls, environment IBL apply + background colour + fog,
    orthographic/vertical cameras without core change, WebGL beyond core (gap 8: scope with Scott first).
+1b. Composable shader nodes (`@margoengine/shader`, parity gap 19), moved up after Scott noted three.js's TSL /
+   RenderPipeline node workflows (r183 RenderPipeline, r186 pipeline hooks): small typed nodes compiling to WGSL for
+   materials and post effects, built on the materials package and the post stack once both APIs settle.
 2. Dedupe: two particle systems (creative GPUParticles vs vfx), two bloom paths (post Bloom vs creative
    PostProcessing), three sky implementations (sky, scenery, creative atmosphere).
 3. Replace three.js inside fbx and usdz with native parsers [running].
