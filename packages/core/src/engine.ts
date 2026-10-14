@@ -118,7 +118,7 @@ export class Engine {
     if(this.recovery)return this.recovery;
     this.recovery=(async()=>{const previous=this.renderer,next=await GPURenderer.create(this.canvas);
       if(this.disposed||this.disposing){next.dispose();return;}
-      try{for(const geometry of this.batches.keys())next.add(geometry,this.store.capacity);}
+      try{for(const batch of this.batches.values())next.add(batch.geometry,batch.instances.length/24);}
       catch(error){next.dispose(false);throw error;}
       this.renderer=next;this.watchDevice();previous.dispose(false);
       for(const plugin of this.plugins.values())plugin.onDeviceRestored?.(this);
@@ -148,8 +148,9 @@ export class Engine {
   }
   retain(geometry:Geometry):void {
     let batch=this.batches.get(geometry);
-    if(!batch){const instances=new Float32Array(this.store.capacity*24);if(!this.recovery)this.renderer.add(geometry,this.store.capacity);batch={geometry,instances,count:0,references:0};this.batches.set(geometry,batch);}
-    batch.references++;
+    if(!batch)this.batches.set(geometry,batch={geometry,instances:new Float32Array,count:0,references:0});
+    // Size instance storage to the meshes using this geometry, doubling as it grows, not to the engine capacity.
+    if(batch.references++>=batch.instances.length/24){const size=batch.references*2;batch.instances=new Float32Array(size*24);if(!this.recovery){this.renderer.remove(geometry);this.renderer.add(geometry,size);}}
   }
   release(geometry:Geometry):void {const batch=this.batches.get(geometry)!;if(--batch.references===0){this.renderer.remove(geometry);this.batches.delete(geometry);}}
   private readonly collect=(mesh:Mesh):void=>{
