@@ -2,6 +2,8 @@ import {SceneTarget} from '../../shared/msaa.js';
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext, type DrawOptions} from '@margoengine/core/extension';
 import {agxShader} from '../../shared/agx.js';
+import {render,group} from '../../shared/gpu.js';
+import type {StackHost,StackStage,StageOutput} from '../../shared/stack.js';
 declare const GPUBufferUsage: {UNIFORM: number; COPY_DST: number};
 declare const GPUTextureUsage: {COPY_SRC: number; RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; STORAGE_BINDING: number};
 
@@ -36,6 +38,8 @@ const composite = agxShader + `
  let c=agx(max(hdr,vec3f(0))*exp2(settings.y));
  return vec4f(select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.055,c>=vec3f(0.0031308)),1);
 }`;
+// In a PostStack, a non-final Bloom hands linear light (with its exposure) to the next effect.
+const linear = composite.replace(/let c=agx[^\n]+\n[^\n]+/, 'return vec4f(max(hdr,vec3f(0))*exp2(settings.y),1);');
 
 /** Owns linear HDR scene capture, half-resolution bloom and a single AgX presentation. */
 export class Bloom implements EnginePlugin {
@@ -64,20 +68,28 @@ export class Bloom implements EnginePlugin {
   private readonly attachment: GPURenderPassColorAttachment = {view: undefined!, loadOp: 'clear', storeOp: 'store'};
   private readonly presentation: GPURenderPassDescriptor = {colorAttachments: [this.attachment]};
   private disposed = false;
+  private host?: StackHost;
+  private input?: GPUTextureView;
+  private key = '';
 
   constructor(readonly options: BloomOptions = {}) {this.validate();}
   static attach(engine: EngineKernel, options: BloomOptions = {}): Bloom {
     const bloom = new Bloom(options); engineRuntime(engine).use(bloom); return bloom;
   }
-  get depthTexture(): GPUTexture | undefined {return this.textures[1];}
-  get sceneTexture(): GPUTexture | undefined {return this.textures[0];}
+  get depthTexture(): GPUTexture | undefined {return this.host ? this.host.depthTexture : this.textures[1];}
+  /** Captured linear scene; undefined in a PostStack. */
+  get sceneTexture(): GPUTexture | undefined {return this.host ? undefined : this.textures[0];}
+  private joinStack(host: StackHost): StackStage {
+    if (this.engine || this.host || this.disposed) throw new Error('Bloom is already attached');
+    this.host = host; return {kind: 'hdr', render: (c, input, output) => this.stage(c, input, output)};
+  }
   private validate(): void {
     const s = this.options.strength ?? 0.8, t = this.options.threshold ?? 1, e = this.options.exposure ?? 0;
     if (!Number.isFinite(s) || s < 0 || s > 4 || !Number.isFinite(t) || t < 0 || t > 100 || !Number.isFinite(e) || Math.abs(e) > 10) throw new RangeError('Invalid bloom options');
   }
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu) throw new Error('Bloom requires WebGPU and a live effect');
-    if (engine.hasPlugin('ssao') || engine.hasPlugin('post-processing') || engine.hasPlugin('tonemap')) throw new Error('Bloom owns the output target; remove the other post effect first');
+    if (!this.host && (engine.hasPlugin('ssao') || engine.hasPlugin('post-processing') || engine.hasPlugin('tonemap'))) throw new Error('Bloom owns the output target; remove the other post effect first');
     this.engine = engine;
     const device = engine.gpu;
     this.uniform = device.createBuffer({size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST});
@@ -88,6 +100,7 @@ export class Bloom implements EnginePlugin {
     this.blur = device.createComputePipeline({layout: 'auto', compute: {module: device.createShaderModule({code: filter}), entryPoint: 'main'}});
   }
   registerPasses(graph: FrameGraph): void {
+    if (this.host) return;
     graph.add({name: 'bloom:capture', order: -60, execute: c => {
       if (c.backend !== 'webgpu') return;
       this.validate();
@@ -131,27 +144,44 @@ export class Bloom implements EnginePlugin {
     this.groups = [group(this.blur!, [this.scene, a, {buffer: this.kernels[0]}]), group(this.blur!, [a, b, {buffer: this.kernels[1]}]), group(this.present, [this.scene, b, {buffer: this.uniform!}])];
   }
   private draw(c: Context): void {
-    this.capture!.resolve(c.encoder,true);
+    this.capture!.resolve(c.encoder,true); this.apply(c, this.original!);
+    this.capture!.restore(c); c.draw = this.originalDraw!;
+  }
+  /** Stacked: blur `input` at half resolution and composite into `output`, AgX-encoded only as the display output. */
+  private stage(c: Context, input: GPUTextureView, output: StageOutput): void {
+    this.validate();
+    const device = c.device, width = Math.max(1, Math.ceil(c.width / 2)), height = Math.max(1, Math.ceil(c.height / 2)), key = output.format + output.multisample.count + output.hdr;
+    if (this.textures[0]?.width !== width || this.textures[0].height !== height) {
+      for (const texture of this.textures) texture.destroy(); this.input = undefined;
+      this.textures = [0, 1].map(() => device.createTexture({size: [width, height], format: 'rgba16float', usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING}));
+    }
+    if (this.key !== key) {this.key = key; this.input = undefined; this.present = render(device, output.hdr ? linear : composite, output.format, {multisample: output.multisample});}
+    if (this.input !== input) {
+      const a = this.textures[0].createView(), b = this.textures[1].createView(); this.input = input;
+      this.groups = [group(device, this.blur!, [input, a, {buffer: this.kernels[0]}]), group(device, this.blur!, [a, b, {buffer: this.kernels[1]}]), group(device, this.present!, [input, b, {buffer: this.uniform!}])];
+    }
+    this.apply(c, output.view);
+  }
+  private apply(c: Context, view: GPUTextureView): void {
     this.values[0] = this.options.strength ?? 0.8; this.values[1] = this.options.exposure ?? 0;
     this.horizontal[3] = this.options.threshold ?? 1;
     c.device.queue.writeBuffer(this.uniform!, 0, this.values);
     c.device.queue.writeBuffer(this.kernels[0], 0, this.horizontal);
     const compute = c.encoder.beginComputePass(); compute.setPipeline(this.blur!);
     for (let i = 0; i < 2; i++) {
-      compute.setBindGroup(0, this.groups[i]); compute.dispatchWorkgroups(Math.ceil(this.textures[2].width / 8), Math.ceil(this.textures[2].height / 8));
+      compute.setBindGroup(0, this.groups[i]); compute.dispatchWorkgroups(Math.ceil(this.textures.at(-1)!.width / 8), Math.ceil(this.textures.at(-1)!.height / 8));
     }
     compute.end();
-    this.attachment.view = this.original!;
+    this.attachment.view = view;
     const pass = c.encoder.beginRenderPass(this.presentation);
     pass.setPipeline(this.present!); pass.setBindGroup(0, this.groups[2]); pass.draw(3); pass.end();
-    this.capture!.restore(c); c.draw = this.originalDraw!;
   }
   private release(): void {
     this.capture?.dispose();this.capture=undefined;
     this.uniform?.destroy(); for (const buffer of this.kernels) buffer.destroy(); for (const texture of this.textures) texture.destroy();
     this.uniform = undefined; this.kernels = []; this.textures = []; this.groups = [];
     this.blur = this.present = undefined; this.scene = this.depth = this.original = this.originalDepth = undefined; this.originalFormat = undefined;
-    this.sourceShader = this.linearShader = '';
+    this.sourceShader = this.linearShader = this.key = ''; this.input = undefined;
     this.scenePipelines.clear(); this.sceneOptions.pipeline = undefined; this.originalDraw = undefined;
   }
   onDeviceRestored(engine: Engine): void {this.release(); this.setup(engine);}

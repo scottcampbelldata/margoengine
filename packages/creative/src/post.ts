@@ -1,6 +1,7 @@
 import type {Engine,EnginePlugin,FrameGraph,PassContext,Vec3} from '@margoengine/core/extension';
 import {invert} from '../../shared/math.js';
 import {HDRRenderTarget} from './targets.js';
+import type {StackHost,StackStage} from '../../shared/stack.js';
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
 declare const GPUTextureUsage:{TEXTURE_BINDING:number;STORAGE_BINDING:number};
 type Context=Extract<PassContext,{backend:'webgpu'}>;
@@ -43,7 +44,16 @@ export class PostProcessing implements EnginePlugin {
   private readonly inverse=this.values.subarray(0,16);private readonly threshold=new Float32Array([0,0,1,1]);
   private readonly inverseWorkspace=new Float64Array(52);private shaderSource?:string;private linearShader='';
   private colorView?:GPUTextureView;private depthView?:GPUTextureView;private filterGroups:GPUBindGroup[]=[];private resolveGroups:GPUBindGroup[]=[];private skyGroup?:GPUBindGroup;private presentGroup?:GPUBindGroup;private skyPass?:GPURenderPassDescriptor;private presentPass?:GPURenderPassDescriptor;
+  private host?:StackHost;private sceneDepth?:GPUTexture;
   constructor(readonly options:PostOptions={}){this.validate();}
+  /** In a PostStack, grades (fog, focus blur, bloom, ACES, grain) the stack's HDR result as its display effect. */
+  private joinStack(host:StackHost):StackStage {
+    if(this.device||this.host)throw new Error('PostProcessing is already attached');
+    this.host=host;return {kind:'display',render:(c,input,output)=>{
+      const depth=host.depthTexture!;if(this.colorView!==input||this.sceneDepth!==depth){this.colorView=input;this.sceneDepth=depth;this.bind(c,input,depth.createView({aspect:'depth-only'}));}
+      this.preparePresent(c,output.format,output.multisample);this.apply(c,output.view);
+    }};
+  }
   private validate():void {const o=this.options,a=o.atmosphere??atmosphere;for(const key in o)if(Object.hasOwn(o,key)){const value=o[key as keyof PostOptions];if(typeof value==='number'&&!finite(value))throw new RangeError(`Invalid post ${key}`);}
     if(!range(o.bloom??0,0,4)||!range(o.threshold??1,0,100)||!range(o.exposure??0,-10,10)||!range(o.contrast??1,0,4)||!range(o.saturation??1,0,4)||!range(o.focus??5,0.01,10000)||!range(o.aperture??0,0,64)||!range(o.grain??0,0,1)||!range(a.density??0,0,10)||!range(a.heightFalloff??0,0,10)||!range(a.scattering??1,0,10)||!range(a.anisotropy??0.76,-0.95,0.95)||!range(a.godRays??0,0,4))throw new RangeError('Invalid post or atmosphere options');
     if(a.sky!==undefined&&typeof a.sky!=='boolean')throw new TypeError('Sky must be boolean');
@@ -56,21 +66,26 @@ export class PostProcessing implements EnginePlugin {
     for(const data of [[0,0,1,this.options.threshold??1],[1,0,0,0],[0,1,0,0]]){const b=this.device.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});this.filters.push(b);this.device.queue.writeBuffer(b,0,new Float32Array(data));}
   }
   registerPasses(graph:FrameGraph):void {
-    graph.add({name:'post:capture',order:-50,execute:context=>{if(context.backend!=='webgpu')return;this.validate();this.resize(context);this.preparePresent(context);this.update(context);this.original=context.color;this.target!.scene.begin(context);
+    graph.add({name:'post:capture',order:-50,execute:context=>{if(context.backend!=='webgpu')return;this.validate();this.resize(context);
+      if(this.host){this.update(context);return;}
+      this.preparePresent(context,context.format,context.descriptor.multisample);this.update(context);this.original=context.color;this.target!.scene.begin(context);
       // The patch depends only on the source text, so it is redone only when another plugin changes the shader.
       if(this.shaderSource!==context.shader){this.shaderSource=context.shader;this.linearShader=context.shader.replace(/let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');}context.shader=this.linearShader;}});
     graph.add({name:'atmosphere:sky',order:2,execute:context=>{if(context.backend==='webgpu'&&(this.options.atmosphere?.sky??false))this.drawSky(context);}});
-    graph.add({name:'post:resolve',order:30,execute:context=>{if(context.backend==='webgpu')this.process(context);}});
+    graph.add({name:'post:resolve',order:30,execute:context=>{if(context.backend==='webgpu'&&!this.host)this.process(context);}});
   }
-  private resize(c:Context):void {const samples=c.descriptor.multisample?.count??4,depth=c.descriptor.depthStencil!.format;if(this.ready&&this.target?.width===c.width&&this.target.height===c.height&&this.target.samples===samples&&this.target.depthFormat===depth)return;this.ready=false;this.target?.dispose();for(const t of this.textures)t.destroy();this.textures=[];this.levels=[];this.target=new HDRRenderTarget(c.device,c.width,c.height,samples,depth);this.presentGroup=undefined;
+  private resize(c:Context):void {const samples=c.descriptor.multisample?.count??4,depth=c.descriptor.depthStencil!.format;if(this.ready&&(this.host?this.output!.width===c.width&&this.output!.height===c.height:this.target?.width===c.width&&this.target.height===c.height&&this.target.samples===samples&&this.target.depthFormat===depth))return;this.ready=false;this.target?.dispose();for(const t of this.textures)t.destroy();this.textures=[];this.levels=[];if(!this.host)this.target=new HDRRenderTarget(c.device,c.width,c.height,samples,depth);this.presentGroup=undefined;
     const create=(w:number,h:number,format:GPUTextureFormat)=>{const t=c.device.createTexture({size:[w,h],format,usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.STORAGE_BINDING});this.textures.push(t);return t;};let w=c.width,h=c.height;
     for(let i=0;i<4;i++){w=Math.max(1,Math.floor(w/2));h=Math.max(1,Math.floor(h/2));this.levels.push([create(w,h,'rgba16float'),create(w,h,'rgba16float')]);}this.output=create(c.width,c.height,'rgba8unorm');
-    this.colorView=this.target.color.createView();this.depthView=this.target.depth.createView();const depthOnly=this.target.depth.createView({aspect:'depth-only'}),output=this.output.createView(),group=(pipeline:GPUComputePipeline|GPURenderPipeline,entries:GPUBindGroupEntry[])=>c.device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries});
-    this.filterGroups=[];let input=this.colorView;for(let i=0;i<this.levels.length;i++){const [a,b]=this.levels[i],av=a.createView(),bv=b.createView();this.filterGroups.push(group(this.blur!,[{binding:0,resource:input},{binding:1,resource:av},{binding:2,resource:{buffer:this.filters[i===0?0:1]}}]),group(this.blur!,[{binding:0,resource:av},{binding:1,resource:bv},{binding:2,resource:{buffer:this.filters[2]}}]));input=bv;}
-    this.resolveGroups=[this.colorView,input].map(view=>group(this.resolve!,[{binding:0,resource:{buffer:this.uniform!}},{binding:1,resource:this.colorView!},{binding:2,resource:depthOnly},{binding:3,resource:view},{binding:4,resource:output}]));
+    // Stacked, the scene views are bound on the first render that sees them.
+    if(this.host)this.colorView=undefined;else{this.colorView=this.target!.color.createView();this.depthView=this.target!.depth.createView();this.bind(c,this.colorView,this.target!.depth.createView({aspect:'depth-only'}));}
     this.ready=true;
   }
-  private preparePresent(c:Context):void {const key=c.format+':'+(c.descriptor.multisample?.count??1);if(!this.present||this.presentKey!==key){const module=c.device.createShaderModule({code:present});this.present=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]},multisample:c.descriptor.multisample});this.presentKey=key;this.presentGroup=undefined;}this.presentGroup??=c.device.createBindGroup({layout:this.present.getBindGroupLayout(0),entries:[{binding:0,resource:this.output!.createView()}]});
+  private bind(c:Context,color:GPUTextureView,depthOnly:GPUTextureView):void {const output=this.output!.createView(),group=(pipeline:GPUComputePipeline|GPURenderPipeline,entries:GPUBindGroupEntry[])=>c.device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries});
+    this.filterGroups=[];let input=color;for(let i=0;i<this.levels.length;i++){const [a,b]=this.levels[i],av=a.createView(),bv=b.createView();this.filterGroups.push(group(this.blur!,[{binding:0,resource:input},{binding:1,resource:av},{binding:2,resource:{buffer:this.filters[i===0?0:1]}}]),group(this.blur!,[{binding:0,resource:av},{binding:1,resource:bv},{binding:2,resource:{buffer:this.filters[2]}}]));input=bv;}
+    this.resolveGroups=[color,input].map(view=>group(this.resolve!,[{binding:0,resource:{buffer:this.uniform!}},{binding:1,resource:color},{binding:2,resource:depthOnly},{binding:3,resource:view},{binding:4,resource:output}]));
+  }
+  private preparePresent(c:Context,format:GPUTextureFormat,multisample:GPUMultisampleState|undefined):void {const key=format+':'+(multisample?.count??1);if(!this.present||this.presentKey!==key){const module=c.device.createShaderModule({code:present});this.present=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format}]},multisample});this.presentKey=key;this.presentGroup=undefined;}this.presentGroup??=c.device.createBindGroup({layout:this.present.getBindGroupLayout(0),entries:[{binding:0,resource:this.output!.createView()}]});
   }
   private update(c:Context):void {const o=this.options,a=o.atmosphere??atmosphere,v=this.values;if(!invert(this.inverse,c.camera.matrix,0,this.inverseWorkspace))throw new Error('Invalid post camera');this.time+=c.delta;
     v.set(c.camera.position,16);v.set(a.sun??sun,20);v[23]=a.scattering??1;v[24]=a.density??0;v[25]=a.heightFalloff??0;v[26]=a.godRays??0;v[27]=a.anisotropy??0.76;v.set(a.color??color,28);v[32]=o.exposure??0;v[33]=o.contrast??1;v[34]=o.saturation??1;v[35]=o.bloom??0;v[36]=o.focus??5;v[37]=o.aperture??0;v[38]=o.grain??0;v[39]=this.time;v[40]=c.camera.near;v[41]=c.camera.far;v[42]=o.threshold??1;v[43]=+(a.sky??false);v.set(o.gain??gain,44);v.set(o.lift??lift,48);v.set(c.camera.matrix,52);
@@ -80,14 +95,15 @@ export class PostProcessing implements EnginePlugin {
   }
   private dispatch(c:Context,pipeline:GPUComputePipeline,group:GPUBindGroup,width:number,height:number):void {const pass=c.encoder.beginComputePass();try{pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.dispatchWorkgroups(Math.ceil(width/8),Math.ceil(height/8));}finally{pass.end();}}
   private failed(c:Context,error:unknown):never {try{this.target!.scene.restore(c);}catch{}throw error;}
-  private process(c:Context):void {try{this.target!.scene.resolve(c.encoder,true);const bloom=(this.options.bloom??0)>0;
+  private process(c:Context):void {try{this.target!.scene.resolve(c.encoder,true);this.apply(c,this.original!);this.target!.scene.restore(c);}catch(error){this.failed(c,error);}}
+  private apply(c:Context,view:GPUTextureView):void {const bloom=(this.options.bloom??0)>0;
     if(bloom)for(let i=0;i<this.levels.length;i++){const [a,b]=this.levels[i];this.dispatch(c,this.blur!,this.filterGroups[i*2],a.width,a.height);this.dispatch(c,this.blur!,this.filterGroups[i*2+1],b.width,b.height);}
     this.dispatch(c,this.resolve!,this.resolveGroups[+bloom],c.width,c.height);
-    const descriptor=this.presentPass??={colorAttachments:[{view:this.original!,loadOp:'clear',clearValue:{r:0,g:0,b:0,a:1},storeOp:'store'}]};(descriptor.colorAttachments as GPURenderPassColorAttachment[])[0].view=this.original!;
-    const pass=c.encoder.beginRenderPass(descriptor);try{pass.setPipeline(this.present!);pass.setBindGroup(0,this.presentGroup!);pass.draw(3);}finally{pass.end();}this.target!.scene.restore(c);}catch(error){this.failed(c,error);}
+    const descriptor=this.presentPass??={colorAttachments:[{view,loadOp:'clear',clearValue:{r:0,g:0,b:0,a:1},storeOp:'store'}]};(descriptor.colorAttachments as GPURenderPassColorAttachment[])[0].view=view;
+    const pass=c.encoder.beginRenderPass(descriptor);try{pass.setPipeline(this.present!);pass.setBindGroup(0,this.presentGroup!);pass.draw(3);}finally{pass.end();}
   }
   onDeviceRestored(engine:Engine):void {const time=this.time;this.dispose();this.setup(engine);this.time=time;}
-  dispose():void {this.target?.dispose();this.target=undefined;for(const t of this.textures)t.destroy();for(const b of this.filters)b.destroy();this.uniform?.destroy();this.filters=[];this.textures=[];this.levels=[];this.uniform=undefined;this.device=undefined;this.ready=false;this.presentKey=this.skyKey='';this.blur=undefined;this.resolve=undefined;this.sky=undefined;this.present=undefined;this.original=undefined;this.colorView=this.depthView=undefined;this.filterGroups=[];this.resolveGroups=[];this.skyGroup=this.presentGroup=undefined;this.skyPass=this.presentPass=undefined;}
+  dispose():void {this.sceneDepth=undefined;this.target?.dispose();this.target=undefined;for(const t of this.textures)t.destroy();for(const b of this.filters)b.destroy();this.uniform?.destroy();this.filters=[];this.textures=[];this.levels=[];this.uniform=undefined;this.device=undefined;this.ready=false;this.presentKey=this.skyKey='';this.blur=undefined;this.resolve=undefined;this.sky=undefined;this.present=undefined;this.original=undefined;this.colorView=this.depthView=undefined;this.filterGroups=[];this.resolveGroups=[];this.skyGroup=this.presentGroup=undefined;this.skyPass=this.presentPass=undefined;}
 }
 
 

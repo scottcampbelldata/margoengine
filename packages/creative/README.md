@@ -35,6 +35,11 @@ Use a feature subpath for a static import or an on-demand `import()`:
 const {GPUParticles} = await import('@margoengine/creative/particles');
 ```
 
+`PostProcessing` alone owns scene capture. To combine it with SSAO, DOF, Bloom or FXAA, add it to a
+`PostStack` from `@margoengine/post/stack` as the display effect, after the HDR effects and before
+FXAA: `PostStack.attach(engine, [new SSAO(), new PostProcessing({bloom: 0.3}), new FXAA()])`. It then
+grades (fog, focus blur, bloom, ACES, grain) the stack's HDR result, and its `target` is undefined.
+
 Each subpath loads that feature and its dependencies. Existing named imports from `@margoengine/creative` remain available and can be tree-shaken by a bundler. `await stage.creative()` intentionally loads the complete pack namespace; use a subpath when loading one feature independently.
 
 Attach a grass field directly to an existing Stage, without extending the facade:

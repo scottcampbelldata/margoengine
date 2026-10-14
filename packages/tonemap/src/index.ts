@@ -3,6 +3,7 @@ import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext} from '@margoengine/core/extension';
 import {parseCube,validateLUT,type CubeLUT} from './cube.js';
 import {tonemapShader} from './shaders.js';
+import type {StackHost,StackStage} from '../../shared/stack.js';
 export {parseCube};
 export type {CubeLUT};
 
@@ -30,7 +31,7 @@ export class Tonemap implements EnginePlugin {
   private group?:GPUBindGroup;
   private scene?:GPUTexture;
   private sceneView?:GPUTextureView;
-  private sourceTexture?:GPUTexture;
+  private sourceTexture?:GPUTexture|GPUTextureView;
   private lutTexture?:GPUTexture;
   private lut?:CubeLUT;
   private original?:GPUTextureView;
@@ -41,9 +42,15 @@ export class Tonemap implements EnginePlugin {
   private readonly attachment:GPURenderPassColorAttachment={view:undefined!,loadOp:'clear',storeOp:'store'};
   private readonly presentation:GPURenderPassDescriptor={colorAttachments:[this.attachment]};
   private disposed=false;
+  private stacked=false;
 
   constructor(readonly options:TonemapOptions={}){this.source=options.source;this.validate();}
   static attach(instance:EngineKernel,options:TonemapOptions={}):Tonemap {const effect=new Tonemap(options);engineRuntime(instance).use(effect);return effect;}
+  /** In a PostStack, grades the stack's HDR result as its display effect. */
+  private joinStack(_host:StackHost):StackStage {
+    if(this.engine||this.stacked||this.disposed||this.source)throw new Error('Tonemap is already attached or has its own source');
+    this.stacked=true;return {kind:'display',render:(c,input,output)=>{this.validate();this.paint(c,input,output.format,output.multisample,output.view);}};
+  }
   private validate():void {
     const o=this.options,e=o.exposure??0,k=o.contrast??1;
     if(o.curve!==undefined&&o.curve!=='agx'&&o.curve!=='acescg'&&o.curve!=='neutral'||o.inputColorSpace!==undefined&&o.inputColorSpace!=='linear-srgb'&&o.inputColorSpace!=='acescg'||
@@ -52,7 +59,7 @@ export class Tonemap implements EnginePlugin {
   }
   setup(engine:Engine):void {
     if(this.disposed||!engine.gpu)throw new Error('Tonemap requires WebGPU and a live effect');
-    if(!this.source&&(engine.hasPlugin('dof')||engine.hasPlugin('ssao')||engine.hasPlugin('post-processing')))throw new Error('Tonemap needs an explicit HDR source when another effect owns scene capture');
+    if(!this.source&&!this.stacked&&(engine.hasPlugin('dof')||engine.hasPlugin('ssao')||engine.hasPlugin('post-processing')))throw new Error('Tonemap needs an explicit HDR source when another effect owns scene capture');
     this.engine=engine;
     this.uniform=engine.gpu.createBuffer({size:64,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
     this.uploadLUT();
@@ -73,6 +80,7 @@ export class Tonemap implements EnginePlugin {
     this.lutTexture=texture;this.group=undefined;previous?.destroy();
   }
   registerPasses(graph:FrameGraph):void {
+    if(this.stacked)return;
     graph.add({name:'tonemap:capture',order:-50,execute:c=>{if(c.backend==='webgpu')this.capture(c);}});
     graph.add({name:'tonemap:grade',order:31,execute:c=>{if(c.backend==='webgpu')this.grade(c);}});
   }
@@ -96,23 +104,25 @@ export class Tonemap implements EnginePlugin {
     const texture=this.source?this.source():this.scene;
     if(!texture||texture.width!==c.width||texture.height!==c.height||texture.dimension!=='2d'||texture.sampleCount!==1||
       texture.format!=='rgba16float'&&texture.format!=='rgba32float'||!(texture.usage&GPUTextureUsage.TEXTURE_BINDING))throw new Error('Tonemap requires a viewport-sized, sampleable linear HDR texture');
-    const format=this.source?c.format:this.format!;
-    const key=format+':'+c.descriptor.multisample?.count;
+    this.paint(c,texture,this.source?c.format:this.format!,c.descriptor.multisample,this.source?c.color:this.original!);
+    if(!this.source)this.captureTarget!.restore(c);
+  }
+  private paint(c:Context,source:GPUTexture|GPUTextureView,format:GPUTextureFormat,multisample:GPUMultisampleState|undefined,view:GPUTextureView):void {
+    const key=format+':'+multisample?.count;
     if(!this.pipeline||this.pipelineFormat!==key){
       const module=c.device.createShaderModule({code:tonemapShader});
-      this.pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format}]},multisample:c.descriptor.multisample});
+      this.pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format}]},multisample});
       this.pipelineFormat=key;this.group=undefined;
     }
-    if(!this.group||this.sourceTexture!==texture){
+    if(!this.group||this.sourceTexture!==source){
       this.group=c.device.createBindGroup({layout:this.pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform!}},
-        {binding:1,resource:texture.createView()},{binding:2,resource:this.lutTexture!.createView()}]});this.sourceTexture=texture;
+        {binding:1,resource:'createView' in source?source.createView():source},{binding:2,resource:this.lutTexture!.createView()}]});this.sourceTexture=source;
     }
     const v=this.values,o=this.options;v[0]=o.exposure??0;v[1]=o.contrast??1;v[2]=o.curve==='acescg'?1:o.curve==='neutral'?2:0;v[3]=+!!this.lut;
     for(let i=0;i<3;i++){v[4+i]=this.lut?.domainMin[i]??0;v[8+i]=this.lut?.domainMax[i]??1;}
     v[12]=+(o.inputColorSpace==='acescg');c.device.queue.writeBuffer(this.uniform!,0,v as Float32Array<ArrayBuffer>);
-    this.attachment.view=this.source?c.color:this.original!;
+    this.attachment.view=view;
     const pass=c.encoder.beginRenderPass(this.presentation);pass.setPipeline(this.pipeline);pass.setBindGroup(0,this.group);pass.draw(3);pass.end();
-    if(!this.source)this.captureTarget!.restore(c);
   }
   private captureTarget?:SceneTarget;private depth?:GPUTexture;
   private pipelineFormat?:string;
