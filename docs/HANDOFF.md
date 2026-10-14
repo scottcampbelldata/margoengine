@@ -232,8 +232,18 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       docs/README.md. Every Margo snippet (```ts blocks) is type-checked against the built packages by
       `tests/from-threejs-snippets.test.js` (part of the unit run). API rough edges found while writing are listed under
       "API rough edges before 1.0" below.
-   l. One-command start: `npm create margo` (or a StackBlitz template) opening a 60 FPS scene with environment
-      lighting, orbit controls and the stats overlay; build on the existing starter-vite.
+   l. [DONE, not published] One-command start: `npm create margo@latest my-app` (also pnpm/yarn/bun create).
+      `tools/create-margo` (not a workspace: tests/modern-support.test.js requires non-package workspaces to be
+      private), zero dependencies, no prompts, refuses a non-empty directory. Template: Vite + TypeScript, one
+      `src/main.ts` (quality tier before `Engine.create`, `paceEngine`, `watchQuality`, procedural-studio IBL +
+      blurred environment background, OrbitControls with damping, Stats overlay, torus knot/sphere/box on a pedestal;
+      resize is CSS-only), caret ranges on the 0.1.0 packages, README linking docs/from-threejs.md and
+      margoengine.com. Production bundle 36,180 bytes gzip (one JS file). `tests/create-margo.test.js` (in `verify`)
+      scaffolds into a temp dir and runs `tsc` + `vite build` against the local packages through node_modules
+      links; `node tools/create-margo/test/browser-check.mjs` (GPU lock) renders it under `vite` dev: passed on Arc
+      140V, Stats 60 FPS on the light tier. examples/vite (starter-vite) still builds against the current packages and
+      was left as is (its React page is the kitchen-sink demo). `npm view create-margo` was a 404 on 2026-10-14
+      (no such package; npm can still refuse a name at publish time); publish with `npm publish tools/create-margo` after the @margoengine packages.
 1g. Modernization (from the 2026-10-14 source scan; no legacy browser APIs, deprecated WebGPU calls or old WGSL found):
    a. [DONE] Drop the `webkitAudioContext` fallback in packages/audio/src/listener.ts (every WebGPU browser has AudioContext).
    b. Replace the `as any` casts with real types (decoders codec globals may stay; exporters/scene.ts, lod/index.ts,
@@ -406,6 +416,9 @@ Before launch, in addition to the work queue:
 - READMEs and getting-started docs for every package; licence and third-party notices checked.
 - API review of the change list before publishing 1.0 to npm.
 - Production deploy and npm publish only with Scott's go-ahead each time.
+- Publish create-margo (`npm publish tools/create-margo`, after the @margoengine packages its template depends on),
+  then check `npm create margo@latest my-app` from a clean directory and add the command to the README and the
+  margoengine.com getting-started page.
 
 ## Feature gaps versus three.js (after optimization; each as an optional package)
 
