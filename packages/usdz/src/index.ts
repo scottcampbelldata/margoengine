@@ -5,10 +5,12 @@ import {
   readZipEntry,
   fetchBytes,
   computeVertexNormals,
+  readUSDA,
   type BinaryInput,
+  type USDPrim,
+  type USDValue,
 } from "@margoengine/loaders";
-import { USDCParser } from "three/addons/loaders/usd/USDCParser.js";
-import { USDAParser } from "three/addons/loaders/usd/USDAParser.js";
+import { parseCrate, type Specs } from "./crate.js";
 
 export interface USDOptions {
   maxBytes?: number;
@@ -17,7 +19,6 @@ export interface USDOptions {
   maxDepth?: number;
   signal?: AbortSignal;
 }
-type Specs = Record<string, { specType: number; fields: Record<string, any> }>;
 export interface USDMesh {
   path: string;
   positions: Float32Array;
@@ -92,204 +93,44 @@ function pathName(name: string, base = ""): string {
   }
   return parts.join("/");
 }
-class AsciiParser extends USDAParser {
-  _parseAttributeValue(type: string, value: unknown): any {
-    if (
-      type.endsWith("[]") &&
-      /^(?:point|normal|texCoord|float|double|int|uint|color)\d?[fd]?\[\]$/.test(
-        type,
-      )
-    ) {
-      const text = String(value),
-        pattern = /[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/g;
-      let count = 0;
-      while (pattern.exec(text)) count++;
-      if (count > 16_000_000) fail("ASCII numeric stream exceeds limit");
-      const result = type.startsWith("int")
-        ? new Int32Array(count)
-        : type.startsWith("uint")
-          ? new Uint32Array(count)
-          : new Float32Array(count);
-      pattern.lastIndex = 0;
-      let match,
-        index = 0;
-      while ((match = pattern.exec(text))) {
-        const value = Number(match[0]);
-        if (
-          !Number.isFinite(Math.fround(value)) ||
-          (/^(u?int)/.test(type) &&
-            (!Number.isSafeInteger(value) ||
-              value < -2147483648 ||
-              value > 4294967295 ||
-              (type.startsWith("uint") && value < 0)))
-        )
-          fail("invalid ASCII numeric value");
-        result[index++] = value;
-      }
-      return result;
+/** USDA prim tree (shared tokenizer from @margoengine/loaders) to the same spec map the Crate reader produces. */
+function asciiSpecs(text: string, maxDepth: number, signal?: AbortSignal): Specs {
+  const layer = readUSDA(text, { maxDepth, signal, assets: true, skipOver: true });
+  const plain = (v: USDValue): any => Array.isArray(v) ? (v.every(e => typeof e === "number" || Array.isArray(e)) ? (v as unknown[]).flat(Infinity) : v.map(plain)) : v && typeof v === "object" ? ("asset" in v ? v.asset : v.path) : v;
+  const paths = (v: USDValue) => (Array.isArray(v) ? v : [v]).map(plain).filter(p => typeof p === "string");
+  const specs: Specs = { "/": { specType: 7, fields: Object.fromEntries([...layer.metadata].map(([k, v]) => [k, plain(v)])) } };
+  const visit = (prim: USDPrim) => {
+    specs[prim.path] = { specType: 6, fields: { typeName: prim.type, ...Object.fromEntries([...prim.metadata].map(([k, v]) => [k, plain(v)])) } };
+    const property = (name: string) => (specs[prim.path + "." + name] ??= { specType: 1, fields: {} }).fields;
+    for (const [key, v] of prim.attrs) {
+      if (key.endsWith(".connect")) property(key.slice(0, -8)).connectionPaths = paths(v);
+      else if (v && typeof v === "object" && ("path" in v || Array.isArray(v) && v.length && v.every(e => e && typeof e === "object" && "path" in e))) property(key).targetPaths = paths(v);
+      else property(key).default = plain(v);
     }
-    return super._parseAttributeValue(type, value);
-  }
-  _extractPrimData(
-    data: any,
-    path: string,
-    fields: any,
-    specs: any,
-    types: any,
-  ): void {
-    super._extractPrimData(data, path, fields, specs, types);
-    for (const symbol of Object.getOwnPropertySymbols(data))
-      for (const [key, metadata] of Object.entries(data[symbol]) as [
-        string,
-        any,
-      ][]) {
-        const name = key.trim().split(/\s+/).at(-1),
-          spec = specs[path + "." + name];
-        if (spec && metadata.interpolation)
-          spec.fields.interpolation = String(metadata.interpolation).replace(
-            /"/g,
-            "",
-          );
-      }
-  }
-}
-class CrateParser extends USDCParser {
-  private decoded = 0;
-  constructor(private readonly maxBytes: number) {
-    super();
-  }
-  _readBootstrap(): void {
-    super._readBootstrap();
-    if (
-      this.version.major !== 0 ||
-      this.version.minor < 4 ||
-      this.version.minor > 12
-    )
-      fail("unsupported Crate version");
-    const reader = this.reader,
-      read = reader.readUint64.bind(reader),
-      seek = reader.seek.bind(reader);
-    reader.readUint64 = () => {
-      const value = read();
-      if (!Number.isSafeInteger(value) || value > this.maxBytes)
-        fail("Crate count or size exceeds limit");
-      return value;
-    };
-    reader.seek = (offset: number) => {
-      if (
-        !Number.isSafeInteger(offset) ||
-        offset < 0 ||
-        offset > this.buffer.byteLength
-      )
-        fail("Crate offset outside layer");
-      seek(offset);
-    };
-  }
-  _readTOC(): void {
-    if (this.reader.view.getBigUint64(this.tocOffset, true) > 32n)
-      fail("too many Crate sections");
-    super._readTOC();
-    for (const section of Object.values(this.sections) as any[]) {
-      if (
-        section.start < 24 ||
-        section.size < 8 ||
-        section.start + section.size > this.buffer.byteLength
-      )
-        fail("Crate section outside layer");
-      if (
-        this.reader.view.getBigUint64(section.start, true) >
-        BigInt(Math.floor(this.maxBytes / 32))
-      )
-        fail("Crate table exceeds limit");
-    }
-  }
-  _readArrayValue(rep: any): any {
-    const offset = this.reader.tell(),
-      count =
-        this.version.minor < 7
-          ? this.reader.view.getUint32(offset, true)
-          : Number(this.reader.view.getBigUint64(offset, true));
-    const components =
-      rep.typeEnum === 15
-        ? 16
-        : rep.typeEnum >= 19 && rep.typeEnum <= 30
-          ? Math.floor((rep.typeEnum - 19) / 4) + 2
-          : rep.typeEnum >= 16 && rep.typeEnum <= 18
-            ? 4
-            : 1;
-    this.decoded += count * components * 8;
-    if (
-      !Number.isSafeInteger(count) ||
-      count < 0 ||
-      this.decoded > this.maxBytes
-    )
-      fail("decoded Crate streams exceed limit");
-    return super._readArrayValue(rep);
-  }
-  _readValue(rep: any): any {
-    if (
-      (rep.typeEnum >= 45 && ![51].includes(rep.typeEnum)) ||
-      rep.typeEnum === 31 ||
-      [35, 47, 55].includes(rep.typeEnum)
-    )
-      fail("composition, animation or unsupported Crate value");
-    return super._readValue(rep);
-  }
-  _readInlinedValue(rep: any): any {
-    // Three's parser omits inlined double vectors and three/four-component half vectors.
-    if ([19, 23, 27, 25, 29].includes(rep.typeEnum)) {
-      const count = Math.floor((rep.typeEnum - 19) / 4) + 2,
-        out = new Float32Array(count),
-        value = rep.getInlinedValue();
-      for (let i = 0; i < count; i++) out[i] = (value << (24 - i * 8)) >> 24;
-      return out;
-    }
-    return super._readInlinedValue(rep);
-  }
+    for (const [key, meta] of prim.properties) Object.assign(property(key.replace(/\.connect$/, "")), Object.fromEntries([...meta].map(([k, v]) => [k, plain(v)])));
+    prim.children.forEach(visit);
+  };
+  layer.roots.forEach(visit);
+  return specs;
 }
 function parseLayer(input: string | BinaryInput, options: USDOptions): Specs {
-  const limits = budget(options),
-    data =
-      typeof input === "string"
-        ? new TextEncoder().encode(input)
-        : bytes(input);
+  const limits = budget(options), data = typeof input === "string" ? new TextEncoder().encode(input) : bytes(input);
   if (data.length > limits.maxBytes) fail("layer exceeds byte budget");
   let specs: Specs;
   if (new TextDecoder().decode(data.subarray(0, 8)) === "PXR-USDC") {
     if (data.length < 88) fail("truncated Crate bootstrap");
-    const offset = new DataView(
-      data.buffer,
-      data.byteOffset,
-      data.byteLength,
-    ).getBigUint64(16, true);
+    const offset = new DataView(data.buffer, data.byteOffset, data.byteLength).getBigUint64(16, true);
     if (offset > BigInt(data.length - 8)) fail("Crate TOC outside layer");
-    const buffer =
-      data.byteOffset === 0 && data.byteLength === data.buffer.byteLength
-        ? data.buffer
-        : data.slice().buffer;
-    specs = new CrateParser(limits.maxBytes).parseData(
-      buffer as ArrayBuffer,
-    ).specsByPath;
+    specs = parseCrate(data, limits.maxBytes);
   } else {
     const text = new TextDecoder("utf-8", { fatal: true }).decode(data);
     if (!text.startsWith("#usda 1.0")) fail("expected USDA or USDC");
-    if (
-      /\b(?:references|payload|subLayers|inherits|specializes|variantSet|timeSamples|instanceable)\b/.test(
-        text,
-      )
-    )
-      fail("composition and animation are unsupported");
-    specs = new AsciiParser().parseData(text).specsByPath;
+    if (/\b(?:references|payload|subLayers|inherits|specializes|variantSet|timeSamples|instanceable)\b/.test(text)) fail("composition and animation are unsupported");
+    specs = asciiSpecs(text, limits.maxDepth, options.signal);
   }
   for (const [path, spec] of Object.entries(specs)) {
-    if (path.split("/").length > limits.maxDepth + 2)
-      fail("hierarchy exceeds depth limit");
-    if (
-      spec.fields.references ||
-      spec.fields.payload ||
-      spec.fields.timeSamples
-    )
-      fail("composition and animation are unsupported");
+    if (path.split("/").length > limits.maxDepth + 2) fail("hierarchy exceeds depth limit");
+    if (spec.fields.references || spec.fields.payload || spec.fields.timeSamples) fail("composition and animation are unsupported");
   }
   return specs;
 }

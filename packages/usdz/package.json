@@ -6,8 +6,7 @@
   "description": "Optional static USDA, USDC and USDZ ingestion through Margo glTF PBR.",
   "sideEffects": false,
   "files": [
-    "dist",
-    "THIRD-PARTY-NOTICES.txt"
+    "dist"
   ],
   "exports": {
     ".": {
