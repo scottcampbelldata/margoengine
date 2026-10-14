@@ -80,6 +80,16 @@ Five parallel workers reviewed 58 packages against baseline `f05414a`; Claude ve
 
 ## Work queue Scott approved (2026-10-14), in order
 
+Global rules: core + stage does not grow without Scott's say-so (limit 20,000; currently 18,554). Real-GPU browser
+checks and benchmarks run one at a time: take the lock with `mkdir C:\Dev\Projects\margo-engine	est-results\gpu.lock`
+(fails if held; wait and retry), remove it when done; never measure while other GPU work runs.
+
+0. Verification gates (serial, idle GPU): shader `browser-check.mjs` re-run; LOD/imposter 2,500-object benchmark on a
+   quiet GPU; post full stack (SSAO+DOF+Bloom+Tonemap+FXAA) in a real scene, visuals and frame time; native FBX/USD in a
+   real browser plus a memory audit (models unloaded/switched destroy their GPU buffers, no leaks); move
+   `test-results/three-size.mjs` to `scripts/` with a package script. (Security review: later commit reviews in the
+   security log report clean; the one timeout was the service being busy.)
+
 Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (`c82e119`), WebGL renderer moved to
 `@margoengine/webgl` (`1356787`; core + stage 18,554 gzip), `@margoengine/math` (`88517f8`).
 
@@ -94,6 +104,11 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    octahedral imposters, texture atlases (needs texture transforms in materials), vertex animation textures for
    GPU crowds. Imposters and LOD first; they serve CAD/simulator scenes and landing pages alike. Compute nodes belong
    in the 1b shader package.
+1d'. Imposter atlas seams: check cell padding/clamping so mips don't bleed between views, and that blending across
+   the three nearest views has no snapping while rotating.
+1d''. Pipeline cache keyed by shader module + override-constant bitmask, with common permutations pre-warmed, so
+   toggling a section plane or fog never stalls on a synchronous compile (pairs with 1e.f).
+1d'''. Ambient occlusion attenuates image-based lighting (environment IBL), not only the constant ambient term.
 1d. Imposter picking: once the glTF picking worker merges, let a raycast that reaches an object in its imposter level
    accept the bounding-sphere/box hit (distant cards have no triangles). LOD screen levels already follow orthographic
    zoom (done).
@@ -139,6 +154,13 @@ default to an old base). Do not junction the whole node_modules (then `@margoeng
 packages): make a real `node_modules` folder holding junctions to the main checkout's third-party packages and
 `@margoengine/*` junctions to the worktree's own packages. Never run a full `npm install` in a worktree; lockfile only
 via `npm install --package-lock-only --offline --no-audit --no-fund --ignore-scripts`.
+
+## Pre-launch hardware investigation
+
+- Galaxy S23 (Adreno) 3-5 FPS on the island: audit every render pass's load/store ops; attachments that are not read
+  later should use `storeOp: 'discard'` (on tile-based mobile GPUs a needless store flushes tile memory every frame).
+  This is a lead to test, not a confirmed cause: particles Off did not help there and other demos run fine on that
+  phone. Needs a capture from the device to confirm.
 
 ## Launch readiness (Hacker News, YouTube, LinkedIn, X; npm is set up, margoengine.com is live)
 
