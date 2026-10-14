@@ -87,7 +87,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    FXAA [done: `@margoengine/post/stack`, `@margoengine/post/fxaa`; SMAA not done], raycast/pick glTF models + DragControls [running], environment IBL apply + background colour + fog [done `269401e`: EnvironmentLighting, Fog, ColorBackground, UltraHDR; light probes (gap 44) and SSAO-on-IBL left],
    orthographic/vertical cameras without core change [done: `@margoengine/cameras`; SSAO, lines/points widths, labels,
    clustered, DOF and splats still assume perspective], WebGL beyond core (gap 8: scope with Scott first).
-1b. [running] Composable shader nodes (`@margoengine/shader`, parity gap 19), moved up after Scott noted three.js's TSL /
+1b. [done `ed83cb6`; GPU check passed in the worker's tree, re-run on the merged branch pending] Composable shader nodes (`@margoengine/shader`, parity gap 19), moved up after Scott noted three.js's TSL /
    RenderPipeline node workflows (r183 RenderPipeline, r186 pipeline hooks): small typed nodes compiling to WGSL for
    materials and post effects, built on the materials package and the post stack once both APIs settle.
 1c. [LOD + imposters running] Production optimizations (from Scott's three.js conference recap, Paris, Sept 2026): general LOD object (gap 18),
@@ -191,6 +191,8 @@ Built and deployed to the preview, not yet measured:
    `npm run test:all`, then commit or revert. It type-checks; nothing else about it has been run.
 
 ## Known issues and caveats
+- Pending re-verification on the merged branch once workers are idle: `node packages/shader/test/browser-check.mjs`
+  (stalled at browser launch while other GPU checks ran), plus each merged package's own `browser-check.mjs`.
 - Engine logic moved out of demos (not yet run in a browser): frame pacing `frameDue`/`frameStatus` ->
   `@margoengine/quality`; Citadel `NightAtmosphere` -> `@margoengine/scenery`; Earth `Stars` -> `@margoengine/creative/stars`.
   Verify with `node scripts/modern-night-citadel-tests.js` and by opening the Earth demo.
