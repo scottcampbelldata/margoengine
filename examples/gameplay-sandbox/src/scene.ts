@@ -3,12 +3,12 @@ import {toGeometry} from '@margoengine/geometry';
 import {createIslandHeight, createHumanoid} from '@margoengine/procedural';
 import {TerrainColors, TerrainHeightmap, heightfieldGeometry} from '@margoengine/terrain';
 import type {Shadows} from '@margoengine/shadows';
-import {sceneSamples} from '../../../packages/shared/quality.js';
 export const ISLAND_SIZE = 160;
 export const terrainHeight = createIslandHeight(731);
 
 export function createLandscape(engine: EngineKernel, shadows: Shadows, wetDepth?: () => GPUTexture | undefined) {
-  const mobile = sceneSamples() === 1;
+  // Terrain and the coastal simulation grid shape the shoreline surf, so only real phones reduce them.
+  const mobile = /Mobi|Android/.test(globalThis.navigator?.userAgent ?? '');
   const data = heightfieldGeometry(terrainHeight,{size: [ISLAND_SIZE,ISLAND_SIZE], resolution: mobile ? 96 : 192});
   const mesh = engine.createMesh().setGeometry(toGeometry(data)).setMaterial(new PbrMaterial({color: '#536b49', roughness: 0.95}));
   mesh.name = 'Island terrain'; shadows.add(mesh, {static: true});
