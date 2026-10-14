@@ -101,7 +101,9 @@ test('PBR culls authored single-sided faces in every pass and reuses mirrored an
     assert.equal(draws('beauty')[0].pipeline.primitive.cullMode, 'back');
     model.nodes[1].scale.x = -1; engine.store.tick(false);
     assert.equal(draws('beauty')[0].pipeline.primitive.cullMode, 'front');
-    assert.equal(pipelines.length, initial + 1, 'Changing determinant or restoring sidedness must reuse existing variants');
+    // MASK alpha-tests (margoAlphaTest constant), so its back-culled variant is its own, not the OPAQUE primitive's.
+    assert.equal(pipelines.length, initial + 2, 'Changing determinant or restoring sidedness must reuse existing variants');
+    assert.deepEqual(pipelines.slice(-2).map(p => p.fragment.constants), [{margoFaceTest: 0, margoAlphaTest: 1}, {margoFaceTest: 0, margoAlphaTest: 1}]);
     const local = engine.gpu.createBuffer({size: 16, usage: GPUBufferUsage.UNIFORM});
     model.addLighting({shader: source => '@group(2) @binding(4) var<uniform> local:vec4f;\n' + source.replace('direct+ambient(s)', 'direct*local.x+ambient(s)'), bindings: () => [{binding: 4, resource: {buffer: local}}]});
     const beforeLighting = pipelines.length, lit = draws('beauty');

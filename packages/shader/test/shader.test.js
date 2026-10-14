@@ -101,7 +101,7 @@ test('NodeMaterial draws through materials and gltf-pro with node bindings; unif
     const beauty = () => h.pipelines.filter(p => p.fragment?.entryPoint === 'fragment' && p.vertex.buffers?.length), code = beauty().map(p => p.vertex.module.code).find(s => s.includes('NdUniforms'));
     assert.ok(code, 'node material pipeline'); assert.equal(beauty().length, 2, 'plain material keeps its own pipeline');
     assert.match(code, /^@group\(2\) @binding\(48\) var ndt0:texture_2d<f32>;\n@group\(2\) @binding\(49\) var ndt0s:sampler;\nstruct NdUniforms \{\n  strength:f32,\n\}\n@group\(2\) @binding\(50\) var<uniform> ndu:NdUniforms;/);
-    assert.match(code, /s\.base = vec4f\(\(textureSample\(ndt0, ndt0s, i\.uv\.xy\)\.xyz \* s\.base\.xyz\) \* ndu\.strength, s\.base\.a\);\n  s\.base\.a = ndu\.strength;\n  if\(!facing/);
+    assert.match(code, /s\.base = vec4f\(\(textureSample\(ndt0, ndt0s, i\.uv\.xy\)\.xyz \* s\.base\.xyz\) \* ndu\.strength, s\.base\.a\);\n  s\.base\.a = ndu\.strength;\n  if\(margoFaceTest&&!facing/);
     assert.ok(code.includes('textureSample(mat_baseMap,'), 'materials maps still apply');
     const group = h.groups.findLast(g => g.entries.some(e => e.binding === 50)), buffer = group.entries.find(e => e.binding === 50).resource.buffer;
     assert.equal(group.entries.find(e => e.binding === 48).resource.texture.format, 'rgba8unorm-srgb', 'texture() binds the shared materials Texture');
@@ -121,7 +121,7 @@ test('node overrides patch both gltf-pro shader variants (standard and physical)
   const m = new NodeMaterial({colorNode: vec3(1, 0, 0), positionNode: positionLocal.mul(2), emissiveNode: varying(normalLocal)});
   for (const source of [pbrShader, physicalShader()]) {
     const code = m.shader(source, 2);
-    assert.ok(code.includes('  s.base = vec4f(vec3f(1.0, 0.0, 0.0), s.base.a);\n  s.emissive = i.ndv0;\n  if(!facing&&f.settings.z<0.5){discard;}'));
+    assert.ok(code.includes('  s.base = vec4f(vec3f(1.0, 0.0, 0.0), s.base.a);\n  s.emissive = i.ndv0;\n  if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}'));
     assert.ok(code.includes('let p=f.model*vec4f(i.position.xyz * 2.0,1);\n  o.ndv0 = i.normal.xyz;') && code.includes('@location(8) ndv0:vec3f\n}'));
     assert.equal(m.shader(source, 2), code, 'cached per source');
   }

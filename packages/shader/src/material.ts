@@ -29,7 +29,7 @@ const fragment:Stage={kind:'fragment',builtins:{uv:'i.uv.xy',vertexColor:'i.colo
     if(i<0){if(list.length>=maxVaryings)throw new RangeError(`NodeMaterial supports ${maxVaryings} varyings`);i=list.push(x)-1;}
     return b.local('i.ndv'+i);
   }};
-const fragmentSite='if(!facing&&f.settings.z<0.5){discard;}',vertexSite='let p=f.model*vec4f(i.position.xyz,1);';
+const fragmentSite='if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}',vertexSite='let p=f.model*vec4f(i.position.xyz,1);';
 
 /**
  * A `@margoengine/materials` Material whose colour, opacity, roughness, metalness, emissive, normal and vertex position come from

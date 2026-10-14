@@ -75,7 +75,7 @@ test('Material subclasses extend the shader patch and bindings that createMesh i
   try {
     let engine;
     class Tinted extends Material {
-      shader(source,group){return super.shader(source,group).replace('if(!facing&&f.settings.z<0.5){discard;}','s.base=vec4f(1,0,0,1);\n  if(!facing&&f.settings.z<0.5){discard;}');}
+      shader(source,group){return super.shader(source,group).replace('if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}','s.base=vec4f(1,0,0,1);\n  if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}');}
       bindings(device,e){engine=e;return super.bindings(device,e);}
     }
     const model=createMesh(s.engine,boxGeometry(1,1,1),new Tinted());s.frame();

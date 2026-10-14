@@ -2,7 +2,7 @@
 // fog used to find their places in gltf-pro's WGSL by text search; now each hands gltf-pro a `pbr(group)` contribution and
 // gltf-pro composes it. A 14-frame story (effects added in different orders, a text-patching custom effect in between, the
 // environment going away and back, removals, an HDR and a canvas target, MSAA 1x/4x, beauty/SSAO-ambient/G-buffer draws, the
-// standard, physical, unlit, masked and blended materials) records every GPU call, descriptor, shader module and buffer
+// standard, physical, unlit and blended materials) records every GPU call, descriptor, shader module and buffer
 // write of gltf-pro + shadows + clustered + environment at `ref` and in the working tree: they must be identical.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/gltf-pro-lighting-hooks.proof.js [ref]
 import assert from 'node:assert/strict';
@@ -15,7 +15,7 @@ const ref = process.argv[2] ?? '15c87f1';
 const load = async () => {const all = await Promise.all(['gltf-pro', 'shadows', 'clustered', 'environment'].map(name => versions(name, ref))); return ['baseline', 'candidate'].map(k => all.map(v => v[k]));};
 const [baseline, candidate] = await load();
 const materials = [{alphaMode: 'OPAQUE'}, {alphaMode: 'BLEND', pbrMetallicRoughness: {baseColorFactor: [1, 1, 1, 0.5]}}, {extensions: {KHR_materials_clearcoat: {clearcoatFactor: 1}}},
-  {extensions: {KHR_materials_unlit: {}}}, {alphaMode: 'MASK', alphaCutoff: 0.3}];
+  {extensions: {KHR_materials_unlit: {}}}];
 
 async function story([gltf, shadowsModule, clusteredModule, environment], samples) {
   const gpu = mockGPU(), store = await TransformStore.create(32), canvas = {width: 128, height: 96, clientWidth: 128, clientHeight: 96};
@@ -52,9 +52,12 @@ async function story([gltf, shadowsModule, clusteredModule, environment], sample
   return log;
 }
 
+// The later discard constants (1e.f, own pixel proof on the real GPU) are normalized away: the override declarations, their
+// use in the two discard tests and the fragment constants (masked materials are left out, since they now get their own pipeline).
+const plain = log => JSON.parse(JSON.stringify(log).replace(/override margoFaceTest:bool=true;\\noverride margoAlphaTest:bool=true;\\n/g, '').replaceAll('margoFaceTest&&', '').replaceAll('margoAlphaTest&&', '').replace(/\"constants\":\{\"margoAlphaTest\":0,\"margoFaceTest\":0\},/g, ''));
 let calls = 0, modules = 0;
 for (const samples of [1, 4]) {
-  const expected = await story(baseline, samples), actual = await story(candidate, samples);
+  const expected = plain(await story(baseline, samples)), actual = plain(await story(candidate, samples));
   const shaders = expected.filter(entry => entry[0] === 'module');
   assert.ok(shaders.some(entry => /shadowLit\(direct/.test(entry[2].code) && /clusterLighting\(/.test(entry[2].code) && /let margoAmbient=/.test(entry[2].code) && /fogAmount\(/.test(entry[2].code) && /\/\/ custom/.test(entry[2].code)), 'story must compose every effect');
   assert.ok(!expected.some(entry => entry[0] === 'throw'), 'no draw may throw');
