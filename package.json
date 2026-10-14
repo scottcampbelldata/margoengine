@@ -88,6 +88,7 @@
     "dev:sandbox": "vite examples/gameplay-sandbox",
     "build:packages": "node scripts/build-modern.js --precompiled && npm run build --workspace packages --if-present",
     "measure:size": "node scripts/measure-size.js",
+    "measure:threejs": "node scripts/compare-threejs-size.js",
     "pack:packages": "npm run build:packages && npm pack --workspace packages --ignore-scripts --pack-destination test-results",
     "package:blender": "python tools/blender-addon/package_addon.py",
     "modern:build": "node scripts/build-modern.js",
