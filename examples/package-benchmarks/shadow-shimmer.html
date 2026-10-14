@@ -1,0 +1,48 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Shadow shimmer</title><style>body{margin:0}canvas{display:block;width:800px;height:600px}</style></head><body><canvas></canvas>
+<script type="module">
+// Driven by shadow-shimmer.mjs. A CAD-like scene (thin posts, a slanted beam, plates) on a floor under cascaded shadows.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {CameraProjection} from '/packages/cameras/dist/index.js';
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[10,12,10],target:[0,0,0],near:0.1,far:200}}),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const grey=new PbrMaterial({color:'#c0c0c0',roughness:0.9}),part=new PbrMaterial({color:'#7088a0',roughness:0.6}),meshes=[];
+const add=(size,position,rotation=[0,0,0],material=part)=>{const m=engine.createMesh().setGeometry(box(...size)).setMaterial(material).setPosition(position).setRotation(rotation);meshes.push(m);return m;};
+add([40,0.1,40],[0,-0.05,0],undefined,grey);
+for(let i=-2;i<=2;i++)for(let j=-2;j<=2;j++)add([0.15,2+((i+j+4)%3)*0.7,0.15],[i*1.7,1+((i+j+4)%3)*0.35,j*1.7]);
+add([8,0.12,0.3],[0,2.6,0.4],[0,0.4,0.25]);add([2,0.05,1.4],[-3,1.2,3],[0.3,0,0]);add([1.6,0.05,1.6],[3,0.8,-3.2],[0,0.7,0.2]);
+const lighting=engineRuntime(engine).lighting;lighting.direction[0]=0.45;lighting.direction[1]=1;lighting.direction[2]=0.3;
+const shadows=Shadows.attach(engine,{resolution:2048,distance:60});let removers=meshes.map(m=>shadows.add(m));
+const projection=new CameraProjection({height:12});engine.use(projection);
+// Frozen fit: the shadow pass sees a reference camera, so its cascades come from the sequence's first camera. With
+// texel snapping the shadow-map texel lattice is world-locked, so a panned frame must match it pixel for pixel.
+const render=shadows.render.bind(shadows);let frozen=null;shadows.render=c=>render(frozen?{...c,camera:frozen}:c);
+const base={position:[10,12,10],target:[0,0,0]};
+const basis=()=>{const p=base.position,t=base.target,f=t.map((v,i)=>v-p[i]),l=Math.hypot(...f),n=f.map(v=>v/l),up=[0,1,0];
+  let r=[n[1]*up[2]-n[2]*up[1],n[2]*up[0]-n[0]*up[2],n[0]*up[1]-n[1]*up[0]];const s=Math.hypot(...r);r=r.map(v=>v/s);return {r,n};};
+const camera=engine.camera;
+window.shimmer={
+  /** state: {mode, pan (pixels at zoom 1 / world 0.02 per px), dolly (fraction of the distance), zoom, frozen, shadows, light} */
+  async set({mode='orthographic',pan=0,dolly=0,zoom=1,frozen:freeze=false,shadows:on=true,light=0}){
+    projection.mode=mode;projection.zoom=zoom;const {r,n}=basis(),step=12/600*pan;
+    const at=(p,d)=>p.map((v,i)=>v+r[i]*step+n[i]*d);const distance=Math.hypot(...base.position.map((v,i)=>v-base.target[i]));
+    camera.position=at(base.position,dolly*distance);camera.target=at(base.target,0);
+    frozen=freeze?{fov:camera.fov,near:camera.near,far:camera.far,position:at(base.position,dolly*distance).map((v,i)=>v-r[i]*step),target:base.target,up:[0,1,0]}:null;
+    // Light rotation about y (control): degrees.
+    const a=light*Math.PI/180;lighting.direction[0]=0.45*Math.cos(a)-0.3*Math.sin(a);lighting.direction[2]=0.45*Math.sin(a)+0.3*Math.cos(a);
+    if(!on&&removers.length){for(const remove of removers)remove();removers=[];}if(on&&!removers.length)removers=meshes.map(m=>shadows.add(m));
+    device.pushErrorScope('validation');for(let i=0;i<2;i++){engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();}const e=await device.popErrorScope();
+    return {error:e?.message??null,errors:errors.splice(0),matrices:[...shadows.matrices],cacheHits:shadows.stats.cacheHits,samples:globalThis.margoLow?1:4};
+  },
+  /** Orthographic only: the cascade each pixel's floor point (y = 0) falls in, base64 bytes, row-major. */
+  cascades(){
+    const W=engine.canvas.width,H=engine.canvas.height,p=camera.position,t=camera.target,f=t.map((v,i)=>v-p[i]),d=Math.hypot(...f),n=f.map(v=>v/d);
+    let r=[-n[2],0,n[0]];const s=Math.hypot(...r);r=r.map(v=>v/s);const u=[r[1]*n[2]-r[2]*n[1],r[2]*n[0]-r[0]*n[2],r[0]*n[1]-r[1]*n[0]];
+    const half=12/projection.zoom/2,out=new Uint8Array(W*H),split=shadows.splits;
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const sx=(2*(x+0.5)/W-1)*half*W/H,sy=(1-2*(y+0.5)/H)*half,py=t[1]+r[1]*sx+u[1]*sy,depth=d-py/n[1];out[y*W+x]=(depth>split[0])+(depth>split[1])+(depth>split[2])+(depth>split[3]);}
+    let text='';for(let i=0;i<out.length;i+=8192)text+=String.fromCharCode(...out.subarray(i,i+8192));return btoa(text);
+  },
+};
+window.ready=true;
+</script></body></html>

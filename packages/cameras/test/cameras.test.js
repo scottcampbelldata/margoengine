@@ -22,7 +22,7 @@ test('orthographic projection matches three.js OrthographicCamera, including zoo
   const {camera,p}=ortho({left:-4,right:2,top:3,bottom:-1,near:1,far:21,zoom:2});
   camera.update(1.5,true);const m=camera.matrix;
   assert.ok(!m[3]&&!m[7]&&!m[11]&&m[15]===1,'w row is constant');
-  // three.js: dx=(r-l)/(2 zoom), cx=(r+l)/2 → visible x in [cx-dx,cx+dx] = [-2.5,0.5], y in [0,2]; aspect ignored.
+  // three.js: dx=(r-l)/(2 zoom), cx=(r+l)/2 â†’ visible x in [cx-dx,cx+dx] = [-2.5,0.5], y in [0,2]; aspect ignored.
   assert.ok(near(ndc(m,[-2.5,0,0]).slice(0,2),[-1,-1])&&near(ndc(m,[0.5,2,5]).slice(0,2),[1,1]));
   p.zoom=1;camera.update(0.3,true);assert.ok(near(ndc(camera.matrix,[2,3,-7]).slice(0,2),[1,1]),'explicit bounds keep three.js semantics on resize');
 });
@@ -153,6 +153,33 @@ test('an exact top-down view reaches shared viewMatrix, labels and points throug
     assert.ok(frame,'points wrote its frame uniform');
     assert.ok(near([...frame.subarray(24,36)],[shared[0],shared[4],shared[8],0,shared[1],shared[5],shared[9],0,shared[2],shared[6],shared[10],0]),'points camera basis');
   } finally {e.dispose();h.cleanup();}
+});
+
+test('fit takes model.bounds: orthographic sets zoom to the box outline, keeps direction and distance, animates', () => {
+  const bounds=[-3,0,-1,5,2,1],corners=[];for(let i=0;i<8;i++)corners.push([bounds[i&1?3:0],bounds[i&2?4:1],bounds[i&4?5:2]]);
+  const extent=m=>Math.max(...corners.flatMap(c=>ndc(m,c).slice(0,2).map(Math.abs)));
+  for(const options of [{height:4},{},{left:-4,right:2,top:3,bottom:-1}]){
+    const {camera,p}=ortho(options,new Camera({position:[6,7,9],target:[0,0,0],fov:50,far:100})),offset=[6,7,9];
+    p.fit(new Float32Array(bounds),{aspect:2,duration:0,padding:1.25});camera.update(2,true);
+    assert.ok(Math.abs(extent(camera.matrix)-0.8)<1e-5,`${JSON.stringify(options)}: outline touches 1/padding (${extent(camera.matrix)})`);
+    assert.ok(near(ndc(camera.matrix,[1,1,0]).slice(0,2),[0,0],1e-6),'box centre at the view centre');
+    assert.ok(near(camera.position.map((v,i)=>v-camera.target[i]),offset,1e-9),'direction and distance unchanged');
+  }
+  // Animated: halfway after half the duration (smoothstep), exact at the end; zoom interpolates geometrically.
+  const {camera,p}=ortho({height:4},new Camera({position:[0,0,10],target:[0,0,0]}));p.fit([-1,-1,-1,1,1,1],{aspect:1,duration:0.4,padding:1});
+  assert.equal(p.zoom,1);p.onPreUpdate(0.2);assert.ok(Math.abs(p.zoom-2**0.5)<1e-9);p.onPreUpdate(0.3);assert.ok(Math.abs(p.zoom-2)<1e-9);
+  p.fit([4,4,4,6,6,6],{duration:0,padding:1});assert.deepEqual([...camera.target],[5,5,5]);assert.ok(Math.abs(p.zoom-2)<1e-9);
+  assert.throws(()=>p.fit([0,0,0,1,1]),/Invalid fit/);assert.throws(()=>p.fit([1,0,0,0,1,1]),/Invalid fit/);assert.throws(()=>p.fit([0,0,0,0,0,0],{duration:0}),/Invalid fit/);
+  assert.throws(()=>p.fit([-600,0,0,600,1,1]),/exceed far/);assert.throws(()=>new CameraProjection().fit(bounds),/not attached/);
+});
+
+test('fit in perspective is core fitToBoundingBox with the engine aspect; orthographic fit runs from the engine frame', async () => {
+  const reference=new Camera({position:[3,4,5],target:[0,1,0]});reference.fitToBoundingBox([-1,0,-2],[1,3,2],{aspect:2,duration:0,padding:1.2});
+  const {camera,p}=ortho({mode:'perspective'},new Camera({position:[3,4,5],target:[0,1,0]}));p.fit([-1,0,-2,1,3,2],{aspect:2,duration:0,padding:1.2});
+  assert.deepEqual([...camera.position],[...reference.position]);assert.deepEqual([...camera.target],[...reference.target]);
+  const projection=new CameraProjection({height:4}),{e}=await engine(projection);
+  projection.fit([-4,-1,-1,4,1,1],{padding:1});e.render({delta:1});e.camera.update(2,true);
+  assert.ok(Math.abs(ndc(e.camera.matrix,[4,0,0])[0]-1)<1e-6,'canvas aspect 2: the 8-wide box fills the width');e.dispose();
 });
 
 test('labels lookAtView and shared viewMatrix match core for the default up', () => {

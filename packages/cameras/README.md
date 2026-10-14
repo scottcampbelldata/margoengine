@@ -16,7 +16,15 @@ projection.mode = 'perspective';             // toggle at any time; vertical vie
 projection.mode = 'orthographic';
 projection.height = 12;                      // or fix the visible world height (resize widens with the aspect)
 projection.zoom = 2;
+projection.fit(model.bounds);                // frame a box: [minX, minY, minZ, maxX, maxY, maxZ], animated
 ```
+
+- **Fitting**: `fit(bounds, {aspect, duration, padding})` takes the flat bounds array models carry (no slicing into
+  min/max). Orthographic: the view direction and distance stay, the box centre moves to the view centre and `zoom` is
+  set so the box's projected outline (not a bounding sphere) fills the view less `padding` (default 1.1), honouring
+  `height` or `left`/`right`/`top`/`bottom`. Perspective: core's `fitToBoundingBox`. `aspect` defaults to the engine
+  canvas, `duration` to 0.3 s; the engine advances the animation (after `attach(camera)` call `onPreUpdate(delta)`
+  yourself). Throws `Bounds exceed far` when the box does not fit the default depth range (`camera.far` deep).
 
 - **Parameters** follow three.js `OrthographicCamera`: `left`, `right`, `top`, `bottom` (all four replace `height` and
   the canvas aspect, so update them on resize as in three.js), `zoom`, `near`, `far` (eye-space, may be negative).
@@ -39,9 +47,10 @@ projection.zoom = 2;
 
 Orthographic-aware (they read `camera.matrix`): SSAO, points, labels, clustered, DOF, splats and lines' world-space
 widths. Shadow cascades are fitted to the perspective frustum, which covers
-the default ortho view; a fixed small `height` far from the target wastes shadow resolution. Specular uses the camera
+the default ortho view; a fixed small `height` far from the target wastes shadow resolution. Cascades stay texel-locked under orthographic pan and
+zoom (no shimmer; measured by `examples/package-benchmarks/shadow-shimmer.mjs`). Specular uses the camera
 position, not a parallel view direction.
 
-MIT. Optional, tree-shakable package, about 1.1 kB min+gzip; core peer: ^0.1.0 || ^1.0.0.
+MIT. Optional, tree-shakable package, about 1.9 kB min+gzip; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/cameras
