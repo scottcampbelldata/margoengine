@@ -50,11 +50,11 @@ const close = (actual, expected) => actual.forEach((v, i) => assert.ok(Math.abs(
 
 test('only required extensions that are still unsupported are rejected, each listed with the missing decoder', () => {
   const {doc, buffers} = triangle();
-  doc.extensionsRequired = ['KHR_mesh_quantization','KHR_texture_transform','KHR_materials_unlit','KHR_materials_emissive_strength','KHR_lights_punctual','KHR_materials_clearcoat','KHR_materials_transmission','KHR_materials_ior','KHR_materials_volume','KHR_materials_sheen','KHR_materials_specular','EXT_texture_webp','EXT_texture_avif'];
+  doc.extensionsRequired = ['KHR_mesh_quantization','KHR_texture_transform','KHR_materials_unlit','KHR_materials_emissive_strength','KHR_lights_punctual','KHR_materials_clearcoat','KHR_materials_transmission','KHR_materials_ior','KHR_materials_volume','KHR_materials_sheen','KHR_materials_specular','EXT_texture_webp','EXT_texture_avif','EXT_mesh_gpu_instancing'];
   assert.doesNotThrow(() => new GLTFAsset(doc, buffers));
-  doc.extensionsRequired.push('KHR_draco_mesh_compression','EXT_meshopt_compression','KHR_texture_basisu','EXT_mesh_gpu_instancing');
-  assert.throws(() => new GLTFAsset(doc, buffers), {message: 'Required glTF extensions are unsupported: KHR_draco_mesh_compression (pass a draco decoder), EXT_meshopt_compression (pass a meshopt decoder), KHR_texture_basisu (pass a ktx2 decoder), EXT_mesh_gpu_instancing'});
-  assert.throws(() => new GLTFAsset(doc, buffers, undefined, {draco: {}, meshopt: {}, ktx2: {}}), {message: 'Required glTF extensions are unsupported: EXT_mesh_gpu_instancing'});
+  doc.extensionsRequired.push('KHR_draco_mesh_compression','EXT_meshopt_compression','KHR_texture_basisu','KHR_animation_pointer');
+  assert.throws(() => new GLTFAsset(doc, buffers), {message: 'Required glTF extensions are unsupported: KHR_draco_mesh_compression (pass a draco decoder), EXT_meshopt_compression (pass a meshopt decoder), KHR_texture_basisu (pass a ktx2 decoder), KHR_animation_pointer'});
+  assert.throws(() => new GLTFAsset(doc, buffers, undefined, {draco: {}, meshopt: {}, ktx2: {}}), {message: 'Required glTF extensions are unsupported: KHR_animation_pointer'});
 });
 
 test('KHR_mesh_quantization admits integer positions, normals and texture coordinates', async () => {

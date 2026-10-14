@@ -1,12 +1,15 @@
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext, type Mesh} from '@margoengine/core/extension';
-import {invertMatrixStable} from '@margoengine/math/mat4';
+import {invertMatrixStable,composeMatrix} from '@margoengine/math/mat4';
 import {viewMatrix} from '../../shared/view.js';
 import {Cleanup} from '../../shared/cleanup.js';
 import {GLTFAsset, container, loadAsset, closeImages, entry, integer, assetLimit, type GLTFImage, type AssetOptions} from './asset.js';
 import {pbrShader, physicalShader, lightPBR, type PBRLighting} from './shader.js';
 export type {PBRLighting} from './shader.js';
 import {mipShader} from './mip.js';
+import {PBRInstances,instancedShader} from './instances.js';
+import {instanceLayout,instanceMatrix} from '../../shared/instances.js';
+export {PBRInstances} from './instances.js';
 export {GLTFAsset} from './asset.js';
 export type {GLTFDocument, GLTFDecoderHooks, GLTFCompressedImage, GLTFImage} from './asset.js';
 /** KHR_lights_punctual light on a scene node, as data. Intensity is candela (point, spot) or lux (directional); the light points down the node's -Z. */
@@ -24,6 +27,8 @@ export interface PBRPrimitive {
   node: Mesh; nodeIndex: number; vertices: Float32Array; indices: Uint32Array;
   definition: any; material: any; weights: Float32Array; targetNames: string[];
   deformed?: GPUBuffer;
+  /** Draw once per instance (node space) in one instanced draw, see `PBRInstances`; set for EXT_mesh_gpu_instancing nodes. */
+  instances?: PBRInstances;
   /** The 80-byte-stride vertex and uint32 index buffers while the model is set up on a device (for picking and outlines). */
   buffers?: {vertex: GPUBuffer; index: GPUBuffer};
 }
@@ -137,6 +142,18 @@ function primitive(asset:GLTFAsset, p:any, node:Mesh, nodeIndex:number, mesh:any
   const weights=vector(asset.doc.nodes[nodeIndex].weights??mesh.weights??Array(targets.length).fill(0),targets.length,'morph weights');
   return {node,nodeIndex,vertices,indices,definition:p,material:m,weights:Float32Array.from(weights),targetNames:targets.map((_:unknown,i:number)=>mesh.extras?.targetNames?.[i]??'Target '+i)};
 }
+/** EXT_mesh_gpu_instancing TRANSLATION/ROTATION/SCALE accessors as node-space instance matrices (T*R*S). */
+function gpuInstances(asset:GLTFAsset,ext:any):PBRInstances {
+  const a=ext?.attributes??{},read=(key:string,type:string)=>a[key]===undefined?null:asset.accessor(a[key],type);
+  const t=read('TRANSLATION','VEC3'),r=read('ROTATION','VEC4'),s=read('SCALE','VEC3'),n=t?t.length/3:r?r.length/4:s?s.length/3:0;
+  if(!n||t&&t.length!==n*3||r&&r.length!==n*4||s&&s.length!==n*3)throw new TypeError('Invalid EXT_mesh_gpu_instancing attributes');
+  const out=new PBRInstances(n),q=[0,0,0,1];
+  for(let i=0;i<n;i++){
+    if(r){const l=Math.hypot(r[i*4],r[i*4+1],r[i*4+2],r[i*4+3]);if(!l)throw new RangeError('Zero instance rotation');for(let k=0;k<4;k++)q[k]=r[i*4+k]/l;}
+    composeMatrix(t?.subarray(i*3)??[0,0,0],q,s?.subarray(i*3)??[1,1,1],out.data.subarray(i*24,i*24+16));
+  }
+  return out;
+}
 function transform(node:Mesh,def:any):void {
   if(def.matrix!==undefined) {
     const m=vector(def.matrix,16,'matrix');
@@ -188,7 +205,8 @@ export class PBRModel implements EnginePlugin {
       for(const i of active)if(defs[i].mesh!==undefined) {
         const mesh=entry(doc.meshes,defs[i].mesh,'mesh');if(!Array.isArray(mesh.primitives)||!mesh.primitives.length)throw new TypeError('Missing primitives');
         if(prepared&&prepared[defs[i].mesh]?.length!==mesh.primitives.length)throw new TypeError('Missing prepared PBR primitives');
-        for(let j=0;j<mesh.primitives.length;j++){const p=mesh.primitives[j],made=prepared?preparedPrimitive(asset,p,prepared[defs[i].mesh][j],this.nodes[i],i,materials,checked):primitive(asset,p,this.nodes[i],i,mesh,materials);for(const data of [made.vertices,made.indices])if(!counted.has(data)){geometryBytes+=data.byteLength;counted.add(data);}if(geometryBytes>assetLimit*4)throw new RangeError('Decoded glTF geometry exceeds byte budget');this.primitives.push(made);}
+        const gpu=defs[i].extensions?.EXT_mesh_gpu_instancing,instances=gpu?gpuInstances(asset,gpu):undefined;
+        for(let j=0;j<mesh.primitives.length;j++){const p=mesh.primitives[j],made:PBRPrimitive=prepared?preparedPrimitive(asset,p,prepared[defs[i].mesh][j],this.nodes[i],i,materials,checked):primitive(asset,p,this.nodes[i],i,mesh,materials);for(const data of [made.vertices,made.indices])if(!counted.has(data)){geometryBytes+=data.byteLength;counted.add(data);}if(geometryBytes>assetLimit*4)throw new RangeError('Decoded glTF geometry exceeds byte budget');if(instances)made.instances=instances;this.primitives.push(made);}
       }
       if(!this.primitives.length)throw new Error('glTF contains no renderable meshes');
     } catch(error) {for(const node of this.created.reverse())node.dispose();throw error;}
@@ -255,7 +273,7 @@ export class PBRModel implements EnginePlugin {
   }
   get shadowPrimitives() {
     return this.resources.filter(r=>r.primitive.material.settings[0]!==2).map(r=>({node:r.primitive.node,vertex:r.primitive.deformed??r.vertex,index:r.index,count:r.primitive.indices.length,stride:80,
-      alphaTexture:r.views[0],alphaSampler:r.samplers[0],alpha:r.primitive.material.base[3],cutoff:r.primitive.material.settings[0]===1?r.primitive.material.settings[1]:0,texCoord:r.primitive.material.maps[0]?.texCoord??0}));
+      alphaTexture:r.views[0],alphaSampler:r.samplers[0],alpha:r.primitive.material.base[3],cutoff:r.primitive.material.settings[0]===1?r.primitive.material.settings[1]:0,texCoord:r.primitive.material.maps[0]?.texCoord??0,instances:r.primitive.instances}));
   }
   draw(c:Context,mode:'beauty'|'gbuffer'|'ambient',color:GPUTextureView,depth:GPUTextureView):void {
     if(this.disposed)return;
@@ -268,9 +286,10 @@ export class PBRModel implements EnginePlugin {
     });
     let pass:GPURenderPassEncoder|undefined;
     try {for(const r of resources) {
-      const p=r.primitive,m=p.material,node=p.node;node.check();let visible=true;
+      const p=r.primitive,m=p.material,node=p.node,inst=p.instances;node.check();let visible=true;
       for(let id=node.id;id!==-1;id=this.engine.store.parents[id])if(this.engine.store.hidden[id])visible=false;
-      if(!visible)continue;
+      if(!visible||inst&&!inst.count)continue;
+      const instances=inst?.upload(c.device);
       const v=r.values;v.set(c.camera.matrix);v.set(node.matrix,16);
       if(!invertMatrixStable(node.matrix,this.inverse,this.workspace))throw new Error('Singular PBR transform');
       for(let i=0;i<16;i++)v[32+i]=this.inverse[(i%4)*4+Math.floor(i/4)];
@@ -288,18 +307,21 @@ export class PBRModel implements EnginePlugin {
         // An `ambient` hook (environment IBL) is what SSAO's ambient replay returns from the lit fragment, `_=color` keeping every
         // lighting binding in the layout. Unlit materials have no ambient.
         if(lit)code=patched;else if(ambient){let replay=this.replays.get(patched);if(replay===undefined){if(this.replays.size>=64)this.replays.clear();this.replays.set(patched,replay=patched.replace('return vec4f(color,','_=color;return vec4f(select(margoAmbient,vec3f(0),f.ext.x>0.5),'));}code=replay;entry='fragment';lit=true;}}
+      // Instancing patches the vertex stage last, so text-patching effects (shader NodeMaterial vertex nodes) keep their anchors.
+      if(inst)code=instancedShader(code);
       // Keep the shader's original front-facing convention, including mirrored transforms.
-      const cull:GPUCullMode=m.settings[2]<0.5?(v[97]>0?'back':'front'):'none';
+      // Mirrored instances flip winding per instance: no culling, the shader's face test discards back faces instead.
+      const face=+(!!inst?.mirrored&&m.settings[2]<0.5),cull:GPUCullMode=m.settings[2]<0.5&&!face?(v[97]>0?'back':'front'):'none';
       const state:PBRRenderState|undefined=mode==='beauty'?m.renderState:undefined;
       // Shader text enters the key as a small id: the code strings are cached objects, so the lookup hashes them once.
       // Discard only where it can happen: back faces are culled by the pipeline and only MASK materials alpha-test.
       const mask=+(m.settings[0]===1);let id=this.codes.get(code);if(id===undefined){if(this.codes.size>=256)this.codes.clear();this.codes.set(code,id=this.codeCount++);}
-      const transmit=!!m.tint,blend=blended(m),key=mode+':'+c.format+':'+blend+transmit+':'+cull+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+':'+entry+':'+id+':'+mask+(state?JSON.stringify(state):'');
+      const transmit=!!m.tint,blend=blended(m),key=mode+':'+c.format+':'+blend+transmit+':'+cull+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+':'+entry+':'+id+':'+mask+(state?JSON.stringify(state):'')+(inst?':i'+face:'');
       let pipeline=this.pipelines.get(key);
       if(!pipeline) {
         const module=c.device.createShaderModule({code}),format=mode==='beauty'?c.format:'rgba16float';
-        pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:80,attributes:Array.from({length:5},(_,i)=>({shaderLocation:i,offset:i*16,format:'float32x4' as const}))}]},
-          fragment:{module,entryPoint:entry,constants:{margoFaceTest:0,margoAlphaTest:mask},targets:[{format,blend:state?.blend!==undefined?state.blend??undefined:blend&&mode!=='gbuffer'?{color:transmit?{srcFactor:'one',dstFactor:'constant'}:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
+        pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:80,attributes:Array.from({length:5},(_,i)=>({shaderLocation:i,offset:i*16,format:'float32x4' as const}))},...inst?[instanceLayout]:[]]},
+          fragment:{module,entryPoint:entry,constants:{margoFaceTest:face,margoAlphaTest:mask},targets:[{format,blend:state?.blend!==undefined?state.blend??undefined:blend&&mode!=='gbuffer'?{color:transmit?{srcFactor:'one',dstFactor:'constant'}:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
           multisample:c.descriptor.multisample,primitive:{cullMode:cull},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:state?.depthWrite??(mode==='beauty'&&!blend),depthCompare:state?.depthCompare??(mode==='beauty'?'greater-equal':'equal')}});
         this.pipelines.set(key,pipeline);
       }
@@ -325,16 +347,25 @@ export class PBRModel implements EnginePlugin {
         }
         pass.setBindGroup(2,cached.group);
       }
-      pass.setVertexBuffer(0,p.deformed??r.vertex);pass.setIndexBuffer(r.index,'uint32');pass.drawIndexed(p.indices.length);
+      pass.setVertexBuffer(0,p.deformed??r.vertex);if(instances)pass.setVertexBuffer(1,instances);pass.setIndexBuffer(r.index,'uint32');
+      if(inst)pass.drawIndexed(p.indices.length,inst.count);else pass.drawIndexed(p.indices.length);
       if(blend&&mode!=='gbuffer'){pass.end();pass=undefined;}
-      if(mode==='beauty'){this.engine.stats.visible++;this.engine.stats.drawCalls++;}
+      if(mode==='beauty'){this.engine.stats.visible+=inst?inst.count:1;this.engine.stats.drawCalls++;}
     }}catch(error){try{pass?.end();}catch{}throw error;}
     pass?.end();
   }
   get bounds():Float32Array {
     this.engine.store.tick(false);const out=new Float32Array([Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity]);
-    for(const p of this.primitives)for(let i=0;i<p.vertices.length;i+=20)for(let r=0;r<3;r++){
-      const m=p.node.matrix,v=m[r]*p.vertices[i]+m[4+r]*p.vertices[i+1]+m[8+r]*p.vertices[i+2]+m[12+r];out[r]=Math.min(out[r],v);out[r+3]=Math.max(out[r+3],v);
+    for(const p of this.primitives){
+      const inst=p.instances;
+      if(!inst){for(let i=0;i<p.vertices.length;i+=20)for(let r=0;r<3;r++){
+        const m=p.node.matrix,v=m[r]*p.vertices[i]+m[4+r]*p.vertices[i+1]+m[8+r]*p.vertices[i+2]+m[12+r];out[r]=Math.min(out[r],v);out[r+3]=Math.max(out[r+3],v);
+      }continue;}
+      // Instances: the eight corners of the local box under each instance's world matrix.
+      const box=[Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity];for(let i=0;i<p.vertices.length;i+=20)for(let r=0;r<3;r++){box[r]=Math.min(box[r],p.vertices[i+r]);box[r+3]=Math.max(box[r+3],p.vertices[i+r]);}
+      for(let k=0;k<inst.count;k++){const m=instanceMatrix(p.node.matrix,inst.data,k,this.inverse);for(let c=0;c<8;c++)for(let r=0;r<3;r++){
+        const v=m[r]*box[c&1?3:0]+m[4+r]*box[c&2?4:1]+m[8+r]*box[c&4?5:2]+m[12+r];out[r]=Math.min(out[r],v);out[r+3]=Math.max(out[r+3],v);
+      }}
     }
     return out;
   }
@@ -348,7 +379,7 @@ export class PBRModel implements EnginePlugin {
     });
   }
   onDispose(callback:()=>void):()=>void {if(typeof callback!=='function')throw new TypeError('Expected cleanup callback');if(this.disposed){callback();return()=>{};}this.cleanupCallbacks.add(callback);return()=>this.cleanupCallbacks.delete(callback);}
-  private releaseGPU():void {const cleanup=new Cleanup(),buffers=new Set<GPUBuffer>();for(const r of this.resources)for(const b of [r.vertex,r.index,r.uniform])if(b)buffers.add(b);for(const b of buffers)cleanup.run(()=>b.destroy());for(const t of this.textures)cleanup.run(()=>t.destroy());for(const p of this.primitives)p.buffers=undefined;this.resources=[];this.textures=[];this.pipelines.clear();this.lightingGroups.clear();cleanup.finish();}
+  private releaseGPU():void {const cleanup=new Cleanup(),buffers=new Set<GPUBuffer>();for(const r of this.resources)for(const b of [r.vertex,r.index,r.uniform])if(b)buffers.add(b);for(const b of buffers)cleanup.run(()=>b.destroy());for(const t of this.textures)cleanup.run(()=>t.destroy());for(const p of this.primitives){p.buffers=undefined;cleanup.run(()=>p.instances?.dispose());}this.resources=[];this.textures=[];this.pipelines.clear();this.lightingGroups.clear();cleanup.finish();}
   onDeviceRestored(engine:Engine):void {this.releaseGPU();for(const p of this.primitives)p.deformed=undefined;this.setup(engine);}
   dispose():void {
     if(this.disposed)return;this.disposed=true;const cleanup=new Cleanup();

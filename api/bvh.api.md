@@ -117,6 +117,10 @@ export interface ModelPrimitiveLike {
         readonly settings: ArrayLike<number>;
     };
     readonly nodeIndex?: number;
+    readonly instances?: {
+        readonly count: number;
+        readonly data: Float32Array;
+    };
 }
 
 export const NOT_INTERSECTED = 0;
@@ -172,6 +176,7 @@ export interface RaycasterHit {
     primitiveIndex?: number;
     nodeIndex?: number;
     uv?: [number, number];
+    instanceId?: number;
     approximate?: boolean;
 }
 

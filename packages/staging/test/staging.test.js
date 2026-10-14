@@ -32,6 +32,17 @@ test('maps the plane footprint to the texture and the height range to depth 0..1
   assert.ok(s.h.resources.filter(r=>r!==s.vertex&&r!==s.index).every(r=>r.destroyed),'dispose releases every buffer and texture');
 });
 
+test('instanced shadow primitives (gltf-pro PBRInstances) draw every instance in one occluder draw',()=>{
+  const s=scene(),contact=ContactShadows.attach(s.engine,{resolution:32}),buffer=s.engine.gpu.createBuffer({size:96*5,usage:GPUBufferUsage.VERTEX}),slots=[],draws=[],render=s.h.context.encoder.beginRenderPass;
+  s.h.context.encoder.beginRenderPass=d=>{const p=render(d);return {...p,setVertexBuffer:(slot,b)=>slots.push([slot,b]),drawIndexed:(...a)=>draws.push(a)};};
+  try {
+    s.model.shadowPrimitives[0].instances={count:5,upload:()=>buffer};contact.add(s.model);s.frame();
+    assert.deepEqual(draws,[[3,5]]);assert.ok(slots.some(([slot,b])=>slot===1&&b===buffer));
+    const occluder=s.h.pipelines.find(p=>p.fragment?.targets[0].format==='r16float'&&p.vertex.buffers);
+    assert.equal(occluder.vertex.buffers[1].stepMode,'instance');assert.equal(occluder.vertex.buffers[1].arrayStride,96);
+    s.model.shadowPrimitives[0].instances.count=0;draws.length=0;s.frame();assert.deepEqual(draws,[],'no instances, no draw');
+  } finally {contact.dispose();}
+});
 test('static re-renders only on transform, source, visibility or option changes',()=>{
   const s=scene(),contact=ContactShadows.attach(s.engine,{static:true,resolution:32}),full=6;
   try {

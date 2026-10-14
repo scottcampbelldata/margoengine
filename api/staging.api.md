@@ -17,6 +17,10 @@ export interface ContactPrimitive {
     alpha?: number;
     cutoff?: number;
     texCoord?: number;
+    instances?: {
+        readonly count: number;
+        upload(device: GPUDevice): GPUBuffer;
+    };
 }
 
 export interface ContactShadowOptions {

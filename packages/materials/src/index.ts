@@ -1,6 +1,6 @@
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine} from '@margoengine/core/extension';
-import {GLTFAsset,PBRModel,textureTransform,type PreparedGeometry,type PBRRenderState,type TextureTransform} from '@margoengine/gltf-pro';
+import {GLTFAsset,PBRModel,PBRInstances,textureTransform,type PreparedGeometry,type PBRRenderState,type TextureTransform} from '@margoengine/gltf-pro';
 import {readResponse} from '../../shared/loading.js';
 export type {TextureTransform} from '@margoengine/gltf-pro';
 export {packAtlas,transformUVs,type Atlas,type AtlasOptions} from './atlas.js';
@@ -214,4 +214,14 @@ export function createMesh(engine:EngineKernel,geometry:MeshGeometry,material:Ma
   const entry:Entry={model,material:m,order:renderOrder};model.registerPasses=()=>{};
   try{runtime.use(model);}catch(error){model.dispose();throw error;}
   set.add(entry);model.onDispose(()=>set.delete(entry));return model;
+}
+/** A materials mesh drawn as `instances.count` instances in one draw call (three.js InstancedMesh); `instances` holds each one's matrix, tint and UV transform. */
+export type InstancedMesh=PBRModel&{readonly instances:PBRInstances};
+/**
+ * `createMesh` for `capacity` copies in one instanced draw: `mesh.instances.setMatrixAt(i, m)`, `setColorAt`, `setUVTransformAt`
+ * (an atlas region), `count`. Instance matrices are relative to `mesh.root`. Works with shadows, clustered, IBL, fog and SSAO.
+ */
+export function createInstancedMesh(engine:EngineKernel,geometry:MeshGeometry,material:Material,capacity:number,options:{renderOrder?:number}={}):InstancedMesh {
+  const instances=new PBRInstances(capacity),model=createMesh(engine,geometry,material,options);
+  model.primitives[0].instances=instances;return Object.defineProperty(model,'instances',{value:instances}) as InstancedMesh;
 }

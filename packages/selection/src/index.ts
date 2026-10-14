@@ -141,7 +141,7 @@ export class Selection implements EnginePlugin {
  /** Selected gltf-pro primitives into the mask, equal depth against the scene so occluded parts stay unmarked (x-ray: no depth test). */
  private drawModels(c:Context,xray:boolean):void {
   const e=this.engine!,draws=xray?this.xr!.draws:this.draws,list=this.primitives(e);draws.reset();
-  for(let i=0;i<list.length;i++){const p=list[i];if(p.buffers&&!hidden(e,p.node.id))draws.add(p,1);}
+  for(let i=0;i<list.length;i++){const p=list[i];if(p.buffers&&!hidden(e,p.node.id))if(!p.instances)draws.add(p,1);else if(p.instances.count)draws.addInstances(p,1,p.node.matrix);}
   if(!draws.count)return;
   const format=c.descriptor.depthStencil!.format,pipeline=(compare:GPUCompareFunction)=>modelPipeline(c.device,modelCode(maskFragment),'r8unorm',{format,depthWriteEnabled:false,depthCompare:compare},c.descriptor.multisample);
   const model=xray?this.xr!.model??=pipeline('always'):this.modelMask??=pipeline('equal');

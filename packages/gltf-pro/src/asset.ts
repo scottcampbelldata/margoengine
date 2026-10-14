@@ -11,7 +11,7 @@ export interface GLTFDecoderHooks {
   meshopt?: {decodeGltfBuffer(target: Uint8Array, count: number, stride: number, source: Uint8Array, mode: string, filter?: string): void};
   ktx2?: {transcode(data: Uint8Array, options?: {signal?: AbortSignal}): Promise<GLTFCompressedImage>};
 }
-const supported = new Set(['KHR_mesh_quantization','KHR_texture_transform','KHR_materials_emissive_strength','KHR_materials_unlit','KHR_lights_punctual','KHR_materials_clearcoat','KHR_materials_transmission','KHR_materials_ior','KHR_materials_volume','KHR_materials_sheen','KHR_materials_specular','EXT_texture_webp','EXT_texture_avif']);
+const supported = new Set(['KHR_mesh_quantization','KHR_texture_transform','KHR_materials_emissive_strength','KHR_materials_unlit','KHR_lights_punctual','KHR_materials_clearcoat','KHR_materials_transmission','KHR_materials_ior','KHR_materials_volume','KHR_materials_sheen','KHR_materials_specular','EXT_texture_webp','EXT_texture_avif','EXT_mesh_gpu_instancing']);
 const hookFor: Record<string, keyof GLTFDecoderHooks> = {KHR_draco_mesh_compression: 'draco', EXT_meshopt_compression: 'meshopt', KHR_meshopt_compression: 'meshopt', KHR_texture_basisu: 'ktx2'};
 const meshopt = (def: any) => def?.extensions?.EXT_meshopt_compression ?? def?.extensions?.KHR_meshopt_compression;
 export function integer(value: unknown, label: string, min = 0): number {

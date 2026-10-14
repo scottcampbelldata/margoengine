@@ -11,7 +11,7 @@ type Context=Extract<PassContext,{backend:'webgpu'}>;
 // Equal as the joined text key was: NaN matches NaN.
 const same=(a:number,b:number)=>a===b||a!==a&&b!==b;
 export interface TAAOptions {historyWeight?:number;depthThreshold?:number;depth?:()=>GPUTexture|undefined}
-export interface VelocityPrimitive {node:Mesh;vertex:GPUBuffer;index:GPUBuffer;count:number;stride:number;alphaTexture?:GPUTextureView;alphaSampler?:GPUSampler;alpha?:number;cutoff?:number;texCoord?:number}
+export interface VelocityPrimitive {node:Mesh;vertex:GPUBuffer;index:GPUBuffer;count:number;stride:number;alphaTexture?:GPUTextureView;alphaSampler?:GPUSampler;alpha?:number;cutoff?:number;texCoord?:number;/** Instanced (gltf-pro PBRInstances) primitives get no object motion: camera reprojection covers static instances. */instances?:unknown}
 export interface VelocitySource {readonly shadowPrimitives:readonly VelocityPrimitive[];readonly disposed?:boolean}
 interface Draw {uniform:GPUBuffer;values:Float32Array;previous:Float32Array;vertices?:GPUBuffer;snapshot?:GPUBindGroup;group:GPUBindGroup;pipeline:GPURenderPipeline;vertex:GPUBuffer;alpha?:GPUTextureView;sampler?:GPUSampler;frame:number}
 export class TAA implements EnginePlugin {
@@ -113,7 +113,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     }
     const camera=c.encoder.beginRenderPass(this.cameraPass!);camera.setPipeline(this.cameraPipeline!);camera.setBindGroup(0,this.cameraGroup!);camera.draw(3);camera.end();
     for(const mesh of this.engine!.meshes.values())if(mesh.geometry&&this.engine!.store.visible[mesh.id]){const buffers=this.engine!.geometryBuffers(mesh.geometry)!,p=this.meshPrimitive;p.node=mesh;p.vertex=buffers.vertex;p.index=buffers.index;p.count=mesh.geometry.indices.length;this.drawMotion(c,p);}
-    for(const source of this.sources){if(source.disposed){this.sources.delete(source);continue;}for(const primitive of source.shadowPrimitives)this.drawMotion(c,primitive);}
+    for(const source of this.sources){if(source.disposed){this.sources.delete(source);continue;}for(const primitive of source.shadowPrimitives)if(!primitive.instances)this.drawMotion(c,primitive);}
     if(this.motionViews.length){
       const depth=sceneTarget(c)!.depthSource!;
       if(this.motionDepth!==depth){this.motionDepth=depth;this.motionGroup=c.device.createBindGroup({layout:this.motionResolve!.getBindGroupLayout(0),entries:[...this.motionViews,depth].map((resource,binding)=>({binding,resource}))});}

@@ -5,6 +5,7 @@ import type {BVHBuildOptions} from './build.js';
 import {MeshBVH, type GeometryLike, type Vec3} from './bvh.js';
 import {invertMatrix} from '@margoengine/math/mat4';
 import {transformPoint, type Side} from './math.js';
+import {instanceMatrix} from '../../shared/instances.js';
 
 // Structural views of the engine internals that `engineRuntime(engine)` exposes. Types only: this module never
 // imports core at runtime, so it stays usable from workers and Node.
@@ -49,7 +50,9 @@ export const getMeshLayers = (mesh: Mesh): number => layerMasks.get(mesh) ?? 1;
  * Structural view of a gltf-pro `PBRModel` primitive (also what @margoengine/materials meshes are). `vertices` is gltf-pro's
  * 20-float CPU vertex: position at 0, normal at 4, TEXCOORD_0 at 12. Skinned and morphed primitives are hit in their bind pose.
  */
-export interface ModelPrimitiveLike {readonly node: Mesh; readonly vertices: Float32Array; readonly indices: Uint32Array; readonly material: {readonly settings: ArrayLike<number>}; readonly nodeIndex?: number}
+export interface ModelPrimitiveLike {readonly node: Mesh; readonly vertices: Float32Array; readonly indices: Uint32Array; readonly material: {readonly settings: ArrayLike<number>}; readonly nodeIndex?: number;
+  /** gltf-pro `PBRInstances`: the primitive is tested once per drawn instance (24 floats each, node-space matrix first). */
+  readonly instances?: {readonly count: number; readonly data: Float32Array}}
 /** Structural view of a gltf-pro `PBRModel`: its `root` node and `primitives`. `intersectEngine` finds attached models itself. */
 export interface ModelLike {readonly root: Mesh; readonly primitives: readonly ModelPrimitiveLike[]; readonly disposed?: boolean}
 /** gltf-pro shape: a `root` node and `primitives` with 20-float CPU vertices (the first one is checked). */
@@ -109,7 +112,7 @@ export async function computePrimitiveBVHAsync(primitive: ModelPrimitiveLike, op
   return bvh;
 }
 
-interface Candidate {node: RuntimeMesh; entry: number; model: ModelLike | null; primitive: ModelPrimitiveLike | null; index: number; sphere?: ArrayLike<number>}
+interface Candidate {node: RuntimeMesh; entry: number; model: ModelLike | null; primitive: ModelPrimitiveLike | null; index: number; sphere?: ArrayLike<number>; matrix?: Float32Array; instance?: number}
 export type RaycasterSide = Side | 'material';
 export interface RaycasterHit {
   /** The core mesh, or for a model hit the glTF node that owns the primitive. */
@@ -136,6 +139,8 @@ export interface RaycasterHit {
   primitiveIndex?: number;
   nodeIndex?: number;
   uv?: [number, number];
+  /** Instanced primitive hits only: the instance index (`PBRInstances` row); `mesh` is the primitive's node. */
+  instanceId?: number;
   /**
    * Pick proxy hits only (an @margoengine/lod imposter level, which has no triangles): true. `mesh` is the LOD anchor, `model`
    * the LOD's model if it has one; point and normals are on the bounding sphere (an ellipsoid under nonuniform scale), faceIndex is -1.
@@ -226,7 +231,7 @@ export class Raycaster {
   private intersect(runtime: RuntimeEngine, meshes: Iterable<RuntimeMesh>, models: readonly ModelLike[], proxies: readonly PickProxy[], {refresh = true}: IntersectOptions = {}): RaycasterHit[] {
     if (runtime.disposed) throw new Error('Engine is disposed');
     if (!(this.near >= 0) || !(this.far >= this.near)) throw new RangeError('Expected 0 <= near <= far');
-    const store = runtime.store, candidates: Candidate[] = [];
+    const store = runtime.store, candidates: Candidate[] = [], scratch = new Float32Array(16);
     if (refresh) store.tick(false);
     // Cheap bounding-sphere rejection first; liveness, visibility, layers and the filter only run for spheres the ray crosses.
     for (const mesh of meshes) {
@@ -239,7 +244,15 @@ export class Raycaster {
       if (model.disposed) continue;
       const primitives = model.primitives, spheres = modelSpheres(model), rootMask = layerMasks.get(model.root);
       for (let index = 0; index < primitives.length; index++) {
-        const primitive = primitives[index], node = primitive.node as unknown as RuntimeMesh, entry = this.entry(store.matrices, node.id * 16, spheres[index]);
+        const primitive = primitives[index], node = primitive.node as unknown as RuntimeMesh, instances = primitive.instances;
+        if (instances) {
+          // ponytail: a linear scan over instances (one 4x4 product and sphere test each); add a BVH over instances past ~100k.
+          if (!instances.count || runtime.meshes.get(node.id) !== node || !this.usable(runtime, node, layerMasks.get(node) ?? rootMask ?? 1, model)) continue;
+          const world = store.matrices.subarray(node.id * 16, node.id * 16 + 16);
+          for (let k = 0; k < instances.count; k++) {const m = instanceMatrix(world, instances.data, k, scratch), entry = this.entry(m, 0, spheres[index]); if (entry >= 0) candidates.push({node, entry, model, primitive, index, matrix: m.slice(), instance: k});}
+          continue;
+        }
+        const entry = this.entry(store.matrices, node.id * 16, spheres[index]);
         if (entry >= 0 && this.usable(runtime, node, layerMasks.get(node) ?? rootMask ?? 1, model)) candidates.push({node, entry, model, primitive, index});
       }
     }
@@ -253,9 +266,9 @@ export class Raycaster {
     const hits: RaycasterHit[] = [], inverse = new Float64Array(16), matrix = new Float64Array(16), local = new Float64Array(3), direction = [0, 0, 0], ray = {origin: local, direction};
     const ox = this.origin[0], oy = this.origin[1], oz = this.origin[2], dx = this.direction[0], dy = this.direction[1], dz = this.direction[2];
     let best = this.far;
-    for (const {node, entry, model, primitive, index, sphere} of candidates) {
+    for (const {node, entry, model, primitive, index, sphere, matrix: world, instance} of candidates) {
       if (this.firstHitOnly && entry > best) break;
-      matrix.set(store.matrices.subarray(node.id * 16, node.id * 16 + 16));
+      matrix.set(world ?? store.matrices.subarray(node.id * 16, node.id * 16 + 16));
       if (!invertMatrix(matrix, inverse)) continue;
       transformPoint(inverse, ox, oy, oz, local);
       direction[0] = inverse[0] * dx + inverse[4] * dy + inverse[8] * dz; direction[1] = inverse[1] * dx + inverse[5] * dy + inverse[9] * dz; direction[2] = inverse[2] * dx + inverse[6] * dy + inverse[10] * dz;
@@ -292,6 +305,7 @@ export class Raycaster {
           const v = primitive.vertices, a = hit.face[0] * 20 + 12, b = hit.face[1] * 20 + 12, c = hit.face[2] * 20 + 12, [wa, wb, wc] = hit.barycoord;
           result.model = model!; result.primitive = primitive; result.primitiveIndex = index; result.nodeIndex = primitive.nodeIndex;
           result.uv = [wa * v[a] + wb * v[b] + wc * v[c], wa * v[a + 1] + wb * v[b + 1] + wc * v[c + 1]];
+          if (instance !== undefined) result.instanceId = instance;
         }
         hits.push(result);
       }

@@ -34,6 +34,10 @@ export interface ShadowPrimitive {
     alpha?: number;
     cutoff?: number;
     texCoord?: number;
+    instances?: {
+        readonly count: number;
+        upload(device: GPUDevice): GPUBuffer;
+    };
 }
 
 export interface ShadowSource {

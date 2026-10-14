@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {Engine, TransformStore} from '../../core/dist/extension.js';
-import {GLTFAsset, PBRModel} from '../../gltf-pro/dist/index.js';
+import {GLTFAsset, PBRModel, PBRInstances} from '../../gltf-pro/dist/index.js';
 import {Picking, Selection} from '../dist/index.js';
 import {optionalGPU} from '../../../tests/support/optional-gpu.js';
 
@@ -97,6 +97,23 @@ test('selection outlines selected model primitives with an equal-depth mask, nod
   selection.dispose(); assert.ok(!engine.hasPlugin('selection'));
 });
 
+test('instanced primitives: the micro pass draws instances near the pixel with their own IDs, outlines mark every instance in one draw', async () => {
+  const w = await world(), {engine, c, draws} = w, model = quads(engine, [[0, 0, 0]]), capacity = engine.store.capacity, inst = new PBRInstances(4);
+  [[30, 0, 0], [0, 0, 0], [0, 0, -2], [-30, 0, 0]].forEach((t, k) => inst.setMatrixAt(k, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, ...t, 1]));
+  model.primitives[0].instances = inst; const picking = Picking.attach(engine);
+  draws.length = 0; w.setPixel(capacity + 1 + 2); // the second instance near the pixel: one primitive slot, no proxies
+  const hit = await picking.pick(64, 48), picked = draws.filter(d => d.pipeline?.vertex?.buffers?.[0]?.arrayStride === 80);
+  assert.equal(picked.length, 2, 'instances off the pick frustum are culled'); assert.deepEqual(picked.map(d => d.instances), [1, 1]);
+  const words = w.storage(); assert.deepEqual([words[16], words[36]], [capacity + 2, capacity + 3], 'one ID per drawn instance');
+  assert.ok(hit.instanceId === 2 && hit.mesh === model.nodes[1] && hit.primitiveIndex === 0, 'the hit names the node, primitive and instance');
+  const selection = Selection.attach(engine); selection.set([model]);
+  c.camera = engine.camera; c.descriptor = {...c.descriptor, depthStencil: {format: 'depth32float'}};
+  draws.length = 0; engine.store.tick(false); engine.frameGraph.execute(c);
+  const marked = draws.filter(d => d.pipeline?.fragment?.targets?.[0]?.format === 'r8unorm');
+  assert.deepEqual(marked.map(d => [d.instances, d.firstInstance]), [[4, 0]], 'one draw over four consecutive slots');
+  assert.deepEqual([...new Float32Array(w.storage().buffer).slice(52, 55)], [0, 0, -2], 'third slot holds the third instance world matrix');
+  selection.dispose(); picking.dispose();
+});
 test('pick proxies (LOD imposter levels) draw an enclosing sphere in the micro pass and resolve to the anchor, flagged approximate', async () => {
   const w = await world(), {engine, draws} = w, list = [], picking = Picking.attach(engine), capacity = engine.store.capacity;
   engine.use({name: 'lod-proxies', setup() {}, pickProxies: () => list});
