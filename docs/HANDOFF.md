@@ -127,6 +127,26 @@ it with every number (on battery Windows throttles the CPU/GPU and may drop the 
      capture/compose 0.39; post total 7.7 ms vs 0.9 ms for the whole frame without post.
      DOF (64 taps, maxRadius 16, full res) is the cost to look at first. Tonemap 'agx' after Bloom is invisible by
      design (Bloom alone already maps with AgX).
+   - DOF made 2-5x cheaper [DONE 2026-10-14, Arc 140V, AC before/after, GPU lock]. Gate `gates/dof.mjs` + `dof.html`
+     (`results/gates-dof.json`): same helmet scene, PostStack [DOF, Tonemap], old = DOF built from `5b9dbbd` loaded in
+     the same page, 6 alternating rounds x 90 frames, DOF passes only. Median ms old -> new, 720p 4x / 1080p 4x:
+     gate focus 3.4 m f/1.4 r16 4.91 -> 1.45 / 8.69 -> 3.26; near 1.6 m 5.15 -> 2.23 / 10.06 -> 4.28; far 12 m
+     3.80 -> 0.86 / 8.63 -> 1.69; wide 2 m f/0.35 r32 5.45 -> 2.35 / 10.52 -> 4.84 (1x MSAA columns in the README
+     cost table; MSAA does not change DOF work). Quality vs old (8-bit, 720p): mean diff 0.009 / 0.10 / 0 / 0.11,
+     max 11 / 118 / 0 / 89, >6 levels on 0.007% / 0.29% / 0 / 0.27% of pixels (single pixels on high-contrast edges
+     inside a blur; `test-results/dof-<focus>-{old,new,off}.png`); slow-pan frame-to-frame change equal (gate) or
+     lower (near 0.191 vs 0.200). Kept: (1) far gather skipped for in-focus/foreground centers and near taps
+     bounded by the largest near radius in the neighbouring 8x8 tiles + 1 px (CoC pass writes tile maxima;
+     bit-identical to the 64-tap gather); (2) far taps scale with the disk: 16 to r 2.26, 32 to r 3.19, 64 beyond,
+     each a constant-count loop; (3) disks > 3.19 px gathered once per 2x2 block (rgba16float coarse pass) and
+     interpolated, 64 taps at depth changes. Rejected (`results/gates-dof-variants-1..4.json`): per-pixel tap count
+     ceil(pi r^2) with runtime spiral math (near/wide slower than fixed 64: offsets no longer constant-folded); far
+     loop as a WGSL function with a pointer + early-break near loop (+0.3-1 ms vs inline); workgroup atomicMax for
+     the tile max (CoC pass 0.05 -> 0.3-0.5 ms; shared-memory max is 0.09-0.13); 2x2 blocks accepted at 10% depth
+     without the silhouette fallback (near max diff 184, slower). Not tried: true half-resolution textures, packing
+     colour + depth into one fp16 texture (would change the CoC texture the postfx test reads). Size: dist gzip
+     5,853 -> 6,761 bytes (+908). `scripts/modern-postfx-tests.js` binds the tile/coarse textures; all its checks
+     (incl. Near CoC sign/clamp) pass on the GPU.
    - SSAO with environment IBL (same JSON, `ssaoIbl`): SSAO passes 2.69 ms without IBL, 2.81 ms with it (+0.12 ms,
      inside run-to-run noise): replaying the full lit shader costs nothing measurable here.
      FIXED (`9702e57`): with IBL on, SSAO darkened the floor below a sharp horizontal line and hatched the metal cube.
