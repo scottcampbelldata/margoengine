@@ -2,7 +2,8 @@ import type {Mesh} from '@margoengine/core';
 import {parseColor, type ColorInput} from './color.js';
 import {Font, type FontOptions} from './font.js';
 import {caretRect, hitTest, layoutText, validateLayoutOptions, type AnchorX, type AnchorY, type LayoutOptions, type TextAlign, type TextDirection, type TextLayout} from './layout.js';
-import {compose, eulerToQuaternion, finiteArray, identity, type Mat4} from './math.js';
+import {eulerToQuaternion} from '@margoengine/math/quat';
+import {compose, finiteArray, identity, type Mat4} from './math.js';
 
 type Vec3 = readonly [number, number, number];
 
@@ -124,7 +125,7 @@ export class Text {
     const s: Vec3 = typeof scale === 'number' ? [scale, scale, scale] : scale;
     finiteArray(position, 3, 'Position'); finiteArray(rotation, 3, 'Rotation'); finiteArray(s, 3, 'Scale');
     if (s.some(v => v === 0)) throw new RangeError('Scale must be nonzero');
-    compose(this.matrix, position, eulerToQuaternion(rotation), s); return this;
+    compose(this.matrix, position, eulerToQuaternion(rotation[0], rotation[1], rotation[2]), s); return this;
   }
   setPosition(position: Vec3): this {finiteArray(position, 3, 'Position'); this.matrix[12] = position[0]; this.matrix[13] = position[1]; this.matrix[14] = position[2]; return this;}
   setMatrix(matrix: Mat4): this {finiteArray(matrix, 16, 'Text matrix'); for (let i = 0; i < 16; i++) this.matrix[i] = matrix[i]; return this;}

@@ -1,4 +1,4 @@
-/** Column-major 4x4 helpers kept local so the package does not depend on other packages' internals. */
+/** Helpers only text uses; shared ones come from `@margoengine/math`. `compose` stays here: its x * (y + y) form differs from math's composeMatrix where products under/overflow. */
 export type Mat4 = ArrayLike<number>;
 
 export const identity = (): Float32Array => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
@@ -12,12 +12,6 @@ export function compose(out: Float32Array, p: ArrayLike<number>, q: ArrayLike<nu
   out[8] = (xz + wy) * s[2]; out[9] = (yz - wx) * s[2]; out[10] = (1 - (xx + yy)) * s[2]; out[11] = 0;
   out[12] = p[0]; out[13] = p[1]; out[14] = p[2]; out[15] = 1;
   return out;
-}
-
-/** Quaternion for XYZ Euler angles in radians, matching the core Mesh.setRotation convention. */
-export function eulerToQuaternion(e: ArrayLike<number>): [number, number, number, number] {
-  const sx = Math.sin(e[0] / 2), cx = Math.cos(e[0] / 2), sy = Math.sin(e[1] / 2), cy = Math.cos(e[1] / 2), sz = Math.sin(e[2] / 2), cz = Math.cos(e[2] / 2);
-  return [sx * cy * cz + cx * sy * sz, cx * sy * cz - sx * cy * sz, cx * cy * sz + sx * sy * cz, cx * cy * cz - sx * sy * sz];
 }
 
 export function finiteArray(values: ArrayLike<number>, length: number, label: string): void {

@@ -5,6 +5,8 @@ import assert from 'node:assert/strict';
 import {Matrix4} from '../dist/index.js';
 import * as mat4 from '../dist/mat4.js';
 import * as validate from '../dist/validate.js';
+import * as quat from '../dist/quat.js';
+import {Quaternion, Euler} from '../dist/index.js';
 
 const I = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
@@ -47,4 +49,11 @@ test('validate finiteVector checks length and Float32 range', () => {
   assert.doesNotThrow(() => validate.finiteVector([0, -1, 3e38], 3, 'Position'));
   assert.throws(() => validate.finiteVector([0, 1], 3, 'Position'), {name: 'TypeError', message: 'Position must contain 3 finite numbers'});
   assert.throws(() => validate.finiteVector([0, 1, 4e38], 3, 'Position'), {name: 'TypeError', message: 'Position must contain 3 finite Float32 numbers'});
+});
+
+test('quat eulerToQuaternion and multiplyQuaternions match Quaternion', () => {
+  const near = (a, b) => a.forEach((v, i) => assert.ok(Math.abs(v - b[i]) < 1e-15, `[${i}] ${v} != ${b[i]}`));
+  near(quat.eulerToQuaternion(0.3, -1.2, 2.5), new Quaternion().setFromEuler(new Euler(0.3, -1.2, 2.5)).toArray());
+  const a = [0.1, 0.2, 0.3, 0.9], b = [-0.4, 0.5, 0.1, 0.7];
+  near(quat.multiplyQuaternions(a, b), new Quaternion(...a).multiply(new Quaternion(...b)).toArray());
 });

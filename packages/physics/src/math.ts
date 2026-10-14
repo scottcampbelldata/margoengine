@@ -1,3 +1,5 @@
+import {eulerToQuaternion} from '@margoengine/math/quat';
+
 export type Vec3 = readonly [number, number, number];
 export type Quat = readonly [number, number, number, number];
 
@@ -18,11 +20,8 @@ export function checkVec(value: unknown, label: string): asserts value is Vec3 {
   if (v.length !== 3 || !Number.isFinite(v[0]) || !Number.isFinite(v[1]) || !Number.isFinite(v[2])) throw new RangeError(`${label} must be three finite numbers`);
 }
 
-/** Same XYZ Euler convention as core's `Mesh.setRotation`. */
-export function eulerToQuat(x: number, y: number, z: number): [number, number, number, number] {
-  const sx = Math.sin(x / 2), cx = Math.cos(x / 2), sy = Math.sin(y / 2), cy = Math.cos(y / 2), sz = Math.sin(z / 2), cz = Math.cos(z / 2);
-  return [sx * cy * cz + cx * sy * sz, cx * sy * cz - sx * cy * sz, cx * cy * sz + sx * sy * cz, cx * cy * cz - sx * sy * sz];
-}
+/** Same XYZ Euler convention as core's `Mesh.setRotation` (`@margoengine/math/quat` eulerToQuaternion). */
+export const eulerToQuat: (x: number, y: number, z: number) => [number, number, number, number] = eulerToQuaternion;
 
 /** Shortest-arc spherical interpolation of quaternions stored at `a` and `b` in `source`, written to `out`. */
 export function slerp(source: ArrayLike<number>, a: number, b: number, t: number, out: number[]): void {

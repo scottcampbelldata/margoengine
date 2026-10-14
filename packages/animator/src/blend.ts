@@ -9,7 +9,6 @@ export function blend2D(samples:readonly (readonly [number,number])[],x:number,y
   if(exact!==-1){weights[exact]=1;return weights;}
   let sum=0;for(let i=0;i<weights.length;i++){weights[i]=(nearest/distances[i])**2;sum+=weights[i];}for(let i=0;i<weights.length;i++)weights[i]/=sum;return weights;
 }
-export function quaternionMultiply(a:ArrayLike<number>,b:ArrayLike<number>):number[] {return [a[3]*b[0]+a[0]*b[3]+a[1]*b[2]-a[2]*b[1],a[3]*b[1]-a[0]*b[2]+a[1]*b[3]+a[2]*b[0],a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3],a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]];}
 /** Writes into `out` when given (it may be `a`); otherwise returns a fresh array. */
 export function quaternionBlend(a:ArrayLike<number>,b:ArrayLike<number>,weight:number,out?:number[]):number[] {
   let dot=0;for(let i=0;i<4;i++)dot+=a[i]*b[i];const sign=dot<0?-1:1;dot=Math.min(1,Math.abs(dot));let x=1-weight,y=weight;
