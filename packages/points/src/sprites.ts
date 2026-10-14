@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {Mesh} from '@margoengine/core';
 import {parseColor, type ColorInput} from './color.js';
 import {SpriteMaterial, type SpriteMaterialOptions} from './material.js';
@@ -106,6 +107,8 @@ export class SpriteBatch {
 
   /** Detaches from the plugin and frees GPU buffers. */
   dispose(): void {this.owner?.remove(this);}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 
   /** @internal */
   bind(owner: PointOwner | undefined): void {

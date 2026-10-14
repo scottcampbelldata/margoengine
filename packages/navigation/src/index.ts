@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import {init, NavMesh, NavMeshQuery, Raw} from 'recast-navigation';
 import {generateSoloNavMesh, soloNavMeshGeneratorConfigDefaults} from 'recast-navigation/generators';
 export interface Vector3 {x:number;y:number;z:number}
@@ -37,4 +38,6 @@ export class Navigation {
     const result = this.query.computePath(start, end); return result.success ? result.path : null;
   }
   dispose(): void {if (this.disposed) return; this.disposed = true; this.query.destroy(); this.navMesh.destroy();}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

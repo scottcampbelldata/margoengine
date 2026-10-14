@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel, EnginePlugin} from '@margoengine/core';
 import type {FrameGraph} from '@margoengine/core/extension';
 import {normalize, smoothParam, type Vec3} from './math.js';
@@ -62,6 +63,8 @@ export class AudioListener implements EnginePlugin {
     void this.resume().then(() => {if (context.state === 'running') this.removeGestureListeners();}, () => {});
   };
 
+  /** Same as `engine.use(new AudioListener(...))`; returns the AudioListener. */
+  static attach(engine: EngineKernel, options?: AudioListenerOptions): AudioListener {const value = new AudioListener(options); engine.use(value); return value;}
   constructor(options: AudioListenerOptions = {}) {
     this.name = options.name ?? 'margoengine-audio';
     this.order = options.order ?? 900;
@@ -204,4 +207,6 @@ export class AudioListener implements EnginePlugin {
     if (this.owned) {this.audioContext = undefined; this.owned = false; this.written = false;}
     this.engine = null;
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

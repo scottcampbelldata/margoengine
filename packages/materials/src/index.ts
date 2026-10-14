@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine} from '@margoengine/core/extension';
 import {GLTFAsset,PBRModel,textureTransform,type PreparedGeometry,type PBRRenderState,type TextureTransform} from '@margoengine/gltf-pro';
@@ -41,6 +42,8 @@ export class Texture {
   update():void {this.version++;}
   /** Frees GPU copies and closes an ImageBitmap created by `loadTexture`. A later use of a still-open source uploads again. */
   dispose():void {for(const slot of this.slots.values())slot.texture?.destroy();this.slots.clear();if(this.owned)(this.source as ImageBitmap).close();}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
   /** @internal View and sampler for a material slot, or undefined while the source has no pixels (unloaded image or video). */
   bind(device:GPUDevice,srgb:boolean):[GPUTextureView,GPUSampler]|undefined {
     const s=this.source as any,o=this.options,[w,h]=dimensions(s),video=this.isVideo;let slot=this.slots.get(device);

@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {Audio} from './audio.js';
 
 export interface AudioAnalyserOptions {
@@ -64,4 +65,6 @@ export class AudioAnalyser {
     this.disposed = true;
     try {this.input.disconnect(this.analyser);} catch {/* already gone */}
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

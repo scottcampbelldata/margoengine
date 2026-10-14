@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {Engine, EnginePlugin, FrameGraph, PassContext} from '@margoengine/core/extension';
 import {engineRuntime, meshRuntime} from '@margoengine/core/extension';
 import type {EngineKernel, Mesh} from '@margoengine/core';
@@ -113,6 +114,8 @@ export class PointsPlugin implements EnginePlugin {
   private hasFrame = false;
   private readonly box = new Float64Array(6);
 
+  /** Same as `engine.use(new PointsPlugin(...))`; returns the PointsPlugin. */
+  static attach(engine: EngineKernel, options?: PointsPluginOptions): PointsPlugin {const value = new PointsPlugin(options); engine.use(value); return value;}
   constructor(options: PointsPluginOptions = {}) {
     this.name = options.name ?? 'points';
     this.order = options.order ?? 10;
@@ -191,6 +194,8 @@ export class PointsPlugin implements EnginePlugin {
 
   /** Releases every GPU resource. Clouds and batches stay registered, so the plugin can be used again. */
   dispose(): void {this.releaseGpu(); this.engine = undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 
   /**
    * CPU picking: the drawn point nearest to CSS pixel (x, y) of the canvas within `radius`, using the latest

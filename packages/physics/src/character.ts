@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {PhysicsBody} from './body.js';
 import {checkVec, tuple, vec, type Vec3} from './math.js';
 
@@ -82,4 +83,6 @@ export class CharacterController {
     this.disposed = true;
     this.owner.removeController(this);
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

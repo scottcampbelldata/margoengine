@@ -1,3 +1,5 @@
+/// <reference lib="esnext.disposable" preserve="true" />
+import type {EngineKernel} from '@margoengine/core';
 import type {Camera,Engine,EnginePlugin,Vec3} from '@margoengine/core/extension';
 
 export interface ProjectionOptions {
@@ -36,6 +38,8 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
   readonly name='cameras';
   mode:'orthographic'|'perspective'='orthographic';height?:number;left?:number;right?:number;top?:number;bottom?:number;zoom=1;near?:number;far?:number;up:Vec3=[0,0,-1];
   private camera?:Camera;private worldUp:Vec3=[0,1,0];private canvas?:{width:number;height:number};private animation?:Fit;
+  /** Same as `engine.use(new CameraProjection(...))`; returns the CameraProjection. */
+  static attach(engine: EngineKernel, options?: ProjectionOptions): CameraProjection {const value = new CameraProjection(options); engine.use(value); return value;}
   constructor(options:ProjectionOptions={}){Object.assign(this,options);}
   setup(engine:Pick<Engine,'camera'>&{canvas?:{width:number;height:number}}):void {this.attach(engine.camera);this.canvas=engine.canvas;}
   /**
@@ -81,6 +85,8 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
     const camera=this.camera;if(!camera)return;this.camera=undefined;this.animation=undefined;
     Object.defineProperty(camera,'up',{configurable:true,enumerable:true,writable:true,value:this.worldUp});camera.project=undefined;
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
   private screenUp(camera:Camera):Vec3 {
     const p=camera.position,t=camera.target,x=p[0]-t[0],y=p[1]-t[1],z=p[2]-t[2];
     if(Math.hypot(x,z)>VERTICAL*Math.hypot(x,y,z))return this.worldUp;

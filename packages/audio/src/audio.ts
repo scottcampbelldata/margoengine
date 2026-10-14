@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel, Mesh} from '@margoengine/core';
 import {engineRuntime, meshRuntime} from '@margoengine/core/extension';
 import type {AudioListener, ListenerSource} from './listener.js';
@@ -312,6 +313,8 @@ export class Audio implements ListenerSource {
     this.disposed = true;
     this.listener.removeSource(this);
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 
   protected get head(): AudioNode {return this.filterList[0] ?? this.fade;}
   protected setMuted(muted: boolean): void {if (muted !== this.muted) {this.muted = muted; this.writeGain();}}
@@ -462,6 +465,8 @@ export class PositionalAudio extends Audio {
     disconnect(this.panner);
     this.meshValue = null;
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 
   private writePose(): void {
     const panner = this.panner, context = this.context, immediate = !this.written, smoothing = this.listener.smoothing;

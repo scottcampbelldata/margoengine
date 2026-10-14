@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {Mesh} from '@margoengine/core';
 import {buildBlocks, expandBlockBounds, packColors, NO_BLOCK, type PointBlocks} from './math.js';
 import {PointsMaterial, type PointsMaterialOptions} from './material.js';
@@ -208,6 +209,8 @@ export class PointCloud {
 
   /** Detaches from its plugin, which frees the GPU buffers. The CPU arrays stay usable. */
   dispose(): void {this.owner?.remove(this);}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 
   /** @internal */
   bind(owner: PointOwner | undefined): void {

@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext, type Mesh} from '@margoengine/core/extension';
 import {invertMatrixStable} from '@margoengine/math/mat4';
@@ -350,7 +351,10 @@ export class PBRModel implements EnginePlugin {
     for(const callback of this.cleanupCallbacks)cleanup.run(callback);this.cleanupCallbacks.clear();cleanup.run(()=>this.releaseGPU());
     for(let i=this.created.length-1;i>=0;i--)cleanup.run(()=>this.created[i].dispose());cleanup.run(()=>closeImages(this.images));cleanup.finish();
   }
-  destroy():void {this.engine.removePlugin(this.name);if(!this.disposed)this.dispose();}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  /** @deprecated Use dispose(); kept as an alias until 1.0. */
+  destroy():void {this.dispose();}
 }
 /** Synchronous parse of in-memory JSON/GLB with decoded `images`; `decoders` takes only the synchronous `instancing` reader. */
 export function parseGLTF(instance:EngineKernel,input:string|object|ArrayBuffer|ArrayBufferView,buffers:Array<ArrayBuffer|ArrayBufferView>=[],images:readonly ImageBitmap[]=[],decoders:Pick<GLTFDecoderHooks,'instancing'>={}):PBRModel {

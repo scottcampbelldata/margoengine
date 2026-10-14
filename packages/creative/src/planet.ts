@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel, Vec3, VectorRef} from '@margoengine/core';
 import type {Engine, EnginePlugin, FrameGraph, Mesh, PassContext} from '@margoengine/core/extension';
 import {readResponse} from '../../shared/loading.js';
@@ -79,6 +80,8 @@ export class Planet implements EnginePlugin {
     };
   }
 
+  /** Adds a planet to `engine` and resolves once its maps are loaded (same as `create`). */
+  static attach(engine: EngineKernel, options: PlanetOptions): Promise<Planet> {return Planet.create(engine, options);}
   static async create(engine: EngineKernel, options: PlanetOptions): Promise<Planet> {
     const planet = new Planet(options);
     const signal = options.signal ? AbortSignal.any([options.signal, planet.controller.signal]) : planet.controller.signal;
@@ -243,4 +246,6 @@ export class Planet implements EnginePlugin {
     this.spin = this.parent = undefined;
     this.engine = undefined;
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

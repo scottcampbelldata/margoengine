@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import {SceneTarget,sceneSamples} from '../../shared/msaa.js';
 import type {PassContext} from '@margoengine/core/extension';
 declare const GPUTextureUsage:{RENDER_ATTACHMENT:number;TEXTURE_BINDING:number;STORAGE_BINDING:number;COPY_SRC:number};
@@ -14,4 +15,6 @@ export class HDRRenderTarget {
     this.scene?.dispose();this.color?.destroy();this.depth?.destroy();this.scene=scene;this.color=color;this.depth=depth;this.width=width;this.height=height;
   }
   dispose():void{this.scene?.dispose();this.color?.destroy();this.depth?.destroy();this.width=this.height=0;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

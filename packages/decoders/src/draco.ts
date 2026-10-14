@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import {WorkerPool, payload, requireWorkers, workerLimit} from './pool.js';
 import type {DecodedDracoGeometry, DracoRequest} from './protocol.js';
 
@@ -38,6 +39,8 @@ export class DracoDecoder {
 
   /** Terminate the workers. Pending decodes reject. */
   dispose(): void {this.pool?.dispose(); this.pool = undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 
   private urls(): {wrapperURL: string; wasmURL: string} {
     if (this.decoderPath !== undefined) {

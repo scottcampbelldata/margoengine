@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel, EnginePlugin, Mesh} from '@margoengine/core';
 import {meshRuntime,Mesh as CoreMesh} from '@margoengine/core/extension';
 import {PhysicsBody, type BodyOptions, type BodyOwner, type BodyType} from './body.js';
@@ -126,6 +127,8 @@ export class Physics implements EnginePlugin, BodyOwner {
   private readonly positionScratch: [number,number,number] = [0,0,0];
   private syncAlpha = 1;
 
+  /** Creates the Physics on `engine` (preferred over the constructor). */
+  static attach(engine: EngineKernel, options: PhysicsOptions): Physics {return new Physics(engine, options);}
   constructor(engine: EngineKernel | null, options: PhysicsOptions) {
     const R = options?.rapier;
     if (!R || typeof R.World !== 'function' || !R.ColliderDesc) throw new TypeError('Pass the initialized Rapier module: new Physics(engine, {rapier: RAPIER}) after await RAPIER.init()');
@@ -498,6 +501,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.engine = null;
     this.queue = this.worldRef = this.hooks = null;
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }
 
 function parentOf(mesh: Mesh): number {

@@ -1,3 +1,5 @@
+/// <reference lib="esnext.disposable" preserve="true" />
+import type {EngineKernel} from '@margoengine/core';
 import type {Engine,EnginePlugin,FrameGraph,PassContext} from '@margoengine/core/extension';
 import type {Animation} from './index.js';
 import {invertMatrixStable} from '@margoengine/math/mat4';
@@ -120,6 +122,8 @@ export class VATCrowd implements EnginePlugin {
   time=0;readonly color:number[];roughness:number;metalness:number;map:VATMap|null;
   private data=new Float32Array(VAT_STRIDE*16);private n=0;private dirty=true;private engine?:Engine;private device?:GPUDevice;private gpu?:{vat:GPUTexture;uvs:GPUBuffer;index:GPUBuffer;frame:GPUBuffer;clips:GPUBuffer;instances?:GPUBuffer;white:GPUTexture;blank:[GPUTextureView,GPUSampler]};
   private pipeline?:GPURenderPipeline;private key='';private group?:GPUBindGroup;private bound:unknown[]=[];private readonly frame=new Float32Array(40);
+  /** Same as `engine.use(new VATCrowd(...))`; returns the VATCrowd. */
+  static attach(engine: EngineKernel, vat: VATData, options?: VATCrowdOptions): VATCrowd {const value = new VATCrowd(vat, options); engine.use(value); return value;}
   constructor(readonly vat:VATData,{color=[1,1,1,1],map=null,roughness=0.6,metalness=0}:VATCrowdOptions={}) {
     if(!(vat?.texels instanceof Float32Array)||!vat.clips?.length||color.length!==4||!(roughness>=0&&roughness<=1&&metalness>=0&&metalness<=1))throw new TypeError('Invalid VAT crowd');
     this.color=[...color];this.roughness=roughness;this.metalness=metalness;this.map=map;
@@ -173,4 +177,6 @@ export class VATCrowd implements EnginePlugin {
   private release():void {const g=this.gpu;if(g)for(const r of [g.vat,g.white,g.uvs,g.index,g.frame,g.clips,g.instances])r?.destroy();this.gpu=this.pipeline=this.group=undefined;this.key='';this.bound=[];this.device=undefined;}
   onDeviceRestored():void {this.release();this.dirty=true;}
   dispose():void {this.release();this.engine=undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }
