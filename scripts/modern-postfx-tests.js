@@ -7,13 +7,13 @@ const browser=await openBrowser({startPath:'/tests/modern-game.html',aliases:{ma
 page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
 try {
   const pixels=await page.evaluate(async()=>{
-    const {cocShader,bokehShader}=await import('/packages/dof/src/shaders.ts');
+    const {cocShader,coarseShader,bokehShader}=await import('/packages/dof/src/shaders.ts');
     const {tonemapShader}=await import('/packages/tonemap/src/shaders.ts');
     const adapter=await navigator.gpu.requestAdapter(),device=await adapter.requestDevice();device.pushErrorScope('validation');
     const check=(condition,message)=>{if(!condition)throw new Error(message);};
     const module=async code=>{const m=device.createShaderModule({code}),info=await m.getCompilationInfo();check(!info.messages.some(x=>x.type==='error'),info.messages.map(x=>x.message).join('\n'));return m;};
     const compute=async code=>device.createComputePipeline({layout:'auto',compute:{module:await module(code),entryPoint:'main'}});
-    const cocPipeline=await compute(cocShader),bokehPipeline=await compute(bokehShader),toneModule=await module(tonemapShader);
+    const cocPipeline=await compute(cocShader),bokehPipeline=await compute(bokehShader),coarsePipeline=await compute(coarseShader),toneModule=await module(tonemapShader);
     const tonePipeline=device.createRenderPipeline({layout:'auto',vertex:{module:toneModule,entryPoint:'vertex'},fragment:{module:toneModule,entryPoint:'fragment',targets:[{format:'rgba32float'}]}});
     const owned=[];
     const texture=(width,height,format,usage,depth=1)=>{const t=device.createTexture({size:[width,height,depth],dimension:depth>1?'3d':'2d',format,usage});owned.push(t);return t;};
@@ -32,7 +32,7 @@ try {
       b.unmap();b.destroy();return out;
     }
     const w=64,h=32,T=GPUTextureUsage;
-    const scene=texture(w,h,'rgba32float',T.TEXTURE_BINDING|T.COPY_DST),depth=texture(w,h,'depth32float',T.TEXTURE_BINDING|T.RENDER_ATTACHMENT),coc=texture(w,h,'rg32float',T.TEXTURE_BINDING|T.STORAGE_BINDING|T.COPY_SRC),output=texture(w,h,'rgba16float',T.STORAGE_BINDING|T.COPY_SRC);
+    const scene=texture(w,h,'rgba32float',T.TEXTURE_BINDING|T.COPY_DST),depth=texture(w,h,'depth32float',T.TEXTURE_BINDING|T.RENDER_ATTACHMENT),coc=texture(w,h,'rg32float',T.TEXTURE_BINDING|T.STORAGE_BINDING|T.COPY_SRC),output=texture(w,h,'rgba16float',T.STORAGE_BINDING|T.COPY_SRC),tiles=texture(w/8,h/8,'r32float',T.TEXTURE_BINDING|T.STORAGE_BINDING),coarse=texture(w/2,h/2,'rgba16float',T.TEXTURE_BINDING|T.STORAGE_BINDING);
     const color=new Float32Array(w*h*4);for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4;color[i+(x<16?0:x<32?1:2)]=1;color[i+3]=1;}
     color.set([20,20,20,1],(16*w+46)*4);device.queue.writeTexture({texture:scene},color,{bytesPerRow:w*16},[w,h]);
     const depthModule=await module(`@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{let xy=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));return vec4f(xy[i],0,1);}
@@ -40,9 +40,9 @@ try {
     const depthPipeline=device.createRenderPipeline({layout:'auto',vertex:{module:depthModule,entryPoint:'vertex'},fragment:{module:depthModule,entryPoint:'fragment',targets:[]},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'always'}});
     // Params is {lens,frame,ortho} (48 bytes) since 5cf148e; ortho.x=0 is perspective.
     const uniform=buffer(48),params=new Float32Array([5,0.05,2.8,8,0.1,100,12,1,0,0,0,0]);device.queue.writeBuffer(uniform,0,params);
-    const cocGroup=group(cocPipeline,[{buffer:uniform},depth.createView(),coc.createView()]),bokehGroup=group(bokehPipeline,[{buffer:uniform},scene.createView(),coc.createView(),output.createView()]);
+    const cocGroup=group(cocPipeline,[{buffer:uniform},depth.createView(),coc.createView(),tiles.createView()]),bokehGroup=group(bokehPipeline,[{buffer:uniform},scene.createView(),coc.createView(),output.createView(),tiles.createView(),coarse.createView()]),coarseGroup=group(coarsePipeline,[{buffer:uniform},scene.createView(),coc.createView(),coarse.createView()]);
     let encoder=device.createCommandEncoder(),pass=encoder.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:depth.createView(),depthClearValue:0,depthLoadOp:'clear',depthStoreOp:'store'}});
-    pass.setPipeline(depthPipeline);pass.draw(3);pass.end();dispatch(encoder,cocPipeline,cocGroup,w,h);dispatch(encoder,bokehPipeline,bokehGroup,w,h);device.queue.submit([encoder.finish()]);
+    pass.setPipeline(depthPipeline);pass.draw(3);pass.end();dispatch(encoder,cocPipeline,cocGroup,w,h);dispatch(encoder,coarsePipeline,coarseGroup,w/2,h/2);dispatch(encoder,bokehPipeline,bokehGroup,w,h);device.queue.submit([encoder.finish()]);
     const co=await read(coc,8),blur=await read(output,8,true),at=(x,y,c)=>blur[(y*w+x)*4+c];
     check(Math.abs(co[8*2]+8)<0.001,'Near CoC sign/clamp');check(Math.abs(co[24*2])<0.001,'Focus CoC');check(Math.abs(co[40*2]-7)<0.001,'Far CoC/depth reconstruction');
     check(at(24,16,1)>0.999&&at(24,16,0)<0.001&&at(24,16,2)<0.001,'Focused color changed');
@@ -52,7 +52,7 @@ try {
     check(at(46,16,0)<10&&at(46,16,0)>0&&litNeighbors>20,`Bokeh did not spread HDR highlight: ${at(46,16,0)}, ${litNeighbors}`);
     encoder=device.createCommandEncoder();dispatch(encoder,bokehPipeline,bokehGroup,w,h);device.queue.submit([encoder.finish()]);const again=await read(output,8,true);
     check(again.every((v,i)=>v===blur[i]),'Static bokeh varies over time');
-    params[7]=0;device.queue.writeBuffer(uniform,0,params);encoder=device.createCommandEncoder();dispatch(encoder,cocPipeline,cocGroup,w,h);dispatch(encoder,bokehPipeline,bokehGroup,w,h);device.queue.submit([encoder.finish()]);
+    params[7]=0;device.queue.writeBuffer(uniform,0,params);encoder=device.createCommandEncoder();dispatch(encoder,cocPipeline,cocGroup,w,h);dispatch(encoder,coarsePipeline,coarseGroup,w/2,h/2);dispatch(encoder,bokehPipeline,bokehGroup,w,h);device.queue.submit([encoder.finish()]);
     const sharp=await read(output,8,true);check(sharp.every((v,i)=>v===color[i]),'Disabled DOF did not preserve input');
 
     const hdr=texture(1,1,'rgba32float',T.TEXTURE_BINDING|T.COPY_DST),display=texture(1,1,'rgba32float',T.RENDER_ATTACHMENT|T.COPY_SRC),lut=texture(33,33,'rgba32float',T.TEXTURE_BINDING|T.COPY_DST,33),gradeUniform=buffer(64);

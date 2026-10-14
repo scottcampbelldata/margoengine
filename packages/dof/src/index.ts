@@ -1,10 +1,10 @@
 import {SceneTarget} from '../../shared/msaa.js';
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext} from '@margoengine/core/extension';
-import {render,group} from '../../shared/gpu.js';
+import {render,group,compute} from '../../shared/gpu.js';
 import {orthographic} from '../../shared/projection.js';
 import type {StackHost,StackStage,StageOutput} from '../../shared/stack.js';
-import {cocShader, bokehShader, presentShader} from './shaders.js';
+import {cocShader, coarseShader, bokehShader, presentShader} from './shaders.js';
 
 declare const GPUBufferUsage: {UNIFORM:number; COPY_DST:number};
 declare const GPUTextureUsage: {RENDER_ATTACHMENT:number; TEXTURE_BINDING:number; STORAGE_BINDING:number; COPY_SRC:number};
@@ -28,10 +28,13 @@ export class DOF implements EnginePlugin {
   private uniform?:GPUBuffer;
   private cocPipeline?:GPUComputePipeline;
   private bokehPipeline?:GPUComputePipeline;
+  private coarsePipeline?:GPUComputePipeline;
   private presentPipeline?:GPURenderPipeline;
   private scene?:GPUTexture;
   private depth?:GPUTexture;
   private coc?:GPUTexture;
+  private tiles?:GPUTexture;
+  private coarse?:GPUTexture;
   private output?:GPUTexture;
   private sceneView?:GPUTextureView;
   private depthView?:GPUTextureView;
@@ -46,7 +49,7 @@ export class DOF implements EnginePlugin {
   private readonly presentation:GPURenderPassDescriptor={colorAttachments:[this.attachment]};
   private captureTarget?:SceneTarget;
   private disposed=false;
-  private host?:StackHost;private input?:GPUTextureView;private sceneDepth?:GPUTexture;private cocView?:GPUTextureView;private outputView?:GPUTextureView;private key='';
+  private host?:StackHost;private input?:GPUTextureView;private sceneDepth?:GPUTexture;private cocView?:GPUTextureView;private tileView?:GPUTextureView;private coarseView?:GPUTextureView;private outputView?:GPUTextureView;private key='';
 
   constructor(readonly options:DOFOptions={}){this.validate();}
   static attach(instance:EngineKernel, options:DOFOptions={}):DOF {
@@ -71,13 +74,13 @@ export class DOF implements EnginePlugin {
     this.engine=engine;
     this.uniform=engine.gpu.createBuffer({size:48,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
     this.cocPipeline=engine.gpu.createComputePipeline({layout:'auto',compute:{module:engine.gpu.createShaderModule({code:cocShader}),entryPoint:'main'}});
-    this.bokehPipeline=engine.gpu.createComputePipeline({layout:'auto',compute:{module:engine.gpu.createShaderModule({code:bokehShader}),entryPoint:'main'}});
+    this.bokehPipeline=compute(engine.gpu,bokehShader);this.coarsePipeline=compute(engine.gpu,coarseShader);
   }
   registerPasses(graph:FrameGraph):void {
     graph.add({name:'dof:capture',order:-55,execute:c=>{if(c.backend==='webgpu')this.capture(c);}});
     if(this.host)return;
     graph.add({name:'dof:coc',order:20,execute:c=>{if(c.backend==='webgpu')this.dispatch(c,this.cocPipeline!,this.groups[0]);}});
-    graph.add({name:'dof:bokeh',order:21,execute:c=>{if(c.backend==='webgpu')this.dispatch(c,this.bokehPipeline!,this.groups[1]);}});
+    graph.add({name:'dof:bokeh',order:21,execute:c=>{if(c.backend==='webgpu')this.blur(c);}});
     graph.add({name:'dof:present',order:30,execute:c=>{if(c.backend==='webgpu')this.present(c);}});
   }
   private capture(c:Context):void {
@@ -105,23 +108,24 @@ export class DOF implements EnginePlugin {
     const depthFormat=c.descriptor.depthStencil!.format;
     if(this.scene?.width===c.width&&this.scene.height===c.height&&this.format===c.format&&this.depthFormat===depthFormat&&this.captureTarget?.samples===(c.descriptor.multisample?.count??4))return;
     this.releaseTextures();this.format=c.format;this.depthFormat=depthFormat;
-    const sampled=GPUTextureUsage.TEXTURE_BINDING,storage=sampled|GPUTextureUsage.STORAGE_BINDING;
+    const sampled=GPUTextureUsage.TEXTURE_BINDING;
     this.scene=c.device.createTexture({size:[c.width,c.height],format:'rgba16float',usage:sampled|GPUTextureUsage.RENDER_ATTACHMENT});
     this.depth=c.device.createTexture({size:[c.width,c.height],format:depthFormat,usage:sampled|GPUTextureUsage.RENDER_ATTACHMENT});
-    this.coc=c.device.createTexture({size:[c.width,c.height],format:'rg32float',usage:storage});
-    this.output=c.device.createTexture({size:[c.width,c.height],format:'rgba16float',usage:storage|GPUTextureUsage.COPY_SRC});
+    this.targets(c.device,c.width,c.height);
     this.captureTarget=new SceneTarget(c.device,this.scene,this.depth,c.descriptor.multisample?.count??4);
     this.sceneView=this.scene.createView();this.depthView=this.depth.createView();
-    const cocView=this.coc.createView(),outputView=this.output.createView();
+    const cocView=this.cocView!,outputView=this.outputView!,tileView=this.tileView!,coarseView=this.coarseView!;
     const module=c.device.createShaderModule({code:presentShader});
     this.presentPipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]},multisample:c.descriptor.multisample});
-    this.groups=[c.device.createBindGroup({layout:this.cocPipeline!.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform!}},{binding:1,resource:this.depth.createView({aspect:'depth-only'})},{binding:2,resource:cocView}]}),
-      c.device.createBindGroup({layout:this.bokehPipeline!.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform!}},{binding:1,resource:this.sceneView},{binding:2,resource:cocView},{binding:3,resource:outputView}]}),
-      c.device.createBindGroup({layout:this.presentPipeline.getBindGroupLayout(0),entries:[{binding:0,resource:outputView}]})];
+    this.groups=[c.device.createBindGroup({layout:this.cocPipeline!.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform!}},{binding:1,resource:this.depth.createView({aspect:'depth-only'})},{binding:2,resource:cocView},{binding:3,resource:tileView}]}),
+      c.device.createBindGroup({layout:this.bokehPipeline!.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform!}},{binding:1,resource:this.sceneView},{binding:2,resource:cocView},{binding:3,resource:outputView},{binding:4,resource:tileView},{binding:5,resource:coarseView}]}),
+      c.device.createBindGroup({layout:this.presentPipeline.getBindGroupLayout(0),entries:[{binding:0,resource:outputView}]}),
+      group(c.device,this.coarsePipeline!,[{buffer:this.uniform!},this.sceneView,cocView,coarseView])];
   }
-  private dispatch(c:Context,pipeline:GPUComputePipeline,group:GPUBindGroup):void {
+  private blur(c:Context):void {this.dispatch(c,this.coarsePipeline!,this.groups[3],16);this.dispatch(c,this.bokehPipeline!,this.groups[1]);}
+  private dispatch(c:Context,pipeline:GPUComputePipeline,group:GPUBindGroup,block=8):void {
     if(pipeline===this.cocPipeline)this.captureTarget?.resolve(c.encoder,true);
-    const pass=c.encoder.beginComputePass();pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.dispatchWorkgroups(Math.ceil(c.width/8),Math.ceil(c.height/8));pass.end();
+    const pass=c.encoder.beginComputePass();pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.dispatchWorkgroups(Math.ceil(c.width/block),Math.ceil(c.height/block));pass.end();
   }
   private present(c:Context):void {
     this.attachment.view=this.originalColor!;
@@ -131,20 +135,24 @@ export class DOF implements EnginePlugin {
   /** Stacked: blur `input` by the shared depth into outputTexture, handed on as linear light or presented as the display output. */
   private stage(c:Context,input:GPUTextureView,output:StageOutput):GPUTextureView|void {
     const device=c.device,depth=this.host!.depthTexture!,key=output.format+output.multisample.count;
-    if(this.coc?.width!==c.width||this.coc.height!==c.height){
-      this.releaseTextures();const storage=GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.STORAGE_BINDING;
-      this.coc=device.createTexture({size:[c.width,c.height],format:'rg32float',usage:storage});this.output=device.createTexture({size:[c.width,c.height],format:'rgba16float',usage:storage|GPUTextureUsage.COPY_SRC});
-      this.cocView=this.coc.createView();this.outputView=this.output.createView();
-    }
-    if(this.sceneDepth!==depth){this.sceneDepth=depth;this.groups[0]=group(device,this.cocPipeline!,[{buffer:this.uniform!},depth.createView({aspect:'depth-only'}),this.cocView!]);}
-    if(this.input!==input){this.input=input;this.groups[1]=group(device,this.bokehPipeline!,[{buffer:this.uniform!},input,this.cocView!,this.outputView!]);}
-    this.dispatch(c,this.cocPipeline!,this.groups[0]);this.dispatch(c,this.bokehPipeline!,this.groups[1]);
+    if(this.coc?.width!==c.width||this.coc.height!==c.height){this.releaseTextures();this.targets(device,c.width,c.height);}
+    if(this.sceneDepth!==depth){this.sceneDepth=depth;this.groups[0]=group(device,this.cocPipeline!,[{buffer:this.uniform!},depth.createView({aspect:'depth-only'}),this.cocView!,this.tileView!]);}
+    if(this.input!==input){this.input=input;this.groups[1]=group(device,this.bokehPipeline!,[{buffer:this.uniform!},input,this.cocView!,this.outputView!,this.tileView!,this.coarseView!]);this.groups[3]=group(device,this.coarsePipeline!,[{buffer:this.uniform!},input,this.cocView!,this.coarseView!]);}
+    this.dispatch(c,this.cocPipeline!,this.groups[0]);this.blur(c);
     if(output.hdr)return this.outputView;
     if(this.key!==key){this.key=key;this.presentPipeline=render(device,presentShader,output.format,{multisample:output.multisample});this.groups[2]=group(device,this.presentPipeline,[this.outputView!]);}
     this.attachment.view=output.view;const pass=c.encoder.beginRenderPass(this.presentation);pass.setPipeline(this.presentPipeline!);pass.setBindGroup(0,this.groups[2]);pass.draw(3);pass.end();
   }
-  private releaseTextures():void {this.captureTarget?.dispose();this.captureTarget=undefined;this.scene?.destroy();this.depth?.destroy();this.coc?.destroy();this.output?.destroy();this.scene=this.depth=this.coc=this.output=undefined;this.sceneView=this.depthView=undefined;this.groups=[];this.presentPipeline=undefined;this.input=this.sceneDepth=this.cocView=this.outputView=undefined;this.key='';}
-  private release():void {this.releaseTextures();this.uniform?.destroy();this.uniform=undefined;this.cocPipeline=this.bokehPipeline=undefined;this.originalColor=this.originalDepth=undefined;this.shaders.clear();}
+  /** CoC (radius, view depth), the blurred output, 8x8-tile near-radius maxima and 2x2-block wide far gathers. */
+  private targets(device:GPUDevice,width:number,height:number):void {
+    const storage=GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.STORAGE_BINDING;
+    this.coc=device.createTexture({size:[width,height],format:'rg32float',usage:storage});this.output=device.createTexture({size:[width,height],format:'rgba16float',usage:storage|GPUTextureUsage.COPY_SRC});
+    this.tiles=device.createTexture({size:[Math.ceil(width/8),Math.ceil(height/8)],format:'r32float',usage:storage});
+    this.coarse=device.createTexture({size:[Math.ceil(width/2),Math.ceil(height/2)],format:'rgba16float',usage:storage});
+    this.cocView=this.coc.createView();this.outputView=this.output.createView();this.tileView=this.tiles.createView();this.coarseView=this.coarse.createView();
+  }
+  private releaseTextures():void {this.captureTarget?.dispose();this.captureTarget=undefined;this.scene?.destroy();this.depth?.destroy();this.coc?.destroy();this.output?.destroy();this.tiles?.destroy();this.coarse?.destroy();this.scene=this.depth=this.coc=this.output=this.tiles=this.coarse=undefined;this.sceneView=this.depthView=undefined;this.groups=[];this.presentPipeline=undefined;this.input=this.sceneDepth=this.cocView=this.outputView=this.tileView=this.coarseView=undefined;this.key='';}
+  private release():void {this.releaseTextures();this.uniform?.destroy();this.uniform=undefined;this.cocPipeline=this.bokehPipeline=this.coarsePipeline=undefined;this.originalColor=this.originalDepth=undefined;this.shaders.clear();}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.engine=undefined;}
   destroy():void {this.dispose();}
