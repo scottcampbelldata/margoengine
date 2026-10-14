@@ -1,5 +1,6 @@
 import {buildBVH, checkSource, INTERNAL_FLAG, NODE_WORDS, type BVHBuildOptions, type BVHData} from './build.js';
-import {closestPointTriangle, invert, rayTriangle, sideCode, transformPoint, triangleBox, triangleOutsidePlanes, triangleTriangle, type Side} from './math.js';
+import {invertMatrix} from '@margoengine/math/mat4';
+import {closestPointTriangle, rayTriangle, sideCode, transformPoint, triangleBox, triangleOutsidePlanes, triangleTriangle, type Side} from './math.js';
 
 export type Vec3 = [number, number, number];
 /** Anything with interleaved stride-6 `vertices` (position xyz, normal xyz) and `indices`, such as the core `Geometry`. */
@@ -365,7 +366,7 @@ export class MeshBVH {
   intersectsBox(box: Box3Like, matrix?: ArrayLike<number>): boolean {
     const bx0 = box.min[0], by0 = box.min[1], bz0 = box.min[2], bx1 = box.max[0], by1 = box.max[1], bz1 = box.max[2];
     if (!(bx0 <= bx1 && by0 <= by1 && bz0 <= bz1)) return false;
-    const inverse = matrix ? invert(matrix) : null;
+    const inverse = matrix ? invertMatrix(matrix, new Float64Array(16)) : null;
     if (matrix && !inverse) throw new RangeError('Box matrix is singular');
     // Conservative BVH-space bounds of the oriented box.
     const bounds = matrix ? transformBox(matrix, bx0, by0, bz0, bx1, by1, bz1) : [bx0, by0, bz0, bx1, by1, bz1];

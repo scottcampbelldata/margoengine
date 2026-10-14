@@ -4,6 +4,7 @@ import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type FrameGraph, type PassContext} from '@margoengine/core/extension';
 import type {Environment} from './environment.js';
 import {background as backgroundShader} from './shaders.js';
+import {invertMatrix} from '@margoengine/math/mat4';
 
 declare const GPUBufferUsage: {UNIFORM: number; COPY_DST: number};
 declare const GPUTextureUsage: {TEXTURE_BINDING: number};
@@ -144,7 +145,7 @@ export class EnvironmentBackground {
 
   private writeUniforms(context: GPUContext, state: DeviceState): void {
     const camera = context.camera, f = this.floats, environment = this.environment;
-    if (!invert(camera.matrix, this.inverse)) return;
+    if (!invertMatrix(camera.matrix, this.inverse)) return;
     for (let i = 0; i < 16; i++) f[i] = this.inverse[i];
     f[16] = camera.position[0]; f[17] = camera.position[1]; f[18] = camera.position[2]; f[19] = 1;
     const angle = environment.rotation + this.rotationValue;
@@ -191,25 +192,4 @@ export class EnvironmentBackground {
   private releaseState(): void {
     this.state?.uniform.destroy(); this.state?.fallback?.destroy(); this.state = undefined;
   }
-}
-
-/** Inverts a column-major 4x4 matrix into `out`; returns false when singular. */
-export function invert(m: ArrayLike<number>, out: Float64Array | Float32Array): boolean {
-  const a00 = m[0], a01 = m[1], a02 = m[2], a03 = m[3], a10 = m[4], a11 = m[5], a12 = m[6], a13 = m[7];
-  const a20 = m[8], a21 = m[9], a22 = m[10], a23 = m[11], a30 = m[12], a31 = m[13], a32 = m[14], a33 = m[15];
-  const b00 = a00 * a11 - a01 * a10, b01 = a00 * a12 - a02 * a10, b02 = a00 * a13 - a03 * a10, b03 = a01 * a12 - a02 * a11;
-  const b04 = a01 * a13 - a03 * a11, b05 = a02 * a13 - a03 * a12, b06 = a20 * a31 - a21 * a30, b07 = a20 * a32 - a22 * a30;
-  const b08 = a20 * a33 - a23 * a30, b09 = a21 * a32 - a22 * a31, b10 = a21 * a33 - a23 * a31, b11 = a22 * a33 - a23 * a32;
-  const det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
-  if (!det || !Number.isFinite(det)) return false;
-  const d = 1 / det;
-  out[0] = (a11 * b11 - a12 * b10 + a13 * b09) * d; out[1] = (a02 * b10 - a01 * b11 - a03 * b09) * d;
-  out[2] = (a31 * b05 - a32 * b04 + a33 * b03) * d; out[3] = (a22 * b04 - a21 * b05 - a23 * b03) * d;
-  out[4] = (a12 * b08 - a10 * b11 - a13 * b07) * d; out[5] = (a00 * b11 - a02 * b08 + a03 * b07) * d;
-  out[6] = (a32 * b02 - a30 * b05 - a33 * b01) * d; out[7] = (a20 * b05 - a22 * b02 + a23 * b01) * d;
-  out[8] = (a10 * b10 - a11 * b08 + a13 * b06) * d; out[9] = (a01 * b08 - a00 * b10 - a03 * b06) * d;
-  out[10] = (a30 * b04 - a31 * b02 + a33 * b00) * d; out[11] = (a21 * b02 - a20 * b04 - a23 * b00) * d;
-  out[12] = (a11 * b07 - a10 * b09 - a12 * b06) * d; out[13] = (a00 * b09 - a01 * b07 + a02 * b06) * d;
-  out[14] = (a31 * b01 - a30 * b03 - a32 * b00) * d; out[15] = (a20 * b03 - a21 * b01 + a22 * b00) * d;
-  return true;
 }
