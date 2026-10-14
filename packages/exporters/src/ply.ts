@@ -1,5 +1,6 @@
+import {LinearToSRGB as toSrgb} from '@margoengine/math/color';
 // PLY writer: the Margo Engine counterpart of Three.js PLYExporter. One merged world-space mesh.
-import {byte, collect, drawables, num, toSrgb, toWorld, type ExportSource, type SceneOptions} from './scene.js';
+import {byte, collect, drawables, num, toWorld, type ExportSource, type SceneOptions} from './scene.js';
 
 export interface PLYOptions extends SceneOptions {
   /** binary_little_endian (true) or ascii (default false, as in Three.js). */

@@ -1,6 +1,6 @@
 // UltraHDR (gain-map JPEG, Adobe/Google hdrgm XMP) decoding: the Three.js UltraHDRLoader equivalent.
 import {MAX_PIXELS, toBytes, type FloatImage} from './hdr.js';
-import {srgbToLinear} from './color.js';
+import {SRGBToLinear as srgbToLinear} from '@margoengine/math/color';
 
 /** Gain-map metadata from the hdrgm XMP, per RGB channel where the format allows it. Min, max and capacities are log2. */
 export interface GainMapMetadata {

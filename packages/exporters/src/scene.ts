@@ -416,7 +416,6 @@ export function num(value: number): string {
   return String(f);
 }
 
-export const toSrgb = (v: number): number => v <= 0.0031308 ? v*12.92 : 1.055*v**(1/2.4)-0.055;
 export const byte = (v: number): number => Math.max(0, Math.min(255, Math.round(v*255)));
 
 /** @internal Replaces whitespace so a name survives line-based formats. */

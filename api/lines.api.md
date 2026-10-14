@@ -224,7 +224,7 @@ export function geometryBounds(geometry: Geometry): Float32Array;
 
 export function meshWorldMatrix(engine: EngineKernel, mesh: Mesh): Float32Array | null;
 
-export function parseColor(value: ColorInput, out?: Float32Array | number[], offset?: number): Float32Array | number[];
+export const parseColor: (value: ColorInput, out?: Float32Array | number[], offset?: number) => Float32Array | number[];
 
 export function segmentCount(mode: LineMode, count: number): number;
 

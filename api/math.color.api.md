@@ -36,6 +36,8 @@ export class Color {
     toArray<T extends NumberArray>(out: T, offset?: number): T;
 }
 
+export type ColorInput = string | number | readonly number[];
+
 export interface ColorLike {
     r: number;
     g: number;
@@ -51,6 +53,8 @@ export interface HSL {
 export const LinearToSRGB: (c: number) => number;
 
 export const SRGBToLinear: (c: number) => number;
+
+export function parseColor(value: ColorInput, out?: Float32Array | number[], offset?: number): Float32Array | number[];
 
 // Not exported from this entry, but used by the exports above:
 

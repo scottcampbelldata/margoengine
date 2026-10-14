@@ -297,7 +297,7 @@ export function layoutText(text: string, options: LayoutOptions, measurer: TextM
 
 export function meshWorldMatrix(engine: EngineKernel, mesh: Mesh): Float32Array | null;
 
-export function parseColor(value: ColorInput, out?: Float32Array | number[], offset?: number): Float32Array | number[];
+export const parseColor: (value: ColorInput, out?: Float32Array | number[], offset?: number) => Float32Array | number[];
 
 export const sdfDistance: (value: number, params?: SdfParams) => number;
 
