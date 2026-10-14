@@ -1,0 +1,216 @@
+{
+  "benchmark": "local-shadows-gpu",
+  "recordedAt": "2026-10-14T23:34:32.213Z",
+  "hardware": {
+    "vendor": "intel",
+    "architecture": "xe-2lpg",
+    "device": "",
+    "description": "",
+    "fallback": false
+  },
+  "browser": "chromium 155.0.4283.45",
+  "resolution": [
+    1280,
+    720
+  ],
+  "powerOnline": {
+    "before": "True",
+    "after": "True"
+  },
+  "visual": [
+    {
+      "mode": "point",
+      "floor": "core",
+      "offEqualsDetachedMaxDiff": 0,
+      "shadowCentreRatios": [
+        0.478,
+        0.433,
+        0.481
+      ],
+      "acneGridPoints": 2285,
+      "acneMaxLumaDiff": 0,
+      "acneMeanLumaDiff": 0,
+      "contactGapPx": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "mode": "point",
+      "floor": "materials",
+      "offEqualsDetachedMaxDiff": 0,
+      "shadowCentreRatios": [
+        0.329,
+        0.296,
+        0.329
+      ],
+      "acneGridPoints": 2285,
+      "acneMaxLumaDiff": 0,
+      "acneMeanLumaDiff": 0,
+      "contactGapPx": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "mode": "spot",
+      "floor": "core",
+      "offEqualsDetachedMaxDiff": 0,
+      "shadowCentreRatios": [
+        0.43,
+        0.406,
+        0.43
+      ],
+      "acneGridPoints": 1389,
+      "acneMaxLumaDiff": 0,
+      "acneMeanLumaDiff": 0,
+      "contactGapPx": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "mode": "spot",
+      "floor": "materials",
+      "offEqualsDetachedMaxDiff": 0,
+      "shadowCentreRatios": [
+        0.293,
+        0.279,
+        0.293
+      ],
+      "acneGridPoints": 1389,
+      "acneMaxLumaDiff": 0,
+      "acneMeanLumaDiff": 0,
+      "contactGapPx": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "timings": [
+    {
+      "count": 0,
+      "dynamic": false,
+      "spot": false,
+      "attached": false,
+      "gpuMs": 4.522,
+      "gpuSamples": 40,
+      "frameMs": 9.2,
+      "layersPerFrame": 0
+    },
+    {
+      "count": 0,
+      "dynamic": false,
+      "spot": false,
+      "attached": true,
+      "gpuMs": 3.67,
+      "gpuSamples": 40,
+      "frameMs": 8.5,
+      "layersPerFrame": 0
+    },
+    {
+      "count": 0,
+      "dynamic": true,
+      "spot": false,
+      "attached": true,
+      "gpuMs": 3.867,
+      "gpuSamples": 40,
+      "frameMs": 8.5,
+      "layersPerFrame": 0
+    },
+    {
+      "count": 1,
+      "dynamic": false,
+      "spot": false,
+      "attached": true,
+      "gpuMs": 4.26,
+      "gpuSamples": 40,
+      "frameMs": 8.9,
+      "layersPerFrame": 0
+    },
+    {
+      "count": 1,
+      "dynamic": true,
+      "spot": false,
+      "attached": true,
+      "gpuMs": 4.26,
+      "gpuSamples": 40,
+      "frameMs": 9.8,
+      "layersPerFrame": 6
+    },
+    {
+      "count": 4,
+      "dynamic": false,
+      "spot": false,
+      "attached": true,
+      "gpuMs": 5.243,
+      "gpuSamples": 40,
+      "frameMs": 9.9,
+      "layersPerFrame": 0
+    },
+    {
+      "count": 4,
+      "dynamic": true,
+      "spot": false,
+      "attached": true,
+      "gpuMs": 5.505,
+      "gpuSamples": 40,
+      "frameMs": 12.6,
+      "layersPerFrame": 24
+    },
+    {
+      "count": 8,
+      "dynamic": false,
+      "spot": false,
+      "attached": true,
+      "gpuMs": 6.291,
+      "gpuSamples": 40,
+      "frameMs": 11.4,
+      "layersPerFrame": 0
+    },
+    {
+      "count": 8,
+      "dynamic": true,
+      "spot": false,
+      "attached": true,
+      "gpuMs": 7.012,
+      "gpuSamples": 40,
+      "frameMs": 16.2,
+      "layersPerFrame": 48
+    },
+    {
+      "count": 8,
+      "dynamic": false,
+      "spot": true,
+      "attached": true,
+      "gpuMs": 5.374,
+      "gpuSamples": 40,
+      "frameMs": 9.9,
+      "layersPerFrame": 0
+    },
+    {
+      "count": 8,
+      "dynamic": true,
+      "spot": true,
+      "attached": true,
+      "gpuMs": 5.374,
+      "gpuSamples": 40,
+      "frameMs": 11.2,
+      "layersPerFrame": 8
+    },
+    {
+      "count": 0,
+      "dynamic": false,
+      "spot": false,
+      "attached": false,
+      "gpuMs": 4.588,
+      "gpuSamples": 40,
+      "frameMs": 9.1,
+      "layersPerFrame": 0
+    }
+  ]
+}

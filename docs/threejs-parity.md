@@ -8,14 +8,14 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 85 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| COVERED | 87 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
 | PARTIAL | 39 | Some of it exists, but a common use case is missing. The notes say what. |
-| MISSING | 32 | No implementation was found in any package's `src/`. |
+| MISSING | 30 | No implementation was found in any package's `src/`. |
 
 Overall: Margo is strong where three.js relies on third-party libraries or examples. That includes cascaded PCSS shadows, clustered lighting, TAA, Gaussian splats, BVH queries, physics, navigation, terrain, water and sky. The day-one basics the first version of this matrix found missing (textures and materials on meshes you build, glTF extensions and compression, an orthographic camera, picking loaded models, image-based lighting outside React, combinable effects, FXAA, a math library) now exist as optional packages. What remains:
 
 - **WebGL2 reaches core meshes only.** The fallback is the optional `@margoengine/webgl` package and draws core meshes flat-shaded with one light. Textures, glTF-pro models, shadows, post-processing, lines, points, text and most other rendering packages need WebGPU.
-- **Lighting is thin outside clustered point and spot lights.** One directional light per engine, a colourless scalar ambient term, a fixed hemisphere fill in glTF-pro, and shadows only from the directional light. No RectAreaLight.
+- **Lighting is thin outside clustered point and spot lights.** One directional light per engine, a colourless scalar ambient term, a fixed hemisphere fill in glTF-pro. Point and spot lights cast shadows through `@margoengine/clustered/shadows` (up to 16 shadowed lights). No RectAreaLight.
 - **Core owns one canvas, one camera and one pass graph.** There is no transparent canvas, no render-to-texture from a second camera, no CubeCamera and no multiple viewports. All of these need core changes, and core is frozen for v1.0.
 - **Materials stop at standard, basic, normal and matcap on your own meshes.** Physical features come only from glTF `KHR_materials_*` files and are approximated (transmission does not refract). No Lambert, Phong, depth or shadow-catcher materials, no second UV set and no geometry groups.
 - **glTF coverage has gaps.** `KHR_animation_pointer`, iridescence, anisotropy, dispersion and material variants are rejected when required. glTF cameras are exposed as data only, and export writes no cameras or lights.
@@ -120,8 +120,8 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | AmbientLight | PARTIAL | core lighting `radiance[3]` (through `core/extension`) | A scalar intensity times albedo. It has no color and does not apply to metals (`packages/core/src/shaders.ts`). environment `EnvironmentLighting` replaces it with IBL. |
 | HemisphereLight | PARTIAL | fixed sky/ground gradient in gltf-pro's ambient term (`packages/gltf-pro/src/shader.ts`, line 61) | Not configurable. Core meshes use the flat ambient. |
 | DirectionalLight | PARTIAL | core lighting `direction` and `radiance` (`packages/core/src/engine.ts`, through `core/extension`) | Exactly one per engine, and not on the public `EngineKernel` type. |
-| PointLight | COVERED † | clustered `Clustered.setLights` (`packages/clustered/src/index.ts`) | Up to 1,024 lights, WebGPU only, no shadows. Core meshes receive them automatically; glTF-pro models, materials meshes and terrain need `add()`. glTF `KHR_lights_punctual` lights come from `model.clusteredLights()`. |
-| SpotLight | COVERED † | clustered `Clustered.setLights` with inner and outer cone | No shadows and no projected `map`. |
+| PointLight | COVERED † | clustered `Clustered.setLights` (`packages/clustered/src/index.ts`) | Up to 1,024 lights, WebGPU only; shadows with `castShadow` and `@margoengine/clustered/shadows` (see Shadows). Core meshes receive them automatically; glTF-pro models, materials meshes and terrain need `add()`. glTF `KHR_lights_punctual` lights come from `model.clusteredLights()`. |
+| SpotLight | COVERED † | clustered `Clustered.setLights` with inner and outer cone | Shadows as for PointLight. No projected `map`. |
 | RectAreaLight | MISSING | — | |
 | LightProbe | PARTIAL | environment `projectEquirectSH`, `environment.sh` | One global probe from the environment map. No placed probes or probe volumes. |
 | IESSpotLight, ProjectorLight | MISSING | — | |
@@ -132,8 +132,8 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | three.js | Status | Margo | Notes |
 | --- | --- | --- | --- |
 | Directional light shadows (incl. CSM add-on, PCF/PCFSoft) | COVERED † | shadows `Shadows` (`packages/shadows/src/index.ts`, `cascades.ts`) | Four cascades, PCSS, and a cache for static casters. WebGPU only. Core meshes are shadowed automatically; glTF-pro models (including skinned ones and materials meshes), terrain and scatter need `add()`. Goes beyond three core. |
-| PointLight shadows | MISSING | — | The clustered README says local lights do not cast shadows. |
-| SpotLight shadows | MISSING | — | |
+| PointLight shadows | COVERED | clustered `LocalShadows`, entry `@margoengine/clustered/shadows` (`packages/clustered/src/shadows.ts`) | Lights with `castShadow` get six cube-face layers in one depth texture array (`maxLights` 1-16, default 4; `resolution` default 512), 3x3 PCF, texel-scaled normal and light-direction bias. Casters: core meshes, glTF-pro models, materials and instanced meshes via `add()`; receivers are whatever clustered lights. Maps re-render only when their light or a caster changes (`{dynamic: true}` for skinned casters). Not drawn: terrain/scatter `drawShadow` casters. Real-GPU check and costs: `examples/package-benchmarks/local-shadows-gpu.mjs`. WebGPU only. |
+| SpotLight shadows | COVERED | clustered `LocalShadows` (as above) | One perspective layer over the outer cone per light; same filtering, bias, casters and caching as point lights. |
 
 ### 9. Environment, fog and color
 
@@ -288,8 +288,8 @@ Every MISSING or PARTIAL item, ordered by how often real three.js projects need 
    **Fit:** freeze conflict: needs `alphaMode` and a transparent clear in core's context setup. Small.
 3. **More than one directional light, a colored ambient light, and a configurable HemisphereLight.** Key, fill and sky lighting is common.
    **Fit:** extend clustered (directional entries), and environment for hemisphere or colored ambient through the same `margoAmbient` shader hook `EnvironmentLighting` uses. Core's single-light uniform is frozen.
-4. **Point and spot light shadows.** Common in interiors and games.
-   **Fit:** extend shadows.
+4. [DONE] **Point and spot light shadows**: clustered `LocalShadows` (`@margoengine/clustered/shadows`), cube faces for point lights and a perspective map for spot lights in one texture array, cached per light (PointLight shadows and SpotLight shadows rows).
+   **Left:** per-light caster culling, `drawShadow` casters (terrain, scatter), soft (PCSS) local shadows.
 5. [DONE] **Textured instancing** (InstancedMesh with a textured material, glTF `EXT_mesh_gpu_instancing`): gltf-pro `PBRInstances` and materials `createInstancedMesh`, one draw for N instances (InstancedMesh row).
    **Left:** per-instance frustum culling, sorting transparent instances, `ScatterInstances` with textured materials.
 6. **Remaining glTF extensions.** `KHR_animation_pointer`, `KHR_materials_iridescence`, `anisotropy`, `dispersion` and `variants`, refracting transmission, and applying glTF cameras. Files that require them are rejected.
@@ -390,7 +390,7 @@ Positioning caveats for a public page:
 
 - **Reading only.** This matrix comes from reading source code. No build, test, benchmark or browser was run while writing it, so no row is a statement that a feature works at runtime.
 - **Line-by-line reading.** Core and the stage facade were read in full (`packages/core/src/*.ts`, `packages/margoengine/src/index.ts`). So were the gltf loader and most of gltf-pro, plus the parts of animation, animator, fbx, toon, the React environment adapter, the bvh raycaster, machinery's OBJ parser and creative's targets that the rows cite.
-- **Re-audit, 2026-10-14.** Every row was re-checked against `perf/auto-quality` at commit 2c53227: each package's README, `src/index.ts` and package.json `exports`. Read line by line in this pass: materials `src/index.ts`, core `camera.ts` and the instance sizing in `engine.ts`, gltf-pro's extension handling (`asset.ts`, decoder hooks) and post's `PostStack` order rules (`stack.ts`). The table then held 156 rows (texture transforms, VAT crowds and ViewHelper had been added to the original 153); the earlier summary still read 65 / 43 / 45.
+- **Re-audit, 2026-10-14.** Every row was re-checked against `perf/auto-quality` at commit 2c53227: each package's README, `src/index.ts` and package.json `exports`. Read line by line in this pass: materials `src/index.ts`, core `camera.ts` and the instance sizing in `engine.ts`, gltf-pro's extension handling (`asset.ts`, decoder hooks) and post's `PostStack` order rules (`stack.ts`). The table then held 156 rows (texture transforms, VAT crowds and ViewHelper had been added to the original 153); the earlier summary still read 65 / 43 / 45. Since then: InstancedMesh PARTIAL -> COVERED (textured instancing), glTF export with animation PARTIAL -> COVERED, PointLight and SpotLight shadows MISSING -> COVERED (`@margoengine/clustered/shadows`, run on a real GPU): 87 / 39 / 30.
 - **Rows marked †.** For these, the evidence is that the named exports exist, the source is non-trivial, the package README describes the behavior, and keyword searches across `packages/*/src` agree. The implementation itself was not audited line by line.
 - **MISSING.** A row is MISSING when no matching class, function or keyword was found in any package's `src/`. README files and tests were not counted as implementation.
 - **The three.js side.** The feature list comes from knowledge of three.js r186, its documentation (<https://threejs.org/docs/>) and `three/addons`. It was not re-checked against the r186 tag while writing.

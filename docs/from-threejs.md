@@ -75,7 +75,7 @@ npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @
 | `FBXLoader`, `USDZLoader`, `PLYLoader`/`PCDLoader`/`3MFLoader`, `STLLoader`/`OBJLoader` | `@margoengine/fbx`, `@margoengine/usdz`, `@margoengine/loaders`, `@margoengine/machinery` |
 | `AnimationMixer`, skinning, morphs | `@margoengine/animation` (+ `@margoengine/animator` for blending) |
 | `DirectionalLight` shadows | `@margoengine/shadows` |
-| `PointLight`, `SpotLight` | `@margoengine/clustered` |
+| `PointLight`, `SpotLight` (and their shadows) | `@margoengine/clustered` (shadows: `@margoengine/clustered/shadows`) |
 | `RGBELoader`, `EXRLoader`, `PMREMGenerator`, `scene.background`, `scene.fog` | `@margoengine/environment` |
 | `Sky` add-on | `@margoengine/sky` |
 | `OrbitControls`, `TransformControls`, `DragControls`, `FlyControls`, ... | `@margoengine/controls` |
@@ -286,8 +286,30 @@ lights.add(model);                           // core meshes are lit automaticall
 
 - Shadows are four cascades with PCSS soft edges; `shadows.add(mesh, {static: true})` caches casters that never move.
 - `setLights` replaces the whole list; call it again to animate lights.
-- One directional light per engine. Point and spot lights cast no shadows. No hemisphere, rect-area or IES lights (glTF
-  models get a fixed sky/ground ambient fill). For image-based ambient light use the next section.
+- One directional light per engine. No hemisphere, rect-area or IES lights (glTF models get a fixed sky/ground ambient
+  fill). For image-based ambient light use the next section.
+
+Point and spot light shadows (three.js `lamp.castShadow = true`) are the optional `@margoengine/clustered/shadows` entry.
+Flag the lights, attach `LocalShadows` to the clustered lights and add the casters (core meshes included, unlike
+directional shadows); everything clustered lights receives the shadows:
+
+```ts
+import {Clustered} from '@margoengine/clustered';
+import {LocalShadows} from '@margoengine/clustered/shadows';
+
+const lamps = Clustered.attach(engine);
+const lampShadows = LocalShadows.attach(engine, {lights: lamps, maxLights: 4, resolution: 512});
+lampShadows.add(mesh);                        // casters: core meshes, gltf-pro models, materials meshes
+lampShadows.add(model);
+lamps.add(model);                             // receivers, as for unshadowed local light
+lamps.setLights([
+  {position: [0, 2, 1], range: 12, intensity: 20, castShadow: true},
+  {position: [2, 3, 0], range: 15, direction: [0, -1, 0], outerAngle: 0.7, intensity: 30, castShadow: true},
+]);
+```
+
+- A point light uses six 512² cube-face layers, a spot light one; the first `maxLights` flagged lights get them.
+- Maps are cached and re-render only when their light or a caster moves; add skinned models with `{dynamic: true}`.
 
 The soft ground shadow of product shots (three.js's ContactShadows example: a depth render from below, blurred, on a
 plane) is `@margoengine/staging`. It needs no light and works with or without `Shadows`:
@@ -873,7 +895,7 @@ From [`docs/threejs-parity.md`](threejs-parity.md). Each would be an optional pa
 | Transparent canvas (`alpha: true`), several scenes or viewports, render to texture from a second camera, `CubeCamera` | Missing; needs core changes |
 | WebGL2 for optional packages | Missing: core meshes, controls, labels, viewcube, bvh, LOD distance levels and the small glTF loader run on WebGL2; the rest needs WebGPU |
 | More than one directional light, coloured ambient, configurable `HemisphereLight`, `RectAreaLight`, IES lights | Missing; point and spot lights via clustered, a fixed hemisphere fill in glTF-pro |
-| Point and spot light shadows, `ShadowMaterial` on any mesh | Missing (`@margoengine/staging` ContactShadows is a ground shadow catcher for product shots) |
+| `ShadowMaterial` on any mesh | Missing (`@margoengine/staging` ContactShadows is a ground shadow catcher for product shots) |
 | glTF `KHR_animation_pointer`, iridescence, anisotropy, dispersion, material variants; applying glTF cameras | Missing (files that require them are rejected; cameras are exposed as data) |
 | `MeshPhysicalMaterial`, Lambert, Phong, depth materials on your own meshes | Missing (glTF physical extensions are approximated; transmission does not refract) |
 | Second UV set, geometry groups and custom attributes on your own meshes | Missing |
