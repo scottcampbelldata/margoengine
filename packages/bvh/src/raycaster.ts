@@ -1,4 +1,5 @@
 import type {Camera, Engine, Geometry, Mesh} from '@margoengine/core';
+import type {Engine as Runtime} from '@margoengine/core/extension';
 import {buildAsync, type AsyncBuildOptions} from './async.js';
 import type {BVHBuildOptions} from './build.js';
 import {MeshBVH, type GeometryLike, type Vec3} from './bvh.js';
@@ -56,7 +57,8 @@ export const isModel = (value: unknown): value is ModelLike => !!value && typeof
 /** Live gltf-pro models attached to an engine: its plugins that have `root` and `primitives`. */
 export function engineModels(engine: Engine): ModelLike[] {
   const out: ModelLike[] = [];
-  for (const plugin of engine.plugins.values()) if (isModel(plugin) && !plugin.disposed) out.push(plugin);
+  // Structural engines (tests, tools) may have no plugin map.
+  for (const plugin of (engine as Runtime).plugins?.values() ?? []) if (isModel(plugin) && !plugin.disposed) out.push(plugin);
   return out;
 }
 
@@ -68,7 +70,7 @@ export interface PickProxy {readonly anchor: Mesh; readonly sphere: ArrayLike<nu
 /** Proxies from every engine plugin with a `pickProxies()` method (an @margoengine/lod `LODSystem`). A new array. */
 export function engineProxies(engine: Engine): PickProxy[] {
   const out: PickProxy[] = [];
-  for (const plugin of engine.plugins.values() as Iterable<{pickProxies?(): readonly PickProxy[]}>) if (typeof plugin.pickProxies === 'function') out.push(...plugin.pickProxies());
+  for (const plugin of ((engine as Runtime).plugins?.values() ?? []) as Iterable<{pickProxies?(): readonly PickProxy[]}>) if (typeof plugin.pickProxies === 'function') out.push(...plugin.pickProxies());
   return out;
 }
 
