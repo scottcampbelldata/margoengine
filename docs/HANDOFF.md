@@ -191,8 +191,22 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
 1d'. [done] Imposter atlas seams: mip bleed (up to 0.43 coverage from neighbouring views at coarse mips) fixed with a
    per-level clamp; snapping (hard 0.5 coverage cut at view midpoints) fixed with a coverage cross-fade and one depth
    parallax step; numbers in packages/lod/README.md, check `node packages/lod/test/imposter-check.mjs`.
-1d''. Pipeline cache keyed by shader module + override-constant bitmask, with common permutations pre-warmed, so
-   toggling a section plane or fog never stalls on a synchronous compile (pairs with 1e.f).
+1d''. [DONE, "Pipeline toggles 3/n" + "4/n"] Pipeline cache keyed by shader module + override-constant bitmask, with common
+   permutations pre-warmed, so toggling a section plane or fog never stalls on a synchronous compile (pairs with 1e.f).
+   Done differently where cheaper: `SectionPlanes.enabled` and `Fog.enabled` switch by uniform (clip loop reads 0 planes;
+   fog uploads near = far = float max, density 0), so the shader never changes and nothing compiles; while sections are
+   off their five cap pipelines compile with createRenderPipelineAsync, and switching on waits for them; FeatureEdges
+   compiles its other (section/plain) variant in the background. gltf-pro's pipeline key is now (state, shader-text id,
+   alpha-test bit) instead of the whole shader text (a 300-primitive lit draw 10.8 -> 1.3 ms CPU, mock GPU). Real GPU
+   (Arc 140V, Edge 1280x720 4x, 1,600 boxes + DamagedHelmet + edges, fresh browser per run, 5 runs): adding the plugin
+   when wanted spikes the frame +178 ms (sections, 146-228) / +121 ms (fog, 96-262); switching on a plugin created off at
+   load +8.6 ms (sections: the caps' first draw) / -0.4 ms (fog, noise). Off renders the same pixels as absent (0 of
+   3.7M channels); GPU frame absent 13.30, off 13.76 (+0.46 ms for the zero-plane loop and zero fog mix), on 16.52 ms.
+   Measured first: an async pre-compile of the exact descriptor makes core's later synchronous compile ~5 ms instead of
+   ~67 ms, but a package cannot pre-compile core's final shader (later passes patch it further), so the uniform switch
+   was used for core-path toggles. Not done: adding/removing an effect still compiles synchronously once (core variant
+   and gltf-pro pipelines); IBL has no `enabled` (its off state is the constant ambient, a different shader).
+   Scripts/results: examples/package-benchmarks/pipeline-toggles/, results/pipeline-toggles.json.
 1d'''. [DONE] Ambient occlusion attenuates image-based lighting (environment IBL), not only the constant ambient term.
    Shader convention `let margoAmbient=` (no imports either way): EnvironmentLighting names its IBL term so; SSAO and
    glTF-pro's ambient replay return it, IBL diffuse and specular occluded by the same AO (specular approximation).
@@ -228,6 +242,20 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       need it); use WebGPU pipeline-overridable constants (`override`) for small toggles such as clipping, fog and IBL
       instead of runtime branches or string patches. Measure GPU time per archetype on the 50k-part scene before and
       after; keep only what measures faster. Core's shader is frozen and already minimal.
+      [DONE, "Specialized pipelines 4/n"] Audit: gltf-pro already splits standard/physical (physical compiled only for
+      materials using it); materials' shading modes and shader-node materials each compile their own code; machinery
+      edges have section/plain variants; caps are own pipelines. The cost found was not register pressure but `discard`:
+      any discard in a fragment shader costs early depth testing. gltf-pro's back-face and alpha-mask discards are now
+      `override` constants (margoFaceTest off in gltf-pro's own pipelines, where the pipeline already culls back faces;
+      margoAlphaTest on only for MASK): full-screen DamagedHelmet 0.852 -> 0.524 ms GPU (timestamp queries, interleaved
+      rounds); turning the other uniform toggles (unlit, HDR output, blend alpha) into constants gave 0.721 alone and
+      nothing on top, so they stay uniforms. Real-GPU pixel proof vs 15c87f1 (7 material kinds front and back, helmet,
+      SSAO G-buffer/ambient passes): 0 of 3.69M channels differ. CAD 50k + edges: the cad-basic (core) and cad-edges
+      shaders are unchanged; pass medians core 12.6/17.9 -> 11.5/13.7 ms, edges 3.54/4.52 -> 3.60/3.67 ms (noise;
+      cad/results-1ef-*.json). Overrides cannot be used for patches of core's shader (core builds that pipeline), so
+      clipping/fog stay uniform-gated (1d''). For Scott, not measured: core's frozen shader culls back faces with
+      `if(!facing&&i.material.z<0.5){discard;}` (its pipeline has cullMode none), so every core mesh pays the same
+      early-depth cost; per-sidedness pipelines with cullMode would remove it (a core change).
    e. A CAD launch demo (large assembly, sections, edges, measurement, ortho views) and an honest comparison page.
 1e'. DECISION FOR SCOTT (CAD scale is CPU-bound in core; measured on AC, docs/cad-performance.md): at 50k parts the
    frame is 20.9 ms CPU (45 FPS), at 90k 39.1 ms (25 FPS); kernel tick 7.7 / 16.4 ms and JS batch collection 6.2 /
@@ -328,6 +356,23 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       materials/index.ts, shader/node.ts, usdz/crate.ts).
    c. Replace WGSL string patching (shadows, tonemap, toon, environment, materials, shader) with override constants,
       specialized pipelines (1e.f) and shader nodes, so one renamed shader line cannot silently break another package.
+      [DONE, "Shader contracts 1/n" + "2/n"; docs/shader-contracts.md] Inventory: ~45 cross-package anchors. (1) gltf-pro's
+      PBR shader patched by shadows (`direct+ambient(s)`), clustered (`var color=`), environment IBL (`fn ambient`,
+      `var color=…+s.emissive;`) and fog (the ACES line), plus gltf-pro's own `includes('let margoAmbient=')` for the SSAO
+      replay: replaced by declared lighting hooks (`LightingEffect.pbr(group)` -> `PBRLighting` {declarations, direct,
+      light, ambient, output}, contract v1, gltf-pro README), composed by gltf-pro; recorded-GPU-call proof
+      (proofs/gltf-pro-lighting-hooks.proof.js): identical to 15c87f1. (2) gltf-pro text patched by materials (map
+      samples, fragment head), shader-node NodeMaterial (surface end, vertex position, struct Out) and LOD baking
+      (fragment head): kept (they rewrite sampling/vertex code, not lighting; all already throw on a missing anchor);
+      anchors listed and tested. (3) core's frozen shader patched by sections, shadows, clustered, environment IBL/fog,
+      sky, taa, tonemap, post (stack, bloom, SSAO capture + ambient replay incl. the `let margoAmbient=` convention),
+      creative (post, toon), dof, selection picking, scatter, terrain colors, plus shared meshVertex's copy of core's
+      inputs (toon, selection): must stay text (core frozen, no overrides possible on core's pipeline); every anchor is in
+      tests/shader-contracts.test.js, which fails naming the package if it stops occurring exactly once. Intra-package
+      patches (gltf-pro physical variant, machinery caps, vfx features, points EDL, sky fog, water spray/HORIZON, post
+      composites) left as is: owner and patcher are the same package and its own tests cover them. Silent no-op patches
+      left silent (taa `o.clip=frame.camera*p`, tonemap/post/creative/dof capture regex, toon, scatter, terrain): the
+      contract test covers the core side; making them throw would touch post/dof, which another worker owns.
    d. [DONE: core hooks merged `571b2a0` (camera.up, camera.project, engine.pace, engine.plugins), +101 bytes;
       packages migrated: cameras uses project/up (no update replacement, no off-vertical nudge; shared viewMatrix reads
       camera.up, as do points' basis and labels' lookAtView), quality caps via engine.pace (`paceEngine(engine)`, no global rAF wrap), selection reads
