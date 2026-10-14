@@ -1,4 +1,4 @@
-import {finiteVector} from '../../shared/math.js';
+import {finiteVector} from '@margoengine/math/validate';
 import type {SkyFeatures} from './base.js';
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
 declare const GPUTextureUsage:{TEXTURE_BINDING:number};

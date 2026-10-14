@@ -5,6 +5,8 @@
 ```ts
 export function invertMatrix<T extends NumberArray>(m: ArrayLike<number>, out: T): T | null;
 
+export function invertMatrixStable<T extends Float32Array | Float64Array>(m: ArrayLike<number>, out: T, workspace?: Float64Array): T | null;
+
 export function multiplyMatrices<T extends NumberArray>(a: ArrayLike<number>, b: ArrayLike<number>, out: T): T;
 
 // Not exported from this entry, but used by the exports above:

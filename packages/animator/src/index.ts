@@ -1,6 +1,6 @@
 import {Animation,sampleTrackInto} from '@margoengine/animation';
 import type {Engine,EnginePlugin,Mesh,Vec3} from '@margoengine/core/extension';
-import {finiteVector} from '../../shared/math.js';
+import {finiteVector} from '@margoengine/math/validate';
 import {blend1D,blend2D,quaternionMultiply,quaternionBlend} from './blend.js';
 import {solveTwoBoneIK,rotationBetween} from './ik.js';
 export {blend1D,blend2D} from './blend.js';export {solveTwoBoneIK} from './ik.js';

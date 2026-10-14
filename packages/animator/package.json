@@ -30,5 +30,8 @@
     "@margoengine/animation": "0.1.0",
     "@margoengine/gltf-pro": "0.1.0"
   },
-  "homepage": "https://margoengine.com"
+  "homepage": "https://margoengine.com",
+  "devDependencies": {
+    "@margoengine/math": "0.1.0"
+  }
 }

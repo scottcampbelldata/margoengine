@@ -4,7 +4,7 @@ import {SSAO} from '../dist/index.js';
 import {optionalGPU} from '../../../tests/support/optional-gpu.js';
 import {mockGPU,passes,context} from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import {viewMatrix} from '../../shared/view.js';
-import {invert} from '../../shared/math.js';
+import {invertMatrixStable} from '../../math/src/mat4.ts';
 import {wgsl} from '../../core/src/shaders.ts';
 
 function recorded(shader=wgsl){
@@ -28,7 +28,7 @@ test('SSAO keeps the perspective sample projection and uses the camera\'s own or
  // Consistent with the depth reconstruction: projection * view * inverse(camera) is the identity.
  const view=values.slice(16,32),inverse=values.slice(0,16),mul=(a,m)=>{const o=new Float64Array(16);for(let col=0;col<4;col++)for(let row=0;row<4;row++)for(let k=0;k<4;k++)o[col*4+row]+=a[k*4+row]*m[col*4+k];return o;};
  const identity=mul(mul(q,view),inverse);for(let i=0;i<16;i++)assert.ok(Math.abs(identity[i]-(i%5===0?1:0))<1e-4,`P*V*M^-1 [${i}] = ${identity[i]}`);
- assert.ok(invert(new Float64Array(16),s.view.camera.matrix),'test matrix invertible');
+ assert.ok(invertMatrixStable(s.view.camera.matrix,new Float64Array(16)),'test matrix invertible');
  s.ssao.dispose();
 });
 

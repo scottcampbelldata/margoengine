@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { readFile, access, glob } from 'node:fs/promises';
 import { basename, dirname } from 'node:path';
 import { readBytes, readResponse } from '../packages/shared/loading.js';
-import { invert, finiteVector } from '../packages/shared/math.js';
+import { invertMatrixStable } from '../packages/math/src/mat4.ts';
+import { finiteVector } from '../packages/math/src/validate.ts';
 import { triangulatePolygon } from '../packages/shared/polygon.js';
 import { compose } from './support/matrices.js';
 
@@ -16,14 +17,14 @@ test('shared streaming retains byte bounds, abort reasons and reader cleanup', a
   const signal = AbortSignal.abort(0); await assert.rejects(readResponse(new Response(new Uint8Array([1])), { maxBytes: 3, signal }), error => error === 0);
 });
 
-test('shared inversion retains affine precision, alias safety and unchanged output on invalid input', () => {
+test('stable inversion retains affine precision, alias safety and unchanged output on invalid input', () => {
   const matrix = new Float64Array(16); compose(matrix, 0, [2, -3, 4], [0, 0, Math.SQRT1_2, Math.SQRT1_2], [-2, 3, 4]);
-  const original = matrix.slice(); assert.equal(invert(matrix, matrix), true);
+  const original = matrix.slice(); assert.equal(invertMatrixStable(matrix, matrix), matrix);
   for (let row = 0; row < 4; row++) for (let column = 0; column < 4; column++) {
     let value = 0; for (let k = 0; k < 4; k++) value += original[k * 4 + row] * matrix[column * 4 + k];
     assert(Math.abs(value - +(row === column)) < 1e-12);
   }
-  const output = new Float32Array(16).fill(7); assert.equal(invert(output, new Float64Array(16)), false); assert(output.every(value => value === 7));
+  const output = new Float32Array(16).fill(7); assert.equal(invertMatrixStable(new Float64Array(16), output), null); assert(output.every(value => value === 7));
   assert.throws(() => finiteVector([0, Infinity], 2, 'CAD vertex'), /finite/);
 });
 

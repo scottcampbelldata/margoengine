@@ -1,5 +1,5 @@
 import type {Engine,EnginePlugin,FrameGraph,PassContext,Vec3} from '@margoengine/core/extension';
-import {invert} from '../../shared/math.js';
+import {invertMatrixStable} from '@margoengine/math/mat4';
 import {HDRRenderTarget} from './targets.js';
 import type {StackHost,StackStage} from '../../shared/stack.js';
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
@@ -78,7 +78,7 @@ export class PostProcessing implements EnginePlugin {
   }
   private preparePresent(c:Context,format:GPUTextureFormat,multisample:GPUMultisampleState|undefined):void {const key=format+':'+(multisample?.count??1);if(!this.present||this.presentKey!==key){const module=c.device.createShaderModule({code:present});this.present=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format}]},multisample});this.presentKey=key;this.presentGroup=undefined;}this.presentGroup??=c.device.createBindGroup({layout:this.present.getBindGroupLayout(0),entries:[{binding:0,resource:this.output!.createView()}]});
   }
-  private update(c:Context):void {const o=this.options,a=o.atmosphere??atmosphere,v=this.values;if(!invert(this.inverse,c.camera.matrix,0,this.inverseWorkspace))throw new Error('Invalid post camera');this.time+=c.delta;
+  private update(c:Context):void {const o=this.options,a=o.atmosphere??atmosphere,v=this.values;if(!invertMatrixStable(c.camera.matrix,this.inverse,this.inverseWorkspace))throw new Error('Invalid post camera');this.time+=c.delta;
     v.set(c.camera.position,16);v.set(a.sun??sun,20);v[24]=a.density??0;v[25]=a.heightFalloff??0;v[26]=a.godRays??0;v.set(a.color??color,28);v[32]=o.exposure??0;v[33]=o.contrast??1;v[34]=o.saturation??1;v[36]=o.focus??5;v[37]=o.aperture??0;v[38]=o.grain??0;v[39]=this.time;v[40]=c.camera.near;v[41]=c.camera.far;v.set(o.gain??gain,44);v.set(o.lift??lift,48);v.set(c.camera.matrix,52);
     c.device.queue.writeBuffer(this.uniform!,0,v as Float32Array<ArrayBuffer>);}
   private dispatch(c:Context,pipeline:GPUComputePipeline,group:GPUBindGroup,width:number,height:number):void {const pass=c.encoder.beginComputePass();try{pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.dispatchWorkgroups(Math.ceil(width/8),Math.ceil(height/8));}finally{pass.end();}}

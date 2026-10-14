@@ -1,4 +1,4 @@
-import {finiteVector} from '../../shared/math.js';
+import {finiteVector} from '@margoengine/math/validate';
 import type {SkyFeatures} from './base.js';
 /** Stylized night (`night` option): gradient, twinkling stars and a phased moon with glow. */
 export const night:NonNullable<SkyFeatures['night']>={wgsl:`fn hash21(p:vec2f)->f32 {var q=fract(p.xyx*0.1031);q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}

@@ -1,4 +1,4 @@
-import { finiteVector } from './math.js';
+import { finiteVector } from '@margoengine/math/validate';
 
 const turn = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
 const turnError = (a, b, c) => (Math.abs((b[0] - a[0]) * (c[1] - a[1])) + Math.abs((b[1] - a[1]) * (c[0] - a[0]))) * Number.EPSILON * 4;

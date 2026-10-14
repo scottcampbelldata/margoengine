@@ -1,6 +1,6 @@
 import type {Engine,EnginePlugin,FrameGraph,PassContext} from '@margoengine/core/extension';
 import type {Animation} from './index.js';
-import {invert} from '../../shared/math.js';
+import {invertMatrixStable} from '@margoengine/math/mat4';
 import {acesShader} from '../../shared/aces.js';
 import {multiplyMatrices} from '@margoengine/math/mat4';
 declare const GPUBufferUsage:{UNIFORM:number;STORAGE:number;VERTEX:number;INDEX:number;COPY_DST:number};
@@ -42,7 +42,7 @@ export function bakeVAT(animation:Animation,{fps=30,clips}:VATBakeOptions={}):VA
     ids.forEach((clip,c)=>{
       const duration=animation.clips[clip].duration;animation.play(clip);
       for(let r=0;r<=frames[c];r++,row++){
-        animation.seek(duration*r/frames[c]);store.tick(false);if(!invert(root,model.root.matrix,0,work))throw new Error('Singular VAT model root');
+        animation.seek(duration*r/frames[c]);store.tick(false);if(!invertMatrixStable(model.root.matrix,root,work))throw new Error('Singular VAT model root');
         let o=row*vertexCount*8;
         for(const x of parts){
           const {p,joints,palette,ids:j,weights:w}=x,v=p.vertices;

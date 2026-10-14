@@ -73,6 +73,10 @@
     "./mat4": {
       "types": "./dist/mat4.d.ts",
       "import": "./dist/mat4.js"
+    },
+    "./validate": {
+      "types": "./dist/validate.d.ts",
+      "import": "./dist/validate.js"
     }
   },
   "files": [

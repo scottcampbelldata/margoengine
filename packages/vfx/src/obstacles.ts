@@ -1,4 +1,4 @@
-import {finiteVector} from '../../shared/math.js';
+import {finiteVector} from '@margoengine/math/validate';
 import {settle} from './shader.js';
 import {extra} from './extra.js';
 import type {VFXFeatures} from './base.js';

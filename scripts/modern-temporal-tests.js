@@ -14,7 +14,7 @@ try{
     const {parseGLTF}=await import('/packages/gltf-pro/dist/index.js'),{Animation}=await import('/packages/animation/dist/index.js');
     const {PostProcessing}=await import('/packages/creative/dist/index.js');
     const {SSAO}=await import('/packages/post/dist/index.js');
-    const {Clustered}=await import('/packages/clustered/dist/index.js'),{invert}=await import('/packages/shared/math.js');
+    const {Clustered}=await import('/packages/clustered/dist/index.js'),{invertMatrixStable}=await import('/packages/math/dist/mat4.js');
     const assert=(ok,message)=>{if(!ok)throw new Error(message);},canvas=document.createElement('canvas');canvas.style.cssText='width:128px;height:128px';document.body.append(canvas);
     const instance=await EngineKernel.create(canvas,{backend:'webgpu',capacity:32,camera:{position:[0,0,6],target:[0,0,0],near:0.1,far:100}}),engine=engineRuntime(instance),device=engine.gpu,modules=[],create=device.createShaderModule.bind(device);
     device.createShaderModule=d=>{const m=create(d);modules.push(m);return m;};device.pushErrorScope('validation');
@@ -54,7 +54,7 @@ try{
     const ssao=SSAO.attach(instance,{samples:8});taa.options.depth=()=>ssao.depthTexture;await render();taa.dispose();await render();taa=TAA.attach(instance,{depth:()=>ssao.depthTexture});await render();ssao.dispose();delete taa.options.depth;
     canvas.style.width='96px';await render();assert(taa.gpuState.history.width===96,'History did not resize');canvas.style.width='128px';await render();
     taa.dispose();taa=TAA.attach(instance,{historyWeight:0});instance.camera.near=5.94;instance.camera.far=5.96;const edgeLight=Clustered.attach(instance,{grid:[3,1,1]}),radiance=engine.lighting.radiance.slice();engine.lighting.radiance.fill(0);
-    const removeEdge=engine.frameGraph.add({name:'temporal:cluster-boundary',order:-4,execute:c=>{const inverse=new Float32Array(16),m=c.camera.matrix;invert(inverse,m);const depth=(m[10]*0.05+m[14])/(m[11]*0.05+m[15]),clip=[42.5/128*2-1,1-64.5/128*2,depth,1],world=[0,1,2,3].map(r=>clip.reduce((sum,v,k)=>sum+inverse[k*4+r]*v,0));edgeLight.setLights([{position:[world[0]/world[3],world[1]/world[3],0.055],range:0.008,color:[1,0,0],intensity:2}]);}});
+    const removeEdge=engine.frameGraph.add({name:'temporal:cluster-boundary',order:-4,execute:c=>{const inverse=new Float32Array(16),m=c.camera.matrix;invertMatrixStable(m,inverse);const depth=(m[10]*0.05+m[14])/(m[11]*0.05+m[15]),clip=[42.5/128*2-1,1-64.5/128*2,depth,1],world=[0,1,2,3].map(r=>clip.reduce((sum,v,k)=>sum+inverse[k*4+r]*v,0));edgeLight.setLights([{position:[world[0]/world[3],world[1]/world[3],0.055],range:0.008,color:[1,0,0],intensity:2}]);}});
     for(let frame=0;frame<4;frame++)await render();const edgeCounts=new Uint32Array(await readBuffer(edgeLight.lightLists.counts));assert(edgeCounts[0]===0&&edgeCounts[1]===1,'Fractional cluster-boundary fixture failed: '+edgeCounts);
     assert(pixel(await readTexture(taa.gpuState.history,8),42,64,4)[0]>0.5,'TAA jitter sent a fragment to the wrong clustered light list');removeEdge();edgeLight.dispose();engine.lighting.radiance.set(radiance);instance.camera.near=0.1;instance.camera.far=100;
     const firstValidation=await device.popErrorScope();assert(!firstValidation,'TAA validation failed: '+firstValidation?.message);
