@@ -10,7 +10,7 @@ are angular deltas; pitch stays between -1.4 (look up) and 0.9 radians (look dow
 Use `Cinematic` ground clearance to keep upward-looking cameras above terrain. Height samples must
 be finite. The caller owns input bindings, character meshes and gait animation.
 
-Orbit, map, trackball, fly, first-person and pointer-lock camera controls plus an interactive transform gizmo for Margo Engine, each tree-shakable on its own.
+Orbit, map, trackball, fly, first-person and pointer-lock camera controls plus an interactive transform gizmo and drag controls for Margo Engine, each tree-shakable on its own. `DragControls` uses `@margoengine/bvh` (a peer dependency) for its hits.
 
 Build from source with `npm run build` in `packages/controls`.
 
@@ -37,6 +37,21 @@ engine.start();
 gizmo.dispose(); orbit.dispose();
 ```
 
+Drag core meshes and gltf-pro models (a model moves by its `root`), with the mouse or touch:
+
+```ts
+import {DragControls, OrbitControls} from '@margoengine/controls';
+import {loadGLTF} from '@margoengine/gltf-pro';
+
+const part = await loadGLTF(engine, '/part.glb');
+const drag = new DragControls(engine, [mesh, part]);          // created before OrbitControls: a grab stops the orbit drag
+const orbit = new OrbitControls(engine);
+drag.plane = [0, 1, 0];                                        // slide on the ground; default 'view' faces the camera
+drag.axis = [1, 0, 0];                                         // or only along world X
+drag.addEventListener('dragstart', event => console.log(event.object, event.hit.point));
+drag.addEventListener('hoveron', event => selection.set([event.object]));
+```
+
 Without an engine, pass a `Camera` and an element and drive the controls yourself: `const fly = new FlyControls(camera, canvas); engine.onFrame((_, delta) => fly.update(delta));`.
 
 `OrbitControls.update()` reuses its camera vectors during continuous updates. Copy `camera.position` and `camera.target` when taking a snapshot.
@@ -52,8 +67,11 @@ Without an engine, pass a `Camera` and an element and drive the controls yoursel
 | `FirstPersonControls` | `FirstPersonControls` | Pointer offset from center turns, WASD or arrows move, R/F up and down, left/right button walks. |
 | `PointerLockControls` | `PointerLockControls` | `lock()` from a click, mouse look while locked, WASD/arrows/R/F through `update(delta)`, plus `moveForward`, `moveRight`, `moveUp`. |
 | `TransformControls` | `TransformControls` | Translate (axis arrows, plane squares, center screen-plane handle), rotate (axis rings, view ring, free trackball disc), scale (axis handles, uniform center). |
+| `DragControls` | `DragControls` | Left button or one finger grabs the nearest listed core mesh or gltf-pro model and moves it on the view plane, a world plane (`plane`) or a world axis (`axis`). Mouse hover reports the object under the pointer. |
 
-Every control has `enabled`, `connect(element)`, `disconnect()`, `update(delta)` (returns true when the camera moved), `dispose()` and three.js-style `addEventListener`. Camera controls emit `change`, and the drag-based ones `start` and `end`. `PointerLockControls` emits `lock` and `unlock`. `TransformControls` emits `change`, `mouseDown`, `mouseUp`, `objectChange`, `dragging-changed` (`value`), `axis-changed` (`value`), `mode-changed` and `space-changed`.
+Every control has `enabled`, `connect(element)`, `disconnect()`, `update(delta)` (returns true when the camera moved), `dispose()` and three.js-style `addEventListener`. Camera controls emit `change`, and the drag-based ones `start` and `end`. `PointerLockControls` emits `lock` and `unlock`. `TransformControls` emits `change`, `mouseDown`, `mouseUp`, `objectChange`, `dragging-changed` (`value`), `axis-changed` (`value`), `mode-changed` and `space-changed`. `DragControls` emits `dragstart` (`object`, `hit`), `drag`, `dragend`, `hoveron` and `hoveroff` (each with `object`).
+
+`DragControls` casts the pointer ray with a bvh `Raycaster` (`setFromEngine`, then `intersectObjects` on its `objects`), so it follows layers, `filter` and material sides, and works with orthographic cameras from @margoengine/cameras, whose rays start on the near plane. The drag plane passes through the grabbed point; with `axis` it contains the axis and faces the camera as far as it can. Each move intersects the new pointer ray with that plane and sets the object's position in its parent's space, so parented meshes follow the pointer. A grab stops later pointer-down listeners on the element and captures the pointer; touch uses the primary pointer and ignores other fingers. Pass your own `raycaster` to share layers and filters.
 
 ## How it works
 
@@ -94,11 +112,11 @@ Every control has `enabled`, `connect(element)`, `disconnect()`, `update(delta)`
 - Margo Engine has no orthographic camera, so orbit `zoom` and the orthographic paths of three.js are absent; dolly is the only zoom. `minTargetRadius`, `maxTargetRadius` and `cursor` from recent three.js `OrbitControls` are not implemented.
 - `TransformControls` has no plane scale handles, does not flip arrows toward the camera, draws no start-to-current delta helper lines, and does not snap free (trackball) rotation. A parent with non-uniform scale and rotation shears its children; drags use the parent's rotation without the shear.
 - The gizmo is always on top of the scene (no occlusion by scene geometry), like three.js by default.
-- `ArcballControls` and `DragControls` are not included.
+- `ArcballControls` is not included. `DragControls` has no rotate mode, `recursive` or `transformGroup` options; pass a model to drag the whole model, or a core mesh to drag that mesh. Skinned models are grabbed in their bind pose (see @margoengine/bvh).
 
 ## Tests
 
-`npm test` in `packages/controls` runs 22 Node tests with synthetic pointer, wheel and keyboard events on a fake element, and real core `Camera`, `TransformStore` and `Engine` objects with a stub renderer: orbit azimuth and polar mapping, polar and azimuth clamping and pole safety, damping convergence at 30 and 60 fps, dolly limits, zoom to cursor keeping the world point on its pixel, screen-space and ground panning moving target and position equally, keyboard pan, touch rotate and pinch, `enabled`, `reset`, auto-rotate, map panning, trackball rotation, coasting and pole guard, fly and first-person movement and look, pointer-lock look limits and WASD helpers, and the gizmo: translating along an axis by a known screen drag, snapping in world and local space, plane and screen handles, ring rotation following the cursor, rotation snapping, more than 180 degrees of rotation, the view ring and free rotation, axis and uniform scale with snapping, local versus world space, a parented mesh (translate, rotate, scale) under a rotated and scaled parent, hover highlighting, axis toggles, OrbitControls disabled during a gizmo drag, tessellation of every mode, and listener and plugin cleanup.
+`npm test` in `packages/controls` runs 32 Node tests with synthetic pointer, wheel and keyboard events on a fake element, and real core `Camera`, `TransformStore` and `Engine` objects with a stub renderer: orbit azimuth and polar mapping, polar and azimuth clamping and pole safety, damping convergence at 30 and 60 fps, dolly limits, zoom to cursor keeping the world point on its pixel, screen-space and ground panning moving target and position equally, keyboard pan, touch rotate and pinch, `enabled`, `reset`, auto-rotate, map panning, trackball rotation, coasting and pole guard, fly and first-person movement and look, pointer-lock look limits and WASD helpers, and the gizmo: translating along an axis by a known screen drag, snapping in world and local space, plane and screen handles, ring rotation following the cursor, rotation snapping, more than 180 degrees of rotation, the view ring and free rotation, axis and uniform scale with snapping, local versus world space, a parented mesh (translate, rotate, scale) under a rotated and scaled parent, hover highlighting, axis toggles, OrbitControls disabled during a gizmo drag, tessellation of every mode, and listener and plugin cleanup. Drag tests move a box under a scaled parent on the view plane (checked against an independent ray-plane intersection), along an axis and on the ground plane, a gltf-pro model by touch under an orthographic camera (600 CSS pixels for 6 world units), and check events, hover, misses falling through to later listeners, other fingers, disposed meshes and models, and cleanup.
 
 `npm run test:browser` starts a real engine in Chromium (or Edge, honoring `BROWSER_CHANNEL`, `BROWSER_EXECUTABLE` and `BROWSER_ARGS`) and drives it with `page.mouse`: an orbit drag moves the rendered box to its newly projected position, the wheel enlarges it, the gizmo draws over the mesh, hover turns the X arrow yellow, dragging the X arrow 100 px moves the mesh and the rendered box by the expected amount while the camera stays still, dispose removes every canvas listener and the overlay pass, there are zero WebGPU validation errors, and the WebGL2 backend draws and removes the same overlay. `npm run size` prints the gzip size of the whole bundle and of each control tree-shaken on its own.
 

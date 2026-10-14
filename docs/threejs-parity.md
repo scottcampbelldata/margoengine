@@ -8,16 +8,16 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 57 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
-| PARTIAL | 47 | Some of it exists, but a common use case is missing. The notes say what. |
-| MISSING | 49 | No implementation was found in any package's `src/`. |
+| COVERED | 65 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| PARTIAL | 43 | Some of it exists, but a common use case is missing. The notes say what. |
+| MISSING | 45 | No implementation was found in any package's `src/`. |
 
 Overall: Margo is strong where three.js relies on third-party libraries or examples. That includes cascaded PCSS shadows, clustered lighting, TAA, Gaussian splats, BVH queries, physics, navigation, terrain, water and sky. The gaps are in the basics a three.js user expects on day one:
 
 - **No materials or textures you can create yourself.** Core `PbrMaterial` is a constant color, opaque and untextured, and core `Geometry` has no UVs. Textures only render on assets loaded through glTF.
 - **No glTF extensions.** Any file that lists `extensionsRequired` is rejected. The Draco, meshopt and KTX2 decoders exist but the glTF loader does not call them.
 - **No orthographic camera.** (Since added as `@margoengine/cameras`, see Cameras.)
-- **Loaded glTF models cannot be picked.** `Raycaster` and `engine.pick` only see core meshes.
+- **Loaded glTF models cannot be picked.** (Since added: bvh `Raycaster` and selection `Picking` hit gltf-pro models, see Interaction.)
 - **Image-based lighting is not applied automatically.** Only the React adapter applies it.
 - **Effects do not combine freely.** Bloom, SSAO and creative post-processing reject each other.
 - **WebGL2 fallback is core-only.** About 30 packages require WebGPU.
@@ -225,7 +225,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | --- | --- | --- | --- |
 | OrbitControls, MapControls, TrackballControls, FlyControls, FirstPersonControls, PointerLockControls | COVERED † | controls (`packages/controls/src/orbit.ts`, `trackball.ts`, `fly.ts`, `first-person.ts`, `pointer-lock.ts`) | core also has `CADCameraControls`. |
 | TransformControls | COVERED † | controls `TransformControls` (`packages/controls/src/transform.ts`); gizmo re-exports it | |
-| DragControls | MISSING | — | |
+| DragControls | COVERED | controls `DragControls` (`packages/controls/src/drag.ts`) | Core meshes and gltf-pro models, mouse and touch, view plane, world plane or axis, hover events; hits from the bvh `Raycaster`. No rotate mode or `transformGroup`. |
 | ArcballControls | MISSING | — | |
 
 ### 15. Helpers
@@ -240,8 +240,8 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 
 | three.js | Status | Margo | Notes |
 | --- | --- | --- | --- |
-| Raycaster | PARTIAL | bvh `Raycaster.intersectEngine` (`packages/bvh/src/raycaster.ts`) | Tests only core meshes that have a core `Geometry`. glTF-pro primitives (all textured or animated models), skinned or morphed meshes and lines are never hit. Hits have no `uv`. points has its own `pickPoint`. |
-| GPU picking | PARTIAL | core `engine.pick`; selection `Picking` (`packages/selection/src/picking.ts`) | Core meshes only. WebGPU only. No plugin adds glTF-pro models to picking. |
+| Raycaster | COVERED | bvh `Raycaster.intersectEngine`, `intersectObjects` (`packages/bvh/src/raycaster.ts`) | Core meshes and gltf-pro primitives (loaded models and materials meshes) with node transforms; model hits carry model, primitive, node and `uv`. Skinned and morphed primitives are hit in bind pose. Lines are never hit; points has its own `pickPoint`. |
+| GPU picking | COVERED | core `engine.pick`; selection `Picking` (`packages/selection/src/picking.ts`) | Core meshes and gltf-pro models (deformed skinned buffers included); `picking.pick` names the model and primitive. WebGPU only. |
 
 ### 17. Special objects
 
@@ -286,6 +286,7 @@ Every MISSING or PARTIAL item, ordered by how often real three.js projects need 
    **Fit:** extend gltf-pro, plus the `GLTFDecoderHooks` the decoders README already proposes.
 3. **Raycasting and picking glTF-pro models.** Click-to-select on loaded models is near-universal, and today only core meshes can be hit.
    **Fit:** extend bvh (`Raycaster` accepts `PBRModel` primitives; the `shadowPrimitives` contract already exposes buffers) and selection (an `onPick` for models).
+   **Done:** bvh `Raycaster` tests gltf-pro primitives, selection `Picking` and `Selection` cover models, `engine.pick` returns model nodes.
 4. **IBL that applies itself** (`scene.environment`). PBR without an environment map looks flat, and outside React every user has to reproduce the shader patch. **Done:** environment `EnvironmentLighting` (core meshes and glTF-pro models).
    **Fit:** extend environment with an `applyTo(model)` or `LightingEffect` export (move the adapter out of `packages/react/src/components.tsx`). Core-mesh IBL is a freeze conflict, since the core shader has no hook for it. A string patch through `PassContext.shader`, as tonemap and toon do, is the workaround.
 5. **Background color and transparent canvas.** `scene.background = color` appears in most three.js scenes, and a transparent canvas is standard for embeds. **Background color done:** environment `ColorBackground`; the transparent canvas remains (core change).
@@ -329,6 +330,7 @@ Every MISSING or PARTIAL item, ordered by how often real three.js projects need 
     **Fit:** extend animation and animator.
 23. **DragControls.**
     **Fit:** extend controls (bvh supplies the hits).
+    **Done:** controls `DragControls`.
 24. **ShadowMaterial (shadow catcher).** Product shots on a page background use it.
     **Fit:** extend shadows.
 25. **Scene-wide fog that is not a post pass,** including fog on transparent objects. **Done:** environment `Fog`.

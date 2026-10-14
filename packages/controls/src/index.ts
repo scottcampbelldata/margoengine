@@ -6,6 +6,8 @@ export {FlyControls} from './fly.js';
 export {FirstPersonControls} from './first-person.js';
 export {PointerLockControls} from './pointer-lock.js';
 export {TransformControls} from './transform.js';
+export {DragControls} from './drag.js';
+export type {DragControlsOptions, DragObject} from './drag.js';
 export type {TransformControlsOptions, TransformSpace, TransformMode, HandleName} from './transform.js';
 export {buildGizmo, pickHandle} from './gizmo.js';
 export type {GizmoFrame, Handle, Prim} from './gizmo.js';
