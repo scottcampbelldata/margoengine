@@ -670,12 +670,18 @@ if intended, run `npm run api:update` after build:packages and commit the `api/`
 
 ## Pre-launch hardware investigation
 
+SHELVED by Scott (2026-10-14): he has no way to test on an S23, so do not start S23/storeOp work unless he asks.
+
 - Galaxy S23 (Adreno) 3-5 FPS on the island: audit every render pass's load/store ops; attachments that are not read
   later should use `storeOp: 'discard'` (on tile-based mobile GPUs a needless store flushes tile memory every frame).
   This is a lead to test, not a confirmed cause: particles Off did not help there and other demos run fine on that
   phone. Needs a capture from the device to confirm.
 
 ## Final phase (Scott, 2026-10-14): after every queue item above is finished
+
+Whitepaper numbers (Scott, 2026-10-14): every published timing must come from a QUIET PC — no other agents building,
+nothing else heavy running (he runs ChatGPT/Codex work on the same laptop), on AC power, under the GPU lock. Ask Scott
+to confirm the machine is quiet before the final benchmark run; numbers taken while workers run are smoke tests only.
 
 1. Rebuild every demo on the current packages and bring each up to date with the new capabilities: quality tiers
    and pacing, materials and textures, shader nodes, post stack + FXAA, environment IBL/fog/backgrounds, cameras
