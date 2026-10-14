@@ -120,10 +120,13 @@ export class FeatureEdges implements EnginePlugin {
     for(let c=0;c<3;c++){const v=Math.min(1,this.color[c]);f[20+c]=encode?(v<=0.0031308?v*12.92:1.055*v**(1/2.4)-0.055):v;}f[23]=this.color[3];context.device.queue.writeBuffer(this.uniform!,0,f);
   }
   private pipeline(context:GPUContext,section:boolean):GPURenderPipeline {
-    const depth=context.descriptor.depthStencil!.format,count=context.descriptor.multisample?.count??1,key=`${context.format}|${depth}|${count}|${section}`;let pipeline=this.pipelines.get(key);
-    if(!pipeline){const device=context.device,module=device.createShaderModule({code:shader(section)});
-      pipeline=device.createRenderPipeline({layout:device.createPipelineLayout({bindGroupLayouts:[section?this.layouts!.section:this.layouts!.plain]}),vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:context.format,blend:{color:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha',operation:'add'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha',operation:'add'}}}]},
-        primitive:{topology:'triangle-list',cullMode:'none'},multisample:{count},depthStencil:{format:depth,depthWriteEnabled:false,depthCompare:'greater-equal',depthBias:this.bias,depthBiasSlopeScale:1}});this.pipelines.set(key,pipeline);}
+    const device=context.device,depth=context.descriptor.depthStencil!.format,count=context.descriptor.multisample?.count??1,key=(clip:boolean)=>`${context.format}|${depth}|${count}|${clip}`;let pipeline=this.pipelines.get(key(section));
+    const descriptor=(clip:boolean):GPURenderPipelineDescriptor=>{const module=device.createShaderModule({code:shader(clip)});
+      return {layout:device.createPipelineLayout({bindGroupLayouts:[clip?this.layouts!.section:this.layouts!.plain]}),vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:context.format,blend:{color:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha',operation:'add'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha',operation:'add'}}}]},
+        primitive:{topology:'triangle-list',cullMode:'none'},multisample:{count},depthStencil:{format:depth,depthWriteEnabled:false,depthCompare:'greater-equal',depthBias:this.bias,depthBiasSlopeScale:1}};};
+    if(!pipeline){pipeline=device.createRenderPipeline(descriptor(section));this.pipelines.set(key(section),pipeline);
+      // Compile the other variant in the background, so adding or removing SectionPlanes later does not stall (HANDOFF 1d'').
+      const other=key(!section);if(!this.pipelines.has(other)&&device.createRenderPipelineAsync)device.createRenderPipelineAsync(descriptor(!section)).then(p=>{if(this.engine?.gpu===device&&!this.pipelines.has(other))this.pipelines.set(other,p);},()=>{});}
     return pipeline;
   }
   onDeviceRestored(engine:Engine):void {this.dispose();this.setup(engine);}

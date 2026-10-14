@@ -194,9 +194,17 @@ export class Fog extends ShaderEffect {
   get heightFalloff(): number {return this.values[7];}
   set heightFalloff(value: number) {this.values[7] = finite(value, 'heightFalloff', 0); this.dirty = true;}
 
+  /**
+   * Fog while true. Switching only rewrites the uniform (off = near and far at the float maximum, density 0, so the shaders mix
+   * in zero fog), so the patched shaders and pipelines stay and switching never compiles. Default true.
+   */
+  get enabled(): boolean {return this.on;}
+  set enabled(value: boolean) {this.on = !!value; this.dirty = true;}
+  private on = true;
+  private readonly off = new Float32Array([0, 0, 0, 0, 3.4028234663852886e38, 3.4028234663852886e38, 0, 0]);
   protected get device(): GPUDevice | undefined {return this.gpu;}
   protected entries(): GPUBindGroupEntry[] {
-    if (this.dirty) {this.gpu!.queue.writeBuffer(this.buffer!, 0, this.values); this.dirty = false;}
+    if (this.dirty) {this.gpu!.queue.writeBuffer(this.buffer!, 0, this.on ? this.values : this.off); this.dirty = false;}
     return this.entry!;
   }
   protected patch(source: string, group: number): string {
