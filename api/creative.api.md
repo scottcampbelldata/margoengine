@@ -17,6 +17,7 @@ export interface AtmosphereOptions {
 
 export class GPUParticles extends VFX {
     readonly name = "gpu-particles";
+    static attach(engine: EngineKernel, options?: ParticleOptions): GPUParticles;
     constructor(options?: ParticleOptions);
     get count(): number;
 }

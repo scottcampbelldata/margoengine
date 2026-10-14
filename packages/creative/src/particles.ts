@@ -1,3 +1,4 @@
+import type {EngineKernel} from '@margoengine/core';
 import type {Vec3} from '@margoengine/core/extension';
 import {VFX,type VFXObstacle,type VFXTexture} from '@margoengine/vfx';
 export type WindObstacle=VFXObstacle;
@@ -6,6 +7,8 @@ export interface ParticleOptions {count?:number;gravity?:Vec3;wind?:Vec3;size?:n
 /** A drifting leaf/weather field: a `@margoengine/vfx` preset that keeps `count` particles wrapping inside a 6 m cube. */
 export class GPUParticles extends VFX {
  override readonly name='gpu-particles';
+ /** Same as `engine.use(new GPUParticles(options))`; returns the GPUParticles (VFX.attach would add a plain VFX). */
+ static override attach(engine:EngineKernel,options?:ParticleOptions):GPUParticles {const value=new GPUParticles(options);engine.use(value);return value;}
  constructor(options:ParticleOptions={}) {
   const {count=5000,gravity=[0,-0.5,0],wind=[0.4,0,0],size=0.035,curl=0}=options;
   if(!Number.isFinite(size)||!(curl>=0&&curl<=10)||gravity.length!==3||wind.length!==3)throw new RangeError('Invalid particle options');
