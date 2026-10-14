@@ -7,7 +7,6 @@ globalThis.modularFeatures = {
   grass: () => import('@margoengine/creative/grass'),
   planet: () => import('@margoengine/creative/planet'),
   sky: () => import('@margoengine/scenery/sky'),
-  skyMoon: () => import('@margoengine/scenery/sky-moon'),
   cad: () => import('@margoengine/machinery/cad'),
   cadAsync: () => import('@margoengine/machinery/cad-async'),
   kinematics: () => import('@margoengine/machinery/kinematics'),

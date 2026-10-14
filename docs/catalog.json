@@ -1071,15 +1071,13 @@
     "package": "@margoengine/scenery",
     "version": "0.1.0",
     "published": false,
-    "description": "Procedural moonlit skies and scenery passes for Margo Engine.",
+    "description": "Moonlit night sky preset (stars, phased moon) over @margoengine/sky.",
     "requirements": "Core 0.1.0 · see the package guide for browser and backend requirements",
     "keywords": "scenery",
     "install": "npm install @margoengine/core@0.1.0 @margoengine/scenery@0.1.0",
     "imports": "import { SkyMoon } from '@margoengine/scenery';",
     "exports": [
-      "NightAtmosphere",
-      "SkyMoon",
-      "SkyMoonPass"
+      "SkyMoon"
     ]
   },
   {

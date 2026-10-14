@@ -11,7 +11,7 @@ import {wgsl} from '../../../packages/core/src/shaders.ts';
 // Default baseline: the parent of the commit that added PostStack.
 const added = execFileSync('git', ['log', '--diff-filter=A', '--format=%h', '--', 'packages/post/src/stack.ts'], {cwd: new URL('../../..', import.meta.url), encoding: 'utf8'}).trim().split('\n').at(-1);
 const ref = process.argv[2] ?? (added ? added + '^' : 'HEAD');
-const post = await versions('post', ref), dof = await versions('dof', ref), tonemap = await versions('tonemap', ref), creative = await versions('creative', ref, 'src/post.ts');
+const post = await versions('post', ref), dof = await versions('dof', ref), tonemap = await versions('tonemap', ref), creative = await versions('creative', ref, 'src/post.ts', '3319317'); // PostProcessing lost bloom and sky after 3319317
 
 /** Runs `effects` (made by `make(gpu)`) with the core main pass for 24 frames, applying `edit(frame, effects, state)` first. */
 function story(make, samples, edit) {

@@ -9,7 +9,7 @@ test('retained reflection lights track actual sun and moon directions through du
   sky.options.hours=hours;h.frame();assert.equal(sky.lights,lights);
   assert.deepEqual(lights[0].direction.slice(0,3),sky.sun);assert.deepEqual(lights[1].direction.slice(0,3),sky.moon);
   assert.equal(lights[0].direction[3],Math.fround(Math.max(0,sky.sun[1])*6));
-  const values=new Float32Array(h.resources.find(r=>!r.destroyed&&r.size===160).data);assert.equal(lights[1].direction[3],values[31],'Moon disc, environment and direct glints share one strength');
+  const values=new Float32Array(h.resources.find(r=>!r.destroyed&&r.size===256).data);assert.equal(lights[1].direction[3],values[31],'Moon disc, environment and direct glints share one strength');
   if(sky.sun[1]>=0)assert.equal(lights[1].direction[3],0,'No moon reflection before sunset');
   else if(sky.sun[1]<=-0.12)assert.equal(lights[1].direction[3],Math.fround(0.6));
   else assert.ok(lights[1].direction[3]>0&&lights[1].direction[3]<0.6);
@@ -85,7 +85,18 @@ test('distance fog borrows scene depth, caches resources and rebinds after resiz
  depth.width=64;assert.throws(h.frame,/matching sampleable scene depth/);depth.width=128;
  sky.options.fog.density=0;const rendered=h.counts.render;h.frame();assert.equal(h.counts.render,rendered+1);
  sky.dispose();assert.equal(depth.destroyed,false);old.destroy();depth.destroy();assert.ok(h.resources.every(r=>r.destroyed));
- for(const fog of [null,{}, {depth:0},{depth:()=>undefined,density:-1},{depth:()=>undefined,density:NaN},{depth:()=>undefined,start:Infinity},{depth:()=>undefined,start:-1}])assert.throws(()=>new Sky({fog}),/fog/);
+ for(const fog of [null,{}, {depth:0},{depth:()=>undefined,density:-1},{depth:()=>undefined,density:NaN},{depth:()=>undefined,start:Infinity},{depth:()=>undefined,start:-1},{depth:()=>undefined,falloff:'linear'},{depth:()=>undefined,height:-1}])assert.throws(()=>new Sky({fog}),/fog/);
+ assert.throws(()=>new Sky({fog:{depth:()=>undefined,color:[1,NaN,0]}}),/Fog color/);
+});
+
+test('exponential height fog with a fixed colour packs its uniform every frame',()=>{
+ const h=optionalGPU(),depth=Object.assign(h.engine.gpu.createTexture({size:[128,96],format:'depth32float',usage:GPUTextureUsage.TEXTURE_BINDING}),{depthOrArrayLayers:1}),color=[0.1,0.2,0.3];
+ const sky=new Sky({fog:{depth:()=>depth,density:0.01,start:0,falloff:'exp',height:0.065,color}});h.engine.use(sky);h.frame();
+ const values=()=>Array.from(new Float32Array(h.resources.find(r=>!r.destroyed&&r.size===32).data),v=>+v.toFixed(4));
+ assert.deepEqual(values(),[0.01,0,1,0.065,0.1,0.2,0.3,1]);
+ color[0]=0.5;sky.options.fog.density=0.02;h.frame();assert.deepEqual(values().slice(0,5),[0.02,0,1,0.065,0.5]);
+ delete sky.options.fog.color;delete sky.options.fog.falloff;h.frame();assert.deepEqual(values().slice(2,8),[0,0.065,0,0,0,0]);
+ sky.dispose();depth.destroy();assert.ok(h.resources.every(r=>r.destroyed));
 });
 
 test('moonlight, ambient color and the reflected night sky share a continuous clock and restore',()=>{
@@ -99,7 +110,7 @@ test('moonlight, ambient color and the reflected night sky share a continuous cl
  options.hours=0;h.frame();assert.deepEqual(h.engine.lighting.direction.slice(0,3),sky.moon);assert.ok(sky.moon[1]>0.17&&sky.moon[1]<0.26,'Moon preset stays 10–15 degrees above the horizon');assert.ok(Math.abs(h.engine.lighting.direction[3]-0.6)<1e-6);
  assert.deepEqual(Array.from(h.engine.lighting.radiance.subarray(0,3)),options.lighting.moon.color.map(Math.fround));
  assert.deepEqual(Array.from(values().subarray(0,3)),options.lighting.ambient.night.map(Math.fround));
- const skyValues=new Float32Array(h.resources.find(r=>r.size===160).data);assert.equal(sky.nightFactor,1);assert.equal(skyValues[23],1);assert.deepEqual(Array.from(skyValues.subarray(28,31)),Array.from(sky.moon));
+ const skyValues=new Float32Array(h.resources.find(r=>r.size===256).data);assert.equal(sky.nightFactor,1);assert.equal(skyValues[23],1);assert.deepEqual(Array.from(skyValues.subarray(28,31)),Array.from(sky.moon));
  options.hours=18;h.frame();assert.ok(sky.nightFactor>0&&sky.nightFactor<1);
  const created={...h.counts};let previous;
  for(let i=0;i<=200;i++){options.hours=17.5+i/200;h.frame();const direction=h.engine.lighting.direction.slice(0,3);if(previous)assert.ok(direction.reduce((sum,v,j)=>sum+v*previous[j],0)>0.995);previous=direction;assert.ok(direction.every(Number.isFinite));}
@@ -125,7 +136,7 @@ test('sky clock wraps midnight and synchronizes sun and lighting once before ren
  h.engine.lighting={direction:new Float32Array(4)};h.engine.use(effect);
  try{
   h.frame();assert.ok(Math.abs(effect.options.hours-0.05)<1e-8);
-  const uniform=h.resources.find(r=>r.size===160),values=new Float32Array(uniform.data);
+  const uniform=h.resources.find(r=>r.size===256),values=new Float32Array(uniform.data);
   assert.deepEqual([...values.subarray(20,23)],[...effect.sun]);
   assert.deepEqual([...h.engine.lighting.direction.subarray(0,3)],[...sunDirection(effect.options.hours)]);
   assert.equal(h.engine.lighting.direction[3],0.25);
@@ -138,7 +149,7 @@ test('sky clock wraps midnight and synchronizes sun and lighting once before ren
 
 test('optional procedural clouds share retained frame data and night sky works without moon lighting',()=>{
  const h=optionalGPU(),sky=new Sky({hours:0,timeScale:0,clouds:{coverage:0.45,speed:8,height:1500}});h.engine.use(sky);sky.reflectionTexture;h.frame();
- const values=()=>new Float32Array(h.resources.find(r=>!r.destroyed&&r.size===160).data),first=values()[37];
+ const values=()=>new Float32Array(h.resources.find(r=>!r.destroyed&&r.size===256).data),first=values()[37];
  assert.equal(values()[23],1);assert.equal(values()[36],Math.fround(0.45));assert.equal(values()[38],1500);
  const created={...h.counts};for(let i=0;i<60;i++)h.frame();assert.ok(values()[37]>first);assert.equal(h.counts.buffers,created.buffers);assert.equal(h.counts.groups,created.groups);
  sky.onDeviceRestored(h.engine);h.frame();assert.ok(values()[37]>first);sky.dispose();assert.ok(h.resources.every(r=>r.destroyed));

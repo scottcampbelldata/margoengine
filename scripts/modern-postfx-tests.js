@@ -121,7 +121,7 @@ try {
           engine.createMesh().setGeometry(box()).setRotation([0.2,0.4,0]).setMaterial(new PbrMaterial({color:[1,0.2,0.1]}));
           if(name==='dof-tone-taa'){const dof=DOF.attach(engine);Tonemap.attach(engine,{source:()=>dof.outputTexture});TAA.attach(engine,{depth:()=>dof.depthTexture});}
           if(name==='ssao-taa'){const ssao=SSAO.attach(engine);TAA.attach(engine,{depth:()=>ssao.depthTexture});}
-          if(name==='creative-taa'){const post=new PostProcessing({bloom:0.1});engine.use(post);TAA.attach(engine,{depth:()=>post.target?.depth});}
+          if(name==='creative-taa'){const post=new PostProcessing({grain:0.01});engine.use(post);TAA.attach(engine,{depth:()=>post.target?.depth});}
           if(name==='tonemap')Tonemap.attach(engine);if(name==='bloom')engine.use(new Bloom());
           for(let i=0;i<3;i++)engine.render();canvas.style.width='96px';engine.render();await device.queue.onSubmittedWorkDone();
           const error=await device.popErrorScope();if(error)throw new Error(name+': '+error.message);

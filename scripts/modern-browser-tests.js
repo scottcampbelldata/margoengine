@@ -23,7 +23,7 @@ try {
   assert.ok(pixels[0].every((v,i)=>Math.abs(v-pixels[1][i])<=3),'Backend PBR pixels disagree');
   const particles=await page.evaluate(async()=>{
     const e=window.modern.state.core,p=await window.modern.particles(),device=e.gpu;
-    const read=async()=>{const buffer=device.createBuffer({size:32,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),encoder=device.createCommandEncoder();encoder.copyBufferToBuffer(p.particles,0,buffer,0,32);device.queue.submit([encoder.finish()]);await buffer.mapAsync(GPUMapMode.READ);const values=[...new Float32Array(buffer.getMappedRange())];buffer.unmap();buffer.destroy();return values;};
+    const read=async()=>{const buffer=device.createBuffer({size:32,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),encoder=device.createCommandEncoder();encoder.copyBufferToBuffer(p.gpuState.particles,0,buffer,0,32);device.queue.submit([encoder.finish()]);await buffer.mapAsync(GPUMapMode.READ);const values=[...new Float32Array(buffer.getMappedRange())];buffer.unmap();buffer.destroy();return values;};
     const before=await read();e.render({delta:0.1});await device.queue.onSubmittedWorkDone();const after=await read();e.removePlugin(p.name);e.render();await device.queue.onSubmittedWorkDone();return {count:p.count,before,after};
   });assert.equal(particles.count,100_000);assert.ok(particles.after[1]<particles.before[1]);assert.ok(particles.after.every(Number.isFinite));result.checks.push({name:'100000 GPU particles update storage and retire passes',...particles});
   await page.evaluate(()=>window.modern.mount());await page.waitForFunction(()=>window.modern.state.react?.meshes.size===2&&window.modern.state.parent&&window.modern.state.child);

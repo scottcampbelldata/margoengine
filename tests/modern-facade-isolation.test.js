@@ -8,7 +8,7 @@ const normalize = path => path.replaceAll('\\', '/');
 const featureMarkers = {
   particles: 'gpu-particles', targets: 'HDR target size exceeds limits', toon: 'toon-shading',
   post: 'post-processing', grass: 'grass:instances', planet: 'planet:surface',
-  sky: 'scenery:sky-moon', skyMoon: 'Sky colors must be non-negative',
+  sky: 'sky-moon',
   cad: 'part-instancer', cadAsync: 'Invalid CAD input',
   kinematics: 'Invalid solver limits', surface: 'surface-physics',
   telemetry: 'telemetry-channel', section: 'section-planes', assembly: 'Invalid assembly tag',
@@ -19,14 +19,14 @@ const featureMarkers = {
   worldAnchor: 'Invalid annotation anchor',
 };
 const cases = [
-  {key: 'particles', pack: 'creative', entry: 'particles', exports: ['GPUParticles'], allowed: ['particles']},
+  // Wrappers load the one implementation they wrap: creative particles over vfx, scenery's SkyMoon over sky.
+  {key: 'particles', pack: 'creative', entry: 'particles', exports: ['GPUParticles'], allowed: ['particles'], packs: ['vfx']},
   {key: 'targets', pack: 'creative', entry: 'targets', exports: ['HDRRenderTarget'], allowed: ['targets']},
   {key: 'toon', pack: 'creative', entry: 'toon', exports: ['ToonShading'], allowed: ['toon']},
   {key: 'post', pack: 'creative', entry: 'post', exports: ['PostProcessing'], allowed: ['post', 'targets']},
   {key: 'grass', pack: 'creative', entry: 'grass', exports: ['GrassField'], allowed: ['grass']},
   {key: 'planet', pack: 'creative', entry: 'planet', exports: ['Planet'], allowed: ['planet']},
-  {key: 'sky', pack: 'scenery', entry: 'sky', exports: ['SkyMoon'], allowed: ['sky', 'skyMoon']},
-  {key: 'skyMoon', pack: 'scenery', entry: 'sky-moon', exports: ['SkyMoonPass'], allowed: ['skyMoon']},
+  {key: 'sky', pack: 'scenery', entry: 'sky', exports: ['SkyMoon'], allowed: ['sky'], packs: ['sky']},
   {key: 'cad', pack: 'machinery', entry: 'cad', exports: ['parseCAD', 'loadCAD', 'deduplicateParts', 'PartInstancer'], allowed: ['cad', 'cadAsync']},
   {key: 'cadAsync', pack: 'machinery', entry: 'cad-async', exports: ['parseCADAsync'], allowed: ['cadAsync']},
   {key: 'kinematics', pack: 'machinery', entry: 'kinematics', exports: ['Kinematics'], allowed: ['kinematics']},
@@ -42,7 +42,7 @@ const cases = [
   {key: 'exploded', pack: 'machinery', entry: 'exploded', exports: ['ExplodedView'], allowed: ['exploded']},
 ];
 const optionalPacks = [
-  'creative', 'scenery', 'machinery', 'gltf', 'gltf-pro', 'blender', 'animation',
+  'creative', 'scenery', 'sky', 'machinery', 'gltf', 'gltf-pro', 'blender', 'animation',
   'post', 'shadows', 'clustered', 'vfx', 'animator', 'taa', 'splats', 'terrain', 'loaders', 'exporters',
   'react', 'controls', 'input', 'audio', 'net', 'ecs', 'fsm', 'cinematic', 'stats', 'inspector',
   'gizmo', 'tween', 'splines', 'points', 'lines', 'text', 'labels', 'physics',
@@ -127,7 +127,7 @@ test('each granular feature consumer excludes unrelated shaders and domain featu
     for (const [key, marker] of Object.entries(featureMarkers)) {
       if (!feature.allowed.includes(key)) assert.ok(!code.includes(marker), key + ' leaked into ' + feature.key + ' through shared/static chunks');
     }
-    for (const pack of optionalPacks.filter(pack => pack !== feature.pack)) {
+    for (const pack of optionalPacks.filter(pack => pack !== feature.pack && !feature.packs?.includes(pack))) {
       assert.ok(modules.every(id => packageName(id) !== pack), pack + ' leaked into ' + feature.key);
     }
     assert.ok(modules.every(id => !id.endsWith('/packages/' + feature.pack + '/dist/index.js')), 'Whole-pack root retained by narrow ' + feature.key + ' import');
@@ -172,15 +172,15 @@ test('actual root/subpath imports share identities and facade helpers preserve r
   }
   // These real imports and constructors need no GPU until setup. They catch a
   // facade helper accidentally returning a module, losing options or attachment.
-  const particleOptions = {count: 16, size: 0.04}, postOptions = {bloom: 0.2}, skyOptions = {moonPhase: 0.5};
+  const particleOptions = {count: 16, size: 0.04}, postOptions = {grain: 0.2}, skyOptions = {moonPhase: 0.5};
   const particle = await prototype.particles.call(receiver, particleOptions);
   const post = await prototype.effects.call(receiver, postOptions);
   const sky = await prototype.sky.call(receiver, skyOptions);
   assert.ok(particle instanceof creative.GPUParticles);
   assert.ok(post instanceof creative.PostProcessing);
   assert.ok(sky instanceof scenery.SkyMoon);
-  assert.equal(particle.options, particleOptions);
+  assert.deepEqual([particle.count, particle.options.size], [16, 0.08]);
   assert.equal(post.options, postOptions);
-  assert.equal(sky.options, skyOptions);
+  assert.equal(sky.config, skyOptions);
   assert.deepEqual(attached, [particle, post, sky], 'Facade no longer attaches each optional feature');
 });

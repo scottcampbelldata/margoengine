@@ -50,7 +50,7 @@ try{
     const model=parseGLTF(instance,doc,buffers.map(b=>new Uint8Array(b))),animation=Animation.attach(model);animation.playing=false;taa.add(model);animation.seek(0);await render();animation.seek(0.5);animation.setMorph(0,0,0.5);await render();
     const deform=await readTexture(taa.gpuState.velocity,4);let movingPixels=0;for(let y=0;y<128;y++)for(let x=0;x<128;x++)if(pixel(deform,x,y,2)[0]>0.04)movingPixels++;assert(movingPixels>30,'Skinned/morphed vertices did not write motion: '+movingPixels);
     model.dispose();mesh.visible=true;mesh.position.x=0;
-    const post=new PostProcessing({bloom:0.1});engine.use(post);taa.options.depth=()=>post.target?.depth;await render();engine.removePlugin(post.name);delete taa.options.depth;
+    const post=new PostProcessing({grain:0.01});engine.use(post);taa.options.depth=()=>post.target?.depth;await render();engine.removePlugin(post.name);delete taa.options.depth;
     const ssao=SSAO.attach(instance,{samples:8});taa.options.depth=()=>ssao.depthTexture;await render();taa.dispose();await render();taa=TAA.attach(instance,{depth:()=>ssao.depthTexture});await render();ssao.dispose();delete taa.options.depth;
     canvas.style.width='96px';await render();assert(taa.gpuState.history.width===96,'History did not resize');canvas.style.width='128px';await render();
     taa.dispose();taa=TAA.attach(instance,{historyWeight:0});instance.camera.near=5.94;instance.camera.far=5.96;const edgeLight=Clustered.attach(instance,{grid:[3,1,1]}),radiance=engine.lighting.radiance.slice();engine.lighting.radiance.fill(0);

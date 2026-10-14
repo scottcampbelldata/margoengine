@@ -59,6 +59,7 @@ the remaining effects. After their GPU work completes, call `start()`, await
 `finished`, and dispose the fade. Pass duration `0` for reduced motion. The
 temporary texture and uniform are released on disposal or device restoration.
 
+`Bloom` is Margo's one bloom (creative `PostProcessing` has none; put Bloom before it in a `PostStack`).
 `Bloom.attach(engine, {strength: 0.8, threshold: 1, exposure: 0})` captures linear HDR,
 filters bright pixels at half resolution and presents with the analytic AgX transform
 shared with `@margoengine/tonemap`. Exposure is in stops. `depthTexture` exposes its

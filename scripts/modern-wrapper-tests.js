@@ -98,7 +98,7 @@ try {
     checks.push({name: `${backend}: orb pixels, controls, canvas resize, model transforms, bounds and visibility${backend === 'webgpu' ? ', custom WGSL before/after reboot and actual device loss' : ', null raw GPU handles'}`, mintPixels: mint, ...modelReport});
     if (backend === 'webgpu') {
       const attached = await page.evaluate(async () => {
-        const app = window.scene.app, plugins = [await app.sky(), await app.particles({count: 32}), await app.effects({bloom: 0.1})];
+        const app = window.scene.app, plugins = [await app.sky(), await app.particles({count: 32}), await app.effects({grain: 0.01})];
         app.engine.render();
         const present = plugins.every(plugin => app.engine.hasPlugin(plugin.name));
         for (const plugin of plugins) app.engine.removePlugin(plugin.name);

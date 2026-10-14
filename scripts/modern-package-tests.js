@@ -5,7 +5,7 @@ import {resolve,join,dirname,basename} from 'node:path';
 import {tmpdir} from 'node:os';
 import {openBrowser} from './browser.js';
 
-const names=['core','gltf','react','machinery','creative','scenery','gltf-pro','animation','post','shadows','clustered','vfx','animator','taa','splats','terrain','environment','controls','margoengine'],npm=process.env.npm_execpath;
+const names=['core','gltf','react','machinery','vfx','sky','creative','scenery','gltf-pro','animation','post','shadows','clustered','animator','taa','splats','terrain','environment','controls','margoengine'],npm=process.env.npm_execpath;
 const packageName=name=>name==='margoengine'?'margoengine':`@margoengine/${name}`;
 assert.ok(npm,'Run this check through npm run modern:test:packages');
 const archives=resolve('test-results/modern-packages');await mkdir(archives,{recursive:true});
@@ -43,7 +43,7 @@ import {loadGLTF} from '@margoengine/gltf';
 import {Canvas,Mesh,BoxGeometry,PbrMaterial,Model,Environment,OrbitControls,useMargo,useMargoStage,type MeshRef} from '@margoengine/react';
 import {Kinematics,ExplodedView,SectionPlanes,EngineeringAnnotations,PartInstancer,parseCAD,parseCADAsync,loadCAD,deduplicateParts,SurfacePhysics,TelemetryChannel,AssemblyBVH,measureClearance} from '@margoengine/machinery';
 import {GPUParticles,PostProcessing,ToonShading,HDRRenderTarget} from '@margoengine/creative';
-import {SkyMoon,SkyMoonPass,type SkyMoonConfig} from '@margoengine/scenery';
+import {SkyMoon,type SkyMoonConfig} from '@margoengine/scenery';
 import {Stage,createStage,sphere,type LoadedModel} from 'margoengine';
 import {renderToString} from 'react-dom/server';
 const device=(pass:PassContext)=>pass.backend==='webgpu'?pass.device:null;
@@ -57,11 +57,10 @@ const html=renderToString(<Canvas><Mesh><BoxGeometry/><PbrMaterial/></Mesh></Can
 const declarative=renderToString(<Canvas shadows onCreated={stage=>stage.engine.camera.position=[1,2,5]}><Model src="/model.glb" materials={{Upper:{baseColor:[0.2,0.8,0.3]}}} onLoad={mesh=>mesh.setPosition([1,0,0])}/><Environment src="/studio.hdr" exposure={1} background/><OrbitControls enableDamping minDistance={1} maxDistance={10}/></Canvas>);
 if(!declarative.includes('<canvas')||typeof useMargo!=='function'||typeof useMargoStage!=='function')throw new Error('Declarative exports failed');
 if(!html.includes('<canvas')||typeof loadGLTF!=='function'||!Kinematics||!ExplodedView||new GPUParticles({count:32}).count!==32)throw new Error('Consumer failed');
-new SectionPlanes({planes:[[0,0,1,0]]});new EngineeringAnnotations();new PartInstancer();new ToonShading();new PostProcessing({atmosphere:{sky:true},bloom:0.5});
+new SectionPlanes({planes:[[0,0,1,0]]});new EngineeringAnnotations();new PartInstancer();new ToonShading();new PostProcessing({atmosphere:{density:0.02}});
 if(typeof parseCAD!=='function'||typeof loadCAD!=='function'||typeof deduplicateParts!=='function'||!HDRRenderTarget)throw new Error('Domain exports failed');
 if(typeof parseCADAsync!=='function'||typeof SurfacePhysics.create!=='function'||typeof TelemetryChannel.create!=='function'||typeof AssemblyBVH.create!=='function'||typeof measureClearance!=='function')throw new Error('Machinery runtime exports failed');
-if(!new SkyMoon({moonPhase:0.5})||typeof SkyMoonPass!=='function')throw new Error('Scenery exports failed');
-function skyPass(device:GPUDevice,encoder:GPURenderPassEncoder){const config:SkyMoonConfig={moonDirection:[0,1,0],moonPhase:1};const sky=new SkyMoonPass(device,'rgba8unorm','depth32float');sky.setConfig(config);sky.updateFrame(new Float32Array(16),[0,0,0],0);sky.record(encoder);sky.dispose();}
+const moonlit:SkyMoonConfig={moonDirection:[0,1,0],moonPhase:1};if(new SkyMoon(moonlit).config!==moonlit)throw new Error('Scenery exports failed');
 function refs(engine:import('@margoengine/core').EngineKernel,node:MeshRef){
 // @ts-expect-error useMargoStage uses the portable engine surface
 engine.frameGraph;

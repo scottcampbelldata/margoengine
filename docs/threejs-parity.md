@@ -142,7 +142,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | HDRLoader / RGBELoader | COVERED † | environment `parseHDR`, `loadEnvironmentImage` (`packages/environment/src/hdr.ts`) | |
 | EXRLoader | COVERED † | environment `parseEXR` (`packages/environment/src/exr.ts`) | Single-part scanline files with NONE, RLE, ZIPS, ZIP or PIZ compression. |
 | PMREMGenerator, `scene.environment` (IBL) | COVERED † | environment `Environment`, `EnvironmentLighting` (`packages/environment/src/lighting.ts`) | `engine.use(lighting)` patches core's mesh shader through `PassContext.shader`; `lighting.applyTo(model)` lights glTF-pro models. React `<Environment>` uses it. IBL replaces the constant ambient term. |
-| Fog, FogExp2 | COVERED † | environment `Fog` (linear, exp2, height); sky `fog` option; creative `PostProcessing` `atmosphere` | `Fog` runs in core's and glTF-pro's mesh shaders, so blended glTF primitives are fogged. Particles, VFX and splats are not. |
+| Fog, FogExp2 | COVERED † | environment `Fog` (linear, exp2, height); sky `fog` option (exp or exp2, height gain, sky-radiance or fixed colour); creative `PostProcessing` `atmosphere` (exponential height fog in its grading pass) | `Fog` runs in core's and glTF-pro's mesh shaders, so blended glTF primitives are fogged. Particles, VFX and splats are not. |
 | Sky add-on | COVERED † | sky `Sky` with Preetham and Bruneton models (`packages/sky/src/`) | Adds clouds, sun, moon and stars. |
 | Tone mapping (`renderer.toneMapping`) | COVERED † | core fixed Reinhard; tonemap `Tonemap` with AgX, ACES fitted and Khronos Neutral (`packages/tonemap/src/index.ts`) | |
 | Color management (sRGB input, linear workflow, `outputColorSpace`) | PARTIAL | core converts hex sRGB to linear and encodes sRGB output | No Color class and no ColorManagement API. No Display-P3 or HDR canvas output. |
@@ -199,7 +199,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | three.js | Status | Margo | Notes |
 | --- | --- | --- | --- |
 | EffectComposer, or the WebGPU PostProcessing node chain | PARTIAL | frame-graph passes run by `order` (`packages/core/src/plugin.ts`) | Each of post `Bloom`, post `SSAO` and creative `PostProcessing` owns the scene capture and rejects the others (post and dof READMEs). DOF, then Tonemap, then TAA is a documented working chain. |
-| UnrealBloomPass | COVERED † | post `Bloom` (`packages/post/src/bloom.ts`); creative `PostProcessing({bloom})` | |
+| UnrealBloomPass | COVERED † | post `Bloom` (`packages/post/src/bloom.ts`) | One implementation since the dedupe: creative `PostProcessing` has no bloom; stack `Bloom` before it in a `PostStack`. Half-resolution 9-tap Gaussian with a hard threshold (no soft knee, no mip chain). |
 | SSAOPass, SAOPass | COVERED † | post `SSAO` (`packages/post/src/ssao.ts`) | Normal-aware bilateral blur. |
 | GTAOPass | MISSING | — | |
 | SSRPass | MISSING | — | |
@@ -213,7 +213,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | AfterimagePass | MISSING | — | |
 | LUTPass | COVERED † | tonemap `setLUT` | 33³ `.cube` files only. |
 | OutputPass, tone mapping | COVERED † | tonemap `Tonemap` | |
-| God rays | PARTIAL | creative `atmosphere.godRays` (`packages/creative/src/post.ts`) | Only inside creative `PostProcessing`, which cannot be combined with post Bloom or SSAO. |
+| God rays | PARTIAL | creative `atmosphere.godRays` (`packages/creative/src/post.ts`) | Screen-space, inside creative `PostProcessing`; combine with post Bloom or SSAO through a `PostStack`. |
 | Motion blur | MISSING | — | taa already produces a velocity buffer. |
 | Color correction, grading | COVERED † | creative `lift`, `gain`, `saturation`, `contrast`; tonemap `contrast` | |
 | Simple screen effects (vignette, RGB shift or chromatic aberration, pixelation, halftone, dot screen, Sobel) | MISSING | — | transitions has chromatic displacement, but only as a scene-change wipe. |
@@ -390,7 +390,7 @@ Two scaling notes from reading core (not measured):
 
 These are not in three.js core or its official add-ons. Many have third-party three.js equivalents (noted), which matters for an honest comparison page.
 
-- **Rendering:** cascaded PCSS shadows with a static-caster cache (shadows); clustered forward lighting for up to 1,024 lights (clustered); TAA with motion vectors (taa); Gaussian splats with GPU covariance projection, radix sort and spherical harmonics up to degree 3 (splats; cf. third-party splat viewers); geometry-clipmap terrain with triplanar layers (terrain); GPU particles (vfx, creative `GPUParticles`); a 100k-blade grass field and a planet renderer (creative); procedural night sky with moon (scenery); scene transitions (transitions); GPU scatter with distance LOD (scatter); device-loss recovery that rebuilds every plugin (`Engine.rebootDevice`).
+- **Rendering:** cascaded PCSS shadows with a static-caster cache (shadows); clustered forward lighting for up to 1,024 lights (clustered); TAA with motion vectors (taa); Gaussian splats with GPU covariance projection, radix sort and spherical harmonics up to degree 3 (splats; cf. third-party splat viewers); geometry-clipmap terrain with triplanar layers (terrain); GPU particles up to 1,000,000 with obstacles, sorting and sprites (vfx; creative `GPUParticles` is a preset of it); a 100k-blade grass field and a planet renderer (creative); physical day sky plus a stylized night with stars and a phased moon (sky; scenery `SkyMoon` is a preset of it); scene transitions (transitions); GPU scatter with distance LOD (scatter); device-loss recovery that rebuilds every plugin (`Engine.rebootDevice`).
 - **Simulation and gameplay:** Rapier physics with a character controller (physics; cf. cannon-es or Rapier bindings); Recast/Detour navigation (navigation) and a dependency-free navmesh with A*, funnel paths and ORCA avoidance (navmesh; cf. three-pathfinding); sparse-set ECS (ecs); hierarchical state machine (fsm); snapshot interpolation for networking (net); semantic input with gamepad and haptics (input); tweening (tween); damped camera follow and shake (cinematic); animator blend trees and foot IK (animator).
 - **Content generation:** procedural cabins, trees, rocks, humanoids, marching cubes and noise (procedural); 3D wave function collapse (wfc); spline roads (road); arc-length splines (splines).
 - **Engineering and BIM:** STEP and IGES import through an OCCT worker, kinematics, capped section planes, metrology and exploded views (machinery); IFC through `web-ifc` (ifc).
@@ -399,7 +399,7 @@ These are not in three.js core or its official add-ons. Many have third-party th
 Positioning caveats for a public page:
 
 - fbx and usdz used to run three.js code at runtime (`FBXLoader` and `GLTFExporter`; the USDA and USDC parsers). Both now have native parsers; three.js is only a test-time reference.
-- Several capabilities exist twice. html and labels both export `CSS3DObject`. gizmo and usdz-export are pure re-exports. There are two particle systems (vfx and creative), two toon paths, two bloom paths (post and creative), three sky or atmosphere implementations (sky, scenery and creative), and two navigation packages.
+- Several capabilities exist twice. html and labels both export `CSS3DObject`. gizmo and usdz-export are pure re-exports. Two toon paths and two navigation packages remain. The particle, bloom and sky duplicates were merged (2026-10-14): vfx is the one particle system (creative `GPUParticles` is a preset over it), post `Bloom` the one bloom (creative `PostProcessing` lost its bloom), and sky the one sky (scenery `SkyMoon` is a preset; `SkyMoonPass`, `NightAtmosphere` and creative's `atmosphere.sky` backdrop were removed). The merge removed 6,017 bytes of gzip across the five packages (root entries, dependencies external) with no measurable change to the four demos (`test-results/dedupe/`); Night Citadel and Afterlight load about 7.5 kB and 3.3 kB more gzip respectively, because they now use the fuller single sky and particle implementations.
 
 ## How this was checked
 

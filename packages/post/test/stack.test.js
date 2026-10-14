@@ -84,8 +84,8 @@ test('SSAO + DOF + Bloom + Tonemap + FXAA combine, resize, restore and dispose w
 });
 
 test('combinations that rejected each other alone now share one capture', () => {
-  for (const make of [() => [new SSAO(), new Bloom()], () => [new Bloom(), new Tonemap()], () => [new SSAO(), new DOF()], () => [new DOF(), new PostProcessing({bloom: 0.4})],
-    () => [new SSAO(), new Bloom(), new PostProcessing({bloom: 0.2, atmosphere: {sky: true}}), new FXAA()], () => [new DOF(), new Tonemap()]]) {
+  for (const make of [() => [new SSAO(), new Bloom()], () => [new Bloom(), new Tonemap()], () => [new SSAO(), new DOF()], () => [new DOF(), new Bloom(), new PostProcessing()],
+    () => [new SSAO(), new Bloom(), new PostProcessing({atmosphere: {density: 0.02, godRays: 0.5}}), new FXAA()], () => [new DOF(), new Tonemap()]]) {
     const h = harness(4), effects = make(), stack = PostStack.attach(h.engine, effects);
     for (let i = 0; i < 3; i++) restored(h, h.frame());
     stack.dispose(); assert.deepEqual(h.live(), [], effects.map(e => e.name).join('+') + ' leaked');
