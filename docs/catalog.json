@@ -481,6 +481,7 @@
     "exports": [
       "exportGLB",
       "exportGLTF",
+      "exportModel",
       "exportOBJ",
       "exportPLY",
       "exportSTL",

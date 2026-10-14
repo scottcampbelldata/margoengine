@@ -445,6 +445,27 @@ for (let i = 0; i < 1000; i++) {
 Skins and clips come from glTF (or FBX). There are no clips authored in code (`KeyframeTrack`), no `SkeletonUtils`
 retargeting and no general CCD IK (animator has two-bone foot IK).
 
+### Exporting glTF
+
+```js
+const exporter = new GLTFExporter();
+const glb = await exporter.parseAsync(gltf.scene, {binary: true, animations: gltf.animations, maxTextureSize: 2048});
+```
+
+```ts
+import {Animation} from '@margoengine/animation';
+import {exportModel} from '@margoengine/exporters/model';
+
+const clips = new Animation(model);
+const glb = await exportModel(model, {binary: true, animations: [clips], maxTextureSize: 2048}); // Uint8Array
+const {text, bin} = await exportModel([model], {embed: false, binUri: 'scene.bin'});          // .gltf + .bin
+```
+
+`exportModel` writes gltf-pro models and `@margoengine/materials` meshes with their current pose, visibility and
+material values: skins, morph targets, clips, `EXT_mesh_gpu_instancing`, PBR textures and the KHR material extensions
+gltf-pro draws. Core meshes and plain data go through `exportGLB(engine)` / `exportGLTF(engine)` (static). Cameras and
+lights are not written.
+
 ## Controls
 
 ```js
@@ -865,5 +886,5 @@ From [`docs/threejs-parity.md`](threejs-parity.md). Each would be an optional pa
 | `TextGeometry`, SVGLoader, Collada, MTL, LDraw and other long-tail loaders | Missing |
 | Clips authored in code, `SkeletonUtils`, CCD IK | Missing (two-bone IK only) |
 | `ArcballControls`, roll in the controls, light and skeleton helpers | Missing (core `camera.up` can roll; no control drives it) |
-| glTF export with animation, Draco/KTX2/EXR export, USDZ export with textures | Missing (static glTF, OBJ, STL, PLY and USDZ export exist) |
+| glTF export of cameras and lights, Draco/KTX2/EXR export, USDZ export with textures | Missing (glTF export with animation, skins, morphs and textures exists, plus OBJ, STL, PLY and static USDZ) |
 | WebXR hit test, controller and hand models, glTF-pro models in XR | Missing (VR sessions and controller poses exist) |

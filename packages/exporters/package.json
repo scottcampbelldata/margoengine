@@ -27,13 +27,23 @@
     "./usdz": {
       "types": "./dist/usdz.d.ts",
       "import": "./dist/usdz.js"
+    },
+    "./model": {
+      "types": "./dist/model.d.ts",
+      "import": "./dist/model.js"
     }
   },
   "files": [
     "dist"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^0.1.0 || ^1.0.0"
+    "@margoengine/core": "^0.1.0 || ^1.0.0",
+    "@margoengine/gltf-pro": "0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/gltf-pro": {
+      "optional": true
+    }
   },
   "homepage": "https://margoengine.com",
   "dependencies": {

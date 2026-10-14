@@ -26,7 +26,7 @@ export type Blending = 'normal' | 'additive' | 'multiply' | 'none';
 
 export type Filter = 'linear' | 'nearest';
 
-export type InstancedMesh = PBRModel & {
+export type InstancedMesh = MaterialMesh & {
     readonly instances: PBRInstances;
 };
 
@@ -70,6 +70,10 @@ export class Material {
     shader(source: string, group: number): string;
     bindings(device: GPUDevice, _engine?: Engine): GPUBindGroupEntry[];
 }
+
+export type MaterialMesh = PBRModel & {
+    readonly material: Material;
+};
 
 export interface MaterialOptions {
     shading?: Shading;
@@ -147,7 +151,7 @@ export function createInstancedMesh(engine: EngineKernel, geometry: MeshGeometry
 
 export function createMesh(engine: EngineKernel, geometry: MeshGeometry, material: Material, { renderOrder }?: {
     renderOrder?: number;
-}): PBRModel;
+}): MaterialMesh;
 
 export function loadTexture(url: string | URL, { signal, ...options }?: TextureOptions & {
     signal?: AbortSignal;
