@@ -20,18 +20,36 @@ fn sqrt(value: f64) -> f64 {
 }
 
 // Each Wasm instance owns one fixed-capacity kernel; no allocations occur in tick.
+// Data beyond the published fields: 16 input snapshot words per entity at 70n+24 (the inputs last seen by world_matrix).
+// Flags: active, visible, constrained, hidden, depth|hidden mark, per-tick state, changed (set here, cleared by the engine).
 pub struct Kernel {
     capacity: usize,
     data: Data,
     flags: Flags,
+    full: bool,
 }
 
 impl Kernel {
     #[cfg(not(target_arch = "wasm32"))]
     fn new(capacity: usize) -> Self {
-        let mut data = vec![0.0; capacity * 70 + 24];
+        let mut data = vec![0.0; capacity * 86 + 24];
         data[10*capacity..11*capacity].fill(-1.0);
-        Self { capacity, data, flags: vec![0; capacity * 5] }
+        Self { capacity, data, flags: vec![0; capacity * 7], full: true }
+    }
+
+    // Stores everything world_matrix reads for one entity (TRS, parent, local bounds, hidden flag) and returns whether
+    // any of it differs from the previous call. A failed tick sets `full`, so a snapshot taken by it is never trusted.
+    #[inline(never)]
+    fn snapshot(&mut self, id: usize) -> bool {
+        let n = self.capacity;
+        let mut changed = false;
+        // Indices are in range by layout; bounds checks here cost about 250 compressed bytes of core.
+        for f in 0..16 { unsafe {
+            let v = if f < 11 { self.data.get_unchecked(f*n+id).to_bits() } else if f < 15 { self.data.get_unchecked(27*n+id*4+f-11).to_bits() } else { *self.flags.get_unchecked(3*n+id) as u32 };
+            let at = self.data.get_unchecked_mut(70*n+24+id*16+f);
+            if at.to_bits() != v { changed = true; *at = f32::from_bits(v); }
+        } }
+        changed
     }
 
     fn matrix(&self, id: usize) -> Option<[f32; 16]> {
@@ -66,17 +84,31 @@ impl Kernel {
         out.iter().all(|v| v.is_finite()).then_some(out)
     }
 
-    fn world_matrix(&mut self, id: usize, level: usize) -> Option<()> {
-        let n=self.capacity;let mark=self.flags[4*n+id];
-        if level>=64 || mark==255 {return None;}
-        let at=50*n+24+id*16;
-        if mark!=0 {return Some(());}
-        self.flags[4*n+id]=255;
-        let mut matrix=self.matrix(id)?;let mut depth=1;let mut hidden=self.flags[3*n+id]!=0;
+    // Returns whether the entity was recomputed: its inputs differ from the snapshot or its parent was recomputed.
+    #[inline(never)]
+    fn world_matrix(&mut self, id: usize, level: usize) -> Option<bool> {
+        let n=self.capacity;let state=self.flags[5*n+id];
+        if level>=64 || state==1 {return None;}
+        if state!=0 {return Some(state==3);}
+        self.flags[5*n+id]=1;
+        let mut changed=self.snapshot(id)|self.full;
         let parent=self.data[10*n+id];
         if parent!=-1.0 {
             if !parent.is_finite() || parent<0.0 || parent as usize as f32!=parent || parent>=n as f32 || self.flags[parent as usize]==0 {return None;}
-            let parent=parent as usize;self.world_matrix(parent,level+1)?;let p=&self.data[50*n+24+parent*16..50*n+24+(parent+1)*16];
+            changed|=self.world_matrix(parent as usize,level+1)?;
+        }
+        if changed {self.compute(id,parent)?;}
+        self.flags[5*n+id]=2+changed as u8;
+        Some(changed)
+    }
+
+    // Separate so the two parent tests are not threaded together (which duplicates the matrix code).
+    #[inline(never)]
+    fn compute(&mut self, id: usize, parent: f32) -> Option<()> {
+        let n=self.capacity;let at=50*n+24+id*16;
+        let mut matrix=self.matrix(id)?;let mut depth=1;let mut hidden=self.flags[3*n+id]!=0;
+        if parent!=-1.0 {
+            let parent=parent as usize;let p=&self.data[50*n+24+parent*16..50*n+24+(parent+1)*16];
             depth=(self.flags[4*n+parent]&127)+1;if depth>64 {return None;}
             hidden|=self.flags[4*n+parent]&128!=0;
             let mut result=[0.0;16];
@@ -115,15 +147,21 @@ impl Kernel {
             }
         }
         // Scratch is fixed at creation; publish only after the entire hierarchy validates.
-        self.flags[4*n..5*n].fill(0);
-        for id in 0..n {if self.flags[id]!=0 && self.world_matrix(id,0).is_none() {return id+1;}}
+        // Only entities whose inputs or ancestors changed are recomputed; a failed tick recomputes everything next time.
+        self.flags[5*n..6*n].fill(0);
+        for id in 0..n {if self.flags[id]!=0 && self.world_matrix(id,0).is_none() {self.full=true;return id+1;}}
         for id in 0..n {
             self.flags[n+id]=0;if self.flags[id]==0 {continue;}
-            self.data.copy_within(50*n+24+id*16..50*n+24+(id+1)*16,11*n+id*16);
-            for field in 0..4 {self.data[(31+field)*n+id]=self.data[66*n+24+id*4+field];}
+            if self.flags[5*n+id]==3 {
+                self.data.copy_within(50*n+24+id*16..50*n+24+(id+1)*16,11*n+id*16);
+                for field in 0..4 {self.data[(31+field)*n+id]=self.data[66*n+24+id*4+field];}
+                // Sticky across ticks (packages tick too) until the engine has copied the matrix.
+                self.flags[6*n+id]=1;
+            }
             self.flags[n+id]=u8::from(self.flags[4*n+id]&128==0);
         }
         if culling { self.cull(); }
+        self.full=false;
         0
     }
 
@@ -176,16 +214,16 @@ pub extern "C" fn kernel_new(capacity: usize) -> *mut Kernel {
     unsafe {
         if INITIALIZED || !(1..=100_000).contains(&capacity) { return core::ptr::null_mut(); }
         let start = (core::ptr::addr_of!(__heap_base) as usize+3)&!3;
-        let length = capacity*70+24;
-        let end = start+length*4+capacity*5;
+        let length = capacity*86+24;
+        let end = start+length*4+capacity*7;
         let required = end.div_ceil(65536);
         let current = core::arch::wasm32::memory_size::<0>();
         if required>current && core::arch::wasm32::memory_grow::<0>(required-current)==usize::MAX { return core::ptr::null_mut(); }
         let data = core::slice::from_raw_parts_mut(start as *mut f32,length);
-        let flags = core::slice::from_raw_parts_mut((start+length*4) as *mut u8,capacity*5);
+        let flags = core::slice::from_raw_parts_mut((start+length*4) as *mut u8,capacity*7);
         data.fill(0.0); flags.fill(0); data[10*capacity..11*capacity].fill(-1.0);
         let handle = core::ptr::addr_of_mut!(KERNEL).cast::<Kernel>();
-        handle.write(Kernel {capacity,data,flags}); INITIALIZED=true; handle
+        handle.write(Kernel {capacity,data,flags,full:true}); INITIALIZED=true; handle
     }
 }
 
@@ -264,5 +302,24 @@ mod tests {
         k.data[21]=0.0;k.flags[4]=1|32;k.data[76+24]=0.0;k.data[76+25]=2.0;k.data[76+34]=-0.5;k.data[76+35]=0.5;k.data[0]=7.0;k.data[70+26]=2.0;k.flags[6]=1;
         assert_eq!(k.tick(false),0);assert_eq!(k.data[0],2.0);assert_eq!(k.data[70+26],0.5);assert_eq!(&k.flags[2..4],&[0,0]);assert!((k.data[22]-0.5f32.cos()).abs()<1e-6);
         k.flags[6]=0;k.flags[7]=1;assert_eq!(k.tick(false),0);assert_eq!(&k.flags[2..4],&[1,0]);
+    }
+    #[test]
+    fn only_changed_inputs_and_their_descendants_are_recomputed() {
+        let n=3;let mut k=Kernel::new(n);
+        for id in 0..n {k.flags[id]=1;for field in 6..10 {k.data[field*n+id]=1.0;}}
+        k.data[10*n+1]=2.0;k.data[10*n+0]=1.0; // 0 -> 1 -> 2 (child ids before parents)
+        // Sticky changed bytes, cleared here the way the engine clears them after copying matrices.
+        let changed=|k:&mut Kernel|{let ids:Vec<usize>=(0..n).filter(|&id|k.flags[6*n+id]!=0).collect();k.flags[6*n..7*n].fill(0);ids};
+        assert_eq!(k.tick(false),0);assert_eq!(changed(&mut k),[0,1,2]);
+        assert_eq!(k.tick(false),0);assert_eq!(changed(&mut k),[]);
+        k.data[2]=5.0;assert_eq!(k.tick(false),0);assert_eq!(changed(&mut k),[0,1,2]);assert_eq!(k.data[11*n+12],5.0);
+        k.data[0]=1.0;assert_eq!(k.tick(false),0);assert_eq!(k.tick(false),0);assert_eq!(changed(&mut k),[0]);assert_eq!(k.data[11*n+12],6.0);
+        k.data[7*n+1]=2.0;assert_eq!(k.tick(false),0);assert_eq!(changed(&mut k),[0,1]);assert_eq!(k.data[11*n+16],2.0);
+        k.flags[3*n+1]=1;assert_eq!(k.tick(false),0);assert_eq!(changed(&mut k),[0,1]);assert_eq!(&k.flags[n..2*n],&[0,0,1]);
+        k.data[10*n]=-1.0;assert_eq!(k.tick(false),0);assert_eq!(changed(&mut k),[0]);assert_eq!(&k.flags[n..2*n],&[1,0,1]);assert_eq!(k.data[11*n+12],1.0);
+        // A failed tick publishes nothing and the next one recomputes everything.
+        let published=k.data[11*n..27*n].to_vec();
+        k.data[2]=f32::NAN;assert_eq!(k.tick(false),2);assert_eq!(&k.data[11*n..27*n],published.as_slice());assert_eq!(changed(&mut k),[]);
+        k.data[2]=5.0;assert_eq!(k.tick(false),0);assert_eq!(changed(&mut k),[0,1,2]);assert_eq!(&k.data[11*n..27*n],published.as_slice());
     }
 }

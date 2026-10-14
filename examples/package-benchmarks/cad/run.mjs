@@ -25,9 +25,9 @@ try {
   {const {page} = await open();out.adapter = await page.evaluate(async () => {const a = await navigator.gpu.requestAdapter({powerPreference: 'high-performance'});return {...a.info.toJSON?.() ?? {vendor: a.info.vendor, architecture: a.info.architecture, description: a.info.description}, timestamp: a.features.has('timestamp-query')};});await page.close();}
   console.log('adapter', JSON.stringify(out.adapter));
   for (const size of sizes) {
-    const {page, errors} = await open(), config = {modules: modulesFor(size), edges: flag('edges'), low: flag('low'), view: arg('view', 'overview'), bvh: !flag('no-bvh'), explode: !flag('no-explode'), ...(arg('machinery') ? {machineryBase: arg('machinery')} : {})};
+    const {page, errors} = await open(), config = {modules: modulesFor(size), edges: flag('edges'), low: flag('low'), view: arg('view', 'overview'), bvh: !flag('no-bvh'), explode: !flag('no-explode'), still: flag('still'), pick: !flag('no-pick'), move: +arg('move', 0),...(arg('machinery') ? {machineryBase: arg('machinery')} : {})};
     const result = await page.evaluate(c => window.cad.run(c), config);result.size = size;result.pageErrors = errors;out.runs.push(result);
-    console.log(size, JSON.stringify({parts: result.parts, kernel: result.kernel.tickCullMs.median, cpu: result.frame.cpuMs.median, gpu: result.frame.gpuMs?.median, fps: result.frame.fps, pick: result.enginePick?.ms?.median, bvh: result.assemblyBVH, explode: result.explodedView?.animatingMs?.median, errors: [...errors, ...result.errors]}));
+    console.log(size, JSON.stringify({parts: result.parts, kernel: result.kernel.tickCullMs.median, frameKernel: result.frame.kernelMs.median, collect: result.frame.collectMs.median, submit: result.frame.submitMs.median, cpu: result.frame.cpuMs.median, gpu: result.frame.gpuMs?.median, fps: result.frame.fps, pick: result.enginePick?.ms?.median, bvh: result.assemblyBVH, explode: result.explodedView?.animatingMs?.median, errors: [...errors, ...result.errors]}));
     await page.close();
   }
   if (flag('shot')) for (const ortho of [false, true]) {const {page} = await open();await page.evaluate(o => window.cad.view({ortho: o}), ortho);await page.locator('canvas').screenshot({path: `test-results/cad-edges-${ortho ? 'ortho' : 'perspective'}.png`});await page.close();}

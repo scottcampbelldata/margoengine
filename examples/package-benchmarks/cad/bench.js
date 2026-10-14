@@ -13,9 +13,9 @@ const mb = bytes => +(bytes / 2 ** 20).toFixed(2);
 const machinery = (base, file) => import(/* @vite-ignore */ `${base}/${file}.js`);
 
 const edgeCpu = [];
-async function run({machineryBase = '/packages/machinery/dist', modules, frames = 240, warmup = 60, pick = true, bvh = true, explode = true, edges = false, view = 'overview', low = false}) {
+async function run({machineryBase = '/packages/machinery/dist', modules, frames = 240, warmup = 60, pick = true, bvh = true, explode = true, edges = false, view = 'overview', low = false, still = false, move = 0}) {
   if (low) globalThis.margoLow = 1;
-  const canvas = document.getElementById('view'), result = {modules, crossOriginIsolated, msaa: low ? 1 : 4, view};
+  const canvas = document.getElementById('view'), result = {modules, crossOriginIsolated, msaa: low ? 1 : 4, view, still, move};
   const capacity = Math.min(100_000, modules * ENTITIES_PER_MODULE + Math.ceil(modules / 32) + 1);
   let t = now();const engine = await withGPUTiming(true, () => Engine.create(canvas, {capacity, camera: {fov: 45, near: 0.05, far: 2000}}));result.engineCreateMs = now() - t;
   const errors = [];engine.gpu.addEventListener('uncapturederror', e => errors.push(e.error.message));
@@ -44,7 +44,9 @@ async function run({machineryBase = '/packages/machinery/dist', modules, frames 
     if (frameNo > warmup) {cpu.push(total);kernel.push(tickMs);submit.push(submitMs);collect.push(total - tickMs - submitMs);if (last) intervals.push(s - last);
       if (stats.gpuTime !== null && stats.gpuTime !== lastGpu) {gpu.push(stats.gpuTime);passes.push(Array.from(stats.gpuPassMilliseconds.subarray(0, stats.gpuPassCount)));lastGpu = stats.gpuTime;}}
     last = s;if (frameNo >= warmup + frames && (gpu.length >= 12 || s - started > 45_000)) done();};
-  engine.onFrame((_, delta) => {angle += delta * 0.3;orbit(angle);});
+  // --still: fixed camera. --move=0.01: every 1/move-th part bobs each frame (the "1% of parts move" case).
+  const movers = move ? assembly.parts.filter((_, i) => i % Math.round(1 / move) === 0).map(p => [p, p.position.y]) : [];result.movers = movers.length;
+  engine.onFrame((_, delta) => {if (!still) {angle += delta * 0.3;orbit(angle);}const dy = 0.002 * Math.sin(frameNo * 0.2);for (const [p, y] of movers) p.position.y = y + dy;});
   engine.start();await finished;engine.stop();
   result.frame = {cpuMs: stat(cpu), kernelMs: stat(kernel), collectMs: stat(collect), submitMs: stat(submit), intervalMs: stat(intervals), fps: +(1000 / stat(intervals).median).toFixed(1), gpuMs: stat(gpu), drawCalls: stats.drawCalls, visible: engine.stats.visible};
   result.frame.edgesCpuMs = stat(edgeCpu.slice(warmup));result.edgesFirstDrawMs = edgeCpu[0] ?? null;result.frame.gpuPassMedianMs = passes.length ? passes[0].map((_, i) => stat(passes.map(p => p[i] ?? 0)).median) : null;
