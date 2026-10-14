@@ -9,7 +9,7 @@ import {mockGPU, context} from './gpu-recorder.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
 
 // Default baseline: the parent of the commit that added PostStack.
-const added = execFileSync('git', ['log', '--diff-filter=A', '--format=%h', '--', 'packages/post/src/stack.ts'], {cwd: import.meta.dirname, encoding: 'utf8'}).trim().split('\n').at(-1);
+const added = execFileSync('git', ['log', '--diff-filter=A', '--format=%h', '--', 'packages/post/src/stack.ts'], {cwd: new URL('../../..', import.meta.url), encoding: 'utf8'}).trim().split('\n').at(-1);
 const ref = process.argv[2] ?? (added ? added + '^' : 'HEAD');
 const post = await versions('post', ref), dof = await versions('dof', ref), tonemap = await versions('tonemap', ref), creative = await versions('creative', ref, 'src/post.ts');
 
