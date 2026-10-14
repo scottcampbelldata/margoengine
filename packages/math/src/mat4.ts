@@ -33,6 +33,17 @@ export function invertMatrix<T extends NumberArray>(m: ArrayLike<number>, out: T
   return out;
 }
 
+/** out = T(t) * R(q) * S(s), the order core and three.js use; `q` = [x, y, z, w] must already be a unit quaternion. */
+export function composeMatrix<T extends Float32Array | Float64Array>(t: ArrayLike<number>, q: ArrayLike<number>, s: ArrayLike<number>, out: T): T {
+  const x = q[0], y = q[1], z = q[2], w = q[3];
+  out.set([
+    (1 - 2 * (y * y + z * z)) * s[0], 2 * (x * y + w * z) * s[0], 2 * (x * z - w * y) * s[0], 0,
+    2 * (x * y - w * z) * s[1], (1 - 2 * (x * x + z * z)) * s[1], 2 * (y * z + w * x) * s[1], 0,
+    2 * (x * z + w * y) * s[2], 2 * (y * z - w * x) * s[2], (1 - 2 * (x * x + y * y)) * s[2], 0,
+    t[0], t[1], t[2], 1,
+  ]);
+  return out;
+}
 /**
  * Inverse by Gauss-Jordan elimination with scaled partial pivoting, for camera and model matrices where accuracy near
  * singular matters more than speed. Returns null (leaving `out` untouched) for non-finite input, a singular matrix, or a
