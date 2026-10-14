@@ -7,7 +7,7 @@ Margo Engine is a small Rust/Wasm engine for web applications with optional doma
 | Phase | Working implementation |
 | --- | --- |
 | Rust math and buffers | Dependency-free Rust kernel; fixed-capacity SoA transform views in Wasm memory; hierarchy composition; SIMD sphere/frustum culling; native joint-limit clamping and inherited visibility masks; atomic validation before publishing matrices. |
-| Rendering | WebGPU adapter/device negotiation, cached pipeline and geometry buffers, instanced indexed drawing, ordered GPU passes, directional GGX PBR, WebGL2 fallback, reversed float depth, 1×1 uint picking, native CAD navigation, canvas/depth resize and disposal. |
+| Rendering | WebGPU adapter/device negotiation, cached pipeline and geometry buffers, instanced indexed drawing, ordered GPU passes, directional GGX PBR, optional WebGL2 fallback (`@margoengine/webgl`), reversed float depth, 1×1 uint picking, native CAD navigation, canvas/depth resize and disposal. |
 | TypeScript/packages | Explicit ESM exports and declarations; `sideEffects: false`; precompiled gzip-embedded Wasm; independent core, glTF, React, machinery, creative and scenery packages. |
 | React/starters | `MargoCanvas` (`Canvas` alias), `useMargoStage`, `useFrame`, mesh components; SSR-safe setup, ResizeObserver and stable refs; Vite and Next.js starters. |
 | Machinery pack | Revolute/prismatic joints, gear/slider-crank couplings, bounded IK/distance constraints, exploded views, GPU sections/stencil caps, SVG dimensions/callouts, worker STL/OBJ/STEP/IGES, Wasm surface transport and telemetry, part instancing, assembly BVH picking, metrology snapping and industrial material presets. |
@@ -28,7 +28,7 @@ The React adapter also supports React 18. See [package choices and individual in
 
 ## Run and build
 
-Use Node.js 22.12+ or 24+ and a browser with WebGL2. TypeScript consumers need TypeScript 7+ with the DOM library; extension GPU types use its native declarations. WebGPU needs a supported browser on localhost or HTTPS.
+Use Node.js 22.12+ or 24+ and a browser with WebGPU (or WebGL2 with the optional fallback). TypeScript consumers need TypeScript 7+ with the DOM library; extension GPU types use its native declarations. WebGPU needs a supported browser on localhost or HTTPS.
 
 ```sh
 npm ci
@@ -84,7 +84,7 @@ engine.start();
 
 Shared `Geometry` identity produces one instanced draw even when material parameters differ. Buffers retire when the last mesh reference disappears. Geometry arrays and bounds are immutable after attachment; dynamic geometry needs a replacement `Geometry`. Material colors are linear RGB arrays or converted sRGB `#rrggbb`; roughness/metalness are 0–1. Rendering uses one directional light plus ambient radiance. Canvas sizing occurs on render and is capped at 4096 pixels per axis.
 
-`backend: 'auto'` tries WebGPU before WebGL2; `fallbackReason` records initialization failure. Explicit `webgpu` reports an error instead of falling back. Once a WebGPU context is acquired, a context configuration failure can prevent fallback on that same canvas. WebGL2 context loss stops rendering and reports an error. WebGPU device loss starts automatic recovery; see the lifecycle below.
+`backend: 'auto'` tries WebGPU and, only when `Engine.create(canvas, {fallback: webglRenderer})` passes the optional `@margoengine/webgl` renderer, falls back to WebGL2; without it, a missing WebGPU rejects with "WebGPU unavailable". `fallbackReason` records initialization failure. Explicit `webgpu` reports an error instead of falling back. Once a WebGPU context is acquired, a context configuration failure can prevent fallback on that same canvas. WebGL2 context loss stops rendering and reports an error. WebGPU device loss starts automatic recovery; see the lifecycle below.
 
 ## Frozen portable API, picking and CAD navigation
 
