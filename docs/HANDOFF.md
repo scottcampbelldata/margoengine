@@ -123,6 +123,9 @@ Built and deployed to the preview, not yet measured:
    `npm run test:all`, then commit or revert. It type-checks; nothing else about it has been run.
 
 ## Known issues and caveats
+- Engine logic moved out of demos (not yet run in a browser): frame pacing `frameDue`/`frameStatus` ->
+  `@margoengine/quality`; Citadel `NightAtmosphere` -> `@margoengine/scenery`; Earth `Stars` -> `@margoengine/creative/stars`.
+  Verify with `node scripts/modern-night-citadel-tests.js` and by opening the Earth demo.
 
 - The measured tier is remembered per browser with no expiry and no on-page control yet.
 - A fast PC sees the light tier on its first page view only; the full tier starts from the next page load.

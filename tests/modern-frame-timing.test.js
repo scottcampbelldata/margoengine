@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { frameDue, frameStatus } from '../apps/showcase-night-citadel/src/frame-timing.js';
+import { frameDue, frameStatus } from '../packages/quality/dist/index.js';
 
 test('120 target uses every callback at 60 Hz and explains the observed limit', () => {
   const clock = new Float64Array(3);

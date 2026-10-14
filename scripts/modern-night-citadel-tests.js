@@ -31,7 +31,7 @@ const instrument=()=>{
 };
 async function fogCoverage(page){
   return page.evaluate(async()=>{
-    const {NightAtmosphere}=await import('/apps/showcase-night-citadel/src/atmosphere.ts');
+    const {NightAtmosphere}=await import('/packages/scenery/src/atmosphere.ts');
     const app=nightCitadel,d=app.device,background=[0.125,0.25,0.5],fog=[0.8,0.1,0.3];
     const depths=[[0,0,0,0],[0.75,0,0,0],[0,0.25,0,0],[0,0,0.5,0],[0,0,0,0.25],[0.25,0,0.75,0],[0.75,0.75,0.75,0.75],[0.25,0.5,0.75,1]];
     const vertex='@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);}';

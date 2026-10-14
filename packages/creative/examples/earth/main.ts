@@ -7,7 +7,7 @@ import {engineRuntime} from '@margoengine/core/extension';
 import {sceneSamples} from '../../../shared/quality.js';
 import {applyQualityTier, watchQuality} from '@margoengine/quality';
 applyQualityTier();
-import {Stars} from './sky.js';
+import {Stars} from '@margoengine/creative/stars';
 
 const controls = document.querySelector<HTMLFieldSetElement>('#controls')!;
 const pause = document.querySelector<HTMLButtonElement>('#pause')!;

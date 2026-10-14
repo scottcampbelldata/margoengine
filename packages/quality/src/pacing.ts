@@ -1,10 +1,10 @@
 /**
- * Gate faster animation clocks without dropping near-native refresh ticks.
- * @param {Float64Array} clock Retained [next deadline, previous timestamp, mean callback interval].
- * @param {number} now rAF timestamp in milliseconds.
- * @param {number} targetRate Requested frames per second.
+ * Gate an animation loop to `targetRate` without dropping near-native refresh ticks.
+ * @param clock Retained [next deadline, previous timestamp, mean callback interval]; start with `new Float64Array(3)`.
+ * @param now rAF timestamp in milliseconds.
+ * @param targetRate Requested frames per second.
  */
-export function frameDue(clock, now, targetRate) {
+export function frameDue(clock: Float64Array, now: number, targetRate: number): boolean {
   const interval = 1000 / targetRate;
   const tolerance = Math.min(2, interval * 0.1);
   const previous = clock[1];
@@ -28,7 +28,7 @@ export function frameDue(clock, now, targetRate) {
   return true;
 }
 /** Report the measured browser callback cadence separately from the requested render cap. */
-export function frameStatus(targetRate, callbackRate, fps) {
+export function frameStatus(targetRate: number, callbackRate: number, fps: number): string {
   if (!callbackRate) return 'Measuring browser cadence…';
   const rate = Math.round(callbackRate);
   if (targetRate > callbackRate * 1.15)
