@@ -174,13 +174,9 @@ test('shadow flags update registration independently and HDR composes with the s
   assert.equal(effect.sources.size,1);assert.equal(model.lighting.size,2);assert.ok(model.lighting.has(effect));
   const source=(await readFile(new URL('../../gltf-pro/src/shader.ts',import.meta.url),'utf8')).split('`')[1];
   const ibl=[...model.lighting].find(value=>value!==effect);
-  const replace=String.prototype.replace;let rewrites=0;
-  try {
-    String.prototype.replace=function(...args){rewrites++;return replace.apply(this,args);};
-    const shader=ibl.shader(source,2);for(let i=0;i<100;i++)assert.equal(ibl.shader(source,2),shader);
-    assert.equal(rewrites,2,'steady frames must reuse the transformed shader');
-  } finally {String.prototype.replace=replace;}
-  for(const order of [[ibl,effect],[effect,ibl]]){let code=source;for(const lighting of order)code=lighting.shader(code,2);assert.match(code,/shadowVisibility/);assert.match(code,/iblShade\(iblSpecular/);assert.match(code,/@binding\(24\)/);}
+  // The IBL reaches gltf-pro through its lighting hooks (one stable object for steady frames); the mock shadows still patch text.
+  const {lightPBR}=await import('../../gltf-pro/src/shader.ts'),hooks=ibl.pbr(2);for(let i=0;i<100;i++)assert.equal(ibl.pbr(2),hooks,'steady frames must reuse the hooks');
+  for(const order of [[ibl,effect],[effect,ibl]]){let code=source;for(const lighting of order)code=lighting===ibl?lightPBR(code,lighting.pbr(2)):lighting.shader(code,2);assert.match(code,/shadowVisibility/);assert.match(code,/iblShade\(iblSpecular/);assert.match(code,/@binding\(24\)/);}
   view.rerender(tree(children(false,true),{shadows:true}));assert.equal(effect.sources.size,0);assert.ok(model.lighting.has(effect));
   view.rerender(tree(children(true,false),{shadows:true}));assert.equal(effect.sources.size,1);assert.equal(model.lighting.has(effect),false);
   view.rerender(tree(children(true,true),{shadows:false}));await flush();assert.equal(effect.disposals,1);assert.equal(effect.sources.size,0);assert.equal(model.lighting.size,1);

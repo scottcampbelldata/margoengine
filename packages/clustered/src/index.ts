@@ -18,7 +18,7 @@ export class Clustered implements EnginePlugin {
   private counts?:GPUBuffer;private indices?:GPUBuffer;private entries:GPUBindGroupEntry[]=[];private receivers=new Map<ClusteredReceiver,()=>void>();
   private readonly values=new Float32Array(32);private readonly ints=new Uint32Array(this.values.buffer);private readonly data=new Float32Array(1024*16);private lightCount=0;private dirty=true;private disposed=false;
   private readonly view=this.values.subarray(0,16);
-  private readonly shaders=new Map<number,Map<string,string>>();
+  private readonly shaders=new Map<number,Map<string,string>>();private readonly hooks=new Map<number,{declarations:string;light:string}>();
   constructor(options:ClusteredOptions={}) {const grid=options.grid??[16,9,24];if(grid.length!==3||grid.some(v=>!Number.isInteger(v)||v<1||v>128)||grid.reduce((a,b)=>a*b,1)>32768)throw new RangeError('Invalid cluster grid');this.grid=[...grid] as [number,number,number];}
   get owner():Engine|undefined {return this.engine;}
   static attach(instance:EngineKernel,options:ClusteredOptions={}):Clustered {const effect=new Clustered(options);engineRuntime(instance).use(effect);return effect;}
@@ -37,10 +37,11 @@ export class Clustered implements EnginePlugin {
   shader(source:string,group=0):string {
     let cache=this.shaders.get(group);const cached=cache?.get(source);if(cached)return cached;
     const base=source.includes('let base=terrainColor')?'base':'i.color';
-    let code=source.replace(/let linear=([^;]+);/,`let linear=$1+clusterLighting(i.clip.xy,i.position,n,frame.eye.xyz,${base},i.material.x,i.material.y);`);
-    if(code===source)code=source.replace('var color=','var color=clusterLighting(i.clip.xy,i.position,s.n,f.eye.xyz,s.base.rgb,s.roughness,s.metal)+');
+    const code=source.replace(/let linear=([^;]+);/,`let linear=$1+clusterLighting(i.clip.xy,i.position,n,frame.eye.xyz,${base},i.material.x,i.material.y);`);
     if(code===source)throw new Error('Clustered lighting requires the standard PBR shader');const output=clusteredSampling(group)+code;if(!cache){cache=new Map();this.shaders.set(group,cache);}cache.set(source,output);return output;
   }
+  /** gltf-pro lighting hooks: local lights add to the surface's light. */
+  pbr(group:number):{declarations:string;light:string} {let hooks=this.hooks.get(group);if(!hooks)this.hooks.set(group,hooks={declarations:clusteredSampling(group),light:'clusterLighting(i.clip.xy,i.position,s.n,f.eye.xyz,s.base.rgb,s.roughness,s.metal)'});return hooks;}
   setup(engine:Engine):void {
     if(this.disposed||!engine.gpu)throw new Error('Clustered lighting requires WebGPU and a live effect');this.engine=engine;this.device=engine.gpu;
     const count=this.grid[0]*this.grid[1]*this.grid[2],bytes=count*1024*4;

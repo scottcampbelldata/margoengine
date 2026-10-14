@@ -1,7 +1,7 @@
-// Scene-wide shading by WGSL string patching from outside core: image-based lighting from an Environment
-// (scene.environment) and distance/height fog (scene.fog). Each effect is an engine plugin that patches core's
-// mesh shader through PassContext.shader and a glTF-pro LightingEffect (`applyTo(model)`), so opaque and
-// blended glTF primitives are lit and fogged in their own shader.
+// Scene-wide shading from outside core: image-based lighting from an Environment (scene.environment) and distance/height
+// fog (scene.fog). Each effect is an engine plugin that patches core's frozen mesh shader through PassContext.shader (text
+// anchors, tests/shader-contracts.test.js) and a glTF-pro LightingEffect (`applyTo(model)`) through glTF-pro's declared
+// lighting hooks, so opaque and blended glTF primitives are lit and fogged in their own shader.
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type FrameGraph} from '@margoengine/core/extension';
 import type {Environment} from './environment.js';
@@ -11,8 +11,10 @@ import {srgbColor, type ColorInput} from './color.js';
 
 declare const GPUBufferUsage: {UNIFORM: number; COPY_DST: number};
 
-/** What the effects patch: core's mesh shader (group 0) or anything with glTF-pro's `addLighting` hook (group 2). */
-export interface LightingTarget {addLighting(effect: {shader(source: string, group: number): string; bindings(): GPUBindGroupEntry[]}): () => void}
+/** glTF-pro's lighting hooks (its `PBRLighting`, declared here so environment does not import glTF-pro). */
+export interface PBRHooks {readonly declarations: string; readonly ambient?: string; output?(color: string): string}
+/** What the effects light: core's mesh shader (patched, group 0) or anything with glTF-pro's `addLighting` (hooks, group 2). */
+export interface LightingTarget {addLighting(effect: {pbr(group: number): PBRHooks | undefined; shader(source: string, group: number): string; bindings(): GPUBindGroupEntry[]}): () => void}
 
 /** First binding of the IBL resources (five) and the fog uniform, in core's group 0 and glTF-pro's group 2. */
 export const IBL_BINDING = 20, FOG_BINDING = 25;
@@ -23,6 +25,7 @@ abstract class ShaderEffect {
   protected engine?: EngineKernel;
   private readonly models = new Map<LightingTarget, () => void>();
   private readonly shaders = new Map<number, Map<string, string>>();
+  private readonly pbrHooks = new Map<number, PBRHooks>();
   constructor(name: string) {this.name = name;}
   /** Device the bindings live on, or null while they cannot be used. */
   protected abstract get device(): GPUDevice | null | undefined;
@@ -32,13 +35,21 @@ abstract class ShaderEffect {
 
   /** Bind group entries for the patched shader; empty (and the shader unpatched) while not ready or disposed. */
   bindings(): GPUBindGroupEntry[] {return this.disposed || !this.device ? [] : this.entries();}
-  /** `source` patched for bind group `group`; unchanged while `bindings()` is empty. Throws on an unknown shader. */
+  /** gltf-pro lighting hooks for bind group `group`; undefined while `bindings()` is empty. */
+  pbr(group: number): PBRHooks | undefined {
+    if (!this.bindings().length) return undefined;
+    let hooks = this.pbrHooks.get(group);
+    if (!hooks) this.pbrHooks.set(group, hooks = this.hooks(group));
+    return hooks;
+  }
+  protected abstract hooks(group: number): PBRHooks;
+  /** Core's mesh shader `source` patched for bind group `group`; unchanged while `bindings()` is empty. Throws on an unknown shader. */
   shader(source: string, group: number): string {
     if (!this.bindings().length) return source;
     let cache = this.shaders.get(group), code = cache?.get(source);
     if (code === undefined) {
       code = this.patch(source, group);
-      if (code === source) throw new Error(`${this.name} requires the standard core or glTF-pro PBR shader`);
+      if (code === source) throw new Error(`${this.name} requires the standard core PBR shader`);
       if (!cache) this.shaders.set(group, cache = new Map());
       if (cache.size >= 64) cache.clear();
       cache.set(source, code);
@@ -99,16 +110,17 @@ export class EnvironmentLighting extends ShaderEffect {
     if (!this.cached || this.version !== this.environment.version) {this.cached = iblBindGroupEntries(this.environment, IBL_BINDING); this.version = this.environment.version;}
     return this.cached;
   }
-  protected patch(source: string, group: number): string {
-    let code = source;
-    const ambient = source.replace(/fn ambient\(s:Surface\)->vec3f \{[^}]*\}/, 'fn ambient(s:Surface)->vec3f {return vec3f(0);}');
-    // The IBL term is named `margoAmbient` (a convention, no import): post's SSAO finds it and occludes this light.
-    const lit = ambient.replace(/var color=([^;]+)\+s\.emissive;/, (_, terms: string) => `let margoAmbient=${iblCall('s.n', 'v', 's.base.rgb', 's.metal', 's.roughness')}*s.occlusion;var color=${terms}+s.emissive+margoAmbient;`);
-    if (ambient !== source && lit !== ambient) code = lit;
-    else code = source.replace(/let linear=([^;]+);/, (_, terms: string) => `let margoAmbient=${iblCall('n', 'v', 'i.color', 'i.material.y', 'i.material.x')};let linear=${terms.replace('frame.radiance.w', '0.0')}+margoAmbient;`);
-    if (code === source) return source;
+  private declarations(group: number): string {
     const b = (offset: number) => `@group(${group}) @binding(${IBL_BINDING + offset})`;
-    return `${b(0)} var iblSpecular:texture_cube<f32>;\n${b(1)} var iblSampler:sampler;\n${b(2)} var iblBrdf:texture_2d<f32>;\n${b(3)} var<uniform> iblSh:array<vec4f,9>;\n${b(4)} var<uniform> iblParams:vec4f;\n${IBL_WGSL}\n${code}`;
+    return `${b(0)} var iblSpecular:texture_cube<f32>;\n${b(1)} var iblSampler:sampler;\n${b(2)} var iblBrdf:texture_2d<f32>;\n${b(3)} var<uniform> iblSh:array<vec4f,9>;\n${b(4)} var<uniform> iblParams:vec4f;\n${IBL_WGSL}\n`;
+  }
+  protected patch(source: string, group: number): string {
+    // The IBL term is named `margoAmbient` (a convention, no import): post's SSAO finds it in core's shader and occludes this light.
+    const code = source.replace(/let linear=([^;]+);/, (_, terms: string) => `let margoAmbient=${iblCall('n', 'v', 'i.color', 'i.material.y', 'i.material.x')};let linear=${terms.replace('frame.radiance.w', '0.0')}+margoAmbient;`);
+    return code === source ? source : this.declarations(group) + code;
+  }
+  protected hooks(group: number): PBRHooks {
+    return {declarations: this.declarations(group), ambient: iblCall('s.n', 'v', 's.base.rgb', 's.metal', 's.roughness') + '*s.occlusion'};
   }
   setup(engine: EngineKernel): void {super.setup(engine); this.restore(engine);}
   onDeviceRestored(engine: EngineKernel): void {this.restore(engine);}
@@ -146,6 +158,7 @@ fn fogAmount(p:vec3f,eye:vec3f)->f32 {
   return amount*exp(-q.w*max(p.y-margoFog.color.w,0.0));
 }
 `;
+const fogMix = (value: string, eye: string) => `mix(${value},margoFog.color.rgb,fogAmount(i.position,${eye}))`;
 
 /**
  * Scene-wide distance and height fog computed in the mesh shaders, so it also covers blended (transparent) glTF-pro
@@ -187,12 +200,11 @@ export class Fog extends ShaderEffect {
     return this.entry!;
   }
   protected patch(source: string, group: number): string {
-    const mix = (value: string, eye: string) => `mix(${value},margoFog.color.rgb,fogAmount(i.position,${eye}))`;
-    let code = source.replace('if(f.settings.w<0.5) {color=aces(max(color,vec3f(0))/0.6);', `color=${mix('select(color,aces(max(color,vec3f(0))/0.6),f.settings.w<0.5)', 'f.eye.xyz')};if(f.settings.w<0.5) {`);
-    if (code === source) code = source.replace('let mapped=linear/(1.0+linear);', `let mapped=${mix('linear/(1.0+linear)', 'frame.eye.xyz')};`);
-    if (code === source) code = source.replace('return vec4f(linear,1);', `return vec4f(${mix('linear', 'frame.eye.xyz')},1);`);
+    let code = source.replace('let mapped=linear/(1.0+linear);', `let mapped=${fogMix('linear/(1.0+linear)', 'frame.eye.xyz')};`);
+    if (code === source) code = source.replace('return vec4f(linear,1);', `return vec4f(${fogMix('linear', 'frame.eye.xyz')},1);`);
     return code === source ? source : fogWgsl(group) + code;
   }
+  protected hooks(group: number): PBRHooks {return {declarations: fogWgsl(group), output: color => fogMix(color, 'f.eye.xyz')};}
   setup(engine: EngineKernel): void {
     super.setup(engine);
     const device = engineRuntime(engine).gpu;

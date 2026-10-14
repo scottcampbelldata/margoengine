@@ -63,6 +63,10 @@ export class Shadows implements EnginePlugin {
     invalidate(): void;
     bindings(): GPUBindGroupEntry[];
     shader(source: string, group?: number): string;
+    pbr(group: number): {
+        declarations: string;
+        direct(direct: string): string;
+    };
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;

@@ -126,6 +126,7 @@ export class EnvironmentLighting extends ShaderEffect {
     protected get device(): GPUDevice | null;
     protected entries(): GPUBindGroupEntry[];
     protected patch(source: string, group: number): string;
+    protected hooks(group: number): PBRHooks;
     setup(engine: EngineKernel): void;
     onDeviceRestored(engine: EngineKernel): void;
 }
@@ -177,6 +178,7 @@ export class Fog extends ShaderEffect {
     protected get device(): GPUDevice | undefined;
     protected entries(): GPUBindGroupEntry[];
     protected patch(source: string, group: number): string;
+    protected hooks(group: number): PBRHooks;
     setup(engine: EngineKernel): void;
     onDeviceRestored(engine: EngineKernel): void;
     dispose(): void;
@@ -213,6 +215,7 @@ export const IBL_WGSL = "\nfn iblRotate(d: vec3f, params: vec4f) -> vec3f {\n  r
 
 export interface LightingTarget {
     addLighting(effect: {
+        pbr(group: number): PBRHooks | undefined;
         shader(source: string, group: number): string;
         bindings(): GPUBindGroupEntry[];
     }): () => void;
@@ -303,6 +306,12 @@ type GPUContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
 
+interface PBRHooks {
+    readonly declarations: string;
+    readonly ambient?: string;
+    output?(color: string): string;
+}
+
 abstract class ShaderEffect {
     readonly name: string;
     disposed: boolean;
@@ -312,6 +321,8 @@ abstract class ShaderEffect {
     protected abstract entries(): GPUBindGroupEntry[];
     protected abstract patch(source: string, group: number): string;
     bindings(): GPUBindGroupEntry[];
+    pbr(group: number): PBRHooks | undefined;
+    protected abstract hooks(group: number): PBRHooks;
     shader(source: string, group: number): string;
     applyTo(model: LightingTarget): () => void;
     setup(engine: EngineKernel): void;

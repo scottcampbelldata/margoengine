@@ -28,15 +28,15 @@ test('PCSS tables retain Float32 spiral direction, radial distribution and tap c
  assert.doesNotMatch(source,/cos\(|sin\(|sqrt\(/);
 });
 
-test('PCSS keeps core and PBR receiver hooks and each requested bind group',()=>{
- const shadows=new Shadows({resolution:64});
+test('PCSS keeps the core receiver patch, the gltf-pro direct hook and each requested bind group',()=>{
+ const shadows=new Shadows({resolution:64}),groups=output=>[...output.matchAll(/@group\((\d+)\) @binding\((\d+)\)/g)].map(match=>[Number(match[1]),Number(match[2])]);
  try{for(const group of [0,2]){
-  for(const [input,hook] of [['let linear=direct*vec3f(1);','shadowLit(direct,i.position,i.normal)*'],['direct+ambient(s)','shadowLit(direct,i.position,s.n)+ambient(s)']]){
-   const output=shadows.shader(input,group);assert.ok(output.includes(hook));assert.ok(output.includes(shadowSampling(group)));
-   const bindings=[...output.matchAll(/@group\((\d+)\) @binding\((\d+)\)/g)].map(match=>[Number(match[1]),Number(match[2])]);
-   assert.deepEqual(bindings,[[group,1],[group,2],[group,3]],'Tables must not add GPU uniforms or bindings');
-   assert.equal(shadows.shader(input,group),output);
-  }
+  const output=shadows.shader('let linear=direct*vec3f(1);',group);assert.ok(output.includes('shadowLit(direct,i.position,i.normal)*'));assert.ok(output.includes(shadowSampling(group)));
+  assert.deepEqual(groups(output),[[group,1],[group,2],[group,3]],'Tables must not add GPU uniforms or bindings');
+  assert.equal(shadows.shader('let linear=direct*vec3f(1);',group),output);
+  const hooks=shadows.pbr(group);assert.equal(hooks.declarations,shadowSampling(group));assert.equal(hooks.direct('direct'),'shadowLit(direct,i.position,s.n)');
+  assert.deepEqual(groups(hooks.declarations),[[group,1],[group,2],[group,3]]);assert.equal(shadows.pbr(group),hooks,'stable hooks');
+  assert.throws(()=>shadows.shader('direct+ambient(s)',group),/standard PBR lighting shader/,'gltf-pro is lit through its hooks, not its text');
  }}finally{shadows.dispose();}
 });
 

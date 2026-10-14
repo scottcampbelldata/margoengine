@@ -26,7 +26,7 @@ export class Shadows implements EnginePlugin {
   private readonly fitted={matrices:this.matrices,ranges:this.ranges};
   private readonly cascadeMatrices=Array.from({length:4},(_,i)=>this.matrices.subarray(i*16,i*16+16));
   private readonly shadowContexts=this.cascadeMatrices.map((matrix,cascade)=>({context:undefined!,pass:undefined!,matrix,cascade}) as ShadowContext);
-  private readonly shaders=new Map<number,Map<string,string>>();
+  private readonly shaders=new Map<number,Map<string,string>>();private readonly hooks=new Map<number,{declarations:string;direct(direct:string):string}>();
   private readonly depthAttachment:GPURenderPassDepthStencilAttachment={view:undefined!,depthClearValue:1,depthLoadOp:'clear',depthStoreOp:'store'};
   private readonly depthPass:GPURenderPassDescriptor={colorAttachments:[],depthStencilAttachment:this.depthAttachment};
   private readonly copySource:GPUTexelCopyTextureInfo={texture:undefined!};private readonly copyDestination:GPUTexelCopyTextureInfo={texture:undefined!};private readonly copySize={width:0,height:0,depthOrArrayLayers:4};
@@ -52,10 +52,11 @@ export class Shadows implements EnginePlugin {
   bindings():GPUBindGroupEntry[] {if(!this.uniform||this.disposed)throw new Error('Shadows are not attached');return this.entries;}
   shader(source:string,group=0):string {
     let cache=this.shaders.get(group);const cached=cache?.get(source);if(cached)return cached;
-    let code=source.replace('let linear=direct*','let linear=shadowLit(direct,i.position,i.normal)*');
-    if(code===source)code=source.replace('direct+ambient(s)','shadowLit(direct,i.position,s.n)+ambient(s)');
+    const code=source.replace('let linear=direct*','let linear=shadowLit(direct,i.position,i.normal)*');
     if(code===source)throw new Error('Shadows require the standard PBR lighting shader');const output=shadowSampling(group)+code;if(!cache){cache=new Map();this.shaders.set(group,cache);}cache.set(source,output);return output;
   }
+  /** gltf-pro lighting hooks: the directional term is shadowed. */
+  pbr(group:number):{declarations:string;direct(direct:string):string} {let hooks=this.hooks.get(group);if(!hooks)this.hooks.set(group,hooks={declarations:shadowSampling(group),direct:d=>`shadowLit(${d},i.position,s.n)`});return hooks;}
   setup(engine:Engine):void {
     if(this.disposed||!engine.gpu)throw new Error('Shadows require WebGPU and a live effect');this.engine=engine;this.device=engine.gpu;this.validate();
     const size=this.options.resolution??2048;if(size>this.device.limits.maxTextureDimension2D||this.device.limits.maxTextureArrayLayers<4)throw new RangeError('Shadow map exceeds device limit');

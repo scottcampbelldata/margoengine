@@ -20,9 +20,21 @@ Supports base color/alpha, metallic-roughness (G/B), normal maps, occlusion (R),
 
 `parsePreparedPBR(engine, document, geometry, images)` accepts a static glTF-style scene/material document and per-mesh arrays of `PreparedGeometry` (`vertices: Float32Array`, `indices: Uint32Array`). Vertices use the existing 80-byte layout: position4, normal4, tangent4, UV0+UV1, color4. Arrays are validated and retained without repacking; keep them immutable until destruction. This path has no accessors, skins or animations and is used by the separate `@margoengine/blender` loader. Existing glTF loading and animation APIs are unchanged.
 
-Attach animation with the separate animation package. Register this model with `ssao.add(model)` to include its mapped normals and ambient lighting in SSAO. When a lighting effect names the ambient light `let margoAmbient=` (environment's `EnvironmentLighting`), the SSAO ambient replay draws the lit fragment returning `margoAmbient` (zero for unlit materials) with the effects' group-2 bindings; otherwise it draws `ambientFragment` as before. Neither extension is imported by this package. Disposal and device restoration retain CPU asset blueprints.
+Attach animation with the separate animation package. Register this model with `ssao.add(model)` to include its mapped normals and ambient lighting in SSAO. When a lighting effect replaces the ambient light through the `ambient` hook (environment's `EnvironmentLighting`), the SSAO ambient replay draws the lit fragment returning that light (`margoAmbient`, zero for unlit materials) with the effects' group-2 bindings; otherwise it draws `ambientFragment` as before. Neither extension is imported by this package. Disposal and device restoration retain CPU asset blueprints.
 
-Register with `shadows.add(model)` and `clustered.add(model)` for optional directional shadows and local PBR lights, including the current skinned vertex buffer. `addLighting()` accepts an optional shader/binding hook without importing these packages. `shadowPrimitives` exposes current opaque/masked GPU geometry to depth consumers; blended materials are omitted.
+Register with `shadows.add(model)` and `clustered.add(model)` for optional directional shadows and local PBR lights, including the current skinned vertex buffer. `addLighting()` takes such effects without importing their packages (see "Lighting hooks").
+
+### Lighting hooks
+
+A `LightingEffect` (`addLighting(effect)`) lights both PBR variants (standard and physical) through declared hook points instead of searching this package's WGSL. `effect.pbr(2)` returns a `PBRLighting` (contract version 1; return `undefined` while not ready, and the same object on steady frames, since composition is cached per object), and `effect.bindings()` its group-2 entries:
+
+- `declarations`: module-scope WGSL put before the shader (bindings in group 2, helper functions).
+- `direct(expr)`: wraps the directional light term (shadows: `shadowLit(direct,i.position,s.n)`).
+- `light`: a `vec3f` added before the directional term (clustered local lights).
+- `ambient`: a `vec3f` replacing the hemisphere ambient (environment IBL; at most one effect). It is declared as `let margoAmbient=`, and SSAO's ambient replay returns it.
+- `output(expr)`: wraps the display colour after tone mapping, before sRGB encoding (fog).
+
+In scope: `i` (vertex output: position, normal, uv, color), `s` (Surface: base, n, roughness, metal, occlusion, emissive), `v` (to the eye) and `f` (frame uniforms). Effects compose in any order to the same shader body. `tests/extensions.test.js` checks each hook point occurs exactly once in both variants; shadows, clustered and environment test their contributions, and `examples/package-benchmarks/proofs/gltf-pro-lighting-hooks.proof.js` shows the GPU calls equal the text patches they replaced. Effects without `pbr` (materials, shader nodes, LOD imposter baking) still patch the text through `shader(source, 2)`; the anchors they use (the map `textureSample` calls, the beauty fragment head up to `let s=surface(i,front);`, `if(!facing&&f.settings.z<0.5){discard;}`, the vertex `let p=f.model*...` line and `struct Out`) are kept and listed in `tests/shader-contracts.test.js`. `shadowPrimitives` exposes current opaque/masked GPU geometry to depth consumers; blended materials are omitted.
 
 Pipeline state hook: set `primitive.material.renderState` (type `PBRRenderState`) to override the beauty pipeline's
 `blend` (a `GPUBlendState`, or `null` for no blending), `depthWrite` and `depthCompare` for every primitive using that
