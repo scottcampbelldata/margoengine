@@ -64,6 +64,7 @@ export class Engine {
     };
     disposed: boolean;
     onError: (error: unknown) => void;
+     collected: number;
     readonly plugins: ReadonlyMap<string, EnginePlugin>;
     pace?: (time: number) => boolean;
      features?: GPUFeatureName[];
@@ -155,7 +156,8 @@ export class Mesh {
     readonly euler: Float32Array;
     readonly matrix: Float32Array;
     geometry: Geometry | null;
-    material: PbrMaterial;
+    get material(): PbrMaterial;
+    set material(value: PbrMaterial);
     constructor(engine: Engine, id: number);
     get visible(): boolean;
     set visible(value: boolean);
@@ -227,6 +229,7 @@ export class TransformStore {
     readonly limits: Float32Array;
     readonly constrained: Uint8Array;
     readonly hidden: Uint8Array;
+    readonly changed: Uint8Array;
     static create(capacity?: number): Promise<TransformStore>;
     private constructor();
     tick(culling?: boolean): void;
