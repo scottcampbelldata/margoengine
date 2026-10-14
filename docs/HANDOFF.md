@@ -252,8 +252,13 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       separate step left `verify`; `npm run catalog:build` still works alone. The generator writes only on a real
       change and keeps the checkout's line endings, and keeps the last `published` value when the registry is
       unreachable (offline builds no longer fail).
-   c. Public API snapshots per package (exported names AND type signatures, e.g. API Extractor-style .d.ts reports)
-      checked in CI, so accidental API changes fail the build and intended ones are reviewed; feeds the 1.0 API list.
+   c. [DONE] Public API snapshots: `api/<package>[.<entry>].api.md`, one per package.json `exports` entry (129), each
+      exported name with its declaration from dist/*.d.ts (comments and private members dropped), the package-local
+      types those use but the entry does not export, and `import` lines for other packages' types. `scripts/api-report.js`
+      reads them with TypeScript 7's checker (`typescript/unstable/sync`, no new dependency; unstable API, so a
+      TypeScript bump may need edits). `npm run api:check` (in `verify` after build:packages, ~3 s) fails with a diff;
+      `npm run api:update` rewrites the reports and `docs/api-surface.md` (export counts per entry, unexported types,
+      `any` count, gzip) for the 1.0 API review.
    d. Add a linter/formatter (Biome: one fast dev tool, no runtime cost) with a small rule set: no `any`, no unused
       code, consistent imports. Pairs with the 1g.e reformat decision.
    e. packages/shared is copied into every package bundle (e.g. sceneSamples, math, msaa, demo-frame); copies can drift
@@ -301,7 +306,9 @@ packages): make a real `node_modules` folder holding junctions to the main check
 via `npm install --package-lock-only --offline --no-audit --no-fund --ignore-scripts`. Also junction `margoengine`
 to the worktree's packages/margoengine. `npm run build:packages` is the whole package build (dependency order from
 package.json, then size gates, then docs/catalog.json); there is no separate workspace build step. Commit-message
-or other temp files in the shared scratchpad must have unique names (two workers' `msg.txt` collided once).
+or other temp files in the shared scratchpad must have unique names (two workers' `msg.txt` collided once). A change
+to any package's public API (anything in its dist/*.d.ts reachable from an `exports` entry) fails `npm run api:check`:
+if intended, run `npm run api:update` after build:packages and commit the `api/` and `docs/api-surface.md` diff.
 
 ## API rough edges before 1.0 (found writing docs/from-threejs.md, 2026-10-14; not changed)
 
