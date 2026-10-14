@@ -1,5 +1,6 @@
 // Real-GPU CAD benchmark. From the repository root, after `npm run build:packages`:
 //   node examples/package-benchmarks/cad/run.mjs [--sizes=10000,50000,max] [--edges] [--low] [--step] [--label=name]
+// BENCH_CONDITIONS (free text, e.g. machine state) and BENCH_CORE (core commit) are recorded in the JSON when set.
 // Writes examples/package-benchmarks/cad/results-<label>.json. Headless Edge (BROWSER_CHANNEL to override), vsync and the
 // frame-rate limit off so FPS is throughput, cross-origin isolated so performance.now() has 5 µs resolution.
 import {chromium} from '@playwright/test';
@@ -19,7 +20,7 @@ const server = await createServer({configFile: false, logLevel: 'error', server:
 await server.listen();
 const browser = await chromium.launch({channel: process.env.BROWSER_CHANNEL ?? 'msedge', headless: true, args: ['--disable-gpu-vsync', '--disable-frame-rate-limit', '--enable-precise-memory-info']});
 const acPowerAtStart = requireAC();
-const out = {label, date: new Date().toISOString(), acPowerAtStart, host: {cpu: cpus()[0].model, cores: cpus().length, memoryGB: Math.round(totalmem() / 2 ** 30), node: process.version, browser: browser.version()}, viewport: [1432, 768], runs: []};
+const out = {label, date: new Date().toISOString(), acPowerAtStart, host: {cpu: cpus()[0].model, cores: cpus().length, memoryGB: Math.round(totalmem() / 2 ** 30), node: process.version, browser: browser.version()}, viewport: [1432, 768], ...(process.env.BENCH_CONDITIONS ? {conditions: process.env.BENCH_CONDITIONS} : {}), ...(process.env.BENCH_CORE ? {core: process.env.BENCH_CORE} : {}), runs: []};
 const open = async () => {const page = await browser.newPage({viewport: {width: 1432, height: 768}, deviceScaleFactor: 1});page.setDefaultTimeout(+(process.env.PAGE_TIMEOUT ?? 600_000));const errors = [];page.on('pageerror', e => errors.push(e.message));page.on('console', m => {if (process.env.DEBUG) console.log('page:', m.text());if (m.type() === 'error') errors.push(m.text());});await page.goto(`http://127.0.0.1:${port}/examples/package-benchmarks/cad/index.html`);await page.waitForFunction(() => window.ready);return {page, errors};};
 try {
   {const {page} = await open();out.adapter = await page.evaluate(async () => {const a = await navigator.gpu.requestAdapter({powerPreference: 'high-performance'});return {...a.info.toJSON?.() ?? {vendor: a.info.vendor, architecture: a.info.architecture, description: a.info.description}, timestamp: a.features.has('timestamp-query')};});await page.close();}
