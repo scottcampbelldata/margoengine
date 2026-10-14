@@ -559,9 +559,22 @@ crates.instances.count = 600; // draw the first 600
 ```
 
 Shadows, clustered lights, IBL, fog and SSAO take `crates` like any materials mesh; `Raycaster` and `Picking` hits
-carry `instanceId`. A loaded model instances the same way (`new PBRInstances(n)` from `@margoengine/gltf-pro` on
-`primitive.instances`, matrices in the primitive's node space), and `EXT_mesh_gpu_instancing` files load instanced. Not
-per instance: frustum culling and sorting of transparent instances. `BatchedMesh` has no equivalent.
+carry `instanceId`. A loaded model instances the same way (`new PBRInstances(n)` on `primitive.instances`, matrices in
+the primitive's node space). Instancing lives in its own entry, `@margoengine/gltf-pro/instancing`, so apps that never
+instance do not load it; `EXT_mesh_gpu_instancing` files load instanced when its reader is passed like a decoder (a
+file that requires the extension is rejected without it):
+
+```ts
+import {loadGLTF} from '@margoengine/gltf-pro';
+import {PBRInstances, instancing} from '@margoengine/gltf-pro/instancing';
+
+const city = await loadGLTF(engine, '/instanced-city.glb', {decoders: {instancing}});
+const tree = await loadGLTF(engine, '/tree.glb'), forest = new PBRInstances(500);
+for (let i = 0; i < 500; i++) forest.setMatrixAt(i, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, i % 25 * 4, 0, Math.floor(i / 25) * 4, 1]);
+for (const primitive of tree.primitives) primitive.instances = forest;
+```
+
+Not per instance: frustum culling and sorting of transparent instances. `BatchedMesh` has no equivalent.
 
 ## LOD and imposters
 

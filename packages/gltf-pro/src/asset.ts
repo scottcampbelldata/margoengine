@@ -1,4 +1,5 @@
 import {readResponse} from '../../shared/loading.js';
+import type {PBRInstances} from './instancing.js';
 export type GLTFDocument = Record<string, any>;
 export const assetLimit = 64 * 1024 * 1024;
 /** A transcoded texture, such as a KTX2Decoder result: every mip level, in a format the device has enabled. */
@@ -10,6 +11,8 @@ export interface GLTFDecoderHooks {
   draco?: {decode(data: Uint8Array, options: {attributeIds: Record<string, number>; componentTypes: Record<string, number>; signal?: AbortSignal}): Promise<{positions?: ArrayLike<number>; normals?: ArrayLike<number>; uvs?: ArrayLike<number>; colors?: ArrayLike<number>; indices?: ArrayLike<number>; attributes?: Record<string, {array: ArrayLike<number>}>}>};
   meshopt?: {decodeGltfBuffer(target: Uint8Array, count: number, stride: number, source: Uint8Array, mode: string, filter?: string): void};
   ktx2?: {transcode(data: Uint8Array, options?: {signal?: AbortSignal}): Promise<GLTFCompressedImage>};
+  /** EXT_mesh_gpu_instancing: `instancing` from @margoengine/gltf-pro/instancing. */
+  instancing?: {read(asset: GLTFAsset, extension: any): PBRInstances};
 }
 const supported = new Set(['KHR_mesh_quantization','KHR_texture_transform','KHR_materials_emissive_strength','KHR_materials_unlit','KHR_lights_punctual','KHR_materials_clearcoat','KHR_materials_transmission','KHR_materials_ior','KHR_materials_volume','KHR_materials_sheen','KHR_materials_specular','EXT_texture_webp','EXT_texture_avif','EXT_mesh_gpu_instancing']);
 const hookFor: Record<string, keyof GLTFDecoderHooks> = {KHR_draco_mesh_compression: 'draco', EXT_meshopt_compression: 'meshopt', KHR_meshopt_compression: 'meshopt', KHR_texture_basisu: 'ktx2'};

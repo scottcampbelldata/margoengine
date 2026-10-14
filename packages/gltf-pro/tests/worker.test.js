@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {parseGLTFAsync} from '../dist/index.js';
 import {modelFromPrepared, parseGLTFInWorker} from '../dist/worker.js';
+import {instancing} from '../dist/instancing.js';
 import {runParseWorker, assertSameBytes} from '../../../tests/support/parse-worker.js';
 import {headless, headlessModels, snapshot} from '../../../tests/support/pbr-snapshot.js';
 import {bigGLB} from '../../../tests/support/big-glb.js';
@@ -20,11 +21,11 @@ for (const [name, load] of [
   ['generated grids drawn 50 times each through EXT_mesh_gpu_instancing', async () => bigGLB({segments: 16, meshes: 2, instances: 50})],
 ]) test(`worker-parsed glTF equals main-thread parse: ${name}`, () => headlessModels(async () => {
   const glb = new Uint8Array(await load());
-  const main = await parseGLTFAsync(await headless(), glb.slice());
+  const decoders = name.includes('instancing') ? {instancing} : {}, main = await parseGLTFAsync(await headless(), glb.slice(), {decoders});
   const prepared = await runParseWorker(worker, {url: 'https://example.test/', input: glb.slice().buffer});
-  const viaWorker = modelFromPrepared(await headless(), prepared);
+  const viaWorker = modelFromPrepared(await headless(), prepared, undefined, decoders);
   assert.ok(main.primitives.length > 0);
-  if (name.includes('instancing')) assert.equal(main.primitives[0].instances.count, 50);
+  if (decoders.instancing) for (const model of [main, viaWorker]) assert.equal(model.primitives[0].instances.count, 50);
   assertSameBytes(snapshot(viaWorker), snapshot(main));
   // The worker packed every primitive, so the main thread decoded nothing.
   assert.ok(prepared.geometry.flat().every(Boolean));

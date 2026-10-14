@@ -15,16 +15,16 @@ const bare = id => !id.startsWith('.') && !isAbsolute(id) && !/^[a-z]:[\\/]/i.te
 async function load(name, entry, ref) {
   // The package's src and packages/shared (inlined into every bundle) both come from the ref.
   const sources = [slash(resolve(root, 'packages', name, 'src')) + '/', slash(resolve(root, 'packages/shared')) + '/'];
+  const show = file => {try {return execFileSync('git', ['show', `${ref}:${file.slice(slash(root).length + 1)}`], {cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 26});} catch {return;}};
   const plugins = ref ? [{name: 'git-source', enforce: 'pre', resolveId(id, importer) {
-    // A file deleted since the ref (e.g. shared/math.js) is missing on disk; resolve it to its path so load() reads the ref.
+    // A file deleted or renamed since the ref (e.g. shared/math.js, gltf-pro's instances.ts) is missing on disk; resolve it
+    // to its path in the ref (.ts when the ref has one) so load() reads the ref.
     if (!importer || !id.startsWith('.')) return;
-    const file = slash(resolve(dirname(importer.split('?')[0]), id));
-    if (sources.some(s => file.startsWith(s)) && !existsSync(file) && !existsSync(file.replace(/\.js$/, '.ts'))) return file;
+    const file = slash(resolve(dirname(importer.split('?')[0]), id)), ts = file.replace(/\.js$/, '.ts');
+    if (sources.some(s => file.startsWith(s)) && !existsSync(file) && !existsSync(ts)) return show(ts) === undefined ? file : ts;
   }, load(id) {
     const file = slash(id.split('?')[0]);
-    if (!sources.some(s => file.startsWith(s))) return;
-    try {return execFileSync('git', ['show', `${ref}:${file.slice(slash(root).length + 1)}`], {cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 26});}
-    catch {return;} // not in the ref: fall back to the working tree
+    if (sources.some(s => file.startsWith(s))) return show(file); // undefined (not in the ref): the working tree
   }}] : [];
   const result = await build({root: resolve(root, 'packages', name), configFile: false, publicDir: false, logLevel: 'silent', plugins,
     build: {write: false, minify: false, target: 'es2022', lib: {entry: resolve(root, 'packages', name, entry), formats: ['es']}, rollupOptions: {external: bare}}});

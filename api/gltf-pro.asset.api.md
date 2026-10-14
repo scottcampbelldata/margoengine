@@ -53,5 +53,36 @@ interface GLTFDecoderHooks {
             signal?: AbortSignal;
         }): Promise<GLTFCompressedImage>;
     };
+    instancing?: {
+        read(asset: GLTFAsset, extension: any): PBRInstances;
+    };
+}
+
+class PBRInstances {
+    readonly data: Float32Array;
+    readonly capacity: number;
+    constructor(capacity: number);
+    get count(): number;
+    set count(n: number);
+    get needsUpdate(): boolean;
+    set needsUpdate(v: boolean);
+    setMatrixAt(i: number, m: ArrayLike<number>): this;
+    getMatrixAt<T extends {
+        [k: number]: number;
+    } = Float32Array>(i: number, out?: T): T;
+    setColorAt(i: number, color: ArrayLike<number>): this;
+    setUVTransformAt(i: number, t: TextureTransform | null): this;
+    get mirrored(): boolean;
+    upload(device: GPUDevice): GPUBuffer;
+    dispose(): void;
+    get layout(): GPUVertexBufferLayout;
+    shader(code: string): string;
+    bounds(node: ArrayLike<number>, vertices: Float32Array, out: Float32Array): void;
+}
+
+interface TextureTransform {
+    offset?: readonly number[];
+    scale?: readonly number[];
+    rotation?: number;
 }
 ```

@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {mkdir, writeFile} from 'node:fs/promises';
+import {existsSync} from 'node:fs';
 import {isAbsolute, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {build} from 'vite';
@@ -13,14 +14,22 @@ import {Engine, TransformStore} from '@margoengine/core/extension';
 import {mockGPU, context} from './gpu-recorder.js';
 
 const root = resolve(import.meta.dirname, '../../..'), slash = value => value.replaceAll('\\', '/'), ref = process.argv[2] ?? '1970fda';
-const sources = ['materials', 'gltf-pro'].map(name => slash(resolve(root, 'packages', name, 'src')) + '/');
-/** materials with gltf-pro bundled in (core stays external), both read from `from` or the working tree. */
+const sources = ['materials/src', 'gltf-pro/src', 'shared'].map(name => slash(resolve(root, 'packages', name)) + '/');
+const show = (from, file) => {try {return execFileSync('git', ['show', `${from}:${file.slice(slash(root).length + 1)}`], {cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore']});} catch {return;}};
+/** materials with gltf-pro (every entry) bundled in (core stays external), both read from `from` or the working tree. */
 async function load(from) {
   const plugins = [{name: 'git-source', enforce: 'pre',
-    resolveId: id => id === '@margoengine/gltf-pro' ? resolve(root, 'packages/gltf-pro/src/index.ts') : null,
+    resolveId(id, importer) {
+      if (id.startsWith('@margoengine/gltf-pro')) return resolve(root, `packages/gltf-pro/src/${id.slice(22) || 'index'}.ts`);
+      // A file renamed or deleted since `from` (shared/math.js, gltf-pro's instances.ts) resolves to its path in `from`.
+      if (!from || !importer || !id.startsWith('.')) return null;
+      const file = slash(resolve(importer.split('?')[0], '..', id)), ts = file.replace(/\.js$/, '.ts');
+      if (sources.some(s => file.startsWith(s)) && !existsSync(file) && !existsSync(ts)) return show(from, ts) === undefined ? file : ts;
+      return null;
+    },
     load(id) {
       const file = slash(id.split('?')[0]); if (!from || !sources.some(s => file.startsWith(s))) return;
-      try {return execFileSync('git', ['show', `${from}:${file.slice(slash(root).length + 1)}`], {cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore']});} catch {return;}
+      return show(from, file);
     }}];
   const result = await build({root, configFile: false, publicDir: false, logLevel: 'silent', plugins,
     build: {write: false, minify: false, target: 'es2022', lib: {entry: resolve(root, 'packages/materials/src/index.ts'), formats: ['es']}, rollupOptions: {external: id => id.startsWith('@margoengine/core')}}});
