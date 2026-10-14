@@ -6,13 +6,15 @@ import {Shadows} from '@margoengine/shadows';
 import {ScatterInstances} from '@margoengine/scatter';
 import {Clustered} from '@margoengine/clustered';
 import {Water} from '@margoengine/water';
-import {VFX} from '@margoengine/vfx';
+import {VFX} from '@margoengine/vfx/base';
 import {sceneSamples} from '../../../packages/shared/quality.js';
 import {applyQualityTier, watchQuality} from '@margoengine/quality';
 applyQualityTier();
 import {createCitadelPBR, moonDirection} from './scene.js';
 import {frameDue, frameStatus} from '@margoengine/quality';
-import {Sky} from '@margoengine/sky';
+import {Sky} from '@margoengine/sky/base';
+import {night} from '@margoengine/sky/night';
+import {fog} from '@margoengine/sky/fog';
 import './style.css';
 
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -61,7 +63,7 @@ export class NightCitadel {
     runtime.use({name:'citadel:framing',setup(){},registerPasses:graph=>graph.add({name:'citadel:framing',order:-100,execute:c=>{if(c.width/c.height>1.1)for(let i=0;i<4;i++)c.camera.matrix[i*4]-=0.12*c.camera.matrix[i*4+3];}})});
     // Midnight sky with stars and a phased moon; height haze in the horizon colour over masonry and water.
     this.atmosphere = Sky.attach(engine,{hours:0,timeScale:0,night:{zenithColor:[zenith[0],zenith[1],zenith[2]],horizonColor:this.horizon,moonColor:[lunar[0],lunar[1],lunar[2]],moonDirection:this.moon,moonSize:0.035,starIntensity:1},
-      fog:{depth:()=>this.water?.depthTexture??this.post.depthTexture,color:this.horizon,falloff:'exp',height:0.065,start:0,density:0}});
+      fog:{depth:()=>this.water?.depthTexture??this.post.depthTexture,color:this.horizon,falloff:'exp',height:0.065,start:0,density:0}},{night,fog});
     this.shadows = Shadows.attach(engine,{resolution:this.stats.samples===4?1024:512,distance:180,lightSize:0.02,normalBias:0.055,casterMargin:70});
     this.lights = Clustered.attach(engine,{grid:[8,4,16]});
     this.instances = ScatterInstances.attach(engine,()=>createCitadelPBR().batches);

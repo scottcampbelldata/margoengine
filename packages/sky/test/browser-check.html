@@ -1,0 +1,46 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky entries browser check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas></canvas>
+<script type="module">
+// Renders each demo sky configuration with the full Sky and with the base entry plus only the features it uses,
+// and reads back the HDR scene (and the reflection map) after every frame for an exact comparison.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {Sky as Base} from '/packages/sky/dist/base.js';
+import {configs} from '/packages/sky/test/configs.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const entries={};for(const name of ['preetham','bruneton','clouds','night','fog','reflection','lighting'])entries[name]=(await import(`/packages/sky/dist/${name}.js`))[name];
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,4,14],target:[0,3,-30],near:0.1,far:800}}),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0.2,threshold:1,exposure:0});
+engine.createMesh().setGeometry(box(60,0.2,200)).setMaterial(new PbrMaterial({color:'#4a5a3a',roughness:0.9})).setPosition([0,0,-60]);
+engine.createMesh().setGeometry(box(4,12,4)).setMaterial(new PbrMaterial({color:'#8a8070',roughness:0.6})).setPosition([-6,6,-40]);
+// The page's first frames can differ from later ones while targets are still being created, so warm up first.
+for(let i=0;i<3;i++){engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();}
+const lighting=engineRuntime(engine).lighting,initial=[lighting.direction.slice(),lighting.radiance.slice()];
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+window.check={samples:sceneSamples,
+ async run(name,variant){
+  const config=configs[name],options=config.options(()=>post.depthTexture);lighting.direction.set(initial[0]);lighting.radiance.set(initial[1]);
+  const sky=variant!=='narrow'?new Sky(options):new Base(options,Object.fromEntries(config.features.map(feature=>[feature,entries[feature]])));
+  device.pushErrorScope('validation');engine.use(sky);if(config.reflection)void sky.reflectionTexture;const frames=[];
+  try{
+   for(const change of config.frames){change(sky);engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();frames.push({scene:await read(post.sceneTexture),reflection:config.reflection?await read(sky.reflectionTexture):null});}
+  }finally{sky.dispose();}
+  const error=await device.popErrorScope();
+  window.last=window.last??{};window.last[variant]=frames;
+  return {error:error?.message??null,errors:errors.splice(0),frames:frames.length,width:post.sceneTexture.width};
+ },
+ // Pixels whose RGBA differs at all between the two variants, and the largest difference, per frame and image.
+ compare(x='full',y='narrow'){const full=window.last[x],narrow=window.last[y];return full.map((f,i)=>Object.fromEntries(['scene','reflection'].filter(k=>f[k]).map(k=>{const a=f[k],b=narrow[i][k];let n=0,max=0,nonzero=0;for(let p=0;p<a.length;p+=4){let d=0;for(let c=0;c<4;c++)d=Math.max(d,Math.abs(a[p+c]-b[p+c]));if(d>0||!Object.is(a[p],b[p]))n++;max=Math.max(max,d);if(a[p]+a[p+1]+a[p+2]>0)nonzero++;}return [k,{differing:n,max,lit:nonzero,pixels:a.length/4}];})));}};
+window.ready=true;
+</script></body></html>

@@ -1,4 +1,4 @@
-const frame=/* wgsl */`
+export const frame=/* wgsl */`
 struct Particle {positionLife:vec4f,velocitySize:vec4f,color:vec4f,rotation:vec4f}
 struct Frame {camera:mat4x4f,right:vec4f,up:vec4f,gravityDelta:vec4f,emitterTime:vec4f,velocitySpread:vec4f,color:vec4f,shape:vec4f,physics:vec4f,emissionExtent:vec4f,control:vec4u}
 @group(0) @binding(0) var<uniform> f:Frame;
@@ -55,49 +55,5 @@ struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) col
 @fragment fn fragment(i:Out)->@location(0) vec4f {
   let radius=dot(i.uv,i.uv);if(radius>1){discard;}return vec4f(i.color.rgb,i.color.a*(1-radius)*(1-radius));
 }`;
-// Optional features patch the default shaders, so effects without them compile byte-identical WGSL.
-const extra=/* wgsl */`
-struct Extra {eye:vec4f,forward:vec4f,count:vec4u,obstacles:array<vec4f,128>}
-@group(0) @binding(6) var<uniform> extra:Extra;
-`;
-/** Outward normal (xyz) and signed distance (w) from obstacle i, a sphere or a box. */
-const obstacle=/* wgsl */`
-fn obstacle(i:u32,position:vec3f)->vec4f {
-  let center=extra.obstacles[i*2u];let extent=extra.obstacles[i*2u+1u].xyz;let r=position-center.xyz;
-  if(center.w<0.5){let d=length(r);return vec4f(select(vec3f(0,1,0),r/max(d,0.0001),d>0.003),d-extent.x);}
-  let q=abs(r)-extent;let outside=max(q,vec3f(0));let nearest=length(outside);let d=nearest+min(max(q.x,max(q.y,q.z)),0.0);
-  if(nearest>0.0001){return vec4f(outside*sign(r)/nearest,d);}
-  let s=select(vec3f(-1),vec3f(1),r>=vec3f(0));
-  if(q.x>=q.y&&q.x>=q.z){return vec4f(s.x,0,0,d);}if(q.y>=q.z){return vec4f(0,s.y,0,d);}return vec4f(0,0,s.z,d);
-}`;
-const force='p.velocitySize=vec4f(p.velocitySize.xyz+(f.gravityDelta.xyz+curlNoise(p.positionLife.xyz))*dt,p.velocitySize.w);';
-const settle='p.rotation.x+=p.rotation.y*dt;';
-export function featureShaders(obstacles:boolean,wrap:boolean,sort:boolean,texture:boolean):{simulation:string;billboard:string;sort?:string} {
-  let simulation=simulationShader;
-  if(obstacles)simulation=simulation.replace('@group(0) @binding(1)',extra+'@group(0) @binding(1)').replace('@compute',obstacle+'\n@compute').replace(force,/* wgsl */`var force=f.gravityDelta.xyz+curlNoise(p.positionLife.xyz);
-  // Flow bends around obstacles within one unit; particles inside are pushed out and reflected.
-  for(var i=0u;i<extra.count.x;i++){let o=obstacle(i,p.positionLife.xyz);if(o.w<1){force-=o.xyz*min(dot(force,o.xyz),0.0)*(1-clamp(o.w,0.0,1.0));}}
-  p.velocitySize=vec4f(p.velocitySize.xyz+force*dt,p.velocitySize.w);`).replace(settle,/* wgsl */`
-  for(var i=0u;i<extra.count.x;i++){let o=obstacle(i,p.positionLife.xyz);let r=p.velocitySize.w*0.5;if(o.w<r){p.positionLife=vec4f(p.positionLife.xyz+o.xyz*(r-o.w),p.positionLife.w);p.velocitySize=vec4f(p.velocitySize.xyz-o.xyz*min(dot(p.velocitySize.xyz,o.xyz),0.0)*(1+f.physics.z),p.velocitySize.w);}}
-  `+settle);
-  // Wrap keeps a field inside the emission box; re-entering particles restart at the emitter velocity.
-  if(wrap)simulation=simulation.replace(settle,/* wgsl */`
-  let low=f.emitterTime.xyz-f.emissionExtent.xyz;let span=2*f.emissionExtent.xyz;let q=p.positionLife.xyz-low;
-  if(any(q<vec3f(0))||any(q>span)){p.positionLife=vec4f(low+q-floor(q/span)*span,p.positionLife.w);p.velocitySize=vec4f(f.velocitySpread.xyz,p.velocitySize.w);}
-  `+settle);
-  const billboard=texture?billboardShader.replace('struct Out','@group(0) @binding(3) var sprite:texture_2d<f32>;\n@group(0) @binding(4) var spriteSampler:sampler;\nstruct Out')
-    .replace('let radius=dot(i.uv,i.uv);if(radius>1){discard;}return vec4f(i.color.rgb,i.color.a*(1-radius)*(1-radius));','let t=textureSample(sprite,spriteSampler,i.uv*vec2f(0.5,-0.5)+0.5);if(t.a<0.02){discard;}return vec4f(i.color.rgb*t.rgb,i.color.a*t.a);'):billboardShader;
-  return {simulation,billboard,sort:sort?frame+extra+/* wgsl */`
-@group(0) @binding(1) var<storage,read> particles:array<Particle>;
-@group(0) @binding(3) var<storage,read_write> alive:array<u32>;
-@group(0) @binding(4) var<storage,read> indirect:array<u32,5>;
-@group(0) @binding(7) var<uniform> stage:vec4u;
-fn key(id:u32)->f32 {if(id==0xffffffffu){return -1e30;}return dot(particles[id].positionLife.xyz-extra.eye.xyz,extra.forward.xyz);}
-// Slots past the live count hold stale ids; mark them so they sort last.
-@compute @workgroup_size(256) fn clear(@builtin(global_invocation_id) id:vec3u){if(id.x>=indirect[1]&&id.x<stage.z){alive[id.x]=0xffffffffu;}}
-// One bitonic compare-exchange step, far particles first.
-@compute @workgroup_size(256) fn main(@builtin(global_invocation_id) id:vec3u){
-  let a=id.x;let b=a^stage.x;if(b<=a||b>=stage.z){return;}let ia=alive[a];let ib=alive[b];let ka=key(ia);let kb=key(ib);let descending=(a&stage.y)==0;
-  if((descending&&ka<kb)||(!descending&&ka>kb)){alive[a]=ib;alive[b]=ia;}
-}`:undefined};
-}
+/** Statement the obstacle and wrap features insert their per-particle work before. */
+export const settle='p.rotation.x+=p.rotation.y*dt;';

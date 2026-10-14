@@ -2,7 +2,7 @@
 
 A moonlit night sky for Margo Engine: twinkling stars, a phased moon with glow, and horizon haze. `SkyMoon` is a
 preset of `Sky` from `@margoengine/sky` (Margo's one sky implementation) held at midnight with its stylized
-`night` options, so it composes with Sky's fog and water reflection. `stage.sky()` loads it.
+`night` options. `stage.sky()` loads it.
 
 In this workspace, `npm run modern:dev` opens the starter; click **Toggle moonlit scenery**.
 
@@ -23,9 +23,12 @@ sky.config.moonPhase = 0.2; // read every frame
 ```
 
 `@margoengine/scenery/sky` and the root export `SkyMoon` and the `SkyMoonConfig` type (an alias of Sky's
-`SkyNightOptions`). `new SkyMoon(config)` is `Sky({hours: 0, timeScale: 0, night: config})` with plugin name
-`sky-moon`; `config` (also `sky.options.night`) is read every frame, so change it in place for live controls.
-Remove it with `engine.removePlugin('sky-moon')` or `sky.dispose()`.
+`SkyNightOptions`). `new SkyMoon(config)` is `new Sky({hours: 0, timeScale: 0, night: config}, {night})` from
+`@margoengine/sky/base` with plugin name `sky-moon`: it loads only the stylized-night feature (6.1 kB min+gzip with
+Sky's base, against 10.2 kB for the full Sky), so it is not an `instanceof` the root `Sky`, and options that need
+other features (fog, clouds, a day model) throw; build a `Sky` with those features instead. `config` (also
+`sky.options.night`) is read every frame, so change it in place for live controls. Remove it with
+`engine.removePlugin('sky-moon')` or `sky.dispose()`.
 
 The options, defaults and limits are Sky's stylized night (see the `@margoengine/sky` README): zenith and horizon
 colours, `hazeDensity`, moon direction, angular size, phase, colour and glow, star intensity and twinkle. The sky

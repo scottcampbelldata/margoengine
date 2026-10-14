@@ -8,6 +8,38 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./base": {
+      "types": "./dist/base.d.ts",
+      "import": "./dist/base.js"
+    },
+    "./preetham": {
+      "types": "./dist/preetham.d.ts",
+      "import": "./dist/preetham.js"
+    },
+    "./bruneton": {
+      "types": "./dist/bruneton.d.ts",
+      "import": "./dist/bruneton.js"
+    },
+    "./clouds": {
+      "types": "./dist/clouds.d.ts",
+      "import": "./dist/clouds.js"
+    },
+    "./night": {
+      "types": "./dist/night.d.ts",
+      "import": "./dist/night.js"
+    },
+    "./fog": {
+      "types": "./dist/fog.d.ts",
+      "import": "./dist/fog.js"
+    },
+    "./reflection": {
+      "types": "./dist/reflection.d.ts",
+      "import": "./dist/reflection.js"
+    },
+    "./lighting": {
+      "types": "./dist/lighting.d.ts",
+      "import": "./dist/lighting.js"
     }
   },
   "files": [

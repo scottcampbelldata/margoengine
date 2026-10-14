@@ -89,7 +89,7 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 | [`@margoengine/exporters`](packages/exporters/README.md) | glTF/GLB/STL/OBJ/PLY and static USDZ export for Quick Look |
 | [`@margoengine/machinery`](packages/machinery/README.md) | Revolute/prismatic joints, gear/piston couplings, bounded IK, sections/caps, dimensions, welded STL/OBJ, assembly queries/visibility, metrology and industrial presets |
 | [`@margoengine/creative`](packages/creative/README.md) | Grass, planet, a leaf-field preset over vfx, toon, HDR targets and a grading effect (height fog, god rays, DOF blur, grain) |
-| [`@margoengine/sky`](packages/sky/README.md) | The one sky: Preetham/Bruneton day, stylized night with stars and phased moon, clouds, distance/height fog |
+| [`@margoengine/sky`](packages/sky/README.md) | The one sky: Preetham/Bruneton day, stylized night with stars and phased moon, clouds, distance/height fog; each feature is its own entry (`/base` + `/bruneton`, `/night`, ...) so a scene loads only what it uses |
 | [`@margoengine/scenery`](packages/scenery/README.md) | `SkyMoon`, a moonlit-night preset of `@margoengine/sky` |
 | `@margoengine/gltf-pro` | Optional metallic-roughness PBR, all five texture maps, normal mapping, mipmaps and alpha modes |
 | [`@margoengine/blender`](packages/blender/README.md) | Offline Blender `.margo` export and prepacked WebGPU PBR ingestion |
@@ -97,7 +97,7 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 | [`@margoengine/post`](packages/post/README.md) | The one bloom, SSAO, FXAA and the PostStack that combines effects |
 | [`@margoengine/shadows`](packages/shadows/README.md) | Four directional cascades, PCSS, cached static depth and dynamic casters |
 | [`@margoengine/clustered`](packages/clustered/README.md) | Compute frustum clusters and forward PBR for up to 1,024 point/spot lights |
-| [`@margoengine/vfx`](packages/vfx/README.md) | The one particle system: up to 1,000,000 GPU particles, curl turbulence, obstacles, sorting, sprites and indirect billboards |
+| [`@margoengine/vfx`](packages/vfx/README.md) | The one particle system: up to 1,000,000 GPU particles, curl turbulence, obstacles, sorting, sprites and indirect billboards; `/base` leaves out the optional features (`/obstacles`, `/wrap`, `/sort`, `/texture`) |
 | [`@margoengine/animator`](packages/animator/README.md) | Gameplay states, 1D/2D blending, additive masks and analytical foot IK |
 | [`@margoengine/taa`](packages/taa/README.md) | Halton jitter, mesh/skinned velocity, depth-tested history and YCoCg clamping |
 | [`@margoengine/splats`](packages/splats/README.md) | GPU radix sorting, covariance ellipses, degree-3 SH and binary Gaussian captures |

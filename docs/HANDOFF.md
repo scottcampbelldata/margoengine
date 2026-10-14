@@ -237,9 +237,23 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       under the GPU lock, with noise-calibrated tolerances like the dedupe worker used).
    g. Changesets (or similar) for versioning and changelogs before the first npm publish; consistent peer ranges.
    h. Consistent error types and messages across packages (one small error-code convention), documented.
-   i. Follow-ups from the dedupe merge: night-citadel browser test expects 4x MSAA but the page now starts on the light
-      tier: make the test pass `?quality=high`. Demos load more after dedupe (Citadel +7.5 KB, Afterlight +3.3 KB,
-      Meadow +2.3 KB gzip): split Sky day models and VFX optional features into separate entries to win it back.
+   i. [DONE] Follow-ups from the dedupe merge. Sky and VFX are split into feature entries: `@margoengine/sky/base` plus
+      `/preetham`, `/bruneton`, `/clouds`, `/night`, `/fog`, `/reflection`, `/lighting` (`new Sky(options, {bruneton,
+      clouds})`), and `@margoengine/vfx/base` plus `/obstacles`, `/wrap`, `/sort`, `/texture`. Root entries keep every
+      feature and record exactly the pre-split GPU work and WGSL (fixtures in `packages/{sky,vfx}/test/fixtures`,
+      recorded from the pre-split build, `1970fda`); narrow skies leave out unused WGSL and render bit-identical HDR pixels and reflection
+      maps on the real GPU (`node packages/sky/test/browser-check.mjs`, 6 configurations x 4x/1x, Arc 140V). Eager
+      gzip per demo (`npm run measure:demos`, against `1970fda`): Night Citadel 65,309 -> 60,704, Afterlight
+      99,730 -> 97,049, Meadow 46,661 -> 44,894, Earth 39,402 -> 39,402; `stage.sky()` fetch 10,318 -> 6,720 (Earth's
+      lazy chunks 64,772 -> 61,467; Meadow's 57,499 -> 58,858, since its unused `stage.sky()` chunk no longer reuses
+      the eager full Sky). Core + stage unchanged at 18,681.
+      Cost: root `Sky` 9,623 -> 10,205 and root `VFX` 6,398 -> 6,617 min+gzip (creative `GPUParticles`, hence
+      `stage.particles()`, still uses the root VFX). `SkyMoon` is now base + night, so not `instanceof` the root Sky
+      and its options cannot add fog/clouds/day. The Citadel browser test asks for `?quality=high` for its 4x checks
+      and has a light-tier check (1x, DPR 1). Before `paceEngine` replaced the global requestAnimationFrame patch, that
+      check was flaky because the patch broke `cancelAnimationFrame` (Citadel `stop()` could miss); with
+      `engine.pace` it passes on the real GPU. Leftover: the apps' unused `src/effects.ts` re-export files still name
+      the root entries.
 2. [DONE `aec1830` cherry-picked] Dedupe: particles -> vfx, bloom -> post Bloom, sky -> @margoengine/sky (API changes listed in
    the commit message; -6,017 gzip across the five packages).
 3. Replace three.js inside fbx and usdz with native parsers [running].
@@ -350,7 +364,7 @@ Built and deployed to the preview, not yet measured:
   (stalled at browser launch while other GPU checks ran), plus each merged package's own `browser-check.mjs`.
 - Engine logic moved out of demos (not yet run in a browser): frame pacing `frameDue`/`frameStatus` ->
   `@margoengine/quality`; Citadel `NightAtmosphere` -> `@margoengine/scenery`; Earth `Stars` -> `@margoengine/creative/stars`.
-  Verify with `node scripts/modern-night-citadel-tests.js` and by opening the Earth demo.
+  Verify with `node scripts/modern-night-citadel-tests.js` (passes, 2026-10-14) and by opening the Earth demo.
 
 - The measured tier is remembered per browser with no expiry and no on-page control yet.
 - A fast PC sees the light tier on its first page view only; the full tier starts from the next page load.

@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import {writeFile} from 'node:fs/promises';
 import {openBrowser} from './browser.js';
 
-const path='/apps/showcase-night-citadel/index.html';
+// Desktops start on the light tier (1x, DPR 1) until a page load measures GPU headroom; `?quality=` forces a tier
+// for one load, so the 4x MSAA checks ask for the full tier and a separate check covers the light one.
+const path='/apps/showcase-night-citadel/index.html',origin='http://127.0.0.1:5193',high=path+'?quality=high',light=path+'?quality=low';
 const browser=await openBrowser({startPath:path,args:['--disable-frame-rate-limit','--disable-gpu-vsync']});
 const {page}=browser, errors=[], report={hardware:browser.hardware};
 page.on('pageerror',e=>errors.push(e.message));
@@ -67,7 +69,7 @@ async function waveHeights(page){
   });
   assert.equal(heights[0].rms,0,'Zero wave height must flatten the displaced surface');
   assert(heights[2].max-heights[2].min>0.5,'Ocean grid filters out the configured waves: '+JSON.stringify(heights));
-  assert(Math.abs(heights[1].rms/heights[2].rms-0.35)<0.0001,'Slider must scale actual vertex displacement');
+  assert(Math.abs(heights[1].rms/heights[2].rms-0.35)<0.0001,'Slider must scale actual vertex displacement: '+JSON.stringify(heights));
   return heights;
 }
 async function moonFraming(page){
@@ -84,7 +86,7 @@ async function moonFraming(page){
   return frame;
 }
 try{
-  await page.addInitScript(instrument);await page.setViewportSize({width:1280,height:800});await page.reload();
+  await page.addInitScript(instrument);await page.setViewportSize({width:1280,height:800});await page.goto(origin+high);
   await page.waitForFunction(()=>window.nightCitadel?.stats.frames>10);
   assert(await page.locator('#status').isHidden());
   assert.equal(await page.evaluate(()=>window.nightCitadel.stats.samples),4);
@@ -198,11 +200,19 @@ try{
   assert.equal(await page.evaluate(()=>nightCitadel.stats.frames),stopped,'Disposed app kept rendering');
   const desktopContext=await page.context().browser().newContext({viewport:{width:1440,height:900},deviceScaleFactor:2});
   const desktop=await desktopContext.newPage();desktop.on('pageerror',e=>errors.push(e.message));await desktop.addInitScript(instrument);
-  await desktop.goto('http://127.0.0.1:5193'+path);await desktop.waitForFunction(()=>window.nightCitadel?.stats.frames>10);
+  await desktop.goto(origin+high);await desktop.waitForFunction(()=>window.nightCitadel?.stats.frames>10);
   report.desktopDensity=await desktop.evaluate(()=>({deviceDpr:devicePixelRatio,effectiveDpr:document.querySelector('canvas').width/innerWidth,samples:nightCitadel.stats.samples,multisampledTextures:gpuAudit.textures.filter(t=>t.samples===4).length}));
   assert.equal(report.desktopDensity.deviceDpr,2);assert.equal(report.desktopDensity.effectiveDpr,1);assert.equal(report.desktopDensity.samples,4);
   assert(report.desktopDensity.multisampledTextures>0,'Desktop lost its 4x MSAA attachments');
   await desktop.evaluate(()=>nightCitadel.dispose());assert.equal(await desktop.evaluate(()=>gpuAudit.live.size),0,'HiDPI desktop leaked GPU buffers/textures');
+  // The light tier every desktop opens on: single-sampled at DPR 1 even on a HiDPI screen, held to about 60 FPS.
+  const lightPage=await desktopContext.newPage();lightPage.on('pageerror',e=>errors.push(e.message));await lightPage.addInitScript(instrument);
+  await lightPage.goto(origin+light);await lightPage.waitForFunction(()=>window.nightCitadel?.stats.frames>10);
+  assert(await lightPage.locator('#status').isHidden());
+  report.lightTier=await lightPage.evaluate(()=>({margoLow:globalThis.margoLow,effectiveDpr:document.querySelector('canvas').width/innerWidth,samples:nightCitadel.stats.samples,multisampledTextures:gpuAudit.textures.filter(t=>t.samples===4).length,multisampledPipelines:gpuAudit.pipelines.filter(s=>s===4).length}));
+  assert.deepEqual(report.lightTier,{margoLow:1,effectiveDpr:1,samples:1,multisampledTextures:0,multisampledPipelines:0},'Light tier: '+JSON.stringify(report.lightTier));
+  report.waveHeights.light=await waveHeights(lightPage);report.framing.push(await moonFraming(lightPage));
+  await lightPage.evaluate(()=>nightCitadel.dispose());assert.equal(await lightPage.evaluate(()=>gpuAudit.live.size),0,'Light tier leaked GPU buffers/textures');
   await desktopContext.close();
   const context=await page.context().browser().newContext({viewport:{width:390,height:844},deviceScaleFactor:3,isMobile:true,hasTouch:true,userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1'});
   const mobile=await context.newPage();mobile.on('pageerror',e=>errors.push(e.message));await mobile.addInitScript(instrument);
@@ -292,7 +302,8 @@ try{
 // A native browser clock proves that selecting 120 never invents extra displayed frames.
 const native=await openBrowser({startPath:path,args:[]});
 try{
-  await native.page.waitForFunction(()=>window.nightCitadel?.stats.frames>10);
+  // The light tier holds ~60 FPS by design; the cadence choice matters on the full tier.
+  await native.page.goto(origin+high);await native.page.waitForFunction(()=>window.nightCitadel?.stats.frames>10);
   await native.page.locator('#cadence').selectOption('120');await native.page.waitForTimeout(2000);
   const observed=await native.page.evaluate(()=>({...nightCitadel.stats,note:document.getElementById('refresh-note').textContent}));
   assert(observed.fps<=observed.callbackRate*1.1);
