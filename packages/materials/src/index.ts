@@ -144,8 +144,10 @@ export class Material {
   /** True when the beauty pipeline needs blending or depth overrides. */
   get customState():boolean {return this.blending!=='normal'||this.depthWrite!==undefined||!this.depthTest;}
   private sync():void {this.settings[0]=this.blend?2:this.settings[1]>0?1:0;}
-  /** @internal gltf-pro LightingEffect bindings for one device. */
-  bindings(device:GPUDevice):GPUBindGroupEntry[] {
+  /** gltf-pro beauty shader patch; subclasses (such as `@margoengine/shader`'s NodeMaterial) may extend it. */
+  shader(source:string,group:number):string {return materialShader(source,group,this.shading);}
+  /** @internal gltf-pro LightingEffect bindings for one device; `engine` is the drawing engine. */
+  bindings(device:GPUDevice,_engine?:Engine):GPUBindGroupEntry[] {
     const d=defaults(device),entries:GPUBindGroupEntry[]=[];
     for(let i=0;i<(this.shading==='matcap'?6:5);i++){const bound=this[slots[i]]?.bind(device,i===0||i>=4)??[i===2?d.normal:d.white,d.sampler];entries.push({binding:32+i*2,resource:bound[0]},{binding:33+i*2,resource:bound[1]});}
     return entries;
@@ -206,7 +208,7 @@ export function createMesh(engine:EngineKernel,geometry:MeshGeometry,material:Ma
   const doc={asset:{version:'2.0'},nodes:[{mesh:0}],meshes:[{primitives:[{material:0}]}],materials:[{pbrMetallicRoughness:{baseColorFactor:m.color,roughnessFactor:m.factors[0],metallicFactor:m.factors[1]},emissiveFactor:m.emissive,alphaMode:['OPAQUE','MASK','BLEND'][m.settings[0]],alphaCutoff:m.settings[1],doubleSided:m.doubleSided}]};
   const model=new PBRModel(engine,new GLTFAsset(doc,[]),[],[[packGeometry(geometry)]]);
   Object.assign(model.primitives[0].material,{base:m.color,emission:m.emissive,factors:m.factors,settings:m.settings});
-  model.addLighting({shader:(code,group)=>materialShader(code,group,m.shading),bindings:()=>m.bindings(runtime.gpu!)});
+  model.addLighting({shader:(code,group)=>m.shader(code,group),bindings:()=>m.bindings(runtime.gpu!,runtime)});
   const entry:Entry={model,material:m,order:renderOrder};model.registerPasses=()=>{};
   try{runtime.use(model);}catch(error){model.dispose();throw error;}
   set.add(entry);model.onDispose(()=>set.delete(entry));return model;

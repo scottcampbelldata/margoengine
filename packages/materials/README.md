@@ -22,6 +22,8 @@ glass.opacity = 0.6;                                                // live: col
 
 `Texture` accepts an ImageBitmap, image, canvas, OffscreenCanvas, video, VideoFrame, ImageData or `{data, width, height}` RGBA8 bytes, with `colorSpace`, `wrapS`/`wrapT` (`'clamp'` default, `'repeat'`, `'mirror'`), `magFilter`/`minFilter`, `mipmaps`, `anisotropy` and `flipY`. Images flip like Three.js (`flipY` true) and raw data does not. Without `colorSpace`, `map`, `emissiveMap` and `matcap` read sRGB and other slots linear. One GPU copy is shared by every material. Videos re-upload when `currentTime` changes; call `texture.update()` after drawing to a canvas or changing data. `loadTexture` fetches http(s), blob: or data: URLs (64 MiB, 4096 x 4096 pixels).
 
+For node-based colour, normal, roughness, emissive, opacity and vertex offsets, `@margoengine/shader`'s `NodeMaterial` extends `Material` through its `shader(source, group)` and `bindings(device, engine)` methods, which subclasses may override.
+
 Sorting matches Three.js: all material meshes draw in one pass, opaque first, then transparent back to front, each group by `renderOrder`.
 
 Limits: one material per mesh (geometry `groups` are ignored); UVs and the vertex arrays are packed once per geometry object, so edit a copy rather than the original; shading and render state are fixed at construction. Maps are bound by a gltf-pro lighting hook, so they apply to the lit colour only: SSAO normals and shadow alpha cut-outs ignore `normalMap` and `map` alpha. Basic and matcap output skips ACES tone mapping. No Lambert, Phong, depth or physical (clearcoat, transmission) materials, no texture transforms or second UV set, and no WebGL2 path.

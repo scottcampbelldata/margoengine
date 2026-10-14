@@ -49,7 +49,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | MSAA | COVERED | core `sceneSamples()` (`packages/core/src/quality.ts`) | 4x on desktop. 1x on user-agent-detected phones and on the light quality tier. |
 | Reversed-Z / logarithmic depth | COVERED | core reversed-Z (`depthCompare:'greater-equal'`) | |
 | ShaderMaterial, RawShaderMaterial, onBeforeCompile | PARTIAL | `core/extension` `FrameGraph`, `DrawOptions.pipeline`, `PassContext.shader` (`packages/core/src/plugin.ts`) | Custom WGSL works per pass, or by string-patching the shared shader. There is no per-mesh material object or uniform abstraction. |
-| Node materials / TSL | MISSING | — | |
+| Node materials / TSL | PARTIAL | shader `NodeMaterial`, `NodePass`, `ComputePass` (`packages/shader/src`) | Typed nodes compile to WGSL with CSE and dead-code elimination; material slots (colour, normal, roughness, metalness, emissive, opacity, vertex position), PostStack effects and 1D compute over storage buffers. No statement-level If, atomics, light/shadow nodes or GLSL output (README limits). |
 | Compute (TSL compute, GPUComputationRenderer) | PARTIAL | raw `engine.gpu` via `core/extension` | No abstraction. Packages write raw WGSL compute. |
 | Render targets / render-to-texture | PARTIAL | creative `HDRRenderTarget` (`packages/creative/src/targets.ts`) | Captures the one scene from the one camera. There is no way to render a second camera or scene into a texture. |
 | Multiple render targets (MRT) | PARTIAL | `DrawOptions.colorAttachments` (`packages/core/src/plugin.ts`) | Low-level only. selection uses it for its ID buffer. |
@@ -320,7 +320,7 @@ Every MISSING or PARTIAL item, ordered by how often real three.js projects need 
 18. **General LOD object.**
     **Fit:** new small package, or extend scatter.
 19. **Node materials, TSL, per-mesh custom shaders.** This is three r186's main extension model, and power users rely on it.
-    **Fit:** new `@margoengine/shader` (material and uniform abstraction) on top of gltf-pro's draw path.
+    **Fit:** new `@margoengine/shader` (material and uniform abstraction) on top of gltf-pro's draw path. **Started:** `@margoengine/shader` covers node materials, node post passes and node compute; per-mesh raw WGSL materials remain.
 20. **glTF export with animation.** Used by editors and configurators.
     **Fit:** extend exporters.
 21. **WebXR completeness** (glTF-pro and skinning in XR, controller and hand models, AR hit test).
