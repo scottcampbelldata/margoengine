@@ -1,0 +1,498 @@
+{
+ "recordedAt": "2026-10-14T13:52:58.408Z",
+ "commit": "648b43e",
+ "config": {
+  "a": "test-results/vfx-x3",
+  "b": "test-results/vfx-x4",
+  "label": "x4-split-layout",
+  "capacities": [
+   1000000
+  ],
+  "samples": [
+   1,
+   4
+  ],
+  "rounds": 16,
+  "frames": 10,
+  "size": [
+   1432,
+   768
+  ],
+  "parityOnly": false
+ },
+ "acPowerBefore": true,
+ "hardware": {
+  "webglRenderer": "ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (16GB) (0x000064A0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "webgpu": {
+   "vendor": "intel",
+   "architecture": "xe-2lpg",
+   "device": "0x64a0",
+   "description": "Intel(R) Arc(TM) 140V GPU (16GB)",
+   "fallback": false
+  },
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+  "browserName": "chromium",
+  "browserVersion": "155.0.4283.45",
+  "requestedChannel": "msedge",
+  "launchArgs": [
+   "--enable-webgpu-developer-features"
+  ],
+  "powerPreference": "high-performance",
+  "hostPlatform": "win32",
+  "headless": false
+ },
+ "parity": "omitted: recorded before vfx-gpu.mjs understood the split layout; see vfx-gpu-final-island.json",
+ "timing": [
+  {
+   "capacity": 1000000,
+   "samples": 1,
+   "width": 1432,
+   "height": 768,
+   "framesPerBlock": 10,
+   "live": [
+    1000000,
+    1000000
+   ],
+   "summary": {
+    "compute": {
+     "A": {
+      "median": 2.37821425,
+      "min": 1.711994,
+      "max": 2.6836814999999996
+     },
+     "B": {
+      "median": 1.10301375,
+      "min": 0.8136145,
+      "max": 1.1718935
+     },
+     "pairedSavingMs": 1.2547575000000002,
+     "bFasterRounds": 16,
+     "rounds": 16
+    },
+    "draw": {
+     "A": {
+      "median": 1.547308,
+      "min": 1.1765295,
+      "max": 1.6780884999999999
+     },
+     "B": {
+      "median": 1.4727255,
+      "min": 1.1406175,
+      "max": 1.639729
+     },
+     "pairedSavingMs": 0.05272049999999995,
+     "bFasterRounds": 14,
+     "rounds": 16
+    },
+    "total": {
+     "A": {
+      "median": 3.99147225,
+      "min": 2.908993,
+      "max": 4.311718
+     },
+     "B": {
+      "median": 2.572562,
+      "min": 1.950873,
+      "max": 2.7621175
+     },
+     "pairedSavingMs": 1.34297375,
+     "bFasterRounds": 16,
+     "rounds": 16
+    }
+   },
+   "blocks": [
+    [
+     {
+      "compute": 1.7229845,
+      "draw": 1.1765295,
+      "total": 2.908993
+     },
+     {
+      "compute": 1.711994,
+      "draw": 1.189159,
+      "total": 2.9140699999999997
+     },
+     {
+      "compute": 1.73564,
+      "draw": 1.209628,
+      "total": 2.9563615
+     },
+     {
+      "compute": 1.7177755000000001,
+      "draw": 1.245669,
+      "total": 2.940268
+     },
+     {
+      "compute": 1.9691285,
+      "draw": 1.3736115,
+      "total": 3.3549795
+     },
+     {
+      "compute": 2.497875,
+      "draw": 1.584469,
+      "total": 4.070053
+     },
+     {
+      "compute": 2.4672245000000004,
+      "draw": 1.555355,
+      "total": 4.127682500000001
+     },
+     {
+      "compute": 2.6836814999999996,
+      "draw": 1.62374,
+      "total": 4.311718
+     },
+     {
+      "compute": 2.4119900000000003,
+      "draw": 1.5779070000000002,
+      "total": 3.990027
+     },
+     {
+      "compute": 2.3889435,
+      "draw": 1.6780884999999999,
+      "total": 4.2226565
+     },
+     {
+      "compute": 2.4450624999999997,
+      "draw": 1.649026,
+      "total": 4.173384499999999
+     },
+     {
+      "compute": 2.5284215,
+      "draw": 1.5373085,
+      "total": 4.06349
+     },
+     {
+      "compute": 2.2994909999999997,
+      "draw": 1.5457714999999999,
+      "total": 3.9929175
+     },
+     {
+      "compute": 2.5603480000000003,
+      "draw": 1.573949,
+      "total": 4.114245
+     },
+     {
+      "compute": 2.3674850000000003,
+      "draw": 1.5488445,
+      "total": 3.9435434999999996
+     },
+     {
+      "compute": 2.3378759999999996,
+      "draw": 1.5339225,
+      "total": 3.884741
+     }
+    ],
+    [
+     {
+      "compute": 0.820125,
+      "draw": 1.1406175,
+      "total": 1.950873
+     },
+     {
+      "compute": 0.827573,
+      "draw": 1.1566334999999999,
+      "total": 1.986498
+     },
+     {
+      "compute": 0.8136145,
+      "draw": 1.1821015,
+      "total": 1.9904305
+     },
+     {
+      "compute": 0.8275985,
+      "draw": 1.198248,
+      "total": 2.0283465
+     },
+     {
+      "compute": 0.8586925000000001,
+      "draw": 1.4183245,
+      "total": 2.3370689999999996
+     },
+     {
+      "compute": 1.1175709999999999,
+      "draw": 1.526449,
+      "total": 2.655817
+     },
+     {
+      "compute": 1.1102535,
+      "draw": 1.481319,
+      "total": 2.5765985000000002
+     },
+     {
+      "compute": 1.0801235,
+      "draw": 1.4643655,
+      "total": 2.5529525
+     },
+     {
+      "compute": 1.1490295,
+      "draw": 1.5437405,
+      "total": 2.683655
+     },
+     {
+      "compute": 1.142389,
+      "draw": 1.4930634999999999,
+      "total": 2.648395
+     },
+     {
+      "compute": 1.1447845,
+      "draw": 1.5093130000000001,
+      "total": 2.6465454999999998
+     },
+     {
+      "compute": 1.1718935,
+      "draw": 1.5343390000000001,
+      "total": 2.72967
+     },
+     {
+      "compute": 1.082884,
+      "draw": 1.461866,
+      "total": 2.5426665
+     },
+     {
+      "compute": 1.1037949999999999,
+      "draw": 1.639729,
+      "total": 2.7621175
+     },
+     {
+      "compute": 1.1022325,
+      "draw": 1.4737149999999999,
+      "total": 2.5803485
+     },
+     {
+      "compute": 1.1054355,
+      "draw": 1.471736,
+      "total": 2.5685255
+     }
+    ]
+   ],
+   "errors": []
+  },
+  {
+   "capacity": 1000000,
+   "samples": 4,
+   "width": 1432,
+   "height": 768,
+   "framesPerBlock": 10,
+   "live": [
+    1000000,
+    1000000
+   ],
+   "summary": {
+    "compute": {
+     "A": {
+      "median": 2.33898275,
+      "min": 2.242226,
+      "max": 2.769983
+     },
+     "B": {
+      "median": 1.0991855,
+      "min": 1.0774935,
+      "max": 1.3657460000000001
+     },
+     "pairedSavingMs": 1.24350775,
+     "bFasterRounds": 16,
+     "rounds": 16
+    },
+    "draw": {
+     "A": {
+      "median": 1.45995175,
+      "min": 1.3968145,
+      "max": 1.617386
+     },
+     "B": {
+      "median": 1.48019925,
+      "min": 1.440616,
+      "max": 1.522621
+     },
+     "pairedSavingMs": -0.025273250000000025,
+     "bFasterRounds": 7,
+     "rounds": 16
+    },
+    "total": {
+     "A": {
+      "median": 3.99488425,
+      "min": 3.6356545000000002,
+      "max": 4.8730685000000005
+     },
+     "B": {
+      "median": 2.604645,
+      "min": 2.5265204999999997,
+      "max": 2.988444
+     },
+     "pairedSavingMs": 1.3083250000000004,
+     "bFasterRounds": 16,
+     "rounds": 16
+    }
+   },
+   "blocks": [
+    [
+     {
+      "compute": 2.3116785,
+      "draw": 1.3968145,
+      "total": 3.7811745
+     },
+     {
+      "compute": 2.2854545,
+      "draw": 1.4107984999999998,
+      "total": 3.7987005
+     },
+     {
+      "compute": 2.769983,
+      "draw": 1.617386,
+      "total": 4.8730685000000005
+     },
+     {
+      "compute": 2.242226,
+      "draw": 1.4104335,
+      "total": 3.6356545000000002
+     },
+     {
+      "compute": 2.3000895,
+      "draw": 1.483454,
+      "total": 3.9171365
+     },
+     {
+      "compute": 2.4738645,
+      "draw": 1.4364495000000002,
+      "total": 4.092865
+     },
+     {
+      "compute": 2.3421465,
+      "draw": 1.549105,
+      "total": 4.0296105
+     },
+     {
+      "compute": 2.2817825000000003,
+      "draw": 1.5325165,
+      "total": 4.0195065
+     },
+     {
+      "compute": 2.6432390000000003,
+      "draw": 1.458116,
+      "total": 4.126692500000001
+     },
+     {
+      "compute": 2.6618325,
+      "draw": 1.4313715,
+      "total": 4.094662
+     },
+     {
+      "compute": 2.3534485,
+      "draw": 1.45822,
+      "total": 3.9935955
+     },
+     {
+      "compute": 2.431469,
+      "draw": 1.4124910000000002,
+      "total": 3.8303665000000002
+     },
+     {
+      "compute": 2.2958715,
+      "draw": 1.4961105,
+      "total": 3.8073985
+     },
+     {
+      "compute": 2.313371,
+      "draw": 1.5136885000000002,
+      "total": 3.996173
+     },
+     {
+      "compute": 2.335819,
+      "draw": 1.4654335,
+      "total": 4.0770055
+     },
+     {
+      "compute": 2.3648805,
+      "draw": 1.4616835,
+      "total": 3.988204
+     }
+    ],
+    [
+     {
+      "compute": 1.0993935000000001,
+      "draw": 1.443715,
+      "total": 2.5373015
+     },
+     {
+      "compute": 1.1266595000000001,
+      "draw": 1.491449,
+      "total": 2.615478
+     },
+     {
+      "compute": 1.3657460000000001,
+      "draw": 1.51434,
+      "total": 2.8538620000000003
+     },
+     {
+      "compute": 1.129863,
+      "draw": 1.481423,
+      "total": 2.6401139999999996
+     },
+     {
+      "compute": 1.120253,
+      "draw": 1.522621,
+      "total": 2.8561015
+     },
+     {
+      "compute": 1.2884039999999999,
+      "draw": 1.5119954999999998,
+      "total": 2.988444
+     },
+     {
+      "compute": 1.0790035,
+      "draw": 1.448897,
+      "total": 2.5386825
+     },
+     {
+      "compute": 1.0989775,
+      "draw": 1.4789755,
+      "total": 2.5902960000000004
+     },
+     {
+      "compute": 1.123274,
+      "draw": 1.4967095000000001,
+      "total": 2.7909205000000004
+     },
+     {
+      "compute": 1.1258525000000001,
+      "draw": 1.5212409999999998,
+      "total": 2.904669
+     },
+     {
+      "compute": 1.097597,
+      "draw": 1.470173,
+      "total": 2.5938120000000002
+     },
+     {
+      "compute": 1.086556,
+      "draw": 1.505407,
+      "total": 2.6957125
+     },
+     {
+      "compute": 1.078405,
+      "draw": 1.456267,
+      "total": 2.5265204999999997
+     },
+     {
+      "compute": 1.082207,
+      "draw": 1.440616,
+      "total": 2.526911
+     },
+     {
+      "compute": 1.0774935,
+      "draw": 1.4543135,
+      "total": 2.529594
+     },
+     {
+      "compute": 1.0807745,
+      "draw": 1.4589495000000001,
+      "total": 2.5625105
+     }
+    ]
+   ],
+   "errors": []
+  }
+ ],
+ "acPowerAfter": true
+}

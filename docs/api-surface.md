@@ -74,7 +74,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/tween | `.` 6 |  |  |  |
 | @margoengine/usdz | `.` 7 | 1 | 2 | 11,322 |
 | @margoengine/usdz-export | `.` 9 |  |  |  |
-| @margoengine/vfx | `.` 5, `./base` 5, `./obstacles` 1, `./wrap` 1, `./sort` 1, `./texture` 1 | 19 |  | 6,617 |
+| @margoengine/vfx | `.` 5, `./base` 5, `./obstacles` 1, `./wrap` 1, `./sort` 1, `./texture` 1 | 19 |  | 7,009 |
 | @margoengine/video | `.` 2 |  |  |  |
 | @margoengine/viewcube | `.` 5 |  |  |  |
 | @margoengine/water | `.` 5 |  |  |  |

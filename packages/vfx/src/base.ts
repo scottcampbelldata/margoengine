@@ -2,8 +2,8 @@ import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type Vec3} from '@margoengine/core/extension';
 import {finiteVector} from '../../shared/math.js';
 import {viewMatrix} from '../../shared/view.js';
-import {simulationShader,billboardShader} from './shader.js';
-declare const GPUBufferUsage:{UNIFORM:number;STORAGE:number;INDIRECT:number;INDEX:number;COPY_DST:number;COPY_SRC:number};
+import {simulationShader,billboardShader,multisampled} from './shader.js';
+declare const GPUBufferUsage:{UNIFORM:number;STORAGE:number;INDIRECT:number;COPY_DST:number;COPY_SRC:number};
 type Context=Extract<PassContext,{backend:'webgpu'}>;
 const defaultPosition:Vec3=[0,1,0],defaultVelocity:Vec3=[0,3,0],defaultGravity:Vec3=[0,-9.81,0],defaultColor:readonly [number,number,number,number]=[1,0.5,0.1,1],defaultLife:readonly [number,number]=[1,3];
 export interface VFXOptions {capacity?:number;initialCount?:number;rate?:number;position?:Vec3;velocity?:Vec3;spread?:number;gravity?:Vec3;color?:readonly [number,number,number,number];size?:number;lifetime?:readonly [number,number];ground?:number;bounce?:number;turbulence?:number;frequency?:number;angularVelocity?:number;emissionExtent?:Vec3;intensity?:number;
@@ -37,7 +37,7 @@ export class VFX implements EnginePlugin {
   private readonly presentation:GPURenderPassDescriptor={colorAttachments:[this.attachment],depthStencilAttachment:this.depthAttachment};
   private renderFormat='';private renderDepth='';private renderKey='';
   readonly name='vfx:'+nextId++;readonly capacity:number;
-  private engine?:Engine;private device?:GPUDevice;private uniform?:GPUBuffer;private particles?:GPUBuffer;private alive?:GPUBuffer;private indirect?:GPUBuffer;private respawn?:GPUBuffer;private index?:GPUBuffer;
+  private engine?:Engine;private device?:GPUDevice;private uniform?:GPUBuffer;private particles?:GPUBuffer;private alive?:GPUBuffer;private indirect?:GPUBuffer;private visible?:GPUBuffer;private respawn?:GPUBuffer;
   private simulation?:GPUComputePipeline;private computeGroup?:GPUBindGroup;private renderGroups=new Map<GPURenderPipeline,GPUBindGroup>();private renders=new Map<string,GPURenderPipeline>();
   private billboard='';private extra?:GPUBuffer;private readonly extraValues=new Float32Array(524);private sprite?:VFXTexture;private spriteEntries:GPUBindGroupEntry[]=[];private sorter?:ReturnType<NonNullable<VFXFeatures['sort']>['create']>;private owned:Owned=[];
   private readonly values=new Float32Array(56);private readonly ints=new Uint32Array(this.values.buffer);private readonly view=new Float32Array(16);private time=0;private remainder=0;private burstCount=0;private disposed=false;
@@ -64,11 +64,12 @@ export class VFX implements EnginePlugin {
     this.uniform=buffer(224,GPUBufferUsage.UNIFORM);this.particles=buffer(this.capacity*64,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC);const size=o.sort?2**Math.ceil(Math.log2(this.capacity)):this.capacity;if(o.obstacles||o.sort)this.extra=buffer(2096,GPUBufferUsage.UNIFORM);
     // Optional features patch the default shaders, so effects without them compile byte-identical WGSL.
     let simulation=simulationShader;if(o.obstacles)simulation=f.obstacles!.patch(simulation);if(o.wrap)simulation=f.wrap!.patch(simulation);this.billboard=this.sprite?f.texture!.patch(billboardShader):billboardShader;
-    this.alive=buffer(size*4,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC);this.indirect=buffer(20,GPUBufferUsage.STORAGE|GPUBufferUsage.INDIRECT|GPUBufferUsage.COPY_SRC);this.respawn=buffer(8,GPUBufferUsage.STORAGE);this.index=buffer(24,GPUBufferUsage.INDEX);
-    this.device.queue.writeBuffer(this.indirect,0,new Uint32Array([6,0,0,0,0]));this.device.queue.writeBuffer(this.index,0,new Uint32Array([0,1,2,2,1,3]));
+    this.alive=buffer(size*4,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC);this.indirect=buffer(20,GPUBufferUsage.STORAGE|GPUBufferUsage.INDIRECT|GPUBufferUsage.COPY_SRC);this.respawn=buffer(8,GPUBufferUsage.STORAGE);
+    // indirect counts live particles; visible holds the draw's [vertexCount, instanceCount, firstVertex, firstInstance] for the on-screen ones listed in alive.
+    this.visible=buffer(20,GPUBufferUsage.STORAGE|GPUBufferUsage.INDIRECT|GPUBufferUsage.COPY_SRC);for(const b of [this.indirect,this.visible])this.device.queue.writeBuffer(b,0,new Uint32Array([3,0,0,0,0]));
     this.simulation=this.device.createComputePipeline({layout:'auto',compute:{module:this.device.createShaderModule({code:simulation}),entryPoint:'main'}});
-    this.computeGroup=this.device.createBindGroup({layout:this.simulation.getBindGroupLayout(0),entries:[this.uniform!,this.particles!,this.alive!,this.indirect!,this.respawn!].map((buffer,binding)=>({binding:binding<2?binding:binding+1,resource:{buffer}})).concat(o.obstacles?[{binding:6,resource:{buffer:this.extra!}}]:[])});
-    if(o.sort)this.sorter=f.sort!.create(this.device,this.particles,this.alive,this.indirect,this.extra!,size,this.owned);
+    this.computeGroup=this.device.createBindGroup({layout:this.simulation.getBindGroupLayout(0),entries:[this.uniform!,this.particles!,this.alive!,this.indirect!,this.respawn!].map((buffer,binding)=>({binding:binding<2?binding:binding+1,resource:{buffer}})).concat({binding:2,resource:{buffer:this.visible}},o.obstacles?[{binding:6,resource:{buffer:this.extra!}}]:[])});
+    if(o.sort)this.sorter=f.sort!.create(this.device,this.particles,this.alive,this.visible,this.extra!,size,this.owned);
     if(this.sprite)this.spriteEntries=f.texture!.create(this.device,this.sprite,this.owned);
     this.burst(this.options.initialCount??0);
   }
@@ -83,20 +84,20 @@ export class VFX implements EnginePlugin {
     this.values.set(o.gravity??defaultGravity,24);this.values[27]=c.delta;this.values.set(o.position??defaultPosition,28);this.values[31]=this.time;this.values.set(o.velocity??defaultVelocity,32);this.values[35]=o.spread??1;this.values.set(o.color??defaultColor,36);const life=o.lifetime??defaultLife;
     this.values[40]=o.size??0.1;this.values[41]=life[0];this.values[42]=life[1];this.values[43]=o.ground??0;this.values[44]=o.turbulence??0.5;this.values[45]=o.frequency??1;this.values[46]=o.bounce??0.3;this.values[47]=o.angularVelocity??0;this.values[51]=o.intensity??1;this.ints[52]=this.capacity;this.ints[53]=budget;c.device.queue.writeBuffer(this.uniform!,0,this.values as Float32Array<ArrayBuffer>);
     if(this.extra){const e=this.extraValues;e.set(c.camera.position);for(let i=0;i<3;i++)e[4+i]=-this.view[i*4+2];c.device.queue.writeBuffer(this.extra,0,e as Float32Array<ArrayBuffer>);}
-    c.encoder.clearBuffer(this.indirect!,4,4);c.encoder.clearBuffer(this.respawn!,0,4);const pass=c.encoder.beginComputePass();pass.setPipeline(this.simulation!);pass.setBindGroup(0,this.computeGroup!);pass.dispatchWorkgroups(Math.ceil(this.capacity/256));
+    c.encoder.clearBuffer(this.indirect!,4,4);c.encoder.clearBuffer(this.visible!,4,4);c.encoder.clearBuffer(this.respawn!,0,4);const pass=c.encoder.beginComputePass();pass.setPipeline(this.simulation!);pass.setBindGroup(0,this.computeGroup!);pass.dispatchWorkgroups(Math.ceil(this.capacity/256));
     this.sorter?.run(pass);pass.end();
   }
   private draw(c:Context):void {
     if(this.renderFormat!==c.format||this.renderDepth!==c.descriptor.depthStencil!.format){this.renderFormat=c.format;this.renderDepth=c.descriptor.depthStencil!.format;this.renderKey=this.renderFormat+':'+this.renderDepth;}
     const key=this.renderKey+':'+c.descriptor.multisample?.count;let pipeline=this.renders.get(key);
-    if(!pipeline){const module=c.device.createShaderModule({code:this.billboard});pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format,blend:{color:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}}]},multisample:c.descriptor.multisample,depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:false,depthCompare:'greater-equal'}});this.renders.set(key,pipeline);}
+    if(!pipeline){const module=c.device.createShaderModule({code:(c.descriptor.multisample?.count??1)>1?multisampled(this.billboard):this.billboard});pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format,blend:{color:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}}]},multisample:c.descriptor.multisample,depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:false,depthCompare:'greater-equal'}});this.renders.set(key,pipeline);}
     // Auto layouts are pipeline-specific, including output format variants.
     let group=this.renderGroups.get(pipeline);if(!group){group=c.device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[...[this.uniform!,this.particles!,this.alive!].map((buffer,binding)=>({binding,resource:{buffer}})),...this.spriteEntries]});this.renderGroups.set(pipeline,group);}
     this.attachment.view=c.color;this.depthAttachment.view=c.depth;this.depthAttachment.stencilReadOnly=c.descriptor.depthStencil!.format.includes('stencil')?true:undefined;
-    const pass=c.encoder.beginRenderPass(this.presentation);pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.setIndexBuffer(this.index!,'uint32');pass.drawIndexedIndirect(this.indirect!,0);pass.end();this.engine!.stats.drawCalls++;
+    const pass=c.encoder.beginRenderPass(this.presentation);pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.drawIndirect(this.visible!,0);pass.end();this.engine!.stats.drawCalls++;
   }
-  get gpuState():{particles:GPUBuffer;indirect:GPUBuffer;alive:GPUBuffer} {if(!this.indirect||!this.particles||!this.alive)throw new Error('VFX is not attached');return {particles:this.particles,indirect:this.indirect,alive:this.alive};}
-  private release():void {for(const buffer of [this.uniform,this.particles,this.alive,this.indirect,this.respawn,this.index,this.extra,...this.owned])buffer?.destroy();this.owned=[];this.spriteEntries=[];this.extra=this.sorter=undefined;this.uniform=this.particles=this.alive=this.indirect=this.respawn=this.index=undefined;this.computeGroup=undefined;this.renderGroups.clear();this.renders.clear();this.simulation=undefined;}
+  get gpuState():{particles:GPUBuffer;indirect:GPUBuffer;alive:GPUBuffer;visible:GPUBuffer} {if(!this.indirect||!this.particles||!this.alive||!this.visible)throw new Error('VFX is not attached');return {particles:this.particles,indirect:this.indirect,alive:this.alive,visible:this.visible};}
+  private release():void {for(const buffer of [this.uniform,this.particles,this.alive,this.indirect,this.visible,this.respawn,this.extra,...this.owned])buffer?.destroy();this.owned=[];this.spriteEntries=[];this.extra=this.sorter=undefined;this.uniform=this.particles=this.alive=this.indirect=this.visible=this.respawn=undefined;this.computeGroup=undefined;this.renderGroups.clear();this.renders.clear();this.simulation=undefined;}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.engine=this.device=undefined;}
   destroy():void {this.dispose();}

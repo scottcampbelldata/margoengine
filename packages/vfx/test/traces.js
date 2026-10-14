@@ -1,5 +1,6 @@
 // Recorded GPU work for particle configurations. `node packages/vfx/test/traces.js <dist>` rewrites
-// fixtures/traces.json from a build; it was recorded from the build before the entry split (1970fda).
+// fixtures/traces.json from a build. First recorded before the entry split (1970fda); re-recorded when the particle
+// layout, culling and one-triangle billboards changed the GPU work (examples/package-benchmarks/vfx-gpu.mjs proves the pixels).
 import {writeFile} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import {resolve} from 'node:path';

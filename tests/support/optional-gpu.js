@@ -6,7 +6,7 @@ export function optionalGPU(){
  const create=engine.gpu.createBuffer;engine.gpu.createBuffer=descriptor=>{const b=create(descriptor);b.data=new ArrayBuffer(descriptor.size);b.mapState='unmapped';b.mapAsync=async()=>{b.mapState='mapped';};b.getMappedRange=()=>b.data;b.unmap=()=>{b.mapState='unmapped';};return b;};
  engine.gpu.queue.writeBuffer=(b,offset,value)=>{new Uint8Array(b.data).set(new Uint8Array(value.buffer,value.byteOffset,value.byteLength),offset);};
  engine.gpu.createSampler=()=>({});engine.gpu.importExternalTexture=descriptor=>descriptor;
- const pass={setPipeline(){},setBindGroup(){},setVertexBuffer(){},setIndexBuffer(){},draw(){counts.draws=(counts.draws??0)+1;},drawIndexed(){counts.indexed=(counts.indexed??0)+1;},drawIndexedIndirect(){counts.indirect=(counts.indirect??0)+1;},dispatchWorkgroups(){},end(){}};
+ const pass={setPipeline(){},setBindGroup(){},setVertexBuffer(){},setIndexBuffer(){},draw(){counts.draws=(counts.draws??0)+1;},drawIndexed(){counts.indexed=(counts.indexed??0)+1;},drawIndexedIndirect(){counts.indirect=(counts.indirect??0)+1;},drawIndirect(){counts.indirect=(counts.indirect??0)+1;},dispatchWorkgroups(){},end(){}};
  c.encoder.beginRenderPass=()=>{counts.render++;return pass;};c.encoder.beginComputePass=()=>{counts.compute++;return pass;};
  c.encoder.clearBuffer=()=>{};c.encoder.copyTextureToTexture=()=>{counts.copies=(counts.copies??0)+1;};c.encoder.copyBufferToBuffer=(source,from,target,to,size)=>new Uint8Array(target.data,to,size).set(new Uint8Array(source.data,from,size));
  c.camera.matrix=new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);c.camera.position=[0,1,4];c.camera.target=[0,0,0];c.camera.planes=new Float32Array(24);c.delta=0.1;

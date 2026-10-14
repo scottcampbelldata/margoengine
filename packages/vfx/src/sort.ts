@@ -3,11 +3,11 @@ import {extra} from './extra.js';
 import type {VFXFeatures} from './base.js';
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
 const shader=frame+extra+/* wgsl */`
-@group(0) @binding(1) var<storage,read> particles:array<Particle>;
+@group(0) @binding(1) var<storage,read> particles:array<vec4f>;
 @group(0) @binding(3) var<storage,read_write> alive:array<u32>;
 @group(0) @binding(4) var<storage,read> indirect:array<u32,5>;
 @group(0) @binding(7) var<uniform> stage:vec4u;
-fn key(id:u32)->f32 {if(id==0xffffffffu){return -1e30;}return dot(particles[id].positionLife.xyz-extra.eye.xyz,extra.forward.xyz);}
+fn key(id:u32)->f32 {if(id==0xffffffffu){return -1e30;}return dot(particles[id*2].xyz-extra.eye.xyz,extra.forward.xyz);}
 // Slots past the live count hold stale ids; mark them so they sort last.
 @compute @workgroup_size(256) fn clear(@builtin(global_invocation_id) id:vec3u){if(id.x>=indirect[1]&&id.x<stage.z){alive[id.x]=0xffffffffu;}}
 // One bitonic compare-exchange step, far particles first.

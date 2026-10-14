@@ -19,6 +19,7 @@ export class VFX implements EnginePlugin {
         particles: GPUBuffer;
         indirect: GPUBuffer;
         alive: GPUBuffer;
+        visible: GPUBuffer;
     };
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
