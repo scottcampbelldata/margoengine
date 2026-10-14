@@ -146,7 +146,7 @@ export class Imposter {
   dispose():void {this.disposed=true;this.release();this.source=this.data=undefined;}
 }
 
-/** Draws one atlas: camera-facing quads that reproject the three nearest views, blend them, relight and write per-pixel depth. */
+/** Draws one atlas: camera-facing quads that reproject the three nearest views (one depth parallax step each), blend them, relight and write per-pixel depth. */
 export const imposterShader=`${acesShader}
 ${octWGSL}
 struct Frame {camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,options:vec4f}
@@ -159,6 +159,7 @@ struct Atlas {center:vec4f,grid:vec4f}
 @group(0) @binding(5) var<uniform> atlas:Atlas;
 struct Out {@builtin(position) clip:vec4f,@location(0) p:vec3f,@location(1) @interpolate(flat) eye:vec3f,@location(2) @interpolate(flat) a:vec4f,@location(3) @interpolate(flat) b:vec2f,@location(4) @interpolate(flat) w:vec3f,@location(5) @interpolate(flat) id:u32}
 struct Pixel {@location(0) color:vec4f,@builtin(frag_depth) depth:f32}
+fn lod_cell(p:vec3f,c:vec3f,r:f32,b:mat3x3f)->vec2f {let l=(p-c)/r;return vec2f(dot(l,b[0]),-dot(l,b[1]))*0.5+0.5;}
 fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}
 @vertex fn vertex(@builtin(vertex_index) v:u32,@builtin(instance_index) id:u32)->Out {
  let m=instances[id];let c=atlas.center.xyz;let r=atlas.center.w;let n=atlas.grid.x;
@@ -173,21 +174,30 @@ fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12
 }
 @fragment fn fragment(i:Out)->Pixel {
  let c=atlas.center.xyz;let r=atlas.center.w;let n=atlas.grid.x;let size=vec2f(textureDimensions(normalMap));let ray=i.p-i.eye;
- let tiles=array<vec2f,3>(i.a.xy,i.a.zw,i.b);let weights=array<f32,3>(i.w.x,i.w.y,i.w.z);
- var acc=vec4f(0.0);var normal=vec3f(0.0,1e-5,0.0);var best=-1.0;var hit=c;var dir=vec3f(0.0,1.0,0.0);var texel=vec4f(0.0);
+ let tiles=array<vec2f,3>(i.a.xy,i.a.zw,i.b);let weights=array<f32,3>(i.w.x,i.w.y,i.w.z);let levels=f32(textureNumLevels(colorMap))-1.0;
+ // Everything is blended by the view weights (no single "best" view), so nothing switches abruptly while the camera turns.
+ var acc=vec4f(0.0);var normal=vec3f(0.0,1e-5,0.0);var along=0.0;var surface=vec2f(0.0);
  for(var k=0;k<3;k++){
-  // Reproject the pixel's ray onto view k's plane through the centre, then sample that tile.
-  let d=lod_decode(tiles[k]/(n-1.0)*2.0-1.0);let basis=lod_basis(d);let denom=dot(ray,d);
-  let h=i.eye+ray*(dot(c-i.eye,d)/select(denom,-0.000001,abs(denom)<0.000001));let local=(h-c)/r;let uv=vec2f(dot(local,basis[0]),dot(local,basis[1]));
-  let half=0.5/atlas.grid.w;let at=(tiles[k]+clamp(vec2f(uv.x,-uv.y)*0.5+0.5,vec2f(half),vec2f(1.0-half)))/n;
-  let sample=textureSample(colorMap,colorSampler,at)*f32(max(abs(uv.x),abs(uv.y))<1.0);let nd=textureLoad(normalMap,vec2i(clamp(at*size,vec2f(0.0),size-1.0)),0);
+  // Reproject the pixel's ray onto view k's plane through the centre.
+  let d=lod_decode(tiles[k]/(n-1.0)*2.0-1.0);let basis=lod_basis(d);let denom=select(dot(ray,d),-0.000001,abs(dot(ray,d))<0.000001);
+  let start=dot(c-i.eye,d)/denom;let centre=lod_cell(i.eye+ray*start,c,r,basis);
+  // Mip level from that smooth coordinate; clamp half a texel of the coarser level sampled, so trilinear filtering never
+  // reads a neighbouring view's texels.
+  let texels=(tiles[k]+centre)/n*size;let lod=clamp(log2(max(length(dpdx(texels)),length(dpdy(texels)))),0.0,levels);let half=exp2(ceil(lod))*0.5/atlas.grid.w;
+  // One parallax step: this view's depth there moves the point along the ray onto its surface, so the three views agree.
+  let first=textureLoad(normalMap,vec2i(clamp((tiles[k]+clamp(centre,vec2f(half),vec2f(1.0-half)))/n*size,vec2f(0.0),size-1.0)),0);
+  let cell=lod_cell(i.eye+ray*(start+first.z*r/denom),c,r,basis);let at=(tiles[k]+clamp(cell,vec2f(half),vec2f(1.0-half)))/n;
+  let sample=textureSampleLevel(colorMap,colorSampler,at,lod)*f32(all(abs(cell-0.5)<vec2f(0.5)));let nd=textureLoad(normalMap,vec2i(clamp(at*size,vec2f(0.0),size-1.0)),0);
   let weight=weights[k]*sample.a;acc+=weights[k]*sample;normal+=lod_decode(nd.xy)*weight;
-  if(weight>best){best=weight;hit=h;dir=d;texel=nd;}
+  // View k's surface point on this pixel's ray (depth nd.z in radius units along d); the weights sum to alpha.
+  let packed=floor(nd.w/32.0);along+=(start+nd.z*r/denom)*weight;surface+=vec2f(packed,nd.w-packed*32.0)*weight;
  }
- let alpha=acc.a;let coverage=clamp((alpha-0.5)/max(fwidth(alpha),0.0001)+0.5,0.0,1.0);
- if((frame.options.y<0.5&&alpha<0.5)||coverage<=0.0){discard;}
- let m=instances[i.id];let world=(m*vec4f(hit+dir*texel.z*r,1.0)).xyz;let clip=frame.camera*vec4f(world,1.0);
- let albedo=acc.rgb/max(alpha,0.0001);let packed=floor(texel.w/32.0);let rough=clamp(packed/31.0,0.045,1.0);let metal=clamp((texel.w-packed*32.0)/31.0,0.0,1.0);
+ // Views that still disagree (silhouettes) cross-fade over alpha 0.25-0.75 instead of a hard cut at 0.5, where whole regions
+ // would switch at once as the weights pass it: alpha-to-coverage under MSAA, a per-pixel dither threshold at 1x.
+ let alpha=acc.a;let coverage=clamp((alpha-0.5)/max(fwidth(alpha),0.5)+0.5,0.0,1.0);
+ if(coverage<=select(fract(52.9829189*fract(dot(i.clip.xy,vec2f(0.06711056,0.00583715)))),0.0,frame.options.y>0.5)){discard;}
+ let m=instances[i.id];let world=(m*vec4f(i.eye+ray*(along/max(alpha,0.000001)),1.0)).xyz;let clip=frame.camera*vec4f(world,1.0);
+ let albedo=acc.rgb/max(alpha,0.0001);let rm=surface/max(alpha,0.000001)/31.0;let rough=clamp(rm.x,0.045,1.0);let metal=clamp(rm.y,0.0,1.0);
  let nn=normalize(mat3x3f(cross(m[1].xyz,m[2].xyz),cross(m[2].xyz,m[0].xyz),cross(m[0].xyz,m[1].xyz))*normalize(normal)*sign(dot(m[0].xyz,cross(m[1].xyz,m[2].xyz))));
  let v=normalize(frame.eye.xyz-world);let l=normalize(frame.light.xyz);let h=(v+l)/max(length(v+l),0.0001);
  let nl=clamp(dot(nn,l),0.0,1.0);let nv=clamp(dot(nn,v),0.0001,1.0);let nh=clamp(dot(nn,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);

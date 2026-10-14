@@ -1,0 +1,113 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Imposter picking and atlas seams check</title><style>body{margin:0;background:#000}canvas{width:256px;height:256px;display:block}</style></head><body><canvas></canvas>
+<script type="module">
+import {Engine,PbrMaterial} from '/packages/core/dist/index.js';
+import {torusKnotGeometry,cylinderGeometry,toGeometry} from '/packages/geometry/dist/index.js';
+import {LODSystem,Imposter} from '/packages/lod/dist/index.js';
+import {Raycaster} from '/packages/bvh/dist/index.js';
+import {Picking} from '/packages/selection/dist/index.js';
+const canvas=document.querySelector('canvas'),errors=[],W=256;
+const engine=await Engine.create(canvas,{backend:'webgpu',capacity:1024,camera:{position:[0,0,40],target:[0,0,0],fov:40,far:4000}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const material=new PbrMaterial({color:'#d08a3c',roughness:0.45,metalness:0.2});
+// A knot (varied silhouette) and a thin disc whose rim reaches the bounding sphere in every view (atlas cells touch at their edges).
+const shapes={knot:toGeometry(torusKnotGeometry(1.6,0.45,400,40)),disc:toGeometry(cylinderGeometry(2,2,0.12,96,1))};
+const copy=document.createElement('canvas');copy.width=copy.height=W;const g=copy.getContext('2d',{willReadFrequently:true});
+// Read the canvas in the same task as the render, before the frame is presented.
+const grab=()=>{engine.render();g.clearRect(0,0,W,W);g.drawImage(canvas,0,0,W,W);return g.getImageData(0,0,W,W).data;};
+const lods=new LODSystem();engine.use(lods);const imposters={};let current=null;
+const full=engine.createMesh().setMaterial(material),proxy=engine.createMesh();full.visible=proxy.visible=false;
+function use(name,frames=12,frameSize=128){
+  const key=name+frames+'x'+frameSize;imposters[key]??=Imposter.bake(engine,shapes[name],{material,frames,frameSize});
+  current?.remove();full.setGeometry(shapes[name]);current=lods.add(proxy,[{object:imposters[key]}]);return imposters[key];
+}
+const place=(distance,yaw,pitch)=>{const y=yaw*Math.PI/180,p=pitch*Math.PI/180;engine.camera.position=[distance*Math.cos(p)*Math.sin(y),distance*Math.sin(p),distance*Math.cos(p)*Math.cos(y)];engine.camera.target=[0,0,0];};
+const bg=()=>{full.visible=proxy.visible=false;const d=grab();return [d[0],d[1],d[2]];};
+const median=a=>{const s=[...a].sort((x,y)=>x-y);return s[s.length>>1];};
+window.check={
+  errors:()=>errors.splice(0),
+  /** One frame as a PNG data URL: the imposter, or the full mesh with `reference`. For inspecting a sweep step. */
+  shot({shape='knot',distance=12,yaw=0,pitch=20,reference=false}){use(shape);place(distance,yaw,pitch);full.visible=reference;proxy.visible=!reference;grab();full.visible=proxy.visible=false;return copy.toDataURL();},
+  /**
+   * Rotates the camera in `step`-degree increments and renders the full mesh and its imposter at each step. Per step: change
+   * from the previous step (reference and imposter) and imposter-vs-reference difference, as mean absolute 8-bit RGB per
+   * reference-silhouette pixel; ghosts: imposter pixels farther than 1 px from any reference pixel, per reference pixel.
+   */
+  async sweep({shape='knot',frames=12,frameSize=128,distance=12,pitch=20,from=0,to=90,step=0.5}){
+    const imp=use(shape,frames,frameSize),back=bg(),series={yaw:[],dRef:[],dImp:[],err:[],ghost:[]};let prevR=null,prevI=null;
+    for(let a=from;a<=to+1e-9;a+=step){
+      place(distance,a,pitch);full.visible=true;proxy.visible=false;const r=grab();full.visible=false;proxy.visible=true;const i=grab();proxy.visible=false;
+      let area=0,dr=0,di=0,e=0,ghost=0;const on=new Uint8Array(W*W);
+      for(let p=0,k=0;p<r.length;p+=4,k++)if(Math.abs(r[p]-back[0])+Math.abs(r[p+1]-back[1])+Math.abs(r[p+2]-back[2])>24){on[k]=1;area++;}
+      for(let p=0,k=0;p<r.length;p+=4,k++){
+        for(let c=0;c<3;c++){e+=Math.abs(i[p+c]-r[p+c]);if(prevR){dr+=Math.abs(r[p+c]-prevR[p+c]);di+=Math.abs(i[p+c]-prevI[p+c]);}}
+        if(!on[k]&&Math.abs(i[p]-back[0])+Math.abs(i[p+1]-back[1])+Math.abs(i[p+2]-back[2])>24){const x=k%W,y=(k/W)|0;let near=false;for(let v=-1;v<=1&&!near;v++)for(let u=-1;u<=1;u++){const q=(y+v)*W+x+u;if(q>=0&&q<W*W&&on[q]){near=true;break;}}if(!near)ghost++;}
+      }
+      const n=Math.max(area,1)*3;series.yaw.push(a);series.err.push(e/n);series.ghost.push(ghost/Math.max(area,1));if(prevR){series.dRef.push(dr/n);series.dImp.push(di/n);}prevR=r;prevI=i;
+    }
+    const summary={shape,frames,frameSize,distance,pitch,steps:series.yaw.length,cardPx:+(imp.radius*2/(2*distance*Math.tan(20*Math.PI/180))*W).toFixed(1),
+      refStep:{median:+median(series.dRef).toFixed(3),max:+Math.max(...series.dRef).toFixed(3)},impStep:{median:+median(series.dImp).toFixed(3),max:+Math.max(...series.dImp).toFixed(3)},
+      excessMax:+Math.max(...series.dImp.map((v,k)=>v-series.dRef[k])).toFixed(3),errMean:+(series.err.reduce((s,v)=>s+v,0)/series.err.length).toFixed(3),errMax:+Math.max(...series.err).toFixed(3),
+      ghostMean:+(series.ghost.reduce((s,v)=>s+v,0)/series.ghost.length).toFixed(5),ghostMax:+Math.max(...series.ghost).toFixed(5)};
+    // Snap: an imposter step much larger than both the typical imposter step and the reference step at the same angle.
+    summary.snapRatio=+(summary.impStep.max/Math.max(summary.impStep.median,1e-6)).toFixed(2);summary.refRatio=+(summary.refStep.max/Math.max(summary.refStep.median,1e-6)).toFixed(2);
+    return {summary,series};
+  },
+  /**
+   * Mip bleed on the GPU-baked atlas (read back with export()): its coverage mip chain is rebuilt with the GPU mip pass's
+   * 2×2 average, then every tile edge is sampled bilinearly (clamp-to-edge addressing) at the shader's clamped coordinate,
+   * per level. Bleed is the coverage that comes from another view's tile. `old`: half a level-0 texel (before);
+   * `new`: half a texel of the sampled level (the shader's rule now).
+   */
+  async bleed({shape='disc',frames=12,frameSize=128}){
+    const imp=use(shape,frames,frameSize),data=await imp.export(),n=data.frames,fs=data.frameSize,S=n*fs,count=imp.color.mipLevelCount,chain=[new Float32Array(S*S)];
+    for(let k=0;k<S*S;k++)chain[0][k]=data.color[k*4+3]/255;
+    for(let L=1;L<count;L++){const s=S>>L,p=chain[L-1],out=new Float32Array(s*s);for(let y=0;y<s;y++)for(let x=0;x<s;x++){const o=2*y*2*s+2*x;out[y*s+x]=(p[o]+p[o+1]+p[o+2*s]+p[o+2*s+1])/4;}chain.push(out);}
+    const out=[];
+    for(const rule of ['old','new'])for(let L=0;L<count;L++){
+      const s=S>>L,a=chain[L],t=fs>>L,half=rule==='old'?0.5/fs:0.5*2**L/fs;let max=0,over=0,samples=0;
+      for(let tj=0;tj<n;tj++)for(let ti=0;ti<n;ti++)for(let e=0;e<4;e++)for(let q=0;q<t;q++){
+        const along=(q+0.5)/t,cell=e<2?[e?1-half:half,along]:[along,e===3?1-half:half];
+        const u=(ti+cell[0])/n*s-0.5,v=(tj+cell[1])/n*s-0.5,x0=Math.floor(u),y0=Math.floor(v),fx=u-x0,fy=v-y0;let bleed=0;
+        for(const [dx,dy,w] of [[0,0,(1-fx)*(1-fy)],[1,0,fx*(1-fy)],[0,1,(1-fx)*fy],[1,1,fx*fy]]){
+          const x=Math.min(s-1,Math.max(0,x0+dx)),y=Math.min(s-1,Math.max(0,y0+dy));if(Math.floor(x/t)!==ti||Math.floor(y/t)!==tj)bleed+=w*a[y*s+x];
+        }
+        samples++;max=Math.max(max,bleed);if(bleed>1/255)over++;
+      }
+      out.push({shape,rule,level:L,tileTexels:t,maxBleed:+max.toFixed(4),bleedingEdgeSamples:+(over/samples).toFixed(4)});
+    }
+    return out;
+  },
+  /**
+   * Imposter picking: near anchors show the full mesh, far anchors their imposter. Every rendered imposter pixel must pick its
+   * anchor (GPU Picking and bvh Raycaster), approximate; full-detail pixels stay exact; GPU and CPU agree over a pixel grid.
+   */
+  async picking(){
+    current?.remove();current=null;const imp=use('knot');current.remove();current=null;
+    const anchors=[],high=shapes.knot;
+    for(let i=0;i<6;i++){const near=i<3,a=engine.createMesh().setPosition([(i%3-1)*(near?7:16),near?5:-14,near?-10:-55]).setMaterial(material);a.userNear=near;anchors.push(a);lods.add(a,[{object:high},{object:imp,distance:60}]);}
+    place(30,0,0);engine.camera.position=[0,0,30];engine.render();
+    const picking=Picking.attach(engine),raycaster=new Raycaster(),back=bg();for(const a of anchors)a.visible=true;const image=grab();
+    const project=p=>{const m=engine.camera.matrix,x=m[0]*p[0]+m[4]*p[1]+m[8]*p[2]+m[12],y=m[1]*p[0]+m[5]*p[1]+m[9]*p[2]+m[13],w=m[3]*p[0]+m[7]*p[1]+m[11]*p[2]+m[15];return [(x/w*0.5+0.5)*W,(0.5-y/w*0.5)*W];};
+    const centres=anchors.map(a=>project([a.position.x,a.position.y,a.position.z])),owner=(x,y)=>{let best=0,d=Infinity;centres.forEach((c,i)=>{const e=Math.hypot(c[0]-x,c[1]-y);if(e<d){d=e;best=i;}});return anchors[best];};
+    const levels=anchors.map(a=>lods.handles.find(h=>h.anchor===a).level);
+    const stats={levels,imposterPixels:0,imposterGpu:0,imposterCpu:0,fullPixels:0,fullGpu:0,fullCpu:0,grid:0,agree:0,background:0,disagreements:[]};
+    // GPU picks fall back to a neighbouring pixel on silhouettes and lit pixels include antialiased edges, so a CPU ray through
+    // the pixel or one of its 8 neighbours counts (the same tolerance as packages/selection/test/models.browser.mjs).
+    const cpuAt=(x,y)=>raycaster.setFromEngine(engine,x+0.5,y+0.5).intersectEngine(engine)[0]??null,near=(x,y,ok)=>[-1,0,1].some(v=>[-1,0,1].some(u=>ok(cpuAt(x+u,y+v))));
+    for(let y=1;y<W;y+=2)for(let x=1;x<W;x+=2){
+      const p=(y*W+x)*4,lit=Math.abs(image[p]-back[0])+Math.abs(image[p+1]-back[1])+Math.abs(image[p+2]-back[2])>24;
+      const gpu=await picking.pick(x+0.5,y+0.5),cpu=cpuAt(x,y),same=h=>(h?.mesh??null)===(gpu?.mesh??null)&&!!h?.approximate===!!gpu?.approximate;
+      stats.grid++;if(same(cpu)||near(x,y,same))stats.agree++;else if(stats.disagreements.length<6)stats.disagreements.push([x,y,gpu?.mesh?.id??null,cpu?.mesh?.id??null]);
+      if(!gpu&&!cpu)stats.background++;
+      if(!lit)continue;const a=owner(x,y);
+      if(a.userNear){stats.fullPixels++;if(gpu?.mesh===a&&!gpu.approximate)stats.fullGpu++;if(near(x,y,h=>h?.mesh===a&&!h.approximate))stats.fullCpu++;}
+      else {stats.imposterPixels++;if(gpu?.mesh===a&&gpu.approximate)stats.imposterGpu++;if(cpu?.mesh===a&&cpu.approximate)stats.imposterCpu++;}
+    }
+    let t=performance.now();for(let i=0;i<20;i++)await picking.pick(...project([16,-14,-55]));stats.gpuPickMs=+((performance.now()-t)/20).toFixed(2);
+    t=performance.now();for(let i=0;i<200;i++)raycaster.setFromEngine(engine,...project([16,-14,-55])).intersectEngine(engine);stats.raycastMs=+((performance.now()-t)/200).toFixed(3);
+    picking.dispose();for(const a of anchors){lods.handles.find(h=>h.anchor===a).remove();a.dispose();}
+    return stats;
+  },
+};
+window.ready=true;
+</script></body></html>

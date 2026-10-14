@@ -261,6 +261,7 @@
       "computeGeometryBVHAsync",
       "computePrimitiveBVHAsync",
       "engineModels",
+      "engineProxies",
       "frustumPlanes",
       "getGeometryBVH",
       "getMeshLayers",

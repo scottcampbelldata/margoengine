@@ -120,17 +120,18 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    octahedral imposters, texture atlases (needs texture transforms in materials), vertex animation textures for
    GPU crowds. Imposters and LOD first; they serve CAD/simulator scenes and landing pages alike. Compute nodes belong
    in the 1b shader package.
-1d'. Imposter atlas seams: check cell padding/clamping so mips don't bleed between views, and that blending across
-   the three nearest views has no snapping while rotating.
+1d'. [done] Imposter atlas seams: mip bleed (up to 0.43 coverage from neighbouring views at coarse mips) fixed with a
+   per-level clamp; snapping (hard 0.5 coverage cut at view midpoints) fixed with a coverage cross-fade and one depth
+   parallax step; numbers in packages/lod/README.md, check `node packages/lod/test/imposter-check.mjs`.
 1d''. Pipeline cache keyed by shader module + override-constant bitmask, with common permutations pre-warmed, so
    toggling a section plane or fog never stalls on a synchronous compile (pairs with 1e.f).
 1d'''. [DONE] Ambient occlusion attenuates image-based lighting (environment IBL), not only the constant ambient term.
    Shader convention `let margoAmbient=` (no imports either way): EnvironmentLighting names its IBL term so; SSAO and
    glTF-pro's ambient replay return it, IBL diffuse and specular occluded by the same AO (specular approximation).
    Real-GPU: `node scripts/ssao-gpu-check.js` (creases darken vs IBL alone, open faces unchanged).
-1d. Imposter picking: once the glTF picking worker merges, let a raycast that reaches an object in its imposter level
-   accept the bounding-sphere/box hit (distant cards have no triangles). LOD screen levels already follow orthographic
-   zoom (done).
+1d. [done] Imposter picking: `LODSystem.pickProxies()` hook; bvh Raycaster and selection Picking hit imposter-level
+   objects through their bounding sphere (`approximate: true`, anchor + model). LOD screen levels already follow
+   orthographic zoom (done).
 1d. [points, labels, clustered, splats, DOF DONE `5cf148e`; SSAO DONE (camera's own projection, signed depth; `scripts/ssao-gpu-check.js`); lines left] Orthographic follow-ups: SSAO, lines/points world widths, labels CSS perspective, clustered froxels, DOF and splats
    assume a perspective camera; fix each in its own package. Optional core hook (Camera.projection + up) would remove
    the cameras package's update replacement; only if Scott wants it.

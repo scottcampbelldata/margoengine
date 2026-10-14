@@ -16,7 +16,13 @@ export const MAX_LEVELS=8;
 
 /** One registered object; `level` is the index shown (-1 before the first frame). */
 export class LOD {
-  /** @internal */ constructor(private readonly system:LODSystem,/** @internal */ public index:number,readonly anchor:Mesh,readonly levels:readonly LODLevel[]) {}
+  /** Local bounding sphere (x, y, z, radius) of the level shown, written by `LODSystem.pickProxies()`. */
+  readonly sphere=new Float64Array(4);
+  /** The first gltf-pro model among the levels, reported with approximate pick hits; null without one. */
+  readonly model:{readonly root:Mesh}|null;
+  /** @internal */ constructor(private readonly system:LODSystem,/** @internal */ public index:number,readonly anchor:Mesh,readonly levels:readonly LODLevel[]) {
+    this.model=(levels.find(l=>(l.object as any)?.root&&(l.object as any).primitives)?.object as {root:Mesh})??null;
+  }
   get level():number {return this.system.levelOf(this);}
   /** Stops managing the object; the level shown stays shown. */
   remove():void {this.system.remove(this);}
@@ -34,7 +40,7 @@ export class LODSystem implements EnginePlugin {
   readonly name='lod:'+serial++;
   hysteresis:number;bias:number;
   private engine?:Engine;private count=0;private dirty=false;
-  private ids=new Int32Array(0);private counts=new Uint8Array(0);private current=new Int8Array(0);private screen=new Uint8Array(0);private swaps=new Uint8Array(0);private radius=new Float32Array(0);
+  private ids=new Int32Array(0);private counts=new Uint8Array(0);private current=new Int8Array(0);private screen=new Uint8Array(0);private swaps=new Uint8Array(0);private radius=new Float32Array(0);private readonly proxies:LOD[]=[];
   private thresholds=new Float32Array(0);private bands=new Float32Array(0);private slots=new Int16Array(0);private levelSlots=new Int16Array(0);
   private anchors:Mesh[]=[];private objects:LODObject[][]=[];private handles:LOD[]=[];private atlases:Atlas[]=[];private readonly keepers=new Map<Geometry,Mesh>();
   private uniform?:GPUBuffer;private sampler?:GPUSampler;private pipeline?:GPURenderPipeline;private format?:string;private samples=0;private depthFormat?:string;private readonly frame=new Float32Array(32);
@@ -68,6 +74,19 @@ export class LODSystem implements EnginePlugin {
     const handle=new LOD(this,i,anchor,[...levels]);this.anchors[i]=anchor;this.objects[i]=handle.levels.map(l=>l.object);this.handles[i]=handle;this.count++;this.dirty=true;return handle;
   }
   /** @internal */ levelOf(lod:LOD):number {return this.handles[lod.index]===lod?this.current[lod.index]:-1;}
+  /**
+   * Objects showing an Imposter level (no triangles to hit), with `sphere` set to the imposter's local bounding sphere.
+   * @margoengine/bvh raycasts and @margoengine/selection picking find this hook on the engine and hit the sphere under the
+   * anchor's world matrix, flagged approximate. Reuses one array; call again for fresh results.
+   */
+  pickProxies():readonly LOD[] {
+    const out=this.proxies;let n=0;
+    for(let i=0;i<this.count;i++){
+      const slot=this.slots[i];if(slot<0)continue;const h=this.handles[i],imp=this.atlases[slot].imposter,s=h.sphere;
+      s[0]=imp.center[0];s[1]=imp.center[1];s[2]=imp.center[2];s[3]=imp.radius;out[n++]=h;
+    }
+    out.length=n;return out;
+  }
   /** @internal */ remove(lod:LOD):void {
     const i=lod.index;if(this.handles[i]!==lod)return;const last=--this.count,b=i*MAX_LEVELS,lb=last*MAX_LEVELS;
     for(let l=0;l<this.counts[i];l++)if(this.levelSlots[b+l]>=0)this.atlases[this.levelSlots[b+l]].users--;
@@ -148,6 +167,6 @@ export class LODSystem implements EnginePlugin {
   /** Removes the keeper meshes and GPU resources; level objects keep their current visibility. Imposters are not disposed. */
   dispose():void {
     this.release();for(const keeper of this.keepers.values())keeper.dispose();this.keepers.clear();
-    for(const h of this.handles)h.index=-1;this.anchors=[];this.objects=[];this.handles=[];this.atlases=[];this.count=0;this.engine=undefined;
+    for(const h of this.handles)h.index=-1;this.anchors=[];this.objects=[];this.handles=[];this.atlases=[];this.proxies.length=0;this.count=0;this.engine=undefined;
   }
 }

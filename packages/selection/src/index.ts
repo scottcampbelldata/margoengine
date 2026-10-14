@@ -1,6 +1,6 @@
 import type {EngineKernel,Mesh} from '@margoengine/core';
 export {Picking,type PickHit} from './picking.js';
-export type {Model,ModelPrimitive} from './models.js';
+export type {Model,ModelPrimitive,PickProxy} from './models.js';
 import {engineRuntime,meshRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type DrawOptions} from '@margoengine/core/extension';
 import {fullscreen,meshVertex,group,compute,render,dispatch,draw} from '../../shared/gpu.js';
 import {Models,ModelDraws,modelCode,modelPipeline,hidden,isModel,type Model,type ModelPrimitive} from './models.js';

@@ -7,18 +7,22 @@ export interface ModelPrimitive {readonly node:Mesh;readonly vertices:Float32Arr
 export interface Model {readonly root:Mesh;readonly primitives:readonly ModelPrimitive[];readonly disposed?:boolean}
 /** gltf-pro shape: a `root` node and `primitives` with 20-float CPU vertices (the first one is checked). */
 export const isModel=(value:unknown):value is Model=>!!value&&typeof value==='object'&&!!(value as Model).root&&Array.isArray((value as Model).primitives)&&(!(value as Model).primitives.length||(value as Model).primitives[0].vertices instanceof Float32Array);
+/** Structural pick proxy (an @margoengine/lod imposter level): local bounding sphere (x, y, z, radius) under the anchor's world matrix. */
+export interface PickProxy {readonly anchor:Mesh;readonly sphere:ArrayLike<number>;readonly model?:object|null}
+/** Proxies from engine plugins with `pickProxies()` (an @margoengine/lod LODSystem), copied into a new array. */
+export const proxies=(e:Engine):PickProxy[]=>{const out:PickProxy[]=[];if(e.plugins)for(const p of e.plugins.values() as Iterable<{pickProxies?:()=>readonly PickProxy[]}>)if(typeof p.pickProxies==='function')out.push(...p.pickProxies());return out;};
 export const hidden=(e:Engine,id:number):boolean=>{for(let slot=id;slot!==-1;slot=e.store.parents[slot])if(e.store.hidden[slot])return true;return false;};
 
 /** Attached gltf-pro models (engine plugins with `root` and `primitives`), rescanned only when the frame graph, mesh count or a model's liveness changes. */
 export class Models {
- list:Model[]=[];starts:number[]=[];version=0;private revision=-1;private size=-1;
+ list:Model[]=[];starts:number[]=[];/** Primitives over all models: pick slots after them belong to pick proxies. */total=0;version=0;private revision=-1;private size=-1;
  update(e:Engine):Model[] {
   let stale=e.frameGraph.revision!==this.revision||e.meshes.size!==this.size;
   for(let i=0;!stale&&i<this.list.length;i++)stale=!!this.list[i].disposed;
   if(!stale)return this.list;
   this.revision=e.frameGraph.revision;this.size=e.meshes.size;this.version++;this.list=[];this.starts=[];let start=0;
   if(e.plugins)for(const plugin of e.plugins.values())if(isModel(plugin)&&!plugin.disposed){this.list.push(plugin);this.starts.push(start);start+=plugin.primitives.length;}
-  return this.list;
+  this.total=start;return this.list;
  }
 }
 
@@ -51,8 +55,8 @@ export class ModelDraws {
  count=0;private data=new Float32Array(20*16);private words=new Uint32Array(this.data.buffer);private primitives:ModelPrimitive[]=[];
  private storage?:GPUBuffer;private camera?:GPUBuffer;private group?:GPUBindGroup;private pipeline?:GPURenderPipeline;
  reset():void {this.count=0;}
- add(p:ModelPrimitive,id:number):void {
-  const o=this.count*20,m=p.node.matrix;
+ add(p:ModelPrimitive,id:number,m:ArrayLike<number>=p.node.matrix):void {
+  const o=this.count*20;
   if(o+20>this.data.length){const data=new Float32Array(this.data.length*2);data.set(this.data);this.data=data;this.words=new Uint32Array(data.buffer);}
   this.data.set(m,o);this.words[o+16]=id;this.words[o+17]=+(p.material.settings[2]>=0.5);
   this.words[o+18]=+(m[0]*(m[5]*m[10]-m[6]*m[9])-m[4]*(m[1]*m[10]-m[2]*m[9])+m[8]*(m[1]*m[6]-m[2]*m[5])>0);this.primitives[this.count++]=p;

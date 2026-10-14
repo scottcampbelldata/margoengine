@@ -8,7 +8,7 @@ import {invert, transformPoint, type Side} from './math.js';
 // imports core at runtime, so it stays usable from workers and Node.
 interface RuntimeStore {matrices: Float32Array; parents: Float32Array; hidden: Uint8Array; tick(culling?: boolean): void}
 interface RuntimeMesh {id: number; geometry: Geometry | null; material: {data: Float32Array}}
-interface RuntimeEngine {store: RuntimeStore; meshes: Map<number, RuntimeMesh>; plugins?: Map<string, unknown>; camera: Camera; canvas: HTMLCanvasElement; backend: 'webgpu' | 'webgl2'; disposed: boolean}
+interface RuntimeEngine {store: RuntimeStore; meshes: Map<number, RuntimeMesh>; camera: Camera; canvas: HTMLCanvasElement; backend: 'webgpu' | 'webgl2'; disposed: boolean}
 
 const bvhCache = new WeakMap<GeometryLike, MeshBVH>();
 
@@ -55,8 +55,20 @@ export const isModel = (value: unknown): value is ModelLike => !!value && typeof
   && (!(value as ModelLike).primitives.length || (value as ModelLike).primitives[0].vertices instanceof Float32Array);
 /** Live gltf-pro models attached to an engine: its plugins that have `root` and `primitives`. */
 export function engineModels(engine: Engine): ModelLike[] {
-  const plugins = (engine as unknown as RuntimeEngine).plugins, out: ModelLike[] = [];
-  if (plugins) for (const plugin of plugins.values()) if (isModel(plugin) && !plugin.disposed) out.push(plugin);
+  const out: ModelLike[] = [];
+  for (const plugin of engine.plugins.values()) if (isModel(plugin) && !plugin.disposed) out.push(plugin);
+  return out;
+}
+
+/**
+ * Structural view of a pick proxy: an object drawn without triangles (an @margoengine/lod imposter level), hit through its
+ * local bounding sphere `sphere` (x, y, z, radius) under `anchor`'s world matrix. `model` is reported with the hit.
+ */
+export interface PickProxy {readonly anchor: Mesh; readonly sphere: ArrayLike<number>; readonly model?: object | null}
+/** Proxies from every engine plugin with a `pickProxies()` method (an @margoengine/lod `LODSystem`). A new array. */
+export function engineProxies(engine: Engine): PickProxy[] {
+  const out: PickProxy[] = [];
+  for (const plugin of engine.plugins.values() as Iterable<{pickProxies?(): readonly PickProxy[]}>) if (typeof plugin.pickProxies === 'function') out.push(...plugin.pickProxies());
   return out;
 }
 
@@ -94,7 +106,7 @@ export async function computePrimitiveBVHAsync(primitive: ModelPrimitiveLike, op
   return bvh;
 }
 
-interface Candidate {node: RuntimeMesh; entry: number; model: ModelLike | null; primitive: ModelPrimitiveLike | null; index: number}
+interface Candidate {node: RuntimeMesh; entry: number; model: ModelLike | null; primitive: ModelPrimitiveLike | null; index: number; sphere?: ArrayLike<number>}
 export type RaycasterSide = Side | 'material';
 export interface RaycasterHit {
   /** The core mesh, or for a model hit the glTF node that owns the primitive. */
@@ -121,6 +133,11 @@ export interface RaycasterHit {
   primitiveIndex?: number;
   nodeIndex?: number;
   uv?: [number, number];
+  /**
+   * Pick proxy hits only (an @margoengine/lod imposter level, which has no triangles): true. `mesh` is the LOD anchor, `model`
+   * the LOD's model if it has one; point and normals are on the bounding sphere (an ellipsoid under nonuniform scale), faceIndex is -1.
+   */
+  approximate?: boolean;
 }
 export interface IntersectOptions {
   /** Run the transform kernel first so world matrices reflect transform edits made since the last render. Default true. */
@@ -184,25 +201,26 @@ export class Raycaster {
     return this.setFromCamera([x / width * 2 - 1, 1 - y / height * 2], runtime.camera, webgpu);
   }
 
-  /** Tests every visible core mesh with geometry and every attached gltf-pro model. Hits are sorted by distance. */
+  /** Tests every visible core mesh with geometry, every attached gltf-pro model and every pick proxy (imposter levels). Hits are sorted by distance. */
   intersectEngine(engine: Engine, options?: IntersectOptions): RaycasterHit[] {
     const runtime = engine as unknown as RuntimeEngine;
-    return this.intersect(runtime, runtime.meshes.values(), engineModels(engine), options);
+    return this.intersect(runtime, runtime.meshes.values(), engineModels(engine), engineProxies(engine), options);
   }
 
-  /** Tests the given core meshes of an engine (hidden ones and those under hidden parents are skipped). */
+  /** Tests the given core meshes of an engine (hidden ones and those under hidden parents are skipped), and pick proxies anchored on them. */
   intersectMeshes(engine: Engine, meshes: Iterable<Mesh>, options?: IntersectOptions): RaycasterHit[] {
-    return this.intersect(engine as unknown as RuntimeEngine, meshes as Iterable<unknown> as Iterable<RuntimeMesh>, [], options);
+    return this.intersectObjects(engine, meshes, options);
   }
 
-  /** Tests the given core meshes and gltf-pro models (`PBRModel`, @margoengine/materials meshes). */
+  /** Tests the given core meshes and gltf-pro models (`PBRModel`, @margoengine/materials meshes), and pick proxies whose anchor or model is given. */
   intersectObjects(engine: Engine, objects: Iterable<Mesh | ModelLike>, options?: IntersectOptions): RaycasterHit[] {
-    const meshes: RuntimeMesh[] = [], models: ModelLike[] = [];
-    for (const object of objects) if (isModel(object)) models.push(object); else meshes.push(object as unknown as RuntimeMesh);
-    return this.intersect(engine as unknown as RuntimeEngine, meshes, models, options);
+    const meshes: RuntimeMesh[] = [], models: ModelLike[] = [], given = new Set<unknown>(objects);
+    for (const object of given) if (isModel(object)) models.push(object); else meshes.push(object as unknown as RuntimeMesh);
+    const proxies = engineProxies(engine).filter(p => given.has(p.anchor) || given.has(p.model));
+    return this.intersect(engine as unknown as RuntimeEngine, meshes, models, proxies, options);
   }
 
-  private intersect(runtime: RuntimeEngine, meshes: Iterable<RuntimeMesh>, models: readonly ModelLike[], {refresh = true}: IntersectOptions = {}): RaycasterHit[] {
+  private intersect(runtime: RuntimeEngine, meshes: Iterable<RuntimeMesh>, models: readonly ModelLike[], proxies: readonly PickProxy[], {refresh = true}: IntersectOptions = {}): RaycasterHit[] {
     if (runtime.disposed) throw new Error('Engine is disposed');
     if (!(this.near >= 0) || !(this.far >= this.near)) throw new RangeError('Expected 0 <= near <= far');
     const store = runtime.store, candidates: Candidate[] = [];
@@ -222,16 +240,35 @@ export class Raycaster {
         if (entry >= 0 && this.usable(runtime, node, layerMasks.get(node) ?? rootMask ?? 1, model)) candidates.push({node, entry, model, primitive, index});
       }
     }
+    for (const {anchor, sphere, model} of proxies) {
+      const node = anchor as unknown as RuntimeMesh, owner = isModel(model) ? model : null;
+      if (runtime.meshes.get(node.id) !== node) continue;
+      const entry = this.entry(store.matrices, node.id * 16, sphere);
+      if (entry >= 0 && this.usable(runtime, node, getMeshLayers(anchor), owner)) candidates.push({node, entry, model: owner, primitive: null, index: -1, sphere});
+    }
     if (this.firstHitOnly) candidates.sort((a, b) => a.entry - b.entry);
     const hits: RaycasterHit[] = [], inverse = new Float64Array(16), matrix = new Float64Array(16), local = new Float64Array(3), direction = [0, 0, 0], ray = {origin: local, direction};
     const ox = this.origin[0], oy = this.origin[1], oz = this.origin[2], dx = this.direction[0], dy = this.direction[1], dz = this.direction[2];
     let best = this.far;
-    for (const {node, entry, model, primitive, index} of candidates) {
+    for (const {node, entry, model, primitive, index, sphere} of candidates) {
       if (this.firstHitOnly && entry > best) break;
       matrix.set(store.matrices.subarray(node.id * 16, node.id * 16 + 16));
       if (!invert(matrix, inverse)) continue;
       transformPoint(inverse, ox, oy, oz, local);
       direction[0] = inverse[0] * dx + inverse[4] * dy + inverse[8] * dz; direction[1] = inverse[1] * dx + inverse[5] * dy + inverse[9] * dz; direction[2] = inverse[2] * dx + inverse[6] * dy + inverse[10] * dz;
+      if (sphere) {
+        // Local ray o + t*d with the world direction mapped (not normalized), so t is the world distance. Proxies are double-sided.
+        const px = local[0] - sphere[0], py = local[1] - sphere[1], pz = local[2] - sphere[2], a = direction[0] ** 2 + direction[1] ** 2 + direction[2] ** 2;
+        const b = px * direction[0] + py * direction[1] + pz * direction[2], disc = b * b - a * (px * px + py * py + pz * pz - sphere[3] ** 2);
+        if (disc < 0) continue;
+        const near = (-b - Math.sqrt(disc)) / a, t = near >= this.near ? near : (-b + Math.sqrt(disc)) / a;
+        if (t < this.near || t > (this.firstHitOnly ? best : this.far)) continue;
+        if (this.firstHitOnly) { best = t; hits.length = 0; }
+        const localPoint: Vec3 = [local[0] + t * direction[0], local[1] + t * direction[1], local[2] + t * direction[2]];
+        const normal = normalTransform(inverse, [localPoint[0] - sphere[0], localPoint[1] - sphere[1], localPoint[2] - sphere[2]]);
+        hits.push({mesh: node as unknown as Mesh, distance: t, point: [ox + t * dx, oy + t * dy, oz + t * dz], normal, faceNormal: normal.slice() as Vec3, faceIndex: -1, barycoord: [0, 0, 0], frontFace: t === near, localPoint, ...(model ? {model} : {}), approximate: true});
+        continue;
+      }
       // Sides follow the local winding, as the renderers do: a mirrored world matrix keeps the mesh's front side.
       const length = Math.hypot(direction[0], direction[1], direction[2]), doubleSided = primitive ? primitive.material.settings[2] >= 0.5 : node.material.data[6] >= 0.5;
       const side: Side = this.side === 'material' ? doubleSided ? 'double' : 'front' : this.side;
