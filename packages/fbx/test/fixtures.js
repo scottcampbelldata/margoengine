@@ -41,6 +41,17 @@ const P=(name,type,...values)=>['P',[name,type,'','A',...values]],props=(...p)=>
 const C=(a,b,rel)=>['C',[rel?'OP':'OO',L(a),L(b),...rel?[rel]:[]]];
 const model=(id,name,type,...p)=>['Model',[L(id),'Model::'+name,type],[['Version',[I(232)]],props(...p)]];
 const T=(x,y,z)=>{const m=[1,0,0,0,0,1,0,0,0,0,1,0,x,y,z,1];return m;};
+/** A segments x segments quad grid (per-vertex normals and UVs, one Phong material), Y-up: the large-file case. */
+export function grid(segments){
+  const n=segments+1,vertices=[],normals=[],uvs=[],polygons=[];
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){vertices.push(x/segments*4-2,0.1*Math.sin(x*0.3)*Math.cos(y*0.2),y/segments*4-2);normals.push(0,1,0);uvs.push(x/segments,y/segments);}
+  for(let y=0;y<segments;y++)for(let x=0;x<segments;x++){const a=y*n+x;polygons.push(a,a+n,a+n+1,~(a+1));}
+  const layer=(name,values,key)=>[name,[I(0)],[['MappingInformationType',['ByVertice']],['ReferenceInformationType',['Direct']],arr(key,'d',values)]];
+  return [['GlobalSettings',[],[['Version',[I(1000)]],props(P('UpAxis','int',I(1)),P('UnitScaleFactor','double',1))]],['Objects',[],[
+    ['Geometry',[L(100),'Geometry::Grid','Mesh'],[arr('Vertices','d',vertices),arr('PolygonVertexIndex','i',polygons),layer('LayerElementNormal',normals,'Normals'),layer('LayerElementUV',uvs,'UV')]],
+    model(200,'Grid','Mesh'),['Material',[L(300),'Material::Grey',''],[['ShadingModel',['phong']],props(P('Diffuse','Vector3D',0.7,0.7,0.7))]]]],
+  ['Connections',[],[C(200,0),C(100,200),C(300,200)]]];
+}
 /** Hierarchy with pivots/pre/post rotation/inherit types, n-gons, layered attributes, two materials, a skin with BindPose, a blend shape and TRS animation, Z-up. */
 export function rich({morphAnimation=false}={}){
   const pent=[[0,0,0],[2,0,0],[2,2,0],[1,1,0],[0,2,0]],quad=[[0,0,1],[1,0,1.2],[1,1,1],[0,1,1]],tri=[[0,0,2],[1,0,2],[0,1,2]],points=[...pent,...quad,...tri];

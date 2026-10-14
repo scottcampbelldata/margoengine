@@ -16,7 +16,7 @@ export function workerLimit(value: number | undefined): number {
 export const spawnDecoderWorker = (): Worker => new Worker(new URL('./decoder.worker.js', import.meta.url), {type: 'module', name: 'margoengine-decoder'});
 
 export function requireWorkers(owner: string): void {
-  if (typeof window === 'undefined' || typeof Worker === 'undefined') throw new Error(`${owner} needs a browser with Web Workers; it cannot decode during SSR`);
+  if (typeof Worker === 'undefined') throw new Error(`${owner} needs a browser with Web Workers; it cannot decode during SSR`);
 }
 
 /** Copy view data out of a larger buffer; whole ArrayBuffers are transferred only when the caller opts in. */

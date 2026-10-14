@@ -24,6 +24,14 @@
     "./asset": {
       "types": "./dist/asset-entry.d.ts",
       "import": "./dist/asset-entry.js"
+    },
+    "./prepare": {
+      "types": "./dist/prepare.d.ts",
+      "import": "./dist/prepare.js"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js"
     }
   },
   "files": [
