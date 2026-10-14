@@ -20,7 +20,8 @@ export const extractShader=frame+`
   let r=viewPosition(right,textureLoad(depth,right,0));let l=viewPosition(left,textureLoad(depth,left,0));
   let b=viewPosition(down,textureLoad(depth,down,0));let t=viewPosition(up,textureLoad(depth,up,0));
   let dx=select(c-l,r-c,abs(r.z-c.z)<abs(c.z-l.z));let dy=select(c-t,b-c,abs(b.z-c.z)<abs(c.z-t.z));
-  let n=cross(dy,dx);let normal=select(vec3f(0,0,1),n/max(length(n),0.000001),dot(n,n)>0.00000001);
+  // Degenerate only if dx and dy are (near) parallel or zero: |n|^2 scales with the pixel footprint^4, so a fixed threshold made close surfaces camera-facing.
+  let n=cross(dy,dx);let normal=select(vec3f(0,0,1),normalize(n),dot(n,n)>0.000001*dot(dx,dx)*dot(dy,dy));
   textureStore(output,p,vec4f(normal,-c.z));
 }
 `;

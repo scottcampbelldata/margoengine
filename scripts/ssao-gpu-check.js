@@ -109,12 +109,17 @@ try {
 
   // 3. IBL + SSAO: occlusion darkens the creases relative to IBL alone, and open faces keep the IBL value.
   //    Constant ambient off, so any darkening comes from the IBL term.
-  for (const [label, options] of [['perspective', {}], ['orthographic', {ortho: true}]]) {
+  //    'close' looks down at open floor from 2 m: small pixel footprints there once made the depth-derived normal fall
+  //    back to camera-facing (an absolute degeneracy threshold), so flat floor nearer than a fixed depth self-occluded
+  //    behind a straight screen-wide edge. Only IBL's large ambient term made it visible.
+  for (const [label, options] of [['perspective', {}], ['orthographic', {ortho: true}], ['close', {eye: [-2.4, 1.2, 4.2], target: [-2.4, 0, 2.6]}]]) {
     const d = await darkening({...options, ibl: true, model: true, ambient: 0});
     await writeFile(`test-results/ssao-ibl-${label}-on.png`, await page.locator('#ao').screenshot());
     (result.ibl ??= {})[label] = d.delta;
     console.log('ibl', label, JSON.stringify(d.delta));
-    if (!baseline) {
+    if (baseline) continue;
+    if (label === 'close') assert.ok(Math.abs(d.delta.open) <= 1, `IBL close: open floor darkened ${JSON.stringify(d.delta)}`);
+    else {
       assert.ok(d.delta.crease > 4 && d.delta.step > 2,`IBL ${label}: creases not occluded ${JSON.stringify(d.delta)}`);
       assert.ok(Math.abs(d.delta.open) <= 1 && Math.abs(d.delta.top) <= 1.5, `IBL ${label}: open faces changed ${JSON.stringify(d.delta)}`);
     }
