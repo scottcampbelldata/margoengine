@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type Vec3} from '@margoengine/core/extension';
 import {finiteVector} from '@margoengine/math/validate';
@@ -100,5 +101,8 @@ export class VFX implements EnginePlugin {
   private release():void {for(const buffer of [this.uniform,this.particles,this.alive,this.indirect,this.visible,this.respawn,this.extra,...this.owned])buffer?.destroy();this.owned=[];this.spriteEntries=[];this.extra=this.sorter=undefined;this.uniform=this.particles=this.alive=this.indirect=this.visible=this.respawn=undefined;this.computeGroup=undefined;this.renderGroups.clear();this.renders.clear();this.simulation=undefined;}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.engine=this.device=undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  /** @deprecated Use dispose(); kept as an alias until 1.0. */
   destroy():void {this.dispose();}
 }

@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import {PbrMaterial, type EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext} from '@margoengine/core/extension';
 import {windShader, validateWind, type ScatterWind} from './wind.js';
@@ -164,4 +165,6 @@ export class ScatterInstances implements EnginePlugin {
   }
   onDeviceRestored(engine: Engine): void {this.release(); this.setup(engine);}
   dispose(): void {if (this.disposed) return; this.disposed = true; this.engine?.removePlugin(this.name); this.release(); this.engine = undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

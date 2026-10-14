@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {Renderer, Batch, Lighting, Geometry, Camera, FrameGraph} from '@margoengine/core/extension';
 import {sceneSamples} from '../../shared/quality.js';
 
@@ -55,6 +56,8 @@ export class GLRenderer implements Renderer {
     gl.bindVertexArray(null);}});
   }
   dispose(): void { for(const geometry of this.resources.keys())this.remove(geometry);this.gl.deleteProgram(this.program); }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }
 
 /** Pass as `fallback` to `Engine.create`: `Engine.create(canvas, {fallback: webglRenderer})`. */

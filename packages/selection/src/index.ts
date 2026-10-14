@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel,Mesh} from '@margoengine/core';
 export {Picking,type PickHit} from './picking.js';
 export type {Model,ModelPrimitive,PickProxy} from './models.js';
@@ -152,4 +153,6 @@ export class Selection implements EnginePlugin {
  private release():void {this.releaseTargets();this.draws.release();this.xr?.draws.release();this.xr?.uniform?.destroy();this.xr=undefined;this.buffer?.destroy();this.uniform?.destroy();this.buffer=this.uniform=undefined;this.maskDraw.bindings=undefined;this.seed=this.jump=undefined;}
  onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
  dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.selected.clear();this.engine=undefined;}
+ declare [Symbol.dispose]: () => void;
+ [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel} from '@margoengine/core';
 import type {Engine, EnginePlugin, FrameGraph} from '@margoengine/core/extension';
 import {GPUProfiler} from './profiler.js';
@@ -179,4 +180,6 @@ export class Stats implements EnginePlugin {
     this.disposed = true; this.engine?.removePlugin(this.name); this.engine = undefined;
     clearInterval(this.timer); this.profiler?.dispose(); this.element.remove();
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

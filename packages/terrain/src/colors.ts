@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel, Mesh} from '@margoengine/core';
 import {engineRuntime, meshRuntime, type Engine, type EnginePlugin, type FrameGraph} from '@margoengine/core/extension';
 declare const GPUTextureUsage: {TEXTURE_BINDING: number; COPY_DST: number; COPY_SRC: number};
@@ -107,4 +108,6 @@ fn terrainWet(position:vec3f)->f32 {
   }
   onDeviceRestored(engine: Engine): void {this.dry?.destroy();this.wet?.destroy();this.dry=this.wet=undefined;this.dryEntry=this.wetEntry=undefined;this.wetSource.texture=this.wetTarget.texture=undefined!;this.engine=undefined;this.setup(engine);}
   dispose(): void {if (this.disposed) return; this.disposed = true; this.dry?.destroy();this.wet?.destroy();this.dry=this.wet=undefined;this.dryEntry=this.wetEntry=undefined;this.wetSource.texture=this.wetTarget.texture=undefined!;const engine = this.engine; this.engine = undefined; engine?.removePlugin(this.name);}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

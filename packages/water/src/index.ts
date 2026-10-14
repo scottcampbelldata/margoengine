@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import {resolveMSAA,sceneTarget} from '../../shared/msaa.js';
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
@@ -264,4 +265,6 @@ export class Water implements EnginePlugin {
  private release():void {this.foamMSAA?.destroy();this.foamMSAA=undefined;this.foamMSAAView=undefined;this.shared?.release();this.shared=undefined;this.spray?.dispose();this.spray=undefined;this.coastal?.dispose();this.coastal=undefined;this.surfaceDepth?.destroy();this.surfaceDepth=undefined;this.surfaceView=undefined;this.copyPipeline=undefined;this.copyGroup=undefined;this.captured?.destroy();this.captured=undefined;this.capturedView=undefined;this.reflected=undefined;this.skySampler=undefined;this.uniform?.destroy();this.vertices?.destroy();this.indices?.destroy();for(const t of this.foam)t.destroy();this.foam=[];this.foamViews=[];this.groups=[];this.sampledDepth=undefined;this.uniform=this.vertices=this.indices=undefined;this.pipeline=undefined;this.format='';}
  onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
  dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.engine=undefined;}
+ declare [Symbol.dispose]: () => void;
+ [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

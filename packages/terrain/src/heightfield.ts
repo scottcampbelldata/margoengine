@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin} from '@margoengine/core/extension';
 import {planeGeometry, computeVertexNormals, type GeometryData} from '@margoengine/geometry';
@@ -54,4 +55,6 @@ export class TerrainHeightmap implements EnginePlugin {
   }
   onDeviceRestored(engine: Engine): void {this.texture?.destroy(); this.texture = undefined; this.setup(engine);}
   dispose(): void {if (this.disposed) return; this.disposed = true; this.texture?.destroy(); this.texture = undefined; const engine = this.engine; this.engine = undefined; engine?.removePlugin(this.name);}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

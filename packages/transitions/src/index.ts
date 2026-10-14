@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
 import {fullscreen,group,render,draw} from '../../shared/gpu.js';
@@ -55,4 +56,6 @@ export class Transitions implements EnginePlugin {
  private release():void {this.capture?.dispose();this.depth?.destroy();this.capture=undefined;this.depth=undefined;this.uniform?.destroy();this.scene?.destroy();this.previous?.destroy();this.uniform=this.scene=this.previous=undefined;this.pipeline=this.bind=undefined;}
  onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
  dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.engine=undefined;}
+ declare [Symbol.dispose]: () => void;
+ [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

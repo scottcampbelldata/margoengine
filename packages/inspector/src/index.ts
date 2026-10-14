@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel, Mesh as MeshHandle} from '@margoengine/core';
 import {engineRuntime, meshRuntime, type Engine, type EnginePlugin, type FrameGraph, type Geometry, type Mesh} from '@margoengine/core/extension';
 import {Lines, Line, BoxHelper, VertexNormalsHelper} from '@margoengine/lines';
@@ -250,4 +251,6 @@ export class Inspector implements EnginePlugin {
     this.disposed = true; this.engine?.removePlugin(this.name); this.engine = undefined;
     clearInterval(this.timer); this.lines.clear(); this.lines.dispose(); this.helpers.clear(); this.items.clear(); this.collapsed.clear(); this.selection = null; this.element.remove();
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

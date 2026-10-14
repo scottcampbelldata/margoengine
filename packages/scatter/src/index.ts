@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import {Geometry,PbrMaterial,type EngineKernel} from '@margoengine/core';
 export {ScatterInstances, type ScatterBatch} from './instances.js';
 export {randomPlacements, radialPlacements} from './candidates.js';
@@ -157,4 +158,6 @@ export class Scatter implements EnginePlugin {
  private release():void {for(const b of [...this.instances,...this.vertices,...this.indices])b.destroy();this.instances=[];this.vertices=[];this.indices=[];this.exclusionBuffer?.destroy();this.exclusionBuffer=undefined;this.uniform?.destroy();this.commands?.destroy();this.fallback?.destroy();this.pbrUniform?.destroy();this.materialUniform?.destroy();this.pbrUniform=this.materialUniform=undefined;this.pbrShader='';this.pbrBindings.length=0;this.pbrGroups.clear();this.uniform=this.commands=undefined;this.fallback=undefined;this.compute=undefined;this.pipelines.clear();this.terrain=undefined;this.computeGroup=undefined;this.renderGroups.clear();}
  onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
  dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.engine=undefined;}
+ declare [Symbol.dispose]: () => void;
+ [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

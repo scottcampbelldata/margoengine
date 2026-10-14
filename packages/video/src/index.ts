@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph} from '@margoengine/core/extension';
 import {group,render} from '../../shared/gpu.js';
@@ -58,4 +59,6 @@ export class Video implements EnginePlugin {
  }});}
  onDeviceRestored(engine:Engine):void {this.uniform?.destroy();this.uniform=undefined;this.pipeline=undefined;this.format='';this.setup(engine);}
  dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.uniform?.destroy();if(this.analyser){this.audioSource?.disconnect(this.analyser);this.analyser.disconnect();const shared=sources.get(this.source as HTMLVideoElement)!;if(!--shared.users)shared.node.disconnect(shared.context.destination);}this.analyser=this.audioSource=undefined;this.pipeline=undefined;this.engine=undefined;}
+ declare [Symbol.dispose]: () => void;
+ [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

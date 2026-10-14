@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph} from '@margoengine/core/extension';
 import {ToonShading,type ToonOptions} from '@margoengine/creative/toon';
@@ -28,4 +29,6 @@ export class Toon implements EnginePlugin {
  private release():void {this.shading.dispose();this.buffer?.destroy();this.buffer=undefined;this.pipeline=undefined;this.format='';}
  onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
  dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.engine=undefined;}
+ declare [Symbol.dispose]: () => void;
+ [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }
