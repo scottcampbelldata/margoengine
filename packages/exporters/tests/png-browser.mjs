@@ -10,7 +10,8 @@ const server = await createServer({root: fileURLToPath(new URL('..', import.meta
 await server.listen();
 let browser;
 try {
-  browser = await chromium.launch({headless: true});
+  const channel = process.env.BROWSER_CHANNEL ?? 'msedge';
+  browser = await chromium.launch({headless: true, channel: channel === 'bundled' ? undefined : channel});
   const page = await browser.newPage();
   await page.goto(`${server.resolvedUrls.local[0]}package.json`);
   const result = await page.evaluate(async () => {
