@@ -39,16 +39,16 @@ mock.module('@margoengine/gltf-pro',{namedExports:{async loadGLTF(engine,src,{si
 mock.module('@margoengine/environment',{namedExports:{
   async loadEnvironmentImage(src,{signal}){imageRequests.push({src,signal});return {};},
   Environment:{async create(engine){
-    const environment={name:'environment',intensity:1,disposed:false,disposals:0,version:0,listeners:new Set(),buffers:[resource(),resource()],textures:[resource(),resource(),resource()],
+    const environment={name:'environment',intensity:1,disposed:false,disposals:0,version:0,listeners:new Set(),device:{},specularView:{version:0},sampler:{},brdfLutView:{},shBuffer:{},paramsBuffer:{},buffers:[resource(),resource()],textures:[resource(),resource(),resource()],
       onChange(callback){this.listeners.add(callback);return()=>this.listeners.delete(callback);},
-      restore(){this.version++;for(const callback of this.listeners)callback(this);},
+      restore(){this.version++;this.specularView={version:this.version};for(const callback of this.listeners)callback(this);},
       dispose(){if(this.disposed)return;this.disposed=true;this.disposals++;for(const owned of [...this.buffers,...this.textures])owned.destroy();this.listeners.clear();}};
     environments.push(environment);if(deferEnvironment)await new Promise(resolve=>pendingEnvironments.push(resolve));return environment;
   }},
   EnvironmentBackground:class {
     constructor(environment){this.name='environment:background';this.environment=environment;this.exposure=1;this.buffer=resource();backgrounds.push(this);}
     dispose(){if(this.disposed)return;this.disposed=true;this.buffer.destroy();}
-  },IBL_WGSL:'fn iblShade() {}',iblBindGroupEntries:environment=>[4,5,6,7,8].map(binding=>({binding,resource:{version:environment.version}})),
+  },EnvironmentLighting:(await import('../../environment/dist/index.js')).EnvironmentLighting,
 }});
 mock.module('@margoengine/controls',{namedExports:{OrbitControls:class {
   constructor(camera,canvas){this.camera=camera;this.canvas=canvas;this.updates=[];this.listener=()=>{};canvas.addEventListener('pointerdown',this.listener);this.disposals=0;controls.push(this);}
@@ -149,7 +149,7 @@ test('HDR exposure and background mutate without reload, models join IBL regardl
   const before=imageRequests.length;
   const children=(exposure,background,showModel=true)=>[React.createElement(Environment,{key:'env',src:'/studio.hdr',exposure,background}),showModel&&React.createElement(Model,{key:'model',src:'/lit.glb'})];
   const view=render(tree(children(1,true)));await flush();const environment=environments.at(-1),model=models.at(-1),background=backgrounds.at(-1),effect=[...model.lighting][0];
-  assert.equal(model.lighting.size,1);const entries=effect.bindings();assert.equal(effect.bindings(),entries);
+  assert.equal(model.lighting.size,1);assert.equal(engines.at(-1).plugins.get('environment:lighting'),effect,'core meshes are lit too');const entries=effect.bindings();assert.equal(effect.bindings(),entries);
   environment.restore();assert.notEqual(effect.bindings(),entries);assert.equal(effect.bindings()[0].resource.version,1);
   view.rerender(tree(children(2,true)));assert.equal(environment.intensity,2);assert.equal(background.exposure,2);assert.equal(backgrounds.at(-1),background);assert.equal(imageRequests.length,before+1);
   view.rerender(tree(children(0.5,false)));assert.equal(background.disposed,true);assert.equal(environment.intensity,0.5);assert.equal(model.lighting.size,1);
@@ -178,7 +178,7 @@ test('shadow flags update registration independently and HDR composes with the s
     const shader=ibl.shader(source,2);for(let i=0;i<100;i++)assert.equal(ibl.shader(source,2),shader);
     assert.equal(rewrites,2,'steady frames must reuse the transformed shader');
   } finally {String.prototype.replace=replace;}
-  for(const order of [[ibl,effect],[effect,ibl]]){let code=source;for(const lighting of order)code=lighting.shader(code,2);assert.match(code,/shadowVisibility/);assert.match(code,/iblShade\(iblSpecular/);assert.match(code,/@binding\(8\)/);}
+  for(const order of [[ibl,effect],[effect,ibl]]){let code=source;for(const lighting of order)code=lighting.shader(code,2);assert.match(code,/shadowVisibility/);assert.match(code,/iblShade\(iblSpecular/);assert.match(code,/@binding\(24\)/);}
   view.rerender(tree(children(false,true),{shadows:true}));assert.equal(effect.sources.size,0);assert.ok(model.lighting.has(effect));
   view.rerender(tree(children(true,false),{shadows:true}));assert.equal(effect.sources.size,1);assert.equal(model.lighting.has(effect),false);
   view.rerender(tree(children(true,true),{shadows:false}));await flush();assert.equal(effect.disposals,1);assert.equal(effect.sources.size,0);assert.equal(model.lighting.size,1);
