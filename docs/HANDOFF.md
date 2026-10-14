@@ -8,7 +8,7 @@ Sell Margo as a modern replacement for three.js: looks good, runs smooth on PCs 
 modular (load only the packages you use). Rules that follow from that:
 
 - Core + stage (`@margoengine/core`, `margoengine`) stay feature-frozen and under 20,000 gzip bytes (CI gate).
-  Scott will consider letting core grow for a significant improvement: bring him the numbers first.
+  Scott wants core firmly under 20k; optional packages may grow moderately ("not massive").
 - New capability goes in separate, optional, tree-shakable packages.
 - Every optimization needs a saved proof (same output, measurably faster) and its byte cost recorded.
 
@@ -47,44 +47,37 @@ Not re-measured since the water restore.
 Size facts for the pitch (three.js r186, minimal lit scene, minified / gzip): Margo core + stage 48 kB / 20 kB;
 three WebGL 621 kB / 139 kB; three WebGPU 959 kB / 229 kB. Script: `test-results/three-size.mjs` (ignored folder).
 
-## In progress
+## CPU package pass (done, commit `f47ff3f`)
 
-Five parallel workers went through 58 packages for CPU-side optimizations (baseline `f05414a`). Their edits are
-UNCOMMITTED in the working tree, with proofs in `examples/package-benchmarks/proofs/`. Reported so far:
+Five parallel workers reviewed 58 packages against baseline `f05414a`; Claude verified the result.
 
-- Kept (need clean verification): taa, post (SSAO), creative (post), splats, animator, points, text, labels,
-  ecs, navmesh, bvh, machinery (CAD parser). Geometry/procedural and file-format workers had not reported when
-  this was written; `git status` shows their edits in geometry, procedural, terrain, wfc, splines, road,
-  exporters, loaders, gltf, gltf-pro.
-- Nothing worth changing: scatter, water, sky, shadows, vfx, clustered, dof, tonemap, environment, toon,
-  transitions, stats, react, html, lines, selection, controls, input, cinematic, inspector, gizmo, audio,
-  tween, net, navigation, physics. Skipped (need a browser): video, xr. Reverted: fsm.
-
-To finish this step:
-
-1. `npm run test:all` (rebuilds every package, runs about 810 unit tests). Two geometry triangulation tests
-   time out when the machine is loaded; re-run them alone before treating that as a failure.
-2. `npm run catalog:build` if any package's exports changed (the catalog test compares them).
-3. Run each `examples/package-benchmarks/proofs/*.proof.js` one at a time on a quiet machine. Revert any change
-   whose speed-up is under about 1.1x or whose output differs. Marginal ones flagged by workers: bvh
-   `intersectsBox` and `closestPointToPoint`, navmesh ORCA, labels with an orbiting camera (parity).
-4. Record gzip size before/after for each changed package; reject poor speed-for-bytes trades.
-5. `npm run measure:size` must stay under 20,000. Commit.
+- Kept, with proofs that all pass when re-run alone (slowest case 1.07x, most 1.5-6x): animation, animator,
+  bvh, creative, decoders, ecs, exporters, geometry, gltf, gltf-pro, labels, loaders, machinery (CAD parser),
+  navmesh, points, post (SSAO), road, splats, splines, taa, terrain, text, wfc.
+- Size: about +5.5 kB gzip across those packages (`results/sizes.json`, `proofs/size.js`). Core + stage unchanged.
+- Reverted (no gain): fsm, procedural, blender. Already lean: scatter, water, sky, shadows, vfx, clustered, dof,
+  tonemap, environment, toon, transitions, stats, react, html, lines, selection, controls, input, cinematic,
+  inspector, gizmo, audio, tween, net, navigation, physics, scenery, fbx, usdz-export.
+  Not measurable in Node: video, xr, ifc, usdz.
+- Fixed: WFC hang with exactly 32 tile types (signed mask comparison).
+- Rerun everything: `npm run test:all`, then each `node examples/package-benchmarks/proofs/<name>.proof.js`.
+- Known remaining CPU opportunities: geometry `loopSubdivide` (string weld keys), geometry primitive `Builder`
+  (pushes to number arrays), ifc vertex arrays, usdz per-corner sampling. CPU tuning will not raise demo FPS;
+  the demos are GPU-bound.
 
 ## To do next, in order
 
-1. Finish and commit the package pass above.
-2. Demos, first impression: choose the quality tier before the first visible frame (quick GPU timing probe)
+1. Demos, first impression: choose the quality tier before the first visible frame (quick GPU timing probe)
    so slow machines never show 10-15 slow seconds and a reload.
-3. Light tier looks jagged (1x at DPR 1 on HiDPI). Measure a render scale between 1 and 2 and the optional
+2. Light tier looks jagged (1x at DPR 1 on HiDPI). Measure a render scale between 1 and 2 and the optional
    TAA package; keep whichever holds 60.
-4. Island at 60 FPS on the laptop with the full water. If short, test terrain mesh 192 -> 96 on the light tier
+3. Island at 60 FPS on the laptop with the full water. If short, test terrain mesh 192 -> 96 on the light tier
    (about 0.9 ms) and check the shoreline still lines up.
-5. GPU-side optimization (shaders, particles, passes). Must be measured on hardware one change at a time;
+4. GPU-side optimization (shaders, particles, passes). Must be measured on hardware one change at a time;
    Codex's notes list tried and rejected ideas. Untested lead: VFX does one shared atomic increment per live
    particle (`docs/vfx-workgroup-compaction-2026-10-13.md`).
-6. Fair three.js benchmark: check `examples/conveyor-simulator` and `examples/benchmark` are like-for-like.
-7. Verified three.js parity matrix, then the feature gaps below.
+5. Fair three.js benchmark: check `examples/conveyor-simulator` and `examples/benchmark` are like-for-like.
+6. Verified three.js parity matrix, then the feature gaps below.
 
 ## Feature gaps versus three.js (after optimization; each as an optional package)
 
@@ -105,6 +98,5 @@ From package descriptions, not yet audited against code:
   its runtime cost was never measured.
 - Water's 4x path borrows the resolved scene colour; Codex left its pixel/timing acceptance open.
 - Earth, meadow and helmet pages build but were not run in a browser after the auto-quality change.
-- Two zero-byte junk files in the repo root, `({name` and `m[1])`, are safe to delete.
 - Frame rates measured while background benchmarks run on the laptop are meaningless (integrated GPU shares
   the CPU's power budget).
