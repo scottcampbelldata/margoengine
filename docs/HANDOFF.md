@@ -335,7 +335,7 @@ if intended, run `npm run api:update` after build:packages and commit the `api/`
    with `destroy()`).
 8. Animation: `loop` and `speed` are attach-time options (`Animation.attach(model, {loop, speed})`), there is no `stop()`
    (set `playing = false`), and one clip at a time without animator.
-9. Stale docs: root README line 3, `packages/margoengine/README.md` and MODERN-ENGINE.md say core falls back to WebGL2;
+9. [ALL DONE: every stale-doc item below fixed in 2c53227 and the README follow-up commit.] Stale docs: root README line 3, `packages/margoengine/README.md` and MODERN-ENGINE.md say core falls back to WebGL2;
    it now needs `fallback: webglRenderer` from `@margoengine/webgl` (`backend: 'auto'` alone rejects without WebGPU).
    `packages/controls/README.md` "How it works"/Limits still say the camera has no up vector and rejects vertical views.
    `packages/animation/README.md` names `margoengine-animator`. `packages/gltf-pro/README.md` says ambient has no IBL.
@@ -343,6 +343,15 @@ if intended, run `npm run api:update` after build:packages and commit the `api/`
    `packages/viewcube/README.md` Limits says "no roll (core's camera has none)" (core has `camera.up`);
    `packages/cameras/README.md` says core throws `Vertical camera` looking straight down (only with the default up);
    `packages/gltf-pro/README.md` Limits says models are "outside core GPU picking" (selection `Picking` covers them).
+10. From the API snapshots (`api/*.api.md`, `docs/api-surface.md`; 1,263 exports in 129 entries): 92 `any` in public
+    signatures (shader `Node<any>` 47, physics raw Rapier 25, controls 11, gltf-pro `GLTFDocument` 7); core root
+    `Engine`/`Mesh`/`EnginePlugin` are different types from `core/extension`'s same names, and root exports both
+    `Engine` and `EngineKernel`; 305 types used by exports but not exported (e.g. `Renderer` for `EngineOptions.fallback`,
+    `SkyBase`/`VFXBase`); `Vec3` declared in 8 packages (mutable in bvh/geometry/lod, readonly elsewhere) and other
+    duplicates (`parseColor`, `smoothstep`, `Ray`, `HeightField`, `TextureSource`, `RaycastOptions`, two
+    `loadGLTF`/`parseUSDZ`); thin re-export packages (gizmo, html, usdz-export, toon); 48 `attach` vs 14 `create`;
+    `SkyMoonConfig`/`SdfParams` break the `*Options` rule. Fixed: post and quality .d.ts pointed into ../../shared
+    (broken after npm install); `tests/dts-self-contained.test.js` now guards every package.
 
 ## Pre-launch hardware investigation
 
