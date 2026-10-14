@@ -124,7 +124,7 @@ export class OrbitControls extends Controls {
       if (theta > Math.PI) theta -= TAU; else if (theta < -Math.PI) theta += TAU;
       theta = min <= max ? clamp(theta, min, max) : theta > (min + max) / 2 ? Math.max(min, theta) : Math.min(max, theta);
     }
-    // The Margo Engine camera has no up vector and rejects a view parallel to Y, so the poles stay EPS away.
+    // Core rejects a view parallel to camera.up (default +Y), so the poles stay EPS away.
     phi = clamp(clamp(phi, this.minPolarAngle, this.maxPolarAngle), EPS, Math.PI - EPS);
     const target = this.nextTarget, cursorZoom = this.zoomToCursor && this.cursor && this.dScale !== 1;
     target[0] = tx + this.dPan[0] * f; target[1] = ty + this.dPan[1] * f; target[2] = tz + this.dPan[2] * f;

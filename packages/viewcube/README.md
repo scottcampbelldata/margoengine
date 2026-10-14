@@ -51,7 +51,7 @@ Why a separate package and not `@margoengine/controls`: the cube is a DOM widget
 (including core's CADCameraControls, which does not use controls) and optionally `@margoengine/cameras`; keeping it
 out leaves controls' bundle and dependencies unchanged.
 
-Limits: no drag-to-orbit on the cube itself, no roll (core's camera has none), no "home" view of your own (use
+Limits: no drag-to-orbit on the cube itself, no roll (the cube sets `camera.up` only on the poles), no "home" view of your own (use
 `camera.fitToBoundingBox`), and the colours are fixed light-grey (restyle `.mvc-face` and `.mvc-projection`).
 
 Size: 3.1 kB min + gzip (the test enforces under 3.5 kB). MIT. Peer: `@margoengine/core` (^0.1.0 || ^1.0.0).
