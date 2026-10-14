@@ -193,6 +193,13 @@ families.push({name: 'colour parse + sRGB', async verify() {
     for (const copy of copies.slice(1)) {const other = outcome(copy, input, make?.(), offset); assert.ok(typeof expected[0] === 'function' ? other[0].name === expected[0].name && other[1] === expected[1] : same(other, expected));}
     n += copies.length;
   }
+  // splats' decode lives inside parseSplat: same text, and every byte value decodes the same through the old and new parser.
+  assert.equal(body('packages/splats/src/data.ts', 'linear').replace(/^.*=>/, '').replaceAll('c', 'v'), decode + ';');
+  const splats = await both('splats', 'src/data.ts'), file = new Uint8Array(256 * 32), view = new DataView(file.buffer);
+  for (let i = 0; i < 256; i++) {for (let k = 0; k < 6; k++) view.setFloat32(i * 32 + k * 4, k < 3 ? random() * 10 - 5 : 0.01 + random(), true); for (let k = 24; k < 32; k++) file[i * 32 + k] = k < 28 ? (i + k * 37) & 255 : 1 + Math.floor(random() * 254);}
+  const parsed = [splats.baseline.parseSplat(file), splats.candidate.parseSplat(file)];
+  for (const key of ['positions', 'covariances', 'colors']) assert.ok(same(parsed[0][key], parsed[1][key]), `splats ${key}`);
+  n += 256 * 4;
   for (let i = 0; i < 200000; i++) {
     const v = i < 300 ? specials[i % specials.length] * (i % 2 ? 1 : 1e-3) : i % 2 ? random() : value();
     assert.ok(Object.is(color.SRGBToLinear(v), environment.srgbToLinear(v)) && Object.is(color.LinearToSRGB(v), text.encodeSrgb(v)) && Object.is(color.LinearToSRGB(v), exporters.toSrgb(v))); n += 3;
