@@ -60,7 +60,7 @@ node examples/package-benchmarks/cad/kernel-node.mjs`, `results-kernel-node.json
 16.4 ms isolated and 20.8 ms inside the frame at 99,976 entities. Culling is under 0.6 ms of it. Claims such as "under
 0.5 ms for 50k" are not supported: 50k parts take 7.7 ms.
 
-## Core hot spots (not changed; core is frozen, numbers for the owner)
+## Core hot spots (as measured before the fast paths below; 1, 2, 3 and 5 are now fixed in core, 4 and 6 are not)
 
 1. **Kernel tick recomputes every entity every frame** (139-164 ns each; 16.4 ms at 100k entities). `world_matrix`
    rebuilds the local matrix from TRS in f64 with full finiteness checks, recurses up the parent chain, then recomputes
@@ -76,7 +76,92 @@ node examples/package-benchmarks/cad/kernel-node.mjs`, `results-kernel-node.json
    90k-part assembly mesh by mesh is O(n²), minutes.
 6. **100,000-entity cap** in `TransformStore.create`: a 100,000-part assembly does not fit once assembly nodes are counted.
 
-## Prototype: static-scene fast paths in core (branch `worktree-agent-a46261c57b837ecd0`, not merged)
+## Core static-scene fast paths (merged 2026-10-14: steps 1, 2, 3 and 5; step 4 not merged)
+
+Scott approved steps 1, 2, 3 and 5 of the prototype below; they are ported onto `perf/auto-quality`, one commit per step,
+together with two small approved core fixes. Step 4 (pick pipeline reuse) is not merged, so `engine.pick` still
+re-renders the scene; it got faster only because the `update()` it runs (kernel + collection) did.
+
+| Commit | What | core + stage gzip |
+| --- | --- | --- |
+| step 1 | kernel recomputes only entities whose inputs (TRS, parent, bounds, hidden) changed, plus descendants; Wasm rebuilt with `wasm-opt -ocimfs 300` | 18,681 → 19,162 (+481) |
+| step 2 | engine reuses last frame's instances; on an unchanged mesh set, material, visibility and cull result it patches only the moved matrices | 19,414 (+252) |
+| step 3 | WebGPU renderer uploads only the changed instance range | 19,510 (+96) |
+| step 5 | `Engine.remove` detaches children with a native scan of the parent column | 19,515 (+5) |
+| CAD controls pole fix | leaving an exact pole (ViewCube top view) keeps the heading given by `camera.up` | 19,536 (+21) |
+| `engine.pick` OffscreenCanvas fix | bounds and scaling use `clientWidth \|\| width` | 19,543 (+7) |
+
+Contract change (core README): core's per-geometry GPU instance buffers are read-only for packages. The only writer outside
+core was `@margoengine/selection`'s micro pick pass (grep of every package, example and script for `geometryBuffers`,
+`.instance` and instance uploads); it now uploads into its own buffer. Readers that bind the buffer (machinery
+`FeatureEdges`) are unaffected: the buffer holds the same data as before. Memory: +66 bytes per kernel entity slot.
+
+Bit-exactness: `tests/core-dirty-transforms.test.js` (dirty propagation equals a full recompute, instance lists equal a
+from-scratch collection every frame) and `node examples/package-benchmarks/cad/pixels-check.mjs` on the real GPU (static +
+moving mix with hide/show, reparent, material edits and assignment, remove/add, scale and geometry swap, compared with a
+from-scratch render: 0 differing pixels over 25 comparisons plus 4 unchanged redraws). `npm run verify`: 1,051 tests pass.
+
+### Before / after on a quiet machine (2026-10-14, 19:08-19:21 local)
+
+Same host and browser setup as above, measured after Scott stopped every other agent, build and benchmark (and closed
+other apps), with this benchmark the only workload, on AC power (checked before and after every run, recorded in each
+JSON as `acPowerAtStart`/`acPowerAtEnd`, plus a `conditions` note and the `core` commit), holding the GPU lock. Before =
+core at `261f1d4`, after = this branch. Before and after alternate per case in two rounds (round 1 before then after,
+round 2 after then before); each cell is the mean of the two rounds' medians. Raw JSON:
+`examples/package-benchmarks/cad/results-{before,after}{1,2}-{orbit,still,move,orbitmove}.json`;
+`node examples/package-benchmarks/cad/summary.mjs before1 before2 after1 after2` prints every run. Cases: `orbit` (camera
+orbits, static parts, then `engine.pick` at the centre), `still` (fixed camera, static parts), `move` (fixed camera, 1%
+of parts bob every frame), `orbitmove` (orbiting camera and 1% moving; not in the prototype table).
+
+| Case | Parts | Kernel in frame (ms) | Collection (ms) | Frame CPU (ms) | FPS | GPU, timestamps (ms) | `engine.pick` (ms) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| orbit | 10,017 | 2.17 → 0.65 | 1.18 → 1.01 | 5.02 → 3.70 | 168 → 247 | 4.85 → 4.62 | 10.7 → 7.6 |
+| orbit | 50,004 | 10.7 → 2.66 | 5.22 → 4.42 | 19.7 → 10.4 | 49 → 92 | 17.0 → 17.5 | 28.9 → 19.5 |
+| orbit | 89,883 | 14.9 → 4.09 | 7.52 → 6.82 | 28.6 → 30.0 | 34 → 33 | 27.0 → 28.3 | 43.2 → 30.9 |
+| still | 10,017 | 2.08 → 0.66 | 1.07 → 0.09 | 4.88 → 3.71 | 182 → 204 | 4.46 → 3.83 | - |
+| still | 50,004 | 9.67 → 3.15 | 4.79 → 0.18 | 18.3 → 11.6 | 53 → 78 | 16.4 → 12.0 | - |
+| still | 89,883 | 16.0 → 5.54 | 7.84 → 0.28 | 29.7 → 17.9 | 33 → 52 | 26.2 → 18.5 | - |
+| move | 10,017 | 1.87 → 0.68 | 0.99 → 0.14 | 4.10 → 4.67 | 207 → 182 | 3.64 → 4.29 | - |
+| move | 50,004 | 9.53 → 2.93 | 4.58 → 0.54 | 17.7 → 6.85 | 54 → 133 | 16.1 → 14.9 | - |
+| move | 89,883 | 15.7 → 5.70 | 7.60 → 1.09 | 29.3 → 22.4 | 33 → 43 | 27.6 → 21.0 | - |
+| orbitmove | 10,017 | 2.11 → 0.65 | 1.12 → 0.94 | 4.69 → 4.54 | 183 → 189 | 4.46 → 4.10 | - |
+| orbitmove | 50,004 | 8.73 → 3.38 | 4.27 → 5.03 | 16.4 → 12.4 | 58 → 76 | 15.1 → 16.2 | - |
+| orbitmove | 89,883 | 14.5 → 5.08 | 7.31 → 7.82 | 28.4 → 29.5 | 34 → 33 | 26.6 → 28.2 | - |
+
+Reading: the kernel is 3-4x cheaper in every case; collection all but disappears while the camera and the cull result
+are fixed (still, move). With an orbiting camera the cull result changes every frame, so collection runs in full as before
+and 90k parts stay GPU-bound (~28 ms of GPU per frame): orbit at 90k is unchanged (34 → 33 FPS), 50k orbit nearly doubles.
+`move` at 10k got slower in both rounds (207 → 182 FPS; GPU 3.6 → 4.3 ms, CPU without GPU wait 4.2 → 2.7 ms): at that size
+the frame is GPU-bound and the GPU time rose; not explained. The quiet-machine "before" numbers are 10-35% better than the
+11:53 session at the top of this page (34 vs 25 FPS at 90k orbit), which is why only same-session pairs are compared.
+
+### Back-face culling by pipeline `cullMode` (measured only, not merged; branch `scratch/core-backface-cull`)
+
+Core's shader rejects back faces with `if(!facing&&i.material.z<0.5){discard;}` under `cullMode:'none'`; a `discard`
+anywhere in the shader stops the GPU from writing depth early, for double-sided materials (the default) too. The scratch
+branch draws each batch once per cull group present (single-sided: `cullMode:'back'`; single-sided mirrored: `'front'`;
+double-sided: `'none'`), with a shader override `G` that drops other groups' instances in the vertex stage and compiles
+the discard out; pipelines that packages build from the same shader text keep `G=3` (no filter, discard kept). Cost:
+core + stage 19,543 → 19,858 B gzip (+315), over the 19,600 target. Caveats: a batch mixing groups is drawn up to three
+times (vertex work, draw order between groups changes), and pipeline creation per group is synchronous.
+
+Benchmark `examples/package-benchmarks/cad/cull-bench.mjs` (on that branch; quiet machine, AC, GPU lock, 1432x768, 4x
+MSAA; 4 runs per case over two alternating rounds, median shown; raw `results-cull-{discard,cullmode}-{1,2}.json`):
+
+| Scene | Sides | GPU, discard (ms) | GPU, cullMode (ms) | Serial frame, discard → cullMode (ms) |
+| --- | --- | --- | --- | --- |
+| CAD 50k parts (46k visible) | double (default) | 15.6 | 13.7 | 21.7 → 19.6 |
+| CAD 50k parts | single | 14.2 | 12.4 | 20.9 → 18.8 |
+| 1 full-screen layer | double | 1.31 | 0.79 | 4.0 → 4.0 |
+| 1 full-screen layer | single | 0.79 | 0.39 | 3.9 → 3.9 |
+| 16 full-screen layers, front to back | double | 1.57 | 0.79 | 4.3 → 3.9 |
+| 16 full-screen layers, front to back | single | 0.79 | 0.33 | 4.0 → 3.8 |
+| 16 full-screen layers, back to front | single | 11.9 | 4.7 | 15.8 → 9.0 |
+
+So: about 2 ms (12%) of GPU per frame on the 50k CAD scene and up to 2.5x on heavy overdraw drawn back to front; the
+CAD runs are noisier (single runs between 8.7 and 15.7 ms).
+
+## Prototype: static-scene fast paths in core (branch `worktree-agent-a46261c57b837ecd0`; steps 1, 2, 3, 5 merged above)
 
 Hot spots 1-5 above, one commit per step so each can be accepted alone. Same API, identical pixels
 (`node examples/package-benchmarks/cad/pixels-check.mjs`: a static + moving mix with hide/show, reparent, material
