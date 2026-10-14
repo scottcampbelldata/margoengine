@@ -1140,6 +1140,7 @@
       "cross",
       "degrees",
       "deltaTime",
+      "discard",
       "distance",
       "div",
       "dot",
@@ -1507,6 +1508,21 @@
     "imports": "import { Video } from '@margoengine/video';",
     "exports": [
       "Video"
+    ]
+  },
+  {
+    "id": "viewcube",
+    "title": "Viewcube",
+    "package": "@margoengine/viewcube",
+    "version": "0.1.0",
+    "published": false,
+    "description": "CAD view cube: shows the camera orientation and animates to top, front, side and isometric views, with a perspective/orthographic toggle.",
+    "requirements": "Core ^0.1.0 || ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "viewcube",
+    "install": "npm install @margoengine/core@0.1.0 @margoengine/viewcube@0.1.0",
+    "imports": "import { ViewCube } from '@margoengine/viewcube';",
+    "exports": [
+      "ViewCube"
     ]
   },
   {

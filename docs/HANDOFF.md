@@ -164,9 +164,12 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    f. Text: @margoengine/text is already GPU SDF text (not DOM). Upgrade to MSDF only if corner sharpness at large
       sizes needs it; add instanced dimension callouts that stay sharp at orthographic zoom, tied to machinery's
       annotations.
-   g. ViewCube (snap to top/front/right/iso, perspective/orthographic toggle) - new; transform gizmos already exist in
+   g. [done: `@margoengine/viewcube` (DOM/CSS 3D, 2.8 kB gzip, real-browser click check); the gizmo was NOT constant-size
+      in orthographic (sized and picked by camera distance): fixed in controls/view.ts + transform.ts, orbit pan too]
+      ViewCube (snap to top/front/right/iso, perspective/orthographic toggle) - new; transform gizmos already exist in
       controls/gizmo, check they keep constant screen size in orthographic.
-   h. Shader nodes: fragment `discard` and compute atomics (small, high value).
+   h. [done: `discard(cond, value)`, `storage(..., {atomic: true})` with atomicAdd/Max/Min/Load/Store; real-GPU check
+      passed on Intel Arc] Shader nodes: fragment `discard` and compute atomics (small, high value).
    i. Shadows: cascades already snap to texels (shadows/src/cascades.ts); verify there is no shimmer when panning in
       orthographic CAD views rather than re-implementing.
    j. Workers and OffscreenCanvas: move FBX/USD/glTF parsing into workers with transferable buffers (machinery CAD and

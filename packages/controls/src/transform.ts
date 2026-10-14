@@ -152,8 +152,10 @@ export class TransformControls extends EventDispatcher {
     const space = this.mode === 'scale' ? 'local' : this.space, q = this.worldQuaternion(object);
     const axes: [V3, V3, V3] = space === 'local' ? [quatRotate(q, [1, 0, 0]), quatRotate(q, [0, 1, 0]), quatRotate(q, [0, 0, 1])] : [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
     const toCamera = sub(camera.position, origin), distance = Math.hypot(...toCamera) || 1;
-    const size = distance * Math.min(1.9 * b.tanHalf, 7) / 4 * this.size;
-    return {mode: this.mode, origin, axes, size, eye: scale(toCamera, 1 / distance), up: b.up, show: {X: this.showX, Y: this.showY, Z: this.showZ}, axis: this.axis, dragging: this.dragging};
+    // Constant screen size: a fixed fraction of the visible height at the gizmo (the whole view height when orthographic,
+    // where every point also sees the camera along the same direction).
+    const size = (b.ortho !== undefined ? b.ortho * 1.9 : distance * Math.min(1.9 * b.tanHalf, 7)) / 4 * this.size;
+    return {mode: this.mode, origin, axes, size, eye: b.ortho !== undefined ? scale(b.forward, -1) : scale(toCamera, 1 / distance), up: b.up, show: {X: this.showX, Y: this.showY, Z: this.showZ}, axis: this.axis, dragging: this.dragging};
   }
   /** Handles for the current frame (also what the overlay draws). */
   handles(): Handle[] {const f = this.frame(); return f ? buildGizmo(f) : [];}
@@ -219,7 +221,7 @@ export class TransformControls extends EventDispatcher {
     const width = Math.max(1, element.clientWidth), height = Math.max(1, element.clientHeight), b = basis(this.engine.camera);
     const axis = this.axis, local = this.local(), parent = this.parentMatrix(object), parentQuaternion = quatFromMatrix(parent);
     const o = f.origin, center = project(b, o, width, height);
-    const pixelsPerUnit = height / (2 * Math.max(1e-9, center.depth) * b.tanHalf) * f.size;
+    const pixelsPerUnit = height / (2 * (b.ortho ?? Math.max(1e-9, center.depth) * b.tanHalf)) * f.size;
     const drag: DragStart = {
       axis, origin: o, axes: f.axes, eye: f.eye, normal: this.planeNormal(axis, f), pointStart: null,
       screenStart: {x, y}, screenLast: {x, y}, position: local.position, quaternion: local.quaternion, scale: local.scale,
