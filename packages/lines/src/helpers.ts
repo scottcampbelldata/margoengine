@@ -2,7 +2,8 @@ import type {Camera, EngineKernel, Geometry, Mesh, Vec3} from '@margoengine/core
 import {parseColor, type ColorInput} from './color.js';
 import {Line, type LineMaterialOptions} from './line.js';
 import {meshWorldMatrix} from './lines.js';
-import {copyIfChanged, finiteArray, invert, transformPoint} from './math.js';
+import {invertMatrix} from '@margoengine/math/mat4';
+import {copyIfChanged, finiteArray, transformPoint} from './math.js';
 
 /** Material options shared by every helper. Helpers default to 1 pixel, butt caps and miter joins. */
 export type HelperOptions = Omit<LineMaterialOptions, 'color'>;
@@ -191,7 +192,7 @@ export class CameraHelper extends Line {
   update(engine: EngineKernel): boolean {
     const camera = this.camera;
     if (camera !== engine.camera) camera.update(this.aspect ?? engine.canvas.width / Math.max(1, engine.canvas.height), true);
-    if (!copyIfChanged(this.seen, camera.matrix) || !invert(this.inverse, camera.matrix)) return true;
+    if (!copyIfChanged(this.seen, camera.matrix) || !invertMatrix(camera.matrix, this.inverse)) return true;
     const out = this.positions; out.length = 0;
     const point = [0, 0, 0];
     for (const [a, b] of cameraPairs) for (const name of [a, b]) {

@@ -3,7 +3,8 @@ import type {Engine as Runtime} from '@margoengine/core/extension';
 import {buildAsync, type AsyncBuildOptions} from './async.js';
 import type {BVHBuildOptions} from './build.js';
 import {MeshBVH, type GeometryLike, type Vec3} from './bvh.js';
-import {invert, transformPoint, type Side} from './math.js';
+import {invertMatrix} from '@margoengine/math/mat4';
+import {transformPoint, type Side} from './math.js';
 
 // Structural views of the engine internals that `engineRuntime(engine)` exposes. Types only: this module never
 // imports core at runtime, so it stays usable from workers and Node.
@@ -187,7 +188,7 @@ export class Raycaster {
    * an orthographic matrix (e.g. from `@margoengine/cameras`), whose rays are parallel.
    */
   setFromCamera(coords: ArrayLike<number>, camera: Camera, webgpu = true): this {
-    const m = camera.matrix, inverse = invert(m);
+    const m = camera.matrix, inverse = invertMatrix(m, new Float64Array(16));
     if (!inverse) throw new RangeError('Camera matrix is singular');
     const x = coords[0], y = coords[1];
     if (!Number.isFinite(x) || !Number.isFinite(y)) throw new RangeError('Invalid device coordinates');
@@ -255,7 +256,7 @@ export class Raycaster {
     for (const {node, entry, model, primitive, index, sphere} of candidates) {
       if (this.firstHitOnly && entry > best) break;
       matrix.set(store.matrices.subarray(node.id * 16, node.id * 16 + 16));
-      if (!invert(matrix, inverse)) continue;
+      if (!invertMatrix(matrix, inverse)) continue;
       transformPoint(inverse, ox, oy, oz, local);
       direction[0] = inverse[0] * dx + inverse[4] * dy + inverse[8] * dz; direction[1] = inverse[1] * dx + inverse[5] * dy + inverse[9] * dz; direction[2] = inverse[2] * dx + inverse[6] * dy + inverse[10] * dz;
       if (sphere) {

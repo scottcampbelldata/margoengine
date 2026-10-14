@@ -82,6 +82,31 @@ families.push({name: 'mat4 multiply', async verify() {
   ];
 }});
 
+// --- mat4 invert (cofactors): bvh, lines, environment ---
+families.push({name: 'mat4 invert', async verify() {
+  const M = matrices(6000), bvh = await both('bvh', 'src/math.ts'), lines = (await both('lines', 'src/math.ts')).baseline, environment = (await both('environment', 'src/background.ts')).baseline;
+  // environment's copy is the same text as lines' (both return a boolean); bvh's returns out/null with `inv` for `d`.
+  const inner = code => code.slice(code.indexOf('{'));
+  assert.equal(inner(body('packages/environment/src/background.ts', 'invert')), inner(body('packages/lines/src/math.ts', 'invert')));
+  for (const m of M) for (const make of [() => new Float64Array(16).fill(7), () => new Float32Array(16).fill(7), () => new Array(16).fill(7)]) {
+    const a = make(), b = make(), c = make(), d = make(), e = make(), result = mat4.invertMatrix(m, a);
+    assert.ok(result === a || result === null);
+    assert.equal(bvh.baseline.invert(m, b), result && b); assert.ok(same(a, b), 'invert');
+    assert.equal(lines.invert(c, m), result !== null); assert.equal(environment.invert(m, d), result !== null); assert.ok(same(a, c) && same(a, d));
+    assert.equal(bvh.candidate.invert(m, e), result && e); assert.ok(same(a, e));
+    const x = bvh.baseline.invert(m), y = bvh.candidate.invert(m); assert.ok(x === null ? y === null : y instanceof Float64Array && same(x, y));
+  }
+  return M.length * 3 * 5;
+}, async bench() {
+  const bvh = await both('bvh', 'src/math.ts'), lines = (await both('lines', 'src/math.ts')).baseline, M = poses(256), out = new Float64Array(16);
+  return [
+    {case: 'bvh Raycaster per-mesh inverse, 200,000', ...time(
+      () => {for (let i = 0; i < 200000; i++) bvh.baseline.invert(M[i & 255], out);}, () => {for (let i = 0; i < 200000; i++) mat4.invertMatrix(M[i & 255], out);})},
+    {case: 'lines CameraHelper / environment background inverse, 200,000', ...time(
+      () => {for (let i = 0; i < 200000; i++) lines.invert(out, M[i & 255]);}, () => {for (let i = 0; i < 200000; i++) mat4.invertMatrix(M[i & 255], out);})},
+  ];
+}});
+
 const checked = {}, timings = [];
 for (const family of families) {
   if (timing) {if (family.bench) timings.push(...(await family.bench()).map(item => ({family: family.name, ...item})));}
