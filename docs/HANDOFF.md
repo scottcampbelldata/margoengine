@@ -203,7 +203,16 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    the route). Costs: +66 B per kernel entity slot, instance-buffer contract (writers must not touch core's buffers),
    rebuilt Wasm kernel. Raw JSON examples/package-benchmarks/cad/results-s0..s5-*.json on that branch.
 1f. Beat-three.js additions (Scott's list, 2026-10-14; checked against the code, modified where noted):
-   a. GPU occlusion culling (Hi-Z depth pyramid + indirect draws) in a new optional package. Core's DrawOptions already
+   a. [DONE: `@margoengine/culling` `CulledInstances`, 7,015 B gzip, no core change. Parts uploaded once, compute pass
+      tests frustum (+ optional Hi-Z occlusion from a depth prepass of last frame's large visible parts, so no one-frame
+      lag), stable in-order compaction, indirect draws with core's frame shader. 90k parts: CPU 23.4 -> 0.4-0.6 ms per
+      frame; FPS orbit 36 -> 52, still 32 -> 53, grazing 48 -> 98 (frustum mode). Occlusion does not pay on the open
+      sheet (nothing extra culled from above; +1-2 ms GPU) but does on a stacked block (90k orbit 28 -> 37 FPS, 81k -> 21k
+      parts drawn), so `frustum` is the default. Real-GPU pixel check: 0 differing pixels over 640 frames vs drawing
+      everything, coplanar twins unchanged. Limits: parts are not core meshes (no engine.pick, hierarchy, ExplodedView,
+      FeatureEdges, section caps, shadows). Numbers: docs/cad-performance.md; JSON results-culling.json. Follow-ups:
+      single-pass Hi-Z downsample, picking via instance IDs, FeatureEdges/caps over these parts.]
+      GPU occlusion culling (Hi-Z depth pyramid + indirect draws) in a new optional package. Core's DrawOptions already
       accept `indirect` per batch, so start there; if a core hook turns out to be needed, bring it to Scott first.
    b. Render-bundle replay: measure first. Core already draws one instanced call per distinct geometry, so encoding is
       small when parts share shapes; bundles matter for assemblies with many unique shapes. Use the CAD benchmark's

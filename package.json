@@ -79,6 +79,7 @@
     "packages/lod",
     "packages/viewcube",
     "packages/staging",
+    "packages/culling",
     "examples/vite",
     "examples/gameplay-sandbox",
     "examples/react-viewer",
