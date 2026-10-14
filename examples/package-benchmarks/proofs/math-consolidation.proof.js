@@ -141,6 +141,22 @@ families.push({name: 'shared/math invert + finiteVector', async verify() {
     () => {for (let i = 0; i < 100000; i++) shared.invert(out, M[i & 255], 0, workspace);}, () => {for (let i = 0; i < 100000; i++) mat4.invertMatrixStable(M[i & 255], out, workspace);})}];
 }});
 
+// --- TRS compose: exporters, labels (labels normalizes the quaternion first) ---
+families.push({name: 'mat4 compose', async verify() {
+  const exporters = (await both('exporters', 'src/scene.ts')).baseline, labels = await both('labels', 'src/projection.ts');
+  const vec = n => Array.from({length: n}, value), unit = () => {const q = vec(4), l = Math.hypot(...q); return l && Number.isFinite(l) && random() < 0.8 ? q.map(v => v / l) : q;};
+  let n = 0;
+  for (let i = 0; i < 30000; i++) {
+    const t = vec(3), q = i % 5 ? unit() : vec(4), s = vec(3);
+    assert.ok(same(exporters.compose(t, q, s), mat4.composeMatrix(t, q, s, new Float64Array(16))), 'compose');
+    for (const Out of [Float64Array, Float32Array]) {const a = mat4.composeMatrix(t, q, s, new Out(16)), b = new Out(exporters.compose(t, q, s)); assert.ok(same(a, b));}
+    const x = labels.baseline.composeMatrix(t, q, s, new Float64Array(16).fill(7)), y = labels.candidate.composeMatrix(t, q, s, new Float64Array(16).fill(7)); assert.ok(same(x, y), 'labels composeMatrix');
+    assert.ok(same(labels.baseline.composeMatrix(t), labels.candidate.composeMatrix(t)) && same(labels.baseline.composeMatrix(t, q), labels.candidate.composeMatrix(t, q)));
+    n += 6;
+  }
+  return n;
+}});
+
 const checked = {}, timings = [];
 for (const family of families) {
   if (timing) {if (family.bench) timings.push(...(await family.bench()).map(item => ({family: family.name, ...item})));}

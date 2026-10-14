@@ -1,3 +1,5 @@
+import {composeMatrix as compose} from '@margoengine/math/mat4';
+
 export type Vec3 = readonly [number, number, number];
 export type Backend = 'webgpu' | 'webgl2';
 
@@ -103,11 +105,5 @@ export function cssPointToWorld(world: ArrayLike<number>, pixelScale: number, x:
 /** Column-major world matrix from position, quaternion [x, y, z, w] and uniform or per-axis scale. */
 export function composeMatrix(position: Vec3, quaternion: readonly number[] = [0, 0, 0, 1], scale: Vec3 = [1, 1, 1], out: Float64Array = new Float64Array(16)): Float64Array {
   const [x, y, z, w] = quaternion, length = Math.hypot(x, y, z, w) || 1;
-  const qx = x / length, qy = y / length, qz = z / length, qw = w / length;
-  const [sx, sy, sz] = scale;
-  out[0] = (1 - 2 * (qy * qy + qz * qz)) * sx; out[1] = 2 * (qx * qy + qz * qw) * sx; out[2] = 2 * (qx * qz - qy * qw) * sx; out[3] = 0;
-  out[4] = 2 * (qx * qy - qz * qw) * sy; out[5] = (1 - 2 * (qx * qx + qz * qz)) * sy; out[6] = 2 * (qy * qz + qx * qw) * sy; out[7] = 0;
-  out[8] = 2 * (qx * qz + qy * qw) * sz; out[9] = 2 * (qy * qz - qx * qw) * sz; out[10] = (1 - 2 * (qx * qx + qy * qy)) * sz; out[11] = 0;
-  out[12] = position[0]; out[13] = position[1]; out[14] = position[2]; out[15] = 1;
-  return out;
+  return compose(position, [x / length, y / length, z / length, w / length], scale, out);
 }

@@ -2,7 +2,7 @@
 // normalizes geometry and materials, and computes local and world transforms in double precision.
 import {engineRuntime, meshRuntime} from '@margoengine/core/extension';
 import type {EngineKernel, Mesh, Geometry, PbrMaterial} from '@margoengine/core';
-import {multiplyMatrices} from '@margoengine/math/mat4';
+import {composeMatrix, multiplyMatrices} from '@margoengine/math/mat4';
 
 /** Plain geometry with optional UVs, tangents and vertex colors, for data that core `Geometry` cannot hold. */
 export interface GeometryData {
@@ -224,16 +224,6 @@ export function normalizeMaterial(data: PbrMaterial|MaterialData): Mat {
 
 // --- column-major 4x4 math in double precision ---
 
-export function compose(t: number[], q: number[], s: number[]): Float64Array {
-  const [x, y, z, w] = q;
-  return new Float64Array([
-    (1-2*(y*y+z*z))*s[0], 2*(x*y+w*z)*s[0], 2*(x*z-w*y)*s[0], 0,
-    2*(x*y-w*z)*s[1], (1-2*(x*x+z*z))*s[1], 2*(y*z+w*x)*s[1], 0,
-    2*(x*z+w*y)*s[2], 2*(y*z-w*x)*s[2], (1-2*(x*x+y*y))*s[2], 0,
-    t[0], t[1], t[2], 1,
-  ]);
-}
-
 export const determinant3 = (m: Float64Array): number =>
   m[0]*(m[5]*m[10]-m[6]*m[9])-m[4]*(m[1]*m[10]-m[2]*m[9])+m[8]*(m[1]*m[6]-m[2]*m[5]);
 
@@ -274,7 +264,7 @@ export function unitQuaternion(q: number[]): number[] {
 
 function makeNode(name: unknown, t: number[], r: number[], s: number[], parent: Float64Array|null): Node {
   if (s.some(v => Math.fround(v) === 0)) throw new RangeError('Scale must be nonzero');
-  const local = compose(t, r, s);
+  const local = composeMatrix(t, r, s, new Float64Array(16));
   return {name: typeof name === 'string' && name ? name : undefined, t, r, s, local, world: parent ? multiplyMatrices(parent, local, new Float64Array(16)) : local, children: []};
 }
 
@@ -331,7 +321,7 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
         if (onlyVisible && store.hidden[id]) return [];
       }
       for (const id of chain) {
-        const t = store.transforms, local = compose([t.x[id], t.y[id], t.z[id]], unitQuaternion([t.qx[id], t.qy[id], t.qz[id], t.qw[id]]), [t.sx[id], t.sy[id], t.sz[id]]);
+        const t = store.transforms, local = composeMatrix([t.x[id], t.y[id], t.z[id]], unitQuaternion([t.qx[id], t.qy[id], t.qz[id], t.qw[id]]), [t.sx[id], t.sy[id], t.sz[id]], new Float64Array(16));
         base = base ? multiplyMatrices(base, local, new Float64Array(16)) : local;
       }
     }

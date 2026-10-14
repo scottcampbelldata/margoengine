@@ -31,5 +31,8 @@
   "peerDependencies": {
     "@margoengine/core": "0.1.0"
   },
-  "homepage": "https://margoengine.com"
+  "homepage": "https://margoengine.com",
+  "devDependencies": {
+    "@margoengine/math": "0.1.0"
+  }
 }
