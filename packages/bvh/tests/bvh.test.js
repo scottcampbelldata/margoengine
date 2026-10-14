@@ -442,6 +442,14 @@ test('Raycaster.setFromCamera inverts the reversed-Z WebGPU and the WebGL view-p
   assert.ok(Math.abs(inverse[0] - 0.5) < 1e-12 && Math.abs(inverse[12] + 0.5) < 1e-12);
 });
 
+test('Raycaster.setFromCamera casts parallel rays from the near plane for an orthographic matrix', () => {
+  // Reversed-Z ortho looking down -z from z=10: x,y in [-4,4] x [-2,2], eye-space near -5, far 20.
+  const n = -5, f = 20, matrix = new Float32Array([0.25, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 1 / (f - n), 0, 0, 0, -10 / (f - n) + f / (f - n), 1]);
+  const ray = new Raycaster().setFromCamera([0.5, -0.5], {matrix, position: [0, 0, 10]});
+  assert.ok([2, -1, 15].every((v, a) => Math.abs(ray.origin[a] - v) < 1e-5), `origin ${[...ray.origin]}`);
+  assert.ok([0, 0, -1].every((v, a) => Math.abs(ray.direction[a] - v) < 1e-6));
+});
+
 test('Raycaster sphere pruning remains conservative under shear and mirrored shear', () => {
   const geometry = box(), raycaster = new Raycaster();
   for (const sign of [1, -1]) {

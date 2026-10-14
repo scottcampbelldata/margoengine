@@ -85,7 +85,8 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
 
 1. Top-10 parity gaps (non-core parts): materials package [done: `@margoengine/materials`], glTF extensions/decoders [running], post stack +
    FXAA [done: `@margoengine/post/stack`, `@margoengine/post/fxaa`; SMAA not done], raycast/pick glTF models + DragControls, environment IBL apply + background colour + fog,
-   orthographic/vertical cameras without core change, WebGL beyond core (gap 8: scope with Scott first).
+   orthographic/vertical cameras without core change [done: `@margoengine/cameras`; SSAO, lines/points widths, labels,
+   clustered, DOF and splats still assume perspective], WebGL beyond core (gap 8: scope with Scott first).
 1b. [running] Composable shader nodes (`@margoengine/shader`, parity gap 19), moved up after Scott noted three.js's TSL /
    RenderPipeline node workflows (r183 RenderPipeline, r186 pipeline hooks): small typed nodes compiling to WGSL for
    materials and post effects, built on the materials package and the post stack once both APIs settle.

@@ -52,6 +52,7 @@
     "packages/tween",
     "packages/quality",
     "packages/materials",
+    "packages/cameras",
     "packages/webgl",
     "packages/math",
     "packages/ecs",

@@ -16,7 +16,7 @@ Overall: Margo is strong where three.js relies on third-party libraries or examp
 
 - **No materials or textures you can create yourself.** Core `PbrMaterial` is a constant color, opaque and untextured, and core `Geometry` has no UVs. Textures only render on assets loaded through glTF.
 - **No glTF extensions.** Any file that lists `extensionsRequired` is rejected. The Draco, meshopt and KTX2 decoders exist but the glTF loader does not call them.
-- **No orthographic camera.**
+- **No orthographic camera.** (Since added as `@margoengine/cameras`, see Cameras.)
 - **Loaded glTF models cannot be picked.** `Raycaster` and `engine.pick` only see core meshes.
 - **Image-based lighting is not applied automatically.** Only the React adapter applies it.
 - **Effects do not combine freely.** Bloom, SSAO and creative post-processing reject each other.
@@ -62,7 +62,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | three.js | Status | Margo | Notes |
 | --- | --- | --- | --- |
 | PerspectiveCamera | PARTIAL | core `Camera` (`packages/core/src/camera.ts`) | Defined by position and target, with no up vector or roll. `update()` throws `RangeError('Vertical camera')` when the view is exactly vertical, so straight top-down or bottom-up views fail. No `zoom`, `setViewOffset`, `focalLength` or `filmGauge`. `fitToBoundingBox` is a Margo extra. |
-| OrthographicCamera | MISSING | — | Orthographic projection exists only inside shadows' cascade fitting. |
+| OrthographicCamera | COVERED | cameras `CameraProjection` (`packages/cameras/src/index.ts`) | Replaces the core camera's `update`, so culling, `engine.pick`, selection and bvh rays follow the ortho frustum; also renders exactly vertical views (perspective or ortho) with an explicit screen up. SSAO, lines/points sizes, labels, clustered, DOF and splats still assume `fov`. |
 | ArrayCamera | PARTIAL | xr stereo renderer (`packages/xr/src/renderer.ts`) | Internal to XR, not a general multi-view camera. |
 | CubeCamera (dynamic environment maps) | MISSING | — | |
 | StereoCamera, AnaglyphEffect, ParallaxBarrierEffect | MISSING | — | |
