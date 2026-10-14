@@ -162,7 +162,7 @@ path: tessellate once (server or build step) and ship the result as a binary mes
 
 ## Reproduce
 
-From the repository root after `node scripts/build-modern.js --precompiled` and `npm run build --workspace packages --if-present`,
+From the repository root after `npm run build:packages`,
 on AC power (the scripts refuse to time on battery unless `BENCH_ALLOW_BATTERY=1`), holding `test-results/gpu.lock`:
 
 ```sh

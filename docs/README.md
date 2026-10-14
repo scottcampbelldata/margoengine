@@ -14,7 +14,7 @@ Open [localhost:5184](http://127.0.0.1:5184). No dependency installation or pack
 
 The catalog uses plain HTML, CSS, JavaScript and `catalog.json`. It loads no engine packages. Examples fetch pinned distribution files from jsDelivr; React also uses esm.sh. Serve copied examples over localhost or HTTPS rather than opening them with `file://`. Examples include pause/play controls, respect reduced-motion preferences and dispose resources when the page closes. Creative rendering requires WebGPU. CDN examples need their Margo packages to be published first.
 
-GitHub Pages serves this directory from `main` at `/margoengine/`; the website build also copies it into `/catalog/`. Run `npm run build:packages` and `npm run catalog:build` to refresh package names, versions, runtime exports and exact-version registry availability. Add runnable examples to the matching `catalog.json` entry; the generator retains that metadata. TypeScript-only types and the advanced core `/extension` entry are covered in the [API guide](../MODERN-ENGINE.md).
+GitHub Pages serves this directory from `main` at `/margoengine/`; the website build also copies it into `/catalog/`. `npm run build:packages` refreshes it (or `npm run catalog:build` after an existing build): it regenerates package names, versions, runtime exports and exact-version registry availability. Add runnable examples to the matching `catalog.json` entry; the generator retains that metadata. TypeScript-only types and the advanced core `/extension` entry are covered in the [API guide](../MODERN-ENGINE.md).
 
 Run the catalog checks after installing workspace development dependencies:
 

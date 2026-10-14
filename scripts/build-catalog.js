@@ -3,7 +3,7 @@ import {readFile, readdir, writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
-const existing = JSON.parse(await readFile('docs/catalog.json', 'utf8'));
+const existingText = await readFile('docs/catalog.json', 'utf8'), existing = JSON.parse(existingText);
 const postfxExamples = {
   dof: {example: '../demos/dof/', exampleTitle: 'Circular bokeh', exampleNote: 'Run the optional depth-of-field package with the current Core 0.1 engine. Focus, focal length, aperture and an effect toggle remain interactive.', exampleSource: false},
   tonemap: {example: '../demos/tonemap/', exampleTitle: 'Highlights and color', exampleNote: 'Run the optional tonemapping package with the current Core 0.1 engine. Compare AgX, ACES fitted and Neutral, exposure, contrast and a local 33-cube LUT.', exampleSource: false}
@@ -17,9 +17,10 @@ for (const id of await readdir('packages')) {
   const previous = existing.find(entry => entry.id === id);
   const exports = Object.keys(await import(pathToFileURL(resolve(`packages/${id}/dist/index.js`)))).sort();
   assert.ok(exports.length, `${manifest.name} has no runtime exports`);
-  const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(manifest.name)}`);
-  assert.ok(response.ok || response.status === 404, `${manifest.name}: registry returned ${response.status}`);
-  const published = response.ok && !!(await response.json()).versions?.[manifest.version];
+  // Offline builds keep the last known registry state instead of failing the package build.
+  const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(manifest.name)}`).catch(() => null);
+  assert.ok(!response || response.ok || response.status === 404, `${manifest.name}: registry returned ${response?.status}`);
+  const published = response ? response.ok && !!(await response.json()).versions?.[manifest.version] : previous?.published ?? false;
   const core = manifest.peerDependencies?.['@margoengine/core'];
   entries.push({
     ...previous, ...postfxExamples[id], id, title: previous?.title ?? (id === 'margoengine' ? 'Stage facade' : id[0].toUpperCase() + id.slice(1)),
@@ -36,5 +37,7 @@ entries.sort((a, b) => {
   const first = ['margoengine', 'core', 'machinery', 'gltf', 'creative', 'react'];
   return (first.includes(a.id) ? first.indexOf(a.id) : first.length) - (first.includes(b.id) ? first.indexOf(b.id) : first.length) || a.id.localeCompare(b.id);
 });
-await writeFile('docs/catalog.json', JSON.stringify(entries, null, 2) + '\n');
+// Keep the checkout's line endings (CRLF under core.autocrlf) and skip unchanged writes, so a clean tree stays clean.
+const text = (JSON.stringify(entries, null, 2) + '\n').replaceAll('\n', existingText.includes('\r\n') ? '\r\n' : '\n');
+if (text !== existingText) await writeFile('docs/catalog.json', text);
 console.log(`Catalog: ${entries.length} packages, ${entries.filter(entry => entry.published).length} published on npm.`);
