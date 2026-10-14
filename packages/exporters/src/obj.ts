@@ -1,5 +1,6 @@
+import {LinearToSRGB as toSrgb} from '@margoengine/math/color';
 // Wavefront OBJ writer: the Margo Engine counterpart of Three.js OBJExporter, plus an optional MTL file.
-import {collect, drawables, num, toSrgb, toWorld, token, type ExportSource, type Mat, type SceneOptions} from './scene.js';
+import {collect, drawables, num, toWorld, token, type ExportSource, type Mat, type SceneOptions} from './scene.js';
 
 export interface OBJOptions extends SceneOptions {
   /** Also write an MTL file and `usemtl` lines. Default false. */

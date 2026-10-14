@@ -1,6 +1,7 @@
 // Solid or vertical-gradient background: the scene.background = color equivalent.
 import type {EngineKernel} from '@margoengine/core';
 import type {FrameGraph, PassContext} from '@margoengine/core/extension';
+import {SRGBToLinear as srgbToLinear} from '@margoengine/math/color';
 
 declare const GPUBufferUsage: {UNIFORM: number; COPY_DST: number};
 
@@ -18,7 +19,6 @@ export function srgbColor(value: ColorInput): [number, number, number] {
   } else if (Array.isArray(value) && value.length === 3 && value.every(v => typeof v === 'number' && v >= 0 && v <= 1)) return [value[0], value[1], value[2]];
   throw new TypeError('Invalid color');
 }
-export const srgbToLinear = (c: number): number => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 
 const shader = /* wgsl */ `
 struct Colors {top:vec4f, bottom:vec4f}

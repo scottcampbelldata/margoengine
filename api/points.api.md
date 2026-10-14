@@ -266,7 +266,7 @@ export function multiply(a: ArrayLike<number>, b: ArrayLike<number>, out?: Float
 
 export function packColors(source: ArrayLike<number>, components: number, count: number, out: Uint32Array, offset?: number): Uint32Array;
 
-export function parseColor(value: ColorInput, out?: Float32Array | number[], offset?: number): Float32Array | number[];
+export const parseColor: (value: ColorInput, out?: Float32Array | number[], offset?: number) => Float32Array | number[];
 
 export function pickPoint(positions: ArrayLike<number>, order: ArrayLike<number> | null, ranges: readonly PickRange[], mvp: ArrayLike<number>, width: number, height: number, x: number, y: number, radius: number): PickHit | null;
 

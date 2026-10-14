@@ -2,6 +2,7 @@ import {PbrMaterial, type Geometry} from '@margoengine/core';
 import type {EngineKernel, Mesh} from '@margoengine/core';
 import {LoaderError, type LoadedGeometry, type LoadedGroup} from './types.js';
 import {pointsToGeometry, toGeometry, type PointsToGeometryOptions, type ToGeometryOptions} from './geometry.js';
+import {SRGBToLinear as toLinear} from '@margoengine/math/color';
 
 export interface CreateMeshesOptions extends Pick<ToGeometryOptions, 'normals'>, PointsToGeometryOptions {
   /** Parent for every created mesh. */
@@ -28,7 +29,6 @@ export interface LoadedMeshes {
   dispose(): void;
 }
 
-const toLinear = (v: number): number => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
 const clamp = (v: number): number => Math.min(1, Math.max(0, Number.isFinite(v) ? v : 0));
 
 function averageColor(loaded: LoadedGeometry, group: LoadedGroup | undefined): [number, number, number] | undefined {

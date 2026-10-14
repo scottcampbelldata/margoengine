@@ -6,6 +6,7 @@ import {Matrix4} from '../dist/index.js';
 import * as mat4 from '../dist/mat4.js';
 import * as validate from '../dist/validate.js';
 import * as quat from '../dist/quat.js';
+import {parseColor, SRGBToLinear} from '../dist/color.js';
 import {Quaternion, Euler} from '../dist/index.js';
 
 const I = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
@@ -56,4 +57,10 @@ test('quat eulerToQuaternion and multiplyQuaternions match Quaternion', () => {
   near(quat.eulerToQuaternion(0.3, -1.2, 2.5), new Quaternion().setFromEuler(new Euler(0.3, -1.2, 2.5)).toArray());
   const a = [0.1, 0.2, 0.3, 0.9], b = [-0.4, 0.5, 0.1, 0.7];
   near(quat.multiplyQuaternions(a, b), new Quaternion(...a).multiply(new Quaternion(...b)).toArray());
+});
+test('color parseColor decodes sRGB hex and numbers, passes linear arrays through and rejects the rest', () => {
+  assert.deepEqual(parseColor('#f00'), [1, 0, 0]);
+  assert.deepEqual(parseColor(0x336699), [0x33, 0x66, 0x99].map(v => SRGBToLinear(v / 255)));
+  const out = new Float32Array(5); assert.equal(parseColor([0.25, 0.5, 2], out, 2), out); assert.deepEqual([...out], [0, 0, 0.25, 0.5, 2]);
+  assert.throws(() => parseColor('red'), TypeError); assert.throws(() => parseColor(-1), RangeError); assert.throws(() => parseColor([0, -1, 0]), RangeError);
 });

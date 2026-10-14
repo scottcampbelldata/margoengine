@@ -3,7 +3,7 @@ import {engineRuntime, meshRuntime} from '@margoengine/core/extension';
 import type {EngineKernel, Mesh} from '@margoengine/core';
 import {viewMatrix} from '../../shared/view.js';
 import {GlyphAtlas} from './atlas.js';
-import {encodeSrgb} from './color.js';
+import {LinearToSRGB as encodeSrgb} from '@margoengine/math/color';
 import {multiplyMatrices} from '@margoengine/math/mat4';
 import {textShader} from './shader.js';
 import {Text} from './text.js';

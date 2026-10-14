@@ -6,7 +6,8 @@ import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type FrameGraph} from '@margoengine/core/extension';
 import type {Environment} from './environment.js';
 import {IBL_WGSL, iblBindGroupEntries} from './ibl.js';
-import {srgbColor, srgbToLinear, type ColorInput} from './color.js';
+import {SRGBToLinear as srgbToLinear} from '@margoengine/math/color';
+import {srgbColor, type ColorInput} from './color.js';
 
 declare const GPUBufferUsage: {UNIFORM: number; COPY_DST: number};
 

@@ -8,6 +8,28 @@ export const SRGBToLinear = (c: number): number => c <= 0.04045 ? c / 12.92 : ((
 /** sRGB transfer function, encoded (linear light to display value). */
 export const LinearToSRGB = (c: number): number => c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055;
 
+/** A color as the packages take it: '#rrggbb' or '#rgb' (sRGB), a 0xrrggbb number (sRGB), or [r, g, b] in linear RGB 0..1 like PbrMaterial. */
+export type ColorInput = string | number | readonly number[];
+
+/** Converts a ColorInput to linear RGB at `out[offset..offset + 2]`. Throws on anything else, or negative/non-finite components. */
+export function parseColor(value: ColorInput, out: Float32Array | number[] = [0, 0, 0], offset = 0): Float32Array | number[] {
+  let rgb: number[];
+  if (typeof value === 'number') {
+    if (!Number.isInteger(value) || value < 0 || value > 0xffffff) throw new RangeError('Numeric colors must be 0x000000..0xffffff');
+    rgb = [value >> 16 & 255, value >> 8 & 255, value & 255].map(v => SRGBToLinear(v / 255));
+  } else if (typeof value === 'string') {
+    const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(value), long = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(value);
+    const parts = long ? long.slice(1) : short ? short.slice(1).map(c => c + c) : null;
+    if (!parts) throw new TypeError('Color strings must be #rrggbb or #rgb');
+    rgb = parts.map(p => SRGBToLinear(parseInt(p, 16) / 255));
+  } else if (value && typeof value === 'object' && value.length === 3) {
+    rgb = [value[0], value[1], value[2]];
+    if (rgb.some(v => typeof v !== 'number' || !Number.isFinite(v) || v < 0)) throw new RangeError('Linear RGB colors must be finite and non-negative');
+  } else throw new TypeError('Expected a color');
+  out[offset] = rgb[0]; out[offset + 1] = rgb[1]; out[offset + 2] = rgb[2];
+  return out;
+}
+
 const hue = (p: number, q: number, t: number): number => {
   t = ((t % 1) + 1) % 1;
   return t < 1 / 6 ? p + (q - p) * 6 * t : t < 1 / 2 ? q : t < 2 / 3 ? p + (q - p) * 6 * (2 / 3 - t) : p;

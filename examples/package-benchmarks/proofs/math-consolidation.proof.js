@@ -174,6 +174,32 @@ families.push({name: 'quat euler + multiply', async verify() {
   return n;
 }});
 
+// --- colour: parseColor (lines, points, text), sRGB decode (those three, loaders engine, environment), encode (text, exporters) ---
+families.push({name: 'colour parse + sRGB', async verify() {
+  const color = await import('@margoengine/math/color'), copies = [];
+  for (const name of ['lines', 'points', 'text']) {const {baseline, candidate} = await both(name, 'src/color.ts'); copies.push(baseline.parseColor, candidate.parseColor);}
+  const environment = (await both('environment', 'src/color.ts')).baseline, text = (await both('text', 'src/color.ts')).baseline, exporters = (await both('exporters', 'src/scene.ts')).baseline;
+  const decode = 'v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4';
+  assert.equal(body('packages/loaders/src/engine.ts', 'toLinear').replace(/^.*=>/, ''), decode + ';');
+  for (const name of ['lines', 'points', 'text']) assert.equal(body(`packages/${name}/src/color.ts`, 'linear').replace(/^.*=>/, '').replaceAll('value', 'v'), decode + ';');
+  const outcome = (f, ...args) => {try {return f(...args);} catch (error) {return [error.constructor, error.message];}};
+  const inputs = [0, 0xffffff, 0x123456, -1, 0x1000000, 1.5, NaN, Infinity, '#fff', '#FFF', '#a1B2c3', '#12345', 'fff', '#ggg', '', '#1234567', null, undefined, {}, true,
+    [0, 0.5, 1], [2, 3, 4], [-0, 0, 0], [-1, 0, 0], [NaN, 0, 0], [Infinity, 0, 0], ['1', 0, 0], [0, 0], [0, 0, 0, 0], new Float32Array([0.1, 0.2, 0.3])];
+  for (let i = 0; i < 5000; i++) inputs.push(Math.floor(random() * 0x1000000), '#' + Math.floor(random() * 0x1000000).toString(16).padStart(6, '0'), '#' + Math.floor(random() * 0x1000).toString(16).padStart(3, '0'), [value(), value(), value()]);
+  let n = 0;
+  for (const input of inputs) for (const [make, offset] of [[() => [0, 0, 0], 0], [() => new Float32Array(5).fill(9), 2], [undefined, undefined]]) {
+    const expected = outcome(copies[0], input, make?.(), offset), actual = outcome(color.parseColor, input, make?.(), offset);
+    assert.ok(Array.isArray(expected) && typeof expected[0] === 'function' ? Object.is(expected[0], actual[0]) || expected[0].name === actual[0].name && expected[1] === actual[1] : same(expected, actual), `parseColor ${String(input)}`);
+    for (const copy of copies.slice(1)) {const other = outcome(copy, input, make?.(), offset); assert.ok(typeof expected[0] === 'function' ? other[0].name === expected[0].name && other[1] === expected[1] : same(other, expected));}
+    n += copies.length;
+  }
+  for (let i = 0; i < 200000; i++) {
+    const v = i < 300 ? specials[i % specials.length] * (i % 2 ? 1 : 1e-3) : i % 2 ? random() : value();
+    assert.ok(Object.is(color.SRGBToLinear(v), environment.srgbToLinear(v)) && Object.is(color.LinearToSRGB(v), text.encodeSrgb(v)) && Object.is(color.LinearToSRGB(v), exporters.toSrgb(v))); n += 3;
+  }
+  return n;
+}});
+
 const checked = {}, timings = [];
 for (const family of families) {
   if (timing) {if (family.bench) timings.push(...(await family.bench()).map(item => ({family: family.name, ...item})));}
