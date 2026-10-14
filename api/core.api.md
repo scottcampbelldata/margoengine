@@ -150,6 +150,8 @@ interface Batch {
     geometry: Geometry;
     instances: Float32Array;
     count: number;
+    start?: number;
+    end?: number;
 }
 
 interface DrawOptions {

@@ -197,10 +197,10 @@ export class Engine {
       for(const batch of this.batches.values())batch.count=0;this.stats.visible=0;this.stats.drawCalls=0;
       this.materialFrame++;this.materials.clear();this.slots.fill(-1);
       this.meshes.forEach(this.collect);this.collected=this.revision;seen.set(visible);changed.fill(0);
-      for(const batch of this.batches.values())if(batch.count)this.stats.drawCalls++;
+      for(const batch of this.batches.values()){if(batch.count)this.stats.drawCalls++;batch.start=0;batch.end=batch.count*24;}
     }else for(let id=changed.indexOf(1);id>=0;id=changed.indexOf(1,id+1)){
       changed[id]=0;const offset=this.slots[id];
-      if(offset>=0){const mesh=this.meshes.get(id)!;this.batches.get(mesh.geometry!)!.instances.set(mesh.matrix,offset);}
+      if(offset>=0){const mesh=this.meshes.get(id)!,batch=this.batches.get(mesh.geometry!)!;batch.instances.set(mesh.matrix,offset);batch.start=Math.min(batch.start!,offset);batch.end=Math.max(batch.end!,offset+16);}
     }
   }
   async pick(x:number,y:number):Promise<Mesh|null> {

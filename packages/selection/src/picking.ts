@@ -63,7 +63,7 @@ function intersects(matrix:Float32Array,model:Float32Array,b:ArrayLike<number>,c
 export class Picking implements EnginePlugin {
  readonly name='picking';private engine?:Engine;private device?:GPUDevice;private disposed=false;private pending=false;
  private readonly models=new Models();private readonly draws=new ModelDraws();private modelPipeline?:GPURenderPipeline;private last:PickHit|null=null;private sphere?:ModelPrimitive;private readonly proxyMatrix=new Float32Array(16);private readonly instanceWorld=new Float32Array(16);private instanceHits:number[][]=[];
- private ids?:GPUTexture;private idsView?:GPUTextureView;private micro?:GPUTexture;private depth?:GPUTexture;private uniform?:GPUBuffer;private read?:GPUBuffer;
+ private ids?:GPUTexture;private idsView?:GPUTextureView;private micro?:GPUTexture;private depth?:GPUTexture;private uniform?:GPUBuffer;private read?:GPUBuffer;private instances?:GPUBuffer;
  private readonly pipelines=new Map<string,GPURenderPipeline>();private readonly groups=new Map<GPURenderPipeline,{entries:GPUBindGroupEntry[];group:GPUBindGroup}>();
  private readonly frame=new Float32Array(28);private readonly camera=new Float32Array(16);private readonly clip=new Float64Array(16);
  private readonly snapshot=new Map<Mesh,Snapshot>();private graphRevision=-1;private captured=false;
@@ -181,7 +181,11 @@ export class Picking implements EnginePlugin {
   }
   const pass=encoder.beginRenderPass({colorAttachments:[{view:c.color,clearValue:{r:0,g:0,b:0,a:0},loadOp:'clear',storeOp:'store'}],depthStencilAttachment:{view:c.depth,depthClearValue:0,depthLoadOp:'clear',depthStoreOp:'store'}});
   pass.setPipeline(pipeline);pass.setBindGroup(0,cached.group);
-  for(const [geometry,values] of batches){const gpu=e.geometryBuffers(geometry)!;device.queue.writeBuffer(gpu.instance,0,new Float32Array(values));pass.setVertexBuffer(0,gpu.vertex);pass.setVertexBuffer(1,gpu.instance);pass.setIndexBuffer(gpu.index,'uint32');pass.drawIndexed(geometry.indices.length,values.length/24);}
+  // Own instance buffer: the core uploads its instance buffers only when they change, so they must not be overwritten here.
+  const data=new Float32Array([...batches.values()].flat());
+  if(data.length&&(this.instances?.size??0)<data.byteLength){this.instances?.destroy();this.instances=device.createBuffer({size:data.byteLength*2,usage:GPUBufferUsage.VERTEX|GPUBufferUsage.COPY_DST});}
+  if(data.length)device.queue.writeBuffer(this.instances!,0,data);let offset=0;
+  for(const [geometry,values] of batches){const gpu=e.geometryBuffers(geometry)!;pass.setVertexBuffer(0,gpu.vertex);pass.setVertexBuffer(1,this.instances!,offset*4);pass.setIndexBuffer(gpu.index,'uint32');pass.drawIndexed(geometry.indices.length,values.length/24);offset+=values.length;}
   // gltf-pro primitives whose bounding sphere meets the micro frustum, alpha cut-outs and transparency ignored, deformed (skinned) buffers used.
   const draws=this.draws,models=this.models.list,starts=this.models.starts;draws.reset();this.instanceHits=[];
   for(let m=0;m<models.length;m++){
@@ -201,8 +205,8 @@ export class Picking implements EnginePlugin {
   pass.end();
  }
  private release():void {
-  for(const resource of [this.ids,this.micro,this.depth,this.uniform,this.read])resource?.destroy();
-  this.ids=this.micro=this.depth=undefined;this.idsView=undefined;this.uniform=this.read=undefined;this.pipelines.clear();this.draws.release();this.sphere?.buffers?.vertex.destroy();this.sphere?.buffers?.index.destroy();this.sphere=undefined;this.modelPipeline=undefined;this.groups.clear();this.snapshot.clear();this.captured=false;this.context=undefined;
+  for(const resource of [this.ids,this.micro,this.depth,this.uniform,this.read,this.instances])resource?.destroy();
+  this.ids=this.micro=this.depth=undefined;this.idsView=undefined;this.uniform=this.read=this.instances=undefined;this.pipelines.clear();this.draws.release();this.sphere?.buffers?.vertex.destroy();this.sphere?.buffers?.index.destroy();this.sphere=undefined;this.modelPipeline=undefined;this.groups.clear();this.snapshot.clear();this.captured=false;this.context=undefined;
  }
  onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
  dispose():void {
