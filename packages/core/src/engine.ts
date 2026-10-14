@@ -205,9 +205,9 @@ export class Engine {
     }
   }
   async pick(x:number,y:number):Promise<Mesh|null> {
-    if(![x,y].every(Number.isFinite))throw new RangeError('Invalid pick');if(this.disposed||this.disposing)throw new Error('Engine disposed');if(this.backend!=='webgpu')throw new Error('WebGPU required');if(x<0||y<0||x>=this.canvas.clientWidth||y>=this.canvas.clientHeight||this.recovery)return null;
+    if(![x,y].every(Number.isFinite))throw new RangeError('Invalid pick');if(this.disposed||this.disposing)throw new Error('Engine disposed');if(this.backend!=='webgpu')throw new Error('WebGPU required');const w=this.canvas.clientWidth||this.canvas.width,h=this.canvas.clientHeight||this.canvas.height;if(x<0||y<0||x>=w||y>=h||this.recovery)return null;
     this.update(true,0);const renderer=this.renderer as GPURenderer,revision=this.revision,picker=[...this.plugins.values()].find(plugin=>plugin.onPick);
-    const mesh=picker?await picker.onPick!(x,y):this.meshes.get(await renderer.pick(this.camera,this.lighting,this.batches.values(),this.frameGraph,x*this.canvas.width/this.canvas.clientWidth,y*this.canvas.height/this.canvas.clientHeight)??-1)??null;
+    const mesh=picker?await picker.onPick!(x,y):this.meshes.get(await renderer.pick(this.camera,this.lighting,this.batches.values(),this.frameGraph,x*this.canvas.width/w,y*this.canvas.height/h)??-1)??null;
     return this.renderer===renderer&&this.revision===revision?mesh:null;
   }
   onFrame(callback:FrameCallback):()=>void {this.callbacks.add(callback);return()=>{this.callbacks.delete(callback);};}
