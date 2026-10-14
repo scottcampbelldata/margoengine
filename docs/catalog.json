@@ -271,6 +271,21 @@
     ]
   },
   {
+    "id": "cameras",
+    "title": "Cameras",
+    "package": "@margoengine/cameras",
+    "version": "0.1.0",
+    "published": false,
+    "description": "Orthographic projection and exactly vertical (top-down) views for the core camera, with matching culling and picking.",
+    "requirements": "Core ^0.1.0 || ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "cameras",
+    "install": "npm install @margoengine/core@0.1.0 @margoengine/cameras@0.1.0",
+    "imports": "import { CameraProjection } from '@margoengine/cameras';",
+    "exports": [
+      "CameraProjection"
+    ]
+  },
+  {
     "id": "cinematic",
     "title": "Cinematic",
     "package": "@margoengine/cinematic",

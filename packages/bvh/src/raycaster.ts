@@ -102,15 +102,16 @@ export class Raycaster {
   /**
    * Ray through normalized device coordinates (x right, y up, both -1..1) by inverting `camera.matrix`, which must be
    * current (the engine updates it every render; `setFromEngine` updates it for you). `webgpu` selects WebGPU's reversed-Z
-   * clip depth (near 1, far 0) instead of WebGL's -1..1. The origin is the camera position.
+   * clip depth (near 1, far 0) instead of WebGL's -1..1. The origin is the camera position, or the near-plane point for
+   * an orthographic matrix (e.g. from `@margoengine/cameras`), whose rays are parallel.
    */
   setFromCamera(coords: ArrayLike<number>, camera: Camera, webgpu = true): this {
-    const inverse = invert(camera.matrix);
+    const m = camera.matrix, inverse = invert(m);
     if (!inverse) throw new RangeError('Camera matrix is singular');
     const x = coords[0], y = coords[1];
     if (!Number.isFinite(x) || !Number.isFinite(y)) throw new RangeError('Invalid device coordinates');
     const near = unproject(inverse, x, y, webgpu ? 1 : -1), far = unproject(inverse, x, y, webgpu ? 0 : 1);
-    return this.set(camera.position, [far[0] - near[0], far[1] - near[1], far[2] - near[2]]);
+    return this.set(!m[3] && !m[7] && !m[11] ? near : camera.position, [far[0] - near[0], far[1] - near[1], far[2] - near[2]]);
   }
 
   /** Ray through a canvas point in CSS pixels (as `engine.pick` takes), using the engine camera and backend. */
