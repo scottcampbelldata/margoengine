@@ -107,6 +107,15 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       depth bias via lines, instanced per part, no z-fighting; silhouettes later.
    c. Exploded view and isolation driven from GPU storage buffers (check what ExplodedView does today).
    d. STEP/IGES load cost: measure the OCCT Wasm payload and init time; look for a lighter path.
+   f. Specialized pipelines instead of uber-shaders. The cost of one do-everything shader is register pressure: the
+      compiler reserves registers for the worst path, cutting how many threads an integrated GPU runs at once.
+      (Branches on per-draw uniforms do not diverge; that part of the usual argument is wrong.) Plan: audit every
+      pipeline (core PBR, gltf-pro standard/physical, materials modes, machinery sections, shader nodes) for unused
+      paths; define four archetypes (cad-basic: colour/metal/rough + key light + IBL; cad-unlit: caps, axes, handles;
+      cad-edges: lines with depth bias, no lighting; pbr-advanced: clearcoat/transmission/sheen for the few parts that
+      need it); use WebGPU pipeline-overridable constants (`override`) for small toggles such as clipping, fog and IBL
+      instead of runtime branches or string patches. Measure GPU time per archetype on the 50k-part scene before and
+      after; keep only what measures faster. Core's shader is frozen and already minimal.
    e. A CAD launch demo (large assembly, sections, edges, measurement, ortho views) and an honest comparison page.
 2. Dedupe: two particle systems (creative GPUParticles vs vfx), two bloom paths (post Bloom vs creative
    PostProcessing), three sky implementations (sky, scenery, creative atmosphere).
