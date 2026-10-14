@@ -61,7 +61,7 @@ const contracts = [
   ['materials/src/index.ts', 'gltf', /textureSample\((baseMap|mrMap|aoMap|emissiveMap),(\w+),(uv\(i,f\.coords[AB]\.[xyzw]\))\)/g],
   ['materials/src/index.ts', 'gltf', /textureSample\(normalMap,normalSampler,(uv\(i,f\.coordsA\.z\))\)\.xyz\*2-1/],
   ['materials/src/index.ts', 'gltf', /@fragment fn fragment\([^{]*\{\s*let s=surface\(i,front\);/],
-  ['shader/src/material.ts', 'gltf', 'if(!facing&&f.settings.z<0.5){discard;}'],
+  ['shader/src/material.ts', 'gltf', 'if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}'],
   ['shader/src/material.ts', 'gltf', 'let p=f.model*vec4f(i.position.xyz,1);'],
   ['shader/src/material.ts', 'gltf', /(struct Out \{[^}]*?)\n\}/],
   ['lod/src/imposter.ts', 'gltf', /@fragment fn fragment\([\s\S]*?let s=surface\(i,front\);/],

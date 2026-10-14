@@ -1,4 +1,7 @@
 import {acesShader} from '../../shared/aces.js';
+// margoFaceTest/margoAlphaTest are pipeline constants (HANDOFF 1e.f): gltf-pro turns them off where they can never discard
+// (back faces are culled; only MASK materials alpha-test), because any discard in the shader costs early depth testing
+// (0.85 -> 0.52 ms GPU, full-screen DamagedHelmet, Arc 140V).
 export const pbrShader = /* wgsl */`
 ${acesShader}
 struct Frame {
@@ -7,6 +10,8 @@ struct Frame {
   settings:vec4f, coordsA:vec4f, coordsB:vec4f, ext:vec4f, uvt:array<vec4f,26>, coat:vec4f, specular:vec4f, sheen:vec4f
 }
 @group(0) @binding(0) var<uniform> f:Frame;
+override margoFaceTest:bool=true;
+override margoAlphaTest:bool=true;
 @group(1) @binding(0) var baseMap:texture_2d<f32>;
 @group(1) @binding(1) var baseSampler:sampler;
 @group(1) @binding(2) var mrMap:texture_2d<f32>;
@@ -52,8 +57,8 @@ fn surface(i:Out,front:bool)->Surface {
     let scale=inverseSqrt(max(max(dot(t,t),dot(b,b)),0.000001)); t*=scale; b*=scale;
   } else {t=normalize(t); b=normalize(cross(n,t))*i.tangent.w;}
   s.n=normalize(t*sampledNormal.x*f.factors.z+b*sampledNormal.y*f.factors.z+n*sampledNormal.z);
-  if(!facing&&f.settings.z<0.5){discard;}
-  if(f.settings.x>0.5&&f.settings.x<1.5&&s.base.a<f.settings.y){discard;}
+  if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}
+  if(margoAlphaTest&&f.settings.x>0.5&&f.settings.x<1.5&&s.base.a<f.settings.y){discard;}
   return s;
 }
 fn ambient(s:Surface)->vec3f {
@@ -121,11 +126,11 @@ export const physicalShader = (): string => physical ??= patch(pbrShader, [
   ['emissive:vec3f}', 'emissive:vec3f, f0:vec3f, tr:f32, cn:vec3f, cc:f32, cr:f32, sh:vec4f}'],
   ['var emissiveSampler:sampler;', 'var emissiveSampler:sampler;\n' + physicalMaps.map((name, i) => `@group(1) @binding(${10 + i * 2}) var ${name}Map:texture_2d<f32>;\n@group(1) @binding(${11 + i * 2}) var ${name}Sampler:sampler;`).join('\n')],
   // Dielectric F0 from IOR and KHR_materials_specular, transmission weight, clearcoat normal and layer factors.
-  ['  if(!facing&&f.settings.z<0.5){discard;}', `  let ior=(f.ext.y-1)/(f.ext.y+1); s.f0=min(ior*ior*f.specular.rgb*${sample('specularColor')}.rgb,vec3f(1))*f.specular.w*${sample('specular')}.a;
+  ['  if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}', `  let ior=(f.ext.y-1)/(f.ext.y+1); s.f0=min(ior*ior*f.specular.rgb*${sample('specularColor')}.rgb,vec3f(1))*f.specular.w*${sample('specular')}.a;
   s.tr=f.coat.w*${sample('transmission')}.r; let cm=${sample('clearcoatNormal')}.xyz*2-1; s.cn=normalize(t*cm.x*f.coat.z+b*cm.y*f.coat.z+n*cm.z);
   s.cc=f.coat.x*${sample('clearcoat')}.r; s.cr=clamp(f.coat.y*${sample('clearcoatRoughness')}.g,0.045,1.0);
   s.sh=vec4f(f.sheen.rgb*${sample('sheenColor')}.rgb,max(f.sheen.w*${sample('sheenRoughness')}.a,0.07));
-  if(!facing&&f.settings.z<0.5){discard;}`],
+  if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}`],
   ['mix(vec3f(0.04),s.base.rgb,s.metal)', 'mix(s.f0,s.base.rgb,s.metal)'],
   ['s.base.rgb*(1-s.metal)+', 's.base.rgb*(1-s.metal)*(1-s.tr)+'],
   ['(1-s.metal)*s.base.rgb/', '(1-s.metal)*(1-s.tr)*s.base.rgb/'],

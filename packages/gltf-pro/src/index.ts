@@ -292,13 +292,14 @@ export class PBRModel implements EnginePlugin {
       const cull:GPUCullMode=m.settings[2]<0.5?(v[97]>0?'back':'front'):'none';
       const state:PBRRenderState|undefined=mode==='beauty'?m.renderState:undefined;
       // Shader text enters the key as a small id: the code strings are cached objects, so the lookup hashes them once.
-      let id=this.codes.get(code);if(id===undefined){if(this.codes.size>=256)this.codes.clear();this.codes.set(code,id=this.codeCount++);}
-      const transmit=!!m.tint,blend=blended(m),key=mode+':'+c.format+':'+blend+transmit+':'+cull+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+':'+entry+':'+id+(state?JSON.stringify(state):'');
+      // Discard only where it can happen: back faces are culled by the pipeline and only MASK materials alpha-test.
+      const mask=+(m.settings[0]===1);let id=this.codes.get(code);if(id===undefined){if(this.codes.size>=256)this.codes.clear();this.codes.set(code,id=this.codeCount++);}
+      const transmit=!!m.tint,blend=blended(m),key=mode+':'+c.format+':'+blend+transmit+':'+cull+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+':'+entry+':'+id+':'+mask+(state?JSON.stringify(state):'');
       let pipeline=this.pipelines.get(key);
       if(!pipeline) {
         const module=c.device.createShaderModule({code}),format=mode==='beauty'?c.format:'rgba16float';
         pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:80,attributes:Array.from({length:5},(_,i)=>({shaderLocation:i,offset:i*16,format:'float32x4' as const}))}]},
-          fragment:{module,entryPoint:entry,targets:[{format,blend:state?.blend!==undefined?state.blend??undefined:blend&&mode!=='gbuffer'?{color:transmit?{srcFactor:'one',dstFactor:'constant'}:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
+          fragment:{module,entryPoint:entry,constants:{margoFaceTest:0,margoAlphaTest:mask},targets:[{format,blend:state?.blend!==undefined?state.blend??undefined:blend&&mode!=='gbuffer'?{color:transmit?{srcFactor:'one',dstFactor:'constant'}:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
           multisample:c.descriptor.multisample,primitive:{cullMode:cull},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:state?.depthWrite??(mode==='beauty'&&!blend),depthCompare:state?.depthCompare??(mode==='beauty'?'greater-equal':'equal')}});
         this.pipelines.set(key,pipeline);
       }
