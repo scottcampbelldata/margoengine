@@ -1,3 +1,4 @@
+import {SRGBToLinear as linear} from '@margoengine/math/color';
 export interface SplatData {positions:Float32Array;covariances:Float32Array;colors:Float32Array;sphericalHarmonics?:Float32Array}
 export function validateSplats(data:SplatData):number {
   if(!data||!(data.positions instanceof Float32Array)||!(data.covariances instanceof Float32Array)||!(data.colors instanceof Float32Array))throw new TypeError('Splat data must use Float32 arrays');
@@ -15,7 +16,6 @@ export function parseSplat(input:ArrayBuffer|ArrayBufferView):SplatData {
   const bytes=input instanceof ArrayBuffer?new Uint8Array(input):new Uint8Array(input.buffer,input.byteOffset,input.byteLength),count=bytes.length/32;
   if(!Number.isInteger(count)||count<1||count>3_000_000)throw new RangeError('Invalid .splat byte length');
   const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),positions=new Float32Array(count*3),covariances=new Float32Array(count*6),colors=new Float32Array(count*4);
-  const linear=(c:number)=>c<=0.04045?c/12.92:((c+0.055)/1.055)**2.4;
   for(let i=0;i<count;i++){
     const at=i*32;for(let j=0;j<3;j++)positions[i*3+j]=view.getFloat32(at+j*4,true);
     const sx=view.getFloat32(at+12,true),sy=view.getFloat32(at+16,true),sz=view.getFloat32(at+20,true);

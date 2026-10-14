@@ -63,7 +63,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/shader | `.` 140 | 11 | 47 |  |
 | @margoengine/shadows | `.` 7 | 1 |  | 6,067 |
 | @margoengine/sky | `.` 8, `./base` 9, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1 | 94 |  | 10,173 |
-| @margoengine/splats | `.` 4, `./data` 3 |  |  | 6,145 |
+| @margoengine/splats | `.` 4, `./data` 3 |  |  | 6,147 |
 | @margoengine/splines | `.` 3 |  |  |  |
 | @margoengine/staging | `.` 4 |  |  |  |
 | @margoengine/stats | `.` 3 |  |  | 3,268 |
