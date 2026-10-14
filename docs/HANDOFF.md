@@ -174,8 +174,15 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    11.3 ms dominate. Core hot spots: (1) kernel recomputes every entity every frame, even static ones (~150 ns each);
    (2) JS batch collection walks every mesh every frame; (3) the whole instance buffer is uploaded every frame;
    (4) engine.pick re-renders the scene and creates a pipeline per pick (63.5 ms at 90k); (5) removing a mesh scans
-   all meshes (disposing a 90k assembly takes minutes); (6) the 100,000-entity cap. A prototype of static-scene fast
-   paths in core is being measured on a scratch branch (bytes and FPS); nothing merges without Scott's approval.
+   all meshes (disposing a 90k assembly takes minutes); (6) the 100,000-entity cap. PROTOTYPE DONE, AWAITING SCOTT:
+   branch `worktree-agent-a46261c57b837ecd0` (base 7980c86, one commit per step; needs a rebase onto the current tip,
+   expect conflicts in selection and scripts/build-modern.js). Core+stage 18,681 -> 19,921 with all five steps:
+   s1 kernel skips unchanged entities (+481; 90k tick 16.5 -> 4.4 ms), s2 reuse last frame's instances (+252),
+   s3 upload only changed ranges (+96), s4 pick reuses pipeline + draws only parts under the pixel (+406; 90k pick
+   57.6 -> ~12 ms), s5 fast removal scan (+5; dispose 90k 48 s -> 20 ms). 90k still: 27 -> 39 FPS; 50k 1% moving:
+   45 -> 103 FPS; 50k orbit 46 -> 79 FPS; 90k orbit only 26 -> 30 (culling changes each frame; GPU culling 1f.a is
+   the route). Costs: +66 B per kernel entity slot, instance-buffer contract (writers must not touch core's buffers),
+   rebuilt Wasm kernel. Raw JSON examples/package-benchmarks/cad/results-s0..s5-*.json on that branch.
 1f. Beat-three.js additions (Scott's list, 2026-10-14; checked against the code, modified where noted):
    a. GPU occlusion culling (Hi-Z depth pyramid + indirect draws) in a new optional package. Core's DrawOptions already
       accept `indirect` per batch, so start there; if a core hook turns out to be needed, bring it to Scott first.
