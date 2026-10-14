@@ -135,6 +135,33 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       instead of runtime branches or string patches. Measure GPU time per archetype on the 50k-part scene before and
       after; keep only what measures faster. Core's shader is frozen and already minimal.
    e. A CAD launch demo (large assembly, sections, edges, measurement, ortho views) and an honest comparison page.
+1f. Beat-three.js additions (Scott's list, 2026-10-14; checked against the code, modified where noted):
+   a. GPU occlusion culling (Hi-Z depth pyramid + indirect draws) in a new optional package. Core's DrawOptions already
+      accept `indirect` per batch, so start there; if a core hook turns out to be needed, bring it to Scott first.
+   b. Render-bundle replay: measure first. Core already draws one instanced call per distinct geometry, so encoding is
+      small when parts share shapes; bundles matter for assemblies with many unique shapes. Use the CAD benchmark's
+      encoding numbers to decide.
+   c. GPU timing overlay: core no longer requests `timestamp-query` (removed to stay under the gate). Options: a tiny
+      core option to request extra device features (a few bytes; Scott decides) or devtools without GPU pass timing.
+      The Stats package already has the profiler and overlay; extend it rather than a new devtools package.
+   d. Contact shadows (ground-plane depth blur) in a new staging package; auto-framing exists already (core
+      `camera.fitToBoundingBox` with duration and padding) - add orthographic support in @margoengine/cameras.
+   e. Outlines: selection already uses jump-flood outlines; add dashed x-ray outlines for hidden parts and glTF/model
+      support (after the picking worker merges).
+   f. Text: @margoengine/text is already GPU SDF text (not DOM). Upgrade to MSDF only if corner sharpness at large
+      sizes needs it; add instanced dimension callouts that stay sharp at orthographic zoom, tied to machinery's
+      annotations.
+   g. ViewCube (snap to top/front/right/iso, perspective/orthographic toggle) - new; transform gizmos already exist in
+      controls/gizmo, check they keep constant screen size in orthographic.
+   h. Shader nodes: fragment `discard` and compute atomics (small, high value).
+   i. Shadows: cascades already snap to texels (shadows/src/cascades.ts); verify there is no shimmer when panning in
+      orthographic CAD views rather than re-implementing.
+   j. Workers and OffscreenCanvas: move FBX/USD/glTF parsing into workers with transferable buffers (machinery CAD and
+      decoders already use workers); test core on an OffscreenCanvas (engine sizing falls back to canvas.width, so
+      it may already work).
+   k. docs/from-threejs.md: side-by-side mapping of common three.js code to Margo.
+   l. One-command start: `npm create margo` (or a StackBlitz template) opening a 60 FPS scene with environment
+      lighting, orbit controls and the stats overlay; build on the existing starter-vite.
 2. Dedupe: two particle systems (creative GPUParticles vs vfx), two bloom paths (post Bloom vs creative
    PostProcessing), three sky implementations (sky, scenery, creative atmosphere).
 3. Replace three.js inside fbx and usdz with native parsers [running].
