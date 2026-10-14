@@ -355,7 +355,36 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    the commit message; -6,017 gzip across the five packages).
 3. Replace three.js inside fbx and usdz with native parsers [running].
 4. Every remaining PARTIAL/MISSING gap in docs/threejs-parity.md that does not need a core change.
-5. Math consolidation: fold the duplicated helpers into `@margoengine/math` (list from the math worker:
+5. [DONE, commits "Math consolidation 1/n..9/n"] Math consolidation. `@margoengine/math` gained plain-array entries the
+   packages now share, each bundled into the package that uses it (devDependency; a runtime dependency of the
+   tsc-emitted bvh, exporters and loaders): `mat4` (multiplyMatrices, invertMatrix, invertMatrixStable = the old
+   shared/math invert, composeMatrix), `quat` (eulerToQuaternion, multiplyQuaternions), `vec3` (add, sub, scale, dot,
+   cross, length, normalize), `validate` (finiteVector), `color` parseColor + ColorInput, MathUtils.createLcgRandom.
+   packages/shared/math.js is deleted. Users: animation, animator, bvh, clustered, controls, creative, environment,
+   exporters, gltf-pro, labels, lines, loaders, machinery, physics, points, post, scatter, shadows, sky, splats, taa,
+   terrain, text, usdz, vfx. Proof: `node examples/package-benchmarks/proofs/math-consolidation.proof.js` builds every
+   replaced copy from 2484971 and compares Object.is per element on random + special inputs (±0, NaN, ±Infinity,
+   subnormals, singular matrices; ~2.0M checks); `--time` times the hot paths (all within noise). Public signatures kept
+   (bvh/points/animation/labels/physics wrap or alias; physics `eulerToQuat`, points `random`/`multiply`,
+   lines/points/text `parseColor` now print as `const` in api/). Only interface change: invertMatrixStable takes
+   (m, out, workspace?) and returns out/null (old shared invert: (out, m, offset, workspace), boolean; every caller
+   passed offset 0 and tested truthiness). Gzip (compact min, math inlined, vs 2484971): most within ±10; points +42
+   (three public-API adapters + createRandom's shape), controls +26 and bvh +23 (wrappers; controls raw +4, the rest is
+   gzip placement), environment -111, labels -30, post/sky/taa/machinery/creative -7..-31. Core + stage 18,681.
+   Deliberately left (not bit-identical or not duplicates): text's compose (x*(y+y) form; differs from 2*(x*y) on
+   under/overflow) and math's own Matrix4/Quaternion class code; every slerp (physics, animation, animator, net, fbx
+   differ in threshold/clamp/renormalize); controls invertAffine and transformPoint, lines' projective transformPoint,
+   bvh transformPoint/frustumPlanes/normalize(x,y,z) (one user or different shape; a controls wrapper would cost more
+   than its copy); exporters decompose (only copy besides fbx's, which differs); loaders/threemf compose (4x3 row-vector
+   product) and parseColor (#rrggbbaa, no linearize); usdz xformOp compose; environment srgbColor (sRGB out, different
+   validation); fbx sRGB decode (rounded reciprocals); geometry's generic vector helpers (dot starts at +0, length is
+   sqrt(dot), normalize copies on zero); audio normalize (fallback); lines/navmesh 2D helpers; lines vs text finiteArray
+   (different checks/errors); procedural xorshift + hash; ray tests (controls ray-plane, selection clip-space sphere,
+   bvh Moller-Trumbore are different tests); core/geometry colour (core frozen). For the 1.0 API review: `Vec3`,
+   `ColorInput`, `Quat` stay declared per package (types are free; re-exporting math's would make bundled packages'
+   .d.ts depend on math); animation `multiplyMatrices(out, a, b)` vs bvh `multiplyMatrices(a, b, out?)` disagree on
+   argument order.
+   Original list (from the math worker:
    shared/math invert+finiteVector users; mat4 multiply in animation, bvh, points, text, exporters, loaders/usdz, usdz;
    mat4 invert in shared, bvh, lines, environment; transformPoint in bvh, lines, controls; compose/decompose in
    exporters, text, loaders/threemf, usdz; euler->quat/slerp in physics, text, controls; frustum planes in bvh, points;
@@ -415,7 +444,7 @@ if intended, run `npm run api:update` after build:packages and commit the `api/`
     `Engine`/`Mesh`/`EnginePlugin` are different types from `core/extension`'s same names, and root exports both
     `Engine` and `EngineKernel`; 305 types used by exports but not exported (e.g. `Renderer` for `EngineOptions.fallback`,
     `SkyBase`/`VFXBase`); `Vec3` declared in 8 packages (mutable in bvh/geometry/lod, readonly elsewhere) and other
-    duplicates (`parseColor`, `smoothstep`, `Ray`, `HeightField`, `TextureSource`, `RaycastOptions`, two
+    duplicates (`parseColor` [one implementation since queue item 5: lines/points/text alias math's], `smoothstep`, `Ray`, `HeightField`, `TextureSource`, `RaycastOptions`, two
     `loadGLTF`/`parseUSDZ`); thin re-export packages (gizmo, html, usdz-export, toon); 48 `attach` vs 14 `create`;
     `SkyMoonConfig`/`SdfParams` break the `*Options` rule. Fixed: post and quality .d.ts pointed into ../../shared
     (broken after npm install); `tests/dts-self-contained.test.js` now guards every package.
