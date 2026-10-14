@@ -198,7 +198,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    l. One-command start: `npm create margo` (or a StackBlitz template) opening a 60 FPS scene with environment
       lighting, orbit controls and the stats overlay; build on the existing starter-vite.
 1g. Modernization (from the 2026-10-14 source scan; no legacy browser APIs, deprecated WebGPU calls or old WGSL found):
-   a. Drop the `webkitAudioContext` fallback in packages/audio/src/listener.ts (every WebGPU browser has AudioContext).
+   a. [DONE] Drop the `webkitAudioContext` fallback in packages/audio/src/listener.ts (every WebGPU browser has AudioContext).
    b. Replace the `as any` casts with real types (decoders codec globals may stay; exporters/scene.ts, lod/index.ts,
       materials/index.ts, shader/node.ts, usdz/crate.ts).
    c. Replace WGSL string patching (shadows, tonemap, toon, environment, materials, shader) with override constants,
