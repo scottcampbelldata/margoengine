@@ -5,7 +5,7 @@ import {heightfieldGeometry} from '@margoengine/terrain';
 import {Scatter, type GroundBounds} from '@margoengine/scatter';
 import {Line, Lines} from '@margoengine/lines';
 import {terrainHeight, ISLAND_SIZE} from './scene.js';
-import {sceneSamples} from '../../../packages/shared/quality.js';
+import {sceneSamples} from '@margoengine/quality';
 import {MATERIALS} from './procedural/meshes.ts';
 import {CABIN_EXCLUSIONS} from './procedural/placement.ts';
 
