@@ -1,6 +1,6 @@
 {
   "benchmark": "textured-instancing-gpu",
-  "recordedAt": "2026-10-14T20:04:30.837Z",
+  "recordedAt": "2026-10-14T21:05:54.963Z",
   "hardware": {
     "vendor": "intel",
     "architecture": "xe-2lpg",
@@ -73,70 +73,70 @@
     {
       "count": 1000,
       "meshes": {
-        "cpuMs": 9.1,
-        "frameMs": 63.1,
+        "cpuMs": 15.2,
+        "frameMs": 73.5,
         "drawCalls": 1000,
         "errors": []
       },
       "instanced": {
-        "cpuMs": 0.5,
-        "frameMs": 4.1,
+        "cpuMs": 0.8,
+        "frameMs": 5.1,
         "drawCalls": 1,
         "errors": []
       },
-      "cpuSpeedup": 18.2,
-      "frameSpeedup": 15.4
+      "cpuSpeedup": 19,
+      "frameSpeedup": 14.4
     },
     {
       "count": 2500,
       "meshes": {
-        "cpuMs": 15.5,
-        "frameMs": 138.8,
+        "cpuMs": 29,
+        "frameMs": 161.9,
         "drawCalls": 2500,
         "errors": []
       },
       "instanced": {
-        "cpuMs": 0.4,
-        "frameMs": 4.3,
+        "cpuMs": 0.6,
+        "frameMs": 4.1,
         "drawCalls": 1,
         "errors": []
       },
-      "cpuSpeedup": 38.8,
-      "frameSpeedup": 32.3
+      "cpuSpeedup": 48.3,
+      "frameSpeedup": 39.5
     },
     {
       "count": 5000,
       "meshes": {
-        "cpuMs": 32.5,
-        "frameMs": 285.9,
+        "cpuMs": 55,
+        "frameMs": 332.8,
         "drawCalls": 5000,
         "errors": []
       },
       "instanced": {
-        "cpuMs": 0.4,
-        "frameMs": 4.3,
-        "drawCalls": 1,
-        "errors": []
-      },
-      "cpuSpeedup": 81.3,
-      "frameSpeedup": 66.5
-    },
-    {
-      "count": 10000,
-      "meshes": {
-        "cpuMs": 69.9,
-        "frameMs": 562.2,
-        "drawCalls": 10000,
-        "errors": []
-      },
-      "instanced": {
-        "cpuMs": 0.5,
+        "cpuMs": 0.7,
         "frameMs": 4.2,
         "drawCalls": 1,
         "errors": []
       },
-      "cpuSpeedup": 139.8,
-      "frameSpeedup": 133.9
+      "cpuSpeedup": 78.6,
+      "frameSpeedup": 79.2
+    },
+    {
+      "count": 10000,
+      "meshes": {
+        "cpuMs": 126.5,
+        "frameMs": 659.3,
+        "drawCalls": 10000,
+        "errors": []
+      },
+      "instanced": {
+        "cpuMs": 0.6,
+        "frameMs": 4.7,
+        "drawCalls": 1,
+        "errors": []
+      },
+      "cpuSpeedup": 210.8,
+      "frameSpeedup": 140.3
     }
   ]
 }
