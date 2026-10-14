@@ -1,3 +1,5 @@
+/// <reference lib="esnext.disposable" preserve="true" />
+import type {EngineKernel} from '@margoengine/core';
 import {PbrMaterial,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type DrawOptions} from '@margoengine/core/extension';
 import {invertMatrixStable} from '@margoengine/math/mat4';
 import {declaration} from './section-uniform.js';
@@ -33,6 +35,8 @@ export class SectionPlanes implements EnginePlugin {
   private referencePass?:GPURenderPassDescriptor;private maskPass?:GPURenderPassDescriptor;
   private stencil?:GPUTexture;private mask?:GPUTexture;private stencilView?:GPUTextureView;private maskView?:GPUTextureView;private width=0;private height=0;
   private readonly backDraw:DrawOptions={clear:false,stencilClear:0};private readonly frontDraw:DrawOptions={clear:false};
+  /** Same as `engine.use(new SectionPlanes(...))`; returns the SectionPlanes. */
+  static attach(engine: EngineKernel, options: SectionOptions): SectionPlanes {const value = new SectionPlanes(options); engine.use(value); return value;}
   constructor(readonly options:SectionOptions){this.cap=options.cap??true;this.hatch=options.hatch??8;this.color=new PbrMaterial({color:options.color??'#f2a65e'}).data.slice(0,4);this.validate();}
   private validate():void {if(!this.options.planes.length||this.options.planes.length>6||this.buffers.length&&this.options.planes.length!==this.buffers.length-1||!Number.isFinite(this.hatch)||this.hatch<0)throw new RangeError('Invalid section options or changed plane count');for(const p of this.options.planes)if(p.length!==4||!p.every(v=>typeof v==='number'&&Number.isFinite(Math.fround(v)))||!Math.hypot(p[0],p[1],p[2]))throw new TypeError('Invalid section plane');}
   setup(engine:Engine):void {if(!engine.gpu)throw new Error('SectionPlanes requires WebGPU');if(this.cap&&!engine.gpu.features.has('depth32float-stencil8'))throw new Error('Solid caps require depth32float-stencil8');this.engine=engine;for(let i=0;i<=this.options.planes.length;i++){const buffer=engine.gpu.createBuffer({size:256,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});this.buffers.push(buffer);this.rows.push(new Float32Array(64));this.bindings.push([{binding:1,resource:{buffer}}]);}}
@@ -86,4 +90,6 @@ export class SectionPlanes implements EnginePlugin {
   }
   onDeviceRestored(engine:Engine):void {this.dispose();this.setup(engine);}
   dispose():void {for(const buffer of this.buffers)buffer.destroy();this.stencil?.destroy();this.mask?.destroy();this.stencil=this.mask=undefined;this.stencilView=this.maskView=undefined;this.width=this.height=0;this.buffers=[];this.rows=[];this.bindings=[];this.pipelines.clear();this.warming.clear();this.engine=undefined;this.pass=this.referencePass=this.maskPass=undefined;this.backDraw.pipeline=this.frontDraw.pipeline=undefined;this.backDraw.bindings=this.frontDraw.bindings=undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

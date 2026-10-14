@@ -1,3 +1,5 @@
+/// <reference lib="esnext.disposable" preserve="true" />
+import type {EngineKernel} from '@margoengine/core';
 import type {Engine,EnginePlugin} from '@margoengine/core/extension';
 import {Kinematics} from './kinematics.js';
 import {machineryMemory} from './runtime.js';
@@ -6,6 +8,8 @@ export class TelemetryChannel implements EnginePlugin {
   readonly name='telemetry-channel';private engine?:Engine;private frames=0;private timestamp=0;private localOrigin=0;private elapsed=0;private span=0;private socket?:WebSocket;
   private readonly seen:Uint8Array;private readonly incoming:Float32Array;private readonly output:Float32Array;
   private constructor(readonly kinematics:Kinematics,readonly options:TelemetryOptions,private readonly memory:Awaited<ReturnType<typeof machineryMemory>>,private readonly ring:Float32Array){this.seen=new Uint8Array(kinematics.jointCount);this.incoming=new Float32Array(kinematics.jointCount);this.output=ring.subarray(4*kinematics.jointCount);}
+  /** `engine.use(await TelemetryChannel.create(kinematics, options))` (attach Kinematics first); resolves to the attached channel. */
+  static async attach(engine:EngineKernel,kinematics:Kinematics,options?:TelemetryOptions):Promise<TelemetryChannel> {const value=await TelemetryChannel.create(kinematics,options);engine.use(value);return value;}
   static async create(kinematics:Kinematics,options:TelemetryOptions={}):Promise<TelemetryChannel> {if(!kinematics.jointCount||!Number.isFinite(options.delay??100)||(options.delay??100)<0)throw new RangeError('Invalid telemetry options');const memory=await machineryMemory(kinematics.jointCount*20);return new TelemetryChannel(kinematics,options,memory,new Float32Array(memory.buffer,memory.ptr,kinematics.jointCount*5));}
   setup(engine:Engine):void {if(!engine.hasPlugin(this.kinematics.name)||!this.kinematics.attachedTo(engine))throw new Error('Attach Kinematics before telemetry');for(let i=0;i<this.kinematics.jointCount;i++)this.kinematics.value(i);this.kinematics.setExternalControl(engine);this.engine=engine;}
   push(input:ArrayBuffer|ArrayBufferView,receivedAt=performance.now()):boolean {
@@ -26,4 +30,6 @@ export class TelemetryChannel implements EnginePlugin {
   connect(socket:WebSocket):void {this.socket?.removeEventListener('message',this.message);this.reset();socket.binaryType='arraybuffer';socket.addEventListener('message',this.message);this.socket=socket;}
   onPreUpdate():void {this.sample();}
   dispose():void {this.socket?.removeEventListener('message',this.message);this.socket=undefined;if(this.engine&&this.kinematics.attachedTo(this.engine))this.kinematics.setExternalControl(null);this.engine=undefined;this.reset();}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

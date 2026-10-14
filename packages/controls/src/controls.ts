@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {Camera, EngineKernel} from '@margoengine/core';
 
 /** The subset of an `HTMLElement` (normally the engine canvas) the controls use. Tests pass a plain object. */
@@ -58,6 +59,12 @@ export abstract class Controls extends EventDispatcher {
   private pluginName: string | null = null;
   private disposed = false;
 
+  /**
+   * Creates the controls on `engine` (preferred over `new OrbitControls(engine, ...)`): they update every frame and
+   * listen on `element` (default the engine canvas). `OrbitControls.attach(engine)`; the constructor stays for a bare Camera.
+   */
+  static attach<T extends Controls, A extends unknown[]>(this: new (engine: EngineKernel, ...args: A) => T, engine: EngineKernel, ...args: A): T {return new this(engine, ...args);}
+
   constructor(source: Camera | EngineKernel, element?: ControlElement | null, autoUpdate = true) {
     super();
     if (isEngine(source)) {this.engine = source; this.camera = source.camera; element = element === undefined ? source.canvas as unknown as ControlElement : element;}
@@ -109,6 +116,8 @@ export abstract class Controls extends EventDispatcher {
     const name = this.pluginName; this.pluginName = null;
     if (name && this.engine && !this.engine.disposed && this.engine.hasPlugin(name)) this.engine.removePlugin(name);
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 
   /** Pointer position in CSS pixels relative to the element. */
   protected local(event: {clientX: number; clientY: number}): {x: number; y: number} {

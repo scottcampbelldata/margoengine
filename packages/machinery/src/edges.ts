@@ -1,3 +1,5 @@
+/// <reference lib="esnext.disposable" preserve="true" />
+import type {EngineKernel} from '@margoengine/core';
 import {PbrMaterial,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type Geometry,type Mesh} from '@margoengine/core/extension';
 import {edgesGeometry} from '@margoengine/geometry';
 import {declaration} from './section-uniform.js';
@@ -75,6 +77,8 @@ export class FeatureEdges implements EnginePlugin {
   private readonly pipelines=new Map<string,GPURenderPipeline>();private cull?:GPUComputePipeline;private readonly drawn:[Shape,GPUBindGroup][]=[];private readonly argsData=new Uint32Array(5);private layouts?:{plain:GPUBindGroupLayout;section:GPUBindGroupLayout};
   private readonly colorAttachment:GPURenderPassColorAttachment={view:undefined!,loadOp:'load',storeOp:'store'};
   private readonly descriptor:GPURenderPassDescriptor={colorAttachments:[this.colorAttachment],depthStencilAttachment:{view:undefined!,depthReadOnly:true,stencilReadOnly:true}};
+  /** Same as `engine.use(new FeatureEdges(...))`; returns the FeatureEdges. */
+  static attach(engine: EngineKernel, options?: FeatureEdgeOptions): FeatureEdges {const value = new FeatureEdges(options); engine.use(value); return value;}
   constructor({angle=30,width=1.5,color='#14181d',depthBias=256,minRadius=6,order=6}:FeatureEdgeOptions={}){
     if(!Number.isFinite(angle)||angle<0||angle>180||!(width>0&&width<=64)||!Number.isInteger(depthBias)||depthBias<0||!(minRadius>=0&&minRadius<1e6)||!Number.isFinite(order))throw new RangeError('Invalid feature edge options');
     this.angle=angle;this.width=width;this.bias=depthBias;this.order=order;this.minRadius=minRadius;this.color=new PbrMaterial({color}).data.slice(0,4);
@@ -131,4 +135,6 @@ export class FeatureEdges implements EnginePlugin {
   }
   onDeviceRestored(engine:Engine):void {this.dispose();this.setup(engine);}
   dispose():void {for(const shape of this.shapes.values())this.release(shape);this.shapes.clear();this.uniform?.destroy();this.uniform=this.layouts=this.engine=this.cull=undefined;this.pipelines.clear();this.size=-1;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }
