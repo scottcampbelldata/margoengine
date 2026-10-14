@@ -9,12 +9,14 @@ Each effect alone owns its own scene capture, so alone they reject each other. `
 capture in array order, like three.js's EffectComposer:
 
 ```ts
+import {createStage} from 'margoengine';
 import {PostStack} from '@margoengine/post/stack';
 import {SSAO} from '@margoengine/post/ssao';
 import {Bloom} from '@margoengine/post/bloom';
 import {FXAA} from '@margoengine/post/fxaa';
 import {DOF} from '@margoengine/dof';
 import {Tonemap} from '@margoengine/tonemap';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 const stack = PostStack.attach(stage.engine, [new SSAO(), new DOF({focalDistance: 6}), new Bloom({strength: 0.6}), new Tonemap({curve: 'agx'}), new FXAA()]);
 // TAA wraps the stack: TAA.attach(stage.engine, {depth: () => stack.depthTexture});
 stack.dispose(); // also disposes its effects

@@ -34,7 +34,7 @@ Use a feature subpath for a static import or an on-demand `import()`:
 | `@margoengine/creative/planet` | `Planet` and planet option types |
 
 ```ts
-const {GPUParticles} = await import('@margoengine/creative/particles');
+const {Planet} = await import('@margoengine/creative/planet'); // loaded only when this line runs
 ```
 
 `GPUParticles({count, gravity, wind, size, curl, obstacles, sort, texture})` keeps `count` particles drifting

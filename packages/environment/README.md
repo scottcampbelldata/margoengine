@@ -27,11 +27,14 @@ engine.start();
 A plain color (or vertical gradient) background and fog, without any environment map:
 
 ```ts
+import {Engine} from '@margoengine/core';
+import {loadGLTF} from '@margoengine/gltf-pro';
 import {ColorBackground, Fog} from '@margoengine/environment';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
 engine.use(new ColorBackground({color: '#bcd4e6'}));          // scene.background = new Color(...)
 const fog = new Fog({color: '#bcd4e6', near: 10, far: 80});    // or {density: 0.02} for FogExp2; heightFalloff for height fog
 engine.use(fog);                                               // fogs core meshes; required (owns the GPU uniform)
-fog.applyTo(model);                                            // glTF-pro models, opaque and blended
+fog.applyTo(await loadGLTF(engine, '/helmet.glb'));            // glTF-pro models, opaque and blended
 fog.far = 120;                                                 // every option is a live property
 ```
 

@@ -3,7 +3,9 @@
 WebGPU atmospheric background with an analytical Preetham/Perez daytime sky and an Earth-based Bruneton-style precomputed Rayleigh/Mie model, an optional stylized night (stars, phased moon) and distance or height fog. This is Margo's one sky: scenery's `SkyMoon` is a midnight preset of it.
 
 ```ts
+import {Engine} from '@margoengine/core';
 import {Sky} from '@margoengine/sky';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
 const sky = Sky.attach(engine, {model: 'bruneton', hours: 12, timeScale: 1 / 3600});
 sky.options.hours = 18;
 ```
@@ -14,9 +16,11 @@ sky.options.hours = 18;
 `@margoengine/sky/base` and pass only the feature entries the scene uses as the second argument:
 
 ```ts
+import {Engine} from '@margoengine/core';
 import {Sky} from '@margoengine/sky/base';
 import {bruneton} from '@margoengine/sky/bruneton';
 import {clouds} from '@margoengine/sky/clouds';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
 const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {bruneton, clouds});
 ```
 
@@ -87,6 +91,9 @@ stars above 15° and a moon disc with phase, glow and size. The object is read e
 live controls.
 
 ```ts
+import {Engine} from '@margoengine/core';
+import {Sky} from '@margoengine/sky';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
 const sky = Sky.attach(engine, {hours: 0, timeScale: 0, night: {
   zenithColor: [0.015, 0.025, 0.065], horizonColor: [0.08, 0.09, 0.15], hazeDensity: 1,
   moonDirection: [0.4, 0.7, 0.5], moonSize: 0.038, moonPhase: 0.85, moonColor: [0.92, 0.95, 1],
@@ -107,7 +114,13 @@ replaces the separate preset moon; leave `lighting.moon` unset with it.
 For lightweight distance haze, provide sampleable reversed-Z scene depth:
 
 ```ts
-sky.options.fog = {depth: () => water.depthTexture, start: 45, density: 0.008};
+import {Engine} from '@margoengine/core';
+import {Sky} from '@margoengine/sky';
+import {Bloom} from '@margoengine/post/bloom';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const bloom = Bloom.attach(engine);          // or @margoengine/water's Water: () => water.depthTexture
+const sky = Sky.attach(engine);
+sky.options.fog = {depth: () => bloom.depthTexture, start: 45, density: 0.008};
 ```
 
 `start` is a clear distance in world meters (default 40); `density` is inverse
