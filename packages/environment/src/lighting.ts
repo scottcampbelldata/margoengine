@@ -101,9 +101,10 @@ export class EnvironmentLighting extends ShaderEffect {
   protected patch(source: string, group: number): string {
     let code = source;
     const ambient = source.replace(/fn ambient\(s:Surface\)->vec3f \{[^}]*\}/, 'fn ambient(s:Surface)->vec3f {return vec3f(0);}');
-    const lit = ambient.replace('+s.emissive;', `+s.emissive+${iblCall('s.n', 'v', 's.base.rgb', 's.metal', 's.roughness')}*s.occlusion;`);
+    // The IBL term is named `margoAmbient` (a convention, no import): post's SSAO finds it and occludes this light.
+    const lit = ambient.replace(/var color=([^;]+)\+s\.emissive;/, (_, terms: string) => `let margoAmbient=${iblCall('s.n', 'v', 's.base.rgb', 's.metal', 's.roughness')}*s.occlusion;var color=${terms}+s.emissive+margoAmbient;`);
     if (ambient !== source && lit !== ambient) code = lit;
-    else code = source.replace(/let linear=([^;]+);/, (_, terms: string) => `let linear=${terms.replace('frame.radiance.w', '0.0')}+${iblCall('n', 'v', 'i.color', 'i.material.y', 'i.material.x')};`);
+    else code = source.replace(/let linear=([^;]+);/, (_, terms: string) => `let margoAmbient=${iblCall('n', 'v', 'i.color', 'i.material.y', 'i.material.x')};let linear=${terms.replace('frame.radiance.w', '0.0')}+margoAmbient;`);
     if (code === source) return source;
     const b = (offset: number) => `@group(${group}) @binding(${IBL_BINDING + offset})`;
     return `${b(0)} var iblSpecular:texture_cube<f32>;\n${b(1)} var iblSampler:sampler;\n${b(2)} var iblBrdf:texture_2d<f32>;\n${b(3)} var<uniform> iblSh:array<vec4f,9>;\n${b(4)} var<uniform> iblParams:vec4f;\n${IBL_WGSL}\n${code}`;

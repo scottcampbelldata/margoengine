@@ -3,6 +3,7 @@ import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
 import {invert} from '../../shared/math.js';
 import {viewMatrix} from '../../shared/view.js';
+import {orthographic} from '../../shared/projection.js';
 import {fullscreen,render,group as bind} from '../../shared/gpu.js';
 import type {StackHost,StackStage,StageOutput} from '../../shared/stack.js';
 import {extractShader,ssaoShader,blurShader,compositeShader} from './shaders.js';
@@ -28,7 +29,7 @@ export class SSAO implements EnginePlugin {
   private replayViews:GPUTextureView[]=[];private replayCopy?:GPURenderPipeline;private replayGroup?:GPUBindGroup;
   private disposed=false;private host?:StackHost;private ao?:GPUTextureView;private input?:GPUTextureView;private key='';
   // Shader patches are cached per source string; pass descriptors are rebuilt with their targets in resize().
-  private captureSource?:string;private captureShader='';private ambientSource?:string;private ambientCode='';
+  private captureSource?:string;private captureShader='';private ambientSource?:string;private ambientCode='';private ambientAll=false;
   private readonly compositeAttachment:GPURenderPassColorAttachment={view:undefined!,loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:1}};private readonly compositePass:GPURenderPassDescriptor={colorAttachments:[this.compositeAttachment]};
   private replayPass?:GPURenderPassDescriptor;private clearPass?:GPURenderPassDescriptor;private resolvePass?:GPURenderPassDescriptor;
   private readonly values=new Float32Array(56);private readonly inverseWorkspace=new Float64Array(52);
@@ -71,7 +72,10 @@ export class SSAO implements EnginePlugin {
         if(this.captureSource!==c.shader){this.captureSource=c.shader;this.captureShader=c.shader.replace(/let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/,'return vec4f(linear,1);');}c.shader=this.captureShader;}
       if(!invert(this.inverse,c.camera.matrix,0,this.inverseWorkspace))throw new Error('Invalid SSAO camera');
       viewMatrix(this.view,c.camera);
-      const p=this.projection,near=c.camera.near,far=c.camera.far,f=1/Math.tan(c.camera.fov*Math.PI/360);p.fill(0);p[0]=f*c.height/c.width;p[5]=f;p[10]=near/(far-near);p[11]=-1;p[14]=far*near/(far-near);
+      // View-space projection for the samples: the camera's own when it is orthographic (constant clip w, signed near/far), else core's perspective.
+      const p=this.projection,o=orthographic(c.camera.matrix,c.camera.position);p.fill(0);
+      if(o){p[0]=o.sx;p[5]=o.sy;p[10]=o.sz;p[12]=o.ox;p[13]=o.oy;p[14]=o.far*o.sz;p[15]=1;}
+      else{const near=c.camera.near,far=c.camera.far,f=1/Math.tan(c.camera.fov*Math.PI/360);p[0]=f*c.height/c.width;p[5]=f;p[10]=near/(far-near);p[11]=-1;p[14]=far*near/(far-near);}
       const v=this.values;v[48]=this.options.radius??0.5;v[49]=this.options.bias??0.025;v[50]=this.options.samples??32;v[51]=+this.enabled;v[52]=c.width;v[53]=c.height;v[54]=v[55]=0;
       c.device.queue.writeBuffer(this.uniform!,0,this.values as Float32Array<ArrayBuffer>);
       for(let i=0;i<2;i++){this.directionValues[i][2]=this.options.radius??0.5;c.device.queue.writeBuffer(this.directions[i],0,this.directionValues[i]);}
@@ -138,7 +142,10 @@ export class SSAO implements EnginePlugin {
     if(this.replayCopy){const pass=c.encoder.beginRenderPass(this.replayPass!);pass.setPipeline(this.replayCopy);pass.setBindGroup(0,this.replayGroup!);pass.draw(3);pass.end();}
     for(const source of this.sources)source.draw(c,'gbuffer',gbuffer,c.depth);
     const clear=c.encoder.beginRenderPass(this.clearPass!);clear.end();
-    if(this.ambientSource!==c.shader){this.ambientSource=c.shader;this.ambientCode=c.shader.replace(/let direct=[\s\S]*return vec4f\([^\n]+\);/,'return vec4f(i.color*(1.0-i.material.y)*frame.radiance.w,1);');}
+    // Convention: a plugin that replaces the ambient light (environment IBL) names it `let margoAmbient=`. Then the replay keeps the
+    // whole shader and only returns margoAmbient (`_=` keeps every binding statically used, so all of c.bindings fit the layout).
+    if(this.ambientSource!==c.shader){this.ambientSource=c.shader;this.ambientAll=c.shader.includes('let margoAmbient=');
+      this.ambientCode=this.ambientAll?c.shader.replace(/(let direct=[\s\S]*)return (vec4f\([^\n]+\));/,'$1_=$2;return vec4f(margoAmbient,1);'):c.shader.replace(/let direct=[\s\S]*return vec4f\([^\n]+\);/,'return vec4f(i.color*(1.0-i.material.y)*frame.radiance.w,1);');}
     const code=this.ambientCode;
     if(!this.ambientPipeline||this.ambientShader!==code) {
       if(code===c.shader)throw new Error('SSAO requires the standard core lighting shader');
@@ -149,7 +156,7 @@ export class SSAO implements EnginePlugin {
     }
     const color=c.color;c.color=ambient;
     // Ambient replay still needs TAA's vertex camera override, while its fragment lighting bindings are unused.
-    try{c.draw({pipeline:this.ambientPipeline,clear:false,bindings:c.bindings.filter(entry=>entry.binding===8)});}finally{c.color=color;}
+    try{c.draw({pipeline:this.ambientPipeline,clear:false,bindings:this.ambientAll?c.bindings:c.bindings.filter(entry=>entry.binding===8)});}finally{c.color=color;}
     for(const source of this.sources)source.draw(c,'ambient',ambient,c.depth);
     if(this.replayViews.length)c.encoder.beginRenderPass(this.resolvePass!).end();
     // A PostStack resolves its shared capture once, after every effect has replayed into it.

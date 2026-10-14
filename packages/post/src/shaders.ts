@@ -1,3 +1,4 @@
+// The gbuffer's w is the signed view depth -z (negative behind an orthographic eye); exactly 0 marks no surface.
 const frame=/* wgsl */`
 struct Frame {inverse:mat4x4f,view:mat4x4f,projection:mat4x4f,params:vec4f,size:vec4f}
 @group(0) @binding(0) var<uniform> f:Frame;
@@ -32,7 +33,7 @@ export const ssaoShader=frame+`
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u) {
   let size=textureDimensions(output);if(any(id.xy>=size)){return;}
   let p=vec2i(id.xy);let data=textureLoad(gbuffer,p,0);
-  if(data.w<=0||f.params.w<0.5){textureStore(output,p,vec4f(1));return;}
+  if(data.w==0||f.params.w<0.5){textureStore(output,p,vec4f(1));return;}
   let n=normalize(data.xyz);let position=viewPosition(p,textureLoad(depth,p,0));
   let random=textureLoad(noise,vec2i(id.xy%4u),0).xyz*2-1;
   var tangent=random-n*dot(random,n);
@@ -45,7 +46,7 @@ export const ssaoShader=frame+`
     if(clip.w<=0){continue;}
     let uv=clip.xy/clip.w*vec2f(0.5,-0.5)+0.5;if(any(uv<vec2f(0))||any(uv>=vec2f(1))){continue;}
     let neighbor=textureLoad(gbuffer,vec2i(uv*vec2f(size)),0).w;
-    if(neighbor>0){let weight=smoothstep(0.0,1.0,f.params.x/max(abs(neighbor-data.w),0.0001));occlusion+=select(0.0,weight,neighbor<-samplePosition.z-f.params.y);}
+    if(neighbor!=0){let weight=smoothstep(0.0,1.0,f.params.x/max(abs(neighbor-data.w),0.0001));occlusion+=select(0.0,weight,neighbor<-samplePosition.z-f.params.y);}
   }
   textureStore(output,p,vec4f(clamp(1-occlusion/f32(samples),0.0,1.0)));
 }
