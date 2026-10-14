@@ -78,7 +78,8 @@ try{
   await mobile.screenshot({path:resolve(output,'mobile-controls.png')});report.checks.push('Touch layout starts, changes all particle tiers and wireframe, exposes movement sticks and pauses');
  }finally{await mobile.close();}
  await page.route('**/*',route=>route.request().url().startsWith(origin+'/')?route.continue():route.abort());
- await page.emulateMedia({reducedMotion:'reduce'});await page.goto(origin);
+ // The desktop full tier starts at 1M particles; without ?quality=high a desktop starts on the light tier (100k).
+ await page.emulateMedia({reducedMotion:'reduce'});await page.goto(origin+'/?quality=high');
  await page.waitForFunction(()=>window.sandbox||document.body.classList.contains('failed'),null,{timeout:60000});
  assert.ok(await page.evaluate(()=>!!window.sandbox),await page.locator('#status').textContent());
  report.hardware=await page.evaluate(async()=>{const a=await navigator.gpu.requestAdapter();return {description:a.info.description,vendor:a.info.vendor,fallback:a.info.isFallbackAdapter};});
