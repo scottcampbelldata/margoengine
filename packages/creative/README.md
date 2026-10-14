@@ -1,6 +1,8 @@
 # @margoengine/creative
 
-WebGPU grass, particles, wind obstacles, procedural atmosphere, toon shading, HDR targets and post-processing for Margo Engine.
+WebGPU grass, a planet renderer, a leaf/weather particle preset, toon shading, HDR targets and a grading post effect (fog, god rays, focus blur, ACES, grain) for Margo Engine.
+
+Each capability has one implementation: `GPUParticles` is a preset over `@margoengine/vfx`, bloom is `Bloom` from `@margoengine/post/bloom`, and sky backdrops are `Sky` from `@margoengine/sky`.
 
 Package name: `@margoengine/creative`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
 
@@ -24,10 +26,10 @@ Use a feature subpath for a static import or an on-demand `import()`:
 
 | Subpath | Feature |
 | --- | --- |
-| `@margoengine/creative/particles` | `GPUParticles` and particle option types |
+| `@margoengine/creative/particles` | `GPUParticles` (a `@margoengine/vfx` preset) and particle option types |
 | `@margoengine/creative/targets` | `HDRRenderTarget` |
 | `@margoengine/creative/toon` | `ToonShading` and toon option types |
-| `@margoengine/creative/post` | `PostProcessing` and atmosphere/post option types |
+| `@margoengine/creative/post` | `PostProcessing` (fog, god rays, focus blur, grading, grain) and its option types |
 | `@margoengine/creative/grass` | `GrassField` and grass option types |
 | `@margoengine/creative/planet` | `Planet` and planet option types |
 
@@ -35,10 +37,18 @@ Use a feature subpath for a static import or an on-demand `import()`:
 const {GPUParticles} = await import('@margoengine/creative/particles');
 ```
 
-`PostProcessing` alone owns scene capture. To combine it with SSAO, DOF, Bloom or FXAA, add it to a
-`PostStack` from `@margoengine/post/stack` as the display effect, after the HDR effects and before
-FXAA: `PostStack.attach(engine, [new SSAO(), new PostProcessing({bloom: 0.3}), new FXAA()])`. It then
-grades (fog, focus blur, bloom, ACES, grain) the stack's HDR result, and its `target` is undefined.
+`GPUParticles({count, gravity, wind, size, curl, obstacles, sort, texture})` keeps `count` particles drifting
+inside a 6 m cube centred on the origin, re-entering on the opposite face. It is a `VFX` from `@margoengine/vfx`
+(`instanceof VFX`, plugin name `gpu-particles`): `wind` is added to `gravity`, `curl` is VFX `turbulence`, and
+`size` is the sprite half-width. Use `VFX` directly for emitters, lifetimes, bursts or up to 1,000,000 particles.
+
+`PostProcessing` grades the HDR scene: exponential height fog, screen-space god rays, a depth-of-field focus
+blur, exposure/contrast/saturation/gain/lift, ACES and grain. It has no bloom and no sky backdrop; passing
+`bloom`, `threshold` or `atmosphere.sky`/`scattering`/`anisotropy` throws with the replacement. Alone it owns
+scene capture. For bloom, or to combine it with SSAO, DOF or FXAA, add it to a `PostStack` from
+`@margoengine/post/stack` as the display effect: `PostStack.attach(engine, [new SSAO(), new Bloom({strength:
+0.3}), new PostProcessing({atmosphere: {density: 0.02}}), new FXAA()])`. In a stack its `target` is undefined.
+For a sky behind the fog, attach `Sky` from `@margoengine/sky`.
 
 Each subpath loads that feature and its dependencies. Existing named imports from `@margoengine/creative` remain available and can be tree-shaken by a bundler. `await stage.creative()` intentionally loads the complete pack namespace; use a subpath when loading one feature independently.
 
@@ -131,6 +141,6 @@ The demo combines Planet's linear HDR surface/cloud/rim output with optional Blo
 
 The build and prepack commands write only this package's `dist` and license copy. Checks and screenshots write to this package's `test-results`; they use existing core artifacts without rebuilding the base. The browser check uses Edge by default (or installed Playwright Chromium as a fallback); set `BROWSER_CHANNEL` to choose another installed Chromium channel. The unit checks cover loading, lifecycle, validation, resource retention and bundle isolation. The WebGPU checks cover shaders, rendered pixels, depth, HDR and device restoration.
 
-This ESM package includes TypeScript declarations and requires `@margoengine/core` 0.1.0. See the [effect options and limitations](https://github.com/scottcampbelldata/margoengine/blob/main/MODERN-ENGINE.md).
+This ESM package includes TypeScript declarations, requires `@margoengine/core` 0.1.0 and depends on `@margoengine/vfx` for particles. See the [effect options and limitations](https://github.com/scottcampbelldata/margoengine/blob/main/MODERN-ENGINE.md).
 
 MIT licensed.

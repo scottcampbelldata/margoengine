@@ -11,8 +11,8 @@ Margo Engine is a small Rust/Wasm engine for web applications with optional doma
 | TypeScript/packages | Explicit ESM exports and declarations; `sideEffects: false`; precompiled gzip-embedded Wasm; independent core, glTF, React, machinery, creative and scenery packages. |
 | React/starters | `MargoCanvas` (`Canvas` alias), `useMargoStage`, `useFrame`, mesh components; SSR-safe setup, ResizeObserver and stable refs; Vite and Next.js starters. |
 | Machinery pack | Revolute/prismatic joints, gear/slider-crank couplings, bounded IK/distance constraints, exploded views, GPU sections/stencil caps, SVG dimensions/callouts, worker STL/OBJ/STEP/IGES, Wasm surface transport and telemetry, part instancing, assembly BVH picking, metrology snapping and industrial material presets. |
-| Creative pack | Textured/sorted GPU particles, curl wind/obstacles, procedural sky/scattering/fog/god rays, toon shading, HDR targets, compute bloom/grading/DOF/grain and ACES presentation. |
-| Scenery pack | Optional `SkyMoon` engine plugin and low-level `SkyMoonPass`; procedural moonlit atmosphere, lunar phases, stars, glow and horizon haze with Reversed-Z background depth. See [usage and limits](packages/scenery/README.md). |
+| Creative pack | Grass, planet, a leaf-field preset over `@margoengine/vfx` particles, toon shading, HDR targets, and a grading effect (height fog, god rays, DOF blur, grain, ACES). Bloom comes from `@margoengine/post`, skies from `@margoengine/sky`. |
+| Scenery pack | `SkyMoon`, a midnight preset of `@margoengine/sky` with stars, lunar phases, glow and horizon haze. See [usage and limits](packages/scenery/README.md). |
 
 Rust owns transforms and culling. TypeScript owns asset orchestration and browser GPU commands. Numeric Wasm exports keep `wasm-bindgen`, `web-sys` and their glue unnecessary for this kernel. Consumers need no Rust installation or Wasm URL configuration. SIMD and browser DecompressionStream gzip support are required; decompression happens once before cached module compilation.
 
@@ -39,7 +39,7 @@ npm run build                         # builds packages and both production star
 npm run pack:packages                 # rebuilds and packs only the seven libraries
 npm run modern:test:browser            # after build: real GPU + both production starters
 npm run modern:test:domains            # caps, FX, sorting, depth readback and loss races
-npm run modern:test:sky                # scenery phases, depth, stars and plugin lifecycle
+npm run modern:test:sky                # sky fog coverage and shader parity on WebGPU
 npm run modern:test:packages           # frozen public exports/types + React 18 fixture
 npm run modern:test:finalization       # picking/depth/conveyor UI + 12k-entity stress; dev server required
 npm run modern:check:conveyor          # live picking/pivot, coupled tick and 15s Chrome drag trace
@@ -209,24 +209,24 @@ The Vite demo's **Domain tools → Load conveyor assembly** loads an optional pr
 
 ```ts
 const { GPUParticles, PostProcessing, ToonShading } = await import('@margoengine/creative');
+const { Bloom } = await import('@margoengine/post/bloom'), { PostStack } = await import('@margoengine/post/stack');
 if (engine.backend === 'webgpu') {
   engine.use(new GPUParticles({ count: 50_000, gravity: [0, -0.5, 0], wind: [1.2, 0, 0.4],
     curl: 0.2, sort: true,
     obstacles: [{ kind: 'sphere', center: [0, 0, 0], radius: 1 }],
   }));
   engine.use(new ToonShading({ bands: 4, rim: 0.15 }));
-  engine.use(new PostProcessing({ bloom: 0.5, threshold: 0.8, exposure: 0.3,
+  engine.use(new PostStack([new Bloom({ strength: 0.5, threshold: 0.8 }), new PostProcessing({ exposure: 0.3,
     focus: 5, aperture: 2, grain: 0.02,
-    atmosphere: { sky: true, density: 0.02, heightFalloff: 0.1,
-      sun: [0.3, 0.6, -0.7], godRays: 0.3 },
-  }));
+    atmosphere: { density: 0.02, heightFalloff: 0.1, sun: [0.3, 0.6, -0.7], godRays: 0.3 },
+  })]));
 }
 // engine.removePlugin('gpu-particles');
 ```
 
-Particle positions/velocities stay in GPU storage; only frame/obstacle uniforms are uploaded. Compute runs at -10, textured camera-facing leaves at 10. Limits: 1–100,000 particles and 64 sphere/axis-aligned-box obstacles. An analytic divergence-free curl field adds turbulence; signed distances project penetrations out and deflect incoming wind/velocity. This is a bounded field approximation without a mesh/fluid solver. Particles wrap at x/z = ±3 and respawn at the opposite y boundary outside ±3. Opt-in GPU bitonic sorting pads to a power of two and orders view depth back to front; O(n log² n) cost is not an FPS guarantee. Replace the built-in RGBA leaf sprite with `texture: { width, height, data: Uint8Array | Uint8ClampedArray }` or `setTexture(imageData)`; dimensions cap at 4096. A copied pixel blueprint survives recovery. Configuration sets initial gravity/wind/size/curl; obstacle definitions are checked each frame.
+`GPUParticles` is a preset of `VFX` from `@margoengine/vfx`, Margo's one particle system: `count` particles wrap inside a 6 m cube, `wind` adds to `gravity`, `curl` is VFX turbulence. Up to 64 sphere/axis-aligned-box obstacles bend the flow and push particles out; opt-in bitonic sorting orders the live list back to front (O(n log² n), not an FPS guarantee); `texture` replaces the soft disc. Positions and velocities stay in GPU storage. See [the VFX README](packages/vfx/README.md) for emitters, lifetimes and limits.
 
-`PostProcessing` owns an `HDRRenderTarget` with rgba16float color and sampleable reversed float depth (depth32float-stencil8 where supported). It captures main at -50, draws optional sky at 2 and resolves at 30 after caps/particles. Bloom uses a four-level threshold/downsample chain and separable Gaussian compute filters on ping-pong HDR textures. Resolve applies bounded depth-of-field blur, exponential height fog, radial depth-occluded god rays, exposure/contrast/saturation/lift/gain, ACES filmic tone mapping, sRGB conversion and grain. A fullscreen pass presents the rgba8unorm compute output. Change `options` between frames; zero aperture/bloom/ray strength skips corresponding work. Fog/sky use linear RGB, sun direction, Rayleigh/Mie-shaped scattering and anisotropy. These are procedural/screen-space approximations; physical volumetric transport, HDR environment-map import and optical bokeh remain outside this pack.
+`PostProcessing` owns an `HDRRenderTarget` with rgba16float color and sampleable reversed float depth (depth32float-stencil8 where supported). It captures main at -50 and resolves at 30 after caps/particles. It has no bloom or sky backdrop: use post `Bloom` before it in a `PostStack`, and `Sky` from `@margoengine/sky`. Resolve applies bounded depth-of-field blur, exponential height fog, radial depth-occluded god rays, exposure/contrast/saturation/lift/gain, ACES filmic tone mapping, sRGB conversion and grain. A fullscreen pass presents the rgba8unorm compute output. Change `options` between frames; zero aperture/ray strength skips corresponding work. Fog uses linear RGB; god rays use the sun direction. These are procedural/screen-space approximations; physical volumetric transport, HDR environment-map import and optical bokeh remain outside this pack.
 
 `HDRRenderTarget(device, width, height)` is exported for custom passes; `resize()` replaces owned color/depth textures and `dispose()` frees them. Sizes are 1–4096 per axis within device limits. The post stack reserves roughly 25–26 bytes per full-resolution pixel with float/stencil depth (implementation-dependent stencil storage) for explicit textures, excluding driver padding and core depth/canvas buffers. `ToonShading` injects 2–16 lighting bands and a rim term. Advanced creative rendering requires WebGPU; omit these plugins to keep the base WebGL2 fallback. Importing only `GPUParticles` tree-shakes post/toon code.
 
@@ -262,7 +262,8 @@ A twelve-candidate Chrome comparison used 976 conveyor entities, changing Euler 
 
 Verified on 11 October 2026 in this workspace:
 
-- Twenty-seven JavaScript tests and four Rust checks: independent transform reference, stable memory, SIMD remainder/tangent cases, atomic rejection, hierarchy, camera depth, geometry/material validation, stale refs, instancing ownership, GLB import/shared primitives/rollback, plugin cleanup and machinery limits. Thirty-two shared math/camera checks also pass, including retained inverse workspace, pivoting, overlapping output, alias rejection and atomic failure.
+- Twenty-seven JavaScript tests and four Rust checks: independent transform reference, stable memory, SIMD remainder/tangent cases, atomic rejection, hierarchy, camera depth, geometry/material validation, stale refs, instancing ownership, GLB import/shared primitives/rollback, plugin cleanup and machinery limits.
+ Thirty-two shared math/camera checks also pass, including retained inverse workspace, pivoting, overlapping output, alias rejection and atomic failure.
 - Strict package declarations and successful Vite/Next production builds.
 - Packed standalone ESM/Wasm imports, strict TypeScript consumer declarations and React 18.3.1 SSR/browser lifecycle: [package evidence](benchmarks/README.md). The fixture is removed after testing; tarballs remain in `test-results/modern-packages/`.
 - Eight real-browser check groups on Microsoft Edge 155 / NVIDIA RTX A6000: both API pixels and instancing/culling; matching PBR pixels; actual GPU storage readback for 100,000 particles; React Strict Mode/nesting/Suspense/teardown/no frame re-renders; automatic fallback; Vite production/lazy imports/controls/mobile layout; Next SSR/hydration/rendered geometry. Zero console/page errors. [Browser evidence](benchmarks/README.md).

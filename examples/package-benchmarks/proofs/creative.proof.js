@@ -7,7 +7,8 @@ import {mockGPU, passes, context} from './gpu-recorder.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
 
 // Built from post.ts: the package index also pulls in .wgsl?raw files, which the harness cannot load from a Git ref.
-const ref = 'f05414a', {baseline, candidate} = await versions('creative', ref, 'src/post.ts');
+// The candidate is pinned to 3319317, the last commit before bloom and the sky backdrop left PostProcessing.
+const ref = 'f05414a', {baseline, candidate} = await versions('creative', ref, 'src/post.ts', '3319317');
 
 function scene(module, samples, options) {
   const gpu = mockGPU(), engine = {gpu: gpu.device}, post = new module.PostProcessing(options); post.setup(engine);

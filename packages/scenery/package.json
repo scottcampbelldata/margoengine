@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
-  "description": "Procedural moonlit skies and scenery passes for Margo Engine.",
+  "description": "Moonlit night sky preset (stars, phased moon) over @margoengine/sky.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
@@ -24,10 +24,6 @@
     "./sky": {
       "types": "./dist/sky.d.ts",
       "import": "./dist/sky.js"
-    },
-    "./sky-moon": {
-      "types": "./dist/sky-moon.d.ts",
-      "import": "./dist/sky-moon.js"
     }
   },
   "files": [
@@ -35,6 +31,9 @@
   ],
   "peerDependencies": {
     "@margoengine/core": "0.1.0"
+  },
+  "dependencies": {
+    "@margoengine/sky": "0.1.0"
   },
   "homepage": "https://margoengine.com"
 }

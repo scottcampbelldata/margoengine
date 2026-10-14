@@ -43,10 +43,10 @@ function App() {
       else{setSceneryLoading(true);setStatus('Loading scenery…');const {SkyMoon}=await import('@margoengine/scenery');if(engine.current!==e||e.disposed)return;e.use(new SkyMoon({moonDirection:[0.45,0,-1]}));setScenery(true);setStatus('Scenery: moonlit sky');}
       // Scenery supplies horizon haze; post fog would obscure its depth-0 backdrop.
       const atmosphere=post.current?.options.atmosphere;
-      if(atmosphere){atmosphere.sky=!e.hasPlugin('sky-moon');atmosphere.density=atmosphere.sky?0.025:0;}
+      if(atmosphere)atmosphere.density=e.hasPlugin('sky-moon')?0:0.025;
     }catch(error){setStatus(String(error));}finally{setSceneryLoading(false);}
   }
-  async function toggleFX(){try{const {PostProcessing}=await import('@margoengine/creative'),e=engine.current;if(!e)return;if(e.hasPlugin('post-processing')){e.removePlugin('post-processing');post.current=null;setStatus('Effects removed');}else{const sky=!e.hasPlugin('sky-moon'),effect=new PostProcessing({bloom:0.5,threshold:0.4,focus:5,aperture:2,grain:0.02,atmosphere:{sky,density:sky?0.025:0,heightFalloff:0.1,godRays:0.2}});e.use(effect);post.current=effect;setStatus('Creative: atmosphere and FX');}}catch(error){setStatus(String(error));}}
+  async function toggleFX(){try{const [{PostProcessing},{Bloom},{PostStack}]=await Promise.all([import('@margoengine/creative/post'),import('@margoengine/post/bloom'),import('@margoengine/post/stack')]),e=engine.current;if(!e)return;if(e.hasPlugin('post:stack')){e.removePlugin('post:stack');post.current=null;setStatus('Effects removed');}else{const effect=new PostProcessing({focus:5,aperture:2,grain:0.02,atmosphere:{density:e.hasPlugin('sky-moon')?0:0.025,heightFalloff:0.1,godRays:0.2}});e.use(new PostStack([new Bloom({strength:0.5,threshold:0.4}),effect]));post.current=effect;setStatus('Bloom, atmosphere and FX');}}catch(error){setStatus(String(error));}}
   async function toggleToon(){try{const {ToonShading}=await import('@margoengine/creative'),e=engine.current;if(!e)return;if(e.hasPlugin('toon-shading')){e.removePlugin('toon-shading');setStatus('Toon removed');}else{e.use(new ToonShading());setStatus('Creative: toon shading');}}catch(error){setStatus(String(error));}}
   async function importCAD(file:File|undefined){
     const e=engine.current;if(!file||!e)return;cadImport.current?.abort();const pending=new AbortController();cadImport.current=pending;setStatus('Loading CAD…');

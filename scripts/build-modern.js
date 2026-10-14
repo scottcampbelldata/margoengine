@@ -31,8 +31,8 @@ if(!precompiled){
  execFileSync(process.execPath,['node_modules/binaryen/bin/wasm-opt',machineryPath,'-O3','--enable-simd','--enable-bulk-memory','--enable-nontrapping-float-to-int','--strip-debug','--strip-producers','-o',machineryPath+'.optimized'],{stdio:'inherit'});
  await writeFile('packages/machinery/src/wasm.ts',`// Generated machinery kernel; consumers need no Rust toolchain.\nexport const machineryWasm: string = '${gzipSync(await readFile(machineryPath+'.optimized')).toString('base64')}';\n`);
 }
-const featurePackages=['gltf-pro','blender','animation','post','shadows','clustered','vfx','animator','taa','splats','geometry','terrain','xr','ifc','usdz','dof','tonemap','lines','stats','inspector','environment','controls'];
-const packages=['core','gltf','react','loaders','exporters','machinery','creative','scenery',...featurePackages,'margoengine'];
+const featurePackages=['gltf-pro','blender','animation','post','shadows','clustered','animator','taa','splats','geometry','terrain','xr','ifc','usdz','dof','tonemap','lines','stats','inspector','environment','controls'];
+const packages=['core','gltf','react','loaders','exporters','machinery','vfx','sky','creative','scenery',...featurePackages,'margoengine'];
 for(const name of packages){
  const output=resolve(`packages/${name}/dist`);assert.equal(dirname(output),resolve(`packages/${name}`),'Output escaped its package');
  await rm(output,{recursive:true,force:true});await copyFile('LICENSE',`packages/${name}/LICENSE`);
@@ -42,7 +42,8 @@ await compactPackage('core');
 for(const name of ['loaders','exporters'])execFileSync(process.execPath,['node_modules/typescript/bin/tsc','-p',`packages/${name}/tsconfig.json`],{stdio:'inherit'});
 // controls type-checks against @margoengine/bvh (DragControls), so bvh's own build must run first.
 execFileSync(process.execPath,['packages/bvh/scripts/build.js'],{stdio:'inherit'});
-for(const name of ['gltf','machinery','creative','scenery',...featurePackages]){
+// vfx and sky build before the creative and scenery wrappers that import their types.
+for(const name of ['gltf','machinery','vfx','sky','creative','scenery',...featurePackages]){
  const output=resolve(`packages/${name}/dist`);assert.ok(output.startsWith(resolve(`packages/${name}`)+'/')||output.startsWith(resolve(`packages/${name}`)+'\\'),'Output escaped its package');
  const manifest=JSON.parse(await readFile(`packages/${name}/package.json`,'utf8'));
  const entry=Object.fromEntries(Object.values(manifest.exports).map(({import:target})=>{
@@ -50,7 +51,7 @@ for(const name of ['gltf','machinery','creative','scenery',...featurePackages]){
   const module=target.slice('./dist/'.length,-'.js'.length);
   return [module,`packages/${name}/src/${module}.ts`];
  }));
- await build({configFile:false,publicDir:false,logLevel:'warn',build:{outDir:output,emptyOutDir:true,target:'es2022',lib:{entry,formats:['es'],fileName:(_,entryName)=>entryName+'.js'},rollupOptions:{external:['@margoengine/core','@margoengine/core/extension','@margoengine/animation','@margoengine/gltf-pro','@margoengine/loaders','@margoengine/lines','@margoengine/bvh'],output:compactOutput}}});
+ await build({configFile:false,publicDir:false,logLevel:'warn',build:{outDir:output,emptyOutDir:true,target:'es2022',lib:{entry,formats:['es'],fileName:(_,entryName)=>entryName+'.js'},rollupOptions:{external:['@margoengine/core','@margoengine/core/extension','@margoengine/animation','@margoengine/gltf-pro','@margoengine/loaders','@margoengine/lines','@margoengine/bvh','@margoengine/vfx','@margoengine/sky'],output:compactOutput}}});
  if(name==='machinery'){
   // Retain analyzable asset URLs for the consuming app's bundler.
   for(const file of (await readdir(output)).filter(file=>file.endsWith('.js'))){const entry=resolve(output,file);await writeFile(entry,(await readFile(entry,'utf8')).replace(/(?:''|""|``)\s*\+\s*import\.meta\.url/g,'import.meta.url'));}

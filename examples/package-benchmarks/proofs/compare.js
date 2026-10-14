@@ -29,9 +29,10 @@ async function load(name, entry, ref) {
   return import(pathToFileURL(file).href);
 }
 
-/** `baseline` is the package at `ref`; `candidate` is the working tree. */
-export async function versions(name, ref, entry = 'src/index.ts') {
-  return {baseline: await load(name, entry, execFileSync('git', ['rev-parse', '--verify', `${ref}^{commit}`], {cwd: root, encoding: 'utf8'}).trim()), candidate: await load(name, entry)};
+/** `baseline` is the package at `ref`; `candidate` is the working tree, or `candidateRef` for a proof of an API that later changed. */
+export async function versions(name, ref, entry = 'src/index.ts', candidateRef) {
+  const commit = value => execFileSync('git', ['rev-parse', '--verify', `${value}^{commit}`], {cwd: root, encoding: 'utf8'}).trim();
+  return {baseline: await load(name, entry, commit(ref)), candidate: await load(name, entry, candidateRef && commit(candidateRef))};
 }
 
 const median = values => values.slice().sort((a, b) => a - b)[values.length >> 1];

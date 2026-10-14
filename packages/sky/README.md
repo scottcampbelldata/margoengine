@@ -1,6 +1,6 @@
 # @margoengine/sky
 
-WebGPU atmospheric background with an analytical Preetham/Perez daytime sky and an Earth-based Bruneton-style precomputed Rayleigh/Mie model.
+WebGPU atmospheric background with an analytical Preetham/Perez daytime sky and an Earth-based Bruneton-style precomputed Rayleigh/Mie model, an optional stylized night (stars, phased moon) and distance or height fog. This is Margo's one sky: scenery's `SkyMoon` is a midnight preset of it.
 
 ```ts
 import {Sky} from '@margoengine/sky';
@@ -49,6 +49,30 @@ sun elevation, reaching the sunset tint below roughly 5° and the daylight tint
 above 30°. Scene lighting and the separate water light record share that tint.
 Omitting `sunset` keeps the configured colour constant.
 
+## Stylized night
+
+Set `night` to replace the default night gradient with a moonlit sky: a zenith-to-horizon gradient, twinkling
+stars above 15° and a moon disc with phase, glow and size. The object is read every frame, so mutate it for
+live controls.
+
+```ts
+const sky = Sky.attach(engine, {hours: 0, timeScale: 0, night: {
+  zenithColor: [0.015, 0.025, 0.065], horizonColor: [0.08, 0.09, 0.15], hazeDensity: 1,
+  moonDirection: [0.4, 0.7, 0.5], moonSize: 0.038, moonPhase: 0.85, moonColor: [0.92, 0.95, 1],
+  glowIntensity: 1.2, starIntensity: 0.8, starTwinkleIntensity: 1,
+}});
+sky.options.night!.moonPhase = -0.2;
+```
+
+Those are the defaults. Colours are non-negative linear RGB; `moonDirection` is normalized; `moonSize` is an
+angular radius in radians between 0 and π/2; `moonPhase` clamps to −1 (new) … 1 (full); glow, star and twinkle
+intensities and `hazeDensity` clamp to zero or above (zero twinkle holds stars steady, zero haze removes the
+gradient). The stylized night shows where the sun is below the horizon, blended by `nightFactor` at dusk, and
+its colours are written as given, also on display targets (the physical day sky is tonemapped there). It
+replaces the separate preset moon; leave `lighting.moon` unset with it.
+
+## Fog
+
 For lightweight distance haze, provide sampleable reversed-Z scene depth:
 
 ```ts
@@ -66,7 +90,12 @@ sun/moon discs. Both 1x and 4x depth work; multisampled depth must match the sce
 sample count. The texture must match the viewport, have `TEXTURE_BINDING` usage
 and stay owned by its provider. With no water, use your post effect's scene depth.
 Re-read the provider after resize/device restoration. Omit `fog` to retain the
-existing rendering. This is homogeneous distance haze, without height fog,
+existing rendering.
+
+Three optional fog fields change the look: `falloff: 'exp'` uses `1 - exp(-optical)` instead of the squared
+default; `height` adds density below y = 0 (optical depth × (1 + height × metres below 0), e.g. 0.065 for a
+sea haze); `color` replaces the sky radiance with a fixed linear colour. Night Citadel uses
+`{start: 0, falloff: 'exp', height: 0.065, color: horizon}`. This is homogeneous distance haze, without height fog,
 volumetric light shafts or particle-depth fog; large scenes need a suitable
 camera far plane.
 

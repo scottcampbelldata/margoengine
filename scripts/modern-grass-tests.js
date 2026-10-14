@@ -10,7 +10,7 @@ browser.page.on('pageerror',error=>errors.push(error.message));
 browser.page.on('console',message=>{if(message.type()==='error'||/Error while parsing|Invalid .*Pipeline|ValidationError/.test(message.text()))errors.push(message.text());});
 try {
   const result=await browser.page.evaluate(async()=>{
-    const {GrassField,PostProcessing}=await import('/packages/creative/dist/index.js');
+    const {GrassField,PostProcessing}=await import('/packages/creative/dist/index.js'),{Bloom}=await import('/packages/post/dist/bloom.js');
     const {Stage}=await import('/packages/margoengine/dist/index.js');
     const assert=(condition,message)=>{if(!condition)throw new Error(message);};
     await window.modern.core('webgpu');
@@ -98,9 +98,9 @@ try {
     engine.camera.position=[12.977123260498047,13.3236722946167,22.119840621948242];
     engine.camera.target=[12.530253112316132,12.867994844913483,21.34999316930771];
     const bloomField=new GrassField(stage,{blades:100_000,area:[60,60],drawDistance:90,spores:true});
-    const bloomPost=new PostProcessing({bloom:0.12,threshold:1.2,atmosphere:{sky:true,density:0.007,heightFalloff:0.08,color:[0.58,0.69,0.75],sun:[0.6,0.5,-0.5]}});
+    const bloomPost=new Bloom({strength:0.12,threshold:1.2});
     engine.use(bloomPost);bloomField.windTime=196.35499572753906;engine.render();
-    const hdr=bloomPost.target.color,hdrRow=Math.ceil(hdr.width*8/256)*256;
+    const hdr=bloomPost.sceneTexture,hdrRow=Math.ceil(hdr.width*8/256)*256;
     const hdrRead=device.createBuffer({size:hdrRow*hdr.height,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
     const hdrEncoder=device.createCommandEncoder();hdrEncoder.copyTextureToBuffer({texture:hdr},{buffer:hdrRead,bytesPerRow:hdrRow},[hdr.width,hdr.height]);device.queue.submit([hdrEncoder.finish()]);await hdrRead.mapAsync(GPUMapMode.READ);
     const hdrPixels=new Uint16Array(hdrRead.getMappedRange());let nonFiniteHDRPixels=0;
@@ -119,7 +119,7 @@ try {
     }
     engine.camera.position=[0,6,18];engine.camera.target=[0,0.5,0];
     const restored=new GrassField(stage,{blades:100_000,area:[50,50],spores:true});
-    engine.use(new PostProcessing({bloom:0.1,atmosphere:{sky:true,density:0.01}}));engine.render();await device.queue.onSubmittedWorkDone();
+    engine.use(new PostProcessing({atmosphere:{density:0.01}}));engine.render();await device.queue.onSubmittedWorkDone();
     engine.canvas.style.width='400px';engine.canvas.style.height='300px';engine.render();await device.queue.onSubmittedWorkDone();
     const diagnostics=(await Promise.all(modules.map(record=>record.module.getCompilationInfo()))).flatMap(info=>info.messages.map(m=>({type:m.type,message:m.message})));
     const validation=await device.popErrorScope();assert(!validation&&!uncaptured.length&&!diagnostics.some(m=>m.type==='error'),'WGSL/GPU validation failed: '+(validation?.message??uncaptured.join('; '))+JSON.stringify(diagnostics));

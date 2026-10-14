@@ -21,7 +21,25 @@ engine.start();
 around `position` (default zero). `intensity` multiplies RGB for HDR emission,
 0..16 (default 1). Billboards draw at frame-graph order 6, after water and scatter.
 
-One million particles use 64 MB for state plus 4 MB for live indices, regardless of the live count. Per-frame CPU work is bounded uniform updates and pass submission; there is no JavaScript object/array per particle. GPU performance still depends on capacity, fill rate and hardware. This package does not replace the smaller textured/weather particles in `margoengine-creative`.
+One million particles use 64 MB for state plus 4 MB for live indices, regardless of the live count. Per-frame CPU work is bounded uniform updates and pass submission; there is no JavaScript object/array per particle. GPU performance still depends on capacity, fill rate and hardware.
+
+This is Margo's one particle system; `GPUParticles` in `@margoengine/creative/particles` is a leaf-field preset
+over it. Four optional features patch the shaders only when set, so effects without them compile the same WGSL
+and make the same GPU calls:
+
+- `obstacles: [{kind:'sphere', center, radius}, {kind:'box', center, halfSize}]` (up to 64): the flow bends
+  around each within one unit, and particles inside are pushed out and reflected with `bounce`. The array is read
+  every frame (move or replace entries freely); pass one, even `[]`, before attaching. Adds a 2,096-byte uniform.
+- `wrap: true` keeps particles inside the emission box (`position` ± `emissionExtent`, every extent > 0): a
+  particle leaving one face re-enters on the opposite face at the emitter velocity. Use with a long `lifetime`
+  and `rate: 0` for a persistent weather field.
+- `sort: true` draws back to front: each frame a bitonic sort orders the live list by view depth. The list is
+  padded to a power of two; the sort costs log2(n)·(log2(n)+1)/2 dispatches, so prefer it for thousands, not a
+  million.
+- `texture: {width, height, data}` (RGBA8, sRGB, up to 4096²) replaces the soft disc; texel RGB multiplies the
+  particle colour and texel alpha its opacity. Copied at construction.
+
+`obstacles`, `wrap`, `sort` and `texture` are read when the effect attaches.
 
 `initialCount` queues an initial burst on attachment and again after device
 restoration. It defaults to 0 and must be an integer from 0 through capacity.
@@ -29,4 +47,4 @@ For a continuously populated field, use `initialCount: capacity`; this replaces
 application restoration hooks. Restoration reseeds particles rather than preserving
 their previous positions and ages.
 
-`gpuState` exposes the current particle and indirect buffers for tests/custom integrations. Particle records are 16 floats (64 bytes); indirect arguments are five 32-bit words. The current particle buffer is stable across frames and observes later updates; it is replaced after device restoration. `dispose()`/`destroy()` releases owned buffers. Device restoration recreates simulation resources. Attach multiple emitters independently; none enter the core/stage bundle.
+`gpuState` exposes the current particle, indirect and live-list (`alive`, the draw order) buffers for tests/custom integrations. Particle records are 16 floats (64 bytes); indirect arguments are five 32-bit words. The current particle buffer is stable across frames and observes later updates; it is replaced after device restoration. `dispose()`/`destroy()` releases owned buffers. Device restoration recreates simulation resources. Attach multiple emitters independently; none enter the core/stage bundle.

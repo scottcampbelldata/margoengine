@@ -29,57 +29,6 @@ const instrument=()=>{
     };
   }
 };
-async function fogCoverage(page){
-  return page.evaluate(async()=>{
-    const {NightAtmosphere}=await import('/packages/scenery/src/atmosphere.ts');
-    const app=nightCitadel,d=app.device,background=[0.125,0.25,0.5],fog=[0.8,0.1,0.3];
-    const depths=[[0,0,0,0],[0.75,0,0,0],[0,0.25,0,0],[0,0,0.5,0],[0,0,0,0.25],[0.25,0,0.75,0],[0.75,0.75,0.75,0.75],[0.25,0.5,0.75,1]];
-    const vertex='@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);}';
-    const checks=[];app.stop();
-    try{for(const samples of [1,4]){
-      const resources=[],texture=desc=>{const t=d.createTexture(desc);resources.push(t);return t;},buffer=desc=>{const b=d.createBuffer(desc);resources.push(b);return b;};
-      const width=depths.length,color=texture({size:[width,1],format:'rgba16float',sampleCount:samples,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});
-      const depth=texture({size:[width,1],format:'depth32float',sampleCount:samples,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});
-      const output=buffer({size:width*samples*16,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),read=buffer({size:output.size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
-      const atmosphere=new NightAtmosphere({},()=>depth);
-      let validationPending=true;d.pushErrorScope('validation');
-      try{
-        atmosphere.setup({gpu:d});atmosphere.fog.set([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);atmosphere.fog.set([...fog,2],20);
-        let haze;atmosphere.registerPasses({add(pass){if(pass.name==='citadel:haze')haze=pass;}});
-        const seed=d.createShaderModule({code:vertex+`
-struct Seed { @location(0) color:vec4f,@builtin(frag_depth) depth:f32 }
-@fragment fn fragment(@builtin(position) p:vec4f${samples===4?',@builtin(sample_index) sample:u32':''})->Seed {
- let depths=array<vec4f,${width}>(${depths.map(values=>'vec4f('+values.join(',')+')').join(',')});
- return Seed(vec4f(${background.join(',')},1),depths[u32(p.x)][${samples===4?'sample':'0'}]);
-}`});
-        const seedPipeline=d.createRenderPipeline({layout:'auto',vertex:{module:seed,entryPoint:'vertex'},fragment:{module:seed,entryPoint:'fragment',targets:[{format:'rgba16float'}]},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'always'},multisample:{count:samples}});
-        const module=d.createShaderModule({code:`@group(0) @binding(0) var image:${samples===4?'texture_multisampled_2d':'texture_2d'}<f32>;
-@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;
-@compute @workgroup_size(1) fn main(@builtin(global_invocation_id) id:vec3u){result[id.x*${samples}u+id.y]=textureLoad(image,vec2i(i32(id.x),0),${samples===4?'i32(id.y)':'0'});}`});
-        const pipeline=d.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}}),group=d.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:color.createView()},{binding:1,resource:{buffer:output}}]});
-        const encoder=d.createCommandEncoder(),seedPass=encoder.beginRenderPass({colorAttachments:[{view:color.createView(),loadOp:'clear',storeOp:'store'}],depthStencilAttachment:{view:depth.createView(),depthLoadOp:'clear',depthClearValue:0,depthStoreOp:'store'}});
-        seedPass.setPipeline(seedPipeline);seedPass.draw(3);seedPass.end();
-        haze.execute({backend:'webgpu',device:d,encoder,color:color.createView(),format:'rgba16float',descriptor:{multisample:{count:samples}},camera:{position:[0,0,0]}});
-        const pass=encoder.beginComputePass();pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.dispatchWorkgroups(width,samples);pass.end();
-        encoder.copyBufferToBuffer(output,0,read,0,output.size);d.queue.submit([encoder.finish()]);await read.mapAsync(GPUMapMode.READ);
-        const pixels=new Float32Array(read.getMappedRange()).slice();read.unmap();
-        validationPending=false;const error=await d.popErrorScope();if(error)throw new Error(error.message);
-        let covered=0,uncovered=0,maxError=0;
-        for(let x=0;x<width;x++)for(let sample=0;sample<samples;sample++){
-          const nearest=samples===4?Math.max(...depths[x]):depths[x][0],alpha=1-Math.exp(-Math.hypot((x+0.5)/width*2-1,nearest)*2),offset=(x*samples+sample)*4;
-          const masked=depths[x][sample]===0;masked?uncovered++:covered++;
-          for(let channel=0;channel<3;channel++){
-            const expected=masked?background[channel]:fog[channel]*alpha+background[channel]*(1-alpha),difference=Math.abs(pixels[offset+channel]-expected);
-            maxError=Math.max(maxError,difference);if(difference>0.001)throw new Error(`${samples}x fog changed ${masked?'background':'covered'} sample ${x}/${sample}/${channel}: ${pixels[offset+channel]} vs ${expected}`);
-          }
-          if(pixels[offset+3]!==1)throw new Error('Fog changed opaque alpha');
-        }
-        checks.push({samples,covered,uncovered,maxError});
-      }finally{try{if(validationPending)await d.popErrorScope();}finally{atmosphere.dispose();for(const resource of resources)resource.destroy();}}
-    }}finally{app.start();}
-    return checks;
-  });
-}
 async function waveHeights(page){
   const heights=await page.evaluate(async()=>{
     const app=nightCitadel,d=app.device,water=app.water,points=[];
@@ -127,7 +76,7 @@ async function moonFraming(page){
     const cw=m[3]*d[0]+m[7]*d[1]+m[11]*d[2];
     const x=r.left+((m[0]*d[0]+m[4]*d[1]+m[8]*d[2])/cw*0.5+0.5)*r.width;
     const y=r.top+(0.5-(m[1]*d[0]+m[5]*d[1]+m[9]*d[2])/cw*0.5)*r.height;
-    const radius=Math.tan(Math.asin(a.sky.uniformData[35]))*r.height/(2*Math.tan(a.camera.fov*Math.PI/360)*cw);
+    const radius=Math.tan(a.atmosphere.options.night.moonSize)*r.height/(2*Math.tan(a.camera.fov*Math.PI/360)*cw);
     const covered=['.title','.panel'].some(selector=>{const r=document.querySelector(selector).getBoundingClientRect();return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom;});
     return {x,y,radius,covered,width:r.right,height:r.bottom};
   });
@@ -140,7 +89,6 @@ try{
   assert(await page.locator('#status').isHidden());
   assert.equal(await page.evaluate(()=>window.nightCitadel.stats.samples),4);
   assert(await page.evaluate(()=>gpuAudit.textures.some(t=>t.samples===4)&&gpuAudit.pipelines.includes(4)));
-  report.fogCoverage=await fogCoverage(page);
   await page.locator('#orbit').uncheck();await page.locator('#reset').click();
   report.waveHeights={desktop:await waveHeights(page)};
   report.framing=[await moonFraming(page)];

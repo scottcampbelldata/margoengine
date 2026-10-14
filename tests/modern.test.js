@@ -132,7 +132,7 @@ test('Machinery pack enforces limits and controls explode positions; particles v
   try{const node=engine.createMesh(),joints=new Kinematics([{node,axis:'y',min:-1,max:1,velocity:2}]);engine.use(joints);engine.render({delta:1});assert.equal(node.rotation.y,1);assert.throws(()=>joints.setAngle(0,2),/limits/);
     const explode=new ExplodedView([{node,offset:[4,0,0]}]);engine.use(explode);explode.amount=0.5;engine.render();assert.equal(node.position.x,2);explode.amount=1.1;assert.throws(()=>engine.render(),/amount/);engine.removePlugin(explode.name);
     const huge=engine.createMesh().setPosition([3e38,0,0]),overflow=new ExplodedView([{node:huge,offset:[3e38,0,0]}]);engine.use(overflow);overflow.amount=1;const saved=huge.position.x;assert.throws(()=>overflow.onPreUpdate(),/position/);assert.equal(huge.position.x,saved);overflow.amount=0;huge.dispose();const reused=engine.createMesh();assert.throws(()=>overflow.onPreUpdate(),/disposed/);assert.equal(reused.position.x,0);engine.removePlugin(overflow.name);
-    assert.throws(()=>new GPUParticles({count:100001}),/options/);assert.throws(()=>engine.use(new GPUParticles({count:10})),/WebGPU/);
+    assert.throws(()=>new GPUParticles({count:1_000_001}),/options/);assert.throws(()=>engine.use(new GPUParticles({count:10})),/WebGPU/);
   }finally{engine.dispose();}
 });
 

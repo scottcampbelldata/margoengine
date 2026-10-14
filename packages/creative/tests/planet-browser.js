@@ -126,7 +126,7 @@ window.runPlanetTests = async () => {
   assert(planetDescriptors.length === 16, 'Planet replaced steady-frame descriptors');
 
   const blocker = engine.createMesh().setGeometry(box(1, 1, 0.1)).setMaterial(new PbrMaterial({color: '#ffffff'})).setPosition([0, 0, 2]);
-  const effects = new PostProcessing({bloom: 0.2, atmosphere: {sky: false}}); engine.use(effects);
+  const effects = new PostProcessing({grain: 0.01}); engine.use(effects);
   engine.render(); await runtime.gpu.queue.onSubmittedWorkDone();
   assert(effects.target?.color.format === 'rgba16float', 'Planet did not compose into the HDR scene');
   const engineValidation = await runtime.gpu.popErrorScope();

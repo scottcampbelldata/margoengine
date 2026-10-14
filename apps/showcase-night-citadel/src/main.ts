@@ -12,7 +12,7 @@ import {applyQualityTier, watchQuality} from '@margoengine/quality';
 applyQualityTier();
 import {createCitadelPBR, moonDirection} from './scene.js';
 import {frameDue, frameStatus} from '@margoengine/quality';
-import {NightAtmosphere} from '@margoengine/scenery';
+import {Sky} from '@margoengine/sky';
 import './style.css';
 
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -40,7 +40,7 @@ export class NightCitadel {
   readonly lights: Clustered;
   readonly water: Water;
   readonly particles: VFX;
-  readonly atmosphere: NightAtmosphere;
+  readonly atmosphere: Sky;
   readonly camera;
   readonly device;
   private readonly events = new AbortController();
@@ -50,7 +50,6 @@ export class NightCitadel {
   private raf = 0;
   private targetRate = 60;
   disposed = false;
-  get sky() {return this.atmosphere.sky;}
 
   constructor(readonly engine: EngineKernel) {
     const runtime = engineRuntime(engine);
@@ -58,8 +57,11 @@ export class NightCitadel {
     this.device = runtime.gpu!;
     this.post = Bloom.attach(engine,{strength:0.25,threshold:1,exposure:0.3});
     const zenith = new PbrMaterial({color:'#020512'}).data, lunar = new PbrMaterial({color:'#e2eeff'}).data;
-    this.atmosphere = new NightAtmosphere({zenithColor:[zenith[0],zenith[1],zenith[2]],horizonColor:this.horizon,moonColor:[lunar[0],lunar[1],lunar[2]],moonDirection:this.moon,moonSize:0.035,starIntensity:1},()=>this.water?.depthTexture??this.post.depthTexture);
-    runtime.use(this.atmosphere);
+    // Keep the fortress between the title and controls on wide screens.
+    runtime.use({name:'citadel:framing',setup(){},registerPasses:graph=>graph.add({name:'citadel:framing',order:-100,execute:c=>{if(c.width/c.height>1.1)for(let i=0;i<4;i++)c.camera.matrix[i*4]-=0.12*c.camera.matrix[i*4+3];}})});
+    // Midnight sky with stars and a phased moon; height haze in the horizon colour over masonry and water.
+    this.atmosphere = Sky.attach(engine,{hours:0,timeScale:0,night:{zenithColor:[zenith[0],zenith[1],zenith[2]],horizonColor:this.horizon,moonColor:[lunar[0],lunar[1],lunar[2]],moonDirection:this.moon,moonSize:0.035,starIntensity:1},
+      fog:{depth:()=>this.water?.depthTexture??this.post.depthTexture,color:this.horizon,falloff:'exp',height:0.065,start:0,density:0}});
     this.shadows = Shadows.attach(engine,{resolution:this.stats.samples===4?1024:512,distance:180,lightSize:0.02,normalBias:0.055,casterMargin:70});
     this.lights = Clustered.attach(engine,{grid:[8,4,16]});
     this.instances = ScatterInstances.attach(engine,()=>createCitadelPBR().batches);
@@ -104,9 +106,8 @@ export class NightCitadel {
     moonDirection(this.moon,controls[0].valueAsNumber,controls[1].valueAsNumber);
     const phase=controls[2].valueAsNumber,haze=controls[3].valueAsNumber;
     for(let i=0;i<3;i++)this.horizon[i]=this.baseHorizon[i]*(0.55+haze*1.3)*(1+0.12*this.moon[1]);
-    Object.assign(this.atmosphere.config,{moonPhase:phase,starTwinkleIntensity:controls[4].valueAsNumber,glowIntensity:controls[5].valueAsNumber,hazeDensity:haze*3});
-    this.sky.setConfig(this.atmosphere.config);
-    this.atmosphere.fog.set(this.horizon,20);this.atmosphere.fog[23]=haze*0.0075;
+    Object.assign(this.atmosphere.options.night!,{moonPhase:phase,starTwinkleIntensity:controls[4].valueAsNumber,glowIntensity:controls[5].valueAsNumber,hazeDensity:haze*3});
+    this.atmosphere.options.fog!.density=haze*0.0075;
     const lighting=engineRuntime(this.engine).lighting;
     lighting.direction.set(this.moon);lighting.direction[3]=0.4+(phase+1)*2.2;
     lighting.radiance.set([0.5,0.68,1,0.08]);

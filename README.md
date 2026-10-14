@@ -62,7 +62,7 @@ npm run pack:packages         # rebuilds and writes npm tarballs to test-results
 npm run package:blender       # creates dist/margo-blender-addon-v1.0.0.zip (Python 3.11+)
 npm run modern:test:browser   # after build: GPU checks and production starter flows
 npm run modern:test:domains   # caps, sorting, FX and real GPU-loss recovery
-npm run modern:test:sky       # scenery phases, stars, depth and plugin lifecycle on WebGPU
+npm run modern:test:sky       # sky fog coverage and shader parity on WebGPU
 npm run modern:test:citadel   # showcase pixels, controls, pacing, resize and orbit heap profile
 npm run modern:test:packages  # frozen exports/types and React 18 lifecycle
 npm run modern:test:wrapper   # five-line setup, loading, lazy packs and teardown
@@ -88,15 +88,16 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 | [`@margoengine/loaders`](packages/loaders/README.md) | PLY/3MF/PCD/OFF/XYZ/VTK and static USDA/USDZ import; USDC is unsupported |
 | [`@margoengine/exporters`](packages/exporters/README.md) | glTF/GLB/STL/OBJ/PLY and static USDZ export for Quick Look |
 | [`@margoengine/machinery`](packages/machinery/README.md) | Revolute/prismatic joints, gear/piston couplings, bounded IK, sections/caps, dimensions, welded STL/OBJ, assembly queries/visibility, metrology and industrial presets |
-| [`@margoengine/creative`](packages/creative/README.md) | Textured/sorted GPU particles, wind obstacles, sky/fog/scattering, toon, HDR and compute post-processing |
-| `@margoengine/scenery` | Independently loaded `SkyMoon` plugin and `SkyMoonPass`, procedural moonlit sky, lunar phases, stars and horizon haze |
+| [`@margoengine/creative`](packages/creative/README.md) | Grass, planet, a leaf-field preset over vfx, toon, HDR targets and a grading effect (height fog, god rays, DOF blur, grain) |
+| [`@margoengine/sky`](packages/sky/README.md) | The one sky: Preetham/Bruneton day, stylized night with stars and phased moon, clouds, distance/height fog |
+| [`@margoengine/scenery`](packages/scenery/README.md) | `SkyMoon`, a moonlit-night preset of `@margoengine/sky` |
 | `@margoengine/gltf-pro` | Optional metallic-roughness PBR, all five texture maps, normal mapping, mipmaps and alpha modes |
 | [`@margoengine/blender`](packages/blender/README.md) | Offline Blender `.margo` export and prepacked WebGPU PBR ingestion |
 | `@margoengine/animation` | Optional storage-buffer skeletal skinning, compute morphs and glTF animation playback |
-| `@margoengine/post` | Optional frame-graph SSAO, view-space normal/depth extraction and bilateral blur |
+| [`@margoengine/post`](packages/post/README.md) | The one bloom, SSAO, FXAA and the PostStack that combines effects |
 | [`@margoengine/shadows`](packages/shadows/README.md) | Four directional cascades, PCSS, cached static depth and dynamic casters |
 | [`@margoengine/clustered`](packages/clustered/README.md) | Compute frustum clusters and forward PBR for up to 1,024 point/spot lights |
-| [`@margoengine/vfx`](packages/vfx/README.md) | Up to 1,000,000 GPU particles, curl turbulence, collisions and indirect billboards |
+| [`@margoengine/vfx`](packages/vfx/README.md) | The one particle system: up to 1,000,000 GPU particles, curl turbulence, obstacles, sorting, sprites and indirect billboards |
 | [`@margoengine/animator`](packages/animator/README.md) | Gameplay states, 1D/2D blending, additive masks and analytical foot IK |
 | [`@margoengine/taa`](packages/taa/README.md) | Halton jitter, mesh/skinned velocity, depth-tested history and YCoCg clamping |
 | [`@margoengine/splats`](packages/splats/README.md) | GPU radix sorting, covariance ellipses, degree-3 SH and binary Gaussian captures |
