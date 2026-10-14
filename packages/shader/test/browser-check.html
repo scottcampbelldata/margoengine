@@ -1,0 +1,50 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Shader nodes browser check</title><style>body{margin:0}#host{width:400px;height:400px}</style></head><body><div id="host"></div>
+<script type="module">
+import {createStage} from '/packages/margoengine/dist/index.js';
+import {planeGeometry} from '/packages/geometry/dist/index.js';
+import {Texture,createMesh} from '/packages/materials/dist/index.js';
+import {PostStack} from '/packages/post/dist/index.js';
+import {NodeMaterial,NodePass,ComputePass,storage,uniform,texture,uv,vec3,vec4,color,mix,step,select,positionLocal,normalLocal,inputColor,inputDepth,float,instanceIndex,loop,Fn,time,sin} from '/packages/shader/dist/index.js';
+const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,3],target:[0,0,0]}});
+const engine=stage.engine,device=engine.gpu,errors=[];let pipelines=0;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const createRenderPipeline=device.createRenderPipeline.bind(device);device.createRenderPipeline=d=>{pipelines++;return createRenderPipeline(d);};
+const solid=(r,g,b)=>new Texture({data:new Uint8Array([r,g,b,255,r,g,b,255,r,g,b,255,r,g,b,255]),width:2,height:2});
+const tint=uniform('#ff8000',{name:'tint'}),plane=material=>createMesh(engine,planeGeometry(2,2),material);
+const field=storage(4,'vec4f'),fill=new ComputePass(4,i=>field.store(i,vec4(i.toFloat(),2,0,1)));
+const scenarios={
+  // Basic shading shows the node colour exactly (sRGB-encoded linear input).
+  uniform:()=>plane(new NodeMaterial({shading:'basic',colorNode:tint})),
+  gradient:()=>plane(new NodeMaterial({shading:'basic',colorNode:mix(color('#ff0000'),color('#0000ff'),step(0.5,uv().y))})),
+  texture:()=>plane(new NodeMaterial({shading:'basic',colorNode:texture(solid(0,255,0)).rgb})),
+  varying:()=>plane(new NodeMaterial({shading:'basic',colorNode:normalLocal.mul(0.5).add(0.5)})),
+  moved:()=>plane(new NodeMaterial({shading:'basic',colorNode:vec3(1),positionNode:positionLocal.add(vec3(10,0,0))})),
+  lit:()=>plane(new NodeMaterial({colorNode:mix(color('#3366ff'),color('#ff6633'),uv().x),roughnessNode:float(0.4).add(sin(time).mul(0.1)),emissiveNode:vec3(0.05)})),
+  loop:()=>{const avg=Fn(c=>loop(4,vec3(0),(i,acc)=>acc.add(c.mul(0.25))),'average');return plane(new NodeMaterial({shading:'basic',colorNode:avg(color('#00ffff'))}));},
+  post:()=>{
+    const mesh=plane(new NodeMaterial({shading:'basic',colorNode:color('#ff8000')}));mesh.root.setScale([0.5,0.5,0.5]);
+    // Inverts the scene where there is geometry, magenta where depth is the cleared far plane.
+    const pass=new NodePass(select(inputDepth().greaterThan(0),vec3(1).sub(inputColor().rgb),vec3(1,0,1))),stack=PostStack.attach(engine,[pass]);
+    return {destroy(){stack.dispose();mesh.destroy();}};
+  },
+  compute:()=>{engine.use(fill);const mesh=plane(new NodeMaterial({shading:'basic',colorNode:vec3(field.element(2).x.div(2),field.element(1).y.div(4),0)}));return {destroy(){engine.removePlugin(fill.name);mesh.destroy();}};},
+};
+window.check={
+  async run(name){device.pushErrorScope('validation');const model=await scenarios[name]();window.current=model;engine.render();await device.queue.onSubmittedWorkDone();const e=await device.popErrorScope();return {error:e?.message??null,errors:errors.splice(0),pipelines};},
+  async setTint(hex){const before=pipelines;tint.value=hex;engine.render();await device.queue.onSubmittedWorkDone();return {errors:errors.splice(0),newPipelines:pipelines-before};},
+  async readField(){
+    const read=device.createBuffer({size:64,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),encoder=device.createCommandEncoder();
+    encoder.copyBufferToBuffer(field.buffer(device),0,read,0,64);device.queue.submit([encoder.finish()]);await read.mapAsync(GPUMapMode.READ);
+    const values=[...new Float32Array(read.getMappedRange())];read.unmap();read.destroy();return values;
+  },
+  // Both gltf-pro variants (standard and KHR physical) with node overrides, including a vertex offset and a varying, must compile.
+  async variants(){
+    const {pbrShader,physicalShader}=await import('/packages/gltf-pro/src/shader.ts');
+    const m=new NodeMaterial({colorNode:mix(tint,texture(solid(0,0,255)).rgb,uv().x),positionNode:positionLocal.add(normalLocal.mul(sin(time).mul(0.1))),emissiveNode:normalLocal.mul(0.1),roughnessNode:0.5});
+    const out=[];for(const source of [pbrShader,physicalShader()]){const info=await device.createShaderModule({code:m.shader(source,2)}).getCompilationInfo();out.push(info.messages.filter(x=>x.type==='error').map(x=>x.message));}
+    return out;
+  },
+  clear(){window.current?.destroy();window.current=null;engine.render();},
+};
+window.ready=true;
+</script></body></html>

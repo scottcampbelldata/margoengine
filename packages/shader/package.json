@@ -1,0 +1,37 @@
+{
+  "name": "@margoengine/shader",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Typed shader nodes that compile to readable WGSL: node materials, node post effects and node compute passes.",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^0.1.0 || ^1.0.0",
+    "@margoengine/materials": "^0.1.0 || ^1.0.0",
+    "@margoengine/gltf-pro": "^0.1.0 || ^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js shader",
+    "test": "npm run build && node --test test/*.test.js",
+    "prepack": "npm run build"
+  },
+  "homepage": "https://margoengine.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/shader"
+  }
+}

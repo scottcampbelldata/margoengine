@@ -65,7 +65,23 @@ test('createMesh draws through gltf-pro with patched shader and default bindings
     const group=s.lighting().at(-1);assert.deepEqual(group.entries.map(e=>e.binding),[32,33,34,35,36,37,38,39,40,41]);
     assert.equal(group.entries[0].resource,group.entries[2].resource,'missing maps share the white default');
     assert.notEqual(group.entries[4].resource,group.entries[0].resource,'normal slot uses the flat normal default');
-    const uniform=s.h.resources.find(r=>r.size===880);// gltf-pro's per-draw Frame uniformassert.deepEqual([...new Float32Array(uniform.data,76*4,4)],[0.5,0.25,1,1]);
+    const uniform=s.h.resources.find(r=>r.size===880);// gltf-pro's per-draw Frame uniform
+    assert.deepEqual([...new Float32Array(uniform.data,76*4,4)],[0.5,0.25,1,1]);
+  } finally {s.close();}
+});
+
+test('Material subclasses extend the shader patch and bindings that createMesh installs',async()=>{
+  const s=await scene();
+  try {
+    let engine;
+    class Tinted extends Material {
+      shader(source,group){return super.shader(source,group).replace('if(!facing&&f.settings.z<0.5){discard;}','s.base=vec4f(1,0,0,1);\n  if(!facing&&f.settings.z<0.5){discard;}');}
+      bindings(device,e){engine=e;return super.bindings(device,e);}
+    }
+    const model=createMesh(s.engine,boxGeometry(1,1,1),new Tinted());s.frame();
+    const code=s.h.pipelines.find(p=>p.fragment?.entryPoint==='fragment'&&p.vertex.buffers?.length).vertex.module.code;
+    assert.ok(code.includes('s.base=vec4f(1,0,0,1);')&&code.includes('textureSample(mat_baseMap,'),'subclass patch applies on top of the materials patch');
+    assert.equal(engine?.canvas.width,128,'bindings receive the drawing engine');model.destroy();
   } finally {s.close();}
 });
 

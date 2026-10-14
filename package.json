@@ -75,6 +75,7 @@
     "packages/scatter",
     "packages/html",
     "packages/video",
+    "packages/shader",
     "examples/vite",
     "examples/gameplay-sandbox",
     "examples/react-viewer",
