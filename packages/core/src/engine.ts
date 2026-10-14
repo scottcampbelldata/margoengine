@@ -156,7 +156,8 @@ export class Engine {
     try{return mesh.setParent(parent);}catch(error){mesh.dispose();throw error;}
   }
   remove(mesh:Mesh):void {
-    mesh.check();for(const child of this.meshes.values())if(this.store.parents[child.id]===mesh.id)this.store.parents[child.id]=-1;
+    // Detach children with a native scan of the parent column (free slots are reset on reuse); skipped when the engine goes.
+    const parents=this.store.parents;mesh.check();if(!this.disposing)for(let id=parents.indexOf(mesh.id);id>=0;id=parents.indexOf(mesh.id,id+1))parents[id]=-1;
     if(mesh.geometry)this.release(mesh.geometry);this.meshes.delete(mesh.id);this.revision++;this.store.active[mesh.id]=0;this.store.visible[mesh.id]=0;this.free.push(mesh.id);
   }
   retain(geometry:Geometry):void {
