@@ -1,6 +1,8 @@
 import {Engine, Camera, PbrMaterial, box} from '@margoengine/core';
 import {engineRuntime} from '@margoengine/core/extension';
-import {Environment, EnvironmentBackground, loadEnvironmentImage, projectEquirectSH, shBasis, halfToFloat, IBL_WGSL, iblLayoutEntries, iblBindGroupEntries} from '../dist/index.js';
+import {Environment, EnvironmentBackground, loadEnvironmentImage, projectEquirectSH, shBasis, halfToFloat, IBL_WGSL, iblLayoutEntries, iblBindGroupEntries, ColorBackground, EnvironmentLighting, Fog, decodeUltraHDR} from '../dist/index.js';
+import {parseGLTF} from '@margoengine/gltf-pro';
+import {animatedTriangle} from '../../../tests/support/gltf-pro-fixture.js';
 
 const assert = (condition, message) => {if (!condition) throw new Error(message);};
 const align = n => Math.ceil(n / 256) * 256;
@@ -427,6 +429,93 @@ window.runEnvironmentTests = async () => {
     assert(environment.disposed && environment.device === null, 'engine.dispose did not dispose the environment plugin');
     report.engine.restoreDifference = restoreWorst;
     report.checks.push('engine: background fills only cleared depth around a core mesh, steady frames allocate nothing, device restore rebuilds, plugin removal and disposal');
+  }
+  // 9. Scene lighting in a real engine: EnvironmentLighting, Fog and ColorBackground on a core mesh and a blended glTF-pro triangle.
+  {
+    const canvas = document.querySelector('#scene');
+    const engine = await Engine.create(canvas, {backend: 'webgpu', camera: {position: [0, 0, 4], target: [0, 0, 0], fov: 60}});
+    const runtime = engineRuntime(engine), gpuErrors = [];
+    runtime.gpu.addEventListener('uncapturederror', event => gpuErrors.push(event.error.message)); runtime.gpu.pushErrorScope('validation');
+    const capture = () => {
+      const copy = document.createElement('canvas'); copy.width = canvas.width; copy.height = canvas.height;
+      const context = copy.getContext('2d'); context.drawImage(canvas, 0, 0);
+      return context.getImageData(0, 0, copy.width, copy.height).data;
+    };
+    const mesh = engine.createMesh().setGeometry(box(1.2, 1.2, 1.2)).setMaterial(new PbrMaterial({color: '#d0a040', roughness: 0.6}));
+    mesh.setRotation([0.4, 0.6, 0]);
+    const fixture = animatedTriangle();
+    fixture.doc.materials = [{alphaMode: 'BLEND', pbrMetallicRoughness: {baseColorFactor: [0.2, 0.6, 0.9, 0.7], metallicFactor: 0, roughnessFactor: 0.5}}];
+    fixture.doc.nodes = [{mesh: 0, translation: [-0.9, -0.9, 1]}]; delete fixture.doc.skins; delete fixture.doc.animations;
+    delete fixture.doc.meshes[0].primitives[0].attributes.JOINTS_0; delete fixture.doc.meshes[0].primitives[0].attributes.WEIGHTS_0;
+    const model = parseGLTF(engine, fixture.doc, fixture.buffers);
+    engine.render(); const plain = capture();
+    const width = canvas.width, height = canvas.height, clear = plain.slice(0, 3);
+    const covered = i => Math.abs(plain[i] - clear[0]) + Math.abs(plain[i + 1] - clear[1]) + Math.abs(plain[i + 2] - clear[2]) > 6;
+    // ColorBackground: exact sRGB bytes where the scene left depth cleared, scene pixels untouched.
+    const background = new ColorBackground({color: '#336699'});
+    engine.use(background); engine.render(); const colored = capture();
+    let bgPixels = 0, bgWorst = 0, sceneWorst = 0, scenePixels = 0;
+    for (let i = 0; i < colored.length; i += 4) {
+      const x = (i / 4) % width, y = Math.floor(i / 4 / width), corner = x < 3 && y < 3;
+      if (corner) {bgPixels++; bgWorst = Math.max(bgWorst, Math.abs(colored[i] - 51), Math.abs(colored[i + 1] - 102), Math.abs(colored[i + 2] - 153));}
+      // The opaque box sits in the middle; the blended triangle (bottom left) legitimately shows the new background through it.
+      else if (covered(i) && Math.abs(x - width / 2) < width / 6 && Math.abs(y - height / 2) < height / 6 && covered(i - 4) && covered(i + 4) && covered(i - width * 4) && covered(i + width * 4)) {
+        scenePixels++; for (let k = 0; k < 3; k++) sceneWorst = Math.max(sceneWorst, Math.abs(colored[i + k] - plain[i + k]));
+      }
+    }
+    assert(bgWorst <= 1 && sceneWorst <= 1 && scenePixels > 200, `color background: corner error ${bgWorst}, scene error ${sceneWorst} over ${scenePixels} px`);
+    // IBL alone (direct light and constant ambient off): a constant environment lights every mesh pixel and changes the frame.
+    const saved = engine.lighting.radiance.slice(); engine.lighting.radiance.set([0, 0, 0, 0]);
+    engine.render(); const dark = capture();
+    const environment = await Environment.create(engine, equirect(64, 32, () => [0.6, 0.6, 0.6]), {size: 32, ...small});
+    const lighting = new EnvironmentLighting(environment);
+    engine.use(environment).use(lighting); lighting.applyTo(model);
+    engine.render(); const lit = capture();
+    let litPixels = 0, darkSum = 0, litSum = 0;
+    for (let i = 0; i < lit.length; i += 4) if (covered(i)) {litPixels++; darkSum += dark[i] + dark[i + 1] + dark[i + 2]; litSum += lit[i] + lit[i + 1] + lit[i + 2];}
+    assert(litPixels > 200 && litSum > darkSum + litPixels * 60, `IBL did not light the scene: ${darkSum} -> ${litSum} over ${litPixels} px`);
+    // Full fog in the background color: the whole frame is that color, including the blended glTF triangle.
+    const fog = new Fog({color: '#336699', near: 0, far: 0.001});
+    engine.use(fog); fog.applyTo(model);
+    engine.render(); const fogged = capture();
+    let fogWorst = 0;
+    for (let i = 0; i < fogged.length; i += 4) fogWorst = Math.max(fogWorst, Math.abs(fogged[i] - 51), Math.abs(fogged[i + 1] - 102), Math.abs(fogged[i + 2] - 153));
+    assert(fogWorst <= 1, `full fog differs from its color by ${fogWorst}`);
+    fog.far = 1000; fog.near = 999; engine.render(); const thin = capture();
+    let thinWorst = 0; for (let i = 0; i < thin.length; i++) thinWorst = Math.max(thinWorst, Math.abs(thin[i] - lit[i]));
+    assert(thinWorst <= 1, `fog beyond the scene changed it by ${thinWorst}`);
+    await runtime.gpu.queue.onSubmittedWorkDone();
+    const validation = await runtime.gpu.popErrorScope();
+    assert(!validation && !gpuErrors.length, `scene lighting validation: ${validation?.message ?? gpuErrors.join('; ')}`);
+    // Removing every effect restores the plain frame.
+    engine.removePlugin(fog.name); engine.removePlugin(lighting.name); engine.removePlugin(background.name);
+    engine.lighting.radiance.set(saved); engine.render(); const after = capture();
+    let afterWorst = 0; for (let i = 0; i < after.length; i++) afterWorst = Math.max(afterWorst, Math.abs(after[i] - plain[i]));
+    assert(afterWorst <= 1, `removing the scene effects left a difference of ${afterWorst}`);
+    report.sceneLighting = {colorBackgroundError: bgWorst, scenePixels, litPixels, darkSum, litSum, fogError: fogWorst, thinFogError: thinWorst, removedError: afterWorst};
+    model.dispose(); engine.dispose();
+    report.checks.push('scene lighting: color background exact on cleared depth, IBL lights core meshes and glTF-pro, full fog covers opaque and blended geometry, removal restores the frame');
+  }
+  // 10. UltraHDR through the browser's own JPEG decoder: a gain-map JPEG assembled from two canvas-encoded JPEGs.
+  {
+    const encode = async (fill, width, height) => {
+      const canvas = new OffscreenCanvas(width, height), context = canvas.getContext('2d');
+      context.fillStyle = fill; context.fillRect(0, 0, width, height);
+      return new Uint8Array(await (await canvas.convertToBlob({type: 'image/jpeg', quality: 1})).arrayBuffer());
+    };
+    const withXmp = (jpeg, xmp) => {
+      const payload = new TextEncoder().encode('http://ns.adobe.com/xap/1.0/\0' + xmp), length = payload.length + 2;
+      return new Uint8Array([0xff, 0xd8, 0xff, 0xe1, length >> 8, length & 255, ...payload, ...jpeg.subarray(2)]);
+    };
+    const primary = withXmp(await encode('#808080', 16, 8), '<rdf:Description hdrgm:Version="1.0"/>');
+    const gain = withXmp(await encode('#ffffff', 4, 2), '<rdf:Description hdrgm:Version="1.0" hdrgm:GainMapMin="0" hdrgm:GainMapMax="3" hdrgm:OffsetSDR="0" hdrgm:OffsetHDR="0" hdrgm:HDRCapacityMax="3"/>');
+    const file = new Uint8Array([...primary, ...gain]);
+    const image = await decodeUltraHDR(file), expected = 8 * ((128 / 255 + 0.055) / 1.055) ** 2.4;
+    let worst = 0;
+    for (let i = 0; i < image.data.length; i += 4) for (let k = 0; k < 3; k++) worst = Math.max(worst, Math.abs(image.data[i + k] - expected) / expected);
+    assert(image.width === 16 && image.height === 8 && worst < 0.03, `UltraHDR decode ${image.width}x${image.height}, relative error ${worst}`);
+    report.ultraHDR = {expected, relativeError: worst};
+    report.checks.push('UltraHDR: browser-decoded primary and upsampled gain map recover 2^GainMapMax times the linear SDR value');
   }
   report.hardware = {vendor: adapter.info?.vendor, architecture: adapter.info?.architecture, fallback: adapter.info?.isFallbackAdapter};
   report.validationErrors = 0;
