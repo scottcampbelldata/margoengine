@@ -1,3 +1,5 @@
+/// <reference lib="esnext.disposable" preserve="true" />
+import type {EngineKernel} from '@margoengine/core';
 import type {Engine,EnginePlugin,FrameGraph,PassContext,Vec3} from '@margoengine/core/extension';
 import {invertMatrixStable} from '@margoengine/math/mat4';
 import {HDRRenderTarget} from './targets.js';
@@ -39,6 +41,8 @@ export class PostProcessing implements EnginePlugin {
   private readonly inverseWorkspace=new Float64Array(52);private shaderSource?:string;private linearShader='';
   private colorView?:GPUTextureView;private depthView?:GPUTextureView;private resolveGroup?:GPUBindGroup;private presentGroup?:GPUBindGroup;private presentPass?:GPURenderPassDescriptor;
   private host?:StackHost;private sceneDepth?:GPUTexture;
+  /** Same as `engine.use(new PostProcessing(...))`; returns the PostProcessing. */
+  static attach(engine: EngineKernel, options?: PostOptions): PostProcessing {const value = new PostProcessing(options); engine.use(value); return value;}
   constructor(readonly options:PostOptions={}){this.validate();}
   /** In a PostStack, grades (fog, focus blur, ACES, grain) the stack's HDR result as its display effect. */
   private joinStack(host:StackHost):StackStage {
@@ -91,6 +95,8 @@ export class PostProcessing implements EnginePlugin {
   }
   onDeviceRestored(engine:Engine):void {const time=this.time;this.dispose();this.setup(engine);this.time=time;}
   dispose():void {this.sceneDepth=undefined;this.target?.dispose();this.target=undefined;this.output?.destroy();this.uniform?.destroy();this.output=this.uniform=undefined;this.device=undefined;this.ready=false;this.presentKey='';this.resolve=undefined;this.present=undefined;this.original=undefined;this.colorView=this.depthView=undefined;this.resolveGroup=this.presentGroup=undefined;this.presentPass=undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }
 
 

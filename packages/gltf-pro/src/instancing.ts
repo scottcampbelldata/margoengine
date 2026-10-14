@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 // @margoengine/gltf-pro/instancing: PBRInstances, its vertex-stage patch and the EXT_mesh_gpu_instancing reader. The root
 // entry only draws what a primitive's `instances` hands it, so apps that never instance do not load this module.
 import {composeMatrix} from '@margoengine/math/mat4';
@@ -59,6 +60,8 @@ export class PBRInstances {
   }
   /** Frees the GPU buffer; the next draw uploads everything again. */
   dispose():void {this.gpu?.destroy();this.gpu=this.device=undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
   /** @internal gltf-pro's instance vertex buffer layout (slot 1). */
   get layout():GPUVertexBufferLayout {return instanceLayout as GPUVertexBufferLayout;}
   /** @internal gltf-pro's PBR shader with the instanced vertex stage. */

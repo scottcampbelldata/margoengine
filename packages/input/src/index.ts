@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 export type Binding = {type: 'key'; code: string; scale?: number} | {type: 'mouse'; button: number; scale?: number} |
   {type: 'pointer'; axis: 'x' | 'y' | 'wheel'; scale?: number} | {type: 'gamepad-axis' | 'gamepad-button'; index: number; gamepad?: number; scale?: number} |
   {type: 'touch'; id: string; axis?: 'x' | 'y'; scale?: number};
@@ -112,4 +113,6 @@ export class Input {
   }
   reset(): void {this.keys.clear(); this.buttons = 0; this.motion.x = this.motion.y = this.motion.wheel = 0; for (const state of this.touch.values()) {state.reset?.();state.down = false; state.x = state.y = 0;}}
   dispose(): void {if (this.disposed) return; this.disposed = true; for (let i = this.cleanups.length - 1; i >= 0; i--) this.cleanups[i](); this.cleanups.length = 0; this.reset();}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

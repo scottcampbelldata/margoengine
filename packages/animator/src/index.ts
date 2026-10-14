@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import {Animation,sampleTrackInto} from '@margoengine/animation';
 import type {Engine,EnginePlugin,Mesh,Vec3} from '@margoengine/core/extension';
 import {finiteVector} from '@margoengine/math/validate';
@@ -85,5 +86,8 @@ export class Animator implements EnginePlugin {
   }
   onDeviceRestored():void {this.animation.playing=false;}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.unsubscribe?.();this.unsubscribe=undefined;this.animation.playing=this.previousPlaying;this.layers.clear();this.feet.clear();this.engine=undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  /** @deprecated Use dispose(); kept as an alias until 1.0. */
   destroy():void {this.dispose();}
 }

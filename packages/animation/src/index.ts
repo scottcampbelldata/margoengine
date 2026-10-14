@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {PBRModel,PBRPrimitive} from '@margoengine/gltf-pro';
 import type {Engine,EnginePlugin,FrameGraph,PassContext} from '@margoengine/core/extension';
 import {invertMatrixStable} from '@margoengine/math/mat4';
@@ -148,5 +149,8 @@ export class Animation implements EnginePlugin {
   private release():void {for(const r of this.resources){if(r.primitive.deformed===r.output)r.primitive.deformed=undefined;for(const b of r.buffers)b.destroy();}this.resources=[];this.pipeline=undefined;}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.model.root.engine.removePlugin(this.name);this.unsubscribe?.();this.unsubscribe=undefined;this.release();this.device=undefined;}
-  destroy():void {this.model.root.engine.removePlugin(this.name);this.dispose();}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  /** @deprecated Use dispose(); kept as an alias until 1.0. */
+  destroy():void {this.dispose();}
 }

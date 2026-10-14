@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import {transcodeFormats} from './formats.js';
 import {WorkerPool, payload, requireWorkers, workerLimit} from './pool.js';
 import type {TranscodeTarget, TranscodedKTX2Result} from './protocol.js';
@@ -99,6 +100,8 @@ export class KTX2Decoder {
 
   /** Terminate the workers. Pending transcodes reject. */
   dispose(): void {this.pool?.dispose(); this.pool = undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 
   private urls(): {transcoderURL: string; wasmURL: string} {
     if (this.transcoderPath !== undefined) {

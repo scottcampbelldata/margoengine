@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {Engine, EnginePlugin, FrameGraph, PassContext} from '@margoengine/core/extension';
 import {engineRuntime, meshRuntime} from '@margoengine/core/extension';
 import type {EngineKernel, Mesh} from '@margoengine/core';
@@ -79,6 +80,8 @@ export class TextRenderer implements EnginePlugin {
   private readonly descriptor: GPURenderPassDescriptor = {colorAttachments: [this.colorAttachment], depthStencilAttachment: this.depthAttachment};
   private atlasEpoch = 0;
 
+  /** Same as `engine.use(new TextRenderer(...))`; returns the TextRenderer. */
+  static attach(engine: EngineKernel, options?: TextRendererOptions): TextRenderer {const value = new TextRenderer(options); engine.use(value); return value;}
   constructor(options: TextRendererOptions = {}) {
     this.name = options.name ?? 'text'; this.order = options.order ?? 22;
     this.options = {atlasSize: options.atlasSize ?? 1024, colorAtlasSize: options.colorAtlasSize ?? 512, maxPages: options.maxPages ?? 64};
@@ -296,11 +299,13 @@ export class TextRenderer implements EnginePlugin {
   private releaseGpu(atlases: boolean): void {
     for (const text of [...this.resources.keys()]) this.release(text);
     this.frameBuffer?.destroy();
-    if (atlases) {this.sdfAtlas?.destroy(); this.colorAtlas?.destroy(); this.sdfAtlas = this.colorAtlas = undefined; this.atlasEpoch++;}
+    if (atlases) {this.sdfAtlas?.dispose(); this.colorAtlas?.dispose(); this.sdfAtlas = this.colorAtlas = undefined; this.atlasEpoch++;}
     this.frameBuffer = this.frameGroup = this.module = this.layouts = this.sampler = this.device = undefined;
     this.pipelines.clear();
   }
 
   /** Releases every GPU resource, atlases included. Texts stay registered, so the plugin can be used again. */
   dispose(): void {this.releaseGpu(true); this.engine = undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

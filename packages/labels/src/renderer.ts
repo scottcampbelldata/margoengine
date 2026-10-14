@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel, EnginePlugin, Mesh} from '@margoengine/core';
 import {engineRuntime, meshRuntime, type FrameGraph} from '@margoengine/core/extension';
 import {cameraCSSTransform, composeMatrix, createScreenPoint, cssPerspective, isOrthographic, lookAtView, objectCSSTransform, orthographicCSSTransform, projectPoint, type ScreenPoint, type Vec3} from './projection.js';
@@ -194,6 +195,8 @@ export class LabelRenderer implements EnginePlugin {
   /** Number of style properties written during the last update (diagnostics and tests). */
   writes = 0;
 
+  /** Same as `engine.use(new LabelRenderer(...))`; returns the LabelRenderer. */
+  static attach(engine: EngineKernel, options?: LabelRendererOptions): LabelRenderer {const value = new LabelRenderer(options); engine.use(value); return value;}
   constructor(options: LabelRendererOptions = {}) {
     this.options = options;
     this.name = options.name ?? 'margoengine-labels';
@@ -343,6 +346,8 @@ export class LabelRenderer implements EnginePlugin {
     for (const cache of [this.rootCache, this.viewerCache, this.cameraCache]) for (const key of Object.keys(cache)) delete cache[key];
     this.engine = null;
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 
   private set(element: HTMLElement, cache: StyleCache, property: string, value: string): void {
     if (cache[property] === value) return;

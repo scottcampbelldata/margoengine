@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext} from '@margoengine/core/extension';
 import {finiteVector} from '@margoengine/math/validate';
@@ -50,6 +51,8 @@ export class GrassField implements EnginePlugin {
   private readonly sporeDepth: GPURenderPassDepthStencilAttachment = {view:undefined!,depthReadOnly:true,stencilReadOnly:true};
   private readonly sporePass: GPURenderPassDescriptor = {colorAttachments:[this.color],depthStencilAttachment:this.sporeDepth};
 
+  /** Creates the GrassField on `engine` (preferred over the constructor). */
+  static attach(engine: EngineKernel, options?: GrassOptions): GrassField {return new GrassField({engine}, options);}
   constructor(stage: {readonly engine:EngineKernel}, options: GrassOptions = {}) {
     const {blades=100_000,area=[50,50],bladeHeight=1.2,windSpeed=1.2,windStrength=0.45,windDirection=[1,0.35],drawDistance=100,spores=false} = options;
     finiteVector(area,2,'Grass area'); finiteVector(windDirection,2,'Wind direction');
@@ -184,9 +187,12 @@ export class GrassField implements EnginePlugin {
     this.module=this.pipelineLayout=this.group=undefined;this.canvasFormat=undefined;
   }
   onDeviceRestored(engine: Engine): void {this.release(); try {this.setup(engine);} catch (error) {this.release(); throw error;}}
+  /** @deprecated Use dispose(); kept as an alias until 1.0. */
   destroy(): void {this.dispose();}
   dispose(): void {
     if (this.engine?.hasPlugin(this.name)) {this.engine.removePlugin(this.name); return;}
     this.release(); this.engine=undefined;
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

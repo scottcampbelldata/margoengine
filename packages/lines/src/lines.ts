@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {Engine, EnginePlugin, FrameGraph, PassContext} from '@margoengine/core/extension';
 import {engineRuntime, meshRuntime} from '@margoengine/core/extension';
 import type {EngineKernel, Mesh} from '@margoengine/core';
@@ -53,6 +54,8 @@ export class Lines implements EnginePlugin {
   private readonly depthAttachment: GPURenderPassDepthStencilAttachment = {view: undefined!, depthReadOnly: true, stencilReadOnly: true};
   private readonly descriptor: GPURenderPassDescriptor = {colorAttachments: [this.colorAttachment], depthStencilAttachment: this.depthAttachment};
 
+  /** Same as `engine.use(new Lines(...))`; returns the Lines. */
+  static attach(engine: EngineKernel, options?: LinesOptions): Lines {const value = new Lines(options); engine.use(value); return value;}
   constructor(options: LinesOptions = {}) {
     this.name = options.name ?? 'lines'; this.order = options.order ?? 20;
     if (!this.name || typeof this.name !== 'string' || !Number.isFinite(this.order)) throw new TypeError('Invalid Lines options');
@@ -208,4 +211,6 @@ export class Lines implements EnginePlugin {
 
   /** Releases every GPU resource. Lines stay registered, so the plugin can be used again. */
   dispose(): void {this.releaseGpu(); this.engine = undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

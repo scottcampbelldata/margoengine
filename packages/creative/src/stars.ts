@@ -1,3 +1,5 @@
+/// <reference lib="esnext.disposable" preserve="true" />
+import type {EngineKernel} from '@margoengine/core';
 import type {Engine, EnginePlugin, FrameGraph, PassContext} from '@margoengine/core/extension';
 import {invertMatrixStable} from '@margoengine/math/mat4';
 import shader from './shaders/stars.wgsl?raw';
@@ -6,6 +8,8 @@ declare const GPUBufferUsage: {UNIFORM: number; COPY_DST: number};
 declare const GPUShaderStage: {VERTEX: number};
 
 export class Stars implements EnginePlugin {
+  /** Same as `engine.use(new Stars(...))`; returns the Stars. */
+  static attach(engine: EngineKernel): Stars {const value = new Stars(); engine.use(value); return value;}
   enabled = true;
   readonly name = 'creative:stars';
   private buffer?: GPUBuffer;
@@ -70,4 +74,6 @@ export class Stars implements EnginePlugin {
     this.buffer = this.layout = this.bindings = this.module = undefined;
     this.pipelines.clear();
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

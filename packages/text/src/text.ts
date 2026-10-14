@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {Mesh} from '@margoengine/core';
 import {parseColor, type ColorInput} from './color.js';
 import {Font, type FontOptions} from './font.js';
@@ -170,4 +171,6 @@ export class Text {
 
   /** Removes the text from its renderer and releases its GPU buffers. It can be added again later. */
   dispose(): void {this.owner?.remove(this);}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

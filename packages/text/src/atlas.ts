@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {GlyphBitmap} from './font.js';
 import {ShelfPacker, type AtlasSlot} from './packer.js';
 
@@ -69,5 +70,9 @@ export class GlyphAtlas {
     for (const [glyph, slot] of this.slots) this.upload(glyph, slot);
   }
 
-  destroy(): void {this.texture?.destroy(); this.texture = this.textureView = undefined; this.layers = 0; this.slots.clear(); this.packer.clear(); this.generation++;}
+  dispose(): void {this.texture?.destroy(); this.texture = this.textureView = undefined; this.layers = 0; this.slots.clear(); this.packer.clear(); this.generation++;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  /** @deprecated Use dispose(); kept as an alias until 1.0. */
+  destroy(): void {this.dispose();}
 }

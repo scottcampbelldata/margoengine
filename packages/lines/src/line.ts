@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel, Mesh} from '@margoengine/core';
 import {parseColor, type ColorInput} from './color.js';
 import {CAPS, JOINS, MODES, computeLineDistances, segmentCount, type LineCap, type LineJoin, type LineMode} from './geometry.js';
@@ -187,4 +188,6 @@ export class Line {
 
   /** Removes the line from its plugin and releases its GPU buffers. The line can be added again later. */
   dispose(): void {this.owner?.remove(this);}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }
