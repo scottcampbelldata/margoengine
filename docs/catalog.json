@@ -353,6 +353,21 @@
     ]
   },
   {
+    "id": "culling",
+    "title": "Culling",
+    "package": "@margoengine/culling",
+    "version": "0.1.0",
+    "published": false,
+    "description": "GPU-driven static instances: frustum and Hi-Z occlusion culling in compute, order-preserving compaction and indirect draws, no per-part CPU work per frame.",
+    "requirements": "Core ^0.1.0 || ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "culling",
+    "install": "npm install @margoengine/core@0.1.0 @margoengine/culling@0.1.0",
+    "imports": "import { CulledInstances } from '@margoengine/culling';",
+    "exports": [
+      "CulledInstances"
+    ]
+  },
+  {
     "id": "decoders",
     "title": "Decoders",
     "package": "@margoengine/decoders",

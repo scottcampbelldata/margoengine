@@ -55,7 +55,8 @@ frames queue behind each other, so the serial-frame row is the upper bound for G
 
 The earlier Node run measured about 12.8 ms per tick at 100,000 entities with 10-deep hierarchies and culling.
 Confirmed: on AC power Node measures 11.4 ms for 100,000 entities in 10-deep chains and 15.7 ms for the 5-level
-assembly (`node examples/package-benchmarks/cad/kernel-node.mjs`, `results-kernel-node.json`); the browser measures
+assembly (`node examples/package-benchmarks/cad/culling.mjs --check --views=orbit,still,grazing --layouts=sheet,stack --label=culling
+node examples/package-benchmarks/cad/kernel-node.mjs`, `results-kernel-node.json`); the browser measures
 16.4 ms isolated and 20.8 ms inside the frame at 99,976 entities. Culling is under 0.6 ms of it. Claims such as "under
 0.5 ms for 50k" are not supported: 50k parts take 7.7 ms.
 
@@ -146,6 +147,56 @@ Raycast is about 2x slower at this size (a linear sphere pass over parts instead
 | `@margoengine/machinery` root | 33,121 B | 33,849 B |
 | core + stage (`npm run measure:size`, untouched) | 18,681 B | 18,681 B |
 
+## GPU culling: `@margoengine/culling` (HANDOFF 1f.a)
+
+Measured 2026-10-14 in one session (Arc 140V, headless Edge, 1432x768, 4x MSAA, AC power checked before and after every
+run, GPU lock held; 0 runs discarded). Raw JSON: `examples/package-benchmarks/cad/results-culling.json`, script
+`culling.mjs` / `culling.js` in the same folder. Compare these numbers with each other only (the core baseline here is
+faster than the session above; another worker's GPU timing shared the machine between runs).
+
+`CulledInstances` draws the same assembly (same shapes, materials and per-shape order) without core meshes: instances
+are uploaded once, and a compute pass culls, compacts in order and writes indirect draws. Core's kernel tick, batch
+collection and 10 MB instance upload do not run for these parts, which is where most of the win comes from.
+
+| 89,883 parts (FPS / GPU ms) | core meshes | culling `none` | `frustum` | `occlusion` |
+| --- | --- | --- | --- | --- |
+| CPU per frame (`engine.render` with the GPU idle) | 23.4 ms | 0.48 ms | 0.41 ms | 0.55 ms |
+| Orbit | 36.4 / 24.7 | 45.5 / 16.4 | 51.8 / 18.3 | 46.6 / 16.3 |
+| Still | 31.9 / 26.6 | 47.9 / 17.4 | 52.9 / 15.7 | 47.2 / 18.9 |
+| Grazing view inside the sheet (0.3 m above the plates) | 48.3 / 15.1 | 48.4 / 18.9 | 97.7 / 8.0 | 83.3 / 9.4 |
+| 50,004 parts, orbit | 62.6 / 15.8 | 71.9 / 12.0 | 89.9 / 8.5 | 75.0 / 10.1 |
+| 50,004 parts, still | 63.0 / 14.9 | 74.5 / 9.9 | 86.4 / 9.2 | 75.2 / 10.9 |
+| 50,004 parts, CPU per frame | 14.2 ms | 0.44 ms | 0.46 ms | 0.48 ms |
+| 10,017 parts, orbit / still | 215 / 197 | 192 / 203 | 230 / 235 | 177 / 194 |
+
+GPU ms are pass timestamps sampled every 15th frame (about ±15% between runs). FPS is throughput (vsync off). The package's
+CPU cost is flat in part count: a few passes and two indirect draws per batch.
+
+Occlusion does not pay on this layout. Seen from above, the parts it could hide (nuts and washers 3-13 mm under a 12 mm
+plate) are never strictly behind the plate across their bounding-sphere footprint, so the overview culls nothing more
+than the frustum test (78,940 parts drawn either way at 90k still), while the occluder prepass (0.5 ms) and Hi-Z build
+(+0.5-2 ms) still run. A dense layout shows the other side: the same modules stacked in 15 layers 0.13 m apart
+(`--layouts=stack`, no core baseline):
+
+| Stacked block, 89,883 parts | `none` | `frustum` | `occlusion` |
+| --- | --- | --- | --- |
+| Orbit: FPS (parts drawn) | 27.2 (89,883) | 28.2 (80,803) | 37.3 (20,643) |
+| Still | 25.9 (89,883) | 26.6 (84,238) | 32.6 (22,370) |
+| Grazing view inside the block | 29.1 (89,883) | 48.7 (38,247) | 52.3 (6,372) |
+
+Hence `frustum` is the default and `occlusion` is opt-in for dense or enclosed assemblies. Per-pass GPU at 90k stacked
+orbit, occlusion: occluder prepass 3.7 ms, Hi-Z + cull 0.9 ms, main 17.4 ms (frustum main: 30.7 ms).
+
+Pixel check (`culling.mjs --check`): two engines render 28,672 parts (1,024 modules plus a coplanar twin of every plate in
+another colour, drawn in a later batch) along a 160-frame path, one culled and one drawing every part, compared byte for
+byte. Sheet: orbit, descent to a grazing flight, view from below. Stack: descending orbit, then a flight between the
+two middle layers (the last 23 frames leave the block and see nothing). 0 differing pixels in all 640 frames (occlusion
+and frustum, both layouts), no WebGPU errors; occlusion drew down to 4,770 parts where frustum drew 16,338. The twin
+plates show everywhere, so coplanar ties still resolve to the later batch.
+
+Package size: 7,015 B min+gzip (core external), most of it WGSL. Zero cost when not imported (separate package,
+`sideEffects: false`, no core change; core + stage stays 18,681).
+
 ## STEP / IGES loading (`loadCAD`)
 
 OCCT (occt-import-js 0.0.23) Wasm: 7,604,031 bytes, 3,110,912 gzip; glue JS 96,871 (26,835 gzip); Margo CAD worker
@@ -172,6 +223,7 @@ node examples/package-benchmarks/cad/run.mjs --sizes=max --low --no-bvh --no-exp
 node examples/package-benchmarks/cad/run.mjs --sizes=1000 --step --shot --no-bvh --no-explode --label=step
 # Before/after against another machinery build (Git Bash: MSYS_NO_PATHCONV=1):
 node examples/package-benchmarks/cad/run.mjs --sizes=10000 --machinery=/test-results/machinery-7d5a5dd --label=before-10k
+node examples/package-benchmarks/cad/culling.mjs --check --views=orbit,still,grazing --layouts=sheet,stack --label=culling
 node examples/package-benchmarks/cad/kernel-node.mjs
 node examples/package-benchmarks/proofs/machinery-cad.proof.js
 node packages/machinery/test/edges-check.mjs
