@@ -175,7 +175,8 @@
     "exports": [
       "Animation",
       "multiplyMatrices",
-      "sampleTrack"
+      "sampleTrack",
+      "sampleTrackInto"
     ]
   },
   {
