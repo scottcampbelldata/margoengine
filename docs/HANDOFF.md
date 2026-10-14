@@ -129,7 +129,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
 1d. [points, labels, clustered, splats, DOF DONE `5cf148e`; SSAO and lines left] Orthographic follow-ups: SSAO, lines/points world widths, labels CSS perspective, clustered froxels, DOF and splats
    assume a perspective camera; fix each in its own package. Optional core hook (Camera.projection + up) would remove
    the cameras package's update replacement; only if Scott wants it.
-1e. [a-d running] CAD track (Scott, 2026-10-14: "the smallest, fastest, best CAD engine"; the visualization/interaction layer, not a
+1e. [a-d done, see below] CAD track (Scott, 2026-10-14: "the smallest, fastest, best CAD engine"; the visualization/interaction layer, not a
    B-rep modelling kernel). Much already exists in @margoengine/machinery: SectionPlanes (with stencil caps),
    ExplodedView, PartInstancer, AssemblyBVH, measurement, annotations, STEP/IGES/STL/OBJ via loadCAD. To do:
    a. Audit and benchmark machinery at CAD scale on real hardware: 10k/50k/100k-part assemblies at 60 FPS, kernel tick
@@ -139,6 +139,12 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       depth bias via lines, instanced per part, no z-fighting; silhouettes later.
    c. Exploded view and isolation driven from GPU storage buffers (check what ExplodedView does today).
    d. STEP/IGES load cost: measure the OCCT Wasm payload and init time; look for a lighter path.
+   Done for a-d (see `docs/cad-performance.md`, raw JSON in `examples/package-benchmarks/cad/`): real-GPU numbers at
+   10k/50k/90k parts; `@margoengine/machinery/edges` FeatureEdges (instanced, depth-biased, ortho + section aware, compute
+   size culling); ExplodedView free at rest; AssemblyBVH two-level (no 1M instanced-triangle cap, rebuild 370x faster).
+   Core hot spots for Scott (not changed): kernel recomputes every entity every frame (109 ns each, 10.9 ms at 100k),
+   JS batch collection 7 ms at 82k visible, 10 MB instance upload per frame, engine.pick 44 ms at 90k, O(n) mesh removal,
+   100k entity cap. OCCT: 3.1 MB gzip Wasm, ~150 ms init, ~1 s parse for a 442 kB STEP.
    f. Specialized pipelines instead of uber-shaders. The cost of one do-everything shader is register pressure: the
       compiler reserves registers for the worst path, cutting how many threads an integrated GPU runs at once.
       (Branches on per-draw uniforms do not diverge; that part of the usual argument is wrong.) Plan: audit every

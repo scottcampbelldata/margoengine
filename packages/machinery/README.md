@@ -48,6 +48,7 @@ Import individual systems from these subpaths to keep unrelated code out of dire
 | `/materials` | `industrialMaterials`, `industrialMaterial` |
 | `/overlays` | `EngineeringAnnotations`, `worldAnchor`, `projectAnnotation` |
 | `/exploded` | `ExplodedView` |
+| `/edges` | `FeatureEdges`, `featureEdges` (uses `@margoengine/geometry`) |
 
 Required dependencies remain shared: telemetry uses kinematics, and BVH picking uses its Wasm spatial kernel. Importing materials or exploded views does not load those systems. Retain the JavaScript and shared chunks in the package's `dist` directory when serving these entry points directly.
 
@@ -55,7 +56,11 @@ Required dependencies remain shared: telemetry uses kinematics, and BVH picking 
 
 Telemetry accepts little-endian `[u32 timestampMs, u16 count, (u16 jointIndex, f32 value) × count]`, using indices in the attached `Kinematics` joint list. `push` validates an entire frame before updating its two-state buffer; invalid floats/limits reject, duplicate/stale timestamps return false, and interpolation holds at the latest sample. `connect(webSocket)` receives binary frames; supply `onError` to handle rejected packets. Attaching telemetry suspends autonomous joint velocity/IK updates; removing it restores them. `reset()` starts a new timeline after a PLC clock restart; u32 rollover is handled automatically. Default playback delay is 100 ms.
 
-`AssemblyBVH.create(meshes)` builds a Wasm triangle BVH. Render after editing transforms, then `rebuild()` after transform/visibility changes; recreate it after geometry changes. `raycast` returns a mesh, triangle, world point and distance; `snap` selects triangle vertices, edge midpoints or supplied circular-ring centers. `measureClearance(a,b,'obb'|'aabb')` measures bounding boxes, not exact mesh solids; OBBs reject sheared transforms. Dispose the BVH separately. Float32 geometry/transforms limit metrology precision.
+`FeatureEdges` draws CAD feature lines: edges whose faces meet at more than `angle` degrees (default 30) plus open boundaries. They are computed once per distinct geometry and drawn with one instanced draw per geometry from the transforms the core already uploaded, so culling, hidden parts and `ExplodedView` apply with no extra work. Lines keep a constant screen width (`width`, CSS pixels), use hardware depth bias (`depthBias`) so they never z-fight their own faces, work with `@margoengine/cameras` orthographic views and are clipped by `SectionPlanes`. WebGPU only. Call `refresh()` after `setGeometry`, or after replacing meshes without changing the mesh count.
+
+`ExplodedView` writes part positions only when `amount` changes, so an exploded view at rest costs nothing per frame.
+
+`AssemblyBVH.create(meshes)` builds one local-space Wasm triangle BVH per distinct geometry, shared by all its instances, and tests rays against per-part bounding spheres first; the 1,000,000-triangle limit applies to distinct geometry, not to instances. Render after editing transforms, then `rebuild()` after transform/visibility changes; recreate it after geometry changes. `raycast` returns a mesh, triangle, world point and distance; `snap` selects triangle vertices, edge midpoints or supplied circular-ring centers. `measureClearance(a,b,'obb'|'aabb')` measures bounding boxes, not exact mesh solids; OBBs reject sheared transforms. Dispose the BVH separately. Float32 geometry/transforms limit metrology precision.
 
 CPU machinery tools work with either backend. Section rendering requires WebGPU; caps require depth32float-stencil8 and closed, consistently oriented geometry. Depth-fail winding uses a dedicated plane-depth/stencil target and composites against beauty depth. For open, nonmanifold or mixed-winding surfaces, use `{ cap: false }`; no stencil algorithm can infer their missing solid interior.
 

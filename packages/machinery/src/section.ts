@@ -1,9 +1,9 @@
 import {PbrMaterial,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type DrawOptions} from '@margoengine/core/extension';
 import {invert} from '../../shared/math.js';
+import {declaration} from './section-uniform.js';
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
 declare const GPUTextureUsage:{RENDER_ATTACHMENT:number;TEXTURE_BINDING:number};
 type GPUContext=Extract<PassContext,{backend:'webgpu'}>;
-const declaration=(binding:number)=>`struct Section {planes:array<vec4f,6>,settings:vec4f,color:vec4f,camera:mat4x4f,inverse:mat4x4f}\n@group(0) @binding(${binding}) var<uniform> section:Section;\n`;
 const capShader=declaration(0)+`
 struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f}
 @vertex fn vertex(@builtin(vertex_index) i:u32)->Out {let p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));var o:Out;o.clip=vec4f(p[i],0,1);o.uv=p[i];return o;}
