@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 // GPU image-based lighting: the PMREMGenerator + scene.environment equivalent for WebGPU.
 import type {EngineKernel, EnginePlugin} from '@margoengine/core';
 import {engineRuntime} from '@margoengine/core/extension';
@@ -288,6 +289,11 @@ export class Environment implements EnginePlugin {
   }
 
   /** Processes `source` on the GPU. `target` is a GPUDevice or a WebGPU engine. */
+  /** `create(engine, source, options)` then `engine.use(environment)`, so it rebuilds itself after a device loss. */
+  static async attach(engine: EngineKernel, source: EnvironmentSource, options?: EnvironmentOptions): Promise<Environment> {
+    const environment = await Environment.create(engine, source, options);
+    try {engine.use(environment); return environment;} catch (error) {environment.dispose(); throw error;}
+  }
   static async create(target: GPUDevice | EngineKernel, source: EnvironmentSource, options: EnvironmentOptions = {}): Promise<Environment> {
     validateSource(source);
     for (const [label, value] of [['rotation', options.rotation], ['intensity', options.intensity]] as const)
@@ -397,4 +403,6 @@ export class Environment implements EnginePlugin {
     this.disposed = true; destroy(this.resources); this.resources = undefined; this.source = undefined; this.restoring = undefined;
     this.listeners.clear();
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

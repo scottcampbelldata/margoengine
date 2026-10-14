@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 // Solid or vertical-gradient background: the scene.background = color equivalent.
 import type {EngineKernel} from '@margoengine/core';
 import type {FrameGraph, PassContext} from '@margoengine/core/extension';
@@ -58,6 +59,8 @@ export class ColorBackground {
   private readonly depthAttachment: GPURenderPassDepthStencilAttachment = {view: undefined!, depthReadOnly: true};
   private readonly passDescriptor: GPURenderPassDescriptor = {label: 'color background', colorAttachments: [this.colorAttachment], depthStencilAttachment: this.depthAttachment};
 
+  /** Same as `engine.use(new ColorBackground(...))`; returns the ColorBackground. */
+  static attach(engine: EngineKernel, options?: ColorBackgroundOptions): ColorBackground {const value = new ColorBackground(options); engine.use(value); return value;}
   constructor(options: ColorBackgroundOptions = {}) {
     this.name = options.name ?? 'background';
     this.order = options.order ?? 0.5;
@@ -79,6 +82,8 @@ export class ColorBackground {
   registerPasses(graph: FrameGraph): void {graph.add({name: this.name, order: this.order, execute: c => {if (c.backend === 'webgpu') this.record(c);}});}
   onDeviceRestored(): void {this.release();}
   dispose(): void {this.disposed = true; this.release();}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 
   /** Records the background into `context.encoder` over `context.color`, testing against `context.depth`. */
   record(context: GPUContext): void {
