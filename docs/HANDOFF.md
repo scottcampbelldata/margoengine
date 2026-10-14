@@ -289,7 +289,17 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       `if(!facing&&i.material.z<0.5){discard;}` (its pipeline has cullMode none), so every core mesh pays the same
       early-depth cost; per-sidedness pipelines with cullMode would remove it (a core change).
    e. A CAD launch demo (large assembly, sections, edges, measurement, ortho views) and an honest comparison page.
-1e'. DECISION FOR SCOTT (CAD scale is CPU-bound in core; measured on AC, docs/cad-performance.md): at 50k parts the
+1e'. [DONE 2026-10-14: steps 1, 2, 3 and 5 ported onto perf/auto-quality, one commit each, plus the CAD-controls pole
+   fix and the engine.pick OffscreenCanvas fix; core + stage 18,681 -> 19,543 B gzip (+481, +252, +96, +5, +21, +7).
+   Quiet-machine before/after (Scott stopped everything else; AC; GPU lock; alternating rounds; docs/cad-performance.md):
+   kernel in frame 3-4x cheaper everywhere (90k still 16.0 -> 5.5 ms); collection 7.8 -> 0.28 ms at 90k still, 7.6 ->
+   1.1 ms at 90k with 1% moving; FPS 50k orbit 49 -> 92, 50k still 53 -> 78, 50k move 54 -> 133, 90k still 33 -> 52,
+   90k move 33 -> 43; 90k orbit unchanged 34 -> 33 (GPU-bound, cull result changes every frame); 10k move 207 -> 182
+   (GPU time rose, unexplained); engine.pick 43 -> 31 ms at 90k (only via the cheaper update, step 4 not merged).
+   Bit-exact: tests/core-dirty-transforms.test.js, real-GPU pixels-check.mjs 0 differing pixels, verify 1,051 pass.
+   Instance-buffer contract in core's README; selection's micro pick pass was the only writer (now its own buffer).
+   Back-face culling measured on branch scratch/core-backface-cull, not merged: +315 B, see the decisions below.]
+   Original decision text: CAD scale is CPU-bound in core; measured on AC, docs/cad-performance.md: at 50k parts the
    frame is 20.9 ms CPU (45 FPS), at 90k 39.1 ms (25 FPS); kernel tick 7.7 / 16.4 ms and JS batch collection 6.2 /
    11.3 ms dominate. Core hot spots: (1) kernel recomputes every entity every frame, even static ones (~150 ns each);
    (2) JS batch collection walks every mesh every frame; (3) the whole instance buffer is uploaded every frame;
@@ -619,8 +629,13 @@ if intended, run `npm run api:update` after build:packages and commit the `api/`
 - Core: APPROVED speed-up steps 1, 2, 3 and 5 from the prototype branch (`worktree-agent-a46261c57b837ecd0`), not
   step 4 (pick pipeline); the core CADCameraControls pole fix (heading from `camera.up` when leaving an exact pole);
   the +8 B `engine.pick` OffscreenCanvas fix (`clientWidth || width`). Target: core+stage under 19,600 B.
+  DONE: all three merged (core+stage 19,543 B; numbers in 1e').
 - Core back-face culling (pipeline `cullMode` instead of the shader's `discard`): MEASURE ONLY on a scratch branch,
-  do not merge; bring the numbers and bytes back to Scott.
+  do not merge; bring the numbers and bytes back to Scott. MEASURED, AWAITING SCOTT: branch
+  `scratch/core-backface-cull` (per cull-group pipelines with a shader override; +315 B -> 19,858, over the 19,600
+  target). GPU per frame: 50k CAD 15.6 -> 13.7 ms (double-sided, the default) and 14.2 -> 12.4 ms (single-sided);
+  one full-screen layer 1.31 -> 0.79 / 0.79 -> 0.39 ms; 16 full-screen layers back to front 11.9 -> 4.7 ms.
+  Details and caveats in docs/cad-performance.md.
 - API: standardize on `X.attach(engine, options)` for features; `dispose()` is the primary cleanup name, `destroy()`
   stays as a deprecated alias until 1.0, and packages (not core) add `[Symbol.dispose]()` calling `dispose()`.
 
