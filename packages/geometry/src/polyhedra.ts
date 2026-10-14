@@ -26,9 +26,8 @@ export function polyhedronGeometry(vertices: readonly number[], indices: readonl
       for (let j = 0; j <= rows; j++) v[i][j] = j === 0 && i === cols ? aj : mix(aj, bj, j / rows);
     }
     for (let i = 0; i < cols; i++) for (let j = 0; j < 2 * (cols - i) - 1; j++) {
-      const k = Math.floor(j / 2);
-      if (j % 2 === 0) out.push(...v[i][k + 1], ...v[i + 1][k], ...v[i][k]);
-      else out.push(...v[i][k + 1], ...v[i + 1][k + 1], ...v[i + 1][k]);
+      const k = Math.floor(j / 2), even = j % 2 === 0, p = v[i][k + 1], q = even ? v[i + 1][k] : v[i + 1][k + 1], r = even ? v[i][k] : v[i + 1][k];
+      out.push(p[0], p[1], p[2], q[0], q[1], q[2], r[0], r[1], r[2]);
     }
   }
   const count = out.length / 3, normals = new Float32Array(out.length), uvs = new Float32Array(count * 2);
@@ -51,20 +50,20 @@ export function polyhedronGeometry(vertices: readonly number[], indices: readonl
       if (out[vi * 3] === 0 && out[vi * 3 + 2] === 0) uvs[vi * 2] = azi / 2 / Math.PI + 0.5;
     }
     // Three.js correctSeam: wrap triangles that straddle u = 0/1.
-    const u = [uvs[t * 2], uvs[t * 2 + 2], uvs[t * 2 + 4]];
-    if (Math.max(...u) > 0.9 && Math.min(...u) < 0.1) for (let k = 0; k < 3; k++) if (u[k] < 0.2) uvs[(t + k) * 2] += 1;
+    const u0 = uvs[t * 2], u1 = uvs[t * 2 + 2], u2 = uvs[t * 2 + 4];
+    if (Math.max(u0, u1, u2) > 0.9 && Math.min(u0, u1, u2) < 0.1) {if (u0 < 0.2) uvs[t * 2] += 1; if (u1 < 0.2) uvs[t * 2 + 2] += 1; if (u2 < 0.2) uvs[t * 2 + 4] += 1;}
   }
   for (let t = 0; t < count; t += 3) {
     let nx: number, ny: number, nz: number;
     if (!smooth) {
-      const o = t * 3, e1 = [out[o + 3] - out[o], out[o + 4] - out[o + 1], out[o + 5] - out[o + 2]], e2 = [out[o + 6] - out[o], out[o + 7] - out[o + 1], out[o + 8] - out[o + 2]];
-      nx = e1[1] * e2[2] - e1[2] * e2[1]; ny = e1[2] * e2[0] - e1[0] * e2[2]; nz = e1[0] * e2[1] - e1[1] * e2[0];
+      const o = t * 3, e1x = out[o + 3] - out[o], e1y = out[o + 4] - out[o + 1], e1z = out[o + 5] - out[o + 2], e2x = out[o + 6] - out[o], e2y = out[o + 7] - out[o + 1], e2z = out[o + 8] - out[o + 2];
+      nx = e1y * e2z - e1z * e2y; ny = e1z * e2x - e1x * e2z; nz = e1x * e2y - e1y * e2x;
       const l = Math.hypot(nx, ny, nz) || 1;
-      for (let k = 0; k < 3; k++) normals.set([nx / l, ny / l, nz / l], (t + k) * 3);
+      for (let k = o; k < o + 9; k += 3) {normals[k] = nx / l; normals[k + 1] = ny / l; normals[k + 2] = nz / l;}
     } else {
       for (let k = 0; k < 3; k++) {
         const o = (t + k) * 3, l = Math.hypot(out[o], out[o + 1], out[o + 2]) || 1;
-        normals.set([out[o] / l, out[o + 1] / l, out[o + 2] / l], o);
+        normals[o] = out[o] / l; normals[o + 1] = out[o + 1] / l; normals[o + 2] = out[o + 2] / l;
       }
     }
   }

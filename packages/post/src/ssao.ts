@@ -25,6 +25,10 @@ export class SSAO implements EnginePlugin {
   private ambientPipeline?:GPURenderPipeline;private ambientShader='';private readonly sources=new Set<SSAOSource>();
   private replayViews:GPUTextureView[]=[];private replayCopy?:GPURenderPipeline;private replayGroup?:GPUBindGroup;
   private disposed=false;
+  // Shader patches are cached per source string; pass descriptors are rebuilt with their targets in resize().
+  private captureSource?:string;private captureShader='';private ambientSource?:string;private ambientCode='';
+  private readonly compositeAttachment:GPURenderPassColorAttachment={view:undefined!,loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:1}};private readonly compositePass:GPURenderPassDescriptor={colorAttachments:[this.compositeAttachment]};
+  private replayPass?:GPURenderPassDescriptor;private clearPass?:GPURenderPassDescriptor;private resolvePass?:GPURenderPassDescriptor;
   private readonly values=new Float32Array(56);private readonly inverseWorkspace=new Float64Array(52);
   private readonly inverse=this.values.subarray(0,16);private readonly view=this.values.subarray(16,32);
   private readonly projection=this.values.subarray(32,48);
@@ -57,11 +61,11 @@ export class SSAO implements EnginePlugin {
     graph.add({name:'ssao:capture',order:-60,execute:c=>{if(c.backend!=='webgpu')return;
       this.validate();if(this.engine!.hasPlugin('post-processing')||this.engine!.hasPlugin('bloom'))throw new Error('SSAO cannot share the output target with another post effect');
       this.resize(c);this.original=c.color;this.originalFormat=c.format;this.captureTarget!.begin(c);
-      c.shader=c.shader.replace(/let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/,'return vec4f(linear,1);');
+      if(this.captureSource!==c.shader){this.captureSource=c.shader;this.captureShader=c.shader.replace(/let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/,'return vec4f(linear,1);');}c.shader=this.captureShader;
       if(!invert(this.inverse,c.camera.matrix,0,this.inverseWorkspace))throw new Error('Invalid SSAO camera');
       viewMatrix(this.view,c.camera);
       const p=this.projection,near=c.camera.near,far=c.camera.far,f=1/Math.tan(c.camera.fov*Math.PI/360);p.fill(0);p[0]=f*c.height/c.width;p[5]=f;p[10]=near/(far-near);p[11]=-1;p[14]=far*near/(far-near);
-      this.values.set([this.options.radius??0.5,this.options.bias??0.025,this.options.samples??32,+this.enabled,c.width,c.height,0,0],48);
+      const v=this.values;v[48]=this.options.radius??0.5;v[49]=this.options.bias??0.025;v[50]=this.options.samples??32;v[51]=+this.enabled;v[52]=c.width;v[53]=c.height;v[54]=v[55]=0;
       c.device.queue.writeBuffer(this.uniform!,0,this.values as Float32Array<ArrayBuffer>);
       for(let i=0;i<2;i++){this.directionValues[i][2]=this.options.radius??0.5;c.device.queue.writeBuffer(this.directions[i],0,this.directionValues[i]);}
     }});
@@ -70,7 +74,7 @@ export class SSAO implements EnginePlugin {
     graph.add({name:'ssao:blur-x',order:12,execute:c=>{if(c.backend==='webgpu')this.dispatch(c,this.blur!,this.groups[2]);}});
     graph.add({name:'ssao:blur-y',order:13,execute:c=>{if(c.backend==='webgpu')this.dispatch(c,this.blur!,this.groups[3]);}});
     graph.add({name:'ssao:composite',order:30,execute:c=>{if(c.backend!=='webgpu')return;
-      const pass=c.encoder.beginRenderPass({colorAttachments:[{view:this.original!,loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:1}}]});
+      this.compositeAttachment.view=this.original!;const pass=c.encoder.beginRenderPass(this.compositePass);
       pass.setPipeline(this.composite!);pass.setBindGroup(0,this.groups[4]);pass.draw(3);pass.end();
       this.captureTarget!.restore(c);
     }});
@@ -100,6 +104,8 @@ export class SSAO implements EnginePlugin {
       group(this.blur!,[raw,this.gbuffer,x,{buffer:this.directions[0]}]),group(this.blur!,[x,this.gbuffer,y,{buffer:this.directions[1]}]),
       group(this.composite,[this.scene,this.ambient,y])];
     this.ambientPipeline=undefined;
+    this.replayPass={colorAttachments:[{view:this.replayViews[0]??this.gbuffer,loadOp:'clear',storeOp:'store'}]};this.clearPass={colorAttachments:[{view:this.replayViews[1]??this.ambient,loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:0}}]};
+    this.resolvePass={colorAttachments:this.replayViews.map((view,i)=>({view,resolveTarget:i===0?this.gbuffer!:this.ambient!,loadOp:'load',storeOp:'discard'}))};
   }
   private dispatch(c:Context,pipeline:GPUComputePipeline,group:GPUBindGroup):void {
     const pass=c.encoder.beginComputePass();pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.dispatchWorkgroups(Math.ceil(c.width/8),Math.ceil(c.height/8));pass.end();
@@ -109,10 +115,11 @@ export class SSAO implements EnginePlugin {
     this.dispatch(c,this.extract!,this.groups[0]);
     const gbuffer=this.replayViews[0]??this.gbuffer!,ambient=this.replayViews[1]??this.ambient!;
     // Replays must test the same coverage samples as the scene; their sampled outputs stay 1x.
-    if(this.replayCopy){const pass=c.encoder.beginRenderPass({colorAttachments:[{view:gbuffer,loadOp:'clear',storeOp:'store'}]});pass.setPipeline(this.replayCopy);pass.setBindGroup(0,this.replayGroup!);pass.draw(3);pass.end();}
+    if(this.replayCopy){const pass=c.encoder.beginRenderPass(this.replayPass!);pass.setPipeline(this.replayCopy);pass.setBindGroup(0,this.replayGroup!);pass.draw(3);pass.end();}
     for(const source of this.sources)source.draw(c,'gbuffer',gbuffer,c.depth);
-    const clear=c.encoder.beginRenderPass({colorAttachments:[{view:ambient,loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:0}}]});clear.end();
-    const code=c.shader.replace(/let direct=[\s\S]*return vec4f\([^\n]+\);/,'return vec4f(i.color*(1.0-i.material.y)*frame.radiance.w,1);');
+    const clear=c.encoder.beginRenderPass(this.clearPass!);clear.end();
+    if(this.ambientSource!==c.shader){this.ambientSource=c.shader;this.ambientCode=c.shader.replace(/let direct=[\s\S]*return vec4f\([^\n]+\);/,'return vec4f(i.color*(1.0-i.material.y)*frame.radiance.w,1);');}
+    const code=this.ambientCode;
     if(!this.ambientPipeline||this.ambientShader!==code) {
       if(code===c.shader)throw new Error('SSAO requires the standard core lighting shader');
       const module=c.device.createShaderModule({code});
@@ -124,14 +131,14 @@ export class SSAO implements EnginePlugin {
     // Ambient replay still needs TAA's vertex camera override, while its fragment lighting bindings are unused.
     try{c.draw({pipeline:this.ambientPipeline,clear:false,bindings:c.bindings.filter(entry=>entry.binding===8)});}finally{c.color=color;}
     for(const source of this.sources)source.draw(c,'ambient',ambient,c.depth);
-    if(this.replayViews.length)c.encoder.beginRenderPass({colorAttachments:this.replayViews.map((view,i)=>({view,resolveTarget:i===0?this.gbuffer!:this.ambient!,loadOp:'load',storeOp:'discard'}))}).end();
+    if(this.replayViews.length)c.encoder.beginRenderPass(this.resolvePass!).end();
     this.captureTarget!.resolve(c.encoder,true);
   }
   private release():void {this.captureTarget?.dispose();this.captureTarget=undefined;
     for(const t of this.textures)t.destroy();for(const b of this.directions)b.destroy();this.uniform?.destroy();this.samples?.destroy();this.noise?.destroy();
     this.textures=[];this.directions=[];this.groups=[];this.width=this.height=0;this.uniform=this.samples=undefined;this.noise=undefined;this.extract=this.occlusion=this.blur=undefined;this.composite=this.ambientPipeline=undefined;
     this.original=this.scene=this.depth=this.gbuffer=this.ambient=undefined;this.originalFormat=undefined;
-    this.replayViews=[];this.replayCopy=undefined;this.replayGroup=undefined;
+    this.replayViews=[];this.replayCopy=undefined;this.replayGroup=undefined;this.replayPass=this.clearPass=this.resolvePass=undefined;this.compositeAttachment.view=undefined!;
   }
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.sources.clear();this.engine=this.device=undefined;}

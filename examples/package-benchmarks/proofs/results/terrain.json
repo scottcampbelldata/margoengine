@@ -1,0 +1,34 @@
+{
+  "package": "terrain",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:28:01.297Z",
+  "outputsIdentical": true,
+  "notes": "Frame timings run against a recording stand-in device (no GPU work), so they measure only the CPU cost Terrain adds per frame. Uploaded uniform bytes, draw calls, pipeline and bind-group creation, and shadowVersion are identical.",
+  "cases": [
+    {
+      "case": "clipmapGrid(64) x 50",
+      "baselineMs": 387.9963,
+      "candidateMs": 46.7904,
+      "speedup": 8.292
+    },
+    {
+      "case": "clipmapGrid(256) x 5",
+      "baselineMs": 959.1235,
+      "candidateMs": 88.4554,
+      "speedup": 10.843
+    },
+    {
+      "case": "prepare + draw, 6 rings, unlit, 600 frames",
+      "baselineMs": 150.2881,
+      "candidateMs": 49.3784,
+      "speedup": 3.044
+    },
+    {
+      "case": "prepare + draw, 6 rings, one lighting provider, 600 frames",
+      "baselineMs": 47.8536,
+      "candidateMs": 20.2529,
+      "speedup": 2.363
+    }
+  ]
+}

@@ -41,6 +41,17 @@ function embedded(uri: string): Uint8Array {
 }
 const componentSizes: Record<number, number> = {5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4};
 const components: Record<string, number> = {SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16};
+const normalizers: Record<number, number> = {5120: 127, 5121: 255, 5122: 32767, 5123: 65535};
+function component(view: DataView, at: number, type: number): number {
+  switch (type) {
+    case 5126: return view.getFloat32(at, true);
+    case 5125: return view.getUint32(at, true);
+    case 5123: return view.getUint16(at, true);
+    case 5122: return view.getInt16(at, true);
+    case 5121: return view.getUint8(at);
+    default: return view.getInt8(at);
+  }
+}
 export class GLTFAsset {
   readonly buffers: Uint8Array[];
   private readonly cache = new Map<number, Float32Array>();
@@ -74,21 +85,24 @@ export class GLTFAsset {
     if (!size || !width || count > 1_000_000 || def.normalized !== undefined && typeof def.normalized !== 'boolean' || def.normalized && [5125,5126].includes(def.componentType)) throw new TypeError('Unsupported glTF accessor');
     this.decoded += count * width * 4; if (this.decoded > assetLimit * 4) throw new RangeError('Decoded glTF exceeds byte budget');
     const output = new Float32Array(count * width);
-    const read = (bytes: Uint8Array, offset: number, stride: number, n: number, write: (i: number, c: number, v: number) => void) => {
+    // Element i lands at row i, or at row ids[i] for sparse values.
+    const read = (bytes: Uint8Array, offset: number, stride: number, n: number, ids?: number[]) => {
       if (offset % size || stride % size || offset + (n - 1) * stride + width * size > bytes.length) throw new RangeError('Invalid glTF accessor bounds/alignment');
-      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-      for (let i = 0; i < n; i++) for (let c = 0; c < width; c++) {
-        const at = offset + i * stride + c * size;
-        let value = def.componentType === 5126 ? view.getFloat32(at, true) : def.componentType === 5125 ? view.getUint32(at, true) : def.componentType === 5123 ? view.getUint16(at, true) : def.componentType === 5122 ? view.getInt16(at, true) : def.componentType === 5121 ? view.getUint8(at) : view.getInt8(at);
-        if (def.normalized) value = Math.max(-1, value / ({5120:127,5121:255,5122:32767,5123:65535}[def.componentType as 5120] ?? 1));
-        if (!Number.isFinite(Math.fround(value))) throw new RangeError('Non-finite glTF accessor');
-        write(i, c, value);
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), type: number = def.componentType, divisor = def.normalized ? normalizers[type] ?? 1 : 0;
+      for (let i = 0; i < n; i++) {
+        const row = (ids ? ids[i] : i) * width;
+        for (let c = 0, at = offset + i * stride; c < width; c++, at += size) {
+          let value = component(view, at, type);
+          if (divisor) value = Math.max(-1, value / divisor);
+          if (!Number.isFinite(Math.fround(value))) throw new RangeError('Non-finite glTF accessor');
+          output[row + c] = value;
+        }
       }
     };
     if (def.bufferView !== undefined) {
       const v = entry(this.doc.bufferViews, def.bufferView, 'bufferView'), stride = integer(v.byteStride ?? size * width, 'stride', size * width);
       if (stride > 252 || integer(v.byteOffset ?? 0, 'view offset') % size) throw new RangeError('Invalid glTF stride/alignment');
-      read(this.view(def.bufferView), integer(def.byteOffset ?? 0, 'accessor offset'), stride, count, (i,c,v) => {output[i * width + c] = v;});
+      read(this.view(def.bufferView), integer(def.byteOffset ?? 0, 'accessor offset'), stride, count);
     } else if (!def.sparse || def.byteOffset) throw new TypeError('Accessor has no data or invalid offset');
     if (def.sparse) {
       const sparse = def.sparse, n = integer(sparse.count, 'sparse count', 1), indices = sparse.indices, values = sparse.values, indexSize = componentSizes[indices?.componentType];
@@ -97,7 +111,7 @@ export class GLTFAsset {
       if (at % indexSize || at + n * indexSize > bytes.length || entry(this.doc.bufferViews,indices.bufferView,'sparse indices').byteStride!==undefined || entry(this.doc.bufferViews,values?.bufferView,'sparse values').byteStride!==undefined) throw new RangeError('Invalid sparse bounds/stride');
       const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), ids: number[] = []; let previous = -1;
       for (let i = 0; i < n; i++) {const p = at + i * indexSize, id = indexSize === 1 ? v.getUint8(p) : indexSize === 2 ? v.getUint16(p,true) : v.getUint32(p,true); if (id <= previous || id >= count) throw new RangeError('Invalid sparse index order/bounds'); ids.push(id); previous = id;}
-      read(this.view(values.bufferView), integer(values.byteOffset ?? 0, 'sparse values offset'), size * width, n, (i,c,v) => {output[ids[i] * width + c] = v;});
+      read(this.view(values.bufferView), integer(values.byteOffset ?? 0, 'sparse values offset'), size * width, n, ids);
     }
     this.cache.set(index, output); return output;
   }

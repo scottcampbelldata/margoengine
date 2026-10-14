@@ -15,8 +15,8 @@ export function decompressLZF(input: Uint8Array, outputLength: number, format = 
       control++;
       if (op + control > outputLength) throw new LoaderError(format, 'range', 'LZF literal run overflows the output');
       if (ip + control > end) throw new LoaderError(format, 'truncated', 'LZF literal run overflows the input');
-      output.set(input.subarray(ip, ip + control), op);
-      ip += control; op += control;
+      // Runs are at most 32 bytes, so a loop beats creating a view for each one.
+      for (let i = 0; i < control; i++) output[op++] = input[ip++];
     } else {
       let length = control >> 5;
       let reference = op - ((control & 0x1f) << 8) - 1;

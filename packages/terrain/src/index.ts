@@ -16,11 +16,12 @@ export interface TerrainOptions {textures:(device:GPUDevice)=>TerrainTextures;la
 export interface TerrainLighting {readonly owner?:Engine;shader(source:string,group:number):string;bindings():GPUBindGroupEntry[]}
 interface Ring {uniform:GPUBuffer;group:GPUBindGroup;values:Float32Array;shadowUniforms:GPUBuffer[];shadowGroups:GPUBindGroup[];shadowValues:Float32Array}
 interface LightingGroup {device:GPUDevice;entries:GPUBindGroupEntry[];group:GPUBindGroup}
+const terrainShader=terrainVertex+terrainFragment,unlit:GPUBindGroupEntry[]=[];
 let nextId=0;
 export class Terrain implements EnginePlugin {
   readonly name='terrain:'+nextId++;shadowVersion=0;disposed=false;
   private engine?:Engine;private device?:GPUDevice;private textures?:TerrainTextures;private vertex?:GPUBuffer;private center?:GPUBuffer;private ring?:GPUBuffer;private rules?:GPUBuffer;private sampler?:GPUSampler;private layout?:GPUBindGroupLayout;private shadowPipeline?:GPURenderPipeline;
-  private rings:Ring[]=[];private pipelines=new Map<string,GPURenderPipeline>();private lightingGroups=new Map<GPURenderPipeline,LightingGroup>();private lighting=new Set<TerrainLighting>();private centerCount=0;private ringCount=0;
+  private rings:Ring[]=[];private pipelines=new Map<string,GPURenderPipeline>();private lightingGroups=new Map<GPURenderPipeline,LightingGroup>();private lighting=new Set<TerrainLighting>();private centerCount=0;private ringCount=0;private last?:{code:string;count:number|undefined;format:GPUTextureFormat;depthFormat:GPUTextureFormat;pipeline:GPURenderPipeline};
   constructor(readonly options:TerrainOptions) {this.validate();}
   static attach(instance:EngineKernel,options:TerrainOptions):Terrain {const terrain=new Terrain(options);engineRuntime(instance).use(terrain);return terrain;}
   private validate():void {const o=this.options;
@@ -45,14 +46,20 @@ export class Terrain implements EnginePlugin {
   }
   registerPasses(graph:FrameGraph):void {graph.add({name:this.name+':prepare',order:-6,execute:c=>{if(c.backend==='webgpu')this.prepare(c);}});graph.add({name:this.name,order:1,execute:c=>{if(c.backend==='webgpu')this.draw(c);}});}
   private prepare(c:Context):void {
-    let previousX=0,previousZ=0;let changed=false;
-    for(let i=0;i<this.rings.length;i++){const r=this.rings[i],spacing=(this.options.cellSize??1)*2**i,x=Math.floor(c.camera.position[0]/spacing)*spacing,z=Math.floor(c.camera.position[2]/spacing)*spacing;if(r.values[28]!==x||r.values[29]!==z)changed=true;
-      r.values.set(c.camera.matrix);r.values.set(c.camera.position,16);r.values.set(this.engine!.lighting.direction,20);r.values.set(this.engine!.lighting.radiance,24);r.values.set([x,z,spacing,this.options.resolution??64],28);r.values.set([i?previousX-x:0,i?previousZ-z:0,i,+(!!this.textures!.normalmap)],32);r.values.set([...(this.options.origin??[0,0]),...this.options.size],36);r.values.set([this.options.heightScale??100,this.options.heightOffset??0,this.options.layers.length,+(c.format==='rgba16float')],40);c.device.queue.writeBuffer(r.uniform,0,r.values as Float32Array<ArrayBuffer>);previousX=x;previousZ=z;
+    let previousX=0,previousZ=0;let changed=false;const o=this.options,origin=o.origin,size=o.size;
+    for(let i=0;i<this.rings.length;i++){const r=this.rings[i],v=r.values,spacing=(o.cellSize??1)*2**i,x=Math.floor(c.camera.position[0]/spacing)*spacing,z=Math.floor(c.camera.position[2]/spacing)*spacing;if(v[28]!==x||v[29]!==z)changed=true;
+      // Scalars go straight into the retained uniform staging array; a frame allocates nothing here.
+      v.set(c.camera.matrix);v.set(c.camera.position,16);v.set(this.engine!.lighting.direction,20);v.set(this.engine!.lighting.radiance,24);v[28]=x;v[29]=z;v[30]=spacing;v[31]=o.resolution??64;v[32]=i?previousX-x:0;v[33]=i?previousZ-z:0;v[34]=i;v[35]=+(!!this.textures!.normalmap);
+      v[36]=origin?origin[0]:0;v[37]=origin?origin[1]:0;v[38]=size[0];v[39]=size[1];v[40]=o.heightScale??100;v[41]=o.heightOffset??0;v[42]=o.layers.length;v[43]=+(c.format==='rgba16float');c.device.queue.writeBuffer(r.uniform,0,v as Float32Array<ArrayBuffer>);previousX=x;previousZ=z;
     }if(changed)this.invalidate();
   }
   private draw(c:Context):void {
-    let code=terrainVertex+terrainFragment;for(const effect of this.lighting)code=effect.shader(code,1);const key=c.descriptor.multisample?.count+':'+c.format+':'+c.descriptor.depthStencil!.format+code;let pipeline=this.pipelines.get(key);const entries=[...this.lighting].flatMap(effect=>effect.bindings());
+    let code=terrainShader;for(const effect of this.lighting)code=effect.shader(code,1);const count=c.descriptor.multisample?.count,depthFormat=c.descriptor.depthStencil!.format,last=this.last;
+    // The pipeline key contains the whole shader text, so last frame's match is checked before that key is built and hashed again.
+    let pipeline=last&&last.code===code&&last.count===count&&last.format===c.format&&last.depthFormat===depthFormat?last.pipeline:undefined;const entries=this.lighting.size?[...this.lighting].flatMap(effect=>effect.bindings()):unlit;
+    if(!pipeline){const key=count+':'+c.format+':'+depthFormat+code;pipeline=this.pipelines.get(key);
     if(!pipeline){const module=c.device.createShaderModule({code}),layouts=[this.layout!];if(entries.length)layouts.push(c.device.createBindGroupLayout({entries:entries.map(entry=>{const binding=entry.binding,visibility=GPUShaderStage.FRAGMENT;if(binding===2)return {binding,visibility,texture:{sampleType:'depth' as const,viewDimension:'2d-array' as const}};if(binding===3)return {binding,visibility,sampler:{type:'comparison' as const}};return {binding,visibility,buffer:{type:binding>=5?'read-only-storage' as const:'uniform' as const}};})}));pipeline=c.device.createRenderPipeline({layout:c.device.createPipelineLayout({bindGroupLayouts:layouts}),vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:8,attributes:[{shaderLocation:0,offset:0,format:'float32x2'}]}]},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]},multisample:c.descriptor.multisample,depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:true,depthCompare:'greater-equal'}});this.pipelines.set(key,pipeline);}
+    this.last={code,count,format:c.format,depthFormat,pipeline};}
     const pass=c.encoder.beginRenderPass({colorAttachments:[{view:c.color,loadOp:'load',storeOp:'store'}],depthStencilAttachment:{view:c.depth,depthLoadOp:'load',depthStoreOp:'store',...(c.descriptor.depthStencil!.format.includes('stencil')?{stencilLoadOp:'load',stencilStoreOp:'store'}:{})}});pass.setPipeline(pipeline);if(entries.length)pass.setBindGroup(1,this.lightingGroup(c.device,pipeline,entries));pass.setVertexBuffer(0,this.vertex!);
     for(let i=0;i<this.rings.length;i++){pass.setBindGroup(0,this.rings[i].group);pass.setIndexBuffer(i?this.ring!:this.center!,'uint32');pass.drawIndexed(i?this.ringCount:this.centerCount);this.engine!.stats.drawCalls++;}pass.end();
   }
@@ -71,7 +78,7 @@ export class Terrain implements EnginePlugin {
     if(this.disposed)return;pass.setPipeline(this.shadowPipeline!);pass.setVertexBuffer(0,this.vertex!);
     for(let i=0;i<this.rings.length;i++){const r=this.rings[i];r.shadowValues.set(r.values);r.shadowValues.set(matrix);context.device.queue.writeBuffer(r.shadowUniforms[cascade],0,r.shadowValues as Float32Array<ArrayBuffer>);pass.setBindGroup(0,r.shadowGroups[cascade]);pass.setIndexBuffer(i?this.ring!:this.center!,'uint32');pass.drawIndexed(i?this.ringCount:this.centerCount);}
   }
-  private release():void {for(const texture of new Set(this.textures?[this.textures.heightmap,this.textures.normalmap,this.textures.layers]:[]))texture?.destroy();for(const buffer of [this.vertex,this.center,this.ring,this.rules])buffer?.destroy();for(const r of this.rings)for(const buffer of [r.uniform,...r.shadowUniforms])buffer.destroy();this.textures=undefined;this.vertex=this.center=this.ring=this.rules=undefined;this.rings=[];this.pipelines.clear();this.lightingGroups.clear();this.shadowPipeline=undefined;this.layout=undefined;this.sampler=undefined;}
+  private release():void {for(const texture of new Set(this.textures?[this.textures.heightmap,this.textures.normalmap,this.textures.layers]:[]))texture?.destroy();for(const buffer of [this.vertex,this.center,this.ring,this.rules])buffer?.destroy();for(const r of this.rings)for(const buffer of [r.uniform,...r.shadowUniforms])buffer.destroy();this.textures=undefined;this.vertex=this.center=this.ring=this.rules=undefined;this.rings=[];this.pipelines.clear();this.last=undefined;this.lightingGroups.clear();this.shadowPipeline=undefined;this.layout=undefined;this.sampler=undefined;}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.lighting.clear();this.engine=this.device=undefined;}
   destroy():void {this.dispose();}

@@ -113,6 +113,8 @@ export class Label extends Item {
   readonly screen: ScreenPoint = createScreenPoint();
   /** World anchor at the last update. */
   readonly world: [number, number, number] = [0, 0, 0];
+  /** @internal Numbers the current transform text was built from: x, y, scaled flag, scale, anchor. */
+  readonly placement = new Float64Array(6).fill(NaN);
   private positionValue: Vec3;
   private offsetValue: Vec3;
   offsetSpace: 'local' | 'world';
@@ -279,13 +281,17 @@ export class LabelRenderer implements EnginePlugin {
       }
       label.onScreen = show;
       if (!show) {this.set(label.element, label.cache, 'display', 'none'); continue;}
-      let scale = '';
+      const key = label.placement, x = Math.round(screen!.x * 100) / 100, y = Math.round(screen!.y * 100) / 100, ax = label.anchor[0], ay = label.anchor[1];
+      let scaled = 0, factor = 0;
       if (label.distanceScale !== null) {
         const options = typeof label.distanceScale === 'number' ? {reference: label.distanceScale} : label.distanceScale;
-        const factor = Math.min(options.max ?? Infinity, Math.max(options.min ?? 0, options.reference / Math.max(label.distance, 1e-6)));
-        scale = ` scale(${Math.round(factor * 1e4) / 1e4})`;
+        factor = Math.round(Math.min(options.max ?? Infinity, Math.max(options.min ?? 0, options.reference / Math.max(label.distance, 1e-6))) * 1e4) / 1e4; scaled = 1;
       }
-      this.set(label.element, label.cache, 'transform', `translate(${px(screen!.x)},${px(screen!.y)})${scale} translate(${-label.anchor[0] * 100}%,${-label.anchor[1] * 100}%)`);
+      // The transform text depends only on these numbers: format and compare it again only when one changed.
+      if (key[0] !== x || key[1] !== y || key[2] !== scaled || key[3] !== factor || key[4] !== ax || key[5] !== ay) {
+        key[0] = x; key[1] = y; key[2] = scaled; key[3] = factor; key[4] = ax; key[5] = ay;
+        this.set(label.element, label.cache, 'transform', `translate(${x}px,${y}px)${scaled ? ` scale(${factor})` : ''} translate(${-ax * 100}%,${-ay * 100}%)`);
+      }
       this.set(label.element, label.cache, 'display', '');
       if (label.sort) visible.push(label);
     }

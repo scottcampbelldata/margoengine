@@ -1,14 +1,24 @@
 import {Geometry} from '@margoengine/core';
 import {triangulatePolygon} from '../../shared/polygon.js';
 export const maxBytes=64*1024*1024,maxVertices=1_000_000,maxIndices=3_000_000;
+/** FNV-style mix of the six rounded weld values stored at `offset`. */
+function weldHash(keys:number[],offset:number):number {let h=0x811c9dc5;for(let i=0;i<6;i++)h=Math.imul(h^(keys[offset+i]|0),0x01000193);return h^(h>>>15);}
 function flat(positions:number[],progress?:(value:number)=>void):Geometry {
   if(!positions.length||positions.length/3>maxIndices||positions.length%9||!positions.every(v=>Number.isFinite(Math.fround(v))))throw new RangeError('CAD requires bounded finite triangles');
-  const packed:number[]=[],normals:number[]=[],indices:number[]=[],seen=new Map<string,number>();
-  for(let i=0;i<positions.length;i+=9){const ux=positions[i+3]-positions[i],uy=positions[i+4]-positions[i+1],uz=positions[i+5]-positions[i+2],vx=positions[i+6]-positions[i],vy=positions[i+7]-positions[i+1],vz=positions[i+8]-positions[i+2],n=[uy*vz-uz*vy,uz*vx-ux*vz,ux*vy-uy*vx],length=Math.hypot(...n);if(!length)throw new RangeError('Degenerate CAD triangle');const normal=n.map(v=>v/length);
-    for(let j=0;j<3;j++){const p=positions.slice(i+j*3,i+j*3+3),key=[...p,...normal].map(v=>Math.round(v*100_000)).join(',');let id=seen.get(key);
-      if(id===undefined){id=packed.length/3;if(id>=maxVertices)throw new RangeError('CAD unique vertex limit');seen.set(key,id);packed.push(...p);normals.push(...normal);}indices.push(id);}
+  // Welding keys are six values rounded to 1e-5, kept as numbers (six per unique vertex) behind an open-addressed table of vertex ids.
+  const packed:number[]=[],normals:number[]=[],indices:number[]=[],keys:number[]=[];let table=new Int32Array(1024).fill(-1);
+  for(let i=0;i<positions.length;i+=9){const ux=positions[i+3]-positions[i],uy=positions[i+4]-positions[i+1],uz=positions[i+5]-positions[i+2],vx=positions[i+6]-positions[i],vy=positions[i+7]-positions[i+1],vz=positions[i+8]-positions[i+2],cx=uy*vz-uz*vy,cy=uz*vx-ux*vz,cz=ux*vy-uy*vx,length=Math.hypot(cx,cy,cz);if(!length)throw new RangeError('Degenerate CAD triangle');
+    const nx=cx/length,ny=cy/length,nz=cz/length,r3=Math.round(nx*100_000),r4=Math.round(ny*100_000),r5=Math.round(nz*100_000);
+    for(let o=i;o<i+9;o+=3){const x=positions[o],y=positions[o+1],z=positions[o+2],at=keys.length;keys.push(Math.round(x*100_000),Math.round(y*100_000),Math.round(z*100_000),r3,r4,r5);
+      let slot=weldHash(keys,at)&(table.length-1),id=table[slot];
+      while(id!==-1){const k=id*6;if(keys[k]===keys[at]&&keys[k+1]===keys[at+1]&&keys[k+2]===keys[at+2]&&keys[k+3]===r3&&keys[k+4]===r4&&keys[k+5]===r5)break;slot=(slot+1)&(table.length-1);id=table[slot];}
+      if(id!==-1)keys.length=at;
+      else{id=packed.length/3;if(id>=maxVertices)throw new RangeError('CAD unique vertex limit');table[slot]=id;packed.push(x,y,z);normals.push(nx,ny,nz);
+        // Keep the table under half full; rebuilding re-inserts every vertex id from its stored key.
+        if((id+1)*2>table.length){table=new Int32Array(table.length*4).fill(-1);for(let v=0;v<=id;v++){let s=weldHash(keys,v*6)&(table.length-1);while(table[s]!==-1)s=(s+1)&(table.length-1);table[s]=v;}}}
+      indices.push(id);}
     if(i%90_000===0)progress?.(0.5+0.5*i/positions.length);
-    if(new Set(indices.slice(-3)).size!==3)throw new RangeError('Triangle collapses at CAD welding tolerance');
+    const a=indices[indices.length-3],b=indices[indices.length-2],c=indices[indices.length-1];if(a===b||b===c||a===c)throw new RangeError('Triangle collapses at CAD welding tolerance');
   }
   // Core uses uint32 indices consistently across both GPU backends.
   return new Geometry(packed,normals,indices);
@@ -51,10 +61,11 @@ export function parseCADGeometry(input:string|ArrayBuffer|ArrayBufferView,format
 
 export function fingerprint(geometry:Geometry):Float32Array {
   if(geometry.indices.length>maxIndices)throw new RangeError('Deduplication triangle limit');const data=new Float32Array(geometry.indices.length*6),order:number[]=[];
-  for(let face=0;face<geometry.indices.length;face+=3){const ids=Array.from(geometry.indices.subarray(face,face+3));let start=0;
-    for(let i=1;i<3;i++){for(let j=0;j<6;j++){const difference=geometry.vertices[ids[i]*6+j]-geometry.vertices[ids[start]*6+j];if(difference<0){start=i;break;}if(difference>0)break;}}
-    for(let i=0;i<3;i++)for(let j=0;j<6;j++)data[face*6+i*6+j]=geometry.vertices[ids[(start+i)%3]*6+j]||0;order.push(face/3);}
-  order.sort((a,b)=>{for(let i=0;i<18;i++){const difference=data[a*18+i]-data[b*18+i];if(difference)return difference;}return 0;});const sorted=new Float32Array(data.length);for(let i=0;i<order.length;i++)sorted.set(data.subarray(order[i]*18,order[i]*18+18),i*18);return sorted;
+  const indices=geometry.indices,vertices=geometry.vertices;
+  for(let face=0;face<indices.length;face+=3){let start=0;
+    for(let i=1;i<3;i++){const candidate=indices[face+i]*6,lowest=indices[face+start]*6;for(let j=0;j<6;j++){const difference=vertices[candidate+j]-vertices[lowest+j];if(difference<0){start=i;break;}if(difference>0)break;}}
+    for(let i=0;i<3;i++){const from=indices[face+(start+i)%3]*6,to=face*6+i*6;for(let j=0;j<6;j++)data[to+j]=vertices[from+j]||0;}order.push(face/3);}
+  order.sort((a,b)=>{for(let i=0;i<18;i++){const difference=data[a*18+i]-data[b*18+i];if(difference)return difference;}return 0;});const sorted=new Float32Array(data.length);for(let i=0;i<order.length;i++){const from=order[i]*18,to=i*18;for(let j=0;j<18;j++)sorted[to+j]=data[from+j];}return sorted;
 }
 let crcTable:Uint32Array|undefined;
-export function hash(data:Float32Array):number {crcTable??=Uint32Array.from({length:256},(_,i)=>{let c=i;for(let bit=0;bit<8;bit++)c=(c>>>1)^((c&1)?0xedb88320:0);return c>>>0;});let crc=0xffffffff;for(const byte of new Uint8Array(data.buffer))crc=(crc>>>8)^crcTable[(crc^byte)&255];return (crc^0xffffffff)>>>0;}
+export function hash(data:Float32Array):number {crcTable??=Uint32Array.from({length:256},(_,i)=>{let c=i;for(let bit=0;bit<8;bit++)c=(c>>>1)^((c&1)?0xedb88320:0);return c>>>0;});let crc=0xffffffff;const bytes=new Uint8Array(data.buffer),table=crcTable;for(let i=0;i<bytes.length;i++)crc=(crc>>>8)^table[(crc^bytes[i])&255];return (crc^0xffffffff)>>>0;}

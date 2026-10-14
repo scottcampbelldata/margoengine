@@ -58,7 +58,8 @@ export class Font implements TextMeasurer {
   readonly cutoff = SDF_DEFAULTS.cutoff;
   private context?: Context2D;
   private readonly advances = new Map<string, number>();
-  private readonly kerns = new Map<string, number>();
+  /** Kerning by left cluster, then right cluster. */
+  private readonly kerns = new Map<string, Map<string, number>>();
   private readonly glyphs = new Map<string, GlyphBitmap>();
   private cachedMetrics?: {ascent: number; descent: number};
   private loading?: Promise<void>;
@@ -140,12 +141,13 @@ export class Font implements TextMeasurer {
   /** Pair kerning in em, measured as width(ab) - width(a) - width(b) and cached. Ideographs, spaces and right-to-left pairs are not kerned. */
   kerning(left: string, right: string): number {
     if (isWhitespace(left) || isWhitespace(right) || isIdeograph(left) || isIdeograph(right) || bidiClass(left) === 'R' || bidiClass(right) === 'R') return 0;
-    const key = left + '\u0000' + right;
-    let value = this.kerns.get(key);
+    let row = this.kerns.get(left);
+    if (!row) this.kerns.set(left, row = new Map());
+    let value = row.get(right);
     if (value === undefined) {
       value = this.ctx().measureText(left + right).width / this.size - this.advance(left) - this.advance(right);
       if (Math.abs(value) < 1e-4) value = 0;
-      this.kerns.set(key, value);
+      row.set(right, value);
     }
     return value;
   }

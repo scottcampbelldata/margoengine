@@ -15,13 +15,13 @@ function meshoptDecodeBytes(src: Uint8Array, pos: number, end: number, buffer: U
       buffer.fill(0, i, i + 16);
     } else if (bits === 1) {
       let v = pos + 4;
-      for (let b = 0; b < 4; b++) {
-        const byte = src[pos + b];
-        for (let s = 6; s >= 0; s -= 2) {
-          const enc = (byte >> s) & 3;
-          if (enc === 3) buffer[i + b * 4 + ((6 - s) >> 1)] = src[v++];
-          else buffer[i + b * 4 + ((6 - s) >> 1)] = enc;
-        }
+      for (let b = 0, o = i; b < 4; b++, o += 4) {
+        // Four 2-bit codes per byte, high bits first; code 3 means the value follows as a whole byte.
+        const byte = src[pos + b], e0 = byte >> 6, e1 = (byte >> 4) & 3, e2 = (byte >> 2) & 3, e3 = byte & 3;
+        buffer[o] = e0 === 3 ? src[v++] : e0;
+        buffer[o + 1] = e1 === 3 ? src[v++] : e1;
+        buffer[o + 2] = e2 === 3 ? src[v++] : e2;
+        buffer[o + 3] = e3 === 3 ? src[v++] : e3;
       }
       pos = v;
     } else if (bits === 2) {
@@ -34,7 +34,7 @@ function meshoptDecodeBytes(src: Uint8Array, pos: number, end: number, buffer: U
       }
       pos = v;
     } else {
-      buffer.set(src.subarray(pos, pos + 16), i);
+      for (let b = 0; b < 16; b++) buffer[i + b] = src[pos + b];
       pos += 16;
     }
   }

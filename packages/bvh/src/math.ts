@@ -83,6 +83,20 @@ export function closestPointTriangle(
   return ex * ex + ey * ey + ez * ez;
 }
 
+// Scratch for the two separating-axis tests below, so their axis helpers need no closure and no per-call arrays.
+// TB: box-centred triangle vertices then the box half extents. TT: both triangles' vertices. EA, EB: their edges.
+const TB = new Float64Array(12), TT = new Float64Array(18), EA = new Float64Array(9), EB = new Float64Array(9);
+function boxAxis(ax: number, ay: number, az: number): boolean {
+  const p0 = ax * TB[0] + ay * TB[1] + az * TB[2], p1 = ax * TB[3] + ay * TB[4] + az * TB[5], p2 = ax * TB[6] + ay * TB[7] + az * TB[8];
+  const rr = TB[9] * Math.abs(ax) + TB[10] * Math.abs(ay) + TB[11] * Math.abs(az);
+  return !(Math.min(p0, p1, p2) > rr || Math.max(p0, p1, p2) < -rr);
+}
+function separated(x: number, y: number, z: number): boolean {
+  const p0 = x * TT[0] + y * TT[1] + z * TT[2], p1 = x * TT[3] + y * TT[4] + z * TT[5], p2 = x * TT[6] + y * TT[7] + z * TT[8];
+  const q0 = x * TT[9] + y * TT[10] + z * TT[11], q1 = x * TT[12] + y * TT[13] + z * TT[14], q2 = x * TT[15] + y * TT[16] + z * TT[17];
+  return Math.max(p0, p1, p2) < Math.min(q0, q1, q2) || Math.max(q0, q1, q2) < Math.min(p0, p1, p2);
+}
+
 /** Separating-axis triangle/AABB overlap (Akenine-Moller). Touching counts as overlapping. */
 export function triangleBox(t: ArrayLike<number>, minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number): boolean {
   const cx = (minX + maxX) * 0.5, cy = (minY + maxY) * 0.5, cz = (minZ + maxZ) * 0.5;
@@ -98,14 +112,10 @@ export function triangleBox(t: ArrayLike<number>, minX: number, minY: number, mi
   const d = nx * v0x + ny * v0y + nz * v0z, r = hx * Math.abs(nx) + hy * Math.abs(ny) + hz * Math.abs(nz);
   if (d > r || d < -r) return false;
   // Nine edge cross products.
-  return axis(0, -f0z, f0y) && axis(0, -f1z, f1y) && axis(0, -f2z, f2y)
-    && axis(f0z, 0, -f0x) && axis(f1z, 0, -f1x) && axis(f2z, 0, -f2x)
-    && axis(-f0y, f0x, 0) && axis(-f1y, f1x, 0) && axis(-f2y, f2x, 0);
-  function axis(ax: number, ay: number, az: number): boolean {
-    const p0 = ax * v0x + ay * v0y + az * v0z, p1 = ax * v1x + ay * v1y + az * v1z, p2 = ax * v2x + ay * v2y + az * v2z;
-    const rr = hx * Math.abs(ax) + hy * Math.abs(ay) + hz * Math.abs(az);
-    return !(Math.min(p0, p1, p2) > rr || Math.max(p0, p1, p2) < -rr);
-  }
+  TB[0] = v0x; TB[1] = v0y; TB[2] = v0z; TB[3] = v1x; TB[4] = v1y; TB[5] = v1z; TB[6] = v2x; TB[7] = v2y; TB[8] = v2z; TB[9] = hx; TB[10] = hy; TB[11] = hz;
+  return boxAxis(0, -f0z, f0y) && boxAxis(0, -f1z, f1y) && boxAxis(0, -f2z, f2y)
+    && boxAxis(f0z, 0, -f0x) && boxAxis(f1z, 0, -f1x) && boxAxis(f2z, 0, -f2x)
+    && boxAxis(-f0y, f0x, 0) && boxAxis(-f1y, f1x, 0) && boxAxis(-f2y, f2x, 0);
 }
 
 /** Separating-axis triangle/triangle overlap, including the coplanar axes. Touching counts as overlapping. */
@@ -116,8 +126,11 @@ export function triangleTriangle(a: ArrayLike<number>, ao: number, b: ArrayLike<
   if (Math.max(a0x, a1x, a2x) < Math.min(b0x, b1x, b2x) || Math.max(b0x, b1x, b2x) < Math.min(a0x, a1x, a2x)) return false;
   if (Math.max(a0y, a1y, a2y) < Math.min(b0y, b1y, b2y) || Math.max(b0y, b1y, b2y) < Math.min(a0y, a1y, a2y)) return false;
   if (Math.max(a0z, a1z, a2z) < Math.min(b0z, b1z, b2z) || Math.max(b0z, b1z, b2z) < Math.min(a0z, a1z, a2z)) return false;
-  const ea = [a1x - a0x, a1y - a0y, a1z - a0z, a2x - a1x, a2y - a1y, a2z - a1z, a0x - a2x, a0y - a2y, a0z - a2z];
-  const eb = [b1x - b0x, b1y - b0y, b1z - b0z, b2x - b1x, b2y - b1y, b2z - b1z, b0x - b2x, b0y - b2y, b0z - b2z];
+  const ea = EA, eb = EB;
+  ea[0] = a1x - a0x; ea[1] = a1y - a0y; ea[2] = a1z - a0z; ea[3] = a2x - a1x; ea[4] = a2y - a1y; ea[5] = a2z - a1z; ea[6] = a0x - a2x; ea[7] = a0y - a2y; ea[8] = a0z - a2z;
+  eb[0] = b1x - b0x; eb[1] = b1y - b0y; eb[2] = b1z - b0z; eb[3] = b2x - b1x; eb[4] = b2y - b1y; eb[5] = b2z - b1z; eb[6] = b0x - b2x; eb[7] = b0y - b2y; eb[8] = b0z - b2z;
+  TT[0] = a0x; TT[1] = a0y; TT[2] = a0z; TT[3] = a1x; TT[4] = a1y; TT[5] = a1z; TT[6] = a2x; TT[7] = a2y; TT[8] = a2z;
+  TT[9] = b0x; TT[10] = b0y; TT[11] = b0z; TT[12] = b1x; TT[13] = b1y; TT[14] = b1z; TT[15] = b2x; TT[16] = b2y; TT[17] = b2z;
   const nax = ea[1] * ea[5] - ea[2] * ea[4], nay = ea[2] * ea[3] - ea[0] * ea[5], naz = ea[0] * ea[4] - ea[1] * ea[3];
   const nbx = eb[1] * eb[5] - eb[2] * eb[4], nby = eb[2] * eb[3] - eb[0] * eb[5], nbz = eb[0] * eb[4] - eb[1] * eb[3];
   if (separated(nax, nay, naz) || separated(nbx, nby, nbz)) return false;
@@ -134,11 +147,6 @@ export function triangleTriangle(a: ArrayLike<number>, ao: number, b: ArrayLike<
     if (separated(nby * eb[i + 2] - nbz * eb[i + 1], nbz * eb[i] - nbx * eb[i + 2], nbx * eb[i + 1] - nby * eb[i])) return false;
   }
   return true;
-  function separated(x: number, y: number, z: number): boolean {
-    const p0 = x * a0x + y * a0y + z * a0z, p1 = x * a1x + y * a1y + z * a1z, p2 = x * a2x + y * a2y + z * a2z;
-    const q0 = x * b0x + y * b0y + z * b0z, q1 = x * b1x + y * b1y + z * b1z, q2 = x * b2x + y * b2y + z * b2z;
-    return Math.max(p0, p1, p2) < Math.min(q0, q1, q2) || Math.max(q0, q1, q2) < Math.min(p0, p1, p2);
-  }
 }
 
 /** True when the triangle is entirely on the negative side of one plane (the plane test used for frustum collection). */

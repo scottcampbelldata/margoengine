@@ -76,8 +76,9 @@ export function parseGLTF(instance:EngineKernel,input:string|object|ArrayBuffer|
       if(indices.length%3)throw new RangeError('Indices must contain complete triangles');
       vertices+=normals?positions.length/3:indices.length;if(vertices>1_000_000)throw new RangeError('glTF exceeds one million vertices');
       if(!normals){const expanded=new Float32Array(indices.length*3);normals=new Float32Array(expanded.length);
-        for(let i=0;i<indices.length;i++){if(indices[i]>=positions.length/3)throw new RangeError('Index exceeds vertices');expanded.set(positions.subarray(indices[i]*3,indices[i]*3+3),i*3);}
-        for(let i=0;i<expanded.length;i+=9){const a=expanded.subarray(i,i+9),ux=a[3]-a[0],uy=a[4]-a[1],uz=a[5]-a[2],vx=a[6]-a[0],vy=a[7]-a[1],vz=a[8]-a[2],normal=[uy*vz-uz*vy,uz*vx-ux*vz,ux*vy-uy*vx];for(let j=0;j<3;j++)normals.set(normal,i+j*3);}positions=expanded;indices=Uint32Array.from({length:expanded.length/3},(_,i)=>i);
+        for(let i=0,limit=positions.length/3;i<indices.length;i++){const v=indices[i];if(v>=limit)throw new RangeError('Index exceeds vertices');expanded[i*3]=positions[v*3];expanded[i*3+1]=positions[v*3+1];expanded[i*3+2]=positions[v*3+2];}
+        for(let i=0;i<expanded.length;i+=9){const a=expanded,ux=a[i+3]-a[i],uy=a[i+4]-a[i+1],uz=a[i+5]-a[i+2],vx=a[i+6]-a[i],vy=a[i+7]-a[i+1],vz=a[i+8]-a[i+2],nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;for(let j=i;j<i+9;j+=3){normals[j]=nx;normals[j+1]=ny;normals[j+2]=nz;}}
+        positions=expanded;indices=new Uint32Array(expanded.length/3);for(let i=0;i<indices.length;i++)indices[i]=i;
       }
       const material=p.material===undefined?new PbrMaterial({color:[1,1,1],roughness:1,metalness:1,doubleSided:false}):materials[integer(p.material,'material reference')];if(!material)throw new Error('Missing material');
       return {geometry:new Geometry(positions,normals,indices),material};

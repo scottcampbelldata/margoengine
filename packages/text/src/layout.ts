@@ -95,14 +95,22 @@ const MIRROR: Record<string, string> = {'(': ')', ')': '(', '[': ']', ']': '[', 
 
 /** 'R' for right-to-left scripts (Hebrew, Arabic and neighbours), 'L' for other letters and digits, 'N' for neutrals. */
 export function bidiClass(cluster: string): 'R' | 'L' | 'N' {
+  // One ASCII character, the common case, is classified by code: letters and digits are 'L', the rest neutral.
+  const c = cluster.charCodeAt(0);
+  if (c < 128 && cluster.length === 1) return c >= 97 && c <= 122 || c >= 65 && c <= 90 || c >= 48 && c <= 57 ? 'L' : 'N';
   if (RTL.test(cluster)) return 'R';
   return STRONG_LTR.test(cluster) ? 'L' : 'N';
 }
-export const isWhitespace = (cluster: string): boolean => SPACE.test(cluster);
-export const isIdeograph = (cluster: string): boolean => IDEOGRAPH.test(cluster);
+export const isWhitespace = (cluster: string): boolean => {
+  const c = cluster.charCodeAt(0);
+  return c < 128 && cluster.length === 1 ? c === 32 || c >= 9 && c <= 13 : SPACE.test(cluster);
+};
+/** Every ideograph range starts at or above U+2E80, so clusters that start below it skip the pattern. */
+export const isIdeograph = (cluster: string): boolean => cluster.charCodeAt(0) >= 0x2e80 && IDEOGRAPH.test(cluster);
 
 interface SegmenterLike {segment(text: string): Iterable<{segment: string; index: number}>}
 let segmenter: SegmenterLike | null | undefined;
+const ASCII = /^[\t\n\x20-\x7e]*$/;
 const COMBINING = /^[\p{M}‍︎️\u{1f3fb}-\u{1f3ff}\u{e0020}-\u{e007f}]/u;
 
 /** Splits text into grapheme clusters with their UTF-16 offsets (Intl.Segmenter when available). */
@@ -112,6 +120,8 @@ export function graphemes(text: string): Array<{cluster: string; index: number}>
     segmenter = Segmenter ? new Segmenter(undefined, {granularity: 'grapheme'}) : null;
   }
   const out: Array<{cluster: string; index: number}> = [];
+  // Tabs, line feeds and printable ASCII are always one cluster each (no CR, which joins a following LF).
+  if (ASCII.test(text)) {for (let index = 0; index < text.length; index++) out.push({cluster: text[index], index}); return out;}
   if (segmenter) {for (const {segment, index} of segmenter.segment(text)) out.push({cluster: segment, index}); return out;}
   // Fallback: code points, with combining marks, joiners, variation selectors and skin tones attached to the previous cluster.
   let index = 0, joined = false;
@@ -129,6 +139,7 @@ export function graphemes(text: string): Array<{cluster: string; index: number}>
 const ALIGNS: readonly TextAlign[] = ['left', 'center', 'right', 'justify'];
 const ANCHORS_X: readonly AnchorX[] = ['left', 'center', 'right'];
 const ANCHORS_Y: readonly AnchorY[] = ['top', 'middle', 'bottom', 'baseline', 'bottom-baseline'];
+const DIRECTIONS: readonly string[] = ['ltr', 'rtl', 'auto'], WHITE_SPACES: readonly string[] = ['normal', 'nowrap'], WRAPS: readonly string[] = ['normal', 'break-word'];
 
 export function validateLayoutOptions(options: LayoutOptions): Required<LayoutOptions> {
   const o: Required<LayoutOptions> = {
@@ -141,7 +152,7 @@ export function validateLayoutOptions(options: LayoutOptions): Required<LayoutOp
   if (typeof o.letterSpacing !== 'number' || !Number.isFinite(o.letterSpacing)) throw new RangeError('letterSpacing must be finite');
   if (typeof o.maxWidth !== 'number' || Number.isNaN(o.maxWidth) || o.maxWidth <= 0) throw new RangeError('maxWidth must be positive (Infinity for no wrapping)');
   if (!ALIGNS.includes(o.textAlign) || !ANCHORS_X.includes(o.anchorX) || !ANCHORS_Y.includes(o.anchorY)) throw new TypeError('Unknown textAlign or anchor');
-  if (!['ltr', 'rtl', 'auto'].includes(o.direction) || !['normal', 'nowrap'].includes(o.whiteSpace) || !['normal', 'break-word'].includes(o.overflowWrap)) throw new TypeError('Unknown direction, whiteSpace or overflowWrap');
+  if (!DIRECTIONS.includes(o.direction) || !WHITE_SPACES.includes(o.whiteSpace) || !WRAPS.includes(o.overflowWrap)) throw new TypeError('Unknown direction, whiteSpace or overflowWrap');
   return o;
 }
 

@@ -1,0 +1,42 @@
+{
+  "package": "gltf-pro",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:18:43.182Z",
+  "outputsIdentical": true,
+  "notes": "Accessors decode through one typed reader straight into the output; vertices are packed and validated with indexed loops instead of subarray, spread and callback calls.",
+  "cases": [
+    {
+      "case": "build model: interleaved, tangents, two UV sets, byte colors",
+      "vertices": 50176,
+      "triangles": 99458,
+      "baselineMs": 474.4819,
+      "candidateMs": 82.1148,
+      "speedup": 5.778
+    },
+    {
+      "case": "build model: position only, computed normals",
+      "vertices": 50176,
+      "triangles": 99458,
+      "baselineMs": 418.1772,
+      "candidateMs": 66.7343,
+      "speedup": 6.266
+    },
+    {
+      "case": "decode accessors only",
+      "vertices": 50176,
+      "triangles": 99458,
+      "baselineMs": 110.5072,
+      "candidateMs": 23.2008,
+      "speedup": 4.763
+    },
+    {
+      "case": "validatePreparedGeometry",
+      "vertices": 50176,
+      "triangles": 99458,
+      "baselineMs": 84.1608,
+      "candidateMs": 34.3273,
+      "speedup": 2.452
+    }
+  ]
+}

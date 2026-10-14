@@ -209,17 +209,20 @@ function concat(parts: Uint8Array[], length: number): Uint8Array {
   return out;
 }
 
-const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-/** @internal Base64 without btoa or Buffer, so it runs anywhere. */
+const alphabet = Uint8Array.from('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/', c => c.charCodeAt(0));
+/** @internal Base64 without btoa or Buffer, so it runs anywhere. Encodes to ASCII bytes, then decodes them in 1 MiB pieces. */
 export function base64(bytes: Uint8Array): string {
-  const out: string[] = [];
-  let chunk = '';
-  for (let i = 0; i < bytes.length; i += 3) {
-    const a = bytes[i], b = bytes[i+1], c = bytes[i+2], n = a << 16 | (b ?? 0) << 8 | (c ?? 0);
-    chunk += alphabet[n >> 18 & 63]+alphabet[n >> 12 & 63]+(b === undefined ? '=' : alphabet[n >> 6 & 63])+(c === undefined ? '=' : alphabet[n & 63]);
-    if (chunk.length >= 8192) {out.push(chunk); chunk = '';}
+  const length = bytes.length, whole = length-length%3, codes = new Uint8Array(Math.ceil(length/3)*4), decoder = new TextDecoder(), out: string[] = [];
+  let i = 0, o = 0;
+  for (; i < whole; i += 3, o += 4) {
+    const n = bytes[i] << 16 | bytes[i+1] << 8 | bytes[i+2];
+    codes[o] = alphabet[n >> 18]; codes[o+1] = alphabet[n >> 12 & 63]; codes[o+2] = alphabet[n >> 6 & 63]; codes[o+3] = alphabet[n & 63];
   }
-  out.push(chunk);
+  if (i < length) {
+    const pair = i+1 < length, n = bytes[i] << 16 | (pair ? bytes[i+1] << 8 : 0);
+    codes[o] = alphabet[n >> 18]; codes[o+1] = alphabet[n >> 12 & 63]; codes[o+2] = pair ? alphabet[n >> 6 & 63] : 61; codes[o+3] = 61;
+  }
+  for (let at = 0; at < codes.length; at += 1 << 20) out.push(decoder.decode(codes.subarray(at, at+(1 << 20))));
   return out.join('');
 }
 

@@ -1,0 +1,42 @@
+{
+  "package": "decoders",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:11:44.695Z",
+  "outputsIdentical": true,
+  "notes": "meshopt byte groups are unpacked with unrolled writes instead of per-group shift loops and subarray copies. Filter-dominated streams (OCTAHEDRAL, EXPONENTIAL) gain about 1.05x and index streams are unchanged; both are compared for equality but not timed.",
+  "cases": [
+    {
+      "case": "positions (16-bit, stride 8)",
+      "elements": 401408,
+      "encodedBytes": 1477376,
+      "baselineMs": 24.0089,
+      "candidateMs": 19.6004,
+      "speedup": 1.225
+    },
+    {
+      "case": "uvs (stride 4)",
+      "elements": 401408,
+      "encodedBytes": 600752,
+      "baselineMs": 11.3628,
+      "candidateMs": 9.9271,
+      "speedup": 1.145
+    },
+    {
+      "case": "rotations QUATERNION",
+      "elements": 401408,
+      "encodedBytes": 1433608,
+      "baselineMs": 50.1901,
+      "candidateMs": 47.0728,
+      "speedup": 1.066
+    },
+    {
+      "case": "incompressible attributes (stride 16)",
+      "elements": 401408,
+      "encodedBytes": 6523144,
+      "baselineMs": 71.1212,
+      "candidateMs": 44.0445,
+      "speedup": 1.615
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "package": "splines",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:25:57.733Z",
+  "outputsIdentical": true,
+  "notes": "at, tangent, atDistance and arcLengths are bit-identical for every curve kind, open and closed.",
+  "cases": [
+    {
+      "case": "catmull-rom closed: 1536 followers x 60 frames",
+      "queries": 184320,
+      "baselineMs": 73.7554,
+      "candidateMs": 39.8071,
+      "speedup": 1.853
+    },
+    {
+      "case": "bezier: 1536 followers x 60 frames",
+      "queries": 184320,
+      "baselineMs": 85.0407,
+      "candidateMs": 32.5884,
+      "speedup": 2.61
+    },
+    {
+      "case": "hermite closed: 1536 followers x 60 frames",
+      "queries": 184320,
+      "baselineMs": 55.5926,
+      "candidateMs": 34.2873,
+      "speedup": 1.621
+    },
+    {
+      "case": "catmull-rom open: 1536 followers x 60 frames",
+      "queries": 184320,
+      "baselineMs": 77.2183,
+      "candidateMs": 54.1815,
+      "speedup": 1.425
+    },
+    {
+      "case": "updateArcLengths, 1024 divisions x 200",
+      "baselineMs": 31.3296,
+      "candidateMs": 22.5619,
+      "speedup": 1.389
+    }
+  ]
+}

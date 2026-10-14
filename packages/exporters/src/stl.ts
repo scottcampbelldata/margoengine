@@ -8,21 +8,8 @@ export interface STLOptions extends SceneOptions {
   name?: string;
 }
 
-interface Triangle {a: number[]; b: number[]; c: number[]; n: number[]}
-
-function triangles(source: ExportSource, options: SceneOptions): Triangle[] {
-  const out: Triangle[] = [];
-  for (const item of drawables(collect(source, options))) {
-    const {positions: p, indices} = toWorld(item);
-    for (let i = 0; i < indices.length; i += 3) {
-      const [a, b, c] = [indices[i], indices[i+1], indices[i+2]].map(v => [p[v*3], p[v*3+1], p[v*3+2]]);
-      const u = [b[0]-a[0], b[1]-a[1], b[2]-a[2]], v = [c[0]-a[0], c[1]-a[1], c[2]-a[2]];
-      const n = [u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]], l = Math.hypot(n[0], n[1], n[2]);
-      out.push({a, b, c, n: l ? n.map(x => x/l) : [0, 0, 0]});
-    }
-  }
-  return out;
-}
+/** World-space positions and winding-corrected indices of every drawable. */
+const meshes = (source: ExportSource, options: SceneOptions) => drawables(collect(source, options)).map(toWorld);
 
 /** Exports STL. Binary layout: 80-byte header, uint32 triangle count, then 50-byte records (normal, 3 vertices, uint16 0). */
 export function exportSTL(source: ExportSource, options?: STLOptions & {binary?: true}): Uint8Array;
@@ -32,27 +19,34 @@ export function exportSTL(source: ExportSource, options: STLOptions = {}): Uint8
   if (typeof binary !== 'boolean') throw new TypeError('binary must be boolean');
   const name = options.name ?? (binary ? 'Margo Engine binary STL' : 'margoengine');
   if (typeof name !== 'string' || !/^[\x20-\x7e]*$/.test(name)) throw new TypeError('STL name must be printable ASCII');
-  const list = triangles(source, options);
-  if (!binary) {
-    const solid = name.replace(/\s+/g, '_');
-    const lines = [`solid ${solid}`];
-    for (const {a, b, c, n} of list) {
-      lines.push(`  facet normal ${n.map(num).join(' ')}`, '    outer loop');
-      for (const v of [a, b, c]) lines.push(`      vertex ${v.map(num).join(' ')}`);
-      lines.push('    endloop', '  endfacet');
-    }
-    lines.push(`endsolid ${solid}`, '');
-    return lines.join('\n');
+  const list = meshes(source, options), lines: string[] = [];
+  let count = 0;
+  for (const {indices} of list) count += indices.length/3;
+  if (binary) {
+    if (name.length > 80 || /^solid/i.test(name)) throw new TypeError('Binary STL header must be at most 80 ASCII bytes and not start with "solid"');
+    if (count > 0xffffffff) throw new RangeError('Too many triangles for STL');
   }
-  if (name.length > 80 || /^solid/i.test(name)) throw new TypeError('Binary STL header must be at most 80 ASCII bytes and not start with "solid"');
-  if (list.length > 0xffffffff) throw new RangeError('Too many triangles for STL');
-  const out = new Uint8Array(84+list.length*50), view = new DataView(out.buffer);
-  for (let i = 0; i < name.length; i++) out[i] = name.charCodeAt(i);
-  view.setUint32(80, list.length, true);
+  const solid = name.replace(/\s+/g, '_'), out = new Uint8Array(binary ? 84+count*50 : 0), view = new DataView(out.buffer);
+  if (binary) {for (let i = 0; i < name.length; i++) out[i] = name.charCodeAt(i); view.setUint32(80, count, true);}
+  else lines.push(`solid ${solid}`);
   let offset = 84;
-  for (const {a, b, c, n} of list) {
-    for (const v of [n, a, b, c]) for (let k = 0; k < 3; k++) {view.setFloat32(offset, v[k], true); offset += 4;}
-    view.setUint16(offset, 0, true); offset += 2;
+  for (const {positions: p, indices} of list) for (let i = 0; i < indices.length; i += 3) {
+    const a = indices[i]*3, b = indices[i+1]*3, c = indices[i+2]*3;
+    const ax = p[a], ay = p[a+1], az = p[a+2], bx = p[b], by = p[b+1], bz = p[b+2], cx = p[c], cy = p[c+1], cz = p[c+2];
+    const ux = bx-ax, uy = by-ay, uz = bz-az, vx = cx-ax, vy = cy-ay, vz = cz-az;
+    let nx = uy*vz-uz*vy, ny = uz*vx-ux*vz, nz = ux*vy-uy*vx;
+    const l = Math.hypot(nx, ny, nz);
+    if (l) {nx /= l; ny /= l; nz /= l;} else nx = ny = nz = 0;
+    if (binary) {
+      view.setFloat32(offset, nx, true); view.setFloat32(offset+4, ny, true); view.setFloat32(offset+8, nz, true);
+      view.setFloat32(offset+12, ax, true); view.setFloat32(offset+16, ay, true); view.setFloat32(offset+20, az, true);
+      view.setFloat32(offset+24, bx, true); view.setFloat32(offset+28, by, true); view.setFloat32(offset+32, bz, true);
+      view.setFloat32(offset+36, cx, true); view.setFloat32(offset+40, cy, true); view.setFloat32(offset+44, cz, true);
+      offset += 50; // The attribute byte count stays zero.
+    } else lines.push(`  facet normal ${num(nx)} ${num(ny)} ${num(nz)}`, '    outer loop', `      vertex ${num(ax)} ${num(ay)} ${num(az)}`,
+      `      vertex ${num(bx)} ${num(by)} ${num(bz)}`, `      vertex ${num(cx)} ${num(cy)} ${num(cz)}`, '    endloop', '  endfacet');
   }
-  return out;
+  if (binary) return out;
+  lines.push(`endsolid ${solid}`, '');
+  return lines.join('\n');
 }
