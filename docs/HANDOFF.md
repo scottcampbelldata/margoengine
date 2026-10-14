@@ -89,6 +89,10 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
 1b. Composable shader nodes (`@margoengine/shader`, parity gap 19), moved up after Scott noted three.js's TSL /
    RenderPipeline node workflows (r183 RenderPipeline, r186 pipeline hooks): small typed nodes compiling to WGSL for
    materials and post effects, built on the materials package and the post stack once both APIs settle.
+1c. Production optimizations (from Scott's three.js conference recap, Paris, Sept 2026): general LOD object (gap 18),
+   octahedral imposters, texture atlases (needs texture transforms in materials), vertex animation textures for
+   GPU crowds. Imposters and LOD first; they serve CAD/simulator scenes and landing pages alike. Compute nodes belong
+   in the 1b shader package.
 2. Dedupe: two particle systems (creative GPUParticles vs vfx), two bloom paths (post Bloom vs creative
    PostProcessing), three sky implementations (sky, scenery, creative atmosphere).
 3. Replace three.js inside fbx and usdz with native parsers [running].
