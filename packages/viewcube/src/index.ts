@@ -23,8 +23,8 @@ type V3=[number,number,number];
 /** Normal, then the face's right and up as seen from outside. Y up, front is +Z, right is +X. */
 const FACES:Record<Face,[V3,V3,V3]>={front:[[0,0,1],[1,0,0],[0,1,0]],back:[[0,0,-1],[-1,0,0],[0,1,0]],right:[[1,0,0],[0,0,-1],[0,1,0]],
   left:[[-1,0,0],[0,0,1],[0,1,0]],top:[[0,1,0],[1,0,0],[0,0,-1]],bottom:[[0,-1,0],[1,0,0],[0,0,1]]};
-/** Same pole margin as OrbitControls: core's camera has no up vector and rejects an exactly vertical view. */
-const EPS=1e-6,STEP=Math.PI/4;
+/** Arrow-key step; polar angles within POLE of 0 or π land exactly on the pole. */
+const STEP=Math.PI/4,POLE=1e-9;
 const CSS=`.mvc{position:absolute;z-index:1;user-select:none;-webkit-user-select:none;font:600 11px system-ui,sans-serif}
 .mvc-cube{position:absolute;inset:0;transform-style:preserve-3d;pointer-events:none}
 .mvc-face{position:absolute;inset:0;display:grid;grid-template:20% 60% 20%/20% 60% 20%;backface-visibility:hidden;-webkit-backface-visibility:hidden;pointer-events:auto;box-sizing:border-box;border:1px solid #868d98;background:rgba(236,238,242,.92);color:#262a31}
@@ -55,7 +55,7 @@ export class ViewCube {
   private readonly cube:HTMLDivElement;private readonly buttons:[HTMLElement,V3][]=[];private readonly toggle?:HTMLButtonElement;private readonly projection?:{mode:Projection};
   private readonly container:HTMLElement;private readonly position:string;
   private animation?:{theta:number;phi:number;dTheta:number;dPhi:number;radius:number;elapsed:number;duration:number;at?:readonly number[]};
-  private last='';private disposed=false;
+  private last='';private disposed=false;private upSet?:V3;private upPrev?:Camera['up'];
 
   constructor(readonly engine:EngineKernel,{container=engine.canvas.parentElement!,corner='top-right',size=80,duration=0.4,projection,labels={}}:ViewCubeOptions={}) {
     if(!container)throw new TypeError('ViewCube needs a container (the canvas has no parent)');
@@ -111,12 +111,11 @@ export class ViewCube {
   }
   /** Advances the animation; the engine calls it before each frame. */
   update(delta:number):void {
-    const a=this.animation,c=this.camera;if(!a)return;
+    const a=this.animation,c=this.camera;
     // Another control moved the camera: it wins.
-    if(a.at&&Math.hypot(...c.position.map((x,i)=>x-a.at![i]))>1e-6*a.radius){this.animation=undefined;return;}
-    const t=a.duration?Math.min(1,(a.elapsed+=Math.max(0,delta))/a.duration):1,s=t*t*(3-2*t);
-    const theta=a.theta+a.dTheta*s,phi=Math.min(Math.PI-EPS,Math.max(EPS,a.phi+a.dPhi*s)),r=a.radius,p=c.target;
-    a.at=c.position=[p[0]+r*Math.sin(phi)*Math.sin(theta),p[1]+r*Math.cos(phi),p[2]+r*Math.sin(phi)*Math.cos(theta)];
+    if(!a||a.at&&Math.hypot(...c.position.map((x,i)=>x-a.at![i]))>1e-6*a.radius){this.animation=undefined;this.pole();return;}
+    const t=a.duration?Math.min(1,(a.elapsed+=Math.max(0,delta))/a.duration):1,s=t*t*(3-2*t),theta=a.theta+a.dTheta*s;
+    a.at=this.place(theta,a.phi+a.dPhi*s,a.radius);this.pole(theta);
     if(t===1)this.animation=undefined;
   }
   /** True while a view change is animating. */
@@ -136,13 +135,40 @@ export class ViewCube {
   }
   dispose():void {
     if(this.disposed)return;this.disposed=true;this.animation=undefined;
+    // Give back the up it set; a vertical camera moves 1e-6 rad off the pole (same image) so core accepts that up.
+    const c=this.camera;
+    if(this.upSet&&c.up===this.upSet){const [theta,phi]=this.current(),d=c.position.map((x,i)=>x-c.target[i]);c.up=this.upPrev!;if(!d[0]&&!d[2])this.place(theta,phi?Math.PI-1e-6:1e-6,Math.hypot(...d));}
     this.element.removeEventListener('click',this.onClick);this.element.removeEventListener('keydown',this.onKey);this.element.remove();
     this.container.style.position=this.position;
     if(!this.engine.disposed&&this.engine.hasPlugin(this.name))this.engine.removePlugin(this.name);
   }
 
+  /** Moves the camera to azimuth theta and polar angle phi around the target; near the poles exactly onto them. */
+  private place(theta:number,phi:number,r:number):V3 {
+    const p=this.camera.target,pole=phi<POLE?1:phi>Math.PI-POLE?-1:0;
+    return this.camera.position=pole?[p[0],p[1]+pole*r,p[2]]:[p[0]+r*Math.sin(phi)*Math.sin(theta),p[1]+r*Math.cos(phi),p[2]+r*Math.sin(phi)*Math.cos(theta)];
+  }
+  /**
+   * Core rejects an up parallel to the view. On an exactly vertical view the cube sets camera.up to the screen up the
+   * view had on its way to the pole (azimuth theta), and puts the previous up back once the camera leaves the pole. An up
+   * it did not set that already works (a CameraProjection's vertical up) is left alone.
+   */
+  private pole(theta?:number):void {
+    const c=this.camera,d=c.position.map((x,i)=>x-c.target[i]);
+    if(this.upSet&&c.up!==this.upSet)this.upSet=undefined;
+    if(d[0]||d[2]||!d[1]){if(this.upSet){c.up=this.upPrev!;this.upSet=undefined;}return;}
+    if(theta===undefined||!this.upSet&&Math.hypot(c.up[0],c.up[2]))return;
+    if(!this.upSet)this.upPrev=c.up;
+    const k=Math.sign(d[1]);c.up=this.upSet=[-k*Math.sin(theta),0,-k*Math.cos(theta)];
+  }
+  /** Azimuth and polar angle of the camera; on the pole the azimuth comes from camera.up (the screen up). */
+  private current():[number,number] {
+    const c=this.camera,d=c.position.map((x,i)=>x-c.target[i]),u=c.up,a=angles(d);
+    if(!d[0]&&!d[2]&&d[1]&&Math.hypot(u[0],u[2]))a[0]=d[1]>0?Math.atan2(-u[0],-u[2]):Math.atan2(u[0],u[2]);
+    return a;
+  }
   private orbit(theta:number,phi:number,duration:number):void {
-    const c=this.camera,offset=c.position.map((x,i)=>x-c.target[i]),[t0,p0]=angles(offset);
+    const c=this.camera,offset=c.position.map((x,i)=>x-c.target[i]),[t0,p0]=this.current();
     c.cancelFit?.();
     this.animation={theta:t0,phi:p0,dTheta:((theta-t0)%(2*Math.PI)+3*Math.PI)%(2*Math.PI)-Math.PI,dPhi:phi-p0,radius:Math.hypot(...offset),elapsed:0,duration};
     if(!duration)this.update(0);
@@ -154,7 +180,7 @@ export class ViewCube {
     else this.setProjection(this.projection!.mode==='orthographic'?'perspective':'orthographic');
   };
   private readonly onKey=(event:KeyboardEvent):void=>{
-    const c=this.camera,[theta,phi]=angles(c.position.map((x,i)=>x-c.target[i])),snap=(x:number)=>Math.round(x/STEP)*STEP;
+    const [theta,phi]=this.current(),snap=(x:number)=>Math.round(x/STEP)*STEP;
     switch(event.key){
       case 'ArrowLeft':this.orbit(snap(theta)-STEP,phi,this.duration);break;
       case 'ArrowRight':this.orbit(snap(theta)+STEP,phi,this.duration);break;

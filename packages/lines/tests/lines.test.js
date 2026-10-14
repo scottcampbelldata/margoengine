@@ -5,6 +5,8 @@ import {
   Line, LineMaterial, Lines, GridHelper, PolarGridHelper, AxesHelper, Box3Helper, BoxHelper, ArrowHelper, CameraHelper, PlaneHelper,
   VertexNormalsHelper, computeLineDistances, expandLine, triangleArea, segmentCount, segmentIndices, parseColor, geometryBounds, VERTICES_PER_SEGMENT,
 } from '../dist/index.js';
+import {CameraProjection} from '../../cameras/dist/index.js';
+import {mockGPU, passes} from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 
 const close = (actual, expected, epsilon = 1e-4, message = '') => assert.ok(Math.abs(actual - expected) <= epsilon, `${message} expected ${expected}, got ${actual}`);
 const fanArea = (radius, sweep, triangles = 10) => 0.5 * triangles * radius * radius * Math.sin(sweep / triangles);
@@ -250,6 +252,30 @@ test('CameraHelper unprojects a reversed-Z frustum', () => {
   assert.deepEqual(p(8), [-10, -10, -5], 'far plane corner f1');
   assert.deepEqual(p(24), [0, 0, 5], 'cone starts at the camera');
   assert.equal(helper.count, 50);
+});
+
+test('world-unit widths match the projection under perspective and orthographic cameras', () => {
+  // The frame uniform's pixels per world unit (viewport.w), divided by clip w as the shader's halfWidth does.
+  const shaderScale = (camera, z) => {
+    const gpu = mockGPU(), lines = new Lines(), m = camera.matrix, size = 256;
+    lines.setup({backend: 'webgpu', gpu: gpu.device, canvas: {clientWidth: size}});
+    lines.add(new Line({positions: [0, 0, z, 1, 0, z], width: 0.5, worldUnits: true}));
+    const view = gpu.device.createTexture({size: [size, size], format: 'rgba8unorm'}).createView();
+    const log = gpu.record(() => passes(lines)({backend: 'webgpu', device: gpu.device, encoder: gpu.encoder, camera, width: size, height: size, format: 'rgba8unorm',
+      color: view, depth: view, descriptor: {depthStencil: {format: 'depth24plus'}, multisample: {count: 1}}}));
+    const frame = new Float32Array(new Uint8Array(Buffer.from(log.find(entry => entry[0] === 'writeBuffer' && entry[3].length === 192)[3], 'hex')).buffer);
+    return frame[19] / (m[11] * z + m[15]);
+  };
+  // Pixels one world unit along x covers at depth z, from the clip matrix itself.
+  const projected = (camera, z) => {const m = camera.matrix, x = px => (m[0] * px + m[8] * z + m[12]) / (m[3] * px + m[11] * z + m[15]); return (x(1) - x(0)) * 0.5 * 256;};
+  const camera = () => new Camera({position: [0, 0, 10], target: [0, 0, 0], fov: 60, near: 0.1, far: 100});
+  const perspective = camera(); perspective.update(1, true);
+  for (const z of [0, -10]) close(shaderScale(perspective, z), projected(perspective, z), 1e-3, `perspective at z ${z}`);
+  // @margoengine/cameras: 4 world units over 256 px is 64 px per unit at every depth, also behind the eye (negative near).
+  const ortho = camera(); new CameraProjection({height: 4, near: -5, far: 30}).attach(ortho); ortho.update(1, true);
+  for (const z of [0, -15, 12]) {close(shaderScale(ortho, z), 64, 1e-4, `orthographic at z ${z}`); close(projected(ortho, z), 64, 1e-4);}
+  const zoomed = camera(); new CameraProjection({height: 4, zoom: 2}).attach(zoomed); zoomed.update(1, true);
+  close(shaderScale(zoomed, 0), 128, 1e-4, 'zoom 2');
 });
 
 test('WebGL2 engines get a single warning and no passes draw', () => {

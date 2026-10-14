@@ -42,8 +42,9 @@ function setup(camera = {position: [0, 0, 10], target: [0, 0, 0]}) {
 const close = (a, b, eps = 1e-4) => a.every((v, i) => Math.abs(v - b[i]) <= eps);
 const unit = v => {const l = Math.hypot(...v); return v.map(x => x / l);};
 const direction = c => unit(c.position.map((v, i) => v - c.target[i]));
-/** Screen right and up as core builds them (no roll: right = forward x +Y). */
-const screen = c => {const f = direction(c).map(v => -v), r = unit([-f[2], 0, f[0]]); return {right: r, up: [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]]};};
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+/** Screen right and up as core builds them: right = camera.up x back, up = back x right. */
+const screen = c => {const z = direction(c), r = unit(cross(c.up, z)); return {right: r, up: cross(z, r)};};
 const cells = cube => cube.element.all().filter(e => 'view' in e.dataset);
 const matrix = cube => cube.element.all().find(e => e.className === 'mvc-cube').style.transform.slice(9, -1).split(',').map(Number);
 
@@ -78,10 +79,10 @@ test('a click animates around the target, keeps the distance, and top/bottom kee
   const mid = direction(engine.camera); assert.ok(mid[1] > 0.1 && mid[1] < 0.95, 'halfway up');
   engine.run(0.3); assert.ok(!cube.animating);
   const c = engine.camera; assert.deepEqual([...c.target], [1, 2, 3]); assert.ok(Math.abs(Math.hypot(...c.position.map((v, i) => v - c.target[i])) - Math.hypot(1, 2, 13)) < 1e-9);
-  assert.ok(direction(c)[1] > 1 - 1e-9, 'straight down (within the pole margin core needs)');
+  assert.deepEqual(direction(c), [0, 1, 0], 'exactly straight down');
   let s = screen(c); assert.ok(close(s.right, [1, 0, 0]) && close(s.up, [0, 0, -1]), 'top view from the back still has X right and -Z up');
   cube.view('bottom'); engine.run(0.5); s = screen(c);
-  assert.ok(direction(c)[1] < -1 + 1e-9 && close(s.right, [1, 0, 0]) && close(s.up, [0, 0, 1]), 'bottom: X right, +Z up');
+  assert.ok(direction(c)[1] === -1 && close(s.right, [1, 0, 0]) && close(s.up, [0, 0, 1]), 'bottom: X right, +Z up');
   for (const [view, right] of [['front', [1, 0, 0]], ['right', [0, 0, -1]], ['back', [-1, 0, 0]], ['left', [0, 0, 1]]]) {
     cube.view(view, 0); assert.ok(close(screen(c).right, right) && close(screen(c).up, [0, 1, 0]), view);
   }
@@ -110,9 +111,36 @@ test('keyboard: arrows step 45 degrees, Home is isometric', () => {
   assert.ok(key('ArrowRight').defaultPrevented); assert.ok(close(direction(engine.camera), unit([1, 0, 1])));
   key('ArrowRight'); assert.ok(close(direction(engine.camera), [1, 0, 0]));
   key('ArrowUp'); assert.ok(close(direction(engine.camera), unit([1, 1, 0])));
-  key('ArrowUp'); key('ArrowUp'); assert.ok(direction(engine.camera)[1] > 1 - 1e-9, 'stops at the pole');
+  key('ArrowUp'); key('ArrowUp'); assert.deepEqual(direction(engine.camera), [0, 1, 0], 'stops exactly on the pole');
   key('Home'); assert.ok(close(direction(engine.camera), unit([1, 1, 1])));
   assert.ok(!key('a').defaultPrevented);
+});
+
+test('top and bottom are exactly vertical through camera.up, which is given back off the pole', () => {
+  const {engine} = setup(), c = engine.camera, worldUp = c.up, cube = new ViewCube(engine, {duration: 0}), key = k => cube.element.dispatch('keydown', {key: k});
+  cube.view('top'); engine.frame();
+  assert.deepEqual(direction(c), [0, 1, 0]); assert.ok(close(c.up, [0, 0, -1]) && c.matrix.every(Number.isFinite), 'core accepts the exact pole');
+  // Same image as the old 1e-6 rad approach, which core rendered with its default +Y up.
+  const near = new Camera({position: [0, 10 * Math.cos(1e-6), 10 * Math.sin(1e-6)], target: [0, 0, 0]}); near.update(4 / 3, true);
+  assert.ok(close([...c.matrix], [...near.matrix], 1e-5));
+  cube.view('front'); engine.frame(); assert.equal(c.up, worldUp, 'the original up object is back');
+  // Arrow keys from the right side to the top: the heading is kept in camera.up and turns on the pole.
+  key('ArrowRight'); key('ArrowRight'); key('ArrowUp'); key('ArrowUp'); engine.frame();
+  assert.deepEqual(direction(c), [0, 1, 0]); assert.ok(close(screen(c).up, [-1, 0, 0]), 'came from +X, so +X is at the bottom');
+  key('ArrowLeft'); engine.frame(); assert.deepEqual(direction(c), [0, 1, 0]); assert.ok(close(screen(c).up, unit([-1, 0, -1])), 'turned 45 degrees on the pole');
+  key('ArrowDown'); engine.frame(); assert.ok(close(direction(c), [0.5, Math.SQRT1_2, 0.5])); assert.equal(c.up, worldUp);
+  key('ArrowDown'); key('ArrowDown'); key('ArrowDown'); key('ArrowDown'); engine.frame();
+  assert.deepEqual(direction(c), [0, -1, 0]); assert.ok(close(screen(c).up, unit([1, 0, 1])), 'bottom: the heading points up the screen');
+  // A control registered after the cube moves off the pole after the cube's update: one frame with the cube's up, then +Y.
+  const orbit = new OrbitControls(engine); orbit.rotateUp(0.3); engine.frame();
+  assert.ok(direction(c)[1] > -0.99 && c.matrix.every(Number.isFinite)); engine.frame(); assert.equal(c.up, worldUp);
+  orbit.dispose();
+  // An up set by someone else is theirs: the cube neither replaces nor restores it.
+  cube.view('top'); const mine = [1, 0, 0]; c.up = mine; cube.view('front'); engine.frame(); assert.equal(c.up, mine);
+  c.up = worldUp;
+  // Disposing on the pole gives the up back and leaves a camera core accepts, showing the same view.
+  cube.view('top'); engine.frame(); const before = [...c.matrix]; cube.dispose(); engine.camera.update(4 / 3, true);
+  assert.equal(c.up, worldUp); assert.ok(close([...c.matrix], before, 1e-5));
 });
 
 test('the projection toggle drives @margoengine/cameras and reports its state', () => {

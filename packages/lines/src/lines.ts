@@ -176,11 +176,12 @@ export class Lines implements EnginePlugin {
       this.stats.lines++; this.stats.segments += segments;
     }
     if (!this.depthLines.length && !this.topLines.length) return;
-    const canvas = engine.canvas, data = this.frameData, camera = context.camera;
-    data.set(camera.matrix, 0);
+    const canvas = engine.canvas, data = this.frameData, camera = context.camera, m = camera.matrix;
+    data.set(m, 0);
     data[16] = context.width; data[17] = context.height;
     data[18] = canvas.clientWidth ? context.width / canvas.clientWidth : 1;
-    data[19] = 0.5 * context.height / Math.tan(camera.fov * Math.PI / 360);
+    // Pixels per world unit at clip w 1. Orthographic (clip w constant, e.g. @margoengine/cameras): from the y row's length.
+    data[19] = m[3] || m[7] || m[11] ? 0.5 * context.height / Math.tan(camera.fov * Math.PI / 360) : 0.5 * context.height * Math.hypot(m[1], m[5], m[9]);
     data[20] = context.format.endsWith('-srgb') || context.format.includes('float') ? 0 : 1;
     device.queue.writeBuffer(this.frameBuffer!, 0, data);
     this.colorAttachment.view = context.color; this.depthAttachment.view = context.depth;
