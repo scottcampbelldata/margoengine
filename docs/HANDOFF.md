@@ -611,6 +611,11 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    Real GPU re-run (`textured-instancing-gpu.mjs`, Intel Xe2 / Arc 140V, AC before and after, GPU lock held): instanced
    frames equal the references (materials and NodeMaterial max channel diff 1, glTF via `decoders.instancing` 0), picks
    return instances 0/5/77/143, 1k-10k boxes CPU 15-127 ms -> 0.6-0.8 ms, frame 74-659 ms -> 4-5 ms.
+5c. Texture-binding limit: a gltf-pro PHYSICAL-variant material + directional shadows + environment IBL + clustered
+   local shadows (`590278e`) needs 17 sampled textures per fragment stage, over WebGPU's default 16. Options: core
+   requests `maxSampledTexturesPerShaderStage` up to the adapter's limit (a core change; most desktop adapters allow
+   more, phones may not), or the packages share textures (e.g. pack IBL maps, or one texture array for shadow maps).
+   Measure which combos hit it and prefer a package-side fix.
 6. Then give Scott the full list of what was done and what remains.
 
 Worker practice: agents run in git worktrees; they must start with `git reset --hard perf/auto-quality` (worktrees
