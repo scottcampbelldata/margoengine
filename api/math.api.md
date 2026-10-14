@@ -138,6 +138,8 @@ export namespace MathUtils {
 
     export const clamp: (value: number, min: number, max: number) => number;
 
+    export const createLcgRandom: (seed: number) => (() => number);
+
     export function createRandom(seed?: number): () => number;
 
     export const damp: (x: number, y: number, lambda: number, dt: number) => number;

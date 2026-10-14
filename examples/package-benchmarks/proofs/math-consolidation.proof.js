@@ -207,6 +207,34 @@ families.push({name: 'colour parse + sRGB', async verify() {
   return n;
 }});
 
+// --- seeded PRNGs: points' mulberry32 (= math createRandom), scatter + creative grass LCG (= math createLcgRandom) ---
+families.push({name: 'seeded PRNGs', async verify() {
+  const utils = await import('@margoengine/math/mathutils'), points = await both('points', 'src/math.ts'), scatter = await both('scatter', 'src/candidates.ts');
+  const seeds = [0, -0, 1, -1, 7, 2 ** 31, 2 ** 32, 2 ** 32 + 5, -(2 ** 31), 2 ** 53, 1.5, -2.5, NaN, Infinity, -Infinity, 0x9e3779b1, 0x12345678];
+  for (let i = 0; i < 200; i++) seeds.push(Math.floor(random() * 2 ** 32), (random() - 0.5) * 1e12);
+  let n = 0;
+  for (const seed of seeds) {
+    const a = points.baseline.random(seed), b = points.candidate.random(seed), c = utils.createRandom(seed);
+    for (let i = 0; i < 1000; i++) {const x = a(); assert.ok(Object.is(b(), x) && Object.is(c(), x), `mulberry32 ${seed}`); n++;}
+  }
+  // grass's closure has math's expression (state named seed); scatter's is the |0 form, compared through its public API.
+  assert.ok(body('packages/creative/src/grass.ts', 'random').includes('seed=(Math.imul(seed,1664525)+1013904223)>>>0;returnseed/4294967296;'));
+  assert.ok(body('packages/scatter/src/candidates.ts', 'random').includes('seed=Math.imul(seed,1664525)+1013904223|0;return(seed>>>0)/4294967296;'));
+  for (const seed of [0, 1, 0x12345678, 0xffffffff, 2 ** 31, ...seeds.slice(17, 80).filter(s => Number.isInteger(s) && s >= 0 && s <= 0xffffffff)]) {
+    const bounds = [-50, -50, 50, 50], x = scatter.baseline.randomPlacements(500, bounds, [0.5, 2], seed), y = scatter.candidate.randomPlacements(500, bounds, [0.5, 2], seed);
+    assert.deepEqual(y, x);
+    const lcg = utils.createLcgRandom(seed); let state = seed; // the scatter expression, transcribed
+    for (let i = 0; i < 1000; i++) {state = Math.imul(state, 1664525) + 1013904223 | 0; assert.ok(Object.is(lcg(), (state >>> 0) / 4294967296)); n++;}
+    n += 500;
+  }
+  return n;
+}, async bench() {
+  const points = await both('points', 'src/math.ts'), count = 400000, positions = new Float32Array(count * 3).map(() => random() * 100);
+  assert.deepEqual(points.candidate.buildBlocks(positions, count, 4096, 3).order, points.baseline.buildBlocks(positions, count, 4096, 3).order);
+  return [{case: 'points buildBlocks (seeded shuffle per block), 400,000 points', ...time(
+    () => {points.baseline.buildBlocks(positions, count, 4096, 3);}, () => {points.candidate.buildBlocks(positions, count, 4096, 3);}, 8)}];
+}});
+
 const checked = {}, timings = [];
 for (const family of families) {
   if (timing) {if (family.bench) timings.push(...(await family.bench()).map(item => ({family: family.name, ...item})));}

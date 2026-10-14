@@ -1,9 +1,10 @@
+import {createLcgRandom} from '@margoengine/math/mathutils';
 import type {GroundBounds, GroundPlacement} from './placement.js';
 import {validateExclusions} from './placement.js';
 
 function random(seed: number, scale: readonly [number, number]): () => number {
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff || scale.length !== 2 || !Number.isFinite(scale[0]) || !Number.isFinite(scale[1]) || scale[0] <= 0 || scale[0] > scale[1]) throw new RangeError('Invalid placement seed or scale');
-  return () => {seed = Math.imul(seed,1664525)+1013904223|0; return (seed>>>0)/4294967296;};
+  return createLcgRandom(seed);
 }
 function count(value: number): void {if (!Number.isInteger(value) || value < 0 || value > 1000000) throw new RangeError('Invalid placement candidate count');}
 

@@ -1,6 +1,7 @@
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext} from '@margoengine/core/extension';
 import {finiteVector} from '@margoengine/math/validate';
+import {createLcgRandom} from '@margoengine/math/mathutils';
 import {sceneSamples} from '../../shared/quality.js';
 import frameShader from './shaders/grass-frame.wgsl?raw';
 import cullShader from './shaders/grass-cull.wgsl?raw';
@@ -93,8 +94,7 @@ export class GrassField implements EnginePlugin {
     this.uniform=device.createBuffer({label:'grass:frame',size:this.frame.byteLength,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
     this.vertices=device.createBuffer({label:'grass:blade',size:200,usage:GPUBufferUsage.VERTEX|GPUBufferUsage.COPY_DST});
     const data=new Float32Array(this.blades*6),columns=Math.min(this.blades,Math.ceil(Math.sqrt(this.blades*this.frame[56]/this.frame[57]))),rows=Math.ceil(this.blades/columns);
-    let seed=0x12345678;
-    const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+    const random=createLcgRandom(0x12345678);
     for (let i=0;i<this.blades;i++) {
       data[i*6]=((i%columns+random())/columns-0.5)*this.frame[56];
       data[i*6+2]=((Math.floor(i/columns)+random())/rows-0.5)*this.frame[57];
