@@ -43,6 +43,8 @@ test('every package class follows the attach / dispose / Symbol.dispose conventi
     if (typeof proto.destroy === 'function' && !proto.destroy.length && typeof proto.dispose !== 'function') problems.push(`${label}: destroy() without dispose()`);
     if (typeof proto.dispose === 'function' && typeof proto[Symbol.dispose] !== 'function') problems.push(`${label}: dispose() without [Symbol.dispose]()`);
     if (typeof proto.setup === 'function' && !NOT_FEATURES.has(name) && typeof Class.attach !== 'function') problems.push(`${label}: engine feature without static attach()`);
+    // An inherited attach must construct the subclass (`new this(...)`), not the base (GPUParticles extends VFX).
+    if (typeof Class.attach === 'function' && !Object.hasOwn(Class, 'attach') && !/new this\b/.test(String(Class.attach))) problems.push(`${label}: inherits a base class attach() that builds the base class`);
   }
   assert.deepEqual(problems, []);
 });
