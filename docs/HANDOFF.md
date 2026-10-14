@@ -80,8 +80,8 @@ Five parallel workers reviewed 58 packages against baseline `f05414a`; Claude ve
 
 ## Work queue Scott approved (2026-10-14), in order
 
-Global rules: core + stage does not grow without Scott's say-so (limit 20,000; currently 18,580 after his approved
-`features` option). Real-GPU browser
+Global rules: core + stage does not grow without Scott's say-so (limit 20,000; currently 18,681 after his approved
+`features` option and core hooks). Real-GPU browser
 checks and benchmarks run one at a time: take the lock with `mkdir C:\Dev\Projects\margo-engine\test-results\gpu.lock`
 (fails if held; wait and retry), remove it when done; never measure while other GPU work runs.
 
@@ -168,7 +168,8 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       materials/index.ts, shader/node.ts, usdz/crate.ts).
    c. Replace WGSL string patching (shadows, tonemap, toon, environment, materials, shader) with override constants,
       specialized pipelines (1e.f) and shader nodes, so one renamed shader line cannot silently break another package.
-   d. DECISION FOR SCOTT before 1.0: a small explicit set of core hooks (camera projection, frame pacing, plugin lookup,
+   d. [DECIDED: core hooks merged `571b2a0` (camera.up, camera.project, engine.pace, engine.plugins), +101 bytes;
+      package migration running] A small explicit set of core hooks (camera projection, frame pacing, plugin lookup,
       pipeline state) to replace today's workarounds: cameras replacing camera.update on the instance, quality/pacing
       wrapping requestAnimationFrame globally, environment and selection reading core's private plugin map, materials
       proxying createRenderPipeline. Costs core bytes; these become public API, so decide before launch.
