@@ -648,7 +648,9 @@ Second set (2026-10-14, evening), all APPROVED by Scott:
   material; budget ~30 B; if it needs dirty-state tracking, leave it to leaf packages). Start after the current core
   agent merges.
 - Multiple directional lights stay OUT of core (belongs in `@margoengine/clustered`).
-- Back-face culling: decide from the scratch-branch numbers.
+- Back-face culling: SKIPPED for core (Scott agreed, 2026-10-14). Measured on `scratch/core-backface-cull`
+  (+315 B -> 19,858; 50k CAD 15.6 -> 13.7 ms GPU, noisy; 16 full-screen layers 11.9 -> 4.7 ms). CAD files often have
+  open shells, mirrored parts and section cuts; pipeline-level culling stays a leaf-package option for closed solids.
 - Island light tier keeps 100k particles by default; add a `?particles=1m` URL switch (the menu already has 1M).
   Start after the visual-regression agent merges (it edits the sandbox).
 
