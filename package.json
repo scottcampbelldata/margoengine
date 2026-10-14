@@ -52,6 +52,7 @@
     "packages/tween",
     "packages/quality",
     "packages/webgl",
+    "packages/math",
     "packages/ecs",
     "packages/fsm",
     "packages/splines",
