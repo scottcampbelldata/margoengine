@@ -510,6 +510,10 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    lines, points, text, loaders/threemf, loaders/engine, splats, core/geometry (core stays as is); seeded PRNGs in points,
    scatter, procedural, creative; ray tests in controls, selection, bvh; per-package math.ts in audio, bvh, controls,
    geometry, lines, physics, points, text). Prove no behaviour change and record bytes per package.
+5b. Make gltf-pro instancing opt-in: textured instancing (`8e5d704`) added +1,942 B gzip to gltf-pro for every app,
+   because reading `EXT_mesh_gpu_instancing` needs `PBRInstances`. Move it behind a decoder-style hook / separate entry
+   (e.g. `@margoengine/gltf-pro/instancing`, imported by materials' `createInstancedMesh`) so apps that never instance
+   pay ~0. Start after the Web Workers parsing change (1f.j) merges, since both touch gltf-pro's parser.
 6. Then give Scott the full list of what was done and what remains.
 
 Worker practice: agents run in git worktrees; they must start with `git reset --hard perf/auto-quality` (worktrees
