@@ -1,6 +1,7 @@
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
 import {viewMatrix} from '../../shared/view.js';
+import {orthographic} from '../../shared/projection.js';
 import {validateSplats,type SplatData} from './data.js';
 import {project,render} from './shader.js';
 import {histogram,scan,scanTotals,scatter} from './sort.js';
@@ -46,6 +47,8 @@ export class Splats implements EnginePlugin {
   private sort(c:Context):void {
     this.values.set(c.camera.matrix);viewMatrix(this.view,c.camera);this.values.set(c.camera.position,32);const focal=c.height/(2*Math.tan(c.camera.fov*Math.PI/360));
     const v=this.values,n=this.integers,e=c.encoder;v[36]=c.width;v[37]=c.height;v[38]=v[39]=focal;v[40]=c.camera.near;v[41]=c.camera.far;v[42]=+(c.format==='rgba16float');v[43]=0;
+    // Orthographic clip matrix (e.g. @margoengine/cameras): affine Jacobian in pixels per world unit, signed near/far.
+    const o=orthographic(c.camera.matrix,c.camera.position);if(o){v[38]=o.sx*c.width/2;v[39]=o.sy*c.height/2;v[40]=o.near;v[41]=o.far;v[43]=1;}
     n[44]=this.count;n[45]=this.sh.length===4?0:this.sh.length/this.count/3;n[46]=n[47]=0;c.device.queue.writeBuffer(this.uniform!,0,this.values as Float32Array<ArrayBuffer>);
     const groups=Math.ceil(this.count/256),blocks=Math.ceil(groups/256);this.dispatch(e,this.projection!,this.projectionGroup!,groups,1);
     for(let pass=0;pass<8;pass++){const binds=this.sortGroups[pass];this.dispatch(e,this.sortPipelines[0],binds[0],groups,1);this.dispatch(e,this.sortPipelines[1],binds[1],blocks,16);this.dispatch(e,this.sortPipelines[2],binds[2],1,1);this.dispatch(e,this.sortPipelines[3],binds[3],groups,1);}

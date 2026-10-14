@@ -24,12 +24,16 @@ lists; authored intensities remain unchanged. The setting survives restoration.
 
 Core meshes receive local lighting automatically. Call `lights.add(pbrModel)` or `lights.add(terrain)` for optional renderers; the returned function unregisters the receiver. Directional shadows compose with local lighting in either registration order. Local lights themselves do not cast shadows.
 
+Orthographic cameras (for example `CameraProjection` from `@margoengine/cameras`, or any projection whose `camera.matrix` has a constant clip w) get linear depth slices between the projection's own near and far planes, which may lie behind the eye, and cluster boxes whose x/y extents do not grow with depth, including off-centre frustums. Everything is read from `camera.matrix` and `camera.position`; the package does not depend on the cameras package. Perspective output is unchanged.
+
 Fragment lookup removes camera projection jitter before selecting the unjittered compute cluster. This keeps TAA from dropping small lights at fractional tile boundaries; the uniform's previously unused depth.zw fields carry the screen offset, without a dependency on TAA.
 
 Each cluster reserves 1,024 indices, preventing silent truncation when many lights overlap. The default grid uses 13.5 MiB for indices. An optional `grid:[x,y,z]` is checked against storage limits at attachment. `lightLists` exposes GPU counts/indices for diagnostics or custom forward materials; ordinary rendering needs no readback. `clusteredSampling(group)` exports WGSL for custom materials. Frame rate depends on light overlap, materials, resolution and hardware; no locked FPS is promised.
 
 Custom code reproducing `ClusterFrame` must include the trailing `intensity:vec4f`
-at byte 112, making the uniform 128 bytes. Its X component is the radiance scale.
+at byte 112, making the uniform 128 bytes. Its X component is the radiance scale; Y and Z hold the
+orthographic NDC offset and W is 1 for an orthographic camera (then `screen.z` is the view half height per NDC unit,
+`screen.w` the x/y ratio and `depth.xy` the signed near/far).
 Consumers of `clusteredSampling()` and `bindings()` receive this layout automatically.
 
 `dispose()`/`destroy()` releases resources and receiver hooks. Device restoration recreates buffers and reuploads the light list. The package stays separate from core, stage and PBR assets.

@@ -2,6 +2,7 @@ import {Engine, PbrMaterial, box} from '@margoengine/core';
 import {engineRuntime} from '@margoengine/core/extension';
 import {SceneTarget} from '../../shared/msaa.js';
 import {PointsPlugin, PointCloud, SpriteBatch, SpriteMaterial, atlasRect, random} from '@margoengine/points';
+import {CameraProjection} from '../../cameras/dist/index.js';
 
 const assert = (condition, message) => {if (!condition) throw new Error(message);};
 const SIZE = 256;
@@ -290,6 +291,50 @@ window.runPointTests = async () => {
   sprites.visible = true;
   await settle(runtime.gpu);
   report.checks.push('Textured points with alpha test, sphere impostor shading, and eye-dome lighting at depth steps');
+
+  // 8b. Orthographic camera (@margoengine/cameras): world sizes, sphere depth, EDL and picking read the clip matrix.
+  {
+    sprites.visible = false;
+    const projection = new CameraProjection({height: 8}), unit = SIZE / 8, at = (x, y) => [Math.floor(SIZE / 2 + x * unit), Math.floor(SIZE / 2 - y * unit)];
+    engine.use(projection);
+    const pair = points.add(new PointCloud({positions: [-2, 0, 0, 2, 0, -10], material: {size: 1, sizeUnits: 'world'}}));
+    image = await frame();
+    const left = bbox({at: (x, y) => x < 128 ? image.at(x, y) : [0, 0, 0]}, white), right = bbox({at: (x, y) => x >= 128 ? image.at(x, y) : [0, 0, 0]}, white);
+    assert(Math.abs(left.width - unit) <= 1.5 && Math.abs(right.width - unit) <= 1.5, `Orthographic world sizes ${left.width} / ${right.width}, expected ${unit} at both depths`);
+    pair.dispose();
+    // Sphere impostor half inside a box: its curved front pokes out at the centre, its rim stays behind the face.
+    const cube = engine.createMesh().setGeometry(box(2, 2, 2)).setMaterial(new PbrMaterial({color: '#ff0000', roughness: 1}));
+    const boxOnly = await frame();
+    const ball = points.add(new PointCloud({positions: [0, 0, 0.5], material: {size: 1.6, sizeUnits: 'world', shading: 'sphere'}}));
+    image = await frame();
+    const center = image.at(...at(0, 0)), rim = image.at(...at(0.72, 0)), face = boxOnly.at(...at(0.72, 0)), equal = (a, b) => a.every((v, i) => Math.abs(v - b[i]) <= 2);
+    assert(!equal(center, boxOnly.at(...at(0, 0))) && white(center) && equal(rim, face), `Orthographic sphere depth: centre ${center}, rim ${rim} vs box ${face}`);
+    ball.dispose(); cube.dispose();
+    // Eye-dome lighting darkens the far layer next to the near one, as in perspective.
+    const layers = [];
+    for (let i = 0; i < 40; i++) for (let j = 0; j < 40; j++) layers.push(-2 + i * 0.1, -2 + j * 0.1, i < 20 ? 0 : -1.5);
+    const steps = points.add(new PointCloud({positions: layers, material: {size: 9}}));
+    const flat = await frame(); steps.material.edl = true; const shaded = await frame();
+    const edgeX = Math.floor(SIZE / 2 - 0.1 * unit + 4.5);
+    let darker = 0, same = 0;
+    for (let y = 100; y < 156; y++) {
+      if (shaded.at(edgeX, y)[0] < flat.at(edgeX, y)[0] - 30) darker++;
+      if (Math.abs(shaded.at(80, y)[0] - flat.at(80, y)[0]) <= 2) same++;
+    }
+    assert(darker > 20 && same > 50, `Orthographic EDL: ${darker} darker, ${same} unchanged`);
+    steps.dispose();
+    // Picking: two points on one line of sight, the nearer wins (clip w is 1 for both).
+    const line = points.add(new PointCloud({positions: [1, 1, -3, 1, 1, 2], material: {size: 6}}));
+    await frame();
+    const hit = points.pick(...at(1, 1).map(v => v + 0.5));
+    assert(hit && hit.index === 1 && hit.depth > 0, `Orthographic pick returned ${hit?.index} at depth ${hit?.depth}`);
+    line.dispose();
+    engine.removePlugin(projection.name);
+    sprites.visible = true;
+    await settle(runtime.gpu);
+    report.orthographic = {worldWidths: [left.width, right.width], expected: unit, sphereCenter: center, sphereRim: rim, edlDarker: darker};
+    report.checks.push('Orthographic camera: world sizes ignore depth, sphere impostors write linear depth, EDL shades depth steps, picking prefers the nearer point');
+  }
 
   // 9. Two million points: chunked, culled, and drawn within the point budget.
   const n = 2_000_000, side = Math.ceil(Math.sqrt(n)), positions = new Float32Array(n * 3), colors = new Uint8Array(n * 3);

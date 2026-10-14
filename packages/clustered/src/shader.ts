@@ -4,20 +4,24 @@ struct ClusterLight {positionRange:vec4f,colorIntensity:vec4f,directionOuter:vec
 @group(${group}) @binding(4) var<uniform> clusterFrame:ClusterFrame;
 @group(${group}) @binding(5) var<storage,read> clusterLights:array<ClusterLight>;
 `;
+// Orthographic cameras (intensity.w): linear depth slices, and x/y bounds constant in depth around the NDC offset intensity.yz.
 export const cullingShader=declarations(0)+/* wgsl */`
 @group(0) @binding(6) var<storage,read_write> clusterCounts:array<u32>;
 @group(0) @binding(7) var<storage,read_write> clusterIndices:array<u32>;
 @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) invocation:vec3u){
   let id=invocation.x;let grid=clusterFrame.grid.xyz;if(id>=grid.x*grid.y*grid.z){return;}
   let cell=vec3u(id%grid.x,(id/grid.x)%grid.y,id/(grid.x*grid.y));
-  let z0=clusterFrame.depth.x*pow(clusterFrame.depth.y/clusterFrame.depth.x,f32(cell.z)/f32(grid.z));
-  let z1=clusterFrame.depth.x*pow(clusterFrame.depth.y/clusterFrame.depth.x,f32(cell.z+1)/f32(grid.z));
-  let x0=(f32(cell.x)/f32(grid.x)*2-1)*clusterFrame.screen.z*clusterFrame.screen.w;
-  let x1=(f32(cell.x+1)/f32(grid.x)*2-1)*clusterFrame.screen.z*clusterFrame.screen.w;
-  let y0=(1-f32(cell.y+1)/f32(grid.y)*2)*clusterFrame.screen.z;
-  let y1=(1-f32(cell.y)/f32(grid.y)*2)*clusterFrame.screen.z;
-  let lo=vec3f(min(x0*z0,x0*z1),min(y0*z0,y0*z1),-z1);
-  let hi=vec3f(max(x1*z0,x1*z1),max(y1*z0,y1*z1),-z0);
+  let ortho=clusterFrame.intensity.w>0.5;let near=clusterFrame.depth.x;let far=clusterFrame.depth.y;
+  var z0=near*pow(far/near,f32(cell.z)/f32(grid.z));
+  var z1=near*pow(far/near,f32(cell.z+1)/f32(grid.z));
+  if(ortho){z0=mix(near,far,f32(cell.z)/f32(grid.z));z1=mix(near,far,f32(cell.z+1)/f32(grid.z));}
+  let x0=(f32(cell.x)/f32(grid.x)*2-1-clusterFrame.intensity.y)*clusterFrame.screen.z*clusterFrame.screen.w;
+  let x1=(f32(cell.x+1)/f32(grid.x)*2-1-clusterFrame.intensity.y)*clusterFrame.screen.z*clusterFrame.screen.w;
+  let y0=(1-f32(cell.y+1)/f32(grid.y)*2-clusterFrame.intensity.z)*clusterFrame.screen.z;
+  let y1=(1-f32(cell.y)/f32(grid.y)*2-clusterFrame.intensity.z)*clusterFrame.screen.z;
+  let s0=select(z0,1.0,ortho);let s1=select(z1,1.0,ortho);
+  let lo=vec3f(min(x0*s0,x0*s1),min(y0*s0,y0*s1),-z1);
+  let hi=vec3f(max(x1*s0,x1*s1),max(y1*s0,y1*s1),-z0);
   let center=(lo+hi)*0.5;let radius=length(hi-lo)*0.5;var count=0u;
   for(var j=0u;j<clusterFrame.grid.w;j++){
     let light=clusterLights[j];let p=(clusterFrame.view*vec4f(light.positionRange.xyz,1)).xyz;
@@ -40,7 +44,8 @@ fn clusterLighting(pixel:vec2f,position:vec3f,n:vec3f,eye:vec3f,base:vec3f,rough
   if(depth<clusterFrame.depth.x||depth>clusterFrame.depth.y){return vec3f(0);}
   let screenPixel=pixel-clusterFrame.depth.zw*clusterFrame.screen.xy;
   let xy=min(vec2u(max(screenPixel,vec2f(0))/clusterFrame.screen.xy*vec2f(grid.xy)),grid.xy-vec2u(1));
-  let z=min(u32(max(0.0,log(depth/clusterFrame.depth.x)/log(clusterFrame.depth.y/clusterFrame.depth.x)*f32(grid.z))),grid.z-1);
+  let near=clusterFrame.depth.x;let far=clusterFrame.depth.y;
+  let z=min(u32(max(0.0,select(log(depth/near)/log(far/near),(depth-near)/(far-near),clusterFrame.intensity.w>0.5)*f32(grid.z))),grid.z-1);
   let cell=xy.x+grid.x*(xy.y+grid.y*z);let count=clusterCounts[cell];var result=vec3f(0);
   let v=normalize(eye-position);let nv=clamp(dot(n,v),0.0001,1.0);let a=max(roughness,0.045)*max(roughness,0.045);let a2=a*a;
   for(var j=0u;j<count;j++){
