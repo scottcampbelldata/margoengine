@@ -159,7 +159,8 @@ try {
   };
   const {page}=browser;
   await page.addInitScript(instrument);await page.setViewportSize({width:1280,height:800});
-  await page.goto('http://127.0.0.1:5193/examples/windy-meadow.html');
+  // Desktops start on the light tier (1x MSAA); the 4x checks below need the full tier.
+  await page.goto('http://127.0.0.1:5193/examples/windy-meadow.html?quality=high');
   await page.locator('#viewport[data-ready=true]').waitFor();
   await page.waitForFunction(()=>meadowAudit.frames>5);
   assert(await page.evaluate(()=>meadowAudit.textures.includes(4)&&meadowAudit.boundSamples.has(4)),'Desktop did not draw with 4× MSAA');

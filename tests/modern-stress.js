@@ -1,5 +1,6 @@
 import {createStage, box, PbrMaterial} from '/packages/margoengine/dist/index.js';
 import {engineRuntime} from '/packages/core/dist/extension.js';
+import {webglRenderer} from '/packages/webgl/dist/index.js';
 import {Splats} from '/packages/splats/dist/index.js';
 import {VFX} from '/packages/vfx/dist/index.js';
 import {Terrain} from '/packages/terrain/dist/index.js';
@@ -37,7 +38,7 @@ window.runStress = async (profile, options) => {
       return {checks, frames};
     }
     const backend = scenario === 'fallback' ? 'auto' : scenario.startsWith('webgl') ? 'webgl2' : 'webgpu';
-    app = await createStage(host, {backend, autoStart: false, capacity: Math.max(options.entities + 1, 16), camera: {position: [0, 2, 8], target: [0, 0, 0]}, onError: error => expected.push(String(error))});
+    app = await createStage(host, {backend, fallback: webglRenderer, autoStart: false, capacity: Math.max(options.entities + 1, 16), camera: {position: [0, 2, 8], target: [0, 0, 0]}, onError: error => expected.push(String(error))});
     const engine = engineRuntime(app.engine), store = engine.store, memory = store.matrices.buffer;
     assert(engine.backend === (backend === 'auto' ? 'webgl2' : backend), 'Unexpected backend');
     if (scenario === 'fallback') {assert(/adapter unavailable/.test(engine.fallbackReason), 'Missing fallback diagnostic'); checks.push('adapter fallback');}
@@ -90,7 +91,7 @@ window.runStress = async (profile, options) => {
       await wait(() => expected.length === 1); const before = ticks;
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       assert(ticks === before && expected[0] === 'Error: WebGL context lost', 'WebGL loss failed to stop/report once');
-      app.dispose(); app = await createStage(host, {backend: 'webgl2', autoStart: false}); app.box(); app.engine.render();
+      app.dispose(); app = await createStage(host, {backend: 'webgl2', fallback: webglRenderer, autoStart: false}); app.box(); app.engine.render();
       await window.stressCapture(); checks.push('WebGL loss stops RAF and permits remount'); return {checks, frames, expected};
     }
     for (let frame = 0; frame < options.frames; frame++) {

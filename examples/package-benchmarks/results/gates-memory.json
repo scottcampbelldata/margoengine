@@ -1,0 +1,565 @@
+{
+ "date": "2026-10-14T17:11:19.063Z",
+ "commit": "f9b2ad0",
+ "acPowerBefore": true,
+ "cycles": 20,
+ "loads": [
+  {
+   "name": "gltf-pro:damaged-helmet",
+   "loadMs": 331.6,
+   "bounds": [
+    -0.947,
+    -0.901,
+    -1.187,
+    0.942,
+    0.901,
+    0.813
+   ],
+   "errors": [],
+   "drawnFraction": 0.0716
+  },
+  {
+   "name": "gltf-pro:robot-expressive",
+   "loadMs": 12.9,
+   "bounds": [
+    -3.312,
+    -0.02,
+    -1.269,
+    3.307,
+    4.441,
+    1.416
+   ],
+   "errors": [],
+   "drawnFraction": 0.049
+  },
+  {
+   "name": "gltf-pro:box-textured",
+   "loadMs": 7.1,
+   "bounds": [
+    -0.5,
+    -0.5,
+    -0.5,
+    0.5,
+    0.5,
+    0.5
+   ],
+   "errors": [],
+   "drawnFraction": 0.1984
+  },
+  {
+   "name": "fbx:triangle.fbx",
+   "loadMs": 9.1,
+   "bounds": [
+    0,
+    0,
+    0,
+    1,
+    1,
+    0
+   ],
+   "errors": [],
+   "drawnFraction": 0.0475
+  },
+  {
+   "name": "fbx:rich-binary-zlib",
+   "loadMs": 26.6,
+   "bounds": [
+    0,
+    -1,
+    -9.237,
+    5.107,
+    5.433,
+    0
+   ],
+   "errors": [],
+   "drawnFraction": 0.0165
+  },
+  {
+   "name": "usdz:triangle.usda",
+   "loadMs": 7.6,
+   "bounds": [
+    1,
+    2,
+    3,
+    2,
+    3,
+    3
+   ],
+   "errors": [],
+   "drawnFraction": 0.0866
+  },
+  {
+   "name": "usdz:triangle.usdc",
+   "loadMs": 6.6,
+   "bounds": [
+    1,
+    2,
+    3,
+    2,
+    3,
+    3
+   ],
+   "errors": [],
+   "drawnFraction": 0.0646
+  },
+  {
+   "name": "usdz:knot-50k.usdz",
+   "loadMs": 149,
+   "bounds": [
+    -1.482,
+    -1.714,
+    -0.8,
+    1.8,
+    1.714,
+    0.8
+   ],
+   "errors": [],
+   "drawnFraction": 0.1022
+  },
+  {
+   "name": "loaders:cube_gears.3mf",
+   "loadMs": 81.1,
+   "bounds": [
+    0.003,
+    0.003,
+    0.002,
+    0.171,
+    0.128,
+    0.036
+   ],
+   "triangles": 25692,
+   "errors": [],
+   "drawnFraction": 0.0716
+  },
+  {
+   "name": "loaders:dolphins.ply",
+   "loadMs": 8.3,
+   "bounds": [
+    -477.202,
+    -86.61,
+    -180.377,
+    349.473,
+    86.61,
+    566.654
+   ],
+   "triangles": 1689,
+   "errors": [],
+   "drawnFraction": 0.0316
+  },
+  {
+   "name": "loaders:fran_cut.vtk",
+   "loadMs": 13.2,
+   "bounds": [
+    0,
+    -0.205,
+    -0.119,
+    0.106,
+    -0.051,
+    0.004
+   ],
+   "triangles": 4224,
+   "errors": [],
+   "drawnFraction": 0.1475
+  },
+  {
+   "name": "loaders:bunny.pcd",
+   "loadMs": 6.1,
+   "bounds": [
+    -0.094,
+    0.037,
+    -0.055,
+    0.06,
+    0.184,
+    0.058
+   ],
+   "triangles": 0,
+   "errors": [],
+   "drawnFraction": 0.0066
+  },
+  {
+   "name": "loaders:decimated-knight.off",
+   "loadMs": 8,
+   "bounds": [
+    0.228,
+    0.051,
+    0.36,
+    0.772,
+    0.95,
+    0.635
+   ],
+   "triangles": 1000,
+   "errors": [],
+   "drawnFraction": 0.0745
+  }
+ ],
+ "memory": [
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 295,
+    "texture": 82
+   },
+   "destroyed": {
+    "buffer": 294,
+    "texture": 80
+   },
+   "jsHeap": 42426989
+  },
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 442,
+    "texture": 122
+   },
+   "destroyed": {
+    "buffer": 441,
+    "texture": 120
+   },
+   "jsHeap": 42543593
+  },
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 589,
+    "texture": 162
+   },
+   "destroyed": {
+    "buffer": 588,
+    "texture": 160
+   },
+   "jsHeap": 40788201
+  },
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 736,
+    "texture": 202
+   },
+   "destroyed": {
+    "buffer": 735,
+    "texture": 200
+   },
+   "jsHeap": 40858281
+  },
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 883,
+    "texture": 242
+   },
+   "destroyed": {
+    "buffer": 882,
+    "texture": 240
+   },
+   "jsHeap": 40862873
+  },
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 1030,
+    "texture": 282
+   },
+   "destroyed": {
+    "buffer": 1029,
+    "texture": 280
+   },
+   "jsHeap": 40917081
+  },
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 1177,
+    "texture": 322
+   },
+   "destroyed": {
+    "buffer": 1176,
+    "texture": 320
+   },
+   "jsHeap": 41653405
+  },
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 1324,
+    "texture": 362
+   },
+   "destroyed": {
+    "buffer": 1323,
+    "texture": 360
+   },
+   "jsHeap": 40946049
+  },
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 1471,
+    "texture": 402
+   },
+   "destroyed": {
+    "buffer": 1470,
+    "texture": 400
+   },
+   "jsHeap": 40919497
+  },
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 1618,
+    "texture": 442
+   },
+   "destroyed": {
+    "buffer": 1617,
+    "texture": 440
+   },
+   "jsHeap": 40961109
+  },
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 1765,
+    "texture": 482
+   },
+   "destroyed": {
+    "buffer": 1764,
+    "texture": 480
+   },
+   "jsHeap": 40933285
+  },
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 1912,
+    "texture": 522
+   },
+   "destroyed": {
+    "buffer": 1911,
+    "texture": 520
+   },
+   "jsHeap": 40957829
+  },
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 2059,
+    "texture": 562
+   },
+   "destroyed": {
+    "buffer": 2058,
+    "texture": 560
+   },
+   "jsHeap": 40946525
+  },
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 2206,
+    "texture": 602
+   },
+   "destroyed": {
+    "buffer": 2205,
+    "texture": 600
+   },
+   "jsHeap": 40951601
+  },
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 2353,
+    "texture": 642
+   },
+   "destroyed": {
+    "buffer": 2352,
+    "texture": 640
+   },
+   "jsHeap": 40954989
+  },
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 2500,
+    "texture": 682
+   },
+   "destroyed": {
+    "buffer": 2499,
+    "texture": 680
+   },
+   "jsHeap": 40977481
+  },
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 2647,
+    "texture": 722
+   },
+   "destroyed": {
+    "buffer": 2646,
+    "texture": 720
+   },
+   "jsHeap": 40969557
+  },
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 2794,
+    "texture": 762
+   },
+   "destroyed": {
+    "buffer": 2793,
+    "texture": 760
+   },
+   "jsHeap": 40993585
+  },
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 2941,
+    "texture": 802
+   },
+   "destroyed": {
+    "buffer": 2940,
+    "texture": 800
+   },
+   "jsHeap": 41022665
+  },
+  {
+   "buffers": 1,
+   "textures": 2,
+   "bufferBytes": 112,
+   "textureBytes": 16588800,
+   "created": {
+    "buffer": 3088,
+    "texture": 842
+   },
+   "destroyed": {
+    "buffer": 3087,
+    "texture": 840
+   },
+   "jsHeap": 40995597
+  }
+ ],
+ "hardware": {
+  "webglRenderer": "ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (16GB) (0x000064A0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "webgpu": {
+   "vendor": "intel",
+   "architecture": "xe-2lpg",
+   "device": "",
+   "description": "",
+   "fallback": false
+  },
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+  "browserName": "chromium",
+  "browserVersion": "155.0.4283.45",
+  "requestedChannel": "msedge",
+  "launchArgs": [
+   "--enable-precise-memory-info",
+   "--js-flags=--expose-gc"
+  ],
+  "powerPreference": "high-performance",
+  "hostPlatform": "win32",
+  "headless": true
+ },
+ "baseline": {
+  "buffers": 1,
+  "textures": 2,
+  "bufferBytes": 112,
+  "textureBytes": 16588800,
+  "created": {
+   "buffer": 1,
+   "texture": 2
+  },
+  "destroyed": {
+   "buffer": 0,
+   "texture": 0
+  },
+  "jsHeap": 19225511,
+  "errors": []
+ },
+ "afterShow": {
+  "buffers": 1,
+  "textures": 2,
+  "bufferBytes": 112,
+  "textureBytes": 16588800,
+  "created": {
+   "buffer": 148,
+   "texture": 42
+  },
+  "destroyed": {
+   "buffer": 147,
+   "texture": 40
+  },
+  "jsHeap": 41100501,
+  "errors": []
+ },
+ "growth": {
+  "buffers": 0,
+  "textures": 0,
+  "bufferBytes": 0,
+  "textureBytes": 0,
+  "jsHeapMB": -1.48
+ },
+ "vsBaseline": {
+  "buffers": 0,
+  "textures": 0,
+  "bufferBytes": 0,
+  "textureBytes": 0
+ },
+ "leftover": [],
+ "acPowerAfter": true
+}

@@ -25,7 +25,7 @@ try {
   for (const backend of ['webgl2', 'webgpu']) {
     await page.evaluate(async backend => {
       const host = document.createElement('div'); host.id = 'viewer'; host.style.cssText = 'width:400px;height:300px'; document.body.append(host);
-      const app = await window.wrapper.createStage('#viewer', {backend, onError: error => {throw error;}});
+      const app = await window.wrapper.createStage('#viewer', {backend, fallback: window.wrapper.webglRenderer, onError: error => {throw error;}});
       const orb = app.sphere({color: '#84d6bd', roughness: 0.25, scale: [1, 0.85, 1]});
       window.scene = {app, host, orb, frames: 0};
       window.scene.unsubscribe = app.onTick(delta => {window.scene.frames++; orb.rotation.z += delta;});
@@ -113,7 +113,7 @@ try {
   }
   await page.evaluate(async () => {
     const canvas = document.createElement('canvas'); canvas.style.cssText = 'width:300px;height:200px;display:block'; document.body.append(canvas);
-    window.borrowed = await window.wrapper.createStage(canvas, {backend: 'webgl2'});
+    window.borrowed = await window.wrapper.createStage(canvas, {backend: 'webgl2', fallback: window.wrapper.webglRenderer});
     window.borrowed.sphere();
   });
   await page.waitForFunction(() => window.borrowed.canvas.width === 300 && window.borrowed.canvas.height === 200);
@@ -123,7 +123,7 @@ try {
   checks.push({name: 'Borrowed canvas automatically resizes from 300x200 to 450x250 and remains attached after disposal'});
   await page.evaluate(async () => {
     const host = document.createElement('div'); host.style.cssText = 'width:300px;height:200px'; document.body.append(host);
-    const errors = [], app = await window.wrapper.createStage(host, {backend: 'webgl2', onError: error => errors.push(String(error))});
+    const errors = [], app = await window.wrapper.createStage(host, {backend: 'webgl2', fallback: window.wrapper.webglRenderer, onError: error => errors.push(String(error))});
     const orb = app.sphere(); orb.position.set(1, 2, 3);
     window.loss = {host, app, orb, errors, frames: 0}; app.onTick(() => window.loss.frames++);
   });
@@ -139,7 +139,7 @@ try {
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const stopped = state.frames === frames, position = [state.orb.position.x, state.orb.position.y, state.orb.position.z];
     state.app.dispose(); const detached = !state.app.canvas.isConnected;
-    state.app = await window.wrapper.createStage(state.host, {backend: 'webgl2', onError: error => state.errors.push(String(error))});
+    state.app = await window.wrapper.createStage(state.host, {backend: 'webgl2', fallback: window.wrapper.webglRenderer, onError: error => state.errors.push(String(error))});
     state.app.sphere({color: '#84d6bd'}); state.frames = 0; state.app.onTick(() => state.frames++);
     return {stopped, position, detached, errors: state.errors};
   });
@@ -153,13 +153,13 @@ try {
   checks.push({name: 'WebGL2 context loss reports one error, stops RAF, retains transforms and permits disposal/recreation', ...loss, recreatedMintPixels: recreatedMint});
   const lifecycle = await page.evaluate(async () => {
     const canvas = document.createElement('canvas'); canvas.style.cssText = 'width:300px;height:200px;touch-action:pan-y'; document.body.append(canvas);
-    const original = canvas.style.cssText, app = await window.wrapper.createStage(canvas, {backend: 'webgl2', autoStart: false});
+    const original = canvas.style.cssText, app = await window.wrapper.createStage(canvas, {backend: 'webgl2', fallback: window.wrapper.webglRenderer, autoStart: false});
     let frames = 0; app.onTick(() => frames++); await new Promise(resolve => requestAnimationFrame(resolve));
     app.dispose(); const borrowed = canvas.isConnected && canvas.style.cssText === original && frames === 0; canvas.remove();
     const host = document.createElement('div'); host.style.height = '200px'; document.body.append(host);
     let failed = false;
-    try {await window.wrapper.createStage(host, {backend: 'webgl2', camera: {near: -1}});} catch {failed = host.children.length === 0;}
-    const fallback = await window.wrapper.createStage(host, {backend: 'webgl2', controls: false, autoStart: false});
+    try {await window.wrapper.createStage(host, {backend: 'webgl2', fallback: window.wrapper.webglRenderer, camera: {near: -1}});} catch {failed = host.children.length === 0;}
+    const fallback = await window.wrapper.createStage(host, {backend: 'webgl2', fallback: window.wrapper.webglRenderer, controls: false, autoStart: false});
     const untouched = fallback.canvas.style.touchAction === '';
     let rejected = 0;
     for (const action of [() => window.wrapper.createStage('#missing'), () => window.wrapper.createStage(host, {autoStart: 'yes'}), () => fallback.sky(), () => fallback.particles(), () => fallback.effects()]) {

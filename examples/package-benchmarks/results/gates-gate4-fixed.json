@@ -1,0 +1,17 @@
+{
+ "label": "gate4-fixed",
+ "date": "2026-10-14T16:05:15.059Z",
+ "commit": "2484971",
+ "results": [
+  {
+   "script": "scripts/modern-postfx-tests.js",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 9.9,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "      0.4044381082057953,\n      0.5563933849334717,\n      0.865041971206665,\n      1\n    ],\n    \"deterministic\": true\n  },\n  \"integration\": {\n    \"taa\": true,\n    \"resized\": true,\n    \"restored\": true\n  },\n  \"mobile\": {\n    \"textures\": 0,\n    \"pipelines\": 0,\n    \"resolves\": 0,\n    \"checked\": [\n      \"dof-tone-taa\",\n      \"ssao-taa\",\n      \"creative-taa\",\n      \"tonemap\",\n      \"bloom\"\n    ]\n  }\n}"
+  }
+ ],
+ "discarded": 0
+}

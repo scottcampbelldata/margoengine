@@ -1,0 +1,107 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Post stack gate</title><style>body{margin:0;background:#000}canvas{width:1280px;height:720px;display:block}</style></head><body><canvas></canvas>
+<script type="module">
+// Real scene for the post-stack gate (post-stack.mjs): DamagedHelmet (gltf-pro) on a floor with near and far boxes, optional
+// environment IBL. window.bench.setup(config) builds a fresh engine; measure(frames) times every GPU pass of each frame.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {PostStack} from '/packages/post/dist/stack.js';
+import {SSAO} from '/packages/post/dist/ssao.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {FXAA} from '/packages/post/dist/fxaa.js';
+import {DOF} from '/packages/dof/dist/index.js';
+import {Tonemap} from '/packages/tonemap/dist/index.js';
+import {Environment,EnvironmentLighting} from '/packages/environment/dist/index.js';
+
+const canvas=document.querySelector('canvas'),helmetUrl='/examples/assets/damaged-helmet.glb';
+// Smooth sky with a bright sun lobe: HDR values well above 1 so IBL specular and bloom have something to work with.
+function sky(width=256,height=128){
+  const data=new Float32Array(width*height*4),sun=[0.5,0.6,-0.62];
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+    const phi=2*Math.PI*((x+0.5)/width-0.5),theta=Math.PI*(y+0.5)/height,d=[Math.sin(theta)*Math.sin(phi),Math.cos(theta),-Math.sin(theta)*Math.cos(phi)];
+    const up=Math.max(d[1],0),dot=Math.max(0,d[0]*sun[0]+d[1]*sun[1]+d[2]*sun[2]),s=40*dot**256;
+    data.set([0.35+0.25*up+s,0.4+0.35*up+s,0.5+0.6*up+s*0.9,1],(y*width+x)*4);
+  }
+  return {width,height,data};
+}
+let state;
+const make={
+  ssao:()=>new SSAO({radius:0.35,bias:0.02,samples:16}),
+  dof:()=>new DOF({focalDistance:3.4,aperture:1.4,maxRadius:16}),
+  bloom:()=>new Bloom({strength:0.8,threshold:0.8}),
+  // Neutral, not AgX: without a display effect the last HDR effect (Bloom) already maps with AgX, so AgX would be invisible.
+  tonemap:()=>new Tonemap({curve:'neutral'}),
+  fxaa:()=>new FXAA(),
+};
+async function teardown(){
+  if(!state)return;const {engine,model,set,resolve,read}=state;state=undefined;
+  await engine.gpu.queue.onSubmittedWorkDone();model.destroy();set?.destroy();resolve?.destroy();read?.destroy();engine.dispose();
+}
+// Every render and compute pass of a frame gets begin/end timestamps, tagged with the effect whose code began it.
+let owner='scene';
+const within=(name,fn)=>function(...args){const prev=owner;owner=name;try{return fn.apply(this,args);}finally{owner=prev;}};
+function tag(plugin,name){
+  const register=plugin.registerPasses;if(register)plugin.registerPasses=function(graph){const g=Object.create(graph);g.add=p=>graph.add({...p,execute:within(name,p.execute)});return register.call(this,g);};
+  const join=plugin.joinStack;if(join)plugin.joinStack=function(host){const stage=join.call(this,host);stage.render=within(name,stage.render);return stage;};
+  return plugin;
+}
+const begin={render:GPUCommandEncoder.prototype.beginRenderPass,compute:GPUCommandEncoder.prototype.beginComputePass};
+GPUCommandEncoder.prototype.beginRenderPass=function(d){return begin.render.call(this,stamp(d));};
+GPUCommandEncoder.prototype.beginComputePass=function(d={}){return begin.compute.call(this,stamp(d));};
+function stamp(d){
+  if(!state?.timing||d.timestampWrites||state.passes>=state.capacity)return d;
+  state.owners[state.passes]=owner;const at=state.passes++*2;return {...d,timestampWrites:{querySet:state.set,beginningOfPassWriteIndex:at,endOfPassWriteIndex:at+1}};
+}
+window.bench={make,
+  async setup({effects=[],env=false,mode='stack'}={}){
+    await teardown();
+    const engine=await Engine.create(canvas,{backend:'webgpu',features:['timestamp-query'],camera:{position:[0.4,0.55,3.4],target:[0,0.05,0],near:0.05,far:100}}),device=engine.gpu,errors=[];
+    device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+    const floor=new PbrMaterial({color:'#9a9488',roughness:0.85}),paint=new PbrMaterial({color:'#2f6fb0',roughness:0.35,metalness:0.1}),steel=new PbrMaterial({color:'#c8c8c8',roughness:0.2,metalness:1});
+    engine.createMesh().setGeometry(box(30,0.1,30)).setPosition([0,-1.05,0]).setMaterial(floor);
+    for(let i=0;i<8;i++)engine.createMesh().setGeometry(box(0.8,1.6,0.8)).setPosition([-5+i*1.5,-0.2,-6-i%3*3]).setRotation([0,i*0.6,0]).setMaterial(i%2?paint:steel);
+    engine.createMesh().setGeometry(box(0.3,0.3,0.3)).setPosition([-0.75,-0.25,1.9]).setRotation([0.5,0.7,0]).setMaterial(paint); // near the camera: DOF near field
+    engine.createMesh().setGeometry(box(0.5,0.5,0.5)).setPosition([1.05,-0.75,0.1]).setMaterial(steel); // corner contact with the floor: SSAO
+    const model=await loadGLTF(engine,helmetUrl);model.setPosition?.([0,0.05,0]);
+    let environment,lighting;
+    if(env){environment=await Environment.create(engine,sky());engine.use(environment);lighting=new EnvironmentLighting(environment);engine.use(lighting);lighting.applyTo(model);}
+    const list=effects.map(name=>tag(make[name](),name)),ssao=list.find(e=>e instanceof SSAO);
+    if(ssao)ssao.add(model);
+    let stack;if(mode==='stack'&&list.length)engine.use(stack=tag(new PostStack(list),'stack'));else for(const e of list)engine.use(e);
+    const timing=device.features.has('timestamp-query'),capacity=2048;
+    const set=timing?device.createQuerySet({type:'timestamp',count:capacity*2}):undefined;
+    const resolve=timing?device.createBuffer({size:capacity*16,usage:GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC}):undefined;
+    const read=timing?device.createBuffer({size:capacity*16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}):undefined;
+    state={engine,model,set,resolve,read,env:environment,lighting,stack,timing:false,passes:0,owners:[],capacity,errors};
+    for(let i=0;i<4;i++)engine.render();await device.queue.onSubmittedWorkDone();
+    return {timestamps:timing,effects,env,mode,errors:errors.splice(0)};
+  },
+  async render(){state.engine.render();await state.engine.gpu.queue.onSubmittedWorkDone();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return {errors:state.errors.splice(0)};},
+  // Frames are submitted back to back (as in a running app, so the GPU clock does not idle down between frames) and
+  // their timestamps resolved in batches that fit the query set.
+  async measure(frames=60,warm=30){
+    const {engine,set,resolve,read}=state,device=engine.gpu,sums=[],spans=[],cpu=[],counts=new Set(),byOwner={};let zeroFrames=0;
+    if(!set)return {error:'no timestamp-query'};
+    for(let i=0;i<warm;i++)engine.render();
+    let done=0;
+    while(done<frames){
+      const batch=[];state.passes=0;state.timing=true;
+      do{const start=state.passes,t=performance.now();engine.render();cpu.push(performance.now()-t);batch.push([start,state.passes]);done++;}
+      while(done<frames&&state.passes+(batch.at(-1)[1]-batch.at(-1)[0])<=state.capacity);
+      state.timing=false;
+      const n=state.passes,e=device.createCommandEncoder();e.resolveQuerySet(set,0,n*2,resolve,0);e.copyBufferToBuffer(resolve,0,read,0,n*16);device.queue.submit([e.finish()]);
+      await read.mapAsync(GPUMapMode.READ);const q=new BigUint64Array(read.getMappedRange().slice(0,n*16));read.unmap();
+      for(const [a,b] of batch){
+        let sum=0,lo=q[2*a],hi=q[2*a+1];const own={};for(let i=a;i<b;i++){const ms=Number(q[2*i+1]-q[2*i])/1e6;own[state.owners[i]]=(own[state.owners[i]]??0)+ms;sum+=Number(q[2*i+1]-q[2*i]);if(q[2*i]<lo)lo=q[2*i];if(q[2*i+1]>hi)hi=q[2*i+1];}
+        // Dawn occasionally returns zeroed timestamps for a whole batch; such frames are counted, not measured.
+        if(sum===0){zeroFrames++;continue;}
+        sums.push(sum/1e6);spans.push(Number(hi-lo)/1e6);counts.add(b-a);for(const k in own)(byOwner[k]??=[]).push(own[k]);
+      }
+    }
+    const stat=a=>{const s=[...a].sort((x,y)=>x-y);return {median:+s[s.length>>1].toFixed(3),p90:+s[Math.floor(s.length*0.9)].toFixed(3),min:+s[0].toFixed(3)};};
+    if(!sums.length)return {error:'all timestamps zero',errors:[]};
+    return {frames,zeroFrames,passes:[...counts],ownerMs:Object.fromEntries(Object.entries(byOwner).map(([k,v])=>[k,stat(v).median])),gpuMs:stat(sums),spanMs:stat(spans),cpuMs:stat(cpu),canvas:[canvas.width,canvas.height],errors:state.errors.splice(0)};
+  },
+  teardown,
+};
+window.ready=true;
+</script></body></html>

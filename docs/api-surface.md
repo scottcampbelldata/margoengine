@@ -55,7 +55,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/post | `.` 8, `./bloom` 2, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1 | 2 |  | 12,570 |
 | @margoengine/procedural | `.` 17 |  |  |  |
 | @margoengine/quality | `.` 13 | 1 |  |  |
-| @margoengine/react | `.` 22 |  |  | 3,759 |
+| @margoengine/react | `.` 22 |  |  | 3,768 |
 | @margoengine/road | `.` 3 |  |  |  |
 | @margoengine/scatter | `.` 17 | 1 |  |  |
 | @margoengine/scenery | `.` 2, `./sky` 2 |  |  | 183 |

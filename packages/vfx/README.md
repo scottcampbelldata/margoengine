@@ -68,8 +68,10 @@ entries: `/obstacles` (+0.8 kB), `/wrap` (+0.1 kB), `/sort` (+0.7 kB), `/texture
 builds with bare imports external (`node examples/package-benchmarks/vfx-size.mjs`, `results/vfx-size.json`).
 
 ```ts
+import {EngineKernel} from '@margoengine/core';
 import {VFX} from '@margoengine/vfx/base';
 import {sort} from '@margoengine/vfx/sort';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const smoke = VFX.attach(engine, {capacity: 4096, sort: true}, {sort});
 ```
 
