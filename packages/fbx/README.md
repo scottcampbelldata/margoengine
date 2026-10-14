@@ -11,6 +11,8 @@ const animation = Animation.attach(model);
 
 `convertFBX(bytes)` returns a GLB; `parseFBX(engine, bytes)` returns a `PBRModel`; `loadFBX(engine, url)` fetches over HTTP(S). Budgets: 64 MiB input, 128 MiB converted output, one million expanded vertices, 256 MiB of decoded FBX arrays and 16 million decoded texture pixels. Loading honors `signal`. Textures referenced by file name are fetched relative to `resourcePath` (by default the FBX file's folder) and must be HTTP(S); embedded textures (`Video` content) need no fetch.
 
+`@margoengine/fbx/worker` exports `loadFBXInWorker(engine, url, options)` and `parseFBXInWorker(engine, bytes, options)`: download, FBX reading, GLB conversion, glTF parsing and texture decoding all run in one worker (`dist/workers/fbx.js`, 16.7 kB gzip, loaded only by apps that import `/worker`); the main thread builds the model and uploads it. Same model as `loadFBX` / `parseFBX`, byte for byte (`test/worker.test.js`). A whole ArrayBuffer input is moved to the worker (detached); falls back to the calling thread without `Worker`. A relative `resourcePath` resolves against the page.
+
 What is read:
 
 - Binary FBX 7.x (32- and 64-bit record headers, zlib-compressed arrays through the platform `DecompressionStream`) and ASCII FBX 7.x. Older 6.x files are rejected.

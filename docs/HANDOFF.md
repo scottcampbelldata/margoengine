@@ -363,9 +363,56 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       cached. Dolly (ortho, fixed height): texel lattice world-locked (radii constant, centres integral to 6e-14 texel);
       112 per frame, of which 63 where the floor point changes cascade (the split distance sweeping, inherent to CSM)
       and 49 elsewhere (0.36%, isolated flips on the thin posts as depth re-quantizes when the snapped centre steps).
-   j. Workers and OffscreenCanvas: move FBX/USD/glTF parsing into workers with transferable buffers (machinery CAD and
+   j. [DONE] Workers and OffscreenCanvas: move FBX/USD/glTF parsing into workers with transferable buffers (machinery CAD and
       decoders already use workers); test core on an OffscreenCanvas (engine sizing falls back to canvas.width, so
       it may already work).
+      Done: opt-in `/worker` entries, each falling back to the calling thread without `Worker` (SSR, Node):
+      `@margoengine/gltf-pro/worker` (`loadGLTFInWorker`, `parseGLTFInWorker`, `modelFromPrepared`; also falls back when
+      `decoders` are passed), `@margoengine/gltf-pro/prepare` (`prepareGLTF`, `prepareAsset`, for other workers),
+      `@margoengine/fbx/worker` (`loadFBXInWorker`, `parseFBXInWorker`: FBX -> GLB -> prepare in one worker),
+      `@margoengine/usdz/worker` (`loadUSDZInWorker`, `parseUSDInWorker`: USDZ/USDC/USDA by content; `USDAsset.images()`
+      split out of `create`), `@margoengine/loaders/worker` (`parseUSDZInWorker`, `parseUSDAInWorker`, LoaderError kept).
+      The worker fetches, parses, decodes accessors (geometry, skins, morph targets, animation samplers), packs the
+      80-byte vertices and decodes images; ArrayBuffers and ImageBitmaps are transferred both ways (a whole input
+      ArrayBuffer is moved/detached, views copied); the main thread builds the PBRModel and uploads to the GPU. gltf-pro's
+      packing moved verbatim to `pack.ts`; PBRModel uses worker-packed geometry via an internal WeakMap keyed by
+      primitive (a primitive the worker could not pack is packed, and fails, on the main thread as before). Worker scripts
+      are self-contained classic workers in `dist/workers/` (`scripts/build-workers.js`, any `src/*.worker.ts`), started
+      with `new URL('./workers/x.js?no-inline', import.meta.url)`, so bundlers copy them as assets and apps without a
+      `/worker` import ship none of it. One worker per load (pool if many parallel loads ever matter).
+      Equality proof: `packages/{gltf-pro,usdz,loaders}/tests/worker.test.js`, `packages/fbx/test/worker.test.js` run the
+      built worker script in-process with request and reply through structuredClone and the real transfer lists, then
+      compare doc, buffers, every accessor, packed vertices/indices, materials, images and the engine transform store
+      byte for byte with the main-thread parse (DamagedHelmet, RobotExpressive, generated 2x66k-vertex GLB; rich, textured
+      and grid FBX; USDA, USDC, textured USDZ, 50k-triangle USDZ; loaders USDZ/USDA); a mutated float/accessor/node is caught.
+      Main-thread blocking (`node examples/package-benchmarks/workers/run.mjs`, `results/workers.json`; Edge 155 headless,
+      Arc 140V, AC before/after, GPU lock; engine rendering every frame during the load; medians of rounds 1-5, round 0
+      discarded; longest long task / total blocking time / max rAF gap, main -> worker):
+      FBX 160k-quad grid (5.5 MB) 1162 / 1112 / 1167 ms -> 0 / 0 / 217 ms (load 1.33 -> 1.66 s);
+      USDZ 200k-triangle knot (12.5 MB) 697 / 647 / 692 -> 0 / 0 / 50 (load 0.83 -> 1.04 s);
+      generated GLB 642k vertices, 1.28M triangles (41 MB) 222 / 172 / 217 -> 0 / 0 / 58 (load 0.60 -> 0.68 s);
+      DamagedHelmet 0 / 0 / 75 -> 0 / 0 / 117 (load 0.50 -> 0.57 s; main had one 143 ms task in the cold round 0, worker
+      none). Worker loads cost 10-25% more wall time (worker start + script parse). Worker mode never produced a long task;
+      its occasional 100-240 ms rAF gaps come with no main-thread task (GPU upload or GC; not attributed). GPU upload and
+      mip generation stay on the main thread. Edge cases: FBX `resourcePath` '' resolves to the page folder (identical for
+      relative texture names); the worker repeats parseFBX's 16M-pixel total texture budget.
+      OffscreenCanvas (`examples/package-benchmarks/workers/offscreen.html` + `offscreen.worker.js`, same run, Edge 155 and
+      Chrome 155, screenshots `test-results/workers-offscreen-*.png`): `Engine.create(canvas.transferControlToOffscreen())`
+      in a module worker works: render, `start()`/`stop()` (rAF exists in dedicated workers), resizing by setting
+      canvas.width/height (no clientWidth, devicePixelRatio undefined -> 1), gltf-pro `loadGLTF` (fetch +
+      createImageBitmap), `loadGLTFInWorker` (nested worker), decoders `DracoDecoder` (nested pool), PostStack [Bloom, FXAA],
+      selection `Picking`; no GPU errors, pixels drawn. Broken: core `engine.pick` returns null (it divides by
+      canvas.clientWidth, undefined -> NaN). Package fixes made: decoders' `requireWorkers` rejected worker contexts
+      (`typeof window`), now checks `typeof Worker` only; selection `Picking` divided by clientWidth, now
+      `clientWidth || width` (coordinates are canvas pixels on an OffscreenCanvas). DOM-bound by design (need the app to
+      forward events/elements): core `CADCameraControls`, controls, stats, html, labels, input, inspector, viewcube,
+      machinery overlays, margoengine `createStage` (querySelector, style). CORE CHANGE FOR SCOTT (not made): in
+      `Engine.pick` use `const w=this.canvas.clientWidth||this.canvas.width,h=this.canvas.clientHeight||this.canvas.height`
+      for the bounds check and the `x*this.canvas.width/w, y*this.canvas.height/h` scaling; core + stage 18,681 -> 18,689
+      gzip (+8, measured on the built dist).
+      Sizes (min+gzip): roots gltf-pro 16,052 -> 16,075, usdz 11,333 -> 11,371, fbx/loaders unchanged; new entries (dist file
+      gzip) gltf-pro/worker 1.3 kB, fbx/worker 1.2 kB, usdz/worker 1.3 kB, loaders/worker 1.6 kB; worker scripts (minified
+      + gzip) gltf 5.5 kB, fbx 16.7 kB, usdz 25.9 kB, loaders usd 6.6 kB; core + stage 18,681 unchanged.
    k. [DONE] docs/from-threejs.md: side-by-side mapping of common three.js code to Margo. Linked from README and
       docs/README.md. Every Margo snippet (```ts blocks) is type-checked against the built packages by
       `tests/from-threejs-snippets.test.js` (part of the unit run). API rough edges found while writing are listed under
@@ -415,8 +462,22 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       proxying createRenderPipeline. Costs core bytes; these become public API, so decide before launch.
    e. DECISION FOR SCOTT before 1.0: reformat the dense single-line TypeScript to conventional readable style
       (automated, no behaviour change; minifiers already handle shipped size) to lower the barrier for contributors.
-   f. Evaluate newer platform features: Float16Array for half-float data, Symbol.dispose / `using` for engine object
+   f. [EVALUATED, recommendation only; workers + OffscreenCanvas done in 1f.j] Evaluate newer platform features:
+      Float16Array for half-float data, Symbol.dispose / `using` for engine object
       cleanup, more parsing in workers + OffscreenCanvas (with 1f.j).
+      Real-browser check (offscreen.html, `results/workers.json`): Edge 155 and Chrome 155 have Float16Array,
+      Math.f16round, DataView get/setFloat16, Symbol.dispose/asyncDispose, DisposableStack and `using` syntax.
+      Support from knowledge (mid-2026, verify Safari before relying on it): Float16Array Chrome/Edge 135, Firefox 129,
+      Safari 18.2 (Baseline 2025; every WebGPU browser except Chrome/Edge 113-134 has it). Explicit resource management
+      (`using`, Symbol.dispose, DisposableStack) Chrome/Edge 134, Firefox 141; Safari had not shipped it, so it is not
+      Baseline. Recommendation: (1) `using`: do not add now. Core is frozen (Engine/Mesh are the objects worth it), each
+      `[Symbol.dispose]()` alias costs bytes in every package, and `using` needs the symbol at runtime (Safari). Apps can
+      already write `using s = new DisposableStack(); s.defer(() => model.destroy())`. Revisit at 1.x when Safari ships:
+      add `[Symbol.dispose]` aliases to Engine, PBRModel and the attach() effects in one batch (core change, Scott).
+      (2) Float16Array: not zero-change, so not done. environment's `floatToHalf` rounds double -> float32 -> half (double
+      rounding) where Float16Array rounds once, so some encodes would change; EXR HALF decode via a Float16Array view is
+      exact but needs a fallback for Chrome 113-134 (more bytes, not fewer). Use it in new code with a feature check
+      where half data is bulk (half-float VAT, environment uploads), with a proof per change.
    g. Full read-only audit of all 68 packages listing each modernization finding with file and line, then fix in batches.
 1g'. [DONE: exact poles; the cube sets `camera.up` to the arrival heading on the pole and restores the previous up off
    it or on dispose; a CameraProjection's vertical up is left alone; unit-tested, no browser run. OrbitControls now takes the heading

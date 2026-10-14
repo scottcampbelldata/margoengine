@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Core on an OffscreenCanvas</title><style>body{margin:0;background:#000}canvas{width:800px;height:450px;display:block}</style></head><body><canvas width="640" height="360"></canvas>
+<script type="module">
+// Transfers the canvas to offscreen.worker.js, which creates the engine there and reports each step (run.mjs reads
+// window.result and screenshots the canvas). Also records the platform features 1g.f asks about.
+const canvas=document.querySelector('canvas'),offscreen=canvas.transferControlToOffscreen();
+const worker=new Worker(new URL('./offscreen.worker.js',import.meta.url),{type:'module'});
+let usingSyntax=false;try{new Function('{using x={[Symbol.dispose](){}};}')();usingSyntax=true;}catch{}
+window.features={Float16Array:typeof Float16Array==='function',float16Round:typeof Math.f16round==='function'?Math.f16round(1.337):null,dataViewFloat16:typeof DataView.prototype.getFloat16==='function',
+  symbolDispose:typeof Symbol.dispose==='symbol',symbolAsyncDispose:typeof Symbol.asyncDispose==='symbol',DisposableStack:typeof DisposableStack==='function',usingSyntax,
+  transferControlToOffscreen:typeof HTMLCanvasElement.prototype.transferControlToOffscreen==='function',userAgent:navigator.userAgent};
+worker.onmessage=({data})=>{window.result=data;};worker.onerror=e=>{window.result={error:e.message};};
+worker.postMessage({canvas:offscreen},[offscreen]);
+</script></body></html>

@@ -133,10 +133,12 @@ export class Picking implements EnginePlugin {
  private async resolve(x:number,y:number):Promise<PickHit|null> {
   if(this.disposed||!this.engine)throw new Error('Picking is disposed');if(this.pending)throw new Error('A pick is already pending');
   if(![x,y].every(Number.isFinite))throw new RangeError('Invalid pick coordinates');
-  if(x<0||y<0||x>=this.engine.canvas.clientWidth||y>=this.engine.canvas.clientHeight)return null;
+  // CSS pixels; an OffscreenCanvas (worker) has no client size, so its coordinates are canvas pixels.
+  const canvas=this.engine.canvas,cssWidth=canvas.clientWidth||canvas.width,cssHeight=canvas.clientHeight||canvas.height;
+  if(x<0||y<0||x>=cssWidth||y>=cssHeight)return null;
   this.pending=true;const e=this.engine,device=this.device!,read=this.read!,meshes=new Map(e.meshes),models=this.models.update(e),starts=this.models.starts,total=this.models.total,list=proxies(e),capacity=e.store.capacity;
   try {
-   const px=Math.floor(x*e.canvas.width/e.canvas.clientWidth),py=Math.floor(y*e.canvas.height/e.canvas.clientHeight),x0=Math.max(0,px-1),y0=Math.max(0,py-1),width=Math.min(e.canvas.width,px+2)-x0,height=Math.min(e.canvas.height,py+2)-y0;
+   const px=Math.floor(x*e.canvas.width/cssWidth),py=Math.floor(y*e.canvas.height/cssHeight),x0=Math.max(0,px-1),y0=Math.max(0,py-1),width=Math.min(e.canvas.width,px+2)-x0,height=Math.min(e.canvas.height,py+2)-y0;
    const encoder=device.createCommandEncoder();let texture:GPUTexture,origin:number[];
    // Model and proxy IDs are not in the forward pass (gltf-pro and imposters draw their own pipelines), so those scenes use the micro pass.
    if(!models.length&&!list.length&&this.fresh()){texture=this.ids!;origin=[x0,y0];}
