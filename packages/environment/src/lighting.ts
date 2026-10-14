@@ -1,6 +1,7 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 // Scene-wide shading from outside core: image-based lighting from an Environment (scene.environment) and distance/height
 // fog (scene.fog). Each effect is an engine plugin that patches core's frozen mesh shader through PassContext.shader (text
-// anchors, tests/shader-contracts.test.js) and a glTF-pro LightingEffect (`applyTo(model)`) through glTF-pro's declared
+// anchors, tests/shader-contracts.test.js) and a glTF-pro LightingEffect (`add(model)`) through glTF-pro's declared
 // lighting hooks, so opaque and blended glTF primitives are lit and fogged in their own shader.
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type FrameGraph} from '@margoengine/core/extension';
@@ -57,7 +58,7 @@ abstract class ShaderEffect {
     return code;
   }
   /** Adds the effect to a glTF-pro model. Returns a remover; `dispose()` removes it from every model. */
-  applyTo(model: LightingTarget): () => void {
+  add(model: LightingTarget): () => void {
     if (this.disposed) throw new Error(`${this.name} is disposed`);
     let release = this.models.get(model);
     if (!release) {
@@ -67,6 +68,8 @@ abstract class ShaderEffect {
     }
     return release;
   }
+  /** @deprecated Use add(model); kept as an alias until 1.0. */
+  applyTo(model: LightingTarget): () => void {return this.add(model);}
   setup(engine: EngineKernel): void {
     if (this.disposed) throw new Error(`${this.name} is disposed`);
     if (engine.backend === 'webgl2') throw new Error(`${this.name} requires the WebGPU backend`);
@@ -85,6 +88,8 @@ abstract class ShaderEffect {
     for (const release of [...this.models.values()]) release();
     this.shaders.clear(); this.engine?.removePlugin(this.name); this.engine = undefined;
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }
 
 const iblCall = (n: string, v: string, base: string, metal: string, roughness: string) =>
@@ -96,7 +101,7 @@ export interface EnvironmentLightingOptions {
 }
 
 /**
- * Lights core meshes (`engine.use(lighting)`) and glTF-pro models (`lighting.applyTo(model)`) with an Environment:
+ * Lights core meshes (`engine.use(lighting)`) and glTF-pro models (`lighting.add(model)`) with an Environment:
  * split-sum specular from the prefiltered cube plus SH irradiance, scaled by `environment.intensity` (Three.js
  * `scene.environment`). It replaces the constant ambient term (core's `lighting.radiance[3]`, glTF-pro's hemisphere
  * ambient); direct lights, shadows and clustered lights still add on top. glTF occlusion maps scale the IBL term.
@@ -104,6 +109,8 @@ export interface EnvironmentLightingOptions {
 export class EnvironmentLighting extends ShaderEffect {
   private cached?: GPUBindGroupEntry[];
   private version = -1;
+  /** Same as `engine.use(new EnvironmentLighting(...))`; returns the EnvironmentLighting. */
+  static attach(engine: EngineKernel, environment: Environment, options?: EnvironmentLightingOptions): EnvironmentLighting {const value = new EnvironmentLighting(environment, options); engine.use(value); return value;}
   constructor(readonly environment: Environment, options: EnvironmentLightingOptions = {}) {super(options.name ?? 'environment:lighting');}
   protected get device(): GPUDevice | null {return this.environment.disposed ? null : this.environment.device;}
   protected entries(): GPUBindGroupEntry[] {
@@ -163,7 +170,7 @@ const fogMix = (value: string, eye: string) => `mix(${value},margoFog.color.rgb,
 /**
  * Scene-wide distance and height fog computed in the mesh shaders, so it also covers blended (transparent) glTF-pro
  * primitives, unlike sky's depth-based post fog. `engine.use(fog)` fogs core meshes and is required (it owns the
- * GPU uniform); `fog.applyTo(model)` adds glTF-pro models. The mix happens after tone mapping on the canvas and in
+ * GPU uniform); `fog.add(model)` adds glTF-pro models. The mix happens after tone mapping on the canvas and in
  * linear radiance on HDR targets, so a ColorBackground with the same color matches at full fog. The background
  * itself, particles and other packages' custom shaders are not fogged.
  */
@@ -175,6 +182,8 @@ export class Fog extends ShaderEffect {
   private dirty = true;
   /** linear color.rgb, height, near, far, density, heightFalloff */
   private readonly values = new Float32Array(8);
+  /** Same as `engine.use(new Fog(...))`; returns the Fog. */
+  static attach(engine: EngineKernel, options?: FogOptions): Fog {const value = new Fog(options); engine.use(value); return value;}
   constructor(options: FogOptions = {}) {
     super(options.name ?? 'fog');
     this.color = options.color ?? '#ffffff';

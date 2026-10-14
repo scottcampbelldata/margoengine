@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 // Environment background: the scene.background = texture (equirect or cube) equivalent, with
 // backgroundIntensity (exposure), backgroundRotation and backgroundBlurriness (blur).
 import type {EngineKernel} from '@margoengine/core';
@@ -73,6 +74,8 @@ export class EnvironmentBackground {
   private readonly depthAttachment: GPURenderPassDepthStencilAttachment = {view: undefined!, depthReadOnly: true};
   private readonly passDescriptor: GPURenderPassDescriptor = {label: 'environment background', colorAttachments: [this.colorAttachment], depthStencilAttachment: this.depthAttachment};
 
+  /** Same as `engine.use(new EnvironmentBackground(...))`; returns the EnvironmentBackground. */
+  static attach(engine: EngineKernel, environment: Environment, options?: EnvironmentBackgroundOptions): EnvironmentBackground {const value = new EnvironmentBackground(environment, options); engine.use(value); return value;}
   constructor(readonly environment: Environment, options: EnvironmentBackgroundOptions = {}) {
     this.name = options.name ?? 'environment:background';
     this.order = finiteNumber(options.order ?? 1, 'order');
@@ -109,6 +112,8 @@ export class EnvironmentBackground {
     if (this.disposed) return;
     this.disposed = true; this.releaseState();
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 
   /**
    * Records the background into `context.encoder` targeting `context.color` / `context.depth`. Skips (draws
