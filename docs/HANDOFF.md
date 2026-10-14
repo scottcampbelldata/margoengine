@@ -80,6 +80,12 @@ Five parallel workers reviewed 58 packages against baseline `f05414a`; Claude ve
 
 ## Feature gaps versus three.js (after optimization; each as an optional package)
 
+Verified matrix: `docs/threejs-parity.md` (153 three.js features: 57 covered, 47 partial, 49 missing; read from
+source, not run). Its top gaps: user materials and textures, glTF extensions/Draco/KTX2 wiring, raycasting loaded models,
+automatic IBL, background colour/transparent canvas, combinable post effects, orthographic and straight-down cameras,
+WebGL2 fallback for packages, a public math library, FXAA/SMAA. Several need core changes (freeze conflicts listed in the
+doc); those are Scott's decision. The older summary below predates the audit.
+
 From package descriptions, not yet audited against code:
 
 - Custom materials and shaders (ShaderMaterial / node materials). Largest gap; material graphs stay out of core.
