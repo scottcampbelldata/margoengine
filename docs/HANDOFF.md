@@ -572,10 +572,32 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    lines, points, text, loaders/threemf, loaders/engine, splats, core/geometry (core stays as is); seeded PRNGs in points,
    scatter, procedural, creative; ray tests in controls, selection, bvh; per-package math.ts in audio, bvh, controls,
    geometry, lines, physics, points, text). Prove no behaviour change and record bytes per package.
-5b. Make gltf-pro instancing opt-in: textured instancing (`8e5d704`) added +1,942 B gzip to gltf-pro for every app,
-   because reading `EXT_mesh_gpu_instancing` needs `PBRInstances`. Move it behind a decoder-style hook / separate entry
-   (e.g. `@margoengine/gltf-pro/instancing`, imported by materials' `createInstancedMesh`) so apps that never instance
-   pay ~0. Start after the Web Workers parsing change (1f.j) merges, since both touch gltf-pro's parser.
+5b. [DONE] Make gltf-pro instancing opt-in: textured instancing (`8e5d704`) added +1,942 B gzip to gltf-pro for every
+   app, because reading `EXT_mesh_gpu_instancing` needs `PBRInstances`. Now `@margoengine/gltf-pro/instancing`
+   (`src/instancing.ts`, renamed from instances.ts) holds `PBRInstances`, the instanced vertex patch and the reader
+   `instancing` ({read(asset, ext)}), passed like a decoder: `loadGLTF(engine, url, {decoders: {instancing}})`, also
+   `parseGLTFAsync`, `loadGLTFInWorker`/`parseGLTFInWorker` (instancing does not force the main-thread fallback; the worker
+   script still decodes the accessors, `modelFromPrepared(engine, prepared, signal, {instancing})` composes them),
+   `parseGLTF(engine, input, buffers, images, {instancing})`. The root imports PBRInstances as a type only and draws
+   through the object (`inst.shader(code)`, `inst.layout`, `inst.bounds(...)`), so materials' `createInstancedMesh`
+   (imports the entry itself) and hand-assigned `primitive.instances` work unchanged; bvh, selection, shadows, staging
+   and taa already duck-type `primitive.instances` and import nothing from gltf-pro. Missing reader: a file whose
+   `extensionsRequired` lists the extension throws `Required glTF extensions are unsupported: EXT_mesh_gpu_instancing
+   (pass decoders.instancing from @margoengine/gltf-pro/instancing)` (same rule and wording as a missing draco/ktx2
+   decoder, checked in PBRModel so the asset layer and parser workers still read such files); a file that only uses it
+   draws each mesh once at its node (glTF's fallback for an optional extension, as optional KTX2/meshopt fall back).
+   API: root no longer exports PBRInstances; GLTFDecoderHooks gains `instancing`. Gzip (proofs/size.js method, bare
+   imports external, measured from a scratch copy so all three columns share one setup; that setup reads ~120 B above
+   the in-repo numbers) 6eeffab / 114130c / now: gltf-pro root 17,562 / 19,559 / 17,859 (in repo now 17,736: +274 over
+   pre-instancing + the worker change's +23; the remainder is the draw path's instanced branches ~180, the reader call
+   ~50 and the required-extension error ~47), /instancing - / - / 2,581 (in repo 2,466), /worker - / 20,292 / 18,620,
+   /prepare - / 6,180 / 6,179, worker script - / 6,409 / 6,408, materials 7,726 / 7,805 / 7,817; bvh, selection,
+   shadows, staging, taa unchanged vs 114130c (15,701 / 10,855 / 7,098 / 5,362 / 8,696 -> 15,700 / 10,854 / 7,098 /
+   5,362 / 8,695). build-modern's gltf-pro record: 17,866 -> 16,265. Tests: gltf-pro instancing (+ missing-reader case)
+   and worker equality (instanced case via the reader), materials, selection, staging, shadows, bvh, taa, fbx, usdz.
+   Proofs vs 114130c: `gltf-pro-lighting-hooks.proof.js 114130c` 4,556 identical calls, `materials-uv-transform.proof.js
+   114130c` 1,277 identical calls (its default baseline 1970fda already differed before this change, and both proof
+   loaders now resolve files renamed/deleted since the ref); `textured-instancing.mjs` GPU-call counts unchanged.
 6. Then give Scott the full list of what was done and what remains.
 
 Worker practice: agents run in git worktrees; they must start with `git reset --hard perf/auto-quality` (worktrees
@@ -694,7 +716,7 @@ meshes, second UV set/groups/custom attributes, ShadowMaterial, glTF export with
 
 Textured instancing (gap 5, done 2026-10-14, core untouched): gltf-pro `PBRInstances` on `primitive.instances` (matrix in
 node space, RGBA tint, UV scale/offset per instance; `setMatrixAt`/`getMatrixAt`/`setColorAt`/`setUVTransformAt`, `count`,
-`needsUpdate`, dirty-row uploads) draws N instances in one draw; the instanced vertex patch (`gltf-pro/src/instances.ts`)
+`needsUpdate`, dirty-row uploads) draws N instances in one draw; the instanced vertex patch (`gltf-pro/src/instancing.ts`)
 is applied after lighting/material effects so shader `NodeMaterial` vertex nodes keep their anchor. `EXT_mesh_gpu_instancing`
 is read (T/R/S, normalized rotations). materials `createInstancedMesh(engine, geometry, material, capacity)`. Shadows and
 staging contact shadows draw instanced casters (`packages/shared/instances.js`); TAA skips them (camera motion only); bvh
@@ -703,7 +725,8 @@ GPU calls byte-identical vs 6eeffab (`gltf-pro-lighting-hooks.proof.js 6eeffab`,
 Real GPU (Arc 140V, AC, lock held): instanced frames equal N meshes (max channel diff 1) for materials, glTF and NodeMaterial
 scenes under shadows/clustered/SSAO/IBL/fog; picking returns the right instance; 1k-10k textured boxes: CPU 9-70 ms ->
 0.5 ms, frame 63-562 ms -> 4 ms (`examples/package-benchmarks/textured-instancing-gpu.mjs`, `results/textured-instancing-gpu.json`;
-mock-GPU CPU sweep `textured-instancing.mjs`). Size (min+gzip): gltf-pro +1.9 kB, selection +0.38, bvh +0.31, shadows +0.31,
+mock-GPU CPU sweep `textured-instancing.mjs`). Size (min+gzip): gltf-pro +1.9 kB (opt-in since queue item 5b: the
+root keeps +0.27 kB, the rest is `@margoengine/gltf-pro/instancing`), selection +0.38, bvh +0.31, shadows +0.31,
 staging +0.28, materials +0.08, taa +0.01. Left: per-instance frustum culling, transparent instance sorting, textured
 `ScatterInstances`, one-instance outlines.
 The older summary below predates the audit.

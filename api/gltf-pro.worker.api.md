@@ -16,7 +16,7 @@ export interface PreparedGLTF {
 
 export function loadGLTFInWorker(instance: EngineKernel, url: string | URL, options?: GLTFLoadOptions): Promise<PBRModel>;
 
-export function modelFromPrepared(instance: EngineKernel, prepared: PreparedGLTF, signal?: AbortSignal): PBRModel;
+export function modelFromPrepared(instance: EngineKernel, prepared: PreparedGLTF, signal?: AbortSignal, decoders?: Pick<GLTFDecoderHooks, 'instancing'>): PBRModel;
 
 export function parseGLTFInWorker(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, options?: AssetOptions): Promise<PBRModel>;
 
@@ -107,6 +107,9 @@ interface GLTFDecoderHooks {
             signal?: AbortSignal;
         }): Promise<GLTFCompressedImage>;
     };
+    instancing?: {
+        read(asset: GLTFAsset, extension: any): PBRInstances;
+    };
 }
 
 type GLTFDocument = Record<string, any>;
@@ -151,6 +154,9 @@ class PBRInstances {
     get mirrored(): boolean;
     upload(device: GPUDevice): GPUBuffer;
     dispose(): void;
+    get layout(): GPUVertexBufferLayout;
+    shader(code: string): string;
+    bounds(node: ArrayLike<number>, vertices: Float32Array, out: Float32Array): void;
 }
 
 interface PBRLighting {

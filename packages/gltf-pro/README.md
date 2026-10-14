@@ -48,11 +48,12 @@ Without it the pipelines are unchanged. `@margoengine/materials` uses it for `bl
 
 ### Instancing
 
-`primitive.instances = new PBRInstances(capacity)` draws a primitive `count` times in one instanced draw (the counterpart of three.js `InstancedMesh`; `@margoengine/materials` `createInstancedMesh` wraps it). Instance matrices are in the primitive's node space (world = node matrix x instance matrix, as `EXT_mesh_gpu_instancing`), so for a model whose meshes sit on nodes with their own transforms, an instance matrix moves the node, not the model root. Primitives, also of different models, may share one `PBRInstances`; all primitives of a node share one when it comes from `EXT_mesh_gpu_instancing`.
+Instancing is its own entry, `@margoengine/gltf-pro/instancing` (about 2.5 kB gzip), so apps that never instance load none of it. `primitive.instances = new PBRInstances(capacity)` draws a primitive `count` times in one instanced draw (the counterpart of three.js `InstancedMesh`; `@margoengine/materials` `createInstancedMesh` wraps it). Instance matrices are in the primitive's node space (world = node matrix x instance matrix, as `EXT_mesh_gpu_instancing`), so for a model whose meshes sit on nodes with their own transforms, an instance matrix moves the node, not the model root. Primitives, also of different models, may share one `PBRInstances`; all primitives of a node share one when it comes from `EXT_mesh_gpu_instancing`.
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF, PBRInstances} from '@margoengine/gltf-pro';
+import {loadGLTF} from '@margoengine/gltf-pro';
+import {PBRInstances, instancing} from '@margoengine/gltf-pro/instancing';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const tree = await loadGLTF(stage.engine, '/tree.glb');
 const forest = new PBRInstances(2000);
@@ -60,7 +61,12 @@ for (let i = 0; i < 2000; i++) forest.setMatrixAt(i, [1, 0, 0, 0, 0, 1, 0, 0, 0,
 for (const primitive of tree.primitives) primitive.instances = forest;
 forest.count = 1500;                     // drawn instances (default and maximum: capacity)
 // forest.data: 24 floats per instance (matrix, tint, UV scale + offset); after writing it directly: forest.needsUpdate = true
+
+// EXT_mesh_gpu_instancing files: pass the reader like a decoder (also to parseGLTFAsync, parseGLTF and the worker loaders).
+const city = await loadGLTF(stage.engine, '/instanced-city.glb', {decoders: {instancing}});
 ```
+
+Without `decoders.instancing`, a file whose `extensionsRequired` lists `EXT_mesh_gpu_instancing` is rejected with `Required glTF extensions are unsupported: EXT_mesh_gpu_instancing (pass decoders.instancing from @margoengine/gltf-pro/instancing)`, the same rule as a missing Draco or KTX2 decoder. A file that only lists it in `extensionsUsed` loads with each instanced node's mesh drawn once at the node (the glTF fallback for an unsupported optional extension). `parseGLTF(engine, input, buffers, images, {instancing})` and `modelFromPrepared(engine, prepared, signal, {instancing})` take the reader as their last argument.
 
 `setMatrixAt(i, m)` (column-major affine), `getMatrixAt(i, out?)`, `setColorAt(i, [r, g, b(, a)])` (linear, multiplies the base colour like a vertex colour), `setUVTransformAt(i, {offset, scale})` (applied to both UV sets before the material's texture transforms, e.g. a `packAtlas` region; no rotation), `count`, `needsUpdate`, `dispose()` (frees the GPU buffer; it is recreated on the next draw). Setters upload only the changed rows on the next frame. Shadows and `@margoengine/staging` contact shadows cast every instance; clustered, IBL, fog and SSAO apply through the same lighting hooks (the instanced shader changes only the vertex stage); `model.bounds` covers every instance; bvh's `Raycaster` and selection's `Picking` report `instanceId`, and a selected model outlines every instance. A mirrored instance (negative determinant) turns off face culling for that primitive and discards back faces in the shader instead. The non-instanced draw makes the same GPU calls as before (`gltf-pro-lighting-hooks.proof.js`, `materials-uv-transform.proof.js` against the previous commit).
 
@@ -79,11 +85,11 @@ const bytes = await (await fetch('/scene.glb')).arrayBuffer();
 const dropped = await parseGLTFInWorker(stage.engine, bytes); // bytes move to the worker and are detached here
 ```
 
-The result equals `loadGLTF` / `parseGLTFAsync` byte for byte (`tests/worker.test.js` compares document, buffers, every accessor, packed vertices, materials, images and node transforms). The functions run on the calling thread instead when `Worker` is unavailable (SSR, Node) or `decoders` are passed (Draco and KTX2 already decode in their own workers). The worker script, `dist/workers/gltf.js` (5.5 kB gzip), is started with `new URL('./workers/gltf.js', import.meta.url)`, which Vite and webpack copy as an asset: apps that do not import `/worker` ship none of it. One worker per load, terminated afterwards. `modelFromPrepared(engine, prepared)` and `@margoengine/gltf-pro/prepare` (`prepareGLTF`, `prepareAsset`) let other loaders' workers (fbx, usdz) reuse the step. Main-thread blocking measured in a real browser: `examples/package-benchmarks/workers/` (HANDOFF 1f.j).
+The result equals `loadGLTF` / `parseGLTFAsync` byte for byte (`tests/worker.test.js` compares document, buffers, every accessor, packed vertices, materials, images and node transforms). The functions run on the calling thread instead when `Worker` is unavailable (SSR, Node) or Draco, meshopt or KTX2 `decoders` are passed (Draco and KTX2 already decode in their own workers); `decoders.instancing` stays on the worker path (the worker decodes the `EXT_mesh_gpu_instancing` accessors, the main thread composes the matrices). The worker script, `dist/workers/gltf.js` (5.5 kB gzip), is started with `new URL('./workers/gltf.js', import.meta.url)`, which Vite and webpack copy as an asset: apps that do not import `/worker` ship none of it. One worker per load, terminated afterwards. `modelFromPrepared(engine, prepared)` and `@margoengine/gltf-pro/prepare` (`prepareGLTF`, `prepareAsset`) let other loaders' workers (fbx, usdz) reuse the step. Main-thread blocking measured in a real browser: `examples/package-benchmarks/workers/` (HANDOFF 1f.j).
 
 ## Extensions and compressed files
 
-Supported glTF extensions: `KHR_mesh_quantization`, `KHR_texture_transform`, `KHR_materials_emissive_strength`, `KHR_materials_unlit`, `KHR_lights_punctual`, `KHR_materials_clearcoat`, `KHR_materials_transmission`, `KHR_materials_ior`, `KHR_materials_volume`, `KHR_materials_sheen`, `KHR_materials_specular`, `EXT_texture_webp`, `EXT_texture_avif`, `EXT_mesh_gpu_instancing` (`TRANSLATION`, `ROTATION` including normalized integers, `SCALE`; the node's primitives get one `PBRInstances`, see "Instancing"), plus `KHR_draco_mesh_compression`, `EXT_meshopt_compression` (and `KHR_meshopt_compression`) and `KHR_texture_basisu` when you pass the matching decoder. A file is rejected only when its `extensionsRequired` lists something still unsupported; the error names each one and the decoder it needs.
+Supported glTF extensions: `KHR_mesh_quantization`, `KHR_texture_transform`, `KHR_materials_emissive_strength`, `KHR_materials_unlit`, `KHR_lights_punctual`, `KHR_materials_clearcoat`, `KHR_materials_transmission`, `KHR_materials_ior`, `KHR_materials_volume`, `KHR_materials_sheen`, `KHR_materials_specular`, `EXT_texture_webp`, `EXT_texture_avif`, plus `EXT_mesh_gpu_instancing` (`TRANSLATION`, `ROTATION` including normalized integers, `SCALE`; the node's primitives get one `PBRInstances`, see "Instancing"), `KHR_draco_mesh_compression`, `EXT_meshopt_compression` (and `KHR_meshopt_compression`) and `KHR_texture_basisu` when you pass the matching decoder (`instancing` from `@margoengine/gltf-pro/instancing` for the first). A file is rejected only when its `extensionsRequired` lists something still unsupported; the error names each one and the decoder it needs.
 
 This package does not import `@margoengine/decoders`. Pass decoders in, so files without compression pay nothing:
 
@@ -97,7 +103,7 @@ const dropped = await parseGLTFAsync(stage.engine, await file.arrayBuffer(), {de
 // decoders.draco.dispose(); decoders.ktx2.dispose(); when no more loads are expected.
 ```
 
-Any object with the same shape works (`GLTFDecoderHooks`): `draco.decode(bytes, {attributeIds, componentTypes, signal})` resolving to `{positions, normals?, uvs?, colors?, indices?, attributes?}`, `meshopt.decodeGltfBuffer(target, count, stride, source, mode, filter)` (three.js's `MeshoptDecoder` fits once its `ready` promise resolves), and `ktx2.transcode(bytes, {signal})` resolving to `{width, height, format, mipmaps: [{data, width, height}]}` in rgba8, BC7, ASTC 4x4 or ETC2 RGBA8. The synchronous `parseGLTF` keeps its signature and takes no decoders. Without a ktx2 decoder, KTX2 images are skipped and a texture's PNG/JPEG fallback `source` is used.
+Any object with the same shape works (`GLTFDecoderHooks`): `draco.decode(bytes, {attributeIds, componentTypes, signal})` resolving to `{positions, normals?, uvs?, colors?, indices?, attributes?}`, `meshopt.decodeGltfBuffer(target, count, stride, source, mode, filter)` (three.js's `MeshoptDecoder` fits once its `ready` promise resolves), and `ktx2.transcode(bytes, {signal})` resolving to `{width, height, format, mipmaps: [{data, width, height}]}` in rgba8, BC7, ASTC 4x4 or ETC2 RGBA8. The synchronous `parseGLTF` takes only the synchronous `instancing` reader (its fifth argument). Without a ktx2 decoder, KTX2 images are skipped and a texture's PNG/JPEG fallback `source` is used.
 
 `model.lights` and `model.cameras` expose `KHR_lights_punctual` lights and glTF cameras as data, each with its scene `node`. `model.clusteredLights()` returns the point and spot lights in world space for `clustered.setLights(...)`; an unbounded light gets the range where intensity/d² falls to 1/256. Directional lights are left to the engine's own light.
 

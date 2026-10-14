@@ -1,6 +1,7 @@
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine} from '@margoengine/core/extension';
-import {GLTFAsset,PBRModel,PBRInstances,textureTransform,type PreparedGeometry,type PBRRenderState,type TextureTransform} from '@margoengine/gltf-pro';
+import {GLTFAsset,PBRModel,textureTransform,type PreparedGeometry,type PBRRenderState,type TextureTransform} from '@margoengine/gltf-pro';
+import {PBRInstances} from '@margoengine/gltf-pro/instancing';
 import {readResponse} from '../../shared/loading.js';
 export type {TextureTransform} from '@margoengine/gltf-pro';
 export {packAtlas,transformUVs,type Atlas,type AtlasOptions} from './atlas.js';

@@ -1,4 +1,9 @@
+// @margoengine/gltf-pro/instancing: PBRInstances, its vertex-stage patch and the EXT_mesh_gpu_instancing reader. The root
+// entry only draws what a primitive's `instances` hands it, so apps that never instance do not load this module.
+import {composeMatrix} from '@margoengine/math/mat4';
+import {instanceLayout,instanceMatrix} from '../../shared/instances.js';
 import type {TextureTransform} from './index.js';
+import type {GLTFAsset} from './asset.js';
 declare const GPUBufferUsage:{VERTEX:number;COPY_DST:number};
 const identity=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,1,1,1,1,1,1,0,0];
 /**
@@ -54,7 +59,40 @@ export class PBRInstances {
   }
   /** Frees the GPU buffer; the next draw uploads everything again. */
   dispose():void {this.gpu?.destroy();this.gpu=this.device=undefined;}
+  /** @internal gltf-pro's instance vertex buffer layout (slot 1). */
+  get layout():GPUVertexBufferLayout {return instanceLayout as GPUVertexBufferLayout;}
+  /** @internal gltf-pro's PBR shader with the instanced vertex stage. */
+  shader(code:string):string {return instancedShader(code);}
+  /** @internal Grows `out` (min xyz, max xyz) by the box of `vertices` (80-byte PBR) under each drawn instance's world matrix. */
+  bounds(node:ArrayLike<number>,vertices:Float32Array,out:Float32Array):void {
+    const box=[Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity],m=new Float32Array(16);
+    for(let i=0;i<vertices.length;i+=20)for(let r=0;r<3;r++){box[r]=Math.min(box[r],vertices[i+r]);box[r+3]=Math.max(box[r+3],vertices[i+r]);}
+    // The eight corners of the local box under each instance's world matrix.
+    for(let k=0;k<this.drawn;k++){instanceMatrix(node,this.data,k,m);for(let c=0;c<8;c++)for(let r=0;r<3;r++){
+      const v=m[r]*box[c&1?3:0]+m[4+r]*box[c&2?4:1]+m[8+r]*box[c&4?5:2]+m[12+r];out[r]=Math.min(out[r],v);out[r+3]=Math.max(out[r+3],v);
+    }}
+  }
 }
+/**
+ * The EXT_mesh_gpu_instancing reader: pass it as `decoders: {instancing}` to loadGLTF, parseGLTFAsync, parseGLTF or the
+ * worker loaders, and each node carrying the extension draws its mesh once per instance through a PBRInstances. Without it
+ * a glTF that requires the extension is rejected and one that only uses it draws each mesh once at its node (the spec's
+ * fallback).
+ */
+export const instancing={
+  /** TRANSLATION/ROTATION/SCALE accessors as node-space instance matrices (T*R*S). */
+  read(asset:GLTFAsset,ext:any):PBRInstances {
+    const a=ext?.attributes??{},read=(key:string,type:string)=>a[key]===undefined?null:asset.accessor(a[key],type);
+    const t=read('TRANSLATION','VEC3'),r=read('ROTATION','VEC4'),s=read('SCALE','VEC3'),n=t?t.length/3:r?r.length/4:s?s.length/3:0;
+    if(!n||t&&t.length!==n*3||r&&r.length!==n*4||s&&s.length!==n*3)throw new TypeError('Invalid EXT_mesh_gpu_instancing attributes');
+    const out=new PBRInstances(n),q=[0,0,0,1];
+    for(let i=0;i<n;i++){
+      if(r){const l=Math.hypot(r[i*4],r[i*4+1],r[i*4+2],r[i*4+3]);if(!l)throw new RangeError('Zero instance rotation');for(let k=0;k<4;k++)q[k]=r[i*4+k]/l;}
+      composeMatrix(t?.subarray(i*3)??[0,0,0],q,s?.subarray(i*3)??[1,1,1],out.data.subarray(i*24,i*24+16));
+    }
+    return out;
+  },
+};
 // Instanced vertex stage, patched after lighting and material effects (shader NodeMaterial's vertex nodes keep their anchor):
 // the node matrix times the instance matrix, normals by its cofactor matrix (the inverse-transpose up to a positive scale,
 // normalized per fragment), per-instance handedness for facing and tangents, tint and UV scale/offset.

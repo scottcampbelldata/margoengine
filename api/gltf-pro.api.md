@@ -81,6 +81,9 @@ export interface GLTFDecoderHooks {
             signal?: AbortSignal;
         }): Promise<GLTFCompressedImage>;
     };
+    instancing?: {
+        read(asset: GLTFAsset, extension: any): PBRInstances;
+    };
 }
 
 export type GLTFDocument = Record<string, any>;
@@ -106,25 +109,6 @@ export interface LightingEffect {
     pbr?(group: number): PBRLighting | undefined;
     shader?(source: string, group: number): string;
     bindings(): GPUBindGroupEntry[];
-}
-
-export class PBRInstances {
-    readonly data: Float32Array;
-    readonly capacity: number;
-    constructor(capacity: number);
-    get count(): number;
-    set count(n: number);
-    get needsUpdate(): boolean;
-    set needsUpdate(v: boolean);
-    setMatrixAt(i: number, m: ArrayLike<number>): this;
-    getMatrixAt<T extends {
-        [k: number]: number;
-    } = Float32Array>(i: number, out?: T): T;
-    setColorAt(i: number, color: ArrayLike<number>): this;
-    setUVTransformAt(i: number, t: TextureTransform | null): this;
-    get mirrored(): boolean;
-    upload(device: GPUDevice): GPUBuffer;
-    dispose(): void;
 }
 
 export interface PBRLighting {
@@ -206,7 +190,7 @@ export interface TextureTransform {
 
 export function loadGLTF(instance: EngineKernel, url: string | URL, options?: GLTFLoadOptions): Promise<PBRModel>;
 
-export function parseGLTF(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, images?: readonly ImageBitmap[]): PBRModel;
+export function parseGLTF(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, images?: readonly ImageBitmap[], decoders?: Pick<GLTFDecoderHooks, 'instancing'>): PBRModel;
 
 export function parseGLTFAsync(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, options?: AssetOptions): Promise<PBRModel>;
 
@@ -227,4 +211,26 @@ interface AssetOptions {
 type Context = Extract<PassContext, {
     backend: 'webgpu';
 }>;
+
+class PBRInstances {
+    readonly data: Float32Array;
+    readonly capacity: number;
+    constructor(capacity: number);
+    get count(): number;
+    set count(n: number);
+    get needsUpdate(): boolean;
+    set needsUpdate(v: boolean);
+    setMatrixAt(i: number, m: ArrayLike<number>): this;
+    getMatrixAt<T extends {
+        [k: number]: number;
+    } = Float32Array>(i: number, out?: T): T;
+    setColorAt(i: number, color: ArrayLike<number>): this;
+    setUVTransformAt(i: number, t: TextureTransform | null): this;
+    get mirrored(): boolean;
+    upload(device: GPUDevice): GPUBuffer;
+    dispose(): void;
+    get layout(): GPUVertexBufferLayout;
+    shader(code: string): string;
+    bounds(node: ArrayLike<number>, vertices: Float32Array, out: Float32Array): void;
+}
 ```

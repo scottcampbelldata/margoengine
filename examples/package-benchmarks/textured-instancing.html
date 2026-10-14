@@ -7,6 +7,7 @@ import {createStage} from '/packages/margoengine/dist/index.js';
 import {boxGeometry,planeGeometry} from '/packages/geometry/dist/index.js';
 import {Texture,Material,createMesh,createInstancedMesh,packAtlas} from '/packages/materials/dist/index.js';
 import {parseGLTFAsync} from '/packages/gltf-pro/dist/index.js';
+import {instancing} from '/packages/gltf-pro/dist/instancing.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
 import {Clustered} from '/packages/clustered/dist/index.js';
 import {SSAO} from '/packages/post/dist/index.js';
@@ -34,7 +35,7 @@ const scenes={
   meshes(){const list=[],removers=[];for(let k=0;k<count;k++){const p=placement(k),m=createMesh(engine,box,new Material({map,color:p.tint,uvTransform:p.region}));m.root.setPosition(p.t).setQuaternion(p.q).setScale(p.s);list.push(m);removers.push(effects(m));}return {destroy(){removers.forEach(r=>r());list.forEach(m=>m.destroy());}};},
   instanced(){const m=createInstancedMesh(engine,box,new Material({map}),count);for(let k=0;k<count;k++){const p=placement(k);m.instances.setMatrixAt(k,compose(p)).setColorAt(k,p.tint).setUVTransformAt(k,p.region);}const remove=effects(m);window.instancedMesh=m;return {destroy(){remove();m.destroy();}};},
   async gltfNodes(){const {doc,buffers}=instancedGLTF(gltfTransforms,{instanced:false,image:await png()}),m=await parseGLTFAsync(engine,doc,{buffers});const remove=effects(m);return {destroy(){remove();m.destroy();}};},
-  async gltfInstanced(){const {doc,buffers}=instancedGLTF(gltfTransforms,{image:await png()}),m=await parseGLTFAsync(engine,doc,{buffers});const remove=effects(m);window.gltfModel=m;return {destroy(){remove();m.destroy();}};},
+  async gltfInstanced(){const {doc,buffers}=instancedGLTF(gltfTransforms,{image:await png()}),m=await parseGLTFAsync(engine,doc,{buffers,decoders:{instancing}});const remove=effects(m);window.gltfModel=m;return {destroy(){remove();m.destroy();}};},
 };
 // Shader nodes (colour from the map and UV, vertex offset along the normal) keep working on instances.
 const nodeMaterial=()=>new NodeMaterial({map,colorNode:mix(color('#2040ff'),texture(map).rgb,uv().y),positionNode:positionLocal.add(normalLocal.mul(0.08))});

@@ -5,7 +5,8 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine } from "@margoengine/core/extension";
-import { PBRInstances, PBRModel, PreparedGeometry } from "@margoengine/gltf-pro";
+import { PBRModel, PreparedGeometry } from "@margoengine/gltf-pro";
+import { PBRInstances } from "@margoengine/gltf-pro/instancing";
 
 export interface Atlas {
     image: {

@@ -2,13 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mockGPU, context} from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import {Engine, TransformStore} from '../../core/dist/extension.js';
-import {PBRInstances, parseGLTF} from '../dist/index.js';
+import {parseGLTF} from '../dist/index.js';
+import {PBRInstances, instancing} from '../dist/instancing.js';
 import {Shadows} from '../../shadows/dist/index.js';
 import {Clustered} from '../../clustered/dist/index.js';
 import {EnvironmentLighting, Fog} from '../../environment/dist/index.js';
 import {Raycaster} from '../../bvh/dist/index.js';
 import {instancedGLTF} from '../../../tests/support/instanced-gltf.js';
-import {instancedShader} from '../src/instances.ts';
+import {instancedShader} from '../src/instancing.ts';
 import {pbrShader, physicalShader} from '../src/shader.ts';
 import {NodeMaterial, positionLocal, normalLocal, uv, color, mix} from '../../shader/dist/index.js';
 
@@ -43,19 +44,27 @@ test('PBRInstances: identity defaults, validated setters, dirty-range uploads, c
 test('EXT_mesh_gpu_instancing: TRANSLATION/ROTATION (normalized int16)/SCALE become node-space instance matrices', async () => {
   const {engine, store} = await scene(), {doc, buffers} = instancedGLTF(transforms);
   doc.nodes[0].translation = [0, 0, -1];
-  const model = parseGLTF(engine, doc, buffers), inst = model.primitives[0].instances;
+  const model = parseGLTF(engine, doc, buffers, [], {instancing}), inst = model.primitives[0].instances;
   assert.ok(inst instanceof PBRInstances); assert.equal(inst.count, 3);
   // The same transforms as separate nodes give the reference matrices.
   const separate = parseGLTF(engine, ...Object.values(instancedGLTF(transforms, {instanced: false}))); store.tick(false);
   transforms.forEach((_, k) => near(multiply(model.primitives[0].node.matrix, inst.getMatrixAt(k)), multiply([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, -1, 1], separate.primitives[k].node.matrix), 'instance ' + k));
   near(model.bounds, separate.bounds.map((v, i) => i === 2 || i === 5 ? v - 1 : v), 'bounds');
   const bad = instancedGLTF(transforms); bad.doc.nodes[0].extensions.EXT_mesh_gpu_instancing.attributes.SCALE = bad.doc.meshes[0].primitives[0].attributes.TEXCOORD_0;
-  assert.throws(() => parseGLTF(engine, bad.doc, bad.buffers), TypeError);
+  assert.throws(() => parseGLTF(engine, bad.doc, bad.buffers, [], {instancing}), TypeError);
   model.dispose(); separate.dispose(); engine.dispose();
 });
 
+test('without decoders.instancing a required EXT_mesh_gpu_instancing is rejected naming the entry; a used-only one draws each mesh once', async () => {
+  const {engine} = await scene();
+  assert.throws(() => parseGLTF(engine, ...Object.values(instancedGLTF(transforms))), {message: 'Required glTF extensions are unsupported: EXT_mesh_gpu_instancing (pass decoders.instancing from @margoengine/gltf-pro/instancing)'});
+  const fallback = parseGLTF(engine, ...Object.values(instancedGLTF(transforms, {required: false})));
+  assert.equal(fallback.primitives.length, 1); assert.equal(fallback.primitives[0].instances, undefined);
+  fallback.dispose(); engine.dispose();
+});
+
 test('instanced primitives draw once with an instance buffer in beauty, ambient and G-buffer passes, lit by every hook', async () => {
-  const {gpu, engine, store, view} = await scene(), model = parseGLTF(engine, ...Object.values(instancedGLTF(transforms))); store.tick(false);
+  const {gpu, engine, store, view} = await scene(), model = parseGLTF(engine, ...Object.values(instancedGLTF(transforms)), [], {instancing}); store.tick(false);
   const shadows = new Shadows({resolution: 64}), clustered = new Clustered({grid: [4, 3, 2]}), fog = new Fog({color: '#9ab', density: 0.05});
   const ibl = new EnvironmentLighting({device: gpu.device, disposed: false, version: 0, specularView: {}, sampler: {}, brdfLutView: {}, shBuffer: {}, paramsBuffer: {}, restore: () => Promise.resolve()});
   shadows.setup(engine); clustered.setup(engine); fog.setup(engine); shadows.add(model); clustered.add(model); ibl.applyTo(model); fog.applyTo(model);
@@ -82,7 +91,7 @@ test('instanced primitives draw once with an instance buffer in beauty, ambient 
 });
 
 test('bvh Raycaster reports the instance hit, in its world transform', async () => {
-  const {engine, store} = await scene(), model = parseGLTF(engine, ...Object.values(instancedGLTF(transforms))); store.tick(false);
+  const {engine, store} = await scene(), model = parseGLTF(engine, ...Object.values(instancedGLTF(transforms)), [], {instancing}); store.tick(false);
   const ray = new Raycaster([3, 0, 5], [0, 0, -1]), [hit] = ray.intersectObjects(engine, [model]);
   assert.equal(hit.instanceId, 2); assert.equal(hit.mesh, model.primitives[0].node); near(hit.point, [3, 0, 0], 'point');
   const side = new Raycaster([0.2, 1.5, 5], [0, 0, -1]).intersectObjects(engine, [model])[0];

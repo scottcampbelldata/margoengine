@@ -620,7 +620,6 @@
     "imports": "import { GLTFAsset } from '@margoengine/gltf-pro';",
     "exports": [
       "GLTFAsset",
-      "PBRInstances",
       "PBRModel",
       "loadGLTF",
       "parseGLTF",
