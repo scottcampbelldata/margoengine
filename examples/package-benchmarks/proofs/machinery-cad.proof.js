@@ -7,6 +7,8 @@ import assert from 'node:assert/strict';
 import {Engine, TransformStore} from '../../../packages/core/dist/extension.js';
 import {buildAssembly} from '../cad/assembly.js';
 import {versions, time, record} from './compare.js';
+import {requireAC} from '../cad/power.mjs';
+const power = requireAC();
 
 const ref = '7d5a5dd';
 const exploded = await versions('machinery', ref, 'src/exploded.ts'), spatial = await versions('machinery', ref, 'src/spatial.ts');
@@ -55,4 +57,4 @@ for (const modules of [371, 1852]) {
   b.dispose();e.dispose();
 }
 // record() requires speedup >= 1 for measured pairs; the capacity case has no baseline.
-await record('machinery-cad', ref, cases.map(c => c.speedup === null ? {...c, speedup: Infinity} : c), `Node, fake renderer; ExplodedView positions identical; BVH hit distances agree within 1e-4 relative (same node and triangle for ${sameTriangle} rays, the rest hit a coincident face at the same distance); largest error against the exact float64 distance: baseline ${errors.baseline.toExponential(2)} m, candidate ${errors.candidate.toExponential(2)} m.`);
+await record('machinery-cad', ref, cases.map(c => c.speedup === null ? {...c, speedup: Infinity} : c), `AC power: ${power} at start, ${requireAC()} at end. Node, fake renderer; ExplodedView positions identical; BVH hit distances agree within 1e-4 relative (same node and triangle for ${sameTriangle} rays, the rest hit a coincident face at the same distance); largest error against the exact float64 distance: baseline ${errors.baseline.toExponential(2)} m, candidate ${errors.candidate.toExponential(2)} m.`);
