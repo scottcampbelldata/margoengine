@@ -107,6 +107,40 @@ families.push({name: 'mat4 invert', async verify() {
   ];
 }});
 
+// --- packages/shared/math.js (pivoted invert + finiteVector) moved to math: animation, creative, gltf-pro, machinery,
+// post, sky, taa (invert); animator, clustered, creative, shadows, sky, terrain, vfx (finiteVector) ---
+async function sharedAtRef() {
+  const {mkdir, writeFile} = await import('node:fs/promises'), {pathToFileURL} = await import('node:url');
+  const directory = resolve(root, 'test-results/proofs-tmp'), file = resolve(directory, `shared-math-${ref}-${process.pid}.mjs`);
+  await mkdir(directory, {recursive: true}); await writeFile(file, source('packages/shared/math.js'));
+  return import(pathToFileURL(file).href);
+}
+families.push({name: 'shared/math invert + finiteVector', async verify() {
+  const shared = await sharedAtRef(), validate = await import('@margoengine/math/validate'), M = matrices(6000);
+  let n = 0;
+  for (const m of M) for (const Out of [Float64Array, Float32Array]) for (const workspace of [undefined, new Float64Array(52)]) {
+    const a = new Out(16).fill(7), b = new Out(16).fill(7), ok = shared.invert(a, m, 0, workspace), result = mat4.invertMatrixStable(m, b, workspace);
+    assert.equal(result, ok ? b : null); assert.ok(same(a, b), 'invertMatrixStable'); n++;
+    if (m instanceof Out) {const c = m.slice(), d = m.slice(); assert.equal(shared.invert(c, c), mat4.invertMatrixStable(d, d) === d); assert.ok(same(c, d)); n++;} // out aliases m
+  }
+  // Rejected arguments: short arrays, a workspace that is too small, not float64, or shares out's or m's buffer.
+  const m = new Float64Array([2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 1, 2, 3, 1]), shared52 = new Float64Array(52 + 16);
+  for (const [out, input, workspace] of [[new Float64Array(15), m], [new Float64Array(16), m.subarray(1)], [new Float64Array(16), m, new Float64Array(51)], [new Float64Array(16), m, new Float32Array(52)],
+    [shared52.subarray(52), m, shared52.subarray(0, 52)], [new Float64Array(16), shared52.subarray(52), shared52.subarray(0, 52)], [new Float32Array(16), [3.4e38, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1].map((v, i) => i ? v : 1e-39)]]) {
+    const a = out.slice(), b = out.slice(); assert.equal(shared.invert(a, input, 0, workspace), mat4.invertMatrixStable(input, b, workspace) === b); assert.ok(same(a, b)); n++;
+  }
+  for (const v of [...specials, '1', null, undefined, 3.4028235e38, -3.4028235e38, 3.40282357e38]) for (const size of [1, 2]) {
+    const error = f => {try {f(); return null;} catch (e) {return [e.constructor, e.message];}};
+    assert.deepEqual(error(() => validate.finiteVector([v, 0].slice(0, size), size, 'Vector')), error(() => shared.finiteVector([v, 0].slice(0, size), size, 'Vector'))); n++;
+    assert.deepEqual(error(() => validate.finiteVector([v], size, 'Vector')), error(() => shared.finiteVector([v], size, 'Vector'))); n++;
+  }
+  return n;
+}, async bench() {
+  const shared = await sharedAtRef(), M = poses(256), out = new Float32Array(16), workspace = new Float64Array(52);
+  return [{case: 'post/taa/sky/creative per-frame camera inverse (pivoted), 100,000', ...time(
+    () => {for (let i = 0; i < 100000; i++) shared.invert(out, M[i & 255], 0, workspace);}, () => {for (let i = 0; i < 100000; i++) mat4.invertMatrixStable(M[i & 255], out, workspace);})}];
+}});
+
 const checked = {}, timings = [];
 for (const family of families) {
   if (timing) {if (family.bench) timings.push(...(await family.bench()).map(item => ({family: family.name, ...item})));}

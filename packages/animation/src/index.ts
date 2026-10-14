@@ -1,6 +1,6 @@
 import type {PBRModel,PBRPrimitive} from '@margoengine/gltf-pro';
 import type {Engine,EnginePlugin,FrameGraph,PassContext} from '@margoengine/core/extension';
-import {invert} from '../../shared/math.js';
+import {invertMatrixStable} from '@margoengine/math/mat4';
 import {multiplyMatrices} from '@margoengine/math/mat4';
 import {sampleTrackInto,type Interpolation} from './sampling.js';
 import {deformationShader} from './shader.js';
@@ -133,7 +133,7 @@ export class Animation implements EnginePlugin {
     for(const r of this.resources) {
       if(r.primitive.weights.some(v=>!Number.isFinite(v)))throw new RangeError('Invalid morph weights');
       if(r.joints.length) {
-        if(!invert(this.inverse,r.primitive.node.matrix,0,this.workspace))throw new Error('Singular skinned mesh transform');
+        if(!invertMatrixStable(r.primitive.node.matrix,this.inverse,this.workspace))throw new Error('Singular skinned mesh transform');
         for(let i=0;i<r.joints.length;i++){
           multiplyMatrices(this.model.nodes[r.joints[i]].matrix,r.inverseBind[i],this.joint);
           multiplyMatrices(this.inverse,this.joint,this.product);r.palette.set(this.product,i*16);

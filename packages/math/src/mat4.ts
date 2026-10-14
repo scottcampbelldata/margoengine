@@ -32,3 +32,32 @@ export function invertMatrix<T extends NumberArray>(m: ArrayLike<number>, out: T
   out[14] = (a31 * b01 - a30 * b03 - a32 * b00) * d; out[15] = (a20 * b03 - a21 * b01 + a22 * b00) * d;
   return out;
 }
+
+/**
+ * Inverse by Gauss-Jordan elimination with scaled partial pivoting, for camera and model matrices where accuracy near
+ * singular matters more than speed. Returns null (leaving `out` untouched) for non-finite input, a singular matrix, or a
+ * result that is not finite (or overflows Float32 when `out` is a Float32Array). `out` may be `m`. Pass a `workspace`
+ * of 52 float64s, sharing no buffer with `out` or `m`, to avoid the allocation.
+ */
+export function invertMatrixStable<T extends Float32Array | Float64Array>(m: ArrayLike<number>, out: T, workspace?: Float64Array): T | null {
+  if (!out || out.length < 16 || !m || m.length < 16) return null;
+  const a = workspace ?? new Float64Array(52);
+  if (!(a instanceof Float64Array) || a.length < 52 || a.buffer === out.buffer || a.buffer === (m as Partial<Float64Array>).buffer) return null;
+  for (let r = 0; r < 4; r++) {
+    let scale = 0;
+    for (let c = 0; c < 8; c++) { const v = c < 4 ? m[c * 4 + r] : +(c - 4 === r); if (!Number.isFinite(v)) return null; a[r * 8 + c] = v; if (c < 4) scale = Math.max(scale, Math.abs(v)); }
+    if (!scale) return null; a[32 + r] = scale;
+  }
+  for (let c = 0; c < 4; c++) {
+    let pivot = c;
+    for (let r = c + 1; r < 4; r++) if (Math.abs(a[r * 8 + c]) / a[32 + r] > Math.abs(a[pivot * 8 + c]) / a[32 + pivot]) pivot = r;
+    if (a[pivot * 8 + c] === 0 || !Number.isFinite(a[pivot * 8 + c])) return null;
+    for (let k = 0; k < 8; k++) { const value = a[c * 8 + k]; a[c * 8 + k] = a[pivot * 8 + k]; a[pivot * 8 + k] = value; }
+    const scale = a[32 + c]; a[32 + c] = a[32 + pivot]; a[32 + pivot] = scale;
+    const d = a[c * 8 + c]; for (let k = 0; k < 8; k++) a[c * 8 + k] /= d;
+    for (let r = 0; r < 4; r++) if (r !== c) { const f = a[r * 8 + c]; for (let k = 0; k < 8; k++) a[r * 8 + k] -= f * a[c * 8 + k]; }
+  }
+  for (let i = 0; i < 16; i++) { const v = a[(i % 4) * 8 + (i >> 2) + 4]; if (!Number.isFinite(v) || out instanceof Float32Array && !Number.isFinite(Math.fround(v))) return null; a[36 + i] = v; }
+  for (let i = 0; i < 16; i++) out[i] = a[36 + i];
+  return out;
+}

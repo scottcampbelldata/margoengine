@@ -1,6 +1,6 @@
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
-import {finiteVector} from '../../shared/math.js';
+import {finiteVector} from '@margoengine/math/validate';
 import {clipmapGrid} from './grid.js';
 import {terrainVertex,terrainFragment} from './shader.js';
 export {clipmapGrid} from './grid.js';

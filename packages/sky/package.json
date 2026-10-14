@@ -63,5 +63,8 @@
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/sky"
   },
-  "description": "Procedural atmospheric skies, clouds, sun, moon and stars."
+  "description": "Procedural atmospheric skies, clouds, sun, moon and stars.",
+  "devDependencies": {
+    "@margoengine/math": "0.1.0"
+  }
 }

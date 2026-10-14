@@ -1,7 +1,7 @@
 import {SceneTarget,resolveMSAA,sceneTarget} from '../../shared/msaa.js';
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type Mesh} from '@margoengine/core/extension';
-import {invert} from '../../shared/math.js';
+import {invertMatrixStable} from '@margoengine/math/mat4';
 import {jitterProjection} from './jitter.js';
 import {fullscreen,cameraVelocity,objectVelocity,snapshot,resolve,present} from './shader.js';
 export {halton,jitterProjection} from './jitter.js';
@@ -63,7 +63,7 @@ export class TAA implements EnginePlugin {
     this.originalCamera=camera;try{jitterProjection(this.jittered,camera.matrix,this.frame,c.width,c.height);c.camera=this.cameraView!;
     const fov=c.camera.fov,near=c.camera.near,far=c.camera.far;if(!same(fov,this.fov)||!same(near,this.near)||!same(far,this.far)){this.reset();this.fov=fov;this.near=near;this.far=far;}
     this.values.set(c.camera.matrix);this.values.set(this.valid?this.previous:c.camera.matrix,16);
-    if(!invert(this.inverse,c.camera.matrix,0,this.workspace))throw new Error('Invalid TAA camera');
+    if(!invertMatrixStable(c.camera.matrix,this.inverse,this.workspace))throw new Error('Invalid TAA camera');
     this.values[48]=this.options.historyWeight??0.9;this.values[49]=this.options.depthThreshold??0.01;this.values[50]=+this.valid;this.values[51]=0;c.device.queue.writeBuffer(this.uniform!,0,this.values as Float32Array<ArrayBuffer>);
     // Core uploads its frame before extension passes; use the jittered matrix through an existing shader binding.
     if(this.shaderSource!==c.shader){this.shaderSource=c.shader;this.shaderOutput='@group(0) @binding(8) var<uniform> taaCamera:mat4x4f;\n'+c.shader.replace('o.clip=frame.camera*p','o.clip=taaCamera*p');}c.shader=this.shaderOutput;

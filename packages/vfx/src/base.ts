@@ -1,6 +1,6 @@
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type Vec3} from '@margoengine/core/extension';
-import {finiteVector} from '../../shared/math.js';
+import {finiteVector} from '@margoengine/math/validate';
 import {viewMatrix} from '../../shared/view.js';
 import {simulationShader,billboardShader,multisampled} from './shader.js';
 declare const GPUBufferUsage:{UNIFORM:number;STORAGE:number;INDIRECT:number;COPY_DST:number;COPY_SRC:number};

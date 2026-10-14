@@ -1,5 +1,5 @@
 import type {Engine, EnginePlugin, FrameGraph, PassContext} from '@margoengine/core/extension';
-import {invert} from '../../shared/math.js';
+import {invertMatrixStable} from '@margoengine/math/mat4';
 import shader from './shaders/stars.wgsl?raw';
 
 declare const GPUBufferUsage: {UNIFORM: number; COPY_DST: number};
@@ -39,7 +39,7 @@ export class Stars implements EnginePlugin {
 
   private readonly execute = (context: PassContext): void => {
     if (context.backend !== 'webgpu' || !this.enabled) return;
-    if (!invert(this.inverse, context.camera.matrix, 0, this.workspace)) throw new Error('Invalid starfield camera');
+    if (!invertMatrixStable(context.camera.matrix, this.inverse, this.workspace)) throw new Error('Invalid starfield camera');
     let pipeline = this.pipelines.get(context.format+':'+context.descriptor.multisample?.count);
     if (!pipeline) {
       pipeline = context.device.createRenderPipeline({

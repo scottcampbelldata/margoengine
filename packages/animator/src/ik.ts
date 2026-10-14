@@ -1,5 +1,5 @@
 import type {Vec3} from '@margoengine/core/extension';
-import {finiteVector} from '../../shared/math.js';
+import {finiteVector} from '@margoengine/math/validate';
 const subtract=(a:Vec3,b:Vec3)=>a.map((v,i)=>v-b[i]) as [number,number,number];
 export function solveTwoBoneIK(root:Vec3,knee:Vec3,ankle:Vec3,target:Vec3,pole:Vec3):{knee:Vec3;ankle:Vec3} {
   for(const v of [root,knee,ankle,target,pole])finiteVector(v,3,'IK point');

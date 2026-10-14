@@ -1,5 +1,5 @@
 import {PbrMaterial,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type DrawOptions} from '@margoengine/core/extension';
-import {invert} from '../../shared/math.js';
+import {invertMatrixStable} from '@margoengine/math/mat4';
 import {declaration} from './section-uniform.js';
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
 declare const GPUTextureUsage:{RENDER_ATTACHMENT:number;TEXTURE_BINDING:number};
@@ -39,7 +39,7 @@ export class SectionPlanes implements EnginePlugin {
     };graph.add({name:'sections:clip',order:-30,execute:clip,prepare:clip});
     if(this.cap)graph.add({name:'sections:cap',order:5,execute:context=>{if(context.backend==='webgpu')this.drawCaps(context);}});
   }
-  private upload(context:GPUContext):void {const inverse=this.inverse;if(!invert(inverse,context.camera.matrix,0,this.inverseWorkspace))throw new Error('Invalid cap camera');
+  private upload(context:GPUContext):void {const inverse=this.inverse;if(!invertMatrixStable(context.camera.matrix,inverse,this.inverseWorkspace))throw new Error('Invalid cap camera');
     for(let i=0;i<this.rows.length;i++){const row=this.rows[i];for(let p=0;p<this.options.planes.length;p++){const plane=this.options.planes[p],length=Math.hypot(plane[0],plane[1],plane[2]);for(let c=0;c<4;c++)row[p*4+c]=plane[c]/length;}
       row[24]=this.options.planes.length;row[25]=Math.max(0,i-1);row[26]=context.format==='rgba16float'?1:0;row[27]=this.hatch;row.set(this.color,28);row.set(context.camera.matrix,32);row.set(inverse,48);context.device.queue.writeBuffer(this.buffers[i],0,row as Float32Array<ArrayBuffer>);}
   }

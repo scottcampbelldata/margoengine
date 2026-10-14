@@ -1,5 +1,5 @@
 import type {Camera,Vec3} from '@margoengine/core/extension';
-import {finiteVector} from '../../shared/math.js';
+import {finiteVector} from '@margoengine/math/validate';
 
 export function cascadeSplits(near:number,far:number,lambda=0.5,out=new Float32Array(4)):Float32Array {
   if(!Number.isFinite(near)||!Number.isFinite(far)||!Number.isFinite(lambda)||near<=0||far<=near||lambda<0||lambda>1||out.length!==4)throw new RangeError('Invalid cascade splits');

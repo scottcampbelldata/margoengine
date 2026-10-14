@@ -1,7 +1,7 @@
 import {SceneTarget} from '../../shared/msaa.js';
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
-import {invert} from '../../shared/math.js';
+import {invertMatrixStable} from '@margoengine/math/mat4';
 import {viewMatrix} from '../../shared/view.js';
 import {orthographic} from '../../shared/projection.js';
 import {fullscreen,render,group as bind} from '../../shared/gpu.js';
@@ -70,7 +70,7 @@ export class SSAO implements EnginePlugin {
       this.resize(c);
       if(!this.host){this.original=c.color;this.originalFormat=c.format;this.captureTarget!.begin(c);
         if(this.captureSource!==c.shader){this.captureSource=c.shader;this.captureShader=c.shader.replace(/let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/,'return vec4f(linear,1);');}c.shader=this.captureShader;}
-      if(!invert(this.inverse,c.camera.matrix,0,this.inverseWorkspace))throw new Error('Invalid SSAO camera');
+      if(!invertMatrixStable(c.camera.matrix,this.inverse,this.inverseWorkspace))throw new Error('Invalid SSAO camera');
       viewMatrix(this.view,c.camera);
       // View-space projection for the samples: the camera's own when it is orthographic (constant clip w, signed near/far), else core's perspective.
       const p=this.projection,o=orthographic(c.camera.matrix,c.camera.position);p.fill(0);

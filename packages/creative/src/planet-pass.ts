@@ -1,5 +1,5 @@
 import type {PassContext, Vec3} from '@margoengine/core/extension';
-import {finiteVector} from '../../shared/math.js';
+import {finiteVector} from '@margoengine/math/validate';
 import {sceneSamples} from '../../shared/quality.js';
 import surfaceSource from './shaders/planet_surface.wgsl?raw';
 import atmosphereSource from './shaders/planet_atmosphere.wgsl?raw';

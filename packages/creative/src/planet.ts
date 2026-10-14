@@ -1,7 +1,7 @@
 import type {EngineKernel, Vec3, VectorRef} from '@margoengine/core';
 import type {Engine, EnginePlugin, FrameGraph, Mesh, PassContext} from '@margoengine/core/extension';
 import {readResponse} from '../../shared/loading.js';
-import {finiteVector} from '../../shared/math.js';
+import {finiteVector} from '@margoengine/math/validate';
 import {PlanetPass, type PlanetImages, type PlanetPassConfig} from './planet-pass.js';
 
 export interface PlanetOptions {
