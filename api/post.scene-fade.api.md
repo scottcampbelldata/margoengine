@@ -6,6 +6,13 @@
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 
+export interface PrincipalSceneReadiness {
+    principalSceneSubmitted: number | null;
+    principalSceneGpuComplete: number | null;
+    principalScenePresentedOpportunity: number | null;
+    correlation: 'identified-webgpu-submit' | 'webgl-render-return';
+}
+
 export class SceneFade implements EnginePlugin {
     readonly duration: number;
     readonly name = "post:scene-fade";
@@ -23,16 +30,10 @@ export class SceneFade implements EnginePlugin {
 
 export const afterPresented: (queue: Pick<GPUQueue, 'onSubmittedWorkDone'>, signal: AbortSignal) => Promise<void>;
 
-export function submitPrincipalScene(render: () => void, queue?: Pick<GPUQueue, 'submit' | 'onSubmittedWorkDone'>, options?: {
-  signal?: AbortSignal; now?: () => number; request?: typeof requestAnimationFrame; cancel?: typeof cancelAnimationFrame;
-}): Promise<PrincipalSceneReadiness>;
-
-// Not exported from this entry, but used by the exports above:
-
-interface PrincipalSceneReadiness {
-  principalSceneSubmitted: number | null;
-  principalSceneGpuComplete: number | null;
-  principalScenePresentedOpportunity: number | null;
-  correlation: 'identified-webgpu-submit' | 'webgl-render-return';
-}
+export const submitPrincipalScene: (render: () => void, queue?: Pick<GPUQueue, 'submit' | 'onSubmittedWorkDone'>, options?: {
+    signal?: AbortSignal;
+    now?: () => number;
+    request?: typeof requestAnimationFrame;
+    cancel?: typeof cancelAnimationFrame;
+}) => Promise<PrincipalSceneReadiness>;
 ```

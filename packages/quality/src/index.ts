@@ -1,4 +1,5 @@
 import type {EngineKernel} from '@margoengine/core';
+import {sceneSamples as samples} from '../../shared/quality.js';
 declare global {var margoLow: number | undefined;}
 declare const GPUQueue: {prototype: QueueLike} | undefined;
 interface QueueLike {submit(buffers: unknown): unknown; onSubmittedWorkDone(): Promise<unknown>}
@@ -106,4 +107,4 @@ export function watchQuality({request = globalThis.requestAnimationFrame?.bind(g
 }
 export {frameDue, frameStatus} from './pacing.js';
 /** 1 on phones and the light tier, 4 on the desktop full tier: the scene sample count core uses (call after applyQualityTier). */
-export {sceneSamples} from '../../shared/quality.js';
+export const sceneSamples: () => 1 | 4 = samples; // typed here so the published .d.ts never points into ../../shared

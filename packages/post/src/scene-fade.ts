@@ -2,9 +2,18 @@ import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext} from '@margoengine/core/extension';
 import {sceneSamples} from '../../shared/quality.js';
 import {fullscreen} from '../../shared/gpu.js';
-import {afterPresented as presented} from '../../shared/demo-frame.js';
+import {afterPresented as presented, submitPrincipalScene as submit} from '../../shared/demo-frame.js';
 export const afterPresented: (queue: Pick<GPUQueue, 'onSubmittedWorkDone'>, signal: AbortSignal) => Promise<void> = presented;
-export {submitPrincipalScene} from '../../shared/demo-frame.js';
+// Spelled out (not re-exported) so the published .d.ts never points into ../../shared.
+export interface PrincipalSceneReadiness {
+  principalSceneSubmitted: number | null;
+  principalSceneGpuComplete: number | null;
+  principalScenePresentedOpportunity: number | null;
+  correlation: 'identified-webgpu-submit' | 'webgl-render-return';
+}
+export const submitPrincipalScene: (render: () => void, queue?: Pick<GPUQueue, 'submit' | 'onSubmittedWorkDone'>, options?: {
+  signal?: AbortSignal; now?: () => number; request?: typeof requestAnimationFrame; cancel?: typeof cancelAnimationFrame;
+}) => Promise<PrincipalSceneReadiness> = submit;
 declare const GPUTextureUsage:{RENDER_ATTACHMENT:number;COPY_SRC:number;COPY_DST:number;TEXTURE_BINDING:number};
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
 
