@@ -65,7 +65,7 @@ test('createMesh draws through gltf-pro with patched shader and default bindings
     const group=s.lighting().at(-1);assert.deepEqual(group.entries.map(e=>e.binding),[32,33,34,35,36,37,38,39,40,41]);
     assert.equal(group.entries[0].resource,group.entries[2].resource,'missing maps share the white default');
     assert.notEqual(group.entries[4].resource,group.entries[0].resource,'normal slot uses the flat normal default');
-    const uniform=s.h.resources.find(r=>r.size===400);assert.deepEqual([...new Float32Array(uniform.data,76*4,4)],[0.5,0.25,1,1]);
+    const uniform=s.h.resources.find(r=>r.size===880);// gltf-pro's per-draw Frame uniformassert.deepEqual([...new Float32Array(uniform.data,76*4,4)],[0.5,0.25,1,1]);
   } finally {s.close();}
 });
 

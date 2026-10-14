@@ -8,9 +8,11 @@ export {meshoptDecodeGltfBuffer as decodeMeshoptBuffer, meshoptDecodeVertexBuffe
 export type {DecodedDracoGeometry, DracoAttribute, DracoRequest, KTX2Mip, TranscodeTarget, TranscodedKTX2Result} from './protocol.js';
 import type {DracoDecoder} from './draco.js';
 import type {KTX2Decoder} from './ktx2.js';
+import type {MeshoptDecoder} from './meshopt.js';
 
-/** Optional decoder hooks a glTF loader accepts, e.g. `{draco: new DracoDecoder(), ktx2: new KTX2Decoder({device})}`. */
+/** Decoders for @margoengine/gltf-pro's `decoders` option, e.g. `{draco: new DracoDecoder(), meshopt: MeshoptDecoder, ktx2: new KTX2Decoder({device})}`. */
 export interface GLTFDecoderHooks {
   draco?: Pick<DracoDecoder, 'decode'>;
-  ktx2?: Pick<KTX2Decoder, 'transcode' | 'target'>;
+  meshopt?: Pick<typeof MeshoptDecoder, 'decodeGltfBuffer'>;
+  ktx2?: Pick<KTX2Decoder, 'transcode'>;
 }

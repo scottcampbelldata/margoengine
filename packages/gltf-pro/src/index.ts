@@ -3,11 +3,19 @@ import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type Pas
 import {invert} from '../../shared/math.js';
 import {viewMatrix} from '../../shared/view.js';
 import {Cleanup} from '../../shared/cleanup.js';
-import {GLTFAsset, container, loadAsset, entry, integer, assetLimit} from './asset.js';
-import {pbrShader} from './shader.js';
+import {GLTFAsset, container, loadAsset, closeImages, entry, integer, assetLimit, type GLTFImage, type AssetOptions} from './asset.js';
+import {pbrShader, physicalShader} from './shader.js';
 import {mipShader} from './mip.js';
 export {GLTFAsset} from './asset.js';
-export type {GLTFDocument} from './asset.js';
+export type {GLTFDocument, GLTFDecoderHooks, GLTFCompressedImage, GLTFImage} from './asset.js';
+/** KHR_lights_punctual light on a scene node, as data. Intensity is candela (point, spot) or lux (directional); the light points down the node's -Z. */
+export interface GLTFLight {node:Mesh;nodeIndex:number;type:'directional'|'point'|'spot';color:number[];intensity:number;range?:number;innerConeAngle?:number;outerConeAngle?:number;name?:string}
+/** glTF camera on a scene node, as data; the camera looks down the node's -Z. */
+export interface GLTFCamera {node:Mesh;nodeIndex:number;type:'perspective'|'orthographic';perspective?:{yfov:number;znear:number;zfar?:number;aspectRatio?:number};orthographic?:{xmag:number;ymag:number;znear:number;zfar:number};name?:string}
+/** Point or spot light shaped for @margoengine/clustered `setLights`. */
+export interface GLTFClusteredLight {position:[number,number,number];range:number;color:number[];intensity:number;direction?:[number,number,number];outerAngle?:number;innerAngle?:number}
+export type GLTFLoadOptions = Omit<AssetOptions,'buffers'>;
+const srgbMaps=[0,4,9,12],normalMaps=[2,7],blended=(m:any)=>m.settings[0]===2||!!m.tint;
 declare const GPUBufferUsage: {UNIFORM:number;STORAGE:number;VERTEX:number;INDEX:number;COPY_DST:number};
 declare const GPUTextureUsage: {TEXTURE_BINDING:number;COPY_DST:number;RENDER_ATTACHMENT:number};
 type Context = Extract<PassContext,{backend:'webgpu'}>;
@@ -44,23 +52,35 @@ const vector = (value:any, size:number, label:string, min=-Infinity, max=Infinit
   if (!Array.isArray(value) || value.length !== size || value.some(v=>typeof v!=='number'||!Number.isFinite(Math.fround(v))||v<min||v>max)) throw new TypeError('Invalid glTF '+label);
   return value;
 };
+const scalar=(v:any,min:number,max:number,label:string)=>vector([v],1,label,min,max)[0];
 function material(def:any = {}): any {
-  const p=def.pbrMetallicRoughness??{}, alpha=def.alphaMode??'OPAQUE';
+  const p=def.pbrMetallicRoughness??{}, alpha=def.alphaMode??'OPAQUE', e=def.extensions??{};
   if (!['OPAQUE','MASK','BLEND'].includes(alpha)) throw new TypeError('Invalid glTF alpha mode');
   if (def.doubleSided!==undefined&&typeof def.doubleSided!=='boolean') throw new TypeError('Invalid glTF doubleSided');
-  const scalar=(v:any,min:number,max:number,label:string)=>vector([v],1,label,min,max)[0];
-  return {...def,base:vector(p.baseColorFactor??[1,1,1,1],4,'base color',0,1),
+  const cc=e.KHR_materials_clearcoat,tr=e.KHR_materials_transmission,sh=e.KHR_materials_sheen,sp=e.KHR_materials_specular,vo=e.KHR_materials_volume,physical=!!(cc||tr||sh||sp||vo||e.KHR_materials_ior);
+  const base=vector(p.baseColorFactor??[1,1,1,1],4,'base color',0,1),transmission=scalar(tr?.transmissionFactor??0,0,1,'transmission'),strength=scalar(e.KHR_materials_emissive_strength?.emissiveStrength??1,0,Infinity,'emissive strength');
+  const attenuation=vector(vo?.attenuationColor??[1,1,1],3,'attenuation color',0,1),depth=scalar(vo?.thicknessFactor??0,0,Infinity,'thickness')/(vo?.attenuationDistance===undefined?Infinity:scalar(vo.attenuationDistance,Number.MIN_VALUE,Infinity,'attenuation distance'));
+  const maps=[p.baseColorTexture,p.metallicRoughnessTexture,def.normalTexture,def.occlusionTexture,def.emissiveTexture,...physical?[cc?.clearcoatTexture,cc?.clearcoatRoughnessTexture,cc?.clearcoatNormalTexture,tr?.transmissionTexture,sh?.sheenColorTexture,sh?.sheenRoughnessTexture,sp?.specularTexture,sp?.specularColorTexture]:[]]
+    .map(t=>t?.extensions?.KHR_texture_transform?.texCoord===undefined?t:{...t,texCoord:t.extensions.KHR_texture_transform.texCoord});
+  return {...def,base,
     factors:[scalar(p.roughnessFactor??1,0,1,'roughness'),scalar(p.metallicFactor??1,0,1,'metallic'),scalar(def.normalTexture?.scale??1,-Infinity,Infinity,'normal scale'),scalar(def.occlusionTexture?.strength??1,0,1,'occlusion strength')],
-    emission:vector(def.emissiveFactor??[0,0,0],3,'emissive',0,1),
+    emission:vector(def.emissiveFactor??[0,0,0],3,'emissive',0,1).map(v=>v*strength),
     settings:[['OPAQUE','MASK','BLEND'].indexOf(alpha),scalar(def.alphaCutoff??0.5,0,Infinity,'alpha cutoff'),+(def.doubleSided??false),0],
-    maps:[p.baseColorTexture,p.metallicRoughnessTexture,def.normalTexture,def.occlusionTexture,def.emissiveTexture]};
+    maps,
+    // KHR_texture_transform per map as two rows of offset*rotation*scale; the first row's w holds the UV set.
+    uvt:maps.flatMap(t=>{const x=t?.extensions?.KHR_texture_transform??{},[ox,oy]=vector(x.offset??[0,0],2,'texture offset'),[sx,sy]=vector(x.scale??[1,1],2,'texture scale'),r=scalar(x.rotation??0,-Infinity,Infinity,'texture rotation'),c=Math.cos(r),s=Math.sin(r);return [c*sx,s*sy,ox,t?.texCoord??0,-s*sx,c*sy,oy,0];}),
+    ext:[+!!e.KHR_materials_unlit,scalar(e.KHR_materials_ior?.ior??1.5,0,Infinity,'ior'),0,0],
+    physical:physical?[scalar(cc?.clearcoatFactor??0,0,1,'clearcoat'),scalar(cc?.clearcoatRoughnessFactor??0,0,1,'clearcoat roughness'),scalar(cc?.clearcoatNormalTexture?.scale??1,-Infinity,Infinity,'clearcoat normal scale'),transmission,
+      ...vector(sp?.specularColorFactor??[1,1,1],3,'specular color',0),scalar(sp?.specularFactor??1,0,1,'specular'),...vector(sh?.sheenColorFactor??[0,0,0],3,'sheen color',0,1),scalar(sh?.sheenRoughnessFactor??0,0,1,'sheen roughness')]:undefined,
+    // Transmission blends the background by this per-material tint (base color, Beer-Lambert volume attenuation at thicknessFactor).
+    tint:transmission?base.slice(0,3).map((v,i)=>v*transmission*attenuation[i]**depth):undefined};
 }
 function primitive(asset:GLTFAsset, p:any, node:Mesh, nodeIndex:number, mesh:any, materials:any[]):PBRPrimitive {
-  if ((p.mode??4)!==4 || p.extensions?.KHR_draco_mesh_compression) throw new Error('PBR requires uncompressed triangle primitives');
-  const a=p.attributes??{}, positions=asset.accessor(a.POSITION,'VEC3'), count=positions.length/3;
+  if ((p.mode??4)!==4) throw new Error('PBR requires triangle primitives');
+  const a=p.attributes??{}, positions=asset.accessor(a.POSITION,'VEC3'), count=positions.length/3, quantized=asset.doc.extensionsUsed?.includes('KHR_mesh_quantization');
   if(count<3)throw new RangeError('Expected bounded triangle geometry');
-  for(const key of ['POSITION','NORMAL','TANGENT'])if(a[key]!==undefined){const def=entry(asset.doc.accessors,a[key],'attribute');if(def.componentType!==5126||def.normalized)throw new TypeError('Expected Float32 '+key);}
-  for(const key of ['TEXCOORD_0','TEXCOORD_1','COLOR_0'])if(a[key]!==undefined){const def=entry(asset.doc.accessors,a[key],'attribute');if(![5126,5121,5123].includes(def.componentType)||def.componentType!==5126&&!def.normalized)throw new TypeError('Invalid normalized '+key);}
+  for(const key of ['POSITION','NORMAL','TANGENT'])if(a[key]!==undefined&&!quantized){const def=entry(asset.doc.accessors,a[key],'attribute');if(def.componentType!==5126||def.normalized)throw new TypeError('Expected Float32 '+key);}
+  for(const key of ['TEXCOORD_0','TEXCOORD_1','COLOR_0'])if(a[key]!==undefined&&!(quantized&&key!=='COLOR_0')){const def=entry(asset.doc.accessors,a[key],'attribute');if(![5126,5121,5123].includes(def.componentType)||def.componentType!==5126&&!def.normalized)throw new TypeError('Invalid normalized '+key);}
   let normals=a.NORMAL===undefined?new Float32Array(positions.length):asset.accessor(a.NORMAL,'VEC3');
   const indexValues=p.indices===undefined?null:asset.accessor(p.indices,'SCALAR');
   if(indexValues)for(let i=0;i<indexValues.length;i++){const v=indexValues[i];if(!Number.isInteger(v)||v<0||v>=count)throw new RangeError('Invalid glTF triangle indices');}
@@ -117,13 +137,13 @@ function transform(node:Mesh,def:any):void {
 }
 export class PBRModel implements EnginePlugin {
   readonly name='gltf-pro:'+modelId++;
-  readonly root:Mesh;readonly nodes:Mesh[]=[];readonly primitives:PBRPrimitive[]=[];
+  readonly root:Mesh;readonly nodes:Mesh[]=[];readonly primitives:PBRPrimitive[]=[];readonly lights:GLTFLight[]=[];readonly cameras:GLTFCamera[]=[];
   disposed=false;private readonly created:Mesh[]=[];private resources:DrawResource[]=[];private textures:GPUTexture[]=[];
   private pipelines=new Map<string,GPURenderPipeline>();private readonly inverse=new Float32Array(16);private readonly workspace=new Float64Array(52);private readonly view=new Float32Array(16);
   private engine:Engine;private readonly cleanupCallbacks=new Set<()=>void>();
   private readonly lighting=new Set<LightingEffect>();
   private readonly lightingGroups=new Map<GPURenderPipeline,{entries:GPUBindGroupEntry[];group:GPUBindGroup}>();
-  constructor(instance:EngineKernel,readonly asset:GLTFAsset,private readonly images:readonly ImageBitmap[]=[],prepared?:readonly (readonly PreparedGeometry[])[]) {
+  constructor(instance:EngineKernel,readonly asset:GLTFAsset,private readonly images:readonly GLTFImage[]=[],prepared?:readonly (readonly PreparedGeometry[])[]) {
     this.engine=engineRuntime(instance);
     const doc=asset.doc,defs=doc.nodes??[],parents=new Int32Array(defs.length).fill(-1),materials=(doc.materials??[]).map(material);
     defs.forEach((def:any,id:number)=>{
@@ -138,6 +158,15 @@ export class PBRModel implements EnginePlugin {
       this.root=this.engine.createMesh();this.created.push(this.root);
       for(let i=0;i<defs.length;i++){const node=this.engine.createMesh();this.nodes.push(node);this.created.push(node);node.name=defs[i].name??'';transform(node,defs[i]);}
       for(let i=0;i<defs.length;i++)this.nodes[i].setParent(parents[i]<0?this.root:this.nodes[parents[i]]);
+      for(const i of active){
+        const d=defs[i],light=d.extensions?.KHR_lights_punctual;
+        if(light){
+          const def=entry(doc.extensions?.KHR_lights_punctual?.lights,light.light,'light'),spot=def.type==='spot'?{innerConeAngle:scalar(def.spot?.innerConeAngle??0,0,Math.PI/2,'spot cone'),outerConeAngle:scalar(def.spot?.outerConeAngle??Math.PI/4,0,Math.PI/2,'spot cone')}:{};
+          if(!['directional','point','spot'].includes(def.type)||def.range!==undefined&&!(def.range>0)||spot.innerConeAngle!>=spot.outerConeAngle!)throw new TypeError('Invalid glTF light');
+          this.lights.push({...def,...spot,color:vector(def.color??[1,1,1],3,'light color',0),intensity:scalar(def.intensity??1,0,Infinity,'light intensity'),node:this.nodes[i],nodeIndex:i});
+        }
+        if(d.camera!==undefined){const def=entry(doc.cameras,d.camera,'camera');if(!['perspective','orthographic'].includes(def.type)||typeof def[def.type]!=='object')throw new TypeError('Invalid glTF camera');this.cameras.push({...def,node:this.nodes[i],nodeIndex:i});}
+      }
       let geometryBytes=0;const checked=new Set<PreparedGeometry>(),counted=new Set<Float32Array|Uint32Array>();
       for(const i of active)if(defs[i].mesh!==undefined) {
         const mesh=entry(doc.meshes,defs[i].mesh,'mesh');if(!Array.isArray(mesh.primitives)||!mesh.primitives.length)throw new TypeError('Missing primitives');
@@ -161,23 +190,27 @@ export class PBRModel implements EnginePlugin {
       try{device.queue.writeBuffer(b,0,data as Float32Array<ArrayBuffer>);}catch(e){b.destroy();throw e;}geometryBuffers.set(data,b);return b;
     };
     for(const p of this.primitives) {
-      const r:DrawResource={primitive:p,vertex:undefined!,index:undefined!,uniform:undefined!,values:new Float32Array(100),groups:new Map(),views:[],samplers:[]};
+      const r:DrawResource={primitive:p,vertex:undefined!,index:undefined!,uniform:undefined!,values:new Float32Array(220),groups:new Map(),views:[],samplers:[]};
       this.resources.push(r);r.vertex=upload(p.vertices,GPUBufferUsage.VERTEX|GPUBufferUsage.STORAGE);r.index=upload(p.indices,GPUBufferUsage.INDEX);
-      r.uniform=device.createBuffer({size:400,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
-      for(let i=0;i<5;i++) {
-        const map=p.material.maps[i],def=map?entry(this.asset.doc.textures,map.index,'texture'):null,image=def?this.images[integer(def.source,'image')]:undefined;
+      r.uniform=device.createBuffer({size:880,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+      for(let i=0;i<p.material.maps.length;i++) {
+        const map=p.material.maps[i],def=map?entry(this.asset.doc.textures,map.index,'texture'):null;
+        // KHR_texture_basisu, EXT_texture_webp and EXT_texture_avif sources win when decoded; otherwise the fallback source.
+        const source=def?['KHR_texture_basisu','EXT_texture_webp','EXT_texture_avif'].map(k=>def.extensions?.[k]?.source).find(s=>s!==undefined&&this.images[s])??integer(def.source,'image'):-1,image=this.images[source];
         if(def&&!image)throw new TypeError('Missing decoded glTF image');
-        const format=i===0||i===4?'rgba8unorm-srgb':'rgba8unorm',size=image?[image.width,image.height]:[1,1];
+        const compressed=image&&'mipmaps' in image?image:undefined,format=compressed?compressed.format:srgbMaps.includes(i)?'rgba8unorm-srgb':'rgba8unorm',size=image?[image.width,image.height]:[1,1];
         if(size.some(n=>n>device.limits.maxTextureDimension2D))throw new RangeError('Image exceeds device limit');
-        const key=image?def.source+':'+format:'default:'+i;
+        const key=image?source+':'+format:'default:'+i;
         let texture=imageTextures.get(key);
         if(!texture) {
-          const levels=image?Math.floor(Math.log2(Math.max(...size)))+1:1;
-          texture=device.createTexture({size,format,mipLevelCount:levels,usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST|GPUTextureUsage.RENDER_ATTACHMENT});
+          const levels=compressed?compressed.mipmaps.length:image?Math.floor(Math.log2(Math.max(...size)))+1:1;
+          texture=device.createTexture({size,format,mipLevelCount:levels,usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST|(compressed?0:GPUTextureUsage.RENDER_ATTACHMENT)});
           this.textures.push(texture);imageTextures.set(key,texture);
-          if(image)device.queue.copyExternalImageToTexture({source:image},{texture},size);
-          else device.queue.writeTexture({texture},new Uint8Array(i===2?[128,128,255,255]:[255,255,255,255]),{bytesPerRow:4},[1,1]);
-          if(levels>1) {
+          // Transcoded mips upload as-is: rgba8 rows, or 16-byte 4x4 blocks (BC7, ASTC 4x4, ETC2 RGBA8).
+          if(compressed){const block=format.startsWith('rgba')?1:4,target=texture;compressed.mipmaps.forEach((m,mipLevel)=>{const w=Math.ceil(m.width/block),h=Math.ceil(m.height/block);device.queue.writeTexture({texture:target,mipLevel},m.data as Uint8Array<ArrayBuffer>,{bytesPerRow:w*(block>1?16:4),rowsPerImage:h},[w*block,h*block]);});}
+          else if(image)device.queue.copyExternalImageToTexture({source:image as ImageBitmap},{texture},size);
+          else device.queue.writeTexture({texture},new Uint8Array(normalMaps.includes(i)?[128,128,255,255]:[255,255,255,255]),{bytesPerRow:4},[1,1]);
+          if(levels>1&&!compressed) {
             let pipeline=mipPipelines.get(format);
             if(!pipeline){const module=device.createShaderModule({code:mipShader});pipeline=device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format}]}});mipPipelines.set(format,pipeline);}
             const encoder=device.createCommandEncoder();
@@ -211,7 +244,7 @@ export class PBRModel implements EnginePlugin {
     if(this.disposed)return;
     viewMatrix(this.view,c.camera);
     const resources=[...this.resources].sort((a,b)=>{
-      const blendA=a.primitive.material.settings[0]===2,blendB=b.primitive.material.settings[0]===2;
+      const blendA=blended(a.primitive.material),blendB=blended(b.primitive.material);
       if(blendA!==blendB)return +blendA-+blendB;
       const distance=(r:DrawResource)=>Math.hypot(...c.camera.position.map((v,i)=>v-r.primitive.node.matrix[12+i]));
       return blendA?distance(b)-distance(a):0;
@@ -226,19 +259,21 @@ export class PBRModel implements EnginePlugin {
       for(let i=0;i<16;i++)v[32+i]=this.inverse[(i%4)*4+Math.floor(i/4)];
       v.set(this.view,48);v.set(c.camera.position,64);v.set(this.engine.lighting.direction,68);v.set(this.engine.lighting.radiance,72);
       v.set(m.base,76);v.set(m.factors,80);v.set(m.emission,84);v.set(m.settings,88);v[91]=+(c.format==='rgba16float');
-      for(let i=0;i<5;i++)v[92+i]=m.maps[i]?.texCoord??0;
+      // coordsA/coordsB.x name each base map's slot; uv() reads that slot's KHR_texture_transform row, which carries its UV set.
+      for(let i=0;i<5;i++)v[92+i]=i;
       const a=node.matrix;v[97]=Math.sign(a[0]*(a[5]*a[10]-a[6]*a[9])-a[4]*(a[1]*a[10]-a[2]*a[9])+a[8]*(a[1]*a[6]-a[2]*a[5]));
+      v.set(m.ext,100);v.set(m.uvt,104);if(m.physical)v.set(m.physical,208);
       c.device.queue.writeBuffer(r.uniform,0,v as Float32Array<ArrayBuffer>);
-      let code=pbrShader;
+      let code=m.physical?physicalShader():pbrShader;
       if(mode==='beauty')for(const effect of this.lighting)code=effect.shader(code,2);
       // Keep the shader's original front-facing convention, including mirrored transforms.
       const cull:GPUCullMode=m.settings[2]<0.5?(v[97]>0?'back':'front'):'none';
-      const blend=m.settings[0]===2,key=mode+':'+c.format+':'+blend+':'+cull+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+code;
+      const transmit=!!m.tint,blend=blended(m),key=mode+':'+c.format+':'+blend+transmit+':'+cull+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+code;
       let pipeline=this.pipelines.get(key);
       if(!pipeline) {
         const module=c.device.createShaderModule({code}),format=mode==='beauty'?c.format:'rgba16float';
         pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:80,attributes:Array.from({length:5},(_,i)=>({shaderLocation:i,offset:i*16,format:'float32x4' as const}))}]},
-          fragment:{module,entryPoint:mode==='beauty'?'fragment':mode==='gbuffer'?'gbuffer':'ambientFragment',targets:[{format,blend:blend&&mode!=='gbuffer'?{color:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
+          fragment:{module,entryPoint:mode==='beauty'?'fragment':mode==='gbuffer'?'gbuffer':'ambientFragment',targets:[{format,blend:blend&&mode!=='gbuffer'?{color:transmit?{srcFactor:'one',dstFactor:'constant'}:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
           multisample:c.descriptor.multisample,primitive:{cullMode:cull},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:mode==='beauty'&&!blend,depthCompare:mode==='beauty'?'greater-equal':'equal'}});
         this.pipelines.set(key,pipeline);
       }
@@ -252,6 +287,7 @@ export class PBRModel implements EnginePlugin {
       if(blend&&mode!=='gbuffer'){pass?.end();pass=undefined;}
       pass??=c.encoder.beginRenderPass({colorAttachments:[{view:color,loadOp:'load',storeOp:'store'}],depthStencilAttachment:{view:depth,depthLoadOp:'load',depthStoreOp:'store',...(c.descriptor.depthStencil!.format.includes('stencil')?{stencilLoadOp:'load',stencilStoreOp:'store'}:{})}});
       pass.setPipeline(pipeline);pass.setBindGroup(0,groups[0]);pass.setBindGroup(1,groups[1]);
+      if(transmit&&mode!=='gbuffer')pass.setBlendConstant([...m.tint,1]);
       if(mode==='beauty'&&this.lighting.size){
         const entries=[...this.lighting].flatMap(effect=>effect.bindings());let cached=this.lightingGroups.get(pipeline);
         if(!cached||entries.length!==cached.entries.length||entries.some((entry,i)=>{
@@ -276,6 +312,15 @@ export class PBRModel implements EnginePlugin {
     }
     return out;
   }
+  /** World-space point and spot lights for `clustered.setLights()`. Directional lights are left to engine lighting; an unset range ends where intensity/d² reaches 1/256. */
+  clusteredLights():GLTFClusteredLight[] {
+    this.engine.store.tick(false);
+    return this.lights.filter(l=>l.type!=='directional').map(l=>{
+      const m=l.node.matrix,light:GLTFClusteredLight={position:[m[12],m[13],m[14]],range:l.range??(Math.sqrt(l.intensity*256)||1),color:l.color,intensity:l.intensity};
+      if(l.type==='spot')Object.assign(light,{direction:[-m[8],-m[9],-m[10]],outerAngle:Math.min(l.outerConeAngle!,Math.PI/2-1e-4),innerAngle:Math.min(l.innerConeAngle!,Math.PI/2-1e-4)});
+      return light;
+    });
+  }
   onDispose(callback:()=>void):()=>void {if(typeof callback!=='function')throw new TypeError('Expected cleanup callback');if(this.disposed){callback();return()=>{};}this.cleanupCallbacks.add(callback);return()=>this.cleanupCallbacks.delete(callback);}
   private releaseGPU():void {const cleanup=new Cleanup(),buffers=new Set<GPUBuffer>();for(const r of this.resources)for(const b of [r.vertex,r.index,r.uniform])if(b)buffers.add(b);for(const b of buffers)cleanup.run(()=>b.destroy());for(const t of this.textures)cleanup.run(()=>t.destroy());this.resources=[];this.textures=[];this.pipelines.clear();this.lightingGroups.clear();cleanup.finish();}
   onDeviceRestored(engine:Engine):void {this.releaseGPU();for(const p of this.primitives)p.deformed=undefined;this.setup(engine);}
@@ -284,7 +329,7 @@ export class PBRModel implements EnginePlugin {
     this.lighting.clear();
     cleanup.run(()=>this.engine.removePlugin(this.name)).run(()=>this.engine.frameGraph.removeOwner(this.name));
     for(const callback of this.cleanupCallbacks)cleanup.run(callback);this.cleanupCallbacks.clear();cleanup.run(()=>this.releaseGPU());
-    for(let i=this.created.length-1;i>=0;i--)cleanup.run(()=>this.created[i].dispose());for(const image of this.images)cleanup.run(()=>image.close());cleanup.finish();
+    for(let i=this.created.length-1;i>=0;i--)cleanup.run(()=>this.created[i].dispose());cleanup.run(()=>closeImages(this.images));cleanup.finish();
   }
   destroy():void {this.engine.removePlugin(this.name);if(!this.disposed)this.dispose();}
 }
@@ -297,8 +342,12 @@ export function parsePreparedPBR(instance:EngineKernel,doc:GLTFAsset['doc'],geom
   const model=new PBRModel(instance,new GLTFAsset(doc,[]),images,geometry);
   try{engineRuntime(instance).use(model);return model;}catch(error){model.dispose();throw error;}
 }
-export async function loadGLTF(instance:EngineKernel,url:string|URL,{signal}:{signal?:AbortSignal}={}):Promise<PBRModel> {
-  const {asset,images}=await loadAsset(url,signal);let model:PBRModel|undefined;
+/** Fetch a .gltf/.glb, decode its images and any compressed data with `decoders`, then add the model to the engine. */
+export async function loadGLTF(instance:EngineKernel,url:string|URL,options:GLTFLoadOptions={}):Promise<PBRModel> {return attach(instance,await loadAsset(url,options),options.signal);}
+/** Like parseGLTF for in-memory JSON/GLB, but async so Draco, meshopt and KTX2 decoders can run; also decodes embedded images. External URIs resolve against the page. */
+export async function parseGLTFAsync(instance:EngineKernel,input:string|object|ArrayBuffer|ArrayBufferView,options:AssetOptions={}):Promise<PBRModel> {return attach(instance,await loadAsset(undefined,options,input),options.signal);}
+function attach(instance:EngineKernel,{asset,images}:{asset:GLTFAsset;images:GLTFImage[]},signal?:AbortSignal):PBRModel {
+  let model:PBRModel|undefined;
   try {signal?.throwIfAborted();model=new PBRModel(instance,asset,images);engineRuntime(instance).use(model);return model;}
-  catch(error){if(model)model.dispose();else for(const image of images)image.close();throw error;}
+  catch(error){if(model)model.dispose();else closeImages(images);throw error;}
 }
