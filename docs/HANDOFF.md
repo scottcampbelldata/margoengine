@@ -87,8 +87,8 @@ checks and benchmarks run one at a time: take the lock with `mkdir C:\Dev\Projec
 
 0. Verification gates (serial, idle GPU): shader `browser-check.mjs` re-run; LOD/imposter 2,500-object benchmark on a
    quiet GPU; post full stack (SSAO+DOF+Bloom+Tonemap+FXAA) in a real scene, visuals and frame time; native FBX/USD in a
-   real browser plus a memory audit (models unloaded/switched destroy their GPU buffers, no leaks); move
-   `test-results/three-size.mjs` to `scripts/` with a package script. (Security review: later commit reviews in the
+   real browser plus a memory audit (models unloaded/switched destroy their GPU buffers, no leaks). [Done: size
+   comparison is `npm run measure:threejs` (scripts/compare-threejs-size.js).] (Security review: later commit reviews in the
    security log report clean; the one timeout was the service being busy.)
 
 Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (`c82e119`), WebGL renderer moved to
@@ -195,7 +195,7 @@ Before launch, in addition to the work queue:
 - Demos smooth on first load on desktop and phones, including Android. The Galaxy S23 3-5 FPS island issue is parked
   but is a launch risk; revisit before launch.
 - Every public number reproducible from the repo: size (core + stage gzip, `npm run measure:size`; three.js comparison
-  `test-results/three-size.mjs` should move into `scripts/`), speed proofs, a fair three.js benchmark.
+  `npm run measure:threejs`), speed proofs, a fair three.js benchmark.
 - Comparison page states limits honestly (WebGPU-first, which packages still use third-party code, unverified devices).
 - READMEs and getting-started docs for every package; licence and third-party notices checked.
 - API review of the change list before publishing 1.0 to npm.
