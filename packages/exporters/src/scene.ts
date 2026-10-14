@@ -383,8 +383,8 @@ export function toWorld({geometry, world}: Drawable): {positions: Float64Array; 
 }
 
 // Powers of ten that a double holds exactly.
-const POW10 = Array.from({length: 23}, (_, i) => Number(`1e${i}`));
-const ZEROS = '0'.repeat(21);
+const POW10 = /* @__PURE__ */ Array.from({length: 23}, (_, i) => Number(`1e${i}`));
+const ZEROS = /* @__PURE__ */ '0'.repeat(21);
 
 /** @internal Shortest decimal that reads back as the same Float32 value. */
 export function num(value: number): string {

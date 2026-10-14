@@ -8,8 +8,8 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 84 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
-| PARTIAL | 40 | Some of it exists, but a common use case is missing. The notes say what. |
+| COVERED | 85 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| PARTIAL | 39 | Some of it exists, but a common use case is missing. The notes say what. |
 | MISSING | 32 | No implementation was found in any package's `src/`. |
 
 Overall: Margo is strong where three.js relies on third-party libraries or examples. That includes cascaded PCSS shadows, clustered lighting, TAA, Gaussian splats, BVH queries, physics, navigation, terrain, water and sky. The day-one basics the first version of this matrix found missing (textures and materials on meshes you build, glTF extensions and compression, an orthographic camera, picking loaded models, image-based lighting outside React, combinable effects, FXAA, a math library) now exist as optional packages. What remains:
@@ -18,7 +18,7 @@ Overall: Margo is strong where three.js relies on third-party libraries or examp
 - **Lighting is thin outside clustered point and spot lights.** One directional light per engine, a colourless scalar ambient term, a fixed hemisphere fill in glTF-pro, and shadows only from the directional light. No RectAreaLight.
 - **Core owns one canvas, one camera and one pass graph.** There is no transparent canvas, no render-to-texture from a second camera, no CubeCamera and no multiple viewports. All of these need core changes, and core is frozen for v1.0.
 - **Materials stop at standard, basic, normal and matcap on your own meshes.** Physical features come only from glTF `KHR_materials_*` files and are approximated (transmission does not refract). No Lambert, Phong, depth or shadow-catcher materials, no second UV set and no geometry groups.
-- **glTF coverage has gaps.** `KHR_animation_pointer`, iridescence, anisotropy, dispersion and material variants are rejected when required. glTF cameras are exposed as data only, and export writes no animation.
+- **glTF coverage has gaps.** `KHR_animation_pointer`, iridescence, anisotropy, dispersion and material variants are rejected when required. glTF cameras are exposed as data only, and export writes no cameras or lights.
 - **Post-processing lacks screen-space reflections and GI.** No SSR, GTAO, SSGI, motion blur, SMAA or lens flare, and no built-in screen effects (a shader `NodePass` makes one in a few lines).
 
 Legend. A **†** marks rows where the evidence is the exported symbols, the package README and a non-trivial amount of source code, not a line-by-line read. See [How this was checked](#how-this-was-checked). Rows that work only on WebGPU say "WebGPU only" in their notes.
@@ -177,7 +177,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 
 | three.js | Status | Margo | Notes |
 | --- | --- | --- | --- |
-| GLTFExporter | PARTIAL | exporters `exportGLB`, `exportGLTF` (`packages/exporters/src/gltf.ts`) | Static only. The README says it writes no animations, skins, morphs, cameras, lights or KHR extensions. |
+| GLTFExporter | COVERED | exporters `exportModel` (`packages/exporters/src/model.ts`, also `@margoengine/exporters/model`) for gltf-pro models and materials meshes; `exportGLB`, `exportGLTF` (`gltf.ts`) for engine and data scenes | `exportModel`: options `binary`, `animations`, `onlyVisible`, `embedImages`, `maxTextureSize`; skins, morph targets and weights, clips, `EXT_mesh_gpu_instancing`, metallic-roughness/normal/occlusion/emissive maps, `KHR_texture_transform`, alpha modes and the `KHR_materials_*` gltf-pro draws. Round-trip tested through gltf-pro (DamagedHelmet, RobotExpressive, instanced grids) and the Khronos validator. No cameras or lights, no Draco/meshopt output. |
 | OBJExporter, STLExporter, PLYExporter | COVERED † | exporters `exportOBJ` (with MTL), `exportSTL`, `exportPLY` | |
 | USDZExporter | PARTIAL | exporters `exportUSDZ`, re-exported by usdz-export | Rejects textures, vertex colors and alpha masks. Hierarchy is baked. |
 | DRACOExporter, EXRExporter, KTX2Exporter | MISSING | — | |
@@ -301,8 +301,9 @@ Every MISSING or PARTIAL item, ordered by how often real three.js projects need 
 9. **ShadowMaterial (shadow catcher).** Product shots on a page background use it. The contact-shadow case is done
    (`@margoengine/staging` `ContactShadows`); catching the directional light's cascade shadows is not.
    **Fit:** extend shadows, or a materials shading mode that samples the cascades.
-10. **glTF export with animation.** Used by editors and configurators.
-    **Fit:** extend exporters.
+10. [DONE] **glTF export with animation.** exporters `exportModel`: clips, skins, morphs, instancing, PBR textures and
+    KHR material extensions from gltf-pro models and materials meshes (GLTFExporter row).
+    **Left:** cameras and lights, Draco/meshopt output.
 
 ### Medium
 

@@ -4,6 +4,17 @@
 
 ```ts
 import { EngineKernel, Geometry, Mesh, PbrMaterial } from "@margoengine/core";
+import { PBRModel } from "@margoengine/gltf-pro";
+
+export interface ExportAnimation {
+    model: PBRModel;
+    clips: readonly ExportClip[];
+}
+
+export interface ExportClip {
+    name?: string;
+    tracks: readonly ExportTrack[];
+}
 
 export interface ExportNode {
     name?: string;
@@ -21,6 +32,14 @@ export interface ExportScene {
 }
 
 export type ExportSource = EngineKernel | ExportScene;
+
+export interface ExportTrack {
+    node: number;
+    path: 'translation' | 'rotation' | 'scale' | 'weights';
+    times: ArrayLike<number>;
+    values: ArrayLike<number>;
+    interpolation?: 'STEP' | 'LINEAR' | 'CUBICSPLINE';
+}
 
 export interface GLTFJsonOptions extends GLTFOptions {
     embed?: boolean;
@@ -60,6 +79,17 @@ export interface MaterialData {
     baseColorTexture?: TextureData;
     metallicRoughnessTexture?: TextureData;
     normalTexture?: TextureData;
+}
+
+export interface ModelExportOptions {
+    binary?: boolean;
+    animations?: readonly ExportAnimation[];
+    onlyVisible?: boolean;
+    embedImages?: boolean;
+    maxTextureSize?: number;
+    generator?: string;
+    embed?: boolean;
+    binUri?: string;
 }
 
 export interface OBJOptions extends SceneOptions {
@@ -102,6 +132,14 @@ export interface USDZOptions extends SceneOptions {
 export function exportGLB(source: ExportSource, options?: GLTFOptions): Uint8Array;
 
 export function exportGLTF(source: ExportSource, options?: GLTFJsonOptions): GLTFJsonResult;
+
+export function exportModel(models: PBRModel | readonly PBRModel[], options: ModelExportOptions & {
+    binary: true;
+}): Promise<Uint8Array>;
+export function exportModel(models: PBRModel | readonly PBRModel[], options?: ModelExportOptions & {
+    binary?: false;
+}): Promise<GLTFJsonResult>;
+export function exportModel(models: PBRModel | readonly PBRModel[], options?: ModelExportOptions): Promise<Uint8Array | GLTFJsonResult>;
 
 export function exportOBJ(source: ExportSource, options?: OBJOptions): OBJResult;
 

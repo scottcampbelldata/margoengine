@@ -8,4 +8,6 @@ export {exportPLY} from './ply.js';
 export type {PLYOptions} from './ply.js';
 export {exportUSDZ} from './usdz.js';
 export type {USDZOptions} from './usdz.js';
+export {exportModel} from './model.js';
+export type {ModelExportOptions, ExportAnimation, ExportClip, ExportTrack} from './model.js';
 export type {ExportSource, ExportScene, ExportNode, GeometryData, MaterialData, TextureData, SceneOptions} from './scene.js';

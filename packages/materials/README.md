@@ -18,6 +18,8 @@ glass.opacity = 0.6;                                                // live: col
 // crate.destroy() removes a mesh; map.dispose() frees the texture (meshes never dispose shared textures).
 ```
 
+`createMesh` returns a `MaterialMesh`: the gltf-pro `PBRModel` plus `mesh.material`, the live `Material` it draws with (`@margoengine/exporters` `exportModel` reads its textures to write glTF).
+
 `Material` options: `shading` (`'standard'` PBR, `'basic'` unlit, `'normal'`, `'matcap'`), `color` (`'#rrggbb'` sRGB or linear `[r,g,b(,a)]`), `opacity`, `roughness`, `metalness`, `emissive`, `map`, `metalRoughnessMap` (glTF packing: G roughness, B metalness), `normalMap`, `normalScale`, `aoMap`, `aoMapIntensity`, `emissiveMap`, `matcap`, `transparent`, `alphaTest`, `doubleSided`, `blending` (`'normal'`, `'additive'`, `'multiply'`, `'none'`), `depthWrite`, `depthTest`. Geometry is any `{positions, normals, uvs?, indices?, tangents?, colors?}`, so `@margoengine/geometry` output fits directly; vertex colours (RGB/RGBA floats or bytes) always multiply the base colour.
 
 `Texture` accepts an ImageBitmap, image, canvas, OffscreenCanvas, video, VideoFrame, ImageData or `{data, width, height}` RGBA8 bytes, with `colorSpace`, `wrapS`/`wrapT` (`'clamp'` default, `'repeat'`, `'mirror'`), `magFilter`/`minFilter`, `mipmaps`, `anisotropy` and `flipY`. Images flip like Three.js (`flipY` true) and raw data does not. Without `colorSpace`, `map`, `emissiveMap` and `matcap` read sRGB and other slots linear. One GPU copy is shared by every material. Videos re-upload when `currentTime` changes; call `texture.update()` after drawing to a canvas or changing data. `loadTexture` fetches http(s), blob: or data: URLs (64 MiB, 4096 x 4096 pixels).

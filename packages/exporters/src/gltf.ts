@@ -1,5 +1,7 @@
 // glTF 2.0 writer: the Margo Engine counterpart of Three.js GLTFExporter.
 import {collect, decompose, determinant3, drawables, normalMatrix, type ExportSource, type Geo, type Mat, type Node, type SceneOptions, type TextureData} from './scene.js';
+import {Bin, ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER, type GLTFJsonResult} from './container.js';
+export type {GLTFJsonResult} from './container.js';
 
 export interface GLTFOptions extends SceneOptions {
   /** Write every mesh as a root node with its world transform instead of keeping the hierarchy. Default false. */
@@ -15,64 +17,24 @@ export interface GLTFJsonOptions extends GLTFOptions {
   binUri?: string;
 }
 
-export interface GLTFJsonResult {
-  /** The glTF document object. */
-  json: Record<string, unknown>;
-  /** The document as JSON text, ready to save as `.gltf`. */
-  text: string;
-  /** The separate buffer when `embed` is false and there is binary data, else null. */
-  bin: Uint8Array|null;
-  /** The URI the document uses for `bin`, else null. */
-  binUri: string|null;
-}
-
-const FLOAT = 5126, UNSIGNED_SHORT = 5123, UNSIGNED_INT = 5125, ARRAY_BUFFER = 34962, ELEMENT_ARRAY_BUFFER = 34963;
 const same = (a: number[], b: number[]) => a.every((v, i) => Math.fround(v) === b[i]);
 
-class Writer {
-  readonly parts: Uint8Array[] = [];
-  length = 0;
-  readonly json: Record<string, any> = {};
+class Writer extends Bin {
   private readonly geometryCache = new Map<Geo, {attributes: Record<string, number>; indices: number}>();
   private readonly materialCache = new Map<Mat, number>();
   private readonly meshCache = new Map<Geo, Map<Mat|null, number>>();
   private readonly textureCache = new Map<TextureData, number>();
   private readonly imageCache = new Map<Uint8Array, number>();
 
-  private list(key: string, value: unknown): number {(this.json[key] ??= []).push(value); return this.json[key].length-1;}
-
-  /** Appends bytes on a 4-byte boundary and returns a bufferView index. */
-  private view(bytes: Uint8Array, target?: number): number {
-    const byteOffset = this.length;
-    this.parts.push(bytes);
-    this.length += bytes.length;
-    const pad = (4-this.length%4)%4;
-    if (pad) {this.parts.push(new Uint8Array(pad)); this.length += pad;}
-    const view: Record<string, number> = {buffer: 0, byteOffset, byteLength: bytes.length};
-    if (target) view.target = target;
-    return this.list('bufferViews', view);
-  }
-
-  private floatAccessor(data: Float32Array, size: number, type: string, bounds = false): number {
-    const accessor: Record<string, unknown> = {bufferView: this.view(new Uint8Array(data.buffer, data.byteOffset, data.byteLength).slice(), ARRAY_BUFFER), componentType: FLOAT, count: data.length/size, type};
-    if (bounds) {
-      const min = new Array(size).fill(Infinity), max = new Array(size).fill(-Infinity);
-      for (let i = 0; i < data.length; i++) {const c = i%size; if (data[i] < min[c]) min[c] = data[i]; if (data[i] > max[c]) max[c] = data[i];}
-      accessor.min = min.map(v => v === 0 ? 0 : v); accessor.max = max.map(v => v === 0 ? 0 : v);
-    }
-    return this.list('accessors', accessor);
-  }
-
   private primitive(geo: Geo): {attributes: Record<string, number>; indices: number} {
     let cached = this.geometryCache.get(geo);
     if (cached) return cached;
-    const attributes: Record<string, number> = {POSITION: this.floatAccessor(geo.positions, 3, 'VEC3', true), NORMAL: this.floatAccessor(geo.normals, 3, 'VEC3')};
-    if (geo.tangents) attributes.TANGENT = this.floatAccessor(geo.tangents, 4, 'VEC4');
-    if (geo.uvs) attributes.TEXCOORD_0 = this.floatAccessor(geo.uvs, 2, 'VEC2');
-    if (geo.colors) attributes.COLOR_0 = this.floatAccessor(geo.colors, geo.colorSize, geo.colorSize === 3 ? 'VEC3' : 'VEC4');
+    const attributes: Record<string, number> = {POSITION: this.accessor(geo.positions, 'VEC3', undefined, ARRAY_BUFFER, true), NORMAL: this.accessor(geo.normals, 'VEC3', undefined, ARRAY_BUFFER)};
+    if (geo.tangents) attributes.TANGENT = this.accessor(geo.tangents, 'VEC4', undefined, ARRAY_BUFFER);
+    if (geo.uvs) attributes.TEXCOORD_0 = this.accessor(geo.uvs, 'VEC2', undefined, ARRAY_BUFFER);
+    if (geo.colors) attributes.COLOR_0 = this.accessor(geo.colors, geo.colorSize === 3 ? 'VEC3' : 'VEC4', undefined, ARRAY_BUFFER);
     // 65535 is the primitive restart value for 16-bit indices, so it forces 32-bit indices.
-    const short = geo.count <= 65535, data = short ? Uint16Array.from(geo.indices) : geo.indices;
-    const indices = this.list('accessors', {bufferView: this.view(new Uint8Array(data.buffer, data.byteOffset, data.byteLength).slice(), ELEMENT_ARRAY_BUFFER), componentType: short ? UNSIGNED_SHORT : UNSIGNED_INT, count: data.length, type: 'SCALAR'});
+    const indices = this.accessor(geo.indices, 'SCALAR', geo.count <= 65535 ? 5123 : 5125, ELEMENT_ARRAY_BUFFER);
     cached = {attributes, indices};
     this.geometryCache.set(geo, cached);
     return cached;
@@ -192,69 +154,18 @@ function document(source: ExportSource, options: GLTFOptions): Writer {
     for (const root of roots) sceneNodes.push(visit(root));
   }
   json.scenes = [sceneNodes.length ? {nodes: sceneNodes} : {}];
-  if (writer.length) json.buffers = [{byteLength: writer.length}];
-  // Stable key order: asset first, buffers last.
-  const order = ['asset', 'scene', 'scenes', 'nodes', 'meshes', 'materials', 'textures', 'images', 'samplers', 'accessors', 'bufferViews', 'buffers'];
-  const sorted: Record<string, any> = {};
-  for (const key of order) if (json[key] !== undefined) sorted[key] = json[key];
-  for (const key of Object.keys(json)) delete json[key];
-  Object.assign(json, sorted);
+  writer.finish();
   return writer;
-}
-
-function concat(parts: Uint8Array[], length: number): Uint8Array {
-  const out = new Uint8Array(length);
-  let offset = 0;
-  for (const part of parts) {out.set(part, offset); offset += part.length;}
-  return out;
-}
-
-const alphabet = Uint8Array.from('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/', c => c.charCodeAt(0));
-/** @internal Base64 without btoa or Buffer, so it runs anywhere. Encodes to ASCII bytes, then decodes them in 1 MiB pieces. */
-export function base64(bytes: Uint8Array): string {
-  const length = bytes.length, whole = length-length%3, codes = new Uint8Array(Math.ceil(length/3)*4), decoder = new TextDecoder(), out: string[] = [];
-  let i = 0, o = 0;
-  for (; i < whole; i += 3, o += 4) {
-    const n = bytes[i] << 16 | bytes[i+1] << 8 | bytes[i+2];
-    codes[o] = alphabet[n >> 18]; codes[o+1] = alphabet[n >> 12 & 63]; codes[o+2] = alphabet[n >> 6 & 63]; codes[o+3] = alphabet[n & 63];
-  }
-  if (i < length) {
-    const pair = i+1 < length, n = bytes[i] << 16 | (pair ? bytes[i+1] << 8 : 0);
-    codes[o] = alphabet[n >> 18]; codes[o+1] = alphabet[n >> 12 & 63]; codes[o+2] = pair ? alphabet[n >> 6 & 63] : 61; codes[o+3] = 61;
-  }
-  for (let at = 0; at < codes.length; at += 1 << 20) out.push(decoder.decode(codes.subarray(at, at+(1 << 20))));
-  return out.join('');
 }
 
 /** Exports glTF 2.0 JSON with the binary data embedded as a data URI, or returned as a separate `.bin`. */
 export function exportGLTF(source: ExportSource, options: GLTFJsonOptions = {}): GLTFJsonResult {
   const embed = options.embed ?? true, binUri = options.binUri ?? 'scene.bin';
-  if (typeof embed !== 'boolean') throw new TypeError('embed must be boolean');
-  if (typeof binUri !== 'string' || !binUri || /^[a-z][a-z0-9+.-]*:/i.test(binUri) || /[#?\\]/.test(binUri)) throw new TypeError('binUri must be a relative file name');
-  const writer = document(source, options), json = writer.json;
-  let bin: Uint8Array|null = null, uri: string|null = null;
-  if (writer.length) {
-    const data = concat(writer.parts, writer.length);
-    if (embed) json.buffers[0].uri = `data:application/octet-stream;base64,${base64(data)}`;
-    else {bin = data; uri = encodeURI(binUri); json.buffers[0].uri = uri;}
-  }
-  return {json, text: JSON.stringify(json), bin, binUri: uri};
+  new Bin().gltf(embed, binUri); // validates both before the scene walk
+  return document(source, options).gltf(embed, binUri);
 }
 
 /** Exports a binary glTF (`.glb`): 12-byte header, a space-padded JSON chunk and a zero-padded BIN chunk. */
 export function exportGLB(source: ExportSource, options: GLTFOptions = {}): Uint8Array {
-  const writer = document(source, options);
-  const text = new TextEncoder().encode(JSON.stringify(writer.json)), jsonLength = Math.ceil(text.length/4)*4;
-  const binLength = writer.length, total = 12+8+jsonLength+(binLength ? 8+binLength : 0);
-  const out = new Uint8Array(total), view = new DataView(out.buffer);
-  view.setUint32(0, 0x46546c67, true); view.setUint32(4, 2, true); view.setUint32(8, total, true);
-  view.setUint32(12, jsonLength, true); view.setUint32(16, 0x4e4f534a, true);
-  out.set(text, 20); out.fill(0x20, 20+text.length, 20+jsonLength);
-  if (binLength) {
-    const at = 20+jsonLength;
-    view.setUint32(at, binLength, true); view.setUint32(at+4, 0x004e4942, true);
-    let offset = at+8;
-    for (const part of writer.parts) {out.set(part, offset); offset += part.length;}
-  }
-  return out;
+  return document(source, options).glb();
 }

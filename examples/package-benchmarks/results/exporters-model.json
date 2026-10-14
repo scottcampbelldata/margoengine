@@ -1,0 +1,77 @@
+{
+  "node": "v24.15.0",
+  "date": "2026-10-14T22:31:37.574Z",
+  "cases": [
+    {
+      "name": "DamagedHelmet",
+      "sourceBytes": 3773916,
+      "exportBytes": 3773808,
+      "exportMs": 7.73,
+      "minMs": 5.83,
+      "source": {
+        "errors": 0,
+        "warnings": 1,
+        "infos": 0,
+        "codes": {
+          "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE": 1
+        }
+      },
+      "export": {
+        "errors": 0,
+        "warnings": 1,
+        "infos": 0,
+        "codes": {
+          "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE": 1
+        }
+      }
+    },
+    {
+      "name": "RobotExpressive",
+      "sourceBytes": 463988,
+      "exportBytes": 451072,
+      "exportMs": 3.57,
+      "minMs": 2.34,
+      "source": {
+        "errors": 752,
+        "warnings": 4,
+        "infos": 18,
+        "codes": {
+          "NODE_SKINNED_MESH_NON_ROOT": 2,
+          "NODE_SKINNED_MESH_LOCAL_TRANSFORMS": 2,
+          "ACCESSOR_WEIGHTS_NON_NORMALIZED": 752
+        }
+      },
+      "export": {
+        "errors": 0,
+        "warnings": 4,
+        "infos": 17,
+        "codes": {
+          "NODE_SKINNED_MESH_NON_ROOT": 2,
+          "NODE_SKINNED_MESH_LOCAL_TRANSFORMS": 2
+        }
+      }
+    },
+    {
+      "name": "Instanced grids (2 x 33x33 vertices, 2 x 500 instances)",
+      "sourceBytes": 132056,
+      "exportBytes": 123832,
+      "exportMs": 2.56,
+      "minMs": 1.67,
+      "source": {
+        "errors": 4,
+        "warnings": 0,
+        "infos": 7,
+        "codes": {
+          "ACCESSOR_MIN_MISMATCH": 2,
+          "ACCESSOR_MAX_MISMATCH": 2
+        }
+      },
+      "export": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 9,
+        "codes": {}
+      }
+    }
+  ]
+}

@@ -748,7 +748,7 @@ Verified matrix: `docs/threejs-parity.md`, re-tallied 2026-10-14 against 2c53227
 closed. New top 10: WebGL2 beyond core, transparent canvas (core), multiple directional/coloured ambient/hemisphere
 lights, point and spot shadows, [DONE] textured instancing (+ `EXT_mesh_gpu_instancing`, see below), remaining glTF extensions
 (animation pointer, iridescence, anisotropy, dispersion, variants, refraction, cameras), physical materials on your own
-meshes, second UV set/groups/custom attributes, ShadowMaterial, glTF export with animation. `docs/from-threejs.md`'s
+meshes, second UV set/groups/custom attributes, ShadowMaterial, [DONE, below] glTF export with animation. `docs/from-threejs.md`'s
 "Not yet" table matches it. Several need core changes (freeze conflicts listed in the doc); those are Scott's decision.
 
 Textured instancing (gap 5, done 2026-10-14, core untouched): gltf-pro `PBRInstances` on `primitive.instances` (matrix in
@@ -766,6 +766,26 @@ mock-GPU CPU sweep `textured-instancing.mjs`). Size (min+gzip): gltf-pro +1.9 kB
 root keeps +0.27 kB, the rest is `@margoengine/gltf-pro/instancing`), selection +0.38, bvh +0.31, shadows +0.31,
 staging +0.28, materials +0.08, taa +0.01. Left: per-instance frustum culling, transparent instance sorting, textured
 `ScatterInstances`, one-instance outlines.
+
+glTF export with animation (gap 10, done 2026-10-14, core untouched; GLTFExporter row now COVERED): `exportModel(models,
+{binary, animations, onlyVisible, embedImages, maxTextureSize, generator, embed, binUri})` in
+`@margoengine/exporters/model` (also the root) writes gltf-pro `PBRModel`s and `@margoengine/materials` meshes: document
+node order, live TRS/names/visibility, every attribute and morph target re-written from gltf-pro's decoded accessors
+(lossless; weights divided by their sum), node morph weights, skins, clips (`animations: [Animation]`),
+`EXT_mesh_gpu_instancing` (+ `_COLOR_0` tints), live material values with textures, `KHR_texture_transform`, emissive
+strength, unlit, ior, clearcoat, transmission, sheen, specular, volume factors. Loaded image bytes are copied; materials
+textures are PNG-encoded (own encoder via CompressionStream; non-raw sources and `maxTextureSize` via OffscreenCanvas).
+Materials' `createMesh` now returns `MaterialMesh` (`mesh.material`, API change). The scene exporter moved onto a shared
+`container.ts` (`Bin`); `exportGLB`/`exportGLTF` output is byte-identical to before (checked against the old dist).
+Proof: `packages/exporters/tests/model.test.js` (helmet + robot: node tree, transforms, every accessor and packed vertex
+byte-exact, materials, images, all 14 clips sampled at 5 times each within 2e-5; instanced grids; materials meshes with
+the PNG decoded back exactly; onlyVisible; .gltf). Khronos validator: no new issue vs source (the robot's 752
+unnormalized-weight errors are gone; its 4 skinned-mesh-hierarchy warnings and the helmet's missing-tangents warning
+are the source's). Time/size (`examples/package-benchmarks/exporters-model.mjs`, Node 24): helmet 3.77 MB in 7.7 ms,
+robot 464 -> 451 kB in 3.6 ms, 2 x 500 instanced grids 2.6 ms. Gzip (min, bare external): scene glTF path 7,079 ->
+7,157, usdz 5,911 -> 5,915, `/model` eager 6,859 (entry 5,175 + shared container 1,684), lazy chunks: clip writer 539,
+PNG encoder 1,026. `node packages/exporters/tests/png-browser.mjs` checks the canvas paths (flipY, maxTextureSize) in
+Chromium. Left: cameras/lights, Draco/meshopt output, materials normal/matcap shading and custom blending.
 The older summary below predates the audit.
 
 From package descriptions, not yet audited against code:

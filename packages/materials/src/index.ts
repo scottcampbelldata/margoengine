@@ -200,11 +200,13 @@ function queue(runtime:Engine):Set<Entry> {
   }});}});
   queues.set(runtime,set);return set;
 }
+/** A materials mesh: the gltf-pro model plus the live `material` it draws with (read by @margoengine/exporters `exportModel`). */
+export type MaterialMesh=PBRModel&{readonly material:Material};
 /**
  * Creates a gltf-pro `PBRModel` for one geometry and material. Move it with `model.root`, remove it with `model.destroy()`.
  * It works with `shadows.add`, `clustered.add` and `ssao.add` like a loaded glTF. Textures are not disposed with the model.
  */
-export function createMesh(engine:EngineKernel,geometry:MeshGeometry,material:Material,{renderOrder=0}:{renderOrder?:number}={}):PBRModel {
+export function createMesh(engine:EngineKernel,geometry:MeshGeometry,material:Material,{renderOrder=0}:{renderOrder?:number}={}):MaterialMesh {
   if(!(material instanceof Material)||!Number.isFinite(renderOrder))throw new TypeError('Invalid material mesh');
   const runtime=engineRuntime(engine),m=material,set=queue(runtime);
   const doc={asset:{version:'2.0'},nodes:[{mesh:0}],meshes:[{primitives:[{material:0}]}],materials:[{pbrMetallicRoughness:{baseColorFactor:m.color,roughnessFactor:m.factors[0],metallicFactor:m.factors[1]},emissiveFactor:m.emissive,alphaMode:['OPAQUE','MASK','BLEND'][m.settings[0]],alphaCutoff:m.settings[1],doubleSided:m.doubleSided}]};
@@ -214,10 +216,10 @@ export function createMesh(engine:EngineKernel,geometry:MeshGeometry,material:Ma
   model.addLighting({shader:(code,group)=>m.shader(code,group),bindings:()=>m.bindings(runtime.gpu!,runtime)});
   const entry:Entry={model,material:m,order:renderOrder};model.registerPasses=()=>{};
   try{runtime.use(model);}catch(error){model.dispose();throw error;}
-  set.add(entry);model.onDispose(()=>set.delete(entry));return model;
+  set.add(entry);model.onDispose(()=>set.delete(entry));return Object.defineProperty(model,'material',{value:m}) as MaterialMesh;
 }
 /** A materials mesh drawn as `instances.count` instances in one draw call (three.js InstancedMesh); `instances` holds each one's matrix, tint and UV transform. */
-export type InstancedMesh=PBRModel&{readonly instances:PBRInstances};
+export type InstancedMesh=MaterialMesh&{readonly instances:PBRInstances};
 /**
  * `createMesh` for `capacity` copies in one instanced draw: `mesh.instances.setMatrixAt(i, m)`, `setColorAt`, `setUVTransformAt`
  * (an atlas region), `count`. Instance matrices are relative to `mesh.root`. Works with shadows, clustered, IBL, fog and SSAO.
