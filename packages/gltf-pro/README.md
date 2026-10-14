@@ -66,6 +66,21 @@ forest.count = 1500;                     // drawn instances (default and maximum
 
 Limits: no per-instance frustum culling (all `count` instances are drawn); transparent instances are not sorted among themselves; TAA gives instances camera motion only (static instances are exact, moving ones may ghost); instances are not seen by LOD imposter baking, and selection outlines all instances of a selected primitive rather than one; `ScatterInstances` keeps its own constant-colour path. Shadow caching (`shadows.add(model, {static: true})`) and static contact shadows do not see instance edits until invalidated.
 
+## Parsing in a worker
+
+`@margoengine/gltf-pro/worker` moves everything except GPU uploads off the main thread: download, JSON, accessor decoding (geometry, skins, morph targets, animation samplers), vertex packing and image decoding run in a worker; the buffers and ImageBitmaps are transferred back (no copies) and the main thread only builds the `PBRModel` and uploads it.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTFInWorker, parseGLTFInWorker} from '@margoengine/gltf-pro/worker';
+const stage = await createStage('#viewport', {backend:'webgpu'});
+const model = await loadGLTFInWorker(stage.engine, '/DamagedHelmet.glb'); // same PBRModel as loadGLTF
+const bytes = await (await fetch('/scene.glb')).arrayBuffer();
+const dropped = await parseGLTFInWorker(stage.engine, bytes); // bytes move to the worker and are detached here
+```
+
+The result equals `loadGLTF` / `parseGLTFAsync` byte for byte (`tests/worker.test.js` compares document, buffers, every accessor, packed vertices, materials, images and node transforms). The functions run on the calling thread instead when `Worker` is unavailable (SSR, Node) or `decoders` are passed (Draco and KTX2 already decode in their own workers). The worker script, `dist/workers/gltf.js` (5.5 kB gzip), is started with `new URL('./workers/gltf.js', import.meta.url)`, which Vite and webpack copy as an asset: apps that do not import `/worker` ship none of it. One worker per load, terminated afterwards. `modelFromPrepared(engine, prepared)` and `@margoengine/gltf-pro/prepare` (`prepareGLTF`, `prepareAsset`) let other loaders' workers (fbx, usdz) reuse the step. Main-thread blocking measured in a real browser: `examples/package-benchmarks/workers/` (HANDOFF 1f.j).
+
 ## Extensions and compressed files
 
 Supported glTF extensions: `KHR_mesh_quantization`, `KHR_texture_transform`, `KHR_materials_emissive_strength`, `KHR_materials_unlit`, `KHR_lights_punctual`, `KHR_materials_clearcoat`, `KHR_materials_transmission`, `KHR_materials_ior`, `KHR_materials_volume`, `KHR_materials_sheen`, `KHR_materials_specular`, `EXT_texture_webp`, `EXT_texture_avif`, `EXT_mesh_gpu_instancing` (`TRANSLATION`, `ROTATION` including normalized integers, `SCALE`; the node's primitives get one `PBRInstances`, see "Instancing"), plus `KHR_draco_mesh_compression`, `EXT_meshopt_compression` (and `KHR_meshopt_compression`) and `KHR_texture_basisu` when you pass the matching decoder. A file is rejected only when its `extensionsRequired` lists something still unsupported; the error names each one and the decoder it needs.
