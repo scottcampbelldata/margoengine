@@ -746,6 +746,37 @@
     ]
   },
   {
+    "id": "math",
+    "title": "Math",
+    "package": "@margoengine/math",
+    "version": "0.1.0",
+    "published": false,
+    "description": "Vector, quaternion, matrix, Euler, color, bounds, ray, plane and frustum math with three.js-style names, one module per type.",
+    "requirements": "Core ^0.1.0 || ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "math",
+    "install": "npm install @margoengine/core@0.1.0 @margoengine/math@0.1.0",
+    "imports": "import { Box3 } from '@margoengine/math';",
+    "exports": [
+      "Box3",
+      "Color",
+      "Euler",
+      "Frustum",
+      "LinearToSRGB",
+      "MathUtils",
+      "Matrix3",
+      "Matrix4",
+      "Plane",
+      "Quaternion",
+      "Ray",
+      "SRGBToLinear",
+      "Sphere",
+      "Spherical",
+      "Vector2",
+      "Vector3",
+      "Vector4"
+    ]
+  },
+  {
     "id": "navigation",
     "title": "Navigation",
     "package": "@margoengine/navigation",
