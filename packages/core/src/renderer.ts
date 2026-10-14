@@ -51,10 +51,10 @@ export class GPURenderer implements Renderer {
   private disposed = false;
   private picking=false;
 
-  static async create(canvas: HTMLCanvasElement): Promise<GPURenderer> {
+  static async create(canvas: HTMLCanvasElement, features: GPUFeatureName[] = []): Promise<GPURenderer> {
     const adapter = await navigator.gpu?.requestAdapter({powerPreference:'high-performance'});
     if (!adapter) throw new Error('adapter unavailable');
-    const device = await adapter.requestDevice({requiredFeatures:adapter.features.has('depth32float-stencil8')?['depth32float-stencil8']:[]});
+    const device = await adapter.requestDevice({requiredFeatures:['depth32float-stencil8' as GPUFeatureName,...features].filter(feature=>adapter.features.has(feature))});
     try {
       const format = navigator.gpu.getPreferredCanvasFormat();
       const module = device.createShaderModule({code:wgsl});
