@@ -8,6 +8,17 @@ const selection = Selection.attach(engine, {algorithm: 'jfa', width: 3, color: [
 selection.set([mesh, model, model.nodes[4]]); // core meshes, whole PBRModels, or glTF nodes (with their descendants)
 ```
 
+X-ray (hidden lines): `xray` also outlines the parts of the selection hidden behind other geometry, the CAD "see the selection through the assembly" look. One `Selection` per selection set, each with its own name and style:
+
+```ts
+const picked = Selection.attach(engine, {color: [1, 0.5, 0], xray: true});           // hidden parts dashed (4 px, 85% opacity)
+const hover = Selection.attach(engine, {name: 'hover', color: [0.3, 0.8, 1], width: 2}); // a second set, visible outline only
+picked.options.xray = {dash: 0, opacity: 0.4};   // dimmer solid hidden lines; also color and width (default: the outline's)
+picked.options.xray = false;                     // back to visible-only, exactly as before
+```
+
+With x-ray on, the selection is drawn a second time into the same mask without the depth test (core meshes through the renderer's draw hook, gltf-pro primitives through the model replay), its jump-flood (or dilation) outline is composited blended and dashed, then the visible outline is drawn over it as usual. Dashes follow the nearest silhouette pixel's coordinate along the edge's dominant axis, so straight and curved edges get dashes of the same screen length (diagonal edges up to 1.4× longer). The mask and distance-field targets are reused; x-ray adds two pipelines, one 32-byte uniform and a model draw list, and one more mask pass plus jump flood per frame. Works the same under perspective and orthographic (@margoengine/cameras) views, since both passes read the camera matrix. Hidden lines trace the silhouette of the whole selection, not edges inside it (for hidden feature edges of a part, use machinery `FeatureEdges`). With `xray` off or absent the GPU work is byte-identical to the package before x-ray (`node examples/package-benchmarks/proofs/selection-xray-off.proof.js`, 10,586 recorded calls).
+
 `Picking.attach(engine)` enables faster `engine.pick(x, y)` in canvas CSS pixels, and makes it return gltf-pro models (including @margoengine/materials meshes):
 
 ```ts
@@ -34,6 +45,8 @@ MIT. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/selection
 Real WebGPU checks: npm run test:browser --workspace @margoengine/selection
+
+`test/xray.browser.mjs` half hides a core box and a @margoengine/materials plane behind occluders: inside each occluder there is no outline colour with x-ray off, dashed runs with it on and one solid run with `dash: 0`, in perspective and orthographic views (`test-results/selection-xray-*.png`).
 
 `test/models.browser.mjs` loads the damaged helmet and the robot with `loadGLTF`, a @margoengine/materials mesh and a core box on a real adapter. It checks known pixels, occlusion between the box and the helmet both ways and hidden models. A 600-pixel grid agrees with the bvh Raycaster within one pixel in perspective and orthographic (@margoengine/cameras) views; about 99% agree exactly at the pixel centre, and the rest are silhouette pixels resolved by the one-pixel neighbour fallback. Outline pixels are counted for a picked node, a whole model and a materials mesh, and must be zero for an occluded selection. Pick proxies: `test/models.test.js` checks proxy slots after model slots, culling, the enclosing sphere (faces at least the radius, vertices under 1.05×), hidden and stale proxies; `packages/lod/test/imposter-check.mjs` checks on a real adapter that every rendered imposter pixel picks its LOD anchor (approximate) and that GPU and bvh picks agree over a 16,384-pixel grid within one pixel.
 

@@ -491,7 +491,7 @@ canvas.addEventListener('pointerdown', event => {
 
 // GPU picking: what is drawn under the pixel, including skinned poses. Async.
 const picking = Picking.attach(engine);
-const selection = Selection.attach(engine, {width: 3, color: [1, 0.5, 0]}); // OutlinePass
+const selection = Selection.attach(engine, {width: 3, color: [1, 0.5, 0], xray: true}); // OutlinePass; xray: hidden parts dashed
 canvas.addEventListener('click', async event => {
   const hit = await picking.pick(event.offsetX, event.offsetY);
   selection.set(hit ? [hit.mesh] : []);
