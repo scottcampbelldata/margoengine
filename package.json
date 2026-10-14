@@ -51,6 +51,7 @@
     "packages/usdz-export",
     "packages/tween",
     "packages/quality",
+    "packages/materials",
     "packages/webgl",
     "packages/math",
     "packages/ecs",

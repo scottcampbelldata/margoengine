@@ -1,0 +1,47 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Materials browser check</title><style>body{margin:0}#host{width:400px;height:400px}</style></head><body><div id="host"></div>
+<script type="module">
+import {createStage} from '/packages/margoengine/dist/index.js';
+import {planeGeometry,sphereGeometry,boxGeometry} from '/packages/geometry/dist/index.js';
+import {Texture,Material,createMesh,loadTexture} from '/packages/materials/dist/index.js';
+const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,3],target:[0,0,0]}});
+const engine=stage.engine,device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const solid=(r,g,b,a=255)=>new Texture({data:new Uint8Array([r,g,b,a,r,g,b,a,r,g,b,a,r,g,b,a]),width:2,height:2});
+const canvas=new OffscreenCanvas(8,8),ctx=canvas.getContext('2d');ctx.fillStyle='#00ff00';ctx.fillRect(0,0,8,8);
+const canvasTexture=new Texture(canvas,{minFilter:'nearest',magFilter:'nearest'});
+// Top half of the texture red, bottom half blue: with flipY the top of the image lands at UV v=1 (top of a plane).
+const flip=new OffscreenCanvas(4,4),fc=flip.getContext('2d');fc.fillStyle='#ff0000';fc.fillRect(0,0,4,2);fc.fillStyle='#0000ff';fc.fillRect(0,2,4,2);
+const png=new OffscreenCanvas(4,4),pc=png.getContext('2d');pc.fillStyle='#ff8000';pc.fillRect(0,0,4,4);const pngURL=URL.createObjectURL(await png.convertToBlob({type:'image/png'}));
+const scenarios={
+  loaded:async()=>createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',map:await loadTexture(pngURL)})),
+  basic:()=>createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',map:solid(0,0,255)})),
+  canvas:()=>createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',map:canvasTexture})),
+  flipTop:()=>createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',map:new Texture(flip,{magFilter:'nearest',minFilter:'nearest',mipmaps:false})})),
+  normal:()=>createMesh(engine,sphereGeometry(0.8,32,16),new Material({shading:'normal'})),
+  standard:()=>createMesh(engine,boxGeometry(1,1,1),new Material({map:solid(200,30,30),normalMap:solid(128,128,255),metalRoughnessMap:solid(0,128,0),aoMap:solid(255,255,255),emissiveMap:solid(0,0,0),roughness:0.5})),
+  matcap:()=>createMesh(engine,sphereGeometry(0.8,32,16),new Material({shading:'matcap',matcap:solid(255,128,0)})),
+  transparent:()=>createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',map:solid(255,255,255),color:[1,0,0],transparent:true,opacity:0.5})),
+  additive:()=>createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',color:[0,0.5,0],blending:'additive',depthWrite:false})),
+  mask:()=>createMesh(engine,planeGeometry(2,2),new Material({map:solid(255,255,255,0),alphaTest:0.5,doubleSided:true})),
+};
+const {Shadows}=await import('/packages/shadows/dist/index.js'),{Clustered}=await import('/packages/clustered/dist/index.js'),{SSAO}=await import('/packages/post/dist/index.js');
+scenarios.effects=()=>{
+  const ground=createMesh(engine,boxGeometry(4,0.2,4),new Material({map:solid(200,200,200),normalMap:solid(128,128,255)}));ground.root.setPosition([0,-0.6,0]);
+  const model=createMesh(engine,sphereGeometry(0.5,32,16),new Material({shading:'standard',color:'#3366ff',roughness:0.4}));
+  const shadows=Shadows.attach(engine,{resolution:1024}),lights=Clustered.attach(engine),ssao=SSAO.attach(engine);
+  for(const m of [ground,model]){shadows.add(m);lights.add(m);ssao.add(m);}
+  lights.setLights([{position:[0,1.5,1],range:6,color:[1,0.5,0.2],intensity:10}]);
+  return {destroy(){ssao.dispose?.();engine.removePlugin(ssao.name);engine.removePlugin(shadows.name);engine.removePlugin(lights.name);ground.destroy();model.destroy();}};
+};
+const video=document.createElement('video'),source=document.createElement('canvas');source.width=16;source.height=16;const sc=source.getContext('2d');sc.fillStyle='#ff00ff';sc.fillRect(0,0,16,16);
+video.muted=true;video.playsInline=true;video.srcObject=source.captureStream(30);
+const videoTexture=new Texture(video);
+scenarios.video=()=>createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',map:videoTexture}));
+window.videoStep=async color=>{if(video.paused)await video.play();sc.fillStyle=color;sc.fillRect(0,0,16,16);const t=performance.now();while(performance.now()-t<600)await new Promise(r=>requestAnimationFrame(r));engine.render();await device.queue.onSubmittedWorkDone();return {readyState:video.readyState,time:video.currentTime,errors:errors.splice(0)};};
+window.check={
+  async run(name){device.pushErrorScope('validation');const model=await scenarios[name]();window.current=model;engine.render();await device.queue.onSubmittedWorkDone();const e=await device.popErrorScope();return {error:e?.message??null,errors:errors.splice(0)};},
+  async greenToYellow(){ctx.fillStyle='#ffff00';ctx.fillRect(0,0,8,8);canvasTexture.update();engine.render();await device.queue.onSubmittedWorkDone();return errors.splice(0);},
+  clear(){window.current?.destroy();window.current=null;engine.render();},
+};
+window.ready=true;
+</script></body></html>
