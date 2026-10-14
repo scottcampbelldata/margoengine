@@ -598,6 +598,9 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    Proofs vs 114130c: `gltf-pro-lighting-hooks.proof.js 114130c` 4,556 identical calls, `materials-uv-transform.proof.js
    114130c` 1,277 identical calls (its default baseline 1970fda already differed before this change, and both proof
    loaders now resolve files renamed/deleted since the ref); `textured-instancing.mjs` GPU-call counts unchanged.
+   Real GPU re-run (`textured-instancing-gpu.mjs`, Intel Xe2 / Arc 140V, AC before and after, GPU lock held): instanced
+   frames equal the references (materials and NodeMaterial max channel diff 1, glTF via `decoders.instancing` 0), picks
+   return instances 0/5/77/143, 1k-10k boxes CPU 15-127 ms -> 0.6-0.8 ms, frame 74-659 ms -> 4-5 ms.
 6. Then give Scott the full list of what was done and what remains.
 
 Worker practice: agents run in git worktrees; they must start with `git reset --hard perf/auto-quality` (worktrees
