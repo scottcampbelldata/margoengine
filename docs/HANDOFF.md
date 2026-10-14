@@ -202,7 +202,10 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    j. Workers and OffscreenCanvas: move FBX/USD/glTF parsing into workers with transferable buffers (machinery CAD and
       decoders already use workers); test core on an OffscreenCanvas (engine sizing falls back to canvas.width, so
       it may already work).
-   k. docs/from-threejs.md: side-by-side mapping of common three.js code to Margo.
+   k. [DONE] docs/from-threejs.md: side-by-side mapping of common three.js code to Margo. Linked from README and
+      docs/README.md. Every Margo snippet (```ts blocks) is type-checked against the built packages by
+      `tests/from-threejs-snippets.test.js` (part of the unit run). API rough edges found while writing are listed under
+      "API rough edges before 1.0" below.
    l. One-command start: `npm create margo` (or a StackBlitz template) opening a 60 FPS scene with environment
       lighting, orbit controls and the stats overlay; build on the existing starter-vite.
 1g. Modernization (from the 2026-10-14 source scan; no legacy browser APIs, deprecated WebGPU calls or old WGSL found):
@@ -291,6 +294,38 @@ packages): make a real `node_modules` folder holding junctions to the main check
 via `npm install --package-lock-only --offline --no-audit --no-fund --ignore-scripts`. Also junction `margoengine`
 to the worktree's packages/margoengine. `npm run build:packages` is the whole package build (dependency order from
 package.json, then size gates, then docs/catalog.json); there is no separate workspace build step.
+
+## API rough edges before 1.0 (found writing docs/from-threejs.md, 2026-10-14; not changed)
+
+1. The one directional light and the ambient term are only reachable through `@margoengine/core/extension`
+   (`engineRuntime(engine).lighting.direction` = [x, y, z toward the light, intensity], `.radiance` = [r, g, b, ambient]);
+   the public `EngineKernel` type has no lighting, and the packing is not in core's README. Same for `engine.gpu`:
+   gltf-pro's README passes `stage.engine.gpu` to `KTX2Decoder`, which does not type-check against the public type.
+2. Four ways to add a feature: `X.attach(engine, options)` (Shadows, Clustered, Selection, Picking, SSAO, Bloom, FXAA,
+   PostStack, Tonemap, TAA, Sky, Stats, ComputePass), `engine.use(new X(options))` (Environment, EnvironmentLighting,
+   Fog, ColorBackground, Lines, PointsPlugin, TextRenderer, LabelRenderer, LODSystem, CameraProjection, VATCrowd),
+   constructors with side effects (`new OrbitControls(engine)`, `new ViewCube(engine)`) and free functions
+   (`createMesh(engine, ...)`, `loadGLTF(engine, ...)`). Pick one primary form.
+3. Including a gltf-pro model in a feature uses different verbs: `shadows.add(model)`, `lights.add(model)`,
+   `ssao.add(model)`, but `ibl.applyTo(model)` and `fog.applyTo(model)`. Core meshes need none of them, so a three.js
+   user's loaded model silently misses shadows/IBL/fog until each is called.
+4. `dispose()` and `destroy()` both exist (PBRModel, Animation, Tonemap, SSAO have both; READMEs use either). Option
+   edits differ too: `tonemap.options.exposure`, `sky.options.hours`, but `fog.far` and `glass.opacity` directly.
+5. Core `PbrMaterial` has no setters: recolouring means a new material and `setMaterial`, or writing the undocumented
+   `material.data` array (math's README does). `@margoengine/materials` `Material` is live. Core meshes move with
+   `mesh.position.set(...)`, materials meshes with `mesh.root.setPosition([...])`.
+6. `model.bounds` is a flat `[minX, minY, minZ, maxX, maxY, maxZ]` but `camera.fitToBoundingBox(min, max)` takes two
+   tuples, so every fit slices by hand.
+7. Two packages export `loadGLTF` with different results (`@margoengine/gltf` Model with `dispose()`, gltf-pro PBRModel
+   with `destroy()`).
+8. Animation: `loop` and `speed` are attach-time options (`Animation.attach(model, {loop, speed})`), there is no `stop()`
+   (set `playing = false`), and one clip at a time without animator.
+9. Stale docs: root README line 3, `packages/margoengine/README.md` and MODERN-ENGINE.md say core falls back to WebGL2;
+   it now needs `fallback: webglRenderer` from `@margoengine/webgl` (`backend: 'auto'` alone rejects without WebGPU).
+   `packages/controls/README.md` "How it works"/Limits still say the camera has no up vector and rejects vertical views.
+   `packages/animation/README.md` names `margoengine-animator`. `packages/gltf-pro/README.md` says ambient has no IBL.
+   `docs/threejs-parity.md` summary and sections 5, 6 and 13 still list materials, textures, FXAA and combinable
+   effects as missing (counts in its summary are stale too).
 
 ## Pre-launch hardware investigation
 

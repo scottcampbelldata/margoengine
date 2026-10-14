@@ -20,6 +20,8 @@ window.addEventListener('pagehide', () => app.dispose(), {once: true});
 
 Provide a container such as `<div id="scene" style="height:400px"></div>` and call `app.dispose()` on unmount. Models, machinery, creative effects and scenery load on demand through the same wrapper. The new facade package is available locally and has not been published yet. Run `npm run modern:dev` and open `/quickstart.html` to try it.
 
+Coming from three.js? [docs/from-threejs.md](docs/from-threejs.md) maps common three.js code (renderer, meshes, materials, lights, loaders, animation, controls, post-processing, TSL) to Margo side by side, with the packages to install and what is not there yet.
+
 For a React application:
 
 ```sh
