@@ -76,6 +76,7 @@
     "packages/html",
     "packages/video",
     "packages/shader",
+    "packages/lod",
     "examples/vite",
     "examples/gameplay-sandbox",
     "examples/react-viewer",
