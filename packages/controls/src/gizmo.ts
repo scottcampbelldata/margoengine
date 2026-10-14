@@ -1,4 +1,5 @@
-import {cross, dot, madd, normalize, sub, type V3} from './math.js';
+import {madd, type V3} from './math.js';
+import {cross, dot, normalize, sub} from '@margoengine/math/vec3';
 import {intersectPlane, project, ray, type Basis} from './view.js';
 
 export type TransformMode = 'translate' | 'rotate' | 'scale';

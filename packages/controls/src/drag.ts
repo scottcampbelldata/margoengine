@@ -2,7 +2,8 @@ import type {EngineKernel, Mesh} from '@margoengine/core';
 import {engineRuntime, meshRuntime} from '@margoengine/core/extension';
 import {Raycaster, isModel, type ModelLike, type RaycasterHit} from '@margoengine/bvh';
 import {EventDispatcher, type ControlElement} from './controls.js';
-import {IDENTITY, add, cross, dot, invertAffine, normalize, scale, sub, transformPoint, type V3} from './math.js';
+import {IDENTITY, invertAffine, transformPoint, type V3} from './math.js';
+import {add, cross, dot, normalize, scale, sub} from '@margoengine/math/vec3';
 import {basis, intersectPlane} from './view.js';
 
 /** A core mesh, or a gltf-pro `PBRModel` (also @margoengine/materials meshes), which moves by its `root`. */

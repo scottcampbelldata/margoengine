@@ -3,9 +3,9 @@ import {engineRuntime, meshRuntime, type FrameGraph, type PassContext} from '@ma
 import {EventDispatcher, type ControlElement} from './controls.js';
 import {buildGizmo, pickHandle, type GizmoFrame, type Handle, type HandleName, type Prim, type TransformMode} from './gizmo.js';
 import {
-  IDENTITY, add, cross, dot, invertAffine, madd, normalize, quatAxis, quatConj, quatFromMatrix, quatNormalize, quatRotate,
-  scale, sub, transformPoint, type Q4, type V3,
+  IDENTITY, invertAffine, madd, quatAxis, quatConj, quatFromMatrix, quatNormalize, quatRotate, transformPoint, type Q4, type V3,
 } from './math.js';
+import {add, cross, dot, normalize, scale, sub} from '@margoengine/math/vec3';
 import {OverlayRenderer, tessellate} from './overlay.js';
 import {multiplyQuaternions as quatMul} from '@margoengine/math/quat';
 import {basis, intersectPlane, project, ray, type Basis} from './view.js';

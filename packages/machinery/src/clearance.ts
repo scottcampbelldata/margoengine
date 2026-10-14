@@ -1,9 +1,7 @@
 import {meshRuntime} from '@margoengine/core/extension';
 import type {Mesh,Vec3} from '@margoengine/core';
+import {cross,dot,sub} from '@margoengine/math/vec3';
 interface Bounds {center:number[];axes:number[][];half:number[];corners:number[][]}
-const dot=(a:readonly number[],b:readonly number[])=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
-const sub=(a:readonly number[],b:readonly number[])=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
-const cross=(a:readonly number[],b:readonly number[])=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
 function bounds(node:Mesh,kind:'aabb'|'obb'):Bounds {
   node.check();const g=node.geometry;if(!g)throw new TypeError('Clearance requires geometry');const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity],m=meshRuntime(node).matrix;
   for(let i=0;i<g.vertices.length;i+=6)for(let a=0;a<3;a++){min[a]=Math.min(min[a],g.vertices[i+a]);max[a]=Math.max(max[a],g.vertices[i+a]);}

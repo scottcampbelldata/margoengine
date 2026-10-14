@@ -1,6 +1,8 @@
 import type {Camera, EngineKernel} from '@margoengine/core';
 import {Controls, documentOf, type ControlElement, type EventTargetLike} from './controls.js';
-import {EPS, add, clamp, madd, rotateAxis, scale, type V3} from './math.js';
+import {EPS, madd, rotateAxis, type V3} from './math.js';
+import {add, scale} from '@margoengine/math/vec3';
+import {clamp} from '@margoengine/math/mathutils';
 import {basis} from './view.js';
 
 /** Largest pitch away from the horizon. The Y-up camera cannot look straight up or down. */

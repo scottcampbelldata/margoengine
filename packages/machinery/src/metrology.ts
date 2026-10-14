@@ -1,8 +1,6 @@
 import type {Mesh,Vec3} from '@margoengine/core';
+import {cross,dot,sub} from '@margoengine/math/vec3';
 import {worldAnchor,type Anchor} from './anchors.js';
-const sub=(a:Vec3,b:Vec3):Vec3=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
-const dot=(a:Vec3,b:Vec3)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
-const cross=(a:Vec3,b:Vec3):Vec3=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
 function vertex(node:Mesh,index:number):Vec3 {node.check();if(!node.geometry||!Number.isSafeInteger(index)||index<0||index>=node.geometry.vertices.length/6)throw new RangeError('Invalid metrology vertex');return Array.from(node.geometry.vertices.subarray(index*6,index*6+3)) as unknown as Vec3;}
 export function vertexAnchor(node:Mesh,index:number):Anchor {return {node,point:vertex(node,index)};}
 export function edgeAnchor(node:Mesh,a:number,b:number):Anchor {const x=vertex(node,a),y=vertex(node,b);if(a===b)throw new RangeError('Edge needs two vertices');return {node,point:[(x[0]+y[0])/2,(x[1]+y[1])/2,(x[2]+y[2])/2]};}

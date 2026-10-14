@@ -81,6 +81,10 @@
     "./quat": {
       "types": "./dist/quat.d.ts",
       "import": "./dist/quat.js"
+    },
+    "./vec3": {
+      "types": "./dist/vec3.d.ts",
+      "import": "./dist/vec3.js"
     }
   },
   "files": [

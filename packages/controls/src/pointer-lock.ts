@@ -1,6 +1,8 @@
 import type {Camera, EngineKernel} from '@margoengine/core';
 import {Controls, documentOf, type ControlElement, type EventTargetLike} from './controls.js';
-import {clamp, cross, normalize, scale, type V3} from './math.js';
+import {type V3} from './math.js';
+import {cross, normalize, scale} from '@margoengine/math/vec3';
+import {clamp} from '@margoengine/math/mathutils';
 import {basis} from './view.js';
 import {MAX_PITCH, translate, turn} from './fly.js';
 

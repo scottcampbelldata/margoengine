@@ -23,6 +23,7 @@ function body(file, name) {
   const text = source(file), start = text.search(new RegExp(`(function|const) ${name}\\b`));
   assert.ok(start >= 0, `${name} not found in ${file}`);
   let depth = 0, i = text.indexOf('{', start), end = i;
+  if (i < 0) i = text.length;
   if (text.startsWith('const', start) && text.indexOf(';', start) < i) end = text.indexOf(';', start);
   else for (; i < text.length; i++) {if (text[i] === '{') depth++; else if (text[i] === '}' && --depth === 0) {end = i; break;}}
   return text.slice(start, end + 1).replace(/:\s*(Float64Array|Float32Array|number\[\]|number|Mat4|ArrayLike<number>)\b/g, '').replace(/<number>/g, '').replace(/\s+/g, '');
@@ -43,7 +44,7 @@ function matrices(count) {
 }
 /** Plain random affine matrices (no specials) for timings. */
 const poses = count => Array.from({length: count}, () => {const m = Array.from({length: 16}, () => random() * 4 - 2); m[3] = m[7] = m[11] = 0; m[15] = 1; return new Float32Array(m);});
-const same = (a, b) => a === b || (a && b && a.length === b.length && Array.prototype.every.call(a, (v, i) => Object.is(v, b[i])));
+const same = (a, b) => Object.is(a, b) || (a && b && a.length === b.length && Array.prototype.every.call(a, (v, i) => Object.is(v, b[i])));
 const families = [];
 
 // --- mat4 multiply: animation, bvh, points, text, exporters, loaders/usdz, usdz ---
@@ -233,6 +234,23 @@ families.push({name: 'seeded PRNGs', async verify() {
   assert.deepEqual(points.candidate.buildBlocks(positions, count, 4096, 3).order, points.baseline.buildBlocks(positions, count, 4096, 3).order);
   return [{case: 'points buildBlocks (seeded shuffle per block), 400,000 points', ...time(
     () => {points.baseline.buildBlocks(positions, count, 4096, 3);}, () => {points.candidate.buildBlocks(positions, count, 4096, 3);}, 8)}];
+}});
+
+// --- vec3 helpers: controls (add, sub, scale, dot, cross, length, normalize, clamp), machinery metrology/clearance/dimensions ---
+families.push({name: 'vec3 helpers', async verify() {
+  const vec3 = await import('@margoengine/math/vec3'), utils = await import('@margoengine/math/mathutils'), controls = (await both('controls', 'src/math.ts')).baseline;
+  // machinery's copies differ from controls' only in parameter types.
+  const expression = code => code.replace(/^const\w+=\([^)]*\)(:\w+)?=>/, '');
+  for (const [file, names] of [['packages/machinery/src/metrology.ts', ['sub', 'dot', 'cross']], ['packages/machinery/src/clearance.ts', ['dot', 'sub', 'cross']], ['packages/machinery/src/dimensions.ts', ['sub']]])
+    for (const name of names) assert.equal(expression(body(file, name)), expression(body('packages/controls/src/math.ts', name).replace(/\s/g, '')), `${file} ${name}`);
+  let n = 0;
+  for (let i = 0; i < 100000; i++) {
+    const a = [value(), value(), value()], b = i % 4 ? [value(), value(), value()] : new Float32Array([value(), value(), value()]), s = value();
+    for (const name of ['add', 'sub', 'dot', 'cross']) {assert.ok(same(vec3[name](a, b), controls[name](a, b)), name); n++;}
+    assert.ok(same(vec3.scale(a, s), controls.scale(a, s)) && same(vec3.length(a), controls.length(a)) && same(vec3.normalize(a), controls.normalize(a)) && same(vec3.normalize(b), controls.normalize(b)));
+    assert.ok(Object.is(utils.clamp(s, a[0], a[1]), controls.clamp(s, a[0], a[1]))); n += 5;
+  }
+  return n;
 }});
 
 const checked = {}, timings = [];
