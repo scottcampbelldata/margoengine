@@ -99,7 +99,10 @@ export class Engine {
   private running=false;
   private readonly frameOptions={delta:0};
   private disposing=false;
-  private readonly plugins=new Map<string,EnginePlugin>();
+  /** Attached plugins by name (read-only). */
+  readonly plugins:ReadonlyMap<string,EnginePlugin>=new Map();
+  /** Return false to skip this display refresh (for example a 60 FPS cap on a 120 Hz screen); delta spans skipped refreshes. */
+  pace?:(time:number)=>boolean;
   private recovery?:Promise<void>;
   /** @internal Features requested at creation, requested again when the device is restored. */ features?:GPUFeatureName[];
 
@@ -133,10 +136,10 @@ export class Engine {
   use(plugin:EnginePlugin):this {
     if(this.disposed||this.disposing)throw new Error('Engine disposed');
     if(!plugin.name||this.plugins.has(plugin.name)||owners.has(plugin)||typeof plugin.setup!=='function')throw new TypeError('Invalid plugin');
-    try{this.frameGraph.withOwner(plugin.name,()=>{plugin.setup(this);plugin.registerPasses?.(this.frameGraph);});this.plugins.set(plugin.name,plugin);owners.set(plugin,this);}
+    try{this.frameGraph.withOwner(plugin.name,()=>{plugin.setup(this);plugin.registerPasses?.(this.frameGraph);});(this.plugins as Map<string,EnginePlugin>).set(plugin.name,plugin);owners.set(plugin,this);}
     catch(error){this.frameGraph.removeOwner(plugin.name);try{plugin.dispose?.();}catch{}throw error;}return this;
   }
-  removePlugin(name:string):void {const plugin=this.plugins.get(name);if(!plugin)return;this.frameGraph.removeOwner(name);this.plugins.delete(name);owners.delete(plugin);plugin.dispose?.();}
+  removePlugin(name:string):void {const plugin=this.plugins.get(name);if(!plugin)return;this.frameGraph.removeOwner(name);(this.plugins as Map<string,EnginePlugin>).delete(name);owners.delete(plugin);plugin.dispose?.();}
   createMesh(parent:Mesh|null=null):Mesh {
     if(this.disposed||this.disposing)throw new Error('Engine disposed');parent?.check();if(parent&&parent.engine!==this)throw new TypeError('Foreign parent');
     const id=this.free.pop()??this.next++;if(id>=this.store.capacity){this.next=this.store.capacity;throw new RangeError('Entity capacity');}
@@ -192,6 +195,7 @@ export class Engine {
   start():void {if(this.disposed||this.disposing)throw new Error('Engine disposed');if(this.running)return;this.running=true;this.last=0;this.raf=requestAnimationFrame(this.frame);}
   private readonly frame=(time:number):void=>{
     this.raf=null;if(this.disposed||!this.running)return;
+    if(this.pace&&!this.pace(time)){this.raf=requestAnimationFrame(this.frame);return;}
     const delta=this.last?Math.min((time-this.last)/1000,0.1):0;this.last=time;
     try{for(const callback of this.callbacks)callback(this,delta);this.frameOptions.delta=delta;if(!this.disposed)this.render(this.frameOptions);}catch(error){this.stop();this.onError(error);return;}
     if(!this.disposed&&this.running)this.raf=requestAnimationFrame(this.frame);

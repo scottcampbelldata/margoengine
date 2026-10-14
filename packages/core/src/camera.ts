@@ -5,6 +5,10 @@ export interface CameraOptions { fov?: number; position?: Vec3; target?: Vec3; n
 export class Camera {
   fov: number; near: number; far: number;
   position: Vec3; target: Vec3;
+  /** Screen-up direction; any value not parallel to the view direction (straight-down views need e.g. [0,0,-1]). */
+  up: Vec3 = [0,1,0];
+  /** Replaces the perspective projection: fill `out` (column-major) for this aspect and depth convention. */
+  project?: (out: Float64Array, aspect: number, webgpu: boolean) => void;
   readonly matrix = new Float32Array(16);
   readonly planes = new Float32Array(24);
   private fit?:{position:Vec3;target:Vec3;elapsed:number;duration:number;from:Vec3;fromTarget:Vec3};
@@ -19,11 +23,11 @@ export class Camera {
     let zx=this.position[0]-this.target[0], zy=this.position[1]-this.target[1], zz=this.position[2]-this.target[2];
     const length=Math.hypot(zx,zy,zz); if (!length) throw new RangeError('Camera at target');
     zx/=length; zy/=length; zz/=length;
-    const horizontal=Math.hypot(zx,zz); if (!horizontal) throw new RangeError('Vertical camera');
-    const xx=zz/horizontal, xz=-zx/horizontal, yx=zy*xz, yy=zz*xx-zx*xz, yz=-zy*xx, p=this.position;
-    const v=this.view;v[0]=xx;v[1]=yx;v[2]=zx;v[4]=0;v[5]=yy;v[6]=zy;v[8]=xz;v[9]=yz;v[10]=zz;v[12]=-xx*p[0]-xz*p[2];v[13]=-yx*p[0]-yy*p[1]-yz*p[2];v[14]=-zx*p[0]-zy*p[1]-zz*p[2];v[15]=1;
+    const u=this.up;let xx=u[1]*zz-u[2]*zy,xy=u[2]*zx-u[0]*zz,xz=u[0]*zy-u[1]*zx;const side=Math.hypot(xx,xy,xz); if (!side) throw new RangeError('Vertical camera');
+    xx/=side;xy/=side;xz/=side;const yx=zy*xz-zz*xy, yy=zz*xx-zx*xz, yz=zx*xy-zy*xx, p=this.position;
+    const v=this.view;v[0]=xx;v[1]=yx;v[2]=zx;v[4]=xy;v[5]=yy;v[6]=zy;v[8]=xz;v[9]=yz;v[10]=zz;v[12]=-xx*p[0]-xy*p[1]-xz*p[2];v[13]=-yx*p[0]-yy*p[1]-yz*p[2];v[14]=-zx*p[0]-zy*p[1]-zz*p[2];v[15]=1;
     const f=1/Math.tan(this.fov*Math.PI/360), d=this.near-this.far, projection=this.projection;
-    projection.fill(0); projection[0]=f/aspect; projection[5]=f; projection[10]=webgpu?-this.near/d:(this.far+this.near)/d; projection[11]=-1; projection[14]=webgpu?-this.far*this.near/d:2*this.far*this.near/d;
+    projection.fill(0); if(this.project)this.project(projection,aspect,webgpu); else {projection[0]=f/aspect; projection[5]=f; projection[10]=webgpu?-this.near/d:(this.far+this.near)/d; projection[11]=-1; projection[14]=webgpu?-this.far*this.near/d:2*this.far*this.near/d;}
     const m=this.matrix;
     for (let c=0;c<4;c++) for (let r=0;r<4;r++) m[c*4+r]=projection[r]*v[c*4]+projection[4+r]*v[c*4+1]+projection[8+r]*v[c*4+2]+projection[12+r]*v[c*4+3];
     finite(m,16,'Camera matrix');
