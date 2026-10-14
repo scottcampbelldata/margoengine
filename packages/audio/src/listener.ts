@@ -24,8 +24,7 @@ export interface ListenerSource {update(engine: EngineKernel | null): void; disp
 const gestures = ['pointerdown', 'mousedown', 'keydown', 'touchend'] as const;
 const defaultForward: Vec3 = [0, 0, -1], defaultUp: Vec3 = [0, 1, 0];
 const audioContextClass = (): (new () => AudioContext) => {
-  const scope = globalThis as unknown as {AudioContext?: new () => AudioContext; webkitAudioContext?: new () => AudioContext};
-  const constructor = scope.AudioContext ?? scope.webkitAudioContext;
+  const constructor = (globalThis as {AudioContext?: new () => AudioContext}).AudioContext;
   if (!constructor) throw new Error('Web Audio is unavailable in this environment');
   return constructor;
 };
