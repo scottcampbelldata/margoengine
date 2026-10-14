@@ -194,6 +194,8 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    f. Evaluate newer platform features: Float16Array for half-float data, Symbol.dispose / `using` for engine object
       cleanup, more parsing in workers + OffscreenCanvas (with 1f.j).
    g. Full read-only audit of all 68 packages listing each modernization finding with file and line, then fix in batches.
+1g'. ViewCube follow-up: use core's new `camera.up` for exact top/bottom views instead of stopping 1e-6 rad off the
+   pole (after the core-hook migration merges).
 1h. Less fragile (2026-10-14):
    a. Derive the package build order from package.json dependencies (topological sort) instead of the hand-written
       lists in scripts/build-modern.js (the controls-needs-bvh break came from that list).
