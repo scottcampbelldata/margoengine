@@ -82,6 +82,7 @@ export class PointCloud {
     setSizes(values: ArrayLike<number> | null, notify?: boolean): this;
     rebuild(): this;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     bind(owner: PointOwner | undefined): void;
 }
 
@@ -164,6 +165,7 @@ export class PointsPlugin implements EnginePlugin {
         uploads: number;
         uploadBytes: number;
     };
+    static attach(engine: EngineKernel, options?: PointsPluginOptions): PointsPlugin;
     constructor(options?: PointsPluginOptions);
     get pointClouds(): ReadonlySet<PointCloud>;
     get spriteBatches(): ReadonlySet<SpriteBatch>;
@@ -174,6 +176,7 @@ export class PointsPlugin implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     pick(x: number, y: number, options?: PointsPickOptions): PointsPickResult | null;
 }
 
@@ -206,6 +209,7 @@ export class SpriteBatch {
     clear(): this;
     markDirty(start?: number, count?: number): this;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     bind(owner: PointOwner | undefined): void;
 }
 

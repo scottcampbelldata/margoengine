@@ -147,6 +147,7 @@ class Sky implements EnginePlugin {
     onPreUpdate(delta: number): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 interface SkyTables {

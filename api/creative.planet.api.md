@@ -12,6 +12,7 @@ export class Planet implements EnginePlugin {
         offsetU: number;
     };
     private constructor();
+    static attach(engine: EngineKernel, options: PlanetOptions): Promise<Planet>;
     static create(engine: EngineKernel, options: PlanetOptions): Promise<Planet>;
     get rotation(): VectorRef;
     updateMaps(options: MapOptions): Promise<void>;
@@ -20,6 +21,7 @@ export class Planet implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface PlanetOptions {

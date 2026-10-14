@@ -17,6 +17,7 @@ export class ViewCube {
     readonly camera: Camera;
     duration: number;
     readonly name: string;
+    static attach(engine: EngineKernel, options?: ViewCubeOptions): ViewCube;
     constructor(engine: EngineKernel, { container, corner, size, duration, projection, labels }?: ViewCubeOptions);
     view(view: View, duration?: number): void;
     getProjection(): Projection | undefined;
@@ -25,6 +26,7 @@ export class ViewCube {
     get animating(): boolean;
     sync(): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface ViewCubeOptions {

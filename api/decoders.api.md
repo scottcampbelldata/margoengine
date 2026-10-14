@@ -30,6 +30,7 @@ export class DracoDecoder {
     constructor(options?: DracoOptions);
     decode(data: ArrayBuffer | ArrayBufferView, options?: DracoDecodeOptions): Promise<DecodedDracoGeometry>;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface DracoOptions {
@@ -61,6 +62,7 @@ export class KTX2Decoder {
     transcode(data: ArrayBuffer | ArrayBufferView, options?: KTX2DecodeOptions): Promise<TranscodedKTX2Result>;
     createTexture(data: ArrayBuffer | ArrayBufferView, options?: KTX2DecodeOptions & KTX2TextureOptions): Promise<GPUTexture>;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface KTX2Mip {

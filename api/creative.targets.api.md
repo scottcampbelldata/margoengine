@@ -28,5 +28,6 @@ export class HDRRenderTarget {
     constructor(device: GPUDevice, width: number, height: number, samples?: number, depthFormat?: GPUTextureFormat);
     resize(width: number, height: number): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 ```

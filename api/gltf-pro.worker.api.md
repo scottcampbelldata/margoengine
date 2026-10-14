@@ -154,6 +154,7 @@ class PBRInstances {
     get mirrored(): boolean;
     upload(device: GPUDevice): GPUBuffer;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     get layout(): GPUVertexBufferLayout;
     shader(code: string): string;
     bounds(node: ArrayLike<number>, vertices: Float32Array, out: Float32Array): void;
@@ -199,6 +200,7 @@ class PBRModel implements EnginePlugin {
     onDispose(callback: () => void): () => void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     destroy(): void;
 }
 

@@ -24,6 +24,7 @@ export class GPUParticles extends VFX {
 export class GrassField implements EnginePlugin {
     readonly name: string;
     readonly blades: number;
+    static attach(engine: EngineKernel, options?: GrassOptions): GrassField;
     constructor(stage: {
         readonly engine: EngineKernel;
     }, options?: GrassOptions);
@@ -38,6 +39,7 @@ export class GrassField implements EnginePlugin {
     onDeviceRestored(engine: Engine): void;
     destroy(): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface GrassOptions {
@@ -74,6 +76,7 @@ export class HDRRenderTarget {
     constructor(device: GPUDevice, width: number, height: number, samples?: number, depthFormat?: GPUTextureFormat);
     resize(width: number, height: number): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface ParticleOptions {
@@ -95,6 +98,7 @@ export class Planet implements EnginePlugin {
         offsetU: number;
     };
     private constructor();
+    static attach(engine: EngineKernel, options: PlanetOptions): Promise<Planet>;
     static create(engine: EngineKernel, options: PlanetOptions): Promise<Planet>;
     get rotation(): VectorRef;
     updateMaps(options: MapOptions): Promise<void>;
@@ -103,6 +107,7 @@ export class Planet implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface PlanetOptions {
@@ -137,20 +142,24 @@ export class PostProcessing implements EnginePlugin {
     readonly options: PostOptions;
     readonly name = "post-processing";
     target?: HDRRenderTarget;
+    static attach(engine: EngineKernel, options?: PostOptions): PostProcessing;
     constructor(options?: PostOptions);
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export class Stars implements EnginePlugin {
+    static attach(engine: EngineKernel): Stars;
     enabled: boolean;
     readonly name = "creative:stars";
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface ToonOptions {
@@ -160,11 +169,13 @@ export interface ToonOptions {
 
 export class ToonShading implements EnginePlugin {
     readonly name = "toon-shading";
+    static attach(engine: EngineKernel, options?: ToonOptions): ToonShading;
     constructor({ bands, rim }?: ToonOptions);
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export type WindObstacle = VFXObstacle;

@@ -25,6 +25,7 @@ export class Inspector implements EnginePlugin {
     refresh(): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface InspectorOptions {

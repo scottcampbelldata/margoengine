@@ -16,5 +16,6 @@ export class PostStack implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 ```

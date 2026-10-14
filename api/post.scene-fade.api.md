@@ -26,6 +26,7 @@ export class SceneFade implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export const afterPresented: (queue: Pick<GPUQueue, 'onSubmittedWorkDone'>, signal: AbortSignal) => Promise<void>;

@@ -30,6 +30,7 @@ export class Animator implements EnginePlugin {
     onPreUpdate(delta: number): void;
     onDeviceRestored(): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     destroy(): void;
 }
 

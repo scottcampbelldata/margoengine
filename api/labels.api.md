@@ -81,6 +81,7 @@ export class LabelRenderer implements EnginePlugin {
     root: HTMLDivElement | null;
     occlude: OccludeHook | null;
     writes: number;
+    static attach(engine: EngineKernel, options?: LabelRendererOptions): LabelRenderer;
     constructor(options?: LabelRendererOptions);
     setup(engine: EngineKernel): void;
     registerPasses(graph: FrameGraph): void;
@@ -90,6 +91,7 @@ export class LabelRenderer implements EnginePlugin {
     get size(): number;
     update(): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface LabelRendererOptions {

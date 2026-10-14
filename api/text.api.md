@@ -62,6 +62,8 @@ export class GlyphAtlas {
     get view(): GPUTextureView;
     place(glyph: GlyphBitmap): AtlasSlot;
     restore(device: GPUDevice): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
     destroy(): void;
 }
 
@@ -185,6 +187,7 @@ export class Text {
     };
     bind(owner: Owner | undefined): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export type TextAlign = 'left' | 'center' | 'right' | 'justify';
@@ -235,6 +238,7 @@ export class TextRenderer implements EnginePlugin {
         glyphs: number;
         drawCalls: number;
     };
+    static attach(engine: EngineKernel, options?: TextRendererOptions): TextRenderer;
     constructor(options?: TextRendererOptions);
     get texts(): ReadonlySet<Text>;
     get atlas(): {
@@ -251,6 +255,7 @@ export class TextRenderer implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface TextRendererOptions {

@@ -27,6 +27,7 @@ export class Splats implements EnginePlugin {
     };
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     destroy(): void;
 }
 

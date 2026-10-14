@@ -62,6 +62,7 @@ export class Picking implements EnginePlugin {
     pick(x: number, y: number): Promise<PickHit | null>;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export class Selection implements EnginePlugin {
@@ -74,6 +75,7 @@ export class Selection implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface SelectionOptions {

@@ -44,6 +44,7 @@ export class Input {
     rumble(duration: number, strength?: number, gamepad?: number): Promise<boolean>;
     reset(): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface InputOptions {

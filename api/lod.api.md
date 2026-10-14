@@ -25,6 +25,7 @@ export class Imposter {
     ready(): boolean;
     export(): Promise<ImposterData>;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface ImposterData {
@@ -77,6 +78,7 @@ export class LODSystem implements EnginePlugin {
     readonly name: string;
     hysteresis: number;
     bias: number;
+    static attach(engine: EngineKernel, options?: LODSystemOptions): LODSystem;
     constructor({ hysteresis, bias }?: LODSystemOptions);
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
@@ -89,6 +91,7 @@ export class LODSystem implements EnginePlugin {
     update(): void;
     onDeviceRestored(): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface LODSystemOptions {

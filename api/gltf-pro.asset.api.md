@@ -75,6 +75,7 @@ class PBRInstances {
     get mirrored(): boolean;
     upload(device: GPUDevice): GPUBuffer;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     get layout(): GPUVertexBufferLayout;
     shader(code: string): string;
     bounds(node: ArrayLike<number>, vertices: Float32Array, out: Float32Array): void;

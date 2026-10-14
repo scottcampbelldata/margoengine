@@ -43,6 +43,7 @@ export class CharacterController {
         predicate?: (collider: any) => boolean;
     }): CharacterMoveResult;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface CharacterControllerOptions {
@@ -142,6 +143,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     timeScale: number;
     paused: boolean;
     stepCount: number;
+    static attach(engine: EngineKernel, options: PhysicsOptions): Physics;
     constructor(engine: EngineKernel | null, options: PhysicsOptions);
     get world(): any;
     get isDisposed(): boolean;
@@ -185,6 +187,7 @@ export class Physics implements EnginePlugin, BodyOwner {
         colors: Float32Array;
     };
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export class PhysicsBody {

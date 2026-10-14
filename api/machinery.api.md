@@ -31,6 +31,7 @@ export class AssemblyBVH {
         maxDistance?: number;
     }): Anchor | null;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export class AssemblyIndex {
@@ -99,10 +100,12 @@ export interface DistanceConstraint {
 export class EngineeringAnnotations implements EnginePlugin {
     readonly options: AnnotationOptions;
     readonly name = "engineering-annotations";
+    static attach(engine: EngineKernel, options?: AnnotationOptions): EngineeringAnnotations;
     constructor(options?: AnnotationOptions);
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface ExplodedPart {
@@ -114,10 +117,12 @@ export class ExplodedView implements EnginePlugin {
     readonly parts: readonly ExplodedPart[];
     readonly name = "exploded-view";
     amount: number;
+    static attach(engine: EngineKernel, parts: readonly ExplodedPart[]): ExplodedView;
     constructor(parts: readonly ExplodedPart[]);
     setup(engine: Engine): void;
     onPreUpdate(): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface GearCoupling {
@@ -160,6 +165,7 @@ export class Kinematics implements EnginePlugin {
         error: number;
         iterations: number;
     };
+    static attach(engine: EngineKernel, joints: readonly Joint[], options?: KinematicOptions): Kinematics;
     constructor(joints: readonly Joint[], options?: KinematicOptions);
     setup(engine: Engine): void;
     value(index: number): number;
@@ -175,10 +181,12 @@ export class Kinematics implements EnginePlugin {
     solve(): typeof this.result;
     onPreUpdate(delta: number): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export class PartInstancer implements EnginePlugin {
     readonly name = "part-instancer";
+    static attach(engine: EngineKernel): PartInstancer;
     readonly stats: {
         parts: number;
         unique: number;
@@ -214,11 +222,13 @@ export class SectionPlanes implements EnginePlugin {
     readonly options: SectionOptions;
     readonly name = "section-planes";
     enabled: boolean;
+    static attach(engine: EngineKernel, options: SectionOptions): SectionPlanes;
     constructor(options: SectionOptions);
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface SurfaceCarrier {
@@ -239,11 +249,13 @@ export class SurfacePhysics implements EnginePlugin {
     readonly data: Float32Array;
     readonly name = "surface-physics";
     private constructor();
+    static attach(engine: EngineKernel, parts: readonly ConveyingPart[], carriers: readonly SurfaceCarrier[], options?: SurfaceOptions): Promise<SurfacePhysics>;
     static create(parts: readonly ConveyingPart[], carriers: readonly SurfaceCarrier[], options?: SurfaceOptions): Promise<SurfacePhysics>;
     setup(engine: Engine): void;
     setCarrier(index: number, carrier: number): void;
     onPreUpdate(delta: number): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export class TelemetryChannel implements EnginePlugin {
@@ -251,6 +263,7 @@ export class TelemetryChannel implements EnginePlugin {
     readonly options: TelemetryOptions;
     readonly name = "telemetry-channel";
     private constructor();
+    static attach(engine: EngineKernel, kinematics: Kinematics, options?: TelemetryOptions): Promise<TelemetryChannel>;
     static create(kinematics: Kinematics, options?: TelemetryOptions): Promise<TelemetryChannel>;
     setup(engine: Engine): void;
     push(input: ArrayBuffer | ArrayBufferView, receivedAt?: number): boolean;
@@ -259,6 +272,7 @@ export class TelemetryChannel implements EnginePlugin {
     connect(socket: WebSocket): void;
     onPreUpdate(): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface TelemetryOptions {
