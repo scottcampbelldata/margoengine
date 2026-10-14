@@ -112,7 +112,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    an option, not the light-tier default (already 100k).
 1. Top-10 parity gaps (non-core parts): materials package [done: `@margoengine/materials`], glTF extensions/decoders [done: decoder hooks, KHR extensions, physical materials (`c01eedd`)], post stack +
    FXAA [done: `@margoengine/post/stack`, `@margoengine/post/fxaa`; SMAA not done], raycast/pick glTF models + DragControls [running], environment IBL apply + background colour + fog [done `269401e`: EnvironmentLighting, Fog, ColorBackground, UltraHDR; light probes (gap 44) left; SSAO-on-IBL done (1d''')],
-   orthographic/vertical cameras without core change [done: `@margoengine/cameras`; only lines' world widths still assume perspective], WebGL beyond core (gap 8: scope with Scott first).
+   orthographic/vertical cameras without core change [done: `@margoengine/cameras`; lines' world widths too (1d)], WebGL beyond core (gap 8: scope with Scott first).
 1b. [done `ed83cb6`; GPU check passed in the worker's tree, re-run on the merged branch pending] Composable shader nodes (`@margoengine/shader`, parity gap 19), moved up after Scott noted three.js's TSL /
    RenderPipeline node workflows (r183 RenderPipeline, r186 pipeline hooks): small typed nodes compiling to WGSL for
    materials and post effects, built on the materials package and the post stack once both APIs settle.
@@ -132,7 +132,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
 1d. [done] Imposter picking: `LODSystem.pickProxies()` hook; bvh Raycaster and selection Picking hit imposter-level
    objects through their bounding sphere (`approximate: true`, anchor + model). LOD screen levels already follow
    orthographic zoom (done).
-1d. [points, labels, clustered, splats, DOF DONE `5cf148e`; SSAO DONE (camera's own projection, signed depth; `scripts/ssao-gpu-check.js`); lines left] Orthographic follow-ups: SSAO, lines/points world widths, labels CSS perspective, clustered froxels, DOF and splats
+1d. [DONE: points, labels, clustered, splats, DOF `5cf148e`; SSAO (camera's own projection, signed depth; `scripts/ssao-gpu-check.js`); lines (world widths from the clip matrix's y row; perspective byte-identical, `examples/package-benchmarks/proofs/lines-perspective.proof.js`; ortho unit test, no GPU run)] Orthographic follow-ups: SSAO, lines/points world widths, labels CSS perspective, clustered froxels, DOF and splats
    assume a perspective camera; fix each in its own package. Optional core hook (Camera.projection + up) would remove
    the cameras package's update replacement; only if Scott wants it.
 1e. [a-d done, see below] CAD track (Scott, 2026-10-14: "the smallest, fastest, best CAD engine"; the visualization/interaction layer, not a
@@ -216,8 +216,10 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    f. Evaluate newer platform features: Float16Array for half-float data, Symbol.dispose / `using` for engine object
       cleanup, more parsing in workers + OffscreenCanvas (with 1f.j).
    g. Full read-only audit of all 68 packages listing each modernization finding with file and line, then fix in batches.
-1g'. ViewCube follow-up: use core's new `camera.up` for exact top/bottom views instead of stopping 1e-6 rad off the
-   pole (after the core-hook migration merges).
+1g'. [DONE: exact poles; the cube sets `camera.up` to the arrival heading on the pole and restores the previous up off
+   it or on dispose; a CameraProjection's vertical up is left alone; unit-tested, no browser run. OrbitControls/CAD controls
+   still leave an exact pole at azimuth 0 (a 90° turn after a top view reached from the side)] ViewCube follow-up: use
+   core's new `camera.up` for exact top/bottom views instead of stopping 1e-6 rad off the pole.
 1h. Less fragile (2026-10-14):
    a. Derive the package build order from package.json dependencies (topological sort) instead of the hand-written
       lists in scripts/build-modern.js (the controls-needs-bvh break came from that list).

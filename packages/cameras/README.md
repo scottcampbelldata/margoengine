@@ -37,8 +37,8 @@ projection.zoom = 2;
 - `attach(camera)` drives a camera without an engine; `dispose()` (or `engine.removePlugin('cameras')`) restores core's
   `project` (unset) and a plain `up` field. Attaching to a camera whose `project` is already set throws.
 
-Orthographic-aware (they read `camera.matrix`): SSAO, points, labels, clustered, DOF and splats. Not yet: lines'
-world-space widths. Shadow cascades are fitted to the perspective frustum, which covers
+Orthographic-aware (they read `camera.matrix`): SSAO, points, labels, clustered, DOF, splats and lines' world-space
+widths. Shadow cascades are fitted to the perspective frustum, which covers
 the default ortho view; a fixed small `height` far from the target wastes shadow resolution. Specular uses the camera
 position, not a parallel view direction.
 
