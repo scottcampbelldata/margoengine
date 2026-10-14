@@ -121,17 +121,29 @@ it with every number (on battery Windows throttles the CPU/GPU and may drop the 
      32, bind-group creation failed inside its error scope and the CoC texture read back zero. Test fixed; passes.
    - Post full stack (`gates/post-stack.mjs`, `gates-post-stack.json`): DamagedHelmet + boxes, env IBL, 1280x720 DPR 1,
      4x MSAA, PostStack [SSAO, DOF, Bloom, Tonemap neutral, FXAA]. No black/NaN pixels in any frame; removing each
-     effect changes the image (changed pixels: SSAO 32%, DOF 1.1%, Bloom 0.5%, Tonemap 80%, FXAA 1.9%). GPU per effect
-     (passes each effect begins, median of 8 alternating rounds x 120 frames): SSAO 2.53 ms, DOF 4.58, Bloom 0.27,
-     Tonemap 0.08, FXAA 0.15, stack capture/compose 0.41; post total 8.0 ms vs 0.9 ms for the whole frame without post.
+     effect changes the image (changed pixels, re-run after the SSAO fix below at `9702e57`: SSAO 6.9% (32% with the
+     bug), DOF 1.1%, Bloom 0.5%, Tonemap 57%, FXAA 1.9%). GPU per effect (passes each effect begins, median of 8
+     alternating rounds x 120 frames, that run): SSAO 2.34 ms, DOF 4.49, Bloom 0.28, Tonemap 0.09, FXAA 0.14, stack
+     capture/compose 0.39; post total 7.7 ms vs 0.9 ms for the whole frame without post.
      DOF (64 taps, maxRadius 16, full res) is the cost to look at first. Tonemap 'agx' after Bloom is invisible by
      design (Bloom alone already maps with AgX).
-   - SSAO with environment IBL (same JSON, `ssaoIbl`): SSAO passes 2.78 ms without IBL, 2.85 ms with it (+0.07 ms,
+   - SSAO with environment IBL (same JSON, `ssaoIbl`): SSAO passes 2.69 ms without IBL, 2.81 ms with it (+0.12 ms,
      inside run-to-run noise): replaying the full lit shader costs nothing measurable here.
-     OPEN BUG: with IBL on, SSAO darkens the floor below a sharp horizontal line (`test-results/gates-post-full.png`
-     vs `gates-post-no-ssao.png`; also with radius 0.1 and bias 0.2, and SSAO alone + IBL; not without IBL) and the
-     metal cube shows hatching. Looks like the ambient replay (depthCompare 'equal' on a recompiled shader) or the IBL
-     replay disagreeing with the main pass; not diagnosed further.
+     FIXED (`9702e57`): with IBL on, SSAO darkened the floor below a sharp horizontal line and hatched the metal cube.
+     Not the ambient replay (read back: margoAmbient continuous across the line, same in stack and standalone). Cause:
+     SSAO's extract shader fell back to a camera-facing normal when `dot(n,n)<=1e-8` for n=cross(dy,dx) of
+     neighbouring view positions; |n|^2 scales with the pixel footprint^4, so every surface nearer than a fixed depth
+     (~4.0 m at 1280x720, fov 60) got normal (0,0,1), sampled into itself and read AO ~0.56 instead of 1.0. A floor seen
+     without camera roll has constant view depth per screen row, hence the straight edge. It was always there; the
+     constant ambient (0.05) hid it, IBL's ambient (0.21) showed it. Now relative: `dot(n,n)>1e-6*|dx|^2*|dy|^2`. Gate
+     floor below the line 19.6 luma darker than no-SSAO -> 0; steel cube 4.5 -> 0.26. `scripts/ssao-gpu-check.js`
+     missed it (400x300 canvas, camera 5-7 m away: footprints far above the threshold) and now has an IBL "close" case
+     (open floor 2 m away) that fails on the old shader (7.3 darker) and passes now; creases still darken (IBL
+     perspective 7.5/4.2, ortho 6.5/4.3), its perspective frames are byte-identical to the unfixed build.
+     `proofs/post-ssao-perspective.proof.js` accepts this one shader line; its default ref `12bf774` no longer builds
+     (its ssao.ts imports `packages/shared/math.js`, removed by the math consolidation; the harness overlays only
+     `packages/post/src` from the ref), so it was run against the pre-fix tip: `node ...proof.js 5b9dbbd` passes
+     (3,282 calls identical apart from the extract shader).
    - Loaders + memory (`gates/memory.mjs`, `gates-memory.json`, `test-results/gates-load-*.png`): gltf-pro (DamagedHelmet,
      RobotExpressive, BoxTextured), native FBX (repo `triangle.fbx`; fbx test fixture as zlib binary with skin, blend
      shape, clips), USDA/USDC (repo fixtures), a 50k-triangle USDZ written by exporters, loaders 3MF/PLY/VTK/PCD/OFF all
