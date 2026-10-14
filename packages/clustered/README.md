@@ -22,7 +22,7 @@ Set a nonnegative finite GPU-float value or a callback sampled each render, such
 as `() => sky.nightFactor` for automatic night lights. Zero clears the GPU cluster
 lists; authored intensities remain unchanged. The setting survives restoration.
 
-Core meshes receive local lighting automatically. Call `lights.add(pbrModel)` or `lights.add(terrain)` for optional renderers; the returned function unregisters the receiver. Directional shadows compose with local lighting in either registration order. Local lights themselves do not cast shadows.
+Core meshes receive local lighting automatically. Call `lights.add(pbrModel)` (gltf-pro's `light` lighting hook, `lights.pbr(group)`) or `lights.add(terrain)` (a text patch of its `let linear=` line, as for core meshes; docs/shader-contracts.md) for optional renderers; the returned function unregisters the receiver. Directional shadows compose with local lighting in either registration order. Local lights themselves do not cast shadows.
 
 Orthographic cameras (for example `CameraProjection` from `@margoengine/cameras`, or any projection whose `camera.matrix` has a constant clip w) get linear depth slices between the projection's own near and far planes, which may lie behind the eye, and cluster boxes whose x/y extents do not grow with depth, including off-centre frustums. Everything is read from `camera.matrix` and `camera.position`; the package does not depend on the cameras package. Perspective output is unchanged.
 

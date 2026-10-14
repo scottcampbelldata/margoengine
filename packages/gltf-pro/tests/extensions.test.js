@@ -6,7 +6,7 @@ import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {extname, resolve} from 'node:path';
 import {GLTFAsset, PBRModel, parseGLTF, parseGLTFAsync} from '../dist/index.js';
-import {pbrShader, physicalShader as physical} from '../src/shader.ts';
+import {pbrShader, physicalShader as physical, lightPBR} from '../src/shader.ts';
 import {Engine, TransformStore} from '../../core/dist/extension.js';
 import {MeshoptDecoder} from '../../decoders/dist/index.js';
 import {decodeDraco, initBasis, initDraco, transcodeKTX2} from '../../decoders/dist/codec.js';
@@ -218,15 +218,26 @@ test('physical extensions select the physical shader variant, its maps and the t
   } finally {model.dispose(); engine.dispose();}
 });
 
-test('the base shader keeps every lighting-effect anchor and the physical variant composes with shadows, clustered and IBL patches', () => {
-  for (const anchor of ['var color=', 'direct+ambient(s)', '+s.emissive;']) {assert.ok(pbrShader.includes(anchor)); assert.ok(physicalShader.includes(anchor));}
+test('lighting hooks (contract v1): every hook point occurs once in both variants and shadows, clustered, IBL and fog compose in any order', () => {
+  // gltf-pro's side of the contract; shadows, clustered and environment test their side (their `pbr(group)` contributions).
+  const points = ['direct+ambient(s)', 'var color=', 'if(f.settings.w<0.5) {color=aces(max(color,vec3f(0))/0.6);', 'return vec4f(color,'];
+  for (const source of [pbrShader, physicalShader]) {
+    for (const point of points) assert.equal(source.split(point).length, 2, point);
+    assert.equal(source.match(/fn ambient\(s:Surface\)->vec3f \{[^}]*\}/g).length, 1); assert.equal(source.match(/var color=([^;]+)\+s\.emissive;/g).length, 1);
+  }
   assert.ok(!pbrShader.includes('@binding(10)') && !pbrShader.includes('fn layers'));
   for (let binding = 10; binding < 26; binding++) assert.ok(physicalShader.includes(`@group(1) @binding(${binding})`));
-  let code = physicalShader;
-  for (const effect of [new Shadows(), new Clustered()]) code = effect.shader(code, 2);
-  const ibl = code.replace(/fn ambient\(s:Surface\)->vec3f \{[^}]*\}/, 'fn ambient(s:Surface)->vec3f {return vec3f(0);}').replace('+s.emissive;', '+s.emissive+ibl;');
-  assert.match(ibl, /var color=.*shadow(Visibility|Lit)\(/); assert.match(ibl, /clusterLighting\(/); assert.match(ibl, /\+s\.emissive\+ibl;\n  color=layers\(s,v,l,color\);/);
-  assert.match(ibl, /fn ambient\(s:Surface\)->vec3f \{return vec3f\(0\);\}/);
+  const ibl = {declarations: '// ibl\n', ambient: 'vec3f(0.5)*s.occlusion'}, fog = {declarations: '// fog\n', output: c => `mix(${c},vec3f(1),0.5)`};
+  // Declarations stack in front in insertion order; the shader body is the same in every order.
+  const effects = [new Shadows().pbr(2), new Clustered().pbr(2), ibl, fog], head = physicalShader.slice(0, 200);
+  const compose = order => {const code = order.map(k => effects[k]).reduce(lightPBR, physicalShader); return code.slice(code.indexOf(head));};
+  const body = compose([0, 1, 2, 3]);
+  for (const order of [[3, 2, 1, 0], [1, 3, 0, 2], [2, 0, 3, 1]]) assert.equal(compose(order), body, order.join());
+  assert.match(body, /let margoAmbient=vec3f\(0\.5\)\*s\.occlusion;var color=clusterLighting\([^;]+\)\+shadowLit\(direct,i\.position,s\.n\)\+ambient\(s\)\+s\.emissive\+margoAmbient;\n  color=layers\(s,v,l,color\);/);
+  assert.match(body, /fn ambient\(s:Surface\)->vec3f \{return vec3f\(0\);\}/);
+  assert.match(body, /color=mix\(select\(color,aces\(max\(color,vec3f\(0\)\)\/0\.6\),f\.settings\.w<0\.5\),vec3f\(1\),0\.5\);if\(f\.settings\.w<0\.5\) \{/);
+  assert.throws(() => lightPBR(lightPBR(pbrShader, ibl), {declarations: '', ambient: 'vec3f(1)'}), /hook point missing or used twice/, 'one ambient effect');
+  assert.equal(lightPBR(pbrShader, fog), lightPBR(pbrShader, fog), 'cached per hooks object');
   // @margoengine/materials rewrites the five base-map samples and the fragment head of either variant.
   for (const source of [pbrShader, physicalShader]) for (const shading of ['standard', 'basic']) assert.match(materialShader(source, 2, shading), /mat_baseMap/);
 });

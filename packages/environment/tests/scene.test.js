@@ -75,8 +75,8 @@ test('EnvironmentLighting and Fog compose with every known core shader variant a
     if (name === 'shadows') assert.match(fragment(lit), /shadowLit\(direct,i\.position,i\.normal\)/);
     assert.equal(fog.shader(lit, 0), both, 'cached');
   }
-  assert.throws(() => lighting.shader('@fragment fn custom() {}', 0), /standard core or glTF-pro PBR shader/);
-  assert.throws(() => fog.shader('@fragment fn custom() {}', 0), /standard core or glTF-pro PBR shader/);
+  assert.throws(() => lighting.shader('@fragment fn custom() {}', 0), /standard core PBR shader/);
+  assert.throws(() => fog.shader('@fragment fn custom() {}', 0), /standard core PBR shader/);
   lighting.dispose(); fog.dispose();
 });
 

@@ -103,8 +103,17 @@ export type GLTFLoadOptions = Omit<AssetOptions, 'buffers'>;
 
 export interface LightingEffect {
     readonly owner?: Engine;
-    shader(source: string, group: number): string;
+    pbr?(group: number): PBRLighting | undefined;
+    shader?(source: string, group: number): string;
     bindings(): GPUBindGroupEntry[];
+}
+
+export interface PBRLighting {
+    readonly declarations: string;
+    direct?(direct: string): string;
+    readonly light?: string;
+    readonly ambient?: string;
+    output?(color: string): string;
 }
 
 export class PBRModel implements EnginePlugin {

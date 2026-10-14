@@ -17,6 +17,10 @@ export class Clustered implements EnginePlugin {
     add(receiver: ClusteredReceiver): () => void;
     bindings(): GPUBindGroupEntry[];
     shader(source: string, group?: number): string;
+    pbr(group: number): {
+        declarations: string;
+        light: string;
+    };
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     get lightLists(): {

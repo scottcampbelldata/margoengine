@@ -4,7 +4,8 @@ import {invertMatrixStable} from '@margoengine/math/mat4';
 import {viewMatrix} from '../../shared/view.js';
 import {Cleanup} from '../../shared/cleanup.js';
 import {GLTFAsset, container, loadAsset, closeImages, entry, integer, assetLimit, type GLTFImage, type AssetOptions} from './asset.js';
-import {pbrShader, physicalShader} from './shader.js';
+import {pbrShader, physicalShader, lightPBR, type PBRLighting} from './shader.js';
+export type {PBRLighting} from './shader.js';
 import {mipShader} from './mip.js';
 export {GLTFAsset} from './asset.js';
 export type {GLTFDocument, GLTFDecoderHooks, GLTFCompressedImage, GLTFImage} from './asset.js';
@@ -54,7 +55,8 @@ function preparedPrimitive(asset:GLTFAsset,p:any,data:PreparedGeometry,node:Mesh
   return {node,nodeIndex,vertices,indices,definition:p,material:m,weights:new Float32Array(0),targetNames:[]};
 }
 interface DrawResource {primitive:PBRPrimitive;vertex:GPUBuffer;index:GPUBuffer;uniform:GPUBuffer;values:Float32Array;groups:Map<GPURenderPipeline,[GPUBindGroup,GPUBindGroup]>;views:GPUTextureView[];samplers:GPUSampler[]}
-export interface LightingEffect {readonly owner?:Engine;shader(source:string,group:number):string;bindings():GPUBindGroupEntry[]}
+/** A lighting or shading effect for `addLighting`: `pbr` hooks (lighting; preferred) or a `shader` text patch (materials, LOD baking). */
+export interface LightingEffect {readonly owner?:Engine;pbr?(group:number):PBRLighting|undefined;shader?(source:string,group:number):string;bindings():GPUBindGroupEntry[]}
 let modelId = 0;
 const vector = (value:any, size:number, label:string, min=-Infinity, max=Infinity):number[] => {
   if (!Array.isArray(value) || value.length !== size || value.some(v=>typeof v!=='number'||!Number.isFinite(Math.fround(v))||v<min||v>max)) throw new TypeError('Invalid glTF '+label);
@@ -156,7 +158,7 @@ export class PBRModel implements EnginePlugin {
   disposed=false;private readonly created:Mesh[]=[];private resources:DrawResource[]=[];private textures:GPUTexture[]=[];
   private pipelines=new Map<string,GPURenderPipeline>();private readonly inverse=new Float32Array(16);private readonly workspace=new Float64Array(52);private readonly view=new Float32Array(16);
   private engine:Engine;private readonly cleanupCallbacks=new Set<()=>void>();
-  private readonly lighting=new Set<LightingEffect>();
+  private readonly lighting=new Set<LightingEffect>();private readonly codes=new Map<string,number>();private codeCount=0;private readonly replays=new Map<string,string>();
   private readonly lightingGroups=new Map<GPURenderPipeline,{entries:GPUBindGroupEntry[];group:GPUBindGroup}>();
   constructor(instance:EngineKernel,readonly asset:GLTFAsset,private readonly images:readonly GLTFImage[]=[],prepared?:readonly (readonly PreparedGeometry[])[]) {
     this.engine=engineRuntime(instance);
@@ -247,7 +249,7 @@ export class PBRModel implements EnginePlugin {
   }
   registerPasses(graph:FrameGraph):void {graph.add({name:this.name,order:1,execute:c=>{if(c.backend==='webgpu')this.draw(c,'beauty',c.color,c.depth);}});}
   addLighting(effect:LightingEffect):()=>void {
-    if(this.disposed||!effect||typeof effect.shader!=='function'||typeof effect.bindings!=='function')throw new TypeError('Invalid PBR lighting effect');
+    if(this.disposed||!effect||typeof (effect.pbr??effect.shader)!=='function'||typeof effect.bindings!=='function')throw new TypeError('Invalid PBR lighting effect');
     if(effect.owner&&effect.owner!==this.engine)throw new Error('PBR lighting belongs to another engine');
     this.lighting.add(effect);return()=>this.lighting.delete(effect);
   }
@@ -280,14 +282,18 @@ export class PBRModel implements EnginePlugin {
       v.set(m.ext,100);v.set(m.uvt,104);if(m.physical)v.set(m.physical,208);
       c.device.queue.writeBuffer(r.uniform,0,v as Float32Array<ArrayBuffer>);
       let code=m.physical?physicalShader():pbrShader,entry=mode==='beauty'?'fragment':mode==='gbuffer'?'gbuffer':'ambientFragment',lit=mode==='beauty';
-      if(mode!=='gbuffer'&&this.lighting.size){let patched=code;for(const effect of this.lighting)patched=effect.shader(patched,2);
-        // An effect that replaces the ambient light names it `let margoAmbient=` (environment IBL); SSAO's ambient replay then returns it
-        // from the lit fragment, `_=color` keeping every lighting binding in the layout. Unlit materials have no ambient.
-        if(lit)code=patched;else if(patched.includes('let margoAmbient=')){code=patched.replace('return vec4f(color,','_=color;return vec4f(select(margoAmbient,vec3f(0),f.ext.x>0.5),');entry='fragment';lit=true;}}
+      if(mode!=='gbuffer'&&this.lighting.size){let patched=code,ambient=false;
+        // Effects with `pbr` hooks compose at gltf-pro's hook points; others (materials, LOD baking) still patch the text.
+        for(const effect of this.lighting){if(effect.pbr){const hooks=effect.pbr(2);if(hooks){patched=lightPBR(patched,hooks);ambient||=!!hooks.ambient;}}else patched=effect.shader!(patched,2);}
+        // An `ambient` hook (environment IBL) is what SSAO's ambient replay returns from the lit fragment, `_=color` keeping every
+        // lighting binding in the layout. Unlit materials have no ambient.
+        if(lit)code=patched;else if(ambient){let replay=this.replays.get(patched);if(replay===undefined){if(this.replays.size>=64)this.replays.clear();this.replays.set(patched,replay=patched.replace('return vec4f(color,','_=color;return vec4f(select(margoAmbient,vec3f(0),f.ext.x>0.5),'));}code=replay;entry='fragment';lit=true;}}
       // Keep the shader's original front-facing convention, including mirrored transforms.
       const cull:GPUCullMode=m.settings[2]<0.5?(v[97]>0?'back':'front'):'none';
       const state:PBRRenderState|undefined=mode==='beauty'?m.renderState:undefined;
-      const transmit=!!m.tint,blend=blended(m),key=mode+':'+c.format+':'+blend+transmit+':'+cull+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+(state?JSON.stringify(state):'')+code;
+      // Shader text enters the key as a small id: the code strings are cached objects, so the lookup hashes them once.
+      let id=this.codes.get(code);if(id===undefined){if(this.codes.size>=256)this.codes.clear();this.codes.set(code,id=this.codeCount++);}
+      const transmit=!!m.tint,blend=blended(m),key=mode+':'+c.format+':'+blend+transmit+':'+cull+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+':'+entry+':'+id+(state?JSON.stringify(state):'');
       let pipeline=this.pipelines.get(key);
       if(!pipeline) {
         const module=c.device.createShaderModule({code}),format=mode==='beauty'?c.format:'rgba16float';
