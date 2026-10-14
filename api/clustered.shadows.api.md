@@ -60,7 +60,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
-    [Symbol.dispose](): void;
+    [Symbol.dispose]: () => void;
 }
 
 // Not exported from this entry, but used by the exports above:
@@ -90,6 +90,7 @@ class Clustered implements EnginePlugin {
     };
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
+    [Symbol.dispose]: () => void;
     destroy(): void;
 }
 
