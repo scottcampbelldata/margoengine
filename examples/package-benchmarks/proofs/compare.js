@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {mkdir, writeFile} from 'node:fs/promises';
-import {isAbsolute, resolve} from 'node:path';
+import {existsSync} from 'node:fs';
+import {dirname, isAbsolute, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {performance} from 'node:perf_hooks';
 import {build} from 'vite';
@@ -12,10 +13,16 @@ const root = resolve(import.meta.dirname, '../../..'), slash = value => value.re
 const bare = id => !id.startsWith('.') && !isAbsolute(id) && !/^[a-z]:[\\/]/i.test(id);
 
 async function load(name, entry, ref) {
-  const source = slash(resolve(root, 'packages', name, 'src')) + '/';
-  const plugins = ref ? [{name: 'git-source', enforce: 'pre', load(id) {
+  // The package's src and packages/shared (inlined into every bundle) both come from the ref.
+  const sources = [slash(resolve(root, 'packages', name, 'src')) + '/', slash(resolve(root, 'packages/shared')) + '/'];
+  const plugins = ref ? [{name: 'git-source', enforce: 'pre', resolveId(id, importer) {
+    // A file deleted since the ref (e.g. shared/math.js) is missing on disk; resolve it to its path so load() reads the ref.
+    if (!importer || !id.startsWith('.')) return;
+    const file = slash(resolve(dirname(importer.split('?')[0]), id));
+    if (sources.some(s => file.startsWith(s)) && !existsSync(file) && !existsSync(file.replace(/\.js$/, '.ts'))) return file;
+  }, load(id) {
     const file = slash(id.split('?')[0]);
-    if (!file.startsWith(source)) return;
+    if (!sources.some(s => file.startsWith(s))) return;
     try {return execFileSync('git', ['show', `${ref}:${file.slice(slash(root).length + 1)}`], {cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 26});}
     catch {return;} // not in the ref: fall back to the working tree
   }}] : [];

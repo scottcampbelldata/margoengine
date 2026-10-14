@@ -9,7 +9,9 @@ import {versions} from './compare.js';
 import {mockGPU, passes, context} from './gpu-recorder.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
 
-const ref = process.argv[2] ?? '12bf774', {baseline, candidate} = await versions('post', ref);
+// 9c761d5 is the last commit before the SSAO orthographic work. Older refs differ only in signed zeros of the view
+// matrix, from that commit's camera.up migration in packages/shared.
+const ref = process.argv[2] ?? '9c761d5',{baseline, candidate} = await versions('post', ref);
 // Also accepted (an intended output change): the extract shader's degenerate-normal test is relative to the pixel
 // footprint, not absolute; the old one made flat surfaces nearer than a fixed depth camera-facing (self-occluded).
 const normal = ['let n=cross(dy,dx);let normal=select(vec3f(0,0,1),n/max(length(n),0.000001),dot(n,n)>0.00000001);', '// Degenerate only if dx and dy are (near) parallel or zero: |n|^2 scales with the pixel footprint^4, so a fixed threshold made close surfaces camera-facing.\n  let n=cross(dy,dx);let normal=select(vec3f(0,0,1),normalize(n),dot(n,n)>0.000001*dot(dx,dx)*dot(dy,dy));'];
