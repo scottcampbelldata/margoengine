@@ -1,11 +1,12 @@
 import { TransformStore } from './kernel.js';
 import { Camera, type CameraOptions, type Vec3 } from './camera.js';
 import { Geometry, PbrMaterial, finite } from './geometry.js';
-import { GPURenderer, GLRenderer, type Renderer, type Batch, type GeometryBuffers } from './renderer.js';
+import { GPURenderer, type Renderer, type Batch, type GeometryBuffers } from './renderer.js';
 import { FrameGraph, type EnginePlugin } from './plugin.js';
 import {sceneSamples} from './quality.js';
 
-export interface EngineOptions { capacity?: number; backend?: 'auto'|'webgpu'|'webgl2'; camera?: CameraOptions }
+/** `fallback` supplies a renderer when WebGPU is unavailable or `backend` is 'webgl2', for example `webglRenderer` from @margoengine/webgl. */
+export interface EngineOptions { capacity?: number; backend?: 'auto'|'webgpu'|'webgl2'; camera?: CameraOptions; fallback?: (canvas: HTMLCanvasElement) => Renderer }
 export type FrameCallback = (engine: Engine, delta: number) => void;
 const positionFields=['x','y','z'] as const,scaleFields=['sx','sy','sz'] as const;
 const owners=new WeakMap<EnginePlugin,Engine>();
@@ -107,7 +108,7 @@ export class Engine {
     const store=await TransformStore.create(options.capacity??1024);let renderer:Renderer|undefined,fallbackReason:string|null=null;
     try {
       if(backend!=='webgl2')try{renderer=await GPURenderer.create(canvas);}catch(error){if(backend==='webgpu')throw error;fallbackReason=String(error);}
-      renderer??=new GLRenderer(canvas);return new Engine(canvas,store,renderer,options.camera,fallbackReason);
+      renderer??=(options.fallback??(()=>{throw new Error('WebGPU unavailable')}))(canvas);return new Engine(canvas,store,renderer,options.camera,fallbackReason);
     }catch(error){renderer?.dispose();store.dispose();throw error;}
   }
   private constructor(readonly canvas:HTMLCanvasElement,readonly store:TransformStore,private renderer:Renderer,camera:CameraOptions|undefined,readonly fallbackReason:string|null){this.camera=new Camera(camera);this.watchDevice();}
