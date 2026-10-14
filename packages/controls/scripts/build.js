@@ -12,7 +12,7 @@ await build({
   build: {
     outDir: resolve(root, 'dist'), emptyOutDir: true, target: 'es2022',
     lib: {entry: resolve(root, 'src/index.ts'), formats: ['es'], fileName: 'index'},
-    rollupOptions: {external: ['@margoengine/core', '@margoengine/core/extension']},
+    rollupOptions: {external: ['@margoengine/core', '@margoengine/core/extension', '@margoengine/bvh']},
   },
 });
 execFileSync(process.execPath, [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', resolve(root, 'tsconfig.json')], {stdio: 'inherit'});

@@ -1,6 +1,7 @@
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type Mesh,type Geometry,type EnginePlugin,type FrameGraph,type PassContext,type DrawOptions} from '@margoengine/core/extension';
 import {meshVertex} from '../../shared/gpu.js';
+import {Models,ModelDraws,modelCode,modelPipeline,sphere,hidden,type Model,type ModelPrimitive} from './models.js';
 
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number;MAP_READ:number};
 declare const GPUTextureUsage:{RENDER_ATTACHMENT:number;COPY_SRC:number};
@@ -26,8 +27,11 @@ struct PickPixel {@location(0) color:vec4f,@location(1) id:u32}
 @fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->PickPixel {return PickPixel(shade(i,front),i.id+1u);}`;
 }
 
-function intersects(matrix:Float32Array,mesh:Mesh,clip:Float64Array):boolean {
- const model=mesh.matrix,b=mesh.geometry!.bounds;
+const idFragment=`@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) u32 {if(culled(i,front)){discard;}return i.info.x;}`;
+/** A pick result: the core mesh, or for gltf-pro models the glTF node with its model and primitive. */
+export interface PickHit {mesh:Mesh;model?:Model;primitive?:ModelPrimitive;primitiveIndex?:number}
+
+function intersects(matrix:Float32Array,model:Float32Array,b:ArrayLike<number>,clip:Float64Array):boolean {
  for(let c=0;c<4;c++)for(let r=0;r<4;r++)clip[c*4+r]=matrix[r]*model[c*4]+matrix[4+r]*model[c*4+1]+matrix[8+r]*model[c*4+2]+matrix[12+r]*model[c*4+3];
  // Pull each plane into local space so nonuniform scale, mirrors and hierarchy shear stay conservative.
  for(let plane=0;plane<6;plane++){
@@ -38,9 +42,10 @@ function intersects(matrix:Float32Array,mesh:Mesh,clip:Float64Array):boolean {
  return true;
 }
 
-/** Optional core-mesh picking: forward-pass IDs, with a culled 3x3 pass when the frame is stale. */
+/** Optional picking of core meshes (forward-pass IDs, or a culled 3x3 pass when the frame is stale) and gltf-pro models (always the 3x3 pass). */
 export class Picking implements EnginePlugin {
  readonly name='picking';private engine?:Engine;private device?:GPUDevice;private disposed=false;private pending=false;
+ private readonly models=new Models();private readonly draws=new ModelDraws();private modelPipeline?:GPURenderPipeline;private last:PickHit|null=null;
  private ids?:GPUTexture;private idsView?:GPUTextureView;private micro?:GPUTexture;private depth?:GPUTexture;private uniform?:GPUBuffer;private read?:GPUBuffer;
  private readonly pipelines=new Map<string,GPURenderPipeline>();private readonly groups=new Map<GPURenderPipeline,{entries:GPUBindGroupEntry[];group:GPUBindGroup}>();
  private readonly frame=new Float32Array(28);private readonly camera=new Float32Array(16);private readonly clip=new Float64Array(16);
@@ -74,8 +79,8 @@ export class Picking implements EnginePlugin {
  }
  private capture(c:Context):void {
   this.captured=false;this.context=c;
-  // Integer IDs cannot be resolved; retain the existing single-sample micro pass under MSAA.
-  if((c.descriptor.multisample?.count??1)>1)return;
+  // Integer IDs cannot be resolved; retain the existing single-sample micro pass under MSAA. Scenes with models always pick through it too.
+  if((c.descriptor.multisample?.count??1)>1||this.models.update(this.engine!).length)return;
   if(this.ids?.width!==c.width||this.ids.height!==c.height){this.ids?.destroy();this.ids=c.device.createTexture({size:[c.width,c.height],format:'r32uint',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});this.idsView=this.ids.createView();}
   this.original=c.draw;const original=c.draw;
   c.draw=(options:DrawOptions={})=>{
@@ -101,15 +106,23 @@ export class Picking implements EnginePlugin {
   }
   return true;
  }
- async onPick(x:number,y:number):Promise<Mesh|null> {
+ /** `engine.pick` hook: the core mesh, or the glTF node of a gltf-pro model, at a canvas CSS pixel. */
+ async onPick(x:number,y:number):Promise<Mesh|null> {const hit=await this.resolve(x,y);this.last=hit;return hit?.mesh??null;}
+ /** `engine.pick` (transforms and camera refreshed first), with the model and primitive for model hits. */
+ async pick(x:number,y:number):Promise<PickHit|null> {
+  if(this.disposed||!this.engine)throw new Error('Picking is disposed');
+  this.last=null;const mesh=await this.engine.pick(x,y),hit=this.last as PickHit|null;this.last=null;return mesh&&hit?.mesh===mesh?hit:null;
+ }
+ private async resolve(x:number,y:number):Promise<PickHit|null> {
   if(this.disposed||!this.engine)throw new Error('Picking is disposed');if(this.pending)throw new Error('A pick is already pending');
   if(![x,y].every(Number.isFinite))throw new RangeError('Invalid pick coordinates');
   if(x<0||y<0||x>=this.engine.canvas.clientWidth||y>=this.engine.canvas.clientHeight)return null;
-  this.pending=true;const e=this.engine,device=this.device!,read=this.read!,meshes=new Map(e.meshes);
+  this.pending=true;const e=this.engine,device=this.device!,read=this.read!,meshes=new Map(e.meshes),models=this.models.update(e),starts=this.models.starts,capacity=e.store.capacity;
   try {
    const px=Math.floor(x*e.canvas.width/e.canvas.clientWidth),py=Math.floor(y*e.canvas.height/e.canvas.clientHeight),x0=Math.max(0,px-1),y0=Math.max(0,py-1),width=Math.min(e.canvas.width,px+2)-x0,height=Math.min(e.canvas.height,py+2)-y0;
    const encoder=device.createCommandEncoder();let texture:GPUTexture,origin:number[];
-   if(this.fresh()){texture=this.ids!;origin=[x0,y0];}
+   // Model IDs are not in the forward pass (gltf-pro draws its own pipelines), so scenes with models use the micro pass.
+   if(!models.length&&this.fresh()){texture=this.ids!;origin=[x0,y0];}
    else {this.renderMicro(encoder,px,py);texture=this.micro!;origin=[1+x0-px,1+y0-py];}
    encoder.copyTextureToBuffer({texture,origin},{buffer:read,bytesPerRow:256},[width,height]);device.queue.submit([encoder.finish()]);
    await read.mapAsync(GPUMapMode.READ);
@@ -118,10 +131,15 @@ export class Picking implements EnginePlugin {
     if(!id)for(const [dx,dy] of [[0,-1],[-1,0],[1,0],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]]){
      const nx=cx+dx,ny=cy+dy;if(nx>=0&&ny>=0&&nx<width&&ny<height&&data[ny*64+nx]){id=data[ny*64+nx];break;}
     }
-    const mesh=meshes.get(id-1);
-    if(this.disposed||device!==this.device||!mesh||e.meshes.get(id-1)!==mesh)return null;
-    for(let slot=mesh.id;slot!==-1;slot=e.store.parents[slot])if(e.store.hidden[slot])return null;
-    return mesh;
+    let hit:PickHit|null=null;
+    if(id>capacity){
+     // Model slots follow the core slots: capacity + 1 + the model's first slot + primitive index.
+     const slot=id-capacity-1;let m=models.length-1;while(m>0&&starts[m]>slot)m--;
+     const model=models[m],primitiveIndex=slot-(starts[m]??0),primitive=model?.primitives[primitiveIndex];
+     if(primitive&&!model.disposed)hit={mesh:primitive.node,model,primitive,primitiveIndex};
+    } else {const mesh=meshes.get(id-1);if(mesh)hit={mesh};}
+    if(this.disposed||device!==this.device||!hit||e.meshes.get(hit.mesh.id)!==hit.mesh||hidden(e,hit.mesh.id))return null;
+    return hit;
    } finally {read.unmap();}
   } catch(error){if(this.disposed||device!==this.device||e.gpu!==device)return null;throw error;}
   finally {this.pending=false;}
@@ -137,16 +155,24 @@ export class Picking implements EnginePlugin {
    cached={entries:c.bindings.slice(),group:device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform!}},...c.bindings]})};this.groups.set(pipeline,cached);
   }
   const batches=new Map<Geometry,number[]>();
-  for(const mesh of e.meshes.values())if(mesh.geometry&&e.store.visible[mesh.id]&&intersects(matrix,mesh,this.clip)){
+  for(const mesh of e.meshes.values())if(mesh.geometry&&e.store.visible[mesh.id]&&intersects(matrix,mesh.matrix,mesh.geometry.bounds,this.clip)){
    let values=batches.get(mesh.geometry);if(!values){values=[];batches.set(mesh.geometry,values);}values.push(...mesh.matrix,...mesh.material.data);values[values.length-1]=mesh.id;
   }
   const pass=encoder.beginRenderPass({colorAttachments:[{view:c.color,clearValue:{r:0,g:0,b:0,a:0},loadOp:'clear',storeOp:'store'}],depthStencilAttachment:{view:c.depth,depthClearValue:0,depthLoadOp:'clear',depthStoreOp:'store'}});
   pass.setPipeline(pipeline);pass.setBindGroup(0,cached.group);
-  for(const [geometry,values] of batches){const gpu=e.geometryBuffers(geometry)!;device.queue.writeBuffer(gpu.instance,0,new Float32Array(values));pass.setVertexBuffer(0,gpu.vertex);pass.setVertexBuffer(1,gpu.instance);pass.setIndexBuffer(gpu.index,'uint32');pass.drawIndexed(geometry.indices.length,values.length/24);}pass.end();
+  for(const [geometry,values] of batches){const gpu=e.geometryBuffers(geometry)!;device.queue.writeBuffer(gpu.instance,0,new Float32Array(values));pass.setVertexBuffer(0,gpu.vertex);pass.setVertexBuffer(1,gpu.instance);pass.setIndexBuffer(gpu.index,'uint32');pass.drawIndexed(geometry.indices.length,values.length/24);}
+  // gltf-pro primitives whose bounding sphere meets the micro frustum, alpha cut-outs and transparency ignored, deformed (skinned) buffers used.
+  const draws=this.draws,models=this.models.list,starts=this.models.starts;draws.reset();
+  for(let m=0;m<models.length;m++){
+   const model=models[m];if(model.disposed)continue;
+   for(let i=0;i<model.primitives.length;i++){const p=model.primitives[i];if(p.buffers&&!hidden(e,p.node.id)&&intersects(matrix,p.node.matrix,sphere(p),this.clip))draws.add(p,e.store.capacity+1+starts[m]+i);}
+  }
+  if(draws.count){this.modelPipeline??=modelPipeline(device,modelCode(idFragment),'r32uint',{format:'depth32float',depthWriteEnabled:true,depthCompare:'greater-equal'});draws.draw(device,pass,this.modelPipeline,matrix);}
+  pass.end();
  }
  private release():void {
   for(const resource of [this.ids,this.micro,this.depth,this.uniform,this.read])resource?.destroy();
-  this.ids=this.micro=this.depth=undefined;this.idsView=undefined;this.uniform=this.read=undefined;this.pipelines.clear();this.groups.clear();this.snapshot.clear();this.captured=false;this.context=undefined;
+  this.ids=this.micro=this.depth=undefined;this.idsView=undefined;this.uniform=this.read=undefined;this.pipelines.clear();this.draws.release();this.modelPipeline=undefined;this.groups.clear();this.snapshot.clear();this.captured=false;this.context=undefined;
  }
  onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
  dispose():void {

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
-  "description": "Orbit, map, trackball, fly, first-person, pointer-lock and transform-gizmo camera controls for Margo Engine.",
+  "description": "Orbit, map, trackball, fly, first-person, pointer-lock camera controls, a transform gizmo and drag controls for Margo Engine.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
@@ -30,7 +30,8 @@
     "dist"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^0.1.0 || ^1.0.0"
+    "@margoengine/core": "^0.1.0 || ^1.0.0",
+    "@margoengine/bvh": "^0.1.0 || ^1.0.0"
   },
   "homepage": "https://margoengine.com"
 }

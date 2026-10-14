@@ -23,6 +23,8 @@ export interface PBRPrimitive {
   node: Mesh; nodeIndex: number; vertices: Float32Array; indices: Uint32Array;
   definition: any; material: any; weights: Float32Array; targetNames: string[];
   deformed?: GPUBuffer;
+  /** The 80-byte-stride vertex and uint32 index buffers while the model is set up on a device (for picking and outlines). */
+  buffers?: {vertex: GPUBuffer; index: GPUBuffer};
 }
 export interface PreparedGeometry {vertices:Float32Array;indices:Uint32Array}
 export function validatePreparedGeometry(data:PreparedGeometry):void {
@@ -191,7 +193,7 @@ export class PBRModel implements EnginePlugin {
     };
     for(const p of this.primitives) {
       const r:DrawResource={primitive:p,vertex:undefined!,index:undefined!,uniform:undefined!,values:new Float32Array(220),groups:new Map(),views:[],samplers:[]};
-      this.resources.push(r);r.vertex=upload(p.vertices,GPUBufferUsage.VERTEX|GPUBufferUsage.STORAGE);r.index=upload(p.indices,GPUBufferUsage.INDEX);
+      this.resources.push(r);r.vertex=upload(p.vertices,GPUBufferUsage.VERTEX|GPUBufferUsage.STORAGE);r.index=upload(p.indices,GPUBufferUsage.INDEX);p.buffers={vertex:r.vertex,index:r.index};
       r.uniform=device.createBuffer({size:880,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
       for(let i=0;i<p.material.maps.length;i++) {
         const map=p.material.maps[i],def=map?entry(this.asset.doc.textures,map.index,'texture'):null;
@@ -322,7 +324,7 @@ export class PBRModel implements EnginePlugin {
     });
   }
   onDispose(callback:()=>void):()=>void {if(typeof callback!=='function')throw new TypeError('Expected cleanup callback');if(this.disposed){callback();return()=>{};}this.cleanupCallbacks.add(callback);return()=>this.cleanupCallbacks.delete(callback);}
-  private releaseGPU():void {const cleanup=new Cleanup(),buffers=new Set<GPUBuffer>();for(const r of this.resources)for(const b of [r.vertex,r.index,r.uniform])if(b)buffers.add(b);for(const b of buffers)cleanup.run(()=>b.destroy());for(const t of this.textures)cleanup.run(()=>t.destroy());this.resources=[];this.textures=[];this.pipelines.clear();this.lightingGroups.clear();cleanup.finish();}
+  private releaseGPU():void {const cleanup=new Cleanup(),buffers=new Set<GPUBuffer>();for(const r of this.resources)for(const b of [r.vertex,r.index,r.uniform])if(b)buffers.add(b);for(const b of buffers)cleanup.run(()=>b.destroy());for(const t of this.textures)cleanup.run(()=>t.destroy());for(const p of this.primitives)p.buffers=undefined;this.resources=[];this.textures=[];this.pipelines.clear();this.lightingGroups.clear();cleanup.finish();}
   onDeviceRestored(engine:Engine):void {this.releaseGPU();for(const p of this.primitives)p.deformed=undefined;this.setup(engine);}
   dispose():void {
     if(this.disposed)return;this.disposed=true;const cleanup=new Cleanup();

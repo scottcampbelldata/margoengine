@@ -10,7 +10,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const temp = resolve(root, 'test-results/size');
 await mkdir(temp, {recursive: true});
 const entries = {'dist/index.js (everything)': null, OrbitControls: 'OrbitControls', MapControls: 'MapControls', TrackballControls: 'TrackballControls',
-  FlyControls: 'FlyControls', FirstPersonControls: 'FirstPersonControls', PointerLockControls: 'PointerLockControls', TransformControls: 'TransformControls'};
+  FlyControls: 'FlyControls', FirstPersonControls: 'FirstPersonControls', PointerLockControls: 'PointerLockControls', TransformControls: 'TransformControls', DragControls: 'DragControls'};
 const rows = [];
 for (const [label, name] of Object.entries(entries)) {
   const entry = resolve(temp, `${label.replace(/\W+/g, '-')}.js`);
@@ -18,7 +18,7 @@ for (const [label, name] of Object.entries(entries)) {
   const output = await build({
     root, configFile: false, publicDir: false, logLevel: 'silent',
     build: {write: false, minify: false, target: 'es2022', lib: {entry, formats: ['es'], fileName: 'bundle'},
-      rollupOptions: {external: ['@margoengine/core', '@margoengine/core/extension']}},
+      rollupOptions: {external: ['@margoengine/core', '@margoengine/core/extension', '@margoengine/bvh']}},
   });
   const code = (Array.isArray(output) ? output[0] : output).output.find(chunk => chunk.type === 'chunk').code;
   // Vite keeps whitespace in ES library builds, so minify separately with the oxc minifier rolldown ships.

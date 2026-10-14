@@ -48,7 +48,7 @@ for(const name of ['gltf','machinery','creative','scenery',...featurePackages]){
   const module=target.slice('./dist/'.length,-'.js'.length);
   return [module,`packages/${name}/src/${module}.ts`];
  }));
- await build({configFile:false,publicDir:false,logLevel:'warn',build:{outDir:output,emptyOutDir:true,target:'es2022',lib:{entry,formats:['es'],fileName:(_,entryName)=>entryName+'.js'},rollupOptions:{external:['@margoengine/core','@margoengine/core/extension','@margoengine/animation','@margoengine/gltf-pro','@margoengine/loaders','@margoengine/lines'],output:compactOutput}}});
+ await build({configFile:false,publicDir:false,logLevel:'warn',build:{outDir:output,emptyOutDir:true,target:'es2022',lib:{entry,formats:['es'],fileName:(_,entryName)=>entryName+'.js'},rollupOptions:{external:['@margoengine/core','@margoengine/core/extension','@margoengine/animation','@margoengine/gltf-pro','@margoengine/loaders','@margoengine/lines','@margoengine/bvh'],output:compactOutput}}});
  if(name==='machinery'){
   // Retain analyzable asset URLs for the consuming app's bundler.
   for(const file of (await readdir(output)).filter(file=>file.endsWith('.js'))){const entry=resolve(output,file);await writeFile(entry,(await readFile(entry,'utf8')).replace(/(?:''|""|``)\s*\+\s*import\.meta\.url/g,'import.meta.url'));}

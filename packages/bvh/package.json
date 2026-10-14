@@ -14,10 +14,11 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/bvh.test.js",
+    "test": "npm run build && node --test tests/bvh.test.js tests/models.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "bench": "npm run build && node scripts/bench.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "bench:models": "npm run build && node scripts/bench-models.js"
   },
   "sideEffects": false,
   "exports": {
