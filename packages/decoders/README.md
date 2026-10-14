@@ -48,7 +48,7 @@ draco.dispose(); ktx2.dispose();
 
 ## Limits
 
-KTX2 cube maps, texture arrays and HDR (UASTC HDR) files are rejected. Draco point clouds return no `indices`. The glTF loaders do not call these decoders yet; until they accept `draco` and `ktx2` hooks (`GLTFDecoderHooks`), use the decoders directly.
+KTX2 cube maps, texture arrays and HDR (UASTC HDR) files are rejected. Draco point clouds return no `indices`. `@margoengine/gltf-pro` accepts these decoders without importing this package: `loadGLTF(engine, url, {decoders: {draco, meshopt: MeshoptDecoder, ktx2}})` or `parseGLTFAsync(engine, bytes, {decoders})`. `GLTFDecoderHooks` here types that object. The minimal `@margoengine/gltf` loader does not use them.
 
 ## Tests
 
