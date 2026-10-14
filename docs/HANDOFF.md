@@ -162,6 +162,21 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    k. docs/from-threejs.md: side-by-side mapping of common three.js code to Margo.
    l. One-command start: `npm create margo` (or a StackBlitz template) opening a 60 FPS scene with environment
       lighting, orbit controls and the stats overlay; build on the existing starter-vite.
+1g. Modernization (from the 2026-10-14 source scan; no legacy browser APIs, deprecated WebGPU calls or old WGSL found):
+   a. Drop the `webkitAudioContext` fallback in packages/audio/src/listener.ts (every WebGPU browser has AudioContext).
+   b. Replace the `as any` casts with real types (decoders codec globals may stay; exporters/scene.ts, lod/index.ts,
+      materials/index.ts, shader/node.ts, usdz/crate.ts).
+   c. Replace WGSL string patching (shadows, tonemap, toon, environment, materials, shader) with override constants,
+      specialized pipelines (1e.f) and shader nodes, so one renamed shader line cannot silently break another package.
+   d. DECISION FOR SCOTT before 1.0: a small explicit set of core hooks (camera projection, frame pacing, plugin lookup,
+      pipeline state) to replace today's workarounds: cameras replacing camera.update on the instance, quality/pacing
+      wrapping requestAnimationFrame globally, environment and selection reading core's private plugin map, materials
+      proxying createRenderPipeline. Costs core bytes; these become public API, so decide before launch.
+   e. DECISION FOR SCOTT before 1.0: reformat the dense single-line TypeScript to conventional readable style
+      (automated, no behaviour change; minifiers already handle shipped size) to lower the barrier for contributors.
+   f. Evaluate newer platform features: Float16Array for half-float data, Symbol.dispose / `using` for engine object
+      cleanup, more parsing in workers + OffscreenCanvas (with 1f.j).
+   g. Full read-only audit of all 68 packages listing each modernization finding with file and line, then fix in batches.
 2. Dedupe: two particle systems (creative GPUParticles vs vfx), two bloom paths (post Bloom vs creative
    PostProcessing), three sky implementations (sky, scenery, creative atmosphere).
 3. Replace three.js inside fbx and usdz with native parsers [running].
