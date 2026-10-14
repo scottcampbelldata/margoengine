@@ -100,6 +100,11 @@ checks and benchmarks run one at a time: take the lock with `mkdir C:\Dev\Projec
 Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (`c82e119`), WebGL renderer moved to
 `@margoengine/webgl` (`1356787`; core + stage 18,554 gzip), `@margoengine/math` (`88517f8`).
 
+0b. PRIORITY when the GPU is quiet: 1M particles on Scott's laptop light tier reads about 40 FPS (45 clean before the
+   workers; iPhone holds 60 at 1M). Re-baseline after the dedupe change to vfx, then GPU-time Codex's prepared
+   workgroup-compaction candidate (docs/vfx-workgroup-compaction-2026-10-13.md; ~15,625 global atomics per frame
+   instead of 1,000,000), then the billboard draw cost. Keep only measured wins; if 1M still misses 60, keep it as
+   an option, not the light-tier default (already 100k).
 1. Top-10 parity gaps (non-core parts): materials package [done: `@margoengine/materials`], glTF extensions/decoders [done: decoder hooks, KHR extensions, physical materials (`c01eedd`)], post stack +
    FXAA [done: `@margoengine/post/stack`, `@margoengine/post/fxaa`; SMAA not done], raycast/pick glTF models + DragControls [running], environment IBL apply + background colour + fog [done `269401e`: EnvironmentLighting, Fog, ColorBackground, UltraHDR; light probes (gap 44) and SSAO-on-IBL left],
    orthographic/vertical cameras without core change [done: `@margoengine/cameras`; SSAO, lines/points widths, labels,
