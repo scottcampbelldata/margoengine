@@ -1,6 +1,6 @@
 # Margo Engine
 
-A small Rust/Wasm engine for web apps, with WebGPU rendering, WebGL2 fallback, ordinary React components and optional domain packs.
+A small Rust/Wasm engine for web apps, with WebGPU rendering, an optional WebGL2 fallback (`@margoengine/webgl`), ordinary React components and optional domain packs.
 
 Official website: [margoengine.com](https://margoengine.com). Built with precision, named with love. For Margie.
 

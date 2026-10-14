@@ -293,7 +293,8 @@ packages): make a real `node_modules` folder holding junctions to the main check
 `@margoengine/*` junctions to the worktree's own packages. Never run a full `npm install` in a worktree; lockfile only
 via `npm install --package-lock-only --offline --no-audit --no-fund --ignore-scripts`. Also junction `margoengine`
 to the worktree's packages/margoengine. `npm run build:packages` is the whole package build (dependency order from
-package.json, then size gates, then docs/catalog.json); there is no separate workspace build step.
+package.json, then size gates, then docs/catalog.json); there is no separate workspace build step. Commit-message
+or other temp files in the shared scratchpad must have unique names (two workers' `msg.txt` collided once).
 
 ## API rough edges before 1.0 (found writing docs/from-threejs.md, 2026-10-14; not changed)
 

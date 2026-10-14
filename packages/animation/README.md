@@ -21,7 +21,7 @@ Parses glTF skins, joint hierarchies and inverse bind matrices. Samples STEP, LI
 
 Use `animation.setMorph(nodeIndex, targetIndex, weight)` for manual expressions. Play a clip by name/index; set `loop:false` for one-shot playback. Four influences per vertex are supported; additional influence sets reject explicitly. No blending between clips is included.
 
-The separate `margoengine-animator` package adds gameplay states, blend trees, additive masks and foot IK while reusing this pass's palette buffers. `sampleTrack()` and `multiplyMatrices()` are exported for animation consumers.
+The separate `@margoengine/animator` package adds gameplay states, blend trees, additive masks and foot IK while reusing this pass's palette buffers. `sampleTrack()` and `multiplyMatrices()` are exported for animation consumers.
 
 ## Vertex animation textures (GPU crowds): `@margoengine/animation/vat`
 
