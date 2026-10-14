@@ -772,6 +772,30 @@
     ]
   },
   {
+    "id": "lod",
+    "title": "Lod",
+    "package": "@margoengine/lod",
+    "version": "0.1.0",
+    "published": false,
+    "description": "Level of detail with hysteresis and screen-size switching for thousands of instances, plus GPU-baked octahedral imposters drawn in one instanced call per atlas.",
+    "requirements": "Core ^0.1.0 || ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "lod",
+    "install": "npm install @margoengine/core@0.1.0 @margoengine/lod@0.1.0",
+    "imports": "import { Imposter } from '@margoengine/lod';",
+    "exports": [
+      "Imposter",
+      "LOD",
+      "LODSystem",
+      "MAX_LEVELS",
+      "bakeShader",
+      "frameBasis",
+      "frameDirection",
+      "frameMatrix",
+      "octDecode",
+      "octEncode"
+    ]
+  },
+  {
     "id": "materials",
     "title": "Materials",
     "package": "@margoengine/materials",

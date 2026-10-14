@@ -249,7 +249,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | --- | --- | --- | --- |
 | InstancedMesh | COVERED | core automatic instancing of meshes that share a `Geometry` (`packages/core/src/engine.ts`); scatter `ScatterInstances` | Each instance has its own PBR factors. At most 100,000 entities per engine. See the buffer-sizing note in [Ranked gaps](#ranked-gaps). |
 | BatchedMesh | MISSING | — | Each distinct geometry is its own draw call. |
-| LOD | PARTIAL | scatter's three GPU distance rings (`packages/scatter/src/index.ts`) | No general LOD object. |
+| LOD | COVERED | lod `LODSystem`, `Imposter` (`packages/lod/src/index.ts`, `imposter.ts`); scatter's GPU distance rings | Distance or screen-size levels with three.js hysteresis over core meshes, gltf-pro and materials models, geometry swaps and octahedral imposters (one instanced draw per atlas). Imposters are not pickable and cast no shadows. |
 | Points | COVERED † | points `PointCloud`, `PointsPlugin` (`packages/points/src/cloud.ts`) | Block culling and point budgets. |
 | Sprite | COVERED † | points `SpriteBatch` (`packages/points/src/sprites.ts`) | |
 | Line, LineSegments, LineLoop, Line2 | COVERED † | lines `Lines`, `Line` | WebGPU only. |
@@ -317,7 +317,7 @@ Every MISSING or PARTIAL item, ordered by how often real three.js projects need 
     **Fit:** move OBJ into loaders and add MTL. Needs gap 1 for textures.
 17. **SVGLoader.** Extruded logos and icons are common on marketing sites.
     **Fit:** extend loaders (geometry already has `Shape` and `extrudeGeometry`).
-18. **General LOD object.**
+18. **General LOD object.** (Since added as `@margoengine/lod`, with octahedral imposters.)
     **Fit:** new small package, or extend scatter.
 19. **Node materials, TSL, per-mesh custom shaders.** This is three r186's main extension model, and power users rely on it.
     **Fit:** new `@margoengine/shader` (material and uniform abstraction) on top of gltf-pro's draw path. **Started:** `@margoengine/shader` covers node materials, node post passes and node compute; per-mesh raw WGSL materials remain.
