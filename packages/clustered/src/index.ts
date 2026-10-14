@@ -6,10 +6,12 @@ import {orthographic} from '../../shared/projection.js';
 import {cullingShader,clusteredSampling} from './shader.js';
 export {clusteredSampling} from './shader.js';
 declare const GPUBufferUsage:{UNIFORM:number;STORAGE:number;COPY_DST:number;COPY_SRC:number};
-export interface PointLight {position:Vec3;range:number;color?:Vec3;intensity?:number}
+export interface PointLight {position:Vec3;range:number;color?:Vec3;intensity?:number;/** Casts shadows when \LocalShadows\ (\@margoengine/clustered/shadows\) is attached; the first \maxLights\ such lights get maps. */castShadow?:boolean}
 export interface SpotLight extends PointLight {direction:Vec3;outerAngle:number;innerAngle?:number}
 export interface ClusteredOptions {grid?:readonly [number,number,number]}
 export interface ClusteredReceiver {addLighting(effect:Clustered):()=>void}
+/** Per-light shadow term composed into the light loop (\LocalShadows\ from \@margoengine/clustered/shadows\). */
+export interface ClusteredShadow {declarations(group:number):string;bindings():GPUBindGroupEntry[]}
 export class Clustered implements EnginePlugin {
   readonly name='clustered';readonly grid:readonly [number,number,number];
   /** Multiplies all local lights; a callback is sampled each render. */
@@ -19,6 +21,10 @@ export class Clustered implements EnginePlugin {
   private readonly values=new Float32Array(32);private readonly ints=new Uint32Array(this.values.buffer);private readonly data=new Float32Array(1024*16);private lightCount=0;private dirty=true;private disposed=false;
   private readonly view=this.values.subarray(0,16);
   private readonly shaders=new Map<number,Map<string,string>>();private readonly hooks=new Map<number,{declarations:string;light:string}>();
+  private shadowHook?:ClusteredShadow;private joined?:[GPUBindGroupEntry[],GPUBindGroupEntry[],GPUBindGroupEntry[]];
+  /** Set by \LocalShadows\; changing it recomposes the shaders. */
+  get shadow():ClusteredShadow|undefined {return this.shadowHook;}
+  set shadow(hook:ClusteredShadow|undefined) {this.shadowHook=hook;this.shaders.clear();this.hooks.clear();}
   constructor(options:ClusteredOptions={}) {const grid=options.grid??[16,9,24];if(grid.length!==3||grid.some(v=>!Number.isInteger(v)||v<1||v>128)||grid.reduce((a,b)=>a*b,1)>32768)throw new RangeError('Invalid cluster grid');this.grid=[...grid] as [number,number,number];}
   get owner():Engine|undefined {return this.engine;}
   static attach(instance:EngineKernel,options:ClusteredOptions={}):Clustered {const effect=new Clustered(options);engineRuntime(instance).use(effect);return effect;}
@@ -28,20 +34,21 @@ export class Clustered implements EnginePlugin {
       if(!Number.isFinite(Math.fround(light.range))||light.range<=0||!Number.isFinite(Math.fround(light.intensity??1))||(light.intensity??1)<0||(light.color??[]).some((v:number)=>v<0))throw new RangeError('Invalid light range/color/intensity');
       if('direction' in light){finiteVector(light.direction,3,'Spot direction');if(!Math.hypot(...light.direction)||!Number.isFinite(light.outerAngle)||light.outerAngle<=0||light.outerAngle>=Math.PI/2||!Number.isFinite(light.innerAngle??0)||(light.innerAngle??0)<0||(light.innerAngle??0)>light.outerAngle)throw new RangeError('Invalid spot cone');}
     }
-    lights.forEach((light,i)=>{const offset=i*16;this.data.set([...light.position,light.range,...light.color??[1,1,1],light.intensity??1],offset);
-      if('direction' in light){const length=Math.hypot(...light.direction);this.data.set([...light.direction.map((v:number)=>v/length),Math.cos(light.outerAngle),Math.cos(light.innerAngle??0),1,0,0],offset+8);}else this.data.fill(0,offset+8,offset+16);
+    let shadows=0;lights.forEach((light,i)=>{const offset=i*16,slot=light.castShadow?++shadows:0;this.data.set([...light.position,light.range,...light.color??[1,1,1],light.intensity??1],offset);
+      if('direction' in light){const length=Math.hypot(...light.direction);this.data.set([...light.direction.map((v:number)=>v/length),Math.cos(light.outerAngle),Math.cos(light.innerAngle??0),1,slot,0],offset+8);}else{this.data.fill(0,offset+8,offset+16);this.data[offset+14]=slot;}
     });this.lightCount=lights.length;this.dirty=true;return this;
   }
   add(receiver:ClusteredReceiver):()=>void {if(this.disposed||!receiver||typeof receiver.addLighting!=='function'||this.receivers.has(receiver))throw new TypeError('Invalid or duplicate clustered receiver');const remove=receiver.addLighting(this);this.receivers.set(receiver,remove);return()=>{if(this.receivers.delete(receiver))remove();};}
-  bindings():GPUBindGroupEntry[] {if(!this.uniform||this.disposed)throw new Error('Clustered lighting is not attached');return this.entries;}
+  bindings():GPUBindGroupEntry[] {if(!this.uniform||this.disposed)throw new Error('Clustered lighting is not attached');const extra=this.shadowHook?.bindings();if(!extra)return this.entries;
+    if(this.joined?.[0]!==extra||this.joined[1]!==this.entries)this.joined=[extra,this.entries,[...this.entries,...extra]];return this.joined[2];}
   shader(source:string,group=0):string {
     let cache=this.shaders.get(group);const cached=cache?.get(source);if(cached)return cached;
     const base=source.includes('let base=terrainColor')?'base':'i.color';
     const code=source.replace(/let linear=([^;]+);/,`let linear=$1+clusterLighting(i.clip.xy,i.position,n,frame.eye.xyz,${base},i.material.x,i.material.y);`);
-    if(code===source)throw new Error('Clustered lighting requires the standard PBR shader');const output=clusteredSampling(group)+code;if(!cache){cache=new Map();this.shaders.set(group,cache);}cache.set(source,output);return output;
+    if(code===source)throw new Error('Clustered lighting requires the standard PBR shader');const output=clusteredSampling(group,this.shadowHook)+code;if(!cache){cache=new Map();this.shaders.set(group,cache);}cache.set(source,output);return output;
   }
   /** gltf-pro lighting hooks: local lights add to the surface's light. */
-  pbr(group:number):{declarations:string;light:string} {let hooks=this.hooks.get(group);if(!hooks)this.hooks.set(group,hooks={declarations:clusteredSampling(group),light:'clusterLighting(i.clip.xy,i.position,s.n,f.eye.xyz,s.base.rgb,s.roughness,s.metal)'});return hooks;}
+  pbr(group:number):{declarations:string;light:string} {let hooks=this.hooks.get(group);if(!hooks)this.hooks.set(group,hooks={declarations:clusteredSampling(group,this.shadowHook),light:'clusterLighting(i.clip.xy,i.position,s.n,f.eye.xyz,s.base.rgb,s.roughness,s.metal)'});return hooks;}
   setup(engine:Engine):void {
     if(this.disposed||!engine.gpu)throw new Error('Clustered lighting requires WebGPU and a live effect');this.engine=engine;this.device=engine.gpu;
     const count=this.grid[0]*this.grid[1]*this.grid[2],bytes=count*1024*4;

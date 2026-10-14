@@ -748,7 +748,7 @@ Verified matrix: `docs/threejs-parity.md`, re-tallied 2026-10-14 against 2c53227
 39 partial, 32 missing after textured instancing (InstancedMesh PARTIAL -> COVERED) and glTF export (GLTFExporter PARTIAL -> COVERED); ShadowMaterial became partial with staging's ContactShadows; was 65 / 43 / 45 in its stale summary; read from source, not run). The first audit's top gaps
 (materials, glTF extensions/decoders, picking models, IBL, background colour, post stack, ortho camera, math, FXAA) are
 closed. New top 10: WebGL2 beyond core, transparent canvas (core), multiple directional/coloured ambient/hemisphere
-lights, point and spot shadows, [DONE] textured instancing (+ `EXT_mesh_gpu_instancing`, see below), remaining glTF extensions
+lights, [DONE] point and spot shadows (see below), [DONE] textured instancing (+ `EXT_mesh_gpu_instancing`, see below), remaining glTF extensions
 (animation pointer, iridescence, anisotropy, dispersion, variants, refraction, cameras), physical materials on your own
 meshes, second UV set/groups/custom attributes, ShadowMaterial, [DONE, below] glTF export with animation. `docs/from-threejs.md`'s
 "Not yet" table matches it. Several need core changes (freeze conflicts listed in the doc); those are Scott's decision.
@@ -788,6 +788,25 @@ robot 464 -> 451 kB in 3.6 ms, 2 x 500 instanced grids 2.6 ms. Gzip (min, bare e
 7,157, usdz 5,911 -> 5,915, `/model` eager 6,859 (entry 5,175 + shared container 1,684), lazy chunks: clip writer 539,
 PNG encoder 1,026. `node packages/exporters/tests/png-browser.mjs` checks the canvas paths (flipY, maxTextureSize, passed on
 Edge 155). Left: cameras/lights, Draco/meshopt output, materials normal/matcap shading and custom blending.
+
+Point and spot light shadows (gap 4, done 2026-10-14, core untouched): `LocalShadows` in the new entry
+`@margoengine/clustered/shadows` (`packages/clustered/src/shadows.ts`). `castShadow: true` on a clustered light gives it a
+shadow ordinal in the light buffer's unused params.z; the first `maxLights` (1-16, default 4) get layers in one depth32float
+texture array (`resolution` default 512): six reversed-depth cube faces per point light (each a little over 90° so the 3x3
+PCF stays inside a face), one perspective map per spot light. Bias is texel-scaled at the receiver (`bias` toward the light,
+`normalBias` along the normal). Clustered's root gained a declared hook (`lights.shadow`, set by LocalShadows: its WGSL
+`clusterShadow(light,position,n)` multiplies each light in clustered's loop, its bindings 14-16 join clustered's), so core
+meshes and every `lights.add()` receiver (gltf-pro, materials) receive with no new text anchor. Casters via `add()`: core
+meshes, `shadowPrimitives` sources (gltf-pro, materials, `primitive.instances`, alpha masks); not terrain/scatter
+`drawShadow`. Maps re-render per light when the light changes, all when a caster moves/hides/changes instances or
+`shadowVersion`; `{dynamic:true}` (skinned) re-renders every frame. Proof: clustered GPU calls byte-identical vs 0ed56b9
+without the entry (`proofs/clustered-local-shadows.proof.js`; a `castShadow` flag alone changes only params.z). Real GPU
+(Arc 140V, AC before/after, lock held, `local-shadows-gpu.mjs`, `results/local-shadows-gpu.json`): shadows where expected
+for point and spot on core and materials floors from core, materials and instanced boxes, lit floor unchanged (acne 0),
+contact gap 0 px; frame 8.5 ms attached/unshadowed, 1/4/8 point lights 8.9/9.9/11.4 ms cached and 9.8/12.6/16.2 ms
+re-rendered each frame; timestamp GPU pass sums were noisy (unshadowed baseline without the entry read 4.5 ms, above the
+attached 3.7 ms), so the README quotes frame times. Size (min+gzip): clustered root 4,651 -> 4,829 (+178 B, the hook),
+the shadows entry 5.9 kB, shadows package unchanged. Left: per-light caster culling, `drawShadow` casters, PCSS.
 The older summary below predates the audit.
 
 From package descriptions, not yet audited against code:

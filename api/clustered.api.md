@@ -10,6 +10,8 @@ export class Clustered implements EnginePlugin {
     readonly name = "clustered";
     readonly grid: readonly [number, number, number];
     intensityScale: number | (() => number);
+    get shadow(): ClusteredShadow | undefined;
+    set shadow(hook: ClusteredShadow | undefined);
     constructor(options?: ClusteredOptions);
     get owner(): Engine | undefined;
     static attach(instance: EngineKernel, options?: ClusteredOptions): Clustered;
@@ -40,11 +42,17 @@ export interface ClusteredReceiver {
     addLighting(effect: Clustered): () => void;
 }
 
+export interface ClusteredShadow {
+    declarations(group: number): string;
+    bindings(): GPUBindGroupEntry[];
+}
+
 export interface PointLight {
     position: Vec3;
     range: number;
     color?: Vec3;
     intensity?: number;
+    castShadow?: boolean;
 }
 
 export interface SpotLight extends PointLight {
@@ -53,5 +61,7 @@ export interface SpotLight extends PointLight {
     innerAngle?: number;
 }
 
-export function clusteredSampling(group: number): string;
+export function clusteredSampling(group: number, shadow?: {
+    declarations(group: number): string;
+}): string;
 ```

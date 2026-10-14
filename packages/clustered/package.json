@@ -20,6 +20,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./shadows": {
+      "types": "./dist/shadows.d.ts",
+      "import": "./dist/shadows.js"
     }
   },
   "files": [
