@@ -96,7 +96,7 @@ it with every number (on battery Windows throttles the CPU/GPU and may drop the 
 0. Verification gates (serial, idle GPU): shader `browser-check.mjs` re-run; LOD/imposter 2,500-object benchmark on a
    quiet GPU; post full stack (SSAO+DOF+Bloom+Tonemap+FXAA) in a real scene, visuals and frame time; native FBX/USD in a
    real browser plus a memory audit (models unloaded/switched destroy their GPU buffers, no leaks); `scripts/modern-postfx-tests.js`
-   fails its first DOF check ("Near CoC sign/clamp") after `a281ad2` â€” run it on `9c761d5` to confirm it predates SSAO, then fix;
+   fails its first DOF check ("Near CoC sign/clamp") after `a281ad2`; run it on `9c761d5` to confirm it predates SSAO, then fix;
    GPU cost of the SSAO ambient replay with environment IBL on (now replays the full lit shader); helmet SSAO fixture
    (`scripts/modern-extension-tests.js`) needs a local helmet copy. [Done: size
    comparison is `npm run measure:threejs` (scripts/compare-threejs-size.js).] (Security review: later commit reviews in the
