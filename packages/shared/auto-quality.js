@@ -1,9 +1,12 @@
-const phone = /Mobi|Android/.test(globalThis.navigator?.userAgent ?? '');
+const phone = /Mobi|Android/.test(globalThis.navigator?.userAgent ?? ''), params = new URLSearchParams(globalThis.location?.search);
 let stored;
 try {stored = localStorage.margoQuality ?? (localStorage.margoLow ? 'low' : undefined);} catch {}
-// Desktops start on the light tier (1x MSAA, DPR 1) unless this browser already measured headroom for 4x, so a slow
-// PC never shows a slow phase or a reload. Runs at import, before any engine exists. Phones keep their 1x / DPR 2 path.
-if (!phone && stored !== 'high') globalThis.margoLow = 1;
+// For side-by-side testing: ?quality=high|low forces a tier without remembering it, ?scale=1..2 sets the light tier's pixel ratio.
+const forced = params.get('quality'), scale = Math.min(2, Math.max(1, Number(params.get('scale')) || 1));
+if (forced === 'high' || forced === 'low') stored = forced;
+// Desktops start on the light tier (1x MSAA, DPR `scale`) unless this browser already measured headroom for 4x, so a
+// slow PC never shows a slow phase or a reload. Runs at import, before any engine exists. Phones keep their 1x / DPR 2 path.
+if (!phone && stored !== 'high') globalThis.margoLow = scale;
 // A slow GPU on a 120 Hz panel otherwise swings between 120 and 40 FPS; hold it to a steady ~60.
 if (globalThis.margoLow && globalThis.requestAnimationFrame) capFrameRate();
 
@@ -33,6 +36,7 @@ export function watchFrameRate({request = globalThis.requestAnimationFrame, queu
   store = value => {localStorage.margoQuality = value;}, reload = () => location.reload()} = {}) {
   if (phone) return;
   if (!globalThis.margoLow) {
+    if (forced) return; // a forced tier is for testing: never store or reload
     let start = 0, last = 0, frames = 0, slow = 0, seconds = 0;
     const tick = time => {
       // A long gap is a hidden tab or a startup compile, not steady GPU load: start over.
