@@ -1,0 +1,471 @@
+{
+ "date": "2026-10-14T18:51:41.579Z",
+ "commit": "5b9dbbd",
+ "dirty": true,
+ "baseline": "5b9dbbd",
+ "acPowerBefore": true,
+ "rounds": 5,
+ "frames": 60,
+ "scenes": {
+  "gate": {
+   "focalDistance": 3.4,
+   "aperture": 1.4,
+   "maxRadius": 16
+  },
+  "near": {
+   "focalDistance": 1.6,
+   "aperture": 1.4,
+   "maxRadius": 16
+  },
+  "far": {
+   "focalDistance": 12,
+   "aperture": 1.4,
+   "maxRadius": 16
+  },
+  "wide": {
+   "focalDistance": 2,
+   "aperture": 0.35,
+   "maxRadius": 32
+  }
+ },
+ "scene": "DamagedHelmet + 11 core boxes, env IBL, PostStack [DOF, Tonemap neutral], DPR 1",
+ "quality": {
+  "gate": {
+   "oldVsOff": {
+    "meanAbsDiff": 0.1988,
+    "maxAbsDiff": 135,
+    "changedFraction": 0.00799
+   },
+   "newVsOld": {
+    "meanAbsDiff": 0.009,
+    "maxAbsDiff": 11,
+    "changedFraction": 0.00007
+   },
+   "coarse1VsOld": {
+    "meanAbsDiff": 0.009,
+    "maxAbsDiff": 11,
+    "changedFraction": 0.00007
+   },
+   "tieredVsOld": {
+    "meanAbsDiff": 0.009,
+    "maxAbsDiff": 11,
+    "changedFraction": 0.00007
+   }
+  },
+  "near": {
+   "oldVsOff": {
+    "meanAbsDiff": 1.2219,
+    "maxAbsDiff": 251,
+    "changedFraction": 0.05222
+   },
+   "newVsOld": {
+    "meanAbsDiff": 0.1016,
+    "maxAbsDiff": 118,
+    "changedFraction": 0.00289
+   },
+   "coarse1VsOld": {
+    "meanAbsDiff": 0.1397,
+    "maxAbsDiff": 184,
+    "changedFraction": 0.00463
+   },
+   "tieredVsOld": {
+    "meanAbsDiff": 0.0197,
+    "maxAbsDiff": 43,
+    "changedFraction": 0.00051
+   }
+  },
+  "far": {
+   "oldVsOff": {
+    "meanAbsDiff": 0.9178,
+    "maxAbsDiff": 226,
+    "changedFraction": 0.03961
+   },
+   "newVsOld": {
+    "meanAbsDiff": 0,
+    "maxAbsDiff": 0,
+    "changedFraction": 0
+   },
+   "coarse1VsOld": {
+    "meanAbsDiff": 0,
+    "maxAbsDiff": 0,
+    "changedFraction": 0
+   },
+   "tieredVsOld": {
+    "meanAbsDiff": 0,
+    "maxAbsDiff": 0,
+    "changedFraction": 0
+   }
+  },
+  "wide": {
+   "oldVsOff": {
+    "meanAbsDiff": 2.6547,
+    "maxAbsDiff": 248,
+    "changedFraction": 0.09093
+   },
+   "newVsOld": {
+    "meanAbsDiff": 0.1093,
+    "maxAbsDiff": 89,
+    "changedFraction": 0.00266
+   },
+   "coarse1VsOld": {
+    "meanAbsDiff": 0.1309,
+    "maxAbsDiff": 175,
+    "changedFraction": 0.00376
+   },
+   "tieredVsOld": {
+    "meanAbsDiff": 0,
+    "maxAbsDiff": 1,
+    "changedFraction": 0
+   }
+  }
+ },
+ "flicker": {
+  "gate": {
+   "old": {
+    "meanFrameToFrame": 0.4201,
+    "maxFrameToFrame": 0.4235
+   },
+   "new": {
+    "meanFrameToFrame": 0.4201,
+    "maxFrameToFrame": 0.4235
+   },
+   "coarse1": {
+    "meanFrameToFrame": 0.4201,
+    "maxFrameToFrame": 0.4235
+   },
+   "tiered": {
+    "meanFrameToFrame": 0.4201,
+    "maxFrameToFrame": 0.4235
+   }
+  },
+  "near": {
+   "old": {
+    "meanFrameToFrame": 0.1996,
+    "maxFrameToFrame": 0.2022
+   },
+   "new": {
+    "meanFrameToFrame": 0.1912,
+    "maxFrameToFrame": 0.1947
+   },
+   "coarse1": {
+    "meanFrameToFrame": 0.1948,
+    "maxFrameToFrame": 0.1979
+   },
+   "tiered": {
+    "meanFrameToFrame": 0.1994,
+    "maxFrameToFrame": 0.2018
+   }
+  }
+ },
+ "timing": {
+  "gate 1280x720 4x": {
+   "old": {
+    "median": 2.934,
+    "min": 2.744,
+    "max": 3.734,
+    "rounds": [
+     3.7338,
+     3.4591,
+     2.7442,
+     2.829,
+     2.9344
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.057,
+     "dof:1": 2.856
+    }
+   },
+   "new": {
+    "median": 1.596,
+    "min": 1.489,
+    "max": 1.748,
+    "rounds": [
+     1.7479,
+     1.5959,
+     1.7235,
+     1.4886,
+     1.4953
+    ],
+    "speedup": 1.84,
+    "passMedians": {
+     "dof:0": 0.117,
+     "dof:1": 1.005,
+     "dof:2": 0.495
+    }
+   },
+   "coarse1": {
+    "median": 1.692,
+    "min": 1.456,
+    "max": 1.724,
+    "rounds": [
+     1.7064,
+     1.6764,
+     1.4558,
+     1.7243,
+     1.6921
+    ],
+    "speedup": 1.73,
+    "passMedians": {
+     "dof:0": 0.134,
+     "dof:1": 1.019,
+     "dof:2": 0.524
+    }
+   },
+   "tiered": {
+    "median": 2.015,
+    "min": 1.718,
+    "max": 2.059,
+    "rounds": [
+     2.0286,
+     2.0151,
+     2.0593,
+     1.7182,
+     1.8799
+    ],
+    "speedup": 1.46,
+    "passMedians": {
+     "dof:0": 0.133,
+     "dof:1": 1.878
+    }
+   }
+  },
+  "near 1280x720 4x": {
+   "old": {
+    "median": 3.618,
+    "min": 3.147,
+    "max": 4.281,
+    "rounds": [
+     3.6182,
+     3.1469,
+     4.2808,
+     4.1857,
+     3.2275
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.057,
+     "dof:1": 3.539
+    }
+   },
+   "new": {
+    "median": 1.713,
+    "min": 1.676,
+    "max": 2.069,
+    "rounds": [
+     1.8661,
+     1.6764,
+     1.7129,
+     1.6889,
+     2.0689
+    ],
+    "speedup": 2.11,
+    "passMedians": {
+     "dof:0": 0.091,
+     "dof:1": 1.153,
+     "dof:2": 0.427
+    }
+   },
+   "coarse1": {
+    "median": 2.093,
+    "min": 1.652,
+    "max": 2.513,
+    "rounds": [
+     1.7931,
+     1.6519,
+     2.0927,
+     2.5134,
+     2.4931
+    ],
+    "speedup": 1.73,
+    "passMedians": {
+     "dof:0": 0.113,
+     "dof:1": 1.337,
+     "dof:2": 0.442
+    }
+   },
+   "tiered": {
+    "median": 2.238,
+    "min": 1.95,
+    "max": 2.546,
+    "rounds": [
+     1.95,
+     1.9697,
+     2.3843,
+     2.238,
+     2.5456
+    ],
+    "speedup": 1.62,
+    "passMedians": {
+     "dof:0": 0.091,
+     "dof:1": 2.117
+    }
+   }
+  },
+  "far 1280x720 4x": {
+   "old": {
+    "median": 3.273,
+    "min": 3.065,
+    "max": 3.528,
+    "rounds": [
+     3.081,
+     3.0654,
+     3.3191,
+     3.5279,
+     3.2728
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.059,
+     "dof:1": 3.187
+    }
+   },
+   "new": {
+    "median": 0.874,
+    "min": 0.856,
+    "max": 0.926,
+    "rounds": [
+     0.8735,
+     0.8562,
+     0.9258,
+     0.8783,
+     0.8612
+    ],
+    "speedup": 3.75,
+    "passMedians": {
+     "dof:0": 0.135,
+     "dof:1": 0.054,
+     "dof:2": 0.675
+    }
+   },
+   "coarse1": {
+    "median": 0.879,
+    "min": 0.53,
+    "max": 1.037,
+    "rounds": [
+     0.8649,
+     0.5304,
+     1.0367,
+     0.8794,
+     1.0269
+    ],
+    "speedup": 3.72,
+    "passMedians": {
+     "dof:0": 0.137,
+     "dof:1": 0.055,
+     "dof:2": 0.671
+    }
+   },
+   "tiered": {
+    "median": 0.809,
+    "min": 0.805,
+    "max": 0.967,
+    "rounds": [
+     0.8085,
+     0.9672,
+     0.8303,
+     0.8048,
+     0.8095
+    ],
+    "speedup": 4.04,
+    "passMedians": {
+     "dof:0": 0.135,
+     "dof:1": 0.675
+    }
+   }
+  },
+  "wide 1280x720 4x": {
+   "old": {
+    "median": 5.008,
+    "min": 4.107,
+    "max": 6.427,
+    "rounds": [
+     4.1075,
+     6.4269,
+     5.8364,
+     4.6204,
+     5.0083
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.069,
+     "dof:1": 4.81
+    }
+   },
+   "new": {
+    "median": 2.374,
+    "min": 2.141,
+    "max": 2.413,
+    "rounds": [
+     2.1409,
+     2.4127,
+     2.3651,
+     2.3739,
+     2.3828
+    ],
+    "speedup": 2.11,
+    "passMedians": {
+     "dof:0": 0.114,
+     "dof:1": 1.738,
+     "dof:2": 0.477
+    }
+   },
+   "coarse1": {
+    "median": 2.343,
+    "min": 2.147,
+    "max": 2.656,
+    "rounds": [
+     2.1472,
+     2.6564,
+     2.1955,
+     2.3432,
+     2.5975
+    ],
+    "speedup": 2.14,
+    "passMedians": {
+     "dof:0": 0.112,
+     "dof:1": 1.689,
+     "dof:2": 0.365
+    }
+   },
+   "tiered": {
+    "median": 2.557,
+    "min": 2.374,
+    "max": 2.884,
+    "rounds": [
+     2.6205,
+     2.5573,
+     2.3742,
+     2.5188,
+     2.8838
+    ],
+    "speedup": 1.96,
+    "passMedians": {
+     "dof:0": 0.087,
+     "dof:1": 2.434
+    }
+   }
+  }
+ },
+ "hardware": {
+  "webglRenderer": "ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (16GB) (0x000064A0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "webgpu": {
+   "vendor": "intel",
+   "architecture": "xe-2lpg",
+   "device": "0x64a0",
+   "description": "Intel(R) Arc(TM) 140V GPU (16GB)",
+   "fallback": false
+  },
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+  "browserName": "chromium",
+  "browserVersion": "155.0.4283.45",
+  "requestedChannel": "msedge",
+  "launchArgs": [
+   "--enable-webgpu-developer-features"
+  ],
+  "powerPreference": "high-performance",
+  "hostPlatform": "win32",
+  "headless": true
+ },
+ "acPowerAfter": true
+}
