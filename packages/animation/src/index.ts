@@ -1,7 +1,8 @@
 import type {PBRModel,PBRPrimitive} from '@margoengine/gltf-pro';
 import type {Engine,EnginePlugin,FrameGraph,PassContext} from '@margoengine/core/extension';
 import {invert} from '../../shared/math.js';
-import {sampleTrackInto,multiplyMatrices,type Interpolation} from './sampling.js';
+import {multiplyMatrices} from '@margoengine/math/mat4';
+import {sampleTrackInto,type Interpolation} from './sampling.js';
 import {deformationShader} from './shader.js';
 export {sampleTrack,sampleTrackInto,multiplyMatrices,type Interpolation} from './sampling.js';
 declare const GPUBufferUsage:{STORAGE:number;VERTEX:number;COPY_DST:number;COPY_SRC:number;UNIFORM:number};
@@ -134,8 +135,8 @@ export class Animation implements EnginePlugin {
       if(r.joints.length) {
         if(!invert(this.inverse,r.primitive.node.matrix,0,this.workspace))throw new Error('Singular skinned mesh transform');
         for(let i=0;i<r.joints.length;i++){
-          multiplyMatrices(this.joint,this.model.nodes[r.joints[i]].matrix,r.inverseBind[i]);
-          multiplyMatrices(this.product,this.inverse,this.joint);r.palette.set(this.product,i*16);
+          multiplyMatrices(this.model.nodes[r.joints[i]].matrix,r.inverseBind[i],this.joint);
+          multiplyMatrices(this.inverse,this.joint,this.product);r.palette.set(this.product,i*16);
         }
         if(r.palette.some(v=>!Number.isFinite(v)))throw new RangeError('Skin matrix overflow');
         context.device.queue.writeBuffer(r.bones,0,r.palette as Float32Array<ArrayBuffer>);

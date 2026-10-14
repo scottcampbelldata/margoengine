@@ -2,6 +2,7 @@
 // normalizes geometry and materials, and computes local and world transforms in double precision.
 import {engineRuntime, meshRuntime} from '@margoengine/core/extension';
 import type {EngineKernel, Mesh, Geometry, PbrMaterial} from '@margoengine/core';
+import {multiplyMatrices} from '@margoengine/math/mat4';
 
 /** Plain geometry with optional UVs, tangents and vertex colors, for data that core `Geometry` cannot hold. */
 export interface GeometryData {
@@ -233,12 +234,6 @@ export function compose(t: number[], q: number[], s: number[]): Float64Array {
   ]);
 }
 
-export function multiply(a: Float64Array, b: Float64Array): Float64Array {
-  const out = new Float64Array(16);
-  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) out[c*4+r] = a[r]*b[c*4]+a[4+r]*b[c*4+1]+a[8+r]*b[c*4+2]+a[12+r]*b[c*4+3];
-  return out;
-}
-
 export const determinant3 = (m: Float64Array): number =>
   m[0]*(m[5]*m[10]-m[6]*m[9])-m[4]*(m[1]*m[10]-m[2]*m[9])+m[8]*(m[1]*m[6]-m[2]*m[5]);
 
@@ -280,7 +275,7 @@ export function unitQuaternion(q: number[]): number[] {
 function makeNode(name: unknown, t: number[], r: number[], s: number[], parent: Float64Array|null): Node {
   if (s.some(v => Math.fround(v) === 0)) throw new RangeError('Scale must be nonzero');
   const local = compose(t, r, s);
-  return {name: typeof name === 'string' && name ? name : undefined, t, r, s, local, world: parent ? multiply(parent, local) : local, children: []};
+  return {name: typeof name === 'string' && name ? name : undefined, t, r, s, local, world: parent ? multiplyMatrices(parent, local, new Float64Array(16)) : local, children: []};
 }
 
 function isEngine(source: unknown): source is EngineKernel {
@@ -337,7 +332,7 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
       }
       for (const id of chain) {
         const t = store.transforms, local = compose([t.x[id], t.y[id], t.z[id]], unitQuaternion([t.qx[id], t.qy[id], t.qz[id], t.qw[id]]), [t.sx[id], t.sy[id], t.sz[id]]);
-        base = base ? multiply(base, local) : local;
+        base = base ? multiplyMatrices(base, local, new Float64Array(16)) : local;
       }
     }
     return roots.map(mesh => visit(mesh, base, 0)).filter((node): node is Node => node !== null);

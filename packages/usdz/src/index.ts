@@ -11,6 +11,7 @@ import {
   type USDValue,
 } from "@margoengine/loaders";
 import { parseCrate, type Specs } from "./crate.js";
+import { multiplyMatrices } from "@margoengine/math/mat4";
 
 export interface USDOptions {
   maxBytes?: number;
@@ -134,17 +135,6 @@ function parseLayer(input: string | BinaryInput, options: USDOptions): Specs {
   }
   return specs;
 }
-function multiply(a: number[], b: number[]): number[] {
-  const out = new Array<number>(16);
-  for (let c = 0; c < 4; c++)
-    for (let r = 0; r < 4; r++)
-      out[c * 4 + r] =
-        a[r] * b[c * 4] +
-        a[4 + r] * b[c * 4 + 1] +
-        a[8 + r] * b[c * 4 + 2] +
-        a[12 + r] * b[c * 4 + 3];
-  return out;
-}
 function compose(path: string, specs: Specs): number[] {
   const order =
       specs[path + ".xformOpOrder"]?.fields.default ??
@@ -185,12 +175,12 @@ function compose(path: string, specs: Specs): number[] {
         m[b * 4 + b] = c;
         m[a * 4 + b] = s;
         m[b * 4 + a] = -s;
-        rotation = multiply(m, rotation);
+        rotation = multiplyMatrices(m, rotation, new Array<number>(16));
       }
-      out = multiply(out, rotation);
+      out = multiplyMatrices(out, rotation, new Array<number>(16));
       continue;
     } else fail("unsupported transform " + name);
-    out = multiply(out, op);
+    out = multiplyMatrices(out, op, new Array<number>(16));
   }
   return out;
 }

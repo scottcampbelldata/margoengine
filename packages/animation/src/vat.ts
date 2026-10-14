@@ -2,7 +2,7 @@ import type {Engine,EnginePlugin,FrameGraph,PassContext} from '@margoengine/core
 import type {Animation} from './index.js';
 import {invert} from '../../shared/math.js';
 import {acesShader} from '../../shared/aces.js';
-import {multiplyMatrices} from './sampling.js';
+import {multiplyMatrices} from '@margoengine/math/mat4';
 declare const GPUBufferUsage:{UNIFORM:number;STORAGE:number;VERTEX:number;INDEX:number;COPY_DST:number};
 declare const GPUTextureUsage:{TEXTURE_BINDING:number;COPY_DST:number};
 type Context=Extract<PassContext,{backend:'webgpu'}>;
@@ -46,8 +46,8 @@ export function bakeVAT(animation:Animation,{fps=30,clips}:VATBakeOptions={}):VA
         let o=row*vertexCount*8;
         for(const x of parts){
           const {p,joints,palette,ids:j,weights:w}=x,v=p.vertices;
-          if(joints.length)for(let i=0;i<joints.length;i++){multiplyMatrices(joint,model.nodes[joints[i]].matrix,x.bind.subarray(i*16,i*16+16));multiplyMatrices(palette.subarray(i*16,i*16+16),root,joint);}
-          else multiplyMatrices(palette,root,p.node.matrix);
+          if(joints.length)for(let i=0;i<joints.length;i++){multiplyMatrices(model.nodes[joints[i]].matrix,x.bind.subarray(i*16,i*16+16),joint);multiplyMatrices(root,joint,palette.subarray(i*16,i*16+16));}
+          else multiplyMatrices(root,p.node.matrix,palette);
           for(let i=0;i<x.count;i++,o+=8){
             let px=v[i*20],py=v[i*20+1],pz=v[i*20+2],nx=v[i*20+4],ny=v[i*20+5],nz=v[i*20+6];
             for(let t=0;t<x.deltas.length;t++){const [dp,dn]=x.deltas[t],wt=p.weights[t];if(dp){px+=dp[i*3]*wt;py+=dp[i*3+1]*wt;pz+=dp[i*3+2]*wt;}if(dn){nx+=dn[i*3]*wt;ny+=dn[i*3+1]*wt;nz+=dn[i*3+2]*wt;}}

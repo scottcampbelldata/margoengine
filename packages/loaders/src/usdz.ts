@@ -2,6 +2,7 @@ import {LoaderError,type LoadedGeometry,type LoadedGroup,type ParseLimits} from 
 import {limits,throwIfAborted,toBytes,type BinaryInput} from './util.js';
 import {readZipDirectory,readZipEntry,type ZipOptions} from './zip.js';
 import {computeVertexNormals} from './normals.js';
+import {multiplyMatrices} from '@margoengine/math/mat4';
 
 const F='USD';
 export interface USDOptions extends ParseLimits,Pick<ZipOptions,'maxEntries'|'maxEntryBytes'|'signal'> {
@@ -20,11 +21,6 @@ export interface USDAReadOptions {maxDepth?:number;signal?:AbortSignal;
   skipOver?:boolean}
 function fail(code:'syntax'|'unsupported'|'range'|'limit',message:string):never {throw new LoaderError(F,code,message);}
 const identity=():Float64Array=>new Float64Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);
-function multiply(a:Float64Array,b:Float64Array):Float64Array {
-  const out=new Float64Array(16);
-  for(let c=0;c<4;c++)for(let r=0;r<4;r++)out[c*4+r]=a[r]*b[c*4]+a[4+r]*b[c*4+1]+a[8+r]*b[c*4+2]+a[12+r]*b[c*4+3];
-  return out;
-}
 function numbers(value:Value|undefined,size?:number):number[] {
   if(!Array.isArray(value)||value.some(v=>typeof v!=='number'||!Number.isFinite(v))||size!==undefined&&value.length!==size)fail('syntax','expected a numeric tuple or array');
   return value as number[];
@@ -50,12 +46,12 @@ function transform(prim:Prim,parent:Float64Array,base:Float64Array):Float64Array
       const angles=numbers(value,3).map(v=>v*Math.PI/180);
       for(let axis=0;axis<3;axis++) {
         const rotation=identity(),a=(axis+1)%3,b=(axis+2)%3,c=Math.cos(angles[axis]),s=Math.sin(angles[axis]);
-        rotation[a*4+a]=c;rotation[b*4+b]=c;rotation[a*4+b]=s;rotation[b*4+a]=-s;matrix=multiply(rotation,matrix);
+        rotation[a*4+a]=c;rotation[b*4+b]=c;rotation[a*4+b]=s;rotation[b*4+a]=-s;matrix=multiplyMatrices(rotation,matrix,new Float64Array(16));
       }
     }else fail('unsupported',`unsupported transform ${name}`);
-    local=multiply(local,matrix);
+    local=multiplyMatrices(local,matrix,new Float64Array(16));
   }
-  return multiply(inherited,local);
+  return multiplyMatrices(inherited,local,new Float64Array(16));
 }
 
 /** Tokenizes a static USDA layer into its `def` prim tree. Composition, variants and time samples are rejected explicitly. */

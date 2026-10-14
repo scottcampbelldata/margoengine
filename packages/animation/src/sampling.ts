@@ -1,3 +1,4 @@
+import {multiplyMatrices as multiply} from '@margoengine/math/mat4';
 export type Interpolation='STEP'|'LINEAR'|'CUBICSPLINE';
 export function sampleTrack(times:Float32Array,values:Float32Array,width:number,time:number,interpolation:Interpolation,quaternion=false):Float32Array {
   return sampleTrackInto(times,values,width,time,interpolation,quaternion);
@@ -24,6 +25,5 @@ export function sampleTrackInto(times:Float32Array,values:Float32Array,width:num
   for(let c=0;c<width;c++)if(!Number.isFinite(out[c]))throw new RangeError('Animation sample overflow');
   return out;
 }
-export function multiplyMatrices(out:Float32Array,a:ArrayLike<number>,b:ArrayLike<number>):void {
-  for(let c=0;c<4;c++)for(let r=0;r<4;r++)out[c*4+r]=a[r]*b[c*4]+a[4+r]*b[c*4+1]+a[8+r]*b[c*4+2]+a[12+r]*b[c*4+3];
-}
+/** out = a * b (column-major); `@margoengine/math/mat4` multiplyMatrices with `out` first. */
+export function multiplyMatrices(out:Float32Array,a:ArrayLike<number>,b:ArrayLike<number>):void {multiply(a,b,out);}
