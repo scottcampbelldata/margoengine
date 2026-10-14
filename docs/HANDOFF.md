@@ -742,8 +742,8 @@ Before launch, in addition to the work queue:
 
 ## Feature gaps versus three.js (after optimization; each as an optional package)
 
-Verified matrix: `docs/threejs-parity.md`, re-tallied 2026-10-14 against 2c53227 (156 three.js features: 84 covered,
-40 partial, 32 missing after textured instancing (InstancedMesh PARTIAL -> COVERED); ShadowMaterial became partial with staging's ContactShadows; was 65 / 43 / 45 in its stale summary; read from source, not run). The first audit's top gaps
+Verified matrix: `docs/threejs-parity.md`, re-tallied 2026-10-14 against 2c53227 (156 three.js features: 85 covered,
+39 partial, 32 missing after textured instancing (InstancedMesh PARTIAL -> COVERED) and glTF export (GLTFExporter PARTIAL -> COVERED); ShadowMaterial became partial with staging's ContactShadows; was 65 / 43 / 45 in its stale summary; read from source, not run). The first audit's top gaps
 (materials, glTF extensions/decoders, picking models, IBL, background colour, post stack, ortho camera, math, FXAA) are
 closed. New top 10: WebGL2 beyond core, transparent canvas (core), multiple directional/coloured ambient/hemisphere
 lights, point and spot shadows, [DONE] textured instancing (+ `EXT_mesh_gpu_instancing`, see below), remaining glTF extensions
@@ -784,8 +784,8 @@ unnormalized-weight errors are gone; its 4 skinned-mesh-hierarchy warnings and t
 are the source's). Time/size (`examples/package-benchmarks/exporters-model.mjs`, Node 24): helmet 3.77 MB in 7.7 ms,
 robot 464 -> 451 kB in 3.6 ms, 2 x 500 instanced grids 2.6 ms. Gzip (min, bare external): scene glTF path 7,079 ->
 7,157, usdz 5,911 -> 5,915, `/model` eager 6,859 (entry 5,175 + shared container 1,684), lazy chunks: clip writer 539,
-PNG encoder 1,026. `node packages/exporters/tests/png-browser.mjs` checks the canvas paths (flipY, maxTextureSize) in
-Chromium. Left: cameras/lights, Draco/meshopt output, materials normal/matcap shading and custom blending.
+PNG encoder 1,026. `node packages/exporters/tests/png-browser.mjs` checks the canvas paths (flipY, maxTextureSize, passed on
+Edge 155). Left: cameras/lights, Draco/meshopt output, materials normal/matcap shading and custom blending.
 The older summary below predates the audit.
 
 From package descriptions, not yet audited against code:

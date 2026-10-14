@@ -136,7 +136,7 @@ morph weights at five times per clip within 2e-5), an exported pose with edited 
 50 `EXT_mesh_gpu_instancing` grids with tints and a reduced count, materials meshes (raw textures decoded back from the
 PNG exactly, samplers, UV transform, BLEND/MASK, unlit, instanced with a mirrored instance) and `.gltf` output; every
 output is validated with no error or warning beyond the source's. `node tests/png-browser.mjs` checks the canvas paths
-(ImageBitmap sources, flipY, maxTextureSize) in Chromium.
+(ImageBitmap sources, flipY, maxTextureSize) in headless Edge (`BROWSER_CHANNEL`); passed on Edge 155.
 
 `npm run test:browser` builds a parented hierarchy with shared geometry, two materials and a hidden mesh in a real WebGPU engine (Playwright, honoring `BROWSER_CHANNEL`, `BROWSER_EXECUTABLE` and `BROWSER_ARGS`), exports it, re-imports the GLB into the same engine and compares canvas pixels, world matrices and vertex data, checks for zero WebGPU validation errors, and validates the browser-made GLB, glTF and flattened GLB with the Khronos validator.
 
