@@ -1,9 +1,9 @@
 import type {PBRModel,PBRPrimitive} from '@margoengine/gltf-pro';
 import type {Engine,EnginePlugin,FrameGraph,PassContext} from '@margoengine/core/extension';
 import {invert} from '../../shared/math.js';
-import {sampleTrack,multiplyMatrices,type Interpolation} from './sampling.js';
+import {sampleTrackInto,multiplyMatrices,type Interpolation} from './sampling.js';
 import {deformationShader} from './shader.js';
-export {sampleTrack,multiplyMatrices,type Interpolation} from './sampling.js';
+export {sampleTrack,sampleTrackInto,multiplyMatrices,type Interpolation} from './sampling.js';
 declare const GPUBufferUsage:{STORAGE:number;VERTEX:number;COPY_DST:number;COPY_SRC:number;UNIFORM:number};
 interface Track {node:number;path:'translation'|'rotation'|'scale'|'weights';times:Float32Array;values:Float32Array;width:number;interpolation:Interpolation}
 interface Clip {name:string;duration:number;tracks:Track[]}
@@ -16,6 +16,7 @@ export class Animation implements EnginePlugin {
   playing=true;time=0;clip=0;
   private device?:GPUDevice;private pipeline?:GPUComputePipeline;private resources:Deformation[]=[];
   private readonly inverse=new Float32Array(16);private readonly joint=new Float32Array(16);private readonly product=new Float32Array(16);private readonly workspace=new Float64Array(52);
+  private readonly samples:Float32Array[][];private readonly quaternion:number[]=[0,0,0,1];
   private disposed=false;
   private unsubscribe?:()=>void;
   private readonly rest:Array<{position:[number,number,number];scale:[number,number,number];rotation:number[]}>;
@@ -42,6 +43,7 @@ export class Animation implements EnginePlugin {
       });
       return {name:def.name??'Animation '+id,duration:Math.max(0,...tracks.map(t=>t.times.at(-1)!)),tracks};
     });
+    this.samples=this.clips.map(clip=>clip.tracks.map(track=>new Float32Array(track.width)));
   }
   static attach(model:PBRModel,options:AnimationOptions={}):Animation {const animation=new Animation(model,options);model.root.engine.use(animation);return animation;}
   private validate():void {
@@ -63,11 +65,11 @@ export class Animation implements EnginePlugin {
   private apply(time:number):void {
     const clip=this.clips[this.clip];if(!clip)return;
     const t=(this.options.loop??true)&&clip.duration>0?time%clip.duration:Math.min(time,clip.duration);
-    for(const track of clip.tracks) {
-      const value=sampleTrack(track.times,track.values,track.width,t,track.interpolation,track.path==='rotation'),node=this.model.nodes[track.node];node.check();
+    for(let i=0;i<clip.tracks.length;i++) {const track=clip.tracks[i];
+      const value=sampleTrackInto(track.times,track.values,track.width,t,track.interpolation,track.path==='rotation',this.samples[this.clip]?.[i]),node=this.model.nodes[track.node];node.check();
       if(track.path==='translation')node.setPosition(value as unknown as [number,number,number]);
       else if(track.path==='scale')node.setScale(value as unknown as [number,number,number]);
-      else if(track.path==='rotation')node.setQuaternion(Array.from(value));
+      else if(track.path==='rotation'){if(value.length!==4)node.setQuaternion(Array.from(value));else{for(let c=0;c<4;c++)this.quaternion[c]=value[c];node.setQuaternion(this.quaternion);}}
       else for(const p of this.model.primitives)if(p.nodeIndex===track.node)p.weights.set(value);
     }
   }
