@@ -17,12 +17,14 @@ for (const [name, load] of [
   ['DamagedHelmet (textured, tangents)', () => asset('damaged-helmet.glb')],
   ['RobotExpressive (skins, morph targets, animations)', () => asset('robot-expressive.glb')],
   ['generated 2 x 66k-vertex grids (one without normals)', async () => bigGLB({segments: 256, meshes: 2})],
+  ['generated grids drawn 50 times each through EXT_mesh_gpu_instancing', async () => bigGLB({segments: 16, meshes: 2, instances: 50})],
 ]) test(`worker-parsed glTF equals main-thread parse: ${name}`, () => headlessModels(async () => {
   const glb = new Uint8Array(await load());
   const main = await parseGLTFAsync(await headless(), glb.slice());
   const prepared = await runParseWorker(worker, {url: 'https://example.test/', input: glb.slice().buffer});
   const viaWorker = modelFromPrepared(await headless(), prepared);
   assert.ok(main.primitives.length > 0);
+  if (name.includes('instancing')) assert.equal(main.primitives[0].instances.count, 50);
   assertSameBytes(snapshot(viaWorker), snapshot(main));
   // The worker packed every primitive, so the main thread decoded nothing.
   assert.ok(prepared.geometry.flat().every(Boolean));
