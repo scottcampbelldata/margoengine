@@ -83,7 +83,7 @@ Five parallel workers reviewed 58 packages against baseline `f05414a`; Claude ve
 Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (`c82e119`), WebGL renderer moved to
 `@margoengine/webgl` (`1356787`; core + stage 18,554 gzip), `@margoengine/math` (`88517f8`).
 
-1. Top-10 parity gaps (non-core parts): materials package [running], glTF extensions/decoders [running], post stack +
+1. Top-10 parity gaps (non-core parts): materials package [done: `@margoengine/materials`], glTF extensions/decoders [running], post stack +
    FXAA [running], raycast/pick glTF models + DragControls, environment IBL apply + background colour + fog,
    orthographic/vertical cameras without core change, WebGL beyond core (gap 8: scope with Scott first).
 2. Dedupe: two particle systems (creative GPUParticles vs vfx), two bloom paths (post Bloom vs creative
@@ -101,7 +101,10 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
 6. Then give Scott the full list of what was done and what remains.
 
 Worker practice: agents run in git worktrees; they must start with `git reset --hard perf/auto-quality` (worktrees
-default to an old base) and must not run a full `npm install` (shared node_modules junction).
+default to an old base). Do not junction the whole node_modules (then `@margoengine/*` resolves to the main checkout's
+packages): make a real `node_modules` folder holding junctions to the main checkout's third-party packages and
+`@margoengine/*` junctions to the worktree's own packages. Never run a full `npm install` in a worktree; lockfile only
+via `npm install --package-lock-only --offline --no-audit --no-fund --ignore-scripts`.
 
 ## Feature gaps versus three.js (after optimization; each as an optional package)
 
