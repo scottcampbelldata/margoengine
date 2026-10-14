@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel, Mesh} from '@margoengine/core';
 import {engineRuntime, meshRuntime} from '@margoengine/core/extension';
 import {Raycaster, isModel, type ModelLike, type RaycasterHit} from '@margoengine/bvh';
@@ -41,6 +42,8 @@ export class DragControls extends EventDispatcher {
   private pointerId: number | null = null;
   private previousTouchAction = '';
 
+  /** Creates the DragControls on `engine` (preferred over the constructor). */
+  static attach(engine: EngineKernel, objects?: DragObject[], options?: DragControlsOptions): DragControls {return new DragControls(engine, objects, options);}
   constructor(engine: EngineKernel, objects: DragObject[] = [], options: DragControlsOptions = {}) {
     super();
     this.engine = engine; this.objects = objects; this.plane = options.plane ?? 'view'; this.axis = options.axis ?? null;
@@ -65,6 +68,8 @@ export class DragControls extends EventDispatcher {
     this.element = null;
   }
   dispose(): void {this.disconnect(); this.objects = [];}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 
   /** Nearest draggable hit at CSS pixel coordinates relative to the element, or null. */
   intersect(x: number, y: number): {object: DragObject; hit: RaycasterHit} | null {

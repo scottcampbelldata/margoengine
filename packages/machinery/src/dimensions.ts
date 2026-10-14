@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import {engineRuntime,meshRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
 import type {EngineKernel,Vec3} from '@margoengine/core';
 import {Lines,Line} from '@margoengine/lines';
@@ -132,5 +133,7 @@ export class Dimensions implements EnginePlugin {
  }
  /** Removes the dimensions, their lines and text from the engine and frees their GPU resources. */
  dispose():void {const e=this.engine;if(!e)return;this.engine=undefined;e.removePlugin(this.lines.name);e.removePlugin(this.text.name);e.removePlugin(this.name);}
+ declare [Symbol.dispose]: () => void;
+ [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }
 const sub2=(a:Point,b:Point):Point=>[a[0]-b[0],a[1]-b[1]];

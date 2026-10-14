@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {Camera,EngineKernel} from '@margoengine/core';
 import type {FrameGraph} from '@margoengine/core/extension';
 
@@ -57,6 +58,8 @@ export class ViewCube {
   private animation?:{theta:number;phi:number;dTheta:number;dPhi:number;radius:number;elapsed:number;duration:number;at?:readonly number[]};
   private last='';private disposed=false;private upSet?:V3;private upPrev?:Camera['up'];
 
+  /** Creates the ViewCube on `engine` (preferred over the constructor). */
+  static attach(engine: EngineKernel, options?: ViewCubeOptions): ViewCube {return new ViewCube(engine, options);}
   constructor(readonly engine:EngineKernel,{container=engine.canvas.parentElement!,corner='top-right',size=80,duration=0.4,projection,labels={}}:ViewCubeOptions={}) {
     if(!container)throw new TypeError('ViewCube needs a container (the canvas has no parent)');
     if(!(size>0)||!(duration>=0))throw new RangeError('Invalid ViewCube size or duration');
@@ -142,6 +145,8 @@ export class ViewCube {
     this.container.style.position=this.position;
     if(!this.engine.disposed&&this.engine.hasPlugin(this.name))this.engine.removePlugin(this.name);
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 
   /** Moves the camera to azimuth theta and polar angle phi around the target; near the poles exactly onto them. */
   private place(theta:number,phi:number,r:number):V3 {

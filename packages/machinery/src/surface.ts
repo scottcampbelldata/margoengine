@@ -1,5 +1,6 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import {meshRuntime} from '@margoengine/core/extension';
-import type {Mesh as MeshHandle} from '@margoengine/core';
+import type {EngineKernel,Mesh as MeshHandle} from '@margoengine/core';
 import type {Engine,EnginePlugin,Vec3} from '@margoengine/core/extension';
 import {machineryMemory} from './runtime.js';
 export interface SurfaceCarrier {node:MeshHandle;velocity?:Vec3;angularVelocity?:Vec3;contactOffset?:Vec3}
@@ -11,6 +12,8 @@ function vector(v:Vec3):void {if(v.length!==3)throw new TypeError('Invalid surfa
 export class SurfacePhysics implements EnginePlugin {
   readonly name='surface-physics';private engine?:Engine;private disposed=false;
   private constructor(readonly parts:readonly ConveyingPart[],readonly carriers:readonly SurfaceCarrier[],readonly options:SurfaceOptions,private readonly memory:Awaited<ReturnType<typeof machineryMemory>>,readonly data:Float32Array){}
+  /** `engine.use(await SurfacePhysics.create(parts, carriers, options))`; resolves to the attached SurfacePhysics. */
+  static async attach(engine:EngineKernel,parts:readonly ConveyingPart[],carriers:readonly SurfaceCarrier[],options?:SurfaceOptions):Promise<SurfacePhysics> {const value=await SurfacePhysics.create(parts,carriers,options);engine.use(value);return value;}
   static async create(parts:readonly ConveyingPart[],carriers:readonly SurfaceCarrier[],options:SurfaceOptions={}):Promise<SurfacePhysics> {
     if(!parts.length||parts.length>100_000||!carriers.length||carriers.length>100_000||!Number.isFinite(options.gravity??9.80665)||(options.gravity??9.80665)<0)throw new RangeError('Invalid surface limits');
     const memory=await machineryMemory(parts.length*27*4);return new SurfacePhysics(parts,carriers,options,memory,new Float32Array(memory.buffer,memory.ptr,parts.length*26));
@@ -37,4 +40,6 @@ export class SurfacePhysics implements EnginePlugin {
     for(let i=0;i<n;i++){const id=meshRuntime(this.parts[i].node).id,t=engine.store.transforms;t.x[id]=d[i];t.y[id]=d[n+i];t.z[id]=d[2*n+i];}
   }
   dispose():void {this.engine=undefined;this.disposed=true;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

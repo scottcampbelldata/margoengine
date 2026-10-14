@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import {meshRuntime} from '@margoengine/core/extension';
 import type {Mesh,Vec3} from '@margoengine/core';
 import type {Geometry} from '@margoengine/core/extension';
@@ -57,4 +58,6 @@ export class AssemblyBVH {
     return best;
   }
   dispose():void {this.disposed=true;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

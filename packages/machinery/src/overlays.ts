@@ -1,3 +1,5 @@
+/// <reference lib="esnext.disposable" preserve="true" />
+import type {EngineKernel} from '@margoengine/core';
 import {meshRuntime} from '@margoengine/core/extension';
 import type {Engine,EnginePlugin,FrameGraph,Mesh,Vec3,Camera} from '@margoengine/core/extension';
 import {worldAnchor,type Anchor} from './anchors.js';
@@ -9,6 +11,8 @@ const ns='http://www.w3.org/2000/svg';
 export function projectAnnotation(camera:Camera,point:Vec3,width:number,height:number,gpu=true):readonly [number,number]|null {const m=camera.matrix,w=m[3]*point[0]+m[7]*point[1]+m[11]*point[2]+m[15],z=(m[2]*point[0]+m[6]*point[1]+m[10]*point[2]+m[14])/w;if(w<=0||z<(gpu?0:-1)||z>1)return null;return [((m[0]*point[0]+m[4]*point[1]+m[8]*point[2]+m[12])/w+1)*width/2,(1-(m[1]*point[0]+m[5]*point[1]+m[9]*point[2]+m[13])/w)*height/2];}
 export class EngineeringAnnotations implements EnginePlugin {
   readonly name='engineering-annotations';private engine?:Engine;private svg?:SVGSVGElement;private records:Array<{group:SVGGElement;path:SVGPathElement;text:SVGTextElement}>=[];
+  /** Same as `engine.use(new EngineeringAnnotations(...))`; returns the EngineeringAnnotations. */
+  static attach(engine: EngineKernel, options?: AnnotationOptions): EngineeringAnnotations {const value = new EngineeringAnnotations(options); engine.use(value); return value;}
   constructor(readonly options:AnnotationOptions={}){if((options.dimensions?.length??0)+(options.callouts?.length??0)>1000||!Number.isFinite(options.scale??1)||(options.scale??1)<=0||!Number.isInteger(options.decimals??2)||(options.decimals??2)<0||(options.decimals??2)>6)throw new RangeError('Invalid annotations');}
   setup(engine:Engine):void {this.engine=engine;for(const item of [...(this.options.dimensions??[]),...(this.options.callouts??[])]){for(const anchor of 'anchor'in item?[item.anchor]:[item.a,item.b]){worldAnchor(anchor);if(anchor.node&&meshRuntime(anchor.node).engine!==engine)throw new TypeError('Annotation node belongs to another engine');}if(item.offset&&(item.offset.length!==2||!item.offset.every(Number.isFinite)))throw new TypeError('Invalid annotation offset');}
     const svg=document.createElementNS(ns,'svg');this.svg=svg;svg.setAttribute('role','img');svg.setAttribute('aria-label','Engineering dimensions and callouts');svg.dataset.margoengineAnnotations='';svg.style.cssText='position:fixed;pointer-events:none;z-index:10;overflow:hidden';
@@ -21,5 +25,7 @@ export class EngineeringAnnotations implements EnginePlugin {
     svg.setAttribute('aria-label','Engineering dimensions and callouts: '+this.records.filter(record=>record.group.style.display!=='none').map(record=>record.text.textContent).join('; '));
   }});}
   dispose():void {this.svg?.remove();this.svg=undefined;this.records=[];this.engine=undefined;}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }
 

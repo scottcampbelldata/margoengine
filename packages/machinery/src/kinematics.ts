@@ -1,5 +1,6 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import {meshRuntime} from '@margoengine/core/extension';
-import type {Mesh as MeshHandle} from '@margoengine/core';
+import type {EngineKernel,Mesh as MeshHandle} from '@margoengine/core';
 import type {Engine,EnginePlugin,Mesh,Vec3} from '@margoengine/core/extension';
 export interface Joint {node:MeshHandle;axis:'x'|'y'|'z';kind?:'revolute'|'prismatic';min:number;max:number;velocity?:number}
 export interface GearCoupling {source:number;target:number;ratio:number;offset?:number}
@@ -19,6 +20,8 @@ export class Kinematics implements EnginePlugin {
   private readonly joints:readonly (Omit<Joint,'node'>&{node:Mesh})[];
   private readonly previous:Float64Array;
   private values:Float32Array[]=[];private readonly offsets:Int32Array;
+  /** Same as `engine.use(new Kinematics(...))`; returns the Kinematics. */
+  static attach(engine: EngineKernel, joints: readonly Joint[], options?: KinematicOptions): Kinematics {const value = new Kinematics(joints, options); engine.use(value); return value;}
   constructor(joints:readonly Joint[],readonly options:KinematicOptions={}) {
     this.joints=joints.map(joint=>({...joint,node:meshRuntime(joint.node)}));
     this.previous=new Float64Array(joints.length);this.offsets=new Int32Array(joints.length);
@@ -78,4 +81,6 @@ export class Kinematics implements EnginePlugin {
   }
   onPreUpdate(delta:number):void {if(!Number.isFinite(delta)||delta<0||delta>1)throw new RangeError('Frame delta must be 0..1 seconds');if(this.external)return;this.snapshot();try{for(let i=0;i<this.joints.length;i++)if(!this.driven.has(i))this.write(i,this.previous[i]+(this.joints[i].velocity??0)*delta);this.couple();}catch(error){this.restore();throw error;}if(this.options.targets?.length||this.options.distances?.length)this.solve();}
   dispose():void {if(this.engine&&!this.engine.disposed)for(const joint of this.joints)if(this.engine.meshes.get(joint.node.id)===joint.node)this.engine.store.constrained[joint.node.id]&=~(1<<('xyz'.indexOf(joint.axis)+(joint.kind==='prismatic'?0:3)));this.engine=undefined;this.external=false;this.origins=[];this.values=[];this.order=[];this.driven.clear();}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

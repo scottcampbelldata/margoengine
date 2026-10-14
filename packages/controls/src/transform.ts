@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel, Mesh} from '@margoengine/core';
 import {engineRuntime, meshRuntime, type FrameGraph, type PassContext} from '@margoengine/core/extension';
 import {EventDispatcher, type ControlElement} from './controls.js';
@@ -85,6 +86,8 @@ export class TransformControls extends EventDispatcher {
   readonly pluginName: string;
   private disposed = false;
 
+  /** Creates the TransformControls on `engine` (preferred over the constructor). */
+  static attach(engine: EngineKernel, options?: TransformControlsOptions): TransformControls {return new TransformControls(engine, options);}
   constructor(engine: EngineKernel, options: TransformControlsOptions = {}) {
     super();
     this.engine = engine;
@@ -172,6 +175,8 @@ export class TransformControls extends EventDispatcher {
     this.disconnect(); this.object = null; this.overlay.release();
     if (!this.engine.disposed && this.engine.hasPlugin(this.pluginName)) this.engine.removePlugin(this.pluginName);
   }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 
   // ---- pointer handling ----
   private point(event: {clientX: number; clientY: number}): {x: number; y: number} {
