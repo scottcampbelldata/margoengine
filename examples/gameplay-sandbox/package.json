@@ -12,6 +12,7 @@
     "verify": "node verify.mjs"
   },
   "dependencies": {
+    "@margoengine/quality": "0.1.0",
     "@margoengine/core": "0.1.0",
     "@margoengine/sky": "0.1.0",
     "@margoengine/clustered": "0.1.0",

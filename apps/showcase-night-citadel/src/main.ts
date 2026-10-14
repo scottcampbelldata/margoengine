@@ -8,7 +8,8 @@ import {Clustered} from '@margoengine/clustered';
 import {Water} from '@margoengine/water';
 import {VFX} from '@margoengine/vfx';
 import {sceneSamples} from '../../../packages/shared/quality.js';
-import {watchFrameRate} from '../../../packages/shared/auto-quality.js';
+import {applyQualityTier, watchQuality} from '@margoengine/quality';
+applyQualityTier();
 import {createCitadelPBR, moonDirection} from './scene.js';
 import {frameDue, frameStatus} from './frame-timing.js';
 import {NightAtmosphere} from './atmosphere';
@@ -275,7 +276,7 @@ async function boot():Promise<void> {
   try {
     if(!navigator.gpu)throw new Error('This showcase needs WebGPU. Open it in a WebGPU-enabled browser on localhost or HTTPS.');
     engine=await EngineKernel.create(canvas,{backend:'webgpu',capacity:1,camera:{position:[0,12,82],target:[0,12,0],fov:58,near:0.3,far:500}});
-    window.nightCitadel=new NightCitadel(engine);watchFrameRate();
+    window.nightCitadel=new NightCitadel(engine);watchQuality();
     status.hidden=true;
   } catch(error) {engine?.dispose();status.hidden=false;status.setAttribute('role','alert');status.textContent=error instanceof Error?error.message:String(error);}
 }

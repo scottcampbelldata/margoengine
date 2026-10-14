@@ -896,6 +896,25 @@
     ]
   },
   {
+    "id": "quality",
+    "title": "Quality",
+    "package": "@margoengine/quality",
+    "version": "0.1.0",
+    "published": false,
+    "description": "Measured quality tiers: start light, time the GPU, remember full 4x quality only where it has headroom.",
+    "requirements": "Core ^0.1.0 || ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "quality",
+    "install": "npm install @margoengine/core@0.1.0 @margoengine/quality@0.1.0",
+    "imports": "import { FAST_GPU_MS } from '@margoengine/quality';",
+    "exports": [
+      "FAST_GPU_MS",
+      "SLOW_FPS",
+      "applyQualityTier",
+      "capFrameRate",
+      "watchQuality"
+    ]
+  },
+  {
     "id": "road",
     "title": "Road",
     "package": "@margoengine/road",

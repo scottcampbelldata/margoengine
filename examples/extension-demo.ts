@@ -2,7 +2,8 @@ import {createStage} from 'margoengine';
 import {loadGLTF} from '@margoengine/gltf-pro';
 import {OrbitControls} from '@margoengine/controls';
 import {sceneSamples} from '../packages/shared/quality.js';
-import {watchFrameRate} from '../packages/shared/auto-quality.js';
+import {applyQualityTier, watchQuality} from '@margoengine/quality';
+applyQualityTier();
 import {engineRuntime} from '@margoengine/core/extension';
 import {submitPrincipalScene} from '../packages/shared/demo-frame.js';
 const status=document.querySelector<HTMLElement>('#status')!,error=document.querySelector<HTMLElement>('#error')!,robot=document.body.dataset.demo==='robot';
@@ -71,6 +72,6 @@ try {
     };
   }
   if(robot)demo.readiness=await submitPrincipalScene(()=>stage.engine.render(),engineRuntime(stage.engine).gpu!.queue,{signal:abort.signal});else stage.engine.render();
-  stage.engine.start();watchFrameRate();document.querySelector<HTMLElement>('#viewport')!.dataset.ready='true';status.textContent=upgrade?'Ready. Full detail is loading.':'Ready';
+  stage.engine.start();watchQuality();document.querySelector<HTMLElement>('#viewport')!.dataset.ready='true';status.textContent=upgrade?'Ready. Full detail is loading.':'Ready';
   if(upgrade)void upgrade().catch(reason=>{if(!abort.signal.aborted){status.textContent='Ready. Full detail could not load.';error.textContent=String(reason);}});
 } catch(reason) {dispose?.();if(!abort.signal.aborted){status.textContent='Unable to load scene';error.textContent=String(reason);}}

@@ -15,8 +15,11 @@ import {createCharacter, createLandscape, terrainHeight} from './scene.js';
 import {stepLocomotion, type LocomotionOptions} from '@margoengine/controls';
 import {createProceduralSettlement} from './procedural/index.js';
 import {sceneSamples} from '../../../packages/shared/quality.js';
-import {watchFrameRate} from '../../../packages/shared/auto-quality.js';
+import {applyQualityTier, watchQuality} from '@margoengine/quality';
 import './style.css';
+
+// Before any engine exists: core reads the tier when it builds pipelines and sizes the canvas.
+applyQualityTier();
 
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = element<HTMLCanvasElement>('scene'), status = element('status'), controls = element<HTMLFieldSetElement>('controls');
@@ -140,7 +143,7 @@ async function boot(): Promise<void> {
       startup.phase = 'detail-failed'; status.textContent = `World ready. Extra detail could not load: ${String(error)}`;
     }
     Object.assign(window, {sandbox: {engine, stats, state, actions, camera, cameraDelta, timing, sky, water, shadows, lights, procedural, readiness, get particles() {return particles;}, dispose}});
-    watchFrameRate();
+    watchQuality();
   } catch (error) {dispose(); throw error;}
 }
 

@@ -5,7 +5,8 @@ import {Bloom} from '@margoengine/post/bloom';
 import {submitPrincipalScene} from '@margoengine/post/scene-fade';
 import {engineRuntime} from '@margoengine/core/extension';
 import {sceneSamples} from '../../../shared/quality.js';
-import {watchFrameRate} from '../../../shared/auto-quality.js';
+import {applyQualityTier, watchQuality} from '@margoengine/quality';
+applyQualityTier();
 import {Stars} from './sky.js';
 
 const controls = document.querySelector<HTMLFieldSetElement>('#controls')!;
@@ -119,7 +120,7 @@ try {
   controls.disabled = false;
   status.textContent = mobile ? 'Ready. Explore the day–night boundary with the sun control.' : 'Ready. Full detail is loading.';
   document.body.dataset.ready = 'true';
-  stage.engine.start(); watchFrameRate();
+  stage.engine.start(); watchQuality();
   if (!mobile) void earth.updateMaps({
     signal,
     dayMap: new URL('./assets/earth-day.jpg', import.meta.url),
