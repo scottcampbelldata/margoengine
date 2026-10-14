@@ -19,7 +19,8 @@ async function compactPackage(name){
 const precompiled=process.argv.includes('--precompiled');
 const wasmPath='packages/kernel/target/wasm32-unknown-unknown/release/margoengine_kernel.wasm',optimizedPath=wasmPath.replace('.wasm','.optimized.wasm');
 if(!precompiled)execFileSync('cargo',['build','--manifest-path','packages/kernel/Cargo.toml','--target','wasm32-unknown-unknown','--release'],{stdio:'inherit',env:{...process.env,CARGO_TARGET_DIR:resolve('packages/kernel/target'),RUSTFLAGS:'-C target-feature=+simd128'}});
-if(!precompiled)execFileSync(process.execPath,['node_modules/binaryen/bin/wasm-opt',wasmPath,'-Oz','--enable-simd','--enable-bulk-memory','--enable-bulk-memory-opt','--enable-nontrapping-float-to-int','--strip-debug','--strip-producers','--strip-target-features','--converge','-o',optimizedPath],{stdio:'inherit'});
+// -ocimfs 300: keep the kernel's recompute path out of line so the per-entity unchanged path stays small (CAD, 100k entities: 3.5 vs 4.8 ms per tick).
+if(!precompiled)execFileSync(process.execPath,['node_modules/binaryen/bin/wasm-opt',wasmPath,'-Oz','-ocimfs','300','--enable-simd','--enable-bulk-memory','--enable-bulk-memory-opt','--enable-nontrapping-float-to-int','--strip-debug','--strip-producers','--strip-target-features','--converge','-o',optimizedPath],{stdio:'inherit'});
 const wasm=precompiled?inflateRawSync(Buffer.from(/wasmBase64(?::\s*string)?\s*=\s*'([^']+)'/.exec(await readFile('packages/core/src/wasm.ts','utf8'))[1],'base64')):await readFile(optimizedPath);
 assert.ok(wasm.length<30*1024,`Kernel exceeds 30 KiB: ${wasm.length}`);
 assert.ok(WebAssembly.validate(wasm),'Invalid Wasm artifact');
