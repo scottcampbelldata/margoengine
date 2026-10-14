@@ -1286,6 +1286,22 @@
     ]
   },
   {
+    "id": "webgl",
+    "title": "Webgl",
+    "package": "@margoengine/webgl",
+    "version": "0.1.0",
+    "published": false,
+    "description": "WebGL2 fallback renderer for browsers without WebGPU: flat-shaded PBR core meshes, opt in with Engine.create(canvas, {fallback: webglRenderer}).",
+    "requirements": "Core ^0.1.0 || ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "webgl",
+    "install": "npm install @margoengine/core@0.1.0 @margoengine/webgl@0.1.0",
+    "imports": "import { GLRenderer } from '@margoengine/webgl';",
+    "exports": [
+      "GLRenderer",
+      "webglRenderer"
+    ]
+  },
+  {
     "id": "wfc",
     "title": "Wfc",
     "package": "@margoengine/wfc",

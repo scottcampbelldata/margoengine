@@ -51,6 +51,7 @@
     "packages/usdz-export",
     "packages/tween",
     "packages/quality",
+    "packages/webgl",
     "packages/ecs",
     "packages/fsm",
     "packages/splines",

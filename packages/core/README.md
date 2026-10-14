@@ -1,6 +1,6 @@
 # @margoengine/core
 
-WebGPU rendering with WebGL2 fallback, a deterministic Rust/Wasm transform kernel, instanced PBR, reversed float depth, picking and CAD camera controls.
+WebGPU rendering (WebGL2 fallback via the optional `@margoengine/webgl`), a deterministic Rust/Wasm transform kernel, instanced PBR, reversed float depth, picking and CAD camera controls.
 
 Desktop scenes use 4× MSAA with a canvas DPR cap of 1; phones use single-sample rendering with a DPR cap of 2. For slower desktop GPUs, set `globalThis.margoLow` to a pixel ratio (for example `1` or `1.5`) before creating the engine: scenes then render single-sampled with the DPR capped at that value, which on an integrated laptop GPU roughly halves GPU time compared with 4× MSAA. The site demos choose this light tier by measuring the GPU rather than guessing from the device. Color and depth targets follow canvas resize. Optional scene captures retain that sampling policy and expose single-sample resolved textures. CSS layout and HTML text retain native density.
 

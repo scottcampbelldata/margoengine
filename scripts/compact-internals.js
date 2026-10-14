@@ -10,7 +10,6 @@ const reviewed = {
   TransformStore: 'handle api',
   FrameGraph: 'passes owner executing',
   GPURenderer: 'frame targets views resolveTarget preserveMSAA passDescriptor passContext drawBatches commands draw bindings width height frameId lost deviceLost resources variants groups uniform bindGroup disposed picking canvas device context format pipeline descriptor renderFrame',
-  GLRenderer: 'gl program camera eye light radiance resources canvas',
   Stage: 'imports',
 };
 
