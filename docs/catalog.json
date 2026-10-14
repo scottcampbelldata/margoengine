@@ -123,6 +123,7 @@
       "HDRRenderTarget",
       "Planet",
       "PostProcessing",
+      "Stars",
       "ToonShading"
     ],
     "example": "./examples/creative.html",
@@ -911,6 +912,8 @@
       "SLOW_FPS",
       "applyQualityTier",
       "capFrameRate",
+      "frameDue",
+      "frameStatus",
       "watchQuality"
     ]
   },
@@ -965,6 +968,7 @@
     "install": "npm install @margoengine/core@0.1.0 @margoengine/scenery@0.1.0",
     "imports": "import { SkyMoon } from '@margoengine/scenery';",
     "exports": [
+      "NightAtmosphere",
       "SkyMoon",
       "SkyMoonPass"
     ]

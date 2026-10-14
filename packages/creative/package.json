@@ -48,6 +48,10 @@
     "./planet": {
       "types": "./dist/planet.d.ts",
       "import": "./dist/planet.js"
+    },
+    "./stars": {
+      "types": "./dist/stars.d.ts",
+      "import": "./dist/stars.js"
     }
   },
   "files": [

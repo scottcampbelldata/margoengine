@@ -1,13 +1,13 @@
 import type {Engine, EnginePlugin, FrameGraph, PassContext} from '@margoengine/core/extension';
-import {invert} from '../../../shared/math.js';
-import shader from './stars.wgsl?raw';
+import {invert} from '../../shared/math.js';
+import shader from './shaders/stars.wgsl?raw';
 
 declare const GPUBufferUsage: {UNIFORM: number; COPY_DST: number};
 declare const GPUShaderStage: {VERTEX: number};
 
 export class Stars implements EnginePlugin {
   enabled = true;
-  readonly name = 'earth-demo:stars';
+  readonly name = 'creative:stars';
   private buffer?: GPUBuffer;
   private layout?: GPUBindGroupLayout;
   private bindings?: GPUBindGroup;

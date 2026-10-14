@@ -11,8 +11,8 @@ import {sceneSamples} from '../../../packages/shared/quality.js';
 import {applyQualityTier, watchQuality} from '@margoengine/quality';
 applyQualityTier();
 import {createCitadelPBR, moonDirection} from './scene.js';
-import {frameDue, frameStatus} from './frame-timing.js';
-import {NightAtmosphere} from './atmosphere';
+import {frameDue, frameStatus} from '@margoengine/quality';
+import {NightAtmosphere} from '@margoengine/scenery';
 import './style.css';
 
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;

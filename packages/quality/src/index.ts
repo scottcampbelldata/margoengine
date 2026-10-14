@@ -102,3 +102,4 @@ export function watchQuality({request = globalThis.requestAnimationFrame?.bind(g
   const count = () => {if (done) return; if (++frames > 600) finish(); else request(count);};
   request(count);
 }
+export {frameDue, frameStatus} from './pacing.js';

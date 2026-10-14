@@ -1,6 +1,6 @@
 import type {Engine, EnginePlugin, FrameGraph} from '@margoengine/core/extension';
-import {SkyMoonPass, type SkyMoonConfig} from '@margoengine/scenery';
-import {invert} from '../../../packages/shared/math.js';
+import {SkyMoonPass, type SkyMoonConfig} from './sky-moon.js';
+import {invert} from '../../shared/math.js';
 
 declare const GPUBufferUsage: {UNIFORM: number; COPY_DST: number};
 const fogShader = `
