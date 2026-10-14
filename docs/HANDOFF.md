@@ -78,6 +78,31 @@ Five parallel workers reviewed 58 packages against baseline `f05414a`; Claude ve
 5. Fair three.js benchmark: check `examples/conveyor-simulator` and `examples/benchmark` are like-for-like.
 6. Verified three.js parity matrix, then the feature gaps below.
 
+## Work queue Scott approved (2026-10-14), in order
+
+Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (`c82e119`), WebGL renderer moved to
+`@margoengine/webgl` (`1356787`; core + stage 18,554 gzip), `@margoengine/math` (`88517f8`).
+
+1. Top-10 parity gaps (non-core parts): materials package [running], glTF extensions/decoders [running], post stack +
+   FXAA [running], raycast/pick glTF models + DragControls, environment IBL apply + background colour + fog,
+   orthographic/vertical cameras without core change, WebGL beyond core (gap 8: scope with Scott first).
+2. Dedupe: two particle systems (creative GPUParticles vs vfx), two bloom paths (post Bloom vs creative
+   PostProcessing), three sky implementations (sky, scenery, creative atmosphere).
+3. Replace three.js inside fbx and usdz with native parsers [running].
+4. Every remaining PARTIAL/MISSING gap in docs/threejs-parity.md that does not need a core change.
+5. Math consolidation: fold the duplicated helpers into `@margoengine/math` (list from the math worker:
+   shared/math invert+finiteVector users; mat4 multiply in animation, bvh, points, text, exporters, loaders/usdz, usdz;
+   mat4 invert in shared, bvh, lines, environment; transformPoint in bvh, lines, controls; compose/decompose in
+   exporters, text, loaders/threemf, usdz; euler->quat/slerp in physics, text, controls; frustum planes in bvh, points;
+   vector helpers in geometry, controls, audio, bvh, lines, machinery, navmesh, loaders; colour parsing + sRGB decode in
+   lines, points, text, loaders/threemf, loaders/engine, splats, core/geometry (core stays as is); seeded PRNGs in points,
+   scatter, procedural, creative; ray tests in controls, selection, bvh; per-package math.ts in audio, bvh, controls,
+   geometry, lines, physics, points, text). Prove no behaviour change and record bytes per package.
+6. Then give Scott the full list of what was done and what remains.
+
+Worker practice: agents run in git worktrees; they must start with `git reset --hard perf/auto-quality` (worktrees
+default to an old base) and must not run a full `npm install` (shared node_modules junction).
+
 ## Feature gaps versus three.js (after optimization; each as an optional package)
 
 Verified matrix: `docs/threejs-parity.md` (153 three.js features: 57 covered, 47 partial, 49 missing; read from
