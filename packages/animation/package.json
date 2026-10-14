@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
-  "description": "Storage-buffer skinning and compute morph targets for Margo Engine.",
+  "description": "Storage-buffer skinning, compute morph targets and vertex animation texture crowds for Margo Engine.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
@@ -20,6 +20,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./vat": {
+      "types": "./dist/vat.d.ts",
+      "import": "./dist/vat.js"
     }
   },
   "files": [

@@ -61,6 +61,13 @@ const vector = (value:any, size:number, label:string, min=-Infinity, max=Infinit
   return value;
 };
 const scalar=(v:any,min:number,max:number,label:string)=>vector([v],1,label,min,max)[0];
+/** UV offset, scale and rotation (radians), with KHR_texture_transform semantics: uv' = offset * rotation * scale * uv. */
+export interface TextureTransform {offset?:readonly number[];scale?:readonly number[];rotation?:number}
+/** One map's two uniform rows (offset*rotation*scale) as gltf-pro's shader reads them; the first row's w holds the UV set. */
+export function textureTransform(x:TextureTransform={},texCoord=0):number[] {
+  const [ox,oy]=vector(x.offset??[0,0],2,'texture offset'),[sx,sy]=vector(x.scale??[1,1],2,'texture scale'),r=scalar(x.rotation??0,-Infinity,Infinity,'texture rotation'),c=Math.cos(r),s=Math.sin(r);
+  return [c*sx,s*sy,ox,texCoord,-s*sx,c*sy,oy,0];
+}
 function material(def:any = {}): any {
   const p=def.pbrMetallicRoughness??{}, alpha=def.alphaMode??'OPAQUE', e=def.extensions??{};
   if (!['OPAQUE','MASK','BLEND'].includes(alpha)) throw new TypeError('Invalid glTF alpha mode');
@@ -76,7 +83,7 @@ function material(def:any = {}): any {
     settings:[['OPAQUE','MASK','BLEND'].indexOf(alpha),scalar(def.alphaCutoff??0.5,0,Infinity,'alpha cutoff'),+(def.doubleSided??false),0],
     maps,
     // KHR_texture_transform per map as two rows of offset*rotation*scale; the first row's w holds the UV set.
-    uvt:maps.flatMap(t=>{const x=t?.extensions?.KHR_texture_transform??{},[ox,oy]=vector(x.offset??[0,0],2,'texture offset'),[sx,sy]=vector(x.scale??[1,1],2,'texture scale'),r=scalar(x.rotation??0,-Infinity,Infinity,'texture rotation'),c=Math.cos(r),s=Math.sin(r);return [c*sx,s*sy,ox,t?.texCoord??0,-s*sx,c*sy,oy,0];}),
+    uvt:maps.flatMap(t=>textureTransform(t?.extensions?.KHR_texture_transform??{},t?.texCoord??0)),
     ext:[+!!e.KHR_materials_unlit,scalar(e.KHR_materials_ior?.ior??1.5,0,Infinity,'ior'),0,0],
     physical:physical?[scalar(cc?.clearcoatFactor??0,0,1,'clearcoat'),scalar(cc?.clearcoatRoughnessFactor??0,0,1,'clearcoat roughness'),scalar(cc?.clearcoatNormalTexture?.scale??1,-Infinity,Infinity,'clearcoat normal scale'),transmission,
       ...vector(sp?.specularColorFactor??[1,1,1],3,'specular color',0),scalar(sp?.specularFactor??1,0,1,'specular'),...vector(sh?.sheenColorFactor??[0,0,0],3,'sheen color',0,1),scalar(sh?.sheenRoughnessFactor??0,0,1,'sheen roughness')]:undefined,

@@ -168,7 +168,7 @@
     "package": "@margoengine/animation",
     "version": "0.1.0",
     "published": false,
-    "description": "Storage-buffer skinning and compute morph targets for Margo Engine.",
+    "description": "Storage-buffer skinning, compute morph targets and vertex animation texture crowds for Margo Engine.",
     "requirements": "Core 0.1.0 · see the package guide for browser and backend requirements",
     "keywords": "animation",
     "install": "npm install @margoengine/core@0.1.0 @margoengine/animation@0.1.0",
@@ -610,6 +610,7 @@
       "parseGLTF",
       "parseGLTFAsync",
       "parsePreparedPBR",
+      "textureTransform",
       "validatePreparedGeometry"
     ]
   },
@@ -821,7 +822,9 @@
       "createMesh",
       "loadTexture",
       "materialShader",
-      "packGeometry"
+      "packAtlas",
+      "packGeometry",
+      "transformUVs"
     ]
   },
   {

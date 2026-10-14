@@ -1,0 +1,54 @@
+{
+  "proof": "animation-vat",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T13:15:22.801Z",
+  "asset": "RobotExpressive, Walking clip at 30 rows/s",
+  "bake": {
+    "vertices": 7214,
+    "rows": 30,
+    "textureBytes": 6946816,
+    "bakeMs": 118.3,
+    "cpuSkinningMsPerCharacterFrame": 1.311
+  },
+  "results": {
+    "100": {
+      "skinned": {
+        "updateMs": 2.685,
+        "recordMs": 40.12,
+        "draws": 1900,
+        "dispatches": 700,
+        "bufferWrites": 2600,
+        "uploadBytes": 2776400
+      },
+      "vat": {
+        "updateMs": 0,
+        "recordMs": 0.011,
+        "draws": 1,
+        "dispatches": 0,
+        "bufferWrites": 1,
+        "uploadBytes": 160
+      },
+      "cpuSkinningMs": 131.1
+    },
+    "1000": {
+      "skinned": {
+        "updateMs": 30.491,
+        "recordMs": 433.856,
+        "draws": 19000,
+        "dispatches": 7000,
+        "bufferWrites": 26000,
+        "uploadBytes": 27764000
+      },
+      "vat": {
+        "updateMs": 0,
+        "recordMs": 0.002,
+        "draws": 1,
+        "dispatches": 0,
+        "bufferWrites": 1,
+        "uploadBytes": 160
+      },
+      "cpuSkinningMs": 1311.1
+    }
+  },
+  "notes": "CPU work per frame only (mock GPU). VAT moves skinning to a texture read in the vertex shader: per-frame CPU is one uniform write and one draw, whatever the crowd size. GPU cost is not measured here."
+}

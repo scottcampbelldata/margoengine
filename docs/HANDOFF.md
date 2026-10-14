@@ -96,7 +96,7 @@ it with every number (on battery Windows throttles the CPU/GPU and may drop the 
 0. Verification gates (serial, idle GPU): shader `browser-check.mjs` re-run; LOD/imposter 2,500-object benchmark on a
    quiet GPU; post full stack (SSAO+DOF+Bloom+Tonemap+FXAA) in a real scene, visuals and frame time; native FBX/USD in a
    real browser plus a memory audit (models unloaded/switched destroy their GPU buffers, no leaks); `scripts/modern-postfx-tests.js`
-   fails its first DOF check ("Near CoC sign/clamp") after `a281ad2` — run it on `9c761d5` to confirm it predates SSAO, then fix;
+   fails its first DOF check ("Near CoC sign/clamp") after `a281ad2` â€” run it on `9c761d5` to confirm it predates SSAO, then fix;
    GPU cost of the SSAO ambient replay with environment IBL on (now replays the full lit shader); helmet SSAO fixture
    (`scripts/modern-extension-tests.js`) needs a local helmet copy. [Done: size
    comparison is `npm run measure:threejs` (scripts/compare-threejs-size.js).] (Security review: later commit reviews in the
@@ -116,7 +116,15 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
 1b. [done `ed83cb6`; GPU check passed in the worker's tree, re-run on the merged branch pending] Composable shader nodes (`@margoengine/shader`, parity gap 19), moved up after Scott noted three.js's TSL /
    RenderPipeline node workflows (r183 RenderPipeline, r186 pipeline hooks): small typed nodes compiling to WGSL for
    materials and post effects, built on the materials package and the post stack once both APIs settle.
-1c. [LOD + imposters done `0fff93c`: about 7-20x less GPU time on a 2,500-instance scene; atlases and vertex animation textures left] Production optimizations (from Scott's three.js conference recap, Paris, Sept 2026): general LOD object (gap 18),
+1c. [DONE. LOD + imposters `0fff93c`: about 7-20x less GPU time on a 2,500-instance scene. Texture transforms + atlases:
+   materials `uvTransform`/`setUVTransform` (KHR_texture_transform rows shared with gltf-pro's new `textureTransform`),
+   `packAtlas`, `transformUVs`; untransformed GPU calls byte-identical (`proofs/materials-uv-transform.proof.js`); 256
+   textured boxes 256 -> 1 draw, 8.3 -> 0.05 ms CPU when merged (`proofs/materials-atlas.proof.js`). VAT:
+   `@margoengine/animation/vat` (`bakeVAT`, `VATCrowd`, 6.1 kB gzip separate entry): 1,000 walking robots 1 draw and
+   <0.01 ms CPU vs 465 ms CPU / 19,000 draws as skinned models (`proofs/animation-vat.proof.js`); real-GPU check
+   `node examples/package-benchmarks/atlas-vat/check.mjs` passed on the Arc 140V (AC, Chrome 155): VAT pose matches GPU
+   skinning (silhouette IoU 0.98), merged atlas frame = separate (mean diff 0.07/255, 64 -> 1 draws), 1,024 walking robots
+   in 1 draw at 0.7-0.9 ms CPU and 11-16 ms GPU per frame (7.4M vertices; machine busy). Left: VAT clip blending, shadows/IBL for crowds, half-float VAT.] Production optimizations (from Scott's three.js conference recap, Paris, Sept 2026): general LOD object (gap 18),
    octahedral imposters, texture atlases (needs texture transforms in materials), vertex animation textures for
    GPU crowds. Imposters and LOD first; they serve CAD/simulator scenes and landing pages alike. Compute nodes belong
    in the 1b shader package.

@@ -1,7 +1,9 @@
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine} from '@margoengine/core/extension';
-import {GLTFAsset,PBRModel,type PreparedGeometry,type PBRRenderState} from '@margoengine/gltf-pro';
+import {GLTFAsset,PBRModel,textureTransform,type PreparedGeometry,type PBRRenderState,type TextureTransform} from '@margoengine/gltf-pro';
 import {readResponse} from '../../shared/loading.js';
+export type {TextureTransform} from '@margoengine/gltf-pro';
+export {packAtlas,transformUVs,type Atlas,type AtlasOptions} from './atlas.js';
 declare const GPUTextureUsage:{TEXTURE_BINDING:number;COPY_DST:number;RENDER_ATTACHMENT:number};
 export type RawImage={data:Uint8Array|Uint8ClampedArray;width:number;height:number};
 /** ImageData and `{data,width,height}` upload as raw RGBA8 rows (row 0 at UV v=0); other sources use copyExternalImageToTexture. */
@@ -91,7 +93,10 @@ export interface MaterialOptions {
   shading?:Shading;color?:Color;opacity?:number;roughness?:number;metalness?:number;emissive?:Color;
   map?:Texture|null;metalRoughnessMap?:Texture|null;normalMap?:Texture|null;normalScale?:number;aoMap?:Texture|null;aoMapIntensity?:number;emissiveMap?:Texture|null;matcap?:Texture|null;
   transparent?:boolean;alphaTest?:number;doubleSided?:boolean;blending?:Blending;depthWrite?:boolean;depthTest?:boolean;
+  /** UV offset/scale/rotation for every map but `matcap` (KHR_texture_transform semantics), e.g. an atlas region. */
+  uvTransform?:TextureTransform;
 }
+export type MapSlot='map'|'metalRoughnessMap'|'normalMap'|'aoMap'|'emissiveMap';
 const slots=['map','metalRoughnessMap','normalMap','aoMap','emissiveMap','matcap'] as const,names=['baseMap','mrMap','normalMap','aoMap','emissiveMap','matcap'];
 const unit=(v:unknown,label:string)=>{if(typeof v!=='number'||!(v>=0&&v<=1))throw new RangeError('Material '+label+' must be in [0, 1]');return v;};
 const linear=(c:Color,label:string):number[]=>{
@@ -121,6 +126,8 @@ export class Material {
   readonly shading:Shading;readonly color:number[];readonly emissive:number[];readonly blending:Blending;readonly depthWrite?:boolean;readonly depthTest:boolean;
   /** gltf-pro layout: [roughness, metalness, normalScale, aoMapIntensity] and [alphaMode, alphaTest, doubleSided, 0]. */
   readonly factors:number[];readonly settings:number[];private blend:boolean;
+  /** gltf-pro layout: two rows per map slot (offset*rotation*scale), in `MapSlot` order. */
+  readonly uvt:number[]=[];
   map:Texture|null;metalRoughnessMap:Texture|null;normalMap:Texture|null;aoMap:Texture|null;emissiveMap:Texture|null;matcap:Texture|null;
   constructor(o:MaterialOptions={}) {
     const shading=o.shading??'standard',blending=o.blending??'normal';
@@ -129,7 +136,7 @@ export class Material {
     this.shading=shading;this.blending=blending;this.depthWrite=o.depthWrite;this.depthTest=o.depthTest??true;this.blend=o.transparent??false;
     this.color=linear(o.color??[1,1,1],'color');if(this.color.length===3)this.color.push(unit(o.opacity??1,'opacity'));this.emissive=linear(o.emissive??[0,0,0],'emissive').slice(0,3);
     this.factors=[unit(o.roughness??1,'roughness'),unit(o.metalness??0,'metalness'),o.normalScale??1,unit(o.aoMapIntensity??1,'aoMapIntensity')];
-    this.settings=[0,unit(o.alphaTest??0,'alphaTest'),+(o.doubleSided??false),0];this.sync();
+    this.settings=[0,unit(o.alphaTest??0,'alphaTest'),+(o.doubleSided??false),0];this.sync();this.setUVTransform(o.uvTransform??null);
     this.map=o.map??null;this.metalRoughnessMap=o.metalRoughnessMap??null;this.normalMap=o.normalMap??null;this.aoMap=o.aoMap??null;this.emissiveMap=o.emissiveMap??null;this.matcap=o.matcap??null;
   }
   get roughness():number {return this.factors[0];} set roughness(v:number) {this.factors[0]=unit(v,'roughness');}
@@ -140,6 +147,11 @@ export class Material {
   get alphaTest():number {return this.settings[1];} set alphaTest(v:number) {this.settings[1]=unit(v,'alphaTest');this.sync();}
   get transparent():boolean {return this.blend;} set transparent(v:boolean) {this.blend=!!v;this.sync();}
   get doubleSided():boolean {return this.settings[2]===1;} set doubleSided(v:boolean) {this.settings[2]=+!!v;}
+  /** Live: sets one map slot's UV transform, or every slot's without `slot`; null restores the identity. */
+  setUVTransform(t:TextureTransform|null,slot?:MapSlot):this {
+    const i=slot===undefined?-1:slots.indexOf(slot);if(i>4||slot!==undefined&&i<0)throw new TypeError('Invalid UV transform slot');
+    const rows=textureTransform(t??{});for(let k=0;k<5;k++)if(i<0||k===i)this.uvt.splice(k*8,8,...rows);return this;
+  }
   /** True when the beauty pipeline needs blending or depth overrides. */
   get customState():boolean {return this.blending!=='normal'||this.depthWrite!==undefined||!this.depthTest;}
   private sync():void {this.settings[0]=this.blend?2:this.settings[1]>0?1:0;}
@@ -196,7 +208,7 @@ export function createMesh(engine:EngineKernel,geometry:MeshGeometry,material:Ma
   const runtime=engineRuntime(engine),m=material,set=queue(runtime);
   const doc={asset:{version:'2.0'},nodes:[{mesh:0}],meshes:[{primitives:[{material:0}]}],materials:[{pbrMetallicRoughness:{baseColorFactor:m.color,roughnessFactor:m.factors[0],metallicFactor:m.factors[1]},emissiveFactor:m.emissive,alphaMode:['OPAQUE','MASK','BLEND'][m.settings[0]],alphaCutoff:m.settings[1],doubleSided:m.doubleSided}]};
   const model=new PBRModel(engine,new GLTFAsset(doc,[]),[],[[packGeometry(geometry)]]);
-  Object.assign(model.primitives[0].material,{base:m.color,emission:m.emissive,factors:m.factors,settings:m.settings});
+  Object.assign(model.primitives[0].material,{base:m.color,emission:m.emissive,factors:m.factors,settings:m.settings,uvt:m.uvt});
   if(m.customState)model.primitives[0].material.renderState={blend:blends[m.blending],depthWrite:m.depthWrite,depthCompare:m.depthTest?undefined:'always'} satisfies PBRRenderState;
   model.addLighting({shader:(code,group)=>m.shader(code,group),bindings:()=>m.bindings(runtime.gpu!,runtime)});
   const entry:Entry={model,material:m,order:renderOrder};model.registerPasses=()=>{};
