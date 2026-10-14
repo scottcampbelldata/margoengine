@@ -217,8 +217,9 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       cleanup, more parsing in workers + OffscreenCanvas (with 1f.j).
    g. Full read-only audit of all 68 packages listing each modernization finding with file and line, then fix in batches.
 1g'. [DONE: exact poles; the cube sets `camera.up` to the arrival heading on the pole and restores the previous up off
-   it or on dispose; a CameraProjection's vertical up is left alone; unit-tested, no browser run. OrbitControls/CAD controls
-   still leave an exact pole at azimuth 0 (a 90° turn after a top view reached from the side)] ViewCube follow-up: use
+   it or on dispose; a CameraProjection's vertical up is left alone; unit-tested, no browser run. OrbitControls now takes the heading
+   from `camera.up` on an exact pole; core's CADCameraControls.orbit still leaves a pole at azimuth 0 (a 90° turn after
+   a top view reached from the side) — a core change, needs Scott's approval] ViewCube follow-up: use
    core's new `camera.up` for exact top/bottom views instead of stopping 1e-6 rad off the pole.
 1h. Less fragile (2026-10-14):
    a. Derive the package build order from package.json dependencies (topological sort) instead of the hand-written
