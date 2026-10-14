@@ -83,8 +83,8 @@ Five parallel workers reviewed 58 packages against baseline `f05414a`; Claude ve
 Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (`c82e119`), WebGL renderer moved to
 `@margoengine/webgl` (`1356787`; core + stage 18,554 gzip), `@margoengine/math` (`88517f8`).
 
-1. Top-10 parity gaps (non-core parts): materials package [done: `@margoengine/materials`], glTF extensions/decoders [running], post stack +
-   FXAA [done: `@margoengine/post/stack`, `@margoengine/post/fxaa`; SMAA not done], raycast/pick glTF models + DragControls, environment IBL apply + background colour + fog,
+1. Top-10 parity gaps (non-core parts): materials package [done: `@margoengine/materials`], glTF extensions/decoders [done: decoder hooks, KHR extensions, physical materials (`c01eedd`)], post stack +
+   FXAA [done: `@margoengine/post/stack`, `@margoengine/post/fxaa`; SMAA not done], raycast/pick glTF models + DragControls [running], environment IBL apply + background colour + fog [running; first attempt backed out in `105adec`: broke 3 React tests],
    orthographic/vertical cameras without core change [done: `@margoengine/cameras`; SSAO, lines/points widths, labels,
    clustered, DOF and splats still assume perspective], WebGL beyond core (gap 8: scope with Scott first).
 1b. [running] Composable shader nodes (`@margoengine/shader`, parity gap 19), moved up after Scott noted three.js's TSL /
