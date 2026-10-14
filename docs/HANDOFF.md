@@ -589,6 +589,16 @@ or other temp files in the shared scratchpad must have unique names (two workers
 to any package's public API (anything in its dist/*.d.ts reachable from an `exports` entry) fails `npm run api:check`:
 if intended, run `npm run api:update` after build:packages and commit the `api/` and `docs/api-surface.md` diff.
 
+## Scott's decisions (2026-10-14, 17:10)
+
+- Core: APPROVED speed-up steps 1, 2, 3 and 5 from the prototype branch (`worktree-agent-a46261c57b837ecd0`), not
+  step 4 (pick pipeline); the core CADCameraControls pole fix (heading from `camera.up` when leaving an exact pole);
+  the +8 B `engine.pick` OffscreenCanvas fix (`clientWidth || width`). Target: core+stage under 19,600 B.
+- Core back-face culling (pipeline `cullMode` instead of the shader's `discard`): MEASURE ONLY on a scratch branch,
+  do not merge; bring the numbers and bytes back to Scott.
+- API: standardize on `X.attach(engine, options)` for features; `dispose()` is the primary cleanup name, `destroy()`
+  stays as a deprecated alias until 1.0, and packages (not core) add `[Symbol.dispose]()` calling `dispose()`.
+
 ## API rough edges before 1.0 (found writing docs/from-threejs.md, 2026-10-14; not changed)
 
 1. The one directional light and the ambient term are only reachable through `@margoengine/core/extension`
