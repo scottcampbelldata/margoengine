@@ -89,7 +89,9 @@ suite nightly or manual. Public repositories get free standard Actions minutes, 
 Global rules: core + stage does not grow without Scott's say-so (limit 20,000; currently 18,681 after his approved
 `features` option and core hooks). Real-GPU browser
 checks and benchmarks run one at a time: take the lock with `mkdir C:\Dev\Projects\margo-engine\test-results\gpu.lock`
-(fails if held; wait and retry), remove it when done; never measure while other GPU work runs.
+(fails if held; wait and retry), remove it when done; never measure while other GPU work runs. Measure only on AC power: check
+`(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline` is True and record
+it with every number (on battery Windows throttles the CPU/GPU and may drop the display to 60 Hz).
 
 0. Verification gates (serial, idle GPU): shader `browser-check.mjs` re-run; LOD/imposter 2,500-object benchmark on a
    quiet GPU; post full stack (SSAO+DOF+Bloom+Tonemap+FXAA) in a real scene, visuals and frame time; native FBX/USD in a
