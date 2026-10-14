@@ -3,13 +3,14 @@ import {engineRuntime,meshRuntime,type Engine,type EnginePlugin,type FrameGraph,
 import {viewMatrix} from '../../shared/view.js';
 import {cascadeSplits,fitCascades} from './cascades.js';
 import {shadowSampling,shadowDepth} from './shader.js';
+import {instanceLayout,instancedDepth} from '../../shared/instances.js';
 export {cascadeSplits,fitCascades} from './cascades.js';
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
 declare const GPUTextureUsage:{RENDER_ATTACHMENT:number;TEXTURE_BINDING:number;COPY_SRC:number;COPY_DST:number};
 type Context=Extract<PassContext,{backend:'webgpu'}>;
 export interface ShadowOptions {resolution?:number;distance?:number;lambda?:number;lightSize?:number;bias?:number;normalBias?:number;casterMargin?:number}
 export interface ShadowContext {context:Context;pass:GPURenderPassEncoder;matrix:Float32Array;cascade:number}
-export interface ShadowPrimitive {node:Mesh;vertex:GPUBuffer;index:GPUBuffer;count:number;stride:number;alphaTexture?:GPUTextureView;alphaSampler?:GPUSampler;alpha?:number;cutoff?:number;texCoord?:number}
+export interface ShadowPrimitive {node:Mesh;vertex:GPUBuffer;index:GPUBuffer;count:number;stride:number;alphaTexture?:GPUTextureView;alphaSampler?:GPUSampler;alpha?:number;cutoff?:number;texCoord?:number;/** gltf-pro PBRInstances (80-byte vertices only): drawn once per instance, node matrix x instance matrix. */instances?:{readonly count:number;upload(device:GPUDevice):GPUBuffer}}
 export interface ShadowSource {shadowPrimitives?:readonly ShadowPrimitive[];shadowVersion?:number;drawShadow?(context:ShadowContext):void;addLighting?(effect:Shadows):()=>void;disposed?:boolean}
 interface Source {source:ShadowSource|Mesh;static:boolean;version:number;removeLighting?:()=>void;meshPrimitive?:ShadowPrimitive[]}
 interface Draw {uniforms:GPUBuffer[];groups:GPUBindGroup[];values:Float32Array;vertex:GPUBuffer;index:GPUBuffer;pipeline:GPURenderPipeline;alpha?:GPUTextureView;sampler?:GPUSampler}
@@ -97,8 +98,8 @@ export class Shadows implements EnginePlugin {
     }}catch(error){try{pass.end();}catch{}throw error;}pass.end();
   }
   private draw(pass:GPURenderPassEncoder,p:ShadowPrimitive,matrix:Float32Array,cascade:number):void {
-    let pipeline=this.pipelines.get(p.stride);
-    if(!pipeline){if(![24,80].includes(p.stride))throw new RangeError('Unsupported shadow vertex stride');const module=this.device!.createShaderModule({code:shadowDepth(p.stride===80)});pipeline=this.device!.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:p.stride,attributes:p.stride===80?[{shaderLocation:0,offset:0,format:'float32x4'},{shaderLocation:3,offset:48,format:'float32x4'},{shaderLocation:4,offset:64,format:'float32x4'}]:[{shaderLocation:0,offset:0,format:'float32x3'}]}]},fragment:{module,entryPoint:'fragment',targets:[]},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'less-equal'}});this.pipelines.set(p.stride,pipeline);}
+    const inst=p.instances,key=p.stride+(inst?1:0);if(inst&&!inst.count)return;let pipeline=this.pipelines.get(key);
+    if(!pipeline){if(![24,80].includes(p.stride))throw new RangeError('Unsupported shadow vertex stride');if(inst&&p.stride!==80)throw new RangeError('Instanced shadow casters need 80-byte vertices');const code=shadowDepth(p.stride===80),module=this.device!.createShaderModule({code:inst?instancedDepth(code):code});pipeline=this.device!.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:p.stride,attributes:p.stride===80?[{shaderLocation:0,offset:0,format:'float32x4'},{shaderLocation:3,offset:48,format:'float32x4'},{shaderLocation:4,offset:64,format:'float32x4'}]:[{shaderLocation:0,offset:0,format:'float32x3'}]},...inst?[instanceLayout]:[]]},fragment:{module,entryPoint:'fragment',targets:[]},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'less-equal'}});this.pipelines.set(key,pipeline);}
     // Primitives sharing a node can have different alpha maps and geometry.
     let records=this.draws.get(p.node);if(!records){records=new Map();this.draws.set(p.node,records);}let record=records.get(p.index);
     if(!record||record.vertex!==p.vertex||record.pipeline!==pipeline||record.alpha!==p.alphaTexture||record.sampler!==p.alphaSampler){
@@ -111,7 +112,7 @@ export class Shadows implements EnginePlugin {
       record={uniforms,groups,values:new Float32Array(36),vertex:p.vertex,index:p.index,pipeline,alpha:p.alphaTexture,sampler:p.alphaSampler};records.set(p.index,record);
     }
     record.values.set(matrix);record.values.set(p.node.matrix,16);record.values[32]=p.alpha??1;record.values[33]=p.cutoff??0;record.values[34]=p.texCoord??0;this.device!.queue.writeBuffer(record.uniforms[cascade],0,record.values as Float32Array<ArrayBuffer>);
-    pass.setPipeline(pipeline);pass.setBindGroup(0,record.groups[cascade]);pass.setVertexBuffer(0,p.vertex);pass.setIndexBuffer(p.index,'uint32');pass.drawIndexed(p.count);
+    pass.setPipeline(pipeline);pass.setBindGroup(0,record.groups[cascade]);pass.setVertexBuffer(0,p.vertex);pass.setIndexBuffer(p.index,'uint32');if(inst){pass.setVertexBuffer(1,inst.upload(this.device!));pass.drawIndexed(p.count,inst.count);}else pass.drawIndexed(p.count);
   }
   private clearDraws():void {for(const records of this.draws.values())for(const r of records.values())for(const b of r.uniforms)b.destroy();this.draws.clear();}
   private release():void {this.clearDraws();for(const texture of [this.cached,this.combined,this.white])texture?.destroy();this.uniform?.destroy();this.cached=this.combined=this.white=undefined;this.whiteView=undefined;this.uniform=undefined;this.views=[];this.cachedViews=[];this.entries=[];this.pipelines.clear();this.shaders.clear();for(const shadow of this.shadowContexts){shadow.context=undefined!;shadow.pass=undefined!;}}

@@ -1,8 +1,9 @@
 import type {Engine,Mesh} from '@margoengine/core/extension';
+import {instanceMatrix} from '../../shared/instances.js';
 declare const GPUBufferUsage:{STORAGE:number;UNIFORM:number;COPY_DST:number};
 
 /** Structural gltf-pro `PBRPrimitive`: `buffers` exist while its model is set up on a device; `deformed` replaces the vertices when skinned. */
-export interface ModelPrimitive {readonly node:Mesh;readonly vertices:Float32Array;readonly indices:Uint32Array;readonly material:{readonly settings:ArrayLike<number>};readonly buffers?:{vertex:GPUBuffer;index:GPUBuffer};readonly deformed?:GPUBuffer}
+export interface ModelPrimitive {readonly node:Mesh;readonly vertices:Float32Array;readonly indices:Uint32Array;readonly material:{readonly settings:ArrayLike<number>};readonly buffers?:{vertex:GPUBuffer;index:GPUBuffer};readonly deformed?:GPUBuffer;/** gltf-pro PBRInstances: drawn once per instance (24 floats each, node-space matrix first). */readonly instances?:{readonly count:number;readonly data:Float32Array}}
 /** Structural gltf-pro `PBRModel` (@margoengine/materials meshes are PBRModels too). */
 export interface Model {readonly root:Mesh;readonly primitives:readonly ModelPrimitive[];readonly disposed?:boolean}
 /** gltf-pro shape: a `root` node and `primitives` with 20-float CPU vertices (the first one is checked). */
@@ -52,14 +53,18 @@ export function modelPipeline(device:GPUDevice,code:string,format:GPUTextureForm
 
 /** Per-draw model matrices and info in one storage buffer, drawn with `firstInstance` as the slot. Grows, never shrinks; no per-frame allocation. */
 export class ModelDraws {
- count=0;private data=new Float32Array(20*16);private words=new Uint32Array(this.data.buffer);private primitives:ModelPrimitive[]=[];
+ count=0;private data=new Float32Array(20*16);private words=new Uint32Array(this.data.buffer);private primitives:ModelPrimitive[]=[];private runs:number[]=[];
  private storage?:GPUBuffer;private camera?:GPUBuffer;private group?:GPUBindGroup;private pipeline?:GPURenderPipeline;
- reset():void {this.count=0;}
+ reset():void {this.count=0;this.runs.length=0;}
  add(p:ModelPrimitive,id:number,m:ArrayLike<number>=p.node.matrix):void {
   const o=this.count*20;
   if(o+20>this.data.length){const data=new Float32Array(this.data.length*2);data.set(this.data);this.data=data;this.words=new Uint32Array(data.buffer);}
   this.data.set(m,o);this.words[o+16]=id;this.words[o+17]=+(p.material.settings[2]>=0.5);
   this.words[o+18]=+(m[0]*(m[5]*m[10]-m[6]*m[9])-m[4]*(m[1]*m[10]-m[2]*m[9])+m[8]*(m[1]*m[6]-m[2]*m[5])>0);this.primitives[this.count++]=p;
+ }
+ /** Every drawn instance of `p` (world = node x instance) with one ID, drawn as one instanced draw over consecutive slots. */
+ addInstances(p:ModelPrimitive,id:number,node:ArrayLike<number>):void {
+  const inst=p.instances!,first=this.count,m=new Float32Array(16);for(let k=0;k<inst.count;k++)this.add(p,id,instanceMatrix(node,inst.data,k,m));this.runs[first]=inst.count;
  }
  /** Uploads the draws and camera and binds them; call inside a pass using `pipeline`. */
  draw(device:GPUDevice,pass:GPURenderPassEncoder,pipeline:GPURenderPipeline,camera:Float32Array):void {
@@ -69,7 +74,7 @@ export class ModelDraws {
   if(!this.group||this.pipeline!==pipeline){this.pipeline=pipeline;this.group=device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.camera}},{binding:1,resource:{buffer:this.storage}}]});}
   device.queue.writeBuffer(this.camera,0,camera as Float32Array<ArrayBuffer>);device.queue.writeBuffer(this.storage,0,this.data,0,this.count*20);
   pass.setPipeline(pipeline);pass.setBindGroup(0,this.group);
-  for(let i=0;i<this.count;i++){const p=this.primitives[i];pass.setVertexBuffer(0,p.deformed??p.buffers!.vertex);pass.setIndexBuffer(p.buffers!.index,'uint32');pass.drawIndexed(p.indices.length,1,0,0,i);}
+  for(let i=0;i<this.count;){const p=this.primitives[i],n=this.runs[i]||1;pass.setVertexBuffer(0,p.deformed??p.buffers!.vertex);pass.setIndexBuffer(p.buffers!.index,'uint32');pass.drawIndexed(p.indices.length,n,0,0,i);i+=n;}
  }
  release():void {this.storage?.destroy();this.camera?.destroy();this.storage=this.camera=this.group=this.pipeline=undefined;this.primitives=[];this.count=0;}
 }

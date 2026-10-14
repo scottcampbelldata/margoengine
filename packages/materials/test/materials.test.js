@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Engine,TransformStore} from '../../core/dist/extension.js';
 import {boxGeometry,planeGeometry} from '../../geometry/dist/index.js';
-import {Texture,Material,createMesh,loadTexture,packGeometry,materialShader,packAtlas,transformUVs} from '../dist/index.js';
+import {Texture,Material,createMesh,createInstancedMesh,loadTexture,packGeometry,materialShader,packAtlas,transformUVs} from '../dist/index.js';
 import {optionalGPU} from '../../../tests/support/optional-gpu.js';
 
 async function scene(){
@@ -192,5 +192,19 @@ test('packAtlas shelf-packs images with edge padding and returns regions that ma
     assert.deepEqual([d[0],d[w*4],d[w*8]],[2,1,0],'bottom image row first');assert.deepEqual(r.scale,[2/w,3/flipped.image.height]);
   } finally {delete globalThis.OffscreenCanvas;}
   assert.throws(()=>packAtlas([image(5000,1,1)]),RangeError);assert.throws(()=>packAtlas([]),RangeError);assert.throws(()=>packAtlas([{width:2,height:2,data:new Uint8Array(3)}]),RangeError);
+});
+test('createInstancedMesh draws every instance of a textured material in one draw and frees its instance buffer',async()=>{
+  const s=await scene(),draws=[],slots=[],begin=s.h.context.encoder.beginRenderPass;
+  s.h.context.encoder.beginRenderPass=d=>{const p=begin(d);return {...p,drawIndexed:(...a)=>draws.push(a),setVertexBuffer:(slot,b)=>slots.push([slot,b])};};
+  try {
+    const map=new Texture({data:new Uint8Array(16).fill(200),width:2,height:2}),mesh=createInstancedMesh(s.engine,boxGeometry(1,1,1),new Material({map}),1000);
+    assert.equal(mesh.instances.capacity,1000);assert.equal(mesh.primitives[0].instances,mesh.instances);
+    for(let i=0;i<1000;i++)mesh.instances.setMatrixAt(i,[1,0,0,0,0,1,0,0,0,0,1,0,i%10,0,Math.floor(i/10),1]).setColorAt(i,[i/1000,1,1]);
+    mesh.instances.count=600;s.frame();
+    assert.deepEqual(draws,[[36,600]],'one draw of 600 instances');const buffer=slots.find(([slot])=>slot===1)[1];assert.equal(buffer.size,1000*96);
+    assert.equal(s.lighting().length,1,'material maps bound as for createMesh');
+    assert.throws(()=>createInstancedMesh(s.engine,boxGeometry(1,1,1),new Material(),0),RangeError);
+    mesh.destroy();assert.equal(buffer.destroyed,true);
+  } finally {s.close();}
 });
 class ImageDataLike {constructor(w,h,seed){this.width=w;this.height=h;this.data=Uint8ClampedArray.from({length:w*h*4},(_,i)=>(i*seed+1)%253);}}

@@ -24,6 +24,10 @@ export interface ModelPrimitive {
         index: GPUBuffer;
     };
     readonly deformed?: GPUBuffer;
+    readonly instances?: {
+        readonly count: number;
+        readonly data: Float32Array;
+    };
 }
 
 export interface PickHit {
@@ -32,6 +36,7 @@ export interface PickHit {
     primitive?: ModelPrimitive;
     primitiveIndex?: number;
     approximate?: boolean;
+    instanceId?: number;
 }
 
 export interface PickProxy {

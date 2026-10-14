@@ -42,6 +42,7 @@ export interface VelocityPrimitive {
     alpha?: number;
     cutoff?: number;
     texCoord?: number;
+    instances?: unknown;
 }
 
 export interface VelocitySource {

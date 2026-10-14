@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine } from "@margoengine/core/extension";
-import { PBRModel, PreparedGeometry } from "@margoengine/gltf-pro";
+import { PBRInstances, PBRModel, PreparedGeometry } from "@margoengine/gltf-pro";
 
 export interface Atlas {
     image: {
@@ -24,6 +24,10 @@ export interface AtlasOptions {
 export type Blending = 'normal' | 'additive' | 'multiply' | 'none';
 
 export type Filter = 'linear' | 'nearest';
+
+export type InstancedMesh = PBRModel & {
+    readonly instances: PBRInstances;
+};
 
 export type MapSlot = 'map' | 'metalRoughnessMap' | 'normalMap' | 'aoMap' | 'emissiveMap';
 
@@ -135,6 +139,10 @@ export type TextureSource = ImageBitmap | HTMLImageElement | HTMLCanvasElement |
 export { TextureTransform } from "@margoengine/gltf-pro";
 
 export type Wrap = 'repeat' | 'clamp' | 'mirror';
+
+export function createInstancedMesh(engine: EngineKernel, geometry: MeshGeometry, material: Material, capacity: number, options?: {
+    renderOrder?: number;
+}): InstancedMesh;
 
 export function createMesh(engine: EngineKernel, geometry: MeshGeometry, material: Material, { renderOrder }?: {
     renderOrder?: number;

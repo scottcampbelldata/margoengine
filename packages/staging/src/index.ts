@@ -1,5 +1,6 @@
 import type {EngineKernel,Mesh as MeshHandle} from '@margoengine/core';
 import {engineRuntime,meshRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type Mesh,type Vec3} from '@margoengine/core/extension';
+import {instanceLayout,instancedDepth} from '../../shared/instances.js';
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
 declare const GPUTextureUsage:{RENDER_ATTACHMENT:number;TEXTURE_BINDING:number;COPY_DST:number};
 type Context=Extract<PassContext,{backend:'webgpu'}>;
@@ -24,7 +25,7 @@ export interface ContactShadowOptions {
   static?:boolean;
 }
 /** Same shape as `@margoengine/shadows`' ShadowPrimitive; gltf-pro `PBRModel` and materials meshes provide it. */
-export interface ContactPrimitive {node:Mesh;vertex:GPUBuffer;index:GPUBuffer;count:number;stride:number;alphaTexture?:GPUTextureView;alphaSampler?:GPUSampler;alpha?:number;cutoff?:number;texCoord?:number}
+export interface ContactPrimitive {node:Mesh;vertex:GPUBuffer;index:GPUBuffer;count:number;stride:number;alphaTexture?:GPUTextureView;alphaSampler?:GPUSampler;alpha?:number;cutoff?:number;texCoord?:number;instances?:{readonly count:number;upload(device:GPUDevice):GPUBuffer}}
 export interface ContactSource {shadowPrimitives?:readonly ContactPrimitive[];disposed?:boolean}
 interface Source {source:ContactSource|Mesh;primitive?:ContactPrimitive[]}
 interface Draw {uniform:GPUBuffer;group:GPUBindGroup;values:Float32Array;vertex:GPUBuffer;pipeline:GPURenderPipeline;alpha?:GPUTextureView;sampler?:GPUSampler}
@@ -140,7 +141,7 @@ export class ContactShadows implements EnginePlugin {
         Object.assign(r.primitive[0],{vertex:buffers.vertex,index:buffers.index,count:node.geometry.indices.length});primitives=r.primitive;}
       else primitives=r.source.shadowPrimitives??[];
       for(const p of primitives){const node=p.node;node.check();if(node.engine!==engine)throw new Error('Contact shadow source belongs to another engine');let visible=true;
-        for(let id=node.id;id!==-1;id=engine.store.parents[id])if(engine.store.hidden[id])visible=false;if(!visible)continue;
+        for(let id=node.id;id!==-1;id=engine.store.parents[id])if(engine.store.hidden[id])visible=false;if(!visible||p.instances&&!p.instances.count)continue;
         const draw=this.record(p),v=draw.values,before=v.slice();v.set(m);v.set(node.matrix,16);v[32]=p.alpha??1;v[33]=p.cutoff??0;v[34]=p.texCoord??0;
         for(let i=0;i<35&&!changed;i++)if(v[i]!==before[i])changed=true;list.push([draw,p]);}
     }
@@ -148,7 +149,7 @@ export class ContactShadows implements EnginePlugin {
     if(changed){
       this.stats.updates++;this.dirty=false;
       (this.occluderPass.colorAttachments as GPURenderPassColorAttachment[])[0].view=this.views[0];const pass=c.encoder.beginRenderPass(this.occluderPass);
-      try{for(const [draw,p] of list){device.queue.writeBuffer(draw.uniform,0,draw.values as Float32Array<ArrayBuffer>);pass.setPipeline(draw.pipeline);pass.setBindGroup(0,draw.group);pass.setVertexBuffer(0,p.vertex);pass.setIndexBuffer(p.index,'uint32');pass.drawIndexed(p.count);}}
+      try{for(const [draw,p] of list){device.queue.writeBuffer(draw.uniform,0,draw.values as Float32Array<ArrayBuffer>);pass.setPipeline(draw.pipeline);pass.setBindGroup(0,draw.group);pass.setVertexBuffer(0,p.vertex);pass.setIndexBuffer(p.index,'uint32');if(p.instances){pass.setVertexBuffer(1,p.instances.upload(device));pass.drawIndexed(p.count,p.instances.count);}else pass.drawIndexed(p.count);}}
       catch(error){try{pass.end();}catch{}throw error;}pass.end();
       const steps=new Float32Array(196);for(let i=0;i<4;i++)steps[i*64+(i&1)]=texels/4*(i<2?1:0.4)/resolution;device.queue.writeBuffer(this.blurUniform!,0,steps);
       for(let i=0;i<4;i++){const blurPass=c.encoder.beginRenderPass({colorAttachments:[{view:this.views[1-(i&1)],loadOp:'clear',storeOp:'store',clearValue:[0,0,0,0]}]});blurPass.setPipeline(this.blurPipeline!);blurPass.setBindGroup(0,this.blurGroups[i]);blurPass.draw(3);blurPass.end();}
@@ -167,10 +168,10 @@ export class ContactShadows implements EnginePlugin {
     pass.setPipeline(pipeline);pass.setBindGroup(0,this.planeGroup);pass.draw(4);pass.end();
   }
   private record(p:ContactPrimitive):Draw {
-    let pipeline=this.occluders.get(p.stride);const device=this.device!;
-    if(!pipeline){if(p.stride!==24&&p.stride!==80)throw new RangeError('Unsupported contact shadow vertex stride');const module=device.createShaderModule({code:occluderShader(p.stride===80)});
-      pipeline=device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:p.stride,attributes:p.stride===80?[{shaderLocation:0,offset:0,format:'float32x4'},{shaderLocation:3,offset:48,format:'float32x4'},{shaderLocation:4,offset:64,format:'float32x4'}]:[{shaderLocation:0,offset:0,format:'float32x3'}]}]},
-        fragment:{module,entryPoint:'fragment',targets:[{format:'r16float',blend:{color:{operation:'max',srcFactor:'one',dstFactor:'one'},alpha:{operation:'max',srcFactor:'one',dstFactor:'one'}}}]}});this.occluders.set(p.stride,pipeline);}
+    const inst=!!p.instances,key=p.stride+(inst?1:0);let pipeline=this.occluders.get(key);const device=this.device!;
+    if(!pipeline){if(p.stride!==24&&p.stride!==80||inst&&p.stride!==80)throw new RangeError('Unsupported contact shadow vertex stride');const code=occluderShader(p.stride===80),module=device.createShaderModule({code:inst?instancedDepth(code):code});
+      pipeline=device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:p.stride,attributes:p.stride===80?[{shaderLocation:0,offset:0,format:'float32x4'},{shaderLocation:3,offset:48,format:'float32x4'},{shaderLocation:4,offset:64,format:'float32x4'}]:[{shaderLocation:0,offset:0,format:'float32x3'}]},...inst?[instanceLayout]:[]]},
+        fragment:{module,entryPoint:'fragment',targets:[{format:'r16float',blend:{color:{operation:'max',srcFactor:'one',dstFactor:'one'},alpha:{operation:'max',srcFactor:'one',dstFactor:'one'}}}]}});this.occluders.set(key,pipeline);}
     let records=this.draws.get(p.node);if(!records){records=new Map();this.draws.set(p.node,records);}let draw=records.get(p.index);
     if(!draw||draw.vertex!==p.vertex||draw.pipeline!==pipeline||draw.alpha!==p.alphaTexture||draw.sampler!==p.alphaSampler){
       draw?.uniform.destroy();records.delete(p.index);this.dirty=true;

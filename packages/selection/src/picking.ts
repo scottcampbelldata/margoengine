@@ -1,6 +1,7 @@
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type Mesh,type Geometry,type EnginePlugin,type FrameGraph,type PassContext,type DrawOptions} from '@margoengine/core/extension';
 import {meshVertex} from '../../shared/gpu.js';
+import {instanceMatrix} from '../../shared/instances.js';
 import {Models,ModelDraws,modelCode,modelPipeline,sphere,hidden,isModel,proxies,type Model,type ModelPrimitive,type PickProxy} from './models.js';
 
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number;MAP_READ:number;VERTEX:number;INDEX:number};
@@ -29,7 +30,7 @@ struct PickPixel {@location(0) color:vec4f,@location(1) id:u32}
 
 const idFragment=`@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) u32 {if(culled(i,front)){discard;}return i.info.x;}`;
 /** A pick result: the core mesh, or for gltf-pro models the glTF node with its model and primitive. `approximate`: a pick proxy (imposter level) hit through its bounding sphere; `mesh` is the LOD anchor. */
-export interface PickHit {mesh:Mesh;model?:Model;primitive?:ModelPrimitive;primitiveIndex?:number;approximate?:boolean}
+export interface PickHit {mesh:Mesh;model?:Model;primitive?:ModelPrimitive;primitiveIndex?:number;approximate?:boolean;/** Instanced primitives (gltf-pro PBRInstances): the instance index. */instanceId?:number}
 
 /** UV sphere scaled so its faces enclose the unit sphere (proxy picks cover at least the bounding sphere the bvh Raycaster tests), as 20-float gltf-pro vertices. */
 function proxySphere(device:GPUDevice):ModelPrimitive {
@@ -61,7 +62,7 @@ function intersects(matrix:Float32Array,model:Float32Array,b:ArrayLike<number>,c
 /** Optional picking of core meshes (forward-pass IDs, or a culled 3x3 pass when the frame is stale) and gltf-pro models (always the 3x3 pass). */
 export class Picking implements EnginePlugin {
  readonly name='picking';private engine?:Engine;private device?:GPUDevice;private disposed=false;private pending=false;
- private readonly models=new Models();private readonly draws=new ModelDraws();private modelPipeline?:GPURenderPipeline;private last:PickHit|null=null;private sphere?:ModelPrimitive;private readonly proxyMatrix=new Float32Array(16);
+ private readonly models=new Models();private readonly draws=new ModelDraws();private modelPipeline?:GPURenderPipeline;private last:PickHit|null=null;private sphere?:ModelPrimitive;private readonly proxyMatrix=new Float32Array(16);private readonly instanceWorld=new Float32Array(16);private instanceHits:number[][]=[];
  private ids?:GPUTexture;private idsView?:GPUTextureView;private micro?:GPUTexture;private depth?:GPUTexture;private uniform?:GPUBuffer;private read?:GPUBuffer;
  private readonly pipelines=new Map<string,GPURenderPipeline>();private readonly groups=new Map<GPURenderPipeline,{entries:GPUBindGroupEntry[];group:GPUBindGroup}>();
  private readonly frame=new Float32Array(28);private readonly camera=new Float32Array(16);private readonly clip=new Float64Array(16);
@@ -148,7 +149,8 @@ export class Picking implements EnginePlugin {
      const nx=cx+dx,ny=cy+dy;if(nx>=0&&ny>=0&&nx<width&&ny<height&&data[ny*64+nx]){id=data[ny*64+nx];break;}
     }
     let hit:PickHit|null=null;
-    if(id>capacity+total){const proxy=list[id-capacity-1-total];if(proxy)hit={mesh:proxy.anchor,...(isModel(proxy.model)?{model:proxy.model}:{}),approximate:true};}
+    if(id>capacity+total+list.length){const [m,i,k]=this.instanceHits[id-capacity-total-list.length-1]??[],model=models[m],primitive=model?.primitives[i];if(primitive&&!model.disposed)hit={mesh:primitive.node,model,primitive,primitiveIndex:i,instanceId:k};}
+    else if(id>capacity+total){const proxy=list[id-capacity-1-total];if(proxy)hit={mesh:proxy.anchor,...(isModel(proxy.model)?{model:proxy.model}:{}),approximate:true};}
     else if(id>capacity){
      // Model slots follow the core slots: capacity + 1 + the model's first slot + primitive index.
      const slot=id-capacity-1;let m=models.length-1;while(m>0&&starts[m]>slot)m--;
@@ -179,10 +181,13 @@ export class Picking implements EnginePlugin {
   pass.setPipeline(pipeline);pass.setBindGroup(0,cached.group);
   for(const [geometry,values] of batches){const gpu=e.geometryBuffers(geometry)!;device.queue.writeBuffer(gpu.instance,0,new Float32Array(values));pass.setVertexBuffer(0,gpu.vertex);pass.setVertexBuffer(1,gpu.instance);pass.setIndexBuffer(gpu.index,'uint32');pass.drawIndexed(geometry.indices.length,values.length/24);}
   // gltf-pro primitives whose bounding sphere meets the micro frustum, alpha cut-outs and transparency ignored, deformed (skinned) buffers used.
-  const draws=this.draws,models=this.models.list,starts=this.models.starts;draws.reset();
+  const draws=this.draws,models=this.models.list,starts=this.models.starts;draws.reset();this.instanceHits=[];
   for(let m=0;m<models.length;m++){
    const model=models[m];if(model.disposed)continue;
-   for(let i=0;i<model.primitives.length;i++){const p=model.primitives[i];if(p.buffers&&!hidden(e,p.node.id)&&intersects(matrix,p.node.matrix,sphere(p),this.clip))draws.add(p,e.store.capacity+1+starts[m]+i);}
+   for(let i=0;i<model.primitives.length;i++){const p=model.primitives[i],inst=p.instances;if(!p.buffers||hidden(e,p.node.id))continue;
+    // Instances meeting the micro frustum get IDs after the pick proxies' (one slot per hit candidate, not per instance).
+    if(inst){for(let k=0;k<inst.count;k++){const w=instanceMatrix(p.node.matrix,inst.data,k,this.instanceWorld);if(intersects(matrix,w,sphere(p),this.clip)){this.instanceHits.push([m,i,k]);draws.add(p,e.store.capacity+this.models.total+list.length+this.instanceHits.length,w);}}continue;}
+    if(intersects(matrix,p.node.matrix,sphere(p),this.clip))draws.add(p,e.store.capacity+1+starts[m]+i);}
   }
   // Pick proxies (imposter levels): the enclosing sphere under the anchor's world matrix, slots after every model primitive.
   for(let i=0;i<list.length;i++){
