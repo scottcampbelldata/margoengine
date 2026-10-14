@@ -1,6 +1,6 @@
 import type {EngineKernel, EnginePlugin, Mesh} from '@margoengine/core';
 import {engineRuntime, meshRuntime, type FrameGraph} from '@margoengine/core/extension';
-import {cameraCSSTransform, composeMatrix, createScreenPoint, cssPerspective, lookAtView, objectCSSTransform, projectPoint, type ScreenPoint, type Vec3} from './projection.js';
+import {cameraCSSTransform, composeMatrix, createScreenPoint, cssPerspective, isOrthographic, lookAtView, objectCSSTransform, orthographicCSSTransform, projectPoint, type ScreenPoint, type Vec3} from './projection.js';
 
 export interface LabelInfo {
   /** Projected position in CSS pixels relative to the canvas. */
@@ -186,6 +186,7 @@ export class LabelRenderer implements EnginePlugin {
   private readonly viewerCache: StyleCache = {};
   private readonly cameraCache: StyleCache = {};
   private readonly view = new Float64Array(16);
+  private readonly point = createScreenPoint();
   private readonly visibleLabels: Label[] = [];
   private readonly world: [number, number, number] = [0, 0, 0];
   private left = 0;
@@ -251,7 +252,10 @@ export class LabelRenderer implements EnginePlugin {
     this.syncRoot(canvas, width, height);
     const visible = this.visibleLabels;
     visible.length = 0;
-    const [ex, ey, ez] = camera.position;
+    const [ex, ey, ez] = camera.position, m = camera.matrix;
+    // Orthographic: size does not change with distance, so distanceScale uses the distance at which a perspective
+    // camera with this fov shows the same zoom.
+    const zoomDistance = isOrthographic(m) ? 1 / (Math.hypot(m[1], m[5], m[9]) * Math.tan(camera.fov * Math.PI / 360)) : 0;
     for (const label of this.labels) {
       let show = label.visible;
       const mesh = label.mesh;
@@ -285,7 +289,7 @@ export class LabelRenderer implements EnginePlugin {
       let scaled = 0, factor = 0;
       if (label.distanceScale !== null) {
         const options = typeof label.distanceScale === 'number' ? {reference: label.distanceScale} : label.distanceScale;
-        factor = Math.round(Math.min(options.max ?? Infinity, Math.max(options.min ?? 0, options.reference / Math.max(label.distance, 1e-6))) * 1e4) / 1e4; scaled = 1;
+        factor = Math.round(Math.min(options.max ?? Infinity, Math.max(options.min ?? 0, options.reference / Math.max(zoomDistance || label.distance, 1e-6))) * 1e4) / 1e4; scaled = 1;
       }
       // The transform text depends only on these numbers: format and compare it again only when one changed.
       if (key[0] !== x || key[1] !== y || key[2] !== scaled || key[3] !== factor || key[4] !== ax || key[5] !== ay) {
@@ -298,18 +302,18 @@ export class LabelRenderer implements EnginePlugin {
     // Far labels first: nearer labels get higher z-index and draw on top.
     visible.sort((a, b) => b.distance - a.distance);
     for (let i = 0; i < visible.length; i++) this.set(visible[i].element, visible[i].cache, 'zIndex', String(i + 1));
-    if (this.objects.size) this.update3D(width, height, runtime);
+    if (this.objects.size) this.update3D(width, height, runtime, backend);
   }
 
-  private update3D(width: number, height: number, runtime: ReturnType<typeof engineRuntime>): void {
+  private update3D(width: number, height: number, runtime: ReturnType<typeof engineRuntime>, backend: 'webgpu' | 'webgl2'): void {
     const camera = runtime.camera, store = runtime.store, matrices = store.matrices;
-    const viewer = this.viewer!, cameraElement = this.cameraElement!;
+    const viewer = this.viewer!, cameraElement = this.cameraElement!, orthographic = isOrthographic(camera.matrix);
     const perspective = cssPerspective(camera.fov, height);
-    this.set(viewer, this.viewerCache, 'perspective', px(perspective));
+    this.set(viewer, this.viewerCache, 'perspective', orthographic ? 'none' : px(perspective));
     this.set(cameraElement, this.cameraCache, 'width', px(width));
     this.set(cameraElement, this.cameraCache, 'height', px(height));
-    const view = lookAtView(camera.position, camera.target, this.view);
-    this.set(cameraElement, this.cameraCache, 'transform', cameraCSSTransform(view, perspective, width, height));
+    const view = orthographic ? this.view : lookAtView(camera.position, camera.target, this.view);
+    this.set(cameraElement, this.cameraCache, 'transform', orthographic ? orthographicCSSTransform(camera.matrix, width, height, backend) : cameraCSSTransform(view, perspective, width, height));
     for (const object of this.objects) {
       let show = object.visible;
       const mesh = object.mesh, matrix = object.matrix;
@@ -321,7 +325,7 @@ export class LabelRenderer implements EnginePlugin {
       if (show) {
         // Hide objects whose origin is at or behind the near plane; CSS perspective cannot clip them.
         const viewZ = view[2] * matrix[12] + view[6] * matrix[13] + view[10] * matrix[14] + view[14];
-        if (-viewZ <= camera.near) show = false;
+        if (orthographic ? projectPoint(camera.matrix, matrix[12], matrix[13], matrix[14], width, height, backend, this.point).depth < 0 : -viewZ <= camera.near) show = false;
         object.distance = Math.hypot(matrix[12] - camera.position[0], matrix[13] - camera.position[1], matrix[14] - camera.position[2]);
       }
       object.onScreen = show;

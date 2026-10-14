@@ -2,6 +2,7 @@ import {SceneTarget} from '../../shared/msaa.js';
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext} from '@margoengine/core/extension';
 import {render,group} from '../../shared/gpu.js';
+import {orthographic} from '../../shared/projection.js';
 import type {StackHost,StackStage,StageOutput} from '../../shared/stack.js';
 import {cocShader, bokehShader, presentShader} from './shaders.js';
 
@@ -39,7 +40,7 @@ export class DOF implements EnginePlugin {
   private originalDepth?:GPUTextureView;
   private format?:GPUTextureFormat;
   private depthFormat?:GPUTextureFormat;
-  private readonly values=new Float32Array(8);
+  private readonly values=new Float32Array(12);
   private readonly shaders=new Map<string,string>();
   private readonly attachment:GPURenderPassColorAttachment={view:undefined!,loadOp:'clear',storeOp:'store'};
   private readonly presentation:GPURenderPassDescriptor={colorAttachments:[this.attachment]};
@@ -68,7 +69,7 @@ export class DOF implements EnginePlugin {
     if(this.disposed||!engine.gpu)throw new Error('DOF requires WebGPU and a live effect');
     if(!this.host&&(engine.hasPlugin('ssao')||engine.hasPlugin('post-processing')||engine.hasPlugin('tonemap')&&!engine.hasPlugin(this.name)))throw new Error('DOF owns scene capture; attach it before Tonemap, without SSAO or PostProcessing');
     this.engine=engine;
-    this.uniform=engine.gpu.createBuffer({size:32,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+    this.uniform=engine.gpu.createBuffer({size:48,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
     this.cocPipeline=engine.gpu.createComputePipeline({layout:'auto',compute:{module:engine.gpu.createShaderModule({code:cocShader}),entryPoint:'main'}});
     this.bokehPipeline=engine.gpu.createComputePipeline({layout:'auto',compute:{module:engine.gpu.createShaderModule({code:bokehShader}),entryPoint:'main'}});
   }
@@ -93,7 +94,10 @@ export class DOF implements EnginePlugin {
     c.shader=shader;this.captureTarget!.begin(c);}
     const o=this.options,v=this.values;v[0]=o.focalDistance??5;v[1]=o.focalLength??0.05;v[2]=o.aperture??2.8;v[3]=o.maxRadius??16;
     v[4]=c.camera.near;v[5]=c.camera.far;
-    v[6]=v[1]*c.height/(4*v[2]*(v[0]-v[1])*Math.tan(c.camera.fov*Math.PI/360));v[7]=+this.enabled;
+    v[6]=v[1]*c.height/(4*v[2]*(v[0]-v[1])*Math.tan(c.camera.fov*Math.PI/360));v[7]=+this.enabled;v[8]=0;
+    // Orthographic clip matrix (e.g. @margoengine/cameras): linear depth and a blur linear in defocus, scaled like a
+    // perspective lens whose pixel size at the focal distance matches the orthographic zoom.
+    const ortho=orthographic(c.camera.matrix,c.camera.position);if(ortho){v[4]=ortho.near;v[5]=ortho.far;v[6]=v[1]*c.height*ortho.sy*v[0]/(4*v[2]*(v[0]-v[1]));v[8]=1;}
     if(!Number.isFinite(v[6]))throw new RangeError('DOF lens scale exceeds float32');
     c.device.queue.writeBuffer(this.uniform!,0,v as Float32Array<ArrayBuffer>);
   }

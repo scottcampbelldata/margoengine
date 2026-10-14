@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Camera} from '@margoengine/core';
 import {fakeEngine} from './fake-dom.js';
-import {LabelRenderer, projectPoint, lookAtView, cssPerspective, cameraCSSTransform, objectCSSTransform, cssPointToWorld, composeMatrix} from '../dist/index.js';
+import {LabelRenderer, projectPoint, lookAtView, cssPerspective, cameraCSSTransform, objectCSSTransform, orthographicCSSTransform, isOrthographic, cssPointToWorld, composeMatrix} from '../dist/index.js';
+import {CameraProjection} from '../../cameras/dist/index.js';
 
 const close = (a, b, epsilon = 1e-6) => Math.abs(a - b) <= epsilon;
 
@@ -272,4 +273,59 @@ test('remove and dispose clean up every element and the overlay root', () => {
   assert.equal(renderer.root, null);
   renderer.update();
   assert.equal(renderer.writes, 0);
+});
+
+// Orthographic cameras (@margoengine/cameras replaces camera.update; labels only read camera.matrix).
+const orthographic = (camera, options) => {new CameraProjection(options).attach(camera); return camera;};
+
+test('orthographic: projectPoint keeps labels in front and CSS3D corners land on the projected corners', () => {
+  const width = 640, height = 360;
+  for (const backend of ['webgpu', 'webgl2']) {
+    const camera = orthographic(new Camera({position: [2, 1.5, 4], target: [0, 0.25, 0], fov: 55}), {height: 3, zoom: 1.5, near: -2, far: 20});
+    camera.update(width / height, backend === 'webgpu');
+    assert.ok(isOrthographic(camera.matrix));
+    // Behind the eye but inside the (negative) near plane: still drawn by the GPU, so still in the frustum.
+    const back = [2, 1.25, 4].map(v => v / Math.hypot(2, 1.25, 4)), behind = projectPoint(camera.matrix, 2 + back[0], 1.5 + back[1], 4 + back[2], width, height, backend);
+    assert.ok(behind.inFront && behind.inFrustum && behind.depth > 0 && behind.depth < 1);
+    const world = composeMatrix([0.3, 0.2, -0.4], [0.2, 0.3, -0.1, 0.92], [1.5, 0.8, 1]);
+    const pixelScale = 0.01, elementWidth = 120, elementHeight = 80;
+    const setup = {viewerWidth: width, viewerHeight: height, perspective: Infinity, camera: orthographicCSSTransform(camera.matrix, width, height, backend), object: objectCSSTransform(world, pixelScale), elementWidth, elementHeight};
+    for (const [cx, cy] of [[0, 0], [elementWidth, 0], [0, elementHeight], [elementWidth, elementHeight], [60, 40]]) {
+      const css = cssScreen([cx, cy], setup);
+      const projected = projectPoint(camera.matrix, ...cssPointToWorld(world, pixelScale, cx - elementWidth / 2, cy - elementHeight / 2), width, height, backend);
+      assert.ok(close(css[0], projected.x, 1e-2) && close(css[1], projected.y, 1e-2), `${backend} corner ${cx},${cy}: css ${css} vs ${projected.x},${projected.y}`);
+    }
+    // CSS depth follows the camera: nearer points get larger CSS z (drawn on top with preserve-3d).
+    const m = cssMatrix(setup.camera, width, height), z = p => m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14];
+    const toward = [camera.position[0] - camera.target[0], camera.position[1] - camera.target[1], camera.position[2] - camera.target[2]];
+    assert.ok(z(toward) > z([0, 0, 0]), backend);
+  }
+  const perspective = new Camera({position: [2, 1.5, 4], target: [0, 0.25, 0]}); perspective.update(1, true);
+  assert.equal(isOrthographic(perspective.matrix), false);
+});
+
+test('orthographic: renderer drops CSS perspective, hides objects before the near plane and scales labels by zoom', () => {
+  const {engine, renderer, document} = setup();
+  const projection = new CameraProjection({height: 4, near: 1, far: 20}); projection.attach(engine.camera);
+  const panel = renderer.add3D(document.createElement('div'), {position: [0, 1, 0]});
+  const before = renderer.add3D(document.createElement('div'), {position: [0, 0, 4.5]});
+  const label = renderer.add(document.createElement('div'), {position: [1, 0.5, 0], distanceScale: 10});
+  const far = renderer.add(document.createElement('div'), {position: [1, 0.5, -10], distanceScale: 10});
+  engine.frame();
+  const viewer = renderer.root.children[0], cameraElement = viewer.children[0];
+  assert.equal(viewer.style.perspective, 'none');
+  assert.equal(cameraElement.style.transform, orthographicCSSTransform(engine.camera.matrix, 800, 400));
+  assert.equal(panel.element.style.display, '');
+  assert.equal(before.element.style.display, 'none', 'eye-space z 0.5 is before the near plane at 1');
+  const expected = projectPoint(engine.camera.matrix, 1, 0.5, 0, 800, 400);
+  const [x, y] = translate(label.element);
+  assert.ok(close(x, expected.x, 0.01) && close(y, expected.y, 0.01));
+  // Height 4 at fov 60 is what a perspective camera sees at 2 / tan(30 deg) = 3.464: scale 10 / 3.464, at any depth.
+  const scale = element => Number(element.style.transform.match(/scale\(([-\d.]+)\)/)[1]);
+  assert.ok(close(scale(label.element), 10 / (2 / Math.tan(Math.PI / 6)), 1e-3));
+  assert.equal(scale(far.element), scale(label.element));
+  projection.zoom = 2; engine.frame();
+  assert.ok(close(scale(label.element), 20 / (2 / Math.tan(Math.PI / 6)), 1e-3), 'zooming in enlarges distance-scaled labels');
+  projection.dispose(); engine.frame();
+  assert.equal(viewer.style.perspective, `${Math.round(cssPerspective(60, 400) * 100) / 100}px`, 'back to perspective');
 });

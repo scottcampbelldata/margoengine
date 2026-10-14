@@ -7,6 +7,7 @@ import {
   buildBlocks, expandBlockBounds, worldBox, boxInFrustum, cullBlocks, screenArea, allocateBudget, multiply, projectPoint, pickPoint,
   boxScreenRect, packColors, mergeRanges, atlasRect, random, NO_BLOCK,
 } from '../dist/index.js';
+import {CameraProjection} from '../../cameras/dist/index.js';
 
 const bunny = (await readFile(new URL('./fixtures/bunny.pcd', import.meta.url), 'utf8')).split('\n').slice(10).filter(Boolean).flatMap(line => line.trim().split(/\s+/).map(Number));
 const randomCloud = (n, seed = 7, scale = 10) => {const next = random(seed), p = new Float32Array(n * 3); for (let i = 0; i < p.length; i++) p[i] = (next() - 0.5) * scale; return p;};
@@ -189,6 +190,20 @@ test('projection and nearest-point picking match a brute-force search', () => {
   assert.ok(Math.abs(p[0] - (128 + 128 / Math.tan(Math.PI / 6) / 10)) < 1e-3);
   const rect = boxScreenRect([0, 0, 0, 1, 1, 0], camera().matrix, 256, 256);
   assert.ok(rect[0] < 128 && rect[2] > 128 && rect[1] < 128 && rect[3] > 128);
+});
+
+test('orthographic cameras: screen area ignores distance, picking prefers the nearer point', () => {
+  // @margoengine/cameras replaces camera.update; points only reads camera.matrix (w is 1 everywhere).
+  const ortho = (position = [0, 0, 10]) => {const c = new Camera({position, target: [0, 0, 0], fov: 60, near: 0.1, far: 100}); new CameraProjection({height: 4, near: -5, far: 30}).attach(c); c.update(1, true); return c;};
+  const projScale = 0.5 * 256 * Math.hypot(ortho().matrix[1], ortho().matrix[5], ortho().matrix[9]);
+  assert.equal(projScale, 64, 'height 4 over 256 px');
+  assert.equal(screenArea([0, 0, 0, 1, 1, 1], [0, 0, 50], projScale, 256, 256, true), screenArea([0, 0, 0, 1, 1, 1], [0, 0, 5], projScale, 256, 256, true));
+  assert.ok(Math.abs(screenArea([0, 0, 0, 0.5, 0, 0], [0, 0, 0], projScale, 256, 256, true) - Math.PI * 32 * 32) < 1e-6, 'pi (radius px)^2, even at the eye');
+  const pair = new Float32Array([0, 0, -10, 0, 0, 5, 0, 0, 12]), p = new Float64Array(3);
+  const hit = pickPoint(pair, null, [{start: 0, count: 3}], ortho().matrix, 256, 256, 128, 128, 2);
+  assert.equal(hit.index, 2, 'behind the eye but inside the negative near plane, and nearest');
+  assert.ok(projectPoint(ortho().matrix, 0, 0, -10, 256, 256, p) && Math.abs(p[2] - 25 / 35) < 1e-5, 'depth is the NDC distance from the near plane');
+  assert.equal(projectPoint(ortho().matrix, 0, 0, 16, 256, 256, p), false, 'before the near plane');
 });
 
 test('color packing for float RGB, byte RGBA and clamping', () => {

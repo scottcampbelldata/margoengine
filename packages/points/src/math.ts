@@ -174,8 +174,9 @@ export function cullBlocks(blocks: Pick<PointBlocks, 'bounds' | 'counts' | 'leng
  * Approximate screen area in pixels of a world box seen from `eye`: the projected disc of its bounding sphere,
  * capped at the viewport. `projScale` is pixels per world unit at distance 1 (`0.5 * height / tan(fov / 2)`).
  */
-export function screenArea(box: ArrayLike<number>, eye: ArrayLike<number>, projScale: number, width: number, height: number): number {
+export function screenArea(box: ArrayLike<number>, eye: ArrayLike<number>, projScale: number, width: number, height: number, orthographic = false): number {
   const radius = Math.hypot(box[3], box[4], box[5]);
+  if (orthographic) return Math.min(width * height, Math.PI * (radius * projScale) ** 2);
   const distance = Math.hypot(box[0] - eye[0], box[1] - eye[1], box[2] - eye[2]);
   const viewport = width * height;
   if (distance <= radius) return viewport;
@@ -248,7 +249,8 @@ export function projectPoint(mvp: ArrayLike<number>, x: number, y: number, z: nu
   const cz = mvp[2] * x + mvp[6] * y + mvp[10] * z + mvp[14];
   if (cz < 0 || cz > w) return false;
   const cx = mvp[0] * x + mvp[4] * y + mvp[8] * z + mvp[12], cy = mvp[1] * x + mvp[5] * y + mvp[9] * z + mvp[13];
-  out[0] = (cx / w * 0.5 + 0.5) * width; out[1] = (0.5 - cy / w * 0.5) * height; out[2] = w;
+  // Orthographic (w is 1 everywhere): depth is the reversed-Z distance from the near plane in NDC units.
+  out[0] = (cx / w * 0.5 + 0.5) * width; out[1] = (0.5 - cy / w * 0.5) * height; out[2] = mvp[3] || mvp[7] || mvp[11] ? w : 1 - cz;
   return true;
 }
 

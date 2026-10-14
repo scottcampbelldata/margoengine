@@ -56,7 +56,7 @@ export interface PointsPickResult {
   position: [number, number, number];
   /** Distance from the pick position in CSS pixels. */
   distance: number;
-  /** View depth (clip w) of the point. */
+  /** View depth (clip w) of the point; with an orthographic camera, its distance from the near plane. */
   depth: number;
 }
 
@@ -105,6 +105,7 @@ export class PointsPlugin implements EnginePlugin {
   private edl?: {pipeline: GPURenderPipeline; texture: GPUTexture; view: GPUTextureView; group: GPUBindGroup; width: number; height: number};
   private readonly frameData = new Float32Array(FRAME_BYTES / 4);
   private readonly edlData = new Float32Array(4);
+  private orthographic = false;
   private readonly lastViewProj = new Float32Array(16);
   private lastSize: [number, number] = [0, 0];
   private hasFrame = false;
@@ -220,7 +221,7 @@ export class PointsPlugin implements EnginePlugin {
       if (hit.distance < bestDistance - 0.5 || (Math.abs(hit.distance - bestDistance) <= 0.5 && hit.depth < bestDepth)) {
         const p = hit.index * 3, m = gpu.model, lx = cloud.positions[p], ly = cloud.positions[p + 1], lz = cloud.positions[p + 2];
         const position: [number, number, number] = [0, 1, 2].map(k => m[k] * lx + m[4 + k] * ly + m[8 + k] * lz + m[12 + k]) as [number, number, number];
-        best = {cloud, index: hit.index, position, distance: hit.distance / scale, depth: hit.depth};
+        best = {cloud, index: hit.index, position, distance: hit.distance / scale, depth: this.orthographic ? hit.depth / Math.hypot(this.lastViewProj[2], this.lastViewProj[6], this.lastViewProj[10]) : hit.depth};
         bestDistance = hit.distance; bestDepth = hit.depth;
       }
     }
@@ -437,12 +438,17 @@ export class PointsPlugin implements EnginePlugin {
   // ---- Frame --------------------------------------------------------------------------------------------
 
   private writeFrame(context: GpuContext): void {
-    const camera = context.camera, f = this.frameData;
-    f.set(camera.matrix, 0);
-    const projScale = 0.5 * context.height / Math.tan(camera.fov * Math.PI / 360);
+    const camera = context.camera, f = this.frameData, c = camera.matrix;
+    f.set(c, 0);
+    // Orthographic clip matrix (w independent of position, e.g. @margoengine/cameras): pixels per world unit come
+    // from the y row's length, and depth is linear: depth.y is NDC per world unit and the EDL/sphere value is
+    // 1 + distance from the near plane.
+    this.orthographic = !(c[3] || c[7] || c[11]);
+    const projScale = this.orthographic ? 0.5 * context.height * Math.hypot(c[1], c[5], c[9]) : 0.5 * context.height / Math.tan(camera.fov * Math.PI / 360);
     f[16] = context.width; f[17] = context.height; f[18] = projScale;
     f[19] = context.format.endsWith('-srgb') || context.format.includes('float') ? 0 : 1;
-    f[20] = camera.near / (camera.far - camera.near); f[21] = camera.far * camera.near / (camera.far - camera.near); f[22] = camera.near; f[23] = 0;
+    if (this.orthographic) {f[20] = 0; f[21] = Math.hypot(c[2], c[6], c[10]); f[22] = 1; f[23] = 1;}
+    else {f[20] = camera.near / (camera.far - camera.near); f[21] = camera.far * camera.near / (camera.far - camera.near); f[22] = camera.near; f[23] = 0;}
     // Camera basis, matching Camera.update.
     const p = camera.position, t = camera.target;
     let zx = p[0] - t[0], zy = p[1] - t[1], zz = p[2] - t[2];
@@ -521,7 +527,7 @@ export class PointsPlugin implements EnginePlugin {
         if (!boxInFrustum(this.box, camera.planes, cloud.cullMargin)) continue;
         const box = this.box;
         entryBlock.push(b); entryCount.push(blocks.counts[b]);
-        entryWeight.push(screenArea(box, camera.position, projScale, context.width, context.height));
+        entryWeight.push(screenArea(box, camera.position, projScale, context.width, context.height, this.orthographic));
         entryDistance.push(Math.hypot(box[0] - camera.position[0], box[1] - camera.position[1], box[2] - camera.position[2]));
         cloud.stats.blocksVisible++; cloud.stats.pointsVisible += blocks.counts[b];
       }
@@ -568,7 +574,10 @@ export class PointsPlugin implements EnginePlugin {
       }
       pass.end();
       if (edlUsed && this.edl) {
+        // Orthographic EDL shades linear depth steps, scaled like log2 steps at the distance where a perspective
+        // camera with this fov has the same zoom.
         this.edlData[0] = this.edlStrength; this.edlData[1] = this.edlRadius;
+        this.edlData[2] = this.orthographic ? this.frameData[18] * 2 / context.height * Math.tan(camera.fov * Math.PI / 360) * Math.LOG2E : 0;
         device.queue.writeBuffer(gpu.edlParams, 0, this.edlData);
         const edlPass = context.encoder.beginRenderPass({colorAttachments: [{view: context.color, loadOp: 'load', storeOp: 'store'}]});
         edlPass.setPipeline(this.edlPipeline(context.format, context.descriptor.multisample?.count ?? 1));

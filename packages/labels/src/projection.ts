@@ -72,6 +72,20 @@ export function cameraCSSTransform(view: ArrayLike<number>, perspective: number,
 }
 
 /**
+ * Transform for the CSS3D camera element under an orthographic view-projection (clip w independent of position, e.g.
+ * @margoengine/cameras), read from the clip matrix itself: world to CSS pixels from the viewport centre, Y down, with
+ * Z scaled like Y so that CSS depth sorting follows the camera. Use it with `perspective: none` on the viewer, as
+ * THREE.CSS3DRenderer does for an OrthographicCamera.
+ */
+export function orthographicCSSTransform(matrix: ArrayLike<number>, width: number, height: number, backend: Backend = 'webgpu'): string {
+  const m = matrix, x = width / 2, y = height / 2, z = (backend === 'webgpu' ? y : -y) * Math.hypot(m[1], m[5], m[9]) / (Math.hypot(m[2], m[6], m[10]) || 1);
+  return `matrix3d(${[0, 4, 8, 12].flatMap(c => [m[c] * x, -m[c + 1] * y, m[c + 2] * z, c === 12 ? 1 : 0]).map(number).join(',')}) translate(${number(x)}px,${number(y)}px)`;
+}
+
+/** True when a column-major view-projection is orthographic: clip w does not depend on position. */
+export const isOrthographic = (matrix: ArrayLike<number>): boolean => !(matrix[3] || matrix[7] || matrix[11]);
+
+/**
  * Transform for a CSS3D object: center the element on its origin, scale CSS pixels to world units with `pixelScale`,
  * flip CSS Y down to world Y up, then apply the column-major world matrix.
  */

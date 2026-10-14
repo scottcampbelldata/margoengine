@@ -18,6 +18,8 @@ fn encode(c:vec4f)->vec4f{
 const CORNERS=array<vec2f,4>(vec2f(-1.0,-1.0),vec2f(1.0,-1.0),vec2f(-1.0,1.0),vec2f(1.0,1.0));
 `;
 
+// Orthographic cameras (frame.depth.w): info.y is 1 + distance from the near plane instead of the view distance, and
+// sphere depth is linear in it. The EDL pass shades linear depth steps times params.z when params.z > 0.
 /** Point cloud shader: one instanced quad per point, read from storage buffers through the shuffled slot order. */
 export const pointShader: string = common + /* wgsl */ `
 struct Cloud{model:mat4x4f,color:vec4f,size:vec4f,flags:vec4u,pad:vec4f}
@@ -58,7 +60,7 @@ fn has(bit:u32)->bool{return (cloud.flags.x&bit)!=0u;}
     color*=vec4f(select(c.rgb,toLinear(c.rgb),has(${FLAG.srgbColors}u)),c.a);
   }
   out.clip=clip;out.color=color;out.quad=corner*extent;
-  out.info=vec4f(radius,clip.w,radius*clip.w/frame.viewport.z,0.0);
+  out.info=vec4f(radius,select(clip.w,1.0+(1.0-clip.z)/frame.depth.y,frame.depth.w>0.5),radius*clip.w/frame.viewport.z,0.0);
   return out;
 }
 
@@ -87,10 +89,10 @@ fn surface(i:VOut)->Surface{
   s.color=encode(color);
   return s;
 }
-// Reversed-Z depth of view distance w for this projection: ndc = -A + B / w.
+// Reversed-Z depth of view distance w for this projection: ndc = -A + B / w, or linear when orthographic.
 fn sphereDepth(i:VOut,nz:f32)->f32{
   let w=max(i.info.y-i.info.z*nz,frame.depth.z);
-  return clamp(-frame.depth.x+frame.depth.y/w,0.0,1.0);
+  return clamp(select(-frame.depth.x+frame.depth.y/w,1.0-(w-1.0)*frame.depth.y,frame.depth.w>0.5),0.0,1.0);
 }
 struct EdlOut{@location(0) color:vec4f,@location(1) depth:f32}
 struct SphereOut{@location(0) color:vec4f,@builtin(frag_depth) depth:f32}
@@ -160,7 +162,7 @@ export const edlShader: string = /* wgsl */ `
     let angle=f32(k)*0.78539816;
     let q=clamp(p+vec2i(round(vec2f(cos(angle),sin(angle))*params.y)),vec2i(0),size-1);
     let n=textureLoad(depths,q,0).r;
-    if(n>0.0){sum+=max(0.0,lc-log2(n));}
+    if(n>0.0){sum+=max(0.0,select(lc-log2(n),(center-n)*params.z,params.z>0.0));}
   }
   let shade=exp(-sum/8.0*300.0*params.x);
   return vec4f(shade,shade,shade,1.0);

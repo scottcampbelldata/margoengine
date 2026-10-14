@@ -1,14 +1,16 @@
-const params = `struct Params {lens:vec4f,frame:vec4f}
+const params = `struct Params {lens:vec4f,frame:vec4f,ortho:vec4f}
 @group(0) @binding(0) var<uniform> p:Params;`;
 
+// Orthographic cameras (ortho.x): reversed-Z depth is linear in view distance, and blur grows linearly with defocus.
 export const cocShader = `${params}
 @group(0) @binding(1) var depth:texture_depth_2d;
 @group(0) @binding(2) var coc:texture_storage_2d<rg32float,write>;
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u) {
   if(any(id.xy>=textureDimensions(coc))){return;}
   let d=textureLoad(depth,vec2i(id.xy),0);
-  let z=p.frame.x*p.frame.y/(p.frame.x+d*(p.frame.y-p.frame.x));
-  let radius=clamp(p.frame.z*(1.0-p.lens.x/z),-p.lens.w,p.lens.w)*p.frame.w;
+  let ortho=p.ortho.x>0.5;
+  let z=select(p.frame.x*p.frame.y/(p.frame.x+d*(p.frame.y-p.frame.x)),mix(p.frame.y,p.frame.x,d),ortho);
+  let radius=clamp(p.frame.z*select(1.0-p.lens.x/z,(z-p.lens.x)/p.lens.x,ortho),-p.lens.w,p.lens.w)*p.frame.w;
   textureStore(coc,vec2i(id.xy),vec4f(radius,z,0,0));
 }`;
 

@@ -2,6 +2,7 @@ import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type Vec3} from '@margoengine/core/extension';
 import {finiteVector} from '../../shared/math.js';
 import {viewMatrix} from '../../shared/view.js';
+import {orthographic} from '../../shared/projection.js';
 import {cullingShader,clusteredSampling} from './shader.js';
 export {clusteredSampling} from './shader.js';
 declare const GPUBufferUsage:{UNIFORM:number;STORAGE:number;COPY_DST:number;COPY_SRC:number};
@@ -55,7 +56,9 @@ export class Clustered implements EnginePlugin {
     for(const [receiver,remove] of this.receivers)if('disposed' in receiver&&receiver.disposed){remove();this.receivers.delete(receiver);}
     if(this.dirty){if(this.lightCount)c.device.queue.writeBuffer(this.lights!,0,this.data as Float32Array<ArrayBuffer>,0,this.lightCount*16);this.dirty=false;}
     viewMatrix(this.view,c.camera);for(let i=0;i<3;i++)this.ints[16+i]=this.grid[i];this.ints[19]=intensity===0?0:this.lightCount;
-    const values=this.values;values[20]=c.width;values[21]=c.height;values[22]=Math.tan(c.camera.fov*Math.PI/360);values[23]=c.width/c.height;values[24]=c.camera.near;values[25]=c.camera.far;values[26]=values[27]=0;values[28]=intensity;
+    const values=this.values;values[20]=c.width;values[21]=c.height;values[22]=Math.tan(c.camera.fov*Math.PI/360);values[23]=c.width/c.height;values[24]=c.camera.near;values[25]=c.camera.far;values[26]=values[27]=0;values[28]=intensity;values[29]=values[30]=values[31]=0;
+    // Orthographic clip matrix (e.g. @margoengine/cameras): view-space half extents per NDC unit, signed near/far, NDC offset.
+    const o=orthographic(c.camera.matrix,c.camera.position);if(o){values[22]=1/o.sy;values[23]=o.sy/o.sx;values[24]=o.near;values[25]=o.far;values[29]=o.ox;values[30]=o.oy;values[31]=1;}
     // Map jittered fragments back to the unjittered culling grid using the projection's screen offset.
     const m=c.camera.matrix,v=this.values;v[26]=-0.5*(m[0]*v[2]+m[4]*v[6]+m[8]*v[10]);v[27]=0.5*(m[1]*v[2]+m[5]*v[6]+m[9]*v[10]);c.device.queue.writeBuffer(this.uniform!,0,v as Float32Array<ArrayBuffer>);
     const pass=c.encoder.beginComputePass();pass.setPipeline(this.pipeline!);pass.setBindGroup(0,this.group!);pass.dispatchWorkgroups(Math.ceil(this.grid[0]*this.grid[1]*this.grid[2]/64));pass.end();c.shader=this.shader(c.shader);c.bindings.push(...this.bindings());
