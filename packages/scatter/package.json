@@ -32,5 +32,8 @@
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/scatter"
   },
-  "description": "Seeded instancing, distance-based LOD and procedural wind."
+  "description": "Seeded instancing, distance-based LOD and procedural wind.",
+  "devDependencies": {
+    "@margoengine/math": "0.1.0"
+  }
 }

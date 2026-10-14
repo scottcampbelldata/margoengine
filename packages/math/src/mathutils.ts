@@ -38,6 +38,8 @@ export function createRandom(seed = 0): () => number {
   let state = seed | 0;
   return () => step(state = (state + 0x6d2b79f5) | 0);
 }
+/** Seeded 32-bit linear congruential generator (Numerical Recipes constants) returning floats in [0, 1). Cheaper and lower quality than `createRandom`; scatter and grass placement use it, so its sequences must not change. */
+export const createLcgRandom = (seed: number): (() => number) => () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
 let shared = 1234567;
 /** three.js-style shared seeded random in [0, 1). Passing `seed` restarts the shared sequence. Prefer `createRandom` for isolated streams. */
 export function seededRandom(seed?: number): number {

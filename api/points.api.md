@@ -272,7 +272,7 @@ export function pickPoint(positions: ArrayLike<number>, order: ArrayLike<number>
 
 export function projectPoint(mvp: ArrayLike<number>, x: number, y: number, z: number, width: number, height: number, out: Float64Array | number[]): boolean;
 
-export function random(seed: number): () => number;
+export const random: (seed: number) => () => number;
 
 export function screenArea(box: ArrayLike<number>, eye: ArrayLike<number>, projScale: number, width: number, height: number, orthographic?: boolean): number;
 

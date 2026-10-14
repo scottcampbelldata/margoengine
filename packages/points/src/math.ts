@@ -3,6 +3,7 @@
  * color packing and nearest-point picking. Everything here is pure and runs in Node.
  */
 import {multiplyMatrices} from '@margoengine/math/mat4';
+import {createRandom} from '@margoengine/math/mathutils';
 
 /** Marks a point that belongs to no block (non-finite position at build time). */
 export const NO_BLOCK = 0xffffffff;
@@ -25,17 +26,8 @@ export interface PointBlocks {
   readonly finite: number;
 }
 
-/** Small, fast, seedable PRNG (mulberry32). Returns floats in [0, 1). */
-export function random(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+/** Small, fast, seedable PRNG (mulberry32, `@margoengine/math/mathutils` createRandom). Returns floats in [0, 1). */
+export const random: (seed: number) => () => number = createRandom;
 
 function select(index: Uint32Array, lo: number, hi: number, k: number, positions: ArrayLike<number>, axis: number): void {
   // Hoare quickselect with a median-of-three pivot; leaves index[k] in sorted position, smaller keys before it.
