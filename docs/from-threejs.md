@@ -799,16 +799,21 @@ From [`docs/threejs-parity.md`](threejs-parity.md). Each would be an optional pa
 | three.js | Status in Margo |
 | --- | --- |
 | Transparent canvas (`alpha: true`), several scenes or viewports, render to texture from a second camera, `CubeCamera` | Missing; needs core changes |
-| `BatchedMesh`, render layers | Missing (bvh has raycast layers only) |
-| More than one directional light, coloured ambient, `HemisphereLight`, `RectAreaLight`, IES lights | Missing; point and spot lights via clustered |
+| WebGL2 for optional packages | Missing: core meshes, controls, labels, viewcube, bvh, LOD distance levels and the small glTF loader run on WebGL2; the rest needs WebGPU |
+| More than one directional light, coloured ambient, configurable `HemisphereLight`, `RectAreaLight`, IES lights | Missing; point and spot lights via clustered, a fixed hemisphere fill in glTF-pro |
 | Point and spot light shadows, `ShadowMaterial` | Missing |
-| `MeshPhysicalMaterial`, Lambert, Phong, depth materials on your own meshes | Missing (glTF physical extensions are approximated) |
-| Second UV set and geometry groups on your own meshes | Missing |
-| SMAA, SSR, GTAO, SSGI, motion blur, lens flare, glitch, simple screen passes | Missing (FXAA, TAA, SSAO, bloom, DOF are there) |
+| `InstancedMesh` with a textured material, glTF `EXT_mesh_gpu_instancing` | Missing (core instances constant-colour meshes; atlases plus `mergeGeometries` and VAT crowds are the workarounds) |
+| glTF `KHR_animation_pointer`, iridescence, anisotropy, dispersion, material variants; applying glTF cameras | Missing (files that require them are rejected; cameras are exposed as data) |
+| `MeshPhysicalMaterial`, Lambert, Phong, depth materials on your own meshes | Missing (glTF physical extensions are approximated; transmission does not refract) |
+| Second UV set, geometry groups and custom attributes on your own meshes | Missing |
+| Standalone KTX2 or float/3D/array data textures on your own meshes | Missing (KTX2 works inside glTF; materials takes RGBA8 data) |
+| SMAA, SSR, GTAO, SSGI, motion blur, lens flare, glitch, afterimage | Missing (FXAA, TAA, SSAO, bloom, DOF are there) |
+| Built-in screen effects (vignette, RGB shift, pixelation, halftone, Sobel) | Not built in; a few nodes in a shader `NodePass` |
+| Clipping planes on glTF-pro models and textured meshes | Missing (machinery sections cap core meshes; shader `discard` slices without caps or shadows) |
+| `BatchedMesh`, render layers | Missing (bvh has raycast layers only) |
 | Reflector, Refractor, decals | Missing (water has its own refraction) |
 | `TextGeometry`, SVGLoader, Collada, MTL, LDraw and other long-tail loaders | Missing |
 | Clips authored in code, `SkeletonUtils`, CCD IK | Missing (two-bone IK only) |
-| `ArcballControls`, camera roll | Missing |
-| glTF export with animation, Draco/KTX2/EXR export | Missing (static glTF, OBJ, STL, PLY and USDZ export exist) |
-| WebGL2 for optional packages | Missing: core meshes, controls, labels, viewcube, bvh, LOD distance levels and the small glTF loader run on WebGL2; the rest needs WebGPU |
-| WebXR hit test, controller and hand models | Missing (VR sessions and controller poses exist) |
+| `ArcballControls`, roll in the controls, light and skeleton helpers | Missing (core `camera.up` can roll; no control drives it) |
+| glTF export with animation, Draco/KTX2/EXR export, USDZ export with textures | Missing (static glTF, OBJ, STL, PLY and USDZ export exist) |
+| WebXR hit test, controller and hand models, glTF-pro models in XR | Missing (VR sessions and controller poses exist) |
