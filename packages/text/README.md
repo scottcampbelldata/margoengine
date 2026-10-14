@@ -4,7 +4,7 @@ Crisp GPU text for Margo Engine: signed distance field glyphs generated at runti
 
 Build from source with `npm run build` in `packages/text`.
 
-Replaces troika-three-text's `Text` and the label and signage use cases of the three.js `TextGeometry` add-on.
+Replaces troika-three-text's `Text` and the label and signage use cases of the three.js `TextGeometry` add-on. CAD dimension callouts with constant-pixel labels are built on it in `@margoengine/machinery/dimensions`.
 
 ```ts
 import {Engine, box} from '@margoengine/core';

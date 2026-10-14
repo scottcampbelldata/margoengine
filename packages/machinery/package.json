@@ -76,13 +76,19 @@
     "./edges": {
       "types": "./dist/edges.d.ts",
       "import": "./dist/edges.js"
+    },
+    "./dimensions": {
+      "types": "./dist/dimensions.d.ts",
+      "import": "./dist/dimensions.js"
     }
   },
   "files": [
     "dist"
   ],
   "dependencies": {
-    "@margoengine/geometry": "0.1.0"
+    "@margoengine/geometry": "0.1.0",
+    "@margoengine/lines": "0.1.0",
+    "@margoengine/text": "0.1.0"
   },
   "peerDependencies": {
     "@margoengine/core": "0.1.0"
