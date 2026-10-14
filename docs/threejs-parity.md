@@ -33,7 +33,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | Object3D transforms and hierarchy (position, rotation, quaternion, scale, parent, visible, name) | COVERED | core `Engine.createMesh`, `Mesh.setParent`, `setQuaternion` (`packages/core/src/engine.ts`) | Parent depth of 64 or less. At most 100,000 entities per engine (`packages/core/src/kernel.ts`). No `children`, `traverse`, `userData`, `lookAt` or `getWorldPosition`; world matrices are reachable only through `core/extension`. |
 | Group (transform-only node) | COVERED | core mesh with no geometry | glTF importers use this pattern. |
 | Scene object, multiple scenes | PARTIAL | one `Engine` = one canvas = one implicit scene | No Scene object. A second scene needs a second engine and canvas. |
-| `scene.background` (color, texture, cubemap) | PARTIAL | environment `EnvironmentBackground`, `Skybox` (`packages/environment/src/background.ts`); sky `Sky` | Equirect and cube backgrounds work. The solid clear color is hard-coded (`clearValue:[0.018,0.023,0.035,1]` and GL `clearColor` in `packages/core/src/renderer.ts`) and no API changes it. |
+| `scene.background` (color, texture, cubemap) | COVERED † | environment `EnvironmentBackground`, `Skybox` (`packages/environment/src/background.ts`), `ColorBackground` (`color.ts`, solid or vertical gradient); sky `Sky` | Core's clear color stays hard-coded; `ColorBackground` covers it with a pass on cleared depth. A transparent canvas still needs a core change. WebGPU only. |
 | Transparent canvas (`alpha: true`) | MISSING | — | The WebGPU context is configured without `alphaMode` and WebGL2 is created with `alpha:false` (`packages/core/src/renderer.ts`). Only XR AR clears to transparent. |
 | Frustum culling | COVERED | Rust/Wasm kernel, `TransformStore.tick` (`packages/kernel/src/lib.rs`, `packages/core/src/kernel.ts`) | Bounding spheres against six planes. |
 | Render loop, Clock/Timer | COVERED | core `Engine.start`, `onFrame` (`packages/core/src/engine.ts`) | Frame delta is clamped to 0.1 s. |
@@ -141,8 +141,8 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | --- | --- | --- | --- |
 | HDRLoader / RGBELoader | COVERED † | environment `parseHDR`, `loadEnvironmentImage` (`packages/environment/src/hdr.ts`) | |
 | EXRLoader | COVERED † | environment `parseEXR` (`packages/environment/src/exr.ts`) | Single-part scanline files with NONE, RLE, ZIPS, ZIP or PIZ compression. |
-| PMREMGenerator, `scene.environment` (IBL) | PARTIAL | environment `Environment` (`packages/environment/src/environment.ts`, `ibl.ts`) | Builds the prefiltered cube, SH irradiance and BRDF LUT, but the package does not apply them to any shading. The only built-in consumer is the React `<Environment>` component, which string-patches the glTF-pro shader (`packages/react/src/components.tsx`, lines 218 to 241). Core `PbrMaterial` meshes never receive IBL. |
-| Fog, FogExp2 | PARTIAL | sky `fog` option (`packages/sky/src/index.ts`); creative `PostProcessing` `atmosphere` height fog (`packages/creative/src/post.ts`) | Both are depth-based post passes. Sky fog needs another effect to supply a depth texture. No per-material fog. |
+| PMREMGenerator, `scene.environment` (IBL) | COVERED † | environment `Environment`, `EnvironmentLighting` (`packages/environment/src/lighting.ts`) | `engine.use(lighting)` patches core's mesh shader through `PassContext.shader`; `lighting.applyTo(model)` lights glTF-pro models. React `<Environment>` uses it. IBL replaces the constant ambient term. |
+| Fog, FogExp2 | COVERED † | environment `Fog` (linear, exp2, height); sky `fog` option; creative `PostProcessing` `atmosphere` | `Fog` runs in core's and glTF-pro's mesh shaders, so blended glTF primitives are fogged. Particles, VFX and splats are not. |
 | Sky add-on | COVERED † | sky `Sky` with Preetham and Bruneton models (`packages/sky/src/`) | Adds clouds, sun, moon and stars. |
 | Tone mapping (`renderer.toneMapping`) | COVERED † | core fixed Reinhard; tonemap `Tonemap` with AgX, ACES fitted and Khronos Neutral (`packages/tonemap/src/index.ts`) | |
 | Color management (sRGB input, linear workflow, `outputColorSpace`) | PARTIAL | core converts hex sRGB to linear and encodes sRGB output | No Color class and no ColorManagement API. No Display-P3 or HDR canvas output. |
@@ -169,7 +169,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | ColladaLoader | MISSING | — | |
 | SVGLoader | MISSING | — | geometry has `Shape` and `extrudeGeometry`, but nothing parses SVG paths. |
 | Long-tail model loaders (LDraw, VRML, 3DS, LWO, AMF, MD2, VOX, PDB, GCode, BVH motion capture, 3DM, KMZ, TDS) | MISSING | — | |
-| Texture loaders (UltraHDR, TGA, DDS, KTX v1, TIFF, IES, LUT3dl, LUTImage) | MISSING | — | |
+| Texture loaders (UltraHDR, TGA, DDS, KTX v1, TIFF, IES, LUT3dl, LUTImage) | PARTIAL | environment `decodeUltraHDR` | UltraHDR only, as an environment source. The rest are missing. |
 | LUTCubeLoader | PARTIAL | tonemap `parseCube` (`packages/tonemap/src/cube.ts`) | 33³ LUTs only. |
 | LoadingManager, Cache, progress events | PARTIAL | per-loader `AbortSignal` and byte caps (`packages/shared/loading.js`) | No shared manager or cache. Progress is reported only by machinery's CAD worker. |
 
@@ -286,9 +286,9 @@ Every MISSING or PARTIAL item, ordered by how often real three.js projects need 
    **Fit:** extend gltf-pro, plus the `GLTFDecoderHooks` the decoders README already proposes.
 3. **Raycasting and picking glTF-pro models.** Click-to-select on loaded models is near-universal, and today only core meshes can be hit.
    **Fit:** extend bvh (`Raycaster` accepts `PBRModel` primitives; the `shadowPrimitives` contract already exposes buffers) and selection (an `onPick` for models).
-4. **IBL that applies itself** (`scene.environment`). PBR without an environment map looks flat, and outside React every user has to reproduce the shader patch.
+4. **IBL that applies itself** (`scene.environment`). PBR without an environment map looks flat, and outside React every user has to reproduce the shader patch. **Done:** environment `EnvironmentLighting` (core meshes and glTF-pro models).
    **Fit:** extend environment with an `applyTo(model)` or `LightingEffect` export (move the adapter out of `packages/react/src/components.tsx`). Core-mesh IBL is a freeze conflict, since the core shader has no hook for it. A string patch through `PassContext.shader`, as tonemap and toon do, is the workaround.
-5. **Background color and transparent canvas.** `scene.background = color` appears in most three.js scenes, and a transparent canvas is standard for embeds.
+5. **Background color and transparent canvas.** `scene.background = color` appears in most three.js scenes, and a transparent canvas is standard for embeds. **Background color done:** environment `ColorBackground`; the transparent canvas remains (core change).
    **Fit:** a solid-color background pass is a small addition to environment. A transparent canvas needs `alphaMode` in core's context setup, which is a freeze conflict.
 6. **Effects that combine** (EffectComposer). Bloom with AO with AA with grading is the normal stack, and Bloom, SSAO and creative PostProcessing currently reject each other.
    **Fit:** extend post with a shared HDR scene-capture owner that Bloom, SSAO, DOF, tonemap and creative all read from.
@@ -331,9 +331,9 @@ Every MISSING or PARTIAL item, ordered by how often real three.js projects need 
     **Fit:** extend controls (bvh supplies the hits).
 24. **ShadowMaterial (shadow catcher).** Product shots on a page background use it.
     **Fit:** extend shadows.
-25. **Scene-wide fog that is not a post pass,** including fog on transparent objects.
+25. **Scene-wide fog that is not a post pass,** including fog on transparent objects. **Done:** environment `Fog`.
     **Fit:** extend sky or environment.
-26. **UltraHDR environment maps.** Increasingly used in three.js projects.
+26. **UltraHDR environment maps.** Increasingly used in three.js projects. **Done:** environment `decodeUltraHDR` (also picked by `loadEnvironmentImage`).
     **Fit:** extend environment.
 27. **RectAreaLight.** Archviz and product lighting.
     **Fit:** extend clustered (LTC).

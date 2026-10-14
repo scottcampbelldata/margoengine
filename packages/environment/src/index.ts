@@ -1,8 +1,11 @@
 export {parseHDR, type FloatImage, type HDRImage} from './hdr.js';
 export {parseEXR, type EXRImage, type EXRChannel, type EXRCompression} from './exr.js';
 export {parseEnvironmentImage, loadEnvironmentImage} from './load.js';
+export {parseUltraHDR, applyGainMap, decodeUltraHDR, type GainMapMetadata, type UltraHDRParts, type RGBA8Image, type UltraHDROptions} from './ultrahdr.js';
 export {halfToFloat, floatToHalf} from './half.js';
 export {SH_BASIS, SH_IRRADIANCE_BANDS, shBasis, evaluateSH, projectEquirectSH, radianceToIrradianceSH} from './sh.js';
 export {Environment, type EnvironmentOptions, type EnvironmentSource, type CubeFaces} from './environment.js';
 export {EnvironmentBackground, EnvironmentBackground as Skybox, type EnvironmentBackgroundOptions} from './background.js';
+export {ColorBackground, srgbColor, type ColorBackgroundOptions, type ColorInput} from './color.js';
+export {EnvironmentLighting, Fog, IBL_BINDING, FOG_BINDING, type EnvironmentLightingOptions, type FogOptions, type LightingTarget} from './lighting.js';
 export {IBL_WGSL, iblLayoutEntries, iblBindGroupEntries} from './ibl.js';
