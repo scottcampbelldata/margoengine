@@ -113,6 +113,18 @@ packages): make a real `node_modules` folder holding junctions to the main check
 `@margoengine/*` junctions to the worktree's own packages. Never run a full `npm install` in a worktree; lockfile only
 via `npm install --package-lock-only --offline --no-audit --no-fund --ignore-scripts`.
 
+## Launch readiness (Hacker News, YouTube, LinkedIn, X; npm is set up, margoengine.com is live)
+
+Before launch, in addition to the work queue:
+- Demos smooth on first load on desktop and phones, including Android. The Galaxy S23 3-5 FPS island issue is parked
+  but is a launch risk; revisit before launch.
+- Every public number reproducible from the repo: size (core + stage gzip, `npm run measure:size`; three.js comparison
+  `test-results/three-size.mjs` should move into `scripts/`), speed proofs, a fair three.js benchmark.
+- Comparison page states limits honestly (WebGPU-first, which packages still use third-party code, unverified devices).
+- READMEs and getting-started docs for every package; licence and third-party notices checked.
+- API review of the change list before publishing 1.0 to npm.
+- Production deploy and npm publish only with Scott's go-ahead each time.
+
 ## Feature gaps versus three.js (after optimization; each as an optional package)
 
 Verified matrix: `docs/threejs-parity.md` (153 three.js features: 57 covered, 47 partial, 49 missing; read from
