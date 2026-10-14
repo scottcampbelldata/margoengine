@@ -1302,6 +1302,21 @@
     ]
   },
   {
+    "id": "staging",
+    "title": "Staging",
+    "package": "@margoengine/staging",
+    "version": "0.1.0",
+    "published": false,
+    "description": "Product-shot staging: soft ground contact shadows (shadow-catcher plane) for core meshes and glTF models.",
+    "requirements": "Core ^0.1.0 || ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "staging",
+    "install": "npm install @margoengine/core@0.1.0 @margoengine/staging@0.1.0",
+    "imports": "import { ContactShadows } from '@margoengine/staging';",
+    "exports": [
+      "ContactShadows"
+    ]
+  },
+  {
     "id": "stats",
     "title": "Stats",
     "package": "@margoengine/stats",

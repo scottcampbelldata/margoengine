@@ -210,8 +210,17 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       encoding numbers to decide.
    c. GPU timing overlay: DONE in core - `Engine.create(canvas, {features: ['timestamp-query']})` (approved by Scott,
       +26 bytes); Stats profiling works with it. Remaining: richer overlay in Stats (VRAM/buffer counts) if wanted.
-   d. Contact shadows (ground-plane depth blur) in a new staging package; auto-framing exists already (core
+   d. [DONE] Contact shadows (ground-plane depth blur) in a new staging package; auto-framing exists already (core
       `camera.fitToBoundingBox` with duration and padding) - add orthographic support in @margoengine/cameras.
+      `@margoengine/staging` `ContactShadows.attach(engine, {size, height, blur, opacity, color, resolution, static})`,
+      `add(model|mesh)`, `fit(model.bounds)`, `invalidate()`, `dispose()` (5.0 kB min+gzip): meshes drawn from the ground
+      looking up into an r16float texture (max blend, no depth buffer), 2x separable blur, shadow-catcher plane at
+      frame-graph order 0.5 (after core, before glTF models). Real GPU (`node packages/staging/test/browser-check.mjs`,
+      Arc 140V, AC, 1280x720): pixel checks pass (contact darkens, mesh above `height` casts nothing, floor outside and
+      mesh tops unchanged); texture update 0.05/0.25/0.9-1.1 ms at 256/512/1024, plane 0.02-0.04 ms; `static: true`
+      skips the update while nothing moves. Cameras: `projection.fit(bounds, {aspect, duration, padding})` takes the flat
+      bounds array; orthographic fits by zoom to the box's projected outline (keeps direction and distance, animated
+      through `onPreUpdate`), perspective delegates to core. Cameras 1,072 -> 1,931 B min+gzip.
    e. [DONE] Outlines: selection already uses jump-flood outlines; add dashed x-ray outlines for hidden parts and glTF/model
       support (after the picking worker merges). Done: `Selection` option `xray` (`true` or `{dash, opacity, color,
       width}`; dash 0 = solid dimmer lines), mutable per frame; `name` option for one Selection per selection set. The
@@ -234,8 +243,16 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       controls/gizmo, check they keep constant screen size in orthographic.
    h. [done: `discard(cond, value)`, `storage(..., {atomic: true})` with atomicAdd/Max/Min/Load/Store; real-GPU check
       passed on Intel Arc] Shader nodes: fragment `discard` and compute atomics (small, high value).
-   i. Shadows: cascades already snap to texels (shadows/src/cascades.ts); verify there is no shimmer when panning in
-      orthographic CAD views rather than re-implementing.
+   i. [DONE, verified, no fix needed] Shadows: cascades already snap to texels (shadows/src/cascades.ts); verify there is no shimmer when panning in
+      orthographic CAD views rather than re-implementing. `node examples/package-benchmarks/shadow-shimmer.mjs`
+      (JSON `results/shadow-shimmer.json`; Arc 140V, AC, 800x600 4x MSAA, 2048 maps, 64 frames, 0.25 px per frame;
+      counts are shadow-edge (penumbra) pixels changed by more than 2 levels). Static noise floor 0. Orthographic pan,
+      motion-compensated (frame i vs i+4 shifted 1 px): 0.57 of 14,423 per frame (max 10). Live vs cascades fitted to
+      the first camera: ortho 9.7 (max 14), perspective 2.9 of 4,276 (max 7). Control, a 0.01 degree per frame light
+      turn (real shimmer): 194 per frame (max 466). Ortho zoom (`projection.zoom`): cascade matrices bit-identical, map
+      cached. Dolly (ortho, fixed height): texel lattice world-locked (radii constant, centres integral to 6e-14 texel);
+      112 per frame, of which 63 where the floor point changes cascade (the split distance sweeping, inherent to CSM)
+      and 49 elsewhere (0.36%, isolated flips on the thin posts as depth re-quantizes when the snapped centre steps).
    j. Workers and OffscreenCanvas: move FBX/USD/glTF parsing into workers with transferable buffers (machinery CAD and
       decoders already use workers); test core on an OffscreenCanvas (engine sizing falls back to canvas.width, so
       it may already work).
@@ -369,8 +386,9 @@ if intended, run `npm run api:update` after build:packages and commit the `api/`
 5. Core `PbrMaterial` has no setters: recolouring means a new material and `setMaterial`, or writing the undocumented
    `material.data` array (math's README does). `@margoengine/materials` `Material` is live. Core meshes move with
    `mesh.position.set(...)`, materials meshes with `mesh.root.setPosition([...])`.
-6. `model.bounds` is a flat `[minX, minY, minZ, maxX, maxY, maxZ]` but `camera.fitToBoundingBox(min, max)` takes two
-   tuples, so every fit slices by hand.
+6. [FIXED outside core] `model.bounds` is a flat `[minX, minY, minZ, maxX, maxY, maxZ]` but `camera.fitToBoundingBox(min, max)` takes two
+   tuples, so every fit slices by hand. `@margoengine/cameras` `projection.fit(model.bounds)` and staging
+   `contact.fit(model.bounds)` take the flat array; core's own signature is unchanged (frozen).
 7. Two packages export `loadGLTF` with different results (`@margoengine/gltf` Model with `dispose()`, gltf-pro PBRModel
    with `destroy()`).
 8. Animation: `loop` and `speed` are attach-time options (`Animation.attach(model, {loop, speed})`), there is no `stop()`
@@ -434,7 +452,7 @@ Before launch, in addition to the work queue:
 ## Feature gaps versus three.js (after optimization; each as an optional package)
 
 Verified matrix: `docs/threejs-parity.md`, re-tallied 2026-10-14 against 2c53227 (156 three.js features: 83 covered,
-40 partial, 33 missing; was 65 / 43 / 45 in its stale summary; read from source, not run). The first audit's top gaps
+41 partial, 32 missing (ShadowMaterial became partial with staging's ContactShadows); was 65 / 43 / 45 in its stale summary; read from source, not run). The first audit's top gaps
 (materials, glTF extensions/decoders, picking models, IBL, background colour, post stack, ortho camera, math, FXAA) are
 closed. New top 10: WebGL2 beyond core, transparent canvas (core), multiple directional/coloured ambient/hemisphere
 lights, point and spot shadows, textured instancing (+ `EXT_mesh_gpu_instancing`), remaining glTF extensions

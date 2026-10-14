@@ -19,9 +19,22 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
     far?: number;
     up: Vec3;
     constructor(options?: ProjectionOptions);
-    setup(engine: Pick<Engine, 'camera'>): void;
+    setup(engine: Pick<Engine, 'camera'> & {
+        canvas?: {
+            width: number;
+            height: number;
+        };
+    }): void;
+    fit(bounds: ArrayLike<number>, { aspect, duration, padding }?: FitOptions): void;
+    onPreUpdate(delta: number): void;
     attach(camera: Camera): void;
     dispose(): void;
+}
+
+export interface FitOptions {
+    aspect?: number;
+    duration?: number;
+    padding?: number;
 }
 
 export interface ProjectionOptions {

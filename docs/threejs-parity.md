@@ -9,8 +9,8 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 | Status | Count | Meaning |
 | --- | --- | --- |
 | COVERED | 83 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
-| PARTIAL | 40 | Some of it exists, but a common use case is missing. The notes say what. |
-| MISSING | 33 | No implementation was found in any package's `src/`. |
+| PARTIAL | 41 | Some of it exists, but a common use case is missing. The notes say what. |
+| MISSING | 32 | No implementation was found in any package's `src/`. |
 
 Overall: Margo is strong where three.js relies on third-party libraries or examples. That includes cascaded PCSS shadows, clustered lighting, TAA, Gaussian splats, BVH queries, physics, navigation, terrain, water and sky. The day-one basics the first version of this matrix found missing (textures and materials on meshes you build, glTF extensions and compression, an orthographic camera, picking loaded models, image-based lighting outside React, combinable effects, FXAA, a math library) now exist as optional packages. What remains:
 
@@ -62,7 +62,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | three.js | Status | Margo | Notes |
 | --- | --- | --- | --- |
 | PerspectiveCamera | COVERED | core `Camera` (`packages/core/src/camera.ts`) | Position and target, `fov`, `near`, `far`; the aspect follows the canvas. `camera.up` sets screen up, so exact top-down views and roll work; `update()` throws `RangeError('Vertical camera')` only when `up` is parallel to the view. `camera.project` replaces the projection. No `zoom`, `setViewOffset`, `focalLength` or `filmGauge`. `fitToBoundingBox` is a Margo extra. |
-| OrthographicCamera | COVERED | cameras `CameraProjection` (`packages/cameras/src/index.ts`) | Uses core's `camera.project` and `camera.up` hooks, so culling, `engine.pick`, selection and bvh rays follow the ortho frustum; also renders exactly vertical views (perspective or ortho). SSAO, points, labels, clustered, DOF, splats and lines' world widths read the orthographic matrix. Shadow cascades are still fitted to the perspective frustum. |
+| OrthographicCamera | COVERED | cameras `CameraProjection` (`packages/cameras/src/index.ts`) | Uses core's `camera.project` and `camera.up` hooks, so culling, `engine.pick`, selection and bvh rays follow the ortho frustum; also renders exactly vertical views (perspective or ortho). SSAO, points, labels, clustered, DOF, splats and lines' world widths read the orthographic matrix. `projection.fit(model.bounds)` frames a box by zoom. Shadow cascades are still fitted to the perspective frustum; they stay texel-locked (no shimmer) under orthographic pan and zoom (`examples/package-benchmarks/shadow-shimmer.mjs`). |
 | ArrayCamera | PARTIAL | xr stereo renderer (`packages/xr/src/renderer.ts`) | Internal to XR, not a general multi-view camera. |
 | CubeCamera (dynamic environment maps) | MISSING | — | |
 | StereoCamera, AnaglyphEffect, ParallaxBarrierEffect | MISSING | — | |
@@ -91,7 +91,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | MeshToonMaterial | PARTIAL | toon `Toon`, creative `ToonShading` (`packages/toon/src/index.ts`) | Applies to every core mesh at once, not per material. The README says it does not apply to glTF-pro or skinned meshes. |
 | MeshMatcapMaterial | COVERED | materials `Material({shading: 'matcap', matcap})` | Skips tone mapping, like basic. |
 | MeshNormalMaterial, MeshDepthMaterial, MeshDistanceMaterial | PARTIAL | materials `Material({shading: 'normal'})` | View-space normals as colour. No depth or distance material. |
-| ShadowMaterial (shadow catcher) | MISSING | — | |
+| ShadowMaterial (shadow catcher) | PARTIAL | staging `ContactShadows` (`packages/staging/src/index.ts`) | The product-shot case: a soft contact shadow on a ground plane over whatever is there (three.js's ContactShadows example), from core meshes, glTF-pro and materials meshes. Not a material: it catches no directional-light (cascade) shadows and only on a Y-up plane. WebGPU only. |
 | PointsMaterial, SpriteMaterial | COVERED † | points `PointsMaterial`, `SpriteMaterial` (`packages/points/src/material.ts`) | WebGPU only. |
 | LineBasicMaterial, LineDashedMaterial, Line2's LineMaterial | COVERED † | lines `LineMaterial` (`packages/lines/src/line.ts`) | Width, joins, caps and dashes. WebGPU only. |
 | Transparency, alpha blending, alphaTest | COVERED | materials `transparent`, `opacity`, `alphaTest`; gltf-pro `MASK` and `BLEND` | All material meshes draw in one pass: opaque, then transparent back to front, each by `renderOrder`. Shadows ignore `map` alpha cut-outs on materials meshes. Core meshes are opaque only. |
@@ -299,7 +299,8 @@ Every MISSING or PARTIAL item, ordered by how often real three.js projects need 
    **Fit:** extend materials with physical options over gltf-pro's physical shader variant; refraction needs a scene-color copy, which post's stack already captures.
 8. **Second UV set, geometry groups and custom attributes on your own meshes.** Light maps and AO maps use `uv1`, multi-material meshes use groups, and custom shaders read their own attributes.
    **Fit:** extend materials (gltf-pro's vertex already holds a second UV set; groups become several primitives). Custom attributes need a vertex-layout option in gltf-pro.
-9. **ShadowMaterial (shadow catcher).** Product shots on a page background use it.
+9. **ShadowMaterial (shadow catcher).** Product shots on a page background use it. The contact-shadow case is done
+   (`@margoengine/staging` `ContactShadows`); catching the directional light's cascade shadows is not.
    **Fit:** extend shadows, or a materials shading mode that samples the cascades.
 10. **glTF export with animation.** Used by editors and configurators.
     **Fit:** extend exporters.

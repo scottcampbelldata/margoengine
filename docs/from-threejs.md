@@ -95,6 +95,7 @@ npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @
 | `Vector3`, `Matrix4`, `Quaternion`, `Color`, `Box3` | `@margoengine/math` |
 | stats.js | `@margoengine/stats` |
 | `ViewHelper` | `@margoengine/viewcube` |
+| ContactShadows example (product-shot ground shadow) | `@margoengine/staging` |
 | react-three-fiber | `@margoengine/react` |
 
 Feature entries keep bundles smaller still: `@margoengine/post/ssao`, `@margoengine/post/bloom`,
@@ -143,7 +144,8 @@ app.box({size: [1, 1, 1], color: '#84d6bd'});
 
 - `engine.camera` has `position`, `target`, `fov`, `near`, `far` and `up`. Assign a new tuple to move it
   (`engine.camera.position = [4, 3, 6]`); there is no `lookAt`, the target is the look-at point.
-- `engine.camera.fitToBoundingBox(min, max, {duration: 0.3})` frames a box, animated.
+- `engine.camera.fitToBoundingBox(min, max, {duration: 0.3})` frames a box, animated. `@margoengine/cameras`'
+  `projection.fit(model.bounds)` takes the flat bounds array and also fits orthographic views (by zoom).
 - `engine.backend` is `'webgpu'` or `'webgl2'`; `engine.fallbackReason` says why WebGPU was not used.
 - `capacity` (default 1,024, at most 100,000) is the fixed number of meshes and transform nodes an engine holds. Raise
   it for big scenes: `Engine.create(canvas, {capacity: 50_000})`.
@@ -286,6 +288,17 @@ lights.add(model);                           // core meshes are lit automaticall
 - `setLights` replaces the whole list; call it again to animate lights.
 - One directional light per engine. Point and spot lights cast no shadows. No hemisphere, rect-area or IES lights (glTF
   models get a fixed sky/ground ambient fill). For image-based ambient light use the next section.
+
+The soft ground shadow of product shots (three.js's ContactShadows example: a depth render from below, blurred, on a
+plane) is `@margoengine/staging`. It needs no light and works with or without `Shadows`:
+
+```ts
+import {ContactShadows} from '@margoengine/staging';
+
+const contact = ContactShadows.attach(engine, {opacity: 0.6, blur: 0.08});
+contact.fit(model.bounds); // under the model: ground at its lowest point, plane twice its footprint
+contact.add(model);        // gltf-pro models, materials meshes and core meshes
+```
 
 ## Environment, background and fog
 
@@ -669,6 +682,7 @@ engine.use(projection);
 projection.height = 12;                    // visible world height; or left/right/top/bottom like three.js
 projection.zoom = 2;
 projection.mode = 'perspective';           // toggle at any time
+projection.fit(model.bounds);              // ortho: centre and zoom to the box outline; perspective: core's fit
 ```
 
 Core's camera exposes the two hooks this package uses: `camera.up` (screen up) and `camera.project` (fill the
@@ -801,7 +815,7 @@ From [`docs/threejs-parity.md`](threejs-parity.md). Each would be an optional pa
 | Transparent canvas (`alpha: true`), several scenes or viewports, render to texture from a second camera, `CubeCamera` | Missing; needs core changes |
 | WebGL2 for optional packages | Missing: core meshes, controls, labels, viewcube, bvh, LOD distance levels and the small glTF loader run on WebGL2; the rest needs WebGPU |
 | More than one directional light, coloured ambient, configurable `HemisphereLight`, `RectAreaLight`, IES lights | Missing; point and spot lights via clustered, a fixed hemisphere fill in glTF-pro |
-| Point and spot light shadows, `ShadowMaterial` | Missing |
+| Point and spot light shadows, `ShadowMaterial` on any mesh | Missing (`@margoengine/staging` ContactShadows is a ground shadow catcher for product shots) |
 | `InstancedMesh` with a textured material, glTF `EXT_mesh_gpu_instancing` | Missing (core instances constant-colour meshes; atlases plus `mergeGeometries` and VAT crowds are the workarounds) |
 | glTF `KHR_animation_pointer`, iridescence, anisotropy, dispersion, material variants; applying glTF cameras | Missing (files that require them are rejected; cameras are exposed as data) |
 | `MeshPhysicalMaterial`, Lambert, Phong, depth materials on your own meshes | Missing (glTF physical extensions are approximated; transmission does not refract) |

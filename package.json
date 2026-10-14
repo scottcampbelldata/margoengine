@@ -78,6 +78,7 @@
     "packages/shader",
     "packages/lod",
     "packages/viewcube",
+    "packages/staging",
     "examples/vite",
     "examples/gameplay-sandbox",
     "examples/react-viewer",
