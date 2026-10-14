@@ -40,7 +40,8 @@ const only = process.argv.find(a => a.startsWith('--only='))?.slice(7).split(','
 const chosen = steps.filter(s => only ? only.some(o => o === s.group || o === s.name) : s.group !== 'gpu' || process.argv.includes('--gpu'));
 if (process.argv.includes('--list')) {for (const s of steps) console.log(`${s.group.padEnd(7)} ${s.name.padEnd(28)} ${s.cmd}`);process.exit(0);}
 
-const changed = () => git('status', '--porcelain', '--untracked-files=all', '--', bench).split('\n').filter(Boolean).map(l => [l.slice(0, 2), l.slice(3)]);
+// Not git(): its trim() would eat the leading space of the first ' M path' line.
+const changed = () => execFileSync('git', ['status', '--porcelain', '--untracked-files=all', '--', bench], {encoding: 'utf8'}).split('\n').filter(Boolean).map(l => [l.slice(0, 2), l.slice(3)]);
 if (changed().length) throw new Error(`${bench} has uncommitted changes; commit or stash them first (this run restores committed results after each step).`);
 const out = join('test-results', 'bench', new Date().toISOString().replace(/[:.]/g, '-'));mkdirSync(out, {recursive: true});
 const lock = resolve(dirname(git('rev-parse', '--path-format=absolute', '--git-common-dir')), 'test-results/gpu.lock');
