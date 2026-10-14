@@ -67,8 +67,7 @@ Five parallel workers reviewed 58 packages against baseline `f05414a`; Claude ve
 
 ## To do next, in order
 
-1. Demos, first impression: choose the quality tier before the first visible frame (quick GPU timing probe)
-   so slow machines never show 10-15 slow seconds and a reload.
+1. Done (see below): desktops start on the light tier and probe GPU time; no slow phase, no reload.
 2. Light tier looks jagged (1x at DPR 1 on HiDPI). Measure a render scale between 1 and 2 and the optional
    TAA package; keep whichever holds 60.
 3. Island at 60 FPS on the laptop with the full water. If short, test terrain mesh 192 -> 96 on the light tier
@@ -90,10 +89,20 @@ From package descriptions, not yet audited against code:
 - Scene utilities: decals, reflection probes and cube cameras, a level-of-detail object, an SVG loader.
 - Browser reach: most packages are WebGPU-only; three's WebGL renderer runs without WebGPU. State this openly.
 
+## Quality tiers as they work now (`packages/shared/auto-quality.js`)
+
+- Phones (user agent `Mobi|Android`): 1x MSAA, DPR up to 2, phone scene settings. Unchanged.
+- Desktops start on the light tier (1x MSAA, DPR 1, capped at ~60 FPS) unless `localStorage.margoQuality` is
+  `'high'`. While light, the watcher times submit-to-`onSubmittedWorkDone` for 120 submissions after a 2 s warm-up;
+  90th percentile under `FAST_GPU_MS` (5 ms) stores `'high'` for the next page load, else `'low'`. No reload.
+- On the full tier, five consecutive seconds under 55 FPS store `'low'` and reload once.
+- Laptop result (Arc 140V, busy machine): stored `'low'`, light tier 53-61 FPS with 100k particles.
+- Reset: `localStorage.removeItem('margoQuality')` (the older `margoLow` key is still read as `'low'`).
+
 ## Known issues and caveats
 
-- The light tier is permanent per browser (`localStorage.margoLow`); a 50 Hz display or remote desktop also
-  triggers it. Undo with `localStorage.removeItem('margoLow')`. No on-page control yet.
+- The measured tier is remembered per browser with no expiry and no on-page control yet.
+- A fast PC sees the light tier on its first page view only; the full tier starts from the next page load.
 - `packages/core/src/renderer.ts` requests `timestamp-query` whenever available (for the Stats profiler);
   its runtime cost was never measured.
 - Water's 4x path borrows the resolved scene colour; Codex left its pixel/timing acceptance open.
