@@ -78,6 +78,16 @@ test('GPU picks update scene state without a color frame and optional pickers re
   const pending=engine.pick(100,100);mesh.dispose();engine.createMesh();finish(mesh);assert.equal(await pending,null);assert.equal(frames,0);
  } finally {engine.dispose();}
 });
+test('engine.pick on a canvas without client size (OffscreenCanvas in a worker) uses canvas pixels',async()=>{
+ const store=await TransformStore.create(4),picks=[];
+ const renderer={backend:'webgpu',add(){},remove(){},render(){},dispose(){},async pick(_camera,_light,_batches,_graph,x,y){picks.push([x,y]);return 0;}};
+ const engine=new Engine({width:300,height:150},store,renderer,{position:[0,0,4]},null);
+ try {
+  const mesh=engine.createMesh().setGeometry(box());
+  assert.equal(await engine.pick(250,100),mesh);assert.deepEqual(picks,[[250,100]]);
+  assert.equal(await engine.pick(300,10),null);assert.equal(await engine.pick(10,150),null);assert.equal(picks.length,1);
+ } finally {engine.dispose();}
+});
 
 test('Entity reuse rejects stale refs and shared geometry retires once',async()=>{
   const {engine,resources}=await headlessEngine(2);
