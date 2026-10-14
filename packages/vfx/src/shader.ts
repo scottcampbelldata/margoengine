@@ -4,8 +4,7 @@ struct Frame {camera:mat4x4f,right:vec4f,up:vec4f,gravityDelta:vec4f,emitterTime
 @group(0) @binding(0) var<uniform> f:Frame;
 `;
 export const simulationShader=frame+/* wgsl */`
-@group(0) @binding(1) var<storage,read> source:array<Particle>;
-@group(0) @binding(2) var<storage,read_write> destination:array<Particle>;
+@group(0) @binding(1) var<storage,read_write> particles:array<Particle>;
 @group(0) @binding(3) var<storage,read_write> alive:array<u32>;
 struct Indirect {indexCount:u32,instanceCount:atomic<u32>,firstIndex:u32,baseVertex:i32,firstInstance:u32}
 @group(0) @binding(4) var<storage,read_write> indirect:Indirect;
@@ -24,11 +23,11 @@ fn curlNoise(p:vec3f)->vec3f {
   return curl*f.physics.x;
 }
 @compute @workgroup_size(256) fn main(@builtin(global_invocation_id) id:vec3u){
-  if(id.x>=f.control.x){return;}var p=source[id.x];let dt=f.gravityDelta.w;
+  if(id.x>=f.control.x){return;}var p=particles[id.x];let dt=f.gravityDelta.w;
   p.positionLife.w-=dt;
   if(p.positionLife.w<=0){
     let ticket=atomicAdd(&respawn.count,1u);
-    if(ticket>=f.control.y){p.positionLife.w=0;destination[id.x]=p;return;}
+    if(ticket>=f.control.y){p.positionLife.w=0;particles[id.x]=p;return;}
     let seed=hash(atomicAdd(&respawn.sequence,1u)+id.x);
     let life=mix(f.shape.y,f.shape.z,random(seed));
     let origin=f.emitterTime.xyz+(vec3f(random(seed+5u),random(seed+6u),random(seed+7u))*2-1)*f.emissionExtent.xyz;
@@ -39,7 +38,7 @@ fn curlNoise(p:vec3f)->vec3f {
   p.velocitySize=vec4f(p.velocitySize.xyz+(f.gravityDelta.xyz+curlNoise(p.positionLife.xyz))*dt,p.velocitySize.w);
   p.positionLife=vec4f(p.positionLife.xyz+p.velocitySize.xyz*dt,p.positionLife.w);
   if(p.positionLife.y-p.velocitySize.w*0.5<f.shape.w){p.positionLife.y=f.shape.w+p.velocitySize.w*0.5;if(p.velocitySize.y<0){p.velocitySize.y=-p.velocitySize.y*f.physics.z;}}
-  p.rotation.x+=p.rotation.y*dt;destination[id.x]=p;
+  p.rotation.x+=p.rotation.y*dt;particles[id.x]=p;
   if(p.positionLife.w<=0){return;}
   let instance=atomicAdd(&indirect.instanceCount,1u);alive[instance]=id.x;
 }`;

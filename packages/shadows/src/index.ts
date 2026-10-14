@@ -52,8 +52,8 @@ export class Shadows implements EnginePlugin {
   bindings():GPUBindGroupEntry[] {if(!this.uniform||this.disposed)throw new Error('Shadows are not attached');return this.entries;}
   shader(source:string,group=0):string {
     let cache=this.shaders.get(group);const cached=cache?.get(source);if(cached)return cached;
-    let code=source.replace('let linear=direct*','let linear=direct*shadowVisibility(i.position,i.normal)*');
-    if(code===source)code=source.replace('direct+ambient(s)','direct*shadowVisibility(i.position,s.n)+ambient(s)');
+    let code=source.replace('let linear=direct*','let linear=shadowLit(direct,i.position,i.normal)*');
+    if(code===source)code=source.replace('direct+ambient(s)','shadowLit(direct,i.position,s.n)+ambient(s)');
     if(code===source)throw new Error('Shadows require the standard PBR lighting shader');const output=shadowSampling(group)+code;if(!cache){cache=new Map();this.shaders.set(group,cache);}cache.set(source,output);return output;
   }
   setup(engine:Engine):void {

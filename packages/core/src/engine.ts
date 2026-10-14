@@ -169,8 +169,8 @@ export class Engine {
     if(this.disposed||this.disposing)throw new Error('Engine disposed');
     if(!Number.isFinite(delta)||delta<0||delta>1)throw new RangeError('Invalid delta');
     for(const plugin of this.plugins.values())plugin.onPreUpdate?.(delta);
-    // Avoid multiplying desktop 4x MSAA by another 4x in HiDPI backing pixels.
-    const dpr=Math.min(globalThis.devicePixelRatio??1,2,4/sceneSamples()),width=Math.max(1,Math.min(4096,Math.round(this.canvas.clientWidth*dpr)||this.canvas.width)),height=Math.max(1,Math.min(4096,Math.round(this.canvas.clientHeight*dpr)||this.canvas.height));
+    // Avoid multiplying desktop 4x MSAA by another 4x in HiDPI backing pixels; measured-slow desktops stay at DPR 1.
+    const dpr=Math.min(globalThis.devicePixelRatio??1,globalThis.margoLow?1:2,4/sceneSamples()),width=Math.max(1,Math.min(4096,Math.round(this.canvas.clientWidth*dpr)||this.canvas.width)),height=Math.max(1,Math.min(4096,Math.round(this.canvas.clientHeight*dpr)||this.canvas.height));
     if(this.canvas.width!==width)this.canvas.width=width;if(this.canvas.height!==height)this.canvas.height=height;
     this.camera.advance(delta);this.camera.update(this.canvas.width/this.canvas.height,this.backend==='webgpu');this.store.planes.set(this.camera.planes);this.store.tick(culling);
     for(const batch of this.batches.values())batch.count=0;this.stats.visible=0;this.stats.drawCalls=0;

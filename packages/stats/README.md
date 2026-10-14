@@ -22,13 +22,35 @@ in the next microtask. The Stats plugin profiles one frame out of every 15;
 draw/dispatch counting and numeric ring sampling continue every frame.
 
 GPU timing is the sum of profiled pass durations, not presentation latency.
-It requires `timestamp-query` enabled when requesting the device. Frozen core
-does not request this feature: CPU metrics and counters still work, and GPU
-time remains unavailable. Custom devices can use
+Core negotiates `timestamp-query` when the adapter supports it, including device
+restoration. This repairs the existing optional profiler path without adding a
+core or stage API. Stats profiling remains off by default: enabling the device
+capability creates no queries, query buffers or readbacks. Opt in with
+`Stats.attach(engine, {profiling: true})`. The overlay distinguishes off,
+supported warmup and unavailable timing; unsupported devices retain CPU metrics
+and counters. Custom devices can use
 `stats.enableGPUProfiling(device)` or the standalone `GPUProfiler` API:
 `beginFrame()`, `timestampWrites()` for each pass descriptor, `resolve(encoder)`,
 submit, then `await read()`. Frames while a readback is pending are skipped;
 samples above 128 passes are omitted. Existing timestampWrites are preserved
 and those passes are excluded from this profiler.
+
+The standalone profiler also exposes the latest complete sample through
+`passMilliseconds` (a reused 128-element Float64Array) and `passCount`, in the
+order that `timestampWrites()` was called. `milliseconds` remains the sum of
+those pass durations. `elapsedMilliseconds` spans the first profiled pass beginning
+to the last profiled pass end, including intervening copies, unprofiled passes
+and GPU gaps. Commands before the first pass or after the last pass, queue waiting
+before execution and presentation are outside that span. Timestamp precision
+depends on the browser. Unsupported, empty, overflowing or invalid samples clear
+all timing fields; busy readbacks retain the last complete sample. No additional
+GPU resources are allocated per sample.
+
+Stats exposes that same completed sample through read-only getters
+`gpuPassMilliseconds` (the existing reused array, or null when unsupported/off),
+`gpuPassCount` and `gpuElapsedMilliseconds`. Read only the first `gpuPassCount`
+entries. The array is replaced when a new device requires a new profiler; no copy
+or array allocation occurs when reading these getters. The overlay's GPU span
+includes the inter-pass work described above and is not a displayed-frame time.
 
 `dispose()` removes the overlay, timer and plugin and destroys owned GPU resources.

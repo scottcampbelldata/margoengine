@@ -5,6 +5,11 @@ declare const GPUMapMode: {READ: number};
 export class GPUProfiler {
   readonly supported: boolean;
   milliseconds: number | null = null;
+  /** Reused storage for the latest complete sample, in timestampWrites() order. */
+  readonly passMilliseconds = new Float64Array(128);
+  passCount = 0;
+  /** First pass beginning to last pass end, including intervening commands and gaps. */
+  elapsedMilliseconds: number | null = null;
   private query?: GPUQuerySet;
   private resolveBuffer?: GPUBuffer;
   private readBuffer?: GPUBuffer;
@@ -40,7 +45,7 @@ export class GPUProfiler {
 
   resolve(encoder: GPUCommandEncoder): boolean {
     if (this.state !== 'recording') return false;
-    if (!this.count || this.overflow) {this.milliseconds = null; this.state = 'idle'; return false;}
+    if (!this.count || this.overflow) {this.clearSample(); this.state = 'idle'; return false;}
     encoder.resolveQuerySet(this.query!, 0, this.count * 2, this.resolveBuffer!, 0);
     encoder.copyBufferToBuffer(this.resolveBuffer!, 0, this.readBuffer!, 0, this.count * 16);
     this.state = 'resolved'; return true;
@@ -57,17 +62,23 @@ export class GPUProfiler {
       const timestamps = new BigUint64Array(buffer.getMappedRange(0, this.count * 16));
       let total = 0n;
       for (let i = 0; i < timestamps.length; i += 2) {
-        if (timestamps[i + 1] < timestamps[i]) throw new Error('Invalid GPU timestamps');
+        if (timestamps[i + 1] < timestamps[i] || i > 0 && timestamps[i] < timestamps[i - 1]) throw new Error('Invalid GPU timestamps');
         total += timestamps[i + 1] - timestamps[i];
       }
+      // Validate the whole readback before replacing a previously completed sample.
+      for (let i = 0; i < this.count; i++) this.passMilliseconds[i] = Number(timestamps[i * 2 + 1] - timestamps[i * 2]) / 1e6;
+      this.passMilliseconds.fill(0, this.count); this.passCount = this.count;
+      this.elapsedMilliseconds = Number(timestamps[timestamps.length - 1] - timestamps[0]) / 1e6;
       return this.milliseconds = Number(total) / 1e6;
-    } catch (error) {if (!this.disposed) throw error; return null;}
+    } catch (error) {this.clearSample(); if (!this.disposed) throw error; return null;}
     finally {if (!this.disposed) {buffer.unmap(); this.state = 'idle';}}
   }
+
+  private clearSample(): void {this.milliseconds = this.elapsedMilliseconds = null; this.passCount = 0; this.passMilliseconds.fill(0);}
 
   dispose(): void {
     if (this.state === 'disposed') return;
     this.disposed = true; this.state = 'disposed'; this.query?.destroy(); this.resolveBuffer?.destroy(); this.readBuffer?.destroy();
-    this.query = this.resolveBuffer = this.readBuffer = undefined; this.milliseconds = null;
+    this.query = this.resolveBuffer = this.readBuffer = undefined; this.clearSample();
   }
 }

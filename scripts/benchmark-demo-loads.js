@@ -1,4 +1,4 @@
-// Desktop GPU timings with phone layout/CPU/network emulation; this is not iPhone Safari.
+// Local cold-load profiles; phone layouts still use the host GPU, not physical mobile.
 import assert from 'node:assert/strict';
 import {cp, mkdir, mkdtemp, rm, writeFile} from 'node:fs/promises';
 import {resolve, sep} from 'node:path';
@@ -6,10 +6,17 @@ import {chromium} from '@playwright/test';
 import {preview} from 'vite';
 import {installDemoLoadAudit} from './demo-load-audit.js';
 
-const allDemos=['/night-citadel/','/gameplay-sandbox/','/demos/damaged-helmet.html','/demos/character-animation.html','/demos/robot-expressive.html','/demos/windy-meadow.html','/demos/earth/'];
+const allDemos=['/night-citadel/','/gameplay-sandbox/','/demos/damaged-helmet.html','/demos/character-animation.html','/demos/robot-expressive.html','/demos/windy-meadow.html','/demos/earth/','/demos/dof/','/demos/tonemap/'];
 const demos=process.argv.length>2?process.argv.slice(2):allDemos;
 assert.ok(demos.every(path=>allDemos.includes(path)),'Pass demo paths from the production site');
-const profile={viewport:{width:390,height:844},deviceScaleFactor:3,cpuSlowdown:4,latencyMs:40,downloadMbps:10,samples:3};
+const profiles={
+  'phone-layout-cold':{viewport:{width:390,height:844},deviceScaleFactor:3,cpuSlowdown:4,latencyMs:40,downloadMbps:10,samples:3,headless:true,mobile:true,channel:'msedge'},
+  'native-chrome-cold':{viewport:null,cpuSlowdown:1,latencyMs:40,downloadMbps:10,samples:3,headless:false,mobile:false,channel:'chrome'},
+  'android-layout-fast-4g':{viewport:{width:390,height:844},deviceScaleFactor:3,cpuSlowdown:1,latencyMs:150,downloadMbps:1.6,samples:3,headless:true,mobile:true,channel:'chrome'},
+};
+const profileName=process.env.LOAD_PROFILE??'phone-layout-cold',profile=profiles[profileName];
+assert.ok(profile,'Unknown LOAD_PROFILE; choose '+Object.keys(profiles).join(', '));
+for(const value of Object.values(profiles))assert.ok(value.samples===3&&value.cpuSlowdown>=1&&value.latencyMs>=0&&value.downloadMbps>0&&value.mobile===(value.viewport!==null));
 await mkdir('test-results',{recursive:true});
 // Other chats can rebuild site/dist while a page is fetching its hashed assets.
 const output=resolve('test-results'),snapshot=await mkdtemp(resolve(output,'demo-load-site-'));
@@ -21,9 +28,11 @@ try {
   for(const path of demos){
     const samples=[];
     for(let sample=0;sample<profile.samples;sample++){
-      const browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL??'msedge',headless:true});
+      const browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL??profile.channel,headless:profile.headless,
+        args:profile.headless?[]:['--start-maximized','--disable-features=CalculateNativeWinOcclusion','--disable-backgrounding-occluded-windows','--disable-renderer-backgrounding','--disable-background-timer-throttling']});
       try {
-        const context=await browser.newContext({viewport:profile.viewport,deviceScaleFactor:profile.deviceScaleFactor,isMobile:true,hasTouch:true,userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1'});
+        const context=await browser.newContext({viewport:profile.viewport,...(profile.mobile?{deviceScaleFactor:profile.deviceScaleFactor,isMobile:true,hasTouch:true,
+          userAgent:'Mozilla/5.0 (Linux; Android 15; Test layout) AppleWebKit/537.36 Chrome/154.0.0.0 Mobile Safari/537.36'}:{})});
         const page=await context.newPage(),errors=[];
         page.on('pageerror',error=>errors.push(error.message));
         page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
@@ -33,11 +42,12 @@ try {
         await cdp.send('Network.enable');await cdp.send('Network.setCacheDisabled',{cacheDisabled:true});
         await cdp.send('Network.emulateNetworkConditions',{offline:false,latency:profile.latencyMs,downloadThroughput:profile.downloadMbps*125000,uploadThroughput:625000});
         await page.goto(new URL(path,origin).href);
-        try {await page.waitForFunction(()=>window.demoLoad.firstFrame>0&&window.demoLoad.ready>0,null,{timeout:60000});}
+        try {await page.waitForFunction(()=>window.demoLoad.principalScenePresentedOpportunity>0,null,{timeout:60000});}
         catch(reason){throw new Error(path+' failed to render: '+JSON.stringify({errors,state:await page.evaluate(()=>({...window.demoLoad,status:document.querySelector('#status')?.textContent,error:document.querySelector('#error')?.textContent}))}),{cause:reason});}
         const timing=await page.evaluate(async()=>{
           const adapter=await navigator.gpu.requestAdapter();
-          return {...window.demoLoad,gpu:{vendor:adapter.info.vendor,architecture:adapter.info.architecture,description:adapter.info.description},
+          return {...window.demoLoad,navigation:performance.getEntriesByType('navigation')[0]?.toJSON()??null,gpu:{vendor:adapter.info.vendor,architecture:adapter.info.architecture,description:adapter.info.description,fallback:adapter.info.isFallbackAdapter??adapter.isFallbackAdapter??null},
+            viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio},canvases:[...document.querySelectorAll('canvas')].map(canvas=>({width:canvas.width,height:canvas.height})),
             resources:performance.getEntriesByType('resource').map(r=>({url:r.name,startMs:Math.round(r.startTime),durationMs:Math.round(r.duration),transferBytes:r.transferSize}))};
         });
         assert.deepEqual(errors,[],path+' reported a browser error');
@@ -48,10 +58,12 @@ try {
     }
     const frames=samples.map(sample=>sample.firstFrame).sort((a,b)=>a-b);
     const ready=samples.map(sample=>sample.ready).sort((a,b)=>a-b);
-    const interactive=samples.map(sample=>Math.max(sample.firstFrame,sample.ready)).sort((a,b)=>a-b);
+    const interactive=samples.map(sample=>sample.principalScenePresentedOpportunity).sort((a,b)=>a-b);
     const result={path,medianMs:Math.round(frames[1]),worstMs:Math.round(frames.at(-1)),readyMedianMs:Math.round(ready[1]),sceneReadyMedianMs:Math.round(interactive[1]),sceneReadyWorstMs:Math.round(interactive.at(-1)),underOneSecond:interactive.at(-1)<=1000,samples};
     results.push(result);
     console.log(`${path}: first frame median ${result.medianMs} ms, worst ${result.worstMs} ms; full scene ready median ${result.sceneReadyMedianMs} ms`);
   }
-  await writeFile(demos===allDemos?'test-results/demo-loads.json':'test-results/demo-loads-focused.json',JSON.stringify({profile,browser:'Chromium / '+(process.env.BROWSER_CHANNEL??'msedge'),results},null,2)+'\n');
+  const report=`test-results/demo-loads-${profileName}${demos===allDemos?'':'-focused'}.json`;
+  await writeFile(report,JSON.stringify({profileName,profile,physicalMobile:false,browser:'Chromium / '+(process.env.BROWSER_CHANNEL??profile.channel),results},null,2)+'\n');
+  assert.ok(results.every(result=>result.underOneSecond),'Complete principal scene exceeds 1000 ms; see '+report);
 }finally{await new Promise(resolve=>server.httpServer.close(resolve));await rm(snapshot,{recursive:true,force:true});}

@@ -5,12 +5,12 @@ import {parseGLTF} from '../packages/gltf-pro/dist/index.js';
 import {animatedTriangle} from './support/gltf-pro-fixture.js';
 import {optionalGPU} from './support/optional-gpu.js';
 
-async function scene() {
+async function scene(materials = ['BLEND', 'MASK', 'BLEND', 'OPAQUE'].map(alphaMode => ({alphaMode, doubleSided: true}))) {
   const harness = optionalGPU(), device = harness.engine.gpu, store = await TransformStore.create(16);
   const renderer = {backend: 'webgpu', gpu: device, add() {}, remove() {}, render() {}, dispose() {}};
   const engine = new Engine({width: 128, height: 96, clientWidth: 128, clientHeight: 96}, store, renderer, {position: [0, 0, 4], target: [0, 0, 0]}, null);
   const fixture = animatedTriangle(), primitive = fixture.doc.meshes[0].primitives[0];
-  fixture.doc.materials = ['BLEND', 'MASK', 'BLEND', 'OPAQUE'].map(alphaMode => ({alphaMode, doubleSided: true}));
+  fixture.doc.materials = materials;
   fixture.doc.meshes = fixture.doc.materials.map((_, material) => ({primitives: [{...primitive, material}]}));
   fixture.doc.nodes = [{mesh: 0, translation: [0, 0, 1]}, {mesh: 1}, {mesh: 2, translation: [0, 0, -1]}, {mesh: 3}];
   delete fixture.doc.skins; delete fixture.doc.animations;
@@ -31,7 +31,7 @@ async function scene() {
     };
   }};
   const context = {...harness.context, camera: engine.camera, encoder}, color = {}, depth = {};
-  return {engine, model, context, color, depth, passes, resources: harness.resources};
+  return {engine, model, context, color, depth, passes, resources: harness.resources, pipelines: harness.pipelines};
 }
 
 test('PBR batches nonblended draws and retains transparent pass boundaries and primitive order', async () => {
@@ -66,6 +66,52 @@ test('PBR batches nonblended draws and retains transparent pass boundaries and p
     model.root.visible = false;
     const before = passes.length; model.draw(context, 'beauty', color, depth);
     assert.equal(passes.length, before, 'Hidden hierarchy opened an empty pass');
+  } finally {engine.dispose();}
+  assert.ok(resources.every(resource => resource.destroyed));
+});
+
+test('PBR culls authored single-sided faces in every pass and reuses mirrored and double-sided variants', async () => {
+  const {engine, model, context, color, depth, passes, resources, pipelines} = await scene([
+    {alphaMode: 'BLEND'}, {alphaMode: 'MASK', doubleSided: false},
+    {alphaMode: 'BLEND', doubleSided: true}, {alphaMode: 'OPAQUE'}
+  ]);
+  const draws = mode => {const start = passes.length; model.draw(context, mode, color, depth); return passes.slice(start).flatMap(pass => pass.draws);};
+  try {
+    model.nodes[1].scale.x = -1; model.nodes[2].scale.x = -1; engine.store.tick(false);
+    assert.deepEqual(model.primitives.map(p => p.material.settings[2]), [0, 0, 1, 0], 'glTF omitted doubleSided defaults to false');
+    for (const mode of ['beauty', 'gbuffer', 'ambient']) {
+      const rendered = draws(mode);
+      assert.deepEqual(rendered.map(draw => draw.pipeline.primitive.cullMode), ['front', 'back', 'none', 'back']);
+      assert.ok(rendered.every(draw => (draw.pipeline.primitive.topology ?? 'triangle-list') === 'triangle-list'));
+      assert.ok(rendered.every(draw => (draw.pipeline.primitive.frontFace ?? 'ccw') === 'ccw'));
+      assert.deepEqual(rendered.map(draw => new Float32Array(draw.uniform.data)[97]), [-1, 1, -1, 1]);
+      for (const draw of rendered) {
+        const blend = draw.node === model.nodes[0] || draw.node === model.nodes[2];
+        assert.equal(!!draw.pipeline.fragment.targets[0].blend, blend && mode !== 'gbuffer');
+        assert.equal(draw.pipeline.depthStencil.depthWriteEnabled, mode === 'beauty' && !blend);
+      }
+    }
+    const initial = pipelines.length;
+    for (let i = 0; i < 120; i++) draws('beauty');
+    assert.equal(pipelines.length, initial, 'Steady rendering must reuse cached raster variants');
+    model.primitives[1].material.settings[2] = 1;
+    assert.equal(draws('beauty')[0].pipeline.primitive.cullMode, 'none');
+    assert.equal(pipelines.length, initial + 1, 'New material sidedness needs its own nonblended variant');
+    model.primitives[1].material.settings[2] = 0; model.nodes[1].scale.x = 1; engine.store.tick(false);
+    assert.equal(draws('beauty')[0].pipeline.primitive.cullMode, 'back');
+    model.nodes[1].scale.x = -1; engine.store.tick(false);
+    assert.equal(draws('beauty')[0].pipeline.primitive.cullMode, 'front');
+    assert.equal(pipelines.length, initial + 1, 'Changing determinant or restoring sidedness must reuse existing variants');
+    const local = engine.gpu.createBuffer({size: 16, usage: GPUBufferUsage.UNIFORM});
+    model.addLighting({shader: source => '@group(2) @binding(4) var<uniform> local:vec4f;\n' + source.replace('direct+ambient(s)', 'direct*local.x+ambient(s)'), bindings: () => [{binding: 4, resource: {buffer: local}}]});
+    const beforeLighting = pipelines.length, lit = draws('beauty');
+    assert.equal(pipelines.length, beforeLighting + 4, 'Each active raster variant must compile its changed lighting shader');
+    assert.deepEqual(lit.map(draw => draw.pipeline.primitive.cullMode), ['front', 'back', 'none', 'back']);
+    const afterLighting = pipelines.length; draws('beauty'); assert.equal(pipelines.length, afterLighting);
+    model.onDeviceRestored(engine); const restored = draws('beauty');
+    assert.equal(pipelines.length, afterLighting + 4, 'Restoration must rebuild device-owned raster variants');
+    assert.deepEqual(restored.map(draw => draw.pipeline.primitive.cullMode), ['front', 'back', 'none', 'back']);
+    local.destroy();
   } finally {engine.dispose();}
   assert.ok(resources.every(resource => resource.destroyed));
 });

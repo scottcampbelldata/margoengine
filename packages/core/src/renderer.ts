@@ -54,7 +54,7 @@ export class GPURenderer implements Renderer {
   static async create(canvas: HTMLCanvasElement): Promise<GPURenderer> {
     const adapter = await navigator.gpu?.requestAdapter({powerPreference:'high-performance'});
     if (!adapter) throw new Error('adapter unavailable');
-    const device = await adapter.requestDevice({requiredFeatures:adapter.features.has('depth32float-stencil8')?['depth32float-stencil8']:[]});
+    const device = await adapter.requestDevice({requiredFeatures:(['depth32float-stencil8','timestamp-query'] as GPUFeatureName[]).filter(feature=>adapter.features.has(feature))});
     try {
       const format = navigator.gpu.getPreferredCanvasFormat();
       const module = device.createShaderModule({code:wgsl});
@@ -62,7 +62,7 @@ export class GPURenderer implements Renderer {
         layout:'auto', vertex:{module,entryPoint:'vertex',buffers:[
           {arrayStride:24,attributes:[{shaderLocation:0,offset:0,format:'float32x3'},{shaderLocation:1,offset:12,format:'float32x3'}]},
           {arrayStride:96,stepMode:'instance',attributes:Array.from({length:6},(_,i)=>({shaderLocation:i+2,offset:i*16,format:'float32x4' as const}))}
-        ]}, fragment:{module,entryPoint:'fragment',targets:[{format}]}, primitive:{topology:'triangle-list',cullMode:'none'},
+        ]}, fragment:{module,entryPoint:'fragment',targets:[{format}]},
         depthStencil:{format:device.features.has('depth32float-stencil8')?'depth32float-stencil8':'depth32float',depthWriteEnabled:true,depthCompare:'greater-equal'},multisample:{count:sceneSamples()}
       };
       const pipeline=await device.createRenderPipelineAsync(descriptor);

@@ -18,6 +18,8 @@ const pages = ['character-animation', 'robot-expressive', 'damaged-helmet', 'win
 await build({configFile: false, root: 'examples', base: './', publicDir: false, logLevel: 'warn',
   build: {outDir: `${out}/demos`, emptyOutDir: true, target: 'es2022', rollupOptions: {input: Object.fromEntries(pages.map(page => [page, resolve(`examples/${page}.html`)]))}}});
 await build({configFile: false, root: 'packages/creative/examples/earth', base: './', logLevel: 'warn', build: {outDir: `${out}/demos/earth`, emptyOutDir: true, target: 'es2022'}});
+for (const name of ['dof', 'tonemap']) await build({configFile: false, root: `packages/${name}/examples`, base: './', publicDir: false, logLevel: 'warn',
+  build: {outDir: `${out}/demos/${name}`, emptyOutDir: true, target: 'es2022'}});
 for (const name of ['ATTRIBUTION.md', 'helmet-CREDITS.md', 'robot-CREDITS.md']) await cp(`examples/assets/${name}`, `${out}/demos/assets/${name}`);
 await cp('packages/creative/examples/earth/assets/ATTRIBUTION.md', `${out}/demos/earth/assets/ATTRIBUTION.md`);
 console.log(out);

@@ -48,6 +48,10 @@ export class Stats implements EnginePlugin {
   private readonly profiling: boolean;
   private profileFrame = 0;
 
+  get gpuPassMilliseconds(): Float64Array | null {return !this.disposed && this.profiler?.supported ? this.profiler.passMilliseconds : null;}
+  get gpuPassCount(): number {return this.profiler?.passCount ?? 0;}
+  get gpuElapsedMilliseconds(): number | null {return this.profiler?.elapsedMilliseconds ?? null;}
+
   constructor({parent = document.body, samples = 120, profiling = false}: StatsOptions = {}) {
     if (!Number.isInteger(samples) || samples < 2 || samples > 4096) throw new RangeError('Sample count must be 2..4096');
     if (typeof profiling !== 'boolean') throw new TypeError('profiling must be boolean');
@@ -123,8 +127,9 @@ export class Stats implements EnginePlugin {
   }
   private static finish(this: Encoder, descriptor?: GPUCommandBufferDescriptor): GPUCommandBuffer {
       const stats=this[owner], profiler=this[frameProfiler], resolved = profiler?.resolve(this), result = this[rawFinish].call(this, descriptor);
+      if (profiler && stats.profiler === profiler && !resolved && profiler.milliseconds === null) stats.gpuTime = null;
       if (resolved) queueMicrotask(() => {
-        void profiler!.read().then(value => {if (!stats.disposed && stats.profiler === profiler && value !== null) stats.gpuTime = value;}, error => stats.engine?.onError(error));
+        void profiler!.read().then(value => {if (!stats.disposed && stats.profiler === profiler) stats.gpuTime = value;}, error => {if (!stats.disposed && stats.profiler === profiler) stats.gpuTime = null; stats.engine?.onError(error);});
       });
       return result;
   }
@@ -146,7 +151,8 @@ export class Stats implements EnginePlugin {
 
   refresh(): void {
     if (this.disposed) return;
-    this.text.textContent = `${this.fps.toFixed(0)} FPS  ${this.frameTime.toFixed(2)} ms\n${this.drawCalls} draws  ${this.dispatches} dispatches\nGPU timing ${this.gpuTime === null ? 'unavailable' : this.gpuTime.toFixed(2) + ' ms'}`;
+    const gpu = this.gpuTime !== null ? this.gpuTime.toFixed(2) + ' ms passes' : this.profiler?.supported ? 'warming up' : this.profiling || this.profiler ? 'unavailable' : 'off';
+    this.text.textContent = `${this.fps.toFixed(0)} FPS  ${this.frameTime.toFixed(2)} ms\n${this.drawCalls} draws  ${this.dispatches} dispatches\nGPU timing ${gpu}${this.gpuElapsedMilliseconds === null ? '' : '\nGPU span ' + this.gpuElapsedMilliseconds.toFixed(2) + ' ms'}`;
     const c = this.context;
     if (!c) return;
     const width = this.graph.width, height = this.graph.height;

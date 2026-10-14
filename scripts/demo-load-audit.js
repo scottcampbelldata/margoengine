@@ -1,6 +1,6 @@
 // Browser-side instrumentation, also exercised by the visible-frame regression.
 export function installDemoLoadAudit(){
-  const load=window.demoLoad={draws:0,submitted:0,firstFrame:0,ready:0};
+  const load=window.demoLoad={draws:0,submitted:0,firstFrame:0,ready:0,principalSceneSubmitted:null,principalSceneGpuComplete:null,principalScenePresentedOpportunity:null,principalSceneCorrelation:null};
   const textures=new WeakSet(),views=new WeakSet(),encoders=new WeakMap(),passes=new WeakMap(),commands=new WeakMap();
   const current=GPUCanvasContext.prototype.getCurrentTexture,view=GPUTexture.prototype.createView;
   GPUCanvasContext.prototype.getCurrentTexture=function(...args){const texture=current.apply(this,args);textures.add(texture);return texture;};
@@ -31,8 +31,13 @@ export function installDemoLoadAudit(){
     return result;
   };
   const ready=()=>{
-    if(document.body?.dataset.ready==='true'||document.querySelector('#viewport')?.dataset.ready==='true'||window.sandbox||window.nightCitadel?.stats.frames>0)load.ready=performance.now();
-    else requestAnimationFrame(ready);
+    const principal=window.afterlightStartup?.readiness??window.extensionDemo?.readiness??window.earthDemo?.readiness??window.meadowDemo?.readiness??window.nightCitadel?.readiness??window.dofDemo?.readiness??window.tonemapDemo?.readiness;
+    if(principal?.principalScenePresentedOpportunity>0){
+      for(const key of ['principalSceneSubmitted','principalSceneGpuComplete','principalScenePresentedOpportunity'])load[key]=principal[key];
+      load.principalSceneCorrelation=principal.correlation;
+    }
+    if(!load.ready&&(document.body?.dataset.ready==='true'||document.querySelector('#viewport')?.dataset.ready==='true'||window.sandbox||window.nightCitadel?.stats.frames>0))load.ready=performance.now();
+    if(!load.ready||!load.principalScenePresentedOpportunity)requestAnimationFrame(ready);
   };
   requestAnimationFrame(ready);
 }

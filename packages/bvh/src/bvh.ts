@@ -44,6 +44,7 @@ export interface ShapecastBox {min: Float64Array; max: Float64Array}
 /** Reused triangle handed to shapecast callbacks: a, b and c in the BVH's space. */
 export interface ShapecastTriangle {a: Float64Array; b: Float64Array; c: Float64Array}
 export const NOT_INTERSECTED = 0, INTERSECTED = 1, CONTAINED = 2;
+/** Generic traversal callbacks in the style of three-mesh-bvh's shapecast. The query returns true when a callback stops it. */
 export interface ShapecastCallbacks {
   /** Return NOT_INTERSECTED (or false) to skip the node, INTERSECTED (or true) to descend, CONTAINED to accept the subtree without more bounds tests. */
   intersectsBounds(box: ShapecastBox, isLeaf: boolean, score: number | undefined, depth: number, nodeIndex: number): number | boolean;
@@ -384,7 +385,6 @@ export class MeshBVH {
     return false;
   }
 
-  /** Generic traversal in the style of three-mesh-bvh's shapecast. Returns true when a callback stopped the query. */
   shapecast(callbacks: ShapecastCallbacks): boolean {
     const {intersectsBounds, intersectsTriangle, intersectsRange, boundsTraverseOrder} = callbacks;
     if (typeof intersectsBounds !== 'function') throw new TypeError('shapecast needs intersectsBounds');
@@ -417,13 +417,14 @@ export class MeshBVH {
         firstScore = boundsTraverseOrder(fill(first)); secondScore = boundsTraverseOrder(fill(second));
         if (secondScore < firstScore) { const q = first; first = second; second = q; const t = firstScore; firstScore = secondScore; secondScore = t; }
       }
-      for (const [child, score] of [[first, firstScore], [second, secondScore]] as const) {
+      for (let i = 0; i < 2; i++) {
         let state = CONTAINED;
         if (!contained) {
-          const isLeaf = !(u[child * NODE_WORDS + 7] & INTERNAL_FLAG);
-          state = classify(intersectsBounds(fill(child), isLeaf, score, depth + 1, child));
+          const isLeaf = !(u[first * NODE_WORDS + 7] & INTERNAL_FLAG);
+          state = classify(intersectsBounds(fill(first), isLeaf, firstScore, depth + 1, first));
         }
-        if (state !== NOT_INTERSECTED && visit(child, state === CONTAINED, depth + 1)) return true;
+        if (state !== NOT_INTERSECTED && visit(first, state === CONTAINED, depth + 1)) return true;
+        first = second; firstScore = secondScore;
       }
       return false;
     };

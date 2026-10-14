@@ -156,7 +156,7 @@ export class PBRModel implements EnginePlugin {
     };
     for(const p of this.primitives) {
       const r:DrawResource={primitive:p,vertex:undefined!,index:undefined!,uniform:undefined!,values:new Float32Array(100),groups:new Map(),views:[],samplers:[]};
-      this.resources.push(r);r.vertex=upload(p.vertices,GPUBufferUsage.VERTEX);r.index=upload(p.indices,GPUBufferUsage.INDEX);
+      this.resources.push(r);r.vertex=upload(p.vertices,GPUBufferUsage.VERTEX|GPUBufferUsage.STORAGE);r.index=upload(p.indices,GPUBufferUsage.INDEX);
       r.uniform=device.createBuffer({size:400,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
       for(let i=0;i<5;i++) {
         const map=p.material.maps[i],def=map?entry(this.asset.doc.textures,map.index,'texture'):null,image=def?this.images[integer(def.source,'image')]:undefined;
@@ -225,13 +225,15 @@ export class PBRModel implements EnginePlugin {
       c.device.queue.writeBuffer(r.uniform,0,v as Float32Array<ArrayBuffer>);
       let code=pbrShader;
       if(mode==='beauty')for(const effect of this.lighting)code=effect.shader(code,2);
-      const blend=m.settings[0]===2,key=mode+':'+c.format+':'+blend+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+code;
+      // Keep the shader's original front-facing convention, including mirrored transforms.
+      const cull:GPUCullMode=m.settings[2]<0.5?(v[97]>0?'back':'front'):'none';
+      const blend=m.settings[0]===2,key=mode+':'+c.format+':'+blend+':'+cull+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+code;
       let pipeline=this.pipelines.get(key);
       if(!pipeline) {
         const module=c.device.createShaderModule({code}),format=mode==='beauty'?c.format:'rgba16float';
         pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:80,attributes:Array.from({length:5},(_,i)=>({shaderLocation:i,offset:i*16,format:'float32x4' as const}))}]},
           fragment:{module,entryPoint:mode==='beauty'?'fragment':mode==='gbuffer'?'gbuffer':'ambientFragment',targets:[{format,blend:blend&&mode!=='gbuffer'?{color:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
-          multisample:c.descriptor.multisample,primitive:{topology:'triangle-list',cullMode:'none'},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:mode==='beauty'&&!blend,depthCompare:mode==='beauty'?'greater-equal':'equal'}});
+          multisample:c.descriptor.multisample,primitive:{cullMode:cull},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:mode==='beauty'&&!blend,depthCompare:mode==='beauty'?'greater-equal':'equal'}});
         this.pipelines.set(key,pipeline);
       }
       let groups=r.groups.get(pipeline);

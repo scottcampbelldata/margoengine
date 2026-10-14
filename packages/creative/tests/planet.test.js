@@ -286,3 +286,77 @@ test('Planet builds only initial pipelines, retains exact geometry and caches ta
  assert.throws(()=>run('r32float'),/Unsupported planet target/);assert.throws(()=>run('bgra8unorm',2),/Unsupported planet target/);
  const old=state.resources.filter(value=>['buffer','texture'].includes(value.kind));engine.gpu={...device};planet.onDeviceRestored(engine);assert.ok(old.every(value=>value.destroyed===1));planet.dispose();
 });
+
+test('map upgrade publishes all five maps atomically while preserving visible preview and transforms', async t => {
+ const {engine,state,graph,frame}=fixture(t),options={dayMap:'/low-day',nightMap:'/low-night',specularRoughnessMap:'/low-specular',normalMap:'/low-normal',clouds:'/low-clouds'},planet=await Planet.create(engine,options);
+ const pass=planet.pass,images={...planet.images},nodes=[...engine.meshes.values()],rotation=planet.rotation,clouds=planet.clouds,registered=[...graph.passes],sampler=state.resources.find(r=>r.kind==='sampler').descriptor;planet.rotation.y=0.8;planet.clouds.offsetU=0.35;const offset=planet.clouds.offsetU;planet.setSunDirection([0,2,0]);
+ const oldResources=state.resources.filter(r=>['buffer','texture'].includes(r.kind)),requests=[];
+ globals(t,{fetch:(url,{signal})=>new Promise(resolve=>requests.push({url,signal,resolve}))});
+ const pending=planet.updateMaps({dayMap:'/high-day',nightMap:'/high-night',specularRoughnessMap:'/high-specular',normalMap:'/high-normal',clouds:'/high-clouds'});
+ assert.equal(requests.length,5);frame();assert.equal(state.draws.length,2);assert.equal(planet.pass,pass);assert.deepEqual(planet.images,images);assert(oldResources.every(r=>r.destroyed===0));
+ await assert.rejects(planet.updateMaps({dayMap:'/overlap'}),/already pending/);assert.equal(requests.length,5);
+ for(const request of requests)request.resolve(new Response(new Uint8Array([1])));await pending;
+ assert.notEqual(planet.pass,pass);assert.equal(Object.keys(planet.images).length,5);assert(Object.values(images).every(image=>image.closed===1));assert(oldResources.every(r=>r.destroyed===1));assert.equal(planet.rotation,rotation);assert.equal(planet.clouds,clouds);assert.deepEqual([...engine.meshes.values()],nodes);assert.deepEqual(graph.passes,registered);assert.equal(planet.rotation.y,0.8);assert.equal(planet.clouds.offsetU,offset);assert.deepEqual(Array.from(planet.sun),[0,1,0]);assert.equal(engine.plugins.get('planet'),planet);assert.deepEqual(state.resources.filter(r=>r.kind==='sampler').at(-1).descriptor,sampler);assert(state.resources.filter(r=>r.kind==='texture').every(r=>r.descriptor.mipLevelCount===undefined));
+ frame();const allocations=state.allocations,uploads=state.uploads;frame();frame();assert.equal(state.allocations,allocations);assert.equal(state.uploads,uploads);planet.dispose();assert(state.bitmaps.every(image=>image.closed===1));
+});
+
+test('upgrade fetch failure aborts siblings without retiring the ready preview or lifetime', async t => {
+ const {engine,state,frame}=fixture(t),planet=await Planet.create(engine,{dayMap:'/preview',clouds:'/preview-cloud'}),pass=planet.pass,images={...planet.images},requests=[];let fail;
+ globals(t,{fetch:(url,{signal})=>new Promise((resolve,reject)=>{requests.push({url,signal});if(url==='/bad')fail=()=>resolve(new Response(null,{status:503}));signal.addEventListener('abort',()=>reject(signal.reason),{once:true});})});
+ const pending=planet.updateMaps({dayMap:'/bad',nightMap:'/pending'});fail();await assert.rejects(pending,/503/);assert(requests.every(r=>r.signal.aborted));assert.equal(planet.controller.signal.aborted,false);assert.equal(planet.pass,pass);assert.deepEqual(planet.images,images);assert(Object.values(images).every(image=>image.closed===0));frame();assert.equal(state.draws.length,2);
+ globals(t,{fetch:async()=>new Response(new Uint8Array([1]))});await planet.updateMaps({dayMap:'/retry'});assert.equal(Object.keys(planet.images).length,1);planet.dispose();
+});
+
+test('upgrade cancellation and disposal close late decoded candidates exactly once', async t => {
+ for(const dispose of [false,true]){const {engine,state,frame}=fixture(t),planet=await Planet.create(engine,{dayMap:'/preview'}),pass=planet.pass,preview=planet.images.day;let decoded,started;const decoding=new Promise(resolve=>{started=resolve;});const image={width:32,height:16,closed:0,close(){this.closed++;}};
+  globals(t,{createImageBitmap:()=>new Promise(resolve=>{decoded=resolve;started();})});const controller=new AbortController(),pending=planet.updateMaps({dayMap:'/late',signal:controller.signal});await decoding;if(dispose)planet.dispose();else controller.abort();decoded(image);await assert.rejects(pending);assert.equal(image.closed,1);
+  if(dispose){assert.equal(engine.hasPlugin('planet'),false);assert.equal(preview.closed,1);}else{assert.equal(planet.pass,pass);assert.equal(preview.closed,0);assert.equal(planet.controller.signal.aborted,false);frame();assert.equal(state.draws.length,2);planet.dispose();}
+  // Restore the bitmap factory before constructing the next fixture.
+  globals(t,{createImageBitmap:async()=>{const image={width:16,height:8,closed:0,close(){this.closed++;}};state.bitmaps.push(image);return image;}});
+ }
+});
+
+test('upgrade decode/pipeline/validation failures dispose candidates and keep preview drawable', async t => {
+ const {engine,state,frame}=fixture(t),planet=await Planet.create(engine,{dayMap:'/preview'}),pass=planet.pass,images={...planet.images},before=state.resources.length;
+ globals(t,{createImageBitmap:async()=>{throw Error('Decode failed');}});await assert.rejects(planet.updateMaps({dayMap:'/decode'}),/Decode failed/);assert.equal(planet.pass,pass);
+ globals(t,{createImageBitmap:async()=>{const image={width:32,height:16,closed:0,close(){this.closed++;}};state.bitmaps.push(image);return image;}});
+ state.failPipeline=true;await assert.rejects(planet.updateMaps({dayMap:'/pipeline'}),/Pipeline failed/);state.failPipeline=false;state.validationError={message:'upgrade invalid'};await assert.rejects(planet.updateMaps({dayMap:'/gpu'}),/upgrade invalid/);state.validationError=null;
+ assert.equal(planet.pass,pass);assert.deepEqual(planet.images,images);assert.equal(planet.controller.signal.aborted,false);assert(state.bitmaps.slice(1).every(image=>image.closed===1));assert(state.resources.slice(before).filter(r=>['buffer','texture'].includes(r.kind)).every(r=>r.destroyed===1));frame();assert.equal(state.draws.length,2);planet.dispose();
+});
+
+test('upgrade budget counts distinct retained and pending bitmap identities', async t => {
+ const {engine,state}=fixture(t),planet=await Planet.create(engine,{dayMap:'/preview'}),preview=planet.images.day,pass=planet.pass;
+ globals(t,{createImageBitmap:async()=>{const image={width:8192,height:8192,closed:0,close(){this.closed++;}};state.bitmaps.push(image);return image;}});
+ await assert.rejects(planet.updateMaps({dayMap:'/fits-alone-not-with-preview'}),/256 MiB/);assert.equal(planet.pass,pass);assert.equal(preview.closed,0);assert.equal(state.bitmaps.at(-1).closed,1);
+ // The same owned bitmap returned twice is one allocation and must not be closed twice.
+ globals(t,{createImageBitmap:async()=>preview});await planet.updateMaps({dayMap:'/same-owned',nightMap:'/same-owned'});assert.equal(planet.images.day,preview);assert.equal(planet.images.night,preview);assert.equal(preview.closed,0);planet.dispose();assert.equal(preview.closed,1);
+});
+
+test('restoration during upgrade fetch rebuilds only committed maps before publishing the complete candidate', async t => {
+ const {engine,state,device,frame}=fixture(t),planet=await Planet.create(engine,{dayMap:'/preview',clouds:'/preview-cloud'}),images={...planet.images},rotation=planet.rotation;let release;
+ globals(t,{fetch:()=>new Promise(resolve=>{release=resolve;})});const pending=planet.updateMaps({dayMap:'/new'});const oldPass=planet.pass;engine.gpu={...device};planet.onDeviceRestored(engine);assert.notEqual(planet.pass,oldPass);assert.deepEqual(planet.images,images);frame();assert.equal(state.draws.length,2);release(new Response(new Uint8Array([1])));await pending;assert.notEqual(planet.images.day,images.day);assert.equal(planet.rotation,rotation);planet.dispose();
+});
+
+test('device race during upgrade validation retires stale candidate and validates against the current device', async t => {
+ const {engine,state,device,frame}=fixture(t),planet=await Planet.create(engine,{dayMap:'/preview'}),preview=planet.images.day,rotation=planet.rotation;let release,started;const validating=new Promise(resolve=>{started=resolve;});
+ device.popErrorScope=()=>new Promise(resolve=>{release=resolve;started();});const pending=planet.updateMaps({dayMap:'/upgrade'});await validating;const stale=state.resources.filter(r=>['buffer','texture'].includes(r.kind)),newDevice={...device,async popErrorScope(){return null;}};engine.gpu=newDevice;planet.onDeviceRestored(engine);assert.equal(planet.images.day,preview);frame();release({message:'stale device lost'});await pending;
+ assert.equal(planet.rotation,rotation);assert.notEqual(planet.images.day,preview);assert.equal(preview.closed,1);assert(stale.every(r=>r.destroyed===1));frame();planet.dispose();
+});
+
+test('upgrade revalidates current-device limits and preserves preview when the new device rejects maps', async t => {
+ const {engine,state,device,frame}=fixture(t),planet=await Planet.create(engine,{dayMap:'/preview'}),preview=planet.images.day;let release,started;const validating=new Promise(resolve=>{started=resolve;});
+ globals(t,{createImageBitmap:async()=>{const image={width:128,height:64,closed:0,close(){this.closed++;}};state.bitmaps.push(image);return image;}});device.popErrorScope=()=>new Promise(resolve=>{release=resolve;started();});const pending=planet.updateMaps({dayMap:'/upgrade'});await validating;engine.gpu={...device,limits:{maxTextureDimension2D:64},async popErrorScope(){return null;}};planet.onDeviceRestored(engine);const restored=planet.pass;release(null);await assert.rejects(pending,/dimensions|GPU limits/);assert.equal(planet.pass,restored);assert.equal(planet.images.day,preview);assert.equal(preview.closed,0);assert.equal(state.bitmaps.at(-1).closed,1);frame();planet.dispose();
+});
+
+test('cancellation or disposal during delayed GPU validation preserves the abort reason and cleans candidates', async t => {
+ for(const mode of ['cancel','cancel-validation-error','dispose']){const dispose=mode==='dispose',{engine,state,device,frame}=fixture(t),planet=await Planet.create(engine,{dayMap:'/preview'}),preview=planet.images.day,pass=planet.pass;let release,started;const validating=new Promise(resolve=>{started=resolve;});
+  device.popErrorScope=()=>new Promise((resolve,reject)=>{release=mode==='cancel'?resolve:reject;started();});const controller=new AbortController(),pending=planet.updateMaps({dayMap:'/upgrade',signal:controller.signal});await validating;const candidates=state.resources.filter(r=>['buffer','texture'].includes(r.kind)).filter(r=>!pass.buffers.includes(r)&&!pass.textures.includes(r));
+  if(dispose)planet.dispose();else controller.abort(new DOMException('Map update canceled','AbortError'));release(mode==='cancel'?null:new Error('Lost device validation'));await assert.rejects(pending,error=>error.name==='AbortError');assert(state.bitmaps.slice(1).every(image=>image.closed===1));assert(candidates.every(r=>r.destroyed===1));
+  if(!dispose){assert.equal(planet.pass,pass);assert.equal(preview.closed,0);assert.equal(planet.controller.signal.aborted,false);frame();assert.equal(state.draws.length,2);planet.dispose();}else{assert.equal(engine.hasPlugin('planet'),false);assert.equal(preview.closed,1);}
+ }
+});
+
+test('late sibling decode after an upgrade failure is retired without touching the committed preview', async t => {
+ const {engine,state,frame}=fixture(t),planet=await Planet.create(engine,{dayMap:'/preview'}),preview=planet.images.day,pass=planet.pass;let decode,started,fail;const decoding=new Promise(resolve=>{started=resolve;});const image={width:32,height:16,closed:0,close(){this.closed++;}};
+ globals(t,{fetch:url=>url==='/bad'?new Promise(resolve=>{fail=()=>resolve(new Response(null,{status:503}));}):Promise.resolve(new Response(new Uint8Array([1]))),createImageBitmap:()=>new Promise(resolve=>{decode=resolve;started();})});const pending=planet.updateMaps({dayMap:'/late',nightMap:'/bad'});await decoding;fail();await new Promise(resolve=>setImmediate(resolve));decode(image);await assert.rejects(pending,/503/);assert.equal(image.closed,1);assert.equal(planet.pass,pass);assert.equal(preview.closed,0);assert.equal(planet.controller.signal.aborted,false);frame();assert.equal(state.draws.length,2);planet.dispose();
+});

@@ -4,8 +4,8 @@ import {runInNewContext} from 'node:vm';
 import {test} from 'node:test';
 
 const source = readFileSync(new URL('../scripts/collect-performance.js', import.meta.url), 'utf8');
-function browser({gpu = true, failObserver = false, failDownload = false, inheritedRequest = false} = {}) {
-  let now = 0, serial = 0, clicked = 0;
+function browser({gpu = true, failObserver = false, failDownload = false, inheritedRequest = false, download = true} = {}) {
+  let now = 0, serial = 0, clicked = 0, objectUrls = 0;
   const frames = new Map(), timers = new Map(), events = new Map(), observers = [];
   const listen = {addEventListener(type, callback) {events.set(type, callback);}, removeEventListener(type) {events.delete(type);}};
   class GPUQueue {submit() {return 'submitted';}}
@@ -20,7 +20,7 @@ function browser({gpu = true, failObserver = false, failDownload = false, inheri
     observe({type}) {this.type = type; if (failObserver) throw new Error('Observer failed');}
     disconnect() {}
   }
-  class BrowserURL extends URL {static createObjectURL() {return 'blob:local';} static revokeObjectURL() {}}
+  class BrowserURL extends URL {static createObjectURL() {objectUrls++; return 'blob:local';} static revokeObjectURL() {}}
   const request = callback => {frames.set(++serial, callback); return serial;}, cancel = id => frames.delete(id);
   const window = {...listen, requestAnimationFrame: request, cancelAnimationFrame: cancel,
     matchMedia: () => ({matches: false}), nightCitadel: {stats: {fps: 60, samples: 4, frames: 70, privateValue: 999}},
@@ -29,7 +29,7 @@ function browser({gpu = true, failObserver = false, failDownload = false, inheri
   const globals = {window, GPUQueue, GPUCanvasContext, PerformanceObserver, URL: BrowserURL, Blob,
     console: {info() {}}, location: {href: 'https://margoengine.com/demo?secret=yes#private'},
     navigator: {userAgent: 'test', gpu: {requestAdapter() {assert.fail('Must inspect the active device');}}},
-    document: {...listen, visibilityState: 'visible', hasFocus: () => true, querySelector: selector => selector === '#quality' ? {textContent: 'Desktop 4x MSAA'} :
+    document: {...listen, currentScript: download ? null : {dataset: {download: 'false'}}, visibilityState: 'visible', hasFocus: () => true, querySelector: selector => selector === '#quality' ? {textContent: 'Desktop 4x MSAA'} :
       selector === '#status' ? {textContent: 'World paused https://margoengine.com/?secret=yes#private'} :
       selector === '#error, #error-message' ? {textContent: 'GPU failed https://margoengine.com/shader?token=yes'} : canvas,
       scripts: [{src: '/assets/demo.js?secret=yes#private'}],
@@ -39,7 +39,7 @@ function browser({gpu = true, failObserver = false, failDownload = false, inheri
     setTimeout(callback, delay) {timers.set(++serial, {callback, delay}); return serial;}, clearTimeout: id => timers.delete(id)};
   const originals = {request, cancel, submit: GPUQueue.prototype.submit, texture: GPUCanvasContext.prototype.getCurrentTexture};
   runInNewContext(source, globals);
-  return {window, device, context, events, frames, originals, GPUQueue, GPUCanvasContext, document: globals.document, clicked: () => clicked,
+  return {window, device, context, events, frames, originals, GPUQueue, GPUCanvasContext, document: globals.document, clicked: () => clicked, objectUrls: () => objectUrls,
     emit(type, entries) {observers.find(observer => observer.type === type).callback({getEntries: () => entries});},
     advance(time) {now = time;},
     frame(time) {now = time; for (const [id, callback] of [...frames]) {frames.delete(id); callback.call(window, time);}},
@@ -91,4 +91,10 @@ test('unsupported WebGPU stays unavailable and setup/download failures still res
     if (options.failDownload) assert.match(report.downloadError, /Download failed/);
     assert.equal('gpuTime' in report, false);
   }
+});
+test('an opt-in script can suppress the download while keeping the report promise and restoring hooks', async () => {
+  const b = browser({download: false}); b.frame(10); b.frame(20); b.finish();
+  const report = await b.window.margoPerformanceCapture;
+  assert.equal(report, b.window.margoPerformanceReport); assert.equal(report.nativeCallbacks, 2);
+  assert.equal(b.clicked(), 0); assert.equal(b.objectUrls(), 0); restored(b);
 });

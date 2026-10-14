@@ -2,8 +2,12 @@ import {createStage} from 'margoengine';
 import {loadGLTF} from '@margoengine/gltf-pro';
 import {OrbitControls} from '@margoengine/controls';
 import {sceneSamples} from '../packages/shared/quality.js';
+import {watchFrameRate} from '../packages/shared/auto-quality.js';
+import {engineRuntime} from '@margoengine/core/extension';
+import {submitPrincipalScene} from '../packages/shared/demo-frame.js';
 const status=document.querySelector<HTMLElement>('#status')!,error=document.querySelector<HTMLElement>('#error')!,robot=document.body.dataset.demo==='robot';
 const abort=new AbortController();let dispose:(()=>void)|undefined;
+addEventListener('pagehide',()=>{abort.abort();dispose?.();},{once:true});
 try {
   const extras=robot?Promise.all([import('@margoengine/animation'),import('@margoengine/shadows'),import('@margoengine/tonemap'),import('@margoengine/core/extension')]):import('@margoengine/post/ssao').then(({SSAO})=>({SSAO}));
   // Imports overlap engine startup; the scene's catch reports a later import failure.
@@ -11,14 +15,16 @@ try {
   const stage=await createStage('#viewport',{backend:'webgpu',autoStart:false,controls:false,capacity:2048,
     label:robot?'Animated robot with adjustable facial expressions':'Interactive damaged helmet',
     camera:{position:robot?[2,1.5,7]:[3,2,5],target:[0,0,0],near:0.01,far:500},onError:reason=>{error.textContent=String(reason);}});
-  dispose=()=>stage.dispose();const controls=new OrbitControls(stage.engine);controls.enableDamping=true;stage.canvas.tabIndex=0;
+  dispose=()=>stage.dispose();if(abort.signal.aborted){stage.dispose();abort.signal.throwIfAborted();}const controls=new OrbitControls(stage.engine);controls.enableDamping=true;stage.canvas.tabIndex=0;
   stage.canvas.addEventListener('keydown',event=>{
     if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','-'].includes(event.key))return;event.preventDefault();
     if(event.key==='+'||event.key==='-')stage.canvas.dispatchEvent(new WheelEvent('wheel',{deltaY:event.key==='+'?-100:100,cancelable:true}));
     else {controls.rotateLeft(event.key==='ArrowLeft'?0.1:event.key==='ArrowRight'?-0.1:0);controls.rotateUp(event.key==='ArrowUp'?0.1:event.key==='ArrowDown'?-0.1:0);}
   });
-  const url=robot?new URL('./assets/robot-expressive.glb',import.meta.url):sceneSamples()===1?new URL('./assets/damaged-helmet-mobile.glb',import.meta.url):new URL('./assets/damaged-helmet.glb',import.meta.url);
-  const model=await loadGLTF(stage.engine,url,{signal:abort.signal}),bounds=model.bounds;
+  const url=robot?new URL('./assets/robot-expressive.glb',import.meta.url):new URL('./assets/damaged-helmet-mobile.glb',import.meta.url);
+  let model=await loadGLTF(stage.engine,url,{signal:abort.signal}),upgrade:(()=>Promise<void>)|undefined;
+  const bounds=model.bounds,demo={stage,get model(){return model;},initialModel:model,quality:robot?'full':sceneSamples()===1?'mobile':'preview',readiness:{}};
+  Object.assign(window,{extensionDemo:demo});
   stage.engine.camera.fitToBoundingBox([bounds[0],bounds[1],bounds[2]],[bounds[3],bounds[4],bounds[5]],{aspect:stage.canvas.clientWidth/stage.canvas.clientHeight,duration:0});
   controls.saveState();
   if(robot) {
@@ -55,9 +61,16 @@ try {
     }
     preset.disabled=false;preset.addEventListener('change',()=>{const value=preset.value;for(const input of inputs){input.value=input.id===value?'1':'0';input.dispatchEvent(new Event('input'));}preset.value=value;});
   } else {
+    demo.readiness=await submitPrincipalScene(()=>stage.engine.render(),engineRuntime(stage.engine).gpu!.queue,{signal:abort.signal});
     const {SSAO}=await extras as typeof import('@margoengine/post/ssao'),ssao=SSAO.attach(stage.engine,{radius:0.25,bias:0.01,samples:32});
-    ssao.add(model);const toggle=document.querySelector<HTMLInputElement>('#ssao')!;toggle.disabled=false;toggle.addEventListener('change',()=>{ssao.enabled=toggle.checked;});
+    model.onDispose(ssao.add(model));const toggle=document.querySelector<HTMLInputElement>('#ssao')!;toggle.disabled=false;toggle.addEventListener('change',()=>{ssao.enabled=toggle.checked;});
+    if(sceneSamples()===4)upgrade=async()=>{
+      const full=await loadGLTF(stage.engine,new URL('./assets/damaged-helmet.glb',import.meta.url),{signal:abort.signal});
+      if(abort.signal.aborted){full.destroy();return;}
+      full.onDispose(ssao.add(full));model.destroy();model=full;demo.quality='full';status.textContent='Ready';
+    };
   }
-  stage.engine.render();stage.engine.start();document.querySelector<HTMLElement>('#viewport')!.dataset.ready='true';status.textContent='Ready';
+  if(robot)demo.readiness=await submitPrincipalScene(()=>stage.engine.render(),engineRuntime(stage.engine).gpu!.queue,{signal:abort.signal});else stage.engine.render();
+  stage.engine.start();watchFrameRate();document.querySelector<HTMLElement>('#viewport')!.dataset.ready='true';status.textContent=upgrade?'Ready. Full detail is loading.':'Ready';
+  if(upgrade)void upgrade().catch(reason=>{if(!abort.signal.aborted){status.textContent='Ready. Full detail could not load.';error.textContent=String(reason);}});
 } catch(reason) {dispose?.();if(!abort.signal.aborted){status.textContent='Unable to load scene';error.textContent=String(reason);}}
-addEventListener('pagehide',()=>{abort.abort();dispose?.();},{once:true});

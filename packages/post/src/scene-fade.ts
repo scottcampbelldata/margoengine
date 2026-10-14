@@ -4,6 +4,7 @@ import {sceneSamples} from '../../shared/quality.js';
 import {fullscreen} from '../../shared/gpu.js';
 import {afterPresented as presented} from '../../shared/demo-frame.js';
 export const afterPresented: (queue: Pick<GPUQueue, 'onSubmittedWorkDone'>, signal: AbortSignal) => Promise<void> = presented;
+export {submitPrincipalScene} from '../../shared/demo-frame.js';
 declare const GPUTextureUsage:{RENDER_ATTACHMENT:number;COPY_SRC:number;COPY_DST:number;TEXTURE_BINDING:number};
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
 

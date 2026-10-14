@@ -13,9 +13,11 @@ export const server = createServer(async (request, response) => {
   }
   let file;
   try {
-    const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
-    file = resolve(root, '.' + (pathname === '/' ? '/index.html' : pathname));
-    if (!file.startsWith(resolve(root) + sep) || !types[extname(file)]) {
+    let pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
+    const demo = /^\/demos\/(dof|tonemap)(?:\/|$)/.test(pathname), fileRoot = demo ? resolve(root, '../site/dist') : root;
+    if (demo && pathname.endsWith('/')) pathname += 'index.html';
+    file = resolve(fileRoot, '.' + (pathname === '/' ? '/index.html' : pathname));
+    if (!file.startsWith(resolve(fileRoot) + sep) || !types[extname(file)]) {
       response.writeHead(404).end('Not found.');
       return;
     }
