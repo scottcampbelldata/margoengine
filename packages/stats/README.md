@@ -22,8 +22,9 @@ in the next microtask. The Stats plugin profiles one frame out of every 15;
 draw/dispatch counting and numeric ring sampling continue every frame.
 
 GPU timing is the sum of profiled pass durations, not presentation latency.
-Timing needs a device created with the `timestamp-query` feature. Core does not
-request it (it keeps core inside its size budget), so on engine-created devices
+Timing needs a device created with the `timestamp-query` feature: create the
+engine with `Engine.create(canvas, {features: ['timestamp-query']})` (requested only
+if the adapter offers it, and again after device restoration). Without it,
 `{profiling: true}` reports timing as unavailable and keeps CPU metrics and
 counters. Stats profiling is off by default and creates no queries, query buffers
 or readbacks. The overlay distinguishes off,

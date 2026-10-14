@@ -62,3 +62,13 @@ test('failed pipeline setup destroys the negotiated device and retains its error
  h.adapter.requestDevice=async function(...args){const device=await create.apply(this,args);device.createRenderPipelineAsync=async()=>{throw new Error('pipeline failed');};return device;};
  await assert.rejects(GPURenderer.create(h.canvas),/pipeline failed/);assert.equal(h.devices[0].destroyed,true);assert.equal(h.devices[0].queries,0);
 });
+
+test('apps can opt in to extra GPU features, kept across device restores',async t=>{
+ const h=harness(t,['timestamp-query','depth32float-stencil8']),dom=new JSDOM('<body></body>');dom.window.HTMLCanvasElement.prototype.getContext=()=>null;
+ const engine=await EngineKernel.create(h.canvas,{capacity:1,backend:'webgpu',features:['timestamp-query','shader-f16']});
+ try{
+  assert.deepEqual(h.requests[0],['depth32float-stencil8','timestamp-query'],'only features the adapter offers are requested');
+  assert.equal(h.devices[0].features.has('timestamp-query'),true,'the device Stats profiles on has the feature');
+  await engine.rebootDevice();assert.deepEqual(h.requests[1],['depth32float-stencil8','timestamp-query'],'restoration asks again');
+ }finally{engine.dispose();dom.window.close();}
+});

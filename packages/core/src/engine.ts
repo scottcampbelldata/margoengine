@@ -6,7 +6,7 @@ import { FrameGraph, type EnginePlugin } from './plugin.js';
 import {sceneSamples} from './quality.js';
 
 /** `fallback` supplies a renderer when WebGPU is unavailable or `backend` is 'webgl2', for example `webglRenderer` from @margoengine/webgl. */
-export interface EngineOptions { capacity?: number; backend?: 'auto'|'webgpu'|'webgl2'; camera?: CameraOptions; fallback?: (canvas: HTMLCanvasElement) => Renderer }
+export interface EngineOptions { capacity?: number; backend?: 'auto'|'webgpu'|'webgl2'; camera?: CameraOptions; fallback?: (canvas: HTMLCanvasElement) => Renderer; /** Extra WebGPU features to request when the adapter offers them, e.g. ['timestamp-query'] for Stats GPU timing. */ features?: GPUFeatureName[] }
 export type FrameCallback = (engine: Engine, delta: number) => void;
 const positionFields=['x','y','z'] as const,scaleFields=['sx','sy','sz'] as const;
 const owners=new WeakMap<EnginePlugin,Engine>();
@@ -101,14 +101,15 @@ export class Engine {
   private disposing=false;
   private readonly plugins=new Map<string,EnginePlugin>();
   private recovery?:Promise<void>;
+  /** @internal Features requested at creation, requested again when the device is restored. */ features?:GPUFeatureName[];
 
   static async create(canvas: HTMLCanvasElement, options: EngineOptions={}):Promise<Engine> {
     if(!canvas||typeof canvas.getContext!=='function')throw new TypeError('Expected canvas');
     const backend=options.backend??'auto';if(!['auto','webgpu','webgl2'].includes(backend))throw new TypeError('Unknown backend');
     const store=await TransformStore.create(options.capacity??1024);let renderer:Renderer|undefined,fallbackReason:string|null=null;
     try {
-      if(backend!=='webgl2')try{renderer=await GPURenderer.create(canvas);}catch(error){if(backend==='webgpu')throw error;fallbackReason=String(error);}
-      renderer??=(options.fallback??(()=>{throw new Error('WebGPU unavailable')}))(canvas);return new Engine(canvas,store,renderer,options.camera,fallbackReason);
+      if(backend!=='webgl2')try{renderer=await GPURenderer.create(canvas,options.features);}catch(error){if(backend==='webgpu')throw error;fallbackReason=String(error);}
+      renderer??=(options.fallback??(()=>{throw new Error('WebGPU unavailable')}))(canvas);const engine=new Engine(canvas,store,renderer,options.camera,fallbackReason);engine.features=options.features;return engine;
     }catch(error){renderer?.dispose();store.dispose();throw error;}
   }
   private constructor(readonly canvas:HTMLCanvasElement,readonly store:TransformStore,private renderer:Renderer,camera:CameraOptions|undefined,readonly fallbackReason:string|null){this.camera=new Camera(camera);this.watchDevice();}
@@ -117,7 +118,7 @@ export class Engine {
     if(this.disposed||this.disposing)return Promise.reject(new Error('Engine disposed'));
     if(this.backend!=='webgpu')return Promise.reject(new Error('WebGPU required'));
     if(this.recovery)return this.recovery;
-    this.recovery=(async()=>{const previous=this.renderer,next=await GPURenderer.create(this.canvas);
+    this.recovery=(async()=>{const previous=this.renderer,next=await GPURenderer.create(this.canvas,this.features);
       if(this.disposed||this.disposing){next.dispose();return;}
       try{for(const batch of this.batches.values())next.add(batch.geometry,batch.instances.length/24);}
       catch(error){next.dispose(false);throw error;}

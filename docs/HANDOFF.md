@@ -80,7 +80,8 @@ Five parallel workers reviewed 58 packages against baseline `f05414a`; Claude ve
 
 ## Work queue Scott approved (2026-10-14), in order
 
-Global rules: core + stage does not grow without Scott's say-so (limit 20,000; currently 18,554). Real-GPU browser
+Global rules: core + stage does not grow without Scott's say-so (limit 20,000; currently 18,580 after his approved
+`features` option). Real-GPU browser
 checks and benchmarks run one at a time: take the lock with `mkdir C:\Dev\Projects\margo-engine\test-results\gpu.lock`
 (fails if held; wait and retry), remove it when done; never measure while other GPU work runs.
 
@@ -141,9 +142,8 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    b. Render-bundle replay: measure first. Core already draws one instanced call per distinct geometry, so encoding is
       small when parts share shapes; bundles matter for assemblies with many unique shapes. Use the CAD benchmark's
       encoding numbers to decide.
-   c. GPU timing overlay: core no longer requests `timestamp-query` (removed to stay under the gate). Options: a tiny
-      core option to request extra device features (a few bytes; Scott decides) or devtools without GPU pass timing.
-      The Stats package already has the profiler and overlay; extend it rather than a new devtools package.
+   c. GPU timing overlay: DONE in core - `Engine.create(canvas, {features: ['timestamp-query']})` (approved by Scott,
+      +26 bytes); Stats profiling works with it. Remaining: richer overlay in Stats (VRAM/buffer counts) if wanted.
    d. Contact shadows (ground-plane depth blur) in a new staging package; auto-framing exists already (core
       `camera.fitToBoundingBox` with duration and padding) - add orthographic support in @margoengine/cameras.
    e. Outlines: selection already uses jump-flood outlines; add dashed x-ray outlines for hidden parts and glTF/model
