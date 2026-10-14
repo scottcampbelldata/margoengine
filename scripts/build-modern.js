@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { readFile, writeFile, mkdir, copyFile, rm, readdir } from 'node:fs/promises';
 import { build } from 'vite';
 import { resolve, dirname } from 'node:path';
@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { gzipSync,deflateRawSync,inflateRawSync } from 'node:zlib';
 import { compactInternals } from './compact-internals.js';
 import { compactOutput, external, measureCoreStage } from './measure-size.js';
+import { packageOrder } from './package-order.js';
 async function compactPackage(name){
  const root=`packages/${name}/dist`,files=(await readdir(root)).filter(file=>file.endsWith('.js'));
  for(const file of files)await writeFile(`${root}/${file}`,compactInternals(await readFile(`packages/${name}/src/${file.replace(/\.js$/,'.ts')}`,'utf8'),await readFile(`${root}/${file}`,'utf8')));
@@ -31,22 +32,19 @@ if(!precompiled){
  execFileSync(process.execPath,['node_modules/binaryen/bin/wasm-opt',machineryPath,'-O3','--enable-simd','--enable-bulk-memory','--enable-nontrapping-float-to-int','--strip-debug','--strip-producers','-o',machineryPath+'.optimized'],{stdio:'inherit'});
  await writeFile('packages/machinery/src/wasm.ts',`// Generated machinery kernel; consumers need no Rust toolchain.\nexport const machineryWasm: string = '${gzipSync(await readFile(machineryPath+'.optimized')).toString('base64')}';\n`);
 }
-const featurePackages=['gltf-pro','blender','animation','post','shadows','clustered','animator','taa','splats','geometry','terrain','xr','ifc','usdz','dof','tonemap','lines','stats','inspector','environment','controls'];
-const packages=['core','gltf','react','loaders','exporters','machinery','vfx','sky','creative','scenery',...featurePackages,'margoengine'];
-for(const name of packages){
+// Build every workspace package in dependency order (scripts/package-order.js reads package.json; a package that needs
+// another's dist at build time must declare it). A package with its own `build` script runs it; the rest use the
+// pipeline below: tsc + compaction for core and the stage facade, tsc for react, a Vite library build + tsc otherwise.
+const tsc=name=>execFileSync(process.execPath,['node_modules/typescript/bin/tsc','-p',`packages/${name}/tsconfig.json`],{stdio:'inherit'});
+const manifests=new Map();
+for(const dir of JSON.parse(await readFile('package.json','utf8')).workspaces.filter(dir=>dir.startsWith('packages/')))manifests.set(dir.slice('packages/'.length),JSON.parse(await readFile(`${dir}/package.json`,'utf8')));
+for(const name of packageOrder(manifests)){
+ const manifest=manifests.get(name);
+ if(manifest.scripts?.build){execSync(manifest.scripts.build,{cwd:`packages/${name}`,stdio:'inherit'});continue;}
  const output=resolve(`packages/${name}/dist`);assert.equal(dirname(output),resolve(`packages/${name}`),'Output escaped its package');
  await rm(output,{recursive:true,force:true});await copyFile('LICENSE',`packages/${name}/LICENSE`);
-}
-execFileSync(process.execPath,['node_modules/typescript/bin/tsc','-p','packages/core/tsconfig.json'],{stdio:'inherit'});
-await compactPackage('core');
-for(const name of ['loaders','exporters'])execFileSync(process.execPath,['node_modules/typescript/bin/tsc','-p',`packages/${name}/tsconfig.json`],{stdio:'inherit'});
-// controls type-checks against @margoengine/bvh (DragControls), so bvh's own build must run first.
-execFileSync(process.execPath,['packages/bvh/scripts/build.js'],{stdio:'inherit'});
-// vfx and sky build before the creative and scenery wrappers that import their types.
-// geometry first: machinery/edges imports it as an external package.
-for(const name of ['geometry','gltf','machinery','vfx','sky','creative','scenery',...featurePackages.filter(name=>name!=='geometry')]){
- const output=resolve(`packages/${name}/dist`);assert.ok(output.startsWith(resolve(`packages/${name}`)+'/')||output.startsWith(resolve(`packages/${name}`)+'\\'),'Output escaped its package');
- const manifest=JSON.parse(await readFile(`packages/${name}/package.json`,'utf8'));
+ if(name==='core'||name==='margoengine'){tsc(name);await compactPackage(name);continue;}
+ if(name==='react'){tsc(name);continue;}
  const entry=Object.fromEntries(Object.values(manifest.exports).map(({import:target})=>{
   assert.ok(/^\.\/dist\/[\w-]+\.js$/.test(target),'Unsupported package entry: '+target);
   const module=target.slice('./dist/'.length,-'.js'.length);
@@ -60,12 +58,12 @@ for(const name of ['geometry','gltf','machinery','vfx','sky','creative','scenery
   for(const file of ['occt-import-js.js','occt-import-js.wasm'])await copyFile(`node_modules/occt-import-js/dist/${file}`,resolve(output,'workers',file));
   await copyFile('node_modules/occt-import-js/LICENSE.md',resolve(output,'workers/OCCT-LICENSE.txt'));
   await copyFile('packages/machinery/src/workers/OCCT-NOTICE.txt',resolve(output,'workers/OCCT-NOTICE.txt'));
+ }
+ tsc(name);
 }
- execFileSync(process.execPath,['node_modules/typescript/bin/tsc','-p',`packages/${name}/tsconfig.json`],{stdio:'inherit'});
-}
-execFileSync(process.execPath,['node_modules/typescript/bin/tsc','-p','packages/margoengine/tsconfig.json'],{stdio:'inherit'});
-await compactPackage('margoengine');
-execFileSync(process.execPath,['node_modules/typescript/bin/tsc','-p','packages/react/tsconfig.json'],{stdio:'inherit'});
+// Size records and leak checks only; build order comes from package.json above.
+const featurePackages=['gltf-pro','blender','animation','post','shadows','clustered','animator','taa','splats','geometry','terrain','xr','ifc','usdz','dof','tonemap','lines','stats','inspector','environment','controls'];
+const packages=['core','gltf','react','loaders','exporters','machinery','vfx','sky','creative','scenery',...featurePackages,'margoengine'];
 const sizes={kernel:{raw:wasm.length,gzip:compressedWasm.length}};
 for(const name of packages){
   let output=await build({configFile:false,publicDir:false,logLevel:'silent',build:{write:false,minify:true,target:'es2022',lib:{entry:`packages/${name}/dist/index.js`,formats:['es']},rollupOptions:{external,output:compactOutput}}});
@@ -86,4 +84,6 @@ await mkdir('test-results',{recursive:true});await writeFile('test-results/moder
 const isolation=await build({configFile:false,publicDir:false,logLevel:'silent',build:{write:false,target:'es2022',lib:{entry:'tests/modern-machinery-consumer.js',formats:['es']}}});
 for(const chunk of (Array.isArray(isolation)?isolation[0]:isolation).output.filter(item=>item.type==='chunk'))assert.ok(Object.keys(chunk.modules).every(id=>!id.includes('/creative/')&&!id.includes('/scenery/')),'Creative/scenery code leaked into a machinery consumer');
 console.error(JSON.stringify(sizes,null,2));
+// The catalog reads every built dist, so it is regenerated here and can never trail the packages.
+execFileSync(process.execPath,['scripts/build-catalog.js'],{stdio:'inherit'});
 

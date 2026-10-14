@@ -230,10 +230,18 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    a top view reached from the side) — a core change, needs Scott's approval] ViewCube follow-up: use
    core's new `camera.up` for exact top/bottom views instead of stopping 1e-6 rad off the pole.
 1h. Less fragile (2026-10-14):
-   a. Derive the package build order from package.json dependencies (topological sort) instead of the hand-written
-      lists in scripts/build-modern.js (the controls-needs-bvh break came from that list).
-   b. Generate docs/catalog.json as part of build:packages so it can never be stale (it failed four times today
-      because it was regenerated before packages were rebuilt).
+   a. [DONE] Derive the package build order from package.json dependencies (topological sort) instead of the hand-written
+      lists in scripts/build-modern.js (the controls-needs-bvh break came from that list). Now one pass in
+      build-modern.js over every workspace package in `scripts/package-order.js` order (dependencies, peer and dev
+      `@margoengine/*`/`margoengine`; a cycle fails naming its members; `tests/package-order.test.js`). A package's own
+      `build` script runs in place of the built-in pipeline, so the 17 duplicate builds (and the separate
+      `npm run build --workspace packages` step) are gone. Every `packages/*/dist` file is byte-identical to the old
+      two-step build (526 files hashed). No undeclared build-time dependency was found. Rule: a package that needs
+      another's dist at build time must declare it in package.json.
+   b. [DONE] docs/catalog.json is generated at the end of build-modern.js (so by `build:packages` and `modern:build`); the
+      separate step left `verify`; `npm run catalog:build` still works alone. The generator writes only on a real
+      change and keeps the checkout's line endings, and keeps the last `published` value when the registry is
+      unreachable (offline builds no longer fail).
    c. Public API snapshots per package (exported names AND type signatures, e.g. API Extractor-style .d.ts reports)
       checked in CI, so accidental API changes fail the build and intended ones are reviewed; feeds the 1.0 API list.
    d. Add a linter/formatter (Biome: one fast dev tool, no runtime cost) with a small rule set: no `any`, no unused
@@ -280,7 +288,9 @@ Worker practice: agents run in git worktrees; they must start with `git reset --
 default to an old base). Do not junction the whole node_modules (then `@margoengine/*` resolves to the main checkout's
 packages): make a real `node_modules` folder holding junctions to the main checkout's third-party packages and
 `@margoengine/*` junctions to the worktree's own packages. Never run a full `npm install` in a worktree; lockfile only
-via `npm install --package-lock-only --offline --no-audit --no-fund --ignore-scripts`.
+via `npm install --package-lock-only --offline --no-audit --no-fund --ignore-scripts`. Also junction `margoengine`
+to the worktree's packages/margoengine. `npm run build:packages` is the whole package build (dependency order from
+package.json, then size gates, then docs/catalog.json); there is no separate workspace build step.
 
 ## Pre-launch hardware investigation
 
