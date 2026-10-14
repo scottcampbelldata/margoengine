@@ -624,6 +624,19 @@ if intended, run `npm run api:update` after build:packages and commit the `api/`
 - API: standardize on `X.attach(engine, options)` for features; `dispose()` is the primary cleanup name, `destroy()`
   stays as a deprecated alias until 1.0, and packages (not core) add `[Symbol.dispose]()` calling `dispose()`.
 
+Second set (2026-10-14, evening), all APPROVED by Scott:
+- 1g.e/1h.d: reformat all TypeScript to conventional style with Biome (formatter + small lint rule set) once the core
+  and API-standardization agents have merged (zero shipped bytes; for contributors).
+- WebGL stays strictly a fallback (plain meshes, basic preview). Do not expand WebGL parity (gap 8 closed as won't-do).
+- Core, measured, each stopped if over budget: transparent canvas (`alpha`/premultiplied canvas + clear alpha;
+  budget ~15 B) and minimal live setters on core `PbrMaterial` (color/roughness/metalness without recreating the
+  material; budget ~30 B; if it needs dirty-state tracking, leave it to leaf packages). Start after the current core
+  agent merges.
+- Multiple directional lights stay OUT of core (belongs in `@margoengine/clustered`).
+- Back-face culling: decide from the scratch-branch numbers.
+- Island light tier keeps 100k particles by default; add a `?particles=1m` URL switch (the menu already has 1M).
+  Start after the visual-regression agent merges (it edits the sandbox).
+
 ## API rough edges before 1.0 (found writing docs/from-threejs.md, 2026-10-14; not changed)
 
 1. The one directional light and the ambient term are only reachable through `@margoengine/core/extension`
