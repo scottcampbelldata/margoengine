@@ -14,7 +14,7 @@ import {Clustered} from '@margoengine/clustered';
 import {createCharacter, createLandscape, terrainHeight} from './scene.js';
 import {stepLocomotion, type LocomotionOptions} from '@margoengine/controls';
 import {createProceduralSettlement} from './procedural/index.js';
-import {sceneSamples} from '../../../packages/shared/quality.js';
+import {sceneSamples} from '@margoengine/quality';
 import {applyQualityTier, watchQuality} from '@margoengine/quality';
 import './style.css';
 

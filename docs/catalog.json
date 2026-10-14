@@ -1023,6 +1023,7 @@
       "capFrameRate",
       "frameDue",
       "frameStatus",
+      "sceneSamples",
       "watchQuality"
     ]
   },

@@ -103,3 +103,5 @@ export function watchQuality({request = globalThis.requestAnimationFrame?.bind(g
   request(count);
 }
 export {frameDue, frameStatus} from './pacing.js';
+/** 1 on phones and the light tier, 4 on the desktop full tier: the scene sample count core uses (call after applyQualityTier). */
+export {sceneSamples} from '../../shared/quality.js';
