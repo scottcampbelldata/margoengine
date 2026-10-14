@@ -230,6 +230,22 @@ via `npm install --package-lock-only --offline --no-audit --no-fund --ignore-scr
   This is a lead to test, not a confirmed cause: particles Off did not help there and other demos run fine on that
   phone. Needs a capture from the device to confirm.
 
+## Final phase (Scott, 2026-10-14): after every queue item above is finished
+
+1. Rebuild every demo on the current packages and bring each up to date with the new capabilities: quality tiers
+   and pacing, materials and textures, shader nodes, post stack + FXAA, environment IBL/fog/backgrounds, cameras
+   (orthographic, ViewCube), picking/outlines/DragControls, LOD/imposters, glTF extensions, native FBX/USD, lights,
+   CAD sections/edges/exploded views. Add new demos where a capability has none (e.g. a CAD assembly viewer).
+2. Whitepaper (`docs/whitepaper.md`, also published on the site) proving every public claim with reproducible tests
+   and benchmarks: size (`npm run measure:threejs`), load/startup times, frame times per device tier, CAD scale
+   (10k/50k/100k parts), picking latency, LOD/imposter savings, package proofs, fair three.js benchmark (WebGL and
+   WebGPU), visual-regression results, and stated limits (devices not tested, WebGPU-first). Each number names the
+   command, hardware, browser and date that produced it; all runs serial on an idle GPU.
+3. Everything people need to evaluate it: getting-started docs, docs/from-threejs.md, API reference, comparison page,
+   benchmark page, changelog, licence and third-party notices.
+4. Deploy the rebuilt site and demos to Cloudflare Pages (project `margoengine`): preview branch first, Scott checks
+   it, then production (margoengine.com). Scott asked for the production push; still show him the preview link first.
+
 ## Launch readiness (Hacker News, YouTube, LinkedIn, X; npm is set up, margoengine.com is live)
 
 Before launch, in addition to the work queue:
