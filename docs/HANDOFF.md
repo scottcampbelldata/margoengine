@@ -81,7 +81,7 @@ Five parallel workers reviewed 58 packages against baseline `f05414a`; Claude ve
 ## Work queue Scott approved (2026-10-14), in order
 
 Global rules: core + stage does not grow without Scott's say-so (limit 20,000; currently 18,554). Real-GPU browser
-checks and benchmarks run one at a time: take the lock with `mkdir C:\Dev\Projects\margo-engine	est-results\gpu.lock`
+checks and benchmarks run one at a time: take the lock with `mkdir C:\Dev\Projects\margo-engine\test-results\gpu.lock`
 (fails if held; wait and retry), remove it when done; never measure while other GPU work runs.
 
 0. Verification gates (serial, idle GPU): shader `browser-check.mjs` re-run; LOD/imposter 2,500-object benchmark on a
