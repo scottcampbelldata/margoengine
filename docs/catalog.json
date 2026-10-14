@@ -746,6 +746,26 @@
     ]
   },
   {
+    "id": "materials",
+    "title": "Materials",
+    "package": "@margoengine/materials",
+    "version": "0.1.0",
+    "published": false,
+    "description": "Textured PBR, unlit, normal and matcap materials and a texture loader for meshes built in code.",
+    "requirements": "Core ^0.1.0 || ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "materials",
+    "install": "npm install @margoengine/core@0.1.0 @margoengine/materials@0.1.0",
+    "imports": "import { Material } from '@margoengine/materials';",
+    "exports": [
+      "Material",
+      "Texture",
+      "createMesh",
+      "loadTexture",
+      "materialShader",
+      "packGeometry"
+    ]
+  },
+  {
     "id": "math",
     "title": "Math",
     "package": "@margoengine/math",
