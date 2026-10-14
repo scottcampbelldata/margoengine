@@ -339,8 +339,10 @@ if intended, run `npm run api:update` after build:packages and commit the `api/`
    it now needs `fallback: webglRenderer` from `@margoengine/webgl` (`backend: 'auto'` alone rejects without WebGPU).
    `packages/controls/README.md` "How it works"/Limits still say the camera has no up vector and rejects vertical views.
    `packages/animation/README.md` names `margoengine-animator`. `packages/gltf-pro/README.md` says ambient has no IBL.
-   `docs/threejs-parity.md` summary and sections 5, 6 and 13 still list materials, textures, FXAA and combinable
-   effects as missing (counts in its summary are stale too).
+   [DONE] `docs/threejs-parity.md` re-tallied (see "Feature gaps versus three.js"). Still stale, found in the re-audit:
+   `packages/viewcube/README.md` Limits says "no roll (core's camera has none)" (core has `camera.up`);
+   `packages/cameras/README.md` says core throws `Vertical camera` looking straight down (only with the default up);
+   `packages/gltf-pro/README.md` Limits says models are "outside core GPU picking" (selection `Picking` covers them).
 
 ## Pre-launch hardware investigation
 
@@ -379,11 +381,15 @@ Before launch, in addition to the work queue:
 
 ## Feature gaps versus three.js (after optimization; each as an optional package)
 
-Verified matrix: `docs/threejs-parity.md` (153 three.js features: 57 covered, 47 partial, 49 missing; read from
-source, not run). Its top gaps: user materials and textures, glTF extensions/Draco/KTX2 wiring, raycasting loaded models,
-automatic IBL, background colour/transparent canvas, combinable post effects, orthographic and straight-down cameras,
-WebGL2 fallback for packages, a public math library, FXAA/SMAA. Several need core changes (freeze conflicts listed in the
-doc); those are Scott's decision. The older summary below predates the audit.
+Verified matrix: `docs/threejs-parity.md`, re-tallied 2026-10-14 against 2c53227 (156 three.js features: 83 covered,
+40 partial, 33 missing; was 65 / 43 / 45 in its stale summary; read from source, not run). The first audit's top gaps
+(materials, glTF extensions/decoders, picking models, IBL, background colour, post stack, ortho camera, math, FXAA) are
+closed. New top 10: WebGL2 beyond core, transparent canvas (core), multiple directional/coloured ambient/hemisphere
+lights, point and spot shadows, textured instancing (+ `EXT_mesh_gpu_instancing`), remaining glTF extensions
+(animation pointer, iridescence, anisotropy, dispersion, variants, refraction, cameras), physical materials on your own
+meshes, second UV set/groups/custom attributes, ShadowMaterial, glTF export with animation. `docs/from-threejs.md`'s
+"Not yet" table matches it. Several need core changes (freeze conflicts listed in the doc); those are Scott's decision.
+The older summary below predates the audit.
 
 From package descriptions, not yet audited against code:
 
