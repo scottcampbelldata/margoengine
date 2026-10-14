@@ -41,6 +41,21 @@ and make the same GPU calls:
 
 `obstacles`, `wrap`, `sort` and `texture` are read when the effect attaches.
 
+### Load only what you use
+
+`VFX` from `@margoengine/vfx` (6.6 kB min+gzip) carries all four features. An effect that uses none of them can
+import the same class from `@margoengine/vfx/base` (4.8 kB); add features as a second argument from their own
+entries: `/obstacles` (+0.7 kB), `/wrap` (+0.1 kB), `/sort` (+0.6 kB), `/texture` (+0.4 kB).
+
+```ts
+import {VFX} from '@margoengine/vfx/base';
+import {sort} from '@margoengine/vfx/sort';
+const smoke = VFX.attach(engine, {capacity: 4096, sort: true}, {sort});
+```
+
+Either way the WGSL, uploads and GPU calls are byte-identical to the build before the split for every feature
+combination (`test/split.test.js`). An option whose feature is missing throws a `TypeError` naming the entry.
+
 `initialCount` queues an initial burst on attachment and again after device
 restoration. It defaults to 0 and must be an integer from 0 through capacity.
 For a continuously populated field, use `initialCount: capacity`; this replaces

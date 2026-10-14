@@ -1,9 +1,14 @@
 import {EngineKernel} from '@margoengine/core';
 import {engineRuntime} from '@margoengine/core/extension';
-import {Sky} from '@margoengine/sky';
+import {Sky} from '@margoengine/sky/base';
+import {bruneton} from '@margoengine/sky/bruneton';
+import {clouds} from '@margoengine/sky/clouds';
+import {fog} from '@margoengine/sky/fog';
+import {reflection} from '@margoengine/sky/reflection';
+import {lighting} from '@margoengine/sky/lighting';
 import {Shadows} from '@margoengine/shadows';
 import {Water} from '@margoengine/water';
-import {VFX} from '@margoengine/vfx';
+import {VFX} from '@margoengine/vfx/base';
 import {Input} from '@margoengine/input';
 import {Cinematic} from '@margoengine/cinematic';
 import {Bloom} from '@margoengine/post/bloom';
@@ -43,7 +48,7 @@ async function boot(): Promise<void> {
     runtime.gpu!.addEventListener('uncapturederror', event => engine.onError((event as GPUUncapturedErrorEvent).error), {signal});
     const post = Bloom.attach(engine, {strength: 0.2, threshold: 1.2, exposure: 0.45});
     let water: Water;
-    const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.38}, fog: {depth: () => water?.depthTexture ?? post.depthTexture, density: 0.008, start: 45}, hours: 17.57, timeScale: 1/120, turbidity: 3.2, exposure: -0.35, lighting: {intensity: 6, color: [1,0.97,0.92], sunset: [1,0.69,0.36], moon: {intensity: 0.6, color: [0.25,0.45,0.75]}, ambient: {day: [0.14,0.19,0.24], night: [0.02,0.04,0.09]}}});
+    const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.38}, fog: {depth: () => water?.depthTexture ?? post.depthTexture, density: 0.008, start: 45}, hours: 17.57, timeScale: 1/120, turbidity: 3.2, exposure: -0.35, lighting: {intensity: 6, color: [1,0.97,0.92], sunset: [1,0.69,0.36], moon: {intensity: 0.6, color: [0.25,0.45,0.75]}, ambient: {day: [0.14,0.19,0.24], night: [0.02,0.04,0.09]}}}, {bruneton, clouds, fog, reflection, lighting});
     // Compile the sky and its LUT while the CPU builds the island.
     engine.render({delta: 0});
     const shadows = shadow = new Shadows({resolution: mobile ? 512 : 1024, distance: 115, lambda: 0.7, lightSize: 0.018, normalBias: 0.055, casterMargin: 65});

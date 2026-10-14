@@ -14,7 +14,8 @@ import {Clustered} from '../packages/clustered/dist/index.js';
 import {Transitions} from '../packages/transitions/dist/index.js';
 import {optionalGPU} from './support/optional-gpu.js';
 
-const factories={sky:()=>new Sky(),scatter:()=>new Scatter(box(),{count:2}),ssao:()=>new SSAO(),bloom:()=>new Bloom(),taa:()=>new TAA(),dof:()=>new DOF(),tonemap:()=>new Tonemap(),vfx:()=>new VFX({capacity:2}),shadows:()=>new Shadows({resolution:64}),clustered:()=>new Clustered({grid:[1,1,1]}),transitions:()=>new Transitions(),terrain:h=>{
+const factories={sky:()=>new Sky(),'sky with every feature':()=>new Sky({model:'bruneton',clouds:{},lighting:{ambient:{day:[0,0,0],night:[0,0,0]}}}),
+'vfx with every feature':()=>new VFX({capacity:8,emissionExtent:[1,1,1],wrap:true,sort:true,obstacles:[],texture:{width:1,height:1,data:new Uint8Array(4)}}),scatter:()=>new Scatter(box(),{count:2}),ssao:()=>new SSAO(),bloom:()=>new Bloom(),taa:()=>new TAA(),dof:()=>new DOF(),tonemap:()=>new Tonemap(),vfx:()=>new VFX({capacity:2}),shadows:()=>new Shadows({resolution:64}),clustered:()=>new Clustered({grid:[1,1,1]}),transitions:()=>new Transitions(),terrain:h=>{
  const d=h.engine.gpu,heightmap=d.createTexture({size:[2,2],format:'r32float',usage:GPUTextureUsage.TEXTURE_BINDING}),layers=d.createTexture({size:[2,2,4],format:'rgba8unorm',usage:GPUTextureUsage.TEXTURE_BINDING});heightmap.depthOrArrayLayers=1;layers.depthOrArrayLayers=4;
  return new Terrain({textures:()=>({heightmap,layers}),layers:Array.from({length:4},(_,i)=>({height:[i,i+1],slope:[0,1],scale:1})),size:[2,2],resolution:8,levels:1});
 }};

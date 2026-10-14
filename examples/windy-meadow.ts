@@ -4,7 +4,10 @@ import {OrbitControls} from '@margoengine/controls';
 import {Bloom} from '@margoengine/post/bloom';
 import {submitPrincipalScene} from '@margoengine/post/scene-fade';
 import {engineRuntime} from '@margoengine/core/extension';
-import {Sky} from '@margoengine/sky';
+import {Sky} from '@margoengine/sky/base';
+import {bruneton} from '@margoengine/sky/bruneton';
+import {clouds} from '@margoengine/sky/clouds';
+import {lighting} from '@margoengine/sky/lighting';
 import {sceneSamples} from '../packages/shared/quality.js';
 import {applyQualityTier, paceEngine, watchQuality} from '@margoengine/quality';
 applyQualityTier();
@@ -25,7 +28,7 @@ try {
   const post=Bloom.attach(stage.engine,{strength:0.15,threshold:1.2,exposure:0});
   const sky=Sky.attach(stage.engine,{model:'bruneton',hours:16,timeScale:0,turbidity:3,exposure:-0.35,
     clouds:{coverage:0.38,speed:8},lighting:{intensity:3,color:[1,0.97,0.9],sunset:[1,0.68,0.35],
-      moon:{intensity:0.4,color:[0.25,0.45,0.75]},ambient:{day:[0.14,0.19,0.24],night:[0.02,0.04,0.09]}}});
+      moon:{intensity:0.4,color:[0.25,0.45,0.75]},ambient:{day:[0.14,0.19,0.24],night:[0.02,0.04,0.09]}}},{bruneton,clouds,lighting});
   stage.box({size:[60,0.12,60],position:[0,-0.07,0],color:'#34451f',roughness:1});
   const speed=document.querySelector<HTMLInputElement>('#speed')!,strength=document.querySelector<HTMLInputElement>('#strength')!;
   const density=document.querySelector<HTMLSelectElement>('#density')!,seeds=document.querySelector<HTMLInputElement>('#seeds')!;

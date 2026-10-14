@@ -22,6 +22,26 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./base": {
+      "types": "./dist/base.d.ts",
+      "import": "./dist/base.js"
+    },
+    "./obstacles": {
+      "types": "./dist/obstacles.d.ts",
+      "import": "./dist/obstacles.js"
+    },
+    "./wrap": {
+      "types": "./dist/wrap.d.ts",
+      "import": "./dist/wrap.js"
+    },
+    "./sort": {
+      "types": "./dist/sort.d.ts",
+      "import": "./dist/sort.js"
+    },
+    "./texture": {
+      "types": "./dist/texture.d.ts",
+      "import": "./dist/texture.js"
     }
   },
   "files": [

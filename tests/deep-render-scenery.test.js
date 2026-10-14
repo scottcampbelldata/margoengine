@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {SkyMoon} from '../packages/scenery/dist/index.js';
-import {Sky} from '../packages/sky/dist/index.js';
+import {Sky} from '../packages/sky/dist/base.js';
 import {optionalGPU} from './support/optional-gpu.js';
 
-test('SkyMoon is a midnight Sky preset whose stylized night config is read every frame',()=>{
+test('SkyMoon is a midnight Sky (base entry, stylized night only) whose config is read every frame',()=>{
  const h=optionalGPU();globalThis.GPUTextureUsage??={STORAGE_BINDING:8,TEXTURE_BINDING:4};
  const sky=new SkyMoon({moonPhase:0.7,moonDirection:[0,2,0],moonSize:0.05});
  assert.ok(sky instanceof Sky);assert.equal(sky.name,'sky-moon');
