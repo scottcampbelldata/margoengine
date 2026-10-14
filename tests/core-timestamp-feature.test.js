@@ -26,11 +26,11 @@ function harness(t, offered) {
  return {adapter,canvas,requests,devices,pipelines,restore};
 }
 
-test('renderer negotiates only advertised optional features and preserves effective primitive defaults',async t=>{
+test('renderer requests only the advertised depth-stencil feature (never timestamp queries) and preserves effective primitive defaults',async t=>{
  for(const offered of [[],['timestamp-query'],['depth32float-stencil8'],['timestamp-query','depth32float-stencil8']]){
   const h=harness(t,offered),renderer=await GPURenderer.create(h.canvas);
   try{
-   assert.deepEqual(h.requests[0],['depth32float-stencil8','timestamp-query'].filter(feature=>offered.includes(feature)));
+   assert.deepEqual(h.requests[0],offered.includes('depth32float-stencil8')?['depth32float-stencil8']:[]);
    const descriptor=h.pipelines[0];assert.equal(Object.hasOwn(descriptor,'primitive'),false);
    assert.deepEqual([descriptor.primitive?.topology??'triangle-list',descriptor.primitive?.frontFace??'ccw',descriptor.primitive?.cullMode??'none'],['triangle-list','ccw','none']);
    assert.equal(descriptor.depthStencil.format,offered.includes('depth32float-stencil8')?'depth32float-stencil8':'depth32float');assert.equal(h.devices[0].queries,0);
@@ -38,15 +38,15 @@ test('renderer negotiates only advertised optional features and preserves effect
  }
 });
 
-test('engine restoration renegotiates support and default Stats never allocates timestamp queries',async t=>{
+test('engine restoration renegotiates support and Stats never allocates timestamp queries without the feature',async t=>{
  const h=harness(t,['timestamp-query','depth32float-stencil8']),dom=new JSDOM('<body></body>');dom.window.HTMLCanvasElement.prototype.getContext=()=>null;
  const engine=await EngineKernel.create(h.canvas,{capacity:1,backend:'webgpu'});
  try{
   const stats=Stats.attach(engine,{parent:dom.window.document.body});for(let i=0;i<30;i++)engine.render({delta:0.016});
   assert.equal(h.devices[0].queries,0);assert.equal(stats.gpuPassMilliseconds,null);assert.equal(stats.gpuTime,null);
-  await engine.rebootDevice();assert.deepEqual(h.requests,[['depth32float-stencil8','timestamp-query'],['depth32float-stencil8','timestamp-query']]);assert.equal(h.devices[0].destroyed,true);
+  await engine.rebootDevice();assert.deepEqual(h.requests,[['depth32float-stencil8'],['depth32float-stencil8']]);assert.equal(h.devices[0].destroyed,true);
   for(let i=0;i<30;i++)engine.render({delta:0.016});assert.equal(h.devices[1].queries,0);
-  stats.enableGPUProfiling(h.devices[1]);assert.equal(h.devices[1].queries,1);
+  stats.enableGPUProfiling(h.devices[1]);assert.equal(h.devices[1].queries,0,'core no longer requests timestamp-query');
  }finally{engine.dispose();dom.window.close();}
  assert.ok(h.devices.every(device=>device.destroyed&&device.resources.every(resource=>resource.destroyed)));
 });
