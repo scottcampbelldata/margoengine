@@ -7,8 +7,17 @@ const F='USD';
 export interface USDOptions extends ParseLimits,Pick<ZipOptions,'maxEntries'|'maxEntryBytes'|'signal'> {
   units?:'meters'|'file';maxDepth?:number;
 }
-type Value=number|string|boolean|Value[]|{path:string};
-interface Prim {type:string;name:string;path:string;attrs:Map<string,Value>;metadata:Map<string,Value>;children:Prim[]}
+export type USDValue=number|string|boolean|USDValue[]|{path:string}|{asset:string};
+type Value=USDValue;
+/** One `def` prim of a USDA layer. `attrs` keys are property names as written (`outputs:surface.connect`); `properties` holds each property's `( ... )` metadata. */
+export interface USDPrim {type:string;name:string;path:string;attrs:Map<string,Value>;metadata:Map<string,Value>;properties:Map<string,Map<string,Value>>;children:USDPrim[]}
+type Prim=USDPrim;
+export interface USDALayer {metadata:Map<string,Value>;roots:USDPrim[];prims:Map<string,USDPrim>}
+export interface USDAReadOptions {maxDepth?:number;signal?:AbortSignal;
+  /** Return `@path@` asset values as `{asset}` instead of rejecting them. */
+  assets?:boolean;
+  /** Drop `over` and `class` prims (with their subtrees) instead of rejecting them. */
+  skipOver?:boolean}
 function fail(code:'syntax'|'unsupported'|'range'|'limit',message:string):never {throw new LoaderError(F,code,message);}
 const identity=():Float64Array=>new Float64Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);
 function multiply(a:Float64Array,b:Float64Array):Float64Array {
@@ -49,19 +58,13 @@ function transform(prim:Prim,parent:Float64Array,base:Float64Array):Float64Array
   return multiply(inherited,local);
 }
 
-/** Static USDA polygon meshes. Composition, animation and binary Crate layers are rejected explicitly. */
-export function parseUSDA(input:string|BinaryInput,options:USDOptions={}):LoadedGeometry {
-  throwIfAborted(options.signal,F);
-  const limit=limits(options,F),maxDepth=options.maxDepth??32,maxBytes=options.maxEntryBytes??64*1024*1024;
+/** Tokenizes a static USDA layer into its `def` prim tree. Composition, variants and time samples are rejected explicitly. */
+export function readUSDA(text:string,options:USDAReadOptions={}):USDALayer {
+  const maxDepth=options.maxDepth??32;
   if(!Number.isSafeInteger(maxDepth)||maxDepth<1||maxDepth>64)fail('range','maxDepth must be 1..64');
-  if(!Number.isSafeInteger(maxBytes)||maxBytes<0)fail('range','invalid maxEntryBytes');
-  const bytes=typeof input==='string'?new TextEncoder().encode(input):toBytes(input,F);
-  if(bytes.length>maxBytes)fail('limit','USDA exceeds maxEntryBytes');
-  let text:string;try{text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{fail('syntax','invalid UTF-8');}
   if(!text.startsWith('#usda 1.0'))fail('syntax','expected #usda 1.0');
-  if(options.units!==undefined&&options.units!=='meters'&&options.units!=='file')fail('range','units must be meters or file');
-  const token=/\s+|#[^\n]*|"(?:\\.|[^"\\])*"|<[^>]*>|@[\s\S]*?@|[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|[A-Za-z_!][\w:!.]*|[{}()[\]=,;]/y;
-  let offset=0,cached:{text:string;newLine:boolean}|undefined,polygonWork=0;
+  const token=/\s+|#[^\n]*|"""[\s\S]*?"""|"(?:\\.|[^"\\])*"|<[^>]*>|@[\s\S]*?@|[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|[A-Za-z_!][\w:!.]*|[{}()[\]=,;]/y;
+  let offset=0,cached:{text:string;newLine:boolean}|undefined,numbers=0;
   function peek():{text:string;newLine:boolean} {
     if(cached)return cached;let newLine=false;
     while(offset<text.length) {
@@ -74,57 +77,84 @@ export function parseUSDA(input:string|BinaryInput,options:USDOptions={}):Loaded
   }
   const take=()=>{const value=peek().text;cached=undefined;return value;};
   const expect=(word:string)=>{if(take()!==word)fail('syntax',`expected ${word}`);};
+  const number=(word:string)=>{const n=word?Number(word):NaN;if(!Number.isFinite(n))fail('range','non-finite number');if(++numbers>16_000_000)fail('limit','numeric values exceed 16 million');return n;};
   function value(depth=0):Value {
     if(depth>maxDepth)fail('limit','nested value exceeds maxDepth');
     const word=take();
     if(word==='['||word==='(') {
-      const end=word==='['?']':')',out:Value[]=[];
+      const end=word==='['?']':')',close=text.indexOf(end,offset);
+      // Fast path for flat numeric arrays and arrays of numeric tuples, the bulk of mesh data.
+      if(word==='['&&!cached&&close>=0&&/^[\s\d.eE+\-(),]*$/.test(text.slice(offset,close))&&!/\([^)]*\(/.test(text.slice(offset,close))) {
+        const body=text.slice(offset,close),tuples=body.includes('(')?[...body.matchAll(/\(([^)]*)\)/g)].map(m=>m[1].split(',').map(v=>number(v.trim()))):body.trim()?body.split(',').map(v=>number(v.trim())):[];
+        offset=close+1;return tuples;
+      }
+      const out:Value[]=[];
       while(peek().text!==end){if(!peek().text)fail('syntax','unterminated array');out.push(value(depth+1));if(peek().text===',')take();else if(peek().text!==end)fail('syntax','expected comma');}
       take();return out;
     }
+    if(word==='{') {let open=1;while(open){const t=take();if(!t)fail('syntax','unterminated dictionary');open+=t==='{'?1:t==='}'?-1:0;}return '';}
+    if(word.startsWith('"""'))return word.slice(3,-3);
     if(word.startsWith('"')) {try{return JSON.parse(word);}catch{fail('syntax','invalid string escape');}}
     if(word.startsWith('<'))return {path:word.slice(1,-1)};
-    if(word.startsWith('@'))fail('unsupported','external assets and textures are unsupported');
+    if(word.startsWith('@')){if(!options.assets)fail('unsupported','external assets and textures are unsupported');return {asset:word.replace(/^@+|@+$/g,'')};}
     if(word==='true'||word==='false')return word==='true';
-    if(/^[+-]?(\d|\.\d)/.test(word)){const n=Number(word);if(!Number.isFinite(n))fail('range','non-finite number');return n;}
+    if(/^[+-]?(\d|\.\d)/.test(word))return number(word);
+    if(word==='None')return '';
     fail('unsupported',`unsupported value ${word}`);
   }
   function metadata():Map<string,Value> {
     const out=new Map<string,Value>();expect('(');
     while(peek().text!==')') {
-      const key=take();if(!key)fail('syntax','unterminated metadata');
+      let key=take();if(!key)fail('syntax','unterminated metadata');
+      if(['prepend','append','add','delete','reorder'].includes(key))key=take();
+      if(key.startsWith('"')){out.set('doc',JSON.parse(key));continue;}
       if(['references','payload','subLayers','variants','variantSets','inherits','specializes','instanceable'].includes(key))fail('unsupported',`USD composition ${key} is unsupported`);
       expect('=');out.set(key,value());if(peek().text===','||peek().text===';')take();
     }take();return out;
   }
   const prims=new Map<string,Prim>();
-  function prim(parent:string,depth:number):Prim {
+  function prim(parent:string,depth:number):Prim|undefined {
     if(depth>maxDepth)fail('limit','prim hierarchy exceeds maxDepth');
-    if(take()!=='def')fail('unsupported','only defined static prims are supported');
+    const specifier=take();
+    if(specifier!=='def'&&!(options.skipOver&&(specifier==='over'||specifier==='class')))fail('unsupported','only defined static prims are supported');
     let type=take();const name=type.startsWith('"')?JSON.parse(type):value();if(type.startsWith('"'))type='Xform';
     if(typeof name!=='string')fail('syntax','prim name must be a string');
-    const path=`${parent}/${name}`,attrs=new Map<string,Value>(),meta=peek().text==='('?metadata():new Map<string,Value>(),children:Prim[]=[];
+    const path=`${parent}/${name}`,attrs=new Map<string,Value>(),properties=new Map<string,Map<string,Value>>(),meta=peek().text==='('?metadata():new Map<string,Value>(),children:Prim[]=[];
     if(prims.has(path))fail('syntax','duplicate prim path');
-    const result:Prim={type,name:name as string,path,attrs,metadata:meta,children};prims.set(path,result);expect('{');
+    const result:Prim={type,name:name as string,path,attrs,metadata:meta,properties,children};if(specifier==='def')prims.set(path,result);expect('{');
     while(peek().text!=='}') {
       throwIfAborted(options.signal,F);const first=peek().text;
-      if(first==='def'){children.push(prim(path,depth+1));continue;}
+      if(first==='def'||options.skipOver&&(first==='over'||first==='class')){const p=prim(path,depth+1);if(p)children.push(p);continue;}
       if(!first)fail('syntax','unterminated prim');
       if(first==='over'||first==='class'||first==='variantSet')fail('unsupported',`USD composition ${first} is unsupported`);
       const header:string[]=[];
       while(peek().text!=='=') {
-        if(header.length>=2&&(peek().newLine||peek().text==='}'))break;
+        if(header.length>=2&&(peek().newLine||peek().text==='}'||peek().text==='('))break;
         if(!peek().text||header.length>8)fail('syntax','invalid property declaration');header.push(take());
       }
       const key=header[header.length-1];
       if(!key)fail('syntax','missing property name');
       if(key.includes('timeSamples'))fail('unsupported','animated USD attributes are unsupported');
       if(peek().text==='='){take();if(attrs.has(key))fail('syntax','duplicate property');attrs.set(key,value());}
-      if(peek().text==='(')metadata();if(peek().text===';')take();
-    }take();return result;
+      if(peek().text==='(')properties.set(key,metadata());if(peek().text===';')take();
+    }take();return specifier==='def'?result:undefined;
   }
-  const meta=peek().text==='('?metadata():new Map<string,Value>(),roots:Prim[]=[];
-  while(peek().text)roots.push(prim('',1));
+  const metadataMap=peek().text==='('?metadata():new Map<string,Value>(),roots:Prim[]=[];
+  while(peek().text){const p=prim('',1);if(p)roots.push(p);}
+  return {metadata:metadataMap,roots,prims};
+}
+
+/** Static USDA polygon meshes. Composition, animation and binary Crate layers are rejected explicitly. */
+export function parseUSDA(input:string|BinaryInput,options:USDOptions={}):LoadedGeometry {
+  throwIfAborted(options.signal,F);
+  const limit=limits(options,F),maxBytes=options.maxEntryBytes??64*1024*1024;
+  if(!Number.isSafeInteger(maxBytes)||maxBytes<0)fail('range','invalid maxEntryBytes');
+  const bytes=typeof input==='string'?new TextEncoder().encode(input):toBytes(input,F);
+  if(bytes.length>maxBytes)fail('limit','USDA exceeds maxEntryBytes');
+  let text:string;try{text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{fail('syntax','invalid UTF-8');}
+  if(options.units!==undefined&&options.units!=='meters'&&options.units!=='file')fail('range','units must be meters or file');
+  const {metadata:meta,roots,prims}=readUSDA(text,{maxDepth:options.maxDepth,signal:options.signal});
+  let polygonWork=0;
   const unit=meta.get('metersPerUnit')??0.01,axis=meta.get('upAxis')??'Y';
   if(typeof unit!=='number'||unit<=0||!Number.isFinite(unit))fail('range','invalid metersPerUnit');
   if(axis!=='Y'&&axis!=='Z')fail('unsupported','only Y and Z up stages are supported');

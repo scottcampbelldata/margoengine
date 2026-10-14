@@ -158,13 +158,13 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | DRACOLoader, glTF Draco | PARTIAL | decoders `DracoDecoder` (`packages/decoders/src/draco.ts`) | Not wired into either glTF loader (decoders README, "Limits"). gltf-pro throws on `KHR_draco_mesh_compression` (`index.ts`, line 59). |
 | Meshopt (`EXT_meshopt_compression`) | PARTIAL | decoders `MeshoptDecoder`, `decodeMeshoptBuffer` (`packages/decoders/src/meshopt.ts`) | Same: the decoder exists but the glTF loaders do not call it. |
 | KTX2Loader | PARTIAL | decoders `KTX2Decoder` | Same. |
-| FBXLoader | COVERED | fbx `loadFBX`, `convertFBX` (`packages/fbx/src/index.ts`) | Runs three's own `FBXLoader` and `GLTFExporter` at runtime, then converts into glTF-pro. |
+| FBXLoader | COVERED | fbx `loadFBX`, `convertFBX` (`packages/fbx/src/index.ts`) | Native binary/ASCII FBX 7.x reader and GLB writer (no three.js): hierarchy with pivots, Phong/Lambert as PBR, textures, skins, blend shapes, clips. Tested equivalent to the old three.js bridge. |
 | OBJLoader | PARTIAL | machinery `parseCAD`, `loadCAD` (`packages/machinery/src/cad-parser.ts`) | Geometry only: `vt`, `usemtl` and `mtllib` records are skipped. |
 | MTLLoader | MISSING | — | |
 | STLLoader | COVERED | machinery `parseCAD` (format `stl`) | |
 | PLYLoader | COVERED † | loaders `parsePLY` (`packages/loaders/src/ply.ts`) | Colors and UVs are kept on the data but core does not render them. |
 | 3MFLoader | COVERED † | loaders `parse3MF` (`packages/loaders/src/threemf.ts`) | No textures. |
-| USDZLoader, USDLoader | COVERED † | usdz `loadUSDZ`, `parseUSDA`, `parseUSDC` (`packages/usdz/src/index.ts`) | Static subset. Bundles three's USDA and USDC parsers. loaders also has `parseUSDA` and `parseUSDZ`. |
+| USDZLoader, USDLoader | COVERED † | usdz `loadUSDZ`, `parseUSDA`, `parseUSDC` (`packages/usdz/src/index.ts`) | Static subset. Native USDA (shared `readUSDA` in loaders) and native USDC Crate reader; no three.js. loaders also has `parseUSDA` and `parseUSDZ`. |
 | PCDLoader, XYZLoader, VTKLoader | COVERED † | loaders `parsePCD`, `parseXYZ`, `parseVTK`, plus `parseOFF` | Legacy VTK only. |
 | ColladaLoader | MISSING | — | |
 | SVGLoader | MISSING | — | geometry has `Shape` and `extrudeGeometry`, but nothing parses SVG paths. |
@@ -396,7 +396,7 @@ These are not in three.js core or its official add-ons. Many have third-party th
 
 Positioning caveats for a public page:
 
-- fbx and usdz run three.js code at runtime: `FBXLoader` and `GLTFExporter` in fbx, and the USDA and USDC parsers in usdz.
+- fbx and usdz used to run three.js code at runtime (`FBXLoader` and `GLTFExporter`; the USDA and USDC parsers). Both now have native parsers; three.js is only a test-time reference.
 - Several capabilities exist twice. html and labels both export `CSS3DObject`. gizmo and usdz-export are pure re-exports. There are two particle systems (vfx and creative), two toon paths, two bloom paths (post and creative), three sky or atmosphere implementations (sky, scenery and creative), and two navigation packages.
 
 ## How this was checked

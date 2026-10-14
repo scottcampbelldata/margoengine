@@ -1,56 +1,27 @@
 import type {EngineKernel} from '@margoengine/core';
 import {parseGLTF, type PBRModel} from '@margoengine/gltf-pro';
-import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';
-import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
-import {LoadingManager, MeshStandardMaterial, type Mesh, type Material, type Texture, type Color} from 'three';
 import {readResponse} from '../../shared/loading.js';
+import {readFBX} from './reader.js';
+import {fbxToGLB} from './convert.js';
 export interface FBXOptions {resourcePath?: string; signal?: AbortSignal}
 const budget = 64 * 1024 * 1024;
 
-/** Browser conversion preserves FBX bones, animation clips and morph channels as glTF. */
+/** Native binary (7.x) and ASCII FBX to GLB: hierarchy, pivots, Phong/Lambert as PBR, textures, skins, blend shapes and animation clips. */
 export async function convertFBX(input: ArrayBuffer | ArrayBufferView, {resourcePath = '', signal}: FBXOptions = {}): Promise<ArrayBuffer> {
   signal?.throwIfAborted();
   if (!(input instanceof ArrayBuffer) && !ArrayBuffer.isView(input) || input.byteLength < 32 || input.byteLength > budget) throw new RangeError('Invalid FBX byte budget');
-  if (resourcePath && !['http:', 'https:'].includes(new URL(resourcePath, globalThis.location?.href).protocol)) throw new TypeError('FBX resources need HTTP(S)');
-  const bytes = input instanceof ArrayBuffer ? input : new Uint8Array(input.buffer, input.byteOffset, input.byteLength).slice().buffer;
-  const manager = new LoadingManager(); let loading = false, loadError: Error | undefined, done!: () => void;
-  const ready = new Promise<void>(resolve => {done = resolve;});
-  manager.onStart = () => {loading = true;}; manager.onLoad = done; manager.onError = url => {loadError = new Error('FBX texture failed: ' + url);};
-  const scene = new FBXLoader(manager).parse(bytes, resourcePath), materials = new Set<Material>(), textures = new Set<Texture>(), geometries = new Set<Mesh['geometry']>();
-  try {
-    if (loading) {
-      let abort!: () => void;
-      try {await Promise.race([ready, new Promise<never>((_, reject) => {abort = () => reject(signal!.reason); signal?.addEventListener('abort', abort, {once: true});})]);}
-      finally {signal?.removeEventListener('abort', abort);}
-    }
-    signal?.throwIfAborted(); if (loadError) throw loadError;
-    let vertices = 0;
-    const converted = new Map<Material, MeshStandardMaterial>();
-    scene.traverse(object => {
-      const mesh = object as Mesh; if (!mesh.isMesh) return;
-      vertices += mesh.geometry.getAttribute('position')?.count ?? 0; if (vertices > 1_000_000) throw new RangeError('FBX geometry budget exceeded'); geometries.add(mesh.geometry);
-      const normalize = (material: Material): Material => {
-        materials.add(material); for (const value of Object.values(material)) if ((value as Texture)?.isTexture) textures.add(value as Texture);
-        if ((material as MeshStandardMaterial).isMeshStandardMaterial) return material;
-        let pbr = converted.get(material);
-        if (!pbr) {
-          const legacy = material as Material & {color?: Color; map?: Texture; normalMap?: Texture; shininess?: number};
-          pbr = new MeshStandardMaterial({color: legacy.color, map: legacy.map ?? null, normalMap: legacy.normalMap ?? null, opacity: material.opacity, transparent: material.transparent, side: material.side,
-            roughness: Math.max(0.045, Math.min(1, Math.sqrt(2 / ((legacy.shininess ?? 0) + 2))))});
-          pbr.name = material.name; converted.set(material, pbr); materials.add(pbr);
-        }
-        return pbr;
-      };
-      mesh.material = Array.isArray(mesh.material) ? mesh.material.map(normalize) : normalize(mesh.material);
-    });
-    if (!vertices) throw new RangeError('FBX has no mesh geometry');
-    const result = await new GLTFExporter().parseAsync(scene, {binary: true, animations: scene.animations});
-    signal?.throwIfAborted(); if (!(result instanceof ArrayBuffer) || result.byteLength > budget * 2) throw new RangeError('FBX conversion budget exceeded'); return result;
-  } finally {
-    scene.traverse(object => {const mesh = object as Mesh; if (mesh.isMesh) {geometries.add(mesh.geometry); for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) materials.add(material);}});
-    for (const material of materials) for (const value of Object.values(material)) if ((value as Texture)?.isTexture) textures.add(value as Texture);
-    for (const geometry of geometries) geometry.dispose(); for (const material of materials) material.dispose(); for (const texture of textures) texture.dispose();
-  }
+  const http = (url: URL) => {if (!['http:', 'https:'].includes(url.protocol)) throw new TypeError('FBX resources need HTTP(S)'); return url;};
+  if (resourcePath) http(new URL(resourcePath, globalThis.location?.href));
+  const bytes = input instanceof ArrayBuffer ? new Uint8Array(input) : new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+  const records = await readFBX(bytes); signal?.throwIfAborted();
+  const texture = async (name: string) => {
+    let url: URL; try {url = new URL(resourcePath + name, globalThis.location?.href);} catch {throw new Error('FBX texture failed: ' + name);}
+    const response = await fetch(http(url), {signal}).catch(error => {if (signal?.aborted) throw error; throw new Error('FBX texture failed: ' + url.href);});
+    if (!response.ok) throw new Error('FBX texture failed: ' + url.href);
+    return readResponse(response, {maxBytes: budget, signal, label: 'FBX texture'});
+  };
+  const result = await fbxToGLB(records, texture, 1_000_000, signal);
+  signal?.throwIfAborted(); if (result.byteLength > budget * 2) throw new RangeError('FBX conversion budget exceeded'); return result;
 }
 
 export async function parseFBX(engine: EngineKernel, input: ArrayBuffer | ArrayBufferView, options: FBXOptions = {}): Promise<PBRModel> {

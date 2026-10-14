@@ -68,7 +68,7 @@ test('workspace exposes scoped packages and keeps benchmark dependencies out of 
   }
   assert.equal(manifest.exports, undefined); assert.equal(manifest.types, undefined);
   assert.equal(manifest.devDependencies.three, '0.186.1'); assert.equal(manifest.devDependencies['@babylonjs/core'], undefined);
-  for(const workspace of manifest.workspaces.filter(name=>name.startsWith('packages/'))){const pkg=JSON.parse(await readFile(new URL(`../${workspace}/package.json`,import.meta.url),'utf8'));assert.equal(pkg.dependencies?.three,workspace==='packages/fbx'?'^0.186.1':undefined);}
+  for(const workspace of manifest.workspaces.filter(name=>name.startsWith('packages/'))){const pkg=JSON.parse(await readFile(new URL(`../${workspace}/package.json`,import.meta.url),'utf8'));assert.equal(pkg.dependencies?.three,undefined,workspace+' must not depend on three at runtime');}
   assert(!Object.keys(manifest.scripts).some(name => name.startsWith('legacy:')));
   for (const path of ['src', 'lab', 'reviews', 'LEGACY-README.md', 'group2.html']) await assert.rejects(access(new URL(`../${path}`, import.meta.url)), { code: 'ENOENT' });
 });

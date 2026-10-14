@@ -756,6 +756,7 @@
       "parseVTK",
       "parseXYZ",
       "pointsToGeometry",
+      "readUSDA",
       "readZipDirectory",
       "readZipEntry",
       "toGeometry"
