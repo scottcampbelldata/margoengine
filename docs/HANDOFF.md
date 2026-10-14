@@ -114,8 +114,14 @@ Built and deployed to the preview, not yet measured:
 5. VFX workgroup compaction GPU timing (Codex's prepared harness, correctness already passed headless):
    `node test-results/vfx-compaction-chain-timing.mjs --run --label=chain-v1`. Note: `test-results/` is git-ignored,
    so this harness exists only on this laptop.
+6. UNCOMMITTED, written while the laptop was busy: `packages/geometry/src/subdivide.ts` (loopSubdivide without
+   per-vertex strings, per-edge arrays or Sets). Prove it with
+   `node examples/package-benchmarks/proofs/geometry-subdivide.proof.js` (baseline `bdb7521`), run
+   `npm run test:all`, then commit or revert. It type-checks; nothing else about it has been run.
 
 ## Known issues and caveats
+- The measuring helper (`packages/shared/auto-quality.js`) is internal and not published, so npm users only get the
+  documented `globalThis.margoLow` knob (core README). Consider shipping the watcher as a small optional package.
 
 - The measured tier is remembered per browser with no expiry and no on-page control yet.
 - A fast PC sees the light tier on its first page view only; the full tier starts from the next page load.
