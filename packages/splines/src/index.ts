@@ -25,26 +25,32 @@ export class Spline {
     if (tangents) {this.tangents = new Float64Array(tangents.length * 3); for (let i = 0; i < tangents.length; i++) {vector(tangents[i]); this.tangents.set(tangents[i], i * 3);}}
     this.arcLengths = new Float64Array(divisions + 1); this.updateArcLengths();
   }
-  private point(index: number, axis: number): number {
-    if (this.closed) return this.points[((index % this.count + this.count) % this.count) * 3 + axis];
-    if (index < 0) return 2 * this.points[axis] - this.points[3 + axis];
-    if (index >= this.count) return 2 * this.points[(this.count - 1) * 3 + axis] - this.points[(this.count - 2) * 3 + axis];
-    return this.points[index * 3 + axis];
-  }
   at(t: number, output: Float64Array | Float32Array = this.output): typeof output {
     if (!Number.isFinite(t) || t < 0 || t > 1 || output.length !== 3) throw new RangeError('Curve parameter must be 0..1 and output length 3');
-    const segments = this.kind === 'bezier' ? (this.count - 1) / 3 : this.closed ? this.count : this.count - 1;
+    const points = this.points, count = this.count, kind = this.kind, closed = this.closed;
+    const segments = kind === 'bezier' ? (count - 1) / 3 : closed ? count : count - 1;
     const scaled = t * segments, segment = Math.min(segments - 1, Math.floor(scaled)), u = scaled - segment, u2 = u * u, u3 = u2 * u;
+    // Control-point offsets and basis weights are resolved once per call; each axis still reads the points in turn.
+    if (kind === 'bezier') {
+      const i = segment * 9, v = 1 - u, b0 = v * v * v, b1 = 3 * v * v * u, b2 = 3 * v * u2;
+      for (let a = 0; a < 3; a++) output[a] = b0 * points[i + a] + b1 * points[i + 3 + a] + b2 * points[i + 6 + a] + u3 * points[i + 9 + a];
+      return output;
+    }
+    const h0 = 2 * u3 - 3 * u2 + 1, h1 = u3 - 2 * u2 + u, h2 = -2 * u3 + 3 * u2, h3 = u3 - u2;
+    // Open curves always have `segment` and `segment + 1` in range; closed curves wrap the far end.
+    const i = segment * 3, j = closed ? (segment + 1) % count * 3 : i + 3;
+    if (kind === 'hermite') {
+      const tangents = this.tangents!;
+      for (let a = 0; a < 3; a++) output[a] = h0 * points[i + a] + h1 * tangents[i + a] + h2 * points[j + a] + h3 * tangents[(segment + 1) % count * 3 + a];
+      return output;
+    }
+    // Catmull-Rom neighbors: wrapped when closed, otherwise mirrored through the end point.
+    const before = closed ? (segment + count - 1) % count * 3 : segment > 0 ? i - 3 : -1, after = closed ? (segment + 2) % count * 3 : segment + 2 < count ? j + 3 : -1, last = (count - 1) * 3;
     for (let a = 0; a < 3; a++) {
-      if (this.kind === 'bezier') {
-        const i = segment * 3, v = 1 - u;
-        output[a] = v * v * v * this.point(i, a) + 3 * v * v * u * this.point(i + 1, a) + 3 * v * u2 * this.point(i + 2, a) + u3 * this.point(i + 3, a);
-      } else {
-        const p = this.point(segment, a), q = this.point(segment + 1, a);
-        const m = this.kind === 'hermite' ? this.tangents![segment * 3 + a] : (q - this.point(segment - 1, a)) * 0.5;
-        const n = this.kind === 'hermite' ? this.tangents![((segment + 1) % this.count) * 3 + a] : (this.point(segment + 2, a) - p) * 0.5;
-        output[a] = (2 * u3 - 3 * u2 + 1) * p + (u3 - 2 * u2 + u) * m + (-2 * u3 + 3 * u2) * q + (u3 - u2) * n;
-      }
+      const p = points[i + a], q = points[j + a];
+      const m = (q - (before < 0 ? 2 * points[a] - points[3 + a] : points[before + a])) * 0.5;
+      const n = ((after < 0 ? 2 * points[last + a] - points[last - 3 + a] : points[after + a]) - p) * 0.5;
+      output[a] = h0 * p + h1 * m + h2 * q + h3 * n;
     }
     return output;
   }

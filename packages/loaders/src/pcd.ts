@@ -56,15 +56,20 @@ export function parsePCDHeader(input: BinaryInput, options: ParseLimits = {}): P
   return {version: values.VERSION?.[0] ?? '', fields, width, height, points, viewpoint, data, rowSize, bodyOffset: scanner.pos};
 }
 
-type Read = (view: DataView, offset: number) => number;
-function reader(field: PCDField): Read {
-  if (field.type === 'F') return field.size === 4 ? (v, o) => v.getFloat32(o, true) : (v, o) => v.getFloat64(o, true);
-  const signed = field.type === 'I';
-  switch (field.size) {
-    case 1: return signed ? (v, o) => v.getInt8(o) : (v, o) => v.getUint8(o);
-    case 2: return signed ? (v, o) => v.getInt16(o, true) : (v, o) => v.getUint16(o, true);
-    case 4: return signed ? (v, o) => v.getInt32(o, true) : (v, o) => v.getUint32(o, true);
-    default: return signed ? (v, o) => Number(v.getBigInt64(o, true)) : (v, o) => Number(v.getBigUint64(o, true));
+// A numeric code per field type keeps the point loop on one call site: floats are 0 and 1, then signed and unsigned by size.
+const code = (field: PCDField | undefined): number => !field ? 0 : field.type === 'F' ? (field.size === 4 ? 0 : 1) : (field.type === 'I' ? 2 : 6) + Math.log2(field.size);
+function read(view: DataView, offset: number, kind: number): number {
+  switch (kind) {
+    case 0: return view.getFloat32(offset, true);
+    case 1: return view.getFloat64(offset, true);
+    case 2: return view.getInt8(offset);
+    case 3: return view.getInt16(offset, true);
+    case 4: return view.getInt32(offset, true);
+    case 5: return Number(view.getBigInt64(offset, true));
+    case 6: return view.getUint8(offset);
+    case 7: return view.getUint16(offset, true);
+    case 8: return view.getUint32(offset, true);
+    default: return Number(view.getBigUint64(offset, true));
   }
 }
 
@@ -118,12 +123,12 @@ export function parsePCD(input: BinaryInput, options: PCDOptions = {}): LoadedGe
     if (i < count) throw new LoaderError(F, 'truncated', `file ends after ${i} of ${count} points`);
   } else {
     let body: Uint8Array;
-    // Byte offset of each field's first value for point i: binary is row-major, binary_compressed is column-major.
-    let locate: (f: PCDField, i: number) => number;
+    // Byte offset of each field's first value for point i is `base + i * step`: binary is row-major, binary_compressed is column-major.
+    const bases = new Map<PCDField, number>(), compressed = header.data !== 'binary';
     if (header.data === 'binary') {
       if (header.bodyOffset + count * header.rowSize > bytes.length) throw new LoaderError(F, 'truncated', `binary data needs ${count * header.rowSize} bytes, file has ${bytes.length - header.bodyOffset}`);
       body = bytes.subarray(header.bodyOffset);
-      locate = (f, i) => i * header.rowSize + f.offset;
+      for (const f of header.fields) bases.set(f, f.offset);
     } else {
       if (header.bodyOffset + 8 > bytes.length) throw new LoaderError(F, 'truncated', 'missing compressed size words');
       const sizes = new DataView(bytes.buffer, bytes.byteOffset + header.bodyOffset, 8);
@@ -131,20 +136,19 @@ export function parsePCD(input: BinaryInput, options: PCDOptions = {}): LoadedGe
       if (uncompressed !== count * header.rowSize) throw new LoaderError(F, 'header', `uncompressed size ${uncompressed} does not match ${count} points of ${header.rowSize} bytes`);
       if (header.bodyOffset + 8 + compressed > bytes.length) throw new LoaderError(F, 'truncated', `compressed data needs ${compressed} bytes, file has ${bytes.length - header.bodyOffset - 8}`);
       body = decompressLZF(bytes.subarray(header.bodyOffset + 8, header.bodyOffset + 8 + compressed), uncompressed, F);
-      const starts = new Map<PCDField, number>();
       let start = 0;
-      for (const f of header.fields) {starts.set(f, start); start += f.size * f.count * count;}
-      locate = (f, i) => starts.get(f)! + i * f.size * f.count;
+      for (const f of header.fields) {bases.set(f, start); start += f.size * f.count * count;}
     }
     const view = new DataView(body.buffer, body.byteOffset, body.byteLength);
-    const rx = reader(x), ry = reader(y), rz = reader(z);
-    const rn = hasNormals ? [reader(nx!), reader(ny!), reader(nz!)] : [];
-    const ri = intensity ? reader(intensity) : undefined;
+    const base = (f: PCDField | undefined): number => f ? bases.get(f)! : 0, step = (f: PCDField | undefined): number => !f ? 0 : compressed ? f.size * f.count : header.rowSize;
+    const bx = base(x), by = base(y), bz = base(z), sx = step(x), sy = step(y), sz = step(z), kx = code(x), ky = code(y), kz = code(z);
+    const bnx = base(nx), bny = base(ny), bnz = base(nz), snx = step(nx), sny = step(ny), snz = step(nz), knx = code(nx), kny = code(ny), knz = code(nz);
+    const brgb = base(rgb), srgb = step(rgb), bi = base(intensity), si = step(intensity), ki = code(intensity);
     for (let i = 0; i < count; i++) {
-      positions[i * 3] = rx(view, locate(x, i)); positions[i * 3 + 1] = ry(view, locate(y, i)); positions[i * 3 + 2] = rz(view, locate(z, i));
-      if (normals) {normals[i * 3] = rn[0](view, locate(nx!, i)); normals[i * 3 + 1] = rn[1](view, locate(ny!, i)); normals[i * 3 + 2] = rn[2](view, locate(nz!, i));}
-      if (rgb) setColor(i, view.getUint32(locate(rgb, i), true));
-      if (intensities) intensities[i] = ri!(view, locate(intensity!, i));
+      positions[i * 3] = read(view, bx + i * sx, kx); positions[i * 3 + 1] = read(view, by + i * sy, ky); positions[i * 3 + 2] = read(view, bz + i * sz, kz);
+      if (normals) {normals[i * 3] = read(view, bnx + i * snx, knx); normals[i * 3 + 1] = read(view, bny + i * sny, kny); normals[i * 3 + 2] = read(view, bnz + i * snz, knz);}
+      if (rgb) setColor(i, view.getUint32(brgb + i * srgb, true));
+      if (intensities) intensities[i] = read(view, bi + i * si, ki);
     }
   }
   let kept = count;

@@ -1,0 +1,24 @@
+{
+  "package": "creative",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:11:29.514Z",
+  "outputsIdentical": true,
+  "notes": "PostProcessing only. Mock WebGPU device: identical call sequence, descriptors and buffer bytes over a 26-frame story (resize, option/shader changes, error recovery, device restoration) at 1x and 4x. Times are CPU-side JavaScript only.",
+  "cases": [
+    {
+      "case": "PostProcessing with bloom and sky, 4x MSAA",
+      "frames": 10000,
+      "baselineMs": 60.8939,
+      "candidateMs": 48.8586,
+      "speedup": 1.246
+    },
+    {
+      "case": "PostProcessing grade only, 1x",
+      "frames": 10000,
+      "baselineMs": 41.8408,
+      "candidateMs": 30.445,
+      "speedup": 1.374
+    }
+  ]
+}

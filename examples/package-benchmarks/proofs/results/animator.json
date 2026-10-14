@@ -1,0 +1,38 @@
+{
+  "package": "animator",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:10:24.475Z",
+  "outputsIdentical": true,
+  "notes": "Pose sampling uses sampleTrackInto with a scratch buffer per track width and copies into the pose; mix blends quaternions in place. The cloned rest pose per clip sample is unchanged.",
+  "cases": [
+    {
+      "case": "one clip, 64 joints",
+      "frames": 600,
+      "baselineMs": 193.2484,
+      "candidateMs": 54.5831,
+      "speedup": 3.54
+    },
+    {
+      "case": "1D blend of two clips",
+      "frames": 600,
+      "baselineMs": 418.1281,
+      "candidateMs": 125.2794,
+      "speedup": 3.338
+    },
+    {
+      "case": "2D blend of four clips",
+      "frames": 600,
+      "baselineMs": 1200.8223,
+      "candidateMs": 361.9029,
+      "speedup": 3.318
+    },
+    {
+      "case": "1D blend with a fade and an additive arm layer",
+      "frames": 600,
+      "baselineMs": 523.1086,
+      "candidateMs": 169.29,
+      "speedup": 3.09
+    }
+  ]
+}

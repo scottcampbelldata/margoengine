@@ -44,15 +44,15 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
     }
     for (let i = 0; i < geo.count; i++) {
       let line = `v ${num(positions[i*3])} ${num(positions[i*3+1])} ${num(positions[i*3+2])}`;
-      if (colors && geo.colors) line += ' '+[0, 1, 2].map(k => num(toSrgb(geo.colors![i*geo.colorSize+k]))).join(' ');
+      if (colors && geo.colors) {const c = i*geo.colorSize; line += ` ${num(toSrgb(geo.colors[c]))} ${num(toSrgb(geo.colors[c+1]))} ${num(toSrgb(geo.colors[c+2]))}`;}
       lines.push(line);
     }
     // OBJ texture coordinates have v up; glTF and Margo Engine have v down.
     if (uvs) for (let i = 0; i < geo.count; i++) lines.push(`vt ${num(uvs[i*2])} ${num(1-uvs[i*2+1])}`);
     for (let i = 0; i < geo.count; i++) lines.push(`vn ${num(normals[i*3])} ${num(normals[i*3+1])} ${num(normals[i*3+2])}`);
     for (let i = 0; i < indices.length; i += 3) {
-      const face = [indices[i], indices[i+1], indices[i+2]].map(v => uvs ? `${v+vertexBase}/${v+uvBase}/${v+vertexBase}` : `${v+vertexBase}//${v+vertexBase}`);
-      lines.push(`f ${face.join(' ')}`);
+      const a = indices[i]+vertexBase, b = indices[i+1]+vertexBase, c = indices[i+2]+vertexBase, t = uvBase-vertexBase;
+      lines.push(uvs ? `f ${a}/${a+t}/${a} ${b}/${b+t}/${b} ${c}/${c+t}/${c}` : `f ${a}//${a} ${b}//${b} ${c}//${c}`);
     }
     vertexBase += geo.count;
     if (uvs) uvBase += geo.count;

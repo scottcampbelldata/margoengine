@@ -20,15 +20,16 @@ export function exportPLY(source: ExportSource, options: PLYOptions = {}): Uint8
     'property float x', 'property float y', 'property float z', 'property float nx', 'property float ny', 'property float nz',
     ...(colors ? ['property uchar red', 'property uchar green', 'property uchar blue'] : []),
     `element face ${faceCount}`, 'property list uchar uint vertex_indices', 'end_header', ''].join('\n');
-  const rgb = (item: typeof items[number]['item'], i: number): number[] => {
-    const g = item.geometry, color = g.colors ? [0, 1, 2].map(k => g.colors![i*g.colorSize+k]) : (item.material?.color ?? [1, 1, 1]).slice(0, 3);
-    return color.map(v => byte(toSrgb(v)));
-  };
+  // Vertex colors when the geometry has them, else one material color for the whole mesh.
+  const flat = (item: typeof items[number]['item']): number[] => (item.material?.color ?? [1, 1, 1]).slice(0, 3).map(v => byte(toSrgb(v)));
   if (!binary) {
     const lines = [header.trimEnd()];
-    for (const {positions: p, normals: n, item} of items) for (let i = 0; i < item.geometry.count; i++) {
-      const values = [p[i*3], p[i*3+1], p[i*3+2], n[i*3], n[i*3+1], n[i*3+2]].map(num);
-      lines.push((colors ? [...values, ...rgb(item, i)] : values).join(' '));
+    for (const {positions: p, normals: n, item} of items) {
+      const g = item.geometry, vertexColors = g.colors, size = g.colorSize, fixed = colors && !vertexColors ? ' '+flat(item).join(' ') : '';
+      for (let i = 0, o = 0; i < g.count; i++, o += 3) {
+        const line = `${num(p[o])} ${num(p[o+1])} ${num(p[o+2])} ${num(n[o])} ${num(n[o+1])} ${num(n[o+2])}`;
+        lines.push(colors && vertexColors ? `${line} ${byte(toSrgb(vertexColors[i*size]))} ${byte(toSrgb(vertexColors[i*size+1]))} ${byte(toSrgb(vertexColors[i*size+2]))}` : line+fixed);
+      }
     }
     let base = 0;
     for (const {indices, item} of items) {
@@ -42,15 +43,24 @@ export function exportPLY(source: ExportSource, options: PLYOptions = {}): Uint8
   const out = new Uint8Array(head.length+vertexCount*stride+faceCount*13), view = new DataView(out.buffer);
   out.set(head);
   let offset = head.length;
-  for (const {positions: p, normals: n, item} of items) for (let i = 0; i < item.geometry.count; i++) {
-    for (const v of [p[i*3], p[i*3+1], p[i*3+2], n[i*3], n[i*3+1], n[i*3+2]]) {view.setFloat32(offset, v, true); offset += 4;}
-    if (colors) for (const c of rgb(item, i)) out[offset++] = c;
+  for (const {positions: p, normals: n, item} of items) {
+    const g = item.geometry, vertexColors = g.colors, size = g.colorSize, fixed = colors && !vertexColors ? flat(item) : [0, 0, 0];
+    for (let i = 0, o = 0; i < g.count; i++, o += 3) {
+      view.setFloat32(offset, p[o], true); view.setFloat32(offset+4, p[o+1], true); view.setFloat32(offset+8, p[o+2], true);
+      view.setFloat32(offset+12, n[o], true); view.setFloat32(offset+16, n[o+1], true); view.setFloat32(offset+20, n[o+2], true);
+      offset += 24;
+      if (!colors) continue;
+      if (vertexColors) {out[offset] = byte(toSrgb(vertexColors[i*size])); out[offset+1] = byte(toSrgb(vertexColors[i*size+1])); out[offset+2] = byte(toSrgb(vertexColors[i*size+2]));}
+      else {out[offset] = fixed[0]; out[offset+1] = fixed[1]; out[offset+2] = fixed[2];}
+      offset += 3;
+    }
   }
   let base = 0;
   for (const {indices, item} of items) {
     for (let i = 0; i < indices.length; i += 3) {
-      out[offset++] = 3;
-      for (let k = 0; k < 3; k++) {view.setUint32(offset, indices[i+k]+base, true); offset += 4;}
+      out[offset] = 3;
+      view.setUint32(offset+1, indices[i]+base, true); view.setUint32(offset+5, indices[i+1]+base, true); view.setUint32(offset+9, indices[i+2]+base, true);
+      offset += 13;
     }
     base += item.geometry.count;
   }

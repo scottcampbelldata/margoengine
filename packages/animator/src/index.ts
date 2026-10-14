@@ -1,4 +1,4 @@
-import {Animation,sampleTrack} from '@margoengine/animation';
+import {Animation,sampleTrackInto} from '@margoengine/animation';
 import type {Engine,EnginePlugin,Mesh,Vec3} from '@margoengine/core/extension';
 import {finiteVector} from '../../shared/math.js';
 import {blend1D,blend2D,quaternionMultiply,quaternionBlend} from './blend.js';
@@ -11,10 +11,10 @@ export interface AdditiveLayer {clip:string;weight:number;mask:readonly number[]
 export interface GroundHit {position:Vec3;normal?:Vec3}
 export interface FootIK {hip:number;knee:number;ankle:number;pole:Vec3;raycast:(origin:Vec3,direction:Vec3)=>GroundHit|null;offset?:number;probeHeight?:number}
 interface Pose {position:number[][];rotation:number[][];scale:number[][];weights:Map<number,Float32Array>}
-const clone=(p:Pose):Pose=>({position:p.position.map(v=>v.slice()),rotation:p.rotation.map(v=>v.slice()),scale:p.scale.map(v=>v.slice()),weights:new Map([...p.weights].map(([k,v])=>[k,v.slice()]))});
+const clone=(p:Pose):Pose=>{const weights=new Map<number,Float32Array>();for(const [k,v] of p.weights)weights.set(k,v.slice());return {position:p.position.map(v=>v.slice()),rotation:p.rotation.map(v=>v.slice()),scale:p.scale.map(v=>v.slice()),weights};};
 export class Animator implements EnginePlugin {
   readonly name:string;readonly parameters:Record<string,number>;state:string;time=0;
-  private engine?:Engine;private readonly rest:Pose;private current:Pose;private fade?:{pose:Pose;elapsed:number;duration:number};private layers=new Set<AdditiveLayer>();private feet=new Set<FootIK>();private disposed=false;private unsubscribe?:()=>void;private previousPlaying:boolean;
+  private engine?:Engine;private readonly rest:Pose;private current:Pose;private fade?:{pose:Pose;elapsed:number;duration:number};private layers=new Set<AdditiveLayer>();private readonly scratch=new Map<number,Float32Array>();private feet=new Set<FootIK>();private disposed=false;private unsubscribe?:()=>void;private previousPlaying:boolean;
   constructor(readonly animation:Animation,readonly options:AnimatorOptions) {
     this.name='animator:'+animation.model.name;this.parameters={...options.parameters};this.state=options.initial;
     if(!options.states||!Object.hasOwn(options.states,this.state)||!Object.keys(options.states).length)throw new TypeError('Invalid animator states');
@@ -56,11 +56,18 @@ export class Animator implements EnginePlugin {
   }
   private sample(name:string,time:number,loop=true):Pose {
     const clip=this.clip(name),pose=clone(this.rest),t=loop&&clip.duration>0?time%clip.duration:Math.min(time,clip.duration);
-    for(const track of clip.tracks){const values=sampleTrack(track.times,track.values,track.width,t,track.interpolation,track.path==='rotation');if(track.path==='weights')pose.weights.set(track.node,values);else pose[track.path==='translation'?'position':track.path][track.node]=Array.from(values);}
+    // Sample into one scratch buffer per track width, then copy into the vectors this pose already owns.
+    for(const track of clip.tracks){
+      const width=track.width;let scratch=this.scratch.get(width);if(!scratch)this.scratch.set(width,scratch=new Float32Array(width));
+      const values=sampleTrackInto(track.times,track.values,width,t,track.interpolation,track.path==='rotation',scratch);
+      if(track.path==='weights'){const own=pose.weights.get(track.node);if(own instanceof Float32Array&&own.length===width)own.set(values);else pose.weights.set(track.node,values.slice());continue;}
+      const list=pose[track.path==='translation'?'position':track.path],own=list[track.node];
+      if(own?.length===width)for(let c=0;c<width;c++)own[c]=values[c];else list[track.node]=Array.from(values);
+    }
     return pose;
   }
   private mix(a:Pose,b:Pose,weight:number):Pose {
-    const out=a;for(let i=0;i<out.position.length;i++){for(let c=0;c<3;c++){out.position[i][c]=a.position[i][c]*(1-weight)+b.position[i][c]*weight;out.scale[i][c]=a.scale[i][c]*(1-weight)+b.scale[i][c]*weight;}out.rotation[i]=quaternionBlend(a.rotation[i],b.rotation[i],weight);}
+    const out=a;for(let i=0;i<out.position.length;i++){for(let c=0;c<3;c++){out.position[i][c]=a.position[i][c]*(1-weight)+b.position[i][c]*weight;out.scale[i][c]=a.scale[i][c]*(1-weight)+b.scale[i][c]*weight;}const q=a.rotation[i];out.rotation[i]=quaternionBlend(q,b.rotation[i],weight,q.length===4?q:undefined);}
     for(const [id,values] of out.weights){const other=b.weights.get(id);if(other)for(let i=0;i<values.length;i++)values[i]=values[i]*(1-weight)+other[i]*weight;}return out;
   }
   private worldRotation(node:Mesh):number[] {const t=node.engine.store.transforms,parents=node.engine.store.parents;let q=[0,0,0,1];const chain:number[]=[];for(let id=node.id;id!==-1;id=parents[id])chain.push(id);for(const id of chain.reverse()){

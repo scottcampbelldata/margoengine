@@ -23,15 +23,22 @@ export interface ZipOptions {
   signal?: AbortSignal;
 }
 
-let table: Uint32Array | undefined;
+let table: Int32Array | undefined;
 /** CRC-32 (IEEE) of `bytes`. */
 export function crc32(bytes: Uint8Array): number {
   if (!table) {
-    table = new Uint32Array(256);
-    for (let n = 0; n < 256; n++) {let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; table[n] = c >>> 0;}
+    // Four 256-entry tables (slicing by four): table k advances a byte that is k positions further from the end.
+    table = new Int32Array(1024);
+    for (let n = 0; n < 256; n++) {let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; table[n] = c;}
+    for (let n = 256; n < 1024; n++) {const c = table[n - 256]; table[n] = table[c & 255] ^ (c >>> 8);}
   }
-  let crc = 0xffffffff;
-  for (let i = 0; i < bytes.length; i++) crc = table[(crc ^ bytes[i]) & 255] ^ (crc >>> 8);
+  const t = table, whole = bytes.length - 3;
+  let crc = -1, i = 0;
+  for (; i < whole; i += 4) {
+    crc ^= bytes[i] | bytes[i + 1] << 8 | bytes[i + 2] << 16 | bytes[i + 3] << 24;
+    crc = t[768 + (crc & 255)] ^ t[512 + (crc >>> 8 & 255)] ^ t[256 + (crc >>> 16 & 255)] ^ t[crc >>> 24];
+  }
+  for (; i < bytes.length; i++) crc = t[(crc ^ bytes[i]) & 255] ^ (crc >>> 8);
   return (crc ^ 0xffffffff) >>> 0;
 }
 

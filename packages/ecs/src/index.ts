@@ -9,6 +9,8 @@ export class Component<S extends Schema = Schema> {
   readonly fields: {[K in keyof S]: InstanceType<S[K]>};
   readonly entities: Uint32Array;
   private readonly sparse: Int32Array;
+  /** Field arrays in schema order, so row moves need no per-call Object.values. */
+  private readonly columns: NumericArray[];
   size = 0;
   constructor(readonly world: World, schema: S) {
     if (!Object.keys(schema).length) throw new TypeError('Empty component schema');
@@ -17,6 +19,7 @@ export class Component<S extends Schema = Schema> {
       if (![Float32Array, Float64Array, Int32Array, Uint32Array, Uint8Array].includes(Type as typeof Float32Array)) throw new TypeError('Unsupported component storage');
       return [key, new Type(world.capacity)];
     })) as typeof this.fields;
+    this.columns = Object.values(this.fields) as NumericArray[];
   }
   index(entity: Entity): number {
     if (!this.world.alive(entity)) return -1;
@@ -24,7 +27,8 @@ export class Component<S extends Schema = Schema> {
   }
   add(entity: Entity, values: Partial<Record<keyof S, number>> = {}): number {
     this.world.check(entity);
-    for (const key of Object.keys(values)) {
+    const keys = Object.keys(values), columns = this.columns;
+    for (const key of keys) {
       const value = values[key as keyof S];
       const field=this.fields[key];
       if (!Object.hasOwn(this.fields, key) || typeof value !== 'number' || !Number.isFinite(value) ||
@@ -34,8 +38,8 @@ export class Component<S extends Schema = Schema> {
         field instanceof Uint8Array&&(!Number.isInteger(value)||value<0||value>255)) throw new RangeError('Invalid component data');
     }
     let row = this.index(entity);
-    if (row < 0) {row = this.size++; this.sparse[entity % this.world.capacity] = row; this.entities[row] = entity; for (const field of Object.values(this.fields) as NumericArray[]) field[row] = 0;}
-    for (const key of Object.keys(values)) this.fields[key][row] = values[key as keyof S]!;
+    if (row < 0) {row = this.size++; this.sparse[entity % this.world.capacity] = row; this.entities[row] = entity; for (let i = 0; i < columns.length; i++) columns[i][row] = 0;}
+    for (const key of keys) this.fields[key][row] = values[key as keyof S]!;
     return row;
   }
   remove(entity: Entity): boolean {
@@ -43,7 +47,7 @@ export class Component<S extends Schema = Schema> {
     const last = --this.size; this.sparse[entity % this.world.capacity] = -1;
     if (row !== last) {
       const moved = this.entities[last]; this.entities[row] = moved; this.sparse[moved % this.world.capacity] = row;
-      for (const field of Object.values(this.fields) as NumericArray[]) field[row] = field[last];
+      const columns = this.columns; for (let i = 0; i < columns.length; i++) columns[i][row] = columns[i][last];
     }
     return true;
   }
@@ -80,10 +84,12 @@ export class World {
   query(components: readonly Component[], output: Uint32Array): number {
     if (!components.length || components.some(component => component.world !== this)) throw new TypeError('Query needs components of this world');
     let source = components[0]; for (let i = 1; i < components.length; i++) if (components[i].size < source.size) source = components[i];
-    let count = 0;
-    for (let i = 0; i < source.size; i++) {
-      const entity = source.entities[i]; let match = true;
-      for (let j = 0; j < components.length; j++) if (components[j].index(entity) < 0) {match = false; break;}
+    // index() repeats the liveness test for every component; it depends only on the entity, so test it once per row.
+    let count = 0; const capacity = this.capacity, live = this.live, generations = this.generations, entities = source.entities, size = source.size, width = components.length;
+    for (let i = 0; i < size; i++) {
+      const entity = entities[i], slot = entity % capacity; if (!live[slot] || Math.floor(entity / capacity) !== generations[slot]) continue;
+      let match = true;
+      for (let j = 0; j < width; j++) {const component = components[j], row = component['sparse'][slot]; if (row < 0 || component.entities[row] !== entity) {match = false; break;}}
       if (match) {if (count === output.length) throw new RangeError('Query output is too small'); output[count++] = entity;}
     }
     return count;

@@ -9,13 +9,21 @@ const TYPES: Record<string, ScalarType> = {
 };
 const SIZES: Record<ScalarType, number> = {int8: 1, uint8: 1, int16: 2, uint16: 2, int32: 4, uint32: 4, float32: 4, float64: 8};
 const UNIT: Partial<Record<ScalarType, number>> = {uint8: 255, uint16: 65535, uint32: 4294967295, int8: 127, int16: 32767, int32: 2147483647};
-type Reader = (view: DataView, offset: number, little: boolean) => number;
-const READERS: Record<ScalarType, Reader> = {
-  int8: (v, o) => v.getInt8(o), uint8: (v, o) => v.getUint8(o),
-  int16: (v, o, l) => v.getInt16(o, l), uint16: (v, o, l) => v.getUint16(o, l),
-  int32: (v, o, l) => v.getInt32(o, l), uint32: (v, o, l) => v.getUint32(o, l),
-  float32: (v, o, l) => v.getFloat32(o, l), float64: (v, o, l) => v.getFloat64(o, l),
-};
+// Numeric type codes keep the binary row loop on one call site instead of a table of per-type closures.
+const CODES: Record<ScalarType, number> = {int8: 0, uint8: 1, int16: 2, uint16: 3, int32: 4, uint32: 5, float32: 6, float64: 7};
+const CODE_SIZES = [1, 1, 2, 2, 4, 4, 4, 8];
+function read(view: DataView, offset: number, code: number, little: boolean): number {
+  switch (code) {
+    case 0: return view.getInt8(offset);
+    case 1: return view.getUint8(offset);
+    case 2: return view.getInt16(offset, little);
+    case 3: return view.getUint16(offset, little);
+    case 4: return view.getInt32(offset, little);
+    case 5: return view.getUint32(offset, little);
+    case 6: return view.getFloat32(offset, little);
+    default: return view.getFloat64(offset, little);
+  }
+}
 const MAX_HEADER = 1 << 20;
 const MAX_POLYGON = 65536;
 
@@ -116,15 +124,31 @@ export function parsePLY(input: BinaryInput, options: PLYOptions = {}): LoadedGe
 
   if (header.format === 'ascii') {
     const scanner = new TextScanner(latin1(bytes, header.bodyOffset), F);
+    // Runs of up to 15 digits (indices, list lengths, colors) are summed in place, which is exact. Other plain numbers
+    // go through Number; anything else (nan spellings, garbage, end of data) is read again by the scanner, which
+    // builds the error label only then.
+    const body = scanner.text;
+    const number = (name: string, i: number, suffix: string): number => {
+      let pos = scanner.pos, code = body.charCodeAt(pos);
+      while (code === 32 || (code >= 9 && code <= 13)) code = body.charCodeAt(++pos);
+      let integer = 0;
+      const first = pos;
+      while (code >= 48 && code <= 57 && pos - first < 15) {integer = integer * 10 + (code - 48); code = body.charCodeAt(++pos);}
+      if (pos > first && (pos >= body.length || code === 32 || (code >= 9 && code <= 13))) {scanner.pos = pos; return integer;}
+      const start = scanner.pos, token = scanner.token(), value = token === null ? NaN : Number(token);
+      if (value === value) return value;
+      scanner.pos = start;
+      return scanner.number(`${name} ${i}${suffix}`);
+    };
     for (const element of header.elements) {
-      const isVertex = element === vertexElement, isFace = element === faceElement;
+      const isVertex = element === vertexElement, isFace = element === faceElement, properties = element.properties, name = element.name;
       for (let i = 0; i < element.count; i++) {
-        for (let p = 0; p < element.properties.length; p++) {
-          const property = element.properties[p];
-          if (!property.list) {row[p] = scanner.number(`${element.name} ${i}`); continue;}
-          const count = scanner.integer(`${element.name} ${i} list length`);
+        for (let p = 0; p < properties.length; p++) {
+          if (!properties[p].list) {row[p] = number(name, i, ''); continue;}
+          const count = number(name, i, ' list length');
+          if (!Number.isSafeInteger(count)) throw new LoaderError(F, 'syntax', `expected an integer in ${name} ${i} list length, got ${count}`);
           checkCorners(count);
-          for (let k = 0; k < count; k++) polygon[k] = scanner.number(`${element.name} ${i} list`);
+          for (let k = 0; k < count; k++) polygon[k] = number(name, i, ' list');
           if (isFace && p === faceList) triangulate(indices, count, at, vertexCount, F, limit.maxTriangles);
         }
         if (isVertex) storeVertex(i);
@@ -137,25 +161,28 @@ export function parsePLY(input: BinaryInput, options: PLYOptions = {}): LoadedGe
     const end = bytes.byteLength;
     const truncated = (what: string): never => {throw new LoaderError(F, 'truncated', `binary data ends inside ${what}`);};
     for (const element of header.elements) {
-      const isVertex = element === vertexElement, isFace = element === faceElement;
-      const minimum = element.properties.reduce((sum, p) => sum + SIZES[p.list ? p.list.count : p.type], 0);
+      const isVertex = element === vertexElement, isFace = element === faceElement, properties = element.properties, width = properties.length;
+      const minimum = properties.reduce((sum, p) => sum + SIZES[p.list ? p.list.count : p.type], 0);
       if (element.count * minimum > end - offset) truncated(`the "${element.name}" element`);
-      const fixed = element.properties.every(p => !p.list);
-      const readers = element.properties.map(p => READERS[p.type]);
+      const fixed = properties.every(p => !p.list);
+      // Fixed-size rows of other elements are never looked at, and the check above already proved they fit.
+      if (fixed && !isVertex) {offset += element.count * minimum; continue;}
+      // Value type and list count type (-1 for a scalar) of each property.
+      const codes = properties.map(p => CODES[p.type]), counts = properties.map(p => p.list ? CODES[p.list.count] : -1);
       for (let i = 0; i < element.count; i++) {
-        for (let p = 0; p < element.properties.length; p++) {
-          const property = element.properties[p];
-          if (!property.list) {
-            if (!fixed && offset + SIZES[property.type] > end) truncated(`${element.name} ${i}`);
-            row[p] = readers[p](view, offset, little); offset += SIZES[property.type]; continue;
+        for (let p = 0; p < width; p++) {
+          const code = codes[p], itemSize = CODE_SIZES[code], countCode = counts[p];
+          if (countCode < 0) {
+            if (!fixed && offset + itemSize > end) truncated(`${element.name} ${i}`);
+            row[p] = read(view, offset, code, little); offset += itemSize; continue;
           }
-          const countSize = SIZES[property.list.count], itemSize = SIZES[property.type];
+          const countSize = CODE_SIZES[countCode];
           if (offset + countSize > end) truncated(`${element.name} ${i}`);
-          const count = READERS[property.list.count](view, offset, little); offset += countSize;
+          const count = read(view, offset, countCode, little); offset += countSize;
           checkCorners(count);
           if (offset + count * itemSize > end) truncated(`${element.name} ${i}`);
           if (isFace && p === faceList) {
-            for (let k = 0; k < count; k++) {polygon[k] = readers[p](view, offset, little); offset += itemSize;}
+            for (let k = 0; k < count; k++) {polygon[k] = read(view, offset, code, little); offset += itemSize;}
             triangulate(indices, count, at, vertexCount, F, limit.maxTriangles);
           } else offset += count * itemSize;
         }

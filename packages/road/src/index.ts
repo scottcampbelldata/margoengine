@@ -21,11 +21,11 @@ export function road(curve: Spline, {width = 6, curbWidth = 0.2, curbHeight = 0.
       const lateral = section[strip + 1][0] - section[strip][0], height = section[strip + 1][1] - section[strip][1];
       const nx = ty * rz * lateral - tz * height, ny = (tz * rx - tx * rz) * lateral, nz = tx * height - ty * rx * lateral, normalLength = Math.hypot(nx, ny, nz);
       for (let side = 0; side < 2; side++) {
-        const index = sample * row + strip * 2 + side, p = section[strip + side];
-        positions.set([center[0] + rx * p[0], center[1] + p[1], center[2] + rz * p[0]], index * 3);
-        normals.set([nx / normalLength, ny / normalLength, nz / normalLength], index * 3); uvs.set([offsets[strip + side] / uvMeters, distance / uvMeters], index * 2);
+        const index = sample * row + strip * 2 + side, p = section[strip + side], v = index * 3, t = index * 2;
+        positions[v] = center[0] + rx * p[0]; positions[v + 1] = center[1] + p[1]; positions[v + 2] = center[2] + rz * p[0];
+        normals[v] = nx / normalLength; normals[v + 1] = ny / normalLength; normals[v + 2] = nz / normalLength; uvs[t] = offsets[strip + side] / uvMeters; uvs[t + 1] = distance / uvMeters;
       }
-      if (sample < segments) {const a = sample * row + strip * 2, b = a + row; indices.set([a, b, a + 1, a + 1, b, b + 1], (sample * strips + strip) * 6);}
+      if (sample < segments) {const a = sample * row + strip * 2, b = a + row, i = (sample * strips + strip) * 6; indices[i] = a; indices[i + 1] = b; indices[i + 2] = a + 1; indices[i + 3] = a + 1; indices[i + 4] = b; indices[i + 5] = b + 1;}
     }
   }
   return {geometry: new Geometry(positions, normals, indices), uvs, section: section.map(p => [...p] as [number, number])};

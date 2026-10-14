@@ -40,11 +40,11 @@ export function toGeometry(loaded: LoadedGeometry, options: ToGeometryOptions = 
     if (triangles.length > CORE_MAX_VERTICES) throw new LoaderError(F, 'limit', `flat shading needs ${triangles.length} vertices, more than the core limit of ${CORE_MAX_VERTICES}`);
     const positions = new Float32Array(triangles.length * 3), normals = new Float32Array(triangles.length * 3), indices = new Uint32Array(triangles.length);
     for (let t = 0; t < triangles.length; t += 3) {
-      const n = faceNormal(source, triangles[t], triangles[t + 1], triangles[t + 2]);
+      const n = faceNormal(source, triangles[t], triangles[t + 1], triangles[t + 2]), nx = n[0], ny = n[1], nz = n[2];
       for (let k = 0; k < 3; k++) {
-        const v = triangles[t + k], o = (t + k) * 3;
-        positions[o] = source[v * 3]; positions[o + 1] = source[v * 3 + 1]; positions[o + 2] = source[v * 3 + 2];
-        normals.set(n, o); indices[t + k] = t + k;
+        const v = triangles[t + k] * 3, o = (t + k) * 3;
+        positions[o] = source[v]; positions[o + 1] = source[v + 1]; positions[o + 2] = source[v + 2];
+        normals[o] = nx; normals[o + 1] = ny; normals[o + 2] = nz; indices[t + k] = t + k;
       }
     }
     return build(positions, normals, indices);
@@ -95,28 +95,27 @@ export function pointsToGeometry(loaded: LoadedGeometry, options: PointsToGeomet
   const source = loaded.positions, total = Math.floor(source.length / 3);
   const maxPoints = options.maxPoints ?? Math.floor(CORE_MAX_VERTICES / 6);
   if (!Number.isSafeInteger(maxPoints) || maxPoints < 1 || maxPoints * 6 > CORE_MAX_VERTICES) throw new LoaderError(F, 'range', `maxPoints must be 1 to ${Math.floor(CORE_MAX_VERTICES / 6)}`);
-  const finite: number[] = [];
-  const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+  const finite = new Uint32Array(total);
+  let kept = 0, minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
   for (let i = 0; i < total; i++) {
     const x = source[i * 3], y = source[i * 3 + 1], z = source[i * 3 + 2];
     if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
-    finite.push(i);
-    min[0] = Math.min(min[0], x); min[1] = Math.min(min[1], y); min[2] = Math.min(min[2], z);
-    max[0] = Math.max(max[0], x); max[1] = Math.max(max[1], y); max[2] = Math.max(max[2], z);
+    finite[kept++] = i;
+    if (x < minX) minX = x; if (y < minY) minY = y; if (z < minZ) minZ = z;
+    if (x > maxX) maxX = x; if (y > maxY) maxY = y; if (z > maxZ) maxZ = z;
   }
-  if (!finite.length) throw new LoaderError(F, 'range', 'the point cloud has no finite points');
-  const size = options.size ?? (Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) * 0.004 || 0.01);
+  if (!kept) throw new LoaderError(F, 'range', 'the point cloud has no finite points');
+  const size = options.size ?? (Math.hypot(maxX - minX, maxY - minY, maxZ - minZ) * 0.004 || 0.01);
   if (!(size > 0) || !Number.isFinite(size)) throw new LoaderError(F, 'range', 'size must be a positive number');
-  const count = Math.min(finite.length, maxPoints), step = finite.length / count;
-  const directions = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+  const count = Math.min(kept, maxPoints), step = kept / count;
+  // Octahedron corners in the order +x -x +y -y +z -z; each corner moves one axis by `size` and its normal is that axis.
   const faces = [0, 2, 4, 2, 1, 4, 1, 3, 4, 3, 0, 4, 2, 0, 5, 1, 2, 5, 3, 1, 5, 0, 3, 5];
   const positions = new Float32Array(count * 18), normals = new Float32Array(count * 18), indices = new Uint32Array(count * 24);
   for (let p = 0; p < count; p++) {
-    const i = finite[Math.floor(p * step)];
-    for (let d = 0; d < 6; d++) for (let a = 0; a < 3; a++) {
-      positions[p * 18 + d * 3 + a] = source[i * 3 + a] + directions[d][a] * size;
-      normals[p * 18 + d * 3 + a] = directions[d][a];
-    }
+    const i = finite[Math.floor(p * step)] * 3, x = source[i], y = source[i + 1], z = source[i + 2], o = p * 18;
+    for (let d = 0; d < 18; d += 3) {positions[o + d] = x; positions[o + d + 1] = y; positions[o + d + 2] = z;}
+    positions[o] = x + size; positions[o + 3] = x - size; positions[o + 7] = y + size; positions[o + 10] = y - size; positions[o + 14] = z + size; positions[o + 17] = z - size;
+    normals[o] = 1; normals[o + 3] = -1; normals[o + 7] = 1; normals[o + 10] = -1; normals[o + 14] = 1; normals[o + 17] = -1;
     for (let k = 0; k < 24; k++) indices[p * 24 + k] = p * 6 + faces[k];
   }
   return build(positions, normals, indices);

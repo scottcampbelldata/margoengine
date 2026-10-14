@@ -317,15 +317,16 @@ export class MeshBVH {
     const px = point[0], py = point[1], pz = point[2], f = this.nodeBounds, u = this.nodeData, index = this.index, P = this.positions, s = this.stride;
     const minSq = minDistance * minDistance;
     let best = maxDistance * maxDistance, bestSlot = -1, sp = 0;
-    STACK[sp++] = 0;
+    // Each node's box distance is measured once, when its parent orders the children, and kept beside it on the stack.
+    STACK[sp] = 0; ENTRY[sp++] = boxDistanceSq(f, 0, px, py, pz);
     search: while (sp) {
       const node = STACK[--sp], w = node * NODE_WORDS;
-      if (boxDistanceSq(f, w, px, py, pz) > best * (1 + EPS) + EPS) continue;
+      if (ENTRY[sp] > best * (1 + EPS) + EPS) continue;
       const word = u[w + 7];
       if (word & INTERNAL_FLAG) {
-        const l = node + 1, r = u[w + 6];
-        if (boxDistanceSq(f, l * NODE_WORDS, px, py, pz) < boxDistanceSq(f, r * NODE_WORDS, px, py, pz)) { STACK[sp++] = r; STACK[sp++] = l; }
-        else { STACK[sp++] = l; STACK[sp++] = r; }
+        const l = node + 1, r = u[w + 6], dl = boxDistanceSq(f, l * NODE_WORDS, px, py, pz), dr = boxDistanceSq(f, r * NODE_WORDS, px, py, pz);
+        if (dl < dr) { STACK[sp] = r; ENTRY[sp++] = dr; STACK[sp] = l; ENTRY[sp++] = dl; }
+        else { STACK[sp] = l; ENTRY[sp++] = dl; STACK[sp] = r; ENTRY[sp++] = dr; }
       } else {
         for (let k = u[w + 6], end = k + word; k < end; k++) {
           const a = index[k * 3] * s, b = index[k * 3 + 1] * s, c = index[k * 3 + 2] * s;

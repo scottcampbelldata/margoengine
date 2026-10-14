@@ -379,13 +379,15 @@ export function drawables(nodes: Node[]): Drawable[] {
 
 /** @internal World-space vertices, unit normals and winding-corrected indices of one drawable. */
 export function toWorld({geometry, world}: Drawable): {positions: Float64Array; normals: Float64Array; indices: Uint32Array} {
-  const {count} = geometry, positions = new Float64Array(count*3), normals = new Float64Array(count*3), n = normalMatrix(world);
-  for (let i = 0; i < count; i++) {
-    const x = geometry.positions[i*3], y = geometry.positions[i*3+1], z = geometry.positions[i*3+2];
-    for (let r = 0; r < 3; r++) positions[i*3+r] = world[r]*x+world[4+r]*y+world[8+r]*z+world[12+r];
-    const nx = geometry.normals[i*3], ny = geometry.normals[i*3+1], nz = geometry.normals[i*3+2];
-    const v = [n[0]*nx+n[3]*ny+n[6]*nz, n[1]*nx+n[4]*ny+n[7]*nz, n[2]*nx+n[5]*ny+n[8]*nz], l = Math.hypot(v[0], v[1], v[2]) || 1;
-    for (let r = 0; r < 3; r++) normals[i*3+r] = v[r]/l;
+  const {count} = geometry, source = geometry.positions, sourceNormals = geometry.normals, positions = new Float64Array(count*3), normals = new Float64Array(count*3), n = normalMatrix(world);
+  const m0 = world[0], m1 = world[1], m2 = world[2], m4 = world[4], m5 = world[5], m6 = world[6], m8 = world[8], m9 = world[9], m10 = world[10], m12 = world[12], m13 = world[13], m14 = world[14];
+  const n0 = n[0], n1 = n[1], n2 = n[2], n3 = n[3], n4 = n[4], n5 = n[5], n6 = n[6], n7 = n[7], n8 = n[8];
+  for (let o = 0, end = count*3; o < end; o += 3) {
+    const x = source[o], y = source[o+1], z = source[o+2];
+    positions[o] = m0*x+m4*y+m8*z+m12; positions[o+1] = m1*x+m5*y+m9*z+m13; positions[o+2] = m2*x+m6*y+m10*z+m14;
+    const nx = sourceNormals[o], ny = sourceNormals[o+1], nz = sourceNormals[o+2];
+    const vx = n0*nx+n3*ny+n6*nz, vy = n1*nx+n4*ny+n7*nz, vz = n2*nx+n5*ny+n8*nz, l = Math.hypot(vx, vy, vz) || 1;
+    normals[o] = vx/l; normals[o+1] = vy/l; normals[o+2] = vz/l;
   }
   let indices = geometry.indices;
   if (determinant3(world) < 0) {
@@ -395,10 +397,36 @@ export function toWorld({geometry, world}: Drawable): {positions: Float64Array; 
   return {positions, normals, indices};
 }
 
+// Powers of ten that a double holds exactly.
+const POW10 = Array.from({length: 23}, (_, i) => Number(`1e${i}`));
+const ZEROS = '0'.repeat(21);
+
 /** @internal Shortest decimal that reads back as the same Float32 value. */
 export function num(value: number): string {
   const f = Math.fround(value);
   if (f === 0) return '0';
+  const a = Math.abs(f);
+  let e = Math.floor(Math.log10(a));
+  // Fast path: an integer mantissa below 1e9 times or over an exact power of ten is correctly rounded, so it equals
+  // Number(f.toPrecision(digits)) without building the string. Other magnitudes take the string search below.
+  if (e >= -13 && e <= 21) {
+    let m = e < 0 ? a*POW10[-e] : a/POW10[e];
+    if (m >= 10) {m /= 10; e++;} else if (m < 1) {m *= 10; e--;}
+    for (let digits = 1, scale = 1; digits < 10; digits++, scale *= 10) {
+      const scaled = m*scale, mantissa = Math.round(scaled), k = e-digits+1;
+      // On a rounding tie the scaled value is too imprecise to pick a side. Below seven digits neither side can
+      // round-trip (both are over half a Float32 step away); from seven digits on the string search decides.
+      if (Math.abs(scaled-Math.floor(scaled)-0.5) < 1e-5) {if (digits < 7) continue; break;}
+      const x = k < 0 ? mantissa/POW10[-k] : mantissa*POW10[k];
+      if (Math.fround(x) !== a) continue;
+      // The mantissa's digits are the shortest text of x, so place the decimal point by hand where String(x) would
+      // (`point` digits before it); exponent notation and mantissas that end in zero are left to String.
+      const point = e+1;
+      if (mantissa%10 === 0 || point < -5 || point > 21) return String(f < 0 ? -x : x);
+      const text = String(mantissa), sign = f < 0 ? '-' : '';
+      return sign+(point <= 0 ? '0.'+ZEROS.slice(0, -point)+text : point >= digits ? text+ZEROS.slice(0, point-digits) : text.slice(0, point)+'.'+text.slice(point));
+    }
+  }
   for (let digits = 1; digits < 10; digits++) {const text = f.toPrecision(digits); if (Math.fround(Number(text)) === f) return String(Number(text));}
   return String(f);
 }

@@ -48,6 +48,9 @@ export interface TextOptions extends LayoutOptions, TextStyleOptions {
 
 interface Owner {remove(text: Text): void}
 
+// Range checks of Text.validate, which runs for every drawn text every frame.
+const unit = (value: unknown, name: string): void => {if (typeof value !== 'number' || !(value >= 0 && value <= 1)) throw new RangeError(`${name} must be 0..1`);};
+const extent = (value: unknown, name: string): void => {if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) throw new RangeError(`${name} must be finite and non-negative`);};
 const LAYOUT_KEYS = ['fontSize', 'lineHeight', 'letterSpacing', 'maxWidth', 'textAlign', 'anchorX', 'anchorY', 'direction', 'whiteSpace', 'overflowWrap'] as const;
 
 /**
@@ -110,12 +113,10 @@ export class Text {
     if (typeof this.text !== 'string') throw new TypeError('Text must be a string');
     if (!(this.font instanceof Font)) throw new TypeError('font must be a Font');
     validateLayoutOptions(this);
-    for (const [value, name] of [[this.opacity, 'opacity'], [this.outlineOpacity, 'outlineOpacity'], [this.shadowOpacity, 'shadowOpacity']] as const)
-      if (typeof value !== 'number' || !(value >= 0 && value <= 1)) throw new RangeError(`${name} must be 0..1`);
-    for (const [value, name] of [[this.outlineWidth, 'outlineWidth'], [this.shadowBlur, 'shadowBlur']] as const)
-      if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) throw new RangeError(`${name} must be finite and non-negative`);
+    unit(this.opacity, 'opacity'); unit(this.outlineOpacity, 'outlineOpacity'); unit(this.shadowOpacity, 'shadowOpacity');
+    extent(this.outlineWidth, 'outlineWidth'); extent(this.shadowBlur, 'shadowBlur');
     finiteArray(this.color, 3, 'Color'); finiteArray(this.outlineColor, 3, 'Outline color'); finiteArray(this.shadowColor, 3, 'Shadow color'); finiteArray(this.shadowOffset, 2, 'Shadow offset');
-    for (const flag of [this.billboard, this.onTop, this.visible]) if (typeof flag !== 'boolean') throw new TypeError('billboard, onTop and visible must be boolean');
+    if (typeof this.billboard !== 'boolean' || typeof this.onTop !== 'boolean' || typeof this.visible !== 'boolean') throw new TypeError('billboard, onTop and visible must be boolean');
   }
 
   /** Sets the local matrix from a position, XYZ Euler rotation (radians) and uniform or per-axis scale. */

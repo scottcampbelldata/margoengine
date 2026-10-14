@@ -1,0 +1,31 @@
+{
+  "package": "text",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:28:12.030Z",
+  "outputsIdentical": true,
+  "notes": "ASCII fast paths in bidiClass, isWhitespace, isIdeograph and graphemes; Font.kerning caches in a map per left cluster. Text.validate checks its fields without building arrays. Layout arithmetic is unchanged.",
+  "cases": [
+    {
+      "case": "150 changing name tags, Font measurer",
+      "layouts": 600,
+      "baselineMs": 59.4012,
+      "candidateMs": 25.9485,
+      "speedup": 2.289
+    },
+    {
+      "case": "1,200 character wrapped panel, Font measurer",
+      "layouts": 12,
+      "baselineMs": 31.093,
+      "candidateMs": 15.9391,
+      "speedup": 1.951
+    },
+    {
+      "case": "Text.validate, 150 texts per frame",
+      "frames": 120,
+      "baselineMs": 16.8146,
+      "candidateMs": 6.6676,
+      "speedup": 2.522
+    }
+  ]
+}

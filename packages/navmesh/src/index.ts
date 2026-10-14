@@ -1,5 +1,5 @@
 export type Vec3 = readonly [number, number, number];
-interface Link {to: number; left: Vec3; right: Vec3}
+interface Link {to: number; left: Vec3; right: Vec3; cost: number}
 interface Polygon {vertices: readonly number[]; center: Vec3; links: Link[]; plane: readonly [number, number, number, number]}
 const cross = (a: Vec3, b: Vec3, c: Vec3) => (b[0] - a[0]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[0] - a[0]);
 const area = (a: Vec3, b: Vec3, c: Vec3) => -cross(a, b, c);
@@ -11,6 +11,18 @@ function point(value: Vec3): void {if (value.length !== 3 || value.some(v => !Nu
 export class NavMesh {
   readonly vertices: readonly Vec3[];
   private readonly polygons: Polygon[] = [];
+  /** Flat copies for the hot loops: per polygon its winding sign, per edge the XZ start and direction. */
+  private readonly signs: Float64Array;
+  private readonly edgeStart: Int32Array;
+  private readonly edges: Float64Array;
+  /** Search state reused by every path call; the heap holds one entry per improved polygon cost. */
+  private readonly g: Float64Array;
+  private readonly f: Float64Array;
+  private readonly h: Float64Array;
+  private readonly parent: Int32Array;
+  private readonly state: Uint8Array;
+  private readonly heapKey: Float64Array;
+  private readonly heapNode: Int32Array;
   constructor(vertices: readonly Vec3[], polygons: readonly (readonly number[])[]) {
     if (vertices.length < 3 || vertices.length > 100_000 || !polygons.length || polygons.length > 4096) throw new RangeError('Navmesh size exceeded');
     this.vertices = vertices.map(v => {point(v); return [...v] as unknown as Vec3;});
@@ -34,18 +46,29 @@ export class NavMesh {
         if (edge.linked) throw new TypeError('Non-manifold navmesh edge'); edge.linked = true;
         for (const [from, to] of [[polygon, edge.polygon], [edge.polygon, polygon]]) {
           const leftFirst = cross(this.polygons[from].center, this.polygons[to].center, this.vertices[a]) > 0;
-          this.polygons[from].links.push({to, left: this.vertices[leftFirst ? a : b], right: this.vertices[leftFirst ? b : a]});
+          this.polygons[from].links.push({to, left: this.vertices[leftFirst ? a : b], right: this.vertices[leftFirst ? b : a], cost: distance(this.polygons[from].center, this.polygons[to].center)});
         }
       }
     }
+    const count = this.polygons.length; let edgeCount = 0, linkCount = 0; for (const p of this.polygons) {edgeCount += p.vertices.length; linkCount += p.links.length;}
+    this.signs = new Float64Array(count); this.edgeStart = new Int32Array(count + 1); this.edges = new Float64Array(edgeCount * 4);
+    for (let i = 0, at = 0; i < count; i++) {
+      const ids = this.polygons[i].vertices; this.signs[i] = Math.sign(cross(this.vertices[ids[0]], this.vertices[ids[1]], this.vertices[ids[2]]));
+      for (let edge = 0; edge < ids.length; edge++, at += 4) {const a = this.vertices[ids[edge]], b = this.vertices[ids[(edge + 1) % ids.length]]; this.edges[at] = a[0]; this.edges[at + 1] = a[2]; this.edges[at + 2] = b[0] - a[0]; this.edges[at + 3] = b[2] - a[2];}
+      this.edgeStart[i + 1] = at >> 2;
+    }
+    this.g = new Float64Array(count); this.f = new Float64Array(count); this.h = new Float64Array(count); this.parent = new Int32Array(count); this.state = new Uint8Array(count);
+    this.heapKey = new Float64Array(linkCount + 1); this.heapNode = new Int32Array(linkCount + 1);
   }
   locate(position: Vec3): number {
     point(position); let best = -1, height = Infinity;
-    for (let i = 0; i < this.polygons.length; i++) {
-      const p = this.polygons[i], ids = p.vertices, sign = Math.sign(cross(this.vertices[ids[0]], this.vertices[ids[1]], this.vertices[ids[2]])); let inside = true;
-      for (let edge = 0; edge < ids.length; edge++) if (cross(this.vertices[ids[edge]], this.vertices[ids[(edge + 1) % ids.length]], position) * sign < -1e-8) {inside = false; break;}
+    const signs = this.signs, edgeStart = this.edgeStart, edges = this.edges, px = position[0], pz = position[2];
+    for (let i = 0, count = this.polygons.length; i < count; i++) {
+      const sign = signs[i]; let inside = true;
+      // Same products as cross(a, b, position), with the edge direction b - a stored at construction.
+      for (let o = edgeStart[i] * 4, end = edgeStart[i + 1] * 4; o < end; o += 4) if ((edges[o + 2] * (pz - edges[o + 1]) - edges[o + 3] * (px - edges[o])) * sign < -1e-8) {inside = false; break;}
       if (!inside) continue;
-      const projected = -(p.plane[0] * position[0] + p.plane[2] * position[2] + p.plane[3]) / p.plane[1], delta = Math.abs(projected - position[1]);
+      const p = this.polygons[i], projected = -(p.plane[0] * position[0] + p.plane[2] * position[2] + p.plane[3]) / p.plane[1], delta = Math.abs(projected - position[1]);
       if (delta < height) {height = delta; best = i;}
     }
     return best;
@@ -53,21 +76,39 @@ export class NavMesh {
   path(start: Vec3, end: Vec3): Vec3[] | null {
     const from = this.locate(start), to = this.locate(end); if (from < 0 || to < 0) return null;
     if (from === to) return [[...start] as unknown as Vec3, [...end] as unknown as Vec3];
-    const count = this.polygons.length, g = new Float64Array(count).fill(Infinity), f = new Float64Array(count).fill(Infinity), parent = new Int32Array(count).fill(-1), state = new Uint8Array(count);
-    g[from] = 0; f[from] = distance(this.polygons[from].center, this.polygons[to].center); state[from] = 1;
-    // shortcut: linear open-set scan, use a heap for navmeshes beyond a few thousand polygons.
+    const polygons = this.polygons, {g, f, h, parent, state, heapKey, heapNode} = this, goal = polygons[to].center;
+    g.fill(Infinity); state.fill(0); g[from] = 0; f[from] = h[from] = distance(polygons[from].center, goal); state[from] = 1;
+    // Open set as a binary heap ordered by (f, polygon index): the same pick as a lowest-f, lowest-index scan.
+    let size = 1; heapKey[0] = f[from]; heapNode[0] = from;
     while (true) {
-      let current = -1, cost = Infinity; for (let i = 0; i < count; i++) if (state[i] === 1 && f[i] < cost) {current = i; cost = f[i];}
+      let current = -1;
+      while (size) {
+        const key = heapKey[0], node = heapNode[0], lastKey = heapKey[--size], lastNode = heapNode[size]; let i = 0;
+        for (let child = 1; child < size; child = i * 2 + 1) {
+          if (child + 1 < size && (heapKey[child + 1] < heapKey[child] || heapKey[child + 1] === heapKey[child] && heapNode[child + 1] < heapNode[child])) child++;
+          if (lastKey < heapKey[child] || lastKey === heapKey[child] && lastNode < heapNode[child]) break;
+          heapKey[i] = heapKey[child]; heapNode[i] = heapNode[child]; i = child;
+        }
+        heapKey[i] = lastKey; heapNode[i] = lastNode;
+        // Entries left behind by a later cost improvement or an already closed polygon are stale.
+        if (state[node] === 1 && f[node] === key) {current = node; break;}
+      }
       if (current < 0) return null; if (current === to) break; state[current] = 2;
-      for (const link of this.polygons[current].links) {
-        const next = link.to; if (state[next] === 2) continue;
-        const candidate = g[current] + distance(this.polygons[current].center, this.polygons[next].center);
-        if (candidate < g[next]) {parent[next] = current; g[next] = candidate; f[next] = candidate + distance(this.polygons[next].center, this.polygons[to].center); state[next] = 1;}
+      const links = polygons[current].links;
+      for (let l = 0; l < links.length; l++) {
+        const link = links[l], next = link.to; if (state[next] === 2) continue;
+        const candidate = g[current] + link.cost;
+        if (candidate < g[next]) {
+          if (state[next] === 0) h[next] = distance(polygons[next].center, goal);
+          const key = candidate + h[next]; parent[next] = current; g[next] = candidate; f[next] = key; state[next] = 1;
+          let i = size++; for (let up = (i - 1) >> 1; i > 0 && (key < heapKey[up] || key === heapKey[up] && next < heapNode[up]); i = up, up = (i - 1) >> 1) {heapKey[i] = heapKey[up]; heapNode[i] = heapNode[up];}
+          heapKey[i] = key; heapNode[i] = next;
+        }
       }
     }
-    const corridor = [to]; for (let node = to; node !== from;) {node = parent[node]; corridor.unshift(node);}
+    const corridor = [to]; for (let node = to; node !== from;) {node = parent[node]; corridor.push(node);} corridor.reverse();
     const portals: {left: Vec3; right: Vec3}[] = [{left: start, right: start}];
-    for (let i = 0; i + 1 < corridor.length; i++) portals.push(this.polygons[corridor[i]].links.find(link => link.to === corridor[i + 1])!);
+    for (let i = 0; i + 1 < corridor.length; i++) {const links = polygons[corridor[i]].links, next = corridor[i + 1]; let l = 0; while (links[l].to !== next) l++; portals.push(links[l]);}
     portals.push({left: end, right: end});
     const result: Vec3[] = [[...start] as unknown as Vec3]; let apex = start, left = start, right = start, apexIndex = 0, leftIndex = 0, rightIndex = 0;
     for (let i = 1; i < portals.length; i++) {

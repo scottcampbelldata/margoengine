@@ -1,14 +1,17 @@
 import {collect,drawables,num,toWorld,normalizeMaterial,type ExportSource,type SceneOptions} from './scene.js';
 export interface USDZOptions extends SceneOptions {}
 
+let table:Int32Array|undefined;
 function crc32(bytes:Uint8Array):number {
-  let crc=0xffffffff;
-  for(const byte of bytes){crc^=byte;for(let bit=0;bit<8;bit++)crc=(crc>>>1)^(-(crc&1)&0xedb88320);}
+  // One table lookup per byte; the table is built on first use so importing stays free.
+  if(!table){table=new Int32Array(256);for(let n=0;n<256;n++){let c=n;for(let bit=0;bit<8;bit++)c=(c>>>1)^(-(c&1)&0xedb88320);table[n]=c;}}
+  let crc=-1;
+  for(let i=0;i<bytes.length;i++)crc=table[(crc^bytes[i])&255]^(crc>>>8);
   return (crc^0xffffffff)>>>0;
 }
 const tuples=(values:ArrayLike<number>,size:number):string=>{
   const result:string[]=[];
-  for(let i=0;i<values.length;i+=size)result.push(`(${Array.from({length:size},(_,k)=>num(values[i+k])).join(', ')})`);
+  for(let i=0;i<values.length;i+=size){let tuple=num(values[i]);for(let k=1;k<size;k++)tuple+=', '+num(values[i+k]);result.push(`(${tuple})`);}
   return `[${result.join(', ')}]`;
 };
 
@@ -22,13 +25,13 @@ export function exportUSDZ(source:ExportSource,options:USDZOptions={}):Uint8Arra
     if(material.baseColorTexture||material.metallicRoughnessTexture||material.normalTexture)throw new TypeError('USDZ texture export is unsupported');
     if(item.geometry.colors)throw new TypeError('USDZ vertex color export is unsupported');
     if(material.alphaMode==='MASK')throw new TypeError('USDZ alpha-mask export is unsupported');
-    for(const value of positions)if(!Number.isFinite(Math.fround(value)))throw new RangeError('USDZ world position exceeds Float32 range');
+    for(let v=0;v<positions.length;v++)if(!Number.isFinite(Math.fround(positions[v])))throw new RangeError('USDZ world position exceeds Float32 range');
     const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
     for(let v=0;v<positions.length;v++){const axis=v%3;min[axis]=Math.min(min[axis],positions[v]);max[axis]=Math.max(max[axis],positions[v]);}
     lines.push(`def Mesh "Mesh_${i}" (apiSchemas = ["MaterialBindingAPI"]) {`,`    string displayName = ${JSON.stringify(item.name??`Mesh ${i}`)}`,
       `    float3[] extent = ${tuples([...min,...max],3)}`,
       `    point3f[] points = ${tuples(positions,3)}`,`    normal3f[] normals = ${tuples(normals,3)} (interpolation = "vertex")`,
-      `    int[] faceVertexCounts = [${Array(indices.length/3).fill(3).join(', ')}]`,`    int[] faceVertexIndices = [${Array.from(indices).join(', ')}]`,
+      `    int[] faceVertexCounts = [3${', 3'.repeat(indices.length/3-1)}]`,`    int[] faceVertexIndices = [${indices.join(', ')}]`,
       '    uniform token subdivisionScheme = "none"',`    uniform bool doubleSided = ${material.doubleSided}`,
       `    color3f[] primvars:displayColor = ${tuples(material.color.slice(0,3),3)}`,
       `    rel material:binding = </Margo/Material_${i}>`,'}',`def Material "Material_${i}" {`,

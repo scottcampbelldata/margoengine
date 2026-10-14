@@ -41,7 +41,7 @@ export class PostProcessing implements EnginePlugin {
   readonly name='post-processing';target?:HDRRenderTarget;private device?:GPUDevice;private uniform?:GPUBuffer;private filters:GPUBuffer[]=[];private textures:GPUTexture[]=[];private levels:Array<[GPUTexture,GPUTexture]>=[];private output?:GPUTexture;
   private blur?:GPUComputePipeline;private resolve?:GPUComputePipeline;private sky?:GPURenderPipeline;private present?:GPURenderPipeline;private original?:GPUTextureView;private readonly values=new Float32Array(68);private time=0;private ready=false;private presentKey='';private skyKey='';
   private readonly inverse=this.values.subarray(0,16);private readonly threshold=new Float32Array([0,0,1,1]);
-  private readonly inverseWorkspace=new Float64Array(52);
+  private readonly inverseWorkspace=new Float64Array(52);private shaderSource?:string;private linearShader='';
   private colorView?:GPUTextureView;private depthView?:GPUTextureView;private filterGroups:GPUBindGroup[]=[];private resolveGroups:GPUBindGroup[]=[];private skyGroup?:GPUBindGroup;private presentGroup?:GPUBindGroup;private skyPass?:GPURenderPassDescriptor;private presentPass?:GPURenderPassDescriptor;
   constructor(readonly options:PostOptions={}){this.validate();}
   private validate():void {const o=this.options,a=o.atmosphere??atmosphere;for(const key in o)if(Object.hasOwn(o,key)){const value=o[key as keyof PostOptions];if(typeof value==='number'&&!finite(value))throw new RangeError(`Invalid post ${key}`);}
@@ -56,7 +56,9 @@ export class PostProcessing implements EnginePlugin {
     for(const data of [[0,0,1,this.options.threshold??1],[1,0,0,0],[0,1,0,0]]){const b=this.device.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});this.filters.push(b);this.device.queue.writeBuffer(b,0,new Float32Array(data));}
   }
   registerPasses(graph:FrameGraph):void {
-    graph.add({name:'post:capture',order:-50,execute:context=>{if(context.backend!=='webgpu')return;this.validate();this.resize(context);this.preparePresent(context);this.update(context);this.original=context.color;this.target!.scene.begin(context);context.shader=context.shader.replace(/let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');}});
+    graph.add({name:'post:capture',order:-50,execute:context=>{if(context.backend!=='webgpu')return;this.validate();this.resize(context);this.preparePresent(context);this.update(context);this.original=context.color;this.target!.scene.begin(context);
+      // The patch depends only on the source text, so it is redone only when another plugin changes the shader.
+      if(this.shaderSource!==context.shader){this.shaderSource=context.shader;this.linearShader=context.shader.replace(/let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');}context.shader=this.linearShader;}});
     graph.add({name:'atmosphere:sky',order:2,execute:context=>{if(context.backend==='webgpu'&&(this.options.atmosphere?.sky??false))this.drawSky(context);}});
     graph.add({name:'post:resolve',order:30,execute:context=>{if(context.backend==='webgpu')this.process(context);}});
   }

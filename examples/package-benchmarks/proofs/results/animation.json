@@ -2,37 +2,37 @@
   "package": "animation",
   "baseline": "59350fc",
   "node": "v24.15.0",
-  "recordedAt": "2026-10-14T01:02:15.185Z",
+  "recordedAt": "2026-10-14T03:08:48.234Z",
   "outputsIdentical": true,
   "notes": "Animation.seek now samples into per-track buffers; sampleTrack still returns a fresh array.",
   "cases": [
     {
       "case": "LINEAR width 3",
       "samples": 200000,
-      "baselineMs": 82.188,
-      "candidateMs": 39.3541,
-      "speedup": 2.088
+      "baselineMs": 103.2323,
+      "candidateMs": 52.8782,
+      "speedup": 1.952
     },
     {
       "case": "LINEAR width 4",
       "samples": 200000,
-      "baselineMs": 241.7257,
-      "candidateMs": 69.3995,
-      "speedup": 3.483
+      "baselineMs": 244.0195,
+      "candidateMs": 75.8148,
+      "speedup": 3.219
     },
     {
       "case": "CUBICSPLINE width 3",
       "samples": 200000,
-      "baselineMs": 86.3469,
-      "candidateMs": 41.7276,
-      "speedup": 2.069
+      "baselineMs": 116.2895,
+      "candidateMs": 50.5617,
+      "speedup": 2.3
     },
     {
       "case": "STEP width 3",
       "samples": 200000,
-      "baselineMs": 75.4643,
-      "candidateMs": 34.341,
-      "speedup": 2.197
+      "baselineMs": 76.4681,
+      "candidateMs": 35.9037,
+      "speedup": 2.13
     }
   ]
 }

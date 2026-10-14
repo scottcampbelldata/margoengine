@@ -195,14 +195,16 @@ export function allocateBudget(counts: ArrayLike<number>, weights: ArrayLike<num
   let total = 0;
   for (let i = 0; i < length; i++) total += counts[i];
   if (total <= budget) {for (let i = 0; i < length; i++) out[i] = counts[i]; return total;}
-  const weight = (i: number) => Math.max(1e-9, weights[i] || 0);
-  const sorted = Array.from({length}, (_, i) => i).sort((a, b) => counts[a] / weight(a) - counts[b] / weight(b));
+  // Clamped weights and the sort key (points per unit weight) are computed once, not per comparison.
+  const weight = new Float64Array(length), key = new Float64Array(length), sorted = new Array<number>(length);
+  for (let i = 0; i < length; i++) {weight[i] = Math.max(1e-9, weights[i] || 0); key[i] = counts[i] / weight[i]; sorted[i] = i;}
+  sorted.sort((a, b) => key[a] - key[b]);
   // Suffix sums of the weights in sorted order avoid cancellation when large and tiny weights mix.
   const suffix = new Float64Array(length + 1);
-  for (let k = length - 1; k >= 0; k--) suffix[k] = suffix[k + 1] + weight(sorted[k]);
+  for (let k = length - 1; k >= 0; k--) suffix[k] = suffix[k + 1] + weight[sorted[k]];
   let remaining = budget, k = 0;
   for (; k < length; k++) {
-    const i = sorted[k], share = remaining * weight(i) / suffix[k];
+    const i = sorted[k], share = remaining * weight[i] / suffix[k];
     if (counts[i] > share) break;
     out[i] = counts[i]; remaining -= counts[i];
   }
@@ -212,7 +214,7 @@ export function allocateBudget(counts: ArrayLike<number>, weights: ArrayLike<num
   let used = 0;
   const fractions: Array<[number, number]> = [];
   for (let j = k; j < length; j++) {
-    const i = sorted[j], share = remaining * weight(i) / weightSum, whole = Math.min(counts[i] - 1, Math.floor(share));
+    const i = sorted[j], share = remaining * weight[i] / weightSum, whole = Math.min(counts[i] - 1, Math.floor(share));
     out[i] = whole; used += whole; fractions.push([share - whole, i]);
   }
   let left = remaining - used;
@@ -271,14 +273,19 @@ export interface PickHit {
 export function pickPoint(positions: ArrayLike<number>, order: ArrayLike<number> | null, ranges: readonly PickRange[], mvp: ArrayLike<number>,
   width: number, height: number, x: number, y: number, radius: number): PickHit | null {
   const screen = new Float64Array(3), candidates: number[] = [];
-  let nearest = Infinity;
+  // Squared limits a hair beyond `radius` and `nearest + 0.5` reject far points without Math.hypot; anything
+  // close to a limit still takes the exact comparisons below, so the result is the same.
+  const slack = 1 + 1e-9, reach = radius * radius * slack;
+  let nearest = Infinity, near = Infinity;
   for (const range of ranges) {
     for (let s = range.start; s < range.start + range.count; s++) {
       const p = order ? order[s] : s;
       if (!projectPoint(mvp, positions[p * 3], positions[p * 3 + 1], positions[p * 3 + 2], width, height, screen)) continue;
-      const distance = Math.hypot(screen[0] - x, screen[1] - y);
+      const dx = screen[0] - x, dy = screen[1] - y, squared = dx * dx + dy * dy;
+      if (squared > reach || squared > near) continue;
+      const distance = Math.hypot(dx, dy);
       if (distance > radius || distance > nearest + 0.5) continue;
-      if (distance < nearest) nearest = distance;
+      if (distance < nearest) {nearest = distance; near = (nearest + 0.5) * (nearest + 0.5) * slack;}
       candidates.push(p, distance, screen[2], screen[0], screen[1]);
     }
   }

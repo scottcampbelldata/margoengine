@@ -5,10 +5,12 @@ export type Vec3 = [number, number, number];
 /** Either dimension. Curves are generic over this. */
 export type Vec = Vec2 | Vec3;
 
-export const sub = <V extends Vec>(a: V, b: V): V => a.map((x, i) => x - b[i]) as V;
-export const add = <V extends Vec>(a: V, b: V): V => a.map((x, i) => x + b[i]) as V;
-export const scale = <V extends Vec>(a: V, s: number): V => a.map(x => x * s) as V;
-export const lerp = <V extends Vec>(a: V, b: V, t: number): V => a.map((x, i) => x + (b[i] - x) * t) as V;
+// Plain 2D and 3D arrays, which is what every curve stores, are built directly; anything else keeps the generic map.
+const plain = (a: readonly number[], size: number): boolean => a.length === size && Array.isArray(a);
+export const sub = <V extends Vec>(a: V, b: V): V => (plain(a, 3) ? [a[0] - b[0], a[1] - b[1], a[2]! - b[2]!] : plain(a, 2) ? [a[0] - b[0], a[1] - b[1]] : a.map((x, i) => x - b[i])) as V;
+export const add = <V extends Vec>(a: V, b: V): V => (plain(a, 3) ? [a[0] + b[0], a[1] + b[1], a[2]! + b[2]!] : plain(a, 2) ? [a[0] + b[0], a[1] + b[1]] : a.map((x, i) => x + b[i])) as V;
+export const scale = <V extends Vec>(a: V, s: number): V => (plain(a, 3) ? [a[0] * s, a[1] * s, a[2]! * s] : plain(a, 2) ? [a[0] * s, a[1] * s] : a.map(x => x * s)) as V;
+export const lerp = <V extends Vec>(a: V, b: V, t: number): V => (plain(a, 3) ? [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2]! + (b[2]! - a[2]!) * t] : plain(a, 2) ? [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t] : a.map((x, i) => x + (b[i] - x) * t)) as V;
 export const dot = (a: readonly number[], b: readonly number[]): number => {let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s;};
 export const length = (a: readonly number[]): number => Math.sqrt(dot(a, a));
 export const distance = (a: readonly number[], b: readonly number[]): number => {let s = 0; for (let i = 0; i < a.length; i++) s += (a[i] - b[i]) ** 2; return Math.sqrt(s);};

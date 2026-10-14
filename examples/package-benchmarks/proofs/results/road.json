@@ -1,0 +1,31 @@
+{
+  "package": "road",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:25:35.257Z",
+  "outputsIdentical": true,
+  "notes": "Timings include the spline arc-length queries and core Geometry construction that road() performs; vertices, indices, bounds and UVs are bit-identical.",
+  "cases": [
+    {
+      "case": "demo road, 128 segments, resweep x 60",
+      "vertices": 1806,
+      "baselineMs": 68.7403,
+      "candidateMs": 43.445,
+      "speedup": 1.582
+    },
+    {
+      "case": "circuit, 1024 segments, default section x 10",
+      "vertices": 14350,
+      "baselineMs": 83.7857,
+      "candidateMs": 47.729,
+      "speedup": 1.755
+    },
+    {
+      "case": "circuit, 1024 segments, custom section x 10",
+      "vertices": 12300,
+      "baselineMs": 103.2675,
+      "candidateMs": 53.1707,
+      "speedup": 1.942
+    }
+  ]
+}

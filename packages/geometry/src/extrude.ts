@@ -74,9 +74,9 @@ export function extrudeGeometry(shapes: Shape | readonly Shape[], options: Extru
   for (const shape of list) build(shape, options, pos, uv, groups);
   const count = pos.length / 3, normals = new Float32Array(pos.length);
   for (let t = 0; t < count; t += 3) {
-    const o = t * 3, e1 = [pos[o + 3] - pos[o], pos[o + 4] - pos[o + 1], pos[o + 5] - pos[o + 2]], e2 = [pos[o + 6] - pos[o], pos[o + 7] - pos[o + 1], pos[o + 8] - pos[o + 2]];
-    const nx = e1[1] * e2[2] - e1[2] * e2[1], ny = e1[2] * e2[0] - e1[0] * e2[2], nz = e1[0] * e2[1] - e1[1] * e2[0], l = Math.hypot(nx, ny, nz) || 1;
-    for (let k = 0; k < 3; k++) normals.set([nx / l, ny / l, nz / l], o + k * 3);
+    const o = t * 3, e1x = pos[o + 3] - pos[o], e1y = pos[o + 4] - pos[o + 1], e1z = pos[o + 5] - pos[o + 2], e2x = pos[o + 6] - pos[o], e2y = pos[o + 7] - pos[o + 1], e2z = pos[o + 8] - pos[o + 2];
+    const nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x, l = Math.hypot(nx, ny, nz) || 1;
+    for (let k = o; k < o + 9; k += 3) {normals[k] = nx / l; normals[k + 1] = ny / l; normals[k + 2] = nz / l;}
   }
   return geometryData(pos, normals, uv, sequentialIndices(count), groups);
 }
@@ -121,17 +121,14 @@ function build(shape: Shape, options: ExtrudeOptions, out: number[], uvOut: numb
   }
   for (let b = bevelSegments - 1; b >= 0; b--) bevelLayer(b, z => depth + z);
 
-  const at = (i: number): Vec3 => [layers[i * 3], layers[i * 3 + 1], layers[i * 3 + 2]];
-  const push = (i: number) => {const p = at(i); out.push(p[0], p[1], p[2]);};
+  // Each emitted corner copies one layer vertex; caps take raw XY as UVs, walls the dominant axis against depth.
+  const cap = (i: number) => {out.push(layers[i * 3], layers[i * 3 + 1], layers[i * 3 + 2]); uvOut.push(layers[i * 3], layers[i * 3 + 1]);};
+  const wall = (i: number, useX: boolean) => {out.push(layers[i * 3], layers[i * 3 + 1], layers[i * 3 + 2]); uvOut.push(useX ? layers[i * 3] : layers[i * 3 + 1], 1 - layers[i * 3 + 2]);};
   // Caps.
   let start = out.length / 3;
   const top = vlen * (steps + bevelSegments * 2);
-  for (let f = 0; f < faces.length; f += 3) {
-    for (const i of [faces[f + 2], faces[f + 1], faces[f]]) {push(i); uvOut.push(layers[i * 3], layers[i * 3 + 1]);}
-  }
-  for (let f = 0; f < faces.length; f += 3) {
-    for (const i of [faces[f], faces[f + 1], faces[f + 2]]) {push(i + top); uvOut.push(layers[(i + top) * 3], layers[(i + top) * 3 + 1]);}
-  }
+  for (let f = 0; f < faces.length; f += 3) {cap(faces[f + 2]); cap(faces[f + 1]); cap(faces[f]);}
+  for (let f = 0; f < faces.length; f += 3) {cap(faces[f] + top); cap(faces[f + 1] + top); cap(faces[f + 2] + top);}
   groups.push({start, count: out.length / 3 - start, materialIndex: 0});
   // Side walls, Three.js `sidewalls`: quad (a, b, c, d) as triangles (a, b, d) and (b, c, d).
   start = out.length / 3;
@@ -141,10 +138,8 @@ function build(shape: Shape, options: ExtrudeOptions, out: number[], uvOut: numb
       const j = i, k = i - 1 < 0 ? ring.length - 1 : i - 1;
       for (let s = 0; s < steps + bevelSegments * 2; s++) {
         const a = offset + j + vlen * s, b = offset + k + vlen * s, c = offset + k + vlen * (s + 1), d = offset + j + vlen * (s + 1);
-        const pa = at(a), pb = at(b), pc = at(c), pd = at(d);
-        const useX = Math.abs(pa[1] - pb[1]) < Math.abs(pa[0] - pb[0]);
-        const wallUV = (p: Vec3) => [useX ? p[0] : p[1], 1 - p[2]];
-        for (const [i2, p] of [[a, pa], [b, pb], [d, pd], [b, pb], [c, pc], [d, pd]] as [number, Vec3][]) {push(i2); uvOut.push(...wallUV(p));}
+        const useX = Math.abs(layers[a * 3 + 1] - layers[b * 3 + 1]) < Math.abs(layers[a * 3] - layers[b * 3]);
+        wall(a, useX); wall(b, useX); wall(d, useX); wall(b, useX); wall(c, useX); wall(d, useX);
       }
     }
     offset += ring.length;

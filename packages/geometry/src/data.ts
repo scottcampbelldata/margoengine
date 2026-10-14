@@ -46,16 +46,17 @@ export function footprintRadius(data: GeometryData): number {
 export function pbrVertexStream(data: GeometryData, occlusion?: (x: number, y: number, z: number) => number): Float32Array {
   const count = data.positions.length / 3;
   if (!Number.isInteger(count) || data.normals.length !== count*3 || data.uvs.length !== count*2 || data.tangents?.length !== count*4 || occlusion !== undefined && typeof occlusion !== 'function') throw new RangeError('Invalid PBR vertex attributes');
-  const vertices = new Float32Array(count*20);
+  const vertices = new Float32Array(count*20), P = data.positions, N = data.normals, UV = data.uvs, T = data.tangents!;
   for (let i = 0; i < count; i++) {
-    for (let k = 0; k < 3; k++) {vertices[i*20+k] = data.positions[i*3+k]; vertices[i*20+4+k] = data.normals[i*3+k];}
-    vertices[i*20+3] = 1;
-    for (let k = 0; k < 4; k++) vertices[i*20+8+k] = data.tangents![i*4+k];
-    for (let k = 0; k < 2; k++) vertices[i*20+12+k] = vertices[i*20+14+k] = data.uvs[i*2+k];
-    const ao = occlusion ? occlusion(data.positions[i*3],data.positions[i*3+1],data.positions[i*3+2]) : 1;
+    const o = i*20, p = i*3, t = i*4;
+    vertices[o] = P[p]; vertices[o+1] = P[p+1]; vertices[o+2] = P[p+2]; vertices[o+3] = 1;
+    vertices[o+4] = N[p]; vertices[o+5] = N[p+1]; vertices[o+6] = N[p+2];
+    vertices[o+8] = T[t]; vertices[o+9] = T[t+1]; vertices[o+10] = T[t+2]; vertices[o+11] = T[t+3];
+    vertices[o+12] = vertices[o+14] = UV[i*2]; vertices[o+13] = vertices[o+15] = UV[i*2+1];
+    const ao = occlusion ? occlusion(P[p],P[p+1],P[p+2]) : 1;
     if (!Number.isFinite(ao) || ao<0 || ao>1) throw new RangeError('Invalid baked vertex occlusion');
-    vertices.fill(1,i*20+16,i*20+19); vertices[i*20+19] = ao;
+    vertices[o+16] = vertices[o+17] = vertices[o+18] = 1; vertices[o+19] = ao;
   }
-  if (vertices.some(v => !Number.isFinite(v))) throw new RangeError('PBR vertex attributes must be finite');
+  for (let i = 0; i < vertices.length; i++) if (!Number.isFinite(vertices[i])) throw new RangeError('PBR vertex attributes must be finite');
   return vertices;
 }

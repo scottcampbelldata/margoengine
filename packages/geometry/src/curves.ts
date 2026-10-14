@@ -22,14 +22,25 @@ export class LineCurve3 extends LineCurve<Vec3> {}
 /** Quadratic Bezier (Three.js `QuadraticBezierCurve` / `QuadraticBezierCurve3`). */
 export class QuadraticBezierCurve<V extends Vec = Vec2> extends Curve<V> {
   constructor(public v0: V, public v1: V, public v2: V) {super();}
-  getPoint(t: number): V {return this.v0.map((_, i) => quadratic(t, this.v0[i], this.v1[i], this.v2[i])) as V;}
+  getPoint(t: number): V {
+    const a = this.v0, b = this.v1, c = this.v2;
+    // Plain 2D and 3D control points skip the per-call closure; other array types keep their own map().
+    if (a.length === 2 && Array.isArray(a)) return [quadratic(t, a[0], b[0], c[0]), quadratic(t, a[1], b[1], c[1])] as V;
+    if (a.length === 3 && Array.isArray(a)) return [quadratic(t, a[0], b[0], c[0]), quadratic(t, a[1], b[1], c[1]), quadratic(t, a[2]!, b[2]!, c[2]!)] as V;
+    return this.v0.map((_, i) => quadratic(t, this.v0[i], this.v1[i], this.v2[i])) as V;
+  }
 }
 export class QuadraticBezierCurve3 extends QuadraticBezierCurve<Vec3> {}
 
 /** Cubic Bezier (Three.js `CubicBezierCurve` / `CubicBezierCurve3`). */
 export class CubicBezierCurve<V extends Vec = Vec2> extends Curve<V> {
   constructor(public v0: V, public v1: V, public v2: V, public v3: V) {super();}
-  getPoint(t: number): V {return this.v0.map((_, i) => cubic(t, this.v0[i], this.v1[i], this.v2[i], this.v3[i])) as V;}
+  getPoint(t: number): V {
+    const a = this.v0, b = this.v1, c = this.v2, d = this.v3;
+    if (a.length === 2 && Array.isArray(a)) return [cubic(t, a[0], b[0], c[0], d[0]), cubic(t, a[1], b[1], c[1], d[1])] as V;
+    if (a.length === 3 && Array.isArray(a)) return [cubic(t, a[0], b[0], c[0], d[0]), cubic(t, a[1], b[1], c[1], d[1]), cubic(t, a[2]!, b[2]!, c[2]!, d[2]!)] as V;
+    return this.v0.map((_, i) => cubic(t, this.v0[i], this.v1[i], this.v2[i], this.v3[i])) as V;
+  }
 }
 export class CubicBezierCurve3 extends CubicBezierCurve<Vec3> {}
 
@@ -73,11 +84,12 @@ export class ArcCurve extends EllipseCurve {
 /** `'catmullrom'` is the uniform parameterization; `'uniform'` is accepted as an alias. */
 export type CatmullRomType = 'centripetal' | 'chordal' | 'catmullrom' | 'uniform';
 
-/** Cubic Hermite polynomial c0 + c1 t + c2 t^2 + c3 t^3. */
-function hermite(x0: number, x1: number, t0: number, t1: number): (t: number) => number {
+/** Cubic Hermite polynomial c0 + c1 t + c2 t^2 + c3 t^3, evaluated at `t`. */
+function hermite(x0: number, x1: number, t0: number, t1: number, t: number): number {
   const c2 = -3 * x0 + 3 * x1 - 2 * t0 - t1, c3 = 2 * x0 - 2 * x1 + t0 + t1;
-  return t => x0 + t0 * t + c2 * t * t + c3 * t * t * t;
+  return x0 + t0 * t + c2 * t * t + c3 * t * t * t;
 }
+const squaredDistance = (a: Vec3, b: Vec3) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
 
 /** 3D Catmull-Rom spline (Three.js `CatmullRomCurve3`), centripetal by default, optionally closed. */
 export class CatmullRomCurve3 extends Curve<Vec3> {
@@ -93,8 +105,8 @@ export class CatmullRomCurve3 extends Curve<Vec3> {
     const p3: Vec3 = this.closed || index + 2 < l ? points[(index + 2) % l] : sub(points[l - 1], sub(points[l - 2], points[l - 1]));
     const result: Vec3 = [0, 0, 0];
     if (this.curveType === 'centripetal' || this.curveType === 'chordal') {
-      const power = this.curveType === 'chordal' ? 0.5 : 0.25, d2 = (a: Vec3, b: Vec3) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
-      let dt0 = d2(p0, p1) ** power, dt1 = d2(p1, p2) ** power, dt2 = d2(p2, p3) ** power;
+      const power = this.curveType === 'chordal' ? 0.5 : 0.25;
+      let dt0 = squaredDistance(p0, p1) ** power, dt1 = squaredDistance(p1, p2) ** power, dt2 = squaredDistance(p2, p3) ** power;
       if (dt1 < 1e-4) dt1 = 1;
       if (dt0 < 1e-4) dt0 = dt1;
       if (dt2 < 1e-4) dt2 = dt1;
@@ -102,10 +114,10 @@ export class CatmullRomCurve3 extends Curve<Vec3> {
         const x0 = p0[a], x1 = p1[a], x2 = p2[a], x3 = p3[a];
         const m1 = ((x1 - x0) / dt0 - (x2 - x0) / (dt0 + dt1) + (x2 - x1) / dt1) * dt1;
         const m2 = ((x2 - x1) / dt1 - (x3 - x1) / (dt1 + dt2) + (x3 - x2) / dt2) * dt1;
-        result[a] = hermite(x1, x2, m1, m2)(weight);
+        result[a] = hermite(x1, x2, m1, m2, weight);
       }
     } else {
-      for (let a = 0; a < 3; a++) result[a] = hermite(p1[a], p2[a], this.tension * (p2[a] - p0[a]), this.tension * (p3[a] - p1[a]))(weight);
+      for (let a = 0; a < 3; a++) result[a] = hermite(p1[a], p2[a], this.tension * (p2[a] - p0[a]), this.tension * (p3[a] - p1[a]), weight);
     }
     return result;
   }

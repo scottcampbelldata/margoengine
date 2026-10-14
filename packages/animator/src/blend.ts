@@ -10,8 +10,10 @@ export function blend2D(samples:readonly (readonly [number,number])[],x:number,y
   let sum=0;for(let i=0;i<weights.length;i++){weights[i]=(nearest/distances[i])**2;sum+=weights[i];}for(let i=0;i<weights.length;i++)weights[i]/=sum;return weights;
 }
 export function quaternionMultiply(a:ArrayLike<number>,b:ArrayLike<number>):number[] {return [a[3]*b[0]+a[0]*b[3]+a[1]*b[2]-a[2]*b[1],a[3]*b[1]-a[0]*b[2]+a[1]*b[3]+a[2]*b[0],a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3],a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]];}
-export function quaternionBlend(a:ArrayLike<number>,b:ArrayLike<number>,weight:number):number[] {
+/** Writes into `out` when given (it may be `a`); otherwise returns a fresh array. */
+export function quaternionBlend(a:ArrayLike<number>,b:ArrayLike<number>,weight:number,out?:number[]):number[] {
   let dot=0;for(let i=0;i<4;i++)dot+=a[i]*b[i];const sign=dot<0?-1:1;dot=Math.min(1,Math.abs(dot));let x=1-weight,y=weight;
   if(dot<0.9995){const angle=Math.acos(dot),s=Math.sin(angle);x=Math.sin((1-weight)*angle)/s;y=Math.sin(weight*angle)/s;}
-  const q=Array.from({length:4},(_,i)=>a[i]*x+b[i]*y*sign),length=Math.hypot(...q);if(!length)throw new RangeError('Zero blend quaternion');return q.map(v=>v/length);
+  const q0=a[0]*x+b[0]*y*sign,q1=a[1]*x+b[1]*y*sign,q2=a[2]*x+b[2]*y*sign,q3=a[3]*x+b[3]*y*sign,length=Math.hypot(q0,q1,q2,q3);if(!length)throw new RangeError('Zero blend quaternion');
+  if(!out)return [q0/length,q1/length,q2/length,q3/length];out[0]=q0/length;out[1]=q1/length;out[2]=q2/length;out[3]=q3/length;return out;
 }
