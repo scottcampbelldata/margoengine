@@ -39,18 +39,18 @@ export function projectPoint(matrix: ArrayLike<number>, x: number, y: number, z:
   return out;
 }
 
-/** Y-up look-at view matrix (column-major), identical to the one Margo Engine's Camera builds. */
-export function lookAtView(position: Vec3, target: Vec3, out: Float64Array = new Float64Array(16)): Float64Array {
+/** Look-at view matrix (column-major), identical to the one Margo Engine's Camera builds; pass `camera.up` (default +Y). */
+export function lookAtView(position: Vec3, target: Vec3, out: Float64Array = new Float64Array(16), up: Vec3 = [0, 1, 0]): Float64Array {
   let zx = position[0] - target[0], zy = position[1] - target[1], zz = position[2] - target[2];
   const length = Math.hypot(zx, zy, zz);
   if (!length) throw new RangeError('Camera position equals target');
   zx /= length; zy /= length; zz /= length;
-  const horizontal = Math.hypot(zx, zz);
-  if (!horizontal) throw new RangeError('Camera is parallel to Y up');
-  const xx = zz / horizontal, xz = -zx / horizontal, yx = zy * xz, yy = zz * xx - zx * xz, yz = -zy * xx, p = position;
+  const u = up; let xx = u[1] * zz - u[2] * zy, xy = u[2] * zx - u[0] * zz, xz = u[0] * zy - u[1] * zx; const side = Math.hypot(xx, xy, xz);
+  if (!side) throw new RangeError('Camera is parallel to its up vector');
+  xx /= side; xy /= side; xz /= side; const yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx, p = position;
   out.fill(0);
-  out[0] = xx; out[1] = yx; out[2] = zx; out[5] = yy; out[6] = zy; out[8] = xz; out[9] = yz; out[10] = zz;
-  out[12] = -xx * p[0] - xz * p[2]; out[13] = -yx * p[0] - yy * p[1] - yz * p[2]; out[14] = -zx * p[0] - zy * p[1] - zz * p[2]; out[15] = 1;
+  out[0] = xx; out[1] = yx; out[2] = zx; out[4] = xy; out[5] = yy; out[6] = zy; out[8] = xz; out[9] = yz; out[10] = zz;
+  out[12] = -xx * p[0] - xy * p[1] - xz * p[2]; out[13] = -yx * p[0] - yy * p[1] - yz * p[2]; out[14] = -zx * p[0] - zy * p[1] - zz * p[2]; out[15] = 1;
   return out;
 }
 

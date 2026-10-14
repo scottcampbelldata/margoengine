@@ -1,3 +1,4 @@
+import type {EngineKernel} from '@margoengine/core';
 declare global {var margoLow: number | undefined;}
 declare const GPUQueue: {prototype: QueueLike} | undefined;
 interface QueueLike {submit(buffers: unknown): unknown; onSubmittedWorkDone(): Promise<unknown>}
@@ -23,7 +24,7 @@ const local = (): QualityOptions['storage'] => {try {return globalThis.localStor
 
 /** Choose this page's tier. Call once, before creating any engine: core reads `globalThis.margoLow` when it builds
  * pipelines and sizes the canvas. Desktops start light unless this browser already measured headroom for 4x, so a slow
- * PC never shows a slow phase or a reload; the light tier is also held to ~60 FPS. */
+ * PC never shows a slow phase or a reload; `paceEngine` then holds light-tier engines to ~60 FPS. */
 export function applyQualityTier({search = globalThis.location?.search, storage = local(), userAgent = globalThis.navigator?.userAgent ?? ''}: QualityOptions = {}): QualityTier {
   const params = new URLSearchParams(search), forced = params.get('quality') ?? undefined;
   let stored: string | undefined;
@@ -31,25 +32,26 @@ export function applyQualityTier({search = globalThis.location?.search, storage 
   const choice = forced === 'high' || forced === 'low' ? forced : stored;
   const tier: QualityTier = /Mobi|Android/.test(userAgent) ? 'phone' : choice === 'high' ? 'high' : 'light';
   if (tier !== 'light') delete globalThis.margoLow;
-  else {
-    globalThis.margoLow = Math.min(2, Math.max(1, Number(params.get('scale')) || 1));
-    // A slow GPU on a 120 Hz panel otherwise swings between 120 and 40 FPS.
-    if (typeof requestAnimationFrame === 'function') capFrameRate();
-  }
+  else globalThis.margoLow = Math.min(2, Math.max(1, Number(params.get('scale')) || 1));
   state = {tier, stored: choice, forced: forced === 'high' || forced === 'low' ? forced : undefined, storage};
   return tier;
 }
 
-/** Skip display refreshes so callbacks run at about `rate` per second (60 on 60/120/240 Hz, 72 on 144 Hz).
- * Every callback requested for one refresh shares its fate, so paired callbacks stay in step.
- * ponytail: patches the global because core's frame loop is frozen; a skipped request cannot be cancelled by id. */
-export function capFrameRate(rate = 60, target: {requestAnimationFrame(callback: (time: number) => void): number} = globalThis): void {
-  const native = target.requestAnimationFrame.bind(target), gap = 1000 / rate - 4;
+/** An engine from `Engine.create` / `createStage` (EngineKernel) or the runtime `Engine` from core's extension API. */
+export type Paced = EngineKernel | {pace?: (time: number) => boolean};
+
+/** Set `engine.pace` so the engine renders about `rate` frames per second (60 on 60/120/240 Hz, 72 on 144 Hz): it skips
+ * a display refresh that comes sooner than 4 ms before the next frame is due. */
+export function capFrameRate(engine: Paced, rate = 60): void {
+  const gap = 1000 / rate - 4;
   let last = -Infinity;
-  target.requestAnimationFrame = callback => native(function step(time: number): number | void {
-    if (time !== last && time - last < gap) return native(step);
-    last = time; callback(time);
-  });
+  (engine as {pace?: (time: number) => boolean}).pace = time => time - last < gap ? false : (last = time, true);
+}
+
+/** Apply the chosen tier's frame cap to an engine; call right after creating it. On the light tier a slow GPU on a
+ * 120 Hz panel otherwise swings between 120 and 40 FPS, so it is held to ~60 FPS; other tiers are left uncapped. */
+export function paceEngine(engine: Paced): void {
+  if ((state ?? (applyQualityTier(), state!)).tier === 'light') capFrameRate(engine);
 }
 
 export interface WatchOptions {
@@ -85,7 +87,7 @@ export function watchQuality({request = globalThis.requestAnimationFrame?.bind(g
   }
   if (current.stored || !queue?.submit) return;
   const submit = queue.submit, times: number[] = [];
-  let frames = 0, done = false;
+  let first = -1, elapsed = 0, done = false;
   const finish = () => {
     done = true; if (queue.submit === measured) queue.submit = submit;
     if (times.length < 120) return;
@@ -95,11 +97,11 @@ export function watchQuality({request = globalThis.requestAnimationFrame?.bind(g
   function measured(this: QueueLike, buffers: unknown): unknown {
     const start = now(), result = submit.call(this, buffers);
     // Skip two seconds of startup (shader compiles, uploads); then sample 120 submissions.
-    if (frames > 120 && !done) void this.onSubmittedWorkDone().then(() => {if (!done && times.push(now() - start) === 120) finish();});
+    if (elapsed > 2000 && !done) void this.onSubmittedWorkDone().then(() => {if (!done && times.push(now() - start) === 120) finish();});
     return result;
   }
   queue.submit = measured;
-  const count = () => {if (done) return; if (++frames > 600) finish(); else request(count);};
+  const count = (time: number) => {if (done) return; if (first < 0) first = time; if ((elapsed = time - first) > 10000) finish(); else request(count);};
   request(count);
 }
 export {frameDue, frameStatus} from './pacing.js';

@@ -27,6 +27,12 @@ export interface PBRPrimitive {
   buffers?: {vertex: GPUBuffer; index: GPUBuffer};
 }
 export interface PreparedGeometry {vertices:Float32Array;indices:Uint32Array}
+/**
+ * Optional beauty-pass pipeline overrides, set as `primitive.material.renderState` (shared by every primitive using
+ * that material). Unset fields keep gltf-pro's defaults; `blend: null` turns blending off. The state is part of the
+ * pipeline cache key, so treat it as fixed (replace the object to change it). G-buffer and ambient passes ignore it.
+ */
+export interface PBRRenderState {blend?:GPUBlendState|null;depthWrite?:boolean;depthCompare?:GPUCompareFunction}
 export function validatePreparedGeometry(data:PreparedGeometry):void {
   const {vertices,indices}=data,count=vertices?.length/20;
   if(!(vertices instanceof Float32Array)||!(indices instanceof Uint32Array)||!Number.isInteger(count)||count<3||count>1_000_000||!indices.length||indices.length%3)throw new RangeError('Invalid prepared PBR geometry');
@@ -270,13 +276,14 @@ export class PBRModel implements EnginePlugin {
       if(mode==='beauty')for(const effect of this.lighting)code=effect.shader(code,2);
       // Keep the shader's original front-facing convention, including mirrored transforms.
       const cull:GPUCullMode=m.settings[2]<0.5?(v[97]>0?'back':'front'):'none';
-      const transmit=!!m.tint,blend=blended(m),key=mode+':'+c.format+':'+blend+transmit+':'+cull+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+code;
+      const state:PBRRenderState|undefined=mode==='beauty'?m.renderState:undefined;
+      const transmit=!!m.tint,blend=blended(m),key=mode+':'+c.format+':'+blend+transmit+':'+cull+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+(state?JSON.stringify(state):'')+code;
       let pipeline=this.pipelines.get(key);
       if(!pipeline) {
         const module=c.device.createShaderModule({code}),format=mode==='beauty'?c.format:'rgba16float';
         pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:80,attributes:Array.from({length:5},(_,i)=>({shaderLocation:i,offset:i*16,format:'float32x4' as const}))}]},
-          fragment:{module,entryPoint:mode==='beauty'?'fragment':mode==='gbuffer'?'gbuffer':'ambientFragment',targets:[{format,blend:blend&&mode!=='gbuffer'?{color:transmit?{srcFactor:'one',dstFactor:'constant'}:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
-          multisample:c.descriptor.multisample,primitive:{cullMode:cull},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:mode==='beauty'&&!blend,depthCompare:mode==='beauty'?'greater-equal':'equal'}});
+          fragment:{module,entryPoint:mode==='beauty'?'fragment':mode==='gbuffer'?'gbuffer':'ambientFragment',targets:[{format,blend:state?.blend!==undefined?state.blend??undefined:blend&&mode!=='gbuffer'?{color:transmit?{srcFactor:'one',dstFactor:'constant'}:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
+          multisample:c.descriptor.multisample,primitive:{cullMode:cull},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:state?.depthWrite??(mode==='beauty'&&!blend),depthCompare:state?.depthCompare??(mode==='beauty'?'greater-equal':'equal')}});
         this.pipelines.set(key,pipeline);
       }
       let groups=r.groups.get(pipeline);

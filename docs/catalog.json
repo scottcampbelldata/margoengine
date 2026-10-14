@@ -1025,6 +1025,7 @@
       "capFrameRate",
       "frameDue",
       "frameStatus",
+      "paceEngine",
       "sceneSamples",
       "watchQuality"
     ]

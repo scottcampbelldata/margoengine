@@ -1,6 +1,7 @@
 import type {Engine, EnginePlugin, FrameGraph, PassContext} from '@margoengine/core/extension';
 import {engineRuntime, meshRuntime} from '@margoengine/core/extension';
 import type {EngineKernel, Mesh} from '@margoengine/core';
+import {viewMatrix} from '../../shared/view.js';
 import {PointCloud} from './cloud.js';
 import {SpriteBatch, SPRITE_STRIDE} from './sprites.js';
 import type {PointsMaterial, SpriteMaterial, TextureSource} from './material.js';
@@ -107,6 +108,7 @@ export class PointsPlugin implements EnginePlugin {
   private readonly edlData = new Float32Array(4);
   private orthographic = false;
   private readonly lastViewProj = new Float32Array(16);
+  private readonly view = new Float32Array(16);
   private lastSize: [number, number] = [0, 0];
   private hasFrame = false;
   private readonly box = new Float64Array(6);
@@ -449,12 +451,9 @@ export class PointsPlugin implements EnginePlugin {
     f[19] = context.format.endsWith('-srgb') || context.format.includes('float') ? 0 : 1;
     if (this.orthographic) {f[20] = 0; f[21] = Math.hypot(c[2], c[6], c[10]); f[22] = 1; f[23] = 1;}
     else {f[20] = camera.near / (camera.far - camera.near); f[21] = camera.far * camera.near / (camera.far - camera.near); f[22] = camera.near; f[23] = 0;}
-    // Camera basis, matching Camera.update.
-    const p = camera.position, t = camera.target;
-    let zx = p[0] - t[0], zy = p[1] - t[1], zz = p[2] - t[2];
-    const length = Math.hypot(zx, zy, zz) || 1; zx /= length; zy /= length; zz /= length;
-    const horizontal = Math.hypot(zx, zz) || 1, xx = zz / horizontal, xz = -zx / horizontal;
-    f.set([xx, 0, xz, 0, zy * xz, zz * xx - zx * xz, -zy * xx, 0, zx, zy, zz, 0], 24);
+    // Camera basis (right, up, back), matching Camera.update including camera.up.
+    const v = viewMatrix(this.view, camera);
+    f.set([v[0], v[4], v[8], 0, v[1], v[5], v[9], 0, v[2], v[6], v[10], 0], 24);
     this.device!.queue.writeBuffer(this.gpu!.frame, 0, f);
     this.lastViewProj.set(camera.matrix); this.lastSize = [context.width, context.height]; this.hasFrame = true;
   }

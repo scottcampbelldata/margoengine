@@ -1,9 +1,8 @@
 import type {EngineKernel} from '@margoengine/core';
-import {engineRuntime,type Engine,type PassContext} from '@margoengine/core/extension';
-import {GLTFAsset,PBRModel,type PreparedGeometry} from '@margoengine/gltf-pro';
+import {engineRuntime,type Engine} from '@margoengine/core/extension';
+import {GLTFAsset,PBRModel,type PreparedGeometry,type PBRRenderState} from '@margoengine/gltf-pro';
 import {readResponse} from '../../shared/loading.js';
 declare const GPUTextureUsage:{TEXTURE_BINDING:number;COPY_DST:number;RENDER_ATTACHMENT:number};
-type Context=Extract<PassContext,{backend:'webgpu'}>;
 export type RawImage={data:Uint8Array|Uint8ClampedArray;width:number;height:number};
 /** ImageData and `{data,width,height}` upload as raw RGBA8 rows (row 0 at UV v=0); other sources use copyExternalImageToTexture. */
 export type TextureSource=ImageBitmap|HTMLImageElement|HTMLCanvasElement|OffscreenCanvas|HTMLVideoElement|VideoFrame|ImageData|RawImage;
@@ -172,21 +171,11 @@ export function packGeometry(g:MeshGeometry):PreparedGeometry {
   }
   out={vertices:v,indices:g.indices?Uint32Array.from(g.indices):Uint32Array.from({length:count},(_,i)=>i)};packed.set(g,out);return out;
 }
-interface Entry {model:PBRModel;material:Material;order:number;device?:GPUDevice;proxy?:GPUDevice}
-const queues=new WeakMap<Engine,Set<Entry>>(),blends:Record<Blending,GPUBlendState|undefined>={normal:undefined,none:undefined,
+interface Entry {model:PBRModel;material:Material;order:number}
+const blends:Record<Blending,GPUBlendState|null|undefined>={normal:undefined,none:null,
   additive:{color:{srcFactor:'src-alpha',dstFactor:'one'},alpha:{srcFactor:'one',dstFactor:'one'}},multiply:{color:{srcFactor:'zero',dstFactor:'src'},alpha:{srcFactor:'zero',dstFactor:'src-alpha'}}};
+const queues=new WeakMap<Engine,Set<Entry>>();
 let serial=0;
-function context(c:Context,e:Entry):Context {
-  const m=e.material;if(!m.customState)return c;
-  if(e.device!==c.device){const real=e.device=c.device;e.proxy=new Proxy(real,{get(target,key){
-    const value=Reflect.get(target,key);if(key!=='createRenderPipeline')return typeof value==='function'?value.bind(target):value;
-    return (d:GPURenderPipelineDescriptor)=>{
-      if(d.fragment?.entryPoint!=='fragment')return real.createRenderPipeline(d);const color={...[...d.fragment.targets][0]!};if(m.blending!=='normal')color.blend=blends[m.blending];
-      return real.createRenderPipeline({...d,fragment:{...d.fragment,targets:[color]},depthStencil:{...d.depthStencil!,depthWriteEnabled:m.depthWrite??d.depthStencil!.depthWriteEnabled,depthCompare:m.depthTest?d.depthStencil!.depthCompare:'always'}});
-    };
-  }});}
-  return Object.create(c,{device:{value:e.proxy}});
-}
 /** One pass per engine draws every material mesh: opaque then transparent, each by renderOrder; transparent meshes back to front. */
 function queue(runtime:Engine):Set<Entry> {
   let set=queues.get(runtime);if(set)return set;const entries=set=new Set<Entry>(),name='materials:'+serial++,distance=new Map<Entry,number>();
@@ -194,7 +183,7 @@ function queue(runtime:Engine):Set<Entry> {
     if(c.backend!=='webgpu')return;const eye=c.camera.position;
     for(const e of entries){const m=e.model.primitives[0].node.matrix;distance.set(e,Math.hypot(eye[0]-m[12],eye[1]-m[13],eye[2]-m[14]));}
     const list=[...entries].sort((a,b)=>{const t=+a.material.transparent-+b.material.transparent;return t||a.order-b.order||(a.material.transparent?distance.get(b)!-distance.get(a)!:0);});distance.clear();
-    for(const e of list)e.model.draw(context(c,e),'beauty',c.color,c.depth);
+    for(const e of list)e.model.draw(c,'beauty',c.color,c.depth);
   }});}});
   queues.set(runtime,set);return set;
 }
@@ -208,6 +197,7 @@ export function createMesh(engine:EngineKernel,geometry:MeshGeometry,material:Ma
   const doc={asset:{version:'2.0'},nodes:[{mesh:0}],meshes:[{primitives:[{material:0}]}],materials:[{pbrMetallicRoughness:{baseColorFactor:m.color,roughnessFactor:m.factors[0],metallicFactor:m.factors[1]},emissiveFactor:m.emissive,alphaMode:['OPAQUE','MASK','BLEND'][m.settings[0]],alphaCutoff:m.settings[1],doubleSided:m.doubleSided}]};
   const model=new PBRModel(engine,new GLTFAsset(doc,[]),[],[[packGeometry(geometry)]]);
   Object.assign(model.primitives[0].material,{base:m.color,emission:m.emissive,factors:m.factors,settings:m.settings});
+  if(m.customState)model.primitives[0].material.renderState={blend:blends[m.blending],depthWrite:m.depthWrite,depthCompare:m.depthTest?undefined:'always'} satisfies PBRRenderState;
   model.addLighting({shader:(code,group)=>m.shader(code,group),bindings:()=>m.bindings(runtime.gpu!,runtime)});
   const entry:Entry={model,material:m,order:renderOrder};model.registerPasses=()=>{};
   try{runtime.use(model);}catch(error){model.dispose();throw error;}

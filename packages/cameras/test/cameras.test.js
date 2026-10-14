@@ -7,6 +7,9 @@ import {jitterProjection} from '../../taa/dist/index.js';
 import {fitCascades,cascadeSplits} from '../../shadows/dist/index.js';
 import {OrbitControls} from '../../controls/dist/index.js';
 import {Raycaster} from '../../bvh/dist/index.js';
+import {PointsPlugin,PointCloud} from '../../points/dist/index.js';
+import {lookAtView} from '../../labels/dist/index.js';
+import {optionalGPU} from '../../../tests/support/optional-gpu.js';
 import {CameraProjection} from '../dist/index.js';
 
 const clip=(m,p)=>[0,1,2,3].map(r=>m[r]*p[0]+m[4+r]*p[1]+m[8+r]*p[2]+m[12+r]);
@@ -50,22 +53,27 @@ test('exactly vertical views: core throws, the projection renders north-up and k
     const {camera}=ortho({mode,height:4});camera.position=[1,10,2];camera.target=[1,0,2];camera.update(2,true);
     const centre=ndc(camera.matrix,[1,0,2]),east=ndc(camera.matrix,[1.5,0,2]),north=ndc(camera.matrix,[1,0,1.5]);
     assert.ok(near(centre.slice(0,2),[0,0],1e-6)&&east[0]>0&&Math.abs(east[1])<1e-6&&north[1]>0&&Math.abs(north[0])<1e-6,`${mode}: +x right, -z up`);
-    assert.ok(camera.position[1]===10&&Math.hypot(camera.position[0]-1,camera.position[2]-2)<=1e-8,'nudged a hair off vertical');
-    assert.doesNotThrow(()=>viewMatrix(new Float32Array(16),camera),'shared viewMatrix (shadows, ssao, gltf-pro) accepts it');
-    camera.update(2,true);assert.ok(near(ndc(camera.matrix,[1.5,0,2]),east,1e-6),'stable after the nudge');
+    assert.deepEqual(camera.position,[1,10,2],'position is left exactly vertical');assert.deepEqual(camera.up,[0,0,-1]);
+    const view=viewMatrix(new Float32Array(16),camera),eye=[0,1,2].map(r=>view[r]*1.5+view[8+r]*2+view[12+r]);
+    assert.ok(near(eye,[0.5,0,-10],1e-6),'shared viewMatrix (shadows, ssao, gltf-pro) uses camera.up: +x right, -z up');
+    camera.update(2,true);assert.ok(near(ndc(camera.matrix,[1.5,0,2]),east,1e-6),'stable');
   }
   const below=ortho({mode:'perspective',up:[1,0,0]});below.camera.position=[0,-10,0];below.camera.update(1,true);
   const p=ndc(below.camera.matrix,[1,0,0]);assert.ok(p[1]>0&&Math.abs(p[0])<1e-6,'custom up looking up');
   const bad=ortho({up:[0,1,0]});bad.camera.position=[0,10,0];assert.throws(()=>bad.camera.update(1,true),/vertical up/);
 });
 
-test('perspective mode leaves non-vertical views to core exactly; dispose restores core update', () => {
+test('perspective mode leaves non-vertical views to core exactly; dispose restores core project and up', () => {
   const reference=new Camera({position:[3,4,5],target:[0,1,0]});reference.update(1.3,true);
   const {camera,p}=ortho({mode:'perspective'},new Camera({position:[3,4,5],target:[0,1,0]}));camera.update(1.3,true);
   assert.deepEqual([...camera.matrix],[...reference.matrix]);assert.deepEqual([...camera.planes],[...reference.planes]);
   p.mode='orthographic';camera.update(1.3,true);assert.notDeepEqual([...camera.matrix],[...reference.matrix]);
+  assert.deepEqual(camera.up,[0,1,0],'non-vertical views keep world up');camera.up=[0,1,0];
   p.dispose();camera.update(1.3,true);assert.deepEqual([...camera.matrix],[...reference.matrix]);
+  assert.equal(camera.project,undefined);assert.ok(Object.getOwnPropertyDescriptor(camera,'up').writable,'up is a plain field again');
+  camera.position=[0,9,0];assert.throws(()=>camera.update(1.3,true),/Vertical camera/,'core behaviour after dispose');
   assert.throws(()=>{const q=new CameraProjection();q.attach(camera);q.attach(camera);},/attached/);
+  assert.throws(()=>new CameraProjection().attach(camera),/already set/);
 });
 
 test('culling planes enclose exactly the orthographic box', () => {
@@ -126,4 +134,31 @@ test('taa jitter and shadow cascades accept the orthographic and vertical camera
   const jittered=jitterProjection(new Float32Array(16),camera.matrix,3,400,200),a=ndc(camera.matrix,[0.3,0,0.2]),b=ndc(jittered,[0.3,0,0.2]);
   assert.ok(Math.abs(b[0]-a[0])<=1/400&&Math.abs(b[1]-a[1])<=1/200&&(b[0]!==a[0]||b[1]!==a[1]),'sub-pixel constant offset');
   const splits=cascadeSplits(camera.near,50);assert.doesNotThrow(()=>fitCascades(camera,2,[0.3,-1,0.2],2048,splits));
+});
+
+test('an exact top-down view reaches shared viewMatrix, labels and points through camera.up', async () => {
+  const h=optionalGPU(),store=await TransformStore.create(16);
+  globalThis.GPUShaderStage??={VERTEX:1,FRAGMENT:2,COMPUTE:4};globalThis.GPUTextureUsage??={COPY_SRC:1,COPY_DST:2,TEXTURE_BINDING:4,STORAGE_BINDING:8,RENDER_ATTACHMENT:16};
+  h.engine.gpu.createBindGroupLayout??=d=>({...d});h.engine.gpu.createPipelineLayout??=d=>({...d});
+  const e=new Engine({width:400,height:200,clientWidth:400,clientHeight:200},store,{backend:'webgpu',gpu:h.engine.gpu,add(){},remove(){},render(){},dispose(){}},{position:[1,10,2],target:[1,0,2],near:1,far:100},null);
+  try {
+    e.use(new CameraProjection({height:4}));e.camera.update(2,true);
+    const shared=viewMatrix(new Float32Array(16),e.camera);
+    // Right is +x, up is -z, back is +y: north up looking straight down.
+    assert.deepEqual([shared[0],shared[4],shared[8],shared[1],shared[5],shared[9],shared[2],shared[6],shared[10]].map(v=>Math.round(v)+0),[1,0,0,0,0,-1,0,1,0]);
+    assert.ok(near([...lookAtView(e.camera.position,e.camera.target,undefined,e.camera.up)],[...shared]),'labels CSS camera');
+    const points=new PointsPlugin();e.use(points);points.add(new PointCloud({positions:new Float32Array([1,0,2,1.5,0,2,1,0,1.5])}));
+    e.frameGraph.execute({...h.context,camera:e.camera});
+    const frame=h.resources.filter(r=>r.size===144&&r.data).map(r=>new Float32Array(r.data)).find(f=>f[16]);
+    assert.ok(frame,'points wrote its frame uniform');
+    assert.ok(near([...frame.subarray(24,36)],[shared[0],shared[4],shared[8],0,shared[1],shared[5],shared[9],0,shared[2],shared[6],shared[10],0]),'points camera basis');
+  } finally {e.dispose();h.cleanup();}
+});
+
+test('labels lookAtView and shared viewMatrix match core for the default up', () => {
+  for(let i=0;i<200;i++){
+    const camera=new Camera({position:[Math.random()*20-10,Math.random()*20-10,Math.random()*20-10],target:[Math.random(),Math.random(),Math.random()]});
+    const v=viewMatrix(new Float32Array(16),camera),l=lookAtView(camera.position,camera.target);
+    assert.deepEqual([...v],[...Float32Array.from(l)]);
+  }
 });

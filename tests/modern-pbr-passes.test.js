@@ -116,6 +116,26 @@ test('PBR culls authored single-sided faces in every pass and reuses mirrored an
   assert.ok(resources.every(resource => resource.destroyed));
 });
 
+test('material renderState overrides only beauty pipelines, keys the cache and leaves other materials untouched', async () => {
+  const {engine, model, context, color, depth, passes, pipelines} = await scene();
+  const draws = mode => {const start = passes.length; model.draw(context, mode, color, depth); return new Map(passes.slice(start).flatMap(pass => pass.draws).map(draw => [draw.node, draw.pipeline]));};
+  try {
+    const plain = draws('beauty'), initial = pipelines.length;
+    const [blend, , , opaque] = model.primitives.map(p => p.material), additive = {color: {srcFactor: 'one', dstFactor: 'one'}, alpha: {srcFactor: 'one', dstFactor: 'one'}};
+    blend.renderState = {blend: null, depthWrite: true}; opaque.renderState = {blend: additive, depthCompare: 'always'};
+    const custom = draws('beauty');
+    assert.equal(pipelines.length, initial + 2, 'renderState is part of the pipeline key');
+    const a = custom.get(model.nodes[0]), b = custom.get(model.nodes[3]);
+    assert.equal(a.fragment.targets[0].blend, undefined, 'blend: null turns blending off'); assert.equal(a.depthStencil.depthWriteEnabled, true); assert.equal(a.depthStencil.depthCompare, 'greater-equal');
+    assert.deepEqual(b.fragment.targets[0].blend, additive); assert.equal(b.depthStencil.depthCompare, 'always'); assert.equal(b.depthStencil.depthWriteEnabled, true);
+    for (const node of [model.nodes[1], model.nodes[2]]) assert.equal(custom.get(node), plain.get(node), 'other materials keep their pipelines');
+    for (const mode of ['gbuffer', 'ambient']) for (const pipeline of draws(mode).values()) assert.equal(pipeline.depthStencil.depthCompare, 'equal', `${mode} ignores renderState`);
+    delete blend.renderState; delete opaque.renderState; const after = pipelines.length, restored = draws('beauty');
+    assert.equal(pipelines.length, after, 'without renderState the default pipelines are reused');
+    for (const node of model.nodes) assert.equal(restored.get(node), plain.get(node));
+  } finally {engine.dispose();}
+});
+
 test('PBR closes a partially encoded pass after an upload failure and remains usable', async () => {
   const {engine, model, context, color, depth, passes, resources} = await scene();
   const queue = engine.gpu.queue, write = queue.writeBuffer;

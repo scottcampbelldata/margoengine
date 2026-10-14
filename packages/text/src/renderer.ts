@@ -1,6 +1,7 @@
 import type {Engine, EnginePlugin, FrameGraph, PassContext} from '@margoengine/core/extension';
 import {engineRuntime, meshRuntime} from '@margoengine/core/extension';
 import type {EngineKernel, Mesh} from '@margoengine/core';
+import {viewMatrix} from '../../shared/view.js';
 import {GlyphAtlas} from './atlas.js';
 import {encodeSrgb} from './color.js';
 import {multiply} from './math.js';
@@ -70,6 +71,7 @@ export class TextRenderer implements EnginePlugin {
   private sdfAtlas?: GlyphAtlas;
   private colorAtlas?: GlyphAtlas;
   private readonly frameData = new Float32Array(28);
+  private readonly view = new Float32Array(16);
   private readonly depthTexts: Array<[Text, Resources]> = [];
   private readonly topTexts: Array<[Text, Resources]> = [];
   private readonly colorAttachment: GPURenderPassColorAttachment = {view: undefined!, loadOp: 'load', storeOp: 'store'};
@@ -281,12 +283,10 @@ export class TextRenderer implements EnginePlugin {
   private writeFrame(context: GpuContext, linearTarget: boolean): void {
     const camera = context.camera, data = this.frameData;
     data.set(camera.matrix, 0);
-    // Camera basis, as Camera.update builds its view matrix: right = (z.z, 0, -z.x) / |z.xz|, up = z x right.
-    let zx = camera.position[0] - camera.target[0], zy = camera.position[1] - camera.target[1], zz = camera.position[2] - camera.target[2];
-    const length = Math.hypot(zx, zy, zz) || 1; zx /= length; zy /= length; zz /= length;
-    const horizontal = Math.hypot(zx, zz) || 1, xx = zz / horizontal, xz = -zx / horizontal;
-    data[16] = xx; data[17] = 0; data[18] = xz; data[19] = 0;
-    data[20] = zy * xz; data[21] = zz * xx - zx * xz; data[22] = -zy * xx; data[23] = 0;
+    // Camera basis (right, up), as Camera.update builds its view matrix including camera.up.
+    const v = viewMatrix(this.view, camera);
+    data[16] = v[0]; data[17] = v[4]; data[18] = v[8]; data[19] = 0;
+    data[20] = v[1]; data[21] = v[5]; data[22] = v[9]; data[23] = 0;
     data[24] = linearTarget ? 1 : 0; data[25] = data[26] = data[27] = 0;
     this.device!.queue.writeBuffer(this.frameBuffer!, 0, data);
   }

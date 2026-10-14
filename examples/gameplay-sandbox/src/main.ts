@@ -14,8 +14,7 @@ import {Clustered} from '@margoengine/clustered';
 import {createCharacter, createLandscape, terrainHeight} from './scene.js';
 import {stepLocomotion, type LocomotionOptions} from '@margoengine/controls';
 import {createProceduralSettlement} from './procedural/index.js';
-import {sceneSamples} from '@margoengine/quality';
-import {applyQualityTier, watchQuality} from '@margoengine/quality';
+import {applyQualityTier, paceEngine, sceneSamples, watchQuality} from '@margoengine/quality';
 import './style.css';
 
 // Before any engine exists: core reads the tier when it builds pipelines and sizes the canvas.
@@ -33,6 +32,7 @@ async function boot(): Promise<void> {
   window.addEventListener('pagehide', () => dispose(), {once: true});
   const engine = await EngineKernel.create(canvas, {backend: 'webgpu', capacity: 256, camera: {position: [8, 7, 25], target: [0, 2, 0], near: 0.15, far: 300, fov: 58}});
   if (signal.aborted) {engine.dispose(); return;}
+  paceEngine(engine);
   const runtime = engineRuntime(engine);
   let input: Input | undefined, shadow: Shadows | undefined, disposed = false, playing = !matchMedia('(prefers-reduced-motion: reduce)').matches, timer: ReturnType<typeof setInterval> | undefined;
   dispose = () => {if (disposed) return; disposed = true; events.abort(); clearInterval(timer); input?.dispose(); shadow?.dispose(); engine.dispose();};

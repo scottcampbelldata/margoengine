@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {applyQualityTier, watchQuality, capFrameRate} from '../dist/index.js';
+import {applyQualityTier, watchQuality, capFrameRate, paceEngine} from '../dist/index.js';
 import {Engine} from '../../core/dist/engine.js';
 import {TransformStore} from '../../core/dist/kernel.js';
 import {sceneSamples} from '../../core/dist/quality.js';
@@ -73,11 +73,43 @@ test('the light tier renders HiDPI desktops single-sampled at its pixel ratio', 
 });
 
 test('the light-tier cap runs every other refresh of a 120 Hz display and every refresh at 60 Hz', () => {
-  for (const [hz, expected] of [[120, 60], [60, 60], [144, 72]]) {
-    const queue = [], target = {requestAnimationFrame: callback => queue.push(callback)};
-    capFrameRate(60, target);
-    let runs = 0; const loop = () => {runs++; target.requestAnimationFrame(loop);}; target.requestAnimationFrame(loop);
-    for (let frame = 1; frame <= hz; frame++) for (const callback of queue.splice(0)) callback(frame * 1000 / hz);
+  for (const [hz, expected] of [[120, 60], [60, 60], [144, 72], [240, 60]]) {
+    const engine = {};
+    capFrameRate(engine);
+    let runs = 0;
+    for (let frame = 1; frame <= hz; frame++) runs += engine.pace(frame * 1000 / hz);
     assert.equal(runs, expected, `${hz} Hz`);
   }
+});
+
+test('paceEngine caps a light-tier engine through engine.pace without touching requestAnimationFrame', async () => {
+  const frames = [], saved = globalThis.requestAnimationFrame, savedCancel = globalThis.cancelAnimationFrame;
+  globalThis.requestAnimationFrame = callback => frames.push(callback); globalThis.cancelAnimationFrame = () => {};
+  const raf = globalThis.requestAnimationFrame;
+  try {
+    for (const [userAgent, quality, expected] of [[desktop, '', 60], [desktop, 'high', 120], [phone, '', 120]]) {
+      applyQualityTier({search: '', storage: memory(quality ? {margoQuality: quality} : {}), userAgent});
+      assert.equal(globalThis.requestAnimationFrame, raf, 'the global is left alone');
+      const engine = new Engine({width: 4, height: 4, clientWidth: 4, clientHeight: 4}, await TransformStore.create(1), {backend: 'webgpu', add() {}, remove() {}, render() {}, dispose() {}}, undefined, null);
+      let rendered = 0; engine.onFrame(() => rendered++); paceEngine(engine); engine.start();
+      for (let refresh = 1; refresh <= 120; refresh++) frames.shift()(refresh * 1000 / 120);
+      assert.equal(rendered, expected, `${userAgent.slice(13, 20)} ${quality}`); engine.dispose(); frames.length = 0;
+    }
+  } finally {globalThis.requestAnimationFrame = saved; globalThis.cancelAnimationFrame = savedCancel; delete globalThis.margoLow;}
+});
+
+test('the light-tier measurement skips two seconds and gives up after ten, at any refresh rate', () => {
+  try {
+    for (const hz of [60, 120]) {
+      const frames = [], stored = [];
+      const queue = {submit() {}, onSubmittedWorkDone() {return new Promise(() => {});}};
+      applyQualityTier({search: '', storage: memory(), userAgent: desktop});
+      watchQuality({request: callback => frames.push(callback), queue, now: () => 0, store: value => stored.push(value)});
+      let refresh = 0, firstSample;
+      queue.onSubmittedWorkDone = () => {firstSample ??= (refresh - 1) * 1000 / hz; return new Promise(() => {});};
+      while (frames.length && refresh < hz * 20) {frames.shift()(500 + refresh++ * 1000 / hz); queue.submit([]);}
+      assert.ok(firstSample > 2000 && firstSample <= 2000 + 1000 / hz, `${hz} Hz: sampling starts after 2 s (${firstSample})`);
+      assert.ok(Math.abs(refresh / hz - 10) <= 3 / hz, `${hz} Hz: stops after 10 s (${refresh / hz})`); assert.deepEqual(stored, [], 'too few samples store nothing');
+    }
+  } finally {delete globalThis.margoLow;}
 });

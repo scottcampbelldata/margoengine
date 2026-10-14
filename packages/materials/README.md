@@ -26,7 +26,7 @@ For node-based colour, normal, roughness, emissive, opacity and vertex offsets, 
 
 Sorting matches Three.js: all material meshes draw in one pass, opaque first, then transparent back to front, each group by `renderOrder`.
 
-Limits: one material per mesh (geometry `groups` are ignored); UVs and the vertex arrays are packed once per geometry object, so edit a copy rather than the original; shading and render state are fixed at construction. Maps are bound by a gltf-pro lighting hook, so they apply to the lit colour only: SSAO normals and shadow alpha cut-outs ignore `normalMap` and `map` alpha. Basic and matcap output skips ACES tone mapping. No Lambert, Phong, depth or physical (clearcoat, transmission) materials, no texture transforms or second UV set, and no WebGL2 path.
+Limits: one material per mesh (geometry `groups` are ignored); UVs and the vertex arrays are packed once per geometry object, so edit a copy rather than the original; shading and render state are fixed at construction (render state goes through gltf-pro's `material.renderState` pipeline hook). Maps are bound by a gltf-pro lighting hook, so they apply to the lit colour only: SSAO normals and shadow alpha cut-outs ignore `normalMap` and `map` alpha. Basic and matcap output skips ACES tone mapping. No Lambert, Phong, depth or physical (clearcoat, transmission) materials, no texture transforms or second UV set, and no WebGL2 path.
 
 MIT. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
