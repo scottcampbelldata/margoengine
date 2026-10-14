@@ -118,10 +118,15 @@ Supported glTF extensions: `KHR_mesh_quantization`, `KHR_texture_transform`, `KH
 This package does not import `@margoengine/decoders`. Pass decoders in, so files without compression pay nothing:
 
 ```ts
+import {createStage} from 'margoengine';
+import {engineRuntime} from '@margoengine/core/extension';
 import {loadGLTF, parseGLTFAsync} from '@margoengine/gltf-pro';
 import {DracoDecoder, KTX2Decoder, MeshoptDecoder} from '@margoengine/decoders';
 
-const decoders = {draco: new DracoDecoder(), meshopt: MeshoptDecoder, ktx2: new KTX2Decoder({device: stage.engine.gpu})};
+declare const file: File; // e.g. from a file input or a drop
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const device = engineRuntime(stage.engine).gpu ?? undefined; // lets KTX2 pick BC7/ASTC/ETC2 when enabled
+const decoders = {draco: new DracoDecoder(), meshopt: MeshoptDecoder, ktx2: new KTX2Decoder({device})};
 const model = await loadGLTF(stage.engine, '/gltfpack-output.glb', {decoders});
 const dropped = await parseGLTFAsync(stage.engine, await file.arrayBuffer(), {decoders}); // in-memory GLB/JSON
 // decoders.draco.dispose(); decoders.ktx2.dispose(); when no more loads are expected.

@@ -22,9 +22,9 @@ for(const name of names){
   for(const entry of Object.values(manifest.exports))for(const target of Object.values(entry))assert.ok(files.has(target.slice(2)),`Missing packed export: ${manifest.name} ${target}`);
   dependencies[packageName(name)]=`file:${join(archives,pack.filename).replaceAll('\\','/')}`;
 }
-// Required dependencies of the packages above (machinery, terrain, controls; math since the math consolidation) that are not on
-// npm yet; packed as built.
-for(const name of ['geometry','lines','text','bvh','math']){
+// Required dependencies of the packages above (machinery, terrain, controls; math since the math consolidation) and packages
+// their README examples import (materials, decoders, dof, tonemap) that are not on npm yet; packed as built.
+for(const name of ['geometry','lines','text','bvh','math','materials','decoders','dof','tonemap']){
   const [pack]=JSON.parse(execFileSync(process.execPath,[npm,'pack','--workspace',packageName(name),'--ignore-scripts','--pack-destination',archives,'--json'],{encoding:'utf8'}));
   dependencies[packageName(name)]=`file:${join(archives,pack.filename).replaceAll('\\','/')}`;
 }
@@ -98,10 +98,13 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
 `);
   execFileSync(process.execPath,[resolve('node_modules/typescript/bin/tsc'),'-p',join(fixture,'tsconfig.json')],{stdio:'inherit'});
   execFileSync(process.execPath,[join(fixture,'out/consumer.js')],{cwd:fixture,stdio:'inherit'});
-  for(const directory of ['react/test','react/tests','react/dist','gltf-pro/src'])await mkdir(join(fixture,directory),{recursive:true});
+  for(const directory of ['react/test','react/tests','react/dist','environment/dist','gltf-pro/src','shared'])await mkdir(join(fixture,directory),{recursive:true});
   await writeFile(join(fixture,'react/dist/index.js'),"export * from '@margoengine/react';\n");
+  await copyFile(join(fixture,'node_modules/@margoengine/react/dist/components.js'),join(fixture,'react/dist/components.js')); // read as text by a staleness check
+  // declarative.test.js takes the real EnvironmentLighting from ../../environment/dist before it mocks the package.
+  await writeFile(join(fixture,'environment/dist/index.js'),"export * from '@margoengine/environment';\n");
   for(const file of ['test/declarative.test.js','tests/react.test.js'])await copyFile(`packages/react/${file}`,join(fixture,'react',file));
-  await copyFile('packages/gltf-pro/src/shader.ts',join(fixture,'gltf-pro/src/shader.ts'));
+  await copyFile('packages/gltf-pro/src/shader.ts',join(fixture,'gltf-pro/src/shader.ts'));await copyFile('packages/shared/aces.js',join(fixture,'shared/aces.js')); // shader.ts imports ../../shared/aces.js
   execFileSync(process.execPath,['--experimental-test-module-mocks','--test',join(fixture,'react/test/declarative.test.js'),join(fixture,'react/tests/react.test.js')],{cwd:fixture,stdio:'inherit'});
   const aliases={'@margoengine/core/extension':join(fixture,'node_modules/@margoengine/core/dist/extension.js'),react:join(fixture,'node_modules/react'),'react-dom':join(fixture,'node_modules/react-dom')};
   aliases['@margoengine/core/extension']=join(fixture,'node_modules/@margoengine/core/dist/extension.js');

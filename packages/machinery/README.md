@@ -62,11 +62,16 @@ Telemetry accepts little-endian `[u32 timestampMs, u16 count, (u16 jointIndex, f
 `Dimensions` draws CAD dimension callouts on the GPU: linear distances with extension lines, arrowheads and a label, angles (arc) and radii or diameters (leader). They keep a constant screen size at any zoom, perspective or orthographic (`@margoengine/cameras`), and read the same anchors as metrology and `EngineeringAnnotations`, so a machinery `Dimension` can be added as is.
 
 ```ts
+import {Engine, box} from '@margoengine/core';
 import {Dimensions} from '@margoengine/machinery/dimensions';
 import {vertexAnchor, holeAnchor} from '@margoengine/machinery/metrology';
 
+const engine = await Engine.create(document.querySelector('canvas')!);
+const part = engine.createMesh().setGeometry(box(0.25, 0.1, 0.1)); // stands in for a CAD part
+const ring = [8, 9, 10, 11];                                          // vertex indices around a hole in your part
 const dims = Dimensions.attach(engine, {unit: 'mm', decimals: 1, color: '#ffa76c', fontSize: 14});
-dims.add({a: vertexAnchor(part, 0), b: vertexAnchor(part, 5)});                          // "250.0 mm", 24 px off the part
+const a = vertexAnchor(part, 0), b = vertexAnchor(part, 5);
+const spec = dims.add({a, b});                                                            // "250.0 mm", 24 px off the part
 dims.add({a, b, offset: -40, label: 'B'});                                                // other side, own text
 dims.add({kind: 'angle', vertex: vertexAnchor(part, 0), a: vertexAnchor(part, 1), b: vertexAnchor(part, 3)}); // "90.0°"
 dims.add({kind: 'radius', center: holeAnchor(part, ring), a: vertexAnchor(part, ring[0]), diameter: true});   // "Ø12.0 mm"

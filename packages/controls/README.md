@@ -40,16 +40,20 @@ gizmo.dispose(); orbit.dispose();
 Drag core meshes and gltf-pro models (a model moves by its `root`), with the mouse or touch:
 
 ```ts
+import {Engine, box} from '@margoengine/core';
 import {DragControls, OrbitControls} from '@margoengine/controls';
 import {loadGLTF} from '@margoengine/gltf-pro';
 
+const engine = await Engine.create(document.querySelector('canvas')!);
+const mesh = engine.createMesh().setGeometry(box());
 const part = await loadGLTF(engine, '/part.glb');
 const drag = new DragControls(engine, [mesh, part]);          // created before OrbitControls: a grab stops the orbit drag
 const orbit = new OrbitControls(engine);
 drag.plane = [0, 1, 0];                                        // slide on the ground; default 'view' faces the camera
 drag.axis = [1, 0, 0];                                         // or only along world X
-drag.addEventListener('dragstart', event => console.log(event.object, event.hit.point));
-drag.addEventListener('hoveron', event => selection.set([event.object]));
+drag.addEventListener('dragstart', event => console.log(event.object, event.hit)); // hit: a bvh RaycasterHit
+drag.addEventListener('hoveron', () => {engine.canvas.style.cursor = 'grab';});
+drag.addEventListener('hoveroff', () => {engine.canvas.style.cursor = '';});
 ```
 
 Without an engine, pass a `Camera` and an element and drive the controls yourself: `const fly = new FlyControls(camera, canvas); engine.onFrame((_, delta) => fly.update(delta));`.

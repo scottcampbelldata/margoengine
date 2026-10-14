@@ -28,14 +28,20 @@ The separate `@margoengine/animator` package adds gameplay states, blend trees, 
 A separate entry (6.1 kB gzip; apps that only import `Animation` pay nothing for it). `bakeVAT` samples clips on the CPU with the same skinning and morph maths as the compute pass, every primitive merged in the model root's space, into rgba32float texels (position, normal per vertex per row). `VATCrowd` draws any number of copies in one instanced call; each instance has its own matrix, clip, time offset, speed and atlas region, and per-frame CPU work is one 160-byte uniform write whatever the crowd size.
 
 ```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from '@margoengine/gltf-pro';
 import {Animation} from '@margoengine/animation';
 import {bakeVAT, VATCrowd} from '@margoengine/animation/vat';
 import {Texture, packAtlas} from '@margoengine/materials';
-const vat = bakeVAT(new Animation(model), {fps: 30, clips: ['Walking', 'Running']}); // model: a gltf-pro PBRModel
+declare const red: ImageBitmap, blue: ImageBitmap, green: ImageBitmap; // tint swatches
+declare function placement(i: number): Float32Array;                   // your 4x4 column-major instance matrix
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const model = await loadGLTF(stage.engine, '/RobotExpressive.glb');
+const vat = bakeVAT(new Animation(model), {fps: 30, clips: ['Walking', 'Running']});
 model.destroy();                                                                    // the baked data stands alone
 const tints = packAtlas([red, blue, green]);
 const crowd = new VATCrowd(vat, {map: new Texture(tints.image), roughness: 0.6});
-engine.use(crowd);
+stage.engine.use(crowd);
 for (let i = 0; i < 1000; i++) crowd.add({matrix: placement(i), clip: i % 2, offset: Math.random(), speed: 1, uvTransform: tints.regions[i % 3]});
 crowd.set(5, {clip: 0, offset: 0});                                                   // live; uploads only what changed
 ```
