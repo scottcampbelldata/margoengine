@@ -6,7 +6,7 @@ const reviewed = {
   Camera: 'fit view projection',
   CADCameraControls: 'pointer velocity previousTouchAction menu down move up wheel',
   VectorRef: 'mesh kind get validate write',
-  Engine: 'batches checkedMaterials materialFrame free next revision callbacks raf last frameOptions disposing watchDevice collect frame update',
+  Engine: 'batches checkedMaterials materialFrame free next revision materials seen slots callbacks raf last frameOptions disposing watchDevice collect frame update',
   TransformStore: 'handle api',
   FrameGraph: 'passes owner executing',
   GPURenderer: 'frame targets views resolveTarget preserveMSAA passDescriptor passContext drawBatches commands draw bindings width height frameId lost deviceLost resources variants groups uniform bindGroup disposed picking canvas device context format pipeline descriptor renderFrame',

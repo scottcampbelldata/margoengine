@@ -43,7 +43,10 @@ export class Mesh {
   readonly euler:Float32Array;
   readonly matrix: Float32Array;
   geometry: Geometry|null=null;
-  material=new PbrMaterial();
+  private current=new PbrMaterial();
+  get material():PbrMaterial{return this.current;}
+  /** Assigning a material makes the next frame re-collect instances. */
+  set material(value:PbrMaterial){this.current=value;this.engine.collected=-1;}
   constructor(readonly engine: Engine, readonly id: number) { this.matrix=engine.store.matrices.subarray(id*16,id*16+16);this.euler=engine.store.rotations.subarray(id*3,id*3+3); }
   get visible():boolean {this.check();return this.engine.store.hidden[this.id]===0;}
   set visible(value:boolean){this.check();if(typeof value!=='boolean')throw new TypeError('Invalid Visibility');this.engine.store.hidden[this.id]=+!value;}
@@ -73,7 +76,7 @@ export class Mesh {
     if(geometry)this.engine.retain(geometry);
     const previous=this.geometry;this.geometry=geometry;
     const bounds=this.engine.store.bounds;bounds.fill(0,this.id*4,this.id*4+4);if(geometry)bounds.set(geometry.bounds,this.id*4);
-    if(previous)this.engine.release(previous);return this;
+    if(previous)this.engine.release(previous);this.engine.collected=-1;return this;
   }
   setMaterial(material: PbrMaterial):this {this.check();if(!(material instanceof PbrMaterial))throw new TypeError('Invalid material');this.material=material;return this;}
   dispose():void {if(this.engine.meshes.get(this.id)===this)this.engine.remove(this);}
@@ -93,6 +96,11 @@ export class Engine {
   private readonly free:number[]=[];
   private next=0;
   private revision=0;
+  // Last full collection: revision, visibility, material values, and each entity's instance offset (-1 when not drawn).
+  /** @internal Revision of the last full instance collection; -1 forces one. */ collected=-1;
+  private readonly materials=new Map<PbrMaterial,Float32Array>();
+  private readonly seen:Uint8Array;
+  private readonly slots:Int32Array;
   private readonly callbacks=new Set<FrameCallback>();
   private raf: number|null=null;
   private last=0;
@@ -115,7 +123,7 @@ export class Engine {
       renderer??=(options.fallback??(()=>{throw new Error('WebGPU unavailable')}))(canvas);const engine=new Engine(canvas,store,renderer,options.camera,fallbackReason);engine.features=options.features;return engine;
     }catch(error){renderer?.dispose();store.dispose();throw error;}
   }
-  private constructor(readonly canvas:HTMLCanvasElement,readonly store:TransformStore,private renderer:Renderer,camera:CameraOptions|undefined,readonly fallbackReason:string|null){this.camera=new Camera(camera);this.watchDevice();}
+  private constructor(readonly canvas:HTMLCanvasElement,readonly store:TransformStore,private renderer:Renderer,camera:CameraOptions|undefined,readonly fallbackReason:string|null){this.camera=new Camera(camera);this.seen=new Uint8Array(store.capacity);this.slots=new Int32Array(store.capacity);this.watchDevice();}
   private watchDevice():void {this.renderer.onLost=()=>{if(!this.disposed&&!this.disposing)void this.rebootDevice().catch(error=>this.onError(error));};}
   rebootDevice():Promise<void> {
     if(this.disposed||this.disposing)return Promise.reject(new Error('Engine disposed'));
@@ -162,9 +170,9 @@ export class Engine {
     if(mesh.geometry&&this.store.visible[mesh.id]) {
       if(this.checkedMaterials.get(mesh.material)!==this.materialFrame){const material=mesh.material.data;finite(material,8,'Material');
       for(let i=0;i<8;i++)if(material[i]<0||material[i]>1)throw new RangeError('Invalid material');
-      if(material[3]!==1||material[4]<Math.fround(0.045)||material[6]!==0&&material[6]!==1)throw new RangeError('Invalid material');this.checkedMaterials.set(mesh.material,this.materialFrame);}
+      if(material[3]!==1||material[4]<Math.fround(0.045)||material[6]!==0&&material[6]!==1)throw new RangeError('Invalid material');this.checkedMaterials.set(mesh.material,this.materialFrame);this.materials.set(mesh.material,material.slice());}
       const batch=this.batches.get(mesh.geometry)!,offset=batch.count++*24;
-      batch.instances.set(mesh.matrix,offset);batch.instances.set(mesh.material.data,offset+16);batch.instances[offset+23]=mesh.id;this.stats.visible++;
+      this.slots[mesh.id]=offset;batch.instances.set(mesh.matrix,offset);batch.instances.set(mesh.material.data,offset+16);batch.instances[offset+23]=mesh.id;this.stats.visible++;
     }
   };
   render({culling=true,delta=0}: {culling?:boolean;delta?:number}={}):void {
@@ -179,11 +187,21 @@ export class Engine {
     const dpr=Math.min(globalThis.devicePixelRatio??1,globalThis.margoLow||2,4/sceneSamples()),width=Math.max(1,Math.min(4096,Math.round(this.canvas.clientWidth*dpr)||this.canvas.width)),height=Math.max(1,Math.min(4096,Math.round(this.canvas.clientHeight*dpr)||this.canvas.height));
     if(this.canvas.width!==width)this.canvas.width=width;if(this.canvas.height!==height)this.canvas.height=height;
     this.camera.advance(delta);this.camera.update(this.canvas.width/this.canvas.height,this.backend==='webgpu');this.store.planes.set(this.camera.planes);this.store.tick(culling);
-    for(const batch of this.batches.values())batch.count=0;this.stats.visible=0;this.stats.drawCalls=0;
-    this.materialFrame++;finite(this.lighting.direction,4,'Light');finite(this.lighting.radiance,4,'Radiance');
+    finite(this.lighting.direction,4,'Light');finite(this.lighting.radiance,4,'Radiance');
     if(!Math.hypot(this.lighting.direction[0],this.lighting.direction[1],this.lighting.direction[2])||this.lighting.direction[3]<0||this.lighting.radiance.some(v=>v<0))throw new RangeError('Invalid lighting');
-    this.meshes.forEach(this.collect);
-    for(const batch of this.batches.values())if(batch.count)this.stats.drawCalls++;
+    // Reuse last frame's instances unless the mesh set, visibility or a material changed; then patch moved matrices only.
+    const {visible,changed}=this.store,seen=this.seen;let full=this.collected!==this.revision;
+    for(let id=0;!full&&id<this.next;id++)full=visible[id]!==seen[id];
+    for(const [material,values] of this.materials)for(let i=0;!full&&i<8;i++)full=material.data[i]!==values[i];
+    if(full){
+      for(const batch of this.batches.values())batch.count=0;this.stats.visible=0;this.stats.drawCalls=0;
+      this.materialFrame++;this.materials.clear();this.slots.fill(-1);
+      this.meshes.forEach(this.collect);this.collected=this.revision;seen.set(visible);changed.fill(0);
+      for(const batch of this.batches.values())if(batch.count)this.stats.drawCalls++;
+    }else for(let id=changed.indexOf(1);id>=0;id=changed.indexOf(1,id+1)){
+      changed[id]=0;const offset=this.slots[id];
+      if(offset>=0){const mesh=this.meshes.get(id)!;this.batches.get(mesh.geometry!)!.instances.set(mesh.matrix,offset);}
+    }
   }
   async pick(x:number,y:number):Promise<Mesh|null> {
     if(![x,y].every(Number.isFinite))throw new RangeError('Invalid pick');if(this.disposed||this.disposing)throw new Error('Engine disposed');if(this.backend!=='webgpu')throw new Error('WebGPU required');if(x<0||y<0||x>=this.canvas.clientWidth||y>=this.canvas.clientHeight||this.recovery)return null;

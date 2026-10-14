@@ -22,6 +22,8 @@ export class TransformStore {
   readonly limits:Float32Array;
   readonly constrained:Uint8Array;
   readonly hidden:Uint8Array;
+  /** Set by tick for each entity whose world matrix was recomputed; the engine clears it after copying the matrix. */
+  readonly changed:Uint8Array;
   private handle: number;
 
   static async create(capacity = 1024): Promise<TransformStore> {
@@ -48,6 +50,7 @@ export class TransformStore {
     this.visible = new Uint8Array(buffer, flags+capacity, capacity);
     this.constrained=new Uint8Array(buffer,flags+capacity*2,capacity);
     this.hidden=new Uint8Array(buffer,flags+capacity*3,capacity);
+    this.changed=new Uint8Array(buffer,flags+capacity*6,capacity);
   }
 
   tick(culling = true): void {
