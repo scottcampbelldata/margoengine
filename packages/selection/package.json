@@ -23,7 +23,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js selection",
     "test": "npm run build && node --test test/*.test.js",
-    "test:browser": "node test/picking.browser.mjs && node test/models.browser.mjs",
+    "test:browser": "node test/picking.browser.mjs && node test/models.browser.mjs && node test/xray.browser.mjs",
     "prepack": "npm run build"
   },
   "homepage": "https://margoengine.com",

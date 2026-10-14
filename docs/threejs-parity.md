@@ -209,7 +209,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | TAA (TAARenderPass, TRAA node) | COVERED † | taa `TAA` (`packages/taa/src/index.ts`) | Uses a velocity buffer and YCoCg clamping. |
 | FXAA, SMAA | COVERED † | post `FXAA` (`packages/post/src/fxaa.ts`, entry `@margoengine/post/fxaa`) | FXAA 3.11-style, alone (it wraps any other effect) or last in a `PostStack`. SMAA is not provided. |
 | BokehPass, DOF | COVERED † | dof `DOF` (`packages/dof/src/index.ts`); creative `focus` and `aperture` | |
-| OutlinePass | COVERED † | selection `Selection` with jump flood or dilation (`packages/selection/src/index.ts`) | Core meshes, whole glTF-pro models or single glTF nodes (skinned buffers included), and materials meshes. Not drawn for LOD imposter levels. |
+| OutlinePass | COVERED † | selection `Selection` with jump flood or dilation (`packages/selection/src/index.ts`) | Core meshes, whole glTF-pro models or single glTF nodes (skinned buffers included), and materials meshes. Hidden (occluded) parts in dashed or dimmer lines with `xray` (OutlinePass `hiddenEdgeColor`), one `Selection` per set (`name`). Not drawn for LOD imposter levels. |
 | FilmPass (grain) | COVERED † | creative `PostProcessing({grain})` | |
 | GlitchPass | MISSING | — | |
 | AfterimagePass | MISSING | — | |

@@ -61,7 +61,7 @@ export class Picking implements EnginePlugin {
 
 export class Selection implements EnginePlugin {
     readonly options: SelectionOptions;
-    readonly name = "selection";
+    readonly name: string;
     constructor(options?: SelectionOptions);
     static attach(engine: EngineKernel, options?: SelectionOptions): Selection;
     set(meshes: Iterable<Mesh | Model>): void;
@@ -75,5 +75,14 @@ export interface SelectionOptions {
     algorithm?: 'jfa' | 'morphological';
     width?: number;
     color?: readonly [number, number, number];
+    name?: string;
+    xray?: boolean | XRayOptions;
+}
+
+export interface XRayOptions {
+    dash?: number;
+    opacity?: number;
+    color?: readonly [number, number, number];
+    width?: number;
 }
 ```
