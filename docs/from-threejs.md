@@ -534,10 +534,34 @@ for (let i = 0; i < 1000; i++) {
 }
 ```
 
-There is no `InstancedMesh` class: core instances automatically. Each instance is a full mesh (its own transform,
-visibility, picking) and counts toward `capacity`. Textured `@margoengine/materials` meshes and glTF models draw one call
-per mesh; for many textured copies, merge static meshes with a texture atlas (see Materials), or use VAT crowds,
-`@margoengine/scatter` for vegetation, or LOD imposters. `BatchedMesh` has no equivalent.
+Core instances automatically: each instance is a full mesh (its own transform, visibility, picking) and counts toward
+`capacity`. Textured meshes use `createInstancedMesh`, the counterpart of `InstancedMesh`: one draw, one engine
+entity, per-instance matrix, tint and atlas region.
+
+```ts
+import {boxGeometry} from '@margoengine/geometry';
+import {Material, Texture, createInstancedMesh, packAtlas} from '@margoengine/materials';
+import {Matrix4} from '@margoengine/math/matrix4';
+
+declare const images: ImageData[];
+const atlas = packAtlas(images);
+const crates = createInstancedMesh(engine, boxGeometry(0.5, 0.5, 0.5), new Material({map: new Texture(atlas.image)}), 1000);
+const matrix = new Matrix4();
+for (let i = 0; i < 1000; i++) {
+  matrix.makeTranslation(i % 40, 0, Math.floor(i / 40));
+  crates.instances
+    .setMatrixAt(i, matrix.elements)                     // relative to crates.root; uploads on the next frame
+    .setColorAt(i, [1, 0.8 + 0.2 * Math.random(), 1])   // linear RGB, multiplies the map like a vertex colour
+    .setUVTransformAt(i, atlas.regions[i % images.length]); // per-instance atlas region
+}
+crates.instances.count = 600; // draw the first 600
+// After writing crates.instances.data directly: crates.instances.needsUpdate = true;
+```
+
+Shadows, clustered lights, IBL, fog and SSAO take `crates` like any materials mesh; `Raycaster` and `Picking` hits
+carry `instanceId`. A loaded model instances the same way (`new PBRInstances(n)` from `@margoengine/gltf-pro` on
+`primitive.instances`, matrices in the primitive's node space), and `EXT_mesh_gpu_instancing` files load instanced. Not
+per instance: frustum culling and sorting of transparent instances. `BatchedMesh` has no equivalent.
 
 ## LOD and imposters
 
@@ -816,7 +840,6 @@ From [`docs/threejs-parity.md`](threejs-parity.md). Each would be an optional pa
 | WebGL2 for optional packages | Missing: core meshes, controls, labels, viewcube, bvh, LOD distance levels and the small glTF loader run on WebGL2; the rest needs WebGPU |
 | More than one directional light, coloured ambient, configurable `HemisphereLight`, `RectAreaLight`, IES lights | Missing; point and spot lights via clustered, a fixed hemisphere fill in glTF-pro |
 | Point and spot light shadows, `ShadowMaterial` on any mesh | Missing (`@margoengine/staging` ContactShadows is a ground shadow catcher for product shots) |
-| `InstancedMesh` with a textured material, glTF `EXT_mesh_gpu_instancing` | Missing (core instances constant-colour meshes; atlases plus `mergeGeometries` and VAT crowds are the workarounds) |
 | glTF `KHR_animation_pointer`, iridescence, anisotropy, dispersion, material variants; applying glTF cameras | Missing (files that require them are rejected; cameras are exposed as data) |
 | `MeshPhysicalMaterial`, Lambert, Phong, depth materials on your own meshes | Missing (glTF physical extensions are approximated; transmission does not refract) |
 | Second UV set, geometry groups and custom attributes on your own meshes | Missing |
