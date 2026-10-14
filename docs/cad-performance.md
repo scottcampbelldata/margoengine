@@ -76,6 +76,30 @@ node examples/package-benchmarks/cad/kernel-node.mjs`, `results-kernel-node.json
    90k-part assembly mesh by mesh is O(n²), minutes.
 6. **100,000-entity cap** in `TransformStore.create`: a 100,000-part assembly does not fit once assembly nodes are counted.
 
+## Prototype: static-scene fast paths in core (branch `worktree-agent-a46261c57b837ecd0`, not merged)
+
+Hot spots 1-5 above, one commit per step so each can be accepted alone. Same API, identical pixels
+(`node examples/package-benchmarks/cad/pixels-check.mjs`: a static + moving mix with hide/show, reparent, material
+edits/assignment, remove/add, scale, geometry swap and picks, compared with a from-scratch render every step: 0 differing
+pixels; `engine.pick` agrees with selection's independent micro pass). Measured 2026-10-14 on AC under the GPU lock, same
+host as above; `node examples/package-benchmarks/cad/summary.mjs s0 s1 s2 s3 s4 s5` prints every case. Cases: `orbit`
+(camera orbits, static parts; includes `engine.pick`), `still` (fixed camera, static parts), `move` (fixed camera, 1% of
+parts move every frame). Frame CPU at 90k parts includes waiting on the GPU (26-31 ms GPU per frame), so kernel and
+collection are the CPU numbers to compare there.
+
+| Step | core + stage gzip | Kernel in frame 10k / 50k / 90k | Collection (still · move · orbit), 90k |
+| --- | --- | --- | --- |
+| 0 baseline | 18,681 | 2.2 / 11.6 / 19.5 ms | 10.6 · 11.2 · 10.6 ms |
+| 1 kernel skips unchanged entities | 19,162 (+481) | 0.7 / 3.5 / 6.0 ms | unchanged |
+| 2 reuse instances, patch moved matrices | 19,414 (+252) | - | 0.32 · 1.30 · 10.3 ms |
+| 3 upload changed ranges only | 19,510 (+96) | - | still 90k: 40 FPS (was 30) |
+| 4 pick: reused pipeline, pixel-frustum culling | 19,916 (+406) | - | pick 57.6 → 9.6-13.9 ms at 90k |
+| 5 removal: native parent scan | 19,921 (+5) | - | dispose 90k engine 48 s → 20 ms |
+
+Not solved: during an orbit the cull result changes every frame, so step 2 re-collects (10 ms at 90k parts); keeping
+draw order (coplanar CAD faces resolve by order) rules out cheap incremental insertion. GPU culling with indirect draws
+(1f a) is the route. Memory: +66 bytes per entity slot in the kernel (input snapshot + 2 flags), +5 in JS.
+
 ## Changes in this branch (machinery only)
 
 ### Feature edges: `@margoengine/machinery/edges`
