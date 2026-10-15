@@ -35,12 +35,13 @@ const composite = agxShader + `
 @fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f{
  let uv=p.xy/vec2f(textureDimensions(scene));
  let q=clamp(vec2i(uv*vec2f(textureDimensions(bloom))),vec2i(0),vec2i(textureDimensions(bloom))-1);
- let hdr=textureLoad(scene,vec2i(p.xy),0).rgb+textureLoad(bloom,q,0).rgb*settings.x;
+ let s=textureLoad(scene,vec2i(p.xy),0);let hdr=s.rgb+textureLoad(bloom,q,0).rgb*settings.x;
  let c=agx(max(hdr,vec3f(0))*exp2(settings.y));
- return vec4f(select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.055,c>=vec3f(0.0031308)),1);
+ let o=select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.055,c>=vec3f(0.0031308));return vec4f(o,max(s.a,max(o.r,max(o.g,o.b))));
 }`;
+// Alpha: scene coverage (premultiplied), raised to the glow's brightest channel so glow over a transparent canvas stays valid.
 // In a PostStack, a non-final Bloom hands linear light (with its exposure) to the next effect.
-const linear = composite.replace(/let c=agx[^\n]+\n[^\n]+/, 'return vec4f(max(hdr,vec3f(0))*exp2(settings.y),1);');
+const linear = composite.replace(/let c=agx[^\n]+\n[^\n]+/, 'return vec4f(max(hdr,vec3f(0))*exp2(settings.y),s.a);');
 
 /** Owns linear HDR scene capture, half-resolution bloom and a single AgX presentation. */
 export class Bloom implements EnginePlugin {

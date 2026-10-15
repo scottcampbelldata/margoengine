@@ -750,11 +750,23 @@ Second set (2026-10-14, evening), all APPROVED by Scott:
   `tests/core-material-setters.test.js` (fake GPU: one upload with the new colour, no pipeline/bind-group creation).
   Real GPU (Arc 140V, Edge 155, AC before/after, GPU lock; `examples/package-benchmarks/material-setters-gpu.mjs`): red box
   [170,20,20] -> `set({color: blue})` -> next frame [20,20,170], zero pipelines and bind groups created, no GPU errors.
-  MEASURED, NOT MERGED (transparent canvas): +39 B (`transparent: true` flag) / +40 B (`clearColor` RGBA option) vs the
-  ~15 B budget; the floor is `alphaMode:'premultiplied'` plus the clear-value switch. Parked on branch
-  `scratch/core-transparent-canvas` (core option, `@margoengine/webgl` fallback support and the post alpha fixes);
-  awaiting Scott. Zero-core alternative: a leaf plugin that reconfigures the canvas context to premultiplied and
-  draws alpha 0 over cleared depth (like `ColorBackground`).
+  Transparent canvas in core measured +39 B (`transparent: true`) / +40 B (`clearColor`) vs the ~15 B budget; Scott
+  chose the zero-core plugin. The core version stays on `scratch/core-transparent-canvas` (unmerged, for reference).
+  DONE (0 core bytes, core+stage stays 19,577): `TransparentCanvas.attach(engine)` in `@margoengine/environment`
+  (`color.ts`, a `ColorBackground` subclass): reconfigures core's canvas context (same device, preferred format) with
+  `alphaMode: 'premultiplied'`, writes premultiplied alpha 0 over cleared depth (`ColorBackground` now writes
+  colour x alpha, alpha; opaque output unchanged), reapplies in `onDeviceRestored` (core reconfigures opaque on
+  restore first), `dispose()` restores opaque and detaches. No core hook was needed. WebGL2: the plugin is a no-op;
+  `webglRenderer(canvas, {transparent: true})` (new option) gives a premultiplied `alpha: true` canvas, passed by the
+  app's `fallback` closure because core passes nothing to the fallback. Post alpha fixes (FXAA alpha filtered with
+  colour, Bloom alpha = max(scene alpha, glow), SSAO composite keeps scene alpha); Tonemap/SSAO leave a faint
+  silhouette rim, DOF/TAA/SceneFade stay opaque-canvas only (post README). Tests:
+  `packages/environment/tests/transparent.test.js`, webgl test, api-conventions.
+  Real GPU (Arc 140V, Edge 155, AC before/after, GPU lock; `examples/package-benchmarks/transparent-canvas-gpu.mjs`):
+  magenta page shows in empty pixels for core, after `rebootDevice()`, Tonemap, FXAA, Bloom, SSAO, a PostStack and the
+  transparent WebGL renderer; black/white-backdrop alpha recovery finds 0 invalid premultiplied pixels for core,
+  restore, WebGL, FXAA, Bloom and the stack (Tonemap 183 rim pixels, worst +44/255; SSAO 147, +33/255); after
+  `dispose()` the canvas is opaque again; opaque FXAA/Bloom/SSAO/stack frames byte-identical to the pre-fix post build.
 - Result (Scott, 2026-10-14 late): material setters TAKEN at +34 B (core+stage 19,577); transparent canvas as a
   ZERO-core-byte optional plugin, not core (the +39 B core version stays unmerged on `scratch/core-transparent-canvas`).
 - Multiple directional lights stay OUT of core (belongs in `@margoengine/clustered`).
@@ -864,7 +876,7 @@ Before launch, in addition to the work queue:
 Verified matrix: `docs/threejs-parity.md`, re-tallied 2026-10-14 against 2c53227 (156 three.js features: 85 covered,
 39 partial, 32 missing after textured instancing (InstancedMesh PARTIAL -> COVERED) and glTF export (GLTFExporter PARTIAL -> COVERED); ShadowMaterial became partial with staging's ContactShadows; was 65 / 43 / 45 in its stale summary; read from source, not run). The first audit's top gaps
 (materials, glTF extensions/decoders, picking models, IBL, background colour, post stack, ortho camera, math, FXAA) are
-closed. New top 10: WebGL2 beyond core, transparent canvas (core), multiple directional/coloured ambient/hemisphere
+closed. New top 10: WebGL2 beyond core, [DONE: environment `TransparentCanvas`] transparent canvas, multiple directional/coloured ambient/hemisphere
 lights, [DONE] point and spot shadows (see below), [DONE] textured instancing (+ `EXT_mesh_gpu_instancing`, see below), remaining glTF extensions
 (animation pointer, iridescence, anisotropy, dispersion, variants, refraction, cameras), physical materials on your own
 meshes, second UV set/groups/custom attributes, ShadowMaterial, [DONE, below] glTF export with animation. `docs/from-threejs.md`'s

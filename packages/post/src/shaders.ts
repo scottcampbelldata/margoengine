@@ -79,7 +79,7 @@ struct Out {@builtin(position) clip:vec4f}
 @group(0) @binding(1) var ambient:texture_2d<f32>;
 @group(0) @binding(2) var ao:texture_2d<f32>;
 @fragment fn fragment(i:Out)->@location(0) vec4f {
-  let p=vec2i(i.clip.xy);var c=max(vec3f(0),textureLoad(scene,p,0).rgb-textureLoad(ambient,p,0).rgb*(1-textureLoad(ao,p,0).r));
-  c=c/(1+c);c=select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.055,c>=vec3f(0.0031308));return vec4f(c,1);
+  let p=vec2i(i.clip.xy);let s=textureLoad(scene,p,0);var c=max(vec3f(0),s.rgb-textureLoad(ambient,p,0).rgb*(1-textureLoad(ao,p,0).r));
+  c=c/(1+c);c=select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.055,c>=vec3f(0.0031308));return vec4f(c,s.a);
 }
 `;

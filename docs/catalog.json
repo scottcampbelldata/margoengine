@@ -449,6 +449,7 @@
       "SH_BASIS",
       "SH_IRRADIANCE_BANDS",
       "Skybox",
+      "TransparentCanvas",
       "applyGainMap",
       "decodeUltraHDR",
       "evaluateSH",

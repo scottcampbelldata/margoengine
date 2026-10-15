@@ -151,7 +151,21 @@ app.box({size: [1, 1, 1], color: '#84d6bd'});
 - `engine.backend` is `'webgpu'` or `'webgl2'`; `engine.fallbackReason` says why WebGPU was not used.
 - `capacity` (default 1,024, at most 100,000) is the fixed number of meshes and transform nodes an engine holds. Raise
   it for big scenes: `Engine.create(canvas, {capacity: 50_000})`.
-- A transparent canvas (`alpha: true`) and several scenes or viewports per canvas are not available.
+- Several scenes or viewports per canvas are not available.
+
+A transparent canvas over HTML and CSS, like `new THREE.WebGLRenderer({alpha: true})` with `setClearColor(0x000000, 0)`:
+
+```ts
+import {Engine} from '@margoengine/core';
+import {TransparentCanvas} from '@margoengine/environment';
+import {webglRenderer} from '@margoengine/webgl';
+
+const overlay = await Engine.create(canvas, {fallback: c => webglRenderer(c, {transparent: true})}); // WebGL fallback: transparent too
+TransparentCanvas.attach(overlay); // WebGPU: premultiplied canvas, alpha 0 where nothing is drawn
+```
+
+FXAA, Bloom and `PostStack` keep the alpha; Tonemap and SSAO keep it with a faint rim on silhouettes; DOF, TAA,
+SceneFade and the other backgrounds make the canvas opaque again (`@margoengine/post` README).
 
 ## Meshes and geometry
 
@@ -901,7 +915,7 @@ From [`docs/threejs-parity.md`](threejs-parity.md). Each would be an optional pa
 
 | three.js | Status in Margo |
 | --- | --- |
-| Transparent canvas (`alpha: true`), several scenes or viewports, render to texture from a second camera, `CubeCamera` | Missing; needs core changes |
+| Several scenes or viewports, render to texture from a second camera, `CubeCamera` | Missing; needs core changes |
 | WebGL2 for optional packages | Missing: core meshes, controls, labels, viewcube, bvh, LOD distance levels and the small glTF loader run on WebGL2; the rest needs WebGPU |
 | More than one directional light, coloured ambient, configurable `HemisphereLight`, `RectAreaLight`, IES lights | Missing; point and spot lights via clustered, a fixed hemisphere fill in glTF-pro |
 | `ShadowMaterial` on any mesh | Missing (`@margoengine/staging` ContactShadows is a ground shadow catcher for product shots) |

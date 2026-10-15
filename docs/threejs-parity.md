@@ -8,15 +8,15 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 87 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| COVERED | 88 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
 | PARTIAL | 39 | Some of it exists, but a common use case is missing. The notes say what. |
-| MISSING | 30 | No implementation was found in any package's `src/`. |
+| MISSING | 29 | No implementation was found in any package's `src/`. |
 
 Overall: Margo is strong where three.js relies on third-party libraries or examples. That includes cascaded PCSS shadows, clustered lighting, TAA, Gaussian splats, BVH queries, physics, navigation, terrain, water and sky. The day-one basics the first version of this matrix found missing (textures and materials on meshes you build, glTF extensions and compression, an orthographic camera, picking loaded models, image-based lighting outside React, combinable effects, FXAA, a math library) now exist as optional packages. What remains:
 
 - **WebGL2 reaches core meshes only.** The fallback is the optional `@margoengine/webgl` package and draws core meshes flat-shaded with one light. Textures, glTF-pro models, shadows, post-processing, lines, points, text and most other rendering packages need WebGPU.
 - **Lighting is thin outside clustered point and spot lights.** One directional light per engine, a colourless scalar ambient term, a fixed hemisphere fill in glTF-pro. Point and spot lights cast shadows through `@margoengine/clustered/shadows` (up to 16 shadowed lights). No RectAreaLight.
-- **Core owns one canvas, one camera and one pass graph.** There is no transparent canvas, no render-to-texture from a second camera, no CubeCamera and no multiple viewports. All of these need core changes, and core is frozen for v1.0.
+- **Core owns one canvas, one camera and one pass graph.** There is no render-to-texture from a second camera, no CubeCamera and no multiple viewports. All of these need core changes, and core is frozen for v1.0.
 - **Materials stop at standard, basic, normal and matcap on your own meshes.** Physical features come only from glTF `KHR_materials_*` files and are approximated (transmission does not refract). No Lambert, Phong, depth or shadow-catcher materials, no second UV set and no geometry groups.
 - **glTF coverage has gaps.** `KHR_animation_pointer`, iridescence, anisotropy, dispersion and material variants are rejected when required. glTF cameras are exposed as data only, and export writes no cameras or lights.
 - **Post-processing lacks screen-space reflections and GI.** No SSR, GTAO, SSGI, motion blur, SMAA or lens flare, and no built-in screen effects (a shader `NodePass` makes one in a few lines).
@@ -33,7 +33,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | Group (transform-only node) | COVERED | core mesh with no geometry | glTF importers use this pattern. |
 | Scene object, multiple scenes | PARTIAL | one `Engine` = one canvas = one implicit scene | No Scene object. A second scene needs a second engine and canvas. |
 | `scene.background` (color, texture, cubemap) | COVERED † | environment `EnvironmentBackground`, `Skybox` (`packages/environment/src/background.ts`), `ColorBackground` (`color.ts`, solid or vertical gradient); sky `Sky` | Core's clear color stays hard-coded; `ColorBackground` covers it with a pass on cleared depth. A transparent canvas still needs a core change. WebGPU only. |
-| Transparent canvas (`alpha: true`) | MISSING | — | The WebGPU context is configured without `alphaMode` and clears to an opaque color (`packages/core/src/renderer.ts`). Only XR AR clears to transparent. Measured 2026-10-14: the core change (premultiplied `alphaMode` + clear alpha) costs +39 to +40 B gzip against an approved ~15 B budget, so it is parked on branch `scratch/core-transparent-canvas` for Scott's decision. |
+| Transparent canvas (`alpha: true`) | COVERED | environment `TransparentCanvas` (`packages/environment/src/color.ts`); webgl `webglRenderer(canvas, {transparent: true})` | Zero core bytes: the plugin switches core's canvas context to premultiplied and writes alpha 0 where nothing was drawn, and follows device restores. FXAA, Bloom and PostStack keep valid alpha; Tonemap and SSAO keep alpha with a faint silhouette rim; DOF, TAA and SceneFade are opaque-canvas only (`packages/post/README.md`). |
 | Frustum culling | COVERED | Rust/Wasm kernel, `TransformStore.tick` (`packages/kernel/src/lib.rs`, `packages/core/src/kernel.ts`) | Bounding spheres against six planes, taken from the final camera matrix, so orthographic projections cull exactly. For large static assemblies, culling `CulledInstances` does the same test (plus Hi-Z occlusion) on the GPU with no per-part CPU work. |
 | Render loop, Clock/Timer | COVERED | core `Engine.start`, `onFrame` (`packages/core/src/engine.ts`) | Frame delta is clamped to 0.1 s. |
 | Layers | PARTIAL | bvh `setMeshLayers`, `getMeshLayers` | Only filters raycasts. No camera or render layers. |
@@ -284,7 +284,7 @@ Every MISSING or PARTIAL item, ordered by how often real three.js projects need 
 
 1. **WebGL2 fallback beyond core.** A three.js replacement has to reach browsers and devices without WebGPU. Today the fallback draws flat-shaded core meshes; no textures, models or effects.
    **Fit:** extend each rendering package with a GL path, starting with gltf-pro and materials. This is a large effort and a strategic decision rather than one package.
-2. **Transparent canvas** (`alpha: true`). Standard for embeds over page content.
+2. [DONE: environment `TransparentCanvas`, zero core bytes] **Transparent canvas** (`alpha: true`). Standard for embeds over page content.
    **Fit:** freeze conflict: needs `alphaMode` and a transparent clear in core's context setup. Small.
 3. **More than one directional light, a colored ambient light, and a configurable HemisphereLight.** Key, fill and sky lighting is common.
    **Fit:** extend clustered (directional entries), and environment for hemisphere or colored ambient through the same `margoAmbient` shader hook `EnvironmentLighting` uses. Core's single-light uniform is frozen.

@@ -8,7 +8,7 @@ import {orthographic} from '../../shared/projection.js';
 import {fullscreen,render,group as bind} from '../../shared/gpu.js';
 import type {StackHost,StackStage,StageOutput} from '../../shared/stack.js';
 import {extractShader,ssaoShader,blurShader,compositeShader} from './shaders.js';
-const linearComposite=compositeShader.replace(/c=c\/\(1\+c\);[^\n]+/,'return vec4f(c,1);');
+const linearComposite=compositeShader.replace(/c=c\/\(1\+c\);[^\n]+/,'return vec4f(c,s.a);');
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number;STORAGE:number};
 declare const GPUTextureUsage:{RENDER_ATTACHMENT:number;TEXTURE_BINDING:number;STORAGE_BINDING:number;COPY_DST:number};
 type Context=Extract<PassContext,{backend:'webgpu'}>;

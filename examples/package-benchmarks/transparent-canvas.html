@@ -1,0 +1,35 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Transparent canvas GPU check</title><style>body{margin:0;background:#ff00ff}canvas{width:256px;height:256px;display:block}</style></head><body>
+<script type="module">
+// Driven by transparent-canvas-gpu.mjs. Each scenario builds a fresh engine on a new canvas over a magenta page: a lit
+// green box, optionally with a post effect, made transparent by TransparentCanvas (WebGPU) or the transparent WebGL
+// renderer. 'restore' reboots the GPU device after attaching; 'removed' attaches then disposes (opaque again). 'old:*' scenarios use the post package built before the alpha fixes
+// (test-results/post-before, copied by the runner's caller) to prove opaque output is unchanged.
+import {Engine,box,PbrMaterial} from '/packages/core/dist/index.js';
+import {webglRenderer} from '/packages/webgl/dist/index.js';
+import * as post from '/packages/post/dist/index.js';
+import * as before from '/test-results/post-before/index.js';
+import {Tonemap} from '/packages/tonemap/dist/index.js';
+import {TransparentCanvas} from '/packages/environment/dist/index.js';
+let engine,canvas,transparency,errors=[];
+const effects=lib=>({
+  none:()=>{},restore:async e=>{await e.rebootDevice();},removed:()=>transparency?.dispose(),tonemap:e=>Tonemap.attach(e),fxaa:e=>lib.FXAA.attach(e),bloom:e=>lib.Bloom.attach(e,{strength:0.6,threshold:0.4}),ssao:e=>lib.SSAO.attach(e),
+  stack:e=>lib.PostStack.attach(e,[new lib.SSAO(),new lib.Bloom({strength:0.6,threshold:0.4}),new lib.FXAA()]),
+});
+window.check={
+  async run(scenario){
+    const [lib,effect,backend,transparent]=scenario.split(':');errors=[];
+    canvas=document.body.appendChild(document.createElement('canvas'));
+    engine=await Engine.create(canvas,{backend,fallback:c=>webglRenderer(c,{transparent:transparent==='t'}),camera:{position:[2.2,1.6,2.6],target:[0,0,0]}});
+    transparency=transparent==='t'?TransparentCanvas.attach(engine):undefined;
+    engine.createMesh().setGeometry(box(1.2,1.2,1.2)).setMaterial(new PbrMaterial({color:'#00ff00',roughness:0.8}));
+    await effects(lib==='old'?before:post)[effect](engine);
+    engine.gpu?.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+    for(let i=0;i<4;i++){engine.render({delta:1/60});await engine.gpu?.queue.onSubmittedWorkDone();}
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    return {backend:engine.backend,errors};
+  },
+  background(color){document.body.style.background=color;},
+  clear(){engine.dispose();canvas.remove();document.body.style.background='';},
+};
+window.ready=true;
+</script></body></html>

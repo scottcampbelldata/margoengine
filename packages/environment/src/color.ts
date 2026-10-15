@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // Solid or vertical-gradient background: the scene.background = color equivalent.
 import type {EngineKernel} from '@margoengine/core';
-import type {FrameGraph, PassContext} from '@margoengine/core/extension';
+import {engineRuntime, type FrameGraph, type PassContext} from '@margoengine/core/extension';
 import {SRGBToLinear as srgbToLinear} from '@margoengine/math/color';
 
 declare const GPUBufferUsage: {UNIFORM: number; COPY_DST: number};
@@ -45,7 +45,7 @@ export interface ColorBackgroundOptions {
  * Fills every pixel the scene left empty (depth still at the cleared reversed-Z 0) with a color or a vertical
  * gradient. On the canvas the color is shown exactly (no tone mapping, like Three.js `scene.background = color`);
  * on an rgba16float pass target (tonemap, creative PostProcessing) it writes the linear value so the post chain
- * treats it like scene radiance. The canvas stays opaque: a transparent canvas needs a core change.
+ * treats it like scene radiance. The canvas stays opaque; `TransparentCanvas` (below) clears to alpha 0 instead.
  */
 export class ColorBackground {
   readonly name: string;
@@ -53,7 +53,9 @@ export class ColorBackground {
   private top!: [number, number, number];
   private under?: [number, number, number];
   private state?: {device: GPUDevice; uniform: GPUBuffer; module: GPUShaderModule; pipelines: Map<string, {pipeline: GPURenderPipeline; group: GPUBindGroup}>};
-  private disposed = false;
+  protected disposed = false;
+  /** Written premultiplied: colour times alpha, alpha. */
+  protected alpha = 1;
   private readonly values = new Float32Array(8);
   private readonly colorAttachment: GPURenderPassColorAttachment = {view: undefined!, loadOp: 'load', storeOp: 'store'};
   private readonly depthAttachment: GPURenderPassDepthStencilAttachment = {view: undefined!, depthReadOnly: true};
@@ -103,8 +105,8 @@ export class ColorBackground {
       state.pipelines.set(key, entry = {pipeline, group: device.createBindGroup({layout: pipeline.getBindGroupLayout(0), entries: [{binding: 0, resource: {buffer: state.uniform}}]})});
     }
     const hdr = context.format === 'rgba16float' || context.format === 'rgba32float', v = this.values, bottom = this.under ?? this.top;
-    for (let i = 0; i < 3; i++) {v[i] = hdr ? srgbToLinear(this.top[i]) : this.top[i]; v[4 + i] = hdr ? srgbToLinear(bottom[i]) : bottom[i];}
-    v[3] = v[7] = 1;
+    for (let i = 0; i < 3; i++) {v[i] = (hdr ? srgbToLinear(this.top[i]) : this.top[i]) * this.alpha; v[4 + i] = (hdr ? srgbToLinear(bottom[i]) : bottom[i]) * this.alpha;}
+    v[3] = v[7] = this.alpha;
     device.queue.writeBuffer(state.uniform, 0, v);
     this.colorAttachment.view = context.color; this.depthAttachment.view = context.depth;
     if (depthFormat.includes('stencil')) this.depthAttachment.stencilReadOnly = true; else delete this.depthAttachment.stencilReadOnly;
@@ -112,4 +114,36 @@ export class ColorBackground {
     pass.setPipeline(entry.pipeline); pass.setBindGroup(0, entry.group); pass.draw(3); pass.end();
   }
   private release(): void {this.state?.uniform.destroy(); this.state = undefined;}
+}
+
+/**
+ * Transparent canvas over HTML/CSS (three.js `alpha: true` with a clear alpha of 0) without a core change: switches the
+ * canvas context to `alphaMode: 'premultiplied'` and overwrites every pixel the scene left empty with alpha 0 (the
+ * `ColorBackground` pass, so multisampled silhouettes resolve to valid premultiplied edges). Reapplied after
+ * `engine.rebootDevice()`; `dispose()` restores the opaque canvas. On the WebGL2 fallback it does nothing: create that
+ * renderer transparent instead, `fallback: canvas => webglRenderer(canvas, {transparent: true})`.
+ */
+export class TransparentCanvas extends ColorBackground {
+  private engine?: EngineKernel;
+  /** Same as `engine.use(new TransparentCanvas(...))`; returns the TransparentCanvas. */
+  static attach(engine: EngineKernel, options?: Pick<ColorBackgroundOptions, 'order' | 'name'>): TransparentCanvas {const value = new TransparentCanvas(options); engine.use(value); return value;}
+  constructor(options: Pick<ColorBackgroundOptions, 'order' | 'name'> = {}) {super({name: 'transparent-canvas', ...options}); this.alpha = 0;}
+  setup(engine: EngineKernel): void {
+    if (this.disposed) throw new Error('TransparentCanvas is disposed');
+    this.engine = engine; this.configure('premultiplied');
+  }
+  onDeviceRestored(): void {super.onDeviceRestored(); this.configure('premultiplied');}
+  /** Restores the opaque canvas and detaches from the engine. */
+  dispose(): void {
+    if (this.disposed) return;
+    this.configure('opaque'); super.dispose();
+    const engine = this.engine; this.engine = undefined;
+    if (engine && !engine.disposed && engineRuntime(engine).plugins.get(this.name) === this) engine.removePlugin(this.name);
+  }
+  // Core configured this context with the same device and preferred format; only alphaMode changes.
+  private configure(alphaMode: GPUCanvasAlphaMode): void {
+    const engine = this.engine, device = engine && engineRuntime(engine).gpu;
+    if (!engine || !device || engine.disposed) return;
+    (engine.canvas.getContext('webgpu') as GPUCanvasContext | null)?.configure({device, format: navigator.gpu.getPreferredCanvasFormat(), alphaMode});
+  }
 }
