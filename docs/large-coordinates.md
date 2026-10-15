@@ -31,7 +31,7 @@ eye sees as shaking). Results: `examples/package-benchmarks/results/large-coordi
 
 - **Kernel world matrix** (`store.matrices`, the per-instance model matrix): the root translation is rounded to the
   float32 grid, and child matrices are composed in float64 but stored in float32, so the 1 mm bolts snap to the grid
-  (at 6,000 km the two bolts 7 mm apart land on the same grid point and measure 0 mm; `packages/cameras/test/origin.test.js`). Mostly a
+  (at 6,000 km the two bolts 7 mm apart land on the same grid point, 0 mm apart in world space; machinery `measureDistance` composes the hierarchy in float64 below the common ancestor since HANDOFF 5l.d and still reads 7 mm; `packages/cameras/test/origin.test.js`). Mostly a
   static misplacement, not jitter.
 - **View-projection matrix** (`camera.matrix`, float64 in `Camera.update`, stored float32): its translation column holds
   eye-distance terms of the size of the coordinates, so rounding changes every frame as the camera moves. This is the
@@ -161,7 +161,7 @@ names are mangled in `dist`. A unit test fails if that ever stops working.
 What core alone could do, and why it is not needed here. Relative-to-eye rendering in core (subtract the eye in
 float64 before writing each instance's translation, and build the view-projection with a zero eye) would remove the
 view-projection and vertex world-position errors with no app code. But it cannot fix the kernel stage: positions are
-already float32 in `store.transforms` (0.5 m grid at 6,000 km; the 7 mm bolt measurement still reads 0). It would also
+already float32 in `store.transforms` (0.5 m grid at 6,000 km; the 7 mm bolts still share one world position). It would also
 need float64 position columns in the Rust/Wasm kernel, which changes the memory layout and the `store.transforms`
 types. And `store.matrices` would become eye-relative, which breaks every package that reads world matrices from it
 (gltf-pro, bvh, selection, shadows, machinery, staging, taa and others). Byte cost was not measured on a scratch

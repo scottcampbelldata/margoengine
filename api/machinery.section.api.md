@@ -9,6 +9,7 @@ import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 export interface SectionOptions {
     planes: readonly (readonly number[])[];
     cap?: boolean;
+    capOpenShells?: boolean;
     color?: string | readonly number[];
     hatch?: number;
 }

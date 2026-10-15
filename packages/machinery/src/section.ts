@@ -1,9 +1,10 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel} from '@margoengine/core';
-import {PbrMaterial,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type DrawOptions} from '@margoengine/core/extension';
+import {PbrMaterial,type Batch,type Engine,type EnginePlugin,type FrameGraph,type Geometry,type PassContext,type DrawOptions} from '@margoengine/core/extension';
 import {invertMatrixStable} from '@margoengine/math/mat4';
 import {declaration} from './section-uniform.js';
-declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
+import {featureEdges} from './edges.js';
+declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number;INDIRECT:number};
 declare const GPUTextureUsage:{RENDER_ATTACHMENT:number;TEXTURE_BINDING:number};
 type GPUContext=Extract<PassContext,{backend:'webgpu'}>;
 type Pipelines={back:GPURenderPipeline;front:GPURenderPipeline;reference:GPURenderPipeline;mask:GPURenderPipeline;cap:GPURenderPipeline;groups:GPUBindGroup[];fills:GPUBindGroup[]};
@@ -20,7 +21,24 @@ struct Pixel {@location(0) color:vec4f,@builtin(frag_depth) depth:f32}
  let linear=section.color.xyz*hatch;let mapped=linear/(1+linear);var o:Pixel;o.color=vec4f(select(pow(mapped,vec3f(1.0/2.2)),linear,section.settings.z>0),1);let clip=section.camera*vec4f(world,1);o.depth=clip.z/clip.w;return o;
 }`;
 const maskedCapShader=capShader.replace(declaration(0),declaration(0)+'@group(0) @binding(1) var capMask:texture_2d<f32>;\n').replace(' let near=',' if(textureLoad(capMask,vec2i(i.clip.xy),0).r<0.5){discard;}\n let near=');
-export interface SectionOptions {planes:readonly (readonly number[])[];cap?:boolean;color?:string|readonly number[];hatch?:number}
+/** Options for {@link SectionPlanes}. */
+export interface SectionOptions {
+  /** Up to 6 planes [a, b, c, d]: points with a x + b y + c z + d < 0 are cut away. */
+  planes:readonly (readonly number[])[];
+  /** Fill the cut faces of closed solids (needs depth32float-stencil8). Default true. */
+  cap?:boolean;
+  /**
+   * Also cap open shells (a missing face, a single sheet, a tessellation whose faces do not meet). An open shell has no inside,
+   * so its faces only add stray counts to the cap test and paint caps where there is no material; by default such geometries
+   * (any edge not shared by exactly two consistently wound triangles, positions welded to 0.1 mm per unit) are cut but not
+   * capped. Set true for a mesh whose cracks are tessellation noise around a real solid. Default false.
+   */
+  capOpenShells?:boolean;
+  /** Cap colour. Default '#f2a65e'. */
+  color?:string|readonly number[];
+  /** Hatch lines per world unit on the caps (0: none). Default 8. */
+  hatch?:number;
+}
 export function boxSection(min:readonly [number,number,number],max:readonly [number,number,number]):number[][] {if(![...min,...max].every(Number.isFinite)||min.some((v,i)=>v>=max[i]))throw new RangeError('Invalid section box');return [[1,0,0,-min[0]],[-1,0,0,max[0]],[0,1,0,-min[1]],[0,-1,0,max[1]],[0,0,1,-min[2]],[0,0,-1,max[2]]];}
 export class SectionPlanes implements EnginePlugin {
   readonly name='section-planes';private engine?:Engine;private buffers:GPUBuffer[]=[];private rows:Float32Array[]=[];private bindings:GPUBindGroupEntry[][]=[];
@@ -31,7 +49,7 @@ export class SectionPlanes implements EnginePlugin {
   private readonly color:Float32Array;private readonly cap:boolean;private readonly hatch:number;private base='';
   private readonly inverse=new Float32Array(16);
   private readonly inverseWorkspace=new Float64Array(52);
-  private pass?:GPURenderPassDescriptor;
+  private pass?:GPURenderPassDescriptor;private readonly closed=new WeakMap<Geometry,boolean>();private empty?:GPUBuffer;private readonly skipped:[Batch,Batch['redirect']][]=[];
   private referencePass?:GPURenderPassDescriptor;private maskPass?:GPURenderPassDescriptor;
   private stencil?:GPUTexture;private mask?:GPUTexture;private stencilView?:GPUTextureView;private maskView?:GPUTextureView;private width=0;private height=0;
   private readonly backDraw:DrawOptions={clear:false,stencilClear:0};private readonly frontDraw:DrawOptions={clear:false};
@@ -73,7 +91,8 @@ export class SectionPlanes implements EnginePlugin {
     if(this.width!==context.width||this.height!==context.height){this.stencil?.destroy();this.mask?.destroy();this.stencil=context.device.createTexture({size:[context.width,context.height],format:'depth32float-stencil8',usage:GPUTextureUsage.RENDER_ATTACHMENT});this.mask=context.device.createTexture({size:[context.width,context.height],format:'r8unorm',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});this.stencilView=this.stencil.createView();this.maskView=this.mask.createView();this.width=context.width;this.height=context.height;for(const pipeline of this.pipelines.values())pipeline.fills=[];}
     const pipelines=this.pipelines.get(key)??this.capPipelines(context,key,false) as Pipelines;
     if(!pipelines.fills.length)pipelines.fills=this.buffers.map(buffer=>context.device.createBindGroup({layout:pipelines!.cap.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer}},{binding:1,resource:this.maskView!}]}));
-    for(let i=1;i<this.buffers.length;i++){
+    this.skipOpenShells(context);
+    try{for(let i=1;i<this.buffers.length;i++){
       const reference=this.referencePass??={colorAttachments:[{view:this.maskView!,clearValue:{r:0,g:0,b:0,a:0},loadOp:'clear',storeOp:'store'}],depthStencilAttachment:{view:this.stencilView!,depthClearValue:0,depthLoadOp:'clear',depthStoreOp:'store',stencilClearValue:0,stencilLoadOp:'clear',stencilStoreOp:'store'}};
       (reference.colorAttachments as GPURenderPassColorAttachment[])[0].view=this.maskView!;reference.depthStencilAttachment!.view=this.stencilView!;
       let pass=context.encoder.beginRenderPass(reference);pass.setPipeline(pipelines.reference);pass.setBindGroup(0,pipelines.groups[i]);pass.draw(3);pass.end();
@@ -86,10 +105,21 @@ export class SectionPlanes implements EnginePlugin {
       (descriptor.colorAttachments as GPURenderPassColorAttachment[])[0].view=context.color;descriptor.depthStencilAttachment!.view=context.depth;
       pass=context.encoder.beginRenderPass(descriptor);
       pass.setPipeline(pipelines.cap);pass.setBindGroup(0,pipelines.fills[i]);pass.draw(3);pass.end();
+    }}finally{for(const [batch,redirect] of this.skipped)batch.redirect=redirect;this.skipped.length=0;}
+  }
+  // Open shells draw nothing in the stencil passes: their batches point at a zero-instance indirect draw until the caps are done.
+  private skipOpenShells(context:GPUContext):void {
+    if(this.options.capOpenShells)return;const engine=this.engine!;
+    for(const batch of context.batches??[]){
+      const geometry=batch.geometry;let closed=this.closed.get(geometry);
+      if(closed===undefined)this.closed.set(geometry,closed=featureEdges(geometry,180).length===0);
+      if(closed||!batch.count)continue;
+      this.empty??=context.device.createBuffer({size:20,usage:GPUBufferUsage.INDIRECT});
+      this.skipped.push([batch,batch.redirect]);batch.redirect={instances:batch.redirect?.instances??engine.geometryBuffers(geometry)!.instance,args:this.empty};
     }
   }
   onDeviceRestored(engine:Engine):void {this.dispose();this.setup(engine);}
-  dispose():void {for(const buffer of this.buffers)buffer.destroy();this.stencil?.destroy();this.mask?.destroy();this.stencil=this.mask=undefined;this.stencilView=this.maskView=undefined;this.width=this.height=0;this.buffers=[];this.rows=[];this.bindings=[];this.pipelines.clear();this.warming.clear();this.engine=undefined;this.pass=this.referencePass=this.maskPass=undefined;this.backDraw.pipeline=this.frontDraw.pipeline=undefined;this.backDraw.bindings=this.frontDraw.bindings=undefined;}
+  dispose():void {for(const buffer of this.buffers)buffer.destroy();this.stencil?.destroy();this.mask?.destroy();this.stencil=this.mask=undefined;this.stencilView=this.maskView=undefined;this.width=this.height=0;this.buffers=[];this.rows=[];this.bindings=[];this.pipelines.clear();this.warming.clear();this.engine=undefined;this.pass=this.referencePass=this.maskPass=undefined;this.backDraw.pipeline=this.frontDraw.pipeline=undefined;this.empty?.destroy();this.empty=undefined;this.backDraw.bindings=this.frontDraw.bindings=undefined;}
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

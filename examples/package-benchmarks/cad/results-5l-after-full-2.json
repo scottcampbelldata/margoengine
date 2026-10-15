@@ -1,0 +1,232 @@
+{
+ "label": "5l-after-full-2",
+ "date": "2026-10-15T14:58:18.904Z",
+ "acPowerAtStart": true,
+ "host": {
+  "cpu": "Intel(R) Core(TM) Ultra 7 258V",
+  "cores": 8,
+  "memoryGB": 31,
+  "node": "v24.15.0",
+  "browser": "155.0.4283.45"
+ },
+ "viewport": [
+  1432,
+  768
+ ],
+ "conditions": "quiet-gated: CPU 16% at 2026-10-15T14:58:16.104Z, AC",
+ "runs": [
+  {
+   "modules": 3704,
+   "crossOriginIsolated": true,
+   "msaa": 4,
+   "view": "overview",
+   "still": false,
+   "move": 0,
+   "culled": 1.5,
+   "imposters": 12,
+   "engineCreateMs": 119.10499999672174,
+   "buildMs": 274.8499999977648,
+   "parts": 100008,
+   "groups": 11229,
+   "entities": 114941,
+   "capacity": 111237,
+   "shapes": [
+    {
+     "name": "plate",
+     "triangles": 556,
+     "vertices": 1668
+    },
+    {
+     "name": "bracket",
+     "triangles": 20,
+     "vertices": 60
+    },
+    {
+     "name": "bolt",
+     "triangles": 88,
+     "vertices": 140
+    },
+    {
+     "name": "nut",
+     "triangles": 144,
+     "vertices": 432
+    },
+    {
+     "name": "washer",
+     "triangles": 128,
+     "vertices": 384
+    }
+   ],
+   "triangles": 12875104,
+   "imposterBakeMs": 319.67000000178814,
+   "imposterRadius": 0.2558730959574796,
+   "edgesSetupMs": 2.1349999979138374,
+   "edgeSegments": {
+    "geometries": 5,
+    "segments": 621888,
+    "instances": 8532,
+    "drawCalls": 20
+   },
+   "firstFrameMs": 390.20000000298023,
+   "loadToFirstFrameMs": 784.1549999974668,
+   "kernel": {
+    "tickCullMs": {
+     "n": 60,
+     "median": 6.33,
+     "p95": 6.84,
+     "max": 7.005,
+     "mean": 6.312
+    },
+    "tickNoCullMs": {
+     "n": 60,
+     "median": 5.75,
+     "p95": 6.33,
+     "max": 6.475,
+     "mean": 5.7504
+    },
+    "perPartNs": 55.1
+   },
+   "movers": 0,
+   "gpuDrawn": 336,
+   "frame": {
+    "cpuMs": {
+     "n": 240,
+     "median": 11.285,
+     "p95": 12.57,
+     "max": 15.46,
+     "mean": 10.6796
+    },
+    "kernelMs": {
+     "n": 240,
+     "median": 7.02,
+     "p95": 7.725,
+     "max": 8.34,
+     "mean": 7.0142
+    },
+    "collectMs": {
+     "n": 240,
+     "median": 3.075,
+     "p95": 3.79,
+     "max": 4.96,
+     "mean": 2.4267
+    },
+    "submitMs": {
+     "n": 240,
+     "median": 1.215,
+     "p95": 1.94,
+     "max": 2.345,
+     "mean": 1.2387
+    },
+    "intervalMs": {
+     "n": 240,
+     "median": 11.79,
+     "p95": 13.275,
+     "max": 16.12,
+     "mean": 11.2279
+    },
+    "fps": 84.8,
+    "gpuMs": {
+     "n": 15,
+     "median": 3.1457,
+     "p95": 3.7356,
+     "max": 3.7356,
+     "mean": 2.9404
+    },
+    "drawCalls": 26,
+    "visible": 7371,
+    "edgesCpuMs": {
+     "n": 241,
+     "median": 0.07,
+     "p95": 0.21,
+     "max": 0.6,
+     "mean": 0.0925
+    },
+    "gpuPassMedianMs": [
+     0.0655,
+     0.1311,
+     2.7525,
+     0.0655,
+     0.1311,
+     0
+    ]
+   },
+   "edgesFirstDrawMs": 5.41499999910593,
+   "isolated": {
+    "cpuMs": {
+     "n": 30,
+     "median": 10.69,
+     "p95": 13.335,
+     "max": 13.43,
+     "mean": 10.9227
+    },
+    "gpuTailMs": {
+     "n": 30,
+     "median": 8.3,
+     "p95": 9.97,
+     "max": 10.24,
+     "mean": 8.4125
+    },
+    "frameMs": {
+     "n": 30,
+     "median": 19.375,
+     "p95": 21.395,
+     "max": 22.005,
+     "mean": 19.3352
+    }
+   },
+   "isolatedNoEdges": {
+    "cpuMs": {
+     "n": 30,
+     "median": 9.825,
+     "p95": 10.72,
+     "max": 10.81,
+     "mean": 9.8718
+    },
+    "gpuTailMs": {
+     "n": 30,
+     "median": 7.47,
+     "p95": 8.705,
+     "max": 8.74,
+     "mean": 7.4342
+    },
+    "frameMs": {
+     "n": 30,
+     "median": 17.165,
+     "p95": 18.65,
+     "max": 19.005,
+     "mean": 17.306
+    }
+   },
+   "enginePick": {
+    "ms": {
+     "n": 10,
+     "median": 11.38,
+     "p95": 12.325,
+     "max": 12.325,
+     "mean": 11.317
+    },
+    "first": 56.230000000447035,
+    "hits": 0
+   },
+   "memory": {
+    "jsHeapMB": 69.1,
+    "kernelWasmMB": 75.5,
+    "instanceStagingMB": 10.12,
+    "gpuInstanceMB": 10.12,
+    "geometryMB": 0.07,
+    "msaaTargetsMB": 37.76
+   },
+   "removeOneMeshMs": 0.26999999955296516,
+   "errors": [],
+   "size": "100000",
+   "pageErrors": []
+  }
+ ],
+ "adapter": {
+  "vendor": "intel",
+  "architecture": "xe-2lpg",
+  "description": "",
+  "timestamp": true
+ },
+ "acPowerAtEnd": true
+}

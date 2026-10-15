@@ -14,10 +14,12 @@ export function holeAnchor(node: Mesh, ring: readonly number[], tolerance?: numb
 export function measureDistance(a: Anchor, b: Anchor, unit?: 'mm' | 'in' | 'm', sceneToMeters?: number): number;
 
 export function snapAnchor(node: Mesh, worldPoint: Vec3, { kind, holes, maxDistance }?: {
-    kind?: 'vertex' | 'face' | 'hole';
+    kind?: 'vertex' | 'edge' | 'face' | 'hole';
     holes?: readonly (readonly number[])[];
     maxDistance?: number;
 }): Anchor | null;
+
+export function snapFeature(node: Mesh, worldPoint: Vec3, kind: 'vertex' | 'edge', maxDistance?: number): Anchor | null;
 
 export function vertexAnchor(node: Mesh, index: number): Anchor;
 

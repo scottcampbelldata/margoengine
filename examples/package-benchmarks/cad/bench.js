@@ -13,9 +13,9 @@ const mb = bytes => +(bytes / 2 ** 20).toFixed(2);
 const machinery = (base, file) => import(/* @vite-ignore */ `${base}/${file}.js`);
 
 const edgeCpu = [];
-async function run({machineryBase = '/packages/machinery/dist', modules, frames = 240, warmup = 60, pick = true, bvh = true, explode = true, edges = false, view = 'overview', low = false, still = false, move = 0}) {
+async function run({machineryBase = '/packages/machinery/dist', modules, frames = 240, warmup = 60, pick = true, bvh = true, explode = true, edges = false, view = 'overview', low = false, still = false, move = 0, culled, cullingBase = '/packages/culling/dist', imposters = 0, lodBase = '/packages/lod/dist'}) {
   if (low) globalThis.margoLow = 1;
-  const canvas = document.getElementById('view'), result = {modules, crossOriginIsolated, msaa: low ? 1 : 4, view, still, move};
+  const canvas = document.getElementById('view'), result = {modules, crossOriginIsolated, msaa: low ? 1 : 4, view, still, move, culled: culled ?? null, imposters};
   const capacity = modules * ENTITIES_PER_MODULE + Math.ceil(modules / 32) + 1;
   let t = now();const engine = await withGPUTiming(true, () => Engine.create(canvas, {capacity, camera: {fov: 45, near: 0.05, far: 2000}}));result.engineCreateMs = now() - t;
   const errors = [];engine.gpu.addEventListener('uncapturederror', e => errors.push(e.error.message));
@@ -23,11 +23,24 @@ async function run({machineryBase = '/packages/machinery/dist', modules, frames 
   result.parts = assembly.parts.length;result.groups = assembly.groups.length;result.entities = assembly.parts.length + assembly.groups.length;result.capacity = capacity;
   const shapes = Object.entries(assembly.geometries).map(([name, g]) => ({name, triangles: g.indices.length / 3, vertices: g.vertices.length / 6}));
   result.shapes = shapes;result.triangles = assembly.parts.reduce((sum, p) => sum + p.geometry.indices.length / 3, 0);
+  // culled (px): @margoengine/culling's CulledMeshes culls core meshes on the GPU (frustum + `minRadius` screen size) and
+  // every frame renders with {culling: false}, so the CPU does not cull and the kept set stays stable while orbiting.
+  let culler = null;const frameOptions = culled === undefined ? undefined : {culling: false};
+  if (culled !== undefined) {const {CulledMeshes} = await import(/* @vite-ignore */ `${cullingBase}/index.js`);culler = CulledMeshes.attach(engine, {minRadius: culled});}
+  // imposters (px): @margoengine/lod shows a module (27 parts) as one octahedral imposter, baked once from the first module,
+  // while its bounding sphere is under this many pixels in radius. Each module gets a sibling anchor (one entity per module).
+  if (imposters) {
+    const {LODSystem, Imposter} = await import(/* @vite-ignore */ `${lodBase}/index.js`), list = assembly.groups.filter(g => g.name === 'module');
+    t = now();const imposter = Imposter.bake(engine, list[0], {frames: 12, frameSize: 64});await engine.gpu.queue.onSubmittedWorkDone();result.imposterBakeMs = now() - t;
+    const lods = LODSystem.attach(engine), screen = 2 * imposters / canvas.clientHeight;result.imposterRadius = imposter.radius;
+    for (const m of list) {const anchor = engine.createMesh(engine.meshes.get(engine.store.parents[m.id])).setPosition([m.position.x, m.position.y, m.position.z]).setRotation([m.rotation.x, m.rotation.y, m.rotation.z]);lods.add(anchor, [{object: m}, {object: imposter, screen}], {radius: imposter.radius});}
+    result.entities += list.length;
+  }
   if (edges) {const {FeatureEdges} = await machinery(machineryBase, 'edges');t = now();const plugin = new FeatureEdges({angle: 30, width: 1.5});engine.use(plugin);result.edgesSetupMs = now() - t;result.edgeSegments = plugin.stats;const draw = plugin.draw.bind(plugin);plugin.draw = c => {const s = now();draw(c);edgeCpu.push(now() - s);};}
   const r = assembly.extent * (view === 'close' ? 0.12 : 0.75), aim = view === 'close' ? [0, 0, 0] : [0, 0, 0];
   const orbit = a => {engine.camera.position = [Math.cos(a) * r, r * (view === 'close' ? 0.5 : 0.65), Math.sin(a) * r];engine.camera.target = aim;};orbit(0);
   // First frame: pipeline compile, instance storage growth and first uploads.
-  t = now();engine.render();await engine.gpu.queue.onSubmittedWorkDone();result.firstFrameMs = now() - t;result.loadToFirstFrameMs = result.engineCreateMs + result.buildMs + result.firstFrameMs;
+  t = now();engine.render(frameOptions);await engine.gpu.queue.onSubmittedWorkDone();result.firstFrameMs = now() - t;result.loadToFirstFrameMs = result.engineCreateMs + result.buildMs + result.firstFrameMs;
   // Kernel alone: transform + hierarchy + cull, no rendering. Same planes as the frame.
   const {AssemblyBVH} = await machinery(machineryBase, 'spatial'), {ExplodedView} = await machinery(machineryBase, 'exploded');
   const store = engine.store;store.planes.set(engine.camera.planes);
@@ -40,7 +53,7 @@ async function run({machineryBase = '/packages/machinery/dist', modules, frames 
   let tickMs = 0, submitMs = 0;const cpu = [], kernel = [], submit = [], collect = [], intervals = [], gpu = [], passes = [];
   store.tick = c => {const s = now();rawTick(c);tickMs = now() - s;};renderer.render = (...a) => {const s = now();rawSubmit(...a);submitMs = now() - s;};
   let frameNo = 0, last = 0, lastGpu = null, angle = 0, done, started = now();const finished = new Promise(res => done = res);
-  engine.render = o => {const s = now();rawRender(o);const total = now() - s;frameNo++;
+  engine.render = o => {const s = now();rawRender(frameOptions ? Object.assign(o ?? {}, frameOptions) : o);const total = now() - s;frameNo++;
     if (frameNo > warmup) {cpu.push(total);kernel.push(tickMs);submit.push(submitMs);collect.push(total - tickMs - submitMs);if (last) intervals.push(s - last);
       if (stats.gpuTime !== null && stats.gpuTime !== lastGpu) {gpu.push(stats.gpuTime);passes.push(Array.from(stats.gpuPassMilliseconds.subarray(0, stats.gpuPassCount)));lastGpu = stats.gpuTime;}}
     last = s;if (frameNo >= warmup + frames && (gpu.length >= 12 || s - started > 45_000)) done();};
@@ -48,11 +61,12 @@ async function run({machineryBase = '/packages/machinery/dist', modules, frames 
   const movers = move ? assembly.parts.filter((_, i) => i % Math.round(1 / move) === 0).map(p => [p, p.position.y]) : [];result.movers = movers.length;
   engine.onFrame((_, delta) => {if (!still) {angle += delta * 0.3;orbit(angle);}const dy = 0.002 * Math.sin(frameNo * 0.2);for (const [p, y] of movers) p.position.y = y + dy;});
   engine.start();await finished;engine.stop();
+  if (culler) {let drawn = 0;for (const n of (await culler.readCounts()).values()) drawn += n;result.gpuDrawn = drawn;}
   result.frame = {cpuMs: stat(cpu), kernelMs: stat(kernel), collectMs: stat(collect), submitMs: stat(submit), intervalMs: stat(intervals), fps: +(1000 / stat(intervals).median).toFixed(1), gpuMs: stat(gpu), drawCalls: stats.drawCalls, visible: engine.stats.visible};
   result.frame.edgesCpuMs = stat(edgeCpu.slice(warmup));result.edgesFirstDrawMs = edgeCpu[0] ?? null;result.frame.gpuPassMedianMs = passes.length ? passes[0].map((_, i) => stat(passes.map(p => p[i] ?? 0)).median) : null;
   engine.render = rawRender;store.tick = rawTick;renderer.render = rawSubmit;engine.removePlugin('stats');
   // Serial frames: wait for the GPU after each submit, so the GPU tail is not hidden by pipelining (timestamp sums are unreliable when frames queue).
-  const isolated = async n => {const c = [], g = [];for (let i = 0; i < n; i++) {angle += 0.05;orbit(angle);const s = now();engine.render();const m = now();await engine.gpu.queue.onSubmittedWorkDone();c.push(m - s);g.push(now() - m);}return {cpuMs: stat(c), gpuTailMs: stat(g), frameMs: stat(c.map((v, i) => v + g[i]))};};
+  const isolated = async n => {const c = [], g = [];for (let i = 0; i < n; i++) {angle += 0.05;orbit(angle);const s = now();engine.render(frameOptions);const m = now();await engine.gpu.queue.onSubmittedWorkDone();c.push(m - s);g.push(now() - m);}return {cpuMs: stat(c), gpuTailMs: stat(g), frameMs: stat(c.map((v, i) => v + g[i]))};};
   result.isolated = await isolated(30);if (edges) {engine.removePlugin('feature-edges');result.isolatedNoEdges = await isolated(30);}
   if (pick) {const picks = [];let hits = 0;for (let i = 0; i < 12; i++) {const s = now();const hit = await engine.pick(canvas.clientWidth / 2 + (i % 4) * 7, canvas.clientHeight / 2 + (i >> 2) * 7);picks.push(now() - s);if (hit) hits++;}result.enginePick = {ms: stat(picks.slice(2)), first: picks[0], hits};}
   if (bvh) {
@@ -68,7 +82,7 @@ async function run({machineryBase = '/packages/machinery/dist', modules, frames 
     t = now();const view = new ExplodedView(offsets);engine.use(view);const setupMs = now() - t;
     const animate = [], still = [];for (let i = 0; i < 40; i++) {view.amount = (i % 10) / 10;animate.push(time(() => view.onPreUpdate(0)));}
     for (let i = 0; i < 40; i++) still.push(time(() => view.onPreUpdate(0)));
-    const frameMs = [];for (let i = 0; i < 30; i++) {view.amount = i / 30;const s = now();engine.render();frameMs.push(now() - s);}
+    const frameMs = [];for (let i = 0; i < 30; i++) {view.amount = i / 30;const s = now();engine.render(frameOptions);frameMs.push(now() - s);}
     result.explodedView = {setupMs, animatingMs: stat(animate), unchangedMs: stat(still), renderWhileAnimatingMs: stat(frameMs)};engine.removePlugin('exploded-view');
   }
   // Instance storage: the CPU staging array and the GPU buffer have the same size (24 floats per slot).

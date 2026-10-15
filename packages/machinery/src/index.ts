@@ -10,7 +10,7 @@ export {TelemetryChannel} from './telemetry.js';
 export type {TelemetryOptions} from './telemetry.js';
 export {SectionPlanes,boxSection} from './section.js';
 export {AssemblyIndex} from './assembly.js';
-export {vertexAnchor,edgeAnchor,faceAnchor,holeAnchor,snapAnchor,measureDistance} from './metrology.js';
+export {vertexAnchor,edgeAnchor,faceAnchor,holeAnchor,snapAnchor,snapFeature,measureDistance} from './metrology.js';
 export {AssemblyBVH} from './spatial.js';
 export type {RayHit} from './spatial.js';
 export {measureClearance} from './clearance.js';

@@ -42,7 +42,7 @@ merged at `0ed56b9`:
 
 Recounted 2026-10-15 (HANDOFF 5j), 264 rows: the 233 after 5d (the original 201, 27 from the post-`590278e` audit and 5
 for the material setters and transparent canvas merged during 5d), DOC-072 to DOC-075 (CSP, deploying.md) and PKG-109
-(core back-face culling) added since without updating this table, and LIM-001 to LIM-026 for `docs/limits.md`:
+(core back-face culling) added since without updating this table, and LIM-001 to LIM-027 for `docs/limits.md`:
 
 | Source | PROVEN | STALE | UNPROVEN | OVERCLAIM | REMOVED | HISTORICAL | Total |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -468,6 +468,7 @@ constant (and the test that asserts it, where one exists); the page says "not me
 | LIM-024 | Without the rules: "Compiling or instantiating WebAssembly module violates the following Content Security policy directive"; "Evaluating a string as JavaScript violates the following Content Security Policy directive" | docs/limits.md (Platform) | As DOC-074: `CSP_OVERRIDE` runs printed only | `CSP_OVERRIDE="<policy>" node scripts/csp-check.mjs harness` | UNPROVEN | Deterministic browser behaviour, but the negative runs' output is not committed. Commit it (or have csp-check.mjs record the override runs) to make LIM-024 and DOC-074 PROVEN. |
 | LIM-025 | "Every committed real-GPU result comes from one machine"; iPhone "run by hand ... no scripted run or committed result"; S23 report "unresolved"; untested list | docs/limits.md (Platform) | outline.md hardware list; H-03 (iPhone capture not committed); R-08 | – | PROVEN | A statement of absence: no phone numbers are quoted on the page. |
 | LIM-026 | Browsers: Edge 155 verified, automated; iPhone Safari by hand only; Firefox and macOS Safari not verified | docs/limits.md (Platform) | Every real-GPU result JSON names chromium 155 / Edge; R-08, DOC-072 | – | PROVEN | – |
+| LIM-027 | Entities escape hatch: "with `minRadius: 1.5` a 100,008-part orbit draws 11 % of the parts at 138 FPS (core: 29)" | docs/limits.md (Scale) | `examples/package-benchmarks/cad/results-5l-after-culled1.5.json` (fps 137.8, gpuDrawn 11,363) and `results-5l-before-orbit.json` (fps 29.3); Arc 140V, Edge, AC, quiet-gated, GPU lock (HANDOFF 5l.a) | `node examples/package-benchmarks/cad/run.mjs --sizes=100000 --culled=1.5 --no-bvh --no-explode` | PROVEN | One session; a second session measured 28-30 FPS for core and 61-88 FPS with edges, see cad-performance.md. |
 
 ## vs-three.js results
 

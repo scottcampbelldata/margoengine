@@ -214,6 +214,7 @@ export interface RayHit {
 export interface SectionOptions {
     planes: readonly (readonly number[])[];
     cap?: boolean;
+    capOpenShells?: boolean;
     color?: string | readonly number[];
     hatch?: number;
 }
@@ -349,10 +350,12 @@ export function parseCADAsync(instance: EngineKernel, buffer: ArrayBuffer, forma
 export function projectAnnotation(camera: Camera, point: Vec3, width: number, height: number, gpu?: boolean): readonly [number, number] | null;
 
 export function snapAnchor(node: Mesh, worldPoint: Vec3, { kind, holes, maxDistance }?: {
-    kind?: 'vertex' | 'face' | 'hole';
+    kind?: 'vertex' | 'edge' | 'face' | 'hole';
     holes?: readonly (readonly number[])[];
     maxDistance?: number;
 }): Anchor | null;
+
+export function snapFeature(node: Mesh, worldPoint: Vec3, kind: 'vertex' | 'edge', maxDistance?: number): Anchor | null;
 
 export function vertexAnchor(node: Mesh, index: number): Anchor;
 

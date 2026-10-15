@@ -8,7 +8,9 @@ import {openBrowser} from '../../../scripts/browser.js';
 import {decodePNG} from '../../../tests/support/png.js';
 
 // --edges also attaches FeatureEdges to both engines. Its compute pass appends visible parts with atomics, so its line
-// order (and the blending of overlapping antialiased lines) varies from run to run: with --edges channels may differ by 1.
+// order (and the blending of overlapping antialiased lines) varies from run to run. Lines of parts between minRadius and twice
+// that fade in with alpha below 1, which makes the blend more order-dependent: with --edges channels may differ by up to 3
+// (a missing or extra line would differ by about 100).
 const edges = process.argv.includes('--edges');
 
 const context = await openBrowser({startPath: '/examples/package-benchmarks/cad/culled-meshes.html' + (edges ? '?edges' : ''), port: 5221}), {page, hardware} = context, pageErrors = [];
@@ -25,7 +27,7 @@ try {
     for (let k = 0; k < a.data.length; k += 4) {if (a.data[k] !== b.data[k] || a.data[k + 1] !== b.data[k + 1] || a.data[k + 2] !== b.data[k + 2]) differing++;for (let c = 0; c < 3; c++) delta = Math.max(delta, Math.abs(a.data[k + c] - b.data[k + c]));if (a.data[k] + a.data[k + 1] + a.data[k + 2] > 120) lit++;}
     if (differing) {const at = [];for (let k = 0; k < a.data.length && at.length < 6; k += 4) if (a.data[k] !== b.data[k] || a.data[k + 1] !== b.data[k + 1] || a.data[k + 2] !== b.data[k + 2]) at.push([(k / 4) % a.width, Math.floor(k / 4 / a.width), [...a.data.subarray(k, k + 3)], [...b.data.subarray(k, k + 3)]]);console.log('differing pixels (x, y, culled, core):', JSON.stringify(at));}
     console.log(`step ${i}: ${r.label}: ${differing} of ${a.data.length / 4} pixels differ (max channel delta ${delta}), ${lit} lit; GPU drew ${r.drawn} of ${r.submitted}, capacity ${r.capacity}`);
-    if (edges) assert.ok(delta <= 1, `${r.label}: culled frame differs from core by ${delta}`);else assert.equal(differing, 0, `${r.label}: culled frame differs from core`);assert.ok(lit > 1500, `${r.label}: scene not visible`);
+    if (edges) assert.ok(delta <= 3, `${r.label}: culled frame differs from core by ${delta}`);else assert.equal(differing, 0, `${r.label}: culled frame differs from core`);assert.ok(lit > 1500, `${r.label}: scene not visible`);
     assert.ok(r.drawn <= r.submitted, `${r.label}: drawn count out of range`);
     if (r.drawn < r.submitted * 0.5) partial++;
   }

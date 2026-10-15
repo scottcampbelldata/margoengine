@@ -3,7 +3,7 @@ import {meshRuntime} from '@margoengine/core/extension';
 import type {Mesh,Vec3} from '@margoengine/core';
 import type {Geometry} from '@margoengine/core/extension';
 import {machineryMemory} from './runtime.js';
-import {vertexAnchor,holeAnchor,edgeAnchor} from './metrology.js';
+import {holeAnchor,snapFeature} from './metrology.js';
 import {worldAnchor,type Anchor} from './anchors.js';
 export interface RayHit {node:Mesh;triangle:number;distance:number;point:Vec3}
 /**
@@ -51,10 +51,15 @@ export class AssemblyBVH {
     if(node<0)return null;const hit=this.nodes[node];hit.check();if(hit.geometry!==this.geometries[node])throw new Error('Geometry changed; recreate assembly BVH');
     return {node:hit,triangle,distance:best,point:[ox+ux*best,oy+uy*best,oz+uz*best]};
   }
+  /**
+   * Snaps a hit to the hit part's CAD features within `maxDistance` world units of the hit point: 'vertex' the nearest corner
+   * where feature edges meet, 'edge' the closest point on a feature edge (faces meeting above 30 degrees or open boundaries;
+   * never a triangulation diagonal), 'centerline' the nearest centre of the given vertex-index `rings`. Null when none is that close.
+   */
   snap(hit:RayHit,{kind='vertex',rings=[],maxDistance=Infinity}:{kind?:'vertex'|'edge'|'centerline';rings?:readonly (readonly number[])[];maxDistance?:number}={}):Anchor|null {
     if(this.disposed||!this.nodes.includes(hit.node)||!['vertex','edge','centerline'].includes(kind)||!(maxDistance>=0)||!Number.isSafeInteger(hit.triangle)||hit.triangle<0)throw new RangeError('Invalid BVH snap');hit.node.check();const indices=hit.node.geometry?.indices;if(!indices||hit.triangle>=indices.length/3)throw new RangeError('Invalid hit triangle');worldAnchor({point:hit.point});let best:Anchor|null=null,distance=maxDistance;
-    const ids=indices.subarray(hit.triangle*3,hit.triangle*3+3),count=kind==='centerline'?rings.length:3;
-    for(let i=0;i<count;i++){const anchor=kind==='vertex'?vertexAnchor(hit.node,ids[i]):kind==='edge'?edgeAnchor(hit.node,ids[i],ids[(i+1)%3]):holeAnchor(hit.node,rings[i]),p=worldAnchor(anchor),d=Math.hypot(p[0]-hit.point[0],p[1]-hit.point[1],p[2]-hit.point[2]);if(d<=distance){best=anchor;distance=d;}}
+    if(kind!=='centerline')return snapFeature(hit.node,hit.point,kind,maxDistance);
+    for(let i=0;i<rings.length;i++){const anchor=holeAnchor(hit.node,rings[i]),p=worldAnchor(anchor),d=Math.hypot(p[0]-hit.point[0],p[1]-hit.point[1],p[2]-hit.point[2]);if(d<=distance){best=anchor;distance=d;}}
     return best;
   }
   dispose():void {this.disposed=true;}

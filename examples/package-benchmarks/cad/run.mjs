@@ -1,5 +1,8 @@
 // Real-GPU CAD benchmark. From the repository root, after `npm run build:packages`:
-//   node examples/package-benchmarks/cad/run.mjs [--sizes=10000,50000,max] [--edges] [--low] [--step] [--label=name]
+//   node examples/package-benchmarks/cad/run.mjs [--sizes=10000,50000,max] [--edges] [--low] [--step] [--culled[=px]] [--label=name]
+//   --culled[=px]: GPU culling of the core meshes with @margoengine/culling CulledMeshes (minRadius px, default 0), CPU culling off
+//   --imposters=px: each 27-part module shows as one @margoengine/lod imposter while its bounding sphere is under px pixels
+//   --machinery=, --culling=, --lod=: URL of another build's dist folder (before/after; Git Bash: MSYS_NO_PATHCONV=1)
 // BENCH_CONDITIONS (free text, e.g. machine state) and BENCH_CORE (core commit) are recorded in the JSON when set.
 // Writes examples/package-benchmarks/cad/results-<label>.json. Headless Edge (BROWSER_CHANNEL to override), vsync and the
 // frame-rate limit off so FPS is throughput, cross-origin isolated so performance.now() has 5 µs resolution.
@@ -26,9 +29,9 @@ try {
   {const {page} = await open();out.adapter = await page.evaluate(async () => {const a = await navigator.gpu.requestAdapter({powerPreference: 'high-performance'});return {...a.info.toJSON?.() ?? {vendor: a.info.vendor, architecture: a.info.architecture, description: a.info.description}, timestamp: a.features.has('timestamp-query')};});await page.close();}
   console.log('adapter', JSON.stringify(out.adapter));
   for (const size of sizes) {
-    const {page, errors} = await open(), config = {modules: modulesFor(size), edges: flag('edges'), low: flag('low'), view: arg('view', 'overview'), bvh: !flag('no-bvh'), explode: !flag('no-explode'), still: flag('still'), pick: !flag('no-pick'), move: +arg('move', 0),...(arg('machinery') ? {machineryBase: arg('machinery')} : {})};
+    const {page, errors} = await open(), config = {modules: modulesFor(size), edges: flag('edges'), low: flag('low'), view: arg('view', 'overview'), bvh: !flag('no-bvh'), explode: !flag('no-explode'), still: flag('still'), pick: !flag('no-pick'), move: +arg('move', 0),...(flag('culled') || arg('culled') ? {culled: +(arg('culled') ?? 0)} : {}),...(arg('culling') ? {cullingBase: arg('culling')} : {}),...(arg('imposters') ? {imposters: +arg('imposters')} : {}),...(arg('lod') ? {lodBase: arg('lod')} : {}),...(arg('machinery') ? {machineryBase: arg('machinery')} : {})};
     const result = await page.evaluate(c => window.cad.run(c), config);result.size = size;result.pageErrors = errors;out.runs.push(result);
-    console.log(size, JSON.stringify({parts: result.parts, kernel: result.kernel.tickCullMs.median, frameKernel: result.frame.kernelMs.median, collect: result.frame.collectMs.median, submit: result.frame.submitMs.median, cpu: result.frame.cpuMs.median, gpu: result.frame.gpuMs?.median, fps: result.frame.fps, pick: result.enginePick?.ms?.median, bvh: result.assemblyBVH, explode: result.explodedView?.animatingMs?.median, errors: [...errors, ...result.errors]}));
+    console.log(size, JSON.stringify({parts: result.parts, kernel: result.kernel.tickCullMs.median, frameKernel: result.frame.kernelMs.median, collect: result.frame.collectMs.median, submit: result.frame.submitMs.median, cpu: result.frame.cpuMs.median, gpu: result.frame.gpuMs?.median, gpuDrawn: result.gpuDrawn, fps: result.frame.fps, pick: result.enginePick?.ms?.median, bvh: result.assemblyBVH, explode: result.explodedView?.animatingMs?.median, errors: [...errors, ...result.errors]}));
     await page.close();
   }
   if (flag('shot')) for (const ortho of [false, true]) {const {page} = await open();await page.evaluate(o => window.cad.view({ortho: o}), ortho);await page.locator('canvas').screenshot({path: `test-results/cad-edges-${ortho ? 'ortho' : 'perspective'}.png`});await page.close();}
