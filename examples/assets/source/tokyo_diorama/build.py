@@ -13,22 +13,33 @@ if HERE not in sys.path:
 
 import bpy  # noqa: E402
 
-import buildings  # noqa: E402
+import bake  # noqa: E402
+import cats  # noqa: E402
+import city  # noqa: E402
+import facade  # noqa: E402
 import kit  # noqa: E402
-import props  # noqa: E402
-import street  # noqa: E402
+import merge  # noqa: E402
+import polyhaven  # noqa: E402
+import signs  # noqa: E402
+import streetlife  # noqa: E402
 import tanuki  # noqa: E402
+import tram  # noqa: E402
 
-MODULES = [kit, street, buildings, tanuki, props]
-for module in MODULES:  # pick up edits when re-run inside a live Blender session
+HELPERS = [kit, polyhaven, bake, signs, tram, merge]
+MODULES = [city, facade, tanuki, streetlife, cats]
+for module in HELPERS + MODULES:  # pick up edits when re-run inside a live Blender session
     importlib.reload(module)
 
 
 def build():
     kit.reset_scene()
+    bake.ATLASES.clear()
     root = kit.empty('Diorama_Root', (0, 0, 0))
-    for module in MODULES[1:]:
+    signs.build_atlas()
+    for module in MODULES:
         module.build(root)
+    bake.bake_all()  # after everything exists, so baked AO includes neighbouring buildings and props
+    merge.build(root)  # one mesh per group after baking: thousands of draw calls down to a few hundred
     kit.SCENE.frame_set(kit.FRAME_START)
     return root
 
@@ -42,7 +53,7 @@ def export(path):
             export_apply=True, export_yup=True, export_cameras=False, export_lights=False,
             export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=6,
             export_animations=True, export_animation_mode='SCENE', export_anim_scene_split_object=False, export_force_sampling=True,
-            export_frame_range=True, export_anim_slide_to_zero=True, export_optimize_animation_size=True)
+            export_frame_range=True, export_image_format='JPEG', export_image_quality=88, export_anim_slide_to_zero=True, export_optimize_animation_size=True)
 
 
 def main(out=None, blend=None):
