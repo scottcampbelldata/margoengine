@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import {readdirSync, readFileSync, existsSync} from 'node:fs';
 import {dirname, join, relative, resolve} from 'node:path';
 
-// Published type files may only import relative paths inside their own package; anything else breaks after npm install.
+// Published files (.js and .d.ts) may only import relative paths inside their own package; anything else breaks after
+// npm install (bvh's tsc build once shipped `../../shared/instances.js`).
 const packages = resolve(import.meta.dirname, '../packages');
-const files = dir => readdirSync(dir, {withFileTypes: true}).flatMap(e => e.isDirectory() ? files(join(dir, e.name)) : e.name.endsWith('.d.ts') ? [join(dir, e.name)] : []);
+const files = dir => readdirSync(dir, {withFileTypes: true}).flatMap(e => e.isDirectory() ? files(join(dir, e.name)) : /\.(m?js|d\.ts)$/.test(e.name) ? [join(dir, e.name)] : []);
 
-test('every dist .d.ts stays inside its package', () => {
+test('every dist .js and .d.ts stays inside its package', () => {
   const escapes = [];
   for (const name of readdirSync(packages)) {
     const root = join(packages, name), dist = join(root, 'dist');
