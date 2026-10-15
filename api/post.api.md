@@ -83,6 +83,7 @@ export class SSR implements EnginePlugin {
     readonly name = "ssr";
     constructor(options?: SSROptions);
     static attach(engine: EngineKernel, options?: SSROptions): SSR;
+    add(model: SSRModel): () => void;
     get enabled(): boolean;
     set enabled(value: boolean);
     setup(engine: Engine): void;
@@ -90,6 +91,18 @@ export class SSR implements EnginePlugin {
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
+}
+
+export interface SSRCapture {
+    declarations(code: string): string;
+    readonly targets: readonly GPUColorTargetState[];
+    begin(): GPURenderPassEncoder;
+}
+
+export interface SSRModel {
+    setCapture(hook: SSRCapture): () => void;
+    onDispose(callback: () => void): () => void;
+    draw(context: Context, mode: 'capture', color: GPUTextureView, depth: GPUTextureView): void;
 }
 
 export interface SSROptions {
@@ -117,6 +130,10 @@ export class SceneFade implements EnginePlugin {
 }
 
 // Not exported from this entry, but used by the exports above:
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 
 type Context = Extract<PassContext, {
     backend: 'webgpu';

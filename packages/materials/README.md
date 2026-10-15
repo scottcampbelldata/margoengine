@@ -1,6 +1,6 @@
 # @margoengine/materials
 
-Textures and materials for meshes you build in code: the counterparts of Three.js `TextureLoader`, `MeshStandardMaterial`, `MeshBasicMaterial`, `MeshNormalMaterial`, `MeshMatcapMaterial`, `CanvasTexture`, `VideoTexture` and `DataTexture`. Meshes draw through `@margoengine/gltf-pro`, so they accept the same shadows, clustered lights and SSAO as a loaded glTF. WebGPU only.
+Textures and materials for meshes you build in code: the counterparts of Three.js `TextureLoader`, `MeshStandardMaterial`, `MeshBasicMaterial`, `MeshNormalMaterial`, `MeshMatcapMaterial`, `CanvasTexture`, `VideoTexture` and `DataTexture`. Meshes draw through `@margoengine/gltf-pro`, so they accept the same shadows, clustered lights, SSAO and SSR (`ssr.add(mesh)`: glossy meshes reflect) as a loaded glTF. WebGPU only.
 
 ```ts
 import {createStage} from 'margoengine';
@@ -51,7 +51,7 @@ For node-based colour, normal, roughness, emissive, opacity and vertex offsets, 
 
 Sorting matches Three.js: all material meshes draw in one pass, opaque first, then transparent back to front, each group by `renderOrder`. Overlapping transparent meshes can pop as the camera crosses the point where their order flips; `oit.add(mesh)` from `@margoengine/oit` draws a transparent mesh with `blending: 'normal'` order-independently instead (other blendings and `depthWrite`/`depthTest` overrides stay sorted).
 
-Limits: one material per mesh (geometry `groups` are ignored); UVs and the vertex arrays are packed once per geometry object, so edit a copy rather than the original; shading and render state are fixed at construction (render state goes through gltf-pro's `material.renderState` pipeline hook). Maps are bound by a gltf-pro lighting hook, so they apply to the lit colour only: SSAO normals and shadow alpha cut-outs ignore `normalMap` and `map` alpha. Basic and matcap output skips ACES tone mapping. No Lambert, Phong, depth or physical (clearcoat, transmission) materials, no second UV set, and no WebGL2 path. Shader-node `texture()` reads the raw `uv()`; transform it with nodes.
+Limits: one material per mesh (geometry `groups` are ignored); UVs and the vertex arrays are packed once per geometry object, so edit a copy rather than the original; shading and render state are fixed at construction (render state goes through gltf-pro's `material.renderState` pipeline hook). Maps are bound by a gltf-pro lighting hook, so they apply to the lit colour only: SSAO normals and shadow alpha cut-outs ignore `normalMap` and `map` alpha. Basic and matcap output skips ACES tone mapping. Added to SSR, `basic`, `normal` and `matcap` meshes reflect by their roughness and metalness like `standard` ones (the default roughness 1 never reflects). No Lambert, Phong, depth or physical (clearcoat, transmission) materials, no second UV set, and no WebGL2 path. Shader-node `texture()` reads the raw `uv()`; transform it with nodes.
 
 MIT. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

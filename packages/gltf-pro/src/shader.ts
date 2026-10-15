@@ -137,6 +137,32 @@ export function transparentPBR(code:string,declarations:string):string {
   out=declarations+code.replace(head,'fn margoShade(i:Out,front:bool)->vec4f {')+'\n@fragment fn transparent(i:Out,@builtin(front_facing) front:bool)->MargoTransparent {return margoTransparent(margoShade(i,front),i);}\n';
   if(!cache){if(through.size>=8)through.clear();through.set(declarations,cache=new Map());}if(cache.size>=64)cache.clear();cache.set(code,out);return out;
 }
+/**
+ * Material capture hook (contract version 1, README "Capture hook"), set with `PBRModel.setCapture`; screen-space
+ * reflections (`@margoengine/post` SSR) use it. While set, `model.draw(c, 'capture', ...)` draws the model's opaque and
+ * MASK primitives (not BLEND, transmission or unlit) into `begin()`'s pass with these `targets`, depth tested
+ * (greater-equal) and written. The shader is the lit beauty shader, its lighting in a dead block (every binding stays,
+ * nothing is lit), with an entry point `capture` returning `margoCapture(s, v, k)`: `s` the Surface, `v` toward the eye,
+ * `k` the share of the base layer's light left after clearcoat and sheen (vec3f(1) for standard materials).
+ */
+export interface PBRCapture {
+  /** Module-scope WGSL for the lit shader `code`: `struct MargoCapture` (one output per target) and `fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture`. Return the same string for the same code. */
+  declarations(code:string):string;
+  /** Colour targets of the capture pass, in `MargoCapture` location order. */
+  readonly targets:readonly GPUColorTargetState[];
+  /** This frame's capture pass: these targets and a depth attachment of the context's format; begun on the first draw, ended by the owner. */
+  begin():GPURenderPassEncoder;
+}
+const captured=new Map<string,Map<string,string>>();
+/** `code` (the lit PBR shader) with a `capture` entry point returning `margoCapture(s,v,k)`; the beauty fragment becomes a dead `margoShade` call. */
+export function capturePBR(code:string,declarations:string):string {
+  let cache=captured.get(declarations),out=cache?.get(code);if(out!==undefined)return out;
+  if(code.split(head).length!==2)throw new Error('PBR capture hook point missing or used twice');
+  // Clearcoat and sheen scale the base layer (ambient included) affinely: k = layers(1) - layers(0).
+  const k=code.includes('fn layers(')?'layers(s,v,normalize(f.light.xyz),vec3f(1))-layers(s,v,normalize(f.light.xyz),vec3f(0))':'vec3f(1)';
+  out=declarations+code.replace(head,'fn margoShade(i:Out,front:bool)->vec4f {')+`\n@fragment fn capture(i:Out,@builtin(front_facing) front:bool)->MargoCapture {if(false){_=margoShade(i,front);}let s=surface(i,front);let v=normalize(f.eye.xyz-i.position);return margoCapture(s,v,${k});}\n`;
+  if(!cache){if(captured.size>=8)captured.clear();captured.set(declarations,cache=new Map());}if(cache.size>=64)cache.clear();cache.set(code,out);return out;
+}
 // Material map slots 5-12, in PBRModel order. Sheen and specular colors are sRGB.
 export const physicalMaps = ['clearcoat','clearcoatRoughness','clearcoatNormal','transmission','sheenColor','sheenRoughness','specular','specularColor'];
 const sample = (name: string) => `textureSample(${name}Map,${name}Sampler,uv(i,${physicalMaps.indexOf(name) + 5}))`;

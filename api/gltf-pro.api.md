@@ -119,6 +119,12 @@ export interface LightingEffect {
     bindings(): GPUBindGroupEntry[];
 }
 
+export interface PBRCapture {
+    declarations(code: string): string;
+    readonly targets: readonly GPUColorTargetState[];
+    begin(): GPURenderPassEncoder;
+}
+
 export interface PBRLighting {
     readonly declarations: string;
     direct?(direct: string): string;
@@ -141,6 +147,7 @@ export class PBRModel implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     addLighting(effect: LightingEffect): () => void;
     setTransparency(hook: PBRTransparency): () => void;
+    setCapture(hook: PBRCapture): () => void;
     get shadowPrimitives(): {
         node: Mesh;
         vertex: GPUBuffer;
@@ -154,7 +161,7 @@ export class PBRModel implements EnginePlugin {
         texCoord: any;
         instances: PBRInstances | undefined;
     }[];
-    draw(c: Context, mode: 'beauty' | 'gbuffer' | 'ambient' | 'transparent', color: GPUTextureView, depth: GPUTextureView): void;
+    draw(c: Context, mode: 'beauty' | 'gbuffer' | 'ambient' | 'transparent' | 'capture', color: GPUTextureView, depth: GPUTextureView): void;
     get bounds(): Float32Array;
     clusteredLights(): GLTFClusteredLight[];
     extras(): GLTFNodeExtras[];

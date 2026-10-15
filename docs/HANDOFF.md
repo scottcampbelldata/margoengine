@@ -918,8 +918,24 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    j. Shadows for skinned meshes and VAT crowds; IBL for VAT crowds.
    k. Sweep the remaining PARTIAL parity rows that need no core change.
    (Plus already queued: SSR, volumetrics, progressive loading, OIT, P3, tier presets 5i.b.)
-   l. SSR follow-ups (from 3cf1453): material capture for gltf-pro/materials models so they REFLECT (today only core
-      meshes do; models are reflected but don't reflect), optionally water and terrain; half-resolution trace for
+   l. SSR follow-ups (from 3cf1453): [DONE: model capture] `ssr.add(model)` (gltf-pro `PBRModel` or materials mesh;
+      returns a remover) makes models REFLECT through a declared gltf-pro capture hook (`model.setCapture(PBRCapture)`,
+      `draw(c,'capture')`: the lit shader with the beauty fragment renamed `margoShade` and called only in a dead
+      `if(false)` block, entry `capture` returning SSR's `margoCapture(s,v,k)`; own maps, materials' maps, alpha mask,
+      instances, skinned/morphed buffers; BLEND/transmission/unlit skipped). Replaced IBL term = environment's own
+      split-sum x occlusion x k (k = clearcoat/sheen base-layer share, `layers(1)-layers(0)`), so no double counting.
+      With models added the composite caps removal at what the pixel holds (4x silhouettes; 68 black pixels on the
+      helmet before). Proofs: `proofs/post-ssr-models.proof.js` (no model added / no SSR: 30,858 calls identical to
+      3cf1453); oit-detached, gltf-pro-lighting-hooks and materials-uv-transform identical to 227912f (no hook).
+      Real GPU: `ssr-models-gpu.mjs` (results/ssr-models-gpu.json, Arc 140V): glTF-plane and materials mirror floors
+      give the core floor's reflection (same mirrored centre colour, red area within 1.5%; green 165 -> 41 = replaced,
+      not added), not added = unchanged, roughness map 0.3 blurs (edge 0 -> 17 px) and 0.8 is untouched, DamagedHelmet's
+      metal picks up the red box (3,142 px changed, 1,015 redder), no black. Capture pass (diagnostic timing, machine
+      not quiet): floor filling the view 0.19-0.21 ms at 720p, 0.44-0.46 ms at 1080p; DamagedHelmet 0.05 / 0.06-0.07 ms
+      (the rest of the added cost is the trace on the newly reflective pixels). Sizes: post ./ssr 7,860 -> 8,365 B,
+      gltf-pro root +238 B min+gzip (17,342 B after the rebase onto 67e0172); core untouched (19,793 B).
+      Water and terrain: not done (own pipelines; each needs its own capture into SSR's targets, documented).
+      Remaining: optionally water and terrain; half-resolution trace for
       1080p (trace 4-5 ms there); apply SSR's dead-branch replay trick to SSAO's ambient replay (it halved SSR's
       replay cost) with a proof that SSAO output is unchanged.
    n. Instanced paths vs three.js InstancedMesh (diagnostic, 836b97e: three's WebGL2 InstancedMesh leads at every

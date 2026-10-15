@@ -20,6 +20,10 @@ export interface SSROptions {
   steps?:number;
   enabled?:boolean;
 }
+/** gltf-pro's capture hook (its `PBRCapture`, declared here so post does not import gltf-pro). */
+export interface SSRCapture {declarations(code:string):string;readonly targets:readonly GPUColorTargetState[];begin():GPURenderPassEncoder}
+/** What `ssr.add` takes: a gltf-pro `PBRModel` or `@margoengine/materials` mesh. */
+export interface SSRModel {setCapture(hook:SSRCapture):()=>void;onDispose(callback:()=>void):()=>void;draw(context:Context,mode:'capture',color:GPUTextureView,depth:GPUTextureView):void}
 
 const vertex='@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);}\n';
 // Material replay outputs: environment specular already in the scene (rgb) + roughness, split-sum weight F0*A+B (rgb) +
@@ -34,6 +38,13 @@ ${ibl?'let ab=iblBrdfTerms(nv,rough);let w=f0*ab.x+ab.y;let e=iblPrefiltered(ibl
 :'let r=rough*vec4f(-1,-0.0275,-0.572,0.022)+vec4f(1,0.0425,1.04,-0.04);let k=min(r.x*r.x,exp2(-9.28*nv))*r.x+r.y;let w=f0*(r.z-1.04*k)+(r.w+1.04*k);let e=vec3f(0);'}
 return MargoSSR(vec4f(e,rough),vec4f(w,1),vec4f(n*0.5+0.5,1));
 }`;
+// gltf-pro capture: the same targets from the model's Surface. Its environment ambient is iblShade(...)*s.occlusion, and
+// clearcoat/sheen scale it by k, so the specular to replace and the weight it is replaced with carry both factors.
+const modelTail=(ibl:boolean)=>replayTail(ibl)+`
+struct MargoCapture {@location(0) specular:vec4f,@location(1) weight:vec4f,@location(2) normal:vec4f}
+fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {let m=margoSSR(s.n,v,s.base.rgb,s.metal,s.roughness);let o=k*s.occlusion;return MargoCapture(vec4f(m.specular.rgb*o,m.specular.a),vec4f(m.weight.rgb*o,1),m.normal);}
+`;
+const lit=(code:string)=>code.includes('let margoAmbient=')&&code.includes('fn iblBrdfTerms(');
 // Hierarchical depth (Hi-Z) level: each texel keeps the closest (largest reversed-Z) depth of its 2x2 source texels, and
 // the last row and column also take an odd source's remainder, so every texel bounds its whole cell.
 const reduceShader=(source:string,load:string)=>`
@@ -112,11 +123,15 @@ c=max(vec3f(0),c+f*(m.rgb*reflected-e.rgb));
 c=c/(1+c);c=select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.055,c>=vec3f(0.0031308));return vec4f(c,s.a);
 }`;
 const linearComposite=compositeShader.replace(/c=c\/\(1\+c\);[^\n]+/,'return vec4f(c,s.a);');
-const formats:GPUTextureFormat[]=['rgba16float','rgb10a2unorm','rgb10a2unorm'],blurLevels=5;
+// With models added, never remove more IBL specular than the pixel holds: at 4x a silhouette pixel is the resolve of both
+// sides while its material is the centre sample's, so removal and replacement are scaled by the share the pixel can hold
+// (1 wherever scene and material agree, so exact there). Without models the composite is unchanged.
+const guarded=(code:string)=>code.replace('c=max(vec3f(0),c+f*(m.rgb*reflected-e.rgb));','let q=select(vec3f(1),c/e.rgb,e.rgb>vec3f(1e-6));c=max(vec3f(0),c+f*min(1.0,min(q.x,min(q.y,q.z)))*(m.rgb*reflected-e.rgb));');
+const formats:GPUTextureFormat[]=['rgba16float','rgb10a2unorm','rgb10a2unorm'],blurLevels=5,targets=formats.map(format=>({format}));
 
-/** Screen-space reflections in a PostStack (HDR effect): a material replay of core meshes (roughness, split-sum
- * weight, normal, and the IBL specular to replace), a Hi-Z ray march per pixel, and a composite that swaps the
- * environment specular for the reflected scene where a ray hits; misses keep the IBL. */
+/** Screen-space reflections in a PostStack (HDR effect): a material replay of core meshes and of models added with
+ * `add(model)` (roughness, split-sum weight, normal, and the IBL specular to replace), a Hi-Z ray march per pixel, and a
+ * composite that swaps the environment specular for the reflected scene where a ray hits; misses keep the IBL. */
 export class SSR implements EnginePlugin {
   readonly name='ssr';
   private engine?:Engine;private host?:StackHost;private stack?:PostStack;private disposed=false;
@@ -127,10 +142,27 @@ export class SSR implements EnginePlugin {
   private replay?:GPURenderPipeline;private replayKey?:string;private composite?:GPURenderPipeline;private compositeGroup?:GPUBindGroup;private input?:GPUTextureView;private key='';
   private clearPass?:GPURenderPassDescriptor;private extra:GPURenderPassColorAttachment[]=[];private blurPasses:GPURenderPassDescriptor[]=[];
   private readonly compositeAttachment:GPURenderPassColorAttachment={view:undefined!,loadOp:'clear',storeOp:'store'};private readonly compositePass:GPURenderPassDescriptor={colorAttachments:[this.compositeAttachment]};
+  private readonly models=new Map<SSRModel,()=>void>();private readonly modelCode=new Map<string,string>();private context?:Context;private pass?:GPURenderPassEncoder;
+  // gltf-pro capture hook: model materials into the same three targets, after the core replay.
+  private readonly hook:SSRCapture={targets,
+    declarations:code=>{let out=this.modelCode.get(code);if(out===undefined){if(this.modelCode.size>=64)this.modelCode.clear();this.modelCode.set(code,out=modelTail(lit(code)));}return out;},
+    begin:()=>{if(this.pass)return this.pass;const c=this.context!,stencil=c.descriptor.depthStencil!.format.includes('stencil')?{stencilLoadOp:'load',stencilStoreOp:'store'} as const:{};
+      return this.pass=c.encoder.beginRenderPass({colorAttachments:this.material.map(view=>({view,loadOp:'load',storeOp:'store'})),depthStencilAttachment:{view:c.depth,depthLoadOp:'load',depthStoreOp:'store',...stencil}});}};
   private readonly values=new Float32Array(40);private readonly workspace=new Float64Array(52);private readonly inverse=this.values.subarray(0,16);
   constructor(readonly options:SSROptions={}){this.validate();}
   /** Alone, SSR runs in its own one-effect PostStack (tone mapped like SSAO alone); to combine it, put it in your PostStack. */
   static attach(engine:EngineKernel,options:SSROptions={}):SSR {const effect=new SSR(options);effect.stack=PostStack.attach(engine,[effect]);return effect;}
+  /** Makes a gltf-pro model or materials mesh reflect: its own materials (maps, alpha mask, instances, skinning) are drawn
+   * into SSR's material targets. Returns a remover; models not added are still reflected but do not reflect. */
+  add(model:SSRModel):()=>void {
+    if(this.disposed)throw new Error('SSR is disposed');
+    let release=this.models.get(model);
+    if(!release){
+      const restore=model.setCapture(this.hook),forget=model.onDispose(()=>this.models.delete(model));
+      release=()=>{if(this.models.get(model)===release){this.models.delete(model);forget();restore();}};this.models.set(model,release);
+    }
+    return release;
+  }
   get enabled():boolean{return this.options.enabled??true;}
   set enabled(value:boolean){if(typeof value!=='boolean')throw new TypeError('SSR enabled must be boolean');this.options.enabled=value;}
   private joinStack(host:StackHost):StackStage {
@@ -170,22 +202,26 @@ export class SSR implements EnginePlugin {
     if(this.replayKey!==key){
       const code=c.shader.replace(/(@fragment[^{]*)->@location\(0\) vec4f/,'$1->MargoSSR').replace(/(let direct=[\s\S]*)return (vec4f\([^\n]+\));/,'if(false){$1_=$2;}return margoSSR(n,v,i.color,i.material.y,i.material.x);');
       if(!code.includes('->MargoSSR')||!code.includes('return margoSSR('))throw new Error('SSR requires the standard core lighting shader');
-      const module=c.device.createShaderModule({code:code+replayTail(code.includes('let margoAmbient=')&&code.includes('fn iblBrdfTerms('))});
+      const module=c.device.createShaderModule({code:code+replayTail(lit(code))});
       this.replay=c.device.createRenderPipeline({...this.single!,layout:'auto',vertex:{...c.descriptor.vertex,module},fragment:{module,entryPoint:'fragment',targets:formats.map(format=>({format}))},
         depthStencil:own?this.single!.depthStencil:{...c.descriptor.depthStencil!,depthWriteEnabled:false,depthCompare:'equal'}});
       this.replayKey=key;
     }
     const {color,depth,descriptor}=c;c.color=this.material[0];
     if(own){c.depth=own;c.descriptor=this.single!;}else c.encoder.beginRenderPass(this.clearPass!).end();
-    try{c.draw({pipeline:this.replay,clear:!!own,bindings:c.bindings,colorAttachments:this.extra});}finally{Object.assign(c,{color,depth,descriptor});}
+    try{
+      c.draw({pipeline:this.replay,clear:!!own,bindings:c.bindings,colorAttachments:this.extra});
+      // Added models draw their own materials on top, depth tested against (and, at 4x, into) the same depth.
+      if(this.models.size){this.context=c;for(const model of this.models.keys())model.draw(c,'capture',c.color,c.depth);}
+    }finally{this.pass?.end();this.pass=this.context=undefined;Object.assign(c,{color,depth,descriptor});}
     // Hi-Z over the depth the materials match.
     const pass=c.encoder.beginComputePass();
     for(let i=0;i<this.hizGroups.length;i++){pass.setPipeline(i?this.reduce!:this.reduceDepth!);pass.setBindGroup(0,this.hizGroups[i]);pass.dispatchWorkgroups(Math.ceil(this.hizSizes[i][0]/8),Math.ceil(this.hizSizes[i][1]/8));}
     pass.end();
   }
   private stage(c:Context,input:GPUTextureView,output:StageOutput):void {
-    const key=output.format+output.multisample.count+output.hdr;
-    if(this.key!==key){this.key=key;this.composite=render(c.device,output.hdr?linearComposite:compositeShader,output.format,{multisample:output.multisample});this.input=undefined;}
+    const models=this.models.size>0,key=output.format+output.multisample.count+output.hdr+models,code=output.hdr?linearComposite:compositeShader;
+    if(this.key!==key){this.key=key;this.composite=render(c.device,models?guarded(code):code,output.format,{multisample:output.multisample});this.input=undefined;}
     if(this.input!==input){this.input=input;
       this.blurGroups[0]=bind(c.device,this.downsample!,[input,this.sampler!]);
       this.compositeGroup=bind(c.device,this.composite!,[{buffer:this.uniform!},input,this.blur!,this.sampler!,this.depthView!,this.hiz!,...this.material]);
@@ -223,6 +259,7 @@ export class SSR implements EnginePlugin {
   onDeviceRestored(engine:Engine):void {this.release();this.uniform?.destroy();this.replay=this.composite=undefined;this.replayKey=this.base=undefined;this.key='';this.setup(engine);}
   dispose():void {
     if(this.disposed)return;this.disposed=true;const stack=this.stack;this.stack=undefined;
+    for(const release of [...this.models.values()])release();
     this.engine?.removePlugin(this.name);this.release();this.uniform?.destroy();this.uniform=undefined;this.replay=this.composite=undefined;this.engine=undefined;stack?.dispose();
   }
   declare [Symbol.dispose]: () => void;

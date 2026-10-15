@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mockGPU, context} from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
-import {FrameGraph} from '../../core/dist/extension.js';
+import {FrameGraph, Engine, TransformStore} from '../../core/dist/extension.js';
+import {parseGLTF} from '../../gltf-pro/dist/index.js';
+import {PBRInstances} from '../../gltf-pro/dist/instancing.js';
+import {Material, createMesh} from '../../materials/dist/index.js';
+import {animatedTriangle} from '../../../tests/support/gltf-pro-fixture.js';
 import {wgsl} from '../../core/dist/shaders.js';
 import {PostStack, SSR, SSAO} from '../dist/index.js';
 
@@ -75,4 +79,58 @@ test('disabled SSR skips the replay, Hi-Z and blur and passes the input through'
   assert.equal(h.draws.filter(d => d.pipeline).length, 0);
   assert.equal(log.filter(e => e[0] === 'beginComputePass').length, 0);
   assert.equal(log.filter(e => e[0] === 'beginRenderPass').length, 1 + 3, 'composite plus the stack final depth copies and resolve');
+});
+
+// gltf-pro models (opaque, MASK, BLEND, unlit, physical clearcoat) and an instanced materials mesh on a real core Engine;
+// SSR's frame graph drives their capture with the same pass context. The IBL effect is a stand-in with environment's names.
+async function models(gpu) {
+  const store = await TransformStore.create(32), renderer = {backend: 'webgpu', gpu: gpu.device, add() {}, remove() {}, render() {}, dispose() {}};
+  const engine = new Engine({width: 128, height: 96, clientWidth: 128, clientHeight: 96}, store, renderer, {position: [0, 0, 4], target: [0, 0, 0]}, null);
+  const fixture = animatedTriangle(), primitive = fixture.doc.meshes[0].primitives[0];
+  const materials = [{}, {alphaMode: 'MASK', alphaCutoff: 0.3}, {alphaMode: 'BLEND'}, {extensions: {KHR_materials_unlit: {}}}, {extensions: {KHR_materials_clearcoat: {clearcoatFactor: 1}}}];
+  Object.assign(fixture.doc, {materials, extensionsUsed: ['KHR_materials_unlit', 'KHR_materials_clearcoat'], meshes: materials.map((_, material) => ({primitives: [{...primitive, material}]})), nodes: materials.map((_, mesh) => ({mesh}))});
+  delete fixture.doc.skins; delete fixture.doc.animations;
+  const model = parseGLTF(engine, fixture.doc, fixture.buffers), ibl = {pbr: () => ({declarations: 'fn iblBrdfTerms(nv:f32,r:f32)->vec2f {return vec2f(1,0);}\n', ambient: 'vec3f(0.5)*s.occlusion'}), entries: [{binding: 20, resource: {}}], bindings: () => ibl.entries};
+  model.addLighting(ibl);
+  const mesh = createMesh(engine, {positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1]}, new Material({roughness: 0.1, metalness: 1}));
+  mesh.primitives[0].instances = new PBRInstances(3);
+  engine.camera.update(4 / 3, true); store.tick(false);
+  return {engine, model, mesh};
+}
+for (const samples of [4, 1]) test(`ssr.add(model) draws gltf-pro and materials into the replay targets with their own materials (${samples}x)`, async () => {
+  const h = harness(samples), ssr = new SSR(); h.engine.use(new PostStack([ssr]));
+  const {engine, model, mesh} = await models(h.gpu);
+  const remove = ssr.add(model); assert.equal(ssr.add(model), remove, 'one remover per model'); const removeMesh = ssr.add(mesh);
+  const log = h.gpu.record(() => h.frame());
+  const pipelines = log.filter(e => e[0] === 'renderPipeline' && e[2].fragment.entryPoint === 'capture');
+  assert.equal(pipelines.length, 4, 'opaque, MASK, clearcoat and the materials mesh; BLEND and unlit are not captured');
+  for (const [, , p] of pipelines) {
+    assert.deepEqual(p.fragment.targets.map(t => t.format), ['rgba16float', 'rgb10a2unorm', 'rgb10a2unorm']); assert.equal(p.multisample.count, 1);
+    assert.deepEqual([p.depthStencil.format, p.depthStencil.depthCompare, p.depthStencil.depthWriteEnabled], [samples === 4 ? 'depth32float' : 'depth24plus-stencil8', 'greater-equal', true]);
+  }
+  assert.ok(pipelines.some(([, , p]) => p.vertex.buffers.length === 2), 'instanced materials mesh keeps its instance buffer');
+  assert.deepEqual(pipelines.map(([, , p]) => p.fragment.constants.margoAlphaTest), [0, 1, 0, 0], 'MASK alpha-tests');
+  const code = log.filter(e => e[0] === 'module' && e[2].code.includes('@fragment fn capture(')).map(e => e[2].code);
+  // IBL on the model: the replaced specular is environment's split-sum term times occlusion (and clearcoat/sheen's k).
+  for (const c of code.slice(0, 3)) assert.match(c, /let ab=iblBrdfTerms\(nv,rough\)[\s\S]*let o=k\*s\.occlusion;/);
+  assert.ok(code.some(c => c.includes('margoCapture(s,v,layers(s,v,normalize(f.light.xyz),vec3f(1))-layers(s,v,normalize(f.light.xyz),vec3f(0)))')), 'clearcoat k');
+  assert.match(code.at(-1), /exp2\(-9\.28\*nv\)[\s\S]*mat_baseMap[\s\S]*margoCapture\(s,v,vec3f\(1\)\)/, 'materials mesh without IBL: analytic weight, its own maps');
+  // One capture pass after the core replay, loading SSR's three targets and the depth the Hi-Z is built from.
+  const begins = log.map((e, i) => [e, i]).filter(([e]) => e[0] === 'beginRenderPass'), capture = begins.find(([e]) => e[1].colorAttachments.length === 3 && e[1].colorAttachments.every(a => a.loadOp === 'load'));
+  assert.ok(capture, 'capture pass'); const at = capture[1];
+  assert.ok(log.findIndex(e => e[0] === 'draw') < at && at < log.findIndex(e => e[0] === 'beginComputePass'), 'after the core replay, before the Hi-Z');
+  assert.deepEqual([capture[0][1].depthStencilAttachment.depthLoadOp, capture[0][1].depthStencilAttachment.depthStoreOp], ['load', 'store']);
+  const inPass = log.slice(at, at + log.slice(at).findIndex(e => e[0] === 'pass.end'));
+  assert.deepEqual(inPass.filter(e => e[0] === 'pass.drawIndexed').map(e => e[2] ?? 1), [1, 1, 1, 3], 'four draws in the one pass, the mesh instanced x3');
+  assert.equal(engine.stats.drawCalls, 0, 'captures are not counted as scene draws');
+  // With models the composite never removes more specular than a (4x silhouette) pixel holds.
+  assert.ok(modules(log).some(c => c.includes('fn closest(') && c.includes('c=max(vec3f(0),c+f*min(1.0,min(q.x,min(q.y,q.z)))*(m.rgb*reflected-e.rgb));')), 'guarded composite');
+  // Steady frames create no GPU objects; removers and dispose detach the hook.
+  const steady = h.gpu.record(() => h.frame());
+  assert.deepEqual(steady.filter(e => /^(texture|buffer|module|group|renderPipeline|computePipeline|view|sampler)$/.test(e[0])), []);
+  remove(); removeMesh(); const none = h.gpu.record(() => h.frame());
+  assert.equal(none.filter(e => e[0] === 'pass.drawIndexed').length, 0);
+  ssr.add(mesh); mesh.dispose(); assert.equal(h.gpu.record(() => h.frame()).filter(e => e[0] === 'pass.drawIndexed').length, 0, 'a disposed mesh is forgotten');
+  ssr.add(model); ssr.dispose(); h.engine.removePlugin('post:stack'); assert.throws(() => ssr.add(model), /disposed/);
+  model.dispose(); engine.dispose();
 });

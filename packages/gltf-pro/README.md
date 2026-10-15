@@ -20,7 +20,7 @@ Supports base color/alpha, metallic-roughness (G/B), normal maps, occlusion (R),
 
 `parsePreparedPBR(engine, document, geometry, images)` accepts a static glTF-style scene/material document and per-mesh arrays of `PreparedGeometry` (`vertices: Float32Array`, `indices: Uint32Array`). Vertices use the existing 80-byte layout: position4, normal4, tangent4, UV0+UV1, color4. Arrays are validated and retained without repacking; keep them immutable until destruction. This path has no accessors, skins or animations and is used by the separate `@margoengine/blender` loader. Existing glTF loading and animation APIs are unchanged.
 
-Attach animation with the separate animation package. Register this model with `ssao.add(model)` to include its mapped normals and ambient lighting in SSAO. When a lighting effect replaces the ambient light through the `ambient` hook (environment's `EnvironmentLighting`), the SSAO ambient replay draws the lit fragment returning that light (`margoAmbient`, zero for unlit materials) with the effects' group-2 bindings; otherwise it draws `ambientFragment` as before. Neither extension is imported by this package. Disposal and device restoration retain CPU asset blueprints.
+Attach animation with the separate animation package. Register this model with `ssao.add(model)` to include its mapped normals and ambient lighting in SSAO. When a lighting effect replaces the ambient light through the `ambient` hook (environment's `EnvironmentLighting`), the SSAO ambient replay draws the lit fragment returning that light (`margoAmbient`, zero for unlit materials) with the effects' group-2 bindings; otherwise it draws `ambientFragment` as before. Register it with `ssr.add(model)` (`@margoengine/post/ssr`) to make its glossy surfaces reflect (see "Capture hook"). None of these extensions is imported by this package. Disposal and device restoration retain CPU asset blueprints.
 
 Register with `shadows.add(model)` and `clustered.add(model)` for optional directional shadows and local PBR lights, including the current skinned vertex buffer. `addLighting()` takes such effects without importing their packages (see "Lighting hooks").
 
@@ -60,11 +60,29 @@ group-2 bindings (after the lighting effects' entries, from `hook.bindings()`). 
 (materials, shader nodes) compose as in the beauty pass, and the pass adds no textures. Without a hook nothing changes:
 `examples/package-benchmarks/proofs/oit-detached.proof.js` records identical GPU calls to the build before the hook.
 
+### Capture hook
+
+`model.setCapture(hook)` (type `PBRCapture`, contract version 1; returns a remover) lets a screen-space effect read the
+model's materials; `@margoengine/post`'s `ssr.add(model)` sets it so models reflect. While a hook is set,
+`model.draw(c, 'capture', ...)` draws the opaque and MASK primitives (BLEND, transmission and `KHR_materials_unlit` are
+skipped) into `hook.begin()`'s pass with `hook.targets`, depth tested (`greater-equal`) and written, with the context's
+multisample count and depth format; nothing is counted in `engine.stats`. The shader is the lit beauty shader (lighting
+effects and text patches such as materials' maps compose as in the beauty pass) with the fragment head renamed to
+`fn margoShade(i:Out,front:bool)->vec4f {`, as for transparency, and an entry point `capture` that calls it only in a
+dead `if(false)` block (so every lighting binding stays in the layout but nothing is lit) and returns
+`margoCapture(s, v, k)`: `s` the Surface (alpha mask, normal map, base, metal, roughness and occlusion maps applied),
+`v` toward the eye and `k` the share of the base layer's light left after clearcoat and sheen (`vec3f(1)` for standard
+materials; for physical ones `layers(1) - layers(0)`, exact because the layering is affine). `hook.declarations(code)`
+supplies `struct MargoCapture` and that function for the lit `code`. Instances, skinned and morphed vertex buffers
+(`primitive.deformed`) and mirrored transforms draw as in the beauty pass. Without a hook nothing changes:
+`oit-detached.proof.js`, `gltf-pro-lighting-hooks.proof.js` and `materials-uv-transform.proof.js` run against `227912f` (before the hook) record identical calls.
+
 ### Texture bindings
 
 WebGPU guarantees 16 sampled textures and 16 samplers per shader stage (the default and the minimum every adapter
 supports, phones included), and Margo's device asks for no more. Each lighting effect and material patch adds its
-bindings to the one fragment stage. Sampled textures (samplers) in the beauty and SSAO ambient-replay fragment:
+bindings to the one fragment stage. Sampled textures (samplers) in the beauty, SSAO ambient-replay and SSR capture
+fragment (the capture keeps every binding of the lit shader and adds none; SSR's own composite is a separate pass with 7):
 
 | Material | Alone | + shadows | + IBL | + LocalShadows | + shadows, IBL, LocalShadows |
 | --- | --- | --- | --- | --- | --- |

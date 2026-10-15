@@ -802,12 +802,14 @@ import {Bloom} from '@margoengine/post/bloom';
 
 const ssr = new SSR({maxRoughness: 0.6});   // rougher surfaces keep the environment reflection only
 PostStack.attach(engine, [new SSAO(), ssr, new Bloom({strength: 0.6})]);
+const stop = ssr.add(model);                // a glTF-pro model (or materials mesh) reflects too; stop() undoes it
 ssr.enabled = false;                        // toggles without recompiling; SSR.attach(engine) runs it alone
 ```
 
 - Glossy core meshes (`PbrMaterial` roughness below `maxRoughness`) reflect what is on screen; with `EnvironmentLighting`
   SSR replaces the IBL specular where a ray hits and keeps it where it misses (off-screen, behind objects). glTF-pro
-  models and water are reflected but do not reflect yet. No `groundReflector`/`selects`: every glossy core mesh reflects.
+  models and `@margoengine/materials` meshes reflect once added with `ssr.add(model)` (with their own maps); water and
+  terrain are reflected but do not reflect. No `groundReflector`/`selects`: every glossy core mesh and added model reflects.
 - The stack captures the scene once in linear HDR and runs the effects in array order. The engine renders it; there is
   no `composer.render()`.
 - A single effect can also be attached alone, for example `Bloom.attach(engine, {strength: 0.8})`.

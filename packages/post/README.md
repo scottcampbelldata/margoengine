@@ -41,8 +41,9 @@ against `e2cc4c5` (Bloom, FXAA and SSAO keep the canvas alpha; the last intentio
 
 ## Screen-space reflections: `SSR`
 
-`@margoengine/post/ssr` reflects what is on screen in glossy core meshes (floors, polished CAD metal). It is an HDR
-`PostStack` effect; `SSR.attach(engine, options)` runs it alone in its own one-effect stack (tone mapped like SSAO alone).
+`@margoengine/post/ssr` reflects what is on screen in glossy core meshes (floors, polished CAD metal) and in glTF-pro
+models and `@margoengine/materials` meshes added with `ssr.add(model)`. It is an HDR `PostStack` effect;
+`SSR.attach(engine, options)` runs it alone in its own one-effect stack (tone mapped like SSAO alone).
 
 ```ts
 import {PostStack} from '@margoengine/post/stack';
@@ -51,6 +52,9 @@ import {SSR} from '@margoengine/post/ssr';
 import {Bloom} from '@margoengine/post/bloom';
 const ssr = new SSR({maxRoughness: 0.6, thickness: 0.5, maxDistance: 100, steps: 64});
 const stack = PostStack.attach(stage.engine, [new SSAO(), ssr, new Bloom({strength: 0.6})]);
+const helmet = await loadGLTF(stage.engine, '/DamagedHelmet.glb'); // from '@margoengine/gltf-pro'
+ibl.add(helmet);                     // EnvironmentLighting, so SSR replaces its specular (below)
+const stop = ssr.add(helmet);        // glTF-pro model or materials mesh: its own surfaces reflect; stop() undoes it
 ssr.enabled = false; // pass-through, no recompiles
 ```
 
@@ -62,6 +66,17 @@ ssr.enabled = false; // pass-through, no recompiles
   materials and depth, so MSAA silhouettes never average two materials, and no multisampled targets). The Hi-Z is
   built from that depth. Memory: 16 B/pixel of targets (+4 B depth at 4x), a half-resolution `r32float` Hi-Z and a
   half-resolution `rgba16float` blur chain, about 45 MB at 1080p.
+- **Model capture.** Models added with `ssr.add(model)` (a gltf-pro `PBRModel` or a materials mesh; returns a remover,
+  disposal of the model or of SSR detaches it) then draw into the same three targets in one more pass, through
+  gltf-pro's declared capture hook (gltf-pro README "Capture hook"; no text search of its shader): their own base
+  colour, metal/roughness, normal and occlusion maps, materials' maps, alpha mask, instances and skinned/morphed
+  vertices, depth tested against (and at 4x written into) the depth the Hi-Z is built from. BLEND, transmission and
+  unlit primitives are skipped. Models not added are still reflected but do not reflect. With no model added SSR makes
+  exactly the GPU calls it made before (`examples/package-benchmarks/proofs/post-ssr-models.proof.js`, against
+  `3cf1453`). At 4x, models not added are missing from SSR's own depth, so rays pass through them. With models
+  added the composite also never removes more specular than a pixel holds (a 4x silhouette pixel is the resolve of
+  both sides while its material is the centre sample's; on DamagedHelmet's part seams this turned 68 pixels black):
+  removal and replacement are scaled by `min(1, scene / specular)`, which is 1, so exact, wherever they agree.
 - **Ray march.** One mirror ray per pixel, clipped to the near/far planes and the screen, marched in screen space over
   a hierarchical depth pyramid (Hi-Z: the closest depth per 2^n cell, up to 64 px cells) with `steps` iterations and a
   `thickness` (scene units) a ray may pass behind a surface. Pixel x/y and NDC depth are linear along the projected
@@ -75,9 +90,11 @@ ssr.enabled = false; // pass-through, no recompiles
   `F0·A+B`; the composite writes `scene + f · (weight · reflected − iblSpecular)`, `f` being the fades above. A ray that
   misses (`f = 0`: off screen, behind everything, too rough) leaves the pixel exactly as the environment lit it; a hit
   replaces the environment's specular instead of adding to it. Without IBL nothing is removed and the weight is an
-  analytic split-sum fit. Checked on a real GPU: a mirror floor under a uniform grey environment loses its grey
-  reflection where the red box is reflected (green channel falls to the box's own), and a box above the view leaves
-  the frame unchanged.
+  analytic split-sum fit. On models the environment's term is `iblShade(...)·occlusion` (and clearcoat/sheen scale the
+  base layer by `k`), so the capture writes that specular and the weight both times `k·occlusion`: still exactly the
+  term the model was lit with. Checked on a real GPU: a mirror floor under a uniform grey environment loses its grey
+  reflection where the red box is reflected (green channel falls to the box's own), for a core floor, a glTF plane and
+  a materials mesh alike, and a box above the view leaves the frame unchanged.
 - **Temporal.** Deterministic (no noise), so frames are stable without TAA; with TAA wrapping the stack the jittered
   camera is used throughout and TAA's history smooths reflection edges.
 - **Alpha and bindings.** Keeps the scene alpha (TransparentCanvas). SSR runs in its own passes (the composite samples 7 textures),
@@ -87,9 +104,13 @@ ssr.enabled = false; // pass-through, no recompiles
   1280x720 4x 2.3 ms (0.7 / 1.6), 1x 2.2 ms (0.5 / 1.7); 1920x1080 4x 5.8 ms (1.6 / 4.2), 1x 5.9 ms (1.1 / 4.9).
   `steps: 16` cuts the trace by about a third. `enabled = false` still costs one full-screen copy (0.2-1.0 ms);
   remove SSR from the stack to drop it entirely. `examples/package-benchmarks/ssr-gpu.mjs` (results/ssr-gpu.json).
-- **Limits.** Only core-mesh surfaces (core `PbrMaterial`) show reflections: glTF-pro models, water, terrain and other
-  custom shaders are reflected but do not reflect (they need a material replay, like SSAO's sources). Only what is
-  on screen is reflected. With SSAO before it, a creased pixel's IBL specular was already darkened by AO, so a hit
+  The model capture pass adds 0.19-0.21 ms at 1280x720 and 0.44-0.46 ms at 1920x1080 for a glTF floor filling most
+  of the view, 0.05-0.07 ms for DamagedHelmet (4x and 1x; diagnostic timings on a busy machine); the reflective model
+  pixels then trace like core ones. `examples/package-benchmarks/ssr-models-gpu.mjs` (results/ssr-models-gpu.json).
+- **Limits.** Core meshes and added models show reflections; water, terrain and other custom shaders are reflected but
+  do not reflect (each draws with its own pipeline and would need its own capture into SSR's targets). Only what is
+  on screen is reflected. A clearcoat's own (hemisphere) reflection is not replaced; fog is not applied to the replaced
+  term (core meshes alike). Materials `basic`/`normal`/`matcap` meshes reflect by their roughness like `standard` ones. With SSAO before it, a creased pixel's IBL specular was already darkened by AO, so a hit
   removes slightly more than was left (clamped at zero). Specular from other ambient plugins (sky's ambient patch) is
   not replaced.
 
