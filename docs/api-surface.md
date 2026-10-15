@@ -12,38 +12,38 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 
 | Package | Exports per entry | Unexported | `any` | Gzip |
 | --- | --- | ---: | ---: | ---: |
-| @margoengine/animation | `.` 6, `./vat` 12 | 7 |  | 4,987 |
-| @margoengine/animator | `.` 10 |  |  | 3,883 |
+| @margoengine/animation | `.` 6, `./vat` 12 | 7 |  | 5,000 |
+| @margoengine/animator | `.` 10 |  |  | 3,899 |
 | @margoengine/audio | `.` 17 | 2 |  |  |
 | @margoengine/blender | `.` 4 |  |  | 2,561 |
 | @margoengine/bvh | `.` 46 |  |  |  |
 | @margoengine/cameras | `.` 3 |  |  |  |
 | @margoengine/cinematic | `.` 2 |  |  |  |
-| @margoengine/clustered | `.` 7, `./shadows` 4 | 6 |  | 4,486 |
-| @margoengine/controls | `.` 31 | 9 | 11 | 29,430 |
+| @margoengine/clustered | `.` 7, `./shadows` 4 | 6 |  | 4,503 |
+| @margoengine/controls | `.` 31 | 9 | 11 | 29,522 |
 | @margoengine/core | `.` 14, `./extension` 23 | 13 |  | 17,783 |
-| @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 17,093 |
+| @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 17,186 |
 | @margoengine/culling | `.` 4 |  |  |  |
 | @margoengine/decoders | `.` 22 | 1 |  |  |
-| @margoengine/dof | `.` 2 |  |  | 6,083 |
+| @margoengine/dof | `.` 2 |  |  | 6,097 |
 | @margoengine/ecs | `.` 6 |  |  |  |
-| @margoengine/environment | `.` 45 | 4 |  | 20,802 |
+| @margoengine/environment | `.` 45 | 4 |  | 20,919 |
 | @margoengine/exporters | `.` 26, `./usdz` 2, `./model` 6 | 9 |  | 14,642 |
 | @margoengine/fbx | `.` 4, `./worker` 2 | 1 |  |  |
 | @margoengine/fsm | `.` 3 |  |  |  |
 | @margoengine/geometry | `.` 64 |  |  | 15,270 |
 | @margoengine/gizmo | `.` 12 |  |  |  |
 | @margoengine/gltf | `.` 3 |  |  | 4,460 |
-| @margoengine/gltf-pro | `.` 22, `./asset` 2, `./instancing` 3, `./prepare` 3, `./worker` 4 | 38 | 21 | 16,495 |
+| @margoengine/gltf-pro | `.` 22, `./asset` 2, `./instancing` 3, `./prepare` 3, `./worker` 4 | 38 | 21 | 16,504 |
 | @margoengine/html | `.` 8 |  |  |  |
 | @margoengine/ifc | `.` 4 |  |  | 1,677 |
 | @margoengine/input | `.` 4 |  |  |  |
-| @margoengine/inspector | `.` 2 | 1 |  | 12,108 |
+| @margoengine/inspector | `.` 2 | 1 |  | 12,151 |
 | @margoengine/labels | `.` 22 | 2 |  |  |
-| @margoengine/lines | `.` 31 | 2 |  | 11,921 |
+| @margoengine/lines | `.` 31 | 2 |  | 11,967 |
 | @margoengine/loaders | `.` 60, `./worker` 2 | 8 |  | 21,676 |
 | @margoengine/lod | `.` 18 |  |  |  |
-| @margoengine/machinery | `.` 46, `./cad` 5, `./cad-async` 3, `./kinematics` 7, `./surface` 4, `./telemetry` 2, `./section` 3, `./assembly` 1, `./metrology` 6, `./spatial` 2, `./clearance` 2, `./materials` 2, `./overlays` 7, `./exploded` 2, `./edges` 3, `./dimensions` 7 | 12 |  | 33,275 |
+| @margoengine/machinery | `.` 46, `./cad` 5, `./cad-async` 3, `./kinematics` 7, `./surface` 4, `./telemetry` 2, `./section` 3, `./assembly` 1, `./metrology` 6, `./spatial` 2, `./clearance` 2, `./materials` 2, `./overlays` 7, `./exploded` 2, `./edges` 3, `./dimensions` 7 | 12 |  | 33,418 |
 | margoengine | `.` 21 |  |  | 2,227 |
 | @margoengine/materials | `.` 24 | 2 |  |  |
 | @margoengine/math | `.` 26, `./vector2` 1, `./vector3` 1, `./vector4` 1, `./quaternion` 1, `./euler` 1, `./matrix3` 1, `./matrix4` 1, `./color` 7, `./box3` 1, `./sphere` 1, `./plane` 1, `./ray` 1, `./frustum` 1, `./spherical` 1, `./mathutils` 21, `./mat4` 4, `./validate` 1, `./quat` 2, `./vec3` 7 | 91 |  |  |
@@ -52,34 +52,34 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/net | `.` 3 |  |  |  |
 | @margoengine/physics | `.` 31 | 2 | 25 |  |
 | @margoengine/points | `.` 42 | 3 |  |  |
-| @margoengine/post | `.` 8, `./bloom` 2, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1 | 2 |  | 12,683 |
+| @margoengine/post | `.` 8, `./bloom` 2, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1 | 2 |  | 12,702 |
 | @margoengine/procedural | `.` 17 |  |  |  |
 | @margoengine/quality | `.` 13 | 1 |  |  |
 | @margoengine/react | `.` 22 |  |  | 3,768 |
 | @margoengine/road | `.` 3 |  |  |  |
 | @margoengine/scatter | `.` 17 | 1 |  |  |
-| @margoengine/scenery | `.` 2, `./sky` 2 |  |  | 183 |
+| @margoengine/scenery | `.` 2, `./sky` 2 |  |  | 218 |
 | @margoengine/selection | `.` 8 |  |  |  |
 | @margoengine/shader | `.` 140 | 11 | 47 |  |
-| @margoengine/shadows | `.` 7 | 1 |  | 6,348 |
-| @margoengine/sky | `.` 8, `./base` 9, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1 | 94 |  | 10,173 |
-| @margoengine/splats | `.` 4, `./data` 3 |  |  | 6,147 |
+| @margoengine/shadows | `.` 7 | 1 |  | 6,364 |
+| @margoengine/sky | `.` 8, `./base` 9, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1 | 94 |  | 10,191 |
+| @margoengine/splats | `.` 4, `./data` 3 |  |  | 6,164 |
 | @margoengine/splines | `.` 3 |  |  |  |
 | @margoengine/staging | `.` 4 |  |  |  |
-| @margoengine/stats | `.` 3 |  |  | 3,268 |
-| @margoengine/taa | `.` 6 |  |  | 8,015 |
-| @margoengine/terrain | `.` 12 | 3 |  | 8,318 |
+| @margoengine/stats | `.` 3 |  |  | 3,285 |
+| @margoengine/taa | `.` 6 |  |  | 8,033 |
+| @margoengine/terrain | `.` 12 | 3 |  | 8,339 |
 | @margoengine/text | `.` 34 | 4 |  |  |
-| @margoengine/tonemap | `.` 5 |  |  | 5,707 |
+| @margoengine/tonemap | `.` 5 |  |  | 5,722 |
 | @margoengine/toon | `.` 3 |  |  |  |
 | @margoengine/transitions | `.` 2 |  |  |  |
 | @margoengine/tween | `.` 6 |  |  |  |
 | @margoengine/usdz | `.` 7, `./worker` 2 | 2 | 2 | 11,371 |
 | @margoengine/usdz-export | `.` 9 |  |  |  |
-| @margoengine/vfx | `.` 5, `./base` 5, `./obstacles` 1, `./wrap` 1, `./sort` 1, `./texture` 1 | 19 |  | 7,009 |
+| @margoengine/vfx | `.` 5, `./base` 5, `./obstacles` 1, `./wrap` 1, `./sort` 1, `./texture` 1 | 19 |  | 7,026 |
 | @margoengine/video | `.` 2 |  |  |  |
 | @margoengine/viewcube | `.` 5 |  |  |  |
 | @margoengine/water | `.` 5 |  |  |  |
 | @margoengine/webgl | `.` 2 |  |  |  |
 | @margoengine/wfc | `.` 3 |  |  |  |
-| @margoengine/xr | `.` 19 |  |  | 4,320 |
+| @margoengine/xr | `.` 19 |  |  | 4,349 |
