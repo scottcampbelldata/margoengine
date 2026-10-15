@@ -186,8 +186,8 @@ during the load is not handled (load the model again); each range request needs 
 
 Size (min+gzip, [entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)): an app that already
 imports `loadGLTF` grows by about 3.0 kB when it adds `loadGLTFProgressive` (the entry alone, with the root it imports,
-is 22.7 kB); the worker script is 7.3 kB, and the 4.0 kB main-thread fallback chunk loads only without `Worker`. The
-root entry is +8 B.
+is 22.8 kB); the worker script is 7.3 kB, and the 4.0 kB main-thread fallback chunk loads only without `Worker`. The
+root entry is +5 B (same build of the parent commit, before and after).
 
 Measured (`node examples/package-benchmarks/progressive/run.mjs`,
 [progressive-gltf.json](../../examples/package-benchmarks/results/progressive-gltf.json); Edge 155 headless, Arc 140V,

@@ -771,7 +771,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       once < 1 MB is outstanding; a server without Range streams the whole file and primitives decode as bytes land.
       Main thread uploads within `frameBudget` ms/frame (1 MB buffer writes; one texture + mips per step) and swaps a
       primitive's draw resource by re-running gltf-pro's own `setup` on it (root change: setup's GPU caches became the
-      model field `gpuCache`, +8 B root gzip). Textures after geometry, then the remaining bytes; `complete` is
+      model field `gpuCache`, +5 B root gzip). Textures after geometry, then the remaining bytes; `complete` is
       byte-identical to `loadGLTF` (GPU: every draw resource's vertex/index/uniform bytes, bound texture descriptors
       and uploads, samplers; CPU: doc, buffers, accessors, primitives, images, store), `tests/progressive.test.js`
       (DamagedHelmet, RobotExpressive, generated grids, EXT_mesh_gpu_instancing via `decoders.instancing`, .gltf +
