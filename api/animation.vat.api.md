@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 import { PBRModel } from "@margoengine/gltf-pro";
 
 export interface VATBakeOptions {
@@ -28,6 +28,7 @@ export class VATCrowd implements EnginePlugin {
     roughness: number;
     metalness: number;
     map: VATMap | null;
+    disposed: boolean;
     static attach(engine: EngineKernel, vat: VATData, options?: VATCrowdOptions): VATCrowd;
     constructor(vat: VATData, { color, map, roughness, metalness }?: VATCrowdOptions);
     get count(): number;
@@ -37,6 +38,13 @@ export class VATCrowd implements EnginePlugin {
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
     registerPasses(graph: FrameGraph): void;
+    addLighting(effect: VATLighting): () => void;
+    drawShadow({ context: c, pass, matrix, cascade }: {
+        context: Context;
+        pass: GPURenderPassEncoder;
+        matrix: Float32Array;
+        cascade: number;
+    }): void;
     onDeviceRestored(): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -68,6 +76,20 @@ export interface VATInstance {
         offset?: readonly number[];
         scale?: readonly number[];
     };
+}
+
+export interface VATLighting {
+    pbr?(group: number): VATLightingHooks | undefined;
+    bindings(): GPUBindGroupEntry[];
+    readonly owner?: unknown;
+}
+
+export interface VATLightingHooks {
+    readonly declarations: string;
+    direct?(direct: string): string;
+    readonly light?: string;
+    readonly ambient?: string;
+    output?(color: string): string;
 }
 
 export interface VATMap {
@@ -118,6 +140,10 @@ interface Clip {
     duration: number;
     tracks: Track[];
 }
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 
 type Interpolation = 'STEP' | 'LINEAR' | 'CUBICSPLINE';
 

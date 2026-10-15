@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type {EngineKernel,Mesh as MeshHandle} from '@margoengine/core';
-import {engineRuntime,meshRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type Mesh} from '@margoengine/core/extension';
+import {engineRuntime,meshRuntime,type Camera,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type Mesh} from '@margoengine/core/extension';
 import {viewMatrix} from '../../shared/view.js';
 import {preset} from '../../shared/preset.js';
 import {cascadeSplits,fitCascades} from './cascades.js';
@@ -25,7 +25,7 @@ export class Shadows implements EnginePlugin {
   private readonly values=new Float32Array(92);private readonly ranges=this.values.subarray(84,88);private readonly previous=new Float32Array(64);private readonly view=this.values.subarray(64,80);
   private dirty=true;private disposed=false;
   private whiteView?:GPUTextureView;
-  private readonly light=new Float32Array(3);
+  private readonly light=new Float32Array(3);private readonly fitCamera={position:[0,0,0],target:[0,0,0],fov:60,near:0.1,far:500} as unknown as Camera;
   private readonly fitted={matrices:this.matrices,ranges:this.ranges};
   private readonly cascadeMatrices=Array.from({length:4},(_,i)=>this.matrices.subarray(i*16,i*16+16));
   private readonly shadowContexts=this.cascadeMatrices.map((matrix,cascade)=>({context:undefined!,pass:undefined!,matrix,cascade}) as ShadowContext);
@@ -72,10 +72,31 @@ export class Shadows implements EnginePlugin {
     this.entries=[{binding:1,resource:{buffer:this.uniform}},{binding:2,resource:this.combined.createView({dimension:'2d-array'})},{binding:3,resource:this.sampler}];this.dirty=true;
   }
   registerPasses(graph:FrameGraph):void {graph.add({name:this.name,order:-5,execute:c=>{if(c.backend!=='webgpu')return;this.render(c);c.shader=this.shader(c.shader);c.bindings.push(...this.bindings());}});}
+  /**
+   * Without a `distance` option and with only core-mesh casters, the cascades span the core meshes' bounding box (every
+   * receiver is then a core mesh) instead of up to 500 m: the stage's 1 m cube on a 6 m floor gets about 1 cm texels
+   * instead of 13 cm. Near and far snap to quarter octaves so orbiting and small dollies keep the cascades still.
+   */
+  private range(camera:Camera):Camera {
+    const fit=this.fitCamera;fit.position=camera.position;fit.target=camera.target;fit.fov=camera.fov;fit.near=camera.near;fit.far=Math.min(camera.far,this.options.distance??500);
+    if(this.options.distance!==undefined||!this.sources.length||!this.sources.every(r=>'id' in r.source))return fit;
+    // ponytail: one pass over every core mesh per frame; cache on store revisions if 100k-part scenes leave distance unset.
+    // World bounding spheres from core's per-mesh local spheres; their box centre, then the sphere around them all.
+    const store=this.engine!.store,m=store.matrices,s=store.bounds,box=[Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity],w=[0,0,0,0];
+    const sphere=(id:number)=>{const o=id*16,b=id*4;for(let k=0;k<3;k++)w[k]=m[o+k]*s[b]+m[o+4+k]*s[b+1]+m[o+8+k]*s[b+2]+m[o+12+k];
+      w[3]=s[b+3]*Math.sqrt(Math.max(m[o]**2+m[o+1]**2+m[o+2]**2,m[o+4]**2+m[o+5]**2+m[o+6]**2,m[o+8]**2+m[o+9]**2+m[o+10]**2));return w;};
+    for(const [id,mesh] of this.engine!.meshes)if(mesh.geometry){sphere(id);for(let k=0;k<3;k++){box[k]=Math.min(box[k],w[k]-w[3]);box[k+3]=Math.max(box[k+3],w[k]+w[3]);}}
+    const cx=(box[0]+box[3])/2,cy=(box[1]+box[4])/2,cz=(box[2]+box[5])/2;let radius=0;
+    for(const [id,mesh] of this.engine!.meshes)if(mesh.geometry){sphere(id);radius=Math.max(radius,Math.hypot(w[0]-cx,w[1]-cy,w[2]-cz)+w[3]);}
+    const d=Math.hypot(cx-camera.position[0],cy-camera.position[1],cz-camera.position[2]);
+    const far=2**(Math.ceil(Math.log2(d+radius)*4)/4),near=d>radius?2**(Math.floor(Math.log2(d-radius)*4)/4):0;
+    if(far<fit.far&&far>camera.near)fit.far=far;if(near>fit.near&&near<fit.far)fit.near=near;
+    return fit;
+  }
   private render(c:Context):void {
-    this.validate();const far=Math.min(c.camera.far,this.options.distance??500);cascadeSplits(c.camera.near,far,this.options.lambda??0.5,this.splits);
+    this.validate();const camera=this.range(c.camera);cascadeSplits(camera.near,camera.far,this.options.lambda??0.5,this.splits);
     for(let i=0;i<3;i++)this.light[i]=this.engine!.lighting.direction[i];
-    fitCascades(c.camera,c.width/c.height,this.light as unknown as [number,number,number],this.options.resolution??2048,this.splits,this.matrices,this.ranges,this.options.casterMargin??100,this.fitted);
+    fitCascades(camera,c.width/c.height,this.light as unknown as [number,number,number],this.options.resolution??2048,this.splits,this.matrices,this.ranges,this.options.casterMargin??100,this.fitted);
     for(let i=0;i<64;i++)if(this.matrices[i]!==this.previous[i])this.dirty=true;
     for(let i=this.sources.length-1;i>=0;i--){const r=this.sources[i];if('disposed' in r.source&&r.source.disposed||'id' in r.source&&this.engine!.meshes.get(r.source.id)!==r.source){this.sources.splice(i,1);r.removeLighting?.();this.clearDraws();this.dirty=true;}}
     let dynamic=false;

@@ -175,7 +175,7 @@ test('shadow flags update registration independently and HDR composes with the s
   const source=(await readFile(new URL('../../gltf-pro/src/shader.ts',import.meta.url),'utf8')).split('`')[1];
   const ibl=[...model.lighting].find(value=>value!==effect);
   // The IBL reaches gltf-pro through its lighting hooks (one stable object for steady frames); the mock shadows still patch text.
-  const {lightPBR}=await import('../../gltf-pro/src/shader.ts'),hooks=ibl.pbr(2);for(let i=0;i<100;i++)assert.equal(ibl.pbr(2),hooks,'steady frames must reuse the hooks');
+  const {lightPBR}=await import('../../shared/pbr-hooks.js'),hooks=ibl.pbr(2);for(let i=0;i<100;i++)assert.equal(ibl.pbr(2),hooks,'steady frames must reuse the hooks');
   for(const order of [[ibl,effect],[effect,ibl]]){let code=source;for(const lighting of order)code=lighting===ibl?lightPBR(code,lighting.pbr(2)):lighting.shader(code,2);assert.match(code,/shadowVisibility/);assert.match(code,/iblShade\(iblSpecular/);assert.match(code,/@binding\(24\)/);}
   view.rerender(tree(children(false,true),{shadows:true}));assert.equal(effect.sources.size,0);assert.ok(model.lighting.has(effect));
   view.rerender(tree(children(true,false),{shadows:true}));assert.equal(effect.sources.size,1);assert.equal(model.lighting.has(effect),false);

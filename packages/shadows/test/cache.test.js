@@ -2,6 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Shadows} from '../dist/index.js';
 import {optionalGPU} from '../../../tests/support/optional-gpu.js';
+import {mockGPU, context, passes} from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
+import {Engine, TransformStore} from '../../core/dist/extension.js';
+import {box} from '../../core/dist/index.js';
+
+test('without a distance, core-mesh casters fit the cascades to their bounding sphere; any other caster keeps 500 m', async () => {
+  const gpu = mockGPU(), store = await TransformStore.create(16), buffers = {vertex: gpu.device.createBuffer({size: 576}), index: gpu.device.createBuffer({size: 144})};
+  const engine = new Engine({width: 128, height: 96, clientWidth: 128, clientHeight: 96}, store, {backend: 'webgpu', gpu: gpu.device, add() {}, remove() {}, render() {}, dispose() {}, geometryBuffers: () => buffers}, {position: [0, 2, 6], target: [0, 0, 0]}, null);
+  const floor = engine.createMesh().setGeometry(box(6, 0.2, 6)).setPosition([0, -0.1, 0]), cube = engine.createMesh().setGeometry(box()).setPosition([0, 0.5, 0]);
+  const view = context(gpu, {samples: 1, shader: 'let linear=direct*vec3f(1);'}), split = shadows => {store.tick(false); view.begin(0); view.camera.position = [0, 2, 6]; passes(shadows)(view.c); return shadows.splits[3];};
+  const fitted = new Shadows({resolution: 64}), fixed = new Shadows({resolution: 64, distance: 500}), custom = new Shadows({resolution: 64});
+  try {
+    for (const shadows of [fitted, fixed, custom]) {shadows.setup(engine); shadows.add(floor); shadows.add(cube);}
+    custom.add({drawShadow() {}});
+    // Floor sphere r = 0.5 * hypot(6, 0.2, 6) about the floor centre; camera 6.3 m from the scene centre: far is
+    // distance + radius rounded up to a quarter octave.
+    const far = split(fitted);
+    assert.ok(far >= 9 && far < 12, `fitted far ${far}`); assert.equal(far, Math.fround(2 ** (Math.round(Math.log2(far) * 4) / 4)), 'quarter-octave step');
+    assert.equal(split(fixed), 500); assert.equal(split(custom), 500);
+    floor.setScale([100, 1, 100]); assert.equal(split(fitted), 500, 'a scene larger than 500 m keeps the default');
+  } finally {fitted.dispose(); fixed.dispose(); custom.dispose(); engine.dispose();}
+});
 
 test('shadow cascades reuse descriptors, attachments, callback contexts and matrix views',()=>{
   const h=optionalGPU(),descriptors=[],contexts=[],engine=h.engine;

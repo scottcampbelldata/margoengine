@@ -1,5 +1,5 @@
 {
-  "commit": "5a7bbc2",
+  "commit": "719c7a7",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -14,8 +14,8 @@
         "gzip": 5000
       },
       "./vat": {
-        "raw": 12665,
-        "gzip": 5552
+        "raw": 17169,
+        "gzip": 6791
       }
     },
     "@margoengine/animator": {
@@ -224,8 +224,8 @@
     },
     "@margoengine/gltf-pro": {
       ".": {
-        "raw": 53118,
-        "gzip": 18610
+        "raw": 54562,
+        "gzip": 18979
       },
       "./asset": {
         "raw": 7091,
@@ -240,12 +240,12 @@
         "gzip": 6109
       },
       "./progressive": {
-        "raw": 69709,
-        "gzip": 23964
+        "raw": 71143,
+        "gzip": 24328
       },
       "./worker": {
-        "raw": 53821,
-        "gzip": 18807
+        "raw": 55266,
+        "gzip": 19175
       },
       "dist/workers/gltf.js": {
         "raw": 17043,
@@ -394,8 +394,12 @@
     },
     "@margoengine/materials": {
       ".": {
-        "raw": 16691,
-        "gzip": 6908
+        "raw": 19850,
+        "gzip": 7842
+      },
+      "./transmission": {
+        "raw": 5944,
+        "gzip": 2503
       }
     },
     "@margoengine/math": {
@@ -624,8 +628,8 @@
     },
     "@margoengine/shadows": {
       ".": {
-        "raw": 17633,
-        "gzip": 6433
+        "raw": 18751,
+        "gzip": 6872
       }
     },
     "@margoengine/sky": {
@@ -746,8 +750,8 @@
         "gzip": 8585
       },
       "dist/workers/usdz.js": {
-        "raw": 78491,
-        "gzip": 27964
+        "raw": 79941,
+        "gzip": 28355
       }
     },
     "@margoengine/usdz-export": {
@@ -855,9 +859,9 @@
       "brotli": 20667
     },
     "packages/shadows/dist/index.js": {
-      "raw": 17633,
-      "gzip": 6433,
-      "brotli": 5751
+      "raw": 18751,
+      "gzip": 6872,
+      "brotli": 6144
     },
     "packages/machinery/dist/workers/cad-runtime.js": {
       "raw": 14544,
@@ -915,9 +919,9 @@
       "brotli": 15662
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 77724,
-      "gzip": 27868,
-      "brotli": 24868
+      "raw": 79142,
+      "gzip": 28276,
+      "brotli": 25192
     },
     "packages/loaders/dist/workers/usd.js": {
       "raw": 16790,

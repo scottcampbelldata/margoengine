@@ -1,0 +1,63 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Deformed shadows check</title><style>body{margin:0;background:#000}canvas{width:800px;height:600px;display:block}</style></head><body><canvas></canvas>
+<script type="module">
+import {Engine,box} from '/packages/core/dist/index.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {Animation} from '/packages/animation/dist/index.js';
+import {bakeVAT,VATCrowd} from '/packages/animation/dist/vat.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {EnvironmentLighting} from '/packages/environment/dist/index.js';
+const canvas=document.querySelector('canvas'),errors=[],RES=1024;
+const engine=await Engine.create(canvas,{backend:'webgpu',capacity:4096,camera:{position:[3.5,2.2,-3.2],target:[-0.7,0.4,-0.9],far:200}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+// Floor: a receiver only, so the shadow map holds just the casters under test.
+engine.createMesh().setGeometry(box(14,0.2,14)).setPosition([0,-0.1,0]);
+const robot=await loadGLTF(engine,'/examples/assets/robot-expressive.glb'),animation=Animation.attach(robot);
+robot.root.setScale([0.4,0.4,0.4]);animation.play('Walking');animation.playing=false; // RobotExpressive is about 4.5 m tall
+const shadows=Shadows.attach(engine,{resolution:RES,distance:30});
+const vat=bakeVAT(animation,{fps:30,clips:['Walking']});
+const render=async(n=2)=>{device.pushErrorScope('validation');for(let i=0;i<n;i++){engine.render();await device.queue.onSubmittedWorkDone();}const e=await device.popErrorScope();if(e)errors.push(e.message);};
+// Texels of all four cascades that hold a caster (depth below the cleared 1).
+const readback=device.createBuffer({size:RES*RES*4,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+async function silhouette(){
+  const mask=new Uint8Array(4*RES*RES);
+  for(let layer=0;layer<4;layer++){
+    const encoder=device.createCommandEncoder();encoder.copyTextureToBuffer({texture:shadows.combined,origin:[0,0,layer],aspect:'depth-only'},{buffer:readback,bytesPerRow:RES*4},[RES,RES,1]);device.queue.submit([encoder.finish()]);
+    await readback.mapAsync(GPUMapMode.READ);const depth=new Float32Array(readback.getMappedRange());for(let i=0;i<depth.length;i++)mask[layer*RES*RES+i]=depth[i]<0.99999;readback.unmap();
+  }
+  return mask;
+}
+const count=m=>m.reduce((n,v)=>n+v,0),iou=(a,b)=>{let both=0,either=0;for(let i=0;i<a.length;i++){if(a[i]&&b[i])both++;if(a[i]||b[i])either++;}return +(both/either).toFixed(4);};
+const measure=async(frames=90)=>{const t=[];for(let f=0;f<frames+15;f++){const a=performance.now();engine.render();await device.queue.onSubmittedWorkDone();if(f>=15)t.push(performance.now()-a);}t.sort((x,y)=>x-y);return {median:+t[t.length>>1].toFixed(2),p90:+t[Math.floor(t.length*0.9)].toFixed(2)};};
+let crowd,removeCrowd,removeIbl,slab;
+const instances=[];for(let k=0;k<25;k++)instances.push({matrix:[0.4,0,0,0,0,0.4,0,0,0,0,0.4,0,(k%5-2)*1.6-1,0,(Math.floor(k/5)-2)*1.6-1,1],offset:k*0.137,speed:0});
+window.check={
+  // A walking skinned character: shadow-map silhouette at two clip times, again at the first, and in bind pose.
+  async skinned(t1,t2){
+    const removeRobot=shadows.add(robot),masks={};
+    for(const [name,t] of [['t1',t1],['t2',t2],['again',t1]]){animation.seek(t);await render();masks[name]=await silhouette();}
+    animation.seek(t1);const saved=robot.primitives.map(p=>p.deformed);for(const p of robot.primitives)p.deformed=undefined;await render();masks.bind=await silhouette();robot.primitives.forEach((p,i)=>p.deformed=saved[i]);
+    removeRobot();
+    return {texels:Object.fromEntries(Object.entries(masks).map(([k,m])=>[k,count(m)])),iou:{t1_t2:iou(masks.t1,masks.t2),t1_again:iou(masks.t1,masks.again),t1_bind:iou(masks.t1,masks.bind)},errors:errors.splice(0)};
+  },
+  async pose(t,cast){animation.seek(t);const remove=cast?shadows.add(robot):()=>{};await render();remove();return errors.splice(0);},
+  // VAT crowd: B unshadowed, C without the crowd (gives the crowd's pixels), A cast + received, D A plus IBL.
+  async crowd(step){
+    if(step==='B'){robot.root.visible=false;slab=engine.createMesh().setGeometry(box(5,0.2,5)).setPosition([0,2.4,0]);engine.camera.position=[6,1.6,7];engine.camera.target=[-1,1,-1];shadows.add(slab);crowd=new VATCrowd(vat,{color:[0.95,0.8,0.35,1]});engine.use(crowd);for(const i of instances)crowd.add(i);}
+    if(step==='C')crowd.truncate(0);
+    if(step==='A'){for(const i of instances)crowd.add(i);removeCrowd=shadows.add(crowd);}
+    if(step==='D'){const lighting=await EnvironmentLighting.load(engine,'/packages/environment/tests/fixtures/spot1Lux.hdr',{intensity:2});removeIbl=lighting.add(crowd);window.lighting=lighting;}
+    await render(3);const silhouetteTexels=step==='A'?count(await silhouette()):undefined;return {silhouetteTexels,errors:errors.splice(0)};
+  },
+  // Diagnostic frame times (render + GPU completion): one skinned robot and a 1,024-robot VAT crowd, each with and without casting.
+  async timing(){
+    window.lighting?.dispose();removeCrowd?.();crowd.truncate(0);
+    for(let k=0;k<1024;k++)crowd.add({matrix:[0.4,0,0,0,0,0.4,0,0,0,0,0.4,0,(k%32-15.5)*1.6,0,-Math.floor(k/32)*1.6,1],offset:k*0.137,speed:1});
+    engine.camera.position=[0,14,22];engine.camera.target=[0,0,-14];
+    const out={};out.crowdNoShadow=await measure();const remove=shadows.add(crowd);out.crowdShadow=await measure();remove();crowd.truncate(0);
+    robot.root.visible=true;animation.playing=true;engine.camera.position=[3.5,2.2,-3.2];engine.camera.target=[-0.7,0.4,-0.9];
+    out.robotNoShadow=await measure();const r=shadows.add(robot);out.robotShadow=await measure();r();
+    return {...out,errors:errors.splice(0)};
+  },
+};
+window.ready=true;
+</script></body></html>

@@ -45,9 +45,11 @@ Feature helpers load their entry and its required dependencies rather than the e
 
 ```ts
 const lighting = await app.environment('/studio.hdr', {intensity: 1.2});
-const shadows = await app.shadows({resolution: 2048, distance: 50});
+const shadows = await app.shadows();           // cascades fitted to the scene's meshes
 shadows.add(app.box({position: [2, 0.5, 0]})); // meshes created after the call
 ```
+
+Without a `distance` option and while every caster is a core mesh (the stage's case), the shadow cascades span the meshes' bounding sphere instead of 500 m, so a 1 m cube on a 6 m floor gets 0.35-1.8 cm shadow texels at resolution 1024 instead of 13-98 cm. Pass `distance` to fix the range (large worlds, streaming).
 
 `load()` returns the exported `LoadedModel` type:
 

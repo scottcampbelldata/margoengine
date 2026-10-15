@@ -66,7 +66,13 @@ try {
     return {plugin: window.stage.app.engine.hasPlugin('shadows'), draws: {...shadows.stats}};
   });
   const shadowed = await shot('shadows');
-  const result = {hardware, environment: {...environment, diff: diff(plain, lit), luma: [luma(plain), luma(lit)]}, shadows: {...shadows, diff: diff(lit, shadowed), luma: [luma(lit), luma(shadowed)]}};
+  // Cascade texel size (cm): the default fits the cascades to the scene; `distance: 500` is the range used before 5l.j.
+  const texels = () => page.evaluate(() => {const {shadows} = window.stage, m = shadows.matrices; return [0, 1, 2, 3].map(i => +(200 / Math.hypot(m[i * 16], m[i * 16 + 4], m[i * 16 + 8]) / shadows.options.resolution).toFixed(2));});
+  shadows.texelCm = await texels();
+  await page.evaluate(async () => {window.stage.shadows.options.distance = 500; await window.stage.render();});
+  shadows.texelCmAt500 = await texels(); const at500 = await shot('shadows-500');
+  await page.evaluate(async () => {delete window.stage.shadows.options.distance; await window.stage.render();});
+  const result = {hardware, environment: {...environment, diff: diff(plain, lit), luma: [luma(plain), luma(lit)]}, shadows: {...shadows, diff: diff(lit, shadowed), luma: [luma(lit), luma(shadowed), luma(at500)]}};
 
   result.dispose = await page.evaluate(async () => {
     const {app, lighting, shadows, gpuErrors} = window.stage;
@@ -85,6 +91,7 @@ try {
   assert.equal(result.shadows.plugin, true);
   assert.ok(result.shadows.diff.pixels > 500, `shadows did not change the frame: ${JSON.stringify(result.shadows.diff)}`);
   assert.ok(result.shadows.luma[1] < result.shadows.luma[0], 'shadows did not darken the frame');
+  assert.ok(result.shadows.texelCm.every((t, i) => t < result.shadows.texelCmAt500[i] / 4), 'default cascades are fitted to the small scene');
   assert.deepEqual({...result.dispose, gpuErrors: undefined}, {engine: true, lighting: true, environment: true, canvasRemoved: true, shadowsRemoved: true, abortedLoad: 'AbortError', gpuErrors: undefined});
   assert.deepEqual(result.dispose.gpuErrors, []);
   assert.deepEqual(errors, []);

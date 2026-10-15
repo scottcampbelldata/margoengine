@@ -221,7 +221,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    <0.01 ms CPU vs 465 ms CPU / 19,000 draws as skinned models (`proofs/animation-vat.proof.js`); real-GPU check
    `node examples/package-benchmarks/atlas-vat/check.mjs` passed on the Arc 140V (AC, Chrome 155): VAT pose matches GPU
    skinning (silhouette IoU 0.98), merged atlas frame = separate (mean diff 0.07/255, 64 -> 1 draws), 1,024 walking robots
-   in 1 draw at 0.7-0.9 ms CPU and 11-16 ms GPU per frame (7.4M vertices; machine busy). Left: VAT clip blending, shadows/IBL for crowds, half-float VAT.] Production optimizations (from Scott's three.js conference recap, Paris, Sept 2026): general LOD object (gap 18),
+   in 1 draw at 0.7-0.9 ms CPU and 11-16 ms GPU per frame (7.4M vertices; machine busy). Left: VAT clip blending, half-float VAT (shadows/IBL for crowds: 5l.j).] Production optimizations (from Scott's three.js conference recap, Paris, Sept 2026): general LOD object (gap 18),
    octahedral imposters, texture atlases (needs texture transforms in materials), vertex animation textures for
    GPU crowds. Imposters and LOD first; they serve CAD/simulator scenes and landing pages alike. Compute nodes belong
    in the 1b shader package.
@@ -1283,7 +1283,32 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       behind; colour only (no normal/roughness decals); multiply cannot lighten; no culling of decals.
    i. HDR canvas output on HDR displays (with 5h.c Display P3). DONE: environment `ColorOutput` (`hdr: true`, `peak`) +
       Tonemap's HDR rolloff, zero core bytes; details, proofs and limits under 5h.c.
-   j. Shadows for skinned meshes and VAT crowds; IBL for VAT crowds.
+   j. [DONE 2026-10-15, 0 core/stage bytes, core + stage 19,999 B] Shadows for skinned meshes and VAT crowds; IBL for VAT
+      crowds; the stage's stair-stepped shadow edge.
+      - Skinned/morphed gltf-pro casters needed no code: `shadowPrimitives` already hands Shadows `primitive.deformed`
+        (animation's compute pass runs at order -10, shadows at -5). Real GPU proves it now
+        (`examples/package-benchmarks/deformed-shadows/check.mjs`, Arc 140V, Edge 155, GPU lock, AC): RobotExpressive
+        walking as the only caster, shadow-map silhouette IoU 0.85 between clip times 0.25 s and 0.75 s, 1.0 repeated at
+        0.25 s, 0.69 against the bind pose; the visible floor shadow changes too (screen IoU 0.74); 0 validation errors.
+      - VAT crowds (`@margoengine/animation/vat`): `crowd.drawShadow` draws the posed instances into each cascade (own
+        160-byte frame slot per cascade, the VAT vertex stage as a depth-only pipeline); `crowd.addLighting(effect)` takes
+        effects with gltf-pro `pbr` hooks (Shadows, EnvironmentLighting) and composes them into a lit copy of the VAT
+        shader with gltf-pro's hook points (lightPBR moved to `packages/shared/pbr-hooks.js`, gltf-pro uses it from there).
+        Check above: 25 robots under a slab, crowd luma 182 -> 159 shadowed, 4,056 floor pixels darkened by the crowd,
+        IBL changes 74% of crowd pixels, 0 validation errors. Cost (DIAGNOSTIC, quiet gate passed, other agents open;
+        `results/deformed-shadows.json`): 1,024 walking robots 13.5 -> 35.8 ms per frame with casting (every instance in
+        all four cascades; a per-cascade test in the vertex shader that skipped texture reads measured no gain and was
+        dropped; GPU per-cascade instance compaction is the upgrade); one skinned robot 8.6 -> 9.6 ms.
+      - Stage: the default `distance: 500` with camera near 0.1 put the 1 m cube in 13 cm texels (cascade 0 spans 0.1-63 m).
+        With `distance` unset and only core-mesh casters, Shadows fits near/far to the bounding sphere of all core meshes
+        (quarter-octave steps, so orbiting does not resize cascades); other casters keep 500 m. Stage check: 0.35 / 0.66 /
+        1.1 / 1.8 cm texels instead of 13 / 25 / 42 / 98 cm, no stair steps (`test-results/stage-features-shadows.png`).
+      - Unchanged when unused: `proofs/deformed-shadows.proof.js` (VATCrowd without effects; Shadows with `distance` or a
+        non-mesh caster: GPU calls identical to HEAD), gltf-pro-lighting-hooks and binding-limit proofs identical, the
+        unlit `vatShader` text byte-identical. visual:check 55/55. Sizes (gzip): animation/vat 5,552 -> 6,791, shadows
+        6,433 -> 6,872, gltf-pro 18,972 -> 18,979 and materials 7,835 -> 7,842 (lightPBR now inlined from shared).
+      - Limits: no SSAO or clustered lights on VAT crowds; Fog's hook composes but is not GPU-checked; the fit walks every
+        core mesh each frame (pass `distance` for 100k-part scenes).
    k. Sweep the remaining PARTIAL parity rows that need no core change.
    (Plus already queued: SSR, volumetrics, progressive loading, OIT, P3, tier presets 5i.b.)
    l. SSR follow-ups (from 3cf1453): [DONE: model capture] `ssr.add(model)` (gltf-pro `PBRModel` or materials mesh;
@@ -2080,7 +2105,9 @@ particles, post, `app.environment()`, `app.shadows()`), so a spinning model cost
    `app.shadows({resolution: 1024})` changed 3,266 (8 dynamic caster draws); 0 validation errors; `app.dispose()`
    disposed the lighting, its environment and shadows and removed the canvas, and a load pending at dispose rejected
    with AbortError. Seen in the frame (test-results/stage-features-shadows.png): the 1 m cube's shadow edge is visibly
-   stair-stepped at the default `distance: 500`; not investigated (suspect coarse cascade texels for a tiny scene).]
+   stair-stepped at the default `distance: 500`. FIXED in 5l.j (0 stage bytes): the cascades spanned 0.1-500 m, so the
+   cube sat in 13 cm texels; Shadows now fits them to the core meshes' bounding sphere when `distance` is unset
+   (0.35-1.8 cm texels; the check measures both and saves `stage-features-shadows-500.png` as the old look).]
    Any further addition is lazy-loaded or it raises core + stage, which must stay under 20,000 B.
 2. Show packages grouped by layer wherever they are listed (site catalog, docs/README.md, README), never as one
    alphabetical list of 73: add a `category` field per package (build-catalog.js -> docs/catalog.json) and group the
