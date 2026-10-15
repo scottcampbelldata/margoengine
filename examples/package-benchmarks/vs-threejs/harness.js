@@ -3,7 +3,7 @@
 // render(t) does that frame's scene update and submits it; t is scene time in seconds (fixed 1/60 s per frame, so every
 // engine shows the same camera path and part motion per frame regardless of its frame rate).
 const q = new URLSearchParams(location.search);
-export const params = {engine: q.get('engine'), scene: q.get('scene'), n: +(q.get('n') ?? 0), mode: q.get('mode') ?? 'mesh', move: +(q.get('move') ?? 0), warmup: +(q.get('warmup') ?? 60), frames: +(q.get('frames') ?? 300), gpuFrames: +(q.get('gpuFrames') ?? 60), serialFrames: +(q.get('serialFrames') ?? 30), maxPhaseMs: +(q.get('maxPhaseMs') ?? 20_000)};
+export const params = {engine: q.get('engine'), scene: q.get('scene'), n: +(q.get('n') ?? 0), mode: q.get('mode') ?? 'mesh', move: +(q.get('move') ?? 0), warmup: +(q.get('warmup') ?? 60), frames: +(q.get('frames') ?? 300), gpuFrames: +(q.get('gpuFrames') ?? 60), serialFrames: +(q.get('serialFrames') ?? 30), maxPhaseMs: +(q.get('maxPhaseMs') ?? 20_000), diag: (q.get('diag') ?? '').split('+').filter(Boolean), dump: q.has('dump')};
 const scriptMs = performance.now();
 
 const stat = values => {
@@ -17,7 +17,7 @@ const raf = () => new Promise(r => requestAnimationFrame(r));
 // any engine begins gets begin/end timestamp writes. GPU time of a frame = sum of its pass durations. Same code path
 // for Margo and three.js WebGPURenderer, so neither engine's own profiler is trusted.
 let device;
-const ts = {on: false, n: 0, cap: 2048};
+const ts = {on: false, n: 0, cap: 2048, desc: []};
 if (globalThis.GPUAdapter) {
   const request = GPUAdapter.prototype.requestDevice;
   GPUAdapter.prototype.requestDevice = async function(d = {}) {
@@ -28,9 +28,27 @@ if (globalThis.GPUAdapter) {
   for (const kind of ['beginRenderPass', 'beginComputePass']) {
     const begin = GPUCommandEncoder.prototype[kind];
     GPUCommandEncoder.prototype[kind] = function(d = {}) {
-      if (ts.on && !d.timestampWrites && ts.n < ts.cap) {const at = ts.n++ * 2;d = {...d, timestampWrites: {querySet: ts.set, beginningOfPassWriteIndex: at, endOfPassWriteIndex: at + 1}};}
+      if (ts.on && !d.timestampWrites && ts.n < ts.cap) {
+        const c = d.colorAttachments?.[0];ts.desc[ts.n] = `${kind.slice(5, -4)} ${d.label ?? ''}${d.depthStencilAttachment ? ' +depth' : ''}${c?.resolveTarget ? ' +resolve' : ''}${c ? ` ${c.loadOp}/${c.storeOp}` : ''}`;
+        const at = ts.n++ * 2;d = {...d, timestampWrites: {querySet: ts.set, beginningOfPassWriteIndex: at, endOfPassWriteIndex: at + 1}};
+      }
       return begin.call(this, d);
     };
+  }
+  // ?dump: record every shader module and render pipeline (state that decides GPU cost) for side-by-side reading.
+  if (params.dump) {
+    const shaders = new Map(), pipelines = [];globalThis.dumped = {shaders: [], pipelines};
+    const module = GPUDevice.prototype.createShaderModule;
+    GPUDevice.prototype.createShaderModule = function(d) {const m = module.call(this, d);shaders.set(m, globalThis.dumped.shaders.push(d.code) - 1);return m;};
+    for (const kind of ['createRenderPipeline', 'createRenderPipelineAsync']) {
+      const create = GPUDevice.prototype[kind];
+      GPUDevice.prototype[kind] = function(d) {
+        pipelines.push({vertexShader: shaders.get(d.vertex.module), fragmentShader: d.fragment && shaders.get(d.fragment.module), cullMode: d.primitive?.cullMode ?? 'none', topology: d.primitive?.topology ?? 'triangle-list',
+          depth: d.depthStencil && `${d.depthStencil.format} ${d.depthStencil.depthCompare} write=${d.depthStencil.depthWriteEnabled}`, samples: d.multisample?.count ?? 1, targets: d.fragment?.targets.map(t => `${t.format}${t.blend ? ' blend' : ''}`),
+          vertexBuffers: d.vertex.buffers?.map(b => b && `${b.arrayStride}B ${b.stepMode ?? 'vertex'} x${b.attributes.length}`)});
+        return create.call(this, d);
+      };
+    }
   }
 }
 
@@ -38,7 +56,9 @@ async function webgpuTimes(app, frames, next) {
   if (!device?.features.has('timestamp-query')) return null;
   ts.set ??= device.createQuerySet({type: 'timestamp', count: ts.cap * 2});
   const resolve = device.createBuffer({size: ts.cap * 16, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC}), read = device.createBuffer({size: ts.cap * 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ});
-  const sums = [], passes = new Set();let done = 0, zero = 0;
+  // passMs[k]: durations of the k-th pass of each frame, described in passes[k]; span: first pass
+  // begin to last pass end, so it also holds the gaps between passes (queue writes, copies, idle).
+  const sums = [], passes = new Set(), perPass = [], spans = [];let done = 0, zero = 0;
   while (done < frames) {
     const batch = [];ts.n = 0;ts.on = true;
     do {const a = ts.n;app.render(next());batch.push([a, ts.n]);done++;} while (done < frames && ts.n + (batch.at(-1)[1] - batch.at(-1)[0]) <= ts.cap);
@@ -49,10 +69,12 @@ async function webgpuTimes(app, frames, next) {
       let sum = 0n;for (let i = a; i < b; i++) if (t[2 * i + 1] > t[2 * i]) sum += t[2 * i + 1] - t[2 * i];
       passes.add(b - a);if (sum === 0n) {zero++;continue;} // Dawn sometimes zeroes a batch; counted, not measured.
       sums.push(Number(sum) / 1e6);
+      for (let i = a; i < b; i++) (perPass[i - a] ??= []).push(t[2 * i + 1] > t[2 * i] ? Number(t[2 * i + 1] - t[2 * i]) / 1e6 : 0);
+      if (t[2 * b - 1] > t[2 * a]) spans.push(Number(t[2 * b - 1] - t[2 * a]) / 1e6);
     }
   }
   resolve.destroy();read.destroy();
-  return {method: 'timestamp-query, sum of pass durations', gpuMs: stat(sums), zeroFrames: zero, passesPerFrame: [...passes]};
+  return {method: 'timestamp-query, sum of pass durations', gpuMs: stat(sums), spanMs: stat(spans), passMs: perPass.map(stat), passes: ts.desc.slice(0, perPass.length), zeroFrames: zero, passesPerFrame: [...passes]};
 }
 
 // WebGL2: EXT_disjoint_timer_query_webgl2 TIME_ELAPSED around the whole render call, when the browser exposes it.
@@ -88,10 +110,12 @@ export async function run(create) {
       }
       return {cpu, interval};
     };
-    await loop(params.warmup, false);
-    const {cpu, interval} = await loop(params.frames, true), iv = stat(interval);
-    result.throughput = {frames: cpu.length, cpuMs: stat(cpu), intervalMs: iv, fps: iv ? +(1000 / iv.median).toFixed(1) : null};
-    await app.idle();
+    // fps counts frames until the GPU has finished them: with vsync and the cap off, requestAnimationFrame is not paced
+    // by the GPU, so an engine with cheap submits queues hundreds of frames and its rAF rate (rafFps) overstates what
+    // the GPU renders (three.js InstancedMesh at 50k boxes: ~970 rAF/s with 7.7 ms of GPU work per frame).
+    await loop(params.warmup, false);await app.idle();
+    const t0 = performance.now(), {cpu, interval} = await loop(params.frames, true), iv = stat(interval);await app.idle();
+    result.throughput = {frames: cpu.length, cpuMs: stat(cpu), intervalMs: iv, fps: +(cpu.length * 1000 / (performance.now() - t0)).toFixed(1), rafFps: iv ? +(1000 / iv.median).toFixed(1) : null};
     result.gpu = app.gl ? await webglTimes(app, params.gpuFrames, next) : await webgpuTimes(app, params.gpuFrames, next);
     // Serial frames: submit, then wait until the GPU is idle. Frame latency with no pipelining; the same wait for both
     // APIs (WebGPU onSubmittedWorkDone, WebGL a 1-pixel readPixels, which blocks until all prior work is done).
@@ -102,6 +126,7 @@ export async function run(create) {
     result.jsHeapMB = performance.memory ? +(performance.memory.usedJSHeapSize / 2 ** 20).toFixed(2) : null;
     result.gcExposed = !!globalThis.gc;
     result.info = app.info();
+    if (globalThis.dumped) result.dumped = globalThis.dumped;
     result.resources = performance.getEntriesByType('resource').map(r => ({name: new URL(r.name).pathname, bytes: r.encodedBodySize, ms: +r.duration.toFixed(1)}));
     // Final still frame at t = 0 for the side-by-side screenshot run.mjs takes.
     app.render(0);await app.idle();await raf();
