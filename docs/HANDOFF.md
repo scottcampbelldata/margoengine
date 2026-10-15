@@ -524,8 +524,34 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    e. packages/shared is copied into every package bundle (e.g. sceneSamples, math, msaa, demo-frame); copies can drift
       between packages in one app. Decide: publish it as an internal versioned package, or keep copying but test
       that all copies in a build are identical.
-   f. Turn today's ad-hoc GPU screenshot diffs into a standing visual-regression suite for the site demos (serial,
-      under the GPU lock, with noise-calibrated tolerances like the dedupe worker used).
+   f. [DONE] Standing visual-regression suite for the site demos: `npm run visual:check` / `npm run visual:update`
+      (`scripts/visual-regression.js`, baselines + `tests/visual/manifest.json`; how to run: Worker practice).
+      22 views of the 8 demos `scripts/build-site.js` serves: `/night-citadel/`, `/gameplay-sandbox/`,
+      `/demos/character-animation.html` (`/demos/robot-expressive.html` is the same page, not captured twice),
+      `/demos/damaged-helmet.html`, `/demos/windy-meadow.html`, `/demos/earth/`, `/demos/dof/`, `/demos/tonemap/`; each at
+      1280x720 `?quality=high` and `?quality=low`, and as an iPhone (390x844, DPR 3, iPhone UA = phone tier); dof and
+      tonemap read no tier, so only high + phone. The landing page and /catalog/ are static and not captured.
+      Capture contract (no demo or package code changed): fresh browser context with prefers-reduced-motion: reduce,
+      which every demo already honours as its pause (delta 0 / animation, rotation or wind paused: a still frame at
+      t = 0), the demo's own readiness signal (`submitPrincipalScene` result, `data-ready`, and the helmet's and Earth's
+      full-detail upgrade on the high tier), 1 s settle + 4 frames, FPS/telemetry text masked. Images are box-downsampled
+      (desktop 640x360, phone 195x422) and stored as 8-bit RGB PNG: 1.8 MB for all 22 (largest: meadow 245 kB) — enough
+      to catch a 1-level shift; full-resolution PNGs would be ~15-20 MB per re-baseline in git history.
+      Metrics per view: `changed` (share of pixels with any difference) and `hot` (share off by > 24 levels) gated;
+      tolerance = worst pairwise noise of 4 separate browser launches x 3 + (0.05% changed, 0.02% hot). (x1.5 was too
+      tight: a clean Citadel phone run hit 2.3x its 4-run floor; particles reflected in the water vary a lot.)
+      Noise floors (Arc 140V, Edge 155, core 0ed56b9): 16 of 22 views are bit-identical run to run (robot, helmet,
+      meadow, Earth, dof, tonemap). Night Citadel (changed 0.003/0.07/0.43% high/light/phone) and the island sandbox
+      (changed 5.2/1.3/1.6%, hot 0.34/0.07/0.04%) are not: VFX respawn seeds come from `atomicAdd(&respawn.sequence)` and the draw list from
+      `atomicAdd(&drawn.instanceCount)` (`packages/vfx/src/shader.ts` lines 42 and 58), so which particle gets which seed
+      and the blend order follow GPU thread scheduling. Seeding from the particle index alone would make VFX demos
+      deterministic and let the sandbox tolerance drop ~10x (a package change, not done).
+      Proof it catches real changes (scratch build, then reverted): robot studio light green 0.93 -> 0.91 fails all
+      three robot views (22.6% of pixels changed by 1 level; limit 0.05%); sandbox golden-hour sun green 0.69 -> 0.67
+      fails light (10.3% vs 4.0%) and phone (7.6% vs 4.7%) and stays under the high view's particle-noise limit (13.9%
+      vs 15.6%); every other demo passes. A first mean-diff gate missed the sun change in all three views (particle
+      noise dominated the mean), so the gate became `changed`. Two clean 3-run checks (6 captures per view): all within the x3 limits. The new core (0ed56b9: kernel skips unchanged entities, instance reuse, ranged
+      uploads) renders every view bit-identical to the pre-merge baselines (only the VFX noise above).
    g. Changesets (or similar) for versioning and changelogs before the first npm publish; consistent peer ranges.
    h. Consistent error types and messages across packages (one small error-code convention), documented.
    i. [DONE] Follow-ups from the dedupe merge. Sky and VFX are split into feature entries: `@margoengine/sky/base` plus
@@ -663,6 +689,14 @@ JSON. Correctness checks (pixel diffs, proofs) don't need it. Publication number
 (Scott keeps the laptop idle for those windows). A change
 to any package's public API (anything in its dist/*.d.ts reachable from an `exports` entry) fails `npm run api:check`:
 if intended, run `npm run api:update` after build:packages and commit the `api/` and `docs/api-surface.md` diff.
+Visual regression (GPU, so not in `verify`): after `npm run build:packages`, `npm run visual:check` builds the site,
+captures every demo view and compares it with `tests/visual/*.png` (report, actual and diff images in
+`test-results/visual/index.html`; 1-2.5 min with the site build). It refuses on battery, discards a run that loses AC, and takes the GPU lock
+itself (polls every 60 s); do not pipe it through `Select-Object -First`/`head` (killing it mid-run leaves a stale
+`gpu.lock` behind). A failing view whose change is intended: `npm run visual:update -- --only=<view>` (4 runs per view,
+re-measures the noise floor) and commit the PNG + `tests/visual/manifest.json`, saying why in the commit message.
+Baselines are for the Arc 140V + Edge build recorded in the manifest; another GPU or a browser update needs a full
+`visual:update` first (the check prints a warning when they differ).
 
 ## Scott's decisions (2026-10-14, 17:10)
 
@@ -757,6 +791,12 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    and pacing, materials and textures, shader nodes, post stack + FXAA, environment IBL/fog/backgrounds, cameras
    (orthographic, ViewCube), picking/outlines/DragControls, LOD/imposters, glTF extensions, native FBX/USD, lights,
    CAD sections/edges/exploded views. Add new demos where a capability has none (e.g. a CAD assembly viewer).
+   Run `npm run visual:check` before and after rebuilding each demo: before, to start from a clean pass; after, every
+   failing view of that demo must be an intended change (look at the diff in `test-results/visual/index.html`), then
+   `npm run visual:update -- --only=<demo>` and commit the new baselines with the rebuild. Any other demo failing means
+   a shared package changed it. Keep the capture contract in rebuilt demos (see 1h.f): a still frame under
+   prefers-reduced-motion, a readiness signal, `?quality=high|low`; a new demo gets an entry in
+   `scripts/visual-regression.js` and a `visual:update -- --only=<id>`.
 2. Whitepaper (`docs/whitepaper.md`, also published on the site) proving every public claim with reproducible tests
    and benchmarks: size (`npm run measure:threejs`), load/startup times, frame times per device tier, CAD scale
    (10k/50k/100k parts), picking latency, LOD/imposter savings, package proofs, fair three.js benchmark (WebGL and
