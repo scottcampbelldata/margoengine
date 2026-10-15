@@ -5,6 +5,8 @@ import {Animation} from '@margoengine/animation';
 import {OrbitControls} from '@margoengine/controls';
 import {ColorBackground, Environment, EnvironmentLighting} from '@margoengine/environment';
 import {Stats} from '@margoengine/stats';
+import {Shadows} from '@margoengine/shadows';
+import {Tonemap} from '@margoengine/tonemap';
 import {applyQualityTier, paceEngine, watchQuality} from '@margoengine/quality';
 import {engineRuntime} from '@margoengine/core/extension';
 import {submitPrincipalScene} from '../packages/shared/demo-frame.js';
@@ -33,12 +35,15 @@ try {
     draco.dispose();
   }
 
-  const environment = await Environment.attach(stage.engine, studioCube(64));
+  const environment = await Environment.attach(stage.engine, studioCube(64), {intensity: 0.7});
   EnvironmentLighting.attach(stage.engine, environment).add(model);
   const runtime = engineRuntime(stage.engine);
   runtime.lighting.direction.set([-3, 8, 5, 4]);
-  runtime.lighting.radiance.set([1, 0.95, 0.88, 0.25]);
-  Stats.attach(stage.engine);
+  runtime.lighting.radiance.set([1.25, 1.12, 0.95, 0.2]);
+  Tonemap.attach(stage.engine, {curve: 'acescg', exposure: 0.15, contrast: 1.12});
+  const span = Math.max(model.bounds[3] - model.bounds[0], model.bounds[5] - model.bounds[2]);
+  Shadows.attach(stage.engine, {resolution: 1024, distance: span * 2, casterMargin: span, lightSize: 0.05, normalBias: 0.01}).add(model);
+  Stats.attach(stage.engine, {profiling: new URLSearchParams(location.search).has('profile')});  // ?profile shows GPU time
 
   const controls = OrbitControls.attach(stage.engine);
   controls.enableDamping = true;
