@@ -716,6 +716,20 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       chunked loading, GPU culling for core-mesh-like parts) and a plan for core's 100,000-entity cap (raising it is a
       core change: measure memory/bytes, Scott decides).
    The Biome reformat (1g.e/1h.d) moves to just before the final-phase demo rebuild, when no agents are landing code.
+5h. Production-readiness additions (Scott, 2026-10-14 night; existing pieces checked against the repo):
+   a. [running] Offline asset cache: IndexedDB cache for GLB/.bin/textures/STEP behind the loaders (opt-in entry),
+      versioning + cache-busting (ETag/Last-Modified or explicit version), quota handling and eviction, works with the
+      worker and progressive paths; offline CAD inspection test. Only the LOD imposter cache exists today.
+   b. [running] CAD navigation profiles: one-call presets (SolidWorks, AutoCAD, Blender, Maya, Onshape, three.js
+      OrbitControls) mapping mouse buttons/modifiers/wheel/touch/gamepad to orbit/pan/zoom/roll for
+      `@margoengine/controls` and core CADCameraControls (via `@margoengine/input` where it fits). input already has
+      semantic keyboard/pointer/gamepad/touch actions.
+   c. Wide colour gamut: Display P3 canvas as a zero-core-byte plugin (like TransparentCanvas: reconfigure the context
+      with `colorSpace: 'display-p3'`), tonemap output in P3 where the display supports it, sRGB fallback; prove sRGB
+      output unchanged. tonemap already has AgX / ACES / Khronos PBR Neutral.
+   d. Frame debugger: extend `@margoengine/inspector` (it already has hierarchy, live properties, wireframe/normal/
+      bounds overlays; stats has GPU timestamps) with a frame capture: draw calls, pipelines, bind groups, per-pass GPU
+      time, GPU memory by buffer/texture, texture budget vs the 16-binding limit.
 6. Then give Scott the full list of what was done and what remains.
 
 Worker practice: agents run in git worktrees; they must start with `git reset --hard perf/auto-quality` (worktrees
