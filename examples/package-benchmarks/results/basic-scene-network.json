@@ -1,0 +1,136 @@
+{
+  "commit": "5a7bbc2",
+  "dirty": false,
+  "browser": "msedge 155.0.4283.45 headless",
+  "adapter": "intel xe-2lpg",
+  "method": "Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults",
+  "files": [
+    {
+      "path": "index.html",
+      "role": "Page",
+      "encoding": "identity",
+      "transferred": 794,
+      "raw": 544,
+      "gzip": 366,
+      "brotli": 221
+    },
+    {
+      "path": "assets/geometry-CAWt7Gfm.js",
+      "role": "Shared chunk",
+      "encoding": "gzip",
+      "transferred": 1386,
+      "raw": 2036,
+      "gzip": 1016,
+      "brotli": 938
+    },
+    {
+      "path": "assets/index-QhoK_j53.js",
+      "role": "Entry: core + stage + app",
+      "encoding": "gzip",
+      "transferred": 20945,
+      "raw": 47732,
+      "gzip": 20564,
+      "brotli": 18100
+    },
+    {
+      "path": "assets/extension-DuYhGmhk.js",
+      "role": "Shared chunk",
+      "encoding": "identity",
+      "transferred": 359,
+      "raw": 40,
+      "gzip": 54,
+      "brotli": 44
+    },
+    {
+      "path": "assets/dist-DcjsiO5S.js",
+      "role": "@margoengine/gltf (app.load)",
+      "encoding": "gzip",
+      "transferred": 4938,
+      "raw": 11018,
+      "gzip": 4566,
+      "brotli": 4112
+    },
+    {
+      "path": "model.glb",
+      "role": "Model",
+      "encoding": "identity",
+      "transferred": 1605,
+      "raw": 1332,
+      "gzip": 454,
+      "brotli": 359
+    }
+  ],
+  "total": {
+    "requests": 6,
+    "transferred": 30027,
+    "raw": 62702,
+    "gzip": 27020,
+    "brotli": 23774
+  },
+  "notFetched": [
+    {
+      "path": "assets/cad-DWWqONoM.js",
+      "raw": 53
+    },
+    {
+      "path": "assets/cad-oHFfJiqr-BSSFtnhp.js",
+      "raw": 15869
+    },
+    {
+      "path": "assets/cad-runtime-BArR6b80.js",
+      "raw": 14544
+    },
+    {
+      "path": "assets/dist-B7j0oayJ.js",
+      "raw": 44
+    },
+    {
+      "path": "assets/dist-BpmbhS3V.js",
+      "raw": 17326
+    },
+    {
+      "path": "assets/dist-D-tk8Hn9.js",
+      "raw": 61317
+    },
+    {
+      "path": "assets/dist-i9Xm5CHM.js",
+      "raw": 39985
+    },
+    {
+      "path": "assets/dist-kGK5YhPx.js",
+      "raw": 47987
+    },
+    {
+      "path": "assets/occt-import-js-BhHfLpto.wasm",
+      "raw": 7604031
+    },
+    {
+      "path": "assets/occt-import-js-DJfTYCMO.js",
+      "raw": 97826
+    },
+    {
+      "path": "assets/particles-ClULJ_3y.js",
+      "raw": 55
+    },
+    {
+      "path": "assets/particles-CPc9lTku.js",
+      "raw": 21105
+    },
+    {
+      "path": "assets/post-lLwaL63B.js",
+      "raw": 52
+    },
+    {
+      "path": "assets/post-qR_TNX4W.js",
+      "raw": 16577
+    },
+    {
+      "path": "assets/sky-B7j0oayJ.js",
+      "raw": 44
+    },
+    {
+      "path": "assets/sky-CYmnUrWD.js",
+      "raw": 15720
+    }
+  ]
+}

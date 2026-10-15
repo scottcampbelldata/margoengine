@@ -1,6 +1,6 @@
 {
- "date": "2026-10-15T18:06:03.157Z",
- "commit": "1f11e86+changes",
+ "date": "2026-10-15T18:36:51.635Z",
+ "commit": "5a7bbc2+changes",
  "override": null,
  "pages": [
   {
@@ -18,37 +18,37 @@
      "gltf-pro worker": {
       "ok": true,
       "detail": "flight-helmet-mobile.glb",
-      "ms": 757
+      "ms": 207
      },
      "draco worker": {
       "ok": true,
       "detail": 24,
-      "ms": 72
+      "ms": 68
      },
      "ktx2 worker": {
       "ok": true,
       "detail": "2048x2048 rgba8unorm",
-      "ms": 212
+      "ms": 317
      },
      "bvh worker": {
       "ok": true,
       "detail": "built",
-      "ms": 22
+      "ms": 677
      },
      "post stack": {
       "ok": true,
       "detail": "SSAO + Bloom + FXAA",
-      "ms": 3
+      "ms": 2
      },
      "overlays": {
       "ok": true,
       "detail": "Stats, HTML labels, ViewCube, Inspector",
-      "ms": 10
+      "ms": 11
      },
      "machinery STEP": {
       "ok": true,
       "detail": 1,
-      "ms": 462
+      "ms": 574
      }
     }
    },
