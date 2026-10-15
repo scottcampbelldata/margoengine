@@ -134,7 +134,8 @@ export class GLTFAsset {
     if (type && def.type !== type) throw new TypeError('Invalid glTF accessor type');
     const cached = this.cache.get(index); if (cached) return cached;
     const size = componentSizes[def.componentType], width = components[def.type], count = integer(def.count, 'accessor count', 1);
-    if (!size || !width || count > 1_000_000 || def.normalized !== undefined && typeof def.normalized !== 'boolean' || def.normalized && [5125,5126].includes(def.componentType)) throw new TypeError('Unsupported glTF accessor');
+    // No per-accessor element cap: budget() bounds the decoded size (large CAD meshes exceed 1M indices).
+    if (!size || !width || def.normalized !== undefined && typeof def.normalized !== 'boolean' || def.normalized && [5125,5126].includes(def.componentType)) throw new TypeError(`Unsupported glTF accessor ${index} (componentType ${def.componentType}, type ${def.type}${def.normalized ? ', normalized' : ''})`);
     this.budget(count * width * 4);
     const output = new Float32Array(count * width);
     // Element i lands at row i, or at row ids[i] for sparse values.

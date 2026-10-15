@@ -790,7 +790,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       localhost 766 / 656 / 319 ms, Wi-Fi 20,102 / 20,115 / 414 ms. DevTools offline (context.setOffline): both load
       from the cache (237 / 274 ms) with identical geometry digest and byte-identical frame, and a Web Worker reads
       the identical file (SHA-256) from the cache while offline. The 62 MB conveyor GLB is not loadable by gltf-pro at
-      all ("Unsupported glTF accessor", also with plain fetch) - separate issue. Limits: no Vary; cross-origin ETag
+      all ("Unsupported glTF accessor", also with plain fetch) - separate issue (fixed in 5l.p). Limits: no Vary; cross-origin ETag
       needs Access-Control-Expose-Headers; a cold range miss costs range bytes + whole file; `@margoengine/gltf` (light
       loader) has no `fetch` option (size-gated with core).
    b. [DONE, branch worktree-agent-a97e430da9ad32b46] CAD navigation profiles: `OrbitControls.attach(engine)
@@ -906,9 +906,24 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       `'unsafe-eval'`) - load them as module/classic workers or wrap them so the strict page CSP covers everything;
       occt-import-js uses `new Function` (third party: document, or wrap); the site build copies the 7.6 MB OCCT .wasm
       and CAD code into every demo folder though no demo imports STEP (deploy size only) - stop copying it.
-   p. [running] gltf-pro fails on the 62 MB conveyor GLB ("Unsupported glTF accessor", also without the cache) -
-      find the accessor type/normalization it rejects and support it (or reject with a precise error), test with that
-      file and a generated minimal case.
+   p. [DONE] gltf-pro failed on the 62 MB conveyor GLB ("Unsupported glTF accessor", also without the cache). Cause:
+      not a format feature - `GLTFAsset.accessor` capped every accessor at 1,000,000 elements, and two uint32 index
+      accessors are larger (174: 1,021,494 for mesh 66 "Mesh_16"; 487: 1,480,944 for mesh 171 "Mesh_15"). The file is
+      otherwise plain (float POSITION/NORMAL, one float TEXCOORD_0, uint16/uint32 indices; no normalized, sparse,
+      byteStride or extensions). Khronos glTF-Validator 2.0.0-dev.3.10: 0 errors, 0 warnings, 4 infos (an unused
+      TEXCOORD_0, 3 empty nodes). Fix (asset.ts/pack.ts only): the element cap is gone (the 256 MB decoded budget bounds
+      accessors); vertices stay capped at 1M per primitive in packPrimitive (vertex buffers are also bound as storage,
+      and indices pass through Float32), matching validatePreparedGeometry on the worker path. Errors now name mesh,
+      primitive, attribute and accessor, e.g. `glTF mesh 0 "part" primitive 0: COLOR_0 (accessor 1): Unsupported glTF
+      accessor 1 (componentType 5126, type MAT3)`; gltf-pro.proof.js compares error class + baseline text contained.
+      Tests: packages/gltf-pro/tests/accessors.test.js (generated GLBs: 1,000,002 uint32 indices decode exactly on
+      both paths; >1M vertices still refused; located message) plus the real conveyor file (skipped when only the LFS
+      pointer is checked out): 570 primitives, 2,445,355 triangles, main thread == worker byte for byte. Real browser
+      (Edge, Arc 140V): loadGLTF 8.7 s, loadGLTFInWorker 5.0 s, through @margoengine/cache 4.3 s, same geometry digest,
+      no GPU errors. gltf-pro +236 B gzip (root entry), +221 B (/worker). Follow-ups: the file is 65.1 MB of the 64 MiB
+      (67.1 MB) download budget, so a slightly larger export will fail "glTF download byte budget exceeded"; the
+      main-thread path packs a mesh once per node that uses it (570 packs for 242 meshes, ~220 MB instead of ~166 MB),
+      the worker path packs each once.
    q. Game-developer gaps from the Blender guide (2eb78b9): a helper that collects a model's world-space triangles
       (for physics colliders and navmeshes); physics bodies on non-root meshes; water refraction can't combine with
       SSAO (needs a scene texture from PostStack); camera rig avoids walls, not just terrain; audio listener on
