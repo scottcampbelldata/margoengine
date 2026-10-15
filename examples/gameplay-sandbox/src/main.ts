@@ -19,7 +19,7 @@ import {Clustered} from '@margoengine/clustered';
 import {createCharacter, createLandscape, terrainHeight} from './scene.js';
 import {stepLocomotion, type LocomotionOptions} from '@margoengine/controls';
 import {createProceduralSettlement} from './procedural/index.js';
-import {applyQualityTier, paceEngine, qualityPreset, sceneSamples, watchQuality} from '@margoengine/quality';
+import {applyQualityTier, paceEngine, qualityPreset, redrawAfterRestore, sceneSamples, watchQuality} from '@margoengine/quality';
 import './style.css';
 
 // Before any engine exists: core reads the tier when it builds pipelines and sizes the canvas.
@@ -96,6 +96,7 @@ async function boot(): Promise<void> {
     });
     const stats = Stats.attach(engine, {parent: element('telemetry'), samples: 120, profiling: new URLSearchParams(location.search).has('gpuTiming')});
     const renderStill = () => {if (!playing) engine.render({delta: 0});};
+    redrawAfterRestore(engine, renderStill); // paused, the world draws on demand; a restored GPU device starts empty
     sunSlider.addEventListener('input', () => {sky.options.hours = sunSlider.valueAsNumber; renderStill();}, {signal});
     waveSlider.addEventListener('input', () => {water.setWaveHeight(waveSlider.valueAsNumber); element<HTMLOutputElement>('wave-value').value = `${waveSlider.valueAsNumber.toFixed(2)} m`; renderStill();}, {signal});
     countSelect.addEventListener('change', () => {if (details) selectParticles(Number(countSelect.value)); renderStill();}, {signal});

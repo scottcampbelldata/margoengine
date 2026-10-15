@@ -9,7 +9,7 @@ import {bruneton} from '@margoengine/sky/bruneton';
 import {clouds} from '@margoengine/sky/clouds';
 import {lighting} from '@margoengine/sky/lighting';
 import {sceneSamples} from '../packages/shared/quality.js';
-import {applyQualityTier, paceEngine, watchQuality} from '@margoengine/quality';
+import {applyQualityTier, paceEngine, redrawAfterRestore, watchQuality} from '@margoengine/quality';
 applyQualityTier();
 
 const error=document.querySelector<HTMLElement>('#error')!,status=document.querySelector<HTMLElement>('#status')!;
@@ -65,6 +65,7 @@ try {
   button.addEventListener('click',()=>{paused=!paused;motion();},{signal:abort.signal});
   reduced.addEventListener('change',()=>{paused=reduced.matches;motion();},{signal:abort.signal});
   controls.addEventListener('change',()=>{if(paused)render();});
+  redrawAfterRestore(stage.engine,()=>{if(paused)render();}); // paused, the meadow draws on demand; a restored GPU device starts empty
   document.querySelector<HTMLButtonElement>('#reset-view')!.addEventListener('click',()=>{controls.reset();render();},{signal:abort.signal});
   stage.canvas.addEventListener('keydown',event=>{
     if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','-'].includes(event.key))return;event.preventDefault();

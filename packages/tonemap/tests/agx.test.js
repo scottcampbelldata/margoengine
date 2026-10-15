@@ -47,6 +47,8 @@ test('AgX matrices are the Rec.709/Rec.2020 conversions and the AgX inset/outset
   for (const m of [inset, outset, rec709To2020]) m.forEach(row => assert.ok(Math.abs(row[0] + row[1] + row[2] - 1) < 1e-12, 'white stays white'));
   assert.match(agxShader, /\+12\.47393\)\/16\.5/); // log2(0.18) - 10 = -12.473931, 16.5 stops
   assert.ok(Math.abs(Math.log2(0.18) - 10 + 12.47393) < 1e-5);
+  // The WGSL is only compiled on a GPU: an unbalanced statement (an extra '(' once broke Bloom and Tonemap) fails here.
+  for (const statement of agxShader.split(';')) assert.equal(statement.split('(').length, statement.split(')').length, 'unbalanced parentheses: ' + statement.trim());
 });
 
 test('AgX shader parentheses balance (WGSL rejects the whole module otherwise)', () => {

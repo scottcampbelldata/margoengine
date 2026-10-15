@@ -990,12 +990,49 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       island light 1432x768 100k particles, presets off/on: 60.05/59.9 FPS, GPU span p50 10.33/10.16 ms (same config,
       A/A); DOF demo light 1100x461: 60/60 FPS, submit-to-done p50 5.3 ms (maxRadius 16) / 5.6 ms (8). Both hold 60 on
       the light tier with headroom. Not measured: the other demos on the light tier, a quiet-machine rerun.
-   c. Pipeline pre-warming: core already compiles async; sections/fog have `enabled:false`. Add a general
-      `warmUp(engine)` (async pipeline creation for every attached feature during loading) and measure first-use
-      hitches per feature before/after.
-   d. Device-loss verification: core handles `device.lost` with automatic recovery and 55 package files implement
-      restore hooks. Add an end-to-end browser test that destroys the device mid-frame in every demo and checks the
-      frame returns (visual-regression compare after restore); fix any package that doesn't come back.
+   c. [DONE 2026-10-15] Pipeline pre-warming: `warmUp(engine)` in `@margoengine/quality/warm` (new subpath; no package
+      reads it, so zero cost unless imported; core untouched). Features create pipelines lazily inside their passes, so
+      warmUp renders warm frames (delta 0) into an offscreen texture (nothing presented): the device's sync
+      `createRenderPipeline`/`createComputePipeline` are patched for those frames only; a missing pipeline stops the
+      frame (exception out of the create call), the work the stopped frame already encoded is submitted (else one-time
+      work - sky LUTs, static shadow casters - stays marked done but never ran: first version, shadows/sky images
+      differed), the pipeline compiles with the `*Async` API, and the retry gets it (keyed by descriptor, shader modules
+      by code). A feature that stores state before creating its pipeline fails on the retry -> warmUp restores the device
+      (`rebootDevice`, every restore hook) and finishes synchronously (`report.rebooted`); DOF did this until its resize
+      early-return also required `presentPipeline` (call-identical: post-stack and color-output proofs identical). It
+      resolves after `onSubmittedWorkDone`, so pipelines made synchronously at attach (GrassField) are absorbed too.
+      Measured (`node examples/package-benchmarks/warm-up-gpu.mjs --runs=3`, JSON `results/warm-up-gpu.json`; fresh
+      browser per sample = cold shader cache; helmet + floor 1280x720, default 4x tier; feature attached after 40 steady
+      frames; frame = render() to onSubmittedWorkDone; medians of 3; Edge 155, Arc 140V, AC; DIAGNOSTIC: the committed
+      run's quiet gate timed out at 32% CPU with other agents running; an earlier run of the same code minus the final
+      onSubmittedWorkDone line passed the gate (16% CPU) and matched within ~20%). First visible frame that draws the
+      feature, cold -> after warmUp (steady frame): SSAO 413 -> 9.1 ms (10.1), Bloom 184 -> 4.9 (5.7), DOF 276 -> 7.8
+      (7.5), Tonemap 146 -> 5.1 (4.9), Shadows 325 -> 9.8 (8.1), Sky (bruneton+clouds+lighting) 285 -> 4.0 (5.1),
+      Grass 222 -> 4.9 (5.0). warmUp itself (during loading): 660 / 236 / 347 / 177 / 407 / 278 / 219 ms; 9/5/5/5/4/1/0
+      pipelines made async, 0 fallbacks, 0 reboots; final image identical to the cold run (max diff 0) for all seven.
+      Grass makes its pipelines at attach, so its 219 ms is waited out, not parallelised. Sizes (entry-sizes method):
+      `@margoengine/quality/warm` 2,586 B min / 1,257 B gzip (new); quality `.` 2,747/1,464 -> 2,980/1,564 (+100 gzip,
+      `redrawAfterRestore`, 5i.d); core + stage untouched: 19,928 gzip at this commit. Unit tests `packages/quality/test/warm.test.js`.
+      Limits: a feature attached later or `enabled = false` is not warmed (call warmUp again); a feature that swallows
+      exceptions around pipeline creation may misbehave; demos do not call warmUp yet (measured on a harness page).
+   d. [DONE 2026-10-15] Device-loss verification: `npm run visual:device-loss` (`scripts/visual-regression.js
+      --device-loss`; site demos only, one run; GPU lock + AC as visual:check). After the normal capture an init script
+      destroys every GPUDevice the page made at the start of its next render pass (mid-frame); a demo that draws no
+      frame within 2 s (paused under reduced motion) is hit while idle. Passes when a device made after the loss has
+      submitted work and the capture matches the pre-loss capture within the view's manifest tolerance (bit-exact
+      allowance if none). Result (Edge 155, Arc 140V, AC, commit 11b22e6): 24/24 views pass - night-citadel x3,
+      gameplay-sandbox x3, character-animation x3, robot-expressive (high), flight-helmet x3, windy-meadow x3, earth x3,
+      dof x3, tonemap x2; 18 bit-identical after restore, citadel (max diff 12-67, within its noise tolerance) and
+      sandbox (particles; changed 1.2-5.2% vs limits 4-16%). Fixed: (1) on-demand rendering - windy-meadow and the
+      sandbox, paused, never drew after the restore (empty canvas): new `redrawAfterRestore(engine, render)` in
+      `@margoengine/quality` renders the two frames after each restore (water refraction/sky reflection read the previous
+      frame: with one frame the sandbox water differed by 30%); (2) found on the way, not device loss: `packages/shared/
+      agx.js` (eaddd64) had an extra `(` in the AgX curve, so Bloom's and Tonemap's AgX pipelines were invalid and
+      night-citadel/windy-meadow never became ready, character-animation/earth/tonemap stopped rendering; fixed, plus a
+      parenthesis-balance check in `packages/tonemap/tests/agx.test.js`. AgX visual baselines need a `visual:update`
+      after the eaddd64 re-derivation if visual:check flags them (not run here). Also: visual-regression's default views
+      no longer include the Khronos-only `model` view for site demos (it made `<demo>-model` cases with no baseline).
+      Not covered: a real driver reset / GPU switch (launch gate 3's Mac check), XR and the Khronos gallery.
 5j. [DONE 2026-10-15: `docs/limits.md`, 18 rows in four tables (Scale, Rendering, Assets, Platform), each with an
    enforced/measured/"not measured" threshold, the reason, the exact error string from source and the escape hatch with
    its proof link; linked from README, docs/README.md, the site's "Where it stands" (GitHub link; the site build ships
@@ -1769,6 +1806,7 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    and type-check with no missing peers (`scripts/modern-package-tests.js` passes).
 3. **Device loss survives.** 5i.d end-to-end test passes on every demo (device destroyed mid-frame -> scene back,
    visual compare); plus a manual check on a Mac (unplug a monitor / switch GPU) if Scott can.
+   Status 2026-10-15: automated part passes, 24/24 views (`npm run visual:device-loss`, 5i.d); Mac check open.
 4. **Bundle transparency.** A sizes page (treemap or table) generated from `entry-sizes.json`: every package and entry
    (min+gzip), plus every lazily fetched file (workers, Rapier Wasm, OCCT Wasm, Draco/Basis decoders) and WHEN each
    loads. A test proves a basic glTF scene fetches only the expected files. Core+stage figure from
