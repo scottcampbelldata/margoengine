@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
-  "description": "Orbit, map, trackball, fly, first-person, pointer-lock camera controls, a transform gizmo and drag controls for Margo Engine.",
+  "description": "Orbit, map, trackball, fly, first-person, pointer-lock and collision-aware walkthrough (/walk) camera controls, a transform gizmo and drag controls for Margo Engine.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
@@ -16,6 +16,7 @@
     "build": "node scripts/build.js",
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
+    "test:browser:walk": "npm run build && node scripts/test-walk-browser.js",
     "size": "npm run build && node scripts/size.js",
     "prepack": "npm run build"
   },
@@ -24,6 +25,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./walk": {
+      "types": "./dist/walk.d.ts",
+      "import": "./dist/walk.js"
     }
   },
   "files": [

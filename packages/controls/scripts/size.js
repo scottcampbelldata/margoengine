@@ -10,15 +10,17 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const temp = resolve(root, 'test-results/size');
 await mkdir(temp, {recursive: true});
 const entries = {'dist/index.js (everything)': null, OrbitControls: 'OrbitControls', 'OrbitControls + SOLIDWORKS': 'OrbitControls, SOLIDWORKS', 'OrbitControls + PROFILES': 'OrbitControls, PROFILES', MapControls: 'MapControls', TrackballControls: 'TrackballControls',
-  FlyControls: 'FlyControls', FirstPersonControls: 'FirstPersonControls', PointerLockControls: 'PointerLockControls', TransformControls: 'TransformControls', DragControls: 'DragControls'};
+  FlyControls: 'FlyControls', FirstPersonControls: 'FirstPersonControls', PointerLockControls: 'PointerLockControls', TransformControls: 'TransformControls', DragControls: 'DragControls',
+  // `name@entry`: from another package entry; `+bvh` also bundles the @margoengine/bvh code it uses (an app without bvh yet).
+  'WalkControls (/walk)': 'WalkControls@walk', 'WalkControls (/walk) + bvh': 'WalkControls@walk+bvh'};
 const rows = [];
 for (const [label, name] of Object.entries(entries)) {
-  const entry = resolve(temp, `${label.replace(/\W+/g, '-')}.js`);
-  await writeFile(entry, name ? `export {${name}} from '../../dist/index.js';\n` : `export * from '../../dist/index.js';\n`);
+  const entry = resolve(temp, `${label.replace(/\W+/g, '-')}.js`), [exported, file = 'index'] = name?.split('@') ?? [], bvh = file.endsWith('+bvh');
+  await writeFile(entry, name ? `export {${exported}} from '../../dist/${file.replace('+bvh', '')}.js';\n` : `export * from '../../dist/index.js';\n`);
   const output = await build({
     root, configFile: false, publicDir: false, logLevel: 'silent',
     build: {write: false, minify: false, target: 'es2022', lib: {entry, formats: ['es'], fileName: 'bundle'},
-      rollupOptions: {external: ['@margoengine/core', '@margoengine/core/extension', '@margoengine/bvh']}},
+      rollupOptions: {external: ['@margoengine/core', '@margoengine/core/extension', ...bvh ? [] : ['@margoengine/bvh']]}},
   });
   const code = (Array.isArray(output) ? output[0] : output).output.find(chunk => chunk.type === 'chunk').code;
   // Vite keeps whitespace in ES library builds, so minify separately with the oxc minifier rolldown ships.

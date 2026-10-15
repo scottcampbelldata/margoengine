@@ -11,7 +11,8 @@ await build({
   root, configFile: false, publicDir: false, logLevel: 'warn',
   build: {
     outDir: resolve(root, 'dist'), emptyOutDir: true, target: 'es2022',
-    lib: {entry: resolve(root, 'src/index.ts'), formats: ['es'], fileName: 'index'},
+    // One file per package.json export; modules both entries use (Controls, OrbitControls) become shared chunks.
+    lib: {entry: {index: resolve(root, 'src/index.ts'), walk: resolve(root, 'src/walk.ts')}, formats: ['es'], fileName: (_, name) => `${name}.js`},
     rollupOptions: {external: ['@margoengine/core', '@margoengine/core/extension', '@margoengine/bvh']},
   },
 });

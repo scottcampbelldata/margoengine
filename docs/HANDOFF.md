@@ -1120,6 +1120,34 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       held by down-rays, step height (~0.19 m) for stairs, slope limit, capsule-style wall/counter/glass collision,
       WASD + mouse look, mobile virtual thumbstick + drag-look, smooth (no teleport), and a toggle to an orbit
       "dollhouse" view. Use `@margoengine/bvh` (Raycaster) for collision.
+      (4) [DONE] `WalkControls` in a new entry `@margoengine/controls/walk` (`packages/controls/src/walk.ts`; zero bytes
+      unless that entry is imported; controls already peers on bvh and owns OrbitControls, which the dollhouse uses, so
+      no new package). Collision runs on the Raycaster's own cached trees (`getGeometryBVH`/`getPrimitiveBVH`: core
+      meshes, gltf-pro and materials models, instanced primitives, hidden meshes skipped) with one world-box broadphase
+      per frame and allocation-free tree walks, not `Raycaster.intersect*` per ray (sorted all-hit lists, a scan of every
+      object per ray). Floor: 9 vertical rays per sub-step (centre + ring at 0.9 r) in one tree pass, highest walkable
+      hit within `stepHeight` (0.19), eased eye (1.65); falls land only on floors crossed. Walls: capsule from
+      stepHeight to head, exact segment-triangle closest points, horizontal push-out, sub-steps <= r/2 (no tunnelling).
+      Slope limit, gravity + jump (off by default), crouch with headroom check, WASD/arrows, pointer-lock or drag look,
+      first gamepad, touch floating thumbstick (left half, drawn) + drag-look (right half), `axes` for
+      @margoengine/input; dollhouse: eased yaw/pitch/distance transition to an OrbitControls view of the bounds and back
+      to the exact pose, orthographic through a CameraProjection, saved pose follows a FloatingOrigin rebase.
+      Tests: `packages/controls/tests/walk.test.js` (10 tests, generated geometry incl. `tests/house.js`, a two-storey
+      house with 16 stairs, deck with gaps, rug, counter, glass pane). Real browser: `npm run test:browser:walk
+      --workspace packages/controls` under the GPU lock (Edge 155, Arc 140V, AC): walked the house with the real W key in
+      2,176 frames, worst capsule clearance 0.292 m (r 0.25), largest eye change 2 cm/frame, dollhouse out and back,
+      phone viewport thumbstick 2.16 m in 1.5 s and drag-look 0.200 rad, 0 WebGPU errors; update() median 0.1 ms, max
+      0.9 ms at the browser's timer resolution. Sizes (`examples/package-benchmarks/walk-size.mjs` ->
+      results/walk-size.json): WalkControls 11,985 B min+gzip incl. OrbitControls, 21,844 B incl. the bvh code;
+      `Physics` 8,057 B + rapier3d-compat 0.21.0 `rapier.mjs` 1,645,573 B gzip (4,340,292 raw, Wasm inlined as
+      base64; the bare Wasm is 3,082,103 raw / 1,176,707 gzip). CPU (`walk-cpu.mjs` -> results/walk-cpu.json, Node 24, one thread,
+      quiet gate passed at 20% CPU with other agents running, so diagnostic): warm update() median / p99 / max
+      0.010 / 0.17 / 0.50 ms on the house, 0.033 / 0.21 / 0.65 ms on a 16-house block (912 meshes), 0.033 / 0.23 /
+      0.90 ms on the conveyor GLB (570 primitives, 2.45M triangles); cold first-touch frames up to 57 ms there
+      (synchronous BVH builds). Not done: a roof-hiding "cutaway" dollhouse (apps hide roof meshes; hidden meshes
+      don't collide), moving platforms. Limits (README): static
+      levels (last frame's matrices, no moving platforms), bind-pose skinned meshes, ring can lift the eye
+      0.9 r tan(slope) on slopes, first-touch BVH builds are synchronous (prebuild with computePrimitiveBVHAsync).
    u. ArchViz / real-estate walkthrough showcase (Scott, 2026-10-15): a demo for the final-phase rebuild - a modern
       house GLB loaded with progressive streaming, walk mode with the (t.4) controller, dollhouse orbit toggle,
       environment lighting + shadows (check whether gltf-pro supports lightmaps on a second UV set; queue it if not),
@@ -1214,7 +1242,8 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
         level via extras, physics jump/gravity, third-person camera, audio), with a matching runnable example.
       - Cookbook (how-to) starter set: resize/DPR, device loss, colliders from a glTF hierarchy, switching controls,
         strict CSP deploy (docs/deploying.md), quality tiers, transparency (OIT), large coordinates, STEP pre-conversion,
-        mobile-first architectural walkthrough in ~50 lines (5l.u).
+        mobile-first architectural walkthrough in ~50 lines (5l.u) [DRAFT: docs/guides/walkthrough.md, snippet
+        type-checked; uses a placeholder `/assets/house.glb` until 5l.u picks the house].
       - API reference auto-generated from TSDoc (depends on the hygiene gate 5k item 6), published on the site.
    b. Live-editable examples: an "Edit" button on every docs example (StackBlitz/CodeSandbox once packages are on
       npm, or our own playground that loads the local build), so readers change numbers and see the canvas update.
