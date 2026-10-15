@@ -803,6 +803,11 @@ Second set (2026-10-14, evening), all APPROVED by Scott:
 - Result (Scott, 2026-10-14 late): material setters TAKEN at +34 B (core+stage 19,577); transparent canvas as a
   ZERO-core-byte optional plugin, not core (the +39 B core version stays unmerged on `scratch/core-transparent-canvas`).
 - Multiple directional lights stay OUT of core (belongs in `@margoengine/clustered`).
+- Back-face culling REVISED (Scott, 2026-10-14 night): APPROVED option B in core, +212 B (core+stage ~19,789; the
+  19,600 working target moves to ~19,800): a second, back-culled pipeline per geometry batch, used only when every
+  instance in the batch is single-sided and unmirrored; pixel-identical; `scratch/bvt-core-cull-bytes` (b3514f3).
+  Evidence: docs/whitepaper/boxes-vs-threejs.md (the shader `discard` disables early depth; 40-56% of single-sided
+  GPU time). Earlier note kept for history:
 - Back-face culling: SKIPPED for core (Scott agreed, 2026-10-14). Measured on `scratch/core-backface-cull`
   (+315 B -> 19,858; 50k CAD 15.6 -> 13.7 ms GPU, noisy; 16 full-screen layers 11.9 -> 4.7 ms). CAD files often have
   open shells, mirrored parts and section cuts; pipeline-level culling stays a leaf-package option for closed solids.
