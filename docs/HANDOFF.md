@@ -879,6 +879,10 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       size): give `CulledInstances` the culled pipeline (cullMode back, no discard) and a bulk transform upload (10k
       moving boxes cost 187 ms CPU: one 64 B write per setTransform); profile `createInstancedMesh`'s GPU time vs three
       (gltf-pro shader + ACES vs three's) and close what's package-side. Re-measure with the vs-threejs harness pairs.
+   o. CSP follow-ups (from 1a36f67): the decoders worker runs Draco/Basis glue through `eval` (needs per-file
+      `'unsafe-eval'`) - load them as module/classic workers or wrap them so the strict page CSP covers everything;
+      occt-import-js uses `new Function` (third party: document, or wrap); the site build copies the 7.6 MB OCCT .wasm
+      and CAD code into every demo folder though no demo imports STEP (deploy size only) - stop copying it.
    m. docs/threejs-parity.md summary counts drifted (OIT added a COVERED row without updating the totals) - recount.
    Order: after the current wave, alongside the hygiene phase (5k) and under its gates, before the demo rebuild.
 5m. CORE APPROVALS, conditional (Scott, 2026-10-14 night): do both IF core+stage stays under 20,000 B gzip
