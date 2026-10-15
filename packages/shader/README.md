@@ -65,6 +65,31 @@ ComputePass.attach(stage.engine, n, i => {
 
 The compiler hash-conses the graph, so equal subexpressions built separately (three calls to `uv().y`) become one `let`; nodes not reachable from an output, unused uniforms and unused textures are never emitted. Output text depends only on the graph, so equal graphs give equal shaders and pipelines cache; uniform values live in a buffer, so changing them never recompiles. `material.fragmentCode`, `material.vertexCode`, `pass.code()` and `computePass.code` show the generated WGSL; `test/snapshots` holds examples.
 
+## Noise (`@margoengine/shader/noise`, +2.0 kB min+gzip over the root entry)
+
+```ts
+import {createStage} from 'margoengine';
+import {createMesh} from '@margoengine/materials';
+import {planeGeometry} from '@margoengine/geometry';
+import {NodeMaterial, positionLocal, normalLocal, uniform} from '@margoengine/shader';
+import {simplex2, simplex3, perlin3, fbm, ridged, domainWarp} from '@margoengine/shader/noise';
+const stage = await createStage('#app');
+const p = positionLocal.xy.mul(0.4);
+const height = ridged(q => simplex2(q, 42), p, {octaves: 5});                            // GPU terrain, seed 42
+const clouds = domainWarp(q => fbm(r => simplex3(r, 7), q), positionLocal, {strength: 0.6});
+const seed = uniform(3, {type: 'u32', name: 'seed'});                                     // perlin3 reseeds live
+const material = new NodeMaterial({positionNode: positionLocal.add(normalLocal.mul(height)), emissiveNode: perlin3(positionLocal, seed).abs().xxx.mul(clouds)});
+createMesh(stage.engine, planeGeometry(10, 10, 128, 128), material);
+```
+
+WGSL twins of `@margoengine/procedural/noise`: `simplex2`/`simplex3` match `new Noise(seed).simplex2`/`.simplex`, `perlin3`
+matches `.perlin`, and `fbm`, `ridged`, `domainWarp` match the CPU combinators, so CPU code (physics, placement) can sample
+the same field the GPU displaces. Agreement is to float rounding, not bits (f32 on the GPU, f64 on the CPU), measured on a
+real adapter by `node packages/shader/test/noise-check.mjs` (under the GPU lock); on an Intel Arc 140V (Edge, 4096 points per field) the largest absolute difference was 2e-5 for single simplex and Perlin samples and 1.1e-4 for warped fBm (values span about [-1, 1]). Simplex seeds are compile-time
+(each seed's 256-byte permutation is a private array, declared once per shader); `perlin3` takes a u32 node, so a uniform
+reseeds without recompiling. Fractal sums unroll at graph build time (`octaves` 1..16). Not included: 4D simplex and
+Worley on the GPU. Example: `examples/noise.html` (terrain with CPU-placed markers resting on the GPU surface).
+
 ## Coming from TSL
 
 | three.js TSL | @margoengine/shader |

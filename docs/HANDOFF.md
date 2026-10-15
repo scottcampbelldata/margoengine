@@ -1215,13 +1215,51 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       without asking. Measure (don't assert) load time and memory on desktop and a real phone, with and without
       Rapier. Public copy states Margo's measured numbers; no competitor-bashing. Plus a cookbook recipe in item 8:
       "A mobile-first architectural walkthrough in ~50 lines".
-   v. Procedural generation (Scott, 2026-10-15; checked against source): WFC exists (`@margoengine/wfc`, seeded 3D
-      simple-tiled model) and `@margoengine/procedural` `Noise` has seeded 3D perlin/simplex/worley on the CPU (simplex
-      via the third-party `simplex-noise`). Add: (1) L-systems (grammars, stochastic/parametric rules, turtle ->
-      lines or tube geometry, for plants/branching); (2) Voronoi diagrams 2D/3D via Delaunay (cells, edges,
-      neighbours) + a mesh-fracture helper; (3) noise: fBm/ridged/domain-warp helpers, 2D/4D variants, WGSL noise nodes
-      in `@margoengine/shader` (GPU terrain/clouds), consider replacing `simplex-noise` with our own (bit-exact proof if
-      kept output); (4) WFC overlapping (sample-based) model. All optional, zero core bytes, tests + proofs.
+   v. [DONE 2026-10-15] Procedural generation. 0 core bytes (core + stage 19,922 gzip, unchanged); new subpath entries,
+      min+gzip with other packages external (entry-sizes.mjs method): `@margoengine/procedural/noise` 2,058,
+      `/lsystem` 2,198, `/voronoi` 4,770; `@margoengine/wfc/overlapping` 1,931; `@margoengine/shader/noise` +1,964 over
+      the shader root (4,497 standalone, it shares the node chunk). `@margoengine/procedural` now has NO third-party
+      runtime dependencies (Scott, 2026-10-15): root entry 4,976 -> 6,776 with npm deps external, but what an app ships
+      (deps bundled) 9,976 -> 6,776 (`proofs/procedural-deps.proof.js` -> `results/procedural-deps.json`). READMEs have a
+      section each; example pages
+      `packages/procedural/examples/{lsystem,voronoi}.html`, `packages/shader/examples/noise.html`,
+      `packages/wfc/examples/overlapping.html` (Vite at the repo root).
+      (1) L-systems (`procedural/src/lsystem.ts`): `expand` (seeded stochastic weights, parametric rules with conditions,
+      function successors, module budget), `interpret` (3D turtle: F/G f/g + - & ^ \ / | [ ] !; segments feed
+      `@margoengine/lines` directly), `tubes` (joint rings shared along same-depth continuations). Limits: no
+      context-sensitive rules, no expressions inside successor text, open tube ends.
+      (2) Voronoi (`procedural/src/voronoi.ts`): Bowyer-Watson `delaunay2`/`delaunay3` (cavity repair: a facet the point
+      does not strictly see drops its cell, so grids/co-circular input never overlap; duplicates skipped), `voronoi2`
+      (polygons, per-edge sites, unique edges) and `voronoi3` (convex cells, faces, face sites, volume) clipped from the
+      bounds by Delaunay-neighbour bisectors; `fractureMesh` (welds, clips by each cell plane, caps cuts with earcut
+      incl. holes; collinear cap points the triangulator drops are split back in, cut points on the plane are merged by
+      position, otherwise later cuts hit T-junctions). Checked: 240 fractures of box/icosphere/UV sphere/torus closed
+      (area-vector hole < 2e-6) with volume conserved to 2e-7. Limits: O(n^2) (scan all cells per insertion; walk is the
+      upgrade past ~20k points), closed input mesh, caps flat-normal without UVs, non-indexed chunks, CPU only.
+      (3) Noise: `procedural/src/noise.ts` holds `Noise` (moved from index, same API) with `simplex2`/`simplex`/
+      `simplex4`, plus `fbm`/`ridged`/`domainWarp`, `permutation`, `SIMPLEX_SCALE`. Own simplex written from Perlin 2001 /
+      Gustavson (rank ordering, kernel (0.5 - d^2)^4 in all dimensions, so seamless; scales fitted by sampling +
+      hill-climbing so |v| < 1). BREAKING (README): `Noise.simplex` values changed (simplex-noise's 0.6 3D kernel jumps
+      5.9e-3 across simplex faces; ours < 1e-6, `test/noise.test.js` checks faces, range, mean/deviation, determinism);
+      perlin/worley and the island preset unchanged. `simplex-noise` and `isosurface` removed from package.json and the
+      lockfile (offline). `marchingCubes` is now own marching tetrahedra (6 tets per cube along the main diagonal, shared
+      edge vertices, winding toward the outside corner): test checks closed + consistently wound + Euler characteristic
+      (sphere 2, torus 0) + volume within 2% + sane vertex count. Diagnostic speed vs the old deps (not quiet-gated): 3D
+      simplex ~0.9x, 64^3 sphere surface ~1.8x faster (skips cubes the surface misses). No demo calls `simplex` or
+      `marchingCubes` (the island uses perlin), so visual baselines are unaffected. WGSL twins in
+      `shader/src/noise.ts`: `simplex2`, `simplex3` (seed's permutation as a packed `var<private>` table, declared once
+      per shader), `perlin3` (seed may be a u32 node), unrolled `fbm`/`ridged`/`domainWarp`. Real-GPU CPU/GPU agreement:
+      `node scripts/gpu-lock.mjs run --owner=<id> -- node packages/shader/test/noise-check.mjs` (4096 points per field):
+      passed (msedge channel, adapter intel xe-2lpg = Arc 140V): max |GPU - CPU| simplex2 1.6e-5, simplex3 2.0e-5, perlin3 1.4e-6,
+      fbm3 1.9e-5, ridged2 3.7e-5, warp3 4.1e-5, warpFbm2 1.1e-4 (before the seamless kernel, warp3 jumped 2.7e-3 at a
+      lattice point). Correctness run, so not quiet-gated. Typing fix in shader `uniform`: `{type: 'u32'|'i32'}` now types as that uniform (was f32; 0 bytes).
+      The shader noise API report lists 27 unexported types and 1 `any`: all node.ts's own (Node/Builder/Emit), shared
+      with the root entry; for the 5k hygiene pass. Not done: GPU simplex4/Worley.
+      (4) WFC overlapping (`wfc/src/overlapping.ts`): N 2..5, symmetry 1..8, periodic input/output, AC-4 supporter counts,
+      chronological backtracking on a trail (undo + forbid the failed choice) with a per-attempt budget, then seeded
+      restarts, then a throw; hang-proof test runs an unsatisfiable case in a child process with a timeout. A 7 x 7 maze
+      sample (symmetry 1) fails 6/6 seeds without backtracking and solves 6/6 with it. Limits: <= 4096 patterns,
+      cells x patterns <= 4,194,304, O(cells) entropy scan per choice (heap is the upgrade past ~128 x 128), no pins.
    q. Game-developer gaps from the Blender guide (2eb78b9): a helper that collects a model's world-space triangles
       (for physics colliders and navmeshes); physics bodies on non-root meshes; water refraction can't combine with
       SSAO (needs a scene texture from PostStack); camera rig avoids walls, not just terrain; audio listener on

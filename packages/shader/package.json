@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./noise": {
+      "types": "./dist/noise.d.ts",
+      "import": "./dist/noise.js"
     }
   },
   "files": [

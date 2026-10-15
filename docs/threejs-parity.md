@@ -262,7 +262,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | Reflector, Refractor (planar mirror and glass) | MISSING | — | water does its own refraction. |
 | Water, Water2 add-ons | COVERED † | water `Water` (`packages/water/src/index.ts`) | Gerstner waves, shallow-water flow, foam and spray. |
 | Decals | MISSING | — | |
-| MarchingCubes add-on | COVERED † | procedural `marchingCubes` (`packages/procedural/src/`) | Uses the `isosurface` dependency. |
+| MarchingCubes add-on | COVERED † | procedural `marchingCubes` (`packages/procedural/src/`) | Own marching tetrahedra (closed indexed mesh, no dependency) behind the same `marchingCubes` call. |
 
 ### 18. Audio
 

@@ -1,0 +1,41 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Noise CPU/GPU agreement</title><style>body{margin:0}#host{width:64px;height:64px}</style></head><body><div id="host"></div>
+<script type="module">
+// Evaluates every WGSL noise node on the GPU for 4096 positions and compares with the CPU twins in @margoengine/procedural/noise.
+import {createStage} from '/packages/margoengine/dist/index.js';
+import {ComputePass, storage} from '/packages/shader/dist/index.js';
+import {simplex2, simplex3, perlin3, fbm, ridged, domainWarp} from '/packages/shader/dist/noise.js';
+import {Noise, fbm as cpuFbm, ridged as cpuRidged, domainWarp as cpuWarp} from '/packages/procedural/dist/noise.js';
+const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false});
+const engine=stage.engine,device=engine.gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const count=4096,points=new Float32Array(count*4);let s=12345;const random=()=>{s^=s<<13;s^=s>>>17;s^=s<<5;return (s>>>0)/4294967296;};
+// Coordinates up to +-40 (fbm octaves reach +-640); every 64th point sits on an integer lattice corner.
+for(let i=0;i<count;i++)for(let k=0;k<3;k++)points[i*4+k]=i%64===0?Math.round((random()-0.5)*20):(random()-0.5)*80;
+const input=storage(points,'vec4f'),n7=new Noise(7),n3=new Noise(3),n11=new Noise(11);
+const cases={
+  simplex2:[p=>simplex2(p.xy,7),(x,y)=>n7.simplex2(x,y)],
+  simplex3:[p=>simplex3(p.xyz,7),(x,y,z)=>n7.simplex(x,y,z)],
+  perlin3:[p=>perlin3(p.xyz,7),(x,y,z)=>n7.perlin(x,y,z)],
+  fbm3:[p=>fbm(q=>simplex3(q,7),p.xyz,{octaves:5}),cpuFbm((x,y,z)=>n7.simplex(x,y,z),{octaves:5})],
+  ridged2:[p=>ridged(q=>simplex2(q,3),p.xy,{octaves:4}),cpuRidged((x,y)=>n3.simplex2(x,y),{octaves:4})],
+  warp3:[p=>domainWarp(q=>simplex3(q,11),p.xyz,{strength:0.5}),cpuWarp((x,y,z)=>n11.simplex(x,y,z),{strength:0.5,dimensions:3})],
+  warpFbm2:[p=>domainWarp(q=>fbm(r=>simplex2(r,3),q,{octaves:3}),p.xy,{strength:0.75}),cpuWarp(cpuFbm((x,y)=>n3.simplex2(x,y),{octaves:3}),{strength:0.75,dimensions:2})],
+};
+const outputs=Object.fromEntries(Object.keys(cases).map(k=>[k,storage(count,'f32')]));
+const pass=new ComputePass(count,i=>{const p=input.element(i);return Object.entries(cases).map(([k,[gpu]])=>outputs[k].store(i,gpu(p)));});
+async function readBack(buffer){
+  const size=buffer.data.byteLength,read=device.createBuffer({size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),encoder=device.createCommandEncoder();
+  encoder.copyBufferToBuffer(buffer.buffer(device),0,read,0,size);device.queue.submit([encoder.finish()]);await read.mapAsync(GPUMapMode.READ);
+  const values=new Float32Array(read.getMappedRange().slice(0));read.unmap();read.destroy();return values;
+}
+window.run=async()=>{
+  device.pushErrorScope('validation');engine.use(pass);engine.render();await device.queue.onSubmittedWorkDone();
+  const error=(await device.popErrorScope())?.message??null,result={error,errors,adapter:engine.gpu.adapterInfo??null,cases:{}};
+  for(const [name,[,cpu]] of Object.entries(cases)){
+    const gpu=await readBack(outputs[name]),errors=new Float64Array(count);let max=0,sum=0,worst=-1,lo=Infinity,hi=-Infinity;
+    for(let i=0;i<count;i++){const c=cpu(points[i*4],points[i*4+1],points[i*4+2]),d=errors[i]=Math.abs(gpu[i]-c);sum+=d;if(d>max){max=d;worst=i;}lo=Math.min(lo,c);hi=Math.max(hi,c);}
+    result.cases[name]={maxError:max,p999:errors.sort()[Math.floor(count*0.999)],meanError:sum/count,range:[lo,hi],worst:worst<0?null:[...points.subarray(worst*4,worst*4+3)]};
+  }
+  return result;
+};
+window.ready=true;
+</script></body></html>

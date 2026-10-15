@@ -8,22 +8,44 @@ import { GeometryData } from "@margoengine/geometry";
 
 export type DensityField = (x: number, y: number, z: number) => number;
 
+export interface FractalOptions {
+     octaves?: number;
+     lacunarity?: number;
+     gain?: number;
+     frequency?: number;
+}
+
 export type HeightField = (x: number, z: number) => number;
 
 export class Noise {
     readonly seed: number;
+    readonly perm: Uint8Array;
     constructor(seed?: number);
+    simplex2(x: number, y: number): number;
     simplex(x: number, y: number, z: number): number;
+    simplex4(x: number, y: number, z: number, w: number): number;
     perlin(x: number, y: number, z: number): number;
     worley(x: number, y: number, z: number): number;
 }
 
+export type NoiseFunction = (x: number, y: number, z?: number, w?: number) => number;
+
 export const ROOF_PITCH: number;
+
+export const SIMPLEX_SCALE: readonly number[];
 
 export interface SurfaceOptions {
     resolution?: readonly [number, number, number];
     bounds?: readonly [readonly [number, number, number], readonly [number, number, number]];
     level?: number;
+}
+
+export const WARP_OFFSETS: readonly number[];
+
+export interface WarpOptions {
+     warp?: NoiseFunction;
+     strength?: number;
+     dimensions?: 2 | 3 | 4;
 }
 
 export function contactAO(y: number, groundY: number): number;
@@ -37,6 +59,10 @@ export function createHumanoid(engine: EngineKernel, materials: readonly [PbrMat
 };
 
 export function createIslandHeight(seed?: number): (x: number, z: number) => number;
+
+export function domainWarp(noise: NoiseFunction, { warp, strength, dimensions }?: WarpOptions): NoiseFunction;
+
+export function fbm(noise: NoiseFunction, options?: FractalOptions): NoiseFunction;
 
 export function generateCabinMesh(height: HeightField, position?: readonly [number, number]): {
     floor: number;
@@ -63,7 +89,11 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf'): {
 
 export function marchingCubes(field: DensityField, { resolution, bounds, level }?: SurfaceOptions): Geometry | null;
 
+export function permutation(seed: number): Uint8Array;
+
 export function poseHumanoid(rig: ReturnType<typeof createHumanoid>, position: ArrayLike<number>, heading: number, phase: number, speed: number): void;
 
 export function radialAO(x: number, y: number, z: number, center: ArrayLike<number>, radius: number): number;
+
+export function ridged(noise: NoiseFunction, options?: FractalOptions): NoiseFunction;
 ```
