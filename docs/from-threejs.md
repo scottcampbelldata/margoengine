@@ -544,6 +544,20 @@ gizmo.attach(mesh);
 gizmo.addEventListener('dragging-changed', event => { orbit.enabled = !event.value; });
 ```
 
+three.js has no CAD navigation presets. Margo's OrbitControls takes one in a call (SolidWorks, AutoCAD, Inventor/Fusion,
+Blender, Maya, Onshape, Rhino; `THREE_ORBIT` is the default), each a separate tree-shakable export; bindings table in
+the `@margoengine/controls` README:
+
+```ts
+import {OrbitControls, BLENDER} from '@margoengine/controls';
+import {ViewCube} from '@margoengine/viewcube';
+
+const nav = OrbitControls.attach(engine).setProfile(BLENDER); // middle orbits, Shift pans, Ctrl zooms
+nav.listenToKeyEvents(window);                                // numpad views, numpad 5 persp/ortho, Home fits
+nav.addEventListener('fit', () => engine.camera.fitToBoundingBox([-1, -1, -1], [1, 1, 1])); // your bounds
+ViewCube.attach(engine, {...BLENDER.viewCube});               // clicking the current view flips to the opposite
+```
+
 - Also `MapControls`, `TrackballControls`, `FlyControls`, `FirstPersonControls` and `PointerLockControls`, with three.js
   option names. Core has `CADCameraControls` (orbit about a pivot, pan, smooth zoom), which the stage facade uses.
 - Without an engine, pass a camera and an element and call `update(delta)` yourself:

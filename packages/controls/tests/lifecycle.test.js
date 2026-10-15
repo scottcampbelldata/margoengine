@@ -21,7 +21,7 @@ function engine(canvas) {
 }
 
 test('failed camera/gizmo listener initialization releases partial listeners and engine plugins', () => {
-  for (const [Control, listenerCount] of [[OrbitControls, 6], [TransformControls, 5]]) for (let failAt = 1; failAt <= listenerCount; failAt++) {
+  for (const [Control, listenerCount] of [[OrbitControls, 7], [TransformControls, 5]]) for (let failAt = 1; failAt <= listenerCount; failAt++) {
     const target = new Target(), runtime = engine(target), failure = new Error(`listener ${failAt}`);
     target.failAt = failAt; target.failure = failure;
     assert.throws(() => new Control(runtime), error => error === failure);

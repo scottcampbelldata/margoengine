@@ -26,7 +26,11 @@ cube.dispose();                                        // engine.dispose() also 
 Options: `container` (default: the canvas's parent; made `position: relative` if it is static), `corner`
 (`'top-right'` default, `'top-left'`, `'bottom-right'`, `'bottom-left'`), `size` (cube edge in CSS pixels, 80),
 `duration` (seconds, 0.4), `projection` (a CameraProjection, or anything with `mode`), `labels` (face names, for
-translation). `cube.element` is the widget root for your own styling.
+translation), `flip` (false; also a public field: clicking the view already shown turns to the opposite one, as
+Blender's navigation gizmo and SolidWorks' "Normal To" pressed twice do; Autodesk's ViewCube keeps the view).
+`@margoengine/controls` navigation profiles carry it: `ViewCube.attach(engine, {...BLENDER.viewCube})`. The toggle
+also follows projection changes made elsewhere (Blender's numpad 5 through a profile) on the next frame.
+`cube.element` is the widget root for your own styling.
 
 - **Orientation.** World Y is up, front is +Z, right is +X (glTF and Blender exports). Top shows X right and -Z up,
   bottom X right and +Z up, from whichever side the camera comes, because the animation interpolates azimuth and

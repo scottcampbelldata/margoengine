@@ -7,6 +7,10 @@ import { ModelLike, Raycaster, RaycasterHit } from "@margoengine/bvh";
 import { Camera, EngineKernel, Mesh } from "@margoengine/core";
 import { PassContext } from "@margoengine/core/extension";
 
+export const AUTOCAD: NavigationProfile;
+
+export const BLENDER: NavigationProfile;
+
 export interface ControlElement {
     addEventListener(type: string, listener: (event: any) => void, options?: AddEventListenerOptions | boolean): void;
     removeEventListener(type: string, listener: (event: any) => void, options?: EventListenerOptions | boolean): void;
@@ -61,6 +65,8 @@ export abstract class Controls extends EventDispatcher {
     protected release(id: number): void;
 }
 
+export type DragAction = 'rotate' | 'pan' | 'dolly' | 'rotate-or-pan';
+
 export class DragControls extends EventDispatcher {
     readonly engine: EngineKernel;
     readonly raycaster: Raycaster;
@@ -108,6 +114,8 @@ export interface EventTargetLike {
     addEventListener(type: string, listener: (event: any) => void, options?: AddEventListenerOptions | boolean): void;
     removeEventListener(type: string, listener: (event: any) => void, options?: EventListenerOptions | boolean): void;
 }
+
+export const FUSION: NavigationProfile;
 
 export class FirstPersonControls extends Controls {
     movementSpeed: number;
@@ -198,12 +206,18 @@ export type HandleName = 'X' | 'Y' | 'Z' | 'XY' | 'YZ' | 'XZ' | 'XYZ' | 'E' | 'X
 
 export type HeightField = (x: number, z: number) => number;
 
+export const INVENTOR: NavigationProfile;
+
+export type KeyAction = 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom' | 'iso' | 'fit' | 'projection';
+
 export interface LocomotionOptions {
     bounds?: readonly [minX: number, maxX: number, minZ: number, maxZ: number];
     minHeight?: number;
     walkSpeed?: number;
     runSpeed?: number;
 }
+
+export const MAYA: NavigationProfile;
 
 export const MOUSE: {
     readonly ROTATE: 0;
@@ -215,6 +229,29 @@ export class MapControls extends OrbitControls {
     constructor(source: Camera | EngineKernel, element?: ControlElement | null);
     protected get kind(): string;
 }
+
+export interface NavigationProfile {
+    readonly name: string;
+    readonly drag?: Readonly<Record<string, DragAction>>;
+    readonly mouseButtons?: {
+        LEFT: number | null;
+        MIDDLE: number | null;
+        RIGHT: number | null;
+    };
+    readonly touches: {
+        ONE: number | null;
+        TWO: number | null;
+    };
+    readonly wheel: 1 | -1;
+    readonly zoomToCursor: boolean;
+    readonly fitClick?: 0 | 1 | 2;
+    readonly keys?: Readonly<Record<string, KeyAction>>;
+    readonly viewCube?: {
+        readonly flip?: boolean;
+    };
+}
+
+export const ONSHAPE: NavigationProfile;
 
 export class OrbitControls extends Controls {
     enableDamping: boolean;
@@ -258,6 +295,8 @@ export class OrbitControls extends Controls {
     protected onDisconnect(): void;
     listenToKeyEvents(target: EventTargetLike): void;
     stopListenToKeyEvents(): void;
+    get profile(): NavigationProfile | null;
+    setProfile(profile: NavigationProfile): this;
     getPolarAngle(): number;
     getAzimuthalAngle(): number;
     getDistance(): number;
@@ -272,6 +311,18 @@ export class OrbitControls extends Controls {
     dollyOut(factor: number): void;
     update(delta?: number): boolean;
 }
+
+export const PROFILES: {
+    readonly three: NavigationProfile;
+    readonly solidworks: NavigationProfile;
+    readonly autocad: NavigationProfile;
+    readonly inventor: NavigationProfile;
+    readonly fusion: NavigationProfile;
+    readonly blender: NavigationProfile;
+    readonly maya: NavigationProfile;
+    readonly onshape: NavigationProfile;
+    readonly rhino: NavigationProfile;
+};
 
 export class PointerLockControls extends Controls {
     isLocked: boolean;
@@ -307,6 +358,12 @@ export class PointerLockControls extends Controls {
 }
 
 export type Prim = LinePrim | TrianglePrim;
+
+export const RHINO: NavigationProfile;
+
+export const SOLIDWORKS: NavigationProfile;
+
+export const THREE_ORBIT: NavigationProfile;
 
 export const TOUCH: {
     readonly ROTATE: 0;
