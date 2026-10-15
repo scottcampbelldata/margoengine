@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type {Camera, EngineKernel} from '@margoengine/core';
+import type { Camera, EngineKernel } from '@margoengine/core';
 
 /** The subset of an `HTMLElement` (normally the engine canvas) the controls use. Tests pass a plain object. */
 export interface ControlElement {
@@ -10,8 +10,8 @@ export interface ControlElement {
   setPointerCapture?(pointerId: number): void;
   releasePointerCapture?(pointerId: number): void;
   hasPointerCapture?(pointerId: number): boolean;
-  getBoundingClientRect?(): {left: number; top: number};
-  style?: {touchAction: string};
+  getBoundingClientRect?(): { left: number; top: number };
+  style?: { touchAction: string };
   ownerDocument?: any;
   requestPointerLock?(): unknown;
 }
@@ -21,20 +21,31 @@ export interface EventTargetLike {
   removeEventListener(type: string, listener: (event: any) => void, options?: EventListenerOptions | boolean): void;
 }
 
-export interface ControlEvent {type: string; target: unknown; [key: string]: unknown}
+export interface ControlEvent {
+  type: string;
+  target: unknown;
+  [key: string]: unknown;
+}
 export type ControlListener = (event: ControlEvent) => void;
 
 /** Minimal three.js-style `EventDispatcher`. */
 export class EventDispatcher {
   private readonly handlers = new Map<string, Set<ControlListener>>();
   addEventListener(type: string, listener: ControlListener): void {
-    let set = this.handlers.get(type); if (!set) this.handlers.set(type, set = new Set()); set.add(listener);
+    let set = this.handlers.get(type);
+    if (!set) this.handlers.set(type, (set = new Set()));
+    set.add(listener);
   }
-  removeEventListener(type: string, listener: ControlListener): void {this.handlers.get(type)?.delete(listener);}
-  hasEventListener(type: string, listener: ControlListener): boolean {return !!this.handlers.get(type)?.has(listener);}
-  dispatchEvent(event: {type: string; [key: string]: unknown}): void {
-    const set = this.handlers.get(event.type); if (!set) return;
-    const full = {...event, target: this} as ControlEvent;
+  removeEventListener(type: string, listener: ControlListener): void {
+    this.handlers.get(type)?.delete(listener);
+  }
+  hasEventListener(type: string, listener: ControlListener): boolean {
+    return !!this.handlers.get(type)?.has(listener);
+  }
+  dispatchEvent(event: { type: string; [key: string]: unknown }): void {
+    const set = this.handlers.get(event.type);
+    if (!set) return;
+    const full = { ...event, target: this } as ControlEvent;
     for (const listener of [...set]) listener(full);
   }
 }
@@ -43,7 +54,11 @@ type Binding = [EventTargetLike, string, (event: any) => void, AddEventListenerO
 let pluginCounter = 0;
 
 const isEngine = (value: unknown): value is EngineKernel =>
-  !!value && typeof value === 'object' && 'camera' in value && 'canvas' in value && typeof (value as EngineKernel).use === 'function';
+  !!value &&
+  typeof value === 'object' &&
+  'camera' in value &&
+  'canvas' in value &&
+  typeof (value as EngineKernel).use === 'function';
 
 /**
  * Shared base, mirroring three.js `Controls`: `connect`, `disconnect`, `enabled`, `update` and `dispose`.
@@ -63,18 +78,42 @@ export abstract class Controls extends EventDispatcher {
    * Creates the controls on `engine` (preferred over `new OrbitControls(engine, ...)`): they update every frame and
    * listen on `element` (default the engine canvas). `OrbitControls.attach(engine)`; the constructor stays for a bare Camera.
    */
-  static attach<T extends Controls, A extends unknown[]>(this: new (engine: EngineKernel, ...args: A) => T, engine: EngineKernel, ...args: A): T {return new this(engine, ...args);}
+  static attach<T extends Controls, A extends unknown[]>(
+    this: new (
+      engine: EngineKernel,
+      ...args: A
+    ) => T,
+    engine: EngineKernel,
+    ...args: A
+  ): T {
+    return new this(engine, ...args);
+  }
 
   constructor(source: Camera | EngineKernel, element?: ControlElement | null, autoUpdate = true) {
     super();
-    if (isEngine(source)) {this.engine = source; this.camera = source.camera; element = element === undefined ? source.canvas as unknown as ControlElement : element;}
-    else {
-      if (!source || typeof source !== 'object' || !('position' in source) || !('target' in source)) throw new TypeError('Expected an Engine or a Camera');
-      this.engine = null; this.camera = source;
+    if (isEngine(source)) {
+      this.engine = source;
+      this.camera = source.camera;
+      element = element === undefined ? (source.canvas as unknown as ControlElement) : element;
+    } else {
+      if (!source || typeof source !== 'object' || !('position' in source) || !('target' in source))
+        throw new TypeError('Expected an Engine or a Camera');
+      this.engine = null;
+      this.camera = source;
     }
     if (this.engine && autoUpdate) {
       const name = `margoengine-controls:${this.kind}:${++pluginCounter}`;
-      this.engine.use({name, setup() {}, onPreUpdate: delta => {if (this.enabled) this.update(delta);}, dispose: () => {this.pluginName = null; this.dispose();}});
+      this.engine.use({
+        name,
+        setup() {},
+        onPreUpdate: (delta) => {
+          if (this.enabled) this.update(delta);
+        },
+        dispose: () => {
+          this.pluginName = null;
+          this.dispose();
+        },
+      });
       this.pluginName = name;
     }
     this.pending = element ?? null;
@@ -82,14 +121,24 @@ export abstract class Controls extends EventDispatcher {
   private pending: ControlElement | null;
   /** Subclasses call this at the end of their constructor, once their listener fields exist. */
   protected init(): void {
-    const element = this.pending; this.pending = null;
-    try {if (element) this.connect(element);} catch (error) {this.dispose(); throw error;}
+    const element = this.pending;
+    this.pending = null;
+    try {
+      if (element) this.connect(element);
+    } catch (error) {
+      this.dispose();
+      throw error;
+    }
   }
 
   /** Short name used in plugin names. */
-  protected get kind(): string {return 'controls';}
+  protected get kind(): string {
+    return 'controls';
+  }
   /** Listeners to install on `connect`. Each control lists its own. */
-  protected abstract bind(element: ControlElement): Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
+  protected abstract bind(
+    element: ControlElement,
+  ): Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
   protected onDisconnect(): void {}
 
   connect(element: ControlElement): void {
@@ -97,8 +146,14 @@ export abstract class Controls extends EventDispatcher {
     this.disconnect();
     this.element = element;
     try {
-      for (const [target, type, listener, options] of this.bind(element)) {target.addEventListener(type, listener, options); this.bindings.push([target, type, listener, options]);}
-    } catch (error) {this.disconnect(); throw error;}
+      for (const [target, type, listener, options] of this.bind(element)) {
+        target.addEventListener(type, listener, options);
+        this.bindings.push([target, type, listener, options]);
+      }
+    } catch (error) {
+      this.disconnect();
+      throw error;
+    }
   }
   disconnect(): void {
     this.onDisconnect();
@@ -113,19 +168,34 @@ export abstract class Controls extends EventDispatcher {
     if (this.disposed) return;
     this.disconnect();
     this.disposed = true;
-    const name = this.pluginName; this.pluginName = null;
+    const name = this.pluginName;
+    this.pluginName = null;
     if (name && this.engine && !this.engine.disposed && this.engine.hasPlugin(name)) this.engine.removePlugin(name);
   }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 
   /** Pointer position in CSS pixels relative to the element. */
-  protected local(event: {clientX: number; clientY: number}): {x: number; y: number} {
-    const rect = this.element?.getBoundingClientRect?.() ?? {left: 0, top: 0};
-    return {x: event.clientX - rect.left, y: event.clientY - rect.top};
+  protected local(event: { clientX: number; clientY: number }): { x: number; y: number } {
+    const rect = this.element?.getBoundingClientRect?.() ?? { left: 0, top: 0 };
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   }
-  protected capture(id: number): void {try {this.element?.setPointerCapture?.(id);} catch {/* pointer already released */}}
-  protected release(id: number): void {try {if (this.element?.hasPointerCapture?.(id) ?? true) this.element?.releasePointerCapture?.(id);} catch {/* already released */}}
+  protected capture(id: number): void {
+    try {
+      this.element?.setPointerCapture?.(id);
+    } catch {
+      /* pointer already released */
+    }
+  }
+  protected release(id: number): void {
+    try {
+      if (this.element?.hasPointerCapture?.(id) ?? true) this.element?.releasePointerCapture?.(id);
+    } catch {
+      /* already released */
+    }
+  }
 }
 
 /** Default key target: the element's document when there is one (key events do not reach an unfocused canvas), else the element. */

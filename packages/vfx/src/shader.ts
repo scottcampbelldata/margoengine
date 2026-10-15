@@ -1,4 +1,4 @@
-export const frame=/* wgsl */`
+export const frame = /* wgsl */ `
 struct Particle {positionLife:vec4f,velocitySize:vec4f,color:vec4f,rotation:vec4f}
 struct Frame {camera:mat4x4f,right:vec4f,up:vec4f,gravityDelta:vec4f,emitterTime:vec4f,velocitySpread:vec4f,color:vec4f,shape:vec4f,physics:vec4f,emissionExtent:vec4f,control:vec4u}
 @group(0) @binding(0) var<uniform> f:Frame;
@@ -12,7 +12,9 @@ struct Frame {camera:mat4x4f,right:vec4f,up:vec4f,gravityDelta:vec4f,emitterTime
  * against the four side planes in clip space, with row-norm margins that bound any offset of that length (1% and a
  * w-relative slack cover rounding); the side planes together also reject everything behind the eye.
  */
-export const simulationShader=frame+/* wgsl */`
+export const simulationShader =
+  frame +
+  /* wgsl */ `
 @group(0) @binding(1) var<storage,read_write> particles:array<vec4f>;
 @group(0) @binding(3) var<storage,read_write> alive:array<u32>;
 struct Indirect {vertexCount:u32,instanceCount:atomic<u32>,rest:array<u32,3>}
@@ -58,7 +60,9 @@ fn curlNoise(p:vec3f)->vec3f {
   alive[atomicAdd(&drawn.instanceCount,1u)]=id.x;
 }`;
 /** One triangle around the unit disc (inradius 1) per particle: half the primitives and 3/4 of the vertices of a quad. */
-export const billboardShader=frame+/* wgsl */`
+export const billboardShader =
+  frame +
+  /* wgsl */ `
 @group(0) @binding(1) var<storage,read> particles:array<vec4f>;
 @group(0) @binding(2) var<storage,read> alive:array<u32>;
 struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) color:vec4f}
@@ -76,12 +80,16 @@ struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) col
  * covers more samples than the quad it replaced. Keep exactly the quad's samples: those whose uv (from the pixel centre's
  * uv, its screen derivatives and WebGPU's standard 4x sample offsets) lies in the unit square.
  */
-export const multisampled=(billboard:string)=>billboard.replace('@fragment fn fragment(i:Out)->@location(0) vec4f {',/* wgsl */`struct Samples {@location(0) color:vec4f,@builtin(sample_mask) mask:u32}
+export const multisampled = (billboard: string) =>
+  billboard.replace(
+    '@fragment fn fragment(i:Out)->@location(0) vec4f {',
+    /* wgsl */ `struct Samples {@location(0) color:vec4f,@builtin(sample_mask) mask:u32}
 @fragment fn fragment(i:Out,@builtin(sample_mask) covered:u32)->Samples {
   let dx=dpdx(i.uv);let dy=dpdy(i.uv);let offsets=array<vec2f,4>(vec2f(-0.125,-0.375),vec2f(0.375,-0.125),vec2f(-0.375,0.125),vec2f(0.125,0.375));var mask=0u;
   for(var s=0u;s<4u;s++){let q=abs(i.uv+dx*offsets[s].x+dy*offsets[s].y);if(max(q.x,q.y)<=1){mask|=1u<<s;}}
   return Samples(shade(i),covered&mask);
 }
-fn shade(i:Out)->vec4f {`);
+fn shade(i:Out)->vec4f {`,
+  );
 /** Statement the obstacle and wrap features insert their per-particle work before. */
-export const settle='particles[at]=p.positionLife;';
+export const settle = 'particles[at]=p.positionLife;';

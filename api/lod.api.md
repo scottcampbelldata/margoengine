@@ -14,7 +14,7 @@ export class Imposter {
     radius: number;
     readonly shading: 'core' | 'gltf';
     disposed: boolean;
-     color?: GPUTexture;
+    color?: GPUTexture;
     normal?: GPUTexture;
     uniform?: GPUBuffer;
     device?: GPUDevice;
@@ -54,7 +54,8 @@ export class LOD {
     readonly model: {
         readonly root: Mesh;
     } | null;
-     constructor(system: LODSystem,  index: number, anchor: Mesh, levels: readonly LODLevel[]);
+    constructor(system: LODSystem,
+    index: number, anchor: Mesh, levels: readonly LODLevel[]);
     get level(): number;
     remove(): void;
 }
@@ -85,9 +86,9 @@ export class LODSystem implements EnginePlugin {
     onPreUpdate(): void;
     get size(): number;
     add(anchor: Mesh, levels: readonly LODLevel[], { radius }?: LODOptions): LOD;
-     levelOf(lod: LOD): number;
+    levelOf(lod: LOD): number;
     pickProxies(): readonly LOD[];
-     remove(lod: LOD): void;
+    remove(lod: LOD): void;
     update(): void;
     onDeviceRestored(): void;
     dispose(): void;

@@ -1,12 +1,57 @@
-export type {GeometryData, GeometryGroup} from './data.js';
-export {geometryData, toGeometry, pbrVertexStream, footprintRadius} from './data.js';
-export type {Vec, Vec2, Vec3} from './math.js';
-export {Curve, type FrenetFrames} from './curve.js';
-export {ArcCurve, CatmullRomCurve3, CubicBezierCurve, CubicBezierCurve3, EllipseCurve, LineCurve, LineCurve3, QuadraticBezierCurve, QuadraticBezierCurve3, SplineCurve, type CatmullRomType} from './curves.js';
-export {CurvePath, Path, Shape} from './path.js';
-export {isClockWise, mergeOverlappingPoints, shapeArea, triangulate, triangulateShape} from './triangulate.js';
-export {boxGeometry, capsuleGeometry, circleGeometry, coneGeometry, cylinderGeometry, latheGeometry, planeGeometry, ringGeometry, sphereGeometry, torusGeometry, torusKnotGeometry, tubeGeometry} from './primitives.js';
-export {dodecahedronGeometry, icosahedronGeometry, octahedronGeometry, polyhedronGeometry, tetrahedronGeometry} from './polyhedra.js';
-export {extrudeGeometry, shapeGeometry, type ExtrudeOptions} from './extrude.js';
-export {applyMatrix4, center, computeBoundingBox, computeBoundingSphere, computeTangents, computeVertexNormals, edgesGeometry, mergeGeometries, mergeVertices, toNonIndexed, wireframe, wireframePositions, type MergeVerticesOptions} from './utils.js';
-export {loopSubdivide} from './subdivide.js';
+export type { GeometryData, GeometryGroup } from './data.js';
+export { geometryData, toGeometry, pbrVertexStream, footprintRadius } from './data.js';
+export type { Vec, Vec2, Vec3 } from './math.js';
+export { Curve, type FrenetFrames } from './curve.js';
+export {
+  ArcCurve,
+  CatmullRomCurve3,
+  CubicBezierCurve,
+  CubicBezierCurve3,
+  EllipseCurve,
+  LineCurve,
+  LineCurve3,
+  QuadraticBezierCurve,
+  QuadraticBezierCurve3,
+  SplineCurve,
+  type CatmullRomType,
+} from './curves.js';
+export { CurvePath, Path, Shape } from './path.js';
+export { isClockWise, mergeOverlappingPoints, shapeArea, triangulate, triangulateShape } from './triangulate.js';
+export {
+  boxGeometry,
+  capsuleGeometry,
+  circleGeometry,
+  coneGeometry,
+  cylinderGeometry,
+  latheGeometry,
+  planeGeometry,
+  ringGeometry,
+  sphereGeometry,
+  torusGeometry,
+  torusKnotGeometry,
+  tubeGeometry,
+} from './primitives.js';
+export {
+  dodecahedronGeometry,
+  icosahedronGeometry,
+  octahedronGeometry,
+  polyhedronGeometry,
+  tetrahedronGeometry,
+} from './polyhedra.js';
+export { extrudeGeometry, shapeGeometry, type ExtrudeOptions } from './extrude.js';
+export {
+  applyMatrix4,
+  center,
+  computeBoundingBox,
+  computeBoundingSphere,
+  computeTangents,
+  computeVertexNormals,
+  edgesGeometry,
+  mergeGeometries,
+  mergeVertices,
+  toNonIndexed,
+  wireframe,
+  wireframePositions,
+  type MergeVerticesOptions,
+} from './utils.js';
+export { loopSubdivide } from './subdivide.js';

@@ -1,1 +1,1 @@
-export {SkyMoon} from '@margoengine/scenery/sky';
+export { SkyMoon } from '@margoengine/scenery/sky';

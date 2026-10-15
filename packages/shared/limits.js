@@ -3,7 +3,8 @@
 
 /** Validates the count-cap option `name`: an integer from 1 to 8,388,608 (default 100,000). */
 export function countLimit(name, value = 100_000) {
-  if (!Number.isSafeInteger(value) || value < 1 || value > 8_388_608) throw new RangeError(`${name} must be an integer from 1 to 8388608`);
+  if (!Number.isSafeInteger(value) || value < 1 || value > 8_388_608)
+    throw new RangeError(`${name} must be an integer from 1 to 8388608`);
   return value;
 }
 

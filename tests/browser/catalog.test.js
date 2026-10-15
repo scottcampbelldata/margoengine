@@ -17,12 +17,17 @@ before(async () => {
   await once(server, 'listening');
   url = `http://127.0.0.1:${server.address().port}`;
 });
-after(() => new Promise(resolve => server.close(resolve)));
+after(() => new Promise((resolve) => server.close(resolve)));
 
-test('catalog searches, copies exact text, links examples, and handles clipboard denial', { timeout: 15 * 60_000 }, async () => {
+test('catalog searches, copies exact text, links examples, and handles clipboard denial', {
+  timeout: 15 * 60_000,
+}, async () => {
   let browser;
-  try { browser = await chromium.launch({ channel: 'msedge', headless: true }); }
-  catch { browser = await chromium.launch({ headless: true }); }
+  try {
+    browser = await chromium.launch({ channel: 'msedge', headless: true });
+  } catch {
+    browser = await chromium.launch({ headless: true });
+  }
   try {
     const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
     context.setDefaultTimeout(60_000);
@@ -31,28 +36,42 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
     await context.addInitScript(() => {
       window.copies = 0;
       const write = navigator.clipboard.writeText.bind(navigator.clipboard);
-      navigator.clipboard.writeText = async text => { await write(text); window.copies++; };
+      navigator.clipboard.writeText = async (text) => {
+        await write(text);
+        window.copies++;
+      };
     });
     const page = await context.newPage();
-    const copy = async locator => {
+    const copy = async (locator) => {
       const before = await page.evaluate(() => window.copies);
       await locator.click();
-      await page.waitForFunction(before => window.copies > before, before);
+      await page.waitForFunction((before) => window.copies > before, before);
       return (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');
     };
     const errors = [];
     const requests = [];
-    page.on('pageerror', error => errors.push(error.message));
-    page.on('request', request => requests.push(request.url()));
+    page.on('pageerror', (error) => errors.push(error.message));
+    page.on('request', (request) => requests.push(request.url()));
     await page.goto(url);
     await page.waitForFunction(() => !document.querySelector('#search').disabled);
     assert.equal(await page.locator('.module:visible').count(), entries.length);
     for (const id of ['dof', 'tonemap']) {
       assert.equal(await page.locator(`#${id} .run`).getAttribute('href'), `../demos/${id}/`);
-      assert.equal(await page.locator(`#${id} .source`).isVisible(), false, 'A built route with bundled assets must not be called a complete copyable HTML example');
+      assert.equal(
+        await page.locator(`#${id} .source`).isVisible(),
+        false,
+        'A built route with bundled assets must not be called a complete copyable HTML example',
+      );
       assert.match(await page.locator(`#${id} .requirements`).textContent(), /\^1\.0\.0/);
     }
-    for (const [term, id] of [['conveyor', 'machinery'], ['SectionPlanes', 'machinery'], ['loadGLTF', 'gltf'], ['particle', 'creative'], ['useFrame', 'react'], ['Camera', 'core']]) {
+    for (const [term, id] of [
+      ['conveyor', 'machinery'],
+      ['SectionPlanes', 'machinery'],
+      ['loadGLTF', 'gltf'],
+      ['particle', 'creative'],
+      ['useFrame', 'react'],
+      ['Camera', 'core'],
+    ]) {
       await page.getByLabel('Search modules and API names').fill(term);
       assert.equal(await page.locator(`#${id}`).isVisible(), true, term);
     }
@@ -64,12 +83,12 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
     assert.equal(await page.locator('#empty').isVisible(), true);
     await page.getByRole('button', { name: 'Clear search', exact: true }).click();
     assert.equal(await page.locator('.module:visible').count(), entries.length);
-    assert.equal(await page.locator('#search').evaluate(element => element === document.activeElement), true);
+    assert.equal(await page.locator('#search').evaluate((element) => element === document.activeElement), true);
     for (const card of await page.locator('.module').all()) {
       for (const kind of ['install', 'imports']) {
         assert.equal(await copy(card.locator(`[data-copy="${kind}"]`)), await card.locator(`.${kind}`).textContent());
       }
-      if (!await card.locator('.source').isVisible()) continue;
+      if (!(await card.locator('.source').isVisible())) continue;
       await card.locator('.source summary').click();
       const example = await copy(card.locator('[data-copy="example"]'));
       const response = await fetch(new URL(await card.locator('.run').getAttribute('href'), url));
@@ -78,17 +97,37 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
       await card.locator('.source summary').click();
     }
     await page.locator('#machinery .exports summary').click();
-    assert.equal(await copy(page.getByRole('button', { name: 'Copy import for Kinematics', exact: true })), "import { Kinematics } from '@margoengine/machinery';");
-    await page.evaluate(() => { navigator.clipboard.writeText = async () => { throw new Error('Denied'); }; });
+    assert.equal(
+      await copy(page.getByRole('button', { name: 'Copy import for Kinematics', exact: true })),
+      "import { Kinematics } from '@margoengine/machinery';",
+    );
+    await page.evaluate(() => {
+      navigator.clipboard.writeText = async () => {
+        throw new Error('Denied');
+      };
+    });
     await page.getByRole('button', { name: 'Copy import for SectionPlanes', exact: true }).click();
     await page.waitForFunction(() => /Ctrl\+C/.test(document.querySelector('#copy-status').textContent));
-    assert.equal(await page.evaluate(() => window.getSelection().toString()), "import { SectionPlanes } from '@margoengine/machinery';");
+    assert.equal(
+      await page.evaluate(() => window.getSelection().toString()),
+      "import { SectionPlanes } from '@margoengine/machinery';",
+    );
     for (const width of [375, 1440]) {
       await page.setViewportSize({ width, height: 900 });
-      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `overflow at ${width}px`);
+      assert.equal(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        true,
+        `overflow at ${width}px`,
+      );
     }
     assert.deepEqual(errors, []);
-    assert.equal(requests.some(request => /cdn\.jsdelivr|esm\.sh/.test(request)), false, 'catalog must not load engine packages');
+    assert.equal(
+      requests.some((request) => /cdn\.jsdelivr|esm\.sh/.test(request)),
+      false,
+      'catalog must not load engine packages',
+    );
     await context.close();
-  } finally { await browser.close(); }
+  } finally {
+    await browser.close();
+  }
 });

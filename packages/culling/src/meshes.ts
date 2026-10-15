@@ -1,10 +1,18 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type {EngineKernel} from '@margoengine/core';
-import type {Batch, Engine, EnginePlugin, FrameGraph, Geometry, PassContext} from '@margoengine/core/extension';
+import type { EngineKernel } from '@margoengine/core';
+import type { Batch, Engine, EnginePlugin, FrameGraph, Geometry, PassContext } from '@margoengine/core/extension';
 
-declare const GPUBufferUsage: {COPY_DST: number; COPY_SRC: number; MAP_READ: number; VERTEX: number; UNIFORM: number; STORAGE: number; INDIRECT: number};
-declare const GPUMapMode: {READ: number};
-type Context = Extract<PassContext, {backend: 'webgpu'}>;
+declare const GPUBufferUsage: {
+  COPY_DST: number;
+  COPY_SRC: number;
+  MAP_READ: number;
+  VERTEX: number;
+  UNIFORM: number;
+  STORAGE: number;
+  INDIRECT: number;
+};
+declare const GPUMapMode: { READ: number };
+type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
 export interface CulledMeshesOptions {
   /** Also drop parts whose bounding sphere spans fewer than this many CSS pixels in radius (default 0: frustum only, same pixels as core). */
@@ -58,7 +66,16 @@ fn keep(m:mat4x4f)->bool {
 }
 `;
 
-interface Slot {instance?: GPUBuffer; capacity: number; buffers: GPUBuffer[]; drawn?: GPUBuffer; args?: GPUBuffer; uniform?: GPUBuffer; group?: GPUBindGroup; data: Uint32Array}
+interface Slot {
+  instance?: GPUBuffer;
+  capacity: number;
+  buffers: GPUBuffer[];
+  drawn?: GPUBuffer;
+  args?: GPUBuffer;
+  uniform?: GPUBuffer;
+  group?: GPUBindGroup;
+  data: Uint32Array;
+}
 let serial = 0;
 
 /**
@@ -75,93 +92,205 @@ export class CulledMeshes implements EnginePlugin {
   disposed = false;
   private engine?: Engine;
   private device?: GPUDevice;
-  private pipelines?: {layout: GPUBindGroupLayout; cull: GPUComputePipeline; scan: GPUComputePipeline; scatter: GPUComputePipeline};
+  private pipelines?: {
+    layout: GPUBindGroupLayout;
+    cull: GPUComputePipeline;
+    scan: GPUComputePipeline;
+    scatter: GPUComputePipeline;
+  };
   private frameBuffer?: GPUBuffer;
   private readonly frame = new Float32Array(44);
   private readonly slots = new Map<Geometry, Slot>();
   private redirected: Batch[] = [];
 
   /** Same as `engine.use(new CulledMeshes(options))`; returns the plugin. */
-  static attach(engine: EngineKernel, options?: CulledMeshesOptions): CulledMeshes {const value = new CulledMeshes(options); engine.use(value); return value;}
-  constructor({minRadius = 0}: CulledMeshesOptions = {}) {this.minRadius = minRadius;this.check();}
-  private check(): void {if (!(this.minRadius >= 0 && this.minRadius < 1e6)) throw new RangeError('Invalid culled mesh options');}
+  static attach(engine: EngineKernel, options?: CulledMeshesOptions): CulledMeshes {
+    const value = new CulledMeshes(options);
+    engine.use(value);
+    return value;
+  }
+  constructor({ minRadius = 0 }: CulledMeshesOptions = {}) {
+    this.minRadius = minRadius;
+    this.check();
+  }
+  private check(): void {
+    if (!(this.minRadius >= 0 && this.minRadius < 1e6)) throw new RangeError('Invalid culled mesh options');
+  }
 
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu) throw new Error('CulledMeshes requires WebGPU');
-    this.engine = engine;this.device = engine.gpu;
+    this.engine = engine;
+    this.device = engine.gpu;
   }
   registerPasses(graph: FrameGraph): void {
     // First in the frame, so every core draw of these batches (main pass and replays) sees this frame's culled lists.
-    graph.add({name: this.name, order: -1e6, execute: c => {if (c.backend === 'webgpu') this.cull(c);}});
+    graph.add({
+      name: this.name,
+      order: -1e6,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.cull(c);
+      },
+    });
   }
   /** Instances drawn per redirected batch in the latest submitted frame, keyed by geometry (a GPU readback; for tests and tools). */
   async readCounts(): Promise<Map<Geometry, number>> {
-    const d = this.device;if (!d) throw new Error('CulledMeshes is not attached');
-    const entries = [...this.slots].filter(([, s]) => s.args), read = d.createBuffer({size: Math.max(4, entries.length * 4), usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST});
+    const d = this.device;
+    if (!d) throw new Error('CulledMeshes is not attached');
+    const entries = [...this.slots].filter(([, s]) => s.args),
+      read = d.createBuffer({
+        size: Math.max(4, entries.length * 4),
+        usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+      });
     try {
-      const encoder = d.createCommandEncoder();entries.forEach(([, s], i) => encoder.copyBufferToBuffer(s.args!, 4, read, i * 4, 4));d.queue.submit([encoder.finish()]);
-      await read.mapAsync(GPUMapMode.READ);const values = new Uint32Array(read.getMappedRange().slice(0));read.unmap();
+      const encoder = d.createCommandEncoder();
+      entries.forEach(([, s], i) => encoder.copyBufferToBuffer(s.args!, 4, read, i * 4, 4));
+      d.queue.submit([encoder.finish()]);
+      await read.mapAsync(GPUMapMode.READ);
+      const values = new Uint32Array(read.getMappedRange().slice(0));
+      read.unmap();
       return new Map(entries.map(([g], i) => [g, values[i]]));
-    } finally {read.destroy();}
+    } finally {
+      read.destroy();
+    }
   }
 
   private cull(c: Context): void {
-    this.check();this.restore();
-    const d = c.device, batches = c.batches ?? [], engine = this.engine!;
+    this.check();
+    this.restore();
+    const d = c.device,
+      batches = c.batches ?? [],
+      engine = this.engine!;
     this.pipelines ??= (() => {
       // One explicit layout shared by the three entry points ('auto' layouts are per pipeline and incompatible).
-      const visibility = 4, buffer = (type: GPUBufferBindingType) => ({visibility, buffer: {type}});
-      const layout = d.createBindGroupLayout({entries: [buffer('uniform'), buffer('uniform'), buffer('read-only-storage'), ...[3, 4, 5, 6, 7].map(() => buffer('storage'))].map((e, binding) => ({binding, ...e}))});
-      const module = d.createShaderModule({code: shader}), pipelineLayout = d.createPipelineLayout({bindGroupLayouts: [layout]}), entry = (entryPoint: string) => d.createComputePipeline({layout: pipelineLayout, compute: {module, entryPoint}});
-      return {layout, cull: entry('cull'), scan: entry('scan'), scatter: entry('scatter')};
+      const visibility = 4,
+        buffer = (type: GPUBufferBindingType) => ({ visibility, buffer: { type } });
+      const layout = d.createBindGroupLayout({
+        entries: [
+          buffer('uniform'),
+          buffer('uniform'),
+          buffer('read-only-storage'),
+          ...[3, 4, 5, 6, 7].map(() => buffer('storage')),
+        ].map((e, binding) => ({ binding, ...e })),
+      });
+      const module = d.createShaderModule({ code: shader }),
+        pipelineLayout = d.createPipelineLayout({ bindGroupLayouts: [layout] }),
+        entry = (entryPoint: string) =>
+          d.createComputePipeline({ layout: pipelineLayout, compute: { module, entryPoint } });
+      return { layout, cull: entry('cull'), scan: entry('scan'), scatter: entry('scatter') };
     })();
-    this.frameBuffer ??= d.createBuffer({size: this.frame.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST});
-    const m = c.camera.matrix, canvas = engine.canvas, ratio = canvas.clientWidth ? c.width / canvas.clientWidth : 1, f = this.frame;
-    f.set(m);f.set(c.camera.planes, 16);f[40] = c.width;f[41] = Math.hypot(m[1], m[5], m[9]) * c.height / 2;f[42] = this.minRadius * ratio;
+    this.frameBuffer ??= d.createBuffer({
+      size: this.frame.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    const m = c.camera.matrix,
+      canvas = engine.canvas,
+      ratio = canvas.clientWidth ? c.width / canvas.clientWidth : 1,
+      f = this.frame;
+    f.set(m);
+    f.set(c.camera.planes, 16);
+    f[40] = c.width;
+    f[41] = (Math.hypot(m[1], m[5], m[9]) * c.height) / 2;
+    f[42] = this.minRadius * ratio;
     d.queue.writeBuffer(this.frameBuffer, 0, f as Float32Array<ArrayBuffer>);
-    const pass = c.encoder.beginComputePass(), p = this.pipelines, live = new Set<Geometry>();
+    const pass = c.encoder.beginComputePass(),
+      p = this.pipelines,
+      live = new Set<Geometry>();
     for (const batch of batches) {
       if (!batch.count) continue;
-      const slot = this.slot(d, engine, batch);live.add(batch.geometry);
+      const slot = this.slot(d, engine, batch);
+      live.add(batch.geometry);
       const groups = Math.ceil(batch.count / 256);
       pass.setBindGroup(0, slot.group!);
-      pass.setPipeline(p.cull);pass.dispatchWorkgroups(groups);
-      pass.setPipeline(p.scan);pass.dispatchWorkgroups(1);
-      pass.setPipeline(p.scatter);pass.dispatchWorkgroups(groups);
-      batch.redirect = {instances: slot.drawn!, args: slot.args!};this.redirected.push(batch);
+      pass.setPipeline(p.cull);
+      pass.dispatchWorkgroups(groups);
+      pass.setPipeline(p.scan);
+      pass.dispatchWorkgroups(1);
+      pass.setPipeline(p.scatter);
+      pass.dispatchWorkgroups(groups);
+      batch.redirect = { instances: slot.drawn!, args: slot.args! };
+      this.redirected.push(batch);
     }
     pass.end();
-    for (const [geometry, slot] of this.slots) if (!live.has(geometry)) {for (const b of slot.buffers) b.destroy();this.slots.delete(geometry);}
+    for (const [geometry, slot] of this.slots)
+      if (!live.has(geometry)) {
+        for (const b of slot.buffers) b.destroy();
+        this.slots.delete(geometry);
+      }
   }
   // Per-geometry storage, sized to the batch count (doubling) and rebound when core replaces its instance buffer.
   private slot(d: GPUDevice, engine: Engine, batch: Batch): Slot {
     let slot = this.slots.get(batch.geometry);
-    if (!slot) this.slots.set(batch.geometry, slot = {capacity: 0, buffers: [], data: new Uint32Array(8)});
+    if (!slot) this.slots.set(batch.geometry, (slot = { capacity: 0, buffers: [], data: new Uint32Array(8) }));
     const instance = engine.geometryBuffers(batch.geometry)!.instance;
     if (batch.count > slot.capacity) {
       for (const b of slot.buffers) b.destroy();
-      const n = Math.max(256, 2 ** Math.ceil(Math.log2(batch.count))), S = GPUBufferUsage.STORAGE, make = (size: number, usage: number) => {const b = d.createBuffer({size, usage: usage | GPUBufferUsage.COPY_DST});slot!.buffers.push(b);return b;};
-      slot.buffers = [];slot.capacity = n;
-      slot.uniform = make(32, GPUBufferUsage.UNIFORM);slot.drawn = make(n * 96, S | GPUBufferUsage.VERTEX);slot.args = make(20, S | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_SRC);
-      make(n * 4, S);make(n * 4, S);make(Math.ceil(n / 256) * 4, S);slot.instance = undefined;
+      const n = Math.max(256, 2 ** Math.ceil(Math.log2(batch.count))),
+        S = GPUBufferUsage.STORAGE,
+        make = (size: number, usage: number) => {
+          const b = d.createBuffer({ size, usage: usage | GPUBufferUsage.COPY_DST });
+          slot!.buffers.push(b);
+          return b;
+        };
+      slot.buffers = [];
+      slot.capacity = n;
+      slot.uniform = make(32, GPUBufferUsage.UNIFORM);
+      slot.drawn = make(n * 96, S | GPUBufferUsage.VERTEX);
+      slot.args = make(20, S | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_SRC);
+      make(n * 4, S);
+      make(n * 4, S);
+      make(Math.ceil(n / 256) * 4, S);
+      slot.instance = undefined;
     }
     if (slot.instance !== instance) {
-      const [, , , visible, local, groups] = slot.buffers, r = (buffer: GPUBuffer): GPUBindingResource => ({buffer});
-      slot.group = d.createBindGroup({layout: this.pipelines!.layout, entries: [r(this.frameBuffer!), r(slot.uniform!), r(instance), r(visible), r(local), r(groups), r(slot.drawn!), r(slot.args!)].map((resource, binding) => ({binding, resource}))});
+      const [, , , visible, local, groups] = slot.buffers,
+        r = (buffer: GPUBuffer): GPUBindingResource => ({ buffer });
+      slot.group = d.createBindGroup({
+        layout: this.pipelines!.layout,
+        entries: [
+          r(this.frameBuffer!),
+          r(slot.uniform!),
+          r(instance),
+          r(visible),
+          r(local),
+          r(groups),
+          r(slot.drawn!),
+          r(slot.args!),
+        ].map((resource, binding) => ({ binding, resource })),
+      });
       slot.instance = instance;
     }
-    const words = slot.data;words[0] = batch.count;words[1] = batch.geometry.indices.length;new Float32Array(words.buffer).set(batch.geometry.bounds, 4);
+    const words = slot.data;
+    words[0] = batch.count;
+    words[1] = batch.geometry.indices.length;
+    new Float32Array(words.buffer).set(batch.geometry.bounds, 4);
     d.queue.writeBuffer(slot.uniform!, 0, words as Uint32Array<ArrayBuffer>);
     return slot;
   }
   // Core draws batches without a redirect from its own instance buffer, as before.
-  private restore(): void {for (const batch of this.redirected) batch.redirect = undefined;this.redirected = [];}
-  private release(): void {
-    this.restore();for (const slot of this.slots.values()) for (const b of slot.buffers) b.destroy();
-    this.slots.clear();this.frameBuffer?.destroy();this.frameBuffer = this.pipelines = undefined;
+  private restore(): void {
+    for (const batch of this.redirected) batch.redirect = undefined;
+    this.redirected = [];
   }
-  onDeviceRestored(engine: Engine): void {this.release();this.setup(engine);}
-  dispose(): void {if (this.disposed) return;this.disposed = true;this.engine?.removePlugin(this.name);this.release();this.engine = this.device = undefined;}
+  private release(): void {
+    this.restore();
+    for (const slot of this.slots.values()) for (const b of slot.buffers) b.destroy();
+    this.slots.clear();
+    this.frameBuffer?.destroy();
+    this.frameBuffer = this.pipelines = undefined;
+  }
+  onDeviceRestored(engine: Engine): void {
+    this.release();
+    this.setup(engine);
+  }
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.engine?.removePlugin(this.name);
+    this.release();
+    this.engine = this.device = undefined;
+  }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 }

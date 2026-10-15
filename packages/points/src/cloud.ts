@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type {Mesh} from '@margoengine/core';
-import {buildBlocks, expandBlockBounds, packColors, NO_BLOCK, type PointBlocks} from './math.js';
-import {PointsMaterial, type PointsMaterialOptions} from './material.js';
+import type { Mesh } from '@margoengine/core';
+import { buildBlocks, expandBlockBounds, packColors, NO_BLOCK, type PointBlocks } from './math.js';
+import { PointsMaterial, type PointsMaterialOptions } from './material.js';
 
 /**
  * Point data. This is also the point-cloud output of `@margoengine/loaders`
@@ -42,7 +42,9 @@ export interface PointCloudOptions extends PointCloudData {
 type Channel = 'positions' | 'colors' | 'sizes';
 
 /** Owner interface the plugin implements, so `dispose()` can detach the cloud. */
-export interface PointOwner {remove(item: unknown): void}
+export interface PointOwner {
+  remove(item: unknown): void;
+}
 
 /**
  * A chunked, GPU-resident point cloud: the counterpart of Three.js `Points` with a `PointsMaterial`.
@@ -74,17 +76,18 @@ export class PointCloud {
   /** Chunking result: blocks, bounds and the shuffled draw order. */
   blocks: PointBlocks;
   /** Points drawn and blocks visible in the latest frame. */
-  readonly stats = {blocksVisible: 0, pointsVisible: 0, pointsDrawn: 0};
+  readonly stats = { blocksVisible: 0, pointsVisible: 0, pointsDrawn: 0 };
   /** Bumped when GPU buffers must be recreated (colors or sizes added or removed, rebuild). @internal */
   structure = 0;
   /** Pending `[start, end)` point ranges per channel. @internal */
-  readonly dirty: Record<Channel, Array<[number, number]>> = {positions: [], colors: [], sizes: []};
+  readonly dirty: Record<Channel, Array<[number, number]>> = { positions: [], colors: [], sizes: [] };
   private mesh: Mesh | null = null;
   private owner?: PointOwner;
 
   constructor(options: PointCloudOptions) {
-    if (!options || typeof options !== 'object' || !options.positions) throw new TypeError('PointCloud needs positions');
-    const {positions} = options;
+    if (!options || typeof options !== 'object' || !options.positions)
+      throw new TypeError('PointCloud needs positions');
+    const { positions } = options;
     if (positions.length % 3) throw new RangeError('positions length must be a multiple of 3');
     this.name = options.name ?? '';
     this.count = positions.length / 3;
@@ -92,9 +95,12 @@ export class PointCloud {
     this.seed = options.seed ?? 1;
     this.cullMargin = options.cullMargin ?? 0;
     this.colorSpace = options.colorSpace ?? 'srgb';
-    if (this.colorSpace !== 'srgb' && this.colorSpace !== 'linear') throw new RangeError("colorSpace must be 'srgb' or 'linear'");
-    if (!Number.isFinite(this.cullMargin) || this.cullMargin < 0) throw new RangeError('cullMargin must be finite and non-negative');
-    this.material = options.material instanceof PointsMaterial ? options.material : new PointsMaterial(options.material);
+    if (this.colorSpace !== 'srgb' && this.colorSpace !== 'linear')
+      throw new RangeError("colorSpace must be 'srgb' or 'linear'");
+    if (!Number.isFinite(this.cullMargin) || this.cullMargin < 0)
+      throw new RangeError('cullMargin must be finite and non-negative');
+    this.material =
+      options.material instanceof PointsMaterial ? options.material : new PointsMaterial(options.material);
     let stored = positions instanceof Float32Array ? positions : Float32Array.from(positions);
     if (options.colors) this.setColors(options.colors, options.colorComponents, false);
     if (options.sizes) this.setSizes(options.sizes, false);
@@ -108,8 +114,9 @@ export class PointCloud {
       let tail = blocks.finite;
       for (let i = 0; i < this.count; i++) if (blocks.blockOf[i] === NO_BLOCK) source[tail++] = i;
       const permute = <T extends Float32Array | Uint32Array>(array: T, stride: number): T => {
-        const out = new (array.constructor as {new(length: number): T})(array.length);
-        for (let i = 0; i < this.count; i++) for (let c = 0; c < stride; c++) out[i * stride + c] = array[source[i] * stride + c];
+        const out = new (array.constructor as { new (length: number): T })(array.length);
+        for (let i = 0; i < this.count; i++)
+          for (let c = 0; c < stride; c++) out[i * stride + c] = array[source[i] * stride + c];
         return out;
       };
       stored = permute(stored, 3);
@@ -119,7 +126,7 @@ export class PointCloud {
       for (let b = 0; b < blocks.length; b++) blockOf.fill(b, blocks.starts[b], blocks.starts[b] + blocks.counts[b]);
       const order = new Uint32Array(this.count);
       for (let i = 0; i < this.count; i++) order[i] = i;
-      this.blocks = {...blocks, order, blockOf};
+      this.blocks = { ...blocks, order, blockOf };
       this.sourceIndex = source;
     } else {
       this.blocks = blocks;
@@ -129,10 +136,15 @@ export class PointCloud {
   }
 
   /** The mesh whose world matrix this cloud follows, or null. */
-  get attachedMesh(): Mesh | null {return this.mesh;}
+  get attachedMesh(): Mesh | null {
+    return this.mesh;
+  }
 
   /** Follow a core mesh's world matrix (and its visibility). Pass null to use `matrix` again. */
-  attach(mesh: Mesh | null): this {this.mesh = mesh; return this;}
+  attach(mesh: Mesh | null): this {
+    this.mesh = mesh;
+    return this;
+  }
 
   /** Copies `values` (xyz per point) over points `start ..` and uploads only that range next frame. */
   updatePositions(start: number, values: ArrayLike<number>): this {
@@ -156,7 +168,9 @@ export class PointCloud {
   updateSizes(start: number, values: ArrayLike<number>): this {
     if (!this.sizes) throw new Error('The cloud has no per-point sizes; call setSizes first');
     const n = this.range(start, values.length, 1);
-    for (let i = 0; i < n; i++) if (!(values[i] >= 0) || !Number.isFinite(values[i])) throw new RangeError('sizes must be finite and non-negative');
+    for (let i = 0; i < n; i++)
+      if (!(values[i] >= 0) || !Number.isFinite(values[i]))
+        throw new RangeError('sizes must be finite and non-negative');
     this.sizes.set(values, start);
     this.dirty.sizes.push([start, start + n]);
     return this;
@@ -178,7 +192,8 @@ export class PointCloud {
     if (values === null) this.colors = null;
     else {
       const inferred = components ?? (values.length === this.count * 4 && values.length !== this.count * 3 ? 4 : 3);
-      if (values.length !== this.count * inferred) throw new RangeError(`colors needs ${this.count * inferred} values (${inferred} per point)`);
+      if (values.length !== this.count * inferred)
+        throw new RangeError(`colors needs ${this.count * inferred} values (${inferred} per point)`);
       this.colorComponents = inferred;
       this.colors = packColors(values, inferred, this.count, new Uint32Array(this.count));
     }
@@ -192,7 +207,9 @@ export class PointCloud {
     else {
       if (values.length !== this.count) throw new RangeError(`sizes needs ${this.count} values`);
       const sizes = values instanceof Float32Array ? values : Float32Array.from(values);
-      for (let i = 0; i < sizes.length; i++) if (!(sizes[i] >= 0) || !Number.isFinite(sizes[i])) throw new RangeError('sizes must be finite and non-negative');
+      for (let i = 0; i < sizes.length; i++)
+        if (!(sizes[i] >= 0) || !Number.isFinite(sizes[i]))
+          throw new RangeError('sizes must be finite and non-negative');
       this.sizes = sizes;
     }
     if (notify) this.structure++;
@@ -208,9 +225,13 @@ export class PointCloud {
   }
 
   /** Detaches from its plugin, which frees the GPU buffers. The CPU arrays stay usable. */
-  dispose(): void {this.owner?.remove(this);}
+  dispose(): void {
+    this.owner?.remove(this);
+  }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 
   /** @internal */
   bind(owner: PointOwner | undefined): void {
@@ -220,7 +241,8 @@ export class PointCloud {
 
   private range(start: number, length: number, stride: number): number {
     const n = length / stride;
-    if (!Number.isInteger(start) || !Number.isInteger(n) || start < 0 || start + n > this.count) throw new RangeError(`Range ${start}..${start + n} is outside the cloud of ${this.count} points`);
+    if (!Number.isInteger(start) || !Number.isInteger(n) || start < 0 || start + n > this.count)
+      throw new RangeError(`Range ${start}..${start + n} is outside the cloud of ${this.count} points`);
     return n;
   }
 }

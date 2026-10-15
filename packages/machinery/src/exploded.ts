@@ -1,18 +1,65 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import {meshRuntime} from '@margoengine/core/extension';
-import type {EngineKernel,Mesh as MeshHandle} from '@margoengine/core';
-import type {Engine,EnginePlugin,Mesh,Vec3} from '@margoengine/core/extension';
+import { meshRuntime } from '@margoengine/core/extension';
+import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
+import type { Engine, EnginePlugin, Vec3 } from '@margoengine/core/extension';
 
-export interface ExplodedPart {node:MeshHandle;offset:Vec3}
+export interface ExplodedPart {
+  node: MeshHandle;
+  offset: Vec3;
+}
 /** Moves parts from their setup positions along their offsets by `amount` (0..1). Positions are written only when `amount` changes, so a view at rest costs nothing per frame. */
 export class ExplodedView implements EnginePlugin {
-  readonly name='exploded-view';amount=0;private origins:number[][]=[];private applied=NaN;
+  readonly name = 'exploded-view';
+  amount = 0;
+  private origins: number[][] = [];
+  private applied = NaN;
   /** Same as `engine.use(new ExplodedView(...))`; returns the ExplodedView. */
-  static attach(engine: EngineKernel, parts: readonly ExplodedPart[]): ExplodedView {const value = new ExplodedView(parts); engine.use(value); return value;}
-  constructor(readonly parts:readonly ExplodedPart[]){}
-  setup(engine:Engine):void {this.origins=this.parts.map(({node,offset})=>{node.check();if(meshRuntime(node).engine!==engine||offset.length!==3||offset.some(v=>!Number.isFinite(Math.fround(v))))throw new TypeError('Invalid exploded part');return [node.position.x,node.position.y,node.position.z];});this.applied=NaN;}
-  onPreUpdate():void {if(!Number.isFinite(this.amount)||this.amount<0||this.amount>1)throw new RangeError('Explode amount must be 0..1');if(this.amount===this.applied)return;for(let i=0;i<this.parts.length;i++){const {offset}=this.parts[i],node=meshRuntime(this.parts[i].node),p=this.origins[i],x=p[0]+offset[0]*this.amount,y=p[1]+offset[1]*this.amount,z=p[2]+offset[2]*this.amount;node.check();if(!Number.isFinite(Math.fround(x))||!Number.isFinite(Math.fround(y))||!Number.isFinite(Math.fround(z)))throw new RangeError('Invalid exploded position');const t=node.engine.store.transforms;t.x[node.id]=x;t.y[node.id]=y;t.z[node.id]=z;}this.applied=this.amount;}
-  dispose():void {this.origins=[];this.applied=NaN;}
+  static attach(engine: EngineKernel, parts: readonly ExplodedPart[]): ExplodedView {
+    const value = new ExplodedView(parts);
+    engine.use(value);
+    return value;
+  }
+  constructor(readonly parts: readonly ExplodedPart[]) {}
+  setup(engine: Engine): void {
+    this.origins = this.parts.map(({ node, offset }) => {
+      node.check();
+      if (
+        meshRuntime(node).engine !== engine ||
+        offset.length !== 3 ||
+        offset.some((v) => !Number.isFinite(Math.fround(v)))
+      )
+        throw new TypeError('Invalid exploded part');
+      return [node.position.x, node.position.y, node.position.z];
+    });
+    this.applied = NaN;
+  }
+  onPreUpdate(): void {
+    if (!Number.isFinite(this.amount) || this.amount < 0 || this.amount > 1)
+      throw new RangeError('Explode amount must be 0..1');
+    if (this.amount === this.applied) return;
+    for (let i = 0; i < this.parts.length; i++) {
+      const { offset } = this.parts[i],
+        node = meshRuntime(this.parts[i].node),
+        p = this.origins[i],
+        x = p[0] + offset[0] * this.amount,
+        y = p[1] + offset[1] * this.amount,
+        z = p[2] + offset[2] * this.amount;
+      node.check();
+      if (!Number.isFinite(Math.fround(x)) || !Number.isFinite(Math.fround(y)) || !Number.isFinite(Math.fround(z)))
+        throw new RangeError('Invalid exploded position');
+      const t = node.engine.store.transforms;
+      t.x[node.id] = x;
+      t.y[node.id] = y;
+      t.z[node.id] = z;
+    }
+    this.applied = this.amount;
+  }
+  dispose(): void {
+    this.origins = [];
+    this.applied = NaN;
+  }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 }

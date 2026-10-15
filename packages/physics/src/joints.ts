@@ -1,5 +1,5 @@
-import type {PhysicsBody} from './body.js';
-import {checkVec, quat, vec, type Quat, type Vec3} from './math.js';
+import type { PhysicsBody } from './body.js';
+import { checkVec, quat, vec, type Quat, type Vec3 } from './math.js';
 
 export interface MotorOptions {
   /** Target velocity in radians (revolute) or units (prismatic) per second. */
@@ -23,9 +23,14 @@ interface JointBase {
   contactsEnabled?: boolean;
 }
 export type JointOptions =
-  | (JointBase & {type: 'fixed'; frameA?: Quat; frameB?: Quat})
-  | (JointBase & {type: 'spherical'})
-  | (JointBase & {type: 'revolute' | 'prismatic'; axis: Vec3; limits?: readonly [number, number]; motor?: MotorOptions});
+  | (JointBase & { type: 'fixed'; frameA?: Quat; frameB?: Quat })
+  | (JointBase & { type: 'spherical' })
+  | (JointBase & {
+      type: 'revolute' | 'prismatic';
+      axis: Vec3;
+      limits?: readonly [number, number];
+      motor?: MotorOptions;
+    });
 
 export type JointType = JointOptions['type'];
 
@@ -33,55 +38,96 @@ export type JointType = JointOptions['type'];
 export class PhysicsJoint {
   private removed = false;
   /** @internal */
-  constructor(private readonly owner: {readonly rapier: any; removeJoint(joint: PhysicsJoint): void}, readonly raw: any, readonly type: JointType, readonly bodyA: PhysicsBody, readonly bodyB: PhysicsBody) {}
-  get valid(): boolean {return !this.removed && this.raw.isValid();}
+  constructor(
+    private readonly owner: { readonly rapier: any; removeJoint(joint: PhysicsJoint): void },
+    readonly raw: any,
+    readonly type: JointType,
+    readonly bodyA: PhysicsBody,
+    readonly bodyB: PhysicsBody,
+  ) {}
+  get valid(): boolean {
+    return !this.removed && this.raw.isValid();
+  }
   /** @internal */
-  markRemoved(): void {this.removed = true;}
+  markRemoved(): void {
+    this.removed = true;
+  }
   private unit(): any {
     if (!this.valid) throw new Error('Joint was removed');
-    if (this.type !== 'revolute' && this.type !== 'prismatic') throw new TypeError('Limits and motors need a revolute or prismatic joint');
+    if (this.type !== 'revolute' && this.type !== 'prismatic')
+      throw new TypeError('Limits and motors need a revolute or prismatic joint');
     return this.raw;
   }
   /** Angle (revolute, radians) or translation (prismatic) limits. */
   setLimits(min: number, max: number): this {
-    if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) throw new RangeError('Joint limits need finite min <= max');
-    this.unit().setLimits(min, max); this.wake(); return this;
+    if (!Number.isFinite(min) || !Number.isFinite(max) || min > max)
+      throw new RangeError('Joint limits need finite min <= max');
+    this.unit().setLimits(min, max);
+    this.wake();
+    return this;
   }
-  get limits(): [number, number] | null {const raw = this.unit(); return raw.limitsEnabled() ? [raw.limitsMin(), raw.limitsMax()] : null;}
+  get limits(): [number, number] | null {
+    const raw = this.unit();
+    return raw.limitsEnabled() ? [raw.limitsMin(), raw.limitsMax()] : null;
+  }
   setMotor(motor: MotorOptions): this {
-    const raw = this.unit(), R = this.owner.rapier;
+    const raw = this.unit(),
+      R = this.owner.rapier;
     raw.configureMotorModel(motor.model === 'force' ? R.MotorModel.ForceBased : R.MotorModel.AccelerationBased);
     const velocity = motor.targetVelocity ?? 0;
-    if (motor.targetPosition !== undefined) raw.configureMotor(motor.targetPosition, velocity, motor.stiffness ?? 1, motor.damping ?? 0);
+    if (motor.targetPosition !== undefined)
+      raw.configureMotor(motor.targetPosition, velocity, motor.stiffness ?? 1, motor.damping ?? 0);
     else raw.configureMotorVelocity(velocity, motor.damping ?? 1);
-    this.wake(); return this;
+    this.wake();
+    return this;
   }
   /** Turns the motor off. */
-  clearMotor(): this {this.unit().configureMotor(0, 0, 0, 0); return this;}
-  set contactsEnabled(value: boolean) {if (this.valid) this.raw.setContactsEnabled(value);}
-  get contactsEnabled(): boolean {return this.valid && this.raw.contactsEnabled();}
-  remove(): void {if (!this.removed) this.owner.removeJoint(this);}
-  private wake(): void {if (this.bodyA.valid) this.bodyA.raw.wakeUp(); if (this.bodyB.valid) this.bodyB.raw.wakeUp();}
+  clearMotor(): this {
+    this.unit().configureMotor(0, 0, 0, 0);
+    return this;
+  }
+  set contactsEnabled(value: boolean) {
+    if (this.valid) this.raw.setContactsEnabled(value);
+  }
+  get contactsEnabled(): boolean {
+    return this.valid && this.raw.contactsEnabled();
+  }
+  remove(): void {
+    if (!this.removed) this.owner.removeJoint(this);
+  }
+  private wake(): void {
+    if (this.bodyA.valid) this.bodyA.raw.wakeUp();
+    if (this.bodyB.valid) this.bodyB.raw.wakeUp();
+  }
 }
 
 export function createJointData(R: any, options: JointOptions): any {
-  const anchorA = options.anchorA ?? [0, 0, 0], anchorB = options.anchorB ?? [0, 0, 0];
-  checkVec(anchorA, 'anchorA'); checkVec(anchorB, 'anchorB');
+  const anchorA = options.anchorA ?? [0, 0, 0],
+    anchorB = options.anchorB ?? [0, 0, 0];
+  checkVec(anchorA, 'anchorA');
+  checkVec(anchorB, 'anchorB');
   switch (options.type) {
-    case 'fixed': return R.JointData.fixed(vec(anchorA), quat(options.frameA), vec(anchorB), quat(options.frameB));
-    case 'spherical': return R.JointData.spherical(vec(anchorA), vec(anchorB));
-    case 'revolute': case 'prismatic': {
+    case 'fixed':
+      return R.JointData.fixed(vec(anchorA), quat(options.frameA), vec(anchorB), quat(options.frameB));
+    case 'spherical':
+      return R.JointData.spherical(vec(anchorA), vec(anchorB));
+    case 'revolute':
+    case 'prismatic': {
       checkVec(options.axis, 'Joint axis');
       const length = Math.hypot(...options.axis);
       if (!length) throw new RangeError('Joint axis must be nonzero');
       const axis = vec([options.axis[0] / length, options.axis[1] / length, options.axis[2] / length]);
       if (options.limits) {
         const [min, max] = options.limits;
-        if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) throw new RangeError('Joint limits need finite min <= max');
+        if (!Number.isFinite(min) || !Number.isFinite(max) || min > max)
+          throw new RangeError('Joint limits need finite min <= max');
       }
       // Limits are applied after creation with setLimits: JointData.limits is not honored by every Rapier build.
-      return options.type === 'revolute' ? R.JointData.revolute(vec(anchorA), vec(anchorB), axis) : R.JointData.prismatic(vec(anchorA), vec(anchorB), axis);
+      return options.type === 'revolute'
+        ? R.JointData.revolute(vec(anchorA), vec(anchorB), axis)
+        : R.JointData.prismatic(vec(anchorA), vec(anchorB), axis);
     }
-    default: throw new TypeError(`Unknown joint type ${(options as {type: string}).type}`);
+    default:
+      throw new TypeError(`Unknown joint type ${(options as { type: string }).type}`);
   }
 }

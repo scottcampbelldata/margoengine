@@ -1,8 +1,8 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type {EngineKernel, EnginePlugin, Mesh} from '@margoengine/core';
-import {engineRuntime, meshRuntime, type FrameGraph} from '@margoengine/core/extension';
-import {normalize, smoothParam, type Vec3} from './math.js';
-import {loadAudioBuffer, type LoadAudioOptions} from './loader.js';
+import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
+import { engineRuntime, meshRuntime, type FrameGraph } from '@margoengine/core/extension';
+import { normalize, smoothParam, type Vec3 } from './math.js';
+import { loadAudioBuffer, type LoadAudioOptions } from './loader.js';
 
 export interface AudioListenerOptions {
   /** An existing context (for example an OfflineAudioContext) or a factory. Default: `new AudioContext()` on first use. */
@@ -20,12 +20,17 @@ export interface AudioListenerOptions {
 }
 
 /** Internal contract between the listener and the sounds it owns. */
-export interface ListenerSource {update(engine: EngineKernel | null): void; dispose(): void}
+export interface ListenerSource {
+  update(engine: EngineKernel | null): void;
+  dispose(): void;
+}
 
 const gestures = ['pointerdown', 'mousedown', 'keydown', 'touchend'] as const;
-const defaultForward: Vec3 = [0, 0, -1], defaultUp: Vec3 = [0, 1, 0], meshForward: Vec3 = [0, 0, 1];
+const defaultForward: Vec3 = [0, 0, -1],
+  defaultUp: Vec3 = [0, 1, 0],
+  meshForward: Vec3 = [0, 0, 1];
 const audioContextClass = (): (new () => AudioContext) => {
-  const constructor = (globalThis as {AudioContext?: new () => AudioContext}).AudioContext;
+  const constructor = (globalThis as { AudioContext?: new () => AudioContext }).AudioContext;
   if (!constructor) throw new Error('Web Audio is unavailable in this environment');
   return constructor;
 };
@@ -63,12 +68,24 @@ export class AudioListener implements EnginePlugin {
   private readonly onGesture = (): void => {
     const context = this.audioContext;
     if (!context) return;
-    if (context.state === 'running') {this.removeGestureListeners(); return;}
-    void this.resume().then(() => {if (context.state === 'running') this.removeGestureListeners();}, () => {});
+    if (context.state === 'running') {
+      this.removeGestureListeners();
+      return;
+    }
+    void this.resume().then(
+      () => {
+        if (context.state === 'running') this.removeGestureListeners();
+      },
+      () => {},
+    );
   };
 
   /** Same as `engine.use(new AudioListener(...))`; returns the AudioListener. */
-  static attach(engine: EngineKernel, options?: AudioListenerOptions): AudioListener {const value = new AudioListener(options); engine.use(value); return value;}
+  static attach(engine: EngineKernel, options?: AudioListenerOptions): AudioListener {
+    const value = new AudioListener(options);
+    engine.use(value);
+    return value;
+  }
   constructor(options: AudioListenerOptions = {}) {
     this.name = options.name ?? 'margoengine-audio';
     this.order = options.order ?? 900;
@@ -77,7 +94,8 @@ export class AudioListener implements EnginePlugin {
     this.autoResume = options.autoResume ?? true;
     this.smoothing = options.smoothing ?? 0.02;
     this.volumeValue = options.volume ?? 1;
-    if (!Number.isFinite(this.volumeValue) || this.volumeValue < 0) throw new RangeError('Volume must be a finite number >= 0');
+    if (!Number.isFinite(this.volumeValue) || this.volumeValue < 0)
+      throw new RangeError('Volume must be a finite number >= 0');
     if (!Number.isFinite(this.smoothing) || this.smoothing < 0) throw new RangeError('Smoothing must be >= 0');
   }
 
@@ -87,12 +105,17 @@ export class AudioListener implements EnginePlugin {
       const source = this.source;
       if (typeof source === 'function') this.audioContext = source();
       else if (source) this.audioContext = source;
-      else {this.audioContext = new (audioContextClass())(); this.owned = true;}
+      else {
+        this.audioContext = new (audioContextClass())();
+        this.owned = true;
+      }
     }
     return this.audioContext;
   }
   /** True once the context exists. Reading `context` creates it; this does not. */
-  get hasContext(): boolean {return this.audioContext !== undefined;}
+  get hasContext(): boolean {
+    return this.audioContext !== undefined;
+  }
   /** Master gain node; every sound connects here. Connected to `context.destination`. */
   get input(): GainNode {
     if (!this.master) {
@@ -103,40 +126,51 @@ export class AudioListener implements EnginePlugin {
     }
     return this.master;
   }
-  get volume(): number {return this.volumeValue;}
+  get volume(): number {
+    return this.volumeValue;
+  }
   set volume(value: number) {
     if (!Number.isFinite(value) || value < 0) throw new RangeError('Volume must be a finite number >= 0');
     this.volumeValue = value;
     if (this.master) smoothParam(this.master.gain, value, this.context, this.smoothing);
   }
   /** The engine this listener is attached to, if any. */
-  get attachedEngine(): EngineKernel | null {return this.engine;}
+  get attachedEngine(): EngineKernel | null {
+    return this.engine;
+  }
 
   /** Resumes a suspended AudioContext. Resolves immediately for offline contexts. */
   async resume(): Promise<void> {
     const context = this.audioContext as AudioContext | undefined;
-    if (context && context.state === 'suspended' && typeof (context as AudioContext).close === 'function') await context.resume();
+    if (context && context.state === 'suspended' && typeof (context as AudioContext).close === 'function')
+      await context.resume();
   }
   /** Suspends a running AudioContext (all sounds freeze in place). */
   async suspend(): Promise<void> {
     const context = this.audioContext as AudioContext | undefined;
-    if (context && context.state === 'running' && typeof (context as AudioContext).close === 'function') await context.suspend();
+    if (context && context.state === 'running' && typeof (context as AudioContext).close === 'function')
+      await context.suspend();
   }
   /** Fetches and decodes a sound with this listener's context, cached by URL. */
-  load(url: string, options?: LoadAudioOptions): Promise<AudioBuffer> {return loadAudioBuffer(this.context, url, options);}
+  load(url: string, options?: LoadAudioOptions): Promise<AudioBuffer> {
+    return loadAudioBuffer(this.context, url, options);
+  }
 
   setup(engine: EngineKernel): void {
     this.engine = engine;
     if (this.autoResume) {
-      const document = engine.canvas.ownerDocument as Document | undefined ?? (globalThis as {document?: Document}).document;
+      const document =
+        (engine.canvas.ownerDocument as Document | undefined) ?? (globalThis as { document?: Document }).document;
       const target = document?.defaultView ?? document;
       if (target) {
         this.gestureTarget = target;
-        for (const type of gestures) target.addEventListener(type, this.onGesture, {capture: true, passive: true});
+        for (const type of gestures) target.addEventListener(type, this.onGesture, { capture: true, passive: true });
       }
     }
   }
-  registerPasses(graph: FrameGraph): void {graph.add({name: this.name, order: this.order, execute: () => this.update()});}
+  registerPasses(graph: FrameGraph): void {
+    graph.add({ name: this.name, order: this.order, execute: () => this.update() });
+  }
 
   /**
    * Copies the camera pose into the Web Audio listener and updates every positional sound. Runs once per frame
@@ -149,16 +183,20 @@ export class AudioListener implements EnginePlugin {
   }
 
   /** What the listener follows each frame: `'camera'` (the default), a mesh, or null (only `setPose` moves it). */
-  get following(): 'camera' | Mesh | null {return this.target;}
+  get following(): 'camera' | Mesh | null {
+    return this.target;
+  }
   /**
    * Puts the ears on something other than the camera: a mesh (its world position, its local `forward` axis and local
    * +Y as up, for example a third-person character with `[0, 0, 1]`), `'camera'` (the default), or null to keep the
    * last pose and place the listener only with `setPose`. A disposed mesh keeps its last pose.
    */
   follow(target: 'camera' | Mesh | null, forward: Vec3 = meshForward): this {
-    if (target !== 'camera' && target !== null && !Number.isInteger(meshRuntime(target)?.id)) throw new TypeError("The listener follows a core Mesh, 'camera' or null");
+    if (target !== 'camera' && target !== null && !Number.isInteger(meshRuntime(target)?.id))
+      throw new TypeError("The listener follows a core Mesh, 'camera' or null");
     const f = this.forwardScratch;
-    if (!normalize(forward[0], forward[1], forward[2], f, meshForward)) throw new RangeError('Listener forward axis must be nonzero');
+    if (!normalize(forward[0], forward[1], forward[2], f, meshForward))
+      throw new RangeError('Listener forward axis must be nonzero');
     this.localForward.set(f);
     this.target = target;
     return this;
@@ -166,47 +204,82 @@ export class AudioListener implements EnginePlugin {
 
   private followTarget(engine: EngineKernel): void {
     const target = this.target;
-    if (target === 'camera') {this.followCamera(engine); return;}
+    if (target === 'camera') {
+      this.followCamera(engine);
+      return;
+    }
     if (!target) return;
-    const runtime = engineRuntime(engine), id = meshRuntime(target).id;
+    const runtime = engineRuntime(engine),
+      id = meshRuntime(target).id;
     if (runtime.meshes.get(id) !== target) return;
-    const m = runtime.store.matrices, o = id * 16, l = this.localForward, fx = l[0], fy = l[1], fz = l[2], forward = this.cameraForward, up = this.meshUp;
-    forward[0] = m[o] * fx + m[o + 4] * fy + m[o + 8] * fz; forward[1] = m[o + 1] * fx + m[o + 5] * fy + m[o + 9] * fz; forward[2] = m[o + 2] * fx + m[o + 6] * fy + m[o + 10] * fz;
-    up[0] = m[o + 4]; up[1] = m[o + 5]; up[2] = m[o + 6];
+    const m = runtime.store.matrices,
+      o = id * 16,
+      l = this.localForward,
+      fx = l[0],
+      fy = l[1],
+      fz = l[2],
+      forward = this.cameraForward,
+      up = this.meshUp;
+    forward[0] = m[o] * fx + m[o + 4] * fy + m[o + 8] * fz;
+    forward[1] = m[o + 1] * fx + m[o + 5] * fy + m[o + 9] * fz;
+    forward[2] = m[o + 2] * fx + m[o + 6] * fy + m[o + 10] * fz;
+    up[0] = m[o + 4];
+    up[1] = m[o + 5];
+    up[2] = m[o + 6];
     const position = this.meshPosition;
-    position[0] = m[o + 12]; position[1] = m[o + 13]; position[2] = m[o + 14];
+    position[0] = m[o + 12];
+    position[1] = m[o + 13];
+    position[2] = m[o + 14];
     this.setPose(position, forward, up);
   }
 
   private followCamera(engine: EngineKernel): void {
-    const camera = engine.camera, p = camera.position, t = camera.target;
+    const camera = engine.camera,
+      p = camera.position,
+      t = camera.target;
     const forward = this.cameraForward;
-    forward[0] = t[0] - p[0]; forward[1] = t[1] - p[1]; forward[2] = t[2] - p[2];
+    forward[0] = t[0] - p[0];
+    forward[1] = t[1] - p[1];
+    forward[2] = t[2] - p[2];
     this.setPose(p, forward);
   }
 
   /** Sets the listener pose directly (world position, forward direction, up direction). */
   setPose(position: Vec3, forward: Vec3, up: Vec3 = defaultUp): this {
-    const f = this.forwardScratch, u = this.upScratch;
+    const f = this.forwardScratch,
+      u = this.upScratch;
     normalize(forward[0], forward[1], forward[2], f, defaultForward);
     normalize(up[0], up[1], up[2], u, defaultUp);
-    if (!Number.isFinite(position[0]) || !Number.isFinite(position[1]) || !Number.isFinite(position[2])) throw new RangeError('Listener pose must be finite');
+    if (!Number.isFinite(position[0]) || !Number.isFinite(position[1]) || !Number.isFinite(position[2]))
+      throw new RangeError('Listener pose must be finite');
     let changed = !this.written;
-    for (let i = 0; i < 3; i++) if (position[i] !== this.position[i] || f[i] !== this.forward[i] || u[i] !== this.up[i]) changed = true;
+    for (let i = 0; i < 3; i++)
+      if (position[i] !== this.position[i] || f[i] !== this.forward[i] || u[i] !== this.up[i]) changed = true;
     for (let i = 0; i < 3; i++) this.position[i] = position[i];
-    this.forward.set(f); this.up.set(u);
+    this.forward.set(f);
+    this.up.set(u);
     if (changed && this.audioContext) this.writePose();
     return this;
   }
 
   private writePose(): void {
-    const context = this.context, listener = context.listener, immediate = !this.written;
+    const context = this.context,
+      listener = context.listener,
+      immediate = !this.written;
     this.written = true;
-    const [px, py, pz] = this.position, [fx, fy, fz] = this.forward, [ux, uy, uz] = this.up;
+    const [px, py, pz] = this.position,
+      [fx, fy, fz] = this.forward,
+      [ux, uy, uz] = this.up;
     if (listener.positionX) {
-      smoothParam(listener.positionX, px, context, this.smoothing, immediate); smoothParam(listener.positionY, py, context, this.smoothing, immediate); smoothParam(listener.positionZ, pz, context, this.smoothing, immediate);
-      smoothParam(listener.forwardX, fx, context, this.smoothing, immediate); smoothParam(listener.forwardY, fy, context, this.smoothing, immediate); smoothParam(listener.forwardZ, fz, context, this.smoothing, immediate);
-      smoothParam(listener.upX, ux, context, this.smoothing, immediate); smoothParam(listener.upY, uy, context, this.smoothing, immediate); smoothParam(listener.upZ, uz, context, this.smoothing, immediate);
+      smoothParam(listener.positionX, px, context, this.smoothing, immediate);
+      smoothParam(listener.positionY, py, context, this.smoothing, immediate);
+      smoothParam(listener.positionZ, pz, context, this.smoothing, immediate);
+      smoothParam(listener.forwardX, fx, context, this.smoothing, immediate);
+      smoothParam(listener.forwardY, fy, context, this.smoothing, immediate);
+      smoothParam(listener.forwardZ, fz, context, this.smoothing, immediate);
+      smoothParam(listener.upX, ux, context, this.smoothing, immediate);
+      smoothParam(listener.upY, uy, context, this.smoothing, immediate);
+      smoothParam(listener.upZ, uz, context, this.smoothing, immediate);
     } else {
       listener.setPosition(px, py, pz);
       listener.setOrientation(fx, fy, fz, ux, uy, uz);
@@ -217,15 +290,20 @@ export class AudioListener implements EnginePlugin {
   addSource(source: ListenerSource): void {
     this.sources.add(source);
     // Start at the camera's current pose, so the first sound does not glide in from the origin.
-    if (!this.written) {if (this.engine && !this.engine.disposed) this.followTarget(this.engine); if (!this.written) this.writePose();}
+    if (!this.written) {
+      if (this.engine && !this.engine.disposed) this.followTarget(this.engine);
+      if (!this.written) this.writePose();
+    }
   }
   /** @internal */
-  removeSource(source: ListenerSource): void {this.sources.delete(source);}
+  removeSource(source: ListenerSource): void {
+    this.sources.delete(source);
+  }
 
   private removeGestureListeners(): void {
     const target = this.gestureTarget;
     if (!target) return;
-    for (const type of gestures) target.removeEventListener(type, this.onGesture, {capture: true});
+    for (const type of gestures) target.removeEventListener(type, this.onGesture, { capture: true });
     this.gestureTarget = undefined;
   }
 
@@ -238,9 +316,15 @@ export class AudioListener implements EnginePlugin {
     this.master = undefined;
     const context = this.audioContext as AudioContext | undefined;
     if (context && this.owned && context.state !== 'closed') void context.close().catch(() => {});
-    if (this.owned) {this.audioContext = undefined; this.owned = false; this.written = false;}
+    if (this.owned) {
+      this.audioContext = undefined;
+      this.owned = false;
+      this.written = false;
+    }
     this.engine = null;
   }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 }

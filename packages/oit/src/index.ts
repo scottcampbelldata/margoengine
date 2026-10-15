@@ -1,13 +1,19 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // Weighted blended order-independent transparency (McGuire and Bavoil, JCGT 2013) for gltf-pro BLEND primitives and
 // @margoengine/materials transparent meshes, through gltf-pro's transparency hook (no shader text search).
-import type {EngineKernel} from '@margoengine/core';
-import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext} from '@margoengine/core/extension';
-import type {PBRModel, PBRTransparency} from '@margoengine/gltf-pro';
+import type { EngineKernel } from '@margoengine/core';
+import {
+  engineRuntime,
+  type Engine,
+  type EnginePlugin,
+  type FrameGraph,
+  type PassContext,
+} from '@margoengine/core/extension';
+import type { PBRModel, PBRTransparency } from '@margoengine/gltf-pro';
 
-declare const GPUBufferUsage: {UNIFORM: number; COPY_DST: number};
-declare const GPUTextureUsage: {TEXTURE_BINDING: number; RENDER_ATTACHMENT: number};
-type Context = Extract<PassContext, {backend: 'webgpu'}>;
+declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
+declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number };
+type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
 export interface OITOptions {
   /** Frame graph order of the transparent and composite passes: after the scene and its overlays (edges 6), before SSAO (10), TAA (9) and post composites (30). Default 8. */
@@ -39,7 +45,10 @@ const composite = /* wgsl */ `
   let q=vec2i(p.xy); let a=textureLoad(accumMap,q,0); return vec4f(a.rgb/max(a.a,1e-5),1-textureLoad(revealMap,q,0).r);
 }
 `;
-const over: GPUBlendState = {color: {srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha'}, alpha: {srcFactor: 'one', dstFactor: 'one-minus-src-alpha'}};
+const over: GPUBlendState = {
+  color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
+  alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+};
 let serial = 0;
 
 /**
@@ -52,8 +61,17 @@ export class OIT implements EnginePlugin, PBRTransparency {
   readonly name = 'oit:' + serial++;
   readonly order: number;
   readonly targets: readonly GPUColorTargetState[] = [
-    {format: 'rgba16float', blend: {color: {srcFactor: 'one', dstFactor: 'one'}, alpha: {srcFactor: 'one', dstFactor: 'one'}}},
-    {format: 'r16float', blend: {color: {srcFactor: 'zero', dstFactor: 'one-minus-src'}, alpha: {srcFactor: 'zero', dstFactor: 'one-minus-src'}}},
+    {
+      format: 'rgba16float',
+      blend: { color: { srcFactor: 'one', dstFactor: 'one' }, alpha: { srcFactor: 'one', dstFactor: 'one' } },
+    },
+    {
+      format: 'r16float',
+      blend: {
+        color: { srcFactor: 'zero', dstFactor: 'one-minus-src' },
+        alpha: { srcFactor: 'zero', dstFactor: 'one-minus-src' },
+      },
+    },
   ];
   private readonly depthScale?: number;
   private engine?: Engine;
@@ -70,18 +88,36 @@ export class OIT implements EnginePlugin, PBRTransparency {
   private context?: Context;
   private pass?: GPURenderPassEncoder;
 
-  static attach(engine: EngineKernel, options?: OITOptions): OIT {const value = new OIT(options); engineRuntime(engine).use(value); return value;}
-  constructor({order = 8, depthScale}: OITOptions = {}) {
-    if (!Number.isFinite(order) || order <= 0 || depthScale !== undefined && !(depthScale > 0 && Number.isFinite(depthScale))) throw new RangeError('OIT order must be > 0 and depthScale a positive number');
-    this.order = order; this.depthScale = depthScale;
+  static attach(engine: EngineKernel, options?: OITOptions): OIT {
+    const value = new OIT(options);
+    engineRuntime(engine).use(value);
+    return value;
+  }
+  constructor({ order = 8, depthScale }: OITOptions = {}) {
+    if (
+      !Number.isFinite(order) ||
+      order <= 0 ||
+      (depthScale !== undefined && !(depthScale > 0 && Number.isFinite(depthScale)))
+    )
+      throw new RangeError('OIT order must be > 0 and depthScale a positive number');
+    this.order = order;
+    this.depthScale = depthScale;
   }
   /** Draws a gltf-pro model's BLEND primitives (or a transparent materials mesh) order-independently. Returns a remover. */
   add(model: PBRModel): () => void {
-    if (this.disposed || !this.engine) throw new Error(this.disposed ? 'OIT is disposed' : 'OIT.add needs OIT.attach(engine) first');
+    if (this.disposed || !this.engine)
+      throw new Error(this.disposed ? 'OIT is disposed' : 'OIT.add needs OIT.attach(engine) first');
     let release = this.models.get(model);
     if (!release) {
-      const restore = model.setTransparency(this), forget = model.onDispose(() => this.models.delete(model));
-      release = () => {if (this.models.get(model) === release) {this.models.delete(model); forget(); restore();}};
+      const restore = model.setTransparency(this),
+        forget = model.onDispose(() => this.models.delete(model));
+      release = () => {
+        if (this.models.get(model) === release) {
+          this.models.delete(model);
+          forget();
+          restore();
+        }
+      };
       this.models.set(model, release);
     }
     return release;
@@ -90,59 +126,152 @@ export class OIT implements EnginePlugin, PBRTransparency {
     if (this.disposed) throw new Error('OIT is disposed');
     if (!engine.gpu) throw new Error('OIT requires WebGPU');
     this.engine = engine;
-    this.uniform = engine.gpu.createBuffer({size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST});
+    this.uniform = engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   }
-  registerPasses(graph: FrameGraph): void {graph.add({name: this.name, order: this.order, execute: c => {if (c.backend === 'webgpu') this.render(c);}});}
+  registerPasses(graph: FrameGraph): void {
+    graph.add({
+      name: this.name,
+      order: this.order,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.render(c);
+      },
+    });
+  }
   /** @internal gltf-pro transparency hook. */
-  declarations(group: number): string {let code = this.code.get(group); if (!code) this.code.set(group, code = declarations(group)); return code;}
+  declarations(group: number): string {
+    let code = this.code.get(group);
+    if (!code) this.code.set(group, (code = declarations(group)));
+    return code;
+  }
   /** @internal gltf-pro transparency hook. */
-  bindings(): GPUBindGroupEntry[] {return [{binding: BINDING, resource: {buffer: this.uniform!}}];}
+  bindings(): GPUBindGroupEntry[] {
+    return [{ binding: BINDING, resource: { buffer: this.uniform! } }];
+  }
   /** @internal gltf-pro transparency hook: the accumulation pass, begun on the first transparent draw of the frame. */
   begin(): GPURenderPassEncoder {
     if (this.pass) return this.pass;
-    const c = this.context!, msaa = this.views.length > 2, v = this.views;
-    return this.pass = c.encoder.beginRenderPass({label: 'oit:accumulate', colorAttachments: [
-      {view: msaa ? v[2] : v[0], resolveTarget: msaa ? v[0] : undefined, clearValue: [0, 0, 0, 0], loadOp: 'clear', storeOp: msaa ? 'discard' : 'store'},
-      {view: msaa ? v[3] : v[1], resolveTarget: msaa ? v[1] : undefined, clearValue: [1, 0, 0, 0], loadOp: 'clear', storeOp: msaa ? 'discard' : 'store'},
-    ], depthStencilAttachment: {view: c.depth, depthReadOnly: true, stencilReadOnly: true}});
+    const c = this.context!,
+      msaa = this.views.length > 2,
+      v = this.views;
+    return (this.pass = c.encoder.beginRenderPass({
+      label: 'oit:accumulate',
+      colorAttachments: [
+        {
+          view: msaa ? v[2] : v[0],
+          resolveTarget: msaa ? v[0] : undefined,
+          clearValue: [0, 0, 0, 0],
+          loadOp: 'clear',
+          storeOp: msaa ? 'discard' : 'store',
+        },
+        {
+          view: msaa ? v[3] : v[1],
+          resolveTarget: msaa ? v[1] : undefined,
+          clearValue: [1, 0, 0, 0],
+          loadOp: 'clear',
+          storeOp: msaa ? 'discard' : 'store',
+        },
+      ],
+      depthStencilAttachment: { view: c.depth, depthReadOnly: true, stencilReadOnly: true },
+    }));
   }
   private render(c: Context): void {
     if (this.disposed || !this.models.size) return;
-    const samples = c.descriptor.multisample?.count ?? 1, size = c.width + 'x' + c.height + 'x' + samples, device = c.device;
+    const samples = c.descriptor.multisample?.count ?? 1,
+      size = c.width + 'x' + c.height + 'x' + samples,
+      device = c.device;
     if (size !== this.size) {
-      this.release(); this.size = size;
+      this.release();
+      this.size = size;
       // Resolved (sampled by the composite) targets first, then their multisampled draw targets.
       for (const count of samples > 1 ? [1, 1, samples, samples] : [1, 1]) {
         const format = this.targets[this.textures.length % 2].format;
-        const texture = device.createTexture({label: 'oit:' + format, size: [c.width, c.height], format, sampleCount: count, usage: GPUTextureUsage.RENDER_ATTACHMENT | (count === 1 ? GPUTextureUsage.TEXTURE_BINDING : 0)});
-        this.textures.push(texture); this.views.push(texture.createView());
+        const texture = device.createTexture({
+          label: 'oit:' + format,
+          size: [c.width, c.height],
+          format,
+          sampleCount: count,
+          usage: GPUTextureUsage.RENDER_ATTACHMENT | (count === 1 ? GPUTextureUsage.TEXTURE_BINDING : 0),
+        });
+        this.textures.push(texture);
+        this.views.push(texture.createView());
       }
     }
     const scale = this.depthScale ?? Math.hypot(...c.camera.position.map((p, i) => p - c.camera.target[i]));
-    this.values[0] = 1 / (scale || 1); device.queue.writeBuffer(this.uniform!, 0, this.values);
-    this.context = c; this.pass = undefined;
-    try {for (const model of this.models.keys()) model.draw(c, 'transparent', c.color, c.depth);}
-    finally {this.context = undefined;}
-    const pass = this.pass as GPURenderPassEncoder | undefined; if (!pass) return; pass.end(); this.pass = undefined;
-    const key = c.format + samples;let pipeline = this.pipelines.get(key);
+    this.values[0] = 1 / (scale || 1);
+    device.queue.writeBuffer(this.uniform!, 0, this.values);
+    this.context = c;
+    this.pass = undefined;
+    try {
+      for (const model of this.models.keys()) model.draw(c, 'transparent', c.color, c.depth);
+    } finally {
+      this.context = undefined;
+    }
+    const pass = this.pass as GPURenderPassEncoder | undefined;
+    if (!pass) return;
+    pass.end();
+    this.pass = undefined;
+    const key = c.format + samples;
+    let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      const module = device.createShaderModule({code: composite});
-      this.pipelines.set(key, pipeline = device.createRenderPipeline({label: 'oit:composite', layout: 'auto', vertex: {module, entryPoint: 'vertex'}, fragment: {module, entryPoint: 'fragment', targets: [{format: c.format, blend: over}]}, multisample: {count: samples}}));
+      const module = device.createShaderModule({ code: composite });
+      this.pipelines.set(
+        key,
+        (pipeline = device.createRenderPipeline({
+          label: 'oit:composite',
+          layout: 'auto',
+          vertex: { module, entryPoint: 'vertex' },
+          fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format, blend: over }] },
+          multisample: { count: samples },
+        })),
+      );
     }
     let group = this.groups.get(pipeline);
-    if (!group) this.groups.set(pipeline, group = device.createBindGroup({layout: pipeline.getBindGroupLayout(0), entries: [{binding: 0, resource: this.views[0]}, {binding: 1, resource: this.views[1]}]}));
-    const out = c.encoder.beginRenderPass({label: 'oit:composite', colorAttachments: [{view: c.color, loadOp: 'load', storeOp: 'store'}]});
-    out.setPipeline(pipeline); out.setBindGroup(0, group); out.draw(3); out.end();
+    if (!group)
+      this.groups.set(
+        pipeline,
+        (group = device.createBindGroup({
+          layout: pipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: this.views[0] },
+            { binding: 1, resource: this.views[1] },
+          ],
+        })),
+      );
+    const out = c.encoder.beginRenderPass({
+      label: 'oit:composite',
+      colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
+    });
+    out.setPipeline(pipeline);
+    out.setBindGroup(0, group);
+    out.draw(3);
+    out.end();
   }
-  private release(): void {for (const t of this.textures) t.destroy(); this.textures = []; this.views = []; this.size = ''; this.groups.clear();}
-  onDeviceRestored(engine: Engine): void {this.release(); this.pipelines.clear(); this.uniform?.destroy(); this.setup(engine);}
+  private release(): void {
+    for (const t of this.textures) t.destroy();
+    this.textures = [];
+    this.views = [];
+    this.size = '';
+    this.groups.clear();
+  }
+  onDeviceRestored(engine: Engine): void {
+    this.release();
+    this.pipelines.clear();
+    this.uniform?.destroy();
+    this.setup(engine);
+  }
   /** Restores sorted blending on every added model and frees the targets. */
   dispose(): void {
-    if (this.disposed) return; this.disposed = true;
+    if (this.disposed) return;
+    this.disposed = true;
     for (const release of [...this.models.values()]) release();
-    this.release(); this.pipelines.clear(); this.uniform?.destroy(); this.uniform = undefined;
+    this.release();
+    this.pipelines.clear();
+    this.uniform?.destroy();
+    this.uniform = undefined;
     this.engine?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 }

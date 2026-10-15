@@ -1,13 +1,20 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type {EngineKernel, EnginePlugin, Mesh} from '@margoengine/core';
-import {meshRuntime,Mesh as CoreMesh} from '@margoengine/core/extension';
-import {PhysicsBody, type BodyOptions, type BodyOwner, type BodyType} from './body.js';
-import {CharacterController, type CharacterControllerOptions} from './character.js';
-import {PhysicsJoint, createJointData, type JointOptions} from './joints.js';
-import {checkVec, eulerToQuat, quat, tuple, vec, type Quat, type Vec3} from './math.js';
-import {configureCollider, createColliderDesc, type ColliderOptions, type ColliderSettings, type RapierModule, type ShapeOptions} from './shapes.js';
-import {matrixRotation, matrixScale, worldMatrix, type TransformStoreLike} from './transform.js';
-import {invertMatrix, multiplyMatrices} from '@margoengine/math/mat4';
+import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
+import { meshRuntime, Mesh as CoreMesh } from '@margoengine/core/extension';
+import { PhysicsBody, type BodyOptions, type BodyOwner, type BodyType } from './body.js';
+import { CharacterController, type CharacterControllerOptions } from './character.js';
+import { PhysicsJoint, createJointData, type JointOptions } from './joints.js';
+import { checkVec, eulerToQuat, quat, tuple, vec, type Quat, type Vec3 } from './math.js';
+import {
+  configureCollider,
+  createColliderDesc,
+  type ColliderOptions,
+  type ColliderSettings,
+  type RapierModule,
+  type ShapeOptions,
+} from './shapes.js';
+import { matrixRotation, matrixScale, worldMatrix, type TransformStoreLike } from './transform.js';
+import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
 
 export interface PhysicsOptions {
   /** The initialized `@dimforge/rapier3d-compat` module. */
@@ -106,10 +113,13 @@ export interface ModelPrimitiveLike {
   readonly indices: Uint32Array;
   readonly nodeIndex?: number;
   /** gltf-pro `PBRInstances`: one collider per drawn instance (24 floats each, node-space matrix first). */
-  readonly instances?: {readonly count: number; readonly data: Float32Array};
+  readonly instances?: { readonly count: number; readonly data: Float32Array };
 }
 /** Structural view of a gltf-pro `PBRModel`: its `root` node and `primitives`. */
-export interface ModelLike {readonly root: Mesh; readonly primitives: readonly ModelPrimitiveLike[]}
+export interface ModelLike {
+  readonly root: Mesh;
+  readonly primitives: readonly ModelPrimitiveLike[];
+}
 /** Options for `Physics.addModel`: body options plus how the model's triangles become colliders. */
 export interface ModelBodyOptions extends Omit<BodyOptions, 'colliders' | 'position' | 'rotation'> {
   /**
@@ -127,7 +137,9 @@ export interface ModelBodyOptions extends Omit<BodyOptions, 'colliders' | 'posit
 
 const noop = (): void => {};
 // Set.forEach with the event as thisArg calls listeners without allocating a closure or a snapshot array.
-function callListener(this: unknown, listener: (event: unknown) => void): void {listener(this);}
+function callListener(this: unknown, listener: (event: unknown) => void): void {
+  listener(this);
+}
 const identityRotation: Quat = [0, 0, 0, 1];
 
 /**
@@ -158,7 +170,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   private readonly controllers = new Set<CharacterController>();
   private readonly listeners = new Map<keyof PhysicsEventMap, Set<(event: any) => void>>();
   private readonly scratch = [0, 0, 0, 0];
-  private readonly positionScratch: [number,number,number] = [0,0,0];
+  private readonly positionScratch: [number, number, number] = [0, 0, 0];
   private readonly parentScratch = new Float64Array(16);
   private readonly inverseScratch = new Float64Array(16);
   private readonly parentRotation = [0, 0, 0, 1];
@@ -168,18 +180,35 @@ export class Physics implements EnginePlugin, BodyOwner {
   private collecting: CollisionEvent[] = this.eventBuffer;
   private dispatching = false;
   private readonly collect = (h1: number, h2: number, started: boolean): void => {
-    const bodyA = this.byCollider.get(h1), bodyB = this.byCollider.get(h2);
+    const bodyA = this.byCollider.get(h1),
+      bodyB = this.byCollider.get(h2);
     if (!bodyA || !bodyB) return;
-    const world = this.worldRef, colliderA = world.getCollider(h1), colliderB = world.getCollider(h2);
+    const world = this.worldRef,
+      colliderA = world.getCollider(h1),
+      colliderB = world.getCollider(h2);
     const sensor = !!(colliderA?.isSensor() || colliderB?.isSensor());
-    this.collecting.push({type: sensor ? (started ? 'intersectionstart' : 'intersectionend') : (started ? 'contactstart' : 'contactend'), bodyA, bodyB, meshA: bodyA.mesh, meshB: bodyB.mesh, colliderA, colliderB, sensor});
+    this.collecting.push({
+      type: sensor ? (started ? 'intersectionstart' : 'intersectionend') : started ? 'contactstart' : 'contactend',
+      bodyA,
+      bodyB,
+      meshA: bodyA.mesh,
+      meshB: bodyB.mesh,
+      colliderA,
+      colliderB,
+      sensor,
+    });
   };
 
   /** Creates the Physics on `engine` (preferred over the constructor). */
-  static attach(engine: EngineKernel, options: PhysicsOptions): Physics {return new Physics(engine, options);}
+  static attach(engine: EngineKernel, options: PhysicsOptions): Physics {
+    return new Physics(engine, options);
+  }
   constructor(engine: EngineKernel | null, options: PhysicsOptions) {
     const R = options?.rapier;
-    if (!R || typeof R.World !== 'function' || !R.ColliderDesc) throw new TypeError('Pass the initialized Rapier module: new Physics(engine, {rapier: RAPIER}) after await RAPIER.init()');
+    if (!R || typeof R.World !== 'function' || !R.ColliderDesc)
+      throw new TypeError(
+        'Pass the initialized Rapier module: new Physics(engine, {rapier: RAPIER}) after await RAPIER.init()',
+      );
     this.rapier = R;
     this.name = options.name ?? 'physics';
     this.fixedTimestep = options.fixedTimestep ?? 1 / 60;
@@ -187,35 +216,68 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.interpolate = options.interpolate ?? true;
     this.timeScale = options.timeScale ?? 1;
     this.paused = options.paused ?? false;
-    if (!(this.fixedTimestep > 0 && this.fixedTimestep <= 1)) throw new RangeError('fixedTimestep must be in (0, 1] seconds');
-    if (!Number.isInteger(this.maxSubsteps) || this.maxSubsteps < 1) throw new RangeError('maxSubsteps must be a positive integer');
+    if (!(this.fixedTimestep > 0 && this.fixedTimestep <= 1))
+      throw new RangeError('fixedTimestep must be in (0, 1] seconds');
+    if (!Number.isInteger(this.maxSubsteps) || this.maxSubsteps < 1)
+      throw new RangeError('maxSubsteps must be a positive integer');
     const gravity = options.gravity ?? [0, -9.81, 0];
     checkVec(gravity, 'Gravity');
     this.worldRef = new R.World(vec(gravity));
     this.worldRef.timestep = this.fixedTimestep;
     if (options.solverIterations !== undefined) this.worldRef.numSolverIterations = options.solverIterations;
-    try {this.queue = new R.EventQueue(true);} catch (error) {this.worldRef.free(); throw error;}
+    try {
+      this.queue = new R.EventQueue(true);
+    } catch (error) {
+      this.worldRef.free();
+      throw error;
+    }
     const filter = options.contactFilter;
     if (filter) {
-      const allow = (h1: number, h2: number): boolean => {const a = this.byCollider.get(h1), b = this.byCollider.get(h2); return !a || !b || filter(a, b) !== false;};
+      const allow = (h1: number, h2: number): boolean => {
+        const a = this.byCollider.get(h1),
+          b = this.byCollider.get(h2);
+        return !a || !b || filter(a, b) !== false;
+      };
       this.hooks = {
-        filterContactPair: (h1: number, h2: number) => allow(h1, h2) ? R.SolverFlags.COMPUTE_IMPULSE : null,
+        filterContactPair: (h1: number, h2: number) => (allow(h1, h2) ? R.SolverFlags.COMPUTE_IMPULSE : null),
         filterIntersectionPair: allow,
       };
     }
-    if (engine) try {engine.use(this);} catch (error) {this.dispose(); throw error;}
+    if (engine)
+      try {
+        engine.use(this);
+      } catch (error) {
+        this.dispose();
+        throw error;
+      }
   }
 
   /** The Rapier `World`. Use it for anything this wrapper does not cover. */
-  get world(): any {if (this.disposed) throw new Error('Physics is disposed'); return this.worldRef;}
-  get isDisposed(): boolean {return this.disposed;}
-  get gravity(): [number, number, number] {return tuple(this.world.gravity);}
-  set gravity(value: Vec3) {checkVec(value, 'Gravity'); this.world.gravity = vec(value);}
+  get world(): any {
+    if (this.disposed) throw new Error('Physics is disposed');
+    return this.worldRef;
+  }
+  get isDisposed(): boolean {
+    return this.disposed;
+  }
+  get gravity(): [number, number, number] {
+    return tuple(this.world.gravity);
+  }
+  set gravity(value: Vec3) {
+    checkVec(value, 'Gravity');
+    this.world.gravity = vec(value);
+  }
   /** Interpolation factor used by the last `update`: leftover accumulator time over the step length, 0..1. */
-  get alpha(): number {return this.lastAlpha;}
+  get alpha(): number {
+    return this.lastAlpha;
+  }
   /** Leftover simulation time in seconds, less than one step. */
-  get pendingTime(): number {return this.accumulator;}
-  get bodyCount(): number {return this.bodies.size;}
+  get pendingTime(): number {
+    return this.accumulator;
+  }
+  get bodyCount(): number {
+    return this.bodies.size;
+  }
 
   // Engine plugin hooks.
   setup(engine: EngineKernel): void {
@@ -223,17 +285,24 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (this.engine && this.engine !== engine) throw new Error('Physics is attached to another engine');
     this.engine = engine;
   }
-  onPreUpdate(delta: number): void {this.update(delta);}
+  onPreUpdate(delta: number): void {
+    this.update(delta);
+  }
 
   /** Advances the accumulator by `delta` seconds, runs whole fixed steps, then writes interpolated poses to meshes. Returns the number of steps. */
   update(delta: number): number {
     if (this.disposed) return 0;
-    if (!Number.isFinite(delta) || delta < 0) throw new RangeError('delta must be a finite, non-negative number of seconds');
+    if (!Number.isFinite(delta) || delta < 0)
+      throw new RangeError('delta must be a finite, non-negative number of seconds');
     let steps = 0;
     if (!this.paused) {
       const dt = this.fixedTimestep;
       this.accumulator += delta * this.timeScale;
-      while (this.accumulator + dt * 1e-6 >= dt && steps < this.maxSubsteps) {this.step(); this.accumulator -= dt; steps++;}
+      while (this.accumulator + dt * 1e-6 >= dt && steps < this.maxSubsteps) {
+        this.step();
+        this.accumulator -= dt;
+        steps++;
+      }
       if (this.accumulator >= dt) this.accumulator %= dt;
       if (this.accumulator < 0) this.accumulator = 0;
       this.lastAlpha = this.interpolate ? this.accumulator / dt : 1;
@@ -247,18 +316,24 @@ export class Physics implements EnginePlugin, BodyOwner {
    * Apart from Rapier's own `World.step` and the event objects of steps that have collisions, it allocates nothing.
    */
   step(): void {
-    const world = this.world, dt = this.fixedTimestep;
+    const world = this.world,
+      dt = this.fixedTimestep;
     this.emit('beforestep', dt);
     if (this.disposed) return;
     world.timestep = dt;
     world.step(this.queue, this.hooks);
     this.stepCount++;
     this.bodies.forEach(this.snapshotBody);
-    const outer = this.dispatching, events = this.collecting = outer ? [] : this.eventBuffer;
+    const outer = this.dispatching,
+      events = (this.collecting = outer ? [] : this.eventBuffer);
     this.queue.drainCollisionEvents(this.collect);
     this.dispatching = true;
-    try {for (let i = 0; i < events.length; i++) this.emit(events[i].type, events[i]);}
-    finally {this.dispatching = outer; events.length = 0;}
+    try {
+      for (let i = 0; i < events.length; i++) this.emit(events[i].type, events[i]);
+    } finally {
+      this.dispatching = outer;
+      events.length = 0;
+    }
     this.emit('afterstep', dt);
   }
   private readonly snapshotBody = (body: PhysicsBody): void => {
@@ -267,66 +342,148 @@ export class Physics implements EnginePlugin, BodyOwner {
     // A dynamic body asleep since the previous step has not moved, so skip Rapier's pose getters (in Rapier 0.21 each
     // allocates a typed-array view). The step that puts a body to sleep can still move it, so that one is read.
     const sleeping = body.type === 'dynamic' && body.raw.isSleeping();
-    if (sleeping && body.slept) p.copyWithin(0, 7, 14); else body.snapshot();
+    if (sleeping && body.slept) p.copyWithin(0, 7, 14);
+    else body.snapshot();
     body.slept = sleeping;
-    for (let i = 0; i < 7; i++) if (p[i] !== p[i + 7]) {body.restWritten = false; break;}
+    for (let i = 0; i < 7; i++)
+      if (p[i] !== p[i + 7]) {
+        body.restWritten = false;
+        break;
+      }
   };
 
   /** Writes body poses to their meshes, interpolated by `alpha` between the last two steps. Allocates nothing. */
   sync(alpha = this.lastAlpha): void {
     if (this.disposed) return;
-    if(!Number.isFinite(alpha))throw new RangeError('Invalid physics interpolation alpha');
-    this.syncAlpha=this.interpolate ? Math.min(1, Math.max(0, alpha)) : 1;
+    if (!Number.isFinite(alpha)) throw new RangeError('Invalid physics interpolation alpha');
+    this.syncAlpha = this.interpolate ? Math.min(1, Math.max(0, alpha)) : 1;
     this.bodies.forEach(this.syncBody);
   }
   // A stable callback avoids creating a Set iterator during every synchronization.
-  private readonly syncBody = (body:PhysicsBody):void => {
-      const out=this.scratch,lerp=this.syncAlpha;
-      const mesh = body.mesh;
-      // A resting body on a child mesh is still rewritten: its parent may have moved, and the body keeps its world pose.
-      if (!mesh || (body.type === 'fixed' && !body.dirty) || body.restWritten && parentOf(mesh) === -1) return;
-      try {mesh.check();} catch {this.removeBody(body); return;}
-      const p = body.pose;
-      const position=this.positionScratch;position[0]=p[0]+(p[7]-p[0])*lerp;position[1]=p[1]+(p[8]-p[1])*lerp;position[2]=p[2]+(p[9]-p[2])*lerp;
-      // Shortest-arc slerp of the two step rotations, inline: V8 boxes a fractional number passed to a call it does not
-      // inline (a heap allocation), and Math.hypot allocates an array for its arguments.
-      const ax=p[3],ay=p[4],az=p[5],aw=p[6];let bx=p[10],by=p[11],bz=p[12],bw=p[13],cos=ax*bx+ay*by+az*bz+aw*bw,k0=1-lerp,k1=lerp;
-      if(cos<0){cos=-cos;bx=-bx;by=-by;bz=-bz;bw=-bw;}
-      if(cos<=0.9995){const angle=Math.acos(cos),sin=Math.sin(angle);k0=Math.sin((1-lerp)*angle)/sin;k1=Math.sin(lerp*angle)/sin;}
-      out[0]=ax*k0+bx*k1;out[1]=ay*k0+by*k1;out[2]=az*k0+bz*k1;out[3]=aw*k0+bw*k1;
-      const length=Math.sqrt(out[0]*out[0]+out[1]*out[1]+out[2]*out[2]+out[3]*out[3])||1;
-      for(let i=0;i<4;i++)out[i]/=length;
-      if(mesh instanceof CoreMesh){
-        // Frozen core's setQuaternion maps a fresh array; synchronize through its extension storage.
-        const runtime=meshRuntime(mesh),store=runtime.engine.store,t=store.transforms,id=runtime.id,parent=store.parents[id];
-        // A child mesh gets its pose relative to the parent's current world transform (no frame of lag).
-        if(parent!==-1)this.toLocal(store,parent,position,out);
-        const x=out[0],y=out[1],z=out[2],w=out[3];
-        if(!Number.isFinite(Math.fround(position[0]))||!Number.isFinite(Math.fround(position[1]))||!Number.isFinite(Math.fround(position[2])))throw new RangeError('Invalid physics position');
-        if(!Number.isFinite(Math.fround(x))||!Number.isFinite(Math.fround(y))||!Number.isFinite(Math.fround(z))||!Number.isFinite(Math.fround(w)))throw new RangeError('Invalid physics quaternion');
-        t.x[id]=position[0];t.y[id]=position[1];t.z[id]=position[2];
-        t.qx[id]=x;t.qy[id]=y;t.qz[id]=z;t.qw[id]=w;
-        runtime.euler[1]=Math.asin(Math.max(-1,Math.min(1,2*(x*z+w*y))));
-        runtime.euler[0]=Math.atan2(2*(w*x-y*z),1-2*(x*x+y*y));runtime.euler[2]=Math.atan2(2*(w*z-x*y),1-2*(y*y+z*z));
-      }else{
-        if (parentOf(mesh) !== -1) throw new Error('Physics bodies on child meshes need core meshes');
-        mesh.setPosition(position).setQuaternion(out);
-      }
-      body.dirty = false;
-      body.restWritten = p[0] === p[7] && p[1] === p[8] && p[2] === p[9] && p[3] === p[10] && p[4] === p[11] && p[5] === p[12] && p[6] === p[13];
+  private readonly syncBody = (body: PhysicsBody): void => {
+    const out = this.scratch,
+      lerp = this.syncAlpha;
+    const mesh = body.mesh;
+    // A resting body on a child mesh is still rewritten: its parent may have moved, and the body keeps its world pose.
+    if (!mesh || (body.type === 'fixed' && !body.dirty) || (body.restWritten && parentOf(mesh) === -1)) return;
+    try {
+      mesh.check();
+    } catch {
+      this.removeBody(body);
+      return;
+    }
+    const p = body.pose;
+    const position = this.positionScratch;
+    position[0] = p[0] + (p[7] - p[0]) * lerp;
+    position[1] = p[1] + (p[8] - p[1]) * lerp;
+    position[2] = p[2] + (p[9] - p[2]) * lerp;
+    // Shortest-arc slerp of the two step rotations, inline: V8 boxes a fractional number passed to a call it does not
+    // inline (a heap allocation), and Math.hypot allocates an array for its arguments.
+    const ax = p[3],
+      ay = p[4],
+      az = p[5],
+      aw = p[6];
+    let bx = p[10],
+      by = p[11],
+      bz = p[12],
+      bw = p[13],
+      cos = ax * bx + ay * by + az * bz + aw * bw,
+      k0 = 1 - lerp,
+      k1 = lerp;
+    if (cos < 0) {
+      cos = -cos;
+      bx = -bx;
+      by = -by;
+      bz = -bz;
+      bw = -bw;
+    }
+    if (cos <= 0.9995) {
+      const angle = Math.acos(cos),
+        sin = Math.sin(angle);
+      k0 = Math.sin((1 - lerp) * angle) / sin;
+      k1 = Math.sin(lerp * angle) / sin;
+    }
+    out[0] = ax * k0 + bx * k1;
+    out[1] = ay * k0 + by * k1;
+    out[2] = az * k0 + bz * k1;
+    out[3] = aw * k0 + bw * k1;
+    const length = Math.sqrt(out[0] * out[0] + out[1] * out[1] + out[2] * out[2] + out[3] * out[3]) || 1;
+    for (let i = 0; i < 4; i++) out[i] /= length;
+    if (mesh instanceof CoreMesh) {
+      // Frozen core's setQuaternion maps a fresh array; synchronize through its extension storage.
+      const runtime = meshRuntime(mesh),
+        store = runtime.engine.store,
+        t = store.transforms,
+        id = runtime.id,
+        parent = store.parents[id];
+      // A child mesh gets its pose relative to the parent's current world transform (no frame of lag).
+      if (parent !== -1) this.toLocal(store, parent, position, out);
+      const x = out[0],
+        y = out[1],
+        z = out[2],
+        w = out[3];
+      if (
+        !Number.isFinite(Math.fround(position[0])) ||
+        !Number.isFinite(Math.fround(position[1])) ||
+        !Number.isFinite(Math.fround(position[2]))
+      )
+        throw new RangeError('Invalid physics position');
+      if (
+        !Number.isFinite(Math.fround(x)) ||
+        !Number.isFinite(Math.fround(y)) ||
+        !Number.isFinite(Math.fround(z)) ||
+        !Number.isFinite(Math.fround(w))
+      )
+        throw new RangeError('Invalid physics quaternion');
+      t.x[id] = position[0];
+      t.y[id] = position[1];
+      t.z[id] = position[2];
+      t.qx[id] = x;
+      t.qy[id] = y;
+      t.qz[id] = z;
+      t.qw[id] = w;
+      runtime.euler[1] = Math.asin(Math.max(-1, Math.min(1, 2 * (x * z + w * y))));
+      runtime.euler[0] = Math.atan2(2 * (w * x - y * z), 1 - 2 * (x * x + y * y));
+      runtime.euler[2] = Math.atan2(2 * (w * z - x * y), 1 - 2 * (y * y + z * z));
+    } else {
+      if (parentOf(mesh) !== -1) throw new Error('Physics bodies on child meshes need core meshes');
+      mesh.setPosition(position).setQuaternion(out);
+    }
+    body.dirty = false;
+    body.restWritten =
+      p[0] === p[7] &&
+      p[1] === p[8] &&
+      p[2] === p[9] &&
+      p[3] === p[10] &&
+      p[4] === p[11] &&
+      p[5] === p[12] &&
+      p[6] === p[13];
   };
   /** World pose (in place) to the pose relative to `parent`: inverse parent matrix on the position, inverse parent rotation on the quaternion. */
   private toLocal(store: TransformStoreLike, parent: number, position: number[], rotation: number[]): void {
-    const m = worldMatrix(store, parent, this.parentScratch), inverse = invertMatrix(m, this.inverseScratch);
+    const m = worldMatrix(store, parent, this.parentScratch),
+      inverse = invertMatrix(m, this.inverseScratch);
     if (!inverse) throw new RangeError('Physics body parent has a singular world transform');
-    const x = position[0], y = position[1], z = position[2];
-    for (let r = 0; r < 3; r++) position[r] = inverse[r] * x + inverse[4 + r] * y + inverse[8 + r] * z + inverse[12 + r];
+    const x = position[0],
+      y = position[1],
+      z = position[2];
+    for (let r = 0; r < 3; r++)
+      position[r] = inverse[r] * x + inverse[4 + r] * y + inverse[8 + r] * z + inverse[12 + r];
     const q = this.parentRotation;
     matrixRotation(m, q);
     // conjugate(q) * rotation
-    const ax = -q[0], ay = -q[1], az = -q[2], aw = q[3], bx = rotation[0], by = rotation[1], bz = rotation[2], bw = rotation[3];
-    rotation[0] = aw * bx + ax * bw + ay * bz - az * by; rotation[1] = aw * by - ax * bz + ay * bw + az * bx;
-    rotation[2] = aw * bz + ax * by - ay * bx + az * bw; rotation[3] = aw * bw - ax * bx - ay * by - az * bz;
+    const ax = -q[0],
+      ay = -q[1],
+      az = -q[2],
+      aw = q[3],
+      bx = rotation[0],
+      by = rotation[1],
+      bz = rotation[2],
+      bw = rotation[3];
+    rotation[0] = aw * bx + ax * bw + ay * bz - az * by;
+    rotation[1] = aw * by - ax * bz + ay * bw + az * bx;
+    rotation[2] = aw * bz + ax * by - ay * bx + az * bw;
+    rotation[3] = aw * bw - ax * bx - ay * by - az * bz;
   }
 
   /**
@@ -336,7 +493,9 @@ export class Physics implements EnginePlugin, BodyOwner {
    * written.
    */
   addBody(mesh: Mesh | null, options: BodyOptions = {}): PhysicsBody {
-    const world = this.world, R = this.rapier, type: BodyType = options.type ?? 'dynamic';
+    const world = this.world,
+      R = this.rapier,
+      type: BodyType = options.type ?? 'dynamic';
     let worldPose: Float64Array | null = null;
     if (mesh) {
       mesh.check();
@@ -347,16 +506,38 @@ export class Physics implements EnginePlugin, BodyOwner {
         worldPose = worldMatrix(runtime.engine.store, runtime.id, new Float64Array(16));
       }
     }
-    const factory = {dynamic: 'dynamic', fixed: 'fixed', kinematicPosition: 'kinematicPositionBased', kinematicVelocity: 'kinematicVelocityBased'}[type];
+    const factory = {
+      dynamic: 'dynamic',
+      fixed: 'fixed',
+      kinematicPosition: 'kinematicPositionBased',
+      kinematicVelocity: 'kinematicVelocityBased',
+    }[type];
     if (!factory) throw new TypeError(`Unknown body type ${type}`);
     const desc = R.RigidBodyDesc[factory]();
-    const position = options.position ?? (worldPose ? [worldPose[12], worldPose[13], worldPose[14]] as const : mesh ? [mesh.position.x, mesh.position.y, mesh.position.z] as const : [0, 0, 0] as const);
+    const position =
+      options.position ??
+      (worldPose
+        ? ([worldPose[12], worldPose[13], worldPose[14]] as const)
+        : mesh
+          ? ([mesh.position.x, mesh.position.y, mesh.position.z] as const)
+          : ([0, 0, 0] as const));
     checkVec(position, 'Position');
-    let rotation: Quat = options.rotation ?? (mesh ? eulerToQuat(mesh.rotation.x, mesh.rotation.y, mesh.rotation.z) : identityRotation);
-    if (!options.rotation && worldPose) {const q: [number, number, number, number] = [0, 0, 0, 1]; matrixRotation(worldPose, q); rotation = q;}
+    let rotation: Quat =
+      options.rotation ?? (mesh ? eulerToQuat(mesh.rotation.x, mesh.rotation.y, mesh.rotation.z) : identityRotation);
+    if (!options.rotation && worldPose) {
+      const q: [number, number, number, number] = [0, 0, 0, 1];
+      matrixRotation(worldPose, q);
+      rotation = q;
+    }
     desc.setTranslation(position[0], position[1], position[2]).setRotation(quat(rotation));
-    if (options.linearVelocity) {checkVec(options.linearVelocity, 'linearVelocity'); desc.setLinvel(...options.linearVelocity);}
-    if (options.angularVelocity) {checkVec(options.angularVelocity, 'angularVelocity'); desc.setAngvel(vec(options.angularVelocity));}
+    if (options.linearVelocity) {
+      checkVec(options.linearVelocity, 'linearVelocity');
+      desc.setLinvel(...options.linearVelocity);
+    }
+    if (options.angularVelocity) {
+      checkVec(options.angularVelocity, 'angularVelocity');
+      desc.setAngvel(vec(options.angularVelocity));
+    }
     if (options.linearDamping !== undefined) desc.setLinearDamping(options.linearDamping);
     if (options.angularDamping !== undefined) desc.setAngularDamping(options.angularDamping);
     if (options.gravityScale !== undefined) desc.setGravityScale(options.gravityScale);
@@ -377,9 +558,20 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (mesh && !options.position && !options.rotation) body.dirty = false;
     this.bodies.add(body);
     if (mesh) this.byMesh.set(mesh, body);
-    const colliders = options.colliders === undefined ? (mesh?.geometry ? [{shape: 'box'} as ColliderOptions] : []) : Array.isArray(options.colliders) ? options.colliders : [options.colliders as ColliderOptions];
-    try {for (const collider of colliders) this.addCollider(body, collider);}
-    catch (error) {this.removeBody(body); throw error;}
+    const colliders =
+      options.colliders === undefined
+        ? mesh?.geometry
+          ? [{ shape: 'box' } as ColliderOptions]
+          : []
+        : Array.isArray(options.colliders)
+          ? options.colliders
+          : [options.colliders as ColliderOptions];
+    try {
+      for (const collider of colliders) this.addCollider(body, collider);
+    } catch (error) {
+      this.removeBody(body);
+      throw error;
+    }
     return body;
   }
 
@@ -391,19 +583,26 @@ export class Physics implements EnginePlugin, BodyOwner {
    * that node, and dynamic nodes move on their own). Returns the new bodies; after an error none are kept.
    */
   addModel(model: ModelLike, options: ModelBodyOptions = {}): PhysicsBody[] {
-    const {shape: requested, perNode = false, filter, collider = {}, ...bodyOptions} = options;
-    const type: BodyType = bodyOptions.type ?? 'dynamic', shape = requested ?? (type === 'dynamic' ? 'convexHull' : 'trimesh');
-    if (shape !== 'trimesh' && shape !== 'convexHull') throw new TypeError(`Model colliders are 'trimesh' or 'convexHull', not ${String(shape)}`);
-    if (!model?.root || !Array.isArray(model.primitives)) throw new TypeError('addModel needs a gltf-pro model (root and primitives)');
+    const { shape: requested, perNode = false, filter, collider = {}, ...bodyOptions } = options;
+    const type: BodyType = bodyOptions.type ?? 'dynamic',
+      shape = requested ?? (type === 'dynamic' ? 'convexHull' : 'trimesh');
+    if (shape !== 'trimesh' && shape !== 'convexHull')
+      throw new TypeError(`Model colliders are 'trimesh' or 'convexHull', not ${String(shape)}`);
+    if (!model?.root || !Array.isArray(model.primitives))
+      throw new TypeError('addModel needs a gltf-pro model (root and primitives)');
     const groups = new Map<Mesh, ModelPrimitiveLike[]>();
     for (const primitive of model.primitives) {
       if (filter && !filter(primitive)) continue;
       const anchor = perNode ? primitive.node : model.root;
       let list = groups.get(anchor);
-      if (!list) groups.set(anchor, list = []);
+      if (!list) groups.set(anchor, (list = []));
       list.push(primitive);
     }
-    const created: PhysicsBody[] = [], anchorMatrix = new Float64Array(16), nodeMatrix = new Float64Array(16), instanceMatrix = new Float64Array(16), q = [0, 0, 0, 1];
+    const created: PhysicsBody[] = [],
+      anchorMatrix = new Float64Array(16),
+      nodeMatrix = new Float64Array(16),
+      instanceMatrix = new Float64Array(16),
+      q = [0, 0, 0, 1];
     try {
       for (const [anchor, primitives] of groups) {
         anchor.check();
@@ -411,43 +610,86 @@ export class Physics implements EnginePlugin, BodyOwner {
         worldMatrix(anchorRuntime.engine.store, anchorRuntime.id, anchorMatrix);
         matrixRotation(anchorMatrix, q);
         // Body space = world space under the inverse of the anchor's rigid pose (position and rotation; scale is baked in).
-        const px = anchorMatrix[12], py = anchorMatrix[13], pz = anchorMatrix[14], qx = q[0], qy = q[1], qz = q[2], qw = q[3];
-        const r00 = 1 - 2 * (qy * qy + qz * qz), r10 = 2 * (qx * qy + qw * qz), r20 = 2 * (qx * qz - qw * qy);
-        const r01 = 2 * (qx * qy - qw * qz), r11 = 1 - 2 * (qx * qx + qz * qz), r21 = 2 * (qy * qz + qw * qx);
-        const r02 = 2 * (qx * qz + qw * qy), r12 = 2 * (qy * qz - qw * qx), r22 = 1 - 2 * (qx * qx + qy * qy);
+        const px = anchorMatrix[12],
+          py = anchorMatrix[13],
+          pz = anchorMatrix[14],
+          qx = q[0],
+          qy = q[1],
+          qz = q[2],
+          qw = q[3];
+        const r00 = 1 - 2 * (qy * qy + qz * qz),
+          r10 = 2 * (qx * qy + qw * qz),
+          r20 = 2 * (qx * qz - qw * qy);
+        const r01 = 2 * (qx * qy - qw * qz),
+          r11 = 1 - 2 * (qx * qx + qz * qz),
+          r21 = 2 * (qy * qz + qw * qx);
+        const r02 = 2 * (qx * qz + qw * qy),
+          r12 = 2 * (qy * qz - qw * qx),
+          r22 = 1 - 2 * (qx * qx + qy * qy);
         const colliders: ColliderOptions[] = [];
         for (const primitive of primitives) {
-          const node = meshRuntime(primitive.node), v = primitive.vertices, count = v.length / 20, instances = primitive.instances;
+          const node = meshRuntime(primitive.node),
+            v = primitive.vertices,
+            count = v.length / 20,
+            instances = primitive.instances;
           worldMatrix(node.engine.store, node.id, nodeMatrix);
           for (let k = 0; k < (instances ? instances.count : 1); k++) {
-            const m = instances ? multiplyMatrices(nodeMatrix, instances.data.subarray(k * 24, k * 24 + 16), instanceMatrix) : nodeMatrix, points = new Float32Array(count * 3);
+            const m = instances
+                ? multiplyMatrices(nodeMatrix, instances.data.subarray(k * 24, k * 24 + 16), instanceMatrix)
+                : nodeMatrix,
+              points = new Float32Array(count * 3);
             for (let i = 0; i < count; i++) {
-              const x = v[i * 20], y = v[i * 20 + 1], z = v[i * 20 + 2];
-              const wx = m[0] * x + m[4] * y + m[8] * z + m[12] - px, wy = m[1] * x + m[5] * y + m[9] * z + m[13] - py, wz = m[2] * x + m[6] * y + m[10] * z + m[14] - pz;
-              points[i * 3] = r00 * wx + r10 * wy + r20 * wz; points[i * 3 + 1] = r01 * wx + r11 * wy + r21 * wz; points[i * 3 + 2] = r02 * wx + r12 * wy + r22 * wz;
+              const x = v[i * 20],
+                y = v[i * 20 + 1],
+                z = v[i * 20 + 2];
+              const wx = m[0] * x + m[4] * y + m[8] * z + m[12] - px,
+                wy = m[1] * x + m[5] * y + m[9] * z + m[13] - py,
+                wz = m[2] * x + m[6] * y + m[10] * z + m[14] - pz;
+              points[i * 3] = r00 * wx + r10 * wy + r20 * wz;
+              points[i * 3 + 1] = r01 * wx + r11 * wy + r21 * wz;
+              points[i * 3 + 2] = r02 * wx + r12 * wy + r22 * wz;
             }
-            colliders.push(shape === 'trimesh' ? {...collider, shape, vertices: points, indices: primitive.indices} : {...collider, shape, points});
+            colliders.push(
+              shape === 'trimesh'
+                ? { ...collider, shape, vertices: points, indices: primitive.indices }
+                : { ...collider, shape, points },
+            );
           }
         }
-        created.push(this.addBody(anchor, {...bodyOptions, type, position: [px, py, pz], rotation: [qx, qy, qz, qw], colliders}));
+        created.push(
+          this.addBody(anchor, { ...bodyOptions, type, position: [px, py, pz], rotation: [qx, qy, qz, qw], colliders }),
+        );
         // The pose came from the mesh: nothing to write back until the body moves.
         created[created.length - 1].dirty = false;
       }
-    } catch (error) {for (const body of created) this.removeBody(body); throw error;}
+    } catch (error) {
+      for (const body of created) this.removeBody(body);
+      throw error;
+    }
     return created;
   }
 
   /** The body driving `mesh`, if any. */
-  bodyOf(mesh: Mesh): PhysicsBody | undefined {return this.byMesh.get(mesh);}
+  bodyOf(mesh: Mesh): PhysicsBody | undefined {
+    return this.byMesh.get(mesh);
+  }
   /** The body owning a Rapier collider or collider handle. */
-  bodyOfCollider(collider: any): PhysicsBody | undefined {return this.byCollider.get(typeof collider === 'number' ? collider : collider?.handle);}
-  getBodies(): PhysicsBody[] {return [...this.bodies];}
+  bodyOfCollider(collider: any): PhysicsBody | undefined {
+    return this.byCollider.get(typeof collider === 'number' ? collider : collider?.handle);
+  }
+  getBodies(): PhysicsBody[] {
+    return [...this.bodies];
+  }
 
   /** @internal use `body.addCollider`. */
   addCollider(body: PhysicsBody, options: ColliderOptions): any {
-    const R = this.rapier, mesh = body.mesh;
-    const fit = {geometry: mesh?.geometry ?? null, scale: body.fitScale ?? (mesh ? [mesh.scale.x, mesh.scale.y, mesh.scale.z] as const : [1, 1, 1] as const)};
-    const {desc, center} = createColliderDesc(R, options, fit);
+    const R = this.rapier,
+      mesh = body.mesh;
+    const fit = {
+      geometry: mesh?.geometry ?? null,
+      scale: body.fitScale ?? (mesh ? ([mesh.scale.x, mesh.scale.y, mesh.scale.z] as const) : ([1, 1, 1] as const)),
+    };
+    const { desc, center } = createColliderDesc(R, options, fit);
     configureCollider(R, desc, options, center, !!this.hooks);
     const collider = this.world.createCollider(desc, body.raw);
     body.colliders.push(collider);
@@ -477,7 +719,8 @@ export class Physics implements EnginePlugin, BodyOwner {
 
   /** Connects two bodies with a fixed, spherical, revolute or prismatic joint. Anchors are in each body's local frame. */
   addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: JointOptions): PhysicsJoint {
-    if (!this.bodies.has(bodyA) || !this.bodies.has(bodyB)) throw new Error('Both bodies must belong to this physics world');
+    if (!this.bodies.has(bodyA) || !this.bodies.has(bodyB))
+      throw new Error('Both bodies must belong to this physics world');
     if (bodyA === bodyB) throw new Error('A joint needs two different bodies');
     const raw = this.world.createImpulseJoint(createJointData(this.rapier, options), bodyA.raw, bodyB.raw, true);
     const joint = new PhysicsJoint(this, raw, options.type, bodyA, bodyB);
@@ -513,9 +756,11 @@ export class Physics implements EnginePlugin, BodyOwner {
   on<K extends keyof PhysicsEventMap>(type: K, listener: (event: PhysicsEventMap[K]) => void): () => void {
     if (this.disposed) return noop;
     let set = this.listeners.get(type);
-    if (!set) this.listeners.set(type, set = new Set());
+    if (!set) this.listeners.set(type, (set = new Set()));
     set.add(listener);
-    return () => {set!.delete(listener);};
+    return () => {
+      set!.delete(listener);
+    };
   }
   private emit<K extends keyof PhysicsEventMap>(type: K, event: PhysicsEventMap[K]): void {
     // Listeners removed during dispatch are skipped; listeners added during dispatch also run for this event.
@@ -523,7 +768,9 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
 
   // Scene queries. All positions and directions are world space.
-  private filterArgs(filter: QueryFilter = {}): [number | undefined, number | undefined, undefined, any, ((collider: any) => boolean) | undefined] {
+  private filterArgs(
+    filter: QueryFilter = {},
+  ): [number | undefined, number | undefined, undefined, any, ((collider: any) => boolean) | undefined] {
     const F = this.rapier.QueryFilterFlags;
     let flags = 0;
     if (filter.excludeSensors) flags |= F.EXCLUDE_SENSORS;
@@ -531,91 +778,192 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (filter.excludeKinematic) flags |= F.EXCLUDE_KINEMATIC;
     if (filter.excludeDynamic) flags |= F.EXCLUDE_DYNAMIC;
     const predicate = filter.predicate;
-    return [flags || undefined, filter.groups, undefined, filter.exclude?.raw,
-      collider => {const body = this.byCollider.get(collider.handle); return !!body && (!predicate || predicate(body, collider));}];
+    return [
+      flags || undefined,
+      filter.groups,
+      undefined,
+      filter.exclude?.raw,
+      (collider) => {
+        const body = this.byCollider.get(collider.handle);
+        return !!body && (!predicate || predicate(body, collider));
+      },
+    ];
   }
   private hit(collider: any): Hit | null {
     const body = this.byCollider.get(collider.handle);
-    return body ? {body, mesh: body.mesh, collider} : null;
+    return body ? { body, mesh: body.mesh, collider } : null;
   }
-  private ray(origin: Vec3, direction: Vec3): {ray: any; dir: [number, number, number]} {
-    checkVec(origin, 'Ray origin'); checkVec(direction, 'Ray direction');
+  private ray(origin: Vec3, direction: Vec3): { ray: any; dir: [number, number, number] } {
+    checkVec(origin, 'Ray origin');
+    checkVec(direction, 'Ray direction');
     const length = Math.hypot(...direction);
     if (!length) throw new RangeError('Ray direction must be nonzero');
     const dir: [number, number, number] = [direction[0] / length, direction[1] / length, direction[2] / length];
-    return {ray: new this.rapier.Ray(vec(origin), vec(dir)), dir};
+    return { ray: new this.rapier.Ray(vec(origin), vec(dir)), dir };
   }
 
   /** First hit along a ray, or null. */
   raycast(origin: Vec3, direction: Vec3, options: RaycastOptions = {}): RaycastHit | null {
-    const {ray, dir} = this.ray(origin, direction);
-    const result = this.world.castRayAndGetNormal(ray, options.maxDistance ?? 1e30, options.solid ?? true, ...this.filterArgs(options));
+    const { ray, dir } = this.ray(origin, direction);
+    const result = this.world.castRayAndGetNormal(
+      ray,
+      options.maxDistance ?? 1e30,
+      options.solid ?? true,
+      ...this.filterArgs(options),
+    );
     if (!result) return null;
     const base = this.hit(result.collider);
     if (!base) return null;
     const t = result.timeOfImpact;
-    return {...base, distance: t, point: [origin[0] + dir[0] * t, origin[1] + dir[1] * t, origin[2] + dir[2] * t], normal: tuple(result.normal)};
+    return {
+      ...base,
+      distance: t,
+      point: [origin[0] + dir[0] * t, origin[1] + dir[1] * t, origin[2] + dir[2] * t],
+      normal: tuple(result.normal),
+    };
   }
 
   /** Every hit along a ray, nearest first. */
   raycastAll(origin: Vec3, direction: Vec3, options: RaycastOptions = {}): RaycastHit[] {
-    const {ray, dir} = this.ray(origin, direction), hits: RaycastHit[] = [];
+    const { ray, dir } = this.ray(origin, direction),
+      hits: RaycastHit[] = [];
     const [flags, groups, , excludeBody, predicate] = this.filterArgs(options);
-    this.world.intersectionsWithRay(ray, options.maxDistance ?? 1e30, options.solid ?? true, (result: any) => {
-      const base = this.hit(result.collider), t = result.timeOfImpact;
-      if (base) hits.push({...base, distance: t, point: [origin[0] + dir[0] * t, origin[1] + dir[1] * t, origin[2] + dir[2] * t], normal: tuple(result.normal)});
-      return true;
-    }, flags, groups, undefined, excludeBody, predicate);
+    this.world.intersectionsWithRay(
+      ray,
+      options.maxDistance ?? 1e30,
+      options.solid ?? true,
+      (result: any) => {
+        const base = this.hit(result.collider),
+          t = result.timeOfImpact;
+        if (base)
+          hits.push({
+            ...base,
+            distance: t,
+            point: [origin[0] + dir[0] * t, origin[1] + dir[1] * t, origin[2] + dir[2] * t],
+            normal: tuple(result.normal),
+          });
+        return true;
+      },
+      flags,
+      groups,
+      undefined,
+      excludeBody,
+      predicate,
+    );
     return hits.sort((a, b) => a.distance - b.distance);
   }
 
   /** Sweeps a shape from `position` along `direction` and returns the first hit, or null. */
-  shapeCast(shape: ShapeOptions, position: Vec3, rotation: Quat, direction: Vec3, options: QueryFilter & {maxDistance?: number; targetDistance?: number; stopAtPenetration?: boolean} = {}): ShapeCastHit | null {
+  shapeCast(
+    shape: ShapeOptions,
+    position: Vec3,
+    rotation: Quat,
+    direction: Vec3,
+    options: QueryFilter & { maxDistance?: number; targetDistance?: number; stopAtPenetration?: boolean } = {},
+  ): ShapeCastHit | null {
     checkVec(position, 'Shape position');
-    const {dir} = this.ray(position, direction);
+    const { dir } = this.ray(position, direction);
     const query = createColliderDesc(this.rapier, shape).desc.shape;
-    const result = this.world.castShape(vec(position), quat(rotation), vec(dir), query, options.targetDistance ?? 0, options.maxDistance ?? 1e30, options.stopAtPenetration ?? true, ...this.filterArgs(options));
+    const result = this.world.castShape(
+      vec(position),
+      quat(rotation),
+      vec(dir),
+      query,
+      options.targetDistance ?? 0,
+      options.maxDistance ?? 1e30,
+      options.stopAtPenetration ?? true,
+      ...this.filterArgs(options),
+    );
     if (!result) return null;
     const base = this.hit(result.collider);
-    return base ? {...base, distance: result.time_of_impact, point: tuple(result.witness1), normal: tuple(result.normal1)} : null;
+    return base
+      ? { ...base, distance: result.time_of_impact, point: tuple(result.witness1), normal: tuple(result.normal1) }
+      : null;
   }
 
   /** Closest point on any collider to `point`, or null. */
-  projectPoint(point: Vec3, options: QueryFilter & {solid?: boolean} = {}): PointProjection | null {
+  projectPoint(point: Vec3, options: QueryFilter & { solid?: boolean } = {}): PointProjection | null {
     checkVec(point, 'Point');
     const result = this.world.projectPoint(vec(point), options.solid ?? true, ...this.filterArgs(options));
     if (!result) return null;
     const base = this.hit(result.collider);
     if (!base) return null;
     const projected = tuple(result.point);
-    return {...base, point: projected, inside: result.isInside, distance: result.isInside ? 0 : Math.hypot(projected[0] - point[0], projected[1] - point[1], projected[2] - point[2])};
+    return {
+      ...base,
+      point: projected,
+      inside: result.isInside,
+      distance: result.isInside
+        ? 0
+        : Math.hypot(projected[0] - point[0], projected[1] - point[1], projected[2] - point[2]),
+    };
   }
 
   /** Bodies whose colliders contain `point`. */
   intersectPoint(point: Vec3, options: QueryFilter = {}): PhysicsBody[] {
     checkVec(point, 'Point');
-    const found = new Set<PhysicsBody>(), [flags, groups, , excludeBody, predicate] = this.filterArgs(options);
-    this.world.intersectionsWithPoint(vec(point), (collider: any) => {const body = this.byCollider.get(collider.handle); if (body) found.add(body); return true;}, flags, groups, undefined, excludeBody, predicate);
+    const found = new Set<PhysicsBody>(),
+      [flags, groups, , excludeBody, predicate] = this.filterArgs(options);
+    this.world.intersectionsWithPoint(
+      vec(point),
+      (collider: any) => {
+        const body = this.byCollider.get(collider.handle);
+        if (body) found.add(body);
+        return true;
+      },
+      flags,
+      groups,
+      undefined,
+      excludeBody,
+      predicate,
+    );
     return [...found];
   }
 
   /** Bodies whose colliders overlap a shape placed at `position` and `rotation`. */
-  intersectShape(shape: ShapeOptions, position: Vec3, rotation: Quat = [0, 0, 0, 1], options: QueryFilter = {}): PhysicsBody[] {
+  intersectShape(
+    shape: ShapeOptions,
+    position: Vec3,
+    rotation: Quat = [0, 0, 0, 1],
+    options: QueryFilter = {},
+  ): PhysicsBody[] {
     checkVec(position, 'Shape position');
-    const query = createColliderDesc(this.rapier, shape).desc.shape, found = new Set<PhysicsBody>(), [flags, groups, , excludeBody, predicate] = this.filterArgs(options);
-    this.world.intersectionsWithShape(vec(position), quat(rotation), query, (collider: any) => {const body = this.byCollider.get(collider.handle); if (body) found.add(body); return true;}, flags, groups, undefined, excludeBody, predicate);
+    const query = createColliderDesc(this.rapier, shape).desc.shape,
+      found = new Set<PhysicsBody>(),
+      [flags, groups, , excludeBody, predicate] = this.filterArgs(options);
+    this.world.intersectionsWithShape(
+      vec(position),
+      quat(rotation),
+      query,
+      (collider: any) => {
+        const body = this.byCollider.get(collider.handle);
+        if (body) found.add(body);
+        return true;
+      },
+      flags,
+      groups,
+      undefined,
+      excludeBody,
+      predicate,
+    );
     return [...found];
   }
 
   /** Whether two bodies' colliders currently touch (contact) or overlap (sensor), as of the last step. */
   touching(a: PhysicsBody, b: PhysicsBody): boolean {
     const world = this.world;
-    for (const ca of a.colliders) for (const cb of b.colliders) {
-      if (ca.isSensor() || cb.isSensor()) {if (world.intersectionPair(ca, cb)) return true; continue;}
-      let touching = false;
-      world.contactPair(ca, cb, (manifold: any) => {if (manifold.numContacts() > 0) touching = true;});
-      if (touching) return true;
-    }
+    for (const ca of a.colliders)
+      for (const cb of b.colliders) {
+        if (ca.isSensor() || cb.isSensor()) {
+          if (world.intersectionPair(ca, cb)) return true;
+          continue;
+        }
+        let touching = false;
+        world.contactPair(ca, cb, (manifold: any) => {
+          if (manifold.numContacts() > 0) touching = true;
+        });
+        if (touching) return true;
+      }
     return false;
   }
 
@@ -623,9 +971,9 @@ export class Physics implements EnginePlugin, BodyOwner {
    * Rapier's debug line buffers: `vertices` (xyz pairs, one segment per pair) and `colors` (rgba per vertex).
    * Draw them with `@margoengine/lines`: `new Line({mode: 'segments', positions: vertices, colors})`.
    */
-  debugRender(): {vertices: Float32Array; colors: Float32Array} {
+  debugRender(): { vertices: Float32Array; colors: Float32Array } {
     const buffers = this.world.debugRender();
-    return {vertices: buffers.vertices, colors: buffers.colors};
+    return { vertices: buffers.vertices, colors: buffers.colors };
   }
 
   /** Frees every controller, joint, collider, body and the world. Detaches from the engine if attached. */
@@ -634,7 +982,12 @@ export class Physics implements EnginePlugin, BodyOwner {
     const engine = this.engine;
     if (engine && !engine.disposed && engine.hasPlugin(this.name)) {
       // removePlugin calls back into dispose() after unregistering.
-      try {engine.removePlugin(this.name); return;} catch {/* engine is tearing down; free below */}
+      try {
+        engine.removePlugin(this.name);
+        return;
+      } catch {
+        /* engine is tearing down; free below */
+      }
     }
     for (const controller of [...this.controllers]) controller.dispose();
     for (const joint of [...this.joints]) this.removeJoint(joint);
@@ -647,11 +1000,13 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.queue = this.worldRef = this.hooks = null;
   }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 }
 
 function parentOf(mesh: Mesh): number {
-  const runtime = meshRuntime(mesh) as unknown as {id?: number; engine?: {store?: {parents?: ArrayLike<number>}}};
+  const runtime = meshRuntime(mesh) as unknown as { id?: number; engine?: { store?: { parents?: ArrayLike<number> } } };
   const parents = runtime.engine?.store?.parents;
   return parents && runtime.id !== undefined ? parents[runtime.id] : -1;
 }

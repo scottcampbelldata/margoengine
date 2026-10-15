@@ -40,7 +40,16 @@ export interface ParseLimits {
   maxTriangles?: number;
 }
 
-export type LoaderErrorCode = 'header' | 'truncated' | 'limit' | 'range' | 'syntax' | 'unsupported' | 'zip' | 'aborted' | 'fetch';
+export type LoaderErrorCode =
+  | 'header'
+  | 'truncated'
+  | 'limit'
+  | 'range'
+  | 'syntax'
+  | 'unsupported'
+  | 'zip'
+  | 'aborted'
+  | 'fetch';
 
 /** Thrown for every malformed, truncated, oversized or unsupported input. */
 export class LoaderError extends Error {

@@ -1,5 +1,5 @@
-import {resolveOptions, type BVHBuildOptions, type BVHData} from './build.js';
-import {MeshBVH, sourceArrays, type GeometryLike, type TriangleSource} from './bvh.js';
+import { resolveOptions, type BVHBuildOptions, type BVHData } from './build.js';
+import { MeshBVH, sourceArrays, type GeometryLike, type TriangleSource } from './bvh.js';
 
 export interface AsyncBuildOptions extends BVHBuildOptions {
   /**
@@ -11,8 +11,18 @@ export interface AsyncBuildOptions extends BVHBuildOptions {
   signal?: AbortSignal;
 }
 
-interface Pending {resolve(bvh: MeshBVH): void; reject(error: unknown): void; source: GeometryLike | TriangleSource; transfer: boolean}
-interface Reply extends Partial<BVHData> {id: number; error?: string; positions?: Float32Array | null; indices?: Uint32Array | null}
+interface Pending {
+  resolve(bvh: MeshBVH): void;
+  reject(error: unknown): void;
+  source: GeometryLike | TriangleSource;
+  transfer: boolean;
+}
+interface Reply extends Partial<BVHData> {
+  id: number;
+  error?: string;
+  positions?: Float32Array | null;
+  indices?: Uint32Array | null;
+}
 
 let worker: Worker | null = null;
 let nextId = 1;
@@ -25,26 +35,32 @@ function failAll(error: unknown): void {
 
 function getWorker(): Worker {
   if (worker) return worker;
-  const created = new Worker(new URL('./bvh.worker.js', import.meta.url), {type: 'module'});
-  created.onmessage = ({data}: MessageEvent<Reply>) => {
+  const created = new Worker(new URL('./bvh.worker.js', import.meta.url), { type: 'module' });
+  created.onmessage = ({ data }: MessageEvent<Reply>) => {
     const job = pending.get(data.id);
     if (!job) return;
     pending.delete(data.id);
-    if (data.error) { job.reject(new Error(data.error)); return; }
+    if (data.error) {
+      job.reject(new Error(data.error));
+      return;
+    }
     try {
       let source = job.source;
-      if (job.transfer && data.positions) source = {...(source as TriangleSource), positions: data.positions, indices: data.indices ?? null};
-      job.resolve(new MeshBVH({nodes: data.nodes!, index: data.index!, triangles: data.triangles!}, source));
-    } catch (error) { job.reject(error); }
+      if (job.transfer && data.positions)
+        source = { ...(source as TriangleSource), positions: data.positions, indices: data.indices ?? null };
+      job.resolve(new MeshBVH({ nodes: data.nodes!, index: data.index!, triangles: data.triangles! }, source));
+    } catch (error) {
+      job.reject(error);
+    }
   };
-  created.onerror = event => {
+  created.onerror = (event) => {
     event.preventDefault?.();
     failAll(new Error(`BVH worker failed: ${event.message || 'unknown error'}`));
     created.terminate();
     if (worker === created) worker = null;
   };
   created.onmessageerror = () => failAll(new Error('BVH worker message could not be deserialized'));
-  return worker = created;
+  return (worker = created);
 }
 
 /**
@@ -52,44 +68,82 @@ function getWorker(): Worker {
  * Without `Worker` (Node, SSR) it builds synchronously on the next microtask instead.
  */
 export function buildAsync(source: GeometryLike | TriangleSource, options: AsyncBuildOptions = {}): Promise<MeshBVH> {
-  const {transfer = false, signal, ...buildOptions} = options;
-  try { resolveOptions(buildOptions); } catch (error) { return Promise.reject(error); }
+  const { transfer = false, signal, ...buildOptions } = options;
+  try {
+    resolveOptions(buildOptions);
+  } catch (error) {
+    return Promise.reject(error);
+  }
   if (signal?.aborted) return Promise.reject(signal.reason ?? new Error('Aborted'));
-  if (typeof Worker === 'undefined') return Promise.resolve().then(() => {
-    if (signal?.aborted) throw signal.reason ?? new Error('Aborted');
-    return MeshBVH.build(source, buildOptions);
-  });
+  if (typeof Worker === 'undefined')
+    return Promise.resolve().then(() => {
+      if (signal?.aborted) throw signal.reason ?? new Error('Aborted');
+      return MeshBVH.build(source, buildOptions);
+    });
   let arrays: ReturnType<typeof sourceArrays>;
-  try { arrays = sourceArrays(source); } catch (error) { return Promise.reject(error); }
+  try {
+    arrays = sourceArrays(source);
+  } catch (error) {
+    return Promise.reject(error);
+  }
   const isGeometry = arrays.stride === 6 && (source as GeometryLike).vertices === arrays.positions;
   const move = transfer && !isGeometry;
-  if (move && (source as TriangleSource).normals && ((source as TriangleSource).normals as Float32Array).buffer === arrays.positions.buffer)
+  if (
+    move &&
+    (source as TriangleSource).normals &&
+    ((source as TriangleSource).normals as Float32Array).buffer === arrays.positions.buffer
+  )
     return Promise.reject(new TypeError('transfer cannot move positions that share a buffer with normals'));
   return new Promise<MeshBVH>((resolve, reject) => {
     const id = nextId++;
-    const onAbort = (): void => { if (pending.delete(id)) reject(signal!.reason ?? new Error('Aborted')); };
+    const onAbort = (): void => {
+      if (pending.delete(id)) reject(signal!.reason ?? new Error('Aborted'));
+    };
     pending.set(id, {
-      resolve: bvh => { signal?.removeEventListener('abort', onAbort); resolve(bvh); },
-      reject: error => { signal?.removeEventListener('abort', onAbort); reject(error); },
-      source: move ? {...(source as TriangleSource), positions: arrays.positions, indices: arrays.indices} : source, transfer: move,
+      resolve: (bvh) => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve(bvh);
+      },
+      reject: (error) => {
+        signal?.removeEventListener('abort', onAbort);
+        reject(error);
+      },
+      source: move ? { ...(source as TriangleSource), positions: arrays.positions, indices: arrays.indices } : source,
+      transfer: move,
     });
-    signal?.addEventListener('abort', onAbort, {once: true});
+    signal?.addEventListener('abort', onAbort, { once: true });
     const list: Transferable[] = [];
     if (move) {
       if (!isShared(arrays.positions.buffer)) list.push(arrays.positions.buffer as ArrayBuffer);
-      if (arrays.indices && arrays.indices.buffer !== arrays.positions.buffer && !isShared(arrays.indices.buffer)) list.push(arrays.indices.buffer as ArrayBuffer);
+      if (arrays.indices && arrays.indices.buffer !== arrays.positions.buffer && !isShared(arrays.indices.buffer))
+        list.push(arrays.indices.buffer as ArrayBuffer);
     }
     try {
-      getWorker().postMessage({id, positions: arrays.positions, stride: arrays.stride, indices: arrays.indices, options: buildOptions, returnSource: move}, list);
-    } catch (error) { pending.get(id)?.reject(error); pending.delete(id); }
+      getWorker().postMessage(
+        {
+          id,
+          positions: arrays.positions,
+          stride: arrays.stride,
+          indices: arrays.indices,
+          options: buildOptions,
+          returnSource: move,
+        },
+        list,
+      );
+    } catch (error) {
+      pending.get(id)?.reject(error);
+      pending.delete(id);
+    }
   });
 }
 
 /** Terminates the shared build worker. Pending builds reject; the next `buildAsync` starts a new worker. */
 export function terminateBVHWorker(): void {
   if (!worker) return;
-  worker.terminate(); worker = null;
+  worker.terminate();
+  worker = null;
   failAll(new Error('BVH worker terminated'));
 }
 
-const isShared = (buffer: ArrayBufferLike): boolean => typeof SharedArrayBuffer === 'function' && buffer instanceof SharedArrayBuffer;
+const isShared = (buffer: ArrayBufferLike): boolean =>
+  typeof SharedArrayBuffer === 'function' && buffer instanceof SharedArrayBuffer;

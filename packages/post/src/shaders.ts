@@ -1,5 +1,5 @@
 // The gbuffer's w is the signed view depth -z (negative behind an orthographic eye); exactly 0 marks no surface.
-const frame=/* wgsl */`
+const frame = /* wgsl */ `
 struct Frame {inverse:mat4x4f,view:mat4x4f,projection:mat4x4f,params:vec4f,size:vec4f}
 @group(0) @binding(0) var<uniform> f:Frame;
 fn viewPosition(p:vec2i,d:f32)->vec3f {
@@ -7,7 +7,9 @@ fn viewPosition(p:vec2i,d:f32)->vec3f {
   return (f.view*vec4f(w.xyz/w.w,1)).xyz;
 }
 `;
-export const extractShader=frame+`
+export const extractShader =
+  frame +
+  `
 @group(0) @binding(1) var depth:texture_depth_2d;
 @group(0) @binding(2) var output:texture_storage_2d<rgba16float,write>;
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u) {
@@ -25,7 +27,9 @@ export const extractShader=frame+`
   textureStore(output,p,vec4f(normal,-c.z));
 }
 `;
-export const ssaoShader=frame+`
+export const ssaoShader =
+  frame +
+  `
 @group(0) @binding(1) var depth:texture_depth_2d;
 @group(0) @binding(2) var gbuffer:texture_2d<f32>;
 @group(0) @binding(3) var noise:texture_2d<f32>;
@@ -52,7 +56,7 @@ export const ssaoShader=frame+`
   textureStore(output,p,vec4f(clamp(1-occlusion/f32(samples),0.0,1.0)));
 }
 `;
-export const blurShader=`
+export const blurShader = `
 @group(0) @binding(0) var input:texture_2d<f32>;
 @group(0) @binding(1) var gbuffer:texture_2d<f32>;
 @group(0) @binding(2) var output:texture_storage_2d<r32float,write>;
@@ -70,7 +74,7 @@ export const blurShader=`
   textureStore(output,p,vec4f(sum/max(total,0.000001)));
 }
 `;
-export const compositeShader=`
+export const compositeShader = `
 struct Out {@builtin(position) clip:vec4f}
 @vertex fn vertex(@builtin(vertex_index) i:u32)->Out {
   let positions=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));var o:Out;o.clip=vec4f(positions[i],0,1);return o;

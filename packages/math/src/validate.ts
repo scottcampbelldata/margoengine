@@ -8,6 +8,7 @@ export function finiteVector(v: ArrayLike<number>, size: number, name: string): 
   if (!v || v.length !== size) throw new TypeError(`${name} must contain ${size} finite numbers`);
   for (let i = 0; i < size; i++) {
     const value = v[i];
-    if (typeof value !== 'number' || !(value > -float32Overflow && value < float32Overflow)) throw new TypeError(`${name} must contain ${size} finite Float32 numbers`);
+    if (typeof value !== 'number' || !(value > -float32Overflow && value < float32Overflow))
+      throw new TypeError(`${name} must contain ${size} finite Float32 numbers`);
   }
 }

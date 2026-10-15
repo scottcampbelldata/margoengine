@@ -9,10 +9,10 @@ import { GeometryData } from "@margoengine/geometry";
 export type DensityField = (x: number, y: number, z: number) => number;
 
 export interface FractalOptions {
-     octaves?: number;
-     lacunarity?: number;
-     gain?: number;
-     frequency?: number;
+    octaves?: number;
+    lacunarity?: number;
+    gain?: number;
+    frequency?: number;
 }
 
 export type HeightField = (x: number, z: number) => number;
@@ -43,9 +43,9 @@ export interface SurfaceOptions {
 export const WARP_OFFSETS: readonly number[];
 
 export interface WarpOptions {
-     warp?: NoiseFunction;
-     strength?: number;
-     dimensions?: 2 | 3 | 4;
+    warp?: NoiseFunction;
+    strength?: number;
+    dimensions?: 2 | 3 | 4;
 }
 
 export function contactAO(y: number, groundY: number): number;

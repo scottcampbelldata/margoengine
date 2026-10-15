@@ -33,7 +33,9 @@ fn importanceGGX(xi: vec2f, alpha: f32) -> vec3f {
 }
 `;
 
-export const equirectToCube = common + /* wgsl */ `
+export const equirectToCube =
+  common +
+  /* wgsl */ `
 @group(0) @binding(0) var source: texture_2d<f32>;
 @group(0) @binding(1) var linearSampler: sampler;
 @group(0) @binding(2) var destination: texture_storage_2d_array<rgba16float, write>;
@@ -69,7 +71,9 @@ export const downsample = /* wgsl */ `
 // Karis split-sum specular prefilter with N = V = R, rendered one face and mip at a time. Each sample reads
 // the source mip whose texel solid angle matches the sample's solid angle (GPU Gems 3 ch. 20 filtered
 // importance sampling), which removes fireflies from small bright sources at low sample counts.
-export const prefilter = common + /* wgsl */ `
+export const prefilter =
+  common +
+  /* wgsl */ `
 struct Params { roughness: f32, sourceSize: f32, samples: u32, lod0: f32, face: u32, size: f32 }
 @group(0) @binding(0) var source: texture_cube<f32>;
 @group(0) @binding(1) var linearSampler: sampler;
@@ -114,7 +118,9 @@ struct Params { roughness: f32, sourceSize: f32, samples: u32, lod0: f32, face: 
 // Projects the cube onto the 9 real L2 spherical harmonics with exact per-texel solid angles, reduced in
 // one 64-thread workgroup. Output: result[0..8] = irradiance / PI coefficients (diffuse ready),
 // result[16..24] = radiance coefficients.
-export const sphericalHarmonics = common + /* wgsl */ `
+export const sphericalHarmonics =
+  common +
+  /* wgsl */ `
 @group(0) @binding(0) var source: texture_2d_array<f32>;
 @group(0) @binding(1) var<storage, read_write> result: array<vec4f, 32>;
 var<workgroup> partial: array<vec4f, 576>; // 64 threads x 9 coefficients
@@ -168,7 +174,9 @@ fn areaElement(x: f32, y: f32) -> f32 { return atan(x * y / sqrt(x * x + y * y +
 // Split-sum environment BRDF: x = NdotV, y = perceptual roughness (texel centers), output (scale, bias)
 // so that specular = prefiltered * (F0 * scale + bias). Uses the same GGX D and separable Smith-GGX G as core.
 // Written as size x size f16 pairs into a storage buffer (not a texture): IBL then binds one sampled texture.
-export const brdfLut = common + /* wgsl */ `
+export const brdfLut =
+  common +
+  /* wgsl */ `
 @group(0) @binding(0) var<storage, read_write> destination: array<u32>;
 @group(0) @binding(1) var<uniform> params: vec4u; // samples, size
 fn smithG1(x: f32, a2: f32) -> f32 { return 2.0 * x / (x + sqrt(a2 + (1.0 - a2) * x * x)); }
@@ -202,7 +210,9 @@ fn smithG1(x: f32, a2: f32) -> f32 { return 2.0 * x / (x + sqrt(a2 + (1.0 - a2) 
 // Full-screen background at reversed-Z depth 0, so the 'greater-equal' test only passes where the depth
 // buffer still holds its cleared value. Output matches core: Reinhard then sRGB encode into the canvas
 // format, or linear radiance when the destination is an HDR rgba16float buffer (outputHdr).
-export const background = common + /* wgsl */ `
+export const background =
+  common +
+  /* wgsl */ `
 struct Uniforms { inverseViewProjection: mat4x4f, eye: vec4f, params: vec4f, mode: vec4u }
 @group(0) @binding(0) var<uniform> u: Uniforms;
 @group(0) @binding(1) var linearSampler: sampler;

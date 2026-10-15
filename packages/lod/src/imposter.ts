@@ -1,94 +1,262 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import {Geometry,PbrMaterial,type EngineKernel,type Mesh} from '@margoengine/core';
-import {engineRuntime,meshRuntime,type Engine} from '@margoengine/core/extension';
-import {GLTFAsset,PBRModel} from '@margoengine/gltf-pro';
-import {acesShader} from '../../shared/aces.js';
-declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number;MAP_READ:number};
-declare const GPUTextureUsage:{TEXTURE_BINDING:number;COPY_DST:number;COPY_SRC:number;RENDER_ATTACHMENT:number};
-declare const GPUMapMode:{READ:number};
-export type Vec3=[number,number,number];
+import { Geometry, PbrMaterial, type EngineKernel, type Mesh } from '@margoengine/core';
+import { engineRuntime, meshRuntime, type Engine } from '@margoengine/core/extension';
+import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro';
+import { acesShader } from '../../shared/aces.js';
+declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; MAP_READ: number };
+declare const GPUTextureUsage: {
+  TEXTURE_BINDING: number;
+  COPY_DST: number;
+  COPY_SRC: number;
+  RENDER_ATTACHMENT: number;
+};
+declare const GPUMapMode: { READ: number };
+export type Vec3 = [number, number, number];
 /**
  * A core Geometry (with `material`), a core Mesh, or a gltf-pro model (loaded glTF or `@margoengine/materials` mesh), baked in its
  * root's local space. A Mesh with child meshes bakes its whole visible subtree as it is at bake time (a CAD subassembly), each
  * part with its own material.
  */
-export type ImposterSource=Geometry|Mesh|PBRModel;
-export interface ImposterOptions {/** Views per side of the octahedral grid, 4-32. Default 12 (144 views). */frames?:number;/** Pixels per view, a power of two 16-1024. Default 128. */frameSize?:number;/** Material for a Geometry source. Default core's PbrMaterial. */material?:PbrMaterial}
+export type ImposterSource = Geometry | Mesh | PBRModel;
+export interface ImposterOptions {
+  /** Views per side of the octahedral grid, 4-32. Default 12 (144 views). */ frames?: number;
+  /** Pixels per view, a power of two 16-1024. Default 128. */
+  frameSize?: number;
+  /** Material for a Geometry source. Default core's PbrMaterial. */
+  material?: PbrMaterial;
+}
 /** CPU copy of an atlas for caching: `color` is RGBA8 sRGB albedo with coverage alpha, `normal` raw float16 RGBA (octahedral normal, depth, packed roughness/metalness). */
-export interface ImposterData {frames:number;frameSize:number;center:Vec3;radius:number;shading:'core'|'gltf';color:Uint8Array;normal:Uint16Array}
+export interface ImposterData {
+  frames: number;
+  frameSize: number;
+  center: Vec3;
+  radius: number;
+  shading: 'core' | 'gltf';
+  color: Uint8Array;
+  normal: Uint16Array;
+}
 
 // Octahedral directions with +y at the grid centre and -y at the corners; the sign helper keeps zero on the positive side.
-export const octWGSL=`fn lod_sgn(v:vec2f)->vec2f {return select(vec2f(-1.0),vec2f(1.0),v>=vec2f(0.0));}
+export const octWGSL = `fn lod_sgn(v:vec2f)->vec2f {return select(vec2f(-1.0),vec2f(1.0),v>=vec2f(0.0));}
 fn lod_decode(e:vec2f)->vec3f {var n=vec3f(e.x,1.0-abs(e.x)-abs(e.y),e.y);if(n.y<0.0){let f=(1.0-abs(e.yx))*lod_sgn(e);n=vec3f(f.x,n.y,f.y);}return normalize(n);}
 fn lod_encode(n:vec3f)->vec2f {let p=n.xz/(abs(n.x)+abs(n.y)+abs(n.z));return select(p,(1.0-abs(p.yx))*lod_sgn(p),n.y<0.0);}
 fn lod_basis(d:vec3f)->mat3x3f {let r=normalize(cross(select(vec3f(0.0,1.0,0.0),vec3f(0.0,0.0,1.0),abs(d.y)>0.999),d));return mat3x3f(r,cross(d,r),d);}`;
-const sgn=(v:number)=>v>=0?1:-1,cross=(a:Vec3,b:Vec3):Vec3=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],unit=(v:Vec3):Vec3=>{const l=Math.hypot(...v);return [v[0]/l,v[1]/l,v[2]/l];};
-export function octDecode(x:number,y:number):Vec3 {const h=1-Math.abs(x)-Math.abs(y);return unit(h<0?[(1-Math.abs(y))*sgn(x),h,(1-Math.abs(x))*sgn(y)]:[x,h,y]);}
-export function octEncode(d:Vec3):[number,number] {const s=Math.abs(d[0])+Math.abs(d[1])+Math.abs(d[2]),x=d[0]/s,y=d[2]/s;return d[1]<0?[(1-Math.abs(y))*sgn(x),(1-Math.abs(x))*sgn(y)]:[x,y];}
+const sgn = (v: number) => (v >= 0 ? 1 : -1),
+  cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+  unit = (v: Vec3): Vec3 => {
+    const l = Math.hypot(...v);
+    return [v[0] / l, v[1] / l, v[2] / l];
+  };
+export function octDecode(x: number, y: number): Vec3 {
+  const h = 1 - Math.abs(x) - Math.abs(y);
+  return unit(h < 0 ? [(1 - Math.abs(y)) * sgn(x), h, (1 - Math.abs(x)) * sgn(y)] : [x, h, y]);
+}
+export function octEncode(d: Vec3): [number, number] {
+  const s = Math.abs(d[0]) + Math.abs(d[1]) + Math.abs(d[2]),
+    x = d[0] / s,
+    y = d[2] / s;
+  return d[1] < 0 ? [(1 - Math.abs(y)) * sgn(x), (1 - Math.abs(x)) * sgn(y)] : [x, y];
+}
 /** View direction (object centre towards the camera) of atlas tile column i, row j on an n×n grid. */
-export const frameDirection=(i:number,j:number,n:number):Vec3=>octDecode(i/(n-1)*2-1,j/(n-1)*2-1);
+export const frameDirection = (i: number, j: number, n: number): Vec3 =>
+  octDecode((i / (n - 1)) * 2 - 1, (j / (n - 1)) * 2 - 1);
 /** Screen right and up of a view; matches the WGSL `lod_basis`. */
-export function frameBasis(d:Vec3):[Vec3,Vec3] {const r=unit(cross(Math.abs(d[1])>0.999?[0,0,1]:[0,1,0],d));return [r,cross(d,r)];}
+export function frameBasis(d: Vec3): [Vec3, Vec3] {
+  const r = unit(cross(Math.abs(d[1]) > 0.999 ? [0, 0, 1] : [0, 1, 0], d));
+  return [r, cross(d, r)];
+}
 /** Orthographic clip matrix of one view of the sphere (center, radius): x right, y up, reversed-Z depth with 1 at the camera side. */
-export function frameMatrix(d:Vec3,c:Vec3,r:number,out=new Float32Array(16)):Float32Array {
-  const [x,y]=frameBasis(d),dot=(a:Vec3)=>a[0]*c[0]+a[1]*c[1]+a[2]*c[2];out.fill(0);
-  for(let k=0;k<3;k++){out[k*4]=x[k]/r;out[k*4+1]=y[k]/r;out[k*4+2]=d[k]/(2*r);}
-  out[12]=-dot(x)/r;out[13]=-dot(y)/r;out[14]=0.5-dot(d)/(2*r);out[15]=1;return out;
+export function frameMatrix(d: Vec3, c: Vec3, r: number, out = new Float32Array(16)): Float32Array {
+  const [x, y] = frameBasis(d),
+    dot = (a: Vec3) => a[0] * c[0] + a[1] * c[1] + a[2] * c[2];
+  out.fill(0);
+  for (let k = 0; k < 3; k++) {
+    out[k * 4] = x[k] / r;
+    out[k * 4 + 1] = y[k] / r;
+    out[k * 4 + 2] = d[k] / (2 * r);
+  }
+  out[12] = -dot(x) / r;
+  out[13] = -dot(y) / r;
+  out[14] = 0.5 - dot(d) / (2 * r);
+  out[15] = 1;
+  return out;
 }
 /** Early return added to gltf-pro's beauty fragment: albedo (mode 0) or octahedral normal, depth and roughness*32+metalness in 31 steps each (mode 1, exact in float16). */
-export function bakeShader(code:string,group:number):string {
-  let found=false;const out=code.replace(/@fragment fn fragment\([\s\S]*?let s=surface\(i,front\);/,head=>{found=true;return head+'\n  if(lod_bake.x<2.0){return lod_bake_out(s,i.clip.z);}';});
-  if(!found)throw new Error('Imposter baking requires the gltf-pro PBR shader');
-  return `@group(${group}) @binding(96) var<uniform> lod_bake:vec4f;\n${octWGSL}\nfn lod_bake_out(s:Surface,z:f32)->vec4f {if(lod_bake.x<0.5){return vec4f(s.base.rgb,1.0);}return vec4f(lod_encode(normalize(s.n)),z*2.0-1.0,round(s.roughness*31.0)*32.0+round(s.metal*31.0));}\n`+out;
+export function bakeShader(code: string, group: number): string {
+  let found = false;
+  const out = code.replace(/@fragment fn fragment\([\s\S]*?let s=surface\(i,front\);/, (head) => {
+    found = true;
+    return head + '\n  if(lod_bake.x<2.0){return lod_bake_out(s,i.clip.z);}';
+  });
+  if (!found) throw new Error('Imposter baking requires the gltf-pro PBR shader');
+  return (
+    `@group(${group}) @binding(96) var<uniform> lod_bake:vec4f;\n${octWGSL}\nfn lod_bake_out(s:Surface,z:f32)->vec4f {if(lod_bake.x<0.5){return vec4f(s.base.rgb,1.0);}return vec4f(lod_encode(normalize(s.n)),z*2.0-1.0,round(s.roughness*31.0)*32.0+round(s.metal*31.0));}\n` +
+    out
+  );
 }
-const mipCode=`struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f}
+const mipCode = `struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f}
 @vertex fn vertex(@builtin(vertex_index) i:u32)->Out {let p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));var o:Out;o.clip=vec4f(p[i],0,1);o.uv=p[i]*vec2f(0.5,-0.5)+0.5;return o;}
 @group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var imageSampler:sampler;
 @fragment fn fragment(i:Out)->@location(0) vec4f {return textureSample(image,imageSampler,i.uv);}`;
-function mipmaps(device:GPUDevice,texture:GPUTexture):void {
-  const format=texture.format,module=device.createShaderModule({code:mipCode}),pipeline=device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format}]}});
-  const sampler=device.createSampler({minFilter:'linear',magFilter:'linear'}),encoder=device.createCommandEncoder(),level=(baseMipLevel:number)=>texture.createView({baseMipLevel,mipLevelCount:1});
-  for(let i=1;i<texture.mipLevelCount;i++){
-    const pass=encoder.beginRenderPass({colorAttachments:[{view:level(i),loadOp:'clear',storeOp:'store',clearValue:[0,0,0,0]}]});
-    pass.setPipeline(pipeline);pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:level(i-1)},{binding:1,resource:sampler}]}));pass.draw(3);pass.end();
+function mipmaps(device: GPUDevice, texture: GPUTexture): void {
+  const format = texture.format,
+    module = device.createShaderModule({ code: mipCode }),
+    pipeline = device.createRenderPipeline({
+      layout: 'auto',
+      vertex: { module, entryPoint: 'vertex' },
+      fragment: { module, entryPoint: 'fragment', targets: [{ format }] },
+    });
+  const sampler = device.createSampler({ minFilter: 'linear', magFilter: 'linear' }),
+    encoder = device.createCommandEncoder(),
+    level = (baseMipLevel: number) => texture.createView({ baseMipLevel, mipLevelCount: 1 });
+  for (let i = 1; i < texture.mipLevelCount; i++) {
+    const pass = encoder.beginRenderPass({
+      colorAttachments: [{ view: level(i), loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }],
+    });
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(
+      0,
+      device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: level(i - 1) },
+          { binding: 1, resource: sampler },
+        ],
+      }),
+    );
+    pass.draw(3);
+    pass.end();
   }
   device.queue.submit([encoder.finish()]);
 }
 /** One core part of a bake: geometry, material and its transform relative to the baked root (identity when absent). */
-interface Part {geometry:Geometry;material:PbrMaterial;matrix?:Float32Array}
-/** A static gltf-pro copy of core parts (80-byte vertices, one primitive per part, transforms applied), set up without registering a draw pass. */
-function coreModel(engine:Engine,parts:readonly Part[]):PBRModel {
-  const prepared=parts.map(({geometry:g,matrix:m=identity})=>{
-    // Normals transform by the cofactor matrix; a mirroring transform also flips the winding so front faces stay front.
-    const v=g.vertices,count=v.length/6,out=new Float32Array(count*20),c=[m[5]*m[10]-m[6]*m[9],m[6]*m[8]-m[4]*m[10],m[4]*m[9]-m[5]*m[8],m[2]*m[9]-m[1]*m[10],m[0]*m[10]-m[2]*m[8],m[1]*m[8]-m[0]*m[9],m[1]*m[6]-m[2]*m[5],m[2]*m[4]-m[0]*m[6],m[0]*m[5]-m[1]*m[4]];
-    for(let i=0;i<count;i++){const s=i*6,o=i*20,x=v[s],y=v[s+1],z=v[s+2],a=v[s+3],b=v[s+4],e=v[s+5],nx=c[0]*a+c[1]*b+c[2]*e,ny=c[3]*a+c[4]*b+c[5]*e,nz=c[6]*a+c[7]*b+c[8]*e,l=Math.hypot(nx,ny,nz);
-      out[o]=m[0]*x+m[4]*y+m[8]*z+m[12];out[o+1]=m[1]*x+m[5]*y+m[9]*z+m[13];out[o+2]=m[2]*x+m[6]*y+m[10]*z+m[14];out[o+3]=1;if(l){out[o+4]=nx/l;out[o+5]=ny/l;out[o+6]=nz/l;}else out[o+5]=1;out.fill(1,o+16,o+20);}
-    let indices=g.indices;if(m[0]*c[0]+m[4]*c[3]+m[8]*c[6]<0){indices=indices.slice();for(let i=0;i<indices.length;i+=3){const t=indices[i+1];indices[i+1]=indices[i+2];indices[i+2]=t;}}
-    return {vertices:out,indices};
-  });
-  const doc={asset:{version:'2.0'},nodes:[{mesh:0}],meshes:[{primitives:parts.map((_,material)=>({material}))}],materials:parts.map(({material})=>{const d=material.data;return {pbrMetallicRoughness:{baseColorFactor:[d[0],d[1],d[2],1],roughnessFactor:d[4],metallicFactor:d[5]},doubleSided:d[6]===1};})};
-  const model=new PBRModel(engine,new GLTFAsset(doc,[]),[],[prepared]);
-  try{model.setup(engine);}catch(error){model.dispose();throw error;}return model;
+interface Part {
+  geometry: Geometry;
+  material: PbrMaterial;
+  matrix?: Float32Array;
 }
-const keys=['x','y','z','qx','qy','qz','qw','sx','sy','sz'] as const,identity=new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);
+/** A static gltf-pro copy of core parts (80-byte vertices, one primitive per part, transforms applied), set up without registering a draw pass. */
+function coreModel(engine: Engine, parts: readonly Part[]): PBRModel {
+  const prepared = parts.map(({ geometry: g, matrix: m = identity }) => {
+    // Normals transform by the cofactor matrix; a mirroring transform also flips the winding so front faces stay front.
+    const v = g.vertices,
+      count = v.length / 6,
+      out = new Float32Array(count * 20),
+      c = [
+        m[5] * m[10] - m[6] * m[9],
+        m[6] * m[8] - m[4] * m[10],
+        m[4] * m[9] - m[5] * m[8],
+        m[2] * m[9] - m[1] * m[10],
+        m[0] * m[10] - m[2] * m[8],
+        m[1] * m[8] - m[0] * m[9],
+        m[1] * m[6] - m[2] * m[5],
+        m[2] * m[4] - m[0] * m[6],
+        m[0] * m[5] - m[1] * m[4],
+      ];
+    for (let i = 0; i < count; i++) {
+      const s = i * 6,
+        o = i * 20,
+        x = v[s],
+        y = v[s + 1],
+        z = v[s + 2],
+        a = v[s + 3],
+        b = v[s + 4],
+        e = v[s + 5],
+        nx = c[0] * a + c[1] * b + c[2] * e,
+        ny = c[3] * a + c[4] * b + c[5] * e,
+        nz = c[6] * a + c[7] * b + c[8] * e,
+        l = Math.hypot(nx, ny, nz);
+      out[o] = m[0] * x + m[4] * y + m[8] * z + m[12];
+      out[o + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
+      out[o + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+      out[o + 3] = 1;
+      if (l) {
+        out[o + 4] = nx / l;
+        out[o + 5] = ny / l;
+        out[o + 6] = nz / l;
+      } else out[o + 5] = 1;
+      out.fill(1, o + 16, o + 20);
+    }
+    let indices = g.indices;
+    if (m[0] * c[0] + m[4] * c[3] + m[8] * c[6] < 0) {
+      indices = indices.slice();
+      for (let i = 0; i < indices.length; i += 3) {
+        const t = indices[i + 1];
+        indices[i + 1] = indices[i + 2];
+        indices[i + 2] = t;
+      }
+    }
+    return { vertices: out, indices };
+  });
+  const doc = {
+    asset: { version: '2.0' },
+    nodes: [{ mesh: 0 }],
+    meshes: [{ primitives: parts.map((_, material) => ({ material })) }],
+    materials: parts.map(({ material }) => {
+      const d = material.data;
+      return {
+        pbrMetallicRoughness: { baseColorFactor: [d[0], d[1], d[2], 1], roughnessFactor: d[4], metallicFactor: d[5] },
+        doubleSided: d[6] === 1,
+      };
+    }),
+  };
+  const model = new PBRModel(engine, new GLTFAsset(doc, []), [], [prepared]);
+  try {
+    model.setup(engine);
+  } catch (error) {
+    model.dispose();
+    throw error;
+  }
+  return model;
+}
+const keys = ['x', 'y', 'z', 'qx', 'qy', 'qz', 'qw', 'sx', 'sy', 'sz'] as const,
+  identity = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 /**
  * Runs `fn` with mesh `id` unparented, at the identity transform and unhidden, after a transform tick, so world matrices read
  * inside are relative to that mesh; restores it (and ticks again) afterwards.
  */
-function inLocalSpace<T>(e:Engine,id:number,fn:()=>T):T {
-  const store=e.store,t=store.transforms,saved=keys.map(k=>t[k][id]),parent=store.parents[id],hidden=store.hidden[id];
-  try{keys.forEach((k,i)=>{t[k][id]=+(i>=6);});store.parents[id]=-1;store.hidden[id]=0;store.tick(false);return fn();}
-  finally{keys.forEach((k,i)=>{t[k][id]=saved[i];});store.parents[id]=parent;store.hidden[id]=hidden;store.tick(false);}
+function inLocalSpace<T>(e: Engine, id: number, fn: () => T): T {
+  const store = e.store,
+    t = store.transforms,
+    saved = keys.map((k) => t[k][id]),
+    parent = store.parents[id],
+    hidden = store.hidden[id];
+  try {
+    keys.forEach((k, i) => {
+      t[k][id] = +(i >= 6);
+    });
+    store.parents[id] = -1;
+    store.hidden[id] = 0;
+    store.tick(false);
+    return fn();
+  } finally {
+    keys.forEach((k, i) => {
+      t[k][id] = saved[i];
+    });
+    store.parents[id] = parent;
+    store.hidden[id] = hidden;
+    store.tick(false);
+  }
 }
 /** The visible meshes with geometry in a mesh's subtree (itself included), with transforms relative to it. */
-function subtree(e:Engine,root:Mesh,material:PbrMaterial|undefined):Part[] {
-  const node=meshRuntime(root);node.check();const id=node.id,store=e.store;
-  return inLocalSpace(e,id,()=>{
-    const parts:Part[]=[];
+function subtree(e: Engine, root: Mesh, material: PbrMaterial | undefined): Part[] {
+  const node = meshRuntime(root);
+  node.check();
+  const id = node.id,
+    store = e.store;
+  return inLocalSpace(e, id, () => {
+    const parts: Part[] = [];
     // ponytail: one scan of every mesh per bake, O(meshes x depth); fine for one imposter per distinct subassembly design.
-    for(const mesh of e.meshes.values()){
-      if(!mesh.geometry||!store.visible[mesh.id])continue;let p=mesh.id;for(let depth=0;p!==id&&p>=0&&depth<64;depth++)p=store.parents[p];
-      if(p===id)parts.push({geometry:mesh.geometry,material:mesh.id===id?material??mesh.material:mesh.material,matrix:mesh.matrix.slice()});
+    for (const mesh of e.meshes.values()) {
+      if (!mesh.geometry || !store.visible[mesh.id]) continue;
+      let p = mesh.id;
+      for (let depth = 0; p !== id && p >= 0 && depth < 64; depth++) p = store.parents[p];
+      if (p === id)
+        parts.push({
+          geometry: mesh.geometry,
+          material: mesh.id === id ? (material ?? mesh.material) : mesh.material,
+          matrix: mesh.matrix.slice(),
+        });
     }
     return parts;
   });
@@ -99,93 +267,293 @@ function subtree(e:Engine,root:Mesh,material:PbrMaterial|undefined):Part[] {
  * GPU into albedo + coverage and normal + depth + roughness/metalness. Use it as the last level of a `LODSystem` level list.
  */
 export class Imposter {
-  readonly frames:number;readonly frameSize:number;readonly center:Vec3=[0,0,0];radius=1;readonly shading:'core'|'gltf';disposed=false;
-  /** @internal */ color?:GPUTexture;/** @internal */ normal?:GPUTexture;/** @internal */ uniform?:GPUBuffer;/** @internal */ device?:GPUDevice;
-  private source?:Part[]|PBRModel;private data?:ImposterData;
-  private constructor(private readonly engine:Engine,source:ImposterSource|undefined,data:ImposterData|undefined,{frames=12,frameSize=128,material}:ImposterOptions) {
-    if(!Number.isInteger(frames)||frames<4||frames>32||!Number.isInteger(Math.log2(frameSize))||frameSize<16||frameSize>1024)throw new RangeError('Imposter frames 4-32, frameSize a power of two 16-1024');
-    if(material!==undefined&&!(material instanceof PbrMaterial))throw new TypeError('Expected a PbrMaterial');
-    this.frames=frames;this.frameSize=frameSize;this.data=data;
-    if(source instanceof Geometry)this.source=[{geometry:source,material:material??new PbrMaterial()}];
-    else if(source instanceof PBRModel)this.source=source;
-    else if(source){this.source=subtree(engine,source,material);if(!this.source.length)throw new TypeError('Imposter mesh needs a geometry');}
-    else if(!data)throw new TypeError('Expected an imposter source');
-    this.shading=data?data.shading:this.source instanceof PBRModel?'gltf':'core';
+  readonly frames: number;
+  readonly frameSize: number;
+  readonly center: Vec3 = [0, 0, 0];
+  radius = 1;
+  readonly shading: 'core' | 'gltf';
+  disposed = false;
+  /** @internal */ color?: GPUTexture; /** @internal */
+  normal?: GPUTexture; /** @internal */
+  uniform?: GPUBuffer; /** @internal */
+  device?: GPUDevice;
+  private source?: Part[] | PBRModel;
+  private data?: ImposterData;
+  private constructor(
+    private readonly engine: Engine,
+    source: ImposterSource | undefined,
+    data: ImposterData | undefined,
+    { frames = 12, frameSize = 128, material }: ImposterOptions,
+  ) {
+    if (
+      !Number.isInteger(frames) ||
+      frames < 4 ||
+      frames > 32 ||
+      !Number.isInteger(Math.log2(frameSize)) ||
+      frameSize < 16 ||
+      frameSize > 1024
+    )
+      throw new RangeError('Imposter frames 4-32, frameSize a power of two 16-1024');
+    if (material !== undefined && !(material instanceof PbrMaterial)) throw new TypeError('Expected a PbrMaterial');
+    this.frames = frames;
+    this.frameSize = frameSize;
+    this.data = data;
+    if (source instanceof Geometry) this.source = [{ geometry: source, material: material ?? new PbrMaterial() }];
+    else if (source instanceof PBRModel) this.source = source;
+    else if (source) {
+      this.source = subtree(engine, source, material);
+      if (!this.source.length) throw new TypeError('Imposter mesh needs a geometry');
+    } else if (!data) throw new TypeError('Expected an imposter source');
+    this.shading = data ? data.shading : this.source instanceof PBRModel ? 'gltf' : 'core';
   }
   /** Bakes now (WebGPU). Keep the source alive, or keep `export()` data, if the device may be lost: the atlas is rebuilt from it. */
-  static bake(engine:EngineKernel,source:ImposterSource,options:ImposterOptions={}):Imposter {const i=new Imposter(engineRuntime(engine),source,undefined,options);i.ready();return i;}
-  /** Restores an atlas saved with `export()`, without the source. */
-  static fromData(engine:EngineKernel,data:ImposterData):Imposter {
-    const size=data?.frames*data?.frameSize,ok=data&&data.color instanceof Uint8Array&&data.normal instanceof Uint16Array&&data.color.length===size*size*4&&data.normal.length===size*size*4&&['core','gltf'].includes(data.shading)&&data.radius>0&&data.center?.length===3&&data.center.every(Number.isFinite);
-    if(!ok)throw new TypeError('Invalid imposter data');const i=new Imposter(engineRuntime(engine),undefined,data,data);i.center.splice(0,3,...data.center);i.radius=data.radius;i.ready();return i;
+  static bake(engine: EngineKernel, source: ImposterSource, options: ImposterOptions = {}): Imposter {
+    const i = new Imposter(engineRuntime(engine), source, undefined, options);
+    i.ready();
+    return i;
   }
-  get size():number {return this.frames*this.frameSize;}
+  /** Restores an atlas saved with `export()`, without the source. */
+  static fromData(engine: EngineKernel, data: ImposterData): Imposter {
+    const size = data?.frames * data?.frameSize,
+      ok =
+        data &&
+        data.color instanceof Uint8Array &&
+        data.normal instanceof Uint16Array &&
+        data.color.length === size * size * 4 &&
+        data.normal.length === size * size * 4 &&
+        ['core', 'gltf'].includes(data.shading) &&
+        data.radius > 0 &&
+        data.center?.length === 3 &&
+        data.center.every(Number.isFinite);
+    if (!ok) throw new TypeError('Invalid imposter data');
+    const i = new Imposter(engineRuntime(engine), undefined, data, data);
+    i.center.splice(0, 3, ...data.center);
+    i.radius = data.radius;
+    i.ready();
+    return i;
+  }
+  get size(): number {
+    return this.frames * this.frameSize;
+  }
   /** @internal Brings the atlas onto the engine's current device (re-bake or re-upload after a device restore); false if nothing can be drawn. */
-  ready():boolean {
-    const device=this.engine.gpu;if(this.disposed||!device)return false;if(this.device===device)return !!this.color;
-    this.release();this.device=device;
-    if(this.source instanceof PBRModel&&this.source.disposed)this.source=undefined;
-    if(!this.data&&!this.source)return false;
-    const size=this.size;if(size>device.limits.maxTextureDimension2D)throw new RangeError('Imposter atlas exceeds device limit');
-    this.color=device.createTexture({size:[size,size],format:'rgba8unorm-srgb',mipLevelCount:Math.max(1,Math.log2(this.frameSize)-2),usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST|GPUTextureUsage.COPY_SRC|GPUTextureUsage.RENDER_ATTACHMENT});
-    this.normal=device.createTexture({size:[size,size],format:'rgba16float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST|GPUTextureUsage.COPY_SRC});
-    this.uniform=device.createBuffer({size:32,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
-    if(this.data){device.queue.writeTexture({texture:this.color},this.data.color as Uint8Array<ArrayBuffer>,{bytesPerRow:size*4},[size,size]);device.queue.writeTexture({texture:this.normal},this.data.normal as Uint16Array<ArrayBuffer>,{bytesPerRow:size*8},[size,size]);}
-    else this.bake(device,this.source!);
-    mipmaps(device,this.color);
-    device.queue.writeBuffer(this.uniform,0,new Float32Array([...this.center,this.radius,this.frames,size,+(this.shading==='gltf'),this.frameSize]));
+  ready(): boolean {
+    const device = this.engine.gpu;
+    if (this.disposed || !device) return false;
+    if (this.device === device) return !!this.color;
+    this.release();
+    this.device = device;
+    if (this.source instanceof PBRModel && this.source.disposed) this.source = undefined;
+    if (!this.data && !this.source) return false;
+    const size = this.size;
+    if (size > device.limits.maxTextureDimension2D) throw new RangeError('Imposter atlas exceeds device limit');
+    this.color = device.createTexture({
+      size: [size, size],
+      format: 'rgba8unorm-srgb',
+      mipLevelCount: Math.max(1, Math.log2(this.frameSize) - 2),
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.COPY_SRC |
+        GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    this.normal = device.createTexture({
+      size: [size, size],
+      format: 'rgba16float',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC,
+    });
+    this.uniform = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    if (this.data) {
+      device.queue.writeTexture(
+        { texture: this.color },
+        this.data.color as Uint8Array<ArrayBuffer>,
+        { bytesPerRow: size * 4 },
+        [size, size],
+      );
+      device.queue.writeTexture(
+        { texture: this.normal },
+        this.data.normal as Uint16Array<ArrayBuffer>,
+        { bytesPerRow: size * 8 },
+        [size, size],
+      );
+    } else this.bake(device, this.source!);
+    mipmaps(device, this.color);
+    device.queue.writeBuffer(
+      this.uniform,
+      0,
+      new Float32Array([...this.center, this.radius, this.frames, size, +(this.shading === 'gltf'), this.frameSize]),
+    );
     return true;
   }
-  private bake(device:GPUDevice,source:Part[]|PBRModel):void {
-    const e=this.engine,store=e.store,n=this.frames,fs=this.frameSize,temp=Array.isArray(source),model=Array.isArray(source)?coreModel(e,source):source;
-    const id=meshRuntime(model.root).id,t=store.transforms,saved=keys.map(k=>t[k][id]),parent=store.parents[id],hidden=store.hidden[id],scratch:Array<GPUTexture|GPUBuffer>=[];let remove=()=>{};
+  private bake(device: GPUDevice, source: Part[] | PBRModel): void {
+    const e = this.engine,
+      store = e.store,
+      n = this.frames,
+      fs = this.frameSize,
+      temp = Array.isArray(source),
+      model = Array.isArray(source) ? coreModel(e, source) : source;
+    const id = meshRuntime(model.root).id,
+      t = store.transforms,
+      saved = keys.map((k) => t[k][id]),
+      parent = store.parents[id],
+      hidden = store.hidden[id],
+      scratch: Array<GPUTexture | GPUBuffer> = [];
+    let remove = () => {};
     try {
       // Bake in the root's local space: unparented, identity transform, visible.
-      keys.forEach((k,i)=>{t[k][id]=+(i>=6);});store.parents[id]=-1;store.hidden[id]=0;store.tick(false);
-      const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity],points:number[]=[];
-      for(const p of model.primitives){const m=p.node.matrix,v=p.vertices;for(let i=0;i<v.length;i+=20)for(let r=0;r<3;r++){const x=m[r]*v[i]+m[4+r]*v[i+1]+m[8+r]*v[i+2]+m[12+r];points.push(x);min[r]=Math.min(min[r],x);max[r]=Math.max(max[r],x);}}
-      const c=this.center;for(let r=0;r<3;r++)c[r]=(min[r]+max[r])/2;let radius=0;for(let i=0;i<points.length;i+=3)radius=Math.max(radius,Math.hypot(points[i]-c[0],points[i+1]-c[1],points[i+2]-c[2]));
-      this.radius=radius*1.01||1e-3;
-      const target=(format:GPUTextureFormat)=>{const texture=device.createTexture({size:[fs,fs],format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});scratch.push(texture);return texture;};
-      const albedo=target('rgba8unorm-srgb'),normal=target('rgba16float'),depth=target('depth32float'),views=[albedo,normal,depth].map(texture=>texture.createView());
-      const modes=[0,1].map(mode=>{const buffer=device.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});scratch.push(buffer);device.queue.writeBuffer(buffer,0,new Float32Array([mode,0,0,0]));return buffer;});let mode=0;
-      remove=model.addLighting({owner:e,shader:bakeShader,bindings:()=>[{binding:96,resource:{buffer:modes[mode]}}]});
-      const camera={matrix:new Float32Array(16),position:[0,0,1],target:[0,0,0]},context:any={backend:'webgpu',device,camera,descriptor:{multisample:{count:1},depthStencil:{format:'depth32float'}}};
-      const clearDepth={view:views[2],depthClearValue:0,depthLoadOp:'clear',depthStoreOp:'store'} as const;
-      for(let j=0;j<n;j++)for(let i=0;i<n;i++){
-        frameMatrix(frameDirection(i,j,n),c,this.radius,camera.matrix);const encoder=context.encoder=device.createCommandEncoder();
-        encoder.beginRenderPass({colorAttachments:[0,1].map(k=>({view:views[k],loadOp:'clear',storeOp:'store',clearValue:[0,0,0,0]})),depthStencilAttachment:clearDepth}).end();
-        mode=0;context.format='rgba8unorm-srgb';model.draw(context,'beauty',views[0],views[2]);
-        encoder.beginRenderPass({colorAttachments:[],depthStencilAttachment:clearDepth}).end();
-        mode=1;context.format='rgba16float';model.draw(context,'beauty',views[1],views[2]);
-        for(const [from,to] of [[albedo,this.color!],[normal,this.normal!]])encoder.copyTextureToTexture({texture:from},{texture:to,origin:[i*fs,j*fs]},[fs,fs]);
-        device.queue.submit([encoder.finish()]);
+      keys.forEach((k, i) => {
+        t[k][id] = +(i >= 6);
+      });
+      store.parents[id] = -1;
+      store.hidden[id] = 0;
+      store.tick(false);
+      const min = [Infinity, Infinity, Infinity],
+        max = [-Infinity, -Infinity, -Infinity],
+        points: number[] = [];
+      for (const p of model.primitives) {
+        const m = p.node.matrix,
+          v = p.vertices;
+        for (let i = 0; i < v.length; i += 20)
+          for (let r = 0; r < 3; r++) {
+            const x = m[r] * v[i] + m[4 + r] * v[i + 1] + m[8 + r] * v[i + 2] + m[12 + r];
+            points.push(x);
+            min[r] = Math.min(min[r], x);
+            max[r] = Math.max(max[r], x);
+          }
       }
+      const c = this.center;
+      for (let r = 0; r < 3; r++) c[r] = (min[r] + max[r]) / 2;
+      let radius = 0;
+      for (let i = 0; i < points.length; i += 3)
+        radius = Math.max(radius, Math.hypot(points[i] - c[0], points[i + 1] - c[1], points[i + 2] - c[2]));
+      this.radius = radius * 1.01 || 1e-3;
+      const target = (format: GPUTextureFormat) => {
+        const texture = device.createTexture({
+          size: [fs, fs],
+          format,
+          usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+        });
+        scratch.push(texture);
+        return texture;
+      };
+      const albedo = target('rgba8unorm-srgb'),
+        normal = target('rgba16float'),
+        depth = target('depth32float'),
+        views = [albedo, normal, depth].map((texture) => texture.createView());
+      const modes = [0, 1].map((mode) => {
+        const buffer = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        scratch.push(buffer);
+        device.queue.writeBuffer(buffer, 0, new Float32Array([mode, 0, 0, 0]));
+        return buffer;
+      });
+      let mode = 0;
+      remove = model.addLighting({
+        owner: e,
+        shader: bakeShader,
+        bindings: () => [{ binding: 96, resource: { buffer: modes[mode] } }],
+      });
+      const camera = { matrix: new Float32Array(16), position: [0, 0, 1], target: [0, 0, 0] },
+        context: any = {
+          backend: 'webgpu',
+          device,
+          camera,
+          descriptor: { multisample: { count: 1 }, depthStencil: { format: 'depth32float' } },
+        };
+      const clearDepth = { view: views[2], depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'store' } as const;
+      for (let j = 0; j < n; j++)
+        for (let i = 0; i < n; i++) {
+          frameMatrix(frameDirection(i, j, n), c, this.radius, camera.matrix);
+          const encoder = (context.encoder = device.createCommandEncoder());
+          encoder
+            .beginRenderPass({
+              colorAttachments: [0, 1].map((k) => ({
+                view: views[k],
+                loadOp: 'clear',
+                storeOp: 'store',
+                clearValue: [0, 0, 0, 0],
+              })),
+              depthStencilAttachment: clearDepth,
+            })
+            .end();
+          mode = 0;
+          context.format = 'rgba8unorm-srgb';
+          model.draw(context, 'beauty', views[0], views[2]);
+          encoder.beginRenderPass({ colorAttachments: [], depthStencilAttachment: clearDepth }).end();
+          mode = 1;
+          context.format = 'rgba16float';
+          model.draw(context, 'beauty', views[1], views[2]);
+          for (const [from, to] of [
+            [albedo, this.color!],
+            [normal, this.normal!],
+          ])
+            encoder.copyTextureToTexture({ texture: from }, { texture: to, origin: [i * fs, j * fs] }, [fs, fs]);
+          device.queue.submit([encoder.finish()]);
+        }
     } finally {
-      remove();keys.forEach((k,i)=>{t[k][id]=saved[i];});store.parents[id]=parent;store.hidden[id]=hidden;store.tick(false);
-      for(const resource of scratch)resource.destroy();if(temp)model.dispose();
+      remove();
+      keys.forEach((k, i) => {
+        t[k][id] = saved[i];
+      });
+      store.parents[id] = parent;
+      store.hidden[id] = hidden;
+      store.tick(false);
+      for (const resource of scratch) resource.destroy();
+      if (temp) model.dispose();
     }
   }
   /** Reads the atlas back for caching (IndexedDB, a file); `Imposter.fromData` restores it without baking. */
-  async export():Promise<ImposterData> {
-    if(!this.ready())throw new Error('Imposter has no atlas');const device=this.device!,size=this.size;
-    const read=async(texture:GPUTexture,bytes:number)=>{
-      const row=Math.ceil(size*bytes/256)*256,buffer=device.createBuffer({size:row*size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),encoder=device.createCommandEncoder();
-      try{encoder.copyTextureToBuffer({texture},{buffer,bytesPerRow:row},[size,size]);device.queue.submit([encoder.finish()]);await buffer.mapAsync(GPUMapMode.READ);
-        const mapped=new Uint8Array(buffer.getMappedRange()),out=new Uint8Array(size*size*bytes);for(let y=0;y<size;y++)out.set(mapped.subarray(y*row,y*row+size*bytes),y*size*bytes);buffer.unmap();return out;}
-      finally{buffer.destroy();}
+  async export(): Promise<ImposterData> {
+    if (!this.ready()) throw new Error('Imposter has no atlas');
+    const device = this.device!,
+      size = this.size;
+    const read = async (texture: GPUTexture, bytes: number) => {
+      const row = Math.ceil((size * bytes) / 256) * 256,
+        buffer = device.createBuffer({ size: row * size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
+        encoder = device.createCommandEncoder();
+      try {
+        encoder.copyTextureToBuffer({ texture }, { buffer, bytesPerRow: row }, [size, size]);
+        device.queue.submit([encoder.finish()]);
+        await buffer.mapAsync(GPUMapMode.READ);
+        const mapped = new Uint8Array(buffer.getMappedRange()),
+          out = new Uint8Array(size * size * bytes);
+        for (let y = 0; y < size; y++) out.set(mapped.subarray(y * row, y * row + size * bytes), y * size * bytes);
+        buffer.unmap();
+        return out;
+      } finally {
+        buffer.destroy();
+      }
     };
-    const color=await read(this.color!,4),normal=await read(this.normal!,8);
-    return {frames:this.frames,frameSize:this.frameSize,center:[...this.center],radius:this.radius,shading:this.shading,color,normal:new Uint16Array(normal.buffer)};
+    const color = await read(this.color!, 4),
+      normal = await read(this.normal!, 8);
+    return {
+      frames: this.frames,
+      frameSize: this.frameSize,
+      center: [...this.center],
+      radius: this.radius,
+      shading: this.shading,
+      color,
+      normal: new Uint16Array(normal.buffer),
+    };
   }
-  private release():void {this.color?.destroy();this.normal?.destroy();this.uniform?.destroy();this.color=this.normal=this.uniform=undefined;this.device=undefined;}
-  dispose():void {this.disposed=true;this.release();this.source=this.data=undefined;}
+  private release(): void {
+    this.color?.destroy();
+    this.normal?.destroy();
+    this.uniform?.destroy();
+    this.color = this.normal = this.uniform = undefined;
+    this.device = undefined;
+  }
+  dispose(): void {
+    this.disposed = true;
+    this.release();
+    this.source = this.data = undefined;
+  }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 }
 
 /** Draws one atlas: camera-facing quads that reproject the three nearest views (one depth parallax step each), blend them, relight and write per-pixel depth. */
-export const imposterShader=`${acesShader}
+export const imposterShader = `${acesShader}
 ${octWGSL}
 struct Frame {camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,options:vec4f}
 struct Atlas {center:vec4f,grid:vec4f}

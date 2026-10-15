@@ -4,23 +4,23 @@
 
 ```ts
 export class OverlappingModel {
-     readonly patterns: number;
-     readonly stats: OverlappingStats;
+    readonly patterns: number;
+    readonly stats: OverlappingStats;
     constructor(sample: Sample, { N, periodicInput, symmetry }?: OverlappingOptions);
     solve(width: number, height: number, { seed, periodic, backtracks, attempts }?: OverlappingSolveOptions): Float64Array;
 }
 
 export interface OverlappingOptions {
-     N?: number;
-     periodicInput?: boolean;
-     symmetry?: number;
+    N?: number;
+    periodicInput?: boolean;
+    symmetry?: number;
 }
 
 export interface OverlappingSolveOptions {
-     seed?: number;
-     periodic?: boolean;
-     backtracks?: number;
-     attempts?: number;
+    seed?: number;
+    periodic?: boolean;
+    backtracks?: number;
+    attempts?: number;
 }
 
 export interface OverlappingStats {

@@ -1,1 +1,5 @@
-export function triangulatePolygon(contour:number[][],holes?:number[][][],options?:{maxVertices?:number;allowTouch?:boolean;workCounter?:{used:number;limit:number}}):{positions:number[];indices:number[];rings:number[][][];area:number};
+export function triangulatePolygon(
+  contour: number[][],
+  holes?: number[][][],
+  options?: { maxVertices?: number; allowTouch?: boolean; workCounter?: { used: number; limit: number } },
+): { positions: number[]; indices: number[]; rings: number[][][]; area: number };

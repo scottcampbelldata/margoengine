@@ -1,1 +1,1 @@
-export {SkyMoon,type SkyMoonConfig} from './sky.js';
+export { SkyMoon, type SkyMoonConfig } from './sky.js';

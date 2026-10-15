@@ -1,9 +1,11 @@
-export const frame=`struct Frame {camera:mat4x4f,view:mat4x4f,eye:vec4f,viewport:vec4f,settings:vec4f,counts:vec4u}
+export const frame = `struct Frame {camera:mat4x4f,view:mat4x4f,eye:vec4f,viewport:vec4f,settings:vec4f,counts:vec4u}
 @group(0) @binding(0) var<uniform> f:Frame;
 struct Ellipse {center:vec4f,axes:vec4f}`;
 // Orthographic cameras (settings.w): the projection is affine, so the Jacobian is the constant pixel scale, sort keys
 // count from the (possibly negative) near plane and spherical harmonics use the fixed view direction.
-export const project=frame+`
+export const project =
+  frame +
+  `
 @group(0) @binding(1) var<storage,read> positions:array<vec4f>;
 @group(0) @binding(2) var<storage,read> covariances:array<vec4f>;
 @group(0) @binding(3) var<storage,read> colors:array<vec4f>;
@@ -36,7 +38,9 @@ fn color(index:u32)->vec3f {
     if(all(abs(ndc.xy)<=vec2f(1)+extent)) {ellipse.center=vec4f(ndc,world.w);ellipse.axes=vec4f(first,second);keys[index]=vec2u(~bitcast<u32>(select(depth,depth-f.settings.x,f.settings.w>0.5)),index);}
   }ellipses[index]=ellipse;evaluated[index]=vec4f(color(index),world.w);
 }`;
-export const render=frame+`
+export const render =
+  frame +
+  `
 @group(0) @binding(1) var<storage,read> ellipses:array<Ellipse>;
 @group(0) @binding(2) var<storage,read> colors:array<vec4f>;
 @group(0) @binding(3) var<storage,read> sorted:array<vec2u>;

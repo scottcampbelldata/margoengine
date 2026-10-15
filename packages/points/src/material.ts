@@ -1,10 +1,17 @@
-import {parseColor, type ColorInput} from './color.js';
+import { parseColor, type ColorInput } from './color.js';
 
 /**
  * Anything the plugin can sample: a GPUTexture you own (created on the engine's device), or an image source it
  * uploads itself with `copyExternalImageToTexture` (ImageBitmap, canvas, OffscreenCanvas, image, video, ImageData).
  */
-export type TextureSource = GPUTexture | ImageBitmap | HTMLCanvasElement | OffscreenCanvas | HTMLImageElement | HTMLVideoElement | ImageData;
+export type TextureSource =
+  | GPUTexture
+  | ImageBitmap
+  | HTMLCanvasElement
+  | OffscreenCanvas
+  | HTMLImageElement
+  | HTMLVideoElement
+  | ImageData;
 
 export type Blending = 'normal' | 'additive';
 
@@ -29,7 +36,9 @@ export interface BaseMaterialOptions {
   depthWrite?: boolean;
 }
 
-const checkUnit = (value: number, label: string) => {if (typeof value !== 'number' || !(value >= 0 && value <= 1)) throw new RangeError(`${label} must be in [0, 1]`);};
+const checkUnit = (value: number, label: string) => {
+  if (typeof value !== 'number' || !(value >= 0 && value <= 1)) throw new RangeError(`${label} must be in [0, 1]`);
+};
 
 abstract class BaseMaterial {
   /** Linear RGB. */
@@ -46,21 +55,35 @@ abstract class BaseMaterial {
   mapVersion = 0;
   private source: TextureSource | null = null;
 
-  protected constructor(transparent: boolean) {this.transparent = transparent;}
+  protected constructor(transparent: boolean) {
+    this.transparent = transparent;
+  }
 
-  get map(): TextureSource | null {return this.source;}
+  get map(): TextureSource | null {
+    return this.source;
+  }
   set map(value: TextureSource | null) {
-    if (value !== null && (typeof value !== 'object')) throw new TypeError('map must be a texture source or null');
-    if (value !== this.source) {this.source = value; this.mapVersion++;}
+    if (value !== null && typeof value !== 'object') throw new TypeError('map must be a texture source or null');
+    if (value !== this.source) {
+      this.source = value;
+      this.mapVersion++;
+    }
   }
 
   /** Re-uploads an image source whose pixels changed (for example a canvas you drew into). */
-  needsUpdate(): void {this.mapVersion++;}
+  needsUpdate(): void {
+    this.mapVersion++;
+  }
 
-  setColor(color: ColorInput): this {parseColor(color, this.color); return this;}
+  setColor(color: ColorInput): this {
+    parseColor(color, this.color);
+    return this;
+  }
 
   /** Depth writes after resolving the `null` default. */
-  get writesDepth(): boolean {return this.depthWrite ?? !this.transparent;}
+  get writesDepth(): boolean {
+    return this.depthWrite ?? !this.transparent;
+  }
 
   protected apply(options: BaseMaterialOptions): void {
     if (options.color !== undefined) this.setColor(options.color);
@@ -75,11 +98,20 @@ abstract class BaseMaterial {
   }
 
   validate(): void {
-    checkUnit(this.opacity, 'opacity'); checkUnit(this.alphaTest, 'alphaTest');
-    if (!['linear', 'nearest'].includes(this.mapFilter)) throw new RangeError("mapFilter must be 'linear' or 'nearest'");
-    if (!['normal', 'additive'].includes(this.blending)) throw new RangeError("blending must be 'normal' or 'additive'");
-    if (typeof this.transparent !== 'boolean' || typeof this.depthTest !== 'boolean' || (this.depthWrite !== null && typeof this.depthWrite !== 'boolean')) throw new TypeError('transparent, depthTest and depthWrite must be booleans');
-    for (const v of this.color) if (!Number.isFinite(v) || v < 0) throw new RangeError('color must be finite and non-negative');
+    checkUnit(this.opacity, 'opacity');
+    checkUnit(this.alphaTest, 'alphaTest');
+    if (!['linear', 'nearest'].includes(this.mapFilter))
+      throw new RangeError("mapFilter must be 'linear' or 'nearest'");
+    if (!['normal', 'additive'].includes(this.blending))
+      throw new RangeError("blending must be 'normal' or 'additive'");
+    if (
+      typeof this.transparent !== 'boolean' ||
+      typeof this.depthTest !== 'boolean' ||
+      (this.depthWrite !== null && typeof this.depthWrite !== 'boolean')
+    )
+      throw new TypeError('transparent, depthTest and depthWrite must be booleans');
+    for (const v of this.color)
+      if (!Number.isFinite(v) || v < 0) throw new RangeError('color must be finite and non-negative');
   }
 }
 
@@ -117,10 +149,17 @@ export class PointsMaterial extends BaseMaterial {
   shading: PointShading = 'flat';
   edl = false;
 
-  constructor(options: PointsMaterialOptions = {}) {super(false); this.set(options);}
+  constructor(options: PointsMaterialOptions = {}) {
+    super(false);
+    this.set(options);
+  }
 
-  get sizeAttenuation(): boolean {return this.sizeUnits === 'world';}
-  set sizeAttenuation(value: boolean) {this.sizeUnits = value ? 'world' : 'pixels';}
+  get sizeAttenuation(): boolean {
+    return this.sizeUnits === 'world';
+  }
+  set sizeAttenuation(value: boolean) {
+    this.sizeUnits = value ? 'world' : 'pixels';
+  }
 
   set(options: PointsMaterialOptions): this {
     this.apply(options);
@@ -140,11 +179,13 @@ export class PointsMaterial extends BaseMaterial {
   override validate(): void {
     super.validate();
     if (!(this.size >= 0) || !Number.isFinite(this.size)) throw new RangeError('size must be finite and non-negative');
-    if (!(this.minPixelSize >= 0) || !(this.maxPixelSize >= this.minPixelSize) || !Number.isFinite(this.maxPixelSize)) throw new RangeError('Need 0 <= minPixelSize <= maxPixelSize');
+    if (!(this.minPixelSize >= 0) || !(this.maxPixelSize >= this.minPixelSize) || !Number.isFinite(this.maxPixelSize))
+      throw new RangeError('Need 0 <= minPixelSize <= maxPixelSize');
     if (!['pixels', 'world'].includes(this.sizeUnits)) throw new RangeError("sizeUnits must be 'pixels' or 'world'");
     if (!['square', 'round'].includes(this.shape)) throw new RangeError("shape must be 'square' or 'round'");
     if (!['flat', 'sphere'].includes(this.shading)) throw new RangeError("shading must be 'flat' or 'sphere'");
-    if (typeof this.vertexColors !== 'boolean' || typeof this.edl !== 'boolean') throw new TypeError('vertexColors and edl must be booleans');
+    if (typeof this.vertexColors !== 'boolean' || typeof this.edl !== 'boolean')
+      throw new TypeError('vertexColors and edl must be booleans');
   }
 }
 
@@ -162,10 +203,17 @@ export class SpriteMaterial extends BaseMaterial {
   rotation = 0;
   sizeUnits: 'world' | 'pixels' = 'world';
 
-  constructor(options: SpriteMaterialOptions = {}) {super(true); this.set(options);}
+  constructor(options: SpriteMaterialOptions = {}) {
+    super(true);
+    this.set(options);
+  }
 
-  get sizeAttenuation(): boolean {return this.sizeUnits === 'world';}
-  set sizeAttenuation(value: boolean) {this.sizeUnits = value ? 'world' : 'pixels';}
+  get sizeAttenuation(): boolean {
+    return this.sizeUnits === 'world';
+  }
+  set sizeAttenuation(value: boolean) {
+    this.sizeUnits = value ? 'world' : 'pixels';
+  }
 
   set(options: SpriteMaterialOptions): this {
     this.apply(options);

@@ -1,8 +1,8 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type {Mesh} from '@margoengine/core';
-import {parseColor, type ColorInput} from './color.js';
-import {SpriteMaterial, type SpriteMaterialOptions} from './material.js';
-import type {PointOwner} from './cloud.js';
+import type { Mesh } from '@margoengine/core';
+import { parseColor, type ColorInput } from './color.js';
+import { SpriteMaterial, type SpriteMaterialOptions } from './material.js';
+import type { PointOwner } from './cloud.js';
 
 /** Floats per sprite in `SpriteBatch.data`: position xyz, rotation, size wh, center xy, uv rect, linear RGBA. */
 export const SPRITE_STRIDE = 16;
@@ -55,7 +55,8 @@ export class SpriteBatch {
 
   constructor(options: SpriteBatchOptions = {}) {
     this.name = options.name ?? '';
-    this.material = options.material instanceof SpriteMaterial ? options.material : new SpriteMaterial(options.material);
+    this.material =
+      options.material instanceof SpriteMaterial ? options.material : new SpriteMaterial(options.material);
     const capacity = options.capacity ?? 64;
     if (!Number.isInteger(capacity) || capacity < 1) throw new RangeError('capacity must be a positive integer');
     this.data = new Float32Array(capacity * SPRITE_STRIDE);
@@ -63,19 +64,29 @@ export class SpriteBatch {
   }
 
   /** Number of sprites. */
-  get count(): number {return this.used;}
-  get capacity(): number {return this.data.length / SPRITE_STRIDE;}
-  get attachedMesh(): Mesh | null {return this.mesh;}
+  get count(): number {
+    return this.used;
+  }
+  get capacity(): number {
+    return this.data.length / SPRITE_STRIDE;
+  }
+  get attachedMesh(): Mesh | null {
+    return this.mesh;
+  }
 
   /** Follow a core mesh's world matrix and visibility. */
-  attach(mesh: Mesh | null): this {this.mesh = mesh; return this;}
+  attach(mesh: Mesh | null): this {
+    this.mesh = mesh;
+    return this;
+  }
 
   /** Appends a sprite and returns its index. */
   add(sprite: SpriteOptions = {}): number {
     if (this.used === this.capacity) {
       const grown = new Float32Array(this.data.length * 2);
       grown.set(this.data);
-      this.data = grown; this.structure++;
+      this.data = grown;
+      this.structure++;
     }
     const index = this.used;
     this.write(index, sprite, true);
@@ -84,7 +95,11 @@ export class SpriteBatch {
   }
 
   /** Changes some properties of sprite `index`; the rest stay. */
-  set(index: number, sprite: SpriteOptions): this {this.check(index); this.write(index, sprite, false); return this;}
+  set(index: number, sprite: SpriteOptions): this {
+    this.check(index);
+    this.write(index, sprite, false);
+    return this;
+  }
 
   /** Removes sprite `index` by moving the last sprite into its slot. Returns the old index of the moved sprite, or -1. */
   remove(index: number): number {
@@ -96,19 +111,27 @@ export class SpriteBatch {
     return last;
   }
 
-  clear(): this {this.used = 0; return this;}
+  clear(): this {
+    this.used = 0;
+    return this;
+  }
 
   /** Marks sprites `start .. start + count` changed after direct writes to `data`. */
   markDirty(start = 0, count = this.used - start): this {
-    if (!Number.isInteger(start) || !Number.isInteger(count) || start < 0 || count < 0 || start + count > this.used) throw new RangeError('Sprite range out of bounds');
+    if (!Number.isInteger(start) || !Number.isInteger(count) || start < 0 || count < 0 || start + count > this.used)
+      throw new RangeError('Sprite range out of bounds');
     this.dirty.push([start, start + count]);
     return this;
   }
 
   /** Detaches from the plugin and frees GPU buffers. */
-  dispose(): void {this.owner?.remove(this);}
+  dispose(): void {
+    this.owner?.remove(this);
+  }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 
   /** @internal */
   bind(owner: PointOwner | undefined): void {
@@ -121,17 +144,22 @@ export class SpriteBatch {
   }
 
   private write(index: number, sprite: SpriteOptions, defaults: boolean): void {
-    const d = this.data, o = index * SPRITE_STRIDE;
+    const d = this.data,
+      o = index * SPRITE_STRIDE;
     const scratch = new Float32Array(SPRITE_STRIDE);
     scratch.set(defaults ? [0, 0, 0, 0, 1, 1, 0.5, 0.5, 0, 0, 1, 1, 1, 1, 1, 1] : d.subarray(o, o + SPRITE_STRIDE));
     if (sprite.position) scratch.set(sprite.position.slice(0, 3), 0);
     if (sprite.rotation !== undefined) scratch[3] = sprite.rotation;
     if (sprite.size !== undefined) {
       const size = typeof sprite.size === 'number' ? [sprite.size, sprite.size] : sprite.size;
-      scratch[4] = size[0]; scratch[5] = size[1];
+      scratch[4] = size[0];
+      scratch[5] = size[1];
       if (!(size[0] >= 0 && size[1] >= 0)) throw new RangeError('Sprite size must be non-negative');
     }
-    if (sprite.center) {scratch[6] = sprite.center[0]; scratch[7] = sprite.center[1];}
+    if (sprite.center) {
+      scratch[6] = sprite.center[0];
+      scratch[7] = sprite.center[1];
+    }
     if (sprite.uv) scratch.set(sprite.uv.slice(0, 4), 8);
     if (sprite.color !== undefined) parseColor(sprite.color, scratch, 12);
     if (sprite.opacity !== undefined) {

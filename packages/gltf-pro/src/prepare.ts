@@ -1,6 +1,6 @@
-import {loadAsset, type GLTFAsset, type GLTFDocument, type GLTFImage} from './asset.js';
-import {decodeExtras, packPrimitive} from './pack.js';
-import type {PreparedGeometry} from './index.js';
+import { loadAsset, type GLTFAsset, type GLTFDocument, type GLTFImage } from './asset.js';
+import { decodeExtras, packPrimitive } from './pack.js';
+import type { PreparedGeometry } from './index.js';
 /** A glTF parsed off the main thread: everything PBRModel needs except GPU uploads. Every buffer is transferable. */
 export interface PreparedGLTF {
   doc: GLTFDocument;
@@ -17,14 +17,37 @@ export interface PreparedGLTF {
 }
 /** Decode what PBRModel and @margoengine/animation read from an asset: packed primitives and their accessors. */
 export function prepareAsset(asset: GLTFAsset, images: GLTFImage[]): PreparedGLTF {
-  const doc = asset.doc, attempt = <T>(f: () => T) => {try {return f();} catch {return null;}};
-  const geometry = (doc.meshes ?? []).map((mesh: any) => (Array.isArray(mesh?.primitives) ? mesh.primitives : []).map((p: any) => attempt(() => packPrimitive(asset, p))));
+  const doc = asset.doc,
+    attempt = <T>(f: () => T) => {
+      try {
+        return f();
+      } catch {
+        return null;
+      }
+    };
+  const geometry = (doc.meshes ?? []).map((mesh: any) =>
+    (Array.isArray(mesh?.primitives) ? mesh.primitives : []).map((p: any) => attempt(() => packPrimitive(asset, p))),
+  );
   decodeExtras(asset);
   // GLTFAsset's accessor cache is private to the package; the worker entry seeds a fresh asset's cache with it.
-  return {doc, buffers: asset.buffers, images, geometry, accessors: [...asset['cache']], maxDownloadBytes: asset.maxBytes, maxNodes: asset.maxNodes};
+  return {
+    doc,
+    buffers: asset.buffers,
+    images,
+    geometry,
+    accessors: [...asset['cache']],
+    maxDownloadBytes: asset.maxBytes,
+    maxNodes: asset.maxNodes,
+  };
 }
 /** Fetch (url) or parse (input) and prepare a glTF; no decoders (Draco, meshopt, KTX2 need the main-thread path). */
-export async function prepareGLTF(url: string | URL | undefined, input?: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, maxDownloadBytes?: number, maxNodes?: number): Promise<PreparedGLTF> {
-  const {asset, images} = await loadAsset(url, {buffers, maxDownloadBytes, maxNodes}, input);
+export async function prepareGLTF(
+  url: string | URL | undefined,
+  input?: string | object | ArrayBuffer | ArrayBufferView,
+  buffers?: Array<ArrayBuffer | ArrayBufferView>,
+  maxDownloadBytes?: number,
+  maxNodes?: number,
+): Promise<PreparedGLTF> {
+  const { asset, images } = await loadAsset(url, { buffers, maxDownloadBytes, maxNodes }, input);
   return prepareAsset(asset, images);
 }

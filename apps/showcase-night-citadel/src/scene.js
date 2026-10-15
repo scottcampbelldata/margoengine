@@ -104,18 +104,7 @@ export function createCitadel() {
     amber = new PbrMaterial({ color: '#dba761' }).data;
   const geometries = [box(), roundTower(1), roundTower(0), buttress()];
   const data = Array.from({ length: 7 }, () => []);
-  function instance(
-    group,
-    x,
-    y,
-    z,
-    sx,
-    sy,
-    sz,
-    color,
-    angle = 0,
-    emission = 0,
-  ) {
+  function instance(group, x, y, z, sx, sy, sz, color, angle = 0, emission = 0) {
     const c = Math.cos(angle),
       s = Math.sin(angle);
     data[group].push(
@@ -159,41 +148,11 @@ export function createCitadel() {
           a = Math.sin(angle),
           b = Math.cos(angle),
           level = 3 + (floor * (h - 5)) / 3;
-        block(
-          x + a * r * 0.935,
-          level,
-          z + b * r * 0.935,
-          0.36,
-          1.5,
-          0.045,
-          dark,
-          angle,
-        );
+        block(x + a * r * 0.935, level, z + b * r * 0.935, 0.36, 1.5, 0.045, dark, angle);
         if ((side + floor) % 3 === 0) {
-          block(
-            x + a * r * 0.96,
-            level - 0.12,
-            z + b * r * 0.96,
-            0.12,
-            1.13,
-            0.045,
-            amber,
-            angle,
-            1,
-          );
+          block(x + a * r * 0.96, level - 0.12, z + b * r * 0.96, 0.12, 1.13, 0.045, amber, angle, 1);
           const faceRadius = r * Math.cos(Math.PI / 8) + 0.012;
-          instance(
-            6,
-            x + a * faceRadius,
-            level - 0.58,
-            z + b * faceRadius,
-            0.8,
-            2.3,
-            1,
-            amber,
-            angle,
-            0.065,
-          );
+          instance(6, x + a * faceRadius, level - 0.58, z + b * faceRadius, 0.8, 2.3, 1, amber, angle, 0.065);
         }
       }
   }
@@ -205,8 +164,7 @@ export function createCitadel() {
     tower(x, -2.6, 1.6, 20, 9);
     tower(x, 4.6, 1.3, 17, 7);
   }
-  for (const x of [-10.3, 10.3])
-    for (const z of [-8.2, 8.2]) tower(x, z, 2.15, z < 0 ? 12 : 14, 8);
+  for (const x of [-10.3, 10.3]) for (const z of [-8.2, 8.2]) tower(x, z, 2.15, z < 0 ? 12 : 14, 8);
   for (const x of [-7.5, 7.5]) tower(x, -0.5, 1.25, 17, 7);
   for (const z of [-8.2, 8.2]) {
     block(0, 4.1, z, 20.6, 8.2, 1.15);
@@ -228,8 +186,7 @@ export function createCitadel() {
   // Layered pointed gate and staircase, with dark inset slits in the curtain wall.
   block(0, 2.7, 8.81, 2.6, 5.4, 0.06, dark);
   instance(2, 0, 5.2, 8.84, 1.3, 1.8, 0.07, dark);
-  for (let step = 0; step < 9; step++)
-    block(0, 0.35 - step * 0.2, 10.5 + step * 0.55, 3.8, 0.6, 0.65);
+  for (let step = 0; step < 9; step++) block(0, 0.35 - step * 0.2, 10.5 + step * 0.55, 3.8, 0.6, 0.65);
   for (const x of [-1, 1])
     for (const z of [-5, 0, 5]) {
       instance(3, x * 4.3, 1, z, 1, 1, 1, stone, x > 0 ? 0 : Math.PI);
@@ -264,8 +221,7 @@ export function createCitadel() {
         add(rings[j][i], rings[j][n], rings[j + 1][i]);
         add(rings[j][n], rings[j + 1][n], rings[j + 1][i]);
       }
-    for (let i = 0; i < 32; i++)
-      add([0, 0.9, 0], rings[0][(i + 1) % 32], rings[0][i]);
+    for (let i = 0; i < 32; i++) add([0, 0.9, 0], rings[0][(i + 1) % 32], rings[0][i]);
   });
   geometries.push(cliff);
   instance(4, 0, -0.9, 0, 1, 1, 1, rock);
@@ -326,27 +282,46 @@ export function createCitadel() {
  * @returns {{batches: import('@margoengine/scatter').ScatterBatch[], lights: import('@margoengine/clustered').PointLight[]}}
  */
 export function createCitadelPBR(scene = createCitadel()) {
-  const batches = [], lights = [];
+  const batches = [],
+    lights = [];
   for (const source of scene) {
     if (source.glow) continue;
-    const vertices = new Float32Array(source.geometry.vertices.length / 6 * 20);
+    const vertices = new Float32Array((source.geometry.vertices.length / 6) * 20);
     for (let i = 0; i < source.geometry.vertices.length / 6; i++) {
-      vertices.set(source.geometry.vertices.subarray(i*6,i*6+3),i*20);
-      vertices.set(source.geometry.vertices.subarray(i*6+3,i*6+6),i*20+4);
-      vertices.fill(1,i*20+16,i*20+20);
+      vertices.set(source.geometry.vertices.subarray(i * 6, i * 6 + 3), i * 20);
+      vertices.set(source.geometry.vertices.subarray(i * 6 + 3, i * 6 + 6), i * 20 + 4);
+      vertices.fill(1, i * 20 + 16, i * 20 + 20);
     }
     const groups = new Map();
-    for (let offset=0; offset<source.instances.length; offset+=24) {
-      const color = source.instances.slice(offset+16,offset+19), emission = source.instances[offset+20];
-      const key = [...color,emission].join(',');
+    for (let offset = 0; offset < source.instances.length; offset += 24) {
+      const color = source.instances.slice(offset + 16, offset + 19),
+        emission = source.instances[offset + 20];
+      const key = [...color, emission].join(',');
       let group = groups.get(key);
-      if (!group) {group={color,emission,transforms:[]};groups.set(key,group);}
-      group.transforms.push(...source.instances.subarray(offset,offset+16));
-      if (emission>0) lights.push({position:[source.instances[offset+12],source.instances[offset+13],source.instances[offset+14]],range:4,color:[1,0.65,0.25],intensity:7});
+      if (!group) {
+        group = { color, emission, transforms: [] };
+        groups.set(key, group);
+      }
+      group.transforms.push(...source.instances.subarray(offset, offset + 16));
+      if (emission > 0)
+        lights.push({
+          position: [source.instances[offset + 12], source.instances[offset + 13], source.instances[offset + 14]],
+          range: 4,
+          color: [1, 0.65, 0.25],
+          intensity: 7,
+        });
     }
-    for (const group of groups.values()) batches.push({name:source.name,vertices,indices:source.geometry.indices,transforms:new Float32Array(group.transforms),material:new PbrMaterial({color:Array.from(group.color),roughness:0.82,doubleSided:true}),emissive:Array.from(group.color,v=>v*group.emission*5)});
+    for (const group of groups.values())
+      batches.push({
+        name: source.name,
+        vertices,
+        indices: source.geometry.indices,
+        transforms: new Float32Array(group.transforms),
+        material: new PbrMaterial({ color: Array.from(group.color), roughness: 0.82, doubleSided: true }),
+        emissive: Array.from(group.color, (v) => v * group.emission * 5),
+      });
   }
-  return {batches,lights};
+  return { batches, lights };
 }
 
 /** @param {[number,number,number]} out @param {number} azimuth @param {number} elevation */

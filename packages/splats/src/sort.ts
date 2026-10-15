@@ -1,6 +1,8 @@
-const settings=`struct Sort {count:u32,groups:u32,blocks:u32,shift:u32}
+const settings = `struct Sort {count:u32,groups:u32,blocks:u32,shift:u32}
 @group(0) @binding(0) var<uniform> sort:Sort;`;
-export const histogram=settings+`
+export const histogram =
+  settings +
+  `
 @group(0) @binding(1) var<storage,read> input:array<vec2u>;
 @group(0) @binding(2) var<storage,read_write> histograms:array<u32>;
 var<workgroup> bins:array<atomic<u32>,16>;
@@ -8,7 +10,9 @@ var<workgroup> bins:array<atomic<u32>,16>;
   if(lane<16){atomicStore(&bins[lane],0);}workgroupBarrier();
   if(id.x<sort.count){atomicAdd(&bins[(input[id.x].x>>sort.shift)&15],1);}workgroupBarrier();
   if(lane<16){histograms[lane*sort.groups+group.x]=atomicLoad(&bins[lane]);}}`;
-export const scan=settings+`
+export const scan =
+  settings +
+  `
 @group(0) @binding(1) var<storage,read> histograms:array<u32>;
 @group(0) @binding(2) var<storage,read_write> offsets:array<u32>;
 @group(0) @binding(3) var<storage,read_write> totals:array<u32>;
@@ -19,7 +23,9 @@ var<workgroup> values:array<u32,256>;
   if(lane==0){totals[group.y*sort.blocks+group.x]=values[255];values[255]=0;}workgroupBarrier();
   for(var stride=128u;stride>0;stride/=2){let at=(lane+1)*stride*2-1;if(at<256){let left=values[at-stride];values[at-stride]=values[at];values[at]+=left;}workgroupBarrier();}
   if(index<sort.groups){offsets[group.y*sort.groups+index]=values[lane];}}`;
-export const scanTotals=settings+`
+export const scanTotals =
+  settings +
+  `
 @group(0) @binding(1) var<storage,read> totals:array<u32>;
 @group(0) @binding(2) var<storage,read_write> bases:array<u32>;
 var<workgroup> values:array<u32,1024>;
@@ -29,7 +35,9 @@ var<workgroup> values:array<u32,1024>;
   if(lane==0){values[1023]=0;}workgroupBarrier();
   for(var stride=512u;stride>0;stride/=2){for(var i=lane;i<1024/(stride*2);i+=256){let at=(i+1)*stride*2-1;let left=values[at-stride];values[at-stride]=values[at];values[at]+=left;}workgroupBarrier();}
   for(var i=lane;i<sort.blocks*16;i+=256){bases[i]=values[i];}}`;
-export const scatter=settings+`
+export const scatter =
+  settings +
+  `
 @group(0) @binding(1) var<storage,read> input:array<vec2u>;
 @group(0) @binding(2) var<storage,read_write> output:array<vec2u>;
 @group(0) @binding(3) var<storage,read> offsets:array<u32>;

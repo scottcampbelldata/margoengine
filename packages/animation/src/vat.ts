@@ -1,91 +1,255 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type {EngineKernel} from '@margoengine/core';
-import type {Engine,EnginePlugin,FrameGraph,PassContext} from '@margoengine/core/extension';
-import type {Animation} from './index.js';
-import {invertMatrixStable} from '@margoengine/math/mat4';
-import {acesShader} from '../../shared/aces.js';
-import {lightPBR} from '../../shared/pbr-hooks.js';
-import {multiplyMatrices} from '@margoengine/math/mat4';
-declare const GPUBufferUsage:{UNIFORM:number;STORAGE:number;VERTEX:number;INDEX:number;COPY_DST:number};
-declare const GPUTextureUsage:{TEXTURE_BINDING:number;COPY_DST:number};
-type Context=Extract<PassContext,{backend:'webgpu'}>;
+import type { EngineKernel } from '@margoengine/core';
+import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
+import type { Animation } from './index.js';
+import { invertMatrixStable } from '@margoengine/math/mat4';
+import { acesShader } from '../../shared/aces.js';
+import { lightPBR } from '../../shared/pbr-hooks.js';
+import { multiplyMatrices } from '@margoengine/math/mat4';
+declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; VERTEX: number; INDEX: number; COPY_DST: number };
+declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
+type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
 /** Rows `start`..`start + frames` hold the clip at `duration * row / frames`; a looping clip's last row equals its first. */
-export interface VATClip {name:string;start:number;frames:number;duration:number;loop:boolean}
+export interface VATClip {
+  name: string;
+  start: number;
+  frames: number;
+  duration: number;
+  loop: boolean;
+}
 /** Baked vertex animation: per row and vertex two rgba32float texels (model-root-space position, normal), wrapped at `width`. */
-export interface VATData {vertexCount:number;rows:number;width:number;texels:Float32Array;indices:Uint32Array;/** UV0 in three.js orientation (v up), like `@margoengine/materials` textures. */uvs:Float32Array;clips:VATClip[]}
-export interface VATBakeOptions {/** Rows per second. Default 30. */fps?:number;/** Clip names or indices. Default: all. */clips?:readonly (string|number)[]}
+export interface VATData {
+  vertexCount: number;
+  rows: number;
+  width: number;
+  texels: Float32Array;
+  indices: Uint32Array;
+  /** UV0 in three.js orientation (v up), like `@margoengine/materials` textures. */
+  uvs: Float32Array;
+  clips: VATClip[];
+}
+export interface VATBakeOptions {
+  /** Rows per second. Default 30. */ fps?: number;
+  /** Clip names or indices. Default: all. */
+  clips?: readonly (string | number)[];
+}
 /** Texture width VAT data wraps at (any WebGPU device takes 8192 rows of it). */
-export const VAT_WIDTH=2048;
+export const VAT_WIDTH = 2048;
 /** Texel (x, y) of a baked row's vertex: k 0 is position, 1 is normal. The shader computes the same. */
-export function vatTexel(row:number,vertex:number,k:number,vertexCount:number,width=VAT_WIDTH):[number,number] {const i=(row*vertexCount+vertex)*2+k;return [i%width,Math.floor(i/width)];}
+export function vatTexel(
+  row: number,
+  vertex: number,
+  k: number,
+  vertexCount: number,
+  width = VAT_WIDTH,
+): [number, number] {
+  const i = (row * vertexCount + vertex) * 2 + k;
+  return [i % width, Math.floor(i / width)];
+}
 
 /**
  * Bakes clips of a skinned and/or morphed glTF (an `Animation`) on the CPU into one vertex animation texture, all
  * primitives merged in the model root's space. Skinning and morphs follow the GPU deformation pass. The animation's
  * clip, time and playing state are restored afterwards.
  */
-export function bakeVAT(animation:Animation,{fps=30,clips}:VATBakeOptions={}):VATData {
-  const model=animation.model,doc=model.asset.doc,store=model.root.engine.store,asset=model.asset;
-  const ids=(clips??animation.clips.map((_,i)=>i)).map(c=>typeof c==='string'?animation.clips.findIndex(x=>x.name===c):c);
-  if(!(fps>0&&fps<=1000)||!ids.length||ids.some(i=>!animation.clips[i]))throw new RangeError('Invalid VAT fps or clips');
-  const parts=model.primitives.map(p=>{
-    const def=p.definition,s=doc.nodes[p.nodeIndex].skin===undefined?null:doc.skins[doc.nodes[p.nodeIndex].skin],joints:number[]=s?.joints??[];
-    return {p,count:p.vertices.length/20,joints,deltas:(def.targets??[]).map((t:any)=>[t.POSITION,t.NORMAL].map(a=>a===undefined?null:asset.accessor(a,'VEC3'))),
-      bind:s?.inverseBindMatrices===undefined?new Float32Array(joints.length*16).map((_,i)=>+(i%16%5===0)):asset.accessor(s.inverseBindMatrices,'MAT4'),
-      ids:s?asset.accessor(def.attributes.JOINTS_0,'VEC4'):null,weights:s?asset.accessor(def.attributes.WEIGHTS_0,'VEC4'):null,palette:new Float32Array(Math.max(1,joints.length)*16)};
+export function bakeVAT(animation: Animation, { fps = 30, clips }: VATBakeOptions = {}): VATData {
+  const model = animation.model,
+    doc = model.asset.doc,
+    store = model.root.engine.store,
+    asset = model.asset;
+  const ids = (clips ?? animation.clips.map((_, i) => i)).map((c) =>
+    typeof c === 'string' ? animation.clips.findIndex((x) => x.name === c) : c,
+  );
+  if (!(fps > 0 && fps <= 1000) || !ids.length || ids.some((i) => !animation.clips[i]))
+    throw new RangeError('Invalid VAT fps or clips');
+  const parts = model.primitives.map((p) => {
+    const def = p.definition,
+      s = doc.nodes[p.nodeIndex].skin === undefined ? null : doc.skins[doc.nodes[p.nodeIndex].skin],
+      joints: number[] = s?.joints ?? [];
+    return {
+      p,
+      count: p.vertices.length / 20,
+      joints,
+      deltas: (def.targets ?? []).map((t: any) =>
+        [t.POSITION, t.NORMAL].map((a) => (a === undefined ? null : asset.accessor(a, 'VEC3'))),
+      ),
+      bind:
+        s?.inverseBindMatrices === undefined
+          ? new Float32Array(joints.length * 16).map((_, i) => +((i % 16) % 5 === 0))
+          : asset.accessor(s.inverseBindMatrices, 'MAT4'),
+      ids: s ? asset.accessor(def.attributes.JOINTS_0, 'VEC4') : null,
+      weights: s ? asset.accessor(def.attributes.WEIGHTS_0, 'VEC4') : null,
+      palette: new Float32Array(Math.max(1, joints.length) * 16),
+    };
   });
-  const vertexCount=parts.reduce((n,x)=>n+x.count,0),frames=ids.map(i=>Math.max(1,Math.ceil(animation.clips[i].duration*fps))),rows=frames.reduce((n,f)=>n+f+1,0);
-  const height=Math.ceil(rows*vertexCount*2/VAT_WIDTH);if(height>8192)throw new RangeError('VAT data exceeds 8192 texture rows');
-  const texels=new Float32Array(VAT_WIDTH*height*4),uvs=new Float32Array(vertexCount*2),indices:number[]=[];
-  for(let k=0,base=0;k<parts.length;base+=parts[k++].count){const v=parts[k].p.vertices;for(let i=0;i<parts[k].count;i++){uvs[(base+i)*2]=v[i*20+12];uvs[(base+i)*2+1]=1-v[i*20+13];}for(const i of parts[k].p.indices)indices.push(base+i);}
-  const saved={clip:animation.clip,time:animation.time,playing:animation.playing},root=new Float32Array(16),joint=new Float32Array(16),m=new Float64Array(12),work=new Float64Array(52);
-  let row=0;
+  const vertexCount = parts.reduce((n, x) => n + x.count, 0),
+    frames = ids.map((i) => Math.max(1, Math.ceil(animation.clips[i].duration * fps))),
+    rows = frames.reduce((n, f) => n + f + 1, 0);
+  const height = Math.ceil((rows * vertexCount * 2) / VAT_WIDTH);
+  if (height > 8192) throw new RangeError('VAT data exceeds 8192 texture rows');
+  const texels = new Float32Array(VAT_WIDTH * height * 4),
+    uvs = new Float32Array(vertexCount * 2),
+    indices: number[] = [];
+  for (let k = 0, base = 0; k < parts.length; base += parts[k++].count) {
+    const v = parts[k].p.vertices;
+    for (let i = 0; i < parts[k].count; i++) {
+      uvs[(base + i) * 2] = v[i * 20 + 12];
+      uvs[(base + i) * 2 + 1] = 1 - v[i * 20 + 13];
+    }
+    for (const i of parts[k].p.indices) indices.push(base + i);
+  }
+  const saved = { clip: animation.clip, time: animation.time, playing: animation.playing },
+    root = new Float32Array(16),
+    joint = new Float32Array(16),
+    m = new Float64Array(12),
+    work = new Float64Array(52);
+  let row = 0;
   try {
-    ids.forEach((clip,c)=>{
-      const duration=animation.clips[clip].duration;animation.play(clip);
-      for(let r=0;r<=frames[c];r++,row++){
-        animation.seek(duration*r/frames[c]);store.tick(false);if(!invertMatrixStable(model.root.matrix,root,work))throw new Error('Singular VAT model root');
-        let o=row*vertexCount*8;
-        for(const x of parts){
-          const {p,joints,palette,ids:j,weights:w}=x,v=p.vertices;
-          if(joints.length)for(let i=0;i<joints.length;i++){multiplyMatrices(model.nodes[joints[i]].matrix,x.bind.subarray(i*16,i*16+16),joint);multiplyMatrices(root,joint,palette.subarray(i*16,i*16+16));}
-          else multiplyMatrices(root,p.node.matrix,palette);
-          for(let i=0;i<x.count;i++,o+=8){
-            let px=v[i*20],py=v[i*20+1],pz=v[i*20+2],nx=v[i*20+4],ny=v[i*20+5],nz=v[i*20+6];
-            for(let t=0;t<x.deltas.length;t++){const [dp,dn]=x.deltas[t],wt=p.weights[t];if(dp){px+=dp[i*3]*wt;py+=dp[i*3+1]*wt;pz+=dp[i*3+2]*wt;}if(dn){nx+=dn[i*3]*wt;ny+=dn[i*3+1]*wt;nz+=dn[i*3+2]*wt;}}
+    ids.forEach((clip, c) => {
+      const duration = animation.clips[clip].duration;
+      animation.play(clip);
+      for (let r = 0; r <= frames[c]; r++, row++) {
+        animation.seek((duration * r) / frames[c]);
+        store.tick(false);
+        if (!invertMatrixStable(model.root.matrix, root, work)) throw new Error('Singular VAT model root');
+        let o = row * vertexCount * 8;
+        for (const x of parts) {
+          const { p, joints, palette, ids: j, weights: w } = x,
+            v = p.vertices;
+          if (joints.length)
+            for (let i = 0; i < joints.length; i++) {
+              multiplyMatrices(model.nodes[joints[i]].matrix, x.bind.subarray(i * 16, i * 16 + 16), joint);
+              multiplyMatrices(root, joint, palette.subarray(i * 16, i * 16 + 16));
+            }
+          else multiplyMatrices(root, p.node.matrix, palette);
+          for (let i = 0; i < x.count; i++, o += 8) {
+            let px = v[i * 20],
+              py = v[i * 20 + 1],
+              pz = v[i * 20 + 2],
+              nx = v[i * 20 + 4],
+              ny = v[i * 20 + 5],
+              nz = v[i * 20 + 6];
+            for (let t = 0; t < x.deltas.length; t++) {
+              const [dp, dn] = x.deltas[t],
+                wt = p.weights[t];
+              if (dp) {
+                px += dp[i * 3] * wt;
+                py += dp[i * 3 + 1] * wt;
+                pz += dp[i * 3 + 2] * wt;
+              }
+              if (dn) {
+                nx += dn[i * 3] * wt;
+                ny += dn[i * 3 + 1] * wt;
+                nz += dn[i * 3 + 2] * wt;
+              }
+            }
             // Blended joint matrix (columns 0-3, rows 0-2), weights normalized like the GPU pass.
-            if(j){m.fill(0);const sum=w![i*4]+w![i*4+1]+w![i*4+2]+w![i*4+3];for(let q=0;q<4;q++){const b=j[i*4+q]*16,f=w![i*4+q]/sum;for(let e=0;e<12;e++)m[e]+=palette[b+e+(e/3|0)]*f;}}
-            else for(let e=0;e<12;e++)m[e]=palette[e+(e/3|0)];
-            const X=m[0]*px+m[3]*py+m[6]*pz+m[9],Y=m[1]*px+m[4]*py+m[7]*pz+m[10],Z=m[2]*px+m[5]*py+m[8]*pz+m[11];
+            if (j) {
+              m.fill(0);
+              const sum = w![i * 4] + w![i * 4 + 1] + w![i * 4 + 2] + w![i * 4 + 3];
+              for (let q = 0; q < 4; q++) {
+                const b = j[i * 4 + q] * 16,
+                  f = w![i * 4 + q] / sum;
+                for (let e = 0; e < 12; e++) m[e] += palette[b + e + ((e / 3) | 0)] * f;
+              }
+            } else for (let e = 0; e < 12; e++) m[e] = palette[e + ((e / 3) | 0)];
+            const X = m[0] * px + m[3] * py + m[6] * pz + m[9],
+              Y = m[1] * px + m[4] * py + m[7] * pz + m[10],
+              Z = m[2] * px + m[5] * py + m[8] * pz + m[11];
             // Cofactor matrix times the determinant's sign: correct normals under non-uniform and mirrored scale.
-            const ax=m[4]*m[8]-m[5]*m[7],ay=m[5]*m[6]-m[3]*m[8],az=m[3]*m[7]-m[4]*m[6],bx=m[7]*m[2]-m[8]*m[1],by=m[8]*m[0]-m[6]*m[2],bz=m[6]*m[1]-m[7]*m[0],cx=m[1]*m[5]-m[2]*m[4],cy=m[2]*m[3]-m[0]*m[5],cz=m[0]*m[4]-m[1]*m[3];
-            const sign=Math.sign(m[0]*ax+m[1]*ay+m[2]*az),Nx=(ax*nx+bx*ny+cx*nz)*sign,Ny=(ay*nx+by*ny+cy*nz)*sign,Nz=(az*nx+bz*ny+cz*nz)*sign,l=Math.hypot(Nx,Ny,Nz);
-            texels[o]=X;texels[o+1]=Y;texels[o+2]=Z;texels[o+3]=1;texels[o+4]=Nx/l;texels[o+5]=Ny/l;texels[o+6]=Nz/l;
+            const ax = m[4] * m[8] - m[5] * m[7],
+              ay = m[5] * m[6] - m[3] * m[8],
+              az = m[3] * m[7] - m[4] * m[6],
+              bx = m[7] * m[2] - m[8] * m[1],
+              by = m[8] * m[0] - m[6] * m[2],
+              bz = m[6] * m[1] - m[7] * m[0],
+              cx = m[1] * m[5] - m[2] * m[4],
+              cy = m[2] * m[3] - m[0] * m[5],
+              cz = m[0] * m[4] - m[1] * m[3];
+            const sign = Math.sign(m[0] * ax + m[1] * ay + m[2] * az),
+              Nx = (ax * nx + bx * ny + cx * nz) * sign,
+              Ny = (ay * nx + by * ny + cy * nz) * sign,
+              Nz = (az * nx + bz * ny + cz * nz) * sign,
+              l = Math.hypot(Nx, Ny, Nz);
+            texels[o] = X;
+            texels[o + 1] = Y;
+            texels[o + 2] = Z;
+            texels[o + 3] = 1;
+            texels[o + 4] = Nx / l;
+            texels[o + 5] = Ny / l;
+            texels[o + 6] = Nz / l;
           }
         }
       }
     });
-  } finally {animation.play(saved.clip);animation.seek(saved.time);animation.playing=saved.playing;store.tick(false);}
-  for(let i=0;i<rows*vertexCount*8;i++)if(!Number.isFinite(texels[i]))throw new RangeError('VAT bake produced non-finite vertices (check skin weights)');
-  let start=0;
-  return {vertexCount,rows,width:VAT_WIDTH,texels,indices:Uint32Array.from(indices),uvs,
-    clips:ids.map((i,c)=>{const clip={name:animation.clips[i].name,start,frames:frames[c],duration:animation.clips[i].duration,loop:animation.options.loop??true};start+=frames[c]+1;return clip;})};
+  } finally {
+    animation.play(saved.clip);
+    animation.seek(saved.time);
+    animation.playing = saved.playing;
+    store.tick(false);
+  }
+  for (let i = 0; i < rows * vertexCount * 8; i++)
+    if (!Number.isFinite(texels[i])) throw new RangeError('VAT bake produced non-finite vertices (check skin weights)');
+  let start = 0;
+  return {
+    vertexCount,
+    rows,
+    width: VAT_WIDTH,
+    texels,
+    indices: Uint32Array.from(indices),
+    uvs,
+    clips: ids.map((i, c) => {
+      const clip = {
+        name: animation.clips[i].name,
+        start,
+        frames: frames[c],
+        duration: animation.clips[i].duration,
+        loop: animation.options.loop ?? true,
+      };
+      start += frames[c] + 1;
+      return clip;
+    }),
+  };
 }
 
 /** Instance layout (24 floats): world matrix, then clip, time offset (s), speed, 0, then UV offset.xy and scale.xy. */
-export const VAT_STRIDE=24;
-export interface VATInstance {matrix?:ArrayLike<number>;clip?:number;offset?:number;speed?:number;/** Atlas region (offset and scale; no rotation). */uvTransform?:{offset?:readonly number[];scale?:readonly number[]}}
+export const VAT_STRIDE = 24;
+export interface VATInstance {
+  matrix?: ArrayLike<number>;
+  clip?: number;
+  offset?: number;
+  speed?: number;
+  /** Atlas region (offset and scale; no rotation). */
+  uvTransform?: { offset?: readonly number[]; scale?: readonly number[] };
+}
 /** Anything with `@margoengine/materials` Texture's `bind`. */
-export interface VATMap {bind(device:GPUDevice,srgb:boolean):[GPUTextureView,GPUSampler]|undefined}
-export interface VATCrowdOptions {color?:readonly number[];map?:VATMap|null;roughness?:number;metalness?:number}
+export interface VATMap {
+  bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
+}
+export interface VATCrowdOptions {
+  color?: readonly number[];
+  map?: VATMap | null;
+  roughness?: number;
+  metalness?: number;
+}
 
 /** gltf-pro's lighting hooks (its `PBRLighting`), declared here so the VAT entry does not import gltf-pro. */
-export interface VATLightingHooks {readonly declarations:string;direct?(direct:string):string;readonly light?:string;readonly ambient?:string;output?(color:string):string}
+export interface VATLightingHooks {
+  readonly declarations: string;
+  direct?(direct: string): string;
+  readonly light?: string;
+  readonly ambient?: string;
+  output?(color: string): string;
+}
 /** What `crowd.addLighting` takes: an effect with gltf-pro `pbr` hooks (Shadows, EnvironmentLighting, Fog), bound in group 1. */
-export interface VATLighting {pbr?(group:number):VATLightingHooks|undefined;bindings():GPUBindGroupEntry[];readonly owner?:unknown}
+export interface VATLighting {
+  pbr?(group: number): VATLightingHooks | undefined;
+  bindings(): GPUBindGroupEntry[];
+  readonly owner?: unknown;
+}
 // Bindings, pose sampling and the vertex stage; the shadow depth pass is this module alone (no fragment stage).
-const vatVertex=/* wgsl */`
+const vatVertex = /* wgsl */ `
 struct Frame {camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,base:vec4f,options:vec4f,vat:vec4f}
 struct Instance {m:mat4x4f,p:vec4f,uv:vec4f}
 @group(0) @binding(0) var<uniform> f:Frame;
@@ -103,8 +267,10 @@ fn texel(row:u32,v:u32,k:u32)->vec4f {let i=(row*u32(f.vat.x)+v)*2u+k;let w=u32(
  let m=s.m;let c0=cross(m[1].xyz,m[2].xyz);let world=m*vec4f(p,1.0);
  var o:Out;o.clip=f.camera*world;o.position=world.xyz;o.normal=mat3x3f(c0,cross(m[2].xyz,m[0].xyz),cross(m[0].xyz,m[1].xyz))*n*sign(dot(m[0].xyz,c0));o.uv=s.uv.xy+uv*s.uv.zw;return o;
 }
-`,srgbShader='fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}\n';
-export const vatShader=`${acesShader}${vatVertex}${srgbShader}// gltf-pro's lighting: GGX key light, hemisphere fill, ACES + sRGB unless the target is HDR.
+`,
+  srgbShader =
+    'fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}\n';
+export const vatShader = `${acesShader}${vatVertex}${srgbShader}// gltf-pro's lighting: GGX key light, hemisphere fill, ACES + sRGB unless the target is HDR.
 @fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
  let albedo=(f.base*textureSample(map,mapSampler,i.uv)).rgb;let rough=f.options.z;let metal=f.options.w;
  let nn=normalize(i.normal)*select(-1.0,1.0,front);let v=normalize(f.eye.xyz-i.position);let l=normalize(f.light.xyz);let h=(v+l)/max(length(v+l),0.0001);
@@ -116,10 +282,11 @@ export const vatShader=`${acesShader}${vatVertex}${srgbShader}// gltf-pro's ligh
  if(f.vat.z<0.5){color=srgb(aces(max(color,vec3f(0.0))/0.6));}
  return vec4f(color,1.0);
 }`;
-let lit:string|undefined;
+let lit: string | undefined;
 // The same lighting with gltf-pro's Surface and hook points, so `lightPBR` composes effects into it. Built only once an
 // effect is added; the HDR flag is then also written to the last Frame float, renamed `settings` where the fog hook reads `.w`.
-const litShader=()=>lit??=`${acesShader}${vatVertex.replace('vat:vec4f}','settings:vec4f}').replaceAll('f.vat.','f.settings.')}${srgbShader}
+const litShader = () =>
+  (lit ??= `${acesShader}${vatVertex.replace('vat:vec4f}', 'settings:vec4f}').replaceAll('f.vat.', 'f.settings.')}${srgbShader}
 struct Surface {base:vec4f,n:vec3f,roughness:f32,metal:f32,occlusion:f32,emissive:vec3f}
 fn ambient(s:Surface)->vec3f {let f0=mix(vec3f(0.04),s.base.rgb,s.metal);return (s.base.rgb*(1.0-s.metal)+f0*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1.0),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w*s.occlusion;}
 @fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
@@ -132,8 +299,8 @@ fn ambient(s:Surface)->vec3f {let f0=mix(vec3f(0.04),s.base.rgb,s.metal);return 
  var color=direct+ambient(s)+s.emissive;
  if(f.settings.w<0.5) {color=aces(max(color,vec3f(0))/0.6); color=srgb(color);}
  return vec4f(color,1.0);
-}`;
-let serial=0;
+}`);
+let serial = 0;
 /**
  * Draws any number of copies of baked VAT data in one instanced call: each instance has its own matrix, clip, time
  * offset, speed and atlas region, and the CPU does no per-instance work per frame (instance data uploads only when
@@ -142,99 +309,371 @@ let serial=0;
  * No SSAO or clustered lights.
  */
 export class VATCrowd implements EnginePlugin {
-  readonly name='vat:'+serial++;
+  readonly name = 'vat:' + serial++;
   /** Seconds since added; instance time is `time * speed + offset`. */
-  time=0;readonly color:number[];roughness:number;metalness:number;map:VATMap|null;disposed=false;
-  private data=new Float32Array(VAT_STRIDE*16);private n=0;private dirty=true;private engine?:Engine;private device?:GPUDevice;private gpu?:{vat:GPUTexture;uvs:GPUBuffer;index:GPUBuffer;frame:GPUBuffer;clips:GPUBuffer;instances?:GPUBuffer;white:GPUTexture;blank:[GPUTextureView,GPUSampler]};
-  private pipeline?:GPURenderPipeline;private key='';private group?:GPUBindGroup;private bound:unknown[]=[];private readonly frame=new Float32Array(40);
-  private readonly lighting=new Set<VATLighting>();private code=vatShader;private light?:{group:GPUBindGroup;bound:unknown[]};
-  private shadow?:{pipeline:GPURenderPipeline;frames:GPUBuffer;groups:GPUBindGroup[];instances?:GPUBuffer;values:Float32Array};
+  time = 0;
+  readonly color: number[];
+  roughness: number;
+  metalness: number;
+  map: VATMap | null;
+  disposed = false;
+  private data = new Float32Array(VAT_STRIDE * 16);
+  private n = 0;
+  private dirty = true;
+  private engine?: Engine;
+  private device?: GPUDevice;
+  private gpu?: {
+    vat: GPUTexture;
+    uvs: GPUBuffer;
+    index: GPUBuffer;
+    frame: GPUBuffer;
+    clips: GPUBuffer;
+    instances?: GPUBuffer;
+    white: GPUTexture;
+    blank: [GPUTextureView, GPUSampler];
+  };
+  private pipeline?: GPURenderPipeline;
+  private key = '';
+  private group?: GPUBindGroup;
+  private bound: unknown[] = [];
+  private readonly frame = new Float32Array(40);
+  private readonly lighting = new Set<VATLighting>();
+  private code = vatShader;
+  private light?: { group: GPUBindGroup; bound: unknown[] };
+  private shadow?: {
+    pipeline: GPURenderPipeline;
+    frames: GPUBuffer;
+    groups: GPUBindGroup[];
+    instances?: GPUBuffer;
+    values: Float32Array;
+  };
   /** Same as `engine.use(new VATCrowd(...))`; returns the VATCrowd. */
-  static attach(engine: EngineKernel, vat: VATData, options?: VATCrowdOptions): VATCrowd {const value = new VATCrowd(vat, options); engine.use(value); return value;}
-  constructor(readonly vat:VATData,{color=[1,1,1,1],map=null,roughness=0.6,metalness=0}:VATCrowdOptions={}) {
-    if(!(vat?.texels instanceof Float32Array)||!vat.clips?.length||color.length!==4||!(roughness>=0&&roughness<=1&&metalness>=0&&metalness<=1))throw new TypeError('Invalid VAT crowd');
-    this.color=[...color];this.roughness=roughness;this.metalness=metalness;this.map=map;
+  static attach(engine: EngineKernel, vat: VATData, options?: VATCrowdOptions): VATCrowd {
+    const value = new VATCrowd(vat, options);
+    engine.use(value);
+    return value;
   }
-  get count():number {return this.n;}
+  constructor(
+    readonly vat: VATData,
+    { color = [1, 1, 1, 1], map = null, roughness = 0.6, metalness = 0 }: VATCrowdOptions = {},
+  ) {
+    if (
+      !(vat?.texels instanceof Float32Array) ||
+      !vat.clips?.length ||
+      color.length !== 4 ||
+      !(roughness >= 0 && roughness <= 1 && metalness >= 0 && metalness <= 1)
+    )
+      throw new TypeError('Invalid VAT crowd');
+    this.color = [...color];
+    this.roughness = roughness;
+    this.metalness = metalness;
+    this.map = map;
+  }
+  get count(): number {
+    return this.n;
+  }
   /** Adds an instance (identity matrix, clip 0, offset 0, speed 1, whole texture by default) and returns its index. */
-  add(instance:VATInstance={}):number {
-    if(this.n*VAT_STRIDE===this.data.length){const grown=new Float32Array(this.data.length*2);grown.set(this.data);this.data=grown;}
-    this.data.set([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,1,0,0,0,1,1],this.n*VAT_STRIDE);this.n++;
-    try{this.set(this.n-1,instance);}catch(error){this.n--;throw error;}return this.n-1;
+  add(instance: VATInstance = {}): number {
+    if (this.n * VAT_STRIDE === this.data.length) {
+      const grown = new Float32Array(this.data.length * 2);
+      grown.set(this.data);
+      this.data = grown;
+    }
+    this.data.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 1], this.n * VAT_STRIDE);
+    this.n++;
+    try {
+      this.set(this.n - 1, instance);
+    } catch (error) {
+      this.n--;
+      throw error;
+    }
+    return this.n - 1;
   }
   /** Changes the given fields of one instance. */
-  set(index:number,{matrix,clip,offset,speed,uvTransform}:VATInstance):this {
-    if(!(Number.isInteger(index)&&index>=0&&index<this.n)||clip!==undefined&&!(Number.isInteger(clip)&&clip>=0&&clip<this.vat.clips.length)||matrix!==undefined&&matrix.length!==16)throw new RangeError('Invalid VAT instance');
-    const o=index*VAT_STRIDE,d=this.data;if(matrix)d.set(matrix,o);if(clip!==undefined)d[o+16]=clip;if(offset!==undefined)d[o+17]=offset;if(speed!==undefined)d[o+18]=speed;
-    if(uvTransform){d.set(uvTransform.offset??[0,0],o+20);d.set(uvTransform.scale??[1,1],o+22);}
-    for(let i=o;i<o+VAT_STRIDE;i++)if(!Number.isFinite(d[i]))throw new RangeError('Invalid VAT instance');this.dirty=true;return this;
+  set(index: number, { matrix, clip, offset, speed, uvTransform }: VATInstance): this {
+    if (
+      !(Number.isInteger(index) && index >= 0 && index < this.n) ||
+      (clip !== undefined && !(Number.isInteger(clip) && clip >= 0 && clip < this.vat.clips.length)) ||
+      (matrix !== undefined && matrix.length !== 16)
+    )
+      throw new RangeError('Invalid VAT instance');
+    const o = index * VAT_STRIDE,
+      d = this.data;
+    if (matrix) d.set(matrix, o);
+    if (clip !== undefined) d[o + 16] = clip;
+    if (offset !== undefined) d[o + 17] = offset;
+    if (speed !== undefined) d[o + 18] = speed;
+    if (uvTransform) {
+      d.set(uvTransform.offset ?? [0, 0], o + 20);
+      d.set(uvTransform.scale ?? [1, 1], o + 22);
+    }
+    for (let i = o; i < o + VAT_STRIDE; i++) if (!Number.isFinite(d[i])) throw new RangeError('Invalid VAT instance');
+    this.dirty = true;
+    return this;
   }
   /** Drops the last `count - n` instances. */
-  truncate(n:number):void {if(!(Number.isInteger(n)&&n>=0&&n<=this.n))throw new RangeError('Invalid VAT count');this.n=n;}
-  setup(engine:Engine):void {this.engine=engine;}
-  onPreUpdate(delta:number):void {this.time+=delta;}
-  registerPasses(graph:FrameGraph):void {graph.add({name:this.name,order:1,execute:c=>{if(c.backend==='webgpu')this.draw(c);}});}
-  private resources(device:GPUDevice) {
-    if(this.device===device&&this.gpu)return this.gpu;this.release();this.device=device;const v=this.vat;
-    const buffer=(data:Float32Array|Uint32Array,usage:number)=>{const b=device.createBuffer({size:Math.max(16,data.byteLength),usage:usage|GPUBufferUsage.COPY_DST});device.queue.writeBuffer(b,0,data as Float32Array<ArrayBuffer>);return b;};
-    const vat=device.createTexture({size:[v.width,v.texels.length/v.width/4],format:'rgba32float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});
-    device.queue.writeTexture({texture:vat},v.texels as Float32Array<ArrayBuffer>,{bytesPerRow:v.width*16},[v.width,v.texels.length/v.width/4]);
-    const white=device.createTexture({size:[1,1],format:'rgba8unorm',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});device.queue.writeTexture({texture:white},new Uint8Array([255,255,255,255]),{bytesPerRow:4},[1,1]);
-    return this.gpu={vat,white,blank:[white.createView(),device.createSampler()],uvs:buffer(v.uvs,GPUBufferUsage.VERTEX),index:buffer(v.indices,GPUBufferUsage.INDEX),
-      frame:device.createBuffer({size:160,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),clips:buffer(Float32Array.from(v.clips.flatMap(c=>[c.start,c.frames,c.duration,+c.loop])),GPUBufferUsage.STORAGE)};
+  truncate(n: number): void {
+    if (!(Number.isInteger(n) && n >= 0 && n <= this.n)) throw new RangeError('Invalid VAT count');
+    this.n = n;
+  }
+  setup(engine: Engine): void {
+    this.engine = engine;
+  }
+  onPreUpdate(delta: number): void {
+    this.time += delta;
+  }
+  registerPasses(graph: FrameGraph): void {
+    graph.add({
+      name: this.name,
+      order: 1,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.draw(c);
+      },
+    });
+  }
+  private resources(device: GPUDevice) {
+    if (this.device === device && this.gpu) return this.gpu;
+    this.release();
+    this.device = device;
+    const v = this.vat;
+    const buffer = (data: Float32Array | Uint32Array, usage: number) => {
+      const b = device.createBuffer({ size: Math.max(16, data.byteLength), usage: usage | GPUBufferUsage.COPY_DST });
+      device.queue.writeBuffer(b, 0, data as Float32Array<ArrayBuffer>);
+      return b;
+    };
+    const vat = device.createTexture({
+      size: [v.width, v.texels.length / v.width / 4],
+      format: 'rgba32float',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    device.queue.writeTexture({ texture: vat }, v.texels as Float32Array<ArrayBuffer>, { bytesPerRow: v.width * 16 }, [
+      v.width,
+      v.texels.length / v.width / 4,
+    ]);
+    const white = device.createTexture({
+      size: [1, 1],
+      format: 'rgba8unorm',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    device.queue.writeTexture({ texture: white }, new Uint8Array([255, 255, 255, 255]), { bytesPerRow: 4 }, [1, 1]);
+    return (this.gpu = {
+      vat,
+      white,
+      blank: [white.createView(), device.createSampler()],
+      uvs: buffer(v.uvs, GPUBufferUsage.VERTEX),
+      index: buffer(v.indices, GPUBufferUsage.INDEX),
+      frame: device.createBuffer({ size: 160, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+      clips: buffer(
+        Float32Array.from(v.clips.flatMap((c) => [c.start, c.frames, c.duration, +c.loop])),
+        GPUBufferUsage.STORAGE,
+      ),
+    });
   }
   /** Lights the crowd with an effect's gltf-pro `pbr` hooks; `shadows.add(crowd)` and `lighting.add(crowd)` call this. Returns a remover. */
-  addLighting(effect:VATLighting):()=>void {
-    if(this.disposed||!effect||typeof effect.pbr!=='function'||typeof effect.bindings!=='function')throw new TypeError('VAT crowds take lighting effects with pbr hooks');
-    if(effect.owner&&this.engine&&effect.owner!==this.engine)throw new Error('VAT lighting belongs to another engine');
-    this.lighting.add(effect);return()=>{this.lighting.delete(effect);};
+  addLighting(effect: VATLighting): () => void {
+    if (this.disposed || !effect || typeof effect.pbr !== 'function' || typeof effect.bindings !== 'function')
+      throw new TypeError('VAT crowds take lighting effects with pbr hooks');
+    if (effect.owner && this.engine && effect.owner !== this.engine)
+      throw new Error('VAT lighting belongs to another engine');
+    this.lighting.add(effect);
+    return () => {
+      this.lighting.delete(effect);
+    };
   }
   /** Shadows' per-cascade callback: the posed instances into that cascade's depth map, at the frame's crowd time. */
-  drawShadow({context:c,pass,matrix,cascade}:{context:Context;pass:GPURenderPassEncoder;matrix:Float32Array;cascade:number}):void {
-    if(!this.n||!this.engine)return;const device=c.device,g=this.upload(device);
-    let s=this.shadow;
+  drawShadow({
+    context: c,
+    pass,
+    matrix,
+    cascade,
+  }: {
+    context: Context;
+    pass: GPURenderPassEncoder;
+    matrix: Float32Array;
+    cascade: number;
+  }): void {
+    if (!this.n || !this.engine) return;
+    const device = c.device,
+      g = this.upload(device);
+    let s = this.shadow;
     // ponytail: every instance runs in all four cascades (1,024 robots: about 4x the beauty pass's vertex work); a GPU
     // per-cascade instance compaction with indirect draws is the upgrade if crowds this large need shadows.
-    if(!s){const module=device.createShaderModule({code:vatVertex});
-      s=this.shadow={pipeline:device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:8,attributes:[{shaderLocation:0,offset:0,format:'float32x2'}]}]},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'less-equal'}}),
-        frames:device.createBuffer({size:1024,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),groups:[],values:new Float32Array(40)};}
-    if(s.instances!==g.instances){s.instances=g.instances;const view=g.vat.createView();
-      s.groups=[0,1,2,3].map(i=>device.createBindGroup({layout:s!.pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:s!.frames,offset:i*256,size:160}},{binding:1,resource:{buffer:g.instances!}},{binding:2,resource:{buffer:g.clips}},{binding:3,resource:view}]}));}
-    const v=s.values;v.set(matrix);v[32]=this.time;v[36]=this.vat.vertexCount;v[37]=this.vat.width;device.queue.writeBuffer(s.frames,cascade*256,v);
-    pass.setPipeline(s.pipeline);pass.setBindGroup(0,s.groups[cascade]);pass.setVertexBuffer(0,g.uvs);pass.setIndexBuffer(g.index,'uint32');pass.drawIndexed(this.vat.indices.length,this.n);
+    if (!s) {
+      const module = device.createShaderModule({ code: vatVertex });
+      s = this.shadow = {
+        pipeline: device.createRenderPipeline({
+          layout: 'auto',
+          vertex: {
+            module,
+            entryPoint: 'vertex',
+            buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }],
+          },
+          depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal' },
+        }),
+        frames: device.createBuffer({ size: 1024, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+        groups: [],
+        values: new Float32Array(40),
+      };
+    }
+    if (s.instances !== g.instances) {
+      s.instances = g.instances;
+      const view = g.vat.createView();
+      s.groups = [0, 1, 2, 3].map((i) =>
+        device.createBindGroup({
+          layout: s!.pipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: { buffer: s!.frames, offset: i * 256, size: 160 } },
+            { binding: 1, resource: { buffer: g.instances! } },
+            { binding: 2, resource: { buffer: g.clips } },
+            { binding: 3, resource: view },
+          ],
+        }),
+      );
+    }
+    const v = s.values;
+    v.set(matrix);
+    v[32] = this.time;
+    v[36] = this.vat.vertexCount;
+    v[37] = this.vat.width;
+    device.queue.writeBuffer(s.frames, cascade * 256, v);
+    pass.setPipeline(s.pipeline);
+    pass.setBindGroup(0, s.groups[cascade]);
+    pass.setVertexBuffer(0, g.uvs);
+    pass.setIndexBuffer(g.index, 'uint32');
+    pass.drawIndexed(this.vat.indices.length, this.n);
   }
-  private upload(device:GPUDevice) {
-    const g=this.resources(device);
-    if(!g.instances||g.instances.size<this.n*VAT_STRIDE*4){g.instances?.destroy();g.instances=device.createBuffer({size:this.data.byteLength,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST});this.dirty=true;}
-    if(this.dirty){device.queue.writeBuffer(g.instances,0,this.data,0,this.n*VAT_STRIDE);this.dirty=false;}
+  private upload(device: GPUDevice) {
+    const g = this.resources(device);
+    if (!g.instances || g.instances.size < this.n * VAT_STRIDE * 4) {
+      g.instances?.destroy();
+      g.instances = device.createBuffer({
+        size: this.data.byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
+      this.dirty = true;
+    }
+    if (this.dirty) {
+      device.queue.writeBuffer(g.instances, 0, this.data, 0, this.n * VAT_STRIDE);
+      this.dirty = false;
+    }
     return g;
   }
-  private draw(c:Context):void {
-    const e=this.engine;if(!this.n||!e)return;const device=c.device,g=this.upload(device),samples=c.descriptor.multisample?.count??1,depth=c.descriptor.depthStencil!.format;
+  private draw(c: Context): void {
+    const e = this.engine;
+    if (!this.n || !e) return;
+    const device = c.device,
+      g = this.upload(device),
+      samples = c.descriptor.multisample?.count ?? 1,
+      depth = c.descriptor.depthStencil!.format;
     // Effects compose into the lit shader (group 1); without any (or none ready) the crowd keeps the unlit shader and its exact calls.
-    let code=vatShader;const entries:GPUBindGroupEntry[]=[];
-    for(const effect of this.lighting){const hooks=effect.pbr!(1);if(hooks){code=lightPBR(code===vatShader?litShader():code,hooks);entries.push(...effect.bindings());}}
-    const f=this.frame;f.set(c.camera.matrix);f.set(c.camera.position,16);f.set(e.lighting.direction,20);f.set(e.lighting.radiance,24);f.set(this.color,28);
-    f[32]=this.time;f[34]=Math.min(1,Math.max(0.045,this.roughness));f[35]=this.metalness;f[36]=this.vat.vertexCount;f[37]=this.vat.width;f[38]=+(c.format==='rgba16float');f[39]=code===vatShader?0:f[38];device.queue.writeBuffer(g.frame,0,f);
-    const key=c.format+samples+depth;
-    if(this.key!==key||this.code!==code){
-      const module=device.createShaderModule({code});this.key=key;this.code=code;
-      this.pipeline=device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:8,attributes:[{shaderLocation:0,offset:0,format:'float32x2'}]}]},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]},
-        primitive:{cullMode:'back'},depthStencil:{format:depth,depthWriteEnabled:true,depthCompare:'greater-equal'},multisample:{count:samples}});
+    let code = vatShader;
+    const entries: GPUBindGroupEntry[] = [];
+    for (const effect of this.lighting) {
+      const hooks = effect.pbr!(1);
+      if (hooks) {
+        code = lightPBR(code === vatShader ? litShader() : code, hooks);
+        entries.push(...effect.bindings());
+      }
     }
-    const [view,sampler]=this.map?.bind(device,true)??g.blank,bound=[this.pipeline,g.instances,view,sampler];
-    if(!this.group||bound.some((x,i)=>x!==this.bound[i])){this.bound=bound;this.group=device.createBindGroup({layout:this.pipeline!.getBindGroupLayout(0),entries:[g.frame,g.instances,g.clips].map((buffer,binding)=>({binding,resource:{buffer}} as GPUBindGroupEntry)).concat({binding:3,resource:g.vat.createView()},{binding:4,resource:view},{binding:5,resource:sampler})});}
-    const pass=c.encoder.beginRenderPass({colorAttachments:[{view:c.color,loadOp:'load',storeOp:'store'}],depthStencilAttachment:{view:c.depth,depthLoadOp:'load',depthStoreOp:'store',stencilReadOnly:true}});
-    pass.setPipeline(this.pipeline!);pass.setBindGroup(0,this.group);
-    if(entries.length){const lightBound=[this.pipeline,...entries.map(x=>'buffer' in x.resource?x.resource.buffer:x.resource)];
-      if(!this.light||lightBound.length!==this.light.bound.length||lightBound.some((x,i)=>x!==this.light!.bound[i]))this.light={bound:lightBound,group:device.createBindGroup({layout:this.pipeline!.getBindGroupLayout(1),entries})};
-      pass.setBindGroup(1,this.light.group);}
-    pass.setVertexBuffer(0,g.uvs);pass.setIndexBuffer(g.index,'uint32');pass.drawIndexed(this.vat.indices.length,this.n);pass.end();
-    e.stats.drawCalls++;e.stats.visible+=this.n;
+    const f = this.frame;
+    f.set(c.camera.matrix);
+    f.set(c.camera.position, 16);
+    f.set(e.lighting.direction, 20);
+    f.set(e.lighting.radiance, 24);
+    f.set(this.color, 28);
+    f[32] = this.time;
+    f[34] = Math.min(1, Math.max(0.045, this.roughness));
+    f[35] = this.metalness;
+    f[36] = this.vat.vertexCount;
+    f[37] = this.vat.width;
+    f[38] = +(c.format === 'rgba16float');
+    f[39] = code === vatShader ? 0 : f[38];
+    device.queue.writeBuffer(g.frame, 0, f);
+    const key = c.format + samples + depth;
+    if (this.key !== key || this.code !== code) {
+      const module = device.createShaderModule({ code });
+      this.key = key;
+      this.code = code;
+      this.pipeline = device.createRenderPipeline({
+        layout: 'auto',
+        vertex: {
+          module,
+          entryPoint: 'vertex',
+          buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }],
+        },
+        fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format }] },
+        primitive: { cullMode: 'back' },
+        depthStencil: { format: depth, depthWriteEnabled: true, depthCompare: 'greater-equal' },
+        multisample: { count: samples },
+      });
+    }
+    const [view, sampler] = this.map?.bind(device, true) ?? g.blank,
+      bound = [this.pipeline, g.instances, view, sampler];
+    if (!this.group || bound.some((x, i) => x !== this.bound[i])) {
+      this.bound = bound;
+      this.group = device.createBindGroup({
+        layout: this.pipeline!.getBindGroupLayout(0),
+        entries: [g.frame, g.instances, g.clips]
+          .map((buffer, binding) => ({ binding, resource: { buffer } }) as GPUBindGroupEntry)
+          .concat(
+            { binding: 3, resource: g.vat.createView() },
+            { binding: 4, resource: view },
+            { binding: 5, resource: sampler },
+          ),
+      });
+    }
+    const pass = c.encoder.beginRenderPass({
+      colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
+      depthStencilAttachment: { view: c.depth, depthLoadOp: 'load', depthStoreOp: 'store', stencilReadOnly: true },
+    });
+    pass.setPipeline(this.pipeline!);
+    pass.setBindGroup(0, this.group);
+    if (entries.length) {
+      const lightBound = [
+        this.pipeline,
+        ...entries.map((x) => ('buffer' in x.resource ? x.resource.buffer : x.resource)),
+      ];
+      if (
+        !this.light ||
+        lightBound.length !== this.light.bound.length ||
+        lightBound.some((x, i) => x !== this.light!.bound[i])
+      )
+        this.light = {
+          bound: lightBound,
+          group: device.createBindGroup({ layout: this.pipeline!.getBindGroupLayout(1), entries }),
+        };
+      pass.setBindGroup(1, this.light.group);
+    }
+    pass.setVertexBuffer(0, g.uvs);
+    pass.setIndexBuffer(g.index, 'uint32');
+    pass.drawIndexed(this.vat.indices.length, this.n);
+    pass.end();
+    e.stats.drawCalls++;
+    e.stats.visible += this.n;
   }
-  private release():void {const g=this.gpu;if(g)for(const r of [g.vat,g.white,g.uvs,g.index,g.frame,g.clips,g.instances,this.shadow?.frames])r?.destroy();this.gpu=this.pipeline=this.group=this.light=this.shadow=undefined;this.key='';this.code=vatShader;this.bound=[];this.device=undefined;}
-  onDeviceRestored():void {this.release();this.dirty=true;}
-  dispose():void {this.disposed=true;this.lighting.clear();this.release();this.engine=undefined;}
+  private release(): void {
+    const g = this.gpu;
+    if (g)
+      for (const r of [g.vat, g.white, g.uvs, g.index, g.frame, g.clips, g.instances, this.shadow?.frames])
+        r?.destroy();
+    this.gpu = this.pipeline = this.group = this.light = this.shadow = undefined;
+    this.key = '';
+    this.code = vatShader;
+    this.bound = [];
+    this.device = undefined;
+  }
+  onDeviceRestored(): void {
+    this.release();
+    this.dirty = true;
+  }
+  dispose(): void {
+    this.disposed = true;
+    this.lighting.clear();
+    this.release();
+    this.engine = undefined;
+  }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 }

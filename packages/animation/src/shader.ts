@@ -1,4 +1,4 @@
-export const deformationShader=/* wgsl */`
+export const deformationShader = /* wgsl */ `
 struct Vertex {position:vec4f,normal:vec4f,tangent:vec4f,uv:vec4f,color:vec4f}
 struct Morph {position:vec4f,normal:vec4f,tangent:vec4f}
 struct Influence {joints:vec4u,weights:vec4f}

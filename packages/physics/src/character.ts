@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type {PhysicsBody} from './body.js';
-import {checkVec, tuple, vec, type Vec3} from './math.js';
+import type { PhysicsBody } from './body.js';
+import { checkVec, tuple, vec, type Vec3 } from './math.js';
 
 export interface CharacterControllerOptions {
   /** Gap kept between the character and obstacles (default 0.01). */
@@ -12,7 +12,7 @@ export interface CharacterControllerOptions {
   /** Slopes steeper than this make the character slide down, radians (default 30 degrees). */
   minSlopeSlideAngle?: number;
   /** Climb steps automatically, or false to disable (default {maxHeight: 0.3, minWidth: 0.2, includeDynamicBodies: false}). */
-  autostep?: false | {maxHeight: number; minWidth: number; includeDynamicBodies?: boolean};
+  autostep?: false | { maxHeight: number; minWidth: number; includeDynamicBodies?: boolean };
   /** Snap down to the ground within this distance while walking down stairs and slopes, or false (default 0.2). */
   snapToGround?: false | number;
   /** Slide along obstacles instead of stopping (default true). */
@@ -41,41 +41,60 @@ export class CharacterController {
   private lastGrounded = false;
 
   /** @internal */
-  constructor(private readonly owner: {readonly world: any; removeController(controller: CharacterController): void}, readonly body: PhysicsBody, options: CharacterControllerOptions = {}) {
+  constructor(
+    private readonly owner: { readonly world: any; removeController(controller: CharacterController): void },
+    readonly body: PhysicsBody,
+    options: CharacterControllerOptions = {},
+  ) {
     if (body.type !== 'kinematicPosition') throw new TypeError('A character controller needs a kinematicPosition body');
     if (!body.colliders.length) throw new TypeError('A character controller body needs a collider');
     const raw = owner.world.createCharacterController(options.offset ?? 0.01);
     this.raw = raw;
     try {
-    if (options.up) {checkVec(options.up, 'Up'); raw.setUp(vec(options.up));}
-    raw.setMaxSlopeClimbAngle(options.maxSlopeClimbAngle ?? Math.PI / 4);
-    raw.setMinSlopeSlideAngle(options.minSlopeSlideAngle ?? Math.PI / 6);
-    const step = options.autostep === undefined ? {maxHeight: 0.3, minWidth: 0.2, includeDynamicBodies: false} : options.autostep;
-    if (step) raw.enableAutostep(step.maxHeight, step.minWidth, step.includeDynamicBodies ?? false);
-    const snap = options.snapToGround === undefined ? 0.2 : options.snapToGround;
-    if (snap !== false) raw.enableSnapToGround(snap);
-    raw.setSlideEnabled(options.slide ?? true);
-    raw.setApplyImpulsesToDynamicBodies(options.applyImpulsesToDynamicBodies ?? false);
-    if (options.characterMass !== undefined) raw.setCharacterMass(options.characterMass);
-    } catch (error) {owner.world.removeCharacterController(raw); throw error;}
+      if (options.up) {
+        checkVec(options.up, 'Up');
+        raw.setUp(vec(options.up));
+      }
+      raw.setMaxSlopeClimbAngle(options.maxSlopeClimbAngle ?? Math.PI / 4);
+      raw.setMinSlopeSlideAngle(options.minSlopeSlideAngle ?? Math.PI / 6);
+      const step =
+        options.autostep === undefined
+          ? { maxHeight: 0.3, minWidth: 0.2, includeDynamicBodies: false }
+          : options.autostep;
+      if (step) raw.enableAutostep(step.maxHeight, step.minWidth, step.includeDynamicBodies ?? false);
+      const snap = options.snapToGround === undefined ? 0.2 : options.snapToGround;
+      if (snap !== false) raw.enableSnapToGround(snap);
+      raw.setSlideEnabled(options.slide ?? true);
+      raw.setApplyImpulsesToDynamicBodies(options.applyImpulsesToDynamicBodies ?? false);
+      if (options.characterMass !== undefined) raw.setCharacterMass(options.characterMass);
+    } catch (error) {
+      owner.world.removeCharacterController(raw);
+      throw error;
+    }
   }
 
-  get grounded(): boolean {return this.lastGrounded;}
+  get grounded(): boolean {
+    return this.lastGrounded;
+  }
 
   /**
    * Computes how far the character can move toward `desired` (a translation for this step, gravity included)
    * and schedules it as the body's next kinematic position.
    */
-  move(desired: Vec3, filter?: {groups?: number; flags?: number; predicate?: (collider: any) => boolean}): CharacterMoveResult {
+  move(
+    desired: Vec3,
+    filter?: { groups?: number; flags?: number; predicate?: (collider: any) => boolean },
+  ): CharacterMoveResult {
     if (this.disposed) throw new Error('Character controller is disposed');
     if (!this.body.valid) throw new Error('Character body was removed');
     checkVec(desired, 'Desired movement');
     const collider = this.body.colliders[0];
     this.raw.computeColliderMovement(collider, vec(desired), filter?.flags, filter?.groups, filter?.predicate);
-    const movement = tuple(this.raw.computedMovement()), t = this.body.raw.translation();
-    this.body.raw.setNextKinematicTranslation({x: t.x + movement[0], y: t.y + movement[1], z: t.z + movement[2]});
+    const movement = tuple(this.raw.computedMovement()),
+      t = this.body.raw.translation();
+    this.body.raw.setNextKinematicTranslation({ x: t.x + movement[0], y: t.y + movement[1], z: t.z + movement[2] });
     this.lastGrounded = this.raw.computedGrounded();
-    return {movement, grounded: this.lastGrounded, collisions: this.raw.numComputedCollisions()};
+    return { movement, grounded: this.lastGrounded, collisions: this.raw.numComputedCollisions() };
   }
 
   dispose(): void {
@@ -84,5 +103,7 @@ export class CharacterController {
     this.owner.removeController(this);
   }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 }

@@ -15,7 +15,7 @@ export class CSS3DObject extends Item {
     setMesh(mesh: Mesh | null): this;
     setMatrix(matrix: ArrayLike<number>): this;
     setPose(position: Vec3, quaternion?: readonly number[]): this;
-     get ownMatrix(): Float64Array;
+    get ownMatrix(): Float64Array;
 }
 
 export interface CSS3DOptions {
@@ -145,8 +145,8 @@ abstract class Item {
     onScreen: boolean;
     distance: number;
     protected meshValue: Mesh | null;
-     readonly cache: StyleCache;
-     owner: LabelRenderer | null;
+    readonly cache: StyleCache;
+    owner: LabelRenderer | null;
     constructor(owner: LabelRenderer, element: HTMLElement, mesh: Mesh | null | undefined, followVisibility: boolean | undefined, visible: boolean | undefined);
     get mesh(): Mesh | null;
     remove(): void;

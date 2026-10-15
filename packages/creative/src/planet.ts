@@ -1,9 +1,9 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type {EngineKernel, Vec3, VectorRef} from '@margoengine/core';
-import type {Engine, EnginePlugin, FrameGraph, Mesh, PassContext} from '@margoengine/core/extension';
-import {readResponse} from '../../shared/loading.js';
-import {finiteVector} from '@margoengine/math/validate';
-import {PlanetPass, type PlanetImages, type PlanetPassConfig} from './planet-pass.js';
+import type { EngineKernel, Vec3, VectorRef } from '@margoengine/core';
+import type { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from '@margoengine/core/extension';
+import { readResponse } from '../../shared/loading.js';
+import { finiteVector } from '@margoengine/math/validate';
+import { PlanetPass, type PlanetImages, type PlanetPassConfig } from './planet-pass.js';
 
 export interface PlanetOptions {
   dayMap: string | URL;
@@ -18,18 +18,29 @@ export interface PlanetOptions {
   /** Axial tilt in degrees. Default: 23.4. Rotation accessors use radians. */
   tilt?: number;
   sunDirection?: Vec3;
-  atmosphere?: {color?: Vec3; intensity?: number};
+  atmosphere?: { color?: Vec3; intensity?: number };
   signal?: AbortSignal;
 }
 
-type MapOptions = Pick<PlanetOptions, 'dayMap' | 'nightMap' | 'specularRoughnessMap' | 'normalMap' | 'clouds' | 'signal'>;
+type MapOptions = Pick<
+  PlanetOptions,
+  'dayMap' | 'nightMap' | 'specularRoughnessMap' | 'normalMap' | 'clouds' | 'signal'
+>;
 function mapSources(options: MapOptions): Array<[keyof PlanetImages, string]> {
   if (!options || typeof options !== 'object') throw new TypeError('Expected planet map options');
-  if (options.signal !== undefined && !(options.signal instanceof AbortSignal)) throw new TypeError('Expected AbortSignal');
+  if (options.signal !== undefined && !(options.signal instanceof AbortSignal))
+    throw new TypeError('Expected AbortSignal');
   const sources: Array<[keyof PlanetImages, string]> = [];
-  for (const [name, source] of [['day', options.dayMap], ['night', options.nightMap], ['specular', options.specularRoughnessMap], ['normal', options.normalMap], ['clouds', options.clouds]] as const) {
+  for (const [name, source] of [
+    ['day', options.dayMap],
+    ['night', options.nightMap],
+    ['specular', options.specularRoughnessMap],
+    ['normal', options.normalMap],
+    ['clouds', options.clouds],
+  ] as const) {
     if (source === undefined && name !== 'day') continue;
-    if (!(typeof source === 'string' && source.trim() || source instanceof URL)) throw new TypeError(`Expected ${name} map URL`);
+    if (!((typeof source === 'string' && source.trim()) || source instanceof URL))
+      throw new TypeError(`Expected ${name} map URL`);
     sources.push([name, String(source)]);
   }
   return sources;
@@ -38,9 +49,9 @@ function mapSources(options: MapOptions): Array<[keyof PlanetImages, string]> {
 /** One WebGPU planet plugin per engine; created and attached asynchronously. */
 export class Planet implements EnginePlugin {
   readonly name = 'planet';
-  readonly clouds: {offsetU: number};
+  readonly clouds: { offsetU: number };
   private readonly controller = new AbortController();
-  private readonly images: PlanetImages = {day: undefined!};
+  private readonly images: PlanetImages = { day: undefined! };
   private readonly sources: Array<[keyof PlanetImages, string]> = [];
   private readonly sun = new Float32Array(3);
   private readonly config: PlanetPassConfig;
@@ -55,23 +66,35 @@ export class Planet implements EnginePlugin {
 
   private constructor(options: PlanetOptions) {
     if (!options || typeof options !== 'object') throw new TypeError('Expected planet options');
-    const radius = options.radius ?? 1, tilt = options.tilt ?? 23.4;
+    const radius = options.radius ?? 1,
+      tilt = options.tilt ?? 23.4;
     const intensity = options.atmosphere?.intensity ?? 1.2;
     const color = options.atmosphere?.color ?? [0.3, 0.6, 1];
     for (const value of [radius * 1.01, tilt, intensity]) {
-      if (typeof value !== 'number' || !Number.isFinite(Math.fround(value))) throw new RangeError('Planet parameters must be finite Float32 numbers');
+      if (typeof value !== 'number' || !Number.isFinite(Math.fround(value)))
+        throw new RangeError('Planet parameters must be finite Float32 numbers');
     }
-    if (typeof radius !== 'number' || Math.fround(radius) <= 0 || intensity < 0) throw new RangeError('Planet radius must be positive and atmosphere intensity non-negative');
-    if (options.atmosphere !== undefined && (!options.atmosphere || typeof options.atmosphere !== 'object')) throw new TypeError('Expected atmosphere options');
+    if (typeof radius !== 'number' || Math.fround(radius) <= 0 || intensity < 0)
+      throw new RangeError('Planet radius must be positive and atmosphere intensity non-negative');
+    if (options.atmosphere !== undefined && (!options.atmosphere || typeof options.atmosphere !== 'object'))
+      throw new TypeError('Expected atmosphere options');
     finiteVector(color, 3, 'Atmosphere color');
-    if (color.some(value => value < 0)) throw new RangeError('Atmosphere color must be non-negative');
-    this.config = {radius, atmosphereColor: [color[0], color[1], color[2]], atmosphereIntensity: intensity, nightIntensity: 3};
-    this.tilt = tilt * Math.PI / 180;
+    if (color.some((value) => value < 0)) throw new RangeError('Atmosphere color must be non-negative');
+    this.config = {
+      radius,
+      atmosphereColor: [color[0], color[1], color[2]],
+      atmosphereIntensity: intensity,
+      nightIntensity: 3,
+    };
+    this.tilt = (tilt * Math.PI) / 180;
     this.setSunDirection(options.sunDirection ?? [-1, 0.2, 0.5]);
     this.sources.push(...mapSources(options));
     const planet = this;
     this.clouds = {
-      get offsetU() {planet.check(); return planet.offset;},
+      get offsetU() {
+        planet.check();
+        return planet.offset;
+      },
       set offsetU(value: number) {
         planet.check();
         if (typeof value !== 'number' || !Number.isFinite(value)) throw new RangeError('Cloud offset must be finite');
@@ -81,10 +104,14 @@ export class Planet implements EnginePlugin {
   }
 
   /** Adds a planet to `engine` and resolves once its maps are loaded (same as `create`). */
-  static attach(engine: EngineKernel, options: PlanetOptions): Promise<Planet> {return Planet.create(engine, options);}
+  static attach(engine: EngineKernel, options: PlanetOptions): Promise<Planet> {
+    return Planet.create(engine, options);
+  }
   static async create(engine: EngineKernel, options: PlanetOptions): Promise<Planet> {
     const planet = new Planet(options);
-    const signal = options.signal ? AbortSignal.any([options.signal, planet.controller.signal]) : planet.controller.signal;
+    const signal = options.signal
+      ? AbortSignal.any([options.signal, planet.controller.signal])
+      : planet.controller.signal;
     try {
       signal.throwIfAborted();
       engine.use(planet);
@@ -96,42 +123,68 @@ export class Planet implements EnginePlugin {
     }
   }
 
-  get rotation(): VectorRef {this.check(); if (!this.spin) throw new Error('Planet is not attached'); return this.spin.rotation;}
+  get rotation(): VectorRef {
+    this.check();
+    if (!this.spin) throw new Error('Planet is not attached');
+    return this.spin.rotation;
+  }
 
   /** Replace the complete map set after loading/validation; the current planet stays visible on failure. */
   async updateMaps(options: MapOptions): Promise<void> {
     this.check();
     if (!this.pass || !this.engine) throw new Error('Planet is not ready');
     if (this.upgrading) throw new Error('Planet map update is already pending');
-    const sources = mapSources(options), controller = new AbortController();
+    const sources = mapSources(options),
+      controller = new AbortController();
     this.upgrading = controller;
-    const signal = AbortSignal.any([this.controller.signal, controller.signal, ...(options.signal ? [options.signal] : [])]);
-    const next: PlanetImages = {day: undefined!}, previousImages = new Set<ImageBitmap>(Object.values(this.images));
-    let pass: PlanetPass | undefined, committed = false;
+    const signal = AbortSignal.any([
+      this.controller.signal,
+      controller.signal,
+      ...(options.signal ? [options.signal] : []),
+    ]);
+    const next: PlanetImages = { day: undefined! },
+      previousImages = new Set<ImageBitmap>(Object.values(this.images));
+    let pass: PlanetPass | undefined,
+      committed = false;
     try {
       await this.readMaps(sources, next, signal, controller, this.images);
       for (;;) {
-        signal.throwIfAborted(); this.check();
+        signal.throwIfAborted();
+        this.check();
         const device: GPUDevice = this.engine.gpu!;
         device.pushErrorScope('validation');
-        try {pass = this.createPass(next, device);}
-        catch (error) {
+        try {
+          pass = this.createPass(next, device);
+        } catch (error) {
           await device.popErrorScope().catch(() => null);
-          signal.throwIfAborted(); this.check();
+          signal.throwIfAborted();
+          this.check();
           if (this.engine?.gpu !== device) continue;
           throw error;
         }
         let error: GPUError | null = null;
-        try {error = await device.popErrorScope();}
-        catch (failure) {signal.throwIfAborted(); this.check(); if (this.engine?.gpu === device) throw failure;}
-        signal.throwIfAborted(); this.check();
-        if (this.engine.gpu !== device) {pass.dispose(); pass = undefined; continue;}
+        try {
+          error = await device.popErrorScope();
+        } catch (failure) {
+          signal.throwIfAborted();
+          this.check();
+          if (this.engine?.gpu === device) throw failure;
+        }
+        signal.throwIfAborted();
+        this.check();
+        if (this.engine.gpu !== device) {
+          pass.dispose();
+          pass = undefined;
+          continue;
+        }
         if (error) throw new Error(`Planet GPU initialization failed: ${error.message}`);
         const previousPass = this.pass;
         for (const name of Object.keys(this.images) as Array<keyof PlanetImages>) delete this.images[name];
         Object.assign(this.images, next);
-        this.sources.length = 0; this.sources.push(...sources);
-        this.pass = pass; committed = true;
+        this.sources.length = 0;
+        this.sources.push(...sources);
+        this.pass = pass;
+        committed = true;
         previousPass?.dispose();
         const retained = new Set(Object.values(next));
         for (const image of previousImages) if (!retained.has(image)) image.close();
@@ -147,13 +200,16 @@ export class Planet implements EnginePlugin {
   }
 
   setSunDirection(direction: Vec3): void {
-    this.check(); finiteVector(direction, 3, 'Sun direction');
+    this.check();
+    finiteVector(direction, 3, 'Sun direction');
     const length = Math.hypot(direction[0], direction[1], direction[2]);
     if (!length) throw new RangeError('Sun direction must be nonzero');
     for (let axis = 0; axis < 3; axis++) this.sun[axis] = direction[axis] / length;
   }
 
-  private check(): void {if (this.disposed) throw new Error('Planet is disposed');}
+  private check(): void {
+    if (this.disposed) throw new Error('Planet is disposed');
+  }
 
   setup(engine: Engine): void {
     this.check();
@@ -166,54 +222,93 @@ export class Planet implements EnginePlugin {
   }
 
   registerPasses(graph: FrameGraph): void {
-    graph.add({name: 'planet:surface', order: 3, execute: this.surface});
-    graph.add({name: 'planet:shell', order: 4, execute: this.shell});
+    graph.add({ name: 'planet:surface', order: 3, execute: this.surface });
+    graph.add({ name: 'planet:shell', order: 4, execute: this.shell });
   }
 
   private async load(signal: AbortSignal): Promise<void> {
     await this.readMaps(this.sources, this.images, signal, this.controller);
-    signal.throwIfAborted(); this.check();
+    signal.throwIfAborted();
+    this.check();
     const device = this.engine!.gpu!;
     device.pushErrorScope('validation');
     let pass: PlanetPass;
-    try {pass = this.createPass();}
-    catch (error) {await device.popErrorScope().catch(() => null); throw error;}
+    try {
+      pass = this.createPass();
+    } catch (error) {
+      await device.popErrorScope().catch(() => null);
+      throw error;
+    }
     try {
       const error = await device.popErrorScope();
-      signal.throwIfAborted(); this.check();
+      signal.throwIfAborted();
+      this.check();
       if (error) throw new Error(`Planet GPU initialization failed: ${error.message}`);
       if (this.engine!.gpu === device) this.pass = pass;
       else if (!this.pass) this.pass = this.createPass();
-    } finally {if (this.pass !== pass) pass.dispose();}
+    } finally {
+      if (this.pass !== pass) pass.dispose();
+    }
   }
 
-  private async readMaps(sources: Array<[keyof PlanetImages, string]>, images: PlanetImages, signal: AbortSignal, controller: AbortController, retained?: PlanetImages): Promise<void> {
+  private async readMaps(
+    sources: Array<[keyof PlanetImages, string]>,
+    images: PlanetImages,
+    signal: AbortSignal,
+    controller: AbortController,
+    retained?: PlanetImages,
+  ): Promise<void> {
     const decoded = new Set<ImageBitmap>(Object.values(retained ?? {}).filter(Boolean));
     let decodedBytes = [...decoded].reduce((bytes, image) => bytes + image.width * image.height * 4, 0);
     const loading = sources.map(async ([name, url]) => {
       signal.throwIfAborted();
-      const response = await fetch(url, {signal});
-      const bytes = await readResponse(response, {maxBytes: 32 * 1024 * 1024, signal, label: `Planet ${name} map`});
-      const image = await createImageBitmap(new Blob([bytes]), {colorSpaceConversion: 'none', premultiplyAlpha: 'none'});
+      const response = await fetch(url, { signal });
+      const bytes = await readResponse(response, { maxBytes: 32 * 1024 * 1024, signal, label: `Planet ${name} map` });
+      const image = await createImageBitmap(new Blob([bytes]), {
+        colorSpaceConversion: 'none',
+        premultiplyAlpha: 'none',
+      });
       try {
-        signal.throwIfAborted(); this.check();
+        signal.throwIfAborted();
+        this.check();
         const limit = this.engine!.gpu!.limits.maxTextureDimension2D;
         if (!decoded.has(image)) decodedBytes += image.width * image.height * 4;
-        if (!Number.isSafeInteger(image.width) || !Number.isSafeInteger(image.height) || image.width < 1 || image.height < 1 || image.width > limit || image.height > limit || decodedBytes > 256 * 1024 * 1024) throw new RangeError('Planet maps exceed GPU dimensions or 256 MiB decoded budget');
-        decoded.add(image); images[name] = image;
-      } catch (error) {if (!decoded.has(image)) image.close(); throw error;}
+        if (
+          !Number.isSafeInteger(image.width) ||
+          !Number.isSafeInteger(image.height) ||
+          image.width < 1 ||
+          image.height < 1 ||
+          image.width > limit ||
+          image.height > limit ||
+          decodedBytes > 256 * 1024 * 1024
+        )
+          throw new RangeError('Planet maps exceed GPU dimensions or 256 MiB decoded budget');
+        decoded.add(image);
+        images[name] = image;
+      } catch (error) {
+        if (!decoded.has(image)) image.close();
+        throw error;
+      }
     });
-    try {await Promise.all(loading);}
-    catch (error) {
+    try {
+      await Promise.all(loading);
+    } catch (error) {
       controller.abort(error);
       await Promise.allSettled(loading);
       throw error;
     }
-    signal.throwIfAborted(); this.check();
+    signal.throwIfAborted();
+    this.check();
   }
 
   private createPass(images = this.images, device = this.engine!.gpu!): PlanetPass {
-    return new PlanetPass(device, images, navigator.gpu.getPreferredCanvasFormat(), device.features.has('depth32float-stencil8') ? 'depth32float-stencil8' : 'depth32float', this.config);
+    return new PlanetPass(
+      device,
+      images,
+      navigator.gpu.getPreferredCanvasFormat(),
+      device.features.has('depth32float-stencil8') ? 'depth32float-stencil8' : 'depth32float',
+      this.config,
+    );
   }
 
   private readonly surface = (context: PassContext): void => {
@@ -229,7 +324,8 @@ export class Planet implements EnginePlugin {
   onDeviceRestored(engine: Engine): void {
     this.check();
     if (engine !== this.engine) throw new Error('Planet belongs to another engine');
-    this.pass?.dispose(); this.pass = undefined;
+    this.pass?.dispose();
+    this.pass = undefined;
     if (this.sources.every(([name]) => !!this.images[name])) this.pass = this.createPass();
   }
 
@@ -239,13 +335,17 @@ export class Planet implements EnginePlugin {
     this.controller.abort(new DOMException('Planet disposed', 'AbortError'));
     const engine = this.engine;
     if (engine?.hasPlugin(this.name)) engine.removePlugin(this.name);
-    this.pass?.dispose(); this.pass = undefined;
+    this.pass?.dispose();
+    this.pass = undefined;
     for (const image of new Set(Object.values(this.images))) image?.close();
     for (const name of Object.keys(this.images) as Array<keyof PlanetImages>) delete this.images[name];
-    this.spin?.dispose(); this.parent?.dispose();
+    this.spin?.dispose();
+    this.parent?.dispose();
     this.spin = this.parent = undefined;
     this.engine = undefined;
   }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 }

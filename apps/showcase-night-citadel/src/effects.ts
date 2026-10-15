@@ -1,6 +1,6 @@
-export {Bloom} from '@margoengine/post/bloom';
-export {Shadows} from '@margoengine/shadows';
-export {Clustered} from '@margoengine/clustered';
-export {Water} from '@margoengine/water';
-export {VFX} from '@margoengine/vfx';
-export {Sky} from '@margoengine/sky';
+export { Bloom } from '@margoengine/post/bloom';
+export { Shadows } from '@margoengine/shadows';
+export { Clustered } from '@margoengine/clustered';
+export { Water } from '@margoengine/water';
+export { VFX } from '@margoengine/vfx';
+export { Sky } from '@margoengine/sky';

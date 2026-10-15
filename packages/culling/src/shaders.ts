@@ -7,7 +7,9 @@ struct Record {m:mat4x4f,color:vec4f,factors:vec4f}
 `;
 
 /** Compute stages. `samples` picks the depth texture type the Hi-Z pyramid is built from. */
-export const computeShader = (samples: number): string => common + `
+export const computeShader = (samples: number): string =>
+  common +
+  `
 @group(0) @binding(1) var<storage,read> spheres:array<vec4f>;
 @group(0) @binding(2) var<storage,read_write> visible:array<u32>;
 @group(0) @binding(3) var<storage,read_write> local:array<u32>;
@@ -108,7 +110,9 @@ fn unoccluded(s:vec4f)->bool {
 `;
 
 /** Depth-only prepass of last frame's visible parts. Positions are computed exactly as in core's vertex shader. */
-export const depthShader = common + `
+export const depthShader =
+  common +
+  `
 @group(0) @binding(11) var<storage,read> records:array<Record>;
 struct V {@builtin(position) clip:vec4f,@location(0) @interpolate(flat) side:vec2f}
 @vertex fn vertex(@location(0) position:vec3f,@location(2) index:u32)->V {
