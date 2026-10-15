@@ -2031,6 +2031,10 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    assemblies, modular web 3D apps and instant-load web games - not "replaces Unreal/Unity/Blender". Design-envelope
    page (5j) linked.
 9. **No flaky gates:** `npm run verify` passes 5 times in a row under load (5l.s).
+   Seen 2026-10-15: Night Citadel's visual capture hangs at "Preparing the citadel..." past a 90 s page.goto
+   timeout (high/light views; phone took 53 s) while three agents built and tested in parallel; alone it loads in 4-7 s
+   and passes (twice). No page errors logged. Before launch: reproduce under a bounded load (half the cores) and find
+   what the load event waits on (preview server starved vs the app's own init); a visitor's busy laptop must not hang.
 10. **claims.md:** 0 OVERCLAIM and 0 UNPROVEN rows for anything on public pages.
 
 Before launch, in addition to the work queue:
