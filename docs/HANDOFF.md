@@ -730,6 +730,21 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    d. Frame debugger: extend `@margoengine/inspector` (it already has hierarchy, live properties, wireframe/normal/
       bounds overlays; stats has GPU timestamps) with a frame capture: draw calls, pipelines, bind groups, per-pass GPU
       time, GPU memory by buffer/texture, texture budget vs the 16-binding limit.
+5i. Deployment and resilience (Scott, 2026-10-14 night; checked against the repo):
+   a. Deployment guide + starter headers: COOP/COEP are NOT needed (no SharedArrayBuffer requirement; bvh only detects
+      it; the Wasm kernel is embedded in JS). The real trap is CSP: `script-src 'wasm-unsafe-eval'` for the kernel and
+      `worker-src 'self'` (blob: if any) for parsing workers. Ready-to-paste configs for Cloudflare Pages/Netlify
+      `_headers`, Vercel `vercel.json`, Nginx: CSP, caching of fingerprinted assets, compression; `create-margo`
+      template ships a `_headers`. Test: a page served with the strict CSP loads every demo-class feature.
+   b. Tier-aware feature presets: `@margoengine/quality` already picks light/full tiers (MSAA, DPR, pacing only). Add
+      presets packages read on attach (shadow cascades/resolution, SSR off, volumetrics off/low grid, SSAO half-res,
+      particle counts) so the light tier scales features automatically; measure the light tier on the laptop.
+   c. Pipeline pre-warming: core already compiles async; sections/fog have `enabled:false`. Add a general
+      `warmUp(engine)` (async pipeline creation for every attached feature during loading) and measure first-use
+      hitches per feature before/after.
+   d. Device-loss verification: core handles `device.lost` with automatic recovery and 55 package files implement
+      restore hooks. Add an end-to-end browser test that destroys the device mid-frame in every demo and checks the
+      frame returns (visual-regression compare after restore); fix any package that doesn't come back.
 6. Then give Scott the full list of what was done and what remains.
 
 Worker practice: agents run in git worktrees; they must start with `git reset --hard perf/auto-quality` (worktrees
