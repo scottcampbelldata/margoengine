@@ -39,3 +39,8 @@ test('street, track and moving tram', () => {
   for (const name of ['Diorama_Root', 'Slab', 'Street', 'Sidewalk', 'Track_Rails', 'Track_Sleepers']) nodeIndex(name);
   assert.deepEqual(channels('Tram').sort(), ['rotation', 'translation']);
 });
+
+test('four shop houses with spinning AC fans and roof spinner', () => {
+  for (const name of ['Shop_A', 'Shop_B', 'Shop_C', 'Shop_D']) nodeIndex(name);
+  for (const name of ['AC_Fan_1', 'AC_Fan_2', 'AC_Fan_3', 'AC_Fan_4', 'Roof_Spinner']) assert.deepEqual(channels(name), ['rotation'], name);
+});
