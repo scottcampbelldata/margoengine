@@ -1360,6 +1360,14 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
 5. **Real assets render correctly.** Khronos glTF sample assets in the visual-regression suite (DamagedHelmet exists;
    add FlightHelmet, Sponza and a broader set - Scott approves each download/licence), plus the conveyor GLB and the
    archviz house; all pass the glTF validator and render without visual bugs.
+   Status 2026-10-15: FlightHelmet (CC0) downloaded to `examples/assets/khronos/` (Git LFS, validator 0/0); shortlist
+   of CC0/CC-BY models for Scott's approval in `examples/assets/khronos/SHORTLIST.md`. Sponza excluded (Cryengine
+   licence). Complement (not substitute): Blender-made test scenes that exercise our own Blender pipeline (export
+   settings, custom properties/extras).
+   **LICENCE DECISION FOR SCOTT:** DamagedHelmet - used on margoengine.com and in demos/benchmarks - has an earlier
+   model under CC-BY-NC 4.0 (theblueturtle_); attribution is correct in `examples/assets/ATTRIBUTION.md`, but
+   non-commercial terms on a site marketing the engine are a risk. Recommended: replace public uses with FlightHelmet
+   or SciFiHelmet (both CC0) before launch; keep or drop DamagedHelmet in internal tests per Scott.
 6. **Code hygiene >= 9** (5k), including zero `any` in public APIs and TSDoc on every export (autocomplete with docs).
 7. **Docs + playground** (item 8): quickstart, three.js migration, two flagship tutorials, cookbook, generated API
    reference, live-editable examples.
