@@ -1172,6 +1172,17 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    Rules: every code block type-checked (tests/from-threejs-snippets.test.js already covers docs/guides/*.md) and
    every tutorial runnable from the repo; numbers only with linked proofs (claims.md); docs pages captured in
    visual:check where they embed a live canvas.
+9. LATER (Scott, 2026-10-15, "maybe next week; finish the engine first"): Steam games built on Margo to make money.
+   Not started (research agent stopped on Scott's call). When resumed: (1) cited market research - which genres/tags
+   sell for 1-2 person teams (median vs top revenue, wishlist->sales, Next Fest, demos), (2) genre ranking by demand x
+   Margo fit x scope (factory/automation, stylized roguelike, atmospheric exploration, logistics puzzle are candidates
+   to test, not conclusions), (3) packaging reality check - Electron vs Tauri vs native Dawn/wgpu: verify WebGPU per
+   platform incl. Steam Deck/Linux (Tauri uses the system WebView: WebKitGTK on Linux), Steamworks bindings, (4) web
+   demo -> wishlist funnel evidence, (5) business basics (fees, revenue share, taxes - accountant), (6) phased plan
+   after 1.0 with kill/continue criteria, (7) honest odds. Plan doc goes to Scott's Google Drive folder
+   "Margo Engine - To Do". Graphics settings for games: frame cap 30/60/120 via `capFrameRate`/`engine.pace`
+   (exists); browsers are always vsynced; "VSync off"/uncapped only in the desktop wrapper (Electron
+   `--disable-frame-rate-limit`), check tearing support per wrapper during the research.
 7. POST-LAUNCH (Scott, 2026-10-15): "Margo Studio" - feature-for-feature equivalents of MagicaVoxel, Crocotile 3D
    and Dust3D, built on and for Margo with new, modern code (no copied code or branding; their file formats are
    supported for import/export). Plan, ground rules and draft feature inventories: `docs/margo-studio.md`. Each tool
