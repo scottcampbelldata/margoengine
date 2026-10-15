@@ -924,6 +924,9 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       (67.1 MB) download budget, so a slightly larger export will fail "glTF download byte budget exceeded"; the
       main-thread path packs a mesh once per node that uses it (570 packs for 242 meshes, ~220 MB instead of ~166 MB),
       the worker path packs each once.
+   r. gltf-pro memory/limits from the conveyor fix (0c24e76): the main-thread loader repacks a shared mesh once per
+      node that uses it (570 packs for 242 meshes, ~220 MB vs ~166 MB) - pack once per mesh like the worker path; the
+      64 MiB download budget is 2 MB above the 65.1 MB conveyor file - make it an option with a clear error.
    q. Game-developer gaps from the Blender guide (2eb78b9): a helper that collects a model's world-space triangles
       (for physics colliders and navmeshes); physics bodies on non-root meshes; water refraction can't combine with
       SSAO (needs a scene texture from PostStack); camera rig avoids walls, not just terrain; audio listener on
