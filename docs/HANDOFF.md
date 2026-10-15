@@ -1180,6 +1180,34 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       don't collide), moving platforms. Limits (README): static
       levels (last frame's matrices, no moving platforms), bind-pose skinned meshes, ring can lift the eye
       0.9 r tan(slope) on slopes, first-touch BVH builds are synchronous (prebuild with computePrimitiveBVHAsync).
+      (1)-(3) [DONE] (`packages/physics`; Rapier still optional and passed in, never imported; zero core bytes).
+      (1) `physics.addModel(model, {type, shape, perNode, filter, collider, ...body options})`: one call turns a
+      gltf-pro `PBRModel` (or materials mesh; structural `ModelLike`) into colliders, one per primitive and per
+      instance of an EXT_mesh_gpu_instancing primitive, with every node, instance and scale transform baked into the
+      collider points (body space = world under the anchor's rigid pose). Default one body on `model.root` (a level, or
+      a prop moving as one); `perNode: true` puts a body on each node (hits report the Blender object). Shape: trimesh
+      for fixed/kinematic, convex hull for dynamic (a Rapier trimesh has no mass). Error part-way removes every body it
+      made. (2) Bodies on child meshes: `addBody(node)` starts at the node's world pose (fitted colliders use the world
+      scale) and each sync writes the pose relative to the parent's *current* world transform, composed in float64
+      from the parents' local TRS (`src/transform.ts`), so no frame of lag when the parent moves; resting child bodies
+      are rewritten every frame (they hold their world pose). Exact for rotation + uniform/per-axis scale parents;
+      sheared parents get the nearest rotation. Fake (non-core) meshes with parents are refused. (3) Allocation audit:
+      the old frame path allocated about 2,316 B per `sync()` of 16 moving bodies (Math.hypot's argument array in the
+      slerp, the boxed interpolation factor passed to the non-inlined slerp, validating setters) and about 357 B per
+      step of wrapper code (events array + drain closure, listener snapshot spread, pose getters returning new objects).
+      Now `sync()` writes core's transform storage directly with the slerp inlined and Math.sqrt; `step()` drains into
+      a reused array with a stable callback, dispatches with `Set.forEach(fn, event)`, and reads poses into private
+      class instances (object-literal shapes are shared program-wide by V8 and had generalized to boxed fields: every
+      write allocated). A dynamic body asleep since the previous step skips Rapier's getters. Proof:
+      `packages/physics/tests/allocations.js`, run by physics.test.js in a child with `--expose-gc` and a 64 MB young
+      generation, counts young-space bytes over 20,000 calls with v8.GCProfiler proving no collection in the window:
+      requires < 1 B/call; measured 736 B total for 20,000 syncs (one-off) and 0 B for 20,000 wrapper steps (Rapier's
+      step and getters stubbed out of that case). Not fixable here, measured by the same script (Node 24, Rapier
+      0.21.0): Rapier's own `World.step` allocates ~10.9 kB per step with 16 awake bodies, and each pose getter ~32 B
+      (its wasm-bindgen glue makes a Float32Array view of Wasm memory per call); queries and `CharacterController.move`
+      results also allocate. Tests: physics.test.js 33 pass (new: child bodies, addModel trimesh/instances/perNode/
+      filter/rollback, dynamic convex model, allocation count). Size (walk-size.mjs method, core external, min+gzip):
+      `Physics` 8,057 -> 10,289 B (+2,232: addModel, child bodies, transform helpers, math invert/multiply).
    u. ArchViz / real-estate walkthrough showcase (Scott, 2026-10-15): a demo for the final-phase rebuild - a modern
       house GLB loaded with progressive streaming, walk mode with the (t.4) controller, dollhouse orbit toggle,
       environment lighting + shadows (check whether gltf-pro supports lightmaps on a second UV set; queue it if not),
@@ -1199,6 +1227,36 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       SSAO (needs a scene texture from PostStack); camera rig avoids walls, not just terrain; audio listener on
       something other than the camera; a runnable example game with a rigged character + Blender level GLB (for the
       demo rebuild).
+      [DONE except the example game] All zero core bytes; docs/guides/blender-game.md updated (snippets type-checked).
+      - World triangles: `worldTriangles(engine, objects, {refresh, filter})` in `@margoengine/bvh`
+        (`packages/bvh/src/triangles.ts`): core meshes + gltf-pro/materials models, node/instance/scale transforms,
+        skinned in bind pose, merged world-space `{vertices, indices}` (spreads into a physics trimesh, feeds
+        `Navigation.create`). Runs the kernel first; hidden meshes not skipped (use `filter`). Test
+        (bvh models.test.js): helmet + quad hierarchy + scaled core mesh + instanced primitive, rays at the merged BVH
+        give the Raycaster's distances. Size: `worldTriangles` alone 813 B min+gzip; bvh whole index 14,032 -> 14,432 B;
+        `Raycaster` alone unchanged (12,674 B).
+      - Bodies on non-root meshes + one-call model colliders: see 5l.t (1)-(2).
+      - Water refraction + SSAO: `PostStack.sceneTexture` (`packages/post/src/stack.ts`) exposes the shared 1x
+        rgba16float capture when the stack has an HDR or display effect (undefined otherwise), which is exactly what
+        Water's `sceneColor` validates; no water or core change. Unit test (post stack.test.js: format, 1x, size, COPY_SRC
+        + TEXTURE_BINDING; undefined for an LDR-only stack). PostStack +21 B. Real GPU (`packages/water/test/stack.browser.mjs`, run
+        under the GPU lock; Edge, Intel Arc 140V; correctness only, no timing): PostStack([SSAO, Bloom]) + Water with
+        `sceneColor: () => stack.sceneTexture`, 0 WebGPU validation errors; an underwater red block shows through the
+        water (patch redness R-(G+B)/2 = 111.7 with refraction vs -4.8 with the approximate seabed colour); SSAO is live
+        in the same frame (232 pixels change at a cube/platform crease when it is disabled). Not checked: how SSAO
+        shades the water surface itself (the scene depth does not contain it).
+      - Camera walls: Cinematic `collide: (origin, direction, distance) => hit | null` (any query: physics sphere cast,
+        bvh Raycaster). Pull-in is instant to `clearance` short of the hit, ease-out at the follow damping, spring state
+        and `offset` untouched (`packages/cinematic/src/index.ts`, test in cinematic.test.js). Cinematic 1,489 -> 1,760 B.
+      - Audio listener: `listener.follow(mesh | 'camera' | null, forward = [0, 0, 1])` (world position, local forward
+        axis, local +Y up from the engine's world matrices; null = setPose only) (`packages/audio/src/listener.ts`, test
+        in audio.test.js). AudioListener 2,331 -> 2,694 B; audio whole index 6,339 -> 6,658 B.
+      - Not done, for the demo rebuild: a runnable example game with a rigged character + Blender level GLB. Needs: a
+        CC0/CC-BY rigged character with Idle/Walk/Run/Jump actions and a Blender-made level GLB with `extras` markers
+        (Scott picks; no downloads without asking); an `examples/` app wiring loadGLTF + `physics.addModel(level,
+        {type: 'fixed', perNode: true})` + a kinematic capsule on `hero.root` with CharacterController + Animator blend
+        tree + Input + Cinematic with `collide` + `listener.follow(hero.root)` + PostStack with water; a browser test
+        (walk, jump, coin trigger, no WebGPU errors) and measured load/frame numbers on the light tier.
    s. [DONE] Load-flaky tests in verify. Reproduced each under a 128-thread CPU burn and fixed (tests only):
       - catalog: headless Edge shuts down on low-priority threads, so under load `browser.close()` took 4-6 min
         (graceful close fails after 30 s, then the killed process takes minutes to tear down; 237-394 s measured, even
@@ -1550,9 +1608,8 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
      merge: it says "coming" for each (deploying links docs/deploying.md). Gaps it found, not yet queued: water refraction
      needs standalone Bloom's `sceneTexture` (PostStack has none, and standalone Bloom + SSAO refuse each other); SSR does
      not reflect in glTF surfaces (5l.l); core `Mesh` has no public world matrix (packages read
-     `engineRuntime(engine).store.matrices`; the guide uses `node.matrix` after `engine.render`); physics bodies only on
-     root-level meshes, so glTF nodes need `model.root` or hand-built colliders; no physics/navmesh helper that collects
-     a model's world-space triangles (the guide inlines the loop); audio listener follows the camera only.
+     `engineRuntime(engine).store.matrices`; the guide uses `node.matrix` after `engine.render`). The water/PostStack,
+     child-body, world-triangles, camera-wall and listener gaps were queued as 5l.q and are done there.
 4. Deploy the rebuilt site and demos to Cloudflare Pages (project `margoengine`): preview branch first, Scott checks
    it, then production (margoengine.com). Scott asked for the production push; still show him the preview link first.
 

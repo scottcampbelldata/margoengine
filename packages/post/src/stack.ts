@@ -32,6 +32,9 @@ export class PostStack implements EnginePlugin {
   static attach(engine:EngineKernel,effects:readonly EnginePlugin[]):PostStack {const stack=new PostStack(effects);engineRuntime(engine).use(stack);return stack;}
   /** Resolved 1x scene depth, e.g. for TAA({depth:()=>stack.depthTexture}). */
   get depthTexture():GPUTexture|undefined{return this.host.depthTexture;}
+  /** The 1x linear HDR scene capture (rgba16float) while the stack has an HDR or display effect, e.g. for
+   * Water({sceneColor:()=>stack.sceneTexture}) refraction alongside SSAO; undefined with only LDR effects or before the first frame. */
+  get sceneTexture():GPUTexture|undefined{return this.color?.format==='rgba16float'?this.color:undefined;}
   setup(engine:Engine):void {
     if(this.disposed||!engine.gpu)throw new Error('PostStack requires WebGPU and a live stack');
     for(const name of owners)if(engine.hasPlugin(name))throw new Error(`Add ${name} to the PostStack instead of attaching it alone`);

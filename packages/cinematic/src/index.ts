@@ -2,7 +2,22 @@
 import type {EngineKernel, Mesh, Vec3} from '@margoengine/core';
 import {engineRuntime, meshRuntime, type Engine, type EnginePlugin} from '@margoengine/core/extension';
 
-export interface CinematicOptions {offset?: Vec3; damping?: number; lookDamping?: number; ground?: (x: number, z: number) => number; clearance?: number}
+/**
+ * Distance from `origin` along the unit `direction` to the first obstacle within `distance`, or null/undefined for none.
+ * The arrays are reused every frame: read them, do not keep them.
+ */
+export type CameraCollision = (origin: Float64Array, direction: Float64Array, distance: number) => number | null | undefined;
+export interface CinematicOptions {
+  offset?: Vec3; damping?: number; lookDamping?: number; ground?: (x: number, z: number) => number;
+  /** Space kept between the camera and the ground, and between the camera and a `collide` hit. Default 0.65. */
+  clearance?: number;
+  /**
+   * Walls and ceilings: queried each frame along the arm from the look-at point to the camera. On a hit the camera moves
+   * in at once to `clearance` short of it, and eases back out at the follow damping once the arm is clear. For example
+   * `(o, d, max) => physics.shapeCast({shape: 'sphere', radius: 0.2}, [o[0], o[1], o[2]], [0, 0, 0, 1], [d[0], d[1], d[2]], {maxDistance: max, excludeDynamic: true})?.distance`.
+   */
+  collide?: CameraCollision;
+}
 const valid = (vector: ArrayLike<number>): void => {if (vector.length !== 3) throw new TypeError('Expected 3D target'); for (let i = 0; i < 3; i++) if (!Number.isFinite(vector[i])) throw new RangeError('Target must be finite');};
 
 /** Critically damped virtual camera, with independent follow/look springs and additive shake. */
@@ -15,6 +30,9 @@ export class Cinematic implements EnginePlugin {
   private readonly target = new Float64Array(3);
   private readonly cameraPosition = new Float32Array(3);
   private readonly cameraTarget = new Float32Array(3);
+  private readonly armDirection = new Float64Array(3);
+  /** Arm length allowed by the last `collide` hit, easing back out; Infinity when unobstructed. */
+  private reach = Infinity;
   private engine?: Engine;
   private mesh?: Mesh;
   private amplitude = 0;
@@ -73,9 +91,28 @@ export class Cinematic implements EnginePlugin {
     if (lift > 0) {this.cameraPosition[1] += lift; this.position[1] += lift; this.velocity[1] = Math.max(0, this.velocity[1]);}
     // Preserve upward look when terrain clearance lifts a requested below-target orbit.
     if (this.options.ground && this.offset[1] < 0) this.cameraTarget[1] += Math.max(0, this.cameraPosition[1] - this.lookAt[1] - this.offset[1]);
+    this.avoidWalls(followDecay);
     if (this.engine) {this.engine.camera.position = this.cameraPosition as unknown as Vec3; this.engine.camera.target = this.cameraTarget as unknown as Vec3;}
   }
+  /** Shortens the rendered arm (look-at point to camera) to stay `clearance` in front of the first `collide` hit. */
+  private avoidWalls(followDecay: number): void {
+    const collide = this.options.collide;
+    if (!collide) return;
+    const o = this.lookAt, c = this.cameraPosition, d = this.armDirection;
+    d[0] = c[0] - o[0]; d[1] = c[1] - o[1]; d[2] = c[2] - o[2];
+    const length = Math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+    if (!(length > 0)) return;
+    d[0] /= length; d[1] /= length; d[2] /= length;
+    const hit = collide(o, d, length);
+    if (hit !== null && hit !== undefined && (typeof hit !== 'number' || !Number.isFinite(hit))) throw new RangeError('Camera collision distance must be finite');
+    const limit = hit === null || hit === undefined || hit >= length ? length : Math.max(0, hit - (this.options.clearance ?? 0.65));
+    // In at once (never show the far side of a wall), out at the follow rate.
+    this.reach = limit <= this.reach ? limit : this.reach + (limit - this.reach) * (1 - followDecay);
+    if (limit === length && length - this.reach < 1e-4) this.reach = Infinity;
+    if (this.reach < length) for (let i = 0; i < 3; i++) c[i] = o[i] + d[i] * this.reach;
+  }
   private validateGround(): void {
+    if (this.options.collide !== undefined && typeof this.options.collide !== 'function') throw new TypeError('Camera collide must be a function');
     if (this.options.ground !== undefined && typeof this.options.ground !== 'function' || !Number.isFinite(this.options.clearance ?? 0.65) || (this.options.clearance ?? 0.65) < 0) throw new RangeError('Invalid camera ground clearance');
   }
   private groundOffset(origin: ArrayLike<number>, dx: number, dy: number, dz: number): number {

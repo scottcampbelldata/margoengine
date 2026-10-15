@@ -191,17 +191,13 @@ await RAPIER.init();
 const physics = Physics.attach(engine, {rapier: RAPIER}); // fixed 1/60 s steps, meshes interpolated between them
 const level = await loadGLTF(engine, '/assets/level.glb');
 
-// One static triangle collider for every level mesh not tagged collider = 0 in Blender, in world space.
-engine.render({delta: 0}); // one frame brings the nodes' world matrices up to date
-const positions: number[] = [], indices: number[] = [];
-for (const primitive of level.primitives) {
-  if (level.asset.doc.nodes[primitive.nodeIndex].extras?.collider === 0) continue;
-  const m = primitive.node.matrix, v = primitive.vertices, base = positions.length / 3; // 20 floats per vertex, xyz first
-  for (let i = 0; i < v.length; i += 20)
-    positions.push(m[0] * v[i] + m[4] * v[i + 1] + m[8] * v[i + 2] + m[12], m[1] * v[i] + m[5] * v[i + 1] + m[9] * v[i + 2] + m[13], m[2] * v[i] + m[6] * v[i + 1] + m[10] * v[i + 2] + m[14]);
-  for (const index of primitive.indices) indices.push(base + index);
-}
-physics.addBody(null, {type: 'fixed', colliders: {shape: 'trimesh', vertices: new Float32Array(positions), indices: new Uint32Array(indices)}});
+// Static triangle colliders for the whole level in one call: a body per Blender object (hits then report that
+// object's node), every node, instance and scale transform applied, objects tagged collider = 0 left out.
+physics.addModel(level, {type: 'fixed', perNode: true, filter: primitive => level.asset.doc.nodes[primitive.nodeIndex].extras?.collider !== 0});
+// A loose prop exported as its own file: dynamic, a convex hull per primitive, moving as one body.
+const crate = await loadGLTF(engine, '/assets/crate.glb');
+crate.root.setPosition([2, 3, 0]);
+physics.addModel(crate, {collider: {density: 0.6, friction: 0.8}});
 
 // A pickup trigger: sensors report overlaps instead of colliding.
 const coin = engine.createMesh().setPosition([4, 1, 0]);
@@ -211,9 +207,17 @@ physics.on('intersectionstart', ({meshA, meshB}) => {
 });
 ```
 
-- **Only root-level meshes may carry bodies.** A glTF node is parented to its model's root, so give the body to
-  `model.root` (the character below) or build colliders from the geometry as above. The package throws for a mesh
-  with a parent.
+- **Bodies on glTF nodes.** `addModel` builds trimesh colliders (fixed and kinematic) or convex hulls (dynamic) from
+  a model's node hierarchy; without `perNode` one body on `model.root` holds them all. `addBody(level.nodes[i], ...)`
+  also works on a single child node: the body starts at the node's world pose and the node gets its pose relative to
+  its parent each frame. Skinned meshes are read in their bind pose, so give a character a capsule (below).
+- **One merged triangle soup.** `worldTriangles(engine, [level])` from `@margoengine/bvh` returns the level's
+  world-space `{vertices, indices}`: one trimesh (`physics.addBody(null, {type: 'fixed', colliders: {shape: 'trimesh',
+  ...worldTriangles(engine, [level])}})`) or a navmesh (below).
+- **Optional and not small.** Rapier ships its Wasm inlined in `rapier3d-compat` (about 1.6 MB gzip for `rapier.mjs`,
+  see [Measured numbers](#measured-numbers)); load it only on the pages that need physics, for example with a dynamic
+  `import()`. For walking around a static level without rigid bodies, `@margoengine/controls/walk` collides on the bvh
+  trees without Wasm.
 - Shapes: box, sphere, capsule, cylinder, cone, convex hull, trimesh, heightfield. Joints: fixed, spherical,
   revolute, prismatic, with limits and motors. Queries (`raycast`, `shapeCast`, ...) return the core `Mesh` hit.
 - Not wrapped, reachable through `physics.world` and `physics.rapier`: vehicles, rope and spring joints, multibody
@@ -340,15 +344,25 @@ const hero = await loadGLTF(engine, '/assets/hero.glb');
 const down = new Raycaster();
 const groundHeight = (x: number, z: number) => down.set([x, 100, z], [0, -1, 0]).intersectObjects(engine, [level])[0]?.point[1] ?? 0;
 
-const camera = Cinematic.attach(engine, {offset: [0, 3, 7], damping: 6, lookDamping: 8, ground: groundHeight, clearance: 0.6});
+// Walls and ceilings: the first level hit along the arm from the character to the camera.
+const wall = new Raycaster();
+wall.firstHitOnly = true; wall.near = 0.05; // skip the floor under the character's feet
+const collide = (origin: Float64Array, direction: Float64Array, distance: number) => {
+  wall.far = distance;
+  return wall.set(origin, direction).intersectObjects(engine, [level], {refresh: false})[0]?.distance;
+};
+
+const camera = Cinematic.attach(engine, {offset: [0, 3, 7], damping: 6, lookDamping: 8, ground: groundHeight, clearance: 0.6, collide});
 camera.follow(hero.root);
 camera.setOrbitOffset(0.3, 0.35, 7, 1.2); // yaw, pitch, distance, height: drive yaw from mouse or right stick
 camera.shake(0.15, 0.3);                  // on a hit: amplitude in meters, seconds
 ```
 
 The rig owns the camera while attached (critically damped follow and look-at springs), so do not also attach orbit
-controls. `ground` keeps the camera arm above a height function; walls and ceilings need your own collision test
-(for example a physics `shapeCast` from the character to the camera).
+controls. `ground` keeps the camera arm above a height function. `collide` keeps it in front of walls and ceilings:
+on a hit the camera moves in at once to `clearance` short of it and eases back out when the arm is clear. With
+physics attached, a sphere cast (`physics.shapeCast({shape: 'sphere', radius: 0.2}, ...)`) also keeps the near plane
+out of the wall.
 
 ## Picking and ground snapping
 
@@ -384,15 +398,18 @@ With physics attached, `physics.raycast` answers the same question from the coll
 Two packages, by size of problem:
 
 - `@margoengine/navigation` builds a Recast/Detour navmesh from triangles (it depends on `recast-navigation`, a Wasm
-  module) and answers path queries. Feed it the level triangles from the physics section.
+  module) and answers path queries. Feed it the level's world-space triangles from `worldTriangles`.
 - `@margoengine/navmesh` is dependency-free: A* over convex polygons you supply, funnel smoothing, and ORCA
   avoidance between agents (`avoid()`), up to 4,096 polygons. Good for a hand-made walk mesh exported from Blender.
 
 ```ts
 import {Navigation} from '@margoengine/navigation';
+import {worldTriangles} from '@margoengine/bvh';
+import {loadGLTF} from '@margoengine/gltf-pro';
 
-declare const positions: Float32Array, indices: Uint32Array; // level triangles in world space (see Physics)
-const navigation = await Navigation.create(positions, indices, {cs: 0.2, ch: 0.2});
+const level = await loadGLTF(engine, '/assets/level.glb');
+const {vertices, indices} = worldTriangles(engine, [level]); // every node transform applied, merged
+const navigation = await Navigation.create(vertices, indices, {cs: 0.2, ch: 0.2});
 const enemy = engine.createMesh().setPosition([10, 0, 10]);
 let path = navigation.path({x: 10, y: 0, z: 10}, {x: 0, y: 0, z: 0}) ?? [];
 engine.onFrame((_engine, delta) => {
@@ -445,7 +462,9 @@ import {AudioListener, Audio, PositionalAudio} from '@margoengine/audio';
 import {loadGLTF} from '@margoengine/gltf-pro';
 
 const level = await loadGLTF(engine, '/assets/level.glb');
+const hero = await loadGLTF(engine, '/assets/hero.glb');
 const listener = AudioListener.attach(engine, {volume: 0.8}); // resumes the context on the first click or key press
+listener.follow(hero.root); // ears on the character (glTF faces +Z) instead of the camera
 const coinClip = await listener.load('/assets/coin.ogg');
 
 const waterfall = level.extras().find(entry => entry.extras.sound === 'waterfall')!.node;
@@ -461,9 +480,10 @@ function collectCoin() {new Audio(listener).setBuffer(coinClip).play();}
 collectCoin();
 ```
 
-The listener sits at the camera (HRTF panning by default, distance models and cones like Web Audio's `PannerNode`).
-For a listener on the character instead, skip `attach` and call `listener.setPose(...)` yourself. There is no
-reverb or occlusion; add Web Audio nodes through `setFilters`.
+The listener follows the camera by default (HRTF panning, distance models and cones like Web Audio's `PannerNode`).
+`listener.follow(mesh, forward)` puts it on any mesh (its world position, its local `forward` axis, default +Z);
+`follow('camera')` goes back, and `follow(null)` leaves it where `listener.setPose(...)` puts it. There is no reverb
+or occlusion; add Web Audio nodes through `setFilters`.
 
 ## Sky, water, light and post-processing
 
@@ -520,9 +540,22 @@ Know these limits before you design around them:
   with a core `PbrMaterial` for SSR to do anything.
 - **Water has its own reflection** (the sky and its sun and moon paths), not SSR, and it does not reflect nearby
   objects.
-- **Water refraction and the post stack do not combine yet.** Water's `sceneColor` comes from a standalone `Bloom`;
-  `PostStack` exposes `depthTexture` but no scene colour, and standalone Bloom and SSAO refuse each other. With
-  water, use Bloom alone (as above) or give up refraction (water then uses an approximate seabed colour).
+- **Water refraction with SSAO goes through `PostStack`.** Standalone Bloom and SSAO refuse each other, so for both,
+  give water the stack's shared HDR capture:
+
+```ts
+import {PostStack} from '@margoengine/post/stack';
+import {SSAO} from '@margoengine/post/ssao';
+import {Bloom} from '@margoengine/post/bloom';
+import {Water} from '@margoengine/water';
+
+const stack = PostStack.attach(engine, [new SSAO(), new Bloom({strength: 0.2, threshold: 1.2, exposure: 0.45})]);
+const water = Water.attach(engine, {size: [400, 400], segments: 256, height: 0,
+  depth: () => stack.depthTexture, sceneColor: () => stack.sceneTexture});
+void water;
+```
+
+  Water draws into the stack's capture before the stack's effects run.
 - **Volumetric fog and light shafts are coming**; they have not merged. Use sky's distance fog or environment's
   `Fog` (including height fog) today.
 - A glTF material with every lighting package attached (physical material + shadows + IBL + local shadows) uses all
@@ -593,6 +626,8 @@ laptop with an Intel Arc 140V integrated GPU, Edge 155, on AC power.
 | Loading a generated 41 MB GLB (1.28M triangles) while rendering | longest main-thread task 222 ms with `loadGLTF`, 0 ms with `loadGLTFInWorker`; load time 0.60 s vs 0.68 s | [workers.json](../../examples/package-benchmarks/results/workers.json) (`examples/package-benchmarks/workers/run.mjs`) |
 | Screen-space reflections, worst case (glossy floor filling the view) | 2.3 ms GPU at 1280x720 4x MSAA, 5.8 ms at 1920x1080 4x | [ssr-gpu.json](../../examples/package-benchmarks/results/ssr-gpu.json) |
 | Package entries this game imports (min + gzip, each alone; Rapier and recast-navigation not included) | gltf-pro 16.9 kB, animation 5.0, animator 3.9, input 2.3, physics 8.2, bvh 13.6, cinematic 1.5, audio 6.3, sky base + bruneton + clouds + fog + reflection + lighting 11.7, water 13.9, shadows 6.4, Bloom 4.9, quality 1.3 | [entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json) (`examples/package-benchmarks/entry-sizes.mjs`) |
+
+| Rapier itself, `@dimforge/rapier3d-compat` 0.21.0 `rapier.mjs` (Wasm inlined as base64) | 1,645,573 bytes gzip (4,340,292 raw); the bare Wasm 1,176,707 gzip | [walk-size.json](../../examples/package-benchmarks/results/walk-size.json) (`examples/package-benchmarks/walk-size.mjs`) |
 
 Entry sizes are compressed one at a time, so their sum overstates a combined bundle (shared code compresses once).
 No frame-rate number here describes your game: it depends on your scene, your GPU and the tier. Measure with

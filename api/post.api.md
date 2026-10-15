@@ -43,6 +43,7 @@ export class PostStack implements EnginePlugin {
     constructor(effects: readonly EnginePlugin[]);
     static attach(engine: EngineKernel, effects: readonly EnginePlugin[]): PostStack;
     get depthTexture(): GPUTexture | undefined;
+    get sceneTexture(): GPUTexture | undefined;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;

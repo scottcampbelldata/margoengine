@@ -22,17 +22,3 @@ export function checkVec(value: unknown, label: string): asserts value is Vec3 {
 
 /** Same XYZ Euler convention as core's `Mesh.setRotation` (`@margoengine/math/quat` eulerToQuaternion). */
 export const eulerToQuat: (x: number, y: number, z: number) => [number, number, number, number] = eulerToQuaternion;
-
-/** Shortest-arc spherical interpolation of quaternions stored at `a` and `b` in `source`, written to `out`. */
-export function slerp(source: ArrayLike<number>, a: number, b: number, t: number, out: number[]): void {
-  const ax = source[a], ay = source[a + 1], az = source[a + 2], aw = source[a + 3];
-  let bx = source[b], by = source[b + 1], bz = source[b + 2], bw = source[b + 3];
-  let cos = ax * bx + ay * by + az * bz + aw * bw;
-  if (cos < 0) {cos = -cos; bx = -bx; by = -by; bz = -bz; bw = -bw;}
-  let k0: number, k1: number;
-  if (cos > 0.9995) {k0 = 1 - t; k1 = t;}
-  else {const angle = Math.acos(cos), sin = Math.sin(angle); k0 = Math.sin((1 - t) * angle) / sin; k1 = Math.sin(t * angle) / sin;}
-  out[0] = ax * k0 + bx * k1; out[1] = ay * k0 + by * k1; out[2] = az * k0 + bz * k1; out[3] = aw * k0 + bw * k1;
-  const length = Math.hypot(out[0], out[1], out[2], out[3]) || 1;
-  for (let i = 0; i < 4; i++) out[i] /= length;
-}

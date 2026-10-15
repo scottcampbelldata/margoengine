@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type {EngineKernel, EnginePlugin} from '@margoengine/core';
-import type {FrameGraph} from '@margoengine/core/extension';
+import type {EngineKernel, EnginePlugin, Mesh} from '@margoengine/core';
+import {engineRuntime, meshRuntime, type FrameGraph} from '@margoengine/core/extension';
 import {normalize, smoothParam, type Vec3} from './math.js';
 import {loadAudioBuffer, type LoadAudioOptions} from './loader.js';
 
@@ -23,7 +23,7 @@ export interface AudioListenerOptions {
 export interface ListenerSource {update(engine: EngineKernel | null): void; dispose(): void}
 
 const gestures = ['pointerdown', 'mousedown', 'keydown', 'touchend'] as const;
-const defaultForward: Vec3 = [0, 0, -1], defaultUp: Vec3 = [0, 1, 0];
+const defaultForward: Vec3 = [0, 0, -1], defaultUp: Vec3 = [0, 1, 0], meshForward: Vec3 = [0, 0, 1];
 const audioContextClass = (): (new () => AudioContext) => {
   const constructor = (globalThis as {AudioContext?: new () => AudioContext}).AudioContext;
   if (!constructor) throw new Error('Web Audio is unavailable in this environment');
@@ -31,8 +31,8 @@ const audioContextClass = (): (new () => AudioContext) => {
 };
 
 /**
- * The ears of the scene. As an engine plugin it follows `engine.camera` every frame: position, forward from the
- * camera position toward its target, Y up. Owns the master gain that every Audio and PositionalAudio feeds.
+ * The ears of the scene. As an engine plugin it follows `engine.camera` every frame (position, forward from the
+ * camera position toward its target, Y up), or a mesh such as the player character (`follow`). Owns the master gain that every Audio and PositionalAudio feeds.
  * Counterpart of THREE.AudioListener. The AudioContext is created lazily on first use, never at import time.
  */
 export class AudioListener implements EnginePlugin {
@@ -54,6 +54,10 @@ export class AudioListener implements EnginePlugin {
   private gestureTarget?: EventTarget;
   private written = false;
   private readonly cameraForward: [number, number, number] = [0, 0, -1];
+  private readonly meshUp: [number, number, number] = [0, 1, 0];
+  private readonly meshPosition: [number, number, number] = [0, 0, 0];
+  private readonly localForward = new Float64Array([0, 0, 1]);
+  private target: 'camera' | Mesh | null = 'camera';
   private readonly forwardScratch = new Float64Array(3);
   private readonly upScratch = new Float64Array(3);
   private readonly onGesture = (): void => {
@@ -140,8 +144,38 @@ export class AudioListener implements EnginePlugin {
    */
   update(): void {
     const engine = this.engine;
-    if (engine && !engine.disposed) this.followCamera(engine);
+    if (engine && !engine.disposed) this.followTarget(engine);
     for (const source of this.sources) source.update(engine && !engine.disposed ? engine : null);
+  }
+
+  /** What the listener follows each frame: `'camera'` (the default), a mesh, or null (only `setPose` moves it). */
+  get following(): 'camera' | Mesh | null {return this.target;}
+  /**
+   * Puts the ears on something other than the camera: a mesh (its world position, its local `forward` axis and local
+   * +Y as up, for example a third-person character with `[0, 0, 1]`), `'camera'` (the default), or null to keep the
+   * last pose and place the listener only with `setPose`. A disposed mesh keeps its last pose.
+   */
+  follow(target: 'camera' | Mesh | null, forward: Vec3 = meshForward): this {
+    if (target !== 'camera' && target !== null && !Number.isInteger(meshRuntime(target)?.id)) throw new TypeError("The listener follows a core Mesh, 'camera' or null");
+    const f = this.forwardScratch;
+    if (!normalize(forward[0], forward[1], forward[2], f, meshForward)) throw new RangeError('Listener forward axis must be nonzero');
+    this.localForward.set(f);
+    this.target = target;
+    return this;
+  }
+
+  private followTarget(engine: EngineKernel): void {
+    const target = this.target;
+    if (target === 'camera') {this.followCamera(engine); return;}
+    if (!target) return;
+    const runtime = engineRuntime(engine), id = meshRuntime(target).id;
+    if (runtime.meshes.get(id) !== target) return;
+    const m = runtime.store.matrices, o = id * 16, l = this.localForward, fx = l[0], fy = l[1], fz = l[2], forward = this.cameraForward, up = this.meshUp;
+    forward[0] = m[o] * fx + m[o + 4] * fy + m[o + 8] * fz; forward[1] = m[o + 1] * fx + m[o + 5] * fy + m[o + 9] * fz; forward[2] = m[o + 2] * fx + m[o + 6] * fy + m[o + 10] * fz;
+    up[0] = m[o + 4]; up[1] = m[o + 5]; up[2] = m[o + 6];
+    const position = this.meshPosition;
+    position[0] = m[o + 12]; position[1] = m[o + 13]; position[2] = m[o + 14];
+    this.setPose(position, forward, up);
   }
 
   private followCamera(engine: EngineKernel): void {
@@ -183,7 +217,7 @@ export class AudioListener implements EnginePlugin {
   addSource(source: ListenerSource): void {
     this.sources.add(source);
     // Start at the camera's current pose, so the first sound does not glide in from the origin.
-    if (!this.written) {if (this.engine && !this.engine.disposed) this.followCamera(this.engine); else this.writePose();}
+    if (!this.written) {if (this.engine && !this.engine.disposed) this.followTarget(this.engine); if (!this.written) this.writePose();}
   }
   /** @internal */
   removeSource(source: ListenerSource): void {this.sources.delete(source);}

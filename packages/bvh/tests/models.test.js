@@ -6,7 +6,7 @@ import {Engine, TransformStore, box} from '../../core/dist/extension.js';
 import {GLTFAsset, PBRModel} from '../../gltf-pro/dist/index.js';
 import {CameraProjection} from '../../cameras/dist/index.js';
 import {Material, createMesh} from '../../materials/dist/index.js';
-import {Raycaster, getPrimitiveBVH, hasPrimitiveBVH, setMeshLayers, engineModels} from '../dist/index.js';
+import {Raycaster, getPrimitiveBVH, hasPrimitiveBVH, setMeshLayers, engineModels, worldTriangles, MeshBVH} from '../dist/index.js';
 import {rayTriangle} from '../dist/math.js';
 import {optionalGPU} from '../../../tests/support/optional-gpu.js';
 import {rng} from './reference.js';
@@ -146,4 +146,38 @@ test('skinned robot primitives are hit in their bind pose and materials meshes a
   const [hit] = raycaster.intersectEngine(engine);
   assert.equal(hit.model, mesh); assert.ok(Math.abs(hit.uv[0] - 0.5) < 1e-6 && Math.abs(hit.uv[1] - 0.5) < 1e-6, `${hit.uv}`);
   assert.equal(getPrimitiveBVH(mesh.primitives[0]), getPrimitiveBVH(mesh.primitives[0]), 'cached');
+});
+
+test('worldTriangles merges models, instances and core meshes in world space; rays agree with the Raycaster', async () => {
+  const {engine, load} = await world(), helmet = load(asset('damaged-helmet.glb'));
+  helmet.root.setPosition([0.3, -0.2, 0.1]).setScale([1.5, 1.5, 1.5]).setRotation([0.3, 0.7, 0]);
+  const {doc, buffers} = quadDoc(), quad = new PBRModel(engine, new GLTFAsset(doc, buffers));
+  const core = engine.createMesh().setGeometry(box()).setPosition([0, 0, -5]).setScale([2, 1, 1]);
+  // A structural instanced model (gltf-pro PBRInstances shape): two copies of a triangle, 24 floats per instance.
+  const node = engine.createMesh().setPosition([0, 3, 0]), data = new Float32Array(48), vertices = new Float32Array(60);
+  vertices.set([0, 0, 0], 0); vertices.set([1, 0, 0], 20); vertices.set([0, 1, 0], 40);
+  data.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 0, 0, 1]); data.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -2, 0, 0, 1], 24);
+  const instanced = {root: node, primitives: [{node, vertices, indices: new Uint32Array([0, 1, 2]), material: {settings: [0, 0, 1]}, instances: {count: 2, data}}]};
+  const t = worldTriangles(engine, [helmet, quad, core, instanced]);
+  const count = (models, size) => models.reduce((n, m) => n + m.primitives.reduce((k, p) => k + size(p), 0), 0);
+  assert.equal(t.indices.length, (count([helmet, quad], p => p.indices.length / 3) + core.geometry.indices.length / 3 + 2) * 3);
+  assert.equal(t.vertices.length, (count([helmet, quad], p => p.vertices.length / 20) + core.geometry.vertices.length / 6 + 6) * 3);
+  assert.deepEqual([...t.vertices.slice(-9)], [-2, 3, 0, -1, 3, 0, -2, 4, 0], 'second instance');
+  const bvh = MeshBVH.build({positions: t.vertices, indices: t.indices}), raycaster = new Raycaster(), random = rng(9);
+  raycaster.side = 'double';
+  let hits = 0;
+  for (let i = 0; i < 80; i++) {
+    const origin = [(random() * 2 - 1) * 2, (random() * 2 - 1) * 2 + 1, 6], direction = [(random() * 2 - 1) * 0.3, (random() * 2 - 1) * 0.3, -1];
+    const [first] = raycaster.set(origin, direction).intersectObjects(engine, [helmet, quad, core, instanced]);
+    const length = Math.hypot(...direction), merged = bvh.raycastFirst({origin, direction: direction.map(v => v / length)}, {side: 'double'});
+    assert.equal(!!merged, !!first, `ray ${i}`);
+    if (first) {hits++; assert.ok(Math.abs(merged.distance - first.distance) < 1e-4, `ray ${i}: ${merged.distance} vs ${first.distance}`);}
+  }
+  assert.ok(hits > 20, `${hits} rays hit`);
+  const filtered = worldTriangles(engine, [helmet, quad, core], {filter: (mesh, model) => model !== helmet});
+  assert.equal(filtered.indices.length, (2 + core.geometry.indices.length / 3) * 3);
+  helmet.root.setPosition([10, 0, 0]);
+  assert.ok(worldTriangles(engine, [helmet]).vertices[0] > 5, 'refreshes world matrices by default');
+  quad.dispose();
+  assert.equal(worldTriangles(engine, [quad]).indices.length, 0, 'disposed models are skipped');
 });
