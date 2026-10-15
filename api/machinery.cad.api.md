@@ -28,8 +28,9 @@ export function deduplicateParts(meshes: Iterable<MeshHandle>): {
     unique: number;
 };
 
-export function loadCAD(engine: EngineKernel, url: string | URL, { format, signal, ...options }?: CADImportOptions & {
+export function loadCAD(engine: EngineKernel, url: string | URL, { format, signal, fetch: get, ...options }?: CADImportOptions & {
     format?: CADFormat;
+    fetch?: typeof fetch;
 }): Promise<CADModel>;
 
 export function parseCAD(instance: EngineKernel, input: string | ArrayBuffer | ArrayBufferView, format: 'stl' | 'obj'): CADModel;

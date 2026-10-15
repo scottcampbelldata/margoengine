@@ -1,0 +1,42 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Offline asset cache check</title><style>body{margin:0;background:#000}canvas{width:512px;height:512px;display:block}</style></head><body><canvas></canvas>
+<script type="module">
+// Driven by offline-gpu.mjs: loadGLTF through @margoengine/cache, timed from the call to the first submitted frame, with
+// a geometry digest (every primitive's packed vertices and indices) to prove the offline model is the online one.
+import {Engine} from '/packages/core/dist/index.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {parseGLTFInWorker} from '/packages/gltf-pro/dist/worker.js';
+import {AssetCache} from '/packages/cache/dist/index.js';
+
+const canvas=document.querySelector('canvas'),errors=[],name='margo-cache-check';
+const engine=await Engine.create(canvas,{backend:'webgpu',capacity:8192,camera:{position:[0,0,3],target:[0,0,0],near:0.01,far:5000}});
+engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const hex=buffer=>[...new Uint8Array(buffer)].map(b=>b.toString(16).padStart(2,'0')).join('');
+const digest=async model=>{const parts=model.primitives.flatMap(p=>[p.vertices,p.indices]).map(a=>new Uint8Array(a.buffer,a.byteOffset,a.byteLength)),all=new Uint8Array(parts.reduce((s,p)=>s+p.length,0));let o=0;for(const p of parts){all.set(p,o);o+=p.length;}return hex(await crypto.subtle.digest('SHA-256',all));};
+const frame=async()=>{engine.render();await engine.gpu.queue.onSubmittedWorkDone();};
+let model,worker;
+window.check={
+  reset:()=>new Promise(resolve=>{const q=indexedDB.deleteDatabase(name);q.onsuccess=q.onerror=q.onblocked=()=>resolve();}),
+  // cached: false loads with plain fetch (the baseline); true goes through a fresh AssetCache, as on a new visit.
+  async load(url,cached){
+    model?.dispose();model=undefined;await frame();
+    const cache=cached?new AssetCache({name,version:'check-1',maxBytes:2**30}):undefined,start=performance.now();
+    model=await loadGLTF(engine,url,cached?{fetch:cache.fetch}:{});
+    const b=model.bounds;engine.camera.fitToBoundingBox([b[0],b[1],b[2]],[b[3],b[4],b[5]],{aspect:1,duration:0,padding:1.1});
+    await frame();const ms=performance.now()-start;
+    await cache?.flush();const stored=performance.now()-start,stats=cache?{...cache.stats}:null,usage=await cache?.usage();cache?.dispose();
+    return {ms:+ms.toFixed(1),untilStoredMs:+stored.toFixed(1),stats,usage,primitives:model.primitives.length,triangles:model.primitives.reduce((s,p)=>s+p.indices.length/3,0),digest:await digest(model),onLine:navigator.onLine,errors:errors.splice(0)};
+  },
+  // The cache inside a dedicated Web Worker (started while online so its script loads): fetch there and hash the bytes.
+  startWorker(){worker=new Worker(new URL('./worker.js',import.meta.url),{type:'module'});return new Promise((resolve,reject)=>{worker.onmessage=()=>resolve();worker.onerror=e=>reject(new Error(e.message));});},
+  worker(url){return new Promise(resolve=>{worker.onmessage=({data})=>resolve(data);worker.postMessage({url:new URL(url,location.href).href,name});});},
+  // Worker parsing of a cached GLB: bytes from cache.fetch, parsed by gltf-pro's worker (whose script needs the network).
+  async parseInWorker(url){
+    model?.dispose();model=undefined;
+    const cache=new AssetCache({name,version:'check-1',maxBytes:2**30}),start=performance.now();
+    model=await parseGLTFInWorker(engine,await (await cache.fetch(url)).arrayBuffer());
+    await frame();const ms=performance.now()-start,stats={...cache.stats};cache.dispose();
+    return {ms:+ms.toFixed(1),stats,digest:await digest(model),errors:errors.splice(0)};
+  },
+};
+window.ready=true;
+</script></body></html>

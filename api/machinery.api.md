@@ -333,8 +333,9 @@ export const industrialMaterials: Readonly<{
     }>;
 }>;
 
-export function loadCAD(engine: EngineKernel, url: string | URL, { format, signal, ...options }?: CADImportOptions & {
+export function loadCAD(engine: EngineKernel, url: string | URL, { format, signal, fetch: get, ...options }?: CADImportOptions & {
     format?: CADFormat;
+    fetch?: typeof fetch;
 }): Promise<CADModel>;
 
 export function measureClearance(a: Mesh, b: Mesh, kind?: 'aabb' | 'obb'): Clearance;

@@ -3,11 +3,11 @@ import {parseGLTF, type PBRModel} from '@margoengine/gltf-pro';
 import {readResponse} from '../../shared/loading.js';
 import {readFBX} from './reader.js';
 import {fbxToGLB} from './convert.js';
-export interface FBXOptions {resourcePath?: string; signal?: AbortSignal}
+export interface FBXOptions {resourcePath?: string; signal?: AbortSignal; /** Fetch for the file and its textures, for example `@margoengine/cache`'s `cache.fetch`. Default `globalThis.fetch`. */ fetch?: typeof fetch}
 const budget = 64 * 1024 * 1024;
 
 /** Native binary (7.x) and ASCII FBX to GLB: hierarchy, pivots, Phong/Lambert as PBR, textures, skins, blend shapes and animation clips. */
-export async function convertFBX(input: ArrayBuffer | ArrayBufferView, {resourcePath = '', signal}: FBXOptions = {}): Promise<ArrayBuffer> {
+export async function convertFBX(input: ArrayBuffer | ArrayBufferView, {resourcePath = '', signal, fetch: get = globalThis.fetch}: FBXOptions = {}): Promise<ArrayBuffer> {
   signal?.throwIfAborted();
   if (!(input instanceof ArrayBuffer) && !ArrayBuffer.isView(input) || input.byteLength < 32 || input.byteLength > budget) throw new RangeError('Invalid FBX byte budget');
   const http = (url: URL) => {if (!['http:', 'https:'].includes(url.protocol)) throw new TypeError('FBX resources need HTTP(S)'); return url;};
@@ -16,7 +16,7 @@ export async function convertFBX(input: ArrayBuffer | ArrayBufferView, {resource
   const records = await readFBX(bytes); signal?.throwIfAborted();
   const texture = async (name: string) => {
     let url: URL; try {url = new URL(resourcePath + name, globalThis.location?.href);} catch {throw new Error('FBX texture failed: ' + name);}
-    const response = await fetch(http(url), {signal}).catch(error => {if (signal?.aborted) throw error; throw new Error('FBX texture failed: ' + url.href);});
+    const response = await get(http(url), {signal}).catch(error => {if (signal?.aborted) throw error; throw new Error('FBX texture failed: ' + url.href);});
     if (!response.ok) throw new Error('FBX texture failed: ' + url.href);
     return readResponse(response, {maxBytes: budget, signal, label: 'FBX texture'});
   };
@@ -41,6 +41,6 @@ export async function parseFBX(engine: EngineKernel, input: ArrayBuffer | ArrayB
 }
 export async function loadFBX(engine: EngineKernel, url: string | URL, options: FBXOptions = {}): Promise<PBRModel> {
   const target = new URL(url, globalThis.location?.href); if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('FBX URL needs HTTP(S)');
-  const response = await fetch(target, {signal: options.signal}), bytes = await readResponse(response, {maxBytes: budget, signal: options.signal, label: 'FBX'});
+  const response = await (options.fetch ?? fetch)(target, {signal: options.signal}), bytes = await readResponse(response, {maxBytes: budget, signal: options.signal, label: 'FBX'});
   return parseFBX(engine, bytes, {...options, resourcePath: options.resourcePath ?? new URL('.', response.url || target).href});
 }
