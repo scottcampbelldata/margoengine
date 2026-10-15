@@ -16,7 +16,7 @@ const list = (name, fallback) => arg(name, fallback).split(',').filter(Boolean);
 const sizes = list('sizes', '10000,50000,max'), modes = list('modes', 'core,none,frustum,occlusion'), views = list('views', 'orbit,still'), layouts = list('layouts', 'sheet'), label = arg('label', 'culling'), port = +arg('port', 5232);
 const modulesFor = size => size === 'max' ? Math.floor((100_000 - 1 - 105) / 30) : Math.ceil(+size / 27);
 // The lock lives in the main checkout so git worktrees share it.
-const lock = resolve(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {encoding: 'utf8'}).trim(), '../test-results/gpu.lock');
+const lock = process.env.MARGO_GPU_LOCK_NESTED ?? resolve(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {encoding: 'utf8'}).trim(), '../test-results/gpu.lock');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function waitForAC() {while (acPower() === false) {console.log('on battery, waiting for AC');await sleep(30_000);}}
 

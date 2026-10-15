@@ -16,7 +16,7 @@ import {acPower} from '../cad/power.mjs';
 import {rich, binary} from '../../../packages/fbx/test/fixtures.js';
 
 const cycles = +(process.argv.find(a => a.startsWith('--cycles='))?.split('=')[1] ?? 20);
-const lock = resolve(dirname(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {encoding: 'utf8'}).trim()), 'test-results/gpu.lock');
+const lock = process.env.MARGO_GPU_LOCK_NESTED ?? resolve(dirname(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {encoding: 'utf8'}).trim()), 'test-results/gpu.lock');
 for (;;) {try {mkdirSync(lock); break;} catch (e) {if (e.code !== 'EEXIST') throw e; console.log('gpu.lock held, waiting'); await new Promise(r => setTimeout(r, 15_000));}}
 mkdirSync('test-results', {recursive: true});
 // The fbx package's test fixture (pivots, inherit types, n-gons, layered attributes, materials, skin, blend shape, clips) as zlib binary FBX.

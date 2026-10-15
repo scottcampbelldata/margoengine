@@ -19,7 +19,7 @@ const config = {a: arg('a', 'test-results/vfx-base'), b: arg('b', 'packages/vfx/
   capacities: arg('capacities', '100000,1000000').split(',').map(Number), samples: arg('samples', '1,4').split(',').map(Number),
   rounds: +arg('rounds', 16), frames: +arg('frames', 10), size: arg('size', '1432x768').split('x').map(Number), parityOnly: process.argv.includes('--parity-only'), scene: arg('scene', 'island')};
 const power = () => execFileSync('powershell', ['-NoProfile', '-Command', '(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline'], {encoding: 'utf8'}).trim() === 'True';
-const lock = resolve(dirname(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {encoding: 'utf8'}).trim()), 'test-results/gpu.lock');
+const lock = process.env.MARGO_GPU_LOCK_NESTED ?? resolve(dirname(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {encoding: 'utf8'}).trim()), 'test-results/gpu.lock');
 for (;;) {try {mkdirSync(lock); break;} catch (e) {if (e.code !== 'EEXIST') throw e; console.log('GPU lock held, waiting'); await new Promise(r => setTimeout(r, 15000));}}
 let browser;
 try {

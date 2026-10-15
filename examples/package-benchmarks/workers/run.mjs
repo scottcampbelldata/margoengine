@@ -25,7 +25,7 @@ writeFileSync('test-results/workers-big.glb', bigGLB({segments: 400, meshes: 4})
 writeFileSync('test-results/workers-grid.fbx', binary(grid(400), {compress: true}));
 writeFileSync('test-results/workers-knot.usdz', exportUSDZ({nodes: [{geometry: toGeometry(torusKnotGeometry(1, 0.3, 1000, 100))}]}));
 
-const lock = resolve(dirname(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {encoding: 'utf8'}).trim()), 'test-results/gpu.lock');
+const lock = process.env.MARGO_GPU_LOCK_NESTED ?? resolve(dirname(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {encoding: 'utf8'}).trim()), 'test-results/gpu.lock');
 for (;;) {try {mkdirSync(lock); break;} catch (e) {if (e.code !== 'EEXIST') throw e; console.log(new Date().toISOString(), 'gpu.lock held, waiting 60 s'); await new Promise(r => setTimeout(r, 60_000));}}
 const output = 'examples/package-benchmarks/results/workers.json', previous = existsSync(output) ? JSON.parse(readFileSync(output, 'utf8')) : {};
 const report = {date: new Date().toISOString(), commit: execFileSync('git', ['rev-parse', '--short', 'HEAD'], {encoding: 'utf8'}).trim(), acPowerBefore: acPower(), offscreen: {}, parse: {runs: [], medians: {}}};

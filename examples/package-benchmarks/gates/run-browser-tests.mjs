@@ -12,7 +12,7 @@ import {acPower} from '../cad/power.mjs';
 const root = resolve(import.meta.dirname, '../../..');
 const arg = (name, fallback) => process.argv.find(a => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const only = arg('only', '').split(',').filter(Boolean), label = arg('label', 'browser-tests');
-const lock = resolve(dirname(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {encoding: 'utf8'}).trim()), 'test-results/gpu.lock');
+const lock = process.env.MARGO_GPU_LOCK_NESTED ?? resolve(dirname(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {encoding: 'utf8'}).trim()), 'test-results/gpu.lock');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const selfLocking = new Set(['packages/staging/test/browser-check.mjs']);
 

@@ -45,7 +45,7 @@ if (process.argv.includes('--list')) {for (const s of steps) console.log(`${s.gr
 const changed = () => execFileSync('git', ['status', '--porcelain', '--untracked-files=all', '--', bench], {encoding: 'utf8'}).split('\n').filter(Boolean).map(l => [l.slice(0, 2), l.slice(3)]);
 if (changed().length) throw new Error(`${bench} has uncommitted changes; commit or stash them first (this run restores committed results after each step).`);
 const out = join('test-results', 'bench', new Date().toISOString().replace(/[:.]/g, '-'));mkdirSync(out, {recursive: true});
-const lock = resolve(dirname(git('rev-parse', '--path-format=absolute', '--git-common-dir')), 'test-results/gpu.lock');
+const lock = process.env.MARGO_GPU_LOCK_NESTED ?? resolve(dirname(git('rev-parse', '--path-format=absolute', '--git-common-dir')), 'test-results/gpu.lock');
 const manifest = {date: new Date().toISOString(), commit: git('rev-parse', '--short', 'HEAD'), dirty: git('status', '--porcelain') !== '', host: {cpu: cpus()[0].model, cores: cpus().length, memoryGB: Math.round(totalmem() / 2 ** 30), os: process.platform, node: process.version}, steps: []};
 const save = () => writeFileSync(join(out, 'manifest.json'), JSON.stringify(manifest, null, 1));
 

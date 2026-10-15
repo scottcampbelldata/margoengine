@@ -103,7 +103,7 @@ const round = v => Number(v.toPrecision(3));
 
 // Power and the GPU lock (shared with the other GPU scripts in the main checkout).
 if (acPower() === false) {console.error('On battery: refusing to run (GPU and CPU are throttled). Plug in and retry.'); process.exit(1);}
-const lock = resolve(dirname(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {cwd: root, encoding: 'utf8'}).trim()), 'test-results/gpu.lock');
+const lock = process.env.MARGO_GPU_LOCK_NESTED ?? resolve(dirname(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {cwd: root, encoding: 'utf8'}).trim()), 'test-results/gpu.lock');
 if (!process.argv.includes('--no-build') && cases.some(c => !c.demo.dev)) {
   const built = spawnSync(process.execPath, ['scripts/build-site.js'], {cwd: root, stdio: 'inherit'});
   if (built.status !== 0) process.exit(built.status ?? 1);
