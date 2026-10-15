@@ -24,6 +24,8 @@ Coming from three.js? [docs/from-threejs.md](docs/from-threejs.md) maps common t
 
 Deploying? [docs/deploying.md](docs/deploying.md) has tested Content Security Policy, caching and compression configs for Cloudflare Pages, Netlify, Vercel and Nginx (Margo needs `script-src 'wasm-unsafe-eval'`, not cross-origin isolation).
 
+Making a game? [docs/guides/blender-game.md](docs/guides/blender-game.md) walks through a small third-person game built from Blender exports: glTF export settings, Blender custom properties as level data, characters with blend trees and foot IK, input, Rapier physics, audio, navigation, sky and water, and what you still build yourself.
+
 The packages are not on npm yet (build from source, below). Once published, a React application installs:
 
 ```sh

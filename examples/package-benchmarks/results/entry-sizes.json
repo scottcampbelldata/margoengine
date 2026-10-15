@@ -1,5 +1,5 @@
 {
-  "commit": "5e3bc47",
+  "commit": "948fd41",
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "packages": {
     "@margoengine/animation": {
@@ -196,8 +196,8 @@
     },
     "@margoengine/gltf-pro": {
       ".": {
-        "raw": 48000,
-        "gzip": 16827
+        "raw": 48265,
+        "gzip": 16906
       },
       "./asset": {
         "raw": 6442,
@@ -212,8 +212,8 @@
         "gzip": 5385
       },
       "./worker": {
-        "raw": 49911,
-        "gzip": 17536
+        "raw": 50176,
+        "gzip": 17611
       },
       "dist/workers/gltf.js": {
         "raw": 15122,
@@ -682,8 +682,8 @@
         "gzip": 8542
       },
       "dist/workers/usdz.js": {
-        "raw": 74730,
-        "gzip": 26764
+        "raw": 74995,
+        "gzip": 26830
       }
     },
     "@margoengine/usdz-export": {
