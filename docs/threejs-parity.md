@@ -9,8 +9,8 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 | Status | Count | Meaning |
 | --- | --- | --- |
 | COVERED | 88 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
-| PARTIAL | 39 | Some of it exists, but a common use case is missing. The notes say what. |
-| MISSING | 29 | No implementation was found in any package's `src/`. |
+| PARTIAL | 40 | Some of it exists, but a common use case is missing. The notes say what. |
+| MISSING | 28 | No implementation was found in any package's `src/`. |
 
 Overall: Margo is strong where three.js relies on third-party libraries or examples. That includes cascaded PCSS shadows, clustered lighting, TAA, Gaussian splats, BVH queries, physics, navigation, terrain, water and sky. The day-one basics the first version of this matrix found missing (textures and materials on meshes you build, glTF extensions and compression, an orthographic camera, picking loaded models, image-based lighting outside React, combinable effects, FXAA, a math library) now exist as optional packages. What remains:
 
@@ -19,7 +19,7 @@ Overall: Margo is strong where three.js relies on third-party libraries or examp
 - **Core owns one canvas, one camera and one pass graph.** There is no render-to-texture from a second camera, no CubeCamera and no multiple viewports. All of these need core changes, and core is frozen for v1.0.
 - **Materials stop at standard, basic, normal and matcap on your own meshes.** Physical features come only from glTF `KHR_materials_*` files and are approximated (transmission does not refract). No Lambert, Phong, depth or shadow-catcher materials, no second UV set and no geometry groups.
 - **glTF coverage has gaps.** `KHR_animation_pointer`, iridescence, anisotropy, dispersion and material variants are rejected when required. glTF cameras are exposed as data only, and export writes no cameras or lights.
-- **Post-processing lacks screen-space reflections and GI.** No SSR, GTAO, SSGI, motion blur, SMAA or lens flare, and no built-in screen effects (a shader `NodePass` makes one in a few lines).
+- **Post-processing lacks GI.** No GTAO, SSGI, motion blur, SMAA or lens flare; screen-space reflections (`SSR`) cover core meshes only, and no built-in screen effects (a shader `NodePass` makes one in a few lines).
 
 Legend. A **†** marks rows where the evidence is the exported symbols, the package README and a non-trivial amount of source code, not a line-by-line read. See [How this was checked](#how-this-was-checked). Rows that work only on WebGPU say "WebGPU only" in their notes.
 
@@ -204,7 +204,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | UnrealBloomPass | COVERED † | post `Bloom` (`packages/post/src/bloom.ts`) | One implementation since the dedupe: creative `PostProcessing` has no bloom; stack `Bloom` before it in a `PostStack`. Half-resolution 9-tap Gaussian with a hard threshold (no soft knee, no mip chain). |
 | SSAOPass, SAOPass | COVERED † | post `SSAO` (`packages/post/src/ssao.ts`) | Normal-aware bilateral blur. Works under orthographic cameras and occludes environment IBL (diffuse and specular, same AO factor). |
 | GTAOPass | MISSING | — | |
-| SSRPass | MISSING | — | |
+| SSRPass | PARTIAL | post `SSR` (`packages/post/src/ssr.ts`, entry `@margoengine/post/ssr`) | HDR `PostStack` effect (or `SSR.attach` alone): Hi-Z ray march, roughness blur and fade, replaces `EnvironmentLighting`'s specular where rays hit and keeps it where they miss; perspective and orthographic; works with TAA. Only core-mesh surfaces (core `PbrMaterial`) show reflections; glTF-pro models, water and other custom shaders are reflected but do not reflect. WebGPU only. |
 | SSGI, denoise | MISSING | — | |
 | TAA (TAARenderPass, TRAA node) | COVERED † | taa `TAA` (`packages/taa/src/index.ts`) | Uses a velocity buffer and YCoCg clamping. |
 | FXAA, SMAA | COVERED † | post `FXAA` (`packages/post/src/fxaa.ts`, entry `@margoengine/post/fxaa`) | FXAA 3.11-style, alone (it wraps any other effect) or last in a `PostStack`. SMAA is not provided. |
@@ -333,8 +333,8 @@ Every MISSING or PARTIAL item, ordered by how often real three.js projects need 
 
 ### Low
 
-22. **SSR, GTAO, SSGI, motion blur.**
-    **Fit:** extend post. taa's velocity buffer already exists.
+22. **GTAO, SSGI, motion blur, and SSR on glTF-pro and water surfaces.**
+    **Fit:** extend post. taa's velocity buffer already exists; `SSR` needs a material replay from glTF-pro and water (like SSAO's sources).
 23. **SMAA and built-in screen effects** (vignette, RGB shift, pixelation, halftone, dot screen, Sobel, glitch, afterimage). A shader `NodePass` makes most of them in a few lines; afterimage also needs a history target.
     **Fit:** one small new `@margoengine/fx` package of `NodePass` presets.
 24. **Lensflare, and god rays outside creative.**
@@ -391,7 +391,7 @@ Positioning caveats for a public page:
 
 - **Reading only.** This matrix comes from reading source code. No build, test, benchmark or browser was run while writing it, so no row is a statement that a feature works at runtime.
 - **Line-by-line reading.** Core and the stage facade were read in full (`packages/core/src/*.ts`, `packages/margoengine/src/index.ts`). So were the gltf loader and most of gltf-pro, plus the parts of animation, animator, fbx, toon, the React environment adapter, the bvh raycaster, machinery's OBJ parser and creative's targets that the rows cite.
-- **Re-audit, 2026-10-14.** Every row was re-checked against `perf/auto-quality` at commit 2c53227: each package's README, `src/index.ts` and package.json `exports`. Read line by line in this pass: materials `src/index.ts`, core `camera.ts` and the instance sizing in `engine.ts`, gltf-pro's extension handling (`asset.ts`, decoder hooks) and post's `PostStack` order rules (`stack.ts`). The table then held 156 rows (texture transforms, VAT crowds and ViewHelper had been added to the original 153); the earlier summary still read 65 / 43 / 45. Since then: InstancedMesh PARTIAL -> COVERED (textured instancing), glTF export with animation PARTIAL -> COVERED, PointLight and SpotLight shadows MISSING -> COVERED (`@margoengine/clustered/shadows`, run on a real GPU): 87 / 39 / 30.
+- **Re-audit, 2026-10-14.** Every row was re-checked against `perf/auto-quality` at commit 2c53227: each package's README, `src/index.ts` and package.json `exports`. Read line by line in this pass: materials `src/index.ts`, core `camera.ts` and the instance sizing in `engine.ts`, gltf-pro's extension handling (`asset.ts`, decoder hooks) and post's `PostStack` order rules (`stack.ts`). The table then held 156 rows (texture transforms, VAT crowds and ViewHelper had been added to the original 153); the earlier summary still read 65 / 43 / 45. Since then: InstancedMesh PARTIAL -> COVERED (textured instancing), glTF export with animation PARTIAL -> COVERED, PointLight and SpotLight shadows MISSING -> COVERED (`@margoengine/clustered/shadows`, run on a real GPU): 87 / 39 / 30. SSRPass MISSING -> PARTIAL (post `SSR`, run on a real GPU): 88 / 40 / 28.
 - **Rows marked †.** For these, the evidence is that the named exports exist, the source is non-trivial, the package README describes the behavior, and keyword searches across `packages/*/src` agree. The implementation itself was not audited line by line.
 - **MISSING.** A row is MISSING when no matching class, function or keyword was found in any package's `src/`. README files and tests were not counted as implementation.
 - **The three.js side.** The feature list comes from knowledge of three.js r186, its documentation (<https://threejs.org/docs/>) and `three/addons`. It was not re-checked against the r186 tag while writing.

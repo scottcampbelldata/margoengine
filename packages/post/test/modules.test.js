@@ -22,6 +22,7 @@ test('native Bloom and SSAO imports exclude the other effects',async()=>{
   ['ssao','ssao:capture',['bloom:capture','post:scene-fade','post:stack:capture','fxaa:capture']],
   ['stack','post:stack:capture',['bloom:capture','ssao:capture','fxaa:capture']],
   ['fxaa','fxaa:capture',['bloom:capture','ssao:capture','post:stack:capture']],
+  ['ssr','ssr:gbuffer',['bloom:capture','ssao:capture','fxaa:capture']],
  ]){
   const code=await staticClosure('@margoengine/post/'+entry);
   assert.ok(code.includes(present),'Effect implementation was omitted: '+entry);
@@ -30,8 +31,8 @@ test('native Bloom and SSAO imports exclude the other effects',async()=>{
 });
 
 test('Post root and feature subpaths preserve all runtime export identities',async()=>{
- const [root,bloom,ssao,fade,stack,fxaa]=await Promise.all(['','/bloom','/ssao','/scene-fade','/stack','/fxaa'].map(path=>import('@margoengine/post'+path)));
- assert.deepEqual(Object.keys(root).sort(),['Bloom','FXAA','PostStack','SSAO','SceneFade']);
+ const [root,bloom,ssao,fade,stack,fxaa,ssr]=await Promise.all(['','/bloom','/ssao','/scene-fade','/stack','/fxaa','/ssr'].map(path=>import('@margoengine/post'+path)));
+ assert.deepEqual(Object.keys(root).sort(),['Bloom','FXAA','PostStack','SSAO','SSR','SceneFade']);
  assert.deepEqual(Object.keys(bloom),['Bloom']);assert.deepEqual(Object.keys(ssao),['SSAO']);assert.deepEqual(Object.keys(stack),['PostStack']);assert.deepEqual(Object.keys(fxaa),['FXAA']);
- assert.equal(root.Bloom,bloom.Bloom);assert.equal(root.SSAO,ssao.SSAO);assert.equal(root.SceneFade,fade.SceneFade);assert.equal(root.PostStack,stack.PostStack);assert.equal(root.FXAA,fxaa.FXAA);
+ assert.equal(root.Bloom,bloom.Bloom);assert.equal(root.SSAO,ssao.SSAO);assert.equal(root.SceneFade,fade.SceneFade);assert.equal(root.PostStack,stack.PostStack);assert.equal(root.FXAA,fxaa.FXAA);assert.deepEqual(Object.keys(ssr),['SSR']);assert.equal(root.SSR,ssr.SSR);
 });

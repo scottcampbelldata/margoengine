@@ -1,0 +1,90 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>SSR GPU check</title><style>body{margin:0;background:#000}canvas{display:block}</style></head><body>
+<script type="module">
+// Driven by ssr-gpu.mjs. window.check.run(config) builds a fresh engine: a white metal floor (top at y = 0) under a red
+// box floating at y 0.7..1.7, lit by core's sun and a uniform grey environment (EnvironmentLighting), with a PostStack
+// [SSR] (ssr.enabled toggles the effect inside the same pipeline, so tone mapping is identical). It returns where a
+// planar mirror puts the box (projected corners of the box mirrored through y = 0). window.bench times every GPU pass.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {PostStack} from '/packages/post/dist/stack.js';
+import {SSR} from '/packages/post/dist/ssr.js';
+import {SSAO} from '/packages/post/dist/ssao.js';
+import {Environment,EnvironmentLighting} from '/packages/environment/dist/index.js';
+import {CameraProjection} from '/packages/cameras/dist/index.js';
+import {TAA} from '/packages/taa/dist/index.js';
+
+let state,owner='scene';
+const uniform=(value,w=32,h=16)=>({width:w,height:h,data:new Float32Array(w*h*4).map((_,i)=>i%4===3?1:value)});
+const cameras={persp:{position:[0,2.2,6],target:[0,0.4,0]},offscreen:{position:[0,0.6,4],target:[0,-2.5,0]},ortho:{position:[0,2.2,6],target:[0,0.4,0]}};
+const within=(name,fn)=>function(...args){const prev=owner;owner=name;try{return fn.apply(this,args);}finally{owner=prev;}};
+function tag(plugin,name){
+  const register=plugin.registerPasses;if(register)plugin.registerPasses=function(graph){const g=Object.create(graph);g.add=p=>graph.add({...p,execute:within(name,p.execute)});return register.call(this,g);};
+  const join=plugin.joinStack;if(join)plugin.joinStack=function(host){const stage=join.call(this,host);stage.render=within(name,stage.render);return stage;};
+  return plugin;
+}
+// SSR's own work split: material replay + Hi-Z (order 14) and blur + trace/composite (stack compose).
+SSR.prototype.prepare=within('ssr:gbuffer',SSR.prototype.prepare);SSR.prototype.stage=within('ssr:trace',SSR.prototype.stage);
+const begin={render:GPUCommandEncoder.prototype.beginRenderPass,compute:GPUCommandEncoder.prototype.beginComputePass};
+GPUCommandEncoder.prototype.beginRenderPass=function(d){return begin.render.call(this,stamp(d));};
+GPUCommandEncoder.prototype.beginComputePass=function(d={}){return begin.compute.call(this,stamp(d));};
+function stamp(d){
+  if(!state?.timing||d.timestampWrites||state.passes>=state.capacity)return d;
+  state.owners[state.passes]=owner;const at=state.passes++*2;return {...d,timestampWrites:{querySet:state.set,beginningOfPassWriteIndex:at,endOfPassWriteIndex:at+1}};
+}
+async function teardown(){
+  if(!state)return;const s=state;state=undefined;await s.engine.gpu.queue.onSubmittedWorkDone();s.set?.destroy();s.resolve?.destroy();s.read?.destroy();s.engine.dispose();s.canvas.remove();
+}
+window.check={
+  async run({options={},roughness=0,camera='persp',ssr=true,taa=false,ssao=false,samples=4,size=[512,512],scene='box',frames=4}={}){
+    await teardown();
+    if(samples===1)globalThis.margoLow=1;else delete globalThis.margoLow;
+    const canvas=document.body.appendChild(document.createElement('canvas'));canvas.style.width=size[0]+'px';canvas.style.height=size[1]+'px';
+    const engine=await Engine.create(canvas,{backend:'webgpu',features:['timestamp-query'],camera:{...cameras[camera],near:0.1,far:200}}),errors=[];
+    engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+    if(camera==='ortho')CameraProjection.attach(engine,{height:6});
+    const floor=new PbrMaterial({color:'#ffffff',roughness,metalness:1}),red=new PbrMaterial({color:'#ff0000',roughness:0.8});
+    engine.createMesh().setGeometry(box(40,0.02,40)).setPosition([0,-0.01,0]).setMaterial(floor);
+    engine.createMesh().setGeometry(box(1,1,1)).setPosition([0,1.2,0]).setMaterial(red);
+    if(scene==='bench'){const paint=new PbrMaterial({color:'#2f6fb0',roughness:0.35,metalness:0.1}),steel=new PbrMaterial({color:'#c8c8c8',roughness:0.15,metalness:1});
+      for(let i=0;i<12;i++)engine.createMesh().setGeometry(box(0.8,1.6,0.8)).setPosition([-6+i*1.1,0.8,-3-i%3*2]).setRotation([0,i*0.6,0]).setMaterial(i%2?paint:steel);}
+    const environment=await Environment.attach(engine,uniform(0.6));EnvironmentLighting.attach(engine,environment);
+    const effect=tag(new SSR(options),'ssr');effect.enabled=ssr;
+    const list=ssao?[tag(new SSAO({samples:16}),'ssao'),effect]:[effect],stack=tag(new PostStack(list),'stack');engine.use(stack);
+    if(taa)TAA.attach(engine,{depth:()=>stack.depthTexture});
+    const device=engine.gpu,timing=device.features.has('timestamp-query'),capacity=2048;
+    state={engine,canvas,effect,stack,errors,timing:false,passes:0,owners:[],capacity,
+      set:timing?device.createQuerySet({type:'timestamp',count:capacity*2}):undefined,
+      resolve:timing?device.createBuffer({size:capacity*16,usage:GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC}):undefined,
+      read:timing?device.createBuffer({size:capacity*16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}):undefined};
+    for(let i=0;i<frames;i++){engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();}
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    // Planar mirror of the box through y = 0, projected with the camera's own matrix (perspective or orthographic).
+    const m=engine.camera.matrix,project=([x,y,z])=>{const w=m[3]*x+m[7]*y+m[11]*z+m[15];return [((m[0]*x+m[4]*y+m[8]*z+m[12])/w*0.5+0.5)*canvas.width,(0.5-(m[1]*x+m[5]*y+m[9]*z+m[13])/w*0.5)*canvas.height];};
+    const corners=[];for(const x of [-0.5,0.5])for(const y of [-0.7,-1.7])for(const z of [-0.5,0.5])corners.push(project([x,y,z]));
+    const xs=corners.map(c=>c[0]),ys=corners.map(c=>c[1]),direct=[];for(const x of [-0.5,0.5])for(const y of [0.7,1.7])for(const z of [-0.5,0.5])direct.push(project([x,y,z]));
+    return {errors:errors.splice(0),canvas:[canvas.width,canvas.height],center:project([0,-1.2,0]).map(Math.round),mirror:[Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)].map(Math.round),
+      boxBottom:Math.max(...direct.map(c=>c[1]))};
+  },
+  async toggle(enabled){state.effect.enabled=enabled;for(let i=0;i<2;i++){state.engine.render({delta:1/60});await state.engine.gpu.queue.onSubmittedWorkDone();}await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return {errors:state.errors.splice(0)};},
+  // Frames back to back; timestamps resolved in batches that fit the query set. gpuMs = sum of pass durations.
+  async measure(frames=60,warm=30){
+    const {engine,set,resolve,read}=state,device=engine.gpu,sums=[],byOwner={};let zeroFrames=0;
+    if(!set)return {error:'no timestamp-query'};
+    for(let i=0;i<warm;i++)engine.render({delta:1/60});
+    let done=0;
+    while(done<frames){
+      const batch=[];state.passes=0;state.timing=true;
+      do{const start=state.passes;engine.render({delta:1/60});batch.push([start,state.passes]);done++;}while(done<frames&&state.passes+(batch.at(-1)[1]-batch.at(-1)[0])<=state.capacity);
+      state.timing=false;
+      const n=state.passes,e=device.createCommandEncoder();e.resolveQuerySet(set,0,n*2,resolve,0);e.copyBufferToBuffer(resolve,0,read,0,n*16);device.queue.submit([e.finish()]);
+      await read.mapAsync(GPUMapMode.READ);const q=new BigUint64Array(read.getMappedRange().slice(0,n*16));read.unmap();
+      for(const [a,b] of batch){let sum=0;const own={};for(let i=a;i<b;i++){const ms=Number(q[2*i+1]-q[2*i])/1e6;own[state.owners[i]]=(own[state.owners[i]]??0)+ms;sum+=ms;}
+        if(sum===0){zeroFrames++;continue;}sums.push(sum);for(const k in own)(byOwner[k]??=[]).push(own[k]);}
+    }
+    if(!sums.length)return {error:'all timestamps zero',zeroFrames,errors:state.errors.splice(0)};
+    const median=a=>{const s=[...a].sort((x,y)=>x-y);return +s[s.length>>1].toFixed(3);};
+    return {zeroFrames,gpuMs:median(sums),ownerMs:Object.fromEntries(Object.entries(byOwner).map(([k,v])=>[k,median(v)])),errors:state.errors.splice(0)};
+  },
+  teardown,
+};
+window.ready=true;
+</script></body></html>

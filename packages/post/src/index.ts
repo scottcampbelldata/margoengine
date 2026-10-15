@@ -3,3 +3,4 @@ export {Bloom, type BloomOptions} from './bloom.js';
 export {SceneFade} from './scene-fade.js';
 export {PostStack} from './stack.js';
 export {FXAA} from './fxaa.js';
+export {SSR, type SSROptions} from './ssr.js';

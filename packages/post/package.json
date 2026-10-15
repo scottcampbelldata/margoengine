@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
-  "description": "HDR bloom, AgX tonemapping, frame-graph SSAO, FXAA and a shared-capture effect stack for Margo Engine WebGPU.",
+  "description": "HDR bloom, AgX tonemapping, frame-graph SSAO, screen-space reflections, FXAA and a shared-capture effect stack for Margo Engine WebGPU.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
@@ -40,6 +40,10 @@
     "./fxaa": {
       "types": "./dist/fxaa.d.ts",
       "import": "./dist/fxaa.js"
+    },
+    "./ssr": {
+      "types": "./dist/ssr.d.ts",
+      "import": "./dist/ssr.js"
     }
   },
   "files": [
