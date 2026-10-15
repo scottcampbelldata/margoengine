@@ -13,10 +13,11 @@ if HERE not in sys.path:
 
 import bpy  # noqa: E402
 
+import buildings  # noqa: E402
 import kit  # noqa: E402
 import street  # noqa: E402
 
-MODULES = [kit, street]
+MODULES = [kit, street, buildings]
 for module in MODULES:  # pick up edits when re-run inside a live Blender session
     importlib.reload(module)
 
