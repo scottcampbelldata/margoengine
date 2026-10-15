@@ -720,10 +720,24 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    a. [running] Offline asset cache: IndexedDB cache for GLB/.bin/textures/STEP behind the loaders (opt-in entry),
       versioning + cache-busting (ETag/Last-Modified or explicit version), quota handling and eviction, works with the
       worker and progressive paths; offline CAD inspection test. Only the LOD imposter cache exists today.
-   b. [running] CAD navigation profiles: one-call presets (SolidWorks, AutoCAD, Blender, Maya, Onshape, three.js
-      OrbitControls) mapping mouse buttons/modifiers/wheel/touch/gamepad to orbit/pan/zoom/roll for
-      `@margoengine/controls` and core CADCameraControls (via `@margoengine/input` where it fits). input already has
-      semantic keyboard/pointer/gamepad/touch actions.
+   b. [DONE, branch worktree-agent-a97e430da9ad32b46] CAD navigation profiles: `OrbitControls.attach(engine)
+      .setProfile(SOLIDWORKS)` (also AUTOCAD, INVENTOR = FUSION, BLENDER, MAYA, ONSHAPE, RHINO, THREE_ORBIT = default;
+      `PROFILES` by name). Profiles are data (`NavigationProfile`: drag table keyed `'shift+1'` = Shift + middle, wheel
+      direction, zoom to cursor, touches, double-click fit button, keys keyed by modifiers + `KeyboardEvent.code`) that
+      OrbitControls/MapControls read; each is a separate export (OrbitControls + one profile +171 B gzip, all nine
+      +427 B). Mechanism cost in OrbitControls alone: 4,224 -> 4,866 B min+gzip (+642; whole controls bundle 17,069 ->
+      18,270). `fit` (double middle click, F, Home...) is an event: only the app knows its bounds. View keys snap
+      (eased with damping); Blender numpad 5 toggles the engine's CameraProjection. ViewCube gained `flip` (repeat click
+      -> opposite view: Blender, SolidWorks; profiles carry `viewCube: {flip}`) and its toggle follows outside
+      projection changes (viewcube 3,227 B, budget 3,500). Default proof: `packages/controls/tests/orbit-replay.json`, a
+      113-event pointer/mousedown/contextmenu/wheel/touch/key sequence recorded from the pre-profile build (659038f),
+      replays bit-identically (positions, targets, preventDefault flags, states, events; plain, damped, zoom to cursor)
+      with no profile, `setProfile(THREE_ORBIT)` and Blender -> THREE_ORBIT. Conflicts handled: context menu, middle
+      `mousedown` (autoscroll/paste), Alt keyup after an Alt drag (Firefox menu bar), Ctrl + wheel pinch never inverted,
+      only bound keys cancelled. Bindings table, sources and uncertain defaults (SolidWorks/Onshape/Inventor wheel
+      direction, some zoom-to-cursor defaults, touch rows, Maya dolly axis, Onshape Shift+digit) in the controls README.
+      Not done: core CADCameraControls (hard-coded, core frozen: use OrbitControls), roll, 3Dconnexion, gamepads
+      (`@margoengine/input` polls per tick; profiles are event chords), Trackball profiles. No real-browser run.
    c. Wide colour gamut: Display P3 canvas as a zero-core-byte plugin (like TransparentCanvas: reconfigure the context
       with `colorSpace: 'display-p3'`), tonemap output in P3 where the display supports it, sRGB fallback; prove sRGB
       output unchanged. tonemap already has AgX / ACES / Khronos PBR Neutral.

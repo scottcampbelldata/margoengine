@@ -1,9 +1,10 @@
 import type {Camera, EngineKernel} from '@margoengine/core';
-import {Controls, type ControlElement, type EventTargetLike} from './controls.js';
+import {Controls, documentOf, type ControlElement, type EventTargetLike} from './controls.js';
 import {EPS, madd, type V3} from './math.js';
 import {add, cross, dot, sub} from '@margoengine/math/vec3';
 import {clamp} from '@margoengine/math/mathutils';
 import {basis, intersectPlane, ray} from './view.js';
+import type {KeyAction, NavigationProfile} from './profiles.js';
 
 /** Mouse button actions, as in three.js `MOUSE`. */
 export const MOUSE = {ROTATE: 0, DOLLY: 1, PAN: 2} as const;
@@ -13,6 +14,10 @@ export const TOUCH = {ROTATE: 0, PAN: 1, DOLLY_PAN: 2, DOLLY_ROTATE: 3} as const
 type Action = 'none' | 'rotate' | 'dolly' | 'pan' | 'touch-rotate' | 'touch-pan' | 'touch-dolly-pan' | 'touch-dolly-rotate';
 type Point = {x: number; y: number};
 const TAU = Math.PI * 2;
+/** Profile binding key: `ctrl+shift+alt+` (as held; Meta counts as ctrl) then the button or key code. */
+const chord = (e: MouseEvent | KeyboardEvent, input: number | string): string =>
+  (e.ctrlKey || e.metaKey ? 'ctrl+' : '') + (e.shiftKey ? 'shift+' : '') + (e.altKey ? 'alt+' : '') + input;
+const VIEWS: Record<string, V3> = {front: [0, 0, 1], back: [0, 0, -1], right: [1, 0, 0], left: [-1, 0, 0], top: [0, 1, 0], bottom: [0, -1, 0], iso: [1, 1, 1]};
 
 /**
  * Orbits the camera around `camera.target` (three.js `OrbitControls`). Left drag rotates, middle drag or wheel
@@ -42,6 +47,10 @@ export class OrbitControls extends Controls {
   touches: {ONE: number | null; TWO: number | null} = {ONE: TOUCH.ROTATE, TWO: TOUCH.DOLLY_PAN};
   /** Current gesture, `'none'` when idle. */
   state: Action = 'none';
+  private nav: NavigationProfile | null = null;
+  private lastClick: Point & {t: number} | null = null;
+  private altTarget: EventTargetLike | null = null;
+  private altDrag = false;
 
   private dTheta = 0; private dPhi = 0; private dPan: V3 = [0, 0, 0]; private dScale = 1;
   private cursor: Point | null = null;
@@ -67,10 +76,12 @@ export class OrbitControls extends Controls {
     return [
       [element, 'pointerdown', this.onDown], [element, 'pointermove', this.onMove], [element, 'pointerup', this.onUp],
       [element, 'pointercancel', this.onUp], [element, 'wheel', this.onWheel, {passive: false}], [element, 'contextmenu', this.onMenu],
+      [element, 'mousedown', this.onMouseDown],
     ] as Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
   }
   protected onDisconnect(): void {
     this.stopListenToKeyEvents();
+    this.altTarget?.removeEventListener('keyup', this.onAltUp); this.altTarget = null;
     for (const id of this.pointers.keys()) this.release(id);
     this.pointers.clear(); this.state = 'none';
     if (this.element?.style) this.element.style.touchAction = this.previousTouchAction;
@@ -78,6 +89,19 @@ export class OrbitControls extends Controls {
   /** Arrow keys pan (or rotate with ctrl, meta or shift). Pass `window` or a focusable element. */
   listenToKeyEvents(target: EventTargetLike): void {this.stopListenToKeyEvents(); target.addEventListener('keydown', this.onKey); this.keyTarget = target;}
   stopListenToKeyEvents(): void {this.keyTarget?.removeEventListener('keydown', this.onKey); this.keyTarget = null;}
+
+  /** The CAD navigation profile set with `setProfile`, or null for the three.js defaults. */
+  get profile(): NavigationProfile | null {return this.nav;}
+  /**
+   * Uses a CAD tool's mouse, wheel, touch and key bindings: `orbit.setProfile(SOLIDWORKS)`. Sets `mouseButtons` (when the
+   * profile has no `drag` table), `touches` and `zoomToCursor`; `THREE_ORBIT` restores the defaults. Returns the controls.
+   */
+  setProfile(profile: NavigationProfile): this {
+    this.nav = profile;
+    if (profile.mouseButtons) this.mouseButtons = {...profile.mouseButtons};
+    this.touches = {...profile.touches}; this.zoomToCursor = profile.zoomToCursor;
+    return this;
+  }
 
   getPolarAngle(): number {const o = this.offset(); return Math.acos(clamp(o[1] / Math.hypot(...o), -1, 1));}
   getAzimuthalAngle(): number {const o = this.offset(); return this.heading(o[0], o[1], o[2]);}
@@ -174,15 +198,36 @@ export class OrbitControls extends Controls {
     const p = this.local(event); this.pointers.set(event.pointerId, p);
     if (event.pointerType === 'touch') {this.touchStart(); return;}
     if (this.pointers.size > 1) return;
-    let action = event.button === 0 ? this.mouseButtons.LEFT : event.button === 1 ? this.mouseButtons.MIDDLE : event.button === 2 ? this.mouseButtons.RIGHT : null;
-    const modified = event.ctrlKey || event.metaKey || event.shiftKey;
-    if (action === MOUSE.ROTATE && modified) action = MOUSE.PAN;
-    else if (action === MOUSE.PAN && modified) action = MOUSE.ROTATE;
-    const state: Action = action === MOUSE.ROTATE && this.enableRotate ? 'rotate' : action === MOUSE.DOLLY && this.enableZoom ? 'dolly' : action === MOUSE.PAN && this.enablePan ? 'pan' : 'none';
+    const nav = this.nav, table = nav?.drag;
+    if (nav?.fitClick === event.button) {
+      // Double click: a second press within 400 ms and 6 px of the first.
+      const l = this.lastClick, t = event.timeStamp;
+      if (l && t - l.t < 400 && Math.hypot(p.x - l.x, p.y - l.y) < 6) {this.lastClick = null; this.dispatchEvent({type: 'fit'});} else this.lastClick = {x: p.x, y: p.y, t};
+    }
+    let state: Action;
+    if (table) {
+      let drag = table[chord(event, event.button)];
+      if (drag === 'rotate-or-pan') drag = basis(this.camera).ortho ? 'pan' : 'rotate';
+      state = drag === 'rotate' && this.enableRotate ? 'rotate' : drag === 'dolly' && this.enableZoom ? 'dolly' : drag === 'pan' && this.enablePan ? 'pan' : 'none';
+      if (state !== 'none' && event.altKey) {
+        // Releasing Alt after an Alt drag would open the menu bar in some browsers (Firefox on Windows): eat that keyup.
+        this.altDrag = true;
+        if (!this.altTarget) (this.altTarget = documentOf(this.element!)).addEventListener('keyup', this.onAltUp);
+      }
+    } else {
+      let action = event.button === 0 ? this.mouseButtons.LEFT : event.button === 1 ? this.mouseButtons.MIDDLE : event.button === 2 ? this.mouseButtons.RIGHT : null;
+      const modified = event.ctrlKey || event.metaKey || event.shiftKey;
+      if (action === MOUSE.ROTATE && modified) action = MOUSE.PAN;
+      else if (action === MOUSE.PAN && modified) action = MOUSE.ROTATE;
+      state = action === MOUSE.ROTATE && this.enableRotate ? 'rotate' : action === MOUSE.DOLLY && this.enableZoom ? 'dolly' : action === MOUSE.PAN && this.enablePan ? 'pan' : 'none';
+    }
     this.last = p; this.cursor = p;
     if (state === 'none') {this.pointers.delete(event.pointerId); this.release(event.pointerId); return;}
     this.begin(state);
   };
+  /** With a profile: a press that starts a gesture (e.g. middle drag) must not start autoscroll, text selection or a native drag. */
+  private readonly onMouseDown = (event: MouseEvent): void => {if (this.nav?.drag && this.state !== 'none') event.preventDefault();};
+  private readonly onAltUp = (event: KeyboardEvent): void => {if (event.key === 'Alt' && this.altDrag) {this.altDrag = false; event.preventDefault();}};
   private touchStart(): void {
     const points = [...this.pointers.values()];
     if (this.state !== 'none') this.dispatchEvent({type: 'end'});
@@ -233,7 +278,8 @@ export class OrbitControls extends Controls {
     if (!this.enabled || !this.enableZoom || this.state !== 'none') return;
     event.preventDefault();
     let delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 100 : 1);
-    if (event.ctrlKey) delta *= 10; // trackpad pinch
+    if (event.ctrlKey) delta *= 10; // trackpad pinch (never inverted)
+    else if (this.nav?.wheel === -1) delta = -delta;
     this.cursor = this.local(event);
     this.dispatchEvent({type: 'start'});
     if (delta < 0) this.dollyIn(this.zoomScale(delta)); else if (delta > 0) this.dollyOut(this.zoomScale(delta));
@@ -242,6 +288,8 @@ export class OrbitControls extends Controls {
   };
   private readonly onKey = (event: KeyboardEvent): void => {
     if (!this.enabled) return;
+    const bound = this.nav?.keys?.[chord(event, event.code)];
+    if (bound) {event.preventDefault(); this.keyAction(bound); return;}
     const height = Math.max(1, this.element?.clientHeight ?? 1), turn = TAU * this.rotateSpeed / height;
     const rotate = (event.ctrlKey || event.metaKey || event.shiftKey) && this.enableRotate;
     let handled = true;
@@ -254,6 +302,20 @@ export class OrbitControls extends Controls {
     }
     if (handled) {event.preventDefault(); this.update(0);}
   };
+  private keyAction(action: KeyAction): void {
+    if (action === 'fit') {this.dispatchEvent({type: 'fit'}); return;}
+    if (action === 'projection') {
+      // The engine's @margoengine/cameras CameraProjection, found by plugin name (as the ViewCube does).
+      const projection = (this.engine as unknown as {plugins?: ReadonlyMap<string, {mode?: string}>} | null)?.plugins?.get('cameras');
+      if (projection?.mode) projection.mode = projection.mode === 'orthographic' ? 'perspective' : 'orthographic';
+      return;
+    }
+    // Snap to the view's spherical angles: the shortest turn, eased when damping is on.
+    const d = VIEWS[action], o = this.offset(), turn = (d[0] || d[2] ? Math.atan2(d[0], d[2]) : 0) - this.heading(o[0], o[1], o[2]);
+    this.dTheta = (turn % TAU + 3 * Math.PI) % TAU - Math.PI;
+    this.dPhi = Math.acos(d[1] / Math.hypot(...d)) - Math.acos(clamp(o[1] / Math.hypot(...o), -1, 1));
+    this.applyNow();
+  }
 }
 
 const mid = (a: Point, b: Point): Point => ({x: (a.x + b.x) / 2, y: (a.y + b.y) / 2});

@@ -16,9 +16,10 @@ export class ViewCube {
     readonly element: HTMLDivElement;
     readonly camera: Camera;
     duration: number;
+    flip: boolean;
     readonly name: string;
     static attach(engine: EngineKernel, options?: ViewCubeOptions): ViewCube;
-    constructor(engine: EngineKernel, { container, corner, size, duration, projection, labels }?: ViewCubeOptions);
+    constructor(engine: EngineKernel, { container, corner, size, duration, projection, labels, flip }?: ViewCubeOptions);
     view(view: View, duration?: number): void;
     getProjection(): Projection | undefined;
     setProjection(mode: Projection): void;
@@ -38,5 +39,6 @@ export interface ViewCubeOptions {
         mode: Projection;
     };
     labels?: Partial<Record<Face, string>>;
+    flip?: boolean;
 }
 ```

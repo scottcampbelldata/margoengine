@@ -19,6 +19,9 @@ export interface ViewCubeOptions {
   projection?:{mode:Projection};
   /** Face names, for translation. */
   labels?:Partial<Record<Face,string>>;
+  /** Clicking the view already shown turns to the opposite one (Blender, SolidWorks "Normal To" twice). Default false.
+   * A `@margoengine/controls` profile carries it: `ViewCube.attach(engine, {...BLENDER.viewCube})`. */
+  flip?:boolean;
 }
 type V3=[number,number,number];
 /** Normal, then the face's right and up as seen from outside. Y up, front is +Z, right is +X. */
@@ -52,6 +55,8 @@ export class ViewCube {
   readonly element:HTMLDivElement;
   readonly camera:Camera;
   duration:number;
+  /** See ViewCubeOptions.flip. */
+  flip:boolean;
   readonly name='margoengine-viewcube:'+count++;
   private readonly cube:HTMLDivElement;private readonly buttons:[HTMLElement,V3][]=[];private readonly toggle?:HTMLButtonElement;private readonly projection?:{mode:Projection};
   private readonly container:HTMLElement;private readonly position:string;
@@ -60,13 +65,13 @@ export class ViewCube {
 
   /** Creates the ViewCube on `engine` (preferred over the constructor). */
   static attach(engine: EngineKernel, options?: ViewCubeOptions): ViewCube {return new ViewCube(engine, options);}
-  constructor(readonly engine:EngineKernel,{container=engine.canvas.parentElement!,corner='top-right',size=80,duration=0.4,projection,labels={}}:ViewCubeOptions={}) {
+  constructor(readonly engine:EngineKernel,{container=engine.canvas.parentElement!,corner='top-right',size=80,duration=0.4,projection,labels={},flip=false}:ViewCubeOptions={}) {
     if(!container)throw new TypeError('ViewCube needs a container (the canvas has no parent)');
     if(!(size>0)||!(duration>=0))throw new RangeError('Invalid ViewCube size or duration');
     // A CameraProjection already attached to the engine is found by its plugin name.
     const found=(engine as unknown as {plugins?:ReadonlyMap<string,{mode?:Projection}>}).plugins?.get('cameras');
     projection??=found?.mode?found as {mode:Projection}:undefined;
-    this.camera=engine.camera;this.duration=duration;this.projection=projection;this.container=container;
+    this.camera=engine.camera;this.duration=duration;this.flip=flip;this.projection=projection;this.container=container;
     const names:Record<Face,string>={top:'Top',bottom:'Bottom',front:'Front',back:'Back',left:'Left',right:'Right',...labels};
     const doc=container.ownerDocument,el=<K extends keyof HTMLElementTagNameMap>(tag:K,parent:HTMLElement,className?:string)=>{const e=doc.createElement(tag);if(className)e.className=className;parent.appendChild(e);return e;};
     const root=this.element=el('div',container,'mvc');
@@ -126,6 +131,8 @@ export class ViewCube {
   /** Turns the cube to the camera; called after each frame's updates. */
   sync():void {
     if(this.disposed)return;
+    // The projection may be toggled elsewhere (a controls profile key such as Blender's numpad 5).
+    if(this.toggle&&this.toggle.getAttribute('aria-pressed')!==String(this.projection!.mode==='orthographic'))this.showProjection();
     const c=this.camera,z=c.position.map((x,i)=>x-c.target[i]),l=Math.hypot(...z);if(!l)return;
     // Core's view rotation: right = up x back, then up' = back x right (camera.up is +Y unless an app changed it).
     const [zx,zy,zz]=z.map(x=>x/l),u=c.up??[0,1,0],r=[u[1]*zz-u[2]*zy,u[2]*zx-u[0]*zz,u[0]*zy-u[1]*zx],s=Math.hypot(...r);
@@ -181,7 +188,12 @@ export class ViewCube {
   private showProjection():void {const t=this.toggle!,ortho=this.projection!.mode==='orthographic';t.textContent=ortho?'Ortho':'Persp';t.setAttribute('aria-pressed',String(ortho));}
   private readonly onClick=(event:Event):void=>{
     const target=(event.target as HTMLElement|null)?.closest?.('[data-view],[data-projection]') as HTMLElement|null;if(!target)return;
-    if(target.dataset.view)this.view(target.dataset.view.split(',').map(Number) as V3);
+    if(target.dataset.view){
+      const d=target.dataset.view.split(',').map(Number) as V3,c=this.camera,o=c.position.map((x,i)=>x-c.target[i]);
+      // flip: already looking from d (and not mid-animation) turns to -d.
+      const same=this.flip&&!this.animation&&(o[0]*d[0]+o[1]*d[1]+o[2]*d[2])/Math.hypot(...o)/Math.hypot(...d)>1-1e-9;
+      this.view(same?d.map(x=>-x) as V3:d);
+    }
     else this.setProjection(this.projection!.mode==='orthographic'?'perspective':'orthographic');
   };
   private readonly onKey=(event:KeyboardEvent):void=>{

@@ -9,7 +9,7 @@ import {minifySync} from 'rolldown/experimental';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const temp = resolve(root, 'test-results/size');
 await mkdir(temp, {recursive: true});
-const entries = {'dist/index.js (everything)': null, OrbitControls: 'OrbitControls', MapControls: 'MapControls', TrackballControls: 'TrackballControls',
+const entries = {'dist/index.js (everything)': null, OrbitControls: 'OrbitControls', 'OrbitControls + SOLIDWORKS': 'OrbitControls, SOLIDWORKS', 'OrbitControls + PROFILES': 'OrbitControls, PROFILES', MapControls: 'MapControls', TrackballControls: 'TrackballControls',
   FlyControls: 'FlyControls', FirstPersonControls: 'FirstPersonControls', PointerLockControls: 'PointerLockControls', TransformControls: 'TransformControls', DragControls: 'DragControls'};
 const rows = [];
 for (const [label, name] of Object.entries(entries)) {

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fileURLToPath} from 'node:url';
 import {Camera, CADCameraControls} from '../../core/dist/index.js';
-import {OrbitControls} from '../../controls/dist/index.js';
+import {OrbitControls, AUTOCAD, BLENDER, SOLIDWORKS} from '../../controls/dist/index.js';
 import {CameraProjection} from '../../cameras/dist/index.js';
 import {compactOutput} from '../../../scripts/measure-size.js';
 import {ViewCube} from '../dist/index.js';
@@ -157,6 +157,27 @@ test('the projection toggle drives @margoengine/cameras and reports its state', 
   assert.throws(() => cube.setProjection('fisheye'), /Invalid projection/);
   const found = new ViewCube(engine); assert.equal(found.getProjection(), 'perspective', 'finds the attached CameraProjection'); found.setProjection('orthographic'); assert.equal(projection.mode, 'orthographic');
   assert.throws(() => new ViewCube(setup().engine).setProjection('orthographic'), /without a projection/);
+});
+
+test('navigation profiles: flip turns a repeated click to the opposite view; a profile key toggling the projection updates the label', () => {
+  const click = (cube, view) => cells(cube).find(e => e.dataset.view === view).dispatch('click');
+  for (const [options, flips] of [[{}, false], [{...AUTOCAD.viewCube}, false], [{...BLENDER.viewCube}, true], [{...SOLIDWORKS.viewCube}, true]]) {
+    const {engine} = setup(), cube = new ViewCube(engine, {duration: 0, ...options});
+    click(cube, '1,0,0'); assert.ok(close(direction(engine.camera), [1, 0, 0]), 'first click turns to the view');
+    click(cube, '1,0,0'); assert.ok(close(direction(engine.camera), flips ? [-1, 0, 0] : [1, 0, 0]), `repeat click ${JSON.stringify(options)}`);
+    click(cube, '0,1,0'); click(cube, '0,1,0'); engine.frame();
+    assert.deepEqual(direction(engine.camera), flips ? [0, -1, 0] : [0, 1, 0], 'and on the poles'); assert.ok(engine.camera.matrix.every(Number.isFinite));
+    cube.dispose();
+  }
+  // Mid-animation a click goes where it says, even with flip.
+  const {engine, canvas} = setup(), cube = new ViewCube(engine, {duration: 0.4, flip: true});
+  click(cube, '0,0,1'); assert.ok(cube.animating); click(cube, '0,0,1'); engine.run(0.5); assert.ok(close(direction(engine.camera), [0, 0, 1]));
+  // Blender numpad 5 through OrbitControls flips the projection; the cube's toggle follows on the next frame.
+  const projection = new CameraProjection({mode: 'perspective'}); engine.use(projection);
+  const withToggle = new ViewCube(engine), orbit = OrbitControls.attach(engine).setProfile(BLENDER), toggle = withToggle.element.all().find(e => e.dataset.projection !== undefined);
+  orbit.listenToKeyEvents(canvas); canvas.dispatch('keydown', {code: 'Numpad5'}); engine.frame();
+  assert.equal(projection.mode, 'orthographic'); assert.equal(toggle.getAttribute('aria-pressed'), 'true'); assert.equal(toggle.textContent, 'Ortho');
+  orbit.dispose(); withToggle.dispose(); cube.dispose();
 });
 
 test('dispose removes the widget and its plugin; engine removal disposes it', () => {
