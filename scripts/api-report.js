@@ -270,13 +270,13 @@ function diff(a, b) {
 }
 
 function surface() {
-  const sizesFile = join(root, 'test-results', 'modern-bundle-sizes.json');
+  const sizesFile = join(root, 'examples', 'package-benchmarks', 'results', 'entry-sizes.json');
   const sizes = existsSync(sizesFile) ? JSON.parse(readFileSync(sizesFile, 'utf8')) : {};
   const rows = reports.map((entries) => {
     const { pkg } = entries[0];
     const list = entries.map((r) => `\`${r.entry.subpath}\` ${r.counts.exports}`).join(', ');
     const sum = (field) => entries.reduce((s, r) => s + r.counts[field], 0);
-    const gzip = sizes[pkg.dir]?.gzip;
+    const gzip = sizes.packages?.[pkg.name]?.['.']?.gzip;
     return `| ${pkg.name} | ${list} | ${sum('unexported') || ''} | ${sum('any') || ''} | ${gzip ? gzip.toLocaleString('en-US') : ''} |`;
   });
   return [
@@ -290,7 +290,8 @@ function surface() {
     '- Exports: exported names per entry (re-exports of other packages included).',
     '- Unexported: package-local types the exports use but the entry does not export (summed over entries).',
     '- `any`: occurrences of `any` in the reports (summed over entries).',
-    '- Gzip: root entry min+gzip bytes from `test-results/modern-bundle-sizes.json` at the last `api:update` (blank: not measured).',
+    '- Gzip: root entry min+gzip bytes, other packages external, from the committed',
+    '  [entry-sizes.json](../examples/package-benchmarks/results/entry-sizes.json) (`node examples/package-benchmarks/entry-sizes.mjs`).',
     '',
     '| Package | Exports per entry | Unexported | `any` | Gzip |',
     '| --- | --- | ---: | ---: | ---: |',
