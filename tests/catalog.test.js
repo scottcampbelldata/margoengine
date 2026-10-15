@@ -37,6 +37,22 @@ test('catalog covers every public package with matching versions, imports and re
   assert.equal(new Set(entries.map(entry => entry.package)).size, entries.length);
 });
 
+test('every package has a layer, in the Release presentation order', async () => {
+  // docs/HANDOFF.md "Release presentation: many small packages": ten layers, "Start here" first.
+  const layers = ['Start here', 'Setup and diagnostics', 'Loading and formats', 'Rendering and lighting', 'Post-processing', 'World and effects',
+    'Animation and interaction', 'Simulation and games', 'CAD and engineering', 'Frameworks'];
+  const dirs = [];
+  for (const id of await readdir(new URL('../packages/', import.meta.url))) {
+    try { if (!JSON.parse(await readFile(new URL(`../packages/${id}/package.json`, import.meta.url), 'utf8')).private) dirs.push(id); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
+  assert.deepEqual(entries.map(entry => entry.id).sort(), dirs.sort(), 'catalog and packages/ list the same packages');
+  for (const entry of entries) assert.ok(layers.includes(entry.category), `${entry.package}: category ${entry.category}`);
+  // Contiguous and in order: the page renders one section per run of equal categories.
+  assert.deepEqual([...new Set(entries.map(entry => entry.category))], layers);
+  assert.deepEqual(entries.slice(0, 2).map(entry => entry.package), ['margoengine', '@margoengine/core']);
+});
+
 test('preview serves static files and rejects escaped paths and unsupported methods', async () => {
   const page = await fetch(url);
   assert.equal(page.status, 200);
@@ -100,6 +116,11 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
   };
   try {
     assert.equal(shown(), entries.length);
+    // Grouped by layer, never one flat list: each card sits under its own layer's heading.
+    assert.deepEqual([...document.querySelectorAll('.layer > h2')].map(h => h.textContent), [...new Set(entries.map(entry => entry.category))]);
+    for (const entry of entries) assert.equal($(`#${entry.id}`).closest('.layer').querySelector('h2').textContent, entry.category, entry.id);
+    fill('SectionPlanes');
+    assert.deepEqual([...document.querySelectorAll('.layer')].filter(visible).map(layer => layer.querySelector('h2').textContent), ['CAD and engineering'], 'layers without a match hide');
     for (const id of ['dof', 'tonemap']) {
       assert.equal($(`#${id} .run`).getAttribute('href'), `../demos/${id}/`);
       assert.equal(visible($(`#${id} .source`)), false, 'A built route with bundled assets must not be called a complete copyable HTML example');

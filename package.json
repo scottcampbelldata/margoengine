@@ -156,7 +156,7 @@
     "release:check": "npm run test:all && npm run measure:size && npm run test:modules:packages && npm run modern:test:postfx:packages",
     "publish:packages": "npm run release:check && npm publish --workspace packages --ignore-scripts --access public",
     "catalog:build": "node scripts/build-catalog.js",
-    "build:site": "npm run catalog:build && node scripts/build-site.js",
+    "build:site": "npm run catalog:build && node examples/package-benchmarks/entry-sizes.mjs && node scripts/build-site.js",
     "site:check": "node scripts/site-check.mjs",
     "build:tokyo": "node scripts/build-tokyo-diorama.mjs",
     "test:tokyo": "node scripts/tokyo-diorama-browser-test.mjs"

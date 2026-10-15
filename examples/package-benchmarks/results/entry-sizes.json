@@ -1,6 +1,12 @@
 {
-  "commit": "d1dcf1f",
+  "commit": "1f11e86",
+  "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
+  "coreStage": {
+    "raw": 46652,
+    "gzip": 19999,
+    "limit": 20000
+  },
   "packages": {
     "@margoengine/animation": {
       ".": {
@@ -134,8 +140,8 @@
     },
     "@margoengine/decoders": {
       ".": {
-        "raw": 1128729,
-        "gzip": 477085
+        "raw": 1129965,
+        "gzip": 477488
       }
     },
     "@margoengine/dof": {
@@ -152,12 +158,12 @@
     },
     "@margoengine/environment": {
       ".": {
-        "raw": 68994,
-        "gzip": 22987
+        "raw": 69558,
+        "gzip": 23188
       },
       "./probes": {
         "raw": 28209,
-        "gzip": 10845
+        "gzip": 10841
       },
       "./volumetric": {
         "raw": 16886,
@@ -382,8 +388,8 @@
     },
     "margoengine": {
       ".": {
-        "raw": 4988,
-        "gzip": 2227
+        "raw": 5297,
+        "gzip": 2301
       }
     },
     "@margoengine/materials": {

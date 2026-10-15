@@ -26,10 +26,10 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/core | `.` 15, `./extension` 23 | 14 |  | 18,189 |
 | @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 17,186 |
 | @margoengine/culling | `.` 6 |  |  | 8,656 |
-| @margoengine/decoders | `.` 22 | 1 |  | 477,085 |
+| @margoengine/decoders | `.` 22 | 1 |  | 477,488 |
 | @margoengine/dof | `.` 2 |  |  | 6,100 |
 | @margoengine/ecs | `.` 6 |  |  | 1,277 |
-| @margoengine/environment | `.` 49, `./probes` 7, `./volumetric` 3 | 12 |  | 22,987 |
+| @margoengine/environment | `.` 49, `./probes` 7, `./volumetric` 3 | 12 |  | 23,188 |
 | @margoengine/exporters | `.` 26, `./usdz` 2, `./model` 6 | 9 |  | 14,509 |
 | @margoengine/fbx | `.` 4, `./worker` 2 | 1 |  | 10,629 |
 | @margoengine/fsm | `.` 3 |  |  | 806 |
@@ -46,7 +46,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/loaders | `.` 60, `./worker` 2 | 8 |  | 21,629 |
 | @margoengine/lod | `.` 18 |  |  | 10,301 |
 | @margoengine/machinery | `.` 47, `./cad` 5, `./cad-async` 3, `./kinematics` 7, `./surface` 4, `./telemetry` 2, `./section` 3, `./assembly` 1, `./metrology` 7, `./spatial` 2, `./clearance` 2, `./materials` 2, `./overlays` 7, `./exploded` 2, `./edges` 3, `./dimensions` 7 | 12 |  | 34,771 |
-| margoengine | `.` 22 |  |  | 2,227 |
+| margoengine | `.` 22 |  |  | 2,301 |
 | @margoengine/materials | `.` 24 | 2 |  | 6,908 |
 | @margoengine/math | `.` 26, `./vector2` 1, `./vector3` 1, `./vector4` 1, `./quaternion` 1, `./euler` 1, `./matrix3` 1, `./matrix4` 1, `./color` 7, `./box3` 1, `./sphere` 1, `./plane` 1, `./ray` 1, `./frustum` 1, `./spherical` 1, `./mathutils` 21, `./mat4` 4, `./validate` 1, `./quat` 2, `./vec3` 7 | 91 |  | 10,419 |
 | @margoengine/navigation | `.` 3 |  |  | 912 |
