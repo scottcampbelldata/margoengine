@@ -41,7 +41,7 @@ const views = {
   model: {viewport: {width: 640, height: 480}, deviceScaleFactor: 1, factor: 2, query: ''},
 };
 // path: URL path under the site root; ready: page expression true once the principal scene (and any full-detail
-// upgrade) is on screen; mask: dynamic elements painted over. dof/tonemap read no tier, so their light view is skipped.
+// upgrade) is on screen; mask: dynamic elements painted over. tonemap reads no tier, so its light view is skipped.
 const demos = [
   {id: 'night-citadel', path: 'night-citadel/', ready: '!!window.nightCitadel?.readiness', mask: ['#fps', '#delta', '#refresh-note']},
   {id: 'gameplay-sandbox', path: 'gameplay-sandbox/', ready: '!!window.sandbox', mask: ['#telemetry *']},
@@ -49,7 +49,7 @@ const demos = [
   {id: 'flight-helmet', path: 'demos/flight-helmet.html', ready: "document.querySelector('#viewport')?.dataset.ready==='true'&&window.extensionDemo.quality!=='preview'"},
   {id: 'windy-meadow', path: 'demos/windy-meadow.html', ready: "document.querySelector('#viewport')?.dataset.ready==='true'"},
   {id: 'earth', path: 'demos/earth/', ready: "!!window.earthDemo&&window.earthDemo.quality!=='preview'"},
-  {id: 'dof', path: 'demos/dof/', ready: '!!window.dofDemo', views: ['high', 'phone']},
+  {id: 'dof', path: 'demos/dof/', ready: '!!window.dofDemo'},
   {id: 'tonemap', path: 'demos/tonemap/', ready: '!!window.tonemapDemo', views: ['high', 'phone']},
   // Khronos sample assets (HANDOFF 5w): one small view per model, served by a Vite dev server from the repo root
   // (`dev`) because the site build must not ship 250 MB of models. Models that fail to load are left out.

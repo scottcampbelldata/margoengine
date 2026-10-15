@@ -7,6 +7,7 @@ import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext, type Vec3} from '@margoengine/core/extension';
 import {invertMatrix} from '@margoengine/math/mat4';
 import {sceneTarget} from '../../shared/msaa.js';
+import {preset} from '../../shared/preset.js';
 
 declare const GPUBufferUsage: {UNIFORM: number; COPY_DST: number};
 declare const GPUTextureUsage: {TEXTURE_BINDING: number; STORAGE_BINDING: number; COPY_SRC: number};
@@ -192,7 +193,7 @@ export class VolumetricFog implements EnginePlugin {
   private readonly attachment: GPURenderPassColorAttachment = {view: undefined!, loadOp: 'load', storeOp: 'store'};
   private readonly pass: GPURenderPassDescriptor = {colorAttachments: [this.attachment]};
 
-  constructor(readonly options: VolumetricFogOptions = {}) {this.validate();}
+  constructor(readonly options: VolumetricFogOptions = {}) {this.options = preset('volumetric', options); this.validate();}
   /** Same as `engine.use(new VolumetricFog(options))`; returns the VolumetricFog. */
   static attach(engine: EngineKernel, options: VolumetricFogOptions = {}): VolumetricFog {const fog = new VolumetricFog(options); engineRuntime(engine).use(fog); return fog;}
   /** The integrated volume (rgba16float 3D, grid sized): in-scattered light (rgb) and optical depth (a) from the camera to each slice's far edge, for custom shaders (particles). Changes on grid change and device restore. */

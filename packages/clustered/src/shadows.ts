@@ -2,6 +2,7 @@
 import type {EngineKernel,Mesh as MeshHandle} from '@margoengine/core';
 import {engineRuntime,meshRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type Mesh} from '@margoengine/core/extension';
 import {instanceLayout,instancedDepth} from '../../shared/instances.js';
+import {preset} from '../../shared/preset.js';
 import type {Clustered,ClusteredShadow} from './index.js';
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
 declare const GPUTextureUsage:{RENDER_ATTACHMENT:number;TEXTURE_BINDING:number;COPY_DST:number};
@@ -83,7 +84,7 @@ export class LocalShadows implements EnginePlugin,ClusteredShadow {
   private readonly depthAttachment:GPURenderPassDepthStencilAttachment={view:undefined!,depthClearValue:0,depthLoadOp:'clear',depthStoreOp:'store'};
   private readonly depthPass:GPURenderPassDescriptor={colorAttachments:[],depthStencilAttachment:this.depthAttachment};
   private readonly offset=[0];
-  constructor(readonly options:LocalShadowOptions) {if(!options?.lights||typeof options.lights.setLights!=='function')throw new TypeError('LocalShadows needs the Clustered lights');this.lights=options.lights;this.validate();}
+  constructor(readonly options:LocalShadowOptions) {if(!options?.lights||typeof options.lights.setLights!=='function')throw new TypeError('LocalShadows needs the Clustered lights');this.options=preset('localShadows',options);this.lights=options.lights;this.validate();}
   get owner():Engine|undefined {return this.engine;}
   static attach(instance:EngineKernel,options:LocalShadowOptions):LocalShadows {const effect=new LocalShadows(options);engineRuntime(instance).use(effect);return effect;}
   private validate():void {const o=this.options,max=o.maxLights??4,size=o.resolution??512;

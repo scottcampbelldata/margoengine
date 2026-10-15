@@ -1,0 +1,84 @@
+{
+  "baseline": "96daac7",
+  "recordedAt": "2026-10-15T09:54:51.039Z",
+  "preset": {
+    "shadows": {
+      "resolution": 1024
+    },
+    "ssao": {
+      "samples": 16
+    },
+    "ssr": {
+      "enabled": false,
+      "steps": 32
+    },
+    "dof": {
+      "maxRadius": 8
+    },
+    "volumetric": {
+      "grid": [
+        80,
+        45,
+        32
+      ]
+    },
+    "localShadows": {
+      "resolution": 256
+    },
+    "vfx": {
+      "capacity": 100000
+    }
+  },
+  "packages": {
+    "shadows": {
+      "package": "shadows",
+      "entry": "src/index.ts",
+      "calls": 292,
+      "presetCalls1x": 146,
+      "presetCalls4x": 146
+    },
+    "ssao": {
+      "package": "post",
+      "entry": "src/index.ts",
+      "calls": 1141,
+      "presetCalls1x": 429,
+      "presetCalls4x": 712
+    },
+    "ssr": {
+      "package": "post",
+      "entry": "src/index.ts",
+      "calls": 757,
+      "presetCalls1x": 108,
+      "presetCalls4x": 249
+    },
+    "dof": {
+      "package": "dof",
+      "entry": "src/index.ts",
+      "calls": 743,
+      "presetCalls1x": 301,
+      "presetCalls4x": 442
+    },
+    "volumetric": {
+      "package": "environment",
+      "entry": "src/volumetric.ts",
+      "calls": 720,
+      "presetCalls1x": 291,
+      "presetCalls4x": 429
+    },
+    "localShadows": {
+      "package": "clustered",
+      "entry": "src/shadows.ts",
+      "calls": 408,
+      "presetCalls1x": 204,
+      "presetCalls4x": 204
+    },
+    "vfx": {
+      "package": "vfx",
+      "entry": "src/index.ts",
+      "calls": 360,
+      "presetCalls1x": 180,
+      "presetCalls4x": 180,
+      "initialCountOverPreset": "identical to no preset"
+    }
+  }
+}

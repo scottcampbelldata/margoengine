@@ -10,6 +10,8 @@ Deploying: [deploying.md](deploying.md) gives the Content Security Policy, cachi
 
 Making a game with Blender: [guides/blender-game.md](guides/blender-game.md) builds a small interactive game from glTF exports, step by step.
 
+Quality tiers: [guides/quality-tiers.md](guides/quality-tiers.md) measures the GPU, picks a light or full tier, and lets shadows, SSAO, SSR, depth of field, volumetric fog, local shadows and particles scale from the tier preset.
+
 Search all 71 packages by task, package name or public runtime export. Copy installation commands and imports, open each package guide, and try the five standalone HTML examples. The catalog marks exact versions available on npm; packages marked Source can be built from the repository until publication.
 
 To preview a checkout, use Node.js 22.12+ and run this command from the repository root:

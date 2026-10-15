@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {applyQualityTier, watchQuality, capFrameRate, paceEngine} from '../dist/index.js';
+import {applyQualityTier, watchQuality, capFrameRate, paceEngine, qualityPreset, QUALITY_PRESETS} from '../dist/index.js';
 import {Engine} from '../../core/dist/engine.js';
 import {TransformStore} from '../../core/dist/kernel.js';
 import {sceneSamples} from '../../core/dist/quality.js';
@@ -17,6 +17,19 @@ test('desktops start light unless a measured or forced tier says otherwise; phon
     assert.equal(applyQualityTier({search: '', storage: memory({margoLow: '1'}), userAgent: desktop}), 'light', 'older key still means low');
     assert.equal(applyQualityTier({search: '', storage: memory(), userAgent: phone}), 'phone'); assert.equal(globalThis.margoLow, undefined);
   } finally {delete globalThis.margoLow;}
+});
+
+// Contract with the feature packages (readers: packages/shared/preset.js, tests/quality-presets.test.js): the tier's preset
+// is published as globalThis.margoPreset, keyed by feature, with values named like that feature's options.
+test('applyQualityTier publishes the tier preset as globalThis.margoPreset; the full tier keeps package defaults', () => {
+  try {
+    assert.equal(applyQualityTier({search: '', storage: memory(), userAgent: desktop}), 'light');
+    assert.equal(globalThis.margoPreset, QUALITY_PRESETS.light); assert.equal(qualityPreset(), QUALITY_PRESETS.light);
+    assert.deepEqual(QUALITY_PRESETS.light, {shadows: {resolution: 1024}, ssao: {samples: 16}, ssr: {enabled: false, steps: 32}, dof: {maxRadius: 8},
+      volumetric: {grid: [80, 45, 32]}, localShadows: {resolution: 256}, vfx: {capacity: 100_000}});
+    applyQualityTier({search: '', storage: memory(), userAgent: phone}); assert.equal(globalThis.margoPreset, QUALITY_PRESETS.light, 'phones share the light preset');
+    applyQualityTier({search: '', storage: memory({margoQuality: 'high'}), userAgent: desktop}); assert.deepEqual(globalThis.margoPreset, {}); assert.deepEqual(qualityPreset(), {});
+  } finally {delete globalThis.margoLow; delete globalThis.margoPreset;}
 });
 
 // Drive the full-tier watcher with synthetic frame timestamps; `gaps` lists [interval ms, frame count] runs.

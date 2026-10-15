@@ -4,6 +4,7 @@ import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext} from '@margoengine/core/extension';
 import {render,group,compute} from '../../shared/gpu.js';
 import {orthographic} from '../../shared/projection.js';
+import {preset} from '../../shared/preset.js';
 import type {StackHost,StackStage,StageOutput} from '../../shared/stack.js';
 import {cocShader, coarseShader, bokehShader, presentShader} from './shaders.js';
 
@@ -52,7 +53,7 @@ export class DOF implements EnginePlugin {
   private disposed=false;
   private host?:StackHost;private input?:GPUTextureView;private sceneDepth?:GPUTexture;private cocView?:GPUTextureView;private tileView?:GPUTextureView;private coarseView?:GPUTextureView;private outputView?:GPUTextureView;private key='';
 
-  constructor(readonly options:DOFOptions={}){this.validate();}
+  constructor(readonly options:DOFOptions={}){this.options=preset('dof',options);this.validate();}
   static attach(instance:EngineKernel, options:DOFOptions={}):DOF {
     const effect=new DOF(options);engineRuntime(instance).use(effect);return effect;
   }

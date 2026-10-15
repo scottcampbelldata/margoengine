@@ -2,6 +2,7 @@
 import type {EngineKernel,Mesh as MeshHandle} from '@margoengine/core';
 import {engineRuntime,meshRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type Mesh} from '@margoengine/core/extension';
 import {viewMatrix} from '../../shared/view.js';
+import {preset} from '../../shared/preset.js';
 import {cascadeSplits,fitCascades} from './cascades.js';
 import {shadowSampling,shadowDepth} from './shader.js';
 import {instanceLayout,instancedDepth} from '../../shared/instances.js';
@@ -32,7 +33,7 @@ export class Shadows implements EnginePlugin {
   private readonly depthAttachment:GPURenderPassDepthStencilAttachment={view:undefined!,depthClearValue:1,depthLoadOp:'clear',depthStoreOp:'store'};
   private readonly depthPass:GPURenderPassDescriptor={colorAttachments:[],depthStencilAttachment:this.depthAttachment};
   private readonly copySource:GPUTexelCopyTextureInfo={texture:undefined!};private readonly copyDestination:GPUTexelCopyTextureInfo={texture:undefined!};private readonly copySize={width:0,height:0,depthOrArrayLayers:4};
-  constructor(readonly options:ShadowOptions={}) {this.validate();}
+  constructor(readonly options:ShadowOptions={}) {this.options=preset('shadows',options);this.validate();}
   get owner():Engine|undefined {return this.engine;}
   static attach(instance:EngineKernel,options:ShadowOptions={}):Shadows {const effect=new Shadows(options);engineRuntime(instance).use(effect);return effect;}
   private validate():void {const o=this.options;
