@@ -278,11 +278,21 @@ export function generateGrassMesh(blades = 3): GeometryData {
   return computeTangents(geometryData(p, n, uv, indices));
 }
 
+/**
+ * Ground-contact occlusion factor for a vertex at height `y`: 0.2 at or below `groundY`, rising linearly
+ * to 1 at 0.6 world units above it.
+ * @throws RangeError when either height is not finite.
+ */
 export function contactAO(y: number, groundY: number): number {
   if (!Number.isFinite(y) || !Number.isFinite(groundY)) throw new RangeError('Invalid contact height');
   return Math.min(1, 0.2 + 0.8 * Math.max(0, (y - groundY) / 0.6));
 }
 
+/**
+ * Radial occlusion factor for point (x, y, z): 0.25 at `center`, rising linearly to 1 at `radius`
+ * world units away and capped there.
+ * @throws RangeError when an input is not finite, `center` does not have 3 values, or `radius` is not positive.
+ */
 export function radialAO(x: number, y: number, z: number, center: ArrayLike<number>, radius: number): number {
   if (
     center.length !== 3 ||

@@ -12,10 +12,15 @@ export {
 } from './foliage.js';
 export { generateCabinMesh, ROOF_PITCH, type HeightField } from './cabin.js';
 export { createHumanoid, poseHumanoid } from './humanoid.js';
+/** Scalar field sampled by `marchingCubes` at world position (x, y, z); must return finite values. */
 export type DensityField = (x: number, y: number, z: number) => number;
-export interface SurfaceOptions {
+/** Options for `marchingCubes`; invalid values throw a RangeError. */
+export interface MarchingCubesOptions {
+  /** Grid samples per axis, integers 3..128. Default [32, 32, 32]. */
   resolution?: readonly [number, number, number];
+  /** Min and max corners of the sampled box in world units; min must be below max on every axis. Default [[-1, -1, -1], [1, 1, 1]]. */
   bounds?: readonly [readonly [number, number, number], readonly [number, number, number]];
+  /** Field value of the extracted surface (iso level). Default 0. */
   level?: number;
 }
 /** Seeded coastal island preset; returns an allocation-free world-height sampler. */
@@ -41,7 +46,7 @@ export function marchingCubes(
       [1, 1, 1],
     ],
     level = 0,
-  }: SurfaceOptions = {},
+  }: MarchingCubesOptions = {},
 ): Geometry | null {
   if (
     typeof field !== 'function' ||

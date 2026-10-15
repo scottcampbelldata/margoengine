@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+/** Options for `new AssetCache(...)`. A negative or NaN `maxBytes` or `timeout` throws a RangeError. */
 export interface AssetCacheOptions {
   /** IndexedDB database name, one per app or asset set. Default `'margo-assets'`. */
   name?: string;
@@ -23,10 +24,15 @@ export interface AssetCacheStats {
   evicted: number;
   errors: number;
 }
+/** Result of `AssetCache.usage()`. */
 export interface AssetCacheUsage {
+  /** Total size of the cached files in bytes. */
   bytes: number;
+  /** Number of cached files. */
   files: number;
+  /** Origin storage quota in bytes from `navigator.storage.estimate()`, when available. */
   quota?: number;
+  /** Origin storage used in bytes from `navigator.storage.estimate()`, when available. */
   usage?: number;
 }
 interface Entry {

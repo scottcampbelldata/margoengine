@@ -213,7 +213,10 @@ export class ColorBackground {
 export class TransparentCanvas extends ColorBackground {
   private engine?: EngineKernel;
   /** Same as `engine.use(new TransparentCanvas(...))`; returns the TransparentCanvas. */
-  static attach(engine: EngineKernel, options?: Pick<ColorBackgroundOptions, 'order' | 'name'>): TransparentCanvas {
+  static override attach(
+    engine: EngineKernel,
+    options?: Pick<ColorBackgroundOptions, 'order' | 'name'>,
+  ): TransparentCanvas {
     const value = new TransparentCanvas(options);
     engine.use(value);
     return value;
@@ -222,17 +225,17 @@ export class TransparentCanvas extends ColorBackground {
     super({ name: 'transparent-canvas', ...options });
     this.alpha = 0;
   }
-  setup(engine: EngineKernel): void {
+  override setup(engine: EngineKernel): void {
     if (this.disposed) throw new Error('TransparentCanvas is disposed');
     this.engine = engine;
     this.configure('premultiplied');
   }
-  onDeviceRestored(): void {
+  override onDeviceRestored(): void {
     super.onDeviceRestored();
     this.configure('premultiplied');
   }
   /** Restores the opaque canvas and detaches from the engine. */
-  dispose(): void {
+  override dispose(): void {
     if (this.disposed) return;
     this.configure('opaque');
     super.dispose();

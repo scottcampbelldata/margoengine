@@ -1,9 +1,19 @@
+/**
+ * A disc agent for `avoid`, in the XZ plane (world units, seconds). Invalid fields make `avoid` throw a
+ * RangeError.
+ */
 export interface Agent {
+  /** Safe integer identity; neighbors with the agent's own id are skipped. */
   id: number;
+  /** Current XZ position. */
   position: readonly [number, number];
+  /** Current XZ velocity in world units per second. */
   velocity: readonly [number, number];
+  /** Desired XZ velocity in world units per second. */
   preferred: readonly [number, number];
+  /** Disc radius in world units, non-negative. */
   radius: number;
+  /** Speed limit in world units per second, non-negative. */
   maxSpeed: number;
 }
 interface Line {

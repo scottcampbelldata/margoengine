@@ -1,25 +1,44 @@
+import { MargoError } from '@margoengine/math/errors';
+/** One state of a {@link StateMachine}; `C` is the shared context passed to every hook. */
 export interface State<C> {
+  /** Name of the parent state; ancestors stay entered while moving between their children. */
   parent?: string;
+  /** Called on entry, outermost ancestor first. */
   enter?: (context: C) => void;
+  /** Called on exit, innermost state first. */
   exit?: (context: C) => void;
+  /** Called by `StateMachine.update` for each state on the active path, outermost first, with `delta` in seconds. */
   update?: (context: C, delta: number) => void;
 }
+/** Event-driven edge between two states. */
 export interface Transition {
+  /** Source state; also matches while a descendant of it is active. */
   from: string;
+  /** Target state. */
   to: string;
+  /** Event name passed to `StateMachine.send`; must be non-empty. */
   event: string;
+  /** Cross-fade time in seconds; finite and >= 0. Default 0 (no cross-fade). */
   duration?: number;
+  /** Return false to decline the transition. */
   guard?: () => boolean;
 }
 
 /** Hierarchical state transitions retain common ancestors and expose cross-fade progress. */
 export class StateMachine<C> {
+  /** Name of the current (innermost) state. */
   state: string;
+  /** State being cross-faded from, or null when no cross-fade is running. */
   previous: string | null = null;
+  /** Seconds since the last state change. */
   elapsed = 0;
   private duration = 0;
   private changing = false;
   private readonly paths = new Map<string, readonly string[]>();
+  /**
+   * Build the machine and enter `initial` (and its ancestors).
+   * @throws TypeError for an unknown parent, a hierarchy cycle, an unknown initial state, or an invalid transition.
+   */
   constructor(
     readonly states: Readonly<Record<string, State<C>>>,
     initial: string,
@@ -50,9 +69,14 @@ export class StateMachine<C> {
     this.state = initial;
     for (const name of this.paths.get(initial)!) states[name].enter?.(context);
   }
+  /** Cross-fade progress in [0, 1]; 1 when no cross-fade is running. */
   get blend(): number {
     return this.previous && this.duration ? Math.min(1, this.elapsed / this.duration) : 1;
   }
+  /**
+   * Fire the first matching transition whose guard passes, searching from the current state outward to its ancestors.
+   * Returns false when none matched. Throws as {@link StateMachine.goto} does.
+   */
   send(event: string): boolean {
     const path = this.paths.get(this.state)!;
     for (let i = path.length - 1; i >= 0; i--)
@@ -64,10 +88,20 @@ export class StateMachine<C> {
       }
     return false;
   }
+  /**
+   * Change to `next` directly, exiting and entering only the states below the common ancestor. No-op when already there.
+   * @param duration Cross-fade time in seconds, finite and >= 0. Default 0.
+   * @throws RangeError for an unknown state or invalid `duration`.
+   * @throws MargoError `'state'` when called from an enter/exit hook.
+   */
   goto(next: string, duration = 0): void {
     if (!this.paths.has(next) || !Number.isFinite(duration) || duration < 0)
       throw new RangeError('Invalid state transition');
-    if (this.changing) throw new Error('Recursive state transition');
+    if (this.changing)
+      throw new MargoError(
+        'state',
+        'Recursive state transition; call goto() after the current enter/exit callback returns',
+      );
     if (next === this.state) return;
     const from = this.paths.get(this.state)!,
       to = this.paths.get(next)!;
@@ -85,6 +119,10 @@ export class StateMachine<C> {
       this.changing = false;
     }
   }
+  /**
+   * Advance the cross-fade timer by `delta` seconds and run the active path's update hooks; stops if a hook changes state.
+   * @throws RangeError when `delta` is negative or not finite.
+   */
   update(delta: number): void {
     if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid state delta');
     this.elapsed += delta;

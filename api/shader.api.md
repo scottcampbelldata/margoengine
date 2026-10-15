@@ -9,11 +9,17 @@ import { Material, MaterialOptions } from "@margoengine/materials";
 
 export type Arith<A extends Type, B extends Type> = A extends B ? A : A extends ScalarOf<B> ? B : B extends ScalarOf<A> ? A : A extends `mat${infer K}x${string}` ? B extends `vec${K}f` ? B : never : B extends `mat${infer K}x${string}` ? A extends `vec${K}f` ? A : never : never;
 
+export type BinaryResult<A, B> = [TypeOf<A>] extends [never] ? [TypeOf<B>] extends [never] ? 'f32' : TypeOf<B> : [TypeOf<B>] extends [never] ? TypeOf<A> : Arith<TypeOf<A>, TypeOf<B>>;
+
+export interface BindableTexture {
+    bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
+}
+
 export class Builder {
     readonly program: Program;
-    readonly stage: Stage;
+    readonly stage: ShaderStage;
     inFn: boolean;
-    constructor(program: Program, stage: Stage);
+    constructor(program: Program, stage: ShaderStage);
     expr(n: Node): string;
     wrap(n: Node): string;
     line(code: string): void;
@@ -55,12 +61,12 @@ export class ComputePass implements EnginePlugin {
     [Symbol.dispose]: () => void;
 }
 
-export type Emit = (b: Builder, n: Node<any>) => string;
+export type Emit = (b: Builder, n: Node) => string;
 
 export function Fn<P extends Type[], R extends Type>(body: (...args: {
     [K in keyof P]: Node<P[K]>;
 }) => Node<R>, name?: string): (...args: {
-    [K in keyof P]: Input<P[K]>;
+    [K in keyof P]: NodeInput<P[K]>;
 }) => Node<R>;
 
 export interface Host {
@@ -69,8 +75,6 @@ export interface Host {
     delta?: number;
     [key: string]: unknown;
 }
-
-export type Input<T extends Type = Type> = Node<T> | number;
 
 export const LEAF = 1;
 
@@ -96,12 +100,12 @@ export interface Node<T extends Type = Type> extends Swizzles<T> {
     mod(b: number): Node<T>;
     mod<U extends Type>(b: Node<U>): Node<Arith<T, U>>;
     negate(): Node<T>;
-    lessThan(b: Input<T> | Input<ScalarOf<T>>): Bools<T>;
-    lessThanEqual(b: Input<T> | Input<ScalarOf<T>>): Bools<T>;
-    greaterThan(b: Input<T> | Input<ScalarOf<T>>): Bools<T>;
-    greaterThanEqual(b: Input<T> | Input<ScalarOf<T>>): Bools<T>;
-    equal(b: Input<T> | Input<ScalarOf<T>>): Bools<T>;
-    notEqual(b: Input<T> | Input<ScalarOf<T>>): Bools<T>;
+    lessThan(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Bools<T>;
+    lessThanEqual(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Bools<T>;
+    greaterThan(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Bools<T>;
+    greaterThanEqual(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Bools<T>;
+    equal(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Bools<T>;
+    notEqual(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Bools<T>;
     and(b: Node<T>): Node<T>;
     or(b: Node<T>): Node<T>;
     not(): Node<T>;
@@ -134,21 +138,23 @@ export interface Node<T extends Type = Type> extends Swizzles<T> {
     fwidth(): Node<T>;
     oneMinus(): Node<T>;
     length(): Node<ScalarOf<T>>;
-    distance(b: Input<T>): Node<ScalarOf<T>>;
-    dot(b: Input<T>): Node<ScalarOf<T>>;
+    distance(b: NodeInput<T>): Node<ScalarOf<T>>;
+    dot(b: NodeInput<T>): Node<ScalarOf<T>>;
     cross(b: Node<'vec3f'>): Node<'vec3f'>;
-    min(b: Input<T> | Input<ScalarOf<T>>): Node<T>;
-    max(b: Input<T> | Input<ScalarOf<T>>): Node<T>;
-    pow(b: Input<T> | Input<ScalarOf<T>>): Node<T>;
-    clamp(low: Input<T> | Input<ScalarOf<T>>, high: Input<T> | Input<ScalarOf<T>>): Node<T>;
-    step(edge: Input<T> | Input<ScalarOf<T>>): Node<T>;
-    mix(b: Input<T>, t: Input<T> | Input<ScalarOf<T>>): Node<T>;
-    reflect(n: Input<T>): Node<T>;
-    element(i: Input<'i32' | 'u32'>): Node<T extends Matrix ? `vec${T extends `mat${infer K extends number}x${string}` ? K : 4}f` : ScalarOf<T>>;
+    min(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Node<T>;
+    max(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Node<T>;
+    pow(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Node<T>;
+    clamp(low: NodeInput<T> | NodeInput<ScalarOf<T>>, high: NodeInput<T> | NodeInput<ScalarOf<T>>): Node<T>;
+    step(edge: NodeInput<T> | NodeInput<ScalarOf<T>>): Node<T>;
+    mix(b: NodeInput<T>, t: NodeInput<T> | NodeInput<ScalarOf<T>>): Node<T>;
+    reflect(n: NodeInput<T>): Node<T>;
+    element(i: NodeInput<'i32' | 'u32'>): Node<T extends Matrix ? `vec${T extends `mat${infer K extends number}x${string}` ? K : 4}f` : ScalarOf<T>>;
     toFloat(): Floats<T>;
     toInt(): Node<VecOf<'i32', Size<T>>>;
     toUint(): Node<VecOf<'u32', Size<T>>>;
 }
+
+export type NodeInput<T extends Type = Type> = Node<T> | number;
 
 export class NodeMaterial extends Material {
     readonly program: Program;
@@ -162,9 +168,9 @@ export class NodeMaterial extends Material {
 
 export interface NodeMaterialOptions extends MaterialOptions {
     colorNode?: Node<'vec3f' | 'vec4f'>;
-    opacityNode?: Input<'f32'>;
-    roughnessNode?: Input<'f32'>;
-    metalnessNode?: Input<'f32'>;
+    opacityNode?: NodeInput<'f32'>;
+    roughnessNode?: NodeInput<'f32'>;
+    metalnessNode?: NodeInput<'f32'>;
     emissiveNode?: Node<'vec3f'>;
     normalNode?: Node<'vec3f'>;
     positionNode?: Node<'vec3f'>;
@@ -210,7 +216,7 @@ export class Program {
     readonly varyings: Node[];
     readonly functions: Map<string, string>;
     constructor(base?: number, compute?: boolean);
-    stage(stage: Stage, outputs: readonly Node[]): {
+    stage(stage: ShaderStage, outputs: readonly Node[]): {
         lines: string[];
         values: string[];
     };
@@ -238,13 +244,13 @@ export type Scalar = 'f32' | 'i32' | 'u32' | 'bool';
 
 export type ScalarOf<T extends Type> = T extends 'f32' | `vec${N}f` | Matrix ? 'f32' : T extends 'i32' | `vec${N}i` ? 'i32' : T extends 'u32' | `vec${N}u` ? 'u32' : 'bool';
 
-export type Size<T extends Type> = T extends `vec${infer K extends number}${string}` ? K : 1;
-
-export interface Stage {
+export interface ShaderStage {
     readonly kind: 'vertex' | 'fragment' | 'post' | 'compute';
     readonly builtins: Readonly<Record<string, string | ((b: Builder) => string)>>;
     varying?(b: Builder, x: Node): string;
 }
+
+export type Size<T extends Type> = T extends `vec${infer K extends number}${string}` ? K : 1;
 
 export class StorageBuffer<T extends StorageType = StorageType> implements Resource {
     readonly data: Float32Array | Int32Array | Uint32Array;
@@ -259,12 +265,12 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
     buffer(device: GPUDevice): GPUBuffer;
     update(): void;
     element(i: Index): Node<T>;
-    store(i: Index, value: Input<T>): Store;
-    atomicAdd(this: StorageBuffer<Atomic>, i: Index, value: Input<T>): Node<T>;
-    atomicMax(this: StorageBuffer<Atomic>, i: Index, value: Input<T>): Node<T>;
-    atomicMin(this: StorageBuffer<Atomic>, i: Index, value: Input<T>): Node<T>;
+    store(i: Index, value: NodeInput<T>): Store;
+    atomicAdd(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicMax(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicMin(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
     atomicLoad(this: StorageBuffer<Atomic>, i: Index): Node<T>;
-    atomicStore(this: StorageBuffer<Atomic>, i: Index, value: Input<T>): Store;
+    atomicStore(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Store;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
@@ -272,7 +278,7 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
 export type StorageType = 'f32' | 'i32' | 'u32' | 'vec2f' | 'vec2i' | 'vec2u' | 'vec4f' | 'vec4i' | 'vec4u';
 
 export interface Store {
-    readonly buffer: StorageBuffer<any>;
+    readonly buffer: StorageBuffer;
     readonly index: Node;
     readonly value: Node;
 }
@@ -280,10 +286,6 @@ export interface Store {
 export type Swizzles<T extends Type> = {
     readonly [K in Sw<C> | Sw<R>]: Node<VecOf<ScalarOf<T>, Count<K>>>;
 };
-
-export interface TextureSource {
-    bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
-}
 
 export type Type = Scalar | Vector | Matrix;
 
@@ -299,17 +301,19 @@ export type VecOf<S extends Scalar, K extends number> = K extends 1 ? S : S exte
 
 export type Vector = `vec${N}${'f' | 'i' | 'u'}` | `vec${N}<bool>`;
 
-export const abs: (...a: Input[]) => Node<any>;
+export type Widest<A extends readonly unknown[]> = [TypeOf<A[number]>] extends [never] ? 'f32' : [Exclude<TypeOf<A[number]>, Scalar>] extends [never] ? TypeOf<A[number]> : Exclude<TypeOf<A[number]>, Scalar>;
 
-export const acos: (...a: Input[]) => Node<any>;
+export const abs: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const add: (a: Input, b: Input) => Node<any>;
+export const acos: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const asin: (...a: Input[]) => Node<any>;
+export const add: <A extends NodeInput, B extends NodeInput>(a: A, b: B) => Node<BinaryResult<A, B>>;
 
-export const atan: (...a: Input[]) => Node<any>;
+export const asin: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const atan2: (...a: Input[]) => Node<any>;
+export const atan: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
+
+export const atan2: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export const bool: (x: Part) => Node<'bool'>;
 
@@ -319,59 +323,59 @@ export function call<T extends Type>(name: string, args: Node[], type: T, wgsl?:
 
 export const cameraPosition: Node<"vec3f">;
 
-export function cast<T extends Type>(x: Input | boolean, type: T, label?: string): Node<T>;
+export function cast<T extends Type>(x: NodeInput | boolean, type: T, label?: string): Node<T>;
 
-export const ceil: (...a: Input[]) => Node<any>;
+export const ceil: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const clamp: (...a: Input[]) => Node<any>;
+export const clamp: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export const color: (c: ColorValue) => Node<'vec3f'>;
 
 export function constant<T extends Type>(value: number | boolean, type: T): Node<T>;
 
-export const cos: (...a: Input[]) => Node<any>;
+export const cos: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const cross: (...a: Input[]) => Node<any>;
+export const cross: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const degrees: (...a: Input[]) => Node<any>;
+export const degrees: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export const deltaTime: Node<"f32">;
 
-export function discard<T extends Type>(condition: Input<'bool'> | boolean, value: Input<T>): Node<T>;
+export function discard<T extends Type>(condition: NodeInput<'bool'> | boolean, value: NodeInput<T>): Node<T>;
 
-export const distance: (...a: Input[]) => Node<any>;
+export const distance: <A extends NodeInput[]>(...a: A) => Node<ScalarOf<Widest<A>>>;
 
-export const div: (a: Input, b: Input) => Node<any>;
+export const div: <A extends NodeInput, B extends NodeInput>(a: A, b: B) => Node<BinaryResult<A, B>>;
 
-export const dot: (...a: Input[]) => Node<any>;
+export const dot: <A extends NodeInput[]>(...a: A) => Node<ScalarOf<Widest<A>>>;
 
-export const dpdx: (...a: Input[]) => Node<any>;
+export const dpdx: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const dpdy: (...a: Input[]) => Node<any>;
+export const dpdy: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const exp: (...a: Input[]) => Node<any>;
+export const exp: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const exp2: (...a: Input[]) => Node<any>;
+export const exp2: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export const float: (x: Part) => Node<'f32'>;
 
-export const floor: (...a: Input[]) => Node<any>;
+export const floor: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const fract: (...a: Input[]) => Node<any>;
+export const fract: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export const frontFacing: Node<"bool">;
 
-export const fwidth: (...a: Input[]) => Node<any>;
+export const fwidth: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export function inputColor(coord?: Input<'vec2f'>): Node<'vec4f'>;
+export function inputColor(coord?: NodeInput<'vec2f'>): Node<'vec4f'>;
 
-export function inputDepth(coord?: Input<'vec2f'>): Node<'f32'>;
+export function inputDepth(coord?: NodeInput<'vec2f'>): Node<'f32'>;
 
 export const instanceIndex: Node<"u32">;
 
 export const int: (x: Part) => Node<'i32'>;
 
-export const inverseSqrt: (...a: Input[]) => Node<any>;
+export const inverseSqrt: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export const isMatrix: (t: Type) => boolean;
 
@@ -381,15 +385,15 @@ export const ivec3: (...p: Part[]) => Node<'vec3i'>;
 
 export const ivec4: (...p: Part[]) => Node<'vec4i'>;
 
-export const length: (...a: Input[]) => Node<any>;
+export const length: <A extends NodeInput[]>(...a: A) => Node<ScalarOf<Widest<A>>>;
 
 export function linearColor(c: ColorValue): number[];
 
-export const log: (...a: Input[]) => Node<any>;
+export const log: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const log2: (...a: Input[]) => Node<any>;
+export const log2: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export function loop<T extends Type>(count: Input<'i32' | 'u32'>, init: Input<T>, body: (i: Node<'i32'>, acc: Node<T>) => Input<T>): Node<T>;
+export function loop<T extends Type>(count: NodeInput<'i32' | 'u32'>, init: NodeInput<T>, body: (i: Node<'i32'>, acc: Node<T>) => NodeInput<T>): Node<T>;
 
 export const mat3: (...p: Part[]) => Node<'mat3x3f'>;
 
@@ -405,15 +409,15 @@ export const materialNormal: Node<"vec3f">;
 
 export const materialRoughness: Node<"f32">;
 
-export const max: (...a: Input[]) => Node<any>;
+export const max: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const min: (...a: Input[]) => Node<any>;
+export const min: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const mix: (...a: Input[]) => Node<any>;
+export const mix: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const mod: (a: Input, b: Input) => Node<any>;
+export const mod: <A extends NodeInput, B extends NodeInput>(a: A, b: B) => Node<BinaryResult<A, B>>;
 
-export const mul: (a: Input, b: Input) => Node<any>;
+export const mul: <A extends NodeInput, B extends NodeInput>(a: A, b: B) => Node<BinaryResult<A, B>>;
 
 export const negate: <T extends Type>(x: Node<T>) => Node<T>;
 
@@ -421,7 +425,7 @@ export const normalLocal: Node<"vec3f">;
 
 export const normalWorld: Node<"vec3f">;
 
-export const normalize: (...a: Input[]) => Node<any>;
+export const normalize: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export const not: <T extends Type>(x: Node<T>) => Node<T>;
 
@@ -431,21 +435,21 @@ export const positionLocal: Node<"vec3f">;
 
 export const positionWorld: Node<"vec3f">;
 
-export const pow: (...a: Input[]) => Node<any>;
+export const pow: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const radians: (...a: Input[]) => Node<any>;
+export const radians: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const reflect: (...a: Input[]) => Node<any>;
+export const reflect: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const refract: (i: Input<'vec3f'>, n: Input<'vec3f'>, eta: Input<'f32'>) => Node<'vec3f'>;
+export const refract: (i: NodeInput<'vec3f'>, n: NodeInput<'vec3f'>, eta: NodeInput<'f32'>) => Node<'vec3f'>;
 
 export const resolution: Node<"vec2f">;
 
-export const round: (...a: Input[]) => Node<any>;
+export const round: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export const sameEntries: (a: readonly GPUBindGroupEntry[], b: readonly GPUBindGroupEntry[]) => boolean;
 
-export const saturate: (...a: Input[]) => Node<any>;
+export const saturate: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export const scalarOf: (t: Type) => Scalar;
 
@@ -453,35 +457,35 @@ export const screenCoordinate: Node<"vec2f">;
 
 export const screenUV: Node<"vec2f">;
 
-export function select<T extends Type>(cond: Node<'bool' | `vec${N}<bool>`> | boolean, ifTrue: Input<T>, ifFalse: Input<T>): Node<T>;
+export function select<T extends Type>(cond: Node<'bool' | `vec${N}<bool>`> | boolean, ifTrue: NodeInput<T>, ifFalse: NodeInput<T>): Node<T>;
 
-export const sign: (...a: Input[]) => Node<any>;
+export const sign: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const sin: (...a: Input[]) => Node<any>;
+export const sin: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export const sizeOf: (t: Type) => number;
 
-export const smoothstep: (...a: Input[]) => Node<any>;
+export const smoothstep: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const sqrt: (...a: Input[]) => Node<any>;
+export const sqrt: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const step: (...a: Input[]) => Node<any>;
+export const step: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export function storage<T extends StorageType>(data: number | Float32Array | Int32Array | Uint32Array, type: T, { atomic }?: {
     atomic?: boolean;
 }): StorageBuffer<T>;
 
-export const sub: (a: Input, b: Input) => Node<any>;
+export const sub: <A extends NodeInput, B extends NodeInput>(a: A, b: B) => Node<BinaryResult<A, B>>;
 
-export const tan: (...a: Input[]) => Node<any>;
+export const tan: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export const tanh: (...a: Input[]) => Node<any>;
+export const tanh: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
-export function texture(source: TextureSource, coord?: Input<'vec2f'>, level?: Input<'f32'>): Node<'vec4f'>;
+export function texture(source: BindableTexture, coord?: NodeInput<'vec2f'>, level?: NodeInput<'f32'>): Node<'vec4f'>;
 
 export const time: Node<"f32">;
 
-export const trunc: (...a: Input[]) => Node<any>;
+export const trunc: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export const uint: (x: Part) => Node<'u32'>;
 
@@ -533,7 +537,7 @@ export const vertexColor: () => Node<'vec4f'>;
 
 export const viewDirection: Node<"vec3f">;
 
-export function wgslFn<R extends Type = Type>(code: string): (...args: Input[]) => Node<R>;
+export function wgslFn<R extends Type = Type>(code: string): (...args: NodeInput[]) => Node<R>;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -547,11 +551,11 @@ type Count<S extends string, A extends 0[] = []> = S extends `${infer _}${infer 
 
 type Floats<T extends Type> = Node<VecOf<'f32', Size<T>>>;
 
-type Index = Input<'u32' | 'i32'>;
+type Index = NodeInput<'u32' | 'i32'>;
 
 type N = 2 | 3 | 4;
 
-type Part = Input | boolean;
+type Part = NodeInput | boolean;
 
 type R = 'r' | 'g' | 'b' | 'a';
 
@@ -563,4 +567,8 @@ interface Spec {
 }
 
 type Sw<X extends string> = X | `${X}${X}` | `${X}${X}${X}` | `${X}${X}${X}${X}`;
+
+type TypeOf<X> = X extends {
+    readonly type: infer T extends Type;
+} ? T : never;
 ```

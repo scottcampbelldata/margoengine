@@ -72,7 +72,7 @@ export class HTML extends LabelRenderer {
     this.values = new Float32Array(capacity * 4);
     this.slots = new Array(capacity);
   }
-  static attach(engine: EngineKernel, options: HTMLOptions = {}): HTML {
+  static override attach(engine: EngineKernel, options: HTMLOptions = {}): HTML {
     const overlay = new HTML(options);
     engineRuntime(engine).use(overlay);
     return overlay;

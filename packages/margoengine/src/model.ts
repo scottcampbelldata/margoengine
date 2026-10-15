@@ -3,12 +3,19 @@ import type { Engine as RuntimeEngine, Mesh as RuntimeMesh, GeometryBuffers } fr
 import type { Model } from '@margoengine/gltf';
 import type { CADModel } from '@margoengine/machinery';
 
+/** A model loaded by `Stage.load`. Position, rotation and scale are the root mesh's. */
 export interface LoadedModel extends Pick<Mesh, 'position' | 'rotation' | 'scale'> {
+  /** Root mesh every loaded mesh hangs under. */
   readonly root: Mesh;
+  /** All meshes of the model. */
   readonly meshes: readonly Mesh[];
+  /** Visibility of the root mesh. */
   visible: boolean;
+  /** World-space bounds [minX, minY, minZ, maxX, maxY, maxZ], recomputed from the vertices on each read; throws when the model has no geometry. */
   readonly bounds: Float32Array;
+  /** The model's GPU geometry buffers on WebGPU, null on the WebGL2 backend. */
   readonly raw: readonly GeometryBuffers[] | null;
+  /** Disposes the model and its meshes. */
   destroy(): void;
 }
 

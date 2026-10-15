@@ -557,7 +557,15 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       noise dominated the mean), so the gate became `changed`. Two clean 3-run checks (6 captures per view): all within the x3 limits. The new core (0ed56b9: kernel skips unchanged entities, instance reuse, ranged
       uploads) renders every view bit-identical to the pre-merge baselines (only the VFX noise above).
    g. Changesets (or similar) for versioning and changelogs before the first npm publish; consistent peer ranges.
-   h. Consistent error types and messages across packages (one small error-code convention), documented.
+   h. [CONVENTION DONE with 5k phase 2 group A; groups B/C/D adopt it] Consistent error types and messages across
+      packages (one small error-code convention), documented: docs/conventions.md "Errors". TypeError for a wrong
+      argument type/shape, RangeError for out-of-range values, otherwise `MargoError` (`@margoengine/math`, also
+      `@margoengine/math/errors`) with `code` 'disposed' | 'attached' | 'state' | 'unsupported' | 'failed'; messages
+      say subject, problem, fix (`'Input is disposed; create a new Input'`). Packages bundle their own copy, so the class
+      matches by name (`Symbol.hasInstance`) and `instanceof MargoError` works across packages. packages/shared cannot
+      import math (its consumers would have to build after math), so it throws `margoError(code, message)` from
+      `packages/shared/errors.js` (same name and code). Core (21) and the stage facade (2) keep bare `Error`
+      (Scott's decision, allowlisted in `scripts/hygiene-allowlist.json` `errors`). `LoaderError` stays loaders' own.
    i. [DONE] Follow-ups from the dedupe merge. Sky and VFX are split into feature entries: `@margoengine/sky/base` plus
       `/preetham`, `/bruneton`, `/clouds`, `/night`, `/fog`, `/reflection`, `/lighting` (`new Sky(options, {bruneton,
       clouds})`), and `@margoengine/vfx/base` plus `/obstacles`, `/wrap`, `/sort`, `/texture`. Root entries keep every
@@ -1137,6 +1145,76 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
      staging, stats, cameras, html, viewcube, gizmo, scenery (public `any`: physics raw Rapier 25, controls 17).
    Each group: `npm run hygiene` before/after, api:update only for intended type changes, zero JS byte change unless a
    proof says otherwise; then a short serial pass sets 1h.h's error codes and switches verify to `--strict`.
+   GROUP A [DONE 2026-10-15, one commit on da7d1a4; groups B, C, D can start; `npm run check:merge` passed: 1,322/1,322
+   node tests, 15/15 proofs --current, api:check, build:site, visual:check 55/55]. Rules and decisions: docs/conventions.md
+   (shared types, errors, same-name exports); API changes: CHANGELOG.md.
+   - Types (gate 5): `@margoengine/math` `src/types.ts` is the one home: `Vec2`, `Vec3` (declared in frozen core,
+     re-exported by math: core cannot import math), `Vec4`, `Quat`, `MutableVec2`, `MutableVec3`, `Mat4`, `ColorInput`,
+     `HeightField`, `Vec2/3/4Like`, `SphereLike`/`PlaneLike`/`BoxLike` (math's own five local copies merged). New
+     `@margoengine/math/errors` (`MargoError`) and `@margoengine/math/mesh` (`meshWorldMatrix`, the one copy of what
+     lines/points/text each had; they re-export it, as they do math's `parseColor`/`ColorInput`). Renamed clashes
+     (API break, Scott is the only user): shader `Input`->`NodeInput`, `Stage`->`ShaderStage`, `TextureSource`->
+     `BindableTexture`; points `projectPoint`->`projectToPixels`, `PickHit`->`PointsPickHit`, `Blending`->
+     `PointsBlending`, `TextureSource`->`PointsTextureSource`; tween `smoothstep`->`easeSmoothstep`; lines
+     `ExpandOptions`->`ExpandLineOptions`; procedural `SurfaceOptions`->`MarchingCubesOptions`; navigation `Vector3`->
+     math `Vec3Like`; geometry's mutable `Vec2`/`Vec3` -> math `MutableVec2`/`MutableVec3`; lines/text local `Owner`
+     -> `LineOwner`/`TextOwner`. Kept on purpose and allowlisted (`scripts/hygiene-allowlist.json` `names`, exempt only
+     for exactly that package set): math vs shader `add sub dot cross length normalize clamp smoothstep` (CPU arrays vs
+     WGSL nodes; `smoothstep` argument orders differ and are documented) and procedural vs shader `fbm ridged
+     domainWarp` (CPU noise and its GPU twin). multiplyMatrices: math's `(a, b, out)` is canonical. A package whose
+     .d.ts uses math types or that throws MargoError lists math under `dependencies` (14 packages); build-optional
+     externalizes it (one runtime copy), lines/points/text/geometry still bundle it.
+   - any (gate 3): shader's 48 public `Node<any>` are typed: free operators return `Node<BinaryResult<A, B>>`,
+     component-wise built-ins `Node<Widest<A>>`, `length`/`distance`/`dot` its scalar (new exported helper types
+     `Widest`, `BinaryResult`); `Store.buffer` is `StorageBuffer`. Two internal `as unknown as` casts remain, each with a
+     one-line reason (StorageBuffer<T>/UniformNode<T> are invariant in T). shared `worker.d.ts` `serve` takes
+     `(message: never) => unknown`.
+   - TSDoc (gate 6): every group A export documented (purpose, units, ranges, defaults, throws), read from the code;
+     core's 27 too (comments only).
+   - Errors (gate 7): 27 bare Errors in group A packages converted (TypeError for shader stage misuse, MargoError
+     otherwise; old message text kept as the prefix, so regex tests still match; the fix appended). shared's 6 use
+     `margoError` (packages/shared/errors.js). Core 21 and stage 2 allowlisted (`errors`), unchanged.
+   - Strict (gate 4): `noImplicitOverride` + `noFallthroughCasesInSwitch` on in the shared base
+     (`packages/gltf/tsconfig.json`, 69 packages extend it), core and margoengine; 36 `override` added repo-wide
+     (controls 14, environment 12, lines 4, shader 2, html, sky, vfx, math 1 each; erased, no emit change); no
+     fallthrough errors. Left: react's own tsconfig (group D, 2 flags).
+   - Lint and dead (gates 2, 9): 0 in group A (shared polygon's unused `validateContourIntersections` deleted, internal
+     helpers un-exported; geometry `add` deleted; test unused bindings removed).
+   - Bytes: core + stage 19,999 B gzip, raw 46,652 B, identical; core and margoengine dist byte-identical. Dist
+     hashes against a clean build of c12eed9 (da7d1a4 only edits HANDOFF): 530 of 641 files identical (chunks compared with hashes
+     masked); every .d.ts diff is the type work above; the 30 JS diffs are all the error convention or the math
+     moves, gzip delta per file: text +221, points +110, shader +109, lines +105, usdz worker +93, water +87,
+     navigation +84, animation/vat +82, wfc +78 / overlapping +71, gltf-pro asset chunk +77, ecs +73, fbx worker +71,
+     fsm +69, blender +69, html +69, tween +66, gltf-pro worker +65, post scene-fade +65, materials +63,
+     creative planet +62, gltf +60, cinematic +60, machinery cad +57, fbx +51, input +49, gltf-pro src +37,
+     math index +18; new math entries errors 197, mesh 312.
+   - Scorecard (`npm run hygiene`), group A (23 packages + shared) before -> after:
+     format 0/190 10.0 -> 0/194 10.0; lint 9/190 5.3 -> 0/194 10.0; any 50/739 3.2 -> 0/741 10.0; strict 44/66 0.0 ->
+     0/66 10.0; types 68/568 0.0 -> 14/564 7.5; tsdoc 224/544 0.0 -> 0/545 10.0; errors 56/385 0.0 -> 0/377 10.0;
+     dead 10/1028 9.0 -> 0/1047 10.0; group A mean 3.4 -> 9.7 (types is the only gate below 10). Every group A package is 10.0 except core 8.8,
+     math 8.9, geometry 9.4, shader 9.9 (types 1); their remaining type violations are the B/C/D copies below.
+     Overall: format 10.0; lint 3.2 -> 4.1 (72 -> 63 files); any 3.7 -> 6.3 (121 -> 71); strict 0.0 -> 9.1 (146 -> 2);
+     types 0.1 -> 4.3 (138 -> 79); tsdoc 0.0 -> 0.0 (593 -> 369); errors 0.0 -> 0.0 (534 -> 478); dead 8.5 -> 8.9
+     (43 -> 33); hygiene 3.2 -> 5.3.
+   - DUPLICATES GROUPS B/C/D MUST SWITCH TO MATH (each still charges the math/A side too):
+     B: animation `multiplyMatrices(out, a, b)` (sampling.ts) -> drop the export, callers use math/mat4
+        `multiplyMatrices(a, b, out)` (or rename it); audio `Vec3` -> math `Vec3`; materials local `type Color` ->
+        math `ColorInput`; exporters `GeometryData` (different shape: ArrayLike positions) -> rename (e.g.
+        `ExportGeometryData`) or accept geometry's; loaders `computeVertexNormals(positions, indices)` and
+        `toGeometry(loaded)` (different from geometry's) -> rename; plus B's own `loadGLTF`/`parseGLTF` (gltf vs
+        gltf-pro) and `parseUSDA`/`parseUSDZ`/`USDOptions` (loaders vs usdz).
+     C: lod `Vec3` (mutable) -> math `MutableVec3`; environment `ColorInput` (`readonly [n, n, n]` arrays only) ->
+        math `ColorInput` (keep the 3-component runtime check); sky local `type Color` (9 entries) and terrain local
+        `type Color` -> math `Vec3`; terrain `HeightField` -> re-export math's; vfx exported `texture` feature
+        object clashes with shader's `texture()` node -> rename vfx's (e.g. `textureFeature`) or allowlist with a
+        reason.
+     D: bvh `Vec3` (mutable) -> math `MutableVec3`, bvh `Ray` interface -> rename `BVHRay` (math `Ray` is the
+        class); labels `Vec3` -> math `Vec3`, labels `composeMatrix(position, quaternion?, scale?, out?)` -> rename
+        (e.g. `composeTransform`) or use math's `composeMatrix(t, q, s, out)`; physics `Vec3`, `Quat` -> math's;
+        controls `V3` (mutable) -> math `MutableVec3`, controls `HeightField` -> math's; react `Mesh`/`PbrMaterial`
+        components vs core's classes -> rename or allowlist (core is frozen); react tsconfig needs the two strict
+        flags. Non-math duplicates in the scorecard (`Context`, `GeometryLike`, `ModelLike`, `PickProxy`, ...) are the
+        owning group's own.
 5l. Raise CAD performance and general 3D rendering to 9/10 (Scott, 2026-10-14 night). Measurable targets (Intel Arc
    laptop, quiet PC):
    CAD: 100k parts + feature edges orbit >= 60 FPS; 1M parts >= 30 FPS; pick < 10 ms at 100k; 100k-part model
@@ -1984,7 +2062,9 @@ Second set (2026-10-14, evening), all APPROVED by Scott:
    `packages/viewcube/README.md` Limits says "no roll (core's camera has none)" (core has `camera.up`);
    `packages/cameras/README.md` says core throws `Vertical camera` looking straight down (only with the default up);
    `packages/gltf-pro/README.md` Limits says models are "outside core GPU picking" (selection `Picking` covers them).
-10. From the API snapshots (`api/*.api.md`, `docs/api-surface.md`; 1,263 exports in 129 entries): 92 `any` in public
+10. [GROUP A PART DONE (5k phase 2): shader `Node<any>` typed, Vec3/ColorInput/parseColor/meshWorldMatrix/Ray/HeightField
+    homes in math, group A copies removed; the B/C/D copies are listed in 5k. Still open: core root vs extension
+    same-name types (frozen), unexported-but-used types, `SkyMoonConfig`/`SdfParams` naming.] From the API snapshots (`api/*.api.md`, `docs/api-surface.md`; 1,263 exports in 129 entries): 92 `any` in public
     signatures (shader `Node<any>` 47, physics raw Rapier 25, controls 11, gltf-pro `GLTFDocument` 7); core root
     `Engine`/`Mesh`/`EnginePlugin` are different types from `core/extension`'s same names, and root exports both
     `Engine` and `EngineKernel`; 305 types used by exports but not exported (e.g. `Renderer` for `EngineOptions.fallback`,

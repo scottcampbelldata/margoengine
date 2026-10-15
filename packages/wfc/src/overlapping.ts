@@ -1,5 +1,6 @@
 // Overlapping (sample-based) 2D Wave Function Collapse: N x N patterns from a sample, seeded observation, and
 // chronological backtracking on contradictions under a fixed budget, then seeded restarts.
+import { MargoError } from '@margoengine/math/errors';
 
 /** A sample image: `width * height` values (palette indices, packed RGBA, any numbers), row by row. */
 export interface Sample {
@@ -40,6 +41,11 @@ export class OverlappingModel {
   private readonly weightLogs: Float64Array;
   private readonly propagator: Int32Array[][];
 
+  /**
+   * Extract the N x N patterns of `sample`. The sample must be at least N x N and at most 1,048,576 values.
+   * @throws RangeError for invalid sample or options, non-finite values, more than 65,536 distinct values,
+   * or more than 4096 patterns.
+   */
   constructor(sample: Sample, { N = 3, periodicInput = true, symmetry = 8 }: OverlappingOptions = {}) {
     const { data, width: W, height: H } = sample;
     if (
@@ -265,7 +271,10 @@ export class OverlappingModel {
         ok = propagate();
       }
     }
-    throw new Error('WFC contradicted within the backtrack and attempt budget');
+    throw new MargoError(
+      'failed',
+      'WFC contradicted within the backtrack and attempt budget; raise backtracks or attempts, or try another seed',
+    );
   }
 
   private render(wave: Uint8Array, width: number, height: number, FW: number, periodic: boolean): Float64Array {

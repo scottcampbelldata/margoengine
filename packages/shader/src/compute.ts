@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel } from '@margoengine/core';
 import {
   engineRuntime,
@@ -18,9 +19,9 @@ import {
   scalarOf,
   sizeOf,
   unique,
-  type Input,
+  type NodeInput,
   type Resource,
-  type Stage,
+  type ShaderStage,
 } from './node.js';
 import { effects } from './effects.js';
 declare const GPUBufferUsage: { STORAGE: number; COPY_DST: number; COPY_SRC: number; VERTEX: number };
@@ -30,7 +31,7 @@ export type StorageType = 'f32' | 'i32' | 'u32' | 'vec2f' | 'vec2i' | 'vec2u' | 
 type Atomic = 'u32' | 'i32';
 /** What a ComputePass body returns: writes, atomic results to keep, or nothing when it only makes atomic operations. */
 export type ComputeBody = Store | Node | readonly (Store | Node)[] | void;
-type Index = Input<'u32' | 'i32'>;
+type Index = NodeInput<'u32' | 'i32'>;
 const index = (i: Index) =>
   i instanceof Node
     ? i.type === 'u32' || i.type === 'i32'
@@ -39,7 +40,7 @@ const index = (i: Index) =>
     : cast(i, 'u32', 'storage index');
 /** One write `buffer[index] = value`, made by `StorageBuffer.store` inside a ComputePass body. */
 export interface Store {
-  readonly buffer: StorageBuffer<any>;
+  readonly buffer: StorageBuffer;
   readonly index: Node;
   readonly value: Node;
 }
@@ -104,18 +105,19 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
     });
   }
   /** A write made at the end of the ComputePass body (`atomicStore` on an atomic buffer). */
-  store(i: Index, value: Input<T>): Store {
-    return { buffer: this, index: index(i), value: cast(value, this.type, 'stored value') };
+  store(i: Index, value: NodeInput<T>): Store {
+    // StorageBuffer<T> is invariant in T (element reads and value writes), so widening to Store's buffer needs the cast.
+    return { buffer: this as unknown as StorageBuffer, index: index(i), value: cast(value, this.type, 'stored value') };
   }
   /** Atomically adds `value` to element `i` and returns the previous value (compaction: `out.store(counter.atomicAdd(0, 1), i)`).
    * Runs where it is made, in order with other atomics, even when its result is unused; inside `loop` or `Fn` only when the result is used. */
-  atomicAdd(this: StorageBuffer<Atomic>, i: Index, value: Input<T>): Node<T> {
+  atomicAdd(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T> {
     return this.rmw('atomicAdd', i, value) as never;
   }
-  atomicMax(this: StorageBuffer<Atomic>, i: Index, value: Input<T>): Node<T> {
+  atomicMax(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T> {
     return this.rmw('atomicMax', i, value) as never;
   }
-  atomicMin(this: StorageBuffer<Atomic>, i: Index, value: Input<T>): Node<T> {
+  atomicMin(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T> {
     return this.rmw('atomicMin', i, value) as never;
   }
   /** Reads element `i` at this point of the body, after the atomics made before it (unlike `element`, which reads up front). */
@@ -123,17 +125,17 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
     return this.rmw('atomicLoad', i) as never;
   }
   /** `store` on an atomic buffer. */
-  atomicStore(this: StorageBuffer<Atomic>, i: Index, value: Input<T>): Store {
+  atomicStore(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Store {
     return this.store(i, value as never);
   }
-  private rmw(op: string, i: Index, value?: Input): Node<T> {
+  private rmw(op: string, i: Index, value?: NodeInput): Node<T> {
     if (!this.atomic) throw new TypeError(`${op} needs storage(data, '${this.type}', {atomic: true})`);
     const n = new Node(
       this.type,
       'a' + unique(),
       [index(i), ...(value === undefined ? [] : [cast(value, this.type, op + ' value')])],
       (b, x) => {
-        if (b.stage.kind !== 'compute') throw new Error(`${op} is only available in ComputePass nodes`);
+        if (b.stage.kind !== 'compute') throw new TypeError(`${op} is only available in ComputePass nodes`);
         const [at, v] = x.args.map((a) => b.expr(a)),
           name = b.name();
         b.line(`let ${name} = ${op}(&${b.resource(this)}[${at}]${v ? ', ' + v : ''});`);
@@ -172,12 +174,18 @@ export function storage<T extends StorageType>(
 }
 /** The invocation number in a ComputePass, 0..count-1. */
 export const instanceIndex = /*@__PURE__*/ builtin('instanceIndex', 'u32');
-const stage: Stage = { kind: 'compute', builtins: { instanceIndex: 'gid.x' } };
+const stage: ShaderStage = { kind: 'compute', builtins: { instanceIndex: 'gid.x' } };
 let passes = 0;
+/**
+ * Options for `new ComputePass(count, body, options)`. `count` (invocations, >= 1) divided by `workgroupSize`, rounded
+ * up, must stay <= 65,535 workgroups.
+ */
 export interface ComputeOptions {
+  /** Invocations per workgroup, integer 1..256. Default 64. */
   workgroupSize?: number;
   /** Frame-graph order; the default -100 runs before the scene draws. */
   order?: number;
+  /** Plugin and debug name. Default `'shader:compute:<n>'` (n counts passes). */
   name?: string;
 }
 /** Runs `body` for `count` invocations every frame: atomic operations first, in the order they were made, then the writes it returns (their reads happen before any write). */
@@ -245,7 +253,8 @@ export class ComputePass implements EnginePlugin {
     return pass;
   }
   setup(engine: Engine): void {
-    if (!engine.gpu) throw new Error('ComputePass requires WebGPU');
+    if (!engine.gpu)
+      throw new MargoError('unsupported', 'ComputePass requires WebGPU; it does not run on the WebGL2 fallback');
     this.engine = engine;
   }
   registerPasses(graph: FrameGraph): void {

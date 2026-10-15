@@ -1,14 +1,5 @@
 import { Vector3 } from './vector3.js';
-import type { MatrixLike, Vec3Like } from './types.js';
-
-interface SphereLike {
-  center: Vec3Like;
-  radius: number;
-}
-interface PlaneLike {
-  normal: Vec3Like;
-  constant: number;
-}
+import type { MatrixLike, PlaneLike, SphereLike, Vec3Like } from './types.js';
 
 /**
  * Axis-aligned bounding box. Empty boxes have min = +Infinity and max = -Infinity.

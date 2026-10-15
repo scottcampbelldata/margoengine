@@ -1,19 +1,38 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { MargoError } from '@margoengine/math/errors';
+/**
+ * One source feeding an action. Each sample is multiplied by `scale` (finite, default 1) and summed into the action.
+ * - `key`: `KeyboardEvent.code` (non-empty); 1 while held.
+ * - `mouse`: button 0..4; 1 while held.
+ * - `pointer`: movement on `x`/`y` (pixels) or `wheel` (`WheelEvent.deltaY`) since the last update.
+ * - `gamepad-axis` / `gamepad-button`: axis or button `index` (integer >= 0) of gamepad `gamepad` (default 0);
+ *   axes get the deadzone applied.
+ * - `touch`: a control from `createStick`/`bindTouchButton` by `id`; `axis` reads a stick in [-1, 1], otherwise 1 while down.
+ */
 export type Binding =
   | { type: 'key'; code: string; scale?: number }
   | { type: 'mouse'; button: number; scale?: number }
   | { type: 'pointer'; axis: 'x' | 'y' | 'wheel'; scale?: number }
   | { type: 'gamepad-axis' | 'gamepad-button'; index: number; gamepad?: number; scale?: number }
   | { type: 'touch'; id: string; axis?: 'x' | 'y'; scale?: number };
+/** Per-action result of the last {@link Input.update}. The object is reused across updates. */
 export interface ActionState {
+  /** Sum of the scaled binding samples, clamped to [-1, 1]. */
   value: number;
+  /** True while `value` is non-zero (magnitude above 1e-6). */
   down: boolean;
+  /** True on the update where `down` became true. */
   pressed: boolean;
+  /** True on the update where `down` became false. */
   released: boolean;
 }
+/** Options for the {@link Input} constructor. */
 export interface InputOptions {
+  /** Where keyboard, pointer, wheel and blur listeners attach. Default `window`. */
   target?: EventTarget;
+  /** Gamepad source. Default `navigator.getGamepads()`, or an empty list where unsupported. */
   gamepads?: () => readonly (Gamepad | null)[];
+  /** Gamepad axis deadzone in [0, 1); axes rescale to fill the rest of the range. Default 0.15. */
   deadzone?: number;
 }
 
@@ -29,6 +48,11 @@ export class Input {
   private readonly gamepads: () => readonly (Gamepad | null)[];
   private readonly deadzone: number;
   private disposed = false;
+  /**
+   * Map named actions to bindings and start listening on `target`. Key presses inside form fields are ignored.
+   * @throws RangeError for an invalid deadzone or a non-function `gamepads`.
+   * @throws TypeError for an empty action name, an action without bindings, or an invalid binding.
+   */
   constructor(
     readonly actions: Readonly<Record<string, readonly Binding[]>>,
     { target = window, gamepads = () => navigator.getGamepads?.() ?? [], deadzone = 0.15 }: InputOptions = {},
@@ -97,13 +121,21 @@ export class Input {
     target.addEventListener(type, listener);
     this.cleanups.push(() => target.removeEventListener(type, listener));
   }
+  /**
+   * Live state of `action`, refreshed by each {@link Input.update}.
+   * @throws TypeError for an unknown action.
+   */
   state(action: string): Readonly<ActionState> {
     const state = this.states.get(action);
     if (!state) throw new TypeError('Unknown input action');
     return state;
   }
+  /**
+   * Sample every binding into its action state and clear the accumulated pointer motion. Call once per tick.
+   * @throws MargoError `'disposed'` after {@link Input.dispose}.
+   */
   update(): void {
-    if (this.disposed) throw new Error('Input is disposed');
+    if (this.disposed) throw new MargoError('disposed', 'Input is disposed; create a new Input');
     const pads = this.gamepads();
     for (let i = 0; i < this.samples.length; i++) {
       const sample = this.samples[i],
@@ -152,6 +184,11 @@ export class Input {
     }
     this.motion.x = this.motion.y = this.motion.wheel = 0;
   }
+  /**
+   * Append a 120 px on-screen touch stick to `parent`, readable through `touch` bindings with this `id`.
+   * Removed on dispose.
+   * @throws TypeError when disposed, `id` is empty, or `id` is already used by a touch control.
+   */
   createStick(parent: HTMLElement, id: string): HTMLDivElement {
     if (this.disposed || !id || this.touch.has(id)) throw new TypeError('Invalid or duplicate touch control');
     const doc = parent.ownerDocument,
@@ -210,6 +247,10 @@ export class Input {
     });
     return element;
   }
+  /**
+   * Make an existing element a touch button for `touch` bindings with this `id`; pointer, Space and Enter press it.
+   * @throws TypeError when disposed, `id` is empty, or `id` is already used by a touch control.
+   */
   bindTouchButton(element: HTMLElement, id: string): void {
     if (this.disposed || !id || this.touch.has(id)) throw new TypeError('Invalid or duplicate touch control');
     const state = { x: 0, y: 0, down: false };
@@ -252,8 +293,16 @@ export class Input {
     this.listen(element, 'blur', reset);
     this.cleanups.push(() => this.touch.delete(id));
   }
+  /**
+   * Play a dual-rumble effect; resolves false when the gamepad has no vibration actuator.
+   * @param duration Milliseconds, in [0, 10000].
+   * @param strength Magnitude in [0, 1] for both motors. Default 1.
+   * @param gamepad Gamepad index, an integer >= 0. Default 0.
+   * @throws MargoError `'disposed'` after {@link Input.dispose}.
+   * @throws RangeError for an out-of-range argument.
+   */
   async rumble(duration: number, strength = 1, gamepad = 0): Promise<boolean> {
-    if (this.disposed) throw new Error('Input is disposed');
+    if (this.disposed) throw new MargoError('disposed', 'Input is disposed; create a new Input');
     if (
       !Number.isFinite(duration) ||
       duration < 0 ||
@@ -270,6 +319,7 @@ export class Input {
     await actuator.playEffect('dual-rumble', { duration, strongMagnitude: strength, weakMagnitude: strength });
     return true;
   }
+  /** Release all keys, buttons and touch controls and clear pending motion; runs on blur and pointercancel. */
   reset(): void {
     this.keys.clear();
     this.buttons = 0;
@@ -280,6 +330,7 @@ export class Input {
       state.x = state.y = 0;
     }
   }
+  /** Remove all listeners and created sticks. Idempotent. */
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;

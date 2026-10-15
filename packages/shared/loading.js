@@ -1,3 +1,4 @@
+import { margoError } from './errors.js';
 import { Cleanup } from './cleanup.js';
 
 export async function readBytes(stream, { maxBytes, signal, label = 'Asset', output = null }) {
@@ -53,7 +54,11 @@ export async function readBytes(stream, { maxBytes, signal, label = 'Asset', out
 export async function readResponse(response, options) {
   try {
     options.signal?.throwIfAborted();
-    if (!response.ok) throw new Error(`${options.label ?? 'Asset'} request failed: HTTP ${response.status}`);
+    if (!response.ok)
+      throw margoError(
+        'failed',
+        `${options.label ?? 'Asset'} request failed: HTTP ${response.status}; check the URL and that the server serves it`,
+      );
     const declared = Number(response.headers.get('content-length'));
     if (Number.isFinite(declared) && declared > options.maxBytes)
       throw new RangeError(`${options.label ?? 'Asset'} byte budget exceeded`);

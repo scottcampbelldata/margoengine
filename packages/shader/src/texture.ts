@@ -1,10 +1,10 @@
-import { Node, cast, uv, unique, type Input, type Resource } from './node.js';
+import { Node, cast, uv, unique, type NodeInput, type Resource } from './node.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 /** Anything with `@margoengine/materials` Texture's `bind`; `srgb` is the default colour space (a texture's own `colorSpace` wins). */
-export interface TextureSource {
+export interface BindableTexture {
   bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
 }
-const resources = new WeakMap<TextureSource, Resource & { id: number }>(),
+const resources = new WeakMap<BindableTexture, Resource & { id: number }>(),
   fallbacks = new WeakMap<GPUDevice, [GPUTextureView, GPUSampler]>();
 /** Opaque white until the source has pixels (an unloaded image or video). */
 function white(device: GPUDevice): [GPUTextureView, GPUSampler] {
@@ -23,7 +23,11 @@ function white(device: GPUDevice): [GPUTextureView, GPUSampler] {
 }
 /** Samples a texture (sRGB by default; `new Texture(source, {colorSpace: 'linear'})` for data). Vertex and compute stages, or an explicit
  * `level`, use textureSampleLevel. */
-export function texture(source: TextureSource, coord: Input<'vec2f'> = uv(), level?: Input<'f32'>): Node<'vec4f'> {
+export function texture(
+  source: BindableTexture,
+  coord: NodeInput<'vec2f'> = uv(),
+  level?: NodeInput<'f32'>,
+): Node<'vec4f'> {
   if (typeof source?.bind !== 'function') throw new TypeError('texture() needs a Texture from @margoengine/materials');
   let r = resources.get(source);
   if (!r) {

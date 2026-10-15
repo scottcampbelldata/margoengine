@@ -25,10 +25,6 @@ interface BoxLike {
     max: Vec3Like;
 }
 
-interface BoxLike {
-    intersectsPlane(plane: Plane): boolean;
-}
-
 interface MatrixLike {
     readonly elements: ArrayLike<number>;
 }
@@ -53,16 +49,15 @@ class Plane {
     distanceToSphere(sphere: SphereLike): number;
     projectPoint<T extends Vec3Like>(p: Vec3Like, out: T): T;
     coplanarPoint<T extends Vec3Like>(out: T): T;
-    intersectsBox(box: BoxLike): boolean;
+    intersectsBox(box: PlaneIntersectable): boolean;
     intersectsSphere(sphere: SphereLike): boolean;
     applyMatrix4(m: MatrixLike): this;
     translate(offset: Vec3Like): this;
     equals(plane: Plane): boolean;
 }
 
-interface SphereLike {
-    center: Vec3Like;
-    radius: number;
+interface PlaneIntersectable {
+    intersectsPlane(plane: Plane): boolean;
 }
 
 interface SphereLike {

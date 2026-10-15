@@ -21,7 +21,7 @@ export interface TweenOptions {
 
 export const easeInOutCubic: Easing;
 
-export const linear: Easing;
+export const easeSmoothstep: Easing;
 
-export const smoothstep: Easing;
+export const linear: Easing;
 ```

@@ -34,15 +34,26 @@ export interface Batch {
   mask?: number;
   redirect?: { instances: GPUBuffer; args: GPUBuffer };
 }
+/**
+ * The single directional light. `direction`: xyz toward the light (non-zero), w intensity (>= 0); default [3, 5, 4, 3].
+ * `radiance`: linear rgb light color, w ambient strength, all >= 0; default [1, 1, 1, 0.15]. Invalid values throw
+ * RangeError on the next frame.
+ */
 export interface Lighting {
   direction: Float32Array;
   radiance: Float32Array;
 }
+/** WebGPU buffers core keeps for one geometry: vertices (position + normal), uint32 indices, and per-instance data. */
 export interface GeometryBuffers {
   readonly vertex: GPUBuffer;
   readonly index: GPUBuffer;
   readonly instance: GPUBuffer;
 }
+/**
+ * Backend contract the engine draws through: core's WebGPU renderer, or an `EngineOptions.fallback` such as WebGL2.
+ * `add` sizes a geometry's instance storage (`capacity` instances), `render` draws one frame (`delta` in seconds), and
+ * `onLost` reports device loss.
+ */
 export interface Renderer {
   readonly backend: 'webgpu' | 'webgl2';
   readonly gpu?: GPUDevice;

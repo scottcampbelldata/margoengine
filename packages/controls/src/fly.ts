@@ -66,7 +66,7 @@ export class FlyControls extends Controls {
     this.keyTarget = options.keyTarget ?? null;
     this.init();
   }
-  protected get kind(): string {
+  protected override get kind(): string {
     return 'fly';
   }
   protected bind(element: ControlElement) {
@@ -81,7 +81,7 @@ export class FlyControls extends Controls {
       [keys, 'keyup', this.onKeyUp],
     ] as Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
   }
-  protected onDisconnect(): void {
+  protected override onDisconnect(): void {
     for (const key of Object.keys(this.moveState)) this.moveState[key as keyof typeof this.moveState] = 0;
     this.status = 0;
   }

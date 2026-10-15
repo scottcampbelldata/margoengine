@@ -1,7 +1,7 @@
 // WGSL noise nodes, twins of `@margoengine/procedural/noise`: the same seed gives the same field on the CPU (f64) and the
 // GPU (f32), within float rounding (test/noise-check.mjs measures it on a real adapter). Simplex reads the seed's
 // permutation table, declared once per shader as a private array; Perlin hashes lattice cells and takes the seed as a value.
-import { Node, cast, vec2, vec3, type Input } from './node.js';
+import { Node, cast, vec2, vec3, type NodeInput } from './node.js';
 
 /** Octave sum settings for `fbm` and `ridged` (same defaults as the CPU twins). */
 export interface NoiseFractalOptions {
@@ -141,13 +141,13 @@ const seeded = (
 };
 
 /** 2D simplex in about [-1, 1]; `new Noise(seed).simplex2(x, y)` on the CPU. */
-export const simplex2 = (p: Input<'vec2f'>, seed = 1): Node<'f32'> =>
+export const simplex2 = (p: NodeInput<'vec2f'>, seed = 1): Node<'f32'> =>
   seeded(seed, SIMPLEX2, simplex2Code, 'Simplex2', cast(p, 'vec2f', 'simplex2 position'));
 /** 3D simplex in about [-1, 1]; `new Noise(seed).simplex(x, y, z)` on the CPU. */
-export const simplex3 = (p: Input<'vec3f'>, seed = 1): Node<'f32'> =>
+export const simplex3 = (p: NodeInput<'vec3f'>, seed = 1): Node<'f32'> =>
   seeded(seed, SIMPLEX3, simplex3Code, 'Simplex3', cast(p, 'vec3f', 'simplex3 position'));
 /** 3D gradient noise; `new Noise(seed).perlin(x, y, z)` on the CPU. `seed` may be a u32 node (a uniform reseeds without recompiling). */
-export function perlin3(p: Input<'vec3f'>, seed: number | Node<'u32'> = 1): Node<'f32'> {
+export function perlin3(p: NodeInput<'vec3f'>, seed: number | Node<'u32'> = 1): Node<'f32'> {
   if (typeof seed === 'number' && !Number.isSafeInteger(seed)) throw new RangeError('Invalid noise seed');
   return call(
     'noisePerlin3',

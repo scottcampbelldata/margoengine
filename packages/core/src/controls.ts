@@ -1,4 +1,9 @@
-import { Camera, type Vec3 } from './camera.js';
+import type { Camera, Vec3 } from './camera.js';
+/**
+ * Pointer orbit/pan/zoom for a {@link Camera} on a canvas: left drag orbits, middle/right or Shift+left drag pans, the
+ * wheel zooms between 2x `near` and 0.8x `far`. Call `update(delta)` each frame (seconds) to apply wheel zoom, and
+ * `dispose` to remove the listeners.
+ */
 export class CADCameraControls {
   private pointer?: { id: number; x: number; y: number; pan: boolean };
   private velocity = 0;

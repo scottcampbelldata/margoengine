@@ -1,9 +1,8 @@
-/** A 2D point or vector, `[x, y]`. */
-export type Vec2 = [number, number];
-/** A 3D point or vector, `[x, y, z]`. */
-export type Vec3 = [number, number, number];
+import type { MutableVec2, MutableVec3 } from '@margoengine/math';
+
+export type { MutableVec2, MutableVec3 };
 /** Either dimension. Curves are generic over this. */
-export type Vec = Vec2 | Vec3;
+export type Vec = MutableVec2 | MutableVec3;
 
 // Plain 2D and 3D arrays, which is what every curve stores, are built directly; anything else keeps the generic map.
 const plain = (a: readonly number[], size: number): boolean => a.length === size && Array.isArray(a);
@@ -13,13 +12,7 @@ export const sub = <V extends Vec>(a: V, b: V): V =>
     : plain(a, 2)
       ? [a[0] - b[0], a[1] - b[1]]
       : a.map((x, i) => x - b[i])) as V;
-export const add = <V extends Vec>(a: V, b: V): V =>
-  (plain(a, 3)
-    ? [a[0] + b[0], a[1] + b[1], a[2]! + b[2]!]
-    : plain(a, 2)
-      ? [a[0] + b[0], a[1] + b[1]]
-      : a.map((x, i) => x + b[i])) as V;
-export const scale = <V extends Vec>(a: V, s: number): V =>
+const scale = <V extends Vec>(a: V, s: number): V =>
   (plain(a, 3) ? [a[0] * s, a[1] * s, a[2]! * s] : plain(a, 2) ? [a[0] * s, a[1] * s] : a.map((x) => x * s)) as V;
 export const lerp = <V extends Vec>(a: V, b: V, t: number): V =>
   (plain(a, 3)
@@ -32,7 +25,7 @@ export const dot = (a: readonly number[], b: readonly number[]): number => {
   for (let i = 0; i < a.length; i++) s += a[i] * b[i];
   return s;
 };
-export const length = (a: readonly number[]): number => Math.sqrt(dot(a, a));
+const length = (a: readonly number[]): number => Math.sqrt(dot(a, a));
 export const distance = (a: readonly number[], b: readonly number[]): number => {
   let s = 0;
   for (let i = 0; i < a.length; i++) s += (a[i] - b[i]) ** 2;
@@ -44,15 +37,15 @@ export const normalize = <V extends Vec>(a: V): V => {
   const l = length(a);
   return (l > 0 ? scale(a, 1 / l) : a.slice()) as V;
 };
-export const cross = (a: readonly number[], b: readonly number[]): Vec3 => [
+export const cross = (a: readonly number[], b: readonly number[]): MutableVec3 => [
   a[1] * b[2] - a[2] * b[1],
   a[2] * b[0] - a[0] * b[2],
   a[0] * b[1] - a[1] * b[0],
 ];
-export const to3 = (a: readonly number[]): Vec3 => [a[0], a[1], a.length > 2 ? a[2] : 0];
+export const to3 = (a: readonly number[]): MutableVec3 => [a[0], a[1], a.length > 2 ? a[2] : 0];
 
 /** Rotates `v` around the unit `axis` by `angle` radians (Rodrigues). */
-export function rotateAxis(v: Vec3, axis: Vec3, angle: number): Vec3 {
+export function rotateAxis(v: MutableVec3, axis: MutableVec3, angle: number): MutableVec3 {
   const c = Math.cos(angle),
     s = Math.sin(angle),
     k = cross(axis, v),

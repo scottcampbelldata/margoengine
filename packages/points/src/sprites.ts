@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { Mesh } from '@margoengine/core';
+import { MargoError } from '@margoengine/math/errors';
 import { parseColor, type ColorInput } from './color.js';
 import { SpriteMaterial, type SpriteMaterialOptions } from './material.js';
 import type { PointOwner } from './cloud.js';
@@ -7,6 +8,7 @@ import type { PointOwner } from './cloud.js';
 /** Floats per sprite in `SpriteBatch.data`: position xyz, rotation, size wh, center xy, uv rect, linear RGBA. */
 export const SPRITE_STRIDE = 16;
 
+/** Properties of one sprite in a `SpriteBatch`, for `add` and `set`. */
 export interface SpriteOptions {
   /** Local position (the batch's matrix or attached mesh applies). Default [0, 0, 0]. */
   position?: readonly [number, number, number];
@@ -24,12 +26,15 @@ export interface SpriteOptions {
   uv?: readonly [number, number, number, number];
 }
 
+/** Options for `new SpriteBatch(...)`. */
 export interface SpriteBatchOptions {
+  /** A shared material or options for a new one. Default a new `SpriteMaterial`. */
   material?: SpriteMaterial | SpriteMaterialOptions;
-  /** Initial capacity; the batch grows by doubling. Default 64. */
+  /** Initial capacity; the batch grows by doubling. Must be a positive integer (RangeError otherwise). Default 64. */
   capacity?: number;
   /** Sprites to add right away. */
   sprites?: readonly SpriteOptions[];
+  /** Label for debugging. Default ''. */
   name?: string;
 }
 
@@ -135,7 +140,8 @@ export class SpriteBatch {
 
   /** @internal */
   bind(owner: PointOwner | undefined): void {
-    if (owner && this.owner && this.owner !== owner) throw new Error('The batch already belongs to another plugin');
+    if (owner && this.owner && this.owner !== owner)
+      throw new MargoError('attached', 'The batch already belongs to another plugin; remove it from that plugin first');
     this.owner = owner;
   }
 

@@ -1,14 +1,5 @@
 import { Vector3 } from './vector3.js';
-import type { MatrixLike, Vec3Like } from './types.js';
-
-interface BoxLike {
-  min: Vec3Like;
-  max: Vec3Like;
-}
-interface PlaneLike {
-  normal: Vec3Like;
-  constant: number;
-}
+import type { BoxLike, MatrixLike, PlaneLike, Vec3Like } from './types.js';
 
 /** Bounding sphere. A negative radius means empty. */
 export class Sphere {

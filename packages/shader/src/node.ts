@@ -2,10 +2,15 @@
 import { nested } from './effects.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 type N = 2 | 3 | 4;
+/** WGSL scalar types a node can have. */
 export type Scalar = 'f32' | 'i32' | 'u32' | 'bool';
+/** WGSL vector types with 2-4 components (`vec3f`, `vec2u`, `vec4<bool>`, ...). */
 export type Vector = `vec${N}${'f' | 'i' | 'u'}` | `vec${N}<bool>`;
+/** Square f32 matrix types (column-major, as WGSL stores them). */
 export type Matrix = 'mat2x2f' | 'mat3x3f' | 'mat4x4f';
+/** Every WGSL type a {@link Node} can have; `Node<T>` carries it in its TypeScript type and in `node.type`. */
 export type Type = Scalar | Vector | Matrix;
+/** Component scalar of a type: `ScalarOf<'vec3f'>` is `'f32'` (matrices are f32). */
 export type ScalarOf<T extends Type> = T extends 'f32' | `vec${N}f` | Matrix
   ? 'f32'
   : T extends 'i32' | `vec${N}i`
@@ -13,7 +18,9 @@ export type ScalarOf<T extends Type> = T extends 'f32' | `vec${N}f` | Matrix
     : T extends 'u32' | `vec${N}u`
       ? 'u32'
       : 'bool';
+/** Component count of a vector type, 1 for scalars and matrices. */
 export type Size<T extends Type> = T extends `vec${infer K extends number}${string}` ? K : 1;
+/** The type with scalar `S` and `K` components: `VecOf<'f32', 3>` is `'vec3f'`, `VecOf<'u32', 1>` is `'u32'`. */
 export type VecOf<S extends Scalar, K extends number> = K extends 1
   ? S
   : S extends 'bool'
@@ -45,7 +52,27 @@ type Count<S extends string, A extends 0[] = []> = S extends `${infer _}${infer 
   : A['length'];
 /** `.x`, `.xy`, `.rgb`, `.zyx` ... on vectors; on a scalar they splat (`f.xxx` is `vec3f(f)`). */
 export type Swizzles<T extends Type> = { readonly [K in Sw<C> | Sw<R>]: Node<VecOf<ScalarOf<T>, Count<K>>> };
-export type Input<T extends Type = Type> = Node<T> | number;
+/** What node functions accept: a `Node<T>`, or a plain number that becomes a constant of the needed type. */
+export type NodeInput<T extends Type = Type> = Node<T> | number;
+/** The node type of an operand: `T` for a `Node<T>`, never for a plain number. */
+type TypeOf<X> = X extends { readonly type: infer T extends Type } ? T : never;
+/**
+ * Result type of the component-wise built-ins (`abs`, `min`, `clamp`, `mix`, ...) for the operand list `A`: the widest
+ * node operand (a vector or matrix beats a scalar), or `f32` when every operand is a plain number.
+ */
+export type Widest<A extends readonly unknown[]> = [TypeOf<A[number]>] extends [never]
+  ? 'f32'
+  : [Exclude<TypeOf<A[number]>, Scalar>] extends [never]
+    ? TypeOf<A[number]>
+    : Exclude<TypeOf<A[number]>, Scalar>;
+/** Result type of `add(a, b)` and the other free operators: a plain number adopts the other operand's type ({@link Arith}). */
+export type BinaryResult<A, B> = [TypeOf<A>] extends [never]
+  ? [TypeOf<B>] extends [never]
+    ? 'f32'
+    : TypeOf<B>
+  : [TypeOf<B>] extends [never]
+    ? TypeOf<A>
+    : Arith<TypeOf<A>, TypeOf<B>>;
 
 /** Never bound to a `let`. */
 export const LEAF = 1;
@@ -53,8 +80,10 @@ export const LEAF = 1;
 export const OP = 2;
 /** Writes statements and returns a variable name, once per scope. */
 export const STMT = 4;
-export type Emit = (b: Builder, n: Node<any>) => string;
+/** Writes the WGSL for node `n` with builder `b` and returns its expression (or a variable name for statement nodes). */
+export type Emit = (b: Builder, n: Node) => string;
 let uid = 0;
+/** A process-wide increasing id (0, 1, 2, ...) that keeps node keys of distinct uniforms, params and loops apart. */
 export const unique = (): number => uid++;
 
 /** An immutable expression. Build them with the functions in this package; `key` plus `args` must determine `emit`. */
@@ -79,12 +108,12 @@ export interface Node<T extends Type = Type> extends Swizzles<T> {
   mod(b: number): Node<T>;
   mod<U extends Type>(b: Node<U>): Node<Arith<T, U>>;
   negate(): Node<T>;
-  lessThan(b: Input<T> | Input<ScalarOf<T>>): Bools<T>;
-  lessThanEqual(b: Input<T> | Input<ScalarOf<T>>): Bools<T>;
-  greaterThan(b: Input<T> | Input<ScalarOf<T>>): Bools<T>;
-  greaterThanEqual(b: Input<T> | Input<ScalarOf<T>>): Bools<T>;
-  equal(b: Input<T> | Input<ScalarOf<T>>): Bools<T>;
-  notEqual(b: Input<T> | Input<ScalarOf<T>>): Bools<T>;
+  lessThan(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Bools<T>;
+  lessThanEqual(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Bools<T>;
+  greaterThan(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Bools<T>;
+  greaterThanEqual(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Bools<T>;
+  equal(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Bools<T>;
+  notEqual(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Bools<T>;
   and(b: Node<T>): Node<T>;
   or(b: Node<T>): Node<T>;
   not(): Node<T>;
@@ -117,19 +146,19 @@ export interface Node<T extends Type = Type> extends Swizzles<T> {
   fwidth(): Node<T>;
   oneMinus(): Node<T>;
   length(): Node<ScalarOf<T>>;
-  distance(b: Input<T>): Node<ScalarOf<T>>;
-  dot(b: Input<T>): Node<ScalarOf<T>>;
+  distance(b: NodeInput<T>): Node<ScalarOf<T>>;
+  dot(b: NodeInput<T>): Node<ScalarOf<T>>;
   cross(b: Node<'vec3f'>): Node<'vec3f'>;
-  min(b: Input<T> | Input<ScalarOf<T>>): Node<T>;
-  max(b: Input<T> | Input<ScalarOf<T>>): Node<T>;
-  pow(b: Input<T> | Input<ScalarOf<T>>): Node<T>;
-  clamp(low: Input<T> | Input<ScalarOf<T>>, high: Input<T> | Input<ScalarOf<T>>): Node<T>;
-  step(edge: Input<T> | Input<ScalarOf<T>>): Node<T>;
-  mix(b: Input<T>, t: Input<T> | Input<ScalarOf<T>>): Node<T>;
-  reflect(n: Input<T>): Node<T>;
+  min(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Node<T>;
+  max(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Node<T>;
+  pow(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Node<T>;
+  clamp(low: NodeInput<T> | NodeInput<ScalarOf<T>>, high: NodeInput<T> | NodeInput<ScalarOf<T>>): Node<T>;
+  step(edge: NodeInput<T> | NodeInput<ScalarOf<T>>): Node<T>;
+  mix(b: NodeInput<T>, t: NodeInput<T> | NodeInput<ScalarOf<T>>): Node<T>;
+  reflect(n: NodeInput<T>): Node<T>;
   /** Component `i` of a vector, column of a matrix. */
   element(
-    i: Input<'i32' | 'u32'>,
+    i: NodeInput<'i32' | 'u32'>,
   ): Node<T extends Matrix ? `vec${T extends `mat${infer K extends number}x${string}` ? K : 4}f` : ScalarOf<T>>;
   toFloat(): Floats<T>;
   toInt(): Node<VecOf<'i32', Size<T>>>;
@@ -138,14 +167,18 @@ export interface Node<T extends Type = Type> extends Swizzles<T> {
 
 const vectorRe = /^vec([234])(f|i|u|<bool>)$/,
   matrixRe = /^mat([234])x\1f$/;
+/** Runtime {@link ScalarOf}: `scalarOf('vec3u')` is `'u32'`. */
 export const scalarOf = (t: Type): Scalar =>
   matrixRe.test(t)
     ? 'f32'
     : vectorRe.exec(t)?.[2] === '<bool>'
       ? 'bool'
       : (({ f: 'f32', i: 'i32', u: 'u32' } as Record<string, Scalar>)[vectorRe.exec(t)?.[2] ?? ''] ?? (t as Scalar));
+/** Runtime {@link Size}: 2-4 for vectors, 1 for scalars and matrices. */
 export const sizeOf = (t: Type): number => +(vectorRe.exec(t)?.[1] ?? 1);
+/** True for `mat2x2f`, `mat3x3f` and `mat4x4f`. */
 export const isMatrix = (t: Type): boolean => matrixRe.test(t);
+/** Runtime {@link VecOf}: the type with scalar `s` and `n` (1-4) components. */
 export const vecOf = (s: Scalar, n: number): Type =>
   (n === 1 ? s : s === 'bool' ? `vec${n}<bool>` : `vec${n}${s[0]}`) as Type;
 const fail = (message: string): never => {
@@ -176,7 +209,7 @@ export function constant<T extends Type>(value: number | boolean, type: T): Node
   );
 }
 /** Lifts a number to `type` (scalars splat into vectors) and checks a node already has it. */
-export function cast<T extends Type>(x: Input | boolean, type: T, label = 'value'): Node<T> {
+export function cast<T extends Type>(x: NodeInput | boolean, type: T, label = 'value'): Node<T> {
   if (!(x instanceof Node)) return constant(x, type);
   if (x.type === type) return x as Node<T>;
   if (sizeOf(x.type) === 1 && !isMatrix(x.type) && scalarOf(x.type) === scalarOf(type) && !isMatrix(type))
@@ -185,10 +218,10 @@ export function cast<T extends Type>(x: Input | boolean, type: T, label = 'value
 }
 const splat = <T extends Type>(x: Node, type: T): Node<T> =>
   new Node(type, 's', [x], (b, n) => `${type}(${b.expr(n.args[0])})`);
-const node = (x: Input | boolean): Node =>
+const node = (x: NodeInput | boolean): Node =>
   x instanceof Node ? x : constant(x, typeof x === 'boolean' ? 'bool' : 'f32');
 /** Widest of several operands: numbers adopt the nodes' scalar type, scalars splat to the vector size. */
-function unify(name: string, args: (Input | boolean)[]): Node[] {
+function unify(name: string, args: (NodeInput | boolean)[]): Node[] {
   const nodes = args.filter((a) => a instanceof Node) as Node[],
     first = nodes[0]?.type ?? 'f32';
   const target: Type = nodes.reduce<Type>(
@@ -205,19 +238,20 @@ export function call<T extends Type>(name: string, args: Node[], type: T, wgsl =
 }
 const same =
   (name: string, wgsl = name) =>
-  (...a: Input[]): Node<any> => {
+  <A extends NodeInput[]>(...a: A): Node<Widest<A>> => {
     const u = unify(name, a);
-    return call(name, u, u[0].type, wgsl);
+    return call(name, u, u[0].type as Widest<A>, wgsl);
   };
 const reduce =
   (name: string) =>
-  (...a: Input[]): Node<any> => {
+  <A extends NodeInput[]>(...a: A): Node<ScalarOf<Widest<A>>> => {
     const u = unify(name, a);
-    return call(name, u, scalarOf(u[0].type), name);
+    return call(name, u, scalarOf(u[0].type) as ScalarOf<Widest<A>>, name);
   };
-const unary = (op: string, x: Node): Node<any> => new Node(x.type, 'u' + op, [x], (b, n) => op + b.wrap(n.args[0]), OP);
+const unary = <T extends Type>(op: string, x: Node<T>): Node<T> =>
+  new Node(x.type, 'u' + op, [x], (b, n) => op + b.wrap(n.args[0]), OP);
 
-function binary(op: string, a: Input | boolean, b: Input | boolean, compare: boolean): Node<any> {
+function binary(op: string, a: NodeInput | boolean, b: NodeInput | boolean, compare: boolean): Node {
   let x = node(a),
     y = node(b);
   if (!(a instanceof Node)) x = cast(a, scalarOf(y.type));
@@ -240,11 +274,25 @@ function binary(op: string, a: Input | boolean, b: Input | boolean, compare: boo
     return fail(`${x.type} ${op} ${y.type}: operand types do not combine`);
   return new Node(type, 'o' + op, [x, y], (b, n) => `${b.wrap(n.args[0])} ${op} ${b.wrap(n.args[1])}`, OP);
 }
-export const add = (a: Input, b: Input): Node<any> => binary('+', a, b, false);
-export const sub = (a: Input, b: Input): Node<any> => binary('-', a, b, false);
-export const mul = (a: Input, b: Input): Node<any> => binary('*', a, b, false);
-export const div = (a: Input, b: Input): Node<any> => binary('/', a, b, false);
-export const mod = (a: Input, b: Input): Node<any> => binary('%', a, b, false);
+/**
+ * `a + b`, `a - b`, `a * b`, `a / b`, `a % b` as nodes. Numbers adopt the other operand's scalar type; a scalar
+ * combines with a vector or matrix, and `mul` multiplies a matrix by a vector (either side).
+ * @throws TypeError when the operand types do not combine (e.g. vec2f + vec3f, or bool arithmetic).
+ */
+export const add = <A extends NodeInput, B extends NodeInput>(a: A, b: B): Node<BinaryResult<A, B>> =>
+  binary('+', a, b, false) as Node<BinaryResult<A, B>>;
+/** `a - b` as a node; operand rules as {@link add}. */
+export const sub = <A extends NodeInput, B extends NodeInput>(a: A, b: B): Node<BinaryResult<A, B>> =>
+  binary('-', a, b, false) as Node<BinaryResult<A, B>>;
+/** `a * b` as a node (matrix times vector either side); operand rules as {@link add}. */
+export const mul = <A extends NodeInput, B extends NodeInput>(a: A, b: B): Node<BinaryResult<A, B>> =>
+  binary('*', a, b, false) as Node<BinaryResult<A, B>>;
+/** `a / b` as a node; operand rules as {@link add}. */
+export const div = <A extends NodeInput, B extends NodeInput>(a: A, b: B): Node<BinaryResult<A, B>> =>
+  binary('/', a, b, false) as Node<BinaryResult<A, B>>;
+/** `a % b` (WGSL remainder, sign of `a`) as a node; operand rules as {@link add}. */
+export const mod = <A extends NodeInput, B extends NodeInput>(a: A, b: B): Node<BinaryResult<A, B>> =>
+  binary('%', a, b, false) as Node<BinaryResult<A, B>>;
 
 /** WGSL built-ins. Scalars and numbers splat to the widest argument, so `mix(a, b, 0.5)` and `clamp(v, 0, 1)` work for vectors. */
 export const abs = same('abs'),
@@ -254,6 +302,7 @@ export const abs = same('abs'),
   round = same('round'),
   trunc = same('trunc'),
   fract = same('fract');
+/** WGSL trigonometry, component-wise, in radians: `atan2(y, x)` takes two operands. */
 export const sin = same('sin'),
   cos = same('cos'),
   tan = same('tan'),
@@ -262,6 +311,7 @@ export const sin = same('sin'),
   atan = same('atan'),
   tanh = same('tanh'),
   atan2 = same('atan2');
+/** WGSL exponentials and roots, component-wise (`log` is natural; `saturate` clamps to 0..1). */
 export const exp = same('exp'),
   exp2 = same('exp2'),
   log = same('log'),
@@ -269,12 +319,19 @@ export const exp = same('exp'),
   sqrt = same('sqrt'),
   inverseSqrt = same('inverseSqrt'),
   saturate = same('saturate');
+/** `normalize` (unit vector), angle conversion (`radians`, `degrees`) and screen-space derivatives (`dpdx`, `dpdy`,
+ * `fwidth`; fragment and post stages only, WGSL rule). */
 export const normalize = same('normalize'),
   radians = same('radians'),
   degrees = same('degrees'),
   dpdx = same('dpdx'),
   dpdy = same('dpdy'),
   fwidth = same('fwidth');
+/**
+ * WGSL built-ins over several operands, WGSL argument order: `clamp(x, low, high)`, `step(edge, x)`,
+ * `smoothstep(low, high, x)` (edges first, unlike `@margoengine/math`'s), `mix(a, b, t)`, `reflect(i, n)`, `cross(a, b)`.
+ * @throws TypeError when the operand types do not match.
+ */
 export const min = same('min'),
   max = same('max'),
   pow = same('pow'),
@@ -284,20 +341,28 @@ export const min = same('min'),
   mix = same('mix'),
   reflect = same('reflect'),
   cross = same('cross');
+/** WGSL `length(v)`, `distance(a, b)` and `dot(a, b)`: scalar results of the operands' component type. */
 export const length = reduce('length'),
   distance = reduce('distance'),
   dot = reduce('dot');
-export const refract = (i: Input<'vec3f'>, n: Input<'vec3f'>, eta: Input<'f32'>): Node<'vec3f'> =>
+/** Refraction of incident `i` about unit normal `n` with index ratio `eta` (WGSL `refract`); zero on total internal reflection. */
+export const refract = (i: NodeInput<'vec3f'>, n: NodeInput<'vec3f'>, eta: NodeInput<'f32'>): Node<'vec3f'> =>
   call('refract', [cast(i, 'vec3f'), cast(n, 'vec3f'), cast(eta, 'f32')], 'vec3f');
-export const oneMinus = <T extends Type>(x: Node<T>): Node<T> => binary('-', 1, x, false);
+/** `1 - x`, component-wise. */
+export const oneMinus = <T extends Type>(x: Node<T>): Node<T> => binary('-', 1, x, false) as Node<T>;
+/** `-x`. */
 export const negate = <T extends Type>(x: Node<T>): Node<T> => unary('-', x);
+/**
+ * Logical `!x` of a bool or bool vector.
+ * @throws TypeError for a non-bool node.
+ */
 export const not = <T extends Type>(x: Node<T>): Node<T> =>
   scalarOf(x.type) === 'bool' ? unary('!', x) : fail('not() needs bool');
 /** `cond ? ifTrue : ifFalse` per component (both sides are evaluated). */
 export function select<T extends Type>(
   cond: Node<'bool' | `vec${N}<bool>`> | boolean,
-  ifTrue: Input<T>,
-  ifFalse: Input<T>,
+  ifTrue: NodeInput<T>,
+  ifFalse: NodeInput<T>,
 ): Node<T> {
   const [t, f] = unify('select', [ifTrue, ifFalse]),
     c = cast(
@@ -309,7 +374,7 @@ export function select<T extends Type>(
 }
 /** Discards the fragment where `condition` holds and is `value` elsewhere: `colorNode: discard(texture(map).a.lessThan(0.5), texture(map))`.
  * NodeMaterial fragment nodes and NodePass nodes only (a discarded NodePass pixel stays the cleared transparent black). */
-export function discard<T extends Type>(condition: Input<'bool'> | boolean, value: Input<T>): Node<T> {
+export function discard<T extends Type>(condition: NodeInput<'bool'> | boolean, value: NodeInput<T>): Node<T> {
   const v = node(value) as Node<T>;
   return new Node(
     v.type,
@@ -326,7 +391,7 @@ export function discard<T extends Type>(condition: Input<'bool'> | boolean, valu
     STMT,
   );
 }
-function convert<T extends Type>(x: Input | boolean, type: T): Node<T> {
+function convert<T extends Type>(x: NodeInput | boolean, type: T): Node<T> {
   if (!(x instanceof Node)) return constant(x, type);
   if (x.type === type) return x as Node<T>;
   if (isMatrix(type) || isMatrix(x.type) || (sizeOf(x.type) !== 1 && sizeOf(x.type) !== sizeOf(type)))
@@ -334,7 +399,7 @@ function convert<T extends Type>(x: Input | boolean, type: T): Node<T> {
   return new Node(type, 'v', [x], (b, n) => `${type}(${b.expr(n.args[0])})`);
 }
 /** Builds a vector or matrix from scalars and smaller vectors (`vec4(rgb, 1)`), or splats one scalar. */
-function construct<T extends Type>(type: T, parts: (Input | boolean)[]): Node<T> {
+function construct<T extends Type>(type: T, parts: (NodeInput | boolean)[]): Node<T> {
   const s = scalarOf(type),
     total = isMatrix(type) ? (+type[3]) ** 2 : sizeOf(type);
   if (parts.length === 1 && !(isMatrix(type) && parts[0] instanceof Node && parts[0].type === type))
@@ -347,23 +412,34 @@ function construct<T extends Type>(type: T, parts: (Input | boolean)[]): Node<T>
   if (count !== total) fail(`${type} needs ${total} components, got ${count}`);
   return new Node(type, 'k', args, (b, n) => `${type}(${n.args.map((a) => b.expr(a)).join(', ')})`);
 }
-type Part = Input | boolean;
+type Part = NodeInput | boolean;
+/**
+ * Scalar constants (`float(0.5)`) or conversions of a scalar node (`float(intNode)`, WGSL `f32(...)`).
+ * @throws TypeError for a vector or matrix node, a non-finite number, or a non-integer i32/u32 constant.
+ */
 export const float = (x: Part): Node<'f32'> => convert(x, 'f32'),
   int = (x: Part): Node<'i32'> => convert(x, 'i32'),
   uint = (x: Part): Node<'u32'> => convert(x, 'u32'),
   bool = (x: Part): Node<'bool'> => convert(x, 'bool');
+/**
+ * f32 vectors from scalars and smaller vectors (`vec4(rgb, 1)`), or one splatted scalar (`vec3(0)`).
+ * @throws TypeError when the parts do not add up to the component count.
+ */
 export const vec2 = (...p: Part[]): Node<'vec2f'> => construct('vec2f', p),
   vec3 = (...p: Part[]): Node<'vec3f'> => construct('vec3f', p),
   vec4 = (...p: Part[]): Node<'vec4f'> => construct('vec4f', p);
+/** i32 vectors, built like {@link vec2}. */
 export const ivec2 = (...p: Part[]): Node<'vec2i'> => construct('vec2i', p),
   ivec3 = (...p: Part[]): Node<'vec3i'> => construct('vec3i', p),
   ivec4 = (...p: Part[]): Node<'vec4i'> => construct('vec4i', p);
+/** u32 vectors, built like {@link vec2}. */
 export const uvec2 = (...p: Part[]): Node<'vec2u'> => construct('vec2u', p),
   uvec3 = (...p: Part[]): Node<'vec3u'> => construct('vec3u', p),
   uvec4 = (...p: Part[]): Node<'vec4u'> => construct('vec4u', p);
 /** Column-major: three vec3 columns or nine numbers. */
 export const mat3 = (...p: Part[]): Node<'mat3x3f'> => construct('mat3x3f', p),
   mat4 = (...p: Part[]): Node<'mat4x4f'> => construct('mat4x4f', p);
+/** A colour for {@link color} and uniforms: `'#rrggbb'` or `0xrrggbb` (sRGB, decoded to linear) or linear `[r, g, b]`. */
 export type ColorValue = string | number | readonly number[];
 /** `'#rrggbb'` or `0xrrggbb` (sRGB) or linear `[r, g, b]`, as linear RGB. */
 export function linearColor(c: ColorValue): number[] {
@@ -384,6 +460,10 @@ export function linearColor(c: ColorValue): number[] {
         : fail('Expected a #rrggbb or 0xrrggbb colour or [r, g, b]');
   return v.map((x) => Math.round(x * 1e6) / 1e6);
 }
+/**
+ * A linear-RGB `vec3f` constant from a {@link ColorValue} (components rounded to 6 decimals).
+ * @throws TypeError for anything but `#rrggbb`, `0xrrggbb` (0..0xffffff) or a 3-number array.
+ */
 export const color = (c: ColorValue): Node<'vec3f'> => construct('vec3f', linearColor(c));
 
 const swizzle = (x: Node, s: string): Node => {
@@ -402,14 +482,14 @@ const swizzle = (x: Node, s: string): Node => {
     return m ? `${m[1]}.${index.map((i) => m[2][i]).join('')}` : `${inner}.${xyzw}`;
   });
 };
-const P = Node.prototype as any,
+const P = Node.prototype as unknown as Record<string, unknown>,
   combos = (chars: string, n: number): string[] =>
     n ? combos(chars, n - 1).flatMap((p) => [...chars].map((c) => p + c)) : [''];
 for (const chars of ['xyzw', 'rgba'])
   for (let n = 1; n < 5; n++)
     for (const k of combos(chars, n))
       Object.defineProperty(P, k, {
-        get() {
+        get(this: Node) {
           return swizzle(this, k);
         },
       });
@@ -422,7 +502,7 @@ for (const [name, op] of [
   ['and', '&&'],
   ['or', '||'],
 ])
-  P[name] = function (b: Input) {
+  P[name] = function (this: Node, b: NodeInput) {
     return binary(op, this, b, false);
   };
 for (const [name, op] of [
@@ -433,10 +513,11 @@ for (const [name, op] of [
   ['equal', '=='],
   ['notEqual', '!='],
 ])
-  P[name] = function (b: Input) {
+  P[name] = function (this: Node, b: NodeInput) {
     return binary(op, this, b, true);
   };
-const methods: Record<string, (...a: any[]) => Node<any>> = {
+// Each takes the node as its first argument; never[] parameters accept every signature here.
+const methods: Record<string, (...a: never[]) => Node> = {
   abs,
   sign,
   floor,
@@ -483,10 +564,10 @@ const methods: Record<string, (...a: any[]) => Node<any>> = {
   toUint: (x: Node) => convert(x, vecOf('u32', sizeOf(x.type))),
 };
 for (const name in methods)
-  P[name] = function (...a: any[]) {
-    return methods[name](this, ...a);
+  P[name] = function (this: Node, ...a: unknown[]) {
+    return (methods[name] as (...args: unknown[]) => Node)(this, ...a);
   };
-P.element = function (this: Node, i: Input<'i32' | 'u32'>) {
+P.element = function (this: Node, i: NodeInput<'i32' | 'u32'>) {
   const m = isMatrix(this.type);
   if (!m && sizeOf(this.type) === 1) fail('element() needs a vector or matrix');
   const index = i instanceof Node ? i : constant(i, 'i32');
@@ -501,10 +582,14 @@ P.element = function (this: Node, i: Input<'i32' | 'u32'>) {
 /** A per-stage built-in such as `uv()` or `normalWorld`; the host stage decides what it reads. */
 export const builtin = <T extends Type>(name: string, type: T): Node<T> =>
   new Node(type, 'b' + name, [], (b) => b.builtin(name), LEAF);
+/** The mesh's first UV set (material stages) or the full-screen UV, origin top left (NodePass). */
 export const uv = (): Node<'vec2f'> => builtin('uv', 'vec2f');
+/** The mesh's vertex colour attribute (RGBA). NodeMaterial stages only. */
 export const vertexColor = (): Node<'vec4f'> => builtin('vertexColor', 'vec4f');
+/** Vertex position in model space and world space (world units). NodeMaterial stages only. */
 export const positionLocal = /*@__PURE__*/ builtin('positionLocal', 'vec3f'),
   positionWorld = /*@__PURE__*/ builtin('positionWorld', 'vec3f');
+/** Surface normal in model space and world space (unit length). NodeMaterial stages only. */
 export const normalLocal = /*@__PURE__*/ builtin('normalLocal', 'vec3f'),
   normalWorld = /*@__PURE__*/ builtin('normalWorld', 'vec3f');
 /** Unit vector from the surface to the camera. */
@@ -534,9 +619,9 @@ export function varying<T extends Type>(x: Node<T>): Node<T> {
 const param = <T extends Type>(type: T): Node<T> => new Node(type, 'p' + unique(), [], (b, n) => b.param(n), LEAF);
 /** A bounded fold: `loop(8, init, (i, acc) => next)` runs `acc = next` for i = 0..count-1 and returns the final `acc`. */
 export function loop<T extends Type>(
-  count: Input<'i32' | 'u32'>,
-  init: Input<T>,
-  body: (i: Node<'i32'>, acc: Node<T>) => Input<T>,
+  count: NodeInput<'i32' | 'u32'>,
+  init: NodeInput<T>,
+  body: (i: Node<'i32'>, acc: Node<T>) => NodeInput<T>,
 ): Node<T> {
   const start = node(init) as Node<T>,
     i = param('i32'),
@@ -582,17 +667,22 @@ interface Spec {
 export function Fn<P extends Type[], R extends Type>(
   body: (...args: { [K in keyof P]: Node<P[K]> }) => Node<R>,
   name = 'func',
-): (...args: { [K in keyof P]: Input<P[K]> }) => Node<R> {
+): (...args: { [K in keyof P]: NodeInput<P[K]> }) => Node<R> {
   if (!/^[a-zA-Z]\w*$/.test(name) || name.startsWith('nd') || name === 'fn')
     fail('Fn names are WGSL identifiers not starting with nd');
   const specs = new Map<string, Spec>();
   return (...input) => {
-    const args = input.map((a) => node(a as Input)),
+    const args = input.map((a) => node(a as NodeInput)),
       sig = args.map((a) => a.type).join();
     let spec = specs.get(sig);
     if (!spec) {
       const params = args.map((a) => param(a.type));
-      spec = { name, id: unique(), params, result: node(nested(() => (body as any)(...params))) };
+      spec = {
+        name,
+        id: unique(),
+        params,
+        result: node(nested(() => (body as unknown as (...args: Node[]) => Node<R>)(...params))),
+      };
       specs.set(sig, spec);
     }
     const s = spec;
@@ -605,7 +695,7 @@ export function Fn<P extends Type[], R extends Type>(
   };
 }
 /** Wraps hand-written WGSL: the first `fn name(a: T, ...) -> R` is the one called; further functions in `code` come along. */
-export function wgslFn<R extends Type = Type>(code: string): (...args: Input[]) => Node<R> {
+export function wgslFn<R extends Type = Type>(code: string): (...args: NodeInput[]) => Node<R> {
   const m = /fn\s+(\w+)\s*\(([^)]*)\)\s*->\s*([\w<>]+)/.exec(code) ?? fail('wgslFn needs "fn name(params) -> type"');
   const params = m[2]
     .split(',')
@@ -690,7 +780,10 @@ export function uniform<T extends Type>(
   value: number | ColorValue,
   options: { type: T; name?: string },
 ): UniformNode<T>;
-export function uniform(value: number | ColorValue, options: { type?: Type; name?: string } = {}): UniformNode<any> {
+export function uniform<T extends Type>(
+  value: number | ColorValue,
+  options: { type?: T; name?: string } = {},
+): UniformNode<T> {
   const n = typeof value === 'string' ? 3 : typeof value === 'number' ? 1 : (value as number[]).length;
   return new UniformNode(
     value,
@@ -698,7 +791,7 @@ export function uniform(value: number | ColorValue, options: { type?: Type; name
       ({ 1: 'f32', 2: 'vec2f', 3: 'vec3f', 4: 'vec4f', 9: 'mat3x3f', 16: 'mat4x4f' } as Record<number, Type>)[n] ??
       fail('Unsupported uniform value'),
     options.name,
-  );
+  ) as unknown as UniformNode<T>; // the overloads pick T from the value; UniformNode<T> is invariant
 }
 
 /** Host-side inputs a resource or frame uniform reads when bindings are built. */
@@ -715,7 +808,12 @@ export interface Resource {
   declare(name: string, group: number, binding: number, compute: boolean): string;
   entries(device: GPUDevice, host: Host): GPUBindingResource[];
 }
-export interface Stage {
+/**
+ * One shader stage a host compiles nodes for (`vertex`, `fragment`, `post` or `compute`): the WGSL each built-in such
+ * as `uv` reads there, and how `varying()` crosses to the next stage. Hosts (NodeMaterial, NodePass, ComputePass)
+ * define them; nodes only read them.
+ */
+export interface ShaderStage {
   readonly kind: 'vertex' | 'fragment' | 'post' | 'compute';
   readonly builtins: Readonly<Record<string, string | ((b: Builder) => string)>>;
   varying?(b: Builder, x: Node): string;
@@ -750,7 +848,7 @@ export class Program {
     this.next = base;
   }
   /** Compiles `outputs` for one stage; returns its statements and one expression per output. */
-  stage(stage: Stage, outputs: readonly Node[]): { lines: string[]; values: string[] } {
+  stage(stage: ShaderStage, outputs: readonly Node[]): { lines: string[]; values: string[] } {
     for (const o of outputs) this.count(o);
     const b = new Builder(this, stage),
       values = outputs.map((o) => b.expr(o));
@@ -876,8 +974,8 @@ export class Program {
 export const sameEntries = (a: readonly GPUBindGroupEntry[], b: readonly GPUBindGroupEntry[]): boolean =>
   a.length === b.length &&
   a.every((e, i) => {
-    const x = e.resource as any,
-      y = b[i].resource as any;
+    const x = e.resource as Partial<GPUBufferBinding>,
+      y = b[i].resource as Partial<GPUBufferBinding>;
     return (
       e.binding === b[i].binding &&
       (x === y || (!!x?.buffer && x.buffer === y?.buffer && x.offset === y.offset && x.size === y.size))
@@ -891,7 +989,7 @@ export class Builder {
   private readonly params = new Map<Node, string>();
   constructor(
     readonly program: Program,
-    readonly stage: Stage,
+    readonly stage: ShaderStage,
   ) {}
   expr(n: Node): string {
     const c = this.program.canon(n),

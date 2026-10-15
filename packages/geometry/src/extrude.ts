@@ -1,6 +1,6 @@
 import { geometryData, sequentialIndices, type GeometryData } from './data.js';
 import type { Curve } from './curve.js';
-import { finiteNumber, type Vec2, type Vec3 } from './math.js';
+import { finiteNumber, type MutableVec2, type MutableVec3 } from './math.js';
 import type { Shape } from './path.js';
 import { isClockWise, mergeOverlappingPoints, triangulateShape } from './triangulate.js';
 
@@ -32,6 +32,7 @@ export function shapeGeometry(shapes: Shape | readonly Shape[], curveSegments = 
   return geometryData(p, n, uv, idx, Array.isArray(shapes) ? groups : undefined);
 }
 
+/** Options for `extrudeGeometry` (Three.js `ExtrudeGeometry` parameters). Lengths are in shape units. */
 export interface ExtrudeOptions {
   /** Points per curve segment of the shape. Default 12. */
   curveSegments?: number;
@@ -50,11 +51,11 @@ export interface ExtrudeOptions {
   /** Bevel layers. Default 3. */
   bevelSegments?: number;
   /** 3D curve to sweep the shape along. Shape x follows the frame normal, y the binormal. */
-  extrudePath?: Curve<Vec3>;
+  extrudePath?: Curve<MutableVec3>;
 }
 
 /** Three.js bevel offset direction for a contour vertex (`getBevelVec`). */
-function bevelVector(pt: Vec2, prev: Vec2, next: Vec2): Vec2 {
+function bevelVector(pt: MutableVec2, prev: MutableVec2, next: MutableVec2): MutableVec2 {
   let tx: number, ty: number, shrink: number;
   const px = pt[0] - prev[0],
     py = pt[1] - prev[1],
@@ -95,7 +96,7 @@ function bevelVector(pt: Vec2, prev: Vec2, next: Vec2): Vec2 {
   return [tx / shrink, ty / shrink];
 }
 
-const movements = (ring: Vec2[]) =>
+const movements = (ring: MutableVec2[]) =>
   ring.map((p, i) => bevelVector(p, ring[(i + ring.length - 1) % ring.length], ring[(i + 1) % ring.length]));
 
 /**
@@ -148,8 +149,8 @@ function build(
     bevelOffset = options.bevelOffset ?? 0;
   let bevelSegments = Math.floor(options.bevelSegments ?? 3);
   const path = options.extrudePath;
-  let pathPoints: Vec3[] = [],
-    frames: ReturnType<Curve<Vec3>['computeFrenetFrames']> | null = null;
+  let pathPoints: MutableVec3[] = [],
+    frames: ReturnType<Curve<MutableVec3>['computeFrenetFrames']> | null = null;
   if (path) {
     pathPoints = path.getSpacedPoints(steps);
     frames = path.computeFrenetFrames(steps, false);
@@ -178,7 +179,7 @@ function build(
     allMoves = [contourMoves, ...holeMoves].flat();
   const layers: number[] = [];
   const v = (x: number, y: number, z: number) => layers.push(x, y, z);
-  const scaled = (p: Vec2, m: Vec2, s: number): Vec2 => [p[0] + m[0] * s, p[1] + m[1] * s];
+  const scaled = (p: MutableVec2, m: MutableVec2, s: number): MutableVec2 => [p[0] + m[0] * s, p[1] + m[1] * s];
   const bevelLayer = (b: number, zFor: (z: number) => number) => {
     const t = b / bevelSegments,
       z = bevelThickness * Math.cos((t * Math.PI) / 2),

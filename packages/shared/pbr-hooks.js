@@ -1,5 +1,6 @@
 // gltf-pro's lighting hook composer (its README "Lighting hooks"), shared with VAT crowds whose lit fragment keeps the
 // same hook points: `direct+ambient(s)`, `var color=`, `fn ambient(s:Surface)`, `+s.emissive;` and the tone-map line.
+import { margoError } from './errors.js';
 const lit = new WeakMap();
 /** `code` (a PBR fragment with gltf-pro's hook points, possibly already lit) with one effect's hooks composed in. */
 export function lightPBR(code, hooks) {
@@ -9,7 +10,11 @@ export function lightPBR(code, hooks) {
   out = code;
   const edit = (from, to) => {
     const next = out.replace(from, to);
-    if (next === out) throw new Error('PBR lighting hook point missing or used twice: ' + from);
+    if (next === out)
+      throw margoError(
+        'unsupported',
+        `PBR lighting hook point missing or used twice: ${from}; use matching @margoengine/gltf-pro and effect package versions`,
+      );
     out = next;
   };
   // gltf-pro's transmissive and extended shaders (they define margoAmbientLayers) evaluate light and ambient hooks as

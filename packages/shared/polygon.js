@@ -22,16 +22,16 @@ function measure(ring) {
   }
   return { area: area / 2, error: error / 2 + Math.abs(area) * Number.EPSILON };
 }
-export function signedArea(ring) {
+function signedArea(ring) {
   return measure(ring).area;
 }
-export function chargeContourWork(counter, amount = 1) {
+function chargeContourWork(counter, amount = 1) {
   if (counter) {
     counter.used += amount;
     if (counter.used > counter.limit) throw new RangeError('Text total work budget exceeded');
   }
 }
-export function containsPoint(ring, p, workCounter) {
+function containsPoint(ring, p, workCounter) {
   let inside = false;
   chargeContourWork(workCounter, ring.length);
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -56,46 +56,7 @@ function intersects(a, b, c, d) {
     (values[3] === 0 && on(b, c, d))
   );
 }
-export function validateContourIntersections(rings, workCounter) {
-  const contours = rings.map((ring) => {
-    chargeContourWork(workCounter, ring.length);
-    if (ring.length > 4097) throw new RangeError('Polygon requires 3–4096 total contour vertices');
-    const points = [],
-      min = [Infinity, Infinity],
-      max = [-Infinity, -Infinity];
-    for (const p of ring) {
-      finiteVector(p, 2, 'Polygon vertex');
-      if (!points.length || p[0] !== points.at(-1)[0] || p[1] !== points.at(-1)[1]) points.push(p);
-      for (let i = 0; i < 2; i++) {
-        min[i] = Math.min(min[i], p[i]);
-        max[i] = Math.max(max[i], p[i]);
-      }
-    }
-    if (points.length && points[0][0] === points.at(-1)[0] && points[0][1] === points.at(-1)[1]) points.pop();
-    return { points, min, max };
-  });
-  for (let i = 0; i < contours.length; i++)
-    for (let j = i + 1; j < contours.length; j++) {
-      chargeContourWork(workCounter);
-      const a = contours[i],
-        b = contours[j];
-      if (a.max[0] < b.min[0] || b.max[0] < a.min[0] || a.max[1] < b.min[1] || b.max[1] < a.min[1]) continue;
-      for (let ai = 0; ai < a.points.length; ai++)
-        for (let bi = 0; bi < b.points.length; bi++) {
-          chargeContourWork(workCounter);
-          if (
-            intersects(
-              a.points[ai],
-              a.points[(ai + 1) % a.points.length],
-              b.points[bi],
-              b.points[(bi + 1) % b.points.length],
-            )
-          )
-            throw new RangeError('Polygon contours cross or touch');
-        }
-    }
-}
-export function polygonRings(contour, holes = [], { allowTouch = false, workCounter } = {}) {
+function polygonRings(contour, holes = [], { allowTouch = false, workCounter } = {}) {
   if (!Array.isArray(holes) || holes.length > 4096) throw new TypeError('Invalid polygon holes');
   let count = 0;
   const rings = [contour, ...holes].map((ring) => {

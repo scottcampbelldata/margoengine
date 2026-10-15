@@ -4,23 +4,24 @@
 
 ```ts
 import { Geometry } from "@margoengine/core";
+import { MutableVec2, MutableVec3 } from "@margoengine/math";
 
 export class ArcCurve extends EllipseCurve {
     constructor(aX?: number, aY?: number, aRadius?: number, aStartAngle?: number, aEndAngle?: number, aClockwise?: boolean);
 }
 
-export class CatmullRomCurve3 extends Curve<Vec3> {
-    points: Vec3[];
+export class CatmullRomCurve3 extends Curve<MutableVec3> {
+    points: MutableVec3[];
     closed: boolean;
     curveType: CatmullRomType;
     tension: number;
-    constructor(points?: Vec3[], closed?: boolean, curveType?: CatmullRomType, tension?: number);
-    getPoint(t: number): Vec3;
+    constructor(points?: MutableVec3[], closed?: boolean, curveType?: CatmullRomType, tension?: number);
+    getPoint(t: number): MutableVec3;
 }
 
 export type CatmullRomType = 'centripetal' | 'chordal' | 'catmullrom' | 'uniform';
 
-export class CubicBezierCurve<V extends Vec = Vec2> extends Curve<V> {
+export class CubicBezierCurve<V extends Vec = MutableVec2> extends Curve<V> {
     v0: V;
     v1: V;
     v2: V;
@@ -29,7 +30,7 @@ export class CubicBezierCurve<V extends Vec = Vec2> extends Curve<V> {
     getPoint(t: number): V;
 }
 
-export class CubicBezierCurve3 extends CubicBezierCurve<Vec3> {
+export class CubicBezierCurve3 extends CubicBezierCurve<MutableVec3> {
 }
 
 export abstract class Curve<V extends Vec> {
@@ -47,7 +48,7 @@ export abstract class Curve<V extends Vec> {
     computeFrenetFrames(segments: number, closed?: boolean): FrenetFrames;
 }
 
-export class CurvePath<V extends Vec = Vec2> extends Curve<V> {
+export class CurvePath<V extends Vec = MutableVec2> extends Curve<V> {
     curves: Curve<V>[];
     autoClose: boolean;
     add(curve: Curve<V>): this;
@@ -60,7 +61,7 @@ export class CurvePath<V extends Vec = Vec2> extends Curve<V> {
     getPoints(divisions?: number): V[];
 }
 
-export class EllipseCurve extends Curve<Vec2> {
+export class EllipseCurve extends Curve<MutableVec2> {
     aX: number;
     aY: number;
     xRadius: number;
@@ -70,7 +71,7 @@ export class EllipseCurve extends Curve<Vec2> {
     aClockwise: boolean;
     aRotation: number;
     constructor(aX?: number, aY?: number, xRadius?: number, yRadius?: number, aStartAngle?: number, aEndAngle?: number, aClockwise?: boolean, aRotation?: number);
-    getPoint(t: number): Vec2;
+    getPoint(t: number): MutableVec2;
 }
 
 export interface ExtrudeOptions {
@@ -82,13 +83,13 @@ export interface ExtrudeOptions {
     bevelSize?: number;
     bevelOffset?: number;
     bevelSegments?: number;
-    extrudePath?: Curve<Vec3>;
+    extrudePath?: Curve<MutableVec3>;
 }
 
 export interface FrenetFrames {
-    tangents: Vec3[];
-    normals: Vec3[];
-    binormals: Vec3[];
+    tangents: MutableVec3[];
+    normals: MutableVec3[];
+    binormals: MutableVec3[];
 }
 
 export interface GeometryData {
@@ -106,7 +107,7 @@ export interface GeometryGroup {
     materialIndex: number;
 }
 
-export class LineCurve<V extends Vec = Vec2> extends Curve<V> {
+export class LineCurve<V extends Vec = MutableVec2> extends Curve<V> {
     v1: V;
     v2: V;
     constructor(v1: V, v2: V);
@@ -116,7 +117,7 @@ export class LineCurve<V extends Vec = Vec2> extends Curve<V> {
     getTangentAt(): V;
 }
 
-export class LineCurve3 extends LineCurve<Vec3> {
+export class LineCurve3 extends LineCurve<MutableVec3> {
 }
 
 export interface MergeVerticesOptions {
@@ -125,22 +126,22 @@ export interface MergeVerticesOptions {
     removeDegenerate?: boolean;
 }
 
-export class Path extends CurvePath<Vec2> {
-    currentPoint: Vec2;
-    constructor(points?: Vec2[]);
-    setFromPoints(points: Vec2[]): this;
+export class Path extends CurvePath<MutableVec2> {
+    currentPoint: MutableVec2;
+    constructor(points?: MutableVec2[]);
+    setFromPoints(points: MutableVec2[]): this;
     moveTo(x: number, y: number): this;
     lineTo(x: number, y: number): this;
     quadraticCurveTo(cx: number, cy: number, x: number, y: number): this;
     bezierCurveTo(c1x: number, c1y: number, c2x: number, c2y: number, x: number, y: number): this;
-    splineThru(points: Vec2[]): this;
+    splineThru(points: MutableVec2[]): this;
     arc(aX: number, aY: number, radius: number, startAngle: number, endAngle: number, clockwise?: boolean): this;
     absarc(aX: number, aY: number, radius: number, startAngle: number, endAngle: number, clockwise?: boolean): this;
     ellipse(aX: number, aY: number, xRadius: number, yRadius: number, startAngle: number, endAngle: number, clockwise?: boolean, rotation?: number): this;
     absellipse(aX: number, aY: number, xRadius: number, yRadius: number, startAngle: number, endAngle: number, clockwise?: boolean, rotation?: number): this;
 }
 
-export class QuadraticBezierCurve<V extends Vec = Vec2> extends Curve<V> {
+export class QuadraticBezierCurve<V extends Vec = MutableVec2> extends Curve<V> {
     v0: V;
     v1: V;
     v2: V;
@@ -148,29 +149,25 @@ export class QuadraticBezierCurve<V extends Vec = Vec2> extends Curve<V> {
     getPoint(t: number): V;
 }
 
-export class QuadraticBezierCurve3 extends QuadraticBezierCurve<Vec3> {
+export class QuadraticBezierCurve3 extends QuadraticBezierCurve<MutableVec3> {
 }
 
 export class Shape extends Path {
     holes: Path[];
-    getPointsHoles(divisions?: number): Vec2[][];
+    getPointsHoles(divisions?: number): MutableVec2[][];
     extractPoints(divisions?: number): {
-        shape: Vec2[];
-        holes: Vec2[][];
+        shape: MutableVec2[];
+        holes: MutableVec2[][];
     };
 }
 
-export class SplineCurve extends Curve<Vec2> {
-    points: Vec2[];
-    constructor(points?: Vec2[]);
-    getPoint(t: number): Vec2;
+export class SplineCurve extends Curve<MutableVec2> {
+    points: MutableVec2[];
+    constructor(points?: MutableVec2[]);
+    getPoint(t: number): MutableVec2;
 }
 
-export type Vec = Vec2 | Vec3;
-
-export type Vec2 = [number, number];
-
-export type Vec3 = [number, number, number];
+export type Vec = MutableVec2 | MutableVec3;
 
 export function applyMatrix4(data: GeometryData, m: ArrayLike<number>): GeometryData;
 
@@ -183,12 +180,12 @@ export function center(data: GeometryData): GeometryData;
 export function circleGeometry(radius?: number, segmentCount?: number, thetaStart?: number, thetaLength?: number): GeometryData;
 
 export function computeBoundingBox(data: GeometryData): {
-    min: Vec3;
-    max: Vec3;
+    min: MutableVec3;
+    max: MutableVec3;
 };
 
 export function computeBoundingSphere(data: GeometryData): {
-    center: Vec3;
+    center: MutableVec3;
     radius: number;
 };
 
@@ -212,15 +209,15 @@ export function geometryData(positions: ArrayLike<number>, normals: ArrayLike<nu
 
 export function icosahedronGeometry(radius?: number, detail?: number, smooth?: boolean): GeometryData;
 
-export const isClockWise: (points: readonly Vec2[]) => boolean;
+export const isClockWise: (points: readonly MutableVec2[]) => boolean;
 
-export function latheGeometry(points?: readonly Vec2[], segmentCount?: number, phiStart?: number, phiLength?: number): GeometryData;
+export function latheGeometry(points?: readonly MutableVec2[], segmentCount?: number, phiStart?: number, phiLength?: number): GeometryData;
 
 export function loopSubdivide(data: GeometryData, iterations?: number, tolerance?: number): GeometryData;
 
 export function mergeGeometries(list: readonly GeometryData[], useGroups?: boolean): GeometryData;
 
-export function mergeOverlappingPoints(points: readonly Vec2[]): Vec2[];
+export function mergeOverlappingPoints(points: readonly MutableVec2[]): MutableVec2[];
 
 export function mergeVertices(data: GeometryData, options?: MergeVerticesOptions): GeometryData;
 
@@ -234,7 +231,7 @@ export function polyhedronGeometry(vertices: readonly number[], indices: readonl
 
 export function ringGeometry(innerRadius?: number, outerRadius?: number, thetaSegments?: number, phiSegments?: number, thetaStart?: number, thetaLength?: number): GeometryData;
 
-export function shapeArea(contour: readonly Vec2[]): number;
+export function shapeArea(contour: readonly MutableVec2[]): number;
 
 export function shapeGeometry(shapes: Shape | readonly Shape[], curveSegments?: number): GeometryData;
 
@@ -252,10 +249,10 @@ export function torusKnotGeometry(radius?: number, tube?: number, tubularSegment
 
 export function triangulate(data: ArrayLike<number>, holeIndices?: ArrayLike<number>, dim?: number): number[];
 
-export function triangulateShape(contour: readonly Vec2[], holes?: readonly (readonly Vec2[])[]): {
+export function triangulateShape(contour: readonly MutableVec2[], holes?: readonly (readonly MutableVec2[])[]): {
     indices: number[];
-    contour: Vec2[];
-    holes: Vec2[][];
+    contour: MutableVec2[];
+    holes: MutableVec2[][];
 };
 
 export function tubeGeometry(path: Curve<Vec>, tubularSegments?: number, radius?: number, radialSegments?: number, closed?: boolean): GeometryData;

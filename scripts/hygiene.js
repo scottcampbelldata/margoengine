@@ -15,11 +15,14 @@
 //              `extends`); violation: a flag that is off.
 //   5 types    units: distinct names declared in the api reports of all packages; violation: a type/interface declared
 //              in >= 2 packages (duplicate shared type, e.g. Vec3), or a name declared and exported by >= 2 packages
-//              (clashing export, e.g. loadGLTF). A package is charged for each such name it declares.
+//              (clashing export, e.g. loadGLTF). A package is charged for each such name it declares. A re-export
+//              (`export { Vec3 } from '@margoengine/math'`) is not a declaration. Exempt: a name the allowlist's `names`
+//              grants to exactly that set of packages (same vocabulary in two domains, e.g. math vs shader `dot`).
 //   6 tsdoc    units: exported symbols declared in the package (dist/*.d.ts through the TypeScript checker);
 //              violation: no `/** */` comment on any of its declarations (a symbol two entries export counts once).
-//   7 errors   units: `throw new X(` sites in src; violation: a bare `Error` (the convention is a typed error:
-//              TypeError/RangeError/... or a named class; 1h.h will add shared codes, then this gate tightens).
+//   7 errors   units: `throw new X(` sites in src; violation: a bare `Error` (the convention, docs/conventions.md:
+//              TypeError/RangeError for arguments, MargoError with a code otherwise), beyond the allowlist's `errors`
+//              count for that file (frozen core + stage only).
 //   8 api      not measured here: the open items of "API rough edges before 1.0" in docs/HANDOFF.md are a manual list.
 //   9 dead     units: src files + their named exports; violation: a file no package entry, worker URL or build script
 //              reaches, or an export nothing imports (any repo file), re-exports or makes public.
@@ -182,13 +185,18 @@ if (!quick) {
 
   // --- Gate 5: duplicate shared types and clashing export names (from the api reports).
   const duplicates = [];
+  const allowedDuplicates = [];
   for (const [name, owners] of declared) {
     if (owners.size < 2) continue;
     const list = [...owners];
     const types = list.filter(([, e]) => e.type).length;
     const exported = list.filter(([, e]) => e.exported).length;
-    if (types >= 2 || exported >= 2)
-      duplicates.push({ name, kind: types >= 2 ? 'type' : 'export', packages: list.map(([p]) => p) });
+    if (types < 2 && exported < 2) continue;
+    const duplicate = { name, kind: types >= 2 ? 'type' : 'export', packages: list.map(([p]) => p) };
+    const granted = Object.hasOwn(allowlist.names ?? {}, name) ? allowlist.names[name].packages : undefined;
+    if (granted && [...granted].sort().join() === [...duplicate.packages].sort().join())
+      allowedDuplicates.push(duplicate);
+    else duplicates.push(duplicate);
   }
   const dupNames = new Set(duplicates.map((d) => d.name));
   for (const [name, owners] of declared)
@@ -254,7 +262,8 @@ if (!quick) {
   for (const dir of packages.concat('shared')) {
     for (const file of srcFiles(dir)) {
       const throws = [...read(file).matchAll(/\bthrow new (\w+)\(/g)].map((m) => m[1]);
-      add(dir, 'errors', throws.length, throws.filter((t) => t === 'Error').length);
+      const bare = throws.filter((t) => t === 'Error').length;
+      add(dir, 'errors', throws.length, Math.max(0, bare - (allowlist.errors?.[file]?.count ?? 0)));
     }
   }
 
@@ -409,7 +418,7 @@ if (!quick) {
       if (unused.length) (dead[dir] ??= []).push(`${file}: ${unused.join(', ')}`);
     }
   }
-  details = { duplicates, undocumented, dead };
+  details = { duplicates, allowedDuplicates, undocumented, dead };
 }
 
 // --- Scores and output.

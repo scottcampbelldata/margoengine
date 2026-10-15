@@ -1,10 +1,21 @@
-import { cross, distance, dot, finiteNumber, normalize, rotateAxis, sub, to3, type Vec, type Vec3 } from './math.js';
+import {
+  cross,
+  distance,
+  dot,
+  finiteNumber,
+  normalize,
+  rotateAxis,
+  sub,
+  to3,
+  type Vec,
+  type MutableVec3,
+} from './math.js';
 
 /** Per-sample orthonormal frames along a curve. Arrays have `segments + 1` entries. */
 export interface FrenetFrames {
-  tangents: Vec3[];
-  normals: Vec3[];
-  binormals: Vec3[];
+  tangents: MutableVec3[];
+  normals: MutableVec3[];
+  binormals: MutableVec3[];
 }
 
 /**
@@ -107,16 +118,16 @@ export abstract class Curve<V extends Vec> {
    */
   computeFrenetFrames(segments: number, closed = false): FrenetFrames {
     finiteNumber(segments);
-    const tangents: Vec3[] = [],
-      normals: Vec3[] = [],
-      binormals: Vec3[] = [];
+    const tangents: MutableVec3[] = [],
+      normals: MutableVec3[] = [],
+      binormals: MutableVec3[] = [];
     for (let i = 0; i <= segments; i++) tangents.push(normalize(to3(this.getTangentAt(i / segments))));
     const t0 = tangents[0],
       ax = Math.abs(t0[0]),
       ay = Math.abs(t0[1]),
       az = Math.abs(t0[2]);
     let min = Infinity,
-      seed: Vec3 = [0, 0, 1];
+      seed: MutableVec3 = [0, 0, 1];
     if (ax <= min) {
       min = ax;
       seed = [1, 0, 0];

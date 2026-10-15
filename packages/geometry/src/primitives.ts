@@ -1,6 +1,6 @@
 import { geometryData, type GeometryData, type GeometryGroup } from './data.js';
 import type { Curve } from './curve.js';
-import { finiteNumber, type Vec, type Vec2 } from './math.js';
+import { finiteNumber, type Vec, type MutableVec2 } from './math.js';
 
 const TAU = Math.PI * 2;
 const segments = (value: number, min: number) => Math.max(min, Math.floor(finiteNumber(value)));
@@ -450,7 +450,7 @@ export function torusKnotGeometry(
  * profile like Three.js, but every normal is unit length.
  */
 export function latheGeometry(
-  points: readonly Vec2[] = [
+  points: readonly MutableVec2[] = [
     [0, -0.5],
     [0.5, 0],
     [0, 0.5],

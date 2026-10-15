@@ -14,11 +14,15 @@ import {
   type TextDirection,
   type TextLayout,
 } from './layout.js';
+import { MargoError } from '@margoengine/math/errors';
 import { eulerToQuaternion } from '@margoengine/math/quat';
+import type { Vec3 } from '@margoengine/math';
 import { compose, finiteArray, identity, type Mat4 } from './math.js';
 
-type Vec3 = readonly [number, number, number];
-
+/**
+ * Appearance options of a `Text` block. Validated every frame: opacities outside 0..1 or a negative or
+ * non-finite outline width or shadow blur throw a RangeError, non-boolean flags a TypeError.
+ */
 export interface TextStyleOptions {
   /** Fill color. Default white. */
   color?: ColorInput;
@@ -44,22 +48,27 @@ export interface TextStyleOptions {
   onTop?: boolean;
 }
 
+/** Options for `new Text(...)`: content, font, layout, style and local transform. */
 export interface TextOptions extends LayoutOptions, TextStyleOptions {
+  /** The string to draw. Default ''. */
   text?: string;
   /** A shared Font or options for a new one. Default sans-serif. */
   font?: Font | FontOptions;
+  /** Default true. */
   visible?: boolean;
   /** Follow this core mesh's world matrix; the text's own transform is then relative to the mesh. */
   mesh?: Mesh | null;
+  /** Local position in world units. Default [0, 0, 0]. */
   position?: Vec3;
   /** XYZ Euler angles in radians. */
   rotation?: Vec3;
+  /** Uniform or per-axis scale; zero components throw a RangeError. Default 1. */
   scale?: number | Vec3;
   /** Local matrix (column-major); overrides position, rotation and scale. */
   matrix?: Mat4;
 }
 
-interface Owner {
+interface TextOwner {
   remove(text: Text): void;
 }
 
@@ -117,7 +126,7 @@ export class Text {
   /** Local matrix; the model matrix is this, or the attached mesh's world matrix times this. */
   readonly matrix = identity();
   private target: Mesh | null = null;
-  private owner?: Owner;
+  private owner?: TextOwner;
   private cached?: TextLayout;
   private readonly snapshot: unknown[] = [];
   private layoutRevision = 0;
@@ -252,8 +261,12 @@ export class Text {
   }
 
   /** @internal */
-  bind(owner: Owner | undefined): void {
-    if (owner && this.owner && this.owner !== owner) throw new Error('Text already belongs to another TextRenderer');
+  bind(owner: TextOwner | undefined): void {
+    if (owner && this.owner && this.owner !== owner)
+      throw new MargoError(
+        'attached',
+        'Text already belongs to another TextRenderer; remove it from that renderer first',
+      );
     this.owner = owner;
   }
 

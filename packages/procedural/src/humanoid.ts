@@ -1,6 +1,12 @@
 import { PbrMaterial, type EngineKernel, type Mesh, type Geometry } from '@margoengine/core';
 import { toGeometry, capsuleGeometry, sphereGeometry } from '@margoengine/geometry';
 
+/**
+ * Builds a simple capsule-and-sphere humanoid rig under a new root mesh. `materials` dress, in order, the torso, head
+ * and arms; the legs and back; and the face. Returns the root, a `focus` mesh 1.5 world units above it, the joint and knee
+ * meshes that `poseHumanoid` animates, and every part mesh.
+ * @throws TypeError unless `materials` is exactly three `PbrMaterial`s.
+ */
 export function createHumanoid(engine: EngineKernel, materials: readonly [PbrMaterial, PbrMaterial, PbrMaterial]) {
   if (
     materials.length !== 3 ||

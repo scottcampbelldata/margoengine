@@ -1,4 +1,4 @@
-import { PointsPlugin, PointCloud, SpriteBatch, multiply, projectPoint } from '../../packages/points/dist/index.js';
+import { PointsPlugin, PointCloud, SpriteBatch, multiply, projectToPixels } from '../../packages/points/dist/index.js';
 import { fetchBytes, parsePCD } from '../../packages/loaders/dist/index.js';
 import { controls } from './ui-scene.js';
 
@@ -119,7 +119,13 @@ export async function createWorkload(count = 4, options = {}) {
         canvas = engine.canvas;
       for (let i = 0; i < cloud.positions.length; i += 3)
         if (
-          projectPoint(matrix, ...cloud.positions.subarray(i, i + 3), canvas.clientWidth, canvas.clientHeight, pixel) &&
+          projectToPixels(
+            matrix,
+            ...cloud.positions.subarray(i, i + 3),
+            canvas.clientWidth,
+            canvas.clientHeight,
+            pixel,
+          ) &&
           pixel[0] >= 0 &&
           pixel[0] < canvas.clientWidth &&
           pixel[1] >= 0 &&

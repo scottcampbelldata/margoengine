@@ -13,11 +13,16 @@ export interface TextMeasurer {
   metrics(): { ascent: number; descent: number };
 }
 
+/** Horizontal alignment of each line inside the text block. */
 export type TextAlign = 'left' | 'center' | 'right' | 'justify';
+/** Which edge of the text block sits at the local origin horizontally. */
 export type AnchorX = 'left' | 'center' | 'right';
+/** Which edge or baseline of the text block sits at the local origin vertically. */
 export type AnchorY = 'top' | 'middle' | 'bottom' | 'baseline' | 'bottom-baseline';
+/** Paragraph direction; 'auto' takes it from the first strong character. */
 export type TextDirection = 'ltr' | 'rtl' | 'auto';
 
+/** Layout options shared by `layoutText` and `Text`; checked by `validateLayoutOptions`. */
 export interface LayoutOptions {
   /** Em size in world units. Default 1. */
   fontSize?: number;
@@ -59,31 +64,47 @@ export interface LayoutGlyph {
   whitespace: boolean;
 }
 
+/** One laid-out line, in the text block's local space (x right, y up, world units). */
 export interface LayoutLine {
   /** UTF-16 range [start, end) of the source string, excluding the newline. */
   start: number;
+  /** End of the UTF-16 range (exclusive). */
   end: number;
   /** Range of this line's entries in `glyphs`, in visual order left to right. */
   firstGlyph: number;
+  /** Number of entries in `glyphs` belonging to this line. */
   glyphCount: number;
   /** Line box. Trailing spaces hang outside left..right. */
   left: number;
+  /** Right edge of the line box. */
   right: number;
+  /** Top edge of the line box. */
   top: number;
+  /** Bottom edge of the line box: `top` minus the line height. */
   bottom: number;
+  /** Baseline height. */
   baseline: number;
+  /** True when the line's paragraph runs right to left. */
   rtl: boolean;
 }
 
+/** Result of `layoutText`: positioned glyphs and lines. Lengths are in world units. */
 export interface TextLayout {
+  /** The source string. */
   text: string;
+  /** Positioned clusters of all lines. */
   glyphs: LayoutGlyph[];
+  /** Lines from top to bottom. */
   lines: LayoutLine[];
   /** Union of the line boxes, block width by line count times line height. */
   bounds: { left: number; right: number; top: number; bottom: number };
+  /** Em size in world units. */
   fontSize: number;
+  /** Line box height in world units (the option times fontSize). */
   lineHeight: number;
+  /** Font ascent in world units. */
   ascent: number;
+  /** Font descent in world units, positive. */
   descent: number;
 }
 
@@ -171,6 +192,11 @@ const DIRECTIONS: readonly string[] = ['ltr', 'rtl', 'auto'],
   WHITE_SPACES: readonly string[] = ['normal', 'nowrap'],
   WRAPS: readonly string[] = ['normal', 'break-word'];
 
+/**
+ * Fills in layout defaults and checks ranges.
+ * @throws RangeError when fontSize or lineHeight is not positive and finite, letterSpacing is not finite, or maxWidth is not positive.
+ * @throws TypeError for an unknown textAlign, anchor, direction, whiteSpace or overflowWrap.
+ */
 export function validateLayoutOptions(options: LayoutOptions): Required<LayoutOptions> {
   const o: Required<LayoutOptions> = {
     fontSize: options.fontSize ?? 1,

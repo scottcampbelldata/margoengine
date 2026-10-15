@@ -202,7 +202,7 @@ export class EnvironmentLighting extends ShaderEffect {
   ) {
     super(options.name ?? 'environment:lighting');
   }
-  dispose(): void {
+  override dispose(): void {
     const engine = this.loadedInto;
     this.loadedInto = undefined;
     super.dispose();
@@ -237,7 +237,7 @@ export class EnvironmentLighting extends ShaderEffect {
       ambient: iblCall('s.n', 'v', 's.base.rgb', 's.metal', 's.roughness') + '*s.occlusion',
     };
   }
-  setup(engine: EngineKernel): void {
+  override setup(engine: EngineKernel): void {
     super.setup(engine);
     this.restore(engine);
   }
@@ -392,7 +392,7 @@ export class Fog extends ShaderEffect {
   protected hooks(group: number): PBRHooks {
     return { declarations: fogWgsl(group), output: (color) => fogMix(color, 'f.eye.xyz') };
   }
-  setup(engine: EngineKernel): void {
+  override setup(engine: EngineKernel): void {
     super.setup(engine);
     const device = engineRuntime(engine).gpu;
     if (!device) throw new Error('Fog requires the WebGPU backend');
@@ -418,7 +418,7 @@ export class Fog extends ShaderEffect {
     this.buffer?.destroy();
     this.buffer = this.gpu = this.entry = undefined;
   }
-  dispose(): void {
+  override dispose(): void {
     super.dispose();
     this.release();
   }

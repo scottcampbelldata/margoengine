@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
-import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
-import type { EngineKernel, Mesh } from '@margoengine/core';
+import type { EngineKernel } from '@margoengine/core';
+import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { viewMatrix } from '../../shared/view.js';
 import { GlyphAtlas } from './atlas.js';
 import { LinearToSRGB as encodeSrgb } from '@margoengine/math/color';
@@ -35,21 +35,10 @@ interface Resources {
 
 let warned = false;
 
-/** World matrix of a live, visible core mesh after the latest transform tick, or null. */
-export function meshWorldMatrix(engine: EngineKernel, mesh: Mesh): Float32Array | null {
-  const runtime = engineRuntime(engine),
-    object = meshRuntime(mesh),
-    id = object.id;
-  if (runtime.disposed || runtime.meshes.get(id) !== (mesh as unknown)) return null;
-  for (
-    let current = id, depth = 0;
-    current >= 0 && depth < 64;
-    current = runtime.store.parents?.[current] ?? -1, depth++
-  )
-    if (runtime.store.hidden[current]) return null;
-  return object.matrix ?? runtime.store.matrices.subarray(id * 16, id * 16 + 16);
-}
-
+/**
+ * Options for the `TextRenderer` plugin. Throws a TypeError for an empty name or non-finite order, and a
+ * RangeError when a size or page limit is not a positive integer or an atlas page is under 64 texels.
+ */
 export interface TextRendererOptions {
   /** Plugin name, unique per engine. Default 'text'. */
   name?: string;

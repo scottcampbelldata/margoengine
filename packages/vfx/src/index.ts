@@ -15,7 +15,7 @@ export class VFX extends VFXBase {
   constructor(options: VFXOptions = {}) {
     super(options, features);
   }
-  static attach(instance: EngineKernel, options: VFXOptions = {}): VFX {
+  static override attach(instance: EngineKernel, options: VFXOptions = {}): VFX {
     const effect = new VFX(options);
     engineRuntime(instance).use(effect);
     return effect;

@@ -1,10 +1,14 @@
-import type { ColorSpace, NumberArray } from './types.js';
+import type { ColorInput, ColorSpace, NumberArray } from './types.js';
 
+export type { ColorInput } from './types.js';
+
+/** Any `{r, g, b}` colour (linear RGB components, 0..1 for displayable colours), such as a {@link Color}. */
 export interface ColorLike {
   r: number;
   g: number;
   b: number;
 }
+/** Hue, saturation and lightness, each 0..1 (hue wraps: 0 and 1 are both red), as `Color.getHSL` writes them. */
 export interface HSL {
   h: number;
   s: number;
@@ -16,10 +20,12 @@ export const SRGBToLinear = (c: number): number => (c <= 0.04045 ? c / 12.92 : (
 /** sRGB transfer function, encoded (linear light to display value). */
 export const LinearToSRGB = (c: number): number => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
 
-/** A color as the packages take it: '#rrggbb' or '#rgb' (sRGB), a 0xrrggbb number (sRGB), or [r, g, b] in linear RGB 0..1 like PbrMaterial. */
-export type ColorInput = string | number | readonly number[];
-
-/** Converts a ColorInput to linear RGB at `out[offset..offset + 2]`. Throws on anything else, or negative/non-finite components. */
+/**
+ * Converts a {@link ColorInput} to linear RGB at `out[offset..offset + 2]` and returns `out` (default: a new
+ * `[0, 0, 0]`; `offset` defaults to 0).
+ * @throws RangeError for a number outside 0x000000..0xffffff or a negative/non-finite `[r, g, b]` component.
+ * @throws TypeError for a string that is not `#rrggbb`/`#rgb`, or any other value.
+ */
 export function parseColor(
   value: ColorInput,
   out: Float32Array | number[] = [0, 0, 0],

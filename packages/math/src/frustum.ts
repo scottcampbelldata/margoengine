@@ -1,14 +1,5 @@
 import { Plane } from './plane.js';
-import type { MatrixLike, NumberArray, Vec3Like } from './types.js';
-
-interface SphereLike {
-  center: Vec3Like;
-  radius: number;
-}
-interface BoxLike {
-  min: Vec3Like;
-  max: Vec3Like;
-}
+import type { BoxLike, MatrixLike, NumberArray, SphereLike, Vec3Like } from './types.js';
 
 /**
  * Six inward-facing planes in the same order and layout as core `camera.planes`

@@ -1,5 +1,7 @@
 /** Helpers only text uses; shared ones come from `@margoengine/math`. `compose` stays here: its x * (y + y) form differs from math's composeMatrix where products under/overflow. */
-export type Mat4 = ArrayLike<number>;
+import type { Mat4 } from '@margoengine/math';
+
+export type { Mat4 };
 
 export const identity = (): Float32Array => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 
