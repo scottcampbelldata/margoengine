@@ -4,6 +4,8 @@
 
 Coming from three.js: [from-threejs.md](from-threejs.md) maps three.js code to Margo packages side by side.
 
+Design envelope: [limits.md](limits.md) lists every hard limit (entity count, textures per shader, float32 coordinates, STEP size, browsers and tested hardware), where it starts, and the package or tool that takes you past it.
+
 Deploying: [deploying.md](deploying.md) gives the Content Security Policy, caching and compression headers for Cloudflare Pages, Netlify, Vercel and Nginx.
 
 Making a game with Blender: [guides/blender-game.md](guides/blender-game.md) builds a small interactive game from glTF exports, step by step.
