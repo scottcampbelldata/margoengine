@@ -82,6 +82,7 @@ npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @
 | `DirectionalLight` shadows | `@margoengine/shadows` |
 | `PointLight`, `SpotLight` (and their shadows) | `@margoengine/clustered` (shadows: `@margoengine/clustered/shadows`) |
 | `RGBELoader`, `EXRLoader`, `PMREMGenerator`, `scene.background`, `scene.fog` | `@margoengine/environment` |
+| Volumetric fog and light shafts (`VolumeNodeMaterial`) | `@margoengine/environment/volumetric` |
 | `Sky` add-on | `@margoengine/sky` |
 | `OrbitControls`, `TransformControls`, `DragControls`, `FlyControls`, ... | `@margoengine/controls` |
 | `Raycaster`, three-mesh-bvh | `@margoengine/bvh` |
@@ -399,6 +400,22 @@ ColorBackground.attach(engine, {color: '#bcd4e6'});
 const fog = Fog.attach(engine, {color: '#bcd4e6', near: 10, far: 80}); // {density: 0.02} for FogExp2
 fog.add(model);
 fog.far = 120;            // options are live properties
+```
+
+Volumetric fog with light shafts (three's `webgpu_volume_lighting` example, `VolumeNodeMaterial`) is the optional
+`@margoengine/environment/volumetric` entry. It replaces `Fog` (it throws while an enabled `Fog` is attached) and needs a
+post capture such as `Tonemap` for the scene depth:
+
+```ts
+import {Tonemap} from '@margoengine/tonemap';
+import {Shadows} from '@margoengine/shadows';
+import {Clustered} from '@margoengine/clustered';
+import {VolumetricFog} from '@margoengine/environment/volumetric';
+
+Tonemap.attach(engine);
+const shadows = Shadows.attach(engine);                 // the sun's shadows cut light shafts
+const lights = Clustered.attach(engine);                // point and spot lights glow in the fog
+VolumetricFog.attach(engine, {density: 0.03, heightFalloff: 0.2, anisotropy: 0.6, shadows, lights});
 ```
 
 - IBL replaces the constant ambient term with prefiltered specular and spherical-harmonic diffuse. SSAO darkens it.

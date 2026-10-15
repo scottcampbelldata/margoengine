@@ -760,7 +760,32 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       reflects it); SSR would help (boats, shore) but needs a water material replay: not integrated. Limits: only core
       meshes reflect (glTF-pro, water, terrain need a replay source); 1080p trace is the cost (half-res trace = upgrade).
       Finding: SSAO's ambient replay uses `_=` and so still runs the full lighting; the same dead-block trick would cut it.
-   b. [running] Volumetric fog and light shafts (sun and clustered lights; replaces ad-hoc god rays where it fits).
+   b. [DONE] Volumetric fog and light shafts: `VolumetricFog.attach(engine, {density, heightFalloff, height, anisotropy,
+      noise, wind, range, grid, temporal, shadows, lights, depth})` in the new entry `@margoengine/environment/volumetric`
+      (environment owns scene fog, i.e. three's `scene.fog`; this is its heavier replacement and needs no sky, so CAD and
+      indoor scenes can use it; built separately so the root entry is byte-identical, 21,140 B; the entry is 6,658 B
+      min+gzip). Froxel grid (default 160x90x64, quadratic slices over `range` m from the near plane, read from
+      `camera.matrix`, so perspective and orthographic both work): one compute pass injects density (uniform, height
+      falloff, optional noise + wind) and scattered light (sun from engine lighting through `Shadows`' cascades, four
+      stratified compare samples per froxel; ambient; clustered point/spot lights from clustered's own cluster lists, times `LocalShadows`'
+      `clusterShadow` when attached; Henyey-Greenstein phase), jittered per frame, history reprojected at the froxel centre (0.9), then
+      integrates each column into a 3D texture; a full-screen composite at order 5 (where sky fog runs) blends premultiplied
+      light + scene x transmittance over opaque surfaces and the sky, per sample on 4x depth. Scene depth from any post
+      capture (`sceneTarget`), or `depth: () => texture`. It never patches a lit shader: no texture added to the 16 budget.
+      Shadows/Clustered are read duck-typed through their `pbr(group).declarations` + `bindings()` (no import);
+      `packages/environment/tests/volumetric.test.js` pins the clustered cell lookup and cascade bias it repeats.
+      Fog policy: replaces, never combines. It throws while environment `Fog` is enabled (`enabled = false` may stay
+      attached for a quality switch), sky `fog` has a density, or creative `atmosphere.density` > 0. Proof (no GPU):
+      `proofs/environment-volumetric.proof.js` (root entry same calls at 7c47a09; a 12-frame story with Tonemap, Clustered,
+      Fog off, ColorBackground at 1x/4x: every call outside the fog's own pass, the lit shader and bindings identical with
+      it attached for 5 frames and after dispose). GPU (`volumetric-gpu.mjs`, results/volumetric-gpu.json; Arc 140V, Edge, AC before/after,
+      gpu-lock; 4x and 1x): shaft through a slit 9.6x vs plugged 1.1x (ortho 15.6x/1.2x); spot cone 4.3x, LocalShadows under a
+      caster 0.48x; density 95/152/190 luma; height falloff low/high 2.5x (uniform 1.0x); no NaN/Inf/negative; still camera
+      0.05/255 mean change, slow pan 0.19 vs 0.05 no fog, p99 1 level. First try flickered (1.4/255, p99 13): reprojecting the
+      jittered sample re-filtered history every frame; centre reprojection fixed it (stratified sun samples and the tent
+      filter alone did not). Cost (quiet run, previous build): froxel pass 1.3-2.2 ms (grid-bound; 80x45x32 0.3-0.5,
+      240x135x96 3.4-3.9), composite 0.26/0.4 ms 720p/1080p at 1x, 1.1/2.3 ms at 4x (per sample). Final-build timings in the
+      JSON are diagnostic (busy machine). Next: per-pixel 4x composite option; fog for particles/VFX via `fog.texture`.
    c. [DONE] Progressive glTF loading: `@margoengine/gltf-pro/progressive` (`src/progressive.ts` main thread,
       `src/stream.ts` network + decode, `src/progressive.worker.ts` -> `dist/workers/progressive.js`). API:
       `const load = loadGLTFProgressive(engine, url, {onProgress, frameBudget = 4, signal, decoders})` ->

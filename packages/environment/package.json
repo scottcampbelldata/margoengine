@@ -14,7 +14,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/environment.test.js tests/scene.test.js",
+    "test": "npm run build && node --test tests/environment.test.js tests/scene.test.js tests/volumetric.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "prepack": "npm run build"
   },
@@ -23,6 +23,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./volumetric": {
+      "types": "./dist/volumetric.d.ts",
+      "import": "./dist/volumetric.js"
     }
   },
   "files": [

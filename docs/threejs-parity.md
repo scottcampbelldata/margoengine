@@ -4,12 +4,12 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 ## Summary
 
-157 three.js features in 19 areas:
+158 three.js features in 19 areas:
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 89 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
-| PARTIAL | 40 | Some of it exists, but a common use case is missing. The notes say what. |
+| COVERED | 91 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| PARTIAL | 39 | Some of it exists, but a common use case is missing. The notes say what. |
 | MISSING | 28 | No implementation was found in any package's `src/`. |
 
 Overall: Margo is strong where three.js relies on third-party libraries or examples. That includes cascaded PCSS shadows, clustered lighting, TAA, Gaussian splats, BVH queries, physics, navigation, terrain, water and sky. The day-one basics the first version of this matrix found missing (textures and materials on meshes you build, glTF extensions and compression, an orthographic camera, picking loaded models, image-based lighting outside React, combinable effects, FXAA, a math library) now exist as optional packages. What remains:
@@ -144,6 +144,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | EXRLoader | COVERED † | environment `parseEXR` (`packages/environment/src/exr.ts`) | Single-part scanline files with NONE, RLE, ZIPS, ZIP or PIZ compression. |
 | PMREMGenerator, `scene.environment` (IBL) | COVERED † | environment `Environment`, `EnvironmentLighting` (`packages/environment/src/lighting.ts`) | `EnvironmentLighting.attach(engine, ...)` patches core's mesh shader through `PassContext.shader`; `lighting.add(model)` lights glTF-pro models. IBL replaces the constant ambient term, and post's SSAO occludes it. glTF-pro's clearcoat and sheen layers keep the hemisphere ambient. WebGPU only. |
 | Fog, FogExp2 | COVERED † | environment `Fog` (linear, exp2, height); sky `fog` option (exp or exp2, height gain, sky-radiance or fixed colour); creative `PostProcessing` `atmosphere` (exponential height fog in its grading pass) | `Fog` runs in core's and glTF-pro's mesh shaders, so blended glTF primitives are fogged. Particles, VFX and splats are not. |
+| Volumetric fog and light shafts (`VolumeNodeMaterial`, `webgpu_volume_lighting`) | COVERED | environment `VolumetricFog` (`packages/environment/src/volumetric.ts`, entry `@margoengine/environment/volumetric`) | Froxel grid (default 160 x 90 x 64) lit by the sun through shadows' cascades and by clustered point and spot lights with their `LocalShadows`; height falloff and noise, temporal reprojection, composited over opaque surfaces and the sky (perspective and orthographic, 1x/4x MSAA). Replaces `Fog` and sky fog rather than adding to them. Needs a post capture or a depth texture; transparent surfaces and particles drawn after it are not fogged. WebGPU only. |
 | Sky add-on | COVERED † | sky `Sky` with Preetham and Bruneton models (`packages/sky/src/`) | Adds clouds, sun, moon and stars. |
 | Tone mapping (`renderer.toneMapping`) | COVERED † | core fixed Reinhard; gltf-pro ACES; tonemap `Tonemap` with AgX, ACES fitted and Khronos Neutral (`packages/tonemap/src/index.ts`) | |
 | Color management (sRGB input, linear workflow, `outputColorSpace`) | PARTIAL | core converts hex sRGB to linear and encodes sRGB output; math `Color` stores linear sRGB | No ColorManagement API. No Display-P3 or HDR canvas output. |
@@ -216,7 +217,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | AfterimagePass | MISSING | — | |
 | LUTPass | COVERED † | tonemap `setLUT` | 33³ `.cube` files only. |
 | OutputPass, tone mapping | COVERED † | tonemap `Tonemap` | |
-| God rays | PARTIAL | creative `atmosphere.godRays` (`packages/creative/src/post.ts`) | Screen-space, inside creative `PostProcessing`; combine with post Bloom or SSAO through a `PostStack`. |
+| God rays | COVERED | environment `VolumetricFog` with `shadows` (`packages/environment/src/volumetric.ts`); creative `atmosphere.godRays` (`packages/creative/src/post.ts`) | World-space shafts through real occluders from the sun's cascades (and from clustered spot and point lights). creative's screen-space version stays inside its `PostProcessing`. WebGPU only. |
 | Motion blur | MISSING | — | taa already produces a velocity buffer. |
 | Color correction, grading | COVERED † | creative `lift`, `gain`, `saturation`, `contrast`; tonemap `contrast` | |
 | Simple screen effects (vignette, RGB shift or chromatic aberration, pixelation, halftone, dot screen, Sobel) | PARTIAL | shader `NodePass` with `inputColor`, `inputDepth`, `screenUV` (`packages/shader/src/post.ts`) | None is built in. Each is a few nodes in a `NodePass` (the shader README shows a vignette). transitions has chromatic displacement, but only as a scene-change wipe. |
@@ -338,7 +339,7 @@ Every MISSING or PARTIAL item, ordered by how often real three.js projects need 
     **Fit:** extend post. taa's velocity buffer already exists; `SSR` needs a material capture from water and terrain (glTF-pro and materials have one: `ssr.add(model)`).
 23. **SMAA and built-in screen effects** (vignette, RGB shift, pixelation, halftone, dot screen, Sobel, glitch, afterimage). A shader `NodePass` makes most of them in a few lines; afterimage also needs a history target.
     **Fit:** one small new `@margoengine/fx` package of `NodePass` presets.
-24. **Lensflare, and god rays outside creative.**
+24. **Lensflare.** [God rays DONE: environment `VolumetricFog` shafts from the sun's cascades and clustered lights.]
     **Fit:** extend post or sky.
 25. **TextGeometry and fonts.** SDF text covers most text needs.
     **Fit:** extend geometry (font to `Shape`).

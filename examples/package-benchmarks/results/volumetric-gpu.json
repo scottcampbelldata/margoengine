@@ -1,0 +1,589 @@
+{
+  "benchmark": "volumetric-gpu",
+  "recordedAt": "2026-10-15T04:50:35.227Z",
+  "hardware": {
+    "vendor": "intel",
+    "architecture": "xe-2lpg",
+    "device": "",
+    "description": "",
+    "fallback": false
+  },
+  "browser": "chromium 155.0.4283.45",
+  "powerOnline": {
+    "before": "True",
+    "after": "True"
+  },
+  "checks": {
+    "4x": {
+      "shaft-perspective": {
+        "litColumns": 74.573,
+        "shadowedColumns": 7.756,
+        "closedLeft": 8.59,
+        "closedRight": 7.756,
+        "noFogLeft": 0,
+        "noFogRight": 0,
+        "shaftRatio": 9.615,
+        "closedRatio": 1.108,
+        "profile": [
+          57,
+          60,
+          62,
+          66,
+          70,
+          72,
+          76,
+          80,
+          84,
+          99,
+          199,
+          198,
+          11,
+          10,
+          9,
+          7,
+          7,
+          8,
+          11,
+          10,
+          7,
+          7,
+          7,
+          10,
+          11
+        ]
+      },
+      "shaft-orthographic": {
+        "litColumns": 114.768,
+        "shadowedColumns": 7.338,
+        "closedLeft": 8.734,
+        "closedRight": 7.338,
+        "noFogLeft": 0,
+        "noFogRight": 0,
+        "shaftRatio": 15.64,
+        "closedRatio": 1.19,
+        "profile": [
+          143,
+          140,
+          136,
+          131,
+          127,
+          123,
+          119,
+          115,
+          111,
+          107,
+          104,
+          204,
+          207,
+          201,
+          9,
+          10,
+          8,
+          7,
+          7,
+          9,
+          9,
+          7,
+          7,
+          7,
+          9
+        ]
+      },
+      "volumeAfterShaft": {
+        "texels": 921600,
+        "nonFinite": 0,
+        "negative": 0,
+        "maxOptical": 3.599609375,
+        "maxLight": 1.3720703125
+      },
+      "spot": {
+        "inside": 47.419,
+        "outside": 11,
+        "noLightsInside": 10,
+        "noLightsOutside": 11,
+        "underCasterNoShadow": 38.574,
+        "underCasterShadow": 18.465
+      },
+      "volumeAfterSpot": {
+        "texels": 921600,
+        "nonFinite": 0,
+        "negative": 0,
+        "maxOptical": 3.07421875,
+        "maxLight": 0.1929931640625
+      },
+      "falloff": {
+        "density": [
+          95,
+          152,
+          190
+        ],
+        "uniformLow": 152,
+        "uniformHigh": 152,
+        "falloffLow": 133.111,
+        "falloffHigh": 53.222
+      },
+      "flicker": {
+        "still": {
+          "meanChange": 0.046,
+          "medianChange": 0.047,
+          "maxChange": 0.07,
+          "maxP99": 1
+        },
+        "stillNoFog": {
+          "meanChange": 0,
+          "medianChange": 0,
+          "maxChange": 0,
+          "maxP99": 0
+        },
+        "pan": {
+          "meanChange": 0.19,
+          "medianChange": 0.189,
+          "maxChange": 0.235,
+          "maxP99": 1
+        },
+        "panNoFog": {
+          "meanChange": 0.054,
+          "medianChange": 0.054,
+          "maxChange": 0.057,
+          "maxP99": 1
+        },
+        "still95": {
+          "meanChange": 0.024,
+          "medianChange": 0.025,
+          "maxChange": 0.037,
+          "maxP99": 1
+        },
+        "pan95": {
+          "meanChange": 0.184,
+          "medianChange": 0.182,
+          "maxChange": 0.224,
+          "maxP99": 1
+        }
+      }
+    },
+    "1x": {
+      "shaft-perspective": {
+        "litColumns": 74.579,
+        "shadowedColumns": 7.757,
+        "closedLeft": 8.576,
+        "closedRight": 7.757,
+        "noFogLeft": 0,
+        "noFogRight": 0,
+        "shaftRatio": 9.614,
+        "closedRatio": 1.106,
+        "profile": [
+          57,
+          60,
+          62,
+          66,
+          70,
+          72,
+          76,
+          80,
+          84,
+          85,
+          199,
+          198,
+          11,
+          10,
+          9,
+          7,
+          7,
+          8,
+          11,
+          10,
+          7,
+          7,
+          7,
+          10,
+          11
+        ]
+      },
+      "shaft-orthographic": {
+        "litColumns": 114.769,
+        "shadowedColumns": 7.339,
+        "closedLeft": 8.732,
+        "closedRight": 7.339,
+        "noFogLeft": 0,
+        "noFogRight": 0,
+        "shaftRatio": 15.638,
+        "closedRatio": 1.19,
+        "profile": [
+          143,
+          140,
+          136,
+          131,
+          127,
+          123,
+          119,
+          115,
+          111,
+          107,
+          104,
+          190,
+          207,
+          201,
+          9,
+          10,
+          8,
+          7,
+          7,
+          9,
+          9,
+          7,
+          7,
+          7,
+          9
+        ]
+      },
+      "volumeAfterShaft": {
+        "texels": 921600,
+        "nonFinite": 0,
+        "negative": 0,
+        "maxOptical": 3.599609375,
+        "maxLight": 1.3720703125
+      },
+      "spot": {
+        "inside": 47.419,
+        "outside": 11,
+        "noLightsInside": 10,
+        "noLightsOutside": 11,
+        "underCasterNoShadow": 38.574,
+        "underCasterShadow": 18.465
+      },
+      "volumeAfterSpot": {
+        "texels": 921600,
+        "nonFinite": 0,
+        "negative": 0,
+        "maxOptical": 3.07421875,
+        "maxLight": 0.1929931640625
+      },
+      "falloff": {
+        "density": [
+          95,
+          152,
+          190
+        ],
+        "uniformLow": 152,
+        "uniformHigh": 152,
+        "falloffLow": 133.111,
+        "falloffHigh": 53.222
+      }
+    }
+  },
+  "timingConditions": {
+    "quiet": false,
+    "label": "diagnostic (machine busy)",
+    "reason": "Machine not quiet after 600 s (last CPU load 74%)"
+  },
+  "timings": [
+    {
+      "size": "1280x720",
+      "samples": 4,
+      "case": "no fog",
+      "grid": null,
+      "gpuMs": 5.636,
+      "froxelMs": null,
+      "compositeMs": null,
+      "gpuSamples": 20,
+      "frameMs": 17.3
+    },
+    {
+      "size": "1280x720",
+      "samples": 4,
+      "case": "fog",
+      "grid": "160x90x64",
+      "gpuMs": 7.668,
+      "froxelMs": 0.918,
+      "compositeMs": 1.18,
+      "gpuSamples": 20,
+      "frameMs": 19.6
+    },
+    {
+      "size": "1280x720",
+      "samples": 4,
+      "case": "fog + sun shadows",
+      "grid": "160x90x64",
+      "gpuMs": 7.93,
+      "froxelMs": 1.311,
+      "compositeMs": 1.18,
+      "gpuSamples": 20,
+      "frameMs": 19.7
+    },
+    {
+      "size": "1280x720",
+      "samples": 4,
+      "case": "fog + sun shadows + 8 point lights",
+      "grid": "160x90x64",
+      "gpuMs": 10.486,
+      "froxelMs": 1.638,
+      "compositeMs": 1.18,
+      "gpuSamples": 20,
+      "frameMs": 22.4
+    },
+    {
+      "size": "1280x720",
+      "samples": 4,
+      "case": "fog + sun shadows, grid 80x45x32",
+      "grid": "80x45x32",
+      "gpuMs": 7.864,
+      "froxelMs": 0.786,
+      "compositeMs": 1.376,
+      "gpuSamples": 20,
+      "frameMs": 19.9
+    },
+    {
+      "size": "1280x720",
+      "samples": 4,
+      "case": "fog + sun shadows, grid 240x135x96",
+      "grid": "240x135x96",
+      "gpuMs": 12.845,
+      "froxelMs": 5.177,
+      "compositeMs": 1.442,
+      "gpuSamples": 20,
+      "frameMs": 25.5
+    },
+    {
+      "size": "1280x720",
+      "samples": 4,
+      "case": "no fog (again)",
+      "grid": null,
+      "gpuMs": 7.93,
+      "froxelMs": null,
+      "compositeMs": null,
+      "gpuSamples": 20,
+      "frameMs": 20
+    },
+    {
+      "size": "1920x1080",
+      "samples": 4,
+      "case": "no fog",
+      "grid": null,
+      "gpuMs": 14.615,
+      "froxelMs": null,
+      "compositeMs": null,
+      "gpuSamples": 20,
+      "frameMs": 28.4
+    },
+    {
+      "size": "1920x1080",
+      "samples": 4,
+      "case": "fog",
+      "grid": "160x90x64",
+      "gpuMs": 18.088,
+      "froxelMs": 1.638,
+      "compositeMs": 3.473,
+      "gpuSamples": 20,
+      "frameMs": 32.1
+    },
+    {
+      "size": "1920x1080",
+      "samples": 4,
+      "case": "fog + sun shadows",
+      "grid": "160x90x64",
+      "gpuMs": 19.005,
+      "froxelMs": 2.621,
+      "compositeMs": 3.539,
+      "gpuSamples": 20,
+      "frameMs": 32.5
+    },
+    {
+      "size": "1920x1080",
+      "samples": 4,
+      "case": "fog + sun shadows + 8 point lights",
+      "grid": "160x90x64",
+      "gpuMs": 24.183,
+      "froxelMs": 2.818,
+      "compositeMs": 3.473,
+      "gpuSamples": 20,
+      "frameMs": 37.3
+    },
+    {
+      "size": "1920x1080",
+      "samples": 4,
+      "case": "fog + sun shadows, grid 80x45x32",
+      "grid": "80x45x32",
+      "gpuMs": 17.826,
+      "froxelMs": 1.442,
+      "compositeMs": 3.473,
+      "gpuSamples": 20,
+      "frameMs": 31.8
+    },
+    {
+      "size": "1920x1080",
+      "samples": 4,
+      "case": "fog + sun shadows, grid 240x135x96",
+      "grid": "240x135x96",
+      "gpuMs": 21.43,
+      "froxelMs": 5.374,
+      "compositeMs": 3.473,
+      "gpuSamples": 20,
+      "frameMs": 33.9
+    },
+    {
+      "size": "1920x1080",
+      "samples": 4,
+      "case": "no fog (again)",
+      "grid": null,
+      "gpuMs": 14.352,
+      "froxelMs": null,
+      "compositeMs": null,
+      "gpuSamples": 20,
+      "frameMs": 28.1
+    },
+    {
+      "size": "1280x720",
+      "samples": 1,
+      "case": "no fog",
+      "grid": null,
+      "gpuMs": 2.49,
+      "froxelMs": null,
+      "compositeMs": null,
+      "gpuSamples": 20,
+      "frameMs": 10.9
+    },
+    {
+      "size": "1280x720",
+      "samples": 1,
+      "case": "fog",
+      "grid": "160x90x64",
+      "gpuMs": 4.522,
+      "froxelMs": 1.114,
+      "compositeMs": 0.328,
+      "gpuSamples": 20,
+      "frameMs": 12.8
+    },
+    {
+      "size": "1280x720",
+      "samples": 1,
+      "case": "fog + sun shadows",
+      "grid": "160x90x64",
+      "gpuMs": 5.439,
+      "froxelMs": 1.901,
+      "compositeMs": 0.328,
+      "gpuSamples": 20,
+      "frameMs": 14.1
+    },
+    {
+      "size": "1280x720",
+      "samples": 1,
+      "case": "fog + sun shadows + 8 point lights",
+      "grid": "160x90x64",
+      "gpuMs": 6.029,
+      "froxelMs": 2.032,
+      "compositeMs": 0.328,
+      "gpuSamples": 20,
+      "frameMs": 15.2
+    },
+    {
+      "size": "1280x720",
+      "samples": 1,
+      "case": "fog + sun shadows, grid 80x45x32",
+      "grid": "80x45x32",
+      "gpuMs": 2.687,
+      "froxelMs": 0.262,
+      "compositeMs": 0.197,
+      "gpuSamples": 20,
+      "frameMs": 11.2
+    },
+    {
+      "size": "1280x720",
+      "samples": 1,
+      "case": "fog + sun shadows, grid 240x135x96",
+      "grid": "240x135x96",
+      "gpuMs": 6.029,
+      "froxelMs": 3.473,
+      "compositeMs": 0.328,
+      "gpuSamples": 20,
+      "frameMs": 15
+    },
+    {
+      "size": "1280x720",
+      "samples": 1,
+      "case": "no fog (again)",
+      "grid": null,
+      "gpuMs": 2.228,
+      "froxelMs": null,
+      "compositeMs": null,
+      "gpuSamples": 20,
+      "frameMs": 10.5
+    },
+    {
+      "size": "1920x1080",
+      "samples": 1,
+      "case": "no fog",
+      "grid": null,
+      "gpuMs": 4.719,
+      "froxelMs": null,
+      "compositeMs": null,
+      "gpuSamples": 20,
+      "frameMs": 13.6
+    },
+    {
+      "size": "1920x1080",
+      "samples": 1,
+      "case": "fog",
+      "grid": "160x90x64",
+      "gpuMs": 6.226,
+      "froxelMs": 0.786,
+      "compositeMs": 0.459,
+      "gpuSamples": 20,
+      "frameMs": 15
+    },
+    {
+      "size": "1920x1080",
+      "samples": 1,
+      "case": "fog + sun shadows",
+      "grid": "160x90x64",
+      "gpuMs": 8.978,
+      "froxelMs": 3.08,
+      "compositeMs": 0.655,
+      "gpuSamples": 20,
+      "frameMs": 18.1
+    },
+    {
+      "size": "1920x1080",
+      "samples": 1,
+      "case": "fog + sun shadows + 8 point lights",
+      "grid": "160x90x64",
+      "gpuMs": 9.699,
+      "froxelMs": 1.704,
+      "compositeMs": 0.459,
+      "gpuSamples": 20,
+      "frameMs": 19.1
+    },
+    {
+      "size": "1920x1080",
+      "samples": 1,
+      "case": "fog + sun shadows, grid 80x45x32",
+      "grid": "80x45x32",
+      "gpuMs": 5.571,
+      "froxelMs": 0.393,
+      "compositeMs": 0.393,
+      "gpuSamples": 20,
+      "frameMs": 14.1
+    },
+    {
+      "size": "1920x1080",
+      "samples": 1,
+      "case": "fog + sun shadows, grid 240x135x96",
+      "grid": "240x135x96",
+      "gpuMs": 10.093,
+      "froxelMs": 4.522,
+      "compositeMs": 0.655,
+      "gpuSamples": 20,
+      "frameMs": 19.5
+    },
+    {
+      "size": "1920x1080",
+      "samples": 1,
+      "case": "no fog (again)",
+      "grid": null,
+      "gpuMs": 5.177,
+      "froxelMs": null,
+      "compositeMs": null,
+      "gpuSamples": 20,
+      "frameMs": 14.6
+    }
+  ]
+}
