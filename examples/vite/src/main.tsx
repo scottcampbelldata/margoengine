@@ -1,72 +1,589 @@
 import { StrictMode, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Canvas, Mesh, BoxGeometry, PbrMaterial, useFrame, type MeshRef } from '@margoengine/react';
-import type {createConveyor} from './conveyor';
-import {CADCameraControls} from '@margoengine/core';
-import {webglRenderer} from '@margoengine/webgl';
-import {meshRuntime} from '@margoengine/core/extension';
+import type { createConveyor } from './conveyor';
+import { CADCameraControls } from '@margoengine/core';
+import { webglRenderer } from '@margoengine/webgl';
+import { meshRuntime } from '@margoengine/core/extension';
 import type { Engine } from '@margoengine/core/extension';
 import type { ExplodedView } from '@margoengine/machinery';
-import type {PostProcessing} from '@margoengine/creative';
+import type { PostProcessing } from '@margoengine/creative';
 import './style.css';
 
-function Cube({metalness,onMesh}: {metalness:number;onMesh:(mesh:MeshRef|null)=>void}) {
-  const cube=useRef<MeshRef>(null);
-  useFrame((_,delta)=>{if(cube.current){cube.current.rotation.y+=delta*0.5;cube.current.rotation.x+=delta*0.2;}});
-  return <Mesh ref={mesh=>{cube.current=mesh;onMesh(mesh);}}><BoxGeometry args={[1.6,1.6,1.6]}/><PbrMaterial color="#84d6bd" roughness={0.3} metalness={metalness}/><Mesh position={[1.4,0,0]} scale={[0.35,0.35,0.35]}><BoxGeometry/><PbrMaterial color="#ffa76c" roughness={0.55}/></Mesh></Mesh>;
+function Cube({ metalness, onMesh }: { metalness: number; onMesh: (mesh: MeshRef | null) => void }) {
+  const cube = useRef<MeshRef>(null);
+  useFrame((_, delta) => {
+    if (cube.current) {
+      cube.current.rotation.y += delta * 0.5;
+      cube.current.rotation.x += delta * 0.2;
+    }
+  });
+  return (
+    <Mesh
+      ref={(mesh) => {
+        cube.current = mesh;
+        onMesh(mesh);
+      }}
+    >
+      <BoxGeometry args={[1.6, 1.6, 1.6]} />
+      <PbrMaterial color="#84d6bd" roughness={0.3} metalness={metalness} />
+      <Mesh position={[1.4, 0, 0]} scale={[0.35, 0.35, 0.35]}>
+        <BoxGeometry />
+        <PbrMaterial color="#ffa76c" roughness={0.55} />
+      </Mesh>
+    </Mesh>
+  );
 }
 function App() {
-  const engine=useRef<Engine|null>(null),model=useRef<{dispose():void}|null>(null);
-  const exploded=useRef<ExplodedView|null>(null);
-  const post=useRef<PostProcessing|null>(null);
-  const cadImport=useRef<AbortController|null>(null);
-  const conveyor=useRef<ReturnType<typeof createConveyor>|null>(null),controls=useRef<CADCameraControls|null>(null);
-  const [covers,setCovers]=useState(true),[joint,setJoint]=useState(0),[stroke,setStroke]=useState(0),[rollers,setRollers]=useState(20),[rpm,setRPM]=useState(60),[selection,setSelection]=useState('');
-  const cube=useRef<MeshRef|null>(null),plane=useRef([0,0,-1,0]);
-  const pointerStart=useRef<readonly [number,number]|null>(null);
-  const [backend,setBackend]=useState('Starting…'),[metalness,setMetalness]=useState(0.45),[status,setStatus]=useState('');
-  const [section,setSection]=useState(false),[offset,setOffset]=useState(0);
-  const [scenery,setScenery]=useState(false),[sceneryLoading,setSceneryLoading]=useState(false);
+  const engine = useRef<Engine | null>(null),
+    model = useRef<{ dispose(): void } | null>(null);
+  const exploded = useRef<ExplodedView | null>(null);
+  const post = useRef<PostProcessing | null>(null);
+  const cadImport = useRef<AbortController | null>(null);
+  const conveyor = useRef<ReturnType<typeof createConveyor> | null>(null),
+    controls = useRef<CADCameraControls | null>(null);
+  const [covers, setCovers] = useState(true),
+    [joint, setJoint] = useState(0),
+    [stroke, setStroke] = useState(0),
+    [rollers, setRollers] = useState(20),
+    [rpm, setRPM] = useState(60),
+    [selection, setSelection] = useState('');
+  const cube = useRef<MeshRef | null>(null),
+    plane = useRef([0, 0, -1, 0]);
+  const pointerStart = useRef<readonly [number, number] | null>(null);
+  const [backend, setBackend] = useState('Starting…'),
+    [metalness, setMetalness] = useState(0.45),
+    [status, setStatus] = useState('');
+  const [section, setSection] = useState(false),
+    [offset, setOffset] = useState(0);
+  const [scenery, setScenery] = useState(false),
+    [sceneryLoading, setSceneryLoading] = useState(false);
   async function importModel() {
-    if(!engine.current)return;
+    if (!engine.current) return;
     cadImport.current?.abort();
     setStatus('Loading model…');
-    try {const {loadGLTF}=await import('@margoengine/gltf');const loaded=await loadGLTF(engine.current,'/triangle.gltf');if(exploded.current){exploded.current.amount=0;exploded.current.onPreUpdate();engine.current.removePlugin(exploded.current.name);exploded.current=null;}engine.current?.removePlugin('engineering-annotations');model.current?.dispose();model.current=loaded;conveyor.current=null;if(cube.current)cube.current.visible=true;loaded.root.position.x=-2.2;setStatus('Static glTF loaded');}catch(error){setStatus(String(error));}
+    try {
+      const { loadGLTF } = await import('@margoengine/gltf');
+      const loaded = await loadGLTF(engine.current, '/triangle.gltf');
+      if (exploded.current) {
+        exploded.current.amount = 0;
+        exploded.current.onPreUpdate();
+        engine.current.removePlugin(exploded.current.name);
+        exploded.current = null;
+      }
+      engine.current?.removePlugin('engineering-annotations');
+      model.current?.dispose();
+      model.current = loaded;
+      conveyor.current = null;
+      if (cube.current) cube.current.visible = true;
+      loaded.root.position.x = -2.2;
+      setStatus('Static glTF loaded');
+    } catch (error) {
+      setStatus(String(error));
+    }
   }
-  async function toggleExplode(){try{const {ExplodedView}=await import('@margoengine/machinery'),e=engine.current;if(!e)return;if(!exploded.current){exploded.current=new ExplodedView([...e.meshes.values()].filter(mesh=>mesh.geometry).map((node,i)=>({node,offset:[0,i?1.5:-0.5,0]})));e.use(exploded.current);}exploded.current.amount=1-exploded.current.amount;setStatus(exploded.current.amount?'Machinery: exploded view':'Machinery: assembled');}catch(error){setStatus(String(error));}}
-  async function toggleLeaves(){try{const {GPUParticles}=await import('@margoengine/creative'),e=engine.current;if(!e)return;if(e.backend!=='webgpu'){setStatus('GPU particles need WebGPU');return;}if(e.hasPlugin('gpu-particles')){e.removePlugin('gpu-particles');setStatus('Particles removed');}else{GPUParticles.attach(e, {count:5000,sort:true,curl:0.2,obstacles:[{kind:'sphere',center:[0,0,0],radius:1}]});setStatus('Creative: 5,000 GPU leaves');}}catch(error){setStatus(String(error));}}
-  async function toggleSection(){try{const {SectionPlanes}=await import('@margoengine/machinery'),e=engine.current;if(!e)return;if(e.hasPlugin('section-planes')){e.removePlugin('section-planes');setSection(false);setStatus('Section removed');}else{SectionPlanes.attach(e, {planes:[plane.current],color:'#ffa76c'});setSection(true);setStatus('Machinery: capped section');}}catch(error){setStatus(String(error));}}
-  async function toggleDimensions(){try{const {EngineeringAnnotations}=await import('@margoengine/machinery'),e=engine.current,node=cube.current;if(!e||!node)return;if(e.hasPlugin('engineering-annotations')){e.removePlugin('engineering-annotations');setStatus('Dimensions removed');}else{EngineeringAnnotations.attach(e, {dimensions:[{a:{node,point:[-0.8,0,0]},b:{node,point:[0.8,0,0]}}],callouts:[{anchor:{node,point:[0,0.8,0]},label:'Mint assembly'}]});setStatus('Machinery: dimensions and callout');}}catch(error){setStatus(String(error));}}
-  async function toggleScenery(){
-    const e=engine.current;if(!e)return;if(e.backend!=='webgpu'){setStatus('Moonlit scenery needs WebGPU');return;}
-    try{
-      if(e.hasPlugin('sky-moon')){e.removePlugin('sky-moon');setScenery(false);setStatus('Scenery removed');}
-      else{setSceneryLoading(true);setStatus('Loading scenery…');const {SkyMoon}=await import('@margoengine/scenery');if(engine.current!==e||e.disposed)return;SkyMoon.attach(e, {moonDirection:[0.45,0,-1]});setScenery(true);setStatus('Scenery: moonlit sky');}
+  async function toggleExplode() {
+    try {
+      const { ExplodedView } = await import('@margoengine/machinery'),
+        e = engine.current;
+      if (!e) return;
+      if (!exploded.current) {
+        exploded.current = new ExplodedView(
+          [...e.meshes.values()]
+            .filter((mesh) => mesh.geometry)
+            .map((node, i) => ({ node, offset: [0, i ? 1.5 : -0.5, 0] })),
+        );
+        e.use(exploded.current);
+      }
+      exploded.current.amount = 1 - exploded.current.amount;
+      setStatus(exploded.current.amount ? 'Machinery: exploded view' : 'Machinery: assembled');
+    } catch (error) {
+      setStatus(String(error));
+    }
+  }
+  async function toggleLeaves() {
+    try {
+      const { GPUParticles } = await import('@margoengine/creative'),
+        e = engine.current;
+      if (!e) return;
+      if (e.backend !== 'webgpu') {
+        setStatus('GPU particles need WebGPU');
+        return;
+      }
+      if (e.hasPlugin('gpu-particles')) {
+        e.removePlugin('gpu-particles');
+        setStatus('Particles removed');
+      } else {
+        GPUParticles.attach(e, {
+          count: 5000,
+          sort: true,
+          curl: 0.2,
+          obstacles: [{ kind: 'sphere', center: [0, 0, 0], radius: 1 }],
+        });
+        setStatus('Creative: 5,000 GPU leaves');
+      }
+    } catch (error) {
+      setStatus(String(error));
+    }
+  }
+  async function toggleSection() {
+    try {
+      const { SectionPlanes } = await import('@margoengine/machinery'),
+        e = engine.current;
+      if (!e) return;
+      if (e.hasPlugin('section-planes')) {
+        e.removePlugin('section-planes');
+        setSection(false);
+        setStatus('Section removed');
+      } else {
+        SectionPlanes.attach(e, { planes: [plane.current], color: '#ffa76c' });
+        setSection(true);
+        setStatus('Machinery: capped section');
+      }
+    } catch (error) {
+      setStatus(String(error));
+    }
+  }
+  async function toggleDimensions() {
+    try {
+      const { EngineeringAnnotations } = await import('@margoengine/machinery'),
+        e = engine.current,
+        node = cube.current;
+      if (!e || !node) return;
+      if (e.hasPlugin('engineering-annotations')) {
+        e.removePlugin('engineering-annotations');
+        setStatus('Dimensions removed');
+      } else {
+        EngineeringAnnotations.attach(e, {
+          dimensions: [{ a: { node, point: [-0.8, 0, 0] }, b: { node, point: [0.8, 0, 0] } }],
+          callouts: [{ anchor: { node, point: [0, 0.8, 0] }, label: 'Mint assembly' }],
+        });
+        setStatus('Machinery: dimensions and callout');
+      }
+    } catch (error) {
+      setStatus(String(error));
+    }
+  }
+  async function toggleScenery() {
+    const e = engine.current;
+    if (!e) return;
+    if (e.backend !== 'webgpu') {
+      setStatus('Moonlit scenery needs WebGPU');
+      return;
+    }
+    try {
+      if (e.hasPlugin('sky-moon')) {
+        e.removePlugin('sky-moon');
+        setScenery(false);
+        setStatus('Scenery removed');
+      } else {
+        setSceneryLoading(true);
+        setStatus('Loading scenery…');
+        const { SkyMoon } = await import('@margoengine/scenery');
+        if (engine.current !== e || e.disposed) return;
+        SkyMoon.attach(e, { moonDirection: [0.45, 0, -1] });
+        setScenery(true);
+        setStatus('Scenery: moonlit sky');
+      }
       // Scenery supplies horizon haze; post fog would obscure its depth-0 backdrop.
-      const atmosphere=post.current?.options.atmosphere;
-      if(atmosphere)atmosphere.density=e.hasPlugin('sky-moon')?0:0.025;
-    }catch(error){setStatus(String(error));}finally{setSceneryLoading(false);}
+      const atmosphere = post.current?.options.atmosphere;
+      if (atmosphere) atmosphere.density = e.hasPlugin('sky-moon') ? 0 : 0.025;
+    } catch (error) {
+      setStatus(String(error));
+    } finally {
+      setSceneryLoading(false);
+    }
   }
-  async function toggleFX(){try{const [{PostProcessing},{Bloom},{PostStack}]=await Promise.all([import('@margoengine/creative/post'),import('@margoengine/post/bloom'),import('@margoengine/post/stack')]),e=engine.current;if(!e)return;if(e.hasPlugin('post:stack')){e.removePlugin('post:stack');post.current=null;setStatus('Effects removed');}else{const effect=new PostProcessing({focus:5,aperture:2,grain:0.02,atmosphere:{density:e.hasPlugin('sky-moon')?0:0.025,heightFalloff:0.1,godRays:0.2}});PostStack.attach(e, [new Bloom({strength:0.5,threshold:0.4}),effect]);post.current=effect;setStatus('Bloom, atmosphere and FX');}}catch(error){setStatus(String(error));}}
-  async function toggleToon(){try{const {ToonShading}=await import('@margoengine/creative'),e=engine.current;if(!e)return;if(e.hasPlugin('toon-shading')){e.removePlugin('toon-shading');setStatus('Toon removed');}else{ToonShading.attach(e);setStatus('Creative: toon shading');}}catch(error){setStatus(String(error));}}
-  async function importCAD(file:File|undefined){
-    const e=engine.current;if(!file||!e)return;cadImport.current?.abort();const pending=new AbortController();cadImport.current=pending;setStatus('Loading CAD…');
-    try{
-      if(file.size>64*1024*1024)throw new RangeError('CAD file exceeds 64 MiB');const extension=file.name.split('.').at(-1)?.toLowerCase(),format=extension==='stp'?'step':extension==='igs'?'iges':extension;
-      if(format!=='stl'&&format!=='obj'&&format!=='step'&&format!=='iges')throw new TypeError('Choose STL, OBJ, STEP or IGES');
-      const {parseCADAsync}=await import('@margoengine/machinery'),data=await file.arrayBuffer(),loaded=await parseCADAsync(e,data,format,{signal:pending.signal,onProgress:p=>setStatus(`Loading CAD: ${p}%`)});
-      if(engine.current!==e||pending.signal.aborted){loaded.dispose();return;}
-      if(exploded.current){exploded.current.amount=0;exploded.current.onPreUpdate();e.removePlugin(exploded.current.name);exploded.current=null;}
-      e.removePlugin('engineering-annotations');e.removePlugin('part-instancer');model.current?.dispose();model.current=loaded;conveyor.current=null;if(cube.current)cube.current.visible=true;
-      setStatus(`CAD: ${loaded.meshes.length} parts, ${new Set(loaded.meshes.map(mesh=>mesh.geometry)).size} unique CAD geometries`);
-    }catch(error){if(!pending.signal.aborted)setStatus(String(error));}finally{if(cadImport.current===pending)cadImport.current=null;}
+  async function toggleFX() {
+    try {
+      const [{ PostProcessing }, { Bloom }, { PostStack }] = await Promise.all([
+          import('@margoengine/creative/post'),
+          import('@margoengine/post/bloom'),
+          import('@margoengine/post/stack'),
+        ]),
+        e = engine.current;
+      if (!e) return;
+      if (e.hasPlugin('post:stack')) {
+        e.removePlugin('post:stack');
+        post.current = null;
+        setStatus('Effects removed');
+      } else {
+        const effect = new PostProcessing({
+          focus: 5,
+          aperture: 2,
+          grain: 0.02,
+          atmosphere: { density: e.hasPlugin('sky-moon') ? 0 : 0.025, heightFalloff: 0.1, godRays: 0.2 },
+        });
+        PostStack.attach(e, [new Bloom({ strength: 0.5, threshold: 0.4 }), effect]);
+        post.current = effect;
+        setStatus('Bloom, atmosphere and FX');
+      }
+    } catch (error) {
+      setStatus(String(error));
+    }
   }
-  async function loadConveyor(){cadImport.current?.abort();try{const e=engine.current;if(!e)return;if(!Number.isSafeInteger(rollers)||rollers<20||rollers>240)throw new RangeError('Choose 20..240 rollers');const {createConveyor}=await import('./conveyor');e.removePlugin('engineering-annotations');e.removePlugin('section-planes');setSection(false);model.current?.dispose();const loaded=createConveyor(e,rollers);const slider=document.getElementById("conveyor-explode") as HTMLInputElement|null;if(slider)slider.value="0";model.current=loaded;conveyor.current=loaded;if(cube.current)cube.current.visible=false;exploded.current=loaded.exploded;setCovers(true);setJoint(0);setStroke(0);setRPM(60);e.camera.fitToBoundingBox([-3.5,-1,-1.6],[3.5,1.5,2],{aspect:e.canvas.clientWidth/e.canvas.clientHeight});setStatus('Conveyor: covers, joints, sections and metrology ready');}catch(error){setStatus(String(error));}}
-  async function boxCut(){try{const e=engine.current;if(!e)return;const {SectionPlanes,boxSection}=await import('@margoengine/machinery');e.removePlugin('section-planes');SectionPlanes.attach(e, {planes:boxSection([-2.9,-0.6,-0.8],[2.9,1.2,0.8])});setSection(false);setStatus('Six-plane capped box section');}catch(error){setStatus(String(error));}}
-  async function conveyorDimensions(){try{const e=engine.current,c=conveyor.current;if(!e||!c)return;const {EngineeringAnnotations,measureDistance}=await import('@margoengine/machinery');const a={node:c.root,point:[-3,0.9,0] as const},b={node:c.root,point:[3,0.9,0] as const};e.removePlugin('engineering-annotations');EngineeringAnnotations.attach(e, {dimensions:[{a,b}],unit:'mm',scale:1000,decimals:1});setStatus('Conveyor span: '+measureDistance(a,b).toFixed(1)+' mm');}catch(error){setStatus(String(error));}}
-  async function selectPart(event:React.PointerEvent<HTMLDivElement>){if(event.button!==0||event.altKey||event.shiftKey)return;const e=engine.current;if(!e)return;try{const rect=e.canvas.getBoundingClientRect(),mesh=await e.pick(event.clientX-rect.left,event.clientY-rect.top);setSelection(mesh?.name||'No part selected');if(mesh&&event.ctrlKey){const m=meshRuntime(mesh).matrix;controls.current?.setPivot([m[12],m[13],m[14]]);}}catch(error){setStatus(String(error));}}
-  async function restoreDevice(){try{await engine.current?.rebootDevice();setStatus('GPU restored; scene retained');}catch(error){setStatus(String(error));}}
-  return <main><header><span className="brand">MARGOENGINE <span>ENGINE</span></span><span className="badge">Rust / Wasm + {backend}</span></header><section><div className="copy"><p className="eyebrow">A SMALLER FOUNDATION</p><h1>Built for<br/>the web.</h1><p>Shared transform memory. Native GPU passes. React components that stay out of the frame loop.</p><label htmlFor="metalness">Metalness <output>{metalness.toFixed(2)}</output></label><input id="metalness" type="range" min="0" max="1" step="0.01" value={metalness} onChange={event=>setMetalness(Number(event.target.value))}/><button onClick={importModel}>Load glTF module</button><button onClick={toggleExplode}>Toggle exploded view</button><button onClick={toggleLeaves}>Toggle GPU leaves</button><button onClick={toggleScenery} aria-pressed={scenery} disabled={sceneryLoading}>Toggle moonlit scenery</button><details><summary>Domain tools</summary><label htmlFor="roller-count">Roller count (reload assembly)</label><input id="roller-count" type="number" min="20" max="240" step="20" value={rollers} onChange={event=>setRollers(Number(event.target.value))}/><button onClick={loadConveyor}>Load conveyor assembly</button>{conveyor.current&&<><label><input type="checkbox" checked={covers} onChange={event=>{const visible=event.target.checked;conveyor.current!.query.setSubtreeVisible(conveyor.current!.cover,visible);setCovers(visible);}}/> Drive cover and bolts</label><label htmlFor="joint-angle">Cover hinge (rad)</label><input id="joint-angle" type="range" min="0" max="1.2" step="0.01" value={joint} onChange={event=>{const v=Number(event.target.value);conveyor.current!.joints.setValue(0,v);setJoint(v);}}/><label htmlFor="stroke">Carriage stroke (m)</label><input id="stroke" type="range" min="-2.5" max="2.5" step="0.01" value={stroke} onChange={event=>{const v=Number(event.target.value);conveyor.current!.joints.setValue(1,v);setStroke(v);}}/><label htmlFor="motor-rpm">Motor speed (RPM) <output>{rpm}</output></label><input id="motor-rpm" type="range" min="-120" max="120" step="5" value={rpm} onChange={event=>{const v=Number(event.target.value);conveyor.current!.drive.rpm=v;setRPM(v);}}/><label htmlFor="conveyor-explode">Assembly explode</label><input id="conveyor-explode" type="range" min="0" max="1" step="0.01" defaultValue="0" ref={input=>{if(input)input.oninput=()=>{conveyor.current!.exploded.amount=Number(input.value);};}}/><button onClick={boxCut}>Box section</button><button onClick={conveyorDimensions}>Measure conveyor span</button><output aria-live="polite">{selection}</output><p>Drag to orbit; Shift/right drag to pan; wheel to zoom. Ctrl-click sets the pivot.</p></>}<button onClick={toggleSection}>Toggle capped section</button>{section&&<><label htmlFor="section-offset">Section offset</label><input id="section-offset" type="range" min="-1" max="1" step="0.01" value={offset} onChange={event=>{const value=Number(event.target.value);plane.current[3]=value;setOffset(value);}}/></>}<button onClick={toggleDimensions}>Toggle dimensions</button><label htmlFor="cad-file">Import STL, OBJ, STEP or IGES</label><input id="cad-file" type="file" accept=".stl,.obj,.step,.stp,.iges,.igs" onChange={event=>{void importCAD(event.target.files?.[0]);event.target.value="";}}/><button onClick={toggleFX}>Toggle atmosphere and FX</button><button onClick={toggleToon}>Toggle toon shading</button><button onClick={restoreDevice}>Restore GPU device</button></details><p role="status" className="status">{status}</p></div><div className="scene" onPointerDown={event=>{pointerStart.current=[event.clientX,event.clientY];}} onPointerUp={event=>{const p=pointerStart.current;pointerStart.current=null;if(p&&Math.hypot(event.clientX-p[0],event.clientY-p[1])<4)void selectPart(event);}}><Canvas fallback={webglRenderer} label="Rotating mint cube with an orange child cube" onCreated={({engine:value})=>{engine.current=value as unknown as Engine;controls.current?.dispose();controls.current=new CADCameraControls(value.camera,value.canvas);const current=controls.current;value.onFrame((_,delta)=>current.update(delta));const dispose=value.dispose.bind(value);value.dispose=()=>{if(engine.current===value){cadImport.current?.abort();engine.current=null;}current.dispose();dispose();};exploded.current=null;post.current=null;setScenery(false);setBackend(value.backend);}} onError={error=>setStatus(String(error))}><Cube metalness={metalness} onMesh={mesh=>{cube.current=mesh;}}/></Canvas></div></section><footer><span>01 / THE MICRO-KERNEL</span><span>Core · glTF · React · Domain packs</span></footer></main>;
+  async function toggleToon() {
+    try {
+      const { ToonShading } = await import('@margoengine/creative'),
+        e = engine.current;
+      if (!e) return;
+      if (e.hasPlugin('toon-shading')) {
+        e.removePlugin('toon-shading');
+        setStatus('Toon removed');
+      } else {
+        ToonShading.attach(e);
+        setStatus('Creative: toon shading');
+      }
+    } catch (error) {
+      setStatus(String(error));
+    }
+  }
+  async function importCAD(file: File | undefined) {
+    const e = engine.current;
+    if (!file || !e) return;
+    cadImport.current?.abort();
+    const pending = new AbortController();
+    cadImport.current = pending;
+    setStatus('Loading CAD…');
+    try {
+      if (file.size > 64 * 1024 * 1024) throw new RangeError('CAD file exceeds 64 MiB');
+      const extension = file.name.split('.').at(-1)?.toLowerCase(),
+        format = extension === 'stp' ? 'step' : extension === 'igs' ? 'iges' : extension;
+      if (format !== 'stl' && format !== 'obj' && format !== 'step' && format !== 'iges')
+        throw new TypeError('Choose STL, OBJ, STEP or IGES');
+      const { parseCADAsync } = await import('@margoengine/machinery'),
+        data = await file.arrayBuffer(),
+        loaded = await parseCADAsync(e, data, format, {
+          signal: pending.signal,
+          onProgress: (p) => setStatus(`Loading CAD: ${p}%`),
+        });
+      if (engine.current !== e || pending.signal.aborted) {
+        loaded.dispose();
+        return;
+      }
+      if (exploded.current) {
+        exploded.current.amount = 0;
+        exploded.current.onPreUpdate();
+        e.removePlugin(exploded.current.name);
+        exploded.current = null;
+      }
+      e.removePlugin('engineering-annotations');
+      e.removePlugin('part-instancer');
+      model.current?.dispose();
+      model.current = loaded;
+      conveyor.current = null;
+      if (cube.current) cube.current.visible = true;
+      setStatus(
+        `CAD: ${loaded.meshes.length} parts, ${new Set(loaded.meshes.map((mesh) => mesh.geometry)).size} unique CAD geometries`,
+      );
+    } catch (error) {
+      if (!pending.signal.aborted) setStatus(String(error));
+    } finally {
+      if (cadImport.current === pending) cadImport.current = null;
+    }
+  }
+  async function loadConveyor() {
+    cadImport.current?.abort();
+    try {
+      const e = engine.current;
+      if (!e) return;
+      if (!Number.isSafeInteger(rollers) || rollers < 20 || rollers > 240)
+        throw new RangeError('Choose 20..240 rollers');
+      const { createConveyor } = await import('./conveyor');
+      e.removePlugin('engineering-annotations');
+      e.removePlugin('section-planes');
+      setSection(false);
+      model.current?.dispose();
+      const loaded = createConveyor(e, rollers);
+      const slider = document.getElementById('conveyor-explode') as HTMLInputElement | null;
+      if (slider) slider.value = '0';
+      model.current = loaded;
+      conveyor.current = loaded;
+      if (cube.current) cube.current.visible = false;
+      exploded.current = loaded.exploded;
+      setCovers(true);
+      setJoint(0);
+      setStroke(0);
+      setRPM(60);
+      e.camera.fitToBoundingBox([-3.5, -1, -1.6], [3.5, 1.5, 2], {
+        aspect: e.canvas.clientWidth / e.canvas.clientHeight,
+      });
+      setStatus('Conveyor: covers, joints, sections and metrology ready');
+    } catch (error) {
+      setStatus(String(error));
+    }
+  }
+  async function boxCut() {
+    try {
+      const e = engine.current;
+      if (!e) return;
+      const { SectionPlanes, boxSection } = await import('@margoengine/machinery');
+      e.removePlugin('section-planes');
+      SectionPlanes.attach(e, { planes: boxSection([-2.9, -0.6, -0.8], [2.9, 1.2, 0.8]) });
+      setSection(false);
+      setStatus('Six-plane capped box section');
+    } catch (error) {
+      setStatus(String(error));
+    }
+  }
+  async function conveyorDimensions() {
+    try {
+      const e = engine.current,
+        c = conveyor.current;
+      if (!e || !c) return;
+      const { EngineeringAnnotations, measureDistance } = await import('@margoengine/machinery');
+      const a = { node: c.root, point: [-3, 0.9, 0] as const },
+        b = { node: c.root, point: [3, 0.9, 0] as const };
+      e.removePlugin('engineering-annotations');
+      EngineeringAnnotations.attach(e, { dimensions: [{ a, b }], unit: 'mm', scale: 1000, decimals: 1 });
+      setStatus('Conveyor span: ' + measureDistance(a, b).toFixed(1) + ' mm');
+    } catch (error) {
+      setStatus(String(error));
+    }
+  }
+  async function selectPart(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0 || event.altKey || event.shiftKey) return;
+    const e = engine.current;
+    if (!e) return;
+    try {
+      const rect = e.canvas.getBoundingClientRect(),
+        mesh = await e.pick(event.clientX - rect.left, event.clientY - rect.top);
+      setSelection(mesh?.name || 'No part selected');
+      if (mesh && event.ctrlKey) {
+        const m = meshRuntime(mesh).matrix;
+        controls.current?.setPivot([m[12], m[13], m[14]]);
+      }
+    } catch (error) {
+      setStatus(String(error));
+    }
+  }
+  async function restoreDevice() {
+    try {
+      await engine.current?.rebootDevice();
+      setStatus('GPU restored; scene retained');
+    } catch (error) {
+      setStatus(String(error));
+    }
+  }
+  return (
+    <main>
+      <header>
+        <span className="brand">
+          MARGOENGINE <span>ENGINE</span>
+        </span>
+        <span className="badge">Rust / Wasm + {backend}</span>
+      </header>
+      <section>
+        <div className="copy">
+          <p className="eyebrow">A SMALLER FOUNDATION</p>
+          <h1>
+            Built for
+            <br />
+            the web.
+          </h1>
+          <p>Shared transform memory. Native GPU passes. React components that stay out of the frame loop.</p>
+          <label htmlFor="metalness">
+            Metalness <output>{metalness.toFixed(2)}</output>
+          </label>
+          <input
+            id="metalness"
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={metalness}
+            onChange={(event) => setMetalness(Number(event.target.value))}
+          />
+          <button onClick={importModel}>Load glTF module</button>
+          <button onClick={toggleExplode}>Toggle exploded view</button>
+          <button onClick={toggleLeaves}>Toggle GPU leaves</button>
+          <button onClick={toggleScenery} aria-pressed={scenery} disabled={sceneryLoading}>
+            Toggle moonlit scenery
+          </button>
+          <details>
+            <summary>Domain tools</summary>
+            <label htmlFor="roller-count">Roller count (reload assembly)</label>
+            <input
+              id="roller-count"
+              type="number"
+              min="20"
+              max="240"
+              step="20"
+              value={rollers}
+              onChange={(event) => setRollers(Number(event.target.value))}
+            />
+            <button onClick={loadConveyor}>Load conveyor assembly</button>
+            {conveyor.current && (
+              <>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={covers}
+                    onChange={(event) => {
+                      const visible = event.target.checked;
+                      conveyor.current!.query.setSubtreeVisible(conveyor.current!.cover, visible);
+                      setCovers(visible);
+                    }}
+                  />{' '}
+                  Drive cover and bolts
+                </label>
+                <label htmlFor="joint-angle">Cover hinge (rad)</label>
+                <input
+                  id="joint-angle"
+                  type="range"
+                  min="0"
+                  max="1.2"
+                  step="0.01"
+                  value={joint}
+                  onChange={(event) => {
+                    const v = Number(event.target.value);
+                    conveyor.current!.joints.setValue(0, v);
+                    setJoint(v);
+                  }}
+                />
+                <label htmlFor="stroke">Carriage stroke (m)</label>
+                <input
+                  id="stroke"
+                  type="range"
+                  min="-2.5"
+                  max="2.5"
+                  step="0.01"
+                  value={stroke}
+                  onChange={(event) => {
+                    const v = Number(event.target.value);
+                    conveyor.current!.joints.setValue(1, v);
+                    setStroke(v);
+                  }}
+                />
+                <label htmlFor="motor-rpm">
+                  Motor speed (RPM) <output>{rpm}</output>
+                </label>
+                <input
+                  id="motor-rpm"
+                  type="range"
+                  min="-120"
+                  max="120"
+                  step="5"
+                  value={rpm}
+                  onChange={(event) => {
+                    const v = Number(event.target.value);
+                    conveyor.current!.drive.rpm = v;
+                    setRPM(v);
+                  }}
+                />
+                <label htmlFor="conveyor-explode">Assembly explode</label>
+                <input
+                  id="conveyor-explode"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  defaultValue="0"
+                  ref={(input) => {
+                    if (input)
+                      input.oninput = () => {
+                        conveyor.current!.exploded.amount = Number(input.value);
+                      };
+                  }}
+                />
+                <button onClick={boxCut}>Box section</button>
+                <button onClick={conveyorDimensions}>Measure conveyor span</button>
+                <output aria-live="polite">{selection}</output>
+                <p>Drag to orbit; Shift/right drag to pan; wheel to zoom. Ctrl-click sets the pivot.</p>
+              </>
+            )}
+            <button onClick={toggleSection}>Toggle capped section</button>
+            {section && (
+              <>
+                <label htmlFor="section-offset">Section offset</label>
+                <input
+                  id="section-offset"
+                  type="range"
+                  min="-1"
+                  max="1"
+                  step="0.01"
+                  value={offset}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    plane.current[3] = value;
+                    setOffset(value);
+                  }}
+                />
+              </>
+            )}
+            <button onClick={toggleDimensions}>Toggle dimensions</button>
+            <label htmlFor="cad-file">Import STL, OBJ, STEP or IGES</label>
+            <input
+              id="cad-file"
+              type="file"
+              accept=".stl,.obj,.step,.stp,.iges,.igs"
+              onChange={(event) => {
+                void importCAD(event.target.files?.[0]);
+                event.target.value = '';
+              }}
+            />
+            <button onClick={toggleFX}>Toggle atmosphere and FX</button>
+            <button onClick={toggleToon}>Toggle toon shading</button>
+            <button onClick={restoreDevice}>Restore GPU device</button>
+          </details>
+          <p role="status" className="status">
+            {status}
+          </p>
+        </div>
+        <div
+          className="scene"
+          onPointerDown={(event) => {
+            pointerStart.current = [event.clientX, event.clientY];
+          }}
+          onPointerUp={(event) => {
+            const p = pointerStart.current;
+            pointerStart.current = null;
+            if (p && Math.hypot(event.clientX - p[0], event.clientY - p[1]) < 4) void selectPart(event);
+          }}
+        >
+          <Canvas
+            fallback={webglRenderer}
+            label="Rotating mint cube with an orange child cube"
+            onCreated={({ engine: value }) => {
+              engine.current = value as unknown as Engine;
+              controls.current?.dispose();
+              controls.current = new CADCameraControls(value.camera, value.canvas);
+              const current = controls.current;
+              value.onFrame((_, delta) => current.update(delta));
+              const dispose = value.dispose.bind(value);
+              value.dispose = () => {
+                if (engine.current === value) {
+                  cadImport.current?.abort();
+                  engine.current = null;
+                }
+                current.dispose();
+                dispose();
+              };
+              exploded.current = null;
+              post.current = null;
+              setScenery(false);
+              setBackend(value.backend);
+            }}
+            onError={(error) => setStatus(String(error))}
+          >
+            <Cube
+              metalness={metalness}
+              onMesh={(mesh) => {
+                cube.current = mesh;
+              }}
+            />
+          </Canvas>
+        </div>
+      </section>
+      <footer>
+        <span>01 / THE MICRO-KERNEL</span>
+        <span>Core · glTF · React · Domain packs</span>
+      </footer>
+    </main>
+  );
 }
-createRoot(document.getElementById('root')!).render(<StrictMode><App/></StrictMode>);
-
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+);

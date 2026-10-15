@@ -7,50 +7,105 @@
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/post-ssr-models.proof.js [ref] [pin] [--current]
 // Pinned: 3cf1453 against 838ae6e, the commit that made this claim. --current: 3cf1453 against the working tree.
 import assert from 'node:assert/strict';
-import {refs, versions, ignoreAgx} from './compare.js';
-import {mockGPU, context} from './gpu-recorder.js';
-import {wgsl} from '../../../packages/core/src/shaders.ts';
+import { refs, versions, ignoreAgx } from './compare.js';
+import { mockGPU, context } from './gpu-recorder.js';
+import { wgsl } from '../../../packages/core/src/shaders.ts';
 
-const {ref, pin} = refs('3cf1453', '838ae6e', '3cf1453'), post = await versions('post', ref, undefined, pin);
-const ibl = wgsl.replace(/let linear=([^;]+);/, 'let margoAmbient=vec3f(0.5);let linear=$1+margoAmbient;') + '\nfn iblBrdfTerms(nv:f32,r:f32)->vec2f {return vec2f(1,0);}';
+const { ref, pin } = refs('3cf1453', '838ae6e', '3cf1453'),
+  post = await versions('post', ref, undefined, pin);
+const ibl =
+  wgsl.replace(/let linear=([^;]+);/, 'let margoAmbient=vec3f(0.5);let linear=$1+margoAmbient;') +
+  '\nfn iblBrdfTerms(nv:f32,r:f32)->vec2f {return vec2f(1,0);}';
 
 function story(m, make, samples, shader) {
-  const gpu = mockGPU(), passes = [{order: 0, execute: c => c.draw()}], plugins = new Map();
-  const engine = {gpu: gpu.device, hasPlugin: name => plugins.has(name),
-    use(plugin) {plugin.setup(engine); plugin.registerPasses?.({add: pass => passes.push(pass)}); plugins.set(plugin.name, plugin); passes.sort((a, b) => a.order - b.order);},
-    removePlugin(name) {const plugin = plugins.get(name); plugins.delete(name); plugin?.dispose?.();}};
-  const view = context(gpu, {samples, shader, format: 'bgra8unorm'});
+  const gpu = mockGPU(),
+    passes = [{ order: 0, execute: (c) => c.draw() }],
+    plugins = new Map();
+  const engine = {
+    gpu: gpu.device,
+    hasPlugin: (name) => plugins.has(name),
+    use(plugin) {
+      plugin.setup(engine);
+      plugin.registerPasses?.({ add: (pass) => passes.push(pass) });
+      plugins.set(plugin.name, plugin);
+      passes.sort((a, b) => a.order - b.order);
+    },
+    removePlugin(name) {
+      const plugin = plugins.get(name);
+      plugins.delete(name);
+      plugin?.dispose?.();
+    },
+  };
+  const view = context(gpu, { samples, shader, format: 'bgra8unorm' });
   return gpu.record(() => {
-    const effects = make(m), stack = new m.PostStack(effects); engine.use(stack);
+    const effects = make(m),
+      stack = new m.PostStack(effects);
+    engine.use(stack);
     for (let i = 0; i < 24; i++) {
-      if (i === 4) {view.state.width = 640; view.state.height = 360;}
+      if (i === 4) {
+        view.state.width = 640;
+        view.state.height = 360;
+      }
       if (i === 9) view.state.depthFormat = 'depth32float';
       if (i === 12) view.state.samples = samples === 4 ? 1 : 4;
       if (i === 14) view.state.format = 'rgba8unorm';
       if (i === 18) for (const plugin of plugins.values()) plugin.onDeviceRestored?.(engine);
       for (const effect of effects) {
-        if (effect instanceof m.SSR) {if (i === 5) effect.options.steps = 16; if (i === 7) effect.enabled = false; if (i === 8) effect.enabled = true; if (i === 16) effect.options.maxRoughness = 0; if (i === 17) effect.options.maxRoughness = 0.4;}
-        if (effect instanceof m.SSAO) {if (i === 6) effect.options.radius = 2;}
-        if (effect instanceof m.Bloom) {if (i === 8) effect.options.strength = 3;}
+        if (effect instanceof m.SSR) {
+          if (i === 5) effect.options.steps = 16;
+          if (i === 7) effect.enabled = false;
+          if (i === 8) effect.enabled = true;
+          if (i === 16) effect.options.maxRoughness = 0;
+          if (i === 17) effect.options.maxRoughness = 0.4;
+        }
+        if (effect instanceof m.SSAO) {
+          if (i === 6) effect.options.radius = 2;
+        }
+        if (effect instanceof m.Bloom) {
+          if (i === 8) effect.options.strength = 3;
+        }
       }
       view.begin(i);
-      try {for (const pass of passes) pass.execute(view.c);} catch (error) {gpu.note('throw', error.constructor.name, error.message);}
+      try {
+        for (const pass of passes) pass.execute(view.c);
+      } catch (error) {
+        gpu.note('throw', error.constructor.name, error.message);
+      }
       view.end();
     }
     stack.dispose();
   });
 }
 const lists = {
-  'SSR': m => [new m.SSR()],
-  'SSAO, SSR, Bloom, FXAA': m => [new m.SSAO(), new m.SSR({maxRoughness: 0.8}), new m.Bloom({strength: 0.6}), new m.FXAA()],
-  'SSAO, Bloom, FXAA': m => [new m.SSAO(), new m.Bloom({strength: 0.6}), new m.FXAA()],
-  'FXAA': m => [new m.FXAA()],
+  'SSR': (m) => [new m.SSR()],
+  'SSAO, SSR, Bloom, FXAA': (m) => [
+    new m.SSAO(),
+    new m.SSR({ maxRoughness: 0.8 }),
+    new m.Bloom({ strength: 0.6 }),
+    new m.FXAA(),
+  ],
+  'SSAO, Bloom, FXAA': (m) => [new m.SSAO(), new m.Bloom({ strength: 0.6 }), new m.FXAA()],
+  'FXAA': (m) => [new m.FXAA()],
 };
-let calls = 0, stories = 0;
-for (const [label, make] of Object.entries(lists)) for (const samples of [1, 4]) for (const [name, shader] of [['core', wgsl], ['IBL', ibl]]) {
-  const expected = ignoreAgx(story(post.baseline, make, samples, shader), ref), actual = ignoreAgx(story(post.candidate, make, samples, shader), ref);
-  assert.ok(expected.length > 300, `${label} story must exercise the GPU`);
-  assert.deepEqual(actual, expected, `PostStack [${label}] GPU calls differ at ${samples}x (${name} shader)`); calls += expected.length; stories++;
-}
-assert.ok(typeof post.candidate.SSR.prototype.add === 'function' && !post.baseline.SSR.prototype.add, 'candidate has ssr.add, baseline does not');
-console.log(`SSR without added models and stacks without SSR: GPU call sequences identical to ${ref}: ${calls} recorded calls across ${stories} stories.`);
+let calls = 0,
+  stories = 0;
+for (const [label, make] of Object.entries(lists))
+  for (const samples of [1, 4])
+    for (const [name, shader] of [
+      ['core', wgsl],
+      ['IBL', ibl],
+    ]) {
+      const expected = ignoreAgx(story(post.baseline, make, samples, shader), ref),
+        actual = ignoreAgx(story(post.candidate, make, samples, shader), ref);
+      assert.ok(expected.length > 300, `${label} story must exercise the GPU`);
+      assert.deepEqual(actual, expected, `PostStack [${label}] GPU calls differ at ${samples}x (${name} shader)`);
+      calls += expected.length;
+      stories++;
+    }
+assert.ok(
+  typeof post.candidate.SSR.prototype.add === 'function' && !post.baseline.SSR.prototype.add,
+  'candidate has ssr.add, baseline does not',
+);
+console.log(
+  `SSR without added models and stacks without SSR: GPU call sequences identical to ${ref}: ${calls} recorded calls across ${stories} stories.`,
+);

@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type {Audio} from './audio.js';
+import type { Audio } from './audio.js';
 
 export interface AudioAnalyserOptions {
   /** FFT size, a power of two from 32 to 32768. Default 2048. */
@@ -24,7 +24,7 @@ export class AudioAnalyser {
   private disposed = false;
 
   constructor(source: Audio | AudioNode, options: AudioAnalyserOptions | number = {}) {
-    const settings = typeof options === 'number' ? {fftSize: options} : options;
+    const settings = typeof options === 'number' ? { fftSize: options } : options;
     this.input = 'getOutput' in source ? source.getOutput() : source;
     const analyser = this.input.context.createAnalyser();
     analyser.fftSize = settings.fftSize ?? 2048;
@@ -39,13 +39,25 @@ export class AudioAnalyser {
   }
 
   /** Byte magnitudes per frequency bin (0..255), written into `data`. */
-  getFrequencyData(): Uint8Array<ArrayBuffer> {this.analyser.getByteFrequencyData(this.data); return this.data;}
+  getFrequencyData(): Uint8Array<ArrayBuffer> {
+    this.analyser.getByteFrequencyData(this.data);
+    return this.data;
+  }
   /** Decibel magnitudes per frequency bin. */
-  getFloatFrequencyData(out = new Float32Array(this.analyser.frequencyBinCount)): Float32Array<ArrayBuffer> {this.analyser.getFloatFrequencyData(out); return out;}
+  getFloatFrequencyData(out = new Float32Array(this.analyser.frequencyBinCount)): Float32Array<ArrayBuffer> {
+    this.analyser.getFloatFrequencyData(out);
+    return out;
+  }
   /** Byte waveform samples (128 is silence). */
-  getWaveformData(): Uint8Array<ArrayBuffer> {this.analyser.getByteTimeDomainData(this.waveform); return this.waveform;}
+  getWaveformData(): Uint8Array<ArrayBuffer> {
+    this.analyser.getByteTimeDomainData(this.waveform);
+    return this.waveform;
+  }
   /** Float waveform samples in -1..1. */
-  getFloatWaveformData(out = new Float32Array(this.analyser.fftSize)): Float32Array<ArrayBuffer> {this.analyser.getFloatTimeDomainData(out); return out;}
+  getFloatWaveformData(out = new Float32Array(this.analyser.fftSize)): Float32Array<ArrayBuffer> {
+    this.analyser.getFloatTimeDomainData(out);
+    return out;
+  }
   /** Mean of the byte frequency bins, 0..255. */
   getAverageFrequency(): number {
     const data = this.getFrequencyData();
@@ -58,13 +70,19 @@ export class AudioAnalyser {
     const data = this.getFloatFrequencyData(this.spectrum);
     let best = 0;
     for (let i = 1; i < data.length; i++) if (data[i] > data[best]) best = i;
-    return best * this.analyser.context.sampleRate / this.analyser.fftSize;
+    return (best * this.analyser.context.sampleRate) / this.analyser.fftSize;
   }
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    try {this.input.disconnect(this.analyser);} catch {/* already gone */}
+    try {
+      this.input.disconnect(this.analyser);
+    } catch {
+      /* already gone */
+    }
   }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 }

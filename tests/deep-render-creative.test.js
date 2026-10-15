@@ -1,26 +1,286 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {PostProcessing} from '../packages/creative/dist/post.js';
-import {ToonShading} from '../packages/creative/dist/toon.js';
-import {optionalGPU} from './support/optional-gpu.js';
-import {wgsl} from '../packages/core/src/shaders.ts';
-function harness(){const h=optionalGPU(),c=h.context;h.engine.gpu.limits.maxTextureDimension2D=4096;const color=c.color,depth=c.depth;return {...h,frame(format='bgra8unorm'){c.color=color;c.depth=depth;c.shader=wgsl;c.format=format;c.bindings=[];h.engine.frameGraph.execute(c);}};}
-test('Creative capture and presentation pipelines follow depth, sampling and target formats',()=>{const h=harness(),c=h.context,p=new PostProcessing({atmosphere:{density:0.02}});h.engine.use(p);const begin=c.encoder.beginRenderPass;c.encoder.beginRenderPass=descriptor=>({...begin(descriptor),setPipeline(pipeline){const samples=pipeline.multisample?.count??1;for(const a of descriptor.colorAttachments??[])if(a?.view?.texture)assert.equal(a.view.texture.sampleCount,samples);if(descriptor.depthStencilAttachment?.view?.texture)assert.equal(descriptor.depthStencilAttachment.view.texture.format,pipeline.depthStencil.format);}});try{h.frame();const counts={...h.counts};for(let i=0;i<120;i++)h.frame();for(const key of ['buffers','textures','groups','views'])assert.equal(h.counts[key],counts[key]);for(const [count,format]of [[1,'depth32float'],[1,'depth24plus-stencil8'],[4,'depth24plus'],[4,'depth32float']]){c.descriptor={...c.descriptor,multisample:{count},depthStencil:{format}};h.frame();assert.equal(p.target.samples,count);assert.equal(p.target.depth.format,format);h.frame();}for(const format of ['rgba8unorm','bgra8unorm']){const target=p.target;h.frame(format);assert.equal(p.present.fragment.targets[0].format,format);assert.equal(p.target,target);h.frame(format);}p.onDeviceRestored(h.engine);h.frame();}finally{p.dispose();assert.ok(h.resources.every(r=>r.destroyed));}});
-test('Creative validation and Toon source patches avoid repeated stable-frame scaffolding',()=>{const h=harness(),p=new PostProcessing(),toon=new ToonShading();h.engine.use(p);h.engine.use(toon);h.frame();const entries=Object.entries,replace=String.prototype.replace;let enumerations=0,patches=0;try{Object.entries=function(...args){enumerations++;return entries(...args);};String.prototype.replace=function(...args){if(String(this).includes('let v=normalize(frame.eye.xyz-i.position);')&&String(args[0]).includes('let v=normalize'))patches++;return replace.apply(this,args);};for(let i=0;i<120;i++)h.frame();}finally{Object.entries=entries;String.prototype.replace=replace;}assert.equal(enumerations,0);assert.equal(patches,0);const v=new Float32Array(h.resources.find(r=>r.size===272).data);assert.deepEqual(Array.from(v.slice(44,47)),[1,1,1]);assert.deepEqual(Array.from(v.slice(48,51)),[0,0,0]);for(const change of [()=>p.options.bloom=5,()=>p.options.atmosphere={anisotropy:1},()=>p.options.gain=[17,1,1],()=>p.options.atmosphere={sun:[0,0,0]}]){delete p.options.bloom;delete p.options.atmosphere;delete p.options.gain;change();assert.throws(h.frame);}toon.dispose();p.dispose();assert.ok(h.resources.every(r=>r.destroyed));});
-
-test('Creative capture retries every fallible first-frame allocation and upload',()=>{
- for(const method of ['createTexture','createBindGroup','createRenderPipeline','writeBuffer']){
-  const baseline=harness(),effect=new PostProcessing({atmosphere:{density:0.02}});baseline.engine.use(effect);const source=method==='writeBuffer'?baseline.engine.gpu.queue:baseline.engine.gpu,operation=source[method];let total=0;source[method]=(...args)=>{total++;return operation(...args);};baseline.frame();effect.dispose();assert.ok(baseline.resources.every(r=>r.destroyed));
-  for(let at=1;at<=total;at++){
-   const h=harness(),candidate=new PostProcessing({atmosphere:{density:0.02}});h.engine.use(candidate);const object=method==='writeBuffer'?h.engine.gpu.queue:h.engine.gpu,original=object[method],failure=new Error(method+' '+at);let calls=0;object[method]=(...args)=>{if(++calls===at)throw failure;return original(...args);};
-   try{assert.throws(h.frame,error=>error===failure);object[method]=original;h.frame();h.frame();candidate.dispose();assert.ok(h.resources.every(r=>r.destroyed),failure.message+' leaked');}finally{candidate.dispose();h.cleanup();}
+import { PostProcessing } from '../packages/creative/dist/post.js';
+import { ToonShading } from '../packages/creative/dist/toon.js';
+import { optionalGPU } from './support/optional-gpu.js';
+import { wgsl } from '../packages/core/src/shaders.ts';
+function harness() {
+  const h = optionalGPU(),
+    c = h.context;
+  h.engine.gpu.limits.maxTextureDimension2D = 4096;
+  const color = c.color,
+    depth = c.depth;
+  return {
+    ...h,
+    frame(format = 'bgra8unorm') {
+      c.color = color;
+      c.depth = depth;
+      c.shader = wgsl;
+      c.format = format;
+      c.bindings = [];
+      h.engine.frameGraph.execute(c);
+    },
+  };
+}
+test('Creative capture and presentation pipelines follow depth, sampling and target formats', () => {
+  const h = harness(),
+    c = h.context,
+    p = new PostProcessing({ atmosphere: { density: 0.02 } });
+  h.engine.use(p);
+  const begin = c.encoder.beginRenderPass;
+  c.encoder.beginRenderPass = (descriptor) => ({
+    ...begin(descriptor),
+    setPipeline(pipeline) {
+      const samples = pipeline.multisample?.count ?? 1;
+      for (const a of descriptor.colorAttachments ?? [])
+        if (a?.view?.texture) assert.equal(a.view.texture.sampleCount, samples);
+      if (descriptor.depthStencilAttachment?.view?.texture)
+        assert.equal(descriptor.depthStencilAttachment.view.texture.format, pipeline.depthStencil.format);
+    },
+  });
+  try {
+    h.frame();
+    const counts = { ...h.counts };
+    for (let i = 0; i < 120; i++) h.frame();
+    for (const key of ['buffers', 'textures', 'groups', 'views']) assert.equal(h.counts[key], counts[key]);
+    for (const [count, format] of [
+      [1, 'depth32float'],
+      [1, 'depth24plus-stencil8'],
+      [4, 'depth24plus'],
+      [4, 'depth32float'],
+    ]) {
+      c.descriptor = { ...c.descriptor, multisample: { count }, depthStencil: { format } };
+      h.frame();
+      assert.equal(p.target.samples, count);
+      assert.equal(p.target.depth.format, format);
+      h.frame();
+    }
+    for (const format of ['rgba8unorm', 'bgra8unorm']) {
+      const target = p.target;
+      h.frame(format);
+      assert.equal(p.present.fragment.targets[0].format, format);
+      assert.equal(p.target, target);
+      h.frame(format);
+    }
+    p.onDeviceRestored(h.engine);
+    h.frame();
+  } finally {
+    p.dispose();
+    assert.ok(h.resources.every((r) => r.destroyed));
   }
- }
 });
-test('Creative option bounds, unknown finite fields and Toon shader variants stay live',()=>{
- const valid=[{exposure:10,contrast:4,saturation:4,focus:10000,aperture:64,grain:1,gain:[16,0,1],lift:[-4,4,0],atmosphere:{density:10,heightFalloff:10,godRays:4,color:[0,1,0.5],sun:[1,0,0]}},{exposure:-10,focus:0.01,atmosphere:{godRays:0}}];for(const options of valid)assert.doesNotThrow(()=>new PostProcessing(options));
- for(const [options,kind,message]of [[{bloom:0.5},TypeError,'PostProcessing has no bloom: put Bloom from @margoengine/post/bloom before it in a PostStack'],[{threshold:1},TypeError,'PostProcessing has no bloom: put Bloom from @margoengine/post/bloom before it in a PostStack'],[{unknown:Infinity},RangeError,'Invalid post unknown'],[{atmosphere:{density:NaN}},RangeError,'Invalid post or atmosphere options'],[{atmosphere:{sky:false}},TypeError,'PostProcessing draws no sky: attach Sky from @margoengine/sky'],[{lift:[0,-5,0]},RangeError,'Post color vector exceeds limits'],[{gain:[1,1]},RangeError,'Invalid post vector'],[{gain:[1,NaN,1]},RangeError,'Invalid post vector'],[{atmosphere:{sun:[0,0,0]}},RangeError,'Sun direction must be nonzero']])assert.throws(()=>new PostProcessing(options),error=>error instanceof kind&&error.message===message);
- const h=harness(),toon=new ToonShading();h.engine.use(toon);const shade=h.engine.frameGraph;const original=String.prototype.replace;let patches=0;try{String.prototype.replace=function(...args){if(String(args[0]).includes('let v=normalize'))patches++;return original.apply(this,args);};h.frame();h.frame();assert.equal(patches,1);h.context.shader=wgsl+'\n// changed source';h.context.bindings=[];shade.execute(h.context);assert.equal(patches,2);h.context.shader=wgsl;h.context.bindings=[{binding:1,resource:{}}];shade.execute(h.context);assert.equal(patches,3);h.frame();assert.equal(patches,3);toon.onDeviceRestored(h.engine);h.frame();assert.equal(patches,4);}finally{String.prototype.replace=original;toon.dispose();}assert.ok(h.resources.every(r=>r.destroyed));
+test('Creative validation and Toon source patches avoid repeated stable-frame scaffolding', () => {
+  const h = harness(),
+    p = new PostProcessing(),
+    toon = new ToonShading();
+  h.engine.use(p);
+  h.engine.use(toon);
+  h.frame();
+  const entries = Object.entries,
+    replace = String.prototype.replace;
+  let enumerations = 0,
+    patches = 0;
+  try {
+    Object.entries = function (...args) {
+      enumerations++;
+      return entries(...args);
+    };
+    String.prototype.replace = function (...args) {
+      if (
+        String(this).includes('let v=normalize(frame.eye.xyz-i.position);') &&
+        String(args[0]).includes('let v=normalize')
+      )
+        patches++;
+      return replace.apply(this, args);
+    };
+    for (let i = 0; i < 120; i++) h.frame();
+  } finally {
+    Object.entries = entries;
+    String.prototype.replace = replace;
+  }
+  assert.equal(enumerations, 0);
+  assert.equal(patches, 0);
+  const v = new Float32Array(h.resources.find((r) => r.size === 272).data);
+  assert.deepEqual(Array.from(v.slice(44, 47)), [1, 1, 1]);
+  assert.deepEqual(Array.from(v.slice(48, 51)), [0, 0, 0]);
+  for (const change of [
+    () => (p.options.bloom = 5),
+    () => (p.options.atmosphere = { anisotropy: 1 }),
+    () => (p.options.gain = [17, 1, 1]),
+    () => (p.options.atmosphere = { sun: [0, 0, 0] }),
+  ]) {
+    delete p.options.bloom;
+    delete p.options.atmosphere;
+    delete p.options.gain;
+    change();
+    assert.throws(h.frame);
+  }
+  toon.dispose();
+  p.dispose();
+  assert.ok(h.resources.every((r) => r.destroyed));
 });
 
-test('Creative closes failed compute and presentation passes before restoring capture ownership',()=>{for(const stage of ['compute','present']){const h=harness(),p=new PostProcessing({atmosphere:{density:0.02}}),c=h.context,failure=new Error(stage+' encoding failed');h.engine.use(p);h.frame();const render=c.encoder.beginRenderPass,compute=c.encoder.beginComputePass;let ends=0;const failing=pass=>({...pass,setPipeline(){throw failure;},end(){ends++;pass.end();}});if(stage==='compute')c.encoder.beginComputePass=(...args)=>failing(compute(...args));else c.encoder.beginRenderPass=descriptor=>{const pass=render(descriptor),match=stage==='sky'?descriptor.colorAttachments[0]?.view?.texture?.format==='rgba16float'&&descriptor.depthStencilAttachment:descriptor.colorAttachments[0]?.view===h.originalColor;return match?failing(pass):pass;};try{assert.throws(h.frame,error=>error===failure);assert.equal(ends,1);assert.equal(c.color,h.originalColor);assert.equal(c.depth,h.originalDepth);assert.equal(c.format,'bgra8unorm');c.encoder.beginRenderPass=render;c.encoder.beginComputePass=compute;h.frame();}finally{p.dispose();assert.ok(h.resources.every(r=>r.destroyed));}}});
+test('Creative capture retries every fallible first-frame allocation and upload', () => {
+  for (const method of ['createTexture', 'createBindGroup', 'createRenderPipeline', 'writeBuffer']) {
+    const baseline = harness(),
+      effect = new PostProcessing({ atmosphere: { density: 0.02 } });
+    baseline.engine.use(effect);
+    const source = method === 'writeBuffer' ? baseline.engine.gpu.queue : baseline.engine.gpu,
+      operation = source[method];
+    let total = 0;
+    source[method] = (...args) => {
+      total++;
+      return operation(...args);
+    };
+    baseline.frame();
+    effect.dispose();
+    assert.ok(baseline.resources.every((r) => r.destroyed));
+    for (let at = 1; at <= total; at++) {
+      const h = harness(),
+        candidate = new PostProcessing({ atmosphere: { density: 0.02 } });
+      h.engine.use(candidate);
+      const object = method === 'writeBuffer' ? h.engine.gpu.queue : h.engine.gpu,
+        original = object[method],
+        failure = new Error(method + ' ' + at);
+      let calls = 0;
+      object[method] = (...args) => {
+        if (++calls === at) throw failure;
+        return original(...args);
+      };
+      try {
+        assert.throws(h.frame, (error) => error === failure);
+        object[method] = original;
+        h.frame();
+        h.frame();
+        candidate.dispose();
+        assert.ok(
+          h.resources.every((r) => r.destroyed),
+          failure.message + ' leaked',
+        );
+      } finally {
+        candidate.dispose();
+        h.cleanup();
+      }
+    }
+  }
+});
+test('Creative option bounds, unknown finite fields and Toon shader variants stay live', () => {
+  const valid = [
+    {
+      exposure: 10,
+      contrast: 4,
+      saturation: 4,
+      focus: 10000,
+      aperture: 64,
+      grain: 1,
+      gain: [16, 0, 1],
+      lift: [-4, 4, 0],
+      atmosphere: { density: 10, heightFalloff: 10, godRays: 4, color: [0, 1, 0.5], sun: [1, 0, 0] },
+    },
+    { exposure: -10, focus: 0.01, atmosphere: { godRays: 0 } },
+  ];
+  for (const options of valid) assert.doesNotThrow(() => new PostProcessing(options));
+  for (const [options, kind, message] of [
+    [
+      { bloom: 0.5 },
+      TypeError,
+      'PostProcessing has no bloom: put Bloom from @margoengine/post/bloom before it in a PostStack',
+    ],
+    [
+      { threshold: 1 },
+      TypeError,
+      'PostProcessing has no bloom: put Bloom from @margoengine/post/bloom before it in a PostStack',
+    ],
+    [{ unknown: Infinity }, RangeError, 'Invalid post unknown'],
+    [{ atmosphere: { density: NaN } }, RangeError, 'Invalid post or atmosphere options'],
+    [{ atmosphere: { sky: false } }, TypeError, 'PostProcessing draws no sky: attach Sky from @margoengine/sky'],
+    [{ lift: [0, -5, 0] }, RangeError, 'Post color vector exceeds limits'],
+    [{ gain: [1, 1] }, RangeError, 'Invalid post vector'],
+    [{ gain: [1, NaN, 1] }, RangeError, 'Invalid post vector'],
+    [{ atmosphere: { sun: [0, 0, 0] } }, RangeError, 'Sun direction must be nonzero'],
+  ])
+    assert.throws(
+      () => new PostProcessing(options),
+      (error) => error instanceof kind && error.message === message,
+    );
+  const h = harness(),
+    toon = new ToonShading();
+  h.engine.use(toon);
+  const shade = h.engine.frameGraph;
+  const original = String.prototype.replace;
+  let patches = 0;
+  try {
+    String.prototype.replace = function (...args) {
+      if (String(args[0]).includes('let v=normalize')) patches++;
+      return original.apply(this, args);
+    };
+    h.frame();
+    h.frame();
+    assert.equal(patches, 1);
+    h.context.shader = wgsl + '\n// changed source';
+    h.context.bindings = [];
+    shade.execute(h.context);
+    assert.equal(patches, 2);
+    h.context.shader = wgsl;
+    h.context.bindings = [{ binding: 1, resource: {} }];
+    shade.execute(h.context);
+    assert.equal(patches, 3);
+    h.frame();
+    assert.equal(patches, 3);
+    toon.onDeviceRestored(h.engine);
+    h.frame();
+    assert.equal(patches, 4);
+  } finally {
+    String.prototype.replace = original;
+    toon.dispose();
+  }
+  assert.ok(h.resources.every((r) => r.destroyed));
+});
+
+test('Creative closes failed compute and presentation passes before restoring capture ownership', () => {
+  for (const stage of ['compute', 'present']) {
+    const h = harness(),
+      p = new PostProcessing({ atmosphere: { density: 0.02 } }),
+      c = h.context,
+      failure = new Error(stage + ' encoding failed');
+    h.engine.use(p);
+    h.frame();
+    const render = c.encoder.beginRenderPass,
+      compute = c.encoder.beginComputePass;
+    let ends = 0;
+    const failing = (pass) => ({
+      ...pass,
+      setPipeline() {
+        throw failure;
+      },
+      end() {
+        ends++;
+        pass.end();
+      },
+    });
+    if (stage === 'compute') c.encoder.beginComputePass = (...args) => failing(compute(...args));
+    else
+      c.encoder.beginRenderPass = (descriptor) => {
+        const pass = render(descriptor),
+          match =
+            stage === 'sky'
+              ? descriptor.colorAttachments[0]?.view?.texture?.format === 'rgba16float' &&
+                descriptor.depthStencilAttachment
+              : descriptor.colorAttachments[0]?.view === h.originalColor;
+        return match ? failing(pass) : pass;
+      };
+    try {
+      assert.throws(h.frame, (error) => error === failure);
+      assert.equal(ends, 1);
+      assert.equal(c.color, h.originalColor);
+      assert.equal(c.depth, h.originalDepth);
+      assert.equal(c.format, 'bgra8unorm');
+      c.encoder.beginRenderPass = render;
+      c.encoder.beginComputePass = compute;
+      h.frame();
+    } finally {
+      p.dispose();
+      assert.ok(h.resources.every((r) => r.destroyed));
+    }
+  }
+});

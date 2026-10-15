@@ -1,15 +1,22 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // Display P3 and HDR (extended-range) canvas output without a core change.
-import type {EngineKernel} from '@margoengine/core';
-import {engineRuntime, type FrameGraph, type PassContext} from '@margoengine/core/extension';
+import type { EngineKernel } from '@margoengine/core';
+import { engineRuntime, type FrameGraph, type PassContext } from '@margoengine/core/extension';
 
-declare const GPUBufferUsage: {UNIFORM: number; COPY_DST: number};
-declare const GPUTextureUsage: {RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_SRC: number};
-type GPUContext = Extract<PassContext, {backend: 'webgpu'}>;
-type Configuration = GPUCanvasConfiguration & {colorSpace?: PredefinedColorSpace; toneMapping?: {mode?: 'standard' | 'extended'}};
-type Canvas = GPUCanvasContext & {getConfiguration?(): Configuration | null};
+declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
+declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_SRC: number };
+type GPUContext = Extract<PassContext, { backend: 'webgpu' }>;
+type Configuration = GPUCanvasConfiguration & {
+  colorSpace?: PredefinedColorSpace;
+  toneMapping?: { mode?: 'standard' | 'extended' };
+};
+type Canvas = GPUCanvasContext & { getConfiguration?(): Configuration | null };
 /** What Tonemap reads from the pass context between the two ColorOutput passes (no import between the packages). */
-interface Frame {peak: number; p3: boolean; excess?: (width: number, height: number) => GPUTextureView}
+interface Frame {
+  peak: number;
+  p3: boolean;
+  excess?: (width: number, height: number) => GPUTextureView;
+}
 const OUTPUT = Symbol.for('margoengine.color-output');
 
 export interface ColorOutputOptions {
@@ -61,41 +68,84 @@ export class ColorOutput {
   private disposed = false;
   private original?: PropertyDescriptor | null;
   private real?: () => GPUTexture;
-  private image?: {device: GPUDevice; texture: GPUTexture; view: GPUTextureView};
-  private excessTarget?: {device: GPUDevice; texture: GPUTexture; view: GPUTextureView};
-  private state?: {device: GPUDevice; uniform: GPUBuffer; module: GPUShaderModule; pipelines: Map<string, GPURenderPipeline>; group?: GPUBindGroup; key?: unknown[]};
-  private readonly frame: Frame = {peak: 1, p3: false, excess: (width, height) => {
-    const device = engineRuntime(this.engine!).gpu!, target = this.excessTarget;
-    if (target?.device !== device || target.texture.width !== width || target.texture.height !== height) {
-      target?.texture.destroy();
-      const texture = device.createTexture({label: 'color output excess', size: [width, height], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING});
-      this.excessTarget = {device, texture, view: texture.createView()};
-    }
-    this.used = true; return this.excessTarget!.view;
-  }};
+  private image?: { device: GPUDevice; texture: GPUTexture; view: GPUTextureView };
+  private excessTarget?: { device: GPUDevice; texture: GPUTexture; view: GPUTextureView };
+  private state?: {
+    device: GPUDevice;
+    uniform: GPUBuffer;
+    module: GPUShaderModule;
+    pipelines: Map<string, GPURenderPipeline>;
+    group?: GPUBindGroup;
+    key?: unknown[];
+  };
+  private readonly frame: Frame = {
+    peak: 1,
+    p3: false,
+    excess: (width, height) => {
+      const device = engineRuntime(this.engine!).gpu!,
+        target = this.excessTarget;
+      if (target?.device !== device || target.texture.width !== width || target.texture.height !== height) {
+        target?.texture.destroy();
+        const texture = device.createTexture({
+          label: 'color output excess',
+          size: [width, height],
+          format: 'rgba16float',
+          usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+        });
+        this.excessTarget = { device, texture, view: texture.createView() };
+      }
+      this.used = true;
+      return this.excessTarget!.view;
+    },
+  };
   private readonly values = new Float32Array(4);
-  private readonly attachment: GPURenderPassColorAttachment = {view: undefined!, loadOp: 'clear', storeOp: 'store'};
-  private readonly passDescriptor: GPURenderPassDescriptor = {label: 'color output', colorAttachments: [this.attachment]};
-  private readonly resolveAttachment: GPURenderPassColorAttachment = {view: undefined!, loadOp: 'load', storeOp: 'store'};
-  private readonly resolveDescriptor: GPURenderPassDescriptor = {label: 'color output resolve', colorAttachments: [this.resolveAttachment]};
+  private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'clear', storeOp: 'store' };
+  private readonly passDescriptor: GPURenderPassDescriptor = {
+    label: 'color output',
+    colorAttachments: [this.attachment],
+  };
+  private readonly resolveAttachment: GPURenderPassColorAttachment = {
+    view: undefined!,
+    loadOp: 'load',
+    storeOp: 'store',
+  };
+  private readonly resolveDescriptor: GPURenderPassDescriptor = {
+    label: 'color output resolve',
+    colorAttachments: [this.resolveAttachment],
+  };
 
   /** Same as `engine.use(new ColorOutput(...))`; returns the ColorOutput. */
-  static attach(engine: EngineKernel, options?: ColorOutputOptions): ColorOutput {const value = new ColorOutput(options); engine.use(value); return value;}
+  static attach(engine: EngineKernel, options?: ColorOutputOptions): ColorOutput {
+    const value = new ColorOutput(options);
+    engine.use(value);
+    return value;
+  }
   constructor(readonly options: Readonly<ColorOutputOptions> = {}) {
-    const {gamut = 'p3', hdr = true, peak = 4, force = false} = options;
-    if (gamut !== 'srgb' && gamut !== 'p3' || typeof hdr !== 'boolean' || typeof force !== 'boolean' || !(peak >= 1 && peak <= 16)) throw new RangeError('Invalid ColorOutput options');
+    const { gamut = 'p3', hdr = true, peak = 4, force = false } = options;
+    if (
+      (gamut !== 'srgb' && gamut !== 'p3') ||
+      typeof hdr !== 'boolean' ||
+      typeof force !== 'boolean' ||
+      !(peak >= 1 && peak <= 16)
+    )
+      throw new RangeError('Invalid ColorOutput options');
     this.peak = peak;
   }
   /** Gamut of the canvas now: 'p3' only when the display, the browser and the options all allow it. */
-  get gamut(): 'srgb' | 'p3' {return this.p3 ? 'p3' : 'srgb';}
+  get gamut(): 'srgb' | 'p3' {
+    return this.p3 ? 'p3' : 'srgb';
+  }
   /** True while the canvas is extended-range (float16, `toneMapping: 'extended'`). */
-  get hdr(): boolean {return this.extended;}
+  get hdr(): boolean {
+    return this.extended;
+  }
 
   setup(engine: EngineKernel): void {
     if (this.disposed) throw new Error('ColorOutput is disposed');
     this.engine = engine;
     if (engine.backend !== 'webgpu') return;
-    const {gamut = 'p3', hdr = true, force} = this.options, media = (query: string) => force || typeof matchMedia === 'function' && matchMedia(query).matches;
+    const { gamut = 'p3', hdr = true, force } = this.options,
+      media = (query: string) => force || (typeof matchMedia === 'function' && matchMedia(query).matches);
     this.wantP3 = gamut === 'p3' && media('(color-gamut: p3)');
     this.wantHDR = hdr && media('(dynamic-range: high)');
     this.apply();
@@ -103,33 +153,69 @@ export class ColorOutput {
   // Passes only when active: registering any pass changes how core stores its multisampled frame.
   registerPasses(graph: FrameGraph): void {
     if (!this.on) return;
-    graph.add({name: 'color-output:begin', order: -1e5, execute: c => {if (c.backend === 'webgpu' && this.on) {this.used = false; (c as {[OUTPUT]?: Frame})[OUTPUT] = this.frame;}}});
-    graph.add({name: 'color-output', order: 1e5, execute: c => {if (c.backend === 'webgpu') this.present(c);}});
+    graph.add({
+      name: 'color-output:begin',
+      order: -1e5,
+      execute: (c) => {
+        if (c.backend === 'webgpu' && this.on) {
+          this.used = false;
+          (c as { [OUTPUT]?: Frame })[OUTPUT] = this.frame;
+        }
+      },
+    });
+    graph.add({
+      name: 'color-output',
+      order: 1e5,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.present(c);
+      },
+    });
   }
-  onDeviceRestored(): void {this.release(); this.apply();}
+  onDeviceRestored(): void {
+    this.release();
+    this.apply();
+  }
   /** Restores the sRGB/SDR canvas and detaches from the engine. */
   dispose(): void {
     if (this.disposed) return;
-    this.disposed = true; this.frame.excess = undefined;
-    if (this.on) {this.configure(false, false); this.patch(false);}
-    this.on = this.p3 = this.extended = false; this.release();
-    const engine = this.engine; this.engine = undefined;
-    if (engine && !engine.disposed && engineRuntime(engine).plugins.get(this.name) === this) engine.removePlugin(this.name);
+    this.disposed = true;
+    this.frame.excess = undefined;
+    if (this.on) {
+      this.configure(false, false);
+      this.patch(false);
+    }
+    this.on = this.p3 = this.extended = false;
+    this.release();
+    const engine = this.engine;
+    this.engine = undefined;
+    if (engine && !engine.disposed && engineRuntime(engine).plugins.get(this.name) === this)
+      engine.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 
   // Merges with the current configuration so TransparentCanvas (alphaMode) and a SceneFade (usage) survive.
   private configure(hdr: boolean, p3: boolean): void {
-    const context = this.context!, current = context.getConfiguration?.();
-    context.configure({...current, device: engineRuntime(this.engine!).gpu!, alphaMode: current?.alphaMode ?? 'opaque', format: hdr ? 'rgba16float' : navigator.gpu.getPreferredCanvasFormat(),
-      colorSpace: p3 ? 'display-p3' : 'srgb', toneMapping: {mode: hdr ? 'extended' : 'standard'}} as Configuration);
+    const context = this.context!,
+      current = context.getConfiguration?.();
+    context.configure({
+      ...current,
+      device: engineRuntime(this.engine!).gpu!,
+      alphaMode: current?.alphaMode ?? 'opaque',
+      format: hdr ? 'rgba16float' : navigator.gpu.getPreferredCanvasFormat(),
+      colorSpace: p3 ? 'display-p3' : 'srgb',
+      toneMapping: { mode: hdr ? 'extended' : 'standard' },
+    } as Configuration);
   }
   private apply(): void {
-    const engine = this.engine, wasOn = this.on;
+    const engine = this.engine,
+      wasOn = this.on;
     this.on = this.p3 = this.extended = false;
-    if (!engine || engine.disposed || this.disposed || !engineRuntime(engine).gpu || !(this.wantP3 || this.wantHDR)) return;
-    this.context ??= engine.canvas.getContext('webgpu') as Canvas | null ?? undefined;
+    if (!engine || engine.disposed || this.disposed || !engineRuntime(engine).gpu || !(this.wantP3 || this.wantHDR))
+      return;
+    this.context ??= (engine.canvas.getContext('webgpu') as Canvas | null) ?? undefined;
     if (!this.context) return;
     this.configure(this.wantHDR, this.wantP3);
     // A browser without extended tone mapping (or P3 canvases) drops the member; getConfiguration() shows what stuck.
@@ -139,58 +225,117 @@ export class ColorOutput {
     if (this.wantHDR !== this.extended) this.configure(false, this.p3);
     this.on = this.p3 || this.extended;
     if (wasOn || this.on) this.patch(this.on);
-    this.frame.peak = this.extended ? this.peak : 1; this.frame.p3 = this.p3;
+    this.frame.peak = this.extended ? this.peak : 1;
+    this.frame.p3 = this.p3;
   }
   // Core asks the context for its texture once per frame; it gets an offscreen one in the canvas format instead.
   private patch(on: boolean): void {
     const context = this.context!;
     if (on && this.original === undefined) {
-      this.original = Object.getOwnPropertyDescriptor(context, 'getCurrentTexture') ?? null; this.real = context.getCurrentTexture;
-      Object.defineProperty(context, 'getCurrentTexture', {configurable: true, writable: true, value: this.texture});
+      this.original = Object.getOwnPropertyDescriptor(context, 'getCurrentTexture') ?? null;
+      this.real = context.getCurrentTexture;
+      Object.defineProperty(context, 'getCurrentTexture', { configurable: true, writable: true, value: this.texture });
     } else if (!on && this.original !== undefined) {
-      if (this.original) Object.defineProperty(context, 'getCurrentTexture', this.original); else Reflect.deleteProperty(context, 'getCurrentTexture');
+      if (this.original) Object.defineProperty(context, 'getCurrentTexture', this.original);
+      else Reflect.deleteProperty(context, 'getCurrentTexture');
       this.original = this.real = undefined;
     }
   }
   private readonly texture = (): GPUTexture => {
-    const engine = this.engine!, device = engineRuntime(engine).gpu!, {width, height} = engine.canvas, image = this.image;
+    const engine = this.engine!,
+      device = engineRuntime(engine).gpu!,
+      { width, height } = engine.canvas,
+      image = this.image;
     if (image?.device !== device || image.texture.width !== width || image.texture.height !== height) {
       image?.texture.destroy();
-      const texture = device.createTexture({label: 'color output image', size: [width, height], format: navigator.gpu.getPreferredCanvasFormat(), usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC});
-      this.image = {device, texture, view: texture.createView()};
+      const texture = device.createTexture({
+        label: 'color output image',
+        size: [width, height],
+        format: navigator.gpu.getPreferredCanvasFormat(),
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
+      });
+      this.image = { device, texture, view: texture.createView() };
     }
     return this.image!.texture;
   };
 
   private present(c: GPUContext): void {
-    delete (c as {[OUTPUT]?: Frame})[OUTPUT];
-    const image = this.image, {device} = c;
+    delete (c as { [OUTPUT]?: Frame })[OUTPUT];
+    const image = this.image,
+      { device } = c;
     if (!this.on || image?.device !== device) return;
     if (this.state?.device !== device) {
       this.release(true);
-      const uniform = device.createBuffer({label: 'color output', size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST});
-      try {this.state = {device, uniform, module: device.createShaderModule({label: 'color output', code: shader}), pipelines: new Map()};} catch (error) {uniform.destroy(); throw error;}
+      const uniform = device.createBuffer({
+        label: 'color output',
+        size: 16,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+      try {
+        this.state = {
+          device,
+          uniform,
+          module: device.createShaderModule({ label: 'color output', code: shader }),
+          pipelines: new Map(),
+        };
+      } catch (error) {
+        uniform.destroy();
+        throw error;
+      }
     }
-    const state = this.state, format: GPUTextureFormat = this.extended ? 'rgba16float' : navigator.gpu.getPreferredCanvasFormat();
+    const state = this.state,
+      format: GPUTextureFormat = this.extended ? 'rgba16float' : navigator.gpu.getPreferredCanvasFormat();
     let pipeline = state.pipelines.get(format);
-    if (!pipeline) state.pipelines.set(format, pipeline = device.createRenderPipeline({label: 'color output', layout: 'auto', vertex: {module: state.module, entryPoint: 'vertexMain'},
-      fragment: {module: state.module, entryPoint: 'fragmentMain', targets: [{format}]}, primitive: {topology: 'triangle-list'}}));
+    if (!pipeline)
+      state.pipelines.set(
+        format,
+        (pipeline = device.createRenderPipeline({
+          label: 'color output',
+          layout: 'auto',
+          vertex: { module: state.module, entryPoint: 'vertexMain' },
+          fragment: { module: state.module, entryPoint: 'fragmentMain', targets: [{ format }] },
+          primitive: { topology: 'triangle-list' },
+        })),
+      );
     // Passes after the scene may have drawn into core's multisampled target only; core resolves it after the graph.
-    if ((c.descriptor.multisample?.count ?? 1) > 1) {this.resolveAttachment.view = c.color; this.resolveAttachment.resolveTarget = image.view; c.encoder.beginRenderPass(this.resolveDescriptor).end();}
-    const excess = this.used && this.excessTarget?.device === device ? this.excessTarget.view : image.view, key = [pipeline, image.view, excess];
+    if ((c.descriptor.multisample?.count ?? 1) > 1) {
+      this.resolveAttachment.view = c.color;
+      this.resolveAttachment.resolveTarget = image.view;
+      c.encoder.beginRenderPass(this.resolveDescriptor).end();
+    }
+    const excess = this.used && this.excessTarget?.device === device ? this.excessTarget.view : image.view,
+      key = [pipeline, image.view, excess];
     if (!state.group || state.key!.some((value, i) => value !== key[i])) {
-      state.group = device.createBindGroup({label: 'color output', layout: pipeline.getBindGroupLayout(0), entries: [{binding: 0, resource: image.view}, {binding: 1, resource: excess}, {binding: 2, resource: {buffer: state.uniform}}]});
+      state.group = device.createBindGroup({
+        label: 'color output',
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: image.view },
+          { binding: 1, resource: excess },
+          { binding: 2, resource: { buffer: state.uniform } },
+        ],
+      });
       state.key = key;
     }
-    const v = this.values; v[0] = this.extended ? this.peak : 1; v[1] = +this.p3; v[2] = +(excess !== image.view); v[3] = +(this.context!.getConfiguration?.()?.alphaMode === 'premultiplied');
+    const v = this.values;
+    v[0] = this.extended ? this.peak : 1;
+    v[1] = +this.p3;
+    v[2] = +(excess !== image.view);
+    v[3] = +(this.context!.getConfiguration?.()?.alphaMode === 'premultiplied');
     device.queue.writeBuffer(state.uniform, 0, v);
     this.attachment.view = this.real!.call(this.context!).createView();
     const pass = c.encoder.beginRenderPass(this.passDescriptor);
-    pass.setPipeline(pipeline); pass.setBindGroup(0, state.group); pass.draw(3); pass.end();
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, state.group);
+    pass.draw(3);
+    pass.end();
   }
   private release(keepTargets = false): void {
-    this.state?.uniform.destroy(); this.state = undefined;
+    this.state?.uniform.destroy();
+    this.state = undefined;
     if (keepTargets) return;
-    this.image?.texture.destroy(); this.excessTarget?.texture.destroy(); this.image = this.excessTarget = undefined;
+    this.image?.texture.destroy();
+    this.excessTarget?.texture.destroy();
+    this.image = this.excessTarget = undefined;
   }
 }

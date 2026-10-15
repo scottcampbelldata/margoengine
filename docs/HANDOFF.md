@@ -477,7 +477,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       pipeline state) to replace today's workarounds: cameras replacing camera.update on the instance, quality/pacing
       wrapping requestAnimationFrame globally, environment and selection reading core's private plugin map, materials
       proxying createRenderPipeline. Costs core bytes; these become public API, so decide before launch.
-   e. DECISION FOR SCOTT before 1.0: reformat the dense single-line TypeScript to conventional readable style
+   e. [DONE: 5k phase 1] DECISION FOR SCOTT before 1.0: reformat the dense single-line TypeScript to conventional readable style
       (automated, no behaviour change; minifiers already handle shipped size) to lower the barrier for contributors.
    f. [EVALUATED, recommendation only; workers + OffscreenCanvas done in 1f.j] Evaluate newer platform features:
       Float16Array for half-float data, Symbol.dispose / `using` for engine object
@@ -523,7 +523,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       TypeScript bump may need edits). `npm run api:check` (in `verify` after build:packages, ~3 s) fails with a diff;
       `npm run api:update` rewrites the reports and `docs/api-surface.md` (export counts per entry, unexported types,
       `any` count, gzip) for the 1.0 API review.
-   d. Add a linter/formatter (Biome: one fast dev tool, no runtime cost) with a small rule set: no `any`, no unused
+   d. [DONE: 5k phase 1, Biome 2.5.15] Add a linter/formatter (Biome: one fast dev tool, no runtime cost) with a small rule set: no `any`, no unused
       code, consistent imports. Pairs with the 1g.e reformat decision.
    e. packages/shared is copied into every package bundle (e.g. sceneSamples, math, msaa, demo-frame); copies can drift
       between packages in one app. Decide: publish it as an internal versioned package, or keep copying but test
@@ -1083,6 +1083,60 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    Order: after the current feature wave lands, pause new features; one agent runs the Biome reformat + gates (warn);
    then parallel agents by package group fix types/any/TSDoc/errors; then gates switch to fail; then the demo rebuild.
    Features started afterwards (P3, frame debugger, tier presets, pre-warming, streaming) must pass the gates.
+   PHASE 1 [DONE 2026-10-15, one commit on 5f1d442]: Biome 2.5.15 (exact devDependency; `biome.json`: 2 spaces,
+   width 120, single quotes, semicolons, trailing commas "all", property quotes preserved, `lineEnding: auto` because
+   checkouts are CRLF via core.autocrlf; covers packages/tests/scripts/examples/apps/tools JS/TS, excludes dist, vendor,
+   the generated ltc.ts and both wasm.ts; no import sorting anywhere). 1,041 of 1,059 files reformatted; lint fixes only
+   unused imports (12 files, reviewed: specifiers of still-imported modules or node builtins; React default imports kept
+   via `jsxRuntime: reactClassic`) and let -> const (10 files). 25 doc comments the dense style wrote after a member's
+   `;` for the NEXT member (Biome pulled them before the `;`, detaching them) were moved back above their member.
+   Proof of no behaviour change: core + stage 19,999 B gzip, raw 46,652 B (both identical before/after); 643 dist files
+   hashed: every minified file byte-identical; 35 JS files differ only in packages whose build is plain `tsc` emit
+   (bvh, decoders, exporters, ifc, loaders, react), all AST-identical with identical comments; 53 .d.ts differ in layout
+   and gained JSDoc tsc used to drop from one-line members (AST-identical). Source level: all 1,041 files AST-identical
+   (positions, parentheses, literal spelling, `a && (b && c)` re-association and JSX whitespace normalised) except the
+   22 lint-fixed files; every `/** */` precedes the same code as before; comment texts identical. Entry sizes and the
+   basic-scene network record unchanged except their commit field. Node tests 1,322/1,322 (`--test-concurrency=2`;
+   `scripts/support/serializer-number-candidate.js` anchor updated to the formatted source), proofs --current 15/15,
+   build:site, visual:check 55/55. api/ reports: 10 changed cosmetically (line breaks from formatted .d.ts, Biome
+   dropped parens in shader's `Arith` conditional type); `scripts/api-report.js` now drops binding-pattern trailing
+   commas and the space a stripped leading comment leaves. Text-patching benchmark helpers that read the WORKING TREE
+   (not a pinned ref) need anchors in the formatted style from now on.
+   `npm run hygiene` (`scripts/hygiene.js`, formula in its header: score = max(0, 10 - 1 point per 1% of units in
+   violation); hygiene = mean of gates 1-7 and 9) writes test-results/hygiene.json; `npm run verify` starts with
+   `hygiene.js --verify` (format + lint, warn only, ~2 s); `--strict` exits 1 on any violation (switch verify to it
+   after phase 2). `npm run format` / `npm run lint` run Biome. Internal `any` allowlist: `scripts/hygiene-allowlist.json`
+   (decoders codec.ts 13, Emscripten globals). After merging, run `npm install` in the main checkout (Biome binary; worktrees
+   need `node_modules/@biomejs` and the `biome` bin shim too). Every agent runs `npm run format` before committing.
+   BASELINE (5f1d442 + phase 1): hygiene 3.2 / 10.
+   | Gate | Violations / units | Score | Notes |
+   | --- | --- | --- | --- |
+   | 1 format | 0 / 1,059 files | 10.0 | met |
+   | 2 lint | 72 / 1,059 files (282 warnings) | 3.2 | 251 noExplicitAny, 23 unused vars, 8 useImportType |
+   | 3 any | 121 / 1,906 (382 public declarations + src files) | 3.7 | 109 `any` in public declarations (shader 48, physics 25, gltf-pro 17, controls 17, usdz 2), 243 explicit internal (13 allowlisted) |
+   | 4 strict | 146 / 219 flags | 0.0 | `strict` on everywhere; noImplicitOverride + noFallthroughCasesInSwitch off in all 73 packages. Turning both on costs only 35 TS4114 (missing `override`): controls 14, environment 12, lines 4, shader 2, html/sky/vfx 1; no fallthrough errors |
+   | 5 types | 138 / 1,388 names | 0.1 | 57 names: Vec3 in 9 packages, Context in 7, ColorInput/parseColor 4-5, Color 4, math vs shader helpers (add, dot, cross, normalize, clamp, smoothstep, ...), loadGLTF/parseGLTF, parseUSDA/parseUSDZ, multiplyMatrices, Ray, ... (list in hygiene.json `duplicates`) |
+   | 6 tsdoc | 593 / 1,326 exported symbols | 0.0 | worst: shader 84, machinery 36, core 27, math 27, loaders 26, physics 22, react 22, bvh 20 |
+   | 7 errors | 534 / 1,856 throws are bare `Error` | 0.0 | environment 131, decoders 46, post 32, machinery 29, creative 23, core 21 |
+   | 8 api | manual | - | open items of "API rough edges before 1.0" (1, 7, 8, 10) |
+   | 9 dead | 43 / 2,869 files + exports | 8.5 | no unreachable src file; 43 unused exports, e.g. bvh SIDE_*, controls gizmo constants, geometry math helpers, shared polygon helpers |
+   PHASE 2 groups (4 parallel agents, balanced by measured work = public any + unallowlisted internal any + missing
+   TSDoc + bare Errors + duplicate names + dead + strict errors + other lint; total 1,707):
+   - A (440) math types + shader + core-adjacent: math, shader, core, margoengine, shared, geometry, procedural, lines,
+     text, points, wfc, tween, ecs, fsm, splines, net, input, navigation, navmesh, road, cinematic, quality, cache.
+     Lands FIRST the canonical type-only Vec3/Quat/Mat4/ColorInput/Color/Ray in @margoengine/math (0 bytes) and
+     the parseColor/helper dedupe; the other groups then import them. Core: TSDoc only (comments cost 0 bytes);
+     its 21 bare Errors and any message change cost core bytes at 19,999/20,000, so they need Scott (or an allowlist).
+   - B (420) loaders and assets: gltf-pro, gltf, decoders, loaders, exporters, usdz, fbx, animation, animator,
+     blender, ifc, materials, usdz-export, video, audio (most internal `any`: 143; loadGLTF/parseGLTF and
+     parseUSDA/parseUSDZ clashes).
+   - C (426) lighting, post and environment: environment, post, creative, clustered, tonemap, shadows, taa, sky, water,
+     terrain, dof, oit, toon, transitions, splats, vfx, scatter, lod, webgl, culling (278 bare Errors, mostly
+     mechanical; shader text must stay byte-identical: proofs + visual:check).
+   - D (421) interaction, CAD and UI: physics, controls, machinery, bvh, react, xr, selection, labels, inspector,
+     staging, stats, cameras, html, viewcube, gizmo, scenery (public `any`: physics raw Rapier 25, controls 17).
+   Each group: `npm run hygiene` before/after, api:update only for intended type changes, zero JS byte change unless a
+   proof says otherwise; then a short serial pass sets 1h.h's error codes and switches verify to `--strict`.
 5l. Raise CAD performance and general 3D rendering to 9/10 (Scott, 2026-10-14 night). Measurable targets (Intel Arc
    laptop, quiet PC):
    CAD: 100k parts + feature edges orbit >= 60 FPS; 1M parts >= 30 FPS; pick < 10 ms at 100k; 100k-part model

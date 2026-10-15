@@ -31,8 +31,8 @@ export interface FractureOptions {
 
 export interface Voronoi2 {
     readonly cells: readonly VoronoiCell2[];
-     readonly edges: Float64Array;
-     readonly edgeCells: Int32Array;
+    readonly edges: Float64Array;
+    readonly edgeCells: Int32Array;
     readonly delaunay: Delaunay2;
 }
 
@@ -42,16 +42,16 @@ export interface Voronoi3 {
 }
 
 export interface VoronoiCell2 {
-     readonly polygon: Float64Array;
-     readonly edgeSites: Int32Array;
-     readonly neighbors: Int32Array;
+    readonly polygon: Float64Array;
+    readonly edgeSites: Int32Array;
+    readonly neighbors: Int32Array;
 }
 
 export interface VoronoiCell3 {
-     readonly vertices: Float64Array;
-     readonly faces: readonly (readonly number[])[];
-     readonly faceSites: Int32Array;
-     readonly neighbors: Int32Array;
+    readonly vertices: Float64Array;
+    readonly faces: readonly (readonly number[])[];
+    readonly faceSites: Int32Array;
+    readonly neighbors: Int32Array;
     readonly volume: number;
 }
 

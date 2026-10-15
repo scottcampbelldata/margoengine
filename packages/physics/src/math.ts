@@ -1,23 +1,29 @@
-import {eulerToQuaternion} from '@margoengine/math/quat';
+import { eulerToQuaternion } from '@margoengine/math/quat';
 
 export type Vec3 = readonly [number, number, number];
 export type Quat = readonly [number, number, number, number];
 
-export const vec = (v: Vec3 | undefined, fallback: Vec3 = [0, 0, 0]): {x: number; y: number; z: number} => {
+export const vec = (v: Vec3 | undefined, fallback: Vec3 = [0, 0, 0]): { x: number; y: number; z: number } => {
   const [x, y, z] = v ?? fallback;
-  return {x, y, z};
+  return { x, y, z };
 };
-export const quat = (q: Quat | undefined): {x: number; y: number; z: number; w: number} => {
+export const quat = (q: Quat | undefined): { x: number; y: number; z: number; w: number } => {
   const [x, y, z, w] = q ?? [0, 0, 0, 1];
-  return {x, y, z, w};
+  return { x, y, z, w };
 };
-export const tuple = (v: {x: number; y: number; z: number}): [number, number, number] => [v.x, v.y, v.z];
-export const tuple4 = (q: {x: number; y: number; z: number; w: number}): [number, number, number, number] => [q.x, q.y, q.z, q.w];
+export const tuple = (v: { x: number; y: number; z: number }): [number, number, number] => [v.x, v.y, v.z];
+export const tuple4 = (q: { x: number; y: number; z: number; w: number }): [number, number, number, number] => [
+  q.x,
+  q.y,
+  q.z,
+  q.w,
+];
 
 export function checkVec(value: unknown, label: string): asserts value is Vec3 {
   if (!Array.isArray(value) && !ArrayBuffer.isView(value)) throw new TypeError(`${label} must be [x, y, z]`);
   const v = value as ArrayLike<number>;
-  if (v.length !== 3 || !Number.isFinite(v[0]) || !Number.isFinite(v[1]) || !Number.isFinite(v[2])) throw new RangeError(`${label} must be three finite numbers`);
+  if (v.length !== 3 || !Number.isFinite(v[0]) || !Number.isFinite(v[1]) || !Number.isFinite(v[2]))
+    throw new RangeError(`${label} must be three finite numbers`);
 }
 
 /** Same XYZ Euler convention as core's `Mesh.setRotation` (`@margoengine/math/quat` eulerToQuaternion). */

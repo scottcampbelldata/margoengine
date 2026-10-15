@@ -6,11 +6,11 @@
 import { Geometry } from "@margoengine/core";
 
 export interface Branches {
-     readonly positions: Float32Array;
-     readonly radii: Float32Array;
-     readonly ups: Float32Array;
-     readonly parents: Int32Array;
-     readonly depths: Uint16Array;
+    readonly positions: Float32Array;
+    readonly radii: Float32Array;
+    readonly ups: Float32Array;
+    readonly parents: Int32Array;
+    readonly depths: Uint16Array;
 }
 
 export interface ExpandOptions {
@@ -39,13 +39,13 @@ export interface TubeOptions {
 }
 
 export interface TurtleOptions {
-     angle?: number;
-     step?: number;
-     radius?: number;
-     radiusScale?: number;
-     draw?: string;
-     move?: string;
-     origin?: readonly [number, number, number];
+    angle?: number;
+    step?: number;
+    radius?: number;
+    radiusScale?: number;
+    draw?: string;
+    move?: string;
+    origin?: readonly [number, number, number];
 }
 
 export function expand(axiom: string | readonly Module[], rules: Rules, iterations: number, { seed, maxModules }?: ExpandOptions): Module[];

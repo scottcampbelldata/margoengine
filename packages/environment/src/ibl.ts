@@ -1,7 +1,7 @@
 // What a PBR shader needs to light with an Environment: bindings, entries and WGSL helpers.
-import type {Environment} from './environment.js';
+import type { Environment } from './environment.js';
 
-declare const GPUShaderStage: {FRAGMENT: number};
+declare const GPUShaderStage: { FRAGMENT: number };
 
 /**
  * WGSL helpers for image-based lighting. Declare the five bindings yourself (any group and binding numbers),
@@ -57,21 +57,21 @@ fn iblShade(specular: texture_cube<f32>, s: sampler, sh: array<vec4f, 9>, params
 export function iblLayoutEntries(firstBinding = 0, visibility?: number): GPUBindGroupLayoutEntry[] {
   const v = visibility ?? GPUShaderStage.FRAGMENT;
   return [
-    {binding: firstBinding, visibility: v, texture: {sampleType: 'float', viewDimension: 'cube'}},
-    {binding: firstBinding + 1, visibility: v, sampler: {type: 'filtering'}},
-    {binding: firstBinding + 2, visibility: v, buffer: {type: 'read-only-storage'}},
-    {binding: firstBinding + 3, visibility: v, buffer: {type: 'uniform', minBindingSize: 144}},
-    {binding: firstBinding + 4, visibility: v, buffer: {type: 'uniform', minBindingSize: 16}},
+    { binding: firstBinding, visibility: v, texture: { sampleType: 'float', viewDimension: 'cube' } },
+    { binding: firstBinding + 1, visibility: v, sampler: { type: 'filtering' } },
+    { binding: firstBinding + 2, visibility: v, buffer: { type: 'read-only-storage' } },
+    { binding: firstBinding + 3, visibility: v, buffer: { type: 'uniform', minBindingSize: 144 } },
+    { binding: firstBinding + 4, visibility: v, buffer: { type: 'uniform', minBindingSize: 16 } },
   ];
 }
 
 /** Bind group entries matching `iblLayoutEntries`. Rebuild them when `environment.version` changes. */
 export function iblBindGroupEntries(environment: Environment, firstBinding = 0): GPUBindGroupEntry[] {
   return [
-    {binding: firstBinding, resource: environment.specularView},
-    {binding: firstBinding + 1, resource: environment.sampler},
-    {binding: firstBinding + 2, resource: {buffer: environment.brdfLut}},
-    {binding: firstBinding + 3, resource: {buffer: environment.shBuffer, offset: 0, size: 144}},
-    {binding: firstBinding + 4, resource: {buffer: environment.paramsBuffer, offset: 0, size: 16}},
+    { binding: firstBinding, resource: environment.specularView },
+    { binding: firstBinding + 1, resource: environment.sampler },
+    { binding: firstBinding + 2, resource: { buffer: environment.brdfLut } },
+    { binding: firstBinding + 3, resource: { buffer: environment.shBuffer, offset: 0, size: 144 } },
+    { binding: firstBinding + 4, resource: { buffer: environment.paramsBuffer, offset: 0, size: 16 } },
   ];
 }

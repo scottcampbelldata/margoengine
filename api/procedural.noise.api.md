@@ -4,10 +4,10 @@
 
 ```ts
 export interface FractalOptions {
-     octaves?: number;
-     lacunarity?: number;
-     gain?: number;
-     frequency?: number;
+    octaves?: number;
+    lacunarity?: number;
+    gain?: number;
+    frequency?: number;
 }
 
 export class Noise {
@@ -28,9 +28,9 @@ export const SIMPLEX_SCALE: readonly number[];
 export const WARP_OFFSETS: readonly number[];
 
 export interface WarpOptions {
-     warp?: NoiseFunction;
-     strength?: number;
-     dimensions?: 2 | 3 | 4;
+    warp?: NoiseFunction;
+    strength?: number;
+    dimensions?: 2 | 3 | 4;
 }
 
 export function domainWarp(noise: NoiseFunction, { warp, strength, dimensions }?: WarpOptions): NoiseFunction;

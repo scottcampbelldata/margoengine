@@ -6,10 +6,10 @@
 export type NoiseField<T extends 'vec2f' | 'vec3f'> = (p: Node<T>) => Node<'f32'>;
 
 export interface NoiseFractalOptions {
-     octaves?: number;
-     lacunarity?: number;
-     gain?: number;
-     frequency?: number;
+    octaves?: number;
+    lacunarity?: number;
+    gain?: number;
+    frequency?: number;
 }
 
 export interface NoiseWarpOptions<T extends 'vec2f' | 'vec3f'> {
@@ -31,7 +31,7 @@ export const simplex3: (p: Input<'vec3f'>, seed?: number) => Node<'f32'>;
 
 // Not exported from this entry, but used by the exports above:
 
-type Arith<A extends Type, B extends Type> = A extends B ? A : A extends ScalarOf<B> ? B : B extends ScalarOf<A> ? A : A extends `mat${infer K}x${string}` ? (B extends `vec${K}f` ? B : never) : B extends `mat${infer K}x${string}` ? (A extends `vec${K}f` ? A : never) : never;
+type Arith<A extends Type, B extends Type> = A extends B ? A : A extends ScalarOf<B> ? B : B extends ScalarOf<A> ? A : A extends `mat${infer K}x${string}` ? B extends `vec${K}f` ? B : never : B extends `mat${infer K}x${string}` ? A extends `vec${K}f` ? A : never : never;
 
 type Bools<T extends Type> = Node<VecOf<'bool', Size<T>>>;
 
@@ -170,7 +170,7 @@ class Program {
         binding: number;
     }[];
     readonly varyings: Node[];
-     readonly functions: Map<string, string>;
+    readonly functions: Map<string, string>;
     constructor(base?: number, compute?: boolean);
     stage(stage: Stage, outputs: readonly Node[]): {
         lines: string[];
@@ -178,13 +178,13 @@ class Program {
     };
     declare(group: number): string;
     entries(device: GPUDevice, host: Host): GPUBindGroupEntry[];
-     name(): string;
-     canon(n: Node): Node;
-     count(n: Node): void;
-     shared(c: Node): boolean;
-     declareOnce(key: string, code: () => string): void;
-     resource(resource: Resource): string;
-     member(type: Type, name: string, node?: UniformNode, frame?: string): string;
+    name(): string;
+    canon(n: Node): Node;
+    count(n: Node): void;
+    shared(c: Node): boolean;
+    declareOnce(key: string, code: () => string): void;
+    resource(resource: Resource): string;
+    member(type: Type, name: string, node?: UniformNode, frame?: string): string;
 }
 
 type R = 'r' | 'g' | 'b' | 'a';

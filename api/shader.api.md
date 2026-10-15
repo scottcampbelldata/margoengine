@@ -7,7 +7,7 @@ import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 import { Material, MaterialOptions } from "@margoengine/materials";
 
-export type Arith<A extends Type, B extends Type> = A extends B ? A : A extends ScalarOf<B> ? B : B extends ScalarOf<A> ? A : A extends `mat${infer K}x${string}` ? (B extends `vec${K}f` ? B : never) : B extends `mat${infer K}x${string}` ? (A extends `vec${K}f` ? A : never) : never;
+export type Arith<A extends Type, B extends Type> = A extends B ? A : A extends ScalarOf<B> ? B : B extends ScalarOf<A> ? A : A extends `mat${infer K}x${string}` ? B extends `vec${K}f` ? B : never : B extends `mat${infer K}x${string}` ? A extends `vec${K}f` ? A : never : never;
 
 export class Builder {
     readonly program: Program;
@@ -208,7 +208,7 @@ export class Program {
         binding: number;
     }[];
     readonly varyings: Node[];
-     readonly functions: Map<string, string>;
+    readonly functions: Map<string, string>;
     constructor(base?: number, compute?: boolean);
     stage(stage: Stage, outputs: readonly Node[]): {
         lines: string[];
@@ -216,13 +216,13 @@ export class Program {
     };
     declare(group: number): string;
     entries(device: GPUDevice, host: Host): GPUBindGroupEntry[];
-     name(): string;
-     canon(n: Node): Node;
-     count(n: Node): void;
-     shared(c: Node): boolean;
-     declareOnce(key: string, code: () => string): void;
-     resource(resource: Resource): string;
-     member(type: Type, name: string, node?: UniformNode, frame?: string): string;
+    name(): string;
+    canon(n: Node): Node;
+    count(n: Node): void;
+    shared(c: Node): boolean;
+    declareOnce(key: string, code: () => string): void;
+    resource(resource: Resource): string;
+    member(type: Type, name: string, node?: UniformNode, frame?: string): string;
 }
 
 export interface Resource {
@@ -254,8 +254,8 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
     readonly bindings = 1;
     readonly count: number;
     constructor(data: Float32Array | Int32Array | Uint32Array, type: T, atomic?: boolean);
-     declare(name: string, group: number, binding: number, write: boolean): string;
-     entries(device: GPUDevice): GPUBindingResource[];
+    declare(name: string, group: number, binding: number, write: boolean): string;
+    entries(device: GPUDevice): GPUBindingResource[];
     buffer(device: GPUDevice): GPUBuffer;
     update(): void;
     element(i: Index): Node<T>;

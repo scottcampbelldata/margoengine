@@ -1,1 +1,1 @@
-export {GLTFAsset} from '@margoengine/gltf-pro';
+export { GLTFAsset } from '@margoengine/gltf-pro';

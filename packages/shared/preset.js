@@ -4,7 +4,10 @@
 // tests/quality-presets.test.js (every reader).
 /** `options` with every value the app left undefined filled from the tier preset for `key`. Without a preset it returns
  * `options` itself, so apps that do not use @margoengine/quality run exactly as before. Explicit options always win. */
-export function preset(key,options){
- const values=globalThis.margoPreset?.[key];if(!values)return options;
- const out={...options};for(const name in values)out[name]??=values[name];return out;
+export function preset(key, options) {
+  const values = globalThis.margoPreset?.[key];
+  if (!values) return options;
+  const out = { ...options };
+  for (const name in values) out[name] ??= values[name];
+  return out;
 }

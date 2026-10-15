@@ -1,11 +1,14 @@
-import type {PassContext} from '@margoengine/core/extension';
-import {compute,group} from '../../shared/gpu.js';
-import {waterFrame,type CoastalFlow} from './coastal.js';
-declare const GPUBufferUsage:{STORAGE:number;COPY_SRC:number};
-type Context=Extract<PassContext,{backend:'webgpu'}>;
-const particles=`struct Particle {position:vec4f,velocity:vec4f}
+import type { PassContext } from '@margoengine/core/extension';
+import { compute, group } from '../../shared/gpu.js';
+import { waterFrame, type CoastalFlow } from './coastal.js';
+declare const GPUBufferUsage: { STORAGE: number; COPY_SRC: number };
+type Context = Extract<PassContext, { backend: 'webgpu' }>;
+const particles = `struct Particle {position:vec4f,velocity:vec4f}
 fn random(value:u32)->f32 {var x=value;x=(x^(x>>16u))*2246822519u;x=(x^(x>>13u))*3266489917u;return f32(x^(x>>16u))/4294967295.0;}`;
-const simulate=waterFrame+particles+`
+const simulate =
+  waterFrame +
+  particles +
+  `
 @group(0) @binding(1) var coast:texture_2d<f32>;
 @group(0) @binding(2) var flux:texture_2d<f32>;
 @group(0) @binding(3) var<storage,read_write> droplets:array<Particle>;
@@ -30,7 +33,10 @@ const simulate=waterFrame+particles+`
   }
  }droplets[index]=p;
 }`;
-const render=waterFrame+particles+`
+const render =
+  waterFrame +
+  particles +
+  `
 @group(0) @binding(1) var<storage,read> droplets:array<Particle>;
 @group(0) @binding(2) var surface:texture_depth_2d;
 struct Output {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
@@ -52,24 +58,105 @@ fn linear(d:f32)->f32{return frame.cameraData.x*frame.cameraData.y/(frame.camera
 
 /** Fixed GPU pool, born only where shallow flow is actively breaking. */
 export class Spray {
- readonly buffer:GPUBuffer;
- private readonly simulation:GPUComputePipeline;
- private readonly simulationGroups:GPUBindGroup[]=[];
- private readonly descriptor:GPUComputePassDescriptor={};
- private readonly color:GPURenderPassColorAttachment={view:undefined!,loadOp:'load',storeOp:'store'};
- private readonly depth:GPURenderPassDepthStencilAttachment={view:undefined!,depthReadOnly:true,stencilReadOnly:true};
- private readonly presentation:GPURenderPassDescriptor={colorAttachments:[this.color],depthStencilAttachment:this.depth};
- private render?:GPURenderPipeline;private renderGroup?:GPUBindGroup;private format='';private depthFormat='';private sampled?:GPUTexture;
- constructor(device:GPUDevice,private readonly uniform:GPUBuffer,private readonly coast:CoastalFlow){
-  this.buffer=device.createBuffer({size:2048*32,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC});
-  try{this.simulation=compute(device,simulate);for(let i=0;i<2;i++)this.simulationGroups.push(group(device,this.simulation,[{buffer:uniform},coast.views[i],coast.fluxes[i].createView(),{buffer:this.buffer}]));}
-  catch(error){this.buffer.destroy();throw error;}
- }
- step(encoder:GPUCommandEncoder):void {const pass=encoder.beginComputePass(this.descriptor);pass.setPipeline(this.simulation);pass.setBindGroup(0,this.simulationGroups[this.coast.current]);pass.dispatchWorkgroups(32);pass.end();}
- draw(c:Context,surface:GPUTexture,view:GPUTextureView):void {
-  const key=c.format+':'+surface.sampleCount;if(this.format!==key||this.depthFormat!==surface.format){const code=surface.sampleCount===4?render.replace('surface:texture_depth_2d','surface:texture_depth_multisampled_2d').replace('fragment(i:Output)','fragment(i:Output,@builtin(sample_index) sample:u32)').replace('textureLoad(surface,vec2i(i.clip.xy),0)','textureLoad(surface,vec2i(i.clip.xy),i32(sample))'):render;const module=c.device.createShaderModule({code});this.render=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:c.format,blend:{color:{srcFactor:'one',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}}]},depthStencil:{format:surface.format,depthWriteEnabled:false,depthCompare:'greater-equal'},multisample:{count:surface.sampleCount}});this.format=key;this.depthFormat=surface.format;this.sampled=undefined;}
-  if(this.sampled!==surface){this.renderGroup=group(c.device,this.render!,[{buffer:this.uniform},{buffer:this.buffer},surface.createView({aspect:'depth-only'})]);this.sampled=surface;}
-  this.color.view=c.color;this.depth.view=view;const pass=c.encoder.beginRenderPass(this.presentation);pass.setPipeline(this.render!);pass.setBindGroup(0,this.renderGroup!);pass.draw(6,2048);pass.end();
- }
- dispose():void {this.buffer.destroy();}
+  readonly buffer: GPUBuffer;
+  private readonly simulation: GPUComputePipeline;
+  private readonly simulationGroups: GPUBindGroup[] = [];
+  private readonly descriptor: GPUComputePassDescriptor = {};
+  private readonly color: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
+  private readonly depth: GPURenderPassDepthStencilAttachment = {
+    view: undefined!,
+    depthReadOnly: true,
+    stencilReadOnly: true,
+  };
+  private readonly presentation: GPURenderPassDescriptor = {
+    colorAttachments: [this.color],
+    depthStencilAttachment: this.depth,
+  };
+  private render?: GPURenderPipeline;
+  private renderGroup?: GPUBindGroup;
+  private format = '';
+  private depthFormat = '';
+  private sampled?: GPUTexture;
+  constructor(
+    device: GPUDevice,
+    private readonly uniform: GPUBuffer,
+    private readonly coast: CoastalFlow,
+  ) {
+    this.buffer = device.createBuffer({ size: 2048 * 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
+    try {
+      this.simulation = compute(device, simulate);
+      for (let i = 0; i < 2; i++)
+        this.simulationGroups.push(
+          group(device, this.simulation, [
+            { buffer: uniform },
+            coast.views[i],
+            coast.fluxes[i].createView(),
+            { buffer: this.buffer },
+          ]),
+        );
+    } catch (error) {
+      this.buffer.destroy();
+      throw error;
+    }
+  }
+  step(encoder: GPUCommandEncoder): void {
+    const pass = encoder.beginComputePass(this.descriptor);
+    pass.setPipeline(this.simulation);
+    pass.setBindGroup(0, this.simulationGroups[this.coast.current]);
+    pass.dispatchWorkgroups(32);
+    pass.end();
+  }
+  draw(c: Context, surface: GPUTexture, view: GPUTextureView): void {
+    const key = c.format + ':' + surface.sampleCount;
+    if (this.format !== key || this.depthFormat !== surface.format) {
+      const code =
+        surface.sampleCount === 4
+          ? render
+              .replace('surface:texture_depth_2d', 'surface:texture_depth_multisampled_2d')
+              .replace('fragment(i:Output)', 'fragment(i:Output,@builtin(sample_index) sample:u32)')
+              .replace('textureLoad(surface,vec2i(i.clip.xy),0)', 'textureLoad(surface,vec2i(i.clip.xy),i32(sample))')
+          : render;
+      const module = c.device.createShaderModule({ code });
+      this.render = c.device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'vertex' },
+        fragment: {
+          module,
+          entryPoint: 'fragment',
+          targets: [
+            {
+              format: c.format,
+              blend: {
+                color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+                alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+              },
+            },
+          ],
+        },
+        depthStencil: { format: surface.format, depthWriteEnabled: false, depthCompare: 'greater-equal' },
+        multisample: { count: surface.sampleCount },
+      });
+      this.format = key;
+      this.depthFormat = surface.format;
+      this.sampled = undefined;
+    }
+    if (this.sampled !== surface) {
+      this.renderGroup = group(c.device, this.render!, [
+        { buffer: this.uniform },
+        { buffer: this.buffer },
+        surface.createView({ aspect: 'depth-only' }),
+      ]);
+      this.sampled = surface;
+    }
+    this.color.view = c.color;
+    this.depth.view = view;
+    const pass = c.encoder.beginRenderPass(this.presentation);
+    pass.setPipeline(this.render!);
+    pass.setBindGroup(0, this.renderGroup!);
+    pass.draw(6, 2048);
+    pass.end();
+  }
+  dispose(): void {
+    this.buffer.destroy();
+  }
 }

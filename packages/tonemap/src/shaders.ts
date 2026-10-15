@@ -1,6 +1,6 @@
 // Color transforms from the references in ../NOTICE.md.
-import {agxShader} from '../../shared/agx.js';
-import {acesShader} from '../../shared/aces.js';
+import { agxShader } from '../../shared/agx.js';
+import { acesShader } from '../../shared/aces.js';
 const common = `
 struct Params {grade:vec4f,domainMin:vec4f,domainMax:vec4f,settings:vec4f}
 @group(0) @binding(0) var<uniform> p:Params;
@@ -30,7 +30,9 @@ fn sampleLUT(color:vec3f)->vec3f {
   let xy=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));return vec4f(xy[i],0,1);
 }
 `;
-export const tonemapShader = common + `@fragment fn fragment(@builtin(position) pos:vec4f)->@location(0) vec4f {
+export const tonemapShader =
+  common +
+  `@fragment fn fragment(@builtin(position) pos:vec4f)->@location(0) vec4f {
   let source=textureLoad(scene,vec2i(pos.xy),0);var hdr=source.rgb;
   if(p.settings.x==1.0){hdr=acescgToSRGB(hdr);}
   hdr=max(hdr,vec3f(0))*exp2(p.grade.x);
@@ -48,7 +50,9 @@ export const tonemapShader = common + `@fragment fn fragment(@builtin(position) 
  * The curve below the 0.76 knee is the SDR one; above it Khronos PBR Neutral's rolloff aims at the peak instead of 1
  * (AgX and ACES are scaled by the same rolloff ratio of the brightest channel).
  */
-export const outputShader = common + `
+export const outputShader =
+  common +
+  `
 fn rolloff(x:f32,white:f32)->f32 {if(x<0.76){return x;}return white-(white-0.76)*(white-0.76)/(x+white-1.52);}
 fn linearOutput(pos:vec4f)->vec4f {
   let source=textureLoad(scene,vec2i(pos.xy),0);var hdr=source.rgb;

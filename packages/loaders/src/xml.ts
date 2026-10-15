@@ -1,12 +1,13 @@
-import {LoaderError} from './types.js';
+import { LoaderError } from './types.js';
 
-const ENTITIES: Record<string, string> = {lt: '<', gt: '>', amp: '&', quot: '"', apos: "'"};
+const ENTITIES: Record<string, string> = { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'" };
 function decode(value: string, format: string): string {
   if (value.indexOf('&') < 0) return value;
   return value.replace(/&(#x[0-9a-fA-F]+|#\d+|\w+);/g, (match, name: string) => {
     if (name[0] === '#') {
       const code = name[1] === 'x' ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10);
-      if (!(code >= 0 && code <= 0x10ffff)) throw new LoaderError(format, 'syntax', `invalid character reference ${match}`);
+      if (!(code >= 0 && code <= 0x10ffff))
+        throw new LoaderError(format, 'syntax', `invalid character reference ${match}`);
       return String.fromCodePoint(code);
     }
     const entity = ENTITIES[name];
@@ -34,7 +35,10 @@ export function readXML(xml: string, handler: XMLHandler, format = 'XML', maxDep
   const length = xml.length;
   while (pos < length) {
     const lt = xml.indexOf('<', pos);
-    if (lt < 0) {if (stack.length && handler.text) handler.text(decode(xml.slice(pos), format)); break;}
+    if (lt < 0) {
+      if (stack.length && handler.text) handler.text(decode(xml.slice(pos), format));
+      break;
+    }
     if (lt > pos && stack.length && handler.text) handler.text(decode(xml.slice(pos, lt), format));
     const next = xml.charCodeAt(lt + 1);
     if (next === 33 /* ! */) {
@@ -52,11 +56,13 @@ export function readXML(xml: string, handler: XMLHandler, format = 'XML', maxDep
       continue;
     }
     // Find the closing '>' outside quoted attribute values.
-    let end = lt + 1, quote = 0;
+    let end = lt + 1,
+      quote = 0;
     for (; end < length; end++) {
       const code = xml.charCodeAt(end);
-      if (quote) {if (code === quote) quote = 0;}
-      else if (code === 34 || code === 39) quote = code;
+      if (quote) {
+        if (code === quote) quote = 0;
+      } else if (code === 34 || code === 39) quote = code;
       else if (code === 62) break;
     }
     if (end >= length) throw new LoaderError(format, 'truncated', 'unterminated tag');
@@ -65,7 +71,8 @@ export function readXML(xml: string, handler: XMLHandler, format = 'XML', maxDep
     if (body[0] === '/') {
       const name = local(body.slice(1).trim());
       const open = stack.pop();
-      if (open !== name) throw new LoaderError(format, 'syntax', `closing tag </${name}> does not match <${open ?? 'nothing'}>`);
+      if (open !== name)
+        throw new LoaderError(format, 'syntax', `closing tag </${name}> does not match <${open ?? 'nothing'}>`);
       handler.close(name);
       continue;
     }
@@ -85,7 +92,10 @@ export function readXML(xml: string, handler: XMLHandler, format = 'XML', maxDep
     if (stack.length >= maxDepth) throw new LoaderError(format, 'limit', `elements nest deeper than ${maxDepth}`);
     stack.push(name);
     handler.open(name, attributes);
-    if (selfClosing) {stack.pop(); handler.close(name);}
+    if (selfClosing) {
+      stack.pop();
+      handler.close(name);
+    }
   }
   if (stack.length) throw new LoaderError(format, 'truncated', `document ends inside <${stack[stack.length - 1]}>`);
 }

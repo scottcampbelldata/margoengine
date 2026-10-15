@@ -1,13 +1,15 @@
-import {LoaderError} from './types.js';
+import { LoaderError } from './types.js';
 
 /**
  * Decompresses LZF data (the liblzf format used by PCD `binary_compressed`) into exactly `outputLength` bytes.
  * Every literal run and back reference is bounds checked.
  */
 export function decompressLZF(input: Uint8Array, outputLength: number, format = 'LZF'): Uint8Array {
-  if (!Number.isSafeInteger(outputLength) || outputLength < 0) throw new LoaderError(format, 'range', `invalid LZF output length ${outputLength}`);
+  if (!Number.isSafeInteger(outputLength) || outputLength < 0)
+    throw new LoaderError(format, 'range', `invalid LZF output length ${outputLength}`);
   const output = new Uint8Array(outputLength);
-  let ip = 0, op = 0;
+  let ip = 0,
+    op = 0;
   const end = input.length;
   while (ip < end) {
     let control = input[ip++];
@@ -32,6 +34,7 @@ export function decompressLZF(input: Uint8Array, outputLength: number, format = 
       for (let i = 0; i < length; i++) output[op++] = output[reference++];
     }
   }
-  if (op !== outputLength) throw new LoaderError(format, 'truncated', `LZF produced ${op} bytes, expected ${outputLength}`);
+  if (op !== outputLength)
+    throw new LoaderError(format, 'truncated', `LZF produced ${op} bytes, expected ${outputLength}`);
   return output;
 }

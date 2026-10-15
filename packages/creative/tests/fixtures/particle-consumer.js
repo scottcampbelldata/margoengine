@@ -1,1 +1,1 @@
-export {GPUParticles} from '../../dist/index.js';
+export { GPUParticles } from '../../dist/index.js';

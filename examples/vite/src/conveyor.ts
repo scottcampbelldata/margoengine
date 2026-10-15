@@ -1,17 +1,148 @@
-import {box,Geometry,type Engine,type Mesh} from '@margoengine/core/extension';
-import {AssemblyIndex,Kinematics,ExplodedView,PartInstancer,industrialMaterial} from '@margoengine/machinery';
-function cylinder():Geometry {const p:number[]=[],n:number[]=[],indices:number[]=[];for(let i=0;i<24;i++){const a=i*Math.PI/12,b=(i+1)*Math.PI/12,start=p.length/3;for(const [angle,z] of [[a,-0.5],[b,-0.5],[b,0.5],[a,0.5]]){p.push(Math.cos(angle),Math.sin(angle),z);n.push(Math.cos(angle),Math.sin(angle),0);}indices.push(start,start+1,start+2,start,start+2,start+3);for(const z of [-0.5,0.5]){const at=p.length/3;for(const [x,y] of [[0,0],[Math.cos(a),Math.sin(a)],[Math.cos(b),Math.sin(b)]]){p.push(x,y,z);n.push(0,0,Math.sign(z));}indices.push(...(z>0?[at,at+1,at+2]:[at,at+2,at+1]));}}return new Geometry(p,n,indices);}
-export function createConveyor(engine:Engine,rollers=20) {
-  if(!Number.isSafeInteger(rollers)||rollers<2||rollers>1000)throw new RangeError('Conveyor rollers must be 2..1000');const root=engine.createMesh();root.name='Conveyor_Assembly';const nodes:Mesh[]=[root],cube=box(),round=cylinder(),steel=industrialMaterial('machinedSteel'),coat=industrialMaterial('powderCoat'),rubber=industrialMaterial('neoprene');
-  const part=(name:string,position:readonly [number,number,number],scale:readonly [number,number,number],geometry=cube,material=steel,parent=root)=>{const node=engine.createMesh(parent).setPosition(position).setScale(scale).setGeometry(geometry).setMaterial(material);node.name=name;nodes.push(node);return node;};
-  const shafts:Mesh[]=[];
+import { box, Geometry, type Engine, type Mesh } from '@margoengine/core/extension';
+import { AssemblyIndex, Kinematics, ExplodedView, PartInstancer, industrialMaterial } from '@margoengine/machinery';
+function cylinder(): Geometry {
+  const p: number[] = [],
+    n: number[] = [],
+    indices: number[] = [];
+  for (let i = 0; i < 24; i++) {
+    const a = (i * Math.PI) / 12,
+      b = ((i + 1) * Math.PI) / 12,
+      start = p.length / 3;
+    for (const [angle, z] of [
+      [a, -0.5],
+      [b, -0.5],
+      [b, 0.5],
+      [a, 0.5],
+    ]) {
+      p.push(Math.cos(angle), Math.sin(angle), z);
+      n.push(Math.cos(angle), Math.sin(angle), 0);
+    }
+    indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
+    for (const z of [-0.5, 0.5]) {
+      const at = p.length / 3;
+      for (const [x, y] of [
+        [0, 0],
+        [Math.cos(a), Math.sin(a)],
+        [Math.cos(b), Math.sin(b)],
+      ]) {
+        p.push(x, y, z);
+        n.push(0, 0, Math.sign(z));
+      }
+      indices.push(...(z > 0 ? [at, at + 1, at + 2] : [at, at + 2, at + 1]));
+    }
+  }
+  return new Geometry(p, n, indices);
+}
+export function createConveyor(engine: Engine, rollers = 20) {
+  if (!Number.isSafeInteger(rollers) || rollers < 2 || rollers > 1000)
+    throw new RangeError('Conveyor rollers must be 2..1000');
+  const root = engine.createMesh();
+  root.name = 'Conveyor_Assembly';
+  const nodes: Mesh[] = [root],
+    cube = box(),
+    round = cylinder(),
+    steel = industrialMaterial('machinedSteel'),
+    coat = industrialMaterial('powderCoat'),
+    rubber = industrialMaterial('neoprene');
+  const part = (
+    name: string,
+    position: readonly [number, number, number],
+    scale: readonly [number, number, number],
+    geometry = cube,
+    material = steel,
+    parent = root,
+  ) => {
+    const node = engine
+      .createMesh(parent)
+      .setPosition(position)
+      .setScale(scale)
+      .setGeometry(geometry)
+      .setMaterial(material);
+    node.name = name;
+    nodes.push(node);
+    return node;
+  };
+  const shafts: Mesh[] = [];
   try {
-    for(const z of [-1.1,1.1]){part('Rail_'+z,[0,0.55,z],[6.5,0.3,0.15],cube,coat);for(const x of [-2.6,2.6])part('Support_'+x+'_'+z,[x,-0.1,z],[0.2,1.4,0.2],cube,coat);}
-    for(let i=0;i<rollers;i++){const x=-3+6*i/(rollers-1),assembly=engine.createMesh(root);assembly.name='Roller_Assembly_'+i;assembly.setPosition([x,0.65,0]);nodes.push(assembly);shafts.push(part('Roller_'+i,[0,0,0],[0.18,0.18,2.1],round,steel,assembly));for(const z of [-1.17,1.17])part('Mount_Bolt_'+i+'_'+z,[0,0,z],[0.06,0.06,0.12],round,steel,assembly);}
-    part('Conveyor_Belt',[0,0.84,0],[6.2,0.06,2.08],cube,rubber);
-    const cover=engine.createMesh(root);cover.name='Drive_Cover_Assembly';cover.setPosition([-2.5,0.8,1.35]);nodes.push(cover);part('Drive_Cover',[0,0,0],[0.95,0.65,0.25],cube,coat,cover);for(const x of [-0.38,0.38])part('Cover_Bolt_'+x,[x,0.2,0.16],[0.05,0.05,0.08],round,steel,cover);
-    const carriage=part('Linear_Carriage',[0,1.1,0],[0.7,0.25,0.6],cube,coat),motor=part('Motor',[-2.5,0.45,1.45],[0.28,0.28,0.8],round,steel);
-    engine.removePlugin('conveyor-drive');engine.removePlugin('kinematics');engine.removePlugin('exploded-view');engine.removePlugin('part-instancer');const turn=Math.PI*2,drive={name:'conveyor-drive',rpm:60,angle:0,setup(){},onPreUpdate(delta:number){if(!Number.isFinite(this.rpm)||Math.abs(this.rpm)>120)throw new RangeError('Motor speed must be -120..120 RPM');this.angle=(this.angle+this.rpm*Math.PI/30*delta)%turn;motor.rotation.z=this.angle;}},joints=new Kinematics([{node:cover,axis:'x',min:0,max:1.2},{node:carriage,axis:'x',kind:'prismatic',min:-2.5,max:2.5},{node:motor,axis:'z',min:-turn,max:turn},...shafts.map(node=>({node,axis:'z' as const,min:-turn,max:turn}))],{gears:shafts.map((_,i)=>({source:2,target:3+i,ratio:1}))}),exploded=new ExplodedView([{node:cover,offset:[0,0.8,0.8]},{node:motor,offset:[0,0,1.3]}]);engine.use(drive).use(joints).use(exploded);PartInstancer.attach(engine);const query=new AssemblyIndex(engine);query.tag(cover,'cover');for(const node of query.findChildrenByName('Roller_Assembly_*'))query.tag(node,'roller');
-    return {root,nodes,cover,carriage,motor,shafts,drive,joints,exploded,query,dispose(){engine.removePlugin(drive.name);engine.removePlugin(joints.name);engine.removePlugin(exploded.name);engine.removePlugin('part-instancer');for(let i=nodes.length-1;i>=0;i--)nodes[i].dispose();}};
-  }catch(error){for(let i=nodes.length-1;i>=0;i--)nodes[i].dispose();throw error;}
+    for (const z of [-1.1, 1.1]) {
+      part('Rail_' + z, [0, 0.55, z], [6.5, 0.3, 0.15], cube, coat);
+      for (const x of [-2.6, 2.6]) part('Support_' + x + '_' + z, [x, -0.1, z], [0.2, 1.4, 0.2], cube, coat);
+    }
+    for (let i = 0; i < rollers; i++) {
+      const x = -3 + (6 * i) / (rollers - 1),
+        assembly = engine.createMesh(root);
+      assembly.name = 'Roller_Assembly_' + i;
+      assembly.setPosition([x, 0.65, 0]);
+      nodes.push(assembly);
+      shafts.push(part('Roller_' + i, [0, 0, 0], [0.18, 0.18, 2.1], round, steel, assembly));
+      for (const z of [-1.17, 1.17])
+        part('Mount_Bolt_' + i + '_' + z, [0, 0, z], [0.06, 0.06, 0.12], round, steel, assembly);
+    }
+    part('Conveyor_Belt', [0, 0.84, 0], [6.2, 0.06, 2.08], cube, rubber);
+    const cover = engine.createMesh(root);
+    cover.name = 'Drive_Cover_Assembly';
+    cover.setPosition([-2.5, 0.8, 1.35]);
+    nodes.push(cover);
+    part('Drive_Cover', [0, 0, 0], [0.95, 0.65, 0.25], cube, coat, cover);
+    for (const x of [-0.38, 0.38]) part('Cover_Bolt_' + x, [x, 0.2, 0.16], [0.05, 0.05, 0.08], round, steel, cover);
+    const carriage = part('Linear_Carriage', [0, 1.1, 0], [0.7, 0.25, 0.6], cube, coat),
+      motor = part('Motor', [-2.5, 0.45, 1.45], [0.28, 0.28, 0.8], round, steel);
+    engine.removePlugin('conveyor-drive');
+    engine.removePlugin('kinematics');
+    engine.removePlugin('exploded-view');
+    engine.removePlugin('part-instancer');
+    const turn = Math.PI * 2,
+      drive = {
+        name: 'conveyor-drive',
+        rpm: 60,
+        angle: 0,
+        setup() {},
+        onPreUpdate(delta: number) {
+          if (!Number.isFinite(this.rpm) || Math.abs(this.rpm) > 120)
+            throw new RangeError('Motor speed must be -120..120 RPM');
+          this.angle = (this.angle + ((this.rpm * Math.PI) / 30) * delta) % turn;
+          motor.rotation.z = this.angle;
+        },
+      },
+      joints = new Kinematics(
+        [
+          { node: cover, axis: 'x', min: 0, max: 1.2 },
+          { node: carriage, axis: 'x', kind: 'prismatic', min: -2.5, max: 2.5 },
+          { node: motor, axis: 'z', min: -turn, max: turn },
+          ...shafts.map((node) => ({ node, axis: 'z' as const, min: -turn, max: turn })),
+        ],
+        { gears: shafts.map((_, i) => ({ source: 2, target: 3 + i, ratio: 1 })) },
+      ),
+      exploded = new ExplodedView([
+        { node: cover, offset: [0, 0.8, 0.8] },
+        { node: motor, offset: [0, 0, 1.3] },
+      ]);
+    engine.use(drive).use(joints).use(exploded);
+    PartInstancer.attach(engine);
+    const query = new AssemblyIndex(engine);
+    query.tag(cover, 'cover');
+    for (const node of query.findChildrenByName('Roller_Assembly_*')) query.tag(node, 'roller');
+    return {
+      root,
+      nodes,
+      cover,
+      carriage,
+      motor,
+      shafts,
+      drive,
+      joints,
+      exploded,
+      query,
+      dispose() {
+        engine.removePlugin(drive.name);
+        engine.removePlugin(joints.name);
+        engine.removePlugin(exploded.name);
+        engine.removePlugin('part-instancer');
+        for (let i = nodes.length - 1; i >= 0; i--) nodes[i].dispose();
+      },
+    };
+  } catch (error) {
+    for (let i = nodes.length - 1; i >= 0; i--) nodes[i].dispose();
+    throw error;
+  }
 }

@@ -5,6 +5,13 @@ export interface PrincipalSceneReadiness {
   principalScenePresentedOpportunity: number | null;
   correlation: 'identified-webgpu-submit' | 'webgl-render-return';
 }
-export function submitPrincipalScene(render: () => void, queue?: Pick<GPUQueue, 'submit' | 'onSubmittedWorkDone'>, options?: {
-  signal?: AbortSignal; now?: () => number; request?: typeof requestAnimationFrame; cancel?: typeof cancelAnimationFrame;
-}): Promise<PrincipalSceneReadiness>;
+export function submitPrincipalScene(
+  render: () => void,
+  queue?: Pick<GPUQueue, 'submit' | 'onSubmittedWorkDone'>,
+  options?: {
+    signal?: AbortSignal;
+    now?: () => number;
+    request?: typeof requestAnimationFrame;
+    cancel?: typeof cancelAnimationFrame;
+  },
+): Promise<PrincipalSceneReadiness>;

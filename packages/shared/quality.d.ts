@@ -1,1 +1,1 @@
-export function sceneSamples():1|4;
+export function sceneSamples(): 1 | 4;

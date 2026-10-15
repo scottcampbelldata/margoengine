@@ -103,7 +103,10 @@
     "visual:check": "node scripts/visual-regression.js",
     "visual:update": "node scripts/visual-regression.js --update",
     "visual:device-loss": "node scripts/visual-regression.js --device-loss",
-    "verify": "npm run build:packages && npm run api:check && npm run build --workspace examples/gameplay-sandbox && npm run test --workspace examples/gameplay-sandbox && node --experimental-test-module-mocks --test tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js && npm run measure:size && npm run proofs -- --current",
+    "verify": "node scripts/hygiene.js --verify && npm run build:packages && npm run api:check && npm run build --workspace examples/gameplay-sandbox && npm run test --workspace examples/gameplay-sandbox && node --experimental-test-module-mocks --test tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js && npm run measure:size && npm run proofs -- --current",
+    "hygiene": "node scripts/hygiene.js",
+    "format": "biome format --write",
+    "lint": "biome lint",
     "check:merge": "npm run verify && npm run build:site && npm run visual:check -- --no-build",
     "verify:full": "npm run verify && npm run modern:test:react && npm run modern:test:usdz && npm run modern:test:interop && npm run modern:test:interop:packages && npm run modern:test:game:packages && npm run modern:test:postfx:packages && npm run test:modules:packages",
     "pack:packages": "npm run build:packages && npm pack --workspace packages --ignore-scripts --pack-destination test-results",
@@ -165,6 +168,7 @@
     "test:tokyo": "node scripts/tokyo-diorama-browser-test.mjs"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.15",
     "@dimforge/rapier3d-compat": "^0.21.0",
     "@playwright/test": "^1.64.0",
     "@testing-library/react": "16.3.3",

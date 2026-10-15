@@ -1,8 +1,8 @@
-import type {SkyFeatures} from './base.js';
+import type { SkyFeatures } from './base.js';
 /** Procedural cloud sheet (`clouds` option). */
-export const clouds:NonNullable<SkyFeatures['clouds']>={
-// shortcut: one procedural cloud sheet, use volumetric clouds for flight through the layer.
-wgsl:/* wgsl */`
+export const clouds: NonNullable<SkyFeatures['clouds']> = {
+  // shortcut: one procedural cloud sheet, use volumetric clouds for flight through the layer.
+  wgsl: /* wgsl */ `
 fn cloudNoise(p:vec2f)->f32 {
  let cell=floor(p);let f=fract(p);let t=f*f*(3.0-2.0*f);
  let a=fract(sin(dot(cell,vec2f(127.1,311.7)))*43758.5453);
@@ -27,4 +27,19 @@ fn cloudSky(color:vec3f,ray:vec3f,angularFootprint:f32)->vec3f {
  return mix(color,mix(daylight+silver,night,frame.sun.w),alpha);
 }
 `,
- validate(c){if(typeof c!=='object'||c===null||!Number.isFinite(c.coverage??0.45)||(c.coverage??0.45)<0||(c.coverage??0.45)>1||!Number.isFinite(c.speed??8)||Math.abs(c.speed??8)>100||!Number.isFinite(c.height??1500)||(c.height??1500)<100||(c.height??1500)>10000)throw new RangeError('Invalid sky clouds');}};
+  validate(c) {
+    if (
+      typeof c !== 'object' ||
+      c === null ||
+      !Number.isFinite(c.coverage ?? 0.45) ||
+      (c.coverage ?? 0.45) < 0 ||
+      (c.coverage ?? 0.45) > 1 ||
+      !Number.isFinite(c.speed ?? 8) ||
+      Math.abs(c.speed ?? 8) > 100 ||
+      !Number.isFinite(c.height ?? 1500) ||
+      (c.height ?? 1500) < 100 ||
+      (c.height ?? 1500) > 10000
+    )
+      throw new RangeError('Invalid sky clouds');
+  },
+};

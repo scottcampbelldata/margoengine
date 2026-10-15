@@ -71,10 +71,10 @@ export class Engine {
     };
     disposed: boolean;
     onError: (error: unknown) => void;
-     collected: number;
+    collected: number;
     readonly plugins: ReadonlyMap<string, EnginePlugin>;
     pace?: (time: number) => boolean;
-     features?: GPUFeatureName[];
+    features?: GPUFeatureName[];
     static create(canvas: HTMLCanvasElement, options?: EngineOptions): Promise<Engine>;
     private constructor();
     rebootDevice(): Promise<void>;

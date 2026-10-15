@@ -1,8 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {studioCube} from '../examples/tokyo-studio.js';
+import { studioCube } from '../examples/tokyo-studio.js';
 
-const mean = face => {let sum = 0; for (let i = 0; i < face.length; i += 4) sum += face[i]; return sum / (face.length / 4);};
+const mean = (face) => {
+  let sum = 0;
+  for (let i = 0; i < face.length; i += 4) sum += face[i];
+  return sum / (face.length / 4);
+};
 
 test('six finite RGBA faces in CubeFaces layout', () => {
   const cube = studioCube();

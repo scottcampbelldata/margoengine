@@ -1,11 +1,13 @@
-const declarations=(group:number)=>/* wgsl */`
+const declarations = (group: number) => /* wgsl */ `
 struct ClusterFrame {view:mat4x4f,grid:vec4u,screen:vec4f,depth:vec4f,intensity:vec4f}
 struct ClusterLight {positionRange:vec4f,colorIntensity:vec4f,directionOuter:vec4f,params:vec4f}
 @group(${group}) @binding(4) var<uniform> clusterFrame:ClusterFrame;
 @group(${group}) @binding(5) var<storage,read> clusterLights:array<ClusterLight>;
 `;
 // Orthographic cameras (intensity.w): linear depth slices, and x/y bounds constant in depth around the NDC offset intensity.yz.
-export const cullingShader=declarations(0)+/* wgsl */`
+export const cullingShader =
+  declarations(0) +
+  /* wgsl */ `
 @group(0) @binding(6) var<storage,read_write> clusterCounts:array<u32>;
 @group(0) @binding(7) var<storage,read_write> clusterIndices:array<u32>;
 @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) invocation:vec3u){
@@ -38,7 +40,16 @@ export const cullingShader=declarations(0)+/* wgsl */`
 }`;
 /** WGSL for custom materials. With `shadow` (`@margoengine/clustered/shadows`), each light is multiplied by its `clusterShadow`;
  * with `area` (`@margoengine/clustered/area`), `clusterAreaLighting` is added to the sum. */
-export function clusteredSampling(group:number,shadow?:{declarations(group:number):string},area?:{declarations(group:number):string}):string {return declarations(group)+(shadow?shadow.declarations(group):'')+(area?area.declarations(group):'')+/* wgsl */`
+export function clusteredSampling(
+  group: number,
+  shadow?: { declarations(group: number): string },
+  area?: { declarations(group: number): string },
+): string {
+  return (
+    declarations(group) +
+    (shadow ? shadow.declarations(group) : '') +
+    (area ? area.declarations(group) : '') +
+    /* wgsl */ `
 @group(${group}) @binding(6) var<storage,read> clusterCounts:array<u32>;
 @group(${group}) @binding(7) var<storage,read> clusterIndices:array<u32>;
 fn clusterLighting(pixel:vec2f,position:vec3f,n:vec3f,eye:vec3f,base:vec3f,roughness:f32,metal:f32)->vec3f {
@@ -59,7 +70,9 @@ fn clusterLighting(pixel:vec2f,position:vec3f,n:vec3f,eye:vec3f,base:vec3f,rough
     let f0=mix(vec3f(0.04),base,metal);let fresnel=f0+(1-f0)*pow(1-vh,5.0);
     let falloff=pow(max(0.0,1-pow(distance/light.positionRange.w,4.0)),2.0)/max(distance*distance,0.01);
     var cone=1.0;if(light.params.y>0.5){cone=clamp((dot(-l,light.directionOuter.xyz)-light.directionOuter.w)/max(light.params.x-light.directionOuter.w,0.00001),0.0,1.0);cone*=cone*(3-2*cone);}
-    result+=((1-fresnel)*(1-metal)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${shadow?'*clusterShadow(light,position,n)':''};
+    result+=((1-fresnel)*(1-metal)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${shadow ? '*clusterShadow(light,position,n)' : ''};
   }
-  return ${area?'(result+clusterAreaLighting(position,n,v,nv,base,roughness,metal))':'result'}*clusterFrame.intensity.x;
-}`;}
+  return ${area ? '(result+clusterAreaLighting(position,n,v,nv,base,roughness,metal))' : 'result'}*clusterFrame.intensity.x;
+}`
+  );
+}

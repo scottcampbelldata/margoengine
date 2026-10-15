@@ -1,10 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {spawnSync} from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 
 test('non-finite tessellation and sampling inputs reject before entering their loops', () => {
   const module = new URL('../dist/index.js', import.meta.url).href;
-  const child = spawnSync(process.execPath, ['--input-type=module', '--eval', `
+  const child = spawnSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '--eval',
+      `
     import assert from 'node:assert/strict';
     import * as G from ${JSON.stringify(module)};
     const curve = new G.LineCurve3([0, 0, 0], [0, 0, 1]);
@@ -27,14 +32,22 @@ test('non-finite tessellation and sampling inputs reject before entering their l
       ];
       for (const call of calls) assert.throws(call, RangeError);
     }
-  `], {timeout: 3000, encoding: 'utf8', maxBuffer: 64 * 1024});
+  `,
+    ],
+    { timeout: 3000, encoding: 'utf8', maxBuffer: 64 * 1024 },
+  );
   assert.equal(child.error, undefined, 'Sampling did not return within the subprocess timeout');
   assert.equal(child.status, 0, child.stderr);
 });
 
 test('large finite ellipse sweeps normalize in bounded time and retain arc direction', () => {
   const module = new URL('../dist/index.js', import.meta.url).href;
-  const child = spawnSync(process.execPath, ['--input-type=module', '--eval', `
+  const child = spawnSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '--eval',
+      `
     import assert from 'node:assert/strict';
     import {EllipseCurve} from ${JSON.stringify(module)};
     const tau = 2 * Math.PI;
@@ -60,7 +73,10 @@ test('large finite ellipse sweeps normalize in bounded time and retain arc direc
         assert.ok(Math.abs(actual[1] - 3 * Math.sin(t * directed)) < 1e-12);
       }
     }
-  `], {timeout: 3000, encoding: 'utf8', maxBuffer: 64 * 1024});
+  `,
+    ],
+    { timeout: 3000, encoding: 'utf8', maxBuffer: 64 * 1024 },
+  );
   assert.equal(child.error, undefined, 'Ellipse normalization did not return within the subprocess timeout');
   assert.equal(child.status, 0, child.stderr);
 });

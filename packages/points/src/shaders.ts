@@ -1,8 +1,19 @@
 /** Flag bits of `Cloud.flags.x`, shared by the plugin and the point shader. */
-export const FLAG = {colors: 1, sizes: 2, world: 4, round: 8, map: 16, sphere: 32, direct: 64, srgbColors: 128} as const;
+export const FLAG = {
+  colors: 1,
+  sizes: 2,
+  world: 4,
+  round: 8,
+  map: 16,
+  sphere: 32,
+  direct: 64,
+  srgbColors: 128,
+} as const;
 
 /** Bytes of the shared frame uniform, the per-cloud uniform and the per-batch sprite uniform. */
-export const FRAME_BYTES = 144, CLOUD_BYTES = 128, SPRITE_BYTES = 96;
+export const FRAME_BYTES = 144,
+  CLOUD_BYTES = 128,
+  SPRITE_BYTES = 96;
 
 const common = /* wgsl */ `
 struct Frame{viewProj:mat4x4f,viewport:vec4f,depth:vec4f,right:vec4f,up:vec4f,back:vec4f}
@@ -21,7 +32,9 @@ const CORNERS=array<vec2f,4>(vec2f(-1.0,-1.0),vec2f(1.0,-1.0),vec2f(-1.0,1.0),ve
 // Orthographic cameras (frame.depth.w): info.y is 1 + distance from the near plane instead of the view distance, and
 // sphere depth is linear in it. The EDL pass shades linear depth steps times params.z when params.z > 0.
 /** Point cloud shader: one instanced quad per point, read from storage buffers through the shuffled slot order. */
-export const pointShader: string = common + /* wgsl */ `
+export const pointShader: string =
+  common +
+  /* wgsl */ `
 struct Cloud{model:mat4x4f,color:vec4f,size:vec4f,flags:vec4u,pad:vec4f}
 @group(1) @binding(0) var<uniform> cloud:Cloud;
 @group(1) @binding(1) var<storage,read> positions:array<f32>;
@@ -107,7 +120,9 @@ struct SphereEdlOut{@location(0) color:vec4f,@location(1) edl:f32,@builtin(frag_
 `;
 
 /** Sprite shader: camera-facing instanced quads. */
-export const spriteShader: string = common + /* wgsl */ `
+export const spriteShader: string =
+  common +
+  /* wgsl */ `
 struct Batch{model:mat4x4f,color:vec4f,params:vec4f}
 @group(1) @binding(0) var<uniform> batch:Batch;
 @group(1) @binding(1) var<storage,read> sprites:array<vec4f>;

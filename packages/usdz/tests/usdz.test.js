@@ -1,13 +1,10 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { readFile, mkdir, writeFile } from "node:fs/promises";
-import { deflateRawSync, deflateSync } from "node:zlib";
-import { crc32 } from "@margoengine/loaders";
-import { parseUSDA, parseUSDC, parseUSDZ } from "../dist/index.js";
-const source = (await readFile(
-  new URL("./fixtures/triangle.usda", import.meta.url),
-  "utf8",
-)).replace(/\r\n/g, "\n");
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile, mkdir, writeFile } from 'node:fs/promises';
+import { deflateRawSync, deflateSync } from 'node:zlib';
+import { crc32 } from '@margoengine/loaders';
+import { parseUSDA, parseUSDC, parseUSDZ } from '../dist/index.js';
+const source = (await readFile(new URL('./fixtures/triangle.usda', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
 function png(r, g, b) {
   const header = Buffer.alloc(13);
   header.writeUInt32BE(1, 0);
@@ -24,9 +21,9 @@ function png(r, g, b) {
   };
   return Buffer.concat([
     Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-    chunk("IHDR", header),
-    chunk("IDAT", deflateSync(Buffer.from([0, r, g, b, 255]))),
-    chunk("IEND", Buffer.alloc(0)),
+    chunk('IHDR', header),
+    chunk('IDAT', deflateSync(Buffer.from([0, r, g, b, 255]))),
+    chunk('IEND', Buffer.alloc(0)),
   ]);
 }
 function zip(files, method = 0) {
@@ -64,7 +61,7 @@ function zip(files, method = 0) {
   end.writeUInt32LE(offset, 16);
   return Buffer.concat([...locals, cd, end]);
 }
-test("USDA produces typed geometry, hierarchy and PreviewSurface PBR factors", () => {
+test('USDA produces typed geometry, hierarchy and PreviewSurface PBR factors', () => {
   const asset = parseUSDA(source),
     mesh = asset.meshes[0];
   assert.ok(mesh.positions instanceof Float32Array);
@@ -77,85 +74,64 @@ test("USDA produces typed geometry, hierarchy and PreviewSurface PBR factors", (
   assert.equal(material.metallicFactor, 0.7);
   assert.deepEqual(material.baseColorFactor, [0.2, 0.4, 0.6, 1]);
 });
-test("synthetic OpenUSD Crate and USDA produce equivalent geometry and materials", async () => {
-  const data = await readFile(
-      new URL("./fixtures/triangle.usdc", import.meta.url),
-    ),
+test('synthetic OpenUSD Crate and USDA produce equivalent geometry and materials', async () => {
+  const data = await readFile(new URL('./fixtures/triangle.usdc', import.meta.url)),
     binary = parseUSDC(data),
     ascii = parseUSDA(source);
   assert.deepEqual(binary.meshes[0].positions, ascii.meshes[0].positions);
   assert.deepEqual(binary.meshes[0].normals, ascii.meshes[0].normals);
   assert.deepEqual(binary.meshes[0].uvs, ascii.meshes[0].uvs);
-  assert.deepEqual(
-    binary.document.nodes[1].matrix,
-    ascii.document.nodes[1].matrix,
-  );
-  assert.ok(
-    Math.abs(
-      binary.document.materials[0].pbrMetallicRoughness.metallicFactor - 0.7,
-    ) < 1e-6,
-  );
-  const archive = await parseUSDZ(zip([["scene.usdc", data]], 8));
+  assert.deepEqual(binary.document.nodes[1].matrix, ascii.document.nodes[1].matrix);
+  assert.ok(Math.abs(binary.document.materials[0].pbrMetallicRoughness.metallicFactor - 0.7) < 1e-6);
+  const archive = await parseUSDZ(zip([['scene.usdc', data]], 8));
   assert.deepEqual(archive.meshes[0].positions, binary.meshes[0].positions);
 });
-test("stored and Deflate archives share geometry, validate CRC and enforce budgets", async () => {
+test('stored and Deflate archives share geometry, validate CRC and enforce budgets', async () => {
   for (const method of [0, 8]) {
-    const archive = zip([["scene.usda", Buffer.from(source)]], method);
+    const archive = zip([['scene.usda', Buffer.from(source)]], method);
     assert.equal((await parseUSDZ(archive)).meshes.length, 1);
     await assert.rejects(parseUSDZ(archive, { maxBytes: 20 }), /budget/);
   }
-  const archive = zip([["scene.usda", Buffer.from(source)]]);
+  const archive = zip([['scene.usda', Buffer.from(source)]]);
   archive[40] ^= 1;
   await assert.rejects(parseUSDZ(archive), /CRC/);
-  await assert.rejects(
-    parseUSDZ(zip([["../scene.usda", Buffer.from(source)]])),
-    /escapes/,
-  );
+  await assert.rejects(parseUSDZ(zip([['../scene.usda', Buffer.from(source)]])), /escapes/);
   await assert.rejects(
     parseUSDZ(
       zip([
-        ["scene.usda", Buffer.from(source)],
-        ["scene.usda", Buffer.from(source)],
+        ['scene.usda', Buffer.from(source)],
+        ['scene.usda', Buffer.from(source)],
       ]),
     ),
     /duplicate/,
   );
-  await assert.rejects(
-    parseUSDZ(archive, { signal: AbortSignal.abort() }),
-    /abort/i,
-  );
+  await assert.rejects(parseUSDZ(archive, { signal: AbortSignal.abort() }), /abort/i);
 });
-test("PreviewSurface texture channels map to glTF and missing assets fail", async () => {
+test('PreviewSurface texture channels map to glTF and missing assets fail', async () => {
   const shader = (name, file) =>
     `        def Shader "${name}"\n        {\n            uniform token info:id = "UsdUVTexture"\n            asset inputs:file = @${file}@\n        }\n`;
   const textured = source
     .replace(
-      "color3f inputs:diffuseColor = (0.2, 0.4, 0.6)",
-      "color3f inputs:diffuseColor.connect = </Root/Material/Diffuse.outputs:rgb>\n            normal3f inputs:normal.connect = </Root/Material/Normal.outputs:rgb>",
+      'color3f inputs:diffuseColor = (0.2, 0.4, 0.6)',
+      'color3f inputs:diffuseColor.connect = </Root/Material/Diffuse.outputs:rgb>\n            normal3f inputs:normal.connect = </Root/Material/Normal.outputs:rgb>',
     )
-    .replace(
-      "float inputs:roughness = 0.3",
-      "float inputs:roughness.connect = </Root/Material/Roughness.outputs:r>",
-    )
-    .replace(
-      "float inputs:metallic = 0.7",
-      "float inputs:metallic.connect = </Root/Material/Metallic.outputs:b>",
-    )
+    .replace('float inputs:roughness = 0.3', 'float inputs:roughness.connect = </Root/Material/Roughness.outputs:r>')
+    .replace('float inputs:metallic = 0.7', 'float inputs:metallic.connect = </Root/Material/Metallic.outputs:b>')
     .replace(
       '    def Material "Material"\n    {\n',
       '    def Material "Material"\n    {\n' +
-        shader("Diffuse", "color.png") +
-        shader("Normal", "normal.png") +
-        shader("Roughness", "rough.png") +
-        shader("Metallic", "metal.png"),
+        shader('Diffuse', 'color.png') +
+        shader('Normal', 'normal.png') +
+        shader('Roughness', 'rough.png') +
+        shader('Metallic', 'metal.png'),
     );
   const archive = zip(
       [
-        ["scene.usda", Buffer.from(textured)],
-        ["color.png", png(0, 255, 0)],
-        ["normal.png", png(128, 128, 255)],
-        ["rough.png", png(128, 0, 0)],
-        ["metal.png", png(0, 0, 192)],
+        ['scene.usda', Buffer.from(textured)],
+        ['color.png', png(0, 255, 0)],
+        ['normal.png', png(128, 128, 255)],
+        ['rough.png', png(128, 0, 0)],
+        ['metal.png', png(0, 0, 192)],
       ],
       8,
     ),
@@ -168,31 +144,17 @@ test("PreviewSurface texture channels map to glTF and missing assets fail", asyn
   assert.equal(pbr.metallicRoughnessTexture.index, 2);
   assert.equal(pbr.roughnessFactor, 1);
   assert.equal(pbr.metallicFactor, 1);
-  await assert.rejects(
-    parseUSDZ(zip([["scene.usda", Buffer.from(textured)]])),
-    /missing texture/,
-  );
-  await mkdir("test-results", { recursive: true });
-  await writeFile("test-results/usdz-textured.usdz", archive);
+  await assert.rejects(parseUSDZ(zip([['scene.usda', Buffer.from(textured)]])), /missing texture/);
+  await mkdir('test-results', { recursive: true });
+  await writeFile('test-results/usdz-textured.usdz', archive);
 });
-test("malformed streams, unsupported USD features and Crate table bounds fail explicitly", async () => {
-  assert.throws(
-    () => parseUSDA(source.replace("[0, 1, 2]", "[0, 1, 9]")),
-    /index/,
-  );
+test('malformed streams, unsupported USD features and Crate table bounds fail explicitly', async () => {
+  assert.throws(() => parseUSDA(source.replace('[0, 1, 2]', '[0, 1, 9]')), /index/);
   assert.throws(() => parseUSDA(source, { maxVertices: 2 }), /limit/);
-  assert.throws(
-    () => parseUSDA(source.replace('"none"', '"catmullClark"')),
-    /subdivision/,
-  );
-  assert.throws(
-    () => parseUSDA(source.replace("def Xform", "over Xform")),
-    /no renderable/,
-  );
-  assert.throws(() => parseUSDA(source + "\n# references"), /composition/);
-  const bytes = await readFile(
-      new URL("./fixtures/triangle.usdc", import.meta.url),
-    ),
+  assert.throws(() => parseUSDA(source.replace('"none"', '"catmullClark"')), /subdivision/);
+  assert.throws(() => parseUSDA(source.replace('def Xform', 'over Xform')), /no renderable/);
+  assert.throws(() => parseUSDA(source + '\n# references'), /composition/);
+  const bytes = await readFile(new URL('./fixtures/triangle.usdc', import.meta.url)),
     bad = Buffer.from(bytes);
   bad.writeBigUInt64LE(BigInt(bytes.length + 1), 16);
   assert.throws(() => parseUSDC(bad), /TOC/);

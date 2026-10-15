@@ -1,1 +1,1 @@
-export {decodeMargo} from '../packages/blender/dist/index.js';
+export { decodeMargo } from '../packages/blender/dist/index.js';

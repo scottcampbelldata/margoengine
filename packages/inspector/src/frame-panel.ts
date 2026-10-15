@@ -1,4 +1,4 @@
-import type {CommandReport, FrameReport, GPUPassReport, PipelineReport} from './frame.js';
+import type { CommandReport, FrameReport, GPUPassReport, PipelineReport } from './frame.js';
 
 const css = `
 :host{position:fixed;left:12px;bottom:12px;width:520px;max-width:calc(100vw - 24px);z-index:10001;display:block;color:#202226;font:12px/1.4 system-ui;letter-spacing:0}
@@ -12,9 +12,15 @@ th{font-weight:600}.muted{color:#5d636b}td button{padding:0 6px}
 `;
 
 const ms = (value: number | null): string => (value === null ? '-' : value.toFixed(3) + ' ms');
-const bytes = (value: number): string => (value >= 1048576 ? (value / 1048576).toFixed(2) + ' MB' : value >= 1024 ? (value / 1024).toFixed(1) + ' KB' : value + ' B');
+const bytes = (value: number): string =>
+  value >= 1048576
+    ? (value / 1048576).toFixed(2) + ' MB'
+    : value >= 1024
+      ? (value / 1024).toFixed(1) + ' KB'
+      : value + ' B';
 const name = (pipeline: PipelineReport): string => pipeline.label || `(${pipeline.passes.join(', ') || 'unused'})`;
-const count = (value: number | null | undefined): string => (value === null || value === undefined ? '?' : value.toLocaleString('en-US'));
+const count = (value: number | null | undefined): string =>
+  value === null || value === undefined ? '?' : value.toLocaleString('en-US');
 
 /** DOM view of a FrameReport: frame graph tree, draw tables, pipelines and memory. Text only (no HTML injection). */
 export class FramePanel {
@@ -22,11 +28,18 @@ export class FramePanel {
   private readonly body: HTMLDivElement;
   private readonly doc: Document;
 
-  constructor(parent: HTMLElement, onCapture: () => void, private readonly onSelect: (entity: number) => void) {
+  constructor(
+    parent: HTMLElement,
+    onCapture: () => void,
+    private readonly onSelect: (entity: number) => void,
+  ) {
     this.doc = parent.ownerDocument;
     this.element = this.doc.createElement('div');
     this.element.dataset.margoFrameDebugger = '';
-    const root = this.element.attachShadow({mode: 'open'}), style = this.el('style', css), section = this.el('section'), header = this.el('header');
+    const root = this.element.attachShadow({ mode: 'open' }),
+      style = this.el('style', css),
+      section = this.el('section'),
+      header = this.el('header');
     const button = this.el('button', 'Capture frame');
     button.type = 'button';
     button.addEventListener('click', onCapture);
@@ -39,11 +52,16 @@ export class FramePanel {
   }
 
   show(report: FrameReport): void {
-    const t = report.totals, body = this.body;
+    const t = report.totals,
+      body = this.body;
     body.replaceChildren(
-      this.el('p', `${t.draws} draws (${t.indexedDraws} indexed, ${t.indirectDraws} indirect), ${t.dispatches} dispatches, ${count(t.triangles)} triangles, ` +
-        `${t.renderPasses + t.computePasses} GPU passes. CPU ${ms(report.cpuMilliseconds)}, GPU ${ms(report.gpuMilliseconds)}. ` +
-        `Uploads ${bytes(t.uploadBytes)} in ${t.uploads} writes; ${t.pipelinesCreated} pipelines compiled this frame.`));
+      this.el(
+        'p',
+        `${t.draws} draws (${t.indexedDraws} indexed, ${t.indirectDraws} indirect), ${t.dispatches} dispatches, ${count(t.triangles)} triangles, ` +
+          `${t.renderPasses + t.computePasses} GPU passes. CPU ${ms(report.cpuMilliseconds)}, GPU ${ms(report.gpuMilliseconds)}. ` +
+          `Uploads ${bytes(t.uploadBytes)} in ${t.uploads} writes; ${t.pipelinesCreated} pipelines compiled this frame.`,
+      ),
+    );
     if (report.note) body.append(this.el('p', report.note, 'muted'));
     if (report.warnings.length) {
       const list = this.el('ul');
@@ -52,20 +70,47 @@ export class FramePanel {
     }
     for (const entry of report.graph) {
       const draws = entry.passes.reduce((sum, pass) => sum + pass.commands.length, 0);
-      const node = this.details(`${entry.name} (${entry.owner}${entry.order === null ? '' : ', order ' + entry.order}): ${draws} commands, CPU ${ms(entry.cpuMilliseconds)}, GPU ${ms(entry.gpuMilliseconds)}`);
+      const node = this.details(
+        `${entry.name} (${entry.owner}${entry.order === null ? '' : ', order ' + entry.order}): ${draws} commands, CPU ${ms(entry.cpuMilliseconds)}, GPU ${ms(entry.gpuMilliseconds)}`,
+      );
       for (const pass of entry.passes) node.append(this.pass(pass, report.pipelines));
       body.append(node);
     }
     const pipelines = this.details(`Pipelines (${report.pipelines.length})`);
-    pipelines.append(this.table(['#', 'Label (passes)', 'Kind', 'Cull', 'Blend', 'Depth', 'MSAA', 'Textures', 'Samplers', 'New'], report.pipelines.map(p => [
-      String(p.id), name(p), p.kind, p.cullMode ?? '?', p.blend?.join(', ') ?? '?',
-      p.depth === undefined ? '?' : p.depth === null ? 'none' : `${p.depth.format} ${p.depth.compare}${p.depth.write ? ' write' : ''}`,
-      p.samples === undefined ? '?' : String(p.samples), `${p.textures}/16`, `${p.samplers}/16`, p.createdThisFrame ? 'yes' : ''])));
+    pipelines.append(
+      this.table(
+        ['#', 'Label (passes)', 'Kind', 'Cull', 'Blend', 'Depth', 'MSAA', 'Textures', 'Samplers', 'New'],
+        report.pipelines.map((p) => [
+          String(p.id),
+          name(p),
+          p.kind,
+          p.cullMode ?? '?',
+          p.blend?.join(', ') ?? '?',
+          p.depth === undefined
+            ? '?'
+            : p.depth === null
+              ? 'none'
+              : `${p.depth.format} ${p.depth.compare}${p.depth.write ? ' write' : ''}`,
+          p.samples === undefined ? '?' : String(p.samples),
+          `${p.textures}/16`,
+          `${p.samplers}/16`,
+          p.createdThisFrame ? 'yes' : '',
+        ]),
+      ),
+    );
     body.append(pipelines);
-    const memory = report.memory, memoryNode = this.details(`GPU memory ${bytes(memory.bytes)} (tracked since attach)`);
-    memoryNode.append(this.table(['Kind', 'Label', 'Size'], [
-      ['buffers', `${memory.buffers.count} live`, bytes(memory.buffers.bytes)], ['textures', `${memory.textures.count} live`, bytes(memory.textures.bytes)],
-      ...memory.largest.map(item => [item.kind, item.label, bytes(item.bytes)])]));
+    const memory = report.memory,
+      memoryNode = this.details(`GPU memory ${bytes(memory.bytes)} (tracked since attach)`);
+    memoryNode.append(
+      this.table(
+        ['Kind', 'Label', 'Size'],
+        [
+          ['buffers', `${memory.buffers.count} live`, bytes(memory.buffers.bytes)],
+          ['textures', `${memory.textures.count} live`, bytes(memory.textures.bytes)],
+          ...memory.largest.map((item) => [item.kind, item.label, bytes(item.bytes)]),
+        ],
+      ),
+    );
     body.append(memoryNode);
   }
 
@@ -74,10 +119,20 @@ export class FramePanel {
   }
 
   private pass(pass: GPUPassReport, pipelines: PipelineReport[]): HTMLDetailsElement {
-    const node = this.details(`${pass.kind} pass ${pass.label ? `"${pass.label}" ` : ''}(encoder ${pass.encoder}): ${pass.commands.length} commands, GPU ${ms(pass.gpuMilliseconds)}`);
+    const node = this.details(
+      `${pass.kind} pass ${pass.label ? `"${pass.label}" ` : ''}(encoder ${pass.encoder}): ${pass.commands.length} commands, GPU ${ms(pass.gpuMilliseconds)}`,
+    );
     for (const target of pass.attachments) {
-      const view = target.view ? `${target.view.label || 'texture'} ${target.view.format} ${target.view.width}x${target.view.height}${target.view.sampleCount > 1 ? ' x' + target.view.sampleCount : ''}` : 'view created before attach';
-      node.append(this.el('p', `${target.target}${target.target === 'color' ? target.index : ''}: ${view}, ${target.loadOp ?? '-'}/${target.storeOp ?? '-'}`, 'muted'));
+      const view = target.view
+        ? `${target.view.label || 'texture'} ${target.view.format} ${target.view.width}x${target.view.height}${target.view.sampleCount > 1 ? ' x' + target.view.sampleCount : ''}`
+        : 'view created before attach';
+      node.append(
+        this.el(
+          'p',
+          `${target.target}${target.target === 'color' ? target.index : ''}: ${view}, ${target.loadOp ?? '-'}/${target.storeOp ?? '-'}`,
+          'muted',
+        ),
+      );
     }
     const rows = pass.commands.map((command, index) => this.row(index, command, pipelines));
     if (rows.length) {
@@ -90,9 +145,25 @@ export class FramePanel {
 
   private row(index: number, command: CommandReport, pipelines: PipelineReport[]): HTMLTableRowElement {
     const pipeline = command.pipeline === null ? undefined : pipelines[command.pipeline];
-    const amount = command.workgroups !== undefined ? (command.workgroups ? command.workgroups.join('x') : '?') : command.bundles !== undefined ? `${command.bundles} bundles` : count(command.indexCount ?? command.vertexCount);
+    const amount =
+      command.workgroups !== undefined
+        ? command.workgroups
+          ? command.workgroups.join('x')
+          : '?'
+        : command.bundles !== undefined
+          ? `${command.bundles} bundles`
+          : count(command.indexCount ?? command.vertexCount);
     const row = this.doc.createElement('tr');
-    for (const text of [String(index), command.kind, amount, count(command.instanceCount), count(command.triangles), pipeline ? `#${pipeline.id} ${pipeline.label}`.trim() : '-', command.bindGroups.map(id => id ?? '-').join(', ')]) row.append(this.el('td', text));
+    for (const text of [
+      String(index),
+      command.kind,
+      amount,
+      count(command.instanceCount),
+      count(command.triangles),
+      pipeline ? `#${pipeline.id} ${pipeline.label}`.trim() : '-',
+      command.bindGroups.map((id) => id ?? '-').join(', '),
+    ])
+      row.append(this.el('td', text));
     const cell = this.el('td');
     if (command.entities.length) {
       const button = this.el('button', `${command.entities.length} mesh${command.entities.length > 1 ? 'es' : ''}`);
@@ -112,7 +183,9 @@ export class FramePanel {
   }
 
   private table(head: string[], rows: string[][], className?: string): HTMLTableElement {
-    const table = this.el('table', '', className), header = this.el('tr'), tbody = this.el('tbody');
+    const table = this.el('table', '', className),
+      header = this.el('tr'),
+      tbody = this.el('tbody');
     for (const text of head) header.append(this.el('th', text));
     table.append(this.el('thead'), tbody);
     table.tHead!.append(header);

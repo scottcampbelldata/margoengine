@@ -1,12 +1,21 @@
-const f32=Math.fround;
+const f32 = Math.fround;
 // Preserve the shader's Float32 spiral; generate direction/radius once, not per shaded pixel.
-const shadowOffsets=[16,32].map(count=>{
- const values=Array.from({length:count},(_,j)=>{const angle=f32(j*f32(2.39996323)),radius=f32(Math.sqrt((j+0.5)/count));return `vec2f(${f32(f32(Math.cos(angle))*radius)},${f32(f32(Math.sin(angle))*radius)})`;});
- return `const shadowDisk${count}=array<vec2f,${count}>(${values.join(',')});\n`;
-}).join('');
+const shadowOffsets = [16, 32]
+  .map((count) => {
+    const values = Array.from({ length: count }, (_, j) => {
+      const angle = f32(j * f32(2.39996323)),
+        radius = f32(Math.sqrt((j + 0.5) / count));
+      return `vec2f(${f32(f32(Math.cos(angle)) * radius)},${f32(f32(Math.sin(angle)) * radius)})`;
+    });
+    return `const shadowDisk${count}=array<vec2f,${count}>(${values.join(',')});\n`;
+  })
+  .join('');
 // Compare on the receiver plane; cover comparison-sampler subtexel footprints.
 // Directional lights use angular size and orthographic depth separation.
-export function shadowSampling(group:number):string {return shadowOffsets+/* wgsl */`
+export function shadowSampling(group: number): string {
+  return (
+    shadowOffsets +
+    /* wgsl */ `
 struct ShadowFrame {matrices:array<mat4x4f,4>,view:mat4x4f,splits:vec4f,ranges:vec4f,settings:vec4f}
 @group(${group}) @binding(1) var<uniform> shadowFrame:ShadowFrame;
 @group(${group}) @binding(2) var shadowMap:texture_depth_2d_array;
@@ -45,14 +54,18 @@ fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {
   return visibility/32.0;
 }
 fn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {if(all(direct==vec3f(0))){return direct;}return direct*shadowVisibility(position,normal);}
-`;}
-export function shadowDepth(pbr:boolean):string {return /* wgsl */`
+`
+  );
+}
+export function shadowDepth(pbr: boolean): string {
+  return /* wgsl */ `
 struct Frame {camera:mat4x4f,model:mat4x4f,alpha:vec4f}
 @group(0) @binding(0) var<uniform> f:Frame;
 @group(0) @binding(1) var alphaMap:texture_2d<f32>;
 @group(0) @binding(2) var alphaSampler:sampler;
-struct In {@location(0) position:${pbr?'vec4f':'vec3f'},${pbr?'@location(3) uv:vec4f,@location(4) color:vec4f':''}}
+struct In {@location(0) position:${pbr ? 'vec4f' : 'vec3f'},${pbr ? '@location(3) uv:vec4f,@location(4) color:vec4f' : ''}}
 struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
-@vertex fn vertex(i:In)->Out {var o:Out;o.clip=f.camera*f.model*vec4f(i.position.xyz,1);${pbr?'o.uv=select(i.uv.xy,i.uv.zw,f.alpha.z>0.5);o.alpha=i.color.a;':'o.uv=vec2f(0);o.alpha=1;'}return o;}
+@vertex fn vertex(i:In)->Out {var o:Out;o.clip=f.camera*f.model*vec4f(i.position.xyz,1);${pbr ? 'o.uv=select(i.uv.xy,i.uv.zw,f.alpha.z>0.5);o.alpha=i.color.a;' : 'o.uv=vec2f(0);o.alpha=1;'}return o;}
 @fragment fn fragment(i:Out){if(textureSampleLevel(alphaMap,alphaSampler,i.uv,0).a*f.alpha.x*i.alpha<f.alpha.y){discard;}}
-`;}
+`;
+}

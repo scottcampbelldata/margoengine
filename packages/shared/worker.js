@@ -5,10 +5,15 @@
 export function transferables(value, out = new Set(), seen = new Set()) {
   if (!value || typeof value !== 'object' || seen.has(value)) return out;
   seen.add(value);
-  if (ArrayBuffer.isView(value)) {if (value.buffer instanceof ArrayBuffer) out.add(value.buffer);}
-  else if (value instanceof ArrayBuffer) out.add(value);
+  if (ArrayBuffer.isView(value)) {
+    if (value.buffer instanceof ArrayBuffer) out.add(value.buffer);
+  } else if (value instanceof ArrayBuffer) out.add(value);
   else if (typeof ImageBitmap !== 'undefined' && value instanceof ImageBitmap) out.add(value);
-  else if (value instanceof Map) for (const [k, v] of value) {transferables(k, out, seen); transferables(v, out, seen);}
+  else if (value instanceof Map)
+    for (const [k, v] of value) {
+      transferables(k, out, seen);
+      transferables(v, out, seen);
+    }
   else for (const key in value) transferables(value[key], out, seen);
   return out;
 }
@@ -16,7 +21,13 @@ export function transferables(value, out = new Set(), seen = new Set()) {
 /** Bytes as an ArrayBuffer to post: a whole ArrayBuffer moves (the caller's copy is detached), anything else is copied. */
 export function movable(input) {
   if (input instanceof ArrayBuffer) return input;
-  if (ArrayBuffer.isView(input) && input.buffer instanceof ArrayBuffer && input.byteOffset === 0 && input.byteLength === input.buffer.byteLength) return input.buffer;
+  if (
+    ArrayBuffer.isView(input) &&
+    input.buffer instanceof ArrayBuffer &&
+    input.byteOffset === 0 &&
+    input.byteLength === input.buffer.byteLength
+  )
+    return input.buffer;
   if (ArrayBuffer.isView(input)) return input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength);
   if (typeof input === 'string') return input;
   throw new TypeError('Expected an ArrayBuffer, typed array or string');
@@ -29,26 +40,54 @@ export const canUseWorker = () => typeof Worker === 'function' && typeof globalT
 export function runWorker(url, message, signal, revive) {
   signal?.throwIfAborted();
   return new Promise((resolve, reject) => {
-    const worker = new Worker(url, {name: 'margoengine-parser'});
-    const done = () => {worker.onmessage = worker.onerror = worker.onmessageerror = null; worker.terminate(); signal?.removeEventListener('abort', abort);};
-    const fail = error => {done(); reject(error);};
-    const abort = () => fail(signal.reason ?? new DOMException('Aborted', 'AbortError'));
-    signal?.addEventListener('abort', abort, {once: true});
-    worker.onerror = event => {event.preventDefault?.(); fail(new Error('Parser worker failed: ' + (event.message || 'unknown error')));};
-    worker.onmessageerror = () => fail(new Error('Parser worker reply could not be deserialized'));
-    worker.onmessage = ({data}) => {
+    const worker = new Worker(url, { name: 'margoengine-parser' });
+    const done = () => {
+      worker.onmessage = worker.onerror = worker.onmessageerror = null;
+      worker.terminate();
+      signal?.removeEventListener('abort', abort);
+    };
+    const fail = (error) => {
       done();
-      if (data.error) reject(revive?.(data.error) ?? new ({TypeError, RangeError, SyntaxError}[data.error.name] ?? Error)(data.error.message));
+      reject(error);
+    };
+    const abort = () => fail(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+    signal?.addEventListener('abort', abort, { once: true });
+    worker.onerror = (event) => {
+      event.preventDefault?.();
+      fail(new Error('Parser worker failed: ' + (event.message || 'unknown error')));
+    };
+    worker.onmessageerror = () => fail(new Error('Parser worker reply could not be deserialized'));
+    worker.onmessage = ({ data }) => {
+      done();
+      if (data.error)
+        reject(
+          revive?.(data.error) ??
+            new ({ TypeError, RangeError, SyntaxError }[data.error.name] ?? Error)(data.error.message),
+        );
       else resolve(data.result);
     };
-    try {worker.postMessage(message, [...transferables(message)]);} catch (error) {fail(error);}
+    try {
+      worker.postMessage(message, [...transferables(message)]);
+    } catch (error) {
+      fail(error);
+    }
   });
 }
 
 /** Worker side: answer each message with job(message), transferring the result's buffers and bitmaps. */
 export function serve(job) {
-  self.onmessage = async ({data}) => {
-    try {const result = await job(data); self.postMessage({result}, [...transferables(result)]);}
-    catch (error) {self.postMessage({error: {...error, name: error?.name ?? 'Error', message: error instanceof Error ? error.message : String(error)}});}
+  self.onmessage = async ({ data }) => {
+    try {
+      const result = await job(data);
+      self.postMessage({ result }, [...transferables(result)]);
+    } catch (error) {
+      self.postMessage({
+        error: {
+          ...error,
+          name: error?.name ?? 'Error',
+          message: error instanceof Error ? error.message : String(error),
+        },
+      });
+    }
   };
 }

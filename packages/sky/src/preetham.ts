@@ -1,6 +1,7 @@
-import type {SkyFeatures} from './base.js';
+import type { SkyFeatures } from './base.js';
 /** Preetham analytic day model (the default `model`); needs no precomputed tables. */
-export const preetham:NonNullable<SkyFeatures['preetham']>={wgsl:`fn perez(theta:f32,gamma:f32,a:f32,b:f32,c:f32,d:f32,e:f32)->f32{return (1.0+a*exp(b/max(0.01,cos(theta))))*(1.0+c*exp(d*gamma)+e*cos(gamma)*cos(gamma));}
+export const preetham: NonNullable<SkyFeatures['preetham']> = {
+  wgsl: `fn perez(theta:f32,gamma:f32,a:f32,b:f32,c:f32,d:f32,e:f32)->f32{return (1.0+a*exp(b/max(0.01,cos(theta))))*(1.0+c*exp(d*gamma)+e*cos(gamma)*cos(gamma));}
 fn preetham(w:vec3f,s:vec3f)->vec3f {
  let t=frame.settings.z;let theta=acos(clamp(w.y,0.01,1.0));let gamma=acos(clamp(dot(w,s),-1.0,1.0));let z=acos(clamp(s.y,0.01,1.0));let z2=z*z;let z3=z2*z;
  let yz=max(0.001,(4.0453*t-4.9710)*tan((4.0/9.0-t/120.0)*(3.14159265-2.0*z))-0.2155*t+2.4192);
@@ -12,4 +13,5 @@ fn preetham(w:vec3f,s:vec3f)->vec3f {
  let xyz=vec3f(x*y/max(chroma,0.001),y,(1.0-x-chroma)*y/max(chroma,0.001));
  return max(vec3f(0),mat3x3f(vec3f(3.2406,-0.9689,0.0557),vec3f(-1.5372,1.8758,-0.2040),vec3f(-0.4986,0.0415,1.0570))*xyz)*smoothstep(-0.2,0.05,s.y);
 }
-`};
+`,
+};

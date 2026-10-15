@@ -16,9 +16,7 @@ export function frameDue(clock: Float64Array, now: number, targetRate: number): 
     return true;
   }
   // Average bursty callbacks before deciding whether the browser already limits the cadence.
-  clock[2] = clock[2]
-    ? clock[2] + (callbackDelta - clock[2]) * 0.1
-    : callbackDelta;
+  clock[2] = clock[2] ? clock[2] + (callbackDelta - clock[2]) * 0.1 : callbackDelta;
   // A near-native clock must not accumulate a future deadline if its refresh rate later changes.
   if (clock[2] >= interval - tolerance) clock[0] = Math.min(clock[0], now);
   else if (now + tolerance < clock[0]) return false;
