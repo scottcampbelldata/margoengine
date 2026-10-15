@@ -29,3 +29,15 @@ test('pace skips refreshes and delta spans them; plugins are readable', async ()
     assert.equal(deltas.length, 4, 'every other refresh renders');
   } finally {engine.dispose(); globalThis.requestAnimationFrame = saved;}
 });
+
+test('start({culling: false}) skips the CPU frustum test in the built-in loop; start() restores it', async () => {
+  const frames = [], saved = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = callback => frames.push(callback); globalThis.cancelAnimationFrame = () => {};
+  const engine = new Engine({width: 4, height: 4, clientWidth: 4, clientHeight: 4}, await TransformStore.create(4), {backend: 'webgpu', add() {}, remove() {}, render() {}, dispose() {}}, undefined, null);
+  try {
+    const ticks = [], tick = engine.store.tick.bind(engine.store); engine.store.tick = culling => {ticks.push(culling); tick(culling);};
+    engine.start({culling: false}); frames.shift()(0); frames.shift()(16);
+    engine.stop(); frames.length = 0; engine.start(); frames.shift()(32);
+    assert.deepEqual(ticks, [false, false, true]);
+  } finally {engine.dispose(); globalThis.requestAnimationFrame = saved;}
+});

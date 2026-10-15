@@ -109,7 +109,7 @@ export class Engine {
   private raf: number|null=null;
   private last=0;
   private running=false;
-  private readonly frameOptions={delta:0};
+  private readonly frameOptions:{culling?:boolean;delta:number}={delta:0};
   private disposing=false;
   /** Attached plugins by name (read-only). */
   readonly plugins:ReadonlyMap<string,EnginePlugin>=new Map();
@@ -217,7 +217,7 @@ export class Engine {
     return this.renderer===renderer&&this.revision===revision?mesh:null;
   }
   onFrame(callback:FrameCallback):()=>void {this.callbacks.add(callback);return()=>{this.callbacks.delete(callback);};}
-  start():void {if(this.disposed||this.disposing)throw new Error('Engine disposed');if(this.running)return;this.running=true;this.last=0;this.raf=requestAnimationFrame(this.frame);}
+  start({culling}:{culling?:boolean}={}):void {if(this.disposed||this.disposing)throw new Error('Engine disposed');this.frameOptions.culling=culling;if(this.running)return;this.running=true;this.last=0;this.raf=requestAnimationFrame(this.frame);}
   private readonly frame=(time:number):void=>{
     this.raf=null;if(this.disposed||!this.running)return;
     if(this.pace&&!this.pace(time)){this.raf=requestAnimationFrame(this.frame);return;}

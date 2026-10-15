@@ -1055,8 +1055,8 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       working: `CulledMeshes` (5m.b hook) re-checked on the GPU 2026-10-15 (`cad/culled-meshes.mjs`: 0 differing pixels
       in 8 steps, pick grid identical, BVH hit). Package-side finish: `FeatureEdges` now draws from the redirected
       (culled) list, so edges get the same culling. Not done: Hi-Z occlusion for core meshes (it did not pay on this
-      layout for CulledInstances); an `engine.start()` switch for CPU culling off (core, ~15 B; apps call
-      `engine.render({culling: false})` from their own loop).
+      layout for CulledInstances); the `engine.start()` switch was added afterwards with Scott's approval (2026-10-15):
+      `engine.start({culling: false})`, core + stage 19,922 -> 19,928 B (+6), test in tests/core-hooks.test.js.
    c. [DONE] Cheaper feature edges (`packages/machinery/src/edges.ts`): counts from core's batches (no per-frame loop over
       meshes: CPU 0.9-2.4 -> 0.07-0.2 ms), reads `CulledMeshes`' culled list, parts fade in between `minRadius` and 2x (no
       popping), segments stored longest first and drawn in 4 tiers (all, 1/4, 1/16, 1/64) chosen per part on the GPU from
