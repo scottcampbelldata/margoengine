@@ -26,7 +26,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "NOTICE.md"
   ],
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"

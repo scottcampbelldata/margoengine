@@ -92,4 +92,6 @@ for (const name of ['dof', 'tonemap'])
 for (const name of ['ATTRIBUTION.md', 'robot-CREDITS.md', 'tokyo-diorama-CREDITS.md'])
   await cp(`examples/assets/${name}`, `${out}/demos/assets/${name}`);
 await cp('packages/creative/examples/earth/assets/ATTRIBUTION.md', `${out}/demos/earth/assets/ATTRIBUTION.md`);
+// Licence notices for the third-party code the demos bundle (Draco, Basis, OCCT, Rapier, Recast); scripts/supply-chain.mjs.
+await cp('THIRD-PARTY-NOTICES.md', `${out}/THIRD-PARTY-NOTICES.md`);
 console.log(out);

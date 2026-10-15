@@ -1,0 +1,67 @@
+# npm release (docs/releasing.md). Manual only, and inert until Scott sets the repository variable
+# NPM_PUBLISH_ENABLED=true: every publish needs his go-ahead. Dry run by default.
+# Auth: npm trusted publishing (OIDC, no stored token) once each package has this workflow as its trusted publisher.
+# Bootstrap only (first publish of names that do not exist on npm yet): a granular access token, publish-only, limited
+# to @margoengine/*, margoengine, create-margo and margo-convert, shortest expiry, in the npm-publish environment as
+# NPM_BOOTSTRAP_TOKEN; delete it right after the first release.
+name: Publish
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version being published (must equal every package.json, e.g. 1.0.0)'
+        required: true
+      dry_run:
+        description: 'Dry run (pack and check, publish nothing)'
+        type: boolean
+        default: true
+permissions: {}
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: vars.NPM_PUBLISH_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: npm with trusted publishing support
+        run: npm install --global npm@11 && npm --version
+      - name: Install exactly the lockfile (fails on drift or an integrity mismatch)
+        run: npm ci
+      - name: Versions match the input, and the changelog has this version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          test "$(node -p "require('./packages/core/package.json').version")" = "$VERSION"
+          grep -qF "## $VERSION" CHANGELOG.md
+      - name: Audit runtime dependencies and registry signatures
+        run: |
+          npm audit --omit=dev --audit-level=low
+          npm audit signatures
+      - name: Build, test, check tarballs and notices
+        run: |
+          npm run build:packages
+          node scripts/supply-chain.mjs --check
+          node --test --test-concurrency=2 tests/supply-chain.test.js tests/versions.test.js
+      - name: Bootstrap token (first release only)
+        env:
+          TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
+        run: if [ -n "$TOKEN" ]; then npm config set //registry.npmjs.org/:_authToken "$TOKEN"; fi
+      - name: Publish @margoengine packages and margoengine, then margo-convert, then create-margo
+        env:
+          DRY: ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: |
+          npm publish --workspace packages --provenance --access public --ignore-scripts $DRY
+          npm publish ./tools/margo-convert --provenance --access public --ignore-scripts $DRY
+          npm publish ./tools/create-margo --provenance --access public --ignore-scripts $DRY

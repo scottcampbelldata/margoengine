@@ -47,7 +47,7 @@ export function staticEmbind(source, name) {
   }
   if (out.includes('newFunc(Function')) throw new Error(`${name}: dynamic embind code remains`);
   return (
-    `/* ${name}, modified by Margo Engine's build (scripts/static-embind.js): embind's two \`new Function\` wrapper generators are replaced by equivalent closures (Emscripten's DYNAMIC_EXECUTION=0 form) so it runs without 'unsafe-eval'. Otherwise unchanged. */\n` +
+    `/* ${name}, modified by Margo Engine's build (scripts/static-embind.js; change first made 2026-10-15): embind's two \`new Function\` wrapper generators are replaced by equivalent closures (Emscripten's DYNAMIC_EXECUTION=0 form) so it runs without 'unsafe-eval'. Otherwise unchanged. */\n` +
     out
   );
 }
