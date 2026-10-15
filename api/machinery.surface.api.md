@@ -26,6 +26,7 @@ export interface SurfaceCarrier {
 
 export interface SurfaceOptions {
     gravity?: number;
+    maxParts?: number;
 }
 
 export class SurfacePhysics implements EnginePlugin {

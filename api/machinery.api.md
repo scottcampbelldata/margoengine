@@ -50,6 +50,7 @@ export interface CADImportOptions {
     signal?: AbortSignal;
     onProgress?: (percent: number) => void;
     smoothing?: boolean;
+    maxParts?: number;
 }
 
 export interface CADModel {
@@ -241,6 +242,7 @@ export interface SurfaceCarrier {
 
 export interface SurfaceOptions {
     gravity?: number;
+    maxParts?: number;
 }
 
 export class SurfacePhysics implements EnginePlugin {
@@ -343,7 +345,7 @@ export function measureClearance(a: Mesh, b: Mesh, kind?: 'aabb' | 'obb'): Clear
 
 export function measureDistance(a: Anchor, b: Anchor, unit?: 'mm' | 'in' | 'm', sceneToMeters?: number): number;
 
-export function parseCAD(instance: EngineKernel, input: string | ArrayBuffer | ArrayBufferView, format: 'stl' | 'obj'): CADModel;
+export function parseCAD(instance: EngineKernel, input: string | ArrayBuffer | ArrayBufferView, format: 'stl' | 'obj', { maxParts }?: Pick<CADImportOptions, 'maxParts'>): CADModel;
 
 export function parseCADAsync(instance: EngineKernel, buffer: ArrayBuffer, format: CADFormat, options?: CADImportOptions): Promise<CADModel>;
 

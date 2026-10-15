@@ -1,4 +1,5 @@
 import {readResponse} from '../../shared/loading.js';
+import {checkCount, countLimit} from '../../shared/limits.js';
 import type {PBRInstances} from './instancing.js';
 export type GLTFDocument = Record<string, any>;
 /**
@@ -87,15 +88,15 @@ export class GLTFAsset {
   private readonly cache = new Map<number, Float32Array>();
   private readonly views = new Map<number, Uint8Array>();
   private decoded = 0;
-  /** `maxBytes`: the load's `maxDownloadBytes`; buffers may total that much and decoded accessors 4x. */
-  constructor(readonly doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, readonly hooks: GLTFDecoderHooks = {}, readonly maxBytes: number = assetLimit) {
-    downloadLimit(maxBytes);
+  /** `maxBytes`: the load's `maxDownloadBytes`; buffers may total that much and decoded accessors 4x. `maxNodes`: the load's `maxNodes`. */
+  constructor(readonly doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, readonly hooks: GLTFDecoderHooks = {}, readonly maxBytes: number = assetLimit, readonly maxNodes: number = 100_000) {
+    downloadLimit(maxBytes); countLimit('maxNodes', maxNodes);
     if (!doc || doc.asset?.version !== '2.0') throw new TypeError('Expected glTF 2.0');
     for (const key of ['buffers','bufferViews','accessors','meshes','nodes','scenes','materials','textures','images','samplers','skins','animations','extensionsRequired'])
       if (doc[key] !== undefined && !Array.isArray(doc[key])) throw new TypeError('Invalid glTF ' + key);
     const missing = (doc.extensionsRequired ?? []).filter((name: string) => !supported.has(name) && !hooks[hookFor[name]]);
     if (missing.length) throw new Error('Required glTF extensions are unsupported: ' + missing.map((name: string) => hookFor[name] ? name + ' (pass a ' + hookFor[name] + ' decoder)' : name).join(', '));
-    if ((doc.nodes?.length ?? 0) > 100_000) throw new RangeError('Too many glTF nodes');
+    checkCount('Too many glTF nodes', doc.nodes?.length ?? 0, maxNodes, 'maxNodes');
     let total = 0;
     this.buffers = (doc.buffers ?? []).map((def: any, i: number) => {
       const input = buffers[i], data = input ? input instanceof ArrayBuffer ? new Uint8Array(input) : new Uint8Array(input.buffer, input.byteOffset, input.byteLength) : def.uri ? embedded(def.uri, maxBytes) : i === 0 ? binary : undefined;
@@ -193,9 +194,11 @@ export interface AssetOptions {
    * packed geometry and decoded images may each use 4x this. Exceeding it throws a RangeError naming this option.
    */
   maxDownloadBytes?: number;
+  /** Most glTF nodes the file may have, each one a core mesh (default 100,000; up to core's 8,388,608 entities). */
+  maxNodes?: number;
 }
 /** Fetch (url) or parse (input) a glTF, decode compressed geometry and images. External URIs resolve against url, else the page. */
-export async function loadAsset(url: string | URL | undefined, {signal, decoders = {}, buffers: provided = [], fetch: get = globalThis.fetch, maxDownloadBytes}: AssetOptions = {}, input?: string | object | ArrayBuffer | ArrayBufferView): Promise<{asset: GLTFAsset; images: GLTFImage[]}> {
+export async function loadAsset(url: string | URL | undefined, {signal, decoders = {}, buffers: provided = [], fetch: get = globalThis.fetch, maxDownloadBytes, maxNodes}: AssetOptions = {}, input?: string | object | ArrayBuffer | ArrayBufferView): Promise<{asset: GLTFAsset; images: GLTFImage[]}> {
   const limit = downloadLimit(maxDownloadBytes);
   signal?.throwIfAborted(); let base = url === undefined ? undefined : new URL(url, globalThis.location?.href), total = 0;
   const fetchBytes = async (target: URL, root = false) => {
@@ -214,7 +217,7 @@ export async function loadAsset(url: string | URL | undefined, {signal, decoders
     else if (meshopt(def)?.fallback && decoders.meshopt) buffers.push(new Uint8Array());
     else buffers.push(await fetchBytes(resolve(def.uri)));
   }
-  const asset = new GLTFAsset(doc,buffers,binary,decoders,limit);let decodedImages=0;
+  const asset = new GLTFAsset(doc,buffers,binary,decoders,limit,maxNodes);let decodedImages=0;
   await asset.decode(signal);
   try {
     for (const def of doc.images ?? []) {

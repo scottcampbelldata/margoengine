@@ -20,7 +20,9 @@ export interface GLTFCamera {node:Mesh;nodeIndex:number;type:'perspective'|'orth
 /** A node's glTF `extras` object (Blender: the object's custom properties, exported with Include > Custom Properties) and a copy of its world matrix (column-major, translation in 12-14). */
 export interface GLTFNodeExtras {node:Mesh;nodeIndex:number;name:string;extras:Record<string,unknown>;matrix:Float32Array}
 /** Point or spot light shaped for @margoengine/clustered `setLights`. */
-export interface GLTFClusteredLight {position:[number,number,number];range:number;color:number[];intensity:number;direction?:[number,number,number];outerAngle?:number;innerAngle?:number}
+export interface GLTFClusteredLight {position:[number,number,number];range:number;color:[number,number,number];intensity:number;direction?:[number,number,number];outerAngle?:number;innerAngle?:number}
+/** What `applyGLTFLights` uses of @margoengine/clustered's `Clustered` (structural, so gltf-pro does not import it). */
+export interface GLTFLightReceiver {setLights(lights:GLTFClusteredLight[]):unknown;add(model:PBRModel):()=>void}
 export type GLTFLoadOptions = Omit<AssetOptions,'buffers'>;
 const srgbMaps=[0,4,9,12],normalMaps=[2,7],blended=(m:any)=>m.settings[0]===2||!!m.tint;
 // What a transparency hook takes over: plain alpha blending (transmission tints and custom render state keep the sorted path).
@@ -45,8 +47,11 @@ export interface PBRPrimitive {
   instances?: PBRInstances;
   /** The 80-byte-stride vertex and uint32 index buffers while the model is set up on a device (for picking and outlines). */
   buffers?: {vertex: GPUBuffer; index: GPUBuffer};
+  /** Set for glTF POINTS (`point-list`) and LINES, LINE_LOOP, LINE_STRIP (`line-list`, as index pairs); absent for triangles. */
+  topology?: 'point-list'|'line-list';
 }
-export interface PreparedGeometry {vertices:Float32Array;indices:Uint32Array}
+/** Packed geometry: 20 floats per vertex and uint32 indices; `topology` as on PBRPrimitive (absent: a triangle list). */
+export interface PreparedGeometry {vertices:Float32Array;indices:Uint32Array;topology?:'point-list'|'line-list'}
 /**
  * Optional beauty-pass pipeline overrides, set as `primitive.material.renderState` (shared by every primitive using
  * that material). Unset fields keep gltf-pro's defaults; `blend: null` turns blending off. The state is part of the
@@ -123,7 +128,10 @@ function primitive(asset:GLTFAsset, p:any, node:Mesh, nodeIndex:number, mesh:any
   }
   const targets=p.targets??[];if(!Array.isArray(targets))throw new TypeError('Invalid morph targets');
   const weights=vector(asset.doc.nodes[nodeIndex].weights??mesh.weights??Array(targets.length).fill(0),targets.length,'morph weights');
-  return {node,nodeIndex,vertices,indices,definition:p,material:m,weights:Float32Array.from(weights),targetNames:targets.map((_:unknown,i:number)=>mesh.extras?.targetNames?.[i]??'Target '+i)};
+  const made:PBRPrimitive={node,nodeIndex,vertices,indices,definition:p,material:m,weights:Float32Array.from(weights),targetNames:targets.map((_:unknown,i:number)=>mesh.extras?.targetNames?.[i]??'Target '+i)};
+  // glTF 2.0 3.9.2: points and lines without NORMAL are rendered without lighting (here: the base colour, as KHR_materials_unlit).
+  if(g.topology){made.topology=g.topology;if(a.NORMAL===undefined)made.material={...m,ext:[1,...m.ext.slice(1)]};}
+  return made;
 }
 function transform(node:Mesh,def:any):void {
   if(def.matrix!==undefined) {
@@ -143,6 +151,12 @@ function transform(node:Mesh,def:any):void {
 export class PBRModel implements EnginePlugin {
   readonly name='gltf-pro:'+modelId++;
   readonly root:Mesh;readonly nodes:Mesh[]=[];readonly primitives:PBRPrimitive[]=[];readonly lights:GLTFLight[]=[];readonly cameras:GLTFCamera[]=[];
+  /**
+   * glTF POINTS, LINES, LINE_LOOP and LINE_STRIP primitives (`topology` set), drawn in the beauty pass only: no shadows,
+   * SSAO, SSR or transparency hook. Kept out of `primitives`, which picking, BVH, outlines, walk collisions and exporters
+   * read as triangles. Empty for `@margoengine/gltf-pro/progressive` loads, which leave points and lines out.
+   */
+  readonly pointsAndLines:PBRPrimitive[]=[];
   disposed=false;private readonly created:Mesh[]=[];private resources:DrawResource[]=[];private textures:GPUTexture[]=[];
   private pipelines=new Map<string,GPURenderPipeline>();private readonly gpuCache=new Map<unknown,any>();private readonly inverse=new Float32Array(16);private readonly workspace=new Float64Array(52);private readonly view=new Float32Array(16);
   private engine:Engine;private readonly cleanupCallbacks=new Set<()=>void>();
@@ -179,9 +193,13 @@ export class PBRModel implements EnginePlugin {
         const mesh=entry(doc.meshes,defs[i].mesh,'mesh');if(!Array.isArray(mesh.primitives)||!mesh.primitives.length)throw new TypeError('Missing primitives');
         if(prepared&&prepared[defs[i].mesh]?.length!==mesh.primitives.length)throw new TypeError('Missing prepared PBR primitives');
         const gpu=defs[i].extensions?.EXT_mesh_gpu_instancing,instances=gpu&&reader?.read(asset,gpu);
-        for(let j=0;j<mesh.primitives.length;j++){const p=mesh.primitives[j],made:PBRPrimitive=prepared?preparedPrimitive(asset,p,prepared[defs[i].mesh][j],this.nodes[i],i,materials,checked):primitive(asset,p,this.nodes[i],i,mesh,materials,packs);for(const data of [made.vertices,made.indices])if(!counted.has(data)){geometryBytes+=data.byteLength;counted.add(data);}if(geometryBytes>asset.maxBytes*4)throw overBudget('Decoded glTF geometry exceeds byte budget',asset.maxBytes*4);if(instances)made.instances=instances;this.primitives.push(made);}
+        for(let j=0;j<mesh.primitives.length;j++){
+          const p=mesh.primitives[j];
+          // ponytail: progressive's placeholders are triangle boxes, so it leaves points and lines out; stream them if CAD edges need it.
+          if(!prepared&&(p?.mode??4)<4&&packed.has(p)&&!packed.get(p)!.topology)continue;
+          const made:PBRPrimitive=prepared?preparedPrimitive(asset,p,prepared[defs[i].mesh][j],this.nodes[i],i,materials,checked):primitive(asset,p,this.nodes[i],i,mesh,materials,packs);for(const data of [made.vertices,made.indices])if(!counted.has(data)){geometryBytes+=data.byteLength;counted.add(data);}if(geometryBytes>asset.maxBytes*4)throw overBudget('Decoded glTF geometry exceeds byte budget',asset.maxBytes*4);if(instances)made.instances=instances;(made.topology?this.pointsAndLines:this.primitives).push(made);}
       }
-      if(!this.primitives.length)throw new Error('glTF contains no renderable meshes');
+      if(!this.primitives.length&&!this.pointsAndLines.length)throw new Error('glTF contains no renderable meshes');
     } catch(error) {for(const node of this.created.reverse())node.dispose();throw error;}
   }
   setup(engine:Engine):void {
@@ -196,7 +214,7 @@ export class PBRModel implements EnginePlugin {
       const b=device.createBuffer({size:data.byteLength,usage:usage|GPUBufferUsage.COPY_DST});
       try{device.queue.writeBuffer(b,0,data as Float32Array<ArrayBuffer>);}catch(e){b.destroy();throw e;}cache.set(data,b);return b;
     };
-    for(const p of this.primitives) {
+    for(const p of this.pointsAndLines.length?[...this.primitives,...this.pointsAndLines]:this.primitives) {
       const r:DrawResource={primitive:p,vertex:undefined!,index:undefined!,uniform:undefined!,values:new Float32Array(220),groups:new Map(),views:[],samplers:[]};
       this.resources.push(r);r.vertex=upload(p.vertices,GPUBufferUsage.VERTEX|GPUBufferUsage.STORAGE);r.index=upload(p.indices,GPUBufferUsage.INDEX);p.buffers={vertex:r.vertex,index:r.index};
       r.uniform=device.createBuffer({size:880,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
@@ -254,7 +272,7 @@ export class PBRModel implements EnginePlugin {
     this.capture=hook;return()=>{if(this.capture===hook)this.capture=undefined;};
   }
   get shadowPrimitives() {
-    return this.resources.filter(r=>r.primitive.material.settings[0]!==2).map(r=>({node:r.primitive.node,vertex:r.primitive.deformed??r.vertex,index:r.index,count:r.primitive.indices.length,stride:80,
+    return this.resources.filter(r=>r.primitive.material.settings[0]!==2&&!r.primitive.topology).map(r=>({node:r.primitive.node,vertex:r.primitive.deformed??r.vertex,index:r.index,count:r.primitive.indices.length,stride:80,
       alphaTexture:r.views[0],alphaSampler:r.samplers[0],alpha:r.primitive.material.base[3],cutoff:r.primitive.material.settings[0]===1?r.primitive.material.settings[1]:0,texCoord:r.primitive.material.maps[0]?.texCoord??0,instances:r.primitive.instances}));
   }
   /** `transparent` draws only the BLEND primitives a transparency hook took over (`setTransparency`), into its pass; `capture` the
@@ -272,7 +290,7 @@ export class PBRModel implements EnginePlugin {
     let pass:GPURenderPassEncoder|undefined,shared:GPURenderPassEncoder|undefined;
     try {for(const r of resources) {
       const p=r.primitive,m=p.material,node=p.node,inst=p.instances;
-      if(through?!separable(m):capture?blended(m)||m.ext[0]:mode==='beauty'&&oit&&separable(m))continue;
+      if(p.topology?mode!=='beauty':through?!separable(m):capture?blended(m)||m.ext[0]:mode==='beauty'&&oit&&separable(m))continue;
       node.check();let visible=true;
       for(let id=node.id;id!==-1;id=this.engine.store.parents[id])if(this.engine.store.hidden[id])visible=false;
       if(!visible||inst&&!inst.count)continue;
@@ -304,14 +322,14 @@ export class PBRModel implements EnginePlugin {
       // Shader text enters the key as a small id: the code strings are cached objects, so the lookup hashes them once.
       // Discard only where it can happen: back faces are culled by the pipeline and only MASK materials alpha-test.
       const mask=+(m.settings[0]===1);let id=this.codes.get(code);if(id===undefined){if(this.codes.size>=256)this.codes.clear();this.codes.set(code,id=this.codeCount++);}
-      const transmit=!!m.tint,blend=blended(m),key=mode+':'+c.format+':'+blend+transmit+':'+cull+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+':'+entry+':'+id+':'+mask+(state?JSON.stringify(state):'')+(inst?':i'+face:'');
+      const transmit=!!m.tint,blend=blended(m),key=mode+':'+c.format+':'+blend+transmit+':'+cull+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+':'+entry+':'+id+':'+mask+(state?JSON.stringify(state):'')+(inst?':i'+face:'')+(p.topology?':'+p.topology:'');
       let pipeline=this.pipelines.get(key);
       if(!pipeline) {
         checkLimits(c.device,code,()=>[m.physical?'physical material':'material',...[...this.lighting].flatMap(e=>{const x=e as {name?:string;shadow?:{name?:string}};return [x.name??'shader patch',...x.shadow?.name?[x.shadow.name]:[]];})]);
         const module=c.device.createShaderModule({code}),format=mode==='beauty'?c.format:'rgba16float';
         pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:80,attributes:Array.from({length:5},(_,i)=>({shaderLocation:i,offset:i*16,format:'float32x4' as const}))},...inst?[inst.layout]:[]]},
           fragment:{module,entryPoint:entry,constants:{margoFaceTest:face,margoAlphaTest:mask},targets:through||capture?(through?oit!:hook!).targets as GPUColorTargetState[]:[{format,blend:state?.blend!==undefined?state.blend??undefined:blend&&mode!=='gbuffer'?{color:transmit?{srcFactor:'one',dstFactor:'constant'}:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
-          multisample:c.descriptor.multisample,primitive:{cullMode:cull},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:state?.depthWrite??((mode==='beauty'||capture)&&!blend),depthCompare:state?.depthCompare??(mode==='beauty'||through||capture?'greater-equal':'equal')}});
+          multisample:c.descriptor.multisample,primitive:p.topology?{topology:p.topology}:{cullMode:cull},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:state?.depthWrite??((mode==='beauty'||capture)&&!blend),depthCompare:state?.depthCompare??(mode==='beauty'||through||capture?'greater-equal':'equal')}});
         this.pipelines.set(key,pipeline);
       }
       let groups=r.groups.get(pipeline);
@@ -349,7 +367,7 @@ export class PBRModel implements EnginePlugin {
   }
   get bounds():Float32Array {
     this.engine.store.tick(false);const out=new Float32Array([Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity]);
-    for(const p of this.primitives){
+    for(const p of this.pointsAndLines.length?[...this.primitives,...this.pointsAndLines]:this.primitives){
       if(p.instances){p.instances.bounds(p.node.matrix,p.vertices,out);continue;}
       for(let i=0;i<p.vertices.length;i+=20)for(let r=0;r<3;r++){
         const m=p.node.matrix,v=m[r]*p.vertices[i]+m[4+r]*p.vertices[i+1]+m[8+r]*p.vertices[i+2]+m[12+r];out[r]=Math.min(out[r],v);out[r+3]=Math.max(out[r+3],v);
@@ -361,7 +379,7 @@ export class PBRModel implements EnginePlugin {
   clusteredLights():GLTFClusteredLight[] {
     this.engine.store.tick(false);
     return this.lights.filter(l=>l.type!=='directional').map(l=>{
-      const m=l.node.matrix,light:GLTFClusteredLight={position:[m[12],m[13],m[14]],range:l.range??(Math.sqrt(l.intensity*256)||1),color:l.color,intensity:l.intensity};
+      const m=l.node.matrix,light:GLTFClusteredLight={position:[m[12],m[13],m[14]],range:l.range??(Math.sqrt(l.intensity*256)||1),color:l.color as [number,number,number],intensity:l.intensity};
       if(l.type==='spot')Object.assign(light,{direction:[-m[8],-m[9],-m[10]],outerAngle:Math.min(l.outerConeAngle!,Math.PI/2-1e-4),innerAngle:Math.min(l.innerConeAngle!,Math.PI/2-1e-4)});
       return light;
     });
@@ -373,7 +391,7 @@ export class PBRModel implements EnginePlugin {
     return out;
   }
   onDispose(callback:()=>void):()=>void {if(typeof callback!=='function')throw new TypeError('Expected cleanup callback');if(this.disposed){callback();return()=>{};}this.cleanupCallbacks.add(callback);return()=>this.cleanupCallbacks.delete(callback);}
-  private releaseGPU():void {const cleanup=new Cleanup(),buffers=new Set<GPUBuffer>();for(const r of this.resources)for(const b of [r.vertex,r.index,r.uniform])if(b)buffers.add(b);for(const b of buffers)cleanup.run(()=>b.destroy());for(const t of this.textures)cleanup.run(()=>t.destroy());for(const p of this.primitives){p.buffers=undefined;cleanup.run(()=>p.instances?.dispose());}this.resources=[];this.textures=[];this.pipelines.clear();this.gpuCache.clear();this.lightingGroups.clear();cleanup.finish();}
+  private releaseGPU():void {const cleanup=new Cleanup(),buffers=new Set<GPUBuffer>();for(const r of this.resources)for(const b of [r.vertex,r.index,r.uniform])if(b)buffers.add(b);for(const b of buffers)cleanup.run(()=>b.destroy());for(const t of this.textures)cleanup.run(()=>t.destroy());for(const p of [...this.primitives,...this.pointsAndLines]){p.buffers=undefined;cleanup.run(()=>p.instances?.dispose());}this.resources=[];this.textures=[];this.pipelines.clear();this.gpuCache.clear();this.lightingGroups.clear();cleanup.finish();}
   onDeviceRestored(engine:Engine):void {this.releaseGPU();for(const p of this.primitives)p.deformed=undefined;this.setup(engine);}
   dispose():void {
     if(this.disposed)return;this.disposed=true;const cleanup=new Cleanup();
@@ -387,20 +405,59 @@ export class PBRModel implements EnginePlugin {
   /** @deprecated Use dispose(); kept as an alias until 1.0. */
   destroy():void {this.dispose();}
 }
-/** Synchronous parse of in-memory JSON/GLB with decoded `images`; `decoders` takes only the synchronous `instancing` reader. */
-export function parseGLTF(instance:EngineKernel,input:string|object|ArrayBuffer|ArrayBufferView,buffers:Array<ArrayBuffer|ArrayBufferView>=[],images:readonly ImageBitmap[]=[],decoders:Pick<GLTFDecoderHooks,'instancing'>={}):PBRModel {
-  const {doc,binary}=container(input),model=new PBRModel(instance,new GLTFAsset(doc,buffers,binary,decoders),images);
+/** Synchronous parse of in-memory JSON/GLB with decoded `images`; `decoders` takes only the synchronous `instancing` reader; `maxNodes` as for loadGLTF. */
+export function parseGLTF(instance:EngineKernel,input:string|object|ArrayBuffer|ArrayBufferView,buffers:Array<ArrayBuffer|ArrayBufferView>=[],images:readonly ImageBitmap[]=[],decoders:Pick<GLTFDecoderHooks,'instancing'>={},{maxNodes}:Pick<AssetOptions,'maxNodes'>={}):PBRModel {
+  const {doc,binary}=container(input),model=new PBRModel(instance,new GLTFAsset(doc,buffers,binary,decoders,undefined,maxNodes),images);
   try{engineRuntime(instance).use(model);return model;}catch(error){model.dispose();throw error;}
 }
-export function parsePreparedPBR(instance:EngineKernel,doc:GLTFAsset['doc'],geometry:readonly (readonly PreparedGeometry[])[],images:readonly ImageBitmap[]=[]):PBRModel {
+/** A static scene whose geometry is already packed (as @margoengine/blender's .margo); `maxNodes` as for loadGLTF. */
+export function parsePreparedPBR(instance:EngineKernel,doc:GLTFAsset['doc'],geometry:readonly (readonly PreparedGeometry[])[],images:readonly ImageBitmap[]=[],{maxNodes}:Pick<AssetOptions,'maxNodes'>={}):PBRModel {
   if(doc.buffers?.length||doc.skins?.length||doc.animations?.length||doc.nodes?.some((n:any)=>n.skin!==undefined)||!Array.isArray(geometry)||geometry.length!==doc.meshes?.length)throw new TypeError('Prepared PBR requires a static scene');
-  const model=new PBRModel(instance,new GLTFAsset(doc,[]),images,geometry);
+  const model=new PBRModel(instance,new GLTFAsset(doc,[],undefined,{},undefined,maxNodes),images,geometry);
   try{engineRuntime(instance).use(model);return model;}catch(error){model.dispose();throw error;}
 }
 /** Fetch a .gltf/.glb, decode its images and any compressed data with `decoders`, then add the model to the engine. */
 export async function loadGLTF(instance:EngineKernel,url:string|URL,options:GLTFLoadOptions={}):Promise<PBRModel> {return attach(instance,await loadAsset(url,options),options.signal);}
 /** Like parseGLTF for in-memory JSON/GLB, but async so Draco, meshopt and KTX2 decoders can run; also decodes embedded images. External URIs resolve against the page. */
 export async function parseGLTFAsync(instance:EngineKernel,input:string|object|ArrayBuffer|ArrayBufferView,options:AssetOptions={}):Promise<PBRModel> {return attach(instance,await loadAsset(undefined,options,input),options.signal);}
+/**
+ * Applies a model's KHR_lights_punctual lights in one call. The first directional light becomes the engine's light
+ * (`engine.lighting`: direction toward the light, its colour, and its lux x `exposure` as the strength; core's default
+ * strength is 3 and core has one directional light, so further ones are ignored). Point and spot lights go to `clustered`
+ * (@margoengine/clustered, candela x `exposure`), which then lights the model; without it they are ignored. Lights are
+ * placed where their nodes are now: after moving the model, call `clustered.setLights(model.clusteredLights())` (or this
+ * again for the sun). Call once per clustered instance; returns the remover from `clustered.add` (a no-op without one).
+ */
+export function applyGLTFLights(model:PBRModel,{clustered,exposure=1}:{clustered?:GLTFLightReceiver;exposure?:number}={}):()=>void {
+  if(!Number.isFinite(exposure)||exposure<0)throw new RangeError('applyGLTFLights: exposure must be a finite number >= 0');
+  const engine=model['engine'],sun=model.lights.find(l=>l.type==='directional');
+  if(sun){engine.store.tick(false);const m=sun.node.matrix,length=Math.hypot(m[8],m[9],m[10])||1;engine.lighting.direction.set([m[8]/length,m[9]/length,m[10]/length,sun.intensity*exposure]);engine.lighting.radiance.set(sun.color);}
+  if(!clustered)return()=>{};
+  const lights=model.clusteredLights();for(const light of lights)light.intensity*=exposure;
+  clustered.setLights(lights);return clustered.add(model);
+}
+const orthographic=new WeakSet<object>();
+/**
+ * Views through one of the model's glTF cameras (`model.cameras[camera]`, default the first) with the engine camera:
+ * position, view direction and up from the camera node's world matrix now. Perspective: `yfov` and `znear`, `zfar` when
+ * set (else the camera keeps its `far`), with the canvas aspect. Orthographic: `ymag`, `znear` and `zfar` through
+ * `camera.project`, the width following the canvas aspect; a later perspective camera removes that projection. The target
+ * is 1 unit ahead, so orbit controls turn the view around that point (call their `saveState()` afterwards).
+ */
+export function viewGLTFCamera(model:PBRModel,camera:number|GLTFCamera=0):void {
+  const def=typeof camera==='number'?model.cameras[camera]:camera;if(!def)throw new RangeError(`viewGLTFCamera: the model has no glTF camera ${camera}`);
+  const engine=model['engine'],view=engine.camera;engine.store.tick(false);
+  const m=def.node.matrix,z=Math.hypot(m[8],m[9],m[10])||1,y=Math.hypot(m[4],m[5],m[6])||1;
+  view.position=[m[12],m[13],m[14]];view.target=[m[12]-m[8]/z,m[13]-m[9]/z,m[14]-m[10]/z];view.up=[m[4]/y,m[5]/y,m[6]/y];
+  if(def.type==='perspective'){
+    const p=def.perspective!;view.fov=p.yfov*180/Math.PI;view.near=p.znear;if(p.zfar!==undefined)view.far=p.zfar;if(view.project&&orthographic.has(view.project))view.project=undefined;
+  }else{
+    const {ymag,znear:near,zfar:far}=def.orthographic!,depth=far-near;view.near=near;view.far=far;
+    // Column-major; WebGPU depth is reversed (near 1, far 0) like core's perspective.
+    view.project=(out,aspect,webgpu)=>{out[0]=1/(Math.abs(ymag)*aspect);out[5]=1/Math.abs(ymag);out[10]=webgpu?1/depth:-2/depth;out[14]=webgpu?far/depth:-(far+near)/depth;out[15]=1;};
+    orthographic.add(view.project);
+  }
+}
 function attach(instance:EngineKernel,{asset,images}:{asset:GLTFAsset;images:GLTFImage[]},signal?:AbortSignal):PBRModel {
   let model:PBRModel|undefined;
   try {signal?.throwIfAborted();model=new PBRModel(instance,asset,images);engineRuntime(instance).use(model);return model;}

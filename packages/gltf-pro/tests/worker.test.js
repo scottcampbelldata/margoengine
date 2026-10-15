@@ -33,11 +33,11 @@ for (const [name, load] of [
 
 test('a primitive the worker cannot pack is packed (and fails) on the main thread as before', () => headlessModels(async () => {
   const glb = bigGLB({segments: 4, meshes: 1}), length = new DataView(glb.buffer).getUint32(12, true), json = new TextDecoder().decode(glb.subarray(20, 20 + length));
-  glb.set(new TextEncoder().encode(json.replace('"material":0', '"mode":1'.padEnd(12))), 20); // lines, same JSON length
+  glb.set(new TextEncoder().encode(json.replace('"material":0', '"mode":7'.padEnd(12))), 20); // no such topology, same JSON length
   const prepared = await runParseWorker(worker, {url: 'https://example.test/', input: glb.slice().buffer}), engine = await headless();
   assert.deepEqual(prepared.geometry, [[null]]);
-  assert.throws(() => modelFromPrepared(engine, prepared), /PBR requires triangle primitives/);
-  await assert.rejects(parseGLTFAsync(await headless(), glb), /PBR requires triangle primitives/);
+  assert.throws(() => modelFromPrepared(engine, prepared), /Invalid glTF primitive mode/);
+  await assert.rejects(parseGLTFAsync(await headless(), glb), /Invalid glTF primitive mode/);
 }));
 
 test('worker errors keep their type; without Worker the entry falls back to the main thread', () => headlessModels(async () => {

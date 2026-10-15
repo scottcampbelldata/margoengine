@@ -779,6 +779,51 @@
     "changed": 0.0005,
     "hot": 0.0002
    }
+  },
+  "khronos-MeshPrimitiveModes-model": {
+   "url": "examples/khronos-gallery.html?model=MeshPrimitiveModes",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-MeshoptCubeTest-model": {
+   "url": "examples/khronos-gallery.html?model=MeshoptCubeTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-ABeautifulGame-model": {
+   "url": "examples/khronos-gallery.html?model=ABeautifulGame",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
   }
  },
  "environment": {
@@ -786,8 +831,8 @@
   "gpu": "intel xe-2lpg",
   "acPowerBefore": true,
   "acPowerAfter": true,
-  "date": "2026-10-15T12:33:26.905Z",
-  "commit": "772773c"
+  "date": "2026-10-15T15:08:48.762Z",
+  "commit": "85051d8"
  },
  "method": {
   "hot": 24,

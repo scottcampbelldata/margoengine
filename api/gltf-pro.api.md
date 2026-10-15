@@ -10,8 +10,9 @@ export class GLTFAsset {
     readonly doc: GLTFDocument;
     readonly hooks: GLTFDecoderHooks;
     readonly maxBytes: number;
+    readonly maxNodes: number;
     readonly buffers: Uint8Array[];
-    constructor(doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, hooks?: GLTFDecoderHooks, maxBytes?: number);
+    constructor(doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, hooks?: GLTFDecoderHooks, maxBytes?: number, maxNodes?: number);
     view(id: unknown): Uint8Array;
     decode(signal?: AbortSignal): Promise<void>;
     accessor(id: unknown, type?: string): Float32Array;
@@ -39,7 +40,7 @@ export interface GLTFCamera {
 export interface GLTFClusteredLight {
     position: [number, number, number];
     range: number;
-    color: number[];
+    color: [number, number, number];
     intensity: number;
     direction?: [number, number, number];
     outerAngle?: number;
@@ -103,6 +104,11 @@ export interface GLTFLight {
     name?: string;
 }
 
+export interface GLTFLightReceiver {
+    setLights(lights: GLTFClusteredLight[]): unknown;
+    add(model: PBRModel): () => void;
+}
+
 export type GLTFLoadOptions = Omit<AssetOptions, 'buffers'>;
 
 export interface GLTFNodeExtras {
@@ -142,6 +148,7 @@ export class PBRModel implements EnginePlugin {
     readonly primitives: PBRPrimitive[];
     readonly lights: GLTFLight[];
     readonly cameras: GLTFCamera[];
+    readonly pointsAndLines: PBRPrimitive[];
     disposed: boolean;
     constructor(instance: EngineKernel, asset: GLTFAsset, images?: readonly GLTFImage[], prepared?: readonly (readonly PreparedGeometry[])[]);
     setup(engine: Engine): void;
@@ -188,6 +195,7 @@ export interface PBRPrimitive {
         vertex: GPUBuffer;
         index: GPUBuffer;
     };
+    topology?: 'point-list' | 'line-list';
 }
 
 export interface PBRRenderState {
@@ -206,6 +214,7 @@ export interface PBRTransparency {
 export interface PreparedGeometry {
     vertices: Float32Array;
     indices: Uint32Array;
+    topology?: 'point-list' | 'line-list';
 }
 
 export interface TextureTransform {
@@ -214,17 +223,24 @@ export interface TextureTransform {
     rotation?: number;
 }
 
+export function applyGLTFLights(model: PBRModel, { clustered, exposure }?: {
+    clustered?: GLTFLightReceiver;
+    exposure?: number;
+}): () => void;
+
 export function loadGLTF(instance: EngineKernel, url: string | URL, options?: GLTFLoadOptions): Promise<PBRModel>;
 
-export function parseGLTF(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, images?: readonly ImageBitmap[], decoders?: Pick<GLTFDecoderHooks, 'instancing'>): PBRModel;
+export function parseGLTF(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, images?: readonly ImageBitmap[], decoders?: Pick<GLTFDecoderHooks, 'instancing'>, { maxNodes }?: Pick<AssetOptions, 'maxNodes'>): PBRModel;
 
 export function parseGLTFAsync(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, options?: AssetOptions): Promise<PBRModel>;
 
-export function parsePreparedPBR(instance: EngineKernel, doc: GLTFAsset['doc'], geometry: readonly (readonly PreparedGeometry[])[], images?: readonly ImageBitmap[]): PBRModel;
+export function parsePreparedPBR(instance: EngineKernel, doc: GLTFAsset['doc'], geometry: readonly (readonly PreparedGeometry[])[], images?: readonly ImageBitmap[], { maxNodes }?: Pick<AssetOptions, 'maxNodes'>): PBRModel;
 
 export function textureTransform(x?: TextureTransform, texCoord?: number): number[];
 
 export function validatePreparedGeometry(data: PreparedGeometry): void;
+
+export function viewGLTFCamera(model: PBRModel, camera?: number | GLTFCamera): void;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -234,6 +250,7 @@ interface AssetOptions {
     buffers?: Array<ArrayBuffer | ArrayBufferView>;
     fetch?: typeof fetch;
     maxDownloadBytes?: number;
+    maxNodes?: number;
 }
 
 type Context = Extract<PassContext, {

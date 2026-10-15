@@ -1001,8 +1001,19 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    its proof link; linked from README, docs/README.md, the site's "Where it stands" (GitHub link; the site build ships
    no .md pages) and whitepaper outline section 7; every number is claims.md LIM-001..026 (25 PROVEN; LIM-024, the CSP
    error strings, UNPROVEN like DOC-074 until the CSP_OVERRIDE runs are committed). Limits with NO escape hatch yet, to
-   queue: (1) the 100,000 node/part caps in gltf, gltf-pro, .margo (blender), OBJ (machinery) and SurfacePhysics -
-   raise to core's 8,388,608 or make them options; (2) 16 sampled textures per stage - nothing past dropping a lighting
+   queue: (1) [DONE 2026-10-15, 5w worker] the 100,000 node/part caps in gltf, gltf-pro, .margo (blender), OBJ (machinery)
+   and SurfacePhysics are options now, default unchanged (100,000), allowed 1..8,388,608 (core's entity cap):
+   `maxNodes` on gltf `parseGLTF`/`loadGLTF`, every gltf-pro loader (+ `parseGLTF`/`parsePreparedPBR` last argument, worker
+   and progressive paths), blender `decodeMargo`/`parseMargo`/`loadMargo`; `maxParts` on machinery `parseCAD`/`loadCAD`
+   (OBJ objects/groups and, new, the STEP/IGES worker's 100,000-mesh cap) and `SurfacePhysics.create` (parts and
+   carriers separately). One helper, `packages/shared/limits.js`; errors name the option, e.g. `RangeError: Too many glTF
+   nodes (100001 > 100000; raise the maxNodes option)`; `.margo` and SurfacePhysics now say `Too many .margo nodes` /
+   `Too many surface parts|carriers` instead of the old combined TypeError/RangeError. Test `tests/count-limits.test.js`
+   (each package at 100,001 with and without the option; gltf-pro builds a 100,001-node model headless in < 1 s,
+   diagnostic). Not measured: load time/memory past 100,000. Seen in passing (core, frozen, not fixed): disposing a 100,001-node
+   gltf-pro model takes ~9.4 s in Node vs ~0.6 s to parse it (diagnostic, not quiet-gated): core `Engine.remove` scans
+   the whole parent column for children on every mesh it removes, O(meshes x capacity); a package cannot avoid it. docs/limits.md row
+   and claims LIM-007 updated; (2) 16 sampled textures per stage - nothing past dropping a lighting
    feature (texture arrays 5f.d are post-1.0; or core requests the adapter's higher limit, core bytes); (3) a second
    directional light (area lights landed with 5l.f and are in the page: 64, unshadowed); (4) SSR off-screen reflections (probes 5l.e) and water/terrain reflecting;
    (5) the 64 MiB glTF download budget as an option (5l.r); (6) gltf-pro's 1,000,000 vertices per primitive (no
@@ -1413,16 +1424,37 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    Arc 140V; per-model verdicts in `examples/assets/khronos/README.md`). Not fixed by the asset task. All in optional
    packages (zero core bytes). After each fix: re-run the gallery, update the model's `render` verdict in
    `manifest.json` (+ `node scripts/khronos-assets.mjs`) and `npm run visual:update -- --only=khronos-<Model>`.
-   a. gltf-pro rejects POINTS / LINES / LINE_LOOP / LINE_STRIP primitives ("PBR requires triangle primitives"), which
-      fails the whole file (MeshPrimitiveModes). Draw them (unlit, as glTF specifies for points/lines without normals),
-      or at least skip them with a warning and render the triangle meshes.
-   b. `@margoengine/decoders` meshopt: `KHR_meshopt_compression` filter `COLOR` is unknown, so MeshoptCubeTest fails
-      (mesh 26). Add the filter from the meshoptimizer reference decoder with test vectors.
-   c. gltf-pro's decoded-image budget (`assetLimit` x 4 = 256 MB) rejects ABeautifulGame (33 textures, 43 MB GLB):
-      "glTF images exceed decoded size limit". Make the budget an option (or raise it) and say so in the error.
-   d. `KHR_lights_punctual`: point/spot lights are applied only when the app calls `clustered.setLights(
-      model.clusteredLights())`; directional lights are "left to the engine's own light" with no helper (DirectionalLight
-      renders without its light). Add a one-call helper (directional -> core light, intensity units documented).
+   a. [DONE 2026-10-15, 5w worker] gltf-pro draws every glTF 2.0 topology (`pack.ts` `listIndices`): POINTS as a
+      point list, LINES / LINE_LOOP / LINE_STRIP as line lists (index pairs), TRIANGLE_STRIP / TRIANGLE_FAN as triangle
+      lists (spec winding). Points and lines go to `model.pointsAndLines` (not `primitives`, which picking, BVH, outlines,
+      walk collisions and exporters read as triangles), draw in the beauty pass only (no shadows/SSAO/SSR/OIT), unlit
+      without NORMAL (base colour; emission not added, the shader is unchanged); `PreparedGeometry.topology` carries the
+      mode through the worker path; progressive loads leave points/lines out (ponytail comment). Also fixed on the way:
+      without NORMAL a vertex no triangle shades (unreferenced, as in MeshPrimitiveModes' shared POSITION) threw "Zero
+      glTF normal"; it now gets +Z (a zero normal the file supplies still throws). Triangle pipelines and their keys are
+      unchanged (GPU-call proofs gltf-pro-lighting-hooks 4,556 calls, binding-limit, oit-detached, materials-uv-transform,
+      post-ssr-models, selection-xray-off, clustered-* all identical; gltf-pro.proof.js agrees). Test:
+      `packages/gltf-pro/tests/khronos.test.js` (indices per mode vs the spec formulas, unlit, worker parity).
+   b. [DONE 2026-10-15] MeshoptCubeTest also needed vertex codec v1 (11 of its views; header 0xa1), not only `COLOR`.
+      `packages/decoders/src/meshopt.ts`: v1 (per-byte control modes, 1/2/4/8-bit groups, byte / 16-bit / rotated-XOR
+      channels, ported from meshoptimizer 1.1.1's reference decoder) and `COLOR` (YCoCg + alpha precision bit, the SIMD
+      decoder's float32 arithmetic; it stores the low bits of the float32 pattern of value + 3<<22, which differs from a
+      rounded integer only for out-of-range YCoCg). Bit-exact vs the installed meshoptimizer Wasm decoder: 1,030 fuzz
+      streams (v0/v1, strides 4-64, NONE/COLOR) + 132 encoder-made COLOR streams (8/16-bit, 2-16 bits) + all 60
+      compressed MeshoptCubeTest views, 0 differences. Vectors: `tests/fixtures/meshopt-vectors.json` + 4 cases
+      (attributesV1, color4V1, color8, color8Raw) from `packages/decoders/scripts/meshopt-vectors.mjs`;
+      `decoders.proof.js` keeps the 8 old cases baseline-identical.
+   c. [DONE 2026-10-15] Already an option since 5l.r: images get 4x `maxDownloadBytes` (default 128 MiB -> 512 MiB) and
+      the error names it (`glTF images exceed decoded size limit (536870912 bytes; raise the maxDownloadBytes option)`).
+      ABeautifulGame's 33 2048x2048 textures are 553,648,128 B decoded (528 MiB), so it needs >= 132 MiB; the gallery
+      passes 160 MiB. No new option (an image-only budget would be a second knob for one case). Documented: gltf-pro
+      README "Download budget and memory", docs/limits.md row (which still said 64 MiB / 256 MiB; fixed with LIM-020).
+   d. [DONE 2026-10-15] `applyGLTFLights(model, {clustered?, exposure = 1})` in gltf-pro (tree-shakable function): first
+      directional light -> `engine.lighting` (direction toward the light from the node's +Z, colour, strength = lux x
+      exposure; core's default strength is 3), point/spot -> `clustered.setLights` (candela x exposure) + `clustered.add`;
+      returns the remover. `GLTFClusteredLight.color` is now `[number, number, number]`, so `clustered.setLights(
+      model.clusteredLights())` type-checks (it did not: `number[]` vs `Vec3`). The gallery uses it with exposure
+      3 / sun lux (NodePerformanceTest's sun is 10,000 lux).
    e. Ignored material extensions (load, render without the effect): `KHR_materials_iridescence` (IridescenceLamp),
       `KHR_materials_anisotropy` (AnisotropyBarnLamp), `KHR_materials_diffuse_transmission` (DiffuseTransmissionTeacup,
       subtle), `KHR_materials_variants` (SheenChair, MaterialsVariantsShoe: no variant switching API; matters for the
@@ -1431,10 +1463,27 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    f. CommercialRefrigerator: the glass door (`KHR_materials_transmission`) renders as an opaque light-grey panel and
       hides the bottles the Khronos screenshot shows; ToyCar's and FlightHelmet's transmission do show what is
       behind. Find what differs in that material.
-   g. glTF cameras are data only (`model.cameras`): add a helper to view through one (Cameras sample).
-   h. NodePerformanceTest (10,002 nodes): with capacity 32,768 it loads in about 4 s but the first presented frame
-      came about 20 s after page load in the capture: profile. At 587cd62 the default capacity (1,024) threw a bare
-      "Entity capacity"; the store now grows on demand (5m.a), so re-check and drop the gallery's `capacity`.
+   g. [DONE 2026-10-15] `viewGLTFCamera(model, index | GLTFCamera = 0)`: position/direction/up from the node, perspective
+      yfov/znear/zfar (canvas aspect) or orthographic ymag/znear/zfar through `camera.project` (reversed depth like core;
+      removed again by a later perspective camera). The gallery views through a file's first camera when it has one
+      (Cameras, DirectionalLight, NodePerformanceTest, ToyCar).
+   h. [RE-CHECKED 2026-10-15, gallery `capacity` dropped] NodePerformanceTest loads at the default capacity (the store
+      grows; `khronos.test.js` asserts 10,002 nodes on a default store). Browser, DIAGNOSTIC (Edge, Arc 140V, other agents
+      running, not quiet-gated): load 4.0-4.6 s, first presented frame 5.4-5.9 s after the load started (4 runs); the
+      20 s capture did not reproduce. CPU profile of that page (`?model=NodePerformanceTest`, 200 us sampling): 2.8 s in
+      setup's `upload` (createBuffer + writeBuffer for 20,000 vertex/index buffers: the file has 10,000 distinct meshes),
+      0.6 s rest of setup (10,000 uniform buffers, 50,000 samplers/views), 1.06 s first `draw` (10,000 uniform writes +
+      bind groups). NOT fixed: the remedy is sub-allocating small primitives into shared vertex/index buffers, which
+      changes the `PBRPrimitive.buffers` contract selection/picking draw from (no offsets) and the GPU-call proofs, so it
+      needs its own item; per-descriptor sampler caching is the cheap first step (not measured).
+      5w a-d/g/h + 5j(1) bytes (minified / gzip of each entry with everything it imports, vs 303fecf; core + stage
+      unchanged): gltf-pro root 60,850 / 19,087 -> 64,345 / 20,260 (+1,173 gzip; applyGLTFLights and viewGLTFCamera are
+      separate tree-shakable exports), /asset +103, /prepare +377, /progressive +561, /worker +576, workers/gltf.js +401,
+      workers/progressive.js +375, /instancing 0; decoders root 5,036 -> 5,917 (+881, meshopt v1 + COLOR); gltf +133;
+      blender +158; machinery root +184, /cad +141, /surface +179, cad worker +165. Visual: `visual:update` for the 7
+      khronos views whose image changed (MeshPrimitiveModes, MeshoptCubeTest, ABeautifulGame new; Cameras,
+      DirectionalLight, NodePerformanceTest, ToyCar now through the file's camera/light), then `visual:check
+      --only=khronos` 32/32 pass, run-to-run noise 0.
    i. Gallery coverage, not engine bugs: animations are not played (InterpolationTest, MorphStressTest, RiggedFigure,
       Fox: rest pose only; pose them at a fixed time with `@margoengine/animation` for a still frame); the studio
       environment is a flat procedural grey, so metals look flatter than the HDR references (a CC0 HDR needs Scott's
@@ -1735,7 +1784,7 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    CarConcept, SunglassesKhronos, ChronographWatch, AntiqueCamera) - **Scott to decide**. Validator: 0 errors, 7
    warnings (generated tangents x6, skinned non-root node x1). Credits, third-party notices and per-model render
    verdicts: `examples/assets/khronos/README.md` (`node scripts/khronos-assets.mjs` regenerates). Render check:
-   `examples/khronos-gallery.html`; the 29 models that load are in `visual:check` (`--only=khronos`). Gaps: 5w. Complement (not substitute): Blender-made test scenes that exercise our own Blender pipeline (export
+   `examples/khronos-gallery.html`; all 32 load since 5w a-d (0 GPU validation errors) and are in `visual:check` (`--only=khronos`). Gaps: 5w. Complement (not substitute): Blender-made test scenes that exercise our own Blender pipeline (export
    settings, custom properties/extras).
    [DONE 2026-10-15] **LICENCE DECISION:** DamagedHelmet's earlier model is CC-BY-NC 4.0 (theblueturtle_), so Scott
    decided: replace every public use with a CC0 helmet, keep DamagedHelmet only in internal tests/benchmarks.

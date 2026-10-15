@@ -122,7 +122,7 @@
      "what": "Everything"
     }
    ],
-   "bytes": 30548,
+   "bytes": 31087,
    "triangles": 18,
    "extensionsUsed": [
     "KHR_texture_transform"
@@ -226,7 +226,7 @@
      "what": "Everything"
     }
    ],
-   "bytes": 4275,
+   "bytes": 4508,
    "triangles": 16,
    "extensionsUsed": [],
    "extensionsRequired": [],
@@ -239,8 +239,8 @@
     "codes": {}
    },
    "render": {
-    "verdict": "fails",
-    "notes": "Load error \"PBR requires triangle primitives\": POINTS, LINES, LINE_LOOP and LINE_STRIP are rejected, so the whole file (including its triangle meshes) fails."
+    "verdict": "matches",
+    "notes": "All seven modes render as in the reference: POINTS (1 px), LINES, LINE_LOOP and LINE_STRIP unlit; TRIANGLES, TRIANGLE_STRIP and TRIANGLE_FAN lit."
    }
   },
   {
@@ -448,7 +448,7 @@
      "what": "Everything"
     }
    ],
-   "bytes": 2017,
+   "bytes": 2135,
    "triangles": 3,
    "extensionsUsed": [],
    "extensionsRequired": [],
@@ -482,7 +482,7 @@
      "what": "Everything"
     }
    ],
-   "bytes": 1645,
+   "bytes": 1744,
    "triangles": 2,
    "extensionsUsed": [],
    "extensionsRequired": [],
@@ -495,8 +495,8 @@
     "codes": {}
    },
    "render": {
-    "verdict": "differs",
-    "notes": "Geometry correct; viewed through the fitted camera, not the file's glTF cameras (exposed as model.cameras data only)."
+    "verdict": "matches",
+    "notes": "Viewed through the file's perspective camera (viewGLTFCamera); framing as the reference."
    }
   },
   {
@@ -534,7 +534,7 @@
    },
    "render": {
     "verdict": "differs",
-    "notes": "KHR_lights_punctual directional light is parsed into model.lights but not applied (no helper for the engine's own light): spheres are lit by the studio, not the file's light."
+    "notes": "Its directional light is applied (applyGLTFLights) and its camera used: highlights centred as in the reference, but the studio IBL also lights the spheres, so they read pale instead of the reference's dark yellow (no ambient there)."
    }
   },
   {
@@ -628,7 +628,7 @@
      "what": "Everything"
     }
    ],
-   "bytes": 109809,
+   "bytes": 113401,
    "triangles": 320,
    "extensionsUsed": [
     "KHR_mesh_quantization",
@@ -646,8 +646,8 @@
     "codes": {}
    },
    "render": {
-    "verdict": "fails",
-    "notes": "Load error: KHR_meshopt_compression filter 'COLOR' is unknown to @margoengine/decoders (mesh 26)."
+    "verdict": "matches",
+    "notes": "Every compressed row (vertex codec v0 and v1, INDICES and TRIANGLES, OCTAHEDRAL/QUATERNION/EXPONENTIAL/COLOR filters) matches the uncompressed row; the animated rotation is not played."
    }
   },
   {
@@ -685,7 +685,7 @@
    },
    "render": {
     "verdict": "matches",
-    "notes": "10,002 nodes render; needs an engine capacity above the 1,024 default (gallery uses 32,768). Its directional light is not applied. First frame took about 20 s in the capture."
+    "notes": "10,002 nodes render at the default engine capacity (the entity store grows on demand), through the file's camera with its directional light applied."
    }
   },
   {
@@ -713,7 +713,7 @@
      "what": "Conversion to glTF"
     }
    ],
-   "bytes": 30286979,
+   "bytes": 30287207,
    "triangles": 23358,
    "extensionsUsed": [],
    "extensionsRequired": [],
@@ -776,7 +776,7 @@
    },
    "render": {
     "verdict": "matches",
-    "notes": "Clearcoat paint, sheen cloth and transmissive windows render."
+    "notes": "Clearcoat paint, sheen cloth and transmissive windows render; viewed through the file's first glTF camera (a close-up)."
    }
   },
   {
@@ -862,8 +862,8 @@
     "codes": {}
    },
    "render": {
-    "verdict": "fails",
-    "notes": "Load error \"glTF images exceed decoded size limit\": 33 textures exceed gltf-pro's 256 MB decoded-image budget."
+    "verdict": "matches",
+    "notes": "Loads with maxDownloadBytes 160 MiB (its 33 2048x2048 textures decode to 528 MiB, over the default 512 MiB); marble, wood and glass pieces read as in the reference, which is a close-up."
    }
   },
   {

@@ -4,7 +4,9 @@ import type {Mesh} from '@margoengine/core/extension';
 import type {CADModel} from './cad.js';
 import {maxBytes} from './cad-parser.js';
 export type CADFormat='stl'|'obj'|'step'|'iges';
-export interface CADImportOptions {signal?:AbortSignal;onProgress?:(percent:number)=>void;smoothing?:boolean}
+export interface CADImportOptions {signal?:AbortSignal;onProgress?:(percent:number)=>void;smoothing?:boolean;
+  /** Most parts (OBJ objects and groups, STEP/IGES meshes) the file may have, each one a core mesh (default 100,000; up to core's 8,388,608 entities). */
+  maxParts?:number}
 export function parseCADAsync(instance:EngineKernel,buffer:ArrayBuffer,format:CADFormat,options:CADImportOptions={}):Promise<CADModel> {
   options.signal?.throwIfAborted();if(!(buffer instanceof ArrayBuffer)||!buffer.byteLength||buffer.byteLength>maxBytes||!['stl','obj','step','iges'].includes(format))throw new TypeError('Invalid CAD input');const engine=engineRuntime(instance);if(engine.disposed)throw new Error('Engine is disposed');
   const workerURL=new URL('./workers/cad-runtime.js?no-inline',import.meta.url),occtURL=new URL('./workers/occt-import-js.js?no-inline',import.meta.url),wasmURL=new URL('./workers/occt-import-js.wasm?no-inline',import.meta.url);
@@ -18,6 +20,6 @@ export function parseCADAsync(instance:EngineKernel,buffer:ArrayBuffer,format:CA
         const geometry=part.reuse===undefined?Object.assign(Object.create(Geometry.prototype) as Geometry,{vertices:part.vertices,indices:part.indices,bounds:part.bounds}):meshes[part.reuse]?.geometry;if(!geometry)throw new Error('Invalid CAD part reference');const mesh=engine.createMesh(root);created.push(mesh);mesh.name=part.name;meshes.push(mesh.setGeometry(geometry).setMaterial(material));
       }catch(error){fail(error);}
     };
-    try{worker.postMessage({buffer,format,smoothing:options.smoothing??true,occtURL:occtURL.href,wasmURL:wasmURL.href},[buffer]);}catch(error){fail(error);}
+    try{worker.postMessage({buffer,format,smoothing:options.smoothing??true,maxParts:options.maxParts,occtURL:occtURL.href,wasmURL:wasmURL.href},[buffer]);}catch(error){fail(error);}
   });
 }

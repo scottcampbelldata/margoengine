@@ -2,6 +2,7 @@ import {engineRuntime} from '@margoengine/core/extension';
 import type {EngineKernel,Mesh as MeshHandle} from '@margoengine/core';
 import { Engine, Geometry, PbrMaterial, type Mesh } from '@margoengine/core/extension';
 import { readResponse } from '../../shared/loading.js';
+import { checkCount, countLimit } from '../../shared/limits.js';
 
 const limit=64*1024*1024;
 type Document=Record<string,any>;
@@ -26,11 +27,12 @@ function embedded(uri:string):Uint8Array {
   const match=/^data:application\/(?:octet-stream|gltf-buffer);base64,([A-Za-z0-9+/]*={0,2})$/.exec(uri);
   if(!match||match[1].length>limit*4/3+4)throw new TypeError('Invalid glTF data URI');return Uint8Array.from(atob(match[1]),c=>c.charCodeAt(0));
 }
-function validate(doc:Document):void {
+function validate(doc:Document,maxNodes?:number):void {
+  const nodeLimit=countLimit('maxNodes',maxNodes);
   if(!doc||doc.asset?.version!=='2.0')throw new TypeError('Expected glTF 2.0');
   for(const field of ['buffers','bufferViews','accessors','meshes','nodes','scenes','materials','skins','animations','extensionsRequired'])if(doc[field]!==undefined&&!Array.isArray(doc[field]))throw new TypeError(`glTF ${field} must be an array`);
   if(doc.extensionsRequired?.length||doc.skins?.length||doc.animations?.length)throw new Error('Minimal glTF supports static uncompressed models; required extensions, skins and animations are unsupported');
-  if((doc.nodes?.length??0)>100_000)throw new RangeError('Too many glTF nodes');
+  checkCount('Too many glTF nodes',doc.nodes?.length??0,nodeLimit,'maxNodes');
 }
 function transform(mesh:Mesh,node:any):void {
   if(node.matrix!==undefined){
@@ -50,9 +52,14 @@ function transform(mesh:Mesh,node:any):void {
 }
 
 export interface Model {root:MeshHandle;meshes:readonly MeshHandle[];nodes:readonly MeshHandle[];dispose():void}
-export function parseGLTF(instance:EngineKernel,input:string|object|ArrayBuffer|ArrayBufferView,suppliedBuffers:Array<ArrayBuffer|ArrayBufferView>=[]):Model {
+/** Options for parseGLTF and loadGLTF. */
+export interface GLTFOptions {
+  /** Most glTF nodes the file may have, each one a core mesh (default 100,000; up to core's 8,388,608 entities). */
+  maxNodes?:number;
+}
+export function parseGLTF(instance:EngineKernel,input:string|object|ArrayBuffer|ArrayBufferView,suppliedBuffers:Array<ArrayBuffer|ArrayBufferView>=[],{maxNodes}:GLTFOptions={}):Model {
   const engine=engineRuntime(instance);
-  const {doc,binary}=container(input);validate(doc);let total=0,vertices=0;
+  const {doc,binary}=container(input);validate(doc,maxNodes);let total=0,vertices=0;
   const buffers=(doc.buffers??[]).map((def:any,i:number)=>{const length=integer(def.byteLength,'buffer length',1);const data=suppliedBuffers[i]?bytes(suppliedBuffers[i]):def.uri?embedded(def.uri):i===0?binary:undefined;if(!data||length>data.length)throw new RangeError('Truncated glTF buffer');total+=data.length;if(total>limit)throw new RangeError('glTF buffers exceed 64 MiB');return data.subarray(0,length);});
   const accessor=(id:unknown,index=false):Float32Array|Uint32Array=>{
     const a=entry(doc.accessors,id,'accessor'),v=entry(doc.bufferViews,a.bufferView,'bufferView'),buffer=buffers[integer(v.buffer,'buffer reference')];
@@ -99,11 +106,11 @@ export function parseGLTF(instance:EngineKernel,input:string|object|ArrayBuffer|
   }catch(error){for(let i=created.length-1;i>=0;i--)created[i].dispose();throw error;}
 }
 
-export async function loadGLTF(engine:EngineKernel,url:string|URL,{signal}: {signal?:AbortSignal}={}):Promise<Model> {
+export async function loadGLTF(engine:EngineKernel,url:string|URL,{signal,maxNodes}:GLTFOptions&{signal?:AbortSignal}={}):Promise<Model> {
   signal?.throwIfAborted();let base=new URL(url,globalThis.location?.href),total=0;
   async function fetchBytes(target:URL,root=false){if(!['http:','https:'].includes(target.protocol))throw new TypeError('glTF URL must use HTTP(S)');const response=await fetch(target,{signal});if(root&&response.url)base=new URL(response.url);const data=await readResponse(response,{maxBytes:limit-total,signal,label:'glTF download'});total+=data.byteLength;return data;}
-  const data=await fetchBytes(base,true),glb=data.length>=4&&new DataView(data.buffer).getUint32(0,true)===0x46546c67,{doc,binary}=container(glb?data:new TextDecoder('utf-8',{fatal:true}).decode(data));validate(doc);
+  const data=await fetchBytes(base,true),glb=data.length>=4&&new DataView(data.buffer).getUint32(0,true)===0x46546c67,{doc,binary}=container(glb?data:new TextDecoder('utf-8',{fatal:true}).decode(data));validate(doc,maxNodes);
   const buffers=[];
   for(const def of doc.buffers??[]){if(!def.uri)buffers.push(binary??new Uint8Array());else if(def.uri.startsWith('data:')){const data=embedded(def.uri);total+=data.length;if(total>limit)throw new RangeError('glTF exceeds download limit');buffers.push(data);}else buffers.push(await fetchBytes(new URL(def.uri,base)));}
-  signal?.throwIfAborted();return parseGLTF(engine,doc,buffers);
+  signal?.throwIfAborted();return parseGLTF(engine,doc,buffers,{maxNodes});
 }

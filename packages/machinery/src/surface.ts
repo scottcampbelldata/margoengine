@@ -3,9 +3,12 @@ import {meshRuntime} from '@margoengine/core/extension';
 import type {EngineKernel,Mesh as MeshHandle} from '@margoengine/core';
 import type {Engine,EnginePlugin,Vec3} from '@margoengine/core/extension';
 import {machineryMemory} from './runtime.js';
+import {checkCount,countLimit} from '../../shared/limits.js';
 export interface SurfaceCarrier {node:MeshHandle;velocity?:Vec3;angularVelocity?:Vec3;contactOffset?:Vec3}
 export interface ConveyingPart {node:MeshHandle;carrier:number;lane:number;axis:Vec3;halfLength:number;friction?:number;mass?:number;contactNormal?:Vec3}
-export interface SurfaceOptions {gravity?:number}
+export interface SurfaceOptions {gravity?:number;
+  /** Most parts, and separately most carriers (default 100,000 each; up to core's 8,388,608 entities). */
+  maxParts?:number}
 const zero:Vec3=[0,0,0],up:Vec3=[0,1,0];
 const finite=(v:number)=>typeof v==='number'&&Number.isFinite(Math.fround(v));
 function vector(v:Vec3):void {if(v.length!==3)throw new TypeError('Invalid surface vector');for(let a=0;a<3;a++)if(!finite(v[a]))throw new TypeError('Invalid surface vector');}
@@ -15,7 +18,8 @@ export class SurfacePhysics implements EnginePlugin {
   /** `engine.use(await SurfacePhysics.create(parts, carriers, options))`; resolves to the attached SurfacePhysics. */
   static async attach(engine:EngineKernel,parts:readonly ConveyingPart[],carriers:readonly SurfaceCarrier[],options?:SurfaceOptions):Promise<SurfacePhysics> {const value=await SurfacePhysics.create(parts,carriers,options);engine.use(value);return value;}
   static async create(parts:readonly ConveyingPart[],carriers:readonly SurfaceCarrier[],options:SurfaceOptions={}):Promise<SurfacePhysics> {
-    if(!parts.length||parts.length>100_000||!carriers.length||carriers.length>100_000||!Number.isFinite(options.gravity??9.80665)||(options.gravity??9.80665)<0)throw new RangeError('Invalid surface limits');
+    const limit=countLimit('maxParts',options.maxParts);checkCount('Too many surface parts',parts.length,limit,'maxParts');checkCount('Too many surface carriers',carriers.length,limit,'maxParts');
+    if(!parts.length||!carriers.length||!Number.isFinite(options.gravity??9.80665)||(options.gravity??9.80665)<0)throw new RangeError('Invalid surface limits');
     const memory=await machineryMemory(parts.length*27*4);return new SurfacePhysics(parts,carriers,options,memory,new Float32Array(memory.buffer,memory.ptr,parts.length*26));
   }
   setup(engine:Engine):void {

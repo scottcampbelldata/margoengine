@@ -13,6 +13,7 @@ export interface PreparedGLTF {
     geometry: (PreparedGeometry | null)[][];
     accessors: [number, Float32Array][];
     maxDownloadBytes?: number;
+    maxNodes?: number;
 }
 
 export function loadGLTFInWorker(instance: EngineKernel, url: string | URL, options?: GLTFLoadOptions): Promise<PBRModel>;
@@ -29,6 +30,7 @@ interface AssetOptions {
     buffers?: Array<ArrayBuffer | ArrayBufferView>;
     fetch?: typeof fetch;
     maxDownloadBytes?: number;
+    maxNodes?: number;
 }
 
 type Context = Extract<PassContext, {
@@ -39,8 +41,9 @@ class GLTFAsset {
     readonly doc: GLTFDocument;
     readonly hooks: GLTFDecoderHooks;
     readonly maxBytes: number;
+    readonly maxNodes: number;
     readonly buffers: Uint8Array[];
-    constructor(doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, hooks?: GLTFDecoderHooks, maxBytes?: number);
+    constructor(doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, hooks?: GLTFDecoderHooks, maxBytes?: number, maxNodes?: number);
     view(id: unknown): Uint8Array;
     decode(signal?: AbortSignal): Promise<void>;
     accessor(id: unknown, type?: string): Float32Array;
@@ -68,7 +71,7 @@ interface GLTFCamera {
 interface GLTFClusteredLight {
     position: [number, number, number];
     range: number;
-    color: number[];
+    color: [number, number, number];
     intensity: number;
     direction?: [number, number, number];
     outerAngle?: number;
@@ -194,6 +197,7 @@ class PBRModel implements EnginePlugin {
     readonly primitives: PBRPrimitive[];
     readonly lights: GLTFLight[];
     readonly cameras: GLTFCamera[];
+    readonly pointsAndLines: PBRPrimitive[];
     disposed: boolean;
     constructor(instance: EngineKernel, asset: GLTFAsset, images?: readonly GLTFImage[], prepared?: readonly (readonly PreparedGeometry[])[]);
     setup(engine: Engine): void;
@@ -240,6 +244,7 @@ interface PBRPrimitive {
         vertex: GPUBuffer;
         index: GPUBuffer;
     };
+    topology?: 'point-list' | 'line-list';
 }
 
 interface PBRTransparency {
@@ -252,6 +257,7 @@ interface PBRTransparency {
 interface PreparedGeometry {
     vertices: Float32Array;
     indices: Uint32Array;
+    topology?: 'point-list' | 'line-list';
 }
 
 interface TextureTransform {

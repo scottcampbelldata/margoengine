@@ -302,8 +302,12 @@ test('meshopt decoding is bit-exact with the meshoptimizer reference decoder', a
     decoders.MeshoptDecoder.decodeGltfBuffer(target, c.count, c.stride, bytes(c.encoded), c.mode, c.filter);
     assert.deepEqual(target, bytes(c.expected), `${c.name} via the three-compatible MeshoptDecoder`);
   }
-  assert.equal(vectors.cases.length, 8);
-  assert.throws(() => decoders.decodeMeshoptBuffer(bytes(vectors.vertexCodecV1), 300, 16, 'ATTRIBUTES'), /version 1 is not supported/);
+  // 8 EXT_meshopt_compression cases plus KHR_meshopt_compression's vertex codec v1 and COLOR filter (8- and 16-bit, in and out of range).
+  assert.deepEqual(vectors.cases.slice(8).map(c => c.name), ['attributesV1', 'color4V1', 'color8', 'color8Raw']);
+  const v1 = bytes(vectors.cases[8].encoded); assert.equal(v1[0], 0xa1);
+  assert.throws(() => decoders.decodeMeshoptBuffer(Uint8Array.of(0xa2, ...v1.subarray(1)), 300, 16, 'ATTRIBUTES'), /version 2 is not supported/);
+  for (const cut of [2, 40, v1.length - 1]) assert.throws(() => decoders.decodeMeshoptBuffer(v1.subarray(0, cut), 300, 16, 'ATTRIBUTES'), /truncated|trailing|missing/);
+  assert.throws(() => decoders.decodeMeshoptBuffer(bytes(vectors.cases[7].encoded), 200, 12, 'ATTRIBUTES', 'COLOR'), /COLOR filter requires byteStride 4 or 8/);
   const attributes = vectors.cases[0], encoded = bytes(attributes.encoded);
   for (const cut of [1, 17, encoded.length - 1]) assert.throws(() => decoders.decodeMeshoptBuffer(encoded.subarray(0, cut), attributes.count, attributes.stride, 'ATTRIBUTES'), /truncated|trailing|missing/);
   assert.throws(() => decoders.decodeMeshoptBuffer(encoded, attributes.count, attributes.stride, 'BOGUS'), /unknown mode/);

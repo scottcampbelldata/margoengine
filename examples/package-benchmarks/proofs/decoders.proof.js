@@ -45,8 +45,10 @@ for (const [name, source, n, stride, mode, filter] of streams) {
   agree(`${name} with a trailing byte`, Uint8Array.from([...source, 0]), n, stride, mode, filter); agree(`${name} with one element fewer`, source, n - (mode === 'TRIANGLES' ? 3 : 1), stride, mode, filter);
 }
 const vectors = JSON.parse(readFileSync(new URL('../../../packages/decoders/tests/fixtures/meshopt-vectors.json', import.meta.url), 'utf8')), unpack = text => new Uint8Array(Buffer.from(text, 'base64'));
-for (const c of vectors.cases) {agree(`fixture ${c.name}`, unpack(c.encoded), c.count, c.stride, c.mode, c.filter); assert.ok(Buffer.from(candidate.meshoptDecodeGltfBuffer(unpack(c.encoded), c.count, c.stride, c.mode, c.filter)).equals(Buffer.from(unpack(c.expected))), c.name);}
-agree('vertex codec version 1', unpack(vectors.vertexCodecV1), 300, 16, 'ATTRIBUTES'); agree('unknown mode', streams[0][1], count, 8, 'BOGUS'); agree('unknown filter', streams[0][1], count, 8, 'ATTRIBUTES', 'BOGUS');
+// Cases 9-12 are KHR_meshopt_compression (vertex codec v1, COLOR filter, HANDOFF 5w.b), which the baseline rejects: only
+// the reference decoder's expected bytes apply to them.
+for (const [i, c] of vectors.cases.entries()) {if (i < 8) agree(`fixture ${c.name}`, unpack(c.encoded), c.count, c.stride, c.mode, c.filter); assert.ok(Buffer.from(candidate.meshoptDecodeGltfBuffer(unpack(c.encoded), c.count, c.stride, c.mode, c.filter)).equals(Buffer.from(unpack(c.expected))), c.name);}
+agree('unknown mode', streams[0][1], count, 8, 'BOGUS'); agree('unknown filter', streams[0][1], count, 8, 'ATTRIBUTES', 'BOGUS');
 agree('bad stride', streams[0][1], count, 6, 'ATTRIBUTES'); agree('filter on indices', streams[7][1], indices32.length, 4, 'TRIANGLES', 'OCTAHEDRAL');
 
 const cases = [];

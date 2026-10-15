@@ -13,9 +13,10 @@ export function deduplicateParts(meshes:Iterable<MeshHandle>):{parts:number;uniq
     if(mesh.geometry!==canonical)mesh.setGeometry(canonical);
   }return {parts,unique};
 }
-export function parseCAD(instance:EngineKernel,input:string|ArrayBuffer|ArrayBufferView,format:'stl'|'obj'):CADModel {
+/** Parse STL or OBJ on this thread; `maxParts` as for loadCAD. */
+export function parseCAD(instance:EngineKernel,input:string|ArrayBuffer|ArrayBufferView,format:'stl'|'obj',{maxParts}:Pick<CADImportOptions,'maxParts'>={}):CADModel {
   const engine=engineRuntime(instance);
-  const definitions=parseCADGeometry(input,format);const created:Mesh[]=[];
+  const definitions=parseCADGeometry(input,format,undefined,maxParts);const created:Mesh[]=[];
   try{const root=engine.createMesh();created.push(root);const meshes=definitions.map(part=>{const mesh=engine.createMesh(root);created.push(mesh);mesh.name=part.name;return mesh.setGeometry(part.geometry).setMaterial(new PbrMaterial({color:'#a6b9c8',roughness:0.4,metalness:0.3}));});deduplicateParts(meshes);return {root,meshes,dispose(){for(let i=created.length-1;i>=0;i--)created[i].dispose();}};}
   catch(error){for(let i=created.length-1;i>=0;i--)created[i].dispose();throw error;}
 }

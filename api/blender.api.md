@@ -12,13 +12,17 @@ export interface MargoAsset {
     readonly images: readonly Uint8Array<ArrayBuffer>[];
 }
 
-export function decodeMargo(input: ArrayBuffer | ArrayBufferView): MargoAsset;
+export interface MargoOptions {
+    maxNodes?: number;
+}
 
-export function loadMargo(engine: EngineKernel, url: string | URL, { signal }?: {
+export function decodeMargo(input: ArrayBuffer | ArrayBufferView, { maxNodes }?: MargoOptions): MargoAsset;
+
+export function loadMargo(engine: EngineKernel, url: string | URL, { signal, maxNodes }?: MargoOptions & {
     signal?: AbortSignal;
 }): Promise<PBRModel>;
 
-export function parseMargo(engine: EngineKernel, input: ArrayBuffer | ArrayBufferView, { signal }?: {
+export function parseMargo(engine: EngineKernel, input: ArrayBuffer | ArrayBufferView, { signal, maxNodes }?: MargoOptions & {
     signal?: AbortSignal;
 }): Promise<PBRModel>;
 ```
