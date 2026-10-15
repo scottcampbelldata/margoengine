@@ -3,10 +3,13 @@
 // Best practice on three's side (see README "Fairness"): shared geometries and materials, static objects with
 // matrixAutoUpdate off and scene.matrixWorldAutoUpdate off, and an InstancedMesh variant ('instanced') next to the
 // one-Mesh-per-object variant ('mesh') that most three.js code uses.
-import {Scene, PerspectiveCamera, Object3D, Mesh, InstancedMesh, BoxGeometry, BufferGeometry, BufferAttribute, MeshStandardMaterial, DirectionalLight, AmbientLight, Color, Matrix4, Euler, Quaternion, Vector3, DataTexture, RGBAFormat, FloatType, LinearFilter, EquirectangularReflectionMapping, ReinhardToneMapping, ACESFilmicToneMapping, SRGBColorSpace} from 'three';
+import {Scene, PerspectiveCamera, Object3D, Mesh, InstancedMesh, BoxGeometry, BufferGeometry, BufferAttribute, MeshStandardMaterial, MeshBasicMaterial, DoubleSide, DirectionalLight, AmbientLight, Color, Matrix4, Euler, Quaternion, Vector3, DataTexture, RGBAFormat, FloatType, LinearFilter, EquirectangularReflectionMapping, ReinhardToneMapping, ACESFilmicToneMapping, SRGBColorSpace} from 'three';
 import {LIGHT, CLEAR, PALETTE, CAD_MATERIALS, CANVAS, boxes, cad, HELMET, sky} from './scenes.js';
 
-export async function threeScene(canvas, {scene: name, n, mode, move}, marks, renderer, backend) {
+// Diagnostics only (?diag=a+b): flat = MeshBasicMaterial (vertex + raster cost), double = side DoubleSide (as Margo's
+// default doubleSided material), msaa1 = antialias off (the entry files).
+export async function threeScene(canvas, {scene: name, n, mode, move, diag = []}, marks, renderer, backend) {
+  const side = diag.includes('double') ? {side: DoubleSide} : {}, material = o => diag.includes('flat') ? new MeshBasicMaterial({color: o.color, ...side}) : new MeshStandardMaterial({...o, ...side});
   renderer.setPixelRatio(1);renderer.setSize(CANVAS[0], CANVAS[1], false);
   renderer.toneMapping = name === 'helmet' ? ACESFilmicToneMapping : ReinhardToneMapping; // gltf-pro maps with ACES(x/0.6), core with Reinhard x/(1+x)
   renderer.outputColorSpace = SRGBColorSpace;
@@ -20,12 +23,12 @@ export async function threeScene(canvas, {scene: name, n, mode, move}, marks, re
   if (name === 'boxes') {
     def = boxes(n);const geometry = new BoxGeometry(def.size, def.size, def.size), moving = Math.round(n * move);
     if (mode === 'instanced') {
-      const mesh = new InstancedMesh(geometry, new MeshStandardMaterial(def.material), n), m = new Matrix4(), color = new Color();
+      const mesh = new InstancedMesh(geometry, material(def.material), n), m = new Matrix4(), color = new Color();
       def.items.forEach((b, i) => {mesh.setMatrixAt(i, compose(b.position, b.rotation, m));mesh.setColorAt(i, color.set(PALETTE[b.color]));});
       scene.add(mesh);freeze();
       if (moving) update = t => {for (let i = 0; i < moving; i++) {const b = def.items[i];mesh.setMatrixAt(i, compose(b.position, [0, b.rotation[1] + t, 0], m));}mesh.instanceMatrix.clearUpdateRanges();mesh.instanceMatrix.addUpdateRange(0, moving * 16);mesh.instanceMatrix.needsUpdate = true;};
     } else {
-      const materials = PALETTE.map(color => new MeshStandardMaterial({color, ...def.material}));
+      const materials = PALETTE.map(color => material({color, ...def.material}));
       const meshes = def.items.map(b => {const mesh = new Mesh(geometry, materials[b.color]);mesh.position.set(...b.position);mesh.rotation.set(...b.rotation);scene.add(mesh);return mesh;});
       if (moving) {scene.updateMatrixWorld(true);meshes.slice(moving).forEach(m => {m.matrixAutoUpdate = false;});update = t => {for (let i = 0; i < moving; i++) meshes[i].rotation.y = def.items[i].rotation[1] + t;};}
       else freeze();
@@ -33,7 +36,7 @@ export async function threeScene(canvas, {scene: name, n, mode, move}, marks, re
   } else if (name === 'cad') {
     def = await cad(n);
     const geometries = Object.fromEntries(Object.entries(def.shapes).map(([k, d]) => {const g = new BufferGeometry();g.setAttribute('position', new BufferAttribute(d.positions, 3));g.setAttribute('normal', new BufferAttribute(d.normals, 3));g.setIndex(new BufferAttribute(d.indices, 1));return [k, g];}));
-    const materials = Object.fromEntries(Object.entries(CAD_MATERIALS).map(([k, v]) => [k, new MeshStandardMaterial(v)]));
+    const materials = Object.fromEntries(Object.entries(CAD_MATERIALS).map(([k, v]) => [k, material(v)]));
     const objects = [];
     for (const node of def.nodes) {
       const o = node.shape && mode !== 'instanced' ? new Mesh(geometries[node.shape], materials[node.shape]) : new Object3D();

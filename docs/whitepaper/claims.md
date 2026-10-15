@@ -457,9 +457,17 @@ Things to settle before or in the quiet run:
 
 1. In the smoke run Margo's GPU time was not lower than three.js `InstancedMesh` on static boxes, and was higher on the helmet scene.
    - For the helmet this is expected: Margo renders 4 PCSS cascades against three's one PCF map.
-   - For the boxes it needs a look first: Margo's 4x HDR target, resolve and tonemap passes versus three's direct-to-canvas MSAA.
+   - For the boxes: diagnosed in `boxes-vs-threejs.md`. Not passes or HDR targets (Margo renders one pass straight to
+     the canvas; three's WebGPURenderer is the one with an RGBA16F target and an output pass). The cause is core's
+     missing pipeline back-face culling: back faces are rasterized and discarded in the shader, and the `discard`
+     costs early-Z. The harness also gave Margo a double-sided material against three's `FrontSide` (fixed). With
+     pipeline culling Margo uses 21-37% less GPU time than three's WebGPURenderer; three's WebGL2 renderer stays up
+     to 30% ahead. Fixes and bytes are in that file.
 
    This is exactly the kind of result to state honestly ("three.js wins here"). It must not be hidden.
+   - The smoke run's `fps` column was the requestAnimationFrame rate, which vsync-off Chrome does not pace by the GPU:
+     three's `InstancedMesh` pages showed 760-3,400 FPS with 0.5-7.7 ms of GPU work per frame. Fixed: `fps` now counts
+     frames until the GPU has finished them (`rafFps` keeps the old figure).
 2. The WebGL2 `TIME_ELAPSED` number includes GPU idle time while a CPU-bound renderer is still submitting (thousands of `Mesh` draws). Report it next to `serialFrameMs`, and do not read it as pure GPU work.
 3. Make the clear colour identical (three's background is set in sRGB space; Margo's clear is written as is), and consider an all-ACES floor for the helmet, so the image-diff check means something.
 4. Add an A/A run (the same engine twice) to state the noise floor.

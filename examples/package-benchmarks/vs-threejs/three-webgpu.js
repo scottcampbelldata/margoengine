@@ -4,7 +4,7 @@ import {run} from './harness.js';
 import {threeScene} from './three-scenes.js';
 
 run(async (canvas, params, marks) => {
-  const s = performance.now(), renderer = new WebGPURenderer({canvas, antialias: true, powerPreference: 'high-performance'});
+  const s = performance.now(), renderer = new WebGPURenderer({canvas, antialias: !params.diag.includes('msaa1'), powerPreference: 'high-performance'});
   await renderer.init();
   if (!renderer.backend.isWebGPUBackend) throw new Error('three.js fell back to its WebGL2 backend');
   marks.createMs = +(performance.now() - s).toFixed(1);

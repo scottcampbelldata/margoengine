@@ -16,9 +16,13 @@ import {dirname, extname, join, resolve, sep} from 'node:path';
 import {gzipSync} from 'node:zlib';
 import {cpus, totalmem} from 'node:os';
 import {acPower} from '../cad/power.mjs';
+import {waitForQuiet, cpuLoad} from '../../../scripts/quiet-gate.mjs';
 import {decodePNG} from '../../../tests/support/png.js';
 
 const arg = (name, fallback) => process.argv.find(a => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
+// The quiet gate (scripts/quiet-gate.mjs) runs before every run. --quietMax: CPU % it accepts (above 20 the run is
+// labelled busy); --busy: no gate, only the CPU load at each run's start is recorded (diagnosis on a busy machine).
+const quietMax = +arg('quietMax', 20), busy = process.argv.includes('--busy');
 const rounds = +arg('rounds', 5), only = arg('only', ''), frames = +arg('frames', 300), port = +arg('port', 5251), out = arg('out', 'examples/package-benchmarks/results/vs-threejs.json');
 const root = process.cwd(), here = 'examples/package-benchmarks/vs-threejs', dist = 'test-results/vs-threejs/dist';
 const git = (...a) => execFileSync('git', a, {encoding: 'utf8'}).trim();
@@ -27,9 +31,12 @@ const three = JSON.parse(readFileSync('node_modules/three/package.json', 'utf8')
 const configs = [
   {scene: 'boxes', n: 1000}, {scene: 'boxes', n: 10000}, {scene: 'boxes', n: 50000}, {scene: 'boxes', n: 10000, move: 1},
   {scene: 'cad', n: 10000}, {scene: 'cad', n: 50000}, {scene: 'helmet'},
-].filter(c => !only || only.split(',').some(o => o === c.scene || o === `${c.scene}:${c.n}`)); // --only=boxes or boxes:1000 (exact)
-const variants = c => [{engine: 'margo'}, {engine: 'three-webgl', mode: 'mesh'}, {engine: 'three-webgpu', mode: 'mesh'}, ...(c.scene === 'helmet' ? [] : [{engine: 'three-webgl', mode: 'instanced'}, {engine: 'three-webgpu', mode: 'instanced'}])];
-const key = c => `${c.scene}${c.n ? `-${c.n}` : ''}${c.move ? '-moving' : ''}`, vkey = v => `${v.engine}${v.mode === 'instanced' ? '-instanced' : ''}`;
+].filter(c => !only || only.split(',').some(o => o === c.scene || o === `${c.scene}:${c.n}${c.move ? ':moving' : ''}`)); // --only=boxes, boxes:1000 or boxes:10000:moving (exact)
+// --variants=margo,margo+cull,three-webgpu-instanced+msaa1 picks variants and adds diagnostic patches (?diag=, see
+// margo.js / three-scenes.js; diagnostic runs are never publishable). --dump records shaders and pipeline state.
+const picked = arg('variants', '').split(',').filter(Boolean).map(s => {const [base, ...diag] = s.split('+');return {engine: base.replace(/-instanced$/, ''), mode: base.endsWith('-instanced') ? 'instanced' : 'mesh', diag: diag.join('+')};});
+const variants = c => picked.length ? picked : [{engine: 'margo'}, {engine: 'three-webgl', mode: 'mesh'}, {engine: 'three-webgpu', mode: 'mesh'}, ...(c.scene === 'helmet' ? [] : [{engine: 'three-webgl', mode: 'instanced'}, {engine: 'three-webgpu', mode: 'instanced'}])];
+const key = c => `${c.scene}${c.n ? `-${c.n}` : ''}${c.move ? '-moving' : ''}`, vkey = v => `${v.engine}${v.mode === 'instanced' ? '-instanced' : ''}${v.diag ? `+${v.diag}` : ''}`;
 
 // GPU lock in the main checkout: one wait loop, 60 s poll.
 const lock = resolve(dirname(git('rev-parse', '--path-format=absolute', '--git-common-dir')), 'test-results/gpu.lock');
@@ -40,7 +47,7 @@ let server;
 try {
   const report = {date: new Date().toISOString(), commit: git('rev-parse', '--short', 'HEAD'), three, acPowerBefore: acPower(), rounds, frames, canvas: [1280, 720], dpr: 1,
     // Publishable only with the defaults (5 rounds x 300 frames) on a quiet machine: nothing else running, no other GPU job.
-    note: rounds >= 5 && frames >= 300 && !only ? (process.env.BENCH_QUIET === '1' ? 'full run, operator confirmed a quiet machine' : 'full run; set BENCH_QUIET=1 once the machine is confirmed quiet') : 'SMOKE TEST, NOT FOR PUBLICATION',
+    note: busy || quietMax > 20 ? 'DIAGNOSTIC, BUSY MACHINE, NOT FOR PUBLICATION' : picked.some(v => v.diag) ? 'DIAGNOSTIC (patched variants), NOT FOR PUBLICATION' : rounds >= 5 && frames >= 300 && !only && !picked.length ? (process.env.BENCH_QUIET === '1' ? 'full run, operator confirmed a quiet machine' : 'full run; set BENCH_QUIET=1 once the machine is confirmed quiet') : 'SMOKE TEST, NOT FOR PUBLICATION',
     host: {cpu: cpus()[0].model, cores: cpus().length, memoryGB: Math.round(totalmem() / 2 ** 30), os: process.platform, node: process.version}, bundles: {}, results: {}};
   if (report.acPowerBefore === false && process.env.BENCH_ALLOW_BATTERY !== '1') throw new Error('On battery: plug in (BENCH_ALLOW_BATTERY=1 records anyway).');
 
@@ -70,7 +77,7 @@ try {
     try {
       const page = await browser.newPage({viewport: {width: 1280, height: 720}, deviceScaleFactor: 1}), errors = [];
       page.on('pageerror', e => errors.push(e.message));page.on('console', m => {if (m.type() === 'error') errors.push(m.text());});
-      const query = new URLSearchParams({engine: variant.engine, scene: config.scene, n: config.n ?? 0, move: config.move ?? 0, mode: variant.mode ?? 'mesh', frames});
+      const query = new URLSearchParams({engine: variant.engine, scene: config.scene, n: config.n ?? 0, move: config.move ?? 0, mode: variant.mode ?? 'mesh', frames, ...(variant.diag ? {diag: variant.diag} : {}), ...(process.argv.includes('--dump') ? {dump: 1} : {})});
       await page.goto(`http://127.0.0.1:${port}/${here}/index.html?${query}`);
       if (!report.hardware) report.hardware = {browser: browser.version(), ...await page.evaluate(async () => {
         const a = await navigator.gpu?.requestAdapter({powerPreference: 'high-performance'}), c = document.createElement('canvas').getContext('webgl2'), ext = c?.getExtension('WEBGL_debug_renderer_info');
@@ -87,10 +94,11 @@ try {
     const list = variants(config), order = list.map((_, i) => list[(i + round) % list.length]);
     for (const variant of order) {
       if (acPower() === false && process.env.BENCH_ALLOW_BATTERY !== '1') throw new Error('On battery mid-run');
+      const quiet = busy ? {gate: false, cpuLoadPercent: cpuLoad(), checkedAt: new Date().toISOString()} : await waitForQuiet({max: quietMax});
       const r = await once(config, variant, round), slot = ((report.results[key(config)] ??= {})[vkey(variant)] ??= {runs: []});
-      if (r.png) {slot.png = r.png;delete r.png;}
+      r.quiet = quiet;if (r.png) {slot.png = r.png;delete r.png;}
       slot.runs.push(r);
-      console.log(`round ${round + 1}/${rounds}`, key(config), vkey(variant), r.error ? `ERROR ${r.error.split('\n')[0]}` : JSON.stringify({load: r.loadMs, fps: r.throughput.fps, cpu: r.throughput.cpuMs?.median, gpu: r.gpu?.gpuMs?.median, serial: r.serialFrameMs?.median, heap: r.jsHeapMB, draws: r.info?.drawCalls, errors: [...r.errors, ...r.pageErrors].map(e => e.slice(0, 160))}));
+      console.log(`round ${round + 1}/${rounds}`, key(config), vkey(variant), r.error ? `ERROR ${r.error.split('\n')[0]}` : JSON.stringify({load: r.loadMs, fps: r.throughput.fps, cpu: r.throughput.cpuMs?.median, gpu: r.gpu?.gpuMs?.median, passes: r.gpu?.passMs?.map(p => p?.median), serial: r.serialFrameMs?.median, heap: r.jsHeapMB, draws: r.info?.drawCalls, errors: [...r.errors, ...r.pageErrors].map(e => e.slice(0, 160))}));
     }
   }
 
@@ -101,7 +109,8 @@ try {
     for (const slot of Object.values(byVariant)) {
       const ok = slot.runs.filter(r => !r.error), pick = f => median(ok.map(f));
       slot.summary = {runs: slot.runs.length, failed: slot.runs.length - ok.length, loadMs: pick(r => r.loadMs), createMs: pick(r => r.createMs), buildMs: pick(r => r.buildMs), firstFrameMs: pick(r => r.firstFrameMs),
-        fps: pick(r => r.throughput.fps), cpuMs: pick(r => r.throughput.cpuMs?.median), gpuMs: pick(r => r.gpu?.gpuMs?.median), serialFrameMs: pick(r => r.serialFrameMs?.median), jsHeapMB: pick(r => r.jsHeapMB),
+        fps: pick(r => r.throughput.fps), cpuMs: pick(r => r.throughput.cpuMs?.median), gpuMs: pick(r => r.gpu?.gpuMs?.median), gpuSpanMs: pick(r => r.gpu?.spanMs?.median),
+        passMs: ok[0]?.gpu?.passMs?.map((_, k) => pick(r => r.gpu.passMs[k]?.median)), passes: ok[0]?.gpu?.passes, serialFrameMs: pick(r => r.serialFrameMs?.median), jsHeapMB: pick(r => r.jsHeapMB),
         jsGzipBytes: ok[0]?.jsGzipBytes, drawCalls: ok[0]?.info?.drawCalls, samples: ok[0]?.samples, gpuMethod: ok[0]?.gpu?.method, errors: [...new Set(slot.runs.flatMap(r => [...r.errors, ...r.pageErrors]))].slice(0, 5)};
       if (ref && slot.png) {
         const img = await decodePNG(slot.png);let sum = 0, big = 0;

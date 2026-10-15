@@ -6,7 +6,10 @@ npm run bench:threejs            # = node examples/package-benchmarks/vs-threejs
 ```
 
 Writes `examples/package-benchmarks/results/vs-threejs.json` (or `--out=`) and one screenshot per scene and engine to
-`test-results/vs-threejs/`. Takes the GPU lock and refuses to start on battery. Only a default run (5 rounds x 300
+`test-results/vs-threejs/`. Takes the GPU lock, refuses to start on battery, and waits for a quiet CPU before every run
+(`scripts/quiet-gate.mjs`; `--quietMax=40` loosens it, `--busy` skips it and records the CPU load; both label the JSON
+as not for publication). Diagnosis: `--variants=margo,margo+cull,three-webgpu-instanced+double` picks variants and
+patches (`?diag=`, listed in `margo.js` and `three-scenes.js`), `--dump` records every shader and pipeline. Only a default run (5 rounds x 300
 frames, all scenes) on a machine confirmed quiet (`BENCH_QUIET=1`) is publishable; anything shorter is labelled
 `"SMOKE TEST, NOT FOR PUBLICATION"` in the JSON's `note`. No publishable run exists yet (see
 `docs/whitepaper/reproduce.md`).
@@ -41,12 +44,17 @@ needs a hand-written TSL compute simulation (three's `webgpu_compute_particles` 
   creation, scene build incl. asset fetch/parse, pipeline compilation). Split into `createMs`, `buildMs`,
   `firstFrameMs`. Every run is a fresh browser with a fresh profile, so every load is a cold shader cache.
 - `fps`, `cpuMs`: 300 frames driven by requestAnimationFrame after 60 warm-up frames, vsync and frame-rate cap off.
+  `fps` is frames divided by the time until the GPU has finished the last one. With vsync off, requestAnimationFrame is
+  not paced by the GPU, so the rAF rate (`rafFps`, what `fps` was before 2026-10-15) let an engine with cheap submits
+  queue hundreds of frames and report several times what its GPU renders.
   `cpuMs` is main-thread time inside the frame call (scene update + the engine's render/submit). GPU-process and driver
   time is not in it.
 - `gpuMs`: WebGPU (Margo and three's WebGPURenderer): every render and compute pass either engine begins is given
   timestamp writes by the harness (`GPUCommandEncoder.prototype.beginRenderPass/beginComputePass`), and a frame's GPU
-  time is the sum of its pass durations, so neither engine's own profiler is trusted. WebGL2:
-  `EXT_disjoint_timer_query_webgl2` around the render call, `null` when the browser does not expose it.
+  time is the sum of its pass durations, so neither engine's own profiler is trusted. `passMs`/`passes` give each
+  pass's median and its attachments; `gpuSpanMs` runs from the first pass's start to the last pass's end (it includes
+  gaps between passes). WebGL2: `EXT_disjoint_timer_query_webgl2` around the render call, `null` when the browser does
+  not expose it.
 - `serialFrameMs`: submit one frame, then wait for the GPU to be idle (WebGPU `onSubmittedWorkDone`, WebGL a 1-pixel
   `readPixels`): frame latency with no CPU/GPU overlap, comparable across APIs.
 - `jsHeapMB`: `performance.memory.usedJSHeapSize` after two forced GCs (`--js-flags=--expose-gc`).
@@ -69,6 +77,9 @@ So nobody can call it a strawman:
   `ACESFilmicToneMapping` for the helmet (gltf-pro maps ACES(x/0.6), which is three's ACES with exposure 1). sRGB output
   in both. three.js multiplies ambient light by albedo/π, Margo by albedo, so three's `AmbientLight` gets π x Margo's
   ambient.
+- Single-sided materials on both sides for the boxes and CAD parts (closed solids): three's default `FrontSide`, Margo
+  `doubleSided: false`. Margo core's default material is double-sided, which shades back faces three never draws
+  (+45% GPU at 1k-50k boxes; `docs/whitepaper/boxes-vs-threejs.md`).
 - three.js best practice: shared geometries and materials; static objects have `matrixAutoUpdate = false` and the scene
   `matrixWorldAutoUpdate = false` (the moving-boxes scene keeps auto-update on the moving boxes only); `InstancedMesh`
   variants with per-instance colour (`setColorAt`) and partial matrix uploads (`addUpdateRange`) for moving instances;
@@ -86,6 +97,11 @@ Known asymmetries (they are in the results, not hidden):
   what most apps use). This costs Margo GPU time in `helmet`.
 - In `helmet` Margo's floor is a core mesh (Reinhard) while three tone-maps the whole frame with ACES, so the floor
   differs in brightness; the helmet itself is drawn by gltf-pro with ACES like three's.
+- Margo core has no pipeline back-face culling: back faces are rasterized and a single-sided material discards them in
+  the fragment shader, and the `discard` costs early depth testing. three culls in hardware (`cullMode: 'back'`). This
+  is most of three's GPU lead on the box scenes (`docs/whitepaper/boxes-vs-threejs.md`).
+- three's WebGPURenderer draws into an RGBA16F MSAA target and tone-maps in an extra full-screen pass (about 0.15 ms at
+  1280x720); Margo and three's WebGLRenderer tone-map in the material shader and render straight to the canvas.
 - three's `MeshStandardMaterial` includes features Margo core's material does not (e.g. maps, multi-scattering
   terms): its fragment shader does more work per pixel even when those inputs are unused.
 - Margo's CAD hierarchy is a real scene graph in both the `margo` and three `Mesh` variants; three's instanced CAD
