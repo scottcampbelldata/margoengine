@@ -769,6 +769,28 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    Order: after the current feature wave lands, pause new features; one agent runs the Biome reformat + gates (warn);
    then parallel agents by package group fix types/any/TSDoc/errors; then gates switch to fail; then the demo rebuild.
    Features started afterwards (P3, frame debugger, tier presets, pre-warming, streaming) must pass the gates.
+5l. Raise CAD performance and general 3D rendering to 9/10 (Scott, 2026-10-14 night). Measurable targets (Intel Arc
+   laptop, quiet PC):
+   CAD: 100k parts + feature edges orbit >= 60 FPS; 1M parts >= 30 FPS; pick < 10 ms at 100k; 100k-part model
+   interactive < 2 s; km-scale coordinates jitter-free (5f.a); transparent housings without popping (5f.b).
+   a. Small-part (screen-size) culling + distant-subassembly imposters for core meshes (the 90k orbit is GPU-bound,
+      ~28 ms; most cost is tiny parts).
+   b. GPU culling for core meshes with picking, feature edges, exploded view and AssemblyBVH still working (today
+      CulledInstances parts lose them). If a core hook is needed, measure bytes and bring it to Scott.
+   c. Cheaper feature edges (GPU culling of edges, screen-size fade/drop; 4.7 ms at 50k today).
+   d. CAD correctness: section caps on non-closed shells, measurement precision, snapping to edges/vertices.
+   (Plus already queued: back-face culling B, 5f.a-c, 5g.d streaming + entity cap decision.)
+   General 3D: ~115/156 parity rows covered (88 now); every demo 60 FPS on the light tier; side-by-side renders that
+   hold up against three.js/Babylon for the same scene.
+   e. Light probes (irradiance volumes) and local reflection probes (cubemaps, box projection).
+   f. Rectangle area lights (LTC), three.js RectAreaLight equivalent.
+   g. Physical material on user-built meshes (materials package), with real transmission/refraction.
+   h. Projected decals.
+   i. HDR canvas output on HDR displays (with 5h.c Display P3).
+   j. Shadows for skinned meshes and VAT crowds; IBL for VAT crowds.
+   k. Sweep the remaining PARTIAL parity rows that need no core change.
+   (Plus already queued: SSR, volumetrics, progressive loading, OIT, P3, tier presets 5i.b.)
+   Order: after the current wave, alongside the hygiene phase (5k) and under its gates, before the demo rebuild.
 6. Then give Scott the full list of what was done and what remains.
 
 Worker practice: agents run in git worktrees; they must start with `git reset --hard perf/auto-quality` (worktrees
