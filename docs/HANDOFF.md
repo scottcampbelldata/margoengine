@@ -754,6 +754,21 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    5f.c), one directional light in core (clustered), WebGPU-first (WebGL = basic fallback only), order-independent
    transparency (OIT package 5f.b), no visual editor, untested devices. Write it after 5f/5g land so every threshold
    and escape hatch is real.
+5k. HARD REQUIREMENT (Scott, 2026-10-14 night): code hygiene >= 9/10 before launch, defined as gates enforced by
+   `npm run verify` (warn first, then fail) and reported by a new `npm run hygiene` scorecard:
+   1. Biome formatter, conventional readable style, check mode in verify (replaces 1g.e/1h.d).
+   2. Biome lint, small rule set (no unused vars/imports, no var, consistent imports, noExplicitAny), 0 warnings.
+   3. 0 `any` in public APIs (api/ reports); internal `as any` replaced, any survivor on a justified allowlist (1g.b).
+   4. strict TS everywhere (`strict`, `noImplicitOverride`, `noFallthroughCasesInSwitch`), checked per package.
+   5. One definition per shared type (Vec3, Quat, ColorInput, Ray, ... type-only from @margoengine/math, 0 bytes);
+      resolve clashing names (two loadGLTF, multiplyMatrices argument order).
+   6. TSDoc on every public export (checked from api/ reports).
+   7. One error convention (shared error classes/codes, messages that name the fix) (1h.h).
+   8. Remaining API inconsistencies from "API rough edges before 1.0" resolved.
+   9. No dead code (unused exports/files detected and removed).
+   Order: after the current feature wave lands, pause new features; one agent runs the Biome reformat + gates (warn);
+   then parallel agents by package group fix types/any/TSDoc/errors; then gates switch to fail; then the demo rebuild.
+   Features started afterwards (P3, frame debugger, tier presets, pre-warming, streaming) must pass the gates.
 6. Then give Scott the full list of what was done and what remains.
 
 Worker practice: agents run in git worktrees; they must start with `git reset --hard perf/auto-quality` (worktrees
