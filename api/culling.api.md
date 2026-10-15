@@ -36,5 +36,23 @@ export interface CulledInstancesOptions {
     occluderSize?: number;
 }
 
+export class CulledMeshes implements EnginePlugin {
+    readonly name: string;
+    minRadius: number;
+    disposed: boolean;
+    static attach(engine: EngineKernel, options?: CulledMeshesOptions): CulledMeshes;
+    constructor({ minRadius }?: CulledMeshesOptions);
+    setup(engine: Engine): void;
+    registerPasses(graph: FrameGraph): void;
+    readCounts(): Promise<Map<Geometry, number>>;
+    onDeviceRestored(engine: Engine): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface CulledMeshesOptions {
+    minRadius?: number;
+}
+
 export type CullingMode = 'none' | 'frustum' | 'occlusion';
 ```

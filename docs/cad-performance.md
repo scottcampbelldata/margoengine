@@ -306,7 +306,7 @@ Ticks include culling. "Static" is the dirty-skip path (no entity changed: about
 input compare); "full recompute" is what the first tick after each doubling costs. Collection = a frame forced to
 re-collect minus a reused frame (the orbit case). Read: core meshes scale linearly; at 1M entities the CPU floor is
 about 40 ms of kernel per frame even when nothing moves, so 1M-part scenes need GPU culling with a stable kept set
-(HANDOFF 5m.b) or `CulledInstances` for parts that never need to be meshes.
+(`CulledMeshes` below with `render({culling: false})`) or `CulledInstances` for parts that never need to be meshes.
 Bit-exactness at 1M: `tests/core-dirty-transforms.test.js` (growth from 1,024 to 1,048,576, 63-deep chains, 1% moves
 recomputing exactly the movers and their descendants, 1,000 removals, slot reuse, a failed tick, dispose; every world
 matrix and visibility equals a fresh kernel's full recompute bit for bit, about 10 s). Real GPU: `cad/pixels-check.mjs`
@@ -367,6 +367,30 @@ plates show everywhere, so coplanar ties still resolve to the later batch.
 
 Package size: 7,060 B min+gzip at `e2cc4c5` (core external; entry-sizes.json), most of it WGSL. Zero cost when not (separate package, `sideEffects: false`, no core change).
 
+## GPU culling of core meshes: `CulledMeshes` (HANDOFF 5l.b / 5m.b)
+
+Package-side alone does not work. Core's main pass draws every collected batch from core's own instance buffer, and
+nothing documented lets a package make it skip one: the instance upload happens inside the draw loop (zeroing a
+batch's count also skips its upload, which `FeatureEdges` and the culler need), the batches and their live counts are
+private (`Engine.batches`, the renderer's draw list), and the only workaround is writing core's private, lazily created
+indirect buffer, which breaks the read-only contract and fights machinery's `parts:indirect` pass. Hiding the meshes
+instead removes them from picking, `AssemblyBVH` and edges, which is what `CulledInstances` already is.
+
+So core got the smallest hook that works (+34 B gzip, core + stage 19,888 -> 19,922): passes see `context.batches`
+(this frame's batches in draw order), and a package may set `batch.redirect = {instances, args}`; every core draw of
+that batch then binds the package's instance records and draws `drawIndexedIndirect(args)`, after core has uploaded its
+own buffer as before. `@margoengine/culling`'s `CulledMeshes` uses it: first in the frame, one compute triple per batch
+(frustum + optional `minRadius` screen-size test with a workgroup scan, a scan of the group totals, a stable scatter)
+reads core's instance buffer and writes compacted records and indirect args. Core's own pipelines, shader variants,
+back-face pipeline choice and batch order are reused, so frames are pixel-identical to core.
+
+Real GPU (`node examples/package-benchmarks/cad/culled-meshes.mjs`, Arc 140V, Edge, GPU lock): engine A renders core
+meshes through `CulledMeshes` with CPU culling off, engine B is plain core drawing every part; 8 steps (overview, close
+view with most parts outside the frustum, explode 0.6 via `ExplodedView`, side view, 1-in-7 parts moved, a module
+hidden, view from below, 400 parts added so A's store grows from 1,024 to 2,048): 0 differing pixels in every step; the GPU dropped parts where it should (drew 237 and 171 of 648 in the close views, 757 of 1,021 at the end) and drew all 648 in the overview. `engine.pick` over a
+grid returns the same meshes on both engines (23 of 40 grid points hit) and an `AssemblyBVH` ray hits. With `--edges`
+(FeatureEdges on both): steps 0-6 identical, step 7 has 160 pixels that differ by 1 in one channel; FeatureEdges appends visible parts with atomics, so its line order and the blending of overlapping
+antialiased lines vary run to run (the same happens between two plain-core runs).
 ## STEP / IGES loading (`loadCAD`)
 
 OCCT (occt-import-js 0.0.23) Wasm: 7,604,031 bytes, 3,110,912 gzip; glue JS 96,871 (26,835 gzip); Margo CAD worker

@@ -156,6 +156,10 @@ interface Batch {
     start?: number;
     end?: number;
     mask?: number;
+    redirect?: {
+        instances: GPUBuffer;
+        args: GPUBuffer;
+    };
 }
 
 interface DrawOptions {
@@ -202,6 +206,7 @@ type PassContext = {
     draw(options?: DrawOptions): void;
 } & ({
     backend: 'webgpu';
+    batches?: readonly Batch[];
     device: GPUDevice;
     encoder: GPUCommandEncoder;
     color: GPUTextureView;

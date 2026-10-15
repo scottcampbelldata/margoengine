@@ -1109,7 +1109,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       each failed once under load.
    m. docs/threejs-parity.md summary counts drifted (OIT added a COVERED row without updating the totals) - recount.
    Order: after the current wave, alongside the hygiene phase (5k) and under its gates, before the demo rebuild.
-5m. [a DONE: core + stage 19,888 B gzip] CORE APPROVALS, conditional (Scott, 2026-10-14 night): do both IF core+stage stays under 20,000 B gzip
+5m. [a DONE, b DONE (hook +34 B); core + stage 19,922 B gzip, 77 B headroom] CORE APPROVALS, conditional (Scott, 2026-10-14 night): do both IF core+stage stays under 20,000 B gzip
    (`npm run measure:size`; the build gate fails at >= 20,000). No safety margin needed: 19,999 is acceptable (Scott).
    Start after back-face culling B merges (~19,789).
    a. Raise the 100,000-entity cap (Rust/Wasm kernel + JS side) so streaming can reach 1M parts: measure memory per
@@ -1139,6 +1139,14 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       OBJ parts, `SurfacePhysics` parts; `AssemblyBVH` 1,000,000 triangles per geometry is unrelated. `docs/limits.md`
       does not exist yet (5j): its entity row is "8,388,608 slots, 351 B each; ~40 ms CPU kernel floor at 1M even when
       static; escape hatch CulledMeshes/CulledInstances".
+   Result (b): package-side alone cannot make core skip a batch (upload sits inside the draw loop, batches/counts are
+      private, the only route is writing core's private indirect buffer). Hook: `PassContext.batches` + `Batch.redirect
+      = {instances, args}` (+34 B). `CulledMeshes` in @margoengine/culling: GPU frustum (+ optional `minRadius`)
+      culling and stable compaction of core batches; picking, FeatureEdges, ExplodedView, AssemblyBVH keep working
+      (`cad/culled-meshes.mjs`: 0 differing pixels in 8 steps incl. explode, hide, growth; pick grid identical; BVH hits). Not done: Hi-Z occlusion for core meshes (CulledInstances has it;
+      port its prepass), and an engine-level "CPU culling off" switch for `engine.start()` loops (today only
+      `render({culling: false})`; about +15 B as `engine.culling`), which is what makes the kept set stable while
+      orbiting.
 6. Then give Scott the full list of what was done and what remains.
 8. FINAL TO-DO (Scott, 2026-10-15): thorough docs and as many tutorials as possible - "documentation is the product".
    Structure the docs site by Diataxis (keep the four kinds separate): Tutorials (learning), How-to cookbook

@@ -12,8 +12,11 @@ const defaultDraw:DrawOptions={};
 
 /** `start`/`end`: float range of `instances` changed since the WebGPU renderer last uploaded it (absent: upload all).
  * `mask`: nonzero when a drawn instance needs back faces (double-sided material or mirrored transform); 0 lets core's
- * own pass draw the batch with its back-culled pipeline (absent counts as 0). */
-export interface Batch { geometry: Geometry; instances: Float32Array; count: number; start?: number; end?: number; mask?: number }
+ * own pass draw the batch with its back-culled pipeline (absent counts as 0).
+ * `redirect`: set by a GPU-culling package for the frame (core never sets it): every core draw of the batch reads instances
+ * from `instances` and its drawIndexedIndirect arguments from `args` (offset 0) instead of core's instance buffer and
+ * `count`; core still uploads the batch into its own buffer, which stays the source the package reads. */
+export interface Batch { geometry: Geometry; instances: Float32Array; count: number; start?: number; end?: number; mask?: number; redirect?: {instances: GPUBuffer; args: GPUBuffer} }
 export interface Lighting { direction: Float32Array; radiance: Float32Array }
 export interface GeometryBuffers {readonly vertex:GPUBuffer;readonly index:GPUBuffer;readonly instance:GPUBuffer}
 export interface Renderer {
@@ -152,11 +155,11 @@ export class GPURenderer implements Renderer {
       const resource=this.resources.get(batch.geometry)!;
       // Upload only the changed range, everything into a new buffer.
       if(resource.frame!==this.frameId){const start=resource.frame<0?0:batch.start??0,end=Math.min(resource.frame<0?1/0:batch.end??1/0,batch.count*24);if(end>start)this.device.queue.writeBuffer(resource.instance,start*4,batch.instances as Float32Array<ArrayBuffer>,start,end-start);batch.start=1/0;batch.end=0;resource.frame=this.frameId;}
-      pass.setVertexBuffer(0,resource.vertex); pass.setVertexBuffer(1,resource.instance); pass.setIndexBuffer(resource.index,'uint32');
-      if(options.indirect??context.indirect){resource.indirect??=this.device.createBuffer({size:20,usage:GPUBufferUsage.INDIRECT|GPUBufferUsage.COPY_DST});resource.command??=new Uint32Array([batch.geometry.indices.length,0,0,0,0]);if(resource.command[1]!==batch.count){resource.command[1]=batch.count;this.device.queue.writeBuffer(resource.indirect,0,resource.command as Uint32Array<ArrayBuffer>);}pass.drawIndexedIndirect(resource.indirect,0);}else pass.drawIndexed(batch.geometry.indices.length,batch.count);
+      const redirect=batch.redirect;pass.setVertexBuffer(0,resource.vertex); pass.setVertexBuffer(1,redirect?.instances??resource.instance); pass.setIndexBuffer(resource.index,'uint32');
+      if(redirect)pass.drawIndexedIndirect(redirect.args,0);else if(options.indirect??context.indirect){resource.indirect??=this.device.createBuffer({size:20,usage:GPUBufferUsage.INDIRECT|GPUBufferUsage.COPY_DST});resource.command??=new Uint32Array([batch.geometry.indices.length,0,0,0,0]);if(resource.command[1]!==batch.count){resource.command[1]=batch.count;this.device.queue.writeBuffer(resource.indirect,0,resource.command as Uint32Array<ArrayBuffer>);}pass.drawIndexedIndirect(resource.indirect,0);}else pass.drawIndexed(batch.geometry.indices.length,batch.count);
     }
     pass.end();}} as Extract<PassContext,{backend:'webgpu'}>;
-    Object.assign(context,{draw:this.draw??=context.draw,descriptor:this.descriptor,device:this.device,encoder,color,depth,camera,width,height,delta,format:this.format,shader:wgsl,bindings:this.bindings,indirect:false});this.bindings.length=0;
+    Object.assign(context,{batches:drawBatches,draw:this.draw??=context.draw,descriptor:this.descriptor,device:this.device,encoder,color,depth,camera,width,height,delta,format:this.format,shader:wgsl,bindings:this.bindings,indirect:false});this.bindings.length=0;
     graph.execute(context);if(!this.deviceLost&&!this.disposed){if(this.preserveMSAA)encoder.beginRenderPass({colorAttachments:[{view:color,resolveTarget:this.resolveTarget,loadOp:'load',storeOp:'discard'}],depthStencilAttachment:{view:depth,depthLoadOp:'load',depthStoreOp:'discard',stencilReadOnly:true}}).end();this.commands[0]=encoder.finish();this.device.queue.submit(this.commands);}
   }
   async pick(camera:Camera,lighting:Lighting,batches:Iterable<Batch>,graph:FrameGraph,x:number,y:number):Promise<number|null> {
