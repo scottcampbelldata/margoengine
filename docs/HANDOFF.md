@@ -675,6 +675,21 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    selection) or re-baseline them. Start after the README-snippets and API-standardization agents merge.
 5e. Diagnose why Margo's GPU time on static boxes is not lower than three.js InstancedMesh (vs-threejs smoke run);
    findings in docs/whitepaper/boxes-vs-threejs.md [running].
+5f. Gaps from Scott's architecture review (2026-10-14 late):
+   a. Large coordinates (BIM/GIS/plant layouts jitter at mm zoom; core + kernel are float32). Plan: first a
+      zero-core-byte floating-origin plugin (authoritative positions in float64 on the CPU, roots re-written relative to
+      a moving origin near the camera, rebase when the camera drifts past a threshold; one full transform update per
+      rebase). Measure jitter (px) at 1 km / 100 km / 6,000 km from origin, before/after. Only if the plugin can't fix
+      it (e.g. per-vertex precision inside one huge mesh), write up core camera-relative rendering with bytes for Scott.
+   b. Order-independent transparency: weighted blended OIT as an optional package (accumulation + revealage targets,
+      composite pass) for gltf-pro BLEND and materials transparent meshes; test a 50% housing over nested gears
+      (no popping while orbiting), measure cost; core meshes stay opaque.
+   c. STEP/IGES: an offline converter (`npx margo-convert part.step part.glb`, Node, reusing machinery's OCCT path and
+      the new glTF exporter, optional baked feature edges) so production apps ship pre-tessellated GLB; keep the 3.1 MB
+      OCCT path for drag-and-drop; docs say so plainly. Measure conversion time and output size on the repo's STEP files.
+   d. 16-texture limit, long term: texture arrays for same-size material maps (gltf-pro physical, terrain splats) and
+      shared shadow arrays; optionally core requests a higher `maxSampledTexturesPerShaderStage` when the adapter
+      allows (core bytes, Scott decides). After 1.0 unless a demo needs it.
 6. Then give Scott the full list of what was done and what remains.
 
 Worker practice: agents run in git worktrees; they must start with `git reset --hard perf/auto-quality` (worktrees
