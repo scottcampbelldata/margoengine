@@ -17,6 +17,8 @@ export type {GLTFDocument, GLTFDecoderHooks, GLTFCompressedImage, GLTFImage} fro
 export interface GLTFLight {node:Mesh;nodeIndex:number;type:'directional'|'point'|'spot';color:number[];intensity:number;range?:number;innerConeAngle?:number;outerConeAngle?:number;name?:string}
 /** glTF camera on a scene node, as data; the camera looks down the node's -Z. */
 export interface GLTFCamera {node:Mesh;nodeIndex:number;type:'perspective'|'orthographic';perspective?:{yfov:number;znear:number;zfar?:number;aspectRatio?:number};orthographic?:{xmag:number;ymag:number;znear:number;zfar:number};name?:string}
+/** A node's glTF `extras` object (Blender: the object's custom properties, exported with Include > Custom Properties) and a copy of its world matrix (column-major, translation in 12-14). */
+export interface GLTFNodeExtras {node:Mesh;nodeIndex:number;name:string;extras:Record<string,unknown>;matrix:Float32Array}
 /** Point or spot light shaped for @margoengine/clustered `setLights`. */
 export interface GLTFClusteredLight {position:[number,number,number];range:number;color:number[];intensity:number;direction?:[number,number,number];outerAngle?:number;innerAngle?:number}
 export type GLTFLoadOptions = Omit<AssetOptions,'buffers'>;
@@ -356,6 +358,12 @@ export class PBRModel implements EnginePlugin {
       if(l.type==='spot')Object.assign(light,{direction:[-m[8],-m[9],-m[10]],outerAngle:Math.min(l.outerConeAngle!,Math.PI/2-1e-4),innerAngle:Math.min(l.innerConeAngle!,Math.PI/2-1e-4)});
       return light;
     });
+  }
+  /** Every node whose glTF `extras` is an object, in node order, with its current world matrix: markers and spawn points placed in Blender. Mesh and material extras stay in `asset.doc.meshes[i].extras` and `asset.doc.materials[i].extras`. */
+  extras():GLTFNodeExtras[] {
+    this.engine.store.tick(false);const out:GLTFNodeExtras[]=[];
+    (this.asset.doc.nodes??[]).forEach((def:any,i:number)=>{const e=def.extras;if(e&&typeof e==='object'&&!Array.isArray(e))out.push({node:this.nodes[i],nodeIndex:i,name:this.nodes[i].name,extras:e,matrix:this.nodes[i].matrix.slice()});});
+    return out;
   }
   onDispose(callback:()=>void):()=>void {if(typeof callback!=='function')throw new TypeError('Expected cleanup callback');if(this.disposed){callback();return()=>{};}this.cleanupCallbacks.add(callback);return()=>this.cleanupCallbacks.delete(callback);}
   private releaseGPU():void {const cleanup=new Cleanup(),buffers=new Set<GPUBuffer>();for(const r of this.resources)for(const b of [r.vertex,r.index,r.uniform])if(b)buffers.add(b);for(const b of buffers)cleanup.run(()=>b.destroy());for(const t of this.textures)cleanup.run(()=>t.destroy());for(const p of this.primitives){p.buffers=undefined;cleanup.run(()=>p.instances?.dispose());}this.resources=[];this.textures=[];this.pipelines.clear();this.lightingGroups.clear();cleanup.finish();}
