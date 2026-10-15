@@ -4,18 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Margo Engine: a small WebGPU engine for web apps</title>
-  <meta name="description" content="Margo Engine is an MIT-licensed 3D engine for the web: a Rust and Wasm kernel, WebGPU rendering with a WebGL2 fallback, and optional packs for glTF, machinery, React and effects.">
+  <meta name="description" content="Margo Engine is an MIT-licensed 3D engine for the web: a Rust and Wasm kernel, WebGPU rendering with an optional WebGL2 fallback, and optional packs for glTF, machinery, React and effects.">
   <link rel="canonical" href="https://margoengine.com/">
   <meta name="theme-color" content="#0b1020">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Margo Engine">
-  <meta property="og:description" content="A small Rust and Wasm 3D engine for web apps, with WebGPU rendering, a WebGL2 fallback and optional packs.">
+  <meta property="og:description" content="A small Rust and Wasm 3D engine for web apps, with WebGPU rendering, an optional WebGL2 fallback and optional packs.">
   <meta property="og:url" content="https://margoengine.com/">
   <meta property="og:image" content="https://margoengine.com/images/night-citadel.jpg">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="./favicon.ico" sizes="32x32">
   <link rel="stylesheet" href="./site.css">
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Margo Engine","description":"A small Rust and Wasm 3D engine for web apps, with WebGPU rendering, a WebGL2 fallback and optional domain packs.","url":"https://margoengine.com/","codeRepository":"https://github.com/scottcampbelldata/margoengine","programmingLanguage":["TypeScript","Rust","WGSL"],"license":"https://opensource.org/license/mit","author":{"@type":"Person","name":"Scott Campbell"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Margo Engine","description":"A small Rust and Wasm 3D engine for web apps, with WebGPU rendering, an optional WebGL2 fallback and optional domain packs.","url":"https://margoengine.com/","codeRepository":"https://github.com/scottcampbelldata/margoengine","programmingLanguage":["TypeScript","Rust","WGSL"],"license":"https://opensource.org/license/mit","author":{"@type":"Person","name":"Scott Campbell"}}</script>
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -32,8 +32,8 @@
   <main id="main">
     <section class="hero">
       <div class="hero-copy">
-        <h1>A 3D engine for the web that starts under 20&nbsp;KB.</h1>
-        <p class="lede">A TypeScript engine with a Rust kernel compiled to WebAssembly, WebGPU rendering, a WebGL2 fallback, and optional packs.</p>
+        <h1>A 3D engine for the web that starts under 20&nbsp;kB gzipped.</h1>
+        <p class="lede">A TypeScript engine with a Rust kernel compiled to WebAssembly, WebGPU rendering, an optional WebGL2 fallback, and optional packs.</p>
         <p class="actions">
           <a class="button primary" href="#start">Get started</a>
           <a class="button" href="./night-citadel/">Open the live demo</a>
@@ -64,7 +64,7 @@ npm run dev</code></pre>
         <div>
           <h3>Install from npm, once published</h3>
           <pre tabindex="0"><code>npm install @margoengine/core</code></pre>
-          <p>npm publication is pending. The release includes 60 packages under <code>@margoengine</code> and the <code>margoengine</code> stage facade. <a href="./catalog/">Browse all packages and runnable examples</a></p>
+          <p>npm publication is pending. The release includes 70 packages under <code>@margoengine</code> and the <code>margoengine</code> stage facade. <a href="./catalog/">Browse all packages and runnable examples</a></p>
         </div>
       </div>
     </section>
@@ -72,17 +72,17 @@ npm run dev</code></pre>
     <section class="core">
       <h2>What the core gives you</h2>
       <dl>
-        <div><dt>Under 20 KB gzip</dt><dd>Core plus the stage facade, embedded Wasm and both backends included. CI rejects any build at 20,000 bytes gzip or above.</dd></div>
+        <div><dt>Under 20 kB gzip</dt><dd>Core plus the stage facade, with the embedded Wasm kernel and the WebGPU backend. The build fails at 20,000 bytes gzip or above; <code>npm run measure:size</code> prints the current figure. The WebGL2 fallback is the optional <code>@margoengine/webgl</code> (2.3 kB gzip).</dd></div>
         <div><dt>Transforms in Wasm memory</dt><dd>Hierarchy, culling and world matrices run in a Rust kernel over flat typed arrays. An engine holds 1,024 entities by default, configurable up to 100,000.</dd></div>
         <div><dt>Instancing by default</dt><dd>Visible meshes sharing a geometry instance render in one instanced draw call per scene pass, with per-instance material values.</dd></div>
-        <div><dt>WebGPU first, WebGL2 fallback</dt><dd>Reversed float depth, GPU picking and automatic device-loss recovery on WebGPU. Basic scenes still render on WebGL2.</dd></div>
+        <div><dt>WebGPU first, WebGL2 fallback</dt><dd>Reversed float depth, GPU picking and automatic device-loss recovery on WebGPU. Basic scenes (core meshes, flat PBR, one light) also render on WebGL2 with the optional <code>@margoengine/webgl</code> package.</dd></div>
         <div><dt>Plugins, not a monolith</dt><dd>Frame-graph passes and shader hooks let optional packs add features without growing the base bundle.</dd></div>
       </dl>
     </section>
 
     <section id="packages" class="packages">
       <h2>Optional packs</h2>
-      <p class="section-lede">Each pack is a separate, tree-shakable package. Your app loads only the ones it imports.</p>
+      <p class="section-lede">Each pack is a separate, side-effect-free package. Your bundle includes only the ones it imports.</p>
       <div class="groups">
         <div>
           <h3>Assets</h3>
@@ -133,12 +133,12 @@ npm run dev</code></pre>
         </a>
       </div>
       <p class="more">Optional effects: <a href="./demos/dof/">Depth of field</a> · <a href="./demos/tonemap/">Tonemapping and color grading</a></p>
-      <p class="more"><a href="./catalog/">Browse the published packages and their runnable examples</a></p>
+      <p class="more"><a href="./catalog/">Browse the packages and their runnable examples</a></p>
     </section>
 
     <section class="status">
       <h2>Where it stands</h2>
-      <p>Margo Engine is at version 0.1.0 and MIT licensed. WebGPU needs a supporting browser on HTTPS or localhost. Particles, sections, image-based lighting and the scenery pack require WebGPU; CPU-side machinery and CAD tools work on either backend. It has been verified in Chrome and Edge on desktop. Firefox, Safari and mobile GPUs are not yet verified.</p>
+      <p>Margo Engine is at version 0.1.0 and MIT licensed. WebGPU needs a supporting browser on HTTPS or localhost. Particles, sections, image-based lighting and the scenery pack require WebGPU; CPU-side machinery and CAD tools work on either backend. Its real-GPU test suites run in Edge (Chromium) on a Windows laptop with an Intel Arc 140V; Chrome uses the same engine. Firefox, Safari and mobile GPUs are not yet verified.</p>
     </section>
   </main>
 

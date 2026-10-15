@@ -22,7 +22,7 @@ Provide a container such as `<div id="scene" style="height:400px"></div>` and ca
 
 Coming from three.js? [docs/from-threejs.md](docs/from-threejs.md) maps common three.js code (renderer, meshes, materials, lights, loaders, animation, controls, post-processing, TSL) to Margo side by side, with the packages to install and what is not there yet.
 
-For a React application:
+The packages are not on npm yet (build from source, below). Once published, a React application installs:
 
 ```sh
 npm install @margoengine/core@0.1.0 @margoengine/react@0.1.0 react@^19 react-dom@^19
@@ -76,12 +76,12 @@ npm run dev --workspace @margoengine/starter-next
 
 ## Packages
 
-Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. The release contains 61 packages: most at `0.1.0`, with DOF and tonemapping at `1.0.0`. The [catalog](docs/README.md) lists every package, runtime export and npm publication status.
+Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. The release contains 71 packages (70 under `@margoengine` plus the `margoengine` facade): most at `0.1.0`, with DOF and tonemapping at `1.0.0`. The [catalog](docs/README.md) lists every package, runtime export and npm publication status.
 
 | Package | Includes |
 | --- | --- |
 | [`margoengine`](packages/margoengine/README.md) | Stage facade, canvas mounting, camera controls and lazy domain loading |
-| [`@margoengine/core`](packages/core/README.md) | Wasm transform memory, hierarchy/culling, reversed float depth, uint picking, CAD camera controls, instanced PBR, backends and plugin/pass lifecycle |
+| [`@margoengine/core`](packages/core/README.md) | Wasm transform memory, hierarchy/culling, reversed float depth, uint picking, CAD camera controls, instanced PBR, the WebGPU backend and plugin/pass lifecycle |
 | [`@margoengine/gltf`](packages/gltf/README.md) | Lazy static glTF/GLB loading, named nodes and shared primitive geometry |
 | [`@margoengine/react`](packages/react/README.md) | `MargoCanvas` (`Canvas` alias), `useMargoStage`, stable `useFrame`, mesh components and SSR |
 | [`@margoengine/xr`](packages/xr/README.md) | `XRManager`, `XRController`, inline input tracking and native WebGPU immersive stereo |
@@ -105,7 +105,7 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 | [`@margoengine/splats`](packages/splats/README.md) | GPU radix sorting, covariance ellipses, degree-3 SH and binary Gaussian captures |
 | [`@margoengine/terrain`](packages/terrain/README.md) | Fixed geometry clipmaps, GPU height/normal sampling and triplanar texture layers |
 
-Core plus the stage facade measures **18,681 bytes gzip**, including embedded Wasm and the WebGPU backend (the WebGL2 fallback is the optional `@margoengine/webgl`). The base is feature-frozen for v1.0.0; every push and pull request runs a CI build that rejects a combined size of **20,000 bytes gzip or above** and checks package isolation. Optional PBR, animation and SSAO packages use the existing extension hooks and do not enter the base bundle. The build also retains the 30 KiB combined core/static-glTF budget and 30 KiB raw Wasm budget. React/framework/application code is additional; domain packages have no 20 KiB ceiling.
+Core plus the stage facade is **under 20 kB gzip** (19,543 bytes at `3d845a0`; `npm run measure:size` prints the current figure), including the embedded Wasm kernel and the WebGPU backend (the WebGL2 fallback is the optional `@margoengine/webgl`, 2.3 kB gzip). The base is feature-frozen for v1.0.0; the package build, locally and in the CI workflow, fails at a combined size of **20,000 bytes gzip or above** and checks package isolation. Optional PBR, animation and SSAO packages use the existing extension hooks and do not enter the base bundle. The build also retains the 30 KiB combined core/static-glTF budget and 30 KiB raw Wasm budget. React/framework/application code is additional; domain packages have no 20 KiB ceiling.
 
 The six requested game modules (shadows, clustered, animator, TAA, VFX and splats), plus terrain, use those hooks. Build with `npm run build:packages`; run `npm run modern:test:game` for their combined WebGPU rendering/culling/cache/IK/particle checks, temporal reprojection/clamping, skinned motion, stable radix sorting and ellipse blending. `npm run modern:test:game:packages` checks ten packed packages and seven standalone README TypeScript examples. The normal sort test covers 66,049 splats across hierarchical scan blocks; set `SPLAT_STRESS=1` for the additional three-million-splat capacity/sort check. Million-particle, three-million-splat and 1,024-light execution tests validate correctness separately from FPS claims. These source packages have not been published by this change.
 
@@ -128,7 +128,7 @@ export default function App() {
 
 `EngineKernel`/`Engine`, Canvas callbacks and React mesh refs expose the frozen portable TypeScript API; raw Wasm/GPU state is available only through the explicit `@margoengine/core/extension` entry. Entity creation occurs in effects. Nested components register upward to support child-first commit order. Frame callbacks mutate stable refs without scheduling React renders.
 
-[MODERN-ENGINE.md](MODERN-ENGINE.md) contains the architecture, API examples, lifecycle rules, size evidence, supported loader subset, verification and remaining domain features. Thirty-one JavaScript tests, four Rust checks and 32 browser check groups passed after the modern-only cleanup, including production Vite/Next rendering, actual particle storage readback, packed consumers and React 18/19 lifecycle checks. Chrome conveyor captures verify UI picking/orbit, instanced draws, coupled timing and 15-second GC/allocation traces; the observed collections do not establish zero-GC. AMD Radeon integrated graphics and NVIDIA baseline measurements are recorded in the [benchmark summary](benchmarks/README.md). Raw captures and recovery archives remain local. Firefox/Safari and mobile GPU hardware remain unverified.
+[MODERN-ENGINE.md](MODERN-ENGINE.md) contains the architecture, API examples, lifecycle rules, size evidence, supported loader subset, verification and remaining domain features. `npm run verify` runs the unit, API-surface and size checks; the real-GPU browser suites (production Vite/Next rendering, particle storage readback, packed consumers, React 18/19 lifecycle) record their results in [`gates-browser-tests.json`](examples/package-benchmarks/results/gates-browser-tests.json). Chrome conveyor captures verify UI picking/orbit, instanced draws, coupled timing and 15-second GC/allocation traces; the observed collections do not establish zero-GC. Every published number, its hardware (so far one Intel Arc 140V laptop) and the command that reproduces it is listed in [docs/whitepaper/claims.md](docs/whitepaper/claims.md). Firefox/Safari and mobile GPU hardware remain unverified.
 
 Node.js 22.12+ or 24+ is required; TypeScript consumers need TypeScript 7+ with DOM types; Wasm initialization uses SIMD and DecompressionStream deflate-raw. WebGPU uses HTTPS/localhost; basic scenes can fall back to WebGL2 when an app passes `fallback: webglRenderer` from `@margoengine/webgl`. GPU particles, sections, creative and scenery rendering require WebGPU; solid caps also require depth32float-stencil8 support; CPU machinery/CAD/annotations work with either backend. The libraries are [MIT licensed](LICENSE). The workspace root and starter apps remain private.
 
@@ -142,7 +142,7 @@ Run `npm run modern:dev:extensions`, then open `/examples/damaged-helmet.html` f
 
 ## Package catalog and release
 
-Run `npm run catalog` to preview the [searchable Margo catalog](docs/README.md). All 61 packages use their Margo names. `npm run catalog:build` refreshes the catalog from built runtime exports and checks exact-version availability on npm.
+Run `npm run catalog` to preview the [searchable Margo catalog](docs/README.md). All 71 packages use their Margo names. `npm run catalog:build` refreshes the catalog from built runtime exports and checks exact-version availability on npm.
 
 `npm run release:check` builds and tests the engine, enforces the 20,000-byte core + stage ceiling, and verifies every tarball's exports, TypeScript declarations and internal dependency versions. After signing into npm with access to the `@margoengine` scope, `npm run publish:packages` runs those checks and publishes the public library workspaces. Starter apps and showcases are private. Refresh the catalog after publishing and run `npm run build:site` to assemble the website.
 
