@@ -745,6 +745,15 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    d. Device-loss verification: core handles `device.lost` with automatic recovery and 55 package files implement
       restore hooks. Add an end-to-end browser test that destroys the device mid-frame in every demo and checks the
       frame returns (visual-regression compare after restore); fix any package that doesn't come back.
+5j. "Design envelope" page (Scott, 2026-10-14 night): `docs/limits.md` (also on the site, linked from README and the
+   whitepaper) listing every hard limit as an architectural boundary: the limit, the MEASURED threshold where it
+   starts (no unmeasured numbers - e.g. coordinate jitter distance comes from 5f.a's measurements), why it exists
+   (usually: keeping core small), the clear error or symptom a user sees, and the escape hatch package/tool with its
+   proof link. Rows at least: 100,000-entity cap (GPU culling / streaming 5g.d), 16 sampled textures per stage (named
+   error; texture arrays 5f.d), float32 coordinates (floating-origin plugin 5f.a), giant STEP files (offline converter
+   5f.c), one directional light in core (clustered), WebGPU-first (WebGL = basic fallback only), order-independent
+   transparency (OIT package 5f.b), no visual editor, untested devices. Write it after 5f/5g land so every threshold
+   and escape hatch is real.
 6. Then give Scott the full list of what was done and what remains.
 
 Worker practice: agents run in git worktrees; they must start with `git reset --hard perf/auto-quality` (worktrees
