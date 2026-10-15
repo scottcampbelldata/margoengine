@@ -4,7 +4,7 @@ Cascade descriptors, attachments and matrix views are retained between frames.
 Custom `drawShadow` callbacks receive a borrowed context reused for that cascade;
 consume it synchronously rather than retaining it after the pass.
 
-Optional WebGPU directional shadows. Four practical/logarithmic frustum splits render to a `depth32float` 2D texture array. Stable spherical extents and world-space texel snapping limit edge swimming: on the real GPU a slow pan (perspective or orthographic) and an orthographic zoom leave shadow edges unchanged (`node examples/package-benchmarks/shadow-shimmer.mjs`; numbers in docs/HANDOFF.md 1f.i). PCSS searches 16 blockers and filters 32 comparison samples using directional-light angular size and blocker/receiver separation.
+Optional WebGPU directional shadows. Four practical/logarithmic frustum splits render to a `depth32float` 2D texture array. Stable spherical extents and world-space texel snapping limit edge swimming: on an Intel Arc 140V laptop iGPU (Edge 155) an orthographic zoom leaves the shadow matrices unchanged, and a slow orthographic pan changes about 0.6 of 14k shadow-edge pixels per frame, against 194 for a 0.01° light turn, so there is no visible shimmer (`node examples/package-benchmarks/shadow-shimmer.mjs`, [shadow-shimmer.json](../../examples/package-benchmarks/results/shadow-shimmer.json)). PCSS searches 16 blockers and filters 32 comparison samples using directional-light angular size and blocker/receiver separation.
 
 ```ts
 import {EngineKernel,box} from '@margoengine/core';

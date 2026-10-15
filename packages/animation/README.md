@@ -25,7 +25,7 @@ The separate `@margoengine/animator` package adds gameplay states, blend trees, 
 
 ## Vertex animation textures (GPU crowds): `@margoengine/animation/vat`
 
-A separate entry (6.1 kB gzip; apps that only import `Animation` pay nothing for it). `bakeVAT` samples clips on the CPU with the same skinning and morph maths as the compute pass, every primitive merged in the model root's space, into rgba32float texels (position, normal per vertex per row). `VATCrowd` draws any number of copies in one instanced call; each instance has its own matrix, clip, time offset, speed and atlas region, and per-frame CPU work is one 160-byte uniform write whatever the crowd size.
+A separate entry (about 5.6 kB min+gzip, [entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json); apps that only import `Animation` pay nothing for it). `bakeVAT` samples clips on the CPU with the same skinning and morph maths as the compute pass, every primitive merged in the model root's space, into rgba32float texels (position, normal per vertex per row). `VATCrowd` draws any number of copies in one instanced call; each instance has its own matrix, clip, time offset, speed and atlas region, and per-frame CPU work is one 160-byte uniform write (measured the same at 100 and 1,000 copies).
 
 ```ts
 import {createStage} from 'margoengine';
@@ -45,7 +45,7 @@ for (let i = 0; i < 1000; i++) crowd.add({matrix: placement(i), clip: i % 2, off
 crowd.set(5, {clip: 0, offset: 0});                                                   // live; uploads only what changed
 ```
 
-RobotExpressive (7,214 vertices, 19 primitives) walking, CPU per frame on the mock GPU (`proofs/animation-vat.proof.js`): 1,000 skinned models 30.5 ms update + 434 ms draw recording (19,000 draws, 7,000 compute dispatches, 27.8 MB of uploads); one VATCrowd of 1,000 under 0.01 ms (1 draw, 160 bytes); CPU skinning would cost about 1.3 ms per character. Baking Walking at 30 rows/s takes about 120-180 ms and 6.9 MB of texture. Real GPU (Intel Arc 140V, `node examples/package-benchmarks/atlas-vat/check.mjs`): the VAT pose matches the GPU-skinned pose (silhouette IoU 0.98), and 1,024 walking robots (7.4M vertices) draw in one call at 0.7-0.9 ms CPU and 11-16 ms GPU per frame.
+RobotExpressive (7,214 vertices, 19 primitives) walking, CPU per frame on the mock GPU (`proofs/animation-vat.proof.js`): 1,000 skinned models 30.5 ms update + 434 ms draw recording (19,000 draws, 7,000 compute dispatches, 27.8 MB of uploads); one VATCrowd of 1,000 under 0.01 ms (1 draw, 160 bytes); CPU skinning would cost about 1.3 ms per character. Baking Walking at 30 rows/s took about 120 ms and 6.9 MB of texture. Real GPU check (`node examples/package-benchmarks/atlas-vat/check.mjs`, not in CI): it asserts that the VAT pose matches the GPU-skinned pose (silhouette IoU above 0.97) and that 1,024 walking robots (7.4M vertices) draw in one call; frame timings are not yet recorded.
 
 Limits: rows sample at `fps` and the shader blends adjacent rows linearly (fast rotations look slightly shrunk between rows); no blending between clips; one base colour and optional map for the whole crowd (UVs in three.js orientation, v up; per-instance regions are offset + scale, no rotation); opaque only, drawn with gltf-pro's key-light, hemisphere-fill and ACES look but without shadows, SSAO, clustered or environment lighting; no CPU frustum culling (the GPU clips); texture memory is rows x vertices x 32 bytes and at most 8192 rows of 2048 texels.
 

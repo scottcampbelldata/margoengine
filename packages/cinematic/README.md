@@ -1,7 +1,7 @@
 # @margoengine/cinematic
 
-`rig.setOrbitOffset(yaw, pitch, distance, height = 0)` updates the retained camera
-offset from orbit angles without allocating a new vector. The sandbox uses this
+`rig.setOrbitOffset(yaw, pitch, distance, height = 0)` writes the retained camera
+offset in place from orbit angles (no new vector is created). The sandbox uses this
 public method after its shared locomotion step.
 
 A virtual camera with analytically integrated critically damped follow and look-at springs plus additive screen shake.

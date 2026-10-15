@@ -33,8 +33,8 @@ const cached = Imposter.fromData(engine, data); // ... and skip the bake next lo
 - **Hysteresis** follows three.js: while a level is shown its switch distance shrinks by its `hysteresis` fraction, so
   the camera has to come back further before the finer level returns. No flicker at a boundary.
 - **Cost**: one loop over packed typed arrays before the transform tick, reading last frame's world matrices; only
-  objects whose level changed are touched; nothing is allocated per frame (tested with 3,000 objects switching
-  every frame). Geometry levels keep a hidden mesh per geometry so core never frees and re-uploads a batch whose last
+  objects whose level changed are touched; no measurable heap growth (under 64 KB over 1,000 frames with 3,000
+  objects switching every frame, `npm test`). Geometry levels keep a hidden mesh per geometry so core never frees and re-uploads a batch whose last
   user just switched away. New objects take effect on the next frame.
 - **Imposters** bake `frames`² orthographic views over the whole sphere of directions (octahedral layout) on the
   GPU, through gltf-pro's own shader with an early return, so base-colour textures, vertex colours, normal maps,
@@ -60,20 +60,20 @@ const cached = Imposter.fromData(engine, data); // ... and skip the bake next lo
   `lods.dispose()` (or `engine.removePlugin(lods.name)`) frees keepers and GPU buffers; `imposter.dispose()` frees
   the atlas.
 
-Measured on an Intel Arc (Xe2-LPG) laptop GPU, headless Edge, 1280×720, 4× MSAA, 2,500 instances of a
+Measured on an Intel Arc 140V laptop iGPU, headless Edge 155, 1280×720, 4× MSAA, 2,500 instances of a
 50,000-triangle torus knot (125 M triangles at full detail) with 3,072- and 576-triangle reductions and a 12×12×128 px
-atlas (baked in about 0.25 s), camera orbiting over the grid, median of 120 serialised frames, range over four runs:
+atlas (baked in about 0.16 s), camera orbiting over the grid, median of 120 serialised frames, one run
+([gates-lod-2500.json](../../examples/package-benchmarks/results/gates-lod-2500.json), commit `7c90b73`):
 
 | | CPU `engine.render()` | GPU (submit to done) |
 | --- | --- | --- |
-| empty scene | 0.6-0.7 ms | 3.4-4.2 ms |
-| full detail (2,228 visible) | 1.1 ms | 160-232 ms |
-| LOD + imposters (122 mid, 435 low, 1,943 imposters) | 1.1 ms | 11-25 ms |
+| empty scene | 0.5 ms | 3.6 ms |
+| full detail (2,228 visible) | 0.7 ms | 226.9 ms |
+| LOD + imposters (122 mid, 435 low, 1,943 imposters) | 0.8 ms | 23.2 ms |
 
-The LOD frame differs from the full-detail frame by 1.7/255 on average and covers 99% of its lit pixels. The range is
-across runs on a machine shared with other GPU jobs; most of it is the foreground fill both modes pay. Rerun with
-`node packages/lod/test/browser-check.mjs`: it writes `test-results/lod-benchmark.json` and the screenshot pair
-`test-results/lod-full.png` / `test-results/lod-lod.png`.
+The LOD frame differs from the full-detail frame by 1.7/255 on average and covers 99% of its lit pixels. GPU times
+vary between runs on this laptop; most of the spread is the foreground fill both modes pay. Rerun with `node packages/lod/test/browser-check.mjs`: it writes
+`test-results/lod-benchmark.json` and the screenshot pair `test-results/lod-full.png` / `test-results/lod-lod.png`.
 
 **Atlas seams** (`node packages/lod/test/imposter-check.mjs`, same laptop, 256×256 canvas, 12×12×128 atlas): the camera
 turns around one object in 0.5° steps (1° for small cards) and each step renders the full mesh and the imposter. Before
@@ -81,7 +81,9 @@ the fixes above, the imposter's largest step-to-step change was 7.8-10× its med
 whole regions flipped where the blend weights crossed the hard 0.5 coverage cut at view midpoints, and a thin disc
 jumped by 48/255 per silhouette pixel in one step. Mip bleed, measured on the exported atlas with the GPU mip chain and
 bilinear taps at the shader's clamp, reached 0.43 coverage from the neighbouring view at the 8-pixel mip (24-29% of
-tile-edge samples). Now:
+tile-edge samples). The "before" figures come from an earlier run that was not committed; the "after" row and the
+mip-bleed figures are in [gates-lod-imposter-check.json](../../examples/package-benchmarks/results/gates-lod-imposter-check.json)
+(Intel Arc 140V laptop iGPU, Edge 155). Now:
 
 | 177 px card, knot | largest step / median | mean difference from full mesh | stray pixels |
 | --- | --- | --- | --- |
@@ -90,8 +92,8 @@ tile-edge samples). Now:
 
 The disc's worst step fell from 48 to 12/255 (grazing views 18° apart on a 12×12 grid still differ), mip bleed is zero
 at every level, and the mean difference at 53 and 27 px cards fell from 13.0 and 12.5 to 8.7 and 9.3. Cost: three more
-texel loads per imposter pixel, about +2 ms GPU on the 2,500-instance benchmark (20.5-20.9 → 22.6-22.9 ms median,
-alternating runs, on AC power). The same script checks picking: every rendered imposter pixel picks its object through
+texel loads per imposter pixel, about +2 ms GPU on the 2,500-instance benchmark in an uncommitted A/B run
+(20.5-20.9 → 22.6-22.9 ms median, alternating runs, on AC power). The same script checks picking: every rendered imposter pixel picks its object through
 `Picking` and the bvh Raycaster, full-detail pixels stay exact, and 16,384 grid pixels agree between GPU and CPU
 within one pixel.
 
@@ -107,7 +109,7 @@ position; `screen` levels use the camera's projection, so they also follow ortho
 `@margoengine/cameras`). Object removal swaps with the last entry, so `lods.add` order is not kept. WebGPU
 for imposters; distance and screen selection also work on the WebGL2 backend.
 
-MIT. Optional, tree-shakable package, about 10.8 kB min+gzip (the WGSL is most of it); peers: core and gltf-pro
+MIT. Optional, tree-shakable package, about 9.9 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); peers: core and gltf-pro
 ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/lod. Browser check and benchmark on a real WebGPU adapter:

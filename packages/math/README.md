@@ -1,6 +1,6 @@
 # @margoengine/math
 
-Vector2, Vector3, Vector4, Quaternion, Euler, Matrix3, Matrix4, Color, Box3, Sphere, Plane, Ray, Frustum, Spherical and MathUtils, with three.js method names. Methods write into `this` (chainable) or an `out` argument; nothing allocates except `clone()` and `toArray()` with no target.
+Vector2, Vector3, Vector4, Quaternion, Euler, Matrix3, Matrix4, Color, Box3, Sphere, Plane, Ray, Frustum, Spherical and MathUtils, with three.js method names. Methods write into `this` (chainable) or an `out` argument instead of returning new objects; only `clone()` and `toArray()` with no target return new ones.
 
 ```ts
 import {Vector3, Quaternion, Euler, Color} from '@margoengine/math';
@@ -10,7 +10,7 @@ engine.camera.position = new Vector3().copy(mesh.position).add(new Vector3(0, 2,
 new Color('#ff8800').toArray(mesh.material.data); // linear RGB, recolors in place
 ```
 
-Each type is its own module: `import {Vector3} from '@margoengine/math/vector3'` (or from the root, which tree-shakes the same) ships about 1.3 kB gzip. The whole package is about 10.4 kB gzip.
+Each type is its own module: `import {Vector3} from '@margoengine/math/vector3'` (or from the root, which tree-shakes the same) ships about 1.3 kB min+gzip. The whole package is about 10.4 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)).
 
 Array helpers: the other Margo packages work on plain arrays (`number[]`, `Float32Array`, `Float64Array`) rather than these classes, and share one copy of those helpers from here, each bundled into the package that uses it. `@margoengine/math/mat4`: `multiplyMatrices(a, b, out)`, `invertMatrix(m, out)` (cofactors), `invertMatrixStable(m, out, workspace?)` (pivoted, rejects non-finite input and Float32 overflow; `out` may be `m`) and `composeMatrix(t, q, s, out)`, column-major like `camera.matrix`, float64 arithmetic; the inverses return null (`out` untouched) when they fail. `@margoengine/math/quat`: `eulerToQuaternion(x, y, z)` (XYZ, like `Mesh.setRotation`) and `multiplyQuaternions(a, b)`, returning new `[x, y, z, w]` arrays. `@margoengine/math/color` also has `parseColor(value, out?, offset?)` for the packages' `ColorInput` (`'#rrggbb'`, `'#rgb'`, `0xrrggbb` decoded from sRGB, or linear `[r, g, b]`). `@margoengine/math/vec3`: `add`, `sub`, `scale`, `dot`, `cross`, `length`, `normalize` on `[x, y, z]` (new arrays). `@margoengine/math/validate`: `finiteVector(v, size, name)` throws unless `v` is `size` Float32-finite numbers. These are kept bit-for-bit identical to the package copies they replaced (`examples/package-benchmarks/proofs/math-consolidation.proof.js`), so their operand order is fixed.
 
