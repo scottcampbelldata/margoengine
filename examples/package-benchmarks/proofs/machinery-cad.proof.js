@@ -2,16 +2,17 @@
 // ExplodedView: flat typed arrays and one overflow flag per part instead of per-part closures, arrays and three fround checks.
 // AssemblyBVH: one local-space BVH per distinct geometry plus a per-part sphere pass, instead of one world-space BVH over every
 // instanced triangle (which also capped assemblies at 1M instanced triangles, about 7,800 parts here).
-// Run: node examples/package-benchmarks/proofs/machinery-cad.proof.js
+// Run: node examples/package-benchmarks/proofs/machinery-cad.proof.js [ref] [pin]
+// Pinned: 7d5a5dd against deb4015, the commit that recorded results/machinery-cad.json (re-measured on AC).
 import assert from 'node:assert/strict';
 import {Engine, TransformStore} from '../../../packages/core/dist/extension.js';
 import {buildAssembly} from '../cad/assembly.js';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 import {requireAC} from '../cad/power.mjs';
 const power = requireAC();
 
-const ref = '7d5a5dd';
-const exploded = await versions('machinery', ref, 'src/exploded.ts'), spatial = await versions('machinery', ref, 'src/spatial.ts');
+const {ref, pin} = refs('7d5a5dd', 'deb4015');
+const exploded = await versions('machinery', ref, 'src/exploded.ts', pin), spatial = await versions('machinery', ref, 'src/spatial.ts', pin);
 const scene = async modules => {const e = new Engine({width: 1, height: 1, clientWidth: 1, clientHeight: 1}, await TransformStore.create(Math.min(100_000, modules * 30 + Math.ceil(modules / 32) + 1)), {backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {}}, undefined, null);const assembly = buildAssembly(e, modules);e.render({culling: false});return {e, assembly};};
 const triangles = parts => parts.reduce((n, p) => n + p.geometry.indices.length / 3, 0), cases = [], errors = {baseline: 0, candidate: 0};let sameTriangle = "";
 
@@ -57,4 +58,4 @@ for (const modules of [371, 1852]) {
   b.dispose();e.dispose();
 }
 // record() requires speedup >= 1 for measured pairs; the capacity case has no baseline.
-await record('machinery-cad', ref, cases.map(c => c.speedup === null ? {...c, speedup: Infinity} : c), `AC power: ${power} at start, ${requireAC()} at end. Node, fake renderer; ExplodedView positions identical; BVH hit distances agree within 1e-4 relative (same node and triangle for ${sameTriangle} rays, the rest hit a coincident face at the same distance); largest error against the exact float64 distance: baseline ${errors.baseline.toExponential(2)} m, candidate ${errors.candidate.toExponential(2)} m.`);
+await record('machinery-cad', ref, cases.map(c => c.speedup === null ? {...c, speedup: Infinity} : c), `AC power: ${power} at start, ${requireAC()} at end. Node, fake renderer; ExplodedView positions identical; BVH hit distances agree within 1e-4 relative (same node and triangle for ${sameTriangle} rays, the rest hit a coincident face at the same distance); largest error against the exact float64 distance: baseline ${errors.baseline.toExponential(2)} m, candidate ${errors.candidate.toExponential(2)} m.`, pin);

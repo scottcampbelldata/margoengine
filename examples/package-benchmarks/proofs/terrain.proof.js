@@ -1,11 +1,12 @@
 // Proof for @margoengine/terrain: clipmapGrid fills presized typed arrays; Terrain's per-frame prepare writes ring
 // uniforms without temporary arrays; draw reuses last frame's pipeline before rebuilding the shader-text key.
 // No GPU is involved: a recording stand-in device captures every upload and draw so both versions can be compared.
-// Run: node examples/package-benchmarks/proofs/terrain.proof.js
+// Run: node examples/package-benchmarks/proofs/terrain.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/terrain.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('terrain', ref);
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('terrain', ref, undefined, pin);
 globalThis.GPUBufferUsage ??= {COPY_DST: 8, INDEX: 16, VERTEX: 32, UNIFORM: 64, STORAGE: 128};
 globalThis.GPUTextureUsage ??= {TEXTURE_BINDING: 4}; globalThis.GPUShaderStage ??= {VERTEX: 1, FRAGMENT: 2};
 
@@ -63,4 +64,4 @@ for (const lit of [false, true]) {
   const pair = [baseline, candidate].map(module => {const w = world(module); if (lit) w.terrain.addLighting(provider(w, 1)); w.frame(0); w.state.recording = false; return w;});
   cases.push({case: `prepare + draw, 6 rings, ${lit ? 'one lighting provider' : 'unlit'}, 600 frames`, ...time(() => {for (let i = 0; i < 600; i++) pair[0].frame(i);}, () => {for (let i = 0; i < 600; i++) pair[1].frame(i);})});
 }
-await record('terrain', ref, cases, 'Frame timings run against a recording stand-in device (no GPU work), so they measure only the CPU cost Terrain adds per frame. Uploaded uniform bytes, draw calls, pipeline and bind-group creation, and shadowVersion are identical.');
+await record('terrain', ref, cases, 'Frame timings run against a recording stand-in device (no GPU work), so they measure only the CPU cost Terrain adds per frame. Uploaded uniform bytes, draw calls, pipeline and bind-group creation, and shadowVersion are identical.', pin);

@@ -4,17 +4,17 @@
 // descriptor, shader module and buffer write of clustered (core-mesh shader patch and compute pass) and of a gltf-pro model
 // it lights, at `ref` and in the working tree: identical. With `castShadow: true` lights but no LocalShadows, the only
 // difference is the light buffer's unused params.z (the shadow ordinal); shaders and every other call stay identical.
-// Run (after npm run build:packages): node examples/package-benchmarks/proofs/clustered-local-shadows.proof.js [ref]
+// Run (after npm run build:packages): node examples/package-benchmarks/proofs/clustered-local-shadows.proof.js [ref] [pin] [--current]
+// Pinned: 0ed56b9 against 590278e, the commit that made this claim. --current: 0ed56b9 against the working tree.
 import assert from 'node:assert/strict';
-import {versions} from './compare.js';
+import {refs, versions, entryAt} from './compare.js';
 import {mockGPU, context, passes} from './gpu-recorder.js';
 import {Engine, TransformStore} from '../../../packages/core/dist/extension.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
-import * as gltf from '../../../packages/gltf-pro/dist/index.js';
 import {animatedTriangle} from '../../../tests/support/gltf-pro-fixture.js';
 
-const ref = process.argv[2] ?? '0ed56b9';
-const {baseline, candidate} = await versions('clustered', ref);
+const {ref, pin} = refs('0ed56b9', '590278e', '0ed56b9');
+const {baseline, candidate} = await versions('clustered', ref, undefined, pin), gltf = await entryAt('gltf-pro', 'src/index.ts', pin);
 const point = {position: [0, 2, 1], range: 6, color: [1, 0.5, 0.2], intensity: 9}, spot = {position: [1, 3, 0], range: 8, direction: [0, -1, 0.2], outerAngle: 0.6, innerAngle: 0.3, intensity: 20};
 
 async function story(clustered, castShadow, samples) {

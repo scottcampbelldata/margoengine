@@ -1,11 +1,11 @@
 // Proof for @margoengine/decoders: the pure TypeScript EXT_meshopt_compression decoder (loaded on its own, no workers).
-// Run: node examples/package-benchmarks/proofs/decoders.proof.js
+// Run: node examples/package-benchmarks/proofs/decoders.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/decoders.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
 import {MeshoptEncoder} from 'meshoptimizer';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record, fileAt} from './compare.js';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('decoders', ref, 'src/meshopt.ts');
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('decoders', ref, 'src/meshopt.ts', pin);
 await MeshoptEncoder.ready; // the reference encoder only produces the inputs
 const outcome = operation => {try {return {value: operation()};} catch (error) {return {type: error.constructor.name, message: error.message};}};
 function agree(name, ...args) {
@@ -44,7 +44,7 @@ for (const [name, source, n, stride, mode, filter] of streams) {
   for (const cut of [1, 17, source.length >> 1, source.length - 1]) agree(`${name} cut to ${cut}`, source.subarray(0, cut), n, stride, mode, filter);
   agree(`${name} with a trailing byte`, Uint8Array.from([...source, 0]), n, stride, mode, filter); agree(`${name} with one element fewer`, source, n - (mode === 'TRIANGLES' ? 3 : 1), stride, mode, filter);
 }
-const vectors = JSON.parse(readFileSync(new URL('../../../packages/decoders/tests/fixtures/meshopt-vectors.json', import.meta.url), 'utf8')), unpack = text => new Uint8Array(Buffer.from(text, 'base64'));
+const vectors = JSON.parse(fileAt('packages/decoders/tests/fixtures/meshopt-vectors.json', pin)), unpack = text => new Uint8Array(Buffer.from(text, 'base64'));
 // Cases 9-12 are KHR_meshopt_compression (vertex codec v1, COLOR filter, HANDOFF 5w.b), which the baseline rejects: only
 // the reference decoder's expected bytes apply to them.
 for (const [i, c] of vectors.cases.entries()) {if (i < 8) agree(`fixture ${c.name}`, unpack(c.encoded), c.count, c.stride, c.mode, c.filter); assert.ok(Buffer.from(candidate.meshoptDecodeGltfBuffer(unpack(c.encoded), c.count, c.stride, c.mode, c.filter)).equals(Buffer.from(unpack(c.expected))), c.name);}
@@ -60,4 +60,4 @@ for (const [name, source, n, stride, mode, filter] of streams.filter(([name]) =>
   cases.push({case: name, elements: n * 8, encodedBytes: source.length * 8, ...time(() => repeat(baseline), () => repeat(candidate), 20)});
   console.error(JSON.stringify(cases.at(-1)));
 }
-await record('decoders', ref, cases, 'meshopt byte groups are unpacked with unrolled writes instead of per-group shift loops and subarray copies. Filter-dominated streams (OCTAHEDRAL, EXPONENTIAL) gain about 1.05x and index streams are unchanged; both are compared for equality but not timed.');
+await record('decoders', ref, cases, 'meshopt byte groups are unpacked with unrolled writes instead of per-group shift loops and subarray copies. Filter-dominated streams (OCTAHEDRAL, EXPONENTIAL) gain about 1.05x and index streams are unchanged; both are compared for equality but not timed.', pin);

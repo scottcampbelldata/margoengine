@@ -1,19 +1,19 @@
 // Proof for the PostStack change: every effect used alone (post Bloom and SSAO, dof, tonemap alone and DOF-sourced,
 // creative PostProcessing) makes exactly the GPU calls it made before, over a story of resizes, option edits, format
 // and sample-count changes, a rejected frame, device restoration and disposal at 1x and 4x.
-// Run: node examples/package-benchmarks/proofs/post-stack.proof.js [ref]
+// Run: node examples/package-benchmarks/proofs/post-stack.proof.js [ref] [pin] [--current]
+// Pinned: 5b1fe66^ against 5b1fe66, the commit that added PostStack and made this claim. --current: e2cc4c5 against the
+// working tree. e2cc4c5 (Bloom, FXAA and SSAO keep the canvas alpha for TransparentCanvas) is the last intentional change
+// to a single effect's output; before it, e12fc9c (the DOF rewrite) and a281ad2/9702e57 (SSAO).
+// creative's PostProcessing is always 5b1fe66^ against 3319317: it lost bloom and the sky backdrop after 3319317.
 import assert from 'node:assert/strict';
-import {execFileSync} from 'node:child_process';
-import {versions, ignoreAgx} from './compare.js';
+import {refs, versions, ignoreAgx} from './compare.js';
 import {mockGPU, context} from './gpu-recorder.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
 
-// e2cc4c5 (Bloom, FXAA and SSAO keep the canvas alpha for TransparentCanvas) is the last intentional change to a single
-// effect's output; before it, e12fc9c (the DOF rewrite) and a281ad2/9702e57 (SSAO). So the parent of the commit that added
-// PostStack now differs for Bloom, SSAO and DOF. creative stays on that parent.
-const added = execFileSync('git', ['log', '--diff-filter=A', '--format=%h', '--', 'packages/post/src/stack.ts'], {cwd: new URL('../../..', import.meta.url), encoding: 'utf8'}).trim().split('\n').at(-1);
-const ref = process.argv[2] ?? 'e2cc4c5', before = added ? added + '^' : 'HEAD';
-const post = await versions('post', ref), dof = await versions('dof', ref), tonemap = await versions('tonemap', ref), creative = await versions('creative', before, 'src/post.ts', '3319317'); // PostProcessing lost bloom and sky after 3319317
+const before = '5b1fe66^', {ref, pin} = refs(before, '5b1fe66', 'e2cc4c5');
+const post = await versions('post', ref, undefined, pin), dof = await versions('dof', ref, undefined, pin), tonemap = await versions('tonemap', ref, undefined, pin);
+const creative = await versions('creative', before, 'src/post.ts', '3319317');
 
 /** Runs `effects` (made by `make(gpu)`) with the core main pass for 24 frames, applying `edit(frame, effects, state)` first. */
 function story(make, samples, edit) {
@@ -45,13 +45,14 @@ const cases = {
 };
 let calls = 0;
 for (const [label, [make, edit, module]] of Object.entries(cases)) for (const samples of [1, 4]) {
-  const expected = ignoreAgx(story(() => make(module.baseline), samples, edit)), actual = ignoreAgx(story(() => make(module.candidate), samples, edit));
+  const base = module === creative ? before : ref;
+  const expected = ignoreAgx(story(() => make(module.baseline), samples, edit), base), actual = ignoreAgx(story(() => make(module.candidate), samples, edit), base);
   assert.ok(expected.length > 300 && expected.some(entry => entry[0] === 'throw'), `${label} story must exercise the GPU and an error path`);
   assert.deepEqual(actual, expected, `${label} GPU calls differ at ${samples}x`); calls += expected.length;
 }
 // The documented DOF -> Tonemap({source}) chain, both packages at once.
 for (const samples of [1, 4]) {
-  const chain = side => ignoreAgx(story(() => {const d = new dof[side].DOF(); return [d, new tonemap[side].Tonemap({source: () => d.outputTexture})];}, samples, () => {}));
+  const chain = side => ignoreAgx(story(() => {const d = new dof[side].DOF(); return [d, new tonemap[side].Tonemap({source: () => d.outputTexture})];}, samples, () => {}), ref);
   const expected = chain('baseline'); assert.deepEqual(chain('candidate'), expected, `DOF -> Tonemap chain differs at ${samples}x`); calls += expected.length;
 }
-console.log(`Single-effect GPU call sequences identical to ${ref} (creative: ${before}): ${calls} recorded calls across 12 stories.`);
+console.log(`Single-effect GPU call sequences identical, ${ref} -> ${pin ?? 'working tree'} (creative: ${before} -> 3319317): ${calls} recorded calls across 12 stories.`);

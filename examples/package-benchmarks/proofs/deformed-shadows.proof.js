@@ -7,14 +7,15 @@
 //    (cascades fitted to the meshes' bounding sphere); the proof checks it differs and reports the fitted last split.
 // Skinned and morphed gltf-pro casters needed no change (Shadows reads `primitive.deformed`); gltf-pro-lighting-hooks.proof.js
 // still records gltf-pro + shadows identical, and gltf-pro now takes lightPBR from packages/shared.
-// Run (after npm run build:packages): node examples/package-benchmarks/proofs/deformed-shadows.proof.js [ref]
+// Run (after npm run build:packages): node examples/package-benchmarks/proofs/deformed-shadows.proof.js [ref] [pin] [--current]
+// Pinned: 38d448e against 282e751, the commit that made this claim. --current: 38d448e against the working tree.
 import assert from 'node:assert/strict';
-import {versions} from './compare.js';
+import {refs, versions} from './compare.js';
 import {mockGPU, context, passes} from './gpu-recorder.js';
 import {Engine, TransformStore} from '../../../packages/core/dist/extension.js';
 import {box} from '../../../packages/core/dist/index.js';
 
-const ref = process.argv[2] ?? '38d448e'; // the commit before 5l.j
+const {ref, pin} = refs('38d448e', '282e751', '38d448e'); // 38d448e: the commit before 5l.j
 async function rig() {
   const gpu = mockGPU(), store = await TransformStore.create(32), buffers = new Map();
   const geometryBuffers = geometry => {if (!buffers.has(geometry)) buffers.set(geometry, {vertex: gpu.device.createBuffer({size: 576, usage: 32}), index: gpu.device.createBuffer({size: 144, usage: 16})}); return buffers.get(geometry);};
@@ -55,7 +56,7 @@ async function shadowStory({Shadows}, options, custom) {
   return log;
 }
 
-const [animation, shadowsModule] = await Promise.all([versions('animation', ref, 'src/vat.ts'), versions('shadows', ref)]);
+const [animation, shadowsModule] = await Promise.all([versions('animation', ref, 'src/vat.ts', pin), versions('shadows', ref, undefined, pin)]);
 const result = {baseline: ref};
 const vatBaseline = await vatStory(animation.baseline), vatCandidate = await vatStory(animation.candidate);
 assert.ok(vatBaseline.some(entry => entry[0] === 'pass.drawIndexed'), 'the VAT story draws');

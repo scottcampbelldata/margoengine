@@ -1,11 +1,12 @@
 // Proof for @margoengine/geometry: the per-vertex and per-triangle utilities (normals, tangents, transforms, welding,
 // de-indexing, edges, PBR vertex packing), the polyhedron/extrude emitters and Bezier/line/Catmull-Rom evaluation no
 // longer build temporary arrays, strings or closures per element. Every output must match the baseline bit for bit.
-// Run: node examples/package-benchmarks/proofs/geometry.proof.js
+// Run: node examples/package-benchmarks/proofs/geometry.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/geometry.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('geometry', ref);
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('geometry', ref, undefined, pin);
 const outcome = run => {try {return run();} catch (error) {return `${error.constructor.name}: ${error.message}`;}};
 /** Runs the same expression against both builds and requires identical results (typed arrays compare by bits). */
 const same = (label, run) => assert.deepStrictEqual(outcome(() => run(candidate)), outcome(() => run(baseline)), label);
@@ -104,4 +105,4 @@ bench('getSpacedPoints(2000), 20-knot Catmull-Rom', 20, () => 0, g => new g.Catm
 // Outline extraction for a line of text: 60 glyph-like contours of lines, quadratic and cubic Beziers with a counter.
 bench('Shape.extractPoints, 60 glyph outlines', 10, g => Array.from({length: 60}, () => glyph(g)), (g, shapes) => {for (const shape of shapes) shape.extractPoints(12);});
 bench('CubicBezierCurve3.getSpacedPoints(64), fresh curve', 50, () => 0, g => new g.CubicBezierCurve3([0, 0, 0], [1, 4, 2], [5, -4, -1], [6, 1, 3]).getSpacedPoints(64));
-await record('geometry', ref, cases, 'All outputs are bit-identical, including degenerate triangles, non-finite vertices and out-of-range indices. Measured and reverted for missing the 1.10x bar: scalar computeBoundingBox (1.03-1.07x on computeBoundingSphere) and a loopSubdivide edge-point rewrite (about 1.08x). tubeGeometry as a whole is unchanged within noise; only its frame and curve sampling got faster.');
+await record('geometry', ref, cases, 'All outputs are bit-identical, including degenerate triangles, non-finite vertices and out-of-range indices. Measured and reverted for missing the 1.10x bar: scalar computeBoundingBox (1.03-1.07x on computeBoundingSphere) and a loopSubdivide edge-point rewrite (about 1.08x). tubeGeometry as a whole is unchanged within noise; only its frame and curve sampling got faster.', pin);

@@ -1,10 +1,11 @@
 // Proof for @margoengine/loaders: PLY and PCD body readers, LZF, vertex normals and the Geometry converters.
-// Run: node examples/package-benchmarks/proofs/loaders.proof.js
+// Run: node examples/package-benchmarks/proofs/loaders.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/loaders.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('loaders', ref);
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('loaders', ref, undefined, pin);
 const text = value => new TextEncoder().encode(value), join = parts => Buffer.concat(parts.map(part => typeof part === 'string' ? text(part) : Buffer.from(part.buffer, part.byteOffset, part.byteLength)));
 /** Bit-exact comparison: typed arrays by their bytes (so NaN payloads and -0 count), everything else structurally. */
 function same(actual, expected, path = 'result') {
@@ -166,4 +167,4 @@ add('crc32', {bytes: payload.length}, api => api.crc32(payload));
 add('decompressLZF', {bytes: cloud * 32}, api => api.decompressLZF(packed, cloud * 32));
 add('toGeometry flat', {triangles: 100_000}, api => api.toGeometry({...loaded, indices: triangles.subarray(0, 300_000)}, {normals: 'flat'}), 30);
 add('pointsToGeometry', {points: 200_000, markers: 166_666}, api => api.pointsToGeometry(points));
-await record('loaders', ref, cases, 'PLY and PCD body loops read through numeric type codes and precomputed offsets instead of closures and Map lookups; flat normals and point markers are written without per-item arrays; LZF literal runs copy in a loop; CRC-32 slices four bytes per step.');
+await record('loaders', ref, cases, 'PLY and PCD body loops read through numeric type codes and precomputed offsets instead of closures and Map lookups; flat normals and point markers are written without per-item arrays; LZF literal runs copy in a loop; CRC-32 slices four bytes per step.', pin);

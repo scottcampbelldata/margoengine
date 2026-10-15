@@ -1,10 +1,11 @@
 // Proof for @margoengine/points: nearest-point picking rejects far points on squared distance before Math.hypot,
 // and the point budget split computes its clamped weights and sort keys once instead of inside the comparator.
-// Run: node examples/package-benchmarks/proofs/points.proof.js
+// Run: node examples/package-benchmarks/proofs/points.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/points.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('points', ref);
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('points', ref, undefined, pin);
 const {random, buildBlocks, multiply} = baseline;
 const cloud = (n, seed, scale) => {const next = random(seed), p = new Float32Array(n * 3); for (let i = 0; i < p.length; i++) p[i] = (next() - 0.5) * scale; return p;};
 // Reversed-Z perspective (clip z in 0..w) times a camera `distance` back on +Z, as Margo Engine's camera.matrix.
@@ -77,4 +78,4 @@ const cases = [];
   const frame = (module, i) => {weights[i % length] += 1; module.allocateBudget(counts, weights, length, budgets[i], out);};
   cases.push({case: 'allocateBudget, 611 blocks over budget', frames, ...time(() => {for (let i = 0; i < frames; i++) frame(baseline, i);}, () => {for (let i = 0; i < frames; i++) frame(candidate, i);})});
 }
-await record('points', ref, cases, 'pickPoint pre-rejects on squared distance with a 1e-9 relative slack before the exact Math.hypot comparisons; allocateBudget precomputes clamped weights and sort keys.');
+await record('points', ref, cases, 'pickPoint pre-rejects on squared distance with a 1e-9 relative slack before the exact Math.hypot comparisons; allocateBudget precomputes clamped weights and sort keys.', pin);

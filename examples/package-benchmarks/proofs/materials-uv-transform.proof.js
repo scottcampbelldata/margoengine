@@ -1,8 +1,11 @@
 // Proof that texture transforms (materials `uvTransform`, gltf-pro's shared `textureTransform`) leave untransformed
 // rendering unchanged: a 12-frame story of materials meshes (textured, untextured, normal-mapped, transparent, matcap)
 // and a glTF with and without KHR_texture_transform makes byte-identical GPU calls, shaders and uniform writes with
-// @margoengine/materials + @margoengine/gltf-pro built from `ref` and from the working tree.
-// Run: node examples/package-benchmarks/proofs/materials-uv-transform.proof.js [ref]
+// @margoengine/materials + @margoengine/gltf-pro built from `ref` and from the candidate.
+// Run: node examples/package-benchmarks/proofs/materials-uv-transform.proof.js [ref] [pin] [--current]
+// Pinned: 1970fda (before the transforms) against 700838e, the commit that added them and made this claim. --current:
+// 7f1c9c6 against the working tree; 7f1c9c6 is the last intentional change to the story's output (gltf-pro's discard tests
+// became pipeline constants, 1e.f), so its parent and older refs differ from later trees.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {mkdir, writeFile} from 'node:fs/promises';
@@ -11,11 +14,10 @@ import {isAbsolute, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {build} from 'vite';
 import {Engine, TransformStore} from '@margoengine/core/extension';
+import {refs, announce} from './compare.js';
 import {mockGPU, context} from './gpu-recorder.js';
 
-// 7f1c9c6 is the last intentional change to the story's output (gltf-pro's discard tests became pipeline constants, 1e.f).
-// Its parent and older refs (1970fda, from before the transforms in 700838e) differ.
-const root = resolve(import.meta.dirname, '../../..'), slash = value => value.replaceAll('\\', '/'), ref = process.argv[2] ?? '7f1c9c6';
+const root = resolve(import.meta.dirname, '../../..'), slash = value => value.replaceAll('\\', '/'), {ref, pin} = refs('1970fda', '700838e', '7f1c9c6');
 const sources = ['materials/src', 'gltf-pro/src', 'shared'].map(name => slash(resolve(root, 'packages', name)) + '/');
 const show = (from, file) => {try {return execFileSync('git', ['show', `${from}:${file.slice(slash(root).length + 1)}`], {cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore']});} catch {return;}};
 /** materials with gltf-pro (every entry) bundled in (core stays external), both read from `from` or the working tree. */
@@ -40,7 +42,8 @@ async function load(from) {
   const file = resolve(directory, `materials-uvt-${from ?? 'working'}-${process.pid}.mjs`); await writeFile(file, chunks[0].code + '\nexport {PBRModel as __PBRModel, GLTFAsset as __GLTFAsset};\n');
   return import(pathToFileURL(file).href);
 }
-const baseline = await load(ref), candidate = await load();
+announce('materials + gltf-pro src/index.ts', ref, pin);
+const baseline = await load(ref), candidate = await load(pin);
 
 const box = (() => {const p = [], n = [], uv = [], idx = [];
   for (let f = 0; f < 6; f++) {const axis = f >> 1, sign = f & 1 ? -1 : 1, b = p.length / 3;
@@ -83,5 +86,5 @@ const expected = await story(baseline), actual = await story(candidate);
 assert.ok(expected.filter(e => e[0] === 'pass.drawIndexed').length >= 12 * 7, 'every mesh drew every frame');
 assert.ok(expected.some(e => e[0] === 'module' && e[2].code.includes('mat_baseMap')), 'patched materials shaders were compiled');
 assert.deepEqual(actual, expected, 'GPU calls differ');
-console.log(JSON.stringify({packages: ['materials', 'gltf-pro'], baseline: ref, identicalCalls: expected.length, draws: expected.filter(e => e[0] === 'pass.drawIndexed').length,
+console.log(JSON.stringify({packages: ['materials', 'gltf-pro'], baseline: ref, candidate: pin ?? 'working tree', identicalCalls: expected.length, draws: expected.filter(e => e[0] === 'pass.drawIndexed').length,
   shaderModules: expected.filter(e => e[0] === 'module').length, uniformWrites: expected.filter(e => e[0] === 'writeBuffer').length, result: 'byte-identical'}));

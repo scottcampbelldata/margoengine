@@ -1,10 +1,11 @@
 // Proof for @margoengine/wfc: propagation gathers all six neighbor masks in one pass over the set tiles, and the
 // entropy scan reuses each cell's pre-jitter entropy until its mask changes. Seeded results must not move.
-// Run: node examples/package-benchmarks/proofs/wfc.proof.js
+// Run: node examples/package-benchmarks/proofs/wfc.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/wfc.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('wfc', ref);
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('wfc', ref, undefined, pin);
 // Height-level tiles: a tile may sit next to itself or one level up/down. `vertical` false keeps columns uniform,
 // which is the tile set of the package benchmark demo (examples/package-benchmarks/wfc.js).
 const levels = (weights, vertical) => weights.map((weight, id) => ({weight, neighbors: Array.from({length: 6}, (_, direction) =>
@@ -39,4 +40,4 @@ for (const [name, dimensions, tiles, pins, attempts, solves] of [
     () => {for (let seed = 100; seed < 100 + solves; seed++) a.solve(seed, pins, attempts);},
     () => {for (let seed = 100; seed < 100 + solves; seed++) b.solve(seed, pins, attempts);})});
 }
-await record('wfc', ref, cases, 'Seeded solutions are byte-identical; the random stream is consumed in the same order.');
+await record('wfc', ref, cases, 'Seeded solutions are byte-identical; the random stream is consumed in the same order.', pin);

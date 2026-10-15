@@ -4,19 +4,23 @@
 // types aside) to one that is. Inputs mix random values with ±0, NaN, ±Infinity, subnormals, huge values and singular
 // matrices; equality is Object.is per element, so -0 and NaN count.
 // Run after `npm run build:packages`:
-//   node examples/package-benchmarks/proofs/math-consolidation.proof.js [ref]          outputs
-//   node examples/package-benchmarks/proofs/math-consolidation.proof.js [ref] --time   hot-path timings (fresh process, so
-//     each side's type feedback is only its own, as in an app)
+//   node examples/package-benchmarks/proofs/math-consolidation.proof.js [ref] [pin] [--current]          outputs
+//   node examples/package-benchmarks/proofs/math-consolidation.proof.js [ref] [pin] [--current] --time   hot-path timings
+//     (fresh process, so each side's type feedback is only its own, as in an app)
+// Pinned: 2484971 (before 1/n) against 4eed254 (9/n, the last step): @margoengine/math and the package files are built at
+// 4eed254 (their own @margoengine/math imports resolve to the working tree's build). --current: 2484971 against the
+// working tree, since the guarantee is that math stays bit-identical to the copies it replaced.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {resolve} from 'node:path';
-import {versions, time} from './compare.js';
-import * as mat4 from '@margoengine/math/mat4';
+import {refs, versions, time, entryAt} from './compare.js';
 
-const timing = process.argv.includes('--time'), ref = process.argv.slice(2).find(arg => !arg.startsWith('--')) ?? '2484971';
+const timing = process.argv.includes('--time'), {ref, pin} = refs('2484971', '4eed254');
 const root = resolve(import.meta.dirname, '../../..');
-/** {baseline, candidate}: one package file at `ref` and in the working tree (now using math). */
-const both = (name, entry) => versions(name, ref, entry);
+/** An @margoengine/math entry at the candidate (`pin`, else the working tree's build). */
+const math = entry => entryAt('math', `src/${entry}.ts`, pin), mat4 = await math('mat4');
+/** {baseline, candidate}: one package file at `ref` and at the candidate (now using math). */
+const both = (name, entry) => versions(name, ref, entry, pin);
 const source = file => execFileSync('git', ['show', `${ref}:${file}`], {cwd: root, encoding: 'utf8', maxBuffer: 1 << 26});
 /** Source of `function name(...) {...}` or `const name = ...;` in `file` at `ref`, without whitespace and simple type annotations. */
 function body(file, name) {
@@ -117,7 +121,7 @@ async function sharedAtRef() {
   return import(pathToFileURL(file).href);
 }
 families.push({name: 'shared/math invert + finiteVector', async verify() {
-  const shared = await sharedAtRef(), validate = await import('@margoengine/math/validate'), M = matrices(6000);
+  const shared = await sharedAtRef(), validate = await math('validate'), M = matrices(6000);
   let n = 0;
   for (const m of M) for (const Out of [Float64Array, Float32Array]) for (const workspace of [undefined, new Float64Array(52)]) {
     const a = new Out(16).fill(7), b = new Out(16).fill(7), ok = shared.invert(a, m, 0, workspace), result = mat4.invertMatrixStable(m, b, workspace);
@@ -160,7 +164,7 @@ families.push({name: 'mat4 compose', async verify() {
 
 // --- quaternions: euler -> quaternion (physics, text), multiply (controls, animator) ---
 families.push({name: 'quat euler + multiply', async verify() {
-  const quat = await import('@margoengine/math/quat'), physics = await both('physics', 'src/math.ts'), text = (await both('text', 'src/math.ts')).baseline;
+  const quat = await math('quat'), physics = await both('physics', 'src/math.ts'), text = (await both('text', 'src/math.ts')).baseline;
   // controls' quatMul (not exported) has the same four expressions as animator's quaternionMultiply, which is run below.
   const rows = code => {const start = code.indexOf('[a[3]*b[0]'); return code.slice(start, code.indexOf(']', code.lastIndexOf('a[2]*b[2]')) + 1).replace(/,\]$/, ']');};
   assert.equal(rows(body('packages/controls/src/math.ts', 'quatMul')), rows(body('packages/animator/src/blend.ts', 'quaternionMultiply')));
@@ -177,7 +181,7 @@ families.push({name: 'quat euler + multiply', async verify() {
 
 // --- colour: parseColor (lines, points, text), sRGB decode (those three, loaders engine, environment), encode (text, exporters) ---
 families.push({name: 'colour parse + sRGB', async verify() {
-  const color = await import('@margoengine/math/color'), copies = [];
+  const color = await math('color'), copies = [];
   for (const name of ['lines', 'points', 'text']) {const {baseline, candidate} = await both(name, 'src/color.ts'); copies.push(baseline.parseColor, candidate.parseColor);}
   const environment = (await both('environment', 'src/color.ts')).baseline, text = (await both('text', 'src/color.ts')).baseline, exporters = (await both('exporters', 'src/scene.ts')).baseline;
   const decode = 'v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4';
@@ -210,7 +214,7 @@ families.push({name: 'colour parse + sRGB', async verify() {
 
 // --- seeded PRNGs: points' mulberry32 (= math createRandom), scatter + creative grass LCG (= math createLcgRandom) ---
 families.push({name: 'seeded PRNGs', async verify() {
-  const utils = await import('@margoengine/math/mathutils'), points = await both('points', 'src/math.ts'), scatter = await both('scatter', 'src/candidates.ts');
+  const utils = await math('mathutils'), points = await both('points', 'src/math.ts'), scatter = await both('scatter', 'src/candidates.ts');
   const seeds = [0, -0, 1, -1, 7, 2 ** 31, 2 ** 32, 2 ** 32 + 5, -(2 ** 31), 2 ** 53, 1.5, -2.5, NaN, Infinity, -Infinity, 0x9e3779b1, 0x12345678];
   for (let i = 0; i < 200; i++) seeds.push(Math.floor(random() * 2 ** 32), (random() - 0.5) * 1e12);
   let n = 0;
@@ -238,7 +242,7 @@ families.push({name: 'seeded PRNGs', async verify() {
 
 // --- vec3 helpers: controls (add, sub, scale, dot, cross, length, normalize, clamp), machinery metrology/clearance/dimensions ---
 families.push({name: 'vec3 helpers', async verify() {
-  const vec3 = await import('@margoengine/math/vec3'), utils = await import('@margoengine/math/mathutils'), controls = (await both('controls', 'src/math.ts')).baseline;
+  const vec3 = await math('vec3'), utils = await math('mathutils'), controls = (await both('controls', 'src/math.ts')).baseline;
   // machinery's copies differ from controls' only in parameter types.
   const expression = code => code.replace(/^const\w+=\([^)]*\)(:\w+)?=>/, '');
   for (const [file, names] of [['packages/machinery/src/metrology.ts', ['sub', 'dot', 'cross']], ['packages/machinery/src/clearance.ts', ['dot', 'sub', 'cross']], ['packages/machinery/src/dimensions.ts', ['sub']]])

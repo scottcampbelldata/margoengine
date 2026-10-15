@@ -2,55 +2,46 @@
 // that do not import them:
 // 1. Every pre-existing entry of environment and post (and clustered, gltf-pro, materials, terrain, which the probes
 //    reach) bundles (Vite, minified, bare imports external, src and packages/shared from the ref) to the same bytes at `ref`
-//    and in the working tree, except the entries holding the SSR off-screen fallback (post's ssr.ts, gltf-pro's capture
+//    and at the candidate, except the entries holding the SSR off-screen fallback (post's ssr.ts, gltf-pro's capture
 //    hook), whose new text is emitted only next to LightProbes' `probeSpecular`; their GPU calls without probes are
-//    proven identical by post-ssr.proof.js, post-ssr-models.proof.js, gltf-pro-lighting-hooks.proof.js and
-//    oit-detached.proof.js run with the same ref. The other edit is `export` on environment's ShaderEffect.
+//    proven identical by part 3 and by gltf-pro-lighting-hooks.proof.js and oit-detached.proof.js run with the same refs
+//    (`node <proof> ecdcb31 7d144fb`). The other edit is `export` on environment's ShaderEffect.
 // 2. GPU calls: a 6-frame story of EnvironmentLighting + Fog on core's shader and a gltf-pro model records identical calls
 //    at `ref` and now, also with a LightProbes constructed but never attached; Decals with an empty list records nothing.
-// Run (after npm run build:packages): node examples/package-benchmarks/proofs/probes-decals.proof.js [ref]
+// Run (after npm run build:packages): node examples/package-benchmarks/proofs/probes-decals.proof.js [ref] [pin]
+// Pinned: ecdcb31 against 7d144fb, the commit that added probes and decals ("now" above). Part 1 is a statement about
+// that one change (later commits edit these sources for other reasons), so there is no --current mode.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {isAbsolute, resolve} from 'node:path';
-import {build} from 'vite';
-import {versions} from './compare.js';
+import {resolve} from 'node:path';
+import {refs, versions, bundle, commit, entryAt, announce} from './compare.js';
 import {mockGPU, context, passes} from './gpu-recorder.js';
 import {Engine, TransformStore} from '../../../packages/core/dist/extension.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
-import * as gltf from '../../../packages/gltf-pro/dist/index.js';
-import {LightProbes} from '../../../packages/environment/dist/probes.js';
-import {Decals} from '../../../packages/post/dist/decals.js';
 import {animatedTriangle} from '../../../tests/support/gltf-pro-fixture.js';
 
-const ref = process.argv[2] ?? 'ecdcb31', root = resolve(import.meta.dirname, '../../..'), slash = v => v.replaceAll('\\', '/');
-const commit = execFileSync('git', ['rev-parse', '--verify', `${ref}^{commit}`], {cwd: root, encoding: 'utf8'}).trim();
-const show = file => {try {return execFileSync('git', ['show', `${commit}:${file}`], {cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 26});} catch {return undefined;}};
-const bare = id => !id.startsWith('.') && !isAbsolute(id) && !/^[a-z]:[\\/]/i.test(id) && !id.startsWith('\0');
-async function bundle(name, entry, fromRef) {
-  const sources = [slash(resolve(root, 'packages', name, 'src')) + '/', slash(resolve(root, 'packages/shared')) + '/'];
-  const plugins = fromRef ? [{name: 'git-source', enforce: 'pre', load(id) {const file = slash(id.split('?')[0]); if (sources.some(s => file.startsWith(s))) return show(file.slice(slash(root).length + 1));}}] : [];
-  const out = await build({root: resolve(root, 'packages', name), configFile: false, publicDir: false, logLevel: 'silent', plugins,
-    build: {write: false, minify: true, target: 'es2022', lib: {entry: resolve(root, 'packages', name, entry), formats: ['es']}, rollupOptions: {external: bare}}});
-  return out[0].output.filter(item => item.type === 'chunk').map(chunk => chunk.code).join('\n');
-}
+const {ref, pin} = refs('ecdcb31', '7d144fb'), root = resolve(import.meta.dirname, '../../..'), base = commit(ref), now = pin && commit(pin);
+const show = file => execFileSync('git', ['show', `${base}:${file}`], {cwd: root, encoding: 'utf8', maxBuffer: 1 << 26});
+const code = async (name, entry, at) => (await bundle(name, entry, at, true)).map(chunk => chunk.code).join('\n');
+const gltf = await entryAt('gltf-pro', 'src/index.ts', pin), {LightProbes} = await entryAt('environment', 'src/probes.ts', pin), {Decals} = await entryAt('post', 'src/decals.ts', pin);
 // Existing sources edited: environment's lighting.ts (`export`), and the SSR off-screen fallback: post's ssr.ts and
 // gltf-pro's capture hook (shader.ts) emit new text only when the shader holds LightProbes' `probeSpecular`.
-const changed = execFileSync('git', ['diff', '--name-only', '--diff-filter=M', commit, '--', ...['environment', 'post', 'clustered', 'gltf-pro', 'materials', 'terrain', 'shared'].map(n => `packages/${n}/src`), 'packages/shared'], {cwd: root, encoding: 'utf8'}).split('\n').filter(Boolean);
+announce('entry bundles of environment, post, clustered, gltf-pro, materials, terrain', ref, pin);
+const changed = execFileSync('git', ['diff', '--name-only', '--diff-filter=M', base, ...now ? [now] : [], '--', ...['environment', 'post', 'clustered', 'gltf-pro', 'materials', 'terrain', 'shared'].map(n => `packages/${n}/src`), 'packages/shared'], {cwd: root, encoding: 'utf8'}).split('\n').filter(Boolean);
 assert.deepEqual(changed, ['packages/environment/src/lighting.ts', 'packages/gltf-pro/src/shader.ts', 'packages/post/src/ssr.ts'], 'unexpected edits to existing sources');
 let entries = 0;const differ = [];
 for (const name of ['environment', 'post', 'clustered', 'gltf-pro', 'materials', 'terrain']) {
   const manifest = JSON.parse(show(`packages/${name}/package.json`));
   for (const [path, target] of Object.entries(manifest.exports)) {
-    const entry = target.import.replace('./dist/', 'src/').replace(/\.js$/, '.ts');
-    const now = await bundle(name, entry, false);
-    if (now === await bundle(name, entry, true)) entries++; else {differ.push(name + path.slice(1)); assert.ok(now.includes('margoPosition'), `${name}${path.slice(1)} changed for another reason`);}
+    const entry = target.import.replace('./dist/', 'src/').replace(/\.js$/, '.ts'), after = await code(name, entry, now);
+    if (after === await code(name, entry, base)) entries++; else {differ.push(name + path.slice(1)); assert.ok(after.includes('margoPosition'), `${name}${path.slice(1)} changed for another reason`);}
   }
 }
-// Those entries' GPU calls without probes: post-ssr.proof.js, post-ssr-models.proof.js, gltf-pro-lighting-hooks.proof.js
-// and oit-detached.proof.js with this ref (identical, recorded in HANDOFF 5l.e).
+// Those entries' GPU calls without probes: part 3 below, gltf-pro-lighting-hooks.proof.js and oit-detached.proof.js with
+// these refs (identical, recorded in HANDOFF 5l.e).
 assert.ok(differ.includes('post/ssr') && differ.includes('gltf-pro'), 'the SSR wiring is in the bundles');
 // GPU calls of the scene effects the probes share code with (environment root), before and after.
-const {baseline, candidate} = await versions('environment', commit);
+const {baseline, candidate} = await versions('environment', ref, undefined, pin);
 async function story(environment, withProbes) {
   const gpu = mockGPU(), store = await TransformStore.create(32), canvas = {width: 128, height: 96, clientWidth: 128, clientHeight: 96};
   const renderer = {backend: 'webgpu', gpu: gpu.device, add() {}, remove() {}, render() {}, dispose() {}};
@@ -83,7 +74,7 @@ assert.deepEqual(gpu.record(() => {view.begin(1); passes(decals)(view.c);}), [],
 //    shaders, with a gltf-pro model reflecting through SSR's capture hook, 1x/4x, 12 frames (resize, option edits, toggle,
 //    restore): post and gltf-pro at `ref` and now record identical GPU calls. With LightProbes' shader the replay and the
 //    capture record the pixel position and remove probeSpecular.
-const post = await versions('post', commit), pro = await versions('gltf-pro', commit);
+const post = await versions('post', ref, undefined, pin), pro = await versions('gltf-pro', ref, undefined, pin);
 const ibl = wgsl.replace(/let linear=([^;]+);/, 'let margoAmbient=vec3f(0.5);let linear=$1+margoAmbient;') + '\nfn iblBrdfTerms(nv:f32,r:f32)->vec2f {return vec2f(1,0);}';
 async function ssrStory(m, g, make, samples, shader) {
   const gpu = mockGPU(), passList = [{order: 0, execute: c => c.draw()}], plugins = new Map(), store = await TransformStore.create(32);

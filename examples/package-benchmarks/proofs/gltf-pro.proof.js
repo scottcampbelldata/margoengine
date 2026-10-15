@@ -1,10 +1,11 @@
 // Proof for @margoengine/gltf-pro CPU setup: accessor decoding, vertex packing and prepared-geometry validation.
-// Run: node examples/package-benchmarks/proofs/gltf-pro.proof.js
+// Run: node examples/package-benchmarks/proofs/gltf-pro.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/gltf-pro.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
 import {Engine, TransformStore} from '@margoengine/core/extension';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('gltf-pro', ref);
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('gltf-pro', ref, undefined, pin);
 // A real engine and transform store with a no-op renderer: model construction is CPU only, no GPU is touched.
 const engine = new Engine({width: 256, height: 256, clientWidth: 256, clientHeight: 256}, await TransformStore.create(64), {backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {}});
 const bytesOf = view => Buffer.from(view.buffer, view.byteOffset, view.byteLength);
@@ -94,4 +95,4 @@ add('decode accessors only', api => {const asset = new api.GLTFAsset(full.doc, f
 const valid = prepared();
 add('validatePreparedGeometry', api => api.validatePreparedGeometry(valid));
 engine.dispose();
-await record('gltf-pro', ref, cases, 'Accessors decode through one typed reader straight into the output; vertices are packed and validated with indexed loops instead of subarray, spread and callback calls.');
+await record('gltf-pro', ref, cases, 'Accessors decode through one typed reader straight into the output; vertices are packed and validated with indexed loops instead of subarray, spread and callback calls.', pin);

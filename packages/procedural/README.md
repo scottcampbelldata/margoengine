@@ -83,7 +83,8 @@ continuous across simplex faces (no seams); values stay inside (-1, 1) (`SIMPLEX
 **Breaking change (5l.v):** `Noise.simplex` used to come from simplex-noise 4.0.3, whose 3D kernel (0.6) leaves small
 jumps on simplex faces. The same seed now gives a different (seamless) field; `perlin` and `worley` are unchanged. A world
 that must reproduce old simplex output pins `@margoengine/procedural` from before 5l.v. Diagnostic speed against the old
-dependency: `examples/package-benchmarks/proofs/procedural-deps.proof.js`.
+dependency: `examples/package-benchmarks/proofs/procedural-deps.proof.js`, a dated record (`fff47af`); re-running it needs
+the two old packages installed, otherwise it reports HISTORICAL.
 
 `fbm` divides by the total amplitude (the range stays the field's), `ridged` sums `(1 - |n|)^2`,
 `domainWarp` offsets each axis by `strength * warp(p + o)` (o = `WARP_OFFSETS`). The same names in

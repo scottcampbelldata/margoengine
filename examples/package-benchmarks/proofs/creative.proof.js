@@ -1,14 +1,15 @@
 // Proof for @margoengine/creative (PostProcessing): the linear-output shader patch is cached per source string instead of
 // re-running a regular expression over the scene shader every frame. Particles, grass, planet and toon are unchanged.
-// Run: node examples/package-benchmarks/proofs/creative.proof.js
+// Run: node examples/package-benchmarks/proofs/creative.proof.js [ref] [pin]
 import assert from 'node:assert/strict';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 import {mockGPU, passes, context} from './gpu-recorder.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
 
 // Built from post.ts: the package index also pulls in .wgsl?raw files, which the harness cannot load from a Git ref.
-// The candidate is pinned to 3319317, the last commit before bloom and the sky backdrop left PostProcessing.
-const ref = 'f05414a', {baseline, candidate} = await versions('creative', ref, 'src/post.ts', '3319317');
+// Pinned: f05414a against f47ff3f, the commit that recorded results/creative.json (bloom and the sky backdrop left
+// PostProcessing after 3319317, so the working tree no longer runs this story).
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('creative', ref, 'src/post.ts', pin);
 
 function scene(module, samples, options) {
   const gpu = mockGPU(), engine = {gpu: gpu.device}, post = new module.PostProcessing(options); post.setup(engine);
@@ -51,4 +52,4 @@ for (const [label, samples, options] of [['PostProcessing with bloom and sky, 4x
   const a = scene(baseline, samples, options), b = scene(candidate, samples, options); let ia = 0, ib = 0;
   cases.push({case: label, frames, ...time(() => {for (let i = 0; i < frames; i++) a.frame(ia++);}, () => {for (let i = 0; i < frames; i++) b.frame(ib++);})});
 }
-await record('creative', ref, cases, 'PostProcessing only. Mock WebGPU device: identical call sequence, descriptors and buffer bytes over a 26-frame story (resize, option/shader changes, error recovery, device restoration) at 1x and 4x. Times are CPU-side JavaScript only.');
+await record('creative', ref, cases, 'PostProcessing only. Mock WebGPU device: identical call sequence, descriptors and buffer bytes over a 26-frame story (resize, option/shader changes, error recovery, device restoration) at 1x and 4x. Times are CPU-side JavaScript only.', pin);

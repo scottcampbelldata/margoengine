@@ -3,19 +3,19 @@
 // gltf-pro composes it. A 14-frame story (effects added in different orders, a text-patching custom effect in between, the
 // environment going away and back, removals, an HDR and a canvas target, MSAA 1x/4x, beauty/SSAO-ambient/G-buffer draws, the
 // standard, physical, unlit and blended materials) records every GPU call, descriptor, shader module and buffer
-// write of gltf-pro + shadows + clustered + environment at `ref` and in the working tree: they must be identical.
-// Run (after npm run build:packages): node examples/package-benchmarks/proofs/gltf-pro-lighting-hooks.proof.js [ref]
-// Since 5c the IBL WGSL differs from refs before it (BRDF LUT buffer); binding-limit.proof.js maps that change back.
+// write of gltf-pro + shadows + clustered + environment at `ref` and at the candidate: they must be identical.
+// Run (after npm run build:packages): node examples/package-benchmarks/proofs/gltf-pro-lighting-hooks.proof.js [ref] [pin] [--current]
+// Pinned: 15c87f1 against cf2953e, the commit that replaced the text patches with hooks. --current: f8a36ca against the
+// working tree. f8a36ca (5c: IBL BRDF LUT as a storage buffer) is the last intentional change to the story's output; refs
+// before it (15c87f1, 114130c) differ from later trees only in that binding, which binding-limit.proof.js maps back.
 import assert from 'node:assert/strict';
-import {versions} from './compare.js';
+import {refs, versions} from './compare.js';
 import {mockGPU, context} from './gpu-recorder.js';
 import {Engine, TransformStore} from '../../../packages/core/dist/extension.js';
 import {animatedTriangle} from '../../../tests/support/gltf-pro-fixture.js';
 
-// f8a36ca is that 5c change, the last intentional change to the story's output; refs before it (15c87f1, 114130c) differ
-// only in the IBL BRDF LUT binding.
-const ref = process.argv[2] ?? 'f8a36ca';
-const load = async () => {const all = await Promise.all(['gltf-pro', 'shadows', 'clustered', 'environment'].map(name => versions(name, ref))); return ['baseline', 'candidate'].map(k => all.map(v => v[k]));};
+const {ref, pin} = refs('15c87f1', 'cf2953e', 'f8a36ca');
+const load = async () => {const all = await Promise.all(['gltf-pro', 'shadows', 'clustered', 'environment'].map(name => versions(name, ref, undefined, pin))); return ['baseline', 'candidate'].map(k => all.map(v => v[k]));};
 const [baseline, candidate] = await load();
 const materials = [{alphaMode: 'OPAQUE'}, {alphaMode: 'BLEND', pbrMetallicRoughness: {baseColorFactor: [1, 1, 1, 0.5]}}, {extensions: {KHR_materials_clearcoat: {clearcoatFactor: 1}}},
   {extensions: {KHR_materials_unlit: {}}}];

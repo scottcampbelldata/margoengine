@@ -1,12 +1,13 @@
 // Proof for @margoengine/road: the sweep writes each vertex, normal, UV and index straight into its typed array
 // instead of building a temporary array literal per attribute.
-// Run: node examples/package-benchmarks/proofs/road.proof.js
+// Run: node examples/package-benchmarks/proofs/road.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/road.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('road', ref);
-// Both sides sweep the same working-tree Spline, so only the road package differs.
-const {Spline} = (await versions('splines', ref)).candidate;
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('road', ref, undefined, pin);
+// Both sides sweep the same Spline (the candidate's), so only the road package differs.
+const {Spline} = (await versions('splines', ref, undefined, pin)).candidate;
 const outcome = (module, curve, options) => {
   try {const {geometry, uvs, section} = module.road(curve, options); return {vertices: geometry.vertices, indices: geometry.indices, bounds: geometry.bounds, uvs, section};}
   catch (error) {return `${error.constructor.name}: ${error.message}`;}
@@ -30,4 +31,4 @@ for (const [name, curve, options, sweeps] of [
   ['circuit, 1024 segments, custom section x 10', loop, {segments: 1024, crossSection: lane}, 10],
 ]) cases.push({case: name, vertices: (options.segments + 1) * ((options.crossSection ?? {length: 8}).length - 1) * 2, ...time(
   () => {for (let i = 0; i < sweeps; i++) baseline.road(curve, options);}, () => {for (let i = 0; i < sweeps; i++) candidate.road(curve, options);})});
-await record('road', ref, cases, 'Timings include the spline arc-length queries and core Geometry construction that road() performs; vertices, indices, bounds and UVs are bit-identical.');
+await record('road', ref, cases, 'Timings include the spline arc-length queries and core Geometry construction that road() performs; vertices, indices, bounds and UVs are bit-identical.', pin);

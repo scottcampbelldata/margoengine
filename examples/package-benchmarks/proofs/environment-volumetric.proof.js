@@ -6,21 +6,18 @@
 //    frame 8, every other GPU call (all calls outside its own pass, resource ids renumbered by first use), the lit shader
 //    and its bindings left on the pass context, and the frames before attach and after dispose are identical to the
 //    story without it. Its own pass makes one compute pass and one composite draw per frame.
-// Run (after npm run build:packages): node examples/package-benchmarks/proofs/environment-volumetric.proof.js [ref]
+// Run (after npm run build:packages): node examples/package-benchmarks/proofs/environment-volumetric.proof.js [ref] [pin] [--current]
+// Pinned: 7c47a09 against 366ebff, the commit that made this claim. --current: 7c47a09 against the working tree.
 import assert from 'node:assert/strict';
-import {writeFile} from 'node:fs/promises';
-import {resolve} from 'node:path';
-import {versions} from './compare.js';
+import {refs, versions, entryAt, save} from './compare.js';
 import {mockGPU, context} from './gpu-recorder.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
-import {Clustered} from '../../../packages/clustered/dist/index.js';
-import {Tonemap} from '../../../packages/tonemap/dist/index.js';
-import * as environment from '../../../packages/environment/dist/index.js';
-import {VolumetricFog} from '../../../packages/environment/dist/volumetric.js';
 
-const ref = process.argv[2] ?? '7c47a09';
-// 1. Root entry at ref vs working tree.
-const {baseline, candidate} = await versions('environment', ref);
+const {ref, pin} = refs('7c47a09', '366ebff', '7c47a09');
+// 1. Root entry at ref vs the candidate (the pin, or the working tree).
+const {baseline, candidate} = await versions('environment', ref, undefined, pin);
+// 2. runs on the candidate's packages.
+const [{Clustered}, {Tonemap}, environment, {VolumetricFog}] = await Promise.all([['clustered', 'src/index.ts'], ['tonemap', 'src/index.ts'], ['environment', 'src/index.ts'], ['environment', 'src/volumetric.ts']].map(([name, entry]) => entryAt(name, entry, pin)));
 const rootStory = module => {
   const gpu = mockGPU(), engine = {backend: 'webgpu', gpu: gpu.device, removePlugin() {}, onError() {}}, view = context(gpu, {samples: 4, shader: wgsl, format: 'bgra8unorm'});
   return gpu.record(() => {
@@ -79,4 +76,4 @@ for (const samples of [1, 4]) {
   report.stories[samples + 'x'] = {identicalCalls: without.calls.length, volumetricCalls: withFog.ownPasses.reduce((s, p) => s + p.length, 0)};
 }
 console.log(JSON.stringify(report));
-await writeFile(resolve(import.meta.dirname, 'results/environment-volumetric.json'), JSON.stringify(report, null, 2) + '\n');
+await save('environment-volumetric', {...report, candidate: pin ?? 'working tree'});

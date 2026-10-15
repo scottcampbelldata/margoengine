@@ -5,14 +5,17 @@
 //   shared   - one packAtlas texture, 256 Materials that differ only in uvTransform, 256 meshes (one texture, same draws);
 //   merged   - one packAtlas texture, region UVs baked with transformUVs, boxes merged with @margoengine/geometry: one mesh.
 // Run: node examples/package-benchmarks/proofs/materials-atlas.proof.js
+// Pinned: geometry and materials built at 700838e, the commit that recorded results/materials-atlas.json (--current: the
+// working tree's builds).
 import assert from 'node:assert/strict';
-import {writeFile} from 'node:fs/promises';
-import {resolve} from 'node:path';
 import {performance} from 'node:perf_hooks';
 import {Engine, TransformStore} from '@margoengine/core/extension';
-import {boxGeometry, mergeGeometries, applyMatrix4} from '@margoengine/geometry';
-import {Texture, Material, createMesh, packAtlas, transformUVs} from '@margoengine/materials';
+import {current, entryAt, announce, save} from './compare.js';
 import {mockGPU, context} from './gpu-recorder.js';
+
+const pin = current ? undefined : '700838e';
+announce('geometry + materials (measured, no baseline)', '-', pin);
+const [{boxGeometry, mergeGeometries, applyMatrix4}, {Texture, Material, createMesh, packAtlas, transformUVs}] = await Promise.all(['geometry', 'materials'].map(name => entryAt(name, 'src/index.ts', pin)));
 
 const count = 256, side = 16, images = Array.from({length: count}, (_, k) => ({width: 32, height: 32, data: Uint8Array.from({length: 32 * 32 * 4}, (_, i) => (i * (k + 3) + k) % 256)}));
 const place = k => [(k % side - side / 2) * 1.5, 0, (Math.floor(k / side) - side / 2) * 1.5];
@@ -46,6 +49,6 @@ const results = {};
 for (const variant of ['separate', 'shared', 'merged']) {results[variant] = await scene(variant); console.log(variant, JSON.stringify(results[variant]));}
 assert.equal(results.separate.draws, count); assert.equal(results.shared.draws, count); assert.equal(results.merged.draws, 1);
 assert.equal(results.separate.texturesCreated - results.shared.texturesCreated, count - 1, 'one atlas texture replaces 256');
-const report = {proof: 'materials-atlas', node: process.version, recordedAt: new Date().toISOString(), objects: count, image: '32x32 RGBA each, atlas 1024x512 with 2-texel padding', results,
+const report = {proof: 'materials-atlas', packages: pin ?? 'working tree', node: process.version, recordedAt: new Date().toISOString(), objects: count, image: '32x32 RGBA each, atlas 1024x512 with 2-texel padding', results,
   notes: 'Counts are one steady frame on the recording mock GPU. gltf-pro draws one call per mesh and caches pipelines per model, so sharing a texture alone does not cut draws; merging atlas-mapped geometry does (static meshes only).'};
-await writeFile(resolve(import.meta.dirname, 'results/materials-atlas.json'), JSON.stringify(report, null, 2) + '\n');
+await save('materials-atlas', report);

@@ -721,6 +721,9 @@ test('Loop subdivision quadruples faces, stays watertight and converges toward a
   const plane = loopSubdivide(planeGeometry(2, 2, 2, 2), 2);
   for (let i = 0; i < vcount(plane); i++) {close(P(plane, i)[2], 0, 1e-9); assert.ok(Math.abs(P(plane, i)[0]) <= 1 + 1e-9);}
   close(surfaceArea(plane), 4, 1, 'boundary rule shrinks only the corners');
+  // An index past the vertices is a named error (it used to surface as a TypeError from inside the edge table).
+  const bad = {...planeGeometry(1, 1, 1, 1)}; bad.indices = Uint32Array.from([0, 1, 9]);
+  assert.throws(() => loopSubdivide(bad, 1), {name: 'RangeError', message: 'loopSubdivide: index 9 is past the 4 vertices'});
 });
 
 // ---------- core interop ----------

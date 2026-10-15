@@ -1,13 +1,14 @@
 // Proof for SSR (@margoengine/post/ssr): a PostStack without SSR makes exactly the GPU calls it made before SSR existed,
 // over a story of resizes, option edits, depth-format, sample-count and canvas-format changes, a rejected frame, device
 // restoration and disposal at 1x and 4x, for several effect lists. (The single-effect stories are post-stack.proof.js.)
-// Run: node examples/package-benchmarks/proofs/post-ssr.proof.js [ref]   (ref: the commit before SSR, default 7c47a09)
+// Run: node examples/package-benchmarks/proofs/post-ssr.proof.js [ref] [pin] [--current]   (ref: the commit before SSR, default 7c47a09)
+// Pinned: 7c47a09 against 3cf1453, the commit that made this claim. --current: 7c47a09 against the working tree.
 import assert from 'node:assert/strict';
-import {versions} from './compare.js';
+import {refs, versions, ignoreAgx} from './compare.js';
 import {mockGPU, context} from './gpu-recorder.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
 
-const ref = process.argv[2] ?? '7c47a09', post = await versions('post', ref);
+const {ref, pin} = refs('7c47a09', '3cf1453', '7c47a09'), post = await versions('post', ref, undefined, pin);
 
 function story(m, make, samples) {
   const gpu = mockGPU(), passes = [{order: 0, execute: c => c.draw()}], plugins = new Map();
@@ -42,7 +43,7 @@ const lists = {
 };
 let calls = 0;
 for (const [label, make] of Object.entries(lists)) for (const samples of [1, 4]) {
-  const expected = story(post.baseline, make, samples), actual = story(post.candidate, make, samples);
+  const expected = ignoreAgx(story(post.baseline, make, samples), ref), actual = ignoreAgx(story(post.candidate, make, samples), ref);
   assert.ok(expected.length > 300, `${label} story must exercise the GPU`);
   assert.deepEqual(actual, expected, `PostStack [${label}] GPU calls differ at ${samples}x`); calls += expected.length;
 }

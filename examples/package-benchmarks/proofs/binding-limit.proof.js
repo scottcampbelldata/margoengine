@@ -5,15 +5,16 @@
 // blended materials) records every GPU call of gltf-pro + shadows + clustered + environment at `ref` and in the working tree.
 // Without IBL: identical. With IBL: identical once the intended change is mapped back (the IBL WGSL: LUT declaration,
 // iblBrdfTerms, iblShade's arguments; and the LUT bind group entry, a view before, a buffer binding now).
-// Run (after npm run build:packages): node examples/package-benchmarks/proofs/binding-limit.proof.js [ref]
+// Run (after npm run build:packages): node examples/package-benchmarks/proofs/binding-limit.proof.js [ref] [pin]
+// Pinned: e017d50 against f8a36ca, the 5c commit that made this claim, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import {versions} from './compare.js';
+import {refs, versions} from './compare.js';
 import {mockGPU, context} from './gpu-recorder.js';
 import {Engine, TransformStore} from '../../../packages/core/dist/extension.js';
 import {animatedTriangle} from '../../../tests/support/gltf-pro-fixture.js';
 
-const ref = process.argv[2] ?? 'e017d50';
-const all = await Promise.all(['gltf-pro', 'shadows', 'clustered', 'environment'].map(name => versions(name, ref)));
+const {ref, pin} = refs('e017d50', 'f8a36ca');
+const all = await Promise.all(['gltf-pro', 'shadows', 'clustered', 'environment'].map(name => versions(name, ref, undefined, pin)));
 const [baseline, candidate] = ['baseline', 'candidate'].map(k => all.map(v => v[k]));
 const materials = [{alphaMode: 'OPAQUE'}, {alphaMode: 'BLEND', pbrMetallicRoughness: {baseColorFactor: [1, 1, 1, 0.5]}}, {extensions: {KHR_materials_clearcoat: {clearcoatFactor: 1}}},
   {extensions: {KHR_materials_unlit: {}}}];

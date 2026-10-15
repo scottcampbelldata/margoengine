@@ -1,9 +1,10 @@
 // Proof for @margoengine/text: single ASCII characters are classified (whitespace, bidi class, ideograph) by char
 // code instead of by Unicode patterns, ASCII-only strings skip Intl.Segmenter, and Font caches kerning per left
 // cluster instead of building a joined key for every pair.
-// Run: node examples/package-benchmarks/proofs/text.proof.js
+// Run: node examples/package-benchmarks/proofs/text.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/text.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 
 // Font measures through a 2D canvas. This stand-in gives deterministic widths (with pair kerning for "AV"-like
 // pairs) and records every measureText call, so both versions must measure the same strings in the same order.
@@ -20,7 +21,7 @@ globalThis.OffscreenCanvas = class {
   }
 };
 
-const ref = 'f05414a', {baseline, candidate} = await versions('text', ref);
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('text', ref, undefined, pin);
 const same = (run, message) => {
   measured.length = 0; const a = run(baseline), callsA = measured.slice();
   measured.length = 0; const b = run(candidate);
@@ -90,4 +91,4 @@ for (const bad of [{opacity: 2}, {outlineWidth: -1}, {anchorX: 'middle'}, {shado
   const make = module => {const font = new module.Font(), list = tags.map(text => new module.Text({text, font, outlineWidth: 0.02, shadowOpacity: 0.5})); return () => {for (let frame = 0; frame < 120; frame++) for (const text of list) text.validate();};};
   cases.push({case: 'Text.validate, 150 texts per frame', frames: 120, ...time(make(baseline), make(candidate))});
 }
-await record('text', ref, cases, 'ASCII fast paths in bidiClass, isWhitespace, isIdeograph and graphemes; Font.kerning caches in a map per left cluster. Text.validate checks its fields without building arrays. Layout arithmetic is unchanged.');
+await record('text', ref, cases, 'ASCII fast paths in bidiClass, isWhitespace, isIdeograph and graphemes; Font.kerning caches in a map per left cluster. Text.validate checks its fields without building arrays. Layout arithmetic is unchanged.', pin);

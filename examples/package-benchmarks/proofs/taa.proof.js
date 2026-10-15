@@ -1,11 +1,12 @@
 // Proof for @margoengine/taa: per-frame pass descriptors, the patched shader and uniform packing are reused instead of rebuilt.
-// Run: node examples/package-benchmarks/proofs/taa.proof.js
+// Run: node examples/package-benchmarks/proofs/taa.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/taa.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 import {mockGPU, passes, context} from './gpu-recorder.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('taa', ref);
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('taa', ref, undefined, pin);
 
 /** One engine with TAA attached: core meshes (stride 24), an optional PBR velocity source (stride 80), and a frame driver. */
 function scene(module, samples, meshCount, pbrCount) {
@@ -67,4 +68,4 @@ for (const [label, samples, meshCount, pbrCount, frames] of [['300 meshes + 100 
   const a = scene(baseline, samples, meshCount, pbrCount), b = scene(candidate, samples, meshCount, pbrCount); let ia = 0, ib = 0;
   cases.push({case: label, frames, ...time(() => {for (let i = 0; i < frames; i++) a.frame(ia++);}, () => {for (let i = 0; i < frames; i++) b.frame(ib++);})});
 }
-await record('taa', ref, cases, 'Mock WebGPU device: identical call sequence, descriptors and buffer bytes over a 44-frame story (resize, projection/option/shader changes, hidden/removed meshes, error recovery, device restoration) at 1x and 4x. Times are CPU-side JavaScript only.');
+await record('taa', ref, cases, 'Mock WebGPU device: identical call sequence, descriptors and buffer bytes over a 44-frame story (resize, projection/option/shader changes, hidden/removed meshes, error recovery, device restoration) at 1x and 4x. Times are CPU-side JavaScript only.', pin);

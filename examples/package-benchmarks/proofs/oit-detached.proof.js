@@ -3,15 +3,16 @@
 // write of a 6-frame story: opaque, MASK, BLEND, BLEND + transmission, BLEND + clearcoat (physical) and a BLEND material
 // with a custom renderState, a text-patching lighting effect added and removed, a hidden blended node, an HDR and a
 // canvas target, MSAA 1x/4x, beauty/SSAO-ambient/G-buffer draws through the frame graph and directly. They must be identical.
-// Run (after npm run build:packages): node examples/package-benchmarks/proofs/oit-detached.proof.js [ref]
+// Run (after npm run build:packages): node examples/package-benchmarks/proofs/oit-detached.proof.js [ref] [pin] [--current]
+// Pinned: b803d56 against 0e02ead, the commit that made this claim. --current: b803d56 against the working tree.
 import assert from 'node:assert/strict';
-import {versions} from './compare.js';
+import {refs, versions} from './compare.js';
 import {mockGPU, context} from './gpu-recorder.js';
 import {Engine, TransformStore} from '../../../packages/core/dist/extension.js';
 import {animatedTriangle} from '../../../tests/support/gltf-pro-fixture.js';
 
-const ref = process.argv[2] ?? 'b803d56';
-const {baseline, candidate} = await versions('gltf-pro', ref);
+const {ref, pin} = refs('b803d56', '0e02ead', 'b803d56');
+const {baseline, candidate} = await versions('gltf-pro', ref, undefined, pin);
 const materials = [{}, {alphaMode: 'MASK', alphaCutoff: 0.3}, {alphaMode: 'BLEND', pbrMetallicRoughness: {baseColorFactor: [1, 0, 0, 0.5]}},
   {alphaMode: 'BLEND', extensions: {KHR_materials_transmission: {transmissionFactor: 0.5}}},
   {alphaMode: 'BLEND', pbrMetallicRoughness: {baseColorFactor: [0, 0, 1, 0.4]}, extensions: {KHR_materials_clearcoat: {clearcoatFactor: 1}}},

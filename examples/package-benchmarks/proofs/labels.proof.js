@@ -1,12 +1,13 @@
 // Proof for @margoengine/labels: a label's transform text is formatted and compared again only when one of the
 // numbers it is built from (rounded pixel position, distance scale, anchor) changed since the last frame.
-// Run: node examples/package-benchmarks/proofs/labels.proof.js
+// Run: node examples/package-benchmarks/proofs/labels.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/labels.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
 import {Camera} from '@margoengine/core';
 import {fakeEngine} from '../../../packages/labels/tests/fake-dom.js';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('labels', ref);
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('labels', ref, undefined, pin);
 const noise = seed => {let s = seed >>> 0; return () => ((s = Math.imul(s ^ s >>> 15, s | 1) + 0x6d2b79f5 >>> 0) / 4294967296);};
 
 // A scene of `count` labels over a 1280 x 720 canvas: half follow meshes (local or world offsets), half sit at fixed
@@ -63,4 +64,4 @@ for (const [name, animate] of [
   };
   cases.push({case: name, frames, ...time(make(baseline), make(candidate))});
 }
-await record('labels', ref, cases, 'The gain is on frames where labels keep their pixel position. With the camera orbiting every transform is rewritten and six runs of that case measured 0.77x to 1.13x (median about 1.0), so it is not recorded as a case.');
+await record('labels', ref, cases, 'The gain is on frames where labels keep their pixel position. With the camera orbiting every transform is rewritten and six runs of that case measured 0.77x to 1.13x (median about 1.0), so it is not recorded as a case.', pin);

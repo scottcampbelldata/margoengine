@@ -6,19 +6,17 @@
 //    (explicit options always win).
 // Story per package: setup on a core Engine over the recording mock GPU, 8 frames at 1x and 4x MSAA with a resize and a
 // device restore, then dispose.
-// Run (after npm run build:packages): node examples/package-benchmarks/proofs/quality-presets.proof.js [ref]
+// Run (after npm run build:packages): node examples/package-benchmarks/proofs/quality-presets.proof.js [ref] [pin] [--current]
+// Pinned: 96daac7 against 01e5e35, the commit that recorded results/quality-presets.json. --current: 96daac7 against the
+// working tree.
 import assert from 'node:assert/strict';
-import {writeFile} from 'node:fs/promises';
-import {resolve} from 'node:path';
-import {versions} from './compare.js';
+import {refs, versions, entryAt, save} from './compare.js';
 import {mockGPU, context} from './gpu-recorder.js';
 import {Engine, TransformStore} from '../../../packages/core/dist/extension.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
-import {Clustered} from '../../../packages/clustered/dist/index.js';
-import {Tonemap} from '../../../packages/tonemap/dist/index.js';
-import {QUALITY_PRESETS} from '../../../packages/quality/dist/index.js';
 
-const ref = process.argv[2] ?? '96daac7', light = QUALITY_PRESETS.light;
+const {ref, pin} = refs('96daac7', '01e5e35');
+const [{Clustered}, {Tonemap}, {QUALITY_PRESETS}] = await Promise.all(['clustered', 'tonemap', 'quality'].map(name => entryAt(name, 'src/index.ts', pin))), light = QUALITY_PRESETS.light;
 const point = {position: [0, 2, 1], range: 6, intensity: 9, castShadow: true}, spot = {position: [1, 3, 0], range: 8, direction: [0, -1, 0.2], outerAngle: 0.6, intensity: 20, castShadow: true};
 // key: [package, entry, make(module, options) -> effects (the measured one last), base options, explicit values for every preset key]
 const cases = {
@@ -54,9 +52,9 @@ async function story(make, samples, preset) {
   } finally {delete globalThis.margoPreset; engine.dispose();}
 }
 
-const report = {baseline: ref, recordedAt: new Date().toISOString(), preset: light, packages: {}};
+const report = {baseline: ref, candidate: pin ?? 'working tree', recordedAt: new Date().toISOString(), preset: light, packages: {}};
 for (const [key, [name, entry, make, base, explicit]] of Object.entries(cases)) {
-  const {baseline, candidate} = await versions(name, ref, entry), row = report.packages[key] = {package: name, entry, calls: 0};
+  const {baseline, candidate} = await versions(name, ref, entry, pin), row = report.packages[key] = {package: name, entry, calls: 0};
   for (const samples of [1, 4]) {
     const run = (module, options, preset) => story(() => make(module, options), samples, preset);
     const defaults = await run(baseline, base);
@@ -71,10 +69,9 @@ for (const [key, [name, entry, make, base, explicit]] of Object.entries(cases)) 
 }
 // VFX: an explicit initialCount above the preset capacity keeps the default capacity instead of throwing.
 {
-  const {candidate} = await versions('vfx', ref), options = {initialCount: 500_000};
+  const {candidate} = await versions('vfx', ref, undefined, pin), options = {initialCount: 500_000};
   assert.deepEqual(await story(() => [new candidate.VFX(options)], 1, light), await story(() => [new candidate.VFX(options)], 1), 'vfx: explicit initialCount over the preset capacity');
   report.packages.vfx.initialCountOverPreset = 'identical to no preset';
 }
-const out = resolve(import.meta.dirname, 'results/quality-presets.json');
-await writeFile(out, JSON.stringify(report, null, 2) + '\n');
-console.log(JSON.stringify(Object.fromEntries(Object.entries(report.packages).map(([k, v]) => [k, v.calls]))), 'recorded calls identical to', ref, 'without a preset; wrote', out);
+await save('quality-presets', report);
+console.log(JSON.stringify(Object.fromEntries(Object.entries(report.packages).map(([k, v]) => [k, v.calls]))), 'recorded calls identical to', ref, 'without a preset, candidate', report.candidate);

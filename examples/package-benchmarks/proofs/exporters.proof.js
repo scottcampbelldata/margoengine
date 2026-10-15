@@ -1,9 +1,10 @@
 // Proof for @margoengine/exporters: number formatting, world-space baking and the per-format writers.
-// Run: node examples/package-benchmarks/proofs/exporters.proof.js
+// Run: node examples/package-benchmarks/proofs/exporters.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/exporters.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('exporters', ref);
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('exporters', ref, undefined, pin);
 // Number formatting is shared by every text format, so check it alone first through OBJ `v` lines under an identity
 // transform: both neighbours of every power of ten and two, subnormals, integers, and two million random Float32 bit patterns.
 const bits = new Uint32Array(1), float = new Float32Array(bits.buffer), samples = [0, -0, 0.1, 1 / 3, Math.PI, 1e-45, -1e-45, 3.4028234663852886e38, 16777216, 16777217, 0.5, 100, 1e9, 123456789];
@@ -84,4 +85,4 @@ for (const bad of [api => api.exportUSDZ({nodes: []}), api => api.exportUSDZ(ric
   api => api.exportOBJ({nodes: [{geometry: small, scale: [0, 1, 1]}]}), api => api.exportPLY({nodes: [{geometry: {...small, indices: [0, 1, 99999]}}]})]) {
   const expected = outcome(() => bad(baseline)); assert.ok(expected); assert.deepEqual(outcome(() => bad(candidate)), expected);
 }
-await record('exporters', ref, cases, 'num() finds the shortest Float32 decimal with exact integer arithmetic (string search kept as the fallback); writers stream values instead of building per-vertex arrays; base64 encodes bytes; USDZ CRC uses a table.');
+await record('exporters', ref, cases, 'num() finds the shortest Float32 decimal with exact integer arithmetic (string search kept as the fallback); writers stream values instead of building per-vertex arrays; base64 encodes bytes; USDZ CRC uses a table.', pin);

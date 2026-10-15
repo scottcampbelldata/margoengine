@@ -1,12 +1,13 @@
 // Proof for @margoengine/post (SSAO): the two shader patches are cached per source string, and pass descriptors and
 // uniform packing are reused instead of rebuilt each frame. Bloom and SceneFade are unchanged.
-// Run: node examples/package-benchmarks/proofs/post.proof.js
+// Run: node examples/package-benchmarks/proofs/post.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/post.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 import {mockGPU, passes, context} from './gpu-recorder.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('post', ref);
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('post', ref, undefined, pin);
 
 function scene(module, samples, sources) {
   const gpu = mockGPU(), engine = {gpu: gpu.device, hasPlugin: () => false, removePlugin() {}};
@@ -52,4 +53,4 @@ for (const [label, samples, sources] of [['SSAO frame, 4x MSAA', 4, 0], ['SSAO f
   const a = scene(baseline, samples, sources), b = scene(candidate, samples, sources); let ia = 0, ib = 0;
   cases.push({case: label, frames, ...time(() => {for (let i = 0; i < frames; i++) a.frame(ia++);}, () => {for (let i = 0; i < frames; i++) b.frame(ib++);})});
 }
-await record('post', ref, cases, 'SSAO only. Mock WebGPU device: identical call sequence, descriptors and buffer bytes over a 30-frame story (resize, option/shader changes, rejected shader, error recovery, device restoration) at 1x and 4x. Times are CPU-side JavaScript only.');
+await record('post', ref, cases, 'SSAO only. Mock WebGPU device: identical call sequence, descriptors and buffer bytes over a 30-frame story (resize, option/shader changes, rejected shader, error recovery, device restoration) at 1x and 4x. Times are CPU-side JavaScript only.', pin);
