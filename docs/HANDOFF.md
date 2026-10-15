@@ -761,7 +761,31 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       meshes reflect (glTF-pro, water, terrain need a replay source); 1080p trace is the cost (half-res trace = upgrade).
       Finding: SSAO's ambient replay uses `_=` and so still runs the full lighting; the same dead-block trick would cut it.
    b. [running] Volumetric fog and light shafts (sun and clustered lights; replaces ad-hoc god rays where it fits).
-   c. [running] Progressive glTF loading: bounds/low-res first, full detail streamed in (works with the worker path).
+   c. [DONE] Progressive glTF loading: `@margoengine/gltf-pro/progressive` (`src/progressive.ts` main thread,
+      `src/stream.ts` network + decode, `src/progressive.worker.ts` -> `dist/workers/progressive.js`). API:
+      `const load = loadGLTFProgressive(engine, url, {onProgress, frameBudget = 4, signal, decoders})` ->
+      `{ready, complete, abort()}`. `ready`: the PBRModel with every node and one box per primitive (POSITION min/max,
+      material factors, no textures), bounds valid; `onProgress` stages ready/geometry/textures/complete with bytes,
+      primitives and images counts. Geometry streams by priority (in frustum first, then radius/distance), re-sent
+      when the camera moves (<= every 200 ms): range requests rounded to 256 KB blocks, ~1 MB batches, a new batch only
+      once < 1 MB is outstanding; a server without Range streams the whole file and primitives decode as bytes land.
+      Main thread uploads within `frameBudget` ms/frame (1 MB buffer writes; one texture + mips per step) and swaps a
+      primitive's draw resource by re-running gltf-pro's own `setup` on it (root change: setup's GPU caches became the
+      model field `gpuCache`, +8 B root gzip). Textures after geometry, then the remaining bytes; `complete` is
+      byte-identical to `loadGLTF` (GPU: every draw resource's vertex/index/uniform bytes, bound texture descriptors
+      and uploads, samplers; CPU: doc, buffers, accessors, primitives, images, store), `tests/progressive.test.js`
+      (DamagedHelmet, RobotExpressive, generated grids, EXT_mesh_gpu_instancing via `decoders.instancing`, .gltf +
+      .bin; range and no-range servers; worker script in-process and main-thread fallback; priority, abort, errors).
+      Draco/meshopt/KTX2 decoders fall back to `loadGLTF`. Size: +3.0 kB gzip over an app already using `loadGLTF`;
+      worker script 7.3 kB; 4.0 kB lazy fallback chunk. Real browser (`examples/package-benchmarks/progressive/run.mjs`,
+      `results/progressive-gltf.json`, Edge 155, Arc 140V, AC, quiet-gated, gpu-lock; throttled local server; camera
+      orbiting; medians of 4) first visible / complete / max frame gap, plain -> worker -> progressive:
+      50 Mbit/s 40 ms: DamagedHelmet 1158/1157/42 -> 1156/1155/19 -> 96/1175/37 ms; 41 MB generated 6913/6912/339 ->
+      7049/7048/137 -> 92/6945/20; 2,000-part assembly 2276/2238/289 -> 2493/2450/206 -> 474/2471/162 (interactive
+      590; one 115 ms task building 2,000 nodes). 10 Mbit/s 100 ms: helmet 3346/3345/26 -> 3431/3430/19 -> 142/3775/35;
+      assembly 10342/10291/330 -> 10571/10533/213 -> 1405/10408/141. Limits: no MSFT_lod/gltfpack LODs, no low-res
+      mip first, boxes as placeholders, helpers (animation, shadows, bvh, selection) attach after `complete`, device
+      loss during the load not handled. Next: build the 2,000 placeholder boxes over frames (the 115 ms task).
    d. After the core culling (B) and large-coordinate agents merge: massive-scene streaming (hierarchical LOD,
       chunked loading, GPU culling for core-mesh-like parts) and a plan for core's 100,000-entity cap (raising it is a
       core change: measure memory/bytes, Scott decides).
