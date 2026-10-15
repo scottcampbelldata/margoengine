@@ -82,6 +82,7 @@ npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @
 | `AnimationMixer`, skinning, morphs | `@margoengine/animation` (+ `@margoengine/animator` for blending) |
 | `DirectionalLight` shadows | `@margoengine/shadows` |
 | `PointLight`, `SpotLight` (and their shadows) | `@margoengine/clustered` (shadows: `@margoengine/clustered/shadows`) |
+| `RectAreaLight` | `@margoengine/clustered/area` |
 | `RGBELoader`, `EXRLoader`, `PMREMGenerator`, `scene.background`, `scene.fog` | `@margoengine/environment` |
 | Volumetric fog and light shafts (`VolumeNodeMaterial`) | `@margoengine/environment/volumetric` |
 | `Sky` add-on | `@margoengine/sky` |
@@ -353,8 +354,8 @@ lights.add(model);                           // core meshes are lit automaticall
 
 - Shadows are four cascades with PCSS soft edges; `shadows.add(mesh, {static: true})` caches casters that never move.
 - `setLights` replaces the whole list; call it again to animate lights.
-- One directional light per engine. No hemisphere, rect-area or IES lights (glTF models get a fixed sky/ground ambient
-  fill). For image-based ambient light use the next section.
+- One directional light per engine. No hemisphere or IES lights (glTF models get a fixed sky/ground ambient fill); rect
+  area lights are below. For image-based ambient light use the next section.
 
 Point and spot light shadows (three.js `lamp.castShadow = true`) are the optional `@margoengine/clustered/shadows` entry.
 Flag the lights, attach `LocalShadows` to the clustered lights and add the casters (core meshes included, unlike
@@ -377,6 +378,33 @@ lamps.setLights([
 
 - A point light uses six 512² cube-face layers, a spot light one; the first `maxLights` flagged lights get them.
 - Maps are cached and re-render only when their light or a caster moves; add skinned models with `{dynamic: true}`.
+
+Rectangle area lights (three.js `RectAreaLight` plus `RectAreaLightUniformsLib.init()`) are the optional
+`@margoengine/clustered/area` entry, on top of the clustered lights:
+
+```js
+RectAreaLightUniformsLib.init();
+const panel = new THREE.RectAreaLight('#fff2e0', 8, 1.6, 0.6); // colour, intensity (nits), width, height
+panel.position.set(0, 2.5, 0);
+panel.lookAt(0, 0, 0);
+scene.add(panel);
+```
+
+```ts
+import {Clustered} from '@margoengine/clustered';
+import {AreaLights} from '@margoengine/clustered/area';
+
+const local = Clustered.attach(engine);
+const panels = AreaLights.attach(engine, {lights: local});
+panels.setLights([
+  {position: [0, 2.5, 0], direction: [0, -1, 0], width: 1.6, height: 0.6, color: [1, 0.95, 0.88], intensity: 8},
+  {position: [3, 1, 0], direction: [-1, 0, 0], up: [0, 1, 0], width: 0.4, height: 2, intensity: 4, twoSided: true},
+]);
+local.add(model);                             // receivers, as for point and spot lights
+```
+
+- `direction` is the side the panel lights (three.js's `lookAt` target minus position); `up` turns it about that axis.
+- `intensity` is radiance, as three.js's; colours are linear. No shadows from area lights.
 
 The soft ground shadow of product shots (three.js's ContactShadows example: a depth render from below, blurred, on a
 plane) is `@margoengine/staging`. It needs no light and works with or without `Shadows`:
@@ -1085,7 +1113,7 @@ From [`docs/threejs-parity.md`](threejs-parity.md). Each would be an optional pa
 | --- | --- |
 | Several scenes or viewports, render to texture from a second camera, `CubeCamera` | Missing; needs core changes |
 | WebGL2 for optional packages | Missing: core meshes, controls, labels, viewcube, bvh, LOD distance levels and the small glTF loader run on WebGL2; the rest needs WebGPU |
-| More than one directional light, coloured ambient, configurable `HemisphereLight`, `RectAreaLight`, IES lights | Missing; point and spot lights via clustered, a fixed hemisphere fill in glTF-pro |
+| More than one directional light, coloured ambient, configurable `HemisphereLight`, IES lights | Missing; point, spot and rectangle area lights via clustered, a fixed hemisphere fill in glTF-pro |
 | `ShadowMaterial` on any mesh | Missing (`@margoengine/staging` ContactShadows is a ground shadow catcher for product shots) |
 | glTF `KHR_animation_pointer`, iridescence, anisotropy, dispersion, material variants; applying glTF cameras | Missing (files that require them are rejected; cameras are exposed as data) |
 | `MeshPhysicalMaterial`, Lambert, Phong, depth materials on your own meshes | Missing (glTF physical extensions are approximated; transmission does not refract) |

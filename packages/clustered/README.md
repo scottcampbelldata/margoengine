@@ -1,6 +1,6 @@
 # @margoengine/clustered
 
-Optional clustered forward GGX lighting for up to 1,024 point/spot lights. A compute pass builds logarithmic-depth frustum AABBs and tests view-space light spheres and conservative spot-cone bounds. Fragment shaders calculate their screen/depth cluster and evaluate only its light list. This preserves forward alpha blending and does not require a deferred G-buffer.
+Optional clustered forward GGX lighting for up to 1,024 point/spot lights, plus rectangle area lights (`@margoengine/clustered/area`, below). A compute pass builds logarithmic-depth frustum AABBs and tests view-space light spheres and conservative spot-cone bounds. Fragment shaders calculate their screen/depth cluster and evaluate only its light list. This preserves forward alpha blending and does not require a deferred G-buffer.
 
 ```ts
 import {EngineKernel,box} from '@margoengine/core';
@@ -53,6 +53,33 @@ Without the entry nothing changes: `clustered`'s light loop composes the shadow 
 Limits: casters from `drawShadow` sources (terrain, scatter) are not drawn into local maps; every caster is drawn into every re-rendered layer (no per-light culling), so moving casters cost `layers × casters` draws per frame; the light's own geometry should not be a caster (it would cover the light); no colored, transmissive or soft (PCSS) local shadows; spot frusta wider than about 140° lose resolution; the map adds one sampled texture and one sampler to the lit shader: a gltf-pro physical material (13 maps) with directional `Shadows`, IBL and LocalShadows uses exactly the 16 per stage that WebGPU guarantees on every device, so one more texture on it throws a `RangeError` naming the combination (gltf-pro README, "Texture bindings"). WebGPU only.
 
 Measured (`examples/package-benchmarks/local-shadows-gpu.mjs`, Intel Arc 140V, Chromium, AC power, 1280×720, eight point lights of range 8 over a floor and 19 box casters, `results/local-shadows-gpu.json`): every box casts onto the floor under point and spot lights, on core and materials floors alike; no shadow acne (lit floor unchanged: max luma difference 0 over 2,285 sample points, 1,389 under the spot light); shadows touch their casters (0 px gap). Submit-to-done frame time (one run, before the quiet-machine gate existed) 8.5-9.2 ms with no light shadowed, with or without the entry (the spread is run-to-run noise); with 1/4/8 shadowed point lights 8.9/9.9/11.4 ms when maps are cached and 9.8/12.6/16.2 ms when all of them re-render every frame (6/24/48 layers); eight shadowed spot lights 9.9 ms cached, 11.2 ms re-rendered. `dispose()` (or `using`) releases the maps and removes the hook.
+
+## Rectangle area lights
+
+```ts
+import {EngineKernel,box} from '@margoengine/core';
+import {Clustered} from '@margoengine/clustered';
+import {AreaLights} from '@margoengine/clustered/area';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+engine.createMesh().setGeometry(box(8,0.02,8));
+const lights = Clustered.attach(engine);
+const panels = AreaLights.attach(engine, {lights});
+panels.setLights([
+  {position:[0,2.5,0], direction:[0,-1,0], width:1.6, height:0.6, color:[1,0.95,0.88], intensity:8},           // ceiling panel
+  {position:[3,1,0], direction:[-1,0,0], up:[0,1,0], width:0.4, height:2, intensity:4, twoSided:true},           // light bar
+]);
+engine.start();
+```
+
+The three.js `RectAreaLight` equivalent, shaded with Linearly Transformed Cosines (Heitz, Dupuy, Hill and Neubelt, 2016): GGX specular (the stretched highlight of glossy floors) and Lambert diffuse. A light is a `width` × `height` rectangle centred on `position` that lights the side its `direction` faces (both sides with `twoSided`); `width` runs along `direction × up` and `height` along `up` (default world +Y, or +Z for a vertical `direction`). `intensity` is emitted radiance (luminance, as three.js's), times the linear `color`: a light of area A lights a surface it faces like a clustered point light of intensity `intensity × A` (tested to 0.1%). `lights.intensityScale` applies too. Up to 64 lights; `setLights()` replaces the list and validates every entry first.
+
+Receivers are those of the clustered lights: core meshes automatically, `lights.add()` for gltf-pro models, materials meshes and terrain. Each quad is clipped exactly to the receiving surface's horizon (three.js uses an approximation there), so panels that cross a surface's plane, such as a wall light over a floor, have exact diffuse.
+
+Accuracy (`test/area.test.js`, against brute-force quadrature of GGX with height-correlated Smith masking and Schlick Fresnel, the BRDF the table was fitted to): diffuse matches the exact form factor (under 0.2%, horizon clipping included); specular within 5% for views up to 60° from the normal and a dielectric pixel within 14%; the worst tested case is an 80° view at roughness 0.5 (+16% specular, -19% dielectric). Past about 84° on glossy surfaces the LTC fit itself is off by up to ~40%; that is a property of the published fit, not of the table size.
+
+The LTC table (the inverse-matrix and magnitude/Fresnel fits) is 32×32 cells of six float16 values, resampled from three.js's 64×64 copy of the ltc_code fit (`scripts/build-ltc.mjs` regenerates `src/ltc.ts`). It is uploaded once into the same storage buffer as the lights and filtered bilinearly in the shader, so area lights bind no texture or sampler (one storage buffer, binding 17) and do not touch the 16-texture budget (gltf-pro README, "Texture bindings"). 32×32 matches 64×64 against brute force at every tested case for less than half the bytes: the entry is 9.0 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), about 21 kB with the 64×64 table. Clustered's root entry grew 87 B (4,503 -> 4,590) for the hook.
+
+Without lights, `AreaLights` creates no buffer and composes nothing: GPU calls, shader modules and buffer writes are identical to clustered without the entry (`examples/package-benchmarks/proofs/clustered-area-lights.proof.js`, against `67e0172`). Limits: every fragment evaluates every area light (they have no range, so they are not culled into the cluster grid); no shadows from area lights (combine with `LocalShadows` point/spot lights or directional `Shadows` if needed); no textured (`map`) lights; WebGPU only.
 
 Orthographic cameras (for example `CameraProjection` from `@margoengine/cameras`, or any projection whose `camera.matrix` has a constant clip w) get linear depth slices between the projection's own near and far planes, which may lie behind the eye, and cluster boxes whose x/y extents do not grow with depth, including off-centre frustums. Everything is read from `camera.matrix` and `camera.position`; the package does not depend on the cameras package. Perspective output is unchanged.
 

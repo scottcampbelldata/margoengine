@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
-  "description": "WebGPU clustered forward point and spot lighting.",
+  "description": "WebGPU clustered forward point, spot and rectangle area lighting.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
@@ -24,6 +24,10 @@
     "./shadows": {
       "types": "./dist/shadows.d.ts",
       "import": "./dist/shadows.js"
+    },
+    "./area": {
+      "types": "./dist/area.d.ts",
+      "import": "./dist/area.js"
     }
   },
   "files": [

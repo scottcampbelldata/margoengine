@@ -13,6 +13,9 @@ export interface ClusteredOptions {grid?:readonly [number,number,number]}
 export interface ClusteredReceiver {addLighting(effect:Clustered):()=>void}
 /** Per-light shadow term composed into the light loop (\LocalShadows\ from \@margoengine/clustered/shadows\). */
 export interface ClusteredShadow {declarations(group:number):string;bindings():GPUBindGroupEntry[]}
+/** Extra lights added by the light loop (`AreaLights` from `@margoengine/clustered/area`): `declarations` defines
+ * `clusterAreaLighting(position,n,v,nv,base,roughness,metal)->vec3f`, whose result joins the local lights' sum. */
+export interface ClusteredArea {declarations(group:number):string;bindings():GPUBindGroupEntry[]}
 export class Clustered implements EnginePlugin {
   readonly name='clustered';readonly grid:readonly [number,number,number];
   /** Multiplies all local lights; a callback is sampled each render. */
@@ -22,10 +25,13 @@ export class Clustered implements EnginePlugin {
   private readonly values=new Float32Array(32);private readonly ints=new Uint32Array(this.values.buffer);private readonly data=new Float32Array(1024*16);private lightCount=0;private dirty=true;private disposed=false;
   private readonly view=this.values.subarray(0,16);
   private readonly shaders=new Map<number,Map<string,string>>();private readonly hooks=new Map<number,{declarations:string;light:string}>();
-  private shadowHook?:ClusteredShadow;private joined?:[GPUBindGroupEntry[],GPUBindGroupEntry[],GPUBindGroupEntry[]];
+  private shadowHook?:ClusteredShadow;private areaHook?:ClusteredArea;private joined?:[GPUBindGroupEntry[]|undefined,GPUBindGroupEntry[]|undefined,GPUBindGroupEntry[],GPUBindGroupEntry[]];
   /** Set by \LocalShadows\; changing it recomposes the shaders. */
   get shadow():ClusteredShadow|undefined {return this.shadowHook;}
   set shadow(hook:ClusteredShadow|undefined) {this.shadowHook=hook;this.shaders.clear();this.hooks.clear();}
+  /** Set by `AreaLights` while it has lights; changing it recomposes the shaders. */
+  get area():ClusteredArea|undefined {return this.areaHook;}
+  set area(hook:ClusteredArea|undefined) {this.areaHook=hook;this.shaders.clear();this.hooks.clear();}
   constructor(options:ClusteredOptions={}) {const grid=options.grid??[16,9,24];if(grid.length!==3||grid.some(v=>!Number.isInteger(v)||v<1||v>128)||grid.reduce((a,b)=>a*b,1)>32768)throw new RangeError('Invalid cluster grid');this.grid=[...grid] as [number,number,number];}
   get owner():Engine|undefined {return this.engine;}
   static attach(instance:EngineKernel,options:ClusteredOptions={}):Clustered {const effect=new Clustered(options);engineRuntime(instance).use(effect);return effect;}
@@ -40,16 +46,16 @@ export class Clustered implements EnginePlugin {
     });this.lightCount=lights.length;this.dirty=true;return this;
   }
   add(receiver:ClusteredReceiver):()=>void {if(this.disposed||!receiver||typeof receiver.addLighting!=='function'||this.receivers.has(receiver))throw new TypeError('Invalid or duplicate clustered receiver');const remove=receiver.addLighting(this);this.receivers.set(receiver,remove);return()=>{if(this.receivers.delete(receiver))remove();};}
-  bindings():GPUBindGroupEntry[] {if(!this.uniform||this.disposed)throw new Error('Clustered lighting is not attached');const extra=this.shadowHook?.bindings();if(!extra)return this.entries;
-    if(this.joined?.[0]!==extra||this.joined[1]!==this.entries)this.joined=[extra,this.entries,[...this.entries,...extra]];return this.joined[2];}
+  bindings():GPUBindGroupEntry[] {if(!this.uniform||this.disposed)throw new Error('Clustered lighting is not attached');const shadow=this.shadowHook?.bindings(),area=this.areaHook?.bindings();if(!shadow&&!area)return this.entries;
+    let j=this.joined;if(!j||j[0]!==shadow||j[1]!==area||j[2]!==this.entries)this.joined=j=[shadow,area,this.entries,[...this.entries,...shadow??[],...area??[]]];return j[3];}
   shader(source:string,group=0):string {
     let cache=this.shaders.get(group);const cached=cache?.get(source);if(cached)return cached;
     const base=source.includes('let base=terrainColor')?'base':'i.color';
     const code=source.replace(/let linear=([^;]+);/,`let linear=$1+clusterLighting(i.clip.xy,i.position,n,frame.eye.xyz,${base},i.material.x,i.material.y);`);
-    if(code===source)throw new Error('Clustered lighting requires the standard PBR shader');const output=clusteredSampling(group,this.shadowHook)+code;if(!cache){cache=new Map();this.shaders.set(group,cache);}cache.set(source,output);return output;
+    if(code===source)throw new Error('Clustered lighting requires the standard PBR shader');const output=clusteredSampling(group,this.shadowHook,this.areaHook)+code;if(!cache){cache=new Map();this.shaders.set(group,cache);}cache.set(source,output);return output;
   }
   /** gltf-pro lighting hooks: local lights add to the surface's light. */
-  pbr(group:number):{declarations:string;light:string} {let hooks=this.hooks.get(group);if(!hooks)this.hooks.set(group,hooks={declarations:clusteredSampling(group,this.shadowHook),light:'clusterLighting(i.clip.xy,i.position,s.n,f.eye.xyz,s.base.rgb,s.roughness,s.metal)'});return hooks;}
+  pbr(group:number):{declarations:string;light:string} {let hooks=this.hooks.get(group);if(!hooks)this.hooks.set(group,hooks={declarations:clusteredSampling(group,this.shadowHook,this.areaHook),light:'clusterLighting(i.clip.xy,i.position,s.n,f.eye.xyz,s.base.rgb,s.roughness,s.metal)'});return hooks;}
   setup(engine:Engine):void {
     if(this.disposed||!engine.gpu)throw new Error('Clustered lighting requires WebGPU and a live effect');this.engine=engine;this.device=engine.gpu;
     const count=this.grid[0]*this.grid[1]*this.grid[2],bytes=count*1024*4;

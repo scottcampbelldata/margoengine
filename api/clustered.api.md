@@ -12,6 +12,8 @@ export class Clustered implements EnginePlugin {
     intensityScale: number | (() => number);
     get shadow(): ClusteredShadow | undefined;
     set shadow(hook: ClusteredShadow | undefined);
+    get area(): ClusteredArea | undefined;
+    set area(hook: ClusteredArea | undefined);
     constructor(options?: ClusteredOptions);
     get owner(): Engine | undefined;
     static attach(instance: EngineKernel, options?: ClusteredOptions): Clustered;
@@ -33,6 +35,11 @@ export class Clustered implements EnginePlugin {
     dispose(): void;
     [Symbol.dispose]: () => void;
     destroy(): void;
+}
+
+export interface ClusteredArea {
+    declarations(group: number): string;
+    bindings(): GPUBindGroupEntry[];
 }
 
 export interface ClusteredOptions {
@@ -63,6 +70,8 @@ export interface SpotLight extends PointLight {
 }
 
 export function clusteredSampling(group: number, shadow?: {
+    declarations(group: number): string;
+}, area?: {
     declarations(group: number): string;
 }): string;
 ```
