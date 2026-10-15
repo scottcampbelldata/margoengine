@@ -970,6 +970,10 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    and fall back to package-side streaming (CulledInstances) for whatever doesn't fit. Report the final core+stage
    total and remaining headroom.
 6. Then give Scott the full list of what was done and what remains.
+7. POST-LAUNCH (Scott, 2026-10-15): "Margo Studio" - feature-for-feature equivalents of MagicaVoxel, Crocotile 3D
+   and Dust3D, built on and for Margo with new, modern code (no copied code or branding; their file formats are
+   supported for import/export). Plan, ground rules and draft feature inventories: `docs/margo-studio.md`. Each tool
+   starts with a feature audit against the current release and Scott's scope sign-off. Not before 1.0.
 
 Worker practice: agents run in git worktrees; they must start with `git reset --hard perf/auto-quality` (worktrees
 default to an old base). Do not junction the whole node_modules (then `@margoengine/*` resolves to the main checkout's
