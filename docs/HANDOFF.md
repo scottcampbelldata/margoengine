@@ -919,8 +919,8 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
 ## Launch readiness (Hacker News, YouTube, LinkedIn, X; npm is set up, margoengine.com is live)
 
 Before launch, in addition to the work queue:
-- Demos smooth on first load on desktop and phones, including Android. The Galaxy S23 3-5 FPS island issue is parked
-  but is a launch risk; revisit before launch.
+- Demos smooth on first load on desktop and phones, including Android. The Galaxy S23 3-5 FPS island issue is shelved
+  (Scott has no device to test it).
 - Every public number reproducible from the repo: size (core + stage gzip, `npm run measure:size`; three.js comparison
   `npm run measure:threejs`), speed proofs, a fair three.js benchmark.
 - Comparison page states limits honestly (WebGPU-first, which packages still use third-party code, unverified devices).
