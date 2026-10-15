@@ -18,6 +18,7 @@ test('create-margo scaffolds the template and refuses a non-empty directory', t 
   assert.deepEqual(readdirSync(app).sort(), ['.gitignore', 'README.md', 'index.html', 'package.json', 'public', 'src', 'tsconfig.json']);
   const headers = readFileSync(join(app, 'public/_headers'), 'utf8');
   for (const directive of ["script-src 'self' 'wasm-unsafe-eval'", "worker-src 'self'", 'immutable']) assert.ok(headers.includes(directive), directive);
+  assert.ok(readdirSync(join(app, 'public')).includes('404.html'), 'a 404 page keeps hosts from serving index.html for missing assets');
   const manifest = JSON.parse(readFileSync(join(app, 'package.json'), 'utf8'));
   assert.equal(manifest.name, 'my-app');
   for (const [name, range] of Object.entries(manifest.dependencies)) {

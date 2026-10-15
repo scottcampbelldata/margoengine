@@ -3,44 +3,12 @@
   Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
+  Cache-Control: no-cache
 
 # The catalog examples run inline scripts against packages on jsDelivr and esm.sh, so they keep no CSP.
 /catalog/examples/*
   ! Content-Security-Policy
 
-# Only fingerprinted build assets; HTML and unversioned credits keep revalidation.
-/night-citadel/assets/*
-  Cache-Control: public, max-age=31536000, immutable
-
-/gameplay-sandbox/assets/*
-  Cache-Control: public, max-age=31536000, immutable
-
-/demos/assets/*.js
-  Cache-Control: public, max-age=31536000, immutable
-
-/demos/assets/*.css
-  Cache-Control: public, max-age=31536000, immutable
-
-/demos/assets/*.glb
-  Cache-Control: public, max-age=31536000, immutable
-
-/demos/assets/*.wasm
-  Cache-Control: public, max-age=31536000, immutable
-
-/demos/earth/assets/*.js
-  Cache-Control: public, max-age=31536000, immutable
-
-/demos/earth/assets/*.jpg
-  Cache-Control: public, max-age=31536000, immutable
-
-/demos/earth/assets/*.png
-  Cache-Control: public, max-age=31536000, immutable
-
-/demos/earth/assets/*.webp
-  Cache-Control: public, max-age=31536000, immutable
-
-/demos/dof/assets/*
-  Cache-Control: public, max-age=31536000, immutable
-
-/demos/tonemap/assets/*
-  Cache-Control: public, max-age=31536000, immutable
+# Cache-Control: no-cache above: browsers check every file each visit (an unchanged file costs a 304, nothing is
+# re-downloaded), so a bad copy never sticks. It also overrides the zone's 4-hour Browser Cache TTL on margoengine.com.
+# Missing files get site/404.html with no-store; scripts/site-check.mjs checks all of this after each deploy.
