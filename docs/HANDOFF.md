@@ -911,9 +911,40 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       SSAO, DOF alone and creative PostProcessing stay SDR-range); passes after Tonemap (FXAA, TAA, overlays) see the SDR
       image with the excess added back under them; LUT grades the 0..1 part only; no display headroom API (`peak` is
       the app's choice); no ColorManagement/P3 input; WebGL2 no-op; not seen on a real P3/HDR display (none here).
-   d. Frame debugger: extend `@margoengine/inspector` (it already has hierarchy, live properties, wireframe/normal/
-      bounds overlays; stats has GPU timestamps) with a frame capture: draw calls, pipelines, bind groups, per-pass GPU
-      time, GPU memory by buffer/texture, texture budget vs the 16-binding limit.
+   d. [DONE] Frame debugger: new opt-in entry `@margoengine/inspector/frame` (8,327 B min+gzip, 8,989 B with the
+      stats `GPUProfiler` it reuses; inspector root unchanged at 4,137 B; no core/stage change).
+      `FrameDebugger.attach(engine, {parent?})` (+ panel bottom-left, "Capture frame" button, `<details>` tree and
+      tables; click a draw's mesh button to select it in an attached Inspector); `await debug.capture({render?})` ->
+      plain-JSON `FrameReport`: `graph` (every frame graph pass in order with plugin owner and order, core `main`, plus
+      `(before|after frame graph)` for GPU work outside the graph such as core's MSAA resolve; CPU encode ms, GPU ms),
+      per GPU pass the render targets (format, size, samples, resolve, load/store) and every draw/dispatch/bundle
+      (vertex/index count, instances, triangles, workgroups, pipeline id, bind group ids, core mesh ids), `pipelines`
+      (label, passes that used it, topology, cull, blend, formats, depth state, MSAA, compiled-this-frame, most
+      textures/samplers bound at once: warning at 15/16), `bindGroups` (each binding's resource), `totals` (draws,
+      indexed, indirect, dispatches, triangles, instances, passes, encoders, submits, pipelines + shader modules +
+      bind groups created this frame, uploads/bytes), `uploads` per destination, `memory` (live buffers/textures
+      created since attach: count, bytes, ten largest), `timing` gpu|cpu + note. How: while attached only the
+      device's create* calls are wrapped (descriptions + memory; per-resource destroy/createView, held weakly); for
+      the captured frame only, engine.render, each frame-graph pass record (the private pass list is found by shape:
+      core's build renames the field), createCommandEncoder, encoders/passes, queue writes/submit and
+      `GPUTexture.prototype.createView` are wrapped and restored afterwards (a wrapper someone else stacked on top
+      stays as a pass-through). GPU times via `GPUProfiler` timestampWrites on the frame graph's encoder; indirect
+      args copied (COPY_SRC buffers) to a readback at that encoder's finish. Tests:
+      `packages/inspector/test/frame.test.js` (tracing fake GPU: the report lists exactly the commands the fake
+      passes received, pass by pass; fake timestamps 1 ms/pass; pipeline/bind group/target descriptions; the frame
+      path (engine.render, graph, device, queue, GPUTexture.prototype) is identical before and after capture and on
+      idle frames; dispose restores every device method and unwraps live resources; works under Stats with equal
+      draw counts; panel + select; texture size estimate). Real browser (Arc 140V, Edge 155, AC, GPU lock;
+      `examples/package-benchmarks/frame-debugger-gpu.mjs`): DamagedHelmet (gltf-pro) + Shadows + CulledInstances
+      (400 boxes, compute + drawIndexedIndirect) + PostStack(SSAO, Bloom, FXAA) at 1440x1100: 15 graph passes, 26 GPU
+      passes, 15 draws (1 indirect, 336 culled instances read back), 9 dispatches, 81,323 triangles, GPU 19.5-21.8 ms
+      by timestamps, 434 MB tracked GPU memory, 0 GPU errors, frame path restored; report
+      `test-results/frame-debugger-report.json`, screenshot `test-results/frame-debugger-panel.png` (not committed).
+      Limits: resources/pipelines/bind groups made before attach have no description and no memory entry (attach
+      before loading); texture bytes estimated from format/size/mips/samples; indirect counts need COPY_SRC (else
+      null, excluded from triangles) and are end-of-frame values; GPU time only for passes on the frame graph's
+      encoder without their own timestampWrites (Stats' profiled frame, 1 in 15, takes them); bundle contents not
+      listed; the texture tally sums all bound groups (sampled + storage); browser CPU times are 0.1 ms granular.
 5i. Deployment and resilience (Scott, 2026-10-14 night; checked against the repo):
    a. Deployment guide + starter headers: COOP/COEP are NOT needed (no SharedArrayBuffer requirement; bvh only detects
       it; the Wasm kernel is embedded in JS). The real trap is CSP: `script-src 'wasm-unsafe-eval'` for the kernel and

@@ -29,6 +29,7 @@ code that does the same job. Where Margo has no equivalent yet, the section says
 - [Lines, points, text and labels](#lines-points-text-and-labels)
 - [Math](#math)
 - [Render loop and frame pacing](#render-loop-and-frame-pacing)
+- [Debugging a frame](#debugging-a-frame)
 - [Disposal](#disposal)
 - [Not yet](#not-yet)
 
@@ -100,6 +101,7 @@ npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @
 | `CSS2DRenderer`, `CSS3DRenderer` | `@margoengine/labels` (`@margoengine/html` adds depth occlusion) |
 | `Vector3`, `Matrix4`, `Quaternion`, `Color`, `Box3` | `@margoengine/math` |
 | stats.js | `@margoengine/stats` |
+| `renderer.info`, Spector.js, lil-gui scene inspectors | `@margoengine/inspector` (`@margoengine/inspector/frame`: frame debugger) |
 | `ViewHelper` | `@margoengine/viewcube` |
 | ContactShadows example (product-shot ground shadow) | `@margoengine/staging` |
 | react-three-fiber | `@margoengine/react` |
@@ -1034,6 +1036,30 @@ capFrameRate(engine, 30);                     // or a fixed cap on any engine
 The tier comes from measuring the GPU, not from user-agent rules, and is remembered per browser; `?quality=high` or
 `?quality=low` force one for testing. Plugin work (controls, animation) runs before the transform update, so it shows
 in the frame it changes.
+
+## Debugging a frame
+
+```js
+console.log(renderer.info.render.calls, renderer.info.render.triangles, renderer.info.memory.textures);
+// Spector.js: install the extension, click "capture" and read the command list in its window.
+```
+
+```ts
+import {FrameDebugger} from '@margoengine/inspector/frame';
+
+const debug = FrameDebugger.attach(engine);   // panel at the bottom right; attach before loading assets
+const report = await debug.capture();          // the next frame the engine renders ({render: true}: render now)
+console.log(report.totals.draws, report.totals.triangles, report.memory.textures.bytes);
+for (const pass of report.graph) console.log(pass.name, pass.owner, pass.gpuMilliseconds ?? pass.cpuMilliseconds);
+console.log(report.warnings);                  // pipelines compiled this frame, 15-16 texture bindings, ...
+```
+
+Like `renderer.info` it counts draws, triangles and memory, but per pass and for one captured frame: every frame graph
+pass (core's `main`, then each package's passes by plugin name and order), its GPU passes with render targets and
+load/store ops, and every draw or dispatch with its pipeline (cull mode, blend, depth, MSAA, texture bindings against
+the 16 limit) and bind groups. Like Spector.js it records the real WebGPU calls, but from inside the page and as JSON
+(for tests and CI), with GPU time per pass when the engine is created with `features: ['timestamp-query']`. Nothing
+is wrapped per frame until `capture()`; an engine that never imports `@margoengine/inspector/frame` pays nothing.
 
 ## Disposal
 
