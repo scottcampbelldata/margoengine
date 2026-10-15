@@ -632,7 +632,11 @@ packages): make a real `node_modules` folder holding junctions to the main check
 via `npm install --package-lock-only --offline --no-audit --no-fund --ignore-scripts`. Also junction `margoengine`
 to the worktree's packages/margoengine. `npm run build:packages` is the whole package build (dependency order from
 package.json, then size gates, then docs/catalog.json); there is no separate workspace build step. Commit-message
-or other temp files in the shared scratchpad must have unique names (two workers' `msg.txt` collided once). A change
+or other temp files in the shared scratchpad must have unique names (two workers' `msg.txt` collided once).
+Before ANY timing run (benchmarks, A/B GPU timings) run `node scripts/quiet-gate.mjs` (or import `waitForQuiet`): it
+requires AC power, waits until total CPU stays <= 20% for 20 s, and returns the machine state to store in the results
+JSON. Correctness checks (pixel diffs, proofs) don't need it. Publication numbers also need every other agent stopped
+(Scott keeps the laptop idle for those windows). A change
 to any package's public API (anything in its dist/*.d.ts reachable from an `exports` entry) fails `npm run api:check`:
 if intended, run `npm run api:update` after build:packages and commit the `api/` and `docs/api-surface.md` diff.
 
