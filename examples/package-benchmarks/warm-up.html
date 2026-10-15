@@ -1,0 +1,45 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>warmUp first-use hitch</title><style>body{margin:0;background:#000}canvas{width:1280px;height:720px;display:block}</style></head><body>
+<canvas id="viewport"></canvas>
+<script type="module">
+// Driven by warm-up-gpu.mjs (HANDOFF 5i.c). One run per fresh browser (cold shader caches): the helmet scene renders to
+// a steady state, then one feature is attached and the first frame that draws it is timed (render() call to
+// onSubmittedWorkDone). With `warm`, `await warmUp(engine)` runs first; its warm frames are offscreen, so the timed
+// frame is again the first visible frame that draws the feature (the warm frames' own times are reported too). The page is left
+// showing the last frame for the runner's cold-vs-warm image comparison.
+import {createStage} from '/packages/margoengine/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {warmUp} from '/packages/quality/dist/warm.js';
+
+const features={
+  ssao:async(e,model)=>{const {SSAO}=await import('/packages/post/dist/ssao.js');SSAO.attach(e,{radius:0.25,bias:0.01,samples:32}).add(model);},
+  bloom:async e=>{const {Bloom}=await import('/packages/post/dist/bloom.js');Bloom.attach(e,{strength:0.15,threshold:1.2,exposure:0});},
+  dof:async e=>{const {DOF}=await import('/packages/dof/dist/index.js');DOF.attach(e,{focalDistance:5,focalLength:0.16,aperture:0.7});},
+  tonemap:async e=>{const {Tonemap}=await import('/packages/tonemap/dist/index.js');Tonemap.attach(e,{curve:'agx',exposure:0.35});},
+  shadows:async(e,model,floor)=>{const {Shadows}=await import('/packages/shadows/dist/index.js');const s=Shadows.attach(e,{resolution:1024,distance:12});s.add(floor,{static:true});s.add(model);},
+  sky:async e=>{const [{Sky},{bruneton},{clouds},{lighting}]=await Promise.all(['base','bruneton','clouds','lighting'].map(m=>import(`/packages/sky/dist/${m}.js`)));
+    Sky.attach(e,{model:'bruneton',hours:16,timeScale:0,clouds:{coverage:0.38,speed:8},lighting:{intensity:3}},{bruneton,clouds,lighting});},
+  grass:async e=>{const {GrassField}=await import('/packages/creative/dist/grass.js');GrassField.attach(e,{blades:35000,area:[20,20],bladeHeight:0.6,spores:true});},
+};
+const done=queue=>queue.onSubmittedWorkDone();
+async function frame(engine){const t=performance.now();engine.render({delta:0});await done(engineRuntime(engine).gpu.queue);return performance.now()-t;}
+window.run=async({feature,warm})=>{
+  const stage=await createStage('#viewport',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[3,2,5],target:[0,0,0],near:0.01,far:500}});
+  const engine=stage.engine,model=await loadGLTF(engine,'/examples/assets/damaged-helmet.glb'),floor=stage.box({size:[20,0.1,20],position:[0,-1.1,0],color:'#394b60',roughness:1});
+  const steady=[];for(let i=0;i<40;i++){const ms=await frame(engine);if(i>=10)steady.push(ms);}
+  await features[feature](engine,model,floor);
+  const result={feature,warm,steadyMedianMs:steady.sort((a,b)=>a-b)[steady.length>>1]};
+  if(warm){
+    // Time each complete warm frame (render() returned normally) from its call to its GPU completion.
+    const render=engine.render,frames=[];let t0=performance.now();
+    engine.render=function(options){const t=performance.now();render.call(this,options);frames.push(done(engineRuntime(engine).gpu.queue).then(()=>performance.now()-t));};
+    const report=await warmUp(engine);engine.render=render;
+    result.warmUpMs=performance.now()-t0;result.report=report;result.warmFramesMs=await Promise.all(frames);
+    result.firstFrameMs=await frame(engine);result.nextFrameMs=await frame(engine);
+  } else {result.firstFrameMs=await frame(engine);result.nextFrameMs=await frame(engine);}
+  const after=[];for(let i=0;i<20;i++)after.push(await frame(engine));result.afterMedianMs=after.sort((a,b)=>a-b)[after.length>>1];
+  result.hitchMs=result.firstFrameMs-result.afterMedianMs;
+  return result;
+};
+window.ready=true;
+</script></body></html>

@@ -107,7 +107,7 @@ export class DOF implements EnginePlugin {
   }
   private resize(c:Context):void {
     const depthFormat=c.descriptor.depthStencil!.format;
-    if(this.scene?.width===c.width&&this.scene.height===c.height&&this.format===c.format&&this.depthFormat===depthFormat&&this.captureTarget?.samples===(c.descriptor.multisample?.count??4))return;
+    if(this.presentPipeline&&this.scene?.width===c.width&&this.scene.height===c.height&&this.format===c.format&&this.depthFormat===depthFormat&&this.captureTarget?.samples===(c.descriptor.multisample?.count??4))return;
     this.releaseTextures();this.format=c.format;this.depthFormat=depthFormat;
     const sampled=GPUTextureUsage.TEXTURE_BINDING;
     this.scene=c.device.createTexture({size:[c.width,c.height],format:'rgba16float',usage:sampled|GPUTextureUsage.RENDER_ATTACHMENT});

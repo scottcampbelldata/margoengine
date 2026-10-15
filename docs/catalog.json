@@ -1104,6 +1104,7 @@
       "frameStatus",
       "paceEngine",
       "qualityPreset",
+      "redrawAfterRestore",
       "sceneSamples",
       "watchQuality"
     ]

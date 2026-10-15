@@ -134,6 +134,17 @@ export function watchQuality({request = globalThis.requestAnimationFrame?.bind(g
   const count = (time: number) => {if (done) return; if (first < 0) first = time; if ((elapsed = time - first) > 10000) finish(); else request(count);};
   request(count);
 }
+let restorers = 0;
+/** An app that renders on demand (a paused scene, a stopped loop) shows an empty canvas after core restores a lost GPU
+ * device, until something renders again. Call once: `render` then runs on the next two animation frames after every
+ * restoration (effects that read the previous frame, such as water refraction and sky reflections, settle on the
+ * second). Returns a function that stops it. */
+export function redrawAfterRestore(engine: EngineKernel, render: () => void, request: (callback: () => void) => unknown = globalThis.requestAnimationFrame?.bind(globalThis)): () => void {
+  const name = `redraw-after-restore-${++restorers}`;
+  // Core runs onDeviceRestored before its recovery settles; a frame rendered then would be skipped.
+  engine.use({name, setup() {}, onDeviceRestored: () => {request(() => {render(); request(render);});}});
+  return () => engine.removePlugin(name);
+}
 export {frameDue, frameStatus} from './pacing.js';
 /** 1 on phones and the light tier, 4 on the desktop full tier: the scene sample count core uses (call after applyQualityTier). */
 export const sceneSamples: () => 1 | 4 = samples; // typed here so the published .d.ts never points into ../../shared

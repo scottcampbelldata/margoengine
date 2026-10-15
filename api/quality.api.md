@@ -69,6 +69,8 @@ export function paceEngine(engine: Paced): void;
 
 export const qualityPreset: () => QualityPreset;
 
+export function redrawAfterRestore(engine: EngineKernel, render: () => void, request?: (callback: () => void) => unknown): () => void;
+
 export const sceneSamples: () => 1 | 4;
 
 export function watchQuality({ request, queue, now, store, reload }?: WatchOptions): void;

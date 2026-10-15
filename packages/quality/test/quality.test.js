@@ -126,3 +126,17 @@ test('the light-tier measurement skips two seconds and gives up after ten, at an
     }
   } finally {delete globalThis.margoLow;}
 });
+
+test('redrawAfterRestore renders the two frames after each device restoration until removed', async () => {
+  const {redrawAfterRestore} = await import('../dist/index.js');
+  const plugins = new Map(), frames = [];
+  const engine = {use(plugin) {plugins.set(plugin.name, plugin); return engine;}, removePlugin(name) {plugins.delete(name);}};
+  let renders = 0;
+  const stop = redrawAfterRestore(engine, () => renders++, callback => frames.push(callback));
+  const [plugin] = plugins.values();
+  plugin.onDeviceRestored(engine);
+  assert.equal(renders, 0, 'not inside the restoration');
+  frames.shift()(); assert.equal(renders, 1);
+  frames.shift()(); assert.equal(renders, 2, 'a second frame for effects that read the previous one'); assert.equal(frames.length, 0);
+  stop(); assert.equal(plugins.size, 0);
+});

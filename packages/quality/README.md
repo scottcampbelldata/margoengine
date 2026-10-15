@@ -72,6 +72,35 @@ const particles = qualityPreset().vfx?.capacity ?? 1_000_000;          // read a
   (no preset: identical calls to before; preset = passing its values; explicit options win):
   `node examples/package-benchmarks/proofs/quality-presets.proof.js`.
 
+## Pipeline warm-up and device restoration
+
+```ts
+import {warmUp} from '@margoengine/quality/warm';
+import {redrawAfterRestore} from '@margoengine/quality';
+
+// ...attach features and build the scene, then, still behind the loading screen:
+const report = await warmUp(engine);      // {pipelines, fallbacks, rounds, rebooted}
+engine.start();
+redrawAfterRestore(engine, () => engine.render({delta: 0})); // only for apps that render on demand
+```
+
+- `warmUp(engine)` creates the pipelines of every attached feature with `createRenderPipelineAsync` /
+  `createComputePipelineAsync`, so the first visible frame that draws a feature does not stall on shader compilation.
+  Features create pipelines lazily inside their passes, so it renders warm frames (delta 0) into an offscreen texture:
+  a frame that reaches a missing pipeline is stopped there, the work it already encoded is submitted, the pipeline
+  compiles asynchronously, and the frame is rendered again until two complete. Nothing is presented and frames from the
+  engine's own loop are untouched. It resolves once the GPU has finished the warm frames, so pipelines a feature made
+  synchronously at attach (GrassField does) have compiled by then too, during loading but not in parallel. A feature that stores state before creating its pipeline (so the retry skips the
+  creation) fails on the retry; warmUp then restores the device (`engine.rebootDevice()`, every feature's restore hook)
+  and finishes with synchronous creation (`report.rebooted`). A feature attached later or switched off is not warmed:
+  call `warmUp` again after attaching it. Zero cost unless imported: no package reads it.
+- `redrawAfterRestore(engine, render)`: core restores a lost GPU device by itself and the engine's loop draws the next
+  frame, but an app that renders on demand (paused, loop stopped) shows an empty canvas until it renders again. This
+  runs `render` on the two frames after every restoration (effects that read the previous frame, such as water
+  refraction and sky reflections, settle on the second).
+- First-use hitch per feature (`node examples/package-benchmarks/warm-up-gpu.mjs`, results
+  `examples/package-benchmarks/results/warm-up-gpu.json`): see the table there and in docs/HANDOFF.md 5i.c.
+
 MIT. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/quality

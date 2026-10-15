@@ -1,9 +1,14 @@
 // Visual regression for the site demos (HANDOFF 1h.f). Needs a real GPU, so it is not part of `npm run verify`.
 //   npm run visual:check  [-- --only=earth,dof-high] [--runs=N] [--no-build]   compare against tests/visual baselines
 //   npm run visual:update [-- --only=...] [--runs=3] [--no-build]             re-capture baselines and noise tolerances
+//   npm run visual:device-loss [-- --only=...] [--no-build]                     device loss in every site demo (5i.d)
 // Run `npm run build:packages` first; the script builds the site (scripts/build-site.js) and serves site/dist.
 // Refuses on battery, takes test-results/gpu.lock in the main checkout (waits, polling every 60 s), and discards the
 // run if AC power is lost. Report, actual and diff images: test-results/visual/index.html.
+// --device-loss (site demos only, one run): after the normal capture, every GPUDevice the page made is destroyed at the
+// start of its next render pass (mid-frame; a demo that renders no frame within 2 s is hit while idle). Core restores
+// the device and the packages their GPU state; a view passes once a new device has submitted work and the capture
+// matches the one before the loss within the view's tolerance (manifest, else the bit-exact allowance).
 //
 // Determinism: every capture runs in a fresh browser context with prefers-reduced-motion: reduce, which every demo
 // honours as its pause (still frame at t = 0: delta 0 / animation paused / rotation paused), and a forced tier
@@ -26,8 +31,8 @@ import {acPower} from '../examples/package-benchmarks/cad/power.mjs';
 
 const root = resolve(import.meta.dirname, '..'), baselines = resolve(root, 'tests/visual'), out = resolve(root, 'test-results/visual');
 const arg = name => process.argv.find(a => a.startsWith(`--${name}=`))?.slice(name.length + 3);
-const update = process.argv.includes('--update'), only = (arg('only') ?? '').split(',').filter(Boolean);
-const runs = Number(arg('runs') ?? (update ? 4 : 1));
+const update = process.argv.includes('--update'), loss = process.argv.includes('--device-loss') && !update, only = (arg('only') ?? '').split(',').filter(Boolean);
+const runs = loss ? 1 : Number(arg('runs') ?? (update ? 4 : 1));
 const HOT = 24; // a pixel off by more than ~10% in some channel
 // Tolerance = noise floor x MARGIN + a floor-independent allowance (so a bit-exact demo still tolerates a stray pixel).
 const MARGIN = 3, ALLOWANCE = {changed: 0.0005, hot: 0.0002}, GATED = Object.keys(ALLOWANCE);
@@ -46,6 +51,8 @@ const demos = [
   {id: 'night-citadel', path: 'night-citadel/', ready: '!!window.nightCitadel?.readiness', mask: ['#fps', '#delta', '#refresh-note']},
   {id: 'gameplay-sandbox', path: 'gameplay-sandbox/', ready: '!!window.sandbox', mask: ['#telemetry *']},
   {id: 'character-animation', path: 'demos/character-animation.html', ready: "document.querySelector('#viewport')?.dataset.ready==='true'"},
+  // The same page under its older URL; checked for device loss only.
+  {id: 'robot-expressive', path: 'demos/robot-expressive.html', ready: "document.querySelector('#viewport')?.dataset.ready==='true'", views: ['high'], lossOnly: true},
   {id: 'flight-helmet', path: 'demos/flight-helmet.html', ready: "document.querySelector('#viewport')?.dataset.ready==='true'&&window.extensionDemo.quality!=='preview'"},
   {id: 'windy-meadow', path: 'demos/windy-meadow.html', ready: "document.querySelector('#viewport')?.dataset.ready==='true'"},
   {id: 'earth', path: 'demos/earth/', ready: "!!window.earthDemo&&window.earthDemo.quality!=='preview'"},
@@ -56,7 +63,7 @@ const demos = [
   ...JSON.parse(readFileSync(resolve(import.meta.dirname, '../examples/assets/khronos/manifest.json'), 'utf8')).models.filter(m => m.render?.verdict !== 'fails').map(m => ({
     id: `khronos-${m.name}`, path: `examples/khronos-gallery.html?model=${m.name}`, dev: true, ready: "document.body.dataset.ready==='true'", views: ['model']})),
 ];
-const cases = demos.flatMap(demo => (demo.views ?? Object.keys(views)).map(view => ({id: `${demo.id}-${view}`, demo, view: views[view]})))
+const cases = demos.filter(demo => loss ? !demo.dev : !demo.lossOnly).flatMap(demo => (demo.views ?? ['high', 'light', 'phone']).map(view => ({id: `${demo.id}-${view}`, demo, view: views[view]})))
   .filter(c => !only.length || only.some(o => c.id.includes(o)));
 
 // PNG: 8-bit RGB, per-row filter chosen by the minimum-sum heuristic.
@@ -100,6 +107,23 @@ function compare(a, b) {
   return {changed: changed / n, hot: hot / n, mean: sum / n, max, image: {width: a.width, height: a.height, data: diff}};
 }
 const round = v => Number(v.toPrecision(3));
+// --device-loss page hooks (init script): record every device, destroy them all at the first render pass after
+// `fire` is armed, and flag when a device made after the loss submits work.
+function lossHooks() {
+  const state = window.margoDeviceLoss = {devices: [], lost: [], armed: false, fired: null, dead: 0, restored: false};
+  state.fire = kind => {state.armed = false; state.fired = kind; state.dead = state.devices.length; for (const device of state.devices) device.destroy();};
+  const request = GPUAdapter.prototype.requestDevice, begin = GPUCommandEncoder.prototype.beginRenderPass, submit = GPUQueue.prototype.submit;
+  GPUAdapter.prototype.requestDevice = async function (...args) {
+    const device = await request.apply(this, args);
+    state.devices.push(device); device.lost.then(info => state.lost.push(info.reason));
+    return device;
+  };
+  GPUCommandEncoder.prototype.beginRenderPass = function (...args) {if (state.armed) state.fire('mid-frame'); return begin.apply(this, args);};
+  GPUQueue.prototype.submit = function (...args) {
+    if (state.fired && state.devices.findIndex(device => device.queue === this) >= state.dead) state.restored = true;
+    return submit.apply(this, args);
+  };
+}
 
 // Power and the GPU lock (shared with the other GPU scripts in the main checkout).
 if (acPower() === false) {console.error('On battery: refusing to run (GPU and CPU are throttled). Plug in and retry.'); process.exit(1);}
@@ -129,17 +153,25 @@ try {
       for (const {id, demo, view} of cases) {
         const {factor, query, ...options} = view, result = results.get(id), t = Date.now();
         const context = await browser.newContext({...options, reducedMotion: 'reduce'}), page = await context.newPage();
+        if (loss) await page.addInitScript(lossHooks);
+        const capture = async () => {
+          // Let late UI text settle (sandbox clock label ticks every 500 ms) and a few frames present.
+          await page.waitForTimeout(1000);
+          await page.evaluate(() => document.fonts.ready.then(() => new Promise(r => {let n = 4; const f = () => --n ? requestAnimationFrame(f) : r(); requestAnimationFrame(f);})));
+          return downsample(await decodePNG(await page.screenshot({animations: 'disabled', mask: (demo.mask ?? []).map(s => page.locator(s))})), factor);
+        };
         page.on('pageerror', e => result.errors.push(`pageerror: ${e.message}`));
         page.on('console', m => {if (m.type() === 'error') result.errors.push(`console: ${m.text()}`);});
         try {
           await page.goto((demo.dev ? devOrigin : origin) + '/' + demo.path + query);
           await page.waitForFunction(demo.ready, null, {timeout: 120_000});
           environment.gpu ??= await page.evaluate(async () => {const i = (await navigator.gpu.requestAdapter()).info; return [i.vendor, i.architecture, i.description].filter(Boolean).join(' ');});
-          // Let late UI text settle (sandbox clock label ticks every 500 ms) and a few frames present.
-          await page.waitForTimeout(1000);
-          await page.evaluate(() => document.fonts.ready.then(() => new Promise(r => {let n = 4; const f = () => --n ? requestAnimationFrame(f) : r(); requestAnimationFrame(f);})));
-          const png = await page.screenshot({animations: 'disabled', mask: (demo.mask ?? []).map(s => page.locator(s))});
-          result.captures.push(downsample(await decodePNG(png), factor));
+          if (loss) {
+            result.before = await capture();
+            result.loss = await page.evaluate(() => {const s = window.margoDeviceLoss; s.armed = true; return new Promise(r => setTimeout(() => {if (s.armed) s.fire('idle'); r(s.fired);}, 2000));});
+            await page.waitForFunction(() => window.margoDeviceLoss.restored, null, {timeout: 30_000}).catch(() => {throw new Error(`no frame from a restored device within 30 s (lost: ${result.loss})`);});
+          }
+          result.captures.push(await capture());
         } catch (error) {
           result.errors.push(`capture: ${String(error.message ?? error).split('\n')[0]}`);
           await page.screenshot({path: resolve(out, `${id}.failed.png`)}).catch(() => {});
@@ -170,28 +202,31 @@ try {
       rows.push({...r, status: 'updated', noise: manifest.views[r.id].noise, tolerance});
       continue;
     }
-    const entry = manifest.views[r.id], baseline = entry && await readFile(resolve(baselines, `${r.id}.png`)).then(b => decodePNG(new Uint8Array(b))).catch(() => undefined);
-    if (!baseline || failed) {exitCode = 1; const why = !baseline ? 'no baseline (run visual:update)' : r.errors[0]; console.log(`FAIL ${r.id}: ${why}`); rows.push({...r, status: 'FAIL', why}); continue;}
+    // Device loss: the capture before the loss is the baseline, with the view's tolerance (bit-exact allowance if none).
+    const entry = loss ? {...manifest.views[r.id], tolerance: manifest.views[r.id]?.tolerance ?? ALLOWANCE} : manifest.views[r.id];
+    const baseline = loss ? r.before : entry && await readFile(resolve(baselines, `${r.id}.png`)).then(b => decodePNG(new Uint8Array(b))).catch(() => undefined);
+    if (!baseline || failed) {exitCode = 1; const why = failed ? r.errors[0] ?? 'missing capture' : 'no baseline (run visual:update)'; console.log(`FAIL ${r.id}: ${why}`); rows.push({...r, status: 'FAIL', why}); continue;}
     // Worst of the runs against the baseline.
     const score = m => Math.max(...GATED.map(k => m[k] / entry.tolerance[k]));
     const worst = r.captures.map(c => ({...compare(baseline, c), capture: c})).reduce((a, b) => score(b) > score(a) ? b : a), pass = score(worst) <= 1;
     if (!pass) exitCode = 1;
-    await copyFile(resolve(baselines, `${r.id}.png`), resolve(out, `${r.id}.baseline.png`));
+    if (loss) await writeFile(resolve(out, `${r.id}.baseline.png`), encodePNG(baseline));
+    else await copyFile(resolve(baselines, `${r.id}.png`), resolve(out, `${r.id}.baseline.png`));
     await writeFile(resolve(out, `${r.id}.actual.png`), encodePNG(worst.capture));
     if (worst.image) await writeFile(resolve(out, `${r.id}.diff.png`), encodePNG(worst.image));
     const metrics = {changed: round(worst.changed), hot: round(worst.hot), mean: round(worst.mean), max: worst.max};
-    console.log(`${pass ? 'pass' : 'FAIL'} ${r.id}: changed ${metrics.changed} (limit ${entry.tolerance.changed}), hot ${metrics.hot} (limit ${entry.tolerance.hot}), mean ${metrics.mean}, max ${metrics.max}`);
+    console.log(`${pass ? 'pass' : 'FAIL'} ${r.id}${loss ? ` (device lost ${r.loss}, restored)` : ''}: changed ${metrics.changed} (limit ${entry.tolerance.changed}), hot ${metrics.hot} (limit ${entry.tolerance.hot}), mean ${metrics.mean}, max ${metrics.max}`);
     rows.push({...r, status: pass ? 'pass' : 'FAIL', metrics, noise: entry.noise, tolerance: entry.tolerance, images: true});
   }
   if (update) {manifest.environment = environment; manifest.method = {hot: HOT, margin: MARGIN, allowance: ALLOWANCE}; await writeFile(manifestPath, JSON.stringify(manifest, null, 1) + '\n');}
   else if (manifest.environment && (manifest.environment.gpu !== environment.gpu || manifest.environment.browser !== environment.browser))
     console.log(`warning: baselines are from ${manifest.environment.gpu} / ${manifest.environment.browser}; this run is ${environment.gpu} / ${environment.browser}`);
   const seconds = ((Date.now() - started) / 1000).toFixed(0), esc = s => String(s).replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
-  await writeFile(resolve(out, 'index.html'), `<!doctype html><meta charset="utf-8"><title>Visual ${update ? 'update' : 'check'}</title>
+  await writeFile(resolve(out, 'index.html'), `<!doctype html><meta charset="utf-8"><title>Visual ${update ? 'update' : loss ? 'device loss' : 'check'}</title>
 <style>body{font:14px system-ui;margin:16px;background:#111;color:#ddd}td{vertical-align:top;padding:6px;border-top:1px solid #333}img{max-width:420px;display:block}.FAIL{color:#f66}.pass{color:#6c6}pre{white-space:pre-wrap;max-width:420px;font-size:12px}</style>
-<h1>Visual ${update ? 'update' : 'check'}: ${rows.filter(r => r.status === 'pass' || r.status === 'updated').length}/${rows.length} ok</h1>
+<h1>Visual ${update ? 'update' : loss ? 'device loss' : 'check'}: ${rows.filter(r => r.status === 'pass' || r.status === 'updated').length}/${rows.length} ok</h1>
 <p>${esc(JSON.stringify(environment))}<br>baselines: ${esc(JSON.stringify(manifest.environment ?? {}))}<br>${runs} run(s), ${seconds} s. d = max RGB difference per pixel; hot = share of pixels with d &gt; ${HOT}.</p>
-<table>${rows.map(r => `<tr><td><b class="${r.status.split(' ')[0]}">${r.status}</b> ${esc(r.id)}<br><code>/${esc(r.url)}</code><pre>${esc(JSON.stringify({metrics: r.metrics, noise: r.noise, tolerance: r.tolerance, why: r.why}, null, 1))}\n${esc(r.errors.slice(0, 8).join('\n'))}</pre></td>${r.images ? ['baseline', 'actual', 'diff'].map(k => `<td>${k}<img src="${r.id}.${k}.png"></td>`).join('') : ''}</tr>`).join('\n')}</table>`);
+<table>${rows.map(r => `<tr><td><b class="${r.status.split(' ')[0]}">${r.status}</b> ${esc(r.id)}<br><code>/${esc(r.url)}</code><pre>${esc(JSON.stringify({loss: r.loss, metrics: r.metrics, noise: r.noise, tolerance: r.tolerance, why: r.why}, null, 1))}\n${esc(r.errors.slice(0, 8).join('\n'))}</pre></td>${r.images ? ['baseline', 'actual', 'diff'].map(k => `<td>${k}<img src="${r.id}.${k}.png"></td>`).join('') : ''}</tr>`).join('\n')}</table>`);
   console.log(`${update ? 'updated' : 'checked'} ${rows.length} views in ${seconds} s; report test-results/visual/index.html`);
 } catch (error) {console.error(error); exitCode = 1;}
 finally {await server?.close(); await devServer?.close(); unlock();}
