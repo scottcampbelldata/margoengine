@@ -906,6 +906,14 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       `'unsafe-eval'`) - load them as module/classic workers or wrap them so the strict page CSP covers everything;
       occt-import-js uses `new Function` (third party: document, or wrap); the site build copies the 7.6 MB OCCT .wasm
       and CAD code into every demo folder though no demo imports STEP (deploy size only) - stop copying it.
+   p. [running] gltf-pro fails on the 62 MB conveyor GLB ("Unsupported glTF accessor", also without the cache) -
+      find the accessor type/normalization it rejects and support it (or reject with a precise error), test with that
+      file and a generated minimal case.
+   q. Game-developer gaps from the Blender guide (2eb78b9): a helper that collects a model's world-space triangles
+      (for physics colliders and navmeshes); physics bodies on non-root meshes; water refraction can't combine with
+      SSAO (needs a scene texture from PostStack); camera rig avoids walls, not just terrain; audio listener on
+      something other than the camera; a runnable example game with a rigged character + Blender level GLB (for the
+      demo rebuild).
    m. docs/threejs-parity.md summary counts drifted (OIT added a COVERED row without updating the totals) - recount.
    Order: after the current wave, alongside the hygiene phase (5k) and under its gates, before the demo rebuild.
 5m. CORE APPROVALS, conditional (Scott, 2026-10-14 night): do both IF core+stage stays under 20,000 B gzip
