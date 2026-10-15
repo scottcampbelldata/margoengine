@@ -93,7 +93,31 @@ tens of pixels at 100 km, nothing usable at 6,000 km.
 
 ## Rebase cost
 
-REBASE_RESULTS
+A rebase rewrites every placed root's position (one pass over a Map, float64 → float32). The kernel then sees every
+root as changed (its dirty-skip compares input bits) and recomputes all of them and their descendants. Core patches the
+moved matrices of the visible instances and uploads that range once. The next frames are static again. Parts are
+0.5 m boxes on a 2 km grid 100 km out, camera 50 m from the centre (675 / 3,500 visible).
+
+Node (`large-coordinates.mjs --cost`: real kernel and engine, fake GPU device; `scripts/quiet-gate.mjs` passed first),
+median of 15:
+
+| Placed roots | Static frame | `rebase()` call | Frame after the rebase | Upload | For comparison: every root moved via `mesh.position` + frame |
+| --- | --- | --- | --- | --- | --- |
+| 10,000 | 0.35 ms | 0.77 ms | 1.47 ms | 65 kB | 1.98 ms |
+| 50,000 | 1.62 ms | 4.26 ms | 7.13 ms | 336 kB | 11.1 ms |
+
+Real GPU (`large-coordinates-gpu.mjs --cost`, Arc 140V; wall time of `engine.render()` + `onSubmittedWorkDone`,
+browser timer ~0.1 ms). The quiet gate passed before the run waited for the GPU lock, so treat these as
+semi-diagnostic:
+
+| Placed roots | Static frame | `rebase()` call | Frame after the rebase |
+| --- | --- | --- | --- |
+| 10,000 | 4.7 ms | 0.6 ms | 6.1 ms |
+| 50,000 | 5.4 ms | 4.4 ms | 11 ms |
+
+So a rebase at 50k parts is a single ~10 ms hitch. Rebases are rare: with the default ratio the camera has to travel
+1,000 × its view distance (50 m at 50 mm zoom; 50 km when viewing from 50 m). Orbiting and panning around a
+target almost never rebase; zooming in on a spot far from the current origin triggers one.
 
 ## What works, what doesn't
 

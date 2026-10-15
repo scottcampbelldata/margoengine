@@ -201,5 +201,26 @@
       "maxMeanColorDiff": 0.00022135416666666668
     }
   ],
-  "cost": []
+  "cost": [
+    {
+      "parts": 10000,
+      "visible": 675,
+      "medianMs": {
+        "staticFrame": 4.7,
+        "rebaseCall": 0.6,
+        "rebaseFrame": 6.1
+      },
+      "errors": []
+    },
+    {
+      "parts": 50000,
+      "visible": 3500,
+      "medianMs": {
+        "staticFrame": 5.4,
+        "rebaseCall": 4.4,
+        "rebaseFrame": 11
+      },
+      "errors": []
+    }
+  ]
 }
