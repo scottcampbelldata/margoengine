@@ -44,8 +44,9 @@ iPhone held 60. Causes, from Codex's measurements and ours:
 Measured on the laptop, light tier, before `28f57be`: 100k particles locked at 60 FPS; 1M particles a steady 45.
 Not re-measured since the water restore.
 
-Size facts for the pitch (three.js r186, minimal lit scene, minified / gzip): Margo core + stage 48 kB / 20 kB;
-three WebGL 621 kB / 139 kB; three WebGPU 959 kB / 229 kB. Script: `test-results/three-size.mjs` (ignored folder).
+Size facts for the pitch (three.js 0.186.1, minimal lit scene, minified / gzip, all with the size gate's output options;
+`npm run measure:threejs` -> `examples/package-benchmarks/results/threejs-size.json`, 5d): Margo core + stage 45.5 kB /
+19.5 kB (WebGPU only); three WebGL 530 kB / 130 kB; three WebGPU 791 kB / 212 kB.
 
 ## CPU package pass (done, commit `f47ff3f`)
 
@@ -296,7 +297,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
 1e'. [DONE 2026-10-14: steps 1, 2, 3 and 5 ported onto perf/auto-quality, one commit each, plus the CAD-controls pole
    fix and the engine.pick OffscreenCanvas fix; core + stage 18,681 -> 19,543 B gzip (+481, +252, +96, +5, +21, +7).
    Quiet-machine before/after (Scott stopped everything else; AC; GPU lock; alternating rounds; docs/cad-performance.md):
-   kernel in frame 3-4x cheaper everywhere (90k still 16.0 -> 5.5 ms); collection 7.8 -> 0.28 ms at 90k still, 7.6 ->
+   kernel in frame 2.6-4x cheaper everywhere (90k still 16.0 -> 5.5 ms); collection 7.8 -> 0.28 ms at 90k still, 7.6 ->
    1.1 ms at 90k with 1% moving; FPS 50k orbit 49 -> 92, 50k still 53 -> 78, 50k move 54 -> 133, 90k still 33 -> 52,
    90k move 33 -> 43; 90k orbit unchanged 34 -> 33 (GPU-bound, cull result changes every frame); 10k move 207 -> 182
    (GPU time rose, unexplained); engine.pick 43 -> 31 ms at 90k (only via the cheaper update, step 4 not merged).
@@ -668,11 +669,27 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    matcap) plus all three lighting packages, and any extra texture on a physical material with all three. Remaining
    option for those is the core one (request `maxSampledTexturesPerShaderStage`/`maxSamplersPerShaderStage` up to the
    adapter in `packages/core/src/renderer.ts` `requestDevice`); not needed for any shipped combination.
-5d. Fix the docs against `docs/whitepaper/claims.md` (201 claims: 77 proven, 43 stale, 58 unproven, 23 overclaims):
-   correct every STALE/OVERCLAIM wording in README, site, package READMEs and docs; remove `npm install` lines for
-   unpublished packages (or mark "after publish"); one core-size number from `npm run measure:size`; WebGL as a separate
-   package; restore "byte-identical" proofs whose default command no longer passes (post, materials, gltf-pro,
-   selection) or re-baseline them. Start after the README-snippets and API-standardization agents merge.
+5d. [DONE] Docs fixed against `docs/whitepaper/claims.md` (its Summary has the before/after table). The original 201
+   rows went from 77 PROVEN / 43 STALE / 58 UNPROVEN / 23 OVERCLAIM to 154 PROVEN / 5 STALE / 9 UNPROVEN / 0 OVERCLAIM /
+   18 REMOVED / 15 HISTORICAL (two new statuses: deleted from public text; kept only in a doc labelled as a dated record
+   without committed data). 27 rows added for `590278e`..`3d845a0` (S-12, H-25..32, DOC-062..069, PKG-096..105).
+   Left: HANDOFF rows (internal), and honest-but-unevidenced rows that need a committed run (DOC-061, PKG-005, 080,
+   092, 103/104). One core size everywhere: "under 20 kB gzip (19,543 B at `3d845a0`; `npm run measure:size`)",
+   WebGPU only; WebGL2 is the optional `@margoengine/webgl` (2,088 B). 71 packages everywhere. `npm install` lines kept
+   (names/versions match package.json) but introduced as "once published". No three.js speed claim anywhere; size
+   comparison now committed. New records: `examples/package-benchmarks/entry-sizes.mjs` -> `results/entry-sizes.json`
+   (min+gzip of every exports entry and worker, build-modern's method; also feeds api-surface.md's Gzip column, now
+   filled for all 71 packages) and `measure:threejs` -> `results/threejs-size.json`, with three.js now built with the
+   size gate's output options (lit-box app 129,899 / 211,584 B gzip WebGL/WebGPU; was 138,578 / 229,008 with weaker
+   minification on three's side only). Proofs re-baselined so the plain command passes: post-stack -> `e12fc9c`
+   (creative stays on `5b1fe66^`), materials-uv-transform -> `7f1c9c6`, gltf-pro-lighting-hooks -> `f8a36ca`;
+   selection-xray-off still passes vs `46f9484`. For Scott: (a) the site's "Browse the packages and their runnable
+   examples" leads to catalog examples that load the packages from jsDelivr, so they will not run until the packages
+   are published; (b) nothing was deployed: margoengine.com keeps whatever the last deploy built (the old copy said "both
+   backends included", "verified in Chrome", 60 packages) until the next deploy; (c) fbx/usdz READMEs quote their three.js-era sizes (85.8 kB, 13.7 kB) from
+   commit `95132e9`'s message with "method not recorded": measure that ref with `entry-sizes.mjs` before using the
+   comparison publicly; (d) when the +34 B material setters merge, re-run `measure:size` (19,577 expected): the docs
+   say "under 20 kB" plus a dated figure, so they stay true.
 5e. Diagnose why Margo's GPU time on static boxes is not lower than three.js InstancedMesh (vs-threejs smoke run);
    findings in docs/whitepaper/boxes-vs-threejs.md [running].
 5f. Gaps from Scott's architecture review (2026-10-14 late):
