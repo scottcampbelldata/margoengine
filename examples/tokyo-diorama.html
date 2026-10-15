@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tokyo corner · Margo Engine</title>
+  <link rel="stylesheet" href="./extension-demo.css">
+  <link rel="preload" as="fetch" href="./assets/tokyo-diorama.glb" crossorigin>
+</head>
+<body data-demo="tokyo">
+  <main id="viewport" aria-label="Animated Tokyo street corner diorama"></main>
+  <aside aria-label="Scene controls">
+    <h1>Tokyo corner</h1>
+    <p class="description">A tram rolls past a tanuki lantern sign on a tiny street corner. Keyframed in Blender, played by Margo's animation package.</p>
+    <button id="pause" type="button" aria-pressed="false" disabled>Pause animation</button>
+    <label for="speed">Playback speed <output id="speed-value" for="speed">1×</output></label>
+    <input id="speed" type="range" min="0.25" max="2" step="0.25" value="1" disabled>
+    <label class="check"><input id="auto-rotate" type="checkbox" disabled> Auto-rotate</label>
+    <button id="reset-view" type="button" disabled>Reset view</button>
+    <p id="status" role="status">Loading diorama…</p><p id="error" role="alert"></p>
+    <small>Drag to orbit; scroll to zoom. On touch, pinch to zoom. Focus the scene: arrow keys orbit, + / − zoom.</small>
+    <small>Original diorama made for Margo Engine. Presentation inspired by the three.js keyframes example (<a href="https://www.artstation.com/artwork/1AGwX">Littlest Tokyo</a> by Glen Fox, CC-BY).</small>
+  </aside>
+  <script type="module" src="./tokyo-diorama.ts"></script>
+</body>
+</html>
