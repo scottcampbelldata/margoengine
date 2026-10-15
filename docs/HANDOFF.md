@@ -1106,8 +1106,8 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
      snippets are type-checked by `tests/from-threejs-snippets.test.js` (now every `docs/guides/*.md` too). New API for
      it: gltf-pro `model.extras()` -> `{node, nodeIndex, name, extras, matrix}` for every node with an object `extras`
      (world matrix copied after a transform tick; +79 B gzip root; `packages/gltf-pro/tests/extras.test.js` builds a
-     Blender-shaped GLB). Update the guide when progressive loading, volumetric fog, the asset cache and the deployment
-     guide (5g.c, 5g.b, 5h.a, 5i.a) merge: it says "coming" for each. Gaps it found, not yet queued: water refraction
+     Blender-shaped GLB). Update the guide when progressive loading, volumetric fog and the asset cache (5g.c, 5g.b, 5h.a)
+     merge: it says "coming" for each (deploying links docs/deploying.md). Gaps it found, not yet queued: water refraction
      needs standalone Bloom's `sceneTexture` (PostStack has none, and standalone Bloom + SSAO refuse each other); SSR does
      not reflect in glTF surfaces (5l.l); core `Mesh` has no public world matrix (packages read
      `engineRuntime(engine).store.matrices`; the guide uses `node.matrix` after `engine.render`); physics bodies only on
