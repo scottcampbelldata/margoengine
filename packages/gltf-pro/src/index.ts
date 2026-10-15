@@ -5,8 +5,8 @@ import {invertMatrixStable} from '@margoengine/math/mat4';
 import {viewMatrix} from '../../shared/view.js';
 import {Cleanup} from '../../shared/cleanup.js';
 import {GLTFAsset, container, loadAsset, closeImages, entry, integer, assetLimit, type GLTFImage, type AssetOptions, type GLTFDecoderHooks} from './asset.js';
-import {pbrShader, physicalShader, lightPBR, type PBRLighting} from './shader.js';
-export type {PBRLighting} from './shader.js';
+import {pbrShader, physicalShader, lightPBR, transparentPBR, type PBRLighting, type PBRTransparency} from './shader.js';
+export type {PBRLighting, PBRTransparency} from './shader.js';
 import {mipShader} from './mip.js';
 // Type only: PBRInstances and the EXT_mesh_gpu_instancing reader load with @margoengine/gltf-pro/instancing.
 import type {PBRInstances} from './instancing.js';
@@ -21,6 +21,8 @@ export interface GLTFCamera {node:Mesh;nodeIndex:number;type:'perspective'|'orth
 export interface GLTFClusteredLight {position:[number,number,number];range:number;color:number[];intensity:number;direction?:[number,number,number];outerAngle?:number;innerAngle?:number}
 export type GLTFLoadOptions = Omit<AssetOptions,'buffers'>;
 const srgbMaps=[0,4,9,12],normalMaps=[2,7],blended=(m:any)=>m.settings[0]===2||!!m.tint;
+// What a transparency hook takes over: plain alpha blending (transmission tints and custom render state keep the sorted path).
+const separable=(m:any)=>m.settings[0]===2&&!m.tint&&!m.renderState;
 // Names the material + effects combination instead of an invalid pipeline when the shader declares more sampled textures or
 // samplers than the device allows per stage (WebGPU's default and guaranteed minimum is 16 of each; README "Texture bindings").
 // ponytail: counts declarations, not per-stage use, so a texture read only in the vertex stage still counts.
@@ -141,7 +143,7 @@ export class PBRModel implements EnginePlugin {
   private pipelines=new Map<string,GPURenderPipeline>();private readonly inverse=new Float32Array(16);private readonly workspace=new Float64Array(52);private readonly view=new Float32Array(16);
   private engine:Engine;private readonly cleanupCallbacks=new Set<()=>void>();
   private readonly lighting=new Set<LightingEffect>();private readonly codes=new Map<string,number>();private codeCount=0;private readonly replays=new Map<string,string>();
-  private readonly lightingGroups=new Map<GPURenderPipeline,{entries:GPUBindGroupEntry[];group:GPUBindGroup}>();
+  private readonly lightingGroups=new Map<GPURenderPipeline,{entries:GPUBindGroupEntry[];group:GPUBindGroup}>();private transparency?:PBRTransparency;
   constructor(instance:EngineKernel,readonly asset:GLTFAsset,private readonly images:readonly GLTFImage[]=[],prepared?:readonly (readonly PreparedGeometry[])[]) {
     this.engine=engineRuntime(instance);
     const doc=asset.doc,defs=doc.nodes??[],parents=new Int32Array(defs.length).fill(-1),materials=(doc.materials??[]).map(material);
@@ -238,22 +240,31 @@ export class PBRModel implements EnginePlugin {
     if(effect.owner&&effect.owner!==this.engine)throw new Error('PBR lighting belongs to another engine');
     this.lighting.add(effect);return()=>this.lighting.delete(effect);
   }
+  /** Hands this model's BLEND primitives to a transparency hook (README "Transparency hook"); returns a remover that restores sorted blending. */
+  setTransparency(hook:PBRTransparency):()=>void {
+    if(this.disposed||!hook||typeof hook.declarations!=='function'||typeof hook.bindings!=='function'||typeof hook.begin!=='function'||!Array.isArray(hook.targets))throw new TypeError('Invalid PBR transparency hook');
+    this.transparency=hook;return()=>{if(this.transparency===hook)this.transparency=undefined;};
+  }
   get shadowPrimitives() {
     return this.resources.filter(r=>r.primitive.material.settings[0]!==2).map(r=>({node:r.primitive.node,vertex:r.primitive.deformed??r.vertex,index:r.index,count:r.primitive.indices.length,stride:80,
       alphaTexture:r.views[0],alphaSampler:r.samplers[0],alpha:r.primitive.material.base[3],cutoff:r.primitive.material.settings[0]===1?r.primitive.material.settings[1]:0,texCoord:r.primitive.material.maps[0]?.texCoord??0,instances:r.primitive.instances}));
   }
-  draw(c:Context,mode:'beauty'|'gbuffer'|'ambient',color:GPUTextureView,depth:GPUTextureView):void {
-    if(this.disposed)return;
+  /** `transparent` draws only the BLEND primitives a transparency hook took over (`setTransparency`), into its pass; `color`/`depth` are unused. */
+  draw(c:Context,mode:'beauty'|'gbuffer'|'ambient'|'transparent',color:GPUTextureView,depth:GPUTextureView):void {
+    const oit=this.transparency,through=mode==='transparent';
+    if(this.disposed||through&&!oit)return;
     viewMatrix(this.view,c.camera);
-    const resources=[...this.resources].sort((a,b)=>{
+    const resources=through?this.resources:[...this.resources].sort((a,b)=>{
       const blendA=blended(a.primitive.material),blendB=blended(b.primitive.material);
       if(blendA!==blendB)return +blendA-+blendB;
       const distance=(r:DrawResource)=>Math.hypot(...c.camera.position.map((v,i)=>v-r.primitive.node.matrix[12+i]));
       return blendA?distance(b)-distance(a):0;
     });
-    let pass:GPURenderPassEncoder|undefined;
+    let pass:GPURenderPassEncoder|undefined,shared:GPURenderPassEncoder|undefined;
     try {for(const r of resources) {
-      const p=r.primitive,m=p.material,node=p.node,inst=p.instances;node.check();let visible=true;
+      const p=r.primitive,m=p.material,node=p.node,inst=p.instances;
+      if(through?!separable(m):mode==='beauty'&&oit&&separable(m))continue;
+      node.check();let visible=true;
       for(let id=node.id;id!==-1;id=this.engine.store.parents[id])if(this.engine.store.hidden[id])visible=false;
       if(!visible||inst&&!inst.count)continue;
       const instances=inst?.upload(c.device);
@@ -267,13 +278,14 @@ export class PBRModel implements EnginePlugin {
       const a=node.matrix;v[97]=Math.sign(a[0]*(a[5]*a[10]-a[6]*a[9])-a[4]*(a[1]*a[10]-a[2]*a[9])+a[8]*(a[1]*a[6]-a[2]*a[5]));
       v.set(m.ext,100);v.set(m.uvt,104);if(m.physical)v.set(m.physical,208);
       c.device.queue.writeBuffer(r.uniform,0,v as Float32Array<ArrayBuffer>);
-      let code=m.physical?physicalShader():pbrShader,entry=mode==='beauty'?'fragment':mode==='gbuffer'?'gbuffer':'ambientFragment',lit=mode==='beauty';
+      let code=m.physical?physicalShader():pbrShader,entry=mode==='beauty'?'fragment':mode==='gbuffer'?'gbuffer':through?'transparent':'ambientFragment',lit=mode==='beauty'||through;
       if(mode!=='gbuffer'&&this.lighting.size){let patched=code,ambient=false;
         // Effects with `pbr` hooks compose at gltf-pro's hook points; others (materials, LOD baking) still patch the text.
         for(const effect of this.lighting){if(effect.pbr){const hooks=effect.pbr(2);if(hooks){patched=lightPBR(patched,hooks);ambient||=!!hooks.ambient;}}else patched=effect.shader!(patched,2);}
         // An `ambient` hook (environment IBL) is what SSAO's ambient replay returns from the lit fragment, `_=color` keeping every
         // lighting binding in the layout. Unlit materials have no ambient.
         if(lit)code=patched;else if(ambient){let replay=this.replays.get(patched);if(replay===undefined){if(this.replays.size>=64)this.replays.clear();this.replays.set(patched,replay=patched.replace('return vec4f(color,','_=color;return vec4f(select(margoAmbient,vec3f(0),f.ext.x>0.5),'));}code=replay;entry='fragment';lit=true;}}
+      if(through)code=transparentPBR(code,oit!.declarations(2));
       // Instancing patches the vertex stage last, so text-patching effects (shader NodeMaterial vertex nodes) keep their anchors.
       if(inst)code=inst.shader(code);
       // Keep the shader's original front-facing convention, including mirrored transforms.
@@ -289,8 +301,8 @@ export class PBRModel implements EnginePlugin {
         checkLimits(c.device,code,()=>[m.physical?'physical material':'material',...[...this.lighting].flatMap(e=>{const x=e as {name?:string;shadow?:{name?:string}};return [x.name??'shader patch',...x.shadow?.name?[x.shadow.name]:[]];})]);
         const module=c.device.createShaderModule({code}),format=mode==='beauty'?c.format:'rgba16float';
         pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:80,attributes:Array.from({length:5},(_,i)=>({shaderLocation:i,offset:i*16,format:'float32x4' as const}))},...inst?[inst.layout]:[]]},
-          fragment:{module,entryPoint:entry,constants:{margoFaceTest:face,margoAlphaTest:mask},targets:[{format,blend:state?.blend!==undefined?state.blend??undefined:blend&&mode!=='gbuffer'?{color:transmit?{srcFactor:'one',dstFactor:'constant'}:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
-          multisample:c.descriptor.multisample,primitive:{cullMode:cull},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:state?.depthWrite??(mode==='beauty'&&!blend),depthCompare:state?.depthCompare??(mode==='beauty'?'greater-equal':'equal')}});
+          fragment:{module,entryPoint:entry,constants:{margoFaceTest:face,margoAlphaTest:mask},targets:through?oit!.targets as GPUColorTargetState[]:[{format,blend:state?.blend!==undefined?state.blend??undefined:blend&&mode!=='gbuffer'?{color:transmit?{srcFactor:'one',dstFactor:'constant'}:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
+          multisample:c.descriptor.multisample,primitive:{cullMode:cull},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:state?.depthWrite??(mode==='beauty'&&!blend),depthCompare:state?.depthCompare??(mode==='beauty'||through?'greater-equal':'equal')}});
         this.pipelines.set(key,pipeline);
       }
       let groups=r.groups.get(pipeline);
@@ -299,13 +311,17 @@ export class PBRModel implements EnginePlugin {
           c.device.createBindGroup({layout:pipeline.getBindGroupLayout(1),entries:r.views.flatMap((view,i)=>[{binding:i*2,resource:view},{binding:i*2+1,resource:r.samplers[i]}])})];
         r.groups.set(pipeline,groups);
       }
+      let target:GPURenderPassEncoder;
+      if(through)target=shared??=oit!.begin();
+      else {
       // Retain transparent pass boundaries so attachment-store rounding stays unchanged.
       if(blend&&mode!=='gbuffer'){pass?.end();pass=undefined;}
-      pass??=c.encoder.beginRenderPass({colorAttachments:[{view:color,loadOp:'load',storeOp:'store'}],depthStencilAttachment:{view:depth,depthLoadOp:'load',depthStoreOp:'store',...(c.descriptor.depthStencil!.format.includes('stencil')?{stencilLoadOp:'load',stencilStoreOp:'store'}:{})}});
-      pass.setPipeline(pipeline);pass.setBindGroup(0,groups[0]);pass.setBindGroup(1,groups[1]);
-      if(transmit&&mode!=='gbuffer')pass.setBlendConstant([...m.tint,1]);
-      if(lit&&this.lighting.size){
-        const entries=[...this.lighting].flatMap(effect=>effect.bindings());let cached=this.lightingGroups.get(pipeline);
+      target=pass??=c.encoder.beginRenderPass({colorAttachments:[{view:color,loadOp:'load',storeOp:'store'}],depthStencilAttachment:{view:depth,depthLoadOp:'load',depthStoreOp:'store',...(c.descriptor.depthStencil!.format.includes('stencil')?{stencilLoadOp:'load',stencilStoreOp:'store'}:{})}});
+      }
+      target.setPipeline(pipeline);target.setBindGroup(0,groups[0]);target.setBindGroup(1,groups[1]);
+      if(transmit&&mode!=='gbuffer')target.setBlendConstant([...m.tint,1]);
+      if(lit&&(this.lighting.size||through)){
+        const entries=[...this.lighting].flatMap(effect=>effect.bindings());if(through)entries.push(...oit!.bindings());let cached=this.lightingGroups.get(pipeline);
         if(!cached||entries.length!==cached.entries.length||entries.some((entry,i)=>{
           const previous=cached!.entries[i],resource=entry.resource,old=previous.resource;
           return entry.binding!==previous.binding||!(resource===old||'buffer' in resource&&'buffer' in old&&resource.buffer===old.buffer&&resource.offset===old.offset&&resource.size===old.size);
@@ -313,12 +329,12 @@ export class PBRModel implements EnginePlugin {
           const snapshot=entries.map(({binding,resource})=>({binding,resource:'buffer' in resource?{buffer:resource.buffer,offset:resource.offset,size:resource.size}:resource}));
           const group=c.device.createBindGroup({layout:pipeline.getBindGroupLayout(2),entries});cached={entries:snapshot,group};this.lightingGroups.set(pipeline,cached);
         }
-        pass.setBindGroup(2,cached.group);
+        target.setBindGroup(2,cached.group);
       }
-      pass.setVertexBuffer(0,p.deformed??r.vertex);if(instances)pass.setVertexBuffer(1,instances);pass.setIndexBuffer(r.index,'uint32');
-      if(inst)pass.drawIndexed(p.indices.length,inst.count);else pass.drawIndexed(p.indices.length);
-      if(blend&&mode!=='gbuffer'){pass.end();pass=undefined;}
-      if(mode==='beauty'){this.engine.stats.visible+=inst?inst.count:1;this.engine.stats.drawCalls++;}
+      target.setVertexBuffer(0,p.deformed??r.vertex);if(instances)target.setVertexBuffer(1,instances);target.setIndexBuffer(r.index,'uint32');
+      if(inst)target.drawIndexed(p.indices.length,inst.count);else target.drawIndexed(p.indices.length);
+      if(blend&&mode!=='gbuffer'&&!through){pass!.end();pass=undefined;}
+      if(mode==='beauty'||through){this.engine.stats.visible+=inst?inst.count:1;this.engine.stats.drawCalls++;}
     }}catch(error){try{pass?.end();}catch{}throw error;}
     pass?.end();
   }

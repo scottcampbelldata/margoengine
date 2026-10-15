@@ -46,6 +46,20 @@ material; unset fields keep the defaults above. It is part of the pipeline cache
 mutating it), the g-buffer and ambient passes ignore it, and draw order and pass splitting still follow `alphaMode`.
 Without it the pipelines are unchanged. `@margoengine/materials` uses it for `blending`, `depthWrite` and `depthTest`.
 
+### Transparency hook
+
+`model.setTransparency(hook)` (type `PBRTransparency`, contract version 1; returns a remover) hands the model's BLEND
+primitives to an order-independent transparency pass such as `@margoengine/oit`. While a hook is set, BLEND primitives
+without transmission and without a `renderState` leave the beauty pass (transmission tints and custom blending keep the
+sorted path), and `model.draw(c, 'transparent', ...)` draws only them, into `hook.begin()`'s pass with `hook.targets`,
+depth tested (`greater-equal`) and not written. Their shader is the lit beauty shader with the fragment head
+`@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {` renamed to
+`fn margoShade(i:Out,front:bool)->vec4f {` and an entry point `transparent` returning
+`margoTransparent(margoShade(i,front),i)`; `hook.declarations(2)` supplies `struct MargoTransparent`, that function and its
+group-2 bindings (after the lighting effects' entries, from `hook.bindings()`). Lighting effects and text patches
+(materials, shader nodes) compose as in the beauty pass, and the pass adds no textures. Without a hook nothing changes:
+`examples/package-benchmarks/proofs/oit-detached.proof.js` records identical GPU calls to the build before the hook.
+
 ### Texture bindings
 
 WebGPU guarantees 16 sampled textures and 16 samplers per shader stage (the default and the minimum every adapter

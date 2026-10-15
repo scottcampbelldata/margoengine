@@ -1,0 +1,104 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>OIT GPU check</title><style>body{margin:0;background:#000}canvas{display:block}</style></head><body>
+<script type="module">
+// Driven by oit-gpu.mjs. Two scenes, each built on a fresh engine and canvas:
+// - 'cad': a 50% translucent housing (gltf-pro BLEND, double-sided, subdivided box) over two opaque gears and one 55%
+//   translucent gear, all from parsePreparedPBR. mode 'sorted' = gltf-pro's per-primitive back-to-front path, 'oit' =
+//   OIT.attach + oit.add(model), 'reference' = the translucent parts split into one node per triangle (centroid
+//   translation), so gltf-pro's sort becomes a per-triangle sort: the reference for popping and colour.
+// - 'layers': `count` unlit (materials 'basic') translucent planes facing the camera, front to back, over an opaque grey
+//   plane, so colours can be checked against analytic blending. Optional ortho camera, PostStack, TransparentCanvas.
+import {Engine} from '/packages/core/dist/index.js';
+import {parsePreparedPBR} from '/packages/gltf-pro/dist/index.js';
+import {Material,createMesh} from '/packages/materials/dist/index.js';
+import {planeGeometry,boxGeometry,extrudeGeometry,Shape} from '/packages/geometry/dist/index.js';
+import {OIT} from '/packages/oit/dist/index.js';
+import {CameraProjection} from '/packages/cameras/dist/index.js';
+import {TransparentCanvas} from '/packages/environment/dist/index.js';
+import {PostStack,Bloom,FXAA} from '/packages/post/dist/index.js';
+import {Stats} from '/packages/stats/dist/index.js';
+// Pass labels of the last frame, in begin order (the Stats profiler reports pass times in that order).
+let labels=[];const render=GPUCommandEncoder.prototype.beginRenderPass,compute=GPUCommandEncoder.prototype.beginComputePass;
+GPUCommandEncoder.prototype.beginRenderPass=function(d){labels.push(d?.label||'pass');return render.call(this,d);};
+GPUCommandEncoder.prototype.beginComputePass=function(d){labels.push(d?.label||'compute');return compute.call(this,d);};
+let engine,canvas,errors=[],oit,stats,model,hide=[];
+const layerColors=[[0.9,0.1,0.1,0.5],[0.1,0.8,0.2,0.4],[0.1,0.2,0.9,0.6],[0.9,0.8,0.1,0.5]],layerZ=[0.6,0.3,0,-0.3];
+function prepared(g,offset=[0,0,0]){
+  const n=g.positions.length/3,v=new Float32Array(n*20);
+  for(let i=0;i<n;i++){const o=i*20,nx=g.normals[i*3],ny=g.normals[i*3+1],nz=g.normals[i*3+2],l=Math.hypot(nx,ny,nz)||1;
+    for(let k=0;k<3;k++){v[o+k]=g.positions[i*3+k]-offset[k];}v[o+3]=1;v[o+4]=nx/l;v[o+5]=ny/l;v[o+6]=nz/l;
+    v[o+12]=v[o+14]=g.uvs?.[i*2]??0;v[o+13]=v[o+15]=g.uvs?.[i*2+1]??0;v[o+16]=v[o+17]=v[o+18]=v[o+19]=1;}
+  return {vertices:v,indices:g.indices?Uint32Array.from(g.indices):Uint32Array.from({length:n},(_,i)=>i)};
+}
+// One primitive per triangle, positioned at its centroid.
+function triangles(g){
+  const idx=g.indices??Uint32Array.from({length:g.positions.length/3},(_,i)=>i),out=[];
+  for(let t=0;t<idx.length;t+=3){
+    const c=[0,1,2].map(k=>(g.positions[idx[t]*3+k]+g.positions[idx[t+1]*3+k]+g.positions[idx[t+2]*3+k])/3);
+    const pick=a=>a&&Float32Array.from([0,1,2].flatMap(j=>Array.from(a.slice(idx[t+j]*(a===g.uvs?2:3),idx[t+j]*(a===g.uvs?2:3)+(a===g.uvs?2:3)))));
+    out.push({centre:c,geometry:prepared({positions:pick(g.positions),normals:pick(g.normals),uvs:pick(g.uvs)},c)});
+  }
+  return out;
+}
+const translate=(g,t)=>({...g,positions:g.positions.map((v,i)=>v+t[i%3])});
+function gear(teeth,outer,inner,depth,at){
+  const points=[];for(let i=0;i<teeth*4;i++){const a=i/(teeth*4)*Math.PI*2,r=i%4<2?outer:inner;points.push([Math.cos(a)*r,Math.sin(a)*r]);}
+  return translate(extrudeGeometry(new Shape(points),{depth,bevelEnabled:false,curveSegments:1}),[at[0],at[1],at[2]-depth/2]);
+}
+function cadModel(mode){
+  const materials=[
+    {alphaMode:'BLEND',doubleSided:true,pbrMetallicRoughness:{baseColorFactor:[0.55,0.7,0.9,0.5],metallicFactor:0,roughnessFactor:0.35}},
+    {pbrMetallicRoughness:{baseColorFactor:[0.9,0.45,0.1,1],metallicFactor:0.5,roughnessFactor:0.4}},
+    {pbrMetallicRoughness:{baseColorFactor:[0.6,0.62,0.66,1],metallicFactor:0.8,roughnessFactor:0.35}},
+    {alphaMode:'BLEND',doubleSided:true,pbrMetallicRoughness:{baseColorFactor:[0.2,0.85,0.35,0.55],metallicFactor:0,roughnessFactor:0.5}}];
+  const parts=[[boxGeometry(2.6,1.6,1.4,8,5,4),0],[gear(12,0.55,0.45,0.3,[-0.5,0,-0.15]),1],[gear(10,0.42,0.33,0.3,[0.48,0.05,-0.15]),2],[gear(9,0.4,0.31,0.2,[0.1,-0.25,0.3]),3]];
+  const doc={asset:{version:'2.0'},scene:0,scenes:[{nodes:[]}],nodes:[],meshes:[],materials},geometry=[],add=(g,material,t=[0,0,0])=>{doc.scenes[0].nodes.push(doc.nodes.length);doc.nodes.push({mesh:doc.meshes.length,translation:t});doc.meshes.push({primitives:[{material}]});geometry.push([g]);};
+  for(const [g,material] of parts){
+    if(mode==='reference'&&materials[material].alphaMode==='BLEND')for(const t of triangles(g))add(t.geometry,material,t.centre);
+    else add(prepared(g),material);
+  }
+  const m=parsePreparedPBR(engine,doc,geometry);hide=m.primitives.filter(p=>p.material.settings[0]===2).map(p=>p.node);return m;
+}
+function layerScene(count,background){
+  if(background)createMesh(engine,planeGeometry(6,6),new Material({shading:'basic',color:[0.2,0.2,0.2]})).root.setPosition([0,0,-1.5]);
+  const meshes=[];for(let i=0;i<count;i++){const [r,g,b,a]=layerColors[i],m=createMesh(engine,planeGeometry(1.6,1.6),new Material({shading:'basic',color:[r,g,b],opacity:a,transparent:true,doubleSided:true}));m.root.setPosition([0,0,layerZ[i]]);meshes.push(m);}
+  return meshes;
+}
+window.check={
+  // {scene:'cad'|'layers', mode:'sorted'|'oit'|'reference', samples:1|4, width, height, count, ortho, post, transparent, background}
+  async build(o){
+    errors=[];globalThis.margoLow=o.samples===1?1:undefined;
+    canvas=document.body.appendChild(document.createElement('canvas'));canvas.style.width=o.width+'px';canvas.style.height=o.height+'px';
+    engine=await Engine.create(canvas,{backend:'webgpu',features:['timestamp-query'],camera:{position:[0,0,4],target:[0,0,0],near:0.05,far:100}});
+    engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+    if(o.transparent)TransparentCanvas.attach(engine);
+    if(o.ortho)CameraProjection.attach(engine,{mode:'orthographic'});
+    if(o.post)PostStack.attach(engine,[new Bloom({strength:0.3,threshold:0.9}),new FXAA()]);
+    if(o.mode==='oit')oit=OIT.attach(engine);
+    if(o.scene==='cad'){model=cadModel(o.mode);if(oit)oit.add(model);}
+    else {const meshes=layerScene(o.count,o.background!==false);if(oit)for(const m of meshes)oit.add(m);}
+    if(o.profile)stats=Stats.attach(engine,{profiling:true,parent:document.createElement('div')});
+    return {width:canvas.width,height:canvas.height,samples:o.samples};
+  },
+  // Camera on a 5 m orbit at 20 degrees elevation, `angle` degrees around +y.
+  async orbit(angle,radius=5){
+    const a=angle*Math.PI/180,e=20*Math.PI/180;engine.camera.position=[Math.sin(a)*Math.cos(e)*radius,Math.sin(e)*radius,Math.cos(a)*Math.cos(e)*radius];engine.camera.target=[0,0,0];
+    return this.frames(2);
+  },
+  async frames(n){engine.gpu.pushErrorScope('validation');for(let i=0;i<n;i++){labels=[];engine.render({delta:1/60});await engine.gpu.queue.onSubmittedWorkDone();}const e=await engine.gpu.popErrorScope();if(e)errors.push(e.message);
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return {errors:errors.splice(0),labels:[...labels]};},
+  setTransparentVisible(v){for(const n of hide)n.visible=v;},
+  // Median GPU pass time (Stats timestamp profiler, every 15th frame) over `frames` frames: total and per pass label.
+  async bench(frames=300){
+    for(let i=0;i<30;i++){engine.render({delta:1/60});await engine.gpu.queue.onSubmittedWorkDone();}
+    const totals=[],byLabel={};
+    for(let i=0;i<frames;i++){labels=[];engine.render({delta:1/60});await engine.gpu.queue.onSubmittedWorkDone();
+      if(i%15===14){await new Promise(r=>setTimeout(r,5));const ms=stats.gpuPassMilliseconds,n=stats.gpuPassCount;if(!ms||!n)continue;let sum=0;
+        const seen={};for(let k=0;k<n;k++){sum+=ms[k];const l=labels[k]??'?';seen[l]=(seen[l]??0)+ms[k];}totals.push(sum);for(const [l,v] of Object.entries(seen))(byLabel[l]??=[]).push(v);}}
+    const med=a=>{const b=[...a].sort((x,y)=>x-y);return +b[b.length>>1].toFixed(3);};
+    return {gpuMs:totals.length?med(totals):null,samples:totals.length,passes:Object.fromEntries(Object.entries(byLabel).map(([l,v])=>[l,med(v)])),passLabels:[...labels],errors:errors.splice(0)};
+  },
+  background(color){document.body.style.background=color;},
+  clear(){stats?.dispose();stats=undefined;oit=undefined;model=undefined;hide=[];engine.dispose();canvas.remove();labels=[];document.body.style.background='#000';},
+};
+window.ready=true;
+</script></body></html>

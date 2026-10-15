@@ -934,6 +934,21 @@
     ]
   },
   {
+    "id": "oit",
+    "title": "Oit",
+    "package": "@margoengine/oit",
+    "version": "0.1.0",
+    "published": false,
+    "description": "Weighted blended order-independent transparency for gltf-pro BLEND primitives and materials transparent meshes: no popping between overlapping transparent parts.",
+    "requirements": "Core ^0.1.0 || ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "oit",
+    "install": "npm install @margoengine/core@0.1.0 @margoengine/oit@0.1.0",
+    "imports": "import { OIT } from '@margoengine/oit';",
+    "exports": [
+      "OIT"
+    ]
+  },
+  {
     "id": "physics",
     "title": "Physics",
     "package": "@margoengine/physics",
