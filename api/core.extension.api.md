@@ -9,6 +9,7 @@ export interface Batch {
     count: number;
     start?: number;
     end?: number;
+    mask?: number;
 }
 
 export class Camera {

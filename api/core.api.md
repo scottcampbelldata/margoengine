@@ -155,6 +155,7 @@ interface Batch {
     count: number;
     start?: number;
     end?: number;
+    mask?: number;
 }
 
 interface DrawOptions {

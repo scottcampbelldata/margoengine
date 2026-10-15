@@ -10,8 +10,10 @@ declare const GPUMapMode:{READ:number};
 
 const defaultDraw:DrawOptions={};
 
-/** `start`/`end`: float range of `instances` changed since the WebGPU renderer last uploaded it (absent: upload all). */
-export interface Batch { geometry: Geometry; instances: Float32Array; count: number; start?: number; end?: number }
+/** `start`/`end`: float range of `instances` changed since the WebGPU renderer last uploaded it (absent: upload all).
+ * `mask`: nonzero when a drawn instance needs back faces (double-sided material or mirrored transform); 0 lets core's
+ * own pass draw the batch with its back-culled pipeline (absent counts as 0). */
+export interface Batch { geometry: Geometry; instances: Float32Array; count: number; start?: number; end?: number; mask?: number }
 export interface Lighting { direction: Float32Array; radiance: Float32Array }
 export interface GeometryBuffers {readonly vertex:GPUBuffer;readonly index:GPUBuffer;readonly instance:GPUBuffer}
 export interface Renderer {
@@ -49,6 +51,7 @@ export class GPURenderer implements Renderer {
   private readonly groups=new WeakMap<GPURenderPipeline,{bindings:GPUBindGroupEntry[];group:GPUBindGroup}>();
   private readonly uniform: GPUBuffer;
   private readonly bindGroup: GPUBindGroup;
+  private readonly culledGroup: GPUBindGroup;
   private disposed = false;
   private picking=false;
 
@@ -66,15 +69,15 @@ export class GPURenderer implements Renderer {
         ]}, fragment:{module,entryPoint:'fragment',targets:[{format}]},
         depthStencil:{format:device.features.has('depth32float-stencil8')?'depth32float-stencil8':'depth32float',depthWriteEnabled:true,depthCompare:'greater-equal'},multisample:{count:sceneSamples()}
       };
-      const pipeline=await device.createRenderPipelineAsync(descriptor);
+      const pipeline=await device.createRenderPipelineAsync(descriptor),culled=await device.createRenderPipelineAsync({...descriptor,primitive:{cullMode:'back'},fragment:{...descriptor.fragment!,constants:{C:1}}});
       const context = canvas.getContext('webgpu') as GPUCanvasContext|null; if (!context) throw new Error('No WebGPU canvas');
-      return new GPURenderer(canvas,device,context,format,pipeline,descriptor);
+      return new GPURenderer(canvas,device,context,format,pipeline,descriptor,culled);
     } catch(error) { device.destroy(); throw error; }
   }
 
-  private constructor(private readonly canvas: HTMLCanvasElement, private readonly device: GPUDevice, private readonly context: GPUCanvasContext, private readonly format: GPUTextureFormat, private readonly pipeline: GPURenderPipeline,private readonly descriptor:GPURenderPipelineDescriptor) {
+  private constructor(private readonly canvas: HTMLCanvasElement, private readonly device: GPUDevice, private readonly context: GPUCanvasContext, private readonly format: GPUTextureFormat, private readonly pipeline: GPURenderPipeline,private readonly descriptor:GPURenderPipelineDescriptor,private readonly culled:GPURenderPipeline) {
     this.uniform=device.createBuffer({size:112,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
-    this.bindGroup=device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform}}]});
+    this.bindGroup=device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform}}]});this.culledGroup=device.createBindGroup({layout:culled.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform}}]});
     try { context.configure({device,format}); } catch(error) { this.uniform.destroy(); throw error; }
     device.lost.then(info=>{this.deviceLost=true;if(!this.disposed)this.onLost?.(new Error(`GPU lost: ${info.message}`));});
     device.addEventListener('uncapturederror',event=>{ this.lost=new Error(event.error.message); });
@@ -143,8 +146,9 @@ export class GPURenderer implements Renderer {
     attachments.length=1;if(options.colorAttachments)attachments.push(...options.colorAttachments);
     const stencil=context.descriptor.depthStencil!.format.includes('stencil');depth.stencilClearValue=stencil?options.stencilClear??0:undefined;depth.stencilLoadOp=stencil?(clear||options.stencilClear!==undefined?'clear':'load'):undefined;depth.stencilStoreOp=stencil?depth.depthStoreOp:undefined;
     const pass=context.encoder.beginRenderPass(descriptor);
-    pass.setPipeline(pipeline); pass.setBindGroup(0,group);
+    let current:GPURenderPipeline|undefined;
     for(const batch of drawBatches) if(batch.count) {
+      const p=pipeline===this.pipeline&&!bindings.length&&!batch.mask?this.culled:pipeline;if(p!==current){current=p;pass.setPipeline(p);pass.setBindGroup(0,p===pipeline?group:this.culledGroup);}
       const resource=this.resources.get(batch.geometry)!;
       // Upload only the changed range, everything into a new buffer.
       if(resource.frame!==this.frameId){const start=resource.frame<0?0:batch.start??0,end=Math.min(resource.frame<0?1/0:batch.end??1/0,batch.count*24);if(end>start)this.device.queue.writeBuffer(resource.instance,start*4,batch.instances as Float32Array<ArrayBuffer>,start,end-start);batch.start=1/0;batch.end=0;resource.frame=this.frameId;}
