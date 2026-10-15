@@ -151,6 +151,12 @@ Vite names every file in `dist/assets/` after a hash of its contents (`index-B7j
 gets a new URL:
 
 - `assets/*`: `Cache-Control: public, max-age=31536000, immutable`.
+- A real `404.html` at the site root (the template ships one in `public/`). Without it Cloudflare Pages answers a
+  missing file with `index.html` and status 200, so a request that lands on a deployment without the new file (it
+  happens for a moment during every deploy) gets HTML under the year-long rule above, and the browser keeps that HTML
+  as the script: the page never loads again until the cache is cleared. With `404.html`, Pages answers 404 with
+  `Cache-Control: no-store`. Netlify and Vercel return 404 for missing files unless you add an SPA rewrite; keep
+  rewrites away from `/assets/*`.
 - HTML (and anything else with a fixed URL: `public/` files, `robots.txt`): revalidate, `Cache-Control: no-cache`.
   Cloudflare Pages, Netlify and Vercel already revalidate HTML by default.
 - Big files you reference by a fixed URL from `public/` (models, HDRs) cannot be immutable. Import them with `?url`
