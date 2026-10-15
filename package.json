@@ -156,7 +156,8 @@
     "publish:packages": "npm run release:check && npm publish --workspace packages --ignore-scripts --access public",
     "catalog:build": "node scripts/build-catalog.js",
     "build:site": "npm run catalog:build && node scripts/build-site.js",
-    "site:check": "node scripts/site-check.mjs"
+    "site:check": "node scripts/site-check.mjs",
+    "build:tokyo": "node scripts/build-tokyo-diorama.mjs"
   },
   "devDependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",
