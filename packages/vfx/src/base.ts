@@ -124,6 +124,7 @@ export class VFX implements EnginePlugin {
   private readonly view = new Float32Array(16);
   private time = 0;
   private remainder = 0;
+  private frames = 0;
   private burstCount = 0;
   private disposed = false;
   constructor(
@@ -228,7 +229,7 @@ export class VFX implements EnginePlugin {
     this.billboard = this.sprite ? f.texture!.patch(billboardShader) : billboardShader;
     this.alive = buffer(size * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
     this.indirect = buffer(20, GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_SRC);
-    this.respawn = buffer(8, GPUBufferUsage.STORAGE);
+    this.respawn = buffer(4, GPUBufferUsage.STORAGE);
     // indirect counts live particles; visible holds the draw's [vertexCount, instanceCount, firstVertex, firstInstance] for the on-screen ones listed in alive.
     this.visible = buffer(20, GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_SRC);
     for (const b of [this.indirect, this.visible])
@@ -309,6 +310,7 @@ export class VFX implements EnginePlugin {
     this.values[51] = o.intensity ?? 1;
     this.ints[52] = this.capacity;
     this.ints[53] = budget;
+    this.ints[54] = this.frames++;
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     if (this.extra) {
       const e = this.extraValues;

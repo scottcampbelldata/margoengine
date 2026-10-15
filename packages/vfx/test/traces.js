@@ -1,6 +1,8 @@
 // Recorded GPU work for particle configurations. `node packages/vfx/test/traces.js <dist>` rewrites
 // fixtures/traces.json from a build. First recorded before the entry split (1970fda); re-recorded when the particle
-// layout, culling and one-triangle billboards changed the GPU work (examples/package-benchmarks/vfx-gpu.mjs proves the pixels).
+// layout, culling and one-triangle billboards changed the GPU work (examples/package-benchmarks/vfx-gpu.mjs proves the
+// pixels), and when respawn seeds became slot + frame number instead of an atomic ticket (gate 9: same frames, same
+// particles on any GPU schedule).
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';

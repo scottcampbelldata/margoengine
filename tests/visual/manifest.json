@@ -65,14 +65,14 @@
    "size": "640x360",
    "runs": 4,
    "noise": {
-    "changed": 0.000026,
-    "hot": 0.00000868,
-    "mean": 0.000326,
-    "max": 32
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
    },
    "tolerance": {
-    "changed": 0.000578,
-    "hot": 0.000226
+    "changed": 0.0005,
+    "hot": 0.0002
    }
   },
   "night-citadel-light": {
@@ -80,14 +80,14 @@
    "size": "640x360",
    "runs": 4,
    "noise": {
-    "changed": 0.000773,
-    "hot": 0.0000434,
-    "mean": 0.00668,
-    "max": 77
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
    },
    "tolerance": {
-    "changed": 0.00282,
-    "hot": 0.00033
+    "changed": 0.0005,
+    "hot": 0.0002
    }
   },
   "night-citadel-phone": {
@@ -95,14 +95,14 @@
    "size": "195x422",
    "runs": 4,
    "noise": {
-    "changed": 0.00376,
-    "hot": 0.0000365,
-    "mean": 0.0146,
-    "max": 36
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
    },
    "tolerance": {
-    "changed": 0.0118,
-    "hot": 0.000309
+    "changed": 0.0005,
+    "hot": 0.0002
    }
   },
   "gameplay-sandbox-high": {
@@ -110,14 +110,14 @@
    "size": "640x360",
    "runs": 4,
    "noise": {
-    "changed": 0.0518,
-    "hot": 0.00341,
-    "mean": 0.357,
-    "max": 201
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
    },
    "tolerance": {
-    "changed": 0.156,
-    "hot": 0.0104
+    "changed": 0.0005,
+    "hot": 0.0002
    }
   },
   "gameplay-sandbox-light": {
@@ -125,14 +125,14 @@
    "size": "640x360",
    "runs": 4,
    "noise": {
-    "changed": 0.0133,
-    "hot": 0.000707,
-    "mean": 0.0813,
-    "max": 179
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
    },
    "tolerance": {
-    "changed": 0.0404,
-    "hot": 0.00232
+    "changed": 0.0005,
+    "hot": 0.0002
    }
   },
   "gameplay-sandbox-phone": {
@@ -140,14 +140,14 @@
    "size": "195x422",
    "runs": 4,
    "noise": {
-    "changed": 0.0155,
-    "hot": 0.000389,
-    "mean": 0.0748,
-    "max": 144
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
    },
    "tolerance": {
-    "changed": 0.047,
-    "hot": 0.00137
+    "changed": 0.0005,
+    "hot": 0.0002
    }
   },
   "character-animation-high": {
@@ -831,8 +831,8 @@
   "gpu": "intel xe-2lpg",
   "acPowerBefore": true,
   "acPowerAfter": true,
-  "date": "2026-10-15T20:51:52.655Z",
-  "commit": "e525b6e"
+  "date": "2026-10-15T22:26:42.136Z",
+  "commit": "c12eed9"
  },
  "method": {
   "hot": 24,
