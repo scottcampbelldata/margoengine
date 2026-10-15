@@ -1,5 +1,5 @@
 // CPU checks (mock GPU) for the scene-wide pieces: EnvironmentLighting, Fog, ColorBackground and UltraHDR decoding.
-import test from 'node:test';
+import test, {mock} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {mockGPU, passes, context} from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
@@ -8,7 +8,7 @@ import {animatedTriangle} from '../../../tests/support/gltf-pro-fixture.js';
 import {Engine, TransformStore} from '../../core/dist/extension.js';
 import {parseGLTF} from '../../gltf-pro/dist/index.js';
 import {
-  ColorBackground, EnvironmentLighting, Fog, IBL_BINDING, FOG_BINDING, srgbColor, parseUltraHDR, applyGainMap, decodeUltraHDR, parseEnvironmentImage,
+  ColorBackground, Environment, EnvironmentLighting, Fog, IBL_BINDING, FOG_BINDING, srgbColor, parseUltraHDR, applyGainMap, decodeUltraHDR, parseEnvironmentImage,
 } from '../dist/index.js';
 
 const source = path => readFileSync(new URL(path, import.meta.url), 'utf8').split('`')[1];
@@ -280,4 +280,58 @@ test('UltraHDR: gain-map math matches the hdrgm formula, upsamples the gain map 
   const image = await decodeUltraHDR(file(), {decode: bytes => {const gain = bytes.byteOffset > 0; seen.push(gain ? 'gain' : 'primary'); return gain ? {width: 1, height: 1, data: new Uint8Array([255, 255, 255, 255])} : sdr;}});
   assert.deepEqual(seen.sort(), ['gain', 'primary']);
   assert.equal(image.width, 2); assert.equal(image.data[0], 4);
+});
+
+// A plugin host with core's use/removePlugin/dispose contract, for EnvironmentLighting.load.
+function pluginEngine(device) {
+  const plugins = new Map();
+  return {backend: 'webgpu', gpu: device, disposed: false, plugins, onError(error) {throw error;},
+    use(plugin) {if (this.disposed) throw new Error('Engine disposed'); if (plugins.has(plugin.name)) throw new TypeError('Invalid plugin'); plugin.setup(this); plugins.set(plugin.name, plugin); return this;},
+    removePlugin(name) {const plugin = plugins.get(name); if (plugin) {plugins.delete(name); plugin.dispose?.();}},
+    dispose() {for (const name of plugins.keys()) this.removePlugin(name); this.disposed = true;}};
+}
+const loadable = device => ({...fakeEnvironment(device), name: 'environment', setup() {}, dispose() {this.disposed = true;}});
+const image = {width: 4, height: 2, data: new Float32Array(32).fill(1)};
+
+test('EnvironmentLighting.load attaches an Environment and its lighting from a decoded source or a URL; dispose removes both', async t => {
+  const gpu = mockGPU(), engine = pluginEngine(gpu.device), created = [];
+  t.mock.method(Environment, 'create', async (target, source, options) => {created.push({target, source, options}); return loadable(gpu.device);});
+  const lighting = await EnvironmentLighting.load(engine, image, {intensity: 2, weight: 0.5});
+  assert.ok(lighting instanceof EnvironmentLighting);
+  assert.deepEqual([...engine.plugins.keys()], ['environment', 'environment:lighting']);
+  assert.equal(engine.plugins.get('environment'), lighting.environment);
+  assert.equal(created[0].target, engine); assert.equal(created[0].source, image);
+  assert.deepEqual(created[0].options, {intensity: 2}, 'decode options and the signal stay out of the Environment');
+  lighting.dispose();
+  assert.equal(engine.plugins.size, 0); assert.equal(lighting.environment.disposed, true);
+
+  const bytes = readFileSync(new URL('./fixtures/spot1Lux.hdr', import.meta.url)), fetched = [];
+  t.mock.method(globalThis, 'fetch', async (url, init) => {fetched.push({url, init}); return new Response(bytes);});
+  const signal = new AbortController().signal, remote = await EnvironmentLighting.load(engine, '/studio.hdr', {signal});
+  assert.deepEqual(fetched, [{url: '/studio.hdr', init: {signal}}]);
+  assert.deepEqual([created[1].source.width, created[1].source.height], [parseEnvironmentImage(bytes).width, parseEnvironmentImage(bytes).height]);
+  engine.dispose();
+  assert.equal(remote.disposed, true); assert.equal(remote.environment.disposed, true);
+});
+
+test('EnvironmentLighting.load rejects with AbortError and attaches nothing once the engine is disposed or the signal aborts', async t => {
+  const gpu = mockGPU();
+  let pending, environment;
+  t.mock.method(Environment, 'create', () => {environment = loadable(gpu.device); return new Promise(resolve => {pending = () => resolve(environment);});});
+  const disposed = pluginEngine(gpu.device); disposed.dispose();
+  await assert.rejects(EnvironmentLighting.load(disposed, image), {name: 'AbortError'});
+  await assert.rejects(EnvironmentLighting.load(pluginEngine(gpu.device), image, {signal: AbortSignal.abort()}), {name: 'AbortError'});
+  assert.equal(Environment.create.mock.callCount(), 0, 'nothing is built after an abort');
+  // Disposal while the GPU build is running: the finished Environment is released, not attached.
+  const engine = pluginEngine(gpu.device), loading = EnvironmentLighting.load(engine, image);
+  await new Promise(setImmediate); engine.dispose(); pending();
+  await assert.rejects(loading, {name: 'AbortError'});
+  assert.equal(environment.disposed, true); assert.equal(engine.plugins.size, 0);
+  // A lighting name already in use: the Environment it attached is removed again; the other plugin stays.
+  const busy = pluginEngine(gpu.device), other = {name: 'environment:lighting', setup() {}, dispose() {this.disposed = true;}};
+  busy.use(other);
+  const failing = EnvironmentLighting.load(busy, image);
+  await new Promise(setImmediate); pending();
+  await assert.rejects(failing, /Invalid plugin/);
+  assert.equal(environment.disposed, true); assert.deepEqual([...busy.plugins.values()], [other]); assert.equal(other.disposed, undefined);
 });

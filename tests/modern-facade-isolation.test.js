@@ -8,7 +8,7 @@ const normalize = path => path.replaceAll('\\', '/');
 const featureMarkers = {
   particles: 'gpu-particles', targets: 'HDR target size exceeds limits', toon: 'toon-shading',
   post: 'post-processing', grass: 'grass:instances', planet: 'planet:surface',
-  sky: 'sky-moon',
+  sky: 'sky-moon', shadows: 'Invalid shadow options', environment: 'environment:lighting',
   cad: 'part-instancer', cadAsync: 'Invalid CAD input',
   kinematics: 'Invalid solver limits', surface: 'surface-physics',
   telemetry: 'telemetry-channel', section: 'section-planes', assembly: 'Invalid assembly tag',
@@ -42,7 +42,7 @@ const cases = [
   {key: 'exploded', pack: 'machinery', entry: 'exploded', exports: ['ExplodedView'], allowed: ['exploded']},
 ];
 const optionalPacks = [
-  'creative', 'scenery', 'sky', 'machinery', 'gltf', 'gltf-pro', 'blender', 'animation',
+  'creative', 'scenery', 'sky', 'machinery', 'gltf', 'gltf-pro', 'blender', 'animation', 'environment',
   'post', 'shadows', 'clustered', 'vfx', 'animator', 'taa', 'splats', 'terrain', 'loaders', 'exporters',
   'react', 'controls', 'input', 'audio', 'net', 'ecs', 'fsm', 'cinematic', 'stats', 'inspector',
   'gizmo', 'tween', 'splines', 'points', 'lines', 'text', 'labels', 'physics',
@@ -110,7 +110,7 @@ test('initial core + stage consumer keeps every optional pack behind a lazy boun
   for (const specifier of [
     '@margoengine/creative', '@margoengine/scenery', '@margoengine/machinery', '@margoengine/gltf',
     '@margoengine/creative/particles', '@margoengine/creative/post',
-    '@margoengine/scenery/sky', '@margoengine/machinery/cad',
+    '@margoengine/scenery/sky', '@margoengine/machinery/cad', '@margoengine/shadows', '@margoengine/environment',
   ]) {
     const entry = graph.entry(fileURLToPath(import.meta.resolve(specifier)));
     assert.ok(dynamic.has(entry.fileName), 'Facade lost its actual lazy import for ' + specifier);
@@ -183,4 +183,19 @@ test('actual root/subpath imports share identities and facade helpers preserve r
   assert.equal(post.options, postOptions);
   assert.equal(sky.config, skyOptions);
   assert.deepEqual(attached, [particle, post, sky], 'Facade no longer attaches each optional feature');
+});
+
+test('stage shadows and environment load the real packs: shadows attaches, environment rejects on a disposed engine', async () => {
+  const [facade, {Shadows}] = await Promise.all([import('margoengine'), import('@margoengine/shadows')]);
+  const attached = [], engine = {disposed: false, meshes: new Map(), use(plugin) {attached.push(plugin);}};
+  const receiver = new facade.Stage(engine);
+  attached.length = 0;
+  const shadows = await receiver.shadows({resolution: 512});
+  assert.ok(shadows instanceof Shadows);
+  assert.equal(shadows.options.resolution, 512);
+  assert.deepEqual(attached, [shadows]);
+  // The real EnvironmentLighting.load sees the disposed stage engine and attaches nothing (no fetch, no GPU).
+  engine.disposed = true;
+  await assert.rejects(receiver.environment({width: 4, height: 2, data: new Float32Array(32)}), {name: 'AbortError'});
+  assert.deepEqual(attached, [shadows]);
 });

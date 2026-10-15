@@ -5,8 +5,10 @@
 ```ts
 import { GeometryBuffers } from "@margoengine/core/extension";
 import { ParticleOptions, PostOptions } from "@margoengine/creative";
+import { EnvironmentLighting, EnvironmentLoadOptions, EnvironmentSource } from "@margoengine/environment";
 import { CADFormat, CADImportOptions } from "@margoengine/machinery";
 import { SkyMoonConfig } from "@margoengine/scenery";
+import { ShadowOptions, Shadows } from "@margoengine/shadows";
 
 export { CADCameraControls } from "@margoengine/core";
 
@@ -78,6 +80,8 @@ export class Stage {
     sky(options?: SkyMoonConfig): Promise<import("@margoengine/scenery").SkyMoon>;
     particles(options?: ParticleOptions): Promise<import("@margoengine/creative").GPUParticles>;
     effects(options?: PostOptions): Promise<import("@margoengine/creative").PostProcessing>;
+    environment(source: string | URL | EnvironmentSource, options?: EnvironmentLoadOptions): Promise<EnvironmentLighting>;
+    shadows(options?: ShadowOptions): Promise<Shadows>;
 }
 
 export interface StageOptions extends EngineOptions {

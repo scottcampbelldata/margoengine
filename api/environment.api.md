@@ -152,7 +152,9 @@ export interface EnvironmentBackgroundOptions {
 export class EnvironmentLighting extends ShaderEffect {
     readonly environment: Environment;
     static attach(engine: EngineKernel, environment: Environment, options?: EnvironmentLightingOptions): EnvironmentLighting;
+    static load(engine: EngineKernel, source: string | URL | EnvironmentSource, loadOptions?: EnvironmentLoadOptions): Promise<EnvironmentLighting>;
     constructor(environment: Environment, options?: EnvironmentLightingOptions);
+    dispose(): void;
     protected get device(): GPUDevice | null;
     protected entries(): GPUBindGroupEntry[];
     protected patch(source: string, group: number): string;
@@ -164,6 +166,10 @@ export class EnvironmentLighting extends ShaderEffect {
 export interface EnvironmentLightingOptions {
     name?: string;
 }
+
+export type EnvironmentLoadOptions = EnvironmentOptions & UltraHDROptions & {
+    signal?: AbortSignal;
+};
 
 export interface EnvironmentOptions {
     size?: number;

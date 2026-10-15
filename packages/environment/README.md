@@ -286,7 +286,7 @@ Five bindings, any group and binding numbers. `iblLayoutEntries(firstBinding)` a
 
 ## Options
 
-`Environment.attach(engine, source, options)` resolves once the IBL is built and the environment is attached (it then rebuilds itself after a device loss); `Environment.create(engineOrDevice, source, options)` builds one without attaching it, for example on a bare `GPUDevice`. Options:
+`Environment.attach(engine, source, options)` resolves once the IBL is built and the environment is attached (it then rebuilds itself after a device loss); `Environment.create(engineOrDevice, source, options)` builds one without attaching it, for example on a bare `GPUDevice`. `EnvironmentLighting.load(engine, urlOrSource, options)` does the whole IBL setup in one call (`loadEnvironmentImage` for a URL, `Environment.attach`, `EnvironmentLighting.attach`) and resolves with the lighting, whose `dispose()` also removes that environment; it takes the options below plus `decode`/`weight` (UltraHDR) and `signal`, and rejects with `AbortError`, attaching nothing, when `signal` aborts or the engine is disposed first (`margoengine`'s `app.environment()` calls it). Options:
 
 | Option | Default |
 | --- | --- |
