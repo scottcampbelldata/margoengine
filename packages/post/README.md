@@ -105,3 +105,20 @@ The `@margoengine/post/scene-fade` subpath also exports
 animation-frame opportunities before resolving. It cancels cleanly when the
 signal aborts; it does not establish whether the submitted frame contains the
 scene's subject. Call it after the actual subject render.
+
+## Transparent canvas (`TransparentCanvas` from `@margoengine/environment`)
+
+Checked on a real GPU (`examples/package-benchmarks/transparent-canvas-gpu.mjs`): empty pixels stay
+transparent with every effect below; opaque frames are byte-identical before and after the alpha changes.
+
+- **FXAA** filters alpha with colour (premultiplied), so smoothed silhouettes stay valid.
+- **Bloom** keeps the scene's alpha and raises it to the glow's brightest channel, so glow past an
+  object shows over the page as a valid premultiplied veil. In a `PostStack` its linear output
+  carries the scene alpha.
+- **SSAO** and **Tonemap** (`@margoengine/tonemap`) carry the scene alpha, but tone-map the
+  premultiplied colour of partly covered silhouette pixels, so a 1 px rim can be up to ~45/255
+  brighter than its alpha allows (shows as a faint light edge on dark pages).
+- **PostStack** adds no pass of its own; its last effect writes the canvas.
+- **DOF** (`@margoengine/dof`) keeps the sharp alpha: out-of-focus silhouettes spill colour onto
+  transparent pixels. **TAA** (`@margoengine/taa`) writes opaque alpha. **SceneFade** darkens empty
+  pixels while it fades. Use these on opaque canvases.

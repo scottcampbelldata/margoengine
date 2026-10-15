@@ -9,6 +9,8 @@ import { FrameGraph, PassContext } from "@margoengine/core/extension";
 export class ColorBackground {
     readonly name: string;
     readonly order: number;
+    protected disposed: boolean;
+    protected alpha: number;
     static attach(engine: EngineKernel, options?: ColorBackgroundOptions): ColorBackground;
     constructor(options?: ColorBackgroundOptions);
     get color(): [number, number, number];
@@ -260,6 +262,14 @@ class EnvironmentBackground {
     dispose(): void;
     [Symbol.dispose]: () => void;
     record(context: GPUContext): void;
+}
+
+export class TransparentCanvas extends ColorBackground {
+    static attach(engine: EngineKernel, options?: Pick<ColorBackgroundOptions, 'order' | 'name'>): TransparentCanvas;
+    constructor(options?: Pick<ColorBackgroundOptions, 'order' | 'name'>);
+    setup(engine: EngineKernel): void;
+    onDeviceRestored(): void;
+    dispose(): void;
 }
 
 export interface UltraHDROptions {

@@ -17,8 +17,10 @@ export class GLRenderer implements Renderer {
   private readonly radiance: WebGLUniformLocation|null;
   private readonly resources=new Map<Geometry,{vao:WebGLVertexArrayObject; buffers:WebGLBuffer[]; instance:WebGLBuffer}>();
 
-  constructor(private readonly canvas: HTMLCanvasElement) {
-    const gl=canvas.getContext('webgl2',{alpha:false,antialias:sceneSamples()>1,powerPreference:'high-performance'});
+  private readonly clear:[number,number,number,number];
+  constructor(private readonly canvas: HTMLCanvasElement, {transparent=false}:WebGLRendererOptions={}) {
+    this.clear=transparent?[0,0,0,0]:[0.018,0.023,0.035,1];
+    const gl=canvas.getContext('webgl2',{alpha:transparent,premultipliedAlpha:true,antialias:sceneSamples()>1,powerPreference:'high-performance'});
     if(!gl)throw new Error('No WebGL2 canvas'); this.gl=gl;
     const shaders:WebGLShader[]=[]; const program=gl.createProgram(); if(!program)throw new Error('GL program');
     try {
@@ -50,7 +52,7 @@ export class GLRenderer implements Renderer {
     const gl=this.gl; if(gl.isContextLost())throw new Error('WebGL context lost');
     graph.execute({backend:'webgl2',gl,camera,width:this.canvas.width,height:this.canvas.height,delta,draw:()=>{
     gl.viewport(0,0,this.canvas.width,this.canvas.height); gl.enable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
-    gl.clearColor(0.018,0.023,0.035,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT); gl.useProgram(this.program);
+    gl.clearColor(...this.clear); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT); gl.useProgram(this.program);
     gl.uniformMatrix4fv(this.camera,false,camera.matrix);gl.uniform3f(this.eye,...camera.position);gl.uniform4fv(this.light,lighting.direction);gl.uniform4fv(this.radiance,lighting.radiance);
     for(const batch of batches)if(batch.count){const r=this.resources.get(batch.geometry)!;gl.bindVertexArray(r.vao);gl.bindBuffer(gl.ARRAY_BUFFER,r.instance);gl.bufferSubData(gl.ARRAY_BUFFER,0,batch.instances,0,batch.count*24);gl.drawElementsInstanced(gl.TRIANGLES,batch.geometry.indices.length,gl.UNSIGNED_INT,0,batch.count);}
     gl.bindVertexArray(null);}});
@@ -60,5 +62,7 @@ export class GLRenderer implements Renderer {
   [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }
 
-/** Pass as `fallback` to `Engine.create`: `Engine.create(canvas, {fallback: webglRenderer})`. */
-export const webglRenderer = (canvas: HTMLCanvasElement): Renderer => new GLRenderer(canvas);
+/** `transparent`: premultiplied-alpha canvas cleared to transparent black (the WebGL side of `TransparentCanvas` from @margoengine/environment). */
+export interface WebGLRendererOptions {transparent?: boolean}
+/** Pass as `fallback` to `Engine.create`: `Engine.create(canvas, {fallback: webglRenderer})`, or `fallback: canvas => webglRenderer(canvas, {transparent: true})`. */
+export const webglRenderer = (canvas: HTMLCanvasElement, options?: WebGLRendererOptions): Renderer => new GLRenderer(canvas, options);

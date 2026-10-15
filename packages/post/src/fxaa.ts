@@ -34,7 +34,7 @@ fn luma(uv:vec2f)->f32 {return dot(textureSampleLevel(image,bilinear,uv,0).rgb,v
  let correct=(select(d2,d1,dist1<dist2)<0)!=(m<edge);
  let sub=clamp(abs((2*(n+s+w+e)+nw+ne+sw+se)/12-m)/range,0,1);let blend=(3-2*sub)*sub*sub;
  let offset=max(select(0.0,0.5-min(dist1,dist2)/(dist1+dist2),correct),blend*blend*0.75);
- return vec4f(textureSampleLevel(image,bilinear,uv+across*offset,0).rgb,center.a);
+ return textureSampleLevel(image,bilinear,uv+across*offset,0);
 }`;
 
 /** Fast approximate anti-aliasing for single-sampled (phone or light-tier) output. Alone it captures the finished frame

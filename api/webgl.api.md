@@ -8,7 +8,7 @@ import { Batch, FrameGraph, Lighting, Renderer } from "@margoengine/core/extensi
 
 export class GLRenderer implements Renderer {
     readonly backend = "webgl2";
-    constructor(canvas: HTMLCanvasElement);
+    constructor(canvas: HTMLCanvasElement, { transparent }?: WebGLRendererOptions);
     add(geometry: Geometry, capacity: number): void;
     remove(geometry: Geometry): void;
     render(camera: Camera, lighting: Lighting, batches: Iterable<Batch>, graph: FrameGraph, delta: number): void;
@@ -16,5 +16,9 @@ export class GLRenderer implements Renderer {
     [Symbol.dispose]: () => void;
 }
 
-export const webglRenderer: (canvas: HTMLCanvasElement) => Renderer;
+export interface WebGLRendererOptions {
+    transparent?: boolean;
+}
+
+export const webglRenderer: (canvas: HTMLCanvasElement, options?: WebGLRendererOptions) => Renderer;
 ```
