@@ -19,7 +19,7 @@ Overall: Margo is strong where three.js relies on third-party libraries or examp
 - **Core owns one canvas, one camera and one pass graph.** There is no render-to-texture from a second camera, no CubeCamera and no multiple viewports. All of these need core changes, and core is frozen for v1.0.
 - **Materials stop at standard, basic, normal and matcap on your own meshes.** Physical features come only from glTF `KHR_materials_*` files and are approximated (transmission does not refract). No Lambert, Phong, depth or shadow-catcher materials, no second UV set and no geometry groups.
 - **glTF coverage has gaps.** `KHR_animation_pointer`, iridescence, anisotropy, dispersion and material variants are rejected when required. glTF cameras are exposed as data only, and export writes no cameras or lights.
-- **Post-processing lacks GI.** No GTAO, SSGI, motion blur, SMAA or lens flare; screen-space reflections (`SSR`) cover core meshes only, and no built-in screen effects (a shader `NodePass` makes one in a few lines).
+- **Post-processing lacks GI.** No GTAO, SSGI, motion blur, SMAA or lens flare; screen-space reflections (`SSR`) cover core meshes and added glTF-pro/materials models, not water or terrain, and no built-in screen effects (a shader `NodePass` makes one in a few lines).
 
 Legend. A **†** marks rows where the evidence is the exported symbols, the package README and a non-trivial amount of source code, not a line-by-line read. See [How this was checked](#how-this-was-checked). Rows that work only on WebGPU say "WebGPU only" in their notes.
 
@@ -205,7 +205,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | UnrealBloomPass | COVERED † | post `Bloom` (`packages/post/src/bloom.ts`) | One implementation since the dedupe: creative `PostProcessing` has no bloom; stack `Bloom` before it in a `PostStack`. Half-resolution 9-tap Gaussian with a hard threshold (no soft knee, no mip chain). |
 | SSAOPass, SAOPass | COVERED † | post `SSAO` (`packages/post/src/ssao.ts`) | Normal-aware bilateral blur. Works under orthographic cameras and occludes environment IBL (diffuse and specular, same AO factor). |
 | GTAOPass | MISSING | — | |
-| SSRPass | PARTIAL | post `SSR` (`packages/post/src/ssr.ts`, entry `@margoengine/post/ssr`) | HDR `PostStack` effect (or `SSR.attach` alone): Hi-Z ray march, roughness blur and fade, replaces `EnvironmentLighting`'s specular where rays hit and keeps it where they miss; perspective and orthographic; works with TAA. Only core-mesh surfaces (core `PbrMaterial`) show reflections; glTF-pro models, water and other custom shaders are reflected but do not reflect. WebGPU only. |
+| SSRPass | PARTIAL | post `SSR` (`packages/post/src/ssr.ts`, entry `@margoengine/post/ssr`) | HDR `PostStack` effect (or `SSR.attach` alone): Hi-Z ray march, roughness blur and fade, replaces `EnvironmentLighting`'s specular where rays hit and keeps it where they miss; perspective and orthographic; works with TAA. Core meshes (`PbrMaterial`) and glTF-pro models / materials meshes added with `ssr.add(model)` (their own maps, alpha mask, instances, skinning, through gltf-pro's capture hook) show reflections; water, terrain and other custom shaders are reflected but do not reflect. WebGPU only. |
 | SSGI, denoise | MISSING | — | |
 | TAA (TAARenderPass, TRAA node) | COVERED † | taa `TAA` (`packages/taa/src/index.ts`) | Uses a velocity buffer and YCoCg clamping. |
 | FXAA, SMAA | COVERED † | post `FXAA` (`packages/post/src/fxaa.ts`, entry `@margoengine/post/fxaa`) | FXAA 3.11-style, alone (it wraps any other effect) or last in a `PostStack`. SMAA is not provided. |
@@ -334,8 +334,8 @@ Every MISSING or PARTIAL item, ordered by how often real three.js projects need 
 
 ### Low
 
-22. **GTAO, SSGI, motion blur, and SSR on glTF-pro and water surfaces.**
-    **Fit:** extend post. taa's velocity buffer already exists; `SSR` needs a material replay from glTF-pro and water (like SSAO's sources).
+22. **GTAO, SSGI, motion blur, and SSR on water and terrain surfaces.**
+    **Fit:** extend post. taa's velocity buffer already exists; `SSR` needs a material capture from water and terrain (glTF-pro and materials have one: `ssr.add(model)`).
 23. **SMAA and built-in screen effects** (vignette, RGB shift, pixelation, halftone, dot screen, Sobel, glitch, afterimage). A shader `NodePass` makes most of them in a few lines; afterimage also needs a history target.
     **Fit:** one small new `@margoengine/fx` package of `NodePass` presets.
 24. **Lensflare, and god rays outside creative.**

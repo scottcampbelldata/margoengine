@@ -5,8 +5,8 @@ import {invertMatrixStable} from '@margoengine/math/mat4';
 import {viewMatrix} from '../../shared/view.js';
 import {Cleanup} from '../../shared/cleanup.js';
 import {GLTFAsset, container, loadAsset, closeImages, entry, integer, assetLimit, type GLTFImage, type AssetOptions, type GLTFDecoderHooks} from './asset.js';
-import {pbrShader, physicalShader, lightPBR, transparentPBR, type PBRLighting, type PBRTransparency} from './shader.js';
-export type {PBRLighting, PBRTransparency} from './shader.js';
+import {pbrShader, physicalShader, lightPBR, transparentPBR, capturePBR, type PBRLighting, type PBRTransparency, type PBRCapture} from './shader.js';
+export type {PBRLighting, PBRTransparency, PBRCapture} from './shader.js';
 import {mipShader} from './mip.js';
 // Type only: PBRInstances and the EXT_mesh_gpu_instancing reader load with @margoengine/gltf-pro/instancing.
 import type {PBRInstances} from './instancing.js';
@@ -145,7 +145,7 @@ export class PBRModel implements EnginePlugin {
   private pipelines=new Map<string,GPURenderPipeline>();private readonly gpuCache=new Map<unknown,any>();private readonly inverse=new Float32Array(16);private readonly workspace=new Float64Array(52);private readonly view=new Float32Array(16);
   private engine:Engine;private readonly cleanupCallbacks=new Set<()=>void>();
   private readonly lighting=new Set<LightingEffect>();private readonly codes=new Map<string,number>();private codeCount=0;private readonly replays=new Map<string,string>();
-  private readonly lightingGroups=new Map<GPURenderPipeline,{entries:GPUBindGroupEntry[];group:GPUBindGroup}>();private transparency?:PBRTransparency;
+  private readonly lightingGroups=new Map<GPURenderPipeline,{entries:GPUBindGroupEntry[];group:GPUBindGroup}>();private transparency?:PBRTransparency;private capture?:PBRCapture;
   constructor(instance:EngineKernel,readonly asset:GLTFAsset,private readonly images:readonly GLTFImage[]=[],prepared?:readonly (readonly PreparedGeometry[])[]) {
     this.engine=engineRuntime(instance);
     const doc=asset.doc,defs=doc.nodes??[],parents=new Int32Array(defs.length).fill(-1),materials=(doc.materials??[]).map(material);
@@ -246,16 +246,22 @@ export class PBRModel implements EnginePlugin {
     if(this.disposed||!hook||typeof hook.declarations!=='function'||typeof hook.bindings!=='function'||typeof hook.begin!=='function'||!Array.isArray(hook.targets))throw new TypeError('Invalid PBR transparency hook');
     this.transparency=hook;return()=>{if(this.transparency===hook)this.transparency=undefined;};
   }
+  /** Lets a capture hook (README "Capture hook"; SSR's `ssr.add(model)`) draw this model's materials with `draw(c, 'capture', ...)`; returns a remover. */
+  setCapture(hook:PBRCapture):()=>void {
+    if(this.disposed||!hook||typeof hook.declarations!=='function'||typeof hook.begin!=='function'||!Array.isArray(hook.targets))throw new TypeError('Invalid PBR capture hook');
+    this.capture=hook;return()=>{if(this.capture===hook)this.capture=undefined;};
+  }
   get shadowPrimitives() {
     return this.resources.filter(r=>r.primitive.material.settings[0]!==2).map(r=>({node:r.primitive.node,vertex:r.primitive.deformed??r.vertex,index:r.index,count:r.primitive.indices.length,stride:80,
       alphaTexture:r.views[0],alphaSampler:r.samplers[0],alpha:r.primitive.material.base[3],cutoff:r.primitive.material.settings[0]===1?r.primitive.material.settings[1]:0,texCoord:r.primitive.material.maps[0]?.texCoord??0,instances:r.primitive.instances}));
   }
-  /** `transparent` draws only the BLEND primitives a transparency hook took over (`setTransparency`), into its pass; `color`/`depth` are unused. */
-  draw(c:Context,mode:'beauty'|'gbuffer'|'ambient'|'transparent',color:GPUTextureView,depth:GPUTextureView):void {
-    const oit=this.transparency,through=mode==='transparent';
-    if(this.disposed||through&&!oit)return;
+  /** `transparent` draws only the BLEND primitives a transparency hook took over (`setTransparency`), into its pass; `capture` the
+   * opaque and MASK ones into the capture hook's pass (`setCapture`); for both `color`/`depth` are unused. */
+  draw(c:Context,mode:'beauty'|'gbuffer'|'ambient'|'transparent'|'capture',color:GPUTextureView,depth:GPUTextureView):void {
+    const oit=this.transparency,through=mode==='transparent',hook=this.capture,capture=mode==='capture';
+    if(this.disposed||through&&!oit||capture&&!hook)return;
     viewMatrix(this.view,c.camera);
-    const resources=through?this.resources:[...this.resources].sort((a,b)=>{
+    const resources=through||capture?this.resources:[...this.resources].sort((a,b)=>{
       const blendA=blended(a.primitive.material),blendB=blended(b.primitive.material);
       if(blendA!==blendB)return +blendA-+blendB;
       const distance=(r:DrawResource)=>Math.hypot(...c.camera.position.map((v,i)=>v-r.primitive.node.matrix[12+i]));
@@ -264,7 +270,7 @@ export class PBRModel implements EnginePlugin {
     let pass:GPURenderPassEncoder|undefined,shared:GPURenderPassEncoder|undefined;
     try {for(const r of resources) {
       const p=r.primitive,m=p.material,node=p.node,inst=p.instances;
-      if(through?!separable(m):mode==='beauty'&&oit&&separable(m))continue;
+      if(through?!separable(m):capture?blended(m)||m.ext[0]:mode==='beauty'&&oit&&separable(m))continue;
       node.check();let visible=true;
       for(let id=node.id;id!==-1;id=this.engine.store.parents[id])if(this.engine.store.hidden[id])visible=false;
       if(!visible||inst&&!inst.count)continue;
@@ -279,14 +285,14 @@ export class PBRModel implements EnginePlugin {
       const a=node.matrix;v[97]=Math.sign(a[0]*(a[5]*a[10]-a[6]*a[9])-a[4]*(a[1]*a[10]-a[2]*a[9])+a[8]*(a[1]*a[6]-a[2]*a[5]));
       v.set(m.ext,100);v.set(m.uvt,104);if(m.physical)v.set(m.physical,208);
       c.device.queue.writeBuffer(r.uniform,0,v as Float32Array<ArrayBuffer>);
-      let code=m.physical?physicalShader():pbrShader,entry=mode==='beauty'?'fragment':mode==='gbuffer'?'gbuffer':through?'transparent':'ambientFragment',lit=mode==='beauty'||through;
+      let code=m.physical?physicalShader():pbrShader,entry=mode==='beauty'?'fragment':mode==='gbuffer'?'gbuffer':through?'transparent':capture?'capture':'ambientFragment',lit=mode==='beauty'||through||capture;
       if(mode!=='gbuffer'&&this.lighting.size){let patched=code,ambient=false;
         // Effects with `pbr` hooks compose at gltf-pro's hook points; others (materials, LOD baking) still patch the text.
         for(const effect of this.lighting){if(effect.pbr){const hooks=effect.pbr(2);if(hooks){patched=lightPBR(patched,hooks);ambient||=!!hooks.ambient;}}else patched=effect.shader!(patched,2);}
         // An `ambient` hook (environment IBL) is what SSAO's ambient replay returns from the lit fragment, `_=color` keeping every
         // lighting binding in the layout. Unlit materials have no ambient.
         if(lit)code=patched;else if(ambient){let replay=this.replays.get(patched);if(replay===undefined){if(this.replays.size>=64)this.replays.clear();this.replays.set(patched,replay=patched.replace('return vec4f(color,','_=color;return vec4f(select(margoAmbient,vec3f(0),f.ext.x>0.5),'));}code=replay;entry='fragment';lit=true;}}
-      if(through)code=transparentPBR(code,oit!.declarations(2));
+      if(through)code=transparentPBR(code,oit!.declarations(2));else if(capture)code=capturePBR(code,hook!.declarations(code));
       // Instancing patches the vertex stage last, so text-patching effects (shader NodeMaterial vertex nodes) keep their anchors.
       if(inst)code=inst.shader(code);
       // Keep the shader's original front-facing convention, including mirrored transforms.
@@ -302,8 +308,8 @@ export class PBRModel implements EnginePlugin {
         checkLimits(c.device,code,()=>[m.physical?'physical material':'material',...[...this.lighting].flatMap(e=>{const x=e as {name?:string;shadow?:{name?:string}};return [x.name??'shader patch',...x.shadow?.name?[x.shadow.name]:[]];})]);
         const module=c.device.createShaderModule({code}),format=mode==='beauty'?c.format:'rgba16float';
         pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:80,attributes:Array.from({length:5},(_,i)=>({shaderLocation:i,offset:i*16,format:'float32x4' as const}))},...inst?[inst.layout]:[]]},
-          fragment:{module,entryPoint:entry,constants:{margoFaceTest:face,margoAlphaTest:mask},targets:through?oit!.targets as GPUColorTargetState[]:[{format,blend:state?.blend!==undefined?state.blend??undefined:blend&&mode!=='gbuffer'?{color:transmit?{srcFactor:'one',dstFactor:'constant'}:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
-          multisample:c.descriptor.multisample,primitive:{cullMode:cull},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:state?.depthWrite??(mode==='beauty'&&!blend),depthCompare:state?.depthCompare??(mode==='beauty'||through?'greater-equal':'equal')}});
+          fragment:{module,entryPoint:entry,constants:{margoFaceTest:face,margoAlphaTest:mask},targets:through||capture?(through?oit!:hook!).targets as GPUColorTargetState[]:[{format,blend:state?.blend!==undefined?state.blend??undefined:blend&&mode!=='gbuffer'?{color:transmit?{srcFactor:'one',dstFactor:'constant'}:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
+          multisample:c.descriptor.multisample,primitive:{cullMode:cull},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:state?.depthWrite??((mode==='beauty'||capture)&&!blend),depthCompare:state?.depthCompare??(mode==='beauty'||through||capture?'greater-equal':'equal')}});
         this.pipelines.set(key,pipeline);
       }
       let groups=r.groups.get(pipeline);
@@ -313,7 +319,7 @@ export class PBRModel implements EnginePlugin {
         r.groups.set(pipeline,groups);
       }
       let target:GPURenderPassEncoder;
-      if(through)target=shared??=oit!.begin();
+      if(through||capture)target=shared??=(through?oit!:hook!).begin();
       else {
       // Retain transparent pass boundaries so attachment-store rounding stays unchanged.
       if(blend&&mode!=='gbuffer'){pass?.end();pass=undefined;}

@@ -6,7 +6,7 @@ import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {extname, resolve} from 'node:path';
 import {GLTFAsset, PBRModel, parseGLTF, parseGLTFAsync} from '../dist/index.js';
-import {pbrShader, physicalShader as physical, lightPBR, transparentPBR} from '../src/shader.ts';
+import {pbrShader, physicalShader as physical, lightPBR, transparentPBR, capturePBR} from '../src/shader.ts';
 import {Engine, TransformStore} from '../../core/dist/extension.js';
 import {MeshoptDecoder} from '../../decoders/dist/index.js';
 import {decodeDraco, initBasis, initDraco, transcodeKTX2} from '../../decoders/dist/codec.js';
@@ -252,4 +252,16 @@ test('transparency hook (contract v1): the fragment head occurs once in both var
     assert.equal(transparentPBR(source, declarations), code, 'cached');
   }
   assert.throws(() => transparentPBR(transparentPBR(pbrShader, ''), ''), /transparency hook point missing/);
+});
+
+test('capture hook (contract v1): lit and material-patched variants get a capture entry with the lighting in a dead margoShade call', () => {
+  const declarations = '// ssr\n', lit = lightPBR(lightPBR(physicalShader, new Shadows().pbr(2)), {declarations: '// ibl\n', ambient: 'vec3f(0.5)*s.occlusion'});
+  for (const source of [pbrShader, physicalShader, lit, materialShader(pbrShader, 2, 'standard'), materialShader(physicalShader, 2, 'basic')]) {
+    const code = capturePBR(source, declarations), k = source.includes('fn layers(') ? 'layers(s,v,normalize(f.light.xyz),vec3f(1))-layers(s,v,normalize(f.light.xyz),vec3f(0))' : 'vec3f(1)';
+    assert.ok(code.startsWith(declarations)); assert.ok(!code.includes('@fragment fn fragment('));
+    assert.ok(code.endsWith(`\n@fragment fn capture(i:Out,@builtin(front_facing) front:bool)->MargoCapture {if(false){_=margoShade(i,front);}let s=surface(i,front);let v=normalize(f.eye.xyz-i.position);return margoCapture(s,v,${k});}\n`));
+    assert.equal(code.replace(declarations, '').replace('fn margoShade(i:Out,front:bool)->vec4f {', '@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {').split('\n@fragment fn capture(')[0], source, 'nothing else changes');
+    assert.equal(capturePBR(source, declarations), code, 'cached');
+  }
+  assert.throws(() => capturePBR(capturePBR(pbrShader, ''), ''), /capture hook point missing/);
 });

@@ -4,7 +4,9 @@ Packages extend each other's WGSL in three ways. Prefer them in this order.
 
 1. **Declared hooks.** The package that owns a shader composes other packages' WGSL at named points it guarantees.
    gltf-pro's PBR shader has lighting hooks (`LightingEffect.pbr`, see `packages/gltf-pro/README.md`, "Lighting hooks");
-   shadows, clustered and environment (IBL, fog) use them. Tests in gltf-pro and in each user check the contract.
+   shadows, clustered and environment (IBL, fog) use them. Its transparency hook (`setTransparency`, @margoengine/oit)
+   and capture hook (`setCapture`, post SSR's `ssr.add(model)`) add an entry point to the lit shader. Tests in gltf-pro
+   and in each user check the contract.
 2. **Pipeline-overridable constants** (`override`) for small toggles inside a package's own pipelines. They work only
    where the package creates the pipeline itself: core builds the mesh pipeline from `PassContext.shader`, so a patch of
    core's shader cannot use them.

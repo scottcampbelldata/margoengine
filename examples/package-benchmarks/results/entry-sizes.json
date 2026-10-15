@@ -1,5 +1,5 @@
 {
-  "commit": "9d6e310",
+  "commit": "67e0172",
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "packages": {
     "@margoengine/animation": {
@@ -172,8 +172,8 @@
         "gzip": 11307
       },
       "dist/workers/fbx.js": {
-        "raw": 44901,
-        "gzip": 16800
+        "raw": 45395,
+        "gzip": 16998
       }
     },
     "@margoengine/fsm": {
@@ -202,36 +202,36 @@
     },
     "@margoengine/gltf-pro": {
       ".": {
-        "raw": 48279,
-        "gzip": 16923
+        "raw": 49834,
+        "gzip": 17342
       },
       "./asset": {
-        "raw": 6442,
-        "gzip": 2617
+        "raw": 6524,
+        "gzip": 2645
       },
       "./instancing": {
         "raw": 5324,
         "gzip": 2243
       },
       "./prepare": {
-        "raw": 14574,
-        "gzip": 5420
+        "raw": 15067,
+        "gzip": 5617
       },
       "./progressive": {
-        "raw": 65767,
-        "gzip": 22758
+        "raw": 67321,
+        "gzip": 23177
       },
       "./worker": {
-        "raw": 50201,
-        "gzip": 17628
+        "raw": 51756,
+        "gzip": 18052
       },
       "dist/workers/gltf.js": {
-        "raw": 15211,
-        "gzip": 5625
+        "raw": 15704,
+        "gzip": 5817
       },
       "dist/workers/progressive.js": {
-        "raw": 20132,
-        "gzip": 7286
+        "raw": 20625,
+        "gzip": 7480
       }
     },
     "@margoengine/html": {
@@ -492,8 +492,8 @@
     },
     "@margoengine/post": {
       ".": {
-        "raw": 59037,
-        "gzip": 16413
+        "raw": 60700,
+        "gzip": 16926
       },
       "./bloom": {
         "raw": 15169,
@@ -516,8 +516,8 @@
         "gzip": 3599
       },
       "./ssr": {
-        "raw": 23130,
-        "gzip": 7860
+        "raw": 24793,
+        "gzip": 8365
       }
     },
     "@margoengine/procedural": {
@@ -696,8 +696,8 @@
         "gzip": 8585
       },
       "dist/workers/usdz.js": {
-        "raw": 75061,
-        "gzip": 26855
+        "raw": 76617,
+        "gzip": 27287
       }
     },
     "@margoengine/usdz-export": {
