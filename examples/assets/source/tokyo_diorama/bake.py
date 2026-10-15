@@ -219,10 +219,22 @@ def assign(ob, materials):
 ATLASES = []
 
 
-def bake_all():
-    """Bake every registered atlas after the whole scene exists, so AO sees neighbouring buildings."""
+def bake_all(hide=()):
+    """Bake every registered atlas after the whole scene exists, so AO sees neighbouring buildings.
+
+    Objects in `hide` (the tram, the cat) move during the clip; they are hidden from every bake but their own,
+    so they leave no static contact shadows on the road and walls.
+    """
     for atlas in ATLASES:
-        atlas.bake()
+        own = {ob for ob, _ in atlas.parts}
+        hidden = [ob for ob in hide if ob not in own and not ob.hide_render]
+        for ob in hidden:
+            ob.hide_render = True
+        try:
+            atlas.bake()
+        finally:
+            for ob in hidden:
+                ob.hide_render = False
     ATLASES.clear()
 
 

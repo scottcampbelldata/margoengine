@@ -115,12 +115,12 @@ def build(root):
     # Furniture.
     _vending(atlas, 'Vending_Machine_1', 3.92, 1.35, math.radians(90), '#d9473b')
     _vending(atlas, 'Vending_Machine_2', 3.92, 2.0, math.radians(90), '#2b6cb0')
-    post = kit.empty('Post_Box', (-1.5, -1.95, G), None)
+    post = kit.empty('Post_Box', (-1.5, -1.85, G), None)
     atlas.add(kit.cylinder('Post_Box_Body', 0.17, 0.78, (0, 0, 0.39), None, post, segments=18), 'paint:#c62d2d')
     atlas.add(kit.sphere('Post_Box_Dome', 0.17, (0, 0, 0.78), None, post, scale=(1, 1, 0.55)), 'paint:#c62d2d')
     atlas.add(kit.box('Post_Box_Slot', (0.17, 0.03, 0.035), (0, -0.165, 0.6), None, post), 'rubber')
     atlas.add(kit.box('Post_Box_Plate', (0.12, 0.02, 0.08), (0, -0.17, 0.38), None, post), 'paint:#f4f2ec')
-    _bicycle(atlas, 'Bicycle_1', 0.75, -1.95, 0.0)
+    _bicycle(atlas, 'Bicycle_1', 0.75, -1.8, 0.0)
     _bicycle(atlas, 'Bicycle_2', -0.45, -0.7, math.radians(88))
     for i, (x, y) in enumerate(((3.85, -2.05), (3.6, -2.05), (-2.35, -2.05), (2.3, -3.74), (2.62, -3.76)), start=1):
         _cone(atlas, 'Traffic_Cone_%d' % i, x, y)

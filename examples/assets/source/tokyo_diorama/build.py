@@ -38,7 +38,8 @@ def build():
     signs.build_atlas()
     for module in MODULES:
         module.build(root)
-    bake.bake_all()  # after everything exists, so baked AO includes neighbouring buildings and props
+    movers = [o for name in ('Tram', 'Cats') for o in [kit.SCENE.objects[name]] + list(kit.SCENE.objects[name].children_recursive)]
+    bake.bake_all(hide=movers)  # after everything exists, so baked AO includes neighbours but not things that move away
     merge.build(root)  # one mesh per group after baking: thousands of draw calls down to a few hundred
     kit.SCENE.frame_set(kit.FRAME_START)
     return root
@@ -57,12 +58,18 @@ def export(path):
 
 
 def main(out=None, blend=None):
-    build()
-    if out:
-        export(os.path.abspath(out))
-    if blend:
-        bpy.context.preferences.filepaths.save_version = 0  # no .blend1 backup next to the committed source
-        bpy.ops.wm.save_as_mainfile(filepath=os.path.abspath(blend), copy=True)
+    prefs = bpy.context.preferences
+    saved = (prefs.edit.keyframe_new_interpolation_type, prefs.filepaths.save_version)
+    try:  # build-time settings only; a live MCP build must leave the user's preferences as they were
+        prefs.edit.keyframe_new_interpolation_type = 'LINEAR'
+        build()
+        if out:
+            export(os.path.abspath(out))
+        if blend:
+            prefs.filepaths.save_version = 0  # no .blend1 backup next to the committed source
+            bpy.ops.wm.save_as_mainfile(filepath=os.path.abspath(blend), copy=True)
+    finally:
+        prefs.edit.keyframe_new_interpolation_type, prefs.filepaths.save_version = saved
 
 
 def _cli():
