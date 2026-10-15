@@ -100,7 +100,7 @@ if (want('site')) {
   assert.ok(existsSync(join(dist, '_headers')), 'run npm run build:site first');
   const settle = ms => async page => {await page.waitForTimeout(ms); return {ok: true};};
   builds.push({name: 'site', dist, pages: ['/', '/catalog/', '/night-citadel/', '/gameplay-sandbox/', '/demos/flight-helmet.html', '/demos/character-animation.html',
-    '/demos/robot-expressive.html', '/demos/windy-meadow.html', '/demos/earth/', '/demos/dof/', '/demos/tonemap/'].map(path => [path, settle(path === '/' || path === '/catalog/' ? 1500 : 8000)])});
+    '/demos/robot-expressive.html', '/demos/windy-meadow.html', '/demos/tokyo-diorama.html', '/demos/earth/', '/demos/dof/', '/demos/tonemap/'].map(path => [path, settle(path === '/' || path === '/catalog/' ? 1500 : 8000)])});
 }
 
 if (!onAC()) throw new Error('On battery: refusing to start a browser run');

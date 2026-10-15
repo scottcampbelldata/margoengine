@@ -10,6 +10,7 @@ import tram as hero_tram
 SLAB_W, SLAB_D = 10.0, 8.0
 BLOCK = (-3.3, 4.2, -2.2, 3.4)       # sidewalk block x0, x1, y0, y1
 GROUND = 0.16                         # sidewalk top; buildings stand here
+ROAD_TOP = 0.04                       # asphalt top: rails, paint, manholes and road cones sit here
 RAIL_GAUGE = 0.3
 
 
@@ -58,16 +59,18 @@ def build(root):
     atlas.add(kit.boxes('Curbs', curb, None, root), 'concrete')
 
     # Road paint: crosswalk on the right-hand street, stop line, painted lettering, lane edge dashes.
-    stripes = [((0.12, 0.7, 0.004), (x1 + 0.18 + 0.2 * k, -1.2, 0.082)) for k in range(4)]
+    lane = x1 + 0.37  # centre of the side street (kerb at x1, road edge at 4.85)
+    stripes = [((0.12, 0.7, 0.004), (lane - 0.2 + 0.2 * k, -1.2, ROAD_TOP + 0.002)) for k in range(3)]
     atlas.add(kit.boxes('Crosswalk', stripes, None, root), 'paint:#efece4')
-    atlas.add(kit.box('Stop_Line', (0.75, 0.08, 0.004), (x1 + 0.45, -0.55, 0.082), None, root), 'paint:#efece4')
-    atlas.add(kit.text_mesh('Road_Text', '止まれ', 0.36, (x1 + 0.45, 0.05, 0.083), None, root, rot=(0, 0, math.radians(180))), 'paint:#efece4')
-    dashes = [((0.3, 0.05, 0.004), (x, -2.42, 0.082)) for x in [-2.6 + 0.6 * k for k in range(11)]]
+    atlas.add(kit.box('Stop_Line', (0.54, 0.08, 0.004), (lane, -0.55, ROAD_TOP + 0.002), None, root), 'paint:#efece4')
+    # Stacked along the lane like Japanese road paint, upright for drivers heading -Y toward the stop line.
+    atlas.add(kit.text_mesh('Road_Text', '止\nま\nれ', 1.5, (lane, 0.35, ROAD_TOP + 0.0015), None, root, rot=(0, 0, math.radians(180)), width=0.34, space_line=0.82), 'paint:#efece4')
+    dashes = [((0.3, 0.05, 0.004), (x, -2.42, ROAD_TOP + 0.002)) for x in [-2.6 + 0.6 * k for k in range(11)]]
     atlas.add(kit.boxes('Lane_Dashes', dashes, None, root), 'paint:#e9c84a')
-    manholes = [(1.4, -3.65), (-4.65, 0.6), (x1 + 0.45, 1.6)]
+    manholes = [(-3.55, 0.6), (lane, 1.6)]  # between the kerb and the track, never under the sleepers
     for i, (mx, my) in enumerate(manholes, start=1):
-        atlas.add(kit.cylinder('Manhole_%d' % i, 0.2, 0.012, (mx, my, 0.085), None, root, segments=20), 'metal_dark')
-        atlas.add(kit.boxes('Manhole_%d_Ribs' % i, [((0.3, 0.02, 0.006), (mx, my + dy, 0.093)) for dy in (-0.08, -0.04, 0, 0.04, 0.08)], None, root), 'metal_dark')
+        atlas.add(kit.cylinder('Manhole_%d' % i, 0.18, 0.006, (mx, my, ROAD_TOP + 0.003), None, root, segments=24), 'metal_dark')
+        atlas.add(kit.boxes('Manhole_%d_Ribs' % i, [((0.26, 0.018, 0.003), (mx, my + dy, ROAD_TOP + 0.0075)) for dy in (-0.08, -0.04, 0, 0.04, 0.08)], None, root), 'metal_dark')
 
     # Track: rails, sleepers, and the tram that runs on them.
     at, length = path_sampler()
@@ -85,10 +88,10 @@ def build(root):
     while s <= length + overrun:
         p, h = along(s)
         n = Vector((-math.sin(h), math.cos(h), 0))
-        left.append(p + n * RAIL_GAUGE + Vector((0, 0, 0.1)))
-        right.append(p - n * RAIL_GAUGE + Vector((0, 0, 0.1)))
+        left.append(p + n * RAIL_GAUGE + Vector((0, 0, ROAD_TOP + 0.035 + 0.022)))   # rail tube resting on the sleepers
+        right.append(p - n * RAIL_GAUGE + Vector((0, 0, ROAD_TOP + 0.035 + 0.022)))
         if round(s / 0.1) % 3 == 0:
-            sleepers.append(((0.12, 0.86, 0.035), p + Vector((0, 0, 0.08)), (0, 0, h)))
+            sleepers.append(((0.12, 0.86, 0.035), p + Vector((0, 0, ROAD_TOP + 0.0175)), (0, 0, h)))
         s += 0.1
     atlas.add(kit.tube('Track_Rails', left, 0.022, None, root), 'metal_light')
     atlas.add(kit.tube('Track_Rail_R', right, 0.022, None, root), 'metal_light')
@@ -96,7 +99,7 @@ def build(root):
     stops = []
     for s in (-overrun, length + overrun):
         p, h = along(s)
-        stops.append(((0.16, 0.8, 0.22), p + Vector((0, 0, 0.18)), (0, 0, h)))
+        stops.append(((0.16, 0.8, 0.22), p + Vector((0, 0, ROAD_TOP + 0.11)), (0, 0, h)))
     atlas.add(kit.boxes('Track_Buffer_Stops', stops, None, root), 'paint:#c8452f')
 
     tram = hero_tram.build(root)

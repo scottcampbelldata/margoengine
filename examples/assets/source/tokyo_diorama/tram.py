@@ -261,13 +261,25 @@ def build(root):
     rope_end = _front_point(surface, 0.0, 1.0, -1, 0.03)
     part(kit.tube('Tram_Pole_Rope', kit.sag(tip, rope_end, 0.12, n=10), 0.004, None, tram, sides=4), 'rubber')
 
-    # Running gear peeking under the skirt.
+    # Running gear: flanged steel wheels whose treads sit on the rail tops (rail top 0.119 with the tram keyed at z 0.09),
+    # flanges just inside the rail heads, dished wheel plates and hubs; bogie side frames, axle boxes, leaf springs, brake shoes.
+    radius, axle_z, tread_y, flange_y = 0.09, 0.119, 0.3, 0.268
     for name, bx in (('Front', 0.62), ('Rear', -0.62)):
-        part(kit.box('Tram_Bogie_%s' % name, (0.5, 0.6, 0.06), (bx, 0, 0.12), None, tram, bevel=0.012), 'under')
         for wx in (-0.17, 0.17):
+            x = bx + wx
             for side in (1, -1):
-                part(kit.cylinder('Tram_Wheel_%s_%+.2f_%d' % (name, wx, side), 0.085, 0.04, (bx + wx, side * 0.29, 0.085), None, tram, rot=(math.radians(90), 0, 0), segments=18), 'under')
-            part(kit.tube('Tram_Axle_%s_%+.2f' % (name, wx), [(bx + wx, -0.3, 0.085), (bx + wx, 0.3, 0.085)], 0.018, None, tram, sides=8), 'under')
+                tag = '%s_%+.2f_%d' % (name, wx, side)
+                part(kit.cylinder('Tram_Tread_' + tag, radius, 0.04, (x, side * tread_y, axle_z), None, tram, rot=(math.radians(90), 0, 0), segments=32), 'trim')
+                part(kit.cylinder('Tram_Flange_' + tag, radius + 0.012, 0.012, (x, side * flange_y, axle_z), None, tram, rot=(math.radians(90), 0, 0), segments=32), 'under')
+                part(kit.cylinder('Tram_Wheel_Plate_' + tag, radius - 0.016, 0.008, (x, side * (tread_y + 0.022), axle_z), None, tram, rot=(math.radians(90), 0, 0), segments=28), 'equip')
+                part(kit.cylinder('Tram_Hub_' + tag, 0.03, 0.035, (x, side * (tread_y + 0.038), axle_z), None, tram, rot=(math.radians(90), 0, 0), segments=16), 'equip')
+                part(kit.box('Tram_Brake_Shoe_' + tag, (0.024, 0.04, 0.07), (x + (radius + 0.013) * (1 if wx > 0 else -1), side * tread_y, axle_z), None, tram, bevel=0.004), 'under')
+            part(kit.tube('Tram_Axle_%s_%+.2f' % (name, wx), [(x, -0.33, axle_z), (x, 0.33, axle_z)], 0.016, None, tram, sides=8), 'under')
+        for side in (1, -1):
+            part(kit.box('Tram_Bogie_Frame_%s_%d' % (name, side), (0.62, 0.035, 0.07), (bx, side * 0.375, axle_z + 0.02), None, tram, bevel=0.01), 'under')
+            for wx in (-0.17, 0.17):
+                part(kit.box('Tram_Axle_Box_%s_%+.2f_%d' % (name, wx, side), (0.08, 0.05, 0.085), (bx + wx, side * 0.37, axle_z), None, tram, bevel=0.012), 'equip')
+            part(kit.boxes('Tram_Leaf_Spring_%s_%d' % (name, side), [((0.24 - 0.05 * k, 0.04, 0.012), (bx, side * 0.375, axle_z + 0.07 + 0.013 * k)) for k in range(3)], None, tram), 'equip')
 
     atlas.bake()
     tram.location = (0, 0, 0.04)

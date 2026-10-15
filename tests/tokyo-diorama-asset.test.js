@@ -80,7 +80,9 @@ test('textured: baked atlases and a sign atlas with original lettering', () => {
   const signFaces = doc.meshes.flatMap(m => m.primitives).filter(p => ['TD_signs', 'TD_signs_lit'].includes(doc.materials[p.material]?.name))
     .reduce((sum, p) => sum + doc.accessors[p.indices].count / 6, 0);  // one quad (two triangles) per sign face
   assert.ok(signFaces >= 15, `${signFaces} sign faces`);
-  for (const image of doc.images) assert.equal(image.mimeType, 'image/jpeg', image.name);
+  for (const image of doc.images) assert.equal(image.mimeType, 'image/webp', image.name);  // WebP keeps leaf alpha
+  const leaves = doc.materials.find(m => m.name === 'TD_foliage');
+  assert.ok(leaves?.alphaMode === 'MASK' && leaves.doubleSided && leaves.pbrMetallicRoughness?.baseColorTexture, 'foliage is not alpha-cut, double-sided and textured');
 });
 
 test('hero tram: baked weathering atlas, see-through glass, real detail', () => {

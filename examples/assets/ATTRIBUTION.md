@@ -13,6 +13,9 @@ GitHub's asset server. The original GLBs retain their geometry, materials and an
 - `flight-helmet-mobile.glb`: the same helmet with 512-pixel JPEG maps and 20,734 triangles (meshoptimizer,
   normal/UV-aware, error bound 0.005). Also CC0.
 
+- `tokyo-diorama.glb`: original work for Margo Engine (MIT), built by `npm run build:tokyo`. Its baked textures use
+  Poly Haven CC0 textures and its lettering uses Noto Sans CJK (SIL OFL 1.1). See [its credits](tokyo-diorama-CREDITS.md).
+
 Regenerate both helmet GLBs with `node scripts/optimize-demo-assets.js`. This uses
 the image and mesh tools already installed in this workspace and validates each GLB
 (Khronos glTF-Validator: 0 errors, 0 warnings).

@@ -68,6 +68,7 @@ dd { margin: 6px 0 0; color: var(--muted); max-width: 52ch; }
 .tile { grid-column: span 2; }
 .tile.wide { grid-column: span 4; }
 .tile.half { grid-column: span 3; }
+.tile.full { grid-column: span 6; }
 .more { margin-top: 24px; }
 .tile { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; color: var(--text); text-decoration: none; transition: transform .2s ease; }
 .tile:hover { border-color: var(--accent); transform: translateY(-2px); }
@@ -88,7 +89,7 @@ footer a:first-child { margin-left: 0; }
   .nav nav a:nth-child(2) { display: none; }
   main > section { padding-block: 48px; }
   .hero, .two, .core dl, .groups, .tiles { grid-template-columns: 1fr; }
-  .tile, .tile.wide, .tile.half { grid-column: auto; }
+  .tile, .tile.wide, .tile.half, .tile.full { grid-column: auto; }
   .hero { gap: 28px; padding-block: 24px 48px; }
   .two { gap: 32px; }
 }

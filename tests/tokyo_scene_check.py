@@ -73,6 +73,112 @@ for frame in (1, 145):
         if nearest > 0.12:
             failures.append('tram wheel off the rails at frame %d (%.2f m from the nearest rail)' % (frame, nearest))
 
+# Street plants must stand clear of the buildings (no trunks through AC units, no canopies through walls).
+scene.frame_set(1)
+plants = [o for o in scene.objects['Street_Tree'].children_recursive if o.type == 'MESH']
+buildings = [o for o in scene.objects if o.type == 'MESH' and o.name.startswith('Building_')]
+building_trees = [world_tree(o) for o in buildings]
+for plant in plants:
+    tree = world_tree(plant)
+    hit = [b.name for b, t in zip(buildings, building_trees) if t.overlap(tree)]
+    if hit:
+        failures.append('%s intersects %s' % (plant.name, ', '.join(hit)))
+
+# Ground contact: nothing floats above or sinks into the surface it stands on.
+Vector = __import__('mathutils').Vector
+
+
+def z_range(ob):
+    zs = [(ob.matrix_world @ Vector(c)).z for c in ob.bound_box]
+    return min(zs), max(zs)
+
+
+road_top, side_top = z_range(scene.objects['Road'])[1], z_range(scene.objects['Sidewalk'])[1]
+sleepers, rails = scene.objects['Track_Sleepers'], scene.objects['Track_Rails']
+if abs(z_range(sleepers)[0] - road_top) > 0.004:
+    failures.append('track sleepers float %.3f above the road' % (z_range(sleepers)[0] - road_top))
+if abs(z_range(rails)[0] - z_range(sleepers)[1]) > 0.004:
+    failures.append('rails sit %.3f off the sleepers' % (z_range(rails)[0] - z_range(sleepers)[1]))
+for name in ('Crosswalk', 'Stop_Line', 'Road_Text', 'Lane_Dashes'):
+    low = z_range(scene.objects[name])[0]
+    if not road_top - 0.001 <= low <= road_top + 0.004:
+        failures.append('%s floats %.3f above the road' % (name, low - road_top))
+track_trees = [world_tree(sleepers), world_tree(rails)]
+for ob in [o for o in scene.objects if o.name.startswith('Manhole_') and o.type == 'MESH' and '_Ribs' not in o.name]:
+    if abs(z_range(ob)[0] - road_top) > 0.003:
+        failures.append('%s floats %.3f above the road' % (ob.name, z_range(ob)[0] - road_top))
+    if any(t.overlap(world_tree(ob)) for t in track_trees):
+        failures.append('%s lies under the track' % ob.name)
+x0, x1, y0, y1 = -3.3, 4.2, -2.2, 3.4
+for ob in [o for o in scene.objects if o.name.startswith('Traffic_Cone_') and o.name.endswith('_Base')]:
+    p = ob.matrix_world.translation
+    ground = side_top if x0 <= p.x <= x1 and y0 <= p.y <= y1 else road_top
+    if abs(z_range(ob)[0] - ground) > 0.004:
+        failures.append('%s floats %.3f above the ground' % (ob.name.replace('_Base', ''), z_range(ob)[0] - ground))
+# Tram wheels: treads on the rail tops (flanges drop just inside the rail head).
+scene.frame_set(1)
+rail_top = z_range(rails)[1]
+tram_low = min(z_range(o)[0] for o in scene.objects['Tram'].children_recursive if o.type == 'MESH')
+if not rail_top - 0.02 <= tram_low <= rail_top - 0.004:
+    failures.append('tram wheels are %.3f off the rail tops (flange bottom %.3f, rail top %.3f)' % (tram_low - (rail_top - 0.012), tram_low, rail_top))
+
+# Plants rest on what is under them: pots on the ground, hedge and bush cores on their planters, pots and slabs.
+scene.frame_set(1)
+supports = bmesh.new()
+for ob in scene.objects:
+    if ob.type == 'MESH' and not ob.name.endswith('_Leaves'):
+        part = bmesh.new()
+        part.from_mesh(ob.data)
+        part.transform(ob.matrix_world)
+        mesh_tmp = bpy.data.meshes.new('_support_tmp')
+        part.to_mesh(mesh_tmp)
+        part.free()
+        supports.from_mesh(mesh_tmp)
+        bpy.data.meshes.remove(mesh_tmp)
+support_tree = BVHTree.FromBMesh(supports)
+supports.free()
+for ob in scene.objects:
+    if ob.type != 'MESH' or not (ob.name.endswith('_Pot') or (ob.name.endswith('_Core') and ('Hedge' in ob.name or 'Bush' in ob.name))):
+        continue
+    corners = [ob.matrix_world @ Vector(c) for c in ob.bound_box]
+    low = min(c.z for c in corners)
+    centre = sum(corners, Vector()) / 8
+    hit = support_tree.ray_cast(Vector((centre.x, centre.y, low - 0.001)), Vector((0, 0, -1)))
+    gap = (low - hit[0].z) if hit[0] is not None else float('inf')
+    if gap > 0.03:
+        failures.append('%s floats %.3f above whatever is under it' % (ob.name, gap))
+
+# AC units hang on wall brackets in open air: nothing (canopy, balcony, neighbouring roof) right under them, and no
+# neighbouring building within half a metre in front of the wall they hang on.
+building_meshes = [o for o in scene.objects if o.type == 'MESH' and o.name.startswith('Building_')]
+statics = [(o, world_tree(o)) for o in building_meshes if o.name.endswith('_Static')]
+for i, (a, ta) in enumerate(statics):
+    for b, tb in statics[i + 1:]:
+        if ta.overlap(tb):
+            failures.append('%s and %s intersect (balcony, unit or roof poking into the neighbour)' % (a.name, b.name))
+for holder in sorted((o for o in scene.objects if '_AC_Holder_' in o.name), key=lambda o: o.name):
+    out = (holder.matrix_world.to_3x3() @ Vector((0, -1, 0))).normalized()
+    p = holder.matrix_world.translation
+    hit = support_tree.ray_cast(p - out * 0.13 - Vector((0, 0, 0.175)), Vector((0, 0, -1)), 0.5)
+    if hit[0] is not None and p.z - 0.175 - hit[0].z > 0.03:  # standing on a balcony slab is fine, hovering is not
+        failures.append('%s rests %.2f above something under it' % (holder.name, p.z - 0.175 - hit[0].z))
+    own = holder.name.split('_AC_')[0]
+    for other in (o for o in building_meshes if not o.name.startswith(own + '_')):
+        if world_tree(other).ray_cast(p - out * 0.27, out, 0.55)[0] is not None:
+            failures.append('%s is buried in or pressed against %s' % (holder.name, other.name))
+
+# Road paint must lie on the asphalt: off the sidewalk block and inside the road edge.
+x0, x1, y0, y1 = -3.3, 4.2, -2.2, 3.4
+for name in ('Road_Text', 'Crosswalk', 'Stop_Line', 'Lane_Dashes'):
+    ob = scene.objects[name]
+    corners = [ob.matrix_world @ __import__('mathutils').Vector(c) for c in ob.bound_box]
+    lo = [min(c[i] for c in corners) for i in range(2)]
+    hi = [max(c[i] for c in corners) for i in range(2)]
+    on_block = lo[0] < x1 + 0.05 and hi[0] > x0 - 0.05 and lo[1] < y1 + 0.05 and hi[1] > y0 - 0.05
+    off_road = lo[0] < -4.85 or hi[0] > 4.85 or lo[1] < -3.85 or hi[1] > 3.85
+    if on_block or off_road:
+        failures.append('%s runs off the road: x %.2f..%.2f, y %.2f..%.2f' % (name, lo[0], hi[0], lo[1], hi[1]))
+
 if failures:
     print('SCENE CHECK FAILED:\n  ' + '\n  '.join(failures))
     sys.exit(1)

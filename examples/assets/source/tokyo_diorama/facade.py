@@ -9,6 +9,7 @@ from collections import defaultdict
 
 import bake
 import kit
+import foliage
 import signs
 
 GROUND = 0.16
@@ -22,10 +23,25 @@ BUILDINGS = [
     dict(name='Building_3', atlas='B3_Atlas', x=(1.75, 3.6), y=(-1.6, 0.6), floors=2, wall='plaster_cracked', base='wood_dark', trim='paint:#4a3424',
          roof='gable', tile='tile_grey', shop='stall', faces=('front', 'right', 'left'), styles=('lattice',), balcony=(), seed=3, atlas_size=1024),
     dict(name='Building_4', atlas='B4_Atlas', x=(-2.7, 0.7), y=(0.7, 3.2), floors=5, wall='plaster_grey', base='concrete', trim='paint:#5a5f66',
-         roof='flat', clutter=('garden', 'railing', 'roof_ac', 'shed'), shop='books', faces=('front', 'left', 'back', 'right'), styles=('sash', 'shutter', 'sash', 'louvre'), balcony=(2, 4), seed=4),
+         roof='flat', clutter=('garden', 'railing', 'roof_ac', 'shed'), shop='books', faces=('front', 'left', 'back', 'right'), styles=('sash', 'shutter', 'sash', 'louvre'), balcony=(2, 4), balcony_face='back', seed=4),
     dict(name='Building_5', atlas='B5_Atlas', x=(1.0, 3.6), y=(0.9, 3.2), floors=3, wall='plaster_salmon', base='brick', trim='paint:#7a4030',
-         roof='flat', clutter=('billboard', 'tank', 'railing'), shop='shutter', shop_face='right', faces=('front', 'right', 'back', 'left'), styles=('sash', 'shoji'), balcony=(2,), seed=5),
+         roof='flat', clutter=('billboard', 'tank', 'railing'), shop='shutter', shop_face='right', faces=('front', 'right', 'back', 'left'), styles=('sash', 'shoji'), balcony=(2,), balcony_face='back', seed=5),
 ]
+
+
+def clearance(spec, face):
+    """Open space in front of a face before the nearest neighbouring building (inf when nothing faces it)."""
+    (x0, x1), (y0, y1) = spec['x'], spec['y']
+    gaps = [math.inf]
+    for o in BUILDINGS:
+        (ox0, ox1), (oy0, oy1) = o['x'], o['y']
+        if o is spec:
+            continue
+        if face in ('front', 'back') and ox0 < x1 and ox1 > x0:
+            gaps.append(y0 - oy1 if face == 'front' else oy0 - y1)
+        elif face in ('left', 'right') and oy0 < y1 and oy1 > y0:
+            gaps.append(x0 - ox1 if face == 'left' else ox0 - x1)
+    return min(g for g in gaps if g >= 0)
 
 _counters = defaultdict(int)
 
@@ -166,8 +182,7 @@ def ac_unit(b, face, u, v, idx_holder):
     kit.spin(fan, 2, 5 + b.rng.randint(0, 4))
     for k in range(5):
         b.box('metal_dark', face, 0.012, 0.01, 0.2, u + 0.12 + k * 0.018, 0.285, v)
-    b.box('paint:#d9d5c9', face, 0.06, 0.06, 0.06, u + 0.25, 0.04, v)
-    b.box('paint:#d9d5c9', face, 0.06, 0.06, v - 0.1, u + 0.25, 0.04, v / 2 - 0.02)
+    b.box('paint:#d9d5c9', face, 0.06, 0.06, 0.06, u + 0.25, 0.04, v)  # refrigerant line into the wall
 
 
 def kit_name(b, part):
@@ -207,11 +222,9 @@ def balcony(b, m, face, v):
         b.flatbox(b.rng.choice(m['cloth']), face, 0.16, 0.01, 0.24, uu, 0.3, v + 0.58)
     if b.rng.random() < 0.6:
         b.flatbox(b.rng.choice(m['cloth']), face, w * 0.4, 0.02, 0.3, w * 0.2, 0.46, v + 0.33)  # futon airing on the rail
-    for k in range(2):
-        uu = -w / 2 + 0.12 + k * 0.16
-        pos = b.pt(face, uu, 0.32, v + 0.03)
-        b.part(kit.cylinder(kit_name(b, 'Pot'), 0.05, 0.1, (pos[0], pos[1], pos[2] + 0.05), None, b.parent, segments=10, radius_top=0.065), 'terracotta')
-        b.part(kit.ico(kit_name(b, 'Plant'), 0.09, (pos[0], pos[1], pos[2] + 0.17), None, b.parent, scale=(1, 1, 1.3)), 'leaf' if k else 'leaf_light')
+    pos = b.pt(face, -w / 2 + 0.16, 0.3, v + 0.03)  # on the balcony slab
+    b.part(kit.cylinder(kit_name(b, 'Balcony_Pot'), 0.06, 0.1, (pos[0], pos[1], pos[2] + 0.05), None, b.parent, segments=12, radius_top=0.075), 'terracotta')
+    foliage.bush(b.atlas, kit_name(b, 'Balcony_Bush'), (pos[0], pos[1], pos[2] + 0.1 + 0.06), 0.1, b.parent, bloom=0.2, seed=b.rng.randint(0, 10 ** 6))
 
 
 def blade_sign(b, face, u, v, sid, width=0.26):
@@ -241,7 +254,7 @@ def lantern(b, m, face, u, v, red=True):
 
 
 def awning(b, face, u, v, w, colors):
-    depth, a = 0.5, 0.35
+    depth, a = min(0.5, clearance(b.spec, face) - 0.06), 0.35  # shallower over a narrow alley
     slats = max(4, int(w / 0.1))
     for k in range(slats):
         uu = u - w / 2 + w * (k + 0.5) / slats
@@ -280,17 +293,23 @@ def shopfront(b, m, face):
         awning(b, face, -w * 0.17, 0.92, w * 0.56, ('#2f5d8a', '#f2efe6'))
         for side in (-1, 1):
             pos = b.pt(face, side * (w / 2 - 0.12), 0.18, 0)
-            b.part(kit.cylinder(kit_name(b, 'Pot'), 0.08, 0.18, (pos[0], pos[1], pos[2] + 0.09), None, b.parent, segments=12, radius_top=0.1), 'terracotta')
-            b.part(kit.ico(kit_name(b, 'Shrub'), 0.16, (pos[0], pos[1], pos[2] + 0.32), None, b.parent, scale=(1, 1, 1.4)), 'leaf')
-        board = b.pt(face, w * 0.05, 0.42, 0.28)
-        signs.panel(kit_name(b, 'Menu_Board'), 'menu', 0.2, board, b.parent, rot=(math.radians(-12), 0, Building.yaw(face)))
+            foliage.topiary(b.atlas, kit_name(b, 'Door_Tree'), pos, 0.62, b.parent, bloom=0.3, seed=b.rng.randint(0, 10 ** 6))
+        # A-frame menu board standing on the sidewalk, clear of the post box: lettered front, plain back, hinge, feet.
+        lean = math.radians(12)
+        ob, height = signs.panel(kit_name(b, 'Menu_Board'), 'menu', 0.2, b.pt(face, -w * 0.35, 0.42, 0.0), b.parent,
+                                 rot=(-lean, 0, Building.yaw(face)))
+        ob.location.z = height / 2 * math.cos(lean) + 0.005
+        b.box('wood_dark', face, 0.22, 0.015, height + 0.02, -w * 0.35, 0.42 - 0.003, height / 2 * math.cos(lean) + 0.005, rot=Building.tilt(face, -lean))
+        # front panel leans its top back toward the wall; the plain back panel mirrors it, meeting at the hinge
+        b.box('wood_dark', face, 0.22, 0.015, height + 0.02, -w * 0.35, 0.42 - height * math.sin(lean), height / 2 * math.cos(lean) + 0.005, rot=Building.tilt(face, lean))
+        b.box('metal_dark', face, 0.2, 0.03, 0.02, -w * 0.35, 0.42 - height * math.sin(lean) / 2, height * math.cos(lean))
         b.face_for_banner = face
         banner(b, face, -w * 0.47, 'coffee_v')
     elif kind == 'ramen':
         b.flatbox(m['interior'], face, w * 0.7, 0.01, 0.85, -w * 0.05, 0.002, 0.45)
         b.box('wood_dark', face, w * 0.7, 0.3, 0.06, -w * 0.05, 0.15, 0.48)   # counter
         for k in range(4):
-            pos = b.pt(face, -w * 0.3 + k * 0.17, 0.36, 0)
+            pos = b.pt(face, -w * 0.3 + k * 0.17, 0.33, 0)
             b.part(kit.cylinder(kit_name(b, 'Stool'), 0.06, 0.3, (pos[0], pos[1], pos[2] + 0.15), None, b.parent, segments=10), 'paint:#c8452f')
         noren, _ = signs.panel(kit_name(b, 'Noren'), 'noren_a', w * 0.6, b.pt(face, -w * 0.05, 0.05, 0.77), b.parent, rot=(0, 0, Building.yaw(face)), double=True)
         face_sign(b, face, 0, FLOOR0 - 0.1, 'ramen_h', w * 0.45, n=0.09)
@@ -308,11 +327,13 @@ def shopfront(b, m, face):
             pos = b.pt(face, -w * 0.35 + k * 0.22, 0.62, 0)
             b.part(kit.cylinder(kit_name(b, 'Stool'), 0.06, 0.32, (pos[0], pos[1], pos[2] + 0.16), None, b.parent, segments=10), 'cedar')
         b.flatbox(m['interior'], face, w * 0.8, 0.01, 0.4, -w * 0.05, 0.002, 0.85)
-        signs.panel(kit_name(b, 'Noren'), 'noren_b', w * 0.7, b.pt(face, -w * 0.05, 0.42, 0.88), b.parent, rot=(0, 0, Building.yaw(face)), double=True)
+        # Short noren hanging just under the canopy's front edge (top at 0.98, canopy underside ~0.99 there).
+        signs.panel(kit_name(b, 'Noren'), 'noren_b', w * 0.5, b.pt(face, -w * 0.05, 0.45, 0.98 - w * 0.125), b.parent, rot=(0, 0, Building.yaw(face)), double=True)
         b.box('tile_grey', face, w * 0.95, 0.6, 0.04, -w * 0.05, 0.28, 1.06, rot=Building.tilt(face, 0.3))
         for k in range(3):
             lantern(b, m, face, -w * 0.4 + k * w * 0.35, 0.9, red=k != 1)
-        face_sign(b, face, 0, FLOOR0 + 0.25, 'izakaya', w * 0.7, n=0.05)
+        # The izakaya board stands on the canopy's front lip (canopy top ~1.01 at n 0.5), clear of the windows behind.
+        face_sign(b, face, -w * 0.05, 1.01 + w * 0.1, 'izakaya', w * 0.6, n=0.5)
         b.face_for_banner = face
         banner(b, face, -w * 0.5, 'sake_v')
         stall = kit.empty('Food_Stall', b.pt(face, 0, 0.3, 0), b.parent)
@@ -345,20 +366,23 @@ def roof(b, m):
     if b.spec['roof'] == 'gable':
         tile = b.spec['tile']
         rise, over = 0.6, 0.18
-        b.part(kit.prism(kit_name(b, 'Roof'), w + 2 * over, d + 2 * over, rise, (0, d / 2, h), None, b.parent), tile)
+        # gable ends overhang less where a neighbour stands close (ridge ends included), so eaves never enter its wall
+        ol, orr = (max(0.0, min(over, clearance(b.spec, s) - 0.14)) for s in ('left', 'right'))
+        span, cx = w + ol + orr, (orr - ol) / 2
+        b.part(kit.prism(kit_name(b, 'Roof'), span, d + 2 * over, rise, (cx, d / 2, h), None, b.parent), tile)
         slope = math.atan2(rise, d / 2 + over)
         length = math.hypot(rise, d / 2 + over)
         ribs = []
-        for k in range(int((w + 2 * over) / 0.11)):
-            x = -w / 2 - over + 0.06 + k * 0.11
+        for k in range(int(span / 0.11)):
+            x = -w / 2 - ol + 0.06 + k * 0.11
             for side in (-1, 1):
                 y = d / 2 + side * (d / 2 + over) / 2
                 ribs.append(((0.045, length, 0.03), (x, y, h + rise / 2 + 0.015), (-side * slope, 0, 0)))
         b.part(kit.boxes(kit_name(b, 'Roof_Tiles'), ribs, None, b.parent), tile)
-        b.part(kit.cylinder(kit_name(b, 'Ridge'), 0.07, w + 2 * over + 0.06, (0, d / 2, h + rise + 0.02), None, b.parent, rot=(0, math.radians(90), 0), segments=10), tile)
-        b.part(kit.boxes(kit_name(b, 'Ridge_Ends'), [((0.08, 0.18, 0.2), (side * (w / 2 + over + 0.04), d / 2, h + rise + 0.05)) for side in (-1, 1)], None, b.parent), tile)
-        b.box('wood_dark', 'front', w + 2 * over, 0.05, 0.06, 0, over, h - 0.03)
-        b.box('metal_dark', 'front', w + 2 * over, 0.07, 0.05, 0, over + 0.03, h - 0.07)
+        b.part(kit.cylinder(kit_name(b, 'Ridge'), 0.07, span + 0.06, (cx, d / 2, h + rise + 0.02), None, b.parent, rot=(0, math.radians(90), 0), segments=10), tile)
+        b.part(kit.boxes(kit_name(b, 'Ridge_Ends'), [((0.08, 0.18, 0.2), (x, d / 2, h + rise + 0.05)) for x in (-w / 2 - ol - 0.04, w / 2 + orr + 0.04)], None, b.parent), tile)
+        b.box('wood_dark', 'front', span, 0.05, 0.06, cx, over, h - 0.03)
+        b.box('metal_dark', 'front', span, 0.07, 0.05, cx, over + 0.03, h - 0.07)
         return
     # flat roof: parapet and clutter
     trim = b.spec['trim']
@@ -390,8 +414,7 @@ def roof(b, m):
         for k in range(3):
             x = -w * 0.35 + k * 0.45
             b.part(kit.box(kit_name(b, 'Planter'), (0.36, 0.22, 0.18), (x, d * 0.82, h + 0.11), None, b.parent, bevel=0.01), 'cedar')
-            for j in range(3):
-                b.part(kit.ico(kit_name(b, 'Roof_Plant'), 0.1 + 0.03 * b.rng.random(), (x - 0.1 + j * 0.1, d * 0.82, h + 0.27), None, b.parent, scale=(1, 1, 1.4)), b.rng.choice(('leaf', 'leaf_light')))
+            foliage.hedge(b.atlas, kit_name(b, 'Roof_Hedge'), (x, d * 0.82, h + 0.2 + 0.08), (0.34, 0.2, 0.16), b.parent, bloom=0.15, seed=b.rng.randint(0, 10 ** 6))
     if 'shed' in clutter:
         b.part(kit.box(kit_name(b, 'Shed'), (0.7, 0.55, 0.55), (w * 0.28, d * 0.7, h + 0.3), None, b.parent), 'corrugated')
         b.box('wood_dark', 'front', 0.24, 0.02, 0.4, w * 0.28, -d * 0.7 + 0.28, h + 0.24)
@@ -423,30 +446,53 @@ def build_one(spec, root, m):
     shop_face = spec.get('shop_face', 'front')
     shopfront(b, m, shop_face)
     styles = spec['styles']
+    blade_left = spec['shop'] == 'ramen'  # the ramen blade sign hangs at the front's left end
+    balcony_face = spec.get('balcony_face', 'front')
     for face in spec['faces']:
         fw = b.width(face)
-        n = max(1, int((fw - 0.2) / 0.62))
-        for f in range(1, spec['floors']):
+        open_face = clearance(spec, face) >= 0.3  # a wall a hand's width from its neighbour is blank but for pipes
+        for f in range(1, spec['floors'] if open_face else 1):
             base_v = FLOOR0 + FLOOR * (f - 1)
             style = styles[(f - 1) % len(styles)]
             if face != 'front' and style == 'louvre':
                 style = 'sash'
+            # Reserve one end of the floor for the AC unit, then lay the windows out in the rest: units hang beside
+            # windows (never over them), above the shop signs and clear of the drainpipe at the right edge.
+            side, standing = 0, False
+            if fw >= 1.4 and b.rng.random() < 0.6:
+                side = 1 if (face == 'front' and blade_left) else b.rng.choice((-1, 1))
+                # On a balcony floor the unit stands on the slab's right end, clear of the pot and laundry on the left.
+                standing = face == balcony_face and f in spec['balcony']
+                side = 1 if standing else side
+                # no unit in a tight gap between buildings or perched over the shop canopy
+                if clearance(spec, face) < 0.5 or (face == shop_face and f == 1):
+                    side = 0
+            reserve = max(0.74, fw * 0.11 + 0.45) if standing else 0.74
+            lo, hi = -fw / 2 + (reserve if side == -1 else 0.0), fw / 2 - (reserve if side == 1 else 0.0)
+            n = max(1, int((hi - lo - 0.1) / 0.62))
             for k in range(n):
-                u = -fw / 2 + fw * (k + 0.5) / n
-                window(b, m, face, u, base_v + 0.22, min(0.5, fw / n - 0.16), 0.46, style)
-        if face != shop_face and face != 'front':
-            # side ground floor: small window, door or meter box so no wall is blank
+                window(b, m, face, lo + (hi - lo) * (k + 0.5) / n, base_v + 0.22, min(0.5, (hi - lo) / n - 0.16), 0.46, style)
+            if side and standing:  # bracket bars rest on the slab top (base_v + 0.03), unit inside the railing
+                ac_unit(b, face, fw * 0.39 - 0.27, base_v + 0.225, f)
+            elif side:
+                ac_unit(b, face, side * (fw / 2 - 0.42), base_v + 0.3, f)
+        if face != shop_face and face != 'front' and open_face:
+            # side ground floor: a small window, a meter box and a proper door (frame, glazed panel, handle, step)
             window(b, m, face, -fw * 0.25, 0.45, 0.4, 0.4, 'lattice' if b.rng.random() < 0.5 else 'sash')
             b.box('paint:#d8d4c8', face, 0.22, 0.08, 0.3, fw * 0.25, 0.04, 0.75)
-            b.box('metal_dark', face, 0.36, 0.05, 0.8, fw * 0.05, 0.02, 0.4)
+            if clearance(spec, face) >= 0.5:  # nobody puts a door onto a gap you cannot walk down
+                door_u = fw * 0.05
+                for su, sv, du, dv in ((0.58, 0.05, 0, 0.885), (0.05, 0.9, -0.265, 0.43), (0.05, 0.9, 0.265, 0.43)):
+                    b.box(spec['trim'], face, su, 0.06, sv, door_u + du, 0.02, dv)
+                b.box('wood_dark', face, 0.48, 0.04, 0.84, door_u, 0.015, 0.42)
+                b.flatbox(m['lit'], face, 0.26, 0.01, 0.22, door_u, 0.04, 0.64)
+                b.box('metal_light', face, 0.03, 0.04, 0.08, door_u + 0.17, 0.05, 0.42)
+                b.box('concrete', face, 0.62, 0.16, 0.04, door_u, 0.08, 0.02)
         drainpipe(b, face, fw / 2 - 0.12, h)
         if spec['floors'] > 2:
             cables(b, face, FLOOR0 + 0.05)
-        for f in range(1, spec['floors']):
-            if b.rng.random() < 0.55:
-                ac_unit(b, face, -fw / 2 + 0.35 + b.rng.random() * max(0.0, fw - 0.8), FLOOR0 + FLOOR * (f - 1) + 0.12, f)
     for f in spec['balcony']:
-        balcony(b, m, 'front', FLOOR0 + FLOOR * (f - 1))
+        balcony(b, m, balcony_face, FLOOR0 + FLOOR * (f - 1))
     if spec['shop'] == 'ramen':
         blade_sign(b, 'front', -b.w / 2 + 0.25, FLOOR0 + FLOOR * 1.4, 'pharmacy_v' if spec['seed'] == 4 else 'ramen_v')
     roof(b, m)
@@ -459,11 +505,9 @@ def build(root):
     out = [build_one(spec, root, m) for spec in BUILDINGS]
     b4 = out[3]
     blade_sign(b4, 'left', 0.4, FLOOR0 + FLOOR * 2.2, 'pharmacy_v')
-    face_sign(b4, 'left', -0.6, FLOOR0 + FLOOR * 3.4, 'poster_a', 0.34)
-    face_sign(out[1], 'left', 0.5, FLOOR0 + FLOOR * 2.3, 'poster_b', 0.3)
-    face_sign(out[0], 'left', 0.2, FLOOR0 - 0.1, 'coffee', 0.32, n=0.08)
-    face_sign(out[4], 'back', 0.6, FLOOR0 + 0.2, 'number', 0.2)
-    face_sign(out[2], 'right', -0.4, FLOOR0 + 0.3, 'bath', 0.5)
+    face_sign(out[0], 'left', 0.1, FLOOR0 - 0.03, 'coffee', 0.26, n=0.08)   # over the side door
+    face_sign(out[4], 'back', 1.0, 0.95, 'number', 0.2)                  # beside the meter box
+    face_sign(out[2], 'right', -0.4, FLOOR0, 'bath', 0.4)                 # below the first-floor sills
     for b in out:
         b.finish()
     return out
