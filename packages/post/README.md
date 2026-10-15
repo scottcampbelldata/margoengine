@@ -32,6 +32,11 @@ stack.dispose(); // also disposes its effects
 - Standalone Bloom, SSAO, DOF, Tonemap or PostProcessing on the same engine are refused.
   `stack.depthTexture` (and each member's `depthTexture`) is the shared resolved depth. A stack with
   only LDR effects keeps the core shader's own display mapping.
+- `stack.sceneTexture` is the shared 1x linear HDR capture (`rgba16float`) when the stack has an HDR or
+  display effect (undefined otherwise). It is what `@margoengine/water` refracts, so water refraction works
+  together with SSAO: `Water.attach(engine, {depth: () => stack.depthTexture, sceneColor: () => stack.sceneTexture})`.
+  Water draws into the capture before the stack's effects run. Real-GPU check:
+  `packages/water/test/stack.browser.mjs` (refraction shows an underwater block, SSAO active in the same frame).
 - Intermediate targets are two `rgba16float` and up to two canvas-format textures, created on first
   use and kept until resize or device restoration. Steady frames create no GPU objects.
 

@@ -6,5 +6,7 @@ export {buildAsync, terminateBVHWorker} from './async.js';
 export type {AsyncBuildOptions} from './async.js';
 export {Raycaster, getGeometryBVH, setGeometryBVH, hasGeometryBVH, computeGeometryBVHAsync, setMeshLayers, getMeshLayers, getPrimitiveBVH, hasPrimitiveBVH, computePrimitiveBVHAsync, engineModels, engineProxies, isModel} from './raycaster.js';
 export type {RaycasterHit, RaycasterSide, IntersectOptions, ModelLike, ModelPrimitiveLike, PickProxy} from './raycaster.js';
+export {worldTriangles} from './triangles.js';
+export type {WorldTriangles, WorldTrianglesOptions} from './triangles.js';
 export {frustumPlanes, multiply as multiplyMatrices, invert as invertMatrix} from './math.js';
 export type {Side} from './math.js';

@@ -224,6 +224,34 @@ test('volume changes are smoothed with setTargetAtTime only on a running context
   assert.deepEqual(audio.gain.gain.last(), ['set', 0.1, 2]);
 });
 
+test('the listener can follow a mesh (world position, local forward axis, local up) instead of the camera', () => {
+  const engine = fakeEngine(), context = new FakeAudioContext({state: 'running'});
+  const listener = new AudioListener({context, smoothing: 0});
+  listener.setup(engine); listener.registerPasses(engine.graph);
+  const hero = engine.createMesh();
+  // 90 degrees about Y with scale 2: local +Z maps to world +X; at (4, 5, 6).
+  engine.store.matrices.set([0, 0, -2, 0, 0, 2, 0, 0, 2, 0, 0, 0, 4, 5, 6, 1], hero.id * 16);
+  assert.equal(listener.following, 'camera');
+  assert.equal(listener.follow(hero), listener);
+  engine.frame();
+  assert.deepEqual([...listener.position], [4, 5, 6]);
+  assert.deepEqual([...listener.forward], [1, 0, 0], 'local +Z by default (glTF characters face +Z)');
+  assert.deepEqual([...listener.up], [0, 1, 0]);
+  assert.equal(context.listener.positionX.value, 4);
+  listener.follow(hero, [-1, 0, 0]); engine.frame();
+  assert.deepEqual([...listener.forward], [0, 0, 1], 'custom local forward axis');
+  // A disposed mesh keeps the last pose; null leaves the listener where setPose puts it; 'camera' goes back.
+  engine.meshes.delete(hero.id); engine.frame();
+  assert.deepEqual([...listener.position], [4, 5, 6]);
+  listener.follow(null).setPose([1, 1, 1], [0, 0, -1]); engine.frame();
+  assert.deepEqual([...listener.position], [1, 1, 1]);
+  listener.follow('camera'); engine.frame();
+  assert.deepEqual([...listener.position], [0, 0, 5]);
+  assert.throws(() => listener.follow(hero, [0, 0, 0]), /nonzero/);
+  assert.throws(() => listener.follow({}), /follows a core Mesh/);
+  listener.dispose();
+});
+
 test('positional audio follows a mesh world matrix, its +Z direction, and mutes while hidden', () => {
   const engine = fakeEngine(), context = new FakeAudioContext({state: 'running'});
   const listener = new AudioListener({context, smoothing: 0.02});

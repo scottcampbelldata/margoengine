@@ -22,7 +22,8 @@ export type ShapeOptions =
 
 export type CombineRule = 'average' | 'min' | 'multiply' | 'max';
 
-export type ColliderOptions = ShapeOptions & {
+/** Everything about a collider except its shape. */
+export interface ColliderSettings {
   /** Collider position relative to the body. */
   offset?: Vec3;
   /** Collider rotation relative to the body, as a quaternion [x, y, z, w]. */
@@ -44,7 +45,9 @@ export type ColliderOptions = ShapeOptions & {
   events?: boolean;
   /** Collider enabled (default true). */
   enabled?: boolean;
-};
+}
+
+export type ColliderOptions = ShapeOptions & ColliderSettings;
 
 /** Packs Rapier interaction groups. Each side is a list of group indices 0..15 or a 16-bit mask. */
 export function collisionGroups(memberships: number | readonly number[], filter: number | readonly number[] = 0xffff): number {

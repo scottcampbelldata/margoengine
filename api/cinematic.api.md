@@ -6,6 +6,8 @@
 import { EngineKernel, Mesh, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin } from "@margoengine/core/extension";
 
+export type CameraCollision = (origin: Float64Array, direction: Float64Array, distance: number) => number | null | undefined;
+
 export class Cinematic implements EnginePlugin {
     readonly options: CinematicOptions;
     readonly name = "cinematic";
@@ -30,5 +32,6 @@ export interface CinematicOptions {
     lookDamping?: number;
     ground?: (x: number, z: number) => number;
     clearance?: number;
+    collide?: CameraCollision;
 }
 ```

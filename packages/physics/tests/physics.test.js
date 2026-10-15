@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync} from 'node:fs';
+import {spawnSync} from 'node:child_process';
 import {resolve} from 'node:path';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 import {Geometry, box} from '@margoengine/core';
@@ -477,17 +478,17 @@ rtest('character controller climbs a step, stops at a wall and snaps to the grou
   ramp.dispose();
 });
 
-rtest('only root-level meshes may carry bodies; disposed meshes drop their bodies', () => {
+rtest('child meshes need core meshes (the transform store); disposed meshes drop their bodies', () => {
   const physics = create();
   const child = fakeMesh();
   parents[child.id] = 0;
-  assert.throws(() => physics.addBody(child), /root-level meshes/);
+  assert.throws(() => physics.addBody(child), /child meshes need core meshes/);
   parents[child.id] = -1;
   const body = physics.addBody(child, {colliders: {shape: 'sphere', radius: 1}});
   assert.throws(() => physics.addBody(child), /already has a physics body/);
   assert.equal(physics.bodyOf(child), body);
   parents[child.id] = 0;
-  assert.throws(() => physics.update(1 / 60), /root-level meshes/);
+  assert.throws(() => physics.update(1 / 60), /child meshes need core meshes/);
   parents[child.id] = -1;
   child.dispose();
   physics.update(1 / 60);
@@ -575,14 +576,115 @@ rtest('sensors also fire for kinematic bodies such as characters', () => {
   physics.dispose();
 });
 
-rtest('core transform synchronization reuses input buffers and bypasses allocating quaternion conversion',async()=>{
+rtest('core transform synchronization writes the transform storage directly, bypassing the validating setters',async()=>{
  const store=await TransformStore.create(8),engine=new Engine({width:1,height:1},store,{backend:'webgl2',add(){},remove(){},render(){},dispose(){}},undefined,null);
  const physics=new Physics(engine,{rapier:RAPIER}),mesh=engine.createMesh().setGeometry(box()).setPosition([0,5,0]);
  const body=physics.addBody(mesh);body.raw.setAngvel({x:0.2,y:0.4,z:0.1},true);
- const setPosition=mesh.setPosition,inputs=new Set();mesh.setPosition=function(value){inputs.add(value);return setPosition.call(this,value);};
+ mesh.setPosition=()=>{throw new Error('Validating core position setter used');};
  mesh.setQuaternion=()=>{throw new Error('Allocating core quaternion method used');};
  for(let i=0;i<120;i++)physics.update(1/60);
- assert.equal(inputs.size,1);assert.ok(mesh.position.y<5);
+ assert.ok(mesh.position.y<5);const p=body.pose;near(mesh.position.y,p[1]+(p[8]-p[1])*physics.alpha,1e-4,'synchronized interpolated height');
  const id=mesh.id,q=body.pose.subarray(10,14);for(let i=0;i<4;i++)near(store.transforms[['qx','qy','qz','qw'][i]][id],q[i],0.01,'synchronized quaternion');
  physics.dispose();engine.dispose();
+});
+
+/** A headless core engine (real transform store and kernel, no GPU). */
+async function coreEngine(capacity=64){
+ const store=await TransformStore.create(capacity);
+ return new Engine({width:1,height:1},store,{backend:'webgl2',add(){},remove(){},render(){},dispose(){}},undefined,null);
+}
+/** gltf-pro's 20-float CPU vertices (position first) and indices from a core geometry. */
+function primitiveOf(node,geometry,extra={}){
+ const count=geometry.vertices.length/6,vertices=new Float32Array(count*20);
+ for(let i=0;i<count;i++)vertices.set(geometry.vertices.subarray(i*6,i*6+3),i*20);
+ return {node,vertices,indices:geometry.indices,...extra};
+}
+const worldOf=(engine,mesh)=>{engine.store.tick(false);return mesh.matrix;};
+
+rtest('bodies on child meshes start at the world pose and write parent-relative poses with no lag',async()=>{
+ const engine=await coreEngine(),physics=new Physics(engine,{rapier:RAPIER});
+ try{
+  ground(physics);
+  // Parent: 90 degrees about Y, uniform scale 2, at (0, 3, 0). Child at local (1, 0, 0) is at world (0, 3, -2).
+  const parent=engine.createMesh().setPosition([0,3,0]).setRotation([0,Math.PI/2,0]).setScale([2,2,2]);
+  const child=engine.createMesh(parent).setGeometry(box(1,1,1)).setPosition([1,0,0]);
+  const body=physics.addBody(child);
+  [0,3,-2].forEach((v,i)=>near(body.position[i],v,1e-5,'world start'));
+  near(body.colliders[0].halfExtents().y,1,1e-6,'fitted to the world scale');
+  near(Math.abs(angleAbout(body.rotation,[0,1,0])),Math.PI/2,1e-5,'world rotation');
+  run(physics,3);
+  near(body.position[1],1,0.01,'rests on the ground with the world-scaled box');
+  const m=worldOf(engine,child);
+  [0,1,2].forEach(i=>near(m[12+i],body.position[i],1e-4,'rendered world position'));
+  // Moving the parent keeps the child where physics has it, from the very next sync.
+  parent.setPosition([5,3,1]).setRotation([0.4,0.2,0]);
+  physics.sync();
+  const moved=worldOf(engine,child);
+  [0,1,2].forEach(i=>near(moved[12+i],body.position[i],1e-4,'world position after the parent moved'));
+  const q=body.rotation,x=[1-2*(q[1]**2+q[2]**2),2*(q[0]*q[1]+q[3]*q[2]),2*(q[0]*q[2]-q[3]*q[1])];
+  [0,1,2].forEach(i=>near(moved[i]/2,x[i],1e-4,'world rotation after the parent moved'));
+ }finally{physics.dispose();engine.dispose();}
+});
+
+rtest('addModel: one call builds trimesh colliders for a node hierarchy with instances, scale and filters',async()=>{
+ const engine=await coreEngine(),physics=new Physics(engine,{rapier:RAPIER});
+ try{
+  // Root raised by 1 and turned 90 degrees; a floor node (10 x 0.2 x 10 after its scale) and a wall node; an instanced post.
+  const root=engine.createMesh().setPosition([0,1,0]).setRotation([0,Math.PI/2,0]);
+  const floor=engine.createMesh(root).setScale([10,1,10]),wall=engine.createMesh(root).setPosition([0,1,4]),posts=engine.createMesh(root);
+  const instances={count:2,data:new Float32Array(48)};
+  for(let k=0;k<2;k++)instances.data.set([1,0,0,0,0,1,0,0,0,0,1,0,k*3-6,0.6,0,1],k*24);
+  const model={root,primitives:[primitiveOf(floor,box(1,0.2,1)),primitiveOf(wall,box(4,2,0.2),{nodeIndex:7}),primitiveOf(posts,box(0.2,1,0.2),{instances})]};
+  const [level]=physics.addModel(model,{type:'fixed',collider:{friction:0.5}});
+  assert.equal(physics.bodyCount,1);assert.equal(level.mesh,root);assert.equal(level.colliders.length,4,'one per primitive and per instance');
+  assert.equal(level.colliders[0].friction(),0.5);
+  assert.equal(level.colliders[0].shapeType(),RAPIER.ShapeType.TriMesh);
+  // The floor top is at y = 1.1 in world space; a ball lands on it.
+  const ball=physics.addBody(null,{position:[3,4,-3],colliders:{shape:'sphere',radius:0.5}});
+  run(physics,3);near(ball.position[1],1.6,0.02,'ball rests on the floor');
+  // The wall (local z = 4 under the turned root) stands at world x = 4.
+  assert.equal(physics.raycast([0,2,0],[1,0,0],{exclude:ball}).body,level);
+  near(physics.raycast([0,2,0],[1,0,0],{exclude:ball}).distance,3.9,1e-4,'wall face in world space');
+  // Instanced posts at local x = -6 and -3 under the turned root: world z = 6 and 3.
+  near(physics.raycast([0,1.6,0],[0,0,1],{exclude:ball}).distance,2.9,1e-4,'nearest post instance');
+  // Per node, with a filter: bodies on the nodes themselves, hits report the node.
+  level.remove();
+  const bodies=physics.addModel(model,{type:'fixed',perNode:true,filter:p=>p.nodeIndex!==7});
+  assert.deepEqual(bodies.map(b=>b.mesh),[floor,posts]);
+  physics.step(); // queries see the world as of the last step
+  assert.equal(physics.raycast([3,3,-3],[0,-1,0],{exclude:ball}).mesh,floor);
+  assert.equal(physics.raycast([0,2,0],[1,0,0],{exclude:ball}),null,'filtered wall left out');
+  // A failure part-way keeps nothing.
+  const count=physics.bodyCount;
+  assert.throws(()=>physics.addModel(model,{type:'fixed',perNode:true}),/already has a physics body/);
+  assert.equal(physics.bodyCount,count);
+  assert.throws(()=>physics.addModel(model,{shape:'box'}),/trimesh' or 'convexHull/);
+ }finally{physics.dispose();engine.dispose();}
+});
+
+rtest('addModel: dynamic models get convex hulls and the root moves as one body',async()=>{
+ const engine=await coreEngine(),physics=new Physics(engine,{rapier:RAPIER});
+ try{
+  ground(physics);
+  const root=engine.createMesh().setPosition([0,3,0]),part=engine.createMesh(root).setPosition([0.5,0,0]).setScale([2,2,2]);
+  const [body]=physics.addModel({root,primitives:[primitiveOf(root,box(1,1,1)),primitiveOf(part,box(0.5,0.5,0.5))]});
+  assert.equal(body.colliders[1].shapeType(),RAPIER.ShapeType.ConvexPolyhedron);
+  assert.ok(body.mass>1.9,'convex hulls give the body mass');
+  run(physics,3);
+  near(root.position.y,0.5,0.02,'model rests on its lowest hull');
+  const m=worldOf(engine,part);near(m[13],root.position.y,1e-4,'child follows its parent');
+ }finally{physics.dispose();engine.dispose();}
+});
+
+rtest('the frame path allocates nothing: sync and the wrapper step (heap count in a child process)',()=>{
+ // Rapier's own World.step and pose getters allocate in its JS glue (see the README); the child stubs them out of the step case.
+ const result=spawnSync(process.execPath,['--expose-gc','--min-semi-space-size=64','--max-semi-space-size=64',fileURLToPath(new URL('./allocations.js',import.meta.url)),rapierEntry],{encoding:'utf8'});
+ assert.equal(result.status,0,result.stderr);
+ const {rapier,...measured}=JSON.parse(result.stdout.trim().split('\n').at(-1));
+ assert.ok(rapier.step.calls>0&&rapier.getter.calls>0,'Rapier reference cases ran');
+ for(const [name,{bytes,calls,gcs}] of Object.entries(measured)){
+  assert.equal(gcs,0,`${name}: a collection ran during the window, so the count is not valid`);
+  // Under one byte per call: a single 16-byte object per frame would show as 16.
+  assert.ok(bytes<calls,`${name}: ${bytes} bytes over ${calls} calls`);
+ }
 });

@@ -40,6 +40,25 @@ test('ground clearance covers the damped and shaken arm without changing the req
   assert.throws(()=>new Cinematic({ground:()=>NaN}).update(0),/finite/);
 });
 
+test('collide pulls the camera in front of a wall at once and eases it back out when the arm is clear', () => {
+  let wall = 3;
+  // A wall plane at z = wall facing the target at the origin; the camera sits 6 behind on +Z.
+  const collide = (o, d, max) => {if (!(d[2] > 0)) return null; const t = (wall - o[2]) / d[2]; return t >= 0 && t <= max ? t : null;};
+  const engine = {camera: {}, removePlugin() {}}, rig = new Cinematic({offset: [0, 0, 6], collide, clearance: 0.5});
+  rig.setup(engine); rig.follow([0, 0, 0]); rig.update(0);
+  assert.ok(Math.abs(engine.camera.position[2] - 2.5) < 1e-6, `pulled in to ${engine.camera.position[2]}`);
+  assert.deepEqual([...rig.position], [0, 0, 6], 'the spring state keeps the requested arm');
+  wall = 100; rig.update(1 / 60);
+  const out = engine.camera.position[2];
+  assert.ok(out > 2.5 && out < 3, `eases out (${out})`);
+  for (let i = 0; i < 240; i++) rig.update(1 / 60);
+  assert.equal(engine.camera.position[2], 6, 'fully out once clear');
+  wall = 4; rig.update(1 / 60);
+  assert.ok(Math.abs(engine.camera.position[2] - 3.5) < 1e-6, 'a new wall applies at once');
+  assert.throws(() => new Cinematic({collide: () => NaN}).update(0), /collision distance/);
+  assert.throws(() => new Cinematic({collide: 1}), /collide/);
+});
+
 test('camera springs reuse each decay across all three axes and resample mutable damping each tick',()=>{
   const options={damping:5,lookDamping:7},rig=new Cinematic(options),exp=Math.exp,calls=[];
   rig.update(0);rig.follow([10,2,-5]);

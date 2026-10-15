@@ -68,7 +68,9 @@ export interface CharacterMoveResult {
     collisions: number;
 }
 
-export type ColliderOptions = ShapeOptions & {
+export type ColliderOptions = ShapeOptions & ColliderSettings;
+
+export interface ColliderSettings {
     offset?: Vec3;
     rotation?: Quat;
     friction?: number;
@@ -82,7 +84,7 @@ export type ColliderOptions = ShapeOptions & {
     solverGroups?: number;
     events?: boolean;
     enabled?: boolean;
-};
+}
 
 export interface CollisionEvent {
     type: CollisionEventType;
@@ -126,6 +128,29 @@ export type JointOptions = (JointBase & {
 
 export type JointType = JointOptions['type'];
 
+export interface ModelBodyOptions extends Omit<BodyOptions, 'colliders' | 'position' | 'rotation'> {
+    shape?: 'trimesh' | 'convexHull';
+    perNode?: boolean;
+    filter?: (primitive: ModelPrimitiveLike) => boolean;
+    collider?: Omit<ColliderSettings, 'offset' | 'rotation'>;
+}
+
+export interface ModelLike {
+    readonly root: Mesh;
+    readonly primitives: readonly ModelPrimitiveLike[];
+}
+
+export interface ModelPrimitiveLike {
+    readonly node: Mesh;
+    readonly vertices: Float32Array;
+    readonly indices: Uint32Array;
+    readonly nodeIndex?: number;
+    readonly instances?: {
+        readonly count: number;
+        readonly data: Float32Array;
+    };
+}
+
 export interface MotorOptions {
     targetVelocity?: number;
     targetPosition?: number;
@@ -158,6 +183,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     step(): void;
     sync(alpha?: number): void;
     addBody(mesh: Mesh | null, options?: BodyOptions): PhysicsBody;
+    addModel(model: ModelLike, options?: ModelBodyOptions): PhysicsBody[];
     bodyOf(mesh: Mesh): PhysicsBody | undefined;
     bodyOfCollider(collider: any): PhysicsBody | undefined;
     getBodies(): PhysicsBody[];
@@ -199,6 +225,8 @@ export class PhysicsBody {
     readonly pose: Float64Array<ArrayBuffer>;
     restWritten: boolean;
     dirty: boolean;
+    fitScale: Vec3 | null;
+    slept: boolean;
     constructor(owner: BodyOwner, raw: any, mesh: Mesh | null, type: BodyType);
     get valid(): boolean;
     markRemoved(): void;

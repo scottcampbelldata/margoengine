@@ -33,6 +33,12 @@ export interface BodyOptions {
   userData?: unknown;
 }
 
+// Rapier's translation(target) and rotation(target) fill these instead of allocating; older versions ignore them.
+// A class, not object literals: V8 shares literal shapes program-wide, and once any {x, y, z} literal holds a non-double
+// its fields store boxed numbers (a heap allocation per write). A private shape keeps the fields unboxed.
+class Scratch {x = 0; y = 0; z = 0; w = 1;}
+const translationScratch = new Scratch(), rotationScratch = new Scratch();
+
 /** Internal hooks the body needs from its world. */
 export interface BodyOwner {
   readonly rapier: any;
@@ -53,6 +59,10 @@ export class PhysicsBody {
   restWritten = false;
   /** @internal */
   dirty = true;
+  /** @internal World scale of a child mesh, used instead of its local scale to fit geometry colliders. */
+  fitScale: Vec3 | null = null;
+  /** @internal Rapier reported the body asleep at the previous step's snapshot. */
+  slept = false;
   private removed = false;
 
   /** @internal */
@@ -65,9 +75,9 @@ export class PhysicsBody {
   markRemoved(): void {this.removed = true; this.colliders.length = 0;}
   private check(): any {if (this.removed) throw new Error('Physics body was removed'); return this.raw;}
 
-  /** @internal copies the current Rapier pose into the interpolation buffer. */
+  /** @internal copies the current Rapier pose into the interpolation buffer (into reused objects where Rapier's getters take a target, as 0.21's do). */
   snapshot(reset = false): void {
-    const p = this.pose, t = this.raw.translation(), r = this.raw.rotation();
+    const p = this.pose, t = this.raw.translation(translationScratch), r = this.raw.rotation(rotationScratch);
     if (!reset) p.copyWithin(0, 7, 14);
     p[7] = t.x; p[8] = t.y; p[9] = t.z; p[10] = r.x; p[11] = r.y; p[12] = r.z; p[13] = r.w;
     if (reset) p.copyWithin(0, 7, 14);

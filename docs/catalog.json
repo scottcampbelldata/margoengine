@@ -273,7 +273,8 @@
       "multiplyMatrices",
       "setGeometryBVH",
       "setMeshLayers",
-      "terminateBVHWorker"
+      "terminateBVHWorker",
+      "worldTriangles"
     ]
   },
   {

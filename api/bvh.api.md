@@ -218,6 +218,16 @@ export interface TriangleSource {
 
 export type Vec3 = [number, number, number];
 
+export interface WorldTriangles {
+    vertices: Float32Array;
+    indices: Uint32Array;
+}
+
+export interface WorldTrianglesOptions {
+    refresh?: boolean;
+    filter?: (mesh: Mesh, model?: ModelLike) => boolean;
+}
+
 export function buildAsync(source: GeometryLike | TriangleSource, options?: AsyncBuildOptions): Promise<MeshBVH>;
 
 export function buildBVH(positions: ArrayLike<number>, stride: number, indices: ArrayLike<number> | null, options?: BVHBuildOptions): BVHData;
@@ -255,4 +265,6 @@ export function setGeometryBVH(geometry: Geometry | GeometryLike, bvh: MeshBVH |
 export function setMeshLayers(mesh: Mesh, mask: number): void;
 
 export function terminateBVHWorker(): void;
+
+export function worldTriangles(engine: Engine, objects: Iterable<Mesh | ModelLike>, { refresh, filter }?: WorldTrianglesOptions): WorldTriangles;
 ```

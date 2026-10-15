@@ -58,8 +58,9 @@ test('PostStack validates its order and keeps an LDR-only stack on the core shad
   assert.throws(() => new PostStack([]), /distinct/); assert.throws(() => new PostStack([fake('x', 'hdr', log), fake('x', 'hdr', log)]), /distinct/);
   assert.throws(() => new PostStack([{name: 'plain', setup() {}}]), /cannot join/);
   const effect = new Bloom(); new PostStack([effect]); assert.throws(() => new PostStack([effect]), /already attached/);
-  const h = harness(1); h.engine.use(new PostStack([fake('aa', 'ldr', log)])); const before = h.frame();
+  const h = harness(1), ldr = new PostStack([fake('aa', 'ldr', log)]); h.engine.use(ldr); const before = h.frame();
   assert.equal(log[0].shader, wgsl); assert.equal(log[0].view, before.color); assert.equal(log[0].count, 1);
+  assert.equal(ldr.sceneTexture, undefined, 'no HDR scene to share without an HDR or display effect');
 });
 
 test('SSAO + DOF + Bloom + Tonemap + FXAA combine, resize, restore and dispose without leaks', () => {
@@ -69,6 +70,10 @@ test('SSAO + DOF + Bloom + Tonemap + FXAA combine, resize, restore and dispose w
     for (const name of ['ssao', 'dof', 'bloom', 'tonemap', 'fxaa']) assert.ok(h.engine.hasPlugin(name));
     restored(h, h.frame());
     assert.equal(effects[0].depthTexture, stack.depthTexture); assert.equal(effects[1].depthTexture, stack.depthTexture);
+    // The shared HDR capture is what Water's sceneColor needs: 1x, rgba16float, viewport-sized, copyable and sampleable.
+    const scene = stack.sceneTexture;
+    assert.equal(scene.format, 'rgba16float'); assert.equal(scene.sampleCount, 1); assert.equal(scene.width, h.view.c.width);
+    assert.ok(scene.usage & GPUTextureUsage.COPY_SRC && scene.usage & GPUTextureUsage.TEXTURE_BINDING);
     // Steady frames allocate nothing on the GPU.
     const count = h.resources.length, calls = h.gpu.record(() => restored(h, h.frame()));
     assert.equal(h.resources.length, count);
