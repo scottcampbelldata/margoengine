@@ -30,6 +30,13 @@ engine.start();
 
 Call `engine.dispose()` on teardown. `loadCAD` uses a worker in browsers; `parseCADAsync` transfers and detaches an owned ArrayBuffer. Both support STL/OBJ/STEP/IGES. Synchronous `parseCAD` retains STL/OBJ support. STEP/IGES tessellation loads separate OpenCascade assets only when needed and returns meters; STL/OBJ retain their input units. Worker imports smooth welded normals by default; use `{ smoothing: false }` to retain hard faces. `loadCAD(engine, url, { fetch: cache.fetch })` downloads through `@margoengine/cache` (offline / repeat visits from IndexedDB); parsing stays in the worker.
 
+**STEP/IGES in production: pre-convert.** `loadCAD` keeps the full OCCT path for files users drag in (about 3.1 MB gzip
+of Wasm, ~150 ms to initialise, ~1.2-1.5 s to tessellate a 442 kB STEP). For models you ship, run
+`npx margo-convert part.step part.glb` once ([tools/margo-convert](../../tools/margo-convert/README.md): same OCCT build
+and default tessellation, assembly tree, part names, colours, shared meshes for repeated parts, metres, optional baked
+feature edges) and load the GLB with `@margoengine/gltf` (core meshes, so `FeatureEdges`, `AssemblyBVH`, sections and
+`ExplodedView` work as on a `loadCAD` model) or gltf-pro. The page then never downloads OCCT.
+
 Use `@margoengine/machinery/cad` for `loadCAD`, `parseCAD`, `deduplicateParts` and `PartInstancer`, or `@margoengine/machinery/cad-async` for `parseCADAsync` and its option types. These entries exclude unrelated machinery systems and share module identity with the existing package root. CAD worker assets remain in `dist/workers` and resolve relative to the shipped JavaScript; retain that directory when copying the package directly.
 
 Import individual systems from these subpaths to keep unrelated code out of direct browser imports and lazy-loaded modules. Each entry includes its associated TypeScript types. Existing imports from `@margoengine/machinery` remain supported and use the same classes and functions.

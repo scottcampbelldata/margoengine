@@ -173,6 +173,23 @@ JPEG, PNG, WebP and KTX2 images are already compressed, and so is Draco geometry
 always serve meshopt `.glb` files compressed. Hosts only compress content types on their list; if `.glb`
 (`model/gltf-binary`) is not on yours, upload pre-compressed copies or accept raw transfer for texture-heavy models.
 
+## Pre-convert STEP for production
+
+STEP and IGES import (`loadCAD`, `app.load('/part.step')`) downloads OpenCascade: a 7.6 MB `.wasm` (3.1 MB gzip),
+about 150 ms to initialise, then 1.2-1.5 s to tessellate a 442 kB assembly in the browser, and its worker needs the
+`'unsafe-eval'` rule below. Keep that path for files your users drag in. For models you ship, convert once at build
+time and serve a GLB:
+
+```sh
+npx margo-convert models/gearbox.step public/gearbox.glb
+```
+
+[`margo-convert`](../tools/margo-convert/README.md) uses the same OCCT build and default tessellation as `loadCAD` and
+keeps the assembly tree, part names, colours and shared meshes for repeated parts, in metres. Load the GLB with
+`@margoengine/gltf` (or gltf-pro): no OCCT bytes, no CAD worker, no `'unsafe-eval'`. The 442 kB `as1-oc-214.stp` sample (18 parts) becomes a
+68 kB GLB (25.6 kB gzip) that parses in a few milliseconds, instead of 81 kB of STEP plus 3.1 MB of OCCT and
+1.4-1.7 s in the browser.
+
 ## Configs
 
 All four configs set the same policy. The two eval-worker rules are only for Draco/KTX2 and STEP/IGES; drop them if

@@ -738,6 +738,29 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    c. STEP/IGES: an offline converter (`npx margo-convert part.step part.glb`, Node, reusing machinery's OCCT path and
       the new glTF exporter, optional baked feature edges) so production apps ship pre-tessellated GLB; keep the 3.1 MB
       OCCT path for drag-and-drop; docs say so plainly. Measure conversion time and output size on the repo's STEP files.
+      DONE: `tools/margo-convert` (unscoped npm package `margo-convert`, bin `margo-convert`, like create-margo; not a
+      machinery `bin`, so no Node-only code or exporters dependency lands in a runtime package). `npx margo-convert
+      part.step [part.glb]` (.step/.stp/.iges/.igs/.brep), library `convert(bytes, format, options)`. occt-import-js
+      0.0.23 runs in Node as is (same build and `{linearUnit:'meter'}` defaults as loadCAD's worker); GLB written by
+      exporters' data-scene `exportGLB`. Writes metres (BREP: `--units`, default mm), the STEP product tree with part
+      names, one material per sRGB colour (linear in glTF; parts without colour get loadCAD's #a6b9c8; multi-colour
+      parts split into child meshes), OCCT surface normals, part vertices relative to their bbox centre (node translation
+      in JSON doubles), and shared meshes for rigid copies (same index buffer + rigid transform from 3 anchors within
+      1e-6 of part size; as1-oc-214: 18 parts -> 5 meshes, GLB < half of `--no-instancing`). Not EXT_mesh_gpu_instancing:
+      the data-scene writer has none and the light loader rejects node extensions; shared meshes become one shared core
+      Geometry (instanced draws). Options `--linear-deflection <mm>`, `--angular-deflection <deg>`, `--merge` (one
+      world-space node per material), `--no-instancing`, `--edges`/`--edge-angle` (machinery `featureEdges` offline ->
+      `mesh.extras.featureEdges` uint32 index-pair accessor + `featureAngle`; not lines, both Margo loaders take
+      triangles only; FeatureEdges does not read it yet, recompute costs ~1 ms per 1,000 distinct triangles). No
+      Draco/meshopt (no Draco encoder; meshoptimizer only via @types/three). Results (README, busy machine, quiet gate
+      skipped: results/margo-convert-diagnostic.json): as1-oc-214.stp 441,968 B -> 68,352 B GLB (25,579 gzip), 5,040
+      triangles, ~1.2-2.1 s; as1-tu-203 142 kB -> 65 kB; dm1-oc-214 226 kB -> 35 kB; cube STEP/IGES ~10 kB -> 1.7 kB;
+      BREP 42 kB -> 54 kB. Validator 0/0/0 on all (+1 UNUSED_OBJECT info per edge accessor with --edges). Browser
+      loadCAD of as1 was 1.4-1.7 s + 3.1 MB OCCT. Test `tests/margo-convert.test.js` (in verify; skips without OCCT):
+      validator, gltf-pro + light loader, triangles/bounds (1e-6 m)/part names equal to loadCAD run in Node through an
+      in-process stand-in Worker executing the built cad-runtime.js; instancing, merge, edges == featureEdges, options,
+      BREP units, CLI errors, `tsc --checkJs --strict` of the tool. Follow-ups: a FeatureEdges option to take the baked
+      edges; a gated (quiet) timing run; optional meshopt output if Scott accepts the dependency.
    d. 16-texture limit, long term: texture arrays for same-size material maps (gltf-pro physical, terrain splats) and
       shared shadow arrays; optionally core requests a higher `maxSampledTexturesPerShaderStage` when the adapter
       allows (core bytes, Scott decides). After 1.0 unless a demo needs it.
