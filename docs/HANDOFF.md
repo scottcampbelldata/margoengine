@@ -702,6 +702,19 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    b. Order-independent transparency: weighted blended OIT as an optional package (accumulation + revealage targets,
       composite pass) for gltf-pro BLEND and materials transparent meshes; test a 50% housing over nested gears
       (no popping while orbiting), measure cost; core meshes stay opaque.
+      DONE: `@margoengine/oit` (2,210 B min+gzip; core + stage unchanged). `OIT.attach(engine, {order?, depthScale?})`,
+      `oit.add(model)` (gltf-pro model or materials mesh; returns a remover), `dispose()`. gltf-pro got a declared
+      transparency hook (+323 B): `model.setTransparency(hook)` (`PBRTransparency`: `declarations(group)`, `bindings()`,
+      `targets`, `begin()`) and `draw(c, 'transparent', ...)`; BLEND primitives without transmission or renderState leave
+      the beauty pass and draw (lit shader, fragment head renamed `margoShade`, entry `transparent`) into rgba16float
+      accumulation + r16float revealage at order 8, depth read-only; one composite pass (the only 2 texture reads) blends
+      premultiplied-over. Weight clamp(10/(depth/depthScale)^6, 0.01, 1000), depthScale = camera-to-target distance.
+      Proofs: `proofs/oit-detached.proof.js` (2,964 GPU calls identical to b803d56 without a hook, MSAA 1x/4x),
+      `packages/oit/test/oit.test.js`, gltf-pro extensions test. Real GPU (`oit-gpu.mjs`, AC + lock): colour vs analytic
+      for 1/2/4 layers 0.5/4.6/8.7 (WBOIT approximation; vs the WBOIT formula 0.5/0.3/0.6), same at MSAA 1x/4x and ortho;
+      TransparentCanvas alpha within 0.002; PostStack 1 layer identical to sorted. Orbit 360x1 deg vs a per-triangle
+      sorted reference: steps with >1% popped pixels sorted 13, OIT 0 (worst 1.41% vs 0.36%). GPU (diagnostic, busy
+      machine) 720p sorted +0.33 / OIT +0.56 ms, 1080p +0.59 / +1.28 ms. Limits in `packages/oit/README.md`.
    c. STEP/IGES: an offline converter (`npx margo-convert part.step part.glb`, Node, reusing machinery's OCCT path and
       the new glTF exporter, optional baked feature edges) so production apps ship pre-tessellated GLB; keep the 3.1 MB
       OCCT path for drag-and-drop; docs say so plainly. Measure conversion time and output size on the repo's STEP files.

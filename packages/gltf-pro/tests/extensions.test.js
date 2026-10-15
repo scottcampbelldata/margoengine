@@ -6,7 +6,7 @@ import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {extname, resolve} from 'node:path';
 import {GLTFAsset, PBRModel, parseGLTF, parseGLTFAsync} from '../dist/index.js';
-import {pbrShader, physicalShader as physical, lightPBR} from '../src/shader.ts';
+import {pbrShader, physicalShader as physical, lightPBR, transparentPBR} from '../src/shader.ts';
 import {Engine, TransformStore} from '../../core/dist/extension.js';
 import {MeshoptDecoder} from '../../decoders/dist/index.js';
 import {decodeDraco, initBasis, initDraco, transcodeKTX2} from '../../decoders/dist/codec.js';
@@ -240,4 +240,16 @@ test('lighting hooks (contract v1): every hook point occurs once in both variant
   assert.equal(lightPBR(pbrShader, fog), lightPBR(pbrShader, fog), 'cached per hooks object');
   // @margoengine/materials rewrites the five base-map samples and the fragment head of either variant.
   for (const source of [pbrShader, physicalShader]) for (const shading of ['standard', 'basic']) assert.match(materialShader(source, 2, shading), /mat_baseMap/);
+});
+
+test('transparency hook (contract v1): the fragment head occurs once in both variants, lit and material-patched, and becomes margoShade + a transparent entry', () => {
+  const declarations = '// oit\n', lit = lightPBR(lightPBR(physicalShader, new Shadows().pbr(2)), {declarations: '// fog\n', output: c => `mix(${c},vec3f(1),0.5)`});
+  for (const source of [pbrShader, physicalShader, lit, materialShader(pbrShader, 2, 'basic'), materialShader(physicalShader, 2, 'standard')]) {
+    const code = transparentPBR(source, declarations);
+    assert.ok(code.startsWith(declarations)); assert.equal(code.split('fn margoShade(i:Out,front:bool)->vec4f {').length, 2);
+    assert.ok(!code.includes('@fragment fn fragment(')); assert.match(code, /@fragment fn transparent\(i:Out,@builtin\(front_facing\) front:bool\)->MargoTransparent \{return margoTransparent\(margoShade\(i,front\),i\);\}\n$/);
+    assert.equal(code.replace(declarations, '').replace('fn margoShade(i:Out,front:bool)->vec4f {', '@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {').split('\n@fragment fn transparent(')[0], source, 'nothing else changes');
+    assert.equal(transparentPBR(source, declarations), code, 'cached');
+  }
+  assert.throws(() => transparentPBR(transparentPBR(pbrShader, ''), ''), /transparency hook point missing/);
 });

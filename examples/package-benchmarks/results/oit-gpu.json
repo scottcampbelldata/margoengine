@@ -1,0 +1,1002 @@
+{
+  "benchmark": "oit-gpu",
+  "recordedAt": "2026-10-15T02:37:01.119Z",
+  "hardware": {
+    "vendor": "intel",
+    "architecture": "xe-2lpg",
+    "device": "",
+    "description": "",
+    "fallback": false
+  },
+  "browser": "chromium 155.0.4283.45",
+  "powerOnline": {
+    "before": "True",
+    "after": "True"
+  },
+  "colours": [
+    {
+      "mode": "sorted",
+      "samples": 1,
+      "camera": "perspective",
+      "layers": 1,
+      "pixel": [
+        184,
+        106,
+        106
+      ],
+      "analytic": [
+        183.5,
+        106.3,
+        106.3
+      ],
+      "wboitFormula": [
+        183.5,
+        106.3,
+        106.3
+      ],
+      "errorVsAnalytic": 0.5,
+      "errorVsFormula": 0.5,
+      "passes": []
+    },
+    {
+      "mode": "sorted",
+      "samples": 1,
+      "camera": "perspective",
+      "layers": 2,
+      "pixel": [
+        177,
+        128,
+        106
+      ],
+      "analytic": [
+        176.6,
+        127.8,
+        106.3
+      ],
+      "wboitFormula": [
+        172.3,
+        131.7,
+        107.3
+      ],
+      "errorVsAnalytic": 0.4,
+      "errorVsFormula": 4.66,
+      "passes": []
+    },
+    {
+      "mode": "sorted",
+      "samples": 1,
+      "camera": "perspective",
+      "layers": 4,
+      "pixel": [
+        178,
+        134,
+        125
+      ],
+      "analytic": [
+        177.6,
+        134.3,
+        125.8
+      ],
+      "wboitFormula": [
+        174,
+        142.4,
+        128.4
+      ],
+      "errorVsAnalytic": 0.81,
+      "errorVsFormula": 8.36,
+      "passes": []
+    },
+    {
+      "mode": "oit",
+      "samples": 1,
+      "camera": "perspective",
+      "layers": 1,
+      "pixel": [
+        184,
+        106,
+        106
+      ],
+      "analytic": [
+        183.5,
+        106.3,
+        106.3
+      ],
+      "wboitFormula": [
+        183.5,
+        106.3,
+        106.3
+      ],
+      "errorVsAnalytic": 0.5,
+      "errorVsFormula": 0.5,
+      "passes": [
+        "oit:accumulate",
+        "oit:composite"
+      ]
+    },
+    {
+      "mode": "oit",
+      "samples": 1,
+      "camera": "perspective",
+      "layers": 2,
+      "pixel": [
+        172,
+        132,
+        107
+      ],
+      "analytic": [
+        176.6,
+        127.8,
+        106.3
+      ],
+      "wboitFormula": [
+        172.3,
+        131.7,
+        107.3
+      ],
+      "errorVsAnalytic": 4.6,
+      "errorVsFormula": 0.34,
+      "passes": [
+        "oit:accumulate",
+        "oit:composite"
+      ]
+    },
+    {
+      "mode": "oit",
+      "samples": 1,
+      "camera": "perspective",
+      "layers": 4,
+      "pixel": [
+        174,
+        143,
+        129
+      ],
+      "analytic": [
+        177.6,
+        134.3,
+        125.8
+      ],
+      "wboitFormula": [
+        174,
+        142.4,
+        128.4
+      ],
+      "errorVsAnalytic": 8.74,
+      "errorVsFormula": 0.64,
+      "passes": [
+        "oit:accumulate",
+        "oit:composite"
+      ]
+    },
+    {
+      "mode": "sorted",
+      "samples": 1,
+      "camera": "orthographic",
+      "layers": 1,
+      "pixel": [
+        184,
+        106,
+        106
+      ],
+      "analytic": [
+        183.5,
+        106.3,
+        106.3
+      ],
+      "wboitFormula": [
+        183.5,
+        106.3,
+        106.3
+      ],
+      "errorVsAnalytic": 0.5,
+      "errorVsFormula": 0.5,
+      "passes": []
+    },
+    {
+      "mode": "sorted",
+      "samples": 1,
+      "camera": "orthographic",
+      "layers": 2,
+      "pixel": [
+        177,
+        128,
+        106
+      ],
+      "analytic": [
+        176.6,
+        127.8,
+        106.3
+      ],
+      "wboitFormula": [
+        172.3,
+        131.7,
+        107.3
+      ],
+      "errorVsAnalytic": 0.4,
+      "errorVsFormula": 4.66,
+      "passes": []
+    },
+    {
+      "mode": "sorted",
+      "samples": 1,
+      "camera": "orthographic",
+      "layers": 4,
+      "pixel": [
+        178,
+        134,
+        125
+      ],
+      "analytic": [
+        177.6,
+        134.3,
+        125.8
+      ],
+      "wboitFormula": [
+        174,
+        142.4,
+        128.4
+      ],
+      "errorVsAnalytic": 0.81,
+      "errorVsFormula": 8.36,
+      "passes": []
+    },
+    {
+      "mode": "oit",
+      "samples": 1,
+      "camera": "orthographic",
+      "layers": 1,
+      "pixel": [
+        184,
+        106,
+        106
+      ],
+      "analytic": [
+        183.5,
+        106.3,
+        106.3
+      ],
+      "wboitFormula": [
+        183.5,
+        106.3,
+        106.3
+      ],
+      "errorVsAnalytic": 0.5,
+      "errorVsFormula": 0.5,
+      "passes": [
+        "oit:accumulate",
+        "oit:composite"
+      ]
+    },
+    {
+      "mode": "oit",
+      "samples": 1,
+      "camera": "orthographic",
+      "layers": 2,
+      "pixel": [
+        172,
+        132,
+        107
+      ],
+      "analytic": [
+        176.6,
+        127.8,
+        106.3
+      ],
+      "wboitFormula": [
+        172.3,
+        131.7,
+        107.3
+      ],
+      "errorVsAnalytic": 4.6,
+      "errorVsFormula": 0.34,
+      "passes": [
+        "oit:accumulate",
+        "oit:composite"
+      ]
+    },
+    {
+      "mode": "oit",
+      "samples": 1,
+      "camera": "orthographic",
+      "layers": 4,
+      "pixel": [
+        174,
+        143,
+        129
+      ],
+      "analytic": [
+        177.6,
+        134.3,
+        125.8
+      ],
+      "wboitFormula": [
+        174,
+        142.4,
+        128.4
+      ],
+      "errorVsAnalytic": 8.74,
+      "errorVsFormula": 0.64,
+      "passes": [
+        "oit:accumulate",
+        "oit:composite"
+      ]
+    },
+    {
+      "mode": "sorted",
+      "samples": 4,
+      "camera": "perspective",
+      "layers": 1,
+      "pixel": [
+        184,
+        106,
+        106
+      ],
+      "analytic": [
+        183.5,
+        106.3,
+        106.3
+      ],
+      "wboitFormula": [
+        183.5,
+        106.3,
+        106.3
+      ],
+      "errorVsAnalytic": 0.5,
+      "errorVsFormula": 0.5,
+      "passes": []
+    },
+    {
+      "mode": "sorted",
+      "samples": 4,
+      "camera": "perspective",
+      "layers": 2,
+      "pixel": [
+        177,
+        128,
+        106
+      ],
+      "analytic": [
+        176.6,
+        127.8,
+        106.3
+      ],
+      "wboitFormula": [
+        172.3,
+        131.7,
+        107.3
+      ],
+      "errorVsAnalytic": 0.4,
+      "errorVsFormula": 4.66,
+      "passes": []
+    },
+    {
+      "mode": "sorted",
+      "samples": 4,
+      "camera": "perspective",
+      "layers": 4,
+      "pixel": [
+        178,
+        134,
+        125
+      ],
+      "analytic": [
+        177.6,
+        134.3,
+        125.8
+      ],
+      "wboitFormula": [
+        174,
+        142.4,
+        128.4
+      ],
+      "errorVsAnalytic": 0.81,
+      "errorVsFormula": 8.36,
+      "passes": []
+    },
+    {
+      "mode": "oit",
+      "samples": 4,
+      "camera": "perspective",
+      "layers": 1,
+      "pixel": [
+        184,
+        106,
+        106
+      ],
+      "analytic": [
+        183.5,
+        106.3,
+        106.3
+      ],
+      "wboitFormula": [
+        183.5,
+        106.3,
+        106.3
+      ],
+      "errorVsAnalytic": 0.5,
+      "errorVsFormula": 0.5,
+      "passes": [
+        "oit:accumulate",
+        "oit:composite"
+      ]
+    },
+    {
+      "mode": "oit",
+      "samples": 4,
+      "camera": "perspective",
+      "layers": 2,
+      "pixel": [
+        172,
+        132,
+        107
+      ],
+      "analytic": [
+        176.6,
+        127.8,
+        106.3
+      ],
+      "wboitFormula": [
+        172.3,
+        131.7,
+        107.3
+      ],
+      "errorVsAnalytic": 4.6,
+      "errorVsFormula": 0.34,
+      "passes": [
+        "oit:accumulate",
+        "oit:composite"
+      ]
+    },
+    {
+      "mode": "oit",
+      "samples": 4,
+      "camera": "perspective",
+      "layers": 4,
+      "pixel": [
+        174,
+        143,
+        129
+      ],
+      "analytic": [
+        177.6,
+        134.3,
+        125.8
+      ],
+      "wboitFormula": [
+        174,
+        142.4,
+        128.4
+      ],
+      "errorVsAnalytic": 8.74,
+      "errorVsFormula": 0.64,
+      "passes": [
+        "oit:accumulate",
+        "oit:composite"
+      ]
+    },
+    {
+      "mode": "sorted",
+      "samples": 4,
+      "camera": "orthographic",
+      "layers": 1,
+      "pixel": [
+        184,
+        106,
+        106
+      ],
+      "analytic": [
+        183.5,
+        106.3,
+        106.3
+      ],
+      "wboitFormula": [
+        183.5,
+        106.3,
+        106.3
+      ],
+      "errorVsAnalytic": 0.5,
+      "errorVsFormula": 0.5,
+      "passes": []
+    },
+    {
+      "mode": "sorted",
+      "samples": 4,
+      "camera": "orthographic",
+      "layers": 2,
+      "pixel": [
+        177,
+        128,
+        106
+      ],
+      "analytic": [
+        176.6,
+        127.8,
+        106.3
+      ],
+      "wboitFormula": [
+        172.3,
+        131.7,
+        107.3
+      ],
+      "errorVsAnalytic": 0.4,
+      "errorVsFormula": 4.66,
+      "passes": []
+    },
+    {
+      "mode": "sorted",
+      "samples": 4,
+      "camera": "orthographic",
+      "layers": 4,
+      "pixel": [
+        178,
+        134,
+        125
+      ],
+      "analytic": [
+        177.6,
+        134.3,
+        125.8
+      ],
+      "wboitFormula": [
+        174,
+        142.4,
+        128.4
+      ],
+      "errorVsAnalytic": 0.81,
+      "errorVsFormula": 8.36,
+      "passes": []
+    },
+    {
+      "mode": "oit",
+      "samples": 4,
+      "camera": "orthographic",
+      "layers": 1,
+      "pixel": [
+        184,
+        106,
+        106
+      ],
+      "analytic": [
+        183.5,
+        106.3,
+        106.3
+      ],
+      "wboitFormula": [
+        183.5,
+        106.3,
+        106.3
+      ],
+      "errorVsAnalytic": 0.5,
+      "errorVsFormula": 0.5,
+      "passes": [
+        "oit:accumulate",
+        "oit:composite"
+      ]
+    },
+    {
+      "mode": "oit",
+      "samples": 4,
+      "camera": "orthographic",
+      "layers": 2,
+      "pixel": [
+        172,
+        132,
+        107
+      ],
+      "analytic": [
+        176.6,
+        127.8,
+        106.3
+      ],
+      "wboitFormula": [
+        172.3,
+        131.7,
+        107.3
+      ],
+      "errorVsAnalytic": 4.6,
+      "errorVsFormula": 0.34,
+      "passes": [
+        "oit:accumulate",
+        "oit:composite"
+      ]
+    },
+    {
+      "mode": "oit",
+      "samples": 4,
+      "camera": "orthographic",
+      "layers": 4,
+      "pixel": [
+        174,
+        143,
+        129
+      ],
+      "analytic": [
+        177.6,
+        134.3,
+        125.8
+      ],
+      "wboitFormula": [
+        174,
+        142.4,
+        128.4
+      ],
+      "errorVsAnalytic": 8.74,
+      "errorVsFormula": 0.64,
+      "passes": [
+        "oit:accumulate",
+        "oit:composite"
+      ]
+    }
+  ],
+  "transparentCanvas": [
+    {
+      "layers": 1,
+      "alpha": 0.502,
+      "expectedAlpha": 0.5,
+      "overBlack": [
+        122,
+        45,
+        45
+      ],
+      "expectedPremultiplied": [
+        121.7,
+        44.5,
+        44.5
+      ],
+      "error": 0.48,
+      "valid": true
+    },
+    {
+      "layers": 2,
+      "alpha": 0.702,
+      "expectedAlpha": 0.7,
+      "overBlack": [
+        135,
+        95,
+        70
+      ],
+      "expectedPremultiplied": [
+        135.3,
+        94.7,
+        70.2
+      ],
+      "error": 0.34,
+      "valid": true
+    },
+    {
+      "layers": 4,
+      "alpha": 0.941,
+      "expectedAlpha": 0.94,
+      "overBlack": [
+        167,
+        136,
+        121
+      ],
+      "expectedPremultiplied": [
+        166.6,
+        134.9,
+        121
+      ],
+      "error": 1.05,
+      "valid": true
+    }
+  ],
+  "postStack": [
+    {
+      "layers": 1,
+      "sorted": [
+        183,
+        125,
+        122
+      ],
+      "oit": [
+        183,
+        125,
+        122
+      ],
+      "difference": 0,
+      "oitPasses": [
+        "oit:accumulate",
+        "oit:composite"
+      ]
+    },
+    {
+      "layers": 2,
+      "sorted": [
+        179,
+        146,
+        124
+      ],
+      "oit": [
+        176,
+        149,
+        125
+      ],
+      "difference": 3,
+      "oitPasses": [
+        "oit:accumulate",
+        "oit:composite"
+      ]
+    },
+    {
+      "layers": 4,
+      "sorted": [
+        180,
+        153,
+        148
+      ],
+      "oit": [
+        178,
+        158,
+        150
+      ],
+      "difference": 5,
+      "oitPasses": [
+        "oit:accumulate",
+        "oit:composite"
+      ]
+    }
+  ],
+  "popping": {
+    "steps": 360,
+    "degreesPerStep": 1,
+    "orbitRadius": 3.2,
+    "resolution": [
+      640,
+      360
+    ],
+    "samples": 4,
+    "popThreshold": 16,
+    "referenceStillThreshold": 3,
+    "sorted": {
+      "meanErrorVsReference": 7.46,
+      "maxMeanErrorVsReference": 21.54,
+      "meanP95ErrorVsReference": 29.83,
+      "maxPoppedPixels": "1.41%",
+      "worstStep": 249,
+      "stepsWithOver1PercentPopped": 13,
+      "stepsWithOver0_1PercentPopped": 78
+    },
+    "oit": {
+      "meanErrorVsReference": 6.71,
+      "maxMeanErrorVsReference": 13.19,
+      "meanP95ErrorVsReference": 22.83,
+      "maxPoppedPixels": "0.36%",
+      "worstStep": 259,
+      "stepsWithOver1PercentPopped": 0,
+      "stepsWithOver0_1PercentPopped": 5
+    }
+  },
+  "timing": {
+    "machine": {
+      "diagnostic": true,
+      "reason": "Machine not quiet after 900 s (last CPU load 45%)"
+    },
+    "label": "DIAGNOSTIC (machine not quiet)",
+    "samples": 4,
+    "angleDegrees": 30,
+    "rows": [
+      {
+        "resolution": [
+          1280,
+          720
+        ],
+        "opaqueMs": 0.066,
+        "sortedMs": 0.393,
+        "oitMs": 0.623,
+        "oitAccumulateMs": 0.328,
+        "oitCompositeMs": 0.23,
+        "runs": {
+          "opaque": [
+            {
+              "gpuMs": 0.066,
+              "samples": 20,
+              "passes": {
+                "pass": 0.066
+              },
+              "passLabels": [
+                "pass",
+                "pass",
+                "pass"
+              ],
+              "errors": []
+            },
+            {
+              "gpuMs": 0.066,
+              "samples": 20,
+              "passes": {
+                "pass": 0.066
+              },
+              "passLabels": [
+                "pass",
+                "pass",
+                "pass"
+              ],
+              "errors": []
+            }
+          ],
+          "sorted": [
+            {
+              "gpuMs": 0.393,
+              "samples": 20,
+              "passes": {
+                "pass": 0.393
+              },
+              "passLabels": [
+                "pass",
+                "pass",
+                "pass",
+                "pass",
+                "pass"
+              ],
+              "errors": []
+            },
+            {
+              "gpuMs": 0.393,
+              "samples": 20,
+              "passes": {
+                "pass": 0.393
+              },
+              "passLabels": [
+                "pass",
+                "pass",
+                "pass",
+                "pass",
+                "pass"
+              ],
+              "errors": []
+            }
+          ],
+          "oit": [
+            {
+              "gpuMs": 0.655,
+              "samples": 20,
+              "passes": {
+                "pass": 0.066,
+                "oit:accumulate": 0.328,
+                "oit:composite": 0.262
+              },
+              "passLabels": [
+                "pass",
+                "pass",
+                "oit:accumulate",
+                "oit:composite",
+                "pass"
+              ],
+              "errors": []
+            },
+            {
+              "gpuMs": 0.59,
+              "samples": 20,
+              "passes": {
+                "pass": 0.066,
+                "oit:accumulate": 0.328,
+                "oit:composite": 0.197
+              },
+              "passLabels": [
+                "pass",
+                "pass",
+                "oit:accumulate",
+                "oit:composite",
+                "pass"
+              ],
+              "errors": []
+            }
+          ]
+        },
+        "sortedTransparencyMs": 0.327,
+        "oitTransparencyMs": 0.557
+      },
+      {
+        "resolution": [
+          1920,
+          1080
+        ],
+        "opaqueMs": 0.131,
+        "sortedMs": 0.721,
+        "oitMs": 1.409,
+        "oitAccumulateMs": 0.786,
+        "oitCompositeMs": 0.492,
+        "runs": {
+          "opaque": [
+            {
+              "gpuMs": 0.131,
+              "samples": 20,
+              "passes": {
+                "pass": 0.131
+              },
+              "passLabels": [
+                "pass",
+                "pass",
+                "pass"
+              ],
+              "errors": []
+            },
+            {
+              "gpuMs": 0.131,
+              "samples": 20,
+              "passes": {
+                "pass": 0.131
+              },
+              "passLabels": [
+                "pass",
+                "pass",
+                "pass"
+              ],
+              "errors": []
+            }
+          ],
+          "sorted": [
+            {
+              "gpuMs": 0.721,
+              "samples": 20,
+              "passes": {
+                "pass": 0.721
+              },
+              "passLabels": [
+                "pass",
+                "pass",
+                "pass",
+                "pass",
+                "pass"
+              ],
+              "errors": []
+            },
+            {
+              "gpuMs": 0.721,
+              "samples": 20,
+              "passes": {
+                "pass": 0.721
+              },
+              "passLabels": [
+                "pass",
+                "pass",
+                "pass",
+                "pass",
+                "pass"
+              ],
+              "errors": []
+            }
+          ],
+          "oit": [
+            {
+              "gpuMs": 1.507,
+              "samples": 20,
+              "passes": {
+                "pass": 0.131,
+                "oit:accumulate": 0.852,
+                "oit:composite": 0.524
+              },
+              "passLabels": [
+                "pass",
+                "pass",
+                "oit:accumulate",
+                "oit:composite",
+                "pass"
+              ],
+              "errors": []
+            },
+            {
+              "gpuMs": 1.311,
+              "samples": 20,
+              "passes": {
+                "pass": 0.131,
+                "oit:accumulate": 0.721,
+                "oit:composite": 0.459
+              },
+              "passLabels": [
+                "pass",
+                "pass",
+                "oit:accumulate",
+                "oit:composite",
+                "pass"
+              ],
+              "errors": []
+            }
+          ]
+        },
+        "sortedTransparencyMs": 0.59,
+        "oitTransparencyMs": 1.278
+      }
+    ]
+  }
+}

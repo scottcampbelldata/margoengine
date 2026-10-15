@@ -277,6 +277,20 @@ glass.opacity = 0.6; // colours, scalars and maps are live
   `material.setUVTransform({offset: [0.5, 0], scale: [0.5, 0.5], rotation: 0}, 'normalMap')`.
 - Atlases: `packAtlas(images)` returns one image and a `uvTransform` per input, so many textured meshes can share one
   texture or be merged into one draw.
+- Transparent meshes sort per mesh like three.js, so overlapping ones can pop as the camera moves. Order-independent
+  transparency (weighted blended, an approximation; see `packages/oit/README.md`) fixes that for materials meshes and
+  glTF BLEND materials:
+
+```ts
+import {OIT} from '@margoengine/oit';
+import {planeGeometry} from '@margoengine/geometry';
+import {Material, createMesh} from '@margoengine/materials';
+
+const oit = OIT.attach(engine);
+const pane = createMesh(engine, planeGeometry(2, 2), new Material({color: '#88ccff', transparent: true, opacity: 0.4, doubleSided: true}));
+oit.add(pane);  // and oit.add(model) for a loaded glTF's BLEND primitives
+```
+
 - Not available: Lambert, Phong, physical (clearcoat, transmission) on your own meshes, a second UV set, geometry groups
   (one material per mesh). glTF files do get clearcoat, sheen, transmission and specular (see Loading models).
 

@@ -80,6 +80,7 @@
     "packages/viewcube",
     "packages/staging",
     "packages/culling",
+    "packages/oit",
     "examples/vite",
     "examples/gameplay-sandbox",
     "examples/react-viewer",

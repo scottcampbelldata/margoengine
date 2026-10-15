@@ -113,6 +113,30 @@ export function lightPBR(code:string,hooks:PBRLighting):string {
   if(hooks.output)edit('if(f.settings.w<0.5) {color=aces(max(color,vec3f(0))/0.6);',`color=${hooks.output('select(color,aces(max(color,vec3f(0))/0.6),f.settings.w<0.5)')};if(f.settings.w<0.5) {`);
   out=hooks.declarations+out;if(!cache)lit.set(hooks,cache=new Map());if(cache.size>=64)cache.clear();cache.set(code,out);return out;
 }
+/**
+ * Transparency hook (contract version 1, README "Transparency hook"), set with `PBRModel.setTransparency`. While set, BLEND
+ * primitives (no transmission, no `renderState`) leave the beauty pass and draw only when the owner calls
+ * `model.draw(c, 'transparent', ...)`, into `begin()`'s pass with these `targets`, depth tested (greater-equal) and not
+ * written. Their fragment returns `margoTransparent(color, i)` instead of `color` (the beauty colour, alpha included).
+ */
+export interface PBRTransparency {
+  /** Module-scope WGSL: `struct MargoTransparent` (one output per target), `fn margoTransparent(color:vec4f,i:Out)->MargoTransparent`, its bindings in `group`. Return the same string on steady frames. */
+  declarations(group:number):string;
+  /** Group-2 entries for those bindings (after any lighting effects' entries). */
+  bindings():GPUBindGroupEntry[];
+  /** Colour targets of the transparent pass, in `MargoTransparent` location order. */
+  readonly targets:readonly GPUColorTargetState[];
+  /** This frame's transparent pass: the scene depth read-only and these targets; begun on the first draw, ended by the owner. */
+  begin():GPURenderPassEncoder;
+}
+const head='@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {',through=new Map<string,Map<string,string>>();
+/** `code` (the lit PBR shader) with a `transparent` entry point returning `margoTransparent(<beauty colour>, i)`. */
+export function transparentPBR(code:string,declarations:string):string {
+  let cache=through.get(declarations),out=cache?.get(code);if(out!==undefined)return out;
+  if(code.split(head).length!==2)throw new Error('PBR transparency hook point missing or used twice');
+  out=declarations+code.replace(head,'fn margoShade(i:Out,front:bool)->vec4f {')+'\n@fragment fn transparent(i:Out,@builtin(front_facing) front:bool)->MargoTransparent {return margoTransparent(margoShade(i,front),i);}\n';
+  if(!cache){if(through.size>=8)through.clear();through.set(declarations,cache=new Map());}if(cache.size>=64)cache.clear();cache.set(code,out);return out;
+}
 // Material map slots 5-12, in PBRModel order. Sheen and specular colors are sRGB.
 export const physicalMaps = ['clearcoat','clearcoatRoughness','clearcoatNormal','transmission','sheenColor','sheenRoughness','specular','specularColor'];
 const sample = (name: string) => `textureSample(${name}Map,${name}Sampler,uv(i,${physicalMaps.indexOf(name) + 5}))`;
