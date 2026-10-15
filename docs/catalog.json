@@ -344,7 +344,7 @@
     "package": "@margoengine/controls",
     "version": "0.1.0",
     "published": false,
-    "description": "Orbit, map, trackball, fly, first-person, pointer-lock camera controls, a transform gizmo and drag controls for Margo Engine.",
+    "description": "Orbit, map, trackball, fly, first-person, pointer-lock and collision-aware walkthrough (/walk) camera controls, a transform gizmo and drag controls for Margo Engine.",
     "requirements": "Core ^0.1.0 || ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "controls",
     "install": "npm install @margoengine/core@0.1.0 @margoengine/controls@0.1.0",

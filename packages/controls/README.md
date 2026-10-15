@@ -56,6 +56,53 @@ drag.addEventListener('hoveron', () => {engine.canvas.style.cursor = 'grab';});
 drag.addEventListener('hoveroff', () => {engine.canvas.style.cursor = '';});
 ```
 
+## Walkthroughs and simple games: `@margoengine/controls/walk`
+
+`WalkControls` is a Wasm-free kinematic first-person walker: eye height held above the floor, stairs, slopes, walls,
+glass, jump and crouch, keyboard + mouse, gamepad and touch, and an orbit "dollhouse" view and back. It collides on the
+CPU against the cached triangle trees of the `@margoengine/bvh` Raycaster (core meshes, gltf-pro and materials models),
+so it costs nothing unless you import its entry. A whole recipe: [docs/guides/walkthrough.md](../../docs/guides/walkthrough.md).
+
+```ts
+import {Engine} from '@margoengine/core';
+import {loadGLTF} from '@margoengine/gltf-pro';
+import {WalkControls} from '@margoengine/controls/walk';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {camera: {position: [0, 1.65, 0], target: [0, 1.65, 1]}});
+const house = await loadGLTF(engine, '/house.glb');
+const walk = WalkControls.attach(engine, {colliders: [house]}); // default colliders: every visible mesh and model
+walk.eyeHeight = 1.7; walk.jumpSpeed = 4;                        // games: Space jumps (off by default)
+document.querySelector('#view')!.addEventListener('click', () => walk.toggleDollhouse());
+engine.start();
+```
+
+- **Floor.** Nine vertical rays per sub-step (the centre and a ring at 0.9 × `radius`) find the highest walkable floor
+  within `stepHeight` of the feet, in one tree pass per collider. The eye eases over the change (no teleport). Floors
+  steeper than `maxSlope` are ignored; beyond `stepHeight` below, the walker falls under `gravity` and lands only on
+  floors it crosses. Gaps narrower than about 1.66 × the radius (0.41 m by default, in any direction) are stepped over.
+- **Walls.** A capsule from `stepHeight` to the top of the head (eye + 0.1 m) is pushed horizontally out of every
+  triangle it overlaps (exact segment-triangle closest points, up to four passes), so it slides along walls and around
+  corners. Movement is split into sub-steps of at most half the radius, so a zero-thickness pane is never crossed.
+- **Input.** WASD/arrows, Shift runs, C crouches (stands up only where there is headroom), Space jumps when
+  `jumpSpeed` > 0; a click locks the pointer for mouse look (`pointerLock = false` to drag-look instead); the first
+  connected gamepad (left stick walks, right stick looks, A jumps, B crouches, left stick button runs); on touch, the
+  left half of the element is a floating thumbstick and the right half drag-looks. `walk.axes` (stick convention) adds
+  any other analog source, for example `@margoengine/input` actions.
+- **Dollhouse.** `setMode('dollhouse')` / `toggleDollhouse()` eases (`transitionTime`) to an orbit view of
+  `dollhouseBounds` or of the colliders, from `dollhouseElevation` above the horizon and facing the walk heading, and
+  enables `walk.orbit` (an `OrbitControls`); `'walk'` eases back to the saved pose. Yaw, pitch and distance are
+  interpolated, so the view never passes through vertical. With `projection` (a `CameraProjection`) the dollhouse is
+  orthographic; with `origin` (a `FloatingOrigin`) the saved pose follows rebases. Events: `change`, `mode`, `lock`,
+  `unlock`.
+- **Work per frame** is in `walk.stats` (sub-steps, rays, collider candidates, triangles tested). Sizes and CPU cost are
+  measured in [walk-size.json](../../examples/package-benchmarks/results/walk-size.json) and
+  [walk-cpu.json](../../examples/package-benchmarks/results/walk-cpu.json).
+- **Limits.** Static levels (colliders use the last frame's matrices; moving platforms do not carry the walker);
+  skinned meshes collide in their bind pose; on slopes the ring can hold the eye up to 0.9 × radius × the slope's
+  tangent higher; a primitive's tree is built synchronously the first time the walker comes near it
+  (`computePrimitiveBVHAsync` builds them in a worker beforehand). For rigid bodies, joints and vehicles use
+  `@margoengine/physics` (Rapier).
+
 Without an engine, pass a `Camera` and an element and drive the controls yourself: `const fly = new FlyControls(camera, canvas); engine.onFrame((_, delta) => fly.update(delta));`.
 
 `OrbitControls.update()` reuses its camera vectors during continuous updates. Copy `camera.position` and `camera.target` when taking a snapshot.
@@ -71,6 +118,7 @@ Without an engine, pass a `Camera` and an element and drive the controls yoursel
 | `FirstPersonControls` | `FirstPersonControls` | Pointer offset from center turns, WASD or arrows move, R/F up and down, left/right button walks. |
 | `PointerLockControls` | `PointerLockControls` | `lock()` from a click, mouse look while locked, WASD/arrows/R/F through `update(delta)`, plus `moveForward`, `moveRight`, `moveUp`. |
 | `TransformControls` | `TransformControls` | Translate (axis arrows, plane squares, center screen-plane handle), rotate (axis rings, view ring, free trackball disc), scale (axis handles, uniform center). |
+| `WalkControls` (`/walk`) | (three.js has none; its examples use Octree capsules) | WASD/arrows, mouse look (pointer lock or drag), gamepad sticks, touch thumbstick + drag-look; collides with the scene, holds eye height, climbs stairs. |
 | `DragControls` | `DragControls` | Left button or one finger grabs the nearest listed core mesh or gltf-pro model and moves it on the view plane, a world plane (`plane`) or a world axis (`axis`). Mouse hover reports the object under the pointer. |
 
 Every control has `enabled`, `connect(element)`, `disconnect()`, `update(delta)` (returns true when the camera moved), `dispose()` and three.js-style `addEventListener`. Camera controls emit `change`, and the drag-based ones `start` and `end`. `PointerLockControls` emits `lock` and `unlock`. `TransformControls` emits `change`, `mouseDown`, `mouseUp`, `objectChange`, `dragging-changed` (`value`), `axis-changed` (`value`), `mode-changed` and `space-changed`. `DragControls` emits `dragstart` (`object`, `hit`), `drag`, `dragend`, `hoveron` and `hoveroff` (each with `object`).
@@ -193,6 +241,22 @@ explicit `height` they change only the distance.
 ## Tests
 
 `npm test` in `packages/controls` runs Node tests with synthetic pointer, wheel and keyboard events on a fake element, and real core `Camera`, `TransformStore` and `Engine` objects with a stub renderer: orbit azimuth and polar mapping, polar and azimuth clamping and pole safety, damping convergence at 30 and 60 fps, dolly limits, zoom to cursor keeping the world point on its pixel, screen-space and ground panning moving target and position equally, keyboard pan, touch rotate and pinch, `enabled`, `reset`, auto-rotate, map panning, trackball rotation, coasting and pole guard, fly and first-person movement and look, pointer-lock look limits and WASD helpers, and the gizmo: translating along an axis by a known screen drag, constant screen size, picking, drags and orbit pan under an orthographic camera at several zooms, snapping in world and local space, plane and screen handles, ring rotation following the cursor, rotation snapping, more than 180 degrees of rotation, the view ring and free rotation, axis and uniform scale with snapping, local versus world space, a parented mesh (translate, rotate, scale) under a rotated and scaled parent, hover highlighting, axis toggles, OrbitControls disabled during a gizmo drag, tessellation of every mode, and listener and plugin cleanup. Drag tests move a box under a scaled parent on the view plane (checked against an independent ray-plane intersection), along an axis and on the ground plane, a gltf-pro model by touch under an orthographic camera (600 CSS pixels for 6 world units), and check events, hover, misses falling through to later listeners, other fingers, disposed meshes and models, and cleanup.
+
+`tests/walk.test.js` covers `WalkControls` on real core engines with generated geometry, at fixed time steps: a 12-step
+stair of 0.18 m risers climbed and descended with the eye never jumping more than 6 cm a frame, 0.19 m climbed and 0.25 m
+and 0.4 m refused; sliding along a wall at the radius; a zero-thickness glass pane and corner never crossed at 30 m/s
+at 10, 30 and 60 frames per second; eye height within 2 mm over hardwood, a 12 mm rug and a deck with 1 cm gaps; a
+0.35 m gap bridged and a 0.8 m gap fallen into; 20° and 40° ramps climbed, 60° blocked; no jump at the default
+`jumpSpeed`, a jump's apex within 5 cm of v²/2g, one jump per press, a ceiling stopping the head, a 2 m fall landing;
+crouching under a 1.3 m overhang and standing only past it; the generated two-storey house (`tests/house.js`) walked
+from the deck through the door, over the rug, through the doorway and up 16 stairs to the upper floor with the capsule
+never closer than its radius minus 1 cm to any box or the glass; the dollhouse view out and back (never vertical,
+framed on the bounds, orthographic through a `CameraProjection`, an orbit drag, a `FloatingOrigin` rebase, a toggle
+cancelled half way); a gltf-pro model wall, hidden models, explicit and changed collider lists; and keys, drag and
+pointer-lock look, touch thumbstick and drag-look, a gamepad, and listener and plugin cleanup.
+`npm run test:browser:walk` (real GPU, not in CI) walks the same house in Edge with the real W key, screenshots each
+waypoint and the dollhouse, checks the capsule's clearance every frame and zero WebGPU errors, and drives the touch
+thumbstick on a 390 × 844 phone viewport.
 
 `tests/profiles.test.js` covers navigation profiles: a recorded sequence of mouse drags (every button and modifier),
 wheel notches (pixel, line, page, Ctrl pinch, Shift, Alt), a double middle click, one- and two-finger touch and keys

@@ -11,6 +11,7 @@ export default defineConfig({
     {find: /^@margoengine\/core\/extension$/, replacement: resolve(repository, 'packages/core/dist/extension.js')},
     {find: /^@margoengine\/core$/, replacement: resolve(repository, 'packages/core/dist/index.js')},
     {find: /^@margoengine\/controls$/, replacement: resolve(root, 'dist/index.js')},
+    {find: /^@margoengine\/controls\/walk$/, replacement: resolve(root, 'dist/walk.js')},
   ]},
   server: {host: '127.0.0.1', fs: {allow: [repository]}},
 });
