@@ -1,5 +1,10 @@
 # CAD performance (machinery at assembly scale)
 
+**Headline numbers:** the [quiet-machine before/after table](#before--after-on-a-quiet-machine-2026-10-14-1908-1921-local)
+(merged core fast paths, one Intel Arc 140V laptop iGPU): 50,004 parts orbit at 92 FPS (49 before), 89,883 parts at
+33 FPS (GPU-bound, unchanged), and the kernel is 2.6-4x cheaper in every case. The first results table below is an
+earlier (11:53) session from before those core changes, kept for the hot-spot analysis; do not quote it as current.
+
 Measured 2026-10-14 (11:53-12:02 UTC) on Scott's laptop: Intel Core Ultra 7 258V, Intel Arc 140V (WebGPU `intel` /
 `xe-2lpg`), 31 GB, headless Edge 155 through Playwright, canvas 1432x768 at DPR 1, 4x MSAA (the desktop full tier),
 vsync and the frame-rate limit off (FPS is throughput, not a 60 Hz cap), cross-origin isolated (5 µs timers). All
@@ -23,7 +28,7 @@ The core caps a TransformStore at 100,000 entities, so the largest case is 89,88
 
 The camera orbits the whole assembly (overview: 90-97% of parts visible after culling).
 
-## Results (current branch)
+## Results before the merged core fast paths (11:53 session; superseded by the quiet-machine table below)
 
 | Measure | 10k | 50k | max (90k) |
 | --- | --- | --- | --- |
@@ -55,8 +60,7 @@ frames queue behind each other, so the serial-frame row is the upper bound for G
 
 The earlier Node run measured about 12.8 ms per tick at 100,000 entities with 10-deep hierarchies and culling.
 Confirmed: on AC power Node measures 11.4 ms for 100,000 entities in 10-deep chains and 15.7 ms for the 5-level
-assembly (`node examples/package-benchmarks/cad/culling.mjs --check --views=orbit,still,grazing --layouts=sheet,stack --label=culling
-node examples/package-benchmarks/cad/kernel-node.mjs`, `results-kernel-node.json`); the browser measures
+assembly (`node examples/package-benchmarks/cad/kernel-node.mjs`, `results-kernel-node.json`); the browser measures
 16.4 ms isolated and 20.8 ms inside the frame at 99,976 entities. Culling is under 0.6 ms of it. Claims such as "under
 0.5 ms for 50k" are not supported: 50k parts take 7.7 ms.
 
@@ -99,7 +103,7 @@ core was `@margoengine/selection`'s micro pick pass (grep of every package, exam
 Bit-exactness: `tests/core-dirty-transforms.test.js` (dirty propagation equals a full recompute, instance lists equal a
 from-scratch collection every frame) and `node examples/package-benchmarks/cad/pixels-check.mjs` on the real GPU (static +
 moving mix with hide/show, reparent, material edits and assignment, remove/add, scale and geometry swap, compared with a
-from-scratch render: 0 differing pixels over 25 comparisons plus 4 unchanged redraws). `npm run verify`: 1,051 tests pass.
+from-scratch render: 0 differing pixels over 25 comparisons plus 4 unchanged redraws). `npm run verify` passed at the merge (1,051 tests then).
 
 ### Before / after on a quiet machine (2026-10-14, 19:08-19:21 local)
 
@@ -128,7 +132,7 @@ of parts bob every frame), `orbitmove` (orbiting camera and 1% moving; not in th
 | orbitmove | 50,004 | 8.73 → 3.38 | 4.27 → 5.03 | 16.4 → 12.4 | 58 → 76 | 15.1 → 16.2 | - |
 | orbitmove | 89,883 | 14.5 → 5.08 | 7.31 → 7.82 | 28.4 → 29.5 | 34 → 33 | 26.6 → 28.2 | - |
 
-Reading: the kernel is 3-4x cheaper in every case; collection all but disappears while the camera and the cull result
+Reading: the kernel is 2.6-4x cheaper in every case; collection all but disappears while the camera and the cull result
 are fixed (still, move). With an orbiting camera the cull result changes every frame, so collection runs in full as before
 and 90k parts stay GPU-bound (~28 ms of GPU per frame): orbit at 90k is unchanged (34 → 33 FPS), 50k orbit nearly doubles.
 `move` at 10k got slower in both rounds (207 → 182 FPS; GPU 3.6 → 4.3 ms, CPU without GPU wait 4.2 → 2.7 ms): at that size
@@ -203,7 +207,8 @@ It lives in machinery, not lines: it needs the section clipping uniform (now sha
 CAD-specific; `@margoengine/lines` draws one `Line` per draw call with its own model matrix uniform, which would be 50,000
 draws and 50,000 uniform writes here.
 
-| Edges | 10k | 50k | max (90k) |
+Measured in the 11:53 session, before the merged core fast paths and before `803aa19` changed the edges pass's section
+
 | --- | --- | --- | --- |
 | Segments of visible parts (before the size test) | 0.66 M | 3.28 M | 5.89 M |
 | Edge pass GPU | 2.23 ms | 4.65 ms | 5.83 ms |
@@ -248,13 +253,16 @@ Raycast is about 2x slower at this size (a linear sphere pass over parts instead
 
 ### Sizes (minified + gzip)
 
-| Entry | Before | After |
-| --- | --- | --- |
-| `@margoengine/machinery/edges` (new; app bundle with core external) | - | 4,299 B, plus 551 B for `edgesGeometry` from `@margoengine/geometry` |
-| `@margoengine/machinery/spatial` (with its Wasm kernel chunk) | 14,118 B | 14,937 B |
-| `@margoengine/machinery/exploded` | 508 B | 538 B |
-| `@margoengine/machinery` root | 33,121 B | 33,849 B |
-| core + stage (`npm run measure:size`, untouched) | 18,681 B | 18,681 B |
+Before and after were measured locally for that change (not committed); "Now" is the committed record
+[entry-sizes.json](../examples/package-benchmarks/results/entry-sizes.json) at `3d845a0` (other packages external).
+
+| Entry | Before | After | Now |
+| --- | --- | --- | --- |
+| `@margoengine/machinery/edges` (new; app bundle with core external) | - | 4,299 B, plus 551 B for `edgesGeometry` from `@margoengine/geometry` | 3,940 B (geometry external) |
+| `@margoengine/machinery/spatial` (with its Wasm kernel chunk) | 14,118 B | 14,937 B | 14,411 B |
+| `@margoengine/machinery/exploded` | 508 B | 538 B | 588 B |
+| `@margoengine/machinery` root | 33,121 B | 33,849 B | 33,418 B |
+| core + stage (`npm run measure:size`, untouched) | 18,681 B | 18,681 B | 19,543 B (core fast paths since) |
 
 ## GPU culling: `@margoengine/culling` (HANDOFF 1f.a)
 
@@ -265,7 +273,9 @@ faster than the session above; another worker's GPU timing shared the machine be
 
 `CulledInstances` draws the same assembly (same shapes, materials and per-shape order) without core meshes: instances
 are uploaded once, and a compute pass culls, compacts in order and writes indirect draws. Core's kernel tick, batch
-collection and 10 MB instance upload do not run for these parts, which is where most of the win comes from.
+collection and 10 MB instance upload do not run for these parts, which is where most of the win comes from. The price:
+culled parts are not core meshes, so they get no `engine.pick`, hierarchy, `ExplodedView`/`AssemblyBVH`/`FeatureEdges`,
+section caps or shadows (package README, Limits). The `core meshes` column predates the merged core fast paths.
 
 | 89,883 parts (FPS / GPU ms) | core meshes | culling `none` | `frustum` | `occlusion` |
 | --- | --- | --- | --- | --- |
@@ -303,8 +313,7 @@ two middle layers (the last 23 frames leave the block and see nothing). 0 differ
 and frustum, both layouts), no WebGPU errors; occlusion drew down to 4,770 parts where frustum drew 16,338. The twin
 plates show everywhere, so coplanar ties still resolve to the later batch.
 
-Package size: 7,015 B min+gzip (core external), most of it WGSL. Zero cost when not imported (separate package,
-`sideEffects: false`, no core change; core + stage stays 18,681).
+Package size: 7,060 B min+gzip at `3d845a0` (core external; entry-sizes.json), most of it WGSL. Zero cost when not (separate package, `sideEffects: false`, no core change).
 
 ## STEP / IGES loading (`loadCAD`)
 

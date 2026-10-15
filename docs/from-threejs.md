@@ -38,10 +38,12 @@ code that does the same job. Where Margo has no equivalent yet, the section says
 - **No `Scene` object.** One `Engine` owns one canvas, one camera and one implicit scene. Meshes are created by the
   engine (`engine.createMesh()`), and features (shadows, lights, post effects, controls) are plugins you attach with
   one form, `X.attach(engine, options)` (async ones such as `Environment.attach` return a Promise). A loaded model
-  joins a feature with `feature.add(model)`, and everything disposable has `dispose()` and `[Symbol.dispose]`
-  (`using`).
-- **Small core, optional packages.** Core plus the `margoengine` stage facade is under 20 kB gzip (18,681 bytes today;
-  three.js is about 138 kB for WebGL and 229 kB for WebGPU, `npm run measure:threejs`). Everything else is a separate
+  joins a feature with `feature.add(model)`. Everything disposable has `dispose()`, and every package object also has
+  `[Symbol.dispose]` for `using` (core's `Engine` and meshes and the stage facade have `dispose()` only).
+- **Small core, optional packages.** Core plus the `margoengine` stage facade is under 20 kB gzip (19,543 bytes at
+  `3d845a0`, WebGPU only). The smallest lit-box app is about 130 kB gzip with three.js 0.186's WebGLRenderer and
+  212 kB with its WebGPURenderer, built the same way (`npm run measure:threejs`,
+  [threejs-size.json](../examples/package-benchmarks/results/threejs-size.json)). Everything else is a separate
   package that you install and import only when you use it.
 - **Tuples, not classes.** Positions, colours and directions are plain arrays (`[x, y, z]`, `'#rrggbb'`). A three.js-style
   math library exists (`@margoengine/math`) and converts with `toArray()`.
@@ -59,7 +61,7 @@ code that does the same job. Where Margo has no equivalent yet, the section says
 
 ## Install only what you import
 
-Each row is a separate npm package. Install the ones you import; bundlers drop the rest.
+Each row is a separate npm package (not published yet: until then, build from source with `npm ci && npm run build:packages`). Install the ones you import; bundlers drop the rest.
 
 ```sh
 npm install @margoengine/core                      # engine, camera, meshes, constant PBR material
@@ -883,7 +885,7 @@ import {applyQualityTier, paceEngine, watchQuality, capFrameRate} from '@margoen
 
 applyQualityTier();                           // before Engine.create: 'phone', 'light' or 'high'
 const engine = await Engine.create(canvas);
-paceEngine(engine);                           // the light tier holds about 60 FPS instead of swinging on 120 Hz panels
+paceEngine(engine);                           // caps the light tier at about 60 FPS so 120 Hz panels don't swing 120/40
 engine.start();
 watchQuality();                               // measures GPU time once and remembers the tier for the next load
 capFrameRate(engine, 30);                     // or a fixed cap on any engine
@@ -903,7 +905,7 @@ in the frame it changes.
 | `mixer.uncacheRoot(...)` | `animation.dispose()` (or `model.dispose()`, which removes it) |
 | `composer.dispose()`, `pass.dispose()` | `stack.dispose()` (disposes its effects) |
 | `controls.dispose()` | `orbit.dispose()`, or nothing: `engine.dispose()` disposes attached controls |
-| none | every disposable Margo object has `[Symbol.dispose]`, so `using fog = Fog.attach(engine)` disposes it when the block ends |
+| none | every disposable package object has `[Symbol.dispose]`, so `using fog = Fog.attach(engine)` disposes it when the block ends (core's `Engine`, meshes and the stage: call `dispose()`) |
 | `renderer.dispose()` | `engine.dispose()`: disposes every plugin (shadows, lights, effects, controls, models) |
 
 `engine.removePlugin(plugin.name)` removes one feature while the engine keeps running. After a GPU device loss the

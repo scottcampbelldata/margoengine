@@ -3,12 +3,12 @@
 Scope: all nine pages shipped by `scripts/build-site.js`, including both robot
 entry points. Current local changes stage the complete principal island, helmet
 and Earth before secondary detail. Their final authored features remain. These
-changes have not been deployed; the earlier measurements below are historical.
+changes have not been deployed; the earlier measurements below are historical, and their raw reports stayed in the ignored `test-results/` folder (a dated log, not a current claim; see [docs/whitepaper/claims.md](whitepaper/claims.md)).
 
 Desktop drawing buffers now cap DPR at 1 while retaining 4× MSAA. Phones retain
 their DPR 2 cap and single sampling. HTML/CSS overlays retain native display
-density. The core/stage gzip gate remains below 20,000 bytes; the current build
-measures 19,975 bytes.
+density. The core/stage gzip gate remains below 20,000 bytes; the build measured
+19,975 bytes then (19,543 at `3d845a0`).
 
 ## Method
 
