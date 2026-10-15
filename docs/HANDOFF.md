@@ -992,6 +992,13 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    r. gltf-pro memory/limits from the conveyor fix (0c24e76): the main-thread loader repacks a shared mesh once per
       node that uses it (570 packs for 242 meshes, ~220 MB vs ~166 MB) - pack once per mesh like the worker path; the
       64 MiB download budget is 2 MB above the 65.1 MB conveyor file - make it an option with a clear error.
+   t. Physics (Scott agreed, 2026-10-15): never write our own rigid-body solver; keep `@margoengine/physics` (Rapier,
+      Apache-2.0) optional and lazily loaded (note: Rapier's Wasm is also ~1-2 MB, similar order to Havok - the win is
+      that it's optional, not small; never claim otherwise). Add ergonomics: (1) colliders (trimesh/convex) from a
+      glTF node hierarchy in one call, (2) bodies on nested nodes (both also in q), (3) audit the Rapier -> Margo
+      transform sync for per-frame allocations and make it allocation-free, (4) a Wasm-free kinematic character
+      controller on the bvh Raycaster (walk, slopes, steps, jump, collide with the level) for simple games, with Rapier
+      as the upgrade path. Measure bundle size of (4) and of the physics package + Rapier honestly.
    q. Game-developer gaps from the Blender guide (2eb78b9): a helper that collects a model's world-space triangles
       (for physics colliders and navmeshes); physics bodies on non-root meshes; water refraction can't combine with
       SSAO (needs a scene texture from PostStack); camera rig avoids walls, not just terrain; audio listener on
