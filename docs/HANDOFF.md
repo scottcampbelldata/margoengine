@@ -1016,6 +1016,29 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    and fall back to package-side streaming (CulledInstances) for whatever doesn't fit. Report the final core+stage
    total and remaining headroom.
 6. Then give Scott the full list of what was done and what remains.
+8. FINAL TO-DO (Scott, 2026-10-15): thorough docs and as many tutorials as possible - "documentation is the product".
+   Structure the docs site by Diataxis (keep the four kinds separate): Tutorials (learning), How-to cookbook
+   (problems), Explanation (how it works), Reference (API).
+   a. Launch-day set (required for 1.0):
+      - "Time to triangle" quickstart: lit, rotating object on screen in under 5 minutes, two paths: `npm create
+        margo@latest` (exists, tools/create-margo) and a single zero-config HTML file; plus a side-by-side of the raw
+        WebGPU boilerplate it replaces.
+      - Three.js migration ("Rosetta stone"): docs/from-threejs.md exists - polish into a flagship page (Scene,
+        materials, render loop/useFrame, controls, loaders; three.js vs Margo side by side).
+      - Flagship tutorial: CAD viewer - large assembly with progressive + worker loading, instancing, section planes,
+        edges, picking, ViewCube, navigation profiles, floating origin, offline cache.
+      - Flagship tutorial: indie game - grow docs/guides/blender-game.md into a runnable step-by-step (player, Blender
+        level via extras, physics jump/gravity, third-person camera, audio), with a matching runnable example.
+      - Cookbook (how-to) starter set: resize/DPR, device loss, colliders from a glTF hierarchy, switching controls,
+        strict CSP deploy (docs/deploying.md), quality tiers, transparency (OIT), large coordinates, STEP pre-conversion.
+      - API reference auto-generated from TSDoc (depends on the hygiene gate 5k item 6), published on the site.
+   b. Live-editable examples: an "Edit" button on every docs example (StackBlitz/CodeSandbox once packages are on
+      npm, or our own playground that loads the local build), so readers change numbers and see the canvas update.
+   c. More tutorials after launch: stylized/retro rendering (voxel/tile art, nearest sampling, palettes, post),
+      spatial audio + particles + volumetric fog, and one per major package; short videos once Margo Studio exists.
+   Rules: every code block type-checked (tests/from-threejs-snippets.test.js already covers docs/guides/*.md) and
+   every tutorial runnable from the repo; numbers only with linked proofs (claims.md); docs pages captured in
+   visual:check where they embed a live canvas.
 7. POST-LAUNCH (Scott, 2026-10-15): "Margo Studio" - feature-for-feature equivalents of MagicaVoxel, Crocotile 3D
    and Dust3D, built on and for Margo with new, modern code (no copied code or branding; their file formats are
    supported for import/export). Plan, ground rules and draft feature inventories: `docs/margo-studio.md`. Each tool
