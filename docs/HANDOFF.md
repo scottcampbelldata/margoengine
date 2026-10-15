@@ -616,6 +616,13 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    requests `maxSampledTexturesPerShaderStage` up to the adapter's limit (a core change; most desktop adapters allow
    more, phones may not), or the packages share textures (e.g. pack IBL maps, or one texture array for shadow maps).
    Measure which combos hit it and prefer a package-side fix.
+5d. Fix the docs against `docs/whitepaper/claims.md` (201 claims: 77 proven, 43 stale, 58 unproven, 23 overclaims):
+   correct every STALE/OVERCLAIM wording in README, site, package READMEs and docs; remove `npm install` lines for
+   unpublished packages (or mark "after publish"); one core-size number from `npm run measure:size`; WebGL as a separate
+   package; restore "byte-identical" proofs whose default command no longer passes (post, materials, gltf-pro,
+   selection) or re-baseline them. Start after the README-snippets and API-standardization agents merge.
+5e. Diagnose why Margo's GPU time on static boxes is not lower than three.js InstancedMesh (vs-threejs smoke run);
+   findings in docs/whitepaper/boxes-vs-threejs.md [running].
 6. Then give Scott the full list of what was done and what remains.
 
 Worker practice: agents run in git worktrees; they must start with `git reset --hard perf/auto-quality` (worktrees
