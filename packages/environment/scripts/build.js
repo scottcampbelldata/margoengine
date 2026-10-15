@@ -7,11 +7,12 @@ import {build} from 'vite';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
 await copyFile(resolve(repository, 'LICENSE'), resolve(root, 'LICENSE'));
-await build({
+// One self-contained build per entry, so the optional volumetric entry shares no chunk with (and never changes) the root.
+for (const [entry, emptyOutDir] of [['index', true], ['volumetric', false]]) await build({
   root, configFile: false, publicDir: false, logLevel: 'warn',
   build: {
-    outDir: resolve(root, 'dist'), emptyOutDir: true, target: 'es2022',
-    lib: {entry: resolve(root, 'src/index.ts'), formats: ['es'], fileName: 'index'},
+    outDir: resolve(root, 'dist'), emptyOutDir, target: 'es2022',
+    lib: {entry: resolve(root, `src/${entry}.ts`), formats: ['es'], fileName: entry},
     rollupOptions: {external: ['@margoengine/core', '@margoengine/core/extension']},
   },
 });

@@ -1,0 +1,16 @@
+{
+  "package": "environment",
+  "entry": "volumetric",
+  "baseline": "7c47a09",
+  "rootEntryCalls": 70,
+  "stories": {
+    "1x": {
+      "identicalCalls": 344,
+      "volumetricCalls": 129
+    },
+    "4x": {
+      "identicalCalls": 533,
+      "volumetricCalls": 126
+    }
+  }
+}
