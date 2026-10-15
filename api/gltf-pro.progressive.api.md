@@ -36,6 +36,7 @@ interface AssetOptions {
     decoders?: GLTFDecoderHooks;
     buffers?: Array<ArrayBuffer | ArrayBufferView>;
     fetch?: typeof fetch;
+    maxDownloadBytes?: number;
 }
 
 type Context = Extract<PassContext, {
@@ -45,8 +46,9 @@ type Context = Extract<PassContext, {
 class GLTFAsset {
     readonly doc: GLTFDocument;
     readonly hooks: GLTFDecoderHooks;
+    readonly maxBytes: number;
     readonly buffers: Uint8Array[];
-    constructor(doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, hooks?: GLTFDecoderHooks);
+    constructor(doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, hooks?: GLTFDecoderHooks, maxBytes?: number);
     view(id: unknown): Uint8Array;
     decode(signal?: AbortSignal): Promise<void>;
     accessor(id: unknown, type?: string): Float32Array;

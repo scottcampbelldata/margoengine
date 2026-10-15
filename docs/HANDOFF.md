@@ -1089,9 +1089,26 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       (67.1 MB) download budget, so a slightly larger export will fail "glTF download byte budget exceeded"; the
       main-thread path packs a mesh once per node that uses it (570 packs for 242 meshes, ~220 MB instead of ~166 MB),
       the worker path packs each once.
-   r. gltf-pro memory/limits from the conveyor fix (0c24e76): the main-thread loader repacks a shared mesh once per
-      node that uses it (570 packs for 242 meshes, ~220 MB vs ~166 MB) - pack once per mesh like the worker path; the
-      64 MiB download budget is 2 MB above the 65.1 MB conveyor file - make it an option with a clear error.
+   r. [DONE] gltf-pro memory/limits from the conveyor fix (0c24e76). (1) The main-thread PBRModel packs each mesh
+      primitive once (per-model map keyed by primitive definition) and nodes sharing it share the arrays, so setup's
+      array-keyed upload cache makes one vertex + one index buffer per mesh primitive, as the worker path did; node,
+      weights, material, instances stay per node (packing never depended on the node). Proof: per-primitive sha of the
+      bytes written to its vertex/index buffers (recording mock device, scratch harness) identical before/after for
+      DamagedHelmet, RobotExpressive, the conveyor GLB and an instanced fixture (EXT_mesh_gpu_instancing node + 3 plain
+      nodes on the same mesh); real browser (Edge 155, Arc 140V, quiet-gated, GPU lock, 5 alternating reps): same
+      geometry digest and identical frame pixels. Conveyor: GPU geometry 1,140 buffers / 231.3 MB -> 484 / 173.7 MB;
+      retained ArrayBuffers in Node 298.9 -> 241.3 MB, peak RSS 431 -> 376 MB; browser renderer ArrayBuffer backing
+      store after GC 364 -> 306 MB; browser load to first frame 1,104 -> 973 ms median (Node parse+setup 867 -> 649 ms,
+      but that run was on a busy machine: diagnostic only). (2) `maxDownloadBytes` on loadGLTF, parseGLTFAsync,
+      loadGLTFInWorker, parseGLTFInWorker and loadGLTFProgressive (validated positive integer; parseGLTF keeps the
+      default). Default raised 64 -> 128 MiB (2x the conveyor file; ~0.8 GB peak extrapolated from its 5.7x Node
+      ratio, desktop-safe, risky on phones); decoded accessors, packed geometry and images get 4x it. Every budget
+      error names the option, e.g. `glTF exceeds download budget (134217728 bytes; raise the maxDownloadBytes option)`
+      (old message text kept as prefix). Progressive external images now count toward the budget too. Tests:
+      accessors.test.js (sharing + GPU buffer dedup vs worker-packed bytes, conveyor 242 distinct arrays, budget on
+      main/worker paths), progressive.test.js (loadGLTF + progressive main/worker, ranged and plain, at size-1 / size).
+      gzip: gltf-pro root 17,342 -> 17,552 B (+210), /progressive +247, /worker +226, /prepare +166, /asset +113,
+      workers/gltf.js +166, workers/progressive.js +141. Core and stage untouched. README "Download budget and memory".
    t. Physics (Scott agreed, 2026-10-15): never write our own rigid-body solver; keep `@margoengine/physics` (Rapier,
       Apache-2.0) optional and lazily loaded (note: Rapier's Wasm is also ~1-2 MB, similar order to Havok - the win is
       that it's optional, not small; never claim otherwise). Add ergonomics: (1) colliders (trimesh/convex) from a

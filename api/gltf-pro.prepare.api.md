@@ -9,19 +9,21 @@ export interface PreparedGLTF {
     images: GLTFImage[];
     geometry: (PreparedGeometry | null)[][];
     accessors: [number, Float32Array][];
+    maxDownloadBytes?: number;
 }
 
 export function prepareAsset(asset: GLTFAsset, images: GLTFImage[]): PreparedGLTF;
 
-export function prepareGLTF(url: string | URL | undefined, input?: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>): Promise<PreparedGLTF>;
+export function prepareGLTF(url: string | URL | undefined, input?: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, maxDownloadBytes?: number): Promise<PreparedGLTF>;
 
 // Not exported from this entry, but used by the exports above:
 
 class GLTFAsset {
     readonly doc: GLTFDocument;
     readonly hooks: GLTFDecoderHooks;
+    readonly maxBytes: number;
     readonly buffers: Uint8Array[];
-    constructor(doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, hooks?: GLTFDecoderHooks);
+    constructor(doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, hooks?: GLTFDecoderHooks, maxBytes?: number);
     view(id: unknown): Uint8Array;
     decode(signal?: AbortSignal): Promise<void>;
     accessor(id: unknown, type?: string): Float32Array;
