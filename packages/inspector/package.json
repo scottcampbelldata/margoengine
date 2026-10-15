@@ -3,12 +3,16 @@
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
-  "description": "Entity hierarchy, live properties and WebGPU wireframe, normal and bounding-box overlays.",
+  "description": "Entity hierarchy, live properties, WebGPU wireframe, normal and bounding-box overlays, and a frame debugger.",
   "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./frame": {
+      "types": "./dist/frame.d.ts",
+      "import": "./dist/frame.js"
     }
   },
   "files": [
@@ -19,7 +23,8 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/lines": "0.1.0"
+    "@margoengine/lines": "0.1.0",
+    "@margoengine/stats": "0.1.0"
   },
   "peerDependencies": {
     "@margoengine/core": "^0.1.0 || ^1.0.0"

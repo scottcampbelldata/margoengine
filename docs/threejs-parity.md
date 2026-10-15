@@ -53,7 +53,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | Render targets / render-to-texture | PARTIAL | creative `HDRRenderTarget` (`packages/creative/src/targets.ts`) | Captures the one scene from the one camera. There is no way to render a second camera or scene into a texture. |
 | Multiple render targets (MRT) | PARTIAL | `DrawOptions.colorAttachments` (`packages/core/src/plugin.ts`) | Low-level only. selection uses it for its ID buffer. Node materials have no MRT outputs. |
 | Clipping planes | PARTIAL | machinery `SectionPlanes`, `boxSection` (`packages/machinery/src/section.ts`); shader `discard` | Six planes with stencil caps, core meshes only. A `NodeMaterial` can slice materials meshes with `discard(positionWorld…)`, but shadows still see the whole surface and nothing caps the cut. No per-material `clippingPlanes` on glTF-pro models. WebGPU only. |
-| Stats, GPU timing | COVERED † | stats `Stats`, `GPUProfiler` (`packages/stats/src/`) | Uses timestamp queries (request `features: ['timestamp-query']` at engine creation). |
+| Stats, GPU timing | COVERED † | stats `Stats`, `GPUProfiler` (`packages/stats/src/`); inspector `FrameDebugger` (`packages/inspector/src/frame.ts`) | Uses timestamp queries (request `features: ['timestamp-query']` at engine creation). `FrameDebugger.capture()` is the `renderer.info` / Spector.js counterpart: per-pass draws, pipelines, bindings, targets, GPU time and memory as JSON. |
 | Multiple viewports / scissor | MISSING | — | |
 
 ### 3. Cameras

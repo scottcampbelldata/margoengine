@@ -712,7 +712,7 @@
     "package": "@margoengine/inspector",
     "version": "0.1.0",
     "published": false,
-    "description": "Entity hierarchy, live properties and WebGPU wireframe, normal and bounding-box overlays.",
+    "description": "Entity hierarchy, live properties, WebGPU wireframe, normal and bounding-box overlays, and a frame debugger.",
     "requirements": "Core ^0.1.0 || ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "inspector",
     "install": "npm install @margoengine/core@0.1.0 @margoengine/inspector@0.1.0",
