@@ -2,9 +2,12 @@
 // catalog from docs/ under /catalog/, and the live demos (Night Citadel, the gameplay sandbox and
 // the example pages) each under their own folder.
 // Run `npm run build:packages` first. Deploy the folder with `npx wrangler pages deploy site/dist`.
-import {cp, rm, mkdir, readdir} from 'node:fs/promises';
+// `npm run build:site` measures every package first (entry-sizes.mjs) for /sizes.html.
+import {execFileSync} from 'node:child_process';
+import {cp, rm, mkdir, readdir, writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {build} from 'vite';
+import {readSizesInputs, sizesPage} from './build-sizes.js';
 
 const out = resolve('site/dist');
 // Ten-character hashes renamed every asset once: without site/404.html, Pages answered a request that reached a
@@ -23,6 +26,11 @@ await rm(out, {recursive: true, force: true});
 await mkdir(out, {recursive: true});
 for (const name of await readdir('site')) if (name !== 'dist') await cp(`site/${name}`, `${out}/${name}`, {recursive: true});
 await cp('docs', `${out}/catalog`, {recursive: true, filter: source => !source.endsWith('.md')});
+// Sizes come only from a measurement of this commit. `npm run build:site` measures first; a direct run (visual:check)
+// with an older entry-sizes.json leaves the page out rather than publish another commit's numbers.
+const sizes = readSizesInputs(), head = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {encoding: 'utf8'}).trim();
+if (sizes.sizes.commit === head) await writeFile(`${out}/sizes.html`, sizesPage(sizes));
+else console.warn(`sizes.html left out: entry-sizes.json measured ${sizes.sizes.commit}, HEAD is ${head} (npm run build:site measures first)`);
 // A relative base lets the showcase run from its subfolder.
 await site({root: 'apps/showcase-night-citadel', base: './', build: {outDir: `${out}/night-citadel`}});
 await site({root: 'examples/gameplay-sandbox', base: './', build: {outDir: `${out}/gameplay-sandbox`}});

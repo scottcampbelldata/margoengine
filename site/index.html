@@ -64,7 +64,7 @@ npm run dev</code></pre>
         <div>
           <h3>Install from npm, once published</h3>
           <pre tabindex="0"><code>npm install @margoengine/core</code></pre>
-          <p>npm publication is pending. The release includes 70 packages under <code>@margoengine</code> and the <code>margoengine</code> stage facade. <a href="./catalog/">Browse all packages and runnable examples</a></p>
+          <p>npm publication is pending. The release includes 72 packages under <code>@margoengine</code> and the <code>margoengine</code> stage facade. <a href="./catalog/">Browse all packages and runnable examples</a></p>
         </div>
       </div>
     </section>
@@ -72,7 +72,7 @@ npm run dev</code></pre>
     <section class="core">
       <h2>What the core gives you</h2>
       <dl>
-        <div><dt>Under 20 kB gzip</dt><dd>Core plus the stage facade, with the embedded Wasm kernel and the WebGPU backend. The build fails at 20,000 bytes gzip or above; <code>npm run measure:size</code> prints the current figure. The WebGL2 fallback is the optional <code>@margoengine/webgl</code> (2.2 kB gzip).</dd></div>
+        <div><dt>Under 20 kB gzip</dt><dd>Core plus the stage facade, with the embedded Wasm kernel and the WebGPU backend. The build fails at 20,000 bytes gzip or above; <code>npm run measure:size</code> prints the current figure, and the <a href="./sizes.html">sizes page</a> lists every package entry from the same build. The WebGL2 fallback is the optional <code>@margoengine/webgl</code> (2.2 kB gzip).</dd></div>
         <div><dt>Transforms in Wasm memory</dt><dd>Hierarchy, culling and world matrices run in a Rust kernel over flat typed arrays. An engine starts with 1,024 entity slots and doubles them on demand, up to 8,388,608.</dd></div>
         <div><dt>Instancing by default</dt><dd>Visible meshes sharing a geometry instance render in one instanced draw call per scene pass, with per-instance material values.</dd></div>
         <div><dt>WebGPU first, WebGL2 fallback</dt><dd>Reversed float depth, GPU picking and automatic device-loss recovery on WebGPU. Basic scenes (core meshes, flat PBR, one light) also render on WebGL2 with the optional <code>@margoengine/webgl</code> package.</dd></div>
@@ -149,7 +149,7 @@ npm run dev</code></pre>
 
   <footer>
     <p>Built with precision, named with love. For Margie.</p>
-    <p><a href="https://github.com/scottcampbelldata/margoengine">Source on GitHub</a> <a href="https://github.com/scottcampbelldata/margoengine/blob/main/LICENSE">MIT license</a> <a href="./catalog/">Catalog</a> <a href="./demos/assets/ATTRIBUTION.md">Demo asset credits</a></p>
+    <p><a href="https://github.com/scottcampbelldata/margoengine">Source on GitHub</a> <a href="https://github.com/scottcampbelldata/margoengine/blob/main/LICENSE">MIT license</a> <a href="./catalog/">Catalog</a> <a href="./sizes.html">Package sizes</a> <a href="./demos/assets/ATTRIBUTION.md">Demo asset credits</a></p>
   </footer>
 </body>
 </html>

@@ -3,14 +3,17 @@
 // Method: build-modern's (the dist file bundled by Vite, minify es2022 with its compactOutput), bare imports external
 // (other packages are shared with the app), relative imports (packages/shared included) inlined; zlib default gzip.
 // Root entries therefore match docs/api-surface.md.
-// Run (after npm run build:packages): node examples/package-benchmarks/entry-sizes.mjs
+// Also records core + stage (`npm run measure:size`'s figure) and the commit measured; `dirty` means packages/ had
+// uncommitted changes. scripts/build-sizes.js turns this file into margoengine.com/sizes.html (`npm run build:site`).
+// Run from the repo root (after npm run build:packages): node examples/package-benchmarks/entry-sizes.mjs
 import {execFileSync} from 'node:child_process';
 import {existsSync, readdirSync, readFileSync} from 'node:fs';
 import {writeFile} from 'node:fs/promises';
 import {isAbsolute, resolve} from 'node:path';
 import {gzipSync} from 'node:zlib';
 import {build} from 'vite';
-import {compactOutput} from '../../scripts/measure-size.js';
+import {CORE_STAGE_GZIP_LIMIT} from '../../scripts/core-budget.js';
+import {compactOutput, measureCoreStage} from '../../scripts/measure-size.js';
 
 const root = resolve(import.meta.dirname, '../..');
 const bare = id => !id.startsWith('.') && !isAbsolute(id) && !/^[a-z]:[\\/]/i.test(id) && !id.startsWith('\0');
@@ -20,8 +23,11 @@ async function size(entry) {
   const code = (Array.isArray(output) ? output[0] : output).output.filter(item => item.type === 'chunk').map(item => item.code).join('\n');
   return {raw: Buffer.byteLength(code), gzip: gzipSync(code).length};
 }
-const commit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {cwd: root, encoding: 'utf8'}).trim();
-const report = {commit, method: 'vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level', packages: {}};
+const git = (...args) => execFileSync('git', args, {cwd: root, encoding: 'utf8'}).trim();
+const commit = git('rev-parse', '--short', 'HEAD'), dirty = git('status', '--porcelain', '--', 'packages') !== '';
+const {raw, gzip} = await measureCoreStage();
+const report = {commit, dirty, method: 'vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level',
+  coreStage: {raw, gzip, limit: CORE_STAGE_GZIP_LIMIT}, packages: {}};
 for (const dir of readdirSync(resolve(root, 'packages')).sort()) {
   const file = resolve(root, 'packages', dir, 'package.json');
   if (!existsSync(file)) continue;

@@ -1,6 +1,6 @@
 {
- "date": "2026-10-15T17:30:20.034Z",
- "commit": "dddb936",
+ "date": "2026-10-15T18:06:03.157Z",
+ "commit": "1f11e86+changes",
  "override": null,
  "pages": [
   {
@@ -18,37 +18,37 @@
      "gltf-pro worker": {
       "ok": true,
       "detail": "flight-helmet-mobile.glb",
-      "ms": 196
+      "ms": 757
      },
      "draco worker": {
       "ok": true,
       "detail": 24,
-      "ms": 762
+      "ms": 72
      },
      "ktx2 worker": {
       "ok": true,
       "detail": "2048x2048 rgba8unorm",
-      "ms": 263
+      "ms": 212
      },
      "bvh worker": {
       "ok": true,
       "detail": "built",
-      "ms": 24
+      "ms": 22
      },
      "post stack": {
       "ok": true,
       "detail": "SSAO + Bloom + FXAA",
-      "ms": 2
+      "ms": 3
      },
      "overlays": {
       "ok": true,
       "detail": "Stats, HTML labels, ViewCube, Inspector",
-      "ms": 12
+      "ms": 10
      },
      "machinery STEP": {
       "ok": true,
       "detail": 1,
-      "ms": 596
+      "ms": 462
      }
     }
    },
@@ -79,6 +79,16 @@
    "build": "site",
    "ok": true,
    "path": "/catalog/",
+   "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+   "result": {
+    "ok": true
+   },
+   "problems": []
+  },
+  {
+   "build": "site",
+   "ok": true,
+   "path": "/sizes.html",
    "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
    "result": {
     "ok": true
