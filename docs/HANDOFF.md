@@ -977,7 +977,20 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    d. Device-loss verification: core handles `device.lost` with automatic recovery and 55 package files implement
       restore hooks. Add an end-to-end browser test that destroys the device mid-frame in every demo and checks the
       frame returns (visual-regression compare after restore); fix any package that doesn't come back.
-5j. "Design envelope" page (Scott, 2026-10-14 night): `docs/limits.md` (also on the site, linked from README and the
+5j. [DONE 2026-10-15: `docs/limits.md`, 18 rows in four tables (Scale, Rendering, Assets, Platform), each with an
+   enforced/measured/"not measured" threshold, the reason, the exact error string from source and the escape hatch with
+   its proof link; linked from README, docs/README.md, the site's "Where it stands" (GitHub link; the site build ships
+   no .md pages) and whitepaper outline section 7; every number is claims.md LIM-001..026 (25 PROVEN; LIM-024, the CSP
+   error strings, UNPROVEN like DOC-074 until the CSP_OVERRIDE runs are committed). Limits with NO escape hatch yet, to
+   queue: (1) the 100,000 node/part caps in gltf, gltf-pro, .margo (blender), OBJ (machinery) and SurfacePhysics -
+   raise to core's 8,388,608 or make them options; (2) 16 sampled textures per stage - nothing past dropping a lighting
+   feature (texture arrays 5f.d are post-1.0; or core requests the adapter's higher limit, core bytes); (3) a second
+   directional light (area lights landed with 5l.f and are in the page: 64, unshadowed); (4) SSR off-screen reflections (probes 5l.e) and water/terrain reflecting;
+   (5) the 64 MiB glTF download budget as an option (5l.r); (6) gltf-pro's 1,000,000 vertices per primitive (no
+   splitter); (7) the decoder worker's `'unsafe-eval'` (5l.o); (8) above ~1M core meshes the 41 ms kernel tick stays
+   (hierarchical LOD streaming 5g.d not built); (9) volumetric fog does not reach particles/VFX automatically (only via
+   `fog.texture`). Commit the CSP negative runs to clear LIM-024/DOC-074 (launch gate 10).]
+   "Design envelope" page (Scott, 2026-10-14 night): `docs/limits.md` (also on the site, linked from README and the
    whitepaper) listing every hard limit as an architectural boundary: the limit, the MEASURED threshold where it
    starts (no unmeasured numbers - e.g. coordinate jitter distance comes from 5f.a's measurements), why it exists
    (usually: keeping core small), the clear error or symptom a user sees, and the escape hatch package/tool with its
@@ -1185,8 +1198,10 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       - geometry triangulate-inputs: the 1.5 s spawnSync timeout included Node child startup (ETIMEDOUT under load).
         Kill timeout is now 120 s (catches a hang); the 1.5 s budget is asserted on the child's own CPU time for the
         calls.
-   m. [DONE with 5l.f] docs/threejs-parity.md summary counts drifted (OIT added a COVERED row without updating the
-      totals) - recounted after rebasing onto 3aacae2: 159 rows, 93 COVERED (RectAreaLight now one of them), 39 PARTIAL, 27 MISSING.
+   m. [DONE 2026-10-15, with 5l.f] docs/threejs-parity.md summary counts drifted (OIT added a COVERED row without
+      updating the totals). Script recount of every row's status column: the summary said 158 rows, 91 / 39 / 28; the
+      rows were 159, 92 COVERED (51 †) / 39 PARTIAL / 28 MISSING, no duplicate rows. After RectAreaLight (5l.f):
+      93 / 39 / 27, recounted again by script. Summary, "How this was checked" and claims DOC-063 updated.
    Order: after the current wave, alongside the hygiene phase (5k) and under its gates, before the demo rebuild.
 5m. [a DONE, b DONE (hook +34 B); core + stage 19,922 B gzip, 77 B headroom] CORE APPROVALS, conditional (Scott, 2026-10-14 night): do both IF core+stage stays under 20,000 B gzip
    (`npm run measure:size`; the build gate fails at >= 20,000). No safety margin needed: 19,999 is acceptable (Scott).
@@ -1602,7 +1617,8 @@ Before launch, in addition to the work queue:
 
 ## Feature gaps versus three.js (after optimization; each as an optional package)
 
-Verified matrix: `docs/threejs-parity.md`, re-tallied 2026-10-14 against 2c53227 (156 three.js features: 85 covered,
+Verified matrix: `docs/threejs-parity.md`, recounted 2026-10-15 (5l.m, after RectAreaLight): 159 rows, 93 covered / 39 partial / 27 missing.
+Earlier: re-tallied 2026-10-14 against 2c53227 (156 three.js features: 85 covered,
 39 partial, 32 missing after textured instancing (InstancedMesh PARTIAL -> COVERED) and glTF export (GLTFExporter PARTIAL -> COVERED); ShadowMaterial became partial with staging's ContactShadows; was 65 / 43 / 45 in its stale summary; read from source, not run). The first audit's top gaps
 (materials, glTF extensions/decoders, picking models, IBL, background colour, post stack, ortho camera, math, FXAA) are
 closed. New top 10: WebGL2 beyond core, [DONE: environment `TransparentCanvas`] transparent canvas, multiple directional/coloured ambient/hemisphere

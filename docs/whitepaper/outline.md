@@ -99,6 +99,9 @@ changed since); **[need]** no data yet.
 
 ## 7. Limitations and honest gaps
 
+Source: [docs/limits.md](../limits.md), the design envelope (every hard limit, its measured or enforced threshold, the
+error a user sees and the escape hatch; numbers in claims.md LIM-001 to LIM-026).
+
 - WebGPU-first: most packages need WebGPU; WebGL2 fallback draws core meshes only.
 - Measured on one machine (Intel Arc 140V integrated GPU). No discrete GPU, no Apple GPU, no Android GPU numbers in the
   current set; Galaxy S23 island at 3-5 FPS unresolved.
