@@ -46,11 +46,14 @@ tests every instance's bounding sphere (the kernel's sphere, padded for float32)
 `minRadius`, its projected size, and compacts the kept instance records in their original order into the package's
 buffer with indirect arguments. It then sets `batch.redirect` (core's one GPU-culling hook, see the core README), so
 core's main pass and every replay of it (SSAO, SSR, selection outline...) draw the compacted list with core's own
-pipelines; core still uploads its instance buffer, which `FeatureEdges` and the culler read. `engine.pick` draws from
+pipelines; core still uploads its instance buffer, which the culler reads. `FeatureEdges` (machinery) draws its lines from the
+compacted list too, so edges get the same frustum and screen-size culling. `engine.pick` draws from
 core's CPU instance data and is unaffected. With `minRadius: 0` (default) frames are pixel-identical to core
 (`examples/package-benchmarks/cad/culled-meshes.mjs`). Limits: frustum and screen size only (no Hi-Z occlusion yet; use
 `CulledInstances` for occlusion on static parts); with `engine.render()` (CPU culling on) the GPU test only adds the
-screen-size cut; `minRadius` above `FeatureEdges`' own `minRadius` (6) leaves edge lines of dropped parts.
+screen-size cut. `minRadius` of 1-2 px is the small-part cull for large assemblies (HANDOFF 5l.a; numbers in
+[cad-performance.md](../../docs/cad-performance.md)): a dropped part simply disappears, so keep it under the size where a
+part is still recognisable.
 
 ## Modes
 

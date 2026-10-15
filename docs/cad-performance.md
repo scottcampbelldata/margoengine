@@ -390,7 +390,58 @@ view with most parts outside the frustum, explode 0.6 via `ExplodedView`, side v
 hidden, view from below, 400 parts added so A's store grows from 1,024 to 2,048): 0 differing pixels in every step; the GPU dropped parts where it should (drew 237 and 171 of 648 in the close views, 757 of 1,021 at the end) and drew all 648 in the overview. `engine.pick` over a
 grid returns the same meshes on both engines (23 of 40 grid points hit) and an `AssemblyBVH` ray hits. With `--edges`
 (FeatureEdges on both): steps 0-6 identical, step 7 has 160 pixels that differ by 1 in one channel; FeatureEdges appends visible parts with atomics, so its line order and the blending of overlapping
-antialiased lines vary run to run (the same happens between two plain-core runs).
+antialiased lines vary run to run (the same happens between two plain-core runs). Since HANDOFF 5l.c the edges of
+parts between `minRadius` and twice that fade in with alpha below 1, which makes that blend more order-dependent: step 7
+now differs in about 5,000 pixels by at most 3 (re-run twice, `5l-all` session below); steps 0-6 by at most 1. A missing
+or extra line would differ by about 100.
+
+## 100,000 parts: small-part culling, subassembly imposters, cheaper edges (HANDOFF 5l.a-c)
+
+Same harness as the tables above (`run.mjs`, 1432x768, 4x MSAA, overview orbit, vsync off), 100,008 parts in 111,237
+entities (12.9 M instanced triangles), Arc 140V, Edge, GPU lock held, AC power, every run after `scripts/quiet-gate.mjs`
+passed (CPU <= 20 % for 20 s) unless marked DIAGNOSTIC. Two sessions on 2026-10-15 (14:20-14:31 and 14:45-14:58 UTC):
+the quiet gate only watches the CPU, and the same configuration varied up to 40 % in FPS between them (other agents'
+GPU-free work, thermals), so both are shown. Raw JSON: `examples/package-benchmarks/cad/results-5l-*.json` (`-2` = second
+session); before = this branch's parent (machinery dist copied before the change, `--machinery=` for edges).
+
+| 100k-part orbit | FPS | GPU ms (timestamps) | Frame CPU ms | Parts drawn |
+| --- | --- | --- | --- | --- |
+| Core meshes, CPU culling (before) | 29.3 / 30.4 | 31.1 / 30.7 | 33.4 / 32.3 | 89,879 |
+| `CulledMeshes`, frustum only (`minRadius: 0`) | 44.0 | 21.8 | 20.8 | 92,196 |
+| `CulledMeshes` `minRadius: 1.5` (small-part cull) | 137.8 | 6.9 | 6.6 | 11,363 |
+| + module imposters under 12 px (`@margoengine/lod`) | 91.7 | 3.0 | 10.4 | 312 + imposters |
+| Core + `FeatureEdges`, before / after | 29.3 (DIAG), 28.0 / 29.7, 25.4 | 33.0, 33.0 / 31.4, 36.9 | 33.5, 35.1 / 32.9, 39.0 | |
+| `minRadius: 1.5` + `FeatureEdges`, before / after | 85.6, 57.7 / 87.5, 61.1 | 11.7, 15.9 / 10.3, 13.2 | 10.2, 15.2 / 9.5, 14.2 | 11,400 |
+| `minRadius: 1.5` + imposters + `FeatureEdges` | 86.8 / 84.8 | 2.8 / 3.1 | 11.0 / 11.3 | 328 + imposters |
+
+Reading: the 100k orbit was GPU-bound on parts a pixel or two across. `CulledMeshes` with `minRadius: 1.5` draws 11 % of
+the parts and runs 4.7x faster (frustum culling alone, 1.4x); with feature edges it is 61-88 FPS against the target of 60.
+Imposters cut the GPU to 3 ms but the frame becomes CPU-bound at about 11 ms: every level switch toggles a module's
+`visible`, which makes core re-collect its instance lists (3 ms) and the kernel re-propagate (about 1 ms), so on this
+laptop they lose to small-part culling alone (92 vs 138 FPS); they pay where the GPU is the limit (a heavier GPU load, or
+parts that stay large on screen). Imposter bake: 320-350 ms for a 27-part module (12x12 views of 64 px).
+
+Feature edges, GPU time of the edges passes (compute + draw, medians of the pass timestamps) and CPU per frame:
+
+| Edges | 50k, core | 100k, core | 100k, `minRadius: 1.5` |
+| --- | --- | --- | --- |
+| GPU before (s1 DIAG, s2) | 4.32, 4.39 ms | 5.37, 5.31 ms | 5.51, 7.08 ms |
+| GPU after (s1, s2) | 3.54, 3.54 ms | 4.85, 5.44 ms | 4.33, 5.57 ms |
+| CPU before / after | 0.92-1.07 / 0.15-0.18 ms | 1.93-2.23 / 0.12-0.21 ms | 2.36-2.37 / 0.075 ms |
+
+The edge pass is about 20 % cheaper on the GPU at 50k and with GPU culling (where it now draws from the culled list
+instead of every part); at 100k with CPU culling the two sessions disagree (-10 % / +2 %). CPU drops 6-30x: the per-frame
+loop over every mesh is gone (batch counts come from core). The session-1 run after had an earlier tier rule (a
+conservative per-sphere bound); the shipped centre-depth rule measured the same 3.54 ms at 50k in session 2.
+
+Picking at 100k: `engine.pick` (core, frozen; it re-renders the scene) takes 34-54 ms with core meshes or `CulledMeshes`
+and 11-12 ms with imposters showing (fewer parts collected); `AssemblyBVH.raycast` answers in 0.68 ms median (1.2 ms p95;
+create 88 ms, rebuild after a transform change 51 ms), so the < 10 ms pick target holds on the BVH path only.
+
+Section caps on open shells (HANDOFF 5l.d, `node packages/machinery/test/section-open-check.mjs`, a closed box and a
+single open sheet cut at y = 0, seen from above behind the sheet): before, 9,429 cap-coloured pixels on the sheet (a
+stray cap where there is no material) and 8,337 on the box; after, 0 on the sheet and 8,337 on the box.
+
 ## STEP / IGES loading (`loadCAD`)
 
 OCCT (occt-import-js 0.0.23) Wasm: 7,604,031 bytes, 3,110,912 gzip; glue JS 96,871 (26,835 gzip); Margo CAD worker
@@ -422,6 +473,10 @@ node examples/package-benchmarks/cad/culling.mjs --check --views=orbit,still,gra
 node examples/package-benchmarks/cad/kernel-node.mjs
 node examples/package-benchmarks/proofs/machinery-cad.proof.js
 node packages/machinery/test/edges-check.mjs
+# 100k parts (HANDOFF 5l): small-part culling, imposters, edges; before = a copy of the old dist via --machinery=
+node examples/package-benchmarks/cad/run.mjs --sizes=100000 --culled=1.5 --edges --no-bvh --no-explode --label=after
+node examples/package-benchmarks/cad/run.mjs --sizes=100000 --culled=1.5 --imposters=12 --edges --no-bvh --no-explode --label=imposters
+node packages/machinery/test/section-open-check.mjs
 ```
 
 The `before-*` files used a copy of `packages/machinery/dist` built from `7d5a5dd` sources (`exploded.ts`, `spatial.ts`).

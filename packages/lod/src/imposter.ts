@@ -7,7 +7,11 @@ declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number;MAP_READ:number};
 declare const GPUTextureUsage:{TEXTURE_BINDING:number;COPY_DST:number;COPY_SRC:number;RENDER_ATTACHMENT:number};
 declare const GPUMapMode:{READ:number};
 export type Vec3=[number,number,number];
-/** A core Geometry (with `material`), a core Mesh, or a gltf-pro model (loaded glTF or `@margoengine/materials` mesh), baked in its root's local space. */
+/**
+ * A core Geometry (with `material`), a core Mesh, or a gltf-pro model (loaded glTF or `@margoengine/materials` mesh), baked in its
+ * root's local space. A Mesh with child meshes bakes its whole visible subtree as it is at bake time (a CAD subassembly), each
+ * part with its own material.
+ */
 export type ImposterSource=Geometry|Mesh|PBRModel;
 export interface ImposterOptions {/** Views per side of the octahedral grid, 4-32. Default 12 (144 views). */frames?:number;/** Pixels per view, a power of two 16-1024. Default 128. */frameSize?:number;/** Material for a Geometry source. Default core's PbrMaterial. */material?:PbrMaterial}
 /** CPU copy of an atlas for caching: `color` is RGBA8 sRGB albedo with coverage alpha, `normal` raw float16 RGBA (octahedral normal, depth, packed roughness/metalness). */
@@ -50,15 +54,45 @@ function mipmaps(device:GPUDevice,texture:GPUTexture):void {
   }
   device.queue.submit([encoder.finish()]);
 }
-/** A static gltf-pro copy of a core geometry and material (80-byte vertices), set up without registering a draw pass. */
-function coreModel(engine:Engine,g:Geometry,material:PbrMaterial):PBRModel {
-  const v=g.vertices,count=v.length/6,out=new Float32Array(count*20),d=material.data;
-  for(let i=0;i<count;i++){const s=i*6,o=i*20,l=Math.hypot(v[s+3],v[s+4],v[s+5]);out[o]=v[s];out[o+1]=v[s+1];out[o+2]=v[s+2];out[o+3]=1;if(l){out[o+4]=v[s+3]/l;out[o+5]=v[s+4]/l;out[o+6]=v[s+5]/l;}else out[o+5]=1;out.fill(1,o+16,o+20);}
-  const doc={asset:{version:'2.0'},nodes:[{mesh:0}],meshes:[{primitives:[{material:0}]}],materials:[{pbrMetallicRoughness:{baseColorFactor:[d[0],d[1],d[2],1],roughnessFactor:d[4],metallicFactor:d[5]},doubleSided:d[6]===1}]};
-  const model=new PBRModel(engine,new GLTFAsset(doc,[]),[],[[{vertices:out,indices:g.indices}]]);
+/** One core part of a bake: geometry, material and its transform relative to the baked root (identity when absent). */
+interface Part {geometry:Geometry;material:PbrMaterial;matrix?:Float32Array}
+/** A static gltf-pro copy of core parts (80-byte vertices, one primitive per part, transforms applied), set up without registering a draw pass. */
+function coreModel(engine:Engine,parts:readonly Part[]):PBRModel {
+  const prepared=parts.map(({geometry:g,matrix:m=identity})=>{
+    // Normals transform by the cofactor matrix; a mirroring transform also flips the winding so front faces stay front.
+    const v=g.vertices,count=v.length/6,out=new Float32Array(count*20),c=[m[5]*m[10]-m[6]*m[9],m[6]*m[8]-m[4]*m[10],m[4]*m[9]-m[5]*m[8],m[2]*m[9]-m[1]*m[10],m[0]*m[10]-m[2]*m[8],m[1]*m[8]-m[0]*m[9],m[1]*m[6]-m[2]*m[5],m[2]*m[4]-m[0]*m[6],m[0]*m[5]-m[1]*m[4]];
+    for(let i=0;i<count;i++){const s=i*6,o=i*20,x=v[s],y=v[s+1],z=v[s+2],a=v[s+3],b=v[s+4],e=v[s+5],nx=c[0]*a+c[1]*b+c[2]*e,ny=c[3]*a+c[4]*b+c[5]*e,nz=c[6]*a+c[7]*b+c[8]*e,l=Math.hypot(nx,ny,nz);
+      out[o]=m[0]*x+m[4]*y+m[8]*z+m[12];out[o+1]=m[1]*x+m[5]*y+m[9]*z+m[13];out[o+2]=m[2]*x+m[6]*y+m[10]*z+m[14];out[o+3]=1;if(l){out[o+4]=nx/l;out[o+5]=ny/l;out[o+6]=nz/l;}else out[o+5]=1;out.fill(1,o+16,o+20);}
+    let indices=g.indices;if(m[0]*c[0]+m[4]*c[3]+m[8]*c[6]<0){indices=indices.slice();for(let i=0;i<indices.length;i+=3){const t=indices[i+1];indices[i+1]=indices[i+2];indices[i+2]=t;}}
+    return {vertices:out,indices};
+  });
+  const doc={asset:{version:'2.0'},nodes:[{mesh:0}],meshes:[{primitives:parts.map((_,material)=>({material}))}],materials:parts.map(({material})=>{const d=material.data;return {pbrMetallicRoughness:{baseColorFactor:[d[0],d[1],d[2],1],roughnessFactor:d[4],metallicFactor:d[5]},doubleSided:d[6]===1};})};
+  const model=new PBRModel(engine,new GLTFAsset(doc,[]),[],[prepared]);
   try{model.setup(engine);}catch(error){model.dispose();throw error;}return model;
 }
-const keys=['x','y','z','qx','qy','qz','qw','sx','sy','sz'] as const;
+const keys=['x','y','z','qx','qy','qz','qw','sx','sy','sz'] as const,identity=new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);
+/**
+ * Runs `fn` with mesh `id` unparented, at the identity transform and unhidden, after a transform tick, so world matrices read
+ * inside are relative to that mesh; restores it (and ticks again) afterwards.
+ */
+function inLocalSpace<T>(e:Engine,id:number,fn:()=>T):T {
+  const store=e.store,t=store.transforms,saved=keys.map(k=>t[k][id]),parent=store.parents[id],hidden=store.hidden[id];
+  try{keys.forEach((k,i)=>{t[k][id]=+(i>=6);});store.parents[id]=-1;store.hidden[id]=0;store.tick(false);return fn();}
+  finally{keys.forEach((k,i)=>{t[k][id]=saved[i];});store.parents[id]=parent;store.hidden[id]=hidden;store.tick(false);}
+}
+/** The visible meshes with geometry in a mesh's subtree (itself included), with transforms relative to it. */
+function subtree(e:Engine,root:Mesh,material:PbrMaterial|undefined):Part[] {
+  const node=meshRuntime(root);node.check();const id=node.id,store=e.store;
+  return inLocalSpace(e,id,()=>{
+    const parts:Part[]=[];
+    // ponytail: one scan of every mesh per bake, O(meshes x depth); fine for one imposter per distinct subassembly design.
+    for(const mesh of e.meshes.values()){
+      if(!mesh.geometry||!store.visible[mesh.id])continue;let p=mesh.id;for(let depth=0;p!==id&&p>=0&&depth<64;depth++)p=store.parents[p];
+      if(p===id)parts.push({geometry:mesh.geometry,material:mesh.id===id?material??mesh.material:mesh.material,matrix:mesh.matrix.slice()});
+    }
+    return parts;
+  });
+}
 
 /**
  * Octahedral imposter atlas: `frames`² orthographic views of an object over the whole sphere of directions, baked on the
@@ -67,13 +101,14 @@ const keys=['x','y','z','qx','qy','qz','qw','sx','sy','sz'] as const;
 export class Imposter {
   readonly frames:number;readonly frameSize:number;readonly center:Vec3=[0,0,0];radius=1;readonly shading:'core'|'gltf';disposed=false;
   /** @internal */ color?:GPUTexture;/** @internal */ normal?:GPUTexture;/** @internal */ uniform?:GPUBuffer;/** @internal */ device?:GPUDevice;
-  private source?:Geometry|PBRModel;private material:PbrMaterial;private data?:ImposterData;
+  private source?:Part[]|PBRModel;private data?:ImposterData;
   private constructor(private readonly engine:Engine,source:ImposterSource|undefined,data:ImposterData|undefined,{frames=12,frameSize=128,material}:ImposterOptions) {
     if(!Number.isInteger(frames)||frames<4||frames>32||!Number.isInteger(Math.log2(frameSize))||frameSize<16||frameSize>1024)throw new RangeError('Imposter frames 4-32, frameSize a power of two 16-1024');
     if(material!==undefined&&!(material instanceof PbrMaterial))throw new TypeError('Expected a PbrMaterial');
-    this.frames=frames;this.frameSize=frameSize;this.material=material??new PbrMaterial();this.data=data;
-    if(source instanceof Geometry||source instanceof PBRModel)this.source=source;
-    else if(source){const mesh=meshRuntime(source);mesh.check();if(!mesh.geometry)throw new TypeError('Imposter mesh needs a geometry');this.source=mesh.geometry;if(!material)this.material=mesh.material;}
+    this.frames=frames;this.frameSize=frameSize;this.data=data;
+    if(source instanceof Geometry)this.source=[{geometry:source,material:material??new PbrMaterial()}];
+    else if(source instanceof PBRModel)this.source=source;
+    else if(source){this.source=subtree(engine,source,material);if(!this.source.length)throw new TypeError('Imposter mesh needs a geometry');}
     else if(!data)throw new TypeError('Expected an imposter source');
     this.shading=data?data.shading:this.source instanceof PBRModel?'gltf':'core';
   }
@@ -101,8 +136,8 @@ export class Imposter {
     device.queue.writeBuffer(this.uniform,0,new Float32Array([...this.center,this.radius,this.frames,size,+(this.shading==='gltf'),this.frameSize]));
     return true;
   }
-  private bake(device:GPUDevice,source:Geometry|PBRModel):void {
-    const e=this.engine,store=e.store,n=this.frames,fs=this.frameSize,temp=source instanceof Geometry,model=source instanceof Geometry?coreModel(e,source,this.material):source;
+  private bake(device:GPUDevice,source:Part[]|PBRModel):void {
+    const e=this.engine,store=e.store,n=this.frames,fs=this.frameSize,temp=Array.isArray(source),model=Array.isArray(source)?coreModel(e,source):source;
     const id=meshRuntime(model.root).id,t=store.transforms,saved=keys.map(k=>t[k][id]),parent=store.parents[id],hidden=store.hidden[id],scratch:Array<GPUTexture|GPUBuffer>=[];let remove=()=>{};
     try {
       // Bake in the root's local space: unparented, identity transform, visible.

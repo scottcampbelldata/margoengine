@@ -175,3 +175,20 @@ test('pick proxies: imposter levels expose their bounding sphere; the bvh Raycas
     lods.dispose();assert.equal(lods.pickProxies().length,0);imposter.dispose();
   } finally {s.close();}
 });
+
+test('mock GPU: a Mesh with children bakes its visible subtree in its own space (CAD subassembly) and is left as it was', async () => {
+  const s=await gpu(),{engine,counts}=s;
+  try {
+    const red=new PbrMaterial({color:'#ff0000'}),blue=new PbrMaterial({color:'#0000ff'}),root=engine.createMesh().setPosition([5,6,7]).setRotation([0,1,0]);
+    engine.createMesh(root).setGeometry(box(2,2,2)).setMaterial(red).setPosition([3,0,0]);const b=engine.createMesh(root).setGeometry(box(2,2,2)).setMaterial(blue).setPosition([-3,0,0]);
+    b.visible=false;engine.render();const before=engine.meshes.size,submits=counts.submits;
+    const one=Imposter.bake(engine,root,{frames:4,frameSize:16});
+    assert.ok(Math.abs(one.center[0]-3)<1e-6&&Math.abs(one.center[1])<1e-6&&Math.abs(one.radius-Math.sqrt(3)*1.01)<1e-5,'hidden part skipped, centre in the root frame');
+    assert.equal(counts.submits-submits,16+1);assert.equal(engine.meshes.size,before,'temporary model disposed');assert.equal(one.shading,'core');
+    assert.deepEqual([root.position.x,root.position.y,root.position.z],[5,6,7]);assert.equal(engine.store.parents[root.id],-1);assert.equal(b.visible,false);
+    b.visible=true;engine.render();const both=Imposter.bake(engine,root,{frames:4,frameSize:16});
+    assert.ok(both.center.every(v=>Math.abs(v)<1e-6)&&Math.abs(both.radius-Math.sqrt(18)*1.01)<1e-5,'both parts, the root rotation not baked in');
+    assert.throws(()=>Imposter.bake(engine,engine.createMesh()),/needs a geometry/);
+    one.dispose();both.dispose();
+  } finally {s.close();}
+});

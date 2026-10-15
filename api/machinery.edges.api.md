@@ -27,7 +27,6 @@ export class FeatureEdges implements EnginePlugin {
     constructor({ angle, width, color, depthBias, minRadius, order }?: FeatureEdgeOptions);
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
-    refresh(): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;

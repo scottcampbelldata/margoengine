@@ -1037,12 +1037,42 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    laptop, quiet PC):
    CAD: 100k parts + feature edges orbit >= 60 FPS; 1M parts >= 30 FPS; pick < 10 ms at 100k; 100k-part model
    interactive < 2 s; km-scale coordinates jitter-free (5f.a); transparent housings without popping (5f.b).
-   a. Small-part (screen-size) culling + distant-subassembly imposters for core meshes (the 90k orbit is GPU-bound,
-      ~28 ms; most cost is tiny parts).
-   b. GPU culling for core meshes with picking, feature edges, exploded view and AssemblyBVH still working (today
-      CulledInstances parts lose them). If a core hook is needed, measure bytes and bring it to Scott.
-   c. Cheaper feature edges (GPU culling of edges, screen-size fade/drop; 4.7 ms at 50k today).
-   d. CAD correctness: section caps on non-closed shells, measurement precision, snapping to edges/vertices.
+   Status 2026-10-15 (a-d, 0 core bytes, core + stage 19,922 B): 100k parts + edges orbit MET with GPU small-part
+   culling (61-88 FPS, two quiet-gated sessions; core path 28-30); pick < 10 ms MET on the `AssemblyBVH` path only (0.68 ms
+   median raycast at 100k), NOT with `engine.pick` (34-54 ms; core re-renders the scene, the unmerged pick fast path is
+   core step 4). Numbers, tables and raw JSON: docs/cad-performance.md "100,000 parts", `cad/results-5l-*.json`.
+   a. [DONE] Small-part (screen-size) culling + distant-subassembly imposters for core meshes. Small parts: `CulledMeshes`
+      `minRadius` (already in @margoengine/culling) is the cull; measured at 100k parts (100,008 parts, 1432x768 4x MSAA
+      orbit, `run.mjs --culled=1.5`): 29.3 -> 137.8 FPS, GPU 31.1 -> 6.9 ms, 11,363 parts drawn. Imposters:
+      `@margoengine/lod` `Imposter.bake(engine, mesh)` now bakes a Mesh's whole visible subtree (each part with its own
+      material, transforms applied, mirrored parts flip winding; `packages/lod/src/imposter.ts`, lod +450 B gzip, test in
+      lod.test.js); a module shown as one imposter under 12 px (`run.mjs --imposters=12`): GPU 3.0 ms but CPU-bound at
+      91.7 FPS (each LOD switch toggles `visible` -> core re-collects, ~4 ms), so on this laptop small-part culling alone
+      wins; imposters are for GPU-limited cases. Limits: imposter modules are not hit by `engine.pick`/`AssemblyBVH`
+      (`lods.pickProxies()` reports them); one subtree scan per bake (bake once per distinct design, share the atlas);
+      anchors must sit outside the subtree (+1 entity per copy).
+   b. [DONE, verified] GPU culling for core meshes with picking, feature edges, exploded view and AssemblyBVH still
+      working: `CulledMeshes` (5m.b hook) re-checked on the GPU 2026-10-15 (`cad/culled-meshes.mjs`: 0 differing pixels
+      in 8 steps, pick grid identical, BVH hit). Package-side finish: `FeatureEdges` now draws from the redirected
+      (culled) list, so edges get the same culling. Not done: Hi-Z occlusion for core meshes (it did not pay on this
+      layout for CulledInstances); an `engine.start()` switch for CPU culling off (core, ~15 B; apps call
+      `engine.render({culling: false})` from their own loop).
+   c. [DONE] Cheaper feature edges (`packages/machinery/src/edges.ts`): counts from core's batches (no per-frame loop over
+      meshes: CPU 0.9-2.4 -> 0.07-0.2 ms), reads `CulledMeshes`' culled list, parts fade in between `minRadius` and 2x (no
+      popping), segments stored longest first and drawn in 4 tiers (all, 1/4, 1/16, 1/64) chosen per part on the GPU from
+      the projected length at its centre depth. GPU edges pass 4.3-4.4 -> 3.5 ms at 50k, 5.5-7.1 -> 4.3-5.6 ms at 100k with
+      GPU culling; at 100k with CPU culling sessions disagree (-10 % / +2 %). `refresh()` removed (not needed). Edges
+      entry 3,940 -> 4,530 B. Limit: a segment just over half a pixel near a large part's front can be skipped.
+   d. [DONE] CAD correctness (machinery): section caps skip open shells (geometry with an edge not shared by exactly two
+      consistently wound triangles, positions welded to 0.1 mm/unit; `capOpenShells: true` restores capping):
+      `section-open-check.mjs` stray cap pixels on an open sheet 9,429 -> 0, closed box unchanged (8,337). Measurement:
+      `measureDistance` composes the hierarchy in float64 below the anchors' common ancestor: 5 mm between parts of an
+      assembly 1 km out, float32 world error 47 µm (4.4 mm at 100 km) -> 8.5e-11 m (`test/metrology.test.js`; the
+      cameras origin test now asserts it). Snapping: `AssemblyBVH.snap` / `snapAnchor` / new `snapFeature` snap
+      'vertex' to CAD corners and 'edge' to the closest point on a feature edge over the whole part (never triangulation
+      diagonals or face interiors; before: hit-triangle vertices and triangle-edge midpoints). Sizes: section 3,958 ->
+      4,325, metrology 1,173 -> 2,296, spatial 14,411 -> 14,941, dimensions 3,434 -> 3,880, machinery root 33,430 -> 34,608 B (edgesGeometry from
+      @margoengine/geometry is external, 551 B, shared).
    (Plus already queued: back-face culling B, 5f.a-c, 5g.d streaming + entity cap decision.)
    General 3D: ~115/156 parity rows covered (93 of 159 now); every demo 60 FPS on the light tier; side-by-side renders that
    hold up against three.js/Babylon for the same scene.

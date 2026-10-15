@@ -34,7 +34,7 @@ const cases = [
   {key: 'telemetry', pack: 'machinery', entry: 'telemetry', exports: ['TelemetryChannel'], allowed: ['telemetry', 'kinematics']},
   {key: 'section', pack: 'machinery', entry: 'section', exports: ['SectionPlanes', 'boxSection'], allowed: ['section']},
   {key: 'assembly', pack: 'machinery', entry: 'assembly', exports: ['AssemblyIndex'], allowed: ['assembly']},
-  {key: 'metrology', pack: 'machinery', entry: 'metrology', exports: ['vertexAnchor', 'edgeAnchor', 'faceAnchor', 'holeAnchor', 'snapAnchor', 'measureDistance'], allowed: ['metrology', 'worldAnchor']},
+  {key: 'metrology', pack: 'machinery', entry: 'metrology', exports: ['vertexAnchor', 'edgeAnchor', 'faceAnchor', 'holeAnchor', 'snapAnchor', 'snapFeature', 'measureDistance'], allowed: ['metrology', 'worldAnchor']},
   {key: 'spatial', pack: 'machinery', entry: 'spatial', exports: ['AssemblyBVH'], allowed: ['spatial', 'metrology', 'worldAnchor']},
   {key: 'clearance', pack: 'machinery', entry: 'clearance', exports: ['measureClearance'], allowed: ['clearance']},
   {key: 'materials', pack: 'machinery', entry: 'materials', exports: ['industrialMaterials', 'industrialMaterial'], exportTypes: {industrialMaterials: 'object'}, allowed: ['materials']},

@@ -1,0 +1,218 @@
+{
+ "label": "5l-before-edges-culled",
+ "date": "2026-10-15T14:27:16.052Z",
+ "acPowerAtStart": true,
+ "host": {
+  "cpu": "Intel(R) Core(TM) Ultra 7 258V",
+  "cores": 8,
+  "memoryGB": 31,
+  "node": "v24.15.0",
+  "browser": "155.0.4283.45"
+ },
+ "viewport": [
+  1432,
+  768
+ ],
+ "conditions": "quiet-gated: CPU 15% at 2026-10-15T14:27:13.498Z, AC",
+ "runs": [
+  {
+   "modules": 3704,
+   "crossOriginIsolated": true,
+   "msaa": 4,
+   "view": "overview",
+   "still": false,
+   "move": 0,
+   "culled": 1.5,
+   "imposters": 0,
+   "engineCreateMs": 425.82500000298023,
+   "buildMs": 273.60999999940395,
+   "parts": 100008,
+   "groups": 11229,
+   "entities": 111237,
+   "capacity": 111237,
+   "shapes": [
+    {
+     "name": "plate",
+     "triangles": 556,
+     "vertices": 1668
+    },
+    {
+     "name": "bracket",
+     "triangles": 20,
+     "vertices": 60
+    },
+    {
+     "name": "bolt",
+     "triangles": 88,
+     "vertices": 140
+    },
+    {
+     "name": "nut",
+     "triangles": 144,
+     "vertices": 432
+    },
+    {
+     "name": "washer",
+     "triangles": 128,
+     "vertices": 384
+    }
+   ],
+   "triangles": 12875104,
+   "edgesSetupMs": 0.7149999998509884,
+   "edgeSegments": {
+    "geometries": 5,
+    "segments": 7289472,
+    "instances": 100008,
+    "drawCalls": 5
+   },
+   "firstFrameMs": 323.54499999806285,
+   "loadToFirstFrameMs": 1022.980000000447,
+   "kernel": {
+    "tickCullMs": {
+     "n": 60,
+     "median": 4.1,
+     "p95": 4.59,
+     "max": 4.715,
+     "mean": 4.1545
+    },
+    "tickNoCullMs": {
+     "n": 60,
+     "median": 4.03,
+     "p95": 4.585,
+     "max": 4.865,
+     "mean": 4.033
+    },
+    "perPartNs": 36.9
+   },
+   "movers": 0,
+   "gpuDrawn": 11600,
+   "frame": {
+    "cpuMs": {
+     "n": 2772,
+     "median": 10.16,
+     "p95": 11.98,
+     "max": 30.345,
+     "mean": 10.1253
+    },
+    "kernelMs": {
+     "n": 2772,
+     "median": 6.11,
+     "p95": 7.05,
+     "max": 27.01,
+     "mean": 6.1624
+    },
+    "collectMs": {
+     "n": 2772,
+     "median": 0.33,
+     "p95": 0.62,
+     "max": 3.315,
+     "mean": 0.3695
+    },
+    "submitMs": {
+     "n": 2772,
+     "median": 3.49,
+     "p95": 5.535,
+     "max": 21.82,
+     "mean": 3.5934
+    },
+    "intervalMs": {
+     "n": 2772,
+     "median": 11.68,
+     "p95": 13.97,
+     "max": 31.575,
+     "mean": 11.4754
+    },
+    "fps": 85.6,
+    "gpuMs": {
+     "n": 12,
+     "median": 11.7309,
+     "p95": 13.697,
+     "max": 13.697,
+     "mean": 11.7856
+    },
+    "drawCalls": 10,
+    "visible": 100008,
+    "edgesCpuMs": {
+     "n": 2773,
+     "median": 2.355,
+     "p95": 3.42,
+     "max": 4.71,
+     "mean": 2.3629
+    },
+    "gpuPassMedianMs": [
+     0.3277,
+     5.9638,
+     0.6554,
+     4.8497,
+     0
+    ]
+   },
+   "edgesFirstDrawMs": 14.765000000596046,
+   "isolated": {
+    "cpuMs": {
+     "n": 30,
+     "median": 9.475,
+     "p95": 11.76,
+     "max": 15.435,
+     "mean": 9.8025
+    },
+    "gpuTailMs": {
+     "n": 30,
+     "median": 16.965,
+     "p95": 18.46,
+     "max": 19.275,
+     "mean": 16.913
+    },
+    "frameMs": {
+     "n": 30,
+     "median": 26.39,
+     "p95": 29.825,
+     "max": 32.635,
+     "mean": 26.7155
+    }
+   },
+   "isolatedNoEdges": {
+    "cpuMs": {
+     "n": 30,
+     "median": 6.235,
+     "p95": 7.045,
+     "max": 7.395,
+     "mean": 6.236
+    },
+    "gpuTailMs": {
+     "n": 30,
+     "median": 11.16,
+     "p95": 12.05,
+     "max": 12.5,
+     "mean": 11.0847
+    },
+    "frameMs": {
+     "n": 30,
+     "median": 17.385,
+     "p95": 18.18,
+     "max": 18.19,
+     "mean": 17.3207
+    }
+   },
+   "memory": {
+    "jsHeapMB": 45.55,
+    "kernelWasmMB": 38.25,
+    "instanceStagingMB": 10.12,
+    "gpuInstanceMB": 10.12,
+    "geometryMB": 0.07,
+    "msaaTargetsMB": 37.76
+   },
+   "removeOneMeshMs": 0.27000000327825546,
+   "errors": [],
+   "size": "100000",
+   "pageErrors": []
+  }
+ ],
+ "adapter": {
+  "vendor": "intel",
+  "architecture": "xe-2lpg",
+  "description": "",
+  "timestamp": true
+ },
+ "acPowerAtEnd": true
+}
