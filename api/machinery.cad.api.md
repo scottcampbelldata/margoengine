@@ -33,7 +33,7 @@ export function loadCAD(engine: EngineKernel, url: string | URL, { format, signa
     fetch?: typeof fetch;
 }): Promise<CADModel>;
 
-export function parseCAD(instance: EngineKernel, input: string | ArrayBuffer | ArrayBufferView, format: 'stl' | 'obj'): CADModel;
+export function parseCAD(instance: EngineKernel, input: string | ArrayBuffer | ArrayBufferView, format: 'stl' | 'obj', { maxParts }?: Pick<CADImportOptions, 'maxParts'>): CADModel;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -43,5 +43,6 @@ interface CADImportOptions {
     signal?: AbortSignal;
     onProgress?: (percent: number) => void;
     smoothing?: boolean;
+    maxParts?: number;
 }
 ```

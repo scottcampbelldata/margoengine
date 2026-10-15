@@ -57,8 +57,8 @@ export class GLTFStream {
   private loaded = 0;
   private reported = 0;
   private base: URL;
-  /** `limit`: maxDownloadBytes, already validated by the caller. */
-  constructor(private readonly url: URL, private readonly post: (message: StreamMessage) => void, private readonly signal: AbortSignal, private readonly limit = assetLimit) {
+  /** `limit`: maxDownloadBytes, already validated by the caller; `maxNodes`: the load's maxNodes. */
+  constructor(private readonly url: URL, private readonly post: (message: StreamMessage) => void, private readonly signal: AbortSignal, private readonly limit = assetLimit, private readonly maxNodes?: number) {
     this.base = url; signal.addEventListener('abort', () => this.notify(), {once: true});
   }
   /** Primitive keys still wanted, most important first (the main thread re-sends this as the camera moves). */
@@ -176,7 +176,7 @@ export class GLTFStream {
       this.map.push({source: k, offset: 0}); return this.sources[k].data!;
     });
     // Same validation (and the same errors) as a plain load: required extensions, buffer sizes, the byte budget.
-    this.asset = new GLTFAsset(doc, views, undefined, {}, this.limit);
+    this.asset = new GLTFAsset(doc, views, undefined, {}, this.limit, this.maxNodes);
     this.needs = primitiveDefs(doc).map(p => {
       const out: Range[] = [], a = p?.attributes ?? {};
       try {for (const id of [a.POSITION, a.NORMAL, a.TANGENT, a.TEXCOORD_0, a.TEXCOORD_1, a.COLOR_0, p.indices]) if (id !== undefined) this.ranges(doc, id, out);}

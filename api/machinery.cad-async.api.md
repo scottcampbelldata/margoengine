@@ -11,6 +11,7 @@ export interface CADImportOptions {
     signal?: AbortSignal;
     onProgress?: (percent: number) => void;
     smoothing?: boolean;
+    maxParts?: number;
 }
 
 export function parseCADAsync(instance: EngineKernel, buffer: ArrayBuffer, format: CADFormat, options?: CADImportOptions): Promise<CADModel>;

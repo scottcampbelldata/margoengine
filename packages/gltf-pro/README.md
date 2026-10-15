@@ -236,6 +236,14 @@ Over the budget, a load fails with a `RangeError` naming the option, e.g. `glTF 
 bytes; raise the maxDownloadBytes option)`. `loadGLTF`, `parseGLTFAsync`, `loadGLTFInWorker`, `parseGLTFInWorker` and
 `loadGLTFProgressive` take it; the synchronous `parseGLTF` uses the default.
 
+Decoded images count against 4x the budget too, so texture-heavy files may need it raised although they are small:
+Khronos's ABeautifulGame (a 43 MB GLB) holds 33 2048x2048 textures, 528 MiB as RGBA8, over the default 512 MiB; it loads
+with `maxDownloadBytes: 160 * 1024 * 1024` (`examples/khronos-gallery.js`).
+
+Every glTF node becomes a core mesh, so a load also caps the node count: `maxNodes` (default 100,000; at most core's
+8,388,608 entities) on every loader above and as the last argument of `parseGLTF` and `parsePreparedPBR`. Over it the
+load fails with `RangeError: Too many glTF nodes (100001 > 100000; raise the maxNodes option)`.
+
 ```ts
 import {createStage} from 'margoengine';
 import {loadGLTF} from '@margoengine/gltf-pro';
@@ -276,7 +284,17 @@ const dropped = await parseGLTFAsync(stage.engine, await file.arrayBuffer(), {de
 
 Any object with the same shape works (`GLTFDecoderHooks`): `draco.decode(bytes, {attributeIds, componentTypes, signal})` resolving to `{positions, normals?, uvs?, colors?, indices?, attributes?}`, `meshopt.decodeGltfBuffer(target, count, stride, source, mode, filter)` (three.js's `MeshoptDecoder` fits once its `ready` promise resolves), and `ktx2.transcode(bytes, {signal})` resolving to `{width, height, format, mipmaps: [{data, width, height}]}` in rgba8, BC7, ASTC 4x4 or ETC2 RGBA8. The synchronous `parseGLTF` takes only the synchronous `instancing` reader (its fifth argument). Without a ktx2 decoder, KTX2 images are skipped and a texture's PNG/JPEG fallback `source` is used.
 
-`model.lights` and `model.cameras` expose `KHR_lights_punctual` lights and glTF cameras as data, each with its scene `node`. `model.clusteredLights()` returns the point and spot lights in world space for `clustered.setLights(...)`; an unbounded light gets the range where intensity/d² falls to 1/256. Directional lights are left to the engine's own light.
+`model.lights` and `model.cameras` expose `KHR_lights_punctual` lights and glTF cameras as data, each with its scene `node`. `applyGLTFLights(model, {clustered, exposure})` applies the lights in one call: the first directional light becomes the engine's light (direction, colour, and its lux x `exposure` as the strength; core's default strength is 3 and core has one directional light), and the point and spot lights go to a `Clustered` from `@margoengine/clustered` (candela x `exposure`), which then lights the model. `model.clusteredLights()` returns those point and spot lights in world space for `clustered.setLights(...)` (call it again after moving the model); an unbounded light gets the range where intensity/d² falls to 1/256. `viewGLTFCamera(model, index = 0)` views through a glTF camera with the engine camera: the node's position, direction and up, `yfov`/`znear`/`zfar` (perspective) or `ymag`/`znear`/`zfar` through `camera.project` (orthographic), with the canvas aspect; the target is 1 unit ahead.
+
+```ts
+import {createStage} from 'margoengine';
+import {applyGLTFLights, loadGLTF, viewGLTFCamera} from '@margoengine/gltf-pro';
+import {Clustered} from '@margoengine/clustered';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const model = await loadGLTF(stage.engine, '/scene.glb');
+applyGLTFLights(model, {clustered: Clustered.attach(stage.engine)});
+if (model.cameras.length) viewGLTFCamera(model);
+```
 
 `model.extras()` lists every node whose glTF `extras` is an object (Blender writes an object's custom properties there when exported with Include > Custom Properties), in node order, as `{node, nodeIndex, name, extras, matrix}` with a copy of the node's current world matrix: spawn points and markers placed in a DCC tool ([docs/guides/blender-game.md](../../docs/guides/blender-game.md#blender-as-a-level-editor), `tests/extras.test.js`). Mesh and material extras stay in `model.asset.doc.meshes[i].extras` and `model.asset.doc.materials[i].extras`.
 
@@ -286,6 +304,6 @@ Materials using clearcoat, transmission, IOR, volume, sheen or specular compile 
 - Sheen (Charlie distribution) and clearcoat (GGX on its own normal, F0 0.04) respond to the key light and the hemisphere fill. Image-based lighting patches and clustered lights light the base layer only.
 - IOR and `KHR_materials_specular` set the dielectric F0 as three.js does: `min(((ior-1)/(ior+1))² × specularColor, 1) × specular`.
 
-Limits: triangles only; four skin influences in the animation package; texture coordinate sets beyond 1 are rejected. Ambient fill uses fixed sky/ground colors unless `@margoengine/environment`'s `EnvironmentLighting` is applied to the model (`ibl.add(model)`), which adds image-based lighting. Bounds describe the original mesh. Core `engine.pick` returns models only when `@margoengine/selection`'s `Picking` is attached; bvh's `Raycaster` hits them on the CPU.
+Limits: `POINTS`, `LINES`, `LINE_LOOP` and `LINE_STRIP` primitives go to `model.pointsAndLines` (point and line lists, one pixel wide, unlit without a `NORMAL`: the base colour, emission not added) and draw in the beauty pass only, with no shadows, SSAO, SSR, transparency hook, picking, BVH or export; progressive loads leave them out. Triangle strips and fans become triangle lists. Four skin influences in the animation package; texture coordinate sets beyond 1 are rejected. Ambient fill uses fixed sky/ground colors unless `@margoengine/environment`'s `EnvironmentLighting` is applied to the model (`ibl.add(model)`), which adds image-based lighting. Bounds describe the original mesh. Core `engine.pick` returns models only when `@margoengine/selection`'s `Picking` is attached; bvh's `Raycaster` hits them on the CPU.
 
 The demo at `/examples/flight-helmet.html` loads the [Khronos Flight Helmet](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/FlightHelmet) (CC0), packed for the web by `scripts/optimize-demo-assets.js`; see `examples/assets/ATTRIBUTION.md`.

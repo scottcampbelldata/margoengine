@@ -10,11 +10,12 @@ export interface PreparedGLTF {
     geometry: (PreparedGeometry | null)[][];
     accessors: [number, Float32Array][];
     maxDownloadBytes?: number;
+    maxNodes?: number;
 }
 
 export function prepareAsset(asset: GLTFAsset, images: GLTFImage[]): PreparedGLTF;
 
-export function prepareGLTF(url: string | URL | undefined, input?: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, maxDownloadBytes?: number): Promise<PreparedGLTF>;
+export function prepareGLTF(url: string | URL | undefined, input?: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, maxDownloadBytes?: number, maxNodes?: number): Promise<PreparedGLTF>;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -22,8 +23,9 @@ class GLTFAsset {
     readonly doc: GLTFDocument;
     readonly hooks: GLTFDecoderHooks;
     readonly maxBytes: number;
+    readonly maxNodes: number;
     readonly buffers: Uint8Array[];
-    constructor(doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, hooks?: GLTFDecoderHooks, maxBytes?: number);
+    constructor(doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, hooks?: GLTFDecoderHooks, maxBytes?: number, maxNodes?: number);
     view(id: unknown): Uint8Array;
     decode(signal?: AbortSignal): Promise<void>;
     accessor(id: unknown, type?: string): Float32Array;
@@ -100,6 +102,7 @@ class PBRInstances {
 interface PreparedGeometry {
     vertices: Float32Array;
     indices: Uint32Array;
+    topology?: 'point-list' | 'line-list';
 }
 
 interface TextureTransform {

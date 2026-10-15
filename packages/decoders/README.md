@@ -1,6 +1,6 @@
 # @margoengine/decoders
 
-Worker-pooled Draco geometry decoding, KTX2/Basis Universal texture transcoding and EXT_meshopt_compression decoding for Margo Engine.
+Worker-pooled Draco geometry decoding, KTX2/Basis Universal texture transcoding and EXT/KHR_meshopt_compression decoding for Margo Engine.
 
 Build from source with `npm run build` in `packages/decoders`.
 
@@ -24,7 +24,7 @@ draco.dispose(); ktx2.dispose();
 
 ## Meshopt
 
-`decodeMeshoptBuffer(source, count, stride, mode, filter)` decodes one `EXT_meshopt_compression` bufferView (ATTRIBUTES, TRIANGLES or INDICES, with the OCTAHEDRAL, QUATERNION and EXPONENTIAL filters) and returns a `Uint8Array`. It is pure TypeScript, synchronous and needs no Wasm. Output matches the meshoptimizer reference decoder bit for bit. `MeshoptDecoder` exposes the same `decodeGltfBuffer` signature as the object three.js loaders expect. The extension only allows vertex codec version 0, so version 1 streams are rejected with a clear error.
+`decodeMeshoptBuffer(source, count, stride, mode, filter)` decodes one `EXT_meshopt_compression` or `KHR_meshopt_compression` bufferView (ATTRIBUTES, TRIANGLES or INDICES; vertex codec versions 0 and 1; the OCTAHEDRAL, QUATERNION, EXPONENTIAL and COLOR filters) and returns a `Uint8Array`. It is pure TypeScript, synchronous and needs no Wasm. Output matches the meshoptimizer reference decoder bit for bit (test vectors from its encoder and Wasm decoder: `scripts/meshopt-vectors.mjs`). `MeshoptDecoder` exposes the same `decodeGltfBuffer` signature as the object three.js loaders expect. Other codec versions are rejected with a clear error.
 
 ## How it works
 

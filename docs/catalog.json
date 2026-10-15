@@ -653,12 +653,14 @@
     "exports": [
       "GLTFAsset",
       "PBRModel",
+      "applyGLTFLights",
       "loadGLTF",
       "parseGLTF",
       "parseGLTFAsync",
       "parsePreparedPBR",
       "textureTransform",
-      "validatePreparedGeometry"
+      "validatePreparedGeometry",
+      "viewGLTFCamera"
     ]
   },
   {

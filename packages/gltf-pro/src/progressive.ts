@@ -65,7 +65,7 @@ export function loadGLTFProgressive(instance: EngineKernel, url: string | URL, o
   const progress: ProgressiveGLTFProgress = {stage: 'ready', bytesLoaded: 0, bytesTotal: 0, primitives: 0, primitivesLoaded: 0, images: 0, imagesLoaded: 0};
   const emit = (stage = progress.stage) => {progress.stage = stage; onProgress?.({...progress});};
   if (decoders.draco || decoders.meshopt || decoders.ktx2) {
-    const model = loadGLTF(instance, url, {decoders, signal: controller.signal, maxDownloadBytes: options.maxDownloadBytes}).then(m => {emit('complete'); return m;});
+    const model = loadGLTF(instance, url, {decoders, signal: controller.signal, maxDownloadBytes: options.maxDownloadBytes, maxNodes: options.maxNodes}).then(m => {emit('complete'); return m;});
     model.catch(() => {}); return {ready: model, complete: model, abort};
   }
   const engine = engineRuntime(instance), device = () => engine.gpu!;
@@ -184,7 +184,7 @@ export function loadGLTFProgressive(instance: EngineKernel, url: string | URL, o
     // Placeholder geometry through the worker path's packed-geometry map; the buffers fill in when the stream completes.
     defs.forEach((p, k) => {const b = box(doc, p); local[k] = [b.lo, b.hi]; if (p && typeof p === 'object') packed.set(p, b);});
     if (decoders.instancing) hooks.instancing = {read: () => undefined};
-    asset = new GLTFAsset(doc, (doc.buffers ?? []).map((b: any) => new Uint8Array(Number.isSafeInteger(b?.byteLength) && b.byteLength > 0 ? b.byteLength : 0)), undefined, hooks, limit);
+    asset = new GLTFAsset(doc, (doc.buffers ?? []).map((b: any) => new Uint8Array(Number.isSafeInteger(b?.byteLength) && b.byteLength > 0 ? b.byteLength : 0)), undefined, hooks, limit, options.maxNodes);
     images = Array.from(doc.images ?? [], () => undefined); settled = images.map(() => false); progress.images = images.length;
     model = new PBRModel(instance, asset, images);
     byKey = defs.map(() => []); keys = model.primitives.map((p, i) => {const k = keyOf.get(p.definition)!; byKey[k].push(i); return k;});
@@ -219,8 +219,8 @@ export function loadGLTFProgressive(instance: EngineKernel, url: string | URL, o
       worker = new Worker(workerURL(), {name: 'margoengine-progressive'});
       worker.onmessage = ({data}) => message(data);
       worker.onerror = event => {event.preventDefault?.(); fail(new Error('Progressive glTF worker failed: ' + (event.message || 'unknown error')));};
-      worker.postMessage({url: href, maxDownloadBytes: limit});
-    } else import('./stream.js').then(({GLTFStream}) => {if (!finished) (stream = new GLTFStream(new URL(href), message, controller.signal, limit)).run();}, fail);
+      worker.postMessage({url: href, maxDownloadBytes: limit, maxNodes: options.maxNodes});
+    } else import('./stream.js').then(({GLTFStream}) => {if (!finished) (stream = new GLTFStream(new URL(href), message, controller.signal, limit, options.maxNodes)).run();}, fail);
   } catch (error) {fail(error);}
   return {ready, complete, abort};
 }

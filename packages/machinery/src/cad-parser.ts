@@ -1,5 +1,6 @@
 import {Geometry} from '@margoengine/core';
 import {triangulatePolygon} from '../../shared/polygon.js';
+import {checkCount,countLimit} from '../../shared/limits.js';
 export const maxBytes=64*1024*1024,maxVertices=1_000_000,maxIndices=3_000_000;
 /** FNV-style mix of the six rounded weld values stored at `offset`. */
 function weldHash(keys:number[],offset:number):number {let h=0x811c9dc5;for(let i=0;i<6;i++)h=Math.imul(h^(keys[offset+i]|0),0x01000193);return h^(h>>>15);}
@@ -35,11 +36,12 @@ function stl(input:string|Uint8Array,progress?:(value:number)=>void):Array<{name
   let face=0;for(const facet of facets){if(face++%10_000===0)progress?.(0.5*face/facets.length);const matches=[...facet.matchAll(vertex)];if(matches.length!==3||! /outer\s+loop/.test(facet)||! /endloop/.test(facet))throw new TypeError('Invalid STL facet');for(const match of matches)positions.push(...match.slice(1).map(Number));}
   return [{name:text.match(/solid\s+([^\r\n]*)/)?.[1]||'STL body',geometry:flat(positions,progress)}];
 }
-function obj(text:string,progress?:(value:number)=>void):Array<{name:string;geometry:Geometry}> {
+function obj(text:string,progress?:(value:number)=>void,maxParts?:number):Array<{name:string;geometry:Geometry}> {
+  const partLimit=countLimit('maxParts',maxParts);
   const vertices:number[][]=[],parts:Array<{name:string;positions:number[]}>=[{name:'OBJ body',positions:[]}],workCounter={used:0,limit:10_000_000};let current=parts[0],total=0;
   const lines=text.split(/\r?\n/);let lineNumber=0;for(const raw of lines){if(lineNumber++%10_000===0)progress?.(0.5*lineNumber/lines.length);const line=raw.replace(/#.*/,'').trim();if(!line)continue;const [tag,...fields]=line.split(/\s+/);
     if(tag==='v'){const p=fields.map(Number);if(p.length!==3||!p.every(v=>Number.isFinite(Math.fround(v)))||vertices.length>=maxVertices)throw new RangeError('Invalid OBJ vertex');vertices.push(p);}
-    else if(tag==='o'||tag==='g'){if(parts.length>=100_000)throw new RangeError('OBJ part limit');current={name:fields.join(' ')||'OBJ body',positions:[]};parts.push(current);}
+    else if(tag==='o'||tag==='g'){checkCount('OBJ part limit',parts.length+1,partLimit,'maxParts');current={name:fields.join(' ')||'OBJ body',positions:[]};parts.push(current);}
     else if(tag==='f'){
       if(fields.length<3||fields.length>4096)throw new RangeError('OBJ face vertex limit');
       const face=fields.map(field=>{if(!/^-?\d+(?:\/(?:-?\d*)?(?:\/-?\d+)?)?$/.test(field))throw new TypeError('Invalid OBJ face');const index=Number(field.split('/')[0]),point=vertices[index>0?index-1:vertices.length+index];if(!index||!point)throw new RangeError('OBJ index exceeds vertices');return point;});
@@ -53,10 +55,11 @@ function obj(text:string,progress?:(value:number)=>void):Array<{name:string;geom
   return parts.filter(part=>part.positions.length).map(part=>({name:part.name,geometry:flat(part.positions)}));
 }
 
-export function parseCADGeometry(input:string|ArrayBuffer|ArrayBufferView,format:'stl'|'obj',progress?:(value:number)=>void):Array<{name:string;geometry:Geometry}> {
+/** `maxParts`: most OBJ objects and groups (default 100,000; up to core's 8,388,608 entities). */
+export function parseCADGeometry(input:string|ArrayBuffer|ArrayBufferView,format:'stl'|'obj',progress?:(value:number)=>void,maxParts?:number):Array<{name:string;geometry:Geometry}> {
  if(!['stl','obj'].includes(format))throw new TypeError('CAD supports STL and OBJ');const data=typeof input==='string'?input:input instanceof ArrayBuffer?new Uint8Array(input):new Uint8Array(input.buffer,input.byteOffset,input.byteLength);
  if((typeof data==='string'?new TextEncoder().encode(data).length:data.length)>maxBytes)throw new RangeError('CAD exceeds 64 MiB');
- const definitions=format==='stl'?stl(data,progress):obj(typeof data==='string'?data:new TextDecoder('utf8',{fatal:true}).decode(data),progress);if(!definitions.length)throw new Error('CAD contains no geometry');return definitions;
+ const definitions=format==='stl'?stl(data,progress):obj(typeof data==='string'?data:new TextDecoder('utf8',{fatal:true}).decode(data),progress,maxParts);if(!definitions.length)throw new Error('CAD contains no geometry');return definitions;
 }
 
 export function fingerprint(geometry:Geometry):Float32Array {

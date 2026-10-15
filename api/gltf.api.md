@@ -5,6 +5,10 @@
 ```ts
 import { EngineKernel, Mesh } from "@margoengine/core";
 
+export interface GLTFOptions {
+    maxNodes?: number;
+}
+
 export interface Model {
     root: MeshHandle;
     meshes: readonly MeshHandle[];
@@ -12,9 +16,9 @@ export interface Model {
     dispose(): void;
 }
 
-export function loadGLTF(engine: EngineKernel, url: string | URL, { signal }?: {
+export function loadGLTF(engine: EngineKernel, url: string | URL, { signal, maxNodes }?: GLTFOptions & {
     signal?: AbortSignal;
 }): Promise<Model>;
 
-export function parseGLTF(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, suppliedBuffers?: Array<ArrayBuffer | ArrayBufferView>): Model;
+export function parseGLTF(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, suppliedBuffers?: Array<ArrayBuffer | ArrayBufferView>, { maxNodes }?: GLTFOptions): Model;
 ```
