@@ -1785,21 +1785,30 @@ Before launch, in addition to the work queue:
   then check `npm create margo@latest my-app` from a clean directory and add the command to the README and the
   margoengine.com getting-started page.
 
-### Release presentation: many small packages (Scott, 2026-10-15)
+### Release presentation: many small packages (Scott, 2026-10-15; checked against the repo the same day)
 
-Position the package count as the reason core stays small, not as something to learn. Risk to manage: "do I need 40
-installs to draw a cube?" and "will package versions clash?". Facts as of 2026-10-15 (recount before publishing):
-73 packages including `margoengine`; core + stage 19,928 B gzip (`npm run measure:size`).
-1. Two entry points, both on the getting-started page and the README top:
-   - Beginners and evaluators: `npm create margo@latest my-app` (template) or `npm install margoengine` (the existing
-     umbrella: core + gltf + machinery + creative + scenery, five-line setup). Check that the umbrella covers the common
-     80% (core, camera, PBR glTF, lighting, controls); add packages to it only if its own size stays reasonable and
-     report its gzip next to core's.
-   - Size-focused teams: install exactly what they use, e.g. `npm install @margoengine/core @margoengine/culling`.
-2. Group packages by layer everywhere they are listed (site catalog, docs/README.md, README): add a `category` field to
-   `docs/catalog.json` (build-catalog.js) and render the catalog grouped, never as one alphabetical list of 73.
-   Proposed layers, real package names (73):
-   - Core and setup (7): margoengine, core, math, quality, webgl, stats, inspector
+Message: the package split is WHY the engine starts small, and nobody has to learn it to start. The worry to answer
+up front: "do I need 40 installs to draw a cube?" and "will package versions clash?". Recount every number below right
+before publishing; use only measured numbers from claims.md.
+
+Facts today: 73 packages (72 `@margoengine/*` + `margoengine`). `margoengine` is the stage facade (`createStage`):
+core + stage = 19,928 B gzip (`npm run measure:size`). Installing it also installs gltf, machinery, creative and scenery,
+but their code loads only on first use (`app.load()` for glTF/STL/OBJ/STEP/IGES, `app.sky()`, particles, post), so a
+spinning model costs core + stage + the gltf entry.
+
+1. Three ways in, shown at the top of the README and the getting-started page, in this order:
+   - `npm create margo@latest my-app`: a working app from the template (quality tiers, orbit controls, stats,
+     environment lighting, the CSP `_headers` and 404 page).
+   - `npm install margoengine`: `createStage('#scene')`, then `app.load('model.glb')` - five lines, no other installs.
+   - Pick-and-choose: `npm install @margoengine/core @margoengine/gltf-pro @margoengine/culling` for teams that count
+     bytes. Each package README starts with its size and what it peers on.
+   Check before launch: does the stage cover the common case (environment lighting and shadows are separate packages
+   today)? Any addition is lazy-loaded or it raises core + stage, which must stay under 20,000 B.
+2. Show packages grouped by layer wherever they are listed (site catalog, docs/README.md, README), never as one
+   alphabetical list of 73: add a `category` field per package (build-catalog.js -> docs/catalog.json) and group the
+   catalog page. Layers (all 73 real names):
+   - Start here (2): margoengine, core
+   - Setup and diagnostics (5): math, quality, webgl, stats, inspector
    - Loading and formats (12): gltf, gltf-pro, loaders, decoders, fbx, usdz, usdz-export, exporters, ifc, blender,
      cache, splats
    - Rendering and lighting (18): materials, shader, environment, clustered, shadows, sky, toon, oit, lod, culling,
@@ -1811,11 +1820,13 @@ installs to draw a cube?" and "will package versions clash?". Facts as of 2026-1
    - Simulation and games (6): physics, navigation, navmesh, ecs, fsm, net
    - CAD and engineering (3): machinery, bvh, geometry
    - Frameworks (1): react
-3. No version clashes: publish every package in lockstep at the same version (1.0.0 together), with peer ranges on
-   `@margoengine/core` of `^1.0.0` (ties to 1h.g, Changesets). Say so on the getting-started page.
-4. Lead with the measured size: the modular split is why core + stage is under 20 KB gzip. Use only measured numbers
-   (claims.md); do NOT claim it "fits in the first TCP packet" (the first round trip carries ~14.6 KB, core + stage
-   is 19.9 KB) and do not invent package names.
+3. No version clashes: publish all 73 in lockstep at 1.0.0, every `@margoengine/core` peer range `^1.0.0`, one
+   changelog (1h.g). Not true yet: 71 packages are 0.1.0, dof and tonemap are 1.0.0; core ranges are `0.1.0` (exact) in
+   16 packages and `^0.1.0 || ^1.0.0` in 54; no Changesets setup. Fix all three before the first publish and add a
+   verify check that every package version and core range match.
+4. Wording: lead with "core + stage is under 20 KB gzip; everything else loads only if you use it". Never claim it
+   fits in the first TCP round trip (~14.6 KB; core + stage is 19.9 KB), never quote a package count or package name
+   without checking, and link docs/limits.md next to the size claim.
 
 ## Feature gaps versus three.js (after optimization; each as an optional package)
 
