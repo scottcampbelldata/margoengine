@@ -29,24 +29,24 @@ Making a game? [docs/guides/blender-game.md](docs/guides/blender-game.md) walks 
 The packages are not on npm yet (build from source, below). Once published, a React application installs:
 
 ```sh
-npm install @margoengine/core@0.1.0 @margoengine/react@0.1.0 react@^19 react-dom@^19
+npm install @margoengine/core@1.0.0 @margoengine/react@1.0.0 react@^19 react-dom@^19
 ```
 
 For plain TypeScript:
 
 ```sh
-npm install @margoengine/core@0.1.0
+npm install @margoengine/core@1.0.0
 ```
 
 Add optional packs as needed:
 
 ```sh
-npm install @margoengine/gltf@0.1.0
-npm install @margoengine/machinery@0.1.0
-npm install @margoengine/creative@0.1.0
+npm install @margoengine/gltf@1.0.0
+npm install @margoengine/machinery@1.0.0
+npm install @margoengine/creative@1.0.0
 ```
 
-The optional packs and React adapter require core 0.1.0. The React adapter supports React 18 and 19; the command above selects React 19.
+The optional packs and React adapter require core 1.0.0 (every package ships at the same version). The React adapter supports React 18 and 19; the command above selects React 19.
 
 ## Run from source
 
@@ -211,7 +211,7 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. E
 
 <!-- /package-list -->
 
-Core plus the stage facade is **under 20 kB gzip** (19,577 bytes at `e2cc4c5`; `npm run measure:size` prints the current figure), including the embedded Wasm kernel and the WebGPU backend (the WebGL2 fallback is the optional `@margoengine/webgl`, 2.2 kB gzip). The base is feature-frozen for v1.0.0; the package build, locally and in the CI workflow, fails at a combined size of **20,000 bytes gzip or above** and checks package isolation. Optional PBR, animation and SSAO packages use the existing extension hooks and do not enter the base bundle. The build also retains the 30 KiB combined core/static-glTF budget and 30 KiB raw Wasm budget. React/framework/application code is additional; domain packages have no 20 KiB ceiling.
+Core plus the stage facade is **under 20 kB gzip** (19,999 bytes at `1f11e86`; `npm run measure:size` prints the current figure), including the embedded Wasm kernel and the WebGPU backend (the WebGL2 fallback is the optional `@margoengine/webgl`, 2.2 kB gzip). The base is feature-frozen for v1.0.0; the package build, locally and in the CI workflow, fails at a combined size of **20,000 bytes gzip or above** and checks package isolation. Optional PBR, animation and SSAO packages use the existing extension hooks and do not enter the base bundle. The build also retains the 30 KiB combined core/static-glTF budget and 30 KiB raw Wasm budget. React/framework/application code is additional; domain packages have no 20 KiB ceiling.
 
 The six requested game modules (shadows, clustered, animator, TAA, VFX and splats), plus terrain, use those hooks. Build with `npm run build:packages`; run `npm run modern:test:game` for their combined WebGPU rendering/culling/cache/IK/particle checks, temporal reprojection/clamping, skinned motion, stable radix sorting and ellipse blending. `npm run modern:test:game:packages` checks ten packed packages and seven standalone README TypeScript examples. The normal sort test covers 66,049 splats across hierarchical scan blocks; set `SPLAT_STRESS=1` for the additional three-million-splat capacity/sort check. Million-particle, three-million-splat and 1,024-light execution tests validate correctness separately from FPS claims. These source packages have not been published by this change.
 

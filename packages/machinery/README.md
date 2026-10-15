@@ -5,7 +5,7 @@ Joints and couplings, bounded IK, Wasm surface transport, binary telemetry, work
 Package name: `@margoengine/machinery`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
 
 ```sh
-npm install @margoengine/core@0.1.0 @margoengine/machinery@0.1.0
+npm install @margoengine/core@1.0.0 @margoengine/machinery@1.0.0
 ```
 
 ```ts

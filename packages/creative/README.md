@@ -7,7 +7,7 @@ Each capability has one implementation: `GPUParticles` is a preset over `@margoe
 Package name: `@margoengine/creative`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
 
 ```sh
-npm install @margoengine/core@0.1.0 @margoengine/creative@0.1.0
+npm install @margoengine/core@1.0.0 @margoengine/creative@1.0.0
 ```
 
 ```ts
