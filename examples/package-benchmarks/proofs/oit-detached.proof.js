@@ -1,6 +1,6 @@
 // Proof that gltf-pro's transparency hook (HANDOFF 5f.b, @margoengine/oit) changes nothing on the GPU while no hook is set:
 // gltf-pro at `ref` (before the hook) and in the working tree record every GPU call, descriptor, shader module and buffer
-// write of a 6-frame story: opaque, MASK, BLEND, BLEND + transmission, BLEND + clearcoat (physical) and a BLEND material
+// write of a 6-frame story: opaque, MASK, BLEND (twice), BLEND + clearcoat (physical) and a BLEND material
 // with a custom renderState, a text-patching lighting effect added and removed, a hidden blended node, an HDR and a
 // canvas target, MSAA 1x/4x, beauty/SSAO-ambient/G-buffer draws through the frame graph and directly. They must be identical.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/oit-detached.proof.js [ref] [pin] [--current]
@@ -14,7 +14,9 @@ import {animatedTriangle} from '../../../tests/support/gltf-pro-fixture.js';
 const {ref, pin} = refs('b803d56', '0e02ead', 'b803d56');
 const {baseline, candidate} = await versions('gltf-pro', ref, undefined, pin);
 const materials = [{}, {alphaMode: 'MASK', alphaCutoff: 0.3}, {alphaMode: 'BLEND', pbrMetallicRoughness: {baseColorFactor: [1, 0, 0, 0.5]}},
-  {alphaMode: 'BLEND', extensions: {KHR_materials_transmission: {transmissionFactor: 0.5}}},
+  // Was BLEND + KHR_materials_transmission (0.5) until 5w.f: transmission now draws twice (tint multiply, then the lit
+  // surface) with the transmissive shader, by design; packages/gltf-pro/tests/materials-ext.test.js covers it.
+  {alphaMode: 'BLEND', pbrMetallicRoughness: {baseColorFactor: [1, 1, 0, 0.6]}},
   {alphaMode: 'BLEND', pbrMetallicRoughness: {baseColorFactor: [0, 0, 1, 0.4]}, extensions: {KHR_materials_clearcoat: {clearcoatFactor: 1}}},
   {alphaMode: 'BLEND', pbrMetallicRoughness: {baseColorFactor: [0, 1, 0, 0.3]}}];
 
@@ -23,7 +25,7 @@ async function story(gltf, samples) {
   const renderer = {backend: 'webgpu', gpu: gpu.device, add() {}, remove() {}, render() {}, dispose() {}};
   const engine = new Engine(canvas, store, renderer, {position: [0, 0, 4], target: [0, 0, 0]}, null);
   const fixture = animatedTriangle(), primitive = fixture.doc.meshes[0].primitives[0];
-  Object.assign(fixture.doc, {materials, extensionsUsed: ['KHR_materials_transmission', 'KHR_materials_clearcoat'], meshes: materials.map((_, material) => ({primitives: [{...primitive, material}]})),
+  Object.assign(fixture.doc, {materials, extensionsUsed: ['KHR_materials_clearcoat'], meshes: materials.map((_, material) => ({primitives: [{...primitive, material}]})),
     nodes: materials.map((_, mesh) => ({mesh, translation: [0.1 * mesh, 0, -mesh]}))});
   delete fixture.doc.skins; delete fixture.doc.animations;
   const log = gpu.record(() => {

@@ -2,10 +2,11 @@
 // (`npx vite`) after `npm run build:packages`, then open /examples/khronos-gallery.html: every model in
 // assets/khronos/manifest.json is loaded in turn and reported (loads or the error, extensions gltf-pro ignores, GPU
 // validation errors). `?model=Name` shows one model as a still frame; that is the view scripts/visual-regression.js
-// captures (readiness: body[data-ready]).
+// captures (readiness: body[data-ready]); `&variant=Name` (or its index) shows that KHR_materials_variants variant (model.selectVariant).
 import {createStage} from 'margoengine';
 import {applyGLTFLights, loadGLTF, viewGLTFCamera} from '@margoengine/gltf-pro';
 import {instancing} from '@margoengine/gltf-pro/instancing';
+import {extendedMaterials} from '@margoengine/gltf-pro/extended';
 import {DracoDecoder, KTX2Decoder, MeshoptDecoder} from '@margoengine/decoders';
 import {Environment, EnvironmentLighting, ColorBackground} from '@margoengine/environment';
 import {OrbitControls} from '@margoengine/controls';
@@ -16,7 +17,8 @@ import {afterPresented} from '../packages/shared/demo-frame.js';
 // below). Any other extension in extensionsUsed is ignored by the loader and listed as a gap.
 const HANDLED = new Set(['KHR_mesh_quantization', 'KHR_texture_transform', 'KHR_materials_emissive_strength', 'KHR_materials_unlit',
   'KHR_materials_clearcoat', 'KHR_materials_transmission', 'KHR_materials_ior', 'KHR_materials_volume', 'KHR_materials_sheen',
-  'KHR_materials_specular', 'EXT_texture_webp', 'EXT_texture_avif', 'EXT_mesh_gpu_instancing', 'KHR_draco_mesh_compression',
+  'KHR_materials_specular', 'KHR_materials_iridescence', 'KHR_materials_anisotropy', 'KHR_materials_diffuse_transmission', 'KHR_materials_variants',
+  'EXT_texture_webp', 'EXT_texture_avif', 'EXT_mesh_gpu_instancing', 'KHR_draco_mesh_compression',
   'EXT_meshopt_compression', 'KHR_meshopt_compression', 'KHR_texture_basisu', 'KHR_lights_punctual']);
 
 // Neutral studio: grey gradient sky with two soft white key lights (equirect, linear radiance).
@@ -42,7 +44,7 @@ async function main() {
   ColorBackground.attach(engine, {color: '#5d6168', bottom: '#2c2f34'});
   const environment = await Environment.attach(engine, studio());
   const lighting = EnvironmentLighting.attach(engine, environment);
-  const decoders = {draco: new DracoDecoder(), ktx2: new KTX2Decoder({device}), meshopt: MeshoptDecoder, instancing};
+  const decoders = {draco: new DracoDecoder(), ktx2: new KTX2Decoder({device}), meshopt: MeshoptDecoder, instancing, materials: extendedMaterials};
   const controls = OrbitControls.attach(engine);
   let clustered; // for KHR_lights_punctual point and spot lights, attached by the first model that has some
   const camera = engine.camera, fov = camera.fov, light = [engine.lighting.direction.slice(), engine.lighting.radiance.slice()];
@@ -61,6 +63,7 @@ async function main() {
       row.loadMs = Math.round(performance.now() - start);
       const used = model.asset.doc.extensionsUsed ?? [];
       row.ignored = used.filter(e => !HANDLED.has(e));
+      if (only && params.has('variant')) {const v = params.get('variant'); model.selectVariant(/^\d+$/.test(v) ? Number(v) : v);}
       lighting.add(model);
       // The file's lights (applyGLTFLights): a directional light replaces the engine's, scaled to its default strength 3.
       const sun = model.lights.find(l => l.type === 'directional');

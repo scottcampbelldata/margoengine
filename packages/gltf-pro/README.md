@@ -109,6 +109,7 @@ fragment (the capture keeps every binding of the lit shader and adds none; SSR's
 | gltf-pro standard | 5 (5) | 6 (6) | 6 (6) | 6 (6) | 8 (8) |
 | gltf-pro physical (clearcoat, transmission, sheen, specular, ior, volume) | 13 (13) | 14 (14) | 14 (14) | 14 (14) | **16 (16)** |
 | gltf-pro physical, refracting (transmission hook, its pass only) | 14 (14) | 15 (15) | 15 (15) | 15 (15) | 17 (17): throws |
+| gltf-pro extended (iridescence, anisotropy, diffuse transmission), E = distinct extension textures it uses, E ≤ 8 | 5+E | 6+E | 6+E | 6+E | 8+E, worst case **16 (16)** |
 | materials `standard`, `basic`, `normal` | 10 (10) | 11 (11) | 11 (11) | 11 (11) | 13 (13) |
 | materials `matcap` | 11 (11) | 12 (12) | 12 (12) | 12 (12) | 14 (14) |
 | materials physical options (factor-only physical variant) | 10 (10) | 11 (11) | 11 (11) | 11 (11) | 13 (13) |
@@ -128,6 +129,14 @@ LUT 1 = 5 of the 8 per stage WebGPU guarantees (6 with light probes). The G-buff
 environment:lighting + clustered + clustered:shadows + shader patch needs 17 sampled textures per shader stage; this
 device allows 16`. Physical materials with every lighting package use all 16 of both, so any further texture on them
 (a custom shader patch) needs a device created with raised limits.
+
+Extended materials (see "Extended materials") bind only the extension maps they use: the five base maps always (text
+patches rely on them), then one binding per distinct glTF texture among the 13 extension maps (clearcoat 3,
+transmission, sheen 2, specular 2, iridescence 2, anisotropy, diffuse transmission 2; maps sharing a texture, such as
+an ORM image read for occlusion and diffuse transmission, bind it once and keep their own UV rows), at most 8. A
+material naming more than 8 distinct extension textures keeps the first 8 in that order and reads the spec default for
+the rest (`extendedTextureLimit`), so every extended permutation stays within 16 with shadows, IBL and LocalShadows
+(`tests/materials-ext.test.js` composes the worst case: 16; `scripts/gltf-pro-materials-gpu-check.js` builds it on a GPU).
 
 ### Instancing
 
@@ -288,7 +297,7 @@ buffers / 231 MB to 484 / 174 MB, with byte-identical data per primitive (HANDOF
 
 ## Extensions and compressed files
 
-Supported glTF extensions: `KHR_mesh_quantization`, `KHR_texture_transform`, `KHR_materials_emissive_strength`, `KHR_materials_unlit`, `KHR_lights_punctual`, `KHR_materials_clearcoat`, `KHR_materials_transmission`, `KHR_materials_ior`, `KHR_materials_volume`, `KHR_materials_sheen`, `KHR_materials_specular`, `EXT_texture_webp`, `EXT_texture_avif`, plus `EXT_mesh_gpu_instancing` (`TRANSLATION`, `ROTATION` including normalized integers, `SCALE`; the node's primitives get one `PBRInstances`, see "Instancing"), `KHR_draco_mesh_compression`, `EXT_meshopt_compression` (and `KHR_meshopt_compression`) and `KHR_texture_basisu` when you pass the matching decoder (`instancing` from `@margoengine/gltf-pro/instancing` for the first). A file is rejected only when its `extensionsRequired` lists something still unsupported; the error names each one and the decoder it needs.
+Supported glTF extensions: `KHR_mesh_quantization`, `KHR_texture_transform`, `KHR_materials_emissive_strength`, `KHR_materials_unlit`, `KHR_lights_punctual`, `KHR_materials_clearcoat`, `KHR_materials_transmission`, `KHR_materials_ior`, `KHR_materials_volume`, `KHR_materials_sheen`, `KHR_materials_specular`, `KHR_materials_variants`, `EXT_texture_webp`, `EXT_texture_avif`, plus `EXT_mesh_gpu_instancing` (`TRANSLATION`, `ROTATION` including normalized integers, `SCALE`; the node's primitives get one `PBRInstances`, see "Instancing"), `KHR_draco_mesh_compression`, `EXT_meshopt_compression` (and `KHR_meshopt_compression`) and `KHR_texture_basisu` when you pass the matching decoder (`instancing` from `@margoengine/gltf-pro/instancing` for the first), and `KHR_materials_iridescence`, `anisotropy` and `diffuse_transmission` with `materials` from `@margoengine/gltf-pro/extended` (see "Extended materials"). A file is rejected only when its `extensionsRequired` lists something still unsupported; the error names each one and the decoder it needs.
 
 This package does not import `@margoengine/decoders`. Pass decoders in, so files without compression pay nothing:
 
@@ -325,9 +334,64 @@ if (model.cameras.length) viewGLTFCamera(model);
 
 Materials using clearcoat, transmission, IOR, volume, sheen or specular compile a separate shader variant with eight more texture slots (clearcoat, clearcoat roughness, clearcoat normal, transmission, sheen color, sheen roughness, specular, specular color), so plain materials keep the original shader and bindings. Approximations, by design:
 
-- Transmission refracts only through a transmission hook (`@margoengine/materials/transmission`: `transmission.add(model)`, see "Transmission hook"). Without one a transmissive surface draws in the blended queue with its diffuse reduced by the transmission factor and texture, and the background shows through multiplied by one per-material tint: base color × transmission × volume attenuation (`attenuationColor` raised to `thicknessFactor / attenuationDistance`), so `transmissionTexture` varies the surface but not the background. `thicknessTexture` is ignored either way.
+- Transmission refracts only through a transmission hook (`@margoengine/materials/transmission`: `transmission.add(model)`, see "Transmission hook"). Without one a transmissive surface draws in the blended queue with its diffuse reduced by the transmission factor and texture, and the background shows through multiplied by one per-material tint: base color × transmission × volume attenuation (`attenuationColor` raised to `thicknessFactor / attenuationDistance`), so `transmissionTexture` varies the surface but not the background. `thicknessTexture` is ignored either way. The blended form draws twice: the `margoTint` entry multiplies what is behind by the tint (blend `zero, src`), then the lit surface adds on top (`one, one`). Image-based lighting, light probes and clustered lights shade only the untransmitted diffuse share. (Before 5w.f an IBL lit clear glass white, and the blend-constant tint read as 0 in Edge on D3D12 with 4x MSAA, so CommercialRefrigerator's door hid its bottles.)
 - Sheen (Charlie distribution) and clearcoat (GGX on its own normal, F0 0.04) respond to the key light and the hemisphere fill. Image-based lighting patches and clustered lights light the base layer only.
 - IOR and `KHR_materials_specular` set the dielectric F0 as three.js does: `min(((ior-1)/(ior+1))² × specularColor, 1) × specular`.
+
+### Extended materials
+
+`KHR_materials_iridescence`, `KHR_materials_anisotropy` and `KHR_materials_diffuse_transmission` are an opt-in entry,
+passed like a decoder, so apps that never load such files ship none of their WGSL (`@margoengine/gltf-pro/extended`,
+see [entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)). Without it they are ignored, and a
+file that requires one is rejected naming the `materials` decoder.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from '@margoengine/gltf-pro';
+import {extendedMaterials} from '@margoengine/gltf-pro/extended';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const lamp = await loadGLTF(stage.engine, '/IridescenceLamp.glb', {decoders: {materials: extendedMaterials}});
+```
+
+With it, a material whose `iridescenceFactor`, `anisotropyStrength` or `diffuseTransmissionFactor` is above 0 compiles
+an extended variant of the physical shader (per combination of the three and per texture plan, built on first use; a
+1,088-byte uniform instead of 880). Materials without them, or with those factors at 0, keep their shaders, bindings and
+GPU calls (`oit-detached`, `gltf-pro-lighting-hooks` and `binding-limit` proofs identical). Written from the Khronos
+specifications:
+
+- `KHR_materials_iridescence`: the thin-film Fresnel of the spec's "Iridescence Fresnel" section (Belcour and Barla
+  2017: Schlick at both interfaces, phase shifts, two Fourier terms of the spectral integral, XYZ to linear Rec. 709),
+  evaluated once per pixel at n·v with the base F0, thickness `mix(min, max, texture.g)`; it replaces Fresnel by the
+  iridescence strength, diffuse weighted by 1 − its largest channel (`rgb_mix`).
+- `KHR_materials_anisotropy`: Burley's anisotropic GGX with the spec's height-correlated visibility, alpha along the
+  rotated texture direction `mix(roughness², 1, strength²)`; image-based light along the spec's bent normal.
+- `KHR_materials_diffuse_transmission`: Lambert reflection mixed with a Lambert BTDF of the colour factor and texture,
+  lit from the back side (directional light and image-based light).
+- Image-based light (environment, probes) is evaluated through the `ambient` hook on modified surfaces, assuming a
+  split-sum term: the thin-film Fresnel replaces its F0, the back side's irradiance passes the diffuse transmission colour.
+  Limits: clustered point and spot lights use the isotropic BRDF without the thin film and only front-side diffuse;
+  anisotropic IBL also bends the diffuse normal; iridescence under clearcoat ignores the extra interface (as the spec).
+
+`tests/materials-ext.test.js` checks the CPU reference (`tests/support/khr-brdf.js`, from the specs) and the shader
+plans; `node scripts/gpu-lock.mjs run --owner=<id> -- node scripts/gltf-pro-materials-gpu-check.js` compiles every
+permutation on a real GPU and compares the WGSL Fresnel and BRDF with that reference.
+
+### Material variants
+
+`model.variants` lists the file's `KHR_materials_variants` names; `model.selectVariant(name | index)` gives every
+primitive with a mapping for that variant the mapped material and every other primitive its own; `selectVariant()`
+restores the file's materials. A variant's textures upload on first use and stay cached; switching rebinds only the
+primitives that change. With `@margoengine/gltf-pro/progressive`, switch after `complete`.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from '@margoengine/gltf-pro';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const shoe = await loadGLTF(stage.engine, '/MaterialsVariantsShoe.glb');
+console.log(shoe.variants);    // ['midnight', 'beach', 'street']
+shoe.selectVariant('beach');
+shoe.selectVariant();          // back to the file's own materials
+```
 
 Limits: `POINTS`, `LINES`, `LINE_LOOP` and `LINE_STRIP` primitives go to `model.pointsAndLines` (point and line lists, one pixel wide, unlit without a `NORMAL`: the base colour, emission not added) and draw in the beauty pass only, with no shadows, SSAO, SSR, transparency hook, picking, BVH or export; progressive loads leave them out. Triangle strips and fans become triangle lists. Four skin influences in the animation package; texture coordinate sets beyond 1 are rejected. Ambient fill uses fixed sky/ground colors unless `@margoengine/environment`'s `EnvironmentLighting` is applied to the model (`ibl.add(model)`), which adds image-based lighting. Bounds describe the original mesh. Core `engine.pick` returns models only when `@margoengine/selection`'s `Picking` is attached; bvh's `Raycaster` hits them on the CPU.
 

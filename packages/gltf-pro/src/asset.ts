@@ -1,6 +1,7 @@
 import {readResponse} from '../../shared/loading.js';
 import {checkCount, countLimit} from '../../shared/limits.js';
 import type {PBRInstances} from './instancing.js';
+import type {ExtendedPlan} from './shader.js';
 export type GLTFDocument = Record<string, any>;
 /**
  * Default `maxDownloadBytes` (128 MiB): twice the largest real file tested (a 65.1 MB CAD conveyor GLB). Decoded
@@ -25,9 +26,24 @@ export interface GLTFDecoderHooks {
   ktx2?: {transcode(data: Uint8Array, options?: {signal?: AbortSignal}): Promise<GLTFCompressedImage>};
   /** EXT_mesh_gpu_instancing: `instancing` from @margoengine/gltf-pro/instancing. */
   instancing?: {read(asset: GLTFAsset, extension: any): PBRInstances};
+  /** KHR_materials_iridescence, anisotropy and diffuse_transmission: `extendedMaterials` from @margoengine/gltf-pro/extended. */
+  materials?: GLTFExtendedMaterials;
 }
-const supported = new Set(['KHR_mesh_quantization','KHR_texture_transform','KHR_materials_emissive_strength','KHR_materials_unlit','KHR_lights_punctual','KHR_materials_clearcoat','KHR_materials_transmission','KHR_materials_ior','KHR_materials_volume','KHR_materials_sheen','KHR_materials_specular','EXT_texture_webp','EXT_texture_avif','EXT_mesh_gpu_instancing']);
-const hookFor: Record<string, keyof GLTFDecoderHooks> = {KHR_draco_mesh_compression: 'draco', EXT_meshopt_compression: 'meshopt', KHR_meshopt_compression: 'meshopt', KHR_texture_basisu: 'ktx2'};
+/** What gltf-pro needs to shade extended materials (`extendedMaterials` from @margoengine/gltf-pro/extended implements it). */
+export interface GLTFExtendedMaterials {
+  /**
+   * A glTF material's `extensions` read for its thin film, anisotropy and diffuse transmission, or undefined when none is
+   * in use (every factor 0): the features, map slots 13-17 (texture infos) and 12 uniform floats (rows iri, aniso, dtr).
+   */
+  parse(extensions: Record<string, any>): {features: Omit<ExtendedPlan, 'slots'>; maps: unknown[]; rows: number[]} | undefined;
+  /** The binding plan for a material's 18 map slots (`extendedPlan`). */
+  plan(maps: readonly ({index: number} | undefined)[], features: Omit<ExtendedPlan, 'slots'>): ExtendedPlan;
+  /** The extended physical shader for a plan (`extendedShader`). */
+  shader(plan: ExtendedPlan): string;
+}
+const supported = new Set(['KHR_mesh_quantization','KHR_texture_transform','KHR_materials_emissive_strength','KHR_materials_unlit','KHR_lights_punctual','KHR_materials_clearcoat','KHR_materials_transmission','KHR_materials_ior','KHR_materials_volume','KHR_materials_sheen','KHR_materials_specular','KHR_materials_variants','EXT_texture_webp','EXT_texture_avif','EXT_mesh_gpu_instancing']);
+const hookFor: Record<string, keyof GLTFDecoderHooks> = {KHR_draco_mesh_compression: 'draco', EXT_meshopt_compression: 'meshopt', KHR_meshopt_compression: 'meshopt', KHR_texture_basisu: 'ktx2',
+  KHR_materials_iridescence: 'materials', KHR_materials_anisotropy: 'materials', KHR_materials_diffuse_transmission: 'materials'};
 const meshopt = (def: any) => def?.extensions?.EXT_meshopt_compression ?? def?.extensions?.KHR_meshopt_compression;
 export function integer(value: unknown, label: string, min = 0): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min) throw new TypeError('Invalid glTF ' + label);

@@ -1,6 +1,6 @@
 {
-  "commit": "719c7a7",
-  "dirty": false,
+  "commit": "e525b6e",
+  "dirty": true,
   "browser": "msedge 155.0.4283.45 headless",
   "adapter": "intel xe-2lpg",
   "method": "Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults",
@@ -15,15 +15,6 @@
       "brotli": 228
     },
     {
-      "path": "assets/index-BR7muG9J.js",
-      "role": "Entry: core + stage + app",
-      "encoding": "gzip",
-      "transferred": 20944,
-      "raw": 47732,
-      "gzip": 20563,
-      "brotli": 18105
-    },
-    {
       "path": "assets/geometry-CAWt7Gfm.js",
       "role": "Shared chunk",
       "encoding": "gzip",
@@ -31,6 +22,15 @@
       "raw": 2036,
       "gzip": 1016,
       "brotli": 938
+    },
+    {
+      "path": "assets/index-BR7muG9J.js",
+      "role": "Entry: core + stage + app",
+      "encoding": "gzip",
+      "transferred": 20944,
+      "raw": 47732,
+      "gzip": 20563,
+      "brotli": 18105
     },
     {
       "path": "assets/extension-DuYhGmhk.js",

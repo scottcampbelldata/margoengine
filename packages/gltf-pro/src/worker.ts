@@ -11,9 +11,10 @@ export type {PreparedGLTF} from './prepare.js';
 const decoding = ({decoders: d = {}, fetch}: {decoders?: GLTFDecoderHooks; fetch?: unknown}) => !!(fetch || d.draco || d.meshopt || d.ktx2);
 /**
  * Build a PBRModel from a worker's PreparedGLTF on this thread (GPU uploads happen here, at the model's setup).
- * `decoders` takes only the `instancing` reader (@margoengine/gltf-pro/instancing) for EXT_mesh_gpu_instancing.
+ * `decoders` takes only the `instancing` reader (@margoengine/gltf-pro/instancing) for EXT_mesh_gpu_instancing and the
+ * `materials` shaders (@margoengine/gltf-pro/extended).
  */
-export function modelFromPrepared(instance: EngineKernel, prepared: PreparedGLTF, signal?: AbortSignal, decoders: Pick<GLTFDecoderHooks, 'instancing'> = {}): PBRModel {
+export function modelFromPrepared(instance: EngineKernel, prepared: PreparedGLTF, signal?: AbortSignal, decoders: Pick<GLTFDecoderHooks, 'instancing' | 'materials'> = {}): PBRModel {
   let model: PBRModel | undefined;
   try {
     signal?.throwIfAborted();

@@ -184,6 +184,7 @@ export function loadGLTFProgressive(instance: EngineKernel, url: string | URL, o
     // Placeholder geometry through the worker path's packed-geometry map; the buffers fill in when the stream completes.
     defs.forEach((p, k) => {const b = box(doc, p); local[k] = [b.lo, b.hi]; if (p && typeof p === 'object') packed.set(p, b);});
     if (decoders.instancing) hooks.instancing = {read: () => undefined};
+    if (decoders.materials) hooks.materials = decoders.materials;
     asset = new GLTFAsset(doc, (doc.buffers ?? []).map((b: any) => new Uint8Array(Number.isSafeInteger(b?.byteLength) && b.byteLength > 0 ? b.byteLength : 0)), undefined, hooks, limit, options.maxNodes);
     images = Array.from(doc.images ?? [], () => undefined); settled = images.map(() => false); progress.images = images.length;
     model = new PBRModel(instance, asset, images);

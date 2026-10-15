@@ -44,7 +44,7 @@ test('BLEND primitives leave the beauty pass and accumulate into rgba16float + r
   assert.equal(composite.depthStencilAttachment, undefined);
   const textures = of(log, 'texture').map(e => e[2]).filter(t => t.label?.startsWith('oit:'));
   assert.deepEqual(textures.map(t => [t.format, t.sampleCount, t.size]), [['rgba16float', 1, [1280, 720]], ['r16float', 1, [1280, 720]], ['rgba16float', 4, [1280, 720]], ['r16float', 4, [1280, 720]]]);
-  assert.equal(draws(log), 4, 'opaque + transmission in beauty, two BLEND primitives accumulated');
+  assert.equal(draws(log), 5, 'opaque + transmission (tint, then lit: gltf-pro 5w.f) in beauty, two BLEND primitives accumulated');
   const pipelines = of(log, 'renderPipeline').map(e => e[2]), transparent = pipelines.filter(p => p.fragment.entryPoint === 'transparent');
   assert.equal(transparent.length, 2, 'standard and physical variants');
   for (const p of transparent) {
@@ -77,11 +77,11 @@ test('1x: targets drawn directly; nothing transparent visible: no OIT passes; di
   for (const a of accumulate.colorAttachments) {assert.equal(a.resolveTarget, undefined); assert.equal(a.storeOp, 'store');}
   assert.equal(new Float32Array(Uint8Array.from(Buffer.from(of(log, 'writeBuffer').find(e => e[3].length === 32)[3], 'hex')).buffer)[0], 0.5, 'fixed depthScale');
   for (const i of [1, 3]) model.nodes[i].visible = false;
-  const hidden = frame(1); assert.equal(passes(hidden).length, 2, 'no accumulate or composite when nothing transparent is drawn'); assert.equal(draws(hidden), 2);
+  const hidden = frame(1); assert.equal(passes(hidden).length, 2, 'no accumulate or composite when nothing transparent is drawn'); assert.equal(draws(hidden), 3, 'opaque + transmission twice');
   for (const i of [1, 3]) model.nodes[i].visible = true;
   oit.dispose(); assert.equal(engine.hasPlugin(oit.name), false);
   const sorted = frame(2);
-  assert.equal(passes(sorted).length, 4, 'opaque pass + one pass per blended primitive'); assert.equal(draws(sorted), 4);
+  assert.equal(passes(sorted).length, 4, 'opaque pass + one pass per blended primitive'); assert.equal(draws(sorted), 5, 'transmission draws twice');
   assert.ok(!passes(sorted).some(p => p.label), 'no OIT passes'); assert.throws(() => oit.add(model), /disposed/);
 });
 

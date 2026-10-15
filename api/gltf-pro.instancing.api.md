@@ -34,6 +34,13 @@ export const instancing: {
 
 // Not exported from this entry, but used by the exports above:
 
+interface ExtendedPlan {
+    readonly slots: readonly number[];
+    readonly iridescence: boolean;
+    readonly anisotropy: boolean;
+    readonly diffuseTransmission: boolean;
+}
+
 class GLTFAsset {
     readonly doc: GLTFDocument;
     readonly hooks: GLTFDecoderHooks;
@@ -85,9 +92,22 @@ interface GLTFDecoderHooks {
     instancing?: {
         read(asset: GLTFAsset, extension: any): PBRInstances;
     };
+    materials?: GLTFExtendedMaterials;
 }
 
 type GLTFDocument = Record<string, any>;
+
+interface GLTFExtendedMaterials {
+    parse(extensions: Record<string, any>): {
+        features: Omit<ExtendedPlan, 'slots'>;
+        maps: unknown[];
+        rows: number[];
+    } | undefined;
+    plan(maps: readonly ({
+        index: number;
+    } | undefined)[], features: Omit<ExtendedPlan, 'slots'>): ExtendedPlan;
+    shader(plan: ExtendedPlan): string;
+}
 
 interface TextureTransform {
     offset?: readonly number[];
