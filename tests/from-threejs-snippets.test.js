@@ -1,21 +1,22 @@
-// Type-checks every Margo snippet (```ts block) in docs/from-threejs.md against the built packages, so the guide
-// fails the unit run when an API it shows is renamed or removed. Needs `npm run build:packages` first.
+// Type-checks every Margo snippet (```ts block) in docs/from-threejs.md and docs/guides/*.md against the built packages,
+// so a guide fails the unit run when an API it shows is renamed or removed. Needs `npm run build:packages` first.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+import {mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
-const doc = readFileSync(resolve(root, 'docs/from-threejs.md'), 'utf8');
-const snippets = [...doc.matchAll(/```ts\r?\n([\s\S]*?)```/g)].map(match => ({code: match[1], line: doc.slice(0, match.index).split('\n').length + 1}));
+const guides = ['docs/from-threejs.md', ...readdirSync(resolve(root, 'docs/guides')).filter(name => name.endsWith('.md')).map(name => `docs/guides/${name}`)];
 
-test('docs/from-threejs.md Margo snippets type-check against the built packages', () => {
-  assert.ok(snippets.length >= 20, `expected the guide's snippets, found ${snippets.length}`);
+for (const file of guides) test(`${file} Margo snippets type-check against the built packages`, () => {
+  const doc = readFileSync(resolve(root, file), 'utf8');
+  const snippets = [...doc.matchAll(/```ts\r?\n([\s\S]*?)```/g)].map(match => ({code: match[1], line: doc.slice(0, match.index).split('\n').length + 1}));
+  assert.ok(snippets.length >= (file === 'docs/from-threejs.md' ? 20 : 1), `expected the guide's snippets, found ${snippets.length}`);
   for (const {code, line} of snippets) for (const [, from] of code.matchAll(/from '([^']+)'/g))
-    assert.match(from, /^(margoengine|@margoengine\/[a-z0-9-]+(\/[a-z0-9-]+)?)$/, `snippet at line ${line} imports ${from}`);
+    assert.match(from, /^(margoengine|@margoengine\/[a-z0-9-]+(\/[a-z0-9-]+)?|@dimforge\/rapier3d-compat)$/, `snippet at line ${line} imports ${from}`);
   // Inside the repository so package resolution finds node_modules; test-results is git-ignored.
-  const dir = resolve(root, 'test-results/from-threejs-snippets');
+  const dir = resolve(root, 'test-results/snippets', file.replace(/[/.]/g, '-'));
   rmSync(dir, {recursive: true, force: true}); mkdirSync(dir, {recursive: true});
   writeFileSync(resolve(dir, 'globals.d.ts'), [
     "import type {EngineKernel, Mesh} from '@margoengine/core';",
@@ -29,7 +30,7 @@ test('docs/from-threejs.md Margo snippets type-check against the built packages'
   try {
     execFileSync(process.execPath, [resolve(root, 'node_modules/typescript/bin/tsc'), '-p', resolve(dir, 'tsconfig.json')], {cwd: dir, encoding: 'utf8', stdio: 'pipe'});
   } catch (error) {
-    // Errors name line-<N>.ts, where N is the line of the snippet's first code line in docs/from-threejs.md.
-    assert.fail(`docs/from-threejs.md snippets do not type-check:\n${error.stdout}${error.stderr}`);
+    // Errors name line-<N>.ts, where N is the line of the snippet's first code line in the guide.
+    assert.fail(`${file} snippets do not type-check:\n${error.stdout}${error.stderr}`);
   }
 });

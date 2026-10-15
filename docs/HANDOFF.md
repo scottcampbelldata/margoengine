@@ -1099,6 +1099,20 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    command, hardware, browser and date that produced it; all runs serial on an idle GPU.
 3. Everything people need to evaluate it: getting-started docs, docs/from-threejs.md, API reference, comparison page,
    benchmark page, changelog, licence and third-party notices.
+   - [DONE] `docs/guides/blender-game.md`: a small third-person game from Blender exports (glTF export settings, custom
+     properties as level data, gltf-pro + `/worker` + decoders, animation + animator, input, Rapier physics, bvh
+     picking/ground snapping, navigation, ecs, audio, sky/water/shadows/post, quality, deploying, "What you build
+     yourself", measured numbers each linked to its result file). Linked from README and docs/README.md; its ```ts
+     snippets are type-checked by `tests/from-threejs-snippets.test.js` (now every `docs/guides/*.md` too). New API for
+     it: gltf-pro `model.extras()` -> `{node, nodeIndex, name, extras, matrix}` for every node with an object `extras`
+     (world matrix copied after a transform tick; +79 B gzip root; `packages/gltf-pro/tests/extras.test.js` builds a
+     Blender-shaped GLB). Update the guide when progressive loading, volumetric fog, the asset cache and the deployment
+     guide (5g.c, 5g.b, 5h.a, 5i.a) merge: it says "coming" for each. Gaps it found, not yet queued: water refraction
+     needs standalone Bloom's `sceneTexture` (PostStack has none, and standalone Bloom + SSAO refuse each other); SSR does
+     not reflect in glTF surfaces (5l.l); core `Mesh` has no public world matrix (packages read
+     `engineRuntime(engine).store.matrices`; the guide uses `node.matrix` after `engine.render`); physics bodies only on
+     root-level meshes, so glTF nodes need `model.root` or hand-built colliders; no physics/navmesh helper that collects
+     a model's world-space triangles (the guide inlines the loop); audio listener follows the camera only.
 4. Deploy the rebuilt site and demos to Cloudflare Pages (project `margoengine`): preview branch first, Scott checks
    it, then production (margoengine.com). Scott asked for the production push; still show him the preview link first.
 
