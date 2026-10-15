@@ -2164,6 +2164,16 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    "Proofs": one table of all 46 with baseline -> pin and the --current ref). H-04 (STALE) became PROVEN: `npm run
    proofs` reproduces every kept optimization proof; the summary is recounted (212 PROVEN, 6 STALE). Mock-GPU timings
    that predate the core speed-ups (PKG-055, the VAT numbers) are dated to `700838e` in the READMEs.
+11. **Security (Scott, 2026-10-15):** 0 open findings, each fixed with a regression test. (a) Every parser of untrusted
+   input (glTF/GLB, OBJ, STL, PLY, 3MF, PCD, XYZ, OFF, VTK, FBX, USD/USDZ, IFC, STEP/IGES, KTX2/Basis, Draco, meshopt,
+   EXR, HDR, UltraHDR, .margo, audio/video metadata, net snapshots) has a seeded fuzzer: malformed and hostile inputs
+   produce a named error within the size/time budget, never a hang, crash, out-of-range read or memory blowup; the
+   fuzzers run in `test:release`. (b) No script injection (user/file strings into innerHTML in html, labels,
+   inspector, stats, viewcube, frame debugger), no prototype pollution from file JSON (glTF extras/extensions, .margo),
+   validated worker messages, URIs from model files cannot escape their base (no path traversal, no surprise
+   cross-origin fetches, data:/blob: handled). (c) Supply chain: npm audit clean or justified, licences listed, lockfile
+   integrity checked, npm publish with 2FA + provenance (plan; publish needs Scott), SECURITY.md with a disclosure
+   address. Strict CSP stays (gate 10 / 5l.o).
 
 Before launch, in addition to the work queue:
 - Demos smooth on first load on desktop and phones, including Android. The Galaxy S23 3-5 FPS island issue is shelved
