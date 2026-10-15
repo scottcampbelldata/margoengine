@@ -49,7 +49,7 @@ const demos = [
   {id: 'flight-helmet', path: 'demos/flight-helmet.html', ready: "document.querySelector('#viewport')?.dataset.ready==='true'&&window.extensionDemo.quality!=='preview'"},
   {id: 'windy-meadow', path: 'demos/windy-meadow.html', ready: "document.querySelector('#viewport')?.dataset.ready==='true'"},
   {id: 'earth', path: 'demos/earth/', ready: "!!window.earthDemo&&window.earthDemo.quality!=='preview'"},
-  {id: 'dof', path: 'demos/dof/', ready: '!!window.dofDemo'},
+  {id: 'dof', path: 'demos/dof/', ready: '!!window.dofDemo', views: ['high', 'light', 'phone']},
   {id: 'tonemap', path: 'demos/tonemap/', ready: '!!window.tonemapDemo', views: ['high', 'phone']},
   // Khronos sample assets (HANDOFF 5w): one small view per model, served by a Vite dev server from the repo root
   // (`dev`) because the site build must not ship 250 MB of models. Models that fail to load are left out.
