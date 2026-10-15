@@ -33,9 +33,6 @@ export interface QualityPreset {
         enabled?: boolean;
         steps?: number;
     };
-    dof?: {
-        maxRadius?: number;
-    };
     volumetric?: {
         grid?: readonly [number, number, number];
     };

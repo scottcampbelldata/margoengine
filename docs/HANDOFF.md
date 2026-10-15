@@ -971,6 +971,25 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    b. Tier-aware feature presets: `@margoengine/quality` already picks light/full tiers (MSAA, DPR, pacing only). Add
       presets packages read on attach (shadow cascades/resolution, SSR off, volumetrics off/low grid, SSAO half-res,
       particle counts) so the light tier scales features automatically; measure the light tier on the laptop.
+      DONE: `applyQualityTier()` publishes the tier's `QualityPreset` as `globalThis.margoPreset` (core's `margoLow`
+      pattern: zero imports, automatic, no app plumbing; a `preset` option would need every app to pass it). Readers use
+      `packages/shared/preset.js` once at construction and fill only options left undefined (explicit wins; no preset ->
+      the app's own options object, unchanged). Light = phone preset: Shadows `resolution` 1024, SSAO `samples` 16, SSR
+      `enabled: false` + `steps` 32, VolumetricFog `grid` [80,45,32], LocalShadows `resolution` 256, VFX `capacity`
+      100,000 (an explicit larger `initialCount` keeps 1M); full tier empty. Table: quality README; cookbook
+      `docs/guides/quality-tiers.md`. Not preset: shadows cascades/PCSS (fixed in the package, no option), Bloom/FXAA/
+      Tonemap/TAA/culling (no cost knob), DOF (`maxRadius` 8 vs 16 measured no saving: fixed 64 taps; dropped).
+      Proofs: `proofs/quality-presets.proof.js` (6 readers, 1x/4x: recorded GPU calls identical to 96daac7 without a
+      preset; preset == passing its values; explicit wins), contract tests `packages/quality/test` (writer) and
+      `tests/quality-presets.test.js` (readers). Bytes (min+gzip): quality +172 (1,477); shadows +64, post root +69
+      (ssao +58, ssr +61), environment/volumetric +65 (root 0), clustered/shadows +71 (root 0), vfx +76; core 0.
+      Demos: DOF demo now applies the tier (it ran 4x everywhere; visual check gains `dof-light`); island particle
+      default comes from the preset (same 100k/1M). Every demo passes explicit values for preset-covered options, so
+      the presets change no shipped demo's settings. Measured (DIAGNOSTIC: busy machine, CPU 43%, AC, Edge 155, Arc
+      140V, GPU lock, 4 ABBA rounds x 6 s, `tier-presets-gpu.mjs`, `results/tier-presets-light-diagnostic.json`):
+      island light 1432x768 100k particles, presets off/on: 60.05/59.9 FPS, GPU span p50 10.33/10.16 ms (same config,
+      A/A); DOF demo light 1100x461: 60/60 FPS, submit-to-done p50 5.3 ms (maxRadius 16) / 5.6 ms (8). Both hold 60 on
+      the light tier with headroom. Not measured: the other demos on the light tier, a quiet-machine rerun.
    c. Pipeline pre-warming: core already compiles async; sections/fog have `enabled:false`. Add a general
       `warmUp(engine)` (async pipeline creation for every attached feature during loading) and measure first-use
       hitches per feature before/after.
@@ -1707,6 +1726,8 @@ engine behaviour belongs in packages, never only in demo code.
 - On the full tier, five consecutive seconds under 55 FPS store `'low'` and reload once.
 - Laptop result (Arc 140V, busy machine): stored `'low'`, light tier 53-61 FPS with 100k particles.
 - Reset: `localStorage.removeItem('margoQuality')` (the older `margoLow` key is still read as `'low'`).
+- Feature presets (5i.b): `applyQualityTier()` also sets `globalThis.margoPreset`; shadows, SSAO, SSR, volumetric
+  fog, local shadows and VFX fill options the app left undefined from it (table in the quality README).
 
 ## Test plan for when the laptop is quiet (close other apps first)
 

@@ -19,8 +19,6 @@ export interface QualityPreset {
   ssao?: {samples?: number};
   /** `SSR` (@margoengine/post/ssr): on/off (default on) and Hi-Z march steps (default 64). */
   ssr?: {enabled?: boolean; steps?: number};
-  /** `DOF` (@margoengine/dof): largest blur radius in pixels (default 16). */
-  dof?: {maxRadius?: number};
   /** `VolumetricFog` (@margoengine/environment/volumetric): froxel grid (default [160, 90, 64]). */
   volumetric?: {grid?: readonly [number, number, number]};
   /** `LocalShadows` (@margoengine/clustered/shadows): shadowed lights (default 4) and layer size (default 512). */
@@ -28,7 +26,7 @@ export interface QualityPreset {
   /** `VFX` (@margoengine/vfx): particle capacity (default 1,000,000). */
   vfx?: {capacity?: number};
 }
-const light: QualityPreset = {shadows: {resolution: 1024}, ssao: {samples: 16}, ssr: {enabled: false, steps: 32}, dof: {maxRadius: 8},
+const light: QualityPreset = {shadows: {resolution: 1024}, ssao: {samples: 16}, ssr: {enabled: false, steps: 32},
   volumetric: {grid: [80, 45, 32]}, localShadows: {resolution: 256}, vfx: {capacity: 100_000}};
 /** The preset per tier. The full tier is empty: every package keeps its own defaults. Phones share the light preset. */
 export const QUALITY_PRESETS: Readonly<Record<QualityTier, QualityPreset>> = {high: {}, light, phone: light};

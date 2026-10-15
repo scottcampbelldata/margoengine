@@ -12,7 +12,7 @@ import {writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {chromium} from '@playwright/test';
 import {createServer} from 'vite';
-import {onAC, waitForQuiet} from '../../scripts/quiet-gate.mjs';
+import {cpuLoad, onAC, waitForQuiet} from '../../scripts/quiet-gate.mjs';
 
 const root = resolve(import.meta.dirname, '../..'), arg = (name, fallback) => process.argv.find(a => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const config = {pages: arg('pages', 'island,dof').split(','), rounds: +arg('rounds', 4), seconds: +arg('seconds', 6), label: arg('label', 'run')};
@@ -41,8 +41,8 @@ const probe = off => {
 
 const report = {recordedAt: new Date().toISOString(), commit: execFileSync('git', ['rev-parse', '--short', 'HEAD'], {cwd: root, encoding: 'utf8'}).trim(), config, runs: []};
 assert.ok(onAC(), 'On battery: GPU timing is throttled, run on AC power');
-try {if (process.argv.includes('--no-quiet')) throw new Error('--no-quiet'); report.machine = await waitForQuiet({timeout: 600}); report.diagnostic = false;}
-catch (error) {if (!onAC()) throw error; report.diagnostic = true; report.machine = {note: String(error.message)}; console.error('DIAGNOSTIC run:', error.message);}
+try {if (process.argv.includes('--no-quiet')) throw new Error('--no-quiet: machine busy (other agents), quiet gate skipped'); report.machine = await waitForQuiet({timeout: 600}); report.diagnostic = false;}
+catch (error) {if (!onAC()) throw error; report.diagnostic = true; report.machine = {note: String(error.message), cpuLoadPercent: cpuLoad()}; console.error('DIAGNOSTIC run:', error.message);}
 const servers = [];
 let browser;
 try {

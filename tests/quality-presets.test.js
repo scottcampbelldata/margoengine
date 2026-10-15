@@ -7,7 +7,6 @@ import {preset} from '../packages/shared/preset.js';
 import {QUALITY_PRESETS} from '../packages/quality/dist/index.js';
 import {Shadows} from '../packages/shadows/dist/index.js';
 import {SSAO, SSR} from '../packages/post/dist/index.js';
-import {DOF} from '../packages/dof/dist/index.js';
 import {VolumetricFog} from '../packages/environment/dist/volumetric.js';
 import {Clustered} from '../packages/clustered/dist/index.js';
 import {LocalShadows} from '../packages/clustered/dist/shadows.js';
@@ -15,7 +14,7 @@ import {VFX} from '../packages/vfx/dist/index.js';
 
 const lights = new Clustered();
 const readers = {
-  shadows: o => new Shadows(o), ssao: o => new SSAO(o), ssr: o => new SSR(o), dof: o => new DOF(o), volumetric: o => new VolumetricFog(o),
+  shadows: o => new Shadows(o), ssao: o => new SSAO(o), ssr: o => new SSR(o), volumetric: o => new VolumetricFog(o),
   localShadows: o => new LocalShadows({...o, lights}), vfx: o => new VFX(o),
 };
 const light = QUALITY_PRESETS.light;
@@ -44,7 +43,7 @@ test('with a preset every reader takes the preset values it was not given, and e
     for (const [key, make] of Object.entries(readers)) {
       const filled = make({});
       for (const [name, value] of Object.entries(light[key])) assert.deepEqual(filled.options[name], value, `${key}.${name} from the preset`);
-      const explicit = Object.fromEntries(Object.keys(light[key]).map(name => [name, {resolution: 2048, samples: 32, enabled: true, steps: 64, maxRadius: 16, grid: [160, 90, 64], maxLights: 3, capacity: 1_000_000}[name]]));
+      const explicit = Object.fromEntries(Object.keys(light[key]).map(name => [name, {resolution: 2048, samples: 32, enabled: true, steps: 64, grid: [160, 90, 64], maxLights: 3, capacity: 1_000_000}[name]]));
       const kept = make(explicit);
       for (const [name, value] of Object.entries(explicit)) assert.deepEqual(kept.options[name], value, `${key}.${name} explicit`);
     }
