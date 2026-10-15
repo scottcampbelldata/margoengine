@@ -103,7 +103,7 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
     for (const id of ['dof', 'tonemap']) {
       assert.equal($(`#${id} .run`).getAttribute('href'), `../demos/${id}/`);
       assert.equal(visible($(`#${id} .source`)), false, 'A built route with bundled assets must not be called a complete copyable HTML example');
-      assert.match($(`#${id} .requirements`).textContent, /\^0\.1\.0/);
+      assert.match($(`#${id} .requirements`).textContent, /\^1\.0\.0/);
     }
     for (const [term, id] of [['conveyor', 'machinery'], ['SectionPlanes', 'machinery'], ['loadGLTF', 'gltf'], ['particle', 'creative'], ['useFrame', 'react'], ['Camera', 'core']]) {
       fill(term);

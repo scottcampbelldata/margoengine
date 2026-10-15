@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/toon",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "sideEffects": false,
@@ -18,10 +18,10 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/creative": "0.1.0"
+    "@margoengine/creative": "^1.0.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^0.1.0 || ^1.0.0"
+    "@margoengine/core": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js toon",

@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/react",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "React 18/19 components and stable mesh refs for Margo Engine.",
@@ -27,12 +27,12 @@
     "dist"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^0.1.0 || ^1.0.0",
-    "margoengine": "^0.1.0 || ^1.0.0",
-    "@margoengine/gltf-pro": "^0.1.0 || ^1.0.0",
-    "@margoengine/environment": "^0.1.0 || ^1.0.0",
-    "@margoengine/controls": "^0.1.0 || ^1.0.0",
-    "@margoengine/shadows": "^0.1.0 || ^1.0.0",
+    "@margoengine/core": "^1.0.0",
+    "margoengine": "^1.0.0",
+    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/environment": "^1.0.0",
+    "@margoengine/controls": "^1.0.0",
+    "@margoengine/shadows": "^1.0.0",
     "react": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {

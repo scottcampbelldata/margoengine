@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/usdz",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "Optional static USDA, USDC and USDZ ingestion through Margo glTF PBR.",
@@ -24,11 +24,11 @@
     "prepack": "npm run build"
   },
   "peerDependencies": {
-    "@margoengine/core": "^0.1.0 || ^1.0.0",
-    "@margoengine/gltf-pro": "^0.1.0 || ^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/gltf-pro": "^1.0.0"
   },
   "dependencies": {
-    "@margoengine/loaders": "0.1.0"
+    "@margoengine/loaders": "^1.0.0"
   },
   "publishConfig": {
     "access": "public"
@@ -40,6 +40,6 @@
     "directory": "packages/usdz"
   },
   "devDependencies": {
-    "@margoengine/math": "0.1.0"
+    "@margoengine/math": "^1.0.0"
   }
 }

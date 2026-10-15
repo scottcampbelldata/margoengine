@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/scenery",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "Moonlit night sky preset (stars, phased moon) over @margoengine/sky.",
@@ -30,10 +30,10 @@
     "dist"
   ],
   "peerDependencies": {
-    "@margoengine/core": "0.1.0"
+    "@margoengine/core": "^1.0.0"
   },
   "dependencies": {
-    "@margoengine/sky": "0.1.0"
+    "@margoengine/sky": "^1.0.0"
   },
   "homepage": "https://margoengine.com"
 }

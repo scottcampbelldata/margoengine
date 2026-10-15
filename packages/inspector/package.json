@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/inspector",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "Entity hierarchy, live properties, WebGPU wireframe, normal and bounding-box overlays, and a frame debugger.",
@@ -23,11 +23,11 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/lines": "0.1.0",
-    "@margoengine/stats": "0.1.0"
+    "@margoengine/lines": "^1.0.0",
+    "@margoengine/stats": "^1.0.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^0.1.0 || ^1.0.0"
+    "@margoengine/core": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js inspector",

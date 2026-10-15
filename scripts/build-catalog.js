@@ -28,7 +28,7 @@ for (const id of await readdir('packages')) {
     description: manifest.description,
     requirements: core ? `Core ${core} · see the package guide for browser and backend requirements` : 'See the package guide for requirements',
     keywords: previous?.keywords ?? id.replaceAll('-', ' '),
-    install: `npm install ${core ? '@margoengine/core@0.1.0 ' : ''}${manifest.name}@${manifest.version}${id === 'react' ? ' react@^19 react-dom@^19' : ''}`,
+    install: `npm install ${core ? `@margoengine/core@${manifest.version} ` : ''}${manifest.name}@${manifest.version}${id === 'react' ? ' react@^19 react-dom@^19' : ''}`,
     imports: previous?.imports ?? `import { ${exports[0]} } from '${manifest.name}';`,
     exports,
   });

@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/post",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "HDR bloom, AgX tonemapping, frame-graph SSAO, screen-space reflections, FXAA and a shared-capture effect stack for Margo Engine WebGPU.",
@@ -51,10 +51,10 @@
     "NOTICE.md"
   ],
   "peerDependencies": {
-    "@margoengine/core": "0.1.0"
+    "@margoengine/core": "^1.0.0"
   },
   "homepage": "https://margoengine.com",
   "devDependencies": {
-    "@margoengine/math": "0.1.0"
+    "@margoengine/math": "^1.0.0"
   }
 }

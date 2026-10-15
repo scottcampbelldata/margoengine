@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/cameras",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "Orthographic projection and exactly vertical (top-down) views for the core camera, with matching culling and picking.",
@@ -23,7 +23,7 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^0.1.0 || ^1.0.0"
+    "@margoengine/core": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js cameras",

@@ -24,7 +24,7 @@ for(const name of await readdir('packages')){
   exported.push(manifest.name+(subpath==='.'?'':subpath.slice(1)));
  }
  packed.push(manifest.name);
- if(requested.includes(name))assert.equal(manifest.peerDependencies['@margoengine/core'],name==='terrain'?'0.1.0':'^0.1.0 || ^1.0.0');
+ if(requested.includes(name))assert.equal(manifest.peerDependencies['@margoengine/core'],`^${manifest.version}`);
 }
 await copyFile('tests/margo-module-consumer.ts',join(fixture,'consumer.ts'));
 await writeFile(join(fixture,'all-exports.ts'),exported.map((name,i)=>'import * as module'+i+' from '+JSON.stringify(name)+';').join('\n')+'\nexport const modules=['+exported.map((_,i)=>'module'+i).join(',')+'];\n');
