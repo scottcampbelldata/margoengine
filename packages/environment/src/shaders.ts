@@ -165,17 +165,18 @@ fn areaElement(x: f32, y: f32) -> f32 { return atan(x * y / sqrt(x * x + y * y +
 }
 `;
 
-// Split-sum environment BRDF: x = NdotV, y = perceptual roughness (texel centers), output rg = (scale, bias)
+// Split-sum environment BRDF: x = NdotV, y = perceptual roughness (texel centers), output (scale, bias)
 // so that specular = prefiltered * (F0 * scale + bias). Uses the same GGX D and separable Smith-GGX G as core.
+// Written as size x size f16 pairs into a storage buffer (not a texture): IBL then binds one sampled texture.
 export const brdfLut = common + /* wgsl */ `
-@group(0) @binding(0) var destination: texture_storage_2d<rgba16float, write>;
-@group(0) @binding(1) var<uniform> params: vec4u; // samples
+@group(0) @binding(0) var<storage, read_write> destination: array<u32>;
+@group(0) @binding(1) var<uniform> params: vec4u; // samples, size
 fn smithG1(x: f32, a2: f32) -> f32 { return 2.0 * x / (x + sqrt(a2 + (1.0 - a2) * x * x)); }
 @compute @workgroup_size(8, 8, 1) fn main(@builtin(global_invocation_id) id: vec3u) {
-  let size = textureDimensions(destination);
-  if (id.x >= size.x || id.y >= size.y) { return; }
-  let nv = (f32(id.x) + 0.5) / f32(size.x);
-  let roughness = (f32(id.y) + 0.5) / f32(size.y);
+  let size = params.y;
+  if (id.x >= size || id.y >= size) { return; }
+  let nv = (f32(id.x) + 0.5) / f32(size);
+  let roughness = (f32(id.y) + 0.5) / f32(size);
   let alpha = roughness * roughness;
   let a2 = alpha * alpha;
   let v = vec3f(sqrt(1.0 - nv * nv), 0.0, nv);
@@ -194,7 +195,7 @@ fn smithG1(x: f32, a2: f32) -> f32 { return 2.0 * x / (x + sqrt(a2 + (1.0 - a2) 
       bias += fc * visibility;
     }
   }
-  textureStore(destination, id.xy, vec4f(scale / f32(samples), bias / f32(samples), 0.0, 1.0));
+  destination[id.y * size + id.x] = pack2x16float(vec2f(scale, bias) / f32(samples));
 }
 `;
 

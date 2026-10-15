@@ -5,6 +5,7 @@
 // standard, physical, unlit and blended materials) records every GPU call, descriptor, shader module and buffer
 // write of gltf-pro + shadows + clustered + environment at `ref` and in the working tree: they must be identical.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/gltf-pro-lighting-hooks.proof.js [ref]
+// Since 5c the IBL WGSL differs from refs before it (BRDF LUT buffer); binding-limit.proof.js maps that change back.
 import assert from 'node:assert/strict';
 import {versions} from './compare.js';
 import {mockGPU, context} from './gpu-recorder.js';
@@ -26,7 +27,7 @@ async function story([gltf, shadowsModule, clusteredModule, environment], sample
   fixture.doc.meshes = materials.map((_, material) => ({primitives: [{...primitive, material}]}));
   fixture.doc.nodes = materials.map((_, mesh) => ({mesh, translation: [0, 0, -mesh]}));
   delete fixture.doc.skins; delete fixture.doc.animations;
-  const environmentStub = {device: gpu.device, disposed: false, version: 0, specularView: {}, sampler: {}, brdfLutView: {}, shBuffer: {}, paramsBuffer: {}, restore: () => Promise.resolve()};
+  const environmentStub = {device: gpu.device, disposed: false, version: 0, specularView: {}, sampler: {}, brdfLutView: {}, brdfLut: {}, shBuffer: {}, paramsBuffer: {}, restore: () => Promise.resolve()};
   const log = gpu.record(() => {
     const model = gltf.parseGLTF(engine, fixture.doc, fixture.buffers); engine.camera.update(4 / 3, true); store.tick(false);
     const view = context(gpu, {samples, format: 'rgba16float', depthFormat: 'depth32float-stencil8'});
@@ -78,7 +79,7 @@ if (process.argv.includes('--time')) {
     fixture.doc.meshes = [{primitives: Array.from({length: count}, (_, k) => ({...primitive, material: k % materials.length}))}];
     fixture.doc.nodes = [{mesh: 0}]; delete fixture.doc.skins; delete fixture.doc.animations;
     const model = gltf.parseGLTF(engine, fixture.doc, fixture.buffers); engine.camera.update(4 / 3, true); store.tick(false);
-    const view = context(gpu, {samples: 4}), stub = {device: gpu.device, disposed: false, version: 0, specularView: {}, sampler: {}, brdfLutView: {}, shBuffer: {}, paramsBuffer: {}, restore: () => Promise.resolve()};
+    const view = context(gpu, {samples: 4}), stub = {device: gpu.device, disposed: false, version: 0, specularView: {}, sampler: {}, brdfLutView: {}, brdfLut: {}, shBuffer: {}, paramsBuffer: {}, restore: () => Promise.resolve()};
     const shadows = new shadowsModule.Shadows({resolution: 64}), clustered = new clusteredModule.Clustered({grid: [4, 3, 2]}), fog = new environment.Fog();
     shadows.setup(engine); clustered.setup(engine); fog.setup(engine); shadows.add(model); clustered.add(model); new environment.EnvironmentLighting(stub).applyTo(model); fog.applyTo(model);
     view.begin(0); model.draw(view.c, 'beauty', view.c.color, view.c.depth);

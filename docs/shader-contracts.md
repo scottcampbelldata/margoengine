@@ -34,5 +34,9 @@ Text anchors in core's shader (the full list, with the package file using each, 
 `packages/shared/gpu.js` `meshVertex` is a copy of core's vertex inputs for packages that draw core meshes with their own
 fragment (selection, toon outline); the test checks it still matches core's `Frame`/`Input` layout and transform.
 
+Every hook or patch adds its bindings to one fragment stage, which WebGPU limits to 16 sampled textures and 16 samplers
+by default. The per-combination counts are in the gltf-pro README ("Texture bindings"); physical materials with
+shadows, IBL and LocalShadows use all 16, and gltf-pro throws naming the combination when a shader exceeds the device.
+
 gltf-pro text patches that remain (materials' map multiply and shading modes, shader-node `NodeMaterial`, LOD imposter
 baking) target anchors documented in the gltf-pro README and listed in the same test.

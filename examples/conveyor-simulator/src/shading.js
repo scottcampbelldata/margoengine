@@ -30,13 +30,13 @@ const body = ibl => `  let n=normalize(i.normal)*select(-1.0,1.0,facing); let v=
   var lit=studioLight(n,v,i.color,i.material.x,i.material.y,normalize(frame.light.xyz),frame.radiance.xyz*frame.light.w)
     +studioLight(n,v,i.color,i.material.x,i.material.y,normalize(vec3f(70.0,45.0,-90.0)),${vec3(linear(0xe0ecff))}*1.6)
     +i.color*(1.0-i.material.y)*mix(${vec3(linear(0x7f8994))},${vec3(linear(0xf7fbff))},0.5*n.y+0.5)*(1.6/3.14159265);
-${ibl ? '  lit+=iblShade(iblSpecular,iblSampler,iblBrdf,iblSh,iblParams,n,v,i.color,i.material.y,i.material.x);\n' : ''}  return vec4f(studioDisplay(lit),1);
+${ibl ? '  lit+=iblShade(iblSpecular,iblSampler,iblSh,iblParams,n,v,i.color,i.material.y,i.material.x);\n' : ''}  return vec4f(studioDisplay(lit),1);
 }`;
 
 const iblDeclarations = first => `
 @group(0) @binding(${first}) var iblSpecular:texture_cube<f32>;
 @group(0) @binding(${first + 1}) var iblSampler:sampler;
-@group(0) @binding(${first + 2}) var iblBrdf:texture_2d<f32>;
+@group(0) @binding(${first + 2}) var<storage,read> iblBrdf:array<u32>;
 @group(0) @binding(${first + 3}) var<uniform> iblSh:array<vec4f,9>;
 @group(0) @binding(${first + 4}) var<uniform> iblParams:vec4f;
 ${IBL_WGSL}`;

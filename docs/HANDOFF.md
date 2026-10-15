@@ -611,11 +611,31 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    Real GPU re-run (`textured-instancing-gpu.mjs`, Intel Xe2 / Arc 140V, AC before and after, GPU lock held): instanced
    frames equal the references (materials and NodeMaterial max channel diff 1, glTF via `decoders.instancing` 0), picks
    return instances 0/5/77/143, 1k-10k boxes CPU 15-127 ms -> 0.6-0.8 ms, frame 74-659 ms -> 4-5 ms.
-5c. Texture-binding limit: a gltf-pro PHYSICAL-variant material + directional shadows + environment IBL + clustered
-   local shadows (`590278e`) needs 17 sampled textures per fragment stage, over WebGPU's default 16. Options: core
-   requests `maxSampledTexturesPerShaderStage` up to the adapter's limit (a core change; most desktop adapters allow
-   more, phones may not), or the packages share textures (e.g. pack IBL maps, or one texture array for shadow maps).
-   Measure which combos hit it and prefer a package-side fix.
+5c. [DONE, package-side, no core change] Texture-binding limit: a gltf-pro PHYSICAL-variant material + directional
+   shadows + environment IBL + clustered LocalShadows (`590278e`) needed 17 sampled textures per fragment stage, over
+   WebGPU's default (and guaranteed minimum, phones included) of 16. Counts per combination: gltf-pro README "Texture
+   bindings" (standard 5, physical 13, materials 10/11 matcap, NodeMaterial 10+N; shadows +1, IBL +1, LocalShadows +1,
+   fog/clustered lights/SSAO/LOD baking +0; physical + all three now exactly 16 textures and 16 samplers). Fix:
+   environment's BRDF LUT is a STORAGE buffer (`environment.brdfLut`, brdfSize² u32 of pack2x16float(scale, bias),
+   written by the same compute integration) read by `iblBrdfTerms` with manual clamp-to-edge bilinear, so IBL = 1 cube
+   texture (SH irradiance was already a uniform). API: `brdfLut` is a GPUBuffer, `brdfLutView` removed, the IBL WGSL
+   binding is `var<storage, read> iblBrdf: array<u32>` (read by name), `iblShade(specular, sampler, sh, params, ...)`
+   lost its `brdf` argument; conveyor-simulator example updated. gltf-pro throws a RangeError naming the combination
+   when a shader declares more sampled textures or samplers than `device.limits` (e.g. `gltf-pro: physical material +
+   environment:lighting + fog + shadows + clustered + clustered:shadows needs 17 sampled textures per shader stage; this
+   device allows 16`). Analytic fit (Scott's option 1) measured and NOT shipped: Karis's mobile fit vs the LUT, real GPU,
+   physical sphere grid: frame mean 0.46/255, max 21/255, rough metals mean 14/255 (centre) and 8/255 at grazing rims;
+   CPU least-squares fits up to 49 terms still reach 0.03 at grazing low roughness. The buffer LUT is exact instead.
+   Proofs: `proofs/binding-limit.proof.js e017d50` (recorded GPU calls: without IBL 3,812 identical calls / 80 modules;
+   with IBL 4,556 identical after mapping back the LUT text and binding, 384 occurrences); real GPU
+   `binding-limit-gpu.mjs` (Intel Xe2 / Arc 140V, Edge 155, AC before/after, GPU lock): e017d50 environment at default limits
+   throws the named error; at raised limits (48) it is the reference; the working tree at default limits renders, max
+   channel diff 1/255, mean 0.0000; environment `test:browser` passes (LUT vs quadrature 0.0013, furnace). Gzip
+   (build-modern): gltf-pro 16,265 -> 16,495 (+230, the limit check), environment 20,544 -> 20,802 (+258, buffer
+   LUT filtering); core + stage unchanged. Still over 16 (throws by name): NodeMaterial with 4+ texture nodes (3 with
+   matcap) plus all three lighting packages, and any extra texture on a physical material with all three. Remaining
+   option for those is the core one (request `maxSampledTexturesPerShaderStage`/`maxSamplersPerShaderStage` up to the
+   adapter in `packages/core/src/renderer.ts` `requestDevice`); not needed for any shipped combination.
 5d. Fix the docs against `docs/whitepaper/claims.md` (201 claims: 77 proven, 43 stale, 58 unproven, 23 overclaims):
    correct every STALE/OVERCLAIM wording in README, site, package READMEs and docs; remove `npm install` lines for
    unpublished packages (or mark "after publish"); one core-size number from `npm run measure:size`; WebGL as a separate

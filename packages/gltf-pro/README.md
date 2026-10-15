@@ -46,6 +46,30 @@ material; unset fields keep the defaults above. It is part of the pipeline cache
 mutating it), the g-buffer and ambient passes ignore it, and draw order and pass splitting still follow `alphaMode`.
 Without it the pipelines are unchanged. `@margoengine/materials` uses it for `blending`, `depthWrite` and `depthTest`.
 
+### Texture bindings
+
+WebGPU guarantees 16 sampled textures and 16 samplers per shader stage (the default and the minimum every adapter
+supports, phones included), and Margo's device asks for no more. Each lighting effect and material patch adds its
+bindings to the one fragment stage. Sampled textures (samplers) in the beauty and SSAO ambient-replay fragment:
+
+| Material | Alone | + shadows | + IBL | + LocalShadows | + shadows, IBL, LocalShadows |
+| --- | --- | --- | --- | --- | --- |
+| gltf-pro standard | 5 (5) | 6 (6) | 6 (6) | 6 (6) | 8 (8) |
+| gltf-pro physical (clearcoat, transmission, sheen, specular, ior, volume) | 13 (13) | 14 (14) | 14 (14) | 14 (14) | **16 (16)** |
+| materials `standard`, `basic`, `normal` | 10 (10) | 11 (11) | 11 (11) | 11 (11) | 13 (13) |
+| materials `matcap` | 11 (11) | 12 (12) | 12 (12) | 12 (12) | 14 (14) |
+| shader `NodeMaterial` with N distinct texture nodes | 10+N | 11+N | 11+N | 11+N | 13+N: over 16 from N = 4 (matcap: N = 3) |
+
+Shadows (directional cascades) add 1 depth array + 1 comparison sampler; environment IBL 1 cube + 1 sampler (its BRDF
+LUT is a storage buffer and SH irradiance a uniform); LocalShadows (`@margoengine/clustered/shadows`) 1 depth array + 1
+comparison sampler. Fog, clustered lights (3 storage buffers), SSAO and LOD baking add no textures, and the G-buffer
+pass binds only the material's own maps (5 or 13). Before 5c the IBL BRDF LUT was a texture, so physical + all three was
+17 and failed pipeline creation. A draw whose shader declares more sampled textures or samplers than
+`device.limits` allows throws a `RangeError` naming the combination, e.g. `gltf-pro: physical material + shadows +
+environment:lighting + clustered + clustered:shadows + shader patch needs 17 sampled textures per shader stage; this
+device allows 16`. Physical materials with every lighting package use all 16 of both, so any further texture on them
+(a custom shader patch) needs a device created with raised limits.
+
 ### Instancing
 
 Instancing is its own entry, `@margoengine/gltf-pro/instancing` (about 2.5 kB gzip), so apps that never instance load none of it. `primitive.instances = new PBRInstances(capacity)` draws a primitive `count` times in one instanced draw (the counterpart of three.js `InstancedMesh`; `@margoengine/materials` `createInstancedMesh` wraps it). Instance matrices are in the primitive's node space (world = node matrix x instance matrix, as `EXT_mesh_gpu_instancing`), so for a model whose meshes sit on nodes with their own transforms, an instance matrix moves the node, not the model root. Primitives, also of different models, may share one `PBRInstances`; all primitives of a node share one when it comes from `EXT_mesh_gpu_instancing`.
