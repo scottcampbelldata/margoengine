@@ -1339,6 +1339,36 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
 
 ## Launch readiness (Hacker News, YouTube, LinkedIn, X; npm is set up, margoengine.com is live)
 
+### LAUNCH GATES (Scott, 2026-10-15): every box checked before the engine goes live. No exceptions.
+
+1. **Benchmarks reproducible, not boastful.** Every speed statement names hardware, browser, scene, commit and the
+   one command to reproduce it (`BENCH_QUIET=1 npm run bench:all -- --gpu`, vs-three.js harness pairs mesh<->mesh and
+   instanced<->instanced, three.js given its best-practice settings); taken on a quiet PC; results committed; places
+   where three.js wins are stated. No "Nx faster" headline without that. Never invent hardware or numbers (e.g. no
+   "RTX A6000" unless one was actually used).
+2. **First 60 seconds bulletproof.** `npm create margo@latest` and the quickstart HTML work on clean environments:
+   Windows (this laptop), Linux (WSL or a container), macOS + Safari and iPhone Safari + Android Chrome (Scott's devices,
+   or listed as untested). No black canvas ever: WebGPU missing, adapter/device request rejected, or shader errors
+   show a clear on-page message with what to do (and the WebGL preview if the app opted in). Packed tarballs install
+   and type-check with no missing peers (`scripts/modern-package-tests.js` passes).
+3. **Device loss survives.** 5i.d end-to-end test passes on every demo (device destroyed mid-frame -> scene back,
+   visual compare); plus a manual check on a Mac (unplug a monitor / switch GPU) if Scott can.
+4. **Bundle transparency.** A sizes page (treemap or table) generated from `entry-sizes.json`: every package and entry
+   (min+gzip), plus every lazily fetched file (workers, Rapier Wasm, OCCT Wasm, Draco/Basis decoders) and WHEN each
+   loads. A test proves a basic glTF scene fetches only the expected files. Core+stage figure from
+   `npm run measure:size`.
+5. **Real assets render correctly.** Khronos glTF sample assets in the visual-regression suite (DamagedHelmet exists;
+   add FlightHelmet, Sponza and a broader set - Scott approves each download/licence), plus the conveyor GLB and the
+   archviz house; all pass the glTF validator and render without visual bugs.
+6. **Code hygiene >= 9** (5k), including zero `any` in public APIs and TSDoc on every export (autocomplete with docs).
+7. **Docs + playground** (item 8): quickstart, three.js migration, two flagship tutorials, cookbook, generated API
+   reference, live-editable examples.
+8. **Humble, exact scope on the landing page:** a small, fast WebGPU engine for high-part-count CAD/engineering
+   assemblies, modular web 3D apps and instant-load web games - not "replaces Unreal/Unity/Blender". Design-envelope
+   page (5j) linked.
+9. **No flaky gates:** `npm run verify` passes 5 times in a row under load (5l.s).
+10. **claims.md:** 0 OVERCLAIM and 0 UNPROVEN rows for anything on public pages.
+
 Before launch, in addition to the work queue:
 - Demos smooth on first load on desktop and phones, including Android. The Galaxy S23 3-5 FPS island issue is shelved
   (Scott has no device to test it).
