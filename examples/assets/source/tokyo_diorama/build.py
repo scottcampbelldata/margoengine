@@ -15,10 +15,11 @@ import bpy  # noqa: E402
 
 import buildings  # noqa: E402
 import kit  # noqa: E402
+import props  # noqa: E402
 import street  # noqa: E402
 import tanuki  # noqa: E402
 
-MODULES = [kit, street, buildings, tanuki]
+MODULES = [kit, street, buildings, tanuki, props]
 for module in MODULES:  # pick up edits when re-run inside a live Blender session
     importlib.reload(module)
 

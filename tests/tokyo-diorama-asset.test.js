@@ -49,3 +49,16 @@ test('tanuki sign swings its lantern', () => {
   nodeIndex('Tanuki_Sign');
   assert.deepEqual(channels('Tanuki_Lantern_Arm'), ['rotation']);
 });
+
+test('street props, power lines and swaying banners', () => {
+  for (const name of ['Utility_Pole', 'Vending_Machine', 'Post_Box', 'Bench', 'Bicycle']) nodeIndex(name);
+  for (let i = 1; i <= 6; i++) nodeIndex('Power_Line_' + i);
+  for (let i = 1; i <= 3; i++) assert.deepEqual(channels('Banner_' + i), ['rotation'], 'Banner_' + i);
+});
+
+test('glowing signs and web budget', () => {
+  const emissive = doc.materials.filter(m => (m.emissiveFactor ?? [0, 0, 0]).some(v => v > 0));
+  assert.ok(emissive.length >= 3, `only ${emissive.length} emissive materials`);
+  assert.ok(triangles() <= 150_000, `${triangles()} triangles`);
+  assert.ok(statSync(file).size <= 5 * 1024 * 1024, `${statSync(file).size} bytes`);
+});
