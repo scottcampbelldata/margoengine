@@ -858,6 +858,10 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       meshes do; models are reflected but don't reflect), optionally water and terrain; half-resolution trace for
       1080p (trace 4-5 ms there); apply SSR's dead-branch replay trick to SSAO's ambient replay (it halved SSR's
       replay cost) with a proof that SSAO output is unchanged.
+   n. Instanced paths vs three.js InstancedMesh (diagnostic, 836b97e: three's WebGL2 InstancedMesh leads at every
+      size): give `CulledInstances` the culled pipeline (cullMode back, no discard) and a bulk transform upload (10k
+      moving boxes cost 187 ms CPU: one 64 B write per setTransform); profile `createInstancedMesh`'s GPU time vs three
+      (gltf-pro shader + ACES vs three's) and close what's package-side. Re-measure with the vs-threejs harness pairs.
    m. docs/threejs-parity.md summary counts drifted (OIT added a COVERED row without updating the totals) - recount.
    Order: after the current wave, alongside the hygiene phase (5k) and under its gates, before the demo rebuild.
 5m. CORE APPROVALS, conditional (Scott, 2026-10-14 night): do both IF core+stage stays under 20,000 B gzip
