@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {readFile, readdir, writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {PACKAGE_LISTS, withPackageList} from './package-lists.js';
 
 const existingText = await readFile('docs/catalog.json', 'utf8'), existing = JSON.parse(existingText);
 const postfxExamples = {
@@ -54,4 +55,9 @@ entries.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
 // Keep the checkout's line endings (CRLF under core.autocrlf) and skip unchanged writes, so a clean tree stays clean.
 const text = (JSON.stringify(entries, null, 2) + '\n').replaceAll('\n', existingText.includes('\r\n') ? '\r\n' : '\n');
 if (text !== existingText) await writeFile('docs/catalog.json', text);
+// README.md and docs/README.md list the packages by the same layers, generated from the catalog so they cannot drift.
+for (const [file, packagesPath] of Object.entries(PACKAGE_LISTS)) {
+  const markdown = await readFile(file, 'utf8'), updated = withPackageList(markdown, entries, packagesPath);
+  if (updated !== markdown) await writeFile(file, updated);
+}
 console.log(`Catalog: ${entries.length} packages, ${entries.filter(entry => entry.published).length} published on npm.`);

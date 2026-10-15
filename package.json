@@ -121,7 +121,7 @@
     "modern:test:hardware": "node scripts/modern-hardware-gpu-tests.js",
     "modern:test:stress": "node scripts/modern-stress-tests.js",
     "modern:test:stress:aggregate": "node scripts/aggregate-stress.js",
-    "test:release": "npm run test:all && npm run measure:size && npm run modern:build:starters && npm run modern:build:showcase && npm run test:modules:packages && npm run modern:test:game:packages && npm run modern:test:interop:packages && npm run modern:test:postfx:packages && npm run modern:test:browser && npm run modern:test:wrapper && npm run modern:test:domains && npm run modern:test:game && npm run modern:test:extensions && npm run modern:test:postfx:browser && npm run modern:test:xr:browser && npm run modern:test:usdz:browser && npm run test:modules:browser && npm run test:catalog:browser && npm run modern:test:stress -- --sessions=500 --frames=120",
+    "test:release": "npm run test:all && npm run measure:size && npm run modern:build:starters && npm run modern:build:showcase && npm run test:modules:packages && npm run modern:test:game:packages && npm run modern:test:interop:packages && npm run modern:test:postfx:packages && npm run modern:test:browser && npm run test:basic-scene && npm run modern:test:wrapper && npm run modern:test:domains && npm run modern:test:game && npm run modern:test:extensions && npm run modern:test:postfx:browser && npm run modern:test:xr:browser && npm run modern:test:usdz:browser && npm run test:modules:browser && npm run test:catalog:browser && npm run modern:test:stress -- --sessions=500 --frames=120",
     "modern:test:extensions": "node scripts/modern-extension-tests.js",
     "modern:test:blender": "node scripts/modern-blender-tests.js",
     "modern:test:interop": "node --test packages/xr/tests/*.test.js packages/ifc/tests/*.test.js packages/loaders/tests/usdz.test.js packages/exporters/tests/usdz.test.js",
@@ -156,7 +156,8 @@
     "release:check": "npm run test:all && npm run measure:size && npm run test:modules:packages && npm run modern:test:postfx:packages",
     "publish:packages": "npm run release:check && npm publish --workspace packages --ignore-scripts --access public",
     "catalog:build": "node scripts/build-catalog.js",
-    "build:site": "npm run catalog:build && node examples/package-benchmarks/entry-sizes.mjs && node scripts/build-site.js",
+    "build:site": "npm run catalog:build && node examples/package-benchmarks/entry-sizes.mjs && node scripts/gpu-lock.mjs run --owner=build-site -- npm run test:basic-scene && node scripts/build-site.js",
+    "test:basic-scene": "node scripts/basic-scene-network.mjs",
     "site:check": "node scripts/site-check.mjs",
     "build:tokyo": "node scripts/build-tokyo-diorama.mjs",
     "test:tokyo": "node scripts/tokyo-diorama-browser-test.mjs"

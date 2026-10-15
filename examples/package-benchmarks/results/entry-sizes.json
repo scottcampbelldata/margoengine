@@ -1,5 +1,5 @@
 {
-  "commit": "1f11e86",
+  "commit": "5a7bbc2",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -821,6 +821,133 @@
         "raw": 12692,
         "gzip": 4382
       }
+    }
+  },
+  "lazyFiles": {
+    "packages/gltf/dist/index.js": {
+      "raw": 11031,
+      "gzip": 4579,
+      "brotli": 4126
+    },
+    "packages/machinery/dist/cad.js": {
+      "raw": 15897,
+      "gzip": 6450,
+      "brotli": 5877
+    },
+    "packages/scenery/dist/sky.js": {
+      "raw": 15854,
+      "gzip": 6143,
+      "brotli": 5568
+    },
+    "packages/creative/dist/particles.js": {
+      "raw": 21212,
+      "gzip": 7371,
+      "brotli": 6698
+    },
+    "packages/creative/dist/post.js": {
+      "raw": 16649,
+      "gzip": 5838,
+      "brotli": 5256
+    },
+    "packages/environment/dist/index.js": {
+      "raw": 69558,
+      "gzip": 23188,
+      "brotli": 20667
+    },
+    "packages/shadows/dist/index.js": {
+      "raw": 17633,
+      "gzip": 6433,
+      "brotli": 5751
+    },
+    "packages/machinery/dist/workers/cad-runtime.js": {
+      "raw": 14544,
+      "gzip": 5811,
+      "brotli": 5253
+    },
+    "packages/machinery/dist/workers/occt-import-js.js": {
+      "raw": 97826,
+      "gzip": 27253,
+      "brotli": 23984
+    },
+    "packages/machinery/dist/workers/occt-import-js.wasm": {
+      "raw": 7604031,
+      "gzip": 3114121,
+      "brotli": 2315009
+    },
+    "packages/decoders/dist/decoder.worker.js": {
+      "raw": 5405,
+      "gzip": 2428,
+      "brotli": 2170
+    },
+    "packages/decoders/dist/draco/draco_wasm_wrapper.js": {
+      "raw": 58572,
+      "gzip": 11816,
+      "brotli": 10032
+    },
+    "packages/decoders/dist/draco/draco_decoder.wasm": {
+      "raw": 192420,
+      "gzip": 63458,
+      "brotli": 48729
+    },
+    "packages/decoders/dist/basis/basis_transcoder.js": {
+      "raw": 58505,
+      "gzip": 15532,
+      "brotli": 13925
+    },
+    "packages/decoders/dist/basis/basis_transcoder.wasm": {
+      "raw": 527333,
+      "gzip": 247619,
+      "brotli": 203605
+    },
+    "packages/gltf-pro/dist/workers/gltf.js": {
+      "raw": 16916,
+      "gzip": 6295,
+      "brotli": 5699
+    },
+    "packages/gltf-pro/dist/workers/progressive.js": {
+      "raw": 21857,
+      "gzip": 7916,
+      "brotli": 7206
+    },
+    "packages/fbx/dist/workers/fbx.js": {
+      "raw": 46220,
+      "gzip": 17446,
+      "brotli": 15662
+    },
+    "packages/usdz/dist/workers/usdz.js": {
+      "raw": 77724,
+      "gzip": 27868,
+      "brotli": 24868
+    },
+    "packages/loaders/dist/workers/usd.js": {
+      "raw": 16790,
+      "gzip": 6613,
+      "brotli": 5932
+    },
+    "packages/bvh/dist/bvh.worker.js": {
+      "raw": 6761,
+      "gzip": 2993,
+      "brotli": 2578
+    },
+    "node_modules/@dimforge/rapier3d-compat/dist/rapier.mjs": {
+      "raw": 4335248,
+      "gzip": 1644912,
+      "brotli": 1196116
+    },
+    "node_modules/@recast-navigation/wasm/dist/recast-navigation.wasm-compat.js": {
+      "raw": 726258,
+      "gzip": 217735,
+      "brotli": 171217
+    },
+    "node_modules/web-ifc/web-ifc.wasm": {
+      "raw": 1595268,
+      "gzip": 578495,
+      "brotli": 439717
+    },
+    "node_modules/web-ifc/web-ifc-mt.wasm": {
+      "raw": 1558039,
+      "gzip": 574912,
+      "brotli": 424250
     }
   }
 }

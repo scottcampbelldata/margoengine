@@ -1,11 +1,14 @@
-// margoengine.com/sizes.html (scripts/build-sizes.js): every catalog package, grouped by layer, with numbers from the one
-// entry-sizes.json measurement and the commit it measured. Checks the committed record; `npm run build:site` re-measures.
+// margoengine.com/sizes.html (scripts/build-sizes.js): every catalog package, grouped by layer, every file loaded later
+// and the basic glTF scene's network log, with numbers from the one entry-sizes.json measurement, the network record of
+// the same commit, and that commit. Checks the committed records; `npm run build:site` re-measures.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync, readdirSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { readSizesInputs, sizesPage } from '../scripts/build-sizes.js';
+import { isLazyBuildFile, LAZY_FILES } from '../scripts/lazy-files.js';
 
-const inputs = readSizesInputs(), { catalog, sizes } = inputs;
+const inputs = readSizesInputs(), { catalog, sizes, network } = inputs;
 const { document } = new JSDOM(sizesPage(inputs)).window;
 const number = cell => Number(cell.textContent.replaceAll(',', ''));
 
@@ -58,4 +61,48 @@ test('sizes page refuses a catalog package without a measurement', () => {
   const packages = { ...sizes.packages };
   delete packages['@margoengine/core'];
   assert.throws(() => sizesPage({ ...inputs, sizes: { ...sizes, packages } }), /no sizes for @margoengine\/core/);
+});
+
+test('sizes page lists every file loaded later, with its measured bytes and the call that loads it', () => {
+  const root = new URL('../', import.meta.url);
+  const built = readdirSync(new URL('packages/', root)).flatMap(id => existsSync(new URL(`packages/${id}/dist`, root))
+    ? readdirSync(new URL(`packages/${id}/dist`, root), { recursive: true }).map(file => `packages/${id}/dist/${file.replaceAll('\\', '/')}`) : []);
+  // Both ways: every built worker and .wasm is listed in scripts/lazy-files.js, and every listed one was built.
+  assert.deepEqual(built.filter(isLazyBuildFile).sort(), LAZY_FILES.map(entry => entry.file).filter(isLazyBuildFile).sort(), 'run npm run build:packages first');
+  for (const entry of LAZY_FILES) assert.ok(existsSync(new URL(entry.file, root)), entry.file);
+  for (const name of ['occt-import-js.wasm', 'draco_decoder.wasm', 'basis_transcoder.wasm', 'rapier3d-compat', 'recast-navigation', 'web-ifc.wasm', 'gltf.js', 'decoder.worker.js'])
+    assert.ok(LAZY_FILES.some(entry => entry.file.includes(name)), name);
+  const rows = [...document.querySelectorAll('#loaded-later ~ .table-scroll tbody tr:not(.group)')];
+  assert.equal(rows.length, LAZY_FILES.length);
+  rows.forEach((row, i) => {
+    const entry = LAZY_FILES[i], cells = [...row.querySelectorAll('td')], body = row.closest('tbody');
+    assert.equal(body.dataset.lazyPackage, entry.package);
+    assert.equal(body.querySelector('tr.group th[scope="rowgroup"]').textContent, entry.package);
+    assert.equal(row.querySelector('th[scope="row"]').textContent, entry.label);
+    assert.deepEqual([...row.querySelectorAll('.num')].map(number), ['raw', 'gzip', 'brotli'].map(key => sizes.lazyFiles[entry.file][key]), entry.file);
+    assert.equal(cells.at(-1).textContent, entry.when.replaceAll('`', ''), `${entry.file}: when it loads`);
+    assert.ok(sizes.lazyFiles[entry.file].brotli > 0);
+  });
+});
+
+test('sizes page shows the basic glTF scene network log from the same build: only the HTML, core + stage, glTF and model', () => {
+  assert.deepEqual([network.commit, network.dirty], [sizes.commit, sizes.dirty]);
+  const paths = network.files.map(file => file.path);
+  assert.deepEqual(paths.filter(path => /\.wasm$|occt|draco|basis|rapier|recast|ifc|worker|cad/i.test(path)), []);
+  for (const role of ['Page', 'Entry: core + stage + app', '@margoengine/gltf (app.load)', 'Model']) assert.equal(network.files.filter(file => file.role === role).length, 1, role);
+  assert.ok(network.files.every(file => file.role), 'every request is an expected file');
+  assert.ok(network.notFetched.some(file => /occt-import-js.*\.wasm$/.test(file.path)), 'the build held the OCCT .wasm it did not fetch');
+  for (const key of ['transferred', 'raw', 'gzip', 'brotli']) assert.equal(network.total[key], network.files.reduce((sum, file) => sum + file[key], 0), key);
+  const rows = [...document.querySelectorAll('#basic-scene ~ .table-scroll tbody tr')];
+  assert.equal(rows.length, network.files.length + 1, 'one row per request plus the total');
+  [...network.files, network.total].forEach((file, i) => {
+    assert.deepEqual([...rows[i].querySelectorAll('.num')].map(number), [file.transferred, file.raw, file.gzip, file.brotli], file.path ?? 'total');
+    if (file.path) assert.equal(rows[i].querySelector('th').textContent, file.path);
+  });
+  assert.match(rows.at(-1).querySelector('th').textContent, new RegExp(`${network.files.length} requests`));
+});
+
+test('sizes page refuses a network record from another build', () => {
+  assert.throws(() => sizesPage({ ...inputs, network: { ...network, commit: '0000000' } }), /basic-scene-network\.json measured 0000000/);
+  assert.throws(() => sizesPage({ ...inputs, network: { ...network, dirty: !network.dirty } }), /basic-scene-network\.json/);
 });
