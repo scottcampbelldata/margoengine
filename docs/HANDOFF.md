@@ -767,9 +767,32 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       core change: measure memory/bytes, Scott decides).
    The Biome reformat (1g.e/1h.d) moves to just before the final-phase demo rebuild, when no agents are landing code.
 5h. Production-readiness additions (Scott, 2026-10-14 night; existing pieces checked against the repo):
-   a. [running] Offline asset cache: IndexedDB cache for GLB/.bin/textures/STEP behind the loaders (opt-in entry),
-      versioning + cache-busting (ETag/Last-Modified or explicit version), quota handling and eviction, works with the
-      worker and progressive paths; offline CAD inspection test. Only the LOD imposter cache exists today.
+   a. [DONE, branch worktree-agent-a54824b909f38c507] Offline asset cache: new `@margoengine/cache` (2.4 kB min+gzip,
+      no deps). `new AssetCache({name, version, maxBytes = 512 MiB, persist, timeout = 5 s, fetch})`; `cache.fetch` is
+      fetch-compatible and goes to every loader's `fetch` option (`cachedFetch` = shared default cache); `flush()`,
+      `usage()` (+ `navigator.storage.estimate()`), `delete`, `clear`, `dispose`/`using`. Loaders: one pass-through
+      `fetch` option on gltf-pro (+12 B; `loadGLTFInWorker` stays on the main thread when it is passed, like decoders;
+      README recipe `parseGLTFInWorker(engine, await (await cache.fetch(url)).arrayBuffer())` keeps worker parsing),
+      fbx (+21 B, file + textures), usdz (+9 B; `loadUSDZInWorker` downloads here, parses in the worker, +63 B),
+      machinery `loadCAD` (+9 B; STEP parsing stays in the OCCT worker); loaders already had it. Design: GET/HTTP(S)
+      only, keyed by URL; miss stores the 200 body in the background (no-store and non-200 skipped); a hit is served
+      without a request while `max-age` holds, else revalidated once per AssetCache with If-None-Match /
+      If-Modified-Since (304 serve, 200 replace); offline, error status, timeout, or a drop mid-download serve the stored
+      copy; the caller's abort still rejects; `version` change clears the DB. Range: hit sliced from the stored whole
+      file (206/416), miss passes through + one background whole-file fill (for the progressive loader). LRU eviction
+      within maxBytes; QuotaExceededError evicts the new file's size more and retries once; no IndexedDB / any IDB
+      error falls through to the network. Works in Web Workers and service workers (README has a 6-line SW recipe for
+      full PWA offline: app shell and worker scripts are not covered by the asset cache). Tests: packages/cache/test
+      (own in-memory fake IndexedDB; fake-indexeddb is not installed). Real browser (Arc 140V, Edge 155, AC before/after,
+      GPU lock, quiet gate passed; `examples/package-benchmarks/cache/offline-gpu.mjs`, results.json, medians of 3,
+      call to first frame, HTTP cache disabled): DamagedHelmet 3.8 MB localhost plain 328 / cold 300 / warm 273 ms,
+      CDP "factory Wi-Fi" 20 Mbit/s 80 ms plain 1,904 / cold 1,913 / warm 375 ms; generated 48 MB GLB (1.92M tris)
+      localhost 766 / 656 / 319 ms, Wi-Fi 20,102 / 20,115 / 414 ms. DevTools offline (context.setOffline): both load
+      from the cache (237 / 274 ms) with identical geometry digest and byte-identical frame, and a Web Worker reads
+      the identical file (SHA-256) from the cache while offline. The 62 MB conveyor GLB is not loadable by gltf-pro at
+      all ("Unsupported glTF accessor", also with plain fetch) - separate issue. Limits: no Vary; cross-origin ETag
+      needs Access-Control-Expose-Headers; a cold range miss costs range bytes + whole file; `@margoengine/gltf` (light
+      loader) has no `fetch` option (size-gated with core).
    b. [DONE, branch worktree-agent-a97e430da9ad32b46] CAD navigation profiles: `OrbitControls.attach(engine)
       .setProfile(SOLIDWORKS)` (also AUTOCAD, INVENTOR = FUSION, BLENDER, MAYA, ONSHAPE, RHINO, THREE_ORBIT = default;
       `PROFILES` by name). Profiles are data (`NavigationProfile`: drag table keyed `'shift+1'` = Shift + middle, wheel
