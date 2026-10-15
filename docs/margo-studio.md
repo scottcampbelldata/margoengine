@@ -18,6 +18,17 @@ Scott's requirement (2026-10-15): replicate the features of each tool exactly; f
   with every behaviour difference recorded. "Exact" means the audit list is fully covered.
 - **Built under the hygiene gates** (HANDOFF 5k) like any Margo package, with tests and proofs.
 
+## Reference sources for the feature audits (from Scott)
+
+| Tool | Source |
+|---|---|
+| MagicaVoxel | https://ephtracy.github.io/ (official site; also the `.vox` format notes linked from it) |
+| Crocotile 3D | https://crocotile3d.com/howto.html#overview (official how-to / manual) |
+| Dust3D | https://github.com/huxingyi/dust3d (MIT source and docs; study allowed, our own code) |
+
+Each audit reads its source end to end and lists every tool, menu item, shortcut, option and file format before any
+building starts.
+
 ## Shared shell ("Margo Studio")
 
 - One Margo viewport kernel for all three: camera navigation profiles (5h.b; each tool's own bindings as a profile),
