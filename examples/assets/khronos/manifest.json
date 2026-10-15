@@ -1,0 +1,1218 @@
+{
+ "source": "https://github.com/KhronosGroup/glTF-Sample-Assets",
+ "commit": "edc7c9e67c639d230715049ee31f9a96a6babbbe",
+ "downloaded": "2026-10-15",
+ "models": [
+  {
+   "name": "MetalRoughSpheres",
+   "tier": "core",
+   "file": "MetalRoughSpheres.glb",
+   "variant": "glTF-Binary",
+   "summary": "Tests various metal and roughness values (texture mapped).",
+   "screenshot": "screenshot.png",
+   "legal": [
+    {
+     "license": "CC-BY-4.0",
+     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+     "artist": "Ed Mackey",
+     "owner": "Analytical Graphics, Inc.",
+     "year": "2017",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 11221356,
+   "triangles": 501776,
+   "extensionsUsed": [],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "Grid, labels and metal/roughness ramps match; metals reflect the plain grey studio light, so they look flatter than the HDR reference."
+   }
+  },
+  {
+   "name": "AlphaBlendModeTest",
+   "tier": "core",
+   "file": "AlphaBlendModeTest.glb",
+   "variant": "glTF-Binary",
+   "summary": "Tests alpha modes and settings.",
+   "screenshot": "screenshot.png",
+   "legal": [
+    {
+     "license": "CC-BY-4.0",
+     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+     "artist": "Ed Mackey",
+     "owner": "Analytical Graphics, Inc.",
+     "year": "2018",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 2978812,
+   "triangles": 61,
+   "extensionsUsed": [],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 8,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "OPAQUE, MASK cut-offs and BLEND levels match the reference columns."
+   }
+  },
+  {
+   "name": "NormalTangentMirrorTest",
+   "tier": "core",
+   "file": "NormalTangentMirrorTest.glb",
+   "variant": "glTF-Binary",
+   "summary": "Tests an engine's ability to load supplied tangent vectors for a normal map.",
+   "screenshot": "screenshot.png",
+   "legal": [
+    {
+     "license": "CC-BY-4.0",
+     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+     "artist": "Ed Mackey",
+     "owner": "Analytical Graphics, Inc.",
+     "year": "2018",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 1567084,
+   "triangles": 5240,
+   "extensionsUsed": [],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "Bumps read the same in every column (mirrored UVs and supplied/generated tangents agree)."
+   }
+  },
+  {
+   "name": "TextureTransformTest",
+   "tier": "core",
+   "file": "TextureTransformTest.gltf",
+   "variant": "glTF",
+   "summary": "Tests if the KHR_texture_transform extension is supported for BaseColor.",
+   "screenshot": "screenshot.jpg",
+   "legal": [
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Microsoft",
+     "owner": "Microsoft",
+     "year": "2018",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 30548,
+   "triangles": 18,
+   "extensionsUsed": [
+    "KHR_texture_transform"
+   ],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 4,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "Offset, rotation and scale tiles land on the green checks as in the reference."
+   }
+  },
+  {
+   "name": "OrientationTest",
+   "tier": "core",
+   "file": "OrientationTest.glb",
+   "variant": "glTF-Binary",
+   "summary": "Tests node translations and rotations.",
+   "screenshot": "screenshot.png",
+   "legal": [
+    {
+     "license": "CC-BY-4.0",
+     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+     "artist": "Khronos",
+     "owner": "Unknown",
+     "year": "2017",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 38920,
+   "triangles": 524,
+   "extensionsUsed": [],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "Arrows point the same way as the reference."
+   }
+  },
+  {
+   "name": "NegativeScaleTest",
+   "tier": "core",
+   "file": "NegativeScaleTest.glb",
+   "variant": "glTF-Binary",
+   "summary": "This model tests what happens when a glTF node has negative scaling.",
+   "screenshot": "screenshot.jpg",
+   "legal": [
+    {
+     "license": "CC-BY-4.0",
+     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+     "artist": "Ed Mackey",
+     "owner": "Analytical Graphics, Inc.",
+     "year": "2023",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 62568,
+   "triangles": 3884,
+   "extensionsUsed": [],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "All checks shown; mirrored spheres light like the originals."
+   }
+  },
+  {
+   "name": "MeshPrimitiveModes",
+   "tier": "core",
+   "file": "MeshPrimitiveModes.gltf",
+   "variant": "glTF",
+   "summary": "An example that shows rendering modes that are supported for mesh primitives in glTF.",
+   "screenshot": "screenshot.png",
+   "legal": [
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Marco Hutter (https://github.com/javagl/)",
+     "owner": "Public",
+     "year": "2023",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 4275,
+   "triangles": 16,
+   "extensionsUsed": [],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "fails",
+    "notes": "Load error \"PBR requires triangle primitives\": POINTS, LINES, LINE_LOOP and LINE_STRIP are rejected, so the whole file (including its triangle meshes) fails."
+   }
+  },
+  {
+   "name": "BoxVertexColors",
+   "tier": "core",
+   "file": "BoxVertexColors.glb",
+   "variant": "glTF-Binary",
+   "summary": "A simple unit cube that uses vertex colors, stored in the `COLORS_0` attribute.",
+   "screenshot": "screenshot.png",
+   "legal": [
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Marco Hutter (https://github.com/javagl/)",
+     "owner": "Public",
+     "year": "2023",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 1924,
+   "triangles": 12,
+   "extensionsUsed": [],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "Vertex colours interpolate as in the reference."
+   }
+  },
+  {
+   "name": "InterpolationTest",
+   "tier": "core",
+   "file": "InterpolationTest.glb",
+   "variant": "glTF-Binary",
+   "summary": "A sample with three different animation interpolations",
+   "screenshot": "screenshot.gif",
+   "legal": [
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Khronos",
+     "owner": "Public",
+     "year": "2017",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 7952,
+   "triangles": 14,
+   "extensionsUsed": [],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 1,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "differs",
+    "notes": "Rest pose only: the gallery does not play animations (STEP/LINEAR/CUBICSPLINE not exercised here)."
+   }
+  },
+  {
+   "name": "MorphStressTest",
+   "tier": "core",
+   "file": "MorphStressTest.glb",
+   "variant": "glTF-Binary",
+   "summary": "Tests up to 8 morph targets.",
+   "screenshot": "screenshot.jpg",
+   "legal": [
+    {
+     "license": "CC-BY-4.0",
+     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+     "artist": "Ed Mackey",
+     "owner": "Analytical Graphics, Inc.",
+     "year": "2021",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 575900,
+   "triangles": 2412,
+   "extensionsUsed": [],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 1,
+    "hints": 42,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "differs",
+    "notes": "Default morph weights (all 0) render correctly; the reference shows an animated state, not exercised here."
+   }
+  },
+  {
+   "name": "RiggedFigure",
+   "tier": "core",
+   "file": "RiggedFigure.glb",
+   "variant": "glTF-Binary",
+   "summary": "Animations. Skins.",
+   "screenshot": "screenshot.gif",
+   "legal": [
+    {
+     "license": "CC-BY-4.0",
+     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+     "artist": "Cesium",
+     "owner": "Cesium",
+     "year": "2017",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 50116,
+   "triangles": 256,
+   "extensionsUsed": [],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 1,
+    "infos": 0,
+    "hints": 0,
+    "codes": {
+     "NODE_SKINNED_MESH_NON_ROOT": 1
+    }
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "Bind pose renders correctly; animation not exercised."
+   }
+  },
+  {
+   "name": "Fox",
+   "tier": "core",
+   "file": "Fox.glb",
+   "variant": "glTF-Binary",
+   "summary": "Multiple animations cycles: Survey, Walk, Run.",
+   "screenshot": "screenshot.jpg",
+   "legal": [
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "PixelMannen",
+     "owner": "Public",
+     "year": "2014",
+     "what": "Model"
+    },
+    {
+     "license": "CC-BY-4.0",
+     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+     "artist": "tomkranis",
+     "owner": "tomkranis",
+     "year": "2014",
+     "what": "Rigging & Animation"
+    },
+    {
+     "license": "CC-BY-4.0",
+     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+     "artist": "@AsoboStudio and @scurest",
+     "owner": "@AsoboStudio and @scurest",
+     "year": "2017",
+     "what": "Conversion to glTF"
+    }
+   ],
+   "bytes": 162852,
+   "triangles": 576,
+   "extensionsUsed": [],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "Bind pose renders correctly; animation clips not exercised."
+   }
+  },
+  {
+   "name": "MultipleScenes",
+   "tier": "core",
+   "file": "MultipleScenes.gltf",
+   "variant": "glTF",
+   "summary": "A simple glTF asset with two scenes. Each scene consists of one node with one mesh.",
+   "screenshot": "screenshot.png",
+   "legal": [
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Public",
+     "owner": "Public",
+     "year": "2017",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 2017,
+   "triangles": 3,
+   "extensionsUsed": [],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "Default scene renders; selecting another scene is not exercised."
+   }
+  },
+  {
+   "name": "Cameras",
+   "tier": "core",
+   "file": "Cameras.gltf",
+   "variant": "glTF",
+   "summary": "A sample with two different camera objects",
+   "screenshot": "screenshot.png",
+   "legal": [
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Marco Hutter (https://github.com/javagl/)",
+     "owner": "Public",
+     "year": "2017",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 1645,
+   "triangles": 2,
+   "extensionsUsed": [],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "differs",
+    "notes": "Geometry correct; viewed through the fitted camera, not the file's glTF cameras (exposed as model.cameras data only)."
+   }
+  },
+  {
+   "name": "DirectionalLight",
+   "tier": "core",
+   "file": "DirectionalLight.glb",
+   "variant": "glTF-Binary",
+   "summary": "Verification of light calculations",
+   "screenshot": "screenshot.png",
+   "legal": [
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Rickard Sahlin",
+     "owner": "Public",
+     "year": 2020,
+     "what": "Everything"
+    }
+   ],
+   "bytes": 453520,
+   "triangles": 31800,
+   "extensionsUsed": [
+    "KHR_lights_punctual"
+   ],
+   "extensionsRequired": [
+    "KHR_lights_punctual"
+   ],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 7,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "differs",
+    "notes": "KHR_lights_punctual directional light is parsed into model.lights but not applied (no helper for the engine's own light): spheres are lit by the studio, not the file's light."
+   }
+  },
+  {
+   "name": "PointLightIntensityTest",
+   "tier": "core",
+   "file": "PointLightIntensityTest.glb",
+   "variant": "glTF-Binary",
+   "summary": "This model tests KHR_lights_punctual intensity vs lamp color.",
+   "screenshot": "screenshot.jpg",
+   "legal": [
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Ed Mackey",
+     "owner": "Public",
+     "year": "2025",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 30148,
+   "triangles": 280,
+   "extensionsUsed": [
+    "KHR_lights_punctual",
+    "KHR_materials_unlit"
+   ],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "differs",
+    "notes": "Point lights applied through model.clusteredLights() + @margoengine/clustered: coloured spots show in the right order, but faint, because the studio IBL also lights the panels (the reference has no ambient light)."
+   }
+  },
+  {
+   "name": "LightsPunctualLamp",
+   "tier": "core",
+   "file": "LightsPunctualLamp.glb",
+   "variant": "glTF-Binary",
+   "summary": "Lamp using punctual lights.",
+   "screenshot": "screenshot.png",
+   "legal": [
+    {
+     "license": "CC-BY-4.0",
+     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+     "artist": "DGG",
+     "owner": "DGG",
+     "year": "2021",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 4341320,
+   "triangles": 6000,
+   "extensionsUsed": [
+    "KHR_materials_transmission",
+    "KHR_lights_punctual"
+   ],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "Lamp materials match; its point lights (applied through model.clusteredLights() + @margoengine/clustered) light the shade."
+   }
+  },
+  {
+   "name": "MeshoptCubeTest",
+   "tier": "core",
+   "file": "MeshoptCubeTest.gltf",
+   "variant": "glTF",
+   "summary": "This model tests the KHR_meshopt_compression extension.",
+   "screenshot": "screenshot.png",
+   "legal": [
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Arseny Kapoulkine",
+     "owner": "Public",
+     "year": "2025",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 109809,
+   "triangles": 320,
+   "extensionsUsed": [
+    "KHR_mesh_quantization",
+    "KHR_meshopt_compression"
+   ],
+   "extensionsRequired": [
+    "KHR_mesh_quantization"
+   ],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 1,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "fails",
+    "notes": "Load error: KHR_meshopt_compression filter 'COLOR' is unknown to @margoengine/decoders (mesh 26)."
+   }
+  },
+  {
+   "name": "NodePerformanceTest",
+   "tier": "core",
+   "file": "NodePerformanceTest.glb",
+   "variant": "glTF-Binary",
+   "summary": "Node, mesh, primitive and texture count performance test",
+   "screenshot": "screenshot.jpg",
+   "legal": [
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Jon Aspeheim",
+     "owner": "Public",
+     "year": 2024,
+     "what": "Everything"
+    }
+   ],
+   "bytes": 37986536,
+   "triangles": 268268,
+   "extensionsUsed": [
+    "KHR_lights_punctual"
+   ],
+   "extensionsRequired": [
+    "KHR_lights_punctual"
+   ],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 100,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "10,002 nodes render; needs an engine capacity above the 1,024 default (gallery uses 32,768). Its directional light is not applied. First frame took about 20 s in the capture."
+   }
+  },
+  {
+   "name": "SciFiHelmet",
+   "tier": "showcase",
+   "file": "SciFiHelmet.gltf",
+   "variant": "glTF",
+   "summary": "Futuristic helmet",
+   "screenshot": "screenshot.jpg",
+   "legal": [
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Michael Pavlovic",
+     "owner": "Public",
+     "year": "2017",
+     "what": "Everything"
+    },
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Norbert Nopper",
+     "owner": "Public",
+     "year": "2017",
+     "what": "Conversion to glTF"
+    }
+   ],
+   "bytes": 30286979,
+   "triangles": 23358,
+   "extensionsUsed": [],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 1,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "Detailed PBR reads correctly."
+   }
+  },
+  {
+   "name": "ToyCar",
+   "tier": "showcase",
+   "file": "ToyCar.glb",
+   "variant": "glTF-Binary",
+   "summary": "Toy car example using transmission, clearcoat, and sheen.",
+   "screenshot": "screenshot.jpg",
+   "legal": [
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Guido Odendahl",
+     "owner": "Public",
+     "year": "2020",
+     "what": "Initial car model"
+    },
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Eric Chadwick",
+     "owner": "Public",
+     "year": "2020",
+     "what": "Extensions and scene composition"
+    }
+   ],
+   "bytes": 5422412,
+   "triangles": 108936,
+   "extensionsUsed": [
+    "KHR_texture_transform",
+    "KHR_materials_clearcoat",
+    "KHR_materials_transmission",
+    "KHR_materials_sheen"
+   ],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 2,
+    "infos": 1,
+    "hints": 0,
+    "codes": {
+     "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE": 2
+    }
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "Clearcoat paint, sheen cloth and transmissive windows render."
+   }
+  },
+  {
+   "name": "SheenChair",
+   "tier": "showcase",
+   "file": "SheenChair.glb",
+   "variant": "glTF-Binary",
+   "summary": "Chair using material variants and sheen.",
+   "screenshot": "screenshot.jpg",
+   "legal": [
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Eric Chadwick",
+     "owner": "Wayfair, LLC",
+     "year": "2020",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 4125648,
+   "triangles": 39936,
+   "extensionsUsed": [
+    "KHR_texture_transform",
+    "KHR_materials_sheen",
+    "KHR_materials_variants"
+   ],
+   "extensionsRequired": [
+    "KHR_texture_transform"
+   ],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 1,
+    "infos": 1,
+    "hints": 0,
+    "codes": {
+     "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE": 1
+    }
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "Sheen fabric reads; KHR_materials_variants ignored (default material shown)."
+   }
+  },
+  {
+   "name": "ABeautifulGame",
+   "tier": "showcase",
+   "file": "ABeautifulGame.glb",
+   "variant": "glTF-Binary",
+   "summary": "Chess set using transmission and volume.",
+   "screenshot": "screenshot.jpg",
+   "legal": [
+    {
+     "license": "CC-BY-4.0",
+     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+     "artist": "MaterialX Project",
+     "owner": "ASWF",
+     "year": "2020",
+     "what": "Original model"
+    },
+    {
+     "license": "CC-BY-4.0",
+     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+     "artist": "Ed Mackey",
+     "owner": "Ed Mackey",
+     "year": "2022",
+     "what": "Conversion to glTF"
+    }
+   ],
+   "bytes": 42977928,
+   "triangles": 573952,
+   "extensionsUsed": [
+    "KHR_materials_transmission",
+    "KHR_materials_volume"
+   ],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "fails",
+    "notes": "Load error \"glTF images exceed decoded size limit\": 33 textures exceed gltf-pro's 256 MB decoded-image budget."
+   }
+  },
+  {
+   "name": "MaterialsVariantsShoe",
+   "tier": "showcase",
+   "file": "MaterialsVariantsShoe.glb",
+   "variant": "glTF-Binary",
+   "summary": "A model of a shoe that illustrates use of the KHR_materials_variants extension with three materials included in the asset.",
+   "screenshot": "screenshot.jpg",
+   "legal": [
+    {
+     "license": "CC-BY-4.0",
+     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+     "artist": "Shopify",
+     "owner": "Shopify",
+     "year": "2021",
+     "what": "Everthing"
+    }
+   ],
+   "bytes": 7833592,
+   "triangles": 22700,
+   "extensionsUsed": [
+    "KHR_materials_variants"
+   ],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 1,
+    "infos": 0,
+    "hints": 0,
+    "codes": {
+     "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE": 1
+    }
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "Default variant renders; KHR_materials_variants ignored (no variant switching)."
+   }
+  },
+  {
+   "name": "IridescenceLamp",
+   "tier": "showcase",
+   "file": "IridescenceLamp.glb",
+   "variant": "glTF-Binary",
+   "summary": "Wayfair Lamp model using transmission, volume, and KHR_materials_iridescence.",
+   "screenshot": "screenshot.jpg",
+   "legal": [
+    {
+     "license": "CC-BY-4.0",
+     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+     "artist": "Eric Chadwick",
+     "owner": "Wayfair, LLC",
+     "year": "2022",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 4083912,
+   "triangles": 18866,
+   "extensionsUsed": [
+    "KHR_materials_transmission",
+    "KHR_materials_volume",
+    "KHR_materials_iridescence",
+    "KHR_materials_ior"
+   ],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "differs",
+    "notes": "KHR_materials_iridescence ignored: base and shade lining lack the iridescent colours."
+   }
+  },
+  {
+   "name": "AnisotropyBarnLamp",
+   "tier": "showcase",
+   "file": "AnisotropyBarnLamp.glb",
+   "variant": "glTF-Binary",
+   "summary": "Wayfair AnisotropyBarnLamp model using anisotropy, clearcoat, emissive_strength, transmission, volume, and basisu extensions.",
+   "screenshot": "screenshot.jpg",
+   "legal": [
+    {
+     "license": "CC-BY-4.0",
+     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+     "artist": "Eric Chadwick",
+     "owner": "Copyright 2023 Wayfair, LLC",
+     "year": "2023",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 7833440,
+   "triangles": 10203,
+   "extensionsUsed": [
+    "KHR_materials_anisotropy",
+    "KHR_materials_clearcoat",
+    "KHR_materials_emissive_strength",
+    "KHR_materials_transmission",
+    "KHR_materials_volume"
+   ],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "differs",
+    "notes": "KHR_materials_anisotropy ignored: brushed copper highlights are isotropic."
+   }
+  },
+  {
+   "name": "DiffuseTransmissionTeacup",
+   "tier": "showcase",
+   "file": "DiffuseTransmissionTeacup.glb",
+   "variant": "glTF-Binary",
+   "summary": "DiffuseTransmissionTeacup model using Diffuse Transmission extension.",
+   "screenshot": "screenshot.jpg",
+   "legal": [
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Polyhaven.com, and Eric Chadwick",
+     "owner": "Public domain",
+     "year": "2023",
+     "what": "Models and Textures"
+    }
+   ],
+   "bytes": 4795028,
+   "triangles": 28184,
+   "extensionsUsed": [
+    "KHR_materials_diffuse_transmission"
+   ],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 2,
+    "infos": 1,
+    "hints": 0,
+    "codes": {
+     "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE": 2
+    }
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "Matches closely; KHR_materials_diffuse_transmission ignored (thin porcelain glow absent, subtle)."
+   }
+  },
+  {
+   "name": "CommercialRefrigerator",
+   "tier": "showcase",
+   "file": "CommercialRefrigerator.glb",
+   "variant": "glTF-Binary",
+   "summary": "Commercial refrigerator with glass condensation, champagne bottles, and door animation.",
+   "screenshot": "screenshot.jpg",
+   "legal": [
+    {
+     "license": "CC-BY-4.0",
+     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+     "artist": "Eric Chadwick",
+     "owner": "Darmstadt Graphics Group GmbH",
+     "year": "2025",
+     "what": "Model and textures and all images in the README.md"
+    },
+    {
+     "license": "CC-BY-4.0",
+     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+     "artist": "Sean Thomas",
+     "owner": "Sean Thomas",
+     "year": "2025",
+     "what": "This work is based on 'Commercial Fridge' (https://sketchfab.com/3d-models/commercial-fridge-2174e1e4f1f24f1a95aa110ee060f473) by Sean Thomas (https://sketchfab.com/foon.) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)"
+    }
+   ],
+   "bytes": 10131180,
+   "triangles": 208679,
+   "extensionsUsed": [
+    "KHR_materials_clearcoat",
+    "KHR_materials_transmission"
+   ],
+   "extensionsRequired": [
+    "KHR_materials_transmission"
+   ],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 0,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "differs",
+    "notes": "Glass door renders as an opaque light-grey panel; the bottles behind it (visible in the reference) are hidden."
+   }
+  },
+  {
+   "name": "Lantern",
+   "tier": "showcase",
+   "file": "Lantern.glb",
+   "variant": "glTF-Binary",
+   "summary": "Old wooden street light.",
+   "screenshot": "screenshot.jpg",
+   "legal": [
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "sbtron",
+     "owner": "Microsoft",
+     "year": "2017",
+     "what": "Initial version"
+    },
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Frank Galligan",
+     "owner": "Frank Galligan",
+     "year": "2018",
+     "what": "Draco compression"
+    }
+   ],
+   "bytes": 9564264,
+   "triangles": 5394,
+   "extensionsUsed": [],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 15,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "Matches the reference."
+   }
+  },
+  {
+   "name": "BoomBox",
+   "tier": "showcase",
+   "file": "BoomBox.glb",
+   "variant": "glTF-Binary",
+   "summary": "A common object with glowing front panel created with Core glTF 2.0.",
+   "screenshot": "screenshot.jpg",
+   "legal": [
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Microsoft",
+     "owner": "Public",
+     "year": "2017",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 10614184,
+   "triangles": 6036,
+   "extensionsUsed": [],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 5,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "Matches; chrome body looks brighter because it reflects the light grey studio."
+   }
+  },
+  {
+   "name": "Corset",
+   "tier": "showcase",
+   "file": "Corset.glb",
+   "variant": "glTF-Binary",
+   "summary": "A female fabric mannequin with a corset and a collar.",
+   "screenshot": "screenshot.jpg",
+   "legal": [
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Microsoft",
+     "owner": "UX3D",
+     "year": "2017",
+     "what": "Everything"
+    }
+   ],
+   "bytes": 13491364,
+   "triangles": 18324,
+   "extensionsUsed": [],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 5,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "Matches the reference."
+   }
+  },
+  {
+   "name": "FlightHelmet",
+   "tier": "showcase",
+   "file": "FlightHelmet.gltf",
+   "variant": "glTF",
+   "summary": "Displayed flight helmet on a wooden stand.",
+   "legal": [
+    {
+     "license": "CC0-1.0",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+     "artist": "Gary Hsu",
+     "owner": "Public",
+     "year": "2018",
+     "what": "Conversion from Maya"
+    }
+   ],
+   "screenshot": "screenshot.jpg",
+   "bytes": 48393281,
+   "triangles": 94722,
+   "extensionsUsed": [
+    "KHR_materials_transmission"
+   ],
+   "extensionsRequired": [],
+   "validator": {
+    "version": "2.0.0-dev.3.10",
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0,
+    "hints": 4,
+    "codes": {}
+   },
+   "render": {
+    "verdict": "matches",
+    "notes": "Matches; goggle glass transmission reads."
+   }
+  }
+ ]
+}

@@ -329,6 +329,441 @@
     "changed": 0.0005,
     "hot": 0.0002
    }
+  },
+  "khronos-MetalRoughSpheres-model": {
+   "url": "examples/khronos-gallery.html?model=MetalRoughSpheres",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-AlphaBlendModeTest-model": {
+   "url": "examples/khronos-gallery.html?model=AlphaBlendModeTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-NormalTangentMirrorTest-model": {
+   "url": "examples/khronos-gallery.html?model=NormalTangentMirrorTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-TextureTransformTest-model": {
+   "url": "examples/khronos-gallery.html?model=TextureTransformTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-OrientationTest-model": {
+   "url": "examples/khronos-gallery.html?model=OrientationTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-NegativeScaleTest-model": {
+   "url": "examples/khronos-gallery.html?model=NegativeScaleTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-BoxVertexColors-model": {
+   "url": "examples/khronos-gallery.html?model=BoxVertexColors",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-InterpolationTest-model": {
+   "url": "examples/khronos-gallery.html?model=InterpolationTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-MorphStressTest-model": {
+   "url": "examples/khronos-gallery.html?model=MorphStressTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-RiggedFigure-model": {
+   "url": "examples/khronos-gallery.html?model=RiggedFigure",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-Fox-model": {
+   "url": "examples/khronos-gallery.html?model=Fox",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-MultipleScenes-model": {
+   "url": "examples/khronos-gallery.html?model=MultipleScenes",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-Cameras-model": {
+   "url": "examples/khronos-gallery.html?model=Cameras",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-DirectionalLight-model": {
+   "url": "examples/khronos-gallery.html?model=DirectionalLight",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-PointLightIntensityTest-model": {
+   "url": "examples/khronos-gallery.html?model=PointLightIntensityTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-LightsPunctualLamp-model": {
+   "url": "examples/khronos-gallery.html?model=LightsPunctualLamp",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-NodePerformanceTest-model": {
+   "url": "examples/khronos-gallery.html?model=NodePerformanceTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-SciFiHelmet-model": {
+   "url": "examples/khronos-gallery.html?model=SciFiHelmet",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-ToyCar-model": {
+   "url": "examples/khronos-gallery.html?model=ToyCar",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-SheenChair-model": {
+   "url": "examples/khronos-gallery.html?model=SheenChair",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-MaterialsVariantsShoe-model": {
+   "url": "examples/khronos-gallery.html?model=MaterialsVariantsShoe",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-IridescenceLamp-model": {
+   "url": "examples/khronos-gallery.html?model=IridescenceLamp",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-AnisotropyBarnLamp-model": {
+   "url": "examples/khronos-gallery.html?model=AnisotropyBarnLamp",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-DiffuseTransmissionTeacup-model": {
+   "url": "examples/khronos-gallery.html?model=DiffuseTransmissionTeacup",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-CommercialRefrigerator-model": {
+   "url": "examples/khronos-gallery.html?model=CommercialRefrigerator",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-Lantern-model": {
+   "url": "examples/khronos-gallery.html?model=Lantern",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-BoomBox-model": {
+   "url": "examples/khronos-gallery.html?model=BoomBox",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-Corset-model": {
+   "url": "examples/khronos-gallery.html?model=Corset",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "khronos-FlightHelmet-model": {
+   "url": "examples/khronos-gallery.html?model=FlightHelmet",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
   }
  },
  "environment": {

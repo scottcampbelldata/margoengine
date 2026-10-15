@@ -2,14 +2,107 @@
 
 Reference models from the official [Khronos glTF-Sample-Assets](https://github.com/KhronosGroup/glTF-Sample-Assets)
 repository, used by the visual-regression suite and real-asset checks (HANDOFF "LAUNCH GATES" #5). Each model keeps
-its own licence; only models whose licence allows redistribution in this repo and use on margoengine.com are added,
-and only after Scott approves each one.
+its own licence; only models whose `metadata.json` lists nothing but CC0 1.0 and/or CC BY 4.0 are added, and only
+after Scott approves them (FlightHelmet 2026-10-15; the `SHORTLIST.md` tiers 2026-10-15).
 
-| Model | Licence | Source | Added | Notes |
-|---|---|---|---|---|
-| FlightHelmet | CC0 1.0 Universal ("© 2018, Public"; conversion from Maya credited to Gary Hsu) | [Models/FlightHelmet](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/FlightHelmet) | 2026-10-15 | glTF + .bin + 15 PNG textures, 46.2 MB, 94,722 triangles, 6 materials, uses `KHR_materials_transmission`; Khronos glTF-Validator: 0 errors, 0 warnings |
+Downloaded 2026-10-15 from Khronos commit `edc7c9e67c639d230715049ee31f9a96a6babbbe` (`main`), the `glTF-Binary` (GLB)
+variant where one exists, otherwise `glTF` + `.bin` + images; every file's size was checked against the GitHub tree
+listing. `screenshot.*` is Khronos's reference render (for eyeballing ours). Binary files are stored with Git LFS
+(`.gitattributes`). `manifest.json` holds the licence records and the validator results;
+`node scripts/khronos-assets.mjs` re-validates every model (Khronos glTF-Validator, the `gltf-validator` dev
+dependency) and regenerates the two generated sections below. Render check: `examples/khronos-gallery.html` (see
+HANDOFF 5w).
 
-Binary files here are stored with Git LFS (`.gitattributes`).
+## Models
 
-Not used: **Sponza** (Cryengine Limited License Agreement, © Crytek) - not suitable for redistribution in an open-source
-repo or public demos.
+Size excludes the screenshot. Validator codes list errors and warnings only.
+
+<!-- models -->
+| Model | Licence | Credit (from metadata.json) | Size | Triangles | Extensions used | Validator | Render check |
+|---|---|---|---|---|---|---|---|
+| [MetalRoughSpheres](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/MetalRoughSpheres) | CC BY 4.0 | Everything: Ed Mackey | 11.22 MB | 501,776 | - | 0 errors, 0 warnings | **matches**: Grid, labels and metal/roughness ramps match; metals reflect the plain grey studio light, so they look flatter than the HDR reference. |
+| [AlphaBlendModeTest](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/AlphaBlendModeTest) | CC BY 4.0 | Everything: Ed Mackey | 2.98 MB | 61 | - | 0 errors, 0 warnings | **matches**: OPAQUE, MASK cut-offs and BLEND levels match the reference columns. |
+| [NormalTangentMirrorTest](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/NormalTangentMirrorTest) | CC BY 4.0 | Everything: Ed Mackey | 1.57 MB | 5,240 | - | 0 errors, 0 warnings | **matches**: Bumps read the same in every column (mirrored UVs and supplied/generated tangents agree). |
+| [TextureTransformTest](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/TextureTransformTest) | CC0 1.0 | Everything: Microsoft | 0.03 MB | 18 | `KHR_texture_transform` | 0 errors, 0 warnings | **matches**: Offset, rotation and scale tiles land on the green checks as in the reference. |
+| [OrientationTest](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/OrientationTest) | CC BY 4.0 | Everything: Khronos | 0.04 MB | 524 | - | 0 errors, 0 warnings | **matches**: Arrows point the same way as the reference. |
+| [NegativeScaleTest](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/NegativeScaleTest) | CC BY 4.0 | Everything: Ed Mackey | 0.06 MB | 3,884 | - | 0 errors, 0 warnings | **matches**: All checks shown; mirrored spheres light like the originals. |
+| [MeshPrimitiveModes](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/MeshPrimitiveModes) | CC0 1.0 | Everything: Marco Hutter (https://github.com/javagl/) | 0.00 MB | 16 | - | 0 errors, 0 warnings | **fails**: Load error "PBR requires triangle primitives": POINTS, LINES, LINE_LOOP and LINE_STRIP are rejected, so the whole file (including its triangle meshes) fails. |
+| [BoxVertexColors](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/BoxVertexColors) | CC0 1.0 | Everything: Marco Hutter (https://github.com/javagl/) | 0.00 MB | 12 | - | 0 errors, 0 warnings | **matches**: Vertex colours interpolate as in the reference. |
+| [InterpolationTest](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/InterpolationTest) | CC0 1.0 | Everything: Khronos | 0.01 MB | 14 | - | 0 errors, 0 warnings | **differs**: Rest pose only: the gallery does not play animations (STEP/LINEAR/CUBICSPLINE not exercised here). |
+| [MorphStressTest](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/MorphStressTest) | CC BY 4.0 | Everything: Ed Mackey | 0.58 MB | 2,412 | - | 0 errors, 0 warnings | **differs**: Default morph weights (all 0) render correctly; the reference shows an animated state, not exercised here. |
+| [RiggedFigure](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/RiggedFigure) | CC BY 4.0 | Everything: Cesium | 0.05 MB | 256 | - | 0 errors, 1 warnings (NODE_SKINNED_MESH_NON_ROOT x1) | **matches**: Bind pose renders correctly; animation not exercised. |
+| [Fox](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Fox) | CC0 1.0 + CC BY 4.0 | Model: PixelMannen; Rigging & Animation: tomkranis; Conversion to glTF: @AsoboStudio and @scurest | 0.16 MB | 576 | - | 0 errors, 0 warnings | **matches**: Bind pose renders correctly; animation clips not exercised. |
+| [MultipleScenes](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/MultipleScenes) | CC0 1.0 | Everything: Public | 0.00 MB | 3 | - | 0 errors, 0 warnings | **matches**: Default scene renders; selecting another scene is not exercised. |
+| [Cameras](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Cameras) | CC0 1.0 | Everything: Marco Hutter (https://github.com/javagl/) | 0.00 MB | 2 | - | 0 errors, 0 warnings | **differs**: Geometry correct; viewed through the fitted camera, not the file's glTF cameras (exposed as model.cameras data only). |
+| [DirectionalLight](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/DirectionalLight) | CC0 1.0 | Everything: Rickard Sahlin | 0.45 MB | 31,800 | `KHR_lights_punctual` | 0 errors, 0 warnings | **differs**: KHR_lights_punctual directional light is parsed into model.lights but not applied (no helper for the engine's own light): spheres are lit by the studio, not the file's light. |
+| [PointLightIntensityTest](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/PointLightIntensityTest) | CC0 1.0 | Everything: Ed Mackey | 0.03 MB | 280 | `KHR_lights_punctual`, `KHR_materials_unlit` | 0 errors, 0 warnings | **differs**: Point lights applied through model.clusteredLights() + @margoengine/clustered: coloured spots show in the right order, but faint, because the studio IBL also lights the panels (the reference has no ambient light). |
+| [LightsPunctualLamp](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/LightsPunctualLamp) | CC BY 4.0 | Everything: DGG | 4.34 MB | 6,000 | `KHR_materials_transmission`, `KHR_lights_punctual` | 0 errors, 0 warnings | **matches**: Lamp materials match; its point lights (applied through model.clusteredLights() + @margoengine/clustered) light the shade. |
+| [MeshoptCubeTest](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/MeshoptCubeTest) | CC0 1.0 | Everything: Arseny Kapoulkine | 0.11 MB | 320 | `KHR_mesh_quantization`, `KHR_meshopt_compression` | 0 errors, 0 warnings | **fails**: Load error: KHR_meshopt_compression filter 'COLOR' is unknown to @margoengine/decoders (mesh 26). |
+| [NodePerformanceTest](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/NodePerformanceTest) | CC0 1.0 | Everything: Jon Aspeheim | 37.99 MB | 268,268 | `KHR_lights_punctual` | 0 errors, 0 warnings | **matches**: 10,002 nodes render; needs an engine capacity above the 1,024 default (gallery uses 32,768). Its directional light is not applied. First frame took about 20 s in the capture. |
+| [SciFiHelmet](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/SciFiHelmet) | CC0 1.0 | Everything: Michael Pavlovic; Conversion to glTF: Norbert Nopper | 30.29 MB | 23,358 | - | 0 errors, 0 warnings | **matches**: Detailed PBR reads correctly. |
+| [ToyCar](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/ToyCar) | CC0 1.0 | Initial car model: Guido Odendahl; Extensions and scene composition: Eric Chadwick | 5.42 MB | 108,936 | `KHR_texture_transform`, `KHR_materials_clearcoat`, `KHR_materials_transmission`, `KHR_materials_sheen` | 0 errors, 2 warnings (MESH_PRIMITIVE_GENERATED_TANGENT_SPACE x2) | **matches**: Clearcoat paint, sheen cloth and transmissive windows render. |
+| [SheenChair](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/SheenChair) | CC0 1.0 | Everything: Eric Chadwick | 4.13 MB | 39,936 | `KHR_texture_transform`, `KHR_materials_sheen`, `KHR_materials_variants` | 0 errors, 1 warnings (MESH_PRIMITIVE_GENERATED_TANGENT_SPACE x1) | **matches**: Sheen fabric reads; KHR_materials_variants ignored (default material shown). |
+| [ABeautifulGame](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/ABeautifulGame) | CC BY 4.0 | Original model: MaterialX Project; Conversion to glTF: Ed Mackey | 42.98 MB | 573,952 | `KHR_materials_transmission`, `KHR_materials_volume` | 0 errors, 0 warnings | **fails**: Load error "glTF images exceed decoded size limit": 33 textures exceed gltf-pro's 256 MB decoded-image budget. |
+| [MaterialsVariantsShoe](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/MaterialsVariantsShoe) | CC BY 4.0 | Everthing: Shopify | 7.83 MB | 22,700 | `KHR_materials_variants` | 0 errors, 1 warnings (MESH_PRIMITIVE_GENERATED_TANGENT_SPACE x1) | **matches**: Default variant renders; KHR_materials_variants ignored (no variant switching). |
+| [IridescenceLamp](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/IridescenceLamp) | CC BY 4.0 | Everything: Eric Chadwick | 4.08 MB | 18,866 | `KHR_materials_transmission`, `KHR_materials_volume`, `KHR_materials_iridescence`, `KHR_materials_ior` | 0 errors, 0 warnings | **differs**: KHR_materials_iridescence ignored: base and shade lining lack the iridescent colours. |
+| [AnisotropyBarnLamp](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/AnisotropyBarnLamp) | CC BY 4.0 | Everything: Eric Chadwick | 7.83 MB | 10,203 | `KHR_materials_anisotropy`, `KHR_materials_clearcoat`, `KHR_materials_emissive_strength`, `KHR_materials_transmission`, `KHR_materials_volume` | 0 errors, 0 warnings | **differs**: KHR_materials_anisotropy ignored: brushed copper highlights are isotropic. |
+| [DiffuseTransmissionTeacup](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/DiffuseTransmissionTeacup) | CC0 1.0 | Models and Textures: Polyhaven.com, and Eric Chadwick | 4.80 MB | 28,184 | `KHR_materials_diffuse_transmission` | 0 errors, 2 warnings (MESH_PRIMITIVE_GENERATED_TANGENT_SPACE x2) | **matches**: Matches closely; KHR_materials_diffuse_transmission ignored (thin porcelain glow absent, subtle). |
+| [CommercialRefrigerator](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CommercialRefrigerator) | CC BY 4.0 | Model and textures and all images in the README.md: Eric Chadwick; This work is based on 'Commercial Fridge' (https://sketchfab.com/3d-models/commercial-fridge-2174e1e4f1f24f1a95aa110ee060f473) by Sean Thomas (https://sketchfab.com/foon.) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/): Sean Thomas | 10.13 MB | 208,679 | `KHR_materials_clearcoat`, `KHR_materials_transmission` | 0 errors, 0 warnings | **differs**: Glass door renders as an opaque light-grey panel; the bottles behind it (visible in the reference) are hidden. |
+| [Lantern](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Lantern) | CC0 1.0 | Initial version: sbtron; Draco compression: Frank Galligan | 9.56 MB | 5,394 | - | 0 errors, 0 warnings | **matches**: Matches the reference. |
+| [BoomBox](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/BoomBox) | CC0 1.0 | Everything: Microsoft | 10.61 MB | 6,036 | - | 0 errors, 0 warnings | **matches**: Matches; chrome body looks brighter because it reflects the light grey studio. |
+| [Corset](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Corset) | CC0 1.0 | Everything: Microsoft | 13.49 MB | 18,324 | - | 0 errors, 0 warnings | **matches**: Matches the reference. |
+| [FlightHelmet](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/FlightHelmet) | CC0 1.0 | Conversion from Maya: Gary Hsu | 48.39 MB | 94,722 | `KHR_materials_transmission` | 0 errors, 0 warnings | **matches**: Matches; goggle glass transmission reads. |
+<!-- /models -->
+
+## Skipped
+
+- Licence differs from plain CC0 / CC BY 4.0 (their `metadata.json` adds a `LicenseRef-LegalMark-*` trademark notice
+  for a logo inside the model, e.g. the glTF logo; Khronos's notice says the model licence confers no right to use
+  the mark beyond its Legal Mark Usage Guidelines). Not downloaded; awaiting Scott's decision: the 16 Compare models
+  (CompareBaseColor, CompareMetallic, CompareRoughness, CompareNormal, CompareAmbientOcclusion, CompareAlphaCoverage,
+  CompareEmissiveStrength, CompareClearcoat, CompareSheen, CompareSpecular, CompareTransmission, CompareVolume,
+  CompareIor, CompareIridescence, CompareAnisotropy, CompareDispersion: CC0 + Khronos mark), MultiUVTest (CC BY +
+  Khronos mark), CesiumMan (CC BY + Cesium mark), CarConcept and SunglassesKhronos (CC BY + Khronos mark),
+  ChronographWatch (CC BY + Khronos and DGG marks), AntiqueCamera (CC0 + UX3D mark).
+- **Sponza**: Cryengine Limited License Agreement (© Crytek), not suitable for redistribution in an open-source repo
+  or public demos.
+
+## Third-party notices
+
+For the site and any public demo that shows these models. CC BY 4.0 requires the credit and a link to the licence;
+CC0 needs none, but credit is given anyway.
+
+<!-- notices -->
+- **MetalRoughSpheres** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/MetalRoughSpheres)): Everything: Ed Mackey (© 2017 Analytical Graphics, Inc.), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
+- **AlphaBlendModeTest** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/AlphaBlendModeTest)): Everything: Ed Mackey (© 2018 Analytical Graphics, Inc.), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
+- **NormalTangentMirrorTest** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/NormalTangentMirrorTest)): Everything: Ed Mackey (© 2018 Analytical Graphics, Inc.), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
+- **TextureTransformTest** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/TextureTransformTest)): Everything: Microsoft (2018), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode).
+- **OrientationTest** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/OrientationTest)): Everything: Khronos (© 2017 Unknown), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
+- **NegativeScaleTest** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/NegativeScaleTest)): Everything: Ed Mackey (© 2023 Analytical Graphics, Inc.), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
+- **MeshPrimitiveModes** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/MeshPrimitiveModes)): Everything: Marco Hutter (https://github.com/javagl/) (2023), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode).
+- **BoxVertexColors** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/BoxVertexColors)): Everything: Marco Hutter (https://github.com/javagl/) (2023), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode).
+- **InterpolationTest** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/InterpolationTest)): Everything: Khronos (2017), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode).
+- **MorphStressTest** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/MorphStressTest)): Everything: Ed Mackey (© 2021 Analytical Graphics, Inc.), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
+- **RiggedFigure** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/RiggedFigure)): Everything: Cesium (2017), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
+- **Fox** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Fox)): Model: PixelMannen (2014), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode); Rigging & Animation: tomkranis (2014), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode); Conversion to glTF: @AsoboStudio and @scurest (2017), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
+- **MultipleScenes** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/MultipleScenes)): Everything: Public (2017), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode).
+- **Cameras** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Cameras)): Everything: Marco Hutter (https://github.com/javagl/) (2017), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode).
+- **DirectionalLight** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/DirectionalLight)): Everything: Rickard Sahlin (2020), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode).
+- **PointLightIntensityTest** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/PointLightIntensityTest)): Everything: Ed Mackey (2025), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode).
+- **LightsPunctualLamp** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/LightsPunctualLamp)): Everything: DGG (2021), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
+- **MeshoptCubeTest** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/MeshoptCubeTest)): Everything: Arseny Kapoulkine (2025), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode).
+- **NodePerformanceTest** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/NodePerformanceTest)): Everything: Jon Aspeheim (2024), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode).
+- **SciFiHelmet** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/SciFiHelmet)): Everything: Michael Pavlovic (2017), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode); Conversion to glTF: Norbert Nopper (2017), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode).
+- **ToyCar** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/ToyCar)): Initial car model: Guido Odendahl (2020), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode); Extensions and scene composition: Eric Chadwick (2020), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode).
+- **SheenChair** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/SheenChair)): Everything: Eric Chadwick (© 2020 Wayfair, LLC), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode).
+- **ABeautifulGame** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/ABeautifulGame)): Original model: MaterialX Project (© 2020 ASWF), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode); Conversion to glTF: Ed Mackey (2022), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
+- **MaterialsVariantsShoe** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/MaterialsVariantsShoe)): Everthing: Shopify (2021), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
+- **IridescenceLamp** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/IridescenceLamp)): Everything: Eric Chadwick (© 2022 Wayfair, LLC), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
+- **AnisotropyBarnLamp** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/AnisotropyBarnLamp)): Everything: Eric Chadwick (© 2023 Copyright 2023 Wayfair, LLC), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
+- **DiffuseTransmissionTeacup** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/DiffuseTransmissionTeacup)): Models and Textures: Polyhaven.com, and Eric Chadwick (© 2023 Public domain), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode).
+- **CommercialRefrigerator** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CommercialRefrigerator)): Model and textures and all images in the README.md: Eric Chadwick (© 2025 Darmstadt Graphics Group GmbH), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode); This work is based on 'Commercial Fridge' (https://sketchfab.com/3d-models/commercial-fridge-2174e1e4f1f24f1a95aa110ee060f473) by Sean Thomas (https://sketchfab.com/foon.) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/): Sean Thomas (2025), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
+- **Lantern** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Lantern)): Initial version: sbtron (© 2017 Microsoft), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode); Draco compression: Frank Galligan (2018), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode).
+- **BoomBox** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/BoomBox)): Everything: Microsoft (2017), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode).
+- **Corset** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Corset)): Everything: Microsoft (© 2017 UX3D), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode).
+- **FlightHelmet** ([source](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/FlightHelmet)): Conversion from Maya: Gary Hsu (2018), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/legalcode).
+<!-- /notices -->
