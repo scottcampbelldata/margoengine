@@ -1785,6 +1785,38 @@ Before launch, in addition to the work queue:
   then check `npm create margo@latest my-app` from a clean directory and add the command to the README and the
   margoengine.com getting-started page.
 
+### Release presentation: many small packages (Scott, 2026-10-15)
+
+Position the package count as the reason core stays small, not as something to learn. Risk to manage: "do I need 40
+installs to draw a cube?" and "will package versions clash?". Facts as of 2026-10-15 (recount before publishing):
+73 packages including `margoengine`; core + stage 19,928 B gzip (`npm run measure:size`).
+1. Two entry points, both on the getting-started page and the README top:
+   - Beginners and evaluators: `npm create margo@latest my-app` (template) or `npm install margoengine` (the existing
+     umbrella: core + gltf + machinery + creative + scenery, five-line setup). Check that the umbrella covers the common
+     80% (core, camera, PBR glTF, lighting, controls); add packages to it only if its own size stays reasonable and
+     report its gzip next to core's.
+   - Size-focused teams: install exactly what they use, e.g. `npm install @margoengine/core @margoengine/culling`.
+2. Group packages by layer everywhere they are listed (site catalog, docs/README.md, README): add a `category` field to
+   `docs/catalog.json` (build-catalog.js) and render the catalog grouped, never as one alphabetical list of 73.
+   Proposed layers, real package names (73):
+   - Core and setup (7): margoengine, core, math, quality, webgl, stats, inspector
+   - Loading and formats (12): gltf, gltf-pro, loaders, decoders, fbx, usdz, usdz-export, exporters, ifc, blender,
+     cache, splats
+   - Rendering and lighting (18): materials, shader, environment, clustered, shadows, sky, toon, oit, lod, culling,
+     points, lines, text, labels, html, video, xr, staging
+   - Post-processing (5): post, tonemap, dof, taa, transitions
+   - World and effects (10): terrain, water, scenery, scatter, road, vfx, creative, procedural, wfc, splines
+   - Animation and interaction (11): animation, animator, tween, cinematic, controls, cameras, input, gizmo, viewcube,
+     selection, audio
+   - Simulation and games (6): physics, navigation, navmesh, ecs, fsm, net
+   - CAD and engineering (3): machinery, bvh, geometry
+   - Frameworks (1): react
+3. No version clashes: publish every package in lockstep at the same version (1.0.0 together), with peer ranges on
+   `@margoengine/core` of `^1.0.0` (ties to 1h.g, Changesets). Say so on the getting-started page.
+4. Lead with the measured size: the modular split is why core + stage is under 20 KB gzip. Use only measured numbers
+   (claims.md); do NOT claim it "fits in the first TCP packet" (the first round trip carries ~14.6 KB, core + stage
+   is 19.9 KB) and do not invent package names.
+
 ## Feature gaps versus three.js (after optimization; each as an optional package)
 
 Verified matrix: `docs/threejs-parity.md`, recounted 2026-10-15 (5l.m, after RectAreaLight): 159 rows, 93 covered / 39 partial / 27 missing.
