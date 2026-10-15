@@ -36,6 +36,8 @@ async function packageClasses() {
 test('every package class follows the attach / dispose / Symbol.dispose conventions', async () => {
   const classes = await packageClasses();
   assert.ok(classes.size > 150, `expected the package classes, found ${classes.size}`);
+  const names = new Set([...classes.values()].map(([, name]) => name));
+  for (const name of ['TransparentCanvas', 'ColorOutput']) assert.ok(names.has(name), `${name} is walked`);
   const problems = [];
   for (const [Class, [entry, name]] of classes) {
     const proto = Class.prototype, label = `${entry} ${name}`;

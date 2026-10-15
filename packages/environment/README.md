@@ -41,6 +41,7 @@ fog.far = 120;                                                 // every option i
 - **`Fog(options)`** computes `amount = linear (near, far)` or `1 - exp(-(density * d)^2)` from the camera distance, times `exp(-heightFalloff * max(y - height, 0))`, inside the mesh shaders (binding 25), so blended glTF primitives are fogged too (glTF-pro's `output` hook), unlike sky's depth-based post fog. On the canvas it mixes after tone mapping, so a fully fogged pixel shows exactly `color` and matches a `ColorBackground` of the same color; on an rgba16float target (tonemap, ssao, dof, creative PostProcessing) it mixes linear radiance before their tone mapping. Height fog is the per-fragment factor, not an integral along the view ray. The background, particles, VFX, splats and other custom shaders are not fogged. `fog.enabled = false` switches it off by uploading zero-fog parameters (near and far at the float maximum, density 0); the patched shaders and pipelines stay, so switching either way never compiles a shader (HANDOFF 1d''), and off renders the same pixels as no fog (checked on the real GPU). Adding or removing the plugin instead changes the shaders.
 - **`ColorBackground({color, bottom})`** draws a full-screen triangle at order 0.5 (after core's opaque meshes, before glTF-pro models so blended primitives composite over it) at reversed-Z depth 0 with a read-only `greater-equal` test, so it only fills pixels whose depth was never written. On the canvas it writes the sRGB bytes exactly (no tone mapping, as Three.js does for a background color); on an rgba16float target it writes the linear value. `bottom` makes a vertical screen-space gradient. Colors are `'#rgb'`, `'#rrggbb'`, `0xrrggbb` or sRGB `[r, g, b]` in 0..1.
 - **`TransparentCanvas.attach(engine)`** is the transparent canvas (three.js `alpha: true` with clear alpha 0) without a core change: it reconfigures core's canvas context with `alphaMode: 'premultiplied'` (same device and preferred format) and runs the `ColorBackground` pass writing premultiplied alpha 0, so the page shows wherever nothing is drawn and multisampled silhouettes resolve to valid premultiplied edges. It reapplies itself after `engine.rebootDevice()` (core reconfigures the context opaque, then calls `onDeviceRestored`), and `dispose()` (or `using`) restores the opaque canvas and detaches. Attach no other background with it (`ColorBackground`, `EnvironmentBackground`, `Sky` would fill the pixels again). On the WebGL2 fallback it does nothing; create that renderer transparent: `fallback: canvas => webglRenderer(canvas, {transparent: true})`. Which post effects keep alpha: `@margoengine/post` README. Real-GPU check: `examples/package-benchmarks/transparent-canvas-gpu.mjs`.
+- **`ColorOutput.attach(engine, {gamut, hdr, peak, force})`**: Display P3 and HDR canvas output (three.js `outputColorSpace`; WebGPU `colorSpace` and `toneMapping`), zero core bytes. See "Display P3 and HDR output" below.
 - All three are built to allocate nothing in steady frames (the browser test measures this for the backgrounds), patch each distinct shader string once (cached), rebuild their GPU state in `onDeviceRestored`, and throw on a shader they do not recognize instead of drawing wrong.
 
 ## Volumetric fog and light shafts
@@ -72,6 +73,82 @@ It renders in its own passes at order 5 (after opaque meshes, glTF-pro models, t
 Measured (Intel Arc 140V, Edge, AC power, GPU lock; `node examples/package-benchmarks/volumetric-gpu.mjs`, [volumetric-gpu.json](../../examples/package-benchmarks/results/volumetric-gpu.json)): light shafts through a 1.5 m slit with the sun behind the wall: the wall seen through the shaft is 9.6x brighter than the wall seen through shadowed fog (1.1x with the slit plugged; orthographic 15.6x vs 1.2x); a clustered spot light's cone in fog is 4.3x its surroundings (no difference without `lights`) and its `LocalShadows` darken the fog under a box caster to 0.48x; fog grows with density (luma 95, 152, 190 at 0.01, 0.03, 0.09) and with `heightFalloff: 0.4` the low wall is 2.5x as fogged as the high wall (equal without it); no NaN, Inf or negative value in the volume; at 4x and 1x MSAA alike. Still camera: mean frame-to-frame change 0.05 of 255 (p99 1 level); slow pan (0.05 degrees per frame): 0.19 against 0.05 without fog, no spike (max 0.24, p99 1). GPU time, quiet machine, sun shadows, default grid: the froxel compute pass 1.3-2.2 ms whatever the resolution (it scales with the grid: 80 x 45 x 32 0.3-0.5 ms, 240 x 135 x 96 3.4-3.9 ms); the composite 0.26 ms at 1280 x 720 and 0.4 ms at 1920 x 1080 at 1x, 1.1 and 2.3 ms at 4x (it runs per sample there). Whole frame: 720p 4x 5.3 -> 7.8 ms, 1080p 4x 11.6 -> 15.7 ms, 720p 1x 1.9 -> 5.0 ms, 1080p 1x 4.6 -> 6.9 ms; 8 clustered point lights in the fog add at most 0.3 ms to the compute pass. (Those timings are from the build before centre reprojection, which adds two matrix products per froxel; the final build's run in the JSON is labelled diagnostic: the machine was busy and its times run up to 50% higher.)
 
 Limits: the 4x composite is per sample (about 4x the 1x cost; a per-pixel variant would be cheaper at the price of silhouette halos); one froxel grid resolution regardless of screen size, so sharp shadow edges in the fog are about one froxel wide (8 × 8 pixels at 1280 × 720 with the default grid) and softened by the temporal blend; fast-moving lights or occluders leave a short trail (lower `temporal`); transparent surfaces, particles, VFX and splats drawn after it are not fogged (blended glTF-pro primitives take the fog of what is behind them); fog beyond `range` is not modelled (distant surfaces get the fog up to `range`); the sun's shadow is a single comparison sample of the cascade, without PCSS; no participating media volumes (boxes, local density fields) and no multiple scattering. WebGPU only.
+
+## Display P3 and HDR output
+
+```ts
+import {ColorOutput} from '@margoengine/environment';
+import {Tonemap} from '@margoengine/tonemap';
+const output = ColorOutput.attach(engine); // defaults: {gamut: 'p3', hdr: true, peak: 4}
+Tonemap.attach(engine, {curve: 'neutral'}); // HDR highlights and colours outside sRGB come from Tonemap
+console.log(output.gamut, output.hdr); // what the canvas actually is: 'srgb' | 'p3', true | false
+```
+
+One class for both because they share one canvas configuration (`format`, `colorSpace` and `toneMapping` are one
+`configure()` call; two plugins would overwrite each other) and one output pass.
+
+**What "on" means.** Each feature turns on only when the display reports it (`matchMedia('(color-gamut: p3)')`,
+`matchMedia('(dynamic-range: high)')`; `force: true` skips the queries) and the browser keeps it (checked with
+`getConfiguration()`). Otherwise nothing happens: no configure call, no pass, the GPU calls are those of an engine
+without the plugin.
+- **P3 on**: the canvas is `colorSpace: 'display-p3'` and the final pass converts the engine's working space (linear
+  sRGB / Rec.709 primaries) to linear P3 before the sRGB transfer function. sRGB-authored content therefore looks the same
+  as on the sRGB canvas (measured: 0 to 1 eight-bit P3 units apart) - P3 does not make sRGB colours more saturated,
+  which would be wrong. What it adds is room for colours outside sRGB: linear Rec.709 values with negative components
+  (a P3-authored texture or colour converted into the working space, an external HDR `source`), which Tonemap clips to
+  the P3 gamut instead of the sRGB gamut. Core's own shader, materials and hex colours are sRGB, so without such input
+  a scene looks identical either way.
+- **HDR on**: the canvas is `rgba16float` with `toneMapping: {mode: 'extended'}`, so values above 1 (SDR white) reach the
+  display, up to what it can show. Tonemap's curves stay the SDR ones below the 0.76 knee; above it Khronos PBR
+  Neutral's highlight rolloff aims at `peak` (relative to SDR white, 1 to 16, default 4) instead of 1, and AgX/ACES are
+  scaled by the same rolloff ratio of the brightest channel. `peak: 1` gives the SDR curve. There is no web API for the
+  display's real headroom; set `peak` for the target display (values above its headroom are clipped by the browser).
+
+**How it works.** Core configures the canvas and draws into `getCurrentTexture()` (into its 4x target, resolved to that
+texture). ColorOutput reconfigures the same context, merging with `getConfiguration()` so TransparentCanvas's
+`alphaMode` and any `usage` survive (TransparentCanvas now merges the same way, so either attach order works). It
+replaces `getCurrentTexture` on that context object with an offscreen texture in the preferred canvas format, so core
+and every package keep drawing exactly what they drew before (sRGB-encoded, canvas format). At order 1e5 it resolves
+core's multisampled target into that texture and draws one full-screen pass into the real canvas texture: decode sRGB,
+add Tonemap's excess, convert to P3, clamp to 0..1 (SDR) or 0..`peak` (HDR), encode (extended sRGB transfer function on
+the float canvas). Between its passes (order -1e5 to 1e5) it leaves a contract on the pass context
+(`Symbol.for('margoengine.color-output')`) that Tonemap reads, alone or as a PostStack's display effect: Tonemap then
+compiles an output variant of its shader that writes the SDR part to the canvas target as before and the part outside
+0..1 (highlights above white, negative components outside sRGB, linear) into a 1x rgba16float excess texture. Device
+restore: core reconfigures sRGB, then `onDeviceRestored` reapplies (and re-checks what the browser kept); `dispose()`
+restores the sRGB/SDR canvas and the original `getCurrentTexture`.
+
+**Cost**: one full-screen pass, a resolve when MSAA is on, a canvas-size texture in the canvas format and, with Tonemap,
+a canvas-size rgba16float excess texture and a second full-screen Tonemap pass. Root entry +1,791 B min+gzip
+(environment, includes the TransparentCanvas merge), tonemap +684 B (the output shader variant, compiled only under
+ColorOutput); core and stage +0.
+
+**Limits.** HDR highlights and out-of-sRGB colours come only from `Tonemap`; Bloom, SSAO, DOF alone and creative
+PostProcessing tone map to 0..1 themselves, so with them the canvas is P3/HDR but the image stays SDR-range. Passes that
+draw after Tonemap (FXAA, TAA, overlays) see the SDR image; the excess is added back under them, so an opaque overlay
+drawn over a highlight above white is lifted by that highlight, and FXAA/TAA do not filter the excess. LUT grading
+applies to the 0..1 part (the excess above 1 is added back unchanged; the out-of-sRGB part is not graded). The
+out-of-sRGB part is scaled by the curve's compression of the brightest channel, not passed through the curve. SceneFade
+captures the offscreen image (pre-conversion), which is also what it blends into, so it should keep working (not
+tested). Creative's `Planet` and `GrassField` build canvas pipelines with `navigator.gpu.getPreferredCanvasFormat()`,
+which still matches the offscreen texture (also untested). Composition with TransparentCanvas needs `getConfiguration()` (Chrome/Edge 131+); without it the
+last plugin to configure wins. WebGL2 fallback: no-op (`gamut` 'srgb', `hdr` false). Display changes (moving the window
+to another monitor) are not followed until the next device restore or a new ColorOutput.
+
+**Proofs.** `packages/environment/tests/output.test.js` (fake GPU through a real core engine): on an sRGB/SDR display
+the configure calls and GPU calls equal an engine without ColorOutput; P3/HDR configuration, offscreen redirect,
+final pass, device restore, dispose, both attach orders with TransparentCanvas, a browser that drops `toneMapping`, and
+the Tonemap contract. `examples/package-benchmarks/proofs/color-output.proof.js`: without ColorOutput, Tonemap (alone,
+DOF-sourced, in a PostStack before FXAA), TransparentCanvas and ColorBackground make exactly the GPU calls of `7dcc958`
+(6,174 recorded calls, 1x and 4x). Real GPU: `examples/package-benchmarks/color-output-gpu.mjs` (Edge 155 and Chrome 155,
+Intel Arc 140V; results `results/color-output-gpu-{msedge,chrome}.json`). The laptop's display reports `color-gamut:
+srgb` only and `dynamic-range: standard`, so `auto` stays sRGB/SDR there (and renders like no plugin); with `force` the
+canvas reports the requested `display-p3` / `rgba16float` / `extended`. A Display P3 green patch (outside sRGB) reads
+back through a Display P3 2D canvas as (0, 188, 0) with P3 on and (86, 188, 55) (clipped to sRGB green) with it off; a
+grey highlight at 3x white reads 1.373 (extended sRGB, linear 2.07) from the float16 canvas texture and from a float16
+P3 2D canvas with HDR on, 252/255 with it off; in-gamut content is 0 to 1 P3 units apart on and off; after
+`rebootDevice()`, with TransparentCanvas (premultiplied) and with a Bloom + Tonemap + FXAA PostStack: same values, no
+validation errors.
 
 ## UltraHDR
 
@@ -156,6 +233,7 @@ Five bindings, any group and binding numbers. `iblLayoutEntries(firstBinding)` a
 | `ColorBackground(options)` | `color` (`'#000000'`), `bottom` (none), `order` (0.5, above 0), `name` (`'background'`); `record(context)` works without an engine |
 | `TransparentCanvas(options)` | `order` (0.5), `name` (`'transparent-canvas'`) |
 | `VolumetricFog(options)` (`/volumetric`) | `density` (0.02 per m), `heightFalloff` (0), `height` (0), `color` (albedo, [1, 1, 1]), `anisotropy` (0.5), `ambient` (engine ambient), `noise` (0), `noiseScale` (8 m), `wind` ([0, 0, 0] m/s), `range` (100 m), `grid` ([160, 90, 64]), `temporal` (0.9), `shadows`, `lights`, `depth` |
+| `ColorOutput(options)` | `gamut` (`'p3'`), `hdr` (true), `peak` (4, 1..16), `force` (false); name `'color-output'` |
 
 ## Limits
 

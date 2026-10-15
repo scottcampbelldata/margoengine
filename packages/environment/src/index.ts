@@ -7,5 +7,6 @@ export {SH_BASIS, SH_IRRADIANCE_BANDS, shBasis, evaluateSH, projectEquirectSH, r
 export {Environment, type EnvironmentOptions, type EnvironmentSource, type CubeFaces} from './environment.js';
 export {EnvironmentBackground, EnvironmentBackground as Skybox, type EnvironmentBackgroundOptions} from './background.js';
 export {ColorBackground, TransparentCanvas, srgbColor, type ColorBackgroundOptions, type ColorInput} from './color.js';
+export {ColorOutput, type ColorOutputOptions} from './output.js';
 export {EnvironmentLighting, Fog, IBL_BINDING, FOG_BINDING, type EnvironmentLightingOptions, type FogOptions, type LightingTarget} from './lighting.js';
 export {IBL_WGSL, iblLayoutEntries, iblBindGroupEntries} from './ibl.js';

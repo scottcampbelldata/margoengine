@@ -171,6 +171,21 @@ TransparentCanvas.attach(overlay); // WebGPU: premultiplied canvas, alpha 0 wher
 FXAA, Bloom and `PostStack` keep the alpha; Tonemap and SSAO keep it with a faint rim on silhouettes; DOF, TAA,
 SceneFade and the other backgrounds make the canvas opaque again (`@margoengine/post` README).
 
+Display P3 and HDR output, like `renderer.outputColorSpace = THREE.DisplayP3ColorSpace` and the WebGPU renderer's
+extended tone mapping:
+
+```ts
+import {ColorOutput} from '@margoengine/environment';
+import {Tonemap} from '@margoengine/tonemap';
+
+const output = ColorOutput.attach(engine, {gamut: 'p3', hdr: true, peak: 4}); // only where the display reports P3 / HDR
+Tonemap.attach(engine, {curve: 'neutral'}); // highlights above white and colours outside sRGB come from Tonemap
+console.log(output.gamut, output.hdr); // what the canvas really is ('srgb' and false on an sRGB/SDR display)
+```
+
+sRGB content looks the same on the P3 canvas (as three.js converts sRGB colours for a P3 output). There is no
+ColorManagement API: colours and textures are sRGB (environment README, "Display P3 and HDR output").
+
 ## Meshes and geometry
 
 ```js
