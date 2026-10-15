@@ -1196,6 +1196,9 @@ via `npm install --package-lock-only --offline --no-audit --no-fund --ignore-scr
 to the worktree's packages/margoengine. `npm run build:packages` is the whole package build (dependency order from
 package.json, then size gates, then docs/catalog.json); there is no separate workspace build step. Commit-message
 or other temp files in the shared scratchpad must have unique names (two workers' `msg.txt` collided once).
+NO synthetic all-core CPU/GPU burn loads: the 2026-10-15 04:21 crash (kernel bugcheck 0x7E, driver access
+violation) happened while an agent ran a 128-thread CPU burn to reproduce flaky tests. Load tests use at most half the
+logical cores, run for minutes not hours, and stop if the laptop is on battery or thermals spike.
 Use `node scripts/gpu-lock.mjs run --owner=<agent id> -- <command>` (or `acquire()` from it) for every GPU run: it
 writes owner.json, waits, holds the lock only while the command runs, never removes someone else's lock, and takes
 over a lock whose process is dead. Never `rmdir` the lock by hand (an agent once deleted another's lock and two GPU
