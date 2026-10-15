@@ -46,14 +46,18 @@ fn areaUnit(p:vec3f)->vec3f {return p*inverseSqrt(max(dot(p,p),1e-20));}
 // z of the edge's vector form factor: cross(a,b).z * theta/sin(theta)/2pi (rational fit, Hill and Heitz 2016).
 fn areaEdge(a:vec3f,b:vec3f)->f32 {let x=dot(a,b);let y=abs(x);let v=(0.8543985+(0.4965155+0.0145206*y)*y)/(3.417594+(4.1616724+y)*y);
   return (a.x*b.y-a.y*b.x)*select(0.5*inverseSqrt(max(1-x*x,1e-7))-v,v,x>0);}
-// Cosine-weighted integral (form factor) of the quad seen through m, clipped to z>=0: its edges plus the horizon chord.
+// One edge clipped to z>=0; records where the quad leaves and re-enters the upper hemisphere.
+fn areaClip(s0:vec3f,e0:vec3f,leave:ptr<function,vec3f>,enter:ptr<function,vec3f>)->f32 {
+  if(s0.z<0&&e0.z<0){return 0.0;}var s=s0;var e=e0;
+  if(s0.z<0){s=mix(s0,e0,s0.z/(s0.z-e0.z));*enter=s;}else if(e0.z<0){e=mix(s0,e0,s0.z/(s0.z-e0.z));*leave=e;}
+  return areaEdge(areaUnit(s),areaUnit(e));
+}
+// Cosine-weighted integral (form factor) of the quad seen through m, clipped to z>=0: its edges plus the horizon chord
+// (zero when nothing was clipped: both points stay at the origin). Unrolled: no dynamically indexed private array.
 fn areaIntegral(m:mat3x3f,a:vec3f,b:vec3f,c:vec3f,d:vec3f)->f32 {
-  var p=array(m*a,m*b,m*c,m*d);var sum=0.0;var leave=vec3f(0);var enter=vec3f(0);var clipped=false;
-  for(var i=0;i<4;i++){var s=p[i];var e=p[(i+1)%4];if(s.z<0&&e.z<0){continue;}
-    if(s.z<0){s=mix(s,e,s.z/(s.z-e.z));enter=s;}else if(e.z<0){e=mix(s,e,s.z/(s.z-e.z));leave=e;clipped=true;}
-    sum+=areaEdge(areaUnit(s),areaUnit(e));}
-  if(clipped){sum+=areaEdge(areaUnit(leave),areaUnit(enter));}
-  return sum;
+  let p0=m*a;let p1=m*b;let p2=m*c;let p3=m*d;var leave=vec3f(0);var enter=vec3f(0);
+  let sum=areaClip(p0,p1,&leave,&enter)+areaClip(p1,p2,&leave,&enter)+areaClip(p2,p3,&leave,&enter)+areaClip(p3,p0,&leave,&enter);
+  return sum+areaEdge(areaUnit(leave),areaUnit(enter));
 }
 fn clusterAreaLighting(position:vec3f,n:vec3f,v:vec3f,nv:f32,base:vec3f,roughness:f32,metal:f32)->vec3f {
   let st=vec2f(clamp(roughness,0.045,1.0),sqrt(1-nv))*${ltcSize-1}.0;let t1=vec4f(areaLut(st,0u),areaLut(st,1u));let t2=areaLut(st,2u);
