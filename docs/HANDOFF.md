@@ -839,7 +839,10 @@ via `npm install --package-lock-only --offline --no-audit --no-fund --ignore-scr
 to the worktree's packages/margoengine. `npm run build:packages` is the whole package build (dependency order from
 package.json, then size gates, then docs/catalog.json); there is no separate workspace build step. Commit-message
 or other temp files in the shared scratchpad must have unique names (two workers' `msg.txt` collided once).
-Hold `test-results/gpu.lock` ONLY while a GPU run is executing; release it between runs (code edits, analysis) so
+Use `node scripts/gpu-lock.mjs run --owner=<agent id> -- <command>` (or `acquire()` from it) for every GPU run: it
+writes owner.json, waits, holds the lock only while the command runs, never removes someone else's lock, and takes
+over a lock whose process is dead. Never `rmdir` the lock by hand (an agent once deleted another's lock and two GPU
+runs overlapped). Hold `test-results/gpu.lock` ONLY while a GPU run is executing; release it between runs (code edits, analysis) so
 queued agents can interleave (one agent once held it 40+ minutes and blocked three others).
 Before ANY timing run (benchmarks, A/B GPU timings) run `node scripts/quiet-gate.mjs` (or import `waitForQuiet`): it
 requires AC power, waits until total CPU stays <= 20% for 20 s, and returns the machine state to store in the results
