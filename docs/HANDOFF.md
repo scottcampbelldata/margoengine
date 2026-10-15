@@ -1059,6 +1059,13 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       without asking. Measure (don't assert) load time and memory on desktop and a real phone, with and without
       Rapier. Public copy states Margo's measured numbers; no competitor-bashing. Plus a cookbook recipe in item 8:
       "A mobile-first architectural walkthrough in ~50 lines".
+   v. Procedural generation (Scott, 2026-10-15; checked against source): WFC exists (`@margoengine/wfc`, seeded 3D
+      simple-tiled model) and `@margoengine/procedural` `Noise` has seeded 3D perlin/simplex/worley on the CPU (simplex
+      via the third-party `simplex-noise`). Add: (1) L-systems (grammars, stochastic/parametric rules, turtle ->
+      lines or tube geometry, for plants/branching); (2) Voronoi diagrams 2D/3D via Delaunay (cells, edges,
+      neighbours) + a mesh-fracture helper; (3) noise: fBm/ridged/domain-warp helpers, 2D/4D variants, WGSL noise nodes
+      in `@margoengine/shader` (GPU terrain/clouds), consider replacing `simplex-noise` with our own (bit-exact proof if
+      kept output); (4) WFC overlapping (sample-based) model. All optional, zero core bytes, tests + proofs.
    q. Game-developer gaps from the Blender guide (2eb78b9): a helper that collects a model's world-space triangles
       (for physics colliders and navmeshes); physics bodies on non-root meshes; water refraction can't combine with
       SSAO (needs a scene texture from PostStack); camera rig avoids walls, not just terrain; audio listener on
