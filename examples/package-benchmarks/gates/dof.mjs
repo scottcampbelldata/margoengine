@@ -38,7 +38,7 @@ await build({root: resolve(root, 'packages/dof'), configFile: false, publicDir: 
 const variants = {old: `/${baseDir}/index.js`, new: '/packages/dof/dist/index.js', ...Object.fromEntries(option('extra', '').split(',').filter(Boolean).map(v => v.split(':')))};
 const names = Object.keys(variants);
 
-const lock = resolve(dirname(git('rev-parse', '--path-format=absolute', '--git-common-dir')), 'test-results/gpu.lock');
+const lock = process.env.MARGO_GPU_LOCK_NESTED ?? resolve(dirname(git('rev-parse', '--path-format=absolute', '--git-common-dir')), 'test-results/gpu.lock');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 for (;;) {try {mkdirSync(lock); break;} catch (e) {if (e.code !== 'EEXIST') throw e; console.log('gpu.lock held, waiting'); await sleep(60_000);}}
 const report = {date: new Date().toISOString(), commit: git('rev-parse', '--short', 'HEAD'), dirty: git('status', '--porcelain', 'packages/dof') !== '', baseline, acPowerBefore: acPower(), rounds, frames, scenes, scene: 'DamagedHelmet + 11 core boxes, env IBL, PostStack [DOF, Tonemap neutral], DPR 1', quality: {}, flicker: {}, timing: {}};

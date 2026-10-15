@@ -18,7 +18,7 @@ import {acPower} from '../cad/power.mjs';
 
 const arg = (name, fallback) => +(process.argv.find(a => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback);
 const rounds = arg('rounds', 8), frames = arg('frames', 120);
-const lock = resolve(dirname(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {encoding: 'utf8'}).trim()), 'test-results/gpu.lock');
+const lock = process.env.MARGO_GPU_LOCK_NESTED ?? resolve(dirname(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {encoding: 'utf8'}).trim()), 'test-results/gpu.lock');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 for (;;) {try {mkdirSync(lock); break;} catch (e) {if (e.code !== 'EEXIST') throw e; console.log('gpu.lock held, waiting'); await sleep(15_000);}}
 const all = ['ssao', 'dof', 'bloom', 'tonemap', 'fxaa'];

@@ -42,7 +42,7 @@ const variants = c => picked.length ? picked : [{engine: 'margo', mode: 'mesh'},
 const key = c => `${c.scene}${c.n ? `-${c.n}` : ''}${c.move ? '-moving' : ''}`, vkey = v => `${v.engine}${v.mode && v.mode !== 'mesh' ? `-${v.mode}` : ''}${v.diag ? `+${v.diag}` : ''}`;
 
 // GPU lock in the main checkout: one wait loop, 60 s poll.
-const lock = resolve(dirname(git('rev-parse', '--path-format=absolute', '--git-common-dir')), 'test-results/gpu.lock');
+const lock = process.env.MARGO_GPU_LOCK_NESTED ?? resolve(dirname(git('rev-parse', '--path-format=absolute', '--git-common-dir')), 'test-results/gpu.lock');
 for (;;) {try {mkdirSync(lock);break;} catch (e) {if (e.code !== 'EEXIST') throw e;console.log(new Date().toISOString(), 'gpu.lock held, waiting 60 s');await new Promise(r => setTimeout(r, 60_000));}}
 // A killed run must not leave the lock behind (finally does not run on a signal).
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => {rmSync(lock, {recursive: true, force: true});process.exit(130);});

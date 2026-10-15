@@ -3,6 +3,8 @@
 // owner process is gone is stale and taken over. Never delete a lock you don't own.
 // CLI: node scripts/gpu-lock.mjs run --owner=<agent id> -- <command...>   (holds the lock only while the command runs)
 //      node scripts/gpu-lock.mjs status
+// Scripts that take test-results/gpu.lock themselves use MARGO_GPU_LOCK_NESTED (a folder inside the held lock) when
+// run under `run`, so wrapping them can't deadlock; acquire() is a no-op there too.
 import {mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {join, resolve} from 'node:path';
@@ -24,6 +26,7 @@ export function status() {
 /** Waits (polling every `poll` ms) until the lock is ours. Returns a release function that only removes our own lock. */
 export async function acquire({owner, poll = 30_000, log = console.error} = {}) {
   if (!owner) throw new Error('gpu-lock: pass an owner (agent id)');
+  if (process.env.MARGO_GPU_LOCK_NESTED) return () => {};
   const token = `${owner}:${process.pid}:${Date.now()}`;
   for (let waited = 0; ; waited += poll) {
     try {
@@ -48,7 +51,8 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     if (split < 0 || !command.length) throw new Error('usage: gpu-lock.mjs run --owner=<id> -- <command...>');
     const release = await acquire({owner});
     let code = 1;
-    try {code = spawnSync(command[0], command.slice(1), {stdio: 'inherit', shell: process.platform === 'win32'}).status ?? 1;} finally {release();}
+    try {code = spawnSync(command[0], command.slice(1), {stdio: 'inherit', shell: process.platform === 'win32',
+      env: {...process.env, MARGO_GPU_LOCK_NESTED: process.env.MARGO_GPU_LOCK_NESTED ?? join(lockDir, 'nested')}}).status ?? 1;} finally {release();}
     process.exit(code);
   } else throw new Error('usage: gpu-lock.mjs run --owner=<id> -- <command...> | status');
 }

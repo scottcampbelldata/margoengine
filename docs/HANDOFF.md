@@ -1326,7 +1326,10 @@ violation) happened while an agent ran a 128-thread CPU burn to reproduce flaky 
 logical cores, run for minutes not hours, and stop if the laptop is on battery or thermals spike.
 Use `node scripts/gpu-lock.mjs run --owner=<agent id> -- <command>` (or `acquire()` from it) for every GPU run: it
 writes owner.json, waits, holds the lock only while the command runs, never removes someone else's lock, and takes
-over a lock whose process is dead. Never `rmdir` the lock by hand (an agent once deleted another's lock and two GPU
+over a lock whose process is dead. Wrapping a script that takes the lock itself (visual:check, the benchmark
+runners) is safe since 2026-10-15: `run` passes `MARGO_GPU_LOCK_NESTED` and those scripts lock that folder instead of
+waiting on their own parent (a wrapped visual:check deadlocked for an hour before that). New self-locking scripts
+must start with `const lock = process.env.MARGO_GPU_LOCK_NESTED ?? ...` or use `acquire()`. Never `rmdir` the lock by hand (an agent once deleted another's lock and two GPU
 runs overlapped). Hold `test-results/gpu.lock` ONLY while a GPU run is executing; release it between runs (code edits, analysis) so
 queued agents can interleave (one agent once held it 40+ minutes and blocked three others).
 Before ANY timing run (benchmarks, A/B GPU timings) run `node scripts/quiet-gate.mjs` (or import `waitForQuiet`): it
