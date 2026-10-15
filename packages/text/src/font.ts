@@ -1,6 +1,11 @@
+import { MargoError } from '@margoengine/math/errors';
 import { alphaToSdf, SDF_DEFAULTS } from './sdf.js';
 import { bidiClass, isIdeograph, isWhitespace, type TextMeasurer } from './layout.js';
 
+/**
+ * Options for `new Font(...)`. Throws a TypeError for a non-FontFace `face`, an empty family, or an
+ * invalid weight or style.
+ */
 export interface FontOptions {
   /** CSS font family or family list, e.g. 'Inter' or '"Noto Sans", sans-serif'. Default 'sans-serif'. */
   family?: string;
@@ -132,13 +137,21 @@ export class Font implements TextMeasurer {
       const canvas = offscreen
         ? new OffscreenCanvas(128, 128)
         : (globalThis as unknown as { document?: Document }).document?.createElement('canvas');
-      if (!canvas) throw new Error('Text measurement needs OffscreenCanvas or a DOM canvas');
+      if (!canvas)
+        throw new MargoError(
+          'unsupported',
+          'Text measurement needs OffscreenCanvas or a DOM canvas; run in a browser or worker, or lay out with your own TextMeasurer',
+        );
       if (!offscreen) {
         canvas.width = 128;
         canvas.height = 128;
       }
       context = (canvas.getContext('2d', { willReadFrequently: true }) as Context2D | null) ?? undefined;
-      if (!context) throw new Error('2D canvas context unavailable');
+      if (!context)
+        throw new MargoError(
+          'unsupported',
+          '2D canvas context unavailable; the browser refused a 2D context (too many canvases?)',
+        );
       this.context = context;
       this.configure(context);
     }

@@ -1,3 +1,4 @@
+import { margoError } from './errors.js';
 /** Wait for submitted scene work and a browser presentation opportunity.
  * @param {{onSubmittedWorkDone(): Promise<void>}} queue
  * @param {AbortSignal} signal
@@ -74,7 +75,11 @@ export async function submitPrincipalScene(
         else delete queue.submit;
       }
     }
-    if (result.principalSceneSubmitted === null) throw new Error('The principal scene render did not submit GPU work');
+    if (result.principalSceneSubmitted === null)
+      throw margoError(
+        'failed',
+        'The principal scene render did not submit GPU work; render the scene through the engine before reporting ready',
+      );
     completion = queue.onSubmittedWorkDone().then(() => {
       result.principalSceneGpuComplete = now();
     });

@@ -19,7 +19,7 @@ export class Plane {
     distanceToSphere(sphere: SphereLike): number;
     projectPoint<T extends Vec3Like>(p: Vec3Like, out: T): T;
     coplanarPoint<T extends Vec3Like>(out: T): T;
-    intersectsBox(box: BoxLike): boolean;
+    intersectsBox(box: PlaneIntersectable): boolean;
     intersectsSphere(sphere: SphereLike): boolean;
     applyMatrix4(m: MatrixLike): this;
     translate(offset: Vec3Like): this;
@@ -28,10 +28,6 @@ export class Plane {
 
 // Not exported from this entry, but used by the exports above:
 
-interface BoxLike {
-    intersectsPlane(plane: Plane): boolean;
-}
-
 interface MatrixLike {
     readonly elements: ArrayLike<number>;
 }
@@ -39,6 +35,10 @@ interface MatrixLike {
 type NumberArray = {
     [index: number]: number;
 };
+
+interface PlaneIntersectable {
+    intersectsPlane(plane: Plane): boolean;
+}
 
 interface SphereLike {
     center: Vec3Like;

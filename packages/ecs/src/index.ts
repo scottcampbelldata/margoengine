@@ -1,6 +1,11 @@
+import { MargoError } from '@margoengine/math/errors';
+/** Typed arrays allowed as component field storage. */
 export type NumericArray = Float32Array | Float64Array | Int32Array | Uint32Array | Uint8Array;
+/** Constructor of a {@link NumericArray}, e.g. `Float32Array`; used as a schema field type. */
 export type ArrayConstructor = { new (length: number): NumericArray };
+/** Component layout: field name to storage constructor. Must have at least one field. */
 export type Schema = Record<string, ArrayConstructor>;
+/** Entity id: `generation * capacity + slot`, a non-negative integer up to `0xffffffff`. Stale ids fail `World.alive`. */
 export type Entity = number;
 const capacityLimit = 1_000_000;
 
@@ -12,6 +17,10 @@ export class Component<S extends Schema = Schema> {
   /** Field arrays in schema order, so row moves need no per-call Object.values. */
   private readonly columns: NumericArray[];
   size = 0;
+  /**
+   * Prefer {@link World.component}, which also registers the store for cleanup on `destroy`.
+   * @throws TypeError for an empty schema or an unsupported storage constructor.
+   */
   constructor(
     readonly world: World,
     schema: S,
@@ -28,11 +37,17 @@ export class Component<S extends Schema = Schema> {
     ) as typeof this.fields;
     this.columns = Object.values(this.fields) as NumericArray[];
   }
+  /** Row of `entity` in the field arrays, or -1 when it is dead or has no such component. */
   index(entity: Entity): number {
     if (!this.world.alive(entity)) return -1;
     const row = this.sparse[entity % this.world.capacity];
     return row >= 0 && this.entities[row] === entity ? row : -1;
   }
+  /**
+   * Add the component to `entity` (new rows start zeroed) or overwrite fields of an existing row; returns the row.
+   * @throws MargoError `'state'` when the entity is stale or destroyed.
+   * @throws RangeError for an unknown field or a value that is not finite or does not fit the field's storage type.
+   */
   add(entity: Entity, values: Partial<Record<keyof S, number>> = {}): number {
     this.world.check(entity);
     const keys = Object.keys(values),
@@ -61,6 +76,7 @@ export class Component<S extends Schema = Schema> {
     for (const key of keys) this.fields[key][row] = values[key as keyof S]!;
     return row;
   }
+  /** Remove the component from `entity`, moving the last row into its place; false when it had none. */
   remove(entity: Entity): boolean {
     const row = this.index(entity);
     if (row < 0) return false;
@@ -77,12 +93,17 @@ export class Component<S extends Schema = Schema> {
   }
 }
 
+/** Fixed-capacity entity allocator with generational ids and the component stores created from it. */
 export class World {
   private readonly live: Uint8Array;
   private readonly generations: Uint32Array;
   private readonly free: Uint32Array;
   private freeCount: number;
   private readonly components = new Set<Component>();
+  /**
+   * @param capacity Maximum live entities, an integer in [1, 1_000_000]. Default 4096.
+   * @throws RangeError for an invalid capacity.
+   */
   constructor(readonly capacity = 4096) {
     if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > capacityLimit)
       throw new RangeError('Invalid ECS capacity');
@@ -92,20 +113,35 @@ export class World {
     this.freeCount = capacity;
     for (let i = 0; i < capacity; i++) this.free[i] = capacity - 1 - i;
   }
+  /** True when `entity` is a current id of this world (created and not destroyed since). */
   alive(entity: Entity): boolean {
     if (!Number.isSafeInteger(entity) || entity < 0 || entity > 0xffffffff) return false;
     const slot = entity % this.capacity;
     return !!this.live[slot] && Math.floor(entity / this.capacity) === this.generations[slot];
   }
+  /**
+   * Assert that `entity` is alive.
+   * @throws MargoError `'state'` when the entity is stale or destroyed.
+   */
   check(entity: Entity): void {
-    if (!this.alive(entity)) throw new Error('Entity is stale or destroyed');
+    if (!this.alive(entity))
+      throw new MargoError('state', 'Entity is stale or destroyed; check world.alive(entity) before using a stored id');
   }
+  /**
+   * Allocate a new entity id.
+   * @throws RangeError when all `capacity` slots are in use.
+   */
   create(): Entity {
     if (!this.freeCount) throw new RangeError('Entity capacity exhausted');
     const slot = this.free[--this.freeCount];
     this.live[slot] = 1;
     return this.generations[slot] * this.capacity + slot;
   }
+  /**
+   * Remove `entity` from every component of this world and free its slot (retired instead once
+   * its next id would exceed `0xffffffff`); the old id becomes stale.
+   * @throws MargoError `'state'` when the entity is already stale or destroyed.
+   */
   destroy(entity: Entity): void {
     this.check(entity);
     for (const component of this.components) component.remove(entity);
@@ -117,12 +153,20 @@ export class World {
       this.free[this.freeCount++] = slot;
     }
   }
+  /**
+   * Create a component store sized to `capacity` and register it with this world.
+   * @throws TypeError for an empty schema or an unsupported storage constructor.
+   */
   component<S extends Schema>(schema: S): Component<S> {
     const component = new Component(this, schema);
     this.components.add(component);
     return component;
   }
-  /** Query output is caller-owned; returns the number of matching entity IDs. */
+  /**
+   * Query output is caller-owned; returns the number of matching entity IDs.
+   * @throws TypeError when `components` is empty or holds a component of another world.
+   * @throws RangeError when `output` is too small for the matches.
+   */
   query(components: readonly Component[], output: Uint32Array): number {
     if (!components.length || components.some((component) => component.world !== this))
       throw new TypeError('Query needs components of this world');

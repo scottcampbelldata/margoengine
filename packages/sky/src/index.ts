@@ -26,7 +26,7 @@ export class Sky extends SkyBase {
   constructor(options: SkyOptions = {}) {
     super(options, features);
   }
-  static attach(engine: EngineKernel, options: SkyOptions = {}): Sky {
+  static override attach(engine: EngineKernel, options: SkyOptions = {}): Sky {
     const effect = new Sky(options);
     engineRuntime(engine).use(effect);
     return effect;

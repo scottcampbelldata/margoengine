@@ -20,24 +20,42 @@ import { loadedModel, worldBounds, type LoadedModel } from './model.js';
 
 export * from '@margoengine/core';
 export type { LoadedModel } from './model.js';
+/** Options for `createStage`: engine options plus the stage's own. */
 export interface StageOptions extends EngineOptions {
+  /** Attach CAD camera controls to the canvas. Default true. */
   controls?: boolean;
+  /** Start the frame loop right away. Default true. */
   autoStart?: boolean;
+  /** Accessible label of a canvas the stage creates. Default 'Interactive 3D scene'. */
   label?: string;
+  /** Receives engine errors (set as `engine.onError`). */
   onError?: (error: unknown) => void;
 }
+/** Options for `Stage.mesh`, `box` and `sphere`: `PbrMaterial` options plus placement. */
 export type MeshOptions = NonNullable<ConstructorParameters<typeof PbrMaterial>[0]> & {
+  /** Parent mesh. Default none (a root mesh). */
   parent?: Mesh;
+  /** Local position in world units. */
   position?: Vec3;
+  /** Local rotation, passed to `mesh.setRotation`. */
   rotation?: Vec3;
+  /** Local scale per axis. */
   scale?: Vec3;
+  /** Default ''. */
   name?: string;
 };
+/** Options for `Stage.load`: CAD import options plus format and framing. */
 export interface LoadOptions extends CADImportOptions {
+  /** File format; default from the URL extension ('stp' is STEP, 'igs' IGES). An unknown format rejects with a TypeError. */
   format?: 'gltf' | 'glb' | CADFormat;
+  /** Fit the camera to the loaded model. Default true. */
   fit?: boolean;
 }
 
+/**
+ * UV sphere geometry centered on the origin, `segments` around and half as many rings (rounded up).
+ * @throws RangeError when `radius` is not positive and finite or `segments` is not an integer 3..256.
+ */
 export function sphere(radius = 1, segments = 32): Geometry {
   if (typeof radius !== 'number' || !Number.isFinite(Math.fround(radius)) || Math.fround(radius) <= 0)
     throw new RangeError('Sphere radius');
@@ -67,6 +85,10 @@ export function sphere(radius = 1, segments = 32): Geometry {
   return new Geometry(positions, normals, indices);
 }
 
+/**
+ * Small facade over an engine for quick scenes: meshes with PBR materials, model loading with camera
+ * fitting, and lazy access to the optional packages. Create one with `createStage`.
+ */
 export class Stage {
   private readonly imports = new AbortController();
 
@@ -198,6 +220,11 @@ export class Stage {
   }
 }
 
+/**
+ * Creates an engine on `target` (a CSS selector or element) and wraps it in a `Stage`. A canvas target is
+ * used directly; any other element gets a new full-size canvas appended, removed again on dispose.
+ * Rejects with a TypeError for invalid options or when the target is not an element.
+ */
 export async function createStage(
   target: string | HTMLElement,
   { controls = true, autoStart = true, label = 'Interactive 3D scene', onError, ...options }: StageOptions = {},

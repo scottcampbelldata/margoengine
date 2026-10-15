@@ -1,4 +1,5 @@
-export { PointsPlugin, meshWorldMatrix } from './plugin.js';
+export { PointsPlugin } from './plugin.js';
+export { meshWorldMatrix } from '@margoengine/math/mesh';
 export type { PointsPluginOptions, PointsPickOptions, PointsPickResult } from './plugin.js';
 export { PointCloud } from './cloud.js';
 export type { PointCloudData, PointCloudOptions } from './cloud.js';
@@ -9,8 +10,8 @@ export type {
   PointsMaterialOptions,
   SpriteMaterialOptions,
   BaseMaterialOptions,
-  TextureSource,
-  Blending,
+  PointsTextureSource,
+  PointsBlending,
   PointShape,
   PointShading,
 } from './material.js';
@@ -23,7 +24,7 @@ export {
   screenArea,
   allocateBudget,
   multiply,
-  projectPoint,
+  projectToPixels,
   pickPoint,
   boxScreenRect,
   packColors,
@@ -32,6 +33,6 @@ export {
   random,
   NO_BLOCK,
 } from './math.js';
-export type { PointBlocks, PickRange, PickHit } from './math.js';
+export type { PointBlocks, PickRange, PointsPickHit } from './math.js';
 export { parseColor } from './color.js';
 export type { ColorInput } from './color.js';

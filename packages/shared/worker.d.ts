@@ -7,4 +7,5 @@ export function runWorker<T>(
   signal?: AbortSignal,
   revive?: (error: { name: string; message: string; [key: string]: unknown }) => Error | undefined,
 ): Promise<T>;
-export function serve(job: (message: any) => unknown): void;
+/** Runs `job` for each message posted to this worker. `never` accepts a job typed for any message shape. */
+export function serve(job: (message: never) => unknown): void;

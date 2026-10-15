@@ -42,7 +42,7 @@ export class PointerLockControls extends Controls {
     this.doc = options.document ?? null;
     this.init();
   }
-  protected get kind(): string {
+  protected override get kind(): string {
     return 'pointer-lock';
   }
   protected bind(element: ControlElement) {
@@ -57,7 +57,7 @@ export class PointerLockControls extends Controls {
       [keys, 'keyup', this.onKeyUp],
     ] as Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
   }
-  protected onDisconnect(): void {
+  protected override onDisconnect(): void {
     this.pressed.clear();
   }
 

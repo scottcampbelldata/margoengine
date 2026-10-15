@@ -1,11 +1,11 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
-import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
-import type { EngineKernel, Mesh } from '@margoengine/core';
+import type { EngineKernel } from '@margoengine/core';
+import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { viewMatrix } from '../../shared/view.js';
 import { PointCloud } from './cloud.js';
 import { SpriteBatch, SPRITE_STRIDE } from './sprites.js';
-import type { PointsMaterial, SpriteMaterial, TextureSource } from './material.js';
+import type { PointsMaterial, SpriteMaterial, PointsTextureSource } from './material.js';
 import {
   allocateBudget,
   boxInFrustum,
@@ -57,12 +57,16 @@ interface BatchGpu {
   written: Float32Array;
 }
 interface OwnedTexture {
-  source: TextureSource;
+  source: PointsTextureSource;
   version: number;
   texture: GPUTexture;
   view: GPUTextureView;
 }
 
+/**
+ * Options for the `PointsPlugin`. An empty name or non-finite order throws a TypeError; a negative
+ * pointBudget or edlStrength, or a non-positive edlRadius, a RangeError.
+ */
 export interface PointsPluginOptions {
   /** Plugin name, unique per engine. Default 'points'. */
   name?: string;
@@ -76,12 +80,15 @@ export interface PointsPluginOptions {
   edlRadius?: number;
 }
 
+/** Options for `PointsPlugin.pick`. */
 export interface PointsPickOptions {
-  /** Search radius in CSS pixels. Default 6. */
+  /** Search radius in CSS pixels; negative throws a RangeError. Default 6. */
   radius?: number;
 }
 
+/** The point found by `PointsPlugin.pick`. */
 export interface PointsPickResult {
+  /** The cloud the point belongs to. */
   cloud: PointCloud;
   /** Index into the cloud's arrays. */
   index: number;
@@ -102,22 +109,7 @@ const warnOnce = (message: string) => {
 };
 let warnedTexture = false;
 
-/** World matrix of a live, visible core mesh after the latest transform tick, or null. */
-export function meshWorldMatrix(engine: EngineKernel, mesh: Mesh): Float32Array | null {
-  const runtime = engineRuntime(engine),
-    object = meshRuntime(mesh),
-    id = object.id;
-  if (runtime.disposed || runtime.meshes.get(id) !== (mesh as unknown)) return null;
-  for (
-    let current = id, depth = 0;
-    current >= 0 && depth < 64;
-    current = runtime.store.parents?.[current] ?? -1, depth++
-  )
-    if (runtime.store.hidden[current]) return null;
-  return object.matrix ?? runtime.store.matrices.subarray(id * 16, id * 16 + 16);
-}
-
-const isGpuTexture = (value: TextureSource): value is GPUTexture =>
+const isGpuTexture = (value: PointsTextureSource): value is GPUTexture =>
   typeof (value as GPUTexture).createView === 'function';
 
 /**

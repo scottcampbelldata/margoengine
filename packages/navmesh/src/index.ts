@@ -1,4 +1,6 @@
-export type Vec3 = readonly [number, number, number];
+import type { Vec3 } from '@margoengine/math';
+
+export type { Vec3 };
 interface Link {
   to: number;
   left: Vec3;
@@ -22,6 +24,7 @@ function point(value: Vec3): void {
 
 /** Convex planar walkable polygons, linked by shared vertex-index edges. */
 export class NavMesh {
+  /** Copies of the vertex positions given to the constructor. */
   readonly vertices: readonly Vec3[];
   private readonly polygons: Polygon[] = [];
   /** Flat copies for the hot loops: per polygon its winding sign, per edge the XZ start and direction. */
@@ -36,6 +39,12 @@ export class NavMesh {
   private readonly state: Uint8Array;
   private readonly heapKey: Float64Array;
   private readonly heapNode: Int32Array;
+  /**
+   * Builds the mesh from world-space vertices and polygons given as vertex-index lists (3..32 each).
+   * @throws RangeError for fewer than 3 or more than 100,000 vertices, no or more than 4096 polygons, non-finite
+   * vertices, or polygons that are not strictly convex and planar or have no XZ extent.
+   * @throws TypeError for out-of-range, repeated or non-integer polygon indices.
+   */
   constructor(vertices: readonly Vec3[], polygons: readonly (readonly number[])[]) {
     if (vertices.length < 3 || vertices.length > 100_000 || !polygons.length || polygons.length > 4096)
       throw new RangeError('Navmesh size exceeded');
@@ -147,6 +156,11 @@ export class NavMesh {
     this.heapKey = new Float64Array(linkCount + 1);
     this.heapNode = new Int32Array(linkCount + 1);
   }
+  /**
+   * Index of the polygon containing `position` in XZ, choosing the one vertically nearest when several
+   * overlap, or -1 when none does.
+   * @throws RangeError when `position` is not a finite 3D point.
+   */
   locate(position: Vec3): number {
     point(position);
     let best = -1,
@@ -176,6 +190,11 @@ export class NavMesh {
     }
     return best;
   }
+  /**
+   * Waypoints from `start` to `end` across linked polygons, including both ends, or null when either point is
+   * off the mesh or no route connects them.
+   * @throws RangeError when a point is not a finite 3D point.
+   */
   path(start: Vec3, end: Vec3): Vec3[] | null {
     const from = this.locate(start),
       to = this.locate(end);

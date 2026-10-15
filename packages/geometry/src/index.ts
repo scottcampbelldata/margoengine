@@ -1,6 +1,6 @@
 export type { GeometryData, GeometryGroup } from './data.js';
 export { geometryData, toGeometry, pbrVertexStream, footprintRadius } from './data.js';
-export type { Vec, Vec2, Vec3 } from './math.js';
+export type { Vec } from './math.js';
 export { Curve, type FrenetFrames } from './curve.js';
 export {
   ArcCurve,

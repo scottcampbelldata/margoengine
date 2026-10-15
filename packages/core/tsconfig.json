@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext",
-    "strict": true, "declaration": true, "outDir": "dist", "rootDir": "src",
+    "strict": true, "noImplicitOverride": true, "noFallthroughCasesInSwitch": true,
+    "declaration": true, "outDir": "dist", "rootDir": "src",
     "types": [], "lib": ["ES2022", "DOM"], "skipLibCheck": false
   },
   "include": ["src"]

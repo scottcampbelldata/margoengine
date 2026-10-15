@@ -1,18 +1,5 @@
 import { Vector3 } from './vector3.js';
-import type { MatrixLike, Vec3Like } from './types.js';
-
-interface SphereLike {
-  center: Vec3Like;
-  radius: number;
-}
-interface PlaneLike {
-  normal: Vec3Like;
-  constant: number;
-}
-interface BoxLike {
-  min: Vec3Like;
-  max: Vec3Like;
-}
+import type { BoxLike, MatrixLike, PlaneLike, SphereLike, Vec3Like } from './types.js';
 
 const write = <T extends Vec3Like>(out: T, x: number, y: number, z: number): T => {
   out.x = x;

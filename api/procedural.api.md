@@ -15,7 +15,13 @@ export interface FractalOptions {
     frequency?: number;
 }
 
-export type HeightField = (x: number, z: number) => number;
+export { HeightField } from "@margoengine/math";
+
+export interface MarchingCubesOptions {
+    resolution?: readonly [number, number, number];
+    bounds?: readonly [readonly [number, number, number], readonly [number, number, number]];
+    level?: number;
+}
 
 export class Noise {
     readonly seed: number;
@@ -33,12 +39,6 @@ export type NoiseFunction = (x: number, y: number, z?: number, w?: number) => nu
 export const ROOF_PITCH: number;
 
 export const SIMPLEX_SCALE: readonly number[];
-
-export interface SurfaceOptions {
-    resolution?: readonly [number, number, number];
-    bounds?: readonly [readonly [number, number, number], readonly [number, number, number]];
-    level?: number;
-}
 
 export const WARP_OFFSETS: readonly number[];
 
@@ -87,7 +87,7 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf'): {
     radius: number;
 };
 
-export function marchingCubes(field: DensityField, { resolution, bounds, level }?: SurfaceOptions): Geometry | null;
+export function marchingCubes(field: DensityField, { resolution, bounds, level }?: MarchingCubesOptions): Geometry | null;
 
 export function permutation(seed: number): Uint8Array;
 

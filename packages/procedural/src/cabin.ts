@@ -9,7 +9,10 @@ import {
   type GeometryData,
 } from '@margoengine/geometry';
 
-export type HeightField = (x: number, z: number) => number;
+import type { HeightField } from '@margoengine/math';
+
+export type { HeightField };
+/** Roof slope of `generateCabinMesh` in radians (35 degrees). */
 export const ROOF_PITCH = (35 * Math.PI) / 180;
 
 function placed(

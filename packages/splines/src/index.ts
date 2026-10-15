@@ -1,8 +1,14 @@
+/** Segment basis: 'catmull-rom' passes through every point, 'bezier' uses 3n+1 control points, 'hermite' takes a tangent per point. */
 export type CurveKind = 'catmull-rom' | 'bezier' | 'hermite';
+/** Options for `new Spline(...)`; invalid combinations throw a RangeError. */
 export interface SplineOptions {
+  /** Default 'catmull-rom'. */
   kind?: CurveKind;
+  /** Join the last point back to the first; not allowed for 'bezier'. Default false. */
   closed?: boolean;
+  /** One finite 3D tangent per point; required for 'hermite'. */
   tangents?: readonly ArrayLike<number>[];
+  /** Samples of the arc-length lookup, an integer 2..1,000,000. Default 256. */
   divisions?: number;
 }
 const vector = (value: ArrayLike<number>): void => {

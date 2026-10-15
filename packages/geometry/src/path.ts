@@ -1,9 +1,9 @@
 import { Curve } from './curve.js';
 import { CubicBezierCurve, EllipseCurve, LineCurve, QuadraticBezierCurve, SplineCurve } from './curves.js';
-import { equals, finiteNumber, type Vec, type Vec2 } from './math.js';
+import { equals, finiteNumber, type Vec, type MutableVec2 } from './math.js';
 
 /** A chain of curves treated as one curve by arc length (Three.js `CurvePath`). */
-export class CurvePath<V extends Vec = Vec2> extends Curve<V> {
+export class CurvePath<V extends Vec = MutableVec2> extends Curve<V> {
   curves: Curve<V>[] = [];
   autoClose = false;
   private curveLengths: number[] | null = null;
@@ -93,15 +93,15 @@ export class CurvePath<V extends Vec = Vec2> extends Curve<V> {
 }
 
 /** 2D path builder with a pen position (Three.js `Path`). */
-export class Path extends CurvePath<Vec2> {
-  currentPoint: Vec2 = [0, 0];
+export class Path extends CurvePath<MutableVec2> {
+  currentPoint: MutableVec2 = [0, 0];
 
-  constructor(points?: Vec2[]) {
+  constructor(points?: MutableVec2[]) {
     super();
     if (points) this.setFromPoints(points);
   }
 
-  setFromPoints(points: Vec2[]): this {
+  setFromPoints(points: MutableVec2[]): this {
     this.moveTo(points[0][0], points[0][1]);
     for (let i = 1; i < points.length; i++) this.lineTo(points[i][0], points[i][1]);
     return this;
@@ -111,18 +111,18 @@ export class Path extends CurvePath<Vec2> {
     return this;
   }
   lineTo(x: number, y: number): this {
-    return this.push(new LineCurve<Vec2>(this.currentPoint, [x, y]), [x, y]);
+    return this.push(new LineCurve<MutableVec2>(this.currentPoint, [x, y]), [x, y]);
   }
   quadraticCurveTo(cx: number, cy: number, x: number, y: number): this {
-    return this.push(new QuadraticBezierCurve<Vec2>(this.currentPoint, [cx, cy], [x, y]), [x, y]);
+    return this.push(new QuadraticBezierCurve<MutableVec2>(this.currentPoint, [cx, cy], [x, y]), [x, y]);
   }
   bezierCurveTo(c1x: number, c1y: number, c2x: number, c2y: number, x: number, y: number): this {
-    return this.push(new CubicBezierCurve<Vec2>(this.currentPoint, [c1x, c1y], [c2x, c2y], [x, y]), [x, y]);
+    return this.push(new CubicBezierCurve<MutableVec2>(this.currentPoint, [c1x, c1y], [c2x, c2y], [x, y]), [x, y]);
   }
-  splineThru(points: Vec2[]): this {
+  splineThru(points: MutableVec2[]): this {
     return this.push(
-      new SplineCurve([this.currentPoint, ...points.map((p) => p.slice() as Vec2)]),
-      points[points.length - 1].slice() as Vec2,
+      new SplineCurve([this.currentPoint, ...points.map((p) => p.slice() as MutableVec2)]),
+      points[points.length - 1].slice() as MutableVec2,
     );
   }
   /** Arc centered relative to the current point. */
@@ -171,7 +171,7 @@ export class Path extends CurvePath<Vec2> {
     }
     return this.push(curve, curve.getPoint(1));
   }
-  private push(curve: Curve<Vec2>, end: Vec2): this {
+  private push(curve: Curve<MutableVec2>, end: MutableVec2): this {
     this.add(curve);
     this.currentPoint = end;
     return this;
@@ -181,10 +181,10 @@ export class Path extends CurvePath<Vec2> {
 /** A closed 2D outline with optional holes (Three.js `Shape`). */
 export class Shape extends Path {
   holes: Path[] = [];
-  getPointsHoles(divisions = 12): Vec2[][] {
+  getPointsHoles(divisions = 12): MutableVec2[][] {
     return this.holes.map((h) => h.getPoints(divisions));
   }
-  extractPoints(divisions = 12): { shape: Vec2[]; holes: Vec2[][] } {
+  extractPoints(divisions = 12): { shape: MutableVec2[]; holes: MutableVec2[][] } {
     return { shape: this.getPoints(divisions), holes: this.getPointsHoles(divisions) };
   }
 }

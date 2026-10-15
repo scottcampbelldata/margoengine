@@ -1,10 +1,15 @@
 const zero = [0, 0, 0],
   identity = [0, 0, 0, 1];
+/** One networked transform state. */
 export interface Snapshot {
+  /** x, y, z in world units. */
   position: Float64Array;
+  /** Unit quaternion x, y, z, w. */
   rotation: Float64Array;
+  /** x, y, z in world units per second. */
   velocity: Float64Array;
 }
+/** A zeroed snapshot with the identity rotation, for use as a reusable `sample` output. */
 export function createSnapshot(): Snapshot {
   return { position: new Float64Array(3), rotation: new Float64Array(identity), velocity: new Float64Array(3) };
 }
@@ -13,7 +18,13 @@ const valid = (value: ArrayLike<number>, size: number): void => {
   for (let i = 0; i < size; i++) if (!Number.isFinite(value[i])) throw new RangeError('Snapshot values must be finite');
 };
 
+/**
+ * Ring buffer of timestamped snapshots for interpolating remote objects. `capacity` is the number of
+ * snapshots kept (an integer 2..65536, default 32); `maxPrediction` caps extrapolation past the newest
+ * snapshot in seconds (0..10, default 0.25). Out-of-range arguments throw a RangeError.
+ */
 export class SnapshotBuffer {
+  /** 11 floats per slot: time, position xyz, rotation xyzw, velocity xyz. */
   readonly samples: Float64Array;
   private readonly output = createSnapshot();
   private count = 0;
@@ -66,6 +77,13 @@ export class SnapshotBuffer {
     this.count = Math.min(this.capacity, this.count + 1);
     return true;
   }
+  /**
+   * State at `time` seconds: Hermite position and slerped rotation between the surrounding snapshots, or
+   * linear extrapolation from the newest (up to `maxPrediction`). Before the oldest it returns the oldest.
+   * Returns null while empty. The default output is reused by every call.
+   * @throws RangeError for a non-finite time.
+   * @throws TypeError for a malformed output.
+   */
   sample(time: number, output: Snapshot = this.output): Snapshot | null {
     if (!Number.isFinite(time)) throw new RangeError('Invalid playback time');
     if (output.position.length !== 3 || output.rotation.length !== 4 || output.velocity.length !== 3)
@@ -124,6 +142,7 @@ export class SnapshotBuffer {
     for (let i = 0; i < 4; i++) output.rotation[i] /= length;
     return output;
   }
+  /** Drops every snapshot. */
   clear(): void {
     this.count = this.head = 0;
   }

@@ -66,6 +66,7 @@
       "Euler",
       "Frustum",
       "LinearToSRGB",
+      "MargoError",
       "MathUtils",
       "Matrix3",
       "Matrix4",
@@ -776,7 +777,7 @@
       "packColors",
       "parseColor",
       "pickPoint",
-      "projectPoint",
+      "projectToPixels",
       "random",
       "screenArea",
       "worldBox"
@@ -1298,8 +1299,8 @@
     "exports": [
       "Tween",
       "easeInOutCubic",
-      "linear",
-      "smoothstep"
+      "easeSmoothstep",
+      "linear"
     ],
     "category": "Animation and interaction"
   },

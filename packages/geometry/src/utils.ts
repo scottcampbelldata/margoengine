@@ -1,5 +1,5 @@
 import type { GeometryData, GeometryGroup } from './data.js';
-import type { Vec3 } from './math.js';
+import type { MutableVec3 } from './math.js';
 
 const clone = (data: GeometryData, changes: Partial<GeometryData>): GeometryData => {
   const out: GeometryData = {
@@ -54,6 +54,7 @@ export function mergeGeometries(list: readonly GeometryData[], useGroups = false
   return out;
 }
 
+/** Options for `mergeVertices`. */
 export interface MergeVerticesOptions {
   /** Maximum per-component difference for two vertices to merge. Default 1e-4. */
   tolerance?: number;
@@ -500,9 +501,9 @@ export function applyMatrix4(data: GeometryData, m: ArrayLike<number>): Geometry
 }
 
 /** Axis-aligned bounds of the positions. Empty geometry gives infinite min and negative-infinite max. */
-export function computeBoundingBox(data: GeometryData): { min: Vec3; max: Vec3 } {
-  const min: Vec3 = [Infinity, Infinity, Infinity],
-    max: Vec3 = [-Infinity, -Infinity, -Infinity],
+export function computeBoundingBox(data: GeometryData): { min: MutableVec3; max: MutableVec3 } {
+  const min: MutableVec3 = [Infinity, Infinity, Infinity],
+    max: MutableVec3 = [-Infinity, -Infinity, -Infinity],
     P = data.positions;
   for (let i = 0; i < P.length; i += 3)
     for (let k = 0; k < 3; k++) {
@@ -513,11 +514,11 @@ export function computeBoundingBox(data: GeometryData): { min: Vec3; max: Vec3 }
 }
 
 /** Bounding sphere centered on the box center (Three.js `computeBoundingSphere`). */
-export function computeBoundingSphere(data: GeometryData): { center: Vec3; radius: number } {
+export function computeBoundingSphere(data: GeometryData): { center: MutableVec3; radius: number } {
   const { min, max } = computeBoundingBox(data),
     P = data.positions;
   if (!P.length) return { center: [0, 0, 0], radius: 0 };
-  const center: Vec3 = [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
+  const center: MutableVec3 = [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
   let r2 = 0;
   for (let i = 0; i < P.length; i += 3)
     r2 = Math.max(r2, (P[i] - center[0]) ** 2 + (P[i + 1] - center[1]) ** 2 + (P[i + 2] - center[2]) ** 2);
@@ -562,7 +563,7 @@ export function edgesGeometry(data: GeometryData, thresholdAngle = 1): Uint32Arr
     }
     return n;
   };
-  const open = new Map<number, { a: number; b: number; n: Vec3 }>(),
+  const open = new Map<number, { a: number; b: number; n: MutableVec3 }>(),
     out: number[] = [],
     tri = [0, 0, 0],
     keys = [0, 0, 0];
@@ -580,7 +581,7 @@ export function edgesGeometry(data: GeometryData, thresholdAngle = 1): Uint32Arr
       e2x = P[c * 3] - P[a * 3],
       e2y = P[c * 3 + 1] - P[a * 3 + 1],
       e2z = P[c * 3 + 2] - P[a * 3 + 2];
-    const n: Vec3 = [e1y * e2z - e1z * e2y, e1z * e2x - e1x * e2z, e1x * e2y - e1y * e2x],
+    const n: MutableVec3 = [e1y * e2z - e1z * e2y, e1z * e2x - e1x * e2z, e1x * e2y - e1y * e2x],
       l = Math.hypot(n[0], n[1], n[2]) || 1;
     n[0] /= l;
     n[1] /= l;

@@ -1,16 +1,27 @@
 import { Geometry } from '@margoengine/core';
 import type { Spline } from '@margoengine/splines';
+/** Options for `road`. Lengths are world units; invalid values throw a RangeError. */
 export interface RoadOptions {
+  /** Driving surface width, positive. Default 6. */
   width?: number;
+  /** Width of each curb, positive. Default 0.2. */
   curbWidth?: number;
+  /** Curb height above the surface, positive. Default 0.15. */
   curbHeight?: number;
+  /** Samples along the spline, an integer 1..4096. Default 128. */
   segments?: number;
+  /** World units per UV repeat, across and along the road. Default 5. */
   uvMeters?: number;
+  /** Lateral offset and height pairs (2..32, no consecutive duplicates) replacing the default curbed profile built from the widths above. */
   crossSection?: readonly (readonly [number, number])[];
 }
+/** Result of `road`. */
 export interface RoadMesh {
+  /** Swept surface with per-strip normals. */
   geometry: Geometry;
+  /** u, v per vertex: distance across the section and along the spline, divided by `uvMeters`. */
   uvs: Float32Array;
+  /** Copy of the cross-section used. */
   section: readonly (readonly [number, number])[];
 }
 

@@ -1,7 +1,7 @@
 import type { Camera, EngineKernel, Geometry, Mesh, Vec3 } from '@margoengine/core';
 import { parseColor, type ColorInput } from './color.js';
 import { Line, type LineMaterialOptions } from './line.js';
-import { meshWorldMatrix } from './lines.js';
+import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { invertMatrix } from '@margoengine/math/mat4';
 import { copyIfChanged, finiteArray, transformPoint } from './math.js';
 
@@ -118,7 +118,7 @@ export class AxesHelper extends Line {
       colors: [1, 0, 0, 1, 0.6, 0, 0, 1, 0, 0.6, 1, 0, 0, 0, 1, 0, 0.6, 1],
     });
   }
-  setColors(x: ColorInput | ArrayLike<number> | null, y?: ColorInput, z?: ColorInput): this {
+  override setColors(x: ColorInput | ArrayLike<number> | null, y?: ColorInput, z?: ColorInput): this {
     if (y === undefined || z === undefined || x === null || (typeof x === 'object' && x.length !== 3))
       return super.setColors(x as ArrayLike<number> | null);
     const a = rgb(x as ColorInput),
@@ -189,7 +189,7 @@ export class BoxHelper extends Line {
     this.seen.fill(NaN);
     return this;
   }
-  update(engine: EngineKernel): boolean {
+  override update(engine: EngineKernel): boolean {
     const matrix = meshWorldMatrix(engine, this.source),
       geometry = this.source.geometry;
     if (!matrix || !geometry) return false;
@@ -356,7 +356,7 @@ export class CameraHelper extends Line {
     super({ ...helperStyle(options), mode: 'segments', positions: new Array(cameraPairs.length * 6).fill(0), colors });
     this.aspect = aspect;
   }
-  update(engine: EngineKernel): boolean {
+  override update(engine: EngineKernel): boolean {
     const camera = this.camera;
     if (camera !== engine.camera)
       camera.update(this.aspect ?? engine.canvas.width / Math.max(1, engine.canvas.height), true);
@@ -432,7 +432,7 @@ export class VertexNormalsHelper extends Line {
     mesh.check();
     this.size = size;
   }
-  update(engine: EngineKernel): boolean {
+  override update(engine: EngineKernel): boolean {
     const m = meshWorldMatrix(engine, this.mesh),
       geometry = this.mesh.geometry;
     if (!m || !geometry) return false;

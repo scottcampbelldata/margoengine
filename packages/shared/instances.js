@@ -5,7 +5,7 @@ export const instanceLayout = {
   stepMode: 'instance',
   attributes: [5, 6, 7, 8, 9, 10].map((shaderLocation, i) => ({ shaderLocation, offset: i * 16, format: 'float32x4' })),
 };
-export const instanceInput =
+const instanceInput =
   '@location(5) m0:vec4f,@location(6) m1:vec4f,@location(7) m2:vec4f,@location(8) m3:vec4f,@location(9) tint:vec4f,@location(10) uvt:vec4f';
 /** A depth/occluder shader whose vertex is `o.clip=f.camera*f.model*vec4f(i.position.xyz,1)` with 80-byte PBR input, drawn per instance. */
 export const instancedDepth = (code) =>

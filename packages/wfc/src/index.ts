@@ -1,9 +1,19 @@
+import { MargoError } from '@margoengine/math/errors';
+/** One tile type of a {@link WFC} tile set; its index in the `tiles` array is its id. */
 export interface Tile {
+  /** Relative pick frequency; finite and > 0. Default 1. */
   weight?: number;
+  /**
+   * Exactly six lists of tile ids allowed next to this tile, in direction order +X, -X, +Y, -Y, +Z, -Z.
+   * Adjacency must be reciprocal: if B is in A's +X list, A must be in B's -X list.
+   */
   neighbors: readonly (readonly number[])[];
 }
+/** Forces one cell to a tile before solving. */
 export interface Pin {
+  /** Integer cell coordinates `[x, y, z]`, each in [0, dimension). */
   position: readonly [number, number, number];
+  /** Tile id, an index into `tiles`. */
   tile: number;
 }
 const directions = [
@@ -17,6 +27,7 @@ const directions = [
 
 /** 3D adjacency WFC, using <=32 tile types and deterministic contradiction retries. */
 export class WFC {
+  /** Per-cell bit mask of still-possible tiles (bit `t` = tile `t`), X fastest, then Y, then Z. */
   readonly cells: Uint32Array;
   private readonly allowed: Uint32Array;
   private readonly weights: Float64Array;
@@ -31,7 +42,14 @@ export class WFC {
   private randomState = 1;
   private pending = 0;
   private readonly full: number;
+  /** Grid size in cells, `[width, height, depth]`. */
   readonly dimensions: readonly [number, number, number];
+  /**
+   * @param dimensions Grid size in cells: positive integers with a product of at most 1,000,000.
+   * @param tiles 1 to 32 tile types.
+   * @throws RangeError for invalid dimensions or tile count.
+   * @throws TypeError for a non-positive weight, a tile without six neighbor lists, or invalid or non-reciprocal adjacency.
+   */
   constructor(
     dimensions: readonly [number, number, number],
     readonly tiles: readonly Tile[],
@@ -129,10 +147,18 @@ export class WFC {
     }
     return true;
   }
+  /**
+   * Collapse the grid and return one tile id per cell (same order as `cells`). Deterministic for a given seed.
+   * @param seed Integer seed. Default 1.
+   * @param pins Cells forced to a tile before solving. Default none.
+   * @param attempts Fresh starts after a contradiction, an integer in [1, 1024]. Default 16.
+   * @throws RangeError for an invalid seed, attempt count or pin.
+   * @throws MargoError `'failed'` when every attempt hits a contradiction.
+   */
   solve(seed = 1, pins: readonly Pin[] = [], attempts = 16): Uint8Array {
     if (!Number.isInteger(seed) || !Number.isInteger(attempts) || attempts < 1 || attempts > 1024)
       throw new RangeError('Invalid WFC seed or retry budget');
-    const [w, h, d] = this.dimensions,
+    const [w, h] = this.dimensions,
       cells = this.cells,
       weights = this.weights,
       weightedLogs = this.weightedLogs,
@@ -225,6 +251,9 @@ export class WFC {
         this.enqueue(selected);
       }
     }
-    throw new Error('WFC constraints contradicted within the retry budget');
+    throw new MargoError(
+      'failed',
+      'WFC constraints contradicted within the retry budget; raise the retry budget, relax the pins or try another seed',
+    );
   }
 }

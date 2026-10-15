@@ -27,6 +27,9 @@
     "@margoengine/materials": "^1.0.0",
     "@margoengine/gltf-pro": "^1.0.0"
   },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
   "scripts": {
     "build": "node ../../scripts/build-optional.js shader",
     "test": "npm run build && node --test test/*.test.js",

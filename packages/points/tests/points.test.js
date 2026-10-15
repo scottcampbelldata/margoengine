@@ -17,7 +17,7 @@ import {
   screenArea,
   allocateBudget,
   multiply,
-  projectPoint,
+  projectToPixels,
   pickPoint,
   boxScreenRect,
   packColors,
@@ -202,7 +202,7 @@ test('frustum culling against Camera.planes: known cases and no false negatives'
     const p = new Float64Array(3);
     let inside = 0;
     for (let i = 0; i < 50_000; i++) {
-      if (!projectPoint(view.matrix, positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2], 100, 100, p))
+      if (!projectToPixels(view.matrix, positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2], 100, 100, p))
         continue;
       if (p[0] < 0 || p[0] > 100 || p[1] < 0 || p[1] > 100) continue;
       inside++;
@@ -265,16 +265,12 @@ test('projection and nearest-point picking match a brute-force search', () => {
   for (let trial = 0; trial < 20; trial++) {
     const x = next() * 256,
       y = next() * 256;
-    let best = -1,
-      bestD = Infinity;
+    let bestD = Infinity;
     for (let i = 0; i < n; i++) {
-      if (!projectPoint(view.matrix, positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2], 256, 256, p))
+      if (!projectToPixels(view.matrix, positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2], 256, 256, p))
         continue;
       const d = Math.hypot(p[0] - x, p[1] - y);
-      if (d < bestD) {
-        bestD = d;
-        best = i;
-      }
+      if (d < bestD) bestD = d;
     }
     const hit = pickPoint(positions, blocks.order, ranges, view.matrix, 256, 256, x, y, 50);
     if (bestD > 50) {
@@ -290,10 +286,10 @@ test('projection and nearest-point picking match a brute-force search', () => {
   assert.equal(hit.index, 1);
   assert.ok(Math.abs(hit.screen[0] - 128) < 1e-3 && Math.abs(hit.screen[1] - 128) < 1e-3);
   // Points behind the camera never project.
-  assert.equal(projectPoint(camera().matrix, 0, 0, 20, 256, 256, p), false);
+  assert.equal(projectToPixels(camera().matrix, 0, 0, 20, 256, 256, p), false);
   // The model matrix goes through `multiply(viewProj, model)`.
   const mvp = multiply(camera().matrix, translate(1, 0, 0));
-  projectPoint(mvp, 0, 0, 0, 256, 256, p);
+  projectToPixels(mvp, 0, 0, 0, 256, 256, p);
   assert.ok(Math.abs(p[0] - (128 + 128 / Math.tan(Math.PI / 6) / 10)) < 1e-3);
   const rect = boxScreenRect([0, 0, 0, 1, 1, 0], camera().matrix, 256, 256);
   assert.ok(rect[0] < 128 && rect[2] > 128 && rect[1] < 128 && rect[3] > 128);
@@ -322,10 +318,10 @@ test('orthographic cameras: screen area ignores distance, picking prefers the ne
   const hit = pickPoint(pair, null, [{ start: 0, count: 3 }], ortho().matrix, 256, 256, 128, 128, 2);
   assert.equal(hit.index, 2, 'behind the eye but inside the negative near plane, and nearest');
   assert.ok(
-    projectPoint(ortho().matrix, 0, 0, -10, 256, 256, p) && Math.abs(p[2] - 25 / 35) < 1e-5,
+    projectToPixels(ortho().matrix, 0, 0, -10, 256, 256, p) && Math.abs(p[2] - 25 / 35) < 1e-5,
     'depth is the NDC distance from the near plane',
   );
-  assert.equal(projectPoint(ortho().matrix, 0, 0, 16, 256, 256, p), false, 'before the near plane');
+  assert.equal(projectToPixels(ortho().matrix, 0, 0, 16, 256, 256, p), false, 'before the near plane');
 });
 
 test('color packing for float RGB, byte RGBA and clamping', () => {

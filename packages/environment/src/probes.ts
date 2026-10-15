@@ -465,7 +465,7 @@ export class LightProbes extends ShaderEffect {
     };
   }
   /** Adds the probe lighting to a model (gltf-pro, materials, terrain); models with a `draw` method are also captured by `bake`. */
-  add(model: LightingTarget): () => void {
+  override add(model: LightingTarget): () => void {
     const release = super.add(model),
       drawable = model as unknown as Partial<CaptureModel>;
     if (typeof drawable.draw !== 'function') return release;
@@ -475,7 +475,7 @@ export class LightProbes extends ShaderEffect {
       release();
     };
   }
-  setup(engine: EngineKernel): void {
+  override setup(engine: EngineKernel): void {
     super.setup(engine);
     const device = engineRuntime(engine).gpu;
     if (!device) throw new Error('LightProbes require the WebGPU backend');
@@ -519,7 +519,7 @@ export class LightProbes extends ShaderEffect {
     this.cached = undefined;
   }
 
-  registerPasses(graph: FrameGraph): void {
+  override registerPasses(graph: FrameGraph): void {
     super.registerPasses(graph);
     // After every shader patch (order -1), before the main draw (0) and the models' passes, whose per-draw uniform writes must
     // land after the capture's submits.
@@ -859,7 +859,7 @@ export class LightProbes extends ShaderEffect {
       device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint } });
     return { sh: make('sh'), resample: make('resample'), prefilter: make('prefilter') };
   }
-  dispose(): void {
+  override dispose(): void {
     super.dispose();
     this.release();
     this.captured.clear();

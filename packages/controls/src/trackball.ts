@@ -64,7 +64,7 @@ export class TrackballControls extends Controls {
     this.saveState();
     this.init();
   }
-  protected get kind(): string {
+  protected override get kind(): string {
     return 'trackball';
   }
   protected bind(element: ControlElement) {
@@ -84,7 +84,7 @@ export class TrackballControls extends Controls {
       [keys, 'keyup', this.onKeyUp],
     ] as Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
   }
-  protected onDisconnect(): void {
+  protected override onDisconnect(): void {
     for (const id of this.pointers.keys()) this.release(id);
     this.pointers.clear();
     this.state = this.keyMode = 'none';

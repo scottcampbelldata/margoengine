@@ -377,7 +377,7 @@ export function multiply(
  * y down). Writes x, y and clip w to `out`; returns false when the point is behind the camera or outside the
  * near/far range (reversed-Z clip z in 0..w).
  */
-export function projectPoint(
+export function projectToPixels(
   mvp: ArrayLike<number>,
   x: number,
   y: number,
@@ -405,7 +405,8 @@ export interface PickRange {
   count: number;
 }
 
-export interface PickHit {
+/** The nearest point found by `pickPoint`, in device pixels. */
+export interface PointsPickHit {
   /** Point index in the cloud's arrays. */
   index: number;
   /** Distance from the pick position in device pixels. */
@@ -430,7 +431,7 @@ export function pickPoint(
   x: number,
   y: number,
   radius: number,
-): PickHit | null {
+): PointsPickHit | null {
   const screen = new Float64Array(3),
     candidates: number[] = [];
   // Squared limits a hair beyond `radius` and `nearest + 0.5` reject far points without Math.hypot; anything
@@ -442,7 +443,7 @@ export function pickPoint(
   for (const range of ranges) {
     for (let s = range.start; s < range.start + range.count; s++) {
       const p = order ? order[s] : s;
-      if (!projectPoint(mvp, positions[p * 3], positions[p * 3 + 1], positions[p * 3 + 2], width, height, screen))
+      if (!projectToPixels(mvp, positions[p * 3], positions[p * 3 + 1], positions[p * 3 + 2], width, height, screen))
         continue;
       const dx = screen[0] - x,
         dy = screen[1] - y,
@@ -457,7 +458,7 @@ export function pickPoint(
       candidates.push(p, distance, screen[2], screen[0], screen[1]);
     }
   }
-  let best: PickHit | null = null;
+  let best: PointsPickHit | null = null;
   for (let c = 0; c < candidates.length; c += 5) {
     if (candidates[c + 1] > nearest + 0.5) continue;
     if (!best || candidates[c + 2] < best.depth)

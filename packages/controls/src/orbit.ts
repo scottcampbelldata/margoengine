@@ -98,7 +98,7 @@ export class OrbitControls extends Controls {
     this.saveState();
     this.init();
   }
-  protected get kind(): string {
+  protected override get kind(): string {
     return 'orbit';
   }
 
@@ -117,7 +117,7 @@ export class OrbitControls extends Controls {
       [element, 'mousedown', this.onMouseDown],
     ] as Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
   }
-  protected onDisconnect(): void {
+  protected override onDisconnect(): void {
     this.stopListenToKeyEvents();
     this.altTarget?.removeEventListener('keyup', this.onAltUp);
     this.altTarget = null;
@@ -594,7 +594,7 @@ export class MapControls extends OrbitControls {
     this.mouseButtons = { LEFT: MOUSE.PAN, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.ROTATE };
     this.touches = { ONE: TOUCH.PAN, TWO: TOUCH.DOLLY_ROTATE };
   }
-  protected get kind(): string {
+  protected override get kind(): string {
     return 'map';
   }
 }

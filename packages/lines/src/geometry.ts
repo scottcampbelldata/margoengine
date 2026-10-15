@@ -4,8 +4,11 @@
  */
 import { transformPoint, type Mat4 } from './math.js';
 
+/** How points connect: 'segments' draws independent pairs, 'strip' an open polyline, 'loop' a closed polyline (needs 3+ points). */
 export type LineMode = 'segments' | 'strip' | 'loop';
+/** Shape where two segments meet. A 'miter' longer than the miter limit falls back to bevel. */
 export type LineJoin = 'miter' | 'round' | 'bevel';
+/** Shape at an open line end; 'square' extends the end by half the line width. */
 export type LineCap = 'butt' | 'round' | 'square';
 
 export const JOINS: readonly LineJoin[] = ['miter', 'round', 'bevel'];
@@ -27,10 +30,15 @@ export function segmentCount(mode: LineMode, count: number): number {
   return count - 1;
 }
 
+/** Point indices that define one drawn segment, as returned by `segmentIndices`. */
 export interface SegmentIndices {
+  /** Start point index. */
   a: number;
+  /** End point index. */
   b: number;
+  /** Point before `a`, or -1 at an open end (the start gets a cap). */
   prev: number;
+  /** Point after `b`, or -1 at an open end (the end gets a cap). */
   next: number;
 }
 
@@ -113,15 +121,7 @@ const dot = (a: V2, b: V2) => a[0] * b[0] + a[1] * b[1];
 const scale = (a: V2, s: number): V2 => [a[0] * s, a[1] * s];
 
 /** Join geometry at a point where direction d0 turns into d1 (unit screen vectors). Mirrors `joint` in the WGSL. */
-export function joint(
-  d0: V2,
-  d1: V2,
-  hwG: number,
-  len0: number,
-  len1: number,
-  join: number,
-  miterLimit: number,
-): Joint {
+function joint(d0: V2, d1: V2, hwG: number, len0: number, len1: number, join: number, miterLimit: number): Joint {
   const n0: V2 = [-d0[1], d0[0]],
     n1: V2 = [-d1[1], d1[0]];
   const cross = d0[0] * d1[1] - d0[1] * d1[0],
@@ -148,12 +148,19 @@ export function joint(
   };
 }
 
-export interface ExpandOptions {
+/** Options for `expandLine`. An unknown mode, join or cap throws a TypeError. */
+export interface ExpandLineOptions {
+  /** Default 'strip'. */
   mode?: LineMode;
+  /** Line width in pixels; clamped to at least 1. Default 1. */
   width?: number;
+  /** Default 'round'. */
   join?: LineJoin;
+  /** Default 'round'. */
   cap?: LineCap;
+  /** Miter length over line width above which a miter join falls back to bevel. Default 4. */
   miterLimit?: number;
+  /** Grow the geometry by one pixel for the edge ramp. Default true. */
   antialias?: boolean;
 }
 
@@ -162,7 +169,7 @@ export interface ExpandOptions {
  * Returns x, y, d triples per vertex where d is the signed distance from the segment centerline; degenerate
  * (zero area) triangles are dropped. With `antialias` the geometry grows by one pixel for the edge ramp.
  */
-export function expandLine(points: ArrayLike<number>, options: ExpandOptions = {}): Float32Array {
+export function expandLine(points: ArrayLike<number>, options: ExpandLineOptions = {}): Float32Array {
   const mode = options.mode ?? 'strip',
     count = points.length >> 1,
     hw = Math.max((options.width ?? 1) / 2, 0.5);

@@ -185,7 +185,7 @@ export class WalkControls extends Controls {
     this.orbit.maxPolarAngle = Math.PI / 2 - 0.05;
     this.init();
   }
-  protected get kind(): string {
+  protected override get kind(): string {
     return 'walk';
   }
   protected bind(element: ControlElement) {
@@ -206,14 +206,14 @@ export class WalkControls extends Controls {
       [keys, 'keyup', this.onKeyUp],
     ] as Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
   }
-  protected onDisconnect(): void {
+  protected override onDisconnect(): void {
     this.pressed.clear();
     this.pointers.clear();
     this.showStick(null);
     if (this.element?.style) this.element.style.touchAction = this.previousTouchAction;
   }
   // The orbit controls bound first, so they restore the element's touch-action last.
-  dispose(): void {
+  override dispose(): void {
     this.unsubscribe?.();
     this.stickView?.remove();
     this.stickView = null;

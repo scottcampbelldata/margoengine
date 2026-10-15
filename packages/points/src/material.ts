@@ -4,7 +4,7 @@ import { parseColor, type ColorInput } from './color.js';
  * Anything the plugin can sample: a GPUTexture you own (created on the engine's device), or an image source it
  * uploads itself with `copyExternalImageToTexture` (ImageBitmap, canvas, OffscreenCanvas, image, video, ImageData).
  */
-export type TextureSource =
+export type PointsTextureSource =
   | GPUTexture
   | ImageBitmap
   | HTMLCanvasElement
@@ -13,15 +13,21 @@ export type TextureSource =
   | HTMLVideoElement
   | ImageData;
 
-export type Blending = 'normal' | 'additive';
+/** Blend mode: 'normal' is alpha over, 'additive' adds color to the target. */
+export type PointsBlending = 'normal' | 'additive';
 
+/**
+ * Options shared by `PointsMaterialOptions` and `SpriteMaterialOptions`. Validated on set and every frame:
+ * opacity or alphaTest outside 0..1, an unknown filter or blending, or a negative color throw a RangeError;
+ * non-boolean flags a TypeError.
+ */
 export interface BaseMaterialOptions {
   /** Base color. '#rrggbb', '#rgb' or 0xrrggbb are sRGB; an [r, g, b] array is linear RGB. Default white. */
   color?: ColorInput;
   /** Multiplies alpha. Default 1. */
   opacity?: number;
   /** Texture multiplied into the color. Image sources are uploaded as sRGB (`rgba8unorm-srgb`). Default null. */
-  map?: TextureSource | null;
+  map?: PointsTextureSource | null;
   /** Texture filtering. Default 'linear'. */
   mapFilter?: 'linear' | 'nearest';
   /** Fragments whose alpha (before edge antialiasing) is below this are discarded. Default 0. */
@@ -29,7 +35,7 @@ export interface BaseMaterialOptions {
   /** Blend without writing depth. Default false for points, true for sprites. */
   transparent?: boolean;
   /** 'normal' (alpha over) or 'additive'. Default 'normal'. */
-  blending?: Blending;
+  blending?: PointsBlending;
   /** Test against the scene depth with reversed-Z `greater-equal`. Default true. */
   depthTest?: boolean;
   /** Write depth. Default `!transparent`. */
@@ -47,22 +53,22 @@ abstract class BaseMaterial {
   mapFilter: 'linear' | 'nearest' = 'linear';
   alphaTest = 0;
   transparent: boolean;
-  blending: Blending = 'normal';
+  blending: PointsBlending = 'normal';
   depthTest = true;
   /** null means `!transparent`. */
   depthWrite: boolean | null = null;
   /** Bumped when `map` changes or `needsUpdate()` is called; the plugin re-uploads image sources. */
   mapVersion = 0;
-  private source: TextureSource | null = null;
+  private source: PointsTextureSource | null = null;
 
   protected constructor(transparent: boolean) {
     this.transparent = transparent;
   }
 
-  get map(): TextureSource | null {
+  get map(): PointsTextureSource | null {
     return this.source;
   }
-  set map(value: TextureSource | null) {
+  set map(value: PointsTextureSource | null) {
     if (value !== null && typeof value !== 'object') throw new TypeError('map must be a texture source or null');
     if (value !== this.source) {
       this.source = value;
@@ -115,9 +121,15 @@ abstract class BaseMaterial {
   }
 }
 
+/** Point footprint: 'square', or 'round' (an antialiased disc). */
 export type PointShape = 'square' | 'round';
+/** 'flat' fills the footprint with one color; 'sphere' shades a lit sphere impostor with curved depth. */
 export type PointShading = 'flat' | 'sphere';
 
+/**
+ * Options for `PointsMaterial`. Besides the base checks, a negative or non-finite size, min above max pixel
+ * size, or an unknown sizeUnits, shape or shading throw a RangeError.
+ */
 export interface PointsMaterialOptions extends BaseMaterialOptions {
   /** Point diameter: pixels, or world units when `sizeUnits` is 'world'. Per-point sizes multiply it. Default 4. */
   size?: number;
@@ -127,6 +139,7 @@ export interface PointsMaterialOptions extends BaseMaterialOptions {
   sizeAttenuation?: boolean;
   /** Clamp of the final diameter in pixels. Defaults 1 and 256. */
   minPixelSize?: number;
+  /** Upper clamp of the final diameter in pixels; must be at least `minPixelSize`. Default 256. */
   maxPixelSize?: number;
   /** 'square', or 'round' (an antialiased disc). Default 'square'. A `map` is sampled across either shape. */
   shape?: PointShape;
@@ -189,6 +202,7 @@ export class PointsMaterial extends BaseMaterial {
   }
 }
 
+/** Options for `SpriteMaterial`. A non-finite rotation or unknown sizeUnits throws a RangeError. */
 export interface SpriteMaterialOptions extends BaseMaterialOptions {
   /** Added to every sprite's own rotation, radians counterclockwise. Default 0. */
   rotation?: number;

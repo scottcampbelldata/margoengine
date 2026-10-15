@@ -1,13 +1,24 @@
 import { finite } from './geometry.js';
+/** Three components `[x, y, z]`, usually a point or direction in world units. */
 export type Vec3 = readonly [number, number, number];
+/** Initial {@link Camera} settings. */
 export interface CameraOptions {
+  /** Vertical field of view in degrees, in (0, 180). Default 60. */
   fov?: number;
+  /** Eye position in world units. Default [0, 2, 5]. */
   position?: Vec3;
+  /** Look-at point in world units; must differ from `position`. Default [0, 0, 0]. */
   target?: Vec3;
+  /** Near clip distance in world units, > 0. Default 0.1. */
   near?: number;
+  /** Far clip distance in world units, > `near`. Default 1000. */
   far?: number;
 }
 
+/**
+ * Perspective look-at camera. Values are checked when the engine updates it each frame: invalid projection settings,
+ * a position equal to the target, or a view parallel to `up` throw RangeError.
+ */
 export class Camera {
   fov: number;
   near: number;

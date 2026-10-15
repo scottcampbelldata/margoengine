@@ -5,6 +5,7 @@
 ```ts
 import { Camera, EngineKernel, Geometry, Mesh, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { Mat4 } from "@margoengine/math";
 
 export class ArrowHelper extends Line {
     constructor({ direction, origin, length, color, headLength, headWidth, ...options }?: {
@@ -51,9 +52,9 @@ export class CameraHelper extends Line {
     update(engine: EngineKernel): boolean;
 }
 
-export type ColorInput = string | number | readonly number[];
+export { ColorInput } from "@margoengine/math";
 
-export interface ExpandOptions {
+export interface ExpandLineOptions {
     mode?: LineMode;
     width?: number;
     join?: LineJoin;
@@ -93,7 +94,7 @@ export class Line {
     setMatrix(matrix: Mat4): this;
     update(_engine: EngineKernel): boolean | void;
     updateDistances(model: Mat4): void;
-    bind(owner: Owner | undefined): void;
+    bind(owner: LineOwner | undefined): void;
     get attached(): boolean;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -221,13 +222,13 @@ export class VertexNormalsHelper extends Line {
 
 export function computeLineDistances(points: Float32Array, count: number, mode: LineMode, matrix?: Mat4 | null): number;
 
-export function expandLine(points: ArrayLike<number>, options?: ExpandOptions): Float32Array;
+export function expandLine(points: ArrayLike<number>, options?: ExpandLineOptions): Float32Array;
 
 export function geometryBounds(geometry: Geometry): Float32Array;
 
-export function meshWorldMatrix(engine: EngineKernel, mesh: Mesh): Float32Array | null;
+export { meshWorldMatrix } from "@margoengine/math";
 
-export const parseColor: (value: ColorInput, out?: Float32Array | number[], offset?: number) => Float32Array | number[];
+export { parseColor } from "@margoengine/math";
 
 export function segmentCount(mode: LineMode, count: number): number;
 
@@ -237,9 +238,7 @@ export function triangleArea(vertices: ArrayLike<number>): number;
 
 // Not exported from this entry, but used by the exports above:
 
-type Mat4 = ArrayLike<number>;
-
-interface Owner {
+interface LineOwner {
     remove(line: Line): void;
 }
 ```

@@ -14,4 +14,26 @@ export { Ray } from './ray.js';
 export { Frustum } from './frustum.js';
 export { Spherical } from './spherical.js';
 export * as MathUtils from './mathutils.js';
-export type { Vec2Like, Vec3Like, Vec4Like, MatrixLike, NumberArray, ColorSpace, EulerOrder } from './types.js';
+export { MargoError, type MargoErrorCode } from './errors.js';
+export type {
+  Vec2,
+  Vec3,
+  Vec4,
+  Quat,
+  MutableVec2,
+  MutableVec3,
+  Mat4,
+  ColorInput,
+  HeightField,
+  Vec2Like,
+  Vec3Like,
+  Vec4Like,
+  SphereLike,
+  PlaneLike,
+  BoxLike,
+  MatrixLike,
+  NumberArray,
+  ColorSpace,
+  EulerOrder,
+} from './types.js';
+// meshWorldMatrix lives only in the ./mesh entry: it imports @margoengine/core/extension at runtime.

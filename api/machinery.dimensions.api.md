@@ -6,7 +6,8 @@
 import { EngineKernel, Mesh, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 import { Lines } from "@margoengine/lines";
-import { ColorInput, Font, FontOptions, TextRenderer } from "@margoengine/text";
+import { ColorInput } from "@margoengine/math";
+import { Font, FontOptions, TextRenderer } from "@margoengine/text";
 
 export interface Anchor {
     point: Vec3;

@@ -19,7 +19,7 @@ export class NavMesh {
     path(start: Vec3, end: Vec3): Vec3[] | null;
 }
 
-export type Vec3 = readonly [number, number, number];
+export { Vec3 } from "@margoengine/core";
 
 export function avoid(agent: Agent, neighbors: readonly Agent[], delta?: number, horizon?: number, output?: Float64Array<ArrayBuffer>): Float64Array;
 ```

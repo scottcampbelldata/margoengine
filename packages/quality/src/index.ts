@@ -44,11 +44,13 @@ const light: QualityPreset = {
 export const QUALITY_PRESETS: Readonly<Record<QualityTier, QualityPreset>> = { high: {}, light, phone: light };
 /** This page's preset (calls `applyQualityTier()` first if nothing has). */
 export const qualityPreset = (): QualityPreset => QUALITY_PRESETS[(state ?? (applyQualityTier(), state!)).tier];
+/** Inputs of `applyQualityTier`; each defaults to the browser's own, so tests can inject them. */
 export interface QualityOptions {
   /** URL query to read `?quality=high|low` (forces a tier, never remembered) and `?scale=1..2` (light-tier DPR). */
   search?: string;
   /** Persistent storage for the measured result; defaults to localStorage. */
   storage?: { getItem(key: string): string | null; setItem(key: string, value: string): void };
+  /** User agent string; a mobile one ('Mobi' or 'Android') selects the phone tier. Default `navigator.userAgent`. */
   userAgent?: string;
 }
 
@@ -109,11 +111,17 @@ export function paceEngine(engine: Paced): void {
   if ((state ?? (applyQualityTier(), state!)).tier === 'light') capFrameRate(engine);
 }
 
+/** Hooks of `watchQuality`; each defaults to the browser's own, so tests can inject them. */
 export interface WatchOptions {
+  /** Frame scheduler, called with a time in milliseconds. Default `requestAnimationFrame`. */
   request?: (callback: (time: number) => void) => unknown;
+  /** Queue whose `submit` is wrapped to time GPU work. Default `GPUQueue.prototype` when WebGPU exists. */
   queue?: QueueLike;
+  /** Clock in milliseconds. Default `performance.now`. */
   now?: () => number;
+  /** Remembers the result. Default writes it to the storage `applyQualityTier` used. */
   store?: (value: 'high' | 'low') => void;
+  /** Called after remembering 'low' on the full tier. Default `location.reload`. */
   reload?: () => void;
 }
 

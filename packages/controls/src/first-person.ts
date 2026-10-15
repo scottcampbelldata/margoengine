@@ -46,7 +46,7 @@ export class FirstPersonControls extends Controls {
     this.setOrientation();
     this.init();
   }
-  protected get kind(): string {
+  protected override get kind(): string {
     return 'first-person';
   }
   protected bind(element: ControlElement) {
@@ -61,7 +61,7 @@ export class FirstPersonControls extends Controls {
       [keys, 'keyup', this.onKeyUp],
     ] as Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
   }
-  protected onDisconnect(): void {
+  protected override onDisconnect(): void {
     for (const key of Object.keys(this.moveState)) this.moveState[key as keyof typeof this.moveState] = false;
     this.mouseDragOn = false;
   }

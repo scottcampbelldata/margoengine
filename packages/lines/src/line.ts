@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel, Mesh } from '@margoengine/core';
+import { MargoError } from '@margoengine/math/errors';
 import { parseColor, type ColorInput } from './color.js';
 import {
   CAPS,
@@ -13,21 +14,32 @@ import {
 } from './geometry.js';
 import { copyIfChanged, finiteArray, identity, type Mat4 } from './math.js';
 
+/**
+ * Style options for `LineMaterial` (and `Line`). Validated on set and every frame: out-of-range numbers throw
+ * a RangeError, an unknown join or cap or a non-boolean flag a TypeError.
+ */
 export interface LineMaterialOptions {
   /** Uniform color, multiplied with vertex colors. Default white. */
   color?: ColorInput;
   /** 0..1. Default 1. */
   opacity?: number;
-  /** CSS pixels, or world units when `worldUnits` is set. Default 1. */
+  /** CSS pixels, or world units when `worldUnits` is set. Must be positive. Default 1. */
   width?: number;
+  /** Measure `width` in world units instead of CSS pixels. Default false. */
   worldUnits?: boolean;
+  /** Default 'round'. */
   join?: LineJoin;
+  /** Default 'round'. */
   cap?: LineCap;
-  /** Miter length over line width above which a miter join falls back to bevel. Default 4. */
+  /** Miter length over line width above which a miter join falls back to bevel. At least 1. Default 4. */
   miterLimit?: number;
+  /** Draw dashes along the line. Default false. */
   dashed?: boolean;
+  /** Dash length in world units along the line. Must be positive. Default 1. */
   dashSize?: number;
+  /** Gap length between dashes in world units. Non-negative. Default 1. */
   gapSize?: number;
+  /** Shifts the dash pattern along the line, in world units. Default 0. */
   dashOffset?: number;
   /** Multiply by the line's per-vertex colors. Default true when the line has colors. */
   vertexColors?: boolean;
@@ -85,6 +97,10 @@ export class LineMaterial {
   }
 }
 
+/**
+ * Options for `new Line(...)`: geometry, placement and material style. Throws a TypeError for an unknown mode
+ * or colors without positions, and a RangeError for malformed positions or colors.
+ */
 export interface LineOptions extends LineMaterialOptions {
   /** x, y, z per point. */
   positions?: ArrayLike<number>;
@@ -98,10 +114,11 @@ export interface LineOptions extends LineMaterialOptions {
   mesh?: Mesh | null;
   /** Model matrix when not attached to a mesh (column-major). Default identity. */
   matrix?: Mat4;
+  /** Default true. */
   visible?: boolean;
 }
 
-interface Owner {
+interface LineOwner {
   remove(line: Line): void;
 }
 
@@ -127,7 +144,7 @@ export class Line {
   totalDistance = 0;
   private pointCount = 0;
   private target: Mesh | null = null;
-  private owner?: Owner;
+  private owner?: LineOwner;
   private distancesFor = new Float32Array(16).fill(NaN);
   private distanceVersion = -1;
   private distanceMode?: LineMode;
@@ -251,8 +268,12 @@ export class Line {
   }
 
   /** @internal */
-  bind(owner: Owner | undefined): void {
-    if (owner && this.owner && this.owner !== owner) throw new Error('Line already belongs to another Lines plugin');
+  bind(owner: LineOwner | undefined): void {
+    if (owner && this.owner && this.owner !== owner)
+      throw new MargoError(
+        'attached',
+        'Line already belongs to another Lines plugin; remove it from that plugin first',
+      );
     this.owner = owner;
   }
   get attached(): boolean {

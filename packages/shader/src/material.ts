@@ -1,3 +1,4 @@
+import { MargoError } from '@margoengine/math/errors';
 import { Material, type MaterialOptions } from '@margoengine/materials';
 import type { Engine } from '@margoengine/core/extension';
 import {
@@ -8,17 +9,17 @@ import {
   normalLocal,
   scalarOf,
   type Node,
-  type Stage,
-  type Input,
+  type ShaderStage,
+  type NodeInput,
 } from './node.js';
 
 /** Material slots a node replaces. Nodes read `@margoengine/materials` maps and factors through `materialColor` and friends. */
 export interface NodeMaterialOptions extends MaterialOptions {
   /** Base colour (linear); vec3f keeps the computed alpha. Replaces color x map x vertex colour. */
   colorNode?: Node<'vec3f' | 'vec4f'>;
-  opacityNode?: Input<'f32'>;
-  roughnessNode?: Input<'f32'>;
-  metalnessNode?: Input<'f32'>;
+  opacityNode?: NodeInput<'f32'>;
+  roughnessNode?: NodeInput<'f32'>;
+  metalnessNode?: NodeInput<'f32'>;
   emissiveNode?: Node<'vec3f'>;
   /** World-space shading normal. */
   normalNode?: Node<'vec3f'>;
@@ -28,13 +29,15 @@ export interface NodeMaterialOptions extends MaterialOptions {
 /** The surface value this material computed before its nodes ran (fragment only). */
 export const materialColor = /*@__PURE__*/ builtin('materialColor', 'vec4f'),
   materialNormal = /*@__PURE__*/ builtin('materialNormal', 'vec3f');
+/** The material's own roughness (0..1), metalness (0..1) and emissive (linear RGB) before the nodes ran (fragment only). */
 export const materialRoughness = /*@__PURE__*/ builtin('materialRoughness', 'f32'),
   materialMetalness = /*@__PURE__*/ builtin('materialMetalness', 'f32'),
   materialEmissive = /*@__PURE__*/ builtin('materialEmissive', 'vec3f');
+/** True when the fragment belongs to a front face (fragment only). */
 export const frontFacing = /*@__PURE__*/ builtin('frontFacing', 'bool');
 const world = '(f.model * vec4f(i.position.xyz, 1.0)).xyz',
   maxVaryings = 8;
-const vertex: Stage = {
+const vertex: ShaderStage = {
   kind: 'vertex',
   builtins: {
     uv: 'i.uv.xy',
@@ -47,7 +50,7 @@ const vertex: Stage = {
     viewDirection: `normalize(f.eye.xyz - ${world})`,
   },
 };
-const fragment: Stage = {
+const fragment: ShaderStage = {
   kind: 'fragment',
   builtins: {
     uv: 'i.uv.xy',
@@ -132,7 +135,7 @@ export class NodeMaterial extends Material {
       )
       .join('');
   }
-  shader(source: string, group: number): string {
+  override shader(source: string, group: number): string {
     const key = group + source;
     let code = this.patched.get(key);
     if (code) return code;
@@ -153,12 +156,15 @@ export class NodeMaterial extends Material {
         return body + this.varyingFields + '\n}';
       });
     if (count !== (this.varyingFields ? 3 : 2))
-      throw new Error('NodeMaterial requires the standard gltf-pro PBR shader');
+      throw new MargoError(
+        'unsupported',
+        'NodeMaterial requires the standard gltf-pro PBR shader; use matching @margoengine/gltf-pro and shader versions',
+      );
     code = this.program.declare(group) + '\n' + code;
     this.patched.set(key, code);
     return code;
   }
-  bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[] {
+  override bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[] {
     const canvas = engine?.canvas;
     return [
       ...super.bindings(device, engine),

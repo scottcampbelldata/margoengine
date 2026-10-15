@@ -21,6 +21,10 @@ export interface GeometryData {
   groups?: GeometryGroup[];
 }
 
+/**
+ * Builds a `GeometryData` from plain arrays: positions and normals xyz per vertex, uvs uv per vertex.
+ * The arrays are copied into typed arrays; groups are copied too and omitted when empty.
+ */
 export function geometryData(
   positions: ArrayLike<number>,
   normals: ArrayLike<number>,

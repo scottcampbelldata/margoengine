@@ -35,6 +35,11 @@ export class Box3 {
     equals(box: Box3): boolean;
 }
 
+export interface BoxLike {
+    min: Vec3Like;
+    max: Vec3Like;
+}
+
 export class Color {
     r: number;
     g: number;
@@ -67,6 +72,8 @@ export class Color {
     toArray(): [number, number, number];
     toArray<T extends NumberArray>(out: T, offset?: number): T;
 }
+
+export type ColorInput = string | number | readonly number[];
 
 export interface ColorLike {
     r: number;
@@ -127,7 +134,19 @@ export interface HSL {
     l: number;
 }
 
+export type HeightField = (x: number, z: number) => number;
+
 export const LinearToSRGB: (c: number) => number;
+
+export class MargoError extends Error {
+    readonly code: MargoErrorCode;
+    constructor(code: MargoErrorCode, message: string);
+    static [Symbol.hasInstance](value: unknown): boolean;
+}
+
+export type MargoErrorCode = 'disposed' | 'attached' | 'state' | 'unsupported' | 'failed';
+
+export type Mat4 = ArrayLike<number>;
 
 export namespace MathUtils {
     export const DEG2RAD: number;
@@ -236,6 +255,10 @@ export interface MatrixLike {
     readonly elements: ArrayLike<number>;
 }
 
+export type MutableVec2 = [x: number, y: number];
+
+export type MutableVec3 = [x: number, y: number, z: number];
+
 export type NumberArray = {
     [index: number]: number;
 };
@@ -256,12 +279,19 @@ export class Plane {
     distanceToSphere(sphere: SphereLike): number;
     projectPoint<T extends Vec3Like>(p: Vec3Like, out: T): T;
     coplanarPoint<T extends Vec3Like>(out: T): T;
-    intersectsBox(box: BoxLike): boolean;
+    intersectsBox(box: PlaneIntersectable): boolean;
     intersectsSphere(sphere: SphereLike): boolean;
     applyMatrix4(m: MatrixLike): this;
     translate(offset: Vec3Like): this;
     equals(plane: Plane): boolean;
 }
+
+export interface PlaneLike {
+    normal: Vec3Like;
+    constant: number;
+}
+
+export type Quat = readonly [x: number, y: number, z: number, w: number];
 
 export class Quaternion {
     x: number;
@@ -347,6 +377,11 @@ export class Sphere {
     equals(sphere: Sphere): boolean;
 }
 
+export interface SphereLike {
+    center: Vec3Like;
+    radius: number;
+}
+
 export class Spherical {
     radius: number;
     phi: number;
@@ -360,16 +395,22 @@ export class Spherical {
     setFromCartesianCoords(x: number, y: number, z: number): this;
 }
 
+export type Vec2 = readonly [x: number, y: number];
+
 export interface Vec2Like {
     x: number;
     y: number;
 }
+
+export { Vec3 } from "@margoengine/core";
 
 export interface Vec3Like {
     x: number;
     y: number;
     z: number;
 }
+
+export type Vec4 = readonly [x: number, y: number, z: number, w: number];
 
 export interface Vec4Like {
     x: number;
@@ -506,25 +547,6 @@ export class Vector4 {
 
 // Not exported from this entry, but used by the exports above:
 
-interface BoxLike {
-    min: Vec3Like;
-    max: Vec3Like;
-}
-
-interface BoxLike {
-    intersectsPlane(plane: Plane): boolean;
-}
-
-interface BoxLike {
-    min: Vec3Like;
-    max: Vec3Like;
-}
-
-interface BoxLike {
-    min: Vec3Like;
-    max: Vec3Like;
-}
-
 interface EulerLike {
     x: number;
     y: number;
@@ -532,39 +554,8 @@ interface EulerLike {
     order: EulerOrder;
 }
 
-interface PlaneLike {
-    normal: Vec3Like;
-    constant: number;
-}
-
-interface PlaneLike {
-    normal: Vec3Like;
-    constant: number;
-}
-
-interface PlaneLike {
-    normal: Vec3Like;
-    constant: number;
-}
-
-interface SphereLike {
-    center: Vec3Like;
-    radius: number;
-}
-
-interface SphereLike {
-    center: Vec3Like;
-    radius: number;
-}
-
-interface SphereLike {
-    center: Vec3Like;
-    radius: number;
-}
-
-interface SphereLike {
-    center: Vec3Like;
-    radius: number;
+interface PlaneIntersectable {
+    intersectsPlane(plane: Plane): boolean;
 }
 
 interface SphericalLike {

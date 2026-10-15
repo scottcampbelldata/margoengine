@@ -1,12 +1,9 @@
 import { Vector3 } from './vector3.js';
-import type { MatrixLike, Vec3Like } from './types.js';
+import type { MatrixLike, SphereLike, Vec3Like } from './types.js';
 
-interface BoxLike {
+/** Anything that can test itself against a plane, such as a {@link Box3}. */
+interface PlaneIntersectable {
   intersectsPlane(plane: Plane): boolean;
-}
-interface SphereLike {
-  center: Vec3Like;
-  radius: number;
 }
 
 /** Plane `normal · p + constant = 0`, with the positive side in front of the normal. */
@@ -81,7 +78,7 @@ export class Plane {
     out.z = -this.normal.z * this.constant;
     return out;
   }
-  intersectsBox(box: BoxLike): boolean {
+  intersectsBox(box: PlaneIntersectable): boolean {
     return box.intersectsPlane(this);
   }
   intersectsSphere(sphere: SphereLike): boolean {

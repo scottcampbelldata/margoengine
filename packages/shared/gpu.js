@@ -1,3 +1,4 @@
+import { margoError } from './errors.js';
 import { SceneTarget, sceneTarget } from './msaa.js';
 export const fullscreen = `
 struct Vertex { @builtin(position) position:vec4f,@location(0) uv:vec2f }
@@ -50,9 +51,10 @@ export function dispatch(c, pipeline, bindGroup, x, y = 1) {
 const key = Symbol.for('margoengine.optional.scene-depth');
 /** Shared across independently bundled optional packages on the same engine. */
 export function acquireDepth(engine) {
-  if (!engine.gpu) throw new Error('Scene depth requires WebGPU');
+  if (!engine.gpu)
+    throw margoError('unsupported', 'Scene depth requires WebGPU; it does not run on the WebGL2 fallback');
   if (engine.hasPlugin('ssao') || engine.hasPlugin('dof'))
-    throw new Error('Supply the depth texture of the effect that owns scene capture');
+    throw margoError('state', 'Supply the depth texture of the effect that owns scene capture');
   let value = engine[key];
   if (!value) {
     value = {
@@ -70,7 +72,7 @@ export function acquireDepth(engine) {
           execute: (c) => {
             if (c.backend !== 'webgpu') return;
             if (engine.hasPlugin('ssao') || engine.hasPlugin('dof'))
-              throw new Error('Supply the depth texture of the effect that owns scene capture');
+              throw margoError('state', 'Supply the depth texture of the effect that owns scene capture');
             const existing = sceneTarget(c);
             this.borrowed = !!existing;
             if (existing) {

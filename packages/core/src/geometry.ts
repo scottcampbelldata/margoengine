@@ -7,6 +7,10 @@ export function finite(values: ArrayLike<number>, size: number, label: string): 
   }
 }
 
+/**
+ * Indexed triangle mesh: 3 to 1,000,000 vertices of xyz positions (world units) and normals, and indices in triples.
+ * Throws TypeError for mismatched array lengths and RangeError for non-finite values or invalid counts or indices.
+ */
 export class Geometry {
   readonly vertices: Float32Array;
   readonly indices: Uint32Array;
@@ -44,6 +48,10 @@ export class Geometry {
   }
 }
 
+/**
+ * Axis-aligned box centred on the origin, sizes in world units (default 1 each).
+ * @throws RangeError when a size is not finite or not positive.
+ */
 export function box(width = 1, height = 1, depth = 1): Geometry {
   const size = [width, height, depth];
   finite(size, 3, 'Box size');
@@ -71,6 +79,10 @@ export function box(width = 1, height = 1, depth = 1): Geometry {
   return new Geometry(positions, normals, indices);
 }
 
+/**
+ * Metallic-roughness material shared by any number of meshes. Defaults: color '#4f46e5', roughness 0.5 (clamped to at
+ * least 0.045), metalness 0, double-sided. Throws TypeError for a malformed color and RangeError for values outside 0..1.
+ */
 export class PbrMaterial {
   readonly data = new Float32Array([0, 0, 0, 1, 0.5, 0, 1, 0]);
   constructor(options: PbrMaterialOptions = {}) {
@@ -102,8 +114,12 @@ export class PbrMaterial {
 }
 /** `color`: '#rrggbb' (sRGB) or linear [r, g, b] in 0..1. */
 export interface PbrMaterialOptions {
+  /** Base color. Default '#4f46e5'. */
   color?: string | readonly number[];
+  /** Roughness in 0..1, stored as at least 0.045. Default 0.5. */
   roughness?: number;
+  /** Metalness in 0..1. Default 0. */
   metalness?: number;
+  /** Draw back faces too. Default true. */
   doubleSided?: boolean;
 }

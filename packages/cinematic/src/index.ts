@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel, Mesh, Vec3 } from '@margoengine/core';
 import { engineRuntime, meshRuntime, type Engine, type EnginePlugin } from '@margoengine/core/extension';
 
@@ -11,10 +12,15 @@ export type CameraCollision = (
   direction: Float64Array,
   distance: number,
 ) => number | null | undefined;
+/** Settings for {@link Cinematic}. Distances are world units. */
 export interface CinematicOptions {
+  /** Camera position relative to the target; finite and non-zero. Default [0, 3, 6]. */
   offset?: Vec3;
+  /** Follow spring rate in 1/seconds (higher is stiffer); finite and > 0. Default 6. */
   damping?: number;
+  /** Look-at spring rate in 1/seconds; finite and > 0. Default 8. */
   lookDamping?: number;
+  /** Ground height at world `(x, z)`; the camera stays `clearance` above it along the arm. Must return finite values. */
   ground?: (x: number, z: number) => number;
   /** Space kept between the camera and the ground, and between the camera and a `collide` hit. Default 0.65. */
   clearance?: number;
@@ -33,8 +39,11 @@ const valid = (vector: ArrayLike<number>): void => {
 /** Critically damped virtual camera, with independent follow/look springs and additive shake. */
 export class Cinematic implements EnginePlugin {
   readonly name = 'cinematic';
+  /** Current camera offset from the target in world units; edit in place or with `setOrbitOffset`. */
   readonly offset: Float64Array;
+  /** Smoothed camera position in world units, before shake. */
   readonly position = new Float64Array(3);
+  /** Smoothed look-at point in world units. */
   readonly lookAt = new Float64Array(3);
   private readonly velocity = new Float64Array(6);
   private readonly target = new Float64Array(3);
@@ -51,6 +60,10 @@ export class Cinematic implements EnginePlugin {
   private frequency = 25;
   private time = 0;
   private initialized = false;
+  /**
+   * @throws TypeError when `offset` is not 3 values or `collide` is not a function.
+   * @throws RangeError for a non-finite or zero offset, invalid damping, a non-function `ground`, or invalid clearance.
+   */
   constructor(readonly options: CinematicOptions = {}) {
     const offset = options.offset ?? [0, 3, 6];
     valid(offset);
@@ -65,11 +78,17 @@ export class Cinematic implements EnginePlugin {
     this.validateGround();
     this.offset = new Float64Array(offset);
   }
+  /** Create a rig and add it to `engine` as the 'cinematic' plugin; it then updates before every frame. */
   static attach(engine: EngineKernel, options: CinematicOptions = {}): Cinematic {
     const rig = new Cinematic(options);
     engineRuntime(engine).use(rig);
     return rig;
   }
+  /**
+   * Set `offset` from spherical coordinates: `yaw`/`pitch` in radians, `distance` (> 0) and extra `height` (default 0)
+   * in world units.
+   * @throws RangeError for non-finite values or a non-positive distance.
+   */
   setOrbitOffset(yaw: number, pitch: number, distance: number, height = 0): void {
     if (
       !Number.isFinite(yaw) ||
@@ -83,6 +102,12 @@ export class Cinematic implements EnginePlugin {
     this.offset[1] = Math.sin(pitch) * distance + height;
     this.offset[2] = Math.cos(yaw) * Math.cos(pitch) * distance;
   }
+  /**
+   * Follow a mesh (its world position, read each update) or a fixed world point.
+   * @throws TypeError for a point that is not 3 values or a mesh of another engine.
+   * @throws RangeError for a non-finite point.
+   * @throws Error 'Mesh disposed' for a disposed mesh.
+   */
   follow(target: Mesh | Vec3): void {
     if (Array.isArray(target)) {
       valid(target);
@@ -95,6 +120,13 @@ export class Cinematic implements EnginePlugin {
       this.mesh = target as Mesh;
     }
   }
+  /**
+   * Start a shake that fades out quadratically, replacing any running one.
+   * @param amplitude World units, >= 0.
+   * @param duration Seconds, > 0.
+   * @param frequency Oscillation rate in radians per second, > 0. Default 25.
+   * @throws RangeError for an out-of-range argument.
+   */
   shake(amplitude: number, duration: number, frequency = 25): void {
     if (
       !Number.isFinite(amplitude) ||
@@ -109,6 +141,11 @@ export class Cinematic implements EnginePlugin {
     this.remaining = this.shakeDuration = duration;
     this.frequency = frequency;
   }
+  /**
+   * Step the springs, shake, ground and wall avoidance by `delta` seconds and write the engine camera when attached.
+   * Called automatically when attached as a plugin.
+   * @throws RangeError for a negative or non-finite delta, invalid options, or non-finite ground or collision results.
+   */
   update(delta: number): void {
     if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid camera delta');
     valid(this.offset);
@@ -224,14 +261,25 @@ export class Cinematic implements EnginePlugin {
     }
     return dy;
   }
+  /**
+   * Plugin hook: bind the rig to `engine`.
+   * @throws MargoError `'attached'` when already attached.
+   * @throws TypeError when the followed mesh belongs to another engine.
+   */
   setup(engine: Engine): void {
-    if (this.engine) throw new Error('Camera rig already attached');
+    if (this.engine)
+      throw new MargoError(
+        'attached',
+        'Camera rig already attached; dispose() it before attaching it again, or create another rig',
+      );
     if (this.mesh && meshRuntime(this.mesh).engine !== engine) throw new TypeError('Target belongs to another engine');
     this.engine = engine;
   }
+  /** Plugin hook: runs {@link Cinematic.update} with the frame delta in seconds. */
   onPreUpdate(delta: number): void {
     this.update(delta);
   }
+  /** Detach from the engine (removing the plugin) and stop following; the rig can be attached again. */
   dispose(): void {
     const engine = this.engine;
     this.engine = undefined;

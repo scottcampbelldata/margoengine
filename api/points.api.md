@@ -9,27 +9,18 @@ import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 export interface BaseMaterialOptions {
     color?: ColorInput;
     opacity?: number;
-    map?: TextureSource | null;
+    map?: PointsTextureSource | null;
     mapFilter?: 'linear' | 'nearest';
     alphaTest?: number;
     transparent?: boolean;
-    blending?: Blending;
+    blending?: PointsBlending;
     depthTest?: boolean;
     depthWrite?: boolean;
 }
 
-export type Blending = 'normal' | 'additive';
-
-export type ColorInput = string | number | readonly number[];
+export { ColorInput } from "@margoengine/math";
 
 export const NO_BLOCK = 4294967295;
-
-export interface PickHit {
-    index: number;
-    distance: number;
-    depth: number;
-    screen: [number, number];
-}
 
 export interface PickRange {
     start: number;
@@ -108,6 +99,8 @@ export type PointShading = 'flat' | 'sphere';
 
 export type PointShape = 'square' | 'round';
 
+export type PointsBlending = 'normal' | 'additive';
+
 export class PointsMaterial extends BaseMaterial {
     size: number;
     sizeUnits: 'pixels' | 'world';
@@ -134,6 +127,13 @@ export interface PointsMaterialOptions extends BaseMaterialOptions {
     vertexColors?: boolean;
     shading?: PointShading;
     edl?: boolean;
+}
+
+export interface PointsPickHit {
+    index: number;
+    distance: number;
+    depth: number;
+    screen: [number, number];
 }
 
 export interface PointsPickOptions {
@@ -187,6 +187,8 @@ export interface PointsPluginOptions {
     edlStrength?: number;
     edlRadius?: number;
 }
+
+export type PointsTextureSource = GPUTexture | ImageBitmap | HTMLCanvasElement | OffscreenCanvas | HTMLImageElement | HTMLVideoElement | ImageData;
 
 export const SPRITE_STRIDE = 16;
 
@@ -246,8 +248,6 @@ export interface SpriteOptions {
     uv?: readonly [number, number, number, number];
 }
 
-export type TextureSource = GPUTexture | ImageBitmap | HTMLCanvasElement | OffscreenCanvas | HTMLImageElement | HTMLVideoElement | ImageData;
-
 export function allocateBudget(counts: ArrayLike<number>, weights: ArrayLike<number>, length: number, budget: number, out: Uint32Array | number[]): number;
 
 export function atlasRect(index: number, columns: number, rows: number, padding?: number): [number, number, number, number];
@@ -264,17 +264,17 @@ export function expandBlockBounds(blocks: PointBlocks, positions: ArrayLike<numb
 
 export function mergeRanges(ranges: Array<[number, number]>): Array<[number, number]>;
 
-export function meshWorldMatrix(engine: EngineKernel, mesh: Mesh): Float32Array | null;
+export { meshWorldMatrix } from "@margoengine/math";
 
 export function multiply(a: ArrayLike<number>, b: ArrayLike<number>, out?: Float64Array | Float32Array | number[]): Float64Array | Float32Array | number[];
 
 export function packColors(source: ArrayLike<number>, components: number, count: number, out: Uint32Array, offset?: number): Uint32Array;
 
-export const parseColor: (value: ColorInput, out?: Float32Array | number[], offset?: number) => Float32Array | number[];
+export { parseColor } from "@margoengine/math";
 
-export function pickPoint(positions: ArrayLike<number>, order: ArrayLike<number> | null, ranges: readonly PickRange[], mvp: ArrayLike<number>, width: number, height: number, x: number, y: number, radius: number): PickHit | null;
+export function pickPoint(positions: ArrayLike<number>, order: ArrayLike<number> | null, ranges: readonly PickRange[], mvp: ArrayLike<number>, width: number, height: number, x: number, y: number, radius: number): PointsPickHit | null;
 
-export function projectPoint(mvp: ArrayLike<number>, x: number, y: number, z: number, width: number, height: number, out: Float64Array | number[]): boolean;
+export function projectToPixels(mvp: ArrayLike<number>, x: number, y: number, z: number, width: number, height: number, out: Float64Array | number[]): boolean;
 
 export const random: (seed: number) => () => number;
 
@@ -290,13 +290,13 @@ abstract class BaseMaterial {
     mapFilter: 'linear' | 'nearest';
     alphaTest: number;
     transparent: boolean;
-    blending: Blending;
+    blending: PointsBlending;
     depthTest: boolean;
     depthWrite: boolean | null;
     mapVersion: number;
     protected constructor(transparent: boolean);
-    get map(): TextureSource | null;
-    set map(value: TextureSource | null);
+    get map(): PointsTextureSource | null;
+    set map(value: PointsTextureSource | null);
     needsUpdate(): void;
     setColor(color: ColorInput): this;
     get writesDepth(): boolean;

@@ -32,11 +32,9 @@ const {
   clamp,
   time,
   deltaTime,
-  resolution,
   positionLocal,
   normalLocal,
   normalWorld,
-  viewDirection,
   inputColor,
   inputDepth,
   materialColor,
@@ -48,7 +46,6 @@ const {
   instanceIndex,
   screenUV,
   dot,
-  Program,
 } = S;
 
 const snapshots = fileURLToPath(new URL('./snapshots/', import.meta.url));

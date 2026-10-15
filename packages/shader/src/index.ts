@@ -1,5 +1,5 @@
 export * from './node.js';
-export { texture, type TextureSource } from './texture.js';
+export { texture, type BindableTexture } from './texture.js';
 export {
   NodeMaterial,
   materialColor,

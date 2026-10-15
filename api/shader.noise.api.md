@@ -21,13 +21,13 @@ export function domainWarp<T extends 'vec2f' | 'vec3f'>(noise: NoiseField<T>, p:
 
 export const fbm: <T extends 'vec2f' | 'vec3f'>(noise: NoiseField<T>, p: Node<T>, options?: NoiseFractalOptions) => Node<'f32'>;
 
-export function perlin3(p: Input<'vec3f'>, seed?: number | Node<'u32'>): Node<'f32'>;
+export function perlin3(p: NodeInput<'vec3f'>, seed?: number | Node<'u32'>): Node<'f32'>;
 
 export const ridged: <T extends 'vec2f' | 'vec3f'>(noise: NoiseField<T>, p: Node<T>, options?: NoiseFractalOptions) => Node<'f32'>;
 
-export const simplex2: (p: Input<'vec2f'>, seed?: number) => Node<'f32'>;
+export const simplex2: (p: NodeInput<'vec2f'>, seed?: number) => Node<'f32'>;
 
-export const simplex3: (p: Input<'vec3f'>, seed?: number) => Node<'f32'>;
+export const simplex3: (p: NodeInput<'vec3f'>, seed?: number) => Node<'f32'>;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -37,9 +37,9 @@ type Bools<T extends Type> = Node<VecOf<'bool', Size<T>>>;
 
 class Builder {
     readonly program: Program;
-    readonly stage: Stage;
+    readonly stage: ShaderStage;
     inFn: boolean;
-    constructor(program: Program, stage: Stage);
+    constructor(program: Program, stage: ShaderStage);
     expr(n: Node): string;
     wrap(n: Node): string;
     line(code: string): void;
@@ -63,7 +63,7 @@ type ColorValue = string | number | readonly number[];
 
 type Count<S extends string, A extends 0[] = []> = S extends `${infer _}${infer Rest}` ? Count<Rest, [...A, 0]> : A['length'];
 
-type Emit = (b: Builder, n: Node<any>) => string;
+type Emit = (b: Builder, n: Node) => string;
 
 type Floats<T extends Type> = Node<VecOf<'f32', Size<T>>>;
 
@@ -73,8 +73,6 @@ interface Host {
     delta?: number;
     [key: string]: unknown;
 }
-
-type Input<T extends Type = Type> = Node<T> | number;
 
 type Matrix = 'mat2x2f' | 'mat3x3f' | 'mat4x4f';
 
@@ -100,12 +98,12 @@ interface Node<T extends Type = Type> extends Swizzles<T> {
     mod(b: number): Node<T>;
     mod<U extends Type>(b: Node<U>): Node<Arith<T, U>>;
     negate(): Node<T>;
-    lessThan(b: Input<T> | Input<ScalarOf<T>>): Bools<T>;
-    lessThanEqual(b: Input<T> | Input<ScalarOf<T>>): Bools<T>;
-    greaterThan(b: Input<T> | Input<ScalarOf<T>>): Bools<T>;
-    greaterThanEqual(b: Input<T> | Input<ScalarOf<T>>): Bools<T>;
-    equal(b: Input<T> | Input<ScalarOf<T>>): Bools<T>;
-    notEqual(b: Input<T> | Input<ScalarOf<T>>): Bools<T>;
+    lessThan(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Bools<T>;
+    lessThanEqual(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Bools<T>;
+    greaterThan(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Bools<T>;
+    greaterThanEqual(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Bools<T>;
+    equal(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Bools<T>;
+    notEqual(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Bools<T>;
     and(b: Node<T>): Node<T>;
     or(b: Node<T>): Node<T>;
     not(): Node<T>;
@@ -138,21 +136,23 @@ interface Node<T extends Type = Type> extends Swizzles<T> {
     fwidth(): Node<T>;
     oneMinus(): Node<T>;
     length(): Node<ScalarOf<T>>;
-    distance(b: Input<T>): Node<ScalarOf<T>>;
-    dot(b: Input<T>): Node<ScalarOf<T>>;
+    distance(b: NodeInput<T>): Node<ScalarOf<T>>;
+    dot(b: NodeInput<T>): Node<ScalarOf<T>>;
     cross(b: Node<'vec3f'>): Node<'vec3f'>;
-    min(b: Input<T> | Input<ScalarOf<T>>): Node<T>;
-    max(b: Input<T> | Input<ScalarOf<T>>): Node<T>;
-    pow(b: Input<T> | Input<ScalarOf<T>>): Node<T>;
-    clamp(low: Input<T> | Input<ScalarOf<T>>, high: Input<T> | Input<ScalarOf<T>>): Node<T>;
-    step(edge: Input<T> | Input<ScalarOf<T>>): Node<T>;
-    mix(b: Input<T>, t: Input<T> | Input<ScalarOf<T>>): Node<T>;
-    reflect(n: Input<T>): Node<T>;
-    element(i: Input<'i32' | 'u32'>): Node<T extends Matrix ? `vec${T extends `mat${infer K extends number}x${string}` ? K : 4}f` : ScalarOf<T>>;
+    min(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Node<T>;
+    max(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Node<T>;
+    pow(b: NodeInput<T> | NodeInput<ScalarOf<T>>): Node<T>;
+    clamp(low: NodeInput<T> | NodeInput<ScalarOf<T>>, high: NodeInput<T> | NodeInput<ScalarOf<T>>): Node<T>;
+    step(edge: NodeInput<T> | NodeInput<ScalarOf<T>>): Node<T>;
+    mix(b: NodeInput<T>, t: NodeInput<T> | NodeInput<ScalarOf<T>>): Node<T>;
+    reflect(n: NodeInput<T>): Node<T>;
+    element(i: NodeInput<'i32' | 'u32'>): Node<T extends Matrix ? `vec${T extends `mat${infer K extends number}x${string}` ? K : 4}f` : ScalarOf<T>>;
     toFloat(): Floats<T>;
     toInt(): Node<VecOf<'i32', Size<T>>>;
     toUint(): Node<VecOf<'u32', Size<T>>>;
 }
+
+type NodeInput<T extends Type = Type> = Node<T> | number;
 
 class Program {
     readonly base: number;
@@ -172,7 +172,7 @@ class Program {
     readonly varyings: Node[];
     readonly functions: Map<string, string>;
     constructor(base?: number, compute?: boolean);
-    stage(stage: Stage, outputs: readonly Node[]): {
+    stage(stage: ShaderStage, outputs: readonly Node[]): {
         lines: string[];
         values: string[];
     };
@@ -200,6 +200,12 @@ type Scalar = 'f32' | 'i32' | 'u32' | 'bool';
 
 type ScalarOf<T extends Type> = T extends 'f32' | `vec${N}f` | Matrix ? 'f32' : T extends 'i32' | `vec${N}i` ? 'i32' : T extends 'u32' | `vec${N}u` ? 'u32' : 'bool';
 
+interface ShaderStage {
+    readonly kind: 'vertex' | 'fragment' | 'post' | 'compute';
+    readonly builtins: Readonly<Record<string, string | ((b: Builder) => string)>>;
+    varying?(b: Builder, x: Node): string;
+}
+
 type Size<T extends Type> = T extends `vec${infer K extends number}${string}` ? K : 1;
 
 interface Spec {
@@ -207,12 +213,6 @@ interface Spec {
     id: number;
     params: Node[];
     result: Node;
-}
-
-interface Stage {
-    readonly kind: 'vertex' | 'fragment' | 'post' | 'compute';
-    readonly builtins: Readonly<Record<string, string | ((b: Builder) => string)>>;
-    varying?(b: Builder, x: Node): string;
 }
 
 type Sw<X extends string> = X | `${X}${X}` | `${X}${X}${X}` | `${X}${X}${X}${X}`;

@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { Mesh } from '@margoengine/core';
+import { MargoError } from '@margoengine/math/errors';
 import { buildBlocks, expandBlockBounds, packColors, NO_BLOCK, type PointBlocks } from './math.js';
 import { PointsMaterial, type PointsMaterialOptions } from './material.js';
 
@@ -20,9 +21,14 @@ export interface PointCloudData {
   normals?: Float32Array | null;
 }
 
+/**
+ * Options for `new PointCloud(...)`. Throws a TypeError without positions, and a RangeError when the
+ * positions length is not a multiple of 3 or an option is out of range.
+ */
 export interface PointCloudOptions extends PointCloudData {
+  /** A shared material or options for a new one. Default a new `PointsMaterial`. */
   material?: PointsMaterial | PointsMaterialOptions;
-  /** Maximum points per culling block. Default 16384. */
+  /** Maximum points per culling block; a positive integer. Default 16384. */
   blockSize?: number;
   /** Seed of the per-block shuffle used for level of detail. Default 1. */
   seed?: number;
@@ -36,6 +42,7 @@ export interface PointCloudOptions extends PointCloudData {
   reorder?: boolean;
   /** World-unit margin added to every frustum plane test, for large points at block edges. Default 0. */
   cullMargin?: number;
+  /** Label for debugging. Default ''. */
   name?: string;
 }
 
@@ -157,7 +164,7 @@ export class PointCloud {
 
   /** Overwrites colors of points `start ..`. `components` defaults to the cloud's current component count. */
   updateColors(start: number, values: ArrayLike<number>, components: 3 | 4 = this.colorComponents): this {
-    if (!this.colors) throw new Error('The cloud has no per-point colors; call setColors first');
+    if (!this.colors) throw new MargoError('state', 'The cloud has no per-point colors; call setColors first');
     const n = this.range(start, values.length, components);
     packColors(values, components, n, this.colors, start);
     this.dirty.colors.push([start, start + n]);
@@ -166,7 +173,7 @@ export class PointCloud {
 
   /** Overwrites per-point sizes of points `start ..`. */
   updateSizes(start: number, values: ArrayLike<number>): this {
-    if (!this.sizes) throw new Error('The cloud has no per-point sizes; call setSizes first');
+    if (!this.sizes) throw new MargoError('state', 'The cloud has no per-point sizes; call setSizes first');
     const n = this.range(start, values.length, 1);
     for (let i = 0; i < n; i++)
       if (!(values[i] >= 0) || !Number.isFinite(values[i]))
@@ -218,7 +225,7 @@ export class PointCloud {
 
   /** Re-chunks from the current positions: tight bounds again, and points that became finite join a block. */
   rebuild(): this {
-    if (this.direct) throw new Error('A reordered cloud cannot be rebuilt; create a new PointCloud');
+    if (this.direct) throw new MargoError('state', 'A reordered cloud cannot be rebuilt; create a new PointCloud');
     this.blocks = buildBlocks(this.positions, this.count, this.blockSize, this.seed);
     this.structure++;
     return this;
@@ -235,7 +242,8 @@ export class PointCloud {
 
   /** @internal */
   bind(owner: PointOwner | undefined): void {
-    if (owner && this.owner && this.owner !== owner) throw new Error('The cloud already belongs to another plugin');
+    if (owner && this.owner && this.owner !== owner)
+      throw new MargoError('attached', 'The cloud already belongs to another plugin; remove it from that plugin first');
     this.owner = owner;
   }
 

@@ -1,10 +1,20 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, PassContext } from '@margoengine/core/extension';
 import { fullscreen, render } from '../../shared/gpu.js';
 import { acesShader } from '../../shared/aces.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
-import { Node, Program, cast, sameEntries, type Builder, type Input, type Resource, type Stage } from './node.js';
+import {
+  Node,
+  Program,
+  cast,
+  sameEntries,
+  type Builder,
+  type NodeInput,
+  type Resource,
+  type ShaderStage,
+} from './node.js';
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 const binding = (type: string, key: string): Resource => ({
   prefix: 'nd' + key[0],
@@ -15,13 +25,17 @@ const binding = (type: string, key: string): Resource => ({
 const input = /*@__PURE__*/ binding('texture_2d<f32>', 'input'),
   sampler = /*@__PURE__*/ binding('sampler', 'sampler'),
   depth = /*@__PURE__*/ binding('texture_depth_2d', 'depth');
-const post: Stage = { kind: 'post', builtins: { uv: 'v.uv', screenUV: 'v.uv', screenCoordinate: 'v.position.xy' } };
+const post: ShaderStage = {
+  kind: 'post',
+  builtins: { uv: 'v.uv', screenUV: 'v.uv', screenCoordinate: 'v.position.xy' },
+};
 const pixel = (b: Builder) => {
-  if (b.stage.kind !== 'post') throw new Error('inputColor() and inputDepth() are only available in NodePass nodes');
+  if (b.stage.kind !== 'post')
+    throw new TypeError('inputColor() and inputDepth() are only available in NodePass nodes');
   return `vec2i(${b.local('v.position.xy')})`;
 };
 /** The effect's input colour at this pixel, or bilinear at `coord` (0-1, origin top left). Linear HDR for `kind: 'hdr'`, display-encoded for `'ldr'`. */
-export function inputColor(coord?: Input<'vec2f'>): Node<'vec4f'> {
+export function inputColor(coord?: NodeInput<'vec2f'>): Node<'vec4f'> {
   return new Node('vec4f', 'ic', coord === undefined ? [] : [cast(coord, 'vec2f', 'inputColor uv')], (b, n) => {
     const at = pixel(b),
       t = b.resource(input);
@@ -31,7 +45,7 @@ export function inputColor(coord?: Input<'vec2f'>): Node<'vec4f'> {
   });
 }
 /** Raw scene depth at this pixel or at `coord` (reversed Z: 1 near, 0 far or sky). */
-export function inputDepth(coord?: Input<'vec2f'>): Node<'f32'> {
+export function inputDepth(coord?: NodeInput<'vec2f'>): Node<'f32'> {
   return new Node('f32', 'id', coord === undefined ? [] : [cast(coord, 'vec2f', 'inputDepth uv')], (b, n) => {
     const at = pixel(b),
       d = b.resource(depth);
@@ -39,9 +53,11 @@ export function inputDepth(coord?: Input<'vec2f'>): Node<'f32'> {
   });
 }
 let passes = 0;
+/** Options for `new NodePass(node, options)`. */
 export interface NodePassOptions {
   /** `'ldr'` (default) runs after tonemapping on display colour; `'hdr'` runs on linear light before it (and tonemaps with ACES when last). */
   kind?: 'hdr' | 'ldr';
+  /** Plugin and debug name. Default `'shader:pass:<n>'` (n counts passes). */
   name?: string;
 }
 /** A full-screen effect written as one node, run by `@margoengine/post`'s PostStack: `PostStack.attach(engine, [new Tonemap(), pass])`. */
@@ -88,14 +104,19 @@ export class NodePass implements EnginePlugin {
     return `${fullscreen}\n${this.program.declare(0)}\n${encode ? acesShader + '\n' : ''}@fragment fn fragment(v:Vertex)->@location(0) vec4f {\n${this.body}  ${out}\n}\n`;
   }
   private joinStack(host: StackHost): StackStage {
-    if (this.host || this.disposed) throw new Error(`${this.name} is already attached`);
+    if (this.host || this.disposed)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'attached',
+        `${this.name} is already attached; create a new NodePass for another PostStack`,
+      );
     this.host = host;
     return { kind: this.kind, render: (c, input, output) => this.render(c, input, output) };
   }
   setup(engine: Engine): void {
     if (!this.host || this.disposed)
-      throw new Error('NodePass runs inside a PostStack: PostStack.attach(engine, [pass])');
-    if (!engine.gpu) throw new Error('NodePass requires WebGPU');
+      throw new MargoError('state', 'NodePass runs inside a PostStack: PostStack.attach(engine, [pass])');
+    if (!engine.gpu)
+      throw new MargoError('unsupported', 'NodePass requires WebGPU; it does not run on the WebGL2 fallback');
     this.engine = engine;
   }
   registerPasses(): void {}

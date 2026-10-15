@@ -7,18 +7,27 @@ import { sceneSamples } from './quality.js';
 
 /** `fallback` supplies a renderer when WebGPU is unavailable or `backend` is 'webgl2', for example `webglRenderer` from @margoengine/webgl. */
 export interface EngineOptions {
+  /** Initial mesh capacity, 1..8388608; the store doubles when full. Default 1024. */
   capacity?: number;
+  /** Renderer choice. 'auto' tries WebGPU then `fallback`; 'webgpu' fails without WebGPU. Default 'auto'. */
   backend?: 'auto' | 'webgpu' | 'webgl2';
+  /** Initial camera settings. */
   camera?: CameraOptions;
+  /** Builds the non-WebGPU renderer. */
   fallback?: (canvas: HTMLCanvasElement) => Renderer;
   /** Extra WebGPU features to request when the adapter offers them, e.g. ['timestamp-query'] for Stats GPU timing. */
   features?: GPUFeatureName[];
 }
+/** Called by the frame loop before each render with the seconds since the previous frame (0 on the first, at most 0.1). */
 export type FrameCallback = (engine: Engine, delta: number) => void;
 const positionFields = ['x', 'y', 'z'] as const,
   scaleFields = ['sx', 'sy', 'sz'] as const;
 const owners = new WeakMap<EnginePlugin, Engine>();
 
+/**
+ * Live x/y/z view of a mesh's position (world units), rotation (Euler radians) or scale in the transform store. Writes
+ * must be finite as float32, and scale components non-zero (RangeError otherwise); throws Error 'Mesh disposed' after disposal.
+ */
 export class VectorRef {
   constructor(
     private readonly mesh: Mesh,
@@ -98,6 +107,10 @@ const views = (mesh: Mesh) =>
     matrix: mesh.engine.store.matrices.subarray(mesh.id * 16, mesh.id * 16 + 16),
     euler: mesh.engine.store.rotations.subarray(mesh.id * 3, mesh.id * 3 + 3),
   });
+/**
+ * Runtime mesh: a slot `id` in its engine's transform store plus geometry and material. Create it with
+ * `engine.createMesh`. Positions are world units relative to the parent, rotations Euler radians, parents at most 64 deep.
+ */
 export class Mesh {
   name = '';
   readonly position = new VectorRef(this, 'position');
@@ -221,6 +234,11 @@ export class Mesh {
   }
 }
 
+/**
+ * Runtime engine behind the public `EngineKernel` surface, with extension access to the store, frame graph and
+ * GPU device. Create it with `Engine.create(canvas, options)`; deltas are seconds, and `render` rejects a delta outside
+ * [0, 1] with RangeError.
+ */
 export class Engine {
   readonly frameGraph = new FrameGraph();
   readonly meshes = new Map<number, Mesh>();

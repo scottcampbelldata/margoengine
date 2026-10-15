@@ -1,5 +1,7 @@
 /** Column-major 4x4 helpers only lines uses; shared ones come from `@margoengine/math/mat4`. */
-export type Mat4 = ArrayLike<number>;
+import type { Mat4 } from '@margoengine/math';
+
+export type { Mat4 };
 
 export const identity = (): Float32Array => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 

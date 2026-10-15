@@ -1,4 +1,4 @@
-import type { Vec2 } from './math.js';
+import type { MutableVec2 } from './math.js';
 
 // Ear-clipping triangulation of a polygon with holes, after the approach popularized by Mapbox earcut: holes are
 // bridged into the outer ring, collinear and duplicate points are filtered, and failed passes fall back to curing
@@ -342,7 +342,7 @@ export function triangulate(data: ArrayLike<number>, holeIndices: ArrayLike<numb
 }
 
 /** Signed area of a 2D contour, positive when counter-clockwise (Three.js `ShapeUtils.area`). */
-export function shapeArea(contour: readonly Vec2[]): number {
+export function shapeArea(contour: readonly MutableVec2[]): number {
   let a = 0;
   for (let p = contour.length - 1, q = 0; q < contour.length; p = q++)
     a += contour[p][0] * contour[q][1] - contour[q][0] * contour[p][1];
@@ -350,9 +350,9 @@ export function shapeArea(contour: readonly Vec2[]): number {
 }
 
 /** Three.js `ShapeUtils.isClockWise`: negative signed area. */
-export const isClockWise = (points: readonly Vec2[]): boolean => shapeArea(points) < 0;
+export const isClockWise = (points: readonly MutableVec2[]): boolean => shapeArea(points) < 0;
 
-function withoutClosingDuplicate(points: readonly Vec2[]): Vec2[] {
+function withoutClosingDuplicate(points: readonly MutableVec2[]): MutableVec2[] {
   const out = points.slice();
   while (out.length > 2 && out[out.length - 1][0] === out[0][0] && out[out.length - 1][1] === out[0][1]) out.pop();
   return out;
@@ -362,7 +362,7 @@ function withoutClosingDuplicate(points: readonly Vec2[]): Vec2[] {
  * Removes consecutive points (including last-to-first) closer than 1e-10 relative to their magnitude, as Three.js
  * `ExtrudeGeometry` does. A full arc ends at (cos 2pi, sin 2pi), which is not exactly its start.
  */
-export function mergeOverlappingPoints(points: readonly Vec2[]): Vec2[] {
+export function mergeOverlappingPoints(points: readonly MutableVec2[]): MutableVec2[] {
   const out = points.slice();
   if (out.length < 2) return out;
   let prev = out[0];
@@ -388,9 +388,9 @@ export function mergeOverlappingPoints(points: readonly Vec2[]): Vec2[] {
  * on copies returned as `contour` and `holes`).
  */
 export function triangulateShape(
-  contour: readonly Vec2[],
-  holes: readonly (readonly Vec2[])[] = [],
-): { indices: number[]; contour: Vec2[]; holes: Vec2[][] } {
+  contour: readonly MutableVec2[],
+  holes: readonly (readonly MutableVec2[])[] = [],
+): { indices: number[]; contour: MutableVec2[]; holes: MutableVec2[][] } {
   const outer = withoutClosingDuplicate(contour),
     inner = holes.map(withoutClosingDuplicate).filter((h) => h.length >= 3);
   const data: number[] = [],

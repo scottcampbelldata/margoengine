@@ -1,4 +1,5 @@
-export { Lines, meshWorldMatrix } from './lines.js';
+export { Lines } from './lines.js';
+export { meshWorldMatrix } from '@margoengine/math/mesh';
 export type { LinesOptions } from './lines.js';
 export { Line, LineMaterial } from './line.js';
 export type { LineOptions, LineMaterialOptions } from './line.js';
@@ -23,6 +24,6 @@ export {
   segmentIndices,
   VERTICES_PER_SEGMENT,
 } from './geometry.js';
-export type { LineMode, LineJoin, LineCap, ExpandOptions, SegmentIndices } from './geometry.js';
+export type { LineMode, LineJoin, LineCap, ExpandLineOptions, SegmentIndices } from './geometry.js';
 export { parseColor } from './color.js';
 export type { ColorInput } from './color.js';

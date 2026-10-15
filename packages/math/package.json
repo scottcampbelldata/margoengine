@@ -85,6 +85,14 @@
     "./vec3": {
       "types": "./dist/vec3.d.ts",
       "import": "./dist/vec3.js"
+    },
+    "./errors": {
+      "types": "./dist/errors.d.ts",
+      "import": "./dist/errors.js"
+    },
+    "./mesh": {
+      "types": "./dist/mesh.d.ts",
+      "import": "./dist/mesh.js"
     }
   },
   "files": [
