@@ -49,6 +49,10 @@ test('AgX matrices are the Rec.709/Rec.2020 conversions and the AgX inset/outset
   assert.ok(Math.abs(Math.log2(0.18) - 10 + 12.47393) < 1e-5);
 });
 
+test('AgX shader parentheses balance (WGSL rejects the whole module otherwise)', () => {
+  assert.equal(agxShader.split('(').length, agxShader.split(')').length);
+});
+
 test('AgX maps black to black, keeps greys neutral and rises monotonically to white', () => {
   const apply = (m, v) => m.map(row => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]);
   const agx = v => {
