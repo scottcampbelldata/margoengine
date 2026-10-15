@@ -791,6 +791,16 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    k. Sweep the remaining PARTIAL parity rows that need no core change.
    (Plus already queued: SSR, volumetrics, progressive loading, OIT, P3, tier presets 5i.b.)
    Order: after the current wave, alongside the hygiene phase (5k) and under its gates, before the demo rebuild.
+5m. CORE APPROVALS, conditional (Scott, 2026-10-14 night): do both IF core+stage stays under 20,000 B gzip
+   (`npm run measure:size`; the build gate fails at >= 20,000). Start after back-face culling B merges (~19,789).
+   a. Raise the 100,000-entity cap (Rust/Wasm kernel + JS side) so streaming can reach 1M parts: measure memory per
+      entity (the kernel uses ~66 B/slot + JS ~5 B/slot) and bytes; prefer growth on demand over a bigger fixed
+      allocation; keep the dirty-skip fast path; tests at 1M entities in Node.
+   b. A core hook letting a package's GPU culling drive regular core meshes (5l.b) - ONLY if the culling package can't
+      do it alone; first try package-side. Smallest hook that works; measure bytes.
+   If a+b together would cross 20,000, do (a) first, report the remaining budget and the hook's exact cost to Scott,
+   and fall back to package-side streaming (CulledInstances) for whatever doesn't fit. Report the final core+stage
+   total and remaining headroom.
 6. Then give Scott the full list of what was done and what remains.
 
 Worker practice: agents run in git worktrees; they must start with `git reset --hard perf/auto-quality` (worktrees
