@@ -160,7 +160,7 @@ export function capturePBR(code:string,declarations:string):string {
   if(code.split(head).length!==2)throw new Error('PBR capture hook point missing or used twice');
   // Clearcoat and sheen scale the base layer (ambient included) affinely: k = layers(1) - layers(0).
   const k=code.includes('fn layers(')?'layers(s,v,normalize(f.light.xyz),vec3f(1))-layers(s,v,normalize(f.light.xyz),vec3f(0))':'vec3f(1)';
-  out=declarations+code.replace(head,'fn margoShade(i:Out,front:bool)->vec4f {')+`\n@fragment fn capture(i:Out,@builtin(front_facing) front:bool)->MargoCapture {if(false){_=margoShade(i,front);}let s=surface(i,front);let v=normalize(f.eye.xyz-i.position);return margoCapture(s,v,${k});}\n`;
+  out=declarations+code.replace(head,'fn margoShade(i:Out,front:bool)->vec4f {')+`\n@fragment fn capture(i:Out,@builtin(front_facing) front:bool)->MargoCapture {if(false){_=margoShade(i,front);}let s=surface(i,front);let v=normalize(f.eye.xyz-i.position);${declarations.includes('var<private> margoPosition:')?'margoPosition=i.position;':''}return margoCapture(s,v,${k});}\n`;
   if(!cache){if(captured.size>=8)captured.clear();captured.set(declarations,cache=new Map());}if(cache.size>=64)cache.clear();cache.set(code,out);return out;
 }
 // Material map slots 5-12, in PBRModel order. Sheen and specular colors are sRGB.

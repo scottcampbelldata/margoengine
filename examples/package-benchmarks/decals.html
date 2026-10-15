@@ -1,0 +1,59 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Decals GPU check</title><style>body{margin:0}#host{width:1280px;height:720px}</style></head><body><div id="host"></div>
+<script type="module">
+// Driven by decals-gpu.mjs. A grey core-mesh floor (top at y = 0) and a white 1 m cube on it (x, z in -0.5..0.5), lit by the
+// sun and ambient, Tonemap 'neutral' as the post capture (scene depth). ?msaa=1 runs the single-sampled scene path.
+// Atlas: 8 x 8 rgba8, quadrants red | green over blue | white.
+if(new URLSearchParams(location.search).get('msaa')==='1')globalThis.margoLow=1;
+import('/packages/margoengine/dist/index.js').then(async({createStage})=>{
+const {box,PbrMaterial}=await import('/packages/core/dist/index.js');
+const {engineRuntime}=await import('/packages/core/dist/extension.js');
+const {invertMatrixStable}=await import('/packages/math/dist/mat4.js');
+const {Tonemap}=await import('/packages/tonemap/dist/index.js');
+const {Stats}=await import('/packages/stats/dist/index.js');
+const {Decals}=await import('/packages/post/dist/decals.js');
+const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,features:['timestamp-query'],camera:{position:[0,3.2,4],target:[0,0,0]}});
+const engine=stage.engine,device=engine.gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const lighting=engineRuntime(engine).lighting;lighting.direction.set([0.3,1,0.5,1]);lighting.radiance.set([0.9,0.9,0.9,0.25]);
+Tonemap.attach(engine,{curve:'neutral'});
+const floor=engine.createMesh().setGeometry(box(40,0.2,40));floor.setMaterial(new PbrMaterial({color:[0.5,0.5,0.5],roughness:1,metalness:0}));floor.position.set(0,-0.1,0);
+const cube=engine.createMesh().setGeometry(box(1,1,1));cube.setMaterial(new PbrMaterial({color:[0.9,0.9,0.9],roughness:1,metalness:0}));cube.position.set(0,0.5,0);
+const atlas=device.createTexture({size:[8,8],format:'rgba8unorm',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST}),texels=new Uint8Array(8*8*4);
+for(let y=0;y<8;y++)for(let x=0;x<8;x++)texels.set([[255,0,0,255],[0,255,0,255],[0,0,255,255],[255,255,255,255]][(y>>2)*2+(x>>2)],(y*8+x)*4);
+device.queue.writeTexture({texture:atlas},texels,{bytesPerRow:32},[8,8]);
+let decals=null;
+const frame=async()=>{engine.render();await device.queue.onSubmittedWorkDone();};
+const inverse=new Float32Array(16),workspace=new Float64Array(52);
+const transform=(m,v)=>[0,1,2,3].map(r=>m[r]*v[0]+m[4+r]*v[1]+m[8+r]*v[2]+m[12+r]*v[3]);
+window.check={
+  samples:()=>globalThis.margoLow?1:4,
+  // list: Decal[] (attached), [] (attached, empty) or null (not attached). camera: optional [position, target].
+  async render({list,camera}){
+    device.pushErrorScope('validation');
+    if(camera){engine.camera.position=camera[0];engine.camera.target=camera[1];}
+    if(list===null&&decals){decals.dispose();decals=null;}
+    if(list!==null){decals??=Decals.attach(engine,{atlas});decals.setDecals(list);}
+    for(let i=0;i<3;i++)await frame();const e=await device.popErrorScope();return {error:e?.message??null,errors:errors.splice(0),eye:[...engine.camera.position]};
+  },
+  rays(pixels){
+    const c=engine.canvas;invertMatrixStable(engine.camera.matrix,inverse,workspace);
+    return pixels.map(([x,y])=>{const ndc=[(x+0.5)/c.clientWidth*2-1,1-(y+0.5)/c.clientHeight*2];
+      const [a,b]=[0.9,0.1].map(z=>{const p=transform(inverse,[...ndc,z,1]);return p.slice(0,3).map(v=>v/p[3]);});
+      const d=b.map((v,i)=>v-a[i]),l=Math.hypot(...d);return d.map(v=>v/l);});
+  },
+  // GPU pass time and frame time with `count` decals of `size` m on the floor in front of the camera (null: not attached).
+  async bench({count,size=1,width=1280,height=720}){
+    const host=document.querySelector('#host');host.style.width=width+'px';host.style.height=height+'px';engine.canvas.width=width;engine.canvas.height=height;
+    engine.camera.position=[0,3.2,4];engine.camera.target=[0,0,0];
+    if(count===null&&decals){decals.dispose();decals=null;}
+    if(count!==null){decals??=Decals.attach(engine,{atlas});decals.setDecals(Array.from({length:count},(_,i)=>({position:[((i*7)%9-4)*0.8,0,((i*5)%7-3)*0.8],direction:[0,-1,0],width:size,height:size,depth:1,rect:[0,0,1,1]})));}
+    const stats=window.stats??=Stats.attach(engine,{profiling:true});for(let i=0;i<20;i++)await frame();
+    const gpu=[],frames=[];
+    for(let i=0;i<600;i++){const t=performance.now();engine.render();await device.queue.onSubmittedWorkDone();frames.push(performance.now()-t);
+      if(i%15===14){await new Promise(r=>setTimeout(r,5));let sum=0;const ms=stats.gpuPassMilliseconds;for(let k=0;k<stats.gpuPassCount;k++)sum+=ms[k];if(stats.gpuPassCount)gpu.push(sum);}}
+    const med=a=>{const b=[...a].sort((x,y)=>x-y);return +b[b.length>>1].toFixed(3);};
+    return {count,size,width,height,gpuMs:gpu.length?med(gpu):null,gpuSamples:gpu.length,frameMs:med(frames),errors:errors.splice(0)};
+  },
+};
+window.ready=true;
+});
+</script></body></html>

@@ -20,7 +20,8 @@ export interface LightingTarget {addLighting(effect: {pbr(group: number): PBRHoo
 /** First binding of the IBL resources (five) and the fog uniform, in core's group 0 and glTF-pro's group 2. */
 export const IBL_BINDING = 20, FOG_BINDING = 25;
 
-abstract class ShaderEffect {
+/** Base of the shader-patching scene effects (EnvironmentLighting, Fog, LightProbes): core patch at order -1 plus `add(model)`. */
+export abstract class ShaderEffect {
   readonly name: string;
   disposed = false;
   protected engine?: EngineKernel;
