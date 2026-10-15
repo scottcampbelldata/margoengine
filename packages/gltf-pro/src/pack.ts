@@ -50,3 +50,16 @@ function pack(asset:GLTFAsset, p:any):PreparedGeometry {
   }
   return {vertices,indices};
 }
+/** Decode the accessors read besides packed geometry (skins, morph targets, animation samplers, GPU instancing); failures are left for the reader. */
+export function decodeExtras(asset: GLTFAsset): [number, Float32Array][] {
+  const doc = asset.doc, ids: unknown[] = [];
+  for (const skin of doc.skins ?? []) ids.push(skin?.inverseBindMatrices);
+  for (const mesh of doc.meshes ?? []) for (const p of mesh?.primitives ?? []) {ids.push(p?.attributes?.JOINTS_0, p?.attributes?.WEIGHTS_0); for (const t of p?.targets ?? []) ids.push(t?.POSITION, t?.NORMAL);}
+  for (const animation of doc.animations ?? []) for (const s of animation?.samplers ?? []) ids.push(s?.input, s?.output);
+  for (const node of doc.nodes ?? []) ids.push(...Object.values(node?.extensions?.EXT_mesh_gpu_instancing?.attributes ?? {}));
+  const out: [number, Float32Array][] = [];
+  for (const id of ids) if (id !== undefined) try {out.push([id as number, asset.accessor(id)]);} catch {}
+  return out;
+}
+/** Primitive definitions mesh by mesh: @margoengine/gltf-pro/progressive and its worker key primitives by this list. */
+export const primitiveDefs = (doc: GLTFAsset['doc']): any[] => (doc.meshes ?? []).flatMap((m: any) => Array.isArray(m?.primitives) ? m.primitives : []);

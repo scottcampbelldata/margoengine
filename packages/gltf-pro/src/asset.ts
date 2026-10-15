@@ -51,13 +51,13 @@ export function container(input: string | object | ArrayBuffer | ArrayBufferView
   if (!doc) throw new TypeError('Missing GLB JSON');
   return {doc, binary};
 }
-function embedded(uri: string): Uint8Array {
+export function embedded(uri: string): Uint8Array {
   const match = /^data:[^;,]+;base64,([A-Za-z0-9+/]*={0,2})$/.exec(uri);
   if (!match || match[1].length > assetLimit * 4 / 3 + 4) throw new TypeError('Invalid glTF data URI');
   return Uint8Array.from(atob(match[1]), c => c.charCodeAt(0));
 }
-const componentSizes: Record<number, number> = {5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4};
-const components: Record<string, number> = {SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16};
+export const componentSizes: Record<number, number> = {5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4};
+export const components: Record<string, number> = {SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16};
 const normalizers: Record<number, number> = {5120: 127, 5121: 255, 5122: 32767, 5123: 65535};
 function component(view: DataView, at: number, type: number): number {
   switch (type) {
