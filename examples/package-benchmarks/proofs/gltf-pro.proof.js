@@ -14,7 +14,10 @@ function agree(name, run) {
   if ('value' in expected) {
     assert.ok('value' in actual, `${name}: ${actual.message}`); assert.equal(actual.value.length, expected.value.length, name);
     expected.value.forEach((view, i) => {assert.equal(actual.value[i].constructor, view.constructor, name); assert.ok(bytesOf(actual.value[i]).equals(bytesOf(view)), `${name}: array ${i} differs`);});
-  } else assert.deepEqual(actual, expected, name);
+  } else {
+    // Since 5l.p errors also name mesh, primitive, attribute and accessor: same class, and the baseline's text still in it.
+    assert.equal(actual.type, expected.type, name); assert.ok(actual.message?.includes(expected.message), `${name}: ${actual.message} lacks ${expected.message}`);
+  }
   if (process.env.PROOF_VERBOSE) console.error(name, '->', expected.message ?? 'ok'); // lists what each edge case exercised
   return expected;
 }

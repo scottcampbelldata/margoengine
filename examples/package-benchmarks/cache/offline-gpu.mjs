@@ -1,7 +1,7 @@
 // Real-browser check of @margoengine/cache (AC power, after npm run build:packages, under the GPU lock):
 //   node scripts/gpu-lock.mjs run --owner=<agent id> -- node examples/package-benchmarks/cache/offline-gpu.mjs [--reps=3] [--quiet-timeout=900]
-// For DamagedHelmet (3.6 MB) and a generated 6 x 160k-vertex GLB (about 48 MB; the 62 MB conveyor GLB is not loadable by
-// gltf-pro, "Unsupported glTF accessor", with or without the cache): loadGLTF with plain fetch (baseline), through an empty cache
+// For DamagedHelmet (3.6 MB) and a generated 6 x 160k-vertex GLB (about 48 MB; picked when the 62 MB conveyor GLB was not
+// loadable by gltf-pro, fixed in HANDOFF 5l.p): loadGLTF with plain fetch (baseline), through an empty cache
 // (cold: download + store) and through a filled cache in a new AssetCache (warm: one conditional request, 304, bytes from
 // IndexedDB), on localhost and on a throttled "factory Wi-Fi" profile (CDP: 20 Mbit/s, 80 ms). Then DevTools offline
 // (context.setOffline): the model loads from the cache with the same geometry digest and the same rendered frame, and a
