@@ -91,6 +91,6 @@ origin.onRebase(() => { section.options.planes = [origin.toLocalPlane(worldPlane
   kilometres from their root are float32 when loaded: re-centre such assets (or load each far part as its own root).
   `dispose()` leaves the scene in local coordinates.
 
-MIT. Optional, tree-shakable package, about 1.7 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); `/origin` is a separate entry of about 1.4 kB; core peer: ^0.1.0 || ^1.0.0.
+MIT. Optional, tree-shakable package, about 1.7 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); `/origin` is a separate entry of about 1.3 kB; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/cameras

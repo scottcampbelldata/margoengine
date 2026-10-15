@@ -694,11 +694,31 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
 5e. Diagnose why Margo's GPU time on static boxes is not lower than three.js InstancedMesh (vs-threejs smoke run);
    findings in docs/whitepaper/boxes-vs-threejs.md [running].
 5f. Gaps from Scott's architecture review (2026-10-14 late):
-   a. Large coordinates (BIM/GIS/plant layouts jitter at mm zoom; core + kernel are float32). Plan: first a
-      zero-core-byte floating-origin plugin (authoritative positions in float64 on the CPU, roots re-written relative to
-      a moving origin near the camera, rebase when the camera drifts past a threshold; one full transform update per
-      rebase). Measure jitter (px) at 1 km / 100 km / 6,000 km from origin, before/after. Only if the plugin can't fix
-      it (e.g. per-vertex precision inside one huge mesh), write up core camera-relative rendering with bytes for Scott.
+   a. [DONE, 0 core bytes, no core change needed; details docs/large-coordinates.md] Large coordinates (BIM/GIS/plant
+      layouts jitter at mm zoom; core + kernel are float32). `FloatingOrigin` in `@margoengine/cameras/origin` (1,258 B
+      min+gzip): `place(rootMesh | model.root, float64World)`, `lookAt(pos, target)` in float64, `toWorld`/`toLocal`/
+      `toLocalPlane`, `worldPosition`, `rebase(point?)`, `onRebase(listener)`, option `ratio` (default 1000: rebase when
+      the camera is farther from the origin than ratio x its distance to the target; the origin moves to the camera,
+      camera + roots + a running fitToBoundingBox shift together). Precision is lost (CPU emulation of core's path,
+      10 mm flange 50 mm from the camera) in the kernel world matrices (float32 translations; child bolts snap to the
+      grid), the float32 view-projection matrix (the main jitter source; at 6,000 km vertices fall behind the eye), the
+      vertex shader's world position, and `frame.eye` (specular off by 2.8° at 100 km, 72° at 6,000 km); clip arithmetic
+      is negligible. Real GPU (Arc 140V, Edge 155; core meshes and a gltf-pro model give the same numbers): core alone
+      jitter 0.38 px at 1 km, 42 px at 100 km, flange not drawn at 6,000 km; with the plugin 0.019 px jitter and 1 px
+      of edge coverage at every distance, engine.pick / selection Picking hit the part at every distance (core alone:
+      nothing at 6,000 km). Worst case before a rebase (CPU): 0.05 px jitter, independent of distance. Rebase cost
+      (Node, real kernel, fake GPU, quiet machine): 10k roots 0.8 ms call + 1.5 ms frame (static 0.35), 50k 4.3 + 7.1 ms
+      (static 1.6); moving all 50k through mesh.position costs 11 ms. Real GPU (frame = render + onSubmittedWorkDone; quiet gate passed before the lock wait, so semi-diagnostic): 10k static 4.7 ms, rebase 0.6 + 6.1 ms; 50k static 5.4, rebase 4.4 + 11 ms, i.e. one ~10 ms hitch per rebase at 50k. Works with core meshes, children,
+      gltf-pro models, CADCameraControls/OrbitControls, engine.pick, bvh hits (toWorld within 1 µm at 6,000 km), machinery
+      measurement (7 mm bolt spacing at 6,000 km: 7.0000002 mm; core alone 0), section planes via toLocalPlane, parts moved
+      through mesh.position (read back). Limits: km-scale vertices or child translations inside one asset (float32 at
+      load; re-centre at load, a loader option could do it), state other code keeps in local coordinates (OrbitControls
+      saveState, an ortho CameraProjection.fit in flight, saved views: shift in onRebase). Core relative-to-eye
+      rendering would not fix the kernel's float32 positions without float64 kernel columns and eye-relative
+      store.matrices (breaks every package reading world matrices); not measured since nothing is left that only core
+      fixes. Fragile point: the plugin finds core Camera's private fit animation by its `fromTarget` key (unit-tested).
+      Tests: `packages/cameras/test/origin.test.js`; measurements `examples/package-benchmarks/large-coordinates.mjs`
+      (CPU, `--cost`) and `large-coordinates-gpu.mjs` (GPU, `--cost`).
    b. Order-independent transparency: weighted blended OIT as an optional package (accumulation + revealage targets,
       composite pass) for gltf-pro BLEND and materials transparent meshes; test a 50% housing over nested gears
       (no popping while orbiting), measure cost; core meshes stay opaque.
