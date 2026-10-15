@@ -1,7 +1,10 @@
 # Claims inventory
 
 Every claim the public docs make or imply, with its evidence and a status. Audited at `f4c6196` (perf/auto-quality,
-2026-10-14). Commands: [reproduce.md](reproduce.md). Outline: [outline.md](outline.md).
+2026-10-14); core-size and CAD rows updated for `0ed56b9` (core speed-ups merged, quiet-machine CAD results).
+
+The exporter rows (PKG-094, PKG-095) were added for `3e1433a`. Not yet audited: `590278e` (point and spot shadows,
+`@margoengine/clustered/shadows`) and anything after it. Re-run the audit on the release commit. Commands: [reproduce.md](reproduce.md). Outline: [outline.md](outline.md).
 
 Status:
 
@@ -31,15 +34,18 @@ Another worker is merging them now. Every core-path CAD number goes stale when t
 
 | Source | PROVEN | STALE | UNPROVEN | OVERCLAIM | Total |
 | --- | --- | --- | --- | --- | --- |
-| Root README (R) | 5 | 2 | 1 | 2 | 10 |
+| Root README (R) | 4 | 3 | 1 | 2 | 10 |
 | Website (S) | 5 | 2 | 1 | 3 | 11 |
-| HANDOFF (H) | 14 | 4 | 6 | 0 | 24 |
-| Engine docs (DOC) | 22 | 10 | 23 | 3 | 58 |
-| Package READMEs (PKG) | 36 | 13 | 27 | 16 | 92 |
-| **All** | **82** | **31** | **58** | **24** | **195** |
+| HANDOFF (H) | 14 | 5 | 5 | 0 | 24 |
+| Engine docs (DOC) | 16 | 19 | 24 | 2 | 61 |
+| Package READMEs (PKG) | 38 | 14 | 27 | 16 | 95 |
+| **All** | **77** | **43** | **58** | **23** | **201** |
 
-Some H rows repeat DOC rows (the CAD numbers), so 195 overcounts the distinct claims slightly. A PROVEN row whose code
-is about to change (the core speed-ups) is marked "stale once ..." in its note, not counted as STALE yet.
+Counted from the status column of the tables below.
+
+- Some H rows repeat DOC rows (the CAD numbers), so 199 overcounts the distinct claims slightly.
+- The core speed-ups merged at 0ed56b9, so every pre-merge core CAD number (DOC-022 to DOC-028, H-10) is now STALE.
+- Those rows are superseded by the quiet-machine before/after table (DOC-059), the first publication-grade real-GPU result in the repo.
 
 ### Worst items for a Hacker News reader
 
@@ -53,9 +59,9 @@ is about to change (the core speed-ups) is marked "stale once ..." in its note, 
 4. **The three.js size comparison has no committed output** (DOC-004, H-01). It says 138 vs 139 kB in two places, and the Margo figure is WebGPU only while three's WebGLRenderer figure includes WebGL.
 5. **CAD scale.**
    - Core caps at 100,000 entities, so "100k parts" is impossible (DOC-021).
-   - The core path runs 45 FPS at 50k and 25 FPS at 90k on one iGPU.
+   - The quiet-machine table after the merged core steps (DOC-059) shows 50k parts orbiting at 92 FPS, but 90k orbiting is unchanged at 33 FPS (GPU-bound). This is on one integrated GPU.
    - The culling package's 52-98 FPS drops picking, hierarchy, edges, caps and shadows (H-12).
-   - Every core-path number goes stale when the core speed-ups merge.
+   - The older pre-merge numbers (45 FPS at 50k, 25 FPS at 90k) are still printed at the top of cad-performance.md, from a busier session. Readers will see two different sets of numbers for the same scene.
 6. **Quality-tier promises** (PKG-066, DOC-019): "Slow PCs never show a slow phase", "holds about 60 FPS". These are absolute claims with no measurement, and a known 3-5 FPS Android case exists.
 7. **"Replaces X" parity lines contradicted by the package's own Limits**: troika text (PKG-079), EXRLoader (PKG-025), Havok/react-three-rapier (PKG-060), Raycaster (PKG-010). The "84 of 156 covered" tally is accurate but mostly API-only (DOC-053).
 8. **Mock-GPU CPU numbers presented without the word "mock"** (PKG-055). The materials instancing README numbers (36 → 0.4 ms) disagree with the HEAD run (55 → 0.7 ms) (PKG-056).
@@ -70,7 +76,8 @@ is about to change (the core speed-ups) is marked "stale once ..." in its note, 
 ### Fastest fixes (docs only, no new measurements)
 
 - Replace "both backends" on the site and in MODERN-ENGINE.md with "WebGPU backend; WebGL2 via `@margoengine/webgl`".
-- Use 18,681 B everywhere, until the core speed-ups land.
+- Use 19,543 B (core speed-ups merged) everywhere: README, from-threejs.md, MODERN-ENGINE.md, benchmarks/.
+- In cad-performance.md, mark the top tables "before the merged core steps".
 - Label the install lines "after publication".
 - Use 71 packages everywhere.
 - Delete or mark "historical, raw data local" every DOC-039 to DOC-051 number.
@@ -101,7 +108,7 @@ New in this task: `examples/package-benchmarks/vs-threejs/` (`npm run bench:thre
 
 | ID | Claim (exact, trimmed) | Location | Evidence | One command? | Status | Corrected wording / note |
 | --- | --- | --- | --- | --- | --- | --- |
-| R-01 | "Core plus the stage facade measures **18,681 bytes gzip**, including embedded Wasm and the WebGPU backend" | README.md:108 | `scripts/measure-size.js`. 18,681 is recorded in `results/textured-instancing.json` (`coreStageGzip`, f4c6196) and in HANDOFF. | `npm run build:packages && npm run measure:size` | PROVEN | Changes when the core speed-ups land (target under 19,600). Re-quote then. |
+| R-01 | "Core plus the stage facade measures **18,681 bytes gzip**, including embedded Wasm and the WebGPU backend" | README.md:108 | `scripts/measure-size.js`: **19,543** at 0ed56b9 after the merged core steps (docs/cad-performance.md table). | `npm run build:packages && npm run measure:size` | STALE | "19,543 bytes gzip" (or "under 20 kB"). Same fix in docs/from-threejs.md (DOC-003). |
 | R-02 | "every push and pull request runs a CI build that rejects a combined size of 20,000 bytes gzip or above" | README.md:108 | `scripts/core-budget.js` (`CORE_STAGE_GZIP_LIMIT = 20_000`), run by `build:packages`. `.github/workflows` runs it. HANDOFF: Actions minutes are spent until next month, so CI is not running now. | `npm run build:packages` | OVERCLAIM | "The build fails at 20,000 bytes gzip or above (locally and in CI)." The mechanism is proven; "every push" is not true this month. |
 | R-03 | "The build also retains the 30 KiB combined core/static-glTF budget and 30 KiB raw Wasm budget" | README.md:108 | `scripts/build-modern.js:24,79` | `npm run build:packages` | PROVEN | – |
 | R-04 | "The release contains 61 packages" | README.md:79,145 | 71 `packages/*/package.json` files, all in the root workspaces. `docs/catalog.json` says 71. | `ls packages/*/package.json` | STALE | "71 packages". |
@@ -116,7 +123,7 @@ New in this task: `examples/package-benchmarks/vs-threejs/` (`npm run bench:thre
 
 | ID | Claim (exact, trimmed) | Location | Evidence | One command? | Status | Corrected wording / note |
 | --- | --- | --- | --- | --- | --- | --- |
-| S-01 | "A 3D engine for the web that starts under 20 KB." | site/index.html (hero) | As R-01: 18,681 B gzip. | `npm run measure:size` | PROVEN | "KB" is gzip of core + stage, WebGPU only. Say "under 20 kB gzip". |
+| S-01 | "A 3D engine for the web that starts under 20 KB." | site/index.html (hero) | As R-01: 19,543 B gzip at 0ed56b9. | `npm run measure:size` | PROVEN | "KB" is gzip of core + stage, WebGPU only. Say "under 20 kB gzip". |
 | S-02 | "Under 20 KB gzip: Core plus the stage facade, embedded Wasm and both backends included." | site/index.html (features) | The WebGL2 backend moved to `@margoengine/webgl` in 1356787. The 18,681 B figure is WebGPU only. The webgl dist file is 2,283 B gzip (level 9, unminified dist). | `npm run measure:size` | OVERCLAIM | "Under 20 kB gzip: core plus the stage facade with the embedded Wasm kernel and the WebGPU backend. The WebGL2 fallback is the optional `@margoengine/webgl` (about 2.3 kB gzip)." |
 | S-03 | "CI rejects any build at 20,000 bytes gzip or above." | site/index.html | As R-02. | `npm run build:packages` | OVERCLAIM | "The build rejects..." (CI is paused this month). |
 | S-04 | "An engine holds 1,024 entities by default, configurable up to 100,000." | site/index.html | `packages/core/src/kernel.ts` capacity cap. | unit tests | PROVEN | – |
@@ -143,8 +150,8 @@ Only HANDOFF items likely to reach the pitch are listed. The CAD rows overlap DO
 | H-07 | Post stack per effect: "SSAO 2.34 ms, DOF 4.49, Bloom 0.28 ... post total 7.7 ms" | HANDOFF:122-128 | `results/gates-post-stack.json` | `node examples/package-benchmarks/gates/post-stack.mjs` | STALE | DOF became 2-5x cheaper after this run. Re-run for the whitepaper. |
 | H-08 | "20 cycles of load -> render -> unload ... zero growth in count or bytes" | HANDOFF:167-172 | `results/gates-memory.json` | `node examples/package-benchmarks/gates/memory.mjs` | PROVEN | – |
 | H-09 | VFX 1M "simulate+draw: 5.00 -> 2.46 ms (1x)"; island "56.7 -> 60 FPS" | HANDOFF:181-204 | `results/vfx-gpu-*.json`, `results/vfx-island-final.json` | `vfx-gpu.mjs` / `vfx-island.mjs` (need a baseline build) | PROVEN | Not one command (a baseline dist snapshot is needed). One integrated GPU. |
-| H-10 | "at 50k parts the frame is 20.9 ms CPU (45 FPS), at 90k 39.1 ms (25 FPS)" | HANDOFF:293-294 | `cad/results-after-*.json` | `cad/run.mjs` | PROVEN | STALE once the core speed-ups land. |
-| H-11 | Prototype: "90k tick 16.5 -> 4.4 ms", "50k 1% moving: 45 -> 103 FPS", "dispose 90k 48 s -> 20 ms" | HANDOFF:300-305 | The raw JSON is on another branch (`worktree-agent-a46261c57b837ecd0`). | not on this branch | UNPROVEN | Becomes provable when the speed-ups merge with their JSON. |
+| H-10 | "at 50k parts the frame is 20.9 ms CPU (45 FPS), at 90k 39.1 ms (25 FPS)" | HANDOFF:293-294 | Pre-merge session. | `cad/run.mjs` | STALE | Superseded by DOC-059 (quiet machine): 50k orbit 49 → 92 FPS, 90k orbit 34 → 33 FPS. |
+| H-11 | Prototype: "90k tick 16.5 -> 4.4 ms", "50k 1% moving: 45 -> 103 FPS", "dispose 90k 48 s -> 20 ms" | HANDOFF; docs/cad-performance.md prototype table | `cad/results-s0..s5-{orbit,still,move}.json` now committed (AC, GPU lock; not the quiet session) | `node examples/package-benchmarks/cad/summary.mjs s0 s1 s2 s3 s4 s5` | PROVEN | Prototype numbers (step 4 not merged). For the paper quote the quiet-machine merged table (DOC-059). |
 | H-12 | Culling "90k parts: CPU 23.4 -> 0.4-0.6 ms per frame; FPS orbit 36 -> 52 ... grazing 48 -> 98" | HANDOFF:307-315 | `cad/results-culling.json` (Arc, AC; 0 differing pixels) | `node examples/package-benchmarks/cad/culling.mjs --check` | PROVEN | Always state the limits: culled parts get no `engine.pick`, hierarchy, ExplodedView, edges, caps or shadows. The "core" column goes stale with the speed-ups. |
 | H-13 | "full-screen DamagedHelmet 0.852 -> 0.524 ms GPU" | HANDOFF:282-283 | `results/pipeline-toggles.json` | `node examples/package-benchmarks/pipeline-toggles/toggle.mjs override` | PROVEN | – |
 | H-14 | "adding the plugin when wanted spikes the frame +178 ms (sections) / +121 ms (fog)" | HANDOFF:233-236 | `results/pipeline-toggles.json` | `toggle.mjs stall` | PROVEN | – |
@@ -164,21 +171,21 @@ Only HANDOFF items likely to reach the pitch are listed. The CAD rows overlap DO
 Facts used below:
 
 - 71 `packages/*/package.json` files, all in the root workspaces.
-- Core + stage is 18,681 B gzip.
+- Core + stage is 18,681 B gzip at f4c6196 and 19,543 B at 0ed56b9 (core speed-ups merged).
 - The embedded Wasm (decoded from `packages/core/src/wasm.ts`) is 12,009 B raw and 5,053 B gzip, SHA-256 `5140c355…`, built with `-Oz` + raw deflate.
 
 | ID | Claim (exact, trimmed) | Location | Evidence | One command? | Status | Corrected wording / note |
 | --- | --- | --- | --- | --- | --- | --- |
 | DOC-001 | "npm install @margoengine/core@0.1.0" (and the five-package install line) | packages/core/README.md:12; MODERN-ENGINE.md:24 | `docs/catalog.json`: `published:false` for all 71. MODERN-ENGINE.md:21 says "until the renamed packages are published". | – | OVERCLAIM | "Not on npm yet. Build from source: `npm ci && npm run build:packages`." |
 | DOC-002 | "The five libraries were published publicly as version `0.1.0` on 11 October 2026" | benchmarks/README.md:15 | Nothing committed. These were the pre-rename names. | no | UNPROVEN | "Pre-rename packages were published 2026-10-11; `@margoengine/*` is not yet published." |
-| DOC-003 | "under 20 kB gzip (18,681 bytes today" | docs/from-threejs.md:41 | `scripts/measure-size.js` + `scripts/core-budget.js`. `coreStageGzip: 18681` in `results/textured-instancing.json` (f4c6196). | `npm run measure:size` | PROVEN | Changes with the core speed-ups (about +834 B, about 19.5k). |
+| DOC-003 | "under 20 kB gzip (18,681 bytes today" | docs/from-threejs.md:41 | `measure:size` is 19,543 at 0ed56b9 | `npm run measure:size` | STALE | "19,543 bytes today". |
 | DOC-004 | "three.js is about 138 kB for WebGL and 229 kB for WebGPU" | docs/from-threejs.md:42 | `scripts/compare-threejs-size.js` prints to the console only. HANDOFF says 139 kB. | `npm run measure:threejs` | UNPROVEN | Commit the output. The Margo figure is WebGPU only. 138 vs 139 kB mismatch. |
 | DOC-005 | "strictly below 20,000 bytes gzip" | packages/margoengine/README.md:9 | `core-budget.js`, run by build:packages. | `npm run measure:size` | PROVEN | – |
 | DOC-006 | "Rust Wasm kernel… 12,046 \| 5,064"; "Core, including embedded Wasm and both backends \| 53,073 \| 19,874" | MODERN-ENGINE.md:249-250 | WebGL left core at 1356787. Now 12,009 / 5,053 and 18,681. | `npm run measure:size` | STALE | "Core + stage (WebGPU only) 18,681 B gzip; kernel 12,009 B raw." |
 | DOC-007 | "glTF… 4,993", "Machinery… 14,527", "Creative… 9,563", "Core plus glTF sums to 24,867", "Vite starter… 90.2 KiB", "606 gzip bytes of headroom" | MODERN-ENGINE.md:251-257 | An Oct 11 measurement, test-results only. Contradicts cad-performance.md:147 (machinery root 33,849). | not committed | UNPROVEN | Regenerate with `proofs/size.js` and commit. |
 | DOC-008 | "`wasm-opt -O3`… reproduced both raw and optimized Wasm byte-for-byte" | MODERN-ENGINE.md:59,259 | The build is now `-Oz` + raw deflate (c82e119). | no | STALE | Describe `-Oz` and give the current SHA. |
 | DOC-009 | "0.169 ms median versus 0.052 ms… 21,110 gzip bytes" | MODERN-ENGINE.md:261 | Nothing committed. Superseded by `-Oz`. | no | UNPROVEN | Remove. |
-| DOC-010 | "locked core measures 19,874 bytes gzip… 12,046 bytes raw, SHA-256 c9fade…" | benchmarks/README.md:11 | Now 18,681 / 12,009 / `5140c355…`. | `npm run measure:size` | STALE | Update, or label historical. |
+| DOC-010 | "locked core measures 19,874 bytes gzip… 12,046 bytes raw, SHA-256 c9fade…" | benchmarks/README.md:11 | 18,681 / 12,009 / `5140c355…` at f4c6196; core + stage 19,543 and a rebuilt kernel (step 1) at 0ed56b9: re-measure the Wasm size and SHA. | `npm run measure:size` | STALE | Update, or label historical. |
 | DOC-011 | "Core + stage gzip is 20,053 bytes, below the 20,480-byte ceiling" (and "20,480-byte… gate") | MODULE-AUDIT.md:81-83; MODERN-ENGINE.md:285; benchmarks/stress-results.md:20; stress-testing.md:3 | The gate is 20,000. 20,053 would fail it today. | `npm run measure:size` | STALE | 18,681 and a 20,000 gate. |
 | DOC-012 | "19,988", "19,997", "19,999… / 47,983 raw", "19,975 bytes" | desktop-frame-rate.md:63,129,159,172; demo-loading.md:11 | Historical builds. | – | STALE | Mark as historical or delete. |
 | DOC-013 | "`machinery/edges` 4,299 B… spatial 14,937… root 33,849"; culling "7,015 B min+gzip" | cad-performance.md:144-148,197 | Measured at c9d6d61 / 037d098, test-results only. Machinery changed since (803aa19). | not committed | UNPROVEN | Commit `proofs/results/sizes.json` from the release commit. |
@@ -190,15 +197,15 @@ Facts used below:
 | DOC-019 | "the light tier holds about 60 FPS instead of swinging on 120 Hz panels" | docs/from-threejs.md:821 | `paceEngine` is a cap. HANDOFF: 53-61 FPS measured. | no | OVERCLAIM | "caps the light tier at about 60 FPS so it does not swing between 120 and 40 on 120 Hz panels". |
 | DOC-020 | "Intel Arc 140V… 4x MSAA… vsync and the frame-rate limit off… AC power" | cad-performance.md:3-9 | `cad/results-*.json` record AC, host and adapter. | – | PROVEN | – |
 | DOC-021 | "the largest case is 89,883 parts in 99,976 entities" | cad-performance.md:16,22 | kernel cap 100,000; `results-after-max.json`. | `cad/run.mjs --sizes=max` | PROVEN | 100,000 parts do not fit in core today. Never pitch "100k parts". |
-| DOC-022 | "Frame interval / FPS \| 6.7 ms / 150 \| 22.0 ms / 45 \| 40.3 ms / 25" | cad-performance.md:37 | `cad/results-after-{10k,50k,max}.json` (deb4015, Arc) | `node examples/package-benchmarks/cad/run.mjs --sizes=10000,50000,max --label=after` | PROVEN | Stale once the core speed-ups land. One integrated GPU. |
-| DOC-023 | "Kernel tick… 1.69 / 7.74 / 16.4 ms", "152/139/164 ns", "Batch collection… 11.3 ms", "Whole-frame CPU 39.1 ms" | cad-performance.md:30-36 | Same files. | same | PROVEN | Stale once s1 lands. |
-| DOC-024 | "`engine.pick` median… 12.1 / 30.3 / 63.5 ms" | cad-performance.md:40 | Same files. | same | PROVEN | Stale once the speed-ups land (pick re-runs update). |
+| DOC-022 | "Frame interval / FPS 6.7 ms / 150 | 22.0 ms / 45 | 40.3 ms / 25" (top table: 11:53 session, core before the merged steps) | docs/cad-performance.md | `cad/results-after-*.json` (deb4015) | `cad/run.mjs` | STALE | Superseded by the quiet-machine before/after table (DOC-059): orbit FPS 168 → 247 / 49 → 92 / 34 → 33 (10k/50k/90k). Quote that table with its core commit. |
+| DOC-023 | "Kernel tick… 1.69 / 7.74 / 16.4 ms… Whole-frame CPU 39.1 ms" (top table: 11:53 session, core before the merged steps) | docs/cad-performance.md | `cad/results-after-*.json` (deb4015) | `cad/run.mjs` | STALE | Superseded by the quiet-machine before/after table (DOC-059): kernel in frame 0.65 / 2.66 / 4.09 ms (orbit). Quote that table with its core commit. |
+| DOC-024 | "`engine.pick` median… 12.1 / 30.3 / 63.5 ms" (top table: 11:53 session, core before the merged steps) | docs/cad-performance.md | `cad/results-after-*.json` (deb4015) | `cad/run.mjs` | STALE | Superseded by the quiet-machine before/after table (DOC-059): pick 7.6 / 19.5 / 30.9 ms. Quote that table with its core commit. |
 | DOC-025 | AssemblyBVH "create 1,465 → 18.9 ms", "rebuild 1,400 → 3.5 ms" | cad-performance.md:41,129-135 | `proofs/results/machinery-cad.json` (Node, AC, identical outputs) | `node examples/package-benchmarks/proofs/machinery-cad.proof.js` | PROVEN | – |
 | DOC-026 | ExplodedView "0 ms at rest" | cad-performance.md:42,114-118 | `machinery-cad.json`, `results-after-*.json` | same | PROVEN | – |
-| DOC-027 | "Load to first frame 592 ms", "JS heap 75 MB", "Instance storage 10.1 MB", "Removing one mesh… 3.0 ms" | cad-performance.md:43-48 | `results-after-max.json` | `cad/run.mjs` | PROVEN | Instance storage and removal go stale with s2, s3 and s5. |
-| DOC-028 | "90k parts with 1x MSAA… 30.9 ms CPU, 24.7 ms GPU, 32 FPS" | cad-performance.md:50-51 | `results-max-1x-msaa.json` | `cad/run.mjs --sizes=max --low` | PROVEN | Stale with the speed-ups. |
+| DOC-027 | "Load to first frame 592 ms, JS heap 75 MB, Instance storage 10.1 MB, removing one mesh 3.0 ms" (top table: 11:53 session, core before the merged steps) | docs/cad-performance.md | `cad/results-after-*.json` (deb4015) | `cad/run.mjs` | STALE | Superseded by the quiet-machine before/after table (DOC-059): re-run run.mjs on the tip for load, heap and removal (step 5 changed removal). Quote that table with its core commit. |
+| DOC-028 | "90k parts with 1x MSAA… 30.9 ms CPU, 24.7 ms GPU, 32 FPS" (top table: 11:53 session, core before the merged steps) | docs/cad-performance.md | `cad/results-after-*.json` (deb4015) | `cad/run.mjs` | STALE | Superseded by the quiet-machine before/after table (DOC-059): re-run `--low` on the tip. Quote that table with its core commit. |
 | DOC-029 | "Node measures 11.4 ms… and 15.7 ms" | cad-performance.md:56-61 | `results-kernel-node.json` | `node examples/package-benchmarks/cad/kernel-node.mjs` | PROVEN | The reproduce command at lines 58-59 is garbled (the culling command is pasted into it). Fix the doc. |
-| DOC-030 | "disposing a 90k-part assembly mesh by mesh is O(n²), minutes" | cad-performance.md:75-76 | 3.0 ms per removal (measured). HANDOFF records 48 s for the prototype's s0, on another branch. | no | OVERCLAIM | "about 48 s". Wrong once s5 lands (20 ms). |
+| DOC-030 | "disposing a 90k-part assembly mesh by mesh is O(n²), minutes" | cad-performance.md:76 | Step 5 merged: disposing a 90k engine 48 s → 20 ms (`cad/results-s0-*`, `results-s5-*.json`). | `cad/run.mjs` | STALE | The hot-spot list is now labelled "as measured before"; quote "48 s before step 5, 20 ms after". |
 | DOC-031 | Edges "GPU 2.23 / 4.65 / 5.83 ms" | cad-performance.md:97-104 | `results-edges.json` | `cad/run.mjs --edges` | STALE | Machinery changed since (803aa19). Re-run. |
 | DOC-032 | Culling at 90k "Orbit \| 36.4 / 24.7 \| … \| 51.8 / 18.3", grazing "97.7" | cad-performance.md:161-170 | `results-culling.json` (Arc). Another worker's GPU timing shared the machine between runs. | `node examples/package-benchmarks/cad/culling.mjs --check --views=orbit,still,grazing --layouts=sheet,stack --label=culling` | PROVEN | The "core" column goes stale with the speed-ups. State the culling limits (H-12). |
 | DOC-033 | "0 differing pixels in all 640 frames" | cad-performance.md:190-195 | `results-culling.json` `checks` | same | PROVEN | – |
@@ -226,7 +233,13 @@ Facts used below:
 | DOC-055 | "texel-locked (no shimmer) under orthographic pan and zoom" | docs/threejs-parity.md:64 | `results/shadow-shimmer.json` | `shadow-shimmer.mjs` | PROVEN | The JSON shows 0.57 of 14,423 edge pixels per frame. "No measurable shimmer" is the precise wording. |
 | DOC-056 | "removed 6,017 bytes of gzip… about 7.5 kB and 3.3 kB more gzip" | docs/threejs-parity.md:385 | test-results/dedupe only. | no | UNPROVEN | – |
 | DOC-057 | "8 check groups for both backends", "automatic fallback", "keep the base WebGL2 fallback" | benchmarks/README.md:27; MODERN-ENGINE.md:231,269,281,307 | True only before 1356787. | – | STALE | "…with the optional `@margoengine/webgl` fallback". |
-| DOC-058 | "285 bytes total per slot" | MODERN-ENGINE.md:83 | Matches `results-after-max.json` (about 282 B). | `cad/run.mjs` | PROVEN | Stale once s1 lands (+66 B per slot). |
+| DOC-058 | "285 bytes total per slot" | MODERN-ENGINE.md:83 | Step 1 added 66 B per slot (docs/cad-performance.md). | `cad/run.mjs` | STALE | About 351 B per slot. |
+| DOC-059 | Quiet-machine before/after table, e.g. "orbit 50,004 … 49 → 92" FPS, "still 89,883 … 33 → 52", "move 50,004 … 54 → 133"; "the kernel is 3-4x cheaper in every case"; "orbit at 90k is unchanged (34 → 33 FPS)"; "`move` at 10k got slower" | docs/cad-performance.md (merged fast paths section) | `cad/results-{before,after}{1,2}-{orbit,still,move,orbitmove}.json` (quiet machine, Arc, AC, GPU lock, 2026-10-14 19:08-19:21 local; `node examples/package-benchmarks/cad/summary.mjs before1 before2 after1 after2`) | `node examples/package-benchmarks/cad/run.mjs` per case (doc lists them), on a quiet machine | PROVEN | Publication-grade: quiet machine recorded in each JSON (`conditions`), AC before and after, alternating rounds, regressions reported. One integrated GPU, two rounds per cell: state the spread. |
+| DOC-060 | Fast paths bit-exact: "0 differing pixels over 25 comparisons plus 4 unchanged redraws"; "`npm run verify`: 1,051 tests pass" | docs/cad-performance.md | `tests/core-dirty-transforms.test.js` (in verify); `cad/pixels-check.mjs` (real GPU, output not committed); the test count is from an uncommitted run log | `npm run verify`; `node examples/package-benchmarks/cad/pixels-check.mjs` | PROVEN | Commit the pixel-check JSON; the test count changes with every merge. |
+| DOC-061 | Back-face culling by `cullMode`: "about 2 ms (12%) of GPU per frame on the 50k CAD scene and up to 2.5x on heavy overdraw" | docs/cad-performance.md | `cull-bench.mjs` and `results-cull-*.json` are on branch `scratch/core-backface-cull`, not this branch | not on this branch | UNPROVEN | Not shipped: fine as a measured proposal, never as an engine property. |
+| PKG-094 | glTF export round trip: RobotExpressive goes from 752 Khronos glTF-Validator errors in the source (unnormalized skin weights) to 0 in the exported file (weights normalized) | exporters (`exportModel`, b45fec0/3e1433a); HANDOFF | `packages/exporters/tests/model.test.js` (in `verify`); `examples/package-benchmarks/exporters-model.mjs` → `results/exporters-model.json` (validator `gltf-validator` from node_modules, Node 24, 2026-10-14) | `node examples/package-benchmarks/exporters-model.mjs` | PROVEN | Deterministic (validator counts), not a timing. Say "the source file has 752 validator errors". |
+| PKG-095 | "DamagedHelmet exports in 7.7 ms" (Node 24, median of 7) | HANDOFF; `results/exporters-model.json` | Same script and JSON (`exportMs` 7.73, min 5.83). Measured while other agents ran. | same | STALE | A Node CPU timing from a busy machine. Re-measure in the quiet-PC run (bench:all includes it, see reproduce.md) before quoting. |
+| PKG-093 | "Static scenes cost little per frame: the kernel recomputes only entities whose … changed" | packages/core/README.md | DOC-059 (`still`, `move`), `tests/core-dirty-transforms.test.js` | as DOC-059 | PROVEN | Add the numbers and the caveat that an orbiting camera still re-collects every frame (90k orbit unchanged). |
 
 ## Package READMEs (`packages/*/README.md`)
 
@@ -298,7 +311,7 @@ Two fixes would clear most rows:
 | PKG-050 | "(160-230 ms measured on an Arc 140V, versus about 8 ms…)" | machinery:83 | `results/pipeline-toggles.json`: +178 ms (146-228) vs +8.6 ms | yes | STALE | "about 180 ms (146-228 ms over 5 runs) vs about 9 ms". |
 | PKG-051 | "These assets add about 7.7 MB" | machinery:91 | OCCT 7,604,031 + 96,871 B | n/a | PROVEN | Also give 3.1 MB gzip. |
 | PKG-052 | "an exploded view at rest costs nothing per frame" | machinery:79 | `cad/results-after-*.json` | `node pkb/cad/run.mjs` | PROVEN | – |
-| PKG-053 | "combined core and stage facade… strictly below 20,000 bytes gzip" | margoengine:9 | `core-budget.js` via build-modern/measure-size; 18,681 B | `npm run measure:size` | PROVEN | CI is paused this month; the gate runs locally. |
+| PKG-053 | "combined core and stage facade… strictly below 20,000 bytes gzip" | margoengine:9 | `core-budget.js` via build-modern/measure-size; 19,543 B at 0ed56b9 | `npm run measure:size` | PROVEN | CI is paused this month; the gate runs locally. |
 | PKG-054 | "Without a transform the GPU calls are byte-identical to before (`materials-uv-transform.proof.js`)" | materials:25 | Default ref 1970fda already differed. Passes vs 114130c. | default fails | STALE | State the ref. |
 | PKG-055 | "256 textured boxes go from 256 draws and 8.3 ms CPU per frame to 1 draw and 0.05 ms" | materials:27 | `proofs/results/materials-atlas.json` is labelled "recording mock GPU"; the draw path changed since | yes | OVERCLAIM | Add "on the mock GPU (CPU encoding only)". |
 | PKG-056 | "5,000 textured boxes: 5,000 draws and 36 ms… 1 draw and 0.4 ms… equals… pixel for pixel" | materials:46 | HEAD run `results/textured-instancing-gpu.json` (f4c6196): 55 → 0.7 ms, maxDiff 1 | `node pkb/textured-instancing-gpu.mjs` | OVERCLAIM | Also stale. "5,000 draws / 55 ms → 1 draw / 0.7 ms CPU; instanced frame within 1/255 per channel". |
@@ -341,4 +354,41 @@ Two fixes would clear most rows:
 
 ## vs-three.js results
 
-VS_PLACEHOLDER
+**No publishable result yet.** The harness is built, and on 2026-10-14 it was smoke-tested on a busy machine:
+
+- Settings: 1 round, 30-60 frames.
+- Scope: every scene except 50k, under the GPU lock, on AC power.
+- The JSON is labelled `"SMOKE TEST, NOT FOR PUBLICATION"` and kept in ignored `test-results/`.
+
+The timing run waits for a quiet PC (`docs/whitepaper/reproduce.md`). Until it exists, the whitepaper and launch posts
+should make no speed claim against three.js.
+
+What the smoke run established (correctness of the harness, not performance):
+
+- Every variant runs:
+  - Margo.
+  - three WebGL2 and WebGPU, each with `Mesh` and with `InstancedMesh`.
+  - three's WebGPURenderer stayed on its WebGPU backend.
+- No page errors once the favicon 404 was silenced.
+- MSAA reports 4 samples everywhere.
+- GPU timing works on both APIs:
+  - WebGPU: timestamp queries injected into every pass, for Margo and three alike.
+  - WebGL2: `EXT_disjoint_timer_query_webgl2` is exposed by Edge 155 on ANGLE/D3D11.
+- Draw counts match the design: Margo 1 per geometry; three `Mesh` about one per visible object; three `InstancedMesh` 1 per shape.
+- The scenes match on screen. Final frames at t = 0 compared with Margo's:
+  - CAD differs on about 2-3% of pixels (edges).
+  - The helmet differs on about 35%: the floor is tone-mapped with Reinhard in Margo and ACES in three, and the clear colour differs slightly.
+
+  Screenshots: `test-results/vs-threejs/*.png`.
+
+Things to settle before or in the quiet run:
+
+1. In the smoke run Margo's GPU time was not lower than three.js `InstancedMesh` on static boxes, and was higher on the helmet scene.
+   - For the helmet this is expected: Margo renders 4 PCSS cascades against three's one PCF map.
+   - For the boxes it needs a look first: Margo's 4x HDR target, resolve and tonemap passes versus three's direct-to-canvas MSAA.
+
+   This is exactly the kind of result to state honestly ("three.js wins here"). It must not be hidden.
+2. The WebGL2 `TIME_ELAPSED` number includes GPU idle time while a CPU-bound renderer is still submitting (thousands of `Mesh` draws). Report it next to `serialFrameMs`, and do not read it as pure GPU work.
+3. Make the clear colour identical (three's background is set in sRGB space; Margo's clear is written as is), and consider an all-ACES floor for the helmet, so the image-diff check means something.
+4. Add an A/A run (the same engine twice) to state the noise floor.
+5. Add the particles scene (design in the harness README) before claiming anything about particles against three.js.

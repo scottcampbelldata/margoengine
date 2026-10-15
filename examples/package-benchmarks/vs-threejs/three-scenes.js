@@ -59,11 +59,12 @@ export async function threeScene(canvas, {scene: name, n, mode, move}, marks, re
   marks.buildMs = +(performance.now() - s).toFixed(1);
   const cam = def.camera, camera = new PerspectiveCamera(cam.fov, CANVAS[0] / CANVAS[1], cam.near, cam.far);
   const place = t => {camera.position.set(...cam.at(t));camera.lookAt(...cam.target);camera.updateMatrixWorld();};
-  const gl = backend === 'webgl' ? renderer.getContext() : undefined, pixel = new Uint8Array(4);
+  const gl = backend === 'webgl' ? renderer.getContext() : undefined, pixel = new Uint8Array(4);let counts = {};
   return {
     gl, samples: gl ? gl.getParameter(gl.SAMPLES) : 4,
-    render(t) {update(t);place(t);renderer.render(scene, camera);},
+    // Read right after the call: WebGPU Info counts drawCalls, WebGL Info counts calls, and either may reset later.
+    render(t) {update(t);place(t);renderer.render(scene, camera);const r = renderer.info.render;counts = {drawCalls: r.drawCalls ?? r.calls, triangles: r.triangles};},
     idle: gl ? async () => {gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);} : () => renderer.backend.device.queue.onSubmittedWorkDone(),
-    info: () => ({drawCalls: renderer.info.render.drawCalls ?? renderer.info.render.calls, triangles: renderer.info.render.triangles}), // WebGPU Info: drawCalls; WebGL: calls
+    info: () => counts,
   };
 }

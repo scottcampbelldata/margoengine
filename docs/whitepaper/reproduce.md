@@ -64,6 +64,7 @@ whitepaper cites into `examples/package-benchmarks/results/` and commit it with 
 | VFX entry sizes | `node examples/package-benchmarks/vfx-size.mjs` | no | `results/vfx-size.json` | |
 | Package optimization proofs (same GPU calls / same output, faster) | `node examples/package-benchmarks/proofs/<name>.proof.js [ref]` | no (recording mock GPU) | `proofs/results/<name>.json` | Each builds a baseline ref; some default refs no longer build (see claims.md). |
 | Kernel tick in Node | `node examples/package-benchmarks/cad/kernel-node.mjs` | no | `cad/results-kernel-node.json` | |
+| glTF export: validator errors and export time | `node examples/package-benchmarks/exporters-model.mjs` | no | `results/exporters-model.json` | Khronos glTF-Validator from node_modules; the timing needs the quiet PC. |
 | Textured instancing, encoding CPU | `node examples/package-benchmarks/textured-instancing.mjs` | no (mock) | `results/textured-instancing.json` | Mock GPU: CPU encoding only, not frame rate. |
 | **Margo vs three.js, same scenes** | `npm run bench:threejs` (`examples/package-benchmarks/vs-threejs/run.mjs`) | yes | `results/vs-threejs.json`, `test-results/vs-threejs/*.png` | See [vs-three.js](../../examples/package-benchmarks/vs-threejs/README.md). |
 | CAD scale 10k/50k/90k parts | `node examples/package-benchmarks/cad/run.mjs --sizes=10000,50000,max --label=<name>` | yes | `cad/results-<name>.json` | `--edges` feature edges, `--low` 1x MSAA, `--step` OCCT STEP/IGES load. Takes no lock itself (bench:all takes it). |
