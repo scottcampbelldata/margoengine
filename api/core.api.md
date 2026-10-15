@@ -124,12 +124,15 @@ export interface Mesh {
 
 export class PbrMaterial {
     readonly data: Float32Array<ArrayBuffer>;
-    constructor({ color, roughness, metalness, doubleSided }?: {
-        color?: string | readonly number[];
-        roughness?: number;
-        metalness?: number;
-        doubleSided?: boolean;
-    });
+    constructor(options?: PbrMaterialOptions);
+    set({ color, roughness, metalness, doubleSided }: PbrMaterialOptions): void;
+}
+
+export interface PbrMaterialOptions {
+    color?: string | readonly number[];
+    roughness?: number;
+    metalness?: number;
+    doubleSided?: boolean;
 }
 
 export type Vec3 = readonly [number, number, number];
