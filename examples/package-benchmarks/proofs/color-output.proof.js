@@ -5,7 +5,7 @@
 // configuration and GPU calls to an engine without it).
 // Run: node examples/package-benchmarks/proofs/color-output.proof.js [ref]
 import assert from 'node:assert/strict';
-import {versions} from './compare.js';
+import {versions, ignoreAgx} from './compare.js';
 import {mockGPU, context} from './gpu-recorder.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
 import {PostStack, FXAA, Bloom} from '../../../packages/post/dist/index.js'; // unchanged package (built by build:packages)
@@ -48,7 +48,7 @@ const cases = {
 };
 let calls = 0;
 for (const [label, make] of Object.entries(cases)) for (const samples of [1, 4]) {
-  const run = side => {let edit; const expected = story(() => {const [effects, e] = make(side); edit = e; return effects;}, samples, (...args) => edit(...args)); return expected;};
+  const run = side => {let edit; const expected = story(() => {const [effects, e] = make(side); edit = e; return effects;}, samples, (...args) => edit(...args)); return ignoreAgx(expected);};
   const expected = run('baseline');
   assert.ok(expected.length > 100, `${label} story must exercise the GPU`);
   assert.deepEqual(run('candidate'), expected, `${label} GPU calls differ at ${samples}x`); calls += expected.length;

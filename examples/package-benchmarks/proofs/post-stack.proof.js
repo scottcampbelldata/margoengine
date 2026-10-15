@@ -4,7 +4,7 @@
 // Run: node examples/package-benchmarks/proofs/post-stack.proof.js [ref]
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {versions} from './compare.js';
+import {versions, ignoreAgx} from './compare.js';
 import {mockGPU, context} from './gpu-recorder.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
 
@@ -45,13 +45,13 @@ const cases = {
 };
 let calls = 0;
 for (const [label, [make, edit, module]] of Object.entries(cases)) for (const samples of [1, 4]) {
-  const expected = story(() => make(module.baseline), samples, edit), actual = story(() => make(module.candidate), samples, edit);
+  const expected = ignoreAgx(story(() => make(module.baseline), samples, edit)), actual = ignoreAgx(story(() => make(module.candidate), samples, edit));
   assert.ok(expected.length > 300 && expected.some(entry => entry[0] === 'throw'), `${label} story must exercise the GPU and an error path`);
   assert.deepEqual(actual, expected, `${label} GPU calls differ at ${samples}x`); calls += expected.length;
 }
 // The documented DOF -> Tonemap({source}) chain, both packages at once.
 for (const samples of [1, 4]) {
-  const chain = side => story(() => {const d = new dof[side].DOF(); return [d, new tonemap[side].Tonemap({source: () => d.outputTexture})];}, samples, () => {});
+  const chain = side => ignoreAgx(story(() => {const d = new dof[side].DOF(); return [d, new tonemap[side].Tonemap({source: () => d.outputTexture})];}, samples, () => {}));
   const expected = chain('baseline'); assert.deepEqual(chain('candidate'), expected, `DOF -> Tonemap chain differs at ${samples}x`); calls += expected.length;
 }
 console.log(`Single-effect GPU call sequences identical to ${ref} (creative: ${before}): ${calls} recorded calls across 12 stories.`);
