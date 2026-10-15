@@ -1048,6 +1048,17 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       transform sync for per-frame allocations and make it allocation-free, (4) a Wasm-free kinematic character
       controller on the bvh Raycaster (walk, slopes, steps, jump, collide with the level) for simple games, with Rapier
       as the upgrade path. Measure bundle size of (4) and of the physics package + Rapier honestly.
+      Scott (2026-10-15): (4) must also serve architectural / real-estate walkthroughs: eye height (default ~1.65 m)
+      held by down-rays, step height (~0.19 m) for stairs, slope limit, capsule-style wall/counter/glass collision,
+      WASD + mouse look, mobile virtual thumbstick + drag-look, smooth (no teleport), and a toggle to an orbit
+      "dollhouse" view. Use `@margoengine/bvh` (Raycaster) for collision.
+   u. ArchViz / real-estate walkthrough showcase (Scott, 2026-10-15): a demo for the final-phase rebuild - a modern
+      house GLB loaded with progressive streaming, walk mode with the (t.4) controller, dollhouse orbit toggle,
+      environment lighting + shadows (check whether gltf-pro supports lightmaps on a second UV set; queue it if not),
+      mobile-first. Needs a house model whose licence allows a public demo (CC0/CC-BY) - Scott picks; don't download
+      without asking. Measure (don't assert) load time and memory on desktop and a real phone, with and without
+      Rapier. Public copy states Margo's measured numbers; no competitor-bashing. Plus a cookbook recipe in item 8:
+      "A mobile-first architectural walkthrough in ~50 lines".
    q. Game-developer gaps from the Blender guide (2eb78b9): a helper that collects a model's world-space triangles
       (for physics colliders and navmeshes); physics bodies on non-root meshes; water refraction can't combine with
       SSAO (needs a scene texture from PostStack); camera rig avoids walls, not just terrain; audio listener on
@@ -1086,7 +1097,8 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       - Flagship tutorial: indie game - grow docs/guides/blender-game.md into a runnable step-by-step (player, Blender
         level via extras, physics jump/gravity, third-person camera, audio), with a matching runnable example.
       - Cookbook (how-to) starter set: resize/DPR, device loss, colliders from a glTF hierarchy, switching controls,
-        strict CSP deploy (docs/deploying.md), quality tiers, transparency (OIT), large coordinates, STEP pre-conversion.
+        strict CSP deploy (docs/deploying.md), quality tiers, transparency (OIT), large coordinates, STEP pre-conversion,
+        mobile-first architectural walkthrough in ~50 lines (5l.u).
       - API reference auto-generated from TSDoc (depends on the hygiene gate 5k item 6), published on the site.
    b. Live-editable examples: an "Edit" button on every docs example (StackBlitz/CodeSandbox once packages are on
       npm, or our own playground that loads the local build), so readers change numbers and see the canvas update.
