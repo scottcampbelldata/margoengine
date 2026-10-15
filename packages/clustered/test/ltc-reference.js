@@ -23,14 +23,14 @@ function edge(a, b) {
   return (a[0] * b[1] - a[1] * b[0]) * (x > 0 ? v : 0.5 / Math.sqrt(Math.max(1 - x * x, 1e-7)) - v);
 }
 function integral(m, quad) {
-  const p = quad.map(q => mul(m, q)); let sum = 0, leave, enter, clipped = false;
+  const p = quad.map(q => mul(m, q)); let sum = 0, leave = [0, 0, 0], enter = [0, 0, 0];
   for (let i = 0; i < 4; i++) {
     let s = p[i], e = p[(i + 1) % 4]; if (s[2] < 0 && e[2] < 0) continue;
     const at = t => add(s, scale(sub(e, s), t));
-    if (s[2] < 0) {s = at(s[2] / (s[2] - e[2])); enter = s;} else if (e[2] < 0) {e = at(s[2] / (s[2] - e[2])); leave = e; clipped = true;}
+    if (s[2] < 0) {s = at(s[2] / (s[2] - e[2])); enter = s;} else if (e[2] < 0) {e = at(s[2] / (s[2] - e[2])); leave = e;}
     sum += edge(unit(s), unit(e));
   }
-  return clipped ? sum + edge(unit(leave), unit(enter)) : sum;
+  return sum + edge(unit(leave), unit(enter)); // zero when nothing was clipped
 }
 /** Mirror of clusterAreaLighting for one packed light: {specular, diffuse} radiance (rgb), and their total. */
 export function ltc(light, position, n, v, base, roughness, metal) {

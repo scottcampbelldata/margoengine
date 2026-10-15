@@ -1,0 +1,211 @@
+{
+  "benchmark": "area-lights-gpu",
+  "recordedAt": "2026-10-15T10:04:15.280Z",
+  "hardware": {
+    "vendor": "intel",
+    "architecture": "xe-2lpg",
+    "device": "",
+    "description": "",
+    "fallback": false
+  },
+  "browser": "chromium 155.0.4283.45",
+  "resolution": [
+    1280,
+    720
+  ],
+  "powerOnline": {
+    "before": "True",
+    "after": "True"
+  },
+  "reference": [
+    {
+      "floor": "core",
+      "roughness": 0.2,
+      "samples": 768,
+      "litSamples": 668,
+      "maxDiffVsCpuMirror": 1,
+      "nonFinite": 0,
+      "vsBruteForce": [
+        {
+          "pixel": [
+            620,
+            350
+          ],
+          "gpu": 0.5538,
+          "bruteForce": 0.55,
+          "relative": 0.007
+        },
+        {
+          "pixel": [
+            660,
+            330
+          ],
+          "gpu": 0.5087,
+          "bruteForce": 0.5092,
+          "relative": -0.001
+        },
+        {
+          "pixel": [
+            580,
+            370
+          ],
+          "gpu": 0.4482,
+          "bruteForce": 0.4434,
+          "relative": 0.011
+        },
+        {
+          "pixel": [
+            700,
+            470
+          ],
+          "gpu": 0.3708,
+          "bruteForce": 0.3715,
+          "relative": -0.002
+        },
+        {
+          "pixel": [
+            540,
+            430
+          ],
+          "gpu": 0.2023,
+          "bruteForce": 0.203,
+          "relative": -0.004
+        }
+      ]
+    },
+    {
+      "floor": "core",
+      "roughness": 0.8,
+      "samples": 768,
+      "litSamples": 668,
+      "maxDiffVsCpuMirror": 1,
+      "nonFinite": 0,
+      "vsBruteForce": [
+        {
+          "pixel": [
+            620,
+            350
+          ],
+          "gpu": 0.5779,
+          "bruteForce": 0.5702,
+          "relative": 0.014
+        },
+        {
+          "pixel": [
+            660,
+            330
+          ],
+          "gpu": 0.5307,
+          "bruteForce": 0.5249,
+          "relative": 0.011
+        },
+        {
+          "pixel": [
+            580,
+            330
+          ],
+          "gpu": 0.4577,
+          "bruteForce": 0.4541,
+          "relative": 0.008
+        },
+        {
+          "pixel": [
+            580,
+            410
+          ],
+          "gpu": 0.3064,
+          "bruteForce": 0.3057,
+          "relative": 0.002
+        },
+        {
+          "pixel": [
+            460,
+            370
+          ],
+          "gpu": 0.1764,
+          "bruteForce": 0.1738,
+          "relative": 0.015
+        }
+      ]
+    },
+    {
+      "floor": "materials",
+      "roughness": 0.2,
+      "samples": 768,
+      "litSamples": 454,
+      "maxDiffVsCpuMirror": 1,
+      "nonFinite": 0
+    },
+    {
+      "floor": "materials",
+      "roughness": 0.8,
+      "samples": 768,
+      "litSamples": 464,
+      "maxDiffVsCpuMirror": 1,
+      "nonFinite": 0
+    }
+  ],
+  "highlight": [
+    {
+      "roughness": 0.2,
+      "peak": 151,
+      "halfMaxSamples": 1784,
+      "extentX": 2.262,
+      "extentZ": 3.059,
+      "stretch": 1.35,
+      "maxStep": 0.0482
+    },
+    {
+      "roughness": 0.8,
+      "peak": 153,
+      "halfMaxSamples": 1435,
+      "extentX": 2.247,
+      "extentZ": 2.15,
+      "stretch": 0.96,
+      "maxStep": 0.0337
+    }
+  ],
+  "twoSided": {
+    "oneSidedFacingAwayMaxDiffVsUnlit": 0,
+    "twoSidedMaxDiffVsFacingDown": 1
+  },
+  "timings": [
+    {
+      "count": null,
+      "gpuMs": 1.245,
+      "gpuSamples": 40,
+      "frameMs": 5
+    },
+    {
+      "count": 0,
+      "gpuMs": 1.245,
+      "gpuSamples": 40,
+      "frameMs": 4.9
+    },
+    {
+      "count": 1,
+      "gpuMs": 3.342,
+      "gpuSamples": 40,
+      "frameMs": 7.9
+    },
+    {
+      "count": 4,
+      "gpuMs": 8.716,
+      "gpuSamples": 40,
+      "frameMs": 12.9
+    },
+    {
+      "count": 16,
+      "gpuMs": 32.309,
+      "gpuSamples": 40,
+      "frameMs": 37.4
+    },
+    {
+      "count": null,
+      "gpuMs": 1.245,
+      "gpuSamples": 40,
+      "frameMs": 5.8
+    }
+  ],
+  "cpuLoadAtStart": 17
+}

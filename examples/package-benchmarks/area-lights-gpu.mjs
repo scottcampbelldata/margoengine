@@ -6,7 +6,8 @@
 //    WGSL (test/ltc-reference.js) pushed through each path's tone mapping, within 3/255; on the core floors a few of those
 //    points are also compared with brute-force GGX + Lambert quadrature (radiance from the inverted tone map).
 // 2. Highlight shape under a square light: the glossy floor's half-maximum region is stretched along the view direction;
-//    the rough floor's is wider and soft. No AreaLights equals an empty one and the plain frame.
+//    the rough floor's is not, and its largest pixel-to-pixel radiance step is much smaller (soft falloff). No AreaLights
+//    equals an empty one.
 // 3. Two-sided: a light facing away from the floor leaves it black; twoSided lights it exactly like the light turned down.
 // 4. --bench: GPU pass time (timestamp queries, median) at 1280x720 with no AreaLights, an empty one, and 1/4/16 lights.
 // Writes results/area-lights-gpu.json and the frames to test-results/area-lights-*.png.
@@ -20,7 +21,7 @@ import {decodePNG} from '../../tests/support/png.js';
 import {AreaLights} from '../../packages/clustered/dist/area.js';
 import {ltc, bruteForce} from '../../packages/clustered/test/ltc-reference.js';
 
-const bench = process.argv.includes('--bench');
+const bench = process.argv.includes('--bench'), benchOnly = process.argv.includes('--bench-only');
 const ac = () => execFileSync('powershell', ['-NoProfile', '-Command', '(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline'], {encoding: 'utf8'}).trim();
 const powerBefore = ac(); assert.equal(powerBefore, 'True', 'run on AC power only');
 const pack = light => {const a = new AreaLights({lights: {setLights() {}}}); a.setLights([light]); return Array.from(a['data'].subarray(4, 20));};
@@ -35,7 +36,10 @@ const aces = v => {
 const output = {core: rgb => rgb.map(c => srgb(c / (1 + c))), materials: rgb => aces(rgb.map(c => Math.max(c, 0) / 0.6)).map(srgb)};
 const pixel = (image, [x, y]) => {const i = (y * image.width + x) * 4; return [image.data[i], image.data[i + 1], image.data[i + 2]];};
 
-const context = await openBrowser({startPath: '/examples/package-benchmarks/area-lights.html', port: 5263}), {page, hardware} = context, pageErrors = [];
+// The page's first load can exceed openBrowser's 30 s goto under load (Vite transforms every dist module), so open a
+// trivial path first and load the page with a longer timeout.
+const context = await openBrowser({startPath: '/LICENSE', port: 5263}), {page, hardware} = context, pageErrors = [];
+await page.goto('http://127.0.0.1:5263/examples/package-benchmarks/area-lights.html', {timeout: 300000});
 page.on('pageerror', e => pageErrors.push(e.message)); page.on('console', m => {if (m.type() === 'error') pageErrors.push(m.text());});
 const report = {benchmark: 'area-lights-gpu', recordedAt: new Date().toISOString(), hardware: hardware.webgpu, browser: hardware.browserName + ' ' + hardware.browserVersion, resolution: [1280, 720], powerOnline: {before: powerBefore}};
 try {
@@ -44,6 +48,7 @@ try {
     const result = await page.evaluate(o => window.check.render(o), options); assert.equal(result.error, null, name); assert.deepEqual(result.errors, [], name);
     const image = await decodePNG(await page.locator('canvas').screenshot({path: `test-results/area-lights-${name}.png`})); assert.equal(image.width, 1280); return {image, eye: result.eye};
   };
+  if (!benchOnly) {
   const grid = []; for (let y = 250; y < 720; y += 20) for (let x = 20; x < 1280; x += 40) grid.push([x, y]);
   const floorPoints = await page.evaluate(p => window.check.unproject(p), grid);
   const panel = {position: [0, 1.4, -0.8], direction: [0, -1, 0.3], width: 1.6, height: 0.6, color: [1, 0.95, 0.9], intensity: 8};
@@ -78,12 +83,17 @@ try {
   for (const roughness of [0.2, 0.8]) {
     const {image} = await shot(`square-${roughness}`, {floor: 'core' + roughness, light: square}), luma = fine.map(p => pixel(image, p)[1]), peak = Math.max(...luma);
     const half = finePoints.filter((p, i) => linear(luma[i]) >= 0.5 * linear(peak)), span = k => Math.max(...half.map(p => p[k])) - Math.min(...half.map(p => p[k]));
-    const row = {roughness, peak, halfMaxSamples: half.length, extentX: +span(0).toFixed(3), extentZ: +span(2).toFixed(3), stretch: +(span(2) / span(0)).toFixed(2)};
+    // Sharpness: largest radiance step between vertically adjacent samples (4 px), from the inverted core tone map.
+    const radiance = luma.map(b => {const m = linear(b); return m / (1 - m);}), across = 880 / 4; let step = 0;
+    for (let i = 0; i + across < radiance.length; i++) step = Math.max(step, Math.abs(radiance[i + across] - radiance[i]));
+    const row = {roughness, peak, halfMaxSamples: half.length, extentX: +span(0).toFixed(3), extentZ: +span(2).toFixed(3), stretch: +(span(2) / span(0)).toFixed(2), maxStep: +step.toFixed(4)};
     report.highlight.push(row); console.log(JSON.stringify(row));
   }
   const [glossy, rough] = report.highlight;
   assert.ok(glossy.stretch > 1.3, `glossy highlight not stretched toward the viewer (${glossy.stretch})`);
-  assert.ok(rough.extentX > 1.5 * glossy.extentX && rough.halfMaxSamples > 3 * glossy.halfMaxSamples, 'rough highlight should be wider and softer');
+  // On these dielectric floors Lambert diffuse (the same at both roughnesses) dominates the half-maximum region, so the
+  // rough floor's softness shows as smaller radiance steps rather than a wider region.
+  assert.ok(rough.stretch < glossy.stretch && glossy.maxStep > 1.25 * rough.maxStep, 'rough highlight should be softer and less stretched');
   // Zero cost when unused: no AreaLights, and an AreaLights without lights, render the same frame.
   const none = (await shot('none', {floor: 'core0.8', light: null})).image, empty = (await shot('empty', {floor: 'core0.8', light: 'empty'})).image;
   assert.deepEqual(empty.data, none.data, 'an AreaLights without lights changed the frame');
@@ -93,12 +103,13 @@ try {
   for (let i = 0; i < down.data.length; i++) {if (i % 4 === 3) continue; awayMax = Math.max(awayMax, Math.abs(away.data[i] - none.data[i])); sideDiff = Math.max(sideDiff, Math.abs(both.data[i] - down.data[i]));}
   report.twoSided = {oneSidedFacingAwayMaxDiffVsUnlit: awayMax, twoSidedMaxDiffVsFacingDown: sideDiff}; console.log(JSON.stringify(report.twoSided));
   assert.ok(awayMax <= 1 && sideDiff <= 1, 'two-sided toggle');
-  if (bench) {
+  }
+  if (bench || benchOnly) {
     report.timings = []; report.cpuLoadAtStart = cpuLoad();
-    for (const count of [null, 0, 1, 4, 16, null]) {const row = await page.evaluate(o => window.check.bench(o), {count}); assert.deepEqual(row.errors, []); delete row.errors; report.timings.push(row); console.log(JSON.stringify(row));}
+    for (const count of benchOnly ? [null, 4] : [null, 0, 1, 4, 16, null]) {const row = await page.evaluate(o => window.check.bench(o), {count}); assert.deepEqual(row.errors, []); delete row.errors; report.timings.push(row); console.log(JSON.stringify(row));}
   }
   assert.deepEqual(pageErrors, []);
 } finally {await context.close();}
 report.powerOnline.after = ac(); assert.equal(report.powerOnline.after, 'True', 'still on AC power');
-await writeFile(resolve(import.meta.dirname, 'results/area-lights-gpu.json'), JSON.stringify(report, null, 2) + '\n');
+if (!benchOnly) await writeFile(resolve(import.meta.dirname, 'results/area-lights-gpu.json'), JSON.stringify(report, null, 2) + '\n');
 console.log('area lights GPU check passed');

@@ -68,8 +68,8 @@
         "gzip": 5228
       },
       "./area": {
-        "raw": 15232,
-        "gzip": 8999
+        "raw": 15600,
+        "gzip": 9177
       }
     },
     "@margoengine/controls": {

@@ -1027,15 +1027,15 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       `src/ltc.ts` (2D-predicted zigzag varints, base64), stored in the SAME storage buffer as the lights (binding 17)
       and filtered bilinearly by hand: 0 textures/samplers (gltf-pro "Texture bindings" unchanged; storage buffers in
       the lit fragment 3+1+1 = 5 of 8). 32x32 vs 64x64: identical error vs brute force at every test case, closer at
-      >84 deg glossy (where the fit itself is off by up to ~40%), 9.0 kB vs ~21 kB entry. Accuracy
+      >84 deg glossy (where the fit itself is off by up to ~40%), 9.2 kB vs ~21 kB entry. Accuracy
       (`packages/clustered/test/area.test.js`, vs midpoint quadrature of GGX height-correlated Smith + Schlick + Lambert,
       15 cases roughness 0.1-1, views 0-80 deg, one light crossing the horizon): diffuse < 0.2%; specular (F=1) within
       5% up to 60 deg, worst +16% at 80 deg r0.5; dielectric pixel within 14% up to 60 deg, worst -19% at 80 deg r0.5;
       mean |specular| error ~2%. Zero cost unless used: the buffer and hook exist only while the list is non-empty;
       `proofs/clustered-area-lights.proof.js` records 482 identical GPU calls vs 67e0172 at 1x/4x MSAA without the entry
       and with an empty AreaLights (and checks one light reaches both shaders). Sizes: clustered root 4,503 -> 4,590 B
-      (+87, hook), `./area` 8,999 B gzip. Limits: no cluster culling (every fragment loops every area light: they have no
-      range), no shadows from area lights, no textured lights, WebGPU only. Real GPU: AREA_GPU_RESULTS.
+      (+87, hook), `./area` 9,177 B gzip. Limits: no cluster culling (every fragment loops every area light: they have no
+      range), no shadows from area lights, no textured lights, WebGPU only. Real GPU: real GPU (`area-lights-gpu.mjs`, Arc 140V, Edge 155, AC, lock): GPU = CPU mirror within 1/255 at 768 px x 4 floors (core + materials, glossy + rough), GPU vs brute force within 1.5% at 10 points, glossy highlight stretched z/x 1.35 vs rough 0.96, two-sided toggle exact, empty AreaLights byte-identical frame; GPU cost (diagnostic, not quiet) 1.25 ms -> 3.34/8.72/32.31 ms for 1/4/16 full-screen lights at 720p, ~1.9 ms per light (diffuse integral alone ~1.3 ms). Follow-ups: optional range + cluster culling of area lights, and a cheaper integral (the per-light cost is high for a full-screen light on an iGPU).
    g. Physical material on user-built meshes (materials package), with real transmission/refraction.
    h. Projected decals.
    i. HDR canvas output on HDR displays (with 5h.c Display P3). DONE: environment `ColorOutput` (`hdr: true`, `peak`) +
