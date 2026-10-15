@@ -47,9 +47,11 @@ projection.fit(model.bounds);                // frame a box: [minX, minY, minZ, 
 Orthographic-aware (they read `camera.matrix`): SSAO, points, labels, clustered, DOF, splats and lines' world-space
 widths. Shadow cascades are fitted to the perspective frustum, which covers
 the default ortho view; a fixed small `height` far from the target wastes shadow resolution. Cascades stay texel-locked under orthographic pan and
-zoom (no shimmer; measured by `examples/package-benchmarks/shadow-shimmer.mjs`). Specular uses the camera
+zoom, with no visible shimmer: an ortho zoom leaves the shadow matrices unchanged, and a slow pan changes about 0.6 of
+14k shadow-edge pixels per frame, against 194 for a 0.01° light turn (Intel Arc 140V laptop iGPU, Edge 155;
+`examples/package-benchmarks/shadow-shimmer.mjs`, [shadow-shimmer.json](../../examples/package-benchmarks/results/shadow-shimmer.json)). Specular uses the camera
 position, not a parallel view direction.
 
-MIT. Optional, tree-shakable package, about 1.9 kB min+gzip; core peer: ^0.1.0 || ^1.0.0.
+MIT. Optional, tree-shakable package, about 1.7 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/cameras

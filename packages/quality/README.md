@@ -1,8 +1,9 @@
 # @margoengine/quality
 
-Measured quality tiers. Desktops start on a light tier (single-sampled, pixel ratio capped, held to about 60 FPS) and
-time how long the GPU takes to finish each frame; a browser with clear headroom gets the full 4× MSAA tier from its next
-page load. Slow PCs never show a slow phase or a reload, and no rule based on device names is involved.
+Measured quality tiers. Desktops start on a light tier (single-sampled, pixel ratio capped, paced to at most about
+60 FPS) and time how long the GPU takes to finish each frame; a browser with clear headroom gets the full 4× MSAA tier
+from its next page load. No PC is first shown the 4× tier or reloaded by the probe (the light tier's own frame rate
+depends on the GPU), and no rule based on device names is involved.
 
 ```ts
 import {applyQualityTier, paceEngine, watchQuality} from '@margoengine/quality';

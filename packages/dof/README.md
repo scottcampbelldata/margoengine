@@ -19,7 +19,7 @@ Standalone output uses Margo's Reinhard/sRGB presentation. For color grading, at
 
 ## Cost
 
-GPU time of the DOF passes (CoC, wide-disk 2x2-block gather, bokeh), Intel Arc 140V, DamagedHelmet scene with environment light in a `PostStack` [DOF, Tonemap], median of 6 alternating old/new rounds x 90 frames (`examples/package-benchmarks/gates/dof.mjs`, `results/gates-dof.json`). "Before" is the 64-tap full-resolution gather of `5b9dbbd`.
+GPU time of the DOF passes (CoC, wide-disk 2x2-block gather, bokeh), Intel Arc 140V laptop iGPU, Edge 155, DamagedHelmet scene with environment light in a `PostStack` [DOF, Tonemap], median of 6 alternating old/new rounds x 90 frames (`examples/package-benchmarks/gates/dof.mjs`, `results/gates-dof.json`). "Before" is the 64-tap full-resolution gather of `5b9dbbd`.
 
 | Focus | 720p 4x MSAA | 720p 1x | 1080p 4x | 1080p 1x |
 | --- | --- | --- | --- | --- |
@@ -32,7 +32,7 @@ MSAA does not change the DOF work (it reads the resolved scene); the 720p 4x/1x 
 
 The work follows the blur: in-focus and foreground pixels skip the far gather; the near gather reads only as far as the largest foreground disk in the neighbouring 8x8 tiles (nothing when none is in reach); far disks get about one tap per covered pixel (16 taps up to 2.26 px, 32 up to 3.19 px, 64 beyond); disks over 3.19 px are gathered once per 2x2 block and interpolated, except next to a depth change. Against the 64-tap gather the 8-bit frames differ by a mean of 0.00–0.11 levels (at most 0.3% of pixels by more than 6 levels, single pixels on high-contrast edges inside a blur); in-focus pixels and the near field are unchanged.
 
-Owned textures, buffers and bind groups are reused between frames, rebuilt on resize/device restoration, and freed on removal. The package creates no JS arrays, typed arrays, descriptors or shader strings in steady-state frames; WebGPU itself returns pass encoder objects. Custom draws must write linear HDR into the current `context.color`; the default core shader is adapted through the extension API.
+Owned textures, buffers and bind groups are reused between frames, rebuilt on resize/device restoration, and freed on removal. Steady frames construct no typed arrays and no GPU objects (counted by a mock-GPU test); WebGPU itself returns pass encoder objects. Custom draws must write linear HDR into the current `context.color`; the default core shader is adapted through the extension API.
 
 From the repository root:
 
@@ -48,7 +48,7 @@ The Vite HTML demo is `examples/index.html`. Run `npm run build:packages` once f
 The package's `1.0.0` version does not require Engine 1.0. It works with the
 current Core/Stage 0.1.0. `node scripts/build-site.js` assembles its standalone
 demo at `/demos/dof/`; the package catalog links to that built route. The demo
-uses the published `dist` entry and marks readiness after the complete scene's
+uses the package's built `dist` entry and marks readiness after the complete scene's
 GPU submission/completion and two later animation callbacks. npm publication
 is separate: use this repository's workspace or packed local archives until the
 package is published.

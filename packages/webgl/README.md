@@ -13,8 +13,9 @@ const engine = await Engine.create(canvas, {backend: 'auto', fallback: webglRend
 ```
 
 Without a `fallback`, `backend: 'auto'` requires WebGPU and `Engine.create` rejects with
-"WebGPU unavailable"; `backend: 'webgl2'` always uses the fallback. Keeping the renderer out of
-core saves about 1.4 KB gzip for apps that target WebGPU only.
+"WebGPU unavailable"; `backend: 'webgl2'` always uses the fallback. The renderer lives outside
+core, so apps that target WebGPU only do not load its about 2.1 kB min+gzip
+([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)).
 
 `fallback: canvas => webglRenderer(canvas, {transparent: true})` gives the WebGL2 canvas `alpha: true`
 (premultiplied) and a transparent clear: the WebGL side of `TransparentCanvas` from

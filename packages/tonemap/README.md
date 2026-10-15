@@ -37,6 +37,6 @@ The standalone Vite demo at `examples/index.html` has exposure/contrast sliders,
 The package's `1.0.0` version does not require Engine 1.0. It works with the
 current Core/Stage 0.1.0. `node scripts/build-site.js` assembles its standalone
 demo at `/demos/tonemap/`; the package catalog links to that built route. The demo
-uses the published `dist` entry, preserves local LUT loading/controls, and marks
+uses the package's built `dist` entry, preserves local LUT loading/controls, and marks
 the complete scene's correlated GPU readiness. npm publication is separate:
 use the workspace or packed local archives until the package is published.

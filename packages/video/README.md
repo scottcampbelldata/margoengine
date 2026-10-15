@@ -1,6 +1,6 @@
 # @margoengine/video
 
-Zero-copy WebGPU external video textures from HTMLVideoElement or VideoFrame, with a screen-rectangle surface and optional Web Audio frequency sampling.
+WebGPU external video textures from HTMLVideoElement or VideoFrame, imported with `importExternalTexture` (no JS-side copy; whether the browser copies depends on the platform), with a screen-rectangle surface and optional Web Audio frequency sampling.
 
 ```ts
 import {Video} from '@margoengine/video';

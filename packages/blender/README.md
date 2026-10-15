@@ -2,7 +2,7 @@
 
 Optional offline Blender `.margo` assets for Margo WebGPU PBR. Core and the stage facade remain unchanged. Geometry is validated and uploaded from views of the original binary buffer without glTF accessor decoding or vertex repacking. Repeated meshes share CPU views and GPU geometry buffers; each object keeps its own transform/material uniforms.
 
-For a published runtime release, install its peer packages too:
+Nothing is on npm yet. Once the runtime packages are published, install the peer packages too:
 
 ```sh
 npm install @margoengine/core @margoengine/gltf-pro @margoengine/blender
@@ -39,7 +39,7 @@ Run `npm run package:blender` from the repository root (Python 3.11+). This crea
 4. Enable **Margo Engine Exporter** if it is not enabled automatically.
 5. Use **File → Export → Margo (.margo)**.
 
-The declared minimum is Blender 4.2; installation/export are exercised in Blender 5.3 Beta. Blender 4.0/4.1 are outside this range. The single folder inside the ZIP follows Blender's [extension archive layout](https://docs.blender.org/manual/en/4.2/advanced/extensions/getting_started.html) and also preserves legacy add-on discovery. Open exported assets with `/examples/blender-loader/index.html` using `npm run modern:dev:extensions`.
+The declared minimum is Blender 4.2; installation/export were developed against Blender 5.3 Beta and are exercised only when `MARGO_BLENDER` points at a Blender executable (no recorded run yet). Blender 4.0/4.1 are outside this range. The single folder inside the ZIP follows Blender's [extension archive layout](https://docs.blender.org/manual/en/4.2/advanced/extensions/getting_started.html) and also preserves legacy add-on discovery. Open exported assets with `/examples/blender-loader/index.html` using `npm run modern:dev:extensions`.
 
 With the existing stage facade (available locally as `margoengine`), load into its engine and let its render loop draw the attached model:
 
@@ -75,7 +75,7 @@ npm run modern:test:interop:packages
 npm run measure:size
 ```
 
-Set `MARGO_BLENDER` to a Blender executable when running `modern:test:blender` to install/enable/export/disable the packaged ZIP in a disposable background profile, then generate and check real exporter fixtures. Without it, CI checks the Python-written fixture, rendered textured pixels, shared GPU geometry, shadow/SSAO compatibility, device restoration and rollback. The Python tests also verify the checked-in fixture matches the writer. The package is optional and decode-only imports discard the PBR renderer.
+Set `MARGO_BLENDER` to a Blender executable when running `modern:test:blender` to install/enable/export/disable the packaged ZIP in a disposable background profile, then generate and check real exporter fixtures. Without it (as in the CI workflow), the run checks the Python-written fixture, rendered textured pixels, shared GPU geometry, shadow/SSAO compatibility, device restoration and rollback. The Python tests also verify the checked-in fixture matches the writer. The package is optional and decode-only imports discard the PBR renderer.
 
 The package checks compile packed consumers and the first README example under strict NodeNext and Bundler resolution. Isolation tests build both core-only and core + stage entries without Blender/PBR modules. Browser tests track every buffer created by `loadMargo` and require exactly one `destroy()` per buffer when the stage unmounts.
 

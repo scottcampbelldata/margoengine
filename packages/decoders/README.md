@@ -52,7 +52,7 @@ KTX2 cube maps, texture arrays and HDR (UASTC HDR) files are rejected. Draco poi
 
 ## Tests
 
-`npm test` in `packages/decoders` runs Node checks with mock and real Wasm: SSR safety, target negotiation, row pitch, mip upload, pool limits and recovery, transfer instead of copy, handle and heap release, the Khronos Box, Avocado and AnisotropyBarnLamp assets, and meshopt vectors produced by the meshoptimizer 1.1.1 reference encoder and decoder. `npm run test:browser` adds module workers in Chromium, a 64-decode burst, a compressed upload with no validation errors, byte-identical RGBA8 GPU readback, and a production Vite consumer build that must emit the worker and decoders as assets.
+`npm test` in `packages/decoders` runs Node checks with mock and real Wasm: SSR safety, target negotiation, row pitch, mip upload, pool limits and recovery, transfer instead of copy, handle and heap release, the Khronos Box, Avocado and AnisotropyBarnLamp assets, and meshopt vectors produced by the meshoptimizer 1.1.1 reference encoder and decoder. `npm run test:browser` (a real-GPU script, not in CI) adds module workers in Chromium, a 64-decode burst, a compressed upload with no validation errors, byte-identical RGBA8 GPU readback, and a production Vite consumer build that must emit the worker and decoders as assets.
 
 The Draco and Basis Universal binaries are Apache-2.0. See `vendor/NOTICE.md`.
 

@@ -46,7 +46,7 @@ and make the same GPU calls:
 Each billboard is one triangle around the soft disc (half the primitives and 3/4 of the vertex work of a quad), and
 the simulation lists only particles whose triangle can reach the screen (a conservative clip-space sphere test, so
 nothing visible is dropped). With 4x MSAA the fragment shader keeps exactly the samples the old quad covered. Measured
-on an Intel Arc 140V (Edge 154, AC power, 1432x768, Afterlight island options and camera, nothing occluding), median
+on an Intel Arc 140V laptop iGPU (Edge 155, AC power, 1432x768, Afterlight island options and camera, nothing occluding), median
 of 16 alternating rounds against the previous build, all 16 rounds faster:
 
 | Particles | MSAA | Before (simulate + draw) | After |
@@ -62,10 +62,13 @@ span from 15.7 to 13.5 ms. Same particle state and pixels within the old rendere
 
 ### Load only what you use
 
-`VFX` from `@margoengine/vfx` (7.7 kB min+gzip) carries all four features. An effect that uses none of them can
-import the same class from `@margoengine/vfx/base` (5.7 kB); add features as a second argument from their own
-entries: `/obstacles` (+0.8 kB), `/wrap` (+0.1 kB), `/sort` (+0.7 kB), `/texture` (+0.4 kB). Sizes are vite library
-builds with bare imports external (`node examples/package-benchmarks/vfx-size.mjs`, `results/vfx-size.json`).
+`VFX` from `@margoengine/vfx` (about 7.0 kB min+gzip) carries all four features. An effect that uses none of them can
+import the same class from `@margoengine/vfx/base` (about 5.2 kB); add features as a second argument from their own
+entries: `/obstacles` (1.2 kB alone), `/wrap` (0.4 kB), `/sort` (1.1 kB), `/texture` (0.6 kB). Sizes are vite library
+builds with bare imports external, each entry compressed on its own
+([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so a bundle that combines them adds
+less: the whole root is 7.0 kB. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
+(`results/vfx-size.json`, at an earlier commit, `76af7a0`).
 
 ```ts
 import {EngineKernel} from '@margoengine/core';

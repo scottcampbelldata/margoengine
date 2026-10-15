@@ -25,7 +25,7 @@ tangents of surviving blades. Both are shared implementations used by the sandbo
 `createHumanoid(engine, [bodyMaterial, trimMaterial, visorMaterial])` creates a
 jointed primitive rig and returns `root`, `focus`, `joints`, `knees` and `parts`.
 Register `parts` with your shadow module. `poseHumanoid(rig, position, heading,
-phase, speed)` updates the existing transforms with a walk pose, without allocations.
+phase, speed)` writes a walk pose into the existing transforms in place.
 The sandbox supplies phase/speed from the shared controls module.
 
 `generateRockMesh()` produces deformed fieldstones with smooth, averaged normals

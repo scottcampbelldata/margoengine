@@ -25,7 +25,7 @@ casts, fading linearly to nothing at it, default 1), `blur` (world units, defaul
 (default 0.6), `color` (default black, written as-is to the scene target), `resolution` (texels per side, default
 512), `static` (default false).
 
-- **Cost** (Intel Arc 140V, Edge, 1280x720, AC; `node packages/staging/test/browser-check.mjs`, JSON in
+- **Cost** (Intel Arc 140V laptop iGPU, Edge 155, 1280x720, AC; `node packages/staging/test/browser-check.mjs`, JSON in
   `examples/package-benchmarks/results/staging-contact.json`): a texture update (occluders + 4 blur passes) takes
   0.05 ms at 256, 0.25 ms at 512 and 0.9-1.1 ms at 1024; the plane 0.02-0.04 ms (4x MSAA). With `static: true` an
   unchanged scene costs only the plane.
@@ -43,6 +43,6 @@ Limits: Y-up ground only; the blur is uniform (three.js's pattern), so the shado
 like a real penumbra; `size` should cover the footprint plus the blur, or the shadow is cut at the plane edge; WebGPU
 only (nothing is drawn on the WebGL2 fallback); the plane is not in SSAO's G-buffer or picking.
 
-MIT. Optional, tree-shakable package, about 5.0 kB min+gzip (half of it WGSL); core peer: ^0.1.0 || ^1.0.0.
+MIT. Optional, tree-shakable package, about 4.6 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/staging. Real GPU: `node packages/staging/test/browser-check.mjs`.

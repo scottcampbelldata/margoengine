@@ -24,19 +24,20 @@ const engine = await Engine.create(document.querySelector('canvas')!, {backend: 
 const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {bruneton, clouds});
 ```
 
-| Entry | Enables | min+gzip |
+| Entry | Enables | min+gzip, entry alone |
 | --- | --- | --- |
-| `@margoengine/sky/base` | clock, sun/moon discs, transmittance, default night gradient, `lights`, `nightFactor` | 5.1 kB |
-| `/preetham` | Preetham day model (the default `model`) | +0.6 kB |
-| `/bruneton` | Bruneton day model and its precomputed tables (about 1.3 MB of GPU memory) | +1.1 kB |
-| `/clouds` | `clouds` | +0.6 kB |
-| `/night` | stylized `night` (stars, phased moon) | +1.0 kB |
-| `/fog` | `fog` | +1.1 kB |
-| `/reflection` | `reflectionTexture` | +0.3 kB |
-| `/lighting` | `lighting` (engine sun/moon light, ambient) | +0.7 kB |
+| `@margoengine/sky/base` | clock, sun/moon discs, transmittance, default night gradient, `lights`, `nightFactor` | 5.0 kB |
+| `/preetham` | Preetham day model (the default `model`) | 0.7 kB |
+| `/bruneton` | Bruneton day model and its precomputed tables (about 1.3 MB of GPU memory) | 2.2 kB |
+| `/clouds` | `clouds` | 0.9 kB |
+| `/night` | stylized `night` (stars, phased moon) | 1.3 kB |
+| `/fog` | `fog` | 1.7 kB |
+| `/reflection` | `reflectionTexture` | 0.8 kB |
+| `/lighting` | `lighting` (engine sun/moon light, ambient) | 1.0 kB |
 
-The root `Sky` is 10.2 kB with all of them; Night Citadel (base, night, fog) loads 7.2 kB, `stage.sky()` (base,
-night) 6.1 kB. With every feature the WGSL is byte-identical to the build before the split; with fewer,
+Each entry is compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)),
+so sums overstate a combined bundle: the root `Sky` is 10.2 kB with all of them, against 13.7 kB
+summed. `stage.sky()` (base, night) sums to about 6.3 kB and Night Citadel (base, night, fog) to about 8.1 kB. With every feature the WGSL is byte-identical to the build before the split; with fewer,
 the shaders leave out the unused functions and branches, and the GPU work, uploads and rendered pixels are the
 same as the root's for that configuration (`test/split.test.js`, and on a real GPU `test/browser-check.mjs`).
 An option or `model` whose feature is missing throws a `TypeError` naming the entry to import. Without a day model
