@@ -8,6 +8,7 @@ import { compactInternals } from './compact-internals.js';
 import { compactOutput, external, measureCoreStage } from './measure-size.js';
 import { packageOrder } from './package-order.js';
 import { buildWorkers } from './build-workers.js';
+import { staticEmbind } from './static-embind.js';
 async function compactPackage(name){
  const root=`packages/${name}/dist`,files=(await readdir(root)).filter(file=>file.endsWith('.js'));
  for(const file of files)await writeFile(`${root}/${file}`,compactInternals(await readFile(`packages/${name}/src/${file.replace(/\.js$/,'.ts')}`,'utf8'),await readFile(`${root}/${file}`,'utf8')));
@@ -57,7 +58,9 @@ for(const name of packageOrder(manifests)){
   // Retain analyzable asset URLs for the consuming app's bundler.
   for(const file of (await readdir(output)).filter(file=>file.endsWith('.js'))){const entry=resolve(output,file);await writeFile(entry,(await readFile(entry,'utf8')).replace(/(?:''|""|``)\s*\+\s*import\.meta\.url/g,'import.meta.url'));}
   await build({configFile:false,publicDir:false,logLevel:'warn',build:{outDir:resolve(output,'workers'),emptyOutDir:true,target:'es2022',lib:{entry:'packages/machinery/src/workers/cad-worker.ts',name:'CADWorker',formats:['iife'],fileName:()=> 'cad-runtime.js'}}});
-  for(const file of ['occt-import-js.js','occt-import-js.wasm'])await copyFile(`node_modules/occt-import-js/dist/${file}`,resolve(output,'workers',file));
+  // occt-import-js's embind wrappers would need 'unsafe-eval'; ship the closure form (scripts/static-embind.js). Wasm unchanged.
+  await writeFile(resolve(output,'workers/occt-import-js.js'),staticEmbind(await readFile('node_modules/occt-import-js/dist/occt-import-js.js','utf8'),'occt-import-js.js'));
+  await copyFile('node_modules/occt-import-js/dist/occt-import-js.wasm',resolve(output,'workers/occt-import-js.wasm'));
   await copyFile('node_modules/occt-import-js/LICENSE.md',resolve(output,'workers/OCCT-LICENSE.txt'));
   await copyFile('packages/machinery/src/workers/OCCT-NOTICE.txt',resolve(output,'workers/OCCT-NOTICE.txt'));
  }

@@ -588,8 +588,8 @@ again. On the full tier, five consecutive seconds under 55 FPS store the light t
 The game is static files: build with Vite (or any bundler that copies `new URL(..., import.meta.url)` assets, which
 the worker loaders and decoders use) and serve over HTTPS (WebGPU needs a secure context). [docs/deploying.md](../deploying.md)
 has tested Content Security Policy, caching and compression configs for Cloudflare Pages, Netlify, Vercel and Nginx:
-Margo needs `script-src 'wasm-unsafe-eval'` and `worker-src 'self'`, the Draco and KTX2 decoder workers need more
-(see that page), and no cross-origin isolation headers are needed. Rapier (`@dimforge/rapier3d-compat`) and
+Margo needs `script-src 'wasm-unsafe-eval'` and `worker-src 'self'` (the Draco and KTX2 decoder workers included,
+no `'unsafe-eval'`), and no cross-origin isolation headers are needed. Rapier (`@dimforge/rapier3d-compat`) and
 `recast-navigation` also compile Wasm; they are not part of that page's CSP check, so test your policy with them.
 An offline asset cache for GLB files and textures is coming; it has not merged.
 ## What you build yourself

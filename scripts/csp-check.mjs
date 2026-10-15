@@ -3,10 +3,11 @@
 // After `npm run build:packages` and `npm run build:site`, on AC power, under the GPU lock:
 //   node scripts/gpu-lock.mjs run --owner=<id> -- node scripts/csp-check.mjs     harness, create-margo app, site/dist
 //   node scripts/csp-check.mjs harness    any subset of: harness app site
-// CSP_OVERRIDE='<policy>' replaces the CSP on every response (to show what a missing directive breaks).
+// CSP_OVERRIDE='<policy>' replaces the CSP on every response (to show what a missing directive breaks); with `harness`
+// alone the run is recorded in examples/package-benchmarks/results/csp-check-negative.json.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync} from 'node:fs';
+import {copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync} from 'node:fs';
 import {createServer} from 'node:http';
 import {extname, join, resolve, sep} from 'node:path';
 import {chromium} from '@playwright/test';
@@ -77,9 +78,8 @@ const builds = [];
 if (want('harness')) {
   const dist = join(out, 'harness');
   await build({configFile: false, root: join(root, 'scripts/csp-check'), base: './', logLevel: 'warn', build: {outDir: dist, emptyOutDir: true, target: 'es2022', assetsInlineLimit: 0}});
-  // The harness ships the create-margo headers plus the eval-worker rules docs/deploying.md gives for Draco/KTX2 and STEP/IGES.
+  // The harness ships the create-margo headers unchanged: one strict policy (no 'unsafe-eval') on the page and every worker.
   copyFileSync(join(root, 'tools/create-margo/template/public/_headers'), join(dist, '_headers'));
-  appendFileSync(join(dist, '_headers'), readFileSync(join(root, 'scripts/csp-check/eval-workers.headers')));
   builds.push({name: 'harness', dist, pages: [['/', page => page.waitForFunction(() => window.cspCheck, null, {timeout: 120_000}).then(h => h.jsonValue())]]});
 }
 if (want('app')) {
@@ -105,7 +105,9 @@ if (want('site')) {
 
 if (!onAC()) throw new Error('On battery: refusing to start a browser run');
 let failed = 0;
-const report = {date: new Date().toISOString(), commit: execFileSync('git', ['rev-parse', '--short', 'HEAD'], {cwd: root, encoding: 'utf8'}).trim(), override: process.env.CSP_OVERRIDE ?? null, pages: []};
+const git = (...args) => execFileSync('git', args, {cwd: root, encoding: 'utf8'}).trim();
+// "+changes": run on uncommitted work (the evidence then lands in the commit that follows this one).
+const report = {date: new Date().toISOString(), commit: git('rev-parse', '--short', 'HEAD') + (git('status', '--porcelain', '--untracked-files=no') ? '+changes' : ''), override: process.env.CSP_OVERRIDE ?? null, pages: []};
 {
   const browser = await chromium.launch({channel: process.env.BROWSER_CHANNEL ?? 'msedge', headless: true, args: ['--enable-unsafe-webgpu']});
   report.browser = `${process.env.BROWSER_CHANNEL ?? 'msedge'} ${browser.version()}`;
@@ -125,7 +127,15 @@ const report = {date: new Date().toISOString(), commit: execFileSync('git', ['re
   if (!onAC()) throw new Error('Lost AC power during the run: discard it');
 }
 report.acPower = 'before and after';
-// The full default run is the committed evidence for docs/deploying.md (docs/whitepaper/claims.md DOC-072).
-if (!only.length && !report.override) writeFileSync(join(root, 'examples/package-benchmarks/results/csp-check.json'), JSON.stringify(report, null, 1) + '\n');
+// The full default run is the committed evidence for docs/deploying.md (docs/whitepaper/claims.md DOC-072). Override
+// (negative) runs of the harness are evidence too (DOC-074, LIM-024): each is kept in csp-check-negative.json under its
+// policy, and is expected to fail.
+const results = join(root, 'examples/package-benchmarks/results');
+if (!only.length && !report.override) writeFileSync(join(results, 'csp-check.json'), JSON.stringify(report, null, 1) + '\n');
+if (report.override && only.length === 1 && only[0] === 'harness') {
+  const file = join(results, 'csp-check-negative.json'), runs = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
+  runs[report.override] = report;
+  writeFileSync(file, JSON.stringify(runs, null, 1) + '\n');
+}
 console.log(failed ? `${failed} page(s) failed` : 'csp-check passed: zero CSP violations');
 process.exitCode = failed ? 1 : 0;

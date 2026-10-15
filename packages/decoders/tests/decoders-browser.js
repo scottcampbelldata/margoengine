@@ -19,7 +19,7 @@ window.runDecoderTests = async () => {
   const NativeWorker = window.Worker;
   window.Worker = class extends NativeWorker {constructor(url, options) {super(url, options); spawned.push({url: String(url), type: options?.type});}};
 
-  // Draco through module workers against the glTF accessor contract.
+  // Draco through classic workers (importScripts, no eval) against the glTF accessor contract.
   const draco = new DracoDecoder({workerLimit: 2});
   for (const name of ['Box', 'Avocado']) {
     const doc = JSON.parse(new TextDecoder().decode(await fixture(`${name}.gltf`))), bin = await fixture(`${name}.bin`), primitive = doc.meshes[0].primitives[0];
@@ -30,11 +30,11 @@ window.runDecoderTests = async () => {
     check(result.positions.buffer.byteLength === result.positions.byteLength, `${name} positions own a transferred buffer`);
     check(bin.byteLength > 0, `${name} caller buffer kept`);
   }
-  checks.push('Draco Box and Avocado decode in module workers with transferred, owned arrays');
+  checks.push('Draco Box and Avocado decode in classic workers with transferred, owned arrays');
 
   const doc = JSON.parse(new TextDecoder().decode(await fixture('Avocado.gltf'))), bin = await fixture('Avocado.bin'), ids = doc.meshes[0].primitives[0].extensions.KHR_draco_mesh_compression.attributes;
   const burst = await longestFrameGap(() => Promise.all(Array.from({length: 64}, () => draco.decode(bin, {attributeIds: ids}))));
-  check(spawned.length === 2 && spawned.every(w => w.type === 'module'), `worker limit respected: ${spawned.length}`);
+  check(spawned.length === 2 && spawned.every(w => w.type === undefined), `worker limit respected: ${spawned.length}`);
   report.dracoBurst = {decodes: 64, ...burst};
   checks.push('64 concurrent Draco decodes share a 2-worker pool');
 

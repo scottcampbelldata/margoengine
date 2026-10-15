@@ -1,0 +1,85 @@
+{
+ "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'": {
+  "date": "2026-10-15T17:32:06.817Z",
+  "commit": "dddb936+changes",
+  "override": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+  "pages": [
+   {
+    "build": "harness",
+    "ok": false,
+    "path": "/",
+    "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+    "result": {
+     "ok": false,
+     "error": "page.waitForFunction: Timeout 120000ms exceeded."
+    },
+    "problems": [
+     "pageerror: WebAssembly.compile(): Compiling or instantiating WebAssembly module violates the following Content Security policy directive because 'unsafe-eval' is not an allowed source of script in the following Content Security Policy directive: \"script-src 'self'\".",
+     "console: Refused to load (Content Security Policy) script-src wasm-eval http://127.0.0.1:51949/assets/index-vT5ASQGT.js:1"
+    ]
+   }
+  ],
+  "browser": "msedge 155.0.4283.45",
+  "acPower": "before and after"
+ },
+ "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'": {
+  "date": "2026-10-15T17:34:12.186Z",
+  "commit": "dddb936+changes",
+  "override": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+  "pages": [
+   {
+    "build": "harness",
+    "ok": true,
+    "path": "/",
+    "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+    "result": {
+     "ok": true,
+     "steps": {
+      "core": {
+       "ok": true,
+       "detail": "Engine.create (embedded Wasm kernel)"
+      },
+      "gltf-pro worker": {
+       "ok": true,
+       "detail": "flight-helmet-mobile.glb",
+       "ms": 202
+      },
+      "draco worker": {
+       "ok": true,
+       "detail": 24,
+       "ms": 72
+      },
+      "ktx2 worker": {
+       "ok": true,
+       "detail": "2048x2048 rgba8unorm",
+       "ms": 302
+      },
+      "bvh worker": {
+       "ok": true,
+       "detail": "built",
+       "ms": 20
+      },
+      "post stack": {
+       "ok": true,
+       "detail": "SSAO + Bloom + FXAA",
+       "ms": 3
+      },
+      "overlays": {
+       "ok": true,
+       "detail": "Stats, HTML labels, ViewCube, Inspector",
+       "ms": 10
+      },
+      "machinery STEP": {
+       "ok": true,
+       "detail": 1,
+       "ms": 545
+      }
+     }
+    },
+    "problems": []
+   }
+  ],
+  "browser": "msedge 155.0.4283.45",
+  "acPower": "before and after"
+ }
+}
