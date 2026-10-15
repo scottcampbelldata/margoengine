@@ -10,13 +10,15 @@ function decode(value: string, format: string): string {
         throw new LoaderError(format, 'syntax', `invalid character reference ${match}`);
       return String.fromCodePoint(code);
     }
-    const entity = ENTITIES[name];
+    const entity = Object.hasOwn(ENTITIES, name) ? ENTITIES[name] : undefined;
     if (entity === undefined) throw new LoaderError(format, 'syntax', `unknown entity ${match}`);
     return entity;
   });
 }
 
-const ATTRIBUTE = /([^\s=/]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+// The lookbehind starts a name only at a token boundary, so a long run with no `=` is scanned once, not once per
+// character (quadratic, ReDoS).
+const ATTRIBUTE = /(?<![^\s=/"'])([^\s=/]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
 
 export interface XMLHandler {
   /** Element names are local names (namespace prefix removed). */
@@ -82,7 +84,8 @@ export function readXML(xml: string, handler: XMLHandler, format = 'XML', maxDep
     const raw = nameEnd < 0 ? inner : inner.slice(0, nameEnd);
     if (!raw) throw new LoaderError(format, 'syntax', 'empty tag name');
     const name = local(raw);
-    const attributes: Record<string, string> = {};
+    // Null prototype: attribute names come from the file (`__proto__="..."`, `constructor="..."`).
+    const attributes: Record<string, string> = Object.create(null);
     if (nameEnd >= 0) {
       ATTRIBUTE.lastIndex = 0;
       const rest = inner.slice(nameEnd);

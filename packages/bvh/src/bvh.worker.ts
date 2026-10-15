@@ -15,6 +15,7 @@ const scope = globalThis as unknown as {
 };
 
 scope.onmessage = ({ data }) => {
+  if (!data || typeof data !== 'object') return; // only BuildRequest objects from async.ts
   const { id, positions, stride, indices, options, returnSource } = data;
   try {
     const result = buildBVH(positions, stride, indices, options);

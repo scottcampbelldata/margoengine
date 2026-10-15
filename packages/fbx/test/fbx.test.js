@@ -430,6 +430,41 @@ test('embedded and referenced textures are carried into the GLB', async () => {
     globalThis.fetch = fetch;
   }
 });
+test('security: FBX texture names stay inside resourcePath unless allowedURLs lists them (gate 11b)', async () => {
+  const fetched = [],
+    fetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    fetched.push(String(url));
+    return new Response(new Uint8Array([1, 2, 3]));
+  };
+  try {
+    const resourcePath = 'https://example.test/assets/';
+    for (const file of ['../secret.png', '..%2Fsecret.png', 'a/../../secret.png'])
+      await assert.rejects(
+        convertFBX(textured(1, { embedded: false, file }), { resourcePath }),
+        /leaves the model's directory/,
+        file,
+      );
+    // Without resourcePath (parseFBX's default) names resolve against the page and never reach another origin.
+    globalThis.location = { href: 'https://app.test/viewer/index.html' };
+    try {
+      for (const file of ['https://evil.test/x.png', '//evil.test/x.png', '../x.png'])
+        await assert.rejects(convertFBX(textured(1, { embedded: false, file })), /leaves the model's directory/, file);
+      assert.deepEqual(fetched, []);
+      await convertFBX(textured(1, { embedded: false, file: 'https://cdn.test/maps/x.png' }), {
+        allowedURLs: ['https://cdn.test/maps/'],
+      });
+    } finally {
+      delete globalThis.location;
+    }
+    // A `.constructor` extension is not a MIME type (own keys only), so nothing is fetched for it.
+    const doc = json(await convertFBX(textured(1, { embedded: false, file: 'x.constructor' }), { resourcePath }));
+    assert.equal(doc.images?.length ?? 0, 0);
+    assert.deepEqual(fetched, ['https://cdn.test/maps/x.png']);
+  } finally {
+    globalThis.fetch = fetch;
+  }
+});
 test('FBX texture pixel accounting reads each decoded image once', () =>
   withBitmaps(
     async () => {

@@ -47,7 +47,7 @@ export function detectFormat(input: BinaryInput, name?: string): LoaderFormat | 
   if (/^(#[^\n]*\n|\s)*(VERSION|FIELDS)\s/.test(head) || /^#\s*\.PCD/.test(head)) return 'pcd';
   if (/^(#[^\n]*\n|\s)*(ST)?C?N?4?n?OFF\b/.test(head)) return 'off';
   const extension = name?.toLowerCase().match(/\.([a-z0-9]+)(?:[?#].*)?$/)?.[1];
-  if (extension && EXTENSIONS[extension]) return EXTENSIONS[extension];
+  if (extension && Object.hasOwn(EXTENSIONS, extension)) return EXTENSIONS[extension];
   if (/^(\s*(#|\/\/)[^\n]*\n)*\s*[-+]?(\d|\.\d)/.test(head)) return 'xyz';
   return null;
 }

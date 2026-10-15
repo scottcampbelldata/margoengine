@@ -27,6 +27,7 @@ export interface ThreeMFOptions extends ParseLimits, Pick<ZipOptions, 'maxEntrie
 export interface ThreeMFResult extends LoadedGeometry {
   kind: 'mesh';
   unit: string;
+  /** `<metadata>` entries by name, in a null-prototype object (names come from the file). */
   metadata: Record<string, string>;
 }
 
@@ -102,7 +103,8 @@ function parseModel(xml: string, limit: { maxVertices: number; maxTriangles: num
     properties: new Map(),
     propertyIds: [],
     items: [],
-    metadata: {},
+    // Null prototype: <metadata name="..."> comes from the file (`__proto__`, `constructor`, `hasOwnProperty`).
+    metadata: Object.create(null),
   };
   const propertyIds = model.propertyIds;
   let object: ObjectData | undefined,
@@ -121,7 +123,7 @@ function parseModel(xml: string, limit: { maxVertices: number; maxTriangles: num
             if (sawModel) throw new LoaderError(F, 'syntax', 'nested <model>');
             sawModel = true;
             model.unit = a.unit ?? 'millimeter';
-            if (!(model.unit in THREEMF_UNITS))
+            if (!Object.hasOwn(THREEMF_UNITS, model.unit))
               throw new LoaderError(F, 'unsupported', `unknown unit "${model.unit.slice(0, 32)}"`);
             break;
           case 'metadata':

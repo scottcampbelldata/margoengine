@@ -21,6 +21,8 @@ const load: ScriptLoader = async (url) => self.importScripts(url);
 let draco: Promise<ModuleBox> | undefined, basis: Promise<ModuleBox> | undefined;
 
 self.onmessage = async ({ data }) => {
+  // Jobs come only from this package's pool; anything that is not a job object is ignored.
+  if (!data || typeof data !== 'object') return;
   const { id } = data;
   try {
     if (data.type === 'draco') {

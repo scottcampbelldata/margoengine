@@ -47,7 +47,8 @@ export async function prepareGLTF(
   buffers?: Array<ArrayBuffer | ArrayBufferView>,
   maxDownloadBytes?: number,
   maxNodes?: number,
+  allowedURLs?: readonly string[],
 ): Promise<PreparedGLTF> {
-  const { asset, images } = await loadAsset(url, { buffers, maxDownloadBytes, maxNodes }, input);
+  const { asset, images } = await loadAsset(url, { buffers, maxDownloadBytes, maxNodes, allowedURLs }, input);
   return prepareAsset(asset, images);
 }

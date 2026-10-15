@@ -1,6 +1,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import { parseGLTF, type PBRModel } from '@margoengine/gltf-pro';
 import { readResponse } from '../../shared/loading.js';
+import { assetURL } from '../../shared/asset-url.js';
 import { readFBX } from './reader.js';
 import { fbxToGLB } from './convert.js';
 export interface FBXOptions {
@@ -8,13 +9,18 @@ export interface FBXOptions {
   signal?: AbortSignal;
   /** Fetch for the file and its textures, for example `@margoengine/cache`'s `cache.fetch`. Default `globalThis.fetch`. */
   fetch?: typeof fetch;
+  /**
+   * URL prefixes (for example `https://cdn.example.com/textures/`) that texture file names inside the FBX may resolve to
+   * besides `resourcePath`'s directory. Default none: absolute, cross-origin and `../`-escaping names throw a TypeError.
+   */
+  allowedURLs?: readonly string[];
 }
 const budget = 64 * 1024 * 1024;
 
 /** Native binary (7.x) and ASCII FBX to GLB: hierarchy, pivots, Phong/Lambert as PBR, textures, skins, blend shapes and animation clips. */
 export async function convertFBX(
   input: ArrayBuffer | ArrayBufferView,
-  { resourcePath = '', signal, fetch: get = globalThis.fetch }: FBXOptions = {},
+  { resourcePath = '', signal, fetch: get = globalThis.fetch, allowedURLs }: FBXOptions = {},
 ): Promise<ArrayBuffer> {
   signal?.throwIfAborted();
   if (
@@ -34,19 +40,30 @@ export async function convertFBX(
       : new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
   const records = await readFBX(bytes);
   signal?.throwIfAborted();
+  let fetched = 0;
   const texture = async (name: string) => {
-    let url: URL;
+    let url: URL, directory: string;
     try {
       url = new URL(resourcePath + name, globalThis.location?.href);
+      directory = new URL(resourcePath || '.', globalThis.location?.href).href;
     } catch {
       throw new Error('FBX texture failed: ' + name);
     }
+    // File names come from the FBX: they stay inside resourcePath's directory unless allowedURLs says otherwise.
+    url = assetURL(url.href, directory, allowedURLs, 'FBX texture');
     const response = await get(http(url), { signal }).catch((error) => {
       if (signal?.aborted) throw error;
       throw new Error('FBX texture failed: ' + url.href);
     });
     if (!response.ok) throw new Error('FBX texture failed: ' + url.href);
-    return readResponse(response, { maxBytes: budget, signal, label: 'FBX texture' });
+    // Each texture within budget, all of them together within the converted GLB's budget (budget * 2, checked below).
+    const bytes = await readResponse(response, {
+      maxBytes: Math.min(budget, budget * 2 - fetched),
+      signal,
+      label: 'FBX texture',
+    });
+    fetched += bytes.length;
+    return bytes;
   };
   const result = await fbxToGLB(records, texture, 1_000_000, signal);
   signal?.throwIfAborted();

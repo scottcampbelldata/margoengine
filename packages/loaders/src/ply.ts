@@ -132,15 +132,16 @@ export function parsePLYHeader(input: BinaryInput): PLYHeader {
       const element = elements[elements.length - 1];
       if (!element) throw new LoaderError(F, 'header', 'property before any element');
       if (parts[1] === 'list') {
-        const count = TYPES[parts[2]],
-          item = TYPES[parts[3]];
+        // Own keys only: `property constructor x` must not resolve Object.prototype.constructor as a type.
+        const count = Object.hasOwn(TYPES, parts[2]) ? TYPES[parts[2]] : undefined,
+          item = Object.hasOwn(TYPES, parts[3]) ? TYPES[parts[3]] : undefined;
         if (parts.length !== 5 || !count || !item)
           throw new LoaderError(F, 'header', `invalid list property "${line.slice(0, 80)}"`);
         if (count === 'float32' || count === 'float64')
           throw new LoaderError(F, 'header', 'list counts must be integers');
         element.properties.push({ name: parts[4], type: item, list: { count } });
       } else {
-        const type = TYPES[parts[1]];
+        const type = Object.hasOwn(TYPES, parts[1]) ? TYPES[parts[1]] : undefined;
         if (parts.length !== 3 || !type) throw new LoaderError(F, 'header', `invalid property "${line.slice(0, 80)}"`);
         element.properties.push({ name: parts[2], type });
       }

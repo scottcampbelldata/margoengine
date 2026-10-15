@@ -67,6 +67,7 @@ export async function loadGLTFInWorker(
         url: new URL(url, globalThis.location.href).href,
         maxDownloadBytes: options.maxDownloadBytes,
         maxNodes: options.maxNodes,
+        allowedURLs: options.allowedURLs,
       },
       options.signal,
     ),
@@ -93,6 +94,7 @@ export async function parseGLTFInWorker(
     buffers: options.buffers?.map(movable),
     maxDownloadBytes: options.maxDownloadBytes,
     maxNodes: options.maxNodes,
+    allowedURLs: options.allowedURLs,
   };
   return modelFromPrepared(
     instance,

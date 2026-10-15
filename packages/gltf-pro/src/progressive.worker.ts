@@ -7,14 +7,18 @@ const scope = self as unknown as {
   postMessage(message: unknown, transfer: Transferable[]): void;
 };
 let stream: GLTFStream | undefined;
+// One {url} start, then {order} updates (integer primitive keys); anything else is ignored.
 scope.onmessage = ({ data }) => {
-  if (data.order) stream?.setOrder(data.order);
-  else
+  if (!data || typeof data !== 'object') return;
+  if (Array.isArray(data.order)) {
+    if (data.order.every(Number.isSafeInteger)) stream?.setOrder(data.order);
+  } else if (!stream && typeof data.url === 'string')
     void (stream = new GLTFStream(
       new URL(data.url),
       (message) => scope.postMessage(message, [...transferables(message)]),
       new AbortController().signal,
       data.maxDownloadBytes,
       data.maxNodes,
+      data.allowedURLs,
     )).run();
 };

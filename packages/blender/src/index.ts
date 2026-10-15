@@ -8,6 +8,7 @@ import {
 } from '@margoengine/gltf-pro';
 import { readResponse } from '../../shared/loading.js';
 import { checkCount, countLimit } from '../../shared/limits.js';
+import { parseJSON } from '../../shared/json.js';
 
 const maxBytes = 256 * 1024 * 1024;
 const littleEndian = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
@@ -73,7 +74,7 @@ export function decodeMargo(input: ArrayBuffer | ArrayBufferView, { maxNodes }: 
     end = (offset + size + 3) & ~3;
   }
   if (end !== length) throw new RangeError('Trailing/truncated .margo data');
-  const doc = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(sections[0].bytes));
+  const doc = parseJSON(new TextDecoder('utf-8', { fatal: true }).decode(sections[0].bytes));
   if (
     !doc ||
     doc.asset?.version !== '2.0' ||

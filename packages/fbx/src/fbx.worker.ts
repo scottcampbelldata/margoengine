@@ -5,13 +5,14 @@ import { readResponse } from '../../shared/loading.js';
 import { serve } from '../../shared/worker.js';
 import { convertFBX } from './index.js';
 const budget = 64 * 1024 * 1024; // convertFBX's input budget
-serve(async ({ url, input, resourcePath }: { url?: string; input?: ArrayBuffer; resourcePath?: string }) => {
+type FBXJob = { url?: string; input?: ArrayBuffer; resourcePath?: string; allowedURLs?: readonly string[] };
+serve(async ({ url, input, resourcePath, allowedURLs }: FBXJob) => {
   if (url) {
     const response = await fetch(url);
     input = (await readResponse(response, { maxBytes: budget, label: 'FBX' })).buffer;
     resourcePath ??= new URL('.', response.url || url).href;
   }
-  const prepared = await prepareGLTF(undefined, await convertFBX(input!, { resourcePath }));
+  const prepared = await prepareGLTF(undefined, await convertFBX(input!, { resourcePath, allowedURLs }));
   // parseFBX's texture budget (all textures together), checked after decoding as it does.
   if (prepared.images.reduce((sum, image) => sum + (image ? image.width * image.height : 0), 0) > 16_000_000) {
     for (const image of prepared.images) if (image && 'close' in image) image.close();

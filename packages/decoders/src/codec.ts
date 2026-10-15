@@ -104,15 +104,16 @@ export function decodeDraco(draco: any, bytes: Uint8Array, request: DracoRequest
     const result: DecodedDracoGeometry = {
       vertexCount,
       positions: undefined as unknown as Float32Array,
-      attributes: {},
+      attributes: Object.create(null),
     };
     for (const [semantic, id] of Object.entries(ids)) {
       if (!Number.isSafeInteger(id) || id < 0) throw new TypeError(`Draco: invalid attribute id for ${semantic}`);
       const attribute = byId ? decoder.GetAttributeByUniqueId(geometry, id) : decoder.GetAttribute(geometry, id);
       if (!attribute || !attribute.ptr) throw new Error(`Draco: missing attribute ${semantic}`);
-      const field = fields[semantic],
+      // Own keys only: semantics and component types come from the glTF (`constructor`, `__proto__`).
+      const field = Object.hasOwn(fields, semantic) ? fields[semantic] : undefined,
         componentType = field ? 5126 : (request.componentTypes?.[semantic] ?? 5126),
-        type = dracoTypes[componentType];
+        type = Object.hasOwn(dracoTypes, componentType) ? dracoTypes[componentType] : undefined;
       if (!type) throw new TypeError(`Draco: unsupported component type ${componentType} for ${semantic}`);
       const [name, Ctor] = type,
         itemSize: number = attribute.num_components(),

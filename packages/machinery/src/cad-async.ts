@@ -55,6 +55,10 @@ export function parseCADAsync(
     worker.onmessageerror = () => fail(new Error('CAD worker message failed'));
     worker.onmessage = (event) => {
       const message = event.data;
+      if (!message || typeof message !== 'object') {
+        fail(new TypeError('Invalid CAD worker message'));
+        return;
+      }
       if (message.error) {
         fail(new Error(message.error));
         return;

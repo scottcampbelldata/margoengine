@@ -70,7 +70,7 @@ class Reader {
   /** Reads `count` values of `type` (`binary` big-endian, or whitespace separated text). */
   values(type: string, count: number, what: string, forceType?: string): Float64Array {
     const kind = (forceType ?? type).toLowerCase();
-    const size = SIZES[kind];
+    const size = Object.hasOwn(SIZES, kind) ? SIZES[kind] : undefined;
     if (size === undefined)
       throw new LoaderError(F, 'unsupported', `unknown data type "${type.slice(0, 32)}" in ${what}`);
     if (size === 0) throw new LoaderError(F, 'unsupported', `bit arrays are not supported (${what})`);
@@ -138,7 +138,8 @@ export function parseVTK(input: BinaryInput, options: VTKOptions = {}): LoadedGe
     normals: Float32Array | undefined,
     colors: Float32Array | undefined,
     uvs: Float32Array | undefined;
-  const attributes: Record<string, Float32Array> = {};
+  // Null prototype: SCALARS names come from the file (`SCALARS __proto__ float` swapped a plain object's prototype).
+  const attributes: Record<string, Float32Array> = Object.create(null);
   const indices = uints();
   let pointCount = 0,
     section: 'none' | 'point' | 'cell' = 'none',

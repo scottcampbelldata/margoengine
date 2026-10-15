@@ -7,6 +7,7 @@ import { EngineKernel, Mesh } from "@margoengine/core";
 
 export interface GLTFOptions {
     maxNodes?: number;
+    allowedURLs?: readonly string[];
 }
 
 export interface Model {
@@ -16,7 +17,7 @@ export interface Model {
     dispose(): void;
 }
 
-export function loadGLTF(engine: EngineKernel, url: string | URL, { signal, maxNodes }?: GLTFOptions & {
+export function loadGLTF(engine: EngineKernel, url: string | URL, { signal, maxNodes, allowedURLs }?: GLTFOptions & {
     signal?: AbortSignal;
 }): Promise<Model>;
 
