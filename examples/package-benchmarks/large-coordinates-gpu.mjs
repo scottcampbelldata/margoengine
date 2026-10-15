@@ -38,7 +38,9 @@ try {
         for (let i = 0; i < shot.mask.length; i++) {xor += shot.mask[i] ^ ref.mask[i]; for (let c = 0; c < 3; c++) diff += Math.abs(shot.data[i * 4 + c] - ref.data[i * 4 + c]);}
         frames.push({dx: shot.n ? shot.cx - ref.cx : NaN, dy: shot.n ? shot.cy - ref.cy : NaN, xor, pixels: shot.n, meanDiff: diff / shot.mask.length / 3});
       }
-      const pick = await page.evaluate(() => window.check.pick());
+      // Pick a pixel well inside the reference silhouette of the last frame (the flange centre is its hole).
+      const last = reference[FRAMES - 1], inside = i => [-3, 0, 3].every(dy => [-3, 0, 3].every(dx => last.mask[i + dy * 640 + dx])), at = last.mask.findIndex((v, i) => v && inside(i));
+      const pick = await page.evaluate(([x, y]) => window.check.pick(x, y), [at % 640, Math.floor(at / 640)]);
       let jitter = 0; for (let k = 1; k < FRAMES; k++) jitter = Math.max(jitter, Math.hypot(frames[k].dx - frames[k - 1].dx, frames[k].dy - frames[k - 1].dy));
       const run = {kind, mode, distance, rebases, pick, coveredPixels: frames[0].pixels,
         maxOffsetPx: Math.max(...frames.map(f => Math.hypot(f.dx, f.dy))), jitterPx: jitter, maxXorPixels: Math.max(...frames.map(f => f.xor)), maxMeanColorDiff: Math.max(...frames.map(f => f.meanDiff))};

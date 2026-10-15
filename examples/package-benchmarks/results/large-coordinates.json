@@ -169,5 +169,30 @@
       "rebases": 2
     }
   ],
-  "cost": []
+  "cost": [
+    {
+      "parts": 10000,
+      "visible": 675,
+      "medianMs": {
+        "staticFrame": 0.345,
+        "rebaseCall": 0.771,
+        "rebaseFrame": 1.469,
+        "moveAllFrame": 1.979
+      },
+      "rebaseUploadBytes": 64880,
+      "moveUploadBytes": 64880
+    },
+    {
+      "parts": 50000,
+      "visible": 3500,
+      "medianMs": {
+        "staticFrame": 1.616,
+        "rebaseCall": 4.261,
+        "rebaseFrame": 7.127,
+        "moveAllFrame": 11.149
+      },
+      "rebaseUploadBytes": 336080,
+      "moveUploadBytes": 336080
+    }
+  ]
 }

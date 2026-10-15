@@ -5,6 +5,7 @@
 import {Engine,Geometry,PbrMaterial,box} from '/packages/core/dist/index.js';
 import {parseGLTF} from '/packages/gltf-pro/dist/index.js';
 import {FloatingOrigin} from '/packages/cameras/dist/origin.js';
+import {Picking} from '/packages/selection/dist/index.js';
 import {ROTATION,BOLTS,CAMERA,cameraOffset,position,flange} from './large-coordinates-scene.js';
 const canvas=document.querySelector('canvas'),engine=await Engine.create(canvas,{backend:'webgpu',capacity:50_016,camera:{...CAMERA}});
 const device=engine.gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
@@ -31,9 +32,11 @@ window.check={
   async setup(kind,mode,distance){
     scene?.dispose();scene=null;if(origin)engine.removePlugin(origin.name);origin=null;
     world=position(distance);
+    // gltf-pro models are picked through selection's Picking plugin; core meshes through plain engine.pick.
+    if(kind==='gltf'&&!engine.hasPlugin('picking'))Picking.attach(engine);if(kind!=='gltf'&&engine.hasPlugin('picking'))engine.removePlugin('picking');
     let root;
-    if(kind==='gltf'){const model=gltfFlange();root=model.root;scene={dispose:()=>model.dispose(),root};}
-    else{root=engine.createMesh().setGeometry(geometry).setMaterial(steel).setRotation(ROTATION);const bolts=BOLTS.map(p=>engine.createMesh(root).setGeometry(bolt).setMaterial(brass).setPosition(p));scene={dispose:()=>{for(const m of [...bolts,root])m.dispose();},root};}
+    if(kind==='gltf'){const model=gltfFlange();root=model.root;scene={dispose:()=>model.dispose(),root,parts:new Set([root,...model.nodes])};}
+    else{root=engine.createMesh().setGeometry(geometry).setMaterial(steel).setRotation(ROTATION);const bolts=BOLTS.map(p=>engine.createMesh(root).setGeometry(bolt).setMaterial(brass).setPosition(p));scene={dispose:()=>{for(const m of [...bolts,root])m.dispose();},root,parts:new Set([root,...bolts])};}
     if(mode==='origin'){origin=FloatingOrigin.attach(engine);origin.place(root,world);}else root.setPosition(world);
     // Warm up (pipelines compile asynchronously) so frame 0 is drawn like the reference's.
     await window.check.frame(0);for(let i=0;i<20;i++)await frame();await new Promise(r=>setTimeout(r,200));await frame();
@@ -44,7 +47,7 @@ window.check={
     if(origin)origin.lookAt(cam,world);else{engine.camera.position=cam;engine.camera.target=world;}
     await frame();return {errors:errors.splice(0),rebases:origin?.rebases??0};
   },
-  async pick(){const mesh=await engine.pick(320,180);return mesh===null?null:mesh===scene.root?'root':'other';},
+  async pick(x,y){const mesh=await engine.pick(x,y);return mesh===null?null:scene.parts.has(mesh)?'flange':'other';},
   // Rebase cost on the real device: n placed box roots over 2 km, 100 km out; ms per frame incl. GPU completion.
   async cost(n){
     scene?.dispose();scene=null;if(origin)engine.removePlugin(origin.name);
