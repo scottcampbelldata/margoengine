@@ -5,9 +5,9 @@ React 18/19 integration with a native canvas, stable mesh refs and frame callbac
 Package name: `@margoengine/react`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
 
 ```sh
-npm install margoengine@0.1.0 @margoengine/core@0.1.0 @margoengine/react@0.1.0 react@^19 react-dom@^19
+npm install margoengine@1.0.0 @margoengine/core@1.0.0 @margoengine/react@1.0.0 react@^19 react-dom@^19
 # Install the optional packages used by your JSX:
-npm install @margoengine/gltf-pro@0.1.0 @margoengine/environment@0.1.0 @margoengine/controls@0.1.0 @margoengine/shadows@0.1.0
+npm install @margoengine/gltf-pro@1.0.0 @margoengine/environment@1.0.0 @margoengine/controls@1.0.0 @margoengine/shadows@1.0.0
 ```
 
 ```tsx

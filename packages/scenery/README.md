@@ -41,5 +41,5 @@ The low-level `SkyMoonPass` (`@margoengine/scenery/sky-moon`) and the Night Cita
 removed when the three sky implementations were merged into `@margoengine/sky`. Use `Sky` directly for custom
 night skies, and Sky's `fog` (`falloff: 'exp'`, `height`, `color`) for the citadel's height haze.
 
-This ESM package includes strict TypeScript declarations, requires core 0.1.0 and `@margoengine/sky`, and supported
+This ESM package includes strict TypeScript declarations, requires core 1.0.0 and `@margoengine/sky`, and supported
 WebGPU hardware on HTTPS or localhost. MIT licensed.
