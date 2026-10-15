@@ -36,8 +36,9 @@ export const cullingShader=declarations(0)+/* wgsl */`
   }
   clusterCounts[id]=count;
 }`;
-/** WGSL for custom materials. With `shadow` (`@margoengine/clustered/shadows`), each light is multiplied by its `clusterShadow`. */
-export function clusteredSampling(group:number,shadow?:{declarations(group:number):string}):string {return declarations(group)+(shadow?shadow.declarations(group):'')+/* wgsl */`
+/** WGSL for custom materials. With `shadow` (`@margoengine/clustered/shadows`), each light is multiplied by its `clusterShadow`;
+ * with `area` (`@margoengine/clustered/area`), `clusterAreaLighting` is added to the sum. */
+export function clusteredSampling(group:number,shadow?:{declarations(group:number):string},area?:{declarations(group:number):string}):string {return declarations(group)+(shadow?shadow.declarations(group):'')+(area?area.declarations(group):'')+/* wgsl */`
 @group(${group}) @binding(6) var<storage,read> clusterCounts:array<u32>;
 @group(${group}) @binding(7) var<storage,read> clusterIndices:array<u32>;
 fn clusterLighting(pixel:vec2f,position:vec3f,n:vec3f,eye:vec3f,base:vec3f,roughness:f32,metal:f32)->vec3f {
@@ -60,5 +61,5 @@ fn clusterLighting(pixel:vec2f,position:vec3f,n:vec3f,eye:vec3f,base:vec3f,rough
     var cone=1.0;if(light.params.y>0.5){cone=clamp((dot(-l,light.directionOuter.xyz)-light.directionOuter.w)/max(light.params.x-light.directionOuter.w,0.00001),0.0,1.0);cone*=cone*(3-2*cone);}
     result+=((1-fresnel)*(1-metal)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${shadow?'*clusterShadow(light,position,n)':''};
   }
-  return result*clusterFrame.intensity.x;
+  return ${area?'(result+clusterAreaLighting(position,n,v,nv,base,roughness,metal))':'result'}*clusterFrame.intensity.x;
 }`;}

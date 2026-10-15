@@ -60,12 +60,16 @@
     },
     "@margoengine/clustered": {
       ".": {
-        "raw": 11763,
-        "gzip": 4503
+        "raw": 12060,
+        "gzip": 4590
       },
       "./shadows": {
         "raw": 13508,
         "gzip": 5228
+      },
+      "./area": {
+        "raw": 15232,
+        "gzip": 8999
       }
     },
     "@margoengine/controls": {

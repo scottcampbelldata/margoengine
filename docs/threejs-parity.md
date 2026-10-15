@@ -4,18 +4,18 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 ## Summary
 
-158 three.js features in 19 areas:
+159 three.js features in 19 areas:
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 91 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| COVERED | 93 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
 | PARTIAL | 39 | Some of it exists, but a common use case is missing. The notes say what. |
-| MISSING | 28 | No implementation was found in any package's `src/`. |
+| MISSING | 27 | No implementation was found in any package's `src/`. |
 
 Overall: Margo is strong where three.js relies on third-party libraries or examples. That includes cascaded PCSS shadows, clustered lighting, TAA, Gaussian splats, BVH queries, physics, navigation, terrain, water and sky. The day-one basics the first version of this matrix found missing (textures and materials on meshes you build, glTF extensions and compression, an orthographic camera, picking loaded models, image-based lighting outside React, combinable effects, FXAA, a math library) now exist as optional packages. What remains:
 
 - **WebGL2 reaches core meshes only.** The fallback is the optional `@margoengine/webgl` package and draws core meshes flat-shaded with one light. Textures, glTF-pro models, shadows, post-processing, lines, points, text and most other rendering packages need WebGPU.
-- **Lighting is thin outside clustered point and spot lights.** One directional light per engine, a colourless scalar ambient term, a fixed hemisphere fill in glTF-pro. Point and spot lights cast shadows through `@margoengine/clustered/shadows` (up to 16 shadowed lights). No RectAreaLight.
+- **Lighting is thin outside clustered point and spot lights.** One directional light per engine, a colourless scalar ambient term, a fixed hemisphere fill in glTF-pro. Point and spot lights cast shadows through `@margoengine/clustered/shadows` (up to 16 shadowed lights). Rectangle area lights (`@margoengine/clustered/area`) are unshadowed.
 - **Core owns one canvas, one camera and one pass graph.** There is no render-to-texture from a second camera, no CubeCamera and no multiple viewports. All of these need core changes, and core is frozen for v1.0.
 - **Materials stop at standard, basic, normal and matcap on your own meshes.** Physical features come only from glTF `KHR_materials_*` files and are approximated (transmission does not refract). No Lambert, Phong, depth or shadow-catcher materials, no second UV set and no geometry groups.
 - **glTF coverage has gaps.** `KHR_animation_pointer`, iridescence, anisotropy, dispersion and material variants are rejected when required. glTF cameras are exposed as data only, and export writes no cameras or lights.
@@ -123,7 +123,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | DirectionalLight | PARTIAL | core lighting `direction` and `radiance` (`packages/core/src/engine.ts`, through `core/extension`) | Exactly one per engine, and not on the public `EngineKernel` type. |
 | PointLight | COVERED † | clustered `Clustered.setLights` (`packages/clustered/src/index.ts`) | Up to 1,024 lights, WebGPU only; shadows with `castShadow` and `@margoengine/clustered/shadows` (see Shadows). Core meshes receive them automatically; glTF-pro models, materials meshes and terrain need `add()`. glTF `KHR_lights_punctual` lights come from `model.clusteredLights()`. |
 | SpotLight | COVERED † | clustered `Clustered.setLights` with inner and outer cone | Shadows as for PointLight. No projected `map`. |
-| RectAreaLight | MISSING | — | |
+| RectAreaLight | COVERED | clustered `AreaLights`, entry `@margoengine/clustered/area` (`packages/clustered/src/area.ts`) | Up to 64 rectangles (position, `direction`, optional `up`, width, height, colour, `intensity` in radiance, `twoSided`), shaded with linearly transformed cosines: GGX specular and Lambert diffuse, each quad clipped exactly to the surface's horizon. Core meshes and every `lights.add()` receiver (glTF-pro models, materials meshes, terrain). Every fragment evaluates every area light (no culling). No shadows from area lights. WebGPU only. |
 | LightProbe | PARTIAL | environment `projectEquirectSH`, `environment.sh` | One global probe from the environment map. No placed probes or probe volumes. |
 | IESSpotLight, ProjectorLight | MISSING | — | |
 | Physical light units (candela, lux) | MISSING | — | Intensities are unitless radiance scales. |
@@ -328,7 +328,7 @@ Every MISSING or PARTIAL item, ordered by how often real three.js projects need 
     **Fit:** extend materials.
 19. **Standalone compressed and data textures.** KTX2 files on materials meshes, float and single-channel `DataTexture`, `Data3DTexture`, `DataArrayTexture`, cube maps as a material input.
     **Fit:** extend materials (accept a decoders `GPUTexture` and more formats).
-20. **RectAreaLight.** Archviz and product lighting.
+20. [DONE] **RectAreaLight**: clustered `AreaLights` (`@margoengine/clustered/area`), linearly transformed cosines with exact horizon clipping, no texture bindings. Unshadowed.
     **Fit:** extend clustered (LTC).
 21. **Decals, Reflector and Refractor, and the missing geometries** (DecalGeometry, ConvexGeometry, RoundedBoxGeometry, ParametricGeometry).
     **Fit:** extend geometry; a planar reflector needs a second camera (gap 11).

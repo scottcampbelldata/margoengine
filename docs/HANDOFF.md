@@ -1012,10 +1012,30 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    c. Cheaper feature edges (GPU culling of edges, screen-size fade/drop; 4.7 ms at 50k today).
    d. CAD correctness: section caps on non-closed shells, measurement precision, snapping to edges/vertices.
    (Plus already queued: back-face culling B, 5f.a-c, 5g.d streaming + entity cap decision.)
-   General 3D: ~115/156 parity rows covered (88 now); every demo 60 FPS on the light tier; side-by-side renders that
+   General 3D: ~115/156 parity rows covered (93 of 159 now); every demo 60 FPS on the light tier; side-by-side renders that
    hold up against three.js/Babylon for the same scene.
    e. Light probes (irradiance volumes) and local reflection probes (cubemaps, box projection).
-   f. Rectangle area lights (LTC), three.js RectAreaLight equivalent.
+   f. [DONE] Rectangle area lights (LTC), three.js RectAreaLight equivalent: `@margoengine/clustered/area`
+      (`packages/clustered/src/area.ts`), `AreaLights.attach(engine, {lights})` + `setLights([{position, direction,
+      width, height, up?, color?, intensity?, twoSided?}])`, up to 64. Intensity = radiance (three.js units; a light of
+      area A equals a clustered point light of intensity `intensity x A` facing the surface, test to 0.1%). GGX specular
+      + Lambert diffuse with linearly transformed cosines; each quad is clipped exactly to the receiver's horizon (three.js
+      approximates), so diffuse equals the exact form factor. Composed inside clustered's `clusterLighting` through a new
+      `Clustered.area` hook (like `shadow`), so core meshes and every `lights.add()` receiver (gltf-pro, materials,
+      terrain) get it; intensityScale applies. LUT: 32x32 cells x 6 float16 (inverse matrix x,y,z,w + magnitude +
+      Fresnel), resampled from three.js r186's 64x64 copy of the ltc_code fit by `scripts/build-ltc.mjs` into
+      `src/ltc.ts` (2D-predicted zigzag varints, base64), stored in the SAME storage buffer as the lights (binding 17)
+      and filtered bilinearly by hand: 0 textures/samplers (gltf-pro "Texture bindings" unchanged; storage buffers in
+      the lit fragment 3+1+1 = 5 of 8). 32x32 vs 64x64: identical error vs brute force at every test case, closer at
+      >84 deg glossy (where the fit itself is off by up to ~40%), 9.0 kB vs ~21 kB entry. Accuracy
+      (`packages/clustered/test/area.test.js`, vs midpoint quadrature of GGX height-correlated Smith + Schlick + Lambert,
+      15 cases roughness 0.1-1, views 0-80 deg, one light crossing the horizon): diffuse < 0.2%; specular (F=1) within
+      5% up to 60 deg, worst +16% at 80 deg r0.5; dielectric pixel within 14% up to 60 deg, worst -19% at 80 deg r0.5;
+      mean |specular| error ~2%. Zero cost unless used: the buffer and hook exist only while the list is non-empty;
+      `proofs/clustered-area-lights.proof.js` records 482 identical GPU calls vs 67e0172 at 1x/4x MSAA without the entry
+      and with an empty AreaLights (and checks one light reaches both shaders). Sizes: clustered root 4,503 -> 4,590 B
+      (+87, hook), `./area` 8,999 B gzip. Limits: no cluster culling (every fragment loops every area light: they have no
+      range), no shadows from area lights, no textured lights, WebGPU only. Real GPU: AREA_GPU_RESULTS.
    g. Physical material on user-built meshes (materials package), with real transmission/refraction.
    h. Projected decals.
    i. HDR canvas output on HDR displays (with 5h.c Display P3). DONE: environment `ColorOutput` (`hdr: true`, `peak`) +
@@ -1120,7 +1140,8 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       - geometry triangulate-inputs: the 1.5 s spawnSync timeout included Node child startup (ETIMEDOUT under load).
         Kill timeout is now 120 s (catches a hang); the 1.5 s budget is asserted on the child's own CPU time for the
         calls.
-   m. docs/threejs-parity.md summary counts drifted (OIT added a COVERED row without updating the totals) - recount.
+   m. [DONE with 5l.f] docs/threejs-parity.md summary counts drifted (OIT added a COVERED row without updating the
+      totals) - recounted after rebasing onto 3aacae2: 159 rows, 93 COVERED (RectAreaLight now one of them), 39 PARTIAL, 27 MISSING.
    Order: after the current wave, alongside the hygiene phase (5k) and under its gates, before the demo rebuild.
 5m. [a DONE, b DONE (hook +34 B); core + stage 19,922 B gzip, 77 B headroom] CORE APPROVALS, conditional (Scott, 2026-10-14 night): do both IF core+stage stays under 20,000 B gzip
    (`npm run measure:size`; the build gate fails at >= 20,000). No safety margin needed: 19,999 is acceptable (Scott).

@@ -71,6 +71,8 @@ class Clustered implements EnginePlugin {
     intensityScale: number | (() => number);
     get shadow(): ClusteredShadow | undefined;
     set shadow(hook: ClusteredShadow | undefined);
+    get area(): ClusteredArea | undefined;
+    set area(hook: ClusteredArea | undefined);
     constructor(options?: ClusteredOptions);
     get owner(): Engine | undefined;
     static attach(instance: EngineKernel, options?: ClusteredOptions): Clustered;
@@ -92,6 +94,11 @@ class Clustered implements EnginePlugin {
     dispose(): void;
     [Symbol.dispose]: () => void;
     destroy(): void;
+}
+
+interface ClusteredArea {
+    declarations(group: number): string;
+    bindings(): GPUBindGroupEntry[];
 }
 
 interface ClusteredOptions {
