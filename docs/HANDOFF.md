@@ -1985,9 +1985,9 @@ up front: "do I need 40 installs to draw a cube?" and "will package versions cla
 before publishing; use only measured numbers from claims.md.
 
 Facts today: 73 packages (72 `@margoengine/*` + `margoengine`). `margoengine` is the stage facade (`createStage`):
-core + stage = 19,928 B gzip (`npm run measure:size`). Installing it also installs gltf, machinery, creative and scenery,
-but their code loads only on first use (`app.load()` for glTF/STL/OBJ/STEP/IGES, `app.sky()`, particles, post), so a
-spinning model costs core + stage + the gltf entry.
+core + stage = 19,999 B gzip (`npm run measure:size`). Installing it also installs gltf, machinery, creative, scenery,
+environment and shadows, but their code loads only on first use (`app.load()` for glTF/STL/OBJ/STEP/IGES, `app.sky()`,
+particles, post, `app.environment()`, `app.shadows()`), so a spinning model costs core + stage + the gltf entry.
 
 1. Three ways in, shown at the top of the README and the getting-started page, in this order:
    - `npm create margo@latest my-app`: a working app from the template (quality tiers, orbit controls, stats,
@@ -1995,8 +1995,21 @@ spinning model costs core + stage + the gltf entry.
    - `npm install margoengine`: `createStage('#scene')`, then `app.load('model.glb')` - five lines, no other installs.
    - Pick-and-choose: `npm install @margoengine/core @margoengine/gltf-pro @margoengine/culling` for teams that count
      bytes. Each package README starts with its size and what it peers on.
-   Check before launch: does the stage cover the common case (environment lighting and shadows are separate packages
-   today)? Any addition is lazy-loaded or it raises core + stage, which must stay under 20,000 B.
+   Check before launch: does the stage cover the common case? [DONE 2026-10-15: `await app.environment(url, options)`
+   and `await app.shadows(options)` lazy-load `@margoengine/environment` and `@margoengine/shadows` (now `margoengine`
+   dependencies, `^1.0.0`) like `app.sky()`. Core + stage 19,928 -> 19,999 B gzip (`npm run measure:size`): ONE byte
+   under the 20,000 gate, so the stage has no room left for another method. To fit, the IBL glue lives in the
+   environment pack (`EnvironmentLighting.load(engine, urlOrSource, options)`: fetch/decode, `Environment.attach`,
+   lighting, AbortError and nothing attached if the engine is disposed or `signal` aborts; disposing the lighting also
+   removes its environment), and shadows cast from the meshes present at the call (later ones: `shadows.add(mesh)`).
+   Lazy packs on first call (Vite minify, core external): environment 25,572 B gzip, shadows 7,120 B.
+   Real GPU (`scripts/stage-features-gpu-check.js`, Arc 140V / Edge 155 headless, GPU lock): stage with a loaded glTF
+   cube on a floor; `app.environment(spot1Lux.hdr, {intensity: 4})` changed 66,084 of 120,000 pixels, then
+   `app.shadows({resolution: 1024})` changed 3,266 (8 dynamic caster draws); 0 validation errors; `app.dispose()`
+   disposed the lighting, its environment and shadows and removed the canvas, and a load pending at dispose rejected
+   with AbortError. Seen in the frame (test-results/stage-features-shadows.png): the 1 m cube's shadow edge is visibly
+   stair-stepped at the default `distance: 500`; not investigated (suspect coarse cascade texels for a tiny scene).]
+   Any further addition is lazy-loaded or it raises core + stage, which must stay under 20,000 B.
 2. Show packages grouped by layer wherever they are listed (site catalog, docs/README.md, README), never as one
    alphabetical list of 73: add a `category` field per package (build-catalog.js -> docs/catalog.json) and group the
    catalog page. Layers (all 73 real names):

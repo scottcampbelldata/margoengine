@@ -3,6 +3,8 @@ import type {Engine as RuntimeEngine} from '@margoengine/core/extension';
 import type {CADFormat, CADImportOptions} from '@margoengine/machinery';
 import type {ParticleOptions, PostOptions} from '@margoengine/creative';
 import type {SkyMoonConfig} from '@margoengine/scenery';
+import type {EnvironmentLighting, EnvironmentLoadOptions, EnvironmentSource} from '@margoengine/environment';
+import type {ShadowOptions, Shadows} from '@margoengine/shadows';
 import {loadedModel, worldBounds, type LoadedModel} from './model.js';
 
 export * from '@margoengine/core';
@@ -113,6 +115,25 @@ export class Stage {
     const {PostProcessing} = await import('@margoengine/creative/post');
     this.imports.signal.throwIfAborted();
     return this.use(new PostProcessing(options));
+  }
+  /**
+   * Loads `@margoengine/environment` and lights every mesh with image-based lighting from an `.hdr`, `.exr` or
+   * UltraHDR `.jpg` URL (or a decoded source). Rejects with `AbortError`, attaching nothing, if the stage is disposed first.
+   */
+  async environment(source: string | URL | EnvironmentSource, options?: EnvironmentLoadOptions): Promise<EnvironmentLighting> {
+    const {EnvironmentLighting} = await import('@margoengine/environment');
+    return EnvironmentLighting.load(this.engine, source, options);
+  }
+  /**
+   * Loads `@margoengine/shadows` and attaches cascaded shadows for the stage's directional light. Meshes present now
+   * cast; add later ones with `shadows.add(mesh)`. Rejects with `AbortError` if the stage is disposed first.
+   */
+  async shadows(options: ShadowOptions = {}): Promise<Shadows> {
+    const {Shadows} = await import('@margoengine/shadows');
+    this.imports.signal.throwIfAborted();
+    const shadows = this.use(new Shadows(options));
+    for (const mesh of (this.engine as unknown as RuntimeEngine).meshes.values()) shadows.add(mesh);
+    return shadows;
   }
 }
 

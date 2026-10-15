@@ -5,7 +5,9 @@
 // lighting hooks, so opaque and blended glTF primitives are lit and fogged in their own shader.
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type FrameGraph} from '@margoengine/core/extension';
-import type {Environment} from './environment.js';
+import {Environment, type EnvironmentOptions, type EnvironmentSource} from './environment.js';
+import {loadEnvironmentImage} from './load.js';
+import type {UltraHDROptions} from './ultrahdr.js';
 import {IBL_WGSL, iblBindGroupEntries} from './ibl.js';
 import {SRGBToLinear as srgbToLinear} from '@margoengine/math/color';
 import {srgbColor, type ColorInput} from './color.js';
@@ -96,6 +98,9 @@ export abstract class ShaderEffect {
 const iblCall = (n: string, v: string, base: string, metal: string, roughness: string) =>
   `iblShade(iblSpecular,iblSampler,iblSh,iblParams,${n},${v},${base},${metal},${roughness})`;
 
+/** `EnvironmentLighting.load` options: the Environment's, UltraHDR decoding for `.jpg` URLs and a cancellation signal. */
+export type EnvironmentLoadOptions = EnvironmentOptions & UltraHDROptions & {signal?: AbortSignal};
+
 export interface EnvironmentLightingOptions {
   /** Plugin and pass name. Default 'environment:lighting'. */
   name?: string;
@@ -110,9 +115,37 @@ export interface EnvironmentLightingOptions {
 export class EnvironmentLighting extends ShaderEffect {
   private cached?: GPUBindGroupEntry[];
   private version = -1;
+  /** Engine whose `environment` plugin this lighting created in `load()` and removes again in `dispose()`. */
+  private loadedInto?: EngineKernel;
   /** Same as `engine.use(new EnvironmentLighting(...))`; returns the EnvironmentLighting. */
   static attach(engine: EngineKernel, environment: Environment, options?: EnvironmentLightingOptions): EnvironmentLighting {const value = new EnvironmentLighting(environment, options); engine.use(value); return value;}
+  /**
+   * Fetches an `.hdr`, `.exr` or UltraHDR `.jpg` URL (or takes a decoded source), attaches its Environment and an
+   * EnvironmentLighting to `engine`, and resolves with the lighting; its `dispose()` also removes that Environment.
+   * Rejects with `AbortError`, leaving nothing attached, when `signal` aborts or the engine is disposed first.
+   */
+  static async load(engine: EngineKernel, source: string | URL | EnvironmentSource, loadOptions: EnvironmentLoadOptions = {}): Promise<EnvironmentLighting> {
+    const {signal, decode, weight, ...options} = loadOptions;
+    // ponytail: engine disposal is checked between steps, so a download in flight finishes first; `signal` cancels it.
+    const check = () => {signal?.throwIfAborted(); if (engine.disposed) throw new DOMException('Engine disposed', 'AbortError');};
+    check();
+    const image = typeof source === 'string' || source instanceof URL ? await loadEnvironmentImage(source, {signal, decode, weight}) : source;
+    check();
+    const environment = await Environment.create(engine, image, options);
+    let attached = false;
+    try {
+      check(); engine.use(environment); attached = true;
+      const lighting = EnvironmentLighting.attach(engine, environment);
+      lighting.loadedInto = engine;
+      return lighting;
+    } catch (error) {if (attached) engine.removePlugin(environment.name); else environment.dispose(); throw error;}
+  }
   constructor(readonly environment: Environment, options: EnvironmentLightingOptions = {}) {super(options.name ?? 'environment:lighting');}
+  dispose(): void {
+    const engine = this.loadedInto;
+    this.loadedInto = undefined; super.dispose();
+    if (engine && !this.environment.disposed) engine.removePlugin(this.environment.name);
+  }
   protected get device(): GPUDevice | null {return this.environment.disposed ? null : this.environment.device;}
   protected entries(): GPUBindGroupEntry[] {
     if (!this.cached || this.version !== this.environment.version) {this.cached = iblBindGroupEntries(this.environment, IBL_BINDING); this.version = this.environment.version;}

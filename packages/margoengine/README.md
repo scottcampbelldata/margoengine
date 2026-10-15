@@ -33,13 +33,21 @@ Use a selector, an HTMLElement container or an existing canvas. The wrapper appe
 | `await app.sky(options)` | Loads the scenery `/sky` entry and attaches SkyMoon |
 | `await app.particles(options)` | Loads creative `/particles` and attaches GPU particles |
 | `await app.effects(options)` | Loads creative `/post` and attaches post-processing/atmosphere |
+| `await app.environment(url, options)` | Loads `@margoengine/environment` and lights every mesh with image-based lighting from an `.hdr`, `.exr` or UltraHDR `.jpg` (or a decoded image); returns the `EnvironmentLighting` (`.environment` has `intensity` and `rotation`) |
+| `await app.shadows(options)` | Loads `@margoengine/shadows` and attaches cascaded shadows for the directional light; meshes present at the call cast, add later ones with `shadows.add(mesh)` |
 | `app.use(plugin)` | Attaches an existing plugin and returns it |
 | `await app.gltf()` / `app.machinery()` / `app.creative()` / `app.scenery()` | Loads the full corresponding pack on demand |
 | `app.engine` | Existing core API: camera, picking, plugins, manual render, start/stop and recovery |
 
 Loading infers format from the URL pathname, including `.stp` and `.igs`; set `format` for extensionless endpoints. Use `fit: false` to preserve camera framing, `signal` to cancel, and CAD `onProgress`/`smoothing` options as needed. Fits use the world-space AABB of transformed vertices. A failed fit retires the imported model. Existing loader byte limits, rollback and supported model subsets apply: glTF supports static opaque constant-color geometry, without textures, skinning or animation.
 
-Feature helpers load their entry and its required dependencies rather than the entire domain pack. CAD loading uses `@margoengine/machinery/cad`, without kinematics, surface transport or telemetry. Explicit pack accessors keep their complete namespaces for compatibility. A helper whose import finishes after stage disposal rejects with `AbortError` before constructing its plugin; active attached plugins remain owned by the engine and are disposed with it.
+Feature helpers load their entry and its required dependencies rather than the entire domain pack. CAD loading uses `@margoengine/machinery/cad`, without kinematics, surface transport or telemetry. Explicit pack accessors keep their complete namespaces for compatibility. A helper whose import finishes after stage disposal rejects with `AbortError` before constructing its plugin; active attached plugins remain owned by the engine and are disposed with it. `app.environment()` is `EnvironmentLighting.load(app.engine, url, options)`: it rejects with `AbortError` and attaches nothing when the stage is disposed before the image is fetched and processed (pass `signal` to also cancel a download in flight), and disposing the returned lighting also removes its environment. For a visible environment background or fog, use `EnvironmentBackground`/`Fog` from `@margoengine/environment` with `app.engine`.
+
+```ts
+const lighting = await app.environment('/studio.hdr', {intensity: 1.2});
+const shadows = await app.shadows({resolution: 2048, distance: 50});
+shadows.add(app.box({position: [2, 0.5, 0]})); // meshes created after the call
+```
 
 `load()` returns the exported `LoadedModel` type:
 
@@ -66,7 +74,7 @@ index.tag(model.root, 'assembly');
 model.destroy();
 ```
 
-Sky, particles, effects, sections and GPU picking retain their WebGPU requirements; unsupported operations reject rather than silently disappearing. Heavy CAD workers are loaded by the existing machinery package when needed. Plugins have their existing unique names: remove one through `app.engine.removePlugin(plugin.name)` before attaching a replacement.
+Sky, particles, effects, environment, shadows, sections and GPU picking retain their WebGPU requirements; unsupported operations reject rather than silently disappearing. Heavy CAD workers are loaded by the existing machinery package when needed. Plugins have their existing unique names: remove one through `app.engine.removePlugin(plugin.name)` before attaching a replacement.
 
 All core exports are also available from this package. React applications can use the existing `@margoengine/react` components or wrap the engine received by Canvas `onCreated` with `new Stage(engine)`. The existing Canvas component retains ownership of rendering and teardown in that case.
 

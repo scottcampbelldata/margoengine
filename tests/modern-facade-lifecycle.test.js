@@ -25,11 +25,17 @@ function plugin(name) {
 }
 
 const SkyMoon = plugin('sky-moon'), GPUParticles = plugin('gpu-particles'), PostProcessing = plugin('post-processing');
+const Shadows = class extends plugin('shadows') {casters = []; add(mesh) {this.casters.push(mesh); return () => {};}};
+// EnvironmentLighting.load owns fetching, abort checks and attachment (tested in packages/environment); the stage forwards to it.
+const loads = [];
+const EnvironmentLighting = {async load(...args) {loads.push(args); return {name: 'environment:lighting'};}};
 mock.module('@margoengine/scenery/sky', {namedExports: {SkyMoon}});
 mock.module('@margoengine/creative/particles', {namedExports: {GPUParticles}});
 mock.module('@margoengine/creative/post', {namedExports: {PostProcessing}});
+mock.module('@margoengine/shadows', {namedExports: {Shadows}});
+mock.module('@margoengine/environment', {namedExports: {EnvironmentLighting}});
 const {Stage} = await import('../packages/margoengine/dist/index.js');
-const features = [['sky', SkyMoon], ['particles', GPUParticles], ['effects', PostProcessing]];
+const features = [['sky', SkyMoon], ['particles', GPUParticles], ['effects', PostProcessing], ['shadows', Shadows]];
 
 async function scene() {
   const store = await TransformStore.create(2), resources = new Set(), buffers = [];
@@ -53,14 +59,34 @@ test('facade feature helpers preserve options, plugin identity, passes and owned
       assert.equal(engine.hasPlugin(effect.name), true);
       attached.push(effect);
     }
-    assert.equal(resources.size, 3);
+    assert.equal(resources.size, features.length);
     engine.frameGraph.execute({backend: 'webgpu', draw() {}});
-    assert.deepEqual(attached.map(effect => effect.frames), [1, 1, 1]);
+    assert.deepEqual(attached.map(effect => effect.frames), features.map(() => 1));
   } finally {app.dispose();}
   app.dispose();
   assert.equal(resources.size, 0);
-  assert.deepEqual(attached.map(effect => effect.disposals), [1, 1, 1]);
-  assert.deepEqual(buffers.map(buffer => buffer.destroys), [1, 1, 1]);
+  assert.deepEqual(attached.map(effect => effect.disposals), features.map(() => 1));
+  assert.deepEqual(buffers.map(buffer => buffer.destroys), features.map(() => 1));
+});
+
+test('shadows casts from the meshes present when it is called', async () => {
+  const {app} = await scene();
+  try {
+    const box = app.box(), orb = app.sphere();
+    const shadows = await app.shadows();
+    assert.deepEqual(shadows.casters, [box, orb]);
+    app.box();
+    assert.equal(shadows.casters.length, 2, 'later meshes are added by the caller');
+  } finally {app.dispose();}
+});
+
+test('environment hands the stage engine, source and options to EnvironmentLighting.load and returns its lighting', async () => {
+  const {app, engine} = await scene(), options = {intensity: 2};
+  try {
+    const lighting = await app.environment('/studio.hdr', options);
+    assert.deepEqual(loads.at(-1), [engine, '/studio.hdr', options]);
+    assert.equal(lighting.name, 'environment:lighting');
+  } finally {app.dispose();}
 });
 
 for (const [method, Class] of features) {
