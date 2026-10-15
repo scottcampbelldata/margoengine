@@ -1,4 +1,4 @@
-// Color transforms adapted from the references and licenses in ../NOTICE.md.
+// Color transforms from the references in ../NOTICE.md.
 import {agxShader} from '../../shared/agx.js';
 import {acesShader} from '../../shared/aces.js';
 const common = `

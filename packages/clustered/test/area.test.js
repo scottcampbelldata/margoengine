@@ -80,8 +80,8 @@ test('LTC GGX specular matches brute-force integration over the rectangle', () =
   }
   console.log(JSON.stringify(rows));
   // Specular-only (F = 1) is the LTC fit's own error; dielectric (diffuse + Schlick specular) is what a lit pixel shows. The
-  // worst case is the 80° grazing view at roughness 0.5 (about +16% specular, -19% dielectric, as three.js's fit); up to 60°
-  // specular stays within 5% and dielectric within 14%. Past ~84° on glossy surfaces the fit is off by up to ~40% (README).
+  // worst case is the 80° grazing view at roughness 0.5 (about +17% specular, -18% dielectric); up to 60°
+  // specular stays within 5% and dielectric within 14%. Past ~84° on glossy surfaces the fit is off by up to ~35% (README).
   for (const r of rows) {
     const bound = r.theta >= 80 ? 0.2 : 0.15;
     assert.ok(Math.abs(r.metal) < bound, `specular ${r.name} ${r.theta}° r${r.roughness}: ${r.metal}`);
