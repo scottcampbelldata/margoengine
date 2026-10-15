@@ -1,5 +1,5 @@
 {
-  "commit": "3d845a0",
+  "commit": "80b4a1f",
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "packages": {
     "@margoengine/animation": {
@@ -66,12 +66,12 @@
     },
     "@margoengine/core": {
       ".": {
-        "raw": 40681,
-        "gzip": 17783
+        "raw": 40773,
+        "gzip": 17822
       },
       "./extension": {
-        "raw": 37786,
-        "gzip": 16966
+        "raw": 37878,
+        "gzip": 17007
       }
     },
     "@margoengine/creative": {
@@ -134,8 +134,8 @@
     },
     "@margoengine/environment": {
       ".": {
-        "raw": 61504,
-        "gzip": 20919
+        "raw": 62286,
+        "gzip": 21140
       }
     },
     "@margoengine/exporters": {
@@ -468,16 +468,16 @@
     },
     "@margoengine/post": {
       ".": {
-        "raw": 46157,
-        "gzip": 12702
+        "raw": 46196,
+        "gzip": 12721
       },
       "./bloom": {
-        "raw": 15122,
-        "gzip": 4836
+        "raw": 15169,
+        "gzip": 4855
       },
       "./ssao": {
-        "raw": 23841,
-        "gzip": 7482
+        "raw": 23853,
+        "gzip": 7488
       },
       "./scene-fade": {
         "raw": 5622,
@@ -488,8 +488,8 @@
         "gzip": 3166
       },
       "./fxaa": {
-        "raw": 10313,
-        "gzip": 3605
+        "raw": 10293,
+        "gzip": 3599
       }
     },
     "@margoengine/procedural": {
@@ -724,8 +724,8 @@
     },
     "@margoengine/webgl": {
       ".": {
-        "raw": 4672,
-        "gzip": 2088
+        "raw": 4766,
+        "gzip": 2156
       }
     },
     "@margoengine/wfc": {

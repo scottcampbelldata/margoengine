@@ -45,7 +45,7 @@ Measured on the laptop, light tier, before `28f57be`: 100k particles locked at 6
 Not re-measured since the water restore.
 
 Size facts for the pitch (three.js 0.186.1, minimal lit scene, minified / gzip, all with the size gate's output options;
-`npm run measure:threejs` -> `examples/package-benchmarks/results/threejs-size.json`, 5d): Margo core + stage 45.5 kB /
+`npm run measure:threejs` -> `examples/package-benchmarks/results/threejs-size.json`, 5d): Margo core + stage 45.6 kB /
 19.5 kB (WebGPU only); three WebGL 530 kB / 130 kB; three WebGPU 791 kB / 212 kB.
 
 ## CPU package pass (done, commit `f47ff3f`)
@@ -672,24 +672,25 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
 5d. [DONE] Docs fixed against `docs/whitepaper/claims.md` (its Summary has the before/after table). The original 201
    rows went from 77 PROVEN / 43 STALE / 58 UNPROVEN / 23 OVERCLAIM to 154 PROVEN / 5 STALE / 9 UNPROVEN / 0 OVERCLAIM /
    18 REMOVED / 15 HISTORICAL (two new statuses: deleted from public text; kept only in a doc labelled as a dated record
-   without committed data). 27 rows added for `590278e`..`3d845a0` (S-12, H-25..32, DOC-062..069, PKG-096..105).
+   without committed data). 32 rows added for `590278e`..`e2cc4c5` (S-12, H-25..32, DOC-062..071, PKG-096..108).
    Left: HANDOFF rows (internal), and honest-but-unevidenced rows that need a committed run (DOC-061, PKG-005, 080,
-   092, 103/104). One core size everywhere: "under 20 kB gzip (19,543 B at `3d845a0`; `npm run measure:size`)",
-   WebGPU only; WebGL2 is the optional `@margoengine/webgl` (2,088 B). 71 packages everywhere. `npm install` lines kept
+   092, 103/104). One core size everywhere: "under 20 kB gzip (19,577 B at `e2cc4c5`; `npm run measure:size`)",
+   WebGPU only; WebGL2 is the optional `@margoengine/webgl` (2,156 B). 71 packages everywhere. `npm install` lines kept
    (names/versions match package.json) but introduced as "once published". No three.js speed claim anywhere; size
    comparison now committed. New records: `examples/package-benchmarks/entry-sizes.mjs` -> `results/entry-sizes.json`
    (min+gzip of every exports entry and worker, build-modern's method; also feeds api-surface.md's Gzip column, now
    filled for all 71 packages) and `measure:threejs` -> `results/threejs-size.json`, with three.js now built with the
    size gate's output options (lit-box app 129,899 / 211,584 B gzip WebGL/WebGPU; was 138,578 / 229,008 with weaker
-   minification on three's side only). Proofs re-baselined so the plain command passes: post-stack -> `e12fc9c`
-   (creative stays on `5b1fe66^`), materials-uv-transform -> `7f1c9c6`, gltf-pro-lighting-hooks -> `f8a36ca`;
-   selection-xray-off still passes vs `46f9484`. For Scott: (a) the site's "Browse the packages and their runnable
+   minification on three's side only). Proofs re-baselined so the plain command passes: post-stack -> `e2cc4c5`
+   (Bloom/FXAA/SSAO alpha change; creative stays on `5b1fe66^`), materials-uv-transform -> `7f1c9c6`, gltf-pro-lighting-hooks -> `f8a36ca`;
+   selection-xray-off still passes vs `46f9484`. Not fixed: `post-ssao-perspective.proof.js`
+   (internal claim) fails at `e2cc4c5`, whose alpha change alters the SSAO shader; extend its accepted differences. For Scott: (a) the site's "Browse the packages and their runnable
    examples" leads to catalog examples that load the packages from jsDelivr, so they will not run until the packages
    are published; (b) nothing was deployed: margoengine.com keeps whatever the last deploy built (the old copy said "both
    backends included", "verified in Chrome", 60 packages) until the next deploy; (c) fbx/usdz READMEs quote their three.js-era sizes (85.8 kB, 13.7 kB) from
    commit `95132e9`'s message with "method not recorded": measure that ref with `entry-sizes.mjs` before using the
-   comparison publicly; (d) when the +34 B material setters merge, re-run `measure:size` (19,577 expected): the docs
-   say "under 20 kB" plus a dated figure, so they stay true.
+   comparison publicly; (d) the material setters and TransparentCanvas merged while 5d ran;
+   the docs quote 19,577 B at `e2cc4c5` (`measure:size`) next to "under 20 kB", and claims.md has rows for both.
 5e. Diagnose why Margo's GPU time on static boxes is not lower than three.js InstancedMesh (vs-threejs smoke run);
    findings in docs/whitepaper/boxes-vs-threejs.md [running].
 5f. Gaps from Scott's architecture review (2026-10-14 late):

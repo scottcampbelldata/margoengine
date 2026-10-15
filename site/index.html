@@ -72,7 +72,7 @@ npm run dev</code></pre>
     <section class="core">
       <h2>What the core gives you</h2>
       <dl>
-        <div><dt>Under 20 kB gzip</dt><dd>Core plus the stage facade, with the embedded Wasm kernel and the WebGPU backend. The build fails at 20,000 bytes gzip or above; <code>npm run measure:size</code> prints the current figure. The WebGL2 fallback is the optional <code>@margoengine/webgl</code> (2.1 kB gzip).</dd></div>
+        <div><dt>Under 20 kB gzip</dt><dd>Core plus the stage facade, with the embedded Wasm kernel and the WebGPU backend. The build fails at 20,000 bytes gzip or above; <code>npm run measure:size</code> prints the current figure. The WebGL2 fallback is the optional <code>@margoengine/webgl</code> (2.2 kB gzip).</dd></div>
         <div><dt>Transforms in Wasm memory</dt><dd>Hierarchy, culling and world matrices run in a Rust kernel over flat typed arrays. An engine holds 1,024 entities by default, configurable up to 100,000.</dd></div>
         <div><dt>Instancing by default</dt><dd>Visible meshes sharing a geometry instance render in one instanced draw call per scene pass, with per-instance material values.</dd></div>
         <div><dt>WebGPU first, WebGL2 fallback</dt><dd>Reversed float depth, GPU picking and automatic device-loss recovery on WebGPU. Basic scenes (core meshes, flat PBR, one light) also render on WebGL2 with the optional <code>@margoengine/webgl</code> package.</dd></div>

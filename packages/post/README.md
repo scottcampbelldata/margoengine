@@ -37,7 +37,7 @@ stack.dispose(); // also disposes its effects
 
 When the stack landed (`5b1fe66`), every effect used alone made exactly the GPU calls it made before the stack existed;
 `examples/package-benchmarks/proofs/post-stack.proof.js` now checks 13,056 recorded calls across 12 single-effect stories
-against `e12fc9c` (the DOF rewrite, the last intentional change to an effect).
+against `e2cc4c5` (Bloom, FXAA and SSAO keep the canvas alpha; the last intentional change to an effect).
 
 ## FXAA
 
@@ -109,8 +109,9 @@ scene's subject. Call it after the actual subject render.
 
 ## Transparent canvas (`TransparentCanvas` from `@margoengine/environment`)
 
-Checked on a real GPU (`examples/package-benchmarks/transparent-canvas-gpu.mjs`): empty pixels stay
-transparent with every effect below; opaque frames are byte-identical before and after the alpha changes.
+Checked on a real GPU (Intel Arc 140V laptop) by `examples/package-benchmarks/transparent-canvas-gpu.mjs`, which
+asserts that empty pixels stay transparent with every effect below and that opaque frames are byte-identical before
+and after the alpha changes (it writes frames only, no committed result yet).
 
 - **FXAA** filters alpha with colour (premultiplied), so smoothed silhouettes stay valid.
 - **Bloom** keeps the scene's alpha and raises it to the glow's brightest channel, so glow past an

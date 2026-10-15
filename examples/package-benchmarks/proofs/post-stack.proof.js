@@ -8,10 +8,11 @@ import {versions} from './compare.js';
 import {mockGPU, context} from './gpu-recorder.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
 
-// e12fc9c is the DOF rewrite, the last intentional change to a single effect's output (SSAO changed in a281ad2 and
-// 9702e57), so the parent of the commit that added PostStack now differs for SSAO and DOF. creative stays on that parent.
+// e2cc4c5 (Bloom, FXAA and SSAO keep the canvas alpha for TransparentCanvas) is the last intentional change to a single
+// effect's output; before it, e12fc9c (the DOF rewrite) and a281ad2/9702e57 (SSAO). So the parent of the commit that added
+// PostStack now differs for Bloom, SSAO and DOF. creative stays on that parent.
 const added = execFileSync('git', ['log', '--diff-filter=A', '--format=%h', '--', 'packages/post/src/stack.ts'], {cwd: new URL('../../..', import.meta.url), encoding: 'utf8'}).trim().split('\n').at(-1);
-const ref = process.argv[2] ?? 'e12fc9c', before = added ? added + '^' : 'HEAD';
+const ref = process.argv[2] ?? 'e2cc4c5', before = added ? added + '^' : 'HEAD';
 const post = await versions('post', ref), dof = await versions('dof', ref), tonemap = await versions('tonemap', ref), creative = await versions('creative', before, 'src/post.ts', '3319317'); // PostProcessing lost bloom and sky after 3319317
 
 /** Runs `effects` (made by `make(gpu)`) with the core main pass for 24 frames, applying `edit(frame, effects, state)` first. */
