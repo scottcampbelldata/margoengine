@@ -976,7 +976,7 @@ Second set (2026-10-14, evening), all APPROVED by Scott:
   instance in the batch is single-sided and unmirrored; pixel-identical; `scratch/bvt-core-cull-bytes` (b3514f3).
   Evidence: docs/whitepaper/boxes-vs-threejs.md (the shader `discard` disables early depth; 40-56% of single-sided
   GPU time).
-  DONE (`4be71f5`, core+stage **19,793 B**, +216 on 19,577): ported onto the setters tip unchanged in substance.
+  DONE (`d96e2d7`, core+stage **19,793 B**, +216 on 19,577): ported onto the setters tip unchanged in substance.
   `Batch.mask` (public, api/ updated) is OR-ed during collection and on the moved-matrix fast path; material value
   changes (incl. `set({doubleSided})`) and material assignment already force a full re-collection, which recomputes
   it. Un-mirroring a moved mesh leaves its batch on the cull-none pipeline until the next full re-collection
