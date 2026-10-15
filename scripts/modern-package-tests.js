@@ -106,9 +106,11 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
   for(const file of ['test/declarative.test.js','tests/react.test.js'])await copyFile(`packages/react/${file}`,join(fixture,'react',file));
   await copyFile('packages/gltf-pro/src/shader.ts',join(fixture,'gltf-pro/src/shader.ts'));await copyFile('packages/shared/aces.js',join(fixture,'shared/aces.js')); // shader.ts imports ../../shared/aces.js
   execFileSync(process.execPath,['--experimental-test-module-mocks','--test',join(fixture,'react/test/declarative.test.js'),join(fixture,'react/tests/react.test.js')],{cwd:fixture,stdio:'inherit'});
-  const aliases={'@margoengine/core/extension':join(fixture,'node_modules/@margoengine/core/dist/extension.js'),react:join(fixture,'node_modules/react'),'react-dom':join(fixture,'node_modules/react-dom')};
-  aliases['@margoengine/core/extension']=join(fixture,'node_modules/@margoengine/core/dist/extension.js');
-  for(const name of names)aliases[packageName(name)]=join(fixture,`node_modules/${packageName(name)}/dist/index.js`);
+  // Every export subpath maps exactly to the packed file (a plain alias would turn '@margoengine/creative/post' into
+  // '.../dist/index.js/post'); react and react-dom keep prefix aliases for their own subpaths.
+  const aliases=[{find:'react',replacement:join(fixture,'node_modules/react')},{find:'react-dom',replacement:join(fixture,'node_modules/react-dom')}];
+  for(const name of names)for(const [key,entry] of Object.entries(JSON.parse(await readFile(`packages/${name}/package.json`,'utf8')).exports))
+    aliases.push({find:new RegExp(`^${(packageName(name)+key.slice(1)).replace(/[.*+?^${}()|[\]\\/]/g,'\\$&')}$`),replacement:join(fixture,'node_modules',packageName(name),entry.import)});
   browser=await openBrowser({startPath:'/tests/modern.html',aliases});const {page}=browser,errors=[];
   page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
   await page.waitForFunction(()=>window.modern);await page.evaluate(()=>window.modern.mount());

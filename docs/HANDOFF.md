@@ -100,9 +100,13 @@ it with every number (on battery Windows throttles the CPU/GPU and may drop the 
      builds the starters and the usdz fixture first). 39/41 pass (`gates-browser-tests.json`; before the fixes below
      27/39, `gates-browser-tests-before-fixes.json`). Not passing: `modern-hardware-gpu-tests.js` needs a discrete
      NVIDIA/AMD GPU (`GPU_VENDOR`), not applicable on this laptop; `modern-package-tests.js` now installs and packs, then
-     fails type-checking README snippets that are fragments (`engine`, `stage`, `model`, `part`, `water`... undeclared;
-     creative's README imports and redeclares `GPUParticles`) in animation, controls, creative, environment, gltf-pro,
-     machinery, post and sky READMEs. Docs-only; not fixed here.
+     failed type-checking README snippets that were fragments. Fixed later the same day: every README snippet is
+     self-contained (animation, controls, creative, environment, gltf-pro, machinery, post, sky; gltf-pro's
+     `stage.engine.gpu` became `engineRuntime(stage.engine).gpu`), the script also packs materials, decoders, dof and
+     tonemap (README imports), gives the packaged React tests the files they read, and aliases each export subpath
+     exactly in the browser stage. README type-check, consumer and React unit tests (17/17) now pass. Still failing: the
+     browser stage, because `@margoengine/bvh` dist/raycaster.js imports `../../shared/instances.js` (since `c0945b9`;
+     bvh builds with plain tsc), which is outside the tarball. Broken for npm users too; needs a bvh build or source fix.
    - Stale tests fixed: postfx DOF uniform 32 -> 48 bytes (see below); WebGL2 paths now pass `fallback: webglRenderer`
      (browser, wrapper, machinery runtime, stress; core needs the fallback since `1356787`); demos that need 4x MSAA or
      unpaced frames load `?quality=high` (grass, extension); sky-fog test uses `sky.tables.view` and its own fog uniform
