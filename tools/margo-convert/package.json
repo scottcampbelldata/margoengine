@@ -1,6 +1,6 @@
 {
   "name": "margo-convert",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "Offline STEP / IGES / BREP to GLB converter for Margo Engine: npx margo-convert part.step part.glb",
@@ -18,10 +18,10 @@
     "node": ">=22.12.0"
   },
   "dependencies": {
-    "@margoengine/core": "0.1.0",
-    "@margoengine/exporters": "0.1.0",
-    "@margoengine/machinery": "0.1.0",
-    "@margoengine/math": "0.1.0",
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/exporters": "^1.0.0",
+    "@margoengine/machinery": "^1.0.0",
+    "@margoengine/math": "^1.0.0",
     "occt-import-js": "0.0.23"
   },
   "homepage": "https://margoengine.com",

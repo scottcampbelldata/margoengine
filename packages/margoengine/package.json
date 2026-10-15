@@ -1,7 +1,7 @@
 {
   "name": "margoengine",
   "homepage": "https://margoengine.com",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Five-line setup for Margo Engine and its domain packs.",
   "type": "module",
   "license": "MIT",
@@ -27,10 +27,10 @@
     "dist"
   ],
   "dependencies": {
-    "@margoengine/core": "0.1.0",
-    "@margoengine/gltf": "0.1.0",
-    "@margoengine/machinery": "0.1.0",
-    "@margoengine/creative": "0.1.0",
-    "@margoengine/scenery": "0.1.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/gltf": "^1.0.0",
+    "@margoengine/machinery": "^1.0.0",
+    "@margoengine/creative": "^1.0.0",
+    "@margoengine/scenery": "^1.0.0"
   }
 }

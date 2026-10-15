@@ -14,7 +14,7 @@ for(const name of ['core','dof','tonemap']){
   const target=join(fixture,'node_modules','@margoengine',name);await mkdir(target,{recursive:true});
   execFileSync('tar',['-xf',join(archives,pack.filename),'-C',target,'--strip-components','1']);
   const manifest=JSON.parse(await readFile(join(target,'package.json'),'utf8'));
-  if(name!=='core'){assert.equal(manifest.peerDependencies['@margoengine/core'],'^0.1.0 || ^1.0.0');assert.equal(manifest.dependencies,undefined);}
+  if(name!=='core'){assert.equal(manifest.peerDependencies['@margoengine/core'],`^${manifest.version}`);assert.equal(manifest.dependencies,undefined);}
 }
 await writeFile(join(fixture,'consumer.ts'),`import {EngineKernel} from '@margoengine/core';
 import {DOF} from '@margoengine/dof';
@@ -31,4 +31,4 @@ await writeFile(join(fixture,'tsconfig.json'),JSON.stringify({compilerOptions:{s
 execFileSync(process.execPath,[resolve('node_modules/typescript/bin/tsc'),'-p',join(fixture,'tsconfig.json')],{stdio:'inherit'});
 await writeFile(join(fixture,'runtime.js'),`import assert from 'node:assert/strict';import {DOF} from '@margoengine/dof';import {Tonemap,parseCube} from '@margoengine/tonemap';assert.equal(new DOF().name,'dof');assert.equal(new Tonemap().name,'tonemap');assert.throws(()=>parseCube('LUT_3D_SIZE 2'));`);
 execFileSync(process.execPath,[join(fixture,'runtime.js')],{stdio:'inherit'});
-console.log('Both packed optional packages import and compile in a strict consumer; core peer contract accepts core 0.1.0 and 1.0.0.');
+console.log('Both packed optional packages import and compile in a strict consumer; core peer range matches the lockstep version.');

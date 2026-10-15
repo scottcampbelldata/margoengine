@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/animation",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "Storage-buffer skinning, compute morph targets and vertex animation texture crowds for Margo Engine.",
@@ -30,11 +30,11 @@
     "dist"
   ],
   "peerDependencies": {
-    "@margoengine/core": "0.1.0",
-    "@margoengine/gltf-pro": "0.1.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/gltf-pro": "^1.0.0"
   },
   "homepage": "https://margoengine.com",
   "devDependencies": {
-    "@margoengine/math": "0.1.0"
+    "@margoengine/math": "^1.0.0"
   }
 }

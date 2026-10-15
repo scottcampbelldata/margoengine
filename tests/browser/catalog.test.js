@@ -50,7 +50,7 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
     for (const id of ['dof', 'tonemap']) {
       assert.equal(await page.locator(`#${id} .run`).getAttribute('href'), `../demos/${id}/`);
       assert.equal(await page.locator(`#${id} .source`).isVisible(), false, 'A built route with bundled assets must not be called a complete copyable HTML example');
-      assert.match(await page.locator(`#${id} .requirements`).textContent(), /\^0\.1\.0/);
+      assert.match(await page.locator(`#${id} .requirements`).textContent(), /\^1\.0\.0/);
     }
     for (const [term, id] of [['conveyor', 'machinery'], ['SectionPlanes', 'machinery'], ['loadGLTF', 'gltf'], ['particle', 'creative'], ['useFrame', 'react'], ['Camera', 'core']]) {
       await page.getByLabel('Search modules and API names').fill(term);

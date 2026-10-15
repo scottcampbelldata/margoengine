@@ -1869,10 +1869,10 @@ spinning model costs core + stage + the gltf entry.
    - Simulation and games (6): physics, navigation, navmesh, ecs, fsm, net
    - CAD and engineering (3): machinery, bvh, geometry
    - Frameworks (1): react
-3. No version clashes: publish all 73 in lockstep at 1.0.0, every `@margoengine/core` peer range `^1.0.0`, one
-   changelog (1h.g). Not true yet: 71 packages are 0.1.0, dof and tonemap are 1.0.0; core ranges are `0.1.0` (exact) in
-   16 packages and `^0.1.0 || ^1.0.0` in 54; no Changesets setup. Fix all three before the first publish and add a
-   verify check that every package version and core range match.
+3. No version clashes: DONE 2026-10-15. All 73 packages, create-margo and margo-convert are 1.0.0; every internal
+   range (packages, template, examples, Night Citadel) is `^1.0.0`. `node scripts/set-version.mjs <x.y.z>` moves them
+   all at once; `tests/versions.test.js` (in verify) fails on any drift. Still to do: one changelog (1h.g, Changesets
+   or a hand-written CHANGELOG.md) before the first publish.
 4. Wording: lead with "core + stage is under 20 KB gzip; everything else loads only if you use it". Never claim it
    fits in the first TCP round trip (~14.6 KB; core + stage is 19.9 KB), never quote a package count or package name
    without checking, and link docs/limits.md next to the size claim.

@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/controls",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "Orbit, map, trackball, fly, first-person, pointer-lock and collision-aware walkthrough (/walk) camera controls, a transform gizmo and drag controls for Margo Engine.",
@@ -35,11 +35,11 @@
     "dist"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^0.1.0 || ^1.0.0",
-    "@margoengine/bvh": "^0.1.0 || ^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/bvh": "^1.0.0"
   },
   "homepage": "https://margoengine.com",
   "devDependencies": {
-    "@margoengine/math": "0.1.0"
+    "@margoengine/math": "^1.0.0"
   }
 }

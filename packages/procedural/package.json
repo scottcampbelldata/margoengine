@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/procedural",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems and Voronoi fracture.",
@@ -31,10 +31,10 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/geometry": "0.1.0"
+    "@margoengine/geometry": "^1.0.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^0.1.0 || ^1.0.0"
+    "@margoengine/core": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js procedural",

@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/blender",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "Optional offline Blender .margo assets using Margo's WebGPU PBR renderer.",
@@ -20,8 +20,8 @@
     "prepack": "npm --prefix ../.. run build:packages"
   },
   "peerDependencies": {
-    "@margoengine/core": "^0.1.0 || ^1.0.0",
-    "@margoengine/gltf-pro": "^0.1.0 || ^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/gltf-pro": "^1.0.0"
   },
   "publishConfig": {
     "access": "public"

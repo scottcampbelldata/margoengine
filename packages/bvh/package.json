@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/bvh",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "Triangle BVH, spatial queries and an engine Raycaster for Margo Engine (three-mesh-bvh and THREE.Raycaster counterparts).",
@@ -31,10 +31,10 @@
     "dist"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^0.1.0 || ^1.0.0"
+    "@margoengine/core": "^1.0.0"
   },
   "homepage": "https://margoengine.com",
   "dependencies": {
-    "@margoengine/math": "0.1.0"
+    "@margoengine/math": "^1.0.0"
   }
 }

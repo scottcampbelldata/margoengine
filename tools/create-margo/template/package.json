@@ -9,13 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@margoengine/bvh": "^0.1.0",
-    "@margoengine/controls": "^0.1.0",
-    "@margoengine/core": "^0.1.0",
-    "@margoengine/environment": "^0.1.0",
-    "@margoengine/geometry": "^0.1.0",
-    "@margoengine/quality": "^0.1.0",
-    "@margoengine/stats": "^0.1.0"
+    "@margoengine/bvh": "^1.0.0",
+    "@margoengine/controls": "^1.0.0",
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/environment": "^1.0.0",
+    "@margoengine/geometry": "^1.0.0",
+    "@margoengine/quality": "^1.0.0",
+    "@margoengine/stats": "^1.0.0"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

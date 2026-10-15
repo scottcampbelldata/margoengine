@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/materials",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "Textured PBR, unlit, normal and matcap materials and a texture loader for meshes built in code.",
@@ -19,8 +19,8 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^0.1.0 || ^1.0.0",
-    "@margoengine/gltf-pro": "^0.1.0 || ^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/gltf-pro": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js materials",
