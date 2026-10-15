@@ -1,6 +1,6 @@
 # Margo Engine validation record
 
-**Current numbers live elsewhere.** Every claim Margo publishes, with its hardware, its committed result and the command that reproduces it, is in [docs/whitepaper/claims.md](../docs/whitepaper/claims.md). Today's core + stage size is printed by `npm run measure:size` (19,543 bytes gzip at `3d845a0`, WebGPU backend only; the build fails at 20,000). This page keeps the 11 October 2026 validation record, from before the `@margoengine` rename, and the committed SwiftShader runs.
+**Current numbers live elsewhere.** Every claim Margo publishes, with its hardware, its committed result and the command that reproduces it, is in [docs/whitepaper/claims.md](../docs/whitepaper/claims.md). Today's core + stage size is printed by `npm run measure:size` (19,577 bytes gzip at `e2cc4c5`, WebGPU backend only; the build fails at 20,000). This page keeps the 11 October 2026 validation record, from before the `@margoengine` rename, and the committed SwiftShader runs.
 
 For release fault injection, deterministic hardware-limit fuzzing, lifecycle soaks and sharded campaigns, see [stress testing](stress-testing.md). Run `npm run test:release` before publishing; it includes a 500-session matrix in addition to the existing regression suites. The [stress validation log](stress-results.md) describes local NVIDIA/AMD campaigns whose raw data was not committed.
 

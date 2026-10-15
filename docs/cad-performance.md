@@ -254,7 +254,7 @@ Raycast is about 2x slower at this size (a linear sphere pass over parts instead
 ### Sizes (minified + gzip)
 
 Before and after were measured locally for that change (not committed); "Now" is the committed record
-[entry-sizes.json](../examples/package-benchmarks/results/entry-sizes.json) at `3d845a0` (other packages external).
+[entry-sizes.json](../examples/package-benchmarks/results/entry-sizes.json) at `e2cc4c5` (other packages external).
 
 | Entry | Before | After | Now |
 | --- | --- | --- | --- |
@@ -262,7 +262,7 @@ Before and after were measured locally for that change (not committed); "Now" is
 | `@margoengine/machinery/spatial` (with its Wasm kernel chunk) | 14,118 B | 14,937 B | 14,411 B |
 | `@margoengine/machinery/exploded` | 508 B | 538 B | 588 B |
 | `@margoengine/machinery` root | 33,121 B | 33,849 B | 33,418 B |
-| core + stage (`npm run measure:size`, untouched) | 18,681 B | 18,681 B | 19,543 B (core fast paths since) |
+| core + stage (`npm run measure:size`, untouched) | 18,681 B | 18,681 B | 19,577 B (core fast paths and material setters since) |
 
 ## GPU culling: `@margoengine/culling` (HANDOFF 1f.a)
 
@@ -313,7 +313,7 @@ two middle layers (the last 23 frames leave the block and see nothing). 0 differ
 and frustum, both layouts), no WebGPU errors; occlusion drew down to 4,770 parts where frustum drew 16,338. The twin
 plates show everywhere, so coplanar ties still resolve to the later batch.
 
-Package size: 7,060 B min+gzip at `3d845a0` (core external; entry-sizes.json), most of it WGSL. Zero cost when not (separate package, `sideEffects: false`, no core change).
+Package size: 7,060 B min+gzip at `e2cc4c5` (core external; entry-sizes.json), most of it WGSL. Zero cost when not (separate package, `sideEffects: false`, no core change).
 
 ## STEP / IGES loading (`loadCAD`)
 

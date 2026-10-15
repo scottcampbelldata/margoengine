@@ -40,8 +40,8 @@ code that does the same job. Where Margo has no equivalent yet, the section says
   one form, `X.attach(engine, options)` (async ones such as `Environment.attach` return a Promise). A loaded model
   joins a feature with `feature.add(model)`. Everything disposable has `dispose()`, and every package object also has
   `[Symbol.dispose]` for `using` (core's `Engine` and meshes and the stage facade have `dispose()` only).
-- **Small core, optional packages.** Core plus the `margoengine` stage facade is under 20 kB gzip (19,543 bytes at
-  `3d845a0`, WebGPU only). The smallest lit-box app is about 130 kB gzip with three.js 0.186's WebGLRenderer and
+- **Small core, optional packages.** Core plus the `margoengine` stage facade is under 20 kB gzip (19,577 bytes at
+  `e2cc4c5`, WebGPU only). The smallest lit-box app is about 130 kB gzip with three.js 0.186's WebGLRenderer and
   212 kB with its WebGPURenderer, built the same way (`npm run measure:threejs`,
   [threejs-size.json](../examples/package-benchmarks/results/threejs-size.json)). Everything else is a separate
   package that you install and import only when you use it.

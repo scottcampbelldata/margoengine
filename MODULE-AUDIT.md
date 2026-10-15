@@ -78,7 +78,7 @@ existing reusable capability, not a half-written package directory.
   checks pass, including settled stacks, transform/pixel agreement, raycasting,
   GPU validation and world disposal. The browser and Node runners now find
   the root Rapier development dependency automatically.
-- Core + stage gzip was **20,053 bytes**, below that day's **20,480-byte** ceiling. Both have since tightened: the gate is 20,000 bytes and core + stage is 19,543 bytes at `3d845a0` (`npm run measure:size`).
+- Core + stage gzip was **20,053 bytes**, below that day's **20,480-byte** ceiling. Both have since tightened: the gate is 20,000 bytes and core + stage is 19,577 bytes at `e2cc4c5` (`npm run measure:size`).
   CI retains that automatic failure gate and now runs the complete unit sweep,
   packed consumer checks and Margo/Rapier GPU checks.
 

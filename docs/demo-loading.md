@@ -8,7 +8,7 @@ changes have not been deployed; the earlier measurements below are historical, a
 Desktop drawing buffers now cap DPR at 1 while retaining 4× MSAA. Phones retain
 their DPR 2 cap and single sampling. HTML/CSS overlays retain native display
 density. The core/stage gzip gate remains below 20,000 bytes; the build measured
-19,975 bytes then (19,543 at `3d845a0`).
+19,975 bytes then (19,577 at `e2cc4c5`).
 
 ## Method
 
