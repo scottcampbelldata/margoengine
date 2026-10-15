@@ -4,7 +4,7 @@ import {applyQualityTier,paceEngine,watchQuality} from '@margoengine/quality';
 import {DOF} from '../dist/index.js';
 import {submitPrincipalScene,type PrincipalSceneReadiness} from '../../shared/demo-frame.js';
 declare global {interface Window {dofDemo?:{stage:Awaited<ReturnType<typeof createStage>>;effect:DOF;readiness:PrincipalSceneReadiness;principalObjects:number}}}
-// Before the stage exists: core reads the tier when it sizes the canvas; DOF reads the tier preset when it is attached.
+// Before the stage exists: core reads the tier when it builds pipelines and sizes the canvas.
 applyQualityTier();
 const status=document.querySelector<HTMLParagraphElement>('#status')!;
 const life=new AbortController();let dispose=()=>{};

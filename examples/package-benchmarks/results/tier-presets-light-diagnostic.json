@@ -1,0 +1,651 @@
+{
+ "recordedAt": "2026-10-15T11:17:44.848Z",
+ "commit": "2e28a40",
+ "config": {
+  "pages": [
+   "island",
+   "dof"
+  ],
+  "rounds": 4,
+  "seconds": 6,
+  "label": "light-diagnostic"
+ },
+ "runs": [
+  {
+   "page": "island",
+   "variant": "off",
+   "round": 0,
+   "fps": 59.9730121445424,
+   "submitsPerSecond": 59.9730121445424,
+   "preset": null,
+   "margoLow": 1,
+   "canvas": [
+    1432,
+    768
+   ],
+   "particles": 100000,
+   "shadowResolution": 512,
+   "summary": {
+    "fps": 60,
+    "submitsPerSecond": 60,
+    "gpuP50": 17.199999999254942,
+    "gpuP90": 22.399999998509884,
+    "spanP50": 10.992353000000001,
+    "spanP90": 13.026324,
+    "spans": 24
+   }
+  },
+  {
+   "page": "island",
+   "variant": "on",
+   "round": 0,
+   "fps": 59.99400059994373,
+   "submitsPerSecond": 59.99400059994373,
+   "preset": {
+    "shadows": {
+     "resolution": 1024
+    },
+    "ssao": {
+     "samples": 16
+    },
+    "ssr": {
+     "enabled": false,
+     "steps": 32
+    },
+    "dof": {
+     "maxRadius": 8
+    },
+    "volumetric": {
+     "grid": [
+      80,
+      45,
+      32
+     ]
+    },
+    "localShadows": {
+     "resolution": 256
+    },
+    "vfx": {
+     "capacity": 100000
+    }
+   },
+   "margoLow": 1,
+   "canvas": [
+    1432,
+    768
+   ],
+   "particles": 100000,
+   "shadowResolution": 512,
+   "summary": {
+    "fps": 60,
+    "submitsPerSecond": 60,
+    "gpuP50": 17.40000000037253,
+    "gpuP90": 18.90000000037253,
+    "spanP50": 10.797146,
+    "spanP90": 11.679093,
+    "spans": 24
+   }
+  },
+  {
+   "page": "island",
+   "variant": "on",
+   "round": 1,
+   "fps": 58.623675970951,
+   "submitsPerSecond": 58.623675970951,
+   "preset": {
+    "shadows": {
+     "resolution": 1024
+    },
+    "ssao": {
+     "samples": 16
+    },
+    "ssr": {
+     "enabled": false,
+     "steps": 32
+    },
+    "dof": {
+     "maxRadius": 8
+    },
+    "volumetric": {
+     "grid": [
+      80,
+      45,
+      32
+     ]
+    },
+    "localShadows": {
+     "resolution": 256
+    },
+    "vfx": {
+     "capacity": 100000
+    }
+   },
+   "margoLow": 1,
+   "canvas": [
+    1432,
+    768
+   ],
+   "particles": 100000,
+   "shadowResolution": 512,
+   "summary": {
+    "fps": 58.6,
+    "submitsPerSecond": 58.6,
+    "gpuP50": 17.59999999962747,
+    "gpuP90": 20.800000000745058,
+    "spanP50": 10.223060499999999,
+    "spanP90": 11.245451,
+    "spans": 24
+   }
+  },
+  {
+   "page": "island",
+   "variant": "off",
+   "round": 1,
+   "fps": 60.15062649960384,
+   "submitsPerSecond": 60.15062649960384,
+   "preset": null,
+   "margoLow": 1,
+   "canvas": [
+    1432,
+    768
+   ],
+   "particles": 100000,
+   "shadowResolution": 512,
+   "summary": {
+    "fps": 60.2,
+    "submitsPerSecond": 60.2,
+    "gpuP50": 18.40000000037253,
+    "gpuP90": 21.5,
+    "spanP50": 10.2768885,
+    "spanP90": 11.43571,
+    "spans": 24
+   }
+  },
+  {
+   "page": "island",
+   "variant": "off",
+   "round": 2,
+   "fps": 60.14862208003519,
+   "submitsPerSecond": 60.14862208003519,
+   "preset": null,
+   "margoLow": 1,
+   "canvas": [
+    1432,
+    768
+   ],
+   "particles": 100000,
+   "shadowResolution": 512,
+   "summary": {
+    "fps": 60.1,
+    "submitsPerSecond": 60.1,
+    "gpuP50": 17.699999999254942,
+    "gpuP90": 18.799999998882413,
+    "spanP50": 10.375456,
+    "spanP90": 10.891651,
+    "spans": 24
+   }
+  },
+  {
+   "page": "island",
+   "variant": "on",
+   "round": 2,
+   "fps": 59.82834763769686,
+   "submitsPerSecond": 59.82834763769686,
+   "preset": {
+    "shadows": {
+     "resolution": 1024
+    },
+    "ssao": {
+     "samples": 16
+    },
+    "ssr": {
+     "enabled": false,
+     "steps": 32
+    },
+    "dof": {
+     "maxRadius": 8
+    },
+    "volumetric": {
+     "grid": [
+      80,
+      45,
+      32
+     ]
+    },
+    "localShadows": {
+     "resolution": 256
+    },
+    "vfx": {
+     "capacity": 100000
+    }
+   },
+   "margoLow": 1,
+   "canvas": [
+    1432,
+    768
+   ],
+   "particles": 100000,
+   "shadowResolution": 512,
+   "summary": {
+    "fps": 59.8,
+    "submitsPerSecond": 59.8,
+    "gpuP50": 16.90000000037253,
+    "gpuP90": 17.700000001117587,
+    "spanP50": 10.101187,
+    "spanP90": 10.759829,
+    "spans": 24
+   }
+  },
+  {
+   "page": "island",
+   "variant": "on",
+   "round": 3,
+   "fps": 59.98200539837304,
+   "submitsPerSecond": 59.98200539837304,
+   "preset": {
+    "shadows": {
+     "resolution": 1024
+    },
+    "ssao": {
+     "samples": 16
+    },
+    "ssr": {
+     "enabled": false,
+     "steps": 32
+    },
+    "dof": {
+     "maxRadius": 8
+    },
+    "volumetric": {
+     "grid": [
+      80,
+      45,
+      32
+     ]
+    },
+    "localShadows": {
+     "resolution": 256
+    },
+    "vfx": {
+     "capacity": 100000
+    }
+   },
+   "margoLow": 1,
+   "canvas": [
+    1432,
+    768
+   ],
+   "particles": 100000,
+   "shadowResolution": 512,
+   "summary": {
+    "fps": 60,
+    "submitsPerSecond": 60,
+    "gpuP50": 14.199999999254942,
+    "gpuP90": 16.800000000745058,
+    "spanP50": 9.9332195,
+    "spanP90": 10.801443,
+    "spans": 24
+   }
+  },
+  {
+   "page": "island",
+   "variant": "off",
+   "round": 3,
+   "fps": 59.95603224303667,
+   "submitsPerSecond": 59.95603224303667,
+   "preset": null,
+   "margoLow": 1,
+   "canvas": [
+    1432,
+    768
+   ],
+   "particles": 100000,
+   "shadowResolution": 512,
+   "summary": {
+    "fps": 60,
+    "submitsPerSecond": 60,
+    "gpuP50": 14.699999999254942,
+    "gpuP90": 16,
+    "spanP50": 10.1818115,
+    "spanP90": 10.378581,
+    "spans": 24
+   }
+  },
+  {
+   "page": "dof",
+   "variant": "off",
+   "round": 0,
+   "fps": 59.97900734743212,
+   "submitsPerSecond": 59.97900734743212,
+   "preset": null,
+   "margoLow": 1,
+   "canvas": [
+    1100,
+    461
+   ],
+   "maxRadius": 16,
+   "summary": {
+    "fps": 60,
+    "submitsPerSecond": 60,
+    "gpuP50": 5.5,
+    "gpuP90": 7.400000000372529,
+    "spanP50": null,
+    "spanP90": null,
+    "spans": 0
+   }
+  },
+  {
+   "page": "dof",
+   "variant": "on",
+   "round": 0,
+   "fps": 59.96002664890073,
+   "submitsPerSecond": 59.96002664890073,
+   "preset": {
+    "shadows": {
+     "resolution": 1024
+    },
+    "ssao": {
+     "samples": 16
+    },
+    "ssr": {
+     "enabled": false,
+     "steps": 32
+    },
+    "dof": {
+     "maxRadius": 8
+    },
+    "volumetric": {
+     "grid": [
+      80,
+      45,
+      32
+     ]
+    },
+    "localShadows": {
+     "resolution": 256
+    },
+    "vfx": {
+     "capacity": 100000
+    }
+   },
+   "margoLow": 1,
+   "canvas": [
+    1100,
+    461
+   ],
+   "maxRadius": 8,
+   "summary": {
+    "fps": 60,
+    "submitsPerSecond": 60,
+    "gpuP50": 5.400000000372529,
+    "gpuP90": 6.699999999254942,
+    "spanP50": null,
+    "spanP90": null,
+    "spans": 0
+   }
+  },
+  {
+   "page": "dof",
+   "variant": "on",
+   "round": 1,
+   "fps": 59.99700014998505,
+   "submitsPerSecond": 59.99700014998505,
+   "preset": {
+    "shadows": {
+     "resolution": 1024
+    },
+    "ssao": {
+     "samples": 16
+    },
+    "ssr": {
+     "enabled": false,
+     "steps": 32
+    },
+    "dof": {
+     "maxRadius": 8
+    },
+    "volumetric": {
+     "grid": [
+      80,
+      45,
+      32
+     ]
+    },
+    "localShadows": {
+     "resolution": 256
+    },
+    "vfx": {
+     "capacity": 100000
+    }
+   },
+   "margoLow": 1,
+   "canvas": [
+    1100,
+    461
+   ],
+   "maxRadius": 8,
+   "summary": {
+    "fps": 60,
+    "submitsPerSecond": 60,
+    "gpuP50": 5.700000001117587,
+    "gpuP90": 7.099999999627471,
+    "spanP50": null,
+    "spanP90": null,
+    "spans": 0
+   }
+  },
+  {
+   "page": "dof",
+   "variant": "off",
+   "round": 1,
+   "fps": 59.99700014998505,
+   "submitsPerSecond": 59.99700014998505,
+   "preset": null,
+   "margoLow": 1,
+   "canvas": [
+    1100,
+    461
+   ],
+   "maxRadius": 16,
+   "summary": {
+    "fps": 60,
+    "submitsPerSecond": 60,
+    "gpuP50": 5.099999999627471,
+    "gpuP90": 6.599999999627471,
+    "spanP50": null,
+    "spanP90": null,
+    "spans": 0
+   }
+  },
+  {
+   "page": "dof",
+   "variant": "off",
+   "round": 2,
+   "fps": 59.991001349793805,
+   "submitsPerSecond": 59.991001349793805,
+   "preset": null,
+   "margoLow": 1,
+   "canvas": [
+    1100,
+    461
+   ],
+   "maxRadius": 16,
+   "summary": {
+    "fps": 60,
+    "submitsPerSecond": 60,
+    "gpuP50": 5.5,
+    "gpuP90": 6.800000000745058,
+    "spanP50": null,
+    "spanP90": null,
+    "spans": 0
+   }
+  },
+  {
+   "page": "dof",
+   "variant": "on",
+   "round": 2,
+   "fps": 59.95703079458976,
+   "submitsPerSecond": 59.95703079458976,
+   "preset": {
+    "shadows": {
+     "resolution": 1024
+    },
+    "ssao": {
+     "samples": 16
+    },
+    "ssr": {
+     "enabled": false,
+     "steps": 32
+    },
+    "dof": {
+     "maxRadius": 8
+    },
+    "volumetric": {
+     "grid": [
+      80,
+      45,
+      32
+     ]
+    },
+    "localShadows": {
+     "resolution": 256
+    },
+    "vfx": {
+     "capacity": 100000
+    }
+   },
+   "margoLow": 1,
+   "canvas": [
+    1100,
+    461
+   ],
+   "maxRadius": 8,
+   "summary": {
+    "fps": 60,
+    "submitsPerSecond": 60,
+    "gpuP50": 5.700000001117587,
+    "gpuP90": 6.800000000745058,
+    "spanP50": null,
+    "spanP90": null,
+    "spans": 0
+   }
+  },
+  {
+   "page": "dof",
+   "variant": "on",
+   "round": 3,
+   "fps": 59.99800006667189,
+   "submitsPerSecond": 59.99800006667189,
+   "preset": {
+    "shadows": {
+     "resolution": 1024
+    },
+    "ssao": {
+     "samples": 16
+    },
+    "ssr": {
+     "enabled": false,
+     "steps": 32
+    },
+    "dof": {
+     "maxRadius": 8
+    },
+    "volumetric": {
+     "grid": [
+      80,
+      45,
+      32
+     ]
+    },
+    "localShadows": {
+     "resolution": 256
+    },
+    "vfx": {
+     "capacity": 100000
+    }
+   },
+   "margoLow": 1,
+   "canvas": [
+    1100,
+    461
+   ],
+   "maxRadius": 8,
+   "summary": {
+    "fps": 60,
+    "submitsPerSecond": 60,
+    "gpuP50": 5.5,
+    "gpuP90": 6.599999999627471,
+    "spanP50": null,
+    "spanP90": null,
+    "spans": 0
+   }
+  },
+  {
+   "page": "dof",
+   "variant": "off",
+   "round": 3,
+   "fps": 59.980006664445185,
+   "submitsPerSecond": 59.980006664445185,
+   "preset": null,
+   "margoLow": 1,
+   "canvas": [
+    1100,
+    461
+   ],
+   "maxRadius": 16,
+   "summary": {
+    "fps": 60,
+    "submitsPerSecond": 60,
+    "gpuP50": 4.900000000372529,
+    "gpuP90": 6.099999999627471,
+    "spanP50": null,
+    "spanP90": null,
+    "spans": 0
+   }
+  }
+ ],
+ "diagnostic": true,
+ "machine": {
+  "note": "--no-quiet: machine busy (other agents), quiet gate skipped",
+  "cpuLoadPercent": 43
+ },
+ "browserVersion": "155.0.4283.45",
+ "summary": {
+  "island/off": {
+   "fps": 60.05,
+   "submitsPerSecond": 60.05,
+   "gpuP50": 17.449999999254942,
+   "gpuP90": 20.149999999441206,
+   "spanP50": 10.326172249999999,
+   "spanP90": 11.1636805,
+   "rounds": 4
+  },
+  "island/on": {
+   "fps": 59.9,
+   "submitsPerSecond": 59.9,
+   "gpuP50": 17.15000000037253,
+   "gpuP90": 18.300000000745058,
+   "spanP50": 10.16212375,
+   "spanP90": 11.023447,
+   "rounds": 4
+  },
+  "dof/off": {
+   "fps": 60,
+   "submitsPerSecond": 60,
+   "gpuP50": 5.2999999998137355,
+   "gpuP90": 6.7000000001862645,
+   "spanP50": null,
+   "spanP90": null,
+   "rounds": 4
+  },
+  "dof/on": {
+   "fps": 60,
+   "submitsPerSecond": 60,
+   "gpuP50": 5.6000000005587935,
+   "gpuP90": 6.75,
+   "spanP50": null,
+   "spanP90": null,
+   "rounds": 4
+  }
+ }
+}

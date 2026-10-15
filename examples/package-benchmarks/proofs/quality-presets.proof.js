@@ -25,7 +25,6 @@ const cases = {
   shadows: ['shadows', 'src/index.ts', (m, o) => [new m.Shadows(o)], {distance: 80}, {resolution: 2048}],
   ssao: ['post', 'src/index.ts', (m, o) => [new m.SSAO(o)], {radius: 0.4}, {samples: 32}],
   ssr: ['post', 'src/index.ts', (m, o) => [new m.PostStack([new m.SSR(o)])], {maxDistance: 50}, {enabled: true, steps: 64}],
-  dof: ['dof', 'src/index.ts', (m, o) => [new m.DOF(o)], {aperture: 2}, {maxRadius: 16}],
   volumetric: ['environment', 'src/volumetric.ts', (m, o) => [new Tonemap(), new m.VolumetricFog(o)], {density: 0.03}, {grid: [160, 90, 64]}],
   localShadows: ['clustered', 'src/shadows.ts', (m, o) => {const lights = new Clustered({grid: [4, 3, 2]}); return [lights, new m.LocalShadows({...o, lights})];}, {bias: 1}, {maxLights: 4, resolution: 512}],
   vfx: ['vfx', 'src/index.ts', (m, o) => [new m.VFX(o)], {rate: 1000, initialCount: 50_000}, {capacity: 1_000_000}],

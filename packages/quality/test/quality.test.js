@@ -25,7 +25,7 @@ test('applyQualityTier publishes the tier preset as globalThis.margoPreset; the 
   try {
     assert.equal(applyQualityTier({search: '', storage: memory(), userAgent: desktop}), 'light');
     assert.equal(globalThis.margoPreset, QUALITY_PRESETS.light); assert.equal(qualityPreset(), QUALITY_PRESETS.light);
-    assert.deepEqual(QUALITY_PRESETS.light, {shadows: {resolution: 1024}, ssao: {samples: 16}, ssr: {enabled: false, steps: 32}, dof: {maxRadius: 8},
+    assert.deepEqual(QUALITY_PRESETS.light, {shadows: {resolution: 1024}, ssao: {samples: 16}, ssr: {enabled: false, steps: 32},
       volumetric: {grid: [80, 45, 32]}, localShadows: {resolution: 256}, vfx: {capacity: 100_000}});
     applyQualityTier({search: '', storage: memory(), userAgent: phone}); assert.equal(globalThis.margoPreset, QUALITY_PRESETS.light, 'phones share the light preset');
     applyQualityTier({search: '', storage: memory({margoQuality: 'high'}), userAgent: desktop}); assert.deepEqual(globalThis.margoPreset, {}); assert.deepEqual(qualityPreset(), {});

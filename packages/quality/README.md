@@ -44,7 +44,6 @@ packages never import this package: the global is the whole contract, so an app 
 | `shadows` | `@margoengine/shadows` `Shadows` | `resolution` | 2048 (two 4-layer maps, 128 MiB) | 1024 (32 MiB) |
 | `ssao` | `@margoengine/post/ssao` `SSAO` | `samples` | 32 | 16 |
 | `ssr` | `@margoengine/post/ssr` `SSR` | `enabled`, `steps` | on, 64 | off (pass `enabled: true` to keep it), 32 |
-| `dof` | `@margoengine/dof` `DOF` | `maxRadius` | 16 px | 8 px |
 | `volumetric` | `@margoengine/environment/volumetric` `VolumetricFog` | `grid` | [160, 90, 64] | [80, 45, 32] |
 | `localShadows` | `@margoengine/clustered/shadows` `LocalShadows` | `resolution` | 512 | 256 |
 | `vfx` | `@margoengine/vfx` `VFX` | `capacity` | 1,000,000 | 100,000 |
@@ -67,6 +66,8 @@ const particles = qualityPreset().vfx?.capacity ?? 1_000_000;          // read a
   many particles). `burst(n)` above the preset capacity throws as it always did above `capacity`; pass `capacity`
   explicitly if your app bursts more than 100,000 particles on the light tier.
 - Bloom, FXAA, Tonemap, TAA and culling have no tier preset: none has an option that trades quality for GPU time.
+  DOF has none either: `maxRadius` 8 instead of 16 measured no GPU saving on the light tier (its 64 taps are fixed)
+  and only shrank the blur (`examples/package-benchmarks/results/tier-presets-light-diagnostic.json`).
 - Contract tests: `test/quality.test.js` (writer) and `tests/quality-presets.test.js` (every reader). GPU-call proof
   (no preset: identical calls to before; preset = passing its values; explicit options win):
   `node examples/package-benchmarks/proofs/quality-presets.proof.js`.

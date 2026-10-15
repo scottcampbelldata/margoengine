@@ -1,6 +1,6 @@
 {
   "baseline": "96daac7",
-  "recordedAt": "2026-10-15T09:54:51.039Z",
+  "recordedAt": "2026-10-15T11:24:35.772Z",
   "preset": {
     "shadows": {
       "resolution": 1024
@@ -11,9 +11,6 @@
     "ssr": {
       "enabled": false,
       "steps": 32
-    },
-    "dof": {
-      "maxRadius": 8
     },
     "volumetric": {
       "grid": [
@@ -50,13 +47,6 @@
       "calls": 757,
       "presetCalls1x": 108,
       "presetCalls4x": 249
-    },
-    "dof": {
-      "package": "dof",
-      "entry": "src/index.ts",
-      "calls": 743,
-      "presetCalls1x": 301,
-      "presetCalls4x": 442
     },
     "volumetric": {
       "package": "environment",
