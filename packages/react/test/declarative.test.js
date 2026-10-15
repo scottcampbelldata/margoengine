@@ -39,7 +39,7 @@ mock.module('@margoengine/gltf-pro',{namedExports:{async loadGLTF(engine,src,{si
 mock.module('@margoengine/environment',{namedExports:{
   async loadEnvironmentImage(src,{signal}){imageRequests.push({src,signal});return {};},
   Environment:{async create(engine){
-    const environment={name:'environment',intensity:1,disposed:false,disposals:0,version:0,listeners:new Set(),device:{},specularView:{version:0},sampler:{},brdfLutView:{},shBuffer:{},paramsBuffer:{},buffers:[resource(),resource()],textures:[resource(),resource(),resource()],
+    const environment={name:'environment',intensity:1,disposed:false,disposals:0,version:0,listeners:new Set(),device:{},specularView:{version:0},sampler:{},brdfLut:{},shBuffer:{},paramsBuffer:{},buffers:[resource(),resource()],textures:[resource(),resource(),resource()],
       onChange(callback){this.listeners.add(callback);return()=>this.listeners.delete(callback);},
       restore(){this.version++;this.specularView={version:this.version};for(const callback of this.listeners)callback(this);},
       dispose(){if(this.disposed)return;this.disposed=true;this.disposals++;for(const owned of [...this.buffers,...this.textures])owned.destroy();this.listeners.clear();}};

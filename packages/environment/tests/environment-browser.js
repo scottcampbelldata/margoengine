@@ -37,6 +37,15 @@ async function readTexture(device, texture, mip = 0) {
     out[((l * height + y) * width) * 4 + x] = halfToFloat(bits[(l * height + y) * row / 2 + x]);
   return {width, height, layers, data: out, at: (layer, x, y) => [...out.subarray(((layer * height + y) * width + x) * 4, ((layer * height + y) * width + x) * 4 + 4)]};
 }
+// environment.brdfLut: a storage buffer of size x size pack2x16float(scale, bias).
+async function readLut(device, lut) {
+  const buffer = device.createBuffer({size: lut.size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ}), encoder = device.createCommandEncoder();
+  encoder.copyBufferToBuffer(lut, 0, buffer, 0, lut.size); device.queue.submit([encoder.finish()]);
+  await buffer.mapAsync(GPUMapMode.READ);
+  const bits = new Uint16Array(buffer.getMappedRange().slice(0)), width = Math.round(Math.sqrt(bits.length / 2));
+  buffer.unmap(); buffer.destroy();
+  return {width, at: (_, x, y) => [halfToFloat(bits[(y * width + x) * 2]), halfToFloat(bits[(y * width + x) * 2 + 1])]};
+}
 
 // Brute-force reference for the split-sum BRDF: uniform grid over the hemisphere of L with core's GGX D and
 // separable Smith G, independent of the GPU's importance sampling.
@@ -214,7 +223,7 @@ window.runEnvironmentTests = async () => {
 
   // 4. BRDF LUT against brute-force quadrature, the smooth-surface analytic limit and Karis's published fit.
   {
-    const lut = await readTexture(device, codedEnvironment.brdfLut, 0), size = lut.width, points = [];
+    const lut = await readLut(device, codedEnvironment.brdfLut), size = lut.width, points = [];
     let quadratureError = 0, karisError = 0, smoothError = 0;
     for (const [x, y] of [[4, 10], [16, 16], [28, 12], [8, 24], [24, 28], [31, 31], [16, 31], [2, 20]]) {
       const nv = (x + 0.5) / size, roughness = (y + 0.5) / size, got = lut.at(0, x, y).slice(0, 2);
@@ -291,13 +300,13 @@ window.runEnvironmentTests = async () => {
     const module = device.createShaderModule({code: `${IBL_WGSL}
 @group(0) @binding(0) var iblSpecular: texture_cube<f32>;
 @group(0) @binding(1) var iblSampler: sampler;
-@group(0) @binding(2) var iblBrdf: texture_2d<f32>;
+@group(0) @binding(2) var<storage, read> iblBrdf: array<u32>;
 @group(0) @binding(3) var<uniform> iblSh: array<vec4f, 9>;
 @group(0) @binding(4) var<uniform> iblParams: vec4f;
 @group(0) @binding(5) var<storage, read_write> out: array<vec4f, 3>;
 @compute @workgroup_size(1) fn main() {
-  out[0] = vec4f(iblShade(iblSpecular, iblSampler, iblBrdf, iblSh, iblParams, vec3f(0.0, 1.0, 0.0), vec3f(0.0, 1.0, 0.0), vec3f(1.0), 0.0, 1.0), 1.0);
-  out[1] = vec4f(iblShade(iblSpecular, iblSampler, iblBrdf, iblSh, iblParams, vec3f(0.0, 1.0, 0.0), vec3f(0.0, 1.0, 0.0), vec3f(1.0), 1.0, 0.0), 1.0);
+  out[0] = vec4f(iblShade(iblSpecular, iblSampler, iblSh, iblParams, vec3f(0.0, 1.0, 0.0), vec3f(0.0, 1.0, 0.0), vec3f(1.0), 0.0, 1.0), 1.0);
+  out[1] = vec4f(iblShade(iblSpecular, iblSampler, iblSh, iblParams, vec3f(0.0, 1.0, 0.0), vec3f(0.0, 1.0, 0.0), vec3f(1.0), 1.0, 0.0), 1.0);
   out[2] = vec4f(iblIrradiance(iblSh, vec3f(0.0, 1.0, 0.0)), 1.0);
 }`});
     const c = [0.5, 1.25, 3], environment = await Environment.create(device, equirect(64, 32, () => c), {size: 16, ...small, brdfSize: 32, brdfSamples: 512});

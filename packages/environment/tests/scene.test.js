@@ -23,7 +23,7 @@ const variants = {
 };
 const fakeEngine = device => ({backend: 'webgpu', gpu: device, errors: [], removed: [], onError(error) {this.errors.push(error);}, removePlugin(name) {this.removed.push(name);}});
 function fakeEnvironment(device) {
-  return {device, disposed: false, version: 0, restores: [], specularView: {id: 'specular'}, sampler: {}, brdfLutView: {}, shBuffer: {}, paramsBuffer: {},
+  return {device, disposed: false, version: 0, restores: [], specularView: {id: 'specular'}, sampler: {}, brdfLut: {}, shBuffer: {}, paramsBuffer: {},
     restore(target) {this.restores.push(target); return Promise.resolve();}};
 }
 const hexFloats = hex => {const b = Buffer.from(hex, 'hex'); return new Float32Array(b.buffer.slice(b.byteOffset, b.byteOffset + b.length));};
@@ -39,7 +39,7 @@ test('EnvironmentLighting patches core meshes only while the environment is live
   assert.match(patched, /@group\(0\) @binding\(20\) var iblSpecular:texture_cube<f32>;/);
   assert.match(patched, /@group\(0\) @binding\(24\) var<uniform> iblParams:vec4f;/);
   // The IBL term is named margoAmbient (the convention post's SSAO occludes) and added where the constant ambient was.
-  assert.match(fragment(patched), /let margoAmbient=iblShade\(iblSpecular,iblSampler,iblBrdf,iblSh,iblParams,n,v,i\.color,i\.material\.y,i\.material\.x\);let linear=direct\*frame\.radiance\.xyz\*frame\.light\.w\+i\.color\*\(1\.0-i\.material\.y\)\*0\.0\+margoAmbient;/);
+  assert.match(fragment(patched), /let margoAmbient=iblShade\(iblSpecular,iblSampler,iblSh,iblParams,n,v,i\.color,i\.material\.y,i\.material\.x\);let linear=direct\*frame\.radiance\.xyz\*frame\.light\.w\+i\.color\*\(1\.0-i\.material\.y\)\*0\.0\+margoAmbient;/);
   assert.doesNotMatch(fragment(patched), /frame\.radiance\.w/, 'IBL replaces the constant ambient term');
   assert.deepEqual(frame.c.bindings.map(entry => entry.binding), [20, 21, 22, 23, 24]);
   assert.equal(frame.c.bindings[0].resource, environment.specularView);
@@ -154,7 +154,7 @@ test('glTF-pro models: applyTo lights and fogs opaque and blended primitives in 
       const code = pipeline.vertex.module.code;
       assert.match(code, /@group\(2\) @binding\(20\) var iblSpecular/);
       assert.match(code, /fn ambient\(s:Surface\)->vec3f \{return vec3f\(0\);\}/);
-      assert.match(code, /let margoAmbient=iblShade\(iblSpecular,iblSampler,iblBrdf,iblSh,iblParams,s\.n,v,s\.base\.rgb,s\.metal,s\.roughness\)\*s\.occlusion;var color=direct\+ambient\(s\)\+s\.emissive\+margoAmbient;/);
+      assert.match(code, /let margoAmbient=iblShade\(iblSpecular,iblSampler,iblSh,iblParams,s\.n,v,s\.base\.rgb,s\.metal,s\.roughness\)\*s\.occlusion;var color=direct\+ambient\(s\)\+s\.emissive\+margoAmbient;/);
       assert.match(code, /color=mix\(select\(color,aces\(max\(color,vec3f\(0\)\)\/0\.6\),f\.settings\.w<0\.5\),margoFog\.color\.rgb,fogAmount\(i\.position,f\.eye\.xyz\)\);if\(f\.settings\.w<0\.5\) \{/);
     }
     assert.ok(lit.pipelines.some(pipeline => pipeline.fragment.targets[0].blend), 'the blended primitive is fogged too');

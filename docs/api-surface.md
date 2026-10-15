@@ -27,14 +27,14 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/decoders | `.` 22 | 1 |  |  |
 | @margoengine/dof | `.` 2 |  |  | 6,083 |
 | @margoengine/ecs | `.` 6 |  |  |  |
-| @margoengine/environment | `.` 45 | 4 |  | 20,544 |
+| @margoengine/environment | `.` 45 | 4 |  | 20,802 |
 | @margoengine/exporters | `.` 26, `./usdz` 2, `./model` 6 | 9 |  | 14,642 |
 | @margoengine/fbx | `.` 4, `./worker` 2 | 1 |  |  |
 | @margoengine/fsm | `.` 3 |  |  |  |
 | @margoengine/geometry | `.` 64 |  |  | 15,270 |
 | @margoengine/gizmo | `.` 12 |  |  |  |
 | @margoengine/gltf | `.` 3 |  |  | 4,460 |
-| @margoengine/gltf-pro | `.` 22, `./asset` 2, `./instancing` 3, `./prepare` 3, `./worker` 4 | 38 | 21 | 16,265 |
+| @margoengine/gltf-pro | `.` 22, `./asset` 2, `./instancing` 3, `./prepare` 3, `./worker` 4 | 38 | 21 | 16,495 |
 | @margoengine/html | `.` 8 |  |  |  |
 | @margoengine/ifc | `.` 4 |  |  | 1,677 |
 | @margoengine/input | `.` 4 |  |  |  |

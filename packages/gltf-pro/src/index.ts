@@ -20,6 +20,15 @@ export interface GLTFCamera {node:Mesh;nodeIndex:number;type:'perspective'|'orth
 export interface GLTFClusteredLight {position:[number,number,number];range:number;color:number[];intensity:number;direction?:[number,number,number];outerAngle?:number;innerAngle?:number}
 export type GLTFLoadOptions = Omit<AssetOptions,'buffers'>;
 const srgbMaps=[0,4,9,12],normalMaps=[2,7],blended=(m:any)=>m.settings[0]===2||!!m.tint;
+// Names the material + effects combination instead of an invalid pipeline when the shader declares more sampled textures or
+// samplers than the device allows per stage (WebGPU's default and guaranteed minimum is 16 of each; README "Texture bindings").
+// ponytail: counts declarations, not per-stage use, so a texture read only in the vertex stage still counts.
+function checkLimits(device:GPUDevice,code:string,combination:()=>string[]):void {
+  for(const [kind,pattern,limit] of [['sampled textures',/var\s*\w+\s*:\s*texture_(?!storage)/g,device.limits?.maxSampledTexturesPerShaderStage??16],['samplers',/var\s*\w+\s*:\s*sampler/g,device.limits?.maxSamplersPerShaderStage??16]] as const){
+    const count=code.match(pattern)?.length??0;
+    if(count>limit)throw new RangeError(`gltf-pro: ${combination().join(' + ')} needs ${count} ${kind} per shader stage; this device allows ${limit}`);
+  }
+}
 declare const GPUBufferUsage: {UNIFORM:number;STORAGE:number;VERTEX:number;INDEX:number;COPY_DST:number};
 declare const GPUTextureUsage: {TEXTURE_BINDING:number;COPY_DST:number;RENDER_ATTACHMENT:number};
 type Context = Extract<PassContext,{backend:'webgpu'}>;
@@ -276,6 +285,7 @@ export class PBRModel implements EnginePlugin {
       const transmit=!!m.tint,blend=blended(m),key=mode+':'+c.format+':'+blend+transmit+':'+cull+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+':'+entry+':'+id+':'+mask+(state?JSON.stringify(state):'')+(inst?':i'+face:'');
       let pipeline=this.pipelines.get(key);
       if(!pipeline) {
+        checkLimits(c.device,code,()=>[m.physical?'physical material':'material',...[...this.lighting].flatMap(e=>{const x=e as {name?:string;shadow?:{name?:string}};return [x.name??'shader patch',...x.shadow?.name?[x.shadow.name]:[]];})]);
         const module=c.device.createShaderModule({code}),format=mode==='beauty'?c.format:'rgba16float';
         pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:80,attributes:Array.from({length:5},(_,i)=>({shaderLocation:i,offset:i*16,format:'float32x4' as const}))},...inst?[inst.layout]:[]]},
           fragment:{module,entryPoint:entry,constants:{margoFaceTest:face,margoAlphaTest:mask},targets:[{format,blend:state?.blend!==undefined?state.blend??undefined:blend&&mode!=='gbuffer'?{color:transmit?{srcFactor:'one',dstFactor:'constant'}:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},

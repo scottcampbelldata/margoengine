@@ -9,6 +9,7 @@ import {Clustered} from '../../clustered/dist/index.js';
 import {EnvironmentLighting, Fog} from '../../environment/dist/index.js';
 import {Raycaster} from '../../bvh/dist/index.js';
 import {instancedGLTF} from '../../../tests/support/instanced-gltf.js';
+import {animatedTriangle} from '../../../tests/support/gltf-pro-fixture.js';
 import {instancedShader} from '../src/instancing.ts';
 import {pbrShader, physicalShader} from '../src/shader.ts';
 import {NodeMaterial, positionLocal, normalLocal, uv, color, mix} from '../../shader/dist/index.js';
@@ -66,7 +67,7 @@ test('without decoders.instancing a required EXT_mesh_gpu_instancing is rejected
 test('instanced primitives draw once with an instance buffer in beauty, ambient and G-buffer passes, lit by every hook', async () => {
   const {gpu, engine, store, view} = await scene(), model = parseGLTF(engine, ...Object.values(instancedGLTF(transforms)), [], {instancing}); store.tick(false);
   const shadows = new Shadows({resolution: 64}), clustered = new Clustered({grid: [4, 3, 2]}), fog = new Fog({color: '#9ab', density: 0.05});
-  const ibl = new EnvironmentLighting({device: gpu.device, disposed: false, version: 0, specularView: {}, sampler: {}, brdfLutView: {}, shBuffer: {}, paramsBuffer: {}, restore: () => Promise.resolve()});
+  const ibl = new EnvironmentLighting({device: gpu.device, disposed: false, version: 0, specularView: {}, sampler: {}, brdfLut: {}, shBuffer: {}, paramsBuffer: {}, restore: () => Promise.resolve()});
   shadows.setup(engine); clustered.setup(engine); fog.setup(engine); shadows.add(model); clustered.add(model); ibl.applyTo(model); fog.applyTo(model);
   const log = gpu.record(() => {
     view.begin(0); shadows['render'](view.c); // the depth pass alone (the frame pass also patches core's shader)
@@ -111,4 +112,24 @@ test('the instanced vertex patch applies after material and shader-node patches,
     assert.equal(instancedShader(nodes.shader(base, 2)), code, 'cached');
   }
   assert.throws(() => instancedShader('fn x(){}'), /instancing patch target missing/);
+});
+
+test('texture binding limit (HANDOFF 5c): over the device limit, the draw throws naming the material and effects', async () => {
+  const {gpu, engine, store, view} = await scene(), fixture = animatedTriangle();
+  fixture.doc.materials = [{extensions: {KHR_materials_clearcoat: {clearcoatFactor: 1}}}]; fixture.doc.extensionsUsed = ['KHR_materials_clearcoat'];
+  delete fixture.doc.skins; delete fixture.doc.animations; delete fixture.doc.nodes[0].skin;
+  const model = parseGLTF(engine, fixture.doc, fixture.buffers); store.tick(false);
+  const shadows = new Shadows({resolution: 64}), clustered = new Clustered({grid: [4, 3, 2]});
+  const ibl = new EnvironmentLighting({device: gpu.device, disposed: false, version: 0, specularView: {}, sampler: {}, brdfLut: {}, shBuffer: {}, paramsBuffer: {}, restore: () => Promise.resolve()});
+  shadows.setup(engine); clustered.setup(engine); shadows.add(model); clustered.add(model); ibl.applyTo(model);
+  const draw = () => gpu.record(() => {view.begin(0); model.draw(view.c, 'beauty', view.c.color, view.c.depth);});
+  gpu.device.limits.maxSampledTexturesPerShaderStage = 14;
+  assert.throws(draw, {name: 'RangeError', message: 'gltf-pro: physical material + shadows + clustered + environment:lighting needs 15 sampled textures per shader stage; this device allows 14'});
+  delete gpu.device.limits.maxSampledTexturesPerShaderStage; // WebGPU's default, 16
+  // Physical 13 + shadows 1 + IBL 1 (the BRDF LUT is a buffer); LocalShadows would add the 16th.
+  const code = draw().find(e => e[0] === 'module')[2].code;
+  assert.equal(code.match(/var\s*\w+\s*:\s*texture_/g).length, 15);
+  model.addLighting({shader: source => '@group(2) @binding(90) var a:texture_2d<f32>;\n@group(2) @binding(91) var b:texture_2d<f32>;\n' + source, bindings: () => []});
+  assert.throws(draw, {message: 'gltf-pro: physical material + shadows + clustered + environment:lighting + shader patch needs 17 sampled textures per shader stage; this device allows 16'});
+  model.dispose(); shadows.dispose(); clustered.dispose(); ibl.dispose(); engine.dispose();
 });

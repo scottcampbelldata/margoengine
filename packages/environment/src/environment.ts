@@ -50,7 +50,7 @@ interface Resources {
   device: GPUDevice;
   cube: GPUTexture; cubeView: GPUTextureView;
   specular: GPUTexture; specularView: GPUTextureView;
-  brdf: GPUTexture; brdfView: GPUTextureView;
+  brdf: GPUBuffer;
   equirect?: GPUTexture; equirectView?: GPUTextureView;
   sampler: GPUSampler; sh: GPUBuffer; params: GPUBuffer;
   radiance: Float32Array; irradiance: Float32Array;
@@ -169,7 +169,7 @@ async function build(device: GPUDevice, source: EnvironmentSource, settings: Set
     pass.dispatchWorkgroups(x, y, z);
     pass.end();
   };
-  let cube!: GPUTexture, specular!: GPUTexture, brdf!: GPUTexture, sh!: GPUBuffer, params!: GPUBuffer, sampler!: GPUSampler, readback!: GPUBuffer;
+  let cube!: GPUTexture, specular!: GPUTexture, brdf!: GPUBuffer, sh!: GPUBuffer, params!: GPUBuffer, sampler!: GPUSampler, readback!: GPUBuffer;
   let equirect: GPUTexture | undefined, equirectView: GPUTextureView | undefined, cubeView!: GPUTextureView;
   const temporary: GPUBuffer[] = [];
   try {
@@ -178,7 +178,7 @@ async function build(device: GPUDevice, source: EnvironmentSource, settings: Set
       sampler = device.createSampler({label: 'environment', magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear'});
       cube = track(device.createTexture({label: 'environment source cube', size: [size, size, 6], mipLevelCount: cubeMips, format: 'rgba16float', usage: storageUsage}));
       specular = track(device.createTexture({label: 'environment specular', size: [specularSize, specularSize, 6], mipLevelCount: specularMips, format: 'rgba16float', usage: renderUsage}));
-      brdf = track(device.createTexture({label: 'environment BRDF LUT', size: [settings.brdfSize, settings.brdfSize], format: 'rgba16float', usage: storageUsage}));
+      brdf = track(device.createBuffer({label: 'environment BRDF LUT', size: settings.brdfSize * settings.brdfSize * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC}));
       sh = track(device.createBuffer({label: 'environment SH', size: 512, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_SRC}));
       params = track(device.createBuffer({label: 'environment params', size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST}));
       readback = track(device.createBuffer({size: 512, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ}));
@@ -232,8 +232,8 @@ async function build(device: GPUDevice, source: EnvironmentSource, settings: Set
       }
       const shMip = Math.max(0, Math.log2(size) - Math.floor(Math.log2(Math.min(settings.shSize, size))));
       dispatch(encoder, 'sphericalHarmonics', [{binding: 0, resource: level(cube, shMip)}, {binding: 1, resource: {buffer: sh}}], 1, 1, 1);
-      const brdfUnit = uniform(new Uint32Array([settings.brdfSamples, 0, 0, 0])); temporary.push(brdfUnit);
-      dispatch(encoder, 'brdfLut', [{binding: 0, resource: brdf.createView()}, {binding: 1, resource: {buffer: brdfUnit}}], groups(settings.brdfSize), groups(settings.brdfSize), 1);
+      const brdfUnit = uniform(new Uint32Array([settings.brdfSamples, settings.brdfSize, 0, 0])); temporary.push(brdfUnit);
+      dispatch(encoder, 'brdfLut', [{binding: 0, resource: {buffer: brdf}}, {binding: 1, resource: {buffer: brdfUnit}}], groups(settings.brdfSize), groups(settings.brdfSize), 1);
       encoder.copyBufferToBuffer(sh, 0, readback, 0, 512);
       device.queue.submit([encoder.finish()]);
     });
@@ -246,7 +246,7 @@ async function build(device: GPUDevice, source: EnvironmentSource, settings: Set
     for (let k = 0; k < 9; k++) for (let c = 0; c < 3; c++) {irradiance[k * 3 + c] = values[k * 4 + c]; radiance[k * 3 + c] = values[64 + k * 4 + c];}
     if (!radiance.every(Number.isFinite)) throw new Error('Environment processing produced non-finite SH');
     return {
-      device, cube, cubeView, specular, specularView: specular.createView({dimension: 'cube'}), brdf, brdfView: brdf.createView(),
+      device, cube, cubeView, specular, specularView: specular.createView({dimension: 'cube'}), brdf,
       equirect, equirectView, sampler, sh, params, radiance, irradiance,
     };
   } catch (error) {
@@ -319,13 +319,15 @@ export class Environment implements EnginePlugin {
   get specularTexture(): GPUTexture {return this.live.specular;}
   /** `texture_cube<f32>` view of the prefiltered specular mips. */
   get specularView(): GPUTextureView {return this.live.specularView;}
-  /** Split-sum BRDF LUT texture (rgba16float; r = scale, g = bias). */
-  get brdfLut(): GPUTexture {return this.live.brdf;}
-  get brdfLutView(): GPUTextureView {return this.live.brdfView;}
+  /**
+   * Split-sum BRDF LUT: a STORAGE buffer of brdfSize x brdfSize u32, row-major (x = NdotV, y = perceptual roughness at
+   * texel centers), each `pack2x16float(scale, bias)`. A buffer, not a texture, so IBL binds one sampled texture per stage.
+   */
+  get brdfLut(): GPUBuffer {return this.live.brdf;}
   /** Equirect source texture (rgba16float, or rgba32float with float32-filterable), if kept. */
   get equirectTexture(): GPUTexture | undefined {return this.live.equirect;}
   get equirectView(): GPUTextureView | undefined {return this.live.equirectView;}
-  /** Trilinear clamp-to-edge sampler for the cube maps and the BRDF LUT. */
+  /** Trilinear clamp-to-edge sampler for the cube maps. */
   get sampler(): GPUSampler {return this.live.sampler;}
   /** 512-byte STORAGE|UNIFORM buffer: bytes 0..143 = 9 vec4f irradiance/PI coefficients, bytes 256..399 = radiance coefficients. */
   get shBuffer(): GPUBuffer {return this.live.sh;}

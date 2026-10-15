@@ -88,7 +88,7 @@ abstract class ShaderEffect {
 }
 
 const iblCall = (n: string, v: string, base: string, metal: string, roughness: string) =>
-  `iblShade(iblSpecular,iblSampler,iblBrdf,iblSh,iblParams,${n},${v},${base},${metal},${roughness})`;
+  `iblShade(iblSpecular,iblSampler,iblSh,iblParams,${n},${v},${base},${metal},${roughness})`;
 
 export interface EnvironmentLightingOptions {
   /** Plugin and pass name. Default 'environment:lighting'. */
@@ -112,7 +112,7 @@ export class EnvironmentLighting extends ShaderEffect {
   }
   private declarations(group: number): string {
     const b = (offset: number) => `@group(${group}) @binding(${IBL_BINDING + offset})`;
-    return `${b(0)} var iblSpecular:texture_cube<f32>;\n${b(1)} var iblSampler:sampler;\n${b(2)} var iblBrdf:texture_2d<f32>;\n${b(3)} var<uniform> iblSh:array<vec4f,9>;\n${b(4)} var<uniform> iblParams:vec4f;\n${IBL_WGSL}\n`;
+    return `${b(0)} var iblSpecular:texture_cube<f32>;\n${b(1)} var iblSampler:sampler;\n${b(2)} var<storage,read> iblBrdf:array<u32>;\n${b(3)} var<uniform> iblSh:array<vec4f,9>;\n${b(4)} var<uniform> iblParams:vec4f;\n${IBL_WGSL}\n`;
   }
   protected patch(source: string, group: number): string {
     // The IBL term is named `margoAmbient` (a convention, no import): post's SSAO finds it in core's shader and occludes this light.
