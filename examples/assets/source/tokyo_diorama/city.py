@@ -71,10 +71,19 @@ def build(root):
 
     # Track: rails, sleepers, and the tram that runs on them.
     at, length = path_sampler()
+    overrun = 0.9  # rails continue past the route ends so the tram's end bogies never leave them
+
+    def along(s):
+        if 0.0 <= s <= length:
+            return at(s)
+        p, h = at(min(max(s, 0.0), length))
+        extra = s if s < 0 else s - length
+        return p + Vector((math.cos(h), math.sin(h), 0)) * extra, h
+
     left, right, sleepers = [], [], []
-    s = 0.0
-    while s <= length:
-        p, h = at(s)
+    s = -overrun
+    while s <= length + overrun:
+        p, h = along(s)
         n = Vector((-math.sin(h), math.cos(h), 0))
         left.append(p + n * RAIL_GAUGE + Vector((0, 0, 0.1)))
         right.append(p - n * RAIL_GAUGE + Vector((0, 0, 0.1)))
@@ -84,9 +93,18 @@ def build(root):
     atlas.add(kit.tube('Track_Rails', left, 0.022, None, root), 'metal_light')
     atlas.add(kit.tube('Track_Rail_R', right, 0.022, None, root), 'metal_light')
     atlas.add(kit.boxes('Track_Sleepers', sleepers, None, root), 'wood_dark')
+    stops = []
+    for s in (-overrun, length + overrun):
+        p, h = along(s)
+        stops.append(((0.16, 0.8, 0.22), p + Vector((0, 0, 0.18)), (0, 0, h)))
+    atlas.add(kit.boxes('Track_Buffer_Stops', stops, None, root), 'paint:#c8452f')
 
     tram = hero_tram.build(root)
+    previous = None
     for frame in range(kit.FRAME_START, kit.FRAME_END + 1, 6):
         t = (frame - kit.FRAME_START) / (kit.FRAME_END - kit.FRAME_START)
         p, h = at(length * (1 - math.cos(math.tau * t)) / 2)  # out and back, easing at both ends
+        if previous is not None:
+            h = previous + math.remainder(h - previous, math.tau)  # never key across the +/-pi branch cut
+        previous = h
         kit.key(tram, frame, location=(p.x, p.y, 0.09), rotation_euler=(0, 0, h))

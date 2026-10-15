@@ -4,11 +4,11 @@ import os
 import urllib.request
 
 CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'textures')
-MAPS = {'diff': 'Diffuse', 'rough': 'Rough', 'nor_gl': 'nor_gl', 'ao': 'AO'}
+MAPS = {'diff': 'Diffuse'}  # the bake only samples base colour
 
 
 def texture(asset, resolution='1k'):
-    """Return {'diff': path, 'rough': path, 'nor_gl': path, 'ao': path} for a Poly Haven texture, downloading as needed."""
+    """Return {'diff': path} for a Poly Haven texture, downloading as needed."""
     os.makedirs(CACHE, exist_ok=True)
     paths = {short: os.path.join(CACHE, '%s_%s_%s.jpg' % (asset, short, resolution)) for short in MAPS}
     if all(os.path.exists(p) for p in paths.values()):
@@ -19,8 +19,13 @@ def texture(asset, resolution='1k'):
             url = files[key][resolution]['jpg']['url']
             if not url.startswith('https://dl.polyhaven.org/'):
                 raise ValueError('unexpected Poly Haven download host: ' + url)
-            with open(paths[short], 'wb') as out:
-                out.write(_get(url))
+            data = _get(url)  # fully in memory before anything touches the cache
+            if not data:
+                raise ValueError('empty download: ' + url)
+            partial = paths[short] + '.part'
+            with open(partial, 'wb') as out:
+                out.write(data)
+            os.replace(partial, paths[short])  # atomic: the cache never holds a truncated texture
     return paths
 
 

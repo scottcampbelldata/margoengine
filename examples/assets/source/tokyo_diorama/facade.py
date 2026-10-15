@@ -290,7 +290,7 @@ def shopfront(b, m, face):
         b.flatbox(m['interior'], face, w * 0.7, 0.01, 0.85, -w * 0.05, 0.002, 0.45)
         b.box('wood_dark', face, w * 0.7, 0.3, 0.06, -w * 0.05, 0.15, 0.48)   # counter
         for k in range(4):
-            pos = b.pt(face, -w * 0.3 + k * 0.17, 0.42, 0)
+            pos = b.pt(face, -w * 0.3 + k * 0.17, 0.36, 0)
             b.part(kit.cylinder(kit_name(b, 'Stool'), 0.06, 0.3, (pos[0], pos[1], pos[2] + 0.15), None, b.parent, segments=10), 'paint:#c8452f')
         noren, _ = signs.panel(kit_name(b, 'Noren'), 'noren_a', w * 0.6, b.pt(face, -w * 0.05, 0.05, 0.77), b.parent, rot=(0, 0, Building.yaw(face)), double=True)
         face_sign(b, face, 0, FLOOR0 - 0.1, 'ramen_h', w * 0.45, n=0.09)

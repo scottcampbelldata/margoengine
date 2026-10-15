@@ -46,16 +46,16 @@ try {
   await page.screenshot({path: 'test-results/tokyo-diorama-phone.png'});
   await page.setViewportSize({width: 1440, height: 1100});
 
-  // Missing asset: visible error, no blank page.
+  // Every load so far (normal, reduced motion, phone) must be free of console and page errors.
+  assert.deepEqual(errors, [], 'Console errors: ' + errors.join('\n'));
+
+  // Missing asset: visible error, no blank page. The 404 itself logs console errors, which are expected here.
   await page.route('**/assets/tokyo-diorama.glb', route => route.fulfill({status: 404, body: 'missing'}));
-  errors.length = 0;
   await page.goto(url);
   await page.waitForFunction(() => document.querySelector('#status').textContent === 'Unable to load scene');
   assert.ok((await page.textContent('#error')).length > 0, 'Load failure not reported');
   await page.unroute('**/assets/tokyo-diorama.glb');
-  errors.length = 0; // the 404 itself logs a console error
 } finally {
   await close();
 }
-assert.deepEqual(errors, [], 'Console errors: ' + errors.join('\n'));
 console.log('Tokyo diorama browser check passed');

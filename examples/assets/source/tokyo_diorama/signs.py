@@ -205,7 +205,7 @@ def build_atlas():
                 _icon(sheet, icon, cx + w / 2, cy + h / 2, min(w, h) * 0.9, 0.002, sid)
         if text:
             cu = bpy.data.curves.new(sid + '_text', 'FONT')
-            cu.body = '\n'.join(text) if vertical else text
+            cu.body = '\n'.join(text.replace('ー', '丨')) if vertical else text  # vertical long-vowel mark
             cu.font = font
             cu.align_x, cu.align_y = 'CENTER', 'CENTER'
             cu.space_line = 0.9

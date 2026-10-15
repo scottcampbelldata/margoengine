@@ -38,7 +38,6 @@ def reset_scene():
     scene.render.fps = FPS
     scene.frame_start = FRAME_START
     scene.frame_end = FRAME_END
-    bpy.context.preferences.edit.keyframe_new_interpolation_type = 'LINEAR'
     SCENE = scene
     return scene
 
