@@ -37,19 +37,21 @@ export class VectorRef {
 
 /** 1 when a mesh needs back faces drawn (double-sided or mirrored); batches without one draw with cullMode back. */
 const keep=({matrix:m,material}:Mesh)=>+(material.data[6]>0||m[0]*(m[5]*m[10]-m[6]*m[9])-m[4]*(m[1]*m[10]-m[2]*m[9])+m[8]*(m[1]*m[6]-m[2]*m[5])<0);
+const views=(mesh:Mesh)=>Object.assign(mesh,{matrix:mesh.engine.store.matrices.subarray(mesh.id*16,mesh.id*16+16),euler:mesh.engine.store.rotations.subarray(mesh.id*3,mesh.id*3+3)});
 export class Mesh {
   name='';
   readonly position=new VectorRef(this,'position');
   readonly rotation=new VectorRef(this,'rotation');
   readonly scale=new VectorRef(this,'scale');
-  readonly euler:Float32Array;
-  readonly matrix: Float32Array;
+  /** Views into the store; createMesh replaces them when it grows the store, so read them, never keep them. */
+  declare readonly euler:Float32Array;
+  declare readonly matrix: Float32Array;
   geometry: Geometry|null=null;
   private current=new PbrMaterial();
   get material():PbrMaterial{return this.current;}
   /** Assigning a material makes the next frame re-collect instances. */
   set material(value:PbrMaterial){this.current=value;this.engine.collected=-1;}
-  constructor(readonly engine: Engine, readonly id: number) { this.matrix=engine.store.matrices.subarray(id*16,id*16+16);this.euler=engine.store.rotations.subarray(id*3,id*3+3); }
+  constructor(readonly engine: Engine, readonly id: number) { views(this); }
   get visible():boolean {this.check();return this.engine.store.hidden[this.id]===0;}
   set visible(value:boolean){this.check();if(typeof value!=='boolean')throw new TypeError('Invalid Visibility');this.engine.store.hidden[this.id]=+!value;}
   check():void { if(this.engine.disposed||this.engine.meshes.get(this.id)!==this)throw new Error('Mesh disposed'); }
@@ -101,8 +103,8 @@ export class Engine {
   // Last full collection: revision, visibility, material values, and each entity's instance offset (-1 when not drawn).
   /** @internal Revision of the last full instance collection; -1 forces one. */ collected=-1;
   private readonly materials=new Map<PbrMaterial,Float32Array>();
-  private readonly seen:Uint8Array;
-  private readonly slots:Int32Array;
+  private seen:Uint8Array;
+  private slots:Int32Array;
   private readonly callbacks=new Set<FrameCallback>();
   private raf: number|null=null;
   private last=0;
@@ -152,7 +154,9 @@ export class Engine {
   removePlugin(name:string):void {const plugin=this.plugins.get(name);if(!plugin)return;this.frameGraph.removeOwner(name);(this.plugins as Map<string,EnginePlugin>).delete(name);owners.delete(plugin);plugin.dispose?.();}
   createMesh(parent:Mesh|null=null):Mesh {
     if(this.disposed||this.disposing)throw new Error('Engine disposed');parent?.check();if(parent&&parent.engine!==this)throw new TypeError('Foreign parent');
-    const id=this.free.pop()??this.next++;if(id>=this.store.capacity){this.next=this.store.capacity;throw new RangeError('Entity capacity');}
+    const id=this.free.pop()??this.next++;
+    // Double the store when full (seen and slots are rebuilt by the full collection the new mesh forces).
+    if(id>=this.store.capacity)try{const size=Math.min(id*2,1<<23);this.seen=new Uint8Array(size);this.slots=new Int32Array(size);this.store.grow(size);this.meshes.forEach(views);}catch(error){this.next=id;throw error;}
     const t=this.store.transforms;for(const key of ['x','y','z','qx','qy','qz'] as const)t[key][id]=0;for(const key of ['qw','sx','sy','sz'] as const)t[key][id]=1;
     this.store.parents[id]=-1;this.store.constrained[id]=0;this.store.hidden[id]=0;this.store.rotations.fill(0,id*3,id*3+3);const mesh=new Mesh(this,id);this.meshes.set(id,mesh);this.revision++;this.store.active[id]=1;
     try{return mesh.setParent(parent);}catch(error){mesh.dispose();throw error;}

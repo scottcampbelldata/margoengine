@@ -29,7 +29,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 
 | three.js | Status | Margo | Notes |
 | --- | --- | --- | --- |
-| Object3D transforms and hierarchy (position, rotation, quaternion, scale, parent, visible, name) | COVERED | core `Engine.createMesh`, `Mesh.setParent`, `setQuaternion` (`packages/core/src/engine.ts`) | Parent depth of 64 or less. At most 100,000 entities per engine (`packages/core/src/kernel.ts`). No `children`, `traverse`, `userData`, `lookAt` or `getWorldPosition`; world matrices are reachable only through `core/extension`. |
+| Object3D transforms and hierarchy (position, rotation, quaternion, scale, parent, visible, name) | COVERED | core `Engine.createMesh`, `Mesh.setParent`, `setQuaternion` (`packages/core/src/engine.ts`) | Parent depth of 64 or less. Entity slots grow on demand up to 8,388,608 per engine (`packages/core/src/kernel.ts`). No `children`, `traverse`, `userData`, `lookAt` or `getWorldPosition`; world matrices are reachable only through `core/extension`. |
 | Group (transform-only node) | COVERED | core mesh with no geometry | glTF importers use this pattern. |
 | Scene object, multiple scenes | PARTIAL | one `Engine` = one canvas = one implicit scene | No Scene object. A second scene needs a second engine and canvas. |
 | `scene.background` (color, texture, cubemap) | COVERED † | environment `EnvironmentBackground`, `Skybox` (`packages/environment/src/background.ts`), `ColorBackground` (`color.ts`, solid or vertical gradient); sky `Sky` | Core's clear color stays hard-coded; `ColorBackground` covers it with a pass on cleared depth. A transparent canvas still needs a core change. WebGPU only. |
@@ -371,7 +371,7 @@ Every MISSING or PARTIAL item, ordered by how often real three.js projects need 
 Two scaling notes from reading core (not measured):
 
 - **Instance buffer size.** Each unique core `Geometry` keeps an instance buffer sized to the meshes that use it, doubling as it grows: 96 bytes per instance on the GPU and the same on the CPU (`Engine.retain` in `packages/core/src/engine.ts`). The earlier per-geometry allocation of the full entity capacity is gone.
-- **Geometry and entity caps.** Core caps `Geometry` at 1,000,000 vertices and engines at 100,000 entities (default capacity 1,024). three.js has neither limit. Materials meshes share the 1,000,000-vertex cap.
+- **Geometry and entity caps.** Core caps `Geometry` at 1,000,000 vertices and engines at 8,388,608 entities (initial capacity 1,024, doubled on demand; 351 B of kernel memory per slot). three.js has neither limit. Materials meshes share the 1,000,000-vertex cap.
 
 ## Margo extras
 

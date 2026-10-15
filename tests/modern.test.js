@@ -45,7 +45,7 @@ test('Nested parents work regardless of slot order; cycles and invalid writes re
 test('Engine instances isolate Wasm memory and capacity is bounded',async()=>{
   const a=await TransformStore.create(1),b=await TransformStore.create(1);
   try{a.transforms.x[0]=42;assert.equal(b.transforms.x[0],0);assert.notEqual(a.transforms.x.buffer,b.transforms.x.buffer);}finally{a.dispose();b.dispose();}
-  await assert.rejects(TransformStore.create(0),/Capacity/);await assert.rejects(TransformStore.create(100001),/Capacity/);
+  await assert.rejects(TransformStore.create(0),/Capacity/);await assert.rejects(TransformStore.create(2**23+1),/Capacity/);
 });
 test('Cached hierarchy preserves late-error atomicity and rejects deep cached parents and cycles',async()=>{
   const store=await TransformStore.create(65);try{for(let i=0;i<65;i++){activate(store,i);store.transforms.x[i]=1;}for(let i=1;i<64;i++)store.parents[i]=i-1;store.tick(false);assert.equal(store.matrices[63*16+12],64);const matrices=store.matrices.slice(),visible=store.visible.slice();store.parents[64]=63;assert.throws(()=>store.tick(false),/Invalid/);assert.deepEqual(store.matrices,matrices);assert.deepEqual(store.visible,visible);store.parents[64]=-1;store.bounds[64*4+3]=-1;assert.throws(()=>store.tick(false),/Invalid/);assert.deepEqual(store.matrices,matrices);store.bounds[64*4+3]=0;store.hidden[0]=1;store.tick(false);assert.equal(store.visible[63],0);assert.equal(store.visible[64],1);store.parents[0]=63;assert.throws(()=>store.tick(false),/Invalid/);store.parents[0]=-1;store.hidden[0]=0;store.transforms.x[0]=2;store.tick(false);assert.equal(store.matrices[63*16+12],65);assert.equal(store.visible[63],1);
@@ -91,7 +91,7 @@ test('engine.pick on a canvas without client size (OffscreenCanvas in a worker) 
 
 test('Entity reuse rejects stale refs and shared geometry retires once',async()=>{
   const {engine,resources}=await headlessEngine(2);
-  try{const g=box(),a=engine.createMesh().setGeometry(g),b=engine.createMesh(a).setGeometry(g);assert.equal(resources.size,1);engine.render();assert.equal(engine.stats.drawCalls,1);assert.throws(()=>engine.createMesh(),/capacity/);a.dispose();assert.equal(engine.store.parents[b.id],-1);const c=engine.createMesh();assert.equal(c.id,a.id);assert.throws(()=>{a.position.x=7;},/disposed/);b.dispose();assert.equal(resources.size,0);}finally{engine.dispose();}assert.equal(engine.store.active.every(v=>v===0),true);
+  try{const g=box(),a=engine.createMesh().setGeometry(g),b=engine.createMesh(a).setGeometry(g);assert.equal(resources.size,1);engine.render();assert.equal(engine.stats.drawCalls,1);engine.store.grow=()=>{throw new Error('Transform allocation');};assert.throws(()=>engine.createMesh(),/Transform allocation/);assert.equal(engine.meshes.size,2);delete engine.store.grow;a.dispose();assert.equal(engine.store.parents[b.id],-1);const c=engine.createMesh();assert.equal(c.id,a.id);assert.throws(()=>{a.position.x=7;},/disposed/);b.dispose();assert.equal(resources.size,0);}finally{engine.dispose();}assert.equal(engine.store.active.every(v=>v===0),true);
 });
 
 function triangle(){const positions=new Float32Array([-1,-1,0,1,-1,0,0,1,0]),normals=new Float32Array([0,0,1,0,0,1,0,0,1]);const bytes=new Uint8Array(72);bytes.set(new Uint8Array(positions.buffer));bytes.set(new Uint8Array(normals.buffer),36);return {asset:{version:'2.0'},buffers:[{byteLength:72,uri:`data:application/octet-stream;base64,${Buffer.from(bytes).toString('base64')}`}],bufferViews:[{buffer:0,byteLength:36},{buffer:0,byteOffset:36,byteLength:36}],accessors:[{bufferView:0,componentType:5126,count:3,type:'VEC3'},{bufferView:1,componentType:5126,count:3,type:'VEC3'}],meshes:[{primitives:[{attributes:{POSITION:0,NORMAL:1},material:0}]}],materials:[{pbrMetallicRoughness:{baseColorFactor:[0.9,0.3,0.1,1],metallicFactor:0,roughnessFactor:0.6}}],nodes:[{mesh:0,translation:[2,0,0]}],scenes:[{nodes:[0]}],scene:0};}
@@ -116,7 +116,8 @@ test('GLB, generated normals, reflected matrix nodes and shared primitives impor
     delete doc.accessors[0].byteOffset;doc.accessors[0].sparse={};assert.throws(()=>parseGLTF(engine,doc,[binary]),/accessor/);
   }finally{engine.dispose();}
   const {engine:small,resources:smallResources}=await headlessEngine(2);
-  try{assert.throws(()=>parseGLTF(small,triangle()),/capacity/);assert.equal(small.meshes.size,0);assert.equal(smallResources.size,0);}finally{small.dispose();}
+  small.store.grow=()=>{throw new Error('Transform allocation');};
+  try{assert.throws(()=>parseGLTF(small,triangle()),/Transform allocation/);assert.equal(small.meshes.size,0);assert.equal(smallResources.size,0);}finally{small.dispose();}
 });
 test('Float32 transform validation is atomic; failed and recursive plugin cleanup retires every resource',async()=>{
   const {engine,resources}=await headlessEngine();const mesh=engine.createMesh().setGeometry(box());
@@ -155,7 +156,7 @@ test('CAD welding preserves hard normals, binary STL imports, OBJ concave groups
     const binary=parseCAD(engine,bytes,'stl');assert.equal(binary.meshes[0].geometry.vertices.length/6,24,'Hard edges were smoothed');assert.equal(binary.meshes[0].geometry.indices.length,36);binary.dispose();
     const obj='v 0 0 0\nv 2 0 0\nv 2 1 0\nv 1 1 0\nv 1 2 0\nv 0 2 0\ng first\nf 1 2 3 4 5 6\ng repeat\nf -6 -5 -4 -3 -2 -1';const assembly=parseCAD(engine,obj,'obj');assert.equal(assembly.meshes.length,2);assert.equal(assembly.meshes[0].geometry,assembly.meshes[1].geometry);assert.equal(resources.size,1);assert.deepEqual(deduplicateParts(assembly.meshes),{parts:2,unique:1});assert.equal(assembly.meshes[0].geometry.indices.length,12);assembly.dispose();
     for(const [input,format] of [['v 0 0 0\nf 1 2 3','obj'],[asciiSTL([[[0,0,0],[0,0,0],[1,0,0]]]),'stl'],[asciiSTL([[[0,0,0],[0.000001,0,0],[0,1,0]]]),'stl']])assert.throws(()=>parseCAD(engine,input,format));assert.equal(engine.meshes.size,0);assert.equal(resources.size,0);
-    const limited=await headlessEngine(1);try{assert.throws(()=>parseCAD(limited.engine,asciiSTL(square),'stl'),/capacity/);assert.equal(limited.engine.meshes.size,0);}finally{limited.engine.dispose();}
+    const limited=await headlessEngine(1);limited.engine.store.grow=()=>{throw new Error('Transform allocation');};try{assert.throws(()=>parseCAD(limited.engine,asciiSTL(square),'stl'),/Transform allocation/);assert.equal(limited.engine.meshes.size,0);}finally{limited.engine.dispose();}
   }finally{engine.dispose();}
 });
 test('Machinery prismatic, gears and slider-crank are bounded and failed coupling writes are atomic',async()=>{

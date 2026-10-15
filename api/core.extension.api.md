@@ -231,6 +231,7 @@ export class TransformStore {
     readonly changed: Uint8Array;
     static create(capacity?: number): Promise<TransformStore>;
     private constructor();
+    grow(capacity: number): void;
     tick(culling?: boolean): void;
     dispose(): void;
 }

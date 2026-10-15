@@ -1,0 +1,126 @@
+{
+ "node": "v24.15.0",
+ "date": "2026-10-15T04:25:10.621Z",
+ "diagnostic": false,
+ "conditions": {
+  "ac": true,
+  "cpuLoadPercent": 8,
+  "waitedSeconds": 424,
+  "checkedAt": "2026-10-15T04:32:15.376Z",
+  "topProcesses": [
+   {
+    "Name": "claude",
+    "Id": 33696,
+    "cpuSeconds": 21248
+   },
+   {
+    "Name": "claude",
+    "Id": 6516,
+    "cpuSeconds": 14156
+   },
+   {
+    "Name": "node",
+    "Id": 2940,
+    "cpuSeconds": 9455
+   },
+   {
+    "Name": "chrome",
+    "Id": 5460,
+    "cpuSeconds": 8612
+   },
+   {
+    "Name": "claude",
+    "Id": 48572,
+    "cpuSeconds": 8032
+   },
+   {
+    "Name": "Selkie",
+    "Id": 27788,
+    "cpuSeconds": 6104
+   },
+   {
+    "Name": "claude",
+    "Id": 44340,
+    "cpuSeconds": 5264
+   },
+   {
+    "Name": "msedgewebview2",
+    "Id": 23352,
+    "cpuSeconds": 4784
+   }
+  ]
+ },
+ "acPower": true,
+ "cases": [
+  {
+   "entities": 100006,
+   "parts": 89910,
+   "capacity": 131072,
+   "visible": 72469,
+   "memory": {
+    "kernelWasmMB": 44.9,
+    "kernelBytesPerSlot": 359.5,
+    "engineTypedBytesPerSlot": 5,
+    "instanceStorageMB": 8.2,
+    "jsHeapMB": 51.1,
+    "jsHeapBytesPerEntity": 536
+   },
+   "buildMs": 373.6,
+   "lastDoublingGrowMs": 11.6,
+   "tickFullRecomputeMs": 14.4,
+   "tickStaticMs": 3.328,
+   "tickMove1PercentMs": 4.519,
+   "fullCollectionFrameMs": 12.432,
+   "reusedFrameMs": 4.163,
+   "collectionMs": 8.269,
+   "disposeMs": 28.4
+  },
+  {
+   "entities": 499992,
+   "parts": 449523,
+   "capacity": 524288,
+   "visible": 211384,
+   "memory": {
+    "kernelWasmMB": 176.6,
+    "kernelBytesPerSlot": 353.1,
+    "engineTypedBytesPerSlot": 5,
+    "instanceStorageMB": 41.2,
+    "jsHeapMB": 191.2,
+    "jsHeapBytesPerEntity": 401
+   },
+   "buildMs": 1796.6,
+   "lastDoublingGrowMs": 59,
+   "tickFullRecomputeMs": 74.9,
+   "tickStaticMs": 20.153,
+   "tickMove1PercentMs": 26.249,
+   "fullCollectionFrameMs": 52.314,
+   "reusedFrameMs": 18.481,
+   "collectionMs": 33.833,
+   "disposeMs": 194
+  },
+  {
+   "entities": 1000012,
+   "parts": 899073,
+   "capacity": 1048576,
+   "visible": 357440,
+   "memory": {
+    "kernelWasmMB": 352.1,
+    "kernelBytesPerSlot": 352.1,
+    "engineTypedBytesPerSlot": 5,
+    "instanceStorageMB": 82.3,
+    "jsHeapMB": 249,
+    "jsHeapBytesPerEntity": 261
+   },
+   "buildMs": 3348.3,
+   "lastDoublingGrowMs": 127.6,
+   "tickFullRecomputeMs": 137.7,
+   "tickStaticMs": 41.461,
+   "tickMove1PercentMs": 43.41,
+   "fullCollectionFrameMs": 106.361,
+   "reusedFrameMs": 41.876,
+   "collectionMs": 64.485,
+   "disposeMs": 474.6
+  }
+ ],
+ "acPowerAtEnd": true
+}

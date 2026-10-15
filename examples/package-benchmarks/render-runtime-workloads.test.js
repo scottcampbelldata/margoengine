@@ -94,7 +94,7 @@ test('Splats demo draws one real combined anisotropic Gaussian cloud, SH toggles
 });
 
 test('Robot construction failure and bounded factory validation release owned partial scene state', async t => {
-  const w = await animator(1, local), h = await fixture(t, w, 1, -1); assert.throws(() => w.mount(h.context), /capacity|Capacity|slots|full/i); assert.equal(h.engine.meshes.size, 1); assert.ok(h.resources.every(resource => resource.destroyed));
+  const w = await animator(1, local), h = await fixture(t, w, 1, -1); h.engine.store.grow = () => {throw new Error('Transform allocation');}; assert.throws(() => w.mount(h.context), /Transform allocation/); assert.equal(h.engine.meshes.size, 1); assert.ok(h.resources.every(resource => resource.destroyed));
   for (const factory of [animator, taa]) for (const count of [0, 5, 1.5]) await assert.rejects(factory(count, local), /count/);
   for (const count of [0, 10, 1.5]) await assert.rejects(splats(count, local), /count/);
   for (const count of [3, 65, 4.5]) assert.throws(() => text(count), /count/);
