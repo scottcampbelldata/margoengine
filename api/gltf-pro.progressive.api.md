@@ -35,6 +35,7 @@ interface AssetOptions {
     signal?: AbortSignal;
     decoders?: GLTFDecoderHooks;
     buffers?: Array<ArrayBuffer | ArrayBufferView>;
+    fetch?: typeof fetch;
 }
 
 type Context = Extract<PassContext, {
@@ -139,6 +140,14 @@ interface GLTFLight {
 
 type GLTFLoadOptions = Omit<AssetOptions, 'buffers'>;
 
+interface GLTFNodeExtras {
+    node: Mesh;
+    nodeIndex: number;
+    name: string;
+    extras: Record<string, unknown>;
+    matrix: Float32Array;
+}
+
 interface LightingEffect {
     readonly owner?: Engine;
     pbr?(group: number): PBRLighting | undefined;
@@ -207,6 +216,7 @@ class PBRModel implements EnginePlugin {
     draw(c: Context, mode: 'beauty' | 'gbuffer' | 'ambient' | 'transparent', color: GPUTextureView, depth: GPUTextureView): void;
     get bounds(): Float32Array;
     clusteredLights(): GLTFClusteredLight[];
+    extras(): GLTFNodeExtras[];
     onDispose(callback: () => void): () => void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;

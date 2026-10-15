@@ -1,5 +1,5 @@
 {
-  "commit": "97a1d7c",
+  "commit": "9d6e310",
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "packages": {
     "@margoengine/animation": {
@@ -34,6 +34,12 @@
       ".": {
         "raw": 35515,
         "gzip": 13634
+      }
+    },
+    "@margoengine/cache": {
+      ".": {
+        "raw": 5787,
+        "gzip": 2421
       }
     },
     "@margoengine/cameras": {
@@ -158,16 +164,16 @@
     },
     "@margoengine/fbx": {
       ".": {
-        "raw": 25759,
-        "gzip": 10608
+        "raw": 25790,
+        "gzip": 10629
       },
       "./worker": {
-        "raw": 27936,
-        "gzip": 11285
+        "raw": 27985,
+        "gzip": 11307
       },
       "dist/workers/fbx.js": {
-        "raw": 44781,
-        "gzip": 16767
+        "raw": 44901,
+        "gzip": 16800
       }
     },
     "@margoengine/fsm": {
@@ -196,8 +202,8 @@
     },
     "@margoengine/gltf-pro": {
       ".": {
-        "raw": 48265,
-        "gzip": 16906
+        "raw": 48279,
+        "gzip": 16923
       },
       "./asset": {
         "raw": 6442,
@@ -208,16 +214,24 @@
         "gzip": 2243
       },
       "./prepare": {
-        "raw": 14485,
-        "gzip": 5385
+        "raw": 14574,
+        "gzip": 5420
+      },
+      "./progressive": {
+        "raw": 65767,
+        "gzip": 22758
       },
       "./worker": {
-        "raw": 50176,
-        "gzip": 17611
+        "raw": 50201,
+        "gzip": 17628
       },
       "dist/workers/gltf.js": {
-        "raw": 15122,
-        "gzip": 5592
+        "raw": 15211,
+        "gzip": 5625
+      },
+      "dist/workers/progressive.js": {
+        "raw": 20132,
+        "gzip": 7286
       }
     },
     "@margoengine/html": {
@@ -278,12 +292,12 @@
     },
     "@margoengine/machinery": {
       ".": {
-        "raw": 72828,
-        "gzip": 33418
+        "raw": 72849,
+        "gzip": 33430
       },
       "./cad": {
-        "raw": 15592,
-        "gzip": 6327
+        "raw": 15613,
+        "gzip": 6336
       },
       "./cad-async": {
         "raw": 1881,
@@ -674,16 +688,16 @@
     },
     "@margoengine/usdz": {
       ".": {
-        "raw": 18675,
-        "gzip": 7784
+        "raw": 18689,
+        "gzip": 7793
       },
       "./worker": {
-        "raw": 20920,
-        "gzip": 8542
+        "raw": 21040,
+        "gzip": 8585
       },
       "dist/workers/usdz.js": {
-        "raw": 74995,
-        "gzip": 26830
+        "raw": 75061,
+        "gzip": 26855
       }
     },
     "@margoengine/usdz-export": {
