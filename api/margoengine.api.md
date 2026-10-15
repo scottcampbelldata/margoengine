@@ -52,6 +52,8 @@ export type MeshOptions = NonNullable<ConstructorParameters<typeof PbrMaterial>[
 
 export { PbrMaterial } from "@margoengine/core";
 
+export { PbrMaterialOptions } from "@margoengine/core";
+
 export class Stage {
     readonly engine: EngineKernel;
     constructor(engine: EngineKernel);

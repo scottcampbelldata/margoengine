@@ -208,6 +208,22 @@ immutable once attached; build a new `Geometry` to change it. For UVs, vertex co
 Core's `PbrMaterial` is colour, roughness, metalness and `doubleSided`. Textures, transparency, unlit and matcap
 shading come from `@margoengine/materials`, which draws through gltf-pro (WebGPU only).
 
+Core materials are live, like three.js's `material.color.set(...)`: `set` changes the given values in place and every
+mesh using the material shows them on the next frame (no new material, pipeline or bind group).
+
+```js
+mesh.material.color.set('#ff8800');
+mesh.material.roughness = 0.2;
+```
+
+```ts
+import {PbrMaterial} from '@margoengine/core';
+
+const paint = new PbrMaterial({color: '#84d6bd'});
+mesh.setMaterial(paint);
+paint.set({color: '#ff8800', roughness: 0.2}); // omitted values keep theirs; invalid input throws and changes nothing
+```
+
 ```js
 const map = new THREE.TextureLoader().load('/crate.jpg');
 map.colorSpace = THREE.SRGBColorSpace;

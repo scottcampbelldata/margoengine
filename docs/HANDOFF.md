@@ -740,6 +740,21 @@ Second set (2026-10-14, evening), all APPROVED by Scott:
   budget ~15 B) and minimal live setters on core `PbrMaterial` (color/roughness/metalness without recreating the
   material; budget ~30 B; if it needs dirty-state tracking, leave it to leaf packages). Start after the current core
   agent merges.
+  DONE (setters, +34 B -> 19,577, 4 B over the ~30 B budget; a +31 B variant parsed the default hex colour on every
+  construction, which `deep-core-box`'s one-map guard rejects): `PbrMaterial.set({color, roughness, metalness,
+  doubleSided})` writes `material.data` in place after validating (omitted values keep theirs; a rejected call changes
+  nothing); the constructor is `set({...options, color: options.color ?? '#4f46e5'})`. No dirty tracking was needed: the engine already compares every drawn material's
+  values each frame, so a change re-collects instances and uploads each drawn batch's range once (static frames after
+  that upload nothing). Ceiling: recolouring one part re-uploads all instances that frame; per-part dirty ranges would
+  need material->mesh tracking (leaf packages). No `opacity` (core requires alpha 1). Test:
+  `tests/core-material-setters.test.js` (fake GPU: one upload with the new colour, no pipeline/bind-group creation).
+  Real GPU (Arc 140V, Edge 155, AC before/after, GPU lock; `examples/package-benchmarks/material-setters-gpu.mjs`): red box
+  [170,20,20] -> `set({color: blue})` -> next frame [20,20,170], zero pipelines and bind groups created, no GPU errors.
+  MEASURED, NOT MERGED (transparent canvas): +39 B (`transparent: true` flag) / +40 B (`clearColor` RGBA option) vs the
+  ~15 B budget; the floor is `alphaMode:'premultiplied'` plus the clear-value switch. Parked on branch
+  `scratch/core-transparent-canvas` (core option, `@margoengine/webgl` fallback support and the post alpha fixes);
+  awaiting Scott. Zero-core alternative: a leaf plugin that reconfigures the canvas context to premultiplied and
+  draws alpha 0 over cleared depth (like `ColorBackground`).
 - Result (Scott, 2026-10-14 late): material setters TAKEN at +34 B (core+stage 19,577); transparent canvas as a
   ZERO-core-byte optional plugin, not core (the +39 B core version stays unmerged on `scratch/core-transparent-canvas`).
 - Multiple directional lights stay OUT of core (belongs in `@margoengine/clustered`).
@@ -766,7 +781,7 @@ Second set (2026-10-14, evening), all APPROVED by Scott:
 4. [DONE for dispose/destroy: `dispose()` primary, `destroy()` deprecated alias, READMEs use dispose; option edits
    NOT changed] `dispose()` and `destroy()` both exist (PBRModel, Animation, Tonemap, SSAO have both; READMEs use either). Option
    edits differ too: `tonemap.options.exposure`, `sky.options.hours`, but `fog.far` and `glass.opacity` directly.
-5. Core `PbrMaterial` has no setters: recolouring means a new material and `setMaterial`, or writing the undocumented
+5. [FIXED: `material.set({...})`, see Second set] Core `PbrMaterial` has no setters: recolouring means a new material and `setMaterial`, or writing the undocumented
    `material.data` array (math's README does). `@margoengine/materials` `Material` is live. Core meshes move with
    `mesh.position.set(...)`, materials meshes with `mesh.root.setPosition([...])`.
 6. [FIXED outside core] `model.bounds` is a flat `[minX, minY, minZ, maxX, maxY, maxZ]` but `camera.fitToBoundingBox(min, max)` takes two

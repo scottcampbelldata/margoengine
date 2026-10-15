@@ -26,6 +26,8 @@ engine.onFrame((_, delta) => { mesh.rotation.y += delta; });
 engine.start();
 ```
 
+Materials are live: `material.set({ color: '#ff8800', roughness: 0.2, metalness: 1, doubleSided: false })` changes the given values in place (omitted ones keep theirs; invalid input throws and changes nothing). Every mesh using the material shows it on the next frame with no new pipeline or bind group. A value change re-collects the frame's instances, so each drawn geometry's whole instance range is uploaded once on that frame (only changed ranges after that); for per-frame recolouring of one part among many thousands, give that part its own material or use `@margoengine/materials`. Core materials are opaque (no `opacity`).
+
 Call `engine.dispose()` when the canvas is removed. Wasm is embedded; no Rust toolchain or Wasm bundler plugin is required. The public API is exported from `@margoengine/core`; raw GPU/Wasm access uses the explicit `@margoengine/core/extension` entry. Both entries include TypeScript declarations.
 
 TypeScript 7+ with DOM types, Wasm SIMD and DecompressionStream gzip support are required. WebGPU requires HTTPS or localhost. See the [API and lifecycle guide](https://github.com/scottcampbelldata/margoengine/blob/main/MODERN-ENGINE.md) and [measured baselines](https://github.com/scottcampbelldata/margoengine/blob/main/benchmarks/README.md).

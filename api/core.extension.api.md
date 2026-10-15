@@ -199,12 +199,8 @@ export type PassContext = {
 
 export class PbrMaterial {
     readonly data: Float32Array<ArrayBuffer>;
-    constructor({ color, roughness, metalness, doubleSided }?: {
-        color?: string | readonly number[];
-        roughness?: number;
-        metalness?: number;
-        doubleSided?: boolean;
-    });
+    constructor(options?: PbrMaterialOptions);
+    set({ color, roughness, metalness, doubleSided }: PbrMaterialOptions): void;
 }
 
 export interface Renderer {
@@ -318,6 +314,13 @@ interface Mesh {
     setGeometry(value: Geometry | null): this;
     setMaterial(value: PbrMaterial): this;
     dispose(): void;
+}
+
+interface PbrMaterialOptions {
+    color?: string | readonly number[];
+    roughness?: number;
+    metalness?: number;
+    doubleSided?: boolean;
 }
 
 interface VectorRef {

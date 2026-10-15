@@ -44,13 +44,17 @@ export function box(width = 1, height = 1, depth = 1): Geometry {
 }
 
 export class PbrMaterial {
-  readonly data = new Float32Array(8);
-  constructor({color = '#4f46e5', roughness = 0.5, metalness = 0, doubleSided=true}: {color?: string|readonly number[]; roughness?: number; metalness?: number;doubleSided?:boolean} = {}) {
+  readonly data = new Float32Array([0,0,0,1,0.5,0,1,0]);
+  constructor(options: PbrMaterialOptions = {}) {this.set({...options,color:options.color??'#4f46e5'});}
+  /** Changes values in place; omitted ones keep their value. The next frame re-uploads instances (no new material, pipeline or bind group). */
+  set({color = this.data.slice(0,3) as unknown as number[], roughness = this.data[4], metalness = this.data[5], doubleSided=!!this.data[6]}: PbrMaterialOptions):void {
     const rgb = typeof color === 'string' ? /^#[0-9a-f]{6}$/i.test(color) ? [1,3,5].map(i => {const v=parseInt(color.slice(i,i+2),16)/255;return v <= 0.04045 ? v/12.92 : ((v+0.055)/1.055)**2.4;}) : null : color;
     if (!rgb) throw new TypeError('Invalid Color');
     finite(rgb,3,'Color');
     if ([...rgb,roughness,metalness].some(v => !Number.isFinite(v) || v < 0 || v > 1)) throw new RangeError('Invalid material');
     if(typeof doubleSided!=='boolean')throw new TypeError('Invalid material');
-    this.data.set([...rgb,1,Math.max(0.045,roughness),metalness,+doubleSided,0]);
+    this.data.set([...rgb,1,Math.max(0.045,roughness),metalness,+doubleSided]);
   }
 }
+/** `color`: '#rrggbb' (sRGB) or linear [r, g, b] in 0..1. */
+export interface PbrMaterialOptions {color?: string|readonly number[]; roughness?: number; metalness?: number; doubleSided?: boolean}
