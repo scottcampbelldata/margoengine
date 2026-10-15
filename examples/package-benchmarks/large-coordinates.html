@@ -1,0 +1,61 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Large coordinates GPU check</title><style>body{margin:0;background:#000}canvas{width:640px;height:360px;display:block}</style></head><body><canvas></canvas>
+<script type="module">
+// Driven by large-coordinates-gpu.mjs: the 10 mm flange of large-coordinates-scene.js as core meshes or a gltf-pro
+// model, `distance` metres from the origin, with or without FloatingOrigin; one frame per camera step.
+import {Engine,Geometry,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {parseGLTF} from '/packages/gltf-pro/dist/index.js';
+import {FloatingOrigin} from '/packages/cameras/dist/origin.js';
+import {ROTATION,BOLTS,CAMERA,cameraOffset,position,flange} from './large-coordinates-scene.js';
+const canvas=document.querySelector('canvas'),engine=await Engine.create(canvas,{backend:'webgpu',capacity:50_016,camera:{...CAMERA}});
+const device=engine.gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const shape=flange(),geometry=new Geometry(shape.positions,shape.normals,shape.indices),bolt=box(0.001,0.001,0.001);
+const steel=new PbrMaterial({color:'#9fb4c8',roughness:0.35,metalness:0.6}),brass=new PbrMaterial({color:'#e0b040',roughness:0.4});
+// The same flange and bolts as a glTF asset (gltf-pro PBR shading).
+function gltfFlange(){
+  const f32=a=>new Float32Array(a),buffers=[f32(shape.positions),f32(shape.normals),new Uint32Array(shape.indices)],b=box(0.001,0.001,0.001),bp=[],bn=[];
+  for(let i=0;i<b.vertices.length;i+=6){bp.push(b.vertices[i],b.vertices[i+1],b.vertices[i+2]);bn.push(b.vertices[i+3],b.vertices[i+4],b.vertices[i+5]);}
+  buffers.push(f32(bp),f32(bn),new Uint32Array(b.indices));
+  const minmax=(a)=>{const min=[1e9,1e9,1e9],max=[-1e9,-1e9,-1e9];for(let i=0;i<a.length;i+=3)for(let k=0;k<3;k++){min[k]=Math.min(min[k],a[i+k]);max[k]=Math.max(max[k],a[i+k]);}return {min,max};};
+  const accessors=[{bufferView:0,componentType:5126,count:shape.positions.length/3,type:'VEC3',...minmax(shape.positions)},{bufferView:1,componentType:5126,count:shape.normals.length/3,type:'VEC3'},{bufferView:2,componentType:5125,count:shape.indices.length,type:'SCALAR'},
+    {bufferView:3,componentType:5126,count:bp.length/3,type:'VEC3',...minmax(bp)},{bufferView:4,componentType:5126,count:bn.length/3,type:'VEC3'},{bufferView:5,componentType:5125,count:b.indices.length,type:'SCALAR'}];
+  const q=(()=>{const [x,y,z]=ROTATION,sx=Math.sin(x/2),cx=Math.cos(x/2),sy=Math.sin(y/2),cy=Math.cos(y/2),sz=Math.sin(z/2),cz=Math.cos(z/2);return [sx*cy*cz+cx*sy*sz,cx*sy*cz-sx*cy*sz,cx*cy*sz+sx*sy*cz,cx*cy*cz-sx*sy*sz];})();
+  const doc={asset:{version:'2.0'},buffers:buffers.map(d=>({byteLength:d.byteLength})),bufferViews:buffers.map((d,i)=>({buffer:i,byteLength:d.byteLength})),accessors,
+    materials:[{pbrMetallicRoughness:{baseColorFactor:[0.62,0.7,0.78,1],metallicFactor:0.6,roughnessFactor:0.35},doubleSided:true},{pbrMetallicRoughness:{baseColorFactor:[0.88,0.69,0.25,1],metallicFactor:0,roughnessFactor:0.4},doubleSided:true}],
+    meshes:[{primitives:[{attributes:{POSITION:0,NORMAL:1},indices:2,material:0}]},{primitives:[{attributes:{POSITION:3,NORMAL:4},indices:5,material:1}]}],
+    nodes:[{mesh:0,rotation:q,children:[1,2,3,4]},...BOLTS.map(p=>({mesh:1,translation:p}))],scenes:[{nodes:[0]}]};
+  return parseGLTF(engine,doc,buffers);
+}
+let scene=null,origin=null,world=null;
+const frame=async()=>{engine.render();await device.queue.onSubmittedWorkDone();};
+window.check={
+  async setup(kind,mode,distance){
+    scene?.dispose();scene=null;if(origin)engine.removePlugin(origin.name);origin=null;
+    world=position(distance);
+    let root;
+    if(kind==='gltf'){const model=gltfFlange();root=model.root;scene={dispose:()=>model.dispose(),root};}
+    else{root=engine.createMesh().setGeometry(geometry).setMaterial(steel).setRotation(ROTATION);const bolts=BOLTS.map(p=>engine.createMesh(root).setGeometry(bolt).setMaterial(brass).setPosition(p));scene={dispose:()=>{for(const m of [...bolts,root])m.dispose();},root};}
+    if(mode==='origin'){origin=FloatingOrigin.attach(engine);origin.place(root,world);}else root.setPosition(world);
+    // Warm up (pipelines compile asynchronously) so frame 0 is drawn like the reference's.
+    await window.check.frame(0);for(let i=0;i<20;i++)await frame();await new Promise(r=>setTimeout(r,200));await frame();
+    return {errors:errors.splice(0)};
+  },
+  async frame(k){
+    const offset=cameraOffset(k),cam=world.map((v,i)=>v+offset[i]);
+    if(origin)origin.lookAt(cam,world);else{engine.camera.position=cam;engine.camera.target=world;}
+    await frame();return {errors:errors.splice(0),rebases:origin?.rebases??0};
+  },
+  async pick(){const mesh=await engine.pick(320,180);return mesh===null?null:mesh===scene.root?'root':'other';},
+  // Rebase cost on the real device: n placed box roots over 2 km, 100 km out; ms per frame incl. GPU completion.
+  async cost(n){
+    scene?.dispose();scene=null;if(origin)engine.removePlugin(origin.name);
+    origin=FloatingOrigin.attach(engine);const parts=[],g=box(0.5,0.5,0.5),base=position(1e5),side=Math.ceil(Math.cbrt(n));
+    for(let i=0;i<n;i++){const m=engine.createMesh().setGeometry(g).setMaterial(steel);parts.push(m);origin.place(m,[base[0]+(i%side)*2000/side,base[1]+(Math.floor(i/side)%side)*2000/side,base[2]+Math.floor(i/side/side)*2000/side]);}
+    origin.lookAt(base.map((v,i)=>v+1000+[0,0,50][i]),base.map(v=>v+1000));for(let i=0;i<10;i++)await frame();
+    const time=async run=>{const t=performance.now();await run();return performance.now()-t;},out={staticFrame:[],rebaseCall:[],rebaseFrame:[]};
+    for(let r=0;r<15;r++){out.staticFrame.push(await time(frame));const target=origin.origin.map(v=>v+1);out.rebaseCall.push(await time(()=>origin.rebase(target)));out.rebaseFrame.push(await time(frame));await frame();}
+    const visible=engine.stats.visible;for(const m of parts)m.dispose();engine.removePlugin(origin.name);origin=null;
+    const median=a=>+[...a].sort((x,y)=>x-y)[a.length>>1].toFixed(3);return {parts:n,visible,medianMs:Object.fromEntries(Object.entries(out).map(([k,v])=>[k,median(v)])),errors:errors.splice(0)};
+  },
+};
+window.ready=true;
+</script></body></html>

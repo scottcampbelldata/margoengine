@@ -25,6 +25,7 @@ code that does the same job. Where Margo has no equivalent yet, the section says
 - [Post-processing](#post-processing)
 - [TSL and node materials](#tsl-and-node-materials)
 - [Orthographic cameras and top-down views](#orthographic-cameras-and-top-down-views)
+- [Large coordinates (floating origin)](#large-coordinates-floating-origin)
 - [Lines, points, text and labels](#lines-points-text-and-labels)
 - [Math](#math)
 - [Render loop and frame pacing](#render-loop-and-frame-pacing)
@@ -845,6 +846,27 @@ projection.fit(model.bounds);              // ortho: centre and zoom to the box 
 Core's camera exposes the two hooks this package uses: `camera.up` (screen up) and `camera.project` (fill the
 projection matrix yourself). Culling, picking, raycasts, controls, SSAO, lines, points, labels and clustered lights all
 read the result. Without the package, an exactly vertical view needs `engine.camera.up = [0, 0, -1]`.
+
+## Large coordinates (floating origin)
+
+three.js has no built-in answer: apps subtract an offset from every object by hand (or use a tiles renderer's
+relative-to-centre transforms) to stop float32 jitter far from the origin. Margo's `FloatingOrigin` does the bookkeeping:
+
+```ts
+import {FloatingOrigin} from '@margoengine/cameras/origin';
+import {Raycaster} from '@margoengine/bvh';
+
+const origin = FloatingOrigin.attach(engine);
+origin.place(model.root, [512_034.218, 41.5, 5_403_117.904]); // float64 world (e.g. UTM metres)
+origin.lookAt([512_034.3, 41.6, 5_403_118.0], [512_034.218, 41.5, 5_403_117.904]);
+const [hit] = new Raycaster().setFromEngine(engine, 320, 180).intersectEngine(engine);
+if (hit) console.log(origin.toWorld(hit.point));               // bvh hits back to float64 world
+```
+
+Root meshes keep float64 positions; core sees them relative to an origin that follows the camera, so a 10 mm part
+6,000 km out renders with under 0.05 px of jitter (core alone: tens of pixels at 100 km). Everything else (camera,
+controls, picks, section planes) works in local coordinates; see `docs/large-coordinates.md` for measurements and
+limits.
 
 ## Lines, points, text and labels
 
