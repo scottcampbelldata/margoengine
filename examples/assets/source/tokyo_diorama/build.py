@@ -50,6 +50,7 @@ def main(out=None, blend=None):
     if out:
         export(os.path.abspath(out))
     if blend:
+        bpy.context.preferences.filepaths.save_version = 0  # no .blend1 backup next to the committed source
         bpy.ops.wm.save_as_mainfile(filepath=os.path.abspath(blend), copy=True)
 
 
