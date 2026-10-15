@@ -8,7 +8,7 @@ npm run bench:threejs            # = node examples/package-benchmarks/vs-threejs
 Writes `examples/package-benchmarks/results/vs-threejs.json` (or `--out=`) and one screenshot per scene and engine to
 `test-results/vs-threejs/`. Takes the GPU lock, refuses to start on battery, and waits for a quiet CPU before every run
 (`scripts/quiet-gate.mjs`; `--quietMax=40` loosens it, `--busy` skips it and records the CPU load; both label the JSON
-as not for publication). Diagnosis: `--variants=margo,margo+cull,three-webgpu-instanced+double` picks variants and
+as not for publication). Diagnosis: `--variants=margo,margo-culled,margo+nocull,three-webgpu-instanced+double` picks variants and
 patches (`?diag=`, listed in `margo.js` and `three-scenes.js`), `--dump` records every shader and pipeline. Only a default run (5 rounds x 300
 frames, all scenes) on a machine confirmed quiet (`BENCH_QUIET=1`) is publishable; anything shorter is labelled
 `"SMOKE TEST, NOT FOR PUBLICATION"` in the JSON's `note`. No publishable run exists yet (see
@@ -16,13 +16,32 @@ frames, all scenes) on a machine confirmed quiet (`BENCH_QUIET=1`) is publishabl
 
 ## What is compared
 
-| Variant | Renderer | Scene objects |
-| --- | --- | --- |
-| `margo` | Margo core (WebGPU) + gltf-pro/environment/shadows for the helmet | Core meshes; instancing is automatic (one draw per geometry) |
-| `three-webgl` | three.js r186 `WebGLRenderer` | One `Mesh` per object (shared geometry and materials) |
-| `three-webgl-instanced` | `WebGLRenderer` | One `InstancedMesh` per shape |
-| `three-webgpu` | three.js r186 `WebGPURenderer` (WebGPU backend; the run fails if it falls back to WebGL2) | One `Mesh` per object |
-| `three-webgpu-instanced` | `WebGPURenderer` | One `InstancedMesh` per shape |
+| Variant | Renderer | Scene objects | Pair |
+| --- | --- | --- | --- |
+| `margo` | Margo core (WebGPU) + gltf-pro/environment/shadows for the helmet | One core mesh per object (an entity each; core batches them into one draw per geometry) | mesh |
+| `three-webgl` | three.js r186 `WebGLRenderer` | One `Mesh` per object (shared geometry and materials) | mesh |
+| `three-webgpu` | three.js r186 `WebGPURenderer` (WebGPU backend; the run fails if it falls back to WebGL2) | One `Mesh` per object | mesh |
+| `margo-instanced` | Margo core + `@margoengine/materials` | `createInstancedMesh` per shape (one entity, per-instance matrix and tint) | instanced |
+| `margo-culled` | Margo core + `@margoengine/culling` | `CulledInstances`: one batch per (shape, material), GPU frustum culling, indirect draws | instanced |
+| `three-webgl-instanced` | `WebGLRenderer` | One `InstancedMesh` per shape | instanced |
+| `three-webgpu-instanced` | `WebGPURenderer` | One `InstancedMesh` per shape | instanced |
+
+Compare within a pair: **mesh <-> mesh** is one scene object per box or part on both sides (what most three.js code
+and most Margo code does; Margo's core meshes are batched automatically, three's are one draw each), **instanced <->
+instanced** is the instanced API of each engine (static matrices uploaded once, no per-object CPU work). Until
+2026-10-15 the harness only had core meshes for Margo and quoted them against three's `InstancedMesh`, which compares
+a scene graph of 50,000 entities with one object holding 50,000 matrices (`docs/whitepaper/boxes-vs-threejs.md`).
+Details of the instanced variants:
+
+- `margo-instanced` boxes: one `createInstancedMesh` with a white material and the palette as per-instance tint
+  (as three's `setColorAt`), so 1 draw like three. CAD: one per part shape with baked world matrices (5 draws), as
+  three's instanced CAD. Moving boxes: `instances.setMatrixAt` per moving box per frame (uploads the changed rows).
+  It draws with gltf-pro's shader, which tone-maps with ACES (core and three's box scenes use Reinhard), so its
+  frames are brighter than the other variants'; its GPU time is gltf-pro's material, not core's.
+- `margo-culled` boxes: `CulledInstances` has no per-instance colour, so one batch per palette colour (16 indirect
+  draws). CAD: one batch per part shape (5). It draws with core's frame shader (same pixels as core meshes) but with
+  its own cull-none pipeline, so it does not get core's back-face-culled pipeline (4be71f5). Moving boxes:
+  `setTransform` per moving box per frame (one 64-byte upload each).
 
 Scenes (`scenes.js`, the same data for every engine):
 
@@ -97,9 +116,11 @@ Known asymmetries (they are in the results, not hidden):
   what most apps use). This costs Margo GPU time in `helmet`.
 - In `helmet` Margo's floor is a core mesh (Reinhard) while three tone-maps the whole frame with ACES, so the floor
   differs in brightness; the helmet itself is drawn by gltf-pro with ACES like three's.
-- Margo core has no pipeline back-face culling: back faces are rasterized and a single-sided material discards them in
-  the fragment shader, and the `discard` costs early depth testing. three culls in hardware (`cullMode: 'back'`). This
-  is most of three's GPU lead on the box scenes (`docs/whitepaper/boxes-vs-threejs.md`).
+- Back faces: since 4be71f5 Margo core draws a geometry batch whose instances are all single-sided and unmirrored with a
+  back-culled pipeline without the shader's `discard`, as three does (`cullMode: 'back'`); before it, back faces
+  were rasterized and discarded in the shader, and the `discard` cost early depth testing (most of three's GPU lead
+  on the box scenes; `docs/whitepaper/boxes-vs-threejs.md`). `margo+nocull` reproduces the earlier core on the GPU.
+  `margo-culled` still draws cull-none with the discard (see above).
 - three's WebGPURenderer draws into an RGBA16F MSAA target and tone-maps in an extra full-screen pass (about 0.15 ms at
   1280x720); Margo and three's WebGLRenderer tone-map in the material shader and render straight to the canvas.
 - three's `MeshStandardMaterial` includes features Margo core's material does not (e.g. maps, multi-scattering

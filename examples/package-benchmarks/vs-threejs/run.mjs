@@ -32,11 +32,14 @@ const configs = [
   {scene: 'boxes', n: 1000}, {scene: 'boxes', n: 10000}, {scene: 'boxes', n: 50000}, {scene: 'boxes', n: 10000, move: 1},
   {scene: 'cad', n: 10000}, {scene: 'cad', n: 50000}, {scene: 'helmet'},
 ].filter(c => !only || only.split(',').some(o => o === c.scene || o === `${c.scene}:${c.n}${c.move ? ':moving' : ''}`)); // --only=boxes, boxes:1000 or boxes:10000:moving (exact)
-// --variants=margo,margo+cull,three-webgpu-instanced+msaa1 picks variants and adds diagnostic patches (?diag=, see
+// --variants=margo,margo-instanced,margo-culled+nocull,three-webgpu-instanced+msaa1 picks variants (engine, then -instanced or
+// -culled for an instanced mode, mesh otherwise) and adds diagnostic patches (?diag=, see
 // margo.js / three-scenes.js; diagnostic runs are never publishable). --dump records shaders and pipeline state.
-const picked = arg('variants', '').split(',').filter(Boolean).map(s => {const [base, ...diag] = s.split('+');return {engine: base.replace(/-instanced$/, ''), mode: base.endsWith('-instanced') ? 'instanced' : 'mesh', diag: diag.join('+')};});
-const variants = c => picked.length ? picked : [{engine: 'margo'}, {engine: 'three-webgl', mode: 'mesh'}, {engine: 'three-webgpu', mode: 'mesh'}, ...(c.scene === 'helmet' ? [] : [{engine: 'three-webgl', mode: 'instanced'}, {engine: 'three-webgpu', mode: 'instanced'}])];
-const key = c => `${c.scene}${c.n ? `-${c.n}` : ''}${c.move ? '-moving' : ''}`, vkey = v => `${v.engine}${v.mode === 'instanced' ? '-instanced' : ''}${v.diag ? `+${v.diag}` : ''}`;
+const picked = arg('variants', '').split(',').filter(Boolean).map(s => {const [base, ...diag] = s.split('+');return {engine: base.replace(/-(instanced|culled)$/, ''), mode: base.match(/-(instanced|culled)$/)?.[1] ?? 'mesh', diag: diag.join('+')};});
+// Pairs (README): mesh <-> mesh (Margo core meshes, three Mesh per object) and instanced <-> instanced (Margo materials
+// createInstancedMesh and culling CulledInstances, three InstancedMesh). The helmet has one variant per engine.
+const variants = c => picked.length ? picked : [{engine: 'margo', mode: 'mesh'}, {engine: 'three-webgl', mode: 'mesh'}, {engine: 'three-webgpu', mode: 'mesh'}, ...(c.scene === 'helmet' ? [] : [{engine: 'margo', mode: 'instanced'}, {engine: 'margo', mode: 'culled'}, {engine: 'three-webgl', mode: 'instanced'}, {engine: 'three-webgpu', mode: 'instanced'}])];
+const key = c => `${c.scene}${c.n ? `-${c.n}` : ''}${c.move ? '-moving' : ''}`, vkey = v => `${v.engine}${v.mode && v.mode !== 'mesh' ? `-${v.mode}` : ''}${v.diag ? `+${v.diag}` : ''}`;
 
 // GPU lock in the main checkout: one wait loop, 60 s poll.
 const lock = resolve(dirname(git('rev-parse', '--path-format=absolute', '--git-common-dir')), 'test-results/gpu.lock');
