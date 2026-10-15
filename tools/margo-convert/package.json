@@ -10,6 +10,7 @@
   "exports": {
     ".": "./convert.js"
   },
+  "sideEffects": false,
   "files": [
     "cli.js",
     "convert.js"

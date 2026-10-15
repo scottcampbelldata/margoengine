@@ -2254,6 +2254,49 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    cross-origin fetches, data:/blob: handled). (c) Supply chain: npm audit clean or justified, licences listed, lockfile
    integrity checked, npm publish with 2FA + provenance (plan; publish needs Scott), SECURITY.md with a disclosure
    address. Strict CSP stays (gate 10 / 5l.o).
+   (c) [DONE 2026-10-15 except Scott's account steps below] `scripts/supply-chain.mjs` (`npm run supply-chain`)
+   generates `THIRD-PARTY-NOTICES.md` for all 75 published packages (73 + create-margo + margo-convert) from the
+   manifests and package-lock.json; `--check` (run by `tests/supply-chain.test.js`, in verify) fails on a stale file, a
+   manifest without license/repository/files/exports/sideEffects or with `private`, a runtime dependency without a
+   stated reason, a licence outside MIT/ISC/Apache-2.0/BSD/Zlib/0BSD (reviewed exceptions: occt-import-js LGPL-2.1,
+   web-ifc MPL-2.0), an install script, a deprecation, a non-registry or hash-less lock entry, or a runtime dependency
+   the code never imports. The same test reads every tarball's file list with npm's own npm-packlist (~1 s for all 75)
+   and requires LICENSE, README and each package's third-party notices, and no src/tests/fixtures/source maps/keys.
+   Runtime npm dependencies (lock versions): recast-navigation 0.43.1 + @recast-navigation/core/generators/wasm 0.43.1
+   (MIT; navigation), occt-import-js 0.0.23 (LGPL-2.1; margo-convert); peers web-ifc 0.0.78 (MPL-2.0; ifc),
+   @dimforge/rapier3d-compat 0.21.0 (Apache-2.0, optional; physics), react 19.3.0 (MIT; react). 65 of 75 packages have
+   no third-party runtime dependency. None has an install script; the whole lock has one (fsevents 2.3.3, dev, macOS
+   optional) and one deprecation (whatwg-encoding 3.1.1, dev via jsdom). The pre-1.0 runtime deps (occt-import-js,
+   web-ifc, recast-navigation) are the maintenance risk: check `npm view <name> time.modified` before each release.
+   `npm audit` (registry reachable, 2026-10-15): 0 vulnerabilities (all and `--omit=dev`); `npm audit signatures`
+   against the main checkout's install: 116 packages with verified registry signatures, 39 with attestations.
+   Shipped third-party code and notices: decoders (Draco, Basis: Apache-2.0, now with `dist/LICENSE-Apache-2.0.txt`;
+   the meshopt decoder is a port of meshoptimizer, MIT notice added to its THIRD-PARTY-NOTICE.md), machinery (OCCT
+   glue + Wasm, LGPL-2.1: OCCT-NOTICE.txt rewritten to state each obligation; the patched glue's first line now
+   carries the change date, LGPL s. 2b, via `scripts/static-embind.js`), text (`sdf.ts` follows TinySDF line by line:
+   BSD-2-Clause `NOTICE.md` added and shipped). LGPL how-met list in THIRD-PARTY-NOTICES.md (notice + licence text
+   next to the files, modification marked and dated, transformation script public, upstream source linked, glue and
+   Wasm loaded by URL so users can swap in their own build). Open for Scott: whether linking upstream occt-import-js
+   0.0.23 suffices for LGPL s. 4 or we mirror its source tarball (the airtight option); not legal advice.
+   The site build copies THIRD-PARTY-NOTICES.md to `/THIRD-PARTY-NOTICES.md` (a footer link is still to add).
+   Tarballs (npm pack --dry-run of all 75, after build:packages): no surprises; only package.json, README, LICENSE,
+   NOTICE.md (post, tonemap, text), blender's FORMAT.md and dist/. The OCCT .wasm/.js contain the upstream
+   author's build paths (`C:/Users/vkovacs/...` in assert strings), not ours. Secrets scan (tracked files, all
+   history, built dist): no tokens, keys, .npmrc/.env files or email addresses in files; scott@scottcampbellconsulting.com
+   appears only as the git author email of 389 commits (public once pushed; set user.email to the GitHub noreply
+   address for future commits if that matters). `margo-convert` gained `sideEffects: false`; create-margo is
+   bin-only (no exports). Root `publish:packages` (a local live publish) became `publish:dry-run`; README points to
+   `docs/releasing.md` (2FA, OIDC trusted publishing, bootstrap granular token, `npm ci`, changelog, order:
+   @margoengine + margoengine, then margo-convert, then create-margo; deprecate/unpublish). `.github/workflows/publish.yml`:
+   manual only, inert until the repo variable `NPM_PUBLISH_ENABLED=true`, `npm-publish` environment, `--provenance`,
+   dry run by default; requires a `## <version>` section in CHANGELOG.md (does not exist yet: 1g.g). `SECURITY.md`
+   (1.x supported; GitHub private vulnerability reporting preferred, security@margoengine.com; acknowledge 3 business
+   days, triage 10, fix or plan 30 days, coordinated disclosure at most 90 days) and a `docs/security.md` stub for the
+   gate 11 a/b write-up. **Scott, before launch:** create the security@margoengine.com mailbox (or forwarding) on
+   margoengine.com; enable private vulnerability reporting in the GitHub repo settings; 2FA on npm and GitHub;
+   create the `npm-publish` environment (Scott as reviewer, `main` only); after the first publish, configure
+   trusted publishing per package and revoke the bootstrap token. Blender add-on (Python, not on npm) declares MIT;
+   extensions.blender.org listing would need its licence policy checked first.
 
 Before launch, in addition to the work queue:
 - Demos smooth on first load on desktop and phones, including Android. The Galaxy S23 3-5 FPS island issue is shelved

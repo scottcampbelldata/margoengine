@@ -44,3 +44,4 @@ for (const folder of ['draco', 'basis']) {
 const basis = resolve(dist, 'basis/basis_transcoder.js');
 await writeFile(basis, staticEmbind(await readFile(basis, 'utf8'), 'basis_transcoder.js'));
 await copyFile(resolve(root, 'vendor/NOTICE.md'), resolve(dist, 'THIRD-PARTY-NOTICE.md'));
+await copyFile(resolve(root, 'vendor/LICENSE-Apache-2.0.txt'), resolve(dist, 'LICENSE-Apache-2.0.txt'));

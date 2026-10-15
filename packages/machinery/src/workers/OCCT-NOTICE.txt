@@ -1,18 +1,23 @@
 The separately loaded occt-import-js.js and occt-import-js.wasm assets come
-from occt-import-js 0.0.23, distributed under LGPL-2.1. See OCCT-LICENSE.txt.
-Margo Engine's own source remains MIT licensed.
+from occt-import-js 0.0.23 (Viktor Kovacs), which compiles OpenCascade
+Technology (Open Cascade SAS) to WebAssembly. Both are distributed under the
+GNU Lesser General Public License 2.1; the full text is OCCT-LICENSE.txt next
+to this file. Margo Engine's own source remains MIT licensed.
 
 occt-import-js.wasm is unmodified. occt-import-js.js is modified by Margo
 Engine's build (scripts/static-embind.js in the Margo Engine repository; the
-change is stated in the file's first line): its two embind wrapper generators,
-which used `new Function`, are replaced by equivalent closures so the importer
-runs under a Content Security Policy without 'unsafe-eval'. The modified file
-remains under LGPL-2.1.
+change and its date, 2026-10-15, are stated in the file's first line): its two
+embind wrapper generators, which used `new Function`, are replaced by
+equivalent closures so the importer runs under a Content Security Policy
+without 'unsafe-eval'. The modified file remains under LGPL-2.1.
 
-Importer source, OpenCascade submodule revision, build scripts and notices:
-https://github.com/kovacsv/occt-import-js
+Source: the modified glue is itself JavaScript source; the transformation is
+scripts/static-embind.js at https://github.com/scottcampbelldata/margoengine.
+The importer's C++ source, build scripts and the pinned OpenCascade revision:
+https://github.com/kovacsv/occt-import-js (release 0.0.23)
 https://www.npmjs.com/package/occt-import-js/v/0.0.23
 
-The loader resolves these as separate worker assets so applications can
-replace them with a compatible build. OpenCascade is used only to tessellate
-STEP/IGES input; no original B-Rep is retained in the returned Margo Engine model.
+The loader fetches these two files by URL at run time (never bundled into
+Margo Engine's code), so an application can replace them with its own
+interface-compatible build. OpenCascade is used only to tessellate STEP/IGES
+input; no original B-Rep is retained in the returned Margo Engine model.
