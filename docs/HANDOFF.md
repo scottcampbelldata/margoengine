@@ -834,6 +834,11 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    j. Shadows for skinned meshes and VAT crowds; IBL for VAT crowds.
    k. Sweep the remaining PARTIAL parity rows that need no core change.
    (Plus already queued: SSR, volumetrics, progressive loading, OIT, P3, tier presets 5i.b.)
+   l. SSR follow-ups (from 3cf1453): material capture for gltf-pro/materials models so they REFLECT (today only core
+      meshes do; models are reflected but don't reflect), optionally water and terrain; half-resolution trace for
+      1080p (trace 4-5 ms there); apply SSR's dead-branch replay trick to SSAO's ambient replay (it halved SSR's
+      replay cost) with a proof that SSAO output is unchanged.
+   m. docs/threejs-parity.md summary counts drifted (OIT added a COVERED row without updating the totals) - recount.
    Order: after the current wave, alongside the hygiene phase (5k) and under its gates, before the demo rebuild.
 5m. CORE APPROVALS, conditional (Scott, 2026-10-14 night): do both IF core+stage stays under 20,000 B gzip
    (`npm run measure:size`; the build gate fails at >= 20,000). No safety margin needed: 19,999 is acceptable (Scott).
