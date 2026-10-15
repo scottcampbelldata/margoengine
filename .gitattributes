@@ -6,3 +6,7 @@ examples/assets/khronos/**/*.jpg filter=lfs diff=lfs merge=lfs -text
 examples/assets/khronos/**/*.bin filter=lfs diff=lfs merge=lfs -text
 examples/assets/khronos/**/*.glb filter=lfs diff=lfs merge=lfs -text
 examples/assets/khronos/**/*.gif filter=lfs diff=lfs merge=lfs -text
+examples/assets/kaykit/**/*.glb filter=lfs diff=lfs merge=lfs -text
+examples/assets/kaykit/**/*.gltf filter=lfs diff=lfs merge=lfs -text
+examples/assets/kaykit/**/*.bin filter=lfs diff=lfs merge=lfs -text
+examples/assets/kaykit/**/*.png filter=lfs diff=lfs merge=lfs -text
