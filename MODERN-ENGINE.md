@@ -247,7 +247,7 @@ Measured at `3d845a0` by `npm run build:packages` (minified ES bundles, peers ex
 | Rust Wasm kernel, after Binaryen `-Oz` (embedded raw-deflated: 5,350 B) | 13,043 | – |
 | Core plus the `margoengine` stage facade, embedded Wasm and the WebGPU backend | 45,524 | 19,543 |
 | Core alone | 40,681 | 17,783 |
-| WebGL2 fallback (`@margoengine/webgl`, optional) | – | 2,291 |
+| WebGL2 fallback (`@margoengine/webgl`, optional) | 4,672 | 2,088 |
 | glTF, excluding its core peer | 10,750 | 4,460 |
 | React adapter, excluding React/core peers | 9,845 | 3,768 |
 | Machinery root entry, excluding core peer | 72,828 | 33,418 |
