@@ -98,7 +98,8 @@ class Writer extends Bin {
 
   private primitive(model: PBRModel, p: PBRPrimitive): Json {
     const def = p.definition,
-      attributes: Record<string, number> = {},
+      // Attribute names come from the source file: a null prototype keeps `__proto__` an ordinary key.
+      attributes: Record<string, number> = Object.create(null),
       out: Json = { attributes },
       count = p.vertices.length / 20;
     if (def.attributes)

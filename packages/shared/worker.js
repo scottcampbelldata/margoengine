@@ -36,6 +36,13 @@ export function movable(input) {
 /** True when this context can start a worker (browsers, including inside a worker); false during SSR and in Node. */
 export const canUseWorker = () => typeof Worker === 'function' && typeof globalThis.location !== 'undefined';
 
+const errors = { TypeError, RangeError, SyntaxError };
+/** A worker's {name, message} as an Error; only the listed names map to their classes (own keys, so not `constructor`). */
+const reviveError = ({ name, message }) =>
+  new (Object.hasOwn(errors, name) ? errors[name] : Error)(
+    typeof message === 'string' ? message : 'Parser worker failed',
+  );
+
 /** Post one job to a fresh worker and resolve its result. Aborting terminates the worker. revive rebuilds package error classes. */
 export function runWorker(url, message, signal, revive) {
   signal?.throwIfAborted();
@@ -59,11 +66,8 @@ export function runWorker(url, message, signal, revive) {
     worker.onmessageerror = () => fail(new Error('Parser worker reply could not be deserialized'));
     worker.onmessage = ({ data }) => {
       done();
-      if (data.error)
-        reject(
-          revive?.(data.error) ??
-            new ({ TypeError, RangeError, SyntaxError }[data.error.name] ?? Error)(data.error.message),
-        );
+      if (!data || typeof data !== 'object') reject(new TypeError('Parser worker sent an invalid reply'));
+      else if (data.error) reject(revive?.(data.error) ?? reviveError(data.error));
       else resolve(data.result);
     };
     try {
@@ -78,6 +82,7 @@ export function runWorker(url, message, signal, revive) {
 export function serve(job) {
   self.onmessage = async ({ data }) => {
     try {
+      if (!data || typeof data !== 'object') throw new TypeError('Invalid parser worker job');
       const result = await job(data);
       self.postMessage({ result }, [...transferables(result)]);
     } catch (error) {

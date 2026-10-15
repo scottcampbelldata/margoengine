@@ -412,7 +412,9 @@ export async function fbxToGLB(
   async function image(video: Obj): Promise<number | undefined> {
     if (imageIds.has(video.id)) return imageIds.get(video.id);
     const file = word(child(video.node, 'RelativeFilename')) || word(child(video.node, 'Filename')),
-      mimeType = MIME[file.slice(file.lastIndexOf('.') + 1).toLowerCase()];
+      extension = file.slice(file.lastIndexOf('.') + 1).toLowerCase(),
+      // Own keys only: a file named `x.constructor` must not pick up Object.prototype.constructor.
+      mimeType = Object.hasOwn(MIME, extension) ? MIME[extension] : undefined;
     if (!mimeType) return;
     const content = child(video.node, 'Content'),
       raw =

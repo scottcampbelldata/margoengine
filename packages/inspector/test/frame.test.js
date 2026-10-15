@@ -532,6 +532,25 @@ test("works under Stats (draw counts agree) and the panel lists passes and selec
   assert.equal(dom.window.document.querySelector('[data-margo-frame-debugger]'), null);
 });
 
+test('security: GPU labels and pass names reach the panel as text, never markup (gate 11b)', async (t) => {
+  const gpu = fakeGPU(t),
+    dom = new JSDOM('<body></body>'),
+    hostile = '<img src=x onerror=alert(1)>';
+  t.after(() => dom.window.close());
+  const engine = await EngineKernel.create(gpu.canvas, { capacity: 4, backend: 'webgpu' });
+  t.after(() => engine.dispose());
+  const debug = FrameDebugger.attach(engine, { parent: dom.window.document.body });
+  t.after(() => debug.dispose());
+  // A large labelled texture so it is listed under "GPU memory", and a frame graph pass named like markup.
+  engine.gpu.createTexture({ size: [1024, 1024], format: 'rgba8unorm', usage: 4, label: hostile });
+  engine.createMesh().setGeometry(box());
+  engine.use({ ...effect(), name: hostile });
+  await debug.capture({ render: true });
+  const panel = dom.window.document.querySelector('[data-margo-frame-debugger]').shadowRoot;
+  assert.ok(panel.textContent.includes(hostile), 'the label is shown literally');
+  assert.equal(panel.querySelector('img'), null, 'no element was parsed from a label');
+});
+
 test('texture size estimate covers mips, layers, samples and block formats', () => {
   assert.equal(
     textureBytes({

@@ -113,7 +113,16 @@ function stl(
   if (!/^\s*solid\b/.test(text) || !/\bendsolid\b/.test(text)) throw new TypeError('Invalid STL');
   const number = '[-+]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][-+]?\\d+)?',
     vertex = new RegExp(`vertex\\s+(${number})\\s+(${number})\\s+(${number})`, 'g');
-  const facets = text.match(/facet\s+normal[\s\S]*?endfacet/g) ?? [];
+  // Same facets as /facet\s+normal[\s\S]*?endfacet/g, in linear time: that regex rescans to the end of the text for
+  // every unterminated `facet normal` (quadratic, minutes on a hostile 64 MiB file).
+  const facets: string[] = [],
+    start = /facet\s+normal/g;
+  for (let match; (match = start.exec(text)); ) {
+    const end = text.indexOf('endfacet', start.lastIndex);
+    if (end < 0) break;
+    facets.push(text.slice(match.index, end + 8));
+    start.lastIndex = end + 8;
+  }
   if (facets.length * 3 > maxIndices || !facets.length) throw new RangeError('STL triangle limit');
   let face = 0;
   for (const facet of facets) {

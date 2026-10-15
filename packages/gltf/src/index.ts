@@ -3,6 +3,8 @@ import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import { Geometry, PbrMaterial, type Mesh } from '@margoengine/core/extension';
 import { readResponse } from '../../shared/loading.js';
 import { checkCount, countLimit } from '../../shared/limits.js';
+import { parseJSON } from '../../shared/json.js';
+import { assetURL } from '../../shared/asset-url.js';
 
 const limit = 64 * 1024 * 1024;
 type Document = Record<string, any>;
@@ -25,7 +27,7 @@ function container(input: string | object | ArrayBuffer | ArrayBufferView): { do
   if (typeof input === 'string') {
     if (input.length > limit || new TextEncoder().encode(input).length > limit)
       throw new RangeError('glTF JSON exceeds 64 MiB');
-    return { doc: JSON.parse(input) };
+    return { doc: parseJSON(input) };
   }
   if (!(input instanceof ArrayBuffer) && !ArrayBuffer.isView(input)) return { doc: input as Document };
   const data = bytes(input),
@@ -51,7 +53,7 @@ function container(input: string | object | ArrayBuffer | ArrayBufferView): { do
     if (offset === 20 && type !== 0x4e4f534a) throw new TypeError('GLB JSON must be first');
     if (type === 0x4e4f534a) {
       if (doc) throw new TypeError('Duplicate GLB JSON');
-      doc = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(chunk));
+      doc = parseJSON(new TextDecoder('utf-8', { fatal: true }).decode(chunk));
     } else if (type === 0x004e4942) {
       if (binary) throw new TypeError('Duplicate GLB binary');
       binary = chunk;
@@ -150,6 +152,11 @@ export interface Model {
 export interface GLTFOptions {
   /** Most glTF nodes the file may have, each one a core mesh (default 100,000; up to core's 8,388,608 entities). */
   maxNodes?: number;
+  /**
+   * URL prefixes (for example `https://cdn.example.com/models/`) that buffer URIs inside the file may point to besides
+   * the file's own directory. Default none: absolute, cross-origin and `../`-escaping URIs throw a TypeError.
+   */
+  allowedURLs?: readonly string[];
 }
 export function parseGLTF(
   instance: EngineKernel,
@@ -370,7 +377,7 @@ export function parseGLTF(
 export async function loadGLTF(
   engine: EngineKernel,
   url: string | URL,
-  { signal, maxNodes }: GLTFOptions & { signal?: AbortSignal } = {},
+  { signal, maxNodes, allowedURLs }: GLTFOptions & { signal?: AbortSignal } = {},
 ): Promise<Model> {
   signal?.throwIfAborted();
   let base = new URL(url, globalThis.location?.href),
@@ -390,12 +397,12 @@ export async function loadGLTF(
   const buffers = [];
   for (const def of doc.buffers ?? []) {
     if (!def.uri) buffers.push(binary ?? new Uint8Array());
-    else if (def.uri.startsWith('data:')) {
+    else if (typeof def.uri === 'string' && def.uri.startsWith('data:')) {
       const data = embedded(def.uri);
       total += data.length;
       if (total > limit) throw new RangeError('glTF exceeds download limit');
       buffers.push(data);
-    } else buffers.push(await fetchBytes(new URL(def.uri, base)));
+    } else buffers.push(await fetchBytes(assetURL(def.uri, base, allowedURLs, 'glTF buffer')));
   }
   signal?.throwIfAborted();
   return parseGLTF(engine, doc, buffers, { maxNodes });

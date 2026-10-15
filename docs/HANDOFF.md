@@ -2297,6 +2297,56 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    create the `npm-publish` environment (Scott as reviewer, `main` only); after the first publish, configure
    trusted publishing per package and revoke the bootstrap token. Blender add-on (Python, not on npm) declares MIT;
    extensions.blender.org listing would need its licence policy checked first.
+   Status 2026-10-15 (b), attack-surface review: 0 open findings in (b). Threat model and guarantees: `docs/security.md`
+   (trusted: the app's code, its URLs and options; untrusted: every byte of an asset file, URIs inside it, network data,
+   worker replies). Every fix has a regression test: `tests/security.test.js` (in `verify`), plus "security: ..." tests
+   in `packages/fbx/test/fbx.test.js`, `packages/loaders/tests/loaders.test.js`, `packages/inspector/test/frame.test.js`.
+   New shared helpers: `packages/shared/asset-url.js` (`assetURL`), `packages/shared/json.js` (`parseJSON`).
+   Findings, severity, fix:
+   - HIGH, model URIs escape their base: `gltf` `loadGLTF` buffers, `gltf-pro` buffers/images (`asset.ts`, `stream.ts`
+     progressive) and FBX texture names (`fbx/src/index.ts`, built by string concatenation) were fetched as written:
+     `../`, absolute, protocol-relative and cross-origin URIs, so a model could make the viewer request intranet or
+     same-origin endpoints (with cookies) or track who opens it. Now `assetURL`: same origin, inside the model's
+     directory (after redirects), no `%2F`/`%5C`, HTTP(S) only, else TypeError before any fetch; new option
+     `allowedURLs` (URL prefixes) on gltf `GLTFOptions`, gltf-pro `AssetOptions` (worker and progressive forward it)
+     and `FBXOptions`. Default is the safe one. (API reports updated.)
+   - HIGH, ReDoS: STL text `/facet\s+normal[\s\S]*?endfacet/g` (`machinery/src/cad-parser.ts`) rescanned to EOF for each
+     unterminated facet (20,000 facets, 380 KB: 0.84 s; a 64 MiB file: hours). Now an indexOf scan, same facets.
+   - MEDIUM, ReDoS: 3MF XML attribute regex (`loaders/src/xml.ts`) was quadratic on a long run without `=` (20 KB: 0.3 s);
+     a lookbehind now starts names only at token boundaries (1 MB: 6 ms).
+   - MEDIUM, budget bypass by prototype lookup: gltf-pro `components[def.type]` / `componentSizes[...]` on plain objects:
+     `"type": "constructor"` made sizes NaN, `decoded += NaN` switched the 4x decoded-memory budget off for the asset.
+     Tables are now null-prototype and `budget()` fails on NaN. Same class, fixed with own-key lookups / null-prototype
+     objects: 3MF `unit in THREEMF_UNITS` (NaN positions), PLY `TYPES[...]` (NaN truncation checks), VTK `SIZES[...]`,
+     loaders `detectFormat` extension table, XML `&constructor;` entity, FBX `MIME[ext]` (`x.constructor` passed the
+     extension allowlist and was fetched), Draco `fields`/`dracoTypes`, exporters `widths`/`arrays`, gltf-pro image
+     `source` lookups (`index.ts`, `progressive.ts` settled[]), `hookFor`.
+   - MEDIUM, prototype swap on file-named keys: VTK `SCALARS __proto__`, USDC Crate field token `__proto__`, USDA
+     property metadata via `Object.assign`, 3MF `<metadata name>`, XML attributes, exporters attributes, Draco attributes:
+     all now null-prototype objects (3MF `metadata` and VTK `attributes` are returned that way; documented).
+   - MEDIUM (Scott's rule), `__proto__`/`constructor`/`prototype` keys in glTF/GLB/.margo JSON (extras, extensions)
+     were handed to apps as own keys, ready to pollute through an app's merge. `parseJSON` drops them at every depth
+     (reviver only when the text contains one of them or a `\u` escape; plain files parse at JSON.parse speed:
+     22.8 MB in 230 ms vs 245 ms).
+   - LOW, unbounded reads: progressive glTF read a `.gltf` JSON body, its ranged remainder and external images fully
+     before checking the budget (`stream.ts`); FBX textures had 64 MiB each with no total. Now streamed under the budget
+     (`readResponse`); FBX textures share the converted GLB's 128 MiB.
+   - LOW, worker boundary: `shared/worker.js` `runWorker` hung on a null reply and mapped error name `constructor` to
+     `Object`; `serve`, decoders, bvh and progressive workers threw on non-object messages; progressive started a
+     second stream on any message without `order`; CAD client hung on null; progressive client had no
+     `onmessageerror` and no image-index bounds. All checked at the boundary now; unknown messages are ignored.
+   Reviewed, no finding: no `innerHTML`-class sink in any package (`tests/security.test.js` scans for them; inspector,
+   frame debugger, stats and view cube use `textContent`; a node or GPU label `<img src=x onerror=alert(1)>` renders
+   literally); no window `message` listener, `postMessage('*')`, `eval`/`new Function`/string timers or computed
+   `import()`; no `fetch` sets `credentials` (browser default same-origin); `Math.random` only in math helpers; net has
+   no decoder; USDZ/3MF references stay inside their archive; core + stage untouched (no core finding).
+   Accepted by design (documented in security.md): app-supplied URLs and options are trusted (`decoderPath` goes to
+   `importScripts`; environment/audio/decoder `.wasm` loads read app URLs without a byte cap; text/lines copy option
+   keys onto the instance); `@margoengine/cache` keys by URL only (no `Vary`/credentials) and trusts its own IndexedDB;
+   telemetry socket is the app's. Examples (not packages) use `innerHTML` with first-party numbers only
+   (`examples/conveyor-simulator/src/main.js`).
+   Noted for others (not security, not fixed here): bvh `transfer: true` + abort leaves the caller's buffers detached
+   (`bvh/src/async.ts`); progressive glTF ignores the `fetch` option; decoder pool queues are not capped per worker.
 
 Before launch, in addition to the work queue:
 - Demos smooth on first load on desktop and phones, including Android. The Galaxy S23 3-5 FPS island issue is shelved

@@ -281,6 +281,7 @@ interface AssetOptions {
     fetch?: typeof fetch;
     maxDownloadBytes?: number;
     maxNodes?: number;
+    allowedURLs?: readonly string[];
 }
 
 type Context = Extract<PassContext, {

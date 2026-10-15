@@ -338,7 +338,8 @@ export function parseCrate(data: Uint8Array, maxBytes: number): Specs {
     'variantSelection',
   ];
   for (let i = 0; i < specCount; i++) {
-    const fields: Record<string, any> = {};
+    // Null prototype: field names are tokens from the file (a `__proto__` token swapped a plain object's prototype).
+    const fields: Record<string, any> = Object.create(null);
     for (let f = specSets[i]; ; f++) {
       if (!(f >= 0 && f < fieldSets.length)) fail('field set outside table');
       const field = fieldSets[f];

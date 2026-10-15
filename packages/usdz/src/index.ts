@@ -105,7 +105,9 @@ function asciiSpecs(text: string, maxDepth: number, signal?: AbortSignal): Specs
       specType: 6,
       fields: { typeName: prim.type, ...Object.fromEntries([...prim.metadata].map(([k, v]) => [k, plain(v)])) },
     };
-    const property = (name: string) => (specs[prim.path + '.' + name] ??= { specType: 1, fields: {} }).fields;
+    // Null-prototype fields: the Object.assign below copies file metadata keys, and `__proto__` must stay a plain key.
+    const property = (name: string) =>
+      (specs[prim.path + '.' + name] ??= { specType: 1, fields: Object.create(null) }).fields;
     for (const [key, v] of prim.attrs) {
       if (key.endsWith('.connect')) property(key.slice(0, -8)).connectionPaths = paths(v);
       else if (

@@ -1660,3 +1660,44 @@ test('SSR safety: importing and parsing never touches window, document, navigato
   const output = execFileSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8' });
   assert.match(output, /^ok \d+/);
 });
+
+test('security: file-supplied names never resolve or swap prototypes (gate 11b)', async () => {
+  // 3MF: <metadata name="__proto__"> stays a plain key of a null-prototype object; an inherited unit name is unknown.
+  const result = await parse3MF(
+    package3MF(
+      modelXML({ items: '<item objectid="1"/>' }).replace(
+        '<metadata name="Title">',
+        '<metadata name="__proto__">{"polluted":1}</metadata><metadata name="constructor">x</metadata><metadata name="Title">',
+      ),
+    ),
+  );
+  assert.equal(Object.getPrototypeOf(result.metadata), null);
+  assert.equal(result.metadata.__proto__, '{"polluted":1}');
+  assert.equal(result.metadata.constructor, 'x');
+  assert.equal(result.metadata.Title, 'Test & model');
+  for (const unit of ['constructor', 'toString', '__proto__'])
+    await assert.rejects(parse3MF(package3MF(modelXML({ unit, items: '<item objectid="1"/>' }))), /unknown unit/);
+  // XML: `&constructor;` is not one of the five entities; a long attribute run with no `=` is linear (was quadratic).
+  await assert.rejects(
+    parse3MF(package3MF(modelXML({ items: '<item objectid="1"/>' }).replace('Test &amp; model', '&constructor;'))),
+    /unknown entity/,
+  );
+  const started = performance.now();
+  await parse3MF(package3MF(modelXML({ items: `<item objectid="1" ${'x'.repeat(200_000)}/>` })));
+  assert.ok(performance.now() - started < 2000, 'XML attribute scan must stay linear');
+  // PLY: `property constructor w` is not a type (it made every binary truncation check NaN).
+  const ply = (type) =>
+    `ply\nformat ascii 1.0\nelement vertex 3\nproperty float x\nproperty float y\nproperty float z\nproperty ${type} w\nend_header\n0 0 0 1\n1 0 0 1\n0 1 0 1\n`;
+  for (const type of ['constructor', '__proto__', 'toString'])
+    assert.throws(() => parsePLY(new TextEncoder().encode(ply(type))), /invalid property/);
+  // VTK: `SCALARS __proto__` is an ordinary attribute name; `constructor` is not a data type.
+  const vtk = (name, type) =>
+    `# vtk DataFile Version 3.0\nt\nASCII\nDATASET POLYDATA\nPOINTS 3 float\n0 0 0 1 0 0 0 1 0\nPOLYGONS 1 4\n3 0 1 2\nPOINT_DATA 3\nSCALARS ${name} ${type} 1\nLOOKUP_TABLE default\n1 2 3\n`;
+  const scalars = parseVTK(new TextEncoder().encode(vtk('__proto__', 'float')));
+  assert.equal(Object.getPrototypeOf(scalars.attributes), null);
+  assert.deepEqual([...scalars.attributes.__proto__], [1, 2, 3]);
+  assert.throws(() => parseVTK(new TextEncoder().encode(vtk('t', 'constructor'))), /unknown data type/);
+  // detectFormat: a file name ending in `.constructor` is not a format.
+  assert.equal(detectFormat(new Uint8Array(16), 'model.constructor'), null);
+  assert.equal({}.polluted, undefined);
+});

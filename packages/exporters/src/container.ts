@@ -15,14 +15,21 @@ export interface GLTFJsonResult {
 export const FLOAT = 5126,
   ARRAY_BUFFER = 34962,
   ELEMENT_ARRAY_BUFFER = 34963;
-const widths: Record<string, number> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
+// No prototype: accessor types come from the source file ("constructor" must not resolve to a function).
+const widths: Record<string, number> = Object.assign(Object.create(null), {
+  SCALAR: 1,
+  VEC2: 2,
+  VEC3: 3,
+  VEC4: 4,
+  MAT4: 16,
+});
 const arrays: Record<
   number,
   {
     new (n: number): Uint8Array | Uint16Array | Uint32Array | Float32Array;
     from(values: ArrayLike<number>): Uint8Array | Uint16Array | Uint32Array | Float32Array;
   }
-> = { 5121: Uint8Array, 5123: Uint16Array, 5125: Uint32Array, 5126: Float32Array };
+> = Object.assign(Object.create(null), { 5121: Uint8Array, 5123: Uint16Array, 5125: Uint32Array, 5126: Float32Array });
 // Stable key order: asset first, buffers last.
 const order = [
   'asset',

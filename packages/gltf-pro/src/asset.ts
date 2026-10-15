@@ -1,5 +1,7 @@
 import { readResponse } from '../../shared/loading.js';
 import { checkCount, countLimit } from '../../shared/limits.js';
+import { parseJSON } from '../../shared/json.js';
+import { assetURL } from '../../shared/asset-url.js';
 import type { PBRInstances } from './instancing.js';
 import type { ExtendedPlan } from './shader.js';
 export type GLTFDocument = Record<string, any>;
@@ -87,7 +89,10 @@ const supported = new Set([
   'EXT_texture_avif',
   'EXT_mesh_gpu_instancing',
 ]);
-const hookFor: Record<string, keyof GLTFDecoderHooks> = {
+// Lookup tables indexed by names and numbers from the file have no prototype, so `"type": "constructor"` or an
+// extension named `toString` finds nothing instead of an inherited function (which made sizes NaN and skipped budgets).
+const table = <T extends object>(entries: T): T => Object.assign(Object.create(null), entries);
+const hookFor: Record<string, keyof GLTFDecoderHooks> = table({
   KHR_draco_mesh_compression: 'draco',
   EXT_meshopt_compression: 'meshopt',
   KHR_meshopt_compression: 'meshopt',
@@ -95,7 +100,7 @@ const hookFor: Record<string, keyof GLTFDecoderHooks> = {
   KHR_materials_iridescence: 'materials',
   KHR_materials_anisotropy: 'materials',
   KHR_materials_diffuse_transmission: 'materials',
-};
+});
 const meshopt = (def: any) => def?.extensions?.EXT_meshopt_compression ?? def?.extensions?.KHR_meshopt_compression;
 export function integer(value: unknown, label: string, min = 0): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min)
@@ -113,7 +118,7 @@ export function container(
 ): { doc: GLTFDocument; binary?: Uint8Array } {
   if (typeof input === 'string') {
     if (new TextEncoder().encode(input).length > limit) throw overBudget('glTF JSON exceeds byte budget', limit);
-    return { doc: JSON.parse(input) };
+    return { doc: parseJSON(input) };
   }
   if (!(input instanceof ArrayBuffer) && !ArrayBuffer.isView(input)) return { doc: input as GLTFDocument };
   const data =
@@ -142,7 +147,7 @@ export function container(
     if (offset === 20 && type !== 0x4e4f534a) throw new TypeError('GLB JSON must be first');
     if (type === 0x4e4f534a) {
       if (doc) throw new TypeError('Duplicate GLB JSON');
-      doc = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(chunk));
+      doc = parseJSON(new TextDecoder('utf-8', { fatal: true }).decode(chunk));
     } else if (type === 0x004e4942) {
       if (binary) throw new TypeError('Duplicate GLB binary');
       binary = chunk;
@@ -158,9 +163,9 @@ export function embedded(uri: string, limit = assetLimit): Uint8Array {
   if (!match) throw new TypeError('Invalid glTF data URI');
   return Uint8Array.from(atob(match[1]), (c) => c.charCodeAt(0));
 }
-export const componentSizes: Record<number, number> = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };
-export const components: Record<string, number> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
-const normalizers: Record<number, number> = { 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 };
+export const componentSizes: Record<number, number> = table({ 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 });
+export const components: Record<string, number> = table({ SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 });
+const normalizers: Record<number, number> = table({ 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 });
 function component(view: DataView, at: number, type: number): number {
   switch (type) {
     case 5126:
@@ -269,7 +274,7 @@ export class GLTFAsset {
   }
   private budget(bytes: number): void {
     this.decoded += bytes;
-    if (this.decoded > this.maxBytes * 4) throw overBudget('Decoded glTF exceeds byte budget', this.maxBytes * 4);
+    if (!(this.decoded <= this.maxBytes * 4)) throw overBudget('Decoded glTF exceeds byte budget', this.maxBytes * 4);
   }
   /** Decode KHR_draco_mesh_compression primitives with the draco hook; their accessors then return the decoded data. */
   async decode(signal?: AbortSignal): Promise<void> {
@@ -282,17 +287,17 @@ export class GLTFAsset {
           if (!ext) continue;
           const ids = ext.attributes ?? {},
             a = p.attributes ?? {},
-            componentTypes: Record<string, number> = {};
+            componentTypes: Record<string, number> = Object.create(null);
           for (const key in ids)
             componentTypes[key] = entry(this.doc.accessors, a[key], 'Draco attribute').componentType;
           jobs.push(
             draco.decode(this.view(ext.bufferView), { attributeIds: ids, componentTypes, signal }).then((g) => {
-              const named: Record<string, ArrayLike<number> | undefined> = {
+              const named: Record<string, ArrayLike<number> | undefined> = table({
                 POSITION: g.positions,
                 NORMAL: g.normals,
                 TEXCOORD_0: g.uvs,
                 COLOR_0: g.colors,
-              };
+              });
               for (const key in ids) this.fill(a[key], named[key] ?? g.attributes?.[key]?.array);
               if (p.indices !== undefined) this.fill(p.indices, g.indices);
             }),
@@ -403,6 +408,11 @@ export interface AssetOptions {
   maxDownloadBytes?: number;
   /** Most glTF nodes the file may have, each one a core mesh (default 100,000; up to core's 8,388,608 entities). */
   maxNodes?: number;
+  /**
+   * URL prefixes (for example `https://cdn.example.com/textures/`) that buffer and image URIs inside the file may point
+   * to besides the file's own directory. Default none: absolute, cross-origin and `../`-escaping URIs throw a TypeError.
+   */
+  allowedURLs?: readonly string[];
 }
 /** Fetch (url) or parse (input) a glTF, decode compressed geometry and images. External URIs resolve against url, else the page. */
 export async function loadAsset(
@@ -414,6 +424,7 @@ export async function loadAsset(
     fetch: get = globalThis.fetch,
     maxDownloadBytes,
     maxNodes,
+    allowedURLs,
   }: AssetOptions = {},
   input?: string | object | ArrayBuffer | ArrayBufferView,
 ): Promise<{ asset: GLTFAsset; images: GLTFImage[] }> {
@@ -433,7 +444,7 @@ export async function loadAsset(
     total += bytes.length;
     return bytes;
   };
-  const resolve = (uri: string) => new URL(uri, base ?? globalThis.location?.href);
+  const resolve = (uri: string) => assetURL(uri, base ?? globalThis.location?.href, allowedURLs, 'glTF');
   const { doc, binary } = container(input ?? (await fetchBytes(base!, true)), limit),
     buffers: Uint8Array[] = [],
     images: GLTFImage[] = [];
@@ -446,7 +457,7 @@ export async function loadAsset(
           : new Uint8Array(given.buffer, given.byteOffset, given.byteLength),
       );
     else if (!def.uri) buffers.push((i === 0 && binary) || new Uint8Array());
-    else if (def.uri.startsWith('data:')) {
+    else if (typeof def.uri === 'string' && def.uri.startsWith('data:')) {
       const b = embedded(def.uri, limit);
       total += b.length;
       if (total > limit) throw overBudget('glTF exceeds download budget', limit);

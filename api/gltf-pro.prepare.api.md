@@ -15,7 +15,7 @@ export interface PreparedGLTF {
 
 export function prepareAsset(asset: GLTFAsset, images: GLTFImage[]): PreparedGLTF;
 
-export function prepareGLTF(url: string | URL | undefined, input?: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, maxDownloadBytes?: number, maxNodes?: number): Promise<PreparedGLTF>;
+export function prepareGLTF(url: string | URL | undefined, input?: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, maxDownloadBytes?: number, maxNodes?: number, allowedURLs?: readonly string[]): Promise<PreparedGLTF>;
 
 // Not exported from this entry, but used by the exports above:
 

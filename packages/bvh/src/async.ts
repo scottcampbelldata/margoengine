@@ -37,7 +37,7 @@ function getWorker(): Worker {
   if (worker) return worker;
   const created = new Worker(new URL('./bvh.worker.js', import.meta.url), { type: 'module' });
   created.onmessage = ({ data }: MessageEvent<Reply>) => {
-    const job = pending.get(data.id);
+    const job = pending.get(data?.id);
     if (!job) return;
     pending.delete(data.id);
     if (data.error) {

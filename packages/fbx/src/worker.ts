@@ -20,7 +20,7 @@ export async function parseFBXInWorker(
   if (!canUseWorker() || options.fetch) return parseFBX(engine, input, options);
   const prepared = await runWorker<PreparedGLTF>(
     workerURL(),
-    { input: movable(input), resourcePath: absolute(options.resourcePath ?? '') },
+    { input: movable(input), resourcePath: absolute(options.resourcePath ?? ''), allowedURLs: options.allowedURLs },
     options.signal,
   );
   return modelFromPrepared(engine, prepared, options.signal);
@@ -36,7 +36,7 @@ export async function loadFBXInWorker(
   if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('FBX URL needs HTTP(S)');
   const prepared = await runWorker<PreparedGLTF>(
     workerURL(),
-    { url: target.href, resourcePath: absolute(options.resourcePath) },
+    { url: target.href, resourcePath: absolute(options.resourcePath), allowedURLs: options.allowedURLs },
     options.signal,
   );
   return modelFromPrepared(engine, prepared, options.signal);

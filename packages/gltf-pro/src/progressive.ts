@@ -36,8 +36,11 @@ export interface ProgressiveGLTF {
 const workerURL = () => new URL('./workers/progressive.js?no-inline', import.meta.url);
 const CHUNK = 1 << 20,
   sourceKeys = ['KHR_texture_basisu', 'EXT_texture_webp', 'EXT_texture_avif'];
-const revive = (e: { name: string; message: string }) =>
-  new ((({ TypeError, RangeError, SyntaxError }) as Record<string, ErrorConstructor>)[e.name] ?? Error)(e.message);
+const errors: Record<string, ErrorConstructor> = { TypeError, RangeError, SyntaxError };
+const revive = (e: { name: string; message: string } | undefined) =>
+  new (Object.hasOwn(errors, e?.name ?? '') ? errors[e!.name] : Error)(
+    typeof e?.message === 'string' ? e.message : 'Progressive glTF worker sent an invalid message',
+  );
 // A primitive's stand-in until its data arrives: the box of its POSITION accessor's min/max, in gltf-pro's 80-byte layout.
 function box(doc: GLTFDocument, p: any): { vertices: Float32Array; indices: Uint32Array; lo: number[]; hi: number[] } {
   const a = doc.accessors?.[p?.attributes?.POSITION],
@@ -248,7 +251,7 @@ export function loadGLTFProgressive(
     for (const i of bare) {
       const sources = real[i].maps.flatMap((map: any) => {
         const t = map && doc.textures?.[map.index];
-        return t ? [t.source, ...sourceKeys.map((k) => t.extensions?.[k]?.source)].filter((s) => s !== undefined) : [];
+        return t ? [t.source, ...sourceKeys.map((k) => t.extensions?.[k]?.source)].filter(Number.isSafeInteger) : [];
       });
       if (all || sources.every((s: number) => settled[s])) {
         bare.delete(i);
@@ -438,6 +441,8 @@ export function loadGLTFProgressive(
         received.add(m.key);
         jobs.push(geometry(m.key, m.vertices!, m.indices!));
       } else if (m.type === 'image') {
+        if (!Number.isInteger(m.index) || m.index < 0 || m.index >= images.length)
+          throw new RangeError('Progressive glTF worker sent an invalid image index');
         images[m.index] = m.image;
         settled[m.index] = true;
         if (m.image) progress.imagesLoaded++;
@@ -460,16 +465,38 @@ export function loadGLTFProgressive(
     const href = new URL(url, globalThis.location?.href).href;
     if (canUseWorker()) {
       worker = new Worker(workerURL(), { name: 'margoengine-progressive' });
-      worker.onmessage = ({ data }) => message(data);
+      // Replies come only from this package's worker; anything that is not an object fails the load instead of throwing here.
+      worker.onmessage = ({ data }) =>
+        message(
+          data && typeof data === 'object'
+            ? data
+            : {
+                type: 'error',
+                error: { name: 'TypeError', message: 'Progressive glTF worker sent an invalid message' },
+              },
+        );
       worker.onerror = (event) => {
         event.preventDefault?.();
         fail(new Error('Progressive glTF worker failed: ' + (event.message || 'unknown error')));
       };
-      worker.postMessage({ url: href, maxDownloadBytes: limit, maxNodes: options.maxNodes });
+      worker.onmessageerror = () => fail(new Error('Progressive glTF worker message could not be deserialized'));
+      worker.postMessage({
+        url: href,
+        maxDownloadBytes: limit,
+        maxNodes: options.maxNodes,
+        allowedURLs: options.allowedURLs,
+      });
     } else
       import('./stream.js').then(({ GLTFStream }) => {
         if (!finished)
-          (stream = new GLTFStream(new URL(href), message, controller.signal, limit, options.maxNodes)).run();
+          (stream = new GLTFStream(
+            new URL(href),
+            message,
+            controller.signal,
+            limit,
+            options.maxNodes,
+            options.allowedURLs,
+          )).run();
       }, fail);
   } catch (error) {
     fail(error);

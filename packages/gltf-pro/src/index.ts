@@ -694,7 +694,7 @@ export class PBRModel implements EnginePlugin {
       const source = def
           ? (['KHR_texture_basisu', 'EXT_texture_webp', 'EXT_texture_avif']
               .map((k) => def.extensions?.[k]?.source)
-              .find((s) => s !== undefined && this.images[s]) ?? integer(def.source, 'image'))
+              .find((s) => Number.isSafeInteger(s) && this.images[s]) ?? integer(def.source, 'image'))
           : -1,
         image = this.images[source];
       if (def && !image) throw new TypeError('Missing decoded glTF image');

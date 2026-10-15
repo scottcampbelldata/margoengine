@@ -16,5 +16,6 @@ interface FBXOptions {
     resourcePath?: string;
     signal?: AbortSignal;
     fetch?: typeof fetch;
+    allowedURLs?: readonly string[];
 }
 ```

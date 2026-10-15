@@ -8,6 +8,8 @@ Design envelope: [limits.md](limits.md) lists every hard limit (entity count, te
 
 Deploying: [deploying.md](deploying.md) gives the Content Security Policy, caching and compression headers for Cloudflare Pages, Netlify, Vercel and Nginx.
 
+Security: [security.md](security.md) says what Margo trusts (your code) and what it does not (model files, URLs inside them, network data), what it guarantees and what your app must do.
+
 Making a game with Blender: [guides/blender-game.md](guides/blender-game.md) builds a small interactive game from glTF exports, step by step.
 
 Quality tiers: [guides/quality-tiers.md](guides/quality-tiers.md) measures the GPU, picks a light or full tier, and lets shadows, SSAO, SSR, volumetric fog, local shadows and particles scale from the tier preset.
