@@ -66,13 +66,13 @@
    "runs": 4,
    "noise": {
     "changed": 0.000026,
-    "hot": 0.00000434,
-    "mean": 0.000243,
-    "max": 26
+    "hot": 0.00000868,
+    "mean": 0.000326,
+    "max": 32
    },
    "tolerance": {
     "changed": 0.000578,
-    "hot": 0.000213
+    "hot": 0.000226
    }
   },
   "night-citadel-light": {
@@ -80,14 +80,14 @@
    "size": "640x360",
    "runs": 4,
    "noise": {
-    "changed": 0.00072,
-    "hot": 0.000026,
-    "mean": 0.00577,
+    "changed": 0.000773,
+    "hot": 0.0000434,
+    "mean": 0.00668,
     "max": 77
    },
    "tolerance": {
-    "changed": 0.00266,
-    "hot": 0.000278
+    "changed": 0.00282,
+    "hot": 0.00033
    }
   },
   "night-citadel-phone": {
@@ -95,14 +95,14 @@
    "size": "195x422",
    "runs": 4,
    "noise": {
-    "changed": 0.00434,
-    "hot": 0.0000608,
-    "mean": 0.0193,
-    "max": 34
+    "changed": 0.00376,
+    "hot": 0.0000365,
+    "mean": 0.0146,
+    "max": 36
    },
    "tolerance": {
-    "changed": 0.0135,
-    "hot": 0.000382
+    "changed": 0.0118,
+    "hot": 0.000309
    }
   },
   "gameplay-sandbox-high": {
@@ -831,8 +831,8 @@
   "gpu": "intel xe-2lpg",
   "acPowerBefore": true,
   "acPowerAfter": true,
-  "date": "2026-10-15T15:08:48.762Z",
-  "commit": "85051d8"
+  "date": "2026-10-15T17:14:06.257Z",
+  "commit": "ecdcb31"
  },
  "method": {
   "hot": 24,

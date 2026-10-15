@@ -1583,7 +1583,11 @@ writes owner.json, waits, holds the lock only while the command runs, never remo
 over a lock whose process is dead. Wrapping a script that takes the lock itself (visual:check, the benchmark
 runners) is safe since 2026-10-15: `run` passes `MARGO_GPU_LOCK_NESTED` and those scripts lock that folder instead of
 waiting on their own parent (a wrapped visual:check deadlocked for an hour before that). New self-locking scripts
-must start with `const lock = process.env.MARGO_GPU_LOCK_NESTED ?? ...` or use `acquire()`. Never `rmdir` the lock by hand (an agent once deleted another's lock and two GPU
+must start with `const lock = process.env.MARGO_GPU_LOCK_NESTED ?? ...` or use `acquire()`.
+Any change to WGSL (packages/*/src shaders, packages/shared/*.js shader strings) is not done until `npm run build:site`
+and `npm run visual:check -- --no-build` pass: Node has no WGSL compiler, and GPU-call proofs compare shader TEXT, not
+validity (eaddd64 shipped an AgX shader with an extra `(` that every Node test and proof passed; it broke five demos
+until 4bdfe9e). The merger runs the same check after merging shader changes, before pushing. Never `rmdir` the lock by hand (an agent once deleted another's lock and two GPU
 runs overlapped). Hold `test-results/gpu.lock` ONLY while a GPU run is executing; release it between runs (code edits, analysis) so
 queued agents can interleave (one agent once held it 40+ minutes and blocked three others).
 Before ANY timing run (benchmarks, A/B GPU timings) run `node scripts/quiet-gate.mjs` (or import `waitForQuiet`): it
