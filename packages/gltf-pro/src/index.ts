@@ -4,7 +4,7 @@ import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type Pas
 import {invertMatrixStable} from '@margoengine/math/mat4';
 import {viewMatrix} from '../../shared/view.js';
 import {Cleanup} from '../../shared/cleanup.js';
-import {GLTFAsset, container, loadAsset, closeImages, entry, integer, assetLimit, type GLTFImage, type AssetOptions, type GLTFDecoderHooks} from './asset.js';
+import {GLTFAsset, container, loadAsset, closeImages, entry, integer, overBudget, type GLTFImage, type AssetOptions, type GLTFDecoderHooks} from './asset.js';
 import {pbrShader, physicalShader, lightPBR, transparentPBR, capturePBR, type PBRLighting, type PBRTransparency, type PBRCapture} from './shader.js';
 export type {PBRLighting, PBRTransparency, PBRCapture} from './shader.js';
 import {mipShader} from './mip.js';
@@ -111,8 +111,10 @@ function material(def:any = {}): any {
     // Transmission blends the background by this per-material tint (base color, Beer-Lambert volume attenuation at thicknessFactor).
     tint:transmission?base.slice(0,3).map((v,i)=>v*transmission*attenuation[i]**depth):undefined};
 }
-function primitive(asset:GLTFAsset, p:any, node:Mesh, nodeIndex:number, mesh:any, materials:any[]):PBRPrimitive {
-  const {vertices,indices}=packed.get(p)??packPrimitive(asset,p),a=p.attributes??{};
+function primitive(asset:GLTFAsset, p:any, node:Mesh, nodeIndex:number, mesh:any, materials:any[], packs:Map<object,PreparedGeometry>):PBRPrimitive {
+  // Packing depends only on the primitive definition, so nodes sharing a mesh share its arrays (and GPU buffers, keyed by array).
+  let g=packed.get(p)??packs.get(p);if(!g)packs.set(p,g=packPrimitive(asset,p));
+  const {vertices,indices}=g,a=p.attributes??{};
   const m=p.material===undefined?material():materials[integer(p.material,'material')]; if(!m) throw new TypeError('Missing glTF material');
   for (const map of m.maps) if(map) {
     const set=integer(map.texCoord??0,'texture coordinate');
@@ -170,14 +172,14 @@ export class PBRModel implements EnginePlugin {
         }
         if(d.camera!==undefined){const def=entry(doc.cameras,d.camera,'camera');if(!['perspective','orthographic'].includes(def.type)||typeof def[def.type]!=='object')throw new TypeError('Invalid glTF camera');this.cameras.push({...def,node:this.nodes[i],nodeIndex:i});}
       }
-      let geometryBytes=0;const checked=new Set<PreparedGeometry>(),counted=new Set<Float32Array|Uint32Array>(),reader=asset.hooks.instancing;
+      let geometryBytes=0;const checked=new Set<PreparedGeometry>(),packs=new Map<object,PreparedGeometry>(),counted=new Set<Float32Array|Uint32Array>(),reader=asset.hooks.instancing;
       // Like a missing draco/ktx2 decoder: a required extension without its reader fails, a used-only one falls back (each mesh once).
       if(!reader&&doc.extensionsRequired?.includes('EXT_mesh_gpu_instancing'))throw new Error('Required glTF extensions are unsupported: EXT_mesh_gpu_instancing (pass decoders.instancing from @margoengine/gltf-pro/instancing)');
       for(const i of active)if(defs[i].mesh!==undefined) {
         const mesh=entry(doc.meshes,defs[i].mesh,'mesh');if(!Array.isArray(mesh.primitives)||!mesh.primitives.length)throw new TypeError('Missing primitives');
         if(prepared&&prepared[defs[i].mesh]?.length!==mesh.primitives.length)throw new TypeError('Missing prepared PBR primitives');
         const gpu=defs[i].extensions?.EXT_mesh_gpu_instancing,instances=gpu&&reader?.read(asset,gpu);
-        for(let j=0;j<mesh.primitives.length;j++){const p=mesh.primitives[j],made:PBRPrimitive=prepared?preparedPrimitive(asset,p,prepared[defs[i].mesh][j],this.nodes[i],i,materials,checked):primitive(asset,p,this.nodes[i],i,mesh,materials);for(const data of [made.vertices,made.indices])if(!counted.has(data)){geometryBytes+=data.byteLength;counted.add(data);}if(geometryBytes>assetLimit*4)throw new RangeError('Decoded glTF geometry exceeds byte budget');if(instances)made.instances=instances;this.primitives.push(made);}
+        for(let j=0;j<mesh.primitives.length;j++){const p=mesh.primitives[j],made:PBRPrimitive=prepared?preparedPrimitive(asset,p,prepared[defs[i].mesh][j],this.nodes[i],i,materials,checked):primitive(asset,p,this.nodes[i],i,mesh,materials,packs);for(const data of [made.vertices,made.indices])if(!counted.has(data)){geometryBytes+=data.byteLength;counted.add(data);}if(geometryBytes>asset.maxBytes*4)throw overBudget('Decoded glTF geometry exceeds byte budget',asset.maxBytes*4);if(instances)made.instances=instances;this.primitives.push(made);}
       }
       if(!this.primitives.length)throw new Error('glTF contains no renderable meshes');
     } catch(error) {for(const node of this.created.reverse())node.dispose();throw error;}

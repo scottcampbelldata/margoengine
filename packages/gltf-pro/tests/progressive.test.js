@@ -155,3 +155,19 @@ test('Draco, meshopt or KTX2 decoders fall back to loadGLTF', () => withGlobals(
   const model = await load.complete;
   assert.equal(model.primitives[0].vertices.length, model.asset.doc.accessors[model.primitives[0].definition.attributes.POSITION].count * 20); model.dispose();
 }));
+
+test('maxDownloadBytes bounds loadGLTF and progressive loads (main thread and worker); the error names the option', async () => {
+  const suffix = ` (${helmet.length - 1} bytes; raise the maxDownloadBytes option)`;
+  for (const mode of ['main thread', 'worker']) for (const path of ['/helmet.glb', '/plain/helmet.glb']) await withGlobals(mode === 'worker', async () => {
+    const {engine} = await gpuEngine();
+    await assert.rejects(loadGLTFProgressive(engine, base + path, {maxDownloadBytes: helmet.length - 1}).ready, {name: 'RangeError', message: 'glTF exceeds download budget' + suffix}, `${mode} ${path}`);
+    const model = await loadGLTFProgressive(engine, base + path, {maxDownloadBytes: helmet.length}).complete;
+    assert.equal(model.asset.maxBytes, helmet.length); model.dispose();
+  });
+  await withGlobals(false, async () => {
+    const {engine} = await gpuEngine();
+    await assert.rejects(loadGLTF(engine, base + '/helmet.glb', {maxDownloadBytes: helmet.length - 1}), {name: 'RangeError', message: 'glTF download byte budget exceeded' + suffix});
+    (await loadGLTF(engine, base + '/helmet.glb', {maxDownloadBytes: helmet.length})).dispose();
+    await assert.rejects(loadGLTFProgressive(engine, base + '/helmet.glb', {maxDownloadBytes: 0}).ready, {name: 'RangeError', message: 'maxDownloadBytes must be a positive integer'});
+  });
+});

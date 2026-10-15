@@ -6,5 +6,5 @@ const scope = self as unknown as {onmessage: (event: {data: any}) => void; postM
 let stream: GLTFStream | undefined;
 scope.onmessage = ({data}) => {
   if (data.order) stream?.setOrder(data.order);
-  else void (stream = new GLTFStream(new URL(data.url), message => scope.postMessage(message, [...transferables(message)]), new AbortController().signal)).run();
+  else void (stream = new GLTFStream(new URL(data.url), message => scope.postMessage(message, [...transferables(message)]), new AbortController().signal, data.maxDownloadBytes)).run();
 };

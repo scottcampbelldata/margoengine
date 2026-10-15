@@ -1,7 +1,18 @@
 import {readResponse} from '../../shared/loading.js';
 import type {PBRInstances} from './instancing.js';
 export type GLTFDocument = Record<string, any>;
-export const assetLimit = 64 * 1024 * 1024;
+/**
+ * Default `maxDownloadBytes` (128 MiB): twice the largest real file tested (a 65.1 MB CAD conveyor GLB). Decoded
+ * accessors, packed geometry and decoded images may each use 4x the download budget.
+ */
+export const assetLimit = 128 * 1024 * 1024;
+/** A byte budget derived from `maxDownloadBytes` was exceeded: the error names the option to raise. */
+export const overBudget = (message: string, bytes: number): RangeError => new RangeError(`${message} (${bytes} bytes; raise the maxDownloadBytes option)`);
+/** Validates a `maxDownloadBytes` option (default assetLimit). */
+export function downloadLimit(bytes: number = assetLimit): number {
+  if (!Number.isSafeInteger(bytes) || bytes <= 0) throw new RangeError('maxDownloadBytes must be a positive integer');
+  return bytes;
+}
 /** A transcoded texture, such as a KTX2Decoder result: every mip level, in a format the device has enabled. */
 export interface GLTFCompressedImage {width: number; height: number; format: GPUTextureFormat; mipmaps: readonly {data: Uint8Array; width: number; height: number}[]}
 /** A decoded glTF image slot; undefined when a KTX2 image was skipped because no ktx2 decoder was passed. */
@@ -26,15 +37,16 @@ export function entry(array: any[], id: unknown, label: string): any {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('Missing glTF ' + label);
   return value;
 }
-export function container(input: string | object | ArrayBuffer | ArrayBufferView): {doc: GLTFDocument; binary?: Uint8Array} {
+export function container(input: string | object | ArrayBuffer | ArrayBufferView, limit = assetLimit): {doc: GLTFDocument; binary?: Uint8Array} {
   if (typeof input === 'string') {
-    if (new TextEncoder().encode(input).length > assetLimit) throw new RangeError('glTF JSON exceeds byte budget');
+    if (new TextEncoder().encode(input).length > limit) throw overBudget('glTF JSON exceeds byte budget', limit);
     return {doc: JSON.parse(input)};
   }
   if (!(input instanceof ArrayBuffer) && !ArrayBuffer.isView(input)) return {doc: input as GLTFDocument};
   const data = input instanceof ArrayBuffer ? new Uint8Array(input) : new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
-  if (data.length >= 4 && new DataView(data.buffer, data.byteOffset).getUint32(0, true) !== 0x46546c67) return container(new TextDecoder('utf-8', {fatal: true}).decode(data));
-  if (data.length < 20 || data.length > assetLimit) throw new RangeError('Invalid GLB size');
+  if (data.length >= 4 && new DataView(data.buffer, data.byteOffset).getUint32(0, true) !== 0x46546c67) return container(new TextDecoder('utf-8', {fatal: true}).decode(data), limit);
+  if (data.length > limit) throw overBudget('glTF exceeds download budget', limit);
+  if (data.length < 20) throw new RangeError('Invalid GLB size');
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   if (view.getUint32(0, true) !== 0x46546c67 || view.getUint32(4, true) !== 2 || view.getUint32(8, true) !== data.length) throw new TypeError('Invalid GLB header');
   let doc: GLTFDocument | undefined, binary: Uint8Array | undefined;
@@ -51,9 +63,10 @@ export function container(input: string | object | ArrayBuffer | ArrayBufferView
   if (!doc) throw new TypeError('Missing GLB JSON');
   return {doc, binary};
 }
-export function embedded(uri: string): Uint8Array {
+export function embedded(uri: string, limit = assetLimit): Uint8Array {
   const match = /^data:[^;,]+;base64,([A-Za-z0-9+/]*={0,2})$/.exec(uri);
-  if (!match || match[1].length > assetLimit * 4 / 3 + 4) throw new TypeError('Invalid glTF data URI');
+  if (match && match[1].length > limit * 4 / 3 + 4) throw overBudget('glTF exceeds download budget', limit);
+  if (!match) throw new TypeError('Invalid glTF data URI');
   return Uint8Array.from(atob(match[1]), c => c.charCodeAt(0));
 }
 export const componentSizes: Record<number, number> = {5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4};
@@ -74,7 +87,9 @@ export class GLTFAsset {
   private readonly cache = new Map<number, Float32Array>();
   private readonly views = new Map<number, Uint8Array>();
   private decoded = 0;
-  constructor(readonly doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, readonly hooks: GLTFDecoderHooks = {}) {
+  /** `maxBytes`: the load's `maxDownloadBytes`; buffers may total that much and decoded accessors 4x. */
+  constructor(readonly doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, readonly hooks: GLTFDecoderHooks = {}, readonly maxBytes: number = assetLimit) {
+    downloadLimit(maxBytes);
     if (!doc || doc.asset?.version !== '2.0') throw new TypeError('Expected glTF 2.0');
     for (const key of ['buffers','bufferViews','accessors','meshes','nodes','scenes','materials','textures','images','samplers','skins','animations','extensionsRequired'])
       if (doc[key] !== undefined && !Array.isArray(doc[key])) throw new TypeError('Invalid glTF ' + key);
@@ -83,10 +98,10 @@ export class GLTFAsset {
     if ((doc.nodes?.length ?? 0) > 100_000) throw new RangeError('Too many glTF nodes');
     let total = 0;
     this.buffers = (doc.buffers ?? []).map((def: any, i: number) => {
-      const input = buffers[i], data = input ? input instanceof ArrayBuffer ? new Uint8Array(input) : new Uint8Array(input.buffer, input.byteOffset, input.byteLength) : def.uri ? embedded(def.uri) : i === 0 ? binary : undefined;
+      const input = buffers[i], data = input ? input instanceof ArrayBuffer ? new Uint8Array(input) : new Uint8Array(input.buffer, input.byteOffset, input.byteLength) : def.uri ? embedded(def.uri, maxBytes) : i === 0 ? binary : undefined;
       const length = integer(def.byteLength, 'buffer length', 1);
       if (!data || length > data.length) {if (meshopt(def)?.fallback) return new Uint8Array(0); throw new RangeError('Truncated glTF buffer');}
-      total += data.byteLength; if (total > assetLimit) throw new RangeError('glTF buffers exceed byte budget');
+      total += data.byteLength; if (total > maxBytes) throw overBudget('glTF buffers exceed byte budget', maxBytes);
       return data.subarray(0, length);
     });
   }
@@ -106,7 +121,7 @@ export class GLTFAsset {
     if (!buffer || offset + length > buffer.length) throw new RangeError('Invalid glTF bufferView bounds');
     return buffer.subarray(offset, offset + length);
   }
-  private budget(bytes: number): void {this.decoded += bytes; if (this.decoded > assetLimit * 4) throw new RangeError('Decoded glTF exceeds byte budget');}
+  private budget(bytes: number): void {this.decoded += bytes; if (this.decoded > this.maxBytes * 4) throw overBudget('Decoded glTF exceeds byte budget', this.maxBytes * 4);}
   /** Decode KHR_draco_mesh_compression primitives with the draco hook; their accessors then return the decoded data. */
   async decode(signal?: AbortSignal): Promise<void> {
     const draco = this.hooks.draco, jobs: Promise<void>[] = [];
@@ -169,26 +184,37 @@ export class GLTFAsset {
     this.cache.set(index, output); return output;
   }
 }
-export interface AssetOptions {signal?: AbortSignal; decoders?: GLTFDecoderHooks; buffers?: Array<ArrayBuffer | ArrayBufferView>; /** Fetch for the file and its external buffers and images, for example `@margoengine/cache`'s `cache.fetch`. Default `globalThis.fetch`. */ fetch?: typeof fetch}
+export interface AssetOptions {
+  signal?: AbortSignal; decoders?: GLTFDecoderHooks; buffers?: Array<ArrayBuffer | ArrayBufferView>;
+  /** Fetch for the file and its external buffers and images, for example `@margoengine/cache`'s `cache.fetch`. Default `globalThis.fetch`. */
+  fetch?: typeof fetch;
+  /**
+   * Most bytes the file, its buffers and embedded or external images may total (default 128 MiB). Decoded accessors,
+   * packed geometry and decoded images may each use 4x this. Exceeding it throws a RangeError naming this option.
+   */
+  maxDownloadBytes?: number;
+}
 /** Fetch (url) or parse (input) a glTF, decode compressed geometry and images. External URIs resolve against url, else the page. */
-export async function loadAsset(url: string | URL | undefined, {signal, decoders = {}, buffers: provided = [], fetch: get = globalThis.fetch}: AssetOptions = {}, input?: string | object | ArrayBuffer | ArrayBufferView): Promise<{asset: GLTFAsset; images: GLTFImage[]}> {
+export async function loadAsset(url: string | URL | undefined, {signal, decoders = {}, buffers: provided = [], fetch: get = globalThis.fetch, maxDownloadBytes}: AssetOptions = {}, input?: string | object | ArrayBuffer | ArrayBufferView): Promise<{asset: GLTFAsset; images: GLTFImage[]}> {
+  const limit = downloadLimit(maxDownloadBytes);
   signal?.throwIfAborted(); let base = url === undefined ? undefined : new URL(url, globalThis.location?.href), total = 0;
   const fetchBytes = async (target: URL, root = false) => {
     if (!['http:','https:'].includes(target.protocol)) throw new TypeError('glTF URL must use HTTP(S)');
     const response = await get(target, {signal}); if (root && response.url) base = new URL(response.url);
-    const bytes = await readResponse(response, {maxBytes: assetLimit - total, signal, label: 'glTF download'}); total += bytes.length; return bytes;
+    const bytes = await readResponse(response, {maxBytes: limit - total, signal, label: 'glTF download'}).catch(error => {throw error instanceof RangeError ? overBudget(error.message, limit) : error;});
+    total += bytes.length; return bytes;
   };
   const resolve = (uri: string) => new URL(uri, base ?? globalThis.location?.href);
-  const {doc,binary} = container(input ?? await fetchBytes(base!, true)), buffers: Uint8Array[] = [], images: GLTFImage[] = [];
+  const {doc,binary} = container(input ?? await fetchBytes(base!, true), limit), buffers: Uint8Array[] = [], images: GLTFImage[] = [];
   for (const [i, def] of (doc.buffers ?? []).entries()) {
     const given = provided[i];
     if (given) buffers.push(given instanceof ArrayBuffer ? new Uint8Array(given) : new Uint8Array(given.buffer, given.byteOffset, given.byteLength));
     else if (!def.uri) buffers.push(i === 0 && binary || new Uint8Array());
-    else if (def.uri.startsWith('data:')) {const b = embedded(def.uri); total += b.length; if (total > assetLimit) throw new RangeError('glTF exceeds download budget'); buffers.push(b);}
+    else if (def.uri.startsWith('data:')) {const b = embedded(def.uri, limit); total += b.length; if (total > limit) throw overBudget('glTF exceeds download budget', limit); buffers.push(b);}
     else if (meshopt(def)?.fallback && decoders.meshopt) buffers.push(new Uint8Array());
     else buffers.push(await fetchBytes(resolve(def.uri)));
   }
-  const asset = new GLTFAsset(doc,buffers,binary,decoders);let decodedImages=0;
+  const asset = new GLTFAsset(doc,buffers,binary,decoders,limit);let decodedImages=0;
   await asset.decode(signal);
   try {
     for (const def of doc.images ?? []) {
@@ -196,13 +222,14 @@ export async function loadAsset(url: string | URL | undefined, {signal, decoders
       if (ktx2 && !decoders.ktx2) {images.push(undefined); continue;}
       let data: Uint8Array;
       if (def.bufferView !== undefined) data = asset.view(def.bufferView);
-      else if (typeof def.uri === 'string' && def.uri.startsWith('data:')) {data = embedded(def.uri); total += data.length; if (total > assetLimit) throw new RangeError('glTF exceeds download budget');}
+      else if (typeof def.uri === 'string' && def.uri.startsWith('data:')) {data = embedded(def.uri, limit); total += data.length; if (total > limit) throw overBudget('glTF exceeds download budget', limit);}
       else if (typeof def.uri === 'string') data = await fetchBytes(resolve(def.uri));
       else throw new TypeError('Invalid glTF image');
       const image = ktx2 ? await decoders.ktx2!.transcode(data, {signal}) : await createImageBitmap(new Blob([new Uint8Array(data)],{type:def.mimeType}), {colorSpaceConversion:'none',premultiplyAlpha:'none'});
       images.push(image);
       decodedImages+='mipmaps' in image?image.mipmaps.reduce((sum,m)=>sum+m.data.byteLength,0):image.width*image.height*4;
-      if (image.width * image.height > 16_777_216 || decodedImages>assetLimit*4) throw new RangeError('glTF images exceed decoded size limit');
+      if (image.width * image.height > 16_777_216) throw new RangeError('glTF images exceed decoded size limit');
+      if (decodedImages > limit * 4) throw overBudget('glTF images exceed decoded size limit', limit * 4);
       signal?.throwIfAborted();
     }
     return {asset,images};

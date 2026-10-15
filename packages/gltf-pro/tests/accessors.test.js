@@ -5,12 +5,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {parseGLTFAsync} from '../dist/index.js';
+import {parseGLTFAsync, PBRModel} from '../dist/index.js';
+import {instancing} from '../dist/instancing.js';
+import {instancedGLTF} from '../../../tests/support/instanced-gltf.js';
 import {modelFromPrepared} from '../dist/worker.js';
 import {runParseWorker, assertSameBytes} from '../../../tests/support/parse-worker.js';
 import {headless, headlessModels} from '../../../tests/support/pbr-snapshot.js';
 
-const worker = new URL('../dist/workers/gltf.js', import.meta.url);
+const worker = new URL('../dist/workers/gltf.js', import.meta.url), realSetup = PBRModel.prototype.setup; // before any test stubs it
 /** A one-mesh GLB; each accessor is {data: TypedArray, type, componentType, ...extra accessor fields}. */
 function glb(attributes, indices) {
   const chunks = [], accessors = [], bufferViews = [], width = {SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT3: 9};
@@ -72,6 +74,43 @@ const real = conveyor?.length > 12 && conveyor.readUInt32LE(0) === 0x46546c67;
 test('the 62 MB conveyor GLB parses on the main thread and in the worker, with identical geometry', {skip: !real && 'Untitled.glb is not checked out (git lfs pull)'}, () => headlessModels(async () => {
   const model = await both(new Uint8Array(conveyor.buffer, conveyor.byteOffset, conveyor.byteLength));
   assert.equal(model.primitives.length, 570); // 242 meshes drawn by 570 nodes
+  // HANDOFF 5l.r: each mesh is packed once and shared by its nodes (was 570 packs, ~231 MB; now ~174 MB).
+  assert.equal(new Set(model.primitives.map(p => p.vertices)).size, 242);
+  assert.equal(new Set(model.primitives.map(p => p.indices)).size, 242);
   assert.equal(model.primitives.reduce((sum, p) => sum + p.indices.length / 3, 0), 2_445_355);
   assert.equal(model.asset.accessor(487).length, 1_480_944);
+}));
+
+// HANDOFF 5l.r: the main-thread path packs a mesh once and its nodes share the arrays, so PBRModel.setup (whose upload
+// cache is keyed by array) creates one vertex and one index buffer per mesh primitive, like the worker path.
+test('nodes sharing a mesh share its packed arrays and GPU buffers; uploads equal the worker-packed bytes', () => headlessModels(async () => {
+  const {doc, buffers} = instancedGLTF([{t: [0, 0, 0]}, {t: [2, 0, 0]}]);
+  doc.nodes.push({mesh: 0, translation: [0, 3, 0]}, {mesh: 0, scale: [2, 2, 2]});
+  const engine = await headless(), model = await parseGLTFAsync(engine, doc, {buffers, decoders: {instancing}}), [a, b, c] = model.primitives;
+  assert.equal(model.primitives.length, 3);
+  assert.ok(b.vertices === a.vertices && c.vertices === a.vertices && b.indices === a.indices && c.indices === a.indices);
+  assert.equal(a.instances.count, 2); assert.equal(b.instances, undefined); assert.notEqual(b.node, c.node);
+  const created = [], dummy = () => ({});
+  globalThis.GPUBufferUsage ??= {MAP_READ: 1, COPY_SRC: 4, COPY_DST: 8, INDEX: 16, VERTEX: 32, UNIFORM: 64, STORAGE: 128, INDIRECT: 256};
+  globalThis.GPUTextureUsage ??= {COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, STORAGE_BINDING: 8, RENDER_ATTACHMENT: 16};
+  Object.defineProperty(model['engine'], 'gpu', {configurable: true, value: {limits: {maxBufferSize: 2 ** 28, maxTextureDimension2D: 8192},
+    createBuffer: d => {const buffer = {...d, data: new Uint8Array(d.size)}; created.push(buffer); return buffer;},
+    queue: {writeBuffer: (buffer, at, data) => buffer.data.set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength), at), writeTexture() {}},
+    createTexture: () => ({createView: dummy}), createSampler: dummy}});
+  realSetup.call(model, model['engine']);
+  const resources = model['resources'], geometry = created.filter(buffer => buffer.usage & (GPUBufferUsage.VERTEX | GPUBufferUsage.INDEX));
+  assert.equal(geometry.length, 2);
+  assert.ok(resources.every(r => r.vertex === resources[0].vertex && r.index === resources[0].index));
+  const prepared = await runParseWorker(worker, {url: 'https://example.test/', input: doc, buffers});
+  assertSameBytes([resources[0].vertex.data, resources[0].index.data], [prepared.geometry[0][0].vertices, prepared.geometry[0][0].indices].map(v => new Uint8Array(v.buffer, v.byteOffset, v.byteLength)));
+}));
+
+test('maxDownloadBytes bounds main-thread and worker loads, and the error names the option', () => headlessModels(async () => {
+  const bytes = glb(triangle), url = 'https://example.test/', message = `glTF exceeds download budget (${bytes.length - 1} bytes; raise the maxDownloadBytes option)`;
+  await assert.rejects(parseGLTFAsync(await headless(), bytes.slice(), {maxDownloadBytes: bytes.length - 1}), {name: 'RangeError', message});
+  await assert.rejects(runParseWorker(worker, {url, input: bytes.slice().buffer, maxDownloadBytes: bytes.length - 1}), {name: 'RangeError', message});
+  assert.equal((await parseGLTFAsync(await headless(), bytes.slice(), {maxDownloadBytes: bytes.length})).asset.maxBytes, bytes.length);
+  const prepared = await runParseWorker(worker, {url, input: bytes.slice().buffer, maxDownloadBytes: bytes.length});
+  assert.equal(modelFromPrepared(await headless(), prepared).asset.maxBytes, bytes.length);
+  for (const maxDownloadBytes of [0, -1, 1.5, Infinity]) await assert.rejects(parseGLTFAsync(await headless(), bytes.slice(), {maxDownloadBytes}), {name: 'RangeError', message: 'maxDownloadBytes must be a positive integer'});
 }));

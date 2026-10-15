@@ -228,6 +228,31 @@ Completion takes 0.5-13% longer than `loadGLTF` (the helmet on the slow link pay
 the assembly for 42 requests and 2,000 primitive swaps). The assembly's first frame waits for its 1.3 MB JSON, and building 2,000 nodes and their
 boxes is one 100-115 ms task; the other models never block the main thread for 50 ms.
 
+## Download budget and memory
+
+Every load bounds what it reads: the file, its buffers and its embedded or external images may total
+`maxDownloadBytes` (default 128 MiB), and decoded accessors, packed geometry and decoded images may each use 4x that.
+Over the budget, a load fails with a `RangeError` naming the option, e.g. `glTF exceeds download budget (134217728
+bytes; raise the maxDownloadBytes option)`. `loadGLTF`, `parseGLTFAsync`, `loadGLTFInWorker`, `parseGLTFInWorker` and
+`loadGLTFProgressive` take it; the synchronous `parseGLTF` uses the default.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from '@margoengine/gltf-pro';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const plant = await loadGLTF(stage.engine, '/plant.glb', {maxDownloadBytes: 512 * 1024 * 1024}); // a 300 MB CAD export
+```
+
+Why 128 MiB: it is twice the largest real file tested, a 65.1 MB CAD GLB (242 meshes drawn by 570 nodes, 2.4M
+triangles), while a load at the default stays under a gigabyte. That file peaks at 374 MB of process memory in Node on the
+main-thread path (about 5.7x its size), so a file at the default needs roughly 0.8 GB (extrapolated): fine on desktop
+browsers, risky on phones. Raise it for larger CAD assemblies on desktop; the old 64 MiB default left that file 2 MB
+of headroom.
+
+A mesh used by several nodes is packed once and its nodes share the packed arrays and GPU buffers (per-node transforms,
+morph weights, skins and `EXT_mesh_gpu_instancing` stay per node). On that GLB this took the geometry from 1,140 GPU
+buffers / 231 MB to 484 / 174 MB, with byte-identical data per primitive (HANDOFF 5l.r).
+
 ## Extensions and compressed files
 
 Supported glTF extensions: `KHR_mesh_quantization`, `KHR_texture_transform`, `KHR_materials_emissive_strength`, `KHR_materials_unlit`, `KHR_lights_punctual`, `KHR_materials_clearcoat`, `KHR_materials_transmission`, `KHR_materials_ior`, `KHR_materials_volume`, `KHR_materials_sheen`, `KHR_materials_specular`, `EXT_texture_webp`, `EXT_texture_avif`, plus `EXT_mesh_gpu_instancing` (`TRANSLATION`, `ROTATION` including normalized integers, `SCALE`; the node's primitives get one `PBRInstances`, see "Instancing"), `KHR_draco_mesh_compression`, `EXT_meshopt_compression` (and `KHR_meshopt_compression`) and `KHR_texture_basisu` when you pass the matching decoder (`instancing` from `@margoengine/gltf-pro/instancing` for the first). A file is rejected only when its `extensionsRequired` lists something still unsupported; the error names each one and the decoder it needs.

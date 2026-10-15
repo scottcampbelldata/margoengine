@@ -2,7 +2,7 @@
 // thread where Worker is unavailable. HTTP range requests fetch each primitive's accessor bytes in the priority order
 // the main thread sends; a server without range support streams the whole file and primitives decode as their bytes
 // arrive. Geometry first, then images, then the remaining bytes, so the final buffers equal a plain download.
-import {GLTFAsset, assetLimit, componentSizes, components, embedded, entry} from './asset.js';
+import {GLTFAsset, assetLimit, componentSizes, components, embedded, entry, overBudget} from './asset.js';
 import {decodeExtras, packPrimitive, primitiveDefs} from './pack.js';
 import type {GLTFDocument} from './asset.js';
 
@@ -57,7 +57,8 @@ export class GLTFStream {
   private loaded = 0;
   private reported = 0;
   private base: URL;
-  constructor(private readonly url: URL, private readonly post: (message: StreamMessage) => void, private readonly signal: AbortSignal) {
+  /** `limit`: maxDownloadBytes, already validated by the caller. */
+  constructor(private readonly url: URL, private readonly post: (message: StreamMessage) => void, private readonly signal: AbortSignal, private readonly limit = assetLimit) {
     this.base = url; signal.addEventListener('abort', () => this.notify(), {once: true});
   }
   /** Primitive keys still wanted, most important first (the main thread re-sends this as the camera moves). */
@@ -93,7 +94,7 @@ export class GLTFStream {
     return fetch(source.url, {signal: this.signal, headers}).then(r => {if (!r.ok) throw new Error(`glTF download request failed: HTTP ${r.status}`); return r;});
   }
   private allocate(source: Source, size: number): void {
-    if (!Number.isSafeInteger(size) || size > assetLimit - this.sources.reduce((sum, s) => sum + (s.data?.length ?? 0), 0)) throw new RangeError('glTF exceeds download budget');
+    if (!Number.isSafeInteger(size) || size > this.limit - this.sources.reduce((sum, s) => sum + (s.data?.length ?? 0), 0)) throw overBudget('glTF exceeds download budget', this.limit);
     source.data = new Uint8Array(size); source.size ??= size;
   }
   // Writes a response body at `at` (bounded to the source), marking each chunk as it lands.
@@ -125,7 +126,7 @@ export class GLTFStream {
       for (let r; !(r = await reader.read()).done;) parts.push(r.value);
       if (s.ranged && +range![1] > (length = parts.reduce((n, p) => n + p.length, 0))) parts.push(new Uint8Array(await (await this.fetch(s, {Range: `bytes=${length}-`})).arrayBuffer()));
       const text = new Uint8Array(parts.reduce((n, p) => n + p.length, 0)); parts.reduce((at, p) => (text.set(p, at), at + p.length), 0); this.loaded += text.length;
-      if (text.length > assetLimit) throw new RangeError('glTF JSON exceeds byte budget');
+      if (text.length > this.limit) throw overBudget('glTF JSON exceeds byte budget', this.limit);
       this.sources.length = 0;
       return JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(text));
     }
@@ -166,7 +167,7 @@ export class GLTFStream {
         if (i === 0 && glb && binLength) {this.map.push({source: 0, offset: binStart}); return glb.data!.subarray(binStart, binStart + binLength);}
         this.map.push({source: -1, offset: 0}); return new Uint8Array();
       }
-      if (typeof def.uri === 'string' && def.uri.startsWith('data:')) {this.map.push({source: -1, offset: 0}); const b = embedded(def.uri); this.loaded += b.length; return b;}
+      if (typeof def.uri === 'string' && def.uri.startsWith('data:')) {this.map.push({source: -1, offset: 0}); const b = embedded(def.uri, this.limit); this.loaded += b.length; return b;}
       const url = new URL(def.uri, this.base).href; let k = external.get(url);
       if (k === undefined) {
         k = this.sources.length; external.set(url, k); const s: Source = {url: new URL(url), got: [], asked: []}; this.sources.push(s);
@@ -175,7 +176,7 @@ export class GLTFStream {
       this.map.push({source: k, offset: 0}); return this.sources[k].data!;
     });
     // Same validation (and the same errors) as a plain load: required extensions, buffer sizes, the byte budget.
-    this.asset = new GLTFAsset(doc, views);
+    this.asset = new GLTFAsset(doc, views, undefined, {}, this.limit);
     this.needs = primitiveDefs(doc).map(p => {
       const out: Range[] = [], a = p?.attributes ?? {};
       try {for (const id of [a.POSITION, a.NORMAL, a.TANGENT, a.TEXCOORD_0, a.TEXCOORD_1, a.COLOR_0, p.indices]) if (id !== undefined) this.ranges(doc, id, out);}
@@ -262,12 +263,13 @@ export class GLTFStream {
           while (!covered(s.got, lo, Math.min(hi, s.data!.length))) {if (s.ranged === undefined && !s.probing) this.request(b.source, lo, hi); await this.next();}
         }
         data = this.asset!.view(def.bufferView);
-      } else if (typeof def.uri === 'string' && def.uri.startsWith('data:')) data = embedded(def.uri);
-      else if (typeof def.uri === 'string') {const r = await this.fetch({url: new URL(def.uri, this.base), got: [], asked: []}); data = new Uint8Array(await r.arrayBuffer()); this.loaded += data.length;}
+      } else if (typeof def.uri === 'string' && def.uri.startsWith('data:')) data = embedded(def.uri, this.limit);
+      else if (typeof def.uri === 'string') {const r = await this.fetch({url: new URL(def.uri, this.base), got: [], asked: []}); data = new Uint8Array(await r.arrayBuffer()); this.loaded += data.length; if (this.loaded > this.limit) throw overBudget('glTF exceeds download budget', this.limit);}
       else throw new TypeError('Invalid glTF image');
       const image = await createImageBitmap(new Blob([new Uint8Array(data)], {type: def.mimeType}), {colorSpaceConversion: 'none', premultiplyAlpha: 'none'});
       decoded += image.width * image.height * 4;
-      if (image.width * image.height > 16_777_216 || decoded > assetLimit * 4) {image.close?.(); throw new RangeError('glTF images exceed decoded size limit');}
+      if (image.width * image.height > 16_777_216) {image.close?.(); throw new RangeError('glTF images exceed decoded size limit');}
+      if (decoded > this.limit * 4) {image.close?.(); throw overBudget('glTF images exceed decoded size limit', this.limit * 4);}
       this.post({type: 'image', index, image});
     };
     const workers = Array.from({length: PARALLEL}, async () => {for (let i; (i = queue.shift()) !== undefined;) await one(i);});
