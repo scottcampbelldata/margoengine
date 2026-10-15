@@ -25,6 +25,10 @@
       "types": "./dist/asset-entry.d.ts",
       "import": "./dist/asset-entry.js"
     },
+    "./extended": {
+      "types": "./dist/extended.d.ts",
+      "import": "./dist/extended.js"
+    },
     "./instancing": {
       "types": "./dist/instancing.d.ts",
       "import": "./dist/instancing.js"

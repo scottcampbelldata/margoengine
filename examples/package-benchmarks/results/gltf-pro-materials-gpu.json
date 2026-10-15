@@ -1,0 +1,143 @@
+{
+ "date": "2026-10-15T20:45:04.726Z",
+ "hardware": {
+  "vendor": "intel",
+  "architecture": "xe-2lpg",
+  "device": "",
+  "description": "",
+  "fallback": false
+ },
+ "permutations": [
+  {
+   "name": "extended {\"iridescence\":false,\"anisotropy\":false,\"diffuseTransmission\":false}",
+   "textures": 5,
+   "problems": [],
+   "pipeline": null
+  },
+  {
+   "name": "extended {\"iridescence\":false,\"anisotropy\":false,\"diffuseTransmission\":false} + shadows, clustered, LocalShadows, IBL",
+   "textures": 8,
+   "problems": [],
+   "pipeline": null
+  },
+  {
+   "name": "extended {\"iridescence\":true,\"anisotropy\":false,\"diffuseTransmission\":false}",
+   "textures": 5,
+   "problems": [],
+   "pipeline": null
+  },
+  {
+   "name": "extended {\"iridescence\":true,\"anisotropy\":false,\"diffuseTransmission\":false} + shadows, clustered, LocalShadows, IBL",
+   "textures": 8,
+   "problems": [],
+   "pipeline": null
+  },
+  {
+   "name": "extended {\"iridescence\":false,\"anisotropy\":true,\"diffuseTransmission\":false}",
+   "textures": 5,
+   "problems": [],
+   "pipeline": null
+  },
+  {
+   "name": "extended {\"iridescence\":false,\"anisotropy\":true,\"diffuseTransmission\":false} + shadows, clustered, LocalShadows, IBL",
+   "textures": 8,
+   "problems": [],
+   "pipeline": null
+  },
+  {
+   "name": "extended {\"iridescence\":true,\"anisotropy\":true,\"diffuseTransmission\":false}",
+   "textures": 5,
+   "problems": [],
+   "pipeline": null
+  },
+  {
+   "name": "extended {\"iridescence\":true,\"anisotropy\":true,\"diffuseTransmission\":false} + shadows, clustered, LocalShadows, IBL",
+   "textures": 8,
+   "problems": [],
+   "pipeline": null
+  },
+  {
+   "name": "extended {\"iridescence\":false,\"anisotropy\":false,\"diffuseTransmission\":true}",
+   "textures": 5,
+   "problems": [],
+   "pipeline": null
+  },
+  {
+   "name": "extended {\"iridescence\":false,\"anisotropy\":false,\"diffuseTransmission\":true} + shadows, clustered, LocalShadows, IBL",
+   "textures": 8,
+   "problems": [],
+   "pipeline": null
+  },
+  {
+   "name": "extended {\"iridescence\":true,\"anisotropy\":false,\"diffuseTransmission\":true}",
+   "textures": 5,
+   "problems": [],
+   "pipeline": null
+  },
+  {
+   "name": "extended {\"iridescence\":true,\"anisotropy\":false,\"diffuseTransmission\":true} + shadows, clustered, LocalShadows, IBL",
+   "textures": 8,
+   "problems": [],
+   "pipeline": null
+  },
+  {
+   "name": "extended {\"iridescence\":false,\"anisotropy\":true,\"diffuseTransmission\":true}",
+   "textures": 5,
+   "problems": [],
+   "pipeline": null
+  },
+  {
+   "name": "extended {\"iridescence\":false,\"anisotropy\":true,\"diffuseTransmission\":true} + shadows, clustered, LocalShadows, IBL",
+   "textures": 8,
+   "problems": [],
+   "pipeline": null
+  },
+  {
+   "name": "extended {\"iridescence\":true,\"anisotropy\":true,\"diffuseTransmission\":true}",
+   "textures": 5,
+   "problems": [],
+   "pipeline": null
+  },
+  {
+   "name": "extended {\"iridescence\":true,\"anisotropy\":true,\"diffuseTransmission\":true} + shadows, clustered, LocalShadows, IBL",
+   "textures": 8,
+   "problems": [],
+   "pipeline": null
+  },
+  {
+   "name": "extended worst case",
+   "textures": 13,
+   "problems": [],
+   "pipeline": null
+  },
+  {
+   "name": "extended worst case + shadows, clustered, LocalShadows, IBL",
+   "textures": 16,
+   "problems": [],
+   "pipeline": null
+  },
+  {
+   "name": "transmissive",
+   "textures": 13,
+   "problems": [],
+   "pipeline": null
+  },
+  {
+   "name": "transmissive + shadows, clustered, LocalShadows, IBL",
+   "textures": 16,
+   "problems": [],
+   "pipeline": null
+  }
+ ],
+ "worstRelativeError": {
+  "iridescence": 0.000016318600368769864,
+  "directIsotropic": 0.000001381570849492134,
+  "directAnisotropic": 3.5663701968018443e-7
+ },
+ "cases": {
+  "iridescence": 64,
+  "direct": 96
+ },
+ "gpuErrors": [],
+ "pageErrors": []
+}

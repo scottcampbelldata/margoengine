@@ -776,7 +776,7 @@
    },
    "render": {
     "verdict": "matches",
-    "notes": "Clearcoat paint, sheen cloth and transmissive windows render; viewed through the file's first glTF camera (a close-up)."
+    "notes": "Clearcoat paint, sheen cloth and transmissive windows render; the windscreen now shows the interior (5w.f). Viewed through the file's first glTF camera (a close-up)."
    }
   },
   {
@@ -818,7 +818,7 @@
    },
    "render": {
     "verdict": "matches",
-    "notes": "Sheen fabric reads; KHR_materials_variants ignored (default material shown)."
+    "notes": "Sheen fabric reads; model.selectVariant switches Mango Velvet and Peacock Velvet (gallery &variant=)."
    }
   },
   {
@@ -901,7 +901,7 @@
    },
    "render": {
     "verdict": "matches",
-    "notes": "Default variant renders; KHR_materials_variants ignored (no variant switching)."
+    "notes": "Default variant renders; model.selectVariant switches midnight, beach and street (gallery &variant=)."
    }
   },
   {
@@ -939,8 +939,8 @@
     "codes": {}
    },
    "render": {
-    "verdict": "differs",
-    "notes": "KHR_materials_iridescence ignored: base and shade lining lack the iridescent colours."
+    "verdict": "matches",
+    "notes": "With @margoengine/gltf-pro/extended: the glass globe shows thin-film purple and green fringes; the reference studio is darker, so our globe reads milkier and the metal base plainer. The shade lining is not visible from the gallery camera."
    }
   },
   {
@@ -979,8 +979,8 @@
     "codes": {}
    },
    "render": {
-    "verdict": "differs",
-    "notes": "KHR_materials_anisotropy ignored: brushed copper highlights are isotropic."
+    "verdict": "matches",
+    "notes": "With @margoengine/gltf-pro/extended: brushed copper highlights stretch along the circular grooves (anisotropic GGX, bent-normal IBL); the bulb glass is clear."
    }
   },
   {
@@ -1018,7 +1018,7 @@
    },
    "render": {
     "verdict": "matches",
-    "notes": "Matches closely; KHR_materials_diffuse_transmission ignored (thin porcelain glow absent, subtle)."
+    "notes": "With @margoengine/gltf-pro/extended: light from behind passes through the porcelain (diffuse BTDF), so the cup reads bright white as in the reference."
    }
   },
   {
@@ -1064,8 +1064,8 @@
     "codes": {}
    },
    "render": {
-    "verdict": "differs",
-    "notes": "Glass door renders as an opaque light-grey panel; the bottles behind it (visible in the reference) are hidden."
+    "verdict": "matches",
+    "notes": "Bottles, shelves and the lit interior show through the door (5w.f: the tinted blend now draws as two passes, and IBL no longer lights transmitted glass as a white diffuser); the reference glass is slightly frosted, ours clear."
    }
   },
   {
@@ -1211,7 +1211,7 @@
    },
    "render": {
     "verdict": "matches",
-    "notes": "Matches; goggle glass transmission reads."
+    "notes": "Matches; goggle glass transmission reads (5w.f: the background now shows through the tint)."
    }
   }
  ]

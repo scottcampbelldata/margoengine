@@ -44,6 +44,13 @@ type Context = Extract<PassContext, {
     backend: 'webgpu';
 }>;
 
+interface ExtendedPlan {
+    readonly slots: readonly number[];
+    readonly iridescence: boolean;
+    readonly anisotropy: boolean;
+    readonly diffuseTransmission: boolean;
+}
+
 class GLTFAsset {
     readonly doc: GLTFDocument;
     readonly hooks: GLTFDecoderHooks;
@@ -124,9 +131,22 @@ interface GLTFDecoderHooks {
     instancing?: {
         read(asset: GLTFAsset, extension: any): PBRInstances;
     };
+    materials?: GLTFExtendedMaterials;
 }
 
 type GLTFDocument = Record<string, any>;
+
+interface GLTFExtendedMaterials {
+    parse(extensions: Record<string, any>): {
+        features: Omit<ExtendedPlan, 'slots'>;
+        maps: unknown[];
+        rows: number[];
+    } | undefined;
+    plan(maps: readonly ({
+        index: number;
+    } | undefined)[], features: Omit<ExtendedPlan, 'slots'>): ExtendedPlan;
+    shader(plan: ExtendedPlan): string;
+}
 
 type GLTFImage = ImageBitmap | GLTFCompressedImage | undefined;
 
@@ -205,6 +225,7 @@ class PBRModel implements EnginePlugin {
     readonly lights: GLTFLight[];
     readonly cameras: GLTFCamera[];
     readonly pointsAndLines: PBRPrimitive[];
+    readonly variants: readonly string[];
     disposed: boolean;
     constructor(instance: EngineKernel, asset: GLTFAsset, images?: readonly GLTFImage[], prepared?: readonly (readonly PreparedGeometry[])[]);
     setup(engine: Engine): void;
@@ -213,6 +234,7 @@ class PBRModel implements EnginePlugin {
     setTransparency(hook: PBRTransparency): () => void;
     setCapture(hook: PBRCapture): () => void;
     setTransmission(hook: PBRTransmission): () => void;
+    selectVariant(variant?: string | number): void;
     get shadowPrimitives(): {
         node: Mesh;
         vertex: GPUBuffer;

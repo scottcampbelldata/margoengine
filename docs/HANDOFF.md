@@ -1657,14 +1657,43 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       returns the remover. `GLTFClusteredLight.color` is now `[number, number, number]`, so `clustered.setLights(
       model.clusteredLights())` type-checks (it did not: `number[]` vs `Vec3`). The gallery uses it with exposure
       3 / sun lux (NodePerformanceTest's sun is 10,000 lux).
-   e. Ignored material extensions (load, render without the effect): `KHR_materials_iridescence` (IridescenceLamp),
-      `KHR_materials_anisotropy` (AnisotropyBarnLamp), `KHR_materials_diffuse_transmission` (DiffuseTransmissionTeacup,
-      subtle), `KHR_materials_variants` (SheenChair, MaterialsVariantsShoe: no variant switching API; matters for the
-      product-configurator use case). Physical materials already use all 16 sampler slots with every lighting package
-      (gltf-pro README "Texture bindings"), so new texture maps need a plan.
-   f. CommercialRefrigerator: the glass door (`KHR_materials_transmission`) renders as an opaque light-grey panel and
-      hides the bottles the Khronos screenshot shows; ToyCar's and FlightHelmet's transmission do show what is
-      behind. Find what differs in that material.
+   e. [DONE 2026-10-15, 5w-e worker] Written from the Khronos specs (no other engine's source). `KHR_materials_iridescence`
+      (thin-film Fresnel of the spec's "Iridescence Fresnel": Schlick at both interfaces, phase shifts, two Fourier
+      terms, XYZ to Rec. 709; rgb_mix), `KHR_materials_anisotropy` (Burley anisotropic GGX + the spec's height-correlated
+      V, bent-normal IBL) and `KHR_materials_diffuse_transmission` (Lambert BTDF from the back, directional + IBL) are an
+      opt-in entry `@margoengine/gltf-pro/extended` passed as `decoders.materials` (like `/instancing`); without it they
+      are ignored and a file requiring one is rejected naming the decoder. Extended materials (a factor > 0) compile a
+      per-feature, per-texture-plan variant of the physical shader (1,088-byte uniform): only the extension maps they use
+      are bound, one binding per distinct glTF texture, at most 8 (`extendedTextureLimit`), so the worst case with
+      shadows + IBL + LocalShadows is exactly 16 sampled textures (test composes it; real GPU builds it). IBL/probe
+      ambient hooks are evaluated through `margoAmbientTerm` on modified surfaces (shared `pbr-hooks.js`: layered when the
+      shader defines `margoAmbientLayers`); clustered lights stay isotropic, front-side only (README limits).
+      `KHR_materials_variants`: `model.variants` + `model.selectVariant(name | index | undefined)` (root, rebinds only the
+      changed primitives; gallery `&variant=`). CPU reference `tests/support/khr-brdf.js` + `packages/gltf-pro/tests/
+      materials-ext.test.js` (10 tests); real GPU `scripts/gltf-pro-materials-gpu-check.js` (Arc 140V, Edge 155, GPU lock):
+      20 permutations (8 feature sets, worst-case plan, transmissive; bare and with shadows, clustered + LocalShadows,
+      IBL) compile and build every entry point with 0 errors; WGSL vs CPU reference worst relative error 1.6e-5 thin film
+      (64 cases), 1.4e-6 isotropic, 3.6e-7 anisotropic direct BRDF (96 cases); `results/gltf-pro-materials-gpu.json`.
+      Bytes (min/gzip, entry-sizes.json method, vs 04f941b): gltf-pro root 54,562/18,979 -> 58,446/20,047 (+1,068:
+      variants, the transmission fix, the hook plumbing), `/extended` 14,943/5,146 alone and +2,385 gzip on top of the
+      root (one bundle 22,432), /worker +1,076, /progressive +1,101, workers/gltf.js +41, /asset +40, usdz worker +1,098
+      (bundles the root), animation/vat +140 (pbr-hooks), geometry +41; core + stage unchanged (19,999).
+   f. [DONE 2026-10-15, 5w-e worker] Two causes. (1) The tinted blend read its blend constant as 0 in Edge on the Arc 140V
+      (D3D12) with 4x MSAA (scratch repro: dst x constant returned 0 for pipelines reused across command buffers, even
+      with the constant set before setPipeline), so the glass drew only its own colour over a black background: every
+      transmissive surface in the gallery hid what was behind (ToyCar's and FlightHelmet's "showed through" only by their
+      reflections). gltf-pro now draws transmission twice without a constant: `margoTint` (blend zero, src; tint in the
+      spare Frame lanes coordsB.zw, ext.z) multiplies the background, then the lit surface adds (one, one). (2) IBL and
+      clustered hooks lit transmitted glass with the full base colour, so the fridge's white glass read as an opaque
+      diffuser: `transmissiveShader(physical | factor-only)` evaluates those hooks on `margoFront(s)` (diffuse x (1 -
+      transmission)), as the shader's own terms already did. The `@margoengine/materials/transmission` refraction path is
+      unchanged (physical-gpu.mjs: side by side 0 difference, BRDF and refraction numbers identical to 38d448e).
+      GPU-call proofs: `npm run proofs -- --current` 15/15 pass (gltf-pro-lighting-hooks 4,556, binding-limit,
+      materials-uv-transform, selection-xray-off, ... identical); oit-detached now 2,864 calls (its BLEND + transmission
+      material became a plain BLEND one, since transmission now draws twice by design; materials-ext.test.js covers it).
+      Visual: `visual:check --no-build` 47/55 pass, the 8 failures exactly the intended khronos views (ABeautifulGame,
+      AnisotropyBarnLamp, CommercialRefrigerator, DiffuseTransmissionTeacup, FlightHelmet, IridescenceLamp,
+      LightsPunctualLamp, ToyCar), re-baselined with `visual:update` (noise 0). Verdicts in examples/assets/khronos.
    g. [DONE 2026-10-15] `viewGLTFCamera(model, index | GLTFCamera = 0)`: position/direction/up from the node, perspective
       yfov/znear/zfar (canvas aspect) or orthographic ymag/znear/zfar through `camera.project` (reversed depth like core;
       removed again by a later perspective camera). The gallery views through a file's first camera when it has one

@@ -4,16 +4,16 @@ import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type Pas
 import {invertMatrixStable} from '@margoengine/math/mat4';
 import {viewMatrix} from '../../shared/view.js';
 import {Cleanup} from '../../shared/cleanup.js';
-import {GLTFAsset, container, loadAsset, closeImages, entry, integer, overBudget, type GLTFImage, type AssetOptions, type GLTFDecoderHooks} from './asset.js';
-import {pbrShader, physicalShader, factorPhysicalShader, transparentPBR, capturePBR, transmissionPBR, type PBRLighting, type PBRTransparency, type PBRCapture, type PBRTransmission} from './shader.js';
+import {GLTFAsset, container, loadAsset, closeImages, entry, integer, overBudget, type GLTFImage, type AssetOptions, type GLTFDecoderHooks, type GLTFExtendedMaterials} from './asset.js';
+import {pbrShader, physicalShader, factorPhysicalShader, transmissiveShader, transparentPBR, capturePBR, transmissionPBR, type ExtendedPlan, type PBRLighting, type PBRTransparency, type PBRCapture, type PBRTransmission} from './shader.js';
 import {lightPBR} from '../../shared/pbr-hooks.js';
-export type {PBRLighting, PBRTransparency, PBRCapture, PBRTransmission} from './shader.js';
+export type {PBRLighting, PBRTransparency, PBRCapture, PBRTransmission, ExtendedPlan} from './shader.js';
 import {mipShader} from './mip.js';
 // Type only: PBRInstances and the EXT_mesh_gpu_instancing reader load with @margoengine/gltf-pro/instancing.
 import type {PBRInstances} from './instancing.js';
 import {packed, packPrimitive} from './pack.js';
 export {GLTFAsset} from './asset.js';
-export type {GLTFDocument, GLTFDecoderHooks, GLTFCompressedImage, GLTFImage} from './asset.js';
+export type {GLTFDocument, GLTFDecoderHooks, GLTFCompressedImage, GLTFImage, GLTFExtendedMaterials} from './asset.js';
 /** KHR_lights_punctual light on a scene node, as data. Intensity is candela (point, spot) or lux (directional); the light points down the node's -Z. */
 export interface GLTFLight {node:Mesh;nodeIndex:number;type:'directional'|'point'|'spot';color:number[];intensity:number;range?:number;innerConeAngle?:number;outerConeAngle?:number;name?:string}
 /** glTF camera on a scene node, as data; the camera looks down the node's -Z. */
@@ -25,7 +25,13 @@ export interface GLTFClusteredLight {position:[number,number,number];range:numbe
 /** What `applyGLTFLights` uses of @margoengine/clustered's `Clustered` (structural, so gltf-pro does not import it). */
 export interface GLTFLightReceiver {setLights(lights:GLTFClusteredLight[]):unknown;add(model:PBRModel):()=>void}
 export type GLTFLoadOptions = Omit<AssetOptions,'buffers'>;
-const srgbMaps=[0,4,9,12],normalMaps=[2,7],blended=(m:any)=>m.settings[0]===2||!!m.tint;
+const srgbMaps=[0,4,9,12,17],normalMaps=[2,7],blended=(m:any)=>m.settings[0]===2||!!m.tint;
+// An extended material's binding plan, by material object (progressive loading swaps in copies with fewer maps).
+const plans=new WeakMap<object,ExtendedPlan>();
+const planOf=(m:any,x:GLTFExtendedMaterials):ExtendedPlan=>{let plan=plans.get(m);if(!plan)plans.set(m,plan=x.plan(m.maps,m.extended));return plan;};
+// Map slot i of resource material m gets its own texture and sampler: base slots always; extension slots of extended
+// materials only when bound, once per shared glTF texture.
+const ownSlot=(m:any,i:number,x?:GLTFExtendedMaterials)=>{if(!m.extended||i<5)return true;const slots=planOf(m,x!).slots,j=slots[i];return j>=0&&slots.indexOf(j)===i;};
 // What a transparency hook takes over: plain alpha blending (transmission tints and custom render state keep the sorted path).
 const separable=(m:any)=>m.settings[0]===2&&!m.tint&&!m.renderState,transmits=(m:any)=>!!m.tint&&!m.renderState;
 // Names the material + effects combination instead of an invalid pipeline when the shader declares more sampled textures or
@@ -79,7 +85,7 @@ function preparedPrimitive(asset:GLTFAsset,p:any,data:PreparedGeometry,node:Mesh
   for(const map of m.maps)if(map){if(integer(map.texCoord??0,'texture coordinate')>1)throw new RangeError('Invalid prepared PBR UV set');entry(asset.doc.textures,map.index,'texture');}
   return {node,nodeIndex,vertices,indices,definition:p,material:m,weights:new Float32Array(0),targetNames:[]};
 }
-interface DrawResource {primitive:PBRPrimitive;vertex:GPUBuffer;index:GPUBuffer;uniform:GPUBuffer;volume?:GPUBuffer;values:Float32Array;groups:Map<GPURenderPipeline,[GPUBindGroup,GPUBindGroup]>;views:GPUTextureView[];samplers:GPUSampler[]}
+interface DrawResource {primitive:PBRPrimitive;vertex:GPUBuffer;index:GPUBuffer;uniform:GPUBuffer;volume?:GPUBuffer;values:Float32Array;groups:Map<GPURenderPipeline,GPUBindGroup[]>;views:GPUTextureView[];samplers:GPUSampler[]}
 /** A lighting or shading effect for `addLighting`: `pbr` hooks (lighting; preferred) or a `shader` text patch (materials, LOD baking). */
 export interface LightingEffect {readonly owner?:Engine;pbr?(group:number):PBRLighting|undefined;shader?(source:string,group:number):string;bindings():GPUBindGroupEntry[]}
 let modelId = 0;
@@ -95,14 +101,19 @@ export function textureTransform(x:TextureTransform={},texCoord=0):number[] {
   const [ox,oy]=vector(x.offset??[0,0],2,'texture offset'),[sx,sy]=vector(x.scale??[1,1],2,'texture scale'),r=scalar(x.rotation??0,-Infinity,Infinity,'texture rotation'),c=Math.cos(r),s=Math.sin(r);
   return [c*sx,s*sy,ox,texCoord,-s*sx,c*sy,oy,0];
 }
-function material(def:any = {}): any {
+// `extended`: decoders.materials (@margoengine/gltf-pro/extended), which reads iridescence, anisotropy and diffuse
+// transmission; without it they are ignored, as glTF allows for an optional extension.
+function material(def:any = {},extended?:GLTFExtendedMaterials): any {
   const p=def.pbrMetallicRoughness??{}, alpha=def.alphaMode??'OPAQUE', e=def.extensions??{};
   if (!['OPAQUE','MASK','BLEND'].includes(alpha)) throw new TypeError('Invalid glTF alpha mode');
   if (def.doubleSided!==undefined&&typeof def.doubleSided!=='boolean') throw new TypeError('Invalid glTF doubleSided');
-  const cc=e.KHR_materials_clearcoat,tr=e.KHR_materials_transmission,sh=e.KHR_materials_sheen,sp=e.KHR_materials_specular,vo=e.KHR_materials_volume,physical=!!(cc||tr||sh||sp||vo||e.KHR_materials_ior);
+  const cc=e.KHR_materials_clearcoat,tr=e.KHR_materials_transmission,sh=e.KHR_materials_sheen,sp=e.KHR_materials_specular,vo=e.KHR_materials_volume;
   const base=vector(p.baseColorFactor??[1,1,1,1],4,'base color',0,1),transmission=scalar(tr?.transmissionFactor??0,0,1,'transmission'),strength=scalar(e.KHR_materials_emissive_strength?.emissiveStrength??1,0,Infinity,'emissive strength');
   const attenuation=vector(vo?.attenuationColor??[1,1,1],3,'attenuation color',0,1),thickness=scalar(vo?.thicknessFactor??0,0,Infinity,'thickness'),distance=vo?.attenuationDistance===undefined?Infinity:scalar(vo.attenuationDistance,Number.MIN_VALUE,Infinity,'attenuation distance'),depth=thickness/distance;
-  const maps=[p.baseColorTexture,p.metallicRoughnessTexture,def.normalTexture,def.occlusionTexture,def.emissiveTexture,...physical?[cc?.clearcoatTexture,cc?.clearcoatRoughnessTexture,cc?.clearcoatNormalTexture,tr?.transmissionTexture,sh?.sheenColorTexture,sh?.sheenRoughnessTexture,sp?.specularTexture,sp?.specularColorTexture]:[]]
+  // Extended materials: thin film, anisotropy or diffuse transmission in use (factor > 0); maps 13-17 and three more uniform rows.
+  const x=extended?.parse(e),physical=!!(x||cc||tr||sh||sp||vo||e.KHR_materials_ior);
+  const maps=[p.baseColorTexture,p.metallicRoughnessTexture,def.normalTexture,def.occlusionTexture,def.emissiveTexture,...physical?[cc?.clearcoatTexture,cc?.clearcoatRoughnessTexture,cc?.clearcoatNormalTexture,tr?.transmissionTexture,sh?.sheenColorTexture,sh?.sheenRoughnessTexture,sp?.specularTexture,sp?.specularColorTexture]:[],
+    ...x?x.maps:[]]
     .map(t=>t?.extensions?.KHR_texture_transform?.texCoord===undefined?t:{...t,texCoord:t.extensions.KHR_texture_transform.texCoord});
   return {...def,base,
     factors:[scalar(p.roughnessFactor??1,0,1,'roughness'),scalar(p.metallicFactor??1,0,1,'metallic'),scalar(def.normalTexture?.scale??1,-Infinity,Infinity,'normal scale'),scalar(def.occlusionTexture?.strength??1,0,1,'occlusion strength')],
@@ -113,7 +124,8 @@ function material(def:any = {}): any {
     uvt:maps.flatMap(t=>textureTransform(t?.extensions?.KHR_texture_transform??{},t?.texCoord??0)),
     ext:[+!!e.KHR_materials_unlit,scalar(e.KHR_materials_ior?.ior??1.5,0,Infinity,'ior'),0,0],
     physical:physical?[scalar(cc?.clearcoatFactor??0,0,1,'clearcoat'),scalar(cc?.clearcoatRoughnessFactor??0,0,1,'clearcoat roughness'),scalar(cc?.clearcoatNormalTexture?.scale??1,-Infinity,Infinity,'clearcoat normal scale'),transmission,
-      ...vector(sp?.specularColorFactor??[1,1,1],3,'specular color',0),scalar(sp?.specularFactor??1,0,1,'specular'),...vector(sh?.sheenColorFactor??[0,0,0],3,'sheen color',0,1),scalar(sh?.sheenRoughnessFactor??0,0,1,'sheen roughness')]:undefined,
+      ...vector(sp?.specularColorFactor??[1,1,1],3,'specular color',0),scalar(sp?.specularFactor??1,0,1,'specular'),...vector(sh?.sheenColorFactor??[0,0,0],3,'sheen color',0,1),scalar(sh?.sheenRoughnessFactor??0,0,1,'sheen roughness'),...x?x.rows:[]]:undefined,
+    extended:x?.features,
     // Transmission blends the background by this per-material tint (base color, Beer-Lambert volume attenuation at thicknessFactor).
     tint:transmission?base.slice(0,3).map((v,i)=>v*transmission*attenuation[i]**depth):undefined,
     // Transmission hook only: thickness (mesh space) and transmittance per world unit, attenuationColor^(1/attenuationDistance).
@@ -122,19 +134,25 @@ function material(def:any = {}): any {
 function primitive(asset:GLTFAsset, p:any, node:Mesh, nodeIndex:number, mesh:any, materials:any[], packs:Map<object,PreparedGeometry>):PBRPrimitive {
   // Packing depends only on the primitive definition, so nodes sharing a mesh share its arrays (and GPU buffers, keyed by array).
   let g=packed.get(p)??packs.get(p);if(!g)packs.set(p,g=packPrimitive(asset,p));
-  const {vertices,indices}=g,a=p.attributes??{};
-  const m=p.material===undefined?material():materials[integer(p.material,'material')]; if(!m) throw new TypeError('Missing glTF material');
+  const {vertices,indices}=g;
+  const m=fit(asset,p,p.material===undefined?material():materials[integer(p.material,'material')],!!g.topology);
+  const targets=p.targets??[];if(!Array.isArray(targets))throw new TypeError('Invalid morph targets');
+  const weights=vector(asset.doc.nodes[nodeIndex].weights??mesh.weights??Array(targets.length).fill(0),targets.length,'morph weights');
+  const made:PBRPrimitive={node,nodeIndex,vertices,indices,definition:p,material:m,weights:Float32Array.from(weights),targetNames:targets.map((_:unknown,i:number)=>mesh.extras?.targetNames?.[i]??'Target '+i)};
+  if(g.topology)made.topology=g.topology;
+  return made;
+}
+// Material `m` as primitive `p` draws it: every map must name a texture and a UV set the primitive has. glTF 2.0 3.9.2:
+// points and lines without NORMAL are rendered without lighting (here: the base colour, as KHR_materials_unlit).
+function fit(asset:GLTFAsset,p:any,m:any,pointsOrLines:boolean):any {
+  if(!m) throw new TypeError('Missing glTF material');
+  const a=p.attributes??{};
   for (const map of m.maps) if(map) {
     const set=integer(map.texCoord??0,'texture coordinate');
     if(set>1||a[set===0?'TEXCOORD_0':'TEXCOORD_1']===undefined) throw new Error('Material requires available TEXCOORD_0 or TEXCOORD_1');
     entry(asset.doc.textures,map.index,'texture');
   }
-  const targets=p.targets??[];if(!Array.isArray(targets))throw new TypeError('Invalid morph targets');
-  const weights=vector(asset.doc.nodes[nodeIndex].weights??mesh.weights??Array(targets.length).fill(0),targets.length,'morph weights');
-  const made:PBRPrimitive={node,nodeIndex,vertices,indices,definition:p,material:m,weights:Float32Array.from(weights),targetNames:targets.map((_:unknown,i:number)=>mesh.extras?.targetNames?.[i]??'Target '+i)};
-  // glTF 2.0 3.9.2: points and lines without NORMAL are rendered without lighting (here: the base colour, as KHR_materials_unlit).
-  if(g.topology){made.topology=g.topology;if(a.NORMAL===undefined)made.material={...m,ext:[1,...m.ext.slice(1)]};}
-  return made;
+  return pointsOrLines&&a.NORMAL===undefined?{...m,ext:[1,...m.ext.slice(1)]}:m;
 }
 function transform(node:Mesh,def:any):void {
   if(def.matrix!==undefined) {
@@ -160,6 +178,9 @@ export class PBRModel implements EnginePlugin {
    * read as triangles. Empty for `@margoengine/gltf-pro/progressive` loads, which leave points and lines out.
    */
   readonly pointsAndLines:PBRPrimitive[]=[];
+  /** KHR_materials_variants names in file order (empty without the extension); `selectVariant` takes a name or its index. */
+  readonly variants:readonly string[];
+  private readonly materials:any[];private readonly defaults=new Map<PBRPrimitive,any>();
   disposed=false;private readonly created:Mesh[]=[];private resources:DrawResource[]=[];private textures:GPUTexture[]=[];
   private pipelines=new Map<string,GPURenderPipeline>();private readonly gpuCache=new Map<unknown,any>();private readonly inverse=new Float32Array(16);private readonly workspace=new Float64Array(52);private readonly view=new Float32Array(16);
   private engine:Engine;private readonly cleanupCallbacks=new Set<()=>void>();
@@ -167,7 +188,10 @@ export class PBRModel implements EnginePlugin {
   private readonly lightingGroups=new Map<GPURenderPipeline,{entries:GPUBindGroupEntry[];group:GPUBindGroup}>();private transparency?:PBRTransparency;private capture?:PBRCapture;private transmission?:PBRTransmission;
   constructor(instance:EngineKernel,readonly asset:GLTFAsset,private readonly images:readonly GLTFImage[]=[],prepared?:readonly (readonly PreparedGeometry[])[]) {
     this.engine=engineRuntime(instance);
-    const doc=asset.doc,defs=doc.nodes??[],parents=new Int32Array(defs.length).fill(-1),materials=(doc.materials??[]).map(material);
+    const doc=asset.doc,defs=doc.nodes??[],parents=new Int32Array(defs.length).fill(-1),materials=this.materials=(doc.materials??[]).map((def:any)=>material(def,asset.hooks.materials));
+    const variants=doc.extensions?.KHR_materials_variants?.variants??[];
+    if(!Array.isArray(variants)||variants.some((v:any)=>typeof v?.name!=='string'))throw new TypeError('Invalid glTF material variants');
+    this.variants=variants.map((v:any)=>v.name);
     defs.forEach((def:any,id:number)=>{
       if(!def||def.children!==undefined&&!Array.isArray(def.children))throw new TypeError('Invalid glTF node');
       for(const child of def.children??[]) {const c=integer(child,'child');if(c>=defs.length||parents[c]!==-1||c===id)throw new Error('Invalid glTF hierarchy');parents[c]=id;}
@@ -218,44 +242,51 @@ export class PBRModel implements EnginePlugin {
       try{device.queue.writeBuffer(b,0,data as Float32Array<ArrayBuffer>);}catch(e){b.destroy();throw e;}cache.set(data,b);return b;
     };
     for(const p of this.pointsAndLines.length?[...this.primitives,...this.pointsAndLines]:this.primitives) {
-      const r:DrawResource={primitive:p,vertex:undefined!,index:undefined!,uniform:undefined!,values:new Float32Array(220),groups:new Map(),views:[],samplers:[]};
+      const r:DrawResource={primitive:p,vertex:undefined!,index:undefined!,uniform:undefined!,values:undefined!,groups:new Map(),views:[],samplers:[]};
       this.resources.push(r);r.vertex=upload(p.vertices,GPUBufferUsage.VERTEX|GPUBufferUsage.STORAGE);r.index=upload(p.indices,GPUBufferUsage.INDEX);p.buffers={vertex:r.vertex,index:r.index};
-      r.uniform=device.createBuffer({size:880,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
-      for(let i=0;i<p.material.maps.length;i++) {
-        const map=p.material.maps[i],def=map?entry(this.asset.doc.textures,map.index,'texture'):null;
-        // KHR_texture_basisu, EXT_texture_webp and EXT_texture_avif sources win when decoded; otherwise the fallback source.
-        const source=def?['KHR_texture_basisu','EXT_texture_webp','EXT_texture_avif'].map(k=>def.extensions?.[k]?.source).find(s=>s!==undefined&&this.images[s])??integer(def.source,'image'):-1,image=this.images[source];
-        if(def&&!image)throw new TypeError('Missing decoded glTF image');
-        const compressed=image&&'mipmaps' in image?image:undefined,format=compressed?compressed.format:srgbMaps.includes(i)?'rgba8unorm-srgb':'rgba8unorm',size=image?[image.width,image.height]:[1,1];
-        if(size.some(n=>n>device.limits.maxTextureDimension2D))throw new RangeError('Image exceeds device limit');
-        const key=image?source+':'+format:'default:'+i;
-        let texture:GPUTexture=cache.get(key);
-        if(!texture) {
-          const levels=compressed?compressed.mipmaps.length:image?Math.floor(Math.log2(Math.max(...size)))+1:1;
-          texture=device.createTexture({size,format,mipLevelCount:levels,usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST|(compressed?0:GPUTextureUsage.RENDER_ATTACHMENT)});
-          this.textures.push(texture);cache.set(key,texture);
-          // Transcoded mips upload as-is: rgba8 rows, or 16-byte 4x4 blocks (BC7, ASTC 4x4, ETC2 RGBA8).
-          if(compressed){const block=format.startsWith('rgba')?1:4,target=texture;compressed.mipmaps.forEach((m,mipLevel)=>{const w=Math.ceil(m.width/block),h=Math.ceil(m.height/block);device.queue.writeTexture({texture:target,mipLevel},m.data as Uint8Array<ArrayBuffer>,{bytesPerRow:w*(block>1?16:4),rowsPerImage:h},[w*block,h*block]);});}
-          else if(image)device.queue.copyExternalImageToTexture({source:image as ImageBitmap},{texture},size);
-          else device.queue.writeTexture({texture},new Uint8Array(normalMaps.includes(i)?[128,128,255,255]:[255,255,255,255]),{bytesPerRow:4},[1,1]);
-          if(levels>1&&!compressed) {
-            let pipeline:GPURenderPipeline=cache.get(format);
-            if(!pipeline){const module=device.createShaderModule({code:mipShader});pipeline=device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format}]}});cache.set(format,pipeline);}
-            const encoder=device.createCommandEncoder();
-            for(let level=1;level<levels;level++){
-              const group=device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView({baseMipLevel:level-1,mipLevelCount:1})},{binding:1,resource:mipSampler}]});
-              const pass=encoder.beginRenderPass({colorAttachments:[{view:texture.createView({baseMipLevel:level,mipLevelCount:1}),loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:0}}]});
-              pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.draw(3);pass.end();
-            }
-            device.queue.submit([encoder.finish()]);
+      this.bindMaterial(r,device,mipSampler);
+    }
+  }
+  // The material's uniform buffer (880 bytes, 1088 for extended materials), textures and samplers; again after a variant switch.
+  private bindMaterial(r:DrawResource,device:GPUDevice,mipSampler:GPUSampler):void {
+    const m=r.primitive.material,floats=m.extended?272:220,cache=this.gpuCache;
+    if(r.values?.length!==floats){r.uniform?.destroy();r.values=new Float32Array(floats);r.uniform=device.createBuffer({size:floats*4,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});}
+    r.views=[];r.samplers=[];r.groups.clear();
+    for(let i=0;i<m.maps.length;i++) {
+      if(!ownSlot(m,i,this.asset.hooks.materials)){r.views.push(undefined!);r.samplers.push(undefined!);continue;}
+      const map=m.maps[i],def=map?entry(this.asset.doc.textures,map.index,'texture'):null;
+      // KHR_texture_basisu, EXT_texture_webp and EXT_texture_avif sources win when decoded; otherwise the fallback source.
+      const source=def?['KHR_texture_basisu','EXT_texture_webp','EXT_texture_avif'].map(k=>def.extensions?.[k]?.source).find(s=>s!==undefined&&this.images[s])??integer(def.source,'image'):-1,image=this.images[source];
+      if(def&&!image)throw new TypeError('Missing decoded glTF image');
+      const compressed=image&&'mipmaps' in image?image:undefined,format=compressed?compressed.format:srgbMaps.includes(i)?'rgba8unorm-srgb':'rgba8unorm',size=image?[image.width,image.height]:[1,1];
+      if(size.some(n=>n>device.limits.maxTextureDimension2D))throw new RangeError('Image exceeds device limit');
+      const key=image?source+':'+format:'default:'+i;
+      let texture:GPUTexture=cache.get(key);
+      if(!texture) {
+        const levels=compressed?compressed.mipmaps.length:image?Math.floor(Math.log2(Math.max(...size)))+1:1;
+        texture=device.createTexture({size,format,mipLevelCount:levels,usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST|(compressed?0:GPUTextureUsage.RENDER_ATTACHMENT)});
+        this.textures.push(texture);cache.set(key,texture);
+        // Transcoded mips upload as-is: rgba8 rows, or 16-byte 4x4 blocks (BC7, ASTC 4x4, ETC2 RGBA8).
+        if(compressed){const block=format.startsWith('rgba')?1:4,target=texture;compressed.mipmaps.forEach((m,mipLevel)=>{const w=Math.ceil(m.width/block),h=Math.ceil(m.height/block);device.queue.writeTexture({texture:target,mipLevel},m.data as Uint8Array<ArrayBuffer>,{bytesPerRow:w*(block>1?16:4),rowsPerImage:h},[w*block,h*block]);});}
+        else if(image)device.queue.copyExternalImageToTexture({source:image as ImageBitmap},{texture},size);
+        else device.queue.writeTexture({texture},new Uint8Array(normalMaps.includes(i)?[128,128,255,255]:[255,255,255,255]),{bytesPerRow:4},[1,1]);
+        if(levels>1&&!compressed) {
+          let pipeline:GPURenderPipeline=cache.get(format);
+          if(!pipeline){const module=device.createShaderModule({code:mipShader});pipeline=device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format}]}});cache.set(format,pipeline);}
+          const encoder=device.createCommandEncoder();
+          for(let level=1;level<levels;level++){
+            const group=device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView({baseMipLevel:level-1,mipLevelCount:1})},{binding:1,resource:mipSampler}]});
+            const pass=encoder.beginRenderPass({colorAttachments:[{view:texture.createView({baseMipLevel:level,mipLevelCount:1}),loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:0}}]});
+            pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.draw(3);pass.end();
           }
+          device.queue.submit([encoder.finish()]);
         }
-        r.views.push(texture.createView());
-        const s=def?.sampler===undefined?{}:entry(this.asset.doc.samplers,def.sampler,'sampler');
-        const wrap=(v:any)=>{if(v===undefined||v===10497)return 'repeat';if(v===33071)return 'clamp-to-edge';if(v===33648)return 'mirror-repeat';throw new TypeError('Invalid texture wrapping');};
-        if(s.magFilter!==undefined&&![9728,9729].includes(s.magFilter)||s.minFilter!==undefined&&![9728,9729,9984,9985,9986,9987].includes(s.minFilter))throw new TypeError('Invalid texture filter');
-        r.samplers.push(device.createSampler({addressModeU:wrap(s.wrapS),addressModeV:wrap(s.wrapT),magFilter:s.magFilter===9728?'nearest':'linear',minFilter:[9728,9984,9986].includes(s.minFilter)?'nearest':'linear',mipmapFilter:[9984,9985].includes(s.minFilter)?'nearest':'linear',lodMaxClamp:[9728,9729].includes(s.minFilter)?0:32}));
       }
+      r.views.push(texture.createView());
+      const s=def?.sampler===undefined?{}:entry(this.asset.doc.samplers,def.sampler,'sampler');
+      const wrap=(v:any)=>{if(v===undefined||v===10497)return 'repeat';if(v===33071)return 'clamp-to-edge';if(v===33648)return 'mirror-repeat';throw new TypeError('Invalid texture wrapping');};
+      if(s.magFilter!==undefined&&![9728,9729].includes(s.magFilter)||s.minFilter!==undefined&&![9728,9729,9984,9985,9986,9987].includes(s.minFilter))throw new TypeError('Invalid texture filter');
+      r.samplers.push(device.createSampler({addressModeU:wrap(s.wrapS),addressModeV:wrap(s.wrapT),magFilter:s.magFilter===9728?'nearest':'linear',minFilter:[9728,9984,9986].includes(s.minFilter)?'nearest':'linear',mipmapFilter:[9984,9985].includes(s.minFilter)?'nearest':'linear',lodMaxClamp:[9728,9729].includes(s.minFilter)?0:32}));
     }
   }
   registerPasses(graph:FrameGraph):void {graph.add({name:this.name,order:1,execute:c=>{if(c.backend==='webgpu')this.draw(c,'beauty',c.color,c.depth);}});}
@@ -278,6 +309,30 @@ export class PBRModel implements EnginePlugin {
   setTransmission(hook:PBRTransmission):()=>void {
     if(this.disposed||!hook||typeof hook.declarations!=='function'||typeof hook.bindings!=='function'||typeof hook.begin!=='function'||!Array.isArray(hook.targets))throw new TypeError('Invalid PBR transmission hook');
     this.transmission=hook;return()=>{if(this.transmission===hook)this.transmission=undefined;};
+  }
+  /**
+   * Shows a KHR_materials_variants variant (a name from `variants` or its index): every primitive with a mapping for it draws
+   * that material, the others their own (the glTF fallback); `undefined` restores every primitive's own material. A variant's
+   * textures upload on first use and stay cached. With `@margoengine/gltf-pro/progressive`, call it after `complete`.
+   */
+  selectVariant(variant?:string|number):void {
+    const index=typeof variant==='string'?this.variants.indexOf(variant):variant??-1;
+    if(this.disposed||variant!==undefined&&!(Number.isInteger(index)&&index>=0&&index<this.variants.length))throw new RangeError(`selectVariant: the model has no material variant ${variant}`);
+    // Every material is resolved (and validated) before any primitive changes.
+    const changes:[PBRPrimitive,any][]=[];
+    for(const p of [...this.primitives,...this.pointsAndLines]){
+      const mappings=p.definition.extensions?.KHR_materials_variants?.mappings;if(mappings===undefined)continue;
+      if(!Array.isArray(mappings))throw new TypeError('Invalid glTF material variant mappings');
+      const own=this.defaults.get(p)??p.material,hit=mappings.find((m:any)=>Array.isArray(m?.variants)&&m.variants.includes(index));
+      const m=hit?fit(this.asset,p.definition,this.materials[integer(hit.material,'material')],!!p.topology):own;
+      if(m!==p.material)changes.push([p,m]);
+    }
+    const device=this.engine.gpu,resources=new Map(this.resources.map(r=>[r.primitive,r]));let mipSampler:GPUSampler|undefined;
+    for(const [p,m] of changes){
+      if(!this.defaults.has(p))this.defaults.set(p,p.material);
+      p.material=m;const r=resources.get(p);
+      if(r&&device)this.bindMaterial(r,device,mipSampler??=device.createSampler({minFilter:'linear',magFilter:'linear'}));
+    }
   }
   get shadowPrimitives() {
     return this.resources.filter(r=>r.primitive.material.settings[0]!==2&&!r.primitive.topology).map(r=>({node:r.primitive.node,vertex:r.primitive.deformed??r.vertex,index:r.index,count:r.primitive.indices.length,stride:80,
@@ -312,11 +367,17 @@ export class PBRModel implements EnginePlugin {
       // coordsA/coordsB.x name each base map's slot; uv() reads that slot's KHR_texture_transform row, which carries its UV set.
       for(let i=0;i<5;i++)v[92+i]=i;
       const a=node.matrix;v[97]=Math.sign(a[0]*(a[5]*a[10]-a[6]*a[9])-a[4]*(a[1]*a[10]-a[2]*a[9])+a[8]*(a[1]*a[6]-a[2]*a[5]));
-      v.set(m.ext,100);v.set(m.uvt,104);if(m.physical)v.set(m.physical,208);
+      v.set(m.ext,100);v.set(m.uvt,104);if(m.physical)v.set(m.physical,m.extended?248:208);
+      // Physical rows follow 26 UV rows (36 for extended materials); factor-only materials (five maps) use the same layout.
+      // The transmission tint (margoTint) in spare Frame lanes coordsB.zw and ext.z; zero for every other material.
+      if(m.tint){v[98]=m.tint[0];v[99]=m.tint[1];v[102]=m.tint[2];}
       c.device.queue.writeBuffer(r.uniform,0,v as Float32Array<ArrayBuffer>);
-      // Physical materials listing only the five core maps (materials built in code) draw the factor-only variant.
-      let code=m.physical?m.maps.length>5?physicalShader():factorPhysicalShader():pbrShader,entry=mode==='beauty'||transmission?'fragment':mode==='gbuffer'?'gbuffer':through?'transparent':capture?'capture':'ambientFragment',lit=mode==='beauty'||through||capture;
-      if(mode!=='gbuffer'&&this.lighting.size){let patched=code,ambient=false;
+      // Physical materials listing only the five core maps (materials built in code) draw the factor-only variant;
+      // transmission draws its transmissive form, extended materials the shader of decoders.materials.
+      const x=this.asset.hooks.materials,physical=m.physical?m.maps.length>5?physicalShader():factorPhysicalShader():pbrShader;
+      let code=m.extended?x!.shader(planOf(m,x!)):m.tint?transmissiveShader(physical):physical,entry=mode==='beauty'||transmission?'fragment':mode==='gbuffer'?'gbuffer':through?'transparent':capture?'capture':'ambientFragment',lit=mode==='beauty'||through||capture;
+      if(mode!=='gbuffer'&&this.lighting.size){
+        let patched=code,ambient=false;
         // Effects with `pbr` hooks compose at gltf-pro's hook points; others (materials, LOD baking) still patch the text.
         for(const effect of this.lighting){if(effect.pbr){const hooks=effect.pbr(2);if(hooks){patched=lightPBR(patched,hooks);ambient||=!!hooks.ambient;}}else patched=effect.shader!(patched,2);}
         // An `ambient` hook (environment IBL) is what SSAO's ambient replay returns from the lit fragment, `_=color` keeping every
@@ -332,20 +393,22 @@ export class PBRModel implements EnginePlugin {
       // Shader text enters the key as a small id: the code strings are cached objects, so the lookup hashes them once.
       // Discard only where it can happen: back faces are culled by the pipeline and only MASK materials alpha-test.
       const mask=+(m.settings[0]===1);let id=this.codes.get(code);if(id===undefined){if(this.codes.size>=256)this.codes.clear();this.codes.set(code,id=this.codeCount++);}
-      const transmit=!!m.tint,blend=blended(m),key=mode+':'+c.format+':'+blend+transmit+':'+cull+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+':'+entry+':'+id+':'+mask+(state?JSON.stringify(state):'')+(inst?':i'+face:'')+(p.topology?':'+p.topology:'');
+      const transmit=!!m.tint,blend=blended(m),tinted=transmit&&(mode==='beauty'||mode==='ambient')&&state?.blend===undefined,key=mode+':'+c.format+':'+blend+transmit+':'+cull+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+':'+entry+':'+id+':'+mask+(state?JSON.stringify(state):'')+(inst?':i'+face:'')+(p.topology?':'+p.topology:'');
       let pipeline=this.pipelines.get(key);
       if(!pipeline) {
-        checkLimits(c.device,code,()=>[m.physical?'physical material':'material',...transmission?['transmission']:[],...[...this.lighting].flatMap(e=>{const x=e as {name?:string;shadow?:{name?:string}};return [x.name??'shader patch',...x.shadow?.name?[x.shadow.name]:[]];})]);
+        checkLimits(c.device,code,()=>[m.extended?'extended material':m.physical?'physical material':'material',...transmission?['transmission']:[],...[...this.lighting].flatMap(e=>{const x=e as {name?:string;shadow?:{name?:string}};return [x.name??'shader patch',...x.shadow?.name?[x.shadow.name]:[]];})]);
         const module=c.device.createShaderModule({code}),format=mode==='beauty'?c.format:'rgba16float';
-        pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:80,attributes:Array.from({length:5},(_,i)=>({shaderLocation:i,offset:i*16,format:'float32x4' as const}))},...inst?[inst.layout]:[]]},
-          fragment:{module,entryPoint:entry,constants:{margoFaceTest:face,margoAlphaTest:mask},targets:through||capture?(through?oit!:hook!).targets as GPUColorTargetState[]:[{format,blend:state?.blend!==undefined?state.blend??undefined:blend&&mode!=='gbuffer'?{color:transmit?{srcFactor:'one',dstFactor:'constant'}:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
-          multisample:c.descriptor.multisample,primitive:p.topology?{topology:p.topology}:{cullMode:cull},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:state?.depthWrite??((mode==='beauty'||capture)&&!blend),depthCompare:state?.depthCompare??(mode==='beauty'||through||capture?'greater-equal':'equal')}});
-        this.pipelines.set(key,pipeline);
+        const descriptor:GPURenderPipelineDescriptor={layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:80,attributes:Array.from({length:5},(_,i)=>({shaderLocation:i,offset:i*16,format:'float32x4' as const}))},...inst?[inst.layout]:[]]},
+          fragment:{module,entryPoint:entry,constants:{margoFaceTest:face,margoAlphaTest:mask},targets:through||capture?(through?oit!:hook!).targets as GPUColorTargetState[]:[{format,blend:state?.blend!==undefined?state.blend??undefined:blend&&mode!=='gbuffer'?{color:transmit?{srcFactor:'one',dstFactor:'one'}:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
+          multisample:c.descriptor.multisample,primitive:p.topology?{topology:p.topology}:{cullMode:cull},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:state?.depthWrite??((mode==='beauty'||capture)&&!blend),depthCompare:state?.depthCompare??(mode==='beauty'||through||capture?'greater-equal':'equal')}};
+        pipeline=c.device.createRenderPipeline(descriptor);this.pipelines.set(key,pipeline);
+        // Transmission's first draw: what is behind times the tint (no blend constant, see below).
+        if(tinted)this.pipelines.set(key+':tint',c.device.createRenderPipeline({...descriptor,fragment:{module,entryPoint:'margoTint',targets:[{format,blend:{color:{srcFactor:'zero',dstFactor:'src'},alpha:{srcFactor:'zero',dstFactor:'one'}}}]}}));
       }
       let groups=r.groups.get(pipeline);
       if(!groups) {
         groups=[c.device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:r.uniform}},...transmission?[{binding:1,resource:{buffer:r.volume??=c.device.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST})}}]:[]]}),
-          c.device.createBindGroup({layout:pipeline.getBindGroupLayout(1),entries:r.views.flatMap((view,i)=>[{binding:i*2,resource:view},{binding:i*2+1,resource:r.samplers[i]}])})];
+          c.device.createBindGroup({layout:pipeline.getBindGroupLayout(1),entries:r.views.flatMap((view,i)=>{const b=i<5||!m.extended?i*2:10+planOf(m,x!).slots[i]*2;return view?[{binding:b,resource:view},{binding:b+1,resource:r.samplers[i]}]:[];})})];
         r.groups.set(pipeline,groups);
       }
       let target:GPURenderPassEncoder;
@@ -356,8 +419,16 @@ export class PBRModel implements EnginePlugin {
       target=pass??=c.encoder.beginRenderPass({colorAttachments:[{view:color,loadOp:'load',storeOp:'store'}],depthStencilAttachment:{view:depth,depthLoadOp:'load',depthStoreOp:'store',...(c.descriptor.depthStencil!.format.includes('stencil')?{stencilLoadOp:'load',stencilStoreOp:'store'}:{})}});
       }
       if(transmission)c.device.queue.writeBuffer(r.volume!,0,new Float32Array(m.volume));
+      // Transmission draws twice: margoTint multiplies the background by the tint, then the lit surface adds on top. One
+      // draw with a blend constant (dst x tint) rendered black behind the glass in Edge on an Arc 140V (D3D12, 4x MSAA): the
+      // constant read as 0 for pipelines used across frames (HANDOFF 5w.f).
+      if(tinted){
+        const tint=this.pipelines.get(key+':tint')!;let group=r.groups.get(tint);
+        if(!group){group=[c.device.createBindGroup({layout:tint.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:r.uniform}}]})];r.groups.set(tint,group);}
+        target.setPipeline(tint);target.setBindGroup(0,group[0]);target.setVertexBuffer(0,p.deformed??r.vertex);if(instances)target.setVertexBuffer(1,instances);target.setIndexBuffer(r.index,'uint32');
+        if(inst)target.drawIndexed(p.indices.length,inst.count);else target.drawIndexed(p.indices.length);
+      }
       target.setPipeline(pipeline);target.setBindGroup(0,groups[0]);target.setBindGroup(1,groups[1]);
-      if(transmit&&mode!=='gbuffer')target.setBlendConstant([...m.tint,1]);
       if(lit&&(this.lighting.size||through)){
         const entries=[...this.lighting].flatMap(effect=>effect.bindings());if(through)entries.push(...oit!.bindings());let cached=this.lightingGroups.get(pipeline);
         if(!cached||entries.length!==cached.entries.length||entries.some((entry,i)=>{
@@ -416,8 +487,8 @@ export class PBRModel implements EnginePlugin {
   /** @deprecated Use dispose(); kept as an alias until 1.0. */
   destroy():void {this.dispose();}
 }
-/** Synchronous parse of in-memory JSON/GLB with decoded `images`; `decoders` takes only the synchronous `instancing` reader; `maxNodes` as for loadGLTF. */
-export function parseGLTF(instance:EngineKernel,input:string|object|ArrayBuffer|ArrayBufferView,buffers:Array<ArrayBuffer|ArrayBufferView>=[],images:readonly ImageBitmap[]=[],decoders:Pick<GLTFDecoderHooks,'instancing'>={},{maxNodes}:Pick<AssetOptions,'maxNodes'>={}):PBRModel {
+/** Synchronous parse of in-memory JSON/GLB with decoded `images`; `decoders` takes only the synchronous `instancing` reader and the `materials` shaders; `maxNodes` as for loadGLTF. */
+export function parseGLTF(instance:EngineKernel,input:string|object|ArrayBuffer|ArrayBufferView,buffers:Array<ArrayBuffer|ArrayBufferView>=[],images:readonly ImageBitmap[]=[],decoders:Pick<GLTFDecoderHooks,'instancing'|'materials'>={},{maxNodes}:Pick<AssetOptions,'maxNodes'>={}):PBRModel {
   const {doc,binary}=container(input),model=new PBRModel(instance,new GLTFAsset(doc,buffers,binary,decoders,undefined,maxNodes),images);
   try{engineRuntime(instance).use(model);return model;}catch(error){model.dispose();throw error;}
 }

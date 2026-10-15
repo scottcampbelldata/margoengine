@@ -19,6 +19,13 @@ export type GLTFDocument = Record<string, any>;
 
 // Not exported from this entry, but used by the exports above:
 
+interface ExtendedPlan {
+    readonly slots: readonly number[];
+    readonly iridescence: boolean;
+    readonly anisotropy: boolean;
+    readonly diffuseTransmission: boolean;
+}
+
 interface GLTFCompressedImage {
     width: number;
     height: number;
@@ -58,6 +65,19 @@ interface GLTFDecoderHooks {
     instancing?: {
         read(asset: GLTFAsset, extension: any): PBRInstances;
     };
+    materials?: GLTFExtendedMaterials;
+}
+
+interface GLTFExtendedMaterials {
+    parse(extensions: Record<string, any>): {
+        features: Omit<ExtendedPlan, 'slots'>;
+        maps: unknown[];
+        rows: number[];
+    } | undefined;
+    plan(maps: readonly ({
+        index: number;
+    } | undefined)[], features: Omit<ExtendedPlan, 'slots'>): ExtendedPlan;
+    shader(plan: ExtendedPlan): string;
 }
 
 class PBRInstances {

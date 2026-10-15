@@ -137,7 +137,9 @@ for (const samples of [4, 1]) test(`Transmission refracts materials glass and gl
   assert.equal(passes(frame(3)).filter(p => p.label?.startsWith('transmission')).length, 0);
   // Dispose restores the tinted blend (beauty draws them again).
   glass.root.visible = true; transmission.dispose();
-  const after = frame(4); assert.equal(passes(after).filter(p => p.label?.startsWith('transmission')).length, 0); assert.equal(of(after, 'pass.setBlendConstant').length, 1);
+  // Tinted blend (gltf-pro 5w.f): a margoTint draw multiplies the background, then the lit glass adds on; no blend constant.
+  const after = frame(4); assert.equal(passes(after).filter(p => p.label?.startsWith('transmission')).length, 0); assert.equal(of(after, 'pass.setBlendConstant').length, 0);
+  assert.equal(of(after, 'pass.drawIndexed').length, 3, 'opaque mesh, then the glass twice (tint, lit)');
 });
 
 test('Transmission needs an HDR scene capture', async () => {

@@ -6,7 +6,7 @@ import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {extname, resolve} from 'node:path';
 import {GLTFAsset, PBRModel, parseGLTF, parseGLTFAsync} from '../dist/index.js';
-import {pbrShader, physicalShader as physical, transparentPBR, capturePBR} from '../src/shader.ts';
+import {pbrShader, physicalShader as physical, transmissiveShader, transparentPBR, capturePBR} from '../src/shader.ts';
 import {lightPBR} from '../../shared/pbr-hooks.js';
 import {Engine, TransformStore} from '../../core/dist/extension.js';
 import {MeshoptDecoder} from '../../decoders/dist/index.js';
@@ -210,10 +210,11 @@ test('physical extensions select the physical shader variant, its maps and the t
     close(glass.tint, [0.5 * 0.9, 0.9 * 0.25, 0.9 * 0.0625]);
     const calls = draw(model), pipelines = calls.filter(c => c[0] === 'pipeline').map(c => c[1]), groups = calls.filter(c => c[0] === 'group' && c[1] === 1).map(c => c[2].entries.length);
     assert.equal(pipelines[0].vertex.module.code, pbrShader, 'opaque plain material draws first with the unchanged base shader');
-    assert.equal(pipelines[1].vertex.module.code, physicalShader);
+    // Transmission (5w.f): the transmissive physical variant, drawn twice: the background times the tint, then the lit surface added.
+    assert.equal(pipelines[1].vertex.module.code, transmissiveShader()); assert.equal(pipelines[2].vertex.module, pipelines[1].vertex.module);
+    assert.deepEqual(pipelines.slice(1).map(p => [p.fragment.entryPoint, p.fragment.targets[0].blend.color]), [['margoTint', {srcFactor: 'zero', dstFactor: 'src'}], ['fragment', {srcFactor: 'one', dstFactor: 'one'}]]);
     assert.deepEqual(groups, [10, 26]);
-    assert.deepEqual(pipelines[1].fragment.targets[0].blend.color, {srcFactor: 'one', dstFactor: 'constant'}); assert.equal(pipelines[1].depthStencil.depthWriteEnabled, false);
-    close(calls.find(c => c[0] === 'constant')[1], [...glass.tint, 1]);
+    assert.equal(pipelines[2].depthStencil.depthWriteEnabled, false); assert.ok(!calls.some(c => c[0] === 'constant'), 'no blend constant');
     const formats = h.resources.filter(r => r.format).map(r => r.format);
     assert.equal(formats.filter(f => f === 'rgba8unorm-srgb').length, 4, 'base, emissive and specular-color defaults plus the sheen color image');
     const uniform = new Float32Array(calls.filter(c => c[0] === 'group' && c[1] === 0)[1][2].entries[0].resource.buffer.data);

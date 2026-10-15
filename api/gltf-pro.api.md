@@ -6,6 +6,13 @@
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 
+export interface ExtendedPlan {
+    readonly slots: readonly number[];
+    readonly iridescence: boolean;
+    readonly anisotropy: boolean;
+    readonly diffuseTransmission: boolean;
+}
+
 export class GLTFAsset {
     readonly doc: GLTFDocument;
     readonly hooks: GLTFDecoderHooks;
@@ -86,9 +93,22 @@ export interface GLTFDecoderHooks {
     instancing?: {
         read(asset: GLTFAsset, extension: any): PBRInstances;
     };
+    materials?: GLTFExtendedMaterials;
 }
 
 export type GLTFDocument = Record<string, any>;
+
+export interface GLTFExtendedMaterials {
+    parse(extensions: Record<string, any>): {
+        features: Omit<ExtendedPlan, 'slots'>;
+        maps: unknown[];
+        rows: number[];
+    } | undefined;
+    plan(maps: readonly ({
+        index: number;
+    } | undefined)[], features: Omit<ExtendedPlan, 'slots'>): ExtendedPlan;
+    shader(plan: ExtendedPlan): string;
+}
 
 export type GLTFImage = ImageBitmap | GLTFCompressedImage | undefined;
 
@@ -149,6 +169,7 @@ export class PBRModel implements EnginePlugin {
     readonly lights: GLTFLight[];
     readonly cameras: GLTFCamera[];
     readonly pointsAndLines: PBRPrimitive[];
+    readonly variants: readonly string[];
     disposed: boolean;
     constructor(instance: EngineKernel, asset: GLTFAsset, images?: readonly GLTFImage[], prepared?: readonly (readonly PreparedGeometry[])[]);
     setup(engine: Engine): void;
@@ -157,6 +178,7 @@ export class PBRModel implements EnginePlugin {
     setTransparency(hook: PBRTransparency): () => void;
     setCapture(hook: PBRCapture): () => void;
     setTransmission(hook: PBRTransmission): () => void;
+    selectVariant(variant?: string | number): void;
     get shadowPrimitives(): {
         node: Mesh;
         vertex: GPUBuffer;
@@ -238,7 +260,7 @@ export function applyGLTFLights(model: PBRModel, { clustered, exposure }?: {
 
 export function loadGLTF(instance: EngineKernel, url: string | URL, options?: GLTFLoadOptions): Promise<PBRModel>;
 
-export function parseGLTF(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, images?: readonly ImageBitmap[], decoders?: Pick<GLTFDecoderHooks, 'instancing'>, { maxNodes }?: Pick<AssetOptions, 'maxNodes'>): PBRModel;
+export function parseGLTF(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, images?: readonly ImageBitmap[], decoders?: Pick<GLTFDecoderHooks, 'instancing' | 'materials'>, { maxNodes }?: Pick<AssetOptions, 'maxNodes'>): PBRModel;
 
 export function parseGLTFAsync(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, options?: AssetOptions): Promise<PBRModel>;
 

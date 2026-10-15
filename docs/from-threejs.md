@@ -1119,8 +1119,8 @@ From [`docs/threejs-parity.md`](threejs-parity.md). Each would be an optional pa
 | WebGL2 for optional packages | Missing: core meshes, controls, labels, viewcube, bvh, LOD distance levels and the small glTF loader run on WebGL2; the rest needs WebGPU |
 | More than one directional light, coloured ambient, configurable `HemisphereLight`, IES lights | Missing; point, spot and rectangle area lights via clustered, a fixed hemisphere fill in glTF-pro |
 | `ShadowMaterial` on any mesh | Missing (`@margoengine/staging` ContactShadows is a ground shadow catcher for product shots) |
-| glTF `KHR_animation_pointer`, iridescence, anisotropy, dispersion, material variants; applying glTF cameras | Missing (files that require them are rejected; cameras are exposed as data) |
 | Lambert, Phong, depth materials, physical maps, iridescence, anisotropy, dispersion on your own meshes | Missing (physical factors and refracting transmission exist: materials physical options, `@margoengine/materials/transmission`) |
+| glTF `KHR_animation_pointer`, dispersion | Missing (files that require them are rejected); iridescence, anisotropy and diffuse transmission (`@margoengine/gltf-pro/extended`), material variants (`selectVariant`) and glTF cameras (`viewGLTFCamera`) are supported |
 | Second UV set, geometry groups and custom attributes on your own meshes | Missing |
 | Standalone KTX2 or float/3D/array data textures on your own meshes | Missing (KTX2 works inside glTF; materials takes RGBA8 data) |
 | SMAA, GTAO, SSGI, motion blur, lens flare, glitch, afterimage | Missing (FXAA, TAA, SSAO, SSR, bloom, DOF are there) |
