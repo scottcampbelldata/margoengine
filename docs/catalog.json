@@ -1052,7 +1052,7 @@
     "package": "@margoengine/procedural",
     "version": "0.1.0",
     "published": false,
-    "description": "Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces and seeded 3D noise.",
+    "description": "Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems and Voronoi fracture.",
     "requirements": "Core ^0.1.0 || ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "procedural",
     "install": "npm install @margoengine/core@0.1.0 @margoengine/procedural@0.1.0",
@@ -1060,9 +1060,13 @@
     "exports": [
       "Noise",
       "ROOF_PITCH",
+      "SIMPLEX_SCALE",
+      "WARP_OFFSETS",
       "contactAO",
       "createHumanoid",
       "createIslandHeight",
+      "domainWarp",
+      "fbm",
       "generateCabinMesh",
       "generateFernMesh",
       "generateGrassMesh",
@@ -1070,8 +1074,10 @@
       "generateShrubMesh",
       "generateTreeMesh",
       "marchingCubes",
+      "permutation",
       "poseHumanoid",
-      "radialAO"
+      "radialAO",
+      "ridged"
     ]
   },
   {
@@ -1649,7 +1655,7 @@
     "package": "@margoengine/wfc",
     "version": "0.1.0",
     "published": false,
-    "description": "Seeded 3D tile adjacency wave function collapse.",
+    "description": "Seeded wave function collapse: 3D tile adjacency and the 2D overlapping (sample-based) model with backtracking.",
     "requirements": "Core ^0.1.0 || ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "wfc",
     "install": "npm install @margoengine/core@0.1.0 @margoengine/wfc@0.1.0",

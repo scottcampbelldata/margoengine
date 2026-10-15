@@ -272,8 +272,8 @@ export class UniformNode<T extends Type=Type> extends Node<T> {
     this.data.forEach((v,i)=>{const at=offset+(rows?Math.floor(i/rows)*(rows===2?8:16)+i%rows*4:i*4);s==='f32'?out.setFloat32(at,v,true):s==='i32'?out.setInt32(at,v,true):out.setUint32(at,v,true);});
   }
 }
-/** A live value; the type follows the value (number f32, colour string vec3f, 2/3/4 numbers vecNf, 9 mat3x3f, 16 mat4x4f) or `type`. */
-export function uniform(value:number,options?:{type?:'f32'|'i32'|'u32';name?:string}):UniformNode<'f32'>;
+/** A live value; the type follows the value (number f32, colour string vec3f, 2/3/4 numbers vecNf, 9 mat3x3f, 16 mat4x4f) or `type` (`uniform(3, {type: 'u32'})` is a `UniformNode<'u32'>`, e.g. a live `perlin3` seed). */
+export function uniform(value:number,options?:{type?:'f32';name?:string}):UniformNode<'f32'>;
 export function uniform(value:string,options?:{name?:string}):UniformNode<'vec3f'>;
 export function uniform(value:readonly [number,number],options?:{type?:'vec2f'|'vec2i'|'vec2u';name?:string}):UniformNode<'vec2f'>;
 export function uniform(value:readonly [number,number,number],options?:{type?:'vec3f'|'vec3i'|'vec3u';name?:string}):UniformNode<'vec3f'>;

@@ -486,7 +486,7 @@ export const trunc: (...a: Input[]) => Node<any>;
 export const uint: (x: Part) => Node<'u32'>;
 
 export function uniform(value: number, options?: {
-    type?: 'f32' | 'i32' | 'u32';
+    type?: 'f32';
     name?: string;
 }): UniformNode<'f32'>;
 export function uniform(value: string, options?: {

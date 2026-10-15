@@ -3,12 +3,16 @@
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
-  "description": "Seeded 3D tile adjacency wave function collapse.",
+  "description": "Seeded wave function collapse: 3D tile adjacency and the 2D overlapping (sample-based) model with backtracking.",
   "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./overlapping": {
+      "types": "./dist/overlapping.d.ts",
+      "import": "./dist/overlapping.js"
     }
   },
   "files": [

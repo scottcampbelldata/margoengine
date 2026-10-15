@@ -1,0 +1,33 @@
+{
+  "package": "procedural",
+  "baseline": "ed53ec5",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-15T13:44:07.390Z",
+  "outputsIdentical": false,
+  "quietGated": false,
+  "notes": "Own simplex (seamless, different values) and marching tetrahedra replace simplex-noise and isosurface. Timings are diagnostic (not quiet-gated). Sizes: root entry min+gzip with npm dependencies bundled, @margoengine/* external.",
+  "cases": [
+    {
+      "case": "200k 3D simplex samples",
+      "baselineMs": 14.0805,
+      "candidateMs": 15.6075,
+      "speedup": 0.902
+    },
+    {
+      "case": "marchingCubes 64^3 sphere",
+      "baselineMs": 123.7323,
+      "candidateMs": 69.1196,
+      "speedup": 1.79
+    }
+  ],
+  "sizes": {
+    "before": {
+      "raw": 24962,
+      "gzip": 9976
+    },
+    "after": {
+      "raw": 15843,
+      "gzip": 6776
+    }
+  }
+}
