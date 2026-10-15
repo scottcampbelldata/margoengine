@@ -152,7 +152,7 @@ resize/restoration and remain owned by Bloom. Alone it owns scene capture and ca
 SSAO, Creative PostProcessing or standalone Tonemap; combine them in a `PostStack` (in a stack,
 `sceneTexture` is undefined and `depthTexture` is the stack's). Buffers, bind groups and pass
 descriptors are retained until resize or device restoration. The AgX approximation
-and MIT attribution are described in `NOTICE.md`.
+and its primary sources are listed in `NOTICE.md`.
 
 ```ts
 import {createStage} from 'margoengine';
