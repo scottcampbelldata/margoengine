@@ -3,9 +3,8 @@ import type {Engine as Runtime} from '@margoengine/core/extension';
 import {buildAsync, type AsyncBuildOptions} from './async.js';
 import type {BVHBuildOptions} from './build.js';
 import {MeshBVH, type GeometryLike, type Vec3} from './bvh.js';
-import {invertMatrix} from '@margoengine/math/mat4';
+import {invertMatrix, multiplyMatrices} from '@margoengine/math/mat4';
 import {transformPoint, type Side} from './math.js';
-import {instanceMatrix} from '../../shared/instances.js';
 
 // Structural views of the engine internals that `engineRuntime(engine)` exposes. Types only: this module never
 // imports core at runtime, so it stays usable from workers and Node.
@@ -249,7 +248,7 @@ export class Raycaster {
           // ponytail: a linear scan over instances (one 4x4 product and sphere test each); add a BVH over instances past ~100k.
           if (!instances.count || runtime.meshes.get(node.id) !== node || !this.usable(runtime, node, layerMasks.get(node) ?? rootMask ?? 1, model)) continue;
           const world = store.matrices.subarray(node.id * 16, node.id * 16 + 16);
-          for (let k = 0; k < instances.count; k++) {const m = instanceMatrix(world, instances.data, k, scratch), entry = this.entry(m, 0, spheres[index]); if (entry >= 0) candidates.push({node, entry, model, primitive, index, matrix: m.slice(), instance: k});}
+          for (let k = 0; k < instances.count; k++) {const m = multiplyMatrices(world, instances.data.subarray(k * 24, k * 24 + 16), scratch), entry = this.entry(m, 0, spheres[index]); if (entry >= 0) candidates.push({node, entry, model, primitive, index, matrix: m.slice(), instance: k});}
           continue;
         }
         const entry = this.entry(store.matrices, node.id * 16, spheres[index]);
