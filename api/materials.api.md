@@ -48,7 +48,35 @@ export class Material {
     aoMap: Texture | null;
     emissiveMap: Texture | null;
     matcap: Texture | null;
+    readonly physical?: number[];
+    readonly ext?: number[];
+    readonly volume?: number[];
+    readonly extensions: readonly string[];
     constructor(o?: MaterialOptions);
+    get clearcoat(): number;
+    set clearcoat(v: number);
+    get clearcoatRoughness(): number;
+    set clearcoatRoughness(v: number);
+    get transmission(): number;
+    set transmission(v: number);
+    get specularColor(): number[];
+    set specularColor(c: Color);
+    get specularIntensity(): number;
+    set specularIntensity(v: number);
+    get sheenColor(): number[];
+    set sheenColor(c: Color);
+    get sheenRoughness(): number;
+    set sheenRoughness(v: number);
+    get ior(): number;
+    set ior(v: number);
+    get thickness(): number;
+    set thickness(v: number);
+    get attenuationColor(): number[];
+    set attenuationColor(c: Color);
+    get attenuationDistance(): number;
+    set attenuationDistance(v: number);
+    get transmissive(): boolean;
+    get tint(): number[] | undefined;
     get roughness(): number;
     set roughness(v: number);
     get metalness(): number;
@@ -75,7 +103,7 @@ export type MaterialMesh = PBRModel & {
     readonly material: Material;
 };
 
-export interface MaterialOptions {
+export interface MaterialOptions extends PhysicalOptions {
     shading?: Shading;
     color?: Color;
     opacity?: number;
@@ -106,6 +134,20 @@ export interface MeshGeometry {
     indices?: ArrayLike<number>;
     tangents?: ArrayLike<number>;
     colors?: ArrayLike<number>;
+}
+
+export interface PhysicalOptions {
+    clearcoat?: number;
+    clearcoatRoughness?: number;
+    sheenColor?: Color;
+    sheenRoughness?: number;
+    specularIntensity?: number;
+    specularColor?: Color;
+    ior?: number;
+    transmission?: number;
+    thickness?: number;
+    attenuationColor?: Color;
+    attenuationDistance?: number;
 }
 
 export type RawImage = {

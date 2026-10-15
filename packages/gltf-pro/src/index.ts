@@ -5,8 +5,8 @@ import {invertMatrixStable} from '@margoengine/math/mat4';
 import {viewMatrix} from '../../shared/view.js';
 import {Cleanup} from '../../shared/cleanup.js';
 import {GLTFAsset, container, loadAsset, closeImages, entry, integer, overBudget, type GLTFImage, type AssetOptions, type GLTFDecoderHooks} from './asset.js';
-import {pbrShader, physicalShader, lightPBR, transparentPBR, capturePBR, type PBRLighting, type PBRTransparency, type PBRCapture} from './shader.js';
-export type {PBRLighting, PBRTransparency, PBRCapture} from './shader.js';
+import {pbrShader, physicalShader, factorPhysicalShader, lightPBR, transparentPBR, capturePBR, transmissionPBR, type PBRLighting, type PBRTransparency, type PBRCapture, type PBRTransmission} from './shader.js';
+export type {PBRLighting, PBRTransparency, PBRCapture, PBRTransmission} from './shader.js';
 import {mipShader} from './mip.js';
 // Type only: PBRInstances and the EXT_mesh_gpu_instancing reader load with @margoengine/gltf-pro/instancing.
 import type {PBRInstances} from './instancing.js';
@@ -26,7 +26,7 @@ export interface GLTFLightReceiver {setLights(lights:GLTFClusteredLight[]):unkno
 export type GLTFLoadOptions = Omit<AssetOptions,'buffers'>;
 const srgbMaps=[0,4,9,12],normalMaps=[2,7],blended=(m:any)=>m.settings[0]===2||!!m.tint;
 // What a transparency hook takes over: plain alpha blending (transmission tints and custom render state keep the sorted path).
-const separable=(m:any)=>m.settings[0]===2&&!m.tint&&!m.renderState;
+const separable=(m:any)=>m.settings[0]===2&&!m.tint&&!m.renderState,transmits=(m:any)=>!!m.tint&&!m.renderState;
 // Names the material + effects combination instead of an invalid pipeline when the shader declares more sampled textures or
 // samplers than the device allows per stage (WebGPU's default and guaranteed minimum is 16 of each; README "Texture bindings").
 // ponytail: counts declarations, not per-stage use, so a texture read only in the vertex stage still counts.
@@ -78,7 +78,7 @@ function preparedPrimitive(asset:GLTFAsset,p:any,data:PreparedGeometry,node:Mesh
   for(const map of m.maps)if(map){if(integer(map.texCoord??0,'texture coordinate')>1)throw new RangeError('Invalid prepared PBR UV set');entry(asset.doc.textures,map.index,'texture');}
   return {node,nodeIndex,vertices,indices,definition:p,material:m,weights:new Float32Array(0),targetNames:[]};
 }
-interface DrawResource {primitive:PBRPrimitive;vertex:GPUBuffer;index:GPUBuffer;uniform:GPUBuffer;values:Float32Array;groups:Map<GPURenderPipeline,[GPUBindGroup,GPUBindGroup]>;views:GPUTextureView[];samplers:GPUSampler[]}
+interface DrawResource {primitive:PBRPrimitive;vertex:GPUBuffer;index:GPUBuffer;uniform:GPUBuffer;volume?:GPUBuffer;values:Float32Array;groups:Map<GPURenderPipeline,[GPUBindGroup,GPUBindGroup]>;views:GPUTextureView[];samplers:GPUSampler[]}
 /** A lighting or shading effect for `addLighting`: `pbr` hooks (lighting; preferred) or a `shader` text patch (materials, LOD baking). */
 export interface LightingEffect {readonly owner?:Engine;pbr?(group:number):PBRLighting|undefined;shader?(source:string,group:number):string;bindings():GPUBindGroupEntry[]}
 let modelId = 0;
@@ -100,7 +100,7 @@ function material(def:any = {}): any {
   if (def.doubleSided!==undefined&&typeof def.doubleSided!=='boolean') throw new TypeError('Invalid glTF doubleSided');
   const cc=e.KHR_materials_clearcoat,tr=e.KHR_materials_transmission,sh=e.KHR_materials_sheen,sp=e.KHR_materials_specular,vo=e.KHR_materials_volume,physical=!!(cc||tr||sh||sp||vo||e.KHR_materials_ior);
   const base=vector(p.baseColorFactor??[1,1,1,1],4,'base color',0,1),transmission=scalar(tr?.transmissionFactor??0,0,1,'transmission'),strength=scalar(e.KHR_materials_emissive_strength?.emissiveStrength??1,0,Infinity,'emissive strength');
-  const attenuation=vector(vo?.attenuationColor??[1,1,1],3,'attenuation color',0,1),depth=scalar(vo?.thicknessFactor??0,0,Infinity,'thickness')/(vo?.attenuationDistance===undefined?Infinity:scalar(vo.attenuationDistance,Number.MIN_VALUE,Infinity,'attenuation distance'));
+  const attenuation=vector(vo?.attenuationColor??[1,1,1],3,'attenuation color',0,1),thickness=scalar(vo?.thicknessFactor??0,0,Infinity,'thickness'),distance=vo?.attenuationDistance===undefined?Infinity:scalar(vo.attenuationDistance,Number.MIN_VALUE,Infinity,'attenuation distance'),depth=thickness/distance;
   const maps=[p.baseColorTexture,p.metallicRoughnessTexture,def.normalTexture,def.occlusionTexture,def.emissiveTexture,...physical?[cc?.clearcoatTexture,cc?.clearcoatRoughnessTexture,cc?.clearcoatNormalTexture,tr?.transmissionTexture,sh?.sheenColorTexture,sh?.sheenRoughnessTexture,sp?.specularTexture,sp?.specularColorTexture]:[]]
     .map(t=>t?.extensions?.KHR_texture_transform?.texCoord===undefined?t:{...t,texCoord:t.extensions.KHR_texture_transform.texCoord});
   return {...def,base,
@@ -114,7 +114,9 @@ function material(def:any = {}): any {
     physical:physical?[scalar(cc?.clearcoatFactor??0,0,1,'clearcoat'),scalar(cc?.clearcoatRoughnessFactor??0,0,1,'clearcoat roughness'),scalar(cc?.clearcoatNormalTexture?.scale??1,-Infinity,Infinity,'clearcoat normal scale'),transmission,
       ...vector(sp?.specularColorFactor??[1,1,1],3,'specular color',0),scalar(sp?.specularFactor??1,0,1,'specular'),...vector(sh?.sheenColorFactor??[0,0,0],3,'sheen color',0,1),scalar(sh?.sheenRoughnessFactor??0,0,1,'sheen roughness')]:undefined,
     // Transmission blends the background by this per-material tint (base color, Beer-Lambert volume attenuation at thicknessFactor).
-    tint:transmission?base.slice(0,3).map((v,i)=>v*transmission*attenuation[i]**depth):undefined};
+    tint:transmission?base.slice(0,3).map((v,i)=>v*transmission*attenuation[i]**depth):undefined,
+    // Transmission hook only: thickness (mesh space) and transmittance per world unit, attenuationColor^(1/attenuationDistance).
+    volume:transmission?[thickness,...attenuation.map(c=>c**(1/distance))]:undefined};
 }
 function primitive(asset:GLTFAsset, p:any, node:Mesh, nodeIndex:number, mesh:any, materials:any[], packs:Map<object,PreparedGeometry>):PBRPrimitive {
   // Packing depends only on the primitive definition, so nodes sharing a mesh share its arrays (and GPU buffers, keyed by array).
@@ -161,7 +163,7 @@ export class PBRModel implements EnginePlugin {
   private pipelines=new Map<string,GPURenderPipeline>();private readonly gpuCache=new Map<unknown,any>();private readonly inverse=new Float32Array(16);private readonly workspace=new Float64Array(52);private readonly view=new Float32Array(16);
   private engine:Engine;private readonly cleanupCallbacks=new Set<()=>void>();
   private readonly lighting=new Set<LightingEffect>();private readonly codes=new Map<string,number>();private codeCount=0;private readonly replays=new Map<string,string>();
-  private readonly lightingGroups=new Map<GPURenderPipeline,{entries:GPUBindGroupEntry[];group:GPUBindGroup}>();private transparency?:PBRTransparency;private capture?:PBRCapture;
+  private readonly lightingGroups=new Map<GPURenderPipeline,{entries:GPUBindGroupEntry[];group:GPUBindGroup}>();private transparency?:PBRTransparency;private capture?:PBRCapture;private transmission?:PBRTransmission;
   constructor(instance:EngineKernel,readonly asset:GLTFAsset,private readonly images:readonly GLTFImage[]=[],prepared?:readonly (readonly PreparedGeometry[])[]) {
     this.engine=engineRuntime(instance);
     const doc=asset.doc,defs=doc.nodes??[],parents=new Int32Array(defs.length).fill(-1),materials=(doc.materials??[]).map(material);
@@ -271,14 +273,20 @@ export class PBRModel implements EnginePlugin {
     if(this.disposed||!hook||typeof hook.declarations!=='function'||typeof hook.begin!=='function'||!Array.isArray(hook.targets))throw new TypeError('Invalid PBR capture hook');
     this.capture=hook;return()=>{if(this.capture===hook)this.capture=undefined;};
   }
+  /** Hands this model's transmission primitives to a transmission hook (README "Transmission hook"); returns a remover that restores the tinted blend. */
+  setTransmission(hook:PBRTransmission):()=>void {
+    if(this.disposed||!hook||typeof hook.declarations!=='function'||typeof hook.bindings!=='function'||typeof hook.begin!=='function'||!Array.isArray(hook.targets))throw new TypeError('Invalid PBR transmission hook');
+    this.transmission=hook;return()=>{if(this.transmission===hook)this.transmission=undefined;};
+  }
   get shadowPrimitives() {
     return this.resources.filter(r=>r.primitive.material.settings[0]!==2&&!r.primitive.topology).map(r=>({node:r.primitive.node,vertex:r.primitive.deformed??r.vertex,index:r.index,count:r.primitive.indices.length,stride:80,
       alphaTexture:r.views[0],alphaSampler:r.samplers[0],alpha:r.primitive.material.base[3],cutoff:r.primitive.material.settings[0]===1?r.primitive.material.settings[1]:0,texCoord:r.primitive.material.maps[0]?.texCoord??0,instances:r.primitive.instances}));
   }
-  /** `transparent` draws only the BLEND primitives a transparency hook took over (`setTransparency`), into its pass; `capture` the
-   * opaque and MASK ones into the capture hook's pass (`setCapture`); for both `color`/`depth` are unused. */
-  draw(c:Context,mode:'beauty'|'gbuffer'|'ambient'|'transparent'|'capture',color:GPUTextureView,depth:GPUTextureView):void {
-    const oit=this.transparency,through=mode==='transparent',hook=this.capture,capture=mode==='capture';
+  /** `transparent` draws only the BLEND primitives a transparency hook took over (`setTransparency`), into its pass; `transmission`
+   * those a transmission hook took over (`setTransmission`); `capture` the opaque and MASK ones into the capture hook's pass
+   * (`setCapture`); for these `color`/`depth` are unused. */
+  draw(c:Context,mode:'beauty'|'gbuffer'|'ambient'|'transparent'|'transmission'|'capture',color:GPUTextureView,depth:GPUTextureView):void {
+    const transmission=mode==='transmission',oit=transmission?this.transmission:this.transparency,through=mode==='transparent'||transmission,hook=this.capture,capture=mode==='capture';
     if(this.disposed||through&&!oit||capture&&!hook)return;
     viewMatrix(this.view,c.camera);
     const resources=through||capture?this.resources:[...this.resources].sort((a,b)=>{
@@ -290,7 +298,7 @@ export class PBRModel implements EnginePlugin {
     let pass:GPURenderPassEncoder|undefined,shared:GPURenderPassEncoder|undefined;
     try {for(const r of resources) {
       const p=r.primitive,m=p.material,node=p.node,inst=p.instances;
-      if(p.topology?mode!=='beauty':through?!separable(m):capture?blended(m)||m.ext[0]:mode==='beauty'&&oit&&separable(m))continue;
+      if(p.topology?mode!=='beauty':through?!(transmission?transmits(m):separable(m)):capture?blended(m)||m.ext[0]:mode==='beauty'&&(oit&&separable(m)||!!this.transmission&&transmits(m)))continue;
       node.check();let visible=true;
       for(let id=node.id;id!==-1;id=this.engine.store.parents[id])if(this.engine.store.hidden[id])visible=false;
       if(!visible||inst&&!inst.count)continue;
@@ -305,14 +313,15 @@ export class PBRModel implements EnginePlugin {
       const a=node.matrix;v[97]=Math.sign(a[0]*(a[5]*a[10]-a[6]*a[9])-a[4]*(a[1]*a[10]-a[2]*a[9])+a[8]*(a[1]*a[6]-a[2]*a[5]));
       v.set(m.ext,100);v.set(m.uvt,104);if(m.physical)v.set(m.physical,208);
       c.device.queue.writeBuffer(r.uniform,0,v as Float32Array<ArrayBuffer>);
-      let code=m.physical?physicalShader():pbrShader,entry=mode==='beauty'?'fragment':mode==='gbuffer'?'gbuffer':through?'transparent':capture?'capture':'ambientFragment',lit=mode==='beauty'||through||capture;
+      // Physical materials listing only the five core maps (materials built in code) draw the factor-only variant.
+      let code=m.physical?m.maps.length>5?physicalShader():factorPhysicalShader():pbrShader,entry=mode==='beauty'||transmission?'fragment':mode==='gbuffer'?'gbuffer':through?'transparent':capture?'capture':'ambientFragment',lit=mode==='beauty'||through||capture;
       if(mode!=='gbuffer'&&this.lighting.size){let patched=code,ambient=false;
         // Effects with `pbr` hooks compose at gltf-pro's hook points; others (materials, LOD baking) still patch the text.
         for(const effect of this.lighting){if(effect.pbr){const hooks=effect.pbr(2);if(hooks){patched=lightPBR(patched,hooks);ambient||=!!hooks.ambient;}}else patched=effect.shader!(patched,2);}
         // An `ambient` hook (environment IBL) is what SSAO's ambient replay returns from the lit fragment, `_=color` keeping every
         // lighting binding in the layout. Unlit materials have no ambient.
         if(lit)code=patched;else if(ambient){let replay=this.replays.get(patched);if(replay===undefined){if(this.replays.size>=64)this.replays.clear();this.replays.set(patched,replay=patched.replace('return vec4f(color,','_=color;return vec4f(select(margoAmbient,vec3f(0),f.ext.x>0.5),'));}code=replay;entry='fragment';lit=true;}}
-      if(through)code=transparentPBR(code,oit!.declarations(2));else if(capture)code=capturePBR(code,hook!.declarations(code));
+      if(transmission)code=transmissionPBR(code,oit!.declarations(2));else if(through)code=transparentPBR(code,oit!.declarations(2));else if(capture)code=capturePBR(code,hook!.declarations(code));
       // Instancing patches the vertex stage last, so text-patching effects (shader NodeMaterial vertex nodes) keep their anchors.
       if(inst)code=inst.shader(code);
       // Keep the shader's original front-facing convention, including mirrored transforms.
@@ -325,7 +334,7 @@ export class PBRModel implements EnginePlugin {
       const transmit=!!m.tint,blend=blended(m),key=mode+':'+c.format+':'+blend+transmit+':'+cull+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+':'+entry+':'+id+':'+mask+(state?JSON.stringify(state):'')+(inst?':i'+face:'')+(p.topology?':'+p.topology:'');
       let pipeline=this.pipelines.get(key);
       if(!pipeline) {
-        checkLimits(c.device,code,()=>[m.physical?'physical material':'material',...[...this.lighting].flatMap(e=>{const x=e as {name?:string;shadow?:{name?:string}};return [x.name??'shader patch',...x.shadow?.name?[x.shadow.name]:[]];})]);
+        checkLimits(c.device,code,()=>[m.physical?'physical material':'material',...transmission?['transmission']:[],...[...this.lighting].flatMap(e=>{const x=e as {name?:string;shadow?:{name?:string}};return [x.name??'shader patch',...x.shadow?.name?[x.shadow.name]:[]];})]);
         const module=c.device.createShaderModule({code}),format=mode==='beauty'?c.format:'rgba16float';
         pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:80,attributes:Array.from({length:5},(_,i)=>({shaderLocation:i,offset:i*16,format:'float32x4' as const}))},...inst?[inst.layout]:[]]},
           fragment:{module,entryPoint:entry,constants:{margoFaceTest:face,margoAlphaTest:mask},targets:through||capture?(through?oit!:hook!).targets as GPUColorTargetState[]:[{format,blend:state?.blend!==undefined?state.blend??undefined:blend&&mode!=='gbuffer'?{color:transmit?{srcFactor:'one',dstFactor:'constant'}:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
@@ -334,7 +343,7 @@ export class PBRModel implements EnginePlugin {
       }
       let groups=r.groups.get(pipeline);
       if(!groups) {
-        groups=[c.device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:r.uniform}}]}),
+        groups=[c.device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:r.uniform}},...transmission?[{binding:1,resource:{buffer:r.volume??=c.device.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST})}}]:[]]}),
           c.device.createBindGroup({layout:pipeline.getBindGroupLayout(1),entries:r.views.flatMap((view,i)=>[{binding:i*2,resource:view},{binding:i*2+1,resource:r.samplers[i]}])})];
         r.groups.set(pipeline,groups);
       }
@@ -345,6 +354,7 @@ export class PBRModel implements EnginePlugin {
       if(blend&&mode!=='gbuffer'){pass?.end();pass=undefined;}
       target=pass??=c.encoder.beginRenderPass({colorAttachments:[{view:color,loadOp:'load',storeOp:'store'}],depthStencilAttachment:{view:depth,depthLoadOp:'load',depthStoreOp:'store',...(c.descriptor.depthStencil!.format.includes('stencil')?{stencilLoadOp:'load',stencilStoreOp:'store'}:{})}});
       }
+      if(transmission)c.device.queue.writeBuffer(r.volume!,0,new Float32Array(m.volume));
       target.setPipeline(pipeline);target.setBindGroup(0,groups[0]);target.setBindGroup(1,groups[1]);
       if(transmit&&mode!=='gbuffer')target.setBlendConstant([...m.tint,1]);
       if(lit&&(this.lighting.size||through)){
@@ -391,7 +401,7 @@ export class PBRModel implements EnginePlugin {
     return out;
   }
   onDispose(callback:()=>void):()=>void {if(typeof callback!=='function')throw new TypeError('Expected cleanup callback');if(this.disposed){callback();return()=>{};}this.cleanupCallbacks.add(callback);return()=>this.cleanupCallbacks.delete(callback);}
-  private releaseGPU():void {const cleanup=new Cleanup(),buffers=new Set<GPUBuffer>();for(const r of this.resources)for(const b of [r.vertex,r.index,r.uniform])if(b)buffers.add(b);for(const b of buffers)cleanup.run(()=>b.destroy());for(const t of this.textures)cleanup.run(()=>t.destroy());for(const p of [...this.primitives,...this.pointsAndLines]){p.buffers=undefined;cleanup.run(()=>p.instances?.dispose());}this.resources=[];this.textures=[];this.pipelines.clear();this.gpuCache.clear();this.lightingGroups.clear();cleanup.finish();}
+  private releaseGPU():void {const cleanup=new Cleanup(),buffers=new Set<GPUBuffer>();for(const r of this.resources)for(const b of [r.vertex,r.index,r.uniform,r.volume])if(b)buffers.add(b);for(const b of buffers)cleanup.run(()=>b.destroy());for(const t of this.textures)cleanup.run(()=>t.destroy());for(const p of [...this.primitives,...this.pointsAndLines]){p.buffers=undefined;cleanup.run(()=>p.instances?.dispose());}this.resources=[];this.textures=[];this.pipelines.clear();this.gpuCache.clear();this.lightingGroups.clear();cleanup.finish();}
   onDeviceRestored(engine:Engine):void {this.releaseGPU();for(const p of this.primitives)p.deformed=undefined;this.setup(engine);}
   dispose():void {
     if(this.disposed)return;this.disposed=true;const cleanup=new Cleanup();

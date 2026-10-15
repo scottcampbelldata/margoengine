@@ -1,0 +1,110 @@
+{
+  "benchmark": "physical-gpu",
+  "recordedAt": "2026-10-15T19:04:24.411Z",
+  "hardware": {
+    "vendor": "intel",
+    "architecture": "xe-2lpg",
+    "device": "",
+    "description": "",
+    "fallback": false
+  },
+  "browser": "chromium 155.0.4283.45",
+  "powerOnline": {
+    "before": "True",
+    "after": "True"
+  },
+  "validationErrors": 0,
+  "sideBySide": {
+    "glass": {
+      "hdrMaxAbs": 0,
+      "hdrMeanAbs": 0,
+      "ldrMaxChannel": 0,
+      "ldrPixelsOver1": 0
+    },
+    "carpaint": {
+      "hdrMaxAbs": 0,
+      "hdrMeanAbs": 0,
+      "ldrMaxChannel": 0,
+      "ldrPixelsOver1": 0
+    },
+    "fabric": {
+      "hdrMaxAbs": 0,
+      "hdrMeanAbs": 0,
+      "ldrMaxChannel": 0,
+      "ldrPixelsOver1": 0
+    }
+  },
+  "brdf": {
+    "carpaint": {
+      "absolute": {
+        "pixels": 23667,
+        "mean": 0.00024,
+        "p95": 0.00032,
+        "max": 0.79578
+      },
+      "relative": {
+        "pixels": 23667,
+        "mean": 0.00074,
+        "p95": 0.0022,
+        "max": 0.05944
+      }
+    },
+    "fabric": {
+      "absolute": {
+        "pixels": 23667,
+        "mean": 0.00011,
+        "p95": 0.00038,
+        "max": 0.00181
+      },
+      "relative": {
+        "pixels": 23667,
+        "mean": 0.00076,
+        "p95": 0.0025,
+        "max": 0.0097
+      }
+    }
+  },
+  "refraction": {
+    "1x": {
+      "samples": 1,
+      "lod": 0.36,
+      "refracted": {
+        "pixels": 27864,
+        "mean": 0.00031,
+        "p95": 0.00102,
+        "max": 0.01229
+      },
+      "withoutRefraction": {
+        "pixels": 27864,
+        "mean": 0.16521,
+        "p95": 0.68379,
+        "max": 0.7134
+      }
+    },
+    "4x": {
+      "samples": 4,
+      "lod": 0.36,
+      "refracted": {
+        "pixels": 27864,
+        "mean": 0.00031,
+        "p95": 0.00102,
+        "max": 0.01229
+      },
+      "withoutRefraction": {
+        "pixels": 27864,
+        "mean": 0.16521,
+        "p95": 0.68379,
+        "max": 0.7134
+      }
+    }
+  },
+  "lit": {
+    "glass/materials": "rendered",
+    "glass/gltf": "gltf-pro: physical material + transmission + shadows + clustered + clustered:shadows + environment:lighting + fog needs 17 sampled textures per shader stage; this device allows 16",
+    "carpaint/materials": "rendered",
+    "carpaint/gltf": "rendered",
+    "fabric/materials": "rendered",
+    "fabric/gltf": "rendered"
+  },
+  "pageErrors": []
+}

@@ -1224,7 +1224,44 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       the agx() text (with that function normalised: 6,174 and 13,056 calls identical); quality-presets, creative,
       environment-volumetric and clustered-area-lights (482 calls) pass unchanged. tonemap 6,406 -> 6,326 B, post
       17,014 -> 16,917 B, post/bloom 4,855 -> 4,768 B gzip. NOTICE.md files cite primary sources only.
-   g. Physical material on user-built meshes (materials package), with real transmission/refraction.
+   g. [DONE 2026-10-15] Physical material on user-built meshes (materials package), with real transmission/refraction.
+      0 core bytes (core + stage 19,999 B gzip, unchanged). `Material` physical options (three.js MeshPhysicalMaterial
+      names, glTF KHR_materials_* meaning): `clearcoat`, `clearcoatRoughness`, `sheenColor`, `sheenRoughness`,
+      `specularIntensity`, `specularColor`, `ior`, `transmission`, `thickness`, `attenuationColor`, `attenuationDistance`;
+      which ones exist is fixed at construction, values are live; factors only (no physical maps), standard shading only.
+      The mesh draws gltf-pro's own physical shader, so the BRDF code is shared, not duplicated: `factorPhysicalShader`
+      (gltf-pro shader.ts, appended) is physicalShader with each extension-map read replaced by its default 1x1 texel and
+      those 8 bindings removed, picked when a physical material lists only the 5 core maps (`m.maps.length>5` picks the
+      mapped one, so every glTF keeps its shader). Materials physical = 10 textures (14 with shadows, IBL, LocalShadows and
+      refraction). Refraction: new entry `@margoengine/materials/transmission` (`Transmission.attach(engine, {order = 3})`,
+      `transmission.add(model)` for materials meshes and any gltf-pro model) through a declared gltf-pro hook,
+      `model.setTransmission(PBRTransmission)` + `draw(c, 'transmission')` (README "Transmission hook"): transmissive
+      primitives leave the beauty pass; on the first transmissive draw of a frame the HDR scene capture (`sceneTarget`,
+      resolved at 4x) is copied into an rgba16float mip chain, then the lit physical shader adds `margoTransmission(s,v,i)`
+      under clearcoat and sheen: exit point P + normalize(refract(-v, n, 1/ior)) x thickness x mean model scale, projected;
+      mip log2(width) x roughness x clamp(2 ior - 2, 0, 1); Beer-Lambert attenuationColor^(path / attenuationDistance)
+      (`margoVolume`, group 0 binding 1, a 16 B buffer per primitive); x base x transmission x (1 - metal) x (1 - Schlick
+      at NdotV). Needs an HDR capture (named error otherwise). Without the plugin transmission keeps the tinted blend.
+      Written from the Khronos glTF 2.0 spec Appendix B and the KHR_materials_* texts (screen-space approach of the Khronos
+      sample renderer), not from three.js. Checks: CPU reference `packages/materials/test/physical-reference.js` with
+      `physical.test.js` (F0 from IOR/specular, GGX and Charlie normalisation, Smith, clearcoat mix, Snell, Beer-Lambert,
+      blur level, energy; mock GPU: factor variant has 10 textures, live uniforms, transmission passes at 1x/4x, volume
+      rows, steady frames create nothing, hidden glass costs no copy, dispose restores the tint, no/LDR capture throws).
+      Real GPU (`examples/package-benchmarks/physical-gpu.mjs` + `physical.html`, `results/physical-gpu.json`; Arc 140V,
+      Edge 155, AC before and after, GPU lock, 256x256, correctness only): a materials sphere and the equivalent glTF
+      sphere are identical (HDR and 8-bit max difference 0) for glass (refracting), clearcoat car paint and sheen fabric;
+      the clearcoat and sheen layers against the CPU reference (one light, no ambient): relative error mean 0.07% / 0.08%,
+      p95 0.22% / 0.25% (car paint max 6% at the clearcoat highlight peak; the default clearcoat normal texel is 128/255,
+      the reference uses the exact normal); the light glass adds over a checkerboard against the CPU model: mean 0.0003,
+      p95 0.001 linear HDR at 1x and 4x (the same pixels without refraction: 0.165); with shadows, IBL, fog, clustered and
+      LocalShadows every materials preset renders and glTF glass throws the named 17-texture error (its 13 own maps); 0
+      validation errors. Proofs vs 5a7bbc2 (no hook, no physical options): materials-uv-transform 1,277,
+      gltf-pro-lighting-hooks 4,556, oit-detached 2,964 calls byte-identical; binding-limit passes against its e017d50
+      baseline (post-ssr-models' default run fails on the base too: AgX shader text, unrelated). Sizes (min+gzip,
+      entry-sizes.mjs): gltf-pro 18,610 -> 18,972, materials 6,908 -> 7,842, materials/transmission 2,503 (new); the usdz worker, which bundles gltf-pro, 27,964 -> 28,360.
+      Limits: no physical maps; refraction is screen-space (off screen or in front of the glass is not seen, transmissive
+      surfaces do not see each other, punctual lights do not shine through), `thicknessTexture` ignored, glTF glass with
+      all three lighting packages exceeds 16 textures (5c.d's texture arrays would fix it).
    h. [DONE] Projected decals: `@margoengine/post/decals` (`packages/post/src/decals.ts`, 4,118 B min+gzip, own entry).
       `Decals.attach(engine, {atlas?})`, `setDecals([{position, direction, width, height, depth?, up?, rect?, color?,
       opacity?, angle?, mode?: 'multiply'|'over'}])`, up to 4,096. Screen-space: a pass at order 1.9 (after opaque core,

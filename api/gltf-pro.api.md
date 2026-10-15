@@ -156,6 +156,7 @@ export class PBRModel implements EnginePlugin {
     addLighting(effect: LightingEffect): () => void;
     setTransparency(hook: PBRTransparency): () => void;
     setCapture(hook: PBRCapture): () => void;
+    setTransmission(hook: PBRTransmission): () => void;
     get shadowPrimitives(): {
         node: Mesh;
         vertex: GPUBuffer;
@@ -169,7 +170,7 @@ export class PBRModel implements EnginePlugin {
         texCoord: any;
         instances: PBRInstances | undefined;
     }[];
-    draw(c: Context, mode: 'beauty' | 'gbuffer' | 'ambient' | 'transparent' | 'capture', color: GPUTextureView, depth: GPUTextureView): void;
+    draw(c: Context, mode: 'beauty' | 'gbuffer' | 'ambient' | 'transparent' | 'transmission' | 'capture', color: GPUTextureView, depth: GPUTextureView): void;
     get bounds(): Float32Array;
     clusteredLights(): GLTFClusteredLight[];
     extras(): GLTFNodeExtras[];
@@ -202,6 +203,13 @@ export interface PBRRenderState {
     blend?: GPUBlendState | null;
     depthWrite?: boolean;
     depthCompare?: GPUCompareFunction;
+}
+
+export interface PBRTransmission {
+    declarations(group: number): string;
+    bindings(): GPUBindGroupEntry[];
+    readonly targets: readonly GPUColorTargetState[];
+    begin(): GPURenderPassEncoder;
 }
 
 export interface PBRTransparency {

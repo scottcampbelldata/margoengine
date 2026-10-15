@@ -93,7 +93,26 @@ export async function loadTexture(url:string|URL,{signal,...options}:TextureOpti
 export type Shading='standard'|'basic'|'normal'|'matcap';
 export type Blending='normal'|'additive'|'multiply'|'none';
 type Color=string|readonly number[];
-export interface MaterialOptions {
+/**
+ * Physical options (three.js MeshPhysicalMaterial names, glTF KHR_materials_* meaning; gltf-pro's physical shader draws
+ * them, so a mesh and the same glTF material render alike). Any of them makes the material physical, fixed at
+ * construction; `transmission` makes it transmissive (drawn after opaque meshes). Values stay live.
+ */
+export interface PhysicalOptions {
+  /** KHR_materials_clearcoat: layer strength and roughness, 0-1. */
+  clearcoat?:number;clearcoatRoughness?:number;
+  /** KHR_materials_sheen: sheen colour (default black: none) and roughness 0-1. */
+  sheenColor?:Color;sheenRoughness?:number;
+  /** KHR_materials_specular: dielectric specular strength 0-1 and F0 colour. */
+  specularIntensity?:number;specularColor?:Color;
+  /** KHR_materials_ior: index of refraction, >= 1 (default 1.5). */
+  ior?:number;
+  /** KHR_materials_transmission: share of light passing through, 0-1. Refracts the scene with `@margoengine/materials/transmission`; otherwise the background shows through tinted. */
+  transmission?:number;
+  /** KHR_materials_volume: thickness in mesh units (0 = thin-walled, no refraction), and the colour white light reaches after `attenuationDistance` world units inside. */
+  thickness?:number;attenuationColor?:Color;attenuationDistance?:number;
+}
+export interface MaterialOptions extends PhysicalOptions {
   shading?:Shading;color?:Color;opacity?:number;roughness?:number;metalness?:number;emissive?:Color;
   map?:Texture|null;metalRoughnessMap?:Texture|null;normalMap?:Texture|null;normalScale?:number;aoMap?:Texture|null;aoMapIntensity?:number;emissiveMap?:Texture|null;matcap?:Texture|null;
   transparent?:boolean;alphaTest?:number;doubleSided?:boolean;blending?:Blending;depthWrite?:boolean;depthTest?:boolean;
@@ -103,6 +122,8 @@ export interface MaterialOptions {
 export type MapSlot='map'|'metalRoughnessMap'|'normalMap'|'aoMap'|'emissiveMap';
 const slots=['map','metalRoughnessMap','normalMap','aoMap','emissiveMap','matcap'] as const,names=['baseMap','mrMap','normalMap','aoMap','emissiveMap','matcap'];
 const unit=(v:unknown,label:string)=>{if(typeof v!=='number'||!(v>=0&&v<=1))throw new RangeError('Material '+label+' must be in [0, 1]');return v;};
+// glTF extension of each physical option (the exported material names them).
+const extensions:Record<keyof PhysicalOptions,string>={clearcoat:'clearcoat',clearcoatRoughness:'clearcoat',sheenColor:'sheen',sheenRoughness:'sheen',specularIntensity:'specular',specularColor:'specular',ior:'ior',transmission:'transmission',thickness:'volume',attenuationColor:'volume',attenuationDistance:'volume'};
 const linear=(c:Color,label:string):number[]=>{
   const v=typeof c==='string'?/^#[0-9a-f]{6}$/i.test(c)?[1,3,5].map(i=>{const x=parseInt(c.slice(i,i+2),16)/255;return x<=0.04045?x/12.92:((x+0.055)/1.055)**2.4;}):[]:Array.isArray(c)?[...c]:[];
   if(v.length<3||v.length>4)throw new TypeError('Invalid material '+label);v.forEach(x=>unit(x,label));return v;
@@ -133,6 +154,13 @@ export class Material {
   /** gltf-pro layout: two rows per map slot (offset*rotation*scale), in `MapSlot` order. */
   readonly uvt:number[]=[];
   map:Texture|null;metalRoughnessMap:Texture|null;normalMap:Texture|null;aoMap:Texture|null;emissiveMap:Texture|null;matcap:Texture|null;
+  /** Physical materials only, gltf-pro layout: [clearcoat, clearcoatRoughness, 1, transmission, specularColor rgb, specularIntensity, sheenColor rgb, sheenRoughness], and [0, ior, 0, 0]. */
+  readonly physical?:number[];readonly ext?:number[];
+  /** Transmissive materials only, gltf-pro layout: [thickness, transmittance per world unit rgb]. */
+  readonly volume?:number[];
+  /** glTF extensions (`KHR_materials_<name>`) the physical options use. */
+  readonly extensions:readonly string[];
+  private attenuation=[1,1,1,Infinity];private readonly tinted=[0,0,0];
   constructor(o:MaterialOptions={}) {
     const shading=o.shading??'standard',blending=o.blending??'normal';
     if(!['standard','basic','normal','matcap'].includes(shading)||!['normal','additive','multiply','none'].includes(blending)||[o.transparent,o.doubleSided,o.depthWrite,o.depthTest].some(v=>v!==undefined&&typeof v!=='boolean')||o.normalScale!==undefined&&!Number.isFinite(o.normalScale))throw new TypeError('Invalid material options');
@@ -142,7 +170,31 @@ export class Material {
     this.factors=[unit(o.roughness??1,'roughness'),unit(o.metalness??0,'metalness'),o.normalScale??1,unit(o.aoMapIntensity??1,'aoMapIntensity')];
     this.settings=[0,unit(o.alphaTest??0,'alphaTest'),+(o.doubleSided??false),0];this.sync();this.setUVTransform(o.uvTransform??null);
     this.map=o.map??null;this.metalRoughnessMap=o.metalRoughnessMap??null;this.normalMap=o.normalMap??null;this.aoMap=o.aoMap??null;this.emissiveMap=o.emissiveMap??null;this.matcap=o.matcap??null;
+    const used=(Object.keys(extensions) as (keyof PhysicalOptions)[]).filter(k=>o[k]!==undefined);this.extensions=[...new Set(used.map(k=>extensions[k]))];
+    if(!used.length)return;if(shading!=='standard')throw new TypeError('Physical options need standard shading');
+    this.physical=[0,0,1,0,1,1,1,1,0,0,0,0];this.ext=[0,1.5,0,0];if(o.transmission!==undefined)this.volume=[0,1,1,1];
+    Object.assign(this,Object.fromEntries(used.map(k=>[k,o[k]])));
   }
+  private set(i:number,v:number,label:string):void {if(!this.physical)throw new TypeError(`Material ${label} needs a physical option at construction`);this.physical[i]=unit(v,label);}
+  private setColor(i:number,c:Color,label:string):void {const v=linear(c,label);for(let k=0;k<3;k++)this.set(i+k,v[k],label);}
+  private setVolume(i:number,v:number,label:string):void {
+    if(!this.volume)throw new TypeError(`Material ${label} needs transmission at construction`);if(!(v>=0&&(v<Infinity||i===4)))throw new RangeError(`Material ${label} must be a finite number >= 0`);
+    if(i)this.attenuation[i-1]=v;else this.volume[0]=v;const [r,g,b,d]=this.attenuation;this.volume[1]=r**(1/d);this.volume[2]=g**(1/d);this.volume[3]=b**(1/d);
+  }
+  get clearcoat():number {return this.physical?.[0]??0;} set clearcoat(v:number) {this.set(0,v,'clearcoat');}
+  get clearcoatRoughness():number {return this.physical?.[1]??0;} set clearcoatRoughness(v:number) {this.set(1,v,'clearcoatRoughness');}
+  get transmission():number {return this.physical?.[3]??0;} set transmission(v:number) {if(!this.volume)throw new TypeError('Material transmission needs transmission at construction');this.set(3,v,'transmission');}
+  get specularColor():number[] {return this.physical?.slice(4,7)??[1,1,1];} set specularColor(c:Color) {this.setColor(4,c,'specularColor');}
+  get specularIntensity():number {return this.physical?.[7]??1;} set specularIntensity(v:number) {this.set(7,v,'specularIntensity');}
+  get sheenColor():number[] {return this.physical?.slice(8,11)??[0,0,0];} set sheenColor(c:Color) {this.setColor(8,c,'sheenColor');}
+  get sheenRoughness():number {return this.physical?.[11]??0;} set sheenRoughness(v:number) {this.set(11,v,'sheenRoughness');}
+  get ior():number {return this.ext?.[1]??1.5;} set ior(v:number) {if(!this.ext)throw new TypeError('Material ior needs a physical option at construction');if(!(v>=1&&v<Infinity))throw new RangeError('Material ior must be a finite number >= 1');this.ext[1]=v;}
+  get thickness():number {return this.volume?.[0]??0;} set thickness(v:number) {this.setVolume(0,v,'thickness');}
+  get attenuationColor():number[] {return this.attenuation.slice(0,3);} set attenuationColor(c:Color) {const v=linear(c,'attenuationColor');for(let k=0;k<3;k++)this.setVolume(k+1,v[k],'attenuationColor');}
+  get attenuationDistance():number {return this.attenuation[3];} set attenuationDistance(v:number) {if(!(v>0))throw new RangeError('Material attenuationDistance must be > 0');this.setVolume(4,v,'attenuationDistance');}
+  get transmissive():boolean {return !!this.volume;}
+  /** @internal gltf-pro's tinted-blend constant when no transmission pass refracts: color x transmission x volume attenuation. */
+  get tint():number[]|undefined {if(!this.volume)return undefined;for(let k=0;k<3;k++)this.tinted[k]=this.color[k]*this.physical![3]*this.volume[k+1]**this.volume[0];return this.tinted;}
   get roughness():number {return this.factors[0];} set roughness(v:number) {this.factors[0]=unit(v,'roughness');}
   get metalness():number {return this.factors[1];} set metalness(v:number) {this.factors[1]=unit(v,'metalness');}
   get normalScale():number {return this.factors[2];} set normalScale(v:number) {if(!Number.isFinite(v))throw new RangeError('Invalid normalScale');this.factors[2]=v;}
@@ -190,7 +242,7 @@ export function packGeometry(g:MeshGeometry):PreparedGeometry {
 interface Entry {model:PBRModel;material:Material;order:number}
 const blends:Record<Blending,GPUBlendState|null|undefined>={normal:undefined,none:null,
   additive:{color:{srcFactor:'src-alpha',dstFactor:'one'},alpha:{srcFactor:'one',dstFactor:'one'}},multiply:{color:{srcFactor:'zero',dstFactor:'src'},alpha:{srcFactor:'zero',dstFactor:'src-alpha'}}};
-const queues=new WeakMap<Engine,Set<Entry>>();
+const queues=new WeakMap<Engine,Set<Entry>>(),late=(m:Material)=>m.transparent||m.transmissive;
 let serial=0;
 /** One pass per engine draws every material mesh: opaque then transparent, each by renderOrder; transparent meshes back to front. */
 function queue(runtime:Engine):Set<Entry> {
@@ -198,7 +250,7 @@ function queue(runtime:Engine):Set<Entry> {
   runtime.use({name,setup(){},dispose(){queues.delete(runtime);},registerPasses(graph){graph.add({name,order:1,execute:c=>{
     if(c.backend!=='webgpu')return;const eye=c.camera.position;
     for(const e of entries){const m=e.model.primitives[0].node.matrix;distance.set(e,Math.hypot(eye[0]-m[12],eye[1]-m[13],eye[2]-m[14]));}
-    const list=[...entries].sort((a,b)=>{const t=+a.material.transparent-+b.material.transparent;return t||a.order-b.order||(a.material.transparent?distance.get(b)!-distance.get(a)!:0);});distance.clear();
+    const list=[...entries].sort((a,b)=>{const t=+late(a.material)-+late(b.material);return t||a.order-b.order||(late(a.material)?distance.get(b)!-distance.get(a)!:0);});distance.clear();
     for(const e of list)e.model.draw(c,'beauty',c.color,c.depth);
   }});}});
   queues.set(runtime,set);return set;
@@ -212,10 +264,12 @@ export type MaterialMesh=PBRModel&{readonly material:Material};
 export function createMesh(engine:EngineKernel,geometry:MeshGeometry,material:Material,{renderOrder=0}:{renderOrder?:number}={}):MaterialMesh {
   if(!(material instanceof Material)||!Number.isFinite(renderOrder))throw new TypeError('Invalid material mesh');
   const runtime=engineRuntime(engine),m=material,set=queue(runtime);
-  const doc={asset:{version:'2.0'},nodes:[{mesh:0}],meshes:[{primitives:[{material:0}]}],materials:[{pbrMetallicRoughness:{baseColorFactor:m.color,roughnessFactor:m.factors[0],metallicFactor:m.factors[1]},emissiveFactor:m.emissive,alphaMode:['OPAQUE','MASK','BLEND'][m.settings[0]],alphaCutoff:m.settings[1],doubleSided:m.doubleSided}]};
+  const doc={asset:{version:'2.0'},nodes:[{mesh:0}],meshes:[{primitives:[{material:0}]}],materials:[{pbrMetallicRoughness:{baseColorFactor:m.color,roughnessFactor:m.factors[0],metallicFactor:m.factors[1]},emissiveFactor:m.emissive,alphaMode:['OPAQUE','MASK','BLEND'][m.settings[0]],alphaCutoff:m.settings[1],doubleSided:m.doubleSided,...m.physical&&{extensions:Object.fromEntries(m.extensions.map(e=>['KHR_materials_'+e,{}]))}}]};
   const model=new PBRModel(engine,new GLTFAsset(doc,[]),[],[[packGeometry(geometry)]]);
-  Object.assign(model.primitives[0].material,{base:m.color,emission:m.emissive,factors:m.factors,settings:m.settings,uvt:m.uvt});
-  if(m.customState)model.primitives[0].material.renderState={blend:blends[m.blending],depthWrite:m.depthWrite,depthCompare:m.depthTest?undefined:'always'} satisfies PBRRenderState;
+  const g=model.primitives[0].material;Object.assign(g,{base:m.color,emission:m.emissive,factors:m.factors,settings:m.settings,uvt:m.uvt});
+  // Physical: gltf-pro's factor-only variant (five maps), live arrays, and the tinted-blend constant read every frame.
+  if(m.physical){Object.assign(g,{physical:m.physical,ext:m.ext,volume:m.volume,maps:g.maps.slice(0,5)});Object.defineProperty(g,'tint',{get:()=>m.tint});}
+  if(m.customState)g.renderState={blend:blends[m.blending],depthWrite:m.depthWrite,depthCompare:m.depthTest?undefined:'always'} satisfies PBRRenderState;
   model.addLighting({shader:(code,group)=>m.shader(code,group),bindings:()=>m.bindings(runtime.gpu!,runtime)});
   const entry:Entry={model,material:m,order:renderOrder};model.registerPasses=()=>{};
   try{runtime.use(model);}catch(error){model.dispose();throw error;}
