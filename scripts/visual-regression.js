@@ -163,7 +163,8 @@ try {
         page.on('pageerror', e => result.errors.push(`pageerror: ${e.message}`));
         page.on('console', m => {if (m.type() === 'error') result.errors.push(`console: ${m.text()}`);});
         try {
-          await page.goto((demo.dev ? devOrigin : origin) + '/' + demo.path + query);
+          // 90 s: Night Citadel's first load took over 30 s while other agents built packages (gate 9: no load-flaky checks).
+          await page.goto((demo.dev ? devOrigin : origin) + '/' + demo.path + query, {timeout: 90_000});
           await page.waitForFunction(demo.ready, null, {timeout: 120_000});
           environment.gpu ??= await page.evaluate(async () => {const i = (await navigator.gpu.requestAdapter()).info; return [i.vendor, i.architecture, i.description].filter(Boolean).join(' ');});
           if (loss) {
