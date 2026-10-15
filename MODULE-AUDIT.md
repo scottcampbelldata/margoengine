@@ -1,6 +1,6 @@
 # Margo module completion audit
 
-Inspected and completed on 2026-10-11 in this checkout. The earlier marathon
+Inspected and completed on 2026-10-11 in this checkout. This is a dated record: counts, sizes and browser results below are as of that day, and its reports were not committed (today there are 71 packages; current, reproducible numbers are in [docs/whitepaper/claims.md](docs/whitepaper/claims.md)). The earlier marathon
 description did not match the files on disk: 12 requested packages already had
 substantial implementations, 6 capabilities existed inside other packages but
 lacked the requested standalone package, and 19 modules had not started.
@@ -78,7 +78,7 @@ existing reusable capability, not a half-written package directory.
   checks pass, including settled stacks, transform/pixel agreement, raycasting,
   GPU validation and world disposal. The browser and Node runners now find
   the root Rapier development dependency automatically.
-- Core + stage gzip is **20,053 bytes**, below the **20,480-byte** ceiling.
+- Core + stage gzip was **20,053 bytes**, below that day's **20,480-byte** ceiling. Both have since tightened: the gate is 20,000 bytes and core + stage is 19,543 bytes at `3d845a0` (`npm run measure:size`).
   CI retains that automatic failure gate and now runs the complete unit sweep,
   packed consumer checks and Margo/Rapier GPU checks.
 

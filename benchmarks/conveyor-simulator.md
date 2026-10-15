@@ -1,5 +1,7 @@
 # Conveyor simulator: three.js vs Margo
 
+**Historical log, not a comparison to cite.** The two single-file pages it measured are not in the repository, and three.js ran at 4x MSAA while Margo ran at 1x, so it is neither reproducible nor like-for-like. In it three.js won orbit FPS and load-to-ready; Margo won explode FPS and click-to-select. The like-for-like pages are [examples/conveyor-simulator](../examples/conveyor-simulator/README.md); no results from them are committed yet.
+
 Captured 2026-10-12T05:21:31.764Z with 155.0.4283.45 (headless), 1280x720 at device pixel ratio 1, adapter `{"vendor":"nvidia","architecture":"ampere","fallback":false}`.
 
 Both pages embed the same 569-part GLB, HDR environment and assembly facts. Each page was measured 5 times in a fresh browser context, interleaved and alternating which page ran first. Cells show the median over those runs with the range in brackets. Each scenario runs 60 warm-up frames and 600 measured frames with vsync and the frame-rate limit disabled.

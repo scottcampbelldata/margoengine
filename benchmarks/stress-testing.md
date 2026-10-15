@@ -1,6 +1,6 @@
 # Release stress testing
 
-Run from the repository root on Node 24 with built packages and a supported Chromium browser. `npm run test:release` builds packages and the production starters/showcase, checks all Node tests and the 20,480-byte combined core/stage gzip gate, verifies packed exports and strict TypeScript consumers, runs the existing browser/wrapper/domain/game/PBR/post/XR/USDZ/module tests, then runs 500 seeded sessions of 120 frames. All commands fail on errors; they never publish anything. CI runs a smaller 22-session matrix on explicitly selected SwiftShader. Use physical GPUs for performance evidence.
+Run from the repository root on Node 24 with built packages and a supported Chromium browser. `npm run test:release` builds packages and the production starters/showcase, checks all Node tests and the 20,000-byte combined core/stage gzip gate, verifies packed exports and strict TypeScript consumers, runs the existing browser/wrapper/domain/game/PBR/post/XR/USDZ/module tests, then runs 500 seeded sessions of 120 frames. All commands fail on errors; they never publish anything. CI runs a smaller 22-session matrix on explicitly selected SwiftShader. Use physical GPUs for performance evidence.
 
 ```powershell
 $env:BROWSER_CHANNEL='msedge' # or chrome / chromium (full Playwright Chromium)
