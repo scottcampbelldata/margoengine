@@ -14,8 +14,8 @@ The whole scene is `src/main.ts`. Each `@margoengine/*` package is optional: ins
 
 `public/_headers` (copied into `dist/`) gives Cloudflare Pages and Netlify a Content Security Policy that Margo works
 under and a year-long cache for fingerprinted assets. [Deploying](https://github.com/scottcampbelldata/margoengine/blob/main/docs/deploying.md)
-explains each directive and has the Vercel and Nginx versions; Draco/KTX2 decoding and STEP import each need one
-extra rule.
+explains each directive and has the Vercel and Nginx versions. The same policy covers Draco/KTX2 decoding and STEP
+import: no file needs `'unsafe-eval'`.
 
 ## Where to go next
 

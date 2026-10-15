@@ -12,8 +12,12 @@ export function workerLimit(value: number | undefined): number {
   return limit;
 }
 
-/** Standard URL pattern so Vite, webpack 5 and Next.js emit the worker as its own chunk. */
-export const spawnDecoderWorker = (): Worker => new Worker(new URL('./decoder.worker.js', import.meta.url), {type: 'module', name: 'margoengine-decoder'});
+// The worker is a prebuilt classic script (importScripts needs one). Its URL stays out of `new Worker(...)` so bundlers
+// (Vite, webpack 5, Next.js) copy it as an asset instead of rebuilding it; `?no-inline` keeps it a file, never a data: URL.
+const workerURL = (): URL => new URL('./decoder.worker.js?no-inline', import.meta.url);
+
+/** Start one decoder worker. */
+export const spawnDecoderWorker = (): Worker => new Worker(workerURL(), {name: 'margoengine-decoder'});
 
 export function requireWorkers(owner: string): void {
   if (typeof Worker === 'undefined') throw new Error(`${owner} needs a browser with Web Workers; it cannot decode during SSR`);

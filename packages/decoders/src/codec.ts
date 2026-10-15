@@ -2,14 +2,12 @@
 import {transcodeFormats} from './formats.js';
 import type {DecodedDracoGeometry, DracoRequest, KTX2Mip, TranscodeTarget, TranscodedKTX2Result} from './protocol.js';
 
+/**
+ * Runs a classic Emscripten script in global scope so its top-level `var` factory becomes a global. The worker passes
+ * `importScripts`, which a strict CSP (`script-src 'self'`, no `'unsafe-eval'`) allows; Node tests pass their own. The
+ * Wasm download starts first and overlaps the (synchronous) script load.
+ */
 export type ScriptLoader = (url: string) => Promise<void>;
-
-/** Run a classic Emscripten script in module-worker global scope. Indirect eval keeps its top-level `var` global. */
-export const evaluateScript: ScriptLoader = async url => {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Could not load ${url} (${response.status})`);
-  (0, eval)(await response.text());
-};
 
 async function binary(url: string): Promise<ArrayBuffer> {
   const response = await fetch(url);
@@ -20,15 +18,17 @@ async function binary(url: string): Promise<ArrayBuffer> {
 /** Emscripten module objects are thenable, so they travel inside a box to keep promise resolution finite. */
 export interface ModuleBox {module: any}
 
-export async function initDraco(wrapperURL: string, wasmURL: string, load: ScriptLoader = evaluateScript): Promise<ModuleBox> {
-  const [, wasmBinary] = await Promise.all([load(wrapperURL), binary(wasmURL)]);
+/** Load Google's Draco wrapper with `load` and instantiate it on the downloaded `draco_decoder.wasm`. */
+export async function initDraco(wrapperURL: string, wasmURL: string, load: ScriptLoader): Promise<ModuleBox> {
+  const [wasmBinary] = await Promise.all([binary(wasmURL), load(wrapperURL)]);
   const factory = (globalThis as any).DracoDecoderModule;
   if (typeof factory !== 'function') throw new Error('Draco wrapper did not define DracoDecoderModule');
   return new Promise((resolve, reject) => {factory({wasmBinary}).then((module: any) => resolve({module}), reject);});
 }
 
-export async function initBasis(transcoderURL: string, wasmURL: string, load: ScriptLoader = evaluateScript): Promise<ModuleBox> {
-  const [, wasmBinary] = await Promise.all([load(transcoderURL), binary(wasmURL)]);
+/** Load the Basis transcoder with `load` and instantiate it on the downloaded `basis_transcoder.wasm`. */
+export async function initBasis(transcoderURL: string, wasmURL: string, load: ScriptLoader): Promise<ModuleBox> {
+  const [wasmBinary] = await Promise.all([binary(wasmURL), load(transcoderURL)]);
   const factory = (globalThis as any).BASIS;
   if (typeof factory !== 'function') throw new Error('Basis transcoder did not define BASIS');
   const module: any = await new Promise((resolve, reject) => {factory({wasmBinary}).then((m: any) => resolve({m}), reject);}).then((box: any) => box.m);

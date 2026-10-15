@@ -13,6 +13,12 @@ const out = resolve('site/dist');
 const names = {entryFileNames: 'assets/[name]-[hash:10].js', chunkFileNames: 'assets/[name]-[hash:10].js', assetFileNames: 'assets/[name]-[hash:10][extname]'};
 const site = config => build({...config, logLevel: 'warn', worker: {rollupOptions: {output: names}},
   build: {...config.build, emptyOutDir: true, rollupOptions: {...config.build.rollupOptions, output: names}}});
+// The stage facade (`margoengine`) imports @margoengine/machinery lazily for STEP/IGES/STL/OBJ in `load()`, so every
+// demo built on it shipped the 7.6 MB OCCT .wasm and the CAD chunks (never downloaded: no demo loads CAD). Those builds
+// get a stand-in that rejects instead; demos that need CAD must not use `noCAD`.
+const noCAD = {name: 'margo-site-no-cad', enforce: 'pre',
+  resolveId: id => /^@margoengine\/machinery(\/|$)/.test(id) ? '\0margo-no-cad' : null,
+  load: id => id === '\0margo-no-cad' ? `throw new Error('This margoengine.com demo build leaves out @margoengine/machinery (scripts/build-site.js)');` : null};
 await rm(out, {recursive: true, force: true});
 await mkdir(out, {recursive: true});
 for (const name of await readdir('site')) if (name !== 'dist') await cp(`site/${name}`, `${out}/${name}`, {recursive: true});
@@ -21,10 +27,10 @@ await cp('docs', `${out}/catalog`, {recursive: true, filter: source => !source.e
 await site({root: 'apps/showcase-night-citadel', base: './', build: {outDir: `${out}/night-citadel`}});
 await site({root: 'examples/gameplay-sandbox', base: './', build: {outDir: `${out}/gameplay-sandbox`}});
 const pages = ['character-animation', 'robot-expressive', 'flight-helmet', 'windy-meadow', 'tokyo-diorama'];
-await site({configFile: false, root: 'examples', base: './', publicDir: false,
+await site({configFile: false, root: 'examples', base: './', publicDir: false, plugins: [noCAD],
   build: {outDir: `${out}/demos`, target: 'es2022', rollupOptions: {input: Object.fromEntries(pages.map(page => [page, resolve(`examples/${page}.html`)]))}}});
-await site({configFile: false, root: 'packages/creative/examples/earth', base: './', build: {outDir: `${out}/demos/earth`, target: 'es2022'}});
-for (const name of ['dof', 'tonemap']) await site({configFile: false, root: `packages/${name}/examples`, base: './', publicDir: false,
+await site({configFile: false, root: 'packages/creative/examples/earth', base: './', plugins: [noCAD], build: {outDir: `${out}/demos/earth`, target: 'es2022'}});
+for (const name of ['dof', 'tonemap']) await site({configFile: false, root: `packages/${name}/examples`, base: './', publicDir: false, plugins: [noCAD],
   build: {outDir: `${out}/demos/${name}`, target: 'es2022'}});
 for (const name of ['ATTRIBUTION.md', 'robot-CREDITS.md', 'tokyo-diorama-CREDITS.md']) await cp(`examples/assets/${name}`, `${out}/demos/assets/${name}`);
 await cp('packages/creative/examples/earth/assets/ATTRIBUTION.md', `${out}/demos/earth/assets/ATTRIBUTION.md`);

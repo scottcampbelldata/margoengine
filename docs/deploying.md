@@ -14,8 +14,9 @@ Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval
 ```
 
 - `'wasm-unsafe-eval'` is the one directive Margo itself needs. Without it the engine does not start.
-- Draco or KTX2 decoding (`@margoengine/decoders`) and STEP/IGES import (`@margoengine/machinery/cad-async`) also need
-  `'unsafe-eval'`, but only for their worker files: see [Workers that need `'unsafe-eval'`](#workers-that-need-unsafe-eval).
+- Nothing needs `'unsafe-eval'`, workers included: Draco and KTX2 decoding (`@margoengine/decoders`) and STEP/IGES
+  import (`@margoengine/machinery/cad-async`) run under the same policy. See
+  [Third-party Emscripten code without `eval`](#third-party-emscripten-code-without-eval).
 - You do **not** need cross-origin isolation (COOP/COEP).
 - Fingerprinted files in `assets/` can be cached for a year; HTML must revalidate.
 
@@ -44,7 +45,8 @@ The core kernel (vertex transforms, culling) is Wasm embedded in the JavaScript 
 ("Compiling or instantiating WebAssembly module violates the following Content Security policy directive"). The same directive covers the machinery kernel (also embedded), the OCCT STEP/IGES importer and the
 Draco and Basis decoders. `'wasm-unsafe-eval'` allows compiling Wasm only; it does not allow `eval` or `new Function`.
 
-No package calls `eval` or `new Function` on the page, injects inline `<script>`, or loads code from a CDN.
+No package calls `eval` or `new Function`, on the page or in a worker, injects inline `<script>`, or loads code from a
+CDN.
 
 ### `worker-src 'self'`
 
@@ -54,7 +56,7 @@ Workers are separate files next to your bundle, created with the bundler-friendl
 | Worker | Package | Type |
 | --- | --- | --- |
 | `bvh.worker-*.js` | `@margoengine/bvh` (`buildAsync`) | module |
-| `decoder.worker-*.js` | `@margoengine/decoders` (Draco, KTX2) | module |
+| `decoder.worker-*.js` | `@margoengine/decoders` (Draco, KTX2) | classic, `importScripts` for the Draco and Basis wrappers |
 | `gltf-*.js` | `@margoengine/gltf-pro/worker` (`loadGLTFInWorker`, `parseGLTFInWorker`) | classic |
 | `fbx-*.js`, `usdz-*.js`, `usd-*.js` | `@margoengine/fbx`, `usdz`, `loaders` worker parsers | classic |
 | `cad-runtime-*.js` | `@margoengine/machinery/cad-async` (`parseCADAsync`) | classic, `importScripts` for OCCT |
@@ -64,35 +66,29 @@ intent obvious.
 
 A worker gets its **own** CSP from the headers on the worker script's response, not from the page. A host config that
 sets the CSP on every path (`/*`, as below) therefore also restricts what each worker may fetch and compile; that is
-what you want, and it is why two workers need their own rule.
+what you want: the decoder and CAD workers are held to the same strict policy as the page.
 
-### Workers that need `'unsafe-eval'`
+### Third-party Emscripten code without `eval`
 
-Two workers run third-party Emscripten code that needs JavaScript `eval`:
+Two workers run third-party Emscripten builds. Neither needs `'unsafe-eval'`:
 
-- `decoder.worker-*.js` (`@margoengine/decoders`: Draco, KTX2) runs Google's Draco wrapper and Binomial's Basis
-  transcoder, both classic scripts, through an indirect `eval` (a module worker cannot `importScripts`).
+- `decoder.worker-*.js` (`@margoengine/decoders`: Draco, KTX2) is a classic worker that loads Google's Draco wrapper
+  and Binomial's Basis transcoder with `importScripts` (allowed by `script-src 'self'`).
 - `cad-runtime-*.js` (`@margoengine/machinery/cad-async`, STEP and IGES only; STL and OBJ do not load OCCT) loads
-  `occt-import-js`, whose embind bindings build their call wrappers with `new Function`.
+  `occt-import-js` with `importScripts`.
 
-Under the policy above both are refused inside the worker and decoding or import fails ("Evaluating a string as
-JavaScript violates the following Content Security Policy directive"). Give those two files a policy with
-`'unsafe-eval'`; the page and every other file keep the strict one:
+The Basis transcoder and `occt-import-js` use Emscripten's embind, which builds every C++ call wrapper with
+`new Function` unless the library was compiled with `DYNAMIC_EXECUTION=0`. Those wrappers are JavaScript only, so
+Margo's build rewrites the two code generators in the shipped JavaScript into the closures `DYNAMIC_EXECUTION=0` would
+emit (`scripts/static-embind.js`; the change is stated in each file's first line). The `.wasm` files are unmodified.
+`tests/no-eval-workers.test.js` runs each glue file in a Node context with code generation from strings disabled (what
+a CSP without `'unsafe-eval'` does): the original Basis and OCCT glue throw `EvalError`, the shipped glue transcodes the
+KTX2 fixture to every target and reads a STEP assembly and an IGES part byte-identically to the original.
 
-```
-/assets/decoder.worker-*.js
-  ! Content-Security-Policy
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; connect-src 'self'
-
-/assets/cad-runtime-*.js
-  ! Content-Security-Policy
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; connect-src 'self'
-```
-
-(Cloudflare Pages syntax; the Vercel and Nginx versions are below.) `'unsafe-eval'` here reaches only code running in
-that worker: the page cannot `eval`. The decoder worker fetches the wrapper scripts and `.wasm` files with `fetch`, so if
-you point `decoderPath` at another origin (for example Google's Draco CDN), add that origin to this rule's
-`connect-src`.
+If you replace these files (a `decoderPath` or `transcoderPath` pointing at another copy, or your own OCCT build), the
+replacement may still call `new Function` (three.js's Basis transcoder does) and then needs `'unsafe-eval'` in that
+worker's policy. A wrapper folder on another origin also needs that origin in `script-src` (`importScripts`) and
+`connect-src` (the `.wasm` is fetched).
 
 ### `style-src 'self' 'unsafe-inline'`
 
@@ -182,8 +178,7 @@ always serve meshopt `.glb` files compressed. Hosts only compress content types 
 ## Pre-convert STEP for production
 
 STEP and IGES import (`loadCAD`, `app.load('/part.step')`) downloads OpenCascade: a 7.6 MB `.wasm` (3.1 MB gzip),
-about 150 ms to initialise, then 1.2-1.5 s to tessellate a 442 kB assembly in the browser, and its worker needs the
-`'unsafe-eval'` rule below. Keep that path for files your users drag in. For models you ship, convert once at build
+about 150 ms to initialise, then 1.2-1.5 s to tessellate a 442 kB assembly in the browser. Keep that path for files your users drag in. For models you ship, convert once at build
 time and serve a GLB:
 
 ```sh
@@ -192,14 +187,13 @@ npx margo-convert models/gearbox.step public/gearbox.glb
 
 [`margo-convert`](../tools/margo-convert/README.md) uses the same OCCT build and default tessellation as `loadCAD` and
 keeps the assembly tree, part names, colours and shared meshes for repeated parts, in metres. Load the GLB with
-`@margoengine/gltf` (or gltf-pro): no OCCT bytes, no CAD worker, no `'unsafe-eval'`. The 442 kB `as1-oc-214.stp` sample (18 parts) becomes a
+`@margoengine/gltf` (or gltf-pro): no OCCT bytes and no CAD worker. The 442 kB `as1-oc-214.stp` sample (18 parts) becomes a
 68 kB GLB (25.6 kB gzip) that parses in a few milliseconds, instead of 81 kB of STEP plus 3.1 MB of OCCT and
 1.4-1.7 s in the browser.
 
 ## Configs
 
-All four configs set the same policy. The two eval-worker rules are only for Draco/KTX2 and STEP/IGES; drop them if
-you use neither, and adjust the file patterns if your bundler names workers differently (check `dist/assets/`).
+All four configs set the same policy on every file, workers included; no file needs a rule of its own.
 
 ### Cloudflare Pages and Netlify (`_headers`)
 
@@ -213,44 +207,21 @@ Put the file in `public/` so Vite copies it to `dist/_headers`.
 
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
-
-# Only with @margoengine/decoders (Draco, KTX2):
-/assets/decoder.worker-*.js
-  ! Content-Security-Policy
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; connect-src 'self'
-
-# Only with STEP/IGES import (@margoengine/machinery/cad-async):
-/assets/cad-runtime-*.js
-  ! Content-Security-Policy
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; connect-src 'self'
 ```
 
-Cloudflare applies every matching block in order and `! Name` removes a header an earlier block set. Netlify reads the
-same file, but `!` is Cloudflare syntax: on Netlify, check in the browser console that Draco/KTX2 decoding and STEP
-import work before relying on those rules (two CSP headers on one response are both enforced, so the strict one would
-win).
+Cloudflare Pages and Netlify apply every matching block in order.
 
 ### Vercel (`vercel.json`)
-
-The first rule's negative lookahead keeps the two eval workers out of the global policy, so no rule has to override
-another.
 
 ```json
 {
   "headers": [
     {
-      "source": "/((?!assets/(?:decoder\\.worker|cad-runtime)-).*)",
+      "source": "/(.*)",
       "headers": [
         {"key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"},
         {"key": "X-Content-Type-Options", "value": "nosniff"},
         {"key": "Referrer-Policy", "value": "strict-origin-when-cross-origin"}
-      ]
-    },
-    {
-      "source": "/assets/(decoder\\.worker|cad-runtime)-(.*)",
-      "headers": [
-        {"key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; connect-src 'self'"},
-        {"key": "X-Content-Type-Options", "value": "nosniff"}
       ]
     },
     {
@@ -292,13 +263,6 @@ server {
 
     location /assets/ {
         include snippets/margo-headers.conf;
-        add_header Cache-Control "public, max-age=31536000, immutable" always;
-    }
-
-    # Only with @margoengine/decoders (Draco, KTX2) or STEP/IGES import:
-    location ~ ^/assets/(decoder\.worker|cad-runtime)-.*\.js$ {
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; connect-src 'self'" always;
-        add_header X-Content-Type-Options nosniff always;
         add_header Cache-Control "public, max-age=31536000, immutable" always;
     }
 }

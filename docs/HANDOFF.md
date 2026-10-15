@@ -965,9 +965,10 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       FXAA, Stats/HTML/ViewCube/Inspector, machinery STEP; the create-margo app; 11 site/dist pages; zero violations,
       Edge, Arc 140V, AC; `examples/package-benchmarks/results/csp-check.json`; claims DOC-072..075).
       `CSP_OVERRIDE=<policy>` shows what a missing directive breaks (checked: no `'wasm-unsafe-eval'` -> Engine.create
-      fails; strict policy on the eval workers -> Draco, KTX2, STEP fail, all else passes). Side finding, not fixed: every
-      site demo folder (`demos/`, `demos/dof/`, `demos/tonemap/`, `demos/earth/`) ships the 7.6 MB OCCT `.wasm` and
-      CAD chunks although no demo imports STEP (deploy bytes only; never downloaded).
+      fails; strict policy on the eval workers -> Draco, KTX2, STEP fail, all else passes). Side finding (fixed in 5l.o):
+      every site demo folder (`demos/`, `demos/dof/`, `demos/tonemap/`, `demos/earth/`) shipped the 7.6 MB OCCT `.wasm`
+      and CAD chunks although no demo imports STEP (deploy bytes only; never downloaded). Both eval-worker rules are gone
+      since 5l.o.
    b. Tier-aware feature presets: `@margoengine/quality` already picks light/full tiers (MSAA, DPR, pacing only). Add
       presets packages read on attach (shadow cascades/resolution, SSR off, volumetrics off/low grid, SSAO half-res,
       particle counts) so the light tier scales features automatically; measure the light tier on the laptop.
@@ -1054,9 +1055,9 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    feature (texture arrays 5f.d are post-1.0; or core requests the adapter's higher limit, core bytes); (3) a second
    directional light (area lights landed with 5l.f and are in the page: 64, unshadowed); (4) [off-screen part DONE with 5l.e: reflection probes are SSR's fallback] water/terrain reflecting;
    (5) the 64 MiB glTF download budget as an option (5l.r); (6) gltf-pro's 1,000,000 vertices per primitive (no
-   splitter); (7) the decoder worker's `'unsafe-eval'` (5l.o); (8) above ~1M core meshes the 41 ms kernel tick stays
+   splitter); (7) [DONE, 5l.o] the decoder worker's `'unsafe-eval'`; (8) above ~1M core meshes the 41 ms kernel tick stays
    (hierarchical LOD streaming 5g.d not built); (9) volumetric fog does not reach particles/VFX automatically (only via
-   `fog.texture`). Commit the CSP negative runs to clear LIM-024/DOC-074 (launch gate 10).]
+   `fog.texture`). [DONE, 5l.o] CSP negative runs committed (`results/csp-check-negative.json`): LIM-024/DOC-074 PROVEN.]
    "Design envelope" page (Scott, 2026-10-14 night): `docs/limits.md` (also on the site, linked from README and the
    whitepaper) listing every hard limit as an architectural boundary: the limit, the MEASURED threshold where it
    starts (no unmeasured numbers - e.g. coordinate jitter distance comes from 5f.a's measurements), why it exists
@@ -1272,10 +1273,39 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       size): give `CulledInstances` the culled pipeline (cullMode back, no discard) and a bulk transform upload (10k
       moving boxes cost 187 ms CPU: one 64 B write per setTransform); profile `createInstancedMesh`'s GPU time vs three
       (gltf-pro shader + ACES vs three's) and close what's package-side. Re-measure with the vs-threejs harness pairs.
-   o. CSP follow-ups (from 1a36f67): the decoders worker runs Draco/Basis glue through `eval` (needs per-file
+   o. [DONE 2026-10-15] CSP follow-ups (from 1a36f67): the decoders worker runs Draco/Basis glue through `eval` (needs per-file
       `'unsafe-eval'`) - load them as module/classic workers or wrap them so the strict page CSP covers everything;
       occt-import-js uses `new Function` (third party: document, or wrap); the site build copies the 7.6 MB OCCT .wasm
       and CAD code into every demo folder though no demo imports STEP (deploy size only) - stop copying it.
+      DONE: no file needs `'unsafe-eval'`, workers included. (1) `decoder.worker.js` is now a prebuilt, self-contained
+      classic worker (`packages/decoders/scripts/build.js`, Vite iife; `pool.ts` references it as
+      `new URL('./decoder.worker.js?no-inline', import.meta.url)`, the gltf-pro pattern) that loads the Draco/Basis
+      wrappers with `importScripts`; `codec.ts` lost its `(0, eval)` loader. Asset name unchanged (`decoder.worker-*.js`),
+      app still passes `decoderPath`/`transcoderPath`. (2) Basis and occt-import-js 0.0.23 are embind builds without
+      `DYNAMIC_EXECUTION=0` (occt-import-js 0.0.23 ships dist, its C++ wrapper, CMakeLists with `--bind` and Windows build
+      scripts, not the OpenCascade submodule: rebuilding is not ours).
+      But embind's `new Function` is JS-side only: `scripts/static-embind.js` rewrites the glue's two generators
+      (`craftInvokerFunction`, `_emval_get_method_caller`) into the closures `DYNAMIC_EXECUTION=0` emits, with exact
+      patterns (a different Emscripten version fails the build) and a modification notice in each file's first line;
+      applied to dist `basis/basis_transcoder.js` (decoders build) and `workers/occt-import-js.js` (build-modern.js). Both
+      `.wasm` files and the Draco wrapper are unmodified; NOTICE.md / OCCT-NOTICE.txt (LGPL-2.1) say so. Proof:
+      `tests/no-eval-workers.test.js` (in verify) runs each glue in a Node vm context with code generation from strings
+      disabled: vendor Basis and OCCT glue throw `EvalError`; shipped glue gives byte-identical KTX2 transcodes (all 4
+      targets), identical `as1-oc-214.stp` and `Cube 10x10.igs` reads; Draco Box/Avocado identical; built workers have no
+      `eval`/`Function(`. Glue sizes: Basis 57,548 -> 58,505 B, OCCT 96,871 -> 97,826 B (raw); decoder worker 5,405 B.
+      (3) `scripts/build-site.js` resolves `@margoengine/machinery*` to a stand-in that throws for the four demo builds on
+      the stage facade (the stage's lazy `load()` CAD import pulled OCCT in): `demos/`, `demos/earth/`, `demos/dof/`,
+      `demos/tonemap/` each lose 7,793,583-7,793,677 B of assets (OCCT .wasm + glue, `cad-runtime`, CAD chunks; 31,174,612 B
+      in all; night-citadel and gameplay-sandbox unchanged). (4) Evidence: `csp-check.mjs` harness now serves the
+      create-margo `_headers` unchanged (`scripts/csp-check/eval-workers.headers` deleted; site/_headers loses its Tokyo-corner decoder-worker eval rule): 14/14 pages PASS, zero
+      violations (`results/csp-check.json`); override runs are now recorded in `results/csp-check-negative.json`:
+      `script-src 'self'` -> Engine.create's "WebAssembly.compile(): Compiling or instantiating WebAssembly module violates
+      ..." page error; the strict policy on every file -> all 8 harness steps pass. claims DOC-072/074, LIM-023/024 updated
+      (DOC-074/LIM-024 PROVEN; launch gate 10's CSP rows clear). Docs: deploying.md (eval rules removed from the three
+      configs, new "Third-party Emscripten code without eval"), limits.md, decoders README, template README/_headers,
+      site/_headers, guides/blender-game.md; `tests/create-margo.test.js` asserts the template has no `'unsafe-eval'`.
+      decoders `npm run test:browser` passes with the classic worker (Vite dev server and production consumer, Edge
+      155, GPU lock). Firefox/Safari CSP unverified; visual regression not re-run (no render code changed).
    p. [DONE] gltf-pro failed on the 62 MB conveyor GLB ("Unsupported glTF accessor", also without the cache). Cause:
       not a format feature - `GLTFAsset.accessor` capped every accessor at 1,000,000 elements, and two uint32 index
       accessors are larger (174: 1,021,494 for mesh 66 "Mesh_16"; 487: 1,480,944 for mesh 171 "Mesh_15"). The file is

@@ -1,4 +1,4 @@
-// A production consumer: the bundler must emit the module worker, both Wasm binaries and both Emscripten wrappers.
+// A production consumer: the bundler must emit the classic worker, both Wasm binaries and both Emscripten wrappers.
 import {DracoDecoder, KTX2Decoder} from '@margoengine/decoders';
 import boxURL from '../fixtures/Box.bin?url';
 import ktxURL from '../fixtures/AnisotropyBarnLamp_normalbump.ktx2?url';
