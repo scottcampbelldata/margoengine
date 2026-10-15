@@ -22,7 +22,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/cinematic | `.` 2 |  |  | 1,489 |
 | @margoengine/clustered | `.` 7, `./shadows` 4 | 6 |  | 4,503 |
 | @margoengine/controls | `.` 44 | 9 | 11 | 18,338 |
-| @margoengine/core | `.` 15, `./extension` 23 | 14 |  | 17,822 |
+| @margoengine/core | `.` 15, `./extension` 23 | 14 |  | 18,046 |
 | @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 17,186 |
 | @margoengine/culling | `.` 4 |  |  | 7,060 |
 | @margoengine/decoders | `.` 22 | 1 |  | 476,244 |

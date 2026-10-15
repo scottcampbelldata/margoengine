@@ -587,7 +587,7 @@ laptop with an Intel Arc 140V integrated GPU, Edge 155, on AC power.
 
 | What | Number | Proof |
 | --- | --- | --- |
-| Core + `margoengine` stage, gzip | 19,577 bytes when this guide was written (the build fails at 20,000) | `npm run measure:size` ([scripts/measure-size.js](../../scripts/measure-size.js)) |
+| Core + `margoengine` stage, gzip | 19,793 bytes at `7dcc958` (the build fails at 20,000) | `npm run measure:size` ([scripts/measure-size.js](../../scripts/measure-size.js)) |
 | Island demo, light tier (1x MSAA, DPR 1, paced to 60) | 60 FPS with 100k and with 1M particles in every round; GPU frame span medians about 10 ms (100k) and 12-16 ms (1M) | [vfx-island-final.json](../../examples/package-benchmarks/results/vfx-island-final.json) (`examples/package-benchmarks/vfx-island.mjs`, commit `76af7a0`) |
 | Island demo, full tier (4x MSAA) on the same laptop | 45-53 FPS (100k), 40-44 FPS (1M): below 60, which is why the light tier exists | same file |
 | Loading a generated 41 MB GLB (1.28M triangles) while rendering | longest main-thread task 222 ms with `loadGLTF`, 0 ms with `loadGLTFInWorker`; load time 0.60 s vs 0.68 s | [workers.json](../../examples/package-benchmarks/results/workers.json) (`examples/package-benchmarks/workers/run.mjs`) |
