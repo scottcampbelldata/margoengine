@@ -37,7 +37,7 @@ CompareIor, CompareIridescence, CompareAnisotropy, CompareDispersion
 ### Showcase (also fills demos)
 | Model | Licence | Shows |
 |---|---|---|
-| FlightHelmet | CC0 | **downloaded** - transmission glass, detailed PBR |
+| FlightHelmet | CC0 | **downloaded** - transmission glass, detailed PBR; the public helmet demo since 2026-10-15 |
 | SciFiHelmet | CC0 | detailed PBR helmet (CC0 alternative to DamagedHelmet) |
 | ToyCar | CC0 | clearcoat, sheen, transmission |
 | SheenChair | CC0 | sheen fabric |
@@ -57,7 +57,7 @@ CompareIor, CompareIridescence, CompareAnisotropy, CompareDispersion
 |---|---|
 | Sponza | Cryengine Limited License Agreement (Crytek) |
 | PlaysetLightTest | CC-BY-NC-SA 4.0 (non-commercial) |
-| DamagedHelmet | earlier model CC-BY-NC 4.0 (theblueturtle_) - **already used in our demos/site, see HANDOFF** |
+| DamagedHelmet | earlier model CC-BY-NC 4.0 (theblueturtle_) - public demo/site replaced by FlightHelmet (2026-10-15); kept only in internal tests/benchmarks |
 | BrainStem, Duck, EnvironmentTest, VirtualCity | licence not CC0/CC-BY in metadata (Smith Micro, Sony, Adobe, 3DRT) |
 
 ## Process once approved

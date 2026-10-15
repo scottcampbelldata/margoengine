@@ -12,7 +12,7 @@ const auditOnly=process.argv.includes('--audit-only');
 const cases=[
   {name:'citadel',path:'/night-citadel/'},
   {name:'afterlight',path:'/gameplay-sandbox/'},
-  {name:'helmet',path:'/demos/damaged-helmet.html'}
+  {name:'helmet',path:'/demos/flight-helmet.html'}
 ];
 const server=await preview({configFile:false,root:'site',build:{outDir:'dist'},logLevel:'error',preview:{host:'127.0.0.1',port:0}});
 const browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL??'msedge',args:process.env.BROWSER_ARGS?JSON.parse(process.env.BROWSER_ARGS):[],headless:true}),report=[];

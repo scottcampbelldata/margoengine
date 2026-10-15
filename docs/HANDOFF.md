@@ -531,7 +531,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       (`scripts/visual-regression.js`, baselines + `tests/visual/manifest.json`; how to run: Worker practice).
       22 views of the 8 demos `scripts/build-site.js` serves: `/night-citadel/`, `/gameplay-sandbox/`,
       `/demos/character-animation.html` (`/demos/robot-expressive.html` is the same page, not captured twice),
-      `/demos/damaged-helmet.html`, `/demos/windy-meadow.html`, `/demos/earth/`, `/demos/dof/`, `/demos/tonemap/`; each at
+      `/demos/flight-helmet.html` (was `/demos/damaged-helmet.html`, see LAUNCH GATES #5), `/demos/windy-meadow.html`, `/demos/earth/`, `/demos/dof/`, `/demos/tonemap/`; each at
       1280x720 `?quality=high` and `?quality=low`, and as an iPhone (390x844, DPR 3, iPhone UA = phone tier); dof and
       tonemap read no tier, so only high + phone. The landing page and /catalog/ are static and not captured.
       Capture contract (no demo or package code changed): fresh browser context with prefers-reduced-motion: reduce,
@@ -1442,17 +1442,39 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    (min+gzip), plus every lazily fetched file (workers, Rapier Wasm, OCCT Wasm, Draco/Basis decoders) and WHEN each
    loads. A test proves a basic glTF scene fetches only the expected files. Core+stage figure from
    `npm run measure:size`.
-5. **Real assets render correctly.** Khronos glTF sample assets in the visual-regression suite (DamagedHelmet exists;
-   add FlightHelmet, Sponza and a broader set - Scott approves each download/licence), plus the conveyor GLB and the
+5. **Real assets render correctly.** Khronos glTF sample assets in the visual-regression suite (FlightHelmet exists
+   as the helmet demo; add Sponza and a broader set - Scott approves each download/licence), plus the conveyor GLB and the
    archviz house; all pass the glTF validator and render without visual bugs.
    Status 2026-10-15: FlightHelmet (CC0) downloaded to `examples/assets/khronos/` (Git LFS, validator 0/0); shortlist
    of CC0/CC-BY models for Scott's approval in `examples/assets/khronos/SHORTLIST.md`. Sponza excluded (Cryengine
    licence). Complement (not substitute): Blender-made test scenes that exercise our own Blender pipeline (export
    settings, custom properties/extras).
-   **LICENCE DECISION FOR SCOTT:** DamagedHelmet - used on margoengine.com and in demos/benchmarks - has an earlier
-   model under CC-BY-NC 4.0 (theblueturtle_); attribution is correct in `examples/assets/ATTRIBUTION.md`, but
-   non-commercial terms on a site marketing the engine are a risk. Recommended: replace public uses with FlightHelmet
-   or SciFiHelmet (both CC0) before launch; keep or drop DamagedHelmet in internal tests per Scott.
+   [DONE 2026-10-15] **LICENCE DECISION:** DamagedHelmet's earlier model is CC-BY-NC 4.0 (theblueturtle_), so Scott
+   decided: replace every public use with a CC0 helmet, keep DamagedHelmet only in internal tests/benchmarks.
+   Picked **FlightHelmet** over SciFiHelmet (both CC0, both rendered in the demo): under the demo's lighting (no IBL)
+   SciFiHelmet reads as a flat grey shape seen from the side, while FlightHelmet faces the camera with leather, rubber,
+   brass, glass and wood - clearly the better showcase. It costs more bytes, so the packer now welds, quantizes
+   (`KHR_mesh_quantization`) and simplifies: `node scripts/optimize-demo-assets.js` builds
+   `examples/assets/flight-helmet.glb` (5,553,048 B: 94,722 triangles, 1024 px JPEG maps; DamagedHelmet desktop was
+   3,773,916 B with 2048 px maps) and `flight-helmet-mobile.glb` (1,301,036 B: 20,734 triangles, 512 px JPEG maps,
+   simplification error 0.005; DamagedHelmet phone was 600,948 B / 6,179 triangles) from the CC0 source in
+   `examples/assets/khronos/FlightHelmet/`; Khronos validator 0 errors / 0 warnings for both (DamagedHelmet had a
+   tangent-space warning). SciFiHelmet would have been 1.9 MB / 0.67 MB (1024 / 512 px).
+   Public demo is now `/demos/flight-helmet.html` (old URL 301 via new `site/_redirects`), landing tile
+   `site/images/flight-helmet.jpg`, sitemap, footer link "Demo asset credits" (`/demos/assets/ATTRIBUTION.md`),
+   visual-regression views `flight-helmet-{high,light,phone}` (bit-identical over 4 runs), csp-check, demo
+   subject/desktop/streaming/extension tests, READMEs and docs. `damaged-helmet-mobile.glb` and the old tile are
+   deleted; `damaged-helmet.glb` stays for tests/benchmarks (credits now `examples/assets/damaged-helmet-CREDITS.md`,
+   not copied to the site). Remaining DamagedHelmet mentions are internal: package tests, `examples/package-benchmarks`
+   and their results, measurement notes in package READMEs/docs/whitepaper (labelled as such), this file's history.
+   Not re-measured: the demo-load and frame-rate tables in `docs/demo-loading.md` / `docs/desktop-frame-rate.md`
+   (rows labelled "former demo").
+   OPEN (found by the swap, not fixed - gltf-pro): `scripts/test-helmet-streaming.js` passes its streaming cases but
+   fails its full-detail parity step: loading the full FlightHelmet directly (phone URL fulfilled with the desktop GLB)
+   draws the `KHR_materials_transmission` goggle lenses black (~320 px, max diff 165-171), while the streamed upgrade
+   shows the stand through them. DamagedHelmet has no transmission, so this never showed. Likely the sorted
+   transmission draw depends on load/dispose history. csp-check was not re-run (laptop went on battery); run
+   `node scripts/gpu-lock.mjs run --owner=<id> -- node scripts/csp-check.mjs` on AC.
 6. **Code hygiene >= 9** (5k), including zero `any` in public APIs and TSDoc on every export (autocomplete with docs).
 7. **Docs + playground** (item 8): quickstart, three.js migration, two flagship tutorials, cookbook, generated API
    reference, live-editable examples.

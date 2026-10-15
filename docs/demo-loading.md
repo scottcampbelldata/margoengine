@@ -49,7 +49,7 @@ are retained for comparison; current cold-load timings require a fresh run.
 | --- | ---: | ---: | ---: | ---: |
 | Night Citadel | 615 ms | 751 ms | 1,273 ms | 1,379 ms |
 | Afterlight / gameplay sandbox | 708 ms | 810 ms | 1,858 ms | 2,058 ms |
-| Damaged helmet | 907 ms | 939 ms | 1,406 ms | 1,500 ms |
+| Damaged helmet (former demo; replaced by Flight helmet, not re-measured) | 907 ms | 939 ms | 1,406 ms | 1,500 ms |
 | Character study | 904 ms | 981 ms | 933 ms | 1,011 ms |
 | Robot Expressive | 938 ms | 965 ms | 969 ms | 995 ms |
 | Windy meadow | 759 ms | 781 ms | 789 ms | 811 ms |
