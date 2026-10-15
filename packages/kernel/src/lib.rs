@@ -19,7 +19,8 @@ fn sqrt(value: f64) -> f64 {
     { value.sqrt() }
 }
 
-// Each Wasm instance owns one fixed-capacity kernel; no allocations occur in tick.
+// Each Wasm instance owns one fixed-capacity kernel; no allocations occur in tick. JS grows it by dropping it and
+// creating a larger one at the same address (TransformStore.grow); at most 2^23 slots keep the layout under 4 GiB.
 // Data beyond the published fields: 16 input snapshot words per entity at 70n+24 (the inputs last seen by world_matrix).
 // Flags: active, visible, constrained, hidden, depth|hidden mark, per-tick state, changed (set here, cleared by the engine).
 pub struct Kernel {
@@ -197,7 +198,7 @@ impl Kernel {
 #[unsafe(no_mangle)]
 #[cfg(not(target_arch = "wasm32"))]
 pub extern "C" fn kernel_new(capacity: usize) -> *mut Kernel {
-    if !(1..=100_000).contains(&capacity) { return std::ptr::null_mut(); }
+    if !(1..=1<<23).contains(&capacity) { return std::ptr::null_mut(); }
     Box::into_raw(Box::new(Kernel::new(capacity)))
 }
 
@@ -212,7 +213,7 @@ unsafe extern "C" { static __heap_base: u8; }
 #[unsafe(no_mangle)]
 pub extern "C" fn kernel_new(capacity: usize) -> *mut Kernel {
     unsafe {
-        if INITIALIZED || !(1..=100_000).contains(&capacity) { return core::ptr::null_mut(); }
+        if INITIALIZED || !(1..=1<<23).contains(&capacity) { return core::ptr::null_mut(); }
         let start = (core::ptr::addr_of!(__heap_base) as usize+3)&!3;
         let length = capacity*86+24;
         let end = start+length*4+capacity*7;

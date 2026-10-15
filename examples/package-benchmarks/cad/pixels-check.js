@@ -7,7 +7,8 @@ const camera = {fov: 45, near: 0.05, far: 50, position: [1.3, 1.1, 1.6], target:
 let a, assembly, step = 0;const errors = [];
 const draw = async engine => {engine.render();await engine.gpu.queue.onSubmittedWorkDone();};
 async function setup() {
-  a = await Engine.create(document.getElementById('a'), {capacity: 512, camera});a.gpu.addEventListener('uncapturederror', e => errors.push(e.error.message));
+  // A starts exactly full (242 entities) and grows at step 5, between incremental frames; B grows from 1 slot.
+  a = await Engine.create(document.getElementById('a'), {capacity: 242, camera});a.gpu.addEventListener('uncapturederror', e => errors.push(e.error.message));
   assembly = buildAssembly(a, 8);await draw(a);await draw(a);return {parts: assembly.parts.length};
 }
 // One step: every 10th part moves (a different tenth each step), one module turns (moves its children), plus one edit.
@@ -21,17 +22,17 @@ async function advance() {
     () => {live[5].visible = true;live[7].setParent(modules[0]);},
     () => {live[9].material.data[0] = 0.9;},
     () => {live[11].dispose();},
-    () => {const m = a.createMesh(modules[1]).setGeometry(assembly.geometries.bolt).setMaterial(new PbrMaterial({color: '#ff3000'})).setPosition([0, 0.05, 0]);m.name = 'added';parts.push(m);},
+    () => {for (const y of [0.05, 0.08]) {const m = a.createMesh(modules[1]).setGeometry(assembly.geometries.bolt).setMaterial(new PbrMaterial({color: '#ff3000'})).setPosition([0, y, 0]);m.name = 'added';parts.push(m);}},
     () => {live[13].scale.set(1.5, 1.5, 1.5);},
     () => {live[15].material = new PbrMaterial({color: '#00ff40'});},
     () => {groups[0].position.x += 0.05;},
     async () => {await a.pick(240, 160);},
     () => {live[17].setGeometry(assembly.geometries.nut);},
   ][step % 11];
-  await edit();await draw(a);return {step, full: a.collected};
+  await edit();await draw(a);return {step, full: a.collected, capacity: a.store.capacity};
 }
 async function reference() {
-  const b = await Engine.create(document.getElementById('b'), {capacity: 512, camera}), copies = new Map();
+  const b = await Engine.create(document.getElementById('b'), {capacity: 1, camera}), copies = new Map();
   b.gpu.addEventListener('uncapturederror', e => errors.push(e.error.message));
   for (const mesh of a.meshes.values()) {
     const copy = b.createMesh();copies.set(mesh.id, copy);for (const key of keys) b.store.transforms[key][copy.id] = a.store.transforms[key][mesh.id];

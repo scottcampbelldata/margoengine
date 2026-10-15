@@ -155,8 +155,8 @@ app.box({size: [1, 1, 1], color: '#84d6bd'});
 - `engine.camera.fitToBoundingBox(min, max, {duration: 0.3})` frames a box, animated. `@margoengine/cameras`'
   `projection.fit(model.bounds)` takes the flat bounds array and also fits orthographic views (by zoom).
 - `engine.backend` is `'webgpu'` or `'webgl2'`; `engine.fallbackReason` says why WebGPU was not used.
-- `capacity` (default 1,024, at most 100,000) is the fixed number of meshes and transform nodes an engine holds. Raise
-  it for big scenes: `Engine.create(canvas, {capacity: 50_000})`.
+- `capacity` (default 1,024) is the initial number of meshes and transform nodes an engine holds; `createMesh` doubles it
+  when full, up to 8,388,608. Set it for big scenes to skip the doublings: `Engine.create(canvas, {capacity: 50_000})`.
 - Several scenes or viewports per canvas are not available.
 
 A transparent canvas over HTML and CSS, like `new THREE.WebGLRenderer({alpha: true})` with `setClearColor(0x000000, 0)`:

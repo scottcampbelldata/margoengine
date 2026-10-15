@@ -18,7 +18,8 @@ numbers only within one session. Raw JSON: `examples/package-benchmarks/cad/resu
 `examples/package-benchmarks/cad/assembly.js`: five distinct part shapes (plate with 8 holes, L bracket, hex-head bolt,
 chamfered hex nut, washer) instanced into modules of 27 parts (1 plate, 2 brackets, 8 bolts, 8 nuts, 8 washers) under a
 5-level hierarchy: root > zone (32 modules) > module > fastener set > part. 30 entities per module (27 parts + 3 groups).
-The core caps a TransformStore at 100,000 entities, so the largest case is 89,883 parts in 99,976 entities.
+The core capped a TransformStore at 100,000 entities until HANDOFF 5m.a, so the largest case here is 89,883 parts in 99,976 entities;
+the store now grows on demand (see [Beyond 100,000 entities](#beyond-100000-entities-growth-on-demand-handoff-5ma)).
 
 | Case | Parts | Entities | Instanced triangles | Distinct triangles |
 | --- | --- | --- | --- | --- |
@@ -79,6 +80,7 @@ assembly (`node examples/package-benchmarks/cad/kernel-node.mjs`, `results-kerne
 5. **`Engine.remove` scans every mesh** to unparent children: about 3 ms per removal at 100k entities, so disposing a
    90k-part assembly mesh by mesh is O(n²), minutes.
 6. **100,000-entity cap** in `TransformStore.create`: a 100,000-part assembly does not fit once assembly nodes are counted.
+   (Fixed by HANDOFF 5m.a: the store grows on demand up to 2^23 slots.)
 
 ## Core static-scene fast paths (merged 2026-10-14: steps 1, 2, 3 and 5; step 4 not merged)
 
@@ -274,6 +276,46 @@ Before and after were measured locally for that change (not committed); "Now" is
 | `@margoengine/machinery` root | 33,121 B | 33,849 B | 33,418 B |
 | core + stage (`npm run measure:size`, untouched) | 18,681 B | 18,681 B | 19,577 B (core fast paths and material setters since) |
 
+## Beyond 100,000 entities: growth on demand (HANDOFF 5m.a)
+
+`Engine.create`'s `capacity` is now the initial size; `createMesh` doubles the store when it is full, up to 2^23
+(8,388,608) slots. Growing drops the Wasm kernel and creates a larger one at the same address (one kernel per Wasm
+instance, so memory is reused, not leaked), re-binds every view and `mesh.matrix`, and copies inputs and outputs back
+(each view keeps its per-entity layout, so the old values are a prefix). The next tick recomputes every entity once; the
+dirty-skip path, and "a failed tick publishes nothing", are unchanged. A growth that cannot allocate throws and leaves
+the store as it was. Core + stage 19,793 -> 19,888 B gzip (+95: JS +94, Wasm rebuilt from `lib.rs`, +1).
+
+Memory per slot (layout in `packages/kernel/src/lib.rs`): 86 float columns (TRS 10, parent 1, world matrix 16, local
+sphere 4, world sphere 4, rotations 3, joint limits 12, scratch matrix 16, scratch sphere 4, input snapshot 16) = 344 B,
+plus 7 flag bytes = 351 B in the kernel; 5 B in the engine (`seen`, `slots`). Measured Wasm memory (includes the
+fixed static area and page rounding): 44.9 MB at 131,072 slots, 176.6 MB at 524,288, 352.1 MB at 1,048,576. On top:
+96 B per drawn instance on the CPU and the same on the GPU, and about 260-540 B of JS heap per `Mesh` object. A growth
+briefly holds a JS copy of the exposed views (189 B per old slot).
+
+Node (same Wasm as the browser, fake renderer), CAD assembly built from the default 1,024 slots so every doubling runs;
+quiet-gated (CPU 8%), AC; `node --expose-gc examples/package-benchmarks/cad/scale-node.mjs`, raw
+`examples/package-benchmarks/cad/results-scale-node.json`:
+
+| Entities (parts) | Slots | Kernel Wasm | Build (incl. growth) | Last doubling | Tick, static | Tick, 1% moving | Tick, full recompute | Collection (full) | Dispose |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 100,006 (89,910) | 131,072 | 44.9 MB | 374 ms | 11.6 ms | 3.3 ms | 4.5 ms | 14.4 ms | 8.3 ms | 28 ms |
+| 499,992 (449,523) | 524,288 | 176.6 MB | 1.80 s | 59 ms | 20.2 ms | 26.2 ms | 74.9 ms | 33.8 ms | 194 ms |
+| 1,000,012 (899,073) | 1,048,576 | 352.1 MB | 3.35 s | 128 ms | 41.5 ms | 43.4 ms | 138 ms | 64.5 ms | 475 ms |
+
+Ticks include culling. "Static" is the dirty-skip path (no entity changed: about 41 ns per entity for the per-entity
+input compare); "full recompute" is what the first tick after each doubling costs. Collection = a frame forced to
+re-collect minus a reused frame (the orbit case). Read: core meshes scale linearly; at 1M entities the CPU floor is
+about 40 ms of kernel per frame even when nothing moves, so 1M-part scenes need GPU culling with a stable kept set
+(HANDOFF 5m.b) or `CulledInstances` for parts that never need to be meshes.
+Bit-exactness at 1M: `tests/core-dirty-transforms.test.js` (growth from 1,024 to 1,048,576, 63-deep chains, 1% moves
+recomputing exactly the movers and their descendants, 1,000 removals, slot reuse, a failed tick, dispose; every world
+matrix and visibility equals a fresh kernel's full recompute bit for bit, about 10 s). Real GPU: `cad/pixels-check.mjs`
+now starts engine A exactly full (242 slots) and grows it mid-run, and the reference engine from 1 slot: 0 differing
+pixels over 25 comparisons + 4 redraws; `cad/cull-pixels.mjs --ref=b6a3796`: 0 differing pixels over 13 steps.
+Browser CAD orbit, before (b6a3796) / after, DIAGNOSTIC (machine busy, quiet gate never passed; raw
+`results-cap-{before1,after1,after2}-orbit.json`): kernel in frame 0.59 / 3.55 / 5.87 ms vs 0.46-0.56 / 2.48-2.85 /
+5.39-6.0 ms at 10k / 50k / 90k parts; collection 1.36 / 9.0 / 14.4 vs 1.0 / 5.7-6.6 / 13.6 ms. Nothing slower; a quiet
+re-run (and 200k / 500k / 1M browser runs) is still owed.
 ## GPU culling: `@margoengine/culling` (HANDOFF 1f.a)
 
 Measured 2026-10-14 in one session (Arc 140V, headless Edge, 1432x768, 4x MSAA, AC power checked before and after every

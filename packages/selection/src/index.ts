@@ -111,7 +111,10 @@ export class Selection implements EnginePlugin {
  }
  private draw(c:Context):void {
   if(!this.selected.size)return;
-  this.validate();this.resize(c);this.flags.fill(0);for(const mesh of this.selected){if(isModel(mesh))continue;const id=meshRuntime(mesh).id;if(this.engine!.meshes.get(id)===mesh)this.flags[id]=1;}
+  this.validate();this.resize(c);
+  // Core grows its entity store on demand; keep one flag per entity slot.
+  if(this.flags.length<this.engine!.store.capacity){this.buffer?.destroy();this.flags=new Uint32Array(this.engine!.store.capacity);this.buffer=c.device.createBuffer({size:this.flags.byteLength,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST});this.maskDraw.bindings=[{binding:1,resource:{buffer:this.buffer}}];}
+  this.flags.fill(0);for(const mesh of this.selected){if(isModel(mesh))continue;const id=meshRuntime(mesh).id;if(this.engine!.meshes.get(id)===mesh)this.flags[id]=1;}
   c.device.queue.writeBuffer(this.buffer!,0,this.flags as Uint32Array<ArrayBuffer>);this.values[0]=this.options.width??3;this.values[1]=+(this.options.algorithm==='morphological');this.values.set(this.options.color??[1,0.5,0],4);c.device.queue.writeBuffer(this.uniform!,0,this.values as Float32Array<ArrayBuffer>);
   if(this.options.xray)this.xray(c);
   this.mark(c,this.maskDraw,false);

@@ -25,7 +25,7 @@ try {
   console.log('ok initial', await compare('initial'));
   for (let i = 0; i < 24; i++) {
     const r = await page.evaluate(() => window.check.advance());
-    console.log('ok step', r.step, await compare(`step ${r.step}`));
+    console.log('ok step', r.step, 'capacity', r.capacity, await compare(`step ${r.step}`));
     if (i % 6 === 5) {await page.evaluate(() => window.check.redraw());console.log('ok unchanged redraw', await compare(`redraw after step ${r.step}`));}
   }
   assert.deepEqual(await page.evaluate(() => window.check.errors), []);assert.deepEqual(pageErrors, []);

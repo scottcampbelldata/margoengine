@@ -16,7 +16,7 @@ const edgeCpu = [];
 async function run({machineryBase = '/packages/machinery/dist', modules, frames = 240, warmup = 60, pick = true, bvh = true, explode = true, edges = false, view = 'overview', low = false, still = false, move = 0}) {
   if (low) globalThis.margoLow = 1;
   const canvas = document.getElementById('view'), result = {modules, crossOriginIsolated, msaa: low ? 1 : 4, view, still, move};
-  const capacity = Math.min(100_000, modules * ENTITIES_PER_MODULE + Math.ceil(modules / 32) + 1);
+  const capacity = modules * ENTITIES_PER_MODULE + Math.ceil(modules / 32) + 1;
   let t = now();const engine = await withGPUTiming(true, () => Engine.create(canvas, {capacity, camera: {fov: 45, near: 0.05, far: 2000}}));result.engineCreateMs = now() - t;
   const errors = [];engine.gpu.addEventListener('uncapturederror', e => errors.push(e.error.message));
   t = now();const assembly = buildAssembly(engine, modules);result.buildMs = now() - t;

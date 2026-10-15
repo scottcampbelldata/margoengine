@@ -18,7 +18,7 @@ changed since); **[need]** no data yet.
 ## 1. Architecture
 
 1. Rust/Wasm transform kernel: flat typed arrays in Wasm memory (positions, rotations, scales, hierarchy, world
-   matrices, culling); capacity 1,024-100,000 entities; what runs per frame and its measured cost per entity. **[rerun]**
+   matrices, culling); capacity 1,024 initial, doubled on demand up to 8,388,608 entities; what runs per frame and its measured cost per entity. **[rerun]**
    after the approved core speed-ups (skip unchanged entities, reuse instances, partial uploads, fast removal) land.
 2. WebGPU first: reversed float depth, automatic instancing (one draw per geometry), uint GPU picking, device-loss
    recovery; WebGL2 only via the optional `@margoengine/webgl` (core meshes, flat PBR, one light). State plainly what

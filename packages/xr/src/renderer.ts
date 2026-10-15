@@ -28,6 +28,8 @@ export class StereoRenderer {
     for(const mesh of engine.meshes.values())if(mesh.geometry&&engine.store.visible[mesh.id]) {
       const geometry=mesh.geometry;used.add(geometry);
       let resource=this.resources.get(geometry);
+      // Core grows its entity store on demand: rebuild instance storage sized for the old capacity.
+      if(resource&&resource.data.length<engine.store.capacity*24){resource.vertex.destroy();resource.index.destroy();resource.instance.destroy();this.resources.delete(geometry);resource=undefined;}
       if(!resource) {
         const allocated:GPUBuffer[]=[];
         const upload=(data:Float32Array|Uint32Array,usage:number)=>{

@@ -46,7 +46,8 @@ test('PBR construction rolls back invalid hierarchy/transforms and exhausted cap
     fixture.doc.buffers.push({byteLength:indices.byteLength});fixture.doc.bufferViews.push({buffer:id,byteLength:indices.byteLength});fixture.doc.accessors.push({bufferView:id,componentType:5125,count:3,type:'SCALAR'});fixture.buffers.push(indices);fixture.doc.meshes[0].primitives[0].indices=id;
     assert.throws(()=>new PBRModel(engine,new GLTFAsset(fixture.doc,fixture.buffers)),/indices/);assert.equal(engine.meshes.size,0,'Oversized UInt32 indices cannot wrap into valid vertices');
   } finally {engine.dispose();}
-  const small=await headless(1);try{const f=animatedTriangle();assert.throws(()=>new PBRModel(small,new GLTFAsset(f.doc,f.buffers)),/capacity/);assert.equal(small.meshes.size,0);}finally{small.dispose();}
+  // Core grows its store on demand; simulate the store failing to grow (Wasm memory exhausted).
+  const small=await headless(1);small.store.grow=()=>{throw new Error('Transform allocation');};try{const f=animatedTriangle();assert.throws(()=>new PBRModel(small,new GLTFAsset(f.doc,f.buffers)),/Transform allocation/);assert.equal(small.meshes.size,0);}finally{small.dispose();}
 });
 test('SSAO validates radius, bias, samples and toggles before GPU allocation',async()=>{
   for(const options of [{radius:0},{radius:NaN},{bias:-1},{bias:1,radius:0.5},{samples:33},{samples:2.5},{enabled:'yes'}])assert.throws(()=>new SSAO(options),/options/);

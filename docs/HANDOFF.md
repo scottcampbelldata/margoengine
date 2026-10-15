@@ -1109,7 +1109,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       each failed once under load.
    m. docs/threejs-parity.md summary counts drifted (OIT added a COVERED row without updating the totals) - recount.
    Order: after the current wave, alongside the hygiene phase (5k) and under its gates, before the demo rebuild.
-5m. CORE APPROVALS, conditional (Scott, 2026-10-14 night): do both IF core+stage stays under 20,000 B gzip
+5m. [a DONE: core + stage 19,888 B gzip] CORE APPROVALS, conditional (Scott, 2026-10-14 night): do both IF core+stage stays under 20,000 B gzip
    (`npm run measure:size`; the build gate fails at >= 20,000). No safety margin needed: 19,999 is acceptable (Scott).
    Start after back-face culling B merges (~19,789).
    a. Raise the 100,000-entity cap (Rust/Wasm kernel + JS side) so streaming can reach 1M parts: measure memory per
@@ -1120,6 +1120,25 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    If a+b together would cross 20,000, do (a) first, report the remaining budget and the hook's exact cost to Scott,
    and fall back to package-side streaming (CulledInstances) for whatever doesn't fit. Report the final core+stage
    total and remaining headroom.
+   Result (a): the store grows on demand: `capacity` is the initial size, `createMesh` doubles it when full, up to 2^23
+      (8,388,608) slots. `TransformStore.grow` drops the Wasm kernel and creates a larger one at the same address,
+      re-binds views and every `mesh.matrix`, copies values back; failure keeps the old store. Next tick recomputes all
+      once; dirty-skip and "failed tick publishes nothing" unchanged. +95 B (19,793 -> 19,888). Memory: 351 B/slot in
+      the kernel (the "~66 B" above was only the dirty-skip snapshot), 5 B/slot in the engine: Wasm 44.9 / 176.6 /
+      352.1 MB at 131k / 524k / 1,048k slots. Node (quiet, CAD assembly, `cad/scale-node.mjs`): static tick 3.3 / 20.2
+      / 41.5 ms, 1% moving 4.5 / 26.2 / 43.4 ms, full recompute 14.4 / 74.9 / 138 ms, full collection 8.3 / 33.8 /
+      64.5 ms at 100k / 500k / 1M entities. Proofs: 1M-entity Node test bit-exact vs a fresh kernel
+      (`tests/core-dirty-transforms.test.js`), `cad/pixels-check.mjs` (now grows mid-run) and `cad/cull-pixels.mjs
+      --ref=b6a3796` 0 differing pixels. Wasm rebuilt reproducibly from lib.rs (SHA-256 9a7d9a44...). Selection's
+      outline flags and XR instance storage follow the grown capacity. CAD browser runs at 10k / 50k / 90k (DIAGNOSTIC: the quiet gate never passed, other agents held the GPU;
+      `cad/results-cap-{before1,after1,after2}-orbit.json`; the before2 round and the 200k/500k/1M runs were lost to the
+      04:30 crash): kernel in frame 0.59 / 3.55 / 5.87 ms before vs 0.46-0.56 / 2.48-2.85 / 5.39-6.0 after, collection
+      1.36 / 9.0 / 14.4 vs 1.0 / 5.7-6.6 / 13.6 ms, 90k orbit 14.9 FPS (GPU contended) vs 34.5-35.6; no regression seen,
+      quiet re-run still owed.
+      Still capped at 100,000 by their own input validation (package-side, not core): glTF/gltf-pro nodes, .margo nodes,
+      OBJ parts, `SurfacePhysics` parts; `AssemblyBVH` 1,000,000 triangles per geometry is unrelated. `docs/limits.md`
+      does not exist yet (5j): its entity row is "8,388,608 slots, 351 B each; ~40 ms CPU kernel floor at 1M even when
+      static; escape hatch CulledMeshes/CulledInstances".
 6. Then give Scott the full list of what was done and what remains.
 8. FINAL TO-DO (Scott, 2026-10-15): thorough docs and as many tutorials as possible - "documentation is the product".
    Structure the docs site by Diataxis (keep the four kinds separate): Tutorials (learning), How-to cookbook

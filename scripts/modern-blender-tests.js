@@ -92,7 +92,7 @@ try{
     const canvas=document.createElement('canvas');canvas.style.cssText='width:256px;height:256px';document.body.append(canvas);
     const small=await Engine.create(canvas,{backend:'webgpu',capacity:1});
     const bytes=await (await fetch('/fixture-0.margo')).arrayBuffer();let failed=false;
-    try{await parseMargo(small,bytes);}catch(error){failed=/capacity/.test(error.message);}
+    small.store.grow=()=>{throw new Error('Transform allocation');};try{await parseMargo(small,bytes);}catch(error){failed=/Transform allocation/.test(error.message);}
     assert(failed&&small.meshes.size===0,'Capacity failure did not roll back');small.dispose();canvas.remove();
     const container=document.createElement('div');container.style.cssText='width:256px;height:256px';document.body.append(container);
     const stage=await createStage(container,{backend:'webgpu',capacity:16,controls:false,autoStart:false});
