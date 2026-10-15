@@ -1,0 +1,350 @@
+{
+ "views": {
+  "dof-high": {
+   "url": "demos/dof/?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "dof-phone": {
+   "url": "demos/dof/",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "tonemap-high": {
+   "url": "demos/tonemap/?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "tonemap-phone": {
+   "url": "demos/tonemap/",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "night-citadel-high": {
+   "url": "night-citadel/?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0.000026,
+    "hot": 0.00000434,
+    "mean": 0.000243,
+    "max": 26
+   },
+   "tolerance": {
+    "changed": 0.000578,
+    "hot": 0.000213
+   }
+  },
+  "night-citadel-light": {
+   "url": "night-citadel/?quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0.00072,
+    "hot": 0.000026,
+    "mean": 0.00577,
+    "max": 77
+   },
+   "tolerance": {
+    "changed": 0.00266,
+    "hot": 0.000278
+   }
+  },
+  "night-citadel-phone": {
+   "url": "night-citadel/",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0.00434,
+    "hot": 0.0000608,
+    "mean": 0.0193,
+    "max": 34
+   },
+   "tolerance": {
+    "changed": 0.0135,
+    "hot": 0.000382
+   }
+  },
+  "gameplay-sandbox-high": {
+   "url": "gameplay-sandbox/?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0.0518,
+    "hot": 0.00341,
+    "mean": 0.357,
+    "max": 201
+   },
+   "tolerance": {
+    "changed": 0.156,
+    "hot": 0.0104
+   }
+  },
+  "gameplay-sandbox-light": {
+   "url": "gameplay-sandbox/?quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0.0133,
+    "hot": 0.000707,
+    "mean": 0.0813,
+    "max": 179
+   },
+   "tolerance": {
+    "changed": 0.0404,
+    "hot": 0.00232
+   }
+  },
+  "gameplay-sandbox-phone": {
+   "url": "gameplay-sandbox/",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0.0155,
+    "hot": 0.000389,
+    "mean": 0.0748,
+    "max": 144
+   },
+   "tolerance": {
+    "changed": 0.047,
+    "hot": 0.00137
+   }
+  },
+  "character-animation-high": {
+   "url": "demos/character-animation.html?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "character-animation-light": {
+   "url": "demos/character-animation.html?quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "character-animation-phone": {
+   "url": "demos/character-animation.html",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "damaged-helmet-high": {
+   "url": "demos/damaged-helmet.html?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "damaged-helmet-light": {
+   "url": "demos/damaged-helmet.html?quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "damaged-helmet-phone": {
+   "url": "demos/damaged-helmet.html",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "windy-meadow-high": {
+   "url": "demos/windy-meadow.html?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "windy-meadow-light": {
+   "url": "demos/windy-meadow.html?quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "windy-meadow-phone": {
+   "url": "demos/windy-meadow.html",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "earth-high": {
+   "url": "demos/earth/?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "earth-light": {
+   "url": "demos/earth/?quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "earth-phone": {
+   "url": "demos/earth/",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  }
+ },
+ "environment": {
+  "browser": "msedge 155.0.4283.45",
+  "gpu": "intel xe-2lpg",
+  "acPowerBefore": true,
+  "acPowerAfter": true,
+  "date": "2026-10-14T23:52:47.588Z",
+  "commit": "5d014fe"
+ },
+ "method": {
+  "hot": 24,
+  "margin": 3,
+  "allowance": {
+   "changed": 0.0005,
+   "hot": 0.0002
+  }
+ }
+}
