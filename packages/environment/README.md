@@ -74,6 +74,95 @@ Measured (Intel Arc 140V, Edge, AC power, GPU lock; `node examples/package-bench
 
 Limits: the 4x composite is per sample (about 4x the 1x cost; a per-pixel variant would be cheaper at the price of silhouette halos); one froxel grid resolution regardless of screen size, so sharp shadow edges in the fog are about one froxel wide (8 × 8 pixels at 1280 × 720 with the default grid) and softened by the temporal blend; fast-moving lights or occluders leave a short trail (lower `temporal`); transparent surfaces, particles, VFX and splats drawn after it are not fogged (blended glTF-pro primitives take the fog of what is behind them); fog beyond `range` is not modelled (distant surfaces get the fog up to `range`); the sun's shadow is a single comparison sample of the cascade, without PCSS; no participating media volumes (boxes, local density fields) and no multiple scattering. WebGPU only.
 
+## Light probes: irradiance volumes and reflection probes
+
+`@margoengine/environment/probes` is a separate entry (10,845 B min+gzip; the root entry is byte-identical without it).
+It bakes the scene into light probes on the GPU and uses them as the ambient light of core meshes and of every model
+you `add` (gltf-pro and materials models, terrain), the receivers clustered lights reach:
+
+```ts
+import {Engine} from '@margoengine/core';
+import {Environment, loadEnvironmentImage} from '@margoengine/environment';
+import {LightProbes} from '@margoengine/environment/probes';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const environment = await Environment.create(engine, await loadEnvironmentImage('/sky.hdr'));
+const probes = LightProbes.attach(engine, {
+  environment,                                                            // ambient outside the probes, and the sky they see
+  volume: {min: [-5, 0, -4], max: [5, 3, 4], counts: [6, 2, 5]},          // irradiance probes at the cell centres
+  reflections: [{position: [0, 1.5, 0], min: [-5, 0, -4], max: [5, 3, 4]}], // box-projected onto the room's walls
+});
+// probes.add(model) for each gltf-pro / materials model or terrain; added models are also captured.
+await probes.bake();                                                      // at load, or again whenever the scene changes
+```
+
+- **Irradiance volume.** A box filled with a grid of probes (1-64 per axis, at most 4,096), one per cell centre. Each probe
+  renders the scene into six faces (`resolution`, default 16 px) and projects them to L2 spherical harmonics (`sh: 1` keeps
+  L1: 4 instead of 9 coefficients), stored as irradiance / PI like the environment's SH. Receivers blend the eight nearest
+  probes trilinearly (clamped to the outer cell centres); surfaces on the box faces are inside, and the volume fades to
+  the fallback over `blend` metres outside the box (default 0).
+- **Reflection probes.** Up to 16, each captured at `position` (`resolution`, default 128 px faces) and stored as
+  octahedral radiance levels down to 4 x 4: level 0 resampled from the faces, each rougher level a GGX convolution of
+  level 0 at roughness level / (levels - 1) (n = v = r, as the environment's prefilter). A surface's reflected ray is
+  intersected with the probe's box (box projection) and the radiance read trilinearly over the levels by roughness. The
+  box is also the influence volume (its faces included, so a room box lights its own walls); the probe fades out over
+  `blend` (default 10% of its smallest side) outside it, and
+  where boxes overlap the earlier probe in the list wins, so list nested boxes first.
+- **Replacing the ambient term.** Probes replace the ambient light, named `margoAmbient` like `EnvironmentLighting`, so
+  SSAO occludes it: diffuse from the volume and specular from the reflection probes, split-sum weighted as
+  EnvironmentLighting; where a probe's weight is below 1 the rest comes from `environment` (its SH and prefiltered cube,
+  exactly EnvironmentLighting's term) or, without one, from the receiver's own ambient (core's scalar ambient, gltf-pro's
+  hemisphere). Use LightProbes instead of EnvironmentLighting, not with it (patching both throws, naming the fix). Unbaked
+  probes have weight 0, so attaching them changes nothing until `bake()` resolves.
+- **Baking.** `bake()` renders one ordinary frame (shadow maps and other per-frame inputs come from the previous frame),
+  then a frame whose pass at order -0.5 captures every probe: core meshes through core's fully patched lit shader drawn
+  from the probe camera, and every added model with a `draw` method, as linear radiance without fog (receivers fog
+  themselves); clustered point and spot lights are looped in full (the light lists are culled for the main camera), area
+  lights and shadows are as the frame has them; where nothing was drawn the environment's sky (or black) fills in. One
+  submit per face, then one compute pass per probe. `bounces: n` repeats the capture n times, each seeing the previous
+  bake's probe light (one more bounce each). The result is also read back to the CPU: a device restore re-uploads it, and
+  `irradianceAt(position, normal)` returns the volume's irradiance there, as the shaders compute it.
+- **Bindings.** One storage buffer (header, then float16 RGB texels: 72 B per L2 probe, 21,840 texels per 128 px
+  reflection probe) and no sampled texture; with an environment the same five IBL bindings EnvironmentLighting uses. So
+  gltf-pro's physical material with shadows, LocalShadows and environment lighting stays at 16 sampled textures; storage
+  buffers in the lit fragment become 6 of 8 with clustered + area lights.
+- **SSR.** `@margoengine/post/ssr` removes the probes' own specular (`probeSpecular`) where it finds a reflection on
+  screen and keeps the probe's elsewhere, so reflection probes are SSR's off-screen fallback.
+
+Measured (Intel Arc 140V, Edge 155, AC, GPU lock; `node examples/package-benchmarks/probes-gpu.mjs`,
+[probes-gpu.json](../../examples/package-benchmarks/results/probes-gpu.json)). A closed 4 x 3 x 4 m room whose six walls
+radiate exactly their colour, with a 2 x 2 x 2 L2 volume and one 128 px reflection probe filling it:
+
+- Volume SH read back vs a CPU projection of the analytic room (6 x 256^2 samples): every coefficient of every probe
+  within 1.7% of the probe's DC term (0.7-1.7%).
+- Reflection levels vs the analytic radiance (level 0) and a CPU GGX convolution of it (levels 1-5, roughness 0.2-1):
+  median error 0.0002-0.0018, 95th percentile 0.0003-0.0083 (radiance 0.1-0.9); the largest errors (level 0: 0.22, level
+  1: 0.04) sit on the texels that straddle a wall-colour boundary.
+- Shading through a CPU mirror of the WGSL (trilinear SH, box projection, trilinear levels, split sum, each path's tone
+  map): a white core sphere and a white materials sphere (gltf-pro hook) and a rough (0.5) metal floor within 1/255; a
+  mirror metal floor within 2/255 at the 95th percentile (5/255 at most) for wall points 0.4 m or more from a wall edge.
+- Box projection is physical: on that mirror floor each pixel shows the wall its reflected ray hits (95th percentile
+  2/255). Closer to an edge, where several walls fall in one 128 px octahedral texel seen from the probe, the reflection
+  shows texel-sized steps (a finer `resolution` shrinks them).
+- No geometry, a synthetic HDR sky: the volume's SH equals the Environment's own within 0.05% of DC, and spheres lit by
+  `LightProbes({environment})` match `EnvironmentLighting` within 1/255.
+- Unbaked probes: core meshes bit-identical to no probes, gltf-pro identical (0/255).
+- With SSR (two views, mirror floor): on screen, 99% of reflecting pixels are no brighter than both the wall as rendered
+  and the probe reflection (adding instead of replacing would exceed both; median difference to the wall 2/255); off
+  screen the floor equals the frame without SSR (95th percentile 0/255).
+- Cost (diagnostic: the quiet gate passed at 12% CPU, but other agents' sessions were open), GPU time of the whole
+  frame at 4x MSAA with the room, both spheres and the volume (4 x 2 x 4) and one reflection probe covering the screen:
+  1280 x 720 0.6-1.1 ms -> 3.8-3.9 ms (volume alone 2.5, reflection probe alone 2.1); 1920 x 1080 2.4 ms -> 8.1-9.2 ms
+  (5.6 and 4.9). Bake of 8 volume probes (16 px) and one 128 px reflection probe: 114-121 ms, 382 ms the first time
+  (pipeline creation included).
+
+Limits: static: a moving object or light needs a re-bake (CPU encode plus GPU, see above); no visibility per probe, so
+light leaks through walls thinner than the probe spacing (place volume boxes per room); one volume per LightProbes;
+reflection probes are box-projected only (no sphere projection); the receiver's normal map and occlusion shade the probe
+light (terrain takes the core-style patch like EnvironmentLighting); core meshes and models with a `draw` method
+(gltf-pro, materials) are captured, terrain, water, sky backgrounds, particles and other custom pipelines are not (the
+environment fills in where nothing was drawn); GPU-culled
+(`CulledMeshes`) parts use the main camera's culling in the capture. WebGPU only.
+
 ## Display P3 and HDR output
 
 ```ts
@@ -244,6 +333,8 @@ Two portability measures are deliberate: the specular prefilter samples the cube
 ## Tests
 
 `npm test` in `packages/environment` runs Node checks: every binary16 value round trip; 20 EXR fixtures written by the reference OpenEXR library (NONE, RLE, ZIPS, ZIP and PIZ, each with HALF RGBA, FLOAT RGB, HALF Y and a mixed HALF/FLOAT/UINT layout) decoding bit-exactly; an independent in-test EXR writer (including raw-fallback chunks, decreasing Y and stored, fixed and dynamic deflate blocks); real files `BrightRings.exr` (ZIP) and `AllHalfValues.exr` (PIZ, every half value) from the OpenEXR test images and `spot1Lux.hdr` from the Three.js examples, matched against reference digests; HDR adaptive, flat and old-style runs in both orientations; truncation and random-corruption fuzzing; CPU SH; and SSR safety. `tests/scene.test.js` checks the scene pieces on a mock GPU: `EnvironmentLighting` and `Fog` patch core's shader as left by shadows, sky, clustered and the HDR captures, leave it untouched when not ready, on another device or disposed, follow device restores and rebuild bind entries on `environment.version`; a real glTF-pro model gets lit and fogged pipelines for opaque and blended primitives and returns to the unpatched pipelines when removed; `ColorBackground` writes exact sRGB or linear values, allocates nothing in steady frames or on resize and releases its uniform; and UltraHDR parsing (attribute and element metadata, corruption fuzzing) and gain-map math against the formula.
+
+`tests/probes.test.js` checks LightProbes on a mock GPU: validation and buffer layout, the ambient patch on core's shader variants (with and without an environment, terrain, clustered) and on a glTF-pro model, the bake's capture shader (rebound frame, linear output, no fog, every clustered light), its submits and dispatches, and the CPU irradiance mirror; the real-GPU checks are `examples/package-benchmarks/probes-gpu.mjs` (README section above).
 
 `npm run test:browser` (a real-GPU script, not in CI) runs Chromium WebGPU checks (set `BROWSER_CHANNEL`, `BROWSER_EXECUTABLE` and `BROWSER_ARGS` as in the repository brief): a constant environment gives constant values at every prefiltered mip and L0-only SH; a single bright direction gives SH matching both a CPU projection and the analytic delta projection, with no fireflies in the prefiltered mips; prefiltered mip 0 equals the source; the cube follows the documented face convention; GPU SH matches a CPU projection of the same cube texels; six `CubeFaces` give the same SH as the equirect; the BRDF LUT matches brute-force quadrature, the smooth-surface analytic limit and Karis's published mobile fit; the background renders the expected color in each direction (equirect, cube, rotation, exposure, blur, HDR and tone-mapped targets) and never draws over non-cleared depth; `IBL_WGSL` compiles against `iblLayoutEntries` and passes a white furnace test; a real `.hdr` goes through the whole pipeline; and in a real engine the background leaves every pixel of a core mesh untouched, matches core's tone mapping elsewhere, allocates nothing in steady frames and comes back after `engine.rebootDevice()`; in a real engine `ColorBackground` writes exact bytes on cleared depth only, `EnvironmentLighting` lights a core mesh and a glTF-pro triangle with direct and ambient light off, full `Fog` turns the whole frame (including the blended triangle) into its color, and removing all three restores the original frame byte for byte; and an UltraHDR file assembled from two browser-encoded JPEGs decodes through `createImageBitmap`. Every check runs under WebGPU error scopes with zero validation errors. `tests/fixtures/generate.py` regenerates the synthetic fixtures (`pip install OpenEXR numpy`).
 

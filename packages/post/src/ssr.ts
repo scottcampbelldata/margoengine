@@ -30,18 +30,20 @@ const vertex='@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position
 // Material replay outputs: environment specular already in the scene (rgb) + roughness, split-sum weight F0*A+B (rgb) +
 // coverage, world normal. With `margoAmbient` from EnvironmentLighting the weight and specular come from its own LUT and
 // prefiltered cube, so the composite removes exactly the IBL specular it replaces; without IBL nothing is removed and
-// the weight is Karis' analytic split-sum fit.
-const replayTail=(ibl:boolean)=>`
-struct MargoSSR {@location(0) specular:vec4f,@location(1) weight:vec4f,@location(2) normal:vec4f}
+// the weight is Karis' analytic split-sum fit. With LightProbes (`probeSpecular`, @margoengine/environment/probes) the
+// specular removed is the probes' own at the pixel's world position (`margoPosition`, set by the replay and by gltf-pro's
+// capture), so reflection probes are what SSR falls back to off screen.
+const replayTail=(code:string)=>{const ibl=lit(code),probes=code.includes('fn probeSpecular(');return `
+${probes?'var<private> margoPosition:vec3f;\n':''}struct MargoSSR {@location(0) specular:vec4f,@location(1) weight:vec4f,@location(2) normal:vec4f}
 fn margoSSR(n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32)->MargoSSR {
 let nv=clamp(dot(n,v),1e-4,1.0);let f0=mix(vec3f(0.04),base,metal);
-${ibl?'let ab=iblBrdfTerms(nv,rough);let w=f0*ab.x+ab.y;let e=iblPrefiltered(iblSpecular,iblSampler,iblParams,reflect(-v,n),rough)*w*iblParams.w;'
-:'let r=rough*vec4f(-1,-0.0275,-0.572,0.022)+vec4f(1,0.0425,1.04,-0.04);let k=min(r.x*r.x,exp2(-9.28*nv))*r.x+r.y;let w=f0*(r.z-1.04*k)+(r.w+1.04*k);let e=vec3f(0);'}
+${ibl?'let ab=iblBrdfTerms(nv,rough);let w=f0*ab.x+ab.y;':'let r=rough*vec4f(-1,-0.0275,-0.572,0.022)+vec4f(1,0.0425,1.04,-0.04);let k=min(r.x*r.x,exp2(-9.28*nv))*r.x+r.y;let w=f0*(r.z-1.04*k)+(r.w+1.04*k);'}${
+probes?'let e=probeSpecular(margoPosition,n,v,rough)*w;':ibl?'let e=iblPrefiltered(iblSpecular,iblSampler,iblParams,reflect(-v,n),rough)*w*iblParams.w;':'let e=vec3f(0);'}
 return MargoSSR(vec4f(e,rough),vec4f(w,1),vec4f(n*0.5+0.5,1));
-}`;
+}`;};
 // gltf-pro capture: the same targets from the model's Surface. Its environment ambient is iblShade(...)*s.occlusion, and
 // clearcoat/sheen scale it by k, so the specular to replace and the weight it is replaced with carry both factors.
-const modelTail=(ibl:boolean)=>replayTail(ibl)+`
+const modelTail=(code:string)=>replayTail(code)+`
 struct MargoCapture {@location(0) specular:vec4f,@location(1) weight:vec4f,@location(2) normal:vec4f}
 fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {let m=margoSSR(s.n,v,s.base.rgb,s.metal,s.roughness);let o=k*s.occlusion;return MargoCapture(vec4f(m.specular.rgb*o,m.specular.a),vec4f(m.weight.rgb*o,1),m.normal);}
 `;
@@ -146,7 +148,7 @@ export class SSR implements EnginePlugin {
   private readonly models=new Map<SSRModel,()=>void>();private readonly modelCode=new Map<string,string>();private context?:Context;private pass?:GPURenderPassEncoder;
   // gltf-pro capture hook: model materials into the same three targets, after the core replay.
   private readonly hook:SSRCapture={targets,
-    declarations:code=>{let out=this.modelCode.get(code);if(out===undefined){if(this.modelCode.size>=64)this.modelCode.clear();this.modelCode.set(code,out=modelTail(lit(code)));}return out;},
+    declarations:code=>{let out=this.modelCode.get(code);if(out===undefined){if(this.modelCode.size>=64)this.modelCode.clear();this.modelCode.set(code,out=modelTail(code));}return out;},
     begin:()=>{if(this.pass)return this.pass;const c=this.context!,stencil=c.descriptor.depthStencil!.format.includes('stencil')?{stencilLoadOp:'load',stencilStoreOp:'store'} as const:{};
       return this.pass=c.encoder.beginRenderPass({colorAttachments:this.material.map(view=>({view,loadOp:'load',storeOp:'store'})),depthStencilAttachment:{view:c.depth,depthLoadOp:'load',depthStoreOp:'store',...stencil}});}};
   private readonly values=new Float32Array(40);private readonly workspace=new Float64Array(52);private readonly inverse=this.values.subarray(0,16);
@@ -201,9 +203,9 @@ export class SSR implements EnginePlugin {
     if(this.base!==c.descriptor){this.base=c.descriptor;this.single={...c.descriptor,multisample:{count:1},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'greater-equal'}};}
     const key=c.shader+!!own;
     if(this.replayKey!==key){
-      const code=c.shader.replace(/(@fragment[^{]*)->@location\(0\) vec4f/,'$1->MargoSSR').replace(/(let direct=[\s\S]*)return (vec4f\([^\n]+\));/,'if(false){$1_=$2;}return margoSSR(n,v,i.color,i.material.y,i.material.x);');
+      const code=c.shader.replace(/(@fragment[^{]*)->@location\(0\) vec4f/,'$1->MargoSSR').replace(/(let direct=[\s\S]*)return (vec4f\([^\n]+\));/,c.shader.includes('fn probeSpecular(')?'if(false){$1_=$2;}margoPosition=i.position;return margoSSR(n,v,i.color,i.material.y,i.material.x);':'if(false){$1_=$2;}return margoSSR(n,v,i.color,i.material.y,i.material.x);');
       if(!code.includes('->MargoSSR')||!code.includes('return margoSSR('))throw new Error('SSR requires the standard core lighting shader');
-      const module=c.device.createShaderModule({code:code+replayTail(lit(code))});
+      const module=c.device.createShaderModule({code:code+replayTail(code)});
       this.replay=c.device.createRenderPipeline({...this.single!,layout:'auto',vertex:{...c.descriptor.vertex,module},fragment:{module,entryPoint:'fragment',targets:formats.map(format=>({format}))},
         depthStencil:own?this.single!.depthStencil:{...c.descriptor.depthStencil!,depthWriteEnabled:false,depthCompare:'equal'}});
       this.replayKey=key;

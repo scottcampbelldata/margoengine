@@ -1052,7 +1052,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    the whole parent column for children on every mesh it removes, O(meshes x capacity); a package cannot avoid it. docs/limits.md row
    and claims LIM-007 updated; (2) 16 sampled textures per stage - nothing past dropping a lighting
    feature (texture arrays 5f.d are post-1.0; or core requests the adapter's higher limit, core bytes); (3) a second
-   directional light (area lights landed with 5l.f and are in the page: 64, unshadowed); (4) SSR off-screen reflections (probes 5l.e) and water/terrain reflecting;
+   directional light (area lights landed with 5l.f and are in the page: 64, unshadowed); (4) [off-screen part DONE with 5l.e: reflection probes are SSR's fallback] water/terrain reflecting;
    (5) the 64 MiB glTF download budget as an option (5l.r); (6) gltf-pro's 1,000,000 vertices per primitive (no
    splitter); (7) the decoder worker's `'unsafe-eval'` (5l.o); (8) above ~1M core meshes the 41 ms kernel tick stays
    (hierarchical LOD streaming 5g.d not built); (9) volumetric fog does not reach particles/VFX automatically (only via
@@ -1124,7 +1124,61 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    (Plus already queued: back-face culling B, 5f.a-c, 5g.d streaming + entity cap decision.)
    General 3D: ~115/156 parity rows covered (93 of 159 now); every demo 60 FPS on the light tier; side-by-side renders that
    hold up against three.js/Babylon for the same scene.
-   e. Light probes (irradiance volumes) and local reflection probes (cubemaps, box projection).
+   e. [DONE] Light probes: irradiance volume + local reflection probes, `@margoengine/environment/probes`
+      (`packages/environment/src/probes.ts`, 10,845 B min+gzip, own entry; environment root byte-identical).
+      `LightProbes.attach(engine, {environment?, volume?: {min, max, counts, sh?: 1|2, resolution?, blend?},
+      reflections?: [{position, min, max, blend?}], resolution?})`, `probes.add(model)`, `await probes.bake({bounces?})`,
+      `irradianceAt(position, normal)`. Volume: up to 4,096 probes at cell centres, L2 (or L1) SH as irradiance / PI like the
+      environment's, trilinear (the 8 corners' packed float16 coefficients are blended, then evaluated once). Reflection
+      probes: up to 16, octahedral radiance levels 128 px .. 4 px (level 0 resampled from the faces, levels 1+ a brute-force
+      GGX convolution of level 0, n = v = r), box-projected, trilinear over levels by roughness, earlier probe wins where
+      boxes overlap; boxes include their faces (a room box lights its own walls) and fade out over `blend` outside.
+      Design decision: probes REPLACE the ambient term (named `margoAmbient`, so SSAO occludes them, like
+      EnvironmentLighting) rather than adding through clustered's `clusterLighting` hook as area lights do: added
+      ambient would double-count with IBL / scalar / hemisphere ambient and escape SSAO. Reach is the same receivers:
+      core meshes (`engine.use`, patch at order -1) and every `add(model)` receiver (gltf-pro + materials through the
+      `ambient` hook, terrain through the core-style patch). Fallback where the probe weight < 1: the `environment`
+      (exactly EnvironmentLighting's term; patching both throws naming the fix) or the receiver's own ambient (core scalar,
+      gltf-pro hemisphere), so unbaked probes change nothing. Bindings: ONE storage buffer (binding 26), no sampled
+      texture; with an environment its same five IBL bindings: gltf-pro physical + every light stays at 16 textures, lit
+      fragment storage buffers 6 of 8 with clustered + area. Bake on the GPU: one ordinary frame, then a capture pass at
+      order -0.5 renders each probe's 6 faces (core meshes through core's fully patched lit shader drawn from the probe
+      camera, via c.draw with a rebound Frame; added models via `draw` through a device proxy whose shader modules get the
+      same edits: linear output, fog zeroed, clustered lights looped in full since the light lists are culled for the
+      main camera), alpha 0 where nothing was drawn -> environment sky fill; one submit per face (gltf-pro writes its
+      uniform per draw), one compute pass per probe (SH projection with workgroup reduction; octahedral resample and
+      prefilter). Read back to the CPU after each bake (device restore re-uploads it). Zero core bytes.
+      SSR off-screen fallback (5j limit 4) wired: LightProbes' WGSL exposes `probeSpecular(p,n,v,rough)`; post/ssr's
+      replay and gltf-pro's capture hook record the pixel position (`var<private> margoPosition`, emitted only next to
+      `probeSpecular`) and SSR removes the probes' specular where it hits, keeping the probe elsewhere. Bytes: post ./ssr
+      +85, post root +85, gltf-pro root +28 / ./progressive +28 / ./worker +29 (min+gzip, vs ecdcb31).
+      Proof `proofs/probes-decals.proof.js`: every pre-existing environment/post/clustered/gltf-pro/materials/terrain
+      entry bundles byte-identical to the base except those carrying the SSR wiring (asserted to differ only by it); an
+      EnvironmentLighting + Fog story records identical GPU calls (135) also with an unattached LightProbes; PostStack
+      [SSR] / [SSAO, SSR, Bloom, FXAA] with a gltf-pro model reflecting through the capture hook, plain and IBL shaders,
+      1x/4x: 12,320 identical calls; with LightProbes' shader the replay removes probeSpecular. Also identical:
+      gltf-pro-lighting-hooks (4,556 calls) and oit-detached (2,964) with the base as ref.
+      Real GPU (`examples/package-benchmarks/probes-gpu.mjs` + `probes.html`, results/probes-gpu.json, Arc 140V, Edge 155,
+      AC, GPU lock): room of six walls radiating exactly their colour; volume SH vs CPU projection of the analytic room
+      within 1.7% of DC (all 9 coefficients, 8 probes); reflection level 0 median 0.0002 (max 0.22 on wall-boundary
+      texels), levels 1-5 vs CPU GGX convolution p95 <= 0.0083, max <= 0.04; shading through a CPU mirror of the WGSL:
+      core + materials spheres and rough metal floor within 1/255, mirror floor p95 2/255 (max 5) away from wall edges,
+      mirror vs the physical wall seen p95 2/255; env-only scene: probe SH = Environment SH within 0.05% of DC, spheres
+      vs EnvironmentLighting within 1/255; unbaked = no probes (core and gltf-pro 0/255); SSR + probes: 99% of on-screen
+      hits no brighter than both wall and probe (replaced, not added), off-screen = frame without SSR (p95 0/255).
+      Cost (DIAGNOSTIC: quiet gate passed at 12% CPU but other agents' sessions were open): whole frame 4x, room +
+      spheres, volume 4x2x4 + 1 reflection probe: 720p 0.6-1.1 -> 3.8-3.9 ms (volume alone 2.5, reflection alone 2.1);
+      1080p 2.4 -> 8.1-9.2 ms (5.6 / 4.9); packing the SH into whole vec4u (32 loads per pixel instead of 72) took the
+      720p 'both' from 4.8-5.2 to 3.5-3.9 ms (busy-machine runs). Bake (8 volume probes @16 px + one 128 px reflection
+      probe): 114-121 ms, 382 ms first (pipelines). Tests:
+      `packages/environment/tests/probes.test.js` (validation, layout, patches on core/clustered/terrain/env variants,
+      gltf-pro hook, bake capture shader edits + submits + dispatches, CPU irradiance mirror).
+      Limits: static (re-bake for changes; bake cost ~ probes x 6 scene renders); no per-probe visibility (leaks through
+      thin walls: one volume box per room); one volume per LightProbes; box projection only; mirror reflections show
+      128 px texel steps near wall edges; terrain/water/sky/particles are lit or seen only as the environment fill, not
+      captured; GPU-culled CulledMeshes parts use the main camera's culling in captures; per-frame cost is real (above):
+      a quiet-gated measurement and, if it holds, a cheaper volume path (L1 default, or one probe-lookup per tile) are
+      the follow-ups.
    f. [DONE] Rectangle area lights (LTC), three.js RectAreaLight equivalent: `@margoengine/clustered/area`
       (`packages/clustered/src/area.ts`), `AreaLights.attach(engine, {lights})` + `setLights([{position, direction,
       width, height, up?, color?, intensity?, twoSided?}])`, up to 64. Intensity = radiance (three.js units; a light of
@@ -1170,7 +1224,25 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       environment-volumetric and clustered-area-lights (482 calls) pass unchanged. tonemap 6,406 -> 6,326 B, post
       17,014 -> 16,917 B, post/bloom 4,855 -> 4,768 B gzip. NOTICE.md files cite primary sources only.
    g. Physical material on user-built meshes (materials package), with real transmission/refraction.
-   h. Projected decals.
+   h. [DONE] Projected decals: `@margoengine/post/decals` (`packages/post/src/decals.ts`, 4,118 B min+gzip, own entry).
+      `Decals.attach(engine, {atlas?})`, `setDecals([{position, direction, width, height, depth?, up?, rect?, color?,
+      opacity?, angle?, mode?: 'multiply'|'over'}])`, up to 4,096. Screen-space: a pass at order 1.9 (after opaque core,
+      gltf-pro/materials models and LOD; before sky, water, volumetric fog) draws each decal's box (back faces, no depth
+      test: once per pixel, camera inside a box works), reconstructs world position from the post capture's scene depth
+      (sample 0 at 4x), keeps pixels inside the box, normal from neighbour depths (per axis the nearer neighbour, so
+      silhouettes do not smear), fades by angle to the projector (default 60 degrees, over its last third) and at the box
+      ends, samples one atlas (rect, derivatives before discard). 'multiply' scales the lit pixel (keeps lighting and
+      shadows), 'over' blends unlit radiance. One explicit bind group layout per depth kind shared by both blend
+      pipelines; one storage buffer (96 B per decal). With no decals the pass records nothing (proof above). Tests:
+      `packages/post/test/decals.test.js`. Real GPU (`decals-gpu.mjs` + `decals.html`, results/decals-gpu.json, Arc 140V,
+      Edge 155, AC, GPU lock), 4x and 1x MSAA, every 8th pixel ray-cast on the CPU: outside every box (3 cm margin) the
+      frame is exactly the decal-free one; multiply ratios within 0.04 (inverse neutral tone map); 90-degree cube sides
+      untouched (0/255) while the top is marked; the floor below a box's depth range untouched; atlas 'over' exactly
+      tonemap(0.6, 0, 0); camera inside a box draws; empty == none. Cost (DIAGNOSTIC: quiet gate passed at 6% CPU, other agents'
+      sessions open): 720p 4x 1.64 ms -> 1.64 / 1.97 / 6.36 ms with 1 / 16 / 256 one-metre decals; 1080p 3.67 -> 3.93 /
+      4.33 / 14.03 ms.
+      Limits: needs a post capture (named error); per-pixel edges at 4x; BLEND primitives tinted with the surface
+      behind; colour only (no normal/roughness decals); multiply cannot lighten; no culling of decals.
    i. HDR canvas output on HDR displays (with 5h.c Display P3). DONE: environment `ColorOutput` (`hdr: true`, `peak`) +
       Tonemap's HDR rolloff, zero core bytes; details, proofs and limits under 5h.c.
    j. Shadows for skinned meshes and VAT crowds; IBL for VAT crowds.
@@ -1921,7 +1993,7 @@ spinning model costs core + stage + the gltf entry.
 
 ## Feature gaps versus three.js (after optimization; each as an optional package)
 
-Verified matrix: `docs/threejs-parity.md`, recounted 2026-10-15 (5l.m, after RectAreaLight): 159 rows, 93 covered / 39 partial / 27 missing.
+Verified matrix: `docs/threejs-parity.md`, recounted 2026-10-15 (after light probes and decals, 5l.e/5l.h): 159 rows, 95 covered / 38 partial / 26 missing.
 Earlier: re-tallied 2026-10-14 against 2c53227 (156 three.js features: 85 covered,
 39 partial, 32 missing after textured instancing (InstancedMesh PARTIAL -> COVERED) and glTF export (GLTFExporter PARTIAL -> COVERED); ShadowMaterial became partial with staging's ContactShadows; was 65 / 43 / 45 in its stale summary; read from source, not run). The first audit's top gaps
 (materials, glTF extensions/decoders, picking models, IBL, background colour, post stack, ortho camera, math, FXAA) are

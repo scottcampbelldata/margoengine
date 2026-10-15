@@ -96,8 +96,10 @@ Shadows (directional cascades) add 1 depth array + 1 comparison sampler; environ
 LUT is a storage buffer and SH irradiance a uniform); LocalShadows (`@margoengine/clustered/shadows`) 1 depth array + 1
 comparison sampler. Fog, clustered lights (3 storage buffers), clustered area lights (`@margoengine/clustered/area`: 1
 storage buffer holding the lights and its LTC table, filtered by hand), SSAO and LOD baking add no textures, so every
-column above is unchanged with area lights. Storage buffers in that fragment: clustered 3 + area lights 1 + IBL's BRDF
-LUT 1 = 5 of the 8 per stage WebGPU guarantees. The G-buffer pass binds only the material's own maps (5 or 13). Before 5c the IBL BRDF LUT was a texture, so physical + all three was
+column above is unchanged with area lights. Light probes (`@margoengine/environment/probes`) replace IBL with the same
+five bindings plus 1 storage buffer (or that buffer alone without an environment), so the IBL columns hold for them too.
+Storage buffers in that fragment: clustered 3 + area lights 1 + IBL's BRDF
+LUT 1 = 5 of the 8 per stage WebGPU guarantees (6 with light probes). The G-buffer pass binds only the material's own maps (5 or 13). Before 5c the IBL BRDF LUT was a texture, so physical + all three was
 17 and failed pipeline creation. A draw whose shader declares more sampled textures or samplers than
 `device.limits` allows throws a `RangeError` naming the combination, e.g. `gltf-pro: physical material + shadows +
 environment:lighting + clustered + clustered:shadows + shader patch needs 17 sampled textures per shader stage; this

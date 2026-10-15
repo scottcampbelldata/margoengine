@@ -114,10 +114,63 @@ ssr.enabled = false; // pass-through, no recompiles
   pixels then trace like core ones. `examples/package-benchmarks/ssr-models-gpu.mjs` (results/ssr-models-gpu.json).
 - **Limits.** Core meshes and added models show reflections; water, terrain and other custom shaders are reflected but
   do not reflect (each draws with its own pipeline and would need its own capture into SSR's targets). Only what is
-  on screen is reflected. A clearcoat's own (hemisphere) reflection is not replaced; fog is not applied to the replaced
+  on screen is reflected; with reflection probes (`@margoengine/environment/probes`) SSR removes the probes' own specular
+  where its ray hits and keeps the probe's reflection elsewhere, so off-screen reflections come from the probes
+  ([probes-gpu.json](../../examples/package-benchmarks/results/probes-gpu.json)). A clearcoat's own (hemisphere) reflection is not replaced; fog is not applied to the replaced
   term (core meshes alike). Materials `basic`/`normal`/`matcap` meshes reflect by their roughness like `standard` ones. With SSAO before it, a creased pixel's IBL specular was already darkened by AO, so a hit
   removes slightly more than was left (clamped at zero). Specular from other ambient plugins (sky's ambient patch) is
   not replaced.
+
+## Projected decals: `Decals`
+
+`@margoengine/post/decals` (4,118 B min+gzip, its own entry) projects textured boxes onto whatever is already drawn,
+the screen-space way: each decal is a box projector; its pass reconstructs every covered pixel's world position from
+scene depth, keeps the pixels inside the box, fades by the angle between the surface and the projection and samples one
+texture atlas.
+
+```ts
+import {Tonemap} from '@margoengine/tonemap';
+import {Decals} from '@margoengine/post/decals';
+Tonemap.attach(engine);                               // any post capture provides the scene depth
+const decals = Decals.attach(engine, {atlas});        // atlas: a sampled 2D GPUTexture (default: one white texel)
+decals.setDecals([
+  {position: [0, 0, 1], direction: [0, -1, 0], width: 1, height: 0.5, rect: [0, 0, 0.5, 0.5]},        // grime, multiply
+  {position: [2, 1, -1], direction: [0, 0, -1], width: 0.6, height: 0.3, mode: 'over', color: [4, 3, 2]}, // glowing sign
+]);
+```
+
+- **Projection.** `direction` points into the surface; the footprint is `width` x `height` around `position` (right =
+  direction x `up`), the box reaches `depth` (default the smaller side) along `direction`, and the last 10% at both ends
+  fades. `rect` is the atlas region (u0, v0, u1, v1; v down).
+- **Normal-angle fade.** The surface normal comes from the depth buffer (per axis, the neighbour on the same surface, so
+  silhouettes do not smear); a surface turned more than `angle` (default 60 degrees) from facing the projector gets
+  nothing, with a fade over the last third, so a decal on a box top does not stretch down its sides.
+- **Blending.** `'multiply'` (default) scales the lit pixel by `color x texel` mixed by alpha: lighting, shadows and
+  reflections stay (grime, cracks, paint on a light surface); it cannot brighten. `'over'` blends `color x texel` as
+  unlit radiance (signs, glows; `color` may exceed 1). Multiply decals draw first, then over decals, each in list order.
+- **Where it runs.** Order 1.9: after opaque core meshes (0), gltf-pro and materials models (1) and LOD (1.5); before the
+  sky (2), water (4), volumetric fog (5) and particles, so everything that writes depth before it can carry decals and
+  the effects after it draw over them. Back faces of the boxes only, no depth test: each covered pixel runs once, also
+  with the camera inside a box. One render pass, one instanced draw per mode (36 vertices per decal), one storage buffer
+  of 96 B per decal; it adds nothing to any mesh shader. With no decals the pass records nothing.
+- **Checks** (Intel Arc 140V, Edge 155, AC, GPU lock; `node examples/package-benchmarks/decals-gpu.mjs`,
+  [decals-gpu.json](../../examples/package-benchmarks/results/decals-gpu.json)), each at 4x and 1x MSAA, every 8th
+  pixel ray-cast on the CPU: outside every decal box (3 cm margin) the frame equals the decal-free frame exactly; a
+  multiply decal scales the floor's radiance by its colour (channel ratios within 0.04, through the inverse of Tonemap
+  'neutral'); over a cube's top edge the top face is marked and the 90-degree side faces are untouched (0/255), and the
+  floor below the box's depth range stays untouched; an `over` decal on the atlas's red quadrant shows exactly
+  tonemap(0.6, 0, 0); a box containing the camera still draws; an empty Decals equals none.
+- **Cost** (diagnostic: the quiet gate passed at 6% CPU, but other agents' sessions were open): GPU time of the whole frame, 4x MSAA, 1 m
+  decals on the floor in front of the camera: 1280 x 720 1.64 ms without, 1.64 / 1.97 / 6.36 ms with 1 / 16 / 256
+  decals (256 overlap about four deep); 1920 x 1080 3.67 ms -> 3.93 / 4.33 / 14.03 ms. The first decal's cost is mostly
+  its own pass over the multisampled target; each covered pixel then reads five depth values (position and normal) and
+  one atlas texel.
+
+Limits: needs a post capture's scene depth (throws `Decals need scene depth: attach a post capture (Tonemap, Bloom,
+PostStack, SSAO, TAA) first`); at 4x MSAA it reads depth sample 0 and writes every covered sample, so decal edges along
+geometry silhouettes are per pixel, not per sample; gltf-pro BLEND primitives (drawn before it, without depth) get no
+decal of their own and are tinted with the decal of the surface behind them; no normal or roughness decals (it changes colour
+only); `multiply` cannot lighten; up to 4,096 decals per `setDecals`, every one drawn every frame (no culling). WebGPU only.
 
 ## FXAA
 

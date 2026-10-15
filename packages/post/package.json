@@ -41,6 +41,10 @@
       "types": "./dist/fxaa.d.ts",
       "import": "./dist/fxaa.js"
     },
+    "./decals": {
+      "types": "./dist/decals.d.ts",
+      "import": "./dist/decals.js"
+    },
     "./ssr": {
       "types": "./dist/ssr.d.ts",
       "import": "./dist/ssr.js"
