@@ -1,0 +1,4 @@
+html, body { margin: 0; height: 100%; background: #0e1117; color: #e8eeed; font: 14px system-ui, sans-serif; }
+#view { position: relative; width: 100%; height: 100%; }
+canvas { display: block; width: 100%; height: 100%; }
+#status { position: fixed; right: 12px; bottom: 12px; margin: 0; }

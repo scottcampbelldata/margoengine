@@ -12,6 +12,11 @@ npm run preview   # serve dist/
 
 The whole scene is `src/main.ts`. Each `@margoengine/*` package is optional: install only what you import.
 
+`public/_headers` (copied into `dist/`) gives Cloudflare Pages and Netlify a Content Security Policy that Margo works
+under and a year-long cache for fingerprinted assets. [Deploying](https://github.com/scottcampbelldata/margoengine/blob/main/docs/deploying.md)
+explains each directive and has the Vercel and Nginx versions; Draco/KTX2 decoding and STEP import each need one
+extra rule.
+
 ## Where to go next
 
 - [Coming from three.js](https://github.com/scottcampbelldata/margoengine/blob/main/docs/from-threejs.md): three.js

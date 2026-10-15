@@ -1,0 +1,9 @@
+
+# Only with @margoengine/decoders (Draco, KTX2) or machinery STEP/IGES: docs/deploying.md#workers-that-need-unsafe-eval
+/assets/decoder.worker-*.js
+  ! Content-Security-Policy
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; connect-src 'self'
+
+/assets/cad-runtime-*.js
+  ! Content-Security-Policy
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; connect-src 'self'

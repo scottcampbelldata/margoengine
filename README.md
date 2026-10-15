@@ -22,6 +22,8 @@ Provide a container such as `<div id="scene" style="height:400px"></div>` and ca
 
 Coming from three.js? [docs/from-threejs.md](docs/from-threejs.md) maps common three.js code (renderer, meshes, materials, lights, loaders, animation, controls, post-processing, TSL) to Margo side by side, with the packages to install and what is not there yet.
 
+Deploying? [docs/deploying.md](docs/deploying.md) has tested Content Security Policy, caching and compression configs for Cloudflare Pages, Netlify, Vercel and Nginx (Margo needs `script-src 'wasm-unsafe-eval'`, not cross-origin isolation).
+
 The packages are not on npm yet (build from source, below). Once published, a React application installs:
 
 ```sh
