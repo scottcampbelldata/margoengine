@@ -4,6 +4,7 @@ import type {Engine,EnginePlugin,FrameGraph,PassContext} from '@margoengine/core
 import type {Animation} from './index.js';
 import {invertMatrixStable} from '@margoengine/math/mat4';
 import {acesShader} from '../../shared/aces.js';
+import {lightPBR} from '../../shared/pbr-hooks.js';
 import {multiplyMatrices} from '@margoengine/math/mat4';
 declare const GPUBufferUsage:{UNIFORM:number;STORAGE:number;VERTEX:number;INDEX:number;COPY_DST:number};
 declare const GPUTextureUsage:{TEXTURE_BINDING:number;COPY_DST:number};
@@ -79,7 +80,12 @@ export interface VATInstance {matrix?:ArrayLike<number>;clip?:number;offset?:num
 export interface VATMap {bind(device:GPUDevice,srgb:boolean):[GPUTextureView,GPUSampler]|undefined}
 export interface VATCrowdOptions {color?:readonly number[];map?:VATMap|null;roughness?:number;metalness?:number}
 
-export const vatShader=/* wgsl */`${acesShader}
+/** gltf-pro's lighting hooks (its `PBRLighting`), declared here so the VAT entry does not import gltf-pro. */
+export interface VATLightingHooks {readonly declarations:string;direct?(direct:string):string;readonly light?:string;readonly ambient?:string;output?(color:string):string}
+/** What `crowd.addLighting` takes: an effect with gltf-pro `pbr` hooks (Shadows, EnvironmentLighting, Fog), bound in group 1. */
+export interface VATLighting {pbr?(group:number):VATLightingHooks|undefined;bindings():GPUBindGroupEntry[];readonly owner?:unknown}
+// Bindings, pose sampling and the vertex stage; the shadow depth pass is this module alone (no fragment stage).
+const vatVertex=/* wgsl */`
 struct Frame {camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,base:vec4f,options:vec4f,vat:vec4f}
 struct Instance {m:mat4x4f,p:vec4f,uv:vec4f}
 @group(0) @binding(0) var<uniform> f:Frame;
@@ -97,8 +103,8 @@ fn texel(row:u32,v:u32,k:u32)->vec4f {let i=(row*u32(f.vat.x)+v)*2u+k;let w=u32(
  let m=s.m;let c0=cross(m[1].xyz,m[2].xyz);let world=m*vec4f(p,1.0);
  var o:Out;o.clip=f.camera*world;o.position=world.xyz;o.normal=mat3x3f(c0,cross(m[2].xyz,m[0].xyz),cross(m[0].xyz,m[1].xyz))*n*sign(dot(m[0].xyz,c0));o.uv=s.uv.xy+uv*s.uv.zw;return o;
 }
-fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}
-// gltf-pro's lighting: GGX key light, hemisphere fill, ACES + sRGB unless the target is HDR.
+`,srgbShader='fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}\n';
+export const vatShader=`${acesShader}${vatVertex}${srgbShader}// gltf-pro's lighting: GGX key light, hemisphere fill, ACES + sRGB unless the target is HDR.
 @fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
  let albedo=(f.base*textureSample(map,mapSampler,i.uv)).rgb;let rough=f.options.z;let metal=f.options.w;
  let nn=normalize(i.normal)*select(-1.0,1.0,front);let v=normalize(f.eye.xyz-i.position);let l=normalize(f.light.xyz);let h=(v+l)/max(length(v+l),0.0001);
@@ -110,18 +116,39 @@ fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12
  if(f.vat.z<0.5){color=srgb(aces(max(color,vec3f(0.0))/0.6));}
  return vec4f(color,1.0);
 }`;
+let lit:string|undefined;
+// The same lighting with gltf-pro's Surface and hook points, so `lightPBR` composes effects into it. Built only once an
+// effect is added; the HDR flag is then also written to the last Frame float, renamed `settings` where the fog hook reads `.w`.
+const litShader=()=>lit??=`${acesShader}${vatVertex.replace('vat:vec4f}','settings:vec4f}').replaceAll('f.vat.','f.settings.')}${srgbShader}
+struct Surface {base:vec4f,n:vec3f,roughness:f32,metal:f32,occlusion:f32,emissive:vec3f}
+fn ambient(s:Surface)->vec3f {let f0=mix(vec3f(0.04),s.base.rgb,s.metal);return (s.base.rgb*(1.0-s.metal)+f0*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1.0),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w*s.occlusion;}
+@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
+ var s:Surface;s.base=f.base*textureSample(map,mapSampler,i.uv);s.n=normalize(i.normal)*select(-1.0,1.0,front);s.roughness=f.options.z;s.metal=f.options.w;s.occlusion=1.0;
+ let v=normalize(f.eye.xyz-i.position);let l=normalize(f.light.xyz);let h=(v+l)/max(length(v+l),0.0001);
+ let nl=clamp(dot(s.n,l),0.0,1.0);let nv=clamp(dot(s.n,v),0.0001,1.0);let nh=clamp(dot(s.n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
+ let a=s.roughness*s.roughness;let a2=a*a;let d=a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0));let g=2.0*nv/(nv+sqrt(a2+(1.0-a2)*nv*nv))*2.0*nl/max(nl+sqrt(a2+(1.0-a2)*nl*nl),0.0001);
+ let f0=mix(vec3f(0.04),s.base.rgb,s.metal);let fresnel=f0+(1.0-f0)*pow(1.0-vh,5.0);
+ let direct=((1.0-fresnel)*(1.0-s.metal)*s.base.rgb/3.14159265+d*g*fresnel/max(4.0*nl*nv,0.0001))*nl*f.radiance.rgb*f.light.w;
+ var color=direct+ambient(s)+s.emissive;
+ if(f.settings.w<0.5) {color=aces(max(color,vec3f(0))/0.6); color=srgb(color);}
+ return vec4f(color,1.0);
+}`;
 let serial=0;
 /**
  * Draws any number of copies of baked VAT data in one instanced call: each instance has its own matrix, clip, time
  * offset, speed and atlas region, and the CPU does no per-instance work per frame (instance data uploads only when
- * changed). Opaque, no shadows, SSAO or environment lighting; the GPU clips off-screen instances (no CPU culling).
+ * changed). Opaque; the GPU clips off-screen instances (no CPU culling). `shadows.add(crowd)` casts the posed crowd
+ * into `@margoengine/shadows` and shadows it; `lighting.add(crowd)` lights it with an EnvironmentLighting (IBL).
+ * No SSAO or clustered lights.
  */
 export class VATCrowd implements EnginePlugin {
   readonly name='vat:'+serial++;
   /** Seconds since added; instance time is `time * speed + offset`. */
-  time=0;readonly color:number[];roughness:number;metalness:number;map:VATMap|null;
+  time=0;readonly color:number[];roughness:number;metalness:number;map:VATMap|null;disposed=false;
   private data=new Float32Array(VAT_STRIDE*16);private n=0;private dirty=true;private engine?:Engine;private device?:GPUDevice;private gpu?:{vat:GPUTexture;uvs:GPUBuffer;index:GPUBuffer;frame:GPUBuffer;clips:GPUBuffer;instances?:GPUBuffer;white:GPUTexture;blank:[GPUTextureView,GPUSampler]};
   private pipeline?:GPURenderPipeline;private key='';private group?:GPUBindGroup;private bound:unknown[]=[];private readonly frame=new Float32Array(40);
+  private readonly lighting=new Set<VATLighting>();private code=vatShader;private light?:{group:GPUBindGroup;bound:unknown[]};
+  private shadow?:{pipeline:GPURenderPipeline;frames:GPUBuffer;groups:GPUBindGroup[];instances?:GPUBuffer;values:Float32Array};
   /** Same as `engine.use(new VATCrowd(...))`; returns the VATCrowd. */
   static attach(engine: EngineKernel, vat: VATData, options?: VATCrowdOptions): VATCrowd {const value = new VATCrowd(vat, options); engine.use(value); return value;}
   constructor(readonly vat:VATData,{color=[1,1,1,1],map=null,roughness=0.6,metalness=0}:VATCrowdOptions={}) {
@@ -156,27 +183,58 @@ export class VATCrowd implements EnginePlugin {
     return this.gpu={vat,white,blank:[white.createView(),device.createSampler()],uvs:buffer(v.uvs,GPUBufferUsage.VERTEX),index:buffer(v.indices,GPUBufferUsage.INDEX),
       frame:device.createBuffer({size:160,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),clips:buffer(Float32Array.from(v.clips.flatMap(c=>[c.start,c.frames,c.duration,+c.loop])),GPUBufferUsage.STORAGE)};
   }
-  private draw(c:Context):void {
-    const e=this.engine;if(!this.n||!e)return;const device=c.device,g=this.resources(device),samples=c.descriptor.multisample?.count??1,depth=c.descriptor.depthStencil!.format;
+  /** Lights the crowd with an effect's gltf-pro `pbr` hooks; `shadows.add(crowd)` and `lighting.add(crowd)` call this. Returns a remover. */
+  addLighting(effect:VATLighting):()=>void {
+    if(this.disposed||!effect||typeof effect.pbr!=='function'||typeof effect.bindings!=='function')throw new TypeError('VAT crowds take lighting effects with pbr hooks');
+    if(effect.owner&&this.engine&&effect.owner!==this.engine)throw new Error('VAT lighting belongs to another engine');
+    this.lighting.add(effect);return()=>{this.lighting.delete(effect);};
+  }
+  /** Shadows' per-cascade callback: the posed instances into that cascade's depth map, at the frame's crowd time. */
+  drawShadow({context:c,pass,matrix,cascade}:{context:Context;pass:GPURenderPassEncoder;matrix:Float32Array;cascade:number}):void {
+    if(!this.n||!this.engine)return;const device=c.device,g=this.upload(device);
+    let s=this.shadow;
+    // ponytail: every instance runs in all four cascades (1,024 robots: about 4x the beauty pass's vertex work); a GPU
+    // per-cascade instance compaction with indirect draws is the upgrade if crowds this large need shadows.
+    if(!s){const module=device.createShaderModule({code:vatVertex});
+      s=this.shadow={pipeline:device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:8,attributes:[{shaderLocation:0,offset:0,format:'float32x2'}]}]},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'less-equal'}}),
+        frames:device.createBuffer({size:1024,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),groups:[],values:new Float32Array(40)};}
+    if(s.instances!==g.instances){s.instances=g.instances;const view=g.vat.createView();
+      s.groups=[0,1,2,3].map(i=>device.createBindGroup({layout:s!.pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:s!.frames,offset:i*256,size:160}},{binding:1,resource:{buffer:g.instances!}},{binding:2,resource:{buffer:g.clips}},{binding:3,resource:view}]}));}
+    const v=s.values;v.set(matrix);v[32]=this.time;v[36]=this.vat.vertexCount;v[37]=this.vat.width;device.queue.writeBuffer(s.frames,cascade*256,v);
+    pass.setPipeline(s.pipeline);pass.setBindGroup(0,s.groups[cascade]);pass.setVertexBuffer(0,g.uvs);pass.setIndexBuffer(g.index,'uint32');pass.drawIndexed(this.vat.indices.length,this.n);
+  }
+  private upload(device:GPUDevice) {
+    const g=this.resources(device);
     if(!g.instances||g.instances.size<this.n*VAT_STRIDE*4){g.instances?.destroy();g.instances=device.createBuffer({size:this.data.byteLength,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST});this.dirty=true;}
     if(this.dirty){device.queue.writeBuffer(g.instances,0,this.data,0,this.n*VAT_STRIDE);this.dirty=false;}
+    return g;
+  }
+  private draw(c:Context):void {
+    const e=this.engine;if(!this.n||!e)return;const device=c.device,g=this.upload(device),samples=c.descriptor.multisample?.count??1,depth=c.descriptor.depthStencil!.format;
+    // Effects compose into the lit shader (group 1); without any (or none ready) the crowd keeps the unlit shader and its exact calls.
+    let code=vatShader;const entries:GPUBindGroupEntry[]=[];
+    for(const effect of this.lighting){const hooks=effect.pbr!(1);if(hooks){code=lightPBR(code===vatShader?litShader():code,hooks);entries.push(...effect.bindings());}}
     const f=this.frame;f.set(c.camera.matrix);f.set(c.camera.position,16);f.set(e.lighting.direction,20);f.set(e.lighting.radiance,24);f.set(this.color,28);
-    f[32]=this.time;f[34]=Math.min(1,Math.max(0.045,this.roughness));f[35]=this.metalness;f[36]=this.vat.vertexCount;f[37]=this.vat.width;f[38]=+(c.format==='rgba16float');device.queue.writeBuffer(g.frame,0,f);
+    f[32]=this.time;f[34]=Math.min(1,Math.max(0.045,this.roughness));f[35]=this.metalness;f[36]=this.vat.vertexCount;f[37]=this.vat.width;f[38]=+(c.format==='rgba16float');f[39]=code===vatShader?0:f[38];device.queue.writeBuffer(g.frame,0,f);
     const key=c.format+samples+depth;
-    if(this.key!==key){
-      const module=device.createShaderModule({code:vatShader});this.key=key;
+    if(this.key!==key||this.code!==code){
+      const module=device.createShaderModule({code});this.key=key;this.code=code;
       this.pipeline=device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:8,attributes:[{shaderLocation:0,offset:0,format:'float32x2'}]}]},fragment:{module,entryPoint:'fragment',targets:[{format:c.format}]},
         primitive:{cullMode:'back'},depthStencil:{format:depth,depthWriteEnabled:true,depthCompare:'greater-equal'},multisample:{count:samples}});
     }
     const [view,sampler]=this.map?.bind(device,true)??g.blank,bound=[this.pipeline,g.instances,view,sampler];
     if(!this.group||bound.some((x,i)=>x!==this.bound[i])){this.bound=bound;this.group=device.createBindGroup({layout:this.pipeline!.getBindGroupLayout(0),entries:[g.frame,g.instances,g.clips].map((buffer,binding)=>({binding,resource:{buffer}} as GPUBindGroupEntry)).concat({binding:3,resource:g.vat.createView()},{binding:4,resource:view},{binding:5,resource:sampler})});}
     const pass=c.encoder.beginRenderPass({colorAttachments:[{view:c.color,loadOp:'load',storeOp:'store'}],depthStencilAttachment:{view:c.depth,depthLoadOp:'load',depthStoreOp:'store',stencilReadOnly:true}});
-    pass.setPipeline(this.pipeline!);pass.setBindGroup(0,this.group);pass.setVertexBuffer(0,g.uvs);pass.setIndexBuffer(g.index,'uint32');pass.drawIndexed(this.vat.indices.length,this.n);pass.end();
+    pass.setPipeline(this.pipeline!);pass.setBindGroup(0,this.group);
+    if(entries.length){const lightBound=[this.pipeline,...entries.map(x=>'buffer' in x.resource?x.resource.buffer:x.resource)];
+      if(!this.light||lightBound.length!==this.light.bound.length||lightBound.some((x,i)=>x!==this.light!.bound[i]))this.light={bound:lightBound,group:device.createBindGroup({layout:this.pipeline!.getBindGroupLayout(1),entries})};
+      pass.setBindGroup(1,this.light.group);}
+    pass.setVertexBuffer(0,g.uvs);pass.setIndexBuffer(g.index,'uint32');pass.drawIndexed(this.vat.indices.length,this.n);pass.end();
     e.stats.drawCalls++;e.stats.visible+=this.n;
   }
-  private release():void {const g=this.gpu;if(g)for(const r of [g.vat,g.white,g.uvs,g.index,g.frame,g.clips,g.instances])r?.destroy();this.gpu=this.pipeline=this.group=undefined;this.key='';this.bound=[];this.device=undefined;}
+  private release():void {const g=this.gpu;if(g)for(const r of [g.vat,g.white,g.uvs,g.index,g.frame,g.clips,g.instances,this.shadow?.frames])r?.destroy();this.gpu=this.pipeline=this.group=this.light=this.shadow=undefined;this.key='';this.code=vatShader;this.bound=[];this.device=undefined;}
   onDeviceRestored():void {this.release();this.dirty=true;}
-  dispose():void {this.release();this.engine=undefined;}
+  dispose():void {this.disposed=true;this.lighting.clear();this.release();this.engine=undefined;}
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
 }

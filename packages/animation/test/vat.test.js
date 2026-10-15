@@ -5,7 +5,7 @@ import {Engine, TransformStore} from '../../core/dist/extension.js';
 import {GLTFAsset, PBRModel} from '../../gltf-pro/dist/index.js';
 const parseGLTF = (engine, doc, buffers = []) => new PBRModel(engine, new GLTFAsset(doc, buffers));
 import {Animation} from '../dist/index.js';
-import {bakeVAT, vatTexel, VATCrowd, VAT_STRIDE, VAT_WIDTH} from '../dist/vat.js';
+import {bakeVAT, vatTexel, VATCrowd, VAT_STRIDE, VAT_WIDTH, vatShader} from '../dist/vat.js';
 import {mockGPU, passes, context} from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import {skinnedStrip, bent} from './fixture.js';
 
@@ -82,4 +82,34 @@ test('VATCrowd draws every instance in one indexed call and uploads instance dat
   assert.deepEqual([...floats(clips[0][3])], [0, 4, 1, 1], 'clip table: start, frames, duration, loop');
   crowd.set(3, {clip: 0}); assert.equal(writes(gpu.record(() => frame(3)), 1000 * VAT_STRIDE * 4).length, 1, 'a change re-uploads');
   assert.equal(host.stats.drawCalls, 4); crowd.dispose();
+});
+
+test('VATCrowd casts into Shadows per cascade and composes shadow and IBL hooks into a lit shader, unlit again once removed', async () => {
+  const {Shadows} = await import('../../shadows/dist/index.js');
+  const engine = await headless(), {doc, buffers} = skinnedStrip(), model = parseGLTF(engine, doc, buffers), vat = bakeVAT(new Animation(model), {fps: 4});
+  model.dispose(); engine.dispose();
+  const gpu = mockGPU(), host = {gpu: gpu.device, lighting: {direction: new Float32Array([1, 2, 1, 3]), radiance: new Float32Array([1, 1, 1, 0.2])}, stats: {visible: 0, drawCalls: 0}, meshes: new Map(), removePlugin() {}};
+  const crowd = new VATCrowd(vat), shadows = new Shadows({resolution: 64, distance: 30}), ibl = gpu.device.createBuffer({size: 16, usage: 64});
+  crowd.setup(host); shadows.setup(host); crowd.add(); crowd.add({matrix: [1,0,0,0, 0,1,0,0, 0,0,1,0, 2,0,0,1]});
+  const environment = {pbr: g => ({declarations: `@group(${g}) @binding(20) var<uniform> ibl:vec4f;\n`, ambient: 'ibl.rgb*s.base.rgb*s.occlusion'}), bindings: () => [{binding: 20, resource: {buffer: ibl}}]};
+  const removeShadows = shadows.add(crowd), removeIbl = crowd.addLighting(environment);
+  assert.throws(() => crowd.addLighting({shader: s => s, bindings: () => []}), TypeError, 'text-patching effects are not supported');
+  const view = context(gpu, {samples: 4, shader: 'let linear=direct*vec3f(1);'}), shadowPass = passes(shadows), crowdPass = passes(crowd);
+  const frame = i => {view.begin(i); crowd.onPreUpdate(1 / 60); shadowPass(view.c); crowdPass(view.c); view.end();};
+  const lit = gpu.record(() => frame(0)), steady = gpu.record(() => frame(1));
+  const draws = log => log.filter(e => e[0] === 'pass.drawIndexed').map(e => e.slice(1, 3)), code = log => log.filter(e => e[0] === 'module').map(e => e[2].code);
+  assert.deepEqual(draws(lit), Array(5).fill([24, 2]), 'four cascade depth draws, then the beauty draw');
+  const frames = steady.filter(e => e[0] === 'writeBuffer' && e[3].length === 320), slots = frames.filter(e => e[1] === frames.find(x => x[2] === 256)[1]);
+  assert.deepEqual(slots.map(e => e[2]), [0, 256, 512, 768], 'each cascade writes its own frame slot');
+  slots.forEach((e, i) => assert.deepEqual([...floats(e[3]).subarray(0, 16)], [...shadows.matrices.subarray(i * 16, i * 16 + 16)], 'cascade matrix'));
+  const [depth, beauty] = code(lit);
+  assert.ok(!/@fragment/.test(depth) && /fn texel/.test(depth), 'the depth pass is the VAT vertex stage alone');
+  assert.ok(beauty.includes('shadowLit(direct,i.position,s.n)+ambient(s)') && beauty.includes('let margoAmbient=ibl.rgb*s.base.rgb*s.occlusion') && /@group\(1\) @binding\(1\) var<uniform> shadowFrame/.test(beauty));
+  assert.ok(lit.some(e => e[0] === 'pass.setBindGroup' && e[1] === 1), 'lighting bound in group 1');
+  assert.equal(floats(frames.find(e => !slots.includes(e))[3])[39], 1, 'HDR flag in settings.w while lit');
+  assert.equal(steady.filter(e => ['renderPipeline', 'group', 'module'].includes(e[0])).length, 0, 'steady state creates nothing');
+  removeShadows(); removeIbl();
+  const unlit = gpu.record(() => frame(2));
+  assert.deepEqual(code(unlit), [vatShader], 'back to the unlit shader'); assert.ok(!unlit.some(e => e[0] === 'pass.setBindGroup' && e[1] === 1));
+  crowd.dispose(); assert.ok(crowd.disposed); shadows.dispose();
 });

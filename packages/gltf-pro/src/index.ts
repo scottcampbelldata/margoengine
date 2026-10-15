@@ -5,7 +5,8 @@ import {invertMatrixStable} from '@margoengine/math/mat4';
 import {viewMatrix} from '../../shared/view.js';
 import {Cleanup} from '../../shared/cleanup.js';
 import {GLTFAsset, container, loadAsset, closeImages, entry, integer, overBudget, type GLTFImage, type AssetOptions, type GLTFDecoderHooks} from './asset.js';
-import {pbrShader, physicalShader, factorPhysicalShader, lightPBR, transparentPBR, capturePBR, transmissionPBR, type PBRLighting, type PBRTransparency, type PBRCapture, type PBRTransmission} from './shader.js';
+import {pbrShader, physicalShader, factorPhysicalShader, transparentPBR, capturePBR, transmissionPBR, type PBRLighting, type PBRTransparency, type PBRCapture, type PBRTransmission} from './shader.js';
+import {lightPBR} from '../../shared/pbr-hooks.js';
 export type {PBRLighting, PBRTransparency, PBRCapture, PBRTransmission} from './shader.js';
 import {mipShader} from './mip.js';
 // Type only: PBRInstances and the EXT_mesh_gpu_instancing reader load with @margoengine/gltf-pro/instancing.
