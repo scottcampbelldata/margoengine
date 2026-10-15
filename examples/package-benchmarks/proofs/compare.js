@@ -60,3 +60,7 @@ export async function record(name, ref, cases, notes = '') {
   await writeFile(resolve(import.meta.dirname, 'results', `${name}.json`), JSON.stringify(report, null, 2) + '\n');
   console.log(JSON.stringify(report, null, 2));
 }
+
+/** Recorded GPU calls with the `agx()` WGSL body blanked: eaddd64 re-derived AgX from primary sources (same constants to
+ * 1.2e-8, full-precision Rec.709/Rec.2020 matrices), an intended change that proofs against older refs must not flag. */
+export const ignoreAgx = calls => JSON.parse(JSON.stringify(calls).replace(/fn agx\(v:vec3f\)->vec3f \{.*?\\n\}/g, 'fn agx(v:vec3f)->vec3f {}'));
