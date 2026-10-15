@@ -35,6 +35,8 @@ export class VectorRef {
   get z():number{return this.get(2);} set z(v:number){this.write(2,v);}
 }
 
+/** 1 when a mesh needs back faces drawn (double-sided or mirrored); batches without one draw with cullMode back. */
+const keep=({matrix:m,material}:Mesh)=>+(material.data[6]>0||m[0]*(m[5]*m[10]-m[6]*m[9])-m[4]*(m[1]*m[10]-m[2]*m[9])+m[8]*(m[1]*m[6]-m[2]*m[5])<0);
 export class Mesh {
   name='';
   readonly position=new VectorRef(this,'position');
@@ -172,7 +174,7 @@ export class Engine {
       if(this.checkedMaterials.get(mesh.material)!==this.materialFrame){const material=mesh.material.data;finite(material,8,'Material');
       for(let i=0;i<8;i++)if(material[i]<0||material[i]>1)throw new RangeError('Invalid material');
       if(material[3]!==1||material[4]<Math.fround(0.045)||material[6]!==0&&material[6]!==1)throw new RangeError('Invalid material');this.checkedMaterials.set(mesh.material,this.materialFrame);this.materials.set(mesh.material,material.slice());}
-      const batch=this.batches.get(mesh.geometry)!,offset=batch.count++*24;
+      const batch=this.batches.get(mesh.geometry)!,offset=batch.count++*24;batch.mask!|=keep(mesh);
       this.slots[mesh.id]=offset;batch.instances.set(mesh.matrix,offset);batch.instances.set(mesh.material.data,offset+16);batch.instances[offset+23]=mesh.id;this.stats.visible++;
     }
   };
@@ -195,13 +197,13 @@ export class Engine {
     for(let id=0;!full&&id<this.next;id++)full=visible[id]!==seen[id];
     for(const [material,values] of this.materials)for(let i=0;!full&&i<8;i++)full=material.data[i]!==values[i];
     if(full){
-      for(const batch of this.batches.values())batch.count=0;this.stats.visible=0;this.stats.drawCalls=0;
+      for(const batch of this.batches.values())batch.count=batch.mask=0;this.stats.visible=0;this.stats.drawCalls=0;
       this.materialFrame++;this.materials.clear();this.slots.fill(-1);
       this.meshes.forEach(this.collect);this.collected=this.revision;seen.set(visible);changed.fill(0);
       for(const batch of this.batches.values()){if(batch.count)this.stats.drawCalls++;batch.start=0;batch.end=batch.count*24;}
     }else for(let id=changed.indexOf(1);id>=0;id=changed.indexOf(1,id+1)){
       changed[id]=0;const offset=this.slots[id];
-      if(offset>=0){const mesh=this.meshes.get(id)!,batch=this.batches.get(mesh.geometry!)!;batch.instances.set(mesh.matrix,offset);batch.start=Math.min(batch.start!,offset);batch.end=Math.max(batch.end!,offset+16);}
+      if(offset>=0){const mesh=this.meshes.get(id)!,batch=this.batches.get(mesh.geometry!)!;batch.instances.set(mesh.matrix,offset);batch.mask!|=keep(mesh);batch.start=Math.min(batch.start!,offset);batch.end=Math.max(batch.end!,offset+16);}
     }
   }
   async pick(x:number,y:number):Promise<Mesh|null> {

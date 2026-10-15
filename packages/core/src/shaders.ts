@@ -3,6 +3,7 @@
 export const wgsl = `
 struct Frame { camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f }
 @group(0) @binding(0) var<uniform> frame:Frame;
+override C=false;
 struct Input { @location(0) position:vec3f,@location(1) normal:vec3f,@location(2) m0:vec4f,@location(3) m1:vec4f,@location(4) m2:vec4f,@location(5) m3:vec4f,@location(6) color:vec4f,@location(7) factors:vec4f }
 struct Output { @builtin(position) clip:vec4f,@location(0) position:vec3f,@location(1) normal:vec3f,@location(2) color:vec3f,@location(3) material:vec4f }
 @vertex fn vertex(i:Input)->Output {
@@ -12,7 +13,7 @@ o.normal=mat3x3f(cross(i.m1.xyz,i.m2.xyz),cross(i.m2.xyz,i.m0.xyz),cross(i.m0.xy
 o.color=i.color.rgb;o.material=vec4f(i.factors.xyz,sign(dot(i.m0.xyz,cross(i.m1.xyz,i.m2.xyz))));return o;
 }
 @fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->@location(0) vec4f {
-let facing=front==(i.material.w>0.0);if(!facing&&i.material.z<0.5){discard;}
+let facing=front==(i.material.w>0.0);if(!C&&!facing&&i.material.z<0.5){discard;}
 let n=normalize(i.normal)*select(-1.0,1.0,facing);let v=normalize(frame.eye.xyz-i.position);let l=normalize(frame.light.xyz);let h=(v+l)/max(length(v+l),0.0001);
 let nl=clamp(dot(n,l),0.0,1.0);let nv=clamp(dot(n,v),0.0001,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
 let a=i.material.x*i.material.x;let a2=a*a;let d=a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0));

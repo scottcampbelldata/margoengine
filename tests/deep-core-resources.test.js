@@ -11,7 +11,7 @@ test('Core picking releases partial allocations and permits retries after setup 
   const device={createBuffer(){if(++point===attempt)throw failure;return resource();},createTexture(){if(++point===attempt)throw failure;return resource();},createBindGroup:()=>({}),lost:new Promise(()=>{}),addEventListener(){},destroy(){},
     queue:{writeBuffer(){if(++point===attempt)throw failure;},submit(){}},createShaderModule:()=>({}),createRenderPipeline:()=>({getBindGroupLayout:()=>({})}),
     createCommandEncoder:()=>({copyTextureToBuffer(){},finish:()=>({}),beginRenderPass:()=>({setPipeline(){},setBindGroup(){},end(){}})})};
-  const renderer=new GPURenderer({width:4,height:4},device,{configure(){},unconfigure(){}},'bgra8unorm',{getBindGroupLayout:()=>({})},{multisample:{count:4},depthStencil:{format:'depth32float'}});
+  const renderer=new GPURenderer({width:4,height:4},device,{configure(){},unconfigure(){}},'bgra8unorm',{getBindGroupLayout:()=>({})},{multisample:{count:4},depthStencil:{format:'depth32float'}},{getBindGroupLayout:()=>({})});
   const camera=new Camera();camera.update(1,true);const light={direction:new Float32Array(4),radiance:new Float32Array(4)},graph=new FrameGraph();
   try{
     for(attempt=1;attempt<=5;attempt++){
@@ -34,7 +34,7 @@ test('Core draw bindings observe mutable buffer ranges and shader variants obser
   const device={createBuffer:()=>({destroy(){}}),createBindGroup(descriptor){groups.push(descriptor);return descriptor;},createTexture:()=>({createView:()=>({}),destroy(){}}),
     createShaderModule:()=>({}),createRenderPipeline(descriptor){pipelines.push(descriptor);return {...descriptor,getBindGroupLayout:()=>({})};},lost:new Promise(()=>{}),addEventListener(){},destroy(){},
     queue:{writeBuffer(){},submit(){}},createCommandEncoder:()=>({finish:()=>({}),beginRenderPass(descriptor){if(descriptor.colorAttachments[0].clearValue)attachments.push(descriptor.colorAttachments);return pass;}})};
-  const renderer=new GPURenderer({width:4,height:4},device,{configure(){},unconfigure(){},getCurrentTexture:()=>({createView:()=>({})})},'bgra8unorm',pipeline,{multisample:{count:4},depthStencil:{format:'depth32float'}});
+  const renderer=new GPURenderer({width:4,height:4},device,{configure(){},unconfigure(){},getCurrentTexture:()=>({createView:()=>({})})},'bgra8unorm',pipeline,{multisample:{count:4},depthStencil:{format:'depth32float'}},pipeline);
   const camera=new Camera();camera.update(1,true);const light={direction:new Float32Array(4),radiance:new Float32Array(4)},graph=new FrameGraph();
   let format='depth32float',explicit=true,extras;
   graph.add({name:'mutable bindings',order:-1,execute(c){
@@ -70,7 +70,7 @@ test('Core draw stencil operations follow the current depth target and clear cac
   for(const baseFormat of ['depth32float','depth32float-stencil8']){
     const records=[],pipeline={getBindGroupLayout:()=>({})},pass={setPipeline(){},setBindGroup(){},end(){}};
     const device={createBuffer:()=>({destroy(){}}),createBindGroup:()=>({}),createTexture:()=>({createView:()=>({}),destroy(){}}),createShaderModule:()=>({}),createRenderPipeline:()=>pipeline,lost:new Promise(()=>{}),addEventListener(){},destroy(){},queue:{writeBuffer(){},submit(){}},createCommandEncoder:()=>({finish:()=>({}),beginRenderPass(descriptor){if(descriptor.colorAttachments[0].clearValue)records.push({...descriptor.depthStencilAttachment});return pass;}})};
-    const renderer=new GPURenderer({width:4,height:4},device,{configure(){},unconfigure(){},getCurrentTexture:()=>({createView:()=>({})})},'bgra8unorm',pipeline,{multisample:{count:4},depthStencil:{format:baseFormat}});
+    const renderer=new GPURenderer({width:4,height:4},device,{configure(){},unconfigure(){},getCurrentTexture:()=>({createView:()=>({})})},'bgra8unorm',pipeline,{multisample:{count:4},depthStencil:{format:baseFormat}},pipeline);
     const camera=new Camera();camera.update(1,true);const light={direction:new Float32Array(4),radiance:new Float32Array(4)},graph=new FrameGraph();let format=baseFormat;
     graph.add({name:'depth target',order:-1,execute(c){c.descriptor={...c.descriptor,depthStencil:{format}};c.depth={format};const draw=c.draw;c.draw=()=>draw({clear:false,stencilClear:3});}});
     try{
