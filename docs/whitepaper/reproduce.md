@@ -58,7 +58,8 @@ whitepaper cites into `examples/package-benchmarks/results/` and commit it with 
 | Area | Command | GPU | Output | Notes |
 | --- | --- | --- | --- | --- |
 | Core + stage gzip (CI gate, < 20,000 B) | `npm run measure:size` | no | console | Also enforced by `npm run build:packages`. |
-| Margo vs three.js bundle size | `npm run measure:threejs` | no | console | Minimal lit-box app in three r186 (WebGL and WebGPU) vs Margo's whole core + stage. Prints only; commit the output with the whitepaper. |
+| Margo vs three.js bundle size | `npm run measure:threejs` | no | `results/threejs-size.json` | Minimal lit-box app in three r186 (WebGL and WebGPU) vs Margo's whole core + stage, all built with the size gate's output options. |
+| Every package entry and worker, min+gzip | `node examples/package-benchmarks/entry-sizes.mjs` (after `build:packages`) | no | `results/entry-sizes.json` | build-modern's method, other packages external; also feeds the Gzip column of `docs/api-surface.md`. |
 | Eager JS per demo | `npm run measure:demos` | no | console / `--json=path` | Builds each demo with Vite. |
 | Per-package min+gzip | `node examples/package-benchmarks/proofs/size.js` | no | `proofs/results/sizes.json` | |
 | VFX entry sizes | `node examples/package-benchmarks/vfx-size.mjs` | no | `results/vfx-size.json` | |
