@@ -13,6 +13,74 @@ lists stripped). Reproduce: `node examples/package-benchmarks/vs-threejs/run.mjs
 No round overlapped another agent's GPU run: the stray transparency check ran under a lock this worker had taken at
 20:40 and released, without measuring, when the quiet gate kept it waiting; `diag1` took the lock afterwards.
 
+## Update 2026-10-15: fix B is in core; like-for-like pairs
+
+Scott approved fix B (below). Core `4be71f5` draws a geometry batch with a second, back-culled pipeline whose shader has
+no `discard` when every drawn instance is single-sided and unmirrored; core + stage 19,577 -> **19,793 B** gzip (+216).
+Frames are unchanged: `examples/package-benchmarks/cad/cull-pixels.mjs` renders a mixed scene (single-sided closed
+boxes, open shells showing their inner back faces, a mirrored instance, double-sided parts, `material.set({doubleSided})`
+both ways, material assignment, hide/show) in the pre-change core (`dc0c4ff`) and the new one: 0 of 153,600 pixels differ
+in all 13 steps; `pixels-check.mjs` and `npm run visual:check` (22 views) pass. In the run below, `margo` and
+`margo+nocull` (the new core with its culled pipeline turned back into cull none + discard = the old GPU work) have
+identical t = 0 frames in all four box scenes.
+
+The harness also compared three's `InstancedMesh` with Margo core meshes (50,000 entities against one object holding
+50,000 matrices). It now pairs **mesh <-> mesh** (Margo core meshes, three `Mesh` per box) and **instanced <->
+instanced** (`@margoengine/materials` `createInstancedMesh` and `@margoengine/culling` `CulledInstances` against three
+`InstancedMesh`); see the harness README for what each variant does and its asymmetries.
+
+Run (`results/vs-threejs-boxes-pairs.json`, diagnostic, busy machine: CPU load at run starts 0-90%, 2 alternating
+rounds x 120 frames, at `ef2fb0c`): `node examples/package-benchmarks/vs-threejs/run.mjs --busy --rounds=2 --frames=120
+--only=boxes:1000,boxes:10000,boxes:50000,boxes:10000:moving --variants=margo,margo+nocull,margo-instanced,margo-culled,three-webgl,three-webgpu,three-webgl-instanced,three-webgpu-instanced`.
+Cells: FPS (frames finished by the GPU per second) / CPU ms per frame / GPU ms per frame / serial frame ms; draws in the
+variant column.
+
+GPU win of fix B (same run, `margo+nocull` -> `margo`): 1k 1.64 -> 0.46 ms (3.6x), 10k 5.00 -> 1.80 (2.8x), 50k
+10.87 -> 6.00 (1.8x), 10k moving 5.30 -> 1.79 (3.0x); FPS 448 -> 788, 189 -> 326, 75 -> 101, 145 -> 155.
+
+**Mesh <-> mesh** (one scene object per box)
+
+| Variant | 1k | 10k | 50k | 10k moving |
+| --- | --- | --- | --- | --- |
+| Margo core meshes (1 draw) | **788** / 0.29 / 0.46 / 4.9 | **326** / 2.1 / 1.80 / 9.2 | **101** / 8.7 / 6.00 / 20.2 | **155** / 5.4 / 1.79 / 12.2 |
+| three WebGL2 `Mesh` (~1 draw per visible box) | 375 / 2.1 / 1.63* / 5.6 | 60 / 16.0 / 10.3* / 18.7 | 10 / 95 / 74* / 105 | 40 / 26.5 / 16.0* / 28.8 |
+| three WebGPU `Mesh` | 223 / 3.4 / 1.09 / 9.7 | 32 / 29.2 / 1.99 / 43.4 | 4.6 / 206 / 4.37 / 255 | 8.7 / 114 / 1.96 / 228 |
+
+**Instanced <-> instanced**
+
+| Variant | 1k | 10k | 50k | 10k moving |
+| --- | --- | --- | --- | --- |
+| Margo `createInstancedMesh` (1 draw, gltf-pro shader) | 490 / 0.35 / 1.18 / 6.6 | 212 / 0.32 / n/a† / 10.3 | 94 / 0.29 / 10.2 / 15.9 | 135 / 6.0 / 4.53 / 16.4 |
+| Margo `CulledInstances` (16 indirect draws) | 389 / 0.31 / 1.00 / 6.5 | 270 / 0.26 / 2.36 / 7.7 | 163 / 0.21 / 5.52 / 11.7 | 5.2 / 187 / 4.14 / 286 |
+| three WebGL2 `InstancedMesh` | **891** / 0.15 / 0.73* / 4.8 | **645** / 0.13 / 1.40* / 5.8 | **220** / 0.19 / 5.29* / 12.9 | **256** / 3.3 / 3.15* / 10.0 |
+| three WebGPU `InstancedMesh` | 654 / 0.42 / 0.72 / 5.6 | 364 / 0.44 / 2.40 / 8.4 | 113 / 0.98 / 8.28 / 14.9 | 190 / 3.8 / 3.27 / 12.4 |
+
+\* WebGL2 `TIME_ELAPSED` around the render call (includes GPU idle while a CPU-bound renderer submits). † Dawn returned
+zeroed timestamps for every frame of both runs (counted in `zeroFrames`, not measured).
+
+Reading (diagnostic only; the quiet-PC run decides any claim):
+
+- **Mesh <-> mesh: Margo ahead on CPU and frame rate at every size** (CPU 2.1 vs 16-29 ms at 10k, 8.7 vs 95-206 ms at
+  50k), because core batches every geometry into one instanced draw and three issues one draw per visible `Mesh`.
+  GPU: Margo below three WebGPU at 1k-10k, above it at 50k (6.0 vs 4.4 ms; three's per-object frustum culling skips
+  off-screen boxes, Margo's kernel culls too but the 50k grid is mostly on screen; not diagnosed).
+- **Instanced <-> instanced: three ahead** on these static boxes except `CulledInstances` at 50k against three WebGPU
+  (163 vs 113 FPS). Neither Margo instanced path gets core's culled pipeline: `createInstancedMesh` draws with
+  gltf-pro's heavier PBR shader (and ACES, so its frames are brighter: `vsMargoImage` 20/255), `CulledInstances` with
+  core's cull-none pipeline and the discard plus its compute passes. Core meshes, which do get it, beat three's
+  WebGPU `InstancedMesh` on GPU (0.46 / 1.80 / 6.00 vs 0.72 / 2.40 / 8.28 ms) and take 0.6-1.3x the GPU time of its
+  WebGL2 one, but pay 2-9 ms of CPU per frame for entities an `InstancedMesh` does not have.
+- **Moving instances**: `CulledInstances.setTransform` is one 64-byte `writeBuffer` per part (187 ms CPU per frame for
+  10,000 moving boxes): it is for static assemblies with occasional edits, not for animation. `createInstancedMesh`
+  (validated `setMatrixAt`, one ranged upload) costs 6.0 ms against three's 3.3-3.8 ms.
+- **CAD** (`results/vs-threejs-cad-pairs.json`, same conditions; single-sided parts unless noted): fix B, 10k parts
+  4.04 -> 2.15 ms GPU (`margo+nocull` -> `margo`), 50k 11.44 -> 12.00 ms (no gain; geometry-bound, as before);
+  core's default double-sided material draws the same pipeline as before (`margo+double` 5.24 / 14.73 ms).
+  Instanced <-> instanced at 50k: `CulledInstances` 80 FPS / 0.26 ms CPU / 11.0 ms GPU, `createInstancedMesh` 55 /
+  0.43 / 16.8, three WebGL2 `InstancedMesh` 92 / 0.21 / 10.9, three WebGPU 80 / 0.74 / 11.3; Margo core meshes 69 /
+  12.9 / 12.0 (the mesh <-> mesh three `Mesh` variants were not run here).- Open follow-ups (packages, not core): give `CulledInstances` the same back-culled, discard-free pipeline for
+  single-sided unmirrored batches, and a bulk transform upload; check gltf-pro's single-sided GPU cost.
+
 ## Answer
 
 The smoke run's result was real and has one main cause in core: **Margo core never culls back faces in the
@@ -106,11 +174,11 @@ WebGL2). Its small, dense parts make it geometry-bound; not diagnosed further he
 | Fix | Where | Bytes (core + stage gzip) | GPU, boxes 1k / 10k / 50k (single-sided) | Limits |
 | --- | --- | --- | --- | --- |
 | A. Per-cull-group pipelines (`scratch/core-backface-cull`, 7fce5be) | core | +315 (19,543 -> 19,858) | as the patched row: 0.53 / 1.67 / 5.92 | handles mixed and mirrored batches and package shader variants; already declined by Scott |
-| B. Per-batch culled pipeline (`scratch/bvt-core-cull-bytes`, b3514f3, measure only) | core | **+212** (19,543 -> 19,755) | 0.49 / 1.70 / 5.87 (real GPU, identical frames) | a geometry batch gets culled only if every instance in it is single-sided and unmirrored; package shader variants (fog, clipping, clustered) keep the discard; unit tests that build `GPURenderer` by hand need the new argument |
+| B. Per-batch culled pipeline (`scratch/bvt-core-cull-bytes`, b3514f3; **merged as `4be71f5`**, +216 on 19,577 -> 19,793) | core | **+212** (19,543 -> 19,755) | 0.49 / 1.70 / 5.87 (real GPU, identical frames) | a geometry batch gets culled only if every instance in it is single-sided and unmirrored; package shader variants (fog, clipping, clustered) keep the discard; unit tests that build `GPURenderer` by hand need the new argument |
 | C. Engine plugin that rewrites the main pass (12 lines; the harness's `margo+plugin`) | a leaf package | 0 in core | 0.54 / 1.80 / 5.91 (span 0.75 / 2.02 / 6.26) | culls every core mesh: only for scenes of closed, unmirrored, single-sided solids; its pass makes core keep MSAA buffers and resolve in an extra pass (+0.2-0.35 ms span; already paid when any other package adds a pass); must run after any package that replaces the shader text |
 
-Core is at 19,577 B after the material setters (perf/auto-quality e2cc4c5), so A and B both break the 19,600 target
-(B would land near 19,789). C needs no core change and matches HANDOFF's decision that pipeline culling is a
+Core was at 19,577 B after the material setters (perf/auto-quality e2cc4c5), so A and B both broke the 19,600 target
+(B would land near 19,789). Scott then approved B and moved the working target to ~19,800 (B landed at 19,793). C needs no core change and matches HANDOFF's decision that pipeline culling is a
 leaf-package option for closed solids; `@margoengine/culling` is the natural home (`BackfaceCulling.attach(engine)`,
 following the `X.attach` standard). Not built: it is a new package feature, so it waits for Scott.
 
@@ -123,7 +191,7 @@ its WebGL2 renderer's, on this one integrated GPU.
   WebGPU). Margo also loads first among the WebGPU pages (442-593 ms to the first finished frame vs 618-705 ms for
   three's WebGPURenderer, whose first frame alone takes ~190-220 ms of pipeline compilation); three's WebGL2 page is
   fastest to load (236-293 ms).
-- **CPU per frame: no win in these scenes.** Margo spends 0.3 / 1.9 / 8.0 ms (boxes) and 11.3 ms (CAD 50k) per frame
+- **CPU per frame: no win in these scenes** (against `InstancedMesh`; for the like-for-like pairs see the update at the top). Margo spends 0.3 / 1.9 / 8.0 ms (boxes) and 11.3 ms (CAD 50k) per frame
   against three's 0.1-0.7 ms. An `InstancedMesh` with a static matrix buffer costs three nothing per instance, while
   Margo's kernel culls every entity each frame and, as the orbiting camera changes the visible set, re-collects the
   instance buffer (HANDOFF 1e'; `@margoengine/culling` is the existing fix). Margo's CPU advantage is against one

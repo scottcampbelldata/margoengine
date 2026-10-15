@@ -975,7 +975,22 @@ Second set (2026-10-14, evening), all APPROVED by Scott:
   19,600 working target moves to ~19,800): a second, back-culled pipeline per geometry batch, used only when every
   instance in the batch is single-sided and unmirrored; pixel-identical; `scratch/bvt-core-cull-bytes` (b3514f3).
   Evidence: docs/whitepaper/boxes-vs-threejs.md (the shader `discard` disables early depth; 40-56% of single-sided
-  GPU time). Earlier note kept for history:
+  GPU time).
+  DONE (`4be71f5`, core+stage **19,793 B**, +216 on 19,577): ported onto the setters tip unchanged in substance.
+  `Batch.mask` (public, api/ updated) is OR-ed during collection and on the moved-matrix fast path; material value
+  changes (incl. `set({doubleSided})`) and material assignment already force a full re-collection, which recomputes
+  it. Un-mirroring a moved mesh leaves its batch on the cull-none pipeline until the next full re-collection
+  (conservative, same pixels). Package shader variants, draws with extra bindings, `CulledInstances` and gltf-pro keep
+  their own pipelines. Proof (Arc 140V, Edge 155, AC, GPU lock): `examples/package-benchmarks/cad/cull-pixels.mjs`
+  (builds core from `dc0c4ff` into test-results/core-ref and renders a mixed scene in both through 13 edits: 0 of
+  153,600 pixels differ at every step), `cad/pixels-check.mjs` passes, `npm run visual:check` 22/22. GPU win (diagnostic,
+  busy, same run; `margo+nocull` = the old GPU work): single-sided boxes 1k/10k/50k 1.64/5.00/10.87 -> 0.46/1.80/6.00
+  ms; CAD 10k single-sided 4.04 -> 2.15, 50k no gain. Harness (`vs-threejs`) now pairs mesh <-> mesh and instanced <->
+  instanced (`margo-instanced` = materials `createInstancedMesh`, `margo-culled` = culling `CulledInstances`); tables in
+  the whitepaper, rows in claims.md (still no publishable claim). Follow-ups for packages (not done): `CulledInstances`
+  could use the same back-culled discard-free pipeline for single-sided batches and needs a bulk transform upload
+  (10k moving parts: 187 ms CPU per frame through `setTransform`).
+  Earlier note kept for history:
 - Back-face culling: SKIPPED for core (Scott agreed, 2026-10-14). Measured on `scratch/core-backface-cull`
   (+315 B -> 19,858; 50k CAD 15.6 -> 13.7 ms GPU, noisy; 16 full-screen layers 11.9 -> 4.7 ms). CAD files often have
   open shells, mirrored parts and section cuts; pipeline-level culling stays a leaf-package option for closed solids.
