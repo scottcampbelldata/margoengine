@@ -33,6 +33,10 @@
       "types": "./dist/prepare.d.ts",
       "import": "./dist/prepare.js"
     },
+    "./progressive": {
+      "types": "./dist/progressive.d.ts",
+      "import": "./dist/progressive.js"
+    },
     "./worker": {
       "types": "./dist/worker.d.ts",
       "import": "./dist/worker.js"

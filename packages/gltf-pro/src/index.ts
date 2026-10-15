@@ -142,7 +142,7 @@ export class PBRModel implements EnginePlugin {
   readonly name='gltf-pro:'+modelId++;
   readonly root:Mesh;readonly nodes:Mesh[]=[];readonly primitives:PBRPrimitive[]=[];readonly lights:GLTFLight[]=[];readonly cameras:GLTFCamera[]=[];
   disposed=false;private readonly created:Mesh[]=[];private resources:DrawResource[]=[];private textures:GPUTexture[]=[];
-  private pipelines=new Map<string,GPURenderPipeline>();private readonly inverse=new Float32Array(16);private readonly workspace=new Float64Array(52);private readonly view=new Float32Array(16);
+  private pipelines=new Map<string,GPURenderPipeline>();private readonly gpuCache=new Map<unknown,any>();private readonly inverse=new Float32Array(16);private readonly workspace=new Float64Array(52);private readonly view=new Float32Array(16);
   private engine:Engine;private readonly cleanupCallbacks=new Set<()=>void>();
   private readonly lighting=new Set<LightingEffect>();private readonly codes=new Map<string,number>();private codeCount=0;private readonly replays=new Map<string,string>();
   private readonly lightingGroups=new Map<GPURenderPipeline,{entries:GPUBindGroupEntry[];group:GPUBindGroup}>();private transparency?:PBRTransparency;
@@ -185,15 +185,14 @@ export class PBRModel implements EnginePlugin {
   setup(engine:Engine):void {
     if(engine!==this.engine||this.disposed)throw new Error('PBRModel belongs to another engine or is disposed');
     if(!engine.gpu)throw new Error('PBRModel requires WebGPU');
-    const device=engine.gpu;
-    const mipPipelines=new Map<GPUTextureFormat,GPURenderPipeline>(),mipSampler=device.createSampler({minFilter:'linear',magFilter:'linear'});
-    const imageTextures=new Map<string,GPUTexture>();
-    const geometryBuffers=new Map<Float32Array|Uint32Array,GPUBuffer>();
+    // GPU objects by source (geometry array, image key, mip format), kept until releaseGPU so a later setup of more
+    // primitives (@margoengine/gltf-pro/progressive) shares them as one setup would.
+    const device=engine.gpu,cache=this.gpuCache,mipSampler=device.createSampler({minFilter:'linear',magFilter:'linear'});
     const upload=(data:Float32Array|Uint32Array,usage:number)=>{
-      const existing=geometryBuffers.get(data);if(existing)return existing;
+      const existing=cache.get(data);if(existing)return existing;
       if(data.byteLength>device.limits.maxBufferSize)throw new RangeError('PBR buffer exceeds device limit');
       const b=device.createBuffer({size:data.byteLength,usage:usage|GPUBufferUsage.COPY_DST});
-      try{device.queue.writeBuffer(b,0,data as Float32Array<ArrayBuffer>);}catch(e){b.destroy();throw e;}geometryBuffers.set(data,b);return b;
+      try{device.queue.writeBuffer(b,0,data as Float32Array<ArrayBuffer>);}catch(e){b.destroy();throw e;}cache.set(data,b);return b;
     };
     for(const p of this.primitives) {
       const r:DrawResource={primitive:p,vertex:undefined!,index:undefined!,uniform:undefined!,values:new Float32Array(220),groups:new Map(),views:[],samplers:[]};
@@ -207,18 +206,18 @@ export class PBRModel implements EnginePlugin {
         const compressed=image&&'mipmaps' in image?image:undefined,format=compressed?compressed.format:srgbMaps.includes(i)?'rgba8unorm-srgb':'rgba8unorm',size=image?[image.width,image.height]:[1,1];
         if(size.some(n=>n>device.limits.maxTextureDimension2D))throw new RangeError('Image exceeds device limit');
         const key=image?source+':'+format:'default:'+i;
-        let texture=imageTextures.get(key);
+        let texture:GPUTexture=cache.get(key);
         if(!texture) {
           const levels=compressed?compressed.mipmaps.length:image?Math.floor(Math.log2(Math.max(...size)))+1:1;
           texture=device.createTexture({size,format,mipLevelCount:levels,usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST|(compressed?0:GPUTextureUsage.RENDER_ATTACHMENT)});
-          this.textures.push(texture);imageTextures.set(key,texture);
+          this.textures.push(texture);cache.set(key,texture);
           // Transcoded mips upload as-is: rgba8 rows, or 16-byte 4x4 blocks (BC7, ASTC 4x4, ETC2 RGBA8).
           if(compressed){const block=format.startsWith('rgba')?1:4,target=texture;compressed.mipmaps.forEach((m,mipLevel)=>{const w=Math.ceil(m.width/block),h=Math.ceil(m.height/block);device.queue.writeTexture({texture:target,mipLevel},m.data as Uint8Array<ArrayBuffer>,{bytesPerRow:w*(block>1?16:4),rowsPerImage:h},[w*block,h*block]);});}
           else if(image)device.queue.copyExternalImageToTexture({source:image as ImageBitmap},{texture},size);
           else device.queue.writeTexture({texture},new Uint8Array(normalMaps.includes(i)?[128,128,255,255]:[255,255,255,255]),{bytesPerRow:4},[1,1]);
           if(levels>1&&!compressed) {
-            let pipeline=mipPipelines.get(format);
-            if(!pipeline){const module=device.createShaderModule({code:mipShader});pipeline=device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format}]}});mipPipelines.set(format,pipeline);}
+            let pipeline:GPURenderPipeline=cache.get(format);
+            if(!pipeline){const module=device.createShaderModule({code:mipShader});pipeline=device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format}]}});cache.set(format,pipeline);}
             const encoder=device.createCommandEncoder();
             for(let level=1;level<levels;level++){
               const group=device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView({baseMipLevel:level-1,mipLevelCount:1})},{binding:1,resource:mipSampler}]});
@@ -366,7 +365,7 @@ export class PBRModel implements EnginePlugin {
     return out;
   }
   onDispose(callback:()=>void):()=>void {if(typeof callback!=='function')throw new TypeError('Expected cleanup callback');if(this.disposed){callback();return()=>{};}this.cleanupCallbacks.add(callback);return()=>this.cleanupCallbacks.delete(callback);}
-  private releaseGPU():void {const cleanup=new Cleanup(),buffers=new Set<GPUBuffer>();for(const r of this.resources)for(const b of [r.vertex,r.index,r.uniform])if(b)buffers.add(b);for(const b of buffers)cleanup.run(()=>b.destroy());for(const t of this.textures)cleanup.run(()=>t.destroy());for(const p of this.primitives){p.buffers=undefined;cleanup.run(()=>p.instances?.dispose());}this.resources=[];this.textures=[];this.pipelines.clear();this.lightingGroups.clear();cleanup.finish();}
+  private releaseGPU():void {const cleanup=new Cleanup(),buffers=new Set<GPUBuffer>();for(const r of this.resources)for(const b of [r.vertex,r.index,r.uniform])if(b)buffers.add(b);for(const b of buffers)cleanup.run(()=>b.destroy());for(const t of this.textures)cleanup.run(()=>t.destroy());for(const p of this.primitives){p.buffers=undefined;cleanup.run(()=>p.instances?.dispose());}this.resources=[];this.textures=[];this.pipelines.clear();this.gpuCache.clear();this.lightingGroups.clear();cleanup.finish();}
   onDeviceRestored(engine:Engine):void {this.releaseGPU();for(const p of this.primitives)p.deformed=undefined;this.setup(engine);}
   dispose():void {
     if(this.disposed)return;this.disposed=true;const cleanup=new Cleanup();

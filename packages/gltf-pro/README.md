@@ -129,6 +129,61 @@ Offline / repeat-visit caching: every load function takes `fetch` (the file and 
 example `loadGLTF(engine, url, {fetch: cache.fetch})` with `@margoengine/cache`. To keep worker parsing for a cached
 GLB, fetch the bytes yourself: `parseGLTFInWorker(engine, await (await cache.fetch(url)).arrayBuffer())`.
 
+## Progressive loading
+
+`@margoengine/gltf-pro/progressive` makes a large model interactive as soon as its JSON has arrived and streams the
+rest in. Apps that do not import it pay nothing (the root entry is unchanged).
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTFProgressive} from '@margoengine/gltf-pro/progressive';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const load = loadGLTFProgressive(stage.engine, '/plant.glb', {
+  onProgress: p => console.log(p.stage, p.primitivesLoaded + '/' + p.primitives, p.bytesLoaded + '/' + p.bytesTotal),
+  // frameBudget: 4,          // main-thread ms per frame for GPU uploads; signal and decoders as loadGLTF
+});
+const model = await load.ready;  // a PBRModel drawn as one box per primitive; bounds are valid
+const b = model.bounds;
+stage.engine.camera.fitToBoundingBox([b[0], b[1], b[2]], [b[3], b[4], b[5]]);
+await load.complete;             // the same model, now with every primitive, texture and byte
+// load.abort() (or options.signal, or model.dispose()) stops the load, disposes the model and rejects both promises.
+```
+
+Stages:
+
+1. **ready.** The worker fetches the first 64 KB (one range request; the rest of the JSON if longer), the main thread
+   builds the `PBRModel` with every glTF node and a box per primitive from its `POSITION` accessor's `min`/`max`, drawn
+   with the material's factors (no textures yet). `model.bounds`, `model.nodes` and `model.lights` work at once.
+2. **geometry.** Every animation frame the main thread ranks the primitives not yet loaded: inside the view frustum
+   first, then by bounding-sphere radius over distance (screen size); it re-sends the order when the camera moves (at
+   most every 200 ms). The worker requests the next primitives' accessor bytes with HTTP range requests, rounded to
+   256 KB blocks and merged, about 1 MB at a time (a new batch waits until less than 1 MB is outstanding, so the link is
+   not split across lower-priority parts), decodes each primitive as soon as its bytes are in (the same `packPrimitive`
+   as every loader) and transfers it. If the server ignores `Range` (a `200` reply), that reply is the whole file and
+   primitives decode in priority order as their bytes stream in. The main thread uploads within `frameBudget` ms per
+   frame: vertex and index buffers in 1 MB writes, then the primitive's draw resource is swapped in place.
+3. **textures.** Then images (those of the highest-priority primitives first) are fetched and decoded in the worker.
+   A primitive gets its real material once every image it could use has settled; each texture upload and its mips is
+   one budgeted step.
+4. **complete.** The worker fetches the remaining bytes (skins, animations, unused data), decodes the skin, morph,
+   animation and `EXT_mesh_gpu_instancing` accessors, and moves the whole buffers over. `complete` resolves when the
+   last upload is done. The model then equals `loadGLTF`'s byte for byte: every draw resource's vertex, index and
+   uniform data, every bound texture (descriptor and uploads), every sampler, and the document, buffers, accessors,
+   primitives, images and transforms (`tests/progressive.test.js`: DamagedHelmet, RobotExpressive, generated grids,
+   `EXT_mesh_gpu_instancing`, `.gltf` + `.bin`; range and no-range servers; worker and main thread). Primitives sharing a
+   mesh share their GPU buffers, as with `loadGLTFInWorker`.
+
+Network and decoding run in `dist/workers/progressive.js` (started like the `/worker` script); without `Worker` (SSR,
+Node) the same code runs on the calling thread from a lazily loaded chunk. `decoders.instancing` works (instances apply at
+`complete`; until then an instanced node draws once). Draco, meshopt or KTX2 `decoders` fall back to `loadGLTF`
+(`ready` and `complete` are the same promise).
+
+Limits: no `MSFT_lod` or gltfpack LOD levels, no low-resolution mip or KTX2 base level first (a JPEG/PNG is decoded
+whole anyway); placeholders are axis-aligned boxes; animation, shadows, bvh, selection and other helpers that read
+`model.primitives` should be attached after `complete` (before it they see boxes); a device loss during the load
+during the load is not handled (load the model again); each range request needs the server to answer `206` with
+`Content-Range` (CORS: expose `Content-Range`). Size and timings: see "Progressive loading measured" below.
+
 ## Extensions and compressed files
 
 Supported glTF extensions: `KHR_mesh_quantization`, `KHR_texture_transform`, `KHR_materials_emissive_strength`, `KHR_materials_unlit`, `KHR_lights_punctual`, `KHR_materials_clearcoat`, `KHR_materials_transmission`, `KHR_materials_ior`, `KHR_materials_volume`, `KHR_materials_sheen`, `KHR_materials_specular`, `EXT_texture_webp`, `EXT_texture_avif`, plus `EXT_mesh_gpu_instancing` (`TRANSLATION`, `ROTATION` including normalized integers, `SCALE`; the node's primitives get one `PBRInstances`, see "Instancing"), `KHR_draco_mesh_compression`, `EXT_meshopt_compression` (and `KHR_meshopt_compression`) and `KHR_texture_basisu` when you pass the matching decoder (`instancing` from `@margoengine/gltf-pro/instancing` for the first). A file is rejected only when its `extensionsRequired` lists something still unsupported; the error names each one and the decoder it needs.

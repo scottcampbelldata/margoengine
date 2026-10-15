@@ -433,6 +433,20 @@ const decoders = {draco: new DracoDecoder(), meshopt: MeshoptDecoder, ktx2: new 
 const packed = await loadGLTF(engine, '/gltfpack-output.glb', {decoders});
 ```
 
+Big files: three.js shows nothing until `GLTFLoader` has the whole file. `loadGLTFProgressive` resolves `ready` as soon as
+the JSON is parsed, with one box per part, then streams the real geometry (what is on screen and large first) and the
+textures, without frame hitches; `complete` is the same model `loadGLTF` would have built.
+
+```ts
+import {loadGLTFProgressive} from '@margoengine/gltf-pro/progressive';
+
+const load = loadGLTFProgressive(engine, '/factory.glb', {onProgress: p => console.log(p.stage, p.primitivesLoaded, p.primitives)});
+const model = await load.ready; // boxes with the real bounds: fit and orbit right away
+const b = model.bounds;
+engine.camera.fitToBoundingBox([b[0], b[1], b[2]], [b[3], b[4], b[5]]);
+await load.complete;            // every part, texture and byte; load.abort() cancels and disposes
+```
+
 - `model.nodes` are the glTF nodes (core meshes you can move or hide), `model.primitives` the drawn parts,
   `model.lights` and `model.cameras` the `KHR_lights_punctual` lights and glTF cameras as data.
 - Supported extensions include `KHR_texture_transform`, `KHR_materials_*` (emissive strength, unlit, clearcoat,
