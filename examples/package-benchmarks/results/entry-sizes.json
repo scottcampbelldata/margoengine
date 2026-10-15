@@ -1,5 +1,5 @@
 {
-  "commit": "b50afa9",
+  "commit": "5e3bc47",
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "packages": {
     "@margoengine/animation": {
@@ -478,8 +478,8 @@
     },
     "@margoengine/post": {
       ".": {
-        "raw": 46196,
-        "gzip": 12721
+        "raw": 59037,
+        "gzip": 16413
       },
       "./bloom": {
         "raw": 15169,
@@ -487,7 +487,7 @@
       },
       "./ssao": {
         "raw": 23853,
-        "gzip": 7488
+        "gzip": 7486
       },
       "./scene-fade": {
         "raw": 5622,
@@ -500,6 +500,10 @@
       "./fxaa": {
         "raw": 10293,
         "gzip": 3599
+      },
+      "./ssr": {
+        "raw": 23130,
+        "gzip": 7860
       }
     },
     "@margoengine/procedural": {
