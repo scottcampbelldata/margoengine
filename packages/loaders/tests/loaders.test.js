@@ -866,6 +866,8 @@ test('fetchBytes and load: size limits (declared and streamed), abort, HTTP erro
     if (request.url === '/slow') {response.writeHead(200); response.write(new Uint8Array(10)); return;}
     response.writeHead(404); response.end();
   });
+  // Client closes idle sockets: a server keep-alive close can race a reused socket under load (ECONNRESET).
+  server.keepAliveTimeout = 0;
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   try {

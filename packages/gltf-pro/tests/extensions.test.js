@@ -23,6 +23,8 @@ const server = createServer(async (request, response) => {
   try {const file = resolve(decoders, 'dist', '.' + new URL(request.url, 'http://x').pathname); response.writeHead(200, {'content-type': extname(file) === '.wasm' ? 'application/wasm' : 'text/javascript'}); response.end(await readFile(file));}
   catch {response.writeHead(404); response.end();}
 });
+// Client closes idle sockets: a server keep-alive close can race a reused socket under load (ECONNRESET).
+server.keepAliveTimeout = 0;
 await new Promise(done => server.listen(0, '127.0.0.1', done));
 const base = `http://127.0.0.1:${server.address().port}/`, load = async url => {(0, eval)(await (await fetch(url)).text());};
 test.after(() => server.close());
