@@ -27,13 +27,15 @@ const three = JSON.parse(readFileSync('node_modules/three/package.json', 'utf8')
 const configs = [
   {scene: 'boxes', n: 1000}, {scene: 'boxes', n: 10000}, {scene: 'boxes', n: 50000}, {scene: 'boxes', n: 10000, move: 1},
   {scene: 'cad', n: 10000}, {scene: 'cad', n: 50000}, {scene: 'helmet'},
-].filter(c => !only || only.split(',').some(o => `${c.scene}:${c.n ?? ''}`.startsWith(o)));
+].filter(c => !only || only.split(',').some(o => o === c.scene || o === `${c.scene}:${c.n}`)); // --only=boxes or boxes:1000 (exact)
 const variants = c => [{engine: 'margo'}, {engine: 'three-webgl', mode: 'mesh'}, {engine: 'three-webgpu', mode: 'mesh'}, ...(c.scene === 'helmet' ? [] : [{engine: 'three-webgl', mode: 'instanced'}, {engine: 'three-webgpu', mode: 'instanced'}])];
 const key = c => `${c.scene}${c.n ? `-${c.n}` : ''}${c.move ? '-moving' : ''}`, vkey = v => `${v.engine}${v.mode === 'instanced' ? '-instanced' : ''}`;
 
 // GPU lock in the main checkout: one wait loop, 60 s poll.
 const lock = resolve(dirname(git('rev-parse', '--path-format=absolute', '--git-common-dir')), 'test-results/gpu.lock');
 for (;;) {try {mkdirSync(lock);break;} catch (e) {if (e.code !== 'EEXIST') throw e;console.log(new Date().toISOString(), 'gpu.lock held, waiting 60 s');await new Promise(r => setTimeout(r, 60_000));}}
+// A killed run must not leave the lock behind (finally does not run on a signal).
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => {rmSync(lock, {recursive: true, force: true});process.exit(130);});
 let server;
 try {
   const report = {date: new Date().toISOString(), commit: git('rev-parse', '--short', 'HEAD'), three, acPowerBefore: acPower(), rounds, frames, canvas: [1280, 720], dpr: 1,
@@ -88,7 +90,7 @@ try {
       const r = await once(config, variant, round), slot = ((report.results[key(config)] ??= {})[vkey(variant)] ??= {runs: []});
       if (r.png) {slot.png = r.png;delete r.png;}
       slot.runs.push(r);
-      console.log(`round ${round + 1}/${rounds}`, key(config), vkey(variant), r.error ? `ERROR ${r.error.split('\n')[0]}` : JSON.stringify({load: r.loadMs, fps: r.throughput.fps, cpu: r.throughput.cpuMs?.median, gpu: r.gpu?.gpuMs?.median, serial: r.serialFrameMs?.median, heap: r.jsHeapMB, draws: r.info?.drawCalls, errors: [...r.errors, ...r.pageErrors].length}));
+      console.log(`round ${round + 1}/${rounds}`, key(config), vkey(variant), r.error ? `ERROR ${r.error.split('\n')[0]}` : JSON.stringify({load: r.loadMs, fps: r.throughput.fps, cpu: r.throughput.cpuMs?.median, gpu: r.gpu?.gpuMs?.median, serial: r.serialFrameMs?.median, heap: r.jsHeapMB, draws: r.info?.drawCalls, errors: [...r.errors, ...r.pageErrors].map(e => e.slice(0, 160))}));
     }
   }
 

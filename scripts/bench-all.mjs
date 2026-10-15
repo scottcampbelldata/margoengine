@@ -23,6 +23,7 @@ const steps = [
   {group: 'size', name: 'vfx-size', cmd: `node ${bench}/vfx-size.mjs`},
   {group: 'cpu', name: 'cad-kernel-node', cmd: `node ${bench}/cad/kernel-node.mjs`},
   {group: 'cpu', name: 'textured-instancing-mock', cmd: `node ${bench}/textured-instancing.mjs`},
+  {group: 'cpu', name: 'exporters-model', cmd: `node ${bench}/exporters-model.mjs`},
   ...proofs.map(f => ({group: 'proofs', name: f.replace('.proof.js', ''), cmd: `node ${bench}/proofs/${f}`})),
   {group: 'gpu', name: 'vs-threejs', cmd: `node ${bench}/vs-threejs/run.mjs --out=OUT/vs-threejs.json`},
   {group: 'gpu', name: 'cad', cmd: `node ${bench}/cad/run.mjs --label=bench-all`},

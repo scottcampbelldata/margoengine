@@ -9,7 +9,7 @@ changed since); **[need]** no data yet.
 
 ## 0. Abstract (half a page)
 
-- What Margo is: a WebGPU-first 3D engine for the web with a Rust/Wasm transform kernel, an 18.7 kB gzip core + stage,
+- What Margo is: a WebGPU-first 3D engine for the web with a Rust/Wasm transform kernel, a 19.5 kB gzip core + stage,
   and optional tree-shakable packages; aimed at three.js users and at CAD/engineering viewers.
 - Three headline results, each with its caveat in the same sentence (size, a same-scene comparison with three.js, CAD
   scale). Only numbers that are PROVEN in claims.md on the release commit go here.
@@ -66,11 +66,16 @@ changed since); **[need]** no data yet.
    `npm run bench:threejs`. Harness built and smoke-tested only. **[need]** the quiet-PC timing run
    (reproduce.md), the particles scene, a second machine and a phone.
 2. CAD scale: 10k/50k/90k parts, kernel tick, pick latency, feature edges, GPU culling (`docs/cad-performance.md`,
-   `cad/results-*.json`). **[have]**, **[rerun]** after the core speed-ups.
+   `cad/results-*.json`). Core path: **[have]**, publication-grade: the quiet-machine before/after of the merged
+   core steps (`cad/results-{before,after}{1,2}-*.json`, 0ed56b9). Edges, culling, load/heap and 1x MSAA: **[rerun]**
+   on the quiet machine against the merged core.
 3. Feature costs on GPU: post stack per effect, DOF before/after, VFX 100k/1M, shadows shimmer, LOD/imposters,
    textured instancing, VAT crowds, contact shadows. **[have]** (each with JSON), several **[rerun]** (see claims.md).
 4. Loading: main-thread blocking with and without workers, OCCT STEP init and parse, gltf-pro load times. **[have]**
 5. Memory: load/unload cycles return to baseline (`gates-memory.json`). **[have]**
+5b. Export fidelity: glTF round trip of RobotExpressive goes from 752 glTF-Validator errors in the source to 0 in the
+   export (`exporters-model.mjs`, `results/exporters-model.json`, `packages/exporters/tests/model.test.js`). **[have]**
+   Export time (DamagedHelmet 7.7 ms, Node 24) was measured on a busy machine: **[rerun]** in the quiet-PC run.
 6. Frame rate of the shipped demos per device tier. **[need]** after the demo rebuild.
 
 ## 5. Correctness proofs
