@@ -10,11 +10,11 @@ import {LIGHT, PALETTE, CAD_MATERIALS, boxes, cad, HELMET, sky} from './scenes.j
 
 // Box and CAD materials are single-sided (doubleSided:false), like three's default FrontSide: the parts are closed
 // solids, and core's default double-sided material would shade back faces three never draws (a fairness fix; see
-// docs/whitepaper/boxes-vs-threejs.md). Since 4be71f5 core draws such batches with a back-culled pipeline without the discard.
+// docs/whitepaper/boxes-vs-threejs.md). Since d96e2d7 core draws such batches with a back-culled pipeline without the discard.
 // Diagnostics only (?diag=a+b): patch what core sends to the GPU, without changing core, to isolate one cause at a
 // time. Never part of a published variant.
 //   double     core's default material (doubleSided:true)
-//   nocull     core before 4be71f5: its back-culled pipeline is created with cull none and the discard (same pixels)
+//   nocull     core before d96e2d7: its back-culled pipeline is created with cull none and the discard (same pixels)
 //   cull       pipeline cullMode 'back' + the shader's discard line removed on every core pipeline
 //   plugin     the same as cull, done by a package: an engine plugin's pass rewrites the main pass's shader/descriptor
 //   pass       an empty plugin pass (what any added pass costs: core then keeps MSAA buffers and resolves separately)
@@ -23,7 +23,7 @@ import {LIGHT, PALETTE, CAD_MATERIALS, boxes, cad, HELMET, sky} from './scenes.j
 //   flat       fragment shader returns the vertex colour (vertex + raster cost only)
 //   msaa1      1 sample (core's light tier)
 const diag = new Set(params.diag);
-const discard = /if\((!C&&)?!facing&&i\.material\.z<0\.5\)\{discard;\}/; // core's text before and since 4be71f5
+const discard = /if\((!C&&)?!facing&&i\.material\.z<0\.5\)\{discard;\}/; // core's text before and since d96e2d7
 if (diag.has('msaa1')) globalThis.margoLow = 1;
 if (diag.has('nostencil')) {
   const request = GPUAdapter.prototype.requestDevice;

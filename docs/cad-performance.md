@@ -139,7 +139,7 @@ and 90k parts stay GPU-bound (~28 ms of GPU per frame): orbit at 90k is unchange
 the frame is GPU-bound and the GPU time rose; not explained. The quiet-machine "before" numbers are 10-35% better than the
 11:53 session at the top of this page (34 vs 25 FPS at 90k orbit), which is why only same-session pairs are compared.
 
-### Back-face culling in core (merged 2026-10-15, `4be71f5`)
+### Back-face culling in core (merged 2026-10-15, `d96e2d7`)
 
 Scott approved the smaller per-batch variant instead of the per-cull-group branch below: core builds a second main
 pipeline (`cullMode: 'back'`, the shader's `discard` compiled out by an override) and uses it for a geometry batch

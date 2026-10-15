@@ -423,7 +423,7 @@ Two fixes would clear most rows:
 | PKG-106 | `material.set({...})` "changes the given values in place ... no new pipeline or bind group"; "+34 B gzip, core+stage 19,577" | core README; commit `8427377` | `tests/core-material-setters.test.js` (in verify); `npm run measure:size` prints 19,577 at `e2cc4c5` | `npm run verify` | PROVEN | – |
 | PKG-107 | "Checked on a real GPU (`transparent-canvas-gpu.mjs`): empty pixels stay transparent with every effect below; opaque frames are byte-identical before and after the alpha changes"; Tonemap/SSAO rim "up to ~45/255" | post README (Transparent canvas); environment README (`TransparentCanvas`) | The script asserts these on the Arc laptop but writes only PNGs to ignored `test-results/`; the unit test covers configuration, restore and dispose | `node examples/package-benchmarks/transparent-canvas-gpu.mjs` | UNPROVEN | Added with `e2cc4c5` (merged during 5d). Fixed (5d): the post README now says the script writes no committed result yet. Commit its output to make it PROVEN. |
 | PKG-108 | `webglRenderer(canvas, {transparent: true})` gives an `alpha: true` premultiplied canvas and a transparent clear | webgl README | `packages/webgl/test/webgl.test.js` | `npm test -w @margoengine/webgl` | PROVEN | Added with `e2cc4c5`. |
-| PKG-109 | Core draws a batch whose instances are all single-sided and unmirrored with a back-culled pipeline without the `discard`; "pixels are the same either way"; switches follow `material.set({doubleSided})`, material assignment and mirroring on the next frame | core README | Real GPU (Arc 140V, Edge 155): `cad/cull-pixels.mjs` vs `dc0c4ff`, 0 of 153,600 pixels differ in 13 steps (culled pipeline bound in 12); fake GPU: `tests/core-material-setters.test.js` | `node examples/package-benchmarks/cad/cull-pixels.mjs` (GPU lock) | PROVEN | Added with `4be71f5`; core + stage 19,793 B. GPU speed-up (1.8-3.6x on single-sided boxes) is diagnostic only (busy machine, `boxes-vs-threejs.md`); no claim. |
+| PKG-109 | Core draws a batch whose instances are all single-sided and unmirrored with a back-culled pipeline without the `discard`; "pixels are the same either way"; switches follow `material.set({doubleSided})`, material assignment and mirroring on the next frame | core README | Real GPU (Arc 140V, Edge 155): `cad/cull-pixels.mjs` vs `dc0c4ff`, 0 of 153,600 pixels differ in 13 steps (culled pipeline bound in 12); fake GPU: `tests/core-material-setters.test.js` | `node examples/package-benchmarks/cad/cull-pixels.mjs` (GPU lock) | PROVEN | Added with `d96e2d7`; core + stage 19,793 B. GPU speed-up (1.8-3.6x on single-sided boxes) is diagnostic only (busy machine, `boxes-vs-threejs.md`); no claim. |
 
 ## vs-three.js results
 
@@ -465,7 +465,7 @@ Things to settle before or in the quiet run:
      pipeline culling Margo uses 21-37% less GPU time than three's WebGPURenderer; three's WebGL2 renderer stays up
      to 30% ahead. Fixes and bytes are in that file.
 
-   - 2026-10-15: fix B merged into core (`4be71f5`, +216 B). The harness now pairs mesh <-> mesh (core meshes vs
+   - 2026-10-15: fix B merged into core (`d96e2d7`, +216 B). The harness now pairs mesh <-> mesh (core meshes vs
      three `Mesh`) and instanced <-> instanced (materials `createInstancedMesh` / culling `CulledInstances` vs three
      `InstancedMesh`). Diagnostic busy-machine run (`results/vs-threejs-boxes-pairs.json`, tables in
      `boxes-vs-threejs.md`): mesh <-> mesh Margo leads on CPU and FPS at 1k-50k; instanced <-> instanced three's

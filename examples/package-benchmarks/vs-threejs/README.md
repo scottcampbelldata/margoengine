@@ -40,7 +40,7 @@ Details of the instanced variants:
   frames are brighter than the other variants'; its GPU time is gltf-pro's material, not core's.
 - `margo-culled` boxes: `CulledInstances` has no per-instance colour, so one batch per palette colour (16 indirect
   draws). CAD: one batch per part shape (5). It draws with core's frame shader (same pixels as core meshes) but with
-  its own cull-none pipeline, so it does not get core's back-face-culled pipeline (4be71f5). Moving boxes:
+  its own cull-none pipeline, so it does not get core's back-face-culled pipeline (d96e2d7). Moving boxes:
   `setTransform` per moving box per frame (one 64-byte upload each).
 
 Scenes (`scenes.js`, the same data for every engine):
@@ -116,7 +116,7 @@ Known asymmetries (they are in the results, not hidden):
   what most apps use). This costs Margo GPU time in `helmet`.
 - In `helmet` Margo's floor is a core mesh (Reinhard) while three tone-maps the whole frame with ACES, so the floor
   differs in brightness; the helmet itself is drawn by gltf-pro with ACES like three's.
-- Back faces: since 4be71f5 Margo core draws a geometry batch whose instances are all single-sided and unmirrored with a
+- Back faces: since d96e2d7 Margo core draws a geometry batch whose instances are all single-sided and unmirrored with a
   back-culled pipeline without the shader's `discard`, as three does (`cullMode: 'back'`); before it, back faces
   were rasterized and discarded in the shader, and the `discard` cost early depth testing (most of three's GPU lead
   on the box scenes; `docs/whitepaper/boxes-vs-threejs.md`). `margo+nocull` reproduces the earlier core on the GPU.

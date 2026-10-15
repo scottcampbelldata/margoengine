@@ -15,7 +15,7 @@ No round overlapped another agent's GPU run: the stray transparency check ran un
 
 ## Update 2026-10-15: fix B is in core; like-for-like pairs
 
-Scott approved fix B (below). Core `4be71f5` draws a geometry batch with a second, back-culled pipeline whose shader has
+Scott approved fix B (below). Core `d96e2d7` draws a geometry batch with a second, back-culled pipeline whose shader has
 no `discard` when every drawn instance is single-sided and unmirrored; core + stage 19,577 -> **19,793 B** gzip (+216).
 Frames are unchanged: `examples/package-benchmarks/cad/cull-pixels.mjs` renders a mixed scene (single-sided closed
 boxes, open shells showing their inner back faces, a mirrored instance, double-sided parts, `material.set({doubleSided})`
@@ -30,7 +30,7 @@ instanced** (`@margoengine/materials` `createInstancedMesh` and `@margoengine/cu
 `InstancedMesh`); see the harness README for what each variant does and its asymmetries.
 
 Run (`results/vs-threejs-boxes-pairs.json`, diagnostic, busy machine: CPU load at run starts 0-90%, 2 alternating
-rounds x 120 frames, at `ef2fb0c`): `node examples/package-benchmarks/vs-threejs/run.mjs --busy --rounds=2 --frames=120
+rounds x 120 frames, at `ef2fb0c`, the pre-rebase hash of `fbe2ce3`): `node examples/package-benchmarks/vs-threejs/run.mjs --busy --rounds=2 --frames=120
 --only=boxes:1000,boxes:10000,boxes:50000,boxes:10000:moving --variants=margo,margo+nocull,margo-instanced,margo-culled,three-webgl,three-webgpu,three-webgl-instanced,three-webgpu-instanced`.
 Cells: FPS (frames finished by the GPU per second) / CPU ms per frame / GPU ms per frame / serial frame ms; draws in the
 variant column.
@@ -174,7 +174,7 @@ WebGL2). Its small, dense parts make it geometry-bound; not diagnosed further he
 | Fix | Where | Bytes (core + stage gzip) | GPU, boxes 1k / 10k / 50k (single-sided) | Limits |
 | --- | --- | --- | --- | --- |
 | A. Per-cull-group pipelines (`scratch/core-backface-cull`, 7fce5be) | core | +315 (19,543 -> 19,858) | as the patched row: 0.53 / 1.67 / 5.92 | handles mixed and mirrored batches and package shader variants; already declined by Scott |
-| B. Per-batch culled pipeline (`scratch/bvt-core-cull-bytes`, b3514f3; **merged as `4be71f5`**, +216 on 19,577 -> 19,793) | core | **+212** (19,543 -> 19,755) | 0.49 / 1.70 / 5.87 (real GPU, identical frames) | a geometry batch gets culled only if every instance in it is single-sided and unmirrored; package shader variants (fog, clipping, clustered) keep the discard; unit tests that build `GPURenderer` by hand need the new argument |
+| B. Per-batch culled pipeline (`scratch/bvt-core-cull-bytes`, b3514f3; **merged as `d96e2d7`**, +216 on 19,577 -> 19,793) | core | **+212** (19,543 -> 19,755) | 0.49 / 1.70 / 5.87 (real GPU, identical frames) | a geometry batch gets culled only if every instance in it is single-sided and unmirrored; package shader variants (fog, clipping, clustered) keep the discard; unit tests that build `GPURenderer` by hand need the new argument |
 | C. Engine plugin that rewrites the main pass (12 lines; the harness's `margo+plugin`) | a leaf package | 0 in core | 0.54 / 1.80 / 5.91 (span 0.75 / 2.02 / 6.26) | culls every core mesh: only for scenes of closed, unmirrored, single-sided solids; its pass makes core keep MSAA buffers and resolve in an extra pass (+0.2-0.35 ms span; already paid when any other package adds a pass); must run after any package that replaces the shader text |
 
 Core was at 19,577 B after the material setters (perf/auto-quality e2cc4c5), so A and B both broke the 19,600 target
