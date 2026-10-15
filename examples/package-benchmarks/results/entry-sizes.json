@@ -1,5 +1,5 @@
 {
-  "commit": "80b4a1f",
+  "commit": "0e02ead",
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "packages": {
     "@margoengine/animation": {
@@ -60,8 +60,8 @@
     },
     "@margoengine/controls": {
       ".": {
-        "raw": 54166,
-        "gzip": 17133
+        "raw": 57902,
+        "gzip": 18338
       }
     },
     "@margoengine/core": {
@@ -192,8 +192,8 @@
     },
     "@margoengine/gltf-pro": {
       ".": {
-        "raw": 46819,
-        "gzip": 16504
+        "raw": 48000,
+        "gzip": 16827
       },
       "./asset": {
         "raw": 6442,
@@ -208,8 +208,8 @@
         "gzip": 5385
       },
       "./worker": {
-        "raw": 48724,
-        "gzip": 17207
+        "raw": 49911,
+        "gzip": 17536
       },
       "dist/workers/gltf.js": {
         "raw": 15122,
@@ -454,6 +454,12 @@
         "gzip": 1115
       }
     },
+    "@margoengine/oit": {
+      ".": {
+        "raw": 5090,
+        "gzip": 2210
+      }
+    },
     "@margoengine/physics": {
       ".": {
         "raw": 23859,
@@ -668,8 +674,8 @@
         "gzip": 8542
       },
       "dist/workers/usdz.js": {
-        "raw": 73542,
-        "gzip": 26448
+        "raw": 74730,
+        "gzip": 26764
       }
     },
     "@margoengine/usdz-export": {
@@ -712,8 +718,8 @@
     },
     "@margoengine/viewcube": {
       ".": {
-        "raw": 7313,
-        "gzip": 3120
+        "raw": 7655,
+        "gzip": 3227
       }
     },
     "@margoengine/water": {
