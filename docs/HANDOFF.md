@@ -800,6 +800,23 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       `worker-src 'self'` (blob: if any) for parsing workers. Ready-to-paste configs for Cloudflare Pages/Netlify
       `_headers`, Vercel `vercel.json`, Nginx: CSP, caching of fingerprinted assets, compression; `create-margo`
       template ships a `_headers`. Test: a page served with the strict CSP loads every demo-class feature.
+      DONE: `docs/deploying.md` (linked from README and docs/README.md). Policy: `default-src 'self'; script-src 'self'
+      'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src
+      'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'`. Found in the real-browser
+      run: two workers need `'unsafe-eval'` in their own (per-file) policy: `decoder.worker-*.js` (decoders runs the
+      Draco/Basis Emscripten scripts via indirect eval) and `cad-runtime-*.js` (occt-import-js embind uses `new
+      Function`); a worker takes its CSP from its own response headers, so the page stays strict. `'unsafe-inline'`
+      styles: Vite keeps index.html `<style>` inline, ViewCube and Inspector insert `<style>`. No package source
+      changed. `tools/create-margo/template/public/_headers` (CSP + immutable `/assets/*`); `site/_headers` gains the
+      CSP on every page except `/catalog/examples/*` (inline scripts + jsDelivr/esm.sh, left without CSP) and caching
+      for dof/tonemap assets and demo `.wasm`. Check: `node scripts/gpu-lock.mjs run --owner=<id> -- node
+      scripts/csp-check.mjs` (harness page with core, gltf-pro worker, Draco, KTX2, bvh worker, PostStack SSAO+Bloom+
+      FXAA, Stats/HTML/ViewCube/Inspector, machinery STEP; the create-margo app; 11 site/dist pages; zero violations,
+      Edge, Arc 140V, AC; `examples/package-benchmarks/results/csp-check.json`; claims DOC-072..075).
+      `CSP_OVERRIDE=<policy>` shows what a missing directive breaks (checked: no `'wasm-unsafe-eval'` -> Engine.create
+      fails; strict policy on the eval workers -> Draco, KTX2, STEP fail, all else passes). Side finding, not fixed: every
+      site demo folder (`demos/`, `demos/dof/`, `demos/tonemap/`, `demos/earth/`) ships the 7.6 MB OCCT `.wasm` and
+      CAD chunks although no demo imports STEP (deploy bytes only; never downloaded).
    b. Tier-aware feature presets: `@margoengine/quality` already picks light/full tiers (MSAA, DPR, pacing only). Add
       presets packages read on attach (shadow cascades/resolution, SSR off, volumetrics off/low grid, SSAO half-res,
       particle counts) so the light tier scales features automatically; measure the light tier on the laptop.

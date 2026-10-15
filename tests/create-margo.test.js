@@ -15,7 +15,9 @@ test('create-margo scaffolds the template and refuses a non-empty directory', t 
   const temp = mkdtempSync(join(tmpdir(), 'create-margo-')); t.after(() => rmSync(temp, {recursive: true, force: true}));
   const output = run(['My App'], temp), app = join(temp, 'My App');
   assert.match(output, /cd "My App"\n {2}pnpm install\n {2}pnpm dev/);
-  assert.deepEqual(readdirSync(app).sort(), ['.gitignore', 'README.md', 'index.html', 'package.json', 'src', 'tsconfig.json']);
+  assert.deepEqual(readdirSync(app).sort(), ['.gitignore', 'README.md', 'index.html', 'package.json', 'public', 'src', 'tsconfig.json']);
+  const headers = readFileSync(join(app, 'public/_headers'), 'utf8');
+  for (const directive of ["script-src 'self' 'wasm-unsafe-eval'", "worker-src 'self'", 'immutable']) assert.ok(headers.includes(directive), directive);
   const manifest = JSON.parse(readFileSync(join(app, 'package.json'), 'utf8'));
   assert.equal(manifest.name, 'my-app');
   for (const [name, range] of Object.entries(manifest.dependencies)) {
@@ -40,6 +42,7 @@ test('the scaffolded app type-checks and builds against the local packages', {ti
   for (const name of [...Object.keys(manifest.dependencies), ...Object.keys(manifest.devDependencies)]) symlinkSync(join(root, 'node_modules', name), join(modules, name), 'junction');
   execFileSync(process.execPath, [join(modules, 'typescript/bin/tsc'), '-p', app], {cwd: app, stdio: 'pipe'});
   execFileSync(process.execPath, [join(modules, 'vite/bin/vite.js'), 'build', '--logLevel', 'error'], {cwd: app, stdio: 'pipe'});
+  assert.ok(existsSync(join(app, 'dist/_headers')), 'Vite copies public/_headers into dist');
   const assets = join(app, 'dist/assets'), scripts = readdirSync(assets).filter(file => file.endsWith('.js'));
   const gzip = scripts.reduce((sum, file) => sum + gzipSync(readFileSync(join(assets, file)), {level: 9}).length, 0);
   console.log(`create-margo app: ${scripts.length} JS file(s), ${gzip} bytes gzip`);
