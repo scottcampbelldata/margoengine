@@ -12,7 +12,9 @@ import {mockGPU, context} from './gpu-recorder.js';
 import {Engine, TransformStore} from '../../../packages/core/dist/extension.js';
 import {animatedTriangle} from '../../../tests/support/gltf-pro-fixture.js';
 
-const ref = process.argv[2] ?? '15c87f1';
+// f8a36ca is that 5c change, the last intentional change to the story's output; refs before it (15c87f1, 114130c) differ
+// only in the IBL BRDF LUT binding.
+const ref = process.argv[2] ?? 'f8a36ca';
 const load = async () => {const all = await Promise.all(['gltf-pro', 'shadows', 'clustered', 'environment'].map(name => versions(name, ref))); return ['baseline', 'candidate'].map(k => all.map(v => v[k]));};
 const [baseline, candidate] = await load();
 const materials = [{alphaMode: 'OPAQUE'}, {alphaMode: 'BLEND', pbrMetallicRoughness: {baseColorFactor: [1, 1, 1, 0.5]}}, {extensions: {KHR_materials_clearcoat: {clearcoatFactor: 1}}},

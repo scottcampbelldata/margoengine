@@ -13,7 +13,9 @@ import {build} from 'vite';
 import {Engine, TransformStore} from '@margoengine/core/extension';
 import {mockGPU, context} from './gpu-recorder.js';
 
-const root = resolve(import.meta.dirname, '../../..'), slash = value => value.replaceAll('\\', '/'), ref = process.argv[2] ?? '1970fda';
+// 7f1c9c6 is the last intentional change to the story's output (gltf-pro's discard tests became pipeline constants, 1e.f).
+// Its parent and older refs (1970fda, from before the transforms in 700838e) differ.
+const root = resolve(import.meta.dirname, '../../..'), slash = value => value.replaceAll('\\', '/'), ref = process.argv[2] ?? '7f1c9c6';
 const sources = ['materials/src', 'gltf-pro/src', 'shared'].map(name => slash(resolve(root, 'packages', name)) + '/');
 const show = (from, file) => {try {return execFileSync('git', ['show', `${from}:${file.slice(slash(root).length + 1)}`], {cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore']});} catch {return;}};
 /** materials with gltf-pro (every entry) bundled in (core stays external), both read from `from` or the working tree. */
