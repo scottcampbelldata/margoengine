@@ -1,6 +1,8 @@
 # Desktop frame-rate investigation
 
-The earlier sections record successive historical checks. Current results are
+**Dated investigation log (2026-10-12/13, NVIDIA RTX A6000 over Remote Desktop).** Sizes, test counts and timings below are as of those days and their raw reports stayed in the ignored `test-results/` folder; none is a current claim. Current, reproducible numbers are in [docs/whitepaper/claims.md](whitepaper/claims.md); `npm run measure:size` prints today's core + stage size (19,543 bytes gzip at `3d845a0`).
+
+The earlier sections record successive historical checks. The latest of them are
 in [Second deep package pass](#second-deep-package-pass); the shared
 `test-results/deployed-bundle-integrity.json` is replaced on deployment and
 now verifies only the current build.
