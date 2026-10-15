@@ -764,6 +764,21 @@
     "changed": 0.0005,
     "hot": 0.0002
    }
+  },
+  "dof-light": {
+   "url": "demos/dof/?quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
   }
  },
  "environment": {
@@ -771,8 +786,8 @@
   "gpu": "intel xe-2lpg",
   "acPowerBefore": true,
   "acPowerAfter": true,
-  "date": "2026-10-15T10:02:41.056Z",
-  "commit": "587cd62"
+  "date": "2026-10-15T12:33:26.905Z",
+  "commit": "772773c"
  },
  "method": {
   "hot": 24,
