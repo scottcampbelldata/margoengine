@@ -11,6 +11,8 @@ export type Paced = EngineKernel | {
     pace?: (time: number) => boolean;
 };
 
+export const QUALITY_PRESETS: Readonly<Record<QualityTier, QualityPreset>>;
+
 export interface QualityOptions {
     search?: string;
     storage?: {
@@ -18,6 +20,32 @@ export interface QualityOptions {
         setItem(key: string, value: string): void;
     };
     userAgent?: string;
+}
+
+export interface QualityPreset {
+    shadows?: {
+        resolution?: number;
+    };
+    ssao?: {
+        samples?: number;
+    };
+    ssr?: {
+        enabled?: boolean;
+        steps?: number;
+    };
+    dof?: {
+        maxRadius?: number;
+    };
+    volumetric?: {
+        grid?: readonly [number, number, number];
+    };
+    localShadows?: {
+        maxLights?: number;
+        resolution?: number;
+    };
+    vfx?: {
+        capacity?: number;
+    };
 }
 
 export type QualityTier = 'phone' | 'light' | 'high';
@@ -42,6 +70,8 @@ export function frameStatus(targetRate: number, callbackRate: number, fps: numbe
 
 export function paceEngine(engine: Paced): void;
 
+export const qualityPreset: () => QualityPreset;
+
 export const sceneSamples: () => 1 | 4;
 
 export function watchQuality({ request, queue, now, store, reload }?: WatchOptions): void;
@@ -55,5 +85,6 @@ interface QueueLike {
 
 declare global {
     var margoLow: number | undefined;
+    var margoPreset: QualityPreset | undefined;
 }
 ```

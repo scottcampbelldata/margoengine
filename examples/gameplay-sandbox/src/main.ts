@@ -19,7 +19,7 @@ import {Clustered} from '@margoengine/clustered';
 import {createCharacter, createLandscape, terrainHeight} from './scene.js';
 import {stepLocomotion, type LocomotionOptions} from '@margoengine/controls';
 import {createProceduralSettlement} from './procedural/index.js';
-import {applyQualityTier, paceEngine, sceneSamples, watchQuality} from '@margoengine/quality';
+import {applyQualityTier, paceEngine, qualityPreset, sceneSamples, watchQuality} from '@margoengine/quality';
 import './style.css';
 
 // Before any engine exists: core reads the tier when it builds pipelines and sizes the canvas.
@@ -71,7 +71,8 @@ async function boot(): Promise<void> {
       if (capacity === 0) return;
       particles = VFX.attach(engine, {capacity, initialCount: capacity, rate: capacity / 20, position: [0, 4, 0], emissionExtent: [80, 3, 80], velocity: [0, 0.03, 0], gravity: [0, 0, 0], spread: 0.08, lifetime: [25, 45], size: 0.01, ground: 0.35, turbulence: 0.035, frequency: 0.22, color: [1, 0.85, 0.4, 0.5], intensity: 5});
     };
-    countSelect.value = mobile ? '100000' : '1000000';
+    // The tier preset's particle count (100k on the light and phone tiers, VFX's 1M default on the full tier).
+    countSelect.value = String(qualityPreset().vfx?.capacity ?? 1_000_000);
     input = new Input({
       strafe: [{type: 'key', code: 'KeyD'}, {type: 'key', code: 'ArrowRight'}, {type: 'key', code: 'KeyA', scale: -1}, {type: 'key', code: 'ArrowLeft', scale: -1}, {type: 'touch', id: 'move', axis: 'x'}],
       forward: [{type: 'key', code: 'KeyW'}, {type: 'key', code: 'ArrowUp'}, {type: 'key', code: 'KeyS', scale: -1}, {type: 'key', code: 'ArrowDown', scale: -1}, {type: 'touch', id: 'move', axis: 'y', scale: -1}],

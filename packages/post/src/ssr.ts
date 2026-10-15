@@ -4,6 +4,7 @@ import type {EngineKernel} from '@margoengine/core';
 import type {Engine,EnginePlugin,FrameGraph,PassContext} from '@margoengine/core/extension';
 import {invertMatrixStable} from '@margoengine/math/mat4';
 import {render,compute,group as bind} from '../../shared/gpu.js';
+import {preset} from '../../shared/preset.js';
 import type {StackHost,StackStage,StageOutput} from '../../shared/stack.js';
 import {PostStack} from './stack.js';
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
@@ -149,7 +150,7 @@ export class SSR implements EnginePlugin {
     begin:()=>{if(this.pass)return this.pass;const c=this.context!,stencil=c.descriptor.depthStencil!.format.includes('stencil')?{stencilLoadOp:'load',stencilStoreOp:'store'} as const:{};
       return this.pass=c.encoder.beginRenderPass({colorAttachments:this.material.map(view=>({view,loadOp:'load',storeOp:'store'})),depthStencilAttachment:{view:c.depth,depthLoadOp:'load',depthStoreOp:'store',...stencil}});}};
   private readonly values=new Float32Array(40);private readonly workspace=new Float64Array(52);private readonly inverse=this.values.subarray(0,16);
-  constructor(readonly options:SSROptions={}){this.validate();}
+  constructor(readonly options:SSROptions={}){this.options=preset('ssr',options);this.validate();}
   /** Alone, SSR runs in its own one-effect PostStack (tone mapped like SSAO alone); to combine it, put it in your PostStack. */
   static attach(engine:EngineKernel,options:SSROptions={}):SSR {const effect=new SSR(options);effect.stack=PostStack.attach(engine,[effect]);return effect;}
   /** Makes a gltf-pro model or materials mesh reflect: its own materials (maps, alpha mask, instances, skinning) are drawn

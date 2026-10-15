@@ -4,6 +4,7 @@ import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
 import {invertMatrixStable} from '@margoengine/math/mat4';
 import {viewMatrix} from '../../shared/view.js';
+import {preset} from '../../shared/preset.js';
 import {orthographic} from '../../shared/projection.js';
 import {fullscreen,render,group as bind} from '../../shared/gpu.js';
 import type {StackHost,StackStage,StageOutput} from '../../shared/stack.js';
@@ -37,7 +38,7 @@ export class SSAO implements EnginePlugin {
   private readonly inverse=this.values.subarray(0,16);private readonly view=this.values.subarray(16,32);
   private readonly projection=this.values.subarray(32,48);
   private readonly directionValues=[new Float32Array([1,0,0.5,0]),new Float32Array([0,1,0.5,0])];
-  constructor(readonly options:SSAOOptions={}){this.validate();}
+  constructor(readonly options:SSAOOptions={}){this.options=preset('ssao',options);this.validate();}
   static attach(instance:EngineKernel,options:SSAOOptions={}):SSAO {const effect=new SSAO(options);engineRuntime(instance).use(effect);return effect;}
   get enabled():boolean{return this.options.enabled??true;}
   get depthTexture():GPUTexture|undefined{return this.host?this.host.depthTexture:this.textures[1];}

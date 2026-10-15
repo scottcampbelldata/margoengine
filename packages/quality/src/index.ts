@@ -1,10 +1,39 @@
 import type {EngineKernel} from '@margoengine/core';
 import {sceneSamples as samples} from '../../shared/quality.js';
-declare global {var margoLow: number | undefined;}
+declare global {var margoLow: number | undefined; var margoPreset: QualityPreset | undefined;}
 declare const GPUQueue: {prototype: QueueLike} | undefined;
 interface QueueLike {submit(buffers: unknown): unknown; onSubmittedWorkDone(): Promise<unknown>}
 /** 'phone' keeps core's phone path (1x, DPR up to 2); 'light' is 1x at a capped DPR; 'high' is core's 4x desktop path. */
 export type QualityTier = 'phone' | 'light' | 'high';
+
+/**
+ * Feature defaults for a tier. `applyQualityTier()` publishes the tier's preset as `globalThis.margoPreset`; each feature
+ * package reads its key when an effect is constructed and uses a value only where the app left that option undefined
+ * (explicit options always win). Packages never import this one; without it they keep their own defaults. Value names
+ * are the packages' option names.
+ */
+export interface QualityPreset {
+  /** `Shadows` (@margoengine/shadows): texels per cascade (default 2048). */
+  shadows?: {resolution?: number};
+  /** `SSAO` (@margoengine/post/ssao): kernel samples, 1-32 (default 32). */
+  ssao?: {samples?: number};
+  /** `SSR` (@margoengine/post/ssr): on/off (default on) and Hi-Z march steps (default 64). */
+  ssr?: {enabled?: boolean; steps?: number};
+  /** `DOF` (@margoengine/dof): largest blur radius in pixels (default 16). */
+  dof?: {maxRadius?: number};
+  /** `VolumetricFog` (@margoengine/environment/volumetric): froxel grid (default [160, 90, 64]). */
+  volumetric?: {grid?: readonly [number, number, number]};
+  /** `LocalShadows` (@margoengine/clustered/shadows): shadowed lights (default 4) and layer size (default 512). */
+  localShadows?: {maxLights?: number; resolution?: number};
+  /** `VFX` (@margoengine/vfx): particle capacity (default 1,000,000). */
+  vfx?: {capacity?: number};
+}
+const light: QualityPreset = {shadows: {resolution: 1024}, ssao: {samples: 16}, ssr: {enabled: false, steps: 32}, dof: {maxRadius: 8},
+  volumetric: {grid: [80, 45, 32]}, localShadows: {resolution: 256}, vfx: {capacity: 100_000}};
+/** The preset per tier. The full tier is empty: every package keeps its own defaults. Phones share the light preset. */
+export const QUALITY_PRESETS: Readonly<Record<QualityTier, QualityPreset>> = {high: {}, light, phone: light};
+/** This page's preset (calls `applyQualityTier()` first if nothing has). */
+export const qualityPreset = (): QualityPreset => QUALITY_PRESETS[(state ?? (applyQualityTier(), state!)).tier];
 export interface QualityOptions {
   /** URL query to read `?quality=high|low` (forces a tier, never remembered) and `?scale=1..2` (light-tier DPR). */
   search?: string;
@@ -24,7 +53,8 @@ let state: {tier: QualityTier; stored?: string; forced?: string; storage?: Quali
 const local = (): QualityOptions['storage'] => {try {return globalThis.localStorage;} catch {return undefined;}};
 
 /** Choose this page's tier. Call once, before creating any engine: core reads `globalThis.margoLow` when it builds
- * pipelines and sizes the canvas. Desktops start light unless this browser already measured headroom for 4x, so a slow
+ * pipelines and sizes the canvas, and feature packages read `globalThis.margoPreset` (this tier's `QualityPreset`) when
+ * an effect is constructed. Desktops start light unless this browser already measured headroom for 4x, so a slow
  * PC never shows a slow phase or a reload; `paceEngine` then holds light-tier engines to ~60 FPS. */
 export function applyQualityTier({search = globalThis.location?.search, storage = local(), userAgent = globalThis.navigator?.userAgent ?? ''}: QualityOptions = {}): QualityTier {
   const params = new URLSearchParams(search), forced = params.get('quality') ?? undefined;
@@ -34,6 +64,7 @@ export function applyQualityTier({search = globalThis.location?.search, storage 
   const tier: QualityTier = /Mobi|Android/.test(userAgent) ? 'phone' : choice === 'high' ? 'high' : 'light';
   if (tier !== 'light') delete globalThis.margoLow;
   else globalThis.margoLow = Math.min(2, Math.max(1, Number(params.get('scale')) || 1));
+  globalThis.margoPreset = QUALITY_PRESETS[tier];
   state = {tier, stored: choice, forced: forced === 'high' || forced === 'low' ? forced : undefined, storage};
   return tier;
 }

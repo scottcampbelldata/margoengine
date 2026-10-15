@@ -3,6 +3,7 @@ import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type Vec3} from '@margoengine/core/extension';
 import {finiteVector} from '@margoengine/math/validate';
 import {viewMatrix} from '../../shared/view.js';
+import {preset} from '../../shared/preset.js';
 import {simulationShader,billboardShader,multisampled} from './shader.js';
 declare const GPUBufferUsage:{UNIFORM:number;STORAGE:number;INDIRECT:number;COPY_DST:number;COPY_SRC:number};
 type Context=Extract<PassContext,{backend:'webgpu'}>;
@@ -42,7 +43,9 @@ export class VFX implements EnginePlugin {
   private simulation?:GPUComputePipeline;private computeGroup?:GPUBindGroup;private renderGroups=new Map<GPURenderPipeline,GPUBindGroup>();private renders=new Map<string,GPURenderPipeline>();
   private billboard='';private extra?:GPUBuffer;private readonly extraValues=new Float32Array(524);private sprite?:VFXTexture;private spriteEntries:GPUBindGroupEntry[]=[];private sorter?:ReturnType<NonNullable<VFXFeatures['sort']>['create']>;private owned:Owned=[];
   private readonly values=new Float32Array(56);private readonly ints=new Uint32Array(this.values.buffer);private readonly view=new Float32Array(16);private time=0;private remainder=0;private burstCount=0;private disposed=false;
-  constructor(readonly options:VFXOptions={},private readonly features:VFXFeatures={}) {this.capacity=options.capacity??1_000_000;this.validate();const t=options.texture;
+  constructor(readonly options:VFXOptions={},private readonly features:VFXFeatures={}) {
+    // A preset capacity below an explicit initialCount is ignored: the app asked for that many particles.
+    const tier=preset('vfx',options);this.options=(tier.capacity??0)<(options.initialCount??0)?options:tier;this.capacity=this.options.capacity??1_000_000;this.validate();const t=options.texture;
     if(t){if(!features.texture)throw new TypeError('VFX texture needs texture from @margoengine/vfx/texture');this.sprite=features.texture.copy(t);}}
   static attach(instance:EngineKernel,options:VFXOptions={},features:VFXFeatures={}):VFX {const effect=new VFX(options,features);engineRuntime(instance).use(effect);return effect;}
   private validate():void {const o=this.options;
