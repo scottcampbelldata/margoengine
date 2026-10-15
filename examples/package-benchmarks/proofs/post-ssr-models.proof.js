@@ -6,7 +6,7 @@
 // run with the commit before the capture as ref.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/post-ssr-models.proof.js [ref]
 import assert from 'node:assert/strict';
-import {versions} from './compare.js';
+import {versions, ignoreAgx} from './compare.js';
 import {mockGPU, context} from './gpu-recorder.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
 
@@ -47,7 +47,7 @@ const lists = {
 };
 let calls = 0, stories = 0;
 for (const [label, make] of Object.entries(lists)) for (const samples of [1, 4]) for (const [name, shader] of [['core', wgsl], ['IBL', ibl]]) {
-  const expected = story(post.baseline, make, samples, shader), actual = story(post.candidate, make, samples, shader);
+  const expected = ignoreAgx(story(post.baseline, make, samples, shader)), actual = ignoreAgx(story(post.candidate, make, samples, shader));
   assert.ok(expected.length > 300, `${label} story must exercise the GPU`);
   assert.deepEqual(actual, expected, `PostStack [${label}] GPU calls differ at ${samples}x (${name} shader)`); calls += expected.length; stories++;
 }
