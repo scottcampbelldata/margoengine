@@ -1,6 +1,6 @@
 # Local release stress validation — 11 October 2026
 
-The production stress harness passed these completed campaigns on this Windows host. These are measurements of the current uncommitted workspace based on Git revision `9b98d25e25163d48d02de1c0eb8e8c1b9be4ab5a`; they are not clean-commit release certification. Repeat the release gate from a clean checkout before publishing. Commands and coverage are in [stress-testing.md](stress-testing.md).
+The production stress harness passed these completed campaigns on this Windows host. These are measurements of the current uncommitted workspace based on Git revision `9b98d25e25163d48d02de1c0eb8e8c1b9be4ab5a`; they are not clean-commit release certification, and the raw reports were not committed. Repeat the release gate from a clean checkout before publishing. Commands and coverage are in [stress-testing.md](stress-testing.md).
 
 | Campaign | Browser / WebGPU adapter | Passed sessions | Submitted frames | Seed |
 | --- | --- | ---: | ---: | ---: |
@@ -17,7 +17,7 @@ The main matrix covered all 11 scenarios, with 45–46 profiles each. It explici
 
 The 3,000,000-splat AMD fixture completed all 600 frames, recovered its device and destroyed all owned tracked resources. Instrumented completed-frame median/p95 was **181.4 / 210.9 ms**. This is a substantial workload on integrated graphics and is not a 60 FPS or physical-presentation result. Campaigns on the two physical GPUs overlapped, so the timings also include host contention.
 
-Additional checks passed: 447 Node tests, two gameplay-sandbox tests; Vite and Next production starters, showcase and gameplay-sandbox builds; all 37 packed module imports and strict Bundler/NodeNext TypeScript consumers; packed game, interop and post-processing consumers; and nine existing browser suites on AMD (browser, stage wrapper, domains, game, PBR extensions, post-processing, XR, USDZ and all modules). Core + stage remains **20,053 bytes gzip**, below the **20,480-byte** ceiling. No production engine/package features were added for stress testing.
+Additional checks passed: 447 Node tests, two gameplay-sandbox tests; Vite and Next production starters, showcase and gameplay-sandbox builds; all 37 packed module imports and strict Bundler/NodeNext TypeScript consumers; packed game, interop and post-processing consumers; and nine existing browser suites on AMD (browser, stage wrapper, domains, game, PBR extensions, post-processing, XR, USDZ and all modules). Core + stage was then **20,053 bytes gzip**, below that day's **20,480-byte** ceiling (the gate is 20,000 bytes now; core + stage is 19,543 at `3d845a0`). No production engine/package features were added for stress testing.
 
 During an earlier development-server campaign, an AMD browser session failed before engine initialization with Chromium `ERR_NO_BUFFER_SPACE`. That failed campaign and the interrupted NVIDIA campaign were preserved as `report-dev-server-interrupted.json`. Switching to a production bundle removed development-module connection churn; the complete campaigns above did not reproduce that failure. Playwright's default headless shell also returned no WebGPU adapter with the CI flags; the full `chromium` channel passed the exact 22-session CI command. The GitHub workflow itself has not been dispatched in this session.
 
