@@ -8,7 +8,7 @@ Margo Engine is a small Rust/Wasm engine for web applications with optional doma
 | --- | --- |
 | Rust math and buffers | Dependency-free Rust kernel; fixed-capacity SoA transform views in Wasm memory; hierarchy composition; SIMD sphere/frustum culling; native joint-limit clamping and inherited visibility masks; atomic validation before publishing matrices. |
 | Rendering | WebGPU adapter/device negotiation, cached pipeline and geometry buffers, instanced indexed drawing, ordered GPU passes, directional GGX PBR, optional WebGL2 fallback (`@margoengine/webgl`), reversed float depth, 1×1 uint picking, native CAD navigation, canvas/depth resize and disposal. |
-| TypeScript/packages | Explicit ESM exports and declarations; `sideEffects: false`; precompiled gzip-embedded Wasm; independent core, glTF, React, machinery, creative and scenery packages. |
+| TypeScript/packages | Explicit ESM exports and declarations; `sideEffects: false`; precompiled gzip-embedded Wasm; 71 independent packages (core, glTF, React, machinery, creative, scenery and more; see the [catalog](docs/README.md)). |
 | React/starters | `MargoCanvas` (`Canvas` alias), `useMargoStage`, `useFrame`, mesh components; SSR-safe setup, ResizeObserver and stable refs; Vite and Next.js starters. |
 | Machinery pack | Revolute/prismatic joints, gear/slider-crank couplings, bounded IK/distance constraints, exploded views, GPU sections/stencil caps, SVG dimensions/callouts, worker STL/OBJ/STEP/IGES, Wasm surface transport and telemetry, part instancing, assembly BVH picking, metrology snapping and industrial material presets. |
 | Creative pack | Grass, planet, a leaf-field preset over `@margoengine/vfx` particles, toon shading, HDR targets, and a grading effect (height fog, god rays, DOF blur, grain, ACES). Bloom comes from `@margoengine/post`, skies from `@margoengine/sky`. |
@@ -16,7 +16,7 @@ Margo Engine is a small Rust/Wasm engine for web applications with optional doma
 
 Rust owns transforms and culling. TypeScript owns asset orchestration and browser GPU commands. Numeric Wasm exports keep `wasm-bindgen`, `web-sys` and their glue unnecessary for this kernel. Consumers need no Rust installation or Wasm URL configuration. SIMD and browser DecompressionStream gzip support are required; decompression happens once before cached module compilation.
 
-## Install from npm
+## Install from npm (once published)
 
 The renamed libraries use `@margoengine/*` at version `0.1.0`, with `margoengine` as the meta-package. Build from source or install local tarballs until the renamed packages are published. Package names for a React 19 application:
 
@@ -33,10 +33,10 @@ Use Node.js 22.12+ or 24+ and a browser with WebGPU (or WebGL2 with the optional
 ```sh
 npm ci
 npm run dev                           # new Vite starter; compiles packages first
-npm test                              # compiles packages; runs 40 focused unit checks
-npm run build:packages                # all seven libraries; precompiled Wasm, no Rust
+npm test                              # compiles packages; runs the modern unit checks
+npm run build:packages                # all 71 packages; precompiled Wasm, no Rust
 npm run build                         # builds packages and both production starters
-npm run pack:packages                 # rebuilds and packs only the seven libraries
+npm run pack:packages                 # rebuilds and packs every public library
 npm run modern:test:browser            # after build: real GPU + both production starters
 npm run modern:test:domains            # caps, FX, sorting, depth readback and loss races
 npm run modern:test:sky                # sky fog coverage and shader parity on WebGPU
@@ -56,9 +56,9 @@ npm run modern:build                  # regenerate Wasm with simd128 and compile
 cargo test --manifest-path packages/kernel/Cargo.toml
 ```
 
-The release profile uses speed optimization, fat LTO, one codegen unit, stripped symbols and aborting panics. The no-std Wasm build reserves its memory once without a general allocator. Kernel rebuilds use the pinned Binaryen pipeline below; consumers use the precompiled optimized kernel. A build fails if the Wasm exceeds 30 KiB raw, the core exceeds 20 KiB gzip, or core plus glTF exceeds 30 KiB gzip.
+The release profile uses speed optimization, fat LTO, one codegen unit, stripped symbols and aborting panics. The no-std Wasm build reserves its memory once without a general allocator. Kernel rebuilds use the pinned Binaryen pipeline below; consumers use the precompiled optimized kernel. A build fails if the Wasm exceeds 30 KiB raw, the core exceeds 20 KiB gzip, core plus the stage facade reaches 20,000 bytes gzip, or core plus glTF exceeds 30 KiB gzip.
 
-Consumers import the scoped packages below; the root package manages the workspace and its commands. The libraries remain at version `0.1.0` and are [MIT licensed](LICENSE); the root and starters remain private. Each library's `prepack` hook builds the workspace using the checked-in Wasm, removes stale distribution files and includes a package README and a copy of the root license. `npm run pack:packages` writes all six archives to `test-results/`. The [benchmark summary](benchmarks/README.md) records the locked core and verification results. Raw captures and recovery archives remain local.
+Consumers import the scoped packages below; the root package manages the workspace and its commands. The libraries remain at version `0.1.0` and are [MIT licensed](LICENSE); the root and starters remain private. Each library's `prepack` hook builds the workspace using the checked-in Wasm, removes stale distribution files and includes a package README and a copy of the root license. `npm run pack:packages` writes one archive per public package to `test-results/`. Committed results, with the command that reproduces each, are listed in [docs/whitepaper/claims.md](docs/whitepaper/claims.md).
 
 ## Plain TypeScript
 
@@ -80,7 +80,7 @@ engine.start();
 
 `mesh.position` and `mesh.scale` access Float32 views directly. `mesh.rotation` exposes Euler angles in radians and updates the shared quaternion; `setQuaternion()` is also available. A mesh caches its world-matrix view. The Wasm tick uses fixed scratch memory without runtime allocation. JavaScript float accessors and validation are not guaranteed allocation-free by V8. `engine.stats` counts visible meshes and main geometry batches; additional plugin draws are not included. GPU encoding and framework/browser internals still allocate; this is not a whole-application zero-GC claim.
 
-`capacity` is fixed for an engine (1–100,000 entities). All hierarchy nodes, including transform-only nodes, use slots. Each engine has its own Wasm instance/memory. Parent changes reject cycles, another engine's nodes and excessive depth. Disposed refs reject writes even after a slot is reused. Removal detaches surviving children without preserving their old world transform. World matrices update at `render()`. Each active world matrix and sphere is computed once per tick, using affine composition and cached parent results; validation completes before publishing. Fixed scratch costs an additional 81 bytes per capacity slot (285 bytes total per slot, plus the frustum block and Wasm page/stack overhead).
+`capacity` is fixed for an engine (1–100,000 entities). All hierarchy nodes, including transform-only nodes, use slots. Each engine has its own Wasm instance/memory. Parent changes reject cycles, another engine's nodes and excessive depth. Disposed refs reject writes even after a slot is reused. Removal detaches surviving children without preserving their old world transform. World matrices update at `render()`. Each active world matrix and sphere is computed once per tick, using affine composition and cached parent results; validation completes before publishing. Fixed scratch costs an additional 81 bytes per capacity slot and change tracking 66 more (about 351 bytes total per slot, plus the frustum block and Wasm page/stack overhead).
 
 Shared `Geometry` identity produces one instanced draw even when material parameters differ. Buffers retire when the last mesh reference disappears. Geometry arrays and bounds are immutable after attachment; dynamic geometry needs a replacement `Geometry`. Material colors are linear RGB arrays or converted sRGB `#rrggbb`; roughness/metalness are 0–1. Rendering uses one directional light plus ambient radiance. Canvas sizing occurs on render and is capped at 4096 pixels per axis.
 
@@ -226,7 +226,7 @@ if (engine.backend === 'webgpu') {
 
 `PostProcessing` owns an `HDRRenderTarget` with rgba16float color and sampleable reversed float depth (depth32float-stencil8 where supported). It captures main at -50 and resolves at 30 after caps/particles. It has no bloom or sky backdrop: use post `Bloom` before it in a `PostStack`, and `Sky` from `@margoengine/sky`. Resolve applies bounded depth-of-field blur, exponential height fog, radial depth-occluded god rays, exposure/contrast/saturation/lift/gain, ACES filmic tone mapping, sRGB conversion and grain. A fullscreen pass presents the rgba8unorm compute output. Change `options` between frames; zero aperture/ray strength skips corresponding work. Fog uses linear RGB; god rays use the sun direction. These are procedural/screen-space approximations; physical volumetric transport, HDR environment-map import and optical bokeh remain outside this pack.
 
-`HDRRenderTarget(device, width, height)` is exported for custom passes; `resize()` replaces owned color/depth textures and `dispose()` frees them. Sizes are 1–4096 per axis within device limits. The post stack reserves roughly 25–26 bytes per full-resolution pixel with float/stencil depth (implementation-dependent stencil storage) for explicit textures, excluding driver padding and core depth/canvas buffers. `ToonShading` injects 2–16 lighting bands and a rim term. Advanced creative rendering requires WebGPU; omit these plugins to keep the base WebGL2 fallback. Importing only `GPUParticles` tree-shakes post/toon code.
+`HDRRenderTarget(device, width, height)` is exported for custom passes; `resize()` replaces owned color/depth textures and `dispose()` frees them. Sizes are 1–4096 per axis within device limits. The post stack reserves roughly 25–26 bytes per full-resolution pixel with float/stencil depth (implementation-dependent stencil storage) for explicit textures, excluding driver padding and core depth/canvas buffers. `ToonShading` injects 2–16 lighting bands and a rim term. Advanced creative rendering requires WebGPU; omit these plugins to keep the optional `@margoengine/webgl` fallback usable. Importing only `GPUParticles` tree-shakes post/toon code.
 
 The extension-entry `EnginePlugin` has `name`, `setup(engine)`, optional `onPreUpdate(delta)`, `registerPasses(graph)`, `onDeviceRestored(engine)` and `dispose()`. `engine.use()` attaches an instance to one engine; duplicate names/shared instances reject. Failed attachment removes owned passes and invokes cleanup. Removal unregisters passes before disposal, and engine disposal attempts every cleanup even when one throws. CPU machinery state persists across restoration; GPU plugins rebuild buffers, textures, bind groups and pipelines against the replacement device.
 
@@ -240,43 +240,33 @@ Wasm memory, mesh refs, hierarchy, materials and CPU controllers remain intact. 
 
 ## Size and verification
 
-Current measurements from [modern-bundle-sizes.json](benchmarks/README.md), generated from minified ES library bundles:
+Measured at `3d845a0` by `npm run build:packages` (minified ES bundles, peers external; the root-entry figures are committed in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json) and [docs/api-surface.md](docs/api-surface.md)):
 
 | Artifact | Raw bytes | Gzip bytes |
 | --- | ---: | ---: |
-| Rust Wasm kernel, after Binaryen | 12,046 | 5,064 |
-| Core, including embedded Wasm and both backends | 53,073 | 19,874 |
-| glTF, excluding its core peer | 13,503 | 4,993 |
-| React adapter, excluding React/core peers | 4,743 | 1,857 |
-| Machinery, excluding core peer | 45,368 | 14,527 |
-| Creative, excluding core peer | 32,671 | 9,563 |
-| Particle-only consumer, excluding core peer | 13,744 | 4,638 |
+| Rust Wasm kernel, after Binaryen `-Oz` (embedded raw-deflated: 5,350 B) | 13,043 | – |
+| Core plus the `margoengine` stage facade, embedded Wasm and the WebGPU backend | 45,524 | 19,543 |
+| Core alone | 40,681 | 17,783 |
+| WebGL2 fallback (`@margoengine/webgl`, optional) | – | 2,291 |
+| glTF, excluding its core peer | 10,750 | 4,460 |
+| React adapter, excluding React/core peers | 9,845 | 3,768 |
+| Machinery root entry, excluding core peer | 72,828 | 33,418 |
+| Creative root entry, excluding core peer | 57,418 | 17,186 |
+| Particle-only consumer, excluding core peer | 24,570 | 8,035 |
 
-The 20/30 KiB JavaScript budgets are **gzip transfer budgets**, not raw-source budgets. Core plus glTF sums to 24,867 gzip bytes. React/ReactDOM and application code are additional; the complete Vite starter entry is about 90.2 KiB gzip. Optional packages have separate dynamic chunks, verified not to be fetched at initial load. Core has 606 gzip bytes of headroom below its strict 20 KiB limit. The build asserts no legacy scene/engine inclusion. There is no competitor runtime dependency in these packages.
+`npm run measure:size` prints the current core + stage figure; the build fails at 20,000 bytes gzip or above. The 20/30 KiB JavaScript budgets are **gzip transfer budgets**, not raw-source budgets. React/ReactDOM and application code are additional. Optional packages load as separate dynamic chunks (`npm run modern:test:wrapper` checks they are not fetched at initial load). The build asserts no legacy scene/engine inclusion and no domain pack inside core. There is no competitor runtime dependency in these packages.
 
-Release compilation explicitly freezes `opt-level=3`, `lto="fat"`, `codegen-units=1`, `panic="abort"`, `overflow-checks=false` and `strip="symbols"`. The root `rust-toolchain.toml` pins Rust 1.99.0 and the Wasm target; Binaryen 132.0.0 is pinned in package.json/package-lock.json. Use `npm ci` for locked dependencies. `modern:build` sets SIMD128 and a fixed Cargo output directory, then runs `wasm-opt -O3 --enable-simd --enable-bulk-memory --enable-bulk-memory-opt --enable-nontrapping-float-to-int --strip-debug --strip-producers --strip-target-features --converge` to a separate output. Cargo’s input artifact remains intact. A fresh isolated build reproduced both raw and optimized Wasm byte-for-byte, matching the embedded blueprint; name, producer and target-feature sections are absent. [Reproducibility evidence](benchmarks/README.md). Consumers use the checked-in optimized Wasm and need no Rust or Binaryen.
+Release compilation explicitly freezes `opt-level=3`, `lto="fat"`, `codegen-units=1`, `panic="abort"`, `overflow-checks=false` and `strip="symbols"`. The root `rust-toolchain.toml` pins Rust 1.99.0 and the Wasm target; Binaryen 132.0.0 is pinned in package.json/package-lock.json. Use `npm ci` for locked dependencies. `modern:build` sets SIMD128 and a fixed Cargo output directory, then runs `wasm-opt -Oz --enable-simd --enable-bulk-memory --enable-bulk-memory-opt --enable-nontrapping-float-to-int --strip-debug --strip-producers --strip-target-features --converge` to a separate output and embeds it raw-deflated in `packages/core/src/wasm.ts` (last rebuilt at `c449400`; SHA-256 of the decoded kernel `5a0f9310d6cba8a3ea14f94cb8f282e809d2d4345eb3a6e3fed5cb9ffffa5458`). Cargo's input artifact remains intact. Consumers use the checked-in optimized Wasm and need no Rust or Binaryen.
 
-A twelve-candidate Chrome comparison used 976 conveyor entities, changing Euler values in linear memory, three rounds of 5,000 ticks and alternating candidate order. The size-oriented Rust baseline measured 0.169 ms median versus 0.052 ms for the initial Rust level 3 plus stripped Binaryen O3 selection. Rust level 3 without Binaryen exceeded the core budget at 21,110 gzip bytes. Initial fixture matrices matched every candidate exactly; the final converged build also passes the full checks below. These isolated timings exclude GPU staging and do not measure branch prediction. [Compiler evidence](benchmarks/README.md). Cargo recommends measuring profiles rather than assuming higher levels are faster: [Cargo profiles](https://doc.rust-lang.org/cargo/reference/profiles.html#opt-level).
+What runs, and where:
 
-Verified on 11 October 2026 in this workspace:
+- `npm run verify`: the unit tests, Rust kernel tests (`cargo test`, four), API-surface reports, package isolation and the core size gate.
+- The real-GPU browser suites (core and API pixels, instancing/culling, 100,000-particle storage readback, React Strict Mode/Suspense/teardown, the WebGL2 fallback, Vite and Next production builds, caps, device destruction and recovery, picking and depth precision) run through `node examples/package-benchmarks/gates/run-browser-tests.mjs`; the latest results are committed in [gates-browser-tests.json](examples/package-benchmarks/results/gates-browser-tests.json) (Intel Arc 140V laptop, Edge 155).
+- Core size, machinery/creative isolation, frozen exports and particle-only tree shaking are enforced by the build; domain packages are absent from core.
 
-- Twenty-seven JavaScript tests and four Rust checks: independent transform reference, stable memory, SIMD remainder/tangent cases, atomic rejection, hierarchy, camera depth, geometry/material validation, stale refs, instancing ownership, GLB import/shared primitives/rollback, plugin cleanup and machinery limits.
- Thirty-two shared math/camera checks also pass, including retained inverse workspace, pivoting, overlapping output, alias rejection and atomic failure.
-- Strict package declarations and successful Vite/Next production builds.
-- Packed standalone ESM/Wasm imports, strict TypeScript consumer declarations and React 18.3.1 SSR/browser lifecycle: [package evidence](benchmarks/README.md). The fixture is removed after testing; tarballs remain in `test-results/modern-packages/`.
-- Eight real-browser check groups on Microsoft Edge 155 / NVIDIA RTX A6000: both API pixels and instancing/culling; matching PBR pixels; actual GPU storage readback for 100,000 particles; React Strict Mode/nesting/Suspense/teardown/no frame re-renders; automatic fallback; Vite production/lazy imports/controls/mobile layout; Next SSR/hydration/rendered geometry. Zero console/page errors. [Browser evidence](benchmarks/README.md).
-- Eight additional domain GPU groups: stencil-cap pixels/reflected instances, real device destruction with preserved Wasm references, textured particle sorting/obstacle readback, independent image changes for each FX feature, exact cap-depth readback, combined pass resize/restoration, destruction mid-encoding and immediately after submission with continued CPU/RAF updates. Buffers, textures, cached views, bind groups, pipelines and descriptor shells are checked for replacement. Five steady combined frames reuse all seven render-pass descriptor objects, allocate zero new bind groups and create exactly one canvas view per frame. [Domain evidence](benchmarks/README.md).
-- Five finalization browser groups verify integer picking, industrial-range depth pixels, six-plane caps, conveyor UI and 12,014-entity stress/reboot. The 60 measured frames on RTX A6000 recorded CPU median 2.0 ms / p95 3.2 ms and completion median 5.8 ms / p95 7.7 ms; Wasm memory was 5,373,952 bytes. These are submitted-work timings without presentation/RAF cadence, not sustained FPS claims. [Finalization evidence](benchmarks/README.md).
-- The live Vite conveyor check on Chrome 154 / RTX A6000 captures actual `drawIndexedIndirect` arguments at 20, 200 and 240 rollers: two geometry batches, with 63/603/723 cylindrical instances sharing one indexed draw. All shafts follow the motor in both directions; bolts remain static. The complete motor/coupling/Wasm tick at 240 rollers (976 entities) averaged 0.050 ms, with ten-tick-window p95 0.060 ms and individual p95 0.10 ms (0.1 ms browser timer resolution). The measured CPU transform workload meets the <0.08 ms mean and ten-tick-window p95 targets on this hardware. Across 180 actual rendered frames, the separate means were 0.032 ms JS preparation, 0.062 ms raw Wasm export and 0.117 ms JS collection/encoding/uploads/submission; GPU completion waits are excluded. Full frame CPU work is larger than the transform-only budget. Four real UI picks returned exact IDs (0.3–1.4 ms synchronous work, 4.2–4.6 ms warm asynchronous completion, 23.9 ms first pick). Ctrl-click/orbit retained the selected pivot. Forty ID/depth checks resolved a 0.4 mm fitting 0.1 mm from a 6.5 m rail at 0/45/80/85° grazing angles. [Live evidence](benchmarks/README.md).
-- A separate ordinary Performance trace, with builds and other test suites idle, records 15 seconds of trusted CDP pointer dragging: 417 input events, 480 RAF frames, 59 heap samples, one minor collection (0.547 ms), no major collection, no >50 ms tasks and zero runtime errors. Sampled used heap ranged from 8,994,348 to 9,784,464 bytes; it is not flat or zero-GC. Headless presentation cadence and synthetic trusted input do not establish physical-input/60 FPS performance. [Performance trace](benchmarks/README.md).
-- Allocation instrumentation retained one each of `GPUCommandBuffer`, `GPUCommandEncoder` and `GPUTextureView` (88 bytes each), plus V8 code/metadata, small arrays and test-harness closures. No newly tracked `Float32Array`/`ArrayBuffer` or event wrappers survived the snapshot. Snapshot collection excludes transient objects and tracking itself forces frequent GC. Sampling including collected objects still attributes allocations to React event dispatch, engine validation/rendering and explode updates; these measurements do not justify a zero-allocation claim. Instrumentation and sampling have separate reports/traces so they cannot overwrite ordinary Performance evidence. [Constructor evidence](benchmarks/README.md), [allocation sampling](benchmarks/README.md). The allocation check covers the conveyor loop; optional section/creative effects are functionally tested separately, not certified allocation-free.
-- Core size, machinery/creative isolation, frozen exports and particle-only tree shaking are enforced; domain packages are absent from core.
+Mobile coverage changes desktop viewport dimensions; it is not testing mobile GPU hardware. Firefox/Safari, physical driver reset/OOM recovery and comparative performance against other engines have no committed results yet.
 
-Mobile coverage changes desktop viewport dimensions; it is not testing mobile GPU hardware. Firefox/Safari, physical GPUs beyond RTX A6000 and AMD Radeon integrated graphics, physical driver reset/OOM recovery and comparative performance have not been tested for these packages.
-
-Core and machinery baseline locked on 11 October 2026 after the final descriptor/recovery and CPU timing checks on the 19,874-byte core. The locked transform workload measures 0.050 ms mean / 0.060 ms ten-tick-window p95; the full frame CPU boundary is about 0.211 ms including JS collection, encoding and uploads. Live GPU staging uses 16-byte source/destination offsets and upload lengths with a 96-byte instance stride. This fixture’s Wasm matrix base is also 16-byte aligned. Arbitrary capacities can produce only four-byte-aligned source views, which remain valid under [WebAssembly memory semantics](https://webassembly.github.io/spec/core/exec/instructions.html#memory-instructions). Locking this measured baseline does not extend coverage to other hardware or establish zero-GC. [Lock evidence](benchmarks/README.md).
-
-AMD Radeon integrated graphics (RDNA 2, device 13C0, driver 32.0.21043.5001) also passed the modern browser, domain, packaged-consumer, finalization and live conveyor suites on Edge 155 / Chrome 154. Both WebGL2 and WebGPU reported AMD hardware with no software fallback. The 12,014-entity fixture retained three batches and measured CPU median/p95 2.2/3.0 ms and GPU-completed median/p95 15.9/17.7 ms. The 240-roller transform mean/window-p95 remained 0.050/0.060 ms; the complete submitted CPU frame averaged 0.221 ms. A 15-second uninstrumented drag recorded one minor GC (0.712 ms), no major GC or long tasks, and zero runtime errors. The core remains 19,874 gzipped bytes with the same locked Wasm SHA-256. [AMD reports, full run outcomes and limitations](benchmarks/README.md).
+Before the package rename (11 October 2026) the browser, domain, packaged-consumer, finalization and live conveyor suites also passed on an NVIDIA RTX A6000 and an AMD Radeon integrated GPU. Those raw captures were not committed, so no timing from them is quoted here; every number Margo publishes, with its hardware and reproduce command, is listed in [docs/whitepaper/claims.md](docs/whitepaper/claims.md).
 
 ## Remaining domain features
 
@@ -298,7 +288,7 @@ The remaining rows describe future work; current domain features have working im
 
 ## Historical SwiftShader validation
 
-Committed results, recorded on 11 October 2026 at b3987dd on SwiftShader (software WebGPU and WebGL2, no GPU); setup and machine details are in [benchmarks/README.md](benchmarks/README.md#swiftshader-runs-no-gpu):
+Committed results, recorded on 11 October 2026 at b3987dd on SwiftShader (software WebGPU and WebGL2, no GPU). They describe that commit only: WebGL2 was still in core then (it moved to `@margoengine/webgl` in 1356787) and the core has changed since; setup and machine details are in [benchmarks/README.md](benchmarks/README.md#swiftshader-runs-no-gpu):
 
 - `npm test`: 31 JavaScript tests. `cargo test`: four Rust tests. Strict package declarations and successful Vite/Next production builds.
 - Packed standalone ESM/Wasm imports, strict TypeScript consumer declarations and React 18.3.1 SSR/browser lifecycle: [modern-packages.json](benchmarks/swiftshader/modern-packages.json). The fixture is removed after testing; tarballs remain in `test-results/modern-packages/`.
