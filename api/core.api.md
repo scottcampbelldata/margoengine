@@ -65,7 +65,9 @@ export interface EngineKernel {
         culling?: boolean;
         delta?: number;
     }): void;
-    start(): void;
+    start(options?: {
+        culling?: boolean;
+    }): void;
     stop(): void;
     dispose(): void;
     rebootDevice(): Promise<void>;

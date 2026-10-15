@@ -94,7 +94,9 @@ export class Engine {
     }): void;
     pick(x: number, y: number): Promise<Mesh | null>;
     onFrame(callback: FrameCallback): () => void;
-    start(): void;
+    start({ culling }?: {
+        culling?: boolean;
+    }): void;
     stop(): void;
     dispose(): void;
 }
@@ -280,7 +282,9 @@ interface EngineKernel {
         culling?: boolean;
         delta?: number;
     }): void;
-    start(): void;
+    start(options?: {
+        culling?: boolean;
+    }): void;
     stop(): void;
     dispose(): void;
     rebootDevice(): Promise<void>;

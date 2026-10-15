@@ -36,9 +36,8 @@ shader.
 ```ts
 import {CulledMeshes} from '@margoengine/culling';
 const culled = CulledMeshes.attach(engine);   // {minRadius: 2} also drops parts under 2 CSS px in radius
-engine.onFrame(...);
-// Your loop: let the GPU do the frustum test, so the kept set (and core's instance lists) stay stable while orbiting.
-engine.render({culling: false});
+// Let the GPU do the frustum test, so the kept set (and core's instance lists) stay stable while orbiting.
+engine.start({culling: false});   // or engine.render({culling: false}) from your own loop
 ```
 
 Each frame, before any core draw, a compute pass reads each drawn batch from core's own (read-only) instance buffer,

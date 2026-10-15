@@ -65,7 +65,7 @@ let serial = 0;
  * GPU culling for regular core meshes: every frame a compute pass tests each drawn instance of core's batches against
  * the frustum (and optionally a screen-size threshold), compacts the kept instances in order and points core's draws at
  * them (`Batch.redirect`). The meshes stay core meshes, so `engine.pick`, Picking, hierarchy, ExplodedView,
- * AssemblyBVH and FeatureEdges keep working. Render with `engine.render({culling: false})` to move frustum culling
+ * AssemblyBVH and FeatureEdges keep working. Start with `engine.start({culling: false})` (or render with `{culling: false}`) to move frustum culling
  * off the CPU (the kept set then stays stable while the camera moves, so core reuses its instance lists).
  */
 export class CulledMeshes implements EnginePlugin {

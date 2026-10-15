@@ -9,7 +9,7 @@ export interface Mesh {
 }
 export interface EngineKernel {
   readonly canvas:HTMLCanvasElement;readonly camera:Camera;readonly backend:'webgpu'|'webgl2';readonly fallbackReason:string|null;readonly disposed:boolean;readonly stats:{visible:number;drawCalls:number};
-  onError:(error:unknown)=>void;createMesh(parent?:Mesh|null):Mesh;pick(x:number,y:number):Promise<Mesh|null>;render(options?:{culling?:boolean;delta?:number}):void;start():void;stop():void;dispose():void;rebootDevice():Promise<void>;
+  onError:(error:unknown)=>void;createMesh(parent?:Mesh|null):Mesh;pick(x:number,y:number):Promise<Mesh|null>;render(options?:{culling?:boolean;delta?:number}):void;start(options?:{culling?:boolean}):void;stop():void;dispose():void;rebootDevice():Promise<void>;
   use(plugin:EnginePlugin):this;hasPlugin(name:string):boolean;removePlugin(name:string):void;onFrame(callback:FrameCallback):()=>void;
 }
 export interface EnginePlugin {name:string;setup(engine:EngineKernel):void;onPreUpdate?(delta:number):void;onDeviceRestored?(engine:EngineKernel):void;dispose?():void}
