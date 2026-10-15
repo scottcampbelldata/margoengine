@@ -26,4 +26,5 @@ Run the catalog checks after installing workspace development dependencies:
 
 ```sh
 node --test tests/catalog.test.js
+npm run test:catalog:browser   # real Edge: layout and clipboard (not part of verify)
 ```

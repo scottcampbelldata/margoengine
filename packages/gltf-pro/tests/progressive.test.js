@@ -38,6 +38,8 @@ const server = createServer((request, response) => {
   const lo = +range[1], hi = Math.min(range[2] ? +range[2] : body.length - 1, body.length - 1);
   response.writeHead(206, {'content-range': `bytes ${lo}-${hi}/${body.length}`, 'content-length': hi - lo + 1}); response.end(body.subarray(lo, hi + 1));
 });
+// Client closes idle sockets: a server keep-alive close can race a reused socket under load (ECONNRESET).
+server.keepAliveTimeout = 0;
 await new Promise(done => server.listen(0, '127.0.0.1', done));
 const base = `http://127.0.0.1:${server.address().port}`;
 test.after(() => server.close());

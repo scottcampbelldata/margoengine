@@ -3,12 +3,15 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { request } from 'node:http';
 import { readFile, readdir } from 'node:fs/promises';
-import { chromium } from '@playwright/test';
+import { JSDOM, ResourceLoader, VirtualConsole } from 'jsdom';
 import { server } from '../scripts/serve-catalog.js';
 
 let url;
 const entries = JSON.parse(await readFile(new URL('../docs/catalog.json', import.meta.url), 'utf8'));
 before(async () => {
+  // Node's fetch reuses idle sockets; if the server's 5 s keep-alive timer closes one first (seconds pass between
+  // requests on a loaded machine), the reused request fails with ECONNRESET. Let the client close idle sockets.
+  server.keepAliveTimeout = 0;
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   url = `http://127.0.0.1:${server.address().port}`;
@@ -50,66 +53,95 @@ test('preview serves static files and rejects escaped paths and unsupported meth
   }
 });
 
+// The page script in jsdom, served by the real preview server. jsdom has no fetch or clipboard, so both are supplied
+// here; fetch is Node's, and every request is recorded. Layout and the real browser clipboard are checked in the
+// browser lane (tests/browser/catalog.test.js, not in verify: headless Edge can take minutes to exit under load).
+async function openCatalog(address, clipboard, errors, requests, selected) {
+  const virtualConsole = new VirtualConsole();
+  virtualConsole.on('jsdomError', error => errors.push(error.message));
+  class Recorder extends ResourceLoader { fetch(resource, options) { requests.push(resource); return super.fetch(resource, options); } }
+  const dom = await JSDOM.fromURL(address, {
+    runScripts: 'dangerously', resources: new Recorder(), pretendToBeVisual: true, virtualConsole,
+    beforeParse(window) {
+      window.fetch = (resource, init) => { const target = new URL(resource, window.location.href).href; requests.push(target); return fetch(target, init); };
+      Object.defineProperty(window.navigator, 'clipboard', { value: clipboard, configurable: true });
+      window.addEventListener('error', event => errors.push(event.message));
+      // jsdom collapses the selection when the page then focuses the <pre>; record the text as it is selected.
+      const addRange = window.Selection.prototype.addRange;
+      window.Selection.prototype.addRange = function (range) { selected.push(range.toString()); return addRange.call(this, range); };
+    },
+  });
+  await until(() => !dom.window.document.querySelector('#search').disabled, 'the catalog to load');
+  return dom;
+}
+
+// Poll for an explicit readiness condition instead of sleeping; bounded, with a message naming what never happened.
+async function until(condition, what, timeout = 60_000) {
+  for (const start = Date.now(); !condition();) {
+    if (Date.now() - start > timeout) throw new Error(`Timed out after ${timeout / 1000} s waiting for ${what}`);
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+}
+
 test('catalog searches, copies exact text, links examples, and handles clipboard denial', async () => {
-  let browser;
-  try { browser = await chromium.launch({ channel: 'msedge', headless: true }); }
-  catch { browser = await chromium.launch({ headless: true }); }
+  const errors = [], requests = [], copied = [], selected = [];
+  const clipboard = { writeText: async text => { copied.push(text); } };
+  let dom = await openCatalog(url, clipboard, errors, requests, selected);
+  let { window } = dom, { document } = window;
+  const $ = selector => document.querySelector(selector);
+  const visible = element => { for (let node = element; node; node = node.parentElement) if (node.hidden) return false; return true; };
+  const shown = () => [...document.querySelectorAll('.module')].filter(visible).length;
+  const fill = value => { $('#search').value = value; $('#search').dispatchEvent(new window.Event('input', { bubbles: true })); };
+  const copy = async (button, what) => {
+    const count = copied.length;
+    button.click();
+    await until(() => copied.length > count, `${what} to reach the clipboard`);
+    return copied.at(-1);
+  };
   try {
-    const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
-    const page = await context.newPage();
-    const clipboard = async () => (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');
-    const errors = [];
-    const requests = [];
-    page.on('pageerror', error => errors.push(error.message));
-    page.on('request', request => requests.push(request.url()));
-    await page.goto(url);
-    await page.waitForFunction(() => !document.querySelector('#search').disabled);
-    assert.equal(await page.locator('.module:visible').count(), entries.length);
+    assert.equal(shown(), entries.length);
     for (const id of ['dof', 'tonemap']) {
-      assert.equal(await page.locator(`#${id} .run`).getAttribute('href'), `../demos/${id}/`);
-      assert.equal(await page.locator(`#${id} .source`).isVisible(), false, 'A built route with bundled assets must not be called a complete copyable HTML example');
-      assert.match(await page.locator(`#${id} .requirements`).textContent(), /\^0\.1\.0/);
+      assert.equal($(`#${id} .run`).getAttribute('href'), `../demos/${id}/`);
+      assert.equal(visible($(`#${id} .source`)), false, 'A built route with bundled assets must not be called a complete copyable HTML example');
+      assert.match($(`#${id} .requirements`).textContent, /\^0\.1\.0/);
     }
     for (const [term, id] of [['conveyor', 'machinery'], ['SectionPlanes', 'machinery'], ['loadGLTF', 'gltf'], ['particle', 'creative'], ['useFrame', 'react'], ['Camera', 'core']]) {
-      await page.getByLabel('Search modules and API names').fill(term);
-      assert.equal(await page.locator(`#${id}`).isVisible(), true, term);
+      fill(term);
+      assert.equal(visible($(`#${id}`)), true, term);
     }
-    await page.reload();
-    await page.waitForFunction(() => !document.querySelector('#search').disabled);
-    assert.equal(await page.locator('#search').inputValue(), 'Camera');
-    await page.getByLabel('Search modules and API names').fill('<img src=x onerror=alert(1)>');
-    assert.equal(await page.locator('.module:visible').count(), 0);
-    assert.equal(await page.locator('#empty').isVisible(), true);
-    await page.getByRole('button', { name: 'Clear search', exact: true }).click();
-    assert.equal(await page.locator('.module:visible').count(), entries.length);
-    assert.equal(await page.locator('#search').evaluate(element => element === document.activeElement), true);
-    for (const card of await page.locator('.module').all()) {
+    const address = window.location.href;
+    window.close();
+    dom = await openCatalog(address, clipboard, errors, requests, selected);
+    ({ window } = dom); ({ document } = window);
+    assert.equal($('#search').value, 'Camera');
+    fill('<img src=x onerror=alert(1)>');
+    assert.equal(shown(), 0);
+    assert.equal(visible($('#empty')), true);
+    assert.equal(document.querySelector('img[src="x"]'), null, 'search text must never become markup');
+    $('#clear').click();
+    assert.equal(shown(), entries.length);
+    assert.equal(document.activeElement, $('#search'));
+    for (const card of document.querySelectorAll('.module')) {
       for (const kind of ['install', 'imports']) {
-        await card.locator(`[data-copy="${kind}"]`).click();
-        assert.equal(await clipboard(), await card.locator(`.${kind}`).textContent());
+        assert.equal(await copy(card.querySelector(`[data-copy="${kind}"]`), `${card.id} ${kind}`), card.querySelector(`.${kind}`).textContent);
       }
-      if (!await card.locator('.source').isVisible()) continue;
-      await card.locator('.source summary').click();
-      await card.locator('[data-copy="example"]').click();
-      const example = await clipboard();
-      const response = await fetch(new URL(await card.locator('.run').getAttribute('href'), url));
-      assert.equal(example, (await response.text()).replace(/\r\n/g, '\n'));
+      if (!visible(card.querySelector('.source'))) continue;
+      card.querySelector('.source').open = true;
+      const example = await copy(card.querySelector('[data-copy="example"]'), `${card.id} example`);
+      const response = await fetch(new URL(card.querySelector('.run').getAttribute('href'), window.location.href));
+      assert.equal(example.replace(/\r\n/g, '\n'), (await response.text()).replace(/\r\n/g, '\n'));
       assert.match(example, /^<!doctype html>/);
-      await card.locator('.source summary').click();
+      card.querySelector('.source').open = false;
     }
-    await page.locator('#machinery .exports summary').click();
-    await page.getByRole('button', { name: 'Copy import for Kinematics', exact: true }).click();
-    assert.equal(await clipboard(), "import { Kinematics } from '@margoengine/machinery';");
-    await page.evaluate(() => { navigator.clipboard.writeText = async () => { throw new Error('Denied'); }; });
-    await page.getByRole('button', { name: 'Copy import for SectionPlanes', exact: true }).click();
-    assert.equal(await page.evaluate(() => window.getSelection().toString()), "import { SectionPlanes } from '@margoengine/machinery';");
-    assert.match(await page.locator('#copy-status').textContent(), /Ctrl\+C/);
-    for (const width of [375, 1440]) {
-      await page.setViewportSize({ width, height: 900 });
-      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `overflow at ${width}px`);
-    }
+    const exportButton = name => $(`#machinery .export-list [aria-label="Copy import for ${name}"]`);
+    assert.equal(await copy(exportButton('Kinematics'), 'the Kinematics import'), "import { Kinematics } from '@margoengine/machinery';");
+    clipboard.writeText = async () => { throw new Error('Denied'); };
+    exportButton('SectionPlanes').click();
+    await until(() => selected.length, 'the copy-denied fallback to select the text');
+    assert.deepEqual(selected, ["import { SectionPlanes } from '@margoengine/machinery';"]);
+    assert.equal(document.activeElement, $('#machinery .imports').closest('pre'));
+    assert.match($('#copy-status').textContent, /Ctrl\+C/);
     assert.deepEqual(errors, []);
     assert.equal(requests.some(request => /cdn\.jsdelivr|esm\.sh/.test(request)), false, 'catalog must not load engine packages');
-    await context.close();
-  } finally { await browser.close(); }
+  } finally { window.close(); }
 });

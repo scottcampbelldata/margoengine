@@ -1102,11 +1102,24 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       SSAO (needs a scene texture from PostStack); camera rig avoids walls, not just terrain; audio listener on
       something other than the camera; a runnable example game with a rigged character + Blender level GLB (for the
       demo rebuild).
-   s. Flaky gate: `tests/catalog.test.js` (browser clipboard test) times out under heavy load (4 times so far, up to
-      250 s; always passes alone). Find what it waits on (browser launch, clipboard permission, timeouts) and make it
-      deterministic under load, or move the browser part out of `verify` into a GPU/browser-lane script. Same check
-      for `packages/decoders/tests/decoders.test.js` and `packages/geometry/tests/triangulate-inputs.test.js`, which
-      each failed once under load.
+   s. [DONE] Load-flaky tests in verify. Reproduced each under a 128-thread CPU burn and fixed (tests only):
+      - catalog: headless Edge shuts down on low-priority threads, so under load `browser.close()` took 4-6 min
+        (graceful close fails after 30 s, then the killed process takes minutes to tear down; 237-394 s measured, even
+        with no page work), and the example copy raced the async clipboard write. The verify test now runs catalog.js
+        in jsdom against the real preview server (search, ?q= persistence, markup-safe search, clear/focus, every
+        install/imports/example copy, export import copy, denied-clipboard fallback, no page errors or CDN loads).
+        The real-browser test (layout overflow at 375/1440 px, real clicks and clipboard) moved to
+        `tests/browser/catalog.test.js`, `npm run test:catalog:browser` (also in `test:release`); run it under the GPU
+        lock: `node scripts/gpu-lock.mjs run --owner=<id> -- npm run test:catalog:browser`. It waits for each clipboard
+        write to land before reading.
+      - decoders, gltf-pro progressive (and the same pattern in gltf-pro extensions and loaders): `fetch` reused an
+        idle keep-alive socket just as the in-process test server's 5 s keep-alive timer closed it (a synchronous
+        stretch, e.g. 220 Draco decodes or a big loadGLTF, ran past 5 s under load) -> `fetch failed` ECONNRESET.
+        Test servers now set `keepAliveTimeout = 0` so only the client closes idle sockets. Use this for any new
+        in-process test server that `fetch` talks to.
+      - geometry triangulate-inputs: the 1.5 s spawnSync timeout included Node child startup (ETIMEDOUT under load).
+        Kill timeout is now 120 s (catches a hang); the 1.5 s budget is asserted on the child's own CPU time for the
+        calls.
    m. docs/threejs-parity.md summary counts drifted (OIT added a COVERED row without updating the totals) - recount.
    Order: after the current wave, alongside the hygiene phase (5k) and under its gates, before the demo rebuild.
 5m. [a DONE, b DONE (hook +34 B); core + stage 19,922 B gzip, 77 B headroom] CORE APPROVALS, conditional (Scott, 2026-10-14 night): do both IF core+stage stays under 20,000 B gzip
