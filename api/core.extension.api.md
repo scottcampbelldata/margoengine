@@ -10,6 +10,10 @@ export interface Batch {
     start?: number;
     end?: number;
     mask?: number;
+    redirect?: {
+        instances: GPUBuffer;
+        args: GPUBuffer;
+    };
 }
 
 export class Camera {
@@ -184,6 +188,7 @@ export type PassContext = {
     draw(options?: DrawOptions): void;
 } & ({
     backend: 'webgpu';
+    batches?: readonly Batch[];
     device: GPUDevice;
     encoder: GPUCommandEncoder;
     color: GPUTextureView;

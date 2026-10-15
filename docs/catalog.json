@@ -390,7 +390,8 @@
     "install": "npm install @margoengine/core@0.1.0 @margoengine/culling@0.1.0",
     "imports": "import { CulledInstances } from '@margoengine/culling';",
     "exports": [
-      "CulledInstances"
+      "CulledInstances",
+      "CulledMeshes"
     ]
   },
   {

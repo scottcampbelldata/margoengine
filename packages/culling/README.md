@@ -28,6 +28,30 @@ them), and also the main limit: no core `engine.pick`, no hierarchy, no `Explode
 no section caps, no shadows. Section clipping itself does apply, because the parts are drawn with core's own frame
 shader.
 
+## Core meshes: `CulledMeshes`
+
+`CulledMeshes` GPU-culls regular core meshes instead of a separate part list, so they keep everything core meshes have:
+`engine.pick`, `Picking`, hierarchy, `ExplodedView`, `AssemblyBVH` and `FeatureEdges` (checked on the GPU below).
+
+```ts
+import {CulledMeshes} from '@margoengine/culling';
+const culled = CulledMeshes.attach(engine);   // {minRadius: 2} also drops parts under 2 CSS px in radius
+engine.onFrame(...);
+// Your loop: let the GPU do the frustum test, so the kept set (and core's instance lists) stay stable while orbiting.
+engine.render({culling: false});
+```
+
+Each frame, before any core draw, a compute pass reads each drawn batch from core's own (read-only) instance buffer,
+tests every instance's bounding sphere (the kernel's sphere, padded for float32) against the frustum and, with
+`minRadius`, its projected size, and compacts the kept instance records in their original order into the package's
+buffer with indirect arguments. It then sets `batch.redirect` (core's one GPU-culling hook, see the core README), so
+core's main pass and every replay of it (SSAO, SSR, selection outline...) draw the compacted list with core's own
+pipelines; core still uploads its instance buffer, which `FeatureEdges` and the culler read. `engine.pick` draws from
+core's CPU instance data and is unaffected. With `minRadius: 0` (default) frames are pixel-identical to core
+(`examples/package-benchmarks/cad/culled-meshes.mjs`). Limits: frustum and screen size only (no Hi-Z occlusion yet; use
+`CulledInstances` for occlusion on static parts); with `engine.render()` (CPU culling on) the GPU test only adds the
+screen-size cut; `minRadius` above `FeatureEdges`' own `minRadius` (6) leaves edge lines of dropped parts.
+
 ## Modes
 
 - `'frustum'` (default): bounding spheres against the six frustum planes (the same planes core's kernel uses).

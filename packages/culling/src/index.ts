@@ -3,6 +3,8 @@ import type {EngineKernel} from '@margoengine/core';
 import {Geometry, PbrMaterial} from '@margoengine/core';
 import type {Engine, EnginePlugin, FrameGraph, PassContext} from '@margoengine/core/extension';
 import {computeShader, depthShader} from './shaders.js';
+export {CulledMeshes} from './meshes.js';
+export type {CulledMeshesOptions} from './meshes.js';
 
 declare const GPUBufferUsage: {MAP_READ: number; COPY_SRC: number; COPY_DST: number; INDEX: number; VERTEX: number; UNIFORM: number; STORAGE: number; INDIRECT: number};
 declare const GPUTextureUsage: {RENDER_ATTACHMENT: number; TEXTURE_BINDING: number};

@@ -95,3 +95,26 @@ test('rejects malformed batches and transforms, and rolls back partial uploads',
   const before = restored.resources.filter(r => !r.destroyed).length;parts.onDeviceRestored(restored.engine);restored.run();
   assert.equal(restored.resources.filter(r => !r.destroyed).length, before);parts.dispose();assert.ok(restored.resources.every(r => r.destroyed));
 });
+
+test('CulledMeshes culls core batches on the GPU and redirects core draws; storage is reused, regrown and released', async () => {
+  const {CulledMeshes} = await import('../dist/index.js');
+  const h = harness(), geometry = box(), other = box(0.5), core = new Map([[geometry, {size: 96 * 4}], [other, {size: 96 * 2}]]);
+  h.engine.canvas = {clientWidth: 64};h.engine.gpu.createBindGroupLayout = d => d;h.engine.gpu.createPipelineLayout = d => d;h.engine.geometryBuffers = g => ({instance: core.get(g)});
+  const batches = [{geometry, instances: new Float32Array(96), count: 3}, {geometry: other, instances: new Float32Array(48), count: 0}];h.context.batches = batches;
+  const plugin = new CulledMeshes({minRadius: 2});h.engine.use(plugin);h.run();
+  const redirect = batches[0].redirect;assert.ok(redirect, 'drawn batch redirected');assert.equal(batches[1].redirect, undefined, 'empty batch left to core');
+  assert.equal(redirect.instances.usage, 128 | 32 | 8);assert.equal(redirect.instances.size, 256 * 96);assert.equal(redirect.args.usage, 128 | 256 | 4 | 8);
+  assert.deepEqual(h.pipelines.filter(p => p.compute).map(p => p.compute.entryPoint), ['cull', 'scan', 'scatter']);
+  assert.match(h.pipelines.find(p => p.compute).compute.module.code, /drawn\[p\]=records\[i\]/, 'stable compaction');
+  const group = h.groups.at(-1);assert.equal(group.entries[2].resource.buffer, core.get(geometry), 'reads core instance buffer');
+  const uniform = h.resources.find(r => r.size === 32 && !r.destroyed), words = new Uint32Array(uniform.data);
+  assert.deepEqual([words[0], words[1]], [3, geometry.indices.length]);assert.deepEqual(Array.from(new Float32Array(uniform.data, 16, 4)), Array.from(geometry.bounds));
+  assert.equal(new Float32Array(h.resources.find(r => r.size === 176).data)[42], 2 * 128 / 64, 'minRadius in device pixels');
+  const created = {...h.counts};h.run(30);
+  assert.equal(h.counts.buffers, created.buffers, 'no per-frame buffers');assert.equal(h.counts.groups, created.groups);assert.equal(batches[0].redirect.instances, redirect.instances);
+  core.set(geometry, {size: 96 * 8});h.run();assert.equal(h.counts.groups, created.groups + 1, 'rebinds when core replaces its instance buffer');
+  batches[0].count = 300;h.run();assert.ok(redirect.instances.destroyed);assert.equal(batches[0].redirect.instances.size, 512 * 96, 'grows by doubling');
+  h.context.batches = [batches[1]];h.run();assert.equal(batches[0].redirect, undefined);assert.ok(h.resources.filter(r => r.size === 512 * 96).every(r => r.destroyed), 'unused geometry released');
+  h.context.batches = batches;h.run();plugin.dispose();assert.equal(batches[0].redirect, undefined, 'dispose restores core draws');
+  assert.ok(h.resources.every(r => r.destroyed));assert.throws(() => new CulledMeshes({minRadius: -1}), /options/);
+});

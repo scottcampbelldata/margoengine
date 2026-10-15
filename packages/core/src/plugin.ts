@@ -1,9 +1,10 @@
 import type { Engine, Mesh } from './engine.js';
 import type { Camera } from './camera.js';
+import type { Batch } from './renderer.js';
 
 export interface DrawOptions {pipeline?:GPURenderPipeline;bindings?:GPUBindGroupEntry[];clear?:boolean;stencilClear?:number;indirect?:boolean;colorAttachments?:GPURenderPassColorAttachment[]}
 export type PassContext={delta:number;width:number;height:number;camera:Camera;draw(options?:DrawOptions):void}&(
-  {backend:'webgpu';device:GPUDevice;encoder:GPUCommandEncoder;color:GPUTextureView;depth:GPUTextureView;format:GPUTextureFormat;shader:string;bindings:GPUBindGroupEntry[];indirect:boolean;descriptor:GPURenderPipelineDescriptor}|
+  {backend:'webgpu';/** This frame's drawn batches in draw order (read-only except Batch.redirect); absent in pick passes. */batches?:readonly Batch[];device:GPUDevice;encoder:GPUCommandEncoder;color:GPUTextureView;depth:GPUTextureView;format:GPUTextureFormat;shader:string;bindings:GPUBindGroupEntry[];indirect:boolean;descriptor:GPURenderPipelineDescriptor}|
   {backend:'webgl2';gl:WebGL2RenderingContext}
 );
 export interface FramePass {name:string;order:number;execute(context:PassContext):void;prepare?(context:PassContext):void}
