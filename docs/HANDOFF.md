@@ -82,7 +82,8 @@ Five parallel workers reviewed 58 packages against baseline `f05414a`; Claude ve
 ## Work queue Scott approved (2026-10-14), in order
 
 CI: GitHub Actions minutes are spent until next month (Scott, 2026-10-14). Until then verify locally before merging:
-`npm run verify` (clean package build with the core + stage size gate, catalog, sandbox, all unit tests) and
+`npm run verify` (clean package build with the core + stage size gate, catalog, sandbox, all unit tests, the 15 proofs of
+ongoing guarantees against the working tree via `npm run proofs -- --current`, about 25 s) and
 `npm run verify:full` before anything is pushed (adds the packed-package and interop suites). When minutes return:
 the workflow runs on windows-latest (2x minute cost); consider ubuntu-latest, and a fast job per push with the full
 suite nightly or manual. Public repositories get free standard Actions minutes, so this eases at launch.
@@ -1967,6 +1968,21 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    instanced<->instanced, three.js given its best-practice settings); taken on a quiet PC; results committed; places
    where three.js wins are stated. No "Nx faster" headline without that. Never invent hardware or numbers (e.g. no
    "RTX A6000" unless one was actually used).
+   Status 2026-10-15 (proofs): every `examples/package-benchmarks/proofs/*.proof.js` is pinned: by default it compares
+   its baseline ref with the commit where its claim was made (`refs()` in compare.js; `node <proof> [ref] [pin]`), so
+   later code cannot break it. `npm run proofs` runs all 46, two at a time, and prints a table (baseline -> candidate,
+   result, seconds); it leaves `results/` alone. 45 pass, procedural-deps reports HISTORICAL (`fff47af`: its baseline
+   imports simplex-noise/isosurface, removed from the lockfile in 5l.v; it runs again if both are installed). About
+   8 min, so not in `verify`. The 15 ongoing guarantees ("feature off: identical GPU calls") also run against the
+   working tree: `npm run proofs -- --current` (all pass, ~25 s, now the last step of `verify`; refs in claims.md
+   "Proofs"). Found on the way: post-ssr's current mode differed only by the intended AgX re-derivation (eaddd64;
+   `ignoreAgx(calls, ref)` now blanks agx() only for baselines before eaddd64); exporters/post/splats/probes-decals
+   failed only because they compared old claims with today's tree (intended later changes: exporters' lazy png/animation
+   chunks, SSAO's a281ad2/9702e57/e2cc4c5, splats' orthographic shader 5cf148e, later edits to the probes' sources);
+   decoders' pinned run reads the fixtures of its pin (`fileAt`). One real bug: `loopSubdivide` threw a bare TypeError on an index past the vertices (since before the
+   proofs; the 96edc75 rewrite only changed its message, which is what geometry.proof.js caught); it now throws a named
+   RangeError (test in packages/geometry). Pinned runs still use today's @margoengine/core (frozen), proof scripts and
+   fixtures, so mock-GPU timings recorded before the core speed-ups (0ed56b9) re-run faster; those READMEs date them.
 2. **First 60 seconds bulletproof.** `npm create margo@latest` and the quickstart HTML work on clean environments:
    Windows (this laptop), Linux (WSL or a container), macOS + Safari and iPhone Safari + Android Chrome (Scott's devices,
    or listed as untested). No black canvas ever: WebGPU missing, adapter/device request rejected, or shader errors
@@ -2061,6 +2077,10 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    and passes (twice). No page errors logged. Before launch: reproduce under a bounded load (half the cores) and find
    what the load event waits on (preview server starved vs the app's own init); a visitor's busy laptop must not hang.
 10. **claims.md:** 0 OVERCLAIM and 0 UNPROVEN rows for anything on public pages.
+   Status 2026-10-15 (proofs): every row resting on a proof now cites the proof and its pinned commits (claims.md
+   "Proofs": one table of all 46 with baseline -> pin and the --current ref). H-04 (STALE) became PROVEN: `npm run
+   proofs` reproduces every kept optimization proof; the summary is recounted (212 PROVEN, 6 STALE). Mock-GPU timings
+   that predate the core speed-ups (PKG-055, the VAT numbers) are dated to `700838e` in the READMEs.
 
 Before launch, in addition to the work queue:
 - Demos smooth on first load on desktop and phones, including Android. The Galaxy S23 3-5 FPS island issue is shelved

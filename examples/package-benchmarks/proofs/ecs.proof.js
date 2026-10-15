@@ -1,10 +1,11 @@
 // Proof for @margoengine/ecs: query tests entity liveness once per row instead of once per component, and
 // add/remove walk a cached column list instead of calling Object.values per call.
-// Run: node examples/package-benchmarks/proofs/ecs.proof.js
+// Run: node examples/package-benchmarks/proofs/ecs.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/ecs.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('ecs', ref);
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('ecs', ref, undefined, pin);
 // A mid-sized game scene: 10,000 live entities, every one with a transform, two thirds moving, half with health.
 const entityCount = 10000;
 function scene({World}) {
@@ -54,4 +55,4 @@ cases.push({case: 'spawn and despawn 1,000 entities with 3 components', rounds: 
   () => {for (let i = 0; i < 20; i++) churn(qa, ra++);},
   () => {for (let i = 0; i < 20; i++) churn(qb, rb++);})});
 assert.deepEqual(state(qb), state(qa));
-await record('ecs', ref, cases, 'World.query hoists the per-entity liveness test out of the per-component loop; Component.add/remove iterate a column list cached at construction.');
+await record('ecs', ref, cases, 'World.query hoists the per-entity liveness test out of the per-component loop; Component.add/remove iterate a column list cached at construction.', pin);

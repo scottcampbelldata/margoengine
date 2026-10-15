@@ -1,10 +1,11 @@
 // Proof for @margoengine/animator: pose sampling writes through one scratch buffer per track width into the vectors
 // the pose already owns, and clip blending normalizes quaternions in place, instead of allocating per track and joint.
-// Run: node examples/package-benchmarks/proofs/animator.proof.js
+// Run: node examples/package-benchmarks/proofs/animator.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/animator.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('animator', ref);
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('animator', ref, undefined, pin);
 
 // A 64-joint humanoid: every joint has translation, rotation and scale tracks in each full-body clip, the face joint
 // carries four morph weights, and 'Wave' only touches one arm (the usual additive upper-body layer).
@@ -88,4 +89,4 @@ for (const [name, initial, parameters, setup] of [
   };
   cases.push({case: name, frames, ...time(make(baseline), make(candidate))});
 }
-await record('animator', ref, cases, 'Pose sampling uses sampleTrackInto with a scratch buffer per track width and copies into the pose; mix blends quaternions in place. The cloned rest pose per clip sample is unchanged.');
+await record('animator', ref, cases, 'Pose sampling uses sampleTrackInto with a scratch buffer per track width and copies into the pose; mix blends quaternions in place. The cloned rest pose per clip sample is unchanged.', pin);

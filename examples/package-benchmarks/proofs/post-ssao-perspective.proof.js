@@ -3,17 +3,17 @@
 // variants, a rejected shader, a singular camera, device restore) matches the package at `ref`. The only accepted
 // difference is the occlusion shader's no-surface test (w<=0 -> w==0, neighbour >0 -> !=0), equivalent under a
 // perspective camera because every written w is the view depth beyond a positive near plane.
-// Run: node examples/package-benchmarks/proofs/post-ssao-perspective.proof.js [ref] [candidateRef]
+// Run: node examples/package-benchmarks/proofs/post-ssao-perspective.proof.js [ref] [pin]
 // The candidate is pinned to 9702e57 (orthographic SSAO + the extract-normal fix): later commits change SSAO's GPU calls
 // on purpose (e2cc4c5 keeps scene alpha for transparent canvases), so this proof records that historical claim.
 import assert from 'node:assert/strict';
-import {versions} from './compare.js';
+import {refs, versions} from './compare.js';
 import {mockGPU, passes, context} from './gpu-recorder.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
 
 // 9c761d5 is the last commit before the SSAO orthographic work. Older refs differ only in signed zeros of the view
 // matrix, from that commit's camera.up migration in packages/shared.
-const ref = process.argv[2] ?? '9c761d5', {baseline, candidate} = await versions('post', ref, 'src/index.ts', process.argv[3] ?? '9702e57');
+const {ref, pin} = refs('9c761d5', '9702e57'), {baseline, candidate} = await versions('post', ref, 'src/index.ts', pin);
 // Also accepted (an intended output change): the extract shader's degenerate-normal test is relative to the pixel
 // footprint, not absolute; the old one made flat surfaces nearer than a fixed depth camera-facing (self-occluded).
 const normal = ['let n=cross(dy,dx);let normal=select(vec3f(0,0,1),n/max(length(n),0.000001),dot(n,n)>0.00000001);', '// Degenerate only if dx and dy are (near) parallel or zero: |n|^2 scales with the pixel footprint^4, so a fixed threshold made close surfaces camera-facing.\n  let n=cross(dy,dx);let normal=select(vec3f(0,0,1),normalize(n),dot(n,n)>0.000001*dot(dx,dx)*dot(dy,dy));'];

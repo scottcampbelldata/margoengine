@@ -1,11 +1,12 @@
 // Proof for @margoengine/machinery CAD import: vertex welding looks corners up in a numeric hash table instead of
 // building a string key per corner, part fingerprints copy rows without subarray views, and the CRC walks bytes by index.
 // Only src/cad-parser.ts is loaded: the package index also pulls in worker and wasm URLs the harness cannot build.
-// Run: node examples/package-benchmarks/proofs/machinery.proof.js
+// Run: node examples/package-benchmarks/proofs/machinery.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/machinery.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('machinery', ref, 'src/cad-parser.ts');
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('machinery', ref, 'src/cad-parser.ts', pin);
 // A torus with flat-shaded quads split into triangles, like a tessellated machined ring exported from CAD.
 function torus(major, minor) {
   const triangles = [], at = (i, j) => {const u = i / major * Math.PI * 2, v = j / minor * Math.PI * 2, r = 2 + 0.6 * Math.cos(v); return [Math.fround(r * Math.cos(u)), Math.fround(0.6 * Math.sin(v)), Math.fround(r * Math.sin(u))];};
@@ -51,4 +52,4 @@ cases.push({case: 'parse binary STL, 8,192 triangles', ...time(() => baseline.pa
 // Fingerprint and hash run once per part when an assembly is deduplicated.
 cases.push({case: 'fingerprint, 131,072 triangles', ...time(() => baseline.fingerprint(geometry), () => candidate.fingerprint(geometry), 4)});
 cases.push({case: 'hash, 131,072 triangle fingerprint', ...time(() => baseline.hash(print), () => candidate.hash(print))});
-await record('machinery', ref, cases, 'CAD parser only (src/cad-parser.ts): welding compares the six rounded values as numbers in an open-addressed table instead of a Map keyed by a joined string; fingerprint and hash use indexed loops.');
+await record('machinery', ref, cases, 'CAD parser only (src/cad-parser.ts): welding compares the six rounded values as numbers in an open-addressed table instead of a Map keyed by a joined string; fingerprint and hash use indexed loops.', pin);

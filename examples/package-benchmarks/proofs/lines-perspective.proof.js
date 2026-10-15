@@ -1,12 +1,13 @@
 // Proof that orthographic world-unit widths leave perspective lines unchanged: every GPU call, descriptor and buffer
 // write of a 30-frame story (pixel and world widths, dashes, vertex colors, on-top, resize, MSAA, depth format, add,
 // remove, device restore) matches the package at `ref`, byte for byte.
-// Run: node examples/package-benchmarks/proofs/lines-perspective.proof.js [ref]
+// Run: node examples/package-benchmarks/proofs/lines-perspective.proof.js [ref] [pin] [--current]
+// Pinned: 96edc75 against 6da7f7e, the commit that made this claim. --current: 96edc75 against the working tree.
 import assert from 'node:assert/strict';
-import {versions} from './compare.js';
+import {refs, versions} from './compare.js';
 import {mockGPU, passes, context} from './gpu-recorder.js';
 
-const ref = process.argv[2] ?? '96edc75', {baseline, candidate} = await versions('lines', ref);
+const {ref, pin} = refs('96edc75', '6da7f7e', '96edc75'), {baseline, candidate} = await versions('lines', ref, undefined, pin);
 
 function story(module, samples) {
   const gpu = mockGPU(), engine = {backend: 'webgpu', gpu: gpu.device, canvas: {clientWidth: 640}};

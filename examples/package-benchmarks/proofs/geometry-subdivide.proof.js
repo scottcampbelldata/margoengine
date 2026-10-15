@@ -2,11 +2,12 @@
 // string per vertex, the edge table keeps counts and the first two opposite vertices instead of an array per edge, and
 // neighbour rings are arrays in first-seen order instead of Sets. Smoothing sums run in the same order, so every
 // output must match the baseline bit for bit.
-// Run: node examples/package-benchmarks/proofs/geometry-subdivide.proof.js
+// Run: node examples/package-benchmarks/proofs/geometry-subdivide.proof.js [ref] [pin]
+// Pinned: bdb7521 against 96edc75, the commit that recorded results/geometry-subdivide.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 
-const ref = 'bdb7521', {baseline, candidate} = await versions('geometry', ref);
+const {ref, pin} = refs('bdb7521', '96edc75'), {baseline, candidate} = await versions('geometry', ref, undefined, pin);
 const outcome = run => {try {return run();} catch (error) {return `${error.constructor.name}: ${error.message}`;}};
 const same = (label, run) => assert.deepStrictEqual(outcome(() => run(candidate)), outcome(() => run(baseline)), label);
 
@@ -33,4 +34,4 @@ for (const [label, mesh, iterations] of [['torus knot 64x8, two levels', meshes.
   const a = mesh(baseline), b = mesh(candidate);
   cases.push({case: label, ...time(() => baseline.loopSubdivide(a, iterations), () => candidate.loopSubdivide(b, iterations), 8)});
 }
-await record('geometry-subdivide', ref, cases, 'loopSubdivide only; the rest of geometry is covered by geometry.proof.js against f05414a.');
+await record('geometry-subdivide', ref, cases, 'loopSubdivide only; the rest of geometry is covered by geometry.proof.js against f05414a.', pin);

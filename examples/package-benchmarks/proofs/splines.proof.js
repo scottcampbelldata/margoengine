@@ -1,10 +1,11 @@
 // Proof for @margoengine/splines: Spline.at resolves the curve kind, control-point offsets and basis weights once
 // per call instead of once per axis. Every query type routes through it, so all of them are compared bit-for-bit.
-// Run: node examples/package-benchmarks/proofs/splines.proof.js
+// Run: node examples/package-benchmarks/proofs/splines.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/splines.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('splines', ref);
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('splines', ref, undefined, pin);
 const wave = (count, seed) => Array.from({length: count}, (_, i) => [Math.sin(i * 1.3 + seed) * 6 + i, Math.cos(i * 0.7 + seed) * 2, Math.sin(i * 2.1 + seed) * 5]);
 // The three demo curves (examples/package-benchmarks/splines.js), plus open/closed variants, the two-point minimum,
 // a long path and a multi-segment Bezier so every end-point branch is reached.
@@ -51,4 +52,4 @@ for (const [name, points, options] of fixtures.slice(0, 4)) {
   const a = new baseline.Spline(wave(40, 1), {divisions: 1024}), b = new candidate.Spline(wave(40, 1), {divisions: 1024});
   cases.push({case: 'updateArcLengths, 1024 divisions x 200', ...time(() => {for (let i = 0; i < 200; i++) a.updateArcLengths();}, () => {for (let i = 0; i < 200; i++) b.updateArcLengths();})});
 }
-await record('splines', ref, cases, 'at, tangent, atDistance and arcLengths are bit-identical for every curve kind, open and closed.');
+await record('splines', ref, cases, 'at, tangent, atDistance and arcLengths are bit-identical for every curve kind, open and closed.', pin);

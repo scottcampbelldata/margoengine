@@ -4,13 +4,14 @@
 // 1x and 4x, with core's plain shader and with an IBL-patched one (margoAmbient + environment's BRDF helper).
 // gltf-pro's side (no capture hook set: identical calls) is oit-detached.proof.js and gltf-pro-lighting-hooks.proof.js
 // run with the commit before the capture as ref.
-// Run (after npm run build:packages): node examples/package-benchmarks/proofs/post-ssr-models.proof.js [ref]
+// Run (after npm run build:packages): node examples/package-benchmarks/proofs/post-ssr-models.proof.js [ref] [pin] [--current]
+// Pinned: 3cf1453 against 838ae6e, the commit that made this claim. --current: 3cf1453 against the working tree.
 import assert from 'node:assert/strict';
-import {versions, ignoreAgx} from './compare.js';
+import {refs, versions, ignoreAgx} from './compare.js';
 import {mockGPU, context} from './gpu-recorder.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
 
-const ref = process.argv[2] ?? '3cf1453', post = await versions('post', ref);
+const {ref, pin} = refs('3cf1453', '838ae6e', '3cf1453'), post = await versions('post', ref, undefined, pin);
 const ibl = wgsl.replace(/let linear=([^;]+);/, 'let margoAmbient=vec3f(0.5);let linear=$1+margoAmbient;') + '\nfn iblBrdfTerms(nv:f32,r:f32)->vec2f {return vec2f(1,0);}';
 
 function story(m, make, samples, shader) {
@@ -47,7 +48,7 @@ const lists = {
 };
 let calls = 0, stories = 0;
 for (const [label, make] of Object.entries(lists)) for (const samples of [1, 4]) for (const [name, shader] of [['core', wgsl], ['IBL', ibl]]) {
-  const expected = ignoreAgx(story(post.baseline, make, samples, shader)), actual = ignoreAgx(story(post.candidate, make, samples, shader));
+  const expected = ignoreAgx(story(post.baseline, make, samples, shader), ref), actual = ignoreAgx(story(post.candidate, make, samples, shader), ref);
   assert.ok(expected.length > 300, `${label} story must exercise the GPU`);
   assert.deepEqual(actual, expected, `PostStack [${label}] GPU calls differ at ${samples}x (${name} shader)`); calls += expected.length; stories++;
 }

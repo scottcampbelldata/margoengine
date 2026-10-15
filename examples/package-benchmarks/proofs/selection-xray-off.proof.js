@@ -3,12 +3,13 @@
 // resize, hidden nodes, depth and color format changes, an empty selection, model rescans, device restore, dispose)
 // matches the package at `ref`, byte for byte, at 1x and 4x MSAA, with `xray` absent, false and deleted mid-story.
 // The same story with x-ray on must differ (so the comparison can see the feature).
-// Run: node examples/package-benchmarks/proofs/selection-xray-off.proof.js [ref]
+// Run: node examples/package-benchmarks/proofs/selection-xray-off.proof.js [ref] [pin] [--current]
+// Pinned: 46f9484 against 80d4cfb, the commit that made this claim. --current: 46f9484 against the working tree.
 import assert from 'node:assert/strict';
-import {versions} from './compare.js';
+import {refs, versions} from './compare.js';
 import {mockGPU, passes, context} from './gpu-recorder.js';
 
-const ref = process.argv[2] ?? '46f9484', {baseline, candidate} = await versions('selection', ref);
+const {ref, pin} = refs('46f9484', '80d4cfb', '46f9484'), {baseline, candidate} = await versions('selection', ref, undefined, pin);
 
 function story(module, samples, xray) {
   const gpu = mockGPU(), meshes = new Map(), store = {capacity: 16, parents: new Int32Array(16).fill(-1), hidden: new Uint8Array(16)};

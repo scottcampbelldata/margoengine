@@ -40,9 +40,10 @@ stack.dispose(); // also disposes its effects
 - Intermediate targets are two `rgba16float` and up to two canvas-format textures, created on first
   use and kept until resize or device restoration. Steady frames create no GPU objects.
 
-When the stack landed (`5b1fe66`), every effect used alone made exactly the GPU calls it made before the stack existed;
-`examples/package-benchmarks/proofs/post-stack.proof.js` now checks 13,056 recorded calls across 12 single-effect stories
-against `e2cc4c5` (Bloom, FXAA and SSAO keep the canvas alpha; the last intentional change to an effect).
+When the stack landed (`5b1fe66`), every effect used alone made exactly the GPU calls it made before the stack existed:
+`examples/package-benchmarks/proofs/post-stack.proof.js` checks 12,378 recorded calls across 12 single-effect stories,
+`5b1fe66^` against `5b1fe66`. With `--current` it checks the working tree: 13,056 calls against `e2cc4c5` (Bloom, FXAA and
+SSAO keep the canvas alpha; the last intentional change to an effect).
 
 ## Screen-space reflections: `SSR`
 

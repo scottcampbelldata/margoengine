@@ -1,11 +1,12 @@
 // Proof for @margoengine/splats: the per-frame uniform packing, the 33 compute dispatches and the draw pass no longer
 // allocate arrays, closures, key strings or descriptors. (The depth sort itself runs on the GPU and is untouched.)
-// Run: node examples/package-benchmarks/proofs/splats.proof.js
+// Run: node examples/package-benchmarks/proofs/splats.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/splats.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 import {mockGPU, passes, context} from './gpu-recorder.js';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('splats', ref);
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('splats', ref, undefined, pin);
 
 function cloud(count, bands) {
   const positions = new Float32Array(count * 3), covariances = new Float32Array(count * 6), colors = new Float32Array(count * 4);
@@ -54,4 +55,4 @@ for (const [label, samples, count, bands] of [['100,000 splats with SH, 4x MSAA'
   const a = scene(baseline, samples, count, bands), b = scene(candidate, samples, count, bands); let ia = 0, ib = 0;
   cases.push({case: label, frames, ...time(() => {for (let i = 0; i < frames; i++) a.frame(ia++);}, () => {for (let i = 0; i < frames; i++) b.frame(ib++);})});
 }
-await record('splats', ref, cases, 'Mock WebGPU device: identical call sequence, descriptors and buffer bytes over a 24-frame story (resize, projection/format changes, error, device restoration). Times are CPU-side JavaScript only; the GPU radix sort is not measured.');
+await record('splats', ref, cases, 'Mock WebGPU device: identical call sequence, descriptors and buffer bytes over a 24-frame story (resize, projection/format changes, error, device restoration). Times are CPU-side JavaScript only; the GPU radix sort is not measured.', pin);

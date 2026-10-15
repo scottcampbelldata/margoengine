@@ -5,15 +5,19 @@
 //   cpu     - CPU skinning every vertex every frame (bakeVAT's per-row cost times the crowd), for reference.
 // Timed on the silent mock GPU (CPU work only; medians of 20 frames). About 90 s and 1 GB for 1,000 skinned models.
 // Run: node examples/package-benchmarks/proofs/animation-vat.proof.js [counts, default 100,1000]
+// Pinned: gltf-pro and animation built at 700838e, the commit that recorded results/animation-vat.json (--current: the
+// working tree's builds).
 import assert from 'node:assert/strict';
-import {readFile, writeFile} from 'node:fs/promises';
+import {readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {performance} from 'node:perf_hooks';
 import {Engine, TransformStore} from '@margoengine/core/extension';
-import {GLTFAsset, PBRModel} from '@margoengine/gltf-pro';
-import {Animation} from '@margoengine/animation';
-import {bakeVAT, VATCrowd} from '@margoengine/animation/vat';
+import {current, entryAt, announce, save} from './compare.js';
 import {mockGPU, context} from './gpu-recorder.js';
+
+const pin = current ? undefined : '700838e';
+announce('gltf-pro + animation (measured, no baseline)', '-', pin);
+const [{GLTFAsset, PBRModel}, {Animation}, {bakeVAT, VATCrowd}] = await Promise.all([['gltf-pro', 'src/index.ts'], ['animation', 'src/index.ts'], ['animation', 'src/vat.ts']].map(([name, entry]) => entryAt(name, entry, pin)));
 
 const bytes = await readFile(resolve(import.meta.dirname, '../../assets/robot-expressive.glb')), json = bytes.readUInt32LE(12);
 const doc = JSON.parse(bytes.subarray(20, 20 + json).toString()), bin = bytes.subarray(28 + json, 28 + json + bytes.readUInt32LE(20 + json));
@@ -60,12 +64,12 @@ t = performance.now(); bakeVAT(animation, {fps: 30, clips: ['Walking']}); const 
 const bake = {vertices: data.vertexCount, rows: data.rows, textureBytes: data.texels.byteLength, bakeMs: +bakeMs.toFixed(1), cpuSkinningMsPerCharacterFrame: +rowMs.toFixed(3)};
 console.log('bake', JSON.stringify(bake));
 const results = {};
-for (const n of (process.argv[2] ?? '100,1000').split(',').map(Number)) {
+for (const n of (process.argv.slice(2).find(arg => !arg.startsWith('--')) ?? '100,1000').split(',').map(Number)) {
   const s = await skinned(n), v = await vat(n, data);
   results[n] = {skinned: s, vat: v, cpuSkinningMs: +(rowMs * n).toFixed(1)};
   console.log(n, JSON.stringify(results[n]));
   assert.equal(v.draws, 1); assert.equal(s.draws, n * model.primitives.length);
 }
-const report = {proof: 'animation-vat', node: process.version, recordedAt: new Date().toISOString(), asset: 'RobotExpressive, Walking clip at 30 rows/s', bake, results,
+const report = {proof: 'animation-vat', packages: pin ?? 'working tree', node: process.version, recordedAt: new Date().toISOString(), asset: 'RobotExpressive, Walking clip at 30 rows/s', bake, results,
   notes: 'CPU work per frame only (mock GPU). VAT moves skinning to a texture read in the vertex shader: per-frame CPU is one uniform write and one draw, whatever the crowd size. GPU cost is not measured here.'};
-await writeFile(resolve(import.meta.dirname, 'results/animation-vat.json'), JSON.stringify(report, null, 2) + '\n');
+await save('animation-vat', report);

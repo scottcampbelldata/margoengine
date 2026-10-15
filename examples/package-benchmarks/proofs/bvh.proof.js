@@ -1,10 +1,11 @@
 // Proof for @margoengine/bvh: the triangle/triangle and triangle/box separating-axis tests no longer allocate edge
 // arrays and a closure per call, and closestPointToPoint keeps each child's box distance instead of recomputing it.
-// Run: node examples/package-benchmarks/proofs/bvh.proof.js
+// Run: node examples/package-benchmarks/proofs/bvh.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/bvh.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('bvh', ref);
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('bvh', ref, undefined, pin);
 let seed = 2024; const random = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
 // A lumpy sphere: an organic collision mesh with triangles of mixed size and orientation.
 function blob(segments, rings, radius) {
@@ -69,4 +70,4 @@ cases.push({case: 'intersectsBox, 2,500 boxes', ...time(
 cases.push({case: 'closestPointToPoint, 5,000 points', ...time(
   () => {for (const [p, options] of queries) a.big.closestPointToPoint(p, options);},
   () => {for (const [p, options] of queries) b.big.closestPointToPoint(p, options);}, 30)});
-await record('bvh', ref, cases, 'triangleTriangle and triangleBox keep their vertices and edges in module scratch arrays with hoisted axis helpers; closestPointToPoint stores each child box distance on the traversal stack instead of recomputing it when the node is popped.');
+await record('bvh', ref, cases, 'triangleTriangle and triangleBox keep their vertices and edges in module scratch arrays with hoisted axis helpers; closestPointToPoint stores each child box distance on the traversal stack instead of recomputing it when the node is popped.', pin);

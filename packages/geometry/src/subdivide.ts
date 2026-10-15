@@ -41,6 +41,7 @@ function subdivideOnce(data: GeometryData, tolerance: number): GeometryData {
   // Corners that share a welded position and UV become one vertex (normals are recomputed anyway), so
   // non-indexed input such as polyhedra comes out smooth and indexed.
   const canonCells: number[] = [], canonBuckets = new Map<number, number[]>(), first: number[] = [], I = Uint32Array.from(data.indices, v => {
+    if (!(v < count)) throw new RangeError(`loopSubdivide: index ${v} is past the ${count} vertices`);
     const c = cellIndex(canonBuckets, canonCells, weld[v], Math.round(UV[v * 2] * q), Math.round(UV[v * 2 + 1] * q));
     if (c === first.length) first.push(v);
     return first[c];

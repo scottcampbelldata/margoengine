@@ -3,15 +3,15 @@
 // sample-count changes, a rejected frame, device restoration, disposal; 1x and 4x), and TransparentCanvas/ColorBackground
 // do too. ColorOutput itself on an sRGB/SDR display is covered by packages/environment/tests/output.test.js (identical
 // configuration and GPU calls to an engine without it).
-// Run: node examples/package-benchmarks/proofs/color-output.proof.js [ref]
+// Run: node examples/package-benchmarks/proofs/color-output.proof.js [ref] [pin] [--current]
+// Pinned: 7dcc958 against 225b1d6, the commit that made this claim. --current: 7dcc958 against the working tree.
 import assert from 'node:assert/strict';
-import {versions, ignoreAgx} from './compare.js';
+import {refs, versions, ignoreAgx, entryAt} from './compare.js';
 import {mockGPU, context} from './gpu-recorder.js';
 import {wgsl} from '../../../packages/core/src/shaders.ts';
-import {PostStack, FXAA, Bloom} from '../../../packages/post/dist/index.js'; // unchanged package (built by build:packages)
 
-const ref = process.argv[2] ?? '7dcc958';
-const tonemap = await versions('tonemap', ref), dof = await versions('dof', ref), environment = await versions('environment', ref);
+const {ref, pin} = refs('7dcc958', '225b1d6', '7dcc958'), {PostStack, FXAA, Bloom} = await entryAt('post', 'src/index.ts', pin); // the stack around the effects
+const tonemap = await versions('tonemap', ref, undefined, pin), dof = await versions('dof', ref, undefined, pin), environment = await versions('environment', ref, undefined, pin);
 let lut = 'LUT_3D_SIZE 33\n'; for (let b = 0; b < 33; b++) for (let g = 0; g < 33; g++) for (let r = 0; r < 33; r++) lut += `${r / 32} ${g / 32} ${b / 32 * 0.9}\n`;
 
 function story(make, samples, edit) {
@@ -48,7 +48,7 @@ const cases = {
 };
 let calls = 0;
 for (const [label, make] of Object.entries(cases)) for (const samples of [1, 4]) {
-  const run = side => {let edit; const expected = story(() => {const [effects, e] = make(side); edit = e; return effects;}, samples, (...args) => edit(...args)); return ignoreAgx(expected);};
+  const run = side => {let edit; const expected = story(() => {const [effects, e] = make(side); edit = e; return effects;}, samples, (...args) => edit(...args)); return ignoreAgx(expected, ref);};
   const expected = run('baseline');
   assert.ok(expected.length > 100, `${label} story must exercise the GPU`);
   assert.deepEqual(run('candidate'), expected, `${label} GPU calls differ at ${samples}x`); calls += expected.length;

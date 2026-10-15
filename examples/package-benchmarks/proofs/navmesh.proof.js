@@ -1,10 +1,11 @@
 // Proof for @margoengine/navmesh: A* open set as a binary heap with cached link costs and heuristics, search arrays
 // reused between calls, locate reading flat per-edge data instead of nested vertex arrays, and ORCA half-planes pooled.
-// Run: node examples/package-benchmarks/proofs/navmesh.proof.js
+// Run: node examples/package-benchmarks/proofs/navmesh.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/navmesh.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('navmesh', ref);
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('navmesh', ref, undefined, pin);
 let seed = 12345; const random = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
 // A sloped floor of size x size cells with about 15% of cells blocked; every third open cell is split into two triangles.
 function floor(size) {
@@ -89,4 +90,4 @@ const out = new Float64Array(2);
 cases.push({case: 'avoid, 200 agents with up to 12 neighbours', calls: calls.length, ...time(
   () => {for (let i = 0; i < calls.length; i++) baseline.avoid(calls[i][0], calls[i][1], 1 / 60, 2, out);},
   () => {for (let i = 0; i < calls.length; i++) candidate.avoid(calls[i][0], calls[i][1], 1 / 60, 2, out);})});
-await record('navmesh', ref, cases, 'NavMesh.path uses a (cost, index) binary heap, link costs computed once at construction and per-search cached heuristics; NavMesh.locate reads flat edge arrays; avoid reuses its half-plane records between calls.');
+await record('navmesh', ref, cases, 'NavMesh.path uses a (cost, index) binary heap, link costs computed once at construction and per-search cached heuristics; NavMesh.locate reads flat edge arrays; avoid reuses its half-plane records between calls.', pin);

@@ -1,10 +1,11 @@
 // Proof for @margoengine/gltf: the flat-normal expansion of primitives without NORMAL.
-// Run: node examples/package-benchmarks/proofs/gltf.proof.js
+// Run: node examples/package-benchmarks/proofs/gltf.proof.js [ref] [pin]
+// Pinned: f05414a against f47ff3f, the commit that recorded results/gltf.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
 import {Engine, TransformStore, meshRuntime} from '@margoengine/core/extension';
-import {versions, time, record} from './compare.js';
+import {refs, versions, time, record} from './compare.js';
 
-const ref = 'f05414a', {baseline, candidate} = await versions('gltf', ref);
+const {ref, pin} = refs('f05414a', 'f47ff3f'), {baseline, candidate} = await versions('gltf', ref, undefined, pin);
 // A real engine and transform store with a no-op renderer, so parseGLTF runs end to end without a GPU.
 const engine = new Engine({width: 256, height: 256, clientWidth: 256, clientHeight: 256}, await TransformStore.create(64), {backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {}});
 const bytesOf = view => Buffer.from(view.buffer, view.byteOffset, view.byteLength);
@@ -62,4 +63,4 @@ const add = (name, file) => {cases.push({case: name, ...mesh, ...time(() => load
 add('GLB without normals (flat normals computed)', flat);
 // Files that carry normals take the unchanged accessor path; they are compared above and not timed.
 engine.dispose();
-await record('gltf', ref, cases, 'Flat normals are expanded with indexed writes instead of a subarray and an array per triangle.');
+await record('gltf', ref, cases, 'Flat normals are expanded with indexed writes instead of a subarray and an array per triangle.', pin);
