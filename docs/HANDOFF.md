@@ -708,6 +708,14 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    d. 16-texture limit, long term: texture arrays for same-size material maps (gltf-pro physical, terrain splats) and
       shared shadow arrays; optionally core requests a higher `maxSampledTexturesPerShaderStage` when the adapter
       allows (core bytes, Scott decides). After 1.0 unless a demo needs it.
+5g. Scott (2026-10-14 night): build these now, in this order (not post-1.0):
+   a. [running] Screen-space reflections: optional post effect (water, glossy CAD floors), with fallback to IBL.
+   b. [running] Volumetric fog and light shafts (sun and clustered lights; replaces ad-hoc god rays where it fits).
+   c. [running] Progressive glTF loading: bounds/low-res first, full detail streamed in (works with the worker path).
+   d. After the core culling (B) and large-coordinate agents merge: massive-scene streaming (hierarchical LOD,
+      chunked loading, GPU culling for core-mesh-like parts) and a plan for core's 100,000-entity cap (raising it is a
+      core change: measure memory/bytes, Scott decides).
+   The Biome reformat (1g.e/1h.d) moves to just before the final-phase demo rebuild, when no agents are landing code.
 6. Then give Scott the full list of what was done and what remains.
 
 Worker practice: agents run in git worktrees; they must start with `git reset --hard perf/auto-quality` (worktrees
