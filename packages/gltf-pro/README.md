@@ -182,7 +182,31 @@ Limits: no `MSFT_lod` or gltfpack LOD levels, no low-resolution mip or KTX2 base
 whole anyway); placeholders are axis-aligned boxes; animation, shadows, bvh, selection and other helpers that read
 `model.primitives` should be attached after `complete` (before it they see boxes); a device loss during the load
 during the load is not handled (load the model again); each range request needs the server to answer `206` with
-`Content-Range` (CORS: expose `Content-Range`). Size and timings: see "Progressive loading measured" below.
+`Content-Range` (CORS: expose `Content-Range`).
+
+Size (min+gzip, [entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)): an app that already
+imports `loadGLTF` grows by about 3.0 kB when it adds `loadGLTFProgressive` (the entry alone, with the root it imports,
+is 22.7 kB); the worker script is 7.3 kB, and the 4.0 kB main-thread fallback chunk loads only without `Worker`. The
+root entry is +8 B.
+
+Measured (`node examples/package-benchmarks/progressive/run.mjs`,
+[progressive-gltf.json](../../examples/package-benchmarks/results/progressive-gltf.json); Edge 155 headless, Arc 140V,
+AC power, quiet-gated, GPU lock held; a local server with a shared bandwidth limit and round-trip delay, range support
+on, no cache; the engine renders every frame and the camera orbits the model; medians of rounds 1-4, round 0
+discarded). Times in ms from the load call: first frame showing the model / interactive (no frame gap over 50 ms from
+then to completion) / complete, then the longest frame gap during the load.
+
+| Link | Model | `loadGLTF` | `loadGLTFInWorker` | `loadGLTFProgressive` |
+| --- | --- | --- | --- | --- |
+| 50 Mbit/s, 40 ms | DamagedHelmet, 3.8 MB | 1158 / 1158 / 1157, gap 42 | 1156 / 1156 / 1155, gap 19 | **96 / 96** / 1175, gap 37 |
+| 50 Mbit/s, 40 ms | generated, 41 MB, 5 x 160k vertices | 6913 / 6913 / 6912, gap 339 | 7049 / 7049 / 7048, gap 137 | **92 / 92** / 6945, gap 20 |
+| 50 Mbit/s, 40 ms | assembly, 12.4 MB, 2,000 nodes and meshes | 2276 / 2276 / 2238, gap 289 | 2493 / 2493 / 2450, gap 206 | **474 / 590** / 2471, gap 162 |
+| 10 Mbit/s, 100 ms | DamagedHelmet | 3346 / 3346 / 3345, gap 26 | 3431 / 3431 / 3430, gap 19 | **142 / 142** / 3775, gap 35 |
+| 10 Mbit/s, 100 ms | assembly | 10342 / 10342 / 10291, gap 330 | 10571 / 10571 / 10533, gap 213 | **1405 / 1532** / 10408, gap 141 |
+
+Completion takes 0.5-13% longer than `loadGLTF` (the helmet on the slow link pays for 11 range requests' round trips,
+the assembly for 42 requests and 2,000 primitive swaps). The assembly's first frame waits for its 1.3 MB JSON, and building 2,000 nodes and their
+boxes is one 100-115 ms task; the other models never block the main thread for 50 ms.
 
 ## Extensions and compressed files
 

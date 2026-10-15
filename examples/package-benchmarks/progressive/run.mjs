@@ -6,18 +6,18 @@
 // model, time to interactive (from then on no frame gap over 50 ms), time to complete and the longest frame gap while
 // the engine renders every frame and the camera orbits the model. Round 0 is discarded; medians of the rest. Then one
 // untimed progressive load per model is screenshotted at `ready` and at `complete` (test-results/progressive-*.png).
-// Requires AC power before and after; takes the GPU lock (main checkout's test-results/gpu.lock, checked every 60 s, with an
-// owner.txt) only while a browser session runs (one per link profile, one for screenshots), quiet gate before each;
-// --diagnostic skips the quiet gate and labels the results.
+// Requires AC power before and after. Takes the GPU lock through scripts/gpu-lock.mjs (`acquire`: owner.json, released
+// only by its owner) only while a browser session runs (one per link profile, one for the screenshots); the quiet gate
+// runs before each, outside the lock. --diagnostic skips the quiet gate and labels the results. --owner=<agent id>.
 // Writes examples/package-benchmarks/results/progressive-gltf.json.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {once} from 'node:events';
 import {createServer} from 'node:http';
-import {mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
-import {dirname, resolve} from 'node:path';
+import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {openBrowser} from '../../../scripts/browser.js';
 import {waitForQuiet} from '../../../scripts/quiet-gate.mjs';
+import {acquire} from '../../../scripts/gpu-lock.mjs';
 import {decodePNG} from '../../../tests/support/png.js';
 import {bigGLB} from '../../../tests/support/big-glb.js';
 import {acPower} from '../cad/power.mjs';
@@ -60,19 +60,15 @@ function throttledServer() {
 }
 
 mkdirSync('test-results', {recursive: true});
-// The GPU lock is held only while a browser session is open (one per link profile, one for the screenshots), with an
-// owner file; the fixtures, the quiet gate and writing the results happen outside it.
-const lock = resolve(dirname(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {encoding: 'utf8'}).trim()), 'test-results/gpu.lock');
-const owner = `gltf-pro progressive benchmark (examples/package-benchmarks/progressive/run.mjs in ${process.cwd()}, pid ${process.pid})`;
+const owner = arg('owner', 'gltf-pro progressive benchmark') + ` (progressive/run.mjs in ${process.cwd()})`;
 const output = arg('output', 'examples/package-benchmarks/results/progressive-gltf.json'), pageErrors = [];
 const report = {date: new Date().toISOString(), commit: execFileSync('git', ['rev-parse', '--short', 'HEAD'], {encoding: 'utf8'}).trim(), label: diagnostic ? 'diagnostic (no quiet gate)' : 'quiet-gated', acPowerBefore: acPower(),
   files: Object.fromEntries(Object.entries(files).map(([k, v]) => [k, v.length])), profiles, rounds, machine: [], runs: [], medians: {}, screenshots: {}};
 async function withBrowser(work) {
   if (!diagnostic) report.machine.push(await waitForQuiet());
-  for (;;) {try {mkdirSync(lock); break;} catch (e) {if (e.code !== 'EEXIST') throw e; console.log(new Date().toISOString(), 'gpu.lock held, waiting 60 s'); await sleep(60_000);}}
+  const release = await acquire({owner, poll: 60_000});
   let context;
   try {
-    writeFileSync(resolve(lock, 'owner.txt'), `${owner}\ntaken ${new Date().toISOString()}\n`);
     assert.notEqual(acPower(), false, 'On battery');
     context = await openBrowser({startPath: '/examples/package-benchmarks/progressive/progressive.html', port: 5254});
     const {page, hardware} = context;
@@ -81,7 +77,8 @@ async function withBrowser(work) {
     await page.waitForFunction(() => window.ready, null, {timeout: 60_000});
     await work(page);
     assert.notEqual(acPower(), false, 'Lost AC power during the run');
-  } finally {await context?.close(); rmSync(lock, {recursive: true, force: true});}
+    writeFileSync(output, JSON.stringify({...report, partial: true}, null, 1)); // a later session's failure keeps this one
+  } finally {await context?.close(); release();}
 }
 const {server, link} = throttledServer();
 await new Promise(done => server.listen(0, '127.0.0.1', done));
