@@ -12,7 +12,7 @@ import {installDemoLoadAudit} from './demo-load-audit.js';
 const demos = [
   {name: 'citadel', path: '/night-citadel/', range: ['azimuth', 'azimuth-value']},
   {name: 'afterlight', path: '/gameplay-sandbox/', range: ['wave', 'wave-value']},
-  {name: 'helmet', path: '/demos/damaged-helmet.html'},
+  {name: 'helmet', path: '/demos/flight-helmet.html'},
   {name: 'character', path: '/demos/character-animation.html'},
   {name: 'robot', path: '/demos/robot-expressive.html'},
   {name: 'meadow', path: '/demos/windy-meadow.html', range: ['strength', 'strength-value']},

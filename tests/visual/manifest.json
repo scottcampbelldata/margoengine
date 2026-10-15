@@ -195,51 +195,6 @@
     "hot": 0.0002
    }
   },
-  "damaged-helmet-high": {
-   "url": "demos/damaged-helmet.html?quality=high",
-   "size": "640x360",
-   "runs": 4,
-   "noise": {
-    "changed": 0,
-    "hot": 0,
-    "mean": 0,
-    "max": 0
-   },
-   "tolerance": {
-    "changed": 0.0005,
-    "hot": 0.0002
-   }
-  },
-  "damaged-helmet-light": {
-   "url": "demos/damaged-helmet.html?quality=low",
-   "size": "640x360",
-   "runs": 4,
-   "noise": {
-    "changed": 0,
-    "hot": 0,
-    "mean": 0,
-    "max": 0
-   },
-   "tolerance": {
-    "changed": 0.0005,
-    "hot": 0.0002
-   }
-  },
-  "damaged-helmet-phone": {
-   "url": "demos/damaged-helmet.html",
-   "size": "195x422",
-   "runs": 4,
-   "noise": {
-    "changed": 0,
-    "hot": 0,
-    "mean": 0,
-    "max": 0
-   },
-   "tolerance": {
-    "changed": 0.0005,
-    "hot": 0.0002
-   }
-  },
   "windy-meadow-high": {
    "url": "demos/windy-meadow.html?quality=high",
    "size": "640x360",
@@ -329,6 +284,51 @@
     "changed": 0.0005,
     "hot": 0.0002
    }
+  },
+  "flight-helmet-high": {
+   "url": "demos/flight-helmet.html?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "flight-helmet-light": {
+   "url": "demos/flight-helmet.html?quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
+  },
+  "flight-helmet-phone": {
+   "url": "demos/flight-helmet.html",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   }
   }
  },
  "environment": {
@@ -336,8 +336,8 @@
   "gpu": "intel xe-2lpg",
   "acPowerBefore": true,
   "acPowerAfter": true,
-  "date": "2026-10-14T23:52:47.588Z",
-  "commit": "5d014fe"
+  "date": "2026-10-15T10:02:41.056Z",
+  "commit": "587cd62"
  },
  "method": {
   "hot": 24,

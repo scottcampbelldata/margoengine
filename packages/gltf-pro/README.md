@@ -10,7 +10,7 @@ Optional WebGPU glTF 2.0 metallic-roughness rendering, separate from the frozen 
 import {createStage} from 'margoengine';
 import {loadGLTF} from '@margoengine/gltf-pro';
 const stage = await createStage('#viewport', {backend:'webgpu'});
-const model = await loadGLTF(stage.engine, '/DamagedHelmet.glb');
+const model = await loadGLTF(stage.engine, '/FlightHelmet.glb');
 const b = model.bounds;
 stage.engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]]);
 // Call model.dispose() when unloading the model, or stage.dispose() on unmount.
@@ -136,7 +136,7 @@ Limits: no per-instance frustum culling (all `count` instances are drawn); trans
 import {createStage} from 'margoengine';
 import {loadGLTFInWorker, parseGLTFInWorker} from '@margoengine/gltf-pro/worker';
 const stage = await createStage('#viewport', {backend:'webgpu'});
-const model = await loadGLTFInWorker(stage.engine, '/DamagedHelmet.glb'); // same PBRModel as loadGLTF
+const model = await loadGLTFInWorker(stage.engine, '/FlightHelmet.glb'); // same PBRModel as loadGLTF
 const bytes = await (await fetch('/scene.glb')).arrayBuffer();
 const dropped = await parseGLTFInWorker(stage.engine, bytes); // bytes move to the worker and are detached here
 ```
@@ -261,4 +261,4 @@ Materials using clearcoat, transmission, IOR, volume, sheen or specular compile 
 
 Limits: triangles only; four skin influences in the animation package; texture coordinate sets beyond 1 are rejected. Ambient fill uses fixed sky/ground colors unless `@margoengine/environment`'s `EnvironmentLighting` is applied to the model (`ibl.add(model)`), which adds image-based lighting. Bounds describe the original mesh. Core `engine.pick` returns models only when `@margoengine/selection`'s `Picking` is attached; bvh's `Raycaster` hits them on the CPU.
 
-The demo at `/examples/damaged-helmet.html` downloads the [Khronos Damaged Helmet](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/DamagedHelmet). Its credits/licenses remain with the original asset.
+The demo at `/examples/flight-helmet.html` loads the [Khronos Flight Helmet](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/FlightHelmet) (CC0), packed for the web by `scripts/optimize-demo-assets.js`; see `examples/assets/ATTRIBUTION.md`.

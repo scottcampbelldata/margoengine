@@ -17,7 +17,7 @@ const local={helmet:'examples/assets/damaged-helmet.glb',robot:'examples/assets/
 for(const [name,url] of Object.entries(urls)) {
   const path=local[name];try{assets[name]=await readFile(path);}catch(error){if(error.code!=='ENOENT')throw error;const bytes=await readResponse(await fetch(url),{maxBytes:64*1024*1024,label:name+' asset'});assets[name]=Buffer.from(bytes);await writeFile(path,assets[name]);}
 }
-const demos={helmet:'damaged-helmet',robot:'robot-expressive',character:'character-animation'};
+const demos={helmet:'flight-helmet',robot:'robot-expressive',character:'character-animation'};
 async function assertRobotMobileLayout(page){
   const layout=await page.evaluate(()=>{
     const scene=document.querySelector('#viewport').getBoundingClientRect(),controls=document.querySelector('aside').getBoundingClientRect();

@@ -45,7 +45,7 @@ const demos = [
   {id: 'night-citadel', path: 'night-citadel/', ready: '!!window.nightCitadel?.readiness', mask: ['#fps', '#delta', '#refresh-note']},
   {id: 'gameplay-sandbox', path: 'gameplay-sandbox/', ready: '!!window.sandbox', mask: ['#telemetry *']},
   {id: 'character-animation', path: 'demos/character-animation.html', ready: "document.querySelector('#viewport')?.dataset.ready==='true'"},
-  {id: 'damaged-helmet', path: 'demos/damaged-helmet.html', ready: "document.querySelector('#viewport')?.dataset.ready==='true'&&window.extensionDemo.quality!=='preview'"},
+  {id: 'flight-helmet', path: 'demos/flight-helmet.html', ready: "document.querySelector('#viewport')?.dataset.ready==='true'&&window.extensionDemo.quality!=='preview'"},
   {id: 'windy-meadow', path: 'demos/windy-meadow.html', ready: "document.querySelector('#viewport')?.dataset.ready==='true'"},
   {id: 'earth', path: 'demos/earth/', ready: "!!window.earthDemo&&window.earthDemo.quality!=='preview'"},
   {id: 'dof', path: 'demos/dof/', ready: '!!window.dofDemo', views: ['high', 'phone']},

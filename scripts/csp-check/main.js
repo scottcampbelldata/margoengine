@@ -14,7 +14,7 @@ import {HTML} from '@margoengine/html';
 import {ViewCube} from '@margoengine/viewcube';
 import {Inspector} from '@margoengine/inspector';
 import {parseCADAsync} from '@margoengine/machinery/cad-async';
-import helmetURL from '../../examples/assets/damaged-helmet-mobile.glb?url';
+import helmetURL from '../../examples/assets/flight-helmet-mobile.glb?url';
 import dracoURL from '../../packages/decoders/tests/fixtures/Box.bin?url';
 import ktx2URL from '../../packages/decoders/tests/fixtures/AnisotropyBarnLamp_normalbump.ktx2?url';
 import stepURL from '../../node_modules/occt-import-js/test/testfiles/cube-10x10mm/Cube 10x10.stp?url';
@@ -33,7 +33,7 @@ steps.core = {ok: true, detail: 'Engine.create (embedded Wasm kernel)'};
 engine.createMesh().setGeometry(box(1, 1, 1)).setMaterial(new PbrMaterial({color: '#e8b04a', roughness: 0.4})).position.set(-1.5, 0.5, 0);
 engine.start();
 
-await step('gltf-pro worker', async () => {await loadGLTFInWorker(engine, helmetURL); return 'damaged-helmet-mobile.glb';});
+await step('gltf-pro worker', async () => {await loadGLTFInWorker(engine, helmetURL); return 'flight-helmet-mobile.glb';});
 await step('draco worker', async () => {
   const draco = new DracoDecoder({workerLimit: 1});
   try {return (await draco.decode(await bytes(dracoURL), {attributeIds: {NORMAL: 0, POSITION: 1}})).vertexCount;} finally {draco.dispose();}

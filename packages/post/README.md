@@ -52,7 +52,7 @@ import {SSR} from '@margoengine/post/ssr';
 import {Bloom} from '@margoengine/post/bloom';
 const ssr = new SSR({maxRoughness: 0.6, thickness: 0.5, maxDistance: 100, steps: 64});
 const stack = PostStack.attach(stage.engine, [new SSAO(), ssr, new Bloom({strength: 0.6})]);
-const helmet = await loadGLTF(stage.engine, '/DamagedHelmet.glb'); // from '@margoengine/gltf-pro'
+const helmet = await loadGLTF(stage.engine, '/FlightHelmet.glb'); // from '@margoengine/gltf-pro'
 ibl.add(helmet);                     // EnvironmentLighting, so SSR replaces its specular (below)
 const stop = ssr.add(helmet);        // glTF-pro model or materials mesh: its own surfaces reflect; stop() undoes it
 ssr.enabled = false; // pass-through, no recompiles
@@ -154,7 +154,7 @@ import {createStage} from 'margoengine';
 import {loadGLTF} from '@margoengine/gltf-pro';
 import {SSAO} from '@margoengine/post/ssao';
 const stage = await createStage('#viewport', {backend:'webgpu'});
-const model = await loadGLTF(stage.engine, '/DamagedHelmet.glb');
+const model = await loadGLTF(stage.engine, '/FlightHelmet.glb');
 const ssao = SSAO.attach(stage.engine, {radius:0.5,bias:0.025,samples:32});
 const remove = ssao.add(model);
 ssao.enabled = false;

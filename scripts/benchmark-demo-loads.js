@@ -6,7 +6,7 @@ import {chromium} from '@playwright/test';
 import {preview} from 'vite';
 import {installDemoLoadAudit} from './demo-load-audit.js';
 
-const allDemos=['/night-citadel/','/gameplay-sandbox/','/demos/damaged-helmet.html','/demos/character-animation.html','/demos/robot-expressive.html','/demos/windy-meadow.html','/demos/earth/','/demos/dof/','/demos/tonemap/'];
+const allDemos=['/night-citadel/','/gameplay-sandbox/','/demos/flight-helmet.html','/demos/character-animation.html','/demos/robot-expressive.html','/demos/windy-meadow.html','/demos/earth/','/demos/dof/','/demos/tonemap/'];
 const demos=process.argv.length>2?process.argv.slice(2):allDemos;
 assert.ok(demos.every(path=>allDemos.includes(path)),'Pass demo paths from the production site');
 const profiles={

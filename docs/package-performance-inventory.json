@@ -996,10 +996,10 @@
         },
         {
           "key": "helmet",
-          "title": "Damaged helmet",
-          "pagePath": "examples/damaged-helmet.html",
-          "localDevelopmentPath": "/examples/damaged-helmet.html",
-          "productionUrl": "https://margoengine.com/demos/damaged-helmet.html",
+          "title": "Flight helmet",
+          "pagePath": "examples/flight-helmet.html",
+          "localDevelopmentPath": "/examples/flight-helmet.html",
+          "productionUrl": "https://margoengine.com/demos/flight-helmet.html",
           "productionEvidence": "Mapped by scripts/build-site.js; current deployment not rechecked",
           "sourcePaths": [
             "examples/extension-demo.ts"
@@ -3417,10 +3417,10 @@
         },
         {
           "key": "helmet",
-          "title": "Damaged helmet",
-          "pagePath": "examples/damaged-helmet.html",
-          "localDevelopmentPath": "/examples/damaged-helmet.html",
-          "productionUrl": "https://margoengine.com/demos/damaged-helmet.html",
+          "title": "Flight helmet",
+          "pagePath": "examples/flight-helmet.html",
+          "localDevelopmentPath": "/examples/flight-helmet.html",
+          "productionUrl": "https://margoengine.com/demos/flight-helmet.html",
           "productionEvidence": "Mapped by scripts/build-site.js; current deployment not rechecked",
           "sourcePaths": [
             "examples/extension-demo.ts"
@@ -4574,10 +4574,10 @@
         },
         {
           "key": "helmet",
-          "title": "Damaged helmet",
-          "pagePath": "examples/damaged-helmet.html",
-          "localDevelopmentPath": "/examples/damaged-helmet.html",
-          "productionUrl": "https://margoengine.com/demos/damaged-helmet.html",
+          "title": "Flight helmet",
+          "pagePath": "examples/flight-helmet.html",
+          "localDevelopmentPath": "/examples/flight-helmet.html",
+          "productionUrl": "https://margoengine.com/demos/flight-helmet.html",
           "productionEvidence": "Mapped by scripts/build-site.js; current deployment not rechecked",
           "sourcePaths": [
             "examples/extension-demo.ts"
@@ -5409,10 +5409,10 @@
         },
         {
           "key": "helmet",
-          "title": "Damaged helmet",
-          "pagePath": "examples/damaged-helmet.html",
-          "localDevelopmentPath": "/examples/damaged-helmet.html",
-          "productionUrl": "https://margoengine.com/demos/damaged-helmet.html",
+          "title": "Flight helmet",
+          "pagePath": "examples/flight-helmet.html",
+          "localDevelopmentPath": "/examples/flight-helmet.html",
+          "productionUrl": "https://margoengine.com/demos/flight-helmet.html",
           "productionEvidence": "Mapped by scripts/build-site.js; current deployment not rechecked",
           "sourcePaths": [
             "examples/extension-demo.ts"

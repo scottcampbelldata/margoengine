@@ -38,7 +38,7 @@ timestamps are quantized, so these short durations are approximate.
 | --- | --- | --- | ---: | ---: | ---: |
 | Night Citadel | 2880×1462 | 1440×731 | 1.638 ms | 0.655 ms | 60% |
 | Earth | 2240×1462 | 1120×731 | 0.393 ms | 0.131 ms | 67% |
-| Damaged helmet | 2260×1462 | 1130×731 | 0.786 ms | 0.262 ms | 67% |
+| Damaged helmet (former demo; replaced by Flight helmet) | 2260×1462 | 1130×731 | 0.786 ms | 0.262 ms | 67% |
 | Windy meadow | 2880×1462 | 1440×731 | 1.245 ms | 0.459 ms | 63% |
 
 Raw data and the diagnostic are `test-results/gpu-diagnosis.json` and

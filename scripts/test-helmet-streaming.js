@@ -1,13 +1,14 @@
 // Functional local-source test. Cold production load timing is measured separately.
+// Desktop cases force ?quality=high: the default desktop tier is light (single-sampled phone model, no detail upgrade).
 import assert from 'node:assert/strict';
 import {writeFile} from 'node:fs/promises';
 import {openBrowser} from './browser.js';
 import {decodePNG} from '../tests/support/png.js';
 import {installDemoLoadAudit} from './demo-load-audit.js';
 
-const browser=await openBrowser({startPath:'/examples/damaged-helmet.html',port:5197}),page=browser.page,errors=[];
+const browser=await openBrowser({startPath:'/examples/flight-helmet.html',port:5197}),page=browser.page,errors=[];
 page.on('pageerror',error=>errors.push(error.message));
-const results=[],requests=[];page.on('request',request=>{if(request.url().includes('damaged-helmet'))requests.push(request.url());});
+const results=[],requests=[];page.on('request',request=>{if(request.url().includes('flight-helmet'))requests.push(request.url());});
 await page.addInitScript(installDemoLoadAudit);
 const fullImages=[];
 async function captureFull(label){
@@ -25,8 +26,8 @@ try{
   for(const failDetail of [false,true]){
     let release,detailRequested=false;
     const wait=new Promise(resolve=>{release=resolve;});
-    await page.route('**/assets/damaged-helmet.glb',async route=>{detailRequested=true;await wait;if(failDetail)await route.abort('failed');else await route.continue();});
-    await page.goto('http://127.0.0.1:5197/examples/damaged-helmet.html');
+    await page.route('**/assets/flight-helmet.glb',async route=>{detailRequested=true;await wait;if(failDetail)await route.abort('failed');else await route.continue();});
+    await page.goto('http://127.0.0.1:5197/examples/flight-helmet.html?quality=high');
     await page.waitForFunction(()=>window.extensionDemo?.quality==='preview'&&document.querySelector('#viewport').dataset.ready==='true');
     await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('Full detail is loading'));
     assert.ok(detailRequested,'Desktop detail was never requested after the complete preview');
@@ -46,13 +47,13 @@ try{
     assert.equal(final.activeDisposed,false);assert.equal(final.ssaoChecked,false);assert.ok(final.camera.every((value,i)=>Math.abs(value-preview.camera[i])<1e-12),'Detail upgrade reset the camera');
     if(failDetail){assert.equal(final.quality,'preview');assert.equal(final.previewDisposed,false);assert.equal(final.triangles,preview.triangles);}
     else{assert.equal(final.quality,'full');assert.equal(final.previewDisposed,true);assert.ok(final.triangles>preview.triangles);fullImages.push(...await captureFull('streamed-full'));}
-    results.push({failDetail,preview,final});await page.unroute('**/assets/damaged-helmet.glb');
+    results.push({failDetail,preview,final});await page.unroute('**/assets/flight-helmet.glb');
   }
   let releaseBaseline;
   const baselineHeld=new Promise(resolve=>{releaseBaseline=resolve;});
-  await page.route('**/assets/damaged-helmet-mobile.glb',route=>route.fulfill({path:'examples/assets/damaged-helmet.glb',contentType:'model/gltf-binary'}));
-  await page.route('**/assets/damaged-helmet.glb',async route=>{await baselineHeld;await route.abort('failed');});
-  await page.goto('http://127.0.0.1:5197/examples/damaged-helmet.html');
+  await page.route('**/assets/flight-helmet-mobile.glb',route=>route.fulfill({path:'examples/assets/flight-helmet.glb',contentType:'model/gltf-binary'}));
+  await page.route('**/assets/flight-helmet.glb',async route=>{await baselineHeld;await route.abort('failed');});
+  await page.goto('http://127.0.0.1:5197/examples/flight-helmet.html?quality=high');
   await page.waitForFunction(()=>window.extensionDemo?.quality==='preview'&&document.querySelector('#viewport').dataset.ready==='true');
   assert.ok(await page.evaluate(()=>extensionDemo.model.primitives.reduce((sum,p)=>sum+p.indices.length/3,0)>15000));
   const baselineImages=await captureFull('direct-full');
@@ -62,21 +63,21 @@ try{
   }
   results.push({mode:'full-detail-parity',aoOff:true,aoOn:true,changedChannels:0});
   await page.evaluate(()=>dispatchEvent(new PageTransitionEvent('pagehide')));releaseBaseline();
-  await page.unroute('**/assets/damaged-helmet-mobile.glb');await page.unroute('**/assets/damaged-helmet.glb');
+  await page.unroute('**/assets/flight-helmet-mobile.glb');await page.unroute('**/assets/flight-helmet.glb');
   for(const mode of ['android-layout','pagehide']){
     const mobile=mode==='android-layout',context=await page.context().browser().newContext({viewport:mobile?{width:390,height:844}:{width:1440,height:1100},
       deviceScaleFactor:mobile?3:1,isMobile:mobile,hasTouch:mobile,...(mobile?{userAgent:'Mozilla/5.0 (Linux; Android 15; Test layout) AppleWebKit/537.36 Chrome/154.0.0.0 Mobile Safari/537.36'}:{})});
     try{
       const current=await context.newPage(),caseErrors=[],detailRequests=[];current.on('pageerror',error=>caseErrors.push(error.message));
-      current.on('request',request=>{if(new URL(request.url()).pathname.endsWith('/damaged-helmet.glb'))detailRequests.push(request.url());});
+      current.on('request',request=>{if(new URL(request.url()).pathname.endsWith('/flight-helmet.glb'))detailRequests.push(request.url());});
       await current.addInitScript(installDemoLoadAudit);
       let release,requested=false;const held=new Promise(resolve=>{release=resolve;});
-      await current.route('**/assets/damaged-helmet.glb',async route=>{requested=true;await held;await route.continue();});
-      await current.goto('http://127.0.0.1:5197/examples/damaged-helmet.html');
+      await current.route('**/assets/flight-helmet.glb',async route=>{requested=true;await held;await route.continue();});
+      await current.goto('http://127.0.0.1:5197/examples/flight-helmet.html?quality=high');
       await current.waitForFunction(()=>window.extensionDemo&&document.querySelector('#viewport').dataset.ready==='true'&&demoLoad.principalScenePresentedOpportunity>0);
       if(mobile){
         const state=await current.evaluate(()=>({quality:extensionDemo.quality,triangles:extensionDemo.model.primitives.reduce((sum,p)=>sum+p.indices.length/3,0),readiness:extensionDemo.readiness}));
-        assert.equal(state.quality,'mobile');assert.equal(state.triangles,6179);assert.equal(detailRequests.length,0);results.push({mode,...state});
+        assert.equal(state.quality,'mobile');assert.equal(state.triangles,20734);assert.equal(detailRequests.length,0);results.push({mode,...state});
         await current.evaluate(()=>dispatchEvent(new PageTransitionEvent('pagehide')));
       }else{
         await current.waitForFunction(()=>document.querySelector('#status').textContent.includes('Full detail is loading'));assert.equal(requested,true);
