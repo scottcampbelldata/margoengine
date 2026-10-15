@@ -1,0 +1,187 @@
+{
+  "node": "v24.15.0",
+  "date": "2026-10-15T06:11:46.653Z",
+  "machine": {
+    "diagnostic": true,
+    "cpuLoadPercent": 91,
+    "ac": true
+  },
+  "occtLoadMs": 15579.5,
+  "cases": [
+    {
+      "file": "cax-if/as1-oc-214.stp",
+      "inputBytes": 441968,
+      "inputGzip": 81383,
+      "glbBytes": 68352,
+      "glbGzip": 25579,
+      "edgesGlbBytes": 77168,
+      "parts": 18,
+      "meshes": 5,
+      "instanced": 13,
+      "triangles": 5040,
+      "edgeSegments": 1000,
+      "tessellateMs": 2094.9,
+      "writeMs": 11.1,
+      "coldCliMs": 4068.9,
+      "validator": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 0
+      },
+      "edgesValidator": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 5
+      },
+      "nodeParseMs": {
+        "gltfPro": 4.5,
+        "gltf": 3.8
+      }
+    },
+    {
+      "file": "cax-if/as1-tu-203.stp",
+      "inputBytes": 142057,
+      "inputGzip": 27351,
+      "glbBytes": 64644,
+      "glbGzip": 22783,
+      "edgesGlbBytes": 72964,
+      "parts": 18,
+      "meshes": 5,
+      "instanced": 13,
+      "triangles": 4688,
+      "edgeSegments": 938,
+      "tessellateMs": 375.8,
+      "writeMs": 11.5,
+      "validator": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 0
+      },
+      "edgesValidator": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 5
+      },
+      "nodeParseMs": {
+        "gltfPro": 5.4,
+        "gltf": 2
+      }
+    },
+    {
+      "file": "cax-if/dm1-oc-214.stp",
+      "inputBytes": 226281,
+      "inputGzip": 43244,
+      "glbBytes": 35408,
+      "glbGzip": 15642,
+      "edgesGlbBytes": 40076,
+      "parts": 7,
+      "meshes": 3,
+      "instanced": 4,
+      "triangles": 1904,
+      "edgeSegments": 522,
+      "tessellateMs": 366,
+      "writeMs": 4.4,
+      "validator": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 0
+      },
+      "edgesValidator": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 3
+      },
+      "nodeParseMs": {
+        "gltfPro": 3.1,
+        "gltf": 1.6
+      }
+    },
+    {
+      "file": "cube-10x10mm/Cube 10x10.stp",
+      "inputBytes": 9404,
+      "inputGzip": 2844,
+      "glbBytes": 1748,
+      "glbGzip": 645,
+      "edgesGlbBytes": 2004,
+      "parts": 1,
+      "meshes": 1,
+      "instanced": 0,
+      "triangles": 12,
+      "edgeSegments": 12,
+      "tessellateMs": 15.8,
+      "writeMs": 0.4,
+      "validator": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 0
+      },
+      "edgesValidator": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "nodeParseMs": {
+        "gltfPro": 1.9,
+        "gltf": 1.5
+      }
+    },
+    {
+      "file": "cube-10x10mm/Cube 10x10.igs",
+      "inputBytes": 11562,
+      "inputGzip": 1475,
+      "glbBytes": 1736,
+      "glbGzip": 642,
+      "edgesGlbBytes": 1992,
+      "parts": 1,
+      "meshes": 1,
+      "instanced": 0,
+      "triangles": 12,
+      "edgeSegments": 12,
+      "tessellateMs": 28.3,
+      "writeMs": 0.6,
+      "validator": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 0
+      },
+      "edgesValidator": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "nodeParseMs": {
+        "gltfPro": 1.5,
+        "gltf": 1.4
+      }
+    },
+    {
+      "file": "cax-if-brep/as1_pe_203.brep",
+      "inputBytes": 42186,
+      "inputGzip": 5700,
+      "glbBytes": 53648,
+      "glbGzip": 14994,
+      "edgesGlbBytes": 60624,
+      "parts": 18,
+      "meshes": 5,
+      "instanced": 13,
+      "triangles": 3848,
+      "edgeSegments": 770,
+      "tessellateMs": 88.1,
+      "writeMs": 8.3,
+      "validator": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 0
+      },
+      "edgesValidator": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 5
+      },
+      "nodeParseMs": {
+        "gltfPro": 3.3,
+        "gltf": 3.4
+      }
+    }
+  ]
+}

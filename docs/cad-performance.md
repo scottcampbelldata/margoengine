@@ -336,8 +336,9 @@ OCCT (occt-import-js 0.0.23) Wasm: 7,604,031 bytes, 3,110,912 gzip; glue JS 96,8
 | `cube-10x10mm/Cube 10x10.igs` | 11,562 B | 1 part, 12 triangles | 31-34 ms | 155-181 ms | 358-452 ms | 361-456 ms |
 
 (Three runs each.) OCCT initialisation (load + compile + instantiate) is about 120-200 ms after the worker starts;
-`ReadStepFile` plus normals dominate at about 1.2-1.5 s for a 442 kB file; smoothing and transfer about 30 ms. A lighter
-path: tessellate once (server or build step) and ship the result as a binary mesh, keeping OCCT for user uploads only.
+`ReadStepFile` plus normals dominate at about 1.2-1.5 s for a 442 kB file; smoothing and transfer about 30 ms. The
+lighter path: tessellate once at build time with `npx margo-convert part.step part.glb`
+([tools/margo-convert](../tools/margo-convert/README.md), sizes and times there) and keep OCCT for user uploads only.
 
 ## Reproduce
 

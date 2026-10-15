@@ -494,7 +494,9 @@ const scan = createMeshes(engine, parsePLY(await (await fetch('/scan.ply')).arra
 
 The stage facade loads by extension: `await app.load('/part.step')` handles glTF (constant colours), STL, OBJ, STEP and
 IGES and frames the result. `@margoengine/loaders` also parses 3MF, PCD, XYZ, OFF and legacy VTK. OBJ materials and UVs
-(MTL) and Collada are not supported.
+(MTL) and Collada are not supported. For STEP/IGES files you ship yourself, convert them once with
+`npx margo-convert part.step part.glb` ([tools/margo-convert](../tools/margo-convert/README.md)) and load the GLB:
+the page then skips the 3.1 MB OCCT download.
 
 ### Caching and offline (`THREE.Cache`)
 
