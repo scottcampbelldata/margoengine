@@ -5,6 +5,12 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Cache-Control: no-cache
 
+# The Draco decoder worker (Tokyo corner demo) runs Google's Emscripten wrapper, which needs eval inside that worker
+# only; the page and every other file keep the strict policy. docs/deploying.md "Workers that need 'unsafe-eval'".
+/demos/assets/decoder.worker-*.js
+  ! Content-Security-Policy
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; connect-src 'self'
+
 # The catalog examples run inline scripts against packages on jsDelivr and esm.sh, so they keep no CSP.
 /catalog/examples/*
   ! Content-Security-Policy

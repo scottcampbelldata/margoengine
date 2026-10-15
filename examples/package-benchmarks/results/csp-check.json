@@ -1,6 +1,6 @@
 {
- "date": "2026-10-15T04:03:33.701Z",
- "commit": "cf8a571",
+ "date": "2026-10-15T16:12:27.317Z",
+ "commit": "82767c8",
  "override": null,
  "pages": [
   {
@@ -17,38 +17,38 @@
      },
      "gltf-pro worker": {
       "ok": true,
-      "detail": "damaged-helmet-mobile.glb",
-      "ms": 478
+      "detail": "flight-helmet-mobile.glb",
+      "ms": 62
      },
      "draco worker": {
       "ok": true,
       "detail": 24,
-      "ms": 277
+      "ms": 21
      },
      "ktx2 worker": {
       "ok": true,
       "detail": "2048x2048 rgba8unorm",
-      "ms": 311
+      "ms": 58
      },
      "bvh worker": {
       "ok": true,
       "detail": "built",
-      "ms": 20
+      "ms": 202
      },
      "post stack": {
       "ok": true,
       "detail": "SSAO + Bloom + FXAA",
-      "ms": 2
+      "ms": 1
      },
      "overlays": {
       "ok": true,
       "detail": "Stats, HTML labels, ViewCube, Inspector",
-      "ms": 9
+      "ms": 3
      },
      "machinery STEP": {
       "ok": true,
       "detail": 1,
-      "ms": 476
+      "ms": 172
      }
     }
    },
@@ -108,7 +108,7 @@
   {
    "build": "site",
    "ok": true,
-   "path": "/demos/damaged-helmet.html",
+   "path": "/demos/flight-helmet.html",
    "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
    "result": {
     "ok": true
@@ -139,6 +139,16 @@
    "build": "site",
    "ok": true,
    "path": "/demos/windy-meadow.html",
+   "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+   "result": {
+    "ok": true
+   },
+   "problems": []
+  },
+  {
+   "build": "site",
+   "ok": true,
+   "path": "/demos/tokyo-diorama.html",
    "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
    "result": {
     "ok": true

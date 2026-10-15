@@ -19,13 +19,14 @@ import city  # noqa: E402
 import facade  # noqa: E402
 import kit  # noqa: E402
 import merge  # noqa: E402
+import foliage  # noqa: E402
 import polyhaven  # noqa: E402
 import signs  # noqa: E402
 import streetlife  # noqa: E402
 import tanuki  # noqa: E402
 import tram  # noqa: E402
 
-HELPERS = [kit, polyhaven, bake, signs, tram, merge]
+HELPERS = [kit, polyhaven, bake, signs, foliage, tram, merge]
 MODULES = [city, facade, tanuki, streetlife, cats]
 for module in HELPERS + MODULES:  # pick up edits when re-run inside a live Blender session
     importlib.reload(module)
@@ -36,6 +37,7 @@ def build():
     bake.ATLASES.clear()
     root = kit.empty('Diorama_Root', (0, 0, 0))
     signs.build_atlas()
+    foliage.build_sprites()
     for module in MODULES:
         module.build(root)
     movers = [o for name in ('Tram', 'Cats') for o in [kit.SCENE.objects[name]] + list(kit.SCENE.objects[name].children_recursive)]
@@ -54,7 +56,7 @@ def export(path):
             export_apply=True, export_yup=True, export_cameras=False, export_lights=False,
             export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=6,
             export_animations=True, export_animation_mode='SCENE', export_anim_scene_split_object=False, export_force_sampling=True,
-            export_frame_range=True, export_image_format='JPEG', export_image_quality=88, export_anim_slide_to_zero=True, export_optimize_animation_size=True)
+            export_frame_range=True, export_image_format='WEBP', export_image_quality=85, export_anim_slide_to_zero=True, export_optimize_animation_size=True)
 
 
 def main(out=None, blend=None):

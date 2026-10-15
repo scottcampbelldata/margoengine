@@ -41,7 +41,7 @@ def static_children(group, direct_only=False, keep_prefixes=()):
 def build(root):
     scene = kit.SCENE
     groups = [n for n in ('Building_1', 'Building_2', 'Building_3', 'Building_4', 'Building_5', 'Alley_1', 'Tram_Stop', 'Post_Box',
-                          'Vending_Machine_1', 'Vending_Machine_2', 'Bicycle_1', 'Bicycle_2', 'Tanuki_Statue', 'Tram',
+                          'Vending_Machine_1', 'Vending_Machine_2', 'Bicycle_1', 'Bicycle_2', 'Tanuki_Statue', 'Tram', 'Street_Tree',
                           'Cat_1') if n in scene.objects]
     groups += [o.name for o in scene.objects if o.name.startswith('Bird_') and o.type == 'EMPTY']
     for name in groups:

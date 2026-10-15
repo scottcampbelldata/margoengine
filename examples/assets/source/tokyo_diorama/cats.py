@@ -5,7 +5,7 @@ import bake
 import kit
 
 CATS = [
-    dict(name='Cat_1', coat='#e08a3c', chest='#f6efe2', path=((-1.0, -2.12, 0.16), (1.2, -2.12, 0.16))),
+    dict(name='Cat_1', coat='#e08a3c', chest='#f6efe2', path=((-0.6, -2.12, 0.16), (1.2, -2.12, 0.16))),
 ]
 
 

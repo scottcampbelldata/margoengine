@@ -228,22 +228,25 @@ def swing(ob, axis, amplitude_deg, cycles, phase=0.0, step=6):
         key(ob, frame, rotation_euler=rot)
 
 
-def text_mesh(name, text, height, loc, mat, parent=None, rot=(0, 0, 0), depth=0.0):
+def text_mesh(name, text, height, loc, mat, parent=None, rot=(0, 0, 0), depth=0.0, width=None, space_line=1.0):
     """Flat (or extruded) lettering in Noto Sans CJK (SIL OFL, bundled with Blender), converted to a mesh."""
     import os
     font = bpy.data.fonts.load(os.path.join(bpy.utils.system_resource('DATAFILES'), 'fonts', 'Noto Sans CJK Regular.woff2'), check_existing=True)
     cu = bpy.data.curves.new(name + '_curve', 'FONT')
     cu.body, cu.font, cu.extrude, cu.resolution_u = text, font, depth, 2
     cu.align_x, cu.align_y = 'CENTER', 'CENTER'
+    cu.space_line = space_line
     tmp = bpy.data.objects.new(name + '_tmp', cu)
     SCENE.collection.objects.link(tmp)
     view_layer = SCENE.view_layers[0]
     view_layer.update()
     scale = height / max(tmp.dimensions.y, 1e-4)
+    tmp_dims_x = tmp.dimensions.x
     depsgraph = view_layer.depsgraph
     depsgraph.update()
     me = bpy.data.meshes.new_from_object(tmp.evaluated_get(depsgraph))
     bpy.data.objects.remove(tmp, do_unlink=True)
     bpy.data.curves.remove(cu)
-    ob = _link(name, me, mat, loc, rot, (scale, scale, scale), parent)
+    sx = width / max(tmp_dims_x, 1e-4) if width else scale  # a width stretches the lettering, like road paint
+    ob = _link(name, me, mat, loc, rot, (sx, scale, scale), parent)
     return ob

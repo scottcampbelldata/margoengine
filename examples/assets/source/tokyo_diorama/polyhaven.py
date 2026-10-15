@@ -1,6 +1,8 @@
 """Fetch CC0 textures from Poly Haven (https://polyhaven.com) into a git-ignored cache next to the build script."""
 import json
 import os
+import time
+import urllib.error
 import urllib.request
 
 CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'textures')
@@ -32,8 +34,14 @@ def texture(asset, resolution='1k'):
 def _get(url):
     # Poly Haven asks API clients to identify themselves; the default urllib agent is refused.
     request = urllib.request.Request(url, headers={'User-Agent': 'margo-engine-tokyo-diorama/1.0'})
-    with urllib.request.urlopen(request, timeout=60) as response:
-        return response.read()
+    for attempt in range(4):  # connection resets happen; retry with backoff before failing the build
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                return response.read()
+        except (urllib.error.URLError, ConnectionError, TimeoutError):
+            if attempt == 3:
+                raise
+            time.sleep(2 ** attempt)
 
 
 if __name__ == '__main__':
