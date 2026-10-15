@@ -15,10 +15,10 @@
 // `visual:update` captures each view
 // `runs` times in separate browser launches and stores the worst pairwise run-to-run noise and the tolerance derived from it.
 import {chromium} from '@playwright/test';
-import {preview} from 'vite';
+import {preview, createServer} from 'vite';
 import {spawnSync, execFileSync} from 'node:child_process';
 import {mkdir, rm, readFile, writeFile, copyFile} from 'node:fs/promises';
-import {rmSync} from 'node:fs';
+import {rmSync, readFileSync} from 'node:fs';
 import {resolve, dirname} from 'node:path';
 import {deflateSync, crc32} from 'node:zlib';
 import {decodePNG} from '../tests/support/png.js';
@@ -38,6 +38,7 @@ const views = {
   high: {...desktop, query: '?quality=high'},
   light: {...desktop, query: '?quality=low'},
   phone: {viewport: {width: 390, height: 844}, deviceScaleFactor: 3, isMobile: true, hasTouch: true, userAgent: iphone, factor: 6, query: ''},
+  model: {viewport: {width: 640, height: 480}, deviceScaleFactor: 1, factor: 2, query: ''},
 };
 // path: URL path under the site root; ready: page expression true once the principal scene (and any full-detail
 // upgrade) is on screen; mask: dynamic elements painted over. dof/tonemap read no tier, so their light view is skipped.
@@ -50,6 +51,10 @@ const demos = [
   {id: 'earth', path: 'demos/earth/', ready: "!!window.earthDemo&&window.earthDemo.quality!=='preview'"},
   {id: 'dof', path: 'demos/dof/', ready: '!!window.dofDemo', views: ['high', 'phone']},
   {id: 'tonemap', path: 'demos/tonemap/', ready: '!!window.tonemapDemo', views: ['high', 'phone']},
+  // Khronos sample assets (HANDOFF 5w): one small view per model, served by a Vite dev server from the repo root
+  // (`dev`) because the site build must not ship 250 MB of models. Models that fail to load are left out.
+  ...JSON.parse(readFileSync(resolve(import.meta.dirname, '../examples/assets/khronos/manifest.json'), 'utf8')).models.filter(m => m.render?.verdict !== 'fails').map(m => ({
+    id: `khronos-${m.name}`, path: `examples/khronos-gallery.html?model=${m.name}`, dev: true, ready: "document.body.dataset.ready==='true'", views: ['model']})),
 ];
 const cases = demos.flatMap(demo => (demo.views ?? Object.keys(views)).map(view => ({id: `${demo.id}-${view}`, demo, view: views[view]})))
   .filter(c => !only.length || only.some(o => c.id.includes(o)));
@@ -99,7 +104,7 @@ const round = v => Number(v.toPrecision(3));
 // Power and the GPU lock (shared with the other GPU scripts in the main checkout).
 if (acPower() === false) {console.error('On battery: refusing to run (GPU and CPU are throttled). Plug in and retry.'); process.exit(1);}
 const lock = resolve(dirname(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {cwd: root, encoding: 'utf8'}).trim()), 'test-results/gpu.lock');
-if (!process.argv.includes('--no-build')) {
+if (!process.argv.includes('--no-build') && cases.some(c => !c.demo.dev)) {
   const built = spawnSync(process.execPath, ['scripts/build-site.js'], {cwd: root, stdio: 'inherit'});
   if (built.status !== 0) process.exit(built.status ?? 1);
 }
@@ -109,12 +114,14 @@ const unlock = () => rmSync(lock, {recursive: true, force: true});
 process.on('SIGINT', () => {unlock(); process.exit(130);});
 
 const started = Date.now(), results = new Map(cases.map(c => [c.id, {id: c.id, url: c.demo.path + c.view.query, captures: [], errors: []}]));
-let server, environment = {}, exitCode = 0;
+let server, devServer, environment = {}, exitCode = 0;
 try {
   await rm(out, {recursive: true, force: true}); await mkdir(out, {recursive: true});
   const powerBefore = acPower();
-  server = await preview({configFile: false, root, build: {outDir: 'site/dist'}, preview: {port: 0, strictPort: true}, logLevel: 'error'});
-  const origin = new URL(server.resolvedUrls.local[0]).origin;
+  if (cases.some(c => !c.demo.dev)) server = await preview({configFile: false, root, build: {outDir: 'site/dist'}, preview: {port: 0, strictPort: true}, logLevel: 'error'});
+  const origin = server && new URL(server.resolvedUrls.local[0]).origin;
+  if (cases.some(c => c.demo.dev)) devServer = await (await createServer({configFile: false, root, logLevel: 'error', optimizeDeps: {noDiscovery: true, include: []}, server: {port: 0, hmr: false}})).listen();
+  const devOrigin = devServer && new URL(devServer.resolvedUrls.local[0]).origin;
   for (let run = 0; run < runs; run++) {
     const browser = await chromium.launch({channel: process.env.BROWSER_CHANNEL ?? 'msedge', headless: true, args: ['--enable-unsafe-webgpu']});
     try {
@@ -125,7 +132,7 @@ try {
         page.on('pageerror', e => result.errors.push(`pageerror: ${e.message}`));
         page.on('console', m => {if (m.type() === 'error') result.errors.push(`console: ${m.text()}`);});
         try {
-          await page.goto(origin + '/' + demo.path + query);
+          await page.goto((demo.dev ? devOrigin : origin) + '/' + demo.path + query);
           await page.waitForFunction(demo.ready, null, {timeout: 120_000});
           environment.gpu ??= await page.evaluate(async () => {const i = (await navigator.gpu.requestAdapter()).info; return [i.vendor, i.architecture, i.description].filter(Boolean).join(' ');});
           // Let late UI text settle (sandbox clock label ticks every 500 ms) and a few frames present.
@@ -187,5 +194,5 @@ try {
 <table>${rows.map(r => `<tr><td><b class="${r.status.split(' ')[0]}">${r.status}</b> ${esc(r.id)}<br><code>/${esc(r.url)}</code><pre>${esc(JSON.stringify({metrics: r.metrics, noise: r.noise, tolerance: r.tolerance, why: r.why}, null, 1))}\n${esc(r.errors.slice(0, 8).join('\n'))}</pre></td>${r.images ? ['baseline', 'actual', 'diff'].map(k => `<td>${k}<img src="${r.id}.${k}.png"></td>`).join('') : ''}</tr>`).join('\n')}</table>`);
   console.log(`${update ? 'updated' : 'checked'} ${rows.length} views in ${seconds} s; report test-results/visual/index.html`);
 } catch (error) {console.error(error); exitCode = 1;}
-finally {await server?.close(); unlock();}
+finally {await server?.close(); await devServer?.close(); unlock();}
 process.exit(exitCode);

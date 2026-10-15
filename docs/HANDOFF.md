@@ -1226,6 +1226,36 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       port its prepass), and an engine-level "CPU culling off" switch for `engine.start()` loops (today only
       `render({culling: false})`; about +15 B as `engine.culling`), which is what makes the kept set stable while
       orbiting.
+5w. Khronos sample-asset rendering gaps (launch gate 5; found 2026-10-15 by `examples/khronos-gallery.html`, Edge +
+   Arc 140V; per-model verdicts in `examples/assets/khronos/README.md`). Not fixed by the asset task. All in optional
+   packages (zero core bytes). After each fix: re-run the gallery, update the model's `render` verdict in
+   `manifest.json` (+ `node scripts/khronos-assets.mjs`) and `npm run visual:update -- --only=khronos-<Model>`.
+   a. gltf-pro rejects POINTS / LINES / LINE_LOOP / LINE_STRIP primitives ("PBR requires triangle primitives"), which
+      fails the whole file (MeshPrimitiveModes). Draw them (unlit, as glTF specifies for points/lines without normals),
+      or at least skip them with a warning and render the triangle meshes.
+   b. `@margoengine/decoders` meshopt: `KHR_meshopt_compression` filter `COLOR` is unknown, so MeshoptCubeTest fails
+      (mesh 26). Add the filter from the meshoptimizer reference decoder with test vectors.
+   c. gltf-pro's decoded-image budget (`assetLimit` x 4 = 256 MB) rejects ABeautifulGame (33 textures, 43 MB GLB):
+      "glTF images exceed decoded size limit". Make the budget an option (or raise it) and say so in the error.
+   d. `KHR_lights_punctual`: point/spot lights are applied only when the app calls `clustered.setLights(
+      model.clusteredLights())`; directional lights are "left to the engine's own light" with no helper (DirectionalLight
+      renders without its light). Add a one-call helper (directional -> core light, intensity units documented).
+   e. Ignored material extensions (load, render without the effect): `KHR_materials_iridescence` (IridescenceLamp),
+      `KHR_materials_anisotropy` (AnisotropyBarnLamp), `KHR_materials_diffuse_transmission` (DiffuseTransmissionTeacup,
+      subtle), `KHR_materials_variants` (SheenChair, MaterialsVariantsShoe: no variant switching API; matters for the
+      product-configurator use case). Physical materials already use all 16 sampler slots with every lighting package
+      (gltf-pro README "Texture bindings"), so new texture maps need a plan.
+   f. CommercialRefrigerator: the glass door (`KHR_materials_transmission`) renders as an opaque light-grey panel and
+      hides the bottles the Khronos screenshot shows; ToyCar's and FlightHelmet's transmission do show what is
+      behind. Find what differs in that material.
+   g. glTF cameras are data only (`model.cameras`): add a helper to view through one (Cameras sample).
+   h. NodePerformanceTest (10,002 nodes): with capacity 32,768 it loads in about 4 s but the first presented frame
+      came about 20 s after page load in the capture: profile. At 587cd62 the default capacity (1,024) threw a bare
+      "Entity capacity"; the store now grows on demand (5m.a), so re-check and drop the gallery's `capacity`.
+   i. Gallery coverage, not engine bugs: animations are not played (InterpolationTest, MorphStressTest, RiggedFigure,
+      Fox: rest pose only; pose them at a fixed time with `@margoengine/animation` for a still frame); the studio
+      environment is a flat procedural grey, so metals look flatter than the HDR references (a CC0 HDR needs Scott's
+      approval); views are fitted from a fixed front-right direction.
 6. Then give Scott the full list of what was done and what remains.
 8. FINAL TO-DO (Scott, 2026-10-15): thorough docs and as many tutorials as possible - "documentation is the product".
    Structure the docs site by Diataxis (keep the four kinds separate): Tutorials (learning), How-to cookbook
@@ -1514,7 +1544,13 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    archviz house; all pass the glTF validator and render without visual bugs.
    Status 2026-10-15: FlightHelmet (CC0) downloaded to `examples/assets/khronos/` (Git LFS, validator 0/0); shortlist
    of CC0/CC-BY models for Scott's approval in `examples/assets/khronos/SHORTLIST.md`. Sponza excluded (Cryengine
-   licence). Complement (not substitute): Blender-made test scenes that exercise our own Blender pipeline (export
+   licence). Later 2026-10-15 (Scott approved the shortlist tiers): 32 models in `examples/assets/khronos/` (31 new,
+   212 MB, Git LFS), every one plain CC0 / CC BY 4.0 per its `metadata.json`; 22 shortlisted models skipped because
+   their metadata adds a `LicenseRef-LegalMark-*` trademark notice (all 16 Compare models, MultiUVTest, CesiumMan,
+   CarConcept, SunglassesKhronos, ChronographWatch, AntiqueCamera) - **Scott to decide**. Validator: 0 errors, 7
+   warnings (generated tangents x6, skinned non-root node x1). Credits, third-party notices and per-model render
+   verdicts: `examples/assets/khronos/README.md` (`node scripts/khronos-assets.mjs` regenerates). Render check:
+   `examples/khronos-gallery.html`; the 29 models that load are in `visual:check` (`--only=khronos`). Gaps: 5w. Complement (not substitute): Blender-made test scenes that exercise our own Blender pipeline (export
    settings, custom properties/extras).
    [DONE 2026-10-15] **LICENCE DECISION:** DamagedHelmet's earlier model is CC-BY-NC 4.0 (theblueturtle_), so Scott
    decided: replace every public use with a CC0 helmet, keep DamagedHelmet only in internal tests/benchmarks.
