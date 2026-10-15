@@ -200,3 +200,35 @@ fn layers(s:Surface,v:vec3f,l:vec3f,under:vec3f)->vec3f {
 @fragment fn fragment(`],
   ['  if(f.ext.x>0.5){color=s.base.rgb;}', '  color=layers(s,v,l,color);\n  if(f.ext.x>0.5){color=s.base.rgb;}'],
 ]);
+let factors: string | undefined;
+/** physicalShader with every extension map replaced by the value of its default 1x1 texture: factors only, pbrShader's five group-1 textures.
+ * Drawn for physical materials whose `maps` hold only the five core slots (`@margoengine/materials`). */
+export const factorPhysicalShader = (): string => factors ??= physicalShader()
+  .replace(/@group\(1\) @binding\((\d+)\) var \w+:[^;]+;\n?/g, (line, binding) => +binding < 10 ? line : '')
+  .replace(/textureSample\((\w+)Map,\1Sampler,uv\(i,\d+\)\)/g, (_, name) => name === 'clearcoatNormal' ? 'vec4f(vec2f(128.0/255.0),1,1)' : 'vec4f(1)');
+/**
+ * Transmission hook (contract version 1, README "Transmission hook"), set with `PBRModel.setTransmission`;
+ * `@margoengine/materials/transmission` uses it to refract the scene. While set, primitives with transmission (no
+ * `renderState`) leave the beauty pass and draw only when the owner calls `model.draw(c, 'transmission', ...)`, into
+ * `begin()`'s pass with these `targets`, depth tested (greater-equal) and not written. Their shader is the lit physical
+ * beauty shader with `margoTransmission(s, v, i)` (vec3f: light arriving through the surface) added to the base layer under
+ * clearcoat and sheen; `margoVolume` (group 0) holds the thickness factor and the per-unit-length transmittance of KHR_materials_volume.
+ */
+export interface PBRTransmission {
+  /** Module-scope WGSL: `fn margoTransmission(s:Surface,v:vec3f,i:Out)->vec3f` and its bindings in `group`. Return the same string on steady frames. */
+  declarations(group:number):string;
+  /** Group-2 entries for those bindings (after any lighting effects' entries). */
+  bindings():GPUBindGroupEntry[];
+  /** Colour targets of the transmission pass. */
+  readonly targets:readonly GPUColorTargetState[];
+  /** This frame's transmission pass: the scene colour and depth (read-only); begun on the first draw, ended by the owner. */
+  begin():GPURenderPassEncoder;
+}
+const base='  color=layers(s,v,l,color);',transmitted=new Map<string,Map<string,string>>();
+/** `code` (the lit physical shader) with `margoTransmission(s,v,i)` added under the clearcoat and sheen layers. */
+export function transmissionPBR(code:string,declarations:string):string {
+  let cache=transmitted.get(declarations),out=cache?.get(code);if(out!==undefined)return out;
+  if(code.split(base).length!==2)throw new Error('PBR transmission hook point missing or used twice');
+  out='@group(0) @binding(1) var<uniform> margoVolume:vec4f;\n'+declarations+code.replace(base,'  color=layers(s,v,l,color+margoTransmission(s,v,i));');
+  if(!cache){if(transmitted.size>=8)transmitted.clear();transmitted.set(declarations,cache=new Map());}if(cache.size>=64)cache.clear();cache.set(code,out);return out;
+}

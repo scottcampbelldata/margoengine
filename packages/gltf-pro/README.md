@@ -77,6 +77,26 @@ supplies `struct MargoCapture` and that function for the lit `code`. Instances, 
 (`primitive.deformed`) and mirrored transforms draw as in the beauty pass. Without a hook nothing changes:
 `oit-detached.proof.js`, `gltf-pro-lighting-hooks.proof.js` and `materials-uv-transform.proof.js` run against `227912f` (before the hook) record identical calls.
 
+### Transmission hook
+
+`model.setTransmission(hook)` (type `PBRTransmission`, contract version 1; returns a remover) hands the model's
+transmissive primitives (KHR_materials_transmission, no `renderState`) to a refraction pass such as
+`@margoengine/materials/transmission`. While a hook is set they leave the beauty pass, and
+`model.draw(c, 'transmission', ...)` draws only them, into `hook.begin()`'s pass with `hook.targets`, depth tested
+(`greater-equal`) and not written. Their shader is the lit physical beauty shader (lighting effects and text patches
+compose as in the beauty pass) with `  color=layers(s,v,l,color);` becoming
+`  color=layers(s,v,l,color+margoTransmission(s,v,i));`, so the light through the surface sits in the base layer under
+clearcoat and sheen, and with `@group(0) @binding(1) var<uniform> margoVolume:vec4f` declared: the KHR_materials_volume
+thickness factor and the transmittance per world unit, `attenuationColor^(1/attenuationDistance)` (a 16-byte buffer per
+primitive, made on its first transmission draw). `hook.declarations(2)` supplies `margoTransmission` and its group-2
+bindings (`hook.bindings()`, after the lighting effects' entries). Without a hook nothing changes: the
+`oit-detached`, `gltf-pro-lighting-hooks` and `materials-uv-transform` proofs record identical calls against `5a7bbc2`
+(before the hook). A texture-limit error names the pass (`physical material + transmission + ...`).
+
+Physical materials whose `maps` list only the five core slots (materials built in code, `@margoengine/materials`) draw
+`factorPhysicalShader`: the physical shader with each extension map read replaced by its default texel, so 5 textures
+instead of 13; glTF materials always list all thirteen and keep the mapped variant.
+
 ### Texture bindings
 
 WebGPU guarantees 16 sampled textures and 16 samplers per shader stage (the default and the minimum every adapter
@@ -88,8 +108,11 @@ fragment (the capture keeps every binding of the lit shader and adds none; SSR's
 | --- | --- | --- | --- | --- | --- |
 | gltf-pro standard | 5 (5) | 6 (6) | 6 (6) | 6 (6) | 8 (8) |
 | gltf-pro physical (clearcoat, transmission, sheen, specular, ior, volume) | 13 (13) | 14 (14) | 14 (14) | 14 (14) | **16 (16)** |
+| gltf-pro physical, refracting (transmission hook, its pass only) | 14 (14) | 15 (15) | 15 (15) | 15 (15) | 17 (17): throws |
 | materials `standard`, `basic`, `normal` | 10 (10) | 11 (11) | 11 (11) | 11 (11) | 13 (13) |
 | materials `matcap` | 11 (11) | 12 (12) | 12 (12) | 12 (12) | 14 (14) |
+| materials physical options (factor-only physical variant) | 10 (10) | 11 (11) | 11 (11) | 11 (11) | 13 (13) |
+| materials physical, refracting (`@margoengine/materials/transmission`, its pass only) | 11 (11) | 12 (12) | 12 (12) | 12 (12) | 14 (14) |
 | shader `NodeMaterial` with N distinct texture nodes | 10+N | 11+N | 11+N | 11+N | 13+N: over 16 from N = 4 (matcap: N = 3) |
 
 Shadows (directional cascades) add 1 depth array + 1 comparison sampler; environment IBL 1 cube + 1 sampler (its BRDF
@@ -302,7 +325,7 @@ if (model.cameras.length) viewGLTFCamera(model);
 
 Materials using clearcoat, transmission, IOR, volume, sheen or specular compile a separate shader variant with eight more texture slots (clearcoat, clearcoat roughness, clearcoat normal, transmission, sheen color, sheen roughness, specular, specular color), so plain materials keep the original shader and bindings. Approximations, by design:
 
-- Transmission does not refract. A transmissive surface draws in the blended queue with its diffuse reduced by the transmission factor and texture, and the background shows through multiplied by one per-material tint: base color × transmission × volume attenuation (`attenuationColor` raised to `thicknessFactor / attenuationDistance`). `transmissionTexture` therefore varies the surface but not the background; `thicknessTexture` is ignored.
+- Transmission refracts only through a transmission hook (`@margoengine/materials/transmission`: `transmission.add(model)`, see "Transmission hook"). Without one a transmissive surface draws in the blended queue with its diffuse reduced by the transmission factor and texture, and the background shows through multiplied by one per-material tint: base color × transmission × volume attenuation (`attenuationColor` raised to `thicknessFactor / attenuationDistance`), so `transmissionTexture` varies the surface but not the background. `thicknessTexture` is ignored either way.
 - Sheen (Charlie distribution) and clearcoat (GGX on its own normal, F0 0.04) respond to the key light and the hemisphere fill. Image-based lighting patches and clustered lights light the base layer only.
 - IOR and `KHR_materials_specular` set the dielectric F0 as three.js does: `min(((ior-1)/(ior+1))² × specularColor, 1) × specular`.
 

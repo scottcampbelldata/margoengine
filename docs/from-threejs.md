@@ -311,8 +311,12 @@ const pane = createMesh(engine, planeGeometry(2, 2), new Material({color: '#88cc
 oit.add(pane);  // and oit.add(model) for a loaded glTF's BLEND primitives
 ```
 
-- Not available: Lambert, Phong, physical (clearcoat, transmission) on your own meshes, a second UV set, geometry groups
-  (one material per mesh). glTF files do get clearcoat, sheen, transmission and specular (see Loading models).
+- `MeshPhysicalMaterial`: physical options on `Material` (`clearcoat`, `clearcoatRoughness`, `sheenColor`, `sheenRoughness`,
+  `specularIntensity`, `specularColor`, `ior`, `transmission`, `thickness`, `attenuationColor`, `attenuationDistance`;
+  factors only). Glass refracts with `Transmission.attach(engine).add(mesh)` from `@margoengine/materials/transmission`
+  (needs an HDR post capture such as `PostStack` with `Tonemap`); without it the background shows through tinted.
+- Not available: Lambert, Phong, physical maps, iridescence, anisotropy and dispersion on your own meshes, a second UV
+  set, geometry groups (one material per mesh).
 
 ## Lights and shadows
 
@@ -512,7 +516,7 @@ await load.complete;            // every part, texture and byte; load.abort() ca
 - `model.nodes` are the glTF nodes (core meshes you can move or hide), `model.primitives` the drawn parts,
   `model.lights` and `model.cameras` the `KHR_lights_punctual` lights and glTF cameras as data.
 - Supported extensions include `KHR_texture_transform`, `KHR_materials_*` (emissive strength, unlit, clearcoat,
-  transmission without refraction, IOR, volume, sheen, specular), `KHR_lights_punctual`, `KHR_mesh_quantization`, Draco,
+  transmission, refracting with `@margoengine/materials/transmission`, IOR, volume, sheen, specular), `KHR_lights_punctual`, `KHR_mesh_quantization`, Draco,
   meshopt, KTX2, WebP and AVIF.
 - `@margoengine/gltf` is a smaller loader for untextured constant-colour glTF that also works on WebGL2.
 
@@ -1116,7 +1120,7 @@ From [`docs/threejs-parity.md`](threejs-parity.md). Each would be an optional pa
 | More than one directional light, coloured ambient, configurable `HemisphereLight`, IES lights | Missing; point, spot and rectangle area lights via clustered, a fixed hemisphere fill in glTF-pro |
 | `ShadowMaterial` on any mesh | Missing (`@margoengine/staging` ContactShadows is a ground shadow catcher for product shots) |
 | glTF `KHR_animation_pointer`, iridescence, anisotropy, dispersion, material variants; applying glTF cameras | Missing (files that require them are rejected; cameras are exposed as data) |
-| `MeshPhysicalMaterial`, Lambert, Phong, depth materials on your own meshes | Missing (glTF physical extensions are approximated; transmission does not refract) |
+| Lambert, Phong, depth materials, physical maps, iridescence, anisotropy, dispersion on your own meshes | Missing (physical factors and refracting transmission exist: materials physical options, `@margoengine/materials/transmission`) |
 | Second UV set, geometry groups and custom attributes on your own meshes | Missing |
 | Standalone KTX2 or float/3D/array data textures on your own meshes | Missing (KTX2 works inside glTF; materials takes RGBA8 data) |
 | SMAA, GTAO, SSGI, motion blur, lens flare, glitch, afterimage | Missing (FXAA, TAA, SSAO, SSR, bloom, DOF are there) |
