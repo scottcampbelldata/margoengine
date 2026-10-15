@@ -972,6 +972,11 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       SSAO (needs a scene texture from PostStack); camera rig avoids walls, not just terrain; audio listener on
       something other than the camera; a runnable example game with a rigged character + Blender level GLB (for the
       demo rebuild).
+   s. Flaky gate: `tests/catalog.test.js` (browser clipboard test) times out under heavy load (4 times so far, up to
+      250 s; always passes alone). Find what it waits on (browser launch, clipboard permission, timeouts) and make it
+      deterministic under load, or move the browser part out of `verify` into a GPU/browser-lane script. Same check
+      for `packages/decoders/tests/decoders.test.js` and `packages/geometry/tests/triangulate-inputs.test.js`, which
+      each failed once under load.
    m. docs/threejs-parity.md summary counts drifted (OIT added a COVERED row without updating the totals) - recount.
    Order: after the current wave, alongside the hygiene phase (5k) and under its gates, before the demo rebuild.
 5m. CORE APPROVALS, conditional (Scott, 2026-10-14 night): do both IF core+stage stays under 20,000 B gzip
