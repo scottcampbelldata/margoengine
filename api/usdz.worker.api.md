@@ -19,5 +19,6 @@ interface USDOptions {
     maxTriangles?: number;
     maxDepth?: number;
     signal?: AbortSignal;
+    fetch?: typeof fetch;
 }
 ```

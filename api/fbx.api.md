@@ -9,9 +9,10 @@ import { PBRModel } from "@margoengine/gltf-pro";
 export interface FBXOptions {
     resourcePath?: string;
     signal?: AbortSignal;
+    fetch?: typeof fetch;
 }
 
-export function convertFBX(input: ArrayBuffer | ArrayBufferView, { resourcePath, signal }?: FBXOptions): Promise<ArrayBuffer>;
+export function convertFBX(input: ArrayBuffer | ArrayBufferView, { resourcePath, signal, fetch: get }?: FBXOptions): Promise<ArrayBuffer>;
 
 export function loadFBX(engine: EngineKernel, url: string | URL, options?: FBXOptions): Promise<PBRModel>;
 

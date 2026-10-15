@@ -465,6 +465,25 @@ The stage facade loads by extension: `await app.load('/part.step')` handles glTF
 IGES and frames the result. `@margoengine/loaders` also parses 3MF, PCD, XYZ, OFF and legacy VTK. OBJ materials and UVs
 (MTL) and Collada are not supported.
 
+### Caching and offline (`THREE.Cache`)
+
+```js
+THREE.Cache.enabled = true; // in-memory, this page only
+```
+
+```ts
+import {AssetCache} from '@margoengine/cache';
+import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadCAD} from '@margoengine/machinery/cad';
+
+// IndexedDB: survives reloads, works offline, revalidates with ETag/Last-Modified, LRU within maxBytes.
+const cache = new AssetCache({name: 'plant-viewer', version: '2026.10', maxBytes: 2 ** 30});
+const line = await loadGLTF(engine, '/line-4.glb', {fetch: cache.fetch});
+const gearbox = await loadCAD(engine, '/gearbox.step', {fetch: cache.fetch});
+```
+
+Every loader (gltf-pro, fbx, usdz, machinery `loadCAD`, `@margoengine/loaders`) takes the same `fetch` option.
+
 ## Animation
 
 ```js

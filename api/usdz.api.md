@@ -35,6 +35,7 @@ export interface USDOptions {
     maxTriangles?: number;
     maxDepth?: number;
     signal?: AbortSignal;
+    fetch?: typeof fetch;
 }
 
 export function loadUSDZ(engine: EngineKernel, url: string | URL, options?: USDOptions): Promise<PBRModel>;

@@ -26,6 +26,7 @@ interface AssetOptions {
     signal?: AbortSignal;
     decoders?: GLTFDecoderHooks;
     buffers?: Array<ArrayBuffer | ArrayBufferView>;
+    fetch?: typeof fetch;
 }
 
 type Context = Extract<PassContext, {

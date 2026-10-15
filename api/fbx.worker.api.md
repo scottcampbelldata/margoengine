@@ -15,5 +15,6 @@ export function parseFBXInWorker(engine: EngineKernel, input: ArrayBuffer | Arra
 interface FBXOptions {
     resourcePath?: string;
     signal?: AbortSignal;
+    fetch?: typeof fetch;
 }
 ```

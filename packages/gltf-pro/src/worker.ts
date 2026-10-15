@@ -6,8 +6,9 @@ import {PBRModel, loadGLTF, parseGLTFAsync, type GLTFLoadOptions} from './index.
 import {packed} from './pack.js';
 import type {PreparedGLTF} from './prepare.js';
 export type {PreparedGLTF} from './prepare.js';
-// Draco, meshopt and KTX2 decode on this thread; the instancing reader only composes the worker-decoded accessors.
-const decoding = ({decoders: d = {}}: {decoders?: GLTFDecoderHooks}) => !!(d.draco || d.meshopt || d.ktx2);
+// Draco, meshopt and KTX2 decode on this thread; the instancing reader only composes the worker-decoded accessors. A custom
+// fetch cannot move to the worker, so it keeps the load on this thread too.
+const decoding = ({decoders: d = {}, fetch}: {decoders?: GLTFDecoderHooks; fetch?: unknown}) => !!(fetch || d.draco || d.meshopt || d.ktx2);
 /**
  * Build a PBRModel from a worker's PreparedGLTF on this thread (GPU uploads happen here, at the model's setup).
  * `decoders` takes only the `instancing` reader (@margoengine/gltf-pro/instancing) for EXT_mesh_gpu_instancing.
@@ -26,7 +27,7 @@ export function modelFromPrepared(instance: EngineKernel, prepared: PreparedGLTF
 const workerURL = () => new URL('./workers/gltf.js?no-inline', import.meta.url);
 /**
  * loadGLTF with fetching, JSON parsing, accessor decoding, vertex packing and image decoding in a worker. Same model as
- * loadGLTF. Runs on this thread instead when Workers are unavailable or Draco, meshopt or KTX2 `decoders` are passed.
+ * loadGLTF. Runs on this thread instead when Workers are unavailable or Draco, meshopt or KTX2 `decoders` or `fetch` are passed.
  */
 export async function loadGLTFInWorker(instance: EngineKernel, url: string | URL, options: GLTFLoadOptions = {}): Promise<PBRModel> {
   if (!canUseWorker() || decoding(options)) return loadGLTF(instance, url, options);

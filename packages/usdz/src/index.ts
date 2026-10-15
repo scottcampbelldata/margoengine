@@ -19,6 +19,8 @@ export interface USDOptions {
   maxTriangles?: number;
   maxDepth?: number;
   signal?: AbortSignal;
+  /** Fetch for loadUSDZ, for example `@margoengine/cache`'s `cache.fetch`. Default `globalThis.fetch`. */
+  fetch?: typeof fetch;
 }
 export interface USDMesh {
   path: string;
@@ -697,6 +699,7 @@ export async function loadUSDZ(
     data = await fetchBytes(url, {
       maxBytes: limits.maxBytes,
       signal: options.signal,
+      fetch: options.fetch,
     });
   return (await parseUSDZ(data, options)).create(engine, options);
 }

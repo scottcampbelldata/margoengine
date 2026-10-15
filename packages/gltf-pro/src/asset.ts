@@ -168,13 +168,13 @@ export class GLTFAsset {
     this.cache.set(index, output); return output;
   }
 }
-export interface AssetOptions {signal?: AbortSignal; decoders?: GLTFDecoderHooks; buffers?: Array<ArrayBuffer | ArrayBufferView>}
+export interface AssetOptions {signal?: AbortSignal; decoders?: GLTFDecoderHooks; buffers?: Array<ArrayBuffer | ArrayBufferView>; /** Fetch for the file and its external buffers and images, for example `@margoengine/cache`'s `cache.fetch`. Default `globalThis.fetch`. */ fetch?: typeof fetch}
 /** Fetch (url) or parse (input) a glTF, decode compressed geometry and images. External URIs resolve against url, else the page. */
-export async function loadAsset(url: string | URL | undefined, {signal, decoders = {}, buffers: provided = []}: AssetOptions = {}, input?: string | object | ArrayBuffer | ArrayBufferView): Promise<{asset: GLTFAsset; images: GLTFImage[]}> {
+export async function loadAsset(url: string | URL | undefined, {signal, decoders = {}, buffers: provided = [], fetch: get = globalThis.fetch}: AssetOptions = {}, input?: string | object | ArrayBuffer | ArrayBufferView): Promise<{asset: GLTFAsset; images: GLTFImage[]}> {
   signal?.throwIfAborted(); let base = url === undefined ? undefined : new URL(url, globalThis.location?.href), total = 0;
   const fetchBytes = async (target: URL, root = false) => {
     if (!['http:','https:'].includes(target.protocol)) throw new TypeError('glTF URL must use HTTP(S)');
-    const response = await fetch(target, {signal}); if (root && response.url) base = new URL(response.url);
+    const response = await get(target, {signal}); if (root && response.url) base = new URL(response.url);
     const bytes = await readResponse(response, {maxBytes: assetLimit - total, signal, label: 'glTF download'}); total += bytes.length; return bytes;
   };
   const resolve = (uri: string) => new URL(uri, base ?? globalThis.location?.href);

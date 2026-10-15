@@ -9,16 +9,16 @@ const absolute = (path: string | undefined) => path === undefined ? undefined : 
 /**
  * parseFBX with FBX reading, GLB conversion, glTF parsing and texture decoding in a worker; same model as parseFBX.
  * A whole ArrayBuffer input moves to the worker and is detached here (pass a copy to keep it). Runs on this thread
- * when Workers are unavailable.
+ * when Workers are unavailable or `fetch` is passed.
  */
 export async function parseFBXInWorker(engine: EngineKernel, input: ArrayBuffer | ArrayBufferView, options: FBXOptions = {}): Promise<PBRModel> {
-  if (!canUseWorker()) return parseFBX(engine, input, options);
+  if (!canUseWorker() || options.fetch) return parseFBX(engine, input, options);
   const prepared = await runWorker<PreparedGLTF>(workerURL(), {input: movable(input), resourcePath: absolute(options.resourcePath ?? '')}, options.signal);
   return modelFromPrepared(engine, prepared, options.signal);
 }
-/** loadFBX with the download and all parsing in a worker; same model as loadFBX. */
+/** loadFBX with the download and all parsing in a worker; same model as loadFBX. Runs on this thread when `fetch` is passed. */
 export async function loadFBXInWorker(engine: EngineKernel, url: string | URL, options: FBXOptions = {}): Promise<PBRModel> {
-  if (!canUseWorker()) return loadFBX(engine, url, options);
+  if (!canUseWorker() || options.fetch) return loadFBX(engine, url, options);
   const target = new URL(url, globalThis.location.href); if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('FBX URL needs HTTP(S)');
   const prepared = await runWorker<PreparedGLTF>(workerURL(), {url: target.href, resourcePath: absolute(options.resourcePath)}, options.signal);
   return modelFromPrepared(engine, prepared, options.signal);

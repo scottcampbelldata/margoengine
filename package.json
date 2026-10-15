@@ -81,6 +81,7 @@
     "packages/staging",
     "packages/culling",
     "packages/oit",
+    "packages/cache",
     "examples/vite",
     "examples/gameplay-sandbox",
     "examples/react-viewer",

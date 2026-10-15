@@ -172,7 +172,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | Long-tail model loaders (LDraw, VRML, 3DS, LWO, AMF, MD2, VOX, PDB, GCode, BVH motion capture, 3DM, KMZ, TDS) | MISSING | — | |
 | Texture loaders (UltraHDR, TGA, DDS, KTX v1, TIFF, IES, LUT3dl, LUTImage) | PARTIAL | environment `decodeUltraHDR` | UltraHDR only, as an environment source. The rest are missing. |
 | LUTCubeLoader | PARTIAL | tonemap `parseCube` (`packages/tonemap/src/cube.ts`) | 33³ LUTs only. |
-| LoadingManager, Cache, progress events | PARTIAL | per-loader `AbortSignal` and byte caps (`packages/shared/loading.js`) | No shared manager or cache. Progress is reported only by machinery's CAD worker. |
+| LoadingManager, Cache, progress events | PARTIAL | per-loader `AbortSignal` and byte caps (`packages/shared/loading.js`); cache `AssetCache` (`packages/cache/src/index.ts`) | Cache: persistent IndexedDB with ETag/Last-Modified revalidation, offline fallback, range requests and LRU eviction, passed to every loader as its `fetch` option (goes beyond three's in-memory `THREE.Cache`). No shared loading manager. Progress is reported only by machinery's CAD worker. |
 
 ### 11. Exporters
 
