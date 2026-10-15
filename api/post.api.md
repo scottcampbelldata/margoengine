@@ -78,6 +78,28 @@ export interface SSAOSource {
     draw(context: Context, mode: 'gbuffer' | 'ambient', color: GPUTextureView, depth: GPUTextureView): void;
 }
 
+export class SSR implements EnginePlugin {
+    readonly options: SSROptions;
+    readonly name = "ssr";
+    constructor(options?: SSROptions);
+    static attach(engine: EngineKernel, options?: SSROptions): SSR;
+    get enabled(): boolean;
+    set enabled(value: boolean);
+    setup(engine: Engine): void;
+    registerPasses(graph: FrameGraph): void;
+    onDeviceRestored(engine: Engine): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface SSROptions {
+    maxRoughness?: number;
+    thickness?: number;
+    maxDistance?: number;
+    steps?: number;
+    enabled?: boolean;
+}
+
 export class SceneFade implements EnginePlugin {
     readonly duration: number;
     readonly name = "post:scene-fade";

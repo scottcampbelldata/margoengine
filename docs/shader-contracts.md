@@ -26,6 +26,7 @@ Text anchors in core's shader (the full list, with the package file using each, 
 | `let mapped=linear/(1.0+linear);`, `return vec4f(linear,1);` | environment Fog (on the canvas, or after an HDR capture) |
 | `let direct=…return vec4f(…);`, `i.color*(1.0-i.material.y)*frame.radiance.w` | post SSAO ambient replay |
 | `let margoAmbient=` | convention: environment IBL names its term so; post SSAO occludes it on core meshes |
+| `let direct=…return vec4f(…);`, fragment signature `->@location(0) vec4f`, `n`/`v`/`i.color`/`i.material` | post SSR material replay (three targets: IBL specular + roughness, split-sum weight, normal); with `margoAmbient` it also calls environment's `iblBrdfTerms`/`iblPrefiltered` (`packages/environment/src/ibl.ts`) |
 | `o.clip=frame.camera*p` | taa (jittered camera) |
 | `let v=normalize(frame.eye.xyz-i.position);…let linear=…;` | creative ToonShading |
 | `@location(3) material:vec4f`, `o.color=i.color.rgb`, fragment signature | selection picking (id MRT), scatter, terrain colors |

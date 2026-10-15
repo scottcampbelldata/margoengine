@@ -753,12 +753,33 @@ const stack = PostStack.attach(engine, [new Bloom({strength: 0.6})]);
 TAA.attach(engine, {depth: () => stack.depthTexture});
 ```
 
+Screen-space reflections (three.js `SSRPass`) are an HDR effect in the same stack, after SSAO and before DOF/Bloom:
+
+```js
+import {SSRPass} from 'three/addons/postprocessing/SSRPass.js';
+composer.addPass(new SSRPass({renderer, scene, camera, width: innerWidth, height: innerHeight}));
+```
+
+```ts
+import {PostStack} from '@margoengine/post/stack';
+import {SSAO} from '@margoengine/post/ssao';
+import {SSR} from '@margoengine/post/ssr';
+import {Bloom} from '@margoengine/post/bloom';
+
+const ssr = new SSR({maxRoughness: 0.6});   // rougher surfaces keep the environment reflection only
+PostStack.attach(engine, [new SSAO(), ssr, new Bloom({strength: 0.6})]);
+ssr.enabled = false;                        // toggles without recompiling; SSR.attach(engine) runs it alone
+```
+
+- Glossy core meshes (`PbrMaterial` roughness below `maxRoughness`) reflect what is on screen; with `EnvironmentLighting`
+  SSR replaces the IBL specular where a ray hits and keeps it where it misses (off-screen, behind objects). glTF-pro
+  models and water are reflected but do not reflect yet. No `groundReflector`/`selects`: every glossy core mesh reflects.
 - The stack captures the scene once in linear HDR and runs the effects in array order. The engine renders it; there is
   no `composer.render()`.
 - A single effect can also be attached alone, for example `Bloom.attach(engine, {strength: 0.8})`.
 - Custom full-screen effects are `NodePass`es from `@margoengine/shader` (next section).
 - `Tonemap` curves are `'agx'`, `'acescg'` and `'neutral'`, with exposure in stops and `.cube` LUTs (`setLUT`).
-- Not available: SMAA, SSR, GTAO, motion blur, glitch and the simple screen-effect passes (write them as a `NodePass`).
+- Not available: SMAA, GTAO, motion blur, glitch and the simple screen-effect passes (write them as a `NodePass`).
 
 ## TSL and node materials
 
@@ -953,7 +974,7 @@ From [`docs/threejs-parity.md`](threejs-parity.md). Each would be an optional pa
 | `MeshPhysicalMaterial`, Lambert, Phong, depth materials on your own meshes | Missing (glTF physical extensions are approximated; transmission does not refract) |
 | Second UV set, geometry groups and custom attributes on your own meshes | Missing |
 | Standalone KTX2 or float/3D/array data textures on your own meshes | Missing (KTX2 works inside glTF; materials takes RGBA8 data) |
-| SMAA, SSR, GTAO, SSGI, motion blur, lens flare, glitch, afterimage | Missing (FXAA, TAA, SSAO, bloom, DOF are there) |
+| SMAA, GTAO, SSGI, motion blur, lens flare, glitch, afterimage | Missing (FXAA, TAA, SSAO, SSR, bloom, DOF are there) |
 | Built-in screen effects (vignette, RGB shift, pixelation, halftone, Sobel) | Not built in; a few nodes in a shader `NodePass` |
 | Clipping planes on glTF-pro models and textured meshes | Missing (machinery sections cap core meshes; shader `discard` slices without caps or shadows) |
 | `BatchedMesh`, render layers | Missing (bvh has raycast layers only) |

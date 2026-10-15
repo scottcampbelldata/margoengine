@@ -36,6 +36,10 @@ const contracts = [
   ['post/src/ssao.ts', 'core', /(let direct=[\s\S]*)return (vec4f\([^\n]+\));/],
   ['post/src/ssao.ts', 'core', /let direct=[\s\S]*return vec4f\([^\n]+\);/],
   ['post/src/ssao.ts', 'core', 'i.color*(1.0-i.material.y)*frame.radiance.w'],
+  ['post/src/ssr.ts', 'hdr', /(let direct=[\s\S]*)return (vec4f\([^\n]+\));/],
+  ['post/src/ssr.ts', 'hdr', /(@fragment[^{]*)->@location\(0\) vec4f/],
+  ['post/src/ssr.ts', 'hdr', 'let n=normalize(i.normal)'],
+  ['post/src/ssr.ts', 'hdr', 'let v=normalize(frame.eye.xyz-i.position)'],
   ['creative/src/toon.ts', 'core', /let v=normalize\(frame.eye.xyz-i.position\);[\s\S]*?let linear=[^;]+;/],
   ['selection/src/picking.ts', 'core', '@location(3) material:vec4f'],
   ['selection/src/picking.ts', 'core', 'o.color=i.color.rgb'],
@@ -91,4 +95,11 @@ test('shared meshVertex mirrors core vertex inputs, frame layout and position tr
 test('margoAmbient convention: environment names the IBL term, post SSAO replays it from core meshes', () => {
   assert.match(source('environment/src/lighting.ts'), /let margoAmbient=\$\{iblCall\(/);
   assert.match(source('post/src/ssao.ts'), /c\.shader\.includes\('let margoAmbient='\)/);
+});
+
+test('SSR replays the IBL specular with environment\'s own split-sum helpers', () => {
+  const ibl = source('environment/src/ibl.ts'), ssr = source('post/src/ssr.ts');
+  for (const signature of ['fn iblBrdfTerms(nv: f32, roughness: f32) -> vec2f', 'fn iblPrefiltered(specular: texture_cube<f32>, s: sampler, params: vec4f, r: vec3f, roughness: f32) -> vec3f',
+    'let specularWeight = f0 * ab.x + ab.y;', 'radiance * specularWeight) * params.w']) assert.ok(ibl.includes(signature), `environment ibl.ts changed: ${signature}`);
+  for (const call of ['iblBrdfTerms(nv,rough)', 'iblPrefiltered(iblSpecular,iblSampler,iblParams,reflect(-v,n),rough)*w*iblParams.w', "includes('fn iblBrdfTerms(')"]) assert.ok(ssr.includes(call), `post ssr.ts no longer calls ${call}`);
 });

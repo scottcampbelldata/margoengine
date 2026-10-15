@@ -22,9 +22,9 @@ const stack = PostStack.attach(stage.engine, [new SSAO(), new DOF({focalDistance
 stack.dispose(); // also disposes its effects
 ```
 
-- Order is HDR effects (`SSAO`, `DOF`, `Bloom`), then at most one display effect (`Tonemap` or
+- Order is HDR effects (`SSAO`, `SSR`, `DOF`, `Bloom`), then at most one display effect (`Tonemap` or
   creative `PostProcessing`), then LDR effects (`FXAA`). Anything else throws. Put SSAO first: it
-  darkens the captured ambient light.
+  darkens the captured ambient light. Put SSR before DOF and Bloom so reflections are blurred and glow too.
 - HDR effects hand linear light to the next effect. Without a display effect, the last HDR effect
   tonemaps exactly as it does alone (Bloom AgX, SSAO and DOF Reinhard).
 - The stack attaches its effects; keep references to change their options. Effects given to a stack
@@ -38,6 +38,60 @@ stack.dispose(); // also disposes its effects
 When the stack landed (`5b1fe66`), every effect used alone made exactly the GPU calls it made before the stack existed;
 `examples/package-benchmarks/proofs/post-stack.proof.js` now checks 13,056 recorded calls across 12 single-effect stories
 against `e2cc4c5` (Bloom, FXAA and SSAO keep the canvas alpha; the last intentional change to an effect).
+
+## Screen-space reflections: `SSR`
+
+`@margoengine/post/ssr` reflects what is on screen in glossy core meshes (floors, polished CAD metal). It is an HDR
+`PostStack` effect; `SSR.attach(engine, options)` runs it alone in its own one-effect stack (tone mapped like SSAO alone).
+
+```ts
+import {PostStack} from '@margoengine/post/stack';
+import {SSAO} from '@margoengine/post/ssao';
+import {SSR} from '@margoengine/post/ssr';
+import {Bloom} from '@margoengine/post/bloom';
+const ssr = new SSR({maxRoughness: 0.6, thickness: 0.5, maxDistance: 100, steps: 64});
+const stack = PostStack.attach(stage.engine, [new SSAO(), ssr, new Bloom({strength: 0.6})]);
+ssr.enabled = false; // pass-through, no recompiles
+```
+
+- **Material replay.** After the scene (order 14, after SSAO's replays) SSR redraws core meshes once at 1x with core's
+  own shader (every pass binding; the lighting sits in a dead `if(false)` block so it keeps the bindings but costs
+  nothing) into three targets: the environment specular already in the pixel plus roughness (`rgba16float`), the
+  split-sum weight `F0·A+B` (`rgb10a2unorm`) and the shading normal (`rgb10a2unorm`). A 1x scene is replayed
+  depth-`equal` against the stack's capture depth; a 4x scene into SSR's own 1x `depth32float` (pixel-centre
+  materials and depth, so MSAA silhouettes never average two materials, and no multisampled targets). The Hi-Z is
+  built from that depth. Memory: 16 B/pixel of targets (+4 B depth at 4x), a half-resolution `r32float` Hi-Z and a
+  half-resolution `rgba16float` blur chain, about 45 MB at 1080p.
+- **Ray march.** One mirror ray per pixel, clipped to the near/far planes and the screen, marched in screen space over
+  a hierarchical depth pyramid (Hi-Z: the closest depth per 2^n cell, up to 64 px cells) with `steps` iterations and a
+  `thickness` (scene units) a ray may pass behind a surface. Pixel x/y and NDC depth are linear along the projected
+  ray for perspective and orthographic (`@margoengine/cameras`) projections alike.
+- **Roughness.** Surfaces rougher than `maxRoughness` are skipped; reflections fade out from half of it. The hit colour
+  comes from a half-resolution mip chain of the scene, at a level that grows with roughness² and hit distance.
+- **Fades.** Rays toward the camera, hits on back faces (hit normal along the ray), hits near the screen edge and hits
+  near `maxDistance` fade out.
+- **IBL fallback without double counting.** With `EnvironmentLighting` the replay computes the IBL specular the scene
+  added (`prefiltered(R, roughness) · (F0·A+B) · intensity`, with environment's own LUT and cube) and the weight
+  `F0·A+B`; the composite writes `scene + f · (weight · reflected − iblSpecular)`, `f` being the fades above. A ray that
+  misses (`f = 0`: off screen, behind everything, too rough) leaves the pixel exactly as the environment lit it; a hit
+  replaces the environment's specular instead of adding to it. Without IBL nothing is removed and the weight is an
+  analytic split-sum fit. Checked on a real GPU: a mirror floor under a uniform grey environment loses its grey
+  reflection where the red box is reflected (green channel falls to the box's own), and a box above the view leaves
+  the frame unchanged.
+- **Temporal.** Deterministic (no noise), so frames are stable without TAA; with TAA wrapping the stack the jittered
+  camera is used throughout and TAA's history smooths reflection edges.
+- **Alpha and bindings.** Keeps the scene alpha (TransparentCanvas). SSR runs in its own passes (the composite samples 7 textures),
+  so it adds nothing to the mesh shader's 16-texture budget.
+- **Cost** (Intel Arc 140V, Edge 155, quiet machine, a 0.1-roughness floor filling most of the view: the worst case,
+  every floor pixel traces). GPU time of SSR's own passes, replay + Hi-Z / blur + trace + composite:
+  1280x720 4x 2.3 ms (0.7 / 1.6), 1x 2.2 ms (0.5 / 1.7); 1920x1080 4x 5.8 ms (1.6 / 4.2), 1x 5.9 ms (1.1 / 4.9).
+  `steps: 16` cuts the trace by about a third. `enabled = false` still costs one full-screen copy (0.2-1.0 ms);
+  remove SSR from the stack to drop it entirely. `examples/package-benchmarks/ssr-gpu.mjs` (results/ssr-gpu.json).
+- **Limits.** Only core-mesh surfaces (core `PbrMaterial`) show reflections: glTF-pro models, water, terrain and other
+  custom shaders are reflected but do not reflect (they need a material replay, like SSAO's sources). Only what is
+  on screen is reflected. With SSAO before it, a creased pixel's IBL specular was already darkened by AO, so a hit
+  removes slightly more than was left (clamped at zero). Specular from other ambient plugins (sky's ambient patch) is
+  not replaced.
 
 ## FXAA
 

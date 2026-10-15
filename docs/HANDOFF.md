@@ -722,7 +722,24 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       shared shadow arrays; optionally core requests a higher `maxSampledTexturesPerShaderStage` when the adapter
       allows (core bytes, Scott decides). After 1.0 unless a demo needs it.
 5g. Scott (2026-10-14 night): build these now, in this order (not post-1.0):
-   a. [running] Screen-space reflections: optional post effect (water, glossy CAD floors), with fallback to IBL.
+   a. [DONE, branch worktree-agent-a9bd2499579071c02] Screen-space reflections: `SSR` in `@margoengine/post/ssr` (HDR
+      `PostStack` effect, `SSR.attach(engine)` = its own one-effect stack; put it after SSAO, before DOF/Bloom). Core
+      meshes are replayed once at 1x into three targets (IBL specular + roughness, split-sum weight, normal; lighting
+      in a dead `if(false)` block keeps the bindings without the cost; 4x scenes into SSR's own 1x depth32float), Hi-Z
+      march per pixel (perspective + orthographic), roughness blur/fade (`maxRoughness` 0.6), camera/back-face/edge/
+      distance fades, deterministic (stable without TAA; works inside TAA). Composite: `scene + f·(W·reflected − iblSpec)`
+      with `iblSpec` computed by environment's own LUT and cube, so a hit replaces the IBL specular and a miss leaves the
+      pixel exactly as IBL lit it. Proofs: `proofs/post-ssr.proof.js` (PostStack without SSR: 9,269 recorded GPU calls
+      identical to 7c47a09, 8 stories) and post-stack.proof.js still identical. Real GPU (Arc 140V, Edge 155, AC, lock;
+      `examples/package-benchmarks/ssr-gpu.mjs`, results/ssr-gpu.json): mirror floor reflects the red box inside the
+      projected planar-mirror bounds with red at the mirrored centre (4x, 1x, orthographic, TAA, SSAO+SSR); green at
+      that pixel 165 -> 41 (the grey IBL reflection is replaced, not added); roughness 0.3 edge 1 -> 18 px, 0.45 faded,
+      0.8 untouched; box above the view -> frame byte-identical; no black/NaN. Cost (own passes, quiet-gated, worst-case
+      glossy floor): 720p 2.3 ms 4x / 2.2 1x, 1080p 5.8 / 5.9. Entry `./ssr` 7,862 B min+gzip incl. PostStack (0 unless
+      imported). Water: own fresnel + sky/probe reflection, its own pipeline (writes depth, so SSR leaves it alone and
+      reflects it); SSR would help (boats, shore) but needs a water material replay: not integrated. Limits: only core
+      meshes reflect (glTF-pro, water, terrain need a replay source); 1080p trace is the cost (half-res trace = upgrade).
+      Finding: SSAO's ambient replay uses `_=` and so still runs the full lighting; the same dead-block trick would cut it.
    b. [running] Volumetric fog and light shafts (sun and clustered lights; replaces ad-hoc god rays where it fits).
    c. [running] Progressive glTF loading: bounds/low-res first, full detail streamed in (works with the worker path).
    d. After the core culling (B) and large-coordinate agents merge: massive-scene streaming (hierarchical LOD,
