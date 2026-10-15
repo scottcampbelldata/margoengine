@@ -147,7 +147,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | Volumetric fog and light shafts (`VolumeNodeMaterial`, `webgpu_volume_lighting`) | COVERED | environment `VolumetricFog` (`packages/environment/src/volumetric.ts`, entry `@margoengine/environment/volumetric`) | Froxel grid (default 160 x 90 x 64) lit by the sun through shadows' cascades and by clustered point and spot lights with their `LocalShadows`; height falloff and noise, temporal reprojection, composited over opaque surfaces and the sky (perspective and orthographic, 1x/4x MSAA). Replaces `Fog` and sky fog rather than adding to them. Needs a post capture or a depth texture; transparent surfaces and particles drawn after it are not fogged. WebGPU only. |
 | Sky add-on | COVERED † | sky `Sky` with Preetham and Bruneton models (`packages/sky/src/`) | Adds clouds, sun, moon and stars. |
 | Tone mapping (`renderer.toneMapping`) | COVERED † | core fixed Reinhard; gltf-pro ACES; tonemap `Tonemap` with AgX, ACES fitted and Khronos Neutral (`packages/tonemap/src/index.ts`) | |
-| Color management (sRGB input, linear workflow, `outputColorSpace`) | PARTIAL | core converts hex sRGB to linear and encodes sRGB output; math `Color` stores linear sRGB | No ColorManagement API. No Display-P3 or HDR canvas output. |
+| Color management (sRGB input, linear workflow, `outputColorSpace`) | PARTIAL | core converts hex sRGB to linear and encodes sRGB output; math `Color` stores linear sRGB; environment `ColorOutput` (`packages/environment/src/output.ts`) for Display P3 and HDR (`toneMapping: 'extended'`) canvases | No ColorManagement API (no P3 input colours or textures: the working space is linear sRGB). `ColorOutput` (zero core bytes, only where the display reports P3 / HDR): sRGB content looks the same on the P3 canvas; colours outside sRGB and highlights above white come from Tonemap only (environment README). |
 | Exposure, physical camera parameters | COVERED † | `exposure` in stops on tonemap and Bloom; dof `focalLength` and `aperture` (f-number) | |
 
 ### 10. Loaders
@@ -363,8 +363,8 @@ Every MISSING or PARTIAL item, ordered by how often real three.js projects need 
     **Fit:** extend environment.
 35. **LoadingManager and progress events.**
     **Fit:** extend `shared/loading`.
-36. **Display-P3 or HDR canvas output, and a ColorManagement API.**
-    **Fit:** freeze conflict.
+36. [DONE output: environment `ColorOutput`, zero core bytes] **Display-P3 or HDR canvas output, and a ColorManagement API.**
+    **Fit:** output as a plugin (done); a ColorManagement API (P3 input colours/textures) is a freeze conflict.
 37. **A wireframe material flag.**
     **Fit:** extend materials (geometry `wireframe` plus lines works today).
 

@@ -140,10 +140,12 @@ export class TransparentCanvas extends ColorBackground {
     const engine = this.engine; this.engine = undefined;
     if (engine && !engine.disposed && engineRuntime(engine).plugins.get(this.name) === this) engine.removePlugin(this.name);
   }
-  // Core configured this context with the same device and preferred format; only alphaMode changes.
+  // Core configured this context with the same device and preferred format; only alphaMode changes (the rest of the
+  // current configuration, e.g. ColorOutput's P3/HDR, is kept where the browser can report it).
   private configure(alphaMode: GPUCanvasAlphaMode): void {
     const engine = this.engine, device = engine && engineRuntime(engine).gpu;
     if (!engine || !device || engine.disposed) return;
-    (engine.canvas.getContext('webgpu') as GPUCanvasContext | null)?.configure({device, format: navigator.gpu.getPreferredCanvasFormat(), alphaMode});
+    const context = engine.canvas.getContext('webgpu') as (GPUCanvasContext & {getConfiguration?(): GPUCanvasConfiguration | null}) | null, current = context?.getConfiguration?.();
+    context?.configure({...current, device, format: current?.format ?? navigator.gpu.getPreferredCanvasFormat(), alphaMode});
   }
 }

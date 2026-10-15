@@ -3,7 +3,7 @@ import {SceneTarget} from '../../shared/msaa.js';
 import type {EngineKernel} from '@margoengine/core';
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext} from '@margoengine/core/extension';
 import {parseCube,validateLUT,type CubeLUT} from './cube.js';
-import {tonemapShader} from './shaders.js';
+import {outputShader,tonemapShader} from './shaders.js';
 import type {StackHost,StackStage} from '../../shared/stack.js';
 export {parseCube};
 export type {CubeLUT};
@@ -11,6 +11,9 @@ export type {CubeLUT};
 declare const GPUBufferUsage: {UNIFORM:number; COPY_DST:number};
 declare const GPUTextureUsage: {RENDER_ATTACHMENT:number; TEXTURE_BINDING:number; COPY_DST:number};
 type Context = Extract<PassContext, {backend:'webgpu'}>;
+// Set on the pass context by @margoengine/environment's ColorOutput while a P3 or HDR canvas is active.
+const OUTPUT=Symbol.for('margoengine.color-output');
+type Output={peak:number;p3:boolean;excess?:(width:number,height:number)=>GPUTextureView};
 export type TonemapCurve='agx'|'acescg'|'neutral';
 export interface TonemapOptions {
   curve?:TonemapCurve;
@@ -109,25 +112,33 @@ export class Tonemap implements EnginePlugin {
     if(!this.source)this.captureTarget!.restore(c);
   }
   private paint(c:Context,source:GPUTexture|GPUTextureView,format:GPUTextureFormat,multisample:GPUMultisampleState|undefined,view:GPUTextureView):void {
-    const key=format+':'+multisample?.count;
+    const out=(c as {[OUTPUT]?:Output})[OUTPUT],excess=out?.excess,key=format+':'+multisample?.count+(excess?':output':'');
     if(!this.pipeline||this.pipelineFormat!==key){
-      const module=c.device.createShaderModule({code:tonemapShader});
+      const module=c.device.createShaderModule({code:excess?outputShader:tonemapShader});
       this.pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format}]},multisample});
+      this.excessPipeline=excess&&c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'excess',targets:[{format:'rgba16float'}]}});
       this.pipelineFormat=key;this.group=undefined;
     }
     if(!this.group||this.sourceTexture!==source){
-      this.group=c.device.createBindGroup({layout:this.pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform!}},
-        {binding:1,resource:'createView' in source?source.createView():source},{binding:2,resource:this.lutTexture!.createView()}]});this.sourceTexture=source;
+      const group={layout:this.pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform!}},
+        {binding:1,resource:'createView' in source?source.createView():source},{binding:2,resource:this.lutTexture!.createView()}]};
+      this.group=c.device.createBindGroup(group);this.sourceTexture=source;
+      this.excessGroup=this.excessPipeline&&c.device.createBindGroup({...group,layout:this.excessPipeline.getBindGroupLayout(0)});
     }
     const v=this.values,o=this.options;v[0]=o.exposure??0;v[1]=o.contrast??1;v[2]=o.curve==='acescg'?1:o.curve==='neutral'?2:0;v[3]=+!!this.lut;
     for(let i=0;i<3;i++){v[4+i]=this.lut?.domainMin[i]??0;v[8+i]=this.lut?.domainMax[i]??1;}
-    v[12]=+(o.inputColorSpace==='acescg');c.device.queue.writeBuffer(this.uniform!,0,v as Float32Array<ArrayBuffer>);
+    v[12]=+(o.inputColorSpace==='acescg');v[13]=excess?out!.peak:0;v[14]=+!!(excess&&out!.p3);c.device.queue.writeBuffer(this.uniform!,0,v as Float32Array<ArrayBuffer>);
     this.attachment.view=view;
     const pass=c.encoder.beginRenderPass(this.presentation);pass.setPipeline(this.pipeline);pass.setBindGroup(0,this.group);pass.draw(3);pass.end();
+    // Highlights above SDR white and colours outside sRGB, for ColorOutput to add back on the P3/HDR canvas.
+    if(excess){this.excessPass.view=excess(c.width,c.height);const extra=c.encoder.beginRenderPass(this.excessDescriptor);extra.setPipeline(this.excessPipeline!);extra.setBindGroup(0,this.excessGroup!);extra.draw(3);extra.end();}
   }
+  private excessPipeline?:GPURenderPipeline;private excessGroup?:GPUBindGroup;
+  private readonly excessPass:GPURenderPassColorAttachment={view:undefined!,loadOp:'clear',storeOp:'store'};
+  private readonly excessDescriptor:GPURenderPassDescriptor={colorAttachments:[this.excessPass]};
   private captureTarget?:SceneTarget;private depth?:GPUTexture;
   private pipelineFormat?:string;
-  private release():void {this.captureTarget?.dispose();this.captureTarget=undefined;this.depth?.destroy();this.depth=undefined;this.uniform?.destroy();this.scene?.destroy();this.lutTexture?.destroy();this.uniform=undefined;this.scene=undefined;this.sceneView=undefined;this.lutTexture=undefined;this.sourceTexture=undefined;this.pipeline=undefined;this.group=undefined;this.original=undefined;this.shaders.clear();}
+  private release():void {this.captureTarget?.dispose();this.captureTarget=undefined;this.depth?.destroy();this.depth=undefined;this.uniform?.destroy();this.scene?.destroy();this.lutTexture?.destroy();this.uniform=undefined;this.scene=undefined;this.sceneView=undefined;this.lutTexture=undefined;this.sourceTexture=undefined;this.pipeline=undefined;this.group=undefined;this.excessPipeline=undefined;this.excessGroup=undefined;this.original=undefined;this.shaders.clear();}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.lut=undefined;this.engine=undefined;}
   declare [Symbol.dispose]: () => void;

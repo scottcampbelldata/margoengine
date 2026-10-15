@@ -34,6 +34,28 @@ export interface ColorBackgroundOptions {
 
 export type ColorInput = string | number | readonly [number, number, number];
 
+export class ColorOutput {
+    readonly options: Readonly<ColorOutputOptions>;
+    readonly name = "color-output";
+    readonly peak: number;
+    static attach(engine: EngineKernel, options?: ColorOutputOptions): ColorOutput;
+    constructor(options?: Readonly<ColorOutputOptions>);
+    get gamut(): 'srgb' | 'p3';
+    get hdr(): boolean;
+    setup(engine: EngineKernel): void;
+    registerPasses(graph: FrameGraph): void;
+    onDeviceRestored(): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface ColorOutputOptions {
+    gamut?: 'srgb' | 'p3';
+    hdr?: boolean;
+    peak?: number;
+    force?: boolean;
+}
+
 export interface CubeFaces {
     size: number;
     faces: readonly Float32Array[];

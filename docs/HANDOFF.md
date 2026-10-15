@@ -886,6 +886,31 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    c. Wide colour gamut: Display P3 canvas as a zero-core-byte plugin (like TransparentCanvas: reconfigure the context
       with `colorSpace: 'display-p3'`), tonemap output in P3 where the display supports it, sRGB fallback; prove sRGB
       output unchanged. tonemap already has AgX / ACES / Khronos PBR Neutral.
+      DONE with 5l.i (0 core bytes): `ColorOutput.attach(engine, {gamut: 'p3', hdr: true, peak: 4, force})` in
+      `@margoengine/environment` (`output.ts`; one class: format, colorSpace and toneMapping are one configure call and
+      share one output pass). Turns on only where `matchMedia` reports P3 / `dynamic-range: high` (or `force`) and the
+      browser keeps it (`getConfiguration()`); otherwise no configure, no pass, same GPU calls as without it. Mechanism:
+      reconfigures core's context (merging the current configuration; TransparentCanvas now merges too, either order
+      works), replaces `getCurrentTexture` on that context object with an offscreen canvas-format texture (core and every
+      package draw exactly as before), and at order 1e5 resolves MSAA and writes the real canvas: decode sRGB + Tonemap's
+      excess, Rec.709 -> P3, clamp 0..1 or 0..peak, encode. "P3 on" = sRGB content looks the same (0-1 eight-bit P3
+      units apart, measured), colours outside sRGB (negative Rec.709 components, e.g. an external HDR source) are kept
+      up to P3 instead of clipped. "HDR on" = rgba16float + `extended`; Tonemap (alone or in a PostStack; it reads a
+      `Symbol.for('margoengine.color-output')` contract from the pass context, no import) keeps its SDR curves below the
+      0.76 knee and rolls highlights off toward `peak` (Khronos Neutral's rolloff; AgX/ACES scaled by its ratio), writing
+      the part outside 0..1 to a 1x rgba16float excess texture in a second pass. Bytes: environment +1,791, tonemap +684
+      (min+gzip root entries), core+stage +0. Proofs: `packages/environment/tests/output.test.js`;
+      `examples/package-benchmarks/proofs/color-output.proof.js` (without ColorOutput, Tonemap alone/DOF-sourced/stacked,
+      TransparentCanvas, ColorBackground: 6,174 recorded GPU calls identical to 7dcc958). Real GPU (Arc 140V, Edge 155 and
+      Chrome 155, AC, GPU lock; `examples/package-benchmarks/color-output-gpu.mjs`, `results/color-output-gpu-*.json`):
+      this laptop's display reports `color-gamut: srgb` only and `dynamic-range: standard` (headed run), so `auto` stays
+      sRGB/SDR; forced, the canvas reports display-p3 / rgba16float / extended; a P3-green patch reads (0,188,0) in a
+      Display P3 2D canvas with P3 on vs (86,188,55) off; a 3x-white highlight reads 1.373 from the float16 canvas (and a
+      float16 P3 2D canvas) with HDR on vs 252/255 off; same after `rebootDevice()`, with TransparentCanvas and with a
+      Bloom+Tonemap+FXAA stack, 0 validation errors. Limits (environment README): HDR/wide gamut only via Tonemap (Bloom,
+      SSAO, DOF alone and creative PostProcessing stay SDR-range); passes after Tonemap (FXAA, TAA, overlays) see the SDR
+      image with the excess added back under them; LUT grades the 0..1 part only; no display headroom API (`peak` is
+      the app's choice); no ColorManagement/P3 input; WebGL2 no-op; not seen on a real P3/HDR display (none here).
    d. Frame debugger: extend `@margoengine/inspector` (it already has hierarchy, live properties, wireframe/normal/
       bounds overlays; stats has GPU timestamps) with a frame capture: draw calls, pipelines, bind groups, per-pass GPU
       time, GPU memory by buffer/texture, texture budget vs the 16-binding limit.
@@ -962,7 +987,8 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    f. Rectangle area lights (LTC), three.js RectAreaLight equivalent.
    g. Physical material on user-built meshes (materials package), with real transmission/refraction.
    h. Projected decals.
-   i. HDR canvas output on HDR displays (with 5h.c Display P3).
+   i. HDR canvas output on HDR displays (with 5h.c Display P3). DONE: environment `ColorOutput` (`hdr: true`, `peak`) +
+      Tonemap's HDR rolloff, zero core bytes; details, proofs and limits under 5h.c.
    j. Shadows for skinned meshes and VAT crowds; IBL for VAT crowds.
    k. Sweep the remaining PARTIAL parity rows that need no core change.
    (Plus already queued: SSR, volumetrics, progressive loading, OIT, P3, tier presets 5i.b.)

@@ -465,6 +465,7 @@
     "imports": "import { Environment } from '@margoengine/environment';",
     "exports": [
       "ColorBackground",
+      "ColorOutput",
       "Environment",
       "EnvironmentBackground",
       "EnvironmentLighting",
