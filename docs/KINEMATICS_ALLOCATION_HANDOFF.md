@@ -8,7 +8,60 @@ Fix the Light Keeper robot demo and its optional packages until sustained, warme
 
 The objective remains **active and incomplete**. The recorded constraints-demo stalls have been corrected for the tested trajectories. The robot still allocates and triggers GC in measured captures.
 
-The tested robot checkpoint is now [live on margoengine.com](https://margoengine.com/demos/light-keeper/), production `feeb64de-fa35-4f9b-b66c-f2952a80f0b7`, source `ca5194b`, preview `37bcc883`. It includes the near-face/cross-body eye fix and retains the resting-hand model repair. All **192 public files** were verified after publishing, including 191 unchanged baseline files and all 24 old workshop assets. See [LIGHT_KEEPER_DEPLOYMENT.md](LIGHT_KEEPER_DEPLOYMENT.md) for exact release identities, snapshot hashes, historical hand-release evidence and future deployment procedure.
+The tested robot checkpoint is [live on margoengine.com](https://margoengine.com/demos/light-keeper/), production `f084db7e-b09c-4a8d-af0c-40c1102ef61a`, source `00f0afa`, preview `8de68f47`. It explicitly selects the verified optional Animator writer and Stats pass layout, retains the torso writer, near-face/cross-body eye fix and repaired hand, and keeps the PBR uniform cache reverted. All **193 public files** were verified, with 192 baseline files and all 25 old workshop assets preserved. See [LIGHT_KEEPER_DEPLOYMENT.md](LIGHT_KEEPER_DEPLOYMENT.md) for exact release identities and hashes. The earlier eye-only release `feeb64de` / `ca5194b` is historical evidence below.
+
+### Current deployed build and remaining allocation
+
+The exact production snapshot is `test-results/light-keeper-allocation-live/site`,
+195 files / 193 public. Manifest SHA256 is
+`c1bdc9ebfcae40b230b2663c91610440925dd03775a49cf5eaea7bf2c971f5a4`;
+build-report SHA256 is
+`77644be41feca130533b6dbeae36d3735386615ac06ad6537945a8b1792fe5e7`.
+All public files, canonical route, homepage/Tokyo references, old assets and
+404/`no-store` behavior passed full verification and an independent audit.
+An immediate first probe saw the new entry return 404; the full repeat passed
+193/193, and the failed initial report remains archived. The actual hosted
+workshop was reloaded and checked in the in-app browser; screenshot is
+`production-browser.png` in the same folder.
+
+The final source passed 178/178 selected tests, API checks, 85-buffer/83,968-byte
+native GPU parity, and eight hardware motion cases / fourteen transitions /
+653 published samples with no reported arm/head safety failures, stalled chase
+or browser errors. Interrupted motion checks used conservative reflection
+fallbacks (532/928 reused), while sustained captures below achieved full reuse.
+The build is 707,441 raw / 238,909 gzip JS bytes; core plus stage remains 19,999.
+
+The exact deployed bytes were measured locally on Edge155 / RTX A6000 with
+30 seconds warmup and approximately 30 seconds measured per phase:
+
+| Phase | Sampled MB/s | Minor / major GC | Maximum observed GC slice ms | p95 RAF callback ms | Reflection reuse |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Idle | 0.508865 | 20 / 4 | 1.401 | 2.430 | 818 / 818 |
+| Continuous torso drag | 0.730686 | 27 / 3 | 1.735 | 6.181 | 762 / 762 |
+
+All named GC slices were on `CrRendererMain`; de-nesting did not change counts.
+The queue writer remained native, source hashes stayed fixed, measured drag
+issued 938 trusted commands, and no sampled pose failed safety checks. This is
+an observation of the final build, not an isolated causal comparison with older
+releases. RAF callback duration is not the complete CPU/GPU frame budget.
+Report: `skinning-ik-profile-stats-animator-final-production.json`; compact audit:
+`stats-animator-final-phase-summary.json`, both under ignored `test-results/`.
+**GC remains and the objective is not complete.**
+
+An isolated hidden-sourcemap rebuild matched all seventeen executed JS chunks
+byte-for-byte before mapping the current capture; ten code chunks have maps.
+Largest directly mapped idle/drag source groups in sampled bytes are Stats
+2,661,272/2,443,920; core renderer 2,099,548/1,906,292; core engine
+1,603,356/1,740,608; demo main 1,243,684/1,718,980; hidden GPU audit
+1,214,240/1,225,436; SSAO 739,288/792,632; and probes 549,092/544,608.
+Kinematics constraints accounts for 771,180 directly mapped drag bytes.
+6,351,628 drag bytes remain unmapped. These are source/function-stack weights,
+not object-type censuses or proof that unmapped bytes are browser-native.
+Evidence: `test-results/final-allocation-source-map/`, including
+`exact-hash-proof.json`, `allocation-source-attribution.json` and README.
+Next, inspect the measured hidden-audit publication and pass-tracking sites
+without weakening numerical guards, removing visible heap telemetry, or
+attributing all remaining pressure to native resources.
 
 Two different demos are involved:
 
@@ -19,7 +72,7 @@ An allocation change in one demo does not establish the behavior of the other.
 
 The reported near-face eye bug is fixed for the tested reproductions and live release. Arm candidates previously remained acceptable when the head found a collision-free rotation looking away from the orb; the captured live pointer case reached **103.46 degrees** of optical error. The demo now conditions requested targets against a moving head-pivot gaze workspace and uses bounded waypoints to avoid inward chase chords and recovery latching. The existing demo `HeadAim`, public package API and numerical guards are unchanged; existing head/orb/armor checks remain active. This is a demo adapter policy, not a new public package capability.
 
-### Current eye release: evidence and limits
+### Previous eye release: evidence and limits
 
 The exact deployed snapshot is `test-results/light-keeper-eye-live/site`: **194 files / 192 public**. Manifest SHA256: `f3d62c5867e43b67ed95f2bb5d40f5b704c4ac31802312d2e2d90a2c4faa2595`; final build-report SHA256: `1ea983041bcf3d3ac87d0ee073c252ce3bc4ed0a50a551d76ca87dd8af5e0778`. Only the nested workshop HTML/report replace baseline files; the new hashed entry script is added. Homepage, Tokyo, old assets and Cloudflare configuration remain intact. All public hashes/status/MIME, the canonical route and missing-asset 404/`no-store` behavior passed independent checks. Reports: `test-results/light-keeper-eye-live/production-verification.json`, `production-independent-audit.json` and `production-deployment-metadata.json`.
 
@@ -29,7 +82,7 @@ Validation passed **135/135 full robot tests before the final workspace-only opt
 
 The gaze workspace is a necessary proxy bound and retains posed mesh checks; it does not guarantee exact gaze for every travel-limited or behind-head target. Waypoint step limits exclude torso/base motion, and discrete poses/sampled chords are not actuator certification or swept-volume CCD.
 
-### Current production-build allocation baseline
+### Eye-release production-build baseline (historical)
 
 After the eye release, the exact **703,335 raw / 237,609 gzip JS-byte** production build was profiled on Edge 155 / NVIDIA RTX A6000, with 30 seconds of warmup and approximately 30 seconds of measurement per phase. Report: `test-results/skinning-ik-profile-gaze-repair-production-idle-drag.json`.
 
@@ -69,9 +122,9 @@ The torso commit subtree sampled approximately **1.790 MB** in each baseline dra
 | Prior robot performance checkpoint | f33e094 |
 | Core + stage freeze | No new features; combined gzip must remain strictly below 20,000 bytes |
 | Latest verified core + stage size | **19,999 gzip bytes** |
-| Latest public API check | **166 entries / 1,548 exports unchanged** |
+| Latest public API check | **166 entries / 1,548 exports; new optional Stats/Animator fields explicitly recorded** |
 
-The prior robot allocation code/test checkpoint is committed and pushed as **6794863** on **codex/skinning-ik**. It includes the Animation native-writer/backing-store guards, environment output identity retention, explicit demo-owned head writer, and additional unconditional PBR writer regressions. The current live source is **ca5194b**. The experimental PBR uniform cache remains reverted. These changes do not establish zero-GC operation.
+The prior robot allocation code/test checkpoint is committed and pushed as **6794863** on **codex/skinning-ik**. It includes the Animation native-writer/backing-store guards, environment output identity retention, explicit demo-owned head writer, and additional unconditional PBR writer regressions. Current live source is **00f0afa**, including package commits **9d3ae37** (Stats) and **4d0316c** (Animator). The experimental PBR uniform cache remains reverted. These changes do not establish zero-GC operation.
 
 Preserve unrelated untracked documents, including docs/NEXT_DEMO_HANDOFF.md and docs/package-opinion.md. Large diagnostic recordings and reports live in ignored test-results folders. Only compact numerical regression fixtures are tracked.
 
@@ -735,7 +788,7 @@ From the robot checkout:
 
     node scripts/api-report.js
     node scripts/build-skinning-ik.mjs
-    node test-results/verify-native-upload-caches.mjs --label=native-upload-cache-proof --port=5259 --frames=120
+    node test-results/verify-native-animation-upload.mjs --label=native-animation-upload-proof --port=5259 --frames=120
     node scripts/profile-skinning-ik.js --label=native-cache-production --scene-url=http://127.0.0.1:5192/ --phases=default,torso-pointer-drag --duration-ms=12000 --warmup-ms=15000
     node scripts/profile-skinning-ik.js --label=native-cache-source --phases=default,torso-pointer-drag --duration-ms=12000 --warmup-ms=15000
     node test-results/profile-native-upload-ablation.mjs
@@ -746,7 +799,7 @@ Use fresh report labels for further captures. Keep source/dist frozen and avoid 
 
 The user requested an immediate commit/push checkpoint, followed by continued work, and then the rebuilt production drag allocation/GC results.
 
-The current eye-fix source **ca5194b** is pushed and live as **feeb64de**, with the resting-hand repair retained. Its CPU/size, native GPU bytes, sampled hardware motion and full public-file deployment checks passed as detailed above. The fresh production-build idle/drag capture is recorded near the top of this document; its 0.784223 / 1.067418 MB/s rates still include GC and do not establish an allocation-free end state. Descriptor batching in Stats was measured and rejected. The constraints lab remains on the committed contact-reach-3 controller; both saved complete trajectories replay hold-free. Allocation-driven GC remains in the latest measured capture and the overall goal is active.
+Current source **00f0afa** is pushed and live as **f084db7e**, with the eye and hand repairs retained. The current 0.508865 / 0.730686 MB/s idle/drag observations still include GC. Default package setter/pass semantics remain intact; this demo explicitly selects the new optional Animator/Stats paths. Current tests, native buffer parity, sampled hardware motion, complete public-file deployment verification and remaining mapped stacks are recorded near the top. Stats descriptor batching and the target-only unused-norm experiment remain reverted. The constraints lab remains on contact-reach-3; both saved trajectories replay hold-free. Allocation-driven GC remains and the overall goal is active.
 
 The user explicitly requested an immediate commit/push checkpoint even with unfinished work, followed by continued testing. Preserve that incomplete allocation status; do not present the current release's pointer sample or reflection reuse count as a sustained allocation benchmark. Large raw traces and diagnostic harnesses remain in ignored local test-results folders.
 

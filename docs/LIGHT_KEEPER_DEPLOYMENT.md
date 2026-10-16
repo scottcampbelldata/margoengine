@@ -2,12 +2,76 @@
 
 Published 2026-10-16 to [margoengine.com/demos/light-keeper/](https://margoengine.com/demos/light-keeper/), with a link from the homepage.
 
-## Deployment identity
+## Current allocation checkpoint
+
+Production is `f084db7e-b09c-4a8d-af0c-40c1102ef61a`
+([immutable URL](https://f084db7e.margoengine.pages.dev/demos/light-keeper/)),
+with preview `8de68f47-01ff-4d48-a689-7eb3caf8737d`. Both use source
+`00f0afac0a99fdf527e22d141a79b5cd01d21450`, pushed on `codex/skinning-ik`.
+The production branch label remains `main`; this direct upload does not merge
+Git branches or publish packages to npm. It retains the eye fix and repaired
+resting hand described below.
+
+This release explicitly selects the optional Stats native-pass layout and
+Animator rotation writer. Package defaults preserve their previous setter/pass
+behavior; the new optional API fields and reflective limitations are documented
+in their packages and API reports. These changes do not add core/stage features.
+The earlier experimental PBR uniform cache remains reverted.
+
+The exact snapshot is `test-results/light-keeper-allocation-live/site`:
+**195 files / 193 public files**, manifest SHA256
+`c1bdc9ebfcae40b230b2663c91610440925dd03775a49cf5eaea7bf2c971f5a4`.
+Build-report SHA256 is
+`77644be41feca130533b6dbeae36d3735386615ac06ad6537945a8b1792fe5e7`.
+It preserves 192 baseline files, including all 25 former workshop assets,
+homepage, Tokyo and platform configuration. Only the nested workshop HTML/report
+replace existing files; the new entry script is added and no files are deleted.
+The entry is `assets/skinning-ik-BFVAOjcKHE.js`, 525,711 bytes, SHA256
+`19cd83e29e3e8f289db5d5cf5977761f84bf46f612f19a7947ffa738f9ed6171`.
+
+Preview and production passed full HTTPS checks of all 193 public files:
+status, size, SHA256, MIME, canonical route, homepage/Tokyo references and missing
+asset 404/`no-store`. The first immediate production probe saw a 404 for the new
+entry while the new HTML was already available; that failed report is archived.
+The complete repeat and independent fresh audit both pass. No failed first
+probe is reported as a pass. Evidence and sanitized deployment metadata are in
+`test-results/light-keeper-allocation-live/`; the actual production workshop was
+also reloaded and visually checked in the in-app browser. Screenshot:
+`production-browser.png`.
+
+Validation passed 178/178 selected package/robot tests, API checks, bit-exact
+CPU/GPU comparisons of 85 buffers / 83,968 bytes, and the final standalone
+eight-case motion suite with 14 transitions and 653 published samples. All
+reported arm/head guards passed; maximum grip error was approximately 47.4 nm.
+No browser errors or measured unmoving chase occurred. The interrupted/toggled
+motion suite recorded 532/928 reflection reuses with conservative fallbacks;
+their causes were not classified. This is not every-frame swept certification.
+
+The deployed build is **707,441 raw / 238,909 gzip JS bytes**, 103 runtime modules
+and 21,716,983 scene-asset bytes. Frozen core plus stage remains **19,999 gzip
+bytes**. A fresh local hardware capture of these exact deployed bytes used
+30 seconds warmup and approximately 30 seconds measured per phase:
+
+| Phase | Sampled MB/s | Minor / major GC | Maximum observed GC slice ms | p95 RAF callback ms | Reflection repeats reused |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Idle defaults | 0.508865 | 20 / 4 | 1.401 | 2.430 | 818 / 818 |
+| Continuous torso drag | 0.730686 | 27 / 3 | 1.735 | 6.181 | 762 / 762 |
+
+All named GC spans were on `CrRendererMain`, with no nested named duplicates
+changing the counts. Native queue-writer identity stayed unchanged, source
+hashes stayed frozen, and measured drag issued 938 trusted commands. RAF callback
+duration is not a complete frame CPU budget or GPU completion measurement.
+These final-build observations are not a controlled comparison against the
+older release below. The separate frozen A/B/A and Node attribution evidence
+is recorded in [KINEMATICS_ALLOCATION_HANDOFF.md](KINEMATICS_ALLOCATION_HANDOFF.md).
+**GC remains; the zero-GC objective is active and incomplete.**
+
+## Previous eye release identity (superseded)
 
 - Cloudflare Pages project: `margoengine`; production branch label: `main`; direct upload, not Git-triggered.
 - Production deployment: `feeb64de-fa35-4f9b-b66c-f2952a80f0b7`, https://feeb64de.margoengine.pages.dev.
 - Tested preview deployment: `37bcc883-db76-4a68-ab21-8f2c87d45f45`, https://37bcc883.margoengine.pages.dev.
-- Current source checkpoint: `ca5194b344d4742d43fd5ae5c31a5bf23036bbe2`, pushed on `codex/skinning-ik`; prior allocation checkpoint: `6794863`; source build integration: `6be773c`.
+- Eye-fix source checkpoint: `ca5194b344d4742d43fd5ae5c31a5bf23036bbe2`, pushed on `codex/skinning-ik`; prior allocation checkpoint: `6794863`; source build integration: `6be773c`.
 - Initial workshop deployment: `8d0427c6`, based on `347259f8`, including the Tokyo model update. It added the workshop folder and homepage link. The current eye release retains the resting-hand repair and all previous public files except the intentionally replaced nested workshop HTML/build report.
 - Exact deployed snapshot: `C:/Users/ScottCampbell/.codex/worktrees/skinning-ik/margoengine/test-results/light-keeper-eye-live/site`.
 - Full snapshot manifest SHA256: `f3d62c5867e43b67ed95f2bb5d40f5b704c4ac31802312d2e2d90a2c4faa2595`.
@@ -15,7 +79,7 @@ Published 2026-10-16 to [margoengine.com/demos/light-keeper/](https://margoengin
 
 The snapshot contains **194 files: 192 public files and two Cloudflare configuration files**. Relative to the hand-release baseline it retains 191 files unchanged, replaces the workshop HTML/build report, and adds the new hashed entry script. All 24 old workshop assets remain available. The homepage, Tokyo, `_headers`, `_redirects` and `404.html` remain unchanged. The retained repaired model is 19,957,608 bytes, within the Pages per-file limit. Asset licenses are included. Previous exact snapshots remain in `test-results/light-keeper-live/site` and `test-results/light-keeper-hand-live/site`.
 
-## Verification
+## Previous eye release verification
 
 Both current preview and production passed full HTTPS verification of all **192 public files**: status, byte count, SHA256 and MIME. The homepage and canonical workshop route match their expected HTML, Tokyo's model/script references remain intact, and a missing asset returns 404 with `no-store`. Evidence is under `test-results/light-keeper-eye-live/`: `preview-verification.json`, `production-verification.json`, `production-independent-audit.json` and `production-deployment-metadata.json`. The independent audit confirms all 191 retained baseline files and all 24 old workshop assets. Sanitized deployment metadata confirms production `feeb64de`, branch `main`, source `ca5194b`.
 
@@ -25,7 +89,7 @@ The final standalone build measures **703,335 raw JS bytes / 237,609 gzip bytes*
 
 This release is not a zero-GC claim. A fresh capture of this exact production build used 30 seconds of warmup and approximately 30 seconds of measurement per phase on Edge 155 / NVIDIA RTX A6000. Idle sampled **0.784223 MB/s**, 28 minor/three major GCs, a **2.759 ms** peak observed GC pause and **2.655 ms** p95 RAF callback wall time. Continuous torso drag sampled **1.067418 MB/s**, 22 minor/four major GCs, a **3.713 ms** peak pause and **6.877 ms** p95 RAF callback wall time. Reflection reuse was 344/344 idle and 346/346 drag, with 938 trusted pointer moves during measured drag. Browser errors and source changes were empty. Report: `test-results/skinning-ik-profile-gaze-repair-production-idle-drag.json`.
 
-These are current baseline observations, not a controlled performance comparison against the older pre-hand/pre-eye capture or proof that either visual fix reduced allocation. GC remains and the allocation objective is active and incomplete. Detailed evidence and limits are in [KINEMATICS_ALLOCATION_HANDOFF.md](KINEMATICS_ALLOCATION_HANDOFF.md).
+These are historical eye-release baseline observations, not a controlled performance comparison against the older pre-hand/pre-eye capture or proof that either visual fix reduced allocation. GC remains and the allocation objective is active and incomplete. Detailed evidence and limits are in [KINEMATICS_ALLOCATION_HANDOFF.md](KINEMATICS_ALLOCATION_HANDOFF.md).
 
 ## Near-face and cross-body eye tracking
 
