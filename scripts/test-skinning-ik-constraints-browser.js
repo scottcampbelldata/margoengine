@@ -27,12 +27,12 @@ const separation = (a, b) => Math.hypot(...a.map((value, i) => value - b[i]));
 let referenceLengths;
 
 async function metrics() {
-  return app.page.evaluate(() => JSON.parse(document.querySelector('#viewport').dataset.metrics));
+  return app.page.evaluate(() => JSON.parse(document.querySelector('#viewport').readWorkshopDiagnostics('metrics')));
 }
 async function frames(count) {
   const before = await metrics();
   await app.page.waitForFunction((minimum) => {
-    const text = document.querySelector('#viewport').dataset.metrics;
+    const text = document.querySelector('#viewport').readWorkshopDiagnostics('metrics');
     return text && JSON.parse(text).animationFrames >= minimum;
   }, before.animationFrames + count);
   return metrics();
@@ -145,7 +145,7 @@ try {
     await app.page.locator('#viewport').getAttribute('data-constraint-solver'),
     '@margoengine/kinematics-constraints',
   );
-  await app.page.waitForFunction(() => document.querySelector('#viewport').dataset.metrics);
+  await app.page.waitForFunction(() => typeof document.querySelector('#viewport').readWorkshopDiagnostics === 'function');
   await app.page.locator('details.advanced > summary').click();
   for (const id of ['idle', 'moving-light', 'look', 'autopilot', 'follow']) await app.page.locator(`#${id}`).uncheck();
   const home = validate(await frames(12), 'home');
@@ -191,7 +191,7 @@ try {
       await frames(6);
       await app.page.waitForFunction(
         (expected) => {
-          const value = JSON.parse(document.querySelector('#viewport').dataset.metrics);
+          const value = JSON.parse(document.querySelector('#viewport').readWorkshopDiagnostics('metrics'));
           const distance = (point) => Math.hypot(...point.map((coordinate, i) => coordinate - expected[i]));
           return (
             distance(value.desiredOrb) < 2e-6 &&
@@ -262,11 +262,30 @@ try {
     eyeSamples.push({
       pose,
       metrics: value,
-      independentlyMeasured: validateEyes(value, `eye aim ${pose}`, pose === 'home' || pose === 'front'),
+      independentlyMeasured: validateEyes(value, `eye aim ${pose}`),
+    });
+  }
+  // The fixed-frame samples above deliberately interrupt movement. In the
+  // existing back-to-home route the hand may still be near the waist after
+  // eighteen frames; strict endpoint gaze belongs to the settled target.
+  const settledEyes = [];
+  for (const pose of ['home', 'front']) {
+    await app.page.locator(`[data-pose="${pose}"]`).click();
+    const before = await metrics();
+    await app.page.waitForFunction((previousFrame) => {
+      const value = JSON.parse(document.querySelector('#viewport').readWorkshopDiagnostics('metrics'));
+      return value.animationFrames > previousFrame && value.targetMotion.settled && !value.targetMotion.routing &&
+        Math.abs(value.torso.yaw - value.torso.desiredYaw) < 5e-5;
+    }, before.animationFrames, { timeout: 6000 });
+    const value = validate(await metrics(), `settled eye aim ${pose}`);
+    settledEyes.push({
+      pose,
+      metrics: value,
+      independentlyMeasured: validateEyes(value, `settled eye aim ${pose}`, true),
     });
   }
   await app.page.waitForFunction(() => {
-    const value = JSON.parse(document.querySelector('#viewport').dataset.metrics);
+    const value = JSON.parse(document.querySelector('#viewport').readWorkshopDiagnostics('metrics'));
     return Math.abs(value.torso.yaw - value.torso.desiredYaw) < 5e-8;
   });
   const eyeBefore = validate(await frames(6), 'settled eye aim'),
@@ -276,7 +295,7 @@ try {
     separation(eyeBefore.head.forward, eyeAfter.head.forward) < 1e-6,
     'Stationary and reflection updates must not accumulate head rotation',
   );
-  report.cases.push({ name: 'optical-eye-aim', samples: eyeSamples, stationaryAfter: eyeAfter });
+  report.cases.push({ name: 'optical-eye-aim', samples: eyeSamples, settled: settledEyes, stationaryAfter: eyeAfter });
   await app.page.locator('#look').uncheck();
 
   await app.page.locator('[data-pose="back"]').click();
@@ -299,7 +318,7 @@ try {
   await app.page.mouse.move(start.x, start.y);
   await app.page.mouse.down();
   await app.page.waitForFunction(
-    () => JSON.parse(document.querySelector('#viewport').dataset.metrics).dragging === true,
+    () => JSON.parse(document.querySelector('#viewport').readWorkshopDiagnostics('metrics')).dragging === true,
     null,
     { timeout: 3000 },
   );
@@ -382,7 +401,7 @@ try {
 
   const beforeReflections = validate(await frames(6), 'before reflection cadence');
   await app.page.waitForFunction((previous) => {
-    const value = JSON.parse(document.querySelector('#viewport').dataset.metrics);
+    const value = JSON.parse(document.querySelector('#viewport').readWorkshopDiagnostics('metrics'));
     return value.reflections >= previous + 2;
   }, beforeReflections.reflections);
   const afterReflections = validate(await metrics(), 'after reflection cadence');
@@ -399,7 +418,7 @@ try {
   await app.page.locator('#auto-ik').uncheck();
   const frozen = validate(await frames(6), 'manual pose before reflections');
   await app.page.waitForFunction(
-    (previous) => JSON.parse(document.querySelector('#viewport').dataset.metrics).reflections >= previous + 2,
+    (previous) => JSON.parse(document.querySelector('#viewport').readWorkshopDiagnostics('metrics')).reflections >= previous + 2,
     frozen.reflections,
   );
   const still = validate(await metrics(), 'manual pose after reflections');

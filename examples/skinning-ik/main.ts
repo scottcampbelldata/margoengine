@@ -27,6 +27,7 @@ import { PoseUpdateOrder, PresentedPoseSnapshot, ProbePoseReuse } from './probe-
 import { mapArmControl, nearestArmControlParameter, type ArmControl } from './arm-controls';
 import { ArmControlRoute } from './arm-control-route';
 import { attachGPUAudit } from './gpu-audit';
+import { attachWorkshopDiagnostics } from './diagnostics';
 import { showShadowDebug } from './shadow-debug';
 import { workshopShadowPoints } from './shadow-bounds';
 
@@ -444,6 +445,7 @@ try {
     frames: 0,
     animationFrames: 0,
     poseUpdates: 0,
+    sampleIndex: 0,
     reflections: 0,
     probePose: { attempts: 0, reused: 0, fallback: 0 },
     shadowDraws: 0,
@@ -473,6 +475,49 @@ try {
     },
     performance: { frameMs: 0, p95Ms: 0, probeEncodeMs: 0, probeTotalMs: 0 },
   };
+  const readMetrics = () => {
+    metrics.residual = residual;
+    metrics.gripError = Math.hypot(
+      heldPosition[0] - actualGrip[0], heldPosition[1] - actualGrip[1], heldPosition[2] - actualGrip[2],
+    );
+    metrics.targetMotion.settled = targetMotion.settled && (!controlRoute.active || controlRoute.settled);
+    metrics.targetMotion.routing = controlRoute.active && !controlRoute.settled;
+    metrics.frames = frameCount;
+    metrics.animationFrames = animationFrames;
+    metrics.poseUpdates = poseUpdates;
+    // The old DOM publication ran every sixth render, including probe renders.
+    metrics.sampleIndex = Math.floor(frameCount / 6);
+    metrics.reflections = reflectionCount;
+    metrics.probePose.attempts = probePoseReuse.counters.attempts;
+    metrics.probePose.reused = probePoseReuse.counters.reused;
+    metrics.probePose.fallback = probePoseReuse.counters.fallback;
+    metrics.shadowDraws = shadows.stats.dynamicDraws;
+    for (let i = 0; i < 3; i++) metricTarget[i] = desiredPosition[i] - (heldPosition[i] - wristPosition[i]);
+    metrics.camera = stage.engine.camera.position;
+    metrics.cameraTarget = stage.engine.camera.target;
+    for (let i = 0; i < 4; i++) metrics.light[i] = runtime.lighting.direction[i];
+    metrics.dragging = !!drag.dragging || transform.dragging;
+    metrics.orbitEnabled = orbit.enabled;
+    metrics.animationTime = animator.time;
+    metrics.arm.bodyContact = bodyContact;
+    metrics.arm.safe = enforced.safe;
+    metrics.torso.yaw = torsoAim.yaw;
+    metrics.torso.desiredYaw = torsoAim.desiredYaw;
+    worldPositionInto(head, metricHead);
+    metrics.head.limited = headAim.limited;
+    metrics.head.angle = headAim.angle;
+    metrics.head.rayError = headAim.rayError;
+    metrics.head.rayDistance = headAim.rayDistance;
+    metrics.head.clearanceResolved = headAim.clearanceResolved;
+    metrics.head.headClearance = headAim.headClearance;
+    metrics.head.targetConditioned = gazeConditioned;
+    metrics.performance.frameMs = frameMs;
+    metrics.performance.p95Ms = p95Ms;
+    metrics.performance.probeEncodeMs = probeEncodeMs;
+    metrics.performance.probeTotalMs = probeTotalMs;
+    return metrics;
+  };
+  let diagnosticPublication: ReturnType<typeof attachWorkshopDiagnostics> | undefined;
   const syncSliders = () => {
     runtime.store.tick(false);
     const p = localPoint(
@@ -634,7 +679,6 @@ try {
         c = worldPositionInto(wrist, wristPosition);
       residual = Math.hypot(heldOrb[0] - desiredOrb[0], heldOrb[1] - desiredOrb[1], heldOrb[2] - desiredOrb[2]);
       gripPosition(wrist, localGrip, actualGrip);
-      const gripError = Math.hypot(heldOrb[0] - actualGrip[0], heldOrb[1] - actualGrip[1], heldOrb[2] - actualGrip[2]);
       bones.visible = checkbox('show-rig').checked;
       if (bones.visible) {
         bonePoints.set(a);
@@ -672,42 +716,7 @@ try {
         if (state.textContent !== stateText) state.textContent = stateText;
         const distanceText = residual > 0.012 ? (residual * 100).toFixed(1) + ' cm to target' : 'Grip secure';
         if (distance.value !== distanceText) distance.value = distanceText;
-        metrics.residual = residual;
-        metrics.gripError = gripError;
-        metrics.targetMotion.settled = targetMotion.settled && (!controlRoute.active || controlRoute.settled);
-        metrics.targetMotion.routing = controlRoute.active && !controlRoute.settled;
-        metrics.frames = frameCount;
-        metrics.animationFrames = animationFrames;
-        metrics.poseUpdates = poseUpdates;
-        metrics.reflections = reflectionCount;
-        metrics.probePose.attempts = probePoseReuse.counters.attempts;
-        metrics.probePose.reused = probePoseReuse.counters.reused;
-        metrics.probePose.fallback = probePoseReuse.counters.fallback;
-        metrics.shadowDraws = shadows.stats.dynamicDraws;
-        for (let i = 0; i < 3; i++) metricTarget[i] = desiredOrb[i] - (heldOrb[i] - c[i]);
-        metrics.camera = stage.engine.camera.position;
-        metrics.cameraTarget = stage.engine.camera.target;
-        for (let i = 0; i < 4; i++) metrics.light[i] = runtime.lighting.direction[i];
-        metrics.dragging = !!drag.dragging || transform.dragging;
-        metrics.orbitEnabled = orbit.enabled;
-        metrics.animationTime = animator.time;
-        metrics.arm.bodyContact = bodyContact;
-        metrics.arm.safe = contact.safe;
-        metrics.torso.yaw = torsoAim.yaw;
-        metrics.torso.desiredYaw = torsoAim.desiredYaw;
-        worldPositionInto(head, metricHead);
-        metrics.head.limited = headAim.limited;
-        metrics.head.angle = headAim.angle;
-        metrics.head.rayError = headAim.rayError;
-        metrics.head.rayDistance = headAim.rayDistance;
-        metrics.head.clearanceResolved = headAim.clearanceResolved;
-        metrics.head.headClearance = headAim.headClearance;
-        metrics.head.targetConditioned = gazeConditioned;
-        metrics.performance.frameMs = frameMs;
-        metrics.performance.p95Ms = p95Ms;
-        metrics.performance.probeEncodeMs = probeEncodeMs;
-        metrics.performance.probeTotalMs = probeTotalMs;
-        $('viewport').dataset.metrics = JSON.stringify(metrics);
+        diagnosticPublication?.publishMetrics();
       }
       if (!reusePose) probePoseReuse.accept(contact.safe && headAim.clearanceResolved);
     },
@@ -1025,7 +1034,7 @@ try {
       encodeMs: probeEncodeMs,
       totalMs: probeTotalMs,
     };
-  const publishReflection = () => {
+  const readReflection = () => {
     reflectionMetrics.resolution = probes.resolution;
     reflectionMetrics.cadenceMs = reflectionCadenceMs;
     reflectionMetrics.position = reflectionPosition;
@@ -1033,8 +1042,14 @@ try {
     reflectionMetrics.busy = reflectionBusy;
     reflectionMetrics.encodeMs = probeEncodeMs;
     reflectionMetrics.totalMs = probeTotalMs;
-    $('viewport').dataset.reflection = JSON.stringify(reflectionMetrics);
+    return reflectionMetrics;
   };
+  const diagnostics = attachWorkshopDiagnostics(
+    $('viewport'), readMetrics, readReflection,
+    new URLSearchParams(location.search).get('diagnostics') === 'legacy',
+  );
+  diagnosticPublication = diagnostics;
+  teardown.push(diagnostics.dispose);
   const finalReflection = () => {
     reflectionFrame = 0;
     void refresh();
@@ -1085,7 +1100,7 @@ try {
         probePoseReuse.end();
       }
       probeEncodeMs = performance.now() - started;
-      publishReflection();
+      diagnostics.publishReflection();
       await bakeJob;
       probeTotalMs = performance.now() - started;
       gpuAudit.mark('reflection-complete', probeTotalMs);
@@ -1096,7 +1111,7 @@ try {
       reflectionBusy = false;
       bakeJob = undefined;
       if (!stopped) {
-        publishReflection();
+        diagnostics.publishReflection();
         if (reflectionFinalRequested) queueFinalReflection();
       }
     }

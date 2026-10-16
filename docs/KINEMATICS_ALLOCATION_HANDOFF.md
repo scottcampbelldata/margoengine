@@ -100,6 +100,131 @@ The visible heap graph stays enabled and GC remains unresolved. Next, test
 on-demand publication of the separate hidden pose/reflection telemetry; no
 visible UI or mathematical guard should be removed for that experiment.
 
+### Stats timestamp descriptor attribution: measured, no runtime change
+
+An isolated native WebGPU test compared cached complete descriptors against the
+exact Stats spread expression, using the same timestamp records, attachments,
+GPU work and bounded submissions. Each of seven warmed phases executed 8,192
+render/compute pairs, with 32 pairs per encoder. The initial cached complete
+descriptors were frozen while spread results were mutable, so a separate repeat
+matched integrity levels with ordinary mutable cached complete descriptors.
+Both original and corrected artifacts are retained.
+
+In that corrected fixture, cached complete timestamp descriptors sampled
+32.03–34.03 total bytes per pair versus 108.52–111.28 for fresh spread copies;
+the mean difference was 76.874 sampled bytes per pair. Cached encoding took
+16.2–17.0 ms versus 17.0–18.0 ms per 8,192 pairs; this small isolated experiment
+does not establish a production CPU improvement. Raw no-timestamp controls
+remained close to cached timestamp allocation. All 69,635 expected GPU
+dispatches, the rendered pixel, and 128 nonzero nondecreasing query timestamps
+passed; source changes and page/GPU errors were empty.
+
+This isolates descriptor-construction cost for these plain native fixtures.
+It does not attribute all production `beginRender`/`beginCompute` bytes to the
+spread expression. Production samples selected encoders and skips busy
+readbacks; the existing artifacts do not record the actual number of injected
+descriptor copies. No production byte-rate estimate was invented from the
+one-in-fifteen selection interval. Timestamp-write records are already pooled,
+and default/custom factory getter, identity, retention and failure semantics
+still constrain any replacement. **No package API or runtime cache was added.**
+
+Corrected report: `native-stats-timestamp-descriptor-plain-cache-control.json`;
+summary: `stats-timestamp-descriptor-attribution-summary.json`, under ignored
+`test-results/`. The initial frozen-cache report and all fourteen heap profiles
+remain alongside them. Separately, the final MSAA-resolve descriptor remains an
+explicit core allocation, but retaining it has no proven compatibility/size
+fit under the frozen 20,000-byte gate; no core change was made.
+
+### On-demand pose/reflection diagnostics: retained, publication pending
+
+The demo now exposes the private inspection method
+`viewport.readWorkshopDiagnostics('metrics' | 'reflection')`, returning an owning
+JSON string only when requested. Default operation no longer publishes recurring
+`data-metrics` / `data-reflection` strings. The visible status, distance, Stats,
+heap/GPU graphs and their existing update cadence remain active. This is a
+demo diagnostic contract change, not a new kinematics capability or package API.
+`?diagnostics=legacy` retains automatic publication for compatibility/comparison.
+The separate hidden GPU audit remains enabled after its rejected experiment.
+
+The helper's default publication calls perform no provider, serialization or DOM
+publication work. Requests may allocate; parsed results cannot mutate live
+transforms. Disposal releases providers, disables retained readers and restores
+owned prior properties/attributes without deleting later external replacements.
+The three diagnostic browser scripts now request snapshots explicitly; the
+motion suite's test-owned RAF reader deduplicates by six-render group and real
+animation frame. Those test requests are excluded from unattended-allocation
+claims. The durable source profiler also fingerprints the new helper.
+
+Validation so far: 13 focused tests, four source/standalone × default/legacy
+browser cases, 202 synchronous requests per source mode with no ticks/renders,
+unchanged revisions and bit-identical 21 transform-store views, and eight
+standalone motion cases / fourteen transitions / 639 samples. API reports still
+match 166 entries / 1,548 exports. The build is 708,879 raw / 239,411 gzip JS
+bytes, 104 modules, unchanged scene assets and 19,999 gzip core-plus-stage bytes.
+The broader eye regression exposed a pre-existing test timing assumption:
+its final Home assertion ran eighteen real frames after Back, while routing was
+still active. Exact-prefix default and legacy reproductions, plus the original
+`00f0afa` standalone using the archived original-API script, all reproduced the
+limited transit state (about 1.1001 radians optical error) and then precise,
+unclamped settled gaze (roughly 6e-8–1.3e-7 radians) after another 55–60 reported
+real frames. The arm stayed safe and head clearance remained positive. All
+seventeen original executable hashes were verified. Those are observed sampled
+states, not every-frame or universal recovery guarantees. The test-only
+correction retains the five fixed-frame transient checks and separately requires
+bounded settled Home/Front precise, unclamped aim, using target/route/torso
+convergence rather than head error as the settling criterion. The full corrected
+suite passes thirteen browser cases, all 63 slider samples, five interrupted
+eye samples, two strict settled eye checks plus the stationary check, and sixteen
+trusted torso-drag samples. Manual hold and reflection checks pass, errors and
+resource errors are empty, and all seventeen standalone executable hashes remain
+unchanged. No runtime eye or motion guard was weakened. Reports and all three
+exact reproductions are preserved in `on-demand-diagnostics/`, including
+`final-validation-summary.json` and `constraints-browser-final.json`.
+
+Two fresh-page A/B/A comparisons used the same frozen executable within each
+comparison, 30 seconds warmup and approximately 30 seconds measured per phase.
+Every measured drag issued 938 trusted commands. The first comparison requested
+JSON about four times a second during measurement; legacy mode returned its
+cached attribute string, whereas on-demand mode regenerated a requested snapshot:
+
+| Mode | Idle MB/s | Idle p95 callback ms | Drag MB/s | Drag p95 callback ms |
+| --- | ---: | ---: | ---: | ---: |
+| Legacy A | 0.585973 | 2.590 | 0.704344 | 6.719 |
+| On-demand | 0.563871 | 3.113 | 0.839798 | 7.185 |
+| Legacy B | 0.508329 | 2.137 | 0.845495 | 5.392 |
+
+That mixed result is preserved; it is not evidence of a reliable whole-scene
+benefit for frequent diagnostic readers. The second comparison moved diagnostic
+requests outside sampling, before/after each phase. Heap polling, tracing and
+heap allocation sampling remained active; it is still an instrumented capture:
+
+| Mode | Phase | MB/s | Minor / major GC | Maximum observed GC slice ms | p95 RAF callback ms | Reflections |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Legacy A | Idle | 0.660748 | 23 / 3 | 2.666 | 2.650 | 375 |
+| On-demand | Idle | 0.601728 | 21 / 4 | 2.482 | 2.677 | 321 |
+| Legacy B | Idle | 0.586828 | 22 / 3 | 2.419 | 2.805 | 304 |
+| Legacy A | Drag | 0.887941 | 28 / 3 | 3.786 | 6.486 | 342 |
+| On-demand | Drag | 0.756456 | 20 / 4 | 3.006 | 5.076 | 321 |
+| Legacy B | Drag | 0.900433 | 28 / 4 | 3.428 | 6.644 | 344 |
+
+Retain the removal of unsolicited publication: endpoint-only drag allocation
+and p95 callback duration were below both baselines. Idle savings are not
+established, frequent readers still incur work, and GC remains. Adaptive bake
+cadence differed (321 candidate drag bakes versus 342/344), so the entire rate
+difference cannot be assigned to JSON removal. Candidate drag had 1,833 real
+pose updates versus 1,843/1,842. The second comparison observes pose safety only
+at before/after endpoints; it does not provide in-window pose samples. Separate
+motion checks retain their own scope and are not CCD. RAF callback duration is
+not a complete CPU/GPU frame budget. Legacy mode reproduces the old publication
+cadence within the new implementation, not byte-identical historical source.
+
+Evidence: `test-results/on-demand-diagnostics/` contains the helper/browser/native
+proofs, `first-aba-summary.{json,md}` and `endpoint-aba-summary.{json,md}`; raw
+reports use `workshop-diag-*` labels. All 65 frozen input/executable fingerprints
+matched within each comparison, errors/source changes were empty, and the native
+queue writer was unchanged. These large local artifacts are ignored by Git.
+**The zero-GC objective remains open; this candidate is not yet deployed.**
+
 Two different demos are involved:
 
 - **Constraints lab:** http://127.0.0.1:5173/examples/kinematics-constraints.html. Its demo controller performs full-chain solve, pacing, contact recovery, and reach conditioning.
