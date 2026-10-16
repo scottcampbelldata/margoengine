@@ -1,13 +1,14 @@
 import type {Mesh as MeshHandle} from '@margoengine/core';
 import {meshRuntime,type Engine,type Mesh,type PassContext} from '@margoengine/core/extension';
 import {finiteVector} from '../../shared/math.js';
+import {meshTriangles} from '../../shared/mesh-source.js';
 import {localShadowMatrix} from './local-shadow-math.js';
 declare const GPUBufferUsage:{UNIFORM:number;STORAGE:number;COPY_DST:number};
 declare const GPUTextureUsage:{RENDER_ATTACHMENT:number;TEXTURE_BINDING:number;COPY_DST:number;COPY_SRC:number};
 type Context=Extract<PassContext,{backend:'webgpu'}>;
 export interface LocalShadowOptions {resolution?:number;maxLights?:number}
 export interface LocalLightShadow {near?:number;bias?:number;normalBias?:number}
-export interface LocalShadowPrimitive {node:Mesh;vertex:GPUBuffer;index:GPUBuffer;count:number;stride:number;alphaTexture?:GPUTextureView;alphaSampler?:GPUSampler;alpha?:number;cutoff?:number;texCoord?:number;alphaTransform?:Float32Array}
+export interface LocalShadowPrimitive {primitive?:object;node:Mesh;vertex:GPUBuffer;index:GPUBuffer;count:number;stride:number;alphaTexture?:GPUTextureView;alphaSampler?:GPUSampler;alpha?:number;cutoff?:number;texCoord?:number;alphaTransform?:Float32Array}
 export interface LocalShadowSource {shadowPrimitives?:readonly LocalShadowPrimitive[];disposed?:boolean;drawShadow?:unknown}
 interface ShadowLight {position:ArrayLike<number>;range:number;direction?:ArrayLike<number>;outerAngle?:number;shadow?:boolean|LocalLightShadow}
 interface Source {source:Mesh|LocalShadowSource;primitive?:LocalShadowPrimitive[]}
@@ -21,7 +22,7 @@ const upY=[0,1,0],upZ=[0,0,1];
 export class LocalShadowMaps {
   readonly resolution:number;readonly maxLights:number;readonly stats={passes:0,draws:0};
   private engine?:Engine;private device?:GPUDevice;private depth?:GPUTexture;private white?:GPUTexture;private whiteView?:GPUTextureView;private uniform?:GPUBuffer;private alphaSampler?:GPUSampler;
-  private views:GPUTextureView[]=[];private entries:GPUBindGroupEntry[]=[];private pipelines=new Map<number,GPURenderPipeline>();private draws=new Map<Mesh,Map<GPUBuffer,Draw>>();private sources:Source[]=[];
+  private views:GPUTextureView[]=[];private entries:GPUBindGroupEntry[]=[];private pipelines=new Map<number,GPURenderPipeline>();private draws=new Map<Mesh,Map<object,Draw>>();private sources:Source[]=[];
   private readonly values:Float32Array;private indices:number[]=[];private activeLayers:number[]=[];private matrices:Float32Array[]=[];private dirty=true;private disposed=false;private epoch=0;
   private readonly depthAttachment:GPURenderPassDepthStencilAttachment={view:undefined!,depthClearValue:1,depthLoadOp:'clear',depthStoreOp:'store'};
   private readonly depthPass:GPURenderPassDescriptor={colorAttachments:[],depthStencilAttachment:this.depthAttachment};
@@ -94,14 +95,18 @@ export class LocalShadowMaps {
     if(this.dirty){context.device.queue.writeBuffer(this.uniform!,0,this.values as Float32Array<ArrayBuffer>);this.dirty=false;}
     try{for(const layer of this.activeLayers){
       this.depthAttachment.view=this.views[layer];const pass=context.encoder.beginRenderPass(this.depthPass);this.stats.passes++;
+      const submitted=new Map<Mesh,Set<object>>();
       try{for(const record of this.sources){
         const source=record.source;let primitives:readonly LocalShadowPrimitive[];
-        if('id' in source){if(!source.geometry)continue;const buffers=this.engine!.geometryBuffers(source.geometry);if(!buffers)continue;
-          if(!record.primitive)record.primitive=[{node:source,vertex:buffers.vertex,index:buffers.index,count:source.geometry.indices.length,stride:24}];
-          const primitive=record.primitive[0];primitive.vertex=buffers.vertex;primitive.index=buffers.index;primitive.count=source.geometry.indices.length;primitives=record.primitive;
+        if('id' in source){const triangles=meshTriangles(source);if(!triangles)continue;
+          if(triangles.kind==='pbr')primitives=triangles.source.shadowPrimitives;
+          else {const geometry=triangles.geometry,buffers=this.engine!.geometryBuffers(geometry);if(!buffers)continue;
+          if(!record.primitive)record.primitive=[{node:source,vertex:buffers.vertex,index:buffers.index,count:geometry.indices.length,stride:24}];
+          const primitive=record.primitive[0];primitive.vertex=buffers.vertex;primitive.index=buffers.index;primitive.count=geometry.indices.length;primitives=record.primitive;}
         }else primitives=source.shadowPrimitives??emptyPrimitives;
         for(const primitive of primitives){const node=primitive.node;if(this.engine!.meshes.get(node.id)!==node)continue;node.check();if(node.engine!==this.engine)throw new Error('Local shadow source belongs to another engine');let visible=true;
           for(let id=node.id;id!==-1;id=this.engine!.store.parents[id])if(this.engine!.store.hidden[id]){visible=false;break;}if(!visible)continue;
+          const key=primitive.primitive??primitive.index;let indices=submitted.get(node);if(indices?.has(key))continue;if(!indices){indices=new Set();submitted.set(node,indices);}indices.add(key);
           this.draw(pass,primitive,layer);this.stats.draws++;
         }
       }}finally{pass.end();}
@@ -114,10 +119,10 @@ export class LocalShadowMaps {
     if(!Number.isInteger(p.count)||p.count<0||p.texCoord!==undefined&&p.texCoord!==0&&p.texCoord!==1||!Number.isFinite(Math.fround(p.alpha??1))||!Number.isFinite(Math.fround(p.cutoff??0)))throw new RangeError('Invalid local shadow primitive');
     const key=p.stride+(transform?1:0);let pipeline=this.pipelines.get(key);
     if(!pipeline){const module=this.device!.createShaderModule({code:depthShader(p.stride===80,!!transform)});pipeline=this.device!.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:p.stride,attributes:p.stride===80?[{shaderLocation:0,offset:0,format:'float32x4'},{shaderLocation:3,offset:48,format:'float32x4'},{shaderLocation:4,offset:64,format:'float32x4'}]:[{shaderLocation:0,offset:0,format:'float32x3'}]}]},fragment:{module,entryPoint:'fragment',targets:[]},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'less-equal'}});this.pipelines.set(key,pipeline);}
-    let records=this.draws.get(p.node);if(!records){records=new Map();this.draws.set(p.node,records);}let record=records.get(p.index);
+    const identity=p.primitive??p.index;let records=this.draws.get(p.node);if(!records){records=new Map();this.draws.set(p.node,records);}let record=records.get(identity);
     if(!record||record.vertex!==p.vertex||record.pipeline!==pipeline||record.alpha!==p.alphaTexture||record.sampler!==p.alphaSampler){
-      if(record)this.destroyDraw(record);records.delete(p.index);
-      record={faces:new Map(),values:new Float32Array(transform?44:36),vertex:p.vertex,pipeline,alpha:p.alphaTexture,sampler:p.alphaSampler,epoch:this.epoch};records.set(p.index,record);
+      if(record)this.destroyDraw(record);records.delete(identity);
+      record={faces:new Map(),values:new Float32Array(transform?44:36),vertex:p.vertex,pipeline,alpha:p.alphaTexture,sampler:p.alphaSampler,epoch:this.epoch};records.set(identity,record);
     }
     let face=record.faces.get(layer);
     if(!face){const uniform=this.device!.createBuffer({size:record.values.byteLength,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});

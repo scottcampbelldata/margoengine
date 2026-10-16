@@ -2,26 +2,27 @@ import {engineRuntime,meshRuntime} from '@margoengine/core/extension';
 import type {EngineKernel,Mesh as MeshHandle} from '@margoengine/core';
 import {Geometry,PbrMaterial,type Engine,type Mesh,type EnginePlugin,type FrameGraph} from '@margoengine/core/extension';
 import {readResponse} from '../../shared/loading.js';
-import type {PBRSource,PBRSourcePrimitive} from '../../shared/pbr-source.js';
+import {meshTriangles} from '../../shared/mesh-source.js';
+import type {PBRSourcePrimitive} from '../../shared/pbr-source.js';
 import {maxBytes,maxIndices,parseCADGeometry,fingerprint,hash} from './cad-parser.js';
 import {parseCADAsync,type CADFormat,type CADImportOptions} from './cad-async.js';
 export interface CADModel {root:MeshHandle;meshes:readonly MeshHandle[];dispose():void}
 export function deduplicateParts(meshes:Iterable<MeshHandle>):{parts:number;unique:number} {
   const seen=new Map<string,Array<{data:Float32Array;geometry:Geometry}>>(),known=new Map<Geometry,Geometry>(),pbrSeen=new Map<string,Float32Array[]>(),deformableSeen=new Set<Mesh>();let parts=0,unique=0;
-  for(const handle of meshes){const mesh=meshRuntime(handle);mesh.check();if(!mesh.geometry){
-      const source=(mesh as unknown as {[key:symbol]:PBRSource|undefined})[Symbol.for('margoengine.pbr-source.v1')],primitives=source?.primitives.filter(primitive=>primitive.node===mesh)??[];
+  for(const handle of meshes){const mesh=meshRuntime(handle);mesh.check();const triangles=meshTriangles(mesh);if(!triangles)continue;if(triangles.kind==='pbr'){
+      const {source}=triangles,{primitives}=source;
       // Loader roots, transforms and joints legitimately have no triangles of their own.
       if(!primitives.length)continue;parts++;
       const data=primitiveFingerprint(primitives);
       // Deformable parts cannot safely share buffers or be treated as interchangeable rigs.
-      if(primitives.some(primitive=>source!.asset.doc.nodes?.[primitive.nodeIndex]?.skin!==undefined||primitive.definition.attributes?.JOINTS_0!==undefined||primitive.definition.targets?.length)){if(!deformableSeen.has(mesh)){deformableSeen.add(mesh);unique++;}continue;}
+      if(source.skinned||source.morphed){if(!deformableSeen.has(mesh)){deformableSeen.add(mesh);unique++;}continue;}
       const key=`${data.length}:${hash(data)}`,bucket=pbrSeen.get(key)??[];
       if(!bucket.some(entry=>entry.length===data.length&&entry.every((value,i)=>value===data[i]))){bucket.push(data);pbrSeen.set(key,bucket);unique++;}
       continue;
-    }parts++;let canonical=known.get(mesh.geometry);
-    if(!canonical){const data=fingerprint(mesh.geometry),key=`${data.length}:${hash(data)}`,bucket=seen.get(key)??[],match=bucket.find(entry=>entry.data.length===data.length&&entry.data.every((v,i)=>v===data[i]));canonical=match?.geometry??mesh.geometry;
-      if(!match){bucket.push({data,geometry:canonical});seen.set(key,bucket);unique++;}known.set(mesh.geometry,canonical);}
-    if(mesh.geometry!==canonical)mesh.setGeometry(canonical);
+    }parts++;const {geometry}=triangles;let canonical=known.get(geometry);
+    if(!canonical){const data=fingerprint(geometry),key=`${data.length}:${hash(data)}`,bucket=seen.get(key)??[],match=bucket.find(entry=>entry.data.length===data.length&&entry.data.every((v,i)=>v===data[i]));canonical=match?.geometry??geometry;
+      if(!match){bucket.push({data,geometry:canonical});seen.set(key,bucket);unique++;}known.set(geometry,canonical);}
+    if(geometry!==canonical)mesh.setGeometry(canonical);
   }if(!parts)throw new TypeError('CAD grouping contains no supported geometry');return {parts,unique};
 }
 

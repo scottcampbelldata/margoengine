@@ -45,7 +45,8 @@ export class XR implements EnginePlugin {
     if(!system())throw new Error('WebXR is unavailable');
     const adapter=await navigator.gpu.requestAdapter({xrCompatible:!!platform().XRGPUBinding} as GPURequestAdapterOptions);
     if(!adapter)throw new Error('XR-compatible WebGPU adapter unavailable');
-    const device=await adapter.requestDevice(),xr=new XR(device);
+    const requiredFeatures=runtime.gpu?[...runtime.gpu.features].filter(feature=>adapter.features?.has(feature)) as GPUFeatureName[]:[];
+    const device=await adapter.requestDevice({requiredFeatures}),xr=new XR(device);
     try{runtime.use(xr);return xr;}catch(error){xr.dispose();throw error;}
   }
   private constructor(private readonly device:GPUDevice) {

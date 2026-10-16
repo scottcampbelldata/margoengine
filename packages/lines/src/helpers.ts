@@ -1,4 +1,6 @@
 import type {Camera, EngineKernel, Geometry, Mesh, Vec3} from '@margoengine/core';
+import {meshRuntime} from '@margoengine/core/extension';
+import {meshTriangles} from '../../shared/mesh-source.js';
 import {parseColor, type ColorInput} from './color.js';
 import {Line, type LineMaterialOptions} from './line.js';
 import {meshWorldMatrix} from './lines.js';
@@ -103,11 +105,29 @@ export function geometryBounds(geometry: Geometry): Float32Array {
   return bounds;
 }
 
-/** World-space bounding box of a core mesh, updated every frame, like three.js `BoxHelper`. */
+/** CPU helper data stays in the loader's bind pose; no readback or core draw is added. */
+interface MeshData {identity: object; bounds: Float32Array; parts: {vertices: Float32Array; stride: number; normal: number}[]}
+const helperData = new WeakMap<object, MeshData>();
+function meshData(mesh: Mesh) {
+  const triangles = meshTriangles(meshRuntime(mesh));
+  if (!triangles) return null;
+  const identity = triangles.kind === 'core' ? triangles.geometry : triangles.source;
+  let data = helperData.get(identity);
+  if (!data) {
+    data = triangles.kind === 'core'
+      ? {identity, bounds: geometryBounds(triangles.geometry), parts: [{vertices: triangles.geometry.vertices, stride: 6, normal: 3}]}
+      : {identity, bounds: triangles.source.bounds, parts: triangles.source.primitives.map(p => ({vertices: p.vertices, stride: 20, normal: 4}))};
+    helperData.set(identity, data);
+  }
+  return data;
+}
+
+/** World-space bounding box of a core or loaded PBR mesh. PBR helpers use bind-pose bounds. */
 export class BoxHelper extends Line {
   private source: Mesh;
   private readonly seen = new Float32Array(16).fill(NaN);
-  private geometry: Geometry | null = null;
+  private geometry: object | null = null;
+  private readonly boundsSeen = new Float32Array(6).fill(NaN);
   private readonly scratch: number[] = [];
   private readonly corner = [0, 0, 0];
   constructor(mesh: Mesh, {color = '#ffff00', ...options}: {color?: ColorInput} & HelperOptions = {}) {
@@ -116,11 +136,12 @@ export class BoxHelper extends Line {
   }
   setFromMesh(mesh: Mesh): this {mesh.check(); this.source = mesh; this.seen.fill(NaN); return this;}
   update(engine: EngineKernel): boolean {
-    const matrix = meshWorldMatrix(engine, this.source), geometry = this.source.geometry;
-    if (!matrix || !geometry) return false;
-    if (!copyIfChanged(this.seen, matrix) && geometry === this.geometry) return true;
-    this.geometry = geometry;
-    const b = geometryBounds(geometry), min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity], p = this.corner;
+    const matrix = meshWorldMatrix(engine, this.source), data = meshData(this.source);
+    if (!matrix || !data || !matrix.every(Number.isFinite) || !data.bounds.every(Number.isFinite)) return false;
+    const moved = copyIfChanged(this.seen, matrix), resized = copyIfChanged(this.boundsSeen, data.bounds);
+    if (!moved && !resized && data.identity === this.geometry) return true;
+    this.geometry = data.identity;
+    const b = data.bounds, min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity], p = this.corner;
     for (let i = 0; i < 8; i++) {
       transformPoint(p, 0, matrix, i & 1 ? b[3] : b[0], i & 2 ? b[4] : b[1], i & 4 ? b[5] : b[2]);
       for (let a = 0; a < 3; a++) {min[a] = Math.min(min[a], p[a]); max[a] = Math.max(max[a], p[a]);}
@@ -219,11 +240,11 @@ export class PlaneHelper extends Line {
   }
 }
 
-/** One line per vertex along its normal, in world space, like three.js `VertexNormalsHelper`. */
+/** One world-space line per core or loaded PBR vertex normal. PBR helpers use bind-pose attributes. */
 export class VertexNormalsHelper extends Line {
   size: number;
   private readonly seen = new Float32Array(16).fill(NaN);
-  private geometry: Geometry | null = null;
+  private geometry: object | null = null;
   private seenSize = NaN;
   private scratch = new Float32Array(0);
   constructor(readonly mesh: Mesh, {size = 1, color = '#ff0000', ...options}: {size?: number; color?: ColorInput} & HelperOptions = {}) {
@@ -231,21 +252,22 @@ export class VertexNormalsHelper extends Line {
     mesh.check(); this.size = size;
   }
   update(engine: EngineKernel): boolean {
-    const m = meshWorldMatrix(engine, this.mesh), geometry = this.mesh.geometry;
-    if (!m || !geometry) return false;
+    const m = meshWorldMatrix(engine, this.mesh), data = meshData(this.mesh);
+    if (!m || !data || !m.every(Number.isFinite)) return false;
     if (!Number.isFinite(this.size)) throw new RangeError('Normal size must be finite');
-    if (!copyIfChanged(this.seen, m) && geometry === this.geometry && this.size === this.seenSize) return true;
-    this.geometry = geometry; this.seenSize = this.size;
+    if (!copyIfChanged(this.seen, m) && data.identity === this.geometry && this.size === this.seenSize) return true;
+    this.geometry = data.identity; this.seenSize = this.size;
     // Normal matrix: inverse transpose of the upper 3x3, from the cofactors.
     const c0 = [m[5] * m[10] - m[6] * m[9], m[6] * m[8] - m[4] * m[10], m[4] * m[9] - m[5] * m[8]];
     const c1 = [m[2] * m[9] - m[1] * m[10], m[0] * m[10] - m[2] * m[8], m[1] * m[8] - m[0] * m[9]];
     const c2 = [m[1] * m[6] - m[2] * m[5], m[2] * m[4] - m[0] * m[6], m[0] * m[5] - m[1] * m[4]];
-    const det = m[0] * c0[0] + m[1] * c0[1] + m[2] * c0[2], v = geometry.vertices, count = v.length / 6;
+    const det = m[0] * c0[0] + m[1] * c0[1] + m[2] * c0[2], count = data.parts.reduce((n, part) => n + part.vertices.length / part.stride, 0);
     if (this.scratch.length !== count * 6) this.scratch = new Float32Array(count * 6);
     const out = this.scratch;
-    for (let i = 0; i < count; i++) {
-      const o = i * 6, x = v[o + 3], y = v[o + 4], z = v[o + 5];
-      transformPoint(out, o, m, v[o], v[o + 1], v[o + 2]);
+    let o = 0;
+    for (const {vertices: v, stride, normal} of data.parts) for (let i = 0; i < v.length; i += stride, o += 6) {
+      const x = v[i + normal], y = v[i + normal + 1], z = v[i + normal + 2];
+      transformPoint(out, o, m, v[i], v[i + 1], v[i + 2]);
       const nx = c0[0] * x + c1[0] * y + c2[0] * z, ny = c0[1] * x + c1[1] * y + c2[1] * z, nz = c0[2] * x + c1[2] * y + c2[2] * z;
       const s = Math.sign(det || 1) * this.size / (Math.hypot(nx, ny, nz) || 1);
       out[o + 3] = out[o] + nx * s; out[o + 4] = out[o + 1] + ny * s; out[o + 5] = out[o + 2] + nz * s;

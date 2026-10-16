@@ -77,7 +77,7 @@ That is roughly 3,000 to 4,200 times the brute-force ray rate. The tree takes ab
 
 ## Limits
 
-- Triangles only: no lines or points. `intersectModel` supports current gltf-pro skin/morph poses; ordinary engine queries require CPU `Geometry`. Hits carry barycentric weights but no `uv`.
+- Triangles only: no lines or points. Synchronous `intersectMeshes` and `intersectEngine` discover static glTF Pro/FBX triangles as well as core `Geometry`, including several primitives on one node. Once a GPU deformation buffer is active they throw with a direction to use `await raycaster.intersectModel(model)`, which reads the current pose. They never silently test a deformed mesh's bind pose. Hits carry barycentric weights but no `uv`.
 - `collectFrustum` with `'triangles'` is the conservative culling test (a triangle is dropped only when all three vertices are outside one plane), like three-mesh-bvh's frustum examples, not exact clipping.
 - `refit()` keeps the tree topology; rebuild after large deformations for good query speed.
 - Hits on a shared edge report every triangle that contains the point (the tests account for ties).

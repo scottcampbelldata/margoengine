@@ -39,11 +39,11 @@ export class Selection implements EnginePlugin {
  private maskPipeline?:GPURenderPipeline;private composite?:GPURenderPipeline;private bind?:GPUBindGroup;private format='';private depthFormat='';private readonly values=new Float32Array(8);private disposed=false;
  constructor(readonly options:SelectionOptions={}){this.validate();}
  static attach(engine:EngineKernel,options:SelectionOptions={}):Selection {const effect=new Selection(options);engineRuntime(engine).use(effect);return effect;}
- /** Register optional PBR buffers; select their primitive nodes with set(). */
+ /** Register custom optional buffers. Loader-owned PBR nodes are discovered by set(). */
  add(source:PickingSource):()=>void {if(this.disposed)throw new Error('Selection is disposed');return this.primitives.add(source);}
  set(meshes:Iterable<Mesh>):void {
   if(this.disposed)throw new Error('Selection is disposed');const values=new Set(meshes);if(values.size>4096)throw new RangeError('Selection budget exceeded');
-  if(this.engine)for(const mesh of values)if(this.engine.meshes.get(meshRuntime(mesh).id)!==mesh)throw new TypeError('Foreign or disposed selection mesh');this.selected=values;
+  if(this.engine)for(const mesh of values)if(this.engine.meshes.get(meshRuntime(mesh).id)!==mesh)throw new TypeError('Foreign or disposed selection mesh');this.primitives.discover(values);this.selected=values;
  }
  private validate():void {const o=this.options;if(o.algorithm!==undefined&&!['jfa','morphological'].includes(o.algorithm)||!Number.isFinite(o.width??3)||(o.width??3)<1||(o.width??3)>32||(o.color??[1,0.5,0]).length!==3||(o.color??[]).some(v=>!Number.isFinite(v)||v<0||v>1))throw new RangeError('Invalid selection options');}
  setup(engine:Engine):void {
@@ -75,6 +75,7 @@ export class Selection implements EnginePlugin {
  }
  private draw(c:Context):void {
   if(!this.selected.size)return;
+  this.primitives.discover(this.selected);if(this.primitives.hasSources)this.primitives.prepare(c);
   this.validate();this.resize(c);this.flags.fill(0);for(const mesh of this.selected){const id=meshRuntime(mesh).id;if(this.engine!.meshes.get(id)===mesh)this.flags[id]=1;}
   c.device.queue.writeBuffer(this.buffer!,0,this.flags as Uint32Array<ArrayBuffer>);this.values[0]=this.options.width??3;this.values[1]=+(this.options.algorithm==='morphological');this.values.set(this.options.color??[1,0.5,0],4);c.device.queue.writeBuffer(this.uniform!,0,this.values as Float32Array<ArrayBuffer>);
   const color=c.color;c.color=(this.msaaMaskView??this.maskView)!;

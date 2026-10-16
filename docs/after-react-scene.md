@@ -1,6 +1,12 @@
 # After the React scene layer
 
-Date: 2026-10-16. Start this when `@margoengine/react`, `@margoengine/react/kit`, `@margoengine/react/post`, `@margoengine/react/physics`, and `@margoengine/react/xr` match `docs/react-scene.md`, including one root import, `color` on `<Box>`, a canvas that shows a lit mesh, and a missing-peer error that names the package.
+Date: 2026-10-16. Implemented. Core and the stage facade remain unchanged at **19,999 bytes gzip**.
+
+Steps 1 through 3 are in the tree. `<MeshTransmissionMaterial>` and `<Animation>` export from `@margoengine/react`. Deformed picking is recorded in `docs/three-parity-next.md`. The quaternion table is `tests/modern-quaternion.test.js`. `direct_light` and the `@group` / `@binding` reject are in `packages/gltf-pro`.
+
+Step 4 was tested in isolation and rejected: `opt-level = "z"` reduced the measured bundle from 19,999 to 19,376 bytes gzip, but ticks were 2.19–3.36 times slower than a fresh `opt-level = 3` build across eight scenarios. Both variants passed the four Rust tests and matched the shipping kernel's memory and flags. The shipping kernel and stride layout remain unchanged. `scripts/kernel-opt-experiment.js` reproduces the experiment without rewriting them.
+
+Step 5 uses the allowed documentation alternative: unverified registry install commands were removed from the root and React READMEs. Source builds and local tarballs remain the documented installation path until publication is verified.
 
 Clearcoat, transmission, volume, the node graph, KTX2, texture transforms, eight influences, and point and spot shadows are already in the engine. Do not rebuild them. The React layer should call them.
 

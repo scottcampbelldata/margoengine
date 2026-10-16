@@ -40,7 +40,7 @@ try {
 
     const colors = [[0,0,0], [0.18,0.18,0.18], [1,1,1], [4,0.25,0.1], [0.01,3,0.3], [100,100,100]];
     const surface = /struct Surface \{[^}]+\}/.exec(pbrShader)[0];
-    const ambient = /fn ambient\(s:Surface\)->vec3f \{[\s\S]*?\n\}/.exec(pbrShader)[0];
+    const ambient = /fn hemisphere_ambient\(s:Surface\)->vec3f \{[\s\S]*?\n\}/.exec(pbrShader)[0]+'\n'+/fn ambient\(s:Surface\)->vec3f \{[\s\S]*?\n\}/.exec(pbrShader)[0];
     const code = `${acesShader}\n${surface}\nstruct Frame {radiance:vec4f}\n@group(0) @binding(0) var<uniform> f:Frame;\n${ambient}
       @group(0) @binding(1) var<storage,read_write> output:array<vec4f>;
       @compute @workgroup_size(1) fn main(@builtin(global_invocation_id) id:vec3u) {

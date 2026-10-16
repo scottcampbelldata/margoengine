@@ -85,11 +85,23 @@ does not announce an npm publication or a package version change.
   helpers, FBX loading, effects, Rapier bodies and XR controllers through lazy
   optional peers. Loaded-model colliders support bounds fallbacks and explicit
   cuboid/ball children with live transform updates. Conflicting post-effect
-  capture owners report an error. React 18 packed consumers pass 103 behavioral
-  tests; the React 19 workspace suite passes 108 tests.
+  capture owners report an error. React 18 packed consumers pass 118 behavioral
+  tests; the React 19 workspace suite passes 123 tests.
 
 ### Loaded PBR geometry consumers
 
+- A canonical weak registry now feeds inspector overlays, line helpers, static
+  raycasts/AssemblyBVH, automatic picking/selection, direct mesh shadow casters,
+  TAA and native XR. Multiple primitives retain their identities even when they
+  share GPU buffers. Disposal, hidden ancestors and reused mesh slots are guarded.
+- Native XR owns PBR resources and skin/morph kernels on its compatible device,
+  with separate eye uniforms and live animation/extension replacement handling.
+  Static TAA storage is allocated only when used; standard PBR buffer flags stay
+  unchanged. Current COPY_SRC deformation is copied from the GPU.
+- Four original stage-facade audits remain executable TODOs: mixed `Stage.fit`
+  and its internal raw adapter still read core geometry only. Supported model
+  bounds/raw and explicit camera-fitting alternatives have passing regressions.
+  Core and stage stay frozen; these four limitations are not reported as fixed.
 - Physics, glTF export and CAD grouping read loader-owned bind-pose primitives
   through an optional CPU geometry bridge. Loaded glTF/FBX meshes retain their
   original core geometry slots and hierarchy. Unsupported export data and
@@ -105,12 +117,14 @@ does not announce an npm publication or a package version change.
   `Raycaster.intersectModel()` snapshots the same GPU output for CPU triangle
   queries, with BVH refitting and coherent world transforms. Pending reads,
   replacement, disposal and restoration invalidate stale results and release
-  staging resources. Core, stage and baseline PBR shader/bindings are unchanged.
+  staging resources. Core and stage are unchanged; baseline PBR layouts and pixels
+  are preserved. The shader's generated names now describe their contents.
 
 ### Verification and footprint
 
-- The workspace build passes. The full Node 24 suite passes **1,189 tests**, with
-  zero failures or skips. Strict TypeScript checks and packed exports/imports
+- The workspace build passes. The full Node 24 suite passes **1,281 tests**, with
+  zero failures or skips and **four known frozen-stage TODO audits** that retain
+  their original failing assertions. Strict TypeScript checks and packed exports/imports
   pass across **all 63 packages**, including strict Bundler and NodeNext consumers.
 - Regression coverage includes real normalized Draco UV/color data, index
   extraction at 65,535 / 65,536 / 65,537 vertices, Meshopt fallback buffers,
@@ -124,6 +138,10 @@ does not announce an npm publication or a package version change.
   and 82 texture-coordinate captures, complete Khronos material/KTX2/UV1 assets,
   and independent eight-influence GPU deformation readback. New-lobe assets
   restore bit for bit and release every tracked GPU resource and decoder worker.
+- The silent-geometry browser suite passes 36 captures on hardware and
+  SwiftShader, compiles 67 shader modules, and destroys all 337 tracked resources.
+  Inspector overlays survive frustum edges; native-device PBR eye kernels match
+  the desktop FBX pose bit for bit. No GPU or page errors are reported.
 - `npm run measure:size` reports **47,983 bytes raw / 19,999 bytes gzip** for
   core + stage, including embedded Wasm and both backends. Core and stage remain
   feature-frozen. CI rejects **20,000 gzip bytes or above** and checks package

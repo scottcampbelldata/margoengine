@@ -6,25 +6,41 @@ import {tmpdir} from 'node:os';
 import {openBrowser} from './browser.js';
 
 const names=['core','gltf','react','machinery','creative','scenery','gltf-pro','animation','post','shadows','clustered','vfx','animator','taa','splats','terrain','environment','controls','margoengine'],npm=process.env.npm_execpath;
-const packedNames=[...names,'decoders','geometry','html','labels','fbx','exporters','gizmo','sky','text','dof','tonemap','physics','xr'];
-const noticePackages=new Set(['post','tonemap']);
+const packedNames=[...names,'decoders','geometry','html','labels','fbx','exporters','gizmo','sky','text','dof','tonemap','physics','xr','materials','selection'];
+const noticeFiles=new Map([['post','NOTICE.md'],['tonemap','NOTICE.md'],['materials','THIRD_PARTY_NOTICES.md']]);
 const packageName=name=>name==='margoengine'?'margoengine':`@margoengine/${name}`;
 assert.ok(npm,'Run this check through npm run modern:test:packages');
-const archives=resolve('test-results/modern-packages');await mkdir(archives,{recursive:true});
+// Reuse a verified archive set while concurrent source edits are in progress.
+// This mode never packs, rebuilds, or injects markers into shared dist.
+const reuseTarballs=process.env.MARGOENGINE_PACKAGE_TEST_REUSE_TARBALLS==='1';
+const archives=resolve(reuseTarballs?'test-results/margo-packages':'test-results/modern-packages');
+if(reuseTarballs)await realpath(archives);else await mkdir(archives,{recursive:true});
 const dependencies={react:'18.3.1','react-dom':'18.3.1','@types/react':'^18.3.0','@types/react-dom':'^18.3.0','@testing-library/react':'16.3.3',jsdom:'26.1.0',vite:JSON.parse(await readFile('package.json','utf8')).devDependencies.vite,'@dimforge/rapier3d-compat':JSON.parse(await readFile('node_modules/@dimforge/rapier3d-compat/package.json','utf8')).version};
 // A local retry can reuse the coherent workspace build made by core's prepack.
 // The default still exercises every package's own prepack hook.
 const reuseBuild=process.env.MARGOENGINE_PACKAGE_TEST_REUSE_BUILDS==='1';
-for(const name of ['core','react'])await writeFile(`packages/${name}/dist/__stale-package-test.js`,'throw new Error("Stale build artifact");');
+if(!reuseTarballs)for(const name of ['core','react'])await writeFile(`packages/${name}/dist/__stale-package-test.js`,'throw new Error("Stale build artifact");');
 for(const name of packedNames){
-  const [pack]=JSON.parse(execFileSync(process.execPath,[npm,'pack','--workspace',packageName(name),'--pack-destination',archives,'--json',...(reuseBuild&&name!=='core'?['--ignore-scripts']:[])],{encoding:'utf8'})),files=new Set(pack.files.map(file=>file.path));
-  const unexpected=pack.files.filter(file=>!['package.json','README.md','LICENSE',...(noticePackages.has(name)?['NOTICE.md']:[])].includes(file.path)&&!file.path.startsWith('dist/')).map(file=>file.path);
+  let pack,manifest;
+  if(reuseTarballs){
+    const workspaceManifest=JSON.parse(await readFile(`packages/${name}/package.json`,'utf8'));
+    const filename=packageName(name).replace(/^@/,'').replace('/','-')+'-'+workspaceManifest.version+'.tgz',archive=join(archives,filename);
+    const members=execFileSync('tar',['-tf',archive],{encoding:'utf8'}).split(/\r?\n/).filter(Boolean);
+    assert.ok(members.length&&members.every(member=>member.startsWith('package/')&&!member.split('/').includes('..')),`Invalid cached package archive: ${filename}`);
+    pack={filename,files:members.filter(member=>!member.endsWith('/')).map(member=>({path:member.slice('package/'.length)}))};
+    manifest=JSON.parse(execFileSync('tar',['-xOf',archive,'package/package.json'],{encoding:'utf8'}));
+    assert.equal(manifest.name,packageName(name),`Wrong cached package: ${filename}`);assert.equal(manifest.version,workspaceManifest.version,`Wrong cached version: ${filename}`);
+  }else{
+    [pack]=JSON.parse(execFileSync(process.execPath,[npm,'pack','--workspace',packageName(name),'--pack-destination',archives,'--json',...(reuseBuild&&name!=='core'?['--ignore-scripts']:[])],{encoding:'utf8'}));
+    manifest=JSON.parse(await readFile(`packages/${name}/package.json`,'utf8'));
+  }
+  const files=new Set(pack.files.map(file=>file.path));
+  const unexpected=pack.files.filter(file=>!['package.json','README.md','LICENSE',...(noticeFiles.has(name)?[noticeFiles.get(name)]:[])].includes(file.path)&&!file.path.startsWith('dist/')).map(file=>file.path);
   assert.deepEqual(unexpected,[],`${packageName(name)} contains unexpected packed files: ${unexpected.join(', ')}`);
-  if(noticePackages.has(name))assert.ok(files.has('NOTICE.md'),`${packageName(name)} must retain its color-transform license notice`);
+  if(noticeFiles.has(name))assert.ok(files.has(noticeFiles.get(name)),`${packageName(name)} must retain its third-party notices`);
   assert.ok(files.has('README.md')&&files.has('LICENSE'));assert.ok(!files.has('dist/__stale-package-test.js'));
   if(name==='machinery')for(const file of ['cad-runtime.js','occt-import-js.js','occt-import-js.wasm','OCCT-LICENSE.txt','OCCT-NOTICE.txt'])assert.ok(files.has('dist/workers/'+file),`Missing CAD worker asset: ${file}`);
-  const manifest=JSON.parse(await readFile(`packages/${name}/package.json`,'utf8'));
-  assert.notEqual(manifest.private,true);assert.equal(manifest.license,'MIT');assert.equal(manifest.publishConfig.access,'public');
+  assert.notEqual(manifest.private,true);assert.equal(manifest.license,name==='materials'?'MIT AND Apache-2.0':'MIT');assert.equal(manifest.publishConfig.access,'public');
   for(const entry of Object.values(manifest.exports))for(const target of Object.values(entry))assert.ok(files.has(target.slice(2)),`Missing packed export: ${manifest.name} ${target}`);
   dependencies[packageName(name)]=`file:${join(archives,pack.filename).replaceAll('\\','/')}`;
 }
@@ -32,7 +48,7 @@ const fixture=await mkdtemp(join(tmpdir(),'margoengine-consumer-'));let browser;
 try{
   await writeFile(join(fixture,'package.json'),JSON.stringify({private:true,type:'module',dependencies}));
   execFileSync(process.execPath,[npm,'install','--ignore-scripts','--no-audit','--no-fund'],{cwd:fixture,stdio:'inherit'});
-  for(const name of noticePackages)assert.equal(await readFile(join(fixture,`node_modules/${packageName(name)}/NOTICE.md`),'utf8'),await readFile(`packages/${name}/NOTICE.md`,'utf8'),`${packageName(name)} must preserve its installed notice verbatim`);
+  for(const [name,file] of noticeFiles)assert.equal(await readFile(join(fixture,`node_modules/${packageName(name)}/${file}`),'utf8'),await readFile(`packages/${name}/${file}`,'utf8'),`${packageName(name)} must preserve its installed notice verbatim`);
   for(const name of names){
     assert.equal(await readFile(join(fixture,`node_modules/${packageName(name)}/LICENSE`),'utf8'),await readFile('LICENSE','utf8'));
     const markdown=await readFile(join(fixture,`node_modules/${packageName(name)}/README.md`),'utf8');
@@ -48,7 +64,7 @@ try{
   await writeFile(join(fixture,'consumer.tsx'),`import {TransformStore,type PassContext} from '@margoengine/core/extension';
 import {EngineKernel,type Mesh as MeshHandle} from '@margoengine/core';
 import {loadGLTF} from '@margoengine/gltf';
-import {Canvas,Mesh,BoxGeometry,PbrMaterial,Model,Environment,OrbitControls,useMargo,useMargoStage,type MeshRef} from '@margoengine/react';
+import {Canvas,Mesh,Box,BoxGeometry,PbrMaterial,MeshTransmissionMaterial,Gltf,Animation,Model,Environment,OrbitControls,useMargo,useMargoStage,type MeshRef} from '@margoengine/react';
 import {Kinematics,ExplodedView,SectionPlanes,EngineeringAnnotations,PartInstancer,parseCAD,parseCADAsync,loadCAD,deduplicateParts,SurfacePhysics,TelemetryChannel,AssemblyBVH,measureClearance} from '@margoengine/machinery';
 import {GPUParticles,PostProcessing,ToonShading,HDRRenderTarget} from '@margoengine/creative';
 import {SkyMoon,SkyMoonPass,type SkyMoonConfig} from '@margoengine/scenery';
@@ -62,6 +78,7 @@ function loaded(model:LoadedModel){model.position.set(1,2,3);model.rotation.set(
 model.bounds=new Float32Array(6);
 model.destroy();return {bounds,buffer};}
 const html=renderToString(<Canvas><Mesh><BoxGeometry/><PbrMaterial/></Mesh></Canvas>);
+const afterScene=renderToString(<Canvas><Box color="#84d6bd"/><Mesh><BoxGeometry/><MeshTransmissionMaterial factor={0}/></Mesh><Gltf src="/character.glb"><Animation clip="Walk" blend={0.2}/></Gltf></Canvas>);if(!afterScene.includes('<canvas'))throw new Error('Root scene exports failed');
 const declarative=renderToString(<Canvas shadows onCreated={stage=>stage.engine.camera.position=[1,2,5]}><Model src="/model.glb" materials={{Upper:{baseColor:[0.2,0.8,0.3]}}} onLoad={mesh=>mesh.setPosition([1,0,0])}/><Environment src="/studio.hdr" exposure={1} background/><OrbitControls enableDamping minDistance={1} maxDistance={10}/></Canvas>);
 if(!declarative.includes('<canvas')||typeof useMargo!=='function'||typeof useMargoStage!=='function')throw new Error('Declarative exports failed');
 if(!html.includes('<canvas')||typeof loadGLTF!=='function'||!Kinematics||!ExplodedView||new GPUParticles({count:32}).count!==32)throw new Error('Consumer failed');
@@ -139,7 +156,7 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
   await page.evaluate(()=>window.modern.unmount());assert.ok(await page.evaluate(()=>window.modern.state.react.disposed));assert.equal(await page.evaluate(()=>window.modern.state.react.meshes.size),0);
   assert.deepEqual(await page.evaluate(()=>window.modern.state.errors),[]);assert.deepEqual(errors,[]);
   const react=JSON.parse(await readFile(join(fixture,'node_modules/react/package.json'),'utf8')).version;
-  await writeFile('test-results/modern-packages.json',JSON.stringify({hardware:browser.hardware,packages:packedNames.map(packageName),react,reactTests,checks:['standalone imports and Wasm','strict consumer declarations without workspace ambient types','React 18 SSR','React 18 declarative, kit, post, physics, XR and loader lifecycle unit tests','React 18 StrictMode, nested refs, props, RAF, Suspense and teardown']},null,2));
+  await writeFile('test-results/modern-packages.json',JSON.stringify({hardware:browser.hardware,packages:packedNames.map(packageName),archiveSource:reuseTarballs?'cached-tarballs':'prepack',archiveDirectory:archives,react,reactTests,checks:['standalone imports and Wasm','strict consumer declarations without workspace ambient types','React 18 SSR','React 18 declarative, kit, post, physics, XR and loader lifecycle unit tests','React 18 StrictMode, nested refs, props, RAF, Suspense and teardown']},null,2));
   console.log(`React ${react} packaged browser lifecycle passes`);
 }finally{
   await browser?.close();

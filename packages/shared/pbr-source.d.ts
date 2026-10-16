@@ -18,6 +18,7 @@ export interface PBRSourcePrimitive {
   /** Bind-pose position4, normal4, tangent4, UV0/UV1, color4 (20 floats). */
   readonly vertices: Float32Array;
   readonly indices: Uint32Array;
+  readonly deformed?: GPUBuffer;
   readonly definition: any;
   readonly extension?: unknown;
   readonly material: {

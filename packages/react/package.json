@@ -15,6 +15,7 @@
   "scripts": {
     "test": "node --experimental-test-module-mocks --test tests/*.test.js test/*.test.js",
     "test:browser": "node scripts/test-scene-browser.js",
+    "test:after-scene": "node scripts/test-after-scene-browser.js",
     "prepack": "npm --prefix ../.. run build:packages"
   },
   "sideEffects": false,
@@ -47,6 +48,10 @@
     "@margoengine/core": "^0.1.0 || ^1.0.0",
     "margoengine": "^0.1.0 || ^1.0.0",
     "@margoengine/gltf-pro": "^0.1.0 || ^1.0.0",
+    "@margoengine/materials": "^0.1.0 || ^1.0.0",
+    "@margoengine/animation": "^0.1.0 || ^1.0.0",
+    "@margoengine/animator": "^0.1.0 || ^1.0.0",
+    "@margoengine/selection": "^0.1.0 || ^1.0.0",
     "@margoengine/environment": "^0.1.0 || ^1.0.0",
     "@margoengine/controls": "^0.1.0 || ^1.0.0",
     "@margoengine/shadows": "^0.1.0 || ^1.0.0",
@@ -67,6 +72,10 @@
     "react": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
+    "@margoengine/materials": {"optional": true},
+    "@margoengine/animation": {"optional": true},
+    "@margoengine/animator": {"optional": true},
+    "@margoengine/selection": {"optional": true},
     "@margoengine/gltf-pro": {
       "optional": true
     },
