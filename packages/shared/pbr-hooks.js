@@ -4,10 +4,14 @@ import { margoError } from './errors.js';
 const lit = new WeakMap();
 /** `code` (a PBR fragment with gltf-pro's hook points, possibly already lit) with one effect's hooks composed in. */
 export function lightPBR(code, hooks) {
-  let cache = lit.get(hooks),
+  const cache = lit.get(hooks),
     out = cache?.get(code);
   if (out !== undefined) return out;
-  out = code;
+  return composeLightPBR(code, hooks, cache);
+}
+// Keep the miss-only replacement closures outside the hot cache lookup's function context.
+function composeLightPBR(code, hooks, cache) {
+  let out = code;
   const edit = (from, to) => {
     const next = out.replace(from, to);
     if (next === out)

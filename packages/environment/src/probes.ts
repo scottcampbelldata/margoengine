@@ -13,6 +13,7 @@ import { IBL_BINDING, ShaderEffect, type LightingTarget, type PBRHooks } from '.
 import { evaluateSH } from './sh.js';
 import { halfToFloat } from './half.js';
 import { common } from './shaders.js';
+import { captureDevice } from './capture-device.js';
 
 declare const GPUBufferUsage: {
   UNIFORM: number;
@@ -25,6 +26,40 @@ declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: num
 declare const GPUMapMode: { READ: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 type BakePipelines = Record<'sh' | 'resample' | 'prefilter', GPUComputePipeline>;
+type CaptureTarget = {
+  color: GPUTexture;
+  depth: GPUTexture;
+  array: GPUTextureView;
+  colors: GPUTextureView[];
+  depthView: GPUTextureView;
+  passes: GPURenderPassDescriptor[];
+  groups: Map<GPUComputePipeline, GPUBindGroup[]>;
+};
+type CaptureResources = {
+  device: GPUDevice;
+  owned: Array<GPUTexture | GPUBuffer>;
+  frame: GPUBuffer;
+  params: GPUBuffer;
+  read?: GPUBuffer;
+  sampler: GPUSampler;
+  targets: Map<number, CaptureTarget>;
+  values: Float32Array;
+  slots: Uint32Array;
+  floats: Float32Array;
+  commands: GPUCommandBuffer[];
+  cameras: Camera[];
+  positions: [number, number, number][];
+  aims: [number, number, number][];
+  bindings: GPUBindGroupEntry[];
+  frameBinding: GPUBindGroupEntry;
+  descriptor: GPURenderPipelineDescriptor;
+  depthStencil: GPUDepthStencilState;
+  multisample: GPUMultisampleState;
+  draw: { pipeline: GPURenderPipeline; bindings: GPUBindGroupEntry[]; clear: false };
+  view?: Context;
+  environmentView?: GPUTextureView;
+  environmentParams?: GPUBuffer;
+};
 
 /** A box filled with a grid of irradiance probes, one at the centre of each cell. */
 export interface IrradianceVolume {
@@ -359,17 +394,22 @@ export class LightProbes extends ShaderEffect {
   private cached?: GPUBindGroupEntry[];
   private version = -1;
   private readonly header = new ArrayBuffer(HEADER_BYTES);
+  private readonly headerView = new DataView(this.header);
   private headerBaked = false;
   private readonly texelCount: number;
   private readonly offsets: number[] = [];
   private readonly captured = new Set<CaptureModel>();
   private snapshot?: Uint32Array;
+  private snapshotExposed = false;
   private pending = false;
   private baking = false;
   private bakeSamples = 0;
-  private capture?: { key: string; pipeline: GPURenderPipeline };
+  private capture?: { source: string; buffers: number | undefined; pipeline: GPURenderPipeline };
+  private captureProxy?: { device: GPUDevice; proxy: GPUDevice };
   private bakeDevice?: GPUDevice;
   private readonly bakeCache = new Map<boolean, BakePipelines>();
+  private captureResources?: CaptureResources;
+  private readonly volumePosition: [number, number, number] = [0.1, 0.1, 0.1];
 
   /** Same as `engine.use(new LightProbes(options))`; returns the LightProbes. */
   static attach(engine: EngineKernel, options: LightProbeOptions): LightProbes {
@@ -468,9 +508,9 @@ export class LightProbes extends ShaderEffect {
     if (!vector(position) || position.some((v, i) => v < probe.min[i] || v > probe.max[i]))
       throw new RangeError('Reflection probe position must be finite and inside the box');
     (probe as ReflectionProbe).position = [...position];
-    const view = new DataView(this.header),
+    const view = this.headerView,
       offset = 64 + index * 64;
-    position.forEach((v, i) => view.setFloat32(offset + i * 4, v, true));
+    for (let i = 0; i < 3; i++) view.setFloat32(offset + i * 4, position[i], true);
     if (this.gpu) this.writeHeader(this.headerBaked);
   }
   protected get device(): GPUDevice | null | undefined {
@@ -553,18 +593,22 @@ export class LightProbes extends ShaderEffect {
   }
   private writeHeader(baked: boolean): void {
     this.headerBaked = baked;
-    const view = new DataView(this.header.slice(0));
+    const view = this.headerView;
     if (this.volume) view.setUint32(44, baked ? (this.volume.sh === 2 ? 4 : 2) : 0, true); // vec4u per probe; 0 = unbaked
-    this.reflections.forEach((_, j) => view.setUint32(64 + j * 64 + 60, +baked, true));
+    for (let j = 0; j < this.reflections.length; j++) view.setUint32(64 + j * 64 + 60, +baked, true);
     this.gpu!.queue.writeBuffer(this.buffer!, 0, view.buffer);
   }
   private release(): void {
+    const resources = this.captureResources;
+    this.captureResources = undefined;
+    if (resources) for (const resource of resources.owned) resource.destroy();
     this.buffer?.destroy();
     this.buffer = this.gpu = undefined;
     this.entry = [];
     this.cached = undefined;
     this.capture = undefined;
     this.bakeDevice = undefined;
+    this.captureProxy = undefined;
     this.bakeCache.clear();
   }
 
@@ -605,29 +649,54 @@ export class LightProbes extends ShaderEffect {
         device = this.gpu;
       // One ordinary frame first: shadow maps and other per-frame inputs the capture samples come from the previous frame.
       engine.render({ culling: false });
+      if (this.disposed || this.gpu !== device) throw new Error('Light probe bake interrupted');
       for (let b = 0; b < bounces; b++) {
         this.pending = true;
         device.pushErrorScope('validation');
-        engine.render({ culling: false });
+        try {
+          engine.render({ culling: false });
+        } catch (error) {
+          // A synchronous receiver failure must not leave the device's error-scope stack open.
+          try {
+            await device.popErrorScope();
+          } catch {
+            /* Keep the original rendering failure. */
+          }
+          throw error;
+        }
         const error = await device.popErrorScope();
         if (error) throw new Error(`Light probe bake failed: ${error.message}`);
         if (this.pending) throw new Error('Light probe capture did not run (the engine did not render)');
         if (this.disposed || this.gpu !== device) throw new Error('Light probe bake interrupted');
         this.writeHeader(true);
       }
-      const read = device.createBuffer({
-        size: this.texelCount * 8,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-      });
+      const resources = this.captureResources!;
+      let read = resources.read;
+      if (!read) {
+        read = device.createBuffer({
+          size: this.texelCount * 8,
+          usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+        });
+        resources.owned.push(read);
+        resources.read = read;
+      }
+      let mapped = false;
       try {
         const encoder = device.createCommandEncoder();
         encoder.copyBufferToBuffer(this.buffer!, HEADER_BYTES, read, 0, this.texelCount * 8);
-        device.queue.submit([encoder.finish()]);
+        resources.commands[0] = encoder.finish();
+        device.queue.submit(resources.commands);
         await read.mapAsync(GPUMapMode.READ);
-        this.snapshot = new Uint32Array(read.getMappedRange().slice(0));
-        read.unmap();
+        mapped = true;
+        if (this.disposed || this.gpu !== device) throw new Error('Light probe bake interrupted');
+        const words = new Uint32Array(read.getMappedRange());
+        // Public texels have snapshot lifetime. An unobserved private result can
+        // reuse its large backing store until the getter actually publishes it.
+        if (this.snapshot && !this.snapshotExposed && this.snapshot.length === words.length) this.snapshot.set(words);
+        else this.snapshot = words.slice();
+        this.snapshotExposed = false;
       } finally {
-        read.destroy();
+        if (mapped) read.unmap();
       }
     } finally {
       this.pending = false;
@@ -669,6 +738,7 @@ export class LightProbes extends ShaderEffect {
   /** @internal The last bake's 32-bit words: volume probes first (each its SH as float16 rgb triples in 16 words for L2, 8 for
    * L1), then each reflection probe's octahedral levels (two words per texel: float16 r, g, b, 0). */
   get texels(): Uint32Array | undefined {
+    if (this.snapshot) this.snapshotExposed = true;
     return this.snapshot;
   }
   /** @internal First texel of reflection probe `index`. */
@@ -676,235 +746,322 @@ export class LightProbes extends ShaderEffect {
     return this.offsets[index];
   }
 
-  private captureAll(c: Context): void {
-    const device = c.device,
-      env = this.environment,
-      created: Array<GPUTexture | GPUBuffer> = [];
-    const track = <T extends GPUTexture | GPUBuffer>(r: T): T => {
-      created.push(r);
-      return r;
+  private resources(device: GPUDevice): CaptureResources {
+    if (this.captureResources?.device === device) return this.captureResources;
+    const owned: Array<GPUBuffer | GPUTexture> = [];
+    const track = <T extends GPUBuffer | GPUTexture>(resource: T): T => {
+      owned.push(resource);
+      return resource;
     };
     try {
-      const shader = captureCore(c.shader),
-        key = shader + c.descriptor.vertex.buffers?.length;
-      if (this.capture?.key !== key) {
-        const module = device.createShaderModule({ code: shader });
-        this.capture = {
-          key,
-          pipeline: device.createRenderPipeline({
-            layout: 'auto',
-            vertex: { module, entryPoint: 'vertex', buffers: c.descriptor.vertex.buffers },
-            fragment: { module, entryPoint: 'fragment', targets: [{ format: 'rgba16float' }] },
-            depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'greater-equal' },
-            primitive: { cullMode: 'none' },
-          }),
-        };
-      }
-      const bake = this.bakePipelines(device),
-        frame = track(device.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
-      const params = track(
-          device.createBuffer({ size: 256 * 8, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
-        ),
-        sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
-      const bindings = [...c.bindings, { binding: CAPTURE_BINDING, resource: { buffer: frame } }],
-        lighting = engineRuntime(this.engine!).lighting;
-      const descriptor: GPURenderPipelineDescriptor = {
-        ...c.descriptor,
-        multisample: { count: 1 },
-        depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'greater-equal' },
-      };
-      // Models compile through a device whose shader modules get the same light-loop and fog edits as core's capture shader.
-      const proxy = new Proxy(device, {
-        get: (target, property) =>
-          property === 'createShaderModule'
-            ? (d: GPUShaderModuleDescriptor) => target.createShaderModule({ ...d, code: captureLights(d.code) })
-            : ((value) => (typeof value === 'function' ? value.bind(target) : value))(Reflect.get(target, property)),
-      });
-      // Capture targets: six rgba16float layers (alpha 0 where nothing was drawn) and one depth texture per face edge.
-      const sizes = new Set<number>([
-        ...(this.volume ? [this.volume.resolution ?? 16] : []),
-        ...(this.reflections.length ? [this.resolution] : []),
-      ]);
-      const targets = new Map(
-        [...sizes].map((size) => [
-          size,
-          {
-            color: track(
-              device.createTexture({
-                size: [size, size, 6],
-                format: 'rgba16float',
-                usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-              }),
-            ),
-            depth: track(
-              device.createTexture({
-                size: [size, size],
-                format: 'depth24plus',
-                usage: GPUTextureUsage.RENDER_ATTACHMENT,
-              }),
-            ),
-          },
-        ]),
-      );
-      const values = new Float32Array(28);
-      const probe = (position: Vec3, size: number, finish: (encoder: GPUCommandEncoder, faces: GPUTexture) => void) => {
-        const faces = targets.get(size)!;
-        FACES.forEach(([forward, up], f) => {
-          const camera = new Camera({
-            fov: 90,
-            position,
-            target: position.map((v, i) => v + forward[i]) as unknown as Vec3,
-            near: this.near,
-            far: this.far,
+      const frame = track(device.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })),
+        params = track(device.createBuffer({ size: 256 * 8, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })),
+        sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' }),
+        targets = new Map<number, CaptureTarget>();
+      const makeTarget = (size: number) => {
+        if (targets.has(size)) return;
+        const color = track(
+            device.createTexture({
+              size: [size, size, 6],
+              format: 'rgba16float',
+              usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+            }),
+          ),
+          depth = track(
+            device.createTexture({
+              size: [size, size],
+              format: 'depth24plus',
+              usage: GPUTextureUsage.RENDER_ATTACHMENT,
+            }),
+          ),
+          depthView = depth.createView(),
+          colors: GPUTextureView[] = [],
+          passes: GPURenderPassDescriptor[] = [];
+        for (let face = 0; face < 6; face++) {
+          const view = color.createView({ dimension: '2d', baseArrayLayer: face, arrayLayerCount: 1 });
+          colors.push(view);
+          passes.push({
+            colorAttachments: [{ view, clearValue: [0, 0, 0, 0], loadOp: 'clear', storeOp: 'store' }],
+            depthStencilAttachment: {
+              view: depthView,
+              depthClearValue: 0,
+              depthLoadOp: 'clear',
+              depthStoreOp: 'store',
+            },
           });
-          camera.up = up;
-          camera.update(1, true);
-          values.set(camera.matrix);
-          values.set(position, 16);
-          values[19] = 0;
-          values.set(lighting.direction, 20);
-          values.set(lighting.radiance, 24);
-          device.queue.writeBuffer(frame, 0, values);
-          const encoder = device.createCommandEncoder(),
-            color = faces.color.createView({ dimension: '2d', baseArrayLayer: f, arrayLayerCount: 1 }),
-            depth = faces.depth.createView();
-          encoder
-            .beginRenderPass({
-              colorAttachments: [{ view: color, clearValue: [0, 0, 0, 0], loadOp: 'clear', storeOp: 'store' }],
-              depthStencilAttachment: { view: depth, depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'store' },
-            })
-            .end();
-          const saved = { encoder: c.encoder, color: c.color, depth: c.depth, descriptor: c.descriptor };
-          Object.assign(c, { encoder, color, depth, descriptor });
-          try {
-            c.draw({ pipeline: this.capture!.pipeline, bindings, clear: false });
-          } finally {
-            Object.assign(c, saved);
-          }
-          const view: Context = {
-            ...c,
-            device: proxy,
-            encoder,
-            camera,
-            color,
-            depth,
-            descriptor,
-            format: 'rgba16float',
-            width: size,
-            height: size,
-          };
-          for (const model of this.captured) model.draw(view, 'beauty', color, depth);
-          if (f === 5) finish(encoder, faces.color);
-          device.queue.submit([encoder.finish()]);
-        });
-      };
-      const groups = new Map<string, GPUBindGroup>();
-      const group = (entry: 'sh' | 'resample' | 'prefilter', slot: number, faces: GPUTexture) => {
-        const id = entry + slot + faces.width;
-        let g = groups.get(id);
-        if (!g) {
-          const p = bake[entry],
-            all: GPUBindGroupEntry[] = [
-              { binding: 0, resource: { buffer: this.buffer! } },
-              { binding: 1, resource: { buffer: params, offset: slot * 256, size: 32 } },
-            ];
-          if (entry !== 'prefilter' || this.bakeSamples > 0)
-            all.push(
-              { binding: 2, resource: faces.createView({ dimension: '2d-array' }) },
-              { binding: 3, resource: sampler },
-              ...(env
-                ? [
-                    { binding: 4, resource: env.specularView },
-                    { binding: 5, resource: { buffer: env.paramsBuffer, offset: 0, size: 16 } },
-                  ]
-                : []),
-            );
-          // Without an environment `sh` reads the faces with textureLoad only, so its layout has no sampler.
-          groups.set(
-            id,
-            (g = device.createBindGroup({
-              layout: p.getBindGroupLayout(0),
-              entries: all.filter((e) => entry !== 'sh' || env || e.binding !== 3),
-            })),
-          );
         }
-        return g;
-      };
-      // One 256-byte uniform slot per dispatch (Bake: offset, size, source, sourceSize, roughness, count), written before the
-      // probe's last face is submitted; the next probe's write is queued after that submit.
-      const slots = new Uint32Array(64 * 8),
-        floats = new Float32Array(slots.buffer);
-      type Job = {
-        entry: 'sh' | 'resample' | 'prefilter';
-        offset: number;
-        size: number;
-        roughness?: number;
-        source?: number;
-        count?: number;
-      };
-      const run = (jobs: Job[]) => (encoder: GPUCommandEncoder, faces: GPUTexture) => {
-        jobs.forEach((job, slot) => {
-          slots.set([job.offset, job.size, job.source ?? 0, this.resolution, 0, job.count ?? 0, 0, 0], slot * 64);
-          floats[slot * 64 + 4] = job.roughness ?? 0;
+        targets.set(size, {
+          color,
+          depth,
+          array: color.createView({ dimension: '2d-array' }),
+          colors,
+          depthView,
+          passes,
+          groups: new Map(),
         });
-        device.queue.writeBuffer(params, 0, slots, 0, jobs.length * 64);
-        const pass = encoder.beginComputePass();
-        jobs.forEach((job, slot) => {
-          const x = job.entry === 'sh' ? 1 : Math.ceil(job.size / 8);
-          pass.setPipeline(bake[job.entry]);
-          pass.setBindGroup(0, group(job.entry, slot, faces));
-          pass.dispatchWorkgroups(x, x);
-        });
-        pass.end();
       };
-      if (this.volume) {
-        const v = this.volume,
-          k = v.sh === 1 ? 4 : 9,
-          words = v.sh === 1 ? 2 : 4;
-        for (let z = 0; z < v.counts[2]; z++)
-          for (let y = 0; y < v.counts[1]; y++)
-            for (let x = 0; x < v.counts[0]; x++) {
-              const position = [x, y, z].map(
-                (n, i) => v.min[i] + ((n + 0.5) * (v.max[i] - v.min[i])) / v.counts[i],
-              ) as unknown as Vec3;
-              probe(
-                position,
-                v.resolution ?? 16,
-                run([
-                  { entry: 'sh', offset: (x + v.counts[0] * (y + v.counts[1] * z)) * words, size: words, count: k },
-                ]),
-              );
-            }
+      if (this.volume) makeTarget(this.volume.resolution ?? 16);
+      if (this.reflections.length) makeTarget(this.resolution);
+      const cameras: Camera[] = [],
+        positions: [number, number, number][] = [],
+        aims: [number, number, number][] = [];
+      for (let face = 0; face < 6; face++) {
+        const position: [number, number, number] = [0.1, 0.1, 0.1],
+          target: [number, number, number] = [0.1, 0.1, 0.1],
+          camera = new Camera({ fov: 90, position, target, near: this.near, far: this.far });
+        camera.up = FACES[face][1];
+        cameras.push(camera);
+        positions.push(position);
+        aims.push(target);
       }
-      // Reflection probes: level 0 resampled from the faces, then each rougher level convolved from level 0 (`source`).
-      const levels = levelCount(this.resolution);
-      this.reflections.forEach((r, j) => {
-        const base = this.offsets[j],
-          jobs: Job[] = [{ entry: 'resample', offset: base, size: this.resolution }];
-        for (
-          let level = 1, offset = base + this.resolution ** 2;
-          level < levels;
-          offset += (this.resolution >> level) ** 2, level++
-        )
-          jobs.push({
-            entry: 'prefilter',
-            offset,
-            size: this.resolution >> level,
-            roughness: level / (levels - 1),
-            source: base,
-            count: this.bakeSamples,
-          });
-        probe(r.position, this.resolution, run(jobs));
-      });
-    } finally {
-      // Destroy after the GPU is done with them (destroy is deferred by the queue on WebGPU implementations that track use).
-      device.queue.onSubmittedWorkDone().then(
-        () => {
-          for (const r of created) r.destroy();
-        },
-        () => undefined,
-      );
+      const bindings: GPUBindGroupEntry[] = [],
+        slots = new Uint32Array(64 * 8),
+        resources: CaptureResources = {
+          device,
+          owned,
+          frame,
+          params,
+          sampler,
+          targets,
+          cameras,
+          positions,
+          aims,
+          bindings,
+          frameBinding: { binding: CAPTURE_BINDING, resource: { buffer: frame } },
+          values: new Float32Array(28),
+          slots,
+          floats: new Float32Array(slots.buffer),
+          commands: [],
+          descriptor: {} as GPURenderPipelineDescriptor,
+          depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'greater-equal' },
+          multisample: { count: 1 },
+          draw: { pipeline: this.capture!.pipeline, bindings, clear: false },
+        };
+      this.captureResources = resources;
+      return resources;
+    } catch (error) {
+      for (const resource of owned) resource.destroy();
+      throw error;
     }
+  }
+  private captureAll(c: Context): void {
+    const device = c.device,
+      buffers = c.descriptor.vertex.buffers?.length;
+    if (this.capture?.source !== c.shader || this.capture.buffers !== buffers) {
+      const shader = captureCore(c.shader),
+        module = device.createShaderModule({ code: shader });
+      this.capture = {
+        source: c.shader,
+        buffers,
+        pipeline: device.createRenderPipeline({
+          layout: 'auto',
+          vertex: { module, entryPoint: 'vertex', buffers: c.descriptor.vertex.buffers },
+          fragment: { module, entryPoint: 'fragment', targets: [{ format: 'rgba16float' }] },
+          depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'greater-equal' },
+          primitive: { cullMode: 'none' },
+        }),
+      };
+    }
+    const bake = this.bakePipelines(device),
+      resources = this.resources(device),
+      descriptor = resources.descriptor;
+    // Copy this frame's optional descriptor keys, without retaining keys removed by a host between bakes.
+    for (const key in descriptor)
+      if (!Object.prototype.hasOwnProperty.call(c.descriptor, key))
+        delete (descriptor as unknown as Record<string, unknown>)[key];
+    Object.assign(descriptor, c.descriptor);
+    descriptor.multisample = resources.multisample;
+    descriptor.depthStencil = resources.depthStencil;
+    resources.bindings.length = c.bindings.length + 1;
+    for (let i = 0; i < c.bindings.length; i++) resources.bindings[i] = c.bindings[i];
+    resources.bindings[c.bindings.length] = resources.frameBinding;
+    resources.draw.pipeline = this.capture!.pipeline;
+    const environmentView = this.environment?.specularView,
+      environmentParams = this.environment?.paramsBuffer;
+    if (resources.environmentView !== environmentView || resources.environmentParams !== environmentParams) {
+      for (const target of resources.targets.values()) target.groups.clear();
+      resources.environmentView = environmentView;
+      resources.environmentParams = environmentParams;
+    }
+    // The adapter binds native methods once, preserving native receivers and runtime method overrides.
+    if (this.captureProxy?.device !== device)
+      this.captureProxy = { device, proxy: captureDevice(device, captureLights) };
+    if (!resources.view) resources.view = { ...c };
+    if (this.volume) {
+      const volume = this.volume,
+        size = volume.resolution ?? 16,
+        position = this.volumePosition;
+      for (let z = 0; z < volume.counts[2]; z++)
+        for (let y = 0; y < volume.counts[1]; y++)
+          for (let x = 0; x < volume.counts[0]; x++) {
+            position[0] = volume.min[0] + ((x + 0.5) * (volume.max[0] - volume.min[0])) / volume.counts[0];
+            position[1] = volume.min[1] + ((y + 0.5) * (volume.max[1] - volume.min[1])) / volume.counts[1];
+            position[2] = volume.min[2] + ((z + 0.5) * (volume.max[2] - volume.min[2])) / volume.counts[2];
+            this.captureProbe(
+              c,
+              resources,
+              bake,
+              position,
+              size,
+              x + volume.counts[0] * (y + volume.counts[1] * z),
+              -1,
+            );
+          }
+    }
+    for (let index = 0; index < this.reflections.length; index++)
+      this.captureProbe(c, resources, bake, this.reflections[index].position, this.resolution, -1, index);
+  }
+  private captureProbe(
+    c: Context,
+    resources: CaptureResources,
+    bake: BakePipelines,
+    position: Vec3,
+    size: number,
+    volumeIndex: number,
+    reflectionIndex: number,
+  ): void {
+    const device = c.device,
+      target = resources.targets.get(size)!,
+      lighting = engineRuntime(this.engine!).lighting,
+      values = resources.values,
+      view = resources.view!;
+    for (let face = 0; face < 6; face++) {
+      const camera = resources.cameras[face],
+        eye = resources.positions[face],
+        aim = resources.aims[face],
+        forward = FACES[face][0];
+      for (let axis = 0; axis < 3; axis++) {
+        eye[axis] = position[axis];
+        aim[axis] = position[axis] + forward[axis];
+      }
+      // Draw receivers borrow this camera; restore its capture settings before reusing it.
+      camera.fov = 90;
+      camera.near = this.near;
+      camera.far = this.far;
+      camera.position = eye;
+      camera.target = aim;
+      camera.up = FACES[face][1];
+      camera.project = undefined;
+      camera.cancelFit();
+      camera.update(1, true);
+      values.set(camera.matrix);
+      values.set(position, 16);
+      values[19] = 0;
+      values.set(lighting.direction, 20);
+      values.set(lighting.radiance, 24);
+      device.queue.writeBuffer(resources.frame, 0, values);
+      const encoder = device.createCommandEncoder(),
+        color = target.colors[face],
+        depth = target.depthView,
+        savedEncoder = c.encoder,
+        savedColor = c.color,
+        savedDepth = c.depth,
+        savedDescriptor = c.descriptor;
+      encoder.beginRenderPass(target.passes[face]).end();
+      c.encoder = encoder;
+      c.color = color;
+      c.depth = depth;
+      c.descriptor = resources.descriptor;
+      resources.draw.pipeline = this.capture!.pipeline;
+      resources.draw.bindings = resources.bindings;
+      resources.draw.clear = false;
+      try {
+        c.draw(resources.draw);
+      } finally {
+        c.encoder = savedEncoder;
+        c.color = savedColor;
+        c.depth = savedDepth;
+        c.descriptor = savedDescriptor;
+      }
+      if (this.disposed || this.gpu !== device) throw new Error('Light probe bake interrupted');
+      for (const key in view)
+        if (!Object.prototype.hasOwnProperty.call(c, key)) delete (view as unknown as Record<string, unknown>)[key];
+      Object.assign(view, c);
+      view.device = this.captureProxy!.proxy;
+      view.encoder = encoder;
+      view.camera = camera;
+      view.color = color;
+      view.depth = depth;
+      view.descriptor = resources.descriptor;
+      view.format = 'rgba16float';
+      view.width = view.height = size;
+      for (const model of this.captured) {
+        model.draw(view, 'beauty', color, depth);
+        if (this.disposed || this.gpu !== device) throw new Error('Light probe bake interrupted');
+      }
+      if (face === 5) this.filterProbe(resources, target, bake, encoder, volumeIndex, reflectionIndex);
+      resources.commands[0] = encoder.finish();
+      device.queue.submit(resources.commands);
+    }
+  }
+  private captureGroup(
+    resources: CaptureResources,
+    target: CaptureTarget,
+    pipeline: GPUComputePipeline,
+    entry: keyof BakePipelines,
+    slot: number,
+  ): GPUBindGroup {
+    let groups = target.groups.get(pipeline);
+    if (!groups) target.groups.set(pipeline, (groups = []));
+    let group = groups[slot];
+    if (!group) {
+      const entries: GPUBindGroupEntry[] = [
+        { binding: 0, resource: { buffer: this.buffer! } },
+        { binding: 1, resource: { buffer: resources.params, offset: slot * 256, size: 32 } },
+      ];
+      if (entry !== 'prefilter' || this.bakeSamples > 0) {
+        entries.push({ binding: 2, resource: target.array });
+        // Without an environment SH reads textureLoad and the sampler is absent from its static layout.
+        if (entry !== 'sh' || this.environment) entries.push({ binding: 3, resource: resources.sampler });
+        if (this.environment)
+          entries.push(
+            { binding: 4, resource: resources.environmentView! },
+            { binding: 5, resource: { buffer: resources.environmentParams!, offset: 0, size: 16 } },
+          );
+      }
+      group = resources.device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries });
+      groups[slot] = group;
+    }
+    return group;
+  }
+  private filterProbe(
+    resources: CaptureResources,
+    target: CaptureTarget,
+    bake: BakePipelines,
+    encoder: GPUCommandEncoder,
+    volumeIndex: number,
+    reflectionIndex: number,
+  ): void {
+    const slots = resources.slots,
+      floats = resources.floats,
+      volume = reflectionIndex === -1,
+      count = volume ? 1 : levelCount(this.resolution),
+      base = this.offsets[reflectionIndex];
+    let offset = volume ? volumeIndex * (this.volume!.sh === 1 ? 2 : 4) : base;
+    for (let slot = 0; slot < count; slot++) {
+      const at = slot * 64,
+        size = volume ? (this.volume!.sh === 1 ? 2 : 4) : this.resolution >> slot;
+      slots[at] = offset;
+      slots[at + 1] = size;
+      slots[at + 2] = !volume && slot > 0 ? base : 0;
+      slots[at + 3] = this.resolution;
+      floats[at + 4] = !volume && slot > 0 ? slot / (count - 1) : 0;
+      slots[at + 5] = volume ? (this.volume!.sh === 1 ? 4 : 9) : slot > 0 ? this.bakeSamples : 0;
+      slots[at + 6] = slots[at + 7] = 0;
+      if (!volume) offset += size ** 2;
+    }
+    resources.device.queue.writeBuffer(resources.params, 0, slots, 0, count * 64);
+    const pass = encoder.beginComputePass();
+    for (let slot = 0; slot < count; slot++) {
+      const entry = volume ? 'sh' : slot === 0 ? 'resample' : 'prefilter',
+        size = slots[slot * 64 + 1],
+        x = volume ? 1 : Math.ceil(size / 8),
+        pipeline = bake[entry];
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(0, this.captureGroup(resources, target, pipeline, entry, slot));
+      pass.dispatchWorkgroups(x, x);
+    }
+    pass.end();
   }
   private bakePipelines(device: GPUDevice): BakePipelines {
     if (this.bakeDevice !== device) {

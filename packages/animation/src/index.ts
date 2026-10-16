@@ -28,6 +28,13 @@ interface Deformation {
   weights: GPUBuffer;
   bones: GPUBuffer;
   palette: Float32Array;
+  // These private input buffers keep their last successfully queued upload.
+  // The shared deformed output is still dispatched for every render.
+  paletteBits: Uint32Array;
+  uploadedPalette: Uint32Array;
+  uploadedWeights: Float32Array;
+  bonesUploaded: boolean;
+  weightsUploaded: boolean;
   joints: number[];
   inverseBind: Float32Array[];
 }
@@ -222,6 +229,11 @@ export class Animation implements EnginePlugin {
           weights: undefined!,
           bones: undefined!,
           palette: new Float32Array(),
+          paletteBits: new Uint32Array(),
+          uploadedPalette: new Uint32Array(),
+          uploadedWeights: new Float32Array(p.weights.length),
+          bonesUploaded: false,
+          weightsUploaded: false,
           joints: [],
           inverseBind: [],
         };
@@ -307,6 +319,8 @@ export class Animation implements EnginePlugin {
       record.joints = joints;
       record.inverseBind = joints.map((_, i) => inverseBind.subarray(i * 16, i * 16 + 16));
       record.palette = Float32Array.from(joints.length ? joints.flatMap(() => Array.from(identity)) : identity);
+      record.paletteBits = new Uint32Array(record.palette.buffer);
+      record.uploadedPalette = new Uint32Array(record.palette.length);
       const source = upload(p.vertices),
         output = upload(p.vertices, GPUBufferUsage.STORAGE | GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_SRC),
         morph = upload(deltas),
@@ -347,7 +361,9 @@ export class Animation implements EnginePlugin {
   private deform(context: PassContext): void {
     if (context.backend !== 'webgpu' || this.model.disposed) return;
     for (const r of this.resources) {
-      if (r.primitive.weights.some((v) => !Number.isFinite(v))) throw new RangeError('Invalid morph weights');
+      const weights = r.primitive.weights;
+      for (let i = 0; i < weights.length; i++)
+        if (!Number.isFinite(weights[i])) throw new RangeError('Invalid morph weights');
       if (r.joints.length) {
         if (!invertMatrixStable(r.primitive.node.matrix, this.inverse, this.workspace))
           throw new Error('Singular skinned mesh transform');
@@ -356,11 +372,40 @@ export class Animation implements EnginePlugin {
           multiplyMatrices(this.inverse, this.joint, this.product);
           r.palette.set(this.product, i * 16);
         }
-        if (r.palette.some((v) => !Number.isFinite(v))) throw new RangeError('Skin matrix overflow');
-        context.device.queue.writeBuffer(r.bones, 0, r.palette as Float32Array<ArrayBuffer>);
+        for (let i = 0; i < r.palette.length; i++)
+          if (!Number.isFinite(r.palette[i])) throw new RangeError('Skin matrix overflow');
+        let changed = !r.bonesUploaded;
+        for (let i = 0; i < r.paletteBits.length; i++) if (r.paletteBits[i] !== r.uploadedPalette[i]) changed = true;
+        if (changed) {
+          context.device.queue.writeBuffer(r.bones, 0, r.palette as Float32Array<ArrayBuffer>);
+          r.uploadedPalette.set(r.paletteBits);
+          r.bonesUploaded = true;
+        }
       }
-      if (r.primitive.weights.length)
-        context.device.queue.writeBuffer(r.weights, 0, r.primitive.weights as Float32Array<ArrayBuffer>);
+      if (r.primitive.weights.length) {
+        const values = r.primitive.weights;
+        if (
+          !(values instanceof Float32Array) ||
+          !(values.buffer instanceof ArrayBuffer) ||
+          values.length !== r.uploadedWeights.length
+        ) {
+          // Preserve native writeBuffer validation and partial-write behavior
+          // when callers replace a weight view with a different shape or type.
+          // Shared memory can change while native writeBuffer copies its input.
+          r.weightsUploaded = false;
+          context.device.queue.writeBuffer(r.weights, 0, values as Float32Array<ArrayBuffer>);
+        } else {
+          let changed = !r.weightsUploaded;
+          for (let i = 0; i < values.length; i++)
+            // Finite Float32 values differ in bits exactly when SameValue differs.
+            if (!Object.is(values[i], r.uploadedWeights[i])) changed = true;
+          if (changed) {
+            context.device.queue.writeBuffer(r.weights, 0, values as Float32Array<ArrayBuffer>);
+            r.uploadedWeights.set(values);
+            r.weightsUploaded = true;
+          }
+        }
+      }
       const pass = context.encoder.beginComputePass();
       pass.setPipeline(this.pipeline!);
       pass.setBindGroup(0, r.group);

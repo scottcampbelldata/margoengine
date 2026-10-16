@@ -98,7 +98,7 @@ export class GPURenderer implements Renderer {
       command?: Uint32Array;
     }
   >();
-  private readonly variants = new Map<string, GPURenderPipeline>();
+  private readonly variants: [string, string, GPURenderPipeline][] = [];
   private readonly groups = new WeakMap<GPURenderPipeline, { bindings: GPUBindGroupEntry[]; group: GPUBindGroup }>();
   private readonly uniform: GPUBuffer;
   private readonly bindGroup: GPUBindGroup;
@@ -301,21 +301,21 @@ export class GPURenderer implements Renderer {
           !options.pipeline &&
           (context.shader !== wgsl || context.format !== this.format || context.descriptor !== this.descriptor)
         ) {
-          const key =
-            context.descriptor.multisample?.count +
-            context.format +
-            context.descriptor.depthStencil?.format +
-            context.shader;
-          let cached = this.variants.get(key);
+          const key = context.descriptor.multisample?.count + context.format + context.descriptor.depthStencil?.format;
+          // Keep shader source separate: hashing a new concatenated shader key
+          // flattens its entire string on every draw, even on cache hits.
+          let cached: GPURenderPipeline | undefined;
+          for (const variant of this.variants)
+            if (variant[0] === context.shader && variant[1] === key) cached = variant[2];
           if (!cached) {
-            if (this.variants.size >= 64) throw new RangeError('Shader limit: 64');
+            if (this.variants.length >= 64) throw new RangeError('Shader limit: 64');
             const module = this.device.createShaderModule({ code: context.shader });
             cached = this.device.createRenderPipeline({
               ...context.descriptor,
               vertex: { ...this.descriptor.vertex, module },
               fragment: { ...this.descriptor.fragment!, module, targets: [{ format: context.format }] },
             });
-            this.variants.set(key, cached);
+            this.variants.push([context.shader, key, cached]);
           }
           pipeline = cached;
         }

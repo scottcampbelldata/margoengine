@@ -16,6 +16,7 @@ import { preset } from '../../shared/preset.js';
 import { cascadeSplits, fitCascades } from './cascades.js';
 import { shadowSampling, shadowDepth } from './shader.js';
 import { instanceLayout, instancedDepth } from '../../shared/instances.js';
+import { shadowPrimitivesInto } from '../../shared/shadow-source.js';
 export { cascadeSplits, fitCascades } from './cascades.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: {
@@ -74,6 +75,7 @@ interface Source {
   version: number;
   removeLighting?: () => void;
   meshPrimitive?: ShadowPrimitive[];
+  primitiveBuffers?: ShadowPrimitive[][];
 }
 interface Draw {
   uniforms: GPUBuffer[];
@@ -105,6 +107,7 @@ export class Shadows implements EnginePlugin {
   private pipelines = new Map<number, GPURenderPipeline>();
   private draws = new Map<Mesh, Map<GPUBuffer, Draw>>();
   private sources: Source[] = [];
+  private primitiveDepth = 0;
   private readonly cascadeCount: 1 | 4;
   private readonly values = new Float32Array(92);
   private readonly ranges = this.values.subarray(84, 88);
@@ -174,18 +177,24 @@ export class Shadows implements EnginePlugin {
     )
       throw new RangeError('Invalid shadow bounds: finite world-space min < max required');
     const points = o.bounds?.points;
-    if (
-      points !== undefined &&
-      (!Array.isArray(points) ||
-        points.length < 4 ||
-        points.some(
-          (point) =>
-            !Array.isArray(point) ||
-            point.length !== 3 ||
-            !point.every(Number.isFinite) ||
-            point.some((value, axis) => value < o.bounds!.min[axis] || value > o.bounds!.max[axis]),
-        ))
-    )
+    let validPoints = true;
+    if (points !== undefined) {
+      validPoints = Array.isArray(points) && points.length >= 4;
+      if (validPoints)
+        for (let i = 0; i < points.length && validPoints; i++) {
+          const point = points[i];
+          validPoints = Array.isArray(point) && point.length === 3;
+          if (validPoints)
+            for (let axis = 0; axis < 3; axis++) {
+              const value = point[axis];
+              if (!Number.isFinite(value) || value < o.bounds!.min[axis] || value > o.bounds!.max[axis]) {
+                validPoints = false;
+                break;
+              }
+            }
+        }
+    }
+    if (!validPoints)
       throw new RangeError('Invalid shadow bounds points: at least four finite Vec3 points inside min/max required');
     if ((o.bounds ? 1 : 4) !== this.cascadeCount)
       throw new RangeError('Shadow bounds mode cannot change after construction');
@@ -488,7 +497,8 @@ export class Shadows implements EnginePlugin {
         maxX = -Infinity,
         maxY = -Infinity,
         maxZ = -Infinity;
-      for (const p of points) {
+      for (let i = 0; i < points.length; i++) {
+        const p = points[i];
         const x = p[0] * xx + p[1] * xy + p[2] * xz,
           y = p[0] * yx + p[1] * yy + p[2] * yz,
           z = p[0] * zx + p[1] * zy + p[2] * zz;
@@ -555,6 +565,7 @@ export class Shadows implements EnginePlugin {
     this.depthAttachment.depthLoadOp = cached ? 'clear' : 'load';
     const pass = c.encoder.beginRenderPass(this.depthPass),
       matrix = this.cascadeMatrices[cascade];
+    const level = this.primitiveDepth++;
     try {
       for (let i = 0; i < this.sources.length; i++) {
         const r = this.sources[i];
@@ -581,7 +592,18 @@ export class Shadows implements EnginePlugin {
           primitive.index = buffers.index;
           primitive.count = node.geometry.indices.length;
           primitives = r.meshPrimitive;
-        } else primitives = r.source.shadowPrimitives ?? emptyPrimitives;
+        } else {
+          const writer = (
+            r.source as ShadowSource & {
+              [shadowPrimitivesInto]?: (out: ShadowPrimitive[]) => boolean;
+            }
+          )[shadowPrimitivesInto];
+          if (writer) {
+            const buffers = (r.primitiveBuffers ??= []),
+              buffer = (buffers[level] ??= []);
+            primitives = writer.call(r.source, buffer) ? buffer : (r.source.shadowPrimitives ?? emptyPrimitives);
+          } else primitives = r.source.shadowPrimitives ?? emptyPrimitives;
+        }
         for (let i = 0; i < primitives.length; i++) {
           const primitive = primitives[i],
             node = primitive.node;
@@ -601,6 +623,8 @@ export class Shadows implements EnginePlugin {
         pass.end();
       } catch {}
       throw error;
+    } finally {
+      this.primitiveDepth--;
     }
     pass.end();
   }

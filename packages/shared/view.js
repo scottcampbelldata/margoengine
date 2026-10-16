@@ -5,14 +5,44 @@ export function viewMatrix(out, camera) {
   let x = p[0] - camera.target[0],
     y = p[1] - camera.target[1],
     z = p[2] - camera.target[2];
-  const length = Math.hypot(x, y, z);
+  // Match Math.hypot's normalized, compensated three-component sum without boxing scalar call arguments.
+  // https://github.com/v8/v8/blob/main/src/builtins/math.tq
+  const lengthX = Math.abs(x),
+    lengthY = Math.abs(y),
+    lengthZ = Math.abs(z),
+    lengthMax = Math.max(Math.max(lengthX, lengthY), lengthZ);
+  let length;
+  if (lengthX === Infinity || lengthY === Infinity || lengthZ === Infinity) length = Infinity;
+  else if (lengthMax !== lengthMax) length = lengthMax;
+  else if (lengthMax === 0) length = 0;
+  else {
+    const first = (lengthX / lengthMax) * (lengthX / lengthMax),
+      second = (lengthY / lengthMax) * (lengthY / lengthMax),
+      correction = first + second - first - second,
+      third = (lengthZ / lengthMax) * (lengthZ / lengthMax) - correction;
+    length = Math.sqrt(first + second + third) * lengthMax;
+  }
   x /= length;
   y /= length;
   z /= length;
   let xx = u[1] * z - u[2] * y,
     xy = u[2] * x - u[0] * z,
     xz = u[0] * y - u[1] * x;
-  const side = Math.hypot(xx, xy, xz);
+  const sideX = Math.abs(xx),
+    sideY = Math.abs(xy),
+    sideZ = Math.abs(xz),
+    sideMax = Math.max(Math.max(sideX, sideY), sideZ);
+  let side;
+  if (sideX === Infinity || sideY === Infinity || sideZ === Infinity) side = Infinity;
+  else if (sideMax !== sideMax) side = sideMax;
+  else if (sideMax === 0) side = 0;
+  else {
+    const first = (sideX / sideMax) * (sideX / sideMax),
+      second = (sideY / sideMax) * (sideY / sideMax),
+      correction = first + second - first - second,
+      third = (sideZ / sideMax) * (sideZ / sideMax) - correction;
+    side = Math.sqrt(first + second + third) * sideMax;
+  }
   if (!length || !side) throw new RangeError('Invalid camera view');
   xx /= side;
   xy /= side;

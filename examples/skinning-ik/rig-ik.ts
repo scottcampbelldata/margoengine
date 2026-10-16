@@ -18,41 +18,64 @@ export interface ArmIK {
 
 /** Read a node's current world position; solveArm refreshes the matrices itself. */
 export function worldPosition(mesh: Mesh): Point {
-  mesh.check();
-  return [mesh.matrix[12], mesh.matrix[13], mesh.matrix[14]];
+  return worldPositionInto(mesh, [0, 0, 0]);
 }
 
-const transformPoint = (matrix: ArrayLike<number>, point: Vec3): Point => [
-  matrix[0] * point[0] + matrix[4] * point[1] + matrix[8] * point[2] + matrix[12],
-  matrix[1] * point[0] + matrix[5] * point[1] + matrix[9] * point[2] + matrix[13],
-  matrix[2] * point[0] + matrix[6] * point[1] + matrix[10] * point[2] + matrix[14],
-];
+/** Write a world position into caller-owned storage without changing the fresh-result helper. */
+export function worldPositionInto(mesh: Mesh, out: Point): Point {
+  mesh.check();
+  const matrix = mesh.matrix;
+  out[0] = matrix[12];
+  out[1] = matrix[13];
+  out[2] = matrix[14];
+  return out;
+}
+
+const transformPoint = (matrix: ArrayLike<number>, point: Vec3, out: Point): Point => {
+  const x = point[0],
+    y = point[1],
+    z = point[2];
+  out[0] = matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12];
+  out[1] = matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13];
+  out[2] = matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14];
+  return out;
+};
 
 /** Convert an initial world-space contact point into the joint's local coordinates. */
-export function localPoint(mesh: Mesh, point: Vec3): Point {
+export function localPoint(
+  mesh: Mesh,
+  point: Vec3,
+  out: Point = [0, 0, 0],
+  inverse: Float64Array = new Float64Array(16),
+): Point {
   mesh.check();
-  const inverse = new Float64Array(16);
   if (!invertMatrixStable(mesh.matrix, inverse)) throw new Error('Singular grip transform');
-  return transformPoint(inverse, point);
+  return transformPoint(inverse, point, out);
 }
 
 /** Contact point follows the full joint transform, including model placement and scale. */
-export function gripPosition(joint: Mesh, localGrip: Vec3): Point {
+export function gripPosition(joint: Mesh, localGrip: Vec3, out: Point = [0, 0, 0]): Point {
   joint.check();
-  return transformPoint(joint.matrix, localGrip);
+  return transformPoint(joint.matrix, localGrip, out);
 }
 
 /** A held object's visible center is always attached to the palm, independently of its requested IK target. */
-export function holdObjectAtGrip(object: Mesh, joint: Mesh, localGrip: Vec3): Point {
+export function holdObjectAtGrip(
+  object: Mesh,
+  joint: Mesh,
+  localGrip: Vec3,
+  out: Point = [0, 0, 0],
+  inverse?: Float64Array,
+): Point {
   object.check();
   if (object.engine !== joint.engine) throw new Error('Grip nodes must belong to the same engine');
   const store = joint.engine.store;
   store.tick(false);
-  const world = gripPosition(joint, localGrip),
+  const world = gripPosition(joint, localGrip, out),
     parent = store.parents[object.id];
-  object.setPosition(parent === -1 ? world : localPoint(object.engine.meshes.get(parent)!, world));
+  object.setPosition(parent === -1 ? world : localPoint(object.engine.meshes.get(parent)!, world, out, inverse));
   store.tick(false);
-  return worldPosition(object);
+  return worldPositionInto(object, out);
 }
 
 /** World orientation for a hierarchy with positive uniform scales. */

@@ -150,12 +150,17 @@ test('Core draw bindings observe mutable buffer ranges and shader variants obser
     graph = new FrameGraph();
   let format = 'depth32float',
     explicit = true,
+    shader = 'shader-a',
+    samples = 4,
+    target = 'bgra8unorm',
     extras;
   graph.add({
     name: 'mutable bindings',
     order: -1,
     execute(c) {
-      c.descriptor = { ...c.descriptor, depthStencil: { format } };
+      c.descriptor = { ...c.descriptor, depthStencil: { format }, multisample: { count: samples } };
+      c.shader = shader;
+      c.format = target;
       const draw = c.draw;
       c.draw = () => draw(explicit ? { pipeline, bindings, colorAttachments: extras } : {});
     },
@@ -205,6 +210,30 @@ test('Core draw bindings observe mutable buffer ranges and shader variants obser
     renderer.render(camera, light, [], graph, 0);
     assert.equal(pipelines.length, variants + 1, 'Depth format was ignored');
     assert.equal(pipelines.at(-1).depthStencil.format, 'depth24plus');
+    shader = 'shader-b';
+    renderer.render(camera, light, [], graph, 0);
+    assert.equal(pipelines.length, variants + 2, 'Shader identity was ignored');
+    samples = 1;
+    renderer.render(camera, light, [], graph, 0);
+    assert.equal(pipelines.length, variants + 3, 'Sample count was ignored');
+    target = 'rgba16float';
+    renderer.render(camera, light, [], graph, 0);
+    assert.equal(pipelines.length, variants + 4, 'Color format was ignored');
+    shader = 'shader-a';
+    samples = 4;
+    target = 'bgra8unorm';
+    format = 'depth32float';
+    renderer.render(camera, light, [], graph, 0);
+    assert.equal(pipelines.length, variants + 4, 'Earlier variants must remain reusable');
+    for (let i = pipelines.length; i < 64; i++) {
+      shader = 'shader-' + i;
+      renderer.render(camera, light, [], graph, 0);
+    }
+    shader = 'shader-overflow';
+    assert.throws(() => renderer.render(camera, light, [], graph, 0), /Shader limit: 64/);
+    shader = 'shader-a';
+    renderer.render(camera, light, [], graph, 0);
+    assert.equal(pipelines.length, 64, 'Existing variants still work after rejecting a 65th');
   } finally {
     renderer.dispose();
   }

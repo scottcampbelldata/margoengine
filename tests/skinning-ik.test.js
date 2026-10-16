@@ -5,6 +5,7 @@ import {
   solveArm,
   rotateWorld,
   worldPosition,
+  worldPositionInto,
   localPoint,
   gripPosition,
   holdObjectAtGrip,
@@ -207,6 +208,18 @@ test('palm attachment follows joint rotation and model scale with a separately p
     close(held, gripPosition(r.wrist, localGrip), 2e-6);
     assert.ok(Math.abs(distance(held, worldPosition(r.wrist)) - 0.13 * 1.8) < 2e-6);
     close(localPoint(r.wrist, held), localGrip, 2e-6);
+    const out = [0, 0, 0],
+      inverse = new Float64Array(16);
+    assert.equal(worldPositionInto(orb, out), out);
+    assert.deepEqual(out, held);
+    assert.equal(holdObjectAtGrip(orb, r.wrist, localGrip, out, inverse), out);
+    assert.deepEqual(out, held);
+    const retained = out.slice();
+    assert.equal(localPoint(r.wrist, out, out, inverse), out, 'In-place local conversion is supported');
+    close(out, localGrip, 2e-6);
+    assert.equal(gripPosition(r.wrist, out, out), out, 'In-place world conversion is supported');
+    close(out, retained, 2e-6);
+    assert.notEqual(worldPosition(orb), worldPosition(orb), 'Fresh public results stay independently owned');
   } finally {
     r.engine.dispose();
   }

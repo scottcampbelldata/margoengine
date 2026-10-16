@@ -87,6 +87,11 @@ test('animation retains inverse bind views through 120 moving frames and recreat
     primitive.weights[0] = NaN;
     assert.throws(() => h.frame(), /Invalid morph weights/);
     assert.equal(h.counts.compute, 121);
+    primitive.weights[0] = 0;
+    nodes[1].matrix[0] = 3e38;
+    animation.resources[0].inverseBind[0][0] = 2;
+    assert.throws(() => h.frame(), /Skin matrix overflow/);
+    assert.equal(h.counts.compute, 121, 'Overflow cannot submit a deformation dispatch');
   } finally {
     animation.dispose();
   }

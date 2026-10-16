@@ -2,7 +2,7 @@ import { createStage } from 'margoengine';
 import { engineRuntime, meshRuntime, type Mesh, type Vec3 } from '@margoengine/core/extension';
 import { loadGLTF } from '@margoengine/gltf-pro';
 import { Animation } from '@margoengine/animation';
-import { Animator } from '@margoengine/animator';
+import { Animator, type AdditiveLayer, type FootIK } from '@margoengine/animator';
 import { DragControls, OrbitControls, TransformControls } from '@margoengine/controls';
 import { TransparentCanvas, Environment, loadEnvironmentImage } from '@margoengine/environment';
 import { LightProbes } from '@margoengine/environment/probes';
@@ -12,19 +12,18 @@ import { PostStack } from '@margoengine/post/stack';
 import { SSAO } from '@margoengine/post/ssao';
 import { Bloom } from '@margoengine/post/bloom';
 import { Line, Lines } from '@margoengine/lines';
-import { Quaternion } from '@margoengine/math/quaternion';
-import { multiplyQuaternions } from '@margoengine/math/quat';
 import { SRGBToLinear } from '@margoengine/math/color';
-import {
-  worldPosition,
-  worldRotation,
-  rotateWorld,
-  localPoint,
-  gripPosition,
-  holdObjectAtGrip,
-} from './rig-ik';
+import { worldPosition, worldPositionInto, localPoint, gripPosition, holdObjectAtGrip } from './rig-ik';
 import { attachWorkshopStats } from './performance-hud';
-import { BodyIK } from './body-ik';
+import { BodyIK, type BodyIKResult } from './body-ik';
+import { HeadAim } from './head-aim';
+import { ArmHeadClearance } from './arm-head-clearance';
+import { cowlingHull } from './head-aim-shape';
+import { TorsoAim } from './torso-aim';
+import { TargetMotion } from './target-motion';
+import { PoseUpdateOrder, PresentedPoseSnapshot, ProbePoseReuse } from './probe-pose-reuse';
+import { mapArmControl, nearestArmControlParameter, type ArmControl } from './arm-controls';
+import { ArmControlRoute } from './arm-control-route';
 import { attachGPUAudit } from './gpu-audit';
 import { showShadowDebug } from './shadow-debug';
 import { workshopShadowPoints } from './shadow-bounds';
@@ -47,40 +46,45 @@ addEventListener(
 );
 const subtract = (a: Vec3, b: Vec3): Point => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const add = (a: Vec3, b: Vec3): Point => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-const conjugate = (q: readonly number[]) => [-q[0], -q[1], -q[2], q[3]];
-const between = (a: Vec3, b: Vec3) => {
-  const al = Math.hypot(...a),
-    bl = Math.hypot(...b);
-  if (al < 1e-7 || bl < 1e-7) return [0, 0, 0, 1];
-  const q = new Quaternion().setFromUnitVectors(
-    { x: a[0] / al, y: a[1] / al, z: a[2] / al },
-    { x: b[0] / bl, y: b[1] / bl, z: b[2] / bl },
-  );
-  // Limit the optical head's neck travel; smooth and stable at targets behind the body.
-  const angle = 2 * Math.acos(Math.min(1, Math.abs(q.w)));
-  if (angle > 0.85)
-    q.identity().slerp(
-      new Quaternion().setFromUnitVectors(
-        { x: a[0] / al, y: a[1] / al, z: a[2] / al },
-        { x: b[0] / bl, y: b[1] / bl, z: b[2] / bl },
-      ),
-      0.85 / angle,
-    );
-  return [q.x, q.y, q.z, q.w];
-};
 
 // Playback control belongs to this demo; Animator remains the single owner of the base pose.
 class WorkshopAnimator extends Animator {
   playing = true;
+  probeReuse?: ProbePoseReuse;
+  probeCompatible = true;
   override onPreUpdate(dt: number) {
     this.playing = checkbox('idle').checked;
+    if (this.probeReuse?.skipAnimation(dt)) return;
     super.onPreUpdate(this.playing ? dt : 0);
+  }
+  replayProbePose(): void {
+    super.onPreUpdate(0);
+  }
+  override transition(state: string, duration = 0.15): this {
+    this.probeCompatible = false;
+    this.probeReuse?.invalidate();
+    return super.transition(state, duration);
+  }
+  override addLayer(layer: AdditiveLayer): () => void {
+    this.probeCompatible = false;
+    this.probeReuse?.invalidate();
+    return super.addLayer(layer);
+  }
+  override addFootIK(foot: FootIK): () => void {
+    this.probeCompatible = false;
+    this.probeReuse?.invalidate();
+    return super.addFootIK(foot);
+  }
+  override dispose(): void {
+    this.probeCompatible = false;
+    this.probeReuse?.invalidate();
+    super.dispose();
   }
 }
 
 try {
-  const homeEye: Point = [-1.9, 1.34, -2.8],
-    homeLook: Point = [0.05, 0.58, 0.04];
+  const homeEye: Point = [-2.05, 1.4, -3.03],
+    homeLook: Point = [0.05, 0.78, 0.04];
   const frameScale = () => Math.max(1, 1.4 / ($('viewport').clientWidth / $('viewport').clientHeight));
   const framedEye = (eye: Point, look: Point): Point =>
     add(look, subtract(eye, look).map((v) => v * frameScale()) as Point);
@@ -129,21 +133,55 @@ try {
   const shoulder = node('UpperArm'),
     elbow = node('Forearm'),
     wrist = node('Hand'),
-    head = node('Head');
+    head = node('Head'),
+    body = node('Body');
   runtime.store.tick(false);
   const orbOffset: Point = [0, 0.13, 0],
     home = add(worldPosition(wrist), orbOffset);
   orb.root.setPosition(home);
   const localGrip = localPoint(wrist, home);
   const targetHandle = runtime.createMesh().setPosition(home);
-  const keepOrbHeld = () => holdObjectAtGrip(meshRuntime(orb.root), wrist, localGrip);
-  const wristOrientation = worldRotation(wrist);
-  const bodyIK = new BodyIK({ frame: meshRuntime(model.root), shoulder, elbow, wrist, localGrip });
+  const targetMotion = new TargetMotion(home),
+    controlRoute = new ArmControlRoute();
+  const acceptedOrbLocal = localPoint(meshRuntime(model.root), home);
+  let routeControl: ArmControl | undefined,
+    routeParameter = 0.5;
+  const solved: BodyIKResult = { safe: true, limited: false, blocked: false, orb: [0, 0, 0], collision: null };
+  const enforced: BodyIKResult = { safe: true, limited: false, blocked: false, orb: [0, 0, 0], collision: null };
+  const heldPosition: Point = [0, 0, 0],
+    heldInverse = new Float64Array(16);
+  const keepOrbHeld = () => holdObjectAtGrip(meshRuntime(orb.root), wrist, localGrip, heldPosition, heldInverse);
+  const torsoAim = new TorsoAim(body, meshRuntime(model.root));
+  teardown.push(() => torsoAim.dispose());
+  const armHeadClearance = new ArmHeadClearance(torsoAim.frame, head, shoulder, elbow);
+  const opticalLocal = localPoint(head, gripPosition(meshRuntime(model.root), [0, 1.34, -0.232]));
+  const headAim = new HeadAim(head, opticalLocal, 1.3, {
+    min: [-0.194, -0.039, -0.236],
+    max: [0.194, 0.307, 0.134],
+    targetRadius: 0.10465342044830322,
+    margin: 0.003,
+    chestFloor: -0.032,
+    chestPoints: cowlingHull,
+    rotationClearance: (rotation, out) => armHeadClearance.evaluate(rotation, out),
+  });
+  const bodyIK = new BodyIK({
+    frame: torsoAim.frame,
+    armHeadClearance,
+    shoulder,
+    elbow,
+    wrist,
+    head,
+    localGrip,
+    extraClearance(orb, out) {
+      if (checkbox('look').checked) headAim.update(orb);
+      else headAim.reset(orb);
+      out[0] = headAim.headClearance;
+    },
+  });
   $('viewport').dataset.constraintSolver = '@margoengine/kinematics-constraints';
   const animation = Animation.attach(model);
   if (!animation.clips.length) throw new Error('The robot is missing its Blender-authored idle animation');
   const animator = new WorkshopAnimator(animation, { initial: 'idle', states: { idle: animation.clips[0].name } });
-  stage.use(animator);
 
   // Target manipulation owns pointer-down before orbit sees it. Both controls release on cancel/Escape.
   const transform = TransformControls.attach(stage.engine, { mode: 'translate', space: 'world', size: 0.55 });
@@ -157,6 +195,9 @@ try {
   orbit.minPolarAngle = 0.08;
   orbit.maxPolarAngle = Math.PI * 0.49;
   orbit.saveState();
+  // Orbit's inherited Controls hook updates the camera. Register the base-pose
+  // owner after it so no camera hook separates animation from pose validation.
+  stage.use(animator);
   let orbitInteracting = false,
     lastInteraction = 0;
   orbit.addEventListener('start', () => {
@@ -169,7 +210,9 @@ try {
     orbitInteracting = false;
     lastInteraction = performance.now();
   });
-  $('control-fields').addEventListener('input', () => { lastInteraction = performance.now(); });
+  $('control-fields').addEventListener('input', () => {
+    lastInteraction = performance.now();
+  });
   let previousFrameScale = frameScale();
   const resize = new ResizeObserver(() => {
     const scale = frameScale(),
@@ -315,39 +358,133 @@ try {
     reflectionCount = 0,
     reflectionBusy = false,
     reflectionLast = 0;
-  let frameStamp = 0, frameMs = 0, p95Ms = 0, probeEncodeMs = 0, probeTotalMs = 0;
+  let frameStamp = 0,
+    frameMs = 0,
+    p95Ms = 0,
+    probeEncodeMs = 0,
+    probeTotalMs = 0;
+  const auditContext = { probeEncodeMs, probeTotalMs, reflectionBusy, reflections: reflectionCount };
   const gpuAudit = attachGPUAudit(performanceHUD.stats, $('viewport'), {
     engine: runtime,
-    report: () => ({ probeEncodeMs, probeTotalMs, reflectionBusy, reflections: reflectionCount }),
+    report: () => {
+      auditContext.probeEncodeMs = probeEncodeMs;
+      auditContext.probeTotalMs = probeTotalMs;
+      auditContext.reflectionBusy = reflectionBusy;
+      auditContext.reflections = reflectionCount;
+      return auditContext;
+    },
   });
   teardown.push(gpuAudit.dispose);
-  const frameTimes: number[] = [];
-  const t = runtime.store.transforms;
-  const localRotation = (mesh: Mesh) => [t.qx[mesh.id], t.qy[mesh.id], t.qz[mesh.id], t.qw[mesh.id]];
+  const frameTimes = new Float64Array(120).fill(Infinity),
+    sortedFrameTimes = new Float64Array(120);
+  let frameTimeCursor = 0,
+    frameTimeCount = 0;
+  const savedRotations = [
+    [0, 0, 0, 1],
+    [0, 0, 0, 1],
+    [0, 0, 0, 1],
+  ];
+  const armNodes = [shoulder, elbow, wrist];
+  const desiredPosition: Point = [0, 0, 0],
+    localTarget: Point = [0, 0, 0],
+    shoulderPosition: Point = [0, 0, 0],
+    elbowPosition: Point = [0, 0, 0],
+    wristPosition: Point = [0, 0, 0],
+    actualGrip: Point = [0, 0, 0],
+    boundedTarget: Point = [0, 0, 0],
+    movingTarget: Point = [0, 0, 0],
+    sliderWorld: Point = [0, 0, 0],
+    sliderLocal: Point = [0, 0, 0];
+  const targetInverse = new Float64Array(16),
+    sliderInverse = new Float64Array(16),
+    bonePoints = new Float64Array(9),
+    tetherPoints = new Float64Array(6);
+  const armControls: readonly ArmControl[] = ['side', 'height', 'nearFar'];
+  const controlAxes = ['x', 'y', 'z'] as const;
+  const controlPoint: Point = [0, 0, 0];
+  const eventPosition: Point = [0, 0, 0],
+    metricTarget: Point = [0, 0, 0],
+    metricHead: Point = [0, 0, 0];
+  const metrics = {
+    residual: 0,
+    gripError: 0,
+    desiredOrb: desiredPosition,
+    commandOrb: targetMotion.position,
+    targetMotion: { settled: false, maxSpeed: targetMotion.maxSpeed, routing: false },
+    gripCenter: actualGrip,
+    frames: 0,
+    animationFrames: 0,
+    poseUpdates: 0,
+    reflections: 0,
+    probePose: { attempts: 0, reused: 0, fallback: 0 },
+    shadowDraws: 0,
+    wrist: wristPosition,
+    target: metricTarget,
+    orb: heldPosition,
+    camera: stage.engine.camera.position,
+    cameraTarget: stage.engine.camera.target,
+    light: [0, 0, 0, 0],
+    dragging: false,
+    orbitEnabled: true,
+    animationTime: 0,
+    arm: { shoulder: shoulderPosition, elbow: elbowPosition, wrist: wristPosition, bodyContact: false, safe: true },
+    torso: { yaw: 0, desiredYaw: 0, maxYaw: torsoAim.maxYaw },
+    head: {
+      position: metricHead,
+      opticalOrigin: headAim.origin,
+      forward: headAim.forward,
+      limited: false,
+      angle: 0,
+      rayError: 0,
+      rayDistance: 0,
+      clearanceResolved: true,
+      headClearance: Infinity,
+    },
+    performance: { frameMs: 0, p95Ms: 0, probeEncodeMs: 0, probeTotalMs: 0 },
+  };
   const syncSliders = () => {
-    const p = targetHandle.position;
-    ['x', 'y', 'z'].forEach((axis, i) => {
+    runtime.store.tick(false);
+    const p = localPoint(
+      meshRuntime(model.root),
+      worldPositionInto(targetHandle, sliderWorld),
+      sliderLocal,
+      sliderInverse,
+    );
+    controlAxes.forEach((axis, i) => {
       const input = checkbox('target-' + axis),
-        value = p[['x', 'y', 'z'][i] as 'x' | 'y' | 'z'] - home[i];
-      input.value = String(Math.max(Number(input.min), Math.min(Number(input.max), value)));
-      $<HTMLOutputElement>('target-' + axis + '-value').value = Math.abs(value) < 0.05 ? '0.0' : value.toFixed(1);
+        value = nearestArmControlParameter(armControls[i], p);
+      input.value = String(value);
+      $<HTMLOutputElement>('target-' + axis + '-value').value = Math.round(value * 100) + '%';
     });
   };
-  const moveOrb = (position: Vec3) => {
-    const bounded = position.map((v, i) =>
-      Math.max([-1.3, 0.48, -1.0][i], Math.min([0.75, 1.85, 0.85][i], v)),
-    ) as Point;
-    targetHandle.setPosition(bounded);
+  const releaseControlRoute = () => {
+    controlRoute.release();
+    routeControl = undefined;
+  };
+  const moveOrb = (position: Vec3, routed = false) => {
+    if (!routed) releaseControlRoute();
+    boundedTarget[0] = Math.max(-1.3, Math.min(0.75, position[0]));
+    boundedTarget[1] = Math.max(0.48, Math.min(1.85, position[1]));
+    boundedTarget[2] = Math.max(-1.0, Math.min(0.85, position[2]));
+    targetHandle.setPosition(boundedTarget);
     syncSliders();
   };
+  drag.addEventListener('dragstart', releaseControlRoute);
+  transform.addEventListener('mouseDown', releaseControlRoute);
   drag.addEventListener('drag', () => {
-    moveOrb([orb.root.position.x, orb.root.position.y, orb.root.position.z]);
+    eventPosition[0] = orb.root.position.x;
+    eventPosition[1] = orb.root.position.y;
+    eventPosition[2] = orb.root.position.z;
+    moveOrb(eventPosition);
     keepOrbHeld();
   });
-  transform.addEventListener('objectChange', () =>
-    moveOrb([targetHandle.position.x, targetHandle.position.y, targetHandle.position.z]),
-  );
-  stage.use({
+  transform.addEventListener('objectChange', () => {
+    eventPosition[0] = targetHandle.position.x;
+    eventPosition[1] = targetHandle.position.y;
+    eventPosition[2] = targetHandle.position.z;
+    moveOrb(eventPosition);
+  });
+  const workshopPose = {
     name: 'workshop-pose',
     setup() {},
     onPreUpdate(dt: number) {
@@ -355,69 +492,108 @@ try {
         animationFrames++;
         const now = performance.now();
         if (frameStamp) {
-          frameTimes.push(now - frameStamp);
-          if (frameTimes.length > 120) frameTimes.shift();
+          frameTimes[frameTimeCursor] = now - frameStamp;
+          frameTimeCursor = (frameTimeCursor + 1) % frameTimes.length;
+          frameTimeCount = Math.min(frameTimeCount + 1, frameTimes.length);
           if (frameCount % 30 === 0) {
-            frameMs = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
-            p95Ms = [...frameTimes].sort((a, b) => a - b)[Math.floor(frameTimes.length * 0.95)];
+            let sum = 0;
+            for (let i = 0; i < frameTimeCount; i++)
+              sum += frameTimes[(frameTimeCursor - frameTimeCount + i + frameTimes.length) % frameTimes.length];
+            frameMs = sum / frameTimeCount;
+            sortedFrameTimes.set(frameTimes);
+            sortedFrameTimes.sort();
+            p95Ms = sortedFrameTimes[Math.floor(frameTimeCount * 0.95)];
           }
         }
         frameStamp = now;
       }
       elapsed += Math.min(dt, 0.05);
       frameCount++;
-      if (checkbox('moving-light').checked)
-        runtime.lighting.direction.set([
-          -2.5 + Math.sin(elapsed * 0.35) * 2,
-          3,
-          2.3 + Math.cos(elapsed * 0.35) * 1.4,
-          4,
-        ]);
-      if (checkbox('autopilot').checked && !drag.dragging && !transform.dragging)
-        moveOrb(
-          add(home, [Math.sin(elapsed * 0.65) * 0.17, Math.sin(elapsed * 0.85) * 0.14, Math.cos(elapsed * 0.65) * 0.1]),
-        );
+      if (checkbox('moving-light').checked) {
+        const direction = runtime.lighting.direction;
+        direction[0] = -2.5 + Math.sin(elapsed * 0.35) * 2;
+        direction[1] = 3;
+        direction[2] = 2.3 + Math.cos(elapsed * 0.35) * 1.4;
+        direction[3] = 4;
+      }
+      if (checkbox('autopilot').checked && !drag.dragging && !transform.dragging) {
+        movingTarget[0] = home[0] + Math.sin(elapsed * 0.65) * 0.17;
+        movingTarget[1] = home[1] + Math.sin(elapsed * 0.85) * 0.14;
+        movingTarget[2] = home[2] + Math.cos(elapsed * 0.65) * 0.1;
+        moveOrb(movingTarget);
+      }
       runtime.store.tick(false);
-      const desiredOrb = worldPosition(targetHandle);
-      if (checkbox('ik-enabled').checked) {
-        rotateWorld(wrist, multiplyQuaternions(wristOrientation, conjugate(worldRotation(wrist))));
+      const desiredOrb = worldPositionInto(targetHandle, desiredPosition);
+      // Animation can restore Body between renders. Reapply the accepted turn
+      // before any collision query; only a real arm solve advances its history.
+      const reusePose = probePoseReuse.reusePose(dt);
+      if (!reusePose) {
+        torsoAim.applyHeld();
+        if (dt > 0 || !savedPose) bodyContact = false;
+        if (checkbox('ik-enabled').checked) {
+          // Probe captures render zero-delta frames. Reuse the presented pose so
+          // those extra renders cannot advance contact recovery or shoulder roll.
+          if ((dt > 0 || !savedPose) && (checkbox('auto-ik').checked || manual || !savedPose)) {
+            poseUpdates++;
+            // Only initial setup may solve without an elapsed frame. Probe renders
+            // reuse savedPose and never advance constraint history.
+            const step = dt > 0 ? dt : 1 / 60;
+            let goal = desiredOrb;
+            if (controlRoute.active) {
+              // Animator has already restored its inputs. Route from the final
+              // accepted pose presented last frame, in the moving model's frame.
+              const waypoint = controlRoute.update(acceptedOrbLocal, step);
+              goal = gripPosition(meshRuntime(model.root), waypoint, eventPosition);
+            }
+            const command = targetMotion.update(goal, step);
+            torsoAim.update(localPoint(meshRuntime(model.root), command, localTarget, targetInverse), step);
+            bodyContact = bodyIK.solve(command, step, solved).blocked;
+            manual = false;
+          } else for (let i = 0; i < armNodes.length; i++) armNodes[i].setQuaternion(savedPose![i]);
+        }
+        const contact = bodyIK.enforce(enforced);
+        bodyContact ||= contact.blocked;
+        if (checkbox('ik-enabled').checked) {
+          const t = runtime.store.transforms;
+          for (let i = 0; i < armNodes.length; i++) {
+            const id = armNodes[i].id,
+              q = savedRotations[i];
+            q[0] = t.qx[id];
+            q[1] = t.qy[id];
+            q[2] = t.qz[id];
+            q[3] = t.qw[id];
+          }
+          savedPose = savedRotations;
+        }
         runtime.store.tick(false);
+        const heldOrb = keepOrbHeld();
+        localPoint(meshRuntime(model.root), heldOrb, acceptedOrbLocal, targetInverse);
+        // The accepted head pose was checked with the arm. Refresh diagnostics
+        // against the float32-held center without changing that accepted rotation.
+        headAim.checkClearance(heldOrb);
       }
-      const maintainedOffset = subtract(gripPosition(wrist, localGrip), worldPosition(wrist));
-      const target = subtract(desiredOrb, maintainedOffset);
-      if (dt > 0 || !savedPose) bodyContact = false;
-      if (checkbox('ik-enabled').checked) {
-        // Probe captures render zero-delta frames. Reuse the presented pose so
-        // those extra renders cannot advance contact recovery or shoulder roll.
-        if ((dt > 0 || !savedPose) && (checkbox('auto-ik').checked || manual || !savedPose)) {
-          poseUpdates++;
-          // Only initial setup may solve without an elapsed frame. Probe renders
-          // reuse savedPose and never advance constraint history.
-          bodyContact = bodyIK.solve(desiredOrb, dt > 0 ? dt : 1 / 60).blocked;
-          manual = false;
-        } else [shoulder, elbow, wrist].forEach((mesh, i) => mesh.setQuaternion(savedPose![i]));
-      }
-      const contact = bodyIK.enforce();
-      bodyContact ||= contact.blocked;
-      if (checkbox('ik-enabled').checked) savedPose = [shoulder, elbow, wrist].map(localRotation);
+      const heldOrb = heldPosition,
+        contact = enforced;
       runtime.store.tick(false);
-      const heldOrb = keepOrbHeld();
-      if (checkbox('look').checked) {
-        // The custom robot's optical face points along local -Z.
-        const m = head.matrix,
-          forward: Point = [-m[8], -m[9], -m[10]];
-        rotateWorld(head, between(forward, subtract(worldPosition(meshRuntime(orb.root)), worldPosition(head))));
-      }
-      runtime.store.tick(false);
-      const a = worldPosition(shoulder),
-        b = worldPosition(elbow),
-        c = worldPosition(wrist);
-      residual = Math.hypot(...subtract(heldOrb, desiredOrb));
-      const gripError = Math.hypot(...subtract(heldOrb, gripPosition(wrist, localGrip)));
+      const a = worldPositionInto(shoulder, shoulderPosition),
+        b = worldPositionInto(elbow, elbowPosition),
+        c = worldPositionInto(wrist, wristPosition);
+      residual = Math.hypot(heldOrb[0] - desiredOrb[0], heldOrb[1] - desiredOrb[1], heldOrb[2] - desiredOrb[2]);
+      gripPosition(wrist, localGrip, actualGrip);
+      const gripError = Math.hypot(heldOrb[0] - actualGrip[0], heldOrb[1] - actualGrip[1], heldOrb[2] - actualGrip[2]);
       bones.visible = checkbox('show-rig').checked;
-      bones.setPositions([...a, ...b, ...c]);
+      if (bones.visible) {
+        bonePoints.set(a);
+        bonePoints.set(b, 3);
+        bonePoints.set(c, 6);
+        bones.setPositions(bonePoints);
+      }
       tether.visible = checkbox('show-rig').checked && residual > 0.008;
-      tether.setPositions([...heldOrb, ...desiredOrb]);
+      if (tether.visible) {
+        tetherPoints.set(heldOrb);
+        tetherPoints.set(desiredOrb, 3);
+        tether.setPositions(tetherPoints);
+      }
       transform.visible = checkbox('show-rig').checked;
       transform.enabled = checkbox('show-rig').checked;
       if (checkbox('follow').checked && !drag.dragging && !transform.dragging) {
@@ -428,7 +604,7 @@ try {
         orbit.target = next;
       }
       if (frameCount % 6 === 0) {
-        state.textContent = !checkbox('ik-enabled').checked
+        const stateText = !checkbox('ik-enabled').checked
           ? 'Held in hand · IK off'
           : !checkbox('auto-ik').checked
             ? 'Held pose · solve one step'
@@ -437,40 +613,235 @@ try {
               : residual > 0.012
                 ? 'At arm’s reach'
                 : 'Held in hand';
-        distance.value = residual > 0.012 ? (residual * 100).toFixed(1) + ' cm to target' : 'Grip secure';
-        $('viewport').dataset.metrics = JSON.stringify({
-          residual,
-          gripError,
-          desiredOrb,
-          gripCenter: gripPosition(wrist, localGrip),
-          frames: frameCount,
-          animationFrames,
-          poseUpdates,
-          reflections: reflectionCount,
-          shadowDraws: shadows.stats.dynamicDraws,
-          wrist: c,
-          target,
-          orb: worldPosition(meshRuntime(orb.root)),
-          camera: [...stage.engine.camera.position],
-          light: [...runtime.lighting.direction],
-          dragging: !!drag.dragging || transform.dragging,
-          orbitEnabled: orbit.enabled,
-          animationTime: animator.time,
-          arm: { shoulder: a, elbow: b, wrist: c, bodyContact, safe: contact.safe },
-          head: { position: worldPosition(head), forward: [-head.matrix[8], -head.matrix[9], -head.matrix[10]] },
-          performance: { frameMs, p95Ms, probeEncodeMs, probeTotalMs },
-        });
+        if (state.textContent !== stateText) state.textContent = stateText;
+        const distanceText = residual > 0.012 ? (residual * 100).toFixed(1) + ' cm to target' : 'Grip secure';
+        if (distance.value !== distanceText) distance.value = distanceText;
+        metrics.residual = residual;
+        metrics.gripError = gripError;
+        metrics.targetMotion.settled = targetMotion.settled && (!controlRoute.active || controlRoute.settled);
+        metrics.targetMotion.routing = controlRoute.active && !controlRoute.settled;
+        metrics.frames = frameCount;
+        metrics.animationFrames = animationFrames;
+        metrics.poseUpdates = poseUpdates;
+        metrics.reflections = reflectionCount;
+        metrics.probePose.attempts = probePoseReuse.counters.attempts;
+        metrics.probePose.reused = probePoseReuse.counters.reused;
+        metrics.probePose.fallback = probePoseReuse.counters.fallback;
+        metrics.shadowDraws = shadows.stats.dynamicDraws;
+        for (let i = 0; i < 3; i++) metricTarget[i] = desiredOrb[i] - (heldOrb[i] - c[i]);
+        metrics.camera = stage.engine.camera.position;
+        metrics.cameraTarget = stage.engine.camera.target;
+        for (let i = 0; i < 4; i++) metrics.light[i] = runtime.lighting.direction[i];
+        metrics.dragging = !!drag.dragging || transform.dragging;
+        metrics.orbitEnabled = orbit.enabled;
+        metrics.animationTime = animator.time;
+        metrics.arm.bodyContact = bodyContact;
+        metrics.arm.safe = contact.safe;
+        metrics.torso.yaw = torsoAim.yaw;
+        metrics.torso.desiredYaw = torsoAim.desiredYaw;
+        worldPositionInto(head, metricHead);
+        metrics.head.limited = headAim.limited;
+        metrics.head.angle = headAim.angle;
+        metrics.head.rayError = headAim.rayError;
+        metrics.head.rayDistance = headAim.rayDistance;
+        metrics.head.clearanceResolved = headAim.clearanceResolved;
+        metrics.head.headClearance = headAim.headClearance;
+        metrics.performance.frameMs = frameMs;
+        metrics.performance.p95Ms = p95Ms;
+        metrics.performance.probeEncodeMs = probeEncodeMs;
+        metrics.performance.probeTotalMs = probeTotalMs;
+        $('viewport').dataset.metrics = JSON.stringify(metrics);
       }
+      if (!reusePose) probePoseReuse.accept(contact.safe && headAim.clearanceResolved);
     },
-  });
+  };
+  stage.use(workshopPose);
 
-  for (const [i, axis] of ['x', 'y', 'z'].entries())
-    checkbox('target-' + axis).addEventListener('input', () => {
-      checkbox('autopilot').checked = false;
-      const p: Point = [targetHandle.position.x, targetHandle.position.y, targetHandle.position.z];
-      p[i] = home[i] + checkbox('target-' + axis).valueAsNumber;
-      moveOrb(p);
+  // This demo intentionally omits redundant setter calls during an unchanged,
+  // validated repeat capture. Every ordinary or changed-input frame still uses
+  // the public Animator and Mesh paths, including their guards and overrides.
+  const modelNodeCount = model.nodes.length,
+    orbNodeCount = orb.nodes.length,
+    poseNodes = [
+      meshRuntime(model.root),
+      ...model.nodes,
+      meshRuntime(orb.root),
+      ...orb.nodes,
+      targetHandle,
+      torsoAim.frame,
+    ],
+    poseMorphs = [...model.primitives, ...orb.primitives];
+  // Animation inputs are mutable typed arrays. Snapshot their contents too; an
+  // external edit must take the ordinary validated Animator path.
+  const poseClips = animation.clips.map((clip) => ({
+    clip,
+    name: clip.name,
+    duration: clip.duration,
+    tracks: clip.tracks,
+    entries: clip.tracks.map((track) => ({
+      track,
+      node: track.node,
+      path: track.path,
+      width: track.width,
+      interpolation: track.interpolation,
+    })),
+  }));
+  for (let i = 0; i < poseClips.length; i++)
+    for (let j = 0; j < poseClips[i].entries.length; j++) {
+      const track = poseClips[i].entries[j].track;
+      poseMorphs.push({
+        get weights() {
+          return track.times;
+        },
+      } as (typeof poseMorphs)[number]);
+      poseMorphs.push({
+        get weights() {
+          return track.values;
+        },
+      } as (typeof poseMorphs)[number]);
+    }
+  const poseState = new Float64Array(32),
+    poseSnapshot = new PresentedPoseSnapshot(poseNodes, poseMorphs, poseState.length),
+    expectedBaseUpdate = Animator.prototype.onPreUpdate,
+    expectedAnimationUpdate = animation.onPreUpdate,
+    poseUpdateOrder = new PoseUpdateOrder(runtime.plugins, animator, workshopPose);
+  const readPoseState = (out: Float64Array): boolean => {
+    if (
+      stopped ||
+      model.disposed ||
+      orb.disposed ||
+      !savedPose ||
+      !checkbox('ik-enabled').checked ||
+      !animator.probeCompatible ||
+      Animator.prototype.onPreUpdate !== expectedBaseUpdate ||
+      animation.onPreUpdate !== expectedAnimationUpdate ||
+      runtime.plugins.get(animator.name) !== animator ||
+      runtime.plugins.get(animation.name) !== animation ||
+      runtime.plugins.get(workshopPose.name) !== workshopPose ||
+      animator.state !== 'idle' ||
+      animator.options.initial !== 'idle' ||
+      animator.options.states.idle !== poseClips[0].name ||
+      animator.options.transitions !== undefined ||
+      animation.playing ||
+      model.nodes.length !== modelNodeCount ||
+      orb.nodes.length !== orbNodeCount ||
+      meshRuntime(model.root) !== poseNodes[0] ||
+      meshRuntime(orb.root) !== poseNodes[modelNodeCount + 1] ||
+      animation.clips.length !== poseClips.length
+    )
+      return false;
+    // This demo creates one parameter-free idle state. More general Animator
+    // layers, feet, transitions or caller parameters keep their normal callbacks.
+    for (const key in animator.parameters) if (Object.hasOwn(animator.parameters, key)) return false;
+    for (const key in animator.options.states)
+      if (Object.hasOwn(animator.options.states, key) && key !== 'idle') return false;
+    if (!poseUpdateOrder.matches()) return false;
+    for (let i = 0; i < model.nodes.length; i++) if (model.nodes[i] !== poseNodes[i + 1]) return false;
+    for (let i = 0; i < orb.nodes.length; i++) if (orb.nodes[i] !== poseNodes[modelNodeCount + 2 + i]) return false;
+    for (let i = 0; i < poseClips.length; i++) {
+      const entry = poseClips[i],
+        clip = animation.clips[i];
+      if (
+        clip !== entry.clip ||
+        clip.name !== entry.name ||
+        clip.duration !== entry.duration ||
+        clip.tracks !== entry.tracks ||
+        clip.tracks.length !== entry.entries.length
+      )
+        return false;
+      for (let j = 0; j < entry.entries.length; j++) {
+        const old = entry.entries[j],
+          track = clip.tracks[j];
+        if (
+          track !== old.track ||
+          track.node !== old.node ||
+          track.path !== old.path ||
+          track.width !== old.width ||
+          track.interpolation !== old.interpolation
+        )
+          return false;
+      }
+    }
+    let mask = 0;
+    for (let i = 0; i < poseCheckboxes.length; i++) if (poseCheckboxes[i].checked) mask |= 1 << i;
+    out[0] = mask;
+    out[1] = +manual;
+    out[2] = animator.time;
+    out[3] = elapsed;
+    out[4] = torsoAim.yaw;
+    out[5] = torsoAim.desiredYaw;
+    out[6] = targetMotion.position[0];
+    out[7] = targetMotion.position[1];
+    out[8] = targetMotion.position[2];
+    out[9] = +targetMotion.settled;
+    out[10] = +controlRoute.active;
+    out[11] = +controlRoute.settled;
+    out[12] = controlRoute.position[0];
+    out[13] = controlRoute.position[1];
+    out[14] = controlRoute.position[2];
+    out[15] = routeParameter;
+    out[16] = routeControl === 'side' ? 1 : routeControl === 'height' ? 2 : routeControl === 'nearFar' ? 3 : 0;
+    out[17] = headAim.angle;
+    out[18] = headAim.headClearance;
+    out[19] = +headAim.clearanceResolved;
+    out[20] = acceptedOrbLocal[0];
+    out[21] = acceptedOrbLocal[1];
+    out[22] = acceptedOrbLocal[2];
+    out[23] = +enforced.safe;
+    out[24] = +bodyContact;
+    out[25] = localGrip[0];
+    out[26] = localGrip[1];
+    out[27] = localGrip[2];
+    out[28] = targetMotion.maxSpeed;
+    out[29] = targetMotion.response;
+    out[30] = headAim.maxAngle;
+    out[31] = torsoAim.maxYaw;
+    return true;
+  };
+  const poseCheckboxes = [
+    'ik-enabled',
+    'auto-ik',
+    'look',
+    'idle',
+    'moving-light',
+    'autopilot',
+    'follow',
+    'show-rig',
+  ].map(checkbox);
+  const probePoseReuse = new ProbePoseReuse(poseSnapshot, poseState, readPoseState, () => animator.replayProbePose());
+  animator.probeReuse = probePoseReuse;
+  teardown.push(() => probePoseReuse.invalidate());
+
+  const routeToControl = (control: ArmControl, parameter: number) => {
+    checkbox('autopilot').checked = false;
+    routeControl = control;
+    routeParameter = parameter;
+    controlRoute.request(control, parameter, acceptedOrbLocal);
+    mapArmControl(control, parameter, controlPoint);
+    moveOrb(gripPosition(meshRuntime(model.root), controlPoint, eventPosition), true);
+  };
+  for (const [i, axis] of controlAxes.entries()) {
+    const input = checkbox('target-' + axis),
+      control = armControls[i];
+    input.addEventListener('input', () => routeToControl(control, input.valueAsNumber));
+    // An inactive track can already display its nearest endpoint. Native range
+    // inputs emit nothing for an unchanged value, but selecting it must still
+    // choose that complete track rather than leave the previous goal active.
+    input.addEventListener('pointerdown', () => routeToControl(control, input.valueAsNumber));
+    input.addEventListener('keydown', (event: KeyboardEvent) => {
+      if (event.key !== 'Home' && event.key !== 'End') return;
+      event.preventDefault();
+      routeToControl(control, event.key === 'Home' ? 0 : 1);
     });
+  }
+  const resumeControlRoute = () => {
+    if (!routeControl || controlRoute.active) return;
+    controlRoute.request(routeControl, routeParameter, acceptedOrbLocal);
+  };
+  checkbox('ik-enabled').addEventListener('change', () => {
+    if (checkbox('ik-enabled').checked) resumeControlRoute();
+    else controlRoute.release();
+  });
   const poses: Record<string, Point> = {
     home: [0, 0, 0],
     high: [0.24, 0.52, 0.23],
@@ -482,12 +853,15 @@ try {
   document.querySelectorAll<HTMLButtonElement>('[data-pose]').forEach((button) =>
     button.addEventListener('click', () => {
       checkbox('autopilot').checked = false;
-      moveOrb(add(home, poses[button.dataset.pose!]));
+      if (button.dataset.pose === 'home') routeToControl('side', 0.5);
+      else if (button.dataset.pose === 'high') routeToControl('height', 1);
+      else moveOrb(add(home, poses[button.dataset.pose!]));
     }),
   );
   $('solve-once').addEventListener('click', () => {
     manual = true;
     checkbox('ik-enabled').checked = true;
+    resumeControlRoute();
   });
   $('light-cue').addEventListener('click', () => {
     checkbox('moving-light').checked = !checkbox('moving-light').checked;
@@ -508,6 +882,7 @@ try {
         .forEach((button) => button.classList.toggle('active', button.id === id));
     });
   const reset = () => {
+    probePoseReuse.invalidate();
     releaseInteractions();
     for (const id of ['ik-enabled', 'auto-ik', 'look', 'idle', 'moving-light', 'reflections'])
       checkbox(id).checked = true;
@@ -517,7 +892,12 @@ try {
     elapsed = 0;
     manual = true;
     savedPose = undefined;
+    targetMotion.reset(home);
+    releaseControlRoute();
+    torsoAim.reset();
     bodyIK.reset();
+    headAim.reset();
+    localPoint(meshRuntime(model.root), keepOrbHeld(), acceptedOrbLocal, targetInverse);
     moveOrb(home);
     view(homeEye, homeLook);
     orbit.enabled = true;
@@ -575,8 +955,9 @@ try {
     reflectionFinalRequested = false,
     reflectionFrame = 0;
   let reflectionPosition: Point | undefined;
-  const publishReflection = () => {
-    $('viewport').dataset.reflection = JSON.stringify({
+  const reflectionPoint: Point = [0, 0, 0],
+    bakeOptions = { samples: 256 },
+    reflectionMetrics = {
       resolution: probes.resolution,
       cadenceMs: reflectionCadenceMs,
       position: reflectionPosition,
@@ -584,17 +965,26 @@ try {
       busy: reflectionBusy,
       encodeMs: probeEncodeMs,
       totalMs: probeTotalMs,
-    });
+    };
+  const publishReflection = () => {
+    reflectionMetrics.resolution = probes.resolution;
+    reflectionMetrics.cadenceMs = reflectionCadenceMs;
+    reflectionMetrics.position = reflectionPosition;
+    reflectionMetrics.captures = reflectionCount;
+    reflectionMetrics.busy = reflectionBusy;
+    reflectionMetrics.encodeMs = probeEncodeMs;
+    reflectionMetrics.totalMs = probeTotalMs;
+    $('viewport').dataset.reflection = JSON.stringify(reflectionMetrics);
+  };
+  const finalReflection = () => {
+    reflectionFrame = 0;
+    void refresh();
   };
   const queueFinalReflection = () => {
     reflectionFinalRequested = true;
-    if (!reflectionFrame)
-      reflectionFrame = requestAnimationFrame(() => {
-        reflectionFrame = 0;
-        void refresh();
-      });
+    if (!reflectionFrame) reflectionFrame = requestAnimationFrame(finalReflection);
   };
-  const refresh = async () => {
+  const refresh = (): Promise<void> | undefined => {
     if (stopped || document.hidden || reflectionBusy) return;
     const enabled = checkbox('reflections').checked;
     if (!enabled) {
@@ -602,8 +992,14 @@ try {
       return;
     }
     const now = performance.now();
-    const moving = drag.dragging || transform.dragging || orbitInteracting || now - lastInteraction < 250 ||
-      checkbox('idle').checked || checkbox('moving-light').checked || checkbox('autopilot').checked;
+    const moving =
+      drag.dragging ||
+      transform.dragging ||
+      orbitInteracting ||
+      now - lastInteraction < 250 ||
+      checkbox('idle').checked ||
+      checkbox('moving-light').checked ||
+      checkbox('autopilot').checked;
     // Keep the mirror live during interaction. Spread measured capture work over
     // at least four capture durations; a final input update bypasses this delay.
     reflectionCadenceMs = Math.max(moving ? 50 : 250, probeTotalMs * 4);
@@ -612,13 +1008,23 @@ try {
     reflectionFinalRequested = false;
     reflectionBusy = true;
     reflectionLast = now;
+    return captureReflection();
+  };
+  const captureReflection = async () => {
     try {
       runtime.store.tick(false);
-      reflectionPosition = worldPosition(meshRuntime(orb.root));
+      reflectionPosition = worldPositionInto(meshRuntime(orb.root), reflectionPoint);
       probes.setReflectionPosition(0, reflectionPosition);
       const started = performance.now();
       gpuAudit.mark('reflection-start');
-      bakeJob = probes.bake({ samples: 256 });
+      probePoseReuse.begin();
+      try {
+        bakeJob = probes.bake(bakeOptions);
+      } finally {
+        // bake renders twice before its first await. Async readback and every
+        // ordinary zero-delta/manual render remain outside this private scope.
+        probePoseReuse.end();
+      }
       probeEncodeMs = performance.now() - started;
       publishReflection();
       await bakeJob;
