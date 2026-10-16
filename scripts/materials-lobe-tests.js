@@ -20,7 +20,7 @@ export async function lobeBrowserChecks(page) {
   const filmSource = (
     await readFile(new URL('../packages/materials/src/iridescence.ts', import.meta.url), 'utf8')
   ).replaceAll('\r\n', '\n');
-  const filmWGSL = /export const iridescenceWGSL=\/\* wgsl \*\/`([\s\S]*?)`;/.exec(filmSource)?.[1];
+  const filmWGSL = /export\s+const\s+iridescenceWGSL\s*=\s*\/\*\s*wgsl\s*\*\/\s*`([\s\S]*?)`\s*;/.exec(filmSource)?.[1];
   assert.ok(filmWGSL, 'Missing tested thin-film WGSL');
   const float = (value) => {
     const text = String(Math.fround(value));
