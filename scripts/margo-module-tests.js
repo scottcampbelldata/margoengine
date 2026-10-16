@@ -3,14 +3,23 @@ import {writeFile} from 'node:fs/promises';
 import {openBrowser} from './browser.js';
 const browser=await openBrowser({startPath:'/tests/margo-modules.html'}),{page,hardware}=browser,errors=[];
 page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
-async function pixels(){
- const png=await page.locator('canvas.scene').screenshot();
+async function pixels(png){
+ png??=await page.locator('canvas.scene').screenshot();
  return page.evaluate(async base64=>{
   const data=Uint8Array.from(atob(base64),c=>c.charCodeAt(0)),image=await createImageBitmap(new Blob([data],{type:'image/png'})),canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;
   const c=canvas.getContext('2d');c.drawImage(image,0,0);image.close();const p=c.getImageData(0,0,canvas.width,canvas.height).data;let hash=2166136261,orange=0,green=0;const colors=new Set();
   for(let i=0;i<p.length;i+=4){hash=Math.imul(hash^p[i],16777619)>>>0;hash=Math.imul(hash^p[i+1],16777619)>>>0;hash=Math.imul(hash^p[i+2],16777619)>>>0;colors.add((p[i]<<16)|(p[i+1]<<8)|p[i+2]);if(p[i]>240&&p[i+1]>110&&p[i+1]<150&&p[i+2]<20)orange++;if(p[i+1]>180&&p[i]<100)green++;}
   return {hash,colors:colors.size,orange,green};
  },png.toString('base64'));
+}
+async function pixelDifference(before,after){
+ return page.evaluate(async images=>{
+  const frames=[];
+  for(const base64 of images){const image=await createImageBitmap(new Blob([Uint8Array.from(atob(base64),c=>c.charCodeAt(0))],{type:'image/png'})),canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;const context=canvas.getContext('2d');context.drawImage(image,0,0);image.close();frames.push(context.getImageData(0,0,canvas.width,canvas.height).data);}
+  if(frames[0].length!==frames[1].length)throw new Error('FBX frames changed dimensions');let changed=0;
+  for(let i=0;i<frames[0].length;i+=4)if(frames[0][i]!==frames[1][i]||frames[0][i+1]!==frames[1][i+1]||frames[0][i+2]!==frames[1][i+2])changed++;
+  return {changed,total:frames[0].length/4};
+ },[before.toString('base64'),after.toString('base64')]);
 }
 try{
  await page.waitForFunction(()=>window.margoModules);const results={};
@@ -32,11 +41,16 @@ try{
  const layout=await page.evaluate(()=>{const inspector=document.querySelector('[data-margo-inspector]'),stats=document.querySelector('[data-margo-stats]');return {inspector:inspector?.getBoundingClientRect().toJSON(),stats:stats?.getBoundingClientRect().toJSON(),overflow:document.documentElement.scrollWidth>innerWidth};});
  assert.equal(layout.overflow,false);assert.ok(layout.inspector.top>=layout.stats.bottom,'Mobile overlays overlap');assert.ok(layout.inspector.right<=375&&layout.inspector.bottom<=812,'Inspector escapes mobile viewport');assert.deepEqual(await page.evaluate(()=>window.margoModules.errors),[]);assert.deepEqual(errors,[]);
  const timestamps=await page.evaluate(()=>window.margoModules.timestamps());if(timestamps.supported)assert.ok(timestamps.samples.every(value=>Number.isFinite(value)&&value>=0),'Invalid hardware timestamp readback');
- if(process.env.MARGOENGINE_FBX_FIXTURE){
-  const asset=await page.evaluate(url=>window.margoModules.fbx(url),process.env.MARGOENGINE_FBX_FIXTURE);assert.ok(asset.primitives>0&&asset.skins>0&&asset.joints>10&&asset.clips>0&&asset.channels>0,'FBX fixture lost its skeleton or animation');
-  const before=await pixels();await page.evaluate(()=>window.margoModules.seek(0.5));const after=await pixels();assert.notEqual(before.hash,after.hash,'Imported FBX animation did not change rendered pixels');
-  results.fbx={...asset,before,after};await page.screenshot({path:'test-results/margo-fbx.png'});
- }
+ const fixture=process.env.MARGOENGINE_FBX_FIXTURE??'/packages/fbx/test/fixtures/real-rig.fbx';
+ assert.ok(fixture.trim(),'MARGOENGINE_FBX_FIXTURE must name a skinned animated FBX asset');
+ const asset=await page.evaluate(url=>window.margoModules.fbx(url),fixture);assert.ok(asset.primitives>0&&asset.skins>0&&asset.joints>0&&asset.skinnedPrimitives>0&&asset.clips>0&&asset.channels>0&&asset.duration>0,'FBX fixture lost its skeleton or animation');
+ const beforeImage=await page.locator('canvas.scene').screenshot(),before=await pixels(beforeImage);assert.ok(before.colors>=4,'FBX fixture did not render visible geometry');
+ const playback=await page.evaluate(delta=>window.margoModules.playback(delta),asset.duration/4);assert.equal(playback.playing,true,'FBX clip did not start playing');assert.equal(playback.time,asset.duration/4,'FBX clip playback did not advance');
+ const playedImage=await page.locator('canvas.scene').screenshot(),played=await pixels(playedImage),playbackDifference=await pixelDifference(beforeImage,playedImage);assert.ok(playbackDifference.changed>20,`FBX playback did not animate rendered pixels: ${JSON.stringify(playbackDifference)}`);
+ const seek=await page.evaluate(time=>window.margoModules.seek(time),asset.duration/2);assert.equal(seek.time,asset.duration/2);assert.equal(seek.playing,false);
+ const afterImage=await page.locator('canvas.scene').screenshot(),after=await pixels(afterImage),seekDifference=await pixelDifference(beforeImage,afterImage);assert.ok(seekDifference.changed>20,`Imported FBX animation did not change rendered pixels across seek: ${JSON.stringify(seekDifference)}`);
+ await page.evaluate(()=>window.margoModules.seek(0));const reset=await pixels();assert.equal(reset.hash,before.hash,'FBX seek to zero did not reproduce the first frame');
+ results.fbx={fixture,...asset,before,playback,played,playbackDifference,seek,after,seekDifference,reset};await page.screenshot({path:'test-results/margo-fbx.png'});
  assert.deepEqual(await page.evaluate(()=>window.margoModules.errors),[]);assert.deepEqual(errors,[]);
  const phone=await page.context().browser().newPage({viewport:{width:390,height:664},deviceScaleFactor:3,isMobile:true,hasTouch:true,userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1'});
  let mobile;
