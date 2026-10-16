@@ -61,13 +61,17 @@ try {
     }
     window.kinematicsTestAudit = label => {
       const root = [...demo.root], elbow = [...demo.currentElbow], hand = [...demo.currentHand];
-      const upperGap = segmentDistance(root, elbow, torsoStart, torsoEnd) - torsoRadius - upperRadius;
-      const lowerGap = segmentDistance(elbow, hand, torsoStart, torsoEnd) - torsoRadius - lowerRadius;
-      const targetGap = segmentDistance(hand, hand, torsoStart, torsoEnd) - torsoRadius - lowerRadius;
+      let upperGap = Infinity, lowerGap = Infinity, targetGap = Infinity;
+      for (const volume of demo.volumes) {
+        const a = volume.start ? [...volume.start] : [...volume.center], b = volume.end ? [...volume.end] : a;
+        upperGap = Math.min(upperGap, segmentDistance(root, elbow, a, b) - volume.radius - upperRadius);
+        lowerGap = Math.min(lowerGap, segmentDistance(elbow, hand, a, b) - volume.radius - lowerRadius);
+        targetGap = Math.min(targetGap, segmentDistance(hand, hand, a, b) - volume.radius - lowerRadius);
+      }
       const actualReach = distances(root, hand);
       const lengthError = Math.max(Math.abs(distances(root, elbow) - upper), Math.abs(distances(elbow, hand) - lower));
       if (![...root, ...elbow, ...hand].every(Number.isFinite)) throw new Error(`${label}: non-finite pose`);
-      if (Math.min(upperGap, lowerGap, targetGap) < clearance - 1e-6) throw new Error(`${label}: independent proxy clearance failed`);
+      if (Math.min(upperGap, lowerGap, targetGap) < demo.avoidance.minClearance - 1e-6) throw new Error(`${label}: independent proxy clearance failed`);
       if (actualReach < fold || actualReach > reach) throw new Error(`${label}: operational reach violated`);
       if (lengthError > 1e-6) throw new Error(`${label}: link length changed`);
       return {upperGap, lowerGap, targetGap, reach: actualReach, lengthError};
@@ -131,7 +135,7 @@ try {
         const targetGap = segmentDistance(hand, hand, torsoStart, torsoEnd) - torsoRadius - lowerRadius;
         const lengthError = Math.max(Math.abs(distances(root, elbow) - upper), Math.abs(distances(elbow, hand) - lower));
         const actualReach = distances(root, hand);
-        if (Math.min(upperGap, lowerGap, targetGap) < clearance - 1e-6) throw new Error(`${label}: independent proxy clearance failed`);
+        if (Math.min(upperGap, lowerGap, targetGap) < demo.avoidance.minClearance - 1e-6) throw new Error(`${label}: independent proxy clearance failed`);
         if (actualReach < fold || actualReach > reach) throw new Error(`${label}: operational reach violated`);
         if (lengthError > 1e-6) throw new Error(`${label}: link length changed`);
         report.minimumLinkClearance = Math.min(report.minimumLinkClearance, upperGap, lowerGap);
@@ -159,7 +163,7 @@ try {
       const cursor = document.querySelector('#raw-cursor');
       return {x: rect.left + parseFloat(cursor.style.left), y: rect.top + parseFloat(cursor.style.top)};
     }
-    const points = {start: project(0.9, 0.7, 0.387), overhead: project(demo.root[0], 2.30), waist: project(-0.22, 0.7, 0.387), overshoot: project(demo.root[0], 2.7),
+    const points = {start: project(0.9, 0.7, demo.dragShell), overhead: project(demo.root[0], 2.30), waist: project(-0.22, 0.7, demo.dragShell), overshoot: project(demo.root[0], 2.7),
       bounds: {left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom}};
     document.querySelector('#reset').click();
     return points;
@@ -279,6 +283,7 @@ try {
   });
   await writeFile('test-results/kinematics-constraints-interactions.json', JSON.stringify({initial, torso, adversarial,
     overhead, waistCrossBody, waistCursorError, returnOverhead, overheadOvershoot, verticalContinuity, singularBoundaries, hardware: app.hardware}, null, 2));
+  await app.page.locator('summary').first().click();
   await app.page.locator('#dead-zone').click();
   const held = await app.page.evaluate(() => {
     const demo = window.kinematicsDemo, before = [...demo.currentHand];
@@ -319,11 +324,118 @@ try {
   });
   assert.equal(finalRecovery.status, 0, `Legacy sweep recovery failed: ${JSON.stringify(finalRecovery)}`);
   await app.page.waitForFunction(() => document.querySelector('#status').textContent.includes('Following'));
+  await app.page.locator('#reset').click();
+  const motionTransition = await app.page.evaluate(() => {
+    const d = window.kinematicsDemo, speed = document.querySelector('#speed');
+    d.setInteractiveTarget(0,.9); for (let i = 0; i < 180; i++) d.step(1/60);
+    let sliding = 0, maximumHandStep = 0;
+    for (let i = 0; i < 120; i++) {
+      d.setInteractiveTarget(.02 * Math.sin(i * .08),.9); d.step(1/60);
+      window.kinematicsTestAudit(`Contact slide ${i}`);
+      if (d.result.resolved && d.clampActive && d.handStep > 0) sliding++;
+      maximumHandStep = Math.max(maximumHandStep,d.handStep);
+    }
+    const slidingReadout = {state: document.querySelector('#status').textContent, hand: document.querySelector('#hand-step').textContent};
+    speed.value='0'; speed.dispatchEvent(new Event('input',{bubbles:true})); d.setTarget(-.1,.9,.39);
+    let held = 0;
+    for (let i = 0; i < 120; i++) {
+      d.step(1/60); window.kinematicsTestAudit(`Zero speed hold ${i}`);
+      if (!d.result.resolved) {
+        held++;
+        if (d.handStep !== 0 || d.angleStep !== 0) throw new Error('Held pose reported accepted motion');
+      }
+    }
+    const heldReadout = {state: document.querySelector('#status').textContent, hand: document.querySelector('#hand-step').textContent, pole: document.querySelector('#actual-step').textContent};
+    speed.value='360'; speed.dispatchEvent(new Event('input',{bubbles:true}));
+    let resumed = 0, maximumPoleStep = 0, releaseMaximumHandStep = 0, firstReleaseHandStep = null, releaseMinimumGap = Infinity;
+    for (let i = 0; i < 180; i++) {
+      const angle = d.acceptedPole; d.step(1/60); const audit = window.kinematicsTestAudit(`Speed release ${i}`);
+      releaseMinimumGap = Math.min(releaseMinimumGap,audit.upperGap,audit.lowerGap,audit.targetGap);
+      releaseMaximumHandStep = Math.max(releaseMaximumHandStep,d.handStep);
+      if (firstReleaseHandStep === null && d.result.resolved && d.handStep > 0) firstReleaseHandStep = d.handStep;
+      const delta = Math.abs(d.acceptedPole - angle); maximumPoleStep = Math.max(maximumPoleStep,delta);
+      if (delta > Math.PI/30 + 1e-12) throw new Error('Release bypassed rate limit');
+      if (d.result.resolved && d.handStep > 0) resumed++;
+    }
+    if (sliding < 100 || held < 50 || !resumed || !d.result.resolved) throw new Error('Contact/hold/release transition was not exercised: ' + JSON.stringify({sliding,held,resumed,status:d.result.status,slidingReadout,heldReadout}));
+    if (!slidingReadout.state.includes('Sliding') || !heldReadout.state.includes('pose held') || heldReadout.hand !== '0.00 mm' || heldReadout.pole !== '0.00°') throw new Error('Motion state HUD disagreed with accepted geometry');
+    speed.value='180'; speed.dispatchEvent(new Event('input',{bubbles:true}));
+    document.querySelector('#reset').click();
+    return {sliding,held,resumed,maximumHandStep,maximumPoleStep,releaseMaximumHandStep,firstReleaseHandStep,releaseMinimumGap,dtSeconds:1/60,unsafe:0,slidingReadout,heldReadout};
+  });
+  await app.page.locator('#scene').selectOption('mixed');
+  await app.page.locator('#clock').selectOption('fixed120');
+  await app.page.locator('#yaw-assist').check();
+  const capabilities = await app.page.evaluate(() => {
+    const d = window.kinematicsDemo; let accepted = 0, localSteps = 0, held = 0, maximumYaw = 0, minimumGap = Infinity, maximumHandStep = 0;
+    if (d.volumes.length !== 3) throw new Error('Mixed scene did not install all three colliders');
+    let previousPole = d.acceptedPole;
+    for (let i = 0; i < 720; i++) {
+      const hand = [...d.currentHand], elbow = [...d.currentElbow], root = [...d.root];
+      d.setInteractiveTarget(.3 + .67 * Math.cos(i * .025), .85 + .23 * Math.sin(i * .025));
+      const result = d.step(1 / 30);
+      if (d.dt !== 1 / 120) throw new Error('Fixed caller dt was not passed to the solver');
+      const audit = window.kinematicsTestAudit(`Mixed controller frame ${i}`);
+      minimumGap = Math.min(minimumGap, audit.upperGap, audit.lowerGap, audit.targetGap);
+      maximumYaw = Math.max(maximumYaw, d.yaw); maximumHandStep = Math.max(maximumHandStep,d.handStep);
+      if (result.resolved) {
+        accepted++; if (d.chased) localSteps++;
+        if (Math.abs(d.acceptedPole - previousPole) > Math.PI / 120 + 1e-12) throw new Error('Chase bypassed accepted pole history');
+        previousPole = d.acceptedPole;
+      } else {
+        held++;
+        if ([...d.currentHand].some((x, j) => x !== hand[j]) || [...d.currentElbow].some((x, j) => x !== elbow[j]) || [...d.root].some((x, j) => x !== root[j])) throw new Error('Rejected shoulder/chain was committed');
+      }
+    }
+    if (!(accepted > 100 && maximumYaw > .2 && minimumGap >= .008 - 1e-6)) throw new Error('Mixed scene did not exercise a valid assisted sweep');
+    return {accepted, localSteps, held, maximumYaw, minimumGap, maximumHandStep,dtSeconds:1/120,unsafe:0};
+  });
+  await app.page.locator('#query').selectOption('target');
+  const projectionOnly = await app.page.evaluate(() => {
+    const d = window.kinematicsDemo, hand = [...d.currentHand], elbow = [...d.currentElbow], root = [...d.root];
+    d.setTarget(4,4,4); for (let i = 0; i < 180; i++) d.step(1/60);
+    if (!d.targetResult.resolved) throw new Error('Target-only projection did not resolve');
+    if ([...d.currentHand].some((x,j) => x !== hand[j]) || [...d.currentElbow].some((x,j) => x !== elbow[j]) || [...d.root].some((x,j) => x !== root[j])) throw new Error('Target-only mode changed the unchecked arm');
+    if (!document.querySelector('#status-detail').textContent.includes('not evaluated')) throw new Error('Target-only scope is not explicit');
+    return {hand, projected: [...d.projectedTarget], scope: document.querySelector('#scope').textContent};
+  });
+  assert.ok(projectionOnly.scope.includes('target only'));
+  await app.page.locator('#query').selectOption('chain');
+  await app.page.locator('#gap').evaluate(input => { input.value = '30'; input.dispatchEvent(new Event('input', {bubbles:true})); input.dispatchEvent(new Event('change', {bubbles:true})); });
+  await app.page.locator('#damping').selectOption('0');
+  await app.page.locator('#budget').selectOption('32');
+  assert.equal(await app.page.evaluate(() => window.kinematicsDemo.avoidance.minClearance), .03);
+  assert.equal(await app.page.evaluate(() => window.kinematicsDemo.avoidance.damping), 0);
+  await app.page.evaluate(() => { window.kinematicsTestAudit('Changed gap and damping start'); });
+  await app.page.locator('#scene').selectOption('torso');
+  await app.page.locator('#gap').evaluate(input => { input.value='8'; input.dispatchEvent(new Event('change',{bubbles:true})); });
+  await app.page.locator('#damping').selectOption('0.12');
+  await app.page.locator('#clock').selectOption('live');
+  await app.page.locator('#budget').selectOption('128');
+  await app.page.locator('#yaw-assist').uncheck();
+  await app.page.locator('#reset').click();
+  await app.page.locator('summary').first().click();
+  await app.page.locator('#recording-panel summary').click();
+  await app.page.locator('#record-start').click();
+  assert.equal(await app.page.locator('#recording-indicator').isVisible(), true);
+  await app.page.locator('canvas').focus(); await app.page.keyboard.press('ArrowLeft');
+  await app.page.locator('#speed').evaluate(input => { input.value='90'; input.dispatchEvent(new Event('input',{bubbles:true})); });
+  await app.page.locator('#pause').click(); await app.page.locator('#pause').click();
+  await app.page.locator('#record-stop').click();
+  const recorded = JSON.parse(await app.page.locator('#interaction-recording-data').inputValue());
+  assert.equal(recorded.format,'margo-constraints-interaction'); assert.ok(recorded.frames.length > 0);
+  assert.equal(recorded.invalidFrames,0);
+  assert.ok(recorded.actions.some(action => action.type === 'speed'));
+  for (const key of ['commandTargetX','lastSolveTargetX','lastSolveRootX','acceptedHandStepMeters','acceptedPoleStepRadians']) assert.ok(recorded.columns.includes(key));
+  assert.equal(await app.page.locator('#recording-indicator').isVisible(), false);
+  assert.equal(await app.page.locator('#record-download').isEnabled(), true);
+  await app.page.locator('#record-clear').click(); assert.equal(await app.page.locator('#interaction-recording-data').inputValue(),'');
+  await app.page.locator('#recording-panel summary').click();
   await app.page.screenshot({path: 'test-results/kinematics-constraints-demo.png', fullPage: true});
   await app.page.setViewportSize({width: 390, height: 844});
   assert.equal(await app.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.deepEqual(errors, []);
-  const report = {initial, torso, adversarial, overhead, waistCrossBody, waistCursorError, returnOverhead, overheadOvershoot, verticalContinuity, singularBoundaries, finalRecovery, held, paused, hardware: app.hardware, errors};
+  const report = {initial, torso, adversarial, overhead, waistCrossBody, waistCursorError, returnOverhead, overheadOvershoot, verticalContinuity, singularBoundaries, finalRecovery, motionTransition, capabilities, projectionOnly, recording:{frames:recorded.frames.length,actions:recorded.actions.length,invalidFrames:recorded.invalidFrames}, held, paused, hardware: app.hardware, errors};
   await writeFile('test-results/kinematics-constraints-demo.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report));
 } finally { await app.close(); }

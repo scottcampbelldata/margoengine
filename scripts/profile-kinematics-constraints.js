@@ -9,7 +9,7 @@ import {openBrowser} from './browser.js';
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 const startedAt = new Date().toISOString();
 const sourceSHA256 = {};
-for (const path of ['packages/kinematics-constraints/dist/index.js', 'examples/kinematics-constraints.html', 'scripts/profile-kinematics-constraints.js']) {
+for (const path of ['packages/kinematics-constraints/dist/index.js', 'examples/kinematics-constraints.html', 'examples/kinematics-constraints-controller.js', 'examples/kinematics-constraints-recorder.js', 'scripts/profile-kinematics-constraints.js']) {
   sourceSHA256[path] = createHash('sha256').update(await readFile(path)).digest('hex');
 }
 const argument = (name, fallback) => Number(process.argv.find(value => value.startsWith(`--${name}=`))?.split('=')[1] ?? fallback);
