@@ -1,5 +1,5 @@
 // Independently bundled optional packages must see the same weak registry.
-// Core and the stage facade never import this module.
+// Core never imports this module; the stage only reads existing source records.
 const key=Symbol.for('margoengine.mesh-sources.v1');
 const sources=globalThis[key]??new WeakMap();
 if(!globalThis[key])Object.defineProperty(globalThis,key,{value:sources});

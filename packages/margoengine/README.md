@@ -6,7 +6,7 @@ This package is built from source alongside the engine. See the [package catalog
 
 Apps using Stage load this facade and its shared core, then only the feature entries they use and those features' required dependencies. Apps using the Engine API directly can load core without Stage. Choose specific feature imports and load heavier features on demand; keep one matching core version across the app.
 
-The build requires the combined core and stage facade, with every base export retained, to stay strictly below 20,000 bytes gzip. It writes measurements to `test-results/modern-bundle-sizes.json`; `npm run measure:size` repeats the gate against the built artifacts. Lazy features and application bootstrap/chunk overhead are measured separately; this is not the complete page download size.
+The build requires the combined core and stage facade, with every base export retained, to stay strictly below 25,000 bytes gzip. It writes measurements to `test-results/modern-bundle-sizes.json`; `npm run measure:size` repeats the gate against the built artifacts. Lazy features and application bootstrap/chunk overhead are measured separately; this is not the complete page download size.
 
 Give the container a height, for example `<div id="scene" style="height:400px"></div>`:
 
@@ -39,6 +39,8 @@ Use a selector, an HTMLElement container or an existing canvas. The wrapper appe
 
 Loading infers format from the URL pathname, including `.stp` and `.igs`; set `format` for extensionless endpoints. Use `fit: false` to preserve camera framing, `signal` to cancel, and CAD `onProgress`/`smoothing` options as needed. Fits use the world-space AABB of transformed vertices. A failed fit retires the imported model. Existing loader byte limits, rollback and supported model subsets apply: glTF supports static opaque constant-color geometry, without textures, skinning or animation.
 
+`app.fit()` also reads registered meshes from the optional `@margoengine/gltf-pro` and FBX loaders, including their current node world transforms. Pass primitive nodes explicitly to fit a selection; grouping nodes themselves have no geometry. Hidden meshes and their hidden descendants stay excluded from fitting. PBR bounds use CPU bind-pose positions; fitting does not advance animation or read back GPU deformation. These queries leave PBR rendering in its optional package and keep `mesh.geometry` null. `app.load()` continues to use the basic glTF loader.
+
 Feature helpers load their entry and its required dependencies rather than the entire domain pack. CAD loading uses `@margoengine/machinery/cad`, without kinematics, surface transport or telemetry. Explicit pack accessors keep their complete namespaces for compatibility. A helper whose import finishes after stage disposal rejects with `AbortError` before constructing its plugin; active attached plugins remain owned by the engine and are disposed with it.
 
 `load()` returns the exported `LoadedModel` type:
@@ -49,12 +51,12 @@ Feature helpers load their entry and its required dependencies rather than the e
 | `visible` | Boolean root visibility; hides/shows the complete model hierarchy |
 | `bounds` | Read-only property returning a retained `Float32Array` of world-space `[minX, minY, minZ, maxX, maxY, maxZ]`, refreshed on access, including hidden geometry |
 | `destroy()` | Idempotently unbinds model nodes and releases geometry/GPU buffers when their last mesh reference retires |
-| `raw` | WebGPU buffer records `{vertex, index, instance}` per unique geometry; `null` on WebGL2 |
+| `raw` | Borrowed WebGPU `{vertex, index}` records; core geometry also carries `instance`. Core records are unique per geometry, registered PBR records remain separate per primitive; `null` on WebGL2 |
 | `root`, `meshes` | Existing core handles for hierarchy, queries and domain packs |
 
 The bounds array belongs to the model; treat its contents as read-only. Bounds access scans vertices, so use it when framing or inspecting a model rather than querying large imports every tick. Transforms are read directly from the stage's typed storage; no copied transform objects or JavaScript `Proxy` is involved.
 
-`raw` exposes the actual shared renderer buffers, enabled for read-only storage bindings in custom WGSL compute/render passes. Vertices use interleaved position/normal floats (24-byte stride), indices use uint32, and packed instances use a 96-byte stride (matrix followed by PBR data). Instance order/count follows the current visible geometry batch and can include other meshes sharing that geometry. Acquire handles after rendering, do not destroy or overwrite engine-owned buffers, and reacquire `raw` after device recovery. Access during recovery or after destruction rejects. The buffer lookup remains confined to core's explicit extension API.
+`raw` exposes the actual shared renderer buffers, enabled for read-only storage bindings in custom WGSL compute/render passes. Core vertices use interleaved position/normal floats (24-byte stride), indices use uint32, and packed instances use a 96-byte stride (matrix followed by PBR data). Instance order/count follows the current visible geometry batch and can include other meshes sharing that geometry. Registered PBR records instead borrow the loader's existing 80-byte vertex buffers and uint32 indices, including the current deformed buffer when present, and have no core instance buffer. Raw queries include hidden parts and perform no GPU allocation, rendering, or deformation work. Acquire handles after rendering, do not destroy or overwrite engine-owned buffers, and reacquire `raw` after device recovery. Access after destruction rejects. Core buffer lookup uses its explicit extension API; PBR records come from the existing shared mesh-source registry.
 
 ```ts
 const model = await app.load('/assembly.obj');

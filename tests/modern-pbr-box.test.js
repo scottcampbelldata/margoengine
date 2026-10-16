@@ -206,14 +206,17 @@ test('the unchanged basic glTF Box loader still exports one mesh and one primiti
   } finally {engine.dispose();}
 });
 
-test('Box model.bounds encloses actual world vertices while frozen worldBounds and Stage.fit keep the explicit No geometry contract', async () => {
+test('Box model.bounds, facade worldBounds and Stage.fit enclose the actual PBR world vertices', async () => {
   await withBox(({engine, model, mesh, primitive}) => {
     const {min, max} = positionBounds(transformed(primitivePositions(primitive), mesh.matrix));
     assert.equal(model.bounds.length, 6);
     assert.ok([...model.bounds].every(Number.isFinite));
     close(model.bounds, [...min, ...max], 'model world bounds');
-    assert.throws(() => worldBounds(engine, model.nodes, new Float32Array(6)), {message: 'No geometry'});
-    assert.throws(() => new Stage(engine).fit(), {message: 'No geometry'});
+    close(worldBounds(engine, model.nodes, new Float32Array(6)), [...min, ...max], 'facade PBR world bounds');
+    new Stage(engine).fit(); engine.camera.advance(1);
+    close(engine.camera.target, min.map((value, axis) => (value + max[axis]) / 2), 'facade PBR camera target');
+    assert.equal(mesh.geometry, null);
+    assert.equal([...engine.meshes.values()].filter(node => node.geometry).length, 0, 'bounds and fitting never register a second core draw');
   });
 });
 

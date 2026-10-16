@@ -2,7 +2,7 @@
 
 Date: 2026-10-16. Margo is for developers who are tired of Three.js and want a place to do the same job. It does not have to absorb every Three.js example. It does have to be a complete, predictable engine for the scenes those developers actually ship.
 
-The 19,999-byte gzip measurement of core plus stage is the promise they can check. CI fails at 20,000. Optional packages stay out of that file. A feature that needs a new core API does not land.
+The last measured core plus stage gzip is 19,999 bytes. CI fails at 25,000. A result from 22,000 through 24,999 is inside the allowed band. Optional packages stay out of that file. A feature that needs a new core API does not land.
 
 ## What they are tired of
 

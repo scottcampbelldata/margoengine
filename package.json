@@ -132,6 +132,7 @@
     "pretest": "npm run build:packages",
     "test": "npm run modern:test",
     "test:all": "npm run build:packages && node --experimental-test-module-mocks --test tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js",
+    "test:kernel": "cargo test --locked --manifest-path packages/kernel/Cargo.toml",
     "test:modules:browser": "node scripts/margo-module-tests.js",
     "test:modules:packages": "node scripts/margo-package-tests.js",
     "test:browser": "node scripts/modern-browser-tests.js",

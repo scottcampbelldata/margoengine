@@ -13,6 +13,7 @@
     "access": "public"
   },
   "scripts": {
+    "test": "node --test test/*.test.js ../../tests/modern-game.test.js ../../tests/modern-shadow-texture-transform.test.js",
     "prepack": "npm --prefix ../.. run build:packages"
   },
   "sideEffects": false,

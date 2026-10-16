@@ -13,6 +13,7 @@
     "access": "public"
   },
   "scripts": {
+    "test": "node --test ../../tests/modern-temporal*.test.js ../../tests/deep-render-jitter.test.js ../../tests/deep-render-taa-failures.test.js",
     "prepack": "npm --prefix ../.. run build:packages"
   },
   "sideEffects": false,
