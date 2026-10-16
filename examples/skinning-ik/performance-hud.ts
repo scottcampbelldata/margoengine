@@ -15,7 +15,7 @@ interface BuildFootprint {
 
 /** Real engine counters and optional browser heap measurements, refreshed outside the render loop. */
 export function attachWorkshopStats(engine: EngineKernel, parent: HTMLElement) {
-  const stats = Stats.attach(engine, { parent, samples: 120, profiling: true });
+  const stats = Stats.attach(engine, { parent, samples: 120, profiling: true, lowAllocationPasses: true });
   stats.element.dataset.workshopPerformance = '';
   stats.element.id = 'workshop-performance-panel';
   stats.element.setAttribute('aria-label', 'Workshop performance');
