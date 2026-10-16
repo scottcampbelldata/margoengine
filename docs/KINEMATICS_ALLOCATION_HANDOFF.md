@@ -63,6 +63,43 @@ Next, inspect the measured hidden-audit publication and pass-tracking sites
 without weakening numerical guards, removing visible heap telemetry, or
 attributing all remaining pressure to native resources.
 
+### Hidden GPU-audit opt-out experiment: reverted
+
+The hidden audit serializes timestamp/history JSON into `data-gpu-audit`; the
+visible Stats and heap/GPU HUD do not read that attribute. A temporary
+`?gpuAudit=off` candidate skipped only this diagnostic while preserving the
+default audit-on behavior for a same-bundle A/B/A comparison. Its five helper
+tests and real-hardware on/off proof passed: 125 guard samples per mode, GPU
+sample IDs advanced in both, the off mode had no audit writes, and rendering,
+controls, reflections and the visible HUD remained active. The native queue
+writer was unchanged and page/GPU errors were empty.
+
+Fresh pages used 30 seconds of warmup and approximately 30 seconds measured per
+phase. Every drag measurement completed 938 trusted moves. Results:
+
+| Mode | Phase | Sampled MB/s | Minor / major GC | Maximum observed GC slice ms | p95 RAF callback ms | Reflection bakes |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Audit on, baseline A | Idle | 0.563456 | 20 / 4 | 1.781 | 2.578 | 332 |
+| Audit off, candidate | Idle | 0.472390 | 18 / 3 | 2.173 | 2.644 | 332 |
+| Audit on, baseline B | Idle | 0.639373 | 23 / 4 | 1.983 | 2.167 | 337 |
+| Audit on, baseline A | Drag | 0.727518 | 24 / 4 | 1.904 | 6.773 | 317 |
+| Audit off, candidate | Drag | 0.847692 | 26 / 4 | 5.669 | 7.430 | 333 |
+| Audit on, baseline B | Drag | 0.802214 | 28 / 4 | 4.239 | 6.374 | 324 |
+
+Idle sampled allocation fell, but the candidate's drag rate and p95 callback
+duration were higher than both baselines. Reflection cadence also differed;
+these observations do not establish why the drag run regressed. **Reject the
+experiment rather than retain it as a performance fix.** The main source and
+demo README were restored byte-for-byte, and the current live deployment is
+unchanged. The temporary built site is historical experiment output until the
+next rebuild, not evidence of the restored source's deployed bytes.
+
+Evidence remains in ignored `test-results/gpu-audit-optional/` and the three
+`skinning-ik-profile-gpu-audit-{default-a,off-candidate,default-b}` report groups.
+The visible heap graph stays enabled and GC remains unresolved. Next, test
+on-demand publication of the separate hidden pose/reflection telemetry; no
+visible UI or mathematical guard should be removed for that experiment.
+
 Two different demos are involved:
 
 - **Constraints lab:** http://127.0.0.1:5173/examples/kinematics-constraints.html. Its demo controller performs full-chain solve, pacing, contact recovery, and reach conditioning.
