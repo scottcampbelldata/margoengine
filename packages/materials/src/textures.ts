@@ -1,9 +1,9 @@
-import type {PBRModel} from '@margoengine/gltf-pro';
+import {textureCoordinates, type PBRModel, type TextureTransform} from '@margoengine/gltf-pro';
 import type {ClearcoatTexture} from './index.js';
 
 declare const GPUTextureUsage:{TEXTURE_BINDING:number;COPY_DST:number;RENDER_ATTACHMENT:number};
 
-export interface TextureInfo {index:number;texCoord?:0|1;scale?:number}
+export interface TextureInfo {index:number;texCoord?:0|1;scale?:number;transform?:TextureTransform}
 
 const mipShader=/* wgsl */`
 struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f}
@@ -39,13 +39,13 @@ function samplerDefinition(model:PBRModel,texture:Record<string,any>):Record<str
 /** Validate glTF texture metadata without allocating any GPU resources. */
 export function validateTextureInfo(value:any,model:PBRModel):TextureInfo {
   const info=record(value,'texture info'),index=integer(info.index,'texture index');
-  if(info.extensions?.KHR_texture_transform!==undefined)throw new Error('Clearcoat KHR_texture_transform is unsupported');
-  if(info.texCoord!==undefined&&info.texCoord!==0&&info.texCoord!==1)throw new TypeError('Invalid clearcoat texture coordinate');
+  const transform=info.transform===undefined?info.extensions?.KHR_texture_transform:info.transform;
+  const {texCoord}=textureCoordinates({texCoord:info.texCoord,extensions:{KHR_texture_transform:transform}});
   if(info.scale!==undefined&&(typeof info.scale!=='number'||!Number.isFinite(Math.fround(info.scale))))throw new TypeError('Invalid clearcoat normal scale');
   const texture=entry(model.asset.doc.textures,index,'texture');
-  model.image(integer(texture.source,'image source'));
+  model.image(integer(texture.extensions?.KHR_texture_basisu?.source??texture.source,'image source'));
   samplerDefinition(model,texture);
-  return {index,texCoord:info.texCoord??0,scale:info.scale??1};
+  return {index,texCoord,scale:info.scale??1,...(transform!==undefined?{transform}:{})};
 }
 
 interface ImageTexture {texture:GPUTexture;view:GPUTextureView;levels:number;mipsReady:boolean}
@@ -63,19 +63,19 @@ export class MaterialTextures {
   resolve(value:TextureInfo):ClearcoatTexture {
     if(this.disposed)throw new Error('Material textures are disposed');
     const info=validateTextureInfo(value,this.model),definition=entry(this.model.asset.doc.textures,info.index,'texture');
-    const source=integer(definition.source,'image source'),samplerDefinitionValue=samplerDefinition(this.model,definition);
+    const source=integer(definition.extensions?.KHR_texture_basisu?.source??definition.source,'image source'),samplerDefinitionValue=samplerDefinition(this.model,definition);
     const usesMips=![9728,9729].includes(samplerDefinitionValue.minFilter);
     let imageTexture=this.images.get(source);
     if(!imageTexture){
       const image=this.model.image(source),size=[image.width,image.height];
       if(size.some(n=>!Number.isSafeInteger(n)||n<1||n>this.device.limits.maxTextureDimension2D))throw new RangeError('Clearcoat image exceeds device limit');
       // Reserve all levels so different samplers can share one image without replacing its view.
-      const levels=Math.floor(Math.log2(Math.max(...size)))+1;
-      const texture=this.device.createTexture({size,format:'rgba8unorm',mipLevelCount:levels,
+      const compressed='ktx2' in image,levels=compressed?image.ktx2.mipmaps.length:Math.floor(Math.log2(Math.max(...size)))+1;
+      const texture=compressed?this.model.uploadImage(source,this.device):this.device.createTexture({size,format:'rgba8unorm',mipLevelCount:levels,
         usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST|GPUTextureUsage.RENDER_ATTACHMENT});
       this.owned.add(texture);
-      this.device.queue.copyExternalImageToTexture({source:image},{texture},size);
-      imageTexture={texture,view:texture.createView(),levels,mipsReady:levels===1};
+      if(!compressed)this.device.queue.copyExternalImageToTexture({source:image},{texture},size);
+      imageTexture={texture,view:texture.createView(),levels,mipsReady:compressed||levels===1};
       this.images.set(source,imageTexture);
     }
     if(usesMips&&!imageTexture.mipsReady)this.generateMips(imageTexture);
@@ -89,7 +89,7 @@ export class MaterialTextures {
         mipmapFilter:[9984,9985].includes(s.minFilter)?'nearest':'linear',lodMaxClamp:usesMips?32:0});
       this.samplers.set(samplerId,sampler);
     }
-    return {view:imageTexture.view,sampler,texCoord:info.texCoord,scale:info.scale};
+    return {view:imageTexture.view,sampler,texCoord:info.texCoord,scale:info.scale,transform:info.transform};
   }
 
   private generateMips(image:ImageTexture):void {

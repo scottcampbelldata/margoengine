@@ -3,13 +3,18 @@ import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type Pas
 import {invert} from '../../shared/math.js';
 import {viewMatrix} from '../../shared/view.js';
 import {Cleanup} from '../../shared/cleanup.js';
-import {GLTFAsset, container, loadAsset, entry, integer, assetLimit} from './asset.js';
+import {GLTFAsset, container, loadAsset, entry, integer, assetLimit, textureSource, decodeKTX2Images, type GLTFImage} from './asset.js';
+import {createKTX2Texture} from '@margoengine/decoders';
 import {pbrShader} from './shader.js';
 import {mipShader} from './mip.js';
 import {prepareMaterialExtension, materialExtensionShader, bindMaterialExtension, type MaterialExtension, type MaterialExtensionResource} from './material-extension.js';
 import {compressedIndices, decompressPrimitives, type GLTFLoadOptions} from './compression.js';
+import {textureCoordinates, coordinateExtension, coordinateShader, type CoordinateExtension} from './texture-coordinates.js';
 export {GLTFAsset} from './asset.js';
 export type {GLTFDocument} from './asset.js';
+export type {GLTFImage, KTX2Image} from './asset.js';
+export {textureCoordinates} from './texture-coordinates.js';
+export type {TextureTransform} from './texture-coordinates.js';
 export type {GLTFLoadOptions} from './compression.js';
 export type {MaterialExtension, MaterialExtensionTexture} from './material-extension.js';
 declare const GPUBufferUsage: {UNIFORM:number;STORAGE:number;VERTEX:number;INDEX:number;COPY_DST:number};
@@ -47,7 +52,7 @@ function preparedPrimitive(asset:GLTFAsset,p:any,data:PreparedGeometry,node:Mesh
   for(const map of m.maps)if(map){if(integer(map.texCoord??0,'texture coordinate')>1)throw new RangeError('Invalid prepared PBR UV set');entry(asset.doc.textures,map.index,'texture');}
   return {node,nodeIndex,vertices,indices,definition:p,material:m,weights:new Float32Array(0),targetNames:[]};
 }
-interface DrawResource {primitive:PBRPrimitive;vertex:GPUBuffer;index:GPUBuffer;uniform:GPUBuffer;values:Float32Array;groups:Map<GPURenderPipeline,[GPUBindGroup,GPUBindGroup]>;views:GPUTextureView[];samplers:GPUSampler[];extension?:MaterialExtensionResource}
+interface DrawResource {primitive:PBRPrimitive;vertex:GPUBuffer;index:GPUBuffer;uniform:GPUBuffer;values:Float32Array;groups:Map<GPURenderPipeline,[GPUBindGroup,GPUBindGroup]>;views:GPUTextureView[];samplers:GPUSampler[];extension?:MaterialExtensionResource;coordinates?:CoordinateExtension}
 export interface LightingEffect {readonly owner?:Engine;shader(source:string,group:number):string;bindings():GPUBindGroupEntry[]}
 let modelId = 0;
 const vector = (value:any, size:number, label:string, min=-Infinity, max=Infinity):number[] => {
@@ -63,7 +68,7 @@ function material(def:any = {}): PBRMaterial {
     factors:[scalar(p.roughnessFactor??1,0,1,'roughness'),scalar(p.metallicFactor??1,0,1,'metallic'),scalar(def.normalTexture?.scale??1,-Infinity,Infinity,'normal scale'),scalar(def.occlusionTexture?.strength??1,0,1,'occlusion strength')],
     emission:vector(def.emissiveFactor??[0,0,0],3,'emissive',0,1),
     settings:[['OPAQUE','MASK','BLEND'].indexOf(alpha),scalar(def.alphaCutoff??0.5,0,Infinity,'alpha cutoff'),+(def.doubleSided??false),0],
-    maps:[p.baseColorTexture,p.metallicRoughnessTexture,def.normalTexture,def.occlusionTexture,def.emissiveTexture]};
+    maps:[p.baseColorTexture,p.metallicRoughnessTexture,def.normalTexture,def.occlusionTexture,def.emissiveTexture].map(map=>map?.extensions?.KHR_texture_transform===undefined?map:{...map,texCoord:textureCoordinates(map).texCoord})};
 }
 function primitive(asset:GLTFAsset, p:any, node:Mesh, nodeIndex:number, mesh:any, materials:any[]):PBRPrimitive {
   if ((p.mode??4)!==4) throw new Error('PBR requires triangle primitives');
@@ -137,7 +142,7 @@ export class PBRModel implements EnginePlugin {
   private engine:Engine;private readonly cleanupCallbacks=new Set<()=>void>();
   private readonly lighting=new Set<LightingEffect>();
   private readonly lightingGroups=new Map<GPURenderPipeline,{entries:GPUBindGroupEntry[];group:GPUBindGroup}>();
-  constructor(instance:EngineKernel,readonly asset:GLTFAsset,private readonly images:readonly ImageBitmap[]=[],prepared?:readonly (readonly PreparedGeometry[])[]) {
+  constructor(instance:EngineKernel,readonly asset:GLTFAsset,private readonly images:readonly GLTFImage[]=[],prepared?:readonly (readonly PreparedGeometry[])[]) {
     this.engine=engineRuntime(instance);
     const doc=asset.doc,defs=doc.nodes??[],parents=new Int32Array(defs.length).fill(-1),materials=(doc.materials??[]).map(material);
     defs.forEach((def:any,id:number)=>{
@@ -179,17 +184,20 @@ export class PBRModel implements EnginePlugin {
       this.resources.push(r);r.vertex=upload(p.vertices,GPUBufferUsage.VERTEX);r.index=upload(p.indices,GPUBufferUsage.INDEX);
       r.uniform=device.createBuffer({size:400,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
       for(let i=0;i<5;i++) {
-        const map=p.material.maps[i],def=map?entry(this.asset.doc.textures,map.index,'texture'):null,image=def?this.images[integer(def.source,'image')]:undefined;
+        const map=p.material.maps[i],def=map?entry(this.asset.doc.textures,map.index,'texture'):null,source=def?textureSource(def):-1,image=def?this.images[source]:undefined;
         if(def&&!image)throw new TypeError('Missing decoded glTF image');
         const format=i===0||i===4?'rgba8unorm-srgb':'rgba8unorm',size=image?[image.width,image.height]:[1,1];
         if(size.some(n=>n>device.limits.maxTextureDimension2D))throw new RangeError('Image exceeds device limit');
-        const key=image?def.source+':'+format:'default:'+i;
+        const key=image?source+':'+format:'default:'+i;
         let texture=imageTextures.get(key);
+        if(!texture&&image&&'ktx2' in image){
+          texture=this.uploadImage(source,device,i===0||i===4);this.textures.push(texture);imageTextures.set(key,texture);
+        }
         if(!texture) {
           const levels=image?Math.floor(Math.log2(Math.max(...size)))+1:1;
           texture=device.createTexture({size,format,mipLevelCount:levels,usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST|GPUTextureUsage.RENDER_ATTACHMENT});
           this.textures.push(texture);imageTextures.set(key,texture);
-          if(image)device.queue.copyExternalImageToTexture({source:image},{texture},size);
+          if(image)device.queue.copyExternalImageToTexture({source:image as ImageBitmap},{texture},size);
           else device.queue.writeTexture({texture},new Uint8Array(i===2?[128,128,255,255]:[255,255,255,255]),{bytesPerRow:4},[1,1]);
           if(levels>1) {
             let pipeline=mipPipelines.get(format);
@@ -213,9 +221,19 @@ export class PBRModel implements EnginePlugin {
   }
   registerPasses(graph:FrameGraph):void {graph.add({name:this.name,order:1,execute:c=>{if(c.backend==='webgpu')this.draw(c,'beauty',c.color,c.depth);}});}
   /** Borrow a decoded image for optional material packages; the model owns its lifetime. */
-  image(index:number):ImageBitmap {
+  image(index:number):GLTFImage {
     if(this.disposed)throw new Error('PBRModel is disposed');
     const image=this.images[integer(index,'image')];if(!image)throw new TypeError('Missing decoded glTF image');return image;
+  }
+  /** Upload a retained image; the caller owns and destroys the returned texture. */
+  uploadImage(index:number,device:GPUDevice,srgb=false):GPUTexture {
+    const image=this.image(index);
+    if('ktx2' in image){
+      const format=(image.ktx2.format.replace(/-srgb$/,'')+(srgb?'-srgb':'')) as GPUTextureFormat;
+      return createKTX2Texture(device,{...image.ktx2,format});
+    }
+    const size=[image.width,image.height],texture=device.createTexture({size,format:srgb?'rgba8unorm-srgb':'rgba8unorm',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});
+    try{device.queue.copyExternalImageToTexture({source:image},{texture},size);return texture;}catch(error){texture.destroy();throw error;}
   }
   addLighting(effect:LightingEffect):()=>void {
     if(this.disposed||!effect||typeof effect.shader!=='function'||typeof effect.bindings!=='function')throw new TypeError('Invalid PBR lighting effect');
@@ -224,7 +242,8 @@ export class PBRModel implements EnginePlugin {
   }
   get shadowPrimitives() {
     return this.resources.filter(r=>r.primitive.material.settings[0]!==2).map(r=>({node:r.primitive.node,vertex:r.primitive.deformed??r.vertex,index:r.index,count:r.primitive.indices.length,stride:80,
-      alphaTexture:r.views[0],alphaSampler:r.samplers[0],alpha:r.primitive.material.base[3],cutoff:r.primitive.material.settings[0]===1?r.primitive.material.settings[1]:0,texCoord:r.primitive.material.maps[0]?.texCoord??0}));
+      alphaTexture:r.views[0],alphaSampler:r.samplers[0],alpha:r.primitive.material.base[3],cutoff:r.primitive.material.settings[0]===1?r.primitive.material.settings[1]:0,texCoord:r.primitive.material.maps[0]?textureCoordinates(r.primitive.material.maps[0]).texCoord:0,
+      ...(r.primitive.material.maps[0]?.extensions?.KHR_texture_transform?{alphaTransform:textureCoordinates(r.primitive.material.maps[0]).transform}:{})}));
   }
   draw(c:Context,mode:'beauty'|'gbuffer'|'ambient',color:GPUTextureView,depth:GPUTextureView,phase:'all'|'opaque'|'blend'='all'):void {
     if(this.disposed)return;
@@ -247,11 +266,13 @@ export class PBRModel implements EnginePlugin {
       for(let i=0;i<16;i++)v[32+i]=this.inverse[(i%4)*4+Math.floor(i/4)];
       v.set(this.view,48);v.set(c.camera.position,64);v.set(this.engine.lighting.direction,68);v.set(this.engine.lighting.radiance,72);
       v.set(m.base,76);v.set(m.factors,80);v.set(m.emission,84);v.set(m.settings,88);v[91]=+(c.format==='rgba16float');
-      for(let i=0;i<5;i++)v[92+i]=m.maps[i]?.texCoord??0;
+      for(let i=0;i<5;i++)v[92+i]=m.maps[i]?.extensions?.KHR_texture_transform!==undefined?textureCoordinates(m.maps[i]).texCoord:m.maps[i]?.texCoord??0;
       const a=node.matrix;v[97]=Math.sign(a[0]*(a[5]*a[10]-a[6]*a[9])-a[4]*(a[1]*a[10]-a[2]*a[9])+a[8]*(a[1]*a[6]-a[2]*a[5]));
       c.device.queue.writeBuffer(r.uniform,0,v as Float32Array<ArrayBuffer>);
-      let code=pbrShader;
-      const extension=p.extension??m.extension;
+      const source=p.extension??m.extension;
+      r.coordinates=coordinateExtension(m.maps,source,r.coordinates);
+      let code=coordinateShader(pbrShader,r.coordinates,!!m.maps[2]&&v[94]===1);
+      const extension=r.coordinates?.extension??source;
       if(extension){r.extension=prepareMaterialExtension(c.device,extension,r.extension);code=materialExtensionShader(code,extension);}
       else if(r.extension){r.extension.uniform?.destroy();r.extension=undefined;}
       const lighting=mode==='beauty'&&extension?.lighting!==false&&this.lighting.size>0;
@@ -308,29 +329,30 @@ export class PBRModel implements EnginePlugin {
     this.lighting.clear();
     cleanup.run(()=>this.engine.removePlugin(this.name)).run(()=>this.engine.frameGraph.removeOwner(this.name));
     for(const callback of this.cleanupCallbacks)cleanup.run(callback);this.cleanupCallbacks.clear();cleanup.run(()=>this.releaseGPU());
-    for(let i=this.created.length-1;i>=0;i--)cleanup.run(()=>this.created[i].dispose());for(const image of this.images)cleanup.run(()=>image.close());cleanup.finish();
+    for(let i=this.created.length-1;i>=0;i--)cleanup.run(()=>this.created[i].dispose());for(const image of this.images)cleanup.run(()=>image?.close());cleanup.finish();
   }
   destroy():void {this.engine.removePlugin(this.name);if(!this.disposed)this.dispose();}
 }
-export function parseGLTF(instance:EngineKernel,input:string|object|ArrayBuffer|ArrayBufferView,buffers:Array<ArrayBuffer|ArrayBufferView>=[],images:readonly ImageBitmap[]=[]):PBRModel {
+export function parseGLTF(instance:EngineKernel,input:string|object|ArrayBuffer|ArrayBufferView,buffers:Array<ArrayBuffer|ArrayBufferView>=[],images:readonly GLTFImage[]=[]):PBRModel {
   const {doc,binary}=container(input),model=new PBRModel(instance,new GLTFAsset(doc,buffers,binary),images);
   try{engineRuntime(instance).use(model);return model;}catch(error){model.dispose();throw error;}
 }
-export function parsePreparedPBR(instance:EngineKernel,doc:GLTFAsset['doc'],geometry:readonly (readonly PreparedGeometry[])[],images:readonly ImageBitmap[]=[]):PBRModel {
+export function parsePreparedPBR(instance:EngineKernel,doc:GLTFAsset['doc'],geometry:readonly (readonly PreparedGeometry[])[],images:readonly GLTFImage[]=[]):PBRModel {
   if(doc.buffers?.length||doc.skins?.length||doc.animations?.length||doc.nodes?.some((n:any)=>n.skin!==undefined)||!Array.isArray(geometry)||geometry.length!==doc.meshes?.length)throw new TypeError('Prepared PBR requires a static scene');
   const model=new PBRModel(instance,new GLTFAsset(doc,[]),images,geometry);
   try{engineRuntime(instance).use(model);return model;}catch(error){model.dispose();throw error;}
 }
-export async function parseGLTFAsync(instance:EngineKernel,input:string|object|ArrayBuffer|ArrayBufferView,buffers:Array<ArrayBuffer|ArrayBufferView>=[],images:readonly ImageBitmap[]=[],options:GLTFLoadOptions={}):Promise<PBRModel> {
+export async function parseGLTFAsync(instance:EngineKernel,input:string|object|ArrayBuffer|ArrayBufferView,buffers:Array<ArrayBuffer|ArrayBufferView>=[],images:readonly GLTFImage[]=[],options:GLTFLoadOptions={}):Promise<PBRModel> {
   options.signal?.throwIfAborted();
   const {doc,binary}=container(input),asset=new GLTFAsset(doc,buffers,binary);
   await decompressPrimitives(asset,options);
+  images=await decodeKTX2Images(asset,images,{...options,device:engineRuntime(instance).gpu??undefined});
   options.signal?.throwIfAborted();
   const model=new PBRModel(instance,asset,images);
   try{engineRuntime(instance).use(model);return model;}catch(error){model.dispose();throw error;}
 }
 export async function loadGLTF(instance:EngineKernel,url:string|URL,options:GLTFLoadOptions={}):Promise<PBRModel> {
-  const {signal}=options,{asset,images}=await loadAsset(url,signal,asset=>decompressPrimitives(asset,options));let model:PBRModel|undefined;
+  const {signal}=options,{asset,images}=await loadAsset(url,signal,asset=>decompressPrimitives(asset,options),{...options,device:engineRuntime(instance).gpu??undefined});let model:PBRModel|undefined;
   try {signal?.throwIfAborted();model=new PBRModel(instance,asset,images);engineRuntime(instance).use(model);return model;}
-  catch(error){if(model)model.dispose();else for(const image of images)image.close();throw error;}
+  catch(error){if(model)model.dispose();else for(const image of images)image?.close();throw error;}
 }

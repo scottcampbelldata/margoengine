@@ -39,13 +39,13 @@ fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {
   return visibility/32.0;
 }
 `;}
-export function shadowDepth(pbr:boolean):string {return /* wgsl */`
-struct Frame {camera:mat4x4f,model:mat4x4f,alpha:vec4f}
+export function shadowDepth(pbr:boolean,transformed=false):string {return /* wgsl */`
+struct Frame {camera:mat4x4f,model:mat4x4f,alpha:vec4f${transformed?',alphaUV0:vec4f,alphaUV1:vec4f':''}}
 @group(0) @binding(0) var<uniform> f:Frame;
 @group(0) @binding(1) var alphaMap:texture_2d<f32>;
 @group(0) @binding(2) var alphaSampler:sampler;
 struct In {@location(0) position:${pbr?'vec4f':'vec3f'},${pbr?'@location(3) uv:vec4f,@location(4) color:vec4f':''}}
 struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
-@vertex fn vertex(i:In)->Out {var o:Out;o.clip=f.camera*f.model*vec4f(i.position.xyz,1);${pbr?'o.uv=select(i.uv.xy,i.uv.zw,f.alpha.z>0.5);o.alpha=i.color.a;':'o.uv=vec2f(0);o.alpha=1;'}return o;}
+@vertex fn vertex(i:In)->Out {var o:Out;o.clip=f.camera*f.model*vec4f(i.position.xyz,1);${pbr?'o.uv=select(i.uv.xy,i.uv.zw,f.alpha.z>0.5);o.alpha=i.color.a;':'o.uv=vec2f(0);o.alpha=1;'}${transformed?'let sourceUV=o.uv;o.uv=vec2f(dot(f.alphaUV0.xy,sourceUV)+f.alphaUV0.z,dot(f.alphaUV1.xy,sourceUV)+f.alphaUV1.z);':''}return o;}
 @fragment fn fragment(i:Out){if(textureSampleLevel(alphaMap,alphaSampler,i.uv,0).a*f.alpha.x*i.alpha<f.alpha.y){discard;}}
 `;}

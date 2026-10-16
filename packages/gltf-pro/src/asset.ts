@@ -1,6 +1,11 @@
 import {readResponse} from '../../shared/loading.js';
 import {meshoptDecodeGltfBuffer} from '@margoengine/decoders/meshopt';
+import type {KTX2Decoder, TranscodedKTX2Result} from '@margoengine/decoders';
 export type GLTFDocument = Record<string, any>;
+/** Retained mip bytes let compressed textures upload again after device restoration. */
+export interface KTX2Image {readonly ktx2:TranscodedKTX2Result;readonly width:number;readonly height:number;close():void}
+export type GLTFImage=ImageBitmap|KTX2Image;
+export interface GLTFImageOptions {signal?:AbortSignal;device?:GPUDevice;ktx2?:Pick<KTX2Decoder,'transcode'>}
 export const assetLimit = 64 * 1024 * 1024;
 export function integer(value: unknown, label: string, min = 0): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min) throw new TypeError('Invalid glTF ' + label);
@@ -42,7 +47,13 @@ function embedded(uri: string): Uint8Array {
 }
 const componentSizes: Record<number, number> = {5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4};
 const components: Record<string, number> = {SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16};
-const meshoptExtension = 'EXT_meshopt_compression', dracoExtension = 'KHR_draco_mesh_compression';
+const meshoptExtension = 'EXT_meshopt_compression', dracoExtension = 'KHR_draco_mesh_compression',basisuExtension='KHR_texture_basisu';
+/** Basis Universal replaces the ordinary PNG/JPEG source, including optional fallbacks. */
+export function textureSource(def:any):number {
+  const extension=def.extensions?.[basisuExtension];
+  if(extension!==undefined&&(!extension||typeof extension!=='object'||Array.isArray(extension)))throw new TypeError('Invalid glTF KHR_texture_basisu');
+  return integer(extension===undefined?def.source:extension.source,'image source');
+}
 function accessorLayout(doc: GLTFDocument, id: unknown, type?: string) {
   const index = integer(id, 'accessor'), def = entry(doc.accessors, index, 'accessor');
   if (type && def.type !== type) throw new TypeError('Invalid glTF accessor type');
@@ -67,7 +78,7 @@ export class GLTFAsset {
     if (!doc || doc.asset?.version !== '2.0') throw new TypeError('Expected glTF 2.0');
     for (const key of ['buffers','bufferViews','accessors','meshes','nodes','scenes','materials','textures','images','samplers','skins','animations','extensionsRequired'])
       if (doc[key] !== undefined && !Array.isArray(doc[key])) throw new TypeError('Invalid glTF ' + key);
-    const unsupported = doc.extensionsRequired?.filter((name: unknown) => name !== dracoExtension && name !== meshoptExtension);
+    const unsupported = doc.extensionsRequired?.filter((name: unknown) => name !== dracoExtension && name !== meshoptExtension && name !== basisuExtension && name !== 'KHR_texture_transform');
     if (unsupported?.length) throw new Error('Required glTF extensions are unsupported: ' + unsupported.join(', '));
     if ((doc.nodes?.length ?? 0) > 100_000) throw new RangeError('Too many glTF nodes');
     let total = 0;
@@ -158,7 +169,75 @@ export class GLTFAsset {
     this.cache.set(index, output); return output;
   }
 }
-export async function loadAsset(url: string | URL, signal?: AbortSignal, prepare?: (asset: GLTFAsset) => Promise<void>): Promise<{asset: GLTFAsset; images: ImageBitmap[]}> {
+function ktxSources(doc:GLTFDocument):Set<number> {
+  const sources=new Set<number>();
+  for(const texture of doc.textures??[])if(texture?.extensions?.[basisuExtension]!==undefined){
+    const source=textureSource(texture),def=entry(doc.images,source,'KTX2 image');
+    if(def.mimeType!==undefined&&def.mimeType!=='image/ktx2'||def.bufferView!==undefined&&def.mimeType!=='image/ktx2')throw new TypeError('KHR_texture_basisu requires image/ktx2');
+    sources.add(source);
+  }
+  for(let i=0;i<(doc.images?.length??0);i++)if(doc.images[i]?.mimeType==='image/ktx2')sources.add(i);
+  return sources;
+}
+function unusedBasisuFallbacks(doc:GLTFDocument):Set<number> {
+  const fallbacks=new Set<number>(),selected=new Set<number>();
+  for(const texture of doc.textures??[]){
+    if(texture?.extensions?.[basisuExtension]!==undefined){
+      selected.add(textureSource(texture));
+      if(Number.isSafeInteger(texture.source)&&texture.source>=0)fallbacks.add(texture.source);
+    }else if(Number.isSafeInteger(texture?.source)&&texture.source>=0)selected.add(texture.source);
+  }
+  for(const source of selected)fallbacks.delete(source);return fallbacks;
+}
+function ktxHeader(data:Uint8Array,asset:GLTFAsset,device?:GPUDevice):{width:number;height:number;levels:number} {
+  const magic=[171,75,84,88,32,50,48,187,13,10,26,10];
+  if(data.length<80||magic.some((v,i)=>data[i]!==v))throw new TypeError('Invalid glTF KTX2 header');
+  const view=new DataView(data.buffer,data.byteOffset,data.byteLength),width=view.getUint32(20,true),height=view.getUint32(24,true),levels=view.getUint32(40,true);
+  if(!width||!height||width%4||height%4||width*height>16_777_216||width>(device?.limits.maxTextureDimension2D??16384)||height>(device?.limits.maxTextureDimension2D??16384)||view.getUint32(28,true)||view.getUint32(32,true)||view.getUint32(36,true)!==1||!levels||levels>Math.floor(Math.log2(Math.max(width,height)))+1)throw new RangeError('Invalid glTF KTX2 dimensions or mip levels');
+  let worstBytes=0;for(let level=0;level<levels;level++)worstBytes+=Math.max(1,width>>level)*Math.max(1,height>>level)*4;
+  if(worstBytes>asset.remainingDecodedBytes)throw new RangeError('glTF KTX2 exceeds decoded byte budget');
+  return {width,height,levels};
+}
+function validateKTX2(result:TranscodedKTX2Result,header:ReturnType<typeof ktxHeader>,asset:GLTFAsset):KTX2Image {
+  const formats={rgba8:['rgba8unorm',1,4],bc7:['bc7-rgba-unorm',4,16],'astc-4x4':['astc-4x4-unorm',4,16],etc2:['etc2-rgba8unorm',4,16]} as const;
+  const format=result&&Object.hasOwn(formats,result.target)?formats[result.target]:undefined,base=typeof result?.format==='string'?result.format.replace(/-srgb$/,''):undefined;
+  if(!format||base!==format[0]||result.width!==header.width||result.height!==header.height||!Array.isArray(result.mipmaps)||result.mipmaps.length!==header.levels||typeof result.srgb!=='boolean'||typeof result.hasAlpha!=='boolean')throw new TypeError('Invalid transcoded glTF KTX2 image');
+  let total=0;
+  for(let level=0;level<result.mipmaps.length;level++){
+    const mip=result.mipmaps[level];
+    const width=Math.max(1,header.width>>level),height=Math.max(1,header.height>>level),length=Math.ceil(width/format[1])*Math.ceil(height/format[1])*format[2];
+    if(!mip||mip.width!==width||mip.height!==height||!(mip.data instanceof Uint8Array)||mip.data.byteLength!==length||mip.byteLength!==length)throw new RangeError('Invalid transcoded glTF KTX2 mip');
+    total+=length;
+  }
+  asset.reserveDecodedBytes(total);
+  return {ktx2:result,width:result.width,height:result.height,close(){}};
+}
+function ktxDecoder(asset:GLTFAsset,options:GLTFImageOptions) {
+  let decoder=options.ktx2,owned:KTX2Decoder|undefined;
+  return {
+    async decode(data:Uint8Array):Promise<KTX2Image> {
+      options.signal?.throwIfAborted();const header=ktxHeader(data,asset,options.device);
+      if(!decoder){const {KTX2Decoder}=await import('@margoengine/decoders');options.signal?.throwIfAborted();decoder=owned=new KTX2Decoder({device:options.device});}
+      const result=await decoder.transcode(data,{signal:options.signal});options.signal?.throwIfAborted();return validateKTX2(result,header,asset);
+    },
+    close(){owned?.dispose();}
+  };
+}
+/** Async only for requested KTX2 images; caller-supplied ordinary bitmaps retain their synchronous path. */
+export async function decodeKTX2Images(asset:GLTFAsset,images:readonly GLTFImage[]=[],options:GLTFImageOptions={}):Promise<GLTFImage[]> {
+  options.signal?.throwIfAborted();const sources=ktxSources(asset.doc);if(!sources.size)return images as GLTFImage[];
+  const decoded=images.slice(),decoder=ktxDecoder(asset,options);
+  try {
+    for(const source of sources){
+      if(decoded[source]){if(!('ktx2' in decoded[source]))throw new TypeError('KHR_texture_basisu requires decoded KTX2 images');continue;}
+      const def=entry(asset.doc.images,source,'KTX2 image');
+      const data=def.bufferView!==undefined?asset.view(def.bufferView):typeof def.uri==='string'&&def.uri.startsWith('data:')?embedded(def.uri):undefined;
+      if(!data)throw new Error('External KTX2 images require loadGLTF');decoded[source]=await decoder.decode(data);
+    }
+    return decoded;
+  }finally{decoder.close();}
+}
+export async function loadAsset(url: string | URL, signal?: AbortSignal, prepare?: (asset: GLTFAsset) => Promise<void>,imageOptions:GLTFImageOptions={}): Promise<{asset: GLTFAsset; images: GLTFImage[]}> {
   signal?.throwIfAborted(); let base = new URL(url, globalThis.location?.href), total = 0;
   const fetchBytes = async (target: URL, root = false) => {
     if (!['http:','https:'].includes(target.protocol)) throw new TypeError('glTF URL must use HTTP(S)');
@@ -166,7 +245,7 @@ export async function loadAsset(url: string | URL, signal?: AbortSignal, prepare
     const bytes = await readResponse(response, {maxBytes: assetLimit - total, signal, label: 'glTF download'}); total += bytes.length; return bytes;
   };
   const bytes = await fetchBytes(base, true), glb = bytes.length >= 4 && new DataView(bytes.buffer, bytes.byteOffset).getUint32(0,true) === 0x46546c67;
-  const {doc,binary} = container(glb ? bytes : new TextDecoder('utf-8',{fatal:true}).decode(bytes)), buffers: Uint8Array[] = [], images: ImageBitmap[] = [];
+  const {doc,binary} = container(glb ? bytes : new TextDecoder('utf-8',{fatal:true}).decode(bytes)), buffers: Uint8Array[] = [], images: GLTFImage[] = [];
   for (let i = 0; i < (doc.buffers?.length ?? 0); i++) {
     const def = entry(doc.buffers, i, 'buffer');
     if (def.extensions?.[meshoptExtension]?.fallback === true) continue;
@@ -174,21 +253,23 @@ export async function loadAsset(url: string | URL, signal?: AbortSignal, prepare
     else if (def.uri.startsWith('data:')) {const b = embedded(def.uri); total += b.length; if (total > assetLimit) throw new RangeError('glTF exceeds download budget'); buffers[i] = b;}
     else buffers[i] = await fetchBytes(new URL(def.uri,base));
   }
-  const asset = new GLTFAsset(doc,buffers,binary);let decodedImages=0;
+  const asset = new GLTFAsset(doc,buffers,binary),sources=ktxSources(doc),fallbacks=unusedBasisuFallbacks(doc),decoder=ktxDecoder(asset,{...imageOptions,signal});let decodedImages=0;
   try {
     signal?.throwIfAborted(); await prepare?.(asset); signal?.throwIfAborted();
-    for (const def of doc.images ?? []) {
+    for (let index=0;index<(doc.images?.length??0);index++) {
+      if(fallbacks.has(index))continue;
+      const def=entry(doc.images,index,'image');
       let data: Uint8Array;
       if (def.bufferView !== undefined) data = asset.view(def.bufferView);
       else if (typeof def.uri === 'string' && def.uri.startsWith('data:')) {data = embedded(def.uri); total += data.length; if (total > assetLimit) throw new RangeError('glTF exceeds download budget');}
       else if (typeof def.uri === 'string') data = await fetchBytes(new URL(def.uri,base));
       else throw new TypeError('Invalid glTF image');
-      const bitmap = await createImageBitmap(new Blob([new Uint8Array(data)],{type:def.mimeType}), {colorSpaceConversion:'none',premultiplyAlpha:'none'});
-      images.push(bitmap);
+      const bitmap = sources.has(index)?await decoder.decode(data):await createImageBitmap(new Blob([new Uint8Array(data)],{type:def.mimeType}), {colorSpaceConversion:'none',premultiplyAlpha:'none'});
+      images[index]=bitmap;
       decodedImages+=bitmap.width*bitmap.height*4;
       if (bitmap.width * bitmap.height > 16_777_216 || decodedImages>assetLimit*4) throw new RangeError('glTF images exceed decoded size limit');
       signal?.throwIfAborted();
     }
     return {asset,images};
-  } catch (error) {for (const image of images) image.close(); throw error;}
+  } catch (error) {for (const image of images) image?.close(); throw error;}finally{decoder.close();}
 }

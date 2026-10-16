@@ -573,6 +573,7 @@
       "parseGLTF",
       "parseGLTFAsync",
       "parsePreparedPBR",
+      "textureCoordinates",
       "validatePreparedGeometry"
     ]
   },

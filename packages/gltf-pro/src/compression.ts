@@ -1,10 +1,12 @@
-import type {DracoDecoder, DecodedDracoGeometry} from '@margoengine/decoders';
+import type {DracoDecoder, DecodedDracoGeometry, KTX2Decoder} from '@margoengine/decoders';
 import {GLTFAsset, entry, integer, assetLimit} from './asset.js';
 
 export interface GLTFLoadOptions {
   signal?: AbortSignal;
   /** Optional reusable decoder. The caller retains ownership; otherwise a decoder is created and disposed per load. */
   draco?: Pick<DracoDecoder, 'decode'>;
+  /** Optional reusable Basis transcoder. Only files with KTX2 images create an automatic decoder. */
+  ktx2?: Pick<KTX2Decoder,'transcode'>;
 }
 
 const decoded = new WeakMap<GLTFAsset, Map<object, Float32Array>>();

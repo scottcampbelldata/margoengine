@@ -1,4 +1,5 @@
-import type {MaterialExtension, MaterialExtensionTexture, PBRMaterial, PBRModel} from '@margoengine/gltf-pro';
+import {textureCoordinates, type TextureTransform, type MaterialExtension, type MaterialExtensionTexture, type PBRMaterial, type PBRModel} from '@margoengine/gltf-pro';
+import {coordinateSlot} from './coordinates.js';
 import type {Engine, EnginePlugin} from '@margoengine/core/extension';
 import {Cleanup} from '../../shared/cleanup.js';
 import {clearcoatShader, type ClearcoatShaderTextures} from './shader.js';
@@ -9,7 +10,7 @@ export {transmission, type TransmissionOptions, type VolumeOptions} from './tran
 export {nodeMaterial, installNodeMaterial, NodeMaterialInstallation} from './nodes.js';
 export type * from './node-types.js';
 
-export interface ClearcoatTexture extends MaterialExtensionTexture {texCoord?:0|1;scale?:number}
+export interface ClearcoatTexture extends MaterialExtensionTexture {texCoord?:0|1;scale?:number;transform?:TextureTransform}
 export interface ClearcoatOptions {
   factor?:number;
   roughnessFactor?:number;
@@ -26,6 +27,7 @@ function scalar(value:unknown,fallback:number,label:string,min=-Infinity,max=Inf
 function texture(value:ClearcoatTexture):ClearcoatTexture {
   if(!value||typeof value!=='object'||!value.view||value.texCoord!==undefined&&value.texCoord!==0&&value.texCoord!==1)throw new TypeError('Invalid clearcoat texture or UV set');
   if(value.sampler!==undefined&&!value.sampler)throw new TypeError('Invalid clearcoat sampler');
+  textureCoordinates({texCoord:value.texCoord,extensions:{KHR_texture_transform:value.transform}});
   scalar(value.scale,1,'normal scale');return value;
 }
 
@@ -33,13 +35,13 @@ function texture(value:ClearcoatTexture):ClearcoatTexture {
 export function clearcoat(options:ClearcoatOptions={}):MaterialExtension {
   if(!options||typeof options!=='object'||Array.isArray(options))throw new TypeError('Invalid clearcoat options');
   const factor=scalar(options.factor,0,'factor',0,1),roughness=scalar(options.roughnessFactor,0,'roughness',0,1);
-  const textures:MaterialExtensionTexture[]=[],slots:ClearcoatShaderTextures={};
+  const textures:MaterialExtensionTexture[]=[],slots:ClearcoatShaderTextures={},factors=[factor,roughness,scalar(options.clearcoatNormalTexture?.scale,1,'normal scale'),0];
   for(const [field,slot] of [['clearcoatTexture','factor'],['clearcoatRoughnessTexture','roughness'],['clearcoatNormalTexture','normal']] as const){
     const value=options[field];if(value===undefined)continue;texture(value);
-    slots[slot]={index:textures.length,texCoord:value.texCoord??0,sampler:!!value.sampler};
+    slots[slot]={index:textures.length,...coordinateSlot(value,factors),sampler:!!value.sampler};
     textures.push({view:value.view,...(value.sampler?{sampler:value.sampler}:{})});
   }
-  return {...clearcoatShader(slots),factors:new Float32Array([factor,roughness,scalar(options.clearcoatNormalTexture?.scale,1,'normal scale'),0]),...(textures.length?{textures}:{})};
+  return {...clearcoatShader(slots),factors:new Float32Array(factors),...(textures.length?{textures}:{})};
 }
 
 type CoatMap='clearcoatTexture'|'clearcoatRoughnessTexture'|'clearcoatNormalTexture';
@@ -92,7 +94,7 @@ export class MaterialInstallation implements EnginePlugin {
       if(plan.transmission){maps.transmissionTexture=transmit?.transmissionTexture;maps.thicknessTexture=volume?.thicknessTexture;}
       for(const field of Object.keys(maps) as MapField[])if(maps[field]!==undefined){
         const value=maps[field],map:TextureInfo|ClearcoatTexture=value?.view?texture(value):validateTextureInfo(value,model);
-        const coord=map.texCoord??0;
+        const coord='view' in map?textureCoordinates({texCoord:map.texCoord,extensions:{KHR_texture_transform:map.transform}}).texCoord:map.texCoord??0;
         if(primitives.some(p=>!p.extension&&p.definition.attributes&&p.definition.attributes['TEXCOORD_'+coord]===undefined))throw new Error('Material texture requires available TEXCOORD_'+coord);
         plan.maps[field]=map;
       }

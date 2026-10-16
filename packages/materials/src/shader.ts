@@ -1,7 +1,8 @@
 import type {MaterialExtension} from '@margoengine/gltf-pro';
+import {coordinateExpression,coordinateWGSL} from './coordinates.js';
 
 /** Resource index in the extension slot, and the existing vertex UV set. */
-export interface ClearcoatTextureSlot {index:number;texCoord:0|1;sampler?:boolean}
+export interface ClearcoatTextureSlot {index:number;texCoord:0|1;sampler?:boolean;transformIndex?:number}
 export interface ClearcoatShaderTextures {
   factor?:ClearcoatTextureSlot;
   roughness?:ClearcoatTextureSlot;
@@ -18,7 +19,7 @@ export interface ClearcoatShaderValues {
 /** Factors are [clearcoat, roughness, normal scale, reserved] in materialFactors[0]. */
 export function clearcoatShader(textures:ClearcoatShaderTextures={},values?:ClearcoatShaderValues):Pick<MaterialExtension,'wgsl'|'declarations'|'direct'> {
   const sample=(slot:ClearcoatTextureSlot)=>{
-    const texture=`materialTexture${slot.index}`,coords=`uv(i,${slot.texCoord}.0)`;
+    const texture=`materialTexture${slot.index}`,coords=coordinateExpression(slot);
     if(slot.sampler)return `textureSample(${texture},materialSampler${slot.index},${coords})`;
     const size=`vec2f(textureDimensions(${texture},0))`;
     return `textureLoad(${texture},vec2i(clamp(${coords}*${size},vec2f(0),${size}-vec2f(1))),0)`;
@@ -30,9 +31,9 @@ export function clearcoatShader(textures:ClearcoatShaderTextures={},values?:Clea
   var t=i.tangent.xyz-n*dot(n,i.tangent.xyz);
   var b=cross(n,t)*i.tangent.w;
   let dp1=dpdx(i.position); let dp2=dpdy(i.position);
-  let duv1=dpdx(uv(i,${normal.texCoord}.0)); let duv2=dpdy(uv(i,${normal.texCoord}.0));
+  let duv1=dpdx(${coordinateExpression(normal)}); let duv2=dpdy(${coordinateExpression(normal)});
   // A coat UV set different from the base normal map needs its own tangent frame.
-  if(abs(i.tangent.w)<0.5||f.coordsA.z!=${normal.texCoord}.0) {
+  if(abs(i.tangent.w)<0.5||f.coordsA.z!=${normal.texCoord}.0${normal.transformIndex!==undefined||normal.texCoord===1?'||true':''}) {
     let p1=cross(n,dp1); let p2=cross(dp2,n);
     t=p2*duv1.x+p1*duv2.x; b=p2*duv1.y+p1*duv2.y;
     let scale=inverseSqrt(max(max(dot(t,t),dot(b,b)),0.000001)); t*=scale; b*=scale;
@@ -47,7 +48,7 @@ export function clearcoatShader(textures:ClearcoatShaderTextures={},values?:Clea
     wgsl:`let materialClearcoat=materialClearcoatLighting(i,front${values?','+values.factor+','+values.roughness+(values.normal?','+values.normal:''):''});`,
     // Skip even the addition when factor is zero, preserving the base operation order.
     direct:`if(${values?values.factor:'materialFactors[0].x'}>0.0){direct+=materialClearcoat;}`,
-    declarations:/* wgsl */`
+    declarations:(Object.values(textures).some(slot=>slot?.transformIndex!==undefined)?coordinateWGSL:'')+/* wgsl */`
 // Clearcoat has an independent normal. Never change Surface.n: SSAO and shadows use the base normal.
 fn materialClearcoatLighting(i:Out,front:bool${values?',materialCoatFactor:f32,materialCoatRoughness:f32'+(values.normal?',materialCoatNormal:vec3f':''):''})->vec3f {
 ${values?'':'  let factors=materialFactors[0];\n'}  let factor=clamp(${values?'materialCoatFactor':'factors.x'}${textures.factor?'*'+sample(textures.factor)+'.r':''},0.0,1.0);
