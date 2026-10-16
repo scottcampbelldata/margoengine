@@ -11,6 +11,8 @@ import signs
 
 G = 0.16
 POLE_1, POLE_2 = (-3.0, -1.95), (3.95, -1.95)
+STOP_SIGN = (4.05, 0.4)  # beside Building_3's rear corner, clear of its side doorway
+BENCH_SEAT_HEIGHT = 0.22  # seat top above the pavement, scaled to the diorama's doorways
 
 
 def _pole(atlas, name, x, y, height=5.0):
@@ -25,6 +27,7 @@ def _pole(atlas, name, x, y, height=5.0):
 def _bicycle(atlas, name, x, y, yaw):
     bike = kit.empty(name, (x, y, G), None)
     bike.rotation_euler = (0, 0, yaw)
+    bike.scale = (0.7, 0.7, 0.7)  # match the small doorways while keeping wheel contact at the pavement
     for part, cx in (('Rear', -0.27), ('Front', 0.27)):
         atlas.add(kit.tube('%s_Wheel_%s' % (name, part), kit.ring((cx, 0, 0.2), 0.19, 'Y', n=24), 0.014, None, bike, sides=4), 'rubber')
         atlas.add(kit.boxes('%s_Spokes_%s' % (name, part), [((0.36, 0.004, 0.004), (cx, 0, 0.2), (0, math.radians(a), 0)) for a in range(0, 180, 30)], None, bike), 'metal_light')
@@ -112,9 +115,10 @@ def build(root):
     # Signs on poles and kerb.
     signs.panel('Street_Name_Plate', 'street', 0.5, (POLE_1[0], POLE_1[1] - 0.09, G + 2.3), None)
     signs.panel('No_Bikes_Sign', 'no_bikes', 0.3, (POLE_2[0], POLE_2[1] - 0.09, G + 1.9), None)
-    atlas.add(kit.cylinder('Stop_Sign_Pole', 0.025, 1.6, (4.05, -0.4, G + 0.8), None, None, segments=8), 'metal_light')
-    atlas.add(kit.cylinder('Stop_Sign', 0.2, 0.02, (4.05, -0.42, G + 1.55), None, None, rot=(math.radians(90), 0, 0), segments=3), 'paint:#d23a2f')
-    atlas.add(kit.cylinder('Stop_Sign_Border', 0.23, 0.015, (4.05, -0.41, G + 1.55), None, None, rot=(math.radians(90), 0, 0), segments=3), 'paint:#f4f2ec')
+    sx, sy = STOP_SIGN
+    atlas.add(kit.cylinder('Stop_Sign_Pole', 0.025, 1.6, (sx, sy, G + 0.8), None, None, segments=8), 'metal_light')
+    atlas.add(kit.cylinder('Stop_Sign', 0.2, 0.02, (sx, sy - 0.02, G + 1.55), None, None, rot=(math.radians(90), 0, 0), segments=3), 'paint:#d23a2f')
+    atlas.add(kit.cylinder('Stop_Sign_Border', 0.23, 0.015, (sx, sy - 0.01, G + 1.55), None, None, rot=(math.radians(90), 0, 0), segments=3), 'paint:#f4f2ec')
 
     # Furniture.
     _vending(atlas, 'Vending_Machine_1', 3.92, 1.35, math.radians(90), '#d9473b')
@@ -128,8 +132,9 @@ def build(root):
     atlas.add(kit.box('Post_Box_Slot', (0.13, 0.03, 0.022), (0, -0.115, 0.42), None, post), 'rubber')
     atlas.add(kit.box('Post_Box_Plate', (0.09, 0.02, 0.1), (0, -0.118, 0.27), None, post), 'paint:#f4f2ec')
     atlas.add(kit.text_mesh('Post_Box_Mark', '〒', 0.07, (0, -0.13, 0.27), None, post, rot=(math.radians(90), 0, 0)), 'paint:#c62d2d')
-    _bicycle(atlas, 'Bicycle_1', 0.75, -1.8, 0.0)
-    _bicycle(atlas, 'Bicycle_2', -0.45, -0.7, math.radians(88))
+    # Park under the cafe window, clear of its door/menu board and outside the cat's walking lane.
+    _bicycle(atlas, 'Bicycle_1', -1.95, -1.85, 0.0)
+    _bicycle(atlas, 'Bicycle_2', -0.53, -0.7, math.radians(88))  # clear of the ramen side-door step
     for i, (x, y) in enumerate(((3.85, -2.05), (3.6, -2.05), (2.3, -3.74), (2.62, -3.76)), start=1):
         _cone(atlas, 'Traffic_Cone_%d' % i, x, y)
     for i, (x, y) in enumerate(((-3.05, -1.22), (-3.05, -0.08), (2.0, -1.95)), start=1):
@@ -147,7 +152,13 @@ def build(root):
     for dy in (-0.4, 0.4):
         atlas.add(kit.cylinder('Tram_Stop_Post_%+.1f' % dy, 0.025, 1.3, (0, dy, 0.65), None, stop, segments=8), 'metal_dark')
     atlas.add(kit.box('Tram_Stop_Roof', (0.45, 1.05, 0.04), (0.02, 0, 1.3), None, stop, rot=(0, math.radians(-8), 0)), 'paint:#3d5a55')
-    atlas.add(kit.boxes('Tram_Stop_Bench', [((0.22, 0.7, 0.04), (0.05, 0, 0.36)), ((0.04, 0.7, 0.22), (0.15, 0, 0.5))], None, stop), 'cedar')
+    seat_thickness, back_height = 0.04, 0.22
+    leg_height = BENCH_SEAT_HEIGHT - seat_thickness
+    atlas.add(kit.boxes('Tram_Stop_Bench', [((0.22, 0.7, seat_thickness), (0.05, 0, BENCH_SEAT_HEIGHT - seat_thickness / 2)),
+                                          ((0.04, 0.7, back_height), (0.15, 0, BENCH_SEAT_HEIGHT + back_height / 2))], None, stop), 'cedar')
+    supports = [((0.035, 0.04, leg_height), (0.05, dy, leg_height / 2)) for dy in (-0.26, 0.26)]
+    supports += [((0.22, 0.07, 0.02), (0.05, dy, 0.01)) for dy in (-0.26, 0.26)]
+    atlas.add(kit.boxes('Tram_Stop_Bench_Supports', supports, None, stop), 'metal_dark')
     signs.panel('Tram_Stop_Sign', 'number', 0.2, (-0.03, -0.55, 1.05), stop, rot=(0, 0, math.radians(-90)))
 
     # Alley between Building_1 and Building_2: clutter, a string of lanterns overhead.

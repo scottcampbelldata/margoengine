@@ -123,6 +123,37 @@ test('textured: baked atlases and a sign atlas with original lettering', () => {
   );
 });
 
+test('all atlas images are embedded and textured primitives have valid UV sets', () => {
+  for (const name of [
+    'b1_atlas', 'b2_atlas', 'b3_atlas', 'b4_atlas', 'b5_atlas', 'cats_atlas',
+    'foliage_sprites', 'ground_atlas', 'props_atlas', 'signs_atlas', 'tanuki_atlas', 'tram_atlas',
+  ]) {
+    const image = doc.images.find((image) => image.name === name);
+    assert.ok(image && Number.isInteger(image.bufferView), `${name} is not embedded`);
+    assert.ok(doc.bufferViews[image.bufferView].byteLength > 20, `${name} has no image data`);
+  }
+  for (const mesh of doc.meshes) {
+    for (const primitive of mesh.primitives) {
+      const material = doc.materials[primitive.material];
+      const maps = [
+        material.pbrMetallicRoughness?.baseColorTexture,
+        material.pbrMetallicRoughness?.metallicRoughnessTexture,
+        material.normalTexture, material.occlusionTexture, material.emissiveTexture,
+      ].filter(Boolean);
+      for (const map of maps) {
+        const set = map.texCoord ?? 0;
+        assert.ok(Number.isInteger(set) && set >= 0 && set <= 1,
+          `${mesh.name}/${material.name} has invalid texture coordinate ${set}`);
+        const accessor = doc.accessors[primitive.attributes[`TEXCOORD_${set}`]];
+        assert.ok(accessor, `${mesh.name}/${material.name} has no TEXCOORD_${set}`);
+        assert.equal(accessor.type, 'VEC2', `${mesh.name}/${material.name} UV type`);
+        assert.equal(accessor.count, doc.accessors[primitive.attributes.POSITION].count,
+          `${mesh.name}/${material.name} UV count`);
+      }
+    }
+  }
+});
+
 test('hero tram: baked weathering atlas, see-through glass, real detail', () => {
   const subtree = [nodeIndex('Tram')];
   for (let i = 0; i < subtree.length; i++) subtree.push(...(doc.nodes[subtree[i]].children ?? []));

@@ -4,6 +4,8 @@ import math
 import bake
 import kit
 
+CAT_SCALE = 0.5
+
 CATS = [
     dict(name='Cat_1', coat='#e08a3c', chest='#f6efe2', path=((-0.6, -2.12, 0.16), (1.2, -2.12, 0.16))),
 ]
@@ -16,6 +18,7 @@ def _smooth(t):
 def _cat(atlas, spec, root):
     name, coat, chest = spec['name'], 'paint:' + spec['coat'], 'paint:' + spec['chest']
     cat = kit.empty(name, (0, 0, 0), root)
+    cat.scale = (CAT_SCALE,) * 3
     sitting = 'sit' in spec
     if sitting:
         atlas.add(kit.sphere(name + '_Body', 0.075, (0, 0, 0.09), None, cat, scale=(1.1, 0.95, 1.35)), coat)

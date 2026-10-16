@@ -14,6 +14,7 @@ import signs
 
 GROUND = 0.16
 FLOOR0, FLOOR = 1.1, 0.85
+AC_SCALE = 0.55
 
 BUILDINGS = [
     dict(name='Building_1', atlas='B1_Atlas', x=(-2.7, -0.9), y=(-1.6, 0.4), floors=3, wall='plaster_beige', base='cedar', trim='paint:#6a4630',
@@ -127,7 +128,7 @@ def _mats():
 
 # ---------------------------------------------------------------- facade elements
 
-def window(b, m, face, u, v, w, h, style):
+def window(b, m, face, u, v, w, h, style, ac_mount=False):
     """Window centred at (u, v) bottom edge at v; frame, glass, sill, hood and style-specific detail."""
     trim, t = b.spec['trim'], 0.04
     lit = b.rng.random() < 0.45
@@ -136,6 +137,24 @@ def window(b, m, face, u, v, w, h, style):
         b.box(trim, face, su, 0.06, sv, u + du, 0.02, cz + dv)
     b.box('concrete', face, w + 0.16, 0.11, 0.05, u, 0.05, v - t - 0.02)
     b.box(trim, face, w + 0.12, 0.08, 0.04, u, 0.035, v + h + t + 0.03)
+    if ac_mount:
+        # Preserve the original style's decoration draws so adding a mount does not change the other facades.
+        if lit and style not in ('shoji', 'lattice', 'shutter', 'louvre'):
+            b.rng.choice(m['curtains'])
+        left = u - w / 2
+        panel_w, panel_h = 0.44 * AC_SCALE + 0.04, 0.32 * AC_SCALE + 0.04
+        pane = m['lit'] if lit else m['glass']
+        b.flatbox(pane, face, w, 0.01, h - panel_h, u, 0.004, v + (h + panel_h) / 2)
+        b.flatbox(pane, face, w - panel_w, 0.01, panel_h, left + (w + panel_w) / 2, 0.004, v + panel_h / 2)
+        # A solid infill touches the casing rear at n=0.02; no glazing passes behind the condenser.
+        b.box('wood_dark', face, panel_w, 0.02, panel_h, left + panel_w / 2, 0.01, v + panel_h / 2)
+        b.box(trim, face, 0.03, 0.06, h, left + panel_w, 0.02, cz)
+        b.box(trim, face, w, 0.06, 0.03, u, 0.02, v + panel_h)
+        # Raise the sill under the small brackets so their underside has real support.
+        sill_top = v - t - 0.02 + 0.025
+        bracket_bottom = v + 0.01 - 0.035 * AC_SCALE
+        b.box('concrete', face, panel_w, 0.11, bracket_bottom - sill_top, left + panel_w / 2, 0.05, (sill_top + bracket_bottom) / 2)
+        return
     if style == 'shoji':
         b.flatbox(m['shoji'], face, w, 0.01, h, u, 0.004, cz)
         for k in range(1, 4):
@@ -164,25 +183,27 @@ def window(b, m, face, u, v, w, h, style):
                 b.flatbox(mat, face, w * 0.22, 0.008, h * 0.92, u + side * w * 0.36, 0.007, cz)
 
 
-def ac_unit(b, face, u, v, idx_holder):
-    """Outdoor AC unit on a bracket with a spinning fan, side vents and a duct running down the wall."""
-    p = b.pt(face, u, 0.15, v)
-    unit = kit.box(kit_name(b, 'AC'), b.size(face, 0.44, 0.26, 0.32), p, None, b.parent, bevel=0.02)
+def ac_unit(b, face, u, v, idx_holder, scale=AC_SCALE):
+    """Proportionally scaled condenser assembly, keeping the casing rear 0.02 from the wall."""
+    s = scale
+    mount_n = lambda n: 0.02 + (n - 0.02) * s
+    p = b.pt(face, u, mount_n(0.15), v)
+    unit = kit.box(kit_name(b, 'AC'), b.size(face, 0.44 * s, 0.26 * s, 0.32 * s), p, None, b.parent, bevel=0.02 * s)
     b.part(unit, 'paint:#e6e3da')
     for du in (-0.15, 0.15):
-        b.box('metal_dark', face, 0.03, 0.3, 0.03, u + du, 0.14, v - 0.18)
-    holder = kit.empty(kit_name(b, 'AC_Holder'), b.pt(face, u - 0.06, 0.285, v), b.parent)
+        b.box('metal_dark', face, 0.03 * s, 0.3 * s, 0.03 * s, u + du * s, mount_n(0.14), v - 0.18 * s)
+    holder = kit.empty(kit_name(b, 'AC_Holder'), b.pt(face, u - 0.06 * s, mount_n(0.285), v), b.parent)
     holder.rotation_euler = (0, 0, Building.yaw(face))
     fan = kit.empty(_next('AC_Fan'), (0, 0, 0), holder)
     fan.rotation_mode = 'ZXY'
     fan.rotation_euler = (math.radians(90), 0, 0)
-    b.part(kit.boxes(fan.name + '_Blades', [((0.2, 0.035, 0.012), (0, 0, 0), (0, 0, math.radians(a))) for a in (0, 60, 120)], None, fan), 'metal_dark')
-    b.part(kit.tube(fan.name + '_Grille', kit.ring((0, 0, 0), 0.11, 'Y', n=20), 0.008, None, holder, sides=4), 'metal_dark')
-    b.part(kit.boxes(fan.name + '_Bars', [((0.22, 0.008, 0.008), (0, -0.01, 0)), ((0.008, 0.008, 0.22), (0, -0.01, 0))], None, holder), 'metal_dark')
+    b.part(kit.boxes(fan.name + '_Blades', [((0.2 * s, 0.035 * s, 0.012 * s), (0, 0, 0), (0, 0, math.radians(a))) for a in (0, 60, 120)], None, fan), 'metal_dark')
+    b.part(kit.tube(fan.name + '_Grille', kit.ring((0, 0, 0), 0.11 * s, 'Y', n=20), 0.008 * s, None, holder, sides=4), 'metal_dark')
+    b.part(kit.boxes(fan.name + '_Bars', [((0.22 * s, 0.008 * s, 0.008 * s), (0, -0.01 * s, 0)), ((0.008 * s, 0.008 * s, 0.22 * s), (0, -0.01 * s, 0))], None, holder), 'metal_dark')
     kit.spin(fan, 2, 5 + b.rng.randint(0, 4))
     for k in range(5):
-        b.box('metal_dark', face, 0.012, 0.01, 0.2, u + 0.12 + k * 0.018, 0.285, v)
-    b.box('paint:#d9d5c9', face, 0.06, 0.06, 0.06, u + 0.25, 0.04, v)  # refrigerant line into the wall
+        b.box('metal_dark', face, 0.012 * s, 0.01 * s, 0.2 * s, u + (0.12 + k * 0.018) * s, mount_n(0.285), v)
+    b.box('paint:#d9d5c9', face, 0.06 * s, 0.06 * s, 0.06 * s, u + 0.25 * s, mount_n(0.04), v)  # refrigerant line into the wall
 
 
 def kit_name(b, part):
@@ -254,7 +275,7 @@ def lantern(b, m, face, u, v, red=True):
 
 
 def awning(b, face, u, v, w, colors):
-    depth, a = min(0.5, clearance(b.spec, face) - 0.06), 0.35  # shallower over a narrow alley
+    depth, a = min(0.4, clearance(b.spec, face) - 0.06), 0.35  # keep the front lip clear of the fascia in elevated views
     slats = max(4, int(w / 0.1))
     for k in range(slats):
         uu = u - w / 2 + w * (k + 0.5) / slats
@@ -266,13 +287,18 @@ def awning(b, face, u, v, w, colors):
         b.part(kit.tube(kit_name(b, 'Awning_Arm'), [a3, c3], 0.01, None, b.parent, sides=4), 'metal_dark')
 
 
-def banner(b, face, u, colors_sid):
-    """Nobori banner on a pole at the kerb in front of the face, swaying."""
-    pos = b.pt(face, u, 0.4, 0)
-    b.part(kit.cylinder(kit_name(b, 'Banner_Pole'), 0.012, 1.4, (pos[0], pos[1], pos[2] + 0.7), None, b.parent, segments=8), 'metal_dark')
-    flag = kit.empty(_next('Banner'), (pos[0], pos[1], pos[2] + 1.36), b.parent)
-    flag.rotation_euler = (0, 0, Building.yaw(b.face_for_banner) if hasattr(b, 'face_for_banner') else Building.yaw(face))
-    signs.panel(flag.name + '_Cloth', colors_sid, 0.24, (0.13, 0, -0.42), flag, double=True)
+def banner(b, face, u, colors_sid, n=0.50):
+    """Short pavement banner, extending outward from a facade edge below the fascia."""
+    side = -1 if u < 0 else 1
+    pos = b.pt(face, u, n, 0)
+    b.part(kit.cylinder(kit_name(b, 'Banner_Pole'), 0.012, 0.94, (pos[0], pos[1], pos[2] + 0.47), None, b.parent, segments=8), 'metal_dark')
+    flag = kit.empty(_next('Banner'), (pos[0], pos[1], pos[2] + 0.90), b.parent)
+    flag.rotation_euler = (0, 0, Building.yaw(face))
+    width = 0.18
+    height = width * signs.SIGNS[colors_sid][1] / signs.SIGNS[colors_sid][0]
+    signs.panel(flag.name + '_Cloth', colors_sid, width, (side * (width / 2 + 0.01), 0, -height / 2), flag, double=True)
+    b.box('metal_dark', face, width + 0.02, 0.018, 0.018, u + side * (width / 2 + 0.01), n, 0.91)
+    b.part(kit.cylinder(kit_name(b, 'Banner_Base'), 0.065, 0.03, (pos[0], pos[1], pos[2] + 0.015), None, b.parent, segments=10), 'concrete')
     kit.swing(flag, 2, 10, 2, phase=b.rng.random())
 
 
@@ -282,15 +308,16 @@ def shopfront(b, m, face):
     kind = b.spec['shop']
     w = b.width(face)
     trim = b.spec['trim']
-    b.box(trim, face, w, 0.08, 0.2, 0, 0.04, FLOOR0 - 0.1)  # fascia band
+    b.box(trim, face, w, 0.08, 0.3, 0, 0.04, 1.075)  # fascia band below the first-floor window sills
     if kind == 'cafe':
         b.flatbox(m['lit'], face, w * 0.5, 0.01, 0.62, -w * 0.17, 0.004, 0.52)
         for su, sv, du, dv in ((w * 0.5 + 0.08, 0.04, 0, 0.33), (w * 0.5 + 0.08, 0.06, 0, -0.33), (0.04, 0.62, -w * 0.25, 0), (0.04, 0.62, w * 0.25, 0), (0.03, 0.62, 0, 0)):
             b.box('wood_dark', face, su, 0.05, sv, -w * 0.17 + du, 0.02, 0.52 + dv)
         b.box('wood_dark', face, 0.38, 0.05, 0.86, w * 0.3, 0.02, 0.43)
         b.flatbox(m['lit'], face, 0.24, 0.01, 0.34, w * 0.3, 0.05, 0.6)
-        face_sign(b, face, 0, FLOOR0 - 0.1, 'kissa', w * 0.72, n=0.09)
-        awning(b, face, -w * 0.17, 0.92, w * 0.56, ('#2f5d8a', '#f2efe6'))
+        # Fit the board into the fascia; its backing clears both the canopy and upstairs sills.
+        face_sign(b, face, 0, 1.075, 'kissa', min(w * 0.6, 0.84), n=0.09)
+        awning(b, face, -w * 0.17, 0.84, w * 0.56, ('#2f5d8a', '#f2efe6'))
         for side in (-1, 1):
             pos = b.pt(face, side * (w / 2 - 0.12), 0.18, 0)
             foliage.topiary(b.atlas, kit_name(b, 'Door_Tree'), pos, 0.62, b.parent, bloom=0.3, seed=b.rng.randint(0, 10 ** 6))
@@ -303,20 +330,22 @@ def shopfront(b, m, face):
         # front panel leans its top back toward the wall; the plain back panel mirrors it, meeting at the hinge
         b.box('wood_dark', face, 0.22, 0.015, height + 0.02, -w * 0.35, 0.42 - height * math.sin(lean), height / 2 * math.cos(lean) + 0.005, rot=Building.tilt(face, lean))
         b.box('metal_dark', face, 0.2, 0.03, 0.02, -w * 0.35, 0.42 - height * math.sin(lean) / 2, height * math.cos(lean))
-        b.face_for_banner = face
-        banner(b, face, -w * 0.47, 'coffee_v')
+        banner(b, face, -w / 2 - 0.06, 'coffee_v')
     elif kind == 'ramen':
         b.flatbox(m['interior'], face, w * 0.7, 0.01, 0.85, -w * 0.05, 0.002, 0.45)
         b.box('wood_dark', face, w * 0.7, 0.3, 0.06, -w * 0.05, 0.15, 0.48)   # counter
         for k in range(4):
             pos = b.pt(face, -w * 0.3 + k * 0.17, 0.33, 0)
             b.part(kit.cylinder(kit_name(b, 'Stool'), 0.06, 0.3, (pos[0], pos[1], pos[2] + 0.15), None, b.parent, segments=10), 'paint:#c8452f')
-        noren, _ = signs.panel(kit_name(b, 'Noren'), 'noren_a', w * 0.6, b.pt(face, -w * 0.05, 0.05, 0.77), b.parent, rot=(0, 0, Building.yaw(face)), double=True)
-        face_sign(b, face, 0, FLOOR0 - 0.1, 'ramen_h', w * 0.45, n=0.09)
+        # Preserve the artwork's aspect: top .845, bottom .52, above the .51 counter top.
+        signs.panel(kit_name(b, 'Noren'), 'noren_a', 0.65, b.pt(face, -w * 0.05, 0.04, 0.6825), b.parent, rot=(0, 0, Building.yaw(face)), double=True)
+        b.box('wood_dark', face, 0.69, 0.025, 0.025, -w * 0.05, 0.04, 0.8575)
+        for side in (-1, 1):
+            b.box('metal_dark', face, 0.025, 0.04, 0.025, -w * 0.05 + side * 0.325, 0.02, 0.8575)
+        face_sign(b, face, 0, 1.075, 'ramen_h', min(w * 0.4, 0.56), n=0.09)
         for side in (-1, 1):
             lantern(b, m, face, side * (w * 0.42), 0.82, red=True)
-        b.face_for_banner = face
-        banner(b, face, w * 0.45, 'ramen_v')
+        banner(b, face, -w / 2 - 0.06, 'ramen_v', n=0.30)  # behind the walking cat's sidewalk lane
     elif kind == 'stall':
         b.box('wood_dark', face, w * 0.85, 0.35, 0.55, -w * 0.05, 0.2, 0.28)  # oden counter
         b.box('hinoki', face, w * 0.88, 0.4, 0.04, -w * 0.05, 0.22, 0.57)
@@ -327,15 +356,19 @@ def shopfront(b, m, face):
             pos = b.pt(face, -w * 0.35 + k * 0.22, 0.62, 0)
             b.part(kit.cylinder(kit_name(b, 'Stool'), 0.06, 0.32, (pos[0], pos[1], pos[2] + 0.16), None, b.parent, segments=10), 'cedar')
         b.flatbox(m['interior'], face, w * 0.8, 0.01, 0.4, -w * 0.05, 0.002, 0.85)
-        # Short noren hanging just under the canopy's front edge (top at 0.98, canopy underside ~0.99 there).
-        signs.panel(kit_name(b, 'Noren'), 'noren_b', w * 0.5, b.pt(face, -w * 0.05, 0.45, 0.98 - w * 0.125), b.parent, rot=(0, 0, Building.yaw(face)), double=True)
-        b.box('tile_grey', face, w * 0.95, 0.6, 0.04, -w * 0.05, 0.28, 1.06, rot=Building.tilt(face, 0.3))
+        # The rod sits just below the canopy lip; the curtain ends above the counter.
+        signs.panel(kit_name(b, 'Noren'), 'noren_b', 0.48, b.pt(face, -w * 0.05, 0.59, 0.72), b.parent, rot=(0, 0, Building.yaw(face)), double=True)
+        b.box('wood_dark', face, 0.52, 0.025, 0.025, -w * 0.05, 0.59, 0.8525)
+        for side in (-1, 1):
+            b.box('metal_dark', face, 0.02, 0.06, 0.02, -w * 0.05 + side * 0.24, 0.56, 0.855)
+        b.box('tile_grey', face, w * 0.95, 0.6, 0.04, -w * 0.05, 0.28, 0.96, rot=Building.tilt(face, 0.3))
         for k in range(3):
-            lantern(b, m, face, -w * 0.4 + k * w * 0.35, 0.9, red=k != 1)
-        # The izakaya board stands on the canopy's front lip (canopy top ~1.01 at n 0.5), clear of the windows behind.
-        face_sign(b, face, -w * 0.05, 1.01 + w * 0.1, 'izakaya', w * 0.6, n=0.5)
-        b.face_for_banner = face
-        banner(b, face, -w * 0.5, 'sake_v')
+            lantern(b, m, face, -w * 0.4 + k * w * 0.35, 0.79, red=k != 1)
+        # Small posts attach the sign above the canopy, leaving a visible gap below its backing.
+        face_sign(b, face, -w * 0.05, 1.105, 'izakaya', min(w * 0.4, 0.66), n=0.5)
+        for side in (-1, 1):
+            b.box('metal_dark', face, 0.018, 0.025, 0.09, -w * 0.05 + side * 0.24, 0.475, 0.95)
+        banner(b, face, w / 2 + 0.06, 'sake_v')
         stall = kit.empty('Food_Stall', b.pt(face, 0, 0.3, 0), b.parent)
         stall.empty_display_size = 0.1
     elif kind == 'books':
@@ -349,8 +382,8 @@ def shopfront(b, m, face):
                 b.box('paint:' + color, face, bw, 0.16, b.rng.uniform(0.13, 0.2), u + bw / 2, 0.1, v + 0.09)
                 u += bw + 0.004
         b.flatbox(m['interior'], face, w * 0.62, 0.01, 0.85, 0, 0.002, 0.45)
-        face_sign(b, face, 0, FLOOR0 - 0.1, 'books', w * 0.4, n=0.09)
-        awning(b, face, 0, 0.94, w * 0.7, ('#2f6b4f', '#f2efe6'))
+        face_sign(b, face, 0, 1.075, 'books', min(w * 0.4, 0.56), n=0.09)
+        awning(b, face, 0, 0.84, w * 0.7, ('#2f6b4f', '#f2efe6'))
     elif kind == 'shutter':
         b.box('corrugated', face, w * 0.55, 0.03, 0.8, -w * 0.15, 0.02, 0.42)
         b.box('metal_dark', face, w * 0.6, 0.12, 0.14, -w * 0.15, 0.07, 0.88)
@@ -456,8 +489,8 @@ def build_one(spec, root, m):
             style = styles[(f - 1) % len(styles)]
             if face != 'front' and style == 'louvre':
                 style = 'sash'
-            # Reserve one end of the floor for the AC unit, then lay the windows out in the rest: units hang beside
-            # windows (never over them), above the shop signs and clear of the drainpipe at the right edge.
+            # Keep the regular window grid behind the units: hanging condensers sit in the lower-left of an
+            # existing window, with its frame and the rest of the glazing still visible around them.
             side, standing = 0, False
             if fw >= 1.4 and b.rng.random() < 0.6:
                 side = 1 if (face == 'front' and blade_left) else b.rng.choice((-1, 1))
@@ -467,15 +500,16 @@ def build_one(spec, root, m):
                 # no unit in a tight gap between buildings or perched over the shop canopy
                 if clearance(spec, face) < 0.5 or (face == shop_face and f == 1):
                     side = 0
-            reserve = max(0.74, fw * 0.11 + 0.45) if standing else 0.74
-            lo, hi = -fw / 2 + (reserve if side == -1 else 0.0), fw / 2 - (reserve if side == 1 else 0.0)
-            n = max(1, int((hi - lo - 0.1) / 0.62))
+            n = max(1, int((fw - 0.1) / 0.62))
+            window_w = min(0.5, fw / n - 0.16)
             for k in range(n):
-                window(b, m, face, lo + (hi - lo) * (k + 0.5) / n, base_v + 0.22, min(0.5, (hi - lo) / n - 0.16), 0.46, style)
+                mounted = bool(side and not standing and k == (0 if side < 0 else n - 1))
+                window(b, m, face, -fw / 2 + fw * (k + 0.5) / n, base_v + 0.22, window_w, 0.46, style, ac_mount=mounted)
             if side and standing:  # bracket bars rest on the slab top (base_v + 0.03), unit inside the railing
-                ac_unit(b, face, fw * 0.39 - 0.27, base_v + 0.225, f)
+                ac_unit(b, face, fw * 0.39 - 0.49 + 0.22 * AC_SCALE, base_v + 0.03 + 0.195 * AC_SCALE, f)
             elif side:
-                ac_unit(b, face, side * (fw / 2 - 0.42), base_v + 0.3, f)
+                window_u = side * (fw / 2 - fw / (2 * n))
+                ac_unit(b, face, window_u - window_w / 2 + 0.01 + 0.22 * AC_SCALE, base_v + 0.23 + 0.16 * AC_SCALE, f)
         if face != shop_face and face != 'front' and open_face:
             # side ground floor: a small window, a meter box and a proper door (frame, glazed panel, handle, step)
             window(b, m, face, -fw * 0.25, 0.45, 0.4, 0.4, 'lattice' if b.rng.random() < 0.5 else 'sash')
@@ -494,7 +528,7 @@ def build_one(spec, root, m):
     for f in spec['balcony']:
         balcony(b, m, balcony_face, FLOOR0 + FLOOR * (f - 1))
     if spec['shop'] == 'ramen':
-        blade_sign(b, 'front', -b.w / 2 + 0.25, FLOOR0 + FLOOR * 1.4, 'pharmacy_v' if spec['seed'] == 4 else 'ramen_v')
+        blade_sign(b, 'front', -b.w / 2 + 0.045, FLOOR0 + FLOOR * 1.4, 'pharmacy_v' if spec['seed'] == 4 else 'ramen_v')
     roof(b, m)
     return b  # finished by build() after cross-building signs are added
 
