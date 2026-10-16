@@ -10,12 +10,13 @@ export interface AssetEntry<T> {
 }
 export interface AssetCache {
   engine:EngineKernel|null;disposed:boolean;
-  models:Map<string,AssetEntry<ModelSource>>;environments:Map<string,AssetEntry<EnvironmentSource>>;
+  models:Map<string,AssetEntry<ModelSource>>;fbx:Map<string,AssetEntry<ModelSource>>;environments:Map<string,AssetEntry<EnvironmentSource>>;
 }
 const active=new Set<AssetCache>();
-type AssetKind='model'|'environment';
+export type ModelFormat='model'|'fbx';
+type AssetKind=ModelFormat|'environment';
 const queued=new Map<string,{src:string;kind:AssetKind;promise:Promise<void>;resolve:()=>void;reject:(error:unknown)=>void}>();
-export function createAssetCache(engine:EngineKernel|null):AssetCache {return {engine,disposed:false,models:new Map(),environments:new Map()};}
+export function createAssetCache(engine:EngineKernel|null):AssetCache {return {engine,disposed:false,models:new Map(),fbx:new Map(),environments:new Map()};}
 
 async function copyImages(images:readonly GLTFImage[]):Promise<GLTFImage[]> {
   const copies:GLTFImage[]=[];
@@ -28,9 +29,10 @@ async function copyImages(images:readonly GLTFImage[]):Promise<GLTFImage[]> {
   }catch(error){for(const image of copies)image?.close();throw error;}
 }
 function disposeSource(source:ModelSource):void {source.first?.dispose();source.first=null;for(const image of source.images)image?.close();source.images=[];}
-async function loadModel(cache:AssetCache,src:string,signal:AbortSignal):Promise<ModelSource> {
+async function loadModel(cache:AssetCache,src:string,signal:AbortSignal,format:ModelFormat):Promise<ModelSource> {
   const api=await import('@margoengine/gltf-pro');signal.throwIfAborted();
-  const model=await api.loadGLTF(cache.engine!,src,{signal});
+  const loader=format==='fbx'?(await import('@margoengine/fbx')).loadFBX:api.loadGLTF;
+  signal.throwIfAborted();const model=await loader(cache.engine!,src,{signal});
   model.root.visible=false;
   let copies:GLTFImage[]=[];
   try {
@@ -61,8 +63,8 @@ function entry<T>(cache:AssetCache,map:Map<string,AssetEntry<T>>,src:string,load
   }).catch(error=>{result.error=error;result.status='rejected';});
   return result;
 }
-export function modelAsset(cache:AssetCache,src:string):AssetEntry<ModelSource> {
-  return entry(cache,cache.models,src,signal=>loadModel(cache,src,signal),disposeSource);
+export function modelAsset(cache:AssetCache,src:string,format:ModelFormat='model'):AssetEntry<ModelSource> {
+  return entry(cache,format==='fbx'?cache.fbx:cache.models,src,signal=>loadModel(cache,src,signal,format),disposeSource);
 }
 export function environmentAsset(cache:AssetCache,src:string):AssetEntry<EnvironmentSource> {
   return entry(cache,cache.environments,src,async signal=>{const api=await import('@margoengine/environment');signal.throwIfAborted();const image=await api.loadEnvironmentImage(src,{signal});signal.throwIfAborted();return {api,image};});
@@ -72,17 +74,17 @@ export function retainAsset<T>(cache:AssetCache,src:string,asset:AssetEntry<T>,m
   return()=>{if(--asset.users===0){asset.abort.abort();if(asset.status!=='resolved'&&map.get(src)===asset)map.delete(src);}if(cache.disposed)asset.abort.abort();};
 }
 function warm(cache:AssetCache,src:string,kind:AssetKind):Promise<void> {
-  const asset=kind==='model'?modelAsset(cache,src):environmentAsset(cache,src);
+  const asset=kind==='environment'?environmentAsset(cache,src):modelAsset(cache,src,kind);
   asset.users++;
   return asset.promise.then(()=>{
     if(asset.status==='rejected')throw asset.error;
     // A preloaded model must not appear in the scene before it is mounted.
-    if(kind==='model'){const source=asset.value as ModelSource;if(source.first){source.first.dispose();source.first=null;}}
+    if(kind!=='environment'){const source=asset.value as ModelSource;if(source.first){source.first.dispose();source.first=null;}}
   }).finally(()=>{asset.users--;});
 }
 /** Warm the URL cache of active canvases. Before Canvas is ready, queue the same
  * promise until an engine exists. GPU-backed glTF loading requires that engine. */
-export function preload(src:string,kind:AssetKind=/\.(hdr|exr)$/i.test(src.split(/[?#]/,1)[0])?'environment':'model'):Promise<void> {
+export function preload(src:string,kind:AssetKind=/\.(hdr|exr)$/i.test(src.split(/[?#]/,1)[0])?'environment':/\.fbx$/i.test(src.split(/[?#]/,1)[0])?'fbx':'model'):Promise<void> {
   if(active.size)return Promise.all([...active].map(cache=>warm(cache,src,kind))).then(()=>{});
   const key=kind+':'+src,cached=queued.get(key);if(cached)return cached.promise;
   let resolve!:()=>void,reject!:(error:unknown)=>void;
@@ -95,7 +97,7 @@ export function activateAssetCache(cache:AssetCache):void {
 }
 export function disposeAssetCache(cache:AssetCache):void {
   active.delete(cache);cache.disposed=true;
-  for(const asset of cache.models.values()){asset.abort.abort();if(asset.value)disposeSource(asset.value);}
+  for(const map of [cache.models,cache.fbx])for(const asset of map.values()){asset.abort.abort();if(asset.value)disposeSource(asset.value);}
   for(const asset of cache.environments.values())asset.abort.abort();
-  cache.models.clear();cache.environments.clear();
+  cache.models.clear();cache.fbx.clear();cache.environments.clear();
 }
