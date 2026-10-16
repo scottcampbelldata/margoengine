@@ -8,7 +8,7 @@ Fix the Light Keeper robot demo and its optional packages until sustained, warme
 
 The objective remains **active and incomplete**. The recorded constraints-demo stalls have been corrected for the tested trajectories. The robot still allocates and triggers GC in measured captures.
 
-The tested robot checkpoint is now [live on margoengine.com](https://margoengine.com/demos/light-keeper/), deployment `8d0427c6`. All 189 public files were verified after publishing, with existing demos preserved. See [LIGHT_KEEPER_DEPLOYMENT.md](LIGHT_KEEPER_DEPLOYMENT.md) for the exact snapshot, release identity and future deployment procedure.
+The tested robot checkpoint is now [live on margoengine.com](https://margoengine.com/demos/light-keeper/), deployment `1c027e73`, source `bafb657`. This includes the resting-hand model repair: three relaxed fingers, an opposed thumb, palm and backplate, attached to the existing rig. All 191 public files were verified after publishing, with existing demos and former hashed assets preserved. See [LIGHT_KEEPER_DEPLOYMENT.md](LIGHT_KEEPER_DEPLOYMENT.md) for the exact snapshot, asset checks and future deployment procedure.
 
 Two different demos are involved:
 
@@ -16,6 +16,8 @@ Two different demos are involved:
 - **Light Keeper robot:** http://127.0.0.1:5192/. Its robot adapter integrates the library through resolveTarget(), then retains its analytical arm solve, grip orientation, torso assist, and detailed mesh/contact checks. The constraints lab's new recovery controller is not part of this robot render loop.
 
 An allocation change in one demo does not establish the behavior of the other.
+
+Current visual bug under investigation after the hand release: the user reported the eyes aiming above the held orb during a cross-body reach. A settled authored side-track endpoint reproduces a safe but inaccurate head pose (approximately 19.376 degrees optical error / 39.27 mm ray distance). The existing head search can select a clearance-preserving fallback along the rest-to-target rotation plane; that is a diagnosis target, not a completed fix. Preserve all head/orb/armor clearance guards while checking better bounded orientations. The previous motion tests did not certify exact optical aiming at every contact-limited pose.
 
 ## Workspaces, commits, and constraints
 
