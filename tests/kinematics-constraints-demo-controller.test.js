@@ -340,3 +340,39 @@ test('normal clearance reserve releases all55 reconstructed held contact snapsho
     assert.ok(previousError-error > 0.009, 'must make useful progress towards the requested target');
   }
 });
+
+test('all3103 recorded normal-contact frames recover without artificial waypoint singularity', () => {
+  const fixture = JSON.parse(readFileSync(new URL('./fixtures/constraints-contact-normal-3103-20261016.json', import.meta.url), 'utf8'));
+  const bytes = Buffer.from(fixture.data, 'base64');
+  assert.equal(bytes.length, fixture.frames * 20);
+  const d = createConstraintDemo();
+  d.configure(fixture.settings);
+  d.solveOptions.swivelSpeedLimit = fixture.settings.swivelSpeedLimit;
+  d.solveOptions.searchBudget = fixture.settings.searchBudget;
+  d.setTarget(...fixture.warmup.target);
+  for (let i = 0; i < fixture.warmup.frames; i++) d.step(fixture.warmup.dtSeconds);
+  let detours = 0;
+  for (let frame = 0; frame < fixture.frames; frame++) {
+    const offset = frame * 20;
+    d.setTarget(bytes.readFloatLE(offset + 8), bytes.readFloatLE(offset + 12), bytes.readFloatLE(offset + 16));
+    const beforePole = d.acceptedPole;
+    const beforeError = Math.hypot(...d.currentHand.map((v,axis)=>v-d.rawTarget[axis]));
+    d.step(bytes.readDoubleLE(offset));
+    audit(d);
+    assert.equal(d.result.resolved, true, `recorded frame ${frame}`);
+    assert.ok(Math.abs(d.acceptedPole-beforePole) <= d.solveOptions.swivelSpeedLimit*d.dt+1e-12);
+    // The original target contact band adds up to67um beyond prospective
+    // pacing in this recording. This is a trajectory regression envelope.
+    assert.ok(d.handStep <= 0.75*d.dt+0.00007);
+    if (d.outwardDetour) {
+      detours++;
+      assert.ok(d.handStep <= 0.75*d.dt+1e-6);
+      const requestedReach = Math.hypot(...d.lastSolveTarget.map((v,axis)=>v-d.lastSolveRoot[axis]));
+      assert.ok(requestedReach >= Math.abs(d.upperLength-d.lowerLength)+d.solveOptions.foldMargin);
+      assert.ok(requestedReach <= d.upperLength+d.lowerLength-d.solveOptions.reachMargin);
+      const error = Math.hypot(...d.currentHand.map((v,axis)=>v-d.rawTarget[axis]));
+      assert.ok(error < beforeError, `frame ${frame}: conditioned waypoint must still make progress`);
+    }
+  }
+  assert.ok(detours > 300);
+});

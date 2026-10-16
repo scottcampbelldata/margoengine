@@ -22,7 +22,7 @@ test('recording is opt-in and disabled calls do not inspect controller or event-
   assert.deepEqual(json.actions, []);
   assert.match(json.semantics.clearance, /not continuous/);
   assert.match(json.semantics.coverage, /not every browser pointer event/);
-  assert.equal(json.controllerRevision, 'contact-normal-2');
+  assert.equal(json.controllerRevision, 'contact-reach-3');
   assert.match(json.semantics.outwardDetour, /full-chain package guards/);
 });
 
