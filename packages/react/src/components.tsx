@@ -2,7 +2,7 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useImperativeHandle, forwardRef, type ReactNode, type CSSProperties } from 'react';
 import { Engine, Mesh as EngineMesh, box, PbrMaterial as Material, type EngineOptions, type Vec3, type Geometry } from '@margoengine/core/extension';
 import type {EngineKernel,Mesh as MeshHandle,FrameCallback} from '@margoengine/core';
-import {Stage} from 'margoengine';
+import {Stage as StageFacade} from 'margoengine';
 import type {PBRModel, LightingEffect} from '@margoengine/gltf-pro';
 import type {Shadows} from '@margoengine/shadows';
 import type {Environment as IBLEnvironment, EnvironmentBackground} from '@margoengine/environment';
@@ -16,9 +16,9 @@ interface Registry {
   unregister(mesh: EngineMesh): void;
 }
 interface Resources {models:Set<PBRModel>;lighting:Map<LightingEffect,Map<PBRModel,()=>void>>}
-interface Scene {engine:Engine;registry:Registry|null;resources:Resources;shadows:Shadows|null}
+interface Scene {engine:Engine;registry:Registry|null;resources:Resources;shadows:Shadows|null;requestShadows:()=>()=>void;cameraOverrides:Set<()=>void>}
 const Context=createContext<Scene|null>(null);
-export interface MargoContextValue {stage:Stage|null;ready:boolean;canvas:HTMLCanvasElement|null}
+export interface MargoContextValue {stage:StageFacade|null;ready:boolean;canvas:HTMLCanvasElement|null}
 export const MargoContext=createContext<MargoContextValue|null>(null);
 export function useMargo():MargoContextValue {const value=useContext(MargoContext);if(!value)throw new Error('useMargo requires <MargoCanvas>');return value;}
 function useScene():Scene {const scene=useContext(Context);if(!scene)throw new Error('Engine components require <Canvas>');return scene;}
@@ -29,13 +29,16 @@ const useCommit=typeof window==='undefined'?useEffect:useLayoutEffect;
 
 export interface CanvasProps extends EngineOptions {
   children?: ReactNode; style?:CSSProperties; className?:string; label?:string;
-  shadows?:boolean;onCreated?:(stage:Stage)=>void; onError?:(error:unknown)=>void;
+  shadows?:boolean;onCreated?:(stage:StageFacade)=>void; onError?:(error:unknown)=>void;
 }
 export type MargoCanvasProps=CanvasProps;
 export function MargoCanvas({children,style,className,label='Interactive 3D scene',capacity=1024,backend='auto',camera,shadows=false,onCreated,onError}:CanvasProps) {
   const canvas=useRef<HTMLCanvasElement>(null),queue=useRef<Promise<void>>(Promise.resolve()),created=useRef(onCreated),errorHandler=useRef(onError);
-  const [stage,setStage]=useState<Stage|null>(null),[error,setError]=useState<unknown>(null),[shadow,setShadow]=useState<Shadows|null>(null);
+  const [stage,setStage]=useState<StageFacade|null>(null),[error,setError]=useState<unknown>(null),[shadow,setShadow]=useState<Shadows|null>(null);
+  const [shadowRequests,setShadowRequests]=useState(0),enableShadows=shadows||shadowRequests>0;
+  const requestShadows=useMemo(()=>()=>{setShadowRequests(count=>count+1);return()=>setShadowRequests(count=>count-1);},[]);
   const engine=stage?.engine as unknown as Engine|null;
+  const cameraOverrides=useMemo(()=>new Set<()=>void>(),[engine]);
   const cameraOptions=useRef(camera);created.current=onCreated;errorHandler.current=onError;cameraOptions.current=camera;
   useEffect(()=>{
     const element=canvas.current!;
@@ -50,27 +53,43 @@ export function MargoCanvas({children,style,className,label='Interactive 3D scen
       const resize=()=>{const bounds=element.getBoundingClientRect(),ratio=element.ownerDocument.defaultView?.devicePixelRatio??1;element.width=Math.max(1,Math.round(bounds.width*ratio));element.height=Math.max(1,Math.round(bounds.height*ratio));};
       resize();
       if(typeof ResizeObserver!=='undefined'){observer=new ResizeObserver(resize);observer.observe(element);}
-      const next=new Stage(instance as unknown as EngineKernel);
+      const next=new StageFacade(instance as unknown as EngineKernel);
       if(cameraOptions.current)Object.assign(instance.camera,cameraOptions.current);
       created.current?.(next);if(!cancelled&&!instance.disposed){setStage(next);instance.start();}
       }catch(error){observer?.disconnect();instance.dispose();setStage(null);throw error;}
     }).catch(report);
     return()=>{cancelled=true;observer?.disconnect();current?.dispose();};
   },[capacity,backend]);
-  useCommit(()=>{if(engine&&camera)Object.assign(engine.camera,camera);},[engine,camera?.position?.[0],camera?.position?.[1],camera?.position?.[2],camera?.target?.[0],camera?.target?.[1],camera?.target?.[2],camera?.fov,camera?.near,camera?.far]);
+  useCommit(()=>{if(engine&&camera){Object.assign(engine.camera,camera);for(const apply of cameraOverrides)apply();}},[engine,cameraOverrides,camera?.position?.[0],camera?.position?.[1],camera?.position?.[2],camera?.target?.[0],camera?.target?.[1],camera?.target?.[2],camera?.fov,camera?.near,camera?.far]);
   useEffect(()=>{
-    setShadow(null);if(!engine||!shadows)return;
+    setShadow(null);if(!engine||!enableShadows)return;
     let cancelled=false,effect:Shadows|undefined;
     import('@margoengine/shadows').then(({Shadows})=>{if(cancelled||engine.disposed)return;effect=Shadows.attach(engine as unknown as EngineKernel);setShadow(effect);}).catch(error=>{if(!cancelled)engine.onError(error);});
     return()=>{cancelled=true;effect?.dispose();};
-  },[engine,shadows]);
+  },[engine,enableShadows]);
   const resources=useMemo<Resources>(()=>({models:new Set(),lighting:new Map()}),[engine]);
-  const scene=useMemo<Scene|null>(()=>engine?{engine,registry:null,resources,shadows:shadows&&shadow?.owner===engine?shadow:null}:null,[engine,resources,shadows,shadow]);
+  const scene=useMemo<Scene|null>(()=>engine?{engine,registry:null,resources,shadows:enableShadows&&shadow?.owner===engine?shadow:null,requestShadows,cameraOverrides}:null,[engine,resources,enableShadows,shadow,requestShadows,cameraOverrides]);
   const value=useMemo<MargoContextValue>(()=>({stage,ready:!!stage&&!stage.engine.disposed,canvas:canvas.current}),[stage]);
   return <MargoContext.Provider value={value}><canvas ref={canvas} className={className} style={{display:'block',width:'100%',height:'100%',...style}} role="img" aria-label={label}/>{error!==null&&<p role="alert">{String(error)}</p>}{scene&&!engine?.disposed&&<Context.Provider value={scene}>{children}</Context.Provider>}</MargoContext.Provider>;
 }
 export const Canvas=MargoCanvas;
 export function useMargoStage():EngineKernel {return useScene().engine as unknown as EngineKernel;}
+
+export interface StageProps {camera?:EngineOptions['camera'];shadows?:boolean;children?:ReactNode}
+export function Stage({camera,shadows=false,children}:StageProps) {
+  const {stage,ready}=useMargo(),scene=useContext(Context);
+  const requestShadows=scene?.requestShadows,cameraOverrides=scene?.cameraOverrides;
+  const active=ready&&!!stage&&!stage.engine.disposed;
+  useCommit(()=>{
+    if(!active||!camera)return;
+    // Reapply wrapper settings when Canvas updates its camera defaults.
+    const apply=()=>{Object.assign(stage.engine.camera,camera);};
+    cameraOverrides?.add(apply);apply();
+    return()=>{cameraOverrides?.delete(apply);};
+  },[stage,active,cameraOverrides,camera?.position?.[0],camera?.position?.[1],camera?.position?.[2],camera?.target?.[0],camera?.target?.[1],camera?.target?.[2],camera?.fov,camera?.near,camera?.far]);
+  useEffect(()=>{if(active&&shadows)return requestShadows?.();},[active,stage,shadows,requestShadows]);
+  return active?<>{children}</>:null;
+}
 
 export type MeshRef=MeshHandle;
 export interface MeshProps {position?:Vec3;rotation?:Vec3;scale?:Vec3;children?:ReactNode}
@@ -117,6 +136,7 @@ export function PbrMaterial({color='#4f46e5',roughness=0.5,metalness=0}: {color?
     return()=>{registry.attachments.delete(attach);const mesh=live(registry);if(mesh?.material===material)mesh.setMaterial(new Material());};
   },[registry,color,roughness,metalness]);return null;
 }
+export {Mesh as mesh,BoxGeometry as boxGeometry,PbrMaterial as meshStandardMaterial};
 export function useFrame(callback:FrameCallback):void {
   const {engine}=useScene(),latest=useRef(callback);useCommit(()=>{latest.current=callback;});
   useCommit(()=>engine.onFrame((state,delta)=>latest.current(state as unknown as EngineKernel,delta)),[engine]);

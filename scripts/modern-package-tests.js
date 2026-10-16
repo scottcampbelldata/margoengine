@@ -6,15 +6,19 @@ import {tmpdir} from 'node:os';
 import {openBrowser} from './browser.js';
 
 const names=['core','gltf','react','machinery','creative','scenery','gltf-pro','animation','post','shadows','clustered','vfx','animator','taa','splats','terrain','environment','controls','margoengine'],npm=process.env.npm_execpath;
-const packedNames=[...names,'decoders'];
+const packedNames=[...names,'decoders','geometry'];
 const packageName=name=>name==='margoengine'?'margoengine':`@margoengine/${name}`;
 assert.ok(npm,'Run this check through npm run modern:test:packages');
 const archives=resolve('test-results/modern-packages');await mkdir(archives,{recursive:true});
-const dependencies={react:'18.3.1','react-dom':'18.3.1','@types/react':'^18.3.0','@types/react-dom':'^18.3.0','@testing-library/react':'16.3.3',jsdom:'26.1.0'};
+const dependencies={react:'18.3.1','react-dom':'18.3.1','@types/react':'^18.3.0','@types/react-dom':'^18.3.0','@testing-library/react':'16.3.3',jsdom:'26.1.0',vite:JSON.parse(await readFile('package.json','utf8')).devDependencies.vite};
+// A local retry can reuse the coherent workspace build made by core's prepack.
+// The default still exercises every package's own prepack hook.
+const reuseBuild=process.env.MARGOENGINE_PACKAGE_TEST_REUSE_BUILDS==='1';
 for(const name of ['core','react'])await writeFile(`packages/${name}/dist/__stale-package-test.js`,'throw new Error("Stale build artifact");');
 for(const name of packedNames){
-  const [pack]=JSON.parse(execFileSync(process.execPath,[npm,'pack','--workspace',packageName(name),'--pack-destination',archives,'--json'],{encoding:'utf8'})),files=new Set(pack.files.map(file=>file.path));
-  assert.ok(pack.files.every(file=>['package.json','README.md','LICENSE'].includes(file.path)||file.path.startsWith('dist/')));
+  const [pack]=JSON.parse(execFileSync(process.execPath,[npm,'pack','--workspace',packageName(name),'--pack-destination',archives,'--json',...(reuseBuild&&name!=='core'?['--ignore-scripts']:[])],{encoding:'utf8'})),files=new Set(pack.files.map(file=>file.path));
+  assert.ok(pack.files.every(file=>['package.json','README.md','LICENSE',...(name==='post'?['NOTICE.md']:[])].includes(file.path)||file.path.startsWith('dist/')));
+  if(name==='post')assert.ok(files.has('NOTICE.md'),'Post must retain its color-transform license notice');
   assert.ok(files.has('README.md')&&files.has('LICENSE'));assert.ok(!files.has('dist/__stale-package-test.js'));
   if(name==='machinery')for(const file of ['cad-runtime.js','occt-import-js.js','occt-import-js.wasm','OCCT-LICENSE.txt','OCCT-NOTICE.txt'])assert.ok(files.has('dist/workers/'+file),`Missing CAD worker asset: ${file}`);
   const manifest=JSON.parse(await readFile(`packages/${name}/package.json`,'utf8'));
@@ -28,11 +32,12 @@ try{
   execFileSync(process.execPath,[npm,'install','--ignore-scripts','--no-audit','--no-fund'],{cwd:fixture,stdio:'inherit'});
   for(const name of names){
     assert.equal(await readFile(join(fixture,`node_modules/${packageName(name)}/LICENSE`),'utf8'),await readFile('LICENSE','utf8'));
+    if(name==='post')assert.equal(await readFile(join(fixture,'node_modules/@margoengine/post/NOTICE.md'),'utf8'),await readFile('packages/post/NOTICE.md','utf8'));
     const markdown=await readFile(join(fixture,`node_modules/${packageName(name)}/README.md`),'utf8');
     // Standalone examples have imports; continuation blocks retain the preceding setup.
     const examples=[];
     for(const [,code] of markdown.matchAll(/```tsx?\r?\n([\s\S]*?)```/g)){
-      if(!examples.length||/^\s*import\s/m.test(code))examples.push(code);
+      if(!examples.length||/^\s*(?:import\s|const\s+\{[^}]+\}\s*=\s*await\s+import\s*\()/m.test(code))examples.push(code);
       else examples[examples.length-1]+='\n'+code;
     }
     for(const [index,code] of examples.entries())await writeFile(join(fixture,`${name}-${index}-readme.tsx`),code);
@@ -93,15 +98,20 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
 `);
   execFileSync(process.execPath,[resolve('node_modules/typescript/bin/tsc'),'-p',join(fixture,'tsconfig.json')],{stdio:'inherit'});
   execFileSync(process.execPath,[join(fixture,'out/consumer.js')],{cwd:fixture,stdio:'inherit'});
-  for(const directory of ['react/test','react/tests','react/dist','gltf-pro/src'])await mkdir(join(fixture,directory),{recursive:true});
-  await writeFile(join(fixture,'react/dist/index.js'),"export * from '@margoengine/react';\n");
-  for(const file of ['test/declarative.test.js','tests/react.test.js'])await copyFile(`packages/react/${file}`,join(fixture,'react',file));
-  await copyFile('packages/gltf-pro/src/shader.ts',join(fixture,'gltf-pro/src/shader.ts'));
-  execFileSync(process.execPath,['--experimental-test-module-mocks','--test',join(fixture,'react/test/declarative.test.js'),join(fixture,'react/tests/react.test.js')],{cwd:fixture,stdio:'inherit'});
-  const aliases={'@margoengine/core/extension':join(fixture,'node_modules/@margoengine/core/dist/extension.js'),react:join(fixture,'node_modules/react'),'react-dom':join(fixture,'node_modules/react-dom')};
-  aliases['@margoengine/decoders/meshopt']=join(fixture,'node_modules/@margoengine/decoders/dist/meshopt.js');
-  aliases['@margoengine/core/extension']=join(fixture,'node_modules/@margoengine/core/dist/extension.js');
-  for(const name of packedNames)aliases[packageName(name)]=join(fixture,`node_modules/${packageName(name)}/dist/index.js`);
+  for(const directory of ['packages/react/test','packages/react/tests','packages/react/dist','packages/gltf-pro/src','docs'])await mkdir(join(fixture,directory),{recursive:true});
+  await writeFile(join(fixture,'packages/react/dist/index.js'),"export * from '@margoengine/react';\n");
+  for(const file of ['test/declarative.test.js','tests/react.test.js'])await copyFile(`packages/react/${file}`,join(fixture,'packages/react',file));
+  await copyFile('packages/gltf-pro/src/shader.ts',join(fixture,'packages/gltf-pro/src/shader.ts'));
+  await copyFile('docs/react-integration.md',join(fixture,'docs/react-integration.md'));
+  execFileSync(process.execPath,['--experimental-test-module-mocks','--test',join(fixture,'packages/react/test/declarative.test.js'),join(fixture,'packages/react/tests/react.test.js')],{cwd:fixture,stdio:'inherit'});
+  const aliases=[],browserExport=entry=>typeof entry==='string'?entry:browserExport(entry.browser??entry.import??entry.default);
+  for(const name of [...packedNames.map(packageName),'react','react-dom']){
+    const directory=join(fixture,'node_modules',name),manifest=JSON.parse(await readFile(join(directory,'package.json'),'utf8'));
+    for(const [subpath,entry] of Object.entries(manifest.exports)){
+      const specifier=name+(subpath==='.'?'':subpath.slice(1));
+      aliases.push({find:new RegExp('^'+specifier.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$'),replacement:join(directory,browserExport(entry))});
+    }
+  }
   browser=await openBrowser({startPath:'/tests/modern.html',aliases});const {page}=browser,errors=[];
   page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
   await page.waitForFunction(()=>window.modern);await page.evaluate(()=>window.modern.mount());

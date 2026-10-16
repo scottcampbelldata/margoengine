@@ -78,23 +78,25 @@ Corrections to the notes:
 ### 6. Verification and follow-up compatibility
 
 - [x] `npm test --workspace @margoengine/exporters` (17 tests; plus 3 USDZ/subpath regressions).
-- [x] `npm test --workspace @margoengine/fbx` (52 tests, zero failures or skips).
+- [x] `npm test --workspace @margoengine/fbx` (53 tests: all 52 existing tests unchanged plus the real-file test; zero failures or skips).
 - [x] Existing dependency-policy tests (5 tests).
 - [x] Packed-package checks: all 62 packages import without browser globals; strict Bundler and NodeNext consumers compile.
 - [x] Core + stage gzip remains below 20,000 bytes (19,999 bytes).
 - [x] Required small headless skin + morph + clip integration test, with real PBRModel/Animation attachment and seek.
-- [ ] Rendered WebGPU skin + morph + clip integration with a real asset.
-- [ ] Licensed real Blender/DCC fixture coverage and broader FBX 7.x certification.
+- [x] Required rendered WebGPU skin + clip integration with the checked-in real Blender asset: retained skin data, playback, seek pixels, and first-frame restoration.
+- [x] Licensed real Blender/DCC fixture coverage, with CC0 authoring source and exact headless ground truth.
+- [ ] Broader FBX 7.x/DCC certification and a real-asset rendered morph check.
 - [ ] Faithful cubic/mixed interpolation, additional inheritance modes, and progressive morphs, if not included in the first implementation.
 
 ## Implementation status
 
 - Built and verified: exporter skin/morph/clip support; bounded binary/ASCII readers; geometry/transform modules; native skin/morph/material/animation conversion; public API replacement; dependency removal; source caches and preallocation checks; loading/material regressions.
-- Final full verification under Node 24.22.0: **903 passed, zero failures, zero skips**, including all 52 FBX tests. Log: `test-results/native-fbx-full-node24.log` (ignored local evidence). The earlier intermediate Node 24 run had 888 passing tests; the final count includes 15 additional loading/material and budget regressions.
+- Final full verification under Node 24.22.0: **939 passed, zero failures, zero skips**, including all 53 FBX tests. Log: `test-results/code-to-nine-full-node24.log` (ignored local evidence). The original 52 FBX tests retain their assertions. Concurrent React exports required refreshing the catalog and public-API expectation lists, without changing the React implementation in this task.
 - The first full source build passed. The subsequent host Node 26 test run passed 883/884 tests; its remaining CAD initialization test uses `stripTypeScriptTypes({mode:'transform'})`, removed in Node 26. The complete final suite passes under CI's Node 24 major; no unrelated core/test source was changed.
 - Full source-build size measurement: core + stage 19,999 bytes gzip, with the existing strict 20,000-byte rejection threshold intact.
 - The budget boundary test accepts 19,999 and rejects 20,000/20,001. Scene tests exercise cumulative allocation/work/morph thresholds, rejection before scratch/output allocation, repeated-source caching, and source reduction/remapping across material primitives.
-- Packed consumer verification passed for all 62 packages. Log: `test-results/native-fbx-packages.log`. Focused FBX result: `test-results/native-fbx-focused.log`.
+- Strict typechecks and packed consumer verification passed for all 62 packages. Logs: `test-results/code-to-nine-types-node24.log`, `test-results/code-to-nine-packages-node24.log`. Focused FBX result: `test-results/code-to-nine-fbx-node24.log`.
+- The required fixture browser run passed with Playwright's bundled Chromium headless shell and CI's software WebGPU flags. Playback and seek changed 9,798 and 14,662 pixels respectively; seek back to zero restored the original frame hash. Evidence: `test-results/code-to-nine-browser-node24.log`, `test-results/margo-modules.json`, and `test-results/margo-fbx.png`. CI runs this check against the same fixture and uploads the report and screenshot.
 - Parser limits: 64 MiB cumulative arrays and 128 MiB allocation accounting. Scene limits: 128 MiB cumulative allocation accounting, 128 million work units, and 64 MiB total morph outputs. Animation additionally limits cumulative output values, baking work, sampled evaluations, and Float32 key spacing.
 
 ## Primary format references
@@ -112,4 +114,4 @@ The existing downstream glTF runtime accepts at most 64 MiB of GLB/buffer data. 
 
 ## Completion gates
 
-The first implementation is usable when native binary and ASCII inputs produce valid static and animated GLBs, all public API regression tests pass without Three, unsupported features reject explicitly, and core/stage budgets pass. Broad DCC compatibility remains a separate, visible gate until real exported assets and runtime rendering checks pass. Record exact test results and remaining limitations here rather than treating a synthetic triangle as full FBX compatibility.
+The first implementation gates pass: native binary and ASCII inputs produce valid static and animated GLBs, public API regressions pass without Three, unsupported features reject explicitly, and core/stage budgets pass. One licensed Blender-exported rig now has headless numeric and runtime rendering proof. Broad DCC compatibility remains a separate gate; the fixture's supported bind convention and export settings are documented in [its provenance](../packages/fbx/test/fixtures/README.md).

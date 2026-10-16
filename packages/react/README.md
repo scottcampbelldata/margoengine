@@ -11,6 +11,44 @@ npm install @margoengine/gltf-pro@0.1.0 @margoengine/environment@0.1.0 @margoeng
 ```
 
 ```tsx
+import { Canvas, Stage, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
+
+export function App() {
+  return (
+    <Canvas style={{ height: 400 }}>
+      <Stage camera={{ position: [0, 2, 5] }} shadows>
+        <Mesh position={[0, 1, 0]}>
+          <BoxGeometry args={[1, 1, 1]} />
+          <PbrMaterial color="#84d6bd" />
+        </Mesh>
+      </Stage>
+    </Canvas>
+  );
+}
+```
+
+`Stage` configures the existing canvas stage and renders its children once that stage is available. Its `camera` prop updates the active camera; `shadows` uses the canvas's existing optional `@margoengine/shadows` lifecycle. Install that peer when enabling shadows. Canvas still creates and disposes the single engine and stage.
+
+Lowercase exports are aliases of the same hook-based components: `mesh === Mesh`, `boxGeometry === BoxGeometry`, and `meshStandardMaterial === PbrMaterial`. Use a namespace in JSX:
+
+```tsx
+import * as Margo from '@margoengine/react';
+
+<Margo.Canvas style={{ height: 400 }}>
+  <Margo.Stage camera={{ position: [0, 2, 5] }}>
+    <Margo.mesh position={[0, 1, 0]}>
+      <Margo.boxGeometry args={[1, 1, 1]} />
+      <Margo.meshStandardMaterial color="#84d6bd" />
+    </Margo.mesh>
+  </Margo.Stage>
+</Margo.Canvas>;
+```
+
+React treats bare lowercase tags such as `<mesh>` as DOM elements, even when `mesh` is imported. Namespace members such as `<Margo.mesh>` (or an uppercase import binding) invoke these components. All existing PascalCase exports remain available.
+
+Optional model, lighting and control components can be used directly under the canvas:
+
+```tsx
 'use client';
 import { MargoCanvas, Model, Environment, OrbitControls } from '@margoengine/react';
 

@@ -4,7 +4,7 @@ Date: 2026-10-16. Updated after the first native importer landed. Core and the s
 
 The first implementation is in the tree. `@margoengine/exporters` writes skins, morphs, and clips on a data scene, and engine-scene export stays static. `@margoengine/fbx` parses binary and ASCII FBX itself and calls `exportGLB`. `convertFBX`, `parseFBX`, and `loadFBX` are unchanged. The package has no Three.js runtime dependency. The root `three` and `@types/three` development dependencies are removed. Benchmarks that still compare against Three.js download a pinned 0.186.1 build through `scripts/three-reference.js`. They do not import it from this package.
 
-`npm test --workspace @margoengine/fbx` passed 52 tests on 2026-10-16, with zero failures. `npm test --workspace @margoengine/exporters` passed 17 tests. `npm run measure:size` reported core plus stage at 19,999 bytes gzip, under the 20,000-byte gate. The supported subset and the still-open real-DCC render gate are in `packages/fbx/README.md` and `docs/native-fbx-plan.md`. This file keeps the design. Where the implementation disagreed with the first draft, the notes below follow the code.
+The FBX suite passed 53 tests on 2026-10-16 under Node 24, including the checked-in Blender fixture, with zero failures or skips. `npm test --workspace @margoengine/exporters` passed 17 tests. `npm run measure:size` reported core plus stage at 19,999 bytes gzip, under the 20,000-byte gate. The supported subset is in `packages/fbx/README.md` and `docs/native-fbx-plan.md`. The CC0 Blender fixture gate recorded in `docs/code-to-nine.md` is closed. Broader DCC certification remains separate. This file keeps the design. Where the implementation disagreed with the first draft, the notes below follow the code.
 
 Corrections that the code made to this design:
 
@@ -404,11 +404,11 @@ New tests, each with a binary and an ASCII case where the builder is shared:
 
 The exporter's current validator tests stay untouched and still report zero warnings. A new exporter test covers joints, weights, one inverse-bind matrix, and one translation channel, and it does not import `@margoengine/fbx`. That keeps the writer honest without a parser.
 
-The browser fixture behind `MARGOENGINE_FBX_FIXTURE` stays. It loads a real skinned file, checks that skins and clips survive, and checks that rendered pixels change after a seek. It is not a unit fixture and it is not added to the repo.
+The browser fixture behind `MARGOENGINE_FBX_FIXTURE` defaults to the checked-in [CC0 Blender rig](../packages/fbx/test/fixtures/README.md), and the primary CI job requires that same file. It checks retained skins, clip playback, changed rendered pixels after playback and seek, and restoration of the first frame. A headless test separately pins the file's joints, sixteen inverse-bind values, clip name, quaternion endpoints, and runtime bind pose.
 
 ## Order of work
 
-Steps 1 through 9 are in the tree: the exporter data-scene fields, the binary and ASCII readers, mesh conversion, the `Move` clip, materials, units, axes, skin reduction, morphs, and the removal of the Three.js imports from this package. The open follow-up is a licensed DCC file rendered in WebGPU, plus the rejected features listed above if a later slice takes them on. `docs/native-fbx-plan.md` records the checked boxes.
+Steps 1 through 9 are in the tree: the exporter data-scene fields, the binary and ASCII readers, mesh conversion, the `Move` clip, materials, units, axes, skin reduction, morphs, and the removal of the Three.js imports from this package. The licensed Blender fixture now passes headless numeric checks and WebGPU rendering. Broader DCC certification remains separate from this supported-subset proof. `docs/native-fbx-plan.md` records the checked boxes.
 
 ## Explicit non-goals
 
@@ -438,7 +438,7 @@ These are real FBX features. They are out of this project, and the parser throws
 
 ## Risks
 
-The bind-matrix product `inverse(TransformLink) * Transform` is the usual cluster convention, and some exporters transpose one of the matrices. The skin test uses a cluster whose bind is a known translation, and the expected inverse bind is written out as sixteen numbers in the test. If a real DCC file disagrees, the fixture wins only after one real file is added under `MARGOENGINE_FBX_FIXTURE` and the product is corrected in one place, in `src/skin.ts`.
+The importer accepts cluster binds as `inverse(TransformLink) * Transform`. The real Blender fixture pins a +1 X inverse bind as sixteen explicit numbers. Its joint world binds are identity, so Blender's bone-space `Transform` agrees with this supported convention. General Blender bone-space cluster binds remain outside this proof; the fixture's provenance documents that constraint. No bind-matrix behavior changed to add the fixture.
 
 Float32 animation times cannot tell `46186158000` ticks from the next tick. Keys closer than about `1e-6` seconds collapse, fail the strictly-increasing check, and throw. That is the right failure.
 
