@@ -1,6 +1,14 @@
 import * as module0 from '@margoengine/input';
 import {materialLobes,sheen,specular,anisotropy,iridescence,type MaterialLobeOptions} from '@margoengine/materials';
 import type {MaterialExtension} from '@margoengine/gltf-pro';
+import {preload,Group,Html,type CanvasProps,type PointerHandlers,type MargoContextValue} from '@margoengine/react';
+
+export const demandCanvas:CanvasProps={frameloop:'demand'};
+export const clickHandlers:PointerHandlers={onClick:event=>event.mesh.setPosition([1,0,0])};
+export function reactCanvasContext(context:MargoContextValue):number {context.invalidate();const camera=context.camera,engine=context.gl;return context.size.width+context.size.height+context.clock+(camera&&engine?1:0);}
+export const optionalReactComponents=[Group,Html,preload];
+// @ts-expect-error Canvas accepts only the two supported frame loops.
+export const invalidFrameLoop:CanvasProps={frameloop:'sometimes'};
 
 export function materialExtensions(view:GPUTextureView,sampler:GPUSampler):MaterialExtension {
   const options:MaterialLobeOptions={ior:1.5,sheen:{colorFactor:[0.3,0.2,0.1],sheenColorTexture:{view,sampler,texCoord:1,transform:{offset:[0.2,0.1],rotation:0.3,scale:[0.5,0.75]}}},specular:{factor:0.8,colorFactor:[2,1,0.5]},anisotropy:{strength:0.5,rotation:0.2},iridescence:{factor:0.6,ior:1.3,thicknessMinimum:100,thicknessMaximum:400}};
