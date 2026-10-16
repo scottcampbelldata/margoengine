@@ -1,4 +1,16 @@
 import * as module0 from '@margoengine/input';
+import {materialLobes,sheen,specular,anisotropy,iridescence,type MaterialLobeOptions} from '@margoengine/materials';
+import type {MaterialExtension} from '@margoengine/gltf-pro';
+
+export function materialExtensions(view:GPUTextureView,sampler:GPUSampler):MaterialExtension {
+  const options:MaterialLobeOptions={ior:1.5,sheen:{colorFactor:[0.3,0.2,0.1],sheenColorTexture:{view,sampler,texCoord:1,transform:{offset:[0.2,0.1],rotation:0.3,scale:[0.5,0.75]}}},specular:{factor:0.8,colorFactor:[2,1,0.5]},anisotropy:{strength:0.5,rotation:0.2},iridescence:{factor:0.6,ior:1.3,thicknessMinimum:100,thicknessMaximum:400}};
+  const defaults=[sheen(),specular(),anisotropy(),iridescence()];
+  // @ts-expect-error Factors are numeric, never WGSL source.
+  sheen({roughnessFactor:'0.5'});
+  // @ts-expect-error Only the two fixed UV sets are exposed.
+  anisotropy({anisotropyTexture:{view,texCoord:2}});
+  return materialLobes(options,defaults[0]);
+}
 import * as module1 from '@margoengine/ecs';
 import * as module2 from '@margoengine/fsm';
 import * as module3 from '@margoengine/navmesh';

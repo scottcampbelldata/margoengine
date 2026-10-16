@@ -12,7 +12,7 @@ A typical Three scene is a camera, a mesh, orbit controls, a glTF, metallic-roug
 | --- | --- |
 | Stage, camera, mesh, dispose | `margoengine` and `@margoengine/core` |
 | Metallic-roughness glTF | `@margoengine/gltf-pro` |
-| Clearcoat, transmission, IOR, volume, and authored node materials | [`@margoengine/materials`](../packages/materials/README.md), installed explicitly through the optional material extension slot |
+| Clearcoat, sheen, specular color, anisotropy, iridescence, transmission, IOR, volume, and authored node materials | [`@margoengine/materials`](../packages/materials/README.md), installed explicitly through the optional material extension slot |
 | HDR environment and image-based lighting | `@margoengine/environment` |
 | Orbit controls | `@margoengine/controls` |
 | One skin and morph clip, four or eight influences | `@margoengine/animation` |
@@ -51,7 +51,7 @@ These are the gaps a porter will find. They are not a build list.
 
 | Three.js | This repo |
 | --- | --- |
-| Extended PBR materials | [`@margoengine/materials`](../packages/materials/README.md) adds clearcoat, transmission, IOR, and Beer-law volume through the optional group 3 slot. Refraction samples the opaque screen color once; there is no ray tracing or participating media. Sheen, iridescence, anisotropy, and specular-color remain unsupported. The Blender loader still rejects extended materials. |
+| Extended PBR materials | [`@margoengine/materials`](../packages/materials/README.md) adds clearcoat, sheen, specular color, anisotropy, iridescence, transmission, IOR, and Beer-law volume through group 3. The lobes affect directional lighting and fixed hemispherical ambient; clustered and environment lighting retain their base response. Refraction samples the opaque screen color once; there is no ray tracing or participating media. The Blender loader still rejects extended materials. |
 | Shadowed point and spot lights, rect-area lights, IES profiles | Clustered lights do not cast shadows. Shadows are directional cascades. |
 | `AnimationMixer` on the same object as the skin | `@margoengine/animation` plays one clip, with four or eight influences, and does not crossfade. Crossfades, 1D and 2D blend trees, and masked additive layers are in `@margoengine/animator`. |
 | `ShaderMaterial` and node materials | `materials.nodeMaterial()` compiles a closed TypeScript graph to `MaterialExtension`; it accepts no arbitrary WGSL, node-graph file format, or Three.js TSL. Custom WGSL uses `MaterialExtension` directly, and custom draws use the core extension API. |
@@ -59,7 +59,7 @@ These are the gaps a porter will find. They are not a build list.
 | `Raycaster` against skinned and morphed meshes | `engine.pick` is a GPU id buffer. `@margoengine/selection` covers core mesh geometry and excludes skinned draws. `@margoengine/bvh` is triangles. |
 | `THREE.LOD`, `BatchedMesh`, CSS3D, more than eight joint influences | `@margoengine/scatter` has its own GPU LOD. The animation package bounds influences at eight. |
 
-The native FBX importer has landed. `docs/native-fbx.md` and `packages/fbx/README.md` describe it. `@margoengine/fbx` has no Three.js runtime dependency, and `npm test --workspace @margoengine/fbx` passed 52 tests. A rendered real-DCC fixture is still an open gate. The file a stranger tries first is still a glTF. A compressed glTF now has a path through `loadGLTF`. KTX2 textures, texture transforms and eight-influence character meshes now have that path too.
+The native FBX importer has landed. `docs/native-fbx.md` and `packages/fbx/README.md` describe it. `@margoengine/fbx` has no Three.js runtime dependency. A CC0 Blender rig now has headless numeric checks and a required rendered playback and seek check, recorded in `docs/code-to-nine.md`. Broader DCC certification is still separate. The file a stranger tries first is still a glTF. A compressed glTF now has a path through `loadGLTF`. KTX2 textures, texture transforms and eight-influence character meshes now have that path too.
 
 ## What has to be true before launch
 
@@ -79,11 +79,11 @@ Five launch requirements remain separate from optional materials, point-light sh
 
 Do not hold the launch for these. Document them as absent.
 
-- Sheen, iridescence, anisotropy, and specular-color; ray-traced or multi-bounce transmission and participating media.
+- Ray-traced or multi-bounce transmission and participating media; extended lobes in clustered or environment lighting.
 - Rect-area lights, IES profiles, and shadows from point or spot lights.
 - Three.js TSL and node-graph file formats, SSR, SSGI, GTAO, and a single EffectComposer clone.
 - A CPU raycaster that hits skinned and morphed vertices.
-- Cubic FBX curves, extra inheritance modes, progressive morphs, and a rendered real-DCC fixture. The native reader is already the runtime. Three.js is no longer an FBX dependency.
+- Cubic FBX curves, extra inheritance modes, progressive morphs, and broader DCC certification beyond the checked-in Blender rig. The native reader is already the runtime. Three.js is no longer an FBX dependency.
 - `THREE.LOD`, `BatchedMesh`, CSS3D, and more than eight joint influences.
 
 Draco, meshopt and KTX2 loading, texture transforms, eight influences and the optional materials slot are implemented; keep their regression checks passing. Core and the stage remain frozen at **19,999 bytes gzip**. See the [materials implementation record](materials-extensions.md) for the supported lobes and verification.

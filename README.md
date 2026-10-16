@@ -168,20 +168,22 @@ temporary workers. Texture transforms and UV1 keep the fixed vertex layout;
 nonidentity transforms use the optional group 3 uniform slot. Animation supports
 four or eight normalized joint influences per vertex.
 
-[`@margoengine/materials`](packages/materials/README.md) adds clearcoat,
-transmission, IOR, volume, and a closed TypeScript node graph through the optional
+[`@margoengine/materials`](packages/materials/README.md) adds clearcoat, sheen,
+specular color, anisotropy, iridescence, transmission, IOR, volume, and a closed TypeScript node graph through the optional
 material extension slot. Install optional glTF metadata explicitly with
 `materials.install(model)`, or compile an authored graph with `nodeMaterial()`.
 Refraction samples the opaque screen color once; there is no ray-traced or
 multi-bounce transmission, participating media, or node-graph file format.
-Transmissive surfaces do not cast shadows or receive cascaded shadows. Sheen,
-iridescence, anisotropy, specular-color, and Three.js TSL remain unsupported.
+Transmissive surfaces do not cast shadows or receive cascaded shadows. The new
+lobes affect directional lighting and fixed hemispherical ambient; clustered and
+environment lighting retain their base PBR response. Three.js TSL remains unsupported.
 These features stay outside the frozen core and stage bundle.
 
-Verification on 16 October 2026 passed 1,035 Node 24 tests, strict TypeScript checks
+Verification on 16 October 2026 passed 1,057 Node 24 tests, strict TypeScript checks
 and packed imports across all 63 packages, the existing production browser
-regressions, 42 node-material captures, 82 texture captures, production KTX2/UV1
-assets, and eight-influence character GPU readback. `npm run measure:size` reports **47,983 bytes raw / 19,999 bytes gzip** for
+regressions, 42 node-material captures, 59 additional-lobe captures, 82 texture
+captures, complete Khronos material/KTX2/UV1 assets, and eight-influence character
+GPU readback. `npm run measure:size` reports **47,983 bytes raw / 19,999 bytes gzip** for
 core + stage. The [release notes](CHANGELOG.md#unreleased) record the parser,
 normalization, index-boundary and lifecycle checks.
 

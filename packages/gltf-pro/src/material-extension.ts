@@ -7,6 +7,8 @@ export interface MaterialExtension {
   wgsl?:string;
   /** Beauty-only statements after directional direct lighting, before lighting effects. */
   direct?:string;
+  /** Statements after hemispherical ambient lighting; may mutate materialAmbient. */
+  ambient?:string;
   /** Beauty-only statements after output encoding, before the final return. */
   output?:string;
   /** Disable optional lighting bindings for a caller-managed surface. */
@@ -29,12 +31,13 @@ export interface MaterialExtensionResource {
 }
 
 export function prepareMaterialExtension(device:GPUDevice,extension:MaterialExtension,previous?:MaterialExtensionResource):MaterialExtensionResource {
-  if(!extension||typeof extension!=='object'||extension.wgsl!==undefined&&typeof extension.wgsl!=='string'||extension.direct!==undefined&&typeof extension.direct!=='string'||extension.output!==undefined&&typeof extension.output!=='string'||extension.lighting!==undefined&&typeof extension.lighting!=='boolean'||extension.declarations!==undefined&&typeof extension.declarations!=='string')throw new TypeError('Invalid material extension WGSL');
+  if(!extension||typeof extension!=='object'||extension.wgsl!==undefined&&typeof extension.wgsl!=='string'||extension.direct!==undefined&&typeof extension.direct!=='string'||extension.ambient!==undefined&&typeof extension.ambient!=='string'||extension.output!==undefined&&typeof extension.output!=='string'||extension.lighting!==undefined&&typeof extension.lighting!=='boolean'||extension.declarations!==undefined&&typeof extension.declarations!=='string')throw new TypeError('Invalid material extension WGSL');
   const {factors,textures=[]}=extension;
   if(factors!==undefined&&(!(factors instanceof Float32Array)||!factors.length||factors.length%4||factors.some(v=>!Number.isFinite(v))))throw new TypeError('Material extension factors require finite vec4 values');
   const bytes=factors?.byteLength??0;
   if(bytes>Math.min(device.limits.maxUniformBufferBindingSize??Infinity,device.limits.maxBufferSize))throw new RangeError('Material extension factors exceed device limit');
   if(!Array.isArray(textures)||textures.some(t=>!t?.view))throw new TypeError('Invalid material extension textures');
+  if(textures.length+5>(device.limits.maxSampledTexturesPerShaderStage??Infinity)||textures.filter(texture=>texture.sampler).length+5>(device.limits.maxSamplersPerShaderStage??Infinity))throw new RangeError('Material extension textures exceed device binding limits');
   if((bytes||textures.length)&&(device.limits.maxBindGroups??4)<4)throw new RangeError('Material extensions require bind group 3');
   const resource:MaterialExtensionResource=previous??{bytes:0,entries:[],groups:new Map()};
   if(bytes!==resource.bytes){
@@ -74,6 +77,19 @@ export function materialExtensionShader(source:string,extension:MaterialExtensio
   if(extension.output)code=code.replace('  return vec4f(color,select(1.0,s.base.a,f.settings.x>1.5));',()=>`  ${extension.output}\n  return vec4f(color,select(1.0,s.base.a,f.settings.x>1.5));`);
   code=code.replaceAll('let s=surface(i,front);',()=>`var s=surface(i,front);\n${access}${extension.wgsl??''}\n`);
   return declarations+(extension.declarations??'')+'\n'+code;
+}
+
+/** Apply after optional lighting effects have matched their standard lighting call sites. */
+export function materialExtensionAmbientShader(source:string,extension:MaterialExtension):string {
+  if(!extension.ambient)return source;
+  const entry=(name:string,rewrite:(code:string)=>string)=>{
+    const start=source.indexOf('@fragment fn '+name+'(');if(start<0)return;
+    const next=source.indexOf('@fragment',start+1),end=next<0?source.length:next;
+    source=source.slice(0,start)+rewrite(source.slice(start,end))+source.slice(end);
+  };
+  entry('fragment',code=>code.replace('var color=',()=>`var materialAmbient=ambient(s);\n${extension.ambient}\n  var color=`).replace('ambient(s)+s.emissive','materialAmbient+s.emissive'));
+  entry('ambientFragment',code=>code.replace('return vec4f(ambient(s),',()=>`var materialAmbient=ambient(s);\n${extension.ambient}\n  return vec4f(materialAmbient,`));
+  return source;
 }
 
 export function bindMaterialExtension(device:GPUDevice,pass:GPURenderPassEncoder,pipeline:GPURenderPipeline,resource:MaterialExtensionResource,lighting:boolean):void {

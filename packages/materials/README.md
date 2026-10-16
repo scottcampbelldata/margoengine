@@ -1,6 +1,6 @@
 # Margo Engine Materials
 
-Optional glTF clearcoat, transmission, IOR, volume, and TypeScript node materials through `@margoengine/gltf-pro`'s material extension slot. This package is separate from the frozen core and stage facade, and importing `gltf-pro` does not import materials.
+Optional glTF clearcoat, sheen, specular color, anisotropy, iridescence, transmission, IOR, volume, and TypeScript node materials through `@margoengine/gltf-pro`'s material extension slot. This package is separate from the frozen core and stage facade, and importing `gltf-pro` does not import materials.
 
 ```ts
 import {createStage} from 'margoengine';
@@ -17,7 +17,7 @@ model.destroy();
 stage.dispose();
 ```
 
-`install(model)` is synchronous and registers its engine plugin automatically. It reads optional `KHR_materials_clearcoat`, `KHR_materials_transmission`, `KHR_materials_ior`, and `KHR_materials_volume` data from each primitive's material and uses the model's already loaded images. The baseline `loadGLTF` and `parseGLTF` APIs remain unchanged. Their existing validation rejects these extensions in `extensionsRequired`; use optional metadata for this explicit installation path.
+`install(model)` is synchronous and registers its engine plugin automatically. It reads optional `KHR_materials_clearcoat`, `KHR_materials_sheen`, `KHR_materials_specular`, `KHR_materials_anisotropy`, `KHR_materials_iridescence`, `KHR_materials_transmission`, `KHR_materials_ior`, and `KHR_materials_volume` data from each primitive's material and uses the model's already loaded images. The baseline `loadGLTF` and `parseGLTF` APIs remain unchanged. Their existing validation rejects these extensions in `extensionsRequired`; use optional metadata for this explicit installation path.
 
 Normalized author configuration is also supported: `material.clearcoat` uses `factor`, `roughnessFactor`, `clearcoatTexture`, `clearcoatRoughnessTexture`, and `clearcoatNormalTexture`. Normal texture metadata honors `clearcoatNormalTexture.scale`. `material.transmission` uses `factor`, `ior`, and `transmissionTexture`; `material.volume` uses `thicknessFactor`, `thicknessTexture`, `attenuationColor`, and `attenuationDistance`. Volume can also be nested in `material.transmission.volume`. Installation composes clearcoat and transmission into the same extension slot.
 
@@ -38,6 +38,70 @@ The package supports clearcoat factor, roughness, and the optional clearcoat fac
 The [Khronos clearcoat specification](https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_clearcoat) defines the metadata and texture channels: factor uses red, roughness uses green, and the coat normal uses RGB. Extension textures use linear data. Installed clearcoat, transmission and thickness textures support KTX2, `KHR_texture_transform`, and both UV sets; affine rows share group 3 with lobe factors.
 
 The coat receives directional lighting and its shadow visibility. Clustered point lights continue to illuminate the base lobe; this step does not add a clearcoat contribution from those lights.
+
+## Sheen, specular, anisotropy and iridescence
+
+The four additional glTF lobes share group 3 with clearcoat and transmission.
+`install(model)` reads the standard Khronos fields, or normalized
+`material.sheen`, `material.specular`, `material.anisotropy`, and
+`material.iridescence` objects using the factory options below. No material
+metadata creates an installation plan on an ordinary PBR primitive.
+
+```ts
+import {materialLobes, clearcoat} from '@margoengine/materials';
+
+primitive.extension = materialLobes({
+  sheen: {colorFactor: [0.4, 0.1, 0.05], roughnessFactor: 0.5},
+  specular: {factor: 0.8, colorFactor: [1, 0.8, 0.5]},
+  anisotropy: {strength: 0.5, rotation: Math.PI / 4},
+  iridescence: {factor: 0.6, ior: 1.3, thicknessMinimum: 100, thicknessMaximum: 400},
+}, clearcoat({factor: 0.2}));
+```
+
+`sheen(options, base?)`, `specular(options, base?)`, `anisotropy(options, base?)`,
+and `iridescence(options, base?)` are single-lobe conveniences. `base` can be an
+existing extension, including a compiled node material; its factors, textures,
+clearcoat and output hooks are retained. Repeated lobe factories combine their
+options in one shader. The top-level `ior` configures the supplied lobes' substrate,
+default 1.5; use `materialLobes({ior: 2, specular: {}})` for an IOR-only dielectric
+change. Installation reads `KHR_materials_ior` for it. Iridescence's own `ior` selects the
+thin film instead, default 1.3.
+
+| Lobe | Options and defaults | Texture channels |
+| --- | --- | --- |
+| Sheen | `colorFactor: [0,0,0]`, `roughnessFactor: 0` | `sheenColorTexture`: sRGB RGB; `sheenRoughnessTexture`: linear A |
+| Specular | `factor: 1`, `colorFactor: [1,1,1]` | `specularTexture`: linear A; `specularColorTexture`: sRGB RGB |
+| Anisotropy | `strength: 0`, `rotation: 0` radians | `anisotropyTexture`: linear RG direction remapped to [-1,1], B strength |
+| Iridescence | `factor: 0`, `ior: 1.3`, `thicknessMinimum: 100`, `thicknessMaximum: 400` nm | `iridescenceTexture`: linear R; `iridescenceThicknessTexture`: linear G interpolates endpoints |
+
+All maps support UV0/UV1, texture transforms, and installed KTX2 images.
+Caller-owned map views use the existing `view`, optional `sampler`, `texCoord`
+and `transform` interface. Color views must decode sRGB; installation creates
+the appropriate sRGB views automatically. A missing thickness map uses the
+maximum thickness. Specular colors may exceed 1, with dielectric F0 clamped as
+specified by glTF. Shared view/sampler pairs reuse bindings; complete materials
+must fit the device's texture and sampler limits. Oversized combinations fail
+before allocating their secondary uniform.
+
+Zero sheen color, zero anisotropy and zero iridescence preserve the baseline
+render bit for bit. Specular's neutral value is factor 1 with white color:
+**factor 0 removes the dielectric reflection**, as required by glTF. Metals are
+unaffected by specular factor/color. Uniform values can change without creating
+another pipeline; changing texture/UV shapes or the substrate IOR changes the shader signature.
+
+Sheen uses a Charlie distribution, Neubelt visibility and analytic directional
+albedo scaling. Anisotropy uses tangent-space GGX and a stable derivative frame
+when needed. Iridescence evaluates thin-film Fresnel with two spectral harmonics
+and CIE color integration. These lobes affect the directional BRDF and the
+renderer’s fixed hemisphere approximation. Anisotropy does not change that
+hemisphere approximation. Clustered and environment lighting retain their base
+PBR response. Clearcoat remains on top of the underlying lobes; transmission
+retains its existing single-sample screen-space model.
+
+The shader sources and license notices are included in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Run
+`node scripts/materials-lobe-tests.js` for quantitative GPU and parity checks;
+the complete-asset runner also checks original Khronos models.
 
 Positive transmission opts into a shared opaque-color capture. All opaque and masked PBR primitives, including those from other models, render before the snapshot; blended primitives render afterward. The snapshot preserves the scene format and supports 1x or 4x MSAA, including an existing HDR capture. No frozen core or stage pass is changed. Transmission factor `0` leaves the opaque material and its allocation path unchanged.
 

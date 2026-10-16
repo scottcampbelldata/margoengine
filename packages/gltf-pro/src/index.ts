@@ -7,7 +7,7 @@ import {GLTFAsset, container, loadAsset, entry, integer, assetLimit, textureSour
 import {createKTX2Texture} from '@margoengine/decoders';
 import {pbrShader} from './shader.js';
 import {mipShader} from './mip.js';
-import {prepareMaterialExtension, materialExtensionShader, bindMaterialExtension, type MaterialExtension, type MaterialExtensionResource} from './material-extension.js';
+import {prepareMaterialExtension, materialExtensionShader, materialExtensionAmbientShader, bindMaterialExtension, type MaterialExtension, type MaterialExtensionResource} from './material-extension.js';
 import {compressedIndices, decompressPrimitives, type GLTFLoadOptions} from './compression.js';
 import {textureCoordinates, coordinateExtension, coordinateShader, type CoordinateExtension} from './texture-coordinates.js';
 export {GLTFAsset} from './asset.js';
@@ -277,6 +277,7 @@ export class PBRModel implements EnginePlugin {
       else if(r.extension){r.extension.uniform?.destroy();r.extension=undefined;}
       const lighting=mode==='beauty'&&extension?.lighting!==false&&this.lighting.size>0;
       if(lighting)for(const effect of this.lighting)code=effect.shader(code,2);
+      if(extension?.ambient)code=materialExtensionAmbientShader(code,extension);
       const blend=m.settings[0]===2,key=mode+':'+c.format+':'+blend+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+(extension?':material-extension:':'')+code;
       let pipeline=this.pipelines.get(key);
       if(!pipeline) {

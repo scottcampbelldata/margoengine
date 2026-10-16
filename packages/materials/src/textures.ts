@@ -48,35 +48,36 @@ export function validateTextureInfo(value:any,model:PBRModel):TextureInfo {
   return {index,texCoord,scale:info.scale??1,...(transform!==undefined?{transform}:{})};
 }
 
-interface ImageTexture {texture:GPUTexture;view:GPUTextureView;levels:number;mipsReady:boolean}
+interface ImageTexture {texture:GPUTexture;view:GPUTextureView;levels:number;mipsReady:boolean;format:GPUTextureFormat}
 
 /** Owns extension GPU resources while borrowing the model's retained decoded images. */
 export class MaterialTextures {
-  private readonly images=new Map<number,ImageTexture>();
+  private readonly images=new Map<string,ImageTexture>();
   private readonly samplers=new Map<number,GPUSampler>();
   private readonly owned=new Set<GPUTexture>();
-  private mipPipeline?:GPURenderPipeline;
+  private readonly mipPipelines=new Map<GPUTextureFormat,GPURenderPipeline>();
   private mipSampler?:GPUSampler;
   private disposed=false;
   constructor(private readonly model:PBRModel,private readonly device:GPUDevice) {}
 
-  resolve(value:TextureInfo):ClearcoatTexture {
+  resolve(value:TextureInfo,srgb=false):ClearcoatTexture {
     if(this.disposed)throw new Error('Material textures are disposed');
     const info=validateTextureInfo(value,this.model),definition=entry(this.model.asset.doc.textures,info.index,'texture');
     const source=integer(definition.extensions?.KHR_texture_basisu?.source??definition.source,'image source'),samplerDefinitionValue=samplerDefinition(this.model,definition);
     const usesMips=![9728,9729].includes(samplerDefinitionValue.minFilter);
-    let imageTexture=this.images.get(source);
+    const key=source+':'+srgb,format:GPUTextureFormat=srgb?'rgba8unorm-srgb':'rgba8unorm';
+    let imageTexture=this.images.get(key);
     if(!imageTexture){
       const image=this.model.image(source),size=[image.width,image.height];
       if(size.some(n=>!Number.isSafeInteger(n)||n<1||n>this.device.limits.maxTextureDimension2D))throw new RangeError('Clearcoat image exceeds device limit');
       // Reserve all levels so different samplers can share one image without replacing its view.
       const compressed='ktx2' in image,levels=compressed?image.ktx2.mipmaps.length:Math.floor(Math.log2(Math.max(...size)))+1;
-      const texture=compressed?this.model.uploadImage(source,this.device):this.device.createTexture({size,format:'rgba8unorm',mipLevelCount:levels,
+      const texture=compressed?this.model.uploadImage(source,this.device,srgb):this.device.createTexture({size,format,mipLevelCount:levels,
         usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST|GPUTextureUsage.RENDER_ATTACHMENT});
       this.owned.add(texture);
       if(!compressed)this.device.queue.copyExternalImageToTexture({source:image},{texture},size);
-      imageTexture={texture,view:texture.createView(),levels,mipsReady:compressed||levels===1};
-      this.images.set(source,imageTexture);
+      imageTexture={texture,view:texture.createView(),levels,mipsReady:compressed||levels===1,format};
+      this.images.set(key,imageTexture);
     }
     if(usesMips&&!imageTexture.mipsReady)this.generateMips(imageTexture);
     const samplerId=definition.sampler??-1;
@@ -93,19 +94,20 @@ export class MaterialTextures {
   }
 
   private generateMips(image:ImageTexture):void {
-    if(!this.mipPipeline){
+    let pipeline=this.mipPipelines.get(image.format);
+    if(!pipeline){
       const module=this.device.createShaderModule({code:mipShader});
-      this.mipPipeline=this.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},
-        fragment:{module,entryPoint:'fragment',targets:[{format:'rgba8unorm'}]}});
+      pipeline=this.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},
+        fragment:{module,entryPoint:'fragment',targets:[{format:image.format}]}});this.mipPipelines.set(image.format,pipeline);
     }
     this.mipSampler??=this.device.createSampler({minFilter:'linear',magFilter:'linear'});
     const encoder=this.device.createCommandEncoder();
     for(let level=1;level<image.levels;level++){
-      const group=this.device.createBindGroup({layout:this.mipPipeline.getBindGroupLayout(0),entries:[
+      const group=this.device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[
         {binding:0,resource:image.texture.createView({baseMipLevel:level-1,mipLevelCount:1})},{binding:1,resource:this.mipSampler}]});
       const pass=encoder.beginRenderPass({colorAttachments:[{view:image.texture.createView({baseMipLevel:level,mipLevelCount:1}),
         loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:0}}]});
-      pass.setPipeline(this.mipPipeline);pass.setBindGroup(0,group);pass.draw(3);pass.end();
+      pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.draw(3);pass.end();
     }
     this.device.queue.submit([encoder.finish()]);image.mipsReady=true;
   }
@@ -114,7 +116,7 @@ export class MaterialTextures {
     if(this.disposed)return;this.disposed=true;
     let failure:unknown;
     for(const texture of this.owned)try{texture.destroy();}catch(error){failure??=error;}
-    this.owned.clear();this.images.clear();this.samplers.clear();this.mipPipeline=undefined;this.mipSampler=undefined;
+    this.owned.clear();this.images.clear();this.samplers.clear();this.mipPipelines.clear();this.mipSampler=undefined;
     if(failure!==undefined)throw failure;
   }
 }

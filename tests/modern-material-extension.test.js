@@ -285,3 +285,19 @@ test('failed extension uniform uploads release new allocations and allow a later
   } finally {s.device.queue.writeBuffer = queueWrite; s.engine.dispose();}
   assert.ok(s.resources.every(resource => resource.destroyed));
 });
+
+test('ambient hooks affect beauty and ambient passes after lighting without rewriting caller helpers',async()=>{
+  const s=await scene(),helper='fn callerColor()->f32{var color=0.5;return color;}';
+  s.model.primitives[0].extension={declarations:helper,factors:new Float32Array([0.5,0,0,0]),ambient:'materialAmbient*=materialFactors[0].x;'};
+  s.model.addLighting({shader(code){assert.ok(code.includes('direct+ambient(s)'));return code.replace('direct+ambient(s)','direct*0.75+ambient(s)');},bindings(){return [];}});
+  try{
+    for(const mode of ['beauty','gbuffer','ambient']){
+      s.draw(mode);const code=s.draws.at(-1).pipeline.vertex.module.code;
+      assert.ok(code.includes(helper));assert.equal(code.split('materialAmbient*=materialFactors[0].x;').length-1,2);
+      assert.match(code,/return vec4f\(materialAmbient,/);
+      if(mode==='beauty')assert.match(code,/direct\*0\.75\+materialAmbient\+s.emissive/);
+    }
+    for(const ambient of [false,3,{},null]){s.model.primitives[0].extension={ambient};assert.throws(()=>s.draw(),/extension WGSL/);}
+  }finally{s.engine.dispose();}
+  assert.ok(s.resources.every(resource=>resource.destroyed));
+});
