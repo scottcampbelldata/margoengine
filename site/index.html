@@ -72,7 +72,7 @@ npm run dev</code></pre>
     <section class="core">
       <h2>What the core gives you</h2>
       <dl>
-        <div><dt>Under 20 KB gzip</dt><dd>Core plus the stage facade, embedded Wasm and both backends included. CI rejects any build at 20,000 bytes gzip or above.</dd></div>
+        <div><dt>20,046 bytes gzip</dt><dd>Core plus the stage facade, embedded Wasm and both backends, measured 16 October 2026. CI rejects any build at 20,000 bytes gzip or above, so this build is 46 bytes over the gate.</dd></div>
         <div><dt>Transforms in Wasm memory</dt><dd>Hierarchy, culling and world matrices run in a Rust kernel over flat typed arrays. An engine holds 1,024 entities by default, configurable up to 100,000.</dd></div>
         <div><dt>Instancing by default</dt><dd>Visible meshes sharing a geometry instance render in one instanced draw call per scene pass, with per-instance material values.</dd></div>
         <div><dt>WebGPU first, WebGL2 fallback</dt><dd>Reversed float depth, GPU picking and automatic device-loss recovery on WebGPU. Basic scenes still render on WebGL2.</dd></div>
