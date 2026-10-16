@@ -17,7 +17,40 @@ export interface GeometryData {
   colors?: ArrayLike<number>;
   /** Triangle list. Omit for non-indexed triangles. */
   indices?: ArrayLike<number>;
+  /** Four joint indices and weights per vertex, required together. */
+  joints?: ArrayLike<number>;
+  weights?: ArrayLike<number>;
+  /** Dense xyz deltas in base-vertex order. */
+  morphs?: readonly MorphData[];
 }
+
+export interface MorphData {
+  name?: string;
+  positions: ArrayLike<number>;
+  normals?: ArrayLike<number>;
+  /** xyz deltas; the base tangent keeps its handedness component. */
+  tangents?: ArrayLike<number>;
+}
+
+export interface SkinData {
+  name?: string;
+  /** References to nodes included in this scene. */
+  joints: readonly ExportNode[];
+  /** Sixteen column-major values per joint. */
+  inverseBindMatrices: ArrayLike<number>;
+}
+
+export interface AnimationChannelData {
+  node: ExportNode;
+  path: 'translation'|'rotation'|'scale'|'weights';
+  interpolation?: 'STEP'|'LINEAR'|'CUBICSPLINE';
+  /** Nonnegative, strictly increasing seconds after Float32 conversion. */
+  times: ArrayLike<number>;
+  /** CUBICSPLINE uses in-tangent, value, out-tangent for each key. */
+  values: ArrayLike<number>;
+}
+
+export interface AnimationData {name?: string; channels: readonly AnimationChannelData[]}
 
 /** An encoded PNG or JPEG image referenced by a material. */
 export interface TextureData {
@@ -53,10 +86,12 @@ export interface ExportNode {
   material?: PbrMaterial|MaterialData;
   visible?: boolean;
   children?: readonly ExportNode[];
+  skin?: SkinData;
+  morphWeights?: readonly number[];
 }
 
 /** A plain data scene; geometry and material objects shared between nodes are written once. */
-export interface ExportScene {nodes: readonly ExportNode[]}
+export interface ExportScene {nodes: readonly ExportNode[]; animations?: readonly AnimationData[]}
 
 /** Either a Margo Engine engine (from `Engine.create`) or a plain data scene. */
 export type ExportSource = EngineKernel|ExportScene;
@@ -78,6 +113,8 @@ export interface SceneOptions {
 export interface Geo {
   positions: Float32Array; normals: Float32Array; uvs?: Float32Array; tangents?: Float32Array; colors?: Float32Array; colorSize: 3|4;
   indices: Uint32Array; count: number;
+  joints?: Uint16Array; weights?: Float32Array;
+  morphs?: {name?: string; positions: Float32Array; normals?: Float32Array; tangents?: Float32Array}[];
 }
 /** @internal Normalized material. */
 export interface Mat {
@@ -89,6 +126,7 @@ export interface Mat {
 export interface Node {
   name?: string; t: number[]; r: number[]; s: number[]; local: Float64Array; world: Float64Array;
   geometry?: Geo; material?: Mat; children: Node[];
+  source?: ExportNode; skin?: SkinData; morphWeights?: Float32Array;
 }
 
 const fail = (message: string): never => {throw new TypeError(message);};
@@ -168,6 +206,37 @@ export function normalizeGeometry(data: Geometry|GeometryData): Geo {
     const size = data.colors?.length === count*3 ? 3 : 4, colors = floats(data.colors, count*size, 'Colors');
     if (colors.some(v => v < 0 || v > 1)) throw new RangeError('Colors must be in [0, 1]');
     geo.colors = colors; geo.colorSize = size;
+  }
+  if ((data.joints === undefined) !== (data.weights === undefined)) fail('Joint indices and weights are required together');
+  if (data.joints !== undefined) {
+    if (!isObject(data.joints) || data.joints.length !== count*4) fail('Joints need four values per vertex');
+    const joints = new Uint16Array(count*4), weights = floats(data.weights, count*4, 'Weights');
+    for (let i = 0; i < joints.length; i++) {
+      const joint = data.joints[i];
+      if (!Number.isInteger(joint) || joint < 0 || joint > 65535) throw new RangeError('Joint indices must be unsigned 16-bit integers');
+      if (weights[i] < 0) throw new RangeError('Skin weights must be nonnegative');
+      joints[i] = joint;
+    }
+    for (let i = 0; i < weights.length; i += 4) {
+      const sum = weights[i]+weights[i+1]+weights[i+2]+weights[i+3];
+      if (!(sum > 0)) throw new RangeError('Skin weights must have a positive sum');
+      for (let c = 0; c < 4; c++) weights[i+c] /= sum;
+    }
+    geo.joints = joints; geo.weights = weights;
+  }
+  if (data.morphs !== undefined) {
+    if (!Array.isArray(data.morphs) || !data.morphs.length) fail('Morphs must be a nonempty array');
+    geo.morphs = data.morphs.map((morph: MorphData) => {
+      if (!isObject(morph)) fail('Morph targets must be objects');
+      if (morph.name !== undefined && typeof morph.name !== 'string') fail('Morph name must be a string');
+      const out: NonNullable<Geo['morphs']>[number] = {name: morph.name, positions: floats(morph.positions, count*3, 'Morph positions')};
+      if (morph.normals !== undefined) out.normals = floats(morph.normals, count*3, 'Morph normals');
+      if (morph.tangents !== undefined) {
+        if (!geo.tangents) fail('Morph tangents need base tangents');
+        out.tangents = floats(morph.tangents, count*3, 'Morph tangents');
+      }
+      return out;
+    });
   }
   return geo;
 }
@@ -355,8 +424,16 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
     if (onlyVisible && data.visible === false) return null;
     if (data.name !== undefined && typeof data.name !== 'string') fail('Node name must be a string');
     const node = makeNode(data.name, vector(data.translation, [0, 0, 0], 'Translation'), unitQuaternion(vector(data.rotation, [0, 0, 0, 1], 'Rotation')), vector(data.scale, [1, 1, 1], 'Scale'), parent);
+    node.source = data;
+    if (data.skin !== undefined) {if (!isObject(data.skin)) fail('Skin must be an object'); node.skin = data.skin;}
     if (data.geometry !== undefined) {node.geometry = geometry(data.geometry); if (data.material !== undefined) node.material = material(data.material);}
     else if (data.material !== undefined) fail('A material needs geometry on the same node');
+    if (data.skin !== undefined && !node.geometry) fail('A skin needs geometry on the same node');
+    if (data.morphWeights !== undefined) {
+      const count = node.geometry?.morphs?.length;
+      if (!count) fail('Morph weights need morph targets on the same node');
+      node.morphWeights = floats(data.morphWeights, count!, 'Morph weights');
+    }
     if (data.children !== undefined && !Array.isArray(data.children)) fail('children must be an array');
     for (const child of data.children ?? []) {const out = visit(child, node.world, depth+1); if (out) node.children.push(out);}
     return node;

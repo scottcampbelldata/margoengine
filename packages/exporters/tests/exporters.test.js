@@ -4,6 +4,8 @@ import {readFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import {Geometry, PbrMaterial, box} from '@margoengine/core/extension';
 import {parseGLTF} from '@margoengine/gltf';
+import {GLTFAsset, PBRModel} from '@margoengine/gltf-pro';
+import {Animation} from '@margoengine/animation';
 import * as exporters from '../dist/index.js';
 import {exportGLB, exportGLTF, exportOBJ, exportPLY, exportSTL} from '../dist/index.js';
 import {accessor, headlessEngine, parseASCIISTL, parseMTL, parseOBJ, parsePLY, readGLB, transformPoint, validate, validator} from './helpers.js';
@@ -389,4 +391,136 @@ test('core Geometry and PbrMaterial can be overridden with richer data for engin
   assert.equal(json.materials[0].name, 'grey');
   assert.deepEqual(json.materials[0].emissiveFactor, [0, 0, 1]);
   assert.ok(new Geometry(positions, normals, geometry.indices));
+});
+
+function deformationScene() {
+  const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  const tip = {name: 'tip', translation: [0, 1, 0]}, joint = {name: 'joint', children: [tip]};
+  const geometry = {
+    positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1],
+    tangents: [1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1], indices: [0, 1, 2],
+    joints: [0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0], weights: [1, 3, 0, 0, 1, 3, 0, 0, 1, 3, 0, 0],
+    morphs: [{name: 'raise', positions: [0, 0, 0, 0, 0, 0.5, 0, 0, 0], normals: new Array(9).fill(0), tangents: new Array(9).fill(0)}],
+  };
+  const inverseTip = identity.slice(); inverseTip[13] = -1;
+  const skin = {name: 'arm', joints: [joint, tip], inverseBindMatrices: [...identity, ...inverseTip]};
+  const mesh = {name: 'mesh', geometry, skin, morphWeights: [0.25]};
+  const move = {node: tip, path: 'translation', times: [0, 1], values: [0, 1, 0, 2, 1, 0]};
+  const scene = {nodes: [mesh, joint], animations: [{name: 'Move', channels: [move, {node: mesh, path: 'weights', interpolation: 'STEP', times: [0, 1], values: [0.25, 0.75]}]}]};
+  return {scene, mesh, tip, joint, geometry, skin, move};
+}
+
+test('data scenes export skins, morph targets and animation compatible with the optional animation package', needsValidator, async () => {
+  const {scene, skin} = deformationScene(), glb = exportGLB(scene);
+  await assertValid(glb);
+  const {json, bin} = readGLB(glb), primitive = json.meshes[0].primitives[0];
+  assertAligned(json, bin);
+  assert.deepEqual(json.skins[0].joints, [1, 2]);
+  assert.equal(json.nodes[0].skin, 0);
+  assert.equal(json.accessors[primitive.attributes.JOINTS_0].componentType, 5123);
+  assert.equal(json.accessors[primitive.attributes.WEIGHTS_0].componentType, 5126);
+  close(accessor(json, bin, primitive.attributes.WEIGHTS_0), [0.25, 0.75, 0, 0, 0.25, 0.75, 0, 0, 0.25, 0.75, 0, 0], 0);
+  close(accessor(json, bin, json.skins[0].inverseBindMatrices), skin.inverseBindMatrices, 0);
+  assert.deepEqual(json.nodes[0].weights, [0.25]);
+  assert.deepEqual(json.meshes[0].extras.targetNames, ['raise']);
+  close(accessor(json, bin, primitive.targets[0].POSITION), [0, 0, 0, 0, 0, 0.5, 0, 0, 0], 0);
+  assert.equal(json.accessors[primitive.targets[0].TANGENT].type, 'VEC3');
+  assert.deepEqual(json.animations[0].channels.map(channel => channel.target), [{node: 2, path: 'translation'}, {node: 0, path: 'weights'}]);
+  const sampler = json.animations[0].samplers[0];
+  close(accessor(json, bin, sampler.input), [0, 1], 0);
+  close(accessor(json, bin, sampler.output), [0, 1, 0, 2, 1, 0], 0);
+  for (const id of [sampler.input, sampler.output, json.skins[0].inverseBindMatrices]) assert.equal(json.bufferViews[json.accessors[id].bufferView].target, undefined);
+
+  const engine = await headlessEngine(), model = new PBRModel(engine, new GLTFAsset(json, [bin]));
+  const animation = new Animation(model, {loop: false});
+  animation.play('Move').seek(0.5);
+  close([engine.store.transforms.x[model.nodes[2].id], engine.store.transforms.y[model.nodes[2].id]], [1, 1], 0);
+  close(model.primitives[0].weights, [0.25], 0);
+  animation.seek(1);
+  close(model.primitives[0].weights, [0.75], 0);
+  animation.dispose(); model.dispose(); engine.dispose();
+
+  const separate = exportGLTF(scene, {embed: false});
+  await assertValid(separate.text, {[separate.binUri]: separate.bin});
+  assert.deepEqual(separate.bin, bin);
+});
+
+test('cubic rotation and morph channels preserve value/tangent arity and Float32 timing', needsValidator, async () => {
+  const {scene, mesh, tip} = deformationScene(), q = Math.SQRT1_2;
+  const rotation = [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, q, q, 0, 0, 0, 0];
+  scene.animations = [{channels: [
+    {node: tip, path: 'rotation', interpolation: 'CUBICSPLINE', times: [0, 1], values: rotation},
+    {node: mesh, path: 'weights', interpolation: 'CUBICSPLINE', times: [0, 1], values: [0, 0.25, 0, 0, 0.75, 0]},
+    {node: tip, path: 'scale', interpolation: 'LINEAR', times: [0, 1], values: [1, 1, 1, 2, 2, 2]},
+  ]}];
+  const glb = exportGLB(scene);
+  await assertValid(glb);
+  const {json, bin} = readGLB(glb), samplers = json.animations[0].samplers;
+  assert.equal(json.accessors[samplers[0].output].type, 'VEC4');
+  assert.equal(json.accessors[samplers[0].output].count, 6);
+  assert.equal(json.accessors[samplers[1].output].type, 'SCALAR');
+  assert.equal(json.accessors[samplers[1].output].count, 6);
+  close(accessor(json, bin, samplers[0].output), rotation, 1e-7);
+  assert.equal(samplers[0].interpolation, 'CUBICSPLINE');
+});
+
+test('morph animation packs all target weights per key and keeps per-instance defaults', needsValidator, async () => {
+  const {scene, mesh, geometry} = deformationScene();
+  geometry.morphs.push({name: 'slide', positions: [0.5, 0, 0, 0, 0, 0, 0, 0, 0]});
+  mesh.morphWeights = [0.25, 0.5];
+  const instance = {...mesh, name: 'instance', morphWeights: [0.75, 0]};
+  scene.nodes.push(instance);
+  scene.animations = [{channels: [{node: mesh, path: 'weights', times: [0, 1], values: [0.25, 0.5, 0.75, 1]}]}];
+  const glb = exportGLB(scene);
+  await assertValid(glb);
+  const {json, bin} = readGLB(glb), sampler = json.animations[0].samplers[0];
+  assert.equal(json.meshes.length, 1);
+  assert.equal(json.skins.length, 1);
+  assert.deepEqual(json.nodes[0].weights, [0.25, 0.5]);
+  assert.deepEqual(json.nodes[3].weights, [0.75, 0]);
+  assert.equal(json.accessors[sampler.output].type, 'SCALAR');
+  assert.equal(json.accessors[sampler.output].count, 4);
+  close(accessor(json, bin, sampler.output), [0.25, 0.5, 0.75, 1], 0);
+});
+
+test('deformation export rejects invalid weights, references, morphs and animation data', () => {
+  const checks = [
+    [data => {delete data.geometry.weights;}, /required together/],
+    [data => {data.geometry.joints[0] = 0.5;}, /16-bit/],
+    [data => {data.geometry.joints[0] = 65536;}, /16-bit/],
+    [data => {data.geometry.joints[0] = 2;}, /exceeds skin/],
+    [data => {data.geometry.weights[0] = -1;}, /nonnegative/],
+    [data => {data.geometry.weights.fill(0);}, /positive sum/],
+    [data => {delete data.mesh.skin;}, /need a skin/],
+    [data => {delete data.geometry.joints; delete data.geometry.weights;}, /needs joint/],
+    [data => {data.skin.joints = [data.joint, data.joint];}, /distinct/],
+    [data => {data.skin.joints[1] = {};}, /not an exported/],
+    [data => {data.joint.children = []; data.scene.nodes.push(data.tip);}, /common hierarchy root/],
+    [data => {data.tip.visible = false;}, /not an exported/],
+    [data => {data.skin.inverseBindMatrices.pop();}, /needs 32/],
+    [data => {data.skin.inverseBindMatrices[3] = 1;}, /affine/],
+    [data => {data.geometry.morphs[0].positions.pop();}, /Morph positions/],
+    [data => {delete data.geometry.tangents;}, /need base tangents/],
+    [data => {data.mesh.morphWeights = [0, 1];}, /Morph weights/],
+    [data => {data.move.node = {};}, /not an exported/],
+    [data => {data.move.times = [0, 0];}, /strictly increasing/],
+    [data => {data.move.times = [-1, 1];}, /nonnegative/],
+    [data => {data.move.times = [1, 1+Number.EPSILON];}, /strictly increasing/],
+    [data => {data.move.values.pop();}, /Animation values/],
+    [data => {data.move.values[0] = Infinity;}, /finite/],
+    [data => {data.move.path = 'rotation'; data.move.values = [0, 0, 0, 1, 0, 0, 0, 2];}, /unit quaternions/],
+    [data => {data.move.interpolation = 'BEZIER';}, /interpolation/],
+    [data => {data.move.interpolation = 'CUBICSPLINE'; data.move.times = [0];}, /at least two keys/],
+    [data => {data.scene.animations[0].channels.push({...data.move});}, /Duplicate/],
+    [data => {data.scene.animations[0].channels = [];}, /nonempty channels/],
+    [data => {delete data.geometry.morphs; delete data.mesh.morphWeights;}, /weights need morph/],
+    [data => {data.scene.animations = {};}, /Animations must be an array/],
+  ];
+  for (const [change, pattern] of checks) {
+    const data = deformationScene(); change(data);
+    assert.throws(() => exportGLB(data.scene), pattern);
+  }
+  assert.throws(() => exportGLB(deformationScene().scene, {flatten: true}), /Flatten does not support/);
+  const {scene, tip} = deformationScene(); tip.visible = false;
+  assert.doesNotThrow(() => exportGLB(scene, {onlyVisible: false}));
 });

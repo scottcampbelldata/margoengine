@@ -19,7 +19,7 @@
     "access": "public"
   },
   "dependencies": {
-    "three": "^0.186.1",
+    "@margoengine/exporters": "0.1.0",
     "@margoengine/gltf-pro": "0.1.0"
   },
   "peerDependencies": {

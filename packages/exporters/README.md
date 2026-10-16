@@ -54,11 +54,34 @@ const textured = exportGLB({nodes: [{
 | `materials`, `mtlName` | OBJ | `false`, `'scene.mtl'` |
 | `colors` | OBJ, PLY | `false`. OBJ appends sRGB vertex colors to `v` lines; PLY writes uchar `red green blue` |
 
-`GeometryData` is `{positions, normals, uvs?, tangents?, colors?, indices?}` with xyz, xyz, uv, xyzw and linear rgb or rgba per vertex. Inputs are validated: finite Float32 values, matching lengths, complete triangles, indices in range, colors in [0, 1], nonzero scales and quaternions, PNG or JPEG bytes that match `mimeType`, and textured materials only on geometry with UVs.
+`GeometryData` is `{positions, normals, uvs?, tangents?, colors?, indices?, joints?, weights?, morphs?}` with xyz, xyz, uv, xyzw and linear rgb or rgba per vertex. Inputs are validated: finite Float32 values, matching lengths, complete triangles, indices in range, colors in [0, 1], nonzero scales and quaternions, PNG or JPEG bytes that match `mimeType`, and textured materials only on geometry with UVs.
+
+## Data-scene skin, morph and animation export
+
+`exportGLTF` and `exportGLB` accept deformation data on plain scenes. Engine sources continue to export their static geometry and transforms. Keep the hierarchy when exporting deformation; `flatten: true` rejects skins, morphs and clips.
+
+- A geometry's `joints` and `weights` supply four values per vertex and must appear together. Joint indices are unsigned 16-bit integers within the attached skin's joint list. Weights must be finite and nonnegative with a positive sum per vertex; the writer normalizes them into Float32 `WEIGHTS_0` alongside unsigned-short `JOINTS_0`.
+- A mesh node's `skin` is `{name?, joints, inverseBindMatrices}`. `joints` references the actual `ExportNode` objects in the scene, with no duplicates and a common hierarchy root. `inverseBindMatrices` supplies sixteen finite, column-major affine values per joint. A joint skipped by `onlyVisible` or missing from the scene throws.
+- Geometry `morphs` contain `{name?, positions, normals?, tangents?}`. Each array holds dense xyz deltas per base vertex; these deltas are not normalized. Morph tangents require base tangents, whose handedness remains unchanged. Names become `extras.targetNames`. Node `morphWeights` sets finite default weights and must match the target count; omitted weights default to zero.
+- Scene `animations` contain `{name?, channels}`. Each channel is `{node, path, times, values, interpolation?}`, where `node` references an exported node and `path` is `translation`, `rotation`, `scale` or `weights`. Times are nonnegative seconds, strictly increasing after Float32 conversion. Values have three components for translation/scale, four for unit quaternion rotation, or one component per morph target for weights. Interpolation defaults to `LINEAR`; `STEP` and `CUBICSPLINE` are supported. Cubic channels need at least two keys and use in-tangent, value, out-tangent per key; only quaternion values must have unit length, not their tangents. Two channels in a clip cannot target the same node/path.
+
+```ts
+const joint = {name: 'joint'};
+const mesh = {
+  geometry: {positions, normals, joints, weights, morphs: [{name: 'raise', positions: deltas}]},
+  skin: {joints: [joint], inverseBindMatrices},
+  morphWeights: [0],
+};
+const glb = exportGLB({nodes: [mesh, joint], animations: [{name: 'Move', channels: [{
+  node: joint, path: 'translation', times: [0, 1], values: [0, 0, 0, 1, 0, 0],
+}]}]});
+```
+
+Load these GLBs with `@margoengine/gltf-pro` and attach `@margoengine/animation` for skinning, morphs and clip playback. Other export formats continue to write the static base geometry.
 
 ## Limits
 
-No animations, skins, morph targets, cameras, lights, instancing, KHR material extensions, Draco or meshopt compression, sparse accessors or interleaved buffers. Texture samplers are fixed (linear, mipmapped, repeat). `exportGLTF` puts images in the buffer rather than separate image files. OBJ and PLY write `vn`/normals per vertex rather than deduplicating them. Node names are not made unique. The existing `@margoengine/gltf` loader accepts what these exporters write from an engine, but not vertex colors or textures, so data-scene exports that use them need a fuller loader.
+No cameras, lights, instancing extensions, KHR material extensions, Draco or meshopt compression, sparse accessors or interleaved buffers. Skins support four influences per vertex. Texture samplers are fixed (linear, mipmapped, repeat). `exportGLTF` puts images in the buffer rather than separate image files. OBJ and PLY write `vn`/normals per vertex rather than deduplicating them. Node names are not made unique. The existing `@margoengine/gltf` loader accepts what these exporters write from an engine, but data-scene exports with deformation, vertex colors or textures need the optional packages described above.
 
 ## Tests
 
