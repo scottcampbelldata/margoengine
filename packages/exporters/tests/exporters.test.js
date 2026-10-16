@@ -12,6 +12,18 @@ import {accessor, headlessEngine, parseASCIISTL, parseMTL, parseOBJ, parsePLY, r
 
 const fixture = async name => new Uint8Array(await readFile(new URL(`./fixtures/${name}`, import.meta.url)));
 
+test('engine exports reject missing mesh geometry and preserve intentionally empty data scenes', async () => {
+  const engine = await headlessEngine();
+  try {
+    const node = engine.createMesh();
+    assert.throws(() => exportGLTF(engine, {root: node}), /no supported mesh geometry/);
+    assert.throws(() => exportGLB(engine), /no supported mesh geometry/);
+    assert.deepEqual(exportGLTF({nodes: []}).json.scenes, [{}]);
+    node.visible = false;
+    assert.equal(exportGLTF(engine, {root: node}).json.meshes, undefined);
+  } finally {engine.dispose();}
+});
+
 test('non-finite alpha cutoffs reject instead of serializing as JSON null', () => {
   const geometry = {positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1], indices: [0, 1, 2]};
   for (const alphaCutoff of [Infinity, -Infinity, NaN]) {

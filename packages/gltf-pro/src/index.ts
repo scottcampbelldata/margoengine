@@ -3,6 +3,7 @@ import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type Pas
 import {invert} from '../../shared/math.js';
 import {viewMatrix} from '../../shared/view.js';
 import {Cleanup} from '../../shared/cleanup.js';
+import type {PBRSource} from '../../shared/pbr-source.js';
 import {GLTFAsset, container, loadAsset, entry, integer, assetLimit, textureSource, decodeKTX2Images, type GLTFImage} from './asset.js';
 import {createKTX2Texture} from '@margoengine/decoders';
 import {pbrShader} from './shader.js';
@@ -17,10 +18,17 @@ export {textureCoordinates} from './texture-coordinates.js';
 export type {TextureTransform} from './texture-coordinates.js';
 export type {GLTFLoadOptions} from './compression.js';
 export type {MaterialExtension, MaterialExtensionTexture} from './material-extension.js';
-declare const GPUBufferUsage: {UNIFORM:number;STORAGE:number;VERTEX:number;INDEX:number;COPY_DST:number};
+declare const GPUBufferUsage: {UNIFORM:number;STORAGE:number;VERTEX:number;INDEX:number;COPY_DST:number;COPY_SRC:number;MAP_READ:number};
+declare const GPUMapMode:{READ:number};
 declare const GPUTextureUsage: {TEXTURE_BINDING:number;COPY_DST:number;RENDER_ATTACHMENT:number};
 type Context = Extract<PassContext,{backend:'webgpu'}>;
+/** Narrow encoding hook for optional GPU deformation consumers. */
+export type PBRDeformationContext=Pick<Context,'backend'|'device'|'encoder'>;
+export interface PBRPickingGeometry {node:Mesh;vertices:Float32Array;indices:Uint32Array;doubleSided:boolean;matrix:Float32Array}
 const opaquePasses=new WeakMap<Context,Set<PBRModel>>();
+// A symbol keeps separately bundled optional consumers interoperable without
+// importing the loader or attaching a second drawable core Geometry.
+const cpuSource=Symbol.for('margoengine.pbr-source.v1');
 export interface PBRMaterial {
   [key:string]:any;
   base:number[];factors:number[];emission:number[];settings:number[];maps:any[];
@@ -137,11 +145,14 @@ export class PBRModel implements EnginePlugin {
   }
   readonly name='gltf-pro:'+modelId++;
   readonly root:Mesh;readonly nodes:Mesh[]=[];readonly primitives:PBRPrimitive[]=[];
+  /** Installed by optional deformation packages; does not advance animation time. */
+  prepareDeformation?: (context:PBRDeformationContext)=>void;
   disposed=false;private readonly created:Mesh[]=[];private resources:DrawResource[]=[];private textures:GPUTexture[]=[];
   private pipelines=new Map<string,GPURenderPipeline>();private readonly inverse=new Float32Array(16);private readonly workspace=new Float64Array(52);private readonly view=new Float32Array(16);
   private engine:Engine;private readonly cleanupCallbacks=new Set<()=>void>();
   private readonly lighting=new Set<LightingEffect>();
   private readonly lightingGroups=new Map<GPURenderPipeline,{entries:GPUBindGroupEntry[];group:GPUBindGroup}>();
+  private gpuRevision=0;
   constructor(instance:EngineKernel,readonly asset:GLTFAsset,private readonly images:readonly GLTFImage[]=[],prepared?:readonly (readonly PreparedGeometry[])[]) {
     this.engine=engineRuntime(instance);
     const doc=asset.doc,defs=doc.nodes??[],parents=new Int32Array(defs.length).fill(-1),materials=(doc.materials??[]).map(material);
@@ -164,7 +175,9 @@ export class PBRModel implements EnginePlugin {
         for(let j=0;j<mesh.primitives.length;j++){const p=mesh.primitives[j],made=prepared?preparedPrimitive(asset,p,prepared[defs[i].mesh][j],this.nodes[i],i,materials,checked):primitive(asset,p,this.nodes[i],i,mesh,materials);for(const data of [made.vertices,made.indices])if(!counted.has(data)){geometryBytes+=data.byteLength;counted.add(data);}if(geometryBytes>assetLimit*4)throw new RangeError('Decoded glTF geometry exceeds byte budget');this.primitives.push(made);}
       }
       if(!this.primitives.length)throw new Error('glTF contains no renderable meshes');
-    } catch(error) {for(const node of this.created.reverse())node.dispose();throw error;}
+      const source:PBRSource=this;
+      for(const node of this.created)Object.defineProperty(node,cpuSource,{value:source,configurable:true});
+    } catch(error) {for(const node of this.created.reverse()){Reflect.deleteProperty(node,cpuSource);node.dispose();}throw error;}
   }
   setup(engine:Engine):void {
     if(engine!==this.engine||this.disposed)throw new Error('PBRModel belongs to another engine or is disposed');
@@ -245,6 +258,36 @@ export class PBRModel implements EnginePlugin {
       alphaTexture:r.views[0],alphaSampler:r.samplers[0],alpha:r.primitive.material.base[3],cutoff:r.primitive.material.settings[0]===1?r.primitive.material.settings[1]:0,texCoord:r.primitive.material.maps[0]?textureCoordinates(r.primitive.material.maps[0]).texCoord:0,
       ...(r.primitive.material.maps[0]?.extensions?.KHR_texture_transform?{alphaTransform:textureCoordinates(r.primitive.material.maps[0]).transform}:{})}));
   }
+  /** Borrowed current draw buffers; picking never substitutes bind-pose geometry. */
+  get pickingPrimitives() {
+    if(this.disposed)return [];
+    return this.resources.map(r=>({node:r.primitive.node,vertex:r.primitive.deformed??r.vertex,index:r.index,count:r.primitive.indices.length,stride:80 as const,
+      alphaTexture:r.views[0],alphaSampler:r.samplers[0],alpha:r.primitive.material.base[3],cutoff:r.primitive.material.settings[0]===1?r.primitive.material.settings[1]:r.primitive.material.settings[0]===2?0.001:0,
+      doubleSided:r.primitive.material.settings[2]>=0.5,texCoord:(r.primitive.material.maps[0]?textureCoordinates(r.primitive.material.maps[0]).texCoord:0) as 0|1,
+      ...(r.primitive.material.maps[0]?.extensions?.KHR_texture_transform?{alphaTransform:textureCoordinates(r.primitive.material.maps[0]).transform}:{})}));
+  }
+  /** Explicit CPU-query snapshot. Only deformed geometry incurs GPU readback. */
+  async readPickingGeometry():Promise<readonly PBRPickingGeometry[]> {
+    const device=this.engine.gpu,revision=this.gpuRevision;
+    if(this.disposed||this.engine.disposed||!device)return [];
+    this.engine.store.tick(false);
+    const records=this.resources.map(resource=>({resource,primitive:resource.primitive,deformed:resource.primitive.deformed,matrix:resource.primitive.node.matrix.slice(),vertices:resource.primitive.deformed?undefined:resource.primitive.vertices.slice(),indices:resource.primitive.indices.slice(),doubleSided:resource.primitive.material.settings[2]>=0.5,read:undefined as GPUBuffer|undefined}));
+    try{
+      if(this.prepareDeformation||records.some(record=>record.deformed)){
+        const encoder=device.createCommandEncoder();this.prepareDeformation?.({backend:'webgpu',device,encoder});
+        for(const record of records)if(record.deformed){
+          if(!(record.deformed.usage&GPUBufferUsage.COPY_SRC))throw new TypeError('Deformed picking snapshots require COPY_SRC buffers');
+          const size=record.primitive.vertices.byteLength;if(size>device.limits.maxBufferSize)throw new RangeError('Picking snapshot exceeds device buffer limit');
+          record.read=device.createBuffer({label:'PBR picking snapshot',size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});encoder.copyBufferToBuffer(record.deformed,0,record.read,0,size);
+        }
+        device.queue.submit([encoder.finish()]);
+        await Promise.all(records.filter(record=>record.read).map(record=>record.read!.mapAsync(GPUMapMode.READ)));
+      }
+      if(this.disposed||this.engine.disposed||this.engine.gpu!==device||revision!==this.gpuRevision||records.some(record=>record.primitive.deformed!==record.deformed))return [];
+      return records.filter(record=>this.engine.meshes.get(record.primitive.node.id)===record.primitive.node).map(record=>({node:record.primitive.node,matrix:record.matrix,vertices:record.read?new Float32Array(record.read.getMappedRange()).slice():record.vertices!,indices:record.indices,doubleSided:record.doubleSided}));
+    }catch(error){if(this.disposed||this.engine.disposed||this.engine.gpu!==device||revision!==this.gpuRevision||records.some(record=>record.primitive.deformed!==record.deformed))return [];throw error;}
+    finally{for(const {read} of records)if(read){if(read.mapState==='mapped')read.unmap();read.destroy();}}
+  }
   draw(c:Context,mode:'beauty'|'gbuffer'|'ambient',color:GPUTextureView,depth:GPUTextureView,phase:'all'|'opaque'|'blend'='all'):void {
     if(this.disposed)return;
     const pending=mode==='beauty'&&phase==='all'?opaquePasses.get(c):undefined;
@@ -323,10 +366,11 @@ export class PBRModel implements EnginePlugin {
     return out;
   }
   onDispose(callback:()=>void):()=>void {if(typeof callback!=='function')throw new TypeError('Expected cleanup callback');if(this.disposed){callback();return()=>{};}this.cleanupCallbacks.add(callback);return()=>this.cleanupCallbacks.delete(callback);}
-  private releaseGPU():void {const cleanup=new Cleanup(),buffers=new Set<GPUBuffer>();for(const r of this.resources)for(const b of [r.vertex,r.index,r.uniform,r.extension?.uniform])if(b)buffers.add(b);for(const b of buffers)cleanup.run(()=>b.destroy());for(const t of this.textures)cleanup.run(()=>t.destroy());this.resources=[];this.textures=[];this.pipelines.clear();this.lightingGroups.clear();cleanup.finish();}
+  private releaseGPU():void {this.gpuRevision++;const cleanup=new Cleanup(),buffers=new Set<GPUBuffer>();for(const r of this.resources)for(const b of [r.vertex,r.index,r.uniform,r.extension?.uniform])if(b)buffers.add(b);for(const b of buffers)cleanup.run(()=>b.destroy());for(const t of this.textures)cleanup.run(()=>t.destroy());this.resources=[];this.textures=[];this.pipelines.clear();this.lightingGroups.clear();cleanup.finish();}
   onDeviceRestored(engine:Engine):void {this.releaseGPU();for(const p of this.primitives)p.deformed=undefined;this.setup(engine);}
   dispose():void {
     if(this.disposed)return;this.disposed=true;const cleanup=new Cleanup();
+    for(const node of this.created)Reflect.deleteProperty(node,cpuSource);
     this.lighting.clear();
     cleanup.run(()=>this.engine.removePlugin(this.name)).run(()=>this.engine.frameGraph.removeOwner(this.name));
     for(const callback of this.cleanupCallbacks)cleanup.run(callback);this.cleanupCallbacks.clear();cleanup.run(()=>this.releaseGPU());

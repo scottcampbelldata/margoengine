@@ -98,6 +98,20 @@ test('geometry positions reject fractional or nonfinite strides', () => {
   for(const stride of [3.5,0,Infinity,NaN])assert.throws(()=>geometryPositions({vertices:new Float32Array(stride===3.5?7:6),stride}),/stride/);
 });
 
+rtest('default bodies reject unsupported empty meshes and roll back, while intentional colliderless bodies remain supported', () => {
+  const physics=create(),mesh=fakeMesh();
+  try {
+    assert.throws(()=>physics.addBody(mesh),/needs a mesh with geometry/);
+    assert.equal(physics.bodyCount,0);
+    assert.equal(physics.world.bodies.len(),0,'The failed default collider must release its native body');
+    assert.equal(physics.bodyOf(mesh),undefined);
+    const explicit=physics.addBody(mesh,{colliders:[]}),unbound=physics.addBody(null);
+    assert.equal(explicit.colliders.length,0);
+    assert.equal(unbound.colliders.length,0);
+    assert.equal(physics.bodyCount,2);
+  } finally {physics.dispose();}
+});
+
 rtest('a dropped box comes to rest on the ground at the right height and the mesh follows', () => {
   const physics = create();
   ground(physics);

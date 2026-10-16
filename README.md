@@ -179,11 +179,18 @@ lobes affect directional lighting and fixed hemispherical ambient; clustered and
 environment lighting retain their base PBR response. Three.js TSL remains unsupported.
 These features stay outside the frozen core and stage bundle.
 
-Verification on 16 October 2026 passed 1,094 Node 24 tests, strict TypeScript checks
+Registered PBR models also support GPU picking and selection outlines through
+`@margoengine/selection`, including current skin and morph deformation.
+`@margoengine/bvh` provides an explicit asynchronous `intersectModel()` query
+against a snapshot of that GPU pose. Core picking and ordinary PBR bindings stay
+unchanged; models opt in through registration.
+
+Verification on 16 October 2026 passed 1,189 Node 24 tests, strict TypeScript checks
 and packed imports across all 63 packages, the existing production browser
 regressions, 42 node-material captures, 59 additional-lobe captures, 82 texture
 captures, complete Khronos material/KTX2/UV1 assets, and eight-influence character
-GPU readback. `npm run measure:size` reports **47,983 bytes raw / 19,999 bytes gzip** for
+GPU readback, plus 45 local-shadow and 46 deformed-picking captures.
+`npm run measure:size` reports **47,983 bytes raw / 19,999 bytes gzip** for
 core + stage. The [release notes](CHANGELOG.md#unreleased) record the parser,
 normalization, index-boundary and lifecycle checks.
 

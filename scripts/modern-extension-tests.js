@@ -201,3 +201,4 @@ try {
 await import('./material-extension-tests.js');
 await import('./gltf-parity-tests.js');
 await (await import('./local-shadow-tests.js')).runLocalShadowBrowserTests();
+await (await import('./deformed-picking-tests.js')).runDeformedPickingTests();

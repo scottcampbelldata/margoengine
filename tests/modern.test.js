@@ -66,6 +66,17 @@ test('Geometry validates indices and box winding; material colors use linear RGB
 
 async function headlessEngine(capacity=8){const store=await TransformStore.create(capacity);const resources=new Set();const renderer={backend:'webgl2',add:g=>resources.add(g),remove:g=>resources.delete(g),render(){},dispose(){resources.clear();}};const engine=new Engine({width:200,height:200,clientWidth:200,clientHeight:200},store,renderer,undefined,null);return {engine,resources};}
 
+test('CAD grouping rejects unsupported empty inputs and skips transform-only nodes in populated assemblies',async()=>{
+ const {engine}=await headlessEngine();
+ try {
+  const root=engine.createMesh();
+  assert.throws(()=>deduplicateParts([root]),/no supported geometry/);
+  assert.throws(()=>deduplicateParts([]),/no supported geometry/);
+  engine.createMesh(root).setGeometry(box());
+  assert.deepEqual(deduplicateParts(engine.meshes.values()),{parts:1,unique:1});
+ }finally{engine.dispose();}
+});
+
 test('GPU picks update scene state without a color frame and optional pickers retain stale-slot guards',async()=>{
  const store=await TransformStore.create(4);let frames=0,updates=0,finish;
  const renderer={backend:'webgpu',add(){},remove(){},render(){frames++;},dispose(){},async pick(_camera,_light,batches){assert.equal([...batches][0].instances[12],Math.fround(.1));return 0;}};

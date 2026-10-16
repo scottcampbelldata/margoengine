@@ -1,10 +1,11 @@
 import type {EngineKernel, EnginePlugin, Mesh} from '@margoengine/core';
 import {meshRuntime,Mesh as CoreMesh} from '@margoengine/core/extension';
+import type {PBRSource} from '../../shared/pbr-source.js';
 import {PhysicsBody, type BodyOptions, type BodyOwner, type BodyType} from './body.js';
 import {CharacterController, type CharacterControllerOptions} from './character.js';
 import {PhysicsJoint, createJointData, type JointOptions} from './joints.js';
 import {checkVec, eulerToQuat, quat, slerp, tuple, vec, type Quat, type Vec3} from './math.js';
-import {configureCollider, createColliderDesc, type ColliderOptions, type RapierModule, type ShapeOptions} from './shapes.js';
+import {configureCollider, createColliderDesc, type ColliderOptions, type GeometryLike, type RapierModule, type ShapeOptions} from './shapes.js';
 
 export interface PhysicsOptions {
   /** The initialized `@dimforge/rapier3d-compat` module. */
@@ -283,7 +284,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     body.userData = options.userData;
     this.bodies.add(body);
     if (mesh) this.byMesh.set(mesh, body);
-    const colliders = options.colliders === undefined ? (mesh?.geometry ? [{shape: 'box'} as ColliderOptions] : []) : Array.isArray(options.colliders) ? options.colliders : [options.colliders as ColliderOptions];
+    const colliders = options.colliders === undefined ? (mesh ? [{shape: 'box'} as ColliderOptions] : []) : Array.isArray(options.colliders) ? options.colliders : [options.colliders as ColliderOptions];
     try {for (const collider of colliders) this.addCollider(body, collider);}
     catch (error) {this.removeBody(body); throw error;}
     return body;
@@ -298,7 +299,8 @@ export class Physics implements EnginePlugin, BodyOwner {
   /** @internal use `body.addCollider`. */
   addCollider(body: PhysicsBody, options: ColliderOptions): any {
     const R = this.rapier, mesh = body.mesh;
-    const fit = {geometry: mesh?.geometry ?? null, scale: mesh ? [mesh.scale.x, mesh.scale.y, mesh.scale.z] as const : [1, 1, 1] as const};
+    const needsGeometry = options.shape === 'box' && !options.halfExtents || options.shape === 'sphere' && options.radius === undefined || options.shape === 'convexHull' && !options.points && !options.geometry || options.shape === 'trimesh' && !options.vertices && !options.geometry;
+    const fit = {geometry: mesh ? mesh.geometry ?? (needsGeometry ? primitiveGeometry(mesh) : null) : null, scale: mesh ? [mesh.scale.x, mesh.scale.y, mesh.scale.z] as const : [1, 1, 1] as const};
     const {desc, center} = createColliderDesc(R, options, fit);
     configureCollider(R, desc, options, center, !!this.hooks);
     const collider = this.world.createCollider(desc, body.raw);
@@ -504,4 +506,27 @@ function parentOf(mesh: Mesh): number {
   const runtime = meshRuntime(mesh) as unknown as {id?: number; engine?: {store?: {parents?: ArrayLike<number>}}};
   const parents = runtime.engine?.store?.parents;
   return parents && runtime.id !== undefined ? parents[runtime.id] : -1;
+}
+
+/** Bind-pose triangle data from optional PBR loaders; never attach a second core draw geometry. */
+function primitiveGeometry(mesh: Mesh): GeometryLike | null {
+  const source = (mesh as unknown as {[key: symbol]: PBRSource | undefined})[Symbol.for('margoengine.pbr-source.v1')];
+  if (!source) return null;
+  const primitives = source.primitives.filter(primitive => primitive.node === mesh);
+  if (!primitives.length) return null;
+  let vertexCount = 0, indexCount = 0;
+  for (const primitive of primitives) {
+    if (primitive.vertices.length % 20) throw new RangeError('PBR vertex array length is not a multiple of its stride');
+    vertexCount += primitive.vertices.length / 20;
+    indexCount += primitive.indices.length;
+  }
+  const vertices = new Float32Array(vertexCount * 3), indices = new Uint32Array(indexCount);
+  let vertexOffset = 0, indexOffset = 0;
+  for (const primitive of primitives) {
+    const count = primitive.vertices.length / 20;
+    for (let i = 0; i < count; i++) vertices.set(primitive.vertices.subarray(i * 20, i * 20 + 3), (vertexOffset + i) * 3);
+    for (const index of primitive.indices) indices[indexOffset++] = vertexOffset + index;
+    vertexOffset += count;
+  }
+  return {vertices, indices, stride: 3};
 }

@@ -45,6 +45,8 @@ engine.start(); // each frame's delta drives the accumulator
 
 ## How it works
 
+Meshes loaded by `@margoengine/gltf-pro` or `@margoengine/fbx` also support default fitted colliders. Physics reads every primitive on the selected node in its bind pose, without attaching core geometry. The root-level mesh requirement still applies. A mesh with no usable geometry throws when default fitting is requested; use `colliders: []` for an intentionally colliderless body.
+
 - **Optional peer dependency.** The package never imports Rapier; `new Physics(engine, {rapier})` takes the initialized module, so the 1.6 MB (gzip) Rapier bundle stays out of builds that do not use physics and you choose the Rapier version and loading strategy (`rapier3d-compat` inlines its Wasm, so it works in any bundler without asset configuration). Tested with `@dimforge/rapier3d-compat` 0.21.0.
 - **Fixed timestep with an accumulator.** `onPreUpdate(delta)` adds `delta * timeScale` to an accumulator and runs whole steps of `fixedTimestep` (default 1/60 s), at most `maxSubsteps` (default 4) per frame. Time beyond that is dropped so a long hitch cannot snowball. Each step is identical regardless of frame rate, so a given sequence of inputs replays bit for bit.
 - **Interpolation.** After each step the plugin stores the previous and current pose of every non-fixed body. Meshes get `lerp(previous, current, alpha)` for position and a shortest-arc slerp for rotation, where `alpha = accumulator / fixedTimestep`. Rendering therefore lags physics by less than one step and moves smoothly at any refresh rate. `interpolate: false` writes the latest step instead. Teleports (`body.setPosition`) reset both poses, so they do not streak.

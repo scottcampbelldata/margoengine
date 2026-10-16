@@ -1,4 +1,4 @@
-import type {PBRModel,PBRPrimitive} from '@margoengine/gltf-pro';
+import type {PBRModel,PBRPrimitive,PBRDeformationContext} from '@margoengine/gltf-pro';
 import type {Engine,EnginePlugin,FrameGraph,PassContext} from '@margoengine/core/extension';
 import {invert} from '../../shared/math.js';
 import {sampleTrack,multiplyMatrices,type Interpolation} from './sampling.js';
@@ -18,6 +18,7 @@ export class Animation implements EnginePlugin {
   private readonly inverse=new Float32Array(16);private readonly joint=new Float32Array(16);private readonly product=new Float32Array(16);private readonly workspace=new Float64Array(52);
   private disposed=false;
   private unsubscribe?:()=>void;
+  private readonly prepareDeformation=(context:PBRDeformationContext)=>this.deform(context);
   private readonly rest:Array<{position:[number,number,number];scale:[number,number,number];rotation:number[]}>;
   constructor(readonly model:PBRModel,readonly options:AnimationOptions={}) {
     this.name='animation:'+model.name;this.validate();
@@ -132,6 +133,7 @@ export class Animation implements EnginePlugin {
       record.group=this.device.createBindGroup({layout:record.pipeline.getBindGroupLayout(0),entries:[source,output,morph,weights,bones,influences,counts].map((buffer,binding)=>({binding,resource:{buffer}}))});
       p.deformed=output;
     }
+    this.model.prepareDeformation=this.prepareDeformation;
   }
   onPreUpdate(delta:number):void {
     if(this.model.disposed){this.model.root.engine.removePlugin(this.name);return;}this.validate();
@@ -139,7 +141,7 @@ export class Animation implements EnginePlugin {
     if(this.playing){this.time+=delta*(this.options.speed??1);this.apply(this.time);if(this.options.loop===false&&this.time>=(this.clips[this.clip]?.duration??Infinity))this.playing=false;}
   }
   registerPasses(graph:FrameGraph):void {graph.add({name:this.name,order:-10,execute:c=>this.deform(c)});}
-  private deform(context:PassContext):void {
+  private deform(context:PassContext|PBRDeformationContext):void {
     if(context.backend!=='webgpu'||this.model.disposed)return;
     for(const r of this.resources) {
       for(const weight of r.primitive.weights)if(!Number.isFinite(weight))throw new RangeError('Invalid morph weights');
@@ -156,7 +158,7 @@ export class Animation implements EnginePlugin {
       const pass=context.encoder.beginComputePass();pass.setPipeline(r.pipeline);pass.setBindGroup(0,r.group);pass.dispatchWorkgroups(Math.ceil(r.primitive.vertices.length/20/64));pass.end();
     }
   }
-  private release():void {for(const r of this.resources){if(r.primitive.deformed===r.output)r.primitive.deformed=undefined;for(const b of r.buffers)b.destroy();}this.resources=[];this.pipeline=undefined;this.pipeline8=undefined;}
+  private release():void {if(this.model.prepareDeformation===this.prepareDeformation)this.model.prepareDeformation=undefined;for(const r of this.resources){if(r.primitive.deformed===r.output)r.primitive.deformed=undefined;for(const b of r.buffers)b.destroy();}this.resources=[];this.pipeline=undefined;this.pipeline8=undefined;}
   onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
   dispose():void {if(this.disposed)return;this.disposed=true;this.model.root.engine.removePlugin(this.name);this.unsubscribe?.();this.unsubscribe=undefined;this.release();this.device=undefined;}
   destroy():void {this.model.root.engine.removePlugin(this.name);this.dispose();}

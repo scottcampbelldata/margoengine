@@ -3,6 +3,17 @@ import {materialLobes,sheen,specular,anisotropy,iridescence,type MaterialLobeOpt
 import type {MaterialExtension} from '@margoengine/gltf-pro';
 import {Clustered,type LocalShadowOptions,type LocalLightShadow,type PointLight} from '@margoengine/clustered';
 import type {PBRModel} from '@margoengine/gltf-pro';
+import type {PBRPickingGeometry} from '@margoengine/gltf-pro';
+import type {PickingSource} from '@margoengine/selection';
+
+export async function deformedQueries(engine:import('@margoengine/core').EngineKernel,model:PBRModel) {
+  const source:PickingSource=model,picking=module10.Picking.attach(engine,{capture:false});
+  const remove=picking.add(source),selection=module10.Selection.attach(engine),removeSelection=selection.add(model);
+  selection.set(model.primitives.map(primitive=>primitive.node));
+  const pose:readonly PBRPickingGeometry[]=await model.readPickingGeometry();
+  const hits=await new module24.Raycaster([0,0,4],[0,0,-1]).intersectModel(model);
+  remove();removeSelection();selection.dispose();picking.dispose();return {pose,hits};
+}
 import {preload,Group,Html,type CanvasProps,type PointerHandlers,type MargoContextValue} from '@margoengine/react';
 
 export const demandCanvas:CanvasProps={frameloop:'demand'};

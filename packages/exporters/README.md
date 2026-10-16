@@ -29,6 +29,8 @@ const textured = exportGLB({nodes: [{
 
 ## How it works
 
+Engine exports recognize primitives loaded by `@margoengine/gltf-pro` and `@margoengine/fbx`, without attaching core geometry. glTF/GLB retain all primitives on each node and their bind-pose skin/morph data; other formats write base geometry. Automatic export of PBR textures, material extensions, and more than four skin influences throws explicitly. An engine forest containing no supported mesh geometry also throws; visibility filtering and intentionally empty data scenes remain supported.
+
 - **Scene walk.** An engine source is walked through `engineRuntime(engine)`: `meshes`, `store.parents`, `store.hidden` and the local transforms in `store.transforms` (translation, quaternion, scale). World matrices are recomputed in double precision from the parent chain, so export does not depend on a `render()` having run. Hidden meshes hide their descendants, as in the kernel.
 - **Every Margo Engine mesh is a glTF node.** Transform-only meshes become empty nodes, so the hierarchy survives. With `flatten`, each drawable mesh is a root node with its world transform; when a parent chain with non-uniform scale produces shear, which glTF TRS cannot hold, that mesh's world transform is baked into its vertices (and winding is flipped for mirrors).
 - **Deduplication.** One `Geometry` (or geometry data object) is written once: POSITION (with exact Float32 `min`/`max`), NORMAL, optional TANGENT, TEXCOORD_0 and COLOR_0, and indices. One glTF mesh is written per geometry and material pair, and one glTF material per `PbrMaterial`. Images are deduplicated by byte array.
@@ -58,7 +60,7 @@ const textured = exportGLB({nodes: [{
 
 ## Data-scene skin, morph and animation export
 
-`exportGLTF` and `exportGLB` accept deformation data on plain scenes. Engine sources continue to export their static geometry and transforms. Keep the hierarchy when exporting deformation; `flatten: true` rejects skins, morphs and clips.
+`exportGLTF` and `exportGLB` accept deformation data on plain scenes and retain bind-pose skin/morph data from loaded PBR engine nodes. Original animation clips are not forwarded from an engine; supply a data scene with `animations` to export clips. Keep the hierarchy when exporting deformation; `flatten: true` rejects skins, morphs and clips.
 
 - A geometry's `joints` and `weights` supply four values per vertex and must appear together. Joint indices are unsigned 16-bit integers within the attached skin's joint list. Weights must be finite and nonnegative with a positive sum per vertex; the writer normalizes them into Float32 `WEIGHTS_0` alongside unsigned-short `JOINTS_0`.
 - A mesh node's `skin` is `{name?, joints, inverseBindMatrices}`. `joints` references the actual `ExportNode` objects in the scene, with no duplicates and a common hierarchy root. `inverseBindMatrices` supplies sixteen finite, column-major affine values per joint. A joint skipped by `onlyVisible` or missing from the scene throws.

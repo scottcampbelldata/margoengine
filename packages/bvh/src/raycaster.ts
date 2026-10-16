@@ -64,6 +64,24 @@ export interface IntersectOptions {
   /** Run the transform kernel first so world matrices reflect transform edits made since the last render. Default true. */
   refresh?: boolean;
 }
+/** Snapshot of one PBR primitive in its current deformed pose. No core Geometry is created or assigned. */
+export interface PickingGeometry {
+  readonly node: Mesh;
+  /** PBR vertex layout: 20 floats per vertex, position xyz at 0 and normal xyz at 4. */
+  readonly vertices: Float32Array;
+  readonly indices: Uint32Array;
+  readonly doubleSided: boolean;
+  /** Local-to-world matrix captured with the vertex snapshot, before any asynchronous GPU readback. */
+  readonly matrix: Float32Array;
+}
+/** Structural interface implemented by gltf-pro's PBRModel, without a runtime or package dependency on gltf-pro. */
+export interface DeformedPickingSource {
+  readonly root: Mesh;
+  readonly disposed: boolean;
+  readPickingGeometry(): Promise<readonly PickingGeometry[]>;
+}
+interface PoseBVH {node: Mesh; vertices: Float32Array; indices: Uint32Array; bvh: MeshBVH}
+const poseCache = new WeakMap<DeformedPickingSource, PoseBVH[]>();
 
 /**
  * CPU picking against engine meshes, the Margo Engine counterpart of THREE.Raycaster. Each geometry gets a cached MeshBVH,
@@ -126,6 +144,76 @@ export class Raycaster {
     return this.intersectMeshes(engine, (engine as unknown as RuntimeEngine).meshes.values() as Iterable<unknown> as Iterable<Mesh>, options);
   }
 
+  /**
+   * Picks a PBR source's current skin/morph pose, including deformations outside its bind-pose bounds. This explicit
+   * asynchronous query reads GPU vertex data; use it for pointer events rather than every frame. Unchanged topology
+   * reuses and refits a cached BVH. Ray settings and each primitive's world transform are captured for this query.
+   * Ordinary intersectEngine/intersectMeshes queries stay synchronous and never trigger GPU work.
+   */
+  async intersectModel(source: DeformedPickingSource, {refresh = true}: IntersectOptions = {}): Promise<RaycasterHit[]> {
+    if (!source || typeof source.readPickingGeometry !== 'function' || !source.root) throw new TypeError('Expected a deformed picking source');
+    const root = source.root as unknown as RuntimeMesh & {engine: RuntimeEngine}, runtime = root.engine;
+    if (!runtime || !runtime.meshes || !runtime.store) throw new TypeError('Picking source root has no engine');
+    if (source.disposed || runtime.disposed) throw new Error('Picking source or engine is disposed');
+    if (runtime.meshes.get(root.id) !== root) throw new Error('Picking source root is disposed');
+    const {near, far, side, firstHitOnly, layers, filter} = this, bvhOptions = {...this.bvhOptions};
+    if (!(near >= 0) || !(far >= near)) throw new RangeError('Expected 0 <= near <= far');
+    if (!['material', 'front', 'back', 'double'].includes(side)) throw new TypeError('Invalid raycaster side');
+    const origin = this.origin.slice(), direction = this.direction.slice(), store = runtime.store;
+    if (refresh) store.tick(false);
+    const geometry = await source.readPickingGeometry();
+    // A removed object can have its numeric id reused while mapAsync is pending. Never let that replacement receive a hit.
+    if (source.disposed || runtime.disposed || source.root !== (root as unknown as Mesh) || runtime.meshes.get(root.id) !== root) return [];
+    if (!Array.isArray(geometry)) throw new TypeError('Expected picking geometry snapshots');
+    const previous = poseCache.get(source) ?? [], next: PoseBVH[] = [], hits: RaycasterHit[] = [];
+    const inverse = new Float64Array(16);
+    let best = far;
+    for (let i = 0; i < geometry.length; i++) {
+      const snapshot = geometry[i];
+      if (!snapshot || !snapshot.node) throw new TypeError('Invalid picking geometry snapshot');
+      const handle = snapshot.node, mesh = handle as unknown as RuntimeMesh & {engine: RuntimeEngine};
+      if (mesh.engine !== runtime) throw new TypeError('Picking geometry belongs to another engine');
+      if (runtime.meshes.get(mesh.id) !== mesh || hiddenInHierarchy(store, mesh.id)) continue;
+      if (!(getMeshLayers(handle) & layers) || filter && !filter(handle)) continue;
+      // User predicates can dispose or reparent scene objects synchronously as well.
+      if (source.disposed || runtime.disposed || runtime.meshes.get(root.id) !== root) return [];
+      if (runtime.meshes.get(mesh.id) !== mesh || hiddenInHierarchy(store, mesh.id)) continue;
+      const {vertices, indices, matrix, doubleSided} = snapshot, count = vertices?.length / 20;
+      if (!(vertices instanceof Float32Array) || !Number.isInteger(count) || count < 3 || !(indices instanceof Uint32Array) || !indices.length || indices.length % 3) throw new RangeError('Invalid stride-20 picking geometry');
+      if (typeof doubleSided !== 'boolean' || !(matrix instanceof Float32Array) || matrix.length !== 16) throw new TypeError('Invalid picking material or world matrix');
+      if (vertices.some(v => !Number.isFinite(v)) || matrix.some(v => !Number.isFinite(v))) throw new RangeError('Picking geometry must be finite');
+      if (matrix[3] || matrix[7] || matrix[11] || matrix[15] !== 1) throw new RangeError('Picking matrix must be affine');
+      if (indices.some(index => index >= count)) throw new RangeError('Picking index exceeds vertex count');
+      let cached = previous[i];
+      if (!cached || cached.node !== handle || cached.vertices.length !== count * 6 || cached.indices.length !== indices.length || indices.some((index, at) => index !== cached.indices[at])) {
+        const packed = new Float32Array(count * 6), copiedIndices = indices.slice();
+        packPose(vertices, packed);
+        cached = {node: handle, vertices: packed, indices: copiedIndices, bvh: MeshBVH.fromGeometry({vertices: packed, indices: copiedIndices}, bvhOptions)};
+      } else {
+        packPose(vertices, cached.vertices);
+        cached.bvh.refit();
+      }
+      next[i] = cached;
+      if (!invert(matrix, inverse)) continue;
+      const local = new Float64Array(3), [ox, oy, oz] = origin, [dx, dy, dz] = direction;
+      transformPoint(inverse, ox, oy, oz, local);
+      const lx = inverse[0] * dx + inverse[4] * dy + inverse[8] * dz, ly = inverse[1] * dx + inverse[5] * dy + inverse[9] * dz, lz = inverse[2] * dx + inverse[6] * dy + inverse[10] * dz;
+      const length = Math.hypot(lx, ly, lz);
+      const ray = {origin: local, direction: [lx, ly, lz]}, options = {near: near * length, far: (firstHitOnly ? best : far) * length, side: side === 'material' ? doubleSided ? 'double' as const : 'front' as const : side};
+      const found = firstHitOnly ? [cached.bvh.raycastFirst(ray, options)] : cached.bvh.raycast(ray, options);
+      for (const hit of found) {
+        if (!hit) continue;
+        const point: Vec3 = [0, 0, 0];
+        transformPoint(matrix, hit.point[0], hit.point[1], hit.point[2], point);
+        const distance = hit.distance / length;
+        if (firstHitOnly) {if (distance > best) continue; best = distance; hits.length = 0;}
+        hits.push({mesh: handle, distance, point, normal: normalTransform(inverse, hit.normal), faceNormal: normalTransform(inverse, hit.faceNormal), faceIndex: hit.faceIndex, barycoord: hit.barycoord, frontFace: hit.frontFace, localPoint: hit.point});
+      }
+    }
+    poseCache.set(source, next);
+    return hits.sort((a, b) => a.distance - b.distance);
+  }
+
   /** Tests the given meshes of an engine (hidden ones and those under hidden parents are skipped). */
   intersectMeshes(engine: Engine, meshes: Iterable<Mesh>, {refresh = true}: IntersectOptions = {}): RaycasterHit[] {
     const runtime = engine as unknown as RuntimeEngine;
@@ -184,6 +272,13 @@ export class Raycaster {
       }
     }
     return hits.sort((a, b) => a.distance - b.distance);
+  }
+}
+
+function packPose(source: Float32Array, target: Float32Array): void {
+  for (let i = 0, j = 0; i < source.length; i += 20, j += 6) {
+    target[j] = source[i]; target[j + 1] = source[i + 1]; target[j + 2] = source[i + 2];
+    target[j + 3] = source[i + 4]; target[j + 4] = source[i + 5]; target[j + 5] = source[i + 6];
   }
 }
 

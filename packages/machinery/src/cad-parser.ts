@@ -49,7 +49,7 @@ export function parseCADGeometry(input:string|ArrayBuffer|ArrayBufferView,format
  const definitions=format==='stl'?stl(data,progress):obj(typeof data==='string'?data:new TextDecoder('utf8',{fatal:true}).decode(data),progress);if(!definitions.length)throw new Error('CAD contains no geometry');return definitions;
 }
 
-export function fingerprint(geometry:Geometry):Float32Array {
+export function fingerprint(geometry:Pick<Geometry,'vertices'|'indices'>):Float32Array {
   if(geometry.indices.length>maxIndices)throw new RangeError('Deduplication triangle limit');const data=new Float32Array(geometry.indices.length*6),order:number[]=[];
   for(let face=0;face<geometry.indices.length;face+=3){const ids=Array.from(geometry.indices.subarray(face,face+3));let start=0;
     for(let i=1;i<3;i++){for(let j=0;j<6;j++){const difference=geometry.vertices[ids[i]*6+j]-geometry.vertices[ids[start]*6+j];if(difference<0){start=i;break;}if(difference>0)break;}}
