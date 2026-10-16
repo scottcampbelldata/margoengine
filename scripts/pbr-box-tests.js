@@ -103,7 +103,8 @@ export async function pbrBoxBrowserChecks(page) {
       const world = transformed(local, mesh.matrix), bounds = boundsOf(expectedWorld), parentMatrix = [...parent.matrix], meshMatrix = [...mesh.matrix];
       close(world, expectedWorld, 'retained authored (x,z,-y) transform'); close(model.bounds, bounds, 'PBR bounds');
       check(model.bounds.every(Number.isFinite), 'PBR bounds contain nonfinite values');
-      rejects(() => worldBounds(instance, model.nodes, new Float32Array(6)), /^No geometry$/, 'frozen worldBounds');
+      close(worldBounds(instance, model.nodes, new Float32Array(6)), bounds, 'facade PBR world bounds');
+      check([...engine.meshes.values()].every(node => node.geometry === null), 'facade bounds added a duplicate core draw');
       fit(model); const beauty = await capture('Box.glb:before-physics');
       model.root.visible = false; const blank = await capture('Box.glb:hidden'); model.root.visible = true;
       const visiblePixels = beauty.reduce((count, value, index) => count + +(index % 4 < 3 && value !== blank[index]), 0);
