@@ -10,6 +10,105 @@ The objective remains **active and incomplete**. The recorded constraints-demo s
 
 The tested robot checkpoint is [live on margoengine.com](https://margoengine.com/demos/light-keeper/), production `26027a44-e044-4f68-b74b-be60c992cc44`, source `221c1ad`, preview `f8e27553`. It retains the optional Animator/Stats paths, torso writer, eye fix and repaired hand, keeps the PBR cache reverted, and publishes pose/reflection diagnostics only on request by default. All **194 public files** and the independent audit pass; all 193 other baseline files and 26 old workshop assets are preserved. See [LIGHT_KEEPER_DEPLOYMENT.md](LIGHT_KEEPER_DEPLOYMENT.md) for current hashes/validation and the on-demand comparison below. The prior allocation `f084db7e` / `00f0afa` and eye-only `feeb64de` / `ca5194b` releases are historical evidence below.
 
+### GC trigger audit and native API constructor evidence
+
+Historical profiler reports use the field name `naturalGC` for all observed
+`MinorGC` / `MajorGC` slices. **That name does not establish their trigger.**
+Future captures use `observedGC` schema 2, retaining raw counts and per-thread
+pause unions while adding contained-event counts, thread metadata and grouped
+raw `args.type` labels. Six synthetic overlap/thread/reason tests pass. Named
+non-profiler reasons and missing reasons are not relabeled as natural or
+attributed to an allocating subsystem. Trigger-group durations are nonadditive.
+
+An offline audit of all six valid SSAO comparison phases, six endpoint-only
+diagnostics phases and two existing GC-only phases found no explicit sampling
+profiler trigger. Their minors say `allocation failure`; majors say `finalize
+incremental marking via task`. Independent V8 collector text agrees, including
+`GC in old space requested`, which does not identify why the cycle began.
+All these slices occur on identified `CrRendererMain` threads with matching RAF
+activity. This neither proves retained growth nor attributes them to native
+resources. Original counts, hashes and captures remain unchanged. Evidence:
+`test-results/gc-reason-audit/report.json` and README.
+
+In a separate small native-only WebGPU fixture, each sampling phase's major
+explicitly says `sampling profiler`. That finding applies to that fixture,
+not to the audited robot captures. Its retained-constructor proof uses forced
+GC/snapshots and preallocated reference arrays separately from transient
+sampling. It creates **256 distinct canonical objects and 256 distinct new
+anchored snapshot IDs per class** for `GPUCommandEncoder`,
+`GPURenderPassEncoder`, `GPUComputePassEncoder` and `GPUCommandBuffer`; the
+matched reused-reference control adds zero IDs. Factories and the queue writer
+remain native/unmodified, with no Stats or engine imports and no GPU errors.
+Snapshot anchors are `native` nodes with 88-byte self metadata; those bytes are
+not a JS allocation rate and must not be summed with overlapping wrapper rows.
+
+Separate fresh-browser raw-work phases measured statistical sampled bytes per
+iteration of 1.549 for control, 33.105 encoder, 49.521 render, 46.602 compute,
+65.914 combined passes, and 33.828 repeated encoder. These totals include API,
+conversion and pacing overhead; they are not exact costs per wrapper or a
+production allocation floor. Evidence: `test-results/native-wrapper-proof/`
+contains `summary.json`, `retained-id-proof.json`, raw reports and README.
+This establishes fresh native API objects in that tested runtime, without
+explaining all remaining robot allocations or certifying zero-GC behavior.
+
+### Gaze waypoint request-buffer experiment: rejected
+
+The suspected `coordinates()` helper was already inlined with unboxed finite
+Float32 guards. It had no surviving numeric-tagging or young-allocation site in
+the completed diagnostic graphs, and its guards were left unchanged. A corrected
+replay fixture then reproduced main's changing `maxSpeed * dt` step argument:
+the non-inlined `waypoint()` call received an explicit 16-byte `HeapNumber` in
+its replay caller. This is compiler evidence for that fixture, not a browser
+bytes-per-frame certificate.
+
+A demo-only candidate retained the scalar `waypoint(number)` interface and
+introduced a caller-owned Float64 request with a shared private body. It captured
+the request before input getters and the local step before refresh reentry.
+Actual-source caller/callee traces removed that boxing site without migration;
+40,000 authored moving/transformed replay steps matched 848 output/transform
+values bit-for-bit. Seven isolated guard/alias/failure cases and **22/22 actual
+focused tests** passed. All twelve A/buffered/B control/kernel census windows
+had no in-window GC or structural excess. Waypoint excess HeapNumbers were
+17,204 / 11,060 / 13,320; full-chain excess was 7,457 / 7,207 / 7,218. The latter
+176-byte difference versus baseline B is not a meaningful whole-scene saving.
+
+The actual built candidate passed all **13 robot browser cases**, including 63
+slider samples, eye aiming, 16 trusted torso drag moves and reflection hold;
+page/resource errors were empty. It added 385 raw / 75 gzip JS bytes outside
+core/stage, which remained 19,999. Whole-scene fresh-page A/B/A used the corrected
+`observedGC` profiler, 30-second warmup and 30-second measured phases, with 938
+trusted moves per drag. JSON was read only outside the measured intervals.
+
+| Mode | Phase | Sampled MB/s | Minor / major GC | Maximum observed GC slice ms | p95 RAF callback ms | Reflection bakes | Reuse |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Baseline A | Idle | 0.556146 | 20 / 3 | 2.876 | 2.657 | 351 | 702 / 702 |
+| Candidate | Idle | 0.551749 | 20 / 2 | 1.716 | 2.634 | 371 | 744 / 744 |
+| Baseline B | Idle | 0.540784 | 20 / 4 | 2.235 | 2.399 | 365 | 728 / 728 |
+| Baseline A | Drag | 0.729299 | 24 / 5 | 4.015 | 6.486 | 297 | 594 / 594 |
+| Candidate | Drag | 0.796744 | 27 / 3 | 4.481 | 7.161 | 336 | 672 / 672 |
+| Baseline B | Drag | 0.697812 | 23 / 3 | 1.699 | 6.013 | 369 | 740 / 740 |
+
+**Reject the buffered path:** idle falls within the baseline range, while drag
+allocation and p95 callback time exceed both baselines. Reflection cadence
+differs and the comparison does not identify a cause. Recorded source hashes
+were fixed, native queue identity was preserved, and endpoint safety passed;
+no per-frame pose observations were taken during timing. Every run still has
+observed collections. Public package APIs were unchanged, and no runtime or
+live release change is retained from this experiment.
+
+Ignored evidence: `test-results/gaze-target-attribution/` holds the attribution,
+candidate census, actual-source parity/IR, tests and rejected source snapshot;
+`test-results/gaze-request-robot-compare/summary.{json,md}` holds the frozen sites,
+manifests and browser comparison. Further work should prioritize demonstrated
+recurring allocations over additional rewrites of these already-unboxed guards.
+
+Restoration is complete: all three source/test files match their original
+SHA256, baseline focused tests pass **18/18**, and the rebuilt preview's **17 JS
+chunks** match the frozen baseline bit-for-bit (708,879 raw / 239,411 gzip bytes,
+core/stage 19,999). See the rejected-candidate `restoration-proof.json` and
+`gaze-request-robot-compare/restored-standalone-proof.json`. The eye repair and
+live release remain unchanged.
+
 ### Previous allocation build and remaining mapped sites
 
 The exact production snapshot is `test-results/light-keeper-allocation-live/site`,
@@ -1055,7 +1154,7 @@ Use fresh report labels for further captures. Keep source/dist frozen and avoid 
 
 The user requested an immediate commit/push checkpoint, followed by continued work, and then the rebuilt production drag allocation/GC results.
 
-Current source **221c1ad** is pushed and live as **26027a44**, with eye/hand repairs and on-demand pose/reflection diagnostics retained. Endpoint-only captures observed 0.601728 / 0.756456 MB/s idle/drag with GC remaining; idle savings were inconsistent and the frequent-reader comparison was mixed/worse. Both full comparisons and their observation/workload limits are recorded above. Default package setter/pass semantics remain intact; this demo explicitly selects optional Animator/Stats paths. Stats descriptor batching, target-only unused-norm and hidden-GPU-audit opt-out experiments remain reverted. The constraints lab remains on contact-reach-3; both saved trajectories replay hold-free. The fixture-only probe readback ablation established no allocation benefit and produced no production/API change. The optional SSAO key-string cache removed its isolated strings but was rejected after worse full-scene allocation in both phases. Current work is constructor/IR attribution of the gaze-workspace validation boundary before considering another change. Allocation-driven GC remains and the overall goal is active.
+Current source **221c1ad** is pushed and live as **26027a44**, with eye/hand repairs and on-demand pose/reflection diagnostics retained. Endpoint-only captures observed 0.601728 / 0.756456 MB/s idle/drag with GC remaining; idle savings were inconsistent and the frequent-reader comparison was mixed/worse. Both full comparisons and their observation/workload limits are recorded above. Default package setter/pass semantics remain intact; this demo explicitly selects optional Animator/Stats paths. Stats descriptor batching, target-only unused-norm and hidden-GPU-audit opt-out experiments remain reverted. The constraints lab remains on contact-reach-3; both saved trajectories replay hold-free. The fixture-only probe readback ablation established no allocation benefit and produced no production/API change. SSAO key caching and the gaze step buffer removed isolated allocation sites but were rejected after worse full-scene drag captures. Future profiler reports distinguish observed GC triggers; native API constructor evidence does not explain all residual scene allocation. Next work should target proven recurring owned allocations while preserving history, visible telemetry and public contracts. GC remains and the overall goal is active.
 
 The user explicitly requested an immediate commit/push checkpoint even with unfinished work, followed by continued testing. Preserve that incomplete allocation status; do not present the current release's pointer sample or reflection reuse count as a sustained allocation benchmark. Large raw traces and diagnostic harnesses remain in ignored local test-results folders.
 
