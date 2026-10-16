@@ -5,6 +5,7 @@ from mathutils import Vector
 
 import bake
 import kit
+import makersmark
 import tram as hero_tram
 
 SLAB_W, SLAB_D = 10.0, 8.0
@@ -52,6 +53,7 @@ def build(root):
     x0, x1, y0, y1 = BLOCK
     atlas.add(kit.rounded_slab('Slab', SLAB_W, SLAB_D, 1.0, 0.55, (0, 0, 0), None, root), 'wood_dark')
     atlas.add(kit.rounded_slab('Slab_Base', SLAB_W + 0.16, SLAB_D + 0.16, 1.08, 0.12, (0, 0, -0.5), None, root), 'paint:#2b2420')
+    makersmark.build(root)
     atlas.add(kit.rounded_slab('Road', SLAB_W - 0.2, SLAB_D - 0.2, 0.92, 0.04, (0, 0, 0.04), None, root), 'asphalt')
     atlas.add(kit.box('Sidewalk', (x1 - x0, y1 - y0, 0.12), ((x0 + x1) / 2, (y0 + y1) / 2, GROUND - 0.06), None, root), 'paving')
     curb = [((x1 - x0 + 0.1, 0.1, 0.13), ((x0 + x1) / 2, y0, GROUND - 0.06)), ((0.1, y1 - y0, 0.13), (x0, (y0 + y1) / 2, GROUND - 0.06)),
