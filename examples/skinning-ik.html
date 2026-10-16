@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#edece6">
+  <title>The light keeper · Margo Engine</title>
+  <link rel="stylesheet" href="./skinning-ik/workshop.css">
+</head>
+<body>
+  <main id="viewport" aria-label="360 degree robot workshop. Drag the reflective orb to move the robot arm."></main>
+  <header><a class="brand" href="/">margo<span>engine</span></a><span class="edition">Interactive 3D experiences<br>for a brighter web.</span></header>
+  <section class="intro" aria-label="About this scene"><p class="eyebrow">A STUDY IN MOTION & LIGHT</p><h1>The light keeper.</h1><p>A small robot. A big curiosity.<br>Explore light, motion and reflection<br>in a handcrafted 3D workshop.</p><div class="manifesto"><i></i><span>SAME QUESTIONS.<br>A BRIGHTER WORLD.</span></div></section>
+  <button id="light-cue" class="light-note" type="button" aria-label="Pause or resume the moving light"><span>☼</span><em>Moving light</em></button>
+  <div class="scene-footer"><p>DRAG TO EXPLORE.<br>A BRIGHTER PERSPECTIVE.</p><div class="views" aria-label="Camera views"><span class="orbit-caption">↶<span>360° orbit</span></span><button id="view-close" type="button">Close-up</button><button id="view-room" type="button" class="active">Workshop</button><button id="view-back" type="button">Reverse</button></div><small>REAL-TIME 3D<br>IN YOUR BROWSER.</small></div>
+  <aside aria-label="Workshop controls">
+    <div class="panel-heading"><span>THE WORKSHOP</span><span>STUDY 02</span><i></i></div>
+    <h2>Follow your<br>curiosity.</h2><p class="panel-copy">Move the light. Explore the motion.<br>See the world from a different angle.</p>
+    <fieldset id="control-fields" disabled>
+      <legend>MOVE THE ORB</legend>
+      <label for="target-x">Side to side <output id="target-x-value">0.00</output></label><input id="target-x" type="range" min="-0.6" max="0.8" step="0.005" value="0">
+      <label for="target-y">Height <output id="target-y-value">0.00</output></label><input id="target-y" type="range" min="-0.65" max="0.65" step="0.005" value="0">
+      <label for="target-z">Near & far <output id="target-z-value">0.00</output></label><input id="target-z" type="range" min="-0.6" max="0.8" step="0.005" value="0">
+      <div class="readout"><span id="reach-state" role="status">Preparing workshop…</span><output id="distance">—</output></div>
+      <h3>OPTIONS</h3>
+      <label class="toggle"><span>Inverse kinematics</span><input id="ik-enabled" type="checkbox" checked></label>
+      <label class="toggle"><span>Show arm rig</span><input id="show-rig" type="checkbox"></label>
+      <label class="toggle"><span>Eye follows orb</span><input id="look" type="checkbox" checked></label>
+      <label class="toggle"><span>Moving light & shadows</span><input id="moving-light" type="checkbox" checked></label>
+      <label class="toggle"><span>Live orb reflections</span><input id="reflections" type="checkbox" checked></label>
+      <button class="reset" id="reset" type="button"><span>↻</span> Reset the workshop</button>
+      <details class="advanced"><summary>Explore the mechanics</summary>
+        <div class="presets"><button type="button" data-pose="home">Home</button><button type="button" data-pose="high">Overhead</button><button type="button" data-pose="front">In front</button><button type="button" data-pose="back">Behind</button><button type="button" data-pose="wide">Stretch</button><button type="button" data-pose="far">Too far?</button></div>
+        <label class="toggle"><span>Automatic updates</span><input id="auto-ik" type="checkbox" checked></label>
+        <button class="secondary" id="solve-once" type="button">Solve one step <span>↗</span></button>
+        <label class="toggle"><span>Camera follows orb</span><input id="follow" type="checkbox"></label>
+        <label class="toggle"><span>Orb on autopilot</span><input id="autopilot" type="checkbox"></label>
+        <label class="toggle"><span>Idle motion</span><input id="idle" type="checkbox" checked></label>
+      </details>
+    </fieldset>
+    <p id="error" role="alert"></p>
+    <details><summary>Make yourself at home</summary><p>Orbit a full 360°. Drag the orb with a mouse or one finger; drag elsewhere to orbit. Pinch to zoom. Use the sliders for precise placement.</p><p>Focus the scene: arrows orbit, Shift + arrows pan, + / − zoom. Focus the orb button: arrows move it, Page Up / Down change depth. Escape releases a drag.</p><button id="orb-keyboard" type="button" disabled>Move orb with keyboard</button></details>
+    <div class="panel-signoff"><i></i><p>CURIOSITY TURNS<br>IDEAS INTO MOTION.</p><span>❧</span></div>
+    <p class="credits">An original robot & workshop, made in Blender.<br>Scanned wood & stone: <a href="https://polyhaven.com/license" target="_blank" rel="noopener">Poly Haven · CC0</a>.<br>Rendered with Margo Engine. <a href="https://threejs.org/examples/#webgl_animation_skinning_ik" target="_blank" rel="noopener">Interaction inspiration ↗</a></p>
+  </aside>
+  <script type="module" src="./skinning-ik/main.ts"></script>
+</body>
+</html>

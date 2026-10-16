@@ -76,6 +76,7 @@ const layers = {
   'Animation and interaction': [
     'animation',
     'animator',
+    'kinematics-constraints',
     'tween',
     'cinematic',
     'controls',

@@ -31,6 +31,7 @@
     "packages/loaders",
     "packages/exporters",
     "packages/machinery",
+    "packages/kinematics-constraints",
     "packages/creative",
     "packages/scenery",
     "packages/margoengine",
@@ -165,6 +166,8 @@
     "build:site": "npm run catalog:build && node examples/package-benchmarks/entry-sizes.mjs && node scripts/gpu-lock.mjs run --owner=build-site -- npm run test:basic-scene && node scripts/build-site.js",
     "test:basic-scene": "node scripts/basic-scene-network.mjs",
     "site:check": "node scripts/site-check.mjs",
+    "dev:ik": "vite --host 127.0.0.1 --port 5191 --strictPort",
+    "build:ik": "npm run build:packages && node scripts/build-skinning-ik.mjs",
     "build:tokyo": "node scripts/build-tokyo-diorama.mjs",
     "test:tokyo": "node scripts/tokyo-diorama-browser-test.mjs"
   },
