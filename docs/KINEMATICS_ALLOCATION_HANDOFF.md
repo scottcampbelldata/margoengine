@@ -272,7 +272,7 @@ Leading stack/function observations include:
 
 Inclusive ancestor totals overlap and must not be added to source-own totals.
 
-### Constructor/type telemetry is still unresolved
+### Browser constructor attribution remains unresolved; Node type census completed
 
 **The current sampling profiles do not identify constructor names for BodyIK, target projection or HeadAim.**
 
@@ -280,7 +280,20 @@ Claims that these particular samples are Object literals, Array/Float32Array ins
 
 Several relevant routines already use retained outputs and scratch arrays. A function-entry sample is not proof of a newly allocated vector at a particular source expression.
 
-Next evidence should be a constructor/type census, allocation instrumentation with usable type attribution, or optimized-IR consumers tied to the actual hot path. Static heap snapshots alone can miss short-lived allocations collected between snapshots.
+An isolated Node 24.19.0 / V8 13.6.233.17-node.51 dead-type census has now completed with 10,000 warmup and 10,000 measured moving-target invocations per worker. Each kernel has a matched control performing identical precomputed target loads, authored-pose restoration, store ticks and checksum work. All eight measured windows had zero natural GC; source fingerprints were unchanged. Explicit GC occurred outside the measurement windows.
+
+| Actual robot path | Excess HeapNumber bytes / invocation | Other excess transient types |
+| --- | ---: | --- |
+| BodyIK targetAvoidance.resolveTarget | 67.10 | No excess ordinary object/array/typed-array types |
+| HeadAim | 294.51 | 568 bytes of the structural pattern below |
+| BodyIK without gaze callback | 26.36 | Some compilation artifacts; no matching head structural pattern |
+| Integrated BodyIK + HeadAim | 428.89 | Head pattern occurred 15,434 times across 10,000 invocations |
+
+The head pattern per occurrence is four JS_OBJECT, two FIXED_ARRAY, two FUNCTION_CONTEXT, one JS_FUNCTION, one ARRAY_ELEMENTS, one FIXED_DOUBLE_ARRAY, one JS_ARRAY_ITERATOR and one JS_ARRAY. These are actual V8 internal instance types, not JavaScript constructor names or line-level allocation stacks. HeadAim.commit currently calls Mesh.setQuaternion, whose implementation uses a map callback and destructuring; that is a concrete ablation target, not yet a proven causal attribution.
+
+Reports in the robot checkout: test-results/robot-type-census/reports/warm10k-moving.json and warm10k-moving-summary.json. The earlier 1,000-warmup census produced substantially more HeapNumbers, demonstrating that warmup/optimization state matters. Separate kernel workloads are not additive costs. Node counts do not certify Chromium allocation behavior or identify the browser upload cache's allocation types.
+
+Next evidence should connect these types to a controlled source-path ablation or optimized-IR consumers. Static heap snapshots alone can miss short-lived allocations collected between snapshots.
 
 ## Upload-cache comparison and unresolved regression
 
@@ -305,7 +318,33 @@ A separate fixed-render native ablation compared old draw, guard-only draw, full
 
 Report: native-upload-ablation.json. All phases preserved work and representative GPU bytes, but the large baseline-repeat improvement exposes an **order/warmup confound**. These numbers do not establish a cache win.
 
-Prepared rerun, not yet executed at this checkpoint:
+The globally warmed rerun has now completed (native-upload-ablation-warmed.json):
+
+| Variant | First measured bytes / render | Repeat bytes / render |
+| --- | ---: | ---: |
+| Baseline | 9,113.5 | 13,894.8 |
+| Guard-only | 14,048.5 | 14,234.1 |
+| Full cache | 14,307.8 | 14,363.5 |
+
+All variants received 600 warmup renders before measurement. Each phase retained 720 draws, 240 beauty draws, 120 deforms, 77 resources and bit-identical representative GPU uniforms. The first baseline remains markedly different from its repeat, so this same-document ablation still does not establish a stable cache allocation benefit. It did not collect GC counts or pause durations.
+
+### Fresh-page comparison with 30-second warmup
+
+Report: skinning-ik-profile-native-uniform-fresh-pages.json. Each phase created a fresh document, installed its implementation before scene creation, warmed for 30 seconds, and measured for approximately 12.2 seconds. Source hashes were unchanged and no browser errors were recorded.
+
+| Phase | Sampled MB/s | Minor GC | Major GC | Peak pause ms | Script duration s | Script ms / animation tick |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Baseline A | 0.805 | 10 | 1 | 1.040 | 1.320 | 1.805 |
+| Cache candidate | 0.759 | 12 | 1 | 1.255 | 1.725 | 2.362 |
+| Baseline B | 0.844 | 10 | 1 | 1.150 | 1.418 | 1.937 |
+
+The candidate sampled lower allocation than both baselines in this comparison. The earlier 1.134 MB/s regression was not reproduced. That does not prove its cause was exclusively order effects, nor does fresh-page navigation eliminate every process-wide GC or JIT confound.
+
+The candidate also used 0.425–0.557 ms more aggregate script time per animation tick. These are total ScriptDuration deltas divided by 730–732 animation ticks, not isolated cache timings or peak frame CPU durations. Total renderer work was close but not identical (175 candidate reflections versus 176–178 baseline reflections). Last published rolling frame p95 was 16.9 ms for the candidate versus 16.8 / 17.3 ms for the baselines, with all three average frame intervals approximately 16.67 ms. This is an idle/default-scene comparison; it does not establish the cache's active-drag frame cost or GPU staging savings.
+
+GC counts alone do not identify temporary metadata, retained growth or allocation types. A matched active interaction comparison and concrete allocation attribution remain necessary before the final keep/revise decision.
+
+The fixed-render ablation script and diagnostics remain available:
 
 - Script: test-results/profile-native-upload-ablation.mjs.
 - Warm 600 renders of every variant before measurement.
@@ -317,7 +356,7 @@ Keep or revise the PBR cache only after a controlled benefit is established. Pre
 
 ## Remaining investigation and rejected paths
 
-1. Run the globally warmed native-cache ablation and resolve the candidate regression.
+1. Follow the completed warmed and fresh-page comparisons with active-interaction CPU/frame evidence, then make the cache keep/revise decision.
 2. Identify actual allocation types/IR consumers for BodyIK, target projection, HeadAim and the other drag hotspots.
 3. Reduce measured owned allocations, rerun numerical/mesh and interaction checks, and retain only improvements.
 4. Rebuild the standalone robot and repeat sustained warmed idle/drag profiles, including GC and actual skinned clearance.
@@ -359,7 +398,9 @@ Use fresh report labels for further captures. Keep source/dist frozen and avoid 
 
 ## Immediate handoff
 
-The latest user request was to put the work into Markdown and explain the next action. This document is that checkpoint.
+The latest user request is to compare the fresh-page repeat baseline and determine whether the candidate's added script work affects active interaction frame times.
 
-At this checkpoint no native ablation is running. The improved warmed rerun is prepared and awaiting execution. The constraints lab is running the committed contact-reach-3 controller; both saved complete trajectories replay hold-free. The robot preview has been rebuilt, but allocation-driven GC remains and the pending upload changes still need their final controlled performance decision.
+The warmed fixed-render rerun, isolated fresh-page idle comparison and separate Node type census have completed. A fresh-page continuous-drag comparison and controlled HeadAim ablation are being prepared. The constraints lab is running the committed contact-reach-3 controller; both saved complete trajectories replay hold-free. The robot preview has been rebuilt, but allocation-driven GC remains and the pending upload changes still need their final controlled performance decision.
+
+Package/demo boundary: reusable runtime changes are made in the owning optional packages. The contact-gradient sliding and generated-waypoint reach conditioning currently remain in examples/kinematics-constraints-controller.js, not the public kinematics-constraints solver. Recorder/profiler code is diagnostic-only. Do not present those demo adapter behaviors as current public package capabilities.
 
