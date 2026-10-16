@@ -132,6 +132,7 @@ jobs:
             test-results/modern-bundle-sizes.json
             test-results/modern-game.json
             test-results/modern-temporal.json
+            test-results/local-shadows-webgpu.json
             test-results/modern-xr.json
             test-results/modern-usdz.json
             test-results/gltf-compression-browser/report.json

@@ -32,7 +32,7 @@ export const cullingShader=declarations(0)+/* wgsl */`
   }
   clusterCounts[id]=count;
 }`;
-export function clusteredSampling(group:number):string {return declarations(group)+/* wgsl */`
+export function clusteredSampling(group:number,shadows=false):string {const code=declarations(group)+/* wgsl */`
 @group(${group}) @binding(6) var<storage,read> clusterCounts:array<u32>;
 @group(${group}) @binding(7) var<storage,read> clusterIndices:array<u32>;
 fn clusterLighting(pixel:vec2f,position:vec3f,n:vec3f,eye:vec3f,base:vec3f,roughness:f32,metal:f32)->vec3f {
@@ -55,4 +55,39 @@ fn clusterLighting(pixel:vec2f,position:vec3f,n:vec3f,eye:vec3f,base:vec3f,rough
     result+=((1-fresnel)*(1-metal)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone;
   }
   return result*clusterFrame.intensity.x;
-}`;}
+}`;return shadows?localShadowSampling(group)+code.replace('*falloff*cone;','*falloff*cone*clusterShadowVisibility(light,position,n);'):code;}
+
+/** Bindings 8/9 are already used by optional camera, sky and terrain effects. */
+function localShadowSampling(group:number):string {return /* wgsl */`
+struct ClusterShadowFace {matrix:mat4x4f,settings:vec4f}
+@group(${group}) @binding(16) var<storage,read> clusterShadowFaces:array<ClusterShadowFace>;
+@group(${group}) @binding(17) var clusterShadowMap:texture_depth_2d_array;
+@group(${group}) @binding(18) var clusterShadowSampler:sampler_comparison;
+fn clusterShadowFace(direction:vec3f)->u32 {
+  let axis=abs(direction);
+  if(axis.x>=axis.y&&axis.x>=axis.z){return select(1u,0u,direction.x>=0.0);}
+  if(axis.y>=axis.z){return select(3u,2u,direction.y>=0.0);}
+  return select(5u,4u,direction.z>=0.0);
+}
+fn clusterShadowVisibility(light:ClusterLight,position:vec3f,normal:vec3f)->f32 {
+  if(light.params.z<1.0){return 1.0;}
+  var layer=(u32(light.params.z)-1u)*6u;
+  let settings=clusterShadowFaces[layer].settings;
+  let receiver=position+normal/max(length(normal),0.000001)*settings.y;
+  if(light.params.y<0.5){layer+=clusterShadowFace(receiver-light.positionRange.xyz);}
+  let face=clusterShadowFaces[layer];
+  let clip=face.matrix*vec4f(receiver,1);
+  if(clip.w<=0.0){return 1.0;}
+  let projected=clip.xyz/clip.w;
+  let uv=projected.xy*vec2f(0.5,-0.5)+0.5;
+  let reference=projected.z-face.settings.x;
+  if(any(uv<vec2f(0))||any(uv>vec2f(1))||reference<=0.0||reference>=1.0){return 1.0;}
+  let dimensions=vec2f(textureDimensions(clusterShadowMap));let texel=1.0/dimensions;
+  var visibility=0.0;
+  for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){
+    let sampleUV=clamp(uv+vec2f(f32(x),f32(y))*texel,texel*0.5,vec2f(1)-texel*0.5);
+    visibility+=textureSampleCompareLevel(clusterShadowMap,clusterShadowSampler,sampleUV,i32(layer),reference);
+  }}
+  return visibility/9.0;
+}
+`;}

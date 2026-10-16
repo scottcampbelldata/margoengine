@@ -106,7 +106,7 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 | `@margoengine/animation` | Optional storage-buffer skeletal skinning, compute morphs and glTF animation playback |
 | `@margoengine/post` | Optional frame-graph SSAO, view-space normal/depth extraction and bilateral blur |
 | [`@margoengine/shadows`](packages/shadows/README.md) | Four directional cascades, PCSS, cached static depth and dynamic casters |
-| [`@margoengine/clustered`](packages/clustered/README.md) | Compute frustum clusters and forward PBR for up to 1,024 point/spot lights |
+| [`@margoengine/clustered`](packages/clustered/README.md) | Compute frustum clusters and forward PBR for up to 1,024 point/spot lights, with optional local shadows |
 | [`@margoengine/vfx`](packages/vfx/README.md) | Up to 1,000,000 GPU particles, curl turbulence, collisions and indirect billboards |
 | [`@margoengine/animator`](packages/animator/README.md) | Gameplay states, 1D/2D blending, additive masks and analytical foot IK |
 | [`@margoengine/taa`](packages/taa/README.md) | Halton jitter, mesh/skinned velocity, depth-tested history and YCoCg clamping |
@@ -179,7 +179,7 @@ lobes affect directional lighting and fixed hemispherical ambient; clustered and
 environment lighting retain their base PBR response. Three.js TSL remains unsupported.
 These features stay outside the frozen core and stage bundle.
 
-Verification on 16 October 2026 passed 1,057 Node 24 tests, strict TypeScript checks
+Verification on 16 October 2026 passed 1,094 Node 24 tests, strict TypeScript checks
 and packed imports across all 63 packages, the existing production browser
 regressions, 42 node-material captures, 59 additional-lobe captures, 82 texture
 captures, complete Khronos material/KTX2/UV1 assets, and eight-influence character

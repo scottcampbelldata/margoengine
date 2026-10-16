@@ -20,7 +20,7 @@ Add these in order. Each one is a file that fails today.
 
 These are smaller than the four file gaps.
 
-5. **Shadows from point and spot lights.** `@margoengine/clustered` already lights them and states that they do not cast shadows. Directional cascades in `@margoengine/shadows` stay as they are. Local-light shadows are a new pass in the clustered or shadows package.
+5. **Done: Shadows from point and spot lights.** Opt-in `ClusteredOptions.shadows` adds bounded depth-array maps and `shadow:true` or per-light near/bias settings. Point lights render six perspective faces; spots render their cone. Explicit caster registration supports core and glTF Pro geometry, alpha masks, transformed UV1 and deformed vertex buffers. Core, PBR and terrain receive the shadows. Lighting bindings 16–18 avoid TAA/sky/terrain resources and leave the material slot at group 3. Directional cascades in `@margoengine/shadows` remain unchanged.
 
 6. **Picking on a skinned or morphed mesh.** `engine.pick` and `@margoengine/bvh` miss those draws. `@margoengine/selection` excludes them. The pick has to use the deformed vertex buffer the animation package already writes.
 
@@ -32,7 +32,7 @@ Crossfades, blend trees, and additive layers already live in `@margoengine/anima
 
 ## Verification of file items 1–4
 
-- 1,057 tests pass on Node 24, with no failures or skips. Strict typechecks and packed runtime imports cover all 63 packages.
+- 1,094 tests pass on Node 24, with no failures or skips. Strict typechecks and packed runtime imports cover all 63 packages.
 - `npm run modern:test:extensions` includes the original PBR/material regressions and the new `modern:test:gltf-parity` browser checks.
 - 82 texture captures verify PBR and optional material transforms against baked UVs. Transformed alpha-mask shadow depths match across all four directional cascades. Ordinary shader/frame hashes and identity-transform pixels remain exact.
 - Real ETC1S/UASTC textures upload all mips through RGBA fallback and native BC7 paths. A production Vite consumer emits and fetches Basis workers/Wasm, renders, and disposes every worker and texture.
@@ -44,9 +44,17 @@ Crossfades, blend trees, and additive layers already live in `@margoengine/anima
 
 Fixture sources, pinned hashes and attribution are recorded in [the production asset guide](../scripts/support/gltf-production-assets.README.md), [the material-lobe asset guide](../scripts/support/MATERIAL-LOBE-ASSETS.md), and [the skinning fixture guide](../packages/animation/tests/fixtures/README.md). Larger binaries stay in the ignored test cache.
 
+## Verification of local-light shadows
+
+- `npm run modern:test:local-shadows` exercises 45 actual frame captures, core/PBR/terrain receivers, point and spot motion, independent unshadowed lights, alpha-mask transforms, TAA composition and both directional registration orders.
+- All six point faces match independent analytic depth values within 1.3e-7; GPU sampling independently reports lit and occluded reference points on every face. Disabled maps, removed casters, registration order and device restoration preserve exact pixels.
+- All 39 shader modules compile without errors, and all 288 tracked GPU resources are destroyed. The hardware run uses an NVIDIA RTX A6000 without software fallback; the same checks also pass with bundled Chromium and SwiftShader. A face-boundary test proves normal bias selects the correct point face and prevents a lit seam.
+- Clustered unit regressions retain the original unshadowed shader hashes and bindings. Steady shadow frames reuse buffers, bind groups, pipelines, shaders and typed-array views. Limits, invalid replacements, setup/draw failures and restoration have cleanup checks.
+- Directional shadow sources and frozen core/stage sources are unchanged. Local shadows use a fixed comparison filter; custom-only terrain casters and area-light penumbrae remain outside this implementation. Terrain receives shadows.
+
 ## Done when
 
-File items 1–4 are implemented. Scene items 5–6 remain separate work.
+File items 1–4 and local-light shadows in item 5 are implemented. Picking in item 6 remains separate work.
 
 - A glTF with a KTX2 texture, a texture transform, and eight influences loads through `loadGLTF` and `@margoengine/animation`.
 - Sheen, specular, anisotropy, and iridescence attach through group 3. Zero sheen/aniso/iridescence and neutral specular match baseline pixels exactly; glTF specular factor 0 correctly removes dielectric reflection instead.

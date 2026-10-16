@@ -1,6 +1,8 @@
 import * as module0 from '@margoengine/input';
 import {materialLobes,sheen,specular,anisotropy,iridescence,type MaterialLobeOptions} from '@margoengine/materials';
 import type {MaterialExtension} from '@margoengine/gltf-pro';
+import {Clustered,type LocalShadowOptions,type LocalLightShadow,type PointLight} from '@margoengine/clustered';
+import type {PBRModel} from '@margoengine/gltf-pro';
 import {preload,Group,Html,type CanvasProps,type PointerHandlers,type MargoContextValue} from '@margoengine/react';
 
 export const demandCanvas:CanvasProps={frameloop:'demand'};
@@ -9,6 +11,18 @@ export function reactCanvasContext(context:MargoContextValue):number {context.in
 export const optionalReactComponents=[Group,Html,preload];
 // @ts-expect-error Canvas accepts only the two supported frame loops.
 export const invalidFrameLoop:CanvasProps={frameloop:'sometimes'};
+
+export function localLightShadows(engine:import('@margoengine/core').EngineKernel,mesh:import('@margoengine/core').Mesh,model:PBRModel) {
+  const shadows:LocalShadowOptions={resolution:256,maxLights:2};
+  const shadow:LocalLightShadow={near:0.05,bias:0.0005,normalBias:0.01};
+  const point:PointLight={position:[0,3,0],range:12,shadow};
+  const lights=Clustered.attach(engine,{shadows});
+  lights.setLights([point,{position:[2,3,0],range:10,direction:[0,-1,0],outerAngle:0.6,shadow:true}]);
+  const remove=lights.addShadowCaster(mesh),removeModel=lights.addShadowCaster(model);lights.add(model);
+  // @ts-expect-error Shadow activation is boolean or numeric configuration.
+  lights.setLights([{position:[0,0,0],range:1,shadow:'yes'}]);
+  return ()=>{remove();removeModel();lights.dispose();};
+}
 
 export function materialExtensions(view:GPUTextureView,sampler:GPUSampler):MaterialExtension {
   const options:MaterialLobeOptions={ior:1.5,sheen:{colorFactor:[0.3,0.2,0.1],sheenColorTexture:{view,sampler,texCoord:1,transform:{offset:[0.2,0.1],rotation:0.3,scale:[0.5,0.75]}}},specular:{factor:0.8,colorFactor:[2,1,0.5]},anisotropy:{strength:0.5,rotation:0.2},iridescence:{factor:0.6,ior:1.3,thicknessMinimum:100,thicknessMaximum:400}};

@@ -60,9 +60,28 @@ does not announce an npm publication or a package version change.
   aliases. The FBX suite includes a reproducible CC0 Blender rig and required
   real-file skinning, playback, seek and restoration checks.
 
+### Local-light shadows
+
+- `@margoengine/clustered` adds opt-in point and spot shadow maps with explicit
+  caster registration, alpha-mask/UV1 transforms, per-light bias settings and
+  device restoration. Core, PBR and terrain receive the shadows; directional
+  cascades and frozen core/stage sources remain unchanged. The GPU checks cover
+  45 captures, all six point faces, TAA and directional composition, and release
+  all 288 tracked GPU resources. Unshadowed shaders and bindings remain exact.
+
+### React scene ergonomics
+
+- Canvas-level pointer events use the engine's existing picking path, serialize
+  GPU readbacks, and coalesce hover updates. Clicks distinguish dragging; the
+  WebGL fallback skips unsupported picking.
+- Suspense, a canvas-owned source cache and `preload()` retain independent model
+  instances and abort unused pending loads. Hooks expose camera, size, engine,
+  clock and invalidation; `Group`/`group`, demand rendering and optional `Html`
+  stay in `@margoengine/react`. All 45 React lifecycle tests pass on Node 24.
+
 ### Verification and footprint
 
-- The workspace build passes. The full Node 24 suite passes **1,057 tests**, with
+- The workspace build passes. The full Node 24 suite passes **1,094 tests**, with
   zero failures or skips. Strict TypeScript checks and packed exports/imports
   pass across **all 63 packages**, including strict Bundler and NodeNext consumers.
 - Regression coverage includes real normalized Draco UV/color data, index
