@@ -1,6 +1,7 @@
 // Worker-side decode functions. Kept free of worker globals so unit tests can drive them with real or mock modules.
 import {transcodeFormats} from './formats.js';
 import type {DecodedDracoGeometry, DracoRequest, KTX2Mip, TranscodeTarget, TranscodedKTX2Result} from './protocol.js';
+import {validatedDracoLimits} from './protocol.js';
 
 export type ScriptLoader = (url: string) => Promise<void>;
 
@@ -43,13 +44,13 @@ const dracoTypes: Record<number, [string, any]> = {
   5123: ['DT_UINT16', Uint16Array], 5125: ['DT_UINT32', Uint32Array], 5126: ['DT_FLOAT32', Float32Array],
 };
 const integerRange: Record<string, number> = {DT_INT8: 127, DT_UINT8: 255, DT_INT16: 32767, DT_UINT16: 65535, DT_INT32: 2147483647, DT_UINT32: 4294967295};
-const vertexLimit = 16_777_216;
 
 /**
  * Decode one Draco buffer. Every Draco handle and heap allocation is released before returning, including on error,
  * and every output array is a copy that owns its own buffer so it can be transferred.
  */
 export function decodeDraco(draco: any, bytes: Uint8Array, request: DracoRequest = {}): DecodedDracoGeometry {
+  const limits = validatedDracoLimits(request.limits);
   const decoder = new draco.Decoder(), buffer = new draco.DecoderBuffer();
   let geometry: any = null;
   try {
@@ -61,39 +62,60 @@ export function decodeDraco(draco: any, bytes: Uint8Array, request: DracoRequest
     else throw new Error('Draco: unknown geometry type');
     if (!status.ok() || !geometry.ptr) throw new Error('Draco: ' + status.error_msg());
     const vertexCount: number = geometry.num_points();
-    if (!vertexCount || vertexCount > vertexLimit) throw new RangeError('Draco: invalid vertex count');
+    if (!Number.isSafeInteger(vertexCount) || vertexCount < 1 || vertexCount > limits.maxVertices) throw new RangeError('Draco: invalid vertex count or vertex limit exceeded');
+    const faces: number = kind === draco.TRIANGULAR_MESH ? geometry.num_faces() : 0;
+    if (!Number.isSafeInteger(faces) || faces < (kind === draco.TRIANGULAR_MESH ? 1 : 0)) throw new RangeError('Draco: invalid face count');
+    const indexCount = faces * 3, wide = vertexCount >= 65536, indexBytes = indexCount * (wide ? 4 : 2);
+    if (!Number.isSafeInteger(indexCount) || indexCount > limits.maxIndices || !Number.isSafeInteger(indexBytes)) throw new RangeError('Draco: index limit exceeded');
+    let decodedBytes = indexBytes;
+    if (decodedBytes > limits.maxDecodedBytes) throw new RangeError('Draco: decoded byte limit exceeded');
     const byId = request.attributeIds !== undefined;
     const ids: Record<string, number> = request.attributeIds ?? {};
     if (!byId) for (const [semantic, type] of [['POSITION', 'POSITION'], ['NORMAL', 'NORMAL'], ['TEXCOORD_0', 'TEX_COORD'], ['COLOR_0', 'COLOR']]) {
       const id = decoder.GetAttributeId(geometry, draco[type]);
       if (id >= 0) ids[semantic] = id;
     }
-    const result: DecodedDracoGeometry = {vertexCount, positions: undefined as unknown as Float32Array, attributes: {}};
+    if (!byId && !Object.hasOwn(ids, 'POSITION')) throw new Error('Draco: geometry has no POSITION attribute');
+    const descriptors: {semantic: string; attribute: any; field: typeof fields[string] | undefined; componentType: number; requestedType: number | undefined; name: string; Ctor: any; itemSize: number; count: number; byteLength: number}[] = [];
     for (const [semantic, id] of Object.entries(ids)) {
       if (!Number.isSafeInteger(id) || id < 0) throw new TypeError(`Draco: invalid attribute id for ${semantic}`);
       const attribute = byId ? decoder.GetAttributeByUniqueId(geometry, id) : decoder.GetAttribute(geometry, id);
       if (!attribute || !attribute.ptr) throw new Error(`Draco: missing attribute ${semantic}`);
-      const field = fields[semantic], componentType = field ? 5126 : request.componentTypes?.[semantic] ?? 5126, type = dracoTypes[componentType];
+      const field = fields[semantic], requestedType = request.componentTypes?.[semantic], componentType = requestedType ?? 5126, type = dracoTypes[componentType];
       if (!type) throw new TypeError(`Draco: unsupported component type ${componentType} for ${semantic}`);
       const [name, Ctor] = type, itemSize: number = attribute.num_components(), count = vertexCount * itemSize, byteLength = count * Ctor.BYTES_PER_ELEMENT;
-      if (itemSize < 1 || itemSize > 16) throw new RangeError(`Draco: invalid ${semantic} width`);
+      if (!Number.isSafeInteger(itemSize) || itemSize < 1 || itemSize > 16) throw new RangeError(`Draco: invalid ${semantic} width`);
+      if (limits.attributeWidths?.[semantic] !== undefined && limits.attributeWidths[semantic] !== itemSize) throw new RangeError(`Draco: ${semantic} width does not match accessor`);
+      const outputBytes = field ? count * Float32Array.BYTES_PER_ELEMENT : byteLength;
+      if (!Number.isSafeInteger(count) || !Number.isSafeInteger(byteLength) || !Number.isSafeInteger(outputBytes) || outputBytes > limits.maxDecodedBytes - decodedBytes) throw new RangeError('Draco: decoded byte limit exceeded');
+      decodedBytes += outputBytes;
+      descriptors.push({semantic, attribute, field, componentType, requestedType, name, Ctor, itemSize, count, byteLength});
+    }
+    // The entire primitive must pass metadata preflight before any output allocation or Draco extraction.
+    const result: DecodedDracoGeometry = {vertexCount, positions: new Float32Array(0), attributes: {}};
+    for (const {semantic, attribute, field, componentType, requestedType, name, Ctor, itemSize, count, byteLength} of descriptors) {
       const pointer = draco._malloc(byteLength);
+      if (!pointer) throw new Error('Draco: could not allocate attribute output');
       let array: any;
       try {
         if (!decoder.GetAttributeDataArrayForAllPoints(geometry, attribute, draco[name], byteLength, pointer)) throw new Error(`Draco: could not read ${semantic}`);
         array = new Ctor(draco.HEAPU8.buffer, pointer, count).slice();
       } finally {draco._free(pointer);}
+      if (field) array = array instanceof Float32Array ? array : Float32Array.from(array);
       if (field === 'colors') {
-        const source = Object.keys(integerRange).find(key => draco[key] === attribute.data_type());
-        if (source) {const scale = 1 / integerRange[source]; for (let i = 0; i < array.length; i++) array[i] = Math.max(-1, array[i] * scale);}
+        // Native float conversion honors Draco's normalized flag. Explicit accessor types
+        // retain integer values, so normalize those once using the requested type.
+        const source = requestedType !== undefined ? name : !attribute.normalized?.() ? Object.keys(integerRange).find(key => draco[key] === attribute.data_type()) : undefined;
+        if (source && integerRange[source]) {const scale = 1 / integerRange[source]; for (let i = 0; i < array.length; i++) array[i] = Math.max(-1, array[i] * scale);}
         result.colorSize = itemSize;
       }
       if (field) result[field] = array;
       else result.attributes[semantic] = {array, itemSize, componentType};
     }
-    if (!result.positions) throw new Error('Draco: geometry has no POSITION attribute');
+    if (!result.positions.length && (!byId || Object.hasOwn(ids, 'POSITION'))) throw new Error('Draco: geometry has no POSITION attribute');
     if (kind === draco.TRIANGULAR_MESH) {
-      const count = geometry.num_faces() * 3, wide = vertexCount > 65536, byteLength = count * (wide ? 4 : 2), pointer = draco._malloc(byteLength);
+      const count = indexCount, byteLength = indexBytes, pointer = draco._malloc(byteLength);
+      if (!pointer) throw new Error('Draco: could not allocate index output');
       try {
         const ok = wide ? decoder.GetTrianglesUInt32Array(geometry, byteLength, pointer) : decoder.GetTrianglesUInt16Array(geometry, byteLength, pointer);
         if (!ok) throw new Error('Draco: could not read indices');

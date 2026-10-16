@@ -1,5 +1,6 @@
 import {WorkerPool, payload, requireWorkers, workerLimit} from './pool.js';
 import type {DecodedDracoGeometry, DracoRequest} from './protocol.js';
+import {validatedDracoLimits} from './protocol.js';
 
 export interface DracoOptions {
   /** Folder holding draco_wasm_wrapper.js and draco_decoder.wasm, e.g. 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/'. Defaults to the copy bundled with this package. */
@@ -30,9 +31,10 @@ export class DracoDecoder {
     try {
       requireWorkers('DracoDecoder');
       if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('Aborted', 'AbortError');
+      const limits = validatedDracoLimits(options.limits);
       const buffer = payload(data, options.transfer ?? false), {attributeIds, componentTypes} = options;
       this.pool ??= new WorkerPool(this.workerLimit);
-      return this.pool.run<DecodedDracoGeometry>({type: 'draco', buffer, request: {attributeIds, componentTypes}, ...this.urls()}, [buffer], options.signal);
+      return this.pool.run<DecodedDracoGeometry>({type: 'draco', buffer, request: {attributeIds, componentTypes, limits}, ...this.urls()}, [buffer], options.signal);
     } catch (error) {return Promise.reject(error);}
   }
 

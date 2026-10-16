@@ -6,12 +6,13 @@ import {tmpdir} from 'node:os';
 import {openBrowser} from './browser.js';
 
 const names=['core','gltf','react','machinery','creative','scenery','gltf-pro','animation','post','shadows','clustered','vfx','animator','taa','splats','terrain','environment','controls','margoengine'],npm=process.env.npm_execpath;
+const packedNames=[...names,'decoders'];
 const packageName=name=>name==='margoengine'?'margoengine':`@margoengine/${name}`;
 assert.ok(npm,'Run this check through npm run modern:test:packages');
 const archives=resolve('test-results/modern-packages');await mkdir(archives,{recursive:true});
 const dependencies={react:'18.3.1','react-dom':'18.3.1','@types/react':'^18.3.0','@types/react-dom':'^18.3.0','@testing-library/react':'16.3.3',jsdom:'26.1.0'};
 for(const name of ['core','react'])await writeFile(`packages/${name}/dist/__stale-package-test.js`,'throw new Error("Stale build artifact");');
-for(const name of names){
+for(const name of packedNames){
   const [pack]=JSON.parse(execFileSync(process.execPath,[npm,'pack','--workspace',packageName(name),'--pack-destination',archives,'--json'],{encoding:'utf8'})),files=new Set(pack.files.map(file=>file.path));
   assert.ok(pack.files.every(file=>['package.json','README.md','LICENSE'].includes(file.path)||file.path.startsWith('dist/')));
   assert.ok(files.has('README.md')&&files.has('LICENSE'));assert.ok(!files.has('dist/__stale-package-test.js'));
@@ -98,8 +99,9 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
   await copyFile('packages/gltf-pro/src/shader.ts',join(fixture,'gltf-pro/src/shader.ts'));
   execFileSync(process.execPath,['--experimental-test-module-mocks','--test',join(fixture,'react/test/declarative.test.js'),join(fixture,'react/tests/react.test.js')],{cwd:fixture,stdio:'inherit'});
   const aliases={'@margoengine/core/extension':join(fixture,'node_modules/@margoengine/core/dist/extension.js'),react:join(fixture,'node_modules/react'),'react-dom':join(fixture,'node_modules/react-dom')};
+  aliases['@margoengine/decoders/meshopt']=join(fixture,'node_modules/@margoengine/decoders/dist/meshopt.js');
   aliases['@margoengine/core/extension']=join(fixture,'node_modules/@margoengine/core/dist/extension.js');
-  for(const name of names)aliases[packageName(name)]=join(fixture,`node_modules/${packageName(name)}/dist/index.js`);
+  for(const name of packedNames)aliases[packageName(name)]=join(fixture,`node_modules/${packageName(name)}/dist/index.js`);
   browser=await openBrowser({startPath:'/tests/modern.html',aliases});const {page}=browser,errors=[];
   page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
   await page.waitForFunction(()=>window.modern);await page.evaluate(()=>window.modern.mount());
@@ -113,7 +115,7 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
   await page.evaluate(()=>window.modern.unmount());assert.ok(await page.evaluate(()=>window.modern.state.react.disposed));assert.equal(await page.evaluate(()=>window.modern.state.react.meshes.size),0);
   assert.deepEqual(await page.evaluate(()=>window.modern.state.errors),[]);assert.deepEqual(errors,[]);
   const react=JSON.parse(await readFile(join(fixture,'node_modules/react/package.json'),'utf8')).version;
-  await writeFile('test-results/modern-packages.json',JSON.stringify({hardware:browser.hardware,packages:names.map(packageName),react,checks:['standalone imports and Wasm','strict consumer declarations without workspace ambient types','React 18 SSR','React 18 declarative lifecycle unit tests','React 18 StrictMode, nested refs, props, RAF, Suspense and teardown']},null,2));
+  await writeFile('test-results/modern-packages.json',JSON.stringify({hardware:browser.hardware,packages:packedNames.map(packageName),react,checks:['standalone imports and Wasm','strict consumer declarations without workspace ambient types','React 18 SSR','React 18 declarative lifecycle unit tests','React 18 StrictMode, nested refs, props, RAF, Suspense and teardown']},null,2));
   console.log(`React ${react} packaged browser lifecycle passes`);
 }finally{
   await browser?.close();

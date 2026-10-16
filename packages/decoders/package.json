@@ -26,6 +26,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./meshopt": {
+      "types": "./dist/meshopt.d.ts",
+      "import": "./dist/meshopt.js"
     }
   },
   "files": [

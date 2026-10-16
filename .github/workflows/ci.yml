@@ -71,6 +71,11 @@ jobs:
         env:
           BROWSER_CHANNEL: chromium
           BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
+      - name: Verify production compressed glTF loading with bundled workers and Wasm
+        run: npm run modern:test:gltf-compression
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
       - name: Verify offline .margo PBR, textures and device restoration
         run: npm run modern:test:blender
         env:
@@ -126,6 +131,7 @@ jobs:
             test-results/modern-temporal.json
             test-results/modern-xr.json
             test-results/modern-usdz.json
+            test-results/gltf-compression-browser/report.json
             test-results/modern-blender.json
             test-results/blender/render-*.png
             test-results/modern-postfx.json

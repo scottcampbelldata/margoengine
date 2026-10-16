@@ -11,4 +11,6 @@ test('core + stage gate rejects the ceiling and any excess', async () => {
   assert.ok(modules.some(path => path.includes('/packages/margoengine/')));
   assert.ok(modules.some(path => path.includes('/packages/core/')));
   assert.ok(modules.every(path => !path.replaceAll('\\', '/').includes('/packages/kinematics-constraints/')), 'Kinematics constraints entered core + stage');
+  for (const name of ['decoders', 'gltf-pro'])
+    assert.ok(modules.every(path => !path.replaceAll('\\', '/').includes(`/packages/${name}/`)), name + ' entered core + stage');
 });

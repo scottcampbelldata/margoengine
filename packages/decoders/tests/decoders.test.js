@@ -171,10 +171,14 @@ test('worker errors, crashes, aborts and disposal reject only the affected jobs'
 });
 
 /** Records every Draco handle and allocation so release can be asserted. */
-function mockDraco({kind = 1, ok = true, attributes = {POSITION: 3}, points = 4, faces = 2} = {}) {
-  const log = {created: [], destroyed: [], malloc: [], free: []}, heap = new ArrayBuffer(4096);
+function mockDraco({kind = 1, ok = true, attributes = {POSITION: 3}, points = 4, faces = 2, attributeTypes = {}, normalized = [], values = {}} = {}) {
+  const log = {created: [], destroyed: [], malloc: [], free: [], reads: []}, heap = new ArrayBuffer(4096);
   let top = 8;
   const handle = name => {const h = {ptr: 1, name}; log.created.push(h); return h;};
+  const attribute = id => {
+    const semantic = Object.keys(attributes)[id];
+    return semantic === undefined ? {ptr: 0} : {ptr: 1, semantic, num_components: () => attributes[semantic], data_type: () => attributeTypes[semantic] ?? 9, normalized: () => normalized.includes(semantic)};
+  };
   const draco = {
     TRIANGULAR_MESH: 1, POINT_CLOUD: 2, POSITION: 0, NORMAL: 1, TEX_COORD: 2, COLOR: 3,
     DT_INT8: 1, DT_UINT8: 2, DT_INT16: 3, DT_UINT16: 4, DT_INT32: 5, DT_UINT32: 6, DT_FLOAT32: 9,
@@ -186,11 +190,18 @@ function mockDraco({kind = 1, ok = true, attributes = {POSITION: 3}, points = 4,
         DecodeBufferToMesh: () => ({ok: () => ok, error_msg: () => 'corrupt'}),
         DecodeBufferToPointCloud: () => ({ok: () => ok, error_msg: () => 'corrupt'}),
         GetAttributeId: (_g, type) => Object.keys(attributes).indexOf(['POSITION', 'NORMAL', 'TEXCOORD_0', 'COLOR_0'][type]),
-        GetAttribute: (_g, id) => ({ptr: 1, num_components: () => Object.values(attributes)[id], data_type: () => 9}),
-        GetAttributeByUniqueId: (_g, id) => id === 99 ? {ptr: 0} : {ptr: 1, num_components: () => 3, data_type: () => 9},
-        GetAttributeDataArrayForAllPoints: (_g, _a, _t, bytes, ptr) => {new Float32Array(heap, ptr, bytes / 4).fill(0.5); return true;},
-        GetTrianglesUInt16Array: (_g, bytes, ptr) => {new Uint16Array(heap, ptr, bytes / 2).forEach((_, i, a) => {a[i] = i % points;}); return true;},
-        GetTrianglesUInt32Array: () => true,
+        GetAttribute: (_g, id) => attribute(id),
+        GetAttributeByUniqueId: (_g, id) => attribute(id),
+        GetAttributeDataArrayForAllPoints: (_g, a, type, bytes, ptr) => {
+          log.reads.push('attribute');
+          const Ctor = {1: Int8Array, 2: Uint8Array, 3: Int16Array, 4: Uint16Array, 6: Uint32Array, 9: Float32Array}[type];
+          const array = new Ctor(heap, ptr, bytes / Ctor.BYTES_PER_ELEMENT), source = values[a.semantic] ?? [0.5];
+          const scale = type === 9 && a.normalized() ? ({1: 127, 2: 255, 3: 32767, 4: 65535, 6: 4294967295}[a.data_type()] ?? 1) : 1;
+          array.forEach((_, i) => {array[i] = source[i % source.length] / scale;});
+          return true;
+        },
+        GetTrianglesUInt16Array: (_g, bytes, ptr) => {log.reads.push('indices16'); new Uint16Array(heap, ptr, bytes / 2).forEach((_, i, a) => {a[i] = i % points;}); return true;},
+        GetTrianglesUInt32Array: () => {log.reads.push('indices32'); return true;},
       });
       return d;
     },
@@ -232,6 +243,135 @@ test('mock decode releases memory on every failure path', () => {
   }
 });
 
+test('Draco named channels honor accessor component types and normalize colors once', () => {
+  const config = {attributes: {POSITION: 3, TEXCOORD_0: 2, COLOR_0: 4}, points: 3, faces: 1,
+    attributeTypes: {TEXCOORD_0: 2, COLOR_0: 2}, normalized: ['TEXCOORD_0', 'COLOR_0'],
+    values: {TEXCOORD_0: [0, 255], COLOR_0: [255, 128, 0, 255]}};
+  const {draco} = mockDraco(config);
+  const result = decodeDraco(draco, new Uint8Array(8), {attributeIds: {POSITION: 0, TEXCOORD_0: 1, COLOR_0: 2}, componentTypes: {POSITION: 5126, TEXCOORD_0: 5121, COLOR_0: 5121}});
+  assert.ok(result.uvs instanceof Float32Array && result.colors instanceof Float32Array, 'named channel public types stay Float32');
+  assert.deepEqual([...result.uvs], [0, 255, 0, 255, 0, 255], 'integer UVs remain raw for accessor normalization');
+  assert.deepEqual([...result.colors.slice(0, 4)], [1, Math.fround(128 / 255), 0, 1]);
+  const defaults = decodeDraco(draco, new Uint8Array(8));
+  assert.deepEqual([...defaults.uvs], [0, 1, 0, 1, 0, 1], 'native float conversion already normalizes Draco integer UVs');
+  assert.deepEqual([...defaults.colors.slice(0, 4)], [1, Math.fround(128 / 255), 0, 1], 'default colors are not normalized twice');
+  const unnormalized = mockDraco({...config, normalized: []}).draco;
+  assert.deepEqual([...decodeDraco(unnormalized, new Uint8Array(8)).colors.slice(0, 4)], [1, Math.fround(128 / 255), 0, 1], 'default integer colors retain normalized output');
+});
+
+test('Draco chooses triangle extraction below, at and above the native 65,536-vertex boundary', () => {
+  for (const [points, IndexArray] of [[65535, Uint16Array], [65536, Uint32Array], [65537, Uint32Array]]) {
+    const {draco} = mockDraco({points});
+    const Decoder = draco.Decoder, expected = [0, 1, points - 1, points - 1, 1, 0];
+    draco.Decoder = function () {
+      const decoder = new Decoder();
+      decoder.GetTrianglesUInt16Array = (_geometry, bytes, pointer) => {
+        if (points >= 65536) return false;
+        new Uint16Array(draco.HEAPU8.buffer, pointer, bytes / 2).set(expected); return true;
+      };
+      decoder.GetTrianglesUInt32Array = (_geometry, bytes, pointer) => {
+        new Uint32Array(draco.HEAPU8.buffer, pointer, bytes / 4).set(expected); return true;
+      };
+      return decoder;
+    };
+    const result = decodeDraco(draco, new Uint8Array(8), {attributeIds: {}});
+    assert.ok(result.indices instanceof IndexArray, `${points} vertices use ${IndexArray.name}`);
+    assert.deepEqual([...result.indices], expected, 'the highest vertex index never wraps');
+  }
+});
+
+test('Draco preflights every count, width and combined output budget before allocating or extracting output', () => {
+  const cases = [
+    [{points: 1_000_001}, {limits: {maxVertices: 1_000_000}}, /vertex/],
+    [{points: 16_777_217}, {limits: {maxVertices: Number.MAX_SAFE_INTEGER}}, /vertex/],
+    ...[0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1].map(points => [{points}, {}, /vertex/]),
+    ...[0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1].map(faces => [{faces}, {}, /face/]),
+    [{faces: Number.MAX_SAFE_INTEGER}, {}, /index/],
+    [{faces: 3}, {limits: {maxIndices: 6}}, /index/],
+    [{}, {limits: {maxIndices: 0}}, /index/],
+    [{}, {limits: {maxDecodedBytes: 11}}, /byte/],
+    [{attributes: {POSITION: 3, NORMAL: 3}}, {limits: {maxDecodedBytes: 100}}, /byte/], // 48 + 48 + 12 > 100.
+    [{attributes: {POSITION: 3, NORMAL: 3}}, {limits: {attributeWidths: {POSITION: 3, NORMAL: 2}}}, /NORMAL width/],
+    ...[0, -1, 1.5, NaN, Infinity, 17].map(width => [{attributes: {POSITION: 3, NORMAL: width}}, {}, /NORMAL width/]),
+    [{attributes: {POSITION: 3, NORMAL: 3}}, {attributeIds: {POSITION: 0, NORMAL: 99}}, /missing attribute NORMAL/],
+    [{attributes: {POSITION: 3, NORMAL: 3}}, {attributeIds: {POSITION: 0, NORMAL: 1}, componentTypes: {NORMAL: 1234}}, /component type/],
+    [{kind: 2, points: 1_048_576, attributes: {POSITION: 16, A: 16, B: 16, C: 16, D: 16}}, {attributeIds: {POSITION: 0, A: 1, B: 2, C: 3, D: 4}, limits: {maxDecodedBytes: Number.MAX_SAFE_INTEGER}}, /byte/],
+  ];
+  for (const [options, request, pattern] of cases) {
+    const {draco, log} = mockDraco(options);
+    assert.throws(() => decodeDraco(draco, new Uint8Array(8), request), pattern);
+    assert.deepEqual(log.malloc, [], 'all descriptors are checked before the first output malloc');
+    assert.deepEqual(log.reads, [], 'invalid output metadata never reaches Draco extraction');
+    assert.deepEqual(new Set(log.destroyed), new Set(log.created), 'preflight failure releases geometry and decoder handles');
+  }
+});
+
+test('Draco output limits accept exact boundaries and account for final float32 named channels', () => {
+  const {draco, log} = mockDraco({attributes: {POSITION: 3, NORMAL: 3}});
+  const result = decodeDraco(draco, new Uint8Array(8), {limits: {maxVertices: 4, maxIndices: 6, maxDecodedBytes: 108, attributeWidths: {POSITION: 3, NORMAL: 3}}});
+  assert.equal(result.positions.byteLength + result.normals.byteLength + result.indices.byteLength, 108);
+  assert.equal(log.malloc.length, 3);
+  assert.deepEqual([...log.free].sort(), [...log.malloc].sort());
+  const integer = mockDraco();
+  assert.throws(() => decodeDraco(integer.draco, new Uint8Array(8), {componentTypes: {POSITION: 5121}, limits: {maxDecodedBytes: 59}}), /byte/);
+  assert.deepEqual(integer.log.malloc, [], 'integer named channels are budgeted at their final Float32Array byte length');
+  assert.deepEqual(integer.log.reads, []);
+  const cloud = mockDraco({kind: 2});
+  assert.equal(decodeDraco(cloud.draco, new Uint8Array(8), {limits: {maxIndices: 0, maxDecodedBytes: 48}}).indices, undefined);
+});
+
+test('invalid Draco limits reject before handles, payload copies, input transfer or worker creation', async () => {
+  const globals = ['window', 'Worker'].map(name => [name, Object.getOwnPropertyDescriptor(globalThis, name)]);
+  let copies = 0, workers = 0;
+  globalThis.window = {};
+  globalThis.Worker = class {constructor() {workers++; throw new Error('unexpected worker');}};
+  const source = new ArrayBuffer(1024), slice = source.slice.bind(source), decoder = new decoders.DracoDecoder();
+  source.slice = (...args) => {copies++; return slice(...args);};
+  const invalid = [null, [], 4, {maxVertices: 0}, {maxIndices: -1}, {maxDecodedBytes: 0}, {attributeWidths: null}, {attributeWidths: []}, {attributeWidths: {POSITION: 0}}, {attributeWidths: {POSITION: 17}}, {attributeWidths: {POSITION: 1.5}}];
+  for (const name of ['maxVertices', 'maxIndices', 'maxDecodedBytes']) for (const value of [-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, '4']) invalid.push({[name]: value});
+  try {
+    for (const limits of invalid) {
+      const {draco, log} = mockDraco();
+      assert.throws(() => decodeDraco(draco, new Uint8Array(8), {limits}), /Draco:/);
+      assert.deepEqual(log.created, [], 'invalid requests never initialize Draco handles');
+      for (const transfer of [false, true]) await assert.rejects(decoder.decode(source, {limits, transfer}), /Draco:/);
+      assert.equal(source.byteLength, 1024);
+    }
+    assert.equal(copies, 0);
+    assert.equal(workers, 0);
+  } finally {
+    decoder.dispose();
+    for (const [name, descriptor] of globals) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else delete globalThis[name];
+    }
+  }
+});
+
+test('DracoDecoder carries validated output limits to the worker without changing transfer ownership', async () => {
+  const globals = ['window', 'Worker'].map(name => [name, Object.getOwnPropertyDescriptor(globalThis, name)]);
+  FakeWorker.created = [];
+  globalThis.window = {};
+  globalThis.Worker = class extends FakeWorker {constructor() {super((worker, message) => worker.reply({id: message.id, result: message.request}));}};
+  const decoder = new decoders.DracoDecoder(), source = new ArrayBuffer(8), limits = {maxVertices: 4, maxIndices: 6, maxDecodedBytes: 108, attributeWidths: {POSITION: 3, NORMAL: 3}};
+  try {
+    const request = await decoder.decode(source, {attributeIds: {POSITION: 0, NORMAL: 1}, limits, transfer: true});
+    assert.equal(source.byteLength, 0);
+    assert.deepEqual(request.limits, limits);
+    assert.deepEqual(request.attributeIds, {POSITION: 0, NORMAL: 1});
+    const {draco, log} = mockDraco({points: 5, attributes: {POSITION: 3, NORMAL: 3}});
+    assert.throws(() => decodeDraco(draco, new Uint8Array(8), request), /vertex/);
+    assert.deepEqual(log.malloc, []);
+    assert.deepEqual(log.reads, []);
+  } finally {
+    decoder.dispose();
+    for (const [name, descriptor] of globals) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else delete globalThis[name];
+    }
+  }
+});
+
 test('mock transcode closes and deletes the KTX2 file on success and failure', () => {
   const calls = [];
   const basis = valid => ({KTX2File: function () {
@@ -263,6 +403,13 @@ test('real Draco Wasm decodes the Khronos Box and Avocado and does not grow its 
     for (let i = 0; i < result.positions.length; i++) {const axis = i % 3; assert.ok(result.positions[i] >= position.min[axis] - 1e-4 && result.positions[i] <= position.max[axis] + 1e-4, `${name} position inside accessor bounds`);}
     assert.equal(result.normals.length, position.count * 3);
     for (let i = 0; i < result.normals.length; i += 3) assert.ok(Math.abs(Math.hypot(result.normals[i], result.normals[i + 1], result.normals[i + 2]) - 1) < 0.02, 'unit normals');
+    const normalsOnly = decodeDraco(draco, bin.subarray(view.byteOffset ?? 0, (view.byteOffset ?? 0) + view.byteLength), {attributeIds: {NORMAL: ext.attributes.NORMAL}});
+    assert.equal(normalsOnly.vertexCount, position.count, `${name} explicit subset retains vertex count`);
+    assert.ok(normalsOnly.positions instanceof Float32Array);
+    assert.equal(normalsOnly.positions.length, 0, `${name} explicit subset does not require POSITION`);
+    assert.deepEqual(normalsOnly.normals, result.normals, `${name} requested NORMAL channel is decoded`);
+    assert.throws(() => decodeDraco(draco, bin, {attributeIds: {NORMAL: 999999}}), /missing attribute NORMAL/);
+    assert.throws(() => decodeDraco(draco, bin, {attributeIds: {POSITION: 999999}}), /missing attribute POSITION/);
     if (name === 'Avocado') {assert.equal(result.uvs.length, position.count * 2); assert.equal(result.attributes.TANGENT.itemSize, 4); assert.ok(result.attributes.TANGENT.array instanceof Float32Array);}
   }
   const doc = JSON.parse(await fixture('Avocado.gltf')), bin = await fixture('Avocado.bin'), ext = doc.meshes[0].primitives[0].extensions.KHR_draco_mesh_compression;
@@ -270,6 +417,20 @@ test('real Draco Wasm decodes the Khronos Box and Avocado and does not grow its 
   const settled = draco.HEAPU8.length;
   for (let i = 0; i < 200; i++) decodeDraco(draco, bin, {attributeIds: ext.attributes});
   assert.equal(draco.HEAPU8.length, settled, 'Wasm heap stays flat, so handles and buffers are released');
+});
+
+test('real Draco normalized UVs and colors retain their accessor and default decoder semantics', async () => {
+  const {module: draco} = await initDraco(base + 'draco/draco_wasm_wrapper.js', base + 'draco/draco_decoder.wasm');
+  const doc = JSON.parse(await fixture('NormalizedTriangle.gltf')), bytes = await fixture('NormalizedTriangle.bin');
+  const primitive = doc.meshes[0].primitives[0], attributeIds = primitive.extensions.KHR_draco_mesh_compression.attributes;
+  const componentTypes = Object.fromEntries(Object.keys(attributeIds).map(semantic => [semantic, doc.accessors[primitive.attributes[semantic]].componentType]));
+  const requested = decodeDraco(draco, bytes, {attributeIds, componentTypes});
+  assert.deepEqual([...requested.uvs], [0, 0, 255, 0, 0, 255]);
+  const colors = [255, 128, 0, 255, 0, 255, 128, 255, 128, 0, 255, 255].map(value => Math.fround(value / 255));
+  assert.deepEqual([...requested.colors], colors, 'requested integer colors normalize once');
+  const defaults = decodeDraco(draco, bytes, {attributeIds});
+  assert.deepEqual([...defaults.uvs], [0, 0, 1, 0, 0, 1], 'native float extraction honors the normalized flag');
+  assert.deepEqual([...defaults.colors], colors, 'native normalized colors do not divide by 255 twice');
 });
 
 test('real Basis transcoder decodes a Khronos UASTC + Zstandard texture into each target format', async () => {

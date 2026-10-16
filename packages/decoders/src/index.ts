@@ -5,7 +5,7 @@ export type {DracoOptions, DracoDecodeOptions} from './draco.js';
 export {KTX2Decoder, getSupportedTranscodeFormat, getBytesPerRow, createKTX2Texture} from './ktx2.js';
 export type {KTX2Options, KTX2DecodeOptions, KTX2TextureOptions} from './ktx2.js';
 export {meshoptDecodeGltfBuffer as decodeMeshoptBuffer, meshoptDecodeVertexBuffer, meshoptDecodeIndexBuffer, meshoptDecodeIndexSequence, MeshoptDecoder} from './meshopt.js';
-export type {DecodedDracoGeometry, DracoAttribute, DracoRequest, KTX2Mip, TranscodeTarget, TranscodedKTX2Result} from './protocol.js';
+export type {DecodedDracoGeometry, DracoAttribute, DracoRequest, DracoDecodeLimits, KTX2Mip, TranscodeTarget, TranscodedKTX2Result} from './protocol.js';
 import type {DracoDecoder} from './draco.js';
 import type {KTX2Decoder} from './ktx2.js';
 

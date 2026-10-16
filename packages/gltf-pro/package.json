@@ -29,6 +29,9 @@
   "files": [
     "dist"
   ],
+  "dependencies": {
+    "@margoengine/decoders": "0.1.0"
+  },
   "peerDependencies": {
     "@margoengine/core": "0.1.0"
   },

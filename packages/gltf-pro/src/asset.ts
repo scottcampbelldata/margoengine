@@ -1,4 +1,5 @@
 import {readResponse} from '../../shared/loading.js';
+import {meshoptDecodeGltfBuffer} from '@margoengine/decoders/meshopt';
 export type GLTFDocument = Record<string, any>;
 export const assetLimit = 64 * 1024 * 1024;
 export function integer(value: unknown, label: string, min = 0): number {
@@ -41,38 +42,90 @@ function embedded(uri: string): Uint8Array {
 }
 const componentSizes: Record<number, number> = {5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4};
 const components: Record<string, number> = {SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16};
+const meshoptExtension = 'EXT_meshopt_compression', dracoExtension = 'KHR_draco_mesh_compression';
+function accessorLayout(doc: GLTFDocument, id: unknown, type?: string) {
+  const index = integer(id, 'accessor'), def = entry(doc.accessors, index, 'accessor');
+  if (type && def.type !== type) throw new TypeError('Invalid glTF accessor type');
+  const size = typeof def.componentType === 'number' ? componentSizes[def.componentType] : undefined, width = typeof def.type === 'string' && Object.hasOwn(components, def.type) ? components[def.type] : undefined, count = integer(def.count, 'accessor count', 1);
+  if (!size || !width || count > 1_000_000 || def.normalized !== undefined && typeof def.normalized !== 'boolean' || def.normalized && [5125,5126].includes(def.componentType)) throw new TypeError('Unsupported glTF accessor');
+  return {index, def, size, width, count};
+}
 export class GLTFAsset {
   readonly buffers: Uint8Array[];
   private readonly cache = new Map<number, Float32Array>();
+  private readonly viewCache = new Map<number, Uint8Array>();
   private decoded = 0;
+  /** @internal Remaining retained decode budget, checked before decoder output allocation. */
+  get remainingDecodedBytes(): number {return assetLimit * 4 - this.decoded;}
+  /** @internal Account for retained decoded data, including topology without an accessor. */
+  reserveDecodedBytes(byteLength: number): void {
+    integer(byteLength, 'decoded byte length');
+    if (this.decoded + byteLength > assetLimit * 4) throw new RangeError('Decoded glTF exceeds byte budget');
+    this.decoded += byteLength;
+  }
   constructor(readonly doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array) {
     if (!doc || doc.asset?.version !== '2.0') throw new TypeError('Expected glTF 2.0');
     for (const key of ['buffers','bufferViews','accessors','meshes','nodes','scenes','materials','textures','images','samplers','skins','animations','extensionsRequired'])
       if (doc[key] !== undefined && !Array.isArray(doc[key])) throw new TypeError('Invalid glTF ' + key);
-    if (doc.extensionsRequired?.length) throw new Error('Required glTF extensions are unsupported: ' + doc.extensionsRequired.join(', '));
+    const unsupported = doc.extensionsRequired?.filter((name: unknown) => name !== dracoExtension && name !== meshoptExtension);
+    if (unsupported?.length) throw new Error('Required glTF extensions are unsupported: ' + unsupported.join(', '));
     if ((doc.nodes?.length ?? 0) > 100_000) throw new RangeError('Too many glTF nodes');
     let total = 0;
     this.buffers = (doc.buffers ?? []).map((def: any, i: number) => {
-      const input = buffers[i], data = input ? input instanceof ArrayBuffer ? new Uint8Array(input) : new Uint8Array(input.buffer, input.byteOffset, input.byteLength) : def.uri ? embedded(def.uri) : i === 0 ? binary : undefined;
+      if (!def || typeof def !== 'object' || Array.isArray(def)) throw new TypeError('Invalid glTF buffer');
       const length = integer(def.byteLength, 'buffer length', 1);
+      const fallback = def.extensions?.[meshoptExtension]?.fallback;
+      if (fallback !== undefined && typeof fallback !== 'boolean') throw new TypeError('Invalid glTF meshopt fallback');
+      const input = buffers[i], placeholder = (!input || input.byteLength === 0) && !def.uri && (i !== 0 || !binary);
+      if (fallback === true || placeholder && doc.extensionsRequired?.includes(meshoptExtension)) {
+        const views = (doc.bufferViews ?? []).filter((view: any) => view?.buffer === i);
+        if (!views.length || views.some((view: any) => !view.extensions?.[meshoptExtension]) || doc.bufferViews?.some((view: any) => view?.extensions?.[meshoptExtension]?.buffer === i)) throw new TypeError('Invalid glTF meshopt fallback references');
+        return new Uint8Array();
+      }
+      const data = input ? input instanceof ArrayBuffer ? new Uint8Array(input) : new Uint8Array(input.buffer, input.byteOffset, input.byteLength) : def.uri ? embedded(def.uri) : i === 0 ? binary : undefined;
       if (!data || length > data.length) throw new RangeError('Truncated glTF buffer');
       total += data.byteLength; if (total > assetLimit) throw new RangeError('glTF buffers exceed byte budget');
       return data.subarray(0, length);
     });
   }
   view(id: unknown): Uint8Array {
-    const def = entry(this.doc.bufferViews, id, 'bufferView'), buffer = this.buffers[integer(def.buffer, 'buffer reference')];
+    const index = integer(id, 'bufferView'), def = entry(this.doc.bufferViews, index, 'bufferView'), bufferId = integer(def.buffer, 'buffer reference'), buffer = this.buffers[bufferId];
     const offset = integer(def.byteOffset ?? 0, 'view offset'), length = integer(def.byteLength, 'view length', 1);
+    const declaredLength = integer(entry(this.doc.buffers, bufferId, 'buffer').byteLength, 'buffer length', 1);
+    if (length > declaredLength || offset > declaredLength - length) throw new RangeError('Invalid glTF bufferView bounds');
+    const extension = def.extensions?.[meshoptExtension];
+    if (extension !== undefined) {
+      const cached = this.viewCache.get(index); if (cached) return cached;
+      if (!extension || typeof extension !== 'object' || Array.isArray(extension)) throw new TypeError('Invalid glTF meshopt extension');
+      const source = this.buffers[integer(extension.buffer, 'meshopt buffer reference')], sourceOffset = integer(extension.byteOffset ?? 0, 'meshopt offset'), sourceLength = integer(extension.byteLength, 'meshopt length', 1);
+      const count = integer(extension.count, 'meshopt count', 1), stride = integer(extension.byteStride, 'meshopt stride', 1), mode = extension.mode, filter = extension.filter ?? 'NONE';
+      if (!source || sourceLength > source.length || sourceOffset > source.length - sourceLength) throw new RangeError('Invalid glTF meshopt source bounds');
+      if (!Number.isSafeInteger(count * stride) || count * stride !== length || def.byteStride !== undefined && def.byteStride !== stride) throw new RangeError('Invalid glTF meshopt decoded layout');
+      if (mode === 'ATTRIBUTES' ? stride > 256 || stride % 4 !== 0 : !['TRIANGLES','INDICES'].includes(mode) || ![2,4].includes(stride) || mode === 'TRIANGLES' && count % 3 !== 0) throw new TypeError('Invalid glTF meshopt mode/stride/count');
+      if (!['NONE','OCTAHEDRAL','QUATERNION','EXPONENTIAL'].includes(filter) || filter !== 'NONE' && mode !== 'ATTRIBUTES' || filter === 'OCTAHEDRAL' && ![4,8].includes(stride) || filter === 'QUATERNION' && stride !== 8 || filter === 'EXPONENTIAL' && stride % 4 !== 0) throw new TypeError('Invalid glTF meshopt filter');
+      if (this.decoded + length > assetLimit * 4) throw new RangeError('Decoded glTF exceeds byte budget');
+      const bytes = meshoptDecodeGltfBuffer(source.subarray(sourceOffset, sourceOffset + sourceLength), count, stride, mode, filter);
+      this.reserveDecodedBytes(bytes.byteLength); this.viewCache.set(index, bytes); return bytes;
+    }
     if (!buffer || offset + length > buffer.length) throw new RangeError('Invalid glTF bufferView bounds');
     return buffer.subarray(offset, offset + length);
   }
+  /** Supply already normalized Draco data before constructing a PBR model. */
+  setDecodedAccessor(id: unknown, values: Float32Array): void {
+    const {index, width, count} = accessorLayout(this.doc, id);
+    if (!(values instanceof Float32Array) || values.length !== count * width) throw new RangeError('Mismatched decoded glTF accessor');
+    if (values.some(value => !Number.isFinite(value))) throw new RangeError('Non-finite decoded glTF accessor');
+    const cached = this.cache.get(index);
+    if (cached) {
+      if (cached !== values && cached.some((value, i) => value !== values[i])) throw new TypeError('Conflicting decoded glTF accessor');
+      return;
+    }
+    this.reserveDecodedBytes(values.byteLength); this.cache.set(index, values);
+  }
   accessor(id: unknown, type?: string): Float32Array {
-    const index = integer(id, 'accessor'), def = entry(this.doc.accessors, index, 'accessor');
-    if (type && def.type !== type) throw new TypeError('Invalid glTF accessor type');
+    const {index, def, size, width, count} = accessorLayout(this.doc, id, type);
     const cached = this.cache.get(index); if (cached) return cached;
-    const size = componentSizes[def.componentType], width = components[def.type], count = integer(def.count, 'accessor count', 1);
-    if (!size || !width || count > 1_000_000 || def.normalized !== undefined && typeof def.normalized !== 'boolean' || def.normalized && [5125,5126].includes(def.componentType)) throw new TypeError('Unsupported glTF accessor');
-    this.decoded += count * width * 4; if (this.decoded > assetLimit * 4) throw new RangeError('Decoded glTF exceeds byte budget');
+    this.reserveDecodedBytes(count * width * 4);
     const output = new Float32Array(count * width);
     const read = (bytes: Uint8Array, offset: number, stride: number, n: number, write: (i: number, c: number, v: number) => void) => {
       if (offset % size || stride % size || offset + (n - 1) * stride + width * size > bytes.length) throw new RangeError('Invalid glTF accessor bounds/alignment');
@@ -89,7 +142,10 @@ export class GLTFAsset {
       const v = entry(this.doc.bufferViews, def.bufferView, 'bufferView'), stride = integer(v.byteStride ?? size * width, 'stride', size * width);
       if (stride > 252 || integer(v.byteOffset ?? 0, 'view offset') % size) throw new RangeError('Invalid glTF stride/alignment');
       read(this.view(def.bufferView), integer(def.byteOffset ?? 0, 'accessor offset'), stride, count, (i,c,v) => {output[i * width + c] = v;});
-    } else if (!def.sparse || def.byteOffset) throw new TypeError('Accessor has no data or invalid offset');
+    } else if (!def.sparse || def.byteOffset) {
+      if (this.doc.meshes?.some((mesh: any) => mesh?.primitives?.some((primitive: any) => primitive?.extensions?.[dracoExtension] && (primitive.indices === index || Object.keys(primitive.extensions[dracoExtension].attributes ?? {}).some(semantic => primitive.attributes?.[semantic] === index))))) throw new Error('Draco geometry requires parseGLTFAsync or loadGLTF');
+      throw new TypeError('Accessor has no data or invalid offset');
+    }
     if (def.sparse) {
       const sparse = def.sparse, n = integer(sparse.count, 'sparse count', 1), indices = sparse.indices, values = sparse.values, indexSize = componentSizes[indices?.componentType];
       if (n > count || ![5121,5123,5125].includes(indices?.componentType)) throw new TypeError('Invalid glTF sparse indices');
@@ -102,7 +158,7 @@ export class GLTFAsset {
     this.cache.set(index, output); return output;
   }
 }
-export async function loadAsset(url: string | URL, signal?: AbortSignal): Promise<{asset: GLTFAsset; images: ImageBitmap[]}> {
+export async function loadAsset(url: string | URL, signal?: AbortSignal, prepare?: (asset: GLTFAsset) => Promise<void>): Promise<{asset: GLTFAsset; images: ImageBitmap[]}> {
   signal?.throwIfAborted(); let base = new URL(url, globalThis.location?.href), total = 0;
   const fetchBytes = async (target: URL, root = false) => {
     if (!['http:','https:'].includes(target.protocol)) throw new TypeError('glTF URL must use HTTP(S)');
@@ -111,13 +167,16 @@ export async function loadAsset(url: string | URL, signal?: AbortSignal): Promis
   };
   const bytes = await fetchBytes(base, true), glb = bytes.length >= 4 && new DataView(bytes.buffer, bytes.byteOffset).getUint32(0,true) === 0x46546c67;
   const {doc,binary} = container(glb ? bytes : new TextDecoder('utf-8',{fatal:true}).decode(bytes)), buffers: Uint8Array[] = [], images: ImageBitmap[] = [];
-  for (const def of doc.buffers ?? []) {
-    if (!def.uri) buffers.push(binary ?? new Uint8Array());
-    else if (def.uri.startsWith('data:')) {const b = embedded(def.uri); total += b.length; if (total > assetLimit) throw new RangeError('glTF exceeds download budget'); buffers.push(b);}
-    else buffers.push(await fetchBytes(new URL(def.uri,base)));
+  for (let i = 0; i < (doc.buffers?.length ?? 0); i++) {
+    const def = entry(doc.buffers, i, 'buffer');
+    if (def.extensions?.[meshoptExtension]?.fallback === true) continue;
+    if (!def.uri) {if (i === 0 && binary) buffers[i] = binary;}
+    else if (def.uri.startsWith('data:')) {const b = embedded(def.uri); total += b.length; if (total > assetLimit) throw new RangeError('glTF exceeds download budget'); buffers[i] = b;}
+    else buffers[i] = await fetchBytes(new URL(def.uri,base));
   }
   const asset = new GLTFAsset(doc,buffers,binary);let decodedImages=0;
   try {
+    signal?.throwIfAborted(); await prepare?.(asset); signal?.throwIfAborted();
     for (const def of doc.images ?? []) {
       let data: Uint8Array;
       if (def.bufferView !== undefined) data = asset.view(def.bufferView);

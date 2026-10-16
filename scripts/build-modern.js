@@ -38,6 +38,8 @@ for(const name of packages){
 }
 execFileSync(process.execPath,['node_modules/typescript/bin/tsc','-p','packages/core/tsconfig.json'],{stdio:'inherit'});
 await compactPackage('core');
+// gltf-pro's declarations and runtime imports depend on the standalone decoder package.
+execFileSync(process.execPath,['packages/decoders/scripts/build.js'],{stdio:'inherit'});
 for(const name of ['loaders','exporters'])execFileSync(process.execPath,['node_modules/typescript/bin/tsc','-p',`packages/${name}/tsconfig.json`],{stdio:'inherit'});
 for(const name of ['gltf','machinery','creative','scenery',...featurePackages]){
  const output=resolve(`packages/${name}/dist`);assert.ok(output.startsWith(resolve(`packages/${name}`)+'/')||output.startsWith(resolve(`packages/${name}`)+'\\'),'Output escaped its package');
@@ -47,7 +49,7 @@ for(const name of ['gltf','machinery','creative','scenery',...featurePackages]){
   const module=target.slice('./dist/'.length,-'.js'.length);
   return [module,`packages/${name}/src/${module}.ts`];
  }));
- await build({configFile:false,publicDir:false,logLevel:'warn',build:{outDir:output,emptyOutDir:true,target:'es2022',lib:{entry,formats:['es'],fileName:(_,entryName)=>entryName+'.js'},rollupOptions:{external:['@margoengine/core','@margoengine/core/extension','@margoengine/animation','@margoengine/gltf-pro','@margoengine/loaders','@margoengine/lines'],output:compactOutput}}});
+ await build({configFile:false,publicDir:false,logLevel:'warn',build:{outDir:output,emptyOutDir:true,target:'es2022',lib:{entry,formats:['es'],fileName:(_,entryName)=>entryName+'.js'},rollupOptions:{external:['@margoengine/core','@margoengine/core/extension','@margoengine/animation','@margoengine/gltf-pro','@margoengine/loaders','@margoengine/lines','@margoengine/decoders','@margoengine/decoders/meshopt'],output:compactOutput}}});
  if(name==='machinery'){
   // Retain analyzable asset URLs for the consuming app's bundler.
   for(const file of (await readdir(output)).filter(file=>file.endsWith('.js'))){const entry=resolve(output,file);await writeFile(entry,(await readFile(entry,'utf8')).replace(/(?:''|""|``)\s*\+\s*import\.meta\.url/g,'import.meta.url'));}
