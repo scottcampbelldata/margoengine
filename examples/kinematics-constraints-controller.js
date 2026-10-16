@@ -412,6 +412,21 @@ export function createConstraintDemo() {
           detourTarget[0] = currentHand[0] + xStep / blend;
           detourTarget[1] = currentHand[1] + yStep / blend;
           detourTarget[2] = currentHand[2] + zStep / blend;
+          // Inverting damping can put the generated input outside reach even
+          // though its prospective hand step is inside. Condition this local
+          // waypoint before solve; actual raw singular requests still hold.
+          const minimum = Math.abs(upperLength - lowerLength) + solveOptions.foldMargin;
+          const maximum = upperLength + lowerLength - solveOptions.reachMargin;
+          const inset = Math.min(0.000002, (maximum - minimum) * 0.25);
+          let rx = detourTarget[0] - root[0], ry = detourTarget[1] - root[1], rz = detourTarget[2] - root[2];
+          let reach = length3(rx, ry, rz);
+          if (reach < minimum + inset || reach > maximum - inset) {
+            if (!(reach > 0)) { rx = currentHand[0] - root[0]; ry = currentHand[1] - root[1]; rz = currentHand[2] - root[2]; reach = length3(rx, ry, rz); }
+            const bounded = Math.max(minimum + inset, Math.min(maximum - inset, reach));
+            detourTarget[0] = root[0] + rx / reach * bounded;
+            detourTarget[1] = root[1] + ry / reach * bounded;
+            detourTarget[2] = root[2] + rz / reach * bounded;
+          }
           result = solve(detourTarget);
           if (result.resolved) {
             chased = outwardDetour = true;
