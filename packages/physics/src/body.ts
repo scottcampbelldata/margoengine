@@ -11,7 +11,7 @@ export interface BodyOptions {
   position?: Vec3;
   /** World rotation quaternion [x, y, z, w]. Defaults to the mesh rotation. */
   rotation?: Quat;
-  /** One or more colliders. Defaults to a box fitted to the mesh geometry; pass [] for none. */
+  /** One or more colliders. Defaults to a box fitted to static mesh geometry, or a geometry-free root's descendants; pass [] for none. */
   colliders?: ColliderOptions | readonly ColliderOptions[];
   linearVelocity?: Vec3;
   angularVelocity?: Vec3;

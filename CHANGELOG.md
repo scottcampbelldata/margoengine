@@ -108,6 +108,19 @@ does not announce an npm publication or a package version change.
   operations without usable triangles report explicit errors. Ten real-loader
   regressions and twelve WebGPU audit checks pass.
 
+### Attached PBR model colliders
+
+- `physics.addBody(model.root)` now gathers static descendants of a geometry-free
+  root into one fitted box. Authored hierarchy, offsets, rotations and scales
+  remain intact; Rapier's rigid frame retains root scale exactly once.
+- Skinned or morphed geometry-derived colliders reject with
+  `Skinned mesh needs an explicit collider`. Explicit capsules/dimensions and
+  direct-node fitting retain their existing behavior. Failed fits leave no body.
+- Eleven standalone built-entry Box regressions and five real-Rapier cases cover
+  attached roots, transformed hierarchies, export, CAD/BVH/helpers and cleanup.
+  The native GPU gate also loads complete Draco Avocado with all three original
+  textures, verifies the exact synchronous diagnostic, and releases its worker.
+
 ### Picking on skinned and morphed meshes
 
 - Registered PBR models support current-pose GPU picking and selection outlines
@@ -122,7 +135,7 @@ does not announce an npm publication or a package version change.
 
 ### Verification and footprint
 
-- The workspace build passes. The full Node 24 suite passes **1,287 tests**, with
+- The workspace build passes. The full Node 24 suite passes **1,303 tests**, with
   zero failures or skips and **four known frozen-stage TODO audits** that retain
   their original failing assertions. Strict TypeScript checks and packed exports/imports
   pass across **all 63 packages**, including strict Bundler and NodeNext consumers.
@@ -142,6 +155,11 @@ does not announce an npm publication or a package version change.
   SwiftShader, compiles 67 shader modules, and destroys all 337 tracked resources.
   Inspector overlays survive frustum edges; native-device PBR eye kernels match
   the desktop FBX pose bit for bit. No GPU or page errors are reported.
+- The attached-root Box and complete Avocado browser gate passes on RTX A6000
+  and SwiftShader: six captures, five shaders, all 35 tracked GPU resources
+  released, one decoder worker terminated, and no GPU/page errors. Attaching
+  physics preserves Box pixels bit for bit; local export and world geometry
+  survive reimport.
 - `npm run measure:size` reports **47,983 bytes raw / 19,999 bytes gzip** for
   core + stage, including embedded Wasm and both backends. Core and stage remain
   feature-frozen. CI rejects **20,000 gzip bytes or above** and checks package

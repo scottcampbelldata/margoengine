@@ -84,7 +84,7 @@ the loader also validates returned data before constructing GPU resources.
 
 Attach animation with the separate animation package. Register this model with `ssao.add(model)` to include its mapped normals and ambient lighting in SSAO. Neither extension is imported by this package. Disposal and device restoration retain CPU asset blueprints.
 
-Optional consumers use one weak triangle-source registry across separately bundled packages. Inspector and line helpers use bind-pose positions/normals with current transforms; static spatial queries and shadow mesh registrations also retain loader-owned primitives. `mesh.geometry` remains null, so core does not receive a second drawable. Physics preserves bind-pose collider behavior; glTF export retains supported skin/morph attributes. Disposal clears registry entries, and reused mesh slots cannot inherit them.
+Optional consumers use one weak triangle-source registry across separately bundled packages. Inspector and line helpers use bind-pose positions/normals with current transforms; static spatial queries and shadow mesh registrations also retain loader-owned primitives. `mesh.geometry` remains null, so core does not receive a second drawable. Physics fits static primitive nodes or a geometry-free model root's descendants without changing the hierarchy; skinned or morphed meshes require explicit colliders. glTF export retains supported skin/morph attributes. Disposal clears registry entries, and reused mesh slots cannot inherit them.
 
 `model.raw` borrows one live GPU record per primitive (`vertex`, `index`, `count`,
 `stride: 80`, node and alpha metadata), including current deformation. `bounds`

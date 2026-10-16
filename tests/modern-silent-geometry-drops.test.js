@@ -34,12 +34,19 @@ function close(actual, expected, label) {
 }
 
 for (const fixture of loadedPBRFixtures) {
-  test(`${fixture.producer}: default PhysicsBody creates a collider for real ${fixture.asset}`, async () => {
+  test(`${fixture.producer}: default PhysicsBody fits static ${fixture.asset} geometry or requires an explicit deformed collider`, async () => {
     await withLoaded(fixture, ({engine, mesh, primitive}) => {
       const physics = new Physics(engine, {rapier: RAPIER});
       try {
         // Physics requires a root-level mesh. It is still the actual loaded mesh with its original primitive.
         mesh.setParent(null);
+        const source = meshTriangles(mesh).source;
+        if (source.skinned || source.morphed) {
+          assert.throws(() => physics.addBody(mesh), {message: 'Skinned mesh needs an explicit collider'});
+          assert.equal(physics.bodyCount, 0, 'automatic bind-pose fitting cannot retain an empty skinned body');
+          assert.equal(mesh.geometry, null);
+          return;
+        }
         const {min, max} = positionBounds(primitivePositions(primitive), xyz(mesh.scale));
         const body = physics.addBody(mesh);
         assert.equal(body.colliders.length, 1);

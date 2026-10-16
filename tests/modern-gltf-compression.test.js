@@ -266,7 +266,7 @@ test('Draco validates decoded counts, widths, indices and finite attributes befo
 test('unsupported required extensions and synchronous Draco parsing fail clearly while ordinary parsing remains synchronous', async () => {
   const {engine} = await scene(), {doc, buffers} = compressedTriangle();
   try {
-    assert.throws(() => parseGLTF(engine, doc, buffers), /Draco|asynchronous|parseGLTFAsync/i);
+    assert.throws(() => parseGLTF(engine, doc, buffers), {message: 'Draco geometry requires parseGLTFAsync or loadGLTF'});
     doc.extensionsRequired.push('VENDOR_unknown');
     await assert.rejects(parseGLTFAsync(engine, doc, buffers, [], {draco: {async decode() {throw new Error('must not decode');}}}), /Required.*VENDOR_unknown|VENDOR_unknown.*unsupported/i);
     const plain = meshoptTriangle();

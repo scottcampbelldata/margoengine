@@ -5,7 +5,7 @@ import {PhysicsBody, type BodyOptions, type BodyOwner, type BodyType} from './bo
 import {CharacterController, type CharacterControllerOptions} from './character.js';
 import {PhysicsJoint, createJointData, type JointOptions} from './joints.js';
 import {checkVec, eulerToQuat, quat, slerp, tuple, vec, type Quat, type Vec3} from './math.js';
-import {configureCollider, createColliderDesc, type ColliderOptions, type GeometryLike, type RapierModule, type ShapeOptions} from './shapes.js';
+import {configureCollider, createColliderDesc, geometryPositions, type ColliderOptions, type GeometryLike, type RapierModule, type ShapeOptions} from './shapes.js';
 
 export interface PhysicsOptions {
   /** The initialized `@dimforge/rapier3d-compat` module. */
@@ -255,6 +255,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     const world = this.world, R = this.rapier, type: BodyType = options.type ?? 'dynamic';
     if (mesh) {
       mesh.check();
+      if (mesh instanceof CoreMesh && this.engine && meshRuntime(mesh).engine !== this.engine) throw new TypeError('Physics mesh belongs to another engine');
       if (this.byMesh.has(mesh)) throw new Error('This mesh already has a physics body');
       if (parentOf(mesh) !== -1) throw new Error('Physics bodies need root-level meshes (mesh.setParent(null)); physics works in world space');
     }
@@ -300,7 +301,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   addCollider(body: PhysicsBody, options: ColliderOptions): any {
     const R = this.rapier, mesh = body.mesh;
     const needsGeometry = options.shape === 'box' && !options.halfExtents || options.shape === 'sphere' && options.radius === undefined || options.shape === 'convexHull' && !options.points && !options.geometry || options.shape === 'trimesh' && !options.vertices && !options.geometry;
-    const fit = {geometry: mesh && needsGeometry ? primitiveGeometry(mesh) : null, scale: mesh ? [mesh.scale.x, mesh.scale.y, mesh.scale.z] as const : [1, 1, 1] as const};
+    const fit = mesh && needsGeometry ? colliderGeometry(mesh) : {geometry: null, scale: mesh ? [mesh.scale.x, mesh.scale.y, mesh.scale.z] as const : [1, 1, 1] as const};
     const {desc, center} = createColliderDesc(R, options, fit);
     configureCollider(R, desc, options, center, !!this.hooks);
     const collider = this.world.createCollider(desc, body.raw);
@@ -508,11 +509,12 @@ function parentOf(mesh: Mesh): number {
   return parents && runtime.id !== undefined ? parents[runtime.id] : -1;
 }
 
-/** Bind-pose triangle data from optional PBR loaders; never attach a second core draw geometry. */
+/** Static bind-pose triangle data from optional PBR loaders; never attach a second core draw geometry. */
 function primitiveGeometry(mesh: Mesh): GeometryLike | null {
   const triangles = meshTriangles(meshRuntime(mesh));
   if (!triangles) return null;
   if (triangles.kind === 'core') return triangles.geometry;
+  if (triangles.source.skinned || triangles.source.morphed) throw new Error('Skinned mesh needs an explicit collider');
   const {primitives} = triangles.source;
   if (!primitives.length) return null;
   let vertexCount = 0, indexCount = 0;
@@ -530,4 +532,53 @@ function primitiveGeometry(mesh: Mesh): GeometryLike | null {
     vertexOffset += count;
   }
   return {vertices, indices, stride: 3};
+}
+
+/** Fit a geometry-free root to its static descendants without altering the hierarchy. */
+function colliderGeometry(mesh: Mesh): {geometry: GeometryLike; scale: Vec3} {
+  const direct = primitiveGeometry(mesh);
+  if (direct) return {geometry: direct, scale: [mesh.scale.x, mesh.scale.y, mesh.scale.z]};
+  const root = meshRuntime(mesh), engine = root.engine;
+  if (!engine.meshes || !engine.store.tick) throw new Error('No geometry');
+  engine.store.tick(false);
+  const sources: {node: CoreMesh; positions: Float32Array; indices: ArrayLike<number>}[] = [];
+  let vertexCount = 0, indexCount = 0;
+  for (const node of engine.meshes.values()) {
+    let ancestor = engine.store.parents[node.id], depth = 0;
+    while (ancestor !== -1 && ancestor !== root.id && depth++ < 64) ancestor = engine.store.parents[ancestor];
+    if (ancestor !== root.id) continue;
+    const geometry = primitiveGeometry(node);
+    if (!geometry) continue;
+    const positions = geometryPositions(geometry);
+    if (!positions.length || !geometry.indices?.length) continue;
+    sources.push({node, positions, indices: geometry.indices});
+    vertexCount += positions.length / 3;
+    indexCount += geometry.indices.length;
+  }
+  if (!vertexCount) throw new Error('No geometry');
+
+  const vertices = new Float32Array(vertexCount * 3), indices = new Uint32Array(indexCount);
+  const [qx, qy, qz, qw] = eulerToQuat(mesh.rotation.x, mesh.rotation.y, mesh.rotation.z);
+  const px = mesh.position.x, py = mesh.position.y, pz = mesh.position.z;
+  let vertexOffset = 0, indexOffset = 0;
+  for (const {node, positions, indices: sourceIndices} of sources) {
+    const m = node.matrix;
+    for (let i = 0; i < positions.length; i += 3) {
+      const x = positions[i], y = positions[i + 1], z = positions[i + 2];
+      const wx = m[0] * x + m[4] * y + m[8] * z + m[12] - px;
+      const wy = m[1] * x + m[5] * y + m[9] * z + m[13] - py;
+      const wz = m[2] * x + m[6] * y + m[10] * z + m[14] - pz;
+      // Invert the body's rigid pose, not its scaled world matrix: Rapier has no body scale.
+      // The descendant world matrix already includes every scale, including the root's, once.
+      const tx = -2 * (qy * wz - qz * wy), ty = -2 * (qz * wx - qx * wz), tz = -2 * (qx * wy - qy * wx);
+      const offset = vertexOffset * 3 + i;
+      vertices[offset] = wx + qw * tx - qy * tz + qz * ty;
+      vertices[offset + 1] = wy + qw * ty - qz * tx + qx * tz;
+      vertices[offset + 2] = wz + qw * tz - qx * ty + qy * tx;
+      if (!Number.isFinite(vertices[offset]) || !Number.isFinite(vertices[offset + 1]) || !Number.isFinite(vertices[offset + 2])) throw new RangeError('Geometry positions must be finite');
+    }
+    for (let i = 0; i < sourceIndices.length; i++) indices[indexOffset++] = vertexOffset + sourceIndices[i];
+    vertexOffset += positions.length / 3;
+  }
+  return {geometry: {vertices, indices, stride: 3}, scale: [1, 1, 1]};
 }
