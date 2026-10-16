@@ -23,6 +23,11 @@ export interface MaterialExtension {
 
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
 interface ExtensionGroup {entries:GPUBindGroupEntry[];group:GPUBindGroup;gap?:GPUBindGroup}
+function validateDeclarations(declarations:unknown):void {
+  if(declarations!==undefined&&typeof declarations!=='string')throw new TypeError('Invalid material extension WGSL');
+  if(typeof declarations==='string'&&/@\s*(?:group|binding)\b/.test(declarations))
+    throw new TypeError('Material extension declarations cannot declare @group or @binding; use factors and textures');
+}
 export interface MaterialExtensionResource {
   uniform?:GPUBuffer;
   bytes:number;
@@ -32,6 +37,7 @@ export interface MaterialExtensionResource {
 
 export function prepareMaterialExtension(device:GPUDevice,extension:MaterialExtension,previous?:MaterialExtensionResource):MaterialExtensionResource {
   if(!extension||typeof extension!=='object'||extension.wgsl!==undefined&&typeof extension.wgsl!=='string'||extension.direct!==undefined&&typeof extension.direct!=='string'||extension.ambient!==undefined&&typeof extension.ambient!=='string'||extension.output!==undefined&&typeof extension.output!=='string'||extension.lighting!==undefined&&typeof extension.lighting!=='boolean'||extension.declarations!==undefined&&typeof extension.declarations!=='string')throw new TypeError('Invalid material extension WGSL');
+  validateDeclarations(extension.declarations);
   const {factors,textures=[]}=extension;
   if(factors!==undefined&&(!(factors instanceof Float32Array)||!factors.length||factors.length%4||factors.some(v=>!Number.isFinite(v))))throw new TypeError('Material extension factors require finite vec4 values');
   const bytes=factors?.byteLength??0;
@@ -56,6 +62,7 @@ export function prepareMaterialExtension(device:GPUDevice,extension:MaterialExte
 }
 
 export function materialExtensionShader(source:string,extension:MaterialExtension):string {
+  validateDeclarations(extension.declarations);
   // Even an empty extension has a distinct pipeline signature.
   let declarations='// Material extension: group 3\n',access='';
   if(extension.factors){

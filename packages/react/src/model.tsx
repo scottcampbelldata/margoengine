@@ -1,5 +1,5 @@
 'use client';
-import {useRef,useState} from 'react';
+import {createContext,useRef,useState,type ReactNode} from 'react';
 import type {EngineKernel,Mesh as MeshHandle} from '@margoengine/core';
 import type {Vec3} from '@margoengine/core/extension';
 import type {PBRModel} from '@margoengine/gltf-pro';
@@ -12,8 +12,11 @@ export interface MaterialOverride {
 }
 export interface ModelProps extends PointerHandlers {
   src:string;position?:Vec3;rotation?:Vec3;scale?:Vec3;materials?:Record<string,MaterialOverride>;
-  castShadow?:boolean;receiveShadow?:boolean;onLoad?:(mesh:MeshHandle)=>void;onError?:(error:unknown)=>void;
+  children?:ReactNode;castShadow?:boolean;receiveShadow?:boolean;onLoad?:(mesh:MeshHandle)=>void;onError?:(error:unknown)=>void;
 }
+// Optional model behaviours share the instance that this mount owns. The URL
+// cache keeps source data only; animation state is never shared between mounts.
+export const ModelContext=createContext<PBRModel|null|undefined>(undefined);
 function values(value:readonly number[],size:number,label:string,min=0,max=1):void {
   if(!Array.isArray(value)||value.length!==size||value.some(v=>typeof v!=='number'||!Number.isFinite(Math.fround(v))||v<min||v>max))throw new RangeError('Invalid '+label);
 }
@@ -80,7 +83,7 @@ export function ModelResource({format='model',position=zero,rotation=zero,scale=
   // Start after the first commit so even an initially hidden Suspense subtree
   // has a passive unmount cleanup that can abort its outstanding request.
   if(loading?.src===props.src&&loading.pending)throw loading.promise;
-  return null;
+  return <ModelContext.Provider value={model&&!model.disposed&&loading?.src===props.src?model:null}>{props.children}</ModelContext.Provider>;
 }
 
 export function Model(props:ModelProps){return <ModelResource {...props}/>;}

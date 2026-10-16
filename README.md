@@ -24,27 +24,10 @@ window.addEventListener('pagehide', () => app.dispose(), {once: true});
 
 Provide a container such as `<div id="scene" style="height:400px"></div>` and call `app.dispose()` on unmount. Models, machinery, creative effects and scenery load on demand through the same wrapper. The new facade package is available locally and has not been published yet. Run `npm run modern:dev` and open `/quickstart.html` to try it.
 
-For a React application:
-
-```sh
-npm install @margoengine/core@0.1.0 @margoengine/react@0.1.0 react@^19 react-dom@^19
-```
-
-For plain TypeScript:
-
-```sh
-npm install @margoengine/core@0.1.0
-```
-
-Add optional packs as needed:
-
-```sh
-npm install @margoengine/gltf@0.1.0
-npm install @margoengine/machinery@0.1.0
-npm install @margoengine/creative@0.1.0
-```
-
-The optional packs and React adapter require core 0.1.0. The React adapter supports React 18 and 19; the command above selects React 19.
+Use the source setup below, or build local tarballs with `npm run pack:packages`.
+Registry installation commands will be added with a verified package release.
+The [React guide](packages/react/README.md) covers React 18 and 19; optional packs
+are selected by importing the packages used by your scene.
 
 ## Run from source
 

@@ -62,6 +62,19 @@ for(const name of ['gltf','machinery','creative','scenery',...featurePackages]){
 }
 execFileSync(process.execPath,['node_modules/typescript/bin/tsc','-p','packages/margoengine/tsconfig.json'],{stdio:'inherit'});
 await compactPackage('margoengine');
+// React's lazy peers still appear in its public declarations and bundle measurements.
+// Reuse their package builders before compiling React so clean checkouts resolve them.
+for(const [name,...args] of [
+ ['materials','../../scripts/build-optional.js','materials'],
+ ['selection','../../scripts/build-optional.js','selection'],
+ ['fbx','../../scripts/build-optional.js','fbx'],
+ ['labels','scripts/build.js'],
+ ['html','../../scripts/build-optional.js','html'],
+ ['sky','../../scripts/build-optional.js','sky'],
+ ['text','scripts/build.js'],
+ ['gizmo','../../scripts/build-optional.js','gizmo'],
+ ['physics','scripts/build.js'],
+])execFileSync(process.execPath,args,{cwd:resolve(`packages/${name}`),stdio:'inherit'});
 execFileSync(process.execPath,['node_modules/typescript/bin/tsc','-p','packages/react/tsconfig.json'],{stdio:'inherit'});
 const sizes={kernel:{raw:wasm.length,gzip:compressedWasm.length}};
 for(const name of packages){

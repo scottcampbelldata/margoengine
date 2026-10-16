@@ -5,7 +5,7 @@ import {JSDOM} from 'jsdom';
 import React, {StrictMode, Suspense} from 'react';
 import {transformWithOxc} from 'vite';
 
-const engines=[],models=[],modelRequests=[],imageRequests=[],environments=[],overlays=[],observers=[],controls=[];
+const engines=[],models=[],modelRequests=[],imageRequests=[],environments=[],overlays=[],observers=[],controls=[],pickers=[];
 let deferModels=false,deferImages=false,sourceImages=[];
 class Material {constructor(options={}){Object.assign(this,options);}}
 class Node {
@@ -45,6 +45,12 @@ mock.module('@margoengine/gltf-pro',{namedExports:{PBRModel:class {constructor(e
   const request={engine,src,signal};modelRequests.push(request);
   if(deferModels)await new Promise((resolve,reject)=>Object.assign(request,{resolve,reject}));
   const model=makeModel(engine,{doc:{images:sourceImages.map(()=>({}))}},sourceImages);engine.use(model);return model;
+}}});
+mock.module('@margoengine/selection',{namedExports:{Picking:class {
+  static forEngine(engine){return pickers.find(picker=>picker.engine===engine&&!picker.disposals);}
+  static attach(engine,options){const picker=new this();Object.assign(picker,{name:'picking',engine,options,sources:new Set(),disposals:0});pickers.push(picker);engine.use(picker);return picker;}
+  add(model){this.sources.add(model);return()=>this.sources.delete(model);}
+  dispose(){if(this.disposals)return;this.disposals++;this.sources.clear();this.engine.removePlugin(this.name);}
 }}});
 mock.module('@margoengine/controls',{namedExports:{OrbitControls:class {
   constructor(camera,canvas){this.camera=camera;this.canvas=canvas;this.updates=[];this.disposals=0;controls.push(this);}
@@ -149,12 +155,14 @@ test('canvas skips picking without handlers and on an unsupported WebGL backend'
 });
 
 test('Model pointer handlers dispatch for a loaded primitive and update without reloading',async()=>{
-  let first=0,second=0;const hover=[];const child=onClick=>suspense(React.createElement(Model,{src:'/pointer-model.glb',onClick,onPointerOver:()=>hover.push('over'),onPointerOut:()=>hover.push('out')}));
+  let first=0,second=0;const hover=[],beforePickers=pickers.length;const child=onClick=>suspense(React.createElement(Model,{src:'/pointer-model.glb',onClick,onPointerOver:()=>hover.push('over'),onPointerOut:()=>hover.push('out')}));
   const view=render(tree(child(()=>first++)));await flush();const engine=engines.at(-1),model=models.at(-1),before=modelRequests.length;engine.hit=model.nodes[0];
   await pointer(engine.canvas,'pointerdown',4,5);await pointer(engine.canvas,'pointerup',4,5);assert.equal(first,1);
   view.rerender(tree(child(()=>second++)));await flush();await pointer(engine.canvas,'pointerdown',4,5);await pointer(engine.canvas,'pointerup',4,5);
   assert.equal(first,1);assert.equal(second,1);assert.equal(modelRequests.length,before);
   await pointer(engine.canvas,'pointermove',4,5);engine.hit=null;await pointer(engine.canvas,'pointermove',6,5);assert.deepEqual(hover,['over','out']);
+  assert.equal(pickers.length,beforePickers+1);assert.equal(pickers.at(-1).options.capture,false);assert.deepEqual([...pickers.at(-1).sources],[model]);
+  view.unmount();await flush();assert.equal(pickers.at(-1).disposals,1);assert.equal(pickers.at(-1).sources.size,0);
 });
 
 test('Suspense retains fallback until Model resolves and caches the in-flight URL across retries',async()=>{

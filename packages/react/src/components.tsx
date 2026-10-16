@@ -3,6 +3,8 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, useImp
 import { Engine, Mesh as EngineMesh, box, PbrMaterial as Material, type EngineOptions, type Vec3, type Geometry } from '@margoengine/core/extension';
 import type {EngineKernel,Mesh as MeshHandle,FrameCallback} from '@margoengine/core';
 import {Stage as StageFacade} from 'margoengine';
+import {optionalPeer} from './optional.js';
+import {preparePicking,releasePicking} from './picking.js';
 import type {PBRModel, LightingEffect} from '@margoengine/gltf-pro';
 import type {Shadows} from '@margoengine/shadows';
 import type {Environment as IBLEnvironment, EnvironmentBackground} from '@margoengine/environment';
@@ -10,7 +12,7 @@ import type {OrbitControls as CameraControls} from '@margoengine/controls';
 import {createAssetCache,activateAssetCache,disposeAssetCache,environmentAsset,retainAsset} from './assets.js';
 export {preload} from './assets.js';
 
-import {Context,useScene,useMesh,live,zero,one,useCommit,useResourceEffect,type Scene,type Registry,type Resources,type Frames,type PointerHandlers} from './internal.js';
+import {Context,useScene,useMesh,live,setGeometry,zero,one,useCommit,useResourceEffect,type Scene,type Registry,type Resources,type Frames,type PointerHandlers} from './internal.js';
 export type {MargoPointerEvent,PointerHandlers} from './internal.js';
 
 export interface MargoContextValue {
@@ -35,6 +37,7 @@ export function MargoCanvas({children,style,className,label='Interactive 3D scen
   const pointerHandlers=useMemo(()=>new Map<number,PointerHandlers>(),[engine]);
   const frames=useMemo<Frames>(()=>({elapsed:0,last:null,mode:frameloop,callbacks:new Set()}),[engine]);frames.mode=frameloop;
   const assetCache=useMemo(()=>createAssetCache(engine as unknown as EngineKernel|null),[engine]);
+  const resources=useMemo<Resources>(()=>({models:new Set(),lighting:new Map()}),[engine]);
   useEffect(()=>{if(engine)activateAssetCache(assetCache);return()=>disposeAssetCache(assetCache);},[engine,assetCache]);
   const cameraOptions=useRef(camera),frameloopOptions=useRef(frameloop),engineMode=useRef(frameloop);
   created.current=onCreated;errorHandler.current=onError;cameraOptions.current=camera;frameloopOptions.current=frameloop;
@@ -98,7 +101,11 @@ export function MargoCanvas({children,style,className,label='Interactive 3D scen
       if(request===pendingHover)pendingHover=null;
       picking=true;
       // GPU readback permits one pending pick. Preserve clicks and coalesce hover bursts.
-      void Promise.resolve().then(()=>active&&!engine.disposed&&canPick()?engine.pick(request.x,request.y):null)
+      void Promise.resolve().then(async()=>{
+        if(!active||engine.disposed||!canPick())return null;
+        if(resources.models.size)await preparePicking(engine,resources,frames);
+        return active&&!engine.disposed?engine.pick(request.x,request.y):null;
+      })
         .then(mesh=>{if(active&&!engine.disposed)request.receive(mesh);})
         .catch(error=>{if(active&&!engine.disposed)engine.onError(error);})
         .finally(()=>{picking=false;nextPick();});
@@ -128,16 +135,15 @@ export function MargoCanvas({children,style,className,label='Interactive 3D scen
     const pointercancel=(event:PointerEvent)=>{if(down?.id===event.pointerId)down=null;pointerleave(event);};
     element.addEventListener('pointerdown',pointerdown);element.addEventListener('pointerup',pointerup);element.addEventListener('pointermove',pointermove);
     element.addEventListener('pointerleave',pointerleave);element.addEventListener('pointercancel',pointercancel);
-    return()=>{active=false;++hoverRequest;down=null;hover=null;pendingHover=null;clicks.length=0;element.removeEventListener('pointerdown',pointerdown);element.removeEventListener('pointerup',pointerup);element.removeEventListener('pointermove',pointermove);element.removeEventListener('pointerleave',pointerleave);element.removeEventListener('pointercancel',pointercancel);};
-  },[engine,pointerHandlers]);
+    return()=>{active=false;++hoverRequest;down=null;hover=null;pendingHover=null;clicks.length=0;releasePicking(engine);element.removeEventListener('pointerdown',pointerdown);element.removeEventListener('pointerup',pointerup);element.removeEventListener('pointermove',pointermove);element.removeEventListener('pointerleave',pointerleave);element.removeEventListener('pointercancel',pointercancel);};
+  },[engine,pointerHandlers,resources,frames]);
   useCommit(()=>{if(engine&&camera){Object.assign(engine.camera,camera);for(const apply of cameraOverrides)apply();}},[engine,cameraOverrides,camera?.position?.[0],camera?.position?.[1],camera?.position?.[2],camera?.target?.[0],camera?.target?.[1],camera?.target?.[2],camera?.fov,camera?.near,camera?.far]);
   useEffect(()=>{
     setShadow(null);if(!engine||!enableShadows)return;
     let cancelled=false,effect:Shadows|undefined;
-    import('@margoengine/shadows').then(({Shadows})=>{if(cancelled||engine.disposed)return;effect=Shadows.attach(engine as unknown as EngineKernel);setShadow(effect);}).catch(error=>{if(!cancelled)engine.onError(error);});
+    optionalPeer('@margoengine/shadows',()=>import('@margoengine/shadows')).then(({Shadows})=>{if(cancelled||engine.disposed)return;effect=Shadows.attach(engine as unknown as EngineKernel);setShadow(effect);}).catch(error=>{if(!cancelled)engine.onError(error);});
     return()=>{cancelled=true;effect?.dispose();};
   },[engine,enableShadows]);
-  const resources=useMemo<Resources>(()=>({models:new Set(),lighting:new Map()}),[engine]);
   const scene=useMemo<Scene|null>(()=>engine?{engine,registry:null,resources,shadows:enableShadows&&shadow?.owner===engine?shadow:null,requestShadows,cameraOverrides,pointerHandlers,frames,assetCache}:null,[engine,resources,enableShadows,shadow,requestShadows,cameraOverrides,pointerHandlers,frames,assetCache]);
   const value=useMemo<MargoContextValue>(()=>({stage,ready:!!stage&&!stage.engine.disposed,canvas:canvas.current,camera:stage?.engine.camera??null,gl:stage?.engine??null,get size(){return {width:canvas.current?.clientWidth??0,height:canvas.current?.clientHeight??0};},get clock(){return frames.elapsed;},invalidate}),[stage,frames,invalidate]);
   return <MargoContext.Provider value={value}><canvas ref={canvas} className={className} style={{display:'block',width:'100%',height:'100%',...style}} role="img" aria-label={label}/>{error!==null&&<p role="alert">{String(error)}</p>}{scene&&!engine?.disposed&&<Context.Provider value={scene}>{children}</Context.Provider>}</MargoContext.Provider>;
@@ -166,7 +172,7 @@ export interface MeshProps extends PointerHandlers {position?:Vec3;rotation?:Vec
 export const Mesh=forwardRef<MeshRef,MeshProps>(function Mesh({position=zero,rotation=zero,scale=one,children,onClick,onPointerOver,onPointerOut},ref){
   const parentScene=useScene(),{engine,registry:parent,pointerHandlers}=parentScene;const [node,setNode]=useState<EngineMesh|null>(null);
   const registry=useMemo<Registry>(()=>({
-    current:null,children:new Set(),attachments:new Set(),
+    current:null,children:new Set(),attachments:new Set(),geometry:null,
     register(mesh){this.children.add(mesh);if(this.current)mesh.setParent(this.current);},
     unregister(mesh){this.children.delete(mesh);if(engine.meshes.get(mesh.id)===mesh&&!engine.disposed)mesh.setParent(null);}
   }),[engine]);
@@ -194,16 +200,17 @@ export const Mesh=forwardRef<MeshRef,MeshProps>(function Mesh({position=zero,rot
 export function BoxGeometry({args=one}: {args?:Vec3}) {
   const registry=useMesh();
   useCommit(()=>{
-    const geometry=box(...args),attach=(mesh:EngineMesh)=>{mesh.setGeometry(geometry);};
+    const geometry=box(...args),attach=(mesh:EngineMesh)=>{setGeometry(registry,mesh,geometry);};
     registry.attachments.add(attach);try{if(registry.current)attach(registry.current);}catch(error){registry.attachments.delete(attach);throw error;}
-    return()=>{registry.attachments.delete(attach);const mesh=live(registry);if(mesh&&mesh.geometry===geometry)mesh.setGeometry(null);};
+    return()=>{registry.attachments.delete(attach);const mesh=live(registry);if(mesh&&registry.geometry===geometry)setGeometry(registry,mesh,null);};
   },[registry,args[0],args[1],args[2]]);return null;
 }
 export function GeometryResource({geometry}: {geometry:Geometry}) {
   const registry=useMesh();
-  useCommit(()=>{const attach=(mesh:EngineMesh)=>{mesh.setGeometry(geometry);};registry.attachments.add(attach);try{if(registry.current)attach(registry.current);}catch(error){registry.attachments.delete(attach);throw error;}return()=>{registry.attachments.delete(attach);const mesh=live(registry);if(mesh?.geometry===geometry)mesh.setGeometry(null);};},[registry,geometry]);return null;
+  useCommit(()=>{const attach=(mesh:EngineMesh)=>{setGeometry(registry,mesh,geometry);};registry.attachments.add(attach);try{if(registry.current)attach(registry.current);}catch(error){registry.attachments.delete(attach);throw error;}return()=>{registry.attachments.delete(attach);const mesh=live(registry);if(mesh&&registry.geometry===geometry)setGeometry(registry,mesh,null);};},[registry,geometry]);return null;
 }
-export function PbrMaterial({color='#4f46e5',roughness=0.5,metalness=0}: {color?:string|readonly number[];roughness?:number;metalness?:number}) {
+export interface PbrMaterialProps {color?:string|readonly number[];roughness?:number;metalness?:number}
+export function PbrMaterial({color='#4f46e5',roughness=0.5,metalness=0}:PbrMaterialProps) {
   const registry=useMesh();
   useCommit(()=>{
     const material=new Material({color,roughness,metalness}),attach=(mesh:EngineMesh)=>{mesh.setMaterial(material);};
@@ -298,7 +305,7 @@ interface OverlayEntry {users:number;promise:Promise<HTMLOverlay>}
 const overlays=new WeakMap<Engine,OverlayEntry>();
 function acquireOverlay(engine:Engine):OverlayEntry {
   let entry=overlays.get(engine);
-  if(!entry){entry={users:0,promise:import('@margoengine/html').then(({HTML})=>{if(engine.disposed)throw new Error('Canvas disposed');return HTML.attach(engine as unknown as EngineKernel);})};overlays.set(engine,entry);}
+  if(!entry){entry={users:0,promise:optionalPeer('@margoengine/html',()=>import('@margoengine/html')).then(({HTML})=>{if(engine.disposed)throw new Error('Canvas disposed');return HTML.attach(engine as unknown as EngineKernel);})};overlays.set(engine,entry);}
   entry.users++;return entry;
 }
 function releaseOverlay(engine:Engine,entry:OverlayEntry):void {
@@ -316,7 +323,7 @@ export function Html({children,position=zero,className,style,occlude=true,onErro
     let active=true,current:HTMLOverlay|undefined,item:import('@margoengine/html').Label|undefined;
     const entry=acquireOverlay(engine),element=engine.canvas.ownerDocument.createElement('div');
     const attach=(mesh:EngineMesh)=>{item?.setMesh(mesh as unknown as MeshHandle);item?.setOffset(latest.current.position);};
-    Promise.all([entry.promise,import('react-dom')]).then(([overlay,dom])=>{
+    Promise.all([entry.promise,optionalPeer('react-dom',()=>import('react-dom'))]).then(([overlay,dom])=>{
       if(!active||engine.disposed)return;
       current=overlay;
       const mesh=registry?.current,p=latest.current.position;
@@ -336,7 +343,7 @@ export function OrbitControls({autoRotate=false,autoRotateSpeed=2,enableDamping=
   const {engine,frames}=useScene(),[controls,setControls]=useState<CameraControls|null>(null);
   useEffect(()=>{
     let cancelled=false,current:CameraControls|undefined,unsubscribe:(()=>void)|undefined;
-    import('@margoengine/controls').then(({OrbitControls})=>{
+    optionalPeer('@margoengine/controls',()=>import('@margoengine/controls')).then(({OrbitControls})=>{
       if(cancelled||engine.disposed)return;
       current=new OrbitControls(engine.camera,engine.canvas);
       try{const instance=current,frame:FrameCallback=(_,delta)=>instance.update(delta);frames.callbacks.add(frame);unsubscribe=()=>{frames.callbacks.delete(frame);};setControls(current);}catch(error){current.dispose();throw error;}

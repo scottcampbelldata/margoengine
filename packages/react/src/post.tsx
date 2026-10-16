@@ -7,6 +7,7 @@ import type {DOF as DepthOfFieldEffect, DOFOptions} from '@margoengine/dof';
 import type {Tonemap as TonemapEffect, TonemapOptions, CubeLUT} from '@margoengine/tonemap';
 import type {TAA as TAAEffect, TAAOptions, VelocityPrimitive, VelocitySource} from '@margoengine/taa';
 import {useScene, useCommit, useResourceEffect, type Scene} from './internal.js';
+import {optionalPeer} from './optional.js';
 
 type Kind='bloom'|'ssao'|'dof'|'tonemap'|'taa';
 type Effect=BloomEffect|SSAOEffect|DepthOfFieldEffect|TonemapEffect|TAAEffect;
@@ -68,11 +69,11 @@ function velocitySource(scene:Scene,model:Model) {
 
 async function factory(kind:Kind):Promise<Factory> {
   switch(kind) {
-    case 'bloom':return (await import('@margoengine/post/bloom')).Bloom.attach;
-    case 'ssao':return (await import('@margoengine/post/ssao')).SSAO.attach;
-    case 'dof':return (await import('@margoengine/dof')).DOF.attach;
-    case 'tonemap':return (await import('@margoengine/tonemap')).Tonemap.attach;
-    case 'taa':return (await import('@margoengine/taa')).TAA.attach;
+    case 'bloom':return (await optionalPeer('@margoengine/post/bloom',()=>import('@margoengine/post/bloom'))).Bloom.attach;
+    case 'ssao':return (await optionalPeer('@margoengine/post/ssao',()=>import('@margoengine/post/ssao'))).SSAO.attach;
+    case 'dof':return (await optionalPeer('@margoengine/dof',()=>import('@margoengine/dof'))).DOF.attach;
+    case 'tonemap':return (await optionalPeer('@margoengine/tonemap',()=>import('@margoengine/tonemap'))).Tonemap.attach;
+    case 'taa':return (await optionalPeer('@margoengine/taa',()=>import('@margoengine/taa'))).TAA.attach;
   }
 }
 

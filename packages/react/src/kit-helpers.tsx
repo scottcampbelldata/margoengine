@@ -5,9 +5,10 @@ import type {Geometry,Mesh as EngineMesh} from '@margoengine/core/extension';
 import type {PointerLockControls as PointerControls,TransformControls as GizmoControls,TransformControlsOptions,ControlEvent} from '@margoengine/controls';
 import type {Sky as SkyPlugin,SkyOptions} from '@margoengine/sky';
 import type {Text as TextBlock,TextOptions,TextRenderer,Font} from '@margoengine/text';
-import {Mesh,type MeshProps,type MeshRef} from './components.js';
-import {useScene,useMesh,useCommit,live,zero,type Scene,type Registry} from './internal.js';
+import {Mesh,PbrMaterial,type PbrMaterialProps,type MeshProps,type MeshRef} from './components.js';
+import {useScene,useMesh,useCommit,live,setGeometry,zero,type Scene,type Registry} from './internal.js';
 import {ContactGround,type ContactGroundOptions} from './kit-contact.js';
+import {optionalPeer} from './optional.js';
 
 interface ErrorProps {onError?:(error:unknown)=>void}
 function report(scene:Scene,error:unknown,onError?:ErrorProps['onError']):void {try{onError?.(error);}finally{scene.engine.onError(error);}}
@@ -19,17 +20,17 @@ function ShapeGeometry({kind,args,onError}:{kind:ShapeKind;args:readonly number[
   const key=JSON.stringify(args);
   useEffect(()=>{
     let active=true,geometry:Geometry|undefined;
-    const attach=(mesh:EngineMesh)=>{if(geometry)mesh.setGeometry(geometry);};
-    import('@margoengine/geometry').then(api=>{
+    const attach=(mesh:EngineMesh)=>{if(geometry)setGeometry(registry,mesh,geometry);};
+    optionalPeer('@margoengine/geometry',()=>import('@margoengine/geometry')).then(api=>{
       if(!active||scene.engine.disposed)return;
       const create=api[kind] as (...args:number[])=>ReturnType<GeometryApi[ShapeKind]>;
       geometry=api.toGeometry(create(...args));registry.attachments.add(attach);
       try{const mesh=live(registry);if(mesh)attach(mesh);}catch(error){registry.attachments.delete(attach);throw error;}
     }).catch(cause=>{if(active&&!scene.engine.disposed)report(scene,cause,error.current);});
-    return()=>{active=false;registry.attachments.delete(attach);const mesh=live(registry);if(mesh&&mesh.geometry===geometry)mesh.setGeometry(null);};
+    return()=>{active=false;registry.attachments.delete(attach);const mesh=live(registry);if(mesh&&registry.geometry===geometry)setGeometry(registry,mesh,null);};
   },[scene.engine,registry,kind,key]);return null;
 }
-interface ShapeProps extends MeshProps,ErrorProps {castShadow?:boolean}
+interface ShapeProps extends MeshProps,ErrorProps,PbrMaterialProps {castShadow?:boolean}
 function ShapeCaster({enabled,onError}:{enabled:boolean;onError?:ErrorProps['onError']}) {
   const scene=useScene(),registry=useMesh(),error=useRef(onError);error.current=onError;
   useEffect(()=>{if(enabled)return scene.requestShadows();},[scene.requestShadows,enabled]);
@@ -44,16 +45,16 @@ function ShapeCaster({enabled,onError}:{enabled:boolean;onError?:ErrorProps['onE
 export interface BoxProps extends ShapeProps {args?:Parameters<GeometryApi['boxGeometry']>}
 export interface SphereProps extends ShapeProps {args?:Parameters<GeometryApi['sphereGeometry']>}
 export interface PlaneProps extends ShapeProps {args?:Parameters<GeometryApi['planeGeometry']>}
-export const Box=forwardRef<MeshRef,BoxProps>(function Box({args=[],castShadow=false,onError,children,...props},ref){return <Mesh {...props} ref={ref}><ShapeGeometry kind="boxGeometry" args={args as number[]} onError={onError}/><ShapeCaster enabled={castShadow} onError={onError}/>{children}</Mesh>;});
-export const Sphere=forwardRef<MeshRef,SphereProps>(function Sphere({args=[],castShadow=false,onError,children,...props},ref){return <Mesh {...props} ref={ref}><ShapeGeometry kind="sphereGeometry" args={args as number[]} onError={onError}/><ShapeCaster enabled={castShadow} onError={onError}/>{children}</Mesh>;});
-export const Plane=forwardRef<MeshRef,PlaneProps>(function Plane({args=[],castShadow=false,onError,children,...props},ref){return <Mesh {...props} ref={ref}><ShapeGeometry kind="planeGeometry" args={args as number[]} onError={onError}/><ShapeCaster enabled={castShadow} onError={onError}/>{children}</Mesh>;});
+export const Box=forwardRef<MeshRef,BoxProps>(function Box({args=[],castShadow=false,onError,color,roughness,metalness,children,...props},ref){return <Mesh {...props} ref={ref}><ShapeGeometry kind="boxGeometry" args={args as number[]} onError={onError}/><PbrMaterial color={color} roughness={roughness} metalness={metalness}/><ShapeCaster enabled={castShadow} onError={onError}/>{children}</Mesh>;});
+export const Sphere=forwardRef<MeshRef,SphereProps>(function Sphere({args=[],castShadow=false,onError,color,roughness,metalness,children,...props},ref){return <Mesh {...props} ref={ref}><ShapeGeometry kind="sphereGeometry" args={args as number[]} onError={onError}/><PbrMaterial color={color} roughness={roughness} metalness={metalness}/><ShapeCaster enabled={castShadow} onError={onError}/>{children}</Mesh>;});
+export const Plane=forwardRef<MeshRef,PlaneProps>(function Plane({args=[],castShadow=false,onError,color,roughness,metalness,children,...props},ref){return <Mesh {...props} ref={ref}><ShapeGeometry kind="planeGeometry" args={args as number[]} onError={onError}/><PbrMaterial color={color} roughness={roughness} metalness={metalness}/><ShapeCaster enabled={castShadow} onError={onError}/>{children}</Mesh>;});
 
 export interface SkyProps extends SkyOptions,ErrorProps {}
 export const Sky=forwardRef<SkyPlugin,SkyProps>(function Sky({onError,...options},ref){
   const scene=useScene(),latest=useRef({options,onError}),[sky,setSky]=useState<SkyPlugin|null>(null);latest.current={options,onError};
   useEffect(()=>{
     let active=true,current:SkyPlugin|undefined;
-    import('@margoengine/sky').then(({Sky})=>{
+    optionalPeer('@margoengine/sky',()=>import('@margoengine/sky')).then(({Sky})=>{
       if(!active||scene.engine.disposed)return;
       current=new Sky({...latest.current.options});scene.engine.use(current);setSky(current);
     }).catch(error=>{if(active&&!scene.engine.disposed)report(scene,error,latest.current.onError);});
@@ -133,7 +134,7 @@ export const PointerLock=forwardRef<PointerControls,PointerLockProps>(function P
   const scene=useScene(),latest=useRef(props),[controls,setControls]=useState<PointerControls|null>(null);latest.current=props;
   useEffect(()=>{
     let active=true,current:PointerControls|undefined,release=()=>{};
-    import('@margoengine/controls').then(({PointerLockControls})=>{
+    optionalPeer('@margoengine/controls',()=>import('@margoengine/controls')).then(({PointerLockControls})=>{
       if(!active||scene.engine.disposed)return;
       current=new PointerLockControls(scene.engine as unknown as EngineKernel,scene.engine.canvas);
       const control=current,frame:FrameCallback=(_,delta)=>{control.update(delta);};
@@ -165,7 +166,7 @@ function TransformBinding({options,controlRef}:{options:TransformControlsProps;c
   const scene=useScene(),latest=useRef(options),[controls,setControls]=useState<GizmoControls|null>(null);latest.current=options;
   useEffect(()=>{
     let active=true,current:GizmoControls|undefined,release=()=>{};
-    import('@margoengine/gizmo').then(({TransformControls})=>{
+    optionalPeer('@margoengine/gizmo',()=>import('@margoengine/gizmo')).then(({TransformControls})=>{
       if(!active||scene.engine.disposed)return;
       current=new TransformControls(scene.engine as unknown as EngineKernel,latest.current);
       const control=current,attach=()=>{const object=target(latest.current.object,scene.registry);if(object!==control.object){if(object)control.attach(object);else control.detach();}};
@@ -193,7 +194,7 @@ interface TextRendererLease {users:number;promise:Promise<{renderer:TextRenderer
 const renderers=new WeakMap<Scene['engine'],TextRendererLease>();
 function acquireTextRenderer(scene:Scene):TextRendererLease {
   let entry=renderers.get(scene.engine);
-  if(!entry){entry={users:0,promise:import('@margoengine/text').then(api=>{if(scene.engine.disposed)throw new Error('Canvas disposed');const renderer=new api.TextRenderer({name:'margoengine-react:text'});scene.engine.use(renderer);return {renderer,api};})};renderers.set(scene.engine,entry);}
+  if(!entry){entry={users:0,promise:optionalPeer('@margoengine/text',()=>import('@margoengine/text')).then(api=>{if(scene.engine.disposed)throw new Error('Canvas disposed');const renderer=new api.TextRenderer({name:'margoengine-react:text'});scene.engine.use(renderer);return {renderer,api};})};renderers.set(scene.engine,entry);}
   entry.users++;return entry;
 }
 function releaseTextRenderer(scene:Scene,entry:TextRendererLease):void {

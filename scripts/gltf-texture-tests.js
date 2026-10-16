@@ -97,7 +97,7 @@ export async function textureBrowserChecks(page) {
       const ordinary=await render(payload.ordinary),identity=await render(payload.identity);
       const baselineDifference=difference(ordinary.beauty,identity.beauty);assert(baselineDifference.changed===0,'Identity transform changed ordinary PBR pixels');
       const hash=async value=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(byte=>byte.toString(16).padStart(2,'0')).join('');
-      assert(await hash(ordinary.pipeline.code)==='1920d3bb180dbf0fa32fe4d373a3c03bdfccbdc834fb02a26fcb1b8dfeeffa5b','Ordinary PBR shader changed');
+      assert(await hash(ordinary.pipeline.code)==='469dd81676967dbfd22118fa85b1cf8b6ff37dc7593e7e7f8130e5626a29f508','Ordinary PBR shader changed');
       assert(ordinary.pipeline.code===identity.pipeline.code,'Identity transform changed the PBR shader');
       const results=[];
       for(const item of payload.cases){

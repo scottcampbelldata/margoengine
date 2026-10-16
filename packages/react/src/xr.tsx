@@ -1,4 +1,5 @@
 'use client';
+import {optionalPeer} from './optional.js';
 import {createContext,useContext,useMemo,useRef,useState,type ReactNode} from 'react';
 import type {EngineKernel} from '@margoengine/core';
 import type {XR as XRManager,XRMode,XRSessionOptions,XRNativeSession,XRFrameState,XRInputPose} from '@margoengine/xr';
@@ -31,7 +32,7 @@ export function XR({children,...props}:XRProps) {
   useResourceEffect(lease=>{
     mounted.current=true;setManager(null);setSession(null);
     let instance:XRManager|undefined;
-    void import('@margoengine/xr').then(api=>{if(!lease.active||engine.disposed)return;return api.XR.create(engine as unknown as EngineKernel);}).then(value=>{
+    void optionalPeer('@margoengine/xr',()=>import('@margoengine/xr')).then(api=>{if(!lease.active||engine.disposed)return;return api.XR.create(engine as unknown as EngineKernel);}).then(value=>{
       if(!value)return;instance=value;
       if(!lease.active||engine.disposed){value.dispose();return;}
       current.current=value;setManager(value);latest.current.onReady?.(value);

@@ -56,18 +56,26 @@ fn surface(i:Out,front:bool)->Surface {
   if(f.settings.x>0.5&&f.settings.x<1.5&&s.base.a<f.settings.y){discard;}
   return s;
 }
-fn ambient(s:Surface)->vec3f {
+fn hemisphere_ambient(s:Surface)->vec3f {
   let f0=mix(vec3f(0.04),s.base.rgb,s.metal);
   let hemisphere=mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.n.y*0.5+0.5,0.0,1.0));
   return (s.base.rgb*(1-s.metal)+f0*0.5)*hemisphere*f.radiance.w*s.occlusion;
 }
-@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
-  let s=surface(i,front); let v=normalize(f.eye.xyz-i.position); let l=normalize(f.light.xyz); let h=(v+l)/max(length(v+l),0.0001);
+// Keep the established lighting-effect splice point for optional environment plugins.
+fn ambient(s:Surface)->vec3f {
+  return hemisphere_ambient(s);
+}
+fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {
+  let h=(v+l)/max(length(v+l),0.0001);
   let nl=clamp(dot(s.n,l),0.0,1.0); let nv=clamp(dot(s.n,v),0.0001,1.0); let nh=clamp(dot(s.n,h),0.0,1.0); let vh=clamp(dot(v,h),0.0,1.0);
   let a=s.roughness*s.roughness; let a2=a*a; let d=a2/(3.14159265*pow(nh*nh*(a2-1)+1,2.0));
   let g=2*nv/(nv+sqrt(a2+(1-a2)*nv*nv))*2*nl/max(nl+sqrt(a2+(1-a2)*nl*nl),0.0001);
   let f0=mix(vec3f(0.04),s.base.rgb,s.metal); let fresnel=f0+(1-f0)*pow(1-vh,5.0);
-  let direct=((1-fresnel)*(1-s.metal)*s.base.rgb/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*f.radiance.rgb*f.light.w;
+  return ((1-fresnel)*(1-s.metal)*s.base.rgb/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*f.radiance.rgb*f.light.w;
+}
+@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
+  let s=surface(i,front); let v=normalize(f.eye.xyz-i.position); let l=normalize(f.light.xyz);
+  let direct=direct_light(s,v,l);
   var color=direct+ambient(s)+s.emissive;
   if(f.settings.w<0.5) {color=aces(max(color,vec3f(0))/0.6); color=select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308));}
   return vec4f(color,select(1.0,s.base.a,f.settings.x>1.5));
