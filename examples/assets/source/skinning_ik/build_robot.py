@@ -204,6 +204,31 @@ def skin(o,arm,bone,weights=None):
     return o
 
 
+def resting_hand_details(arm,cream,teal,dark,copper):
+    """Complete the resting gripper with the orb hand's articulated styling.
+
+    The original teal housing and wrist bearing remain unchanged. Every added
+    part belongs rigidly to RightHand, so existing arm lengths and IK stay fixed.
+    """
+    parts=[]
+    def attach(obj):
+        parts.append(skin(obj,arm,"RightHand"))
+    attach(ellipsoid("Right curved resting palm",(.29,.650,-.092),(.102,.034,.062),dark))
+    attach(ellipsoid("Right palm porcelain back armor",(.29,.655,-.035),(.094,.052,.022),cream))
+    for x in (.255,.29,.325):
+        points=[(x,.641,-.113),(x,.615,-.130),(x,.589,-.123),(x,.581,-.105)]
+        for i,(a,b) in enumerate(zip(points,points[1:])):
+            attach(rod("Right relaxed finger phalange "+str(i),a,b,.0105,cream if i!=1 else teal))
+            attach(sphere("Right relaxed finger dark knuckle",a,.013,dark,16))
+        attach(sphere("Right relaxed finger pad",points[-1],.012,dark,16))
+    thumb=[(.336,.671,-.088),(.362,.640,-.108),(.350,.615,-.125)]
+    for a,b in zip(thumb,thumb[1:]):
+        attach(rod("Right opposing relaxed thumb phalange",a,b,.012,cream))
+        attach(sphere("Right opposing relaxed thumb knuckle",a,.014,copper,16))
+    attach(sphere("Right opposing relaxed thumb pad",thumb[-1],.013,dark,16))
+    return parts
+
+
 def sleeve(name,points,names,arm,mat):
     a,b,c=map(g,points)
     u=(b-a).length
@@ -450,6 +475,7 @@ def build():
         skin(rod("Opposing thumb phalange",a,b,.014,cream),arm,"Hand")
         skin(sphere("Opposing thumb knuckle",a,.016,copper,16),arm,"Hand")
     skin(box("Right gripper",(.29,.675,-.075),(.105,.08,.09),teal,.018),arm,"RightHand")
+    resting_hand_details(arm,cream,teal,dark,copper)
 
     skin(torso_shell(cream),arm,"Body")
     skin(curved_chest(teal),arm,"Body")
