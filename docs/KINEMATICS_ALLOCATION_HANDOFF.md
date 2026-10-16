@@ -1,6 +1,6 @@
 # Kinematics and robot allocation handoff
 
-Updated: 2026-10-16. This document records verified work, evidence locations, limits, and the next experiments. It is a checkpoint, not a completion claim.
+Updated: 2026-10-16. This document records verified work, evidence locations, limits, and the next experiments. It is a checkpoint, not a completion claim. Gzip figures in this note are from the checkpoint. The current build measures core at 18,192 bytes gzip and core plus stage at 19,999 bytes gzip. The gate rejects 20,000 or above.
 
 ## Active objective and current state
 
@@ -27,7 +27,7 @@ An allocation change in one demo does not establish the behavior of the other.
 | Generated-waypoint reach fix | Primary c8bb451; robot cherry-pick 8aff06f |
 | Prior robot performance checkpoint | f33e094 |
 | Core + stage freeze | No new features; combined gzip must remain strictly below 20,000 bytes |
-| Latest verified core + stage size | **19,999 gzip bytes** |
+| Checkpoint core + stage size, not the 16 October measurement | **19,999 gzip bytes** |
 | Latest public API check | **166 entries / 1,548 exports unchanged** |
 
 The robot code/test checkpoint is committed and pushed as **6794863** on **codex/skinning-ik**. It includes the Animation native-writer/backing-store guards, environment output identity retention, explicit demo-owned head writer, and additional unconditional PBR writer regressions. The experimental PBR uniform cache was reverted. These changes do not establish zero-GC operation.

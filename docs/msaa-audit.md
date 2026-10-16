@@ -1,5 +1,7 @@
 # Scene sampling audit
 
+Gzip figures in this note are from this audit. The current build measures core at 18,192 bytes gzip and core plus stage at 19,999 bytes gzip. The gate rejects 20,000 or above.
+
 Desktop WebGPU scenes use 4× MSAA and cap canvas DPR at 1, avoiding an additional
 fourfold pixel cost on HiDPI displays. Phone scenes use 1× sampling and cap canvas
 DPR at 2. The phone path allocates no multisampled attachments, creates no 4×
