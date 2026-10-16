@@ -6,16 +6,26 @@ import {Cleanup} from '../../shared/cleanup.js';
 import {GLTFAsset, container, loadAsset, entry, integer, assetLimit} from './asset.js';
 import {pbrShader} from './shader.js';
 import {mipShader} from './mip.js';
+import {prepareMaterialExtension, materialExtensionShader, bindMaterialExtension, type MaterialExtension, type MaterialExtensionResource} from './material-extension.js';
 import {compressedIndices, decompressPrimitives, type GLTFLoadOptions} from './compression.js';
 export {GLTFAsset} from './asset.js';
 export type {GLTFDocument} from './asset.js';
 export type {GLTFLoadOptions} from './compression.js';
+export type {MaterialExtension, MaterialExtensionTexture} from './material-extension.js';
 declare const GPUBufferUsage: {UNIFORM:number;STORAGE:number;VERTEX:number;INDEX:number;COPY_DST:number};
 declare const GPUTextureUsage: {TEXTURE_BINDING:number;COPY_DST:number;RENDER_ATTACHMENT:number};
 type Context = Extract<PassContext,{backend:'webgpu'}>;
+const opaquePasses=new WeakMap<Context,Set<PBRModel>>();
+export interface PBRMaterial {
+  [key:string]:any;
+  base:number[];factors:number[];emission:number[];settings:number[];maps:any[];
+  extension?:MaterialExtension;
+}
 export interface PBRPrimitive {
   node: Mesh; nodeIndex: number; vertices: Float32Array; indices: Uint32Array;
-  definition: any; material: any; weights: Float32Array; targetNames: string[];
+  definition: any; material: PBRMaterial; weights: Float32Array; targetNames: string[];
+  /** Overrides the material's shared extension when supplied. Attach after loading. */
+  extension?:MaterialExtension;
   deformed?: GPUBuffer;
 }
 export interface PreparedGeometry {vertices:Float32Array;indices:Uint32Array}
@@ -37,14 +47,14 @@ function preparedPrimitive(asset:GLTFAsset,p:any,data:PreparedGeometry,node:Mesh
   for(const map of m.maps)if(map){if(integer(map.texCoord??0,'texture coordinate')>1)throw new RangeError('Invalid prepared PBR UV set');entry(asset.doc.textures,map.index,'texture');}
   return {node,nodeIndex,vertices,indices,definition:p,material:m,weights:new Float32Array(0),targetNames:[]};
 }
-interface DrawResource {primitive:PBRPrimitive;vertex:GPUBuffer;index:GPUBuffer;uniform:GPUBuffer;values:Float32Array;groups:Map<GPURenderPipeline,[GPUBindGroup,GPUBindGroup]>;views:GPUTextureView[];samplers:GPUSampler[]}
+interface DrawResource {primitive:PBRPrimitive;vertex:GPUBuffer;index:GPUBuffer;uniform:GPUBuffer;values:Float32Array;groups:Map<GPURenderPipeline,[GPUBindGroup,GPUBindGroup]>;views:GPUTextureView[];samplers:GPUSampler[];extension?:MaterialExtensionResource}
 export interface LightingEffect {readonly owner?:Engine;shader(source:string,group:number):string;bindings():GPUBindGroupEntry[]}
 let modelId = 0;
 const vector = (value:any, size:number, label:string, min=-Infinity, max=Infinity):number[] => {
   if (!Array.isArray(value) || value.length !== size || value.some(v=>typeof v!=='number'||!Number.isFinite(Math.fround(v))||v<min||v>max)) throw new TypeError('Invalid glTF '+label);
   return value;
 };
-function material(def:any = {}): any {
+function material(def:any = {}): PBRMaterial {
   const p=def.pbrMetallicRoughness??{}, alpha=def.alphaMode??'OPAQUE';
   if (!['OPAQUE','MASK','BLEND'].includes(alpha)) throw new TypeError('Invalid glTF alpha mode');
   if (def.doubleSided!==undefined&&typeof def.doubleSided!=='boolean') throw new TypeError('Invalid glTF doubleSided');
@@ -113,6 +123,13 @@ function transform(node:Mesh,def:any):void {
   } else node.setPosition(def.translation??[0,0,0]).setScale(def.scale??[1,1,1]).setQuaternion(def.rotation??[0,0,0,1]);
 }
 export class PBRModel implements EnginePlugin {
+  /** Optional scene-wide opaque phase, used by caller-owned color captures. */
+  static beginOpaquePass(context:Context):void {opaquePasses.set(context,new Set());}
+  static cancelOpaquePass(context:Context):void {opaquePasses.delete(context);}
+  static endOpaquePass(context:Context):void {
+    const models=opaquePasses.get(context);opaquePasses.delete(context);
+    for(const model of models??[])model.draw(context,'beauty',context.color,context.depth,'blend');
+  }
   readonly name='gltf-pro:'+modelId++;
   readonly root:Mesh;readonly nodes:Mesh[]=[];readonly primitives:PBRPrimitive[]=[];
   disposed=false;private readonly created:Mesh[]=[];private resources:DrawResource[]=[];private textures:GPUTexture[]=[];
@@ -195,6 +212,11 @@ export class PBRModel implements EnginePlugin {
     }
   }
   registerPasses(graph:FrameGraph):void {graph.add({name:this.name,order:1,execute:c=>{if(c.backend==='webgpu')this.draw(c,'beauty',c.color,c.depth);}});}
+  /** Borrow a decoded image for optional material packages; the model owns its lifetime. */
+  image(index:number):ImageBitmap {
+    if(this.disposed)throw new Error('PBRModel is disposed');
+    const image=this.images[integer(index,'image')];if(!image)throw new TypeError('Missing decoded glTF image');return image;
+  }
   addLighting(effect:LightingEffect):()=>void {
     if(this.disposed||!effect||typeof effect.shader!=='function'||typeof effect.bindings!=='function')throw new TypeError('Invalid PBR lighting effect');
     if(effect.owner&&effect.owner!==this.engine)throw new Error('PBR lighting belongs to another engine');
@@ -204,10 +226,12 @@ export class PBRModel implements EnginePlugin {
     return this.resources.filter(r=>r.primitive.material.settings[0]!==2).map(r=>({node:r.primitive.node,vertex:r.primitive.deformed??r.vertex,index:r.index,count:r.primitive.indices.length,stride:80,
       alphaTexture:r.views[0],alphaSampler:r.samplers[0],alpha:r.primitive.material.base[3],cutoff:r.primitive.material.settings[0]===1?r.primitive.material.settings[1]:0,texCoord:r.primitive.material.maps[0]?.texCoord??0}));
   }
-  draw(c:Context,mode:'beauty'|'gbuffer'|'ambient',color:GPUTextureView,depth:GPUTextureView):void {
+  draw(c:Context,mode:'beauty'|'gbuffer'|'ambient',color:GPUTextureView,depth:GPUTextureView,phase:'all'|'opaque'|'blend'='all'):void {
     if(this.disposed)return;
+    const pending=mode==='beauty'&&phase==='all'?opaquePasses.get(c):undefined;
+    if(pending){pending.add(this);phase='opaque';}
     viewMatrix(this.view,c.camera);
-    const resources=[...this.resources].sort((a,b)=>{
+    const resources=(phase==='all'?[...this.resources]:this.resources.filter(r=>(r.primitive.material.settings[0]===2)===(phase==='blend'))).sort((a,b)=>{
       const blendA=a.primitive.material.settings[0]===2,blendB=b.primitive.material.settings[0]===2;
       if(blendA!==blendB)return +blendA-+blendB;
       const distance=(r:DrawResource)=>Math.hypot(...c.camera.position.map((v,i)=>v-r.primitive.node.matrix[12+i]));
@@ -227,8 +251,12 @@ export class PBRModel implements EnginePlugin {
       const a=node.matrix;v[97]=Math.sign(a[0]*(a[5]*a[10]-a[6]*a[9])-a[4]*(a[1]*a[10]-a[2]*a[9])+a[8]*(a[1]*a[6]-a[2]*a[5]));
       c.device.queue.writeBuffer(r.uniform,0,v as Float32Array<ArrayBuffer>);
       let code=pbrShader;
-      if(mode==='beauty')for(const effect of this.lighting)code=effect.shader(code,2);
-      const blend=m.settings[0]===2,key=mode+':'+c.format+':'+blend+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+code;
+      const extension=p.extension??m.extension;
+      if(extension){r.extension=prepareMaterialExtension(c.device,extension,r.extension);code=materialExtensionShader(code,extension);}
+      else if(r.extension){r.extension.uniform?.destroy();r.extension=undefined;}
+      const lighting=mode==='beauty'&&extension?.lighting!==false&&this.lighting.size>0;
+      if(lighting)for(const effect of this.lighting)code=effect.shader(code,2);
+      const blend=m.settings[0]===2,key=mode+':'+c.format+':'+blend+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+(extension?':material-extension:':'')+code;
       let pipeline=this.pipelines.get(key);
       if(!pipeline) {
         const module=c.device.createShaderModule({code}),format=mode==='beauty'?c.format:'rgba16float';
@@ -247,7 +275,7 @@ export class PBRModel implements EnginePlugin {
       if(blend&&mode!=='gbuffer'){pass?.end();pass=undefined;}
       pass??=c.encoder.beginRenderPass({colorAttachments:[{view:color,loadOp:'load',storeOp:'store'}],depthStencilAttachment:{view:depth,depthLoadOp:'load',depthStoreOp:'store',...(c.descriptor.depthStencil!.format.includes('stencil')?{stencilLoadOp:'load',stencilStoreOp:'store'}:{})}});
       pass.setPipeline(pipeline);pass.setBindGroup(0,groups[0]);pass.setBindGroup(1,groups[1]);
-      if(mode==='beauty'&&this.lighting.size){
+      if(lighting){
         const entries=[...this.lighting].flatMap(effect=>effect.bindings());let cached=this.lightingGroups.get(pipeline);
         if(!cached||entries.length!==cached.entries.length||entries.some((entry,i)=>{
           const previous=cached!.entries[i],resource=entry.resource,old=previous.resource;
@@ -258,6 +286,7 @@ export class PBRModel implements EnginePlugin {
         }
         pass.setBindGroup(2,cached.group);
       }
+      if(extension)bindMaterialExtension(c.device,pass,pipeline,r.extension!,lighting);
       pass.setVertexBuffer(0,p.deformed??r.vertex);pass.setIndexBuffer(r.index,'uint32');pass.drawIndexed(p.indices.length);
       if(blend&&mode!=='gbuffer'){pass.end();pass=undefined;}
       if(mode==='beauty'){this.engine.stats.visible++;this.engine.stats.drawCalls++;}
@@ -272,7 +301,7 @@ export class PBRModel implements EnginePlugin {
     return out;
   }
   onDispose(callback:()=>void):()=>void {if(typeof callback!=='function')throw new TypeError('Expected cleanup callback');if(this.disposed){callback();return()=>{};}this.cleanupCallbacks.add(callback);return()=>this.cleanupCallbacks.delete(callback);}
-  private releaseGPU():void {const cleanup=new Cleanup(),buffers=new Set<GPUBuffer>();for(const r of this.resources)for(const b of [r.vertex,r.index,r.uniform])if(b)buffers.add(b);for(const b of buffers)cleanup.run(()=>b.destroy());for(const t of this.textures)cleanup.run(()=>t.destroy());this.resources=[];this.textures=[];this.pipelines.clear();this.lightingGroups.clear();cleanup.finish();}
+  private releaseGPU():void {const cleanup=new Cleanup(),buffers=new Set<GPUBuffer>();for(const r of this.resources)for(const b of [r.vertex,r.index,r.uniform,r.extension?.uniform])if(b)buffers.add(b);for(const b of buffers)cleanup.run(()=>b.destroy());for(const t of this.textures)cleanup.run(()=>t.destroy());this.resources=[];this.textures=[];this.pipelines.clear();this.lightingGroups.clear();cleanup.finish();}
   onDeviceRestored(engine:Engine):void {this.releaseGPU();for(const p of this.primitives)p.deformed=undefined;this.setup(engine);}
   dispose():void {
     if(this.disposed)return;this.disposed=true;const cleanup=new Cleanup();

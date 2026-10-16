@@ -761,6 +761,27 @@
     ]
   },
   {
+    "id": "materials",
+    "title": "Extended PBR materials",
+    "package": "@margoengine/materials",
+    "version": "0.1.0",
+    "published": false,
+    "description": "Opt-in glTF clearcoat, transmission, IOR and volume for Margo Engine's PBR extension slot.",
+    "requirements": "Core 0.1.0 · gltf-pro 0.1.0 · WebGPU",
+    "keywords": "materials clearcoat transmission ior volume refraction attenuation KHR_materials_clearcoat KHR_materials_transmission KHR_materials_ior KHR_materials_volume coat factor roughness normal texture pbr gltf",
+    "install": "npm install @margoengine/core@0.1.0 @margoengine/gltf-pro@0.1.0 @margoengine/materials@0.1.0",
+    "imports": "import { clearcoat, install, transmission } from '@margoengine/materials';",
+    "exports": [
+      "MaterialInstallation",
+      "NodeMaterialInstallation",
+      "clearcoat",
+      "install",
+      "installNodeMaterial",
+      "nodeMaterial",
+      "transmission"
+    ]
+  },
+  {
     "id": "navigation",
     "title": "Navigation",
     "package": "@margoengine/navigation",

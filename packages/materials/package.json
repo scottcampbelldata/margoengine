@@ -1,0 +1,35 @@
+{
+  "name": "@margoengine/materials",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Opt-in glTF clearcoat, transmission, IOR and volume for Margo Engine's PBR extension slot.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/materials"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js materials",
+    "test": "npm run build && node --test tests/*.test.js",
+    "prepack": "npm run build"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "@margoengine/core": "0.1.0",
+    "@margoengine/gltf-pro": "0.1.0"
+  },
+  "homepage": "https://margoengine.com"
+}

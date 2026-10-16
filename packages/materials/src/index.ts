@@ -1,0 +1,141 @@
+import type {MaterialExtension, MaterialExtensionTexture, PBRMaterial, PBRModel} from '@margoengine/gltf-pro';
+import type {Engine, EnginePlugin} from '@margoengine/core/extension';
+import {Cleanup} from '../../shared/cleanup.js';
+import {clearcoatShader, type ClearcoatShaderTextures} from './shader.js';
+import {MaterialTextures, validateTextureInfo, type TextureInfo} from './textures.js';
+import {createTransmission, validateTransmission, type TransmissionOptions, type VolumeOptions} from './transmission.js';
+import {acquireOpaqueColor} from './opaque-color.js';
+export {transmission, type TransmissionOptions, type VolumeOptions} from './transmission.js';
+export {nodeMaterial, installNodeMaterial, NodeMaterialInstallation} from './nodes.js';
+export type * from './node-types.js';
+
+export interface ClearcoatTexture extends MaterialExtensionTexture {texCoord?:0|1;scale?:number}
+export interface ClearcoatOptions {
+  factor?:number;
+  roughnessFactor?:number;
+  clearcoatTexture?:ClearcoatTexture;
+  clearcoatRoughnessTexture?:ClearcoatTexture;
+  clearcoatNormalTexture?:ClearcoatTexture;
+}
+
+function scalar(value:unknown,fallback:number,label:string,min=-Infinity,max=Infinity):number {
+  const n=value===undefined?fallback:value;
+  if(typeof n!=='number'||!Number.isFinite(Math.fround(n))||n<min||n>max)throw new RangeError('Invalid clearcoat '+label);
+  return n;
+}
+function texture(value:ClearcoatTexture):ClearcoatTexture {
+  if(!value||typeof value!=='object'||!value.view||value.texCoord!==undefined&&value.texCoord!==0&&value.texCoord!==1)throw new TypeError('Invalid clearcoat texture or UV set');
+  if(value.sampler!==undefined&&!value.sampler)throw new TypeError('Invalid clearcoat sampler');
+  scalar(value.scale,1,'normal scale');return value;
+}
+
+/** Build a clearcoat extension from caller-owned GPU texture views. No GPU allocation. */
+export function clearcoat(options:ClearcoatOptions={}):MaterialExtension {
+  if(!options||typeof options!=='object'||Array.isArray(options))throw new TypeError('Invalid clearcoat options');
+  const factor=scalar(options.factor,0,'factor',0,1),roughness=scalar(options.roughnessFactor,0,'roughness',0,1);
+  const textures:MaterialExtensionTexture[]=[],slots:ClearcoatShaderTextures={};
+  for(const [field,slot] of [['clearcoatTexture','factor'],['clearcoatRoughnessTexture','roughness'],['clearcoatNormalTexture','normal']] as const){
+    const value=options[field];if(value===undefined)continue;texture(value);
+    slots[slot]={index:textures.length,texCoord:value.texCoord??0,sampler:!!value.sampler};
+    textures.push({view:value.view,...(value.sampler?{sampler:value.sampler}:{})});
+  }
+  return {...clearcoatShader(slots),factors:new Float32Array([factor,roughness,scalar(options.clearcoatNormalTexture?.scale,1,'normal scale'),0]),...(textures.length?{textures}:{})};
+}
+
+type CoatMap='clearcoatTexture'|'clearcoatRoughnessTexture'|'clearcoatNormalTexture';
+type MapField=CoatMap|'transmissionTexture'|'thicknessTexture';
+interface Plan {
+  material:PBRMaterial;
+  coat:boolean;
+  factor:number;
+  roughnessFactor:number;
+  maps:Partial<Record<MapField,TextureInfo|ClearcoatTexture>>;
+  previous?:MaterialExtension;
+  extension?:MaterialExtension;
+  transmission?:TransmissionOptions;
+  opaqueIndex?:number;
+  previousMode?:number;
+}
+const mapFields:readonly CoatMap[]=['clearcoatTexture','clearcoatRoughnessTexture','clearcoatNormalTexture'];
+function definition(value:any,label:string):any {
+  if(value!==undefined&&(!value||typeof value!=='object'||Array.isArray(value)))throw new TypeError('Invalid '+label);
+  return value;
+}
+
+/** Owns textures installed from glTF metadata. The model retains its image blueprints. */
+export class MaterialInstallation implements EnginePlugin {
+  readonly name:string;
+  disposed=false;
+  private readonly plans:Plan[]=[];
+  private textures?:MaterialTextures;
+  private unsubscribe?:()=>void;
+  private capture?:ReturnType<typeof acquireOpaqueColor>;
+  constructor(readonly model:PBRModel){
+    this.name='materials:'+model.name;
+    if(model.disposed)throw new Error('Cannot install materials on a disposed model');
+    for(const material of new Set(model.primitives.map(p=>p.material))){
+      const normalized=material.clearcoat!==undefined,def=definition(normalized?material.clearcoat:material.extensions?.KHR_materials_clearcoat,'KHR_materials_clearcoat');
+      const normalizedTransmission=material.transmission!==undefined;
+      const transmit=definition(normalizedTransmission?material.transmission:material.extensions?.KHR_materials_transmission,'KHR_materials_transmission');
+      const volume=definition(material.volume!==undefined?material.volume:transmit?.volume!==undefined?transmit.volume:material.extensions?.KHR_materials_volume,'KHR_materials_volume');
+      if(def===undefined&&transmit===undefined&&volume===undefined)continue;
+      const iorDef=definition(material.extensions?.KHR_materials_ior,'KHR_materials_ior');
+      const transmissionOptions:TransmissionOptions={factor:transmit?(normalizedTransmission?transmit.factor:transmit.transmissionFactor):0,ior:transmit?.ior??material.ior??iorDef?.ior,
+        ...(volume!==undefined?{volume:{thicknessFactor:volume.thicknessFactor,attenuationColor:volume.attenuationColor,attenuationDistance:volume.attenuationDistance}}:{})};
+      const transmitted=validateTransmission(transmissionOptions);
+      if(def===undefined&&transmitted.factor===0)continue;
+      const primitives=model.primitives.filter(p=>p.material===material);
+      const plan:Plan={material,coat:def!==undefined,factor:scalar(normalized?def?.factor:def?.clearcoatFactor,0,'factor',0,1),roughnessFactor:scalar(normalized?def?.roughnessFactor:def?.clearcoatRoughnessFactor,0,'roughness',0,1),maps:{},previous:material.extension,
+        ...(transmitted.factor>0?{transmission:transmissionOptions,previousMode:material.settings[0]}:{})};
+      const maps:Partial<Record<MapField,any>>={};
+      for(const field of mapFields)if(def?.[field]!==undefined)maps[field]=def[field];
+      if(plan.transmission){maps.transmissionTexture=transmit?.transmissionTexture;maps.thicknessTexture=volume?.thicknessTexture;}
+      for(const field of Object.keys(maps) as MapField[])if(maps[field]!==undefined){
+        const value=maps[field],map:TextureInfo|ClearcoatTexture=value?.view?texture(value):validateTextureInfo(value,model);
+        const coord=map.texCoord??0;
+        if(primitives.some(p=>!p.extension&&p.definition.attributes&&p.definition.attributes['TEXCOORD_'+coord]===undefined))throw new Error('Material texture requires available TEXCOORD_'+coord);
+        plan.maps[field]=map;
+      }
+      this.plans.push(plan);
+    }
+  }
+  setup(engine:Engine):void {
+    if(this.disposed||this.model.disposed||engine!==this.model.root.engine)throw new Error('Materials model is disposed or belongs to another engine');
+    if(!engine.gpu)throw new Error('Materials require WebGPU');
+    const textures=new MaterialTextures(this.model,engine.gpu);
+    try{
+      if(this.plans.some(plan=>plan.transmission)&&!this.capture)this.capture=acquireOpaqueColor(engine,view=>{
+        for(const plan of this.plans)if(plan.opaqueIndex!==undefined&&plan.extension?.textures)plan.extension.textures[plan.opaqueIndex].view=view;
+      });
+      const ready=this.plans.filter(plan=>!plan.extension||plan.material.extension===plan.extension).map(plan=>{
+        const options:ClearcoatOptions={factor:plan.factor,roughnessFactor:plan.roughnessFactor};
+        const resolved:Partial<Record<MapField,ClearcoatTexture>>={};
+        for(const field of Object.keys(plan.maps) as MapField[]){const map=plan.maps[field];if(map)resolved[field]='view' in map?map:textures.resolve(map);}
+        for(const field of mapFields)options[field]=resolved[field];
+        const coat=plan.coat?clearcoat(options):undefined;
+        plan.opaqueIndex=plan.transmission?(coat?.textures?.length??0):undefined;
+        const extension=plan.transmission?createTransmission({...plan.transmission,opaqueColor:this.capture!.view,transmissionTexture:resolved.transmissionTexture,
+          ...(plan.transmission.volume?{volume:{...plan.transmission.volume,thicknessTexture:resolved.thicknessTexture}}:{})},coat):coat!;
+        if(plan.extension?.factors)extension.factors=plan.extension.factors;
+        return {plan,extension};
+      });
+      for(const {plan,extension} of ready){plan.extension=extension;plan.material.extension=extension;if(plan.transmission)plan.material.settings[0]=2;}
+      this.textures=textures;
+      this.unsubscribe??=this.model.onDispose(()=>this.destroy());
+    }catch(error){const cleanup=new Cleanup(error);cleanup.run(()=>textures.dispose()).run(()=>this.capture?.release());this.capture=undefined;cleanup.finish();}
+  }
+  onDeviceRestored(engine:Engine):void {this.textures?.dispose();this.textures=undefined;this.setup(engine);}
+  dispose():void {
+    if(this.disposed)return;this.disposed=true;
+    const cleanup=new Cleanup();cleanup.run(()=>this.model.root.engine.removePlugin(this.name));
+    this.unsubscribe?.();this.unsubscribe=undefined;
+    for(const plan of this.plans)if(plan.extension&&plan.material.extension===plan.extension){plan.material.extension=plan.previous;if(plan.previousMode!==undefined&&plan.material.settings[0]===2)plan.material.settings[0]=plan.previousMode;}
+    cleanup.run(()=>this.textures?.dispose()).run(()=>this.capture?.release());this.textures=undefined;this.capture=undefined;cleanup.finish();
+  }
+  destroy():void {this.dispose();}
+}
+
+/** Explicit opt-in after loadGLTF/parseGLTF; absent clearcoat metadata allocates nothing. */
+export function install(model:PBRModel):MaterialInstallation {
+  const installation=new MaterialInstallation(model);model.root.engine.use(installation);return installation;
+}
