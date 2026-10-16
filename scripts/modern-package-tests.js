@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os';
 import {openBrowser} from './browser.js';
 
 const names=['core','gltf','react','machinery','creative','scenery','gltf-pro','animation','post','shadows','clustered','vfx','animator','taa','splats','terrain','environment','controls','margoengine'],npm=process.env.npm_execpath;
-const packedNames=[...names,'decoders','geometry'];
+const packedNames=[...names,'decoders','geometry','html','labels'];
 const packageName=name=>name==='margoengine'?'margoengine':`@margoengine/${name}`;
 assert.ok(npm,'Run this check through npm run modern:test:packages');
 const archives=resolve('test-results/modern-packages');await mkdir(archives,{recursive:true});
@@ -100,10 +100,11 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
   execFileSync(process.execPath,[join(fixture,'out/consumer.js')],{cwd:fixture,stdio:'inherit'});
   for(const directory of ['packages/react/test','packages/react/tests','packages/react/dist','packages/gltf-pro/src','docs'])await mkdir(join(fixture,directory),{recursive:true});
   await writeFile(join(fixture,'packages/react/dist/index.js'),"export * from '@margoengine/react';\n");
-  for(const file of ['test/declarative.test.js','tests/react.test.js'])await copyFile(`packages/react/${file}`,join(fixture,'packages/react',file));
+  const reactTests=['test/declarative.test.js','tests/react.test.js','tests/enhancements.test.js'];
+  for(const file of reactTests)await copyFile(`packages/react/${file}`,join(fixture,'packages/react',file));
   await copyFile('packages/gltf-pro/src/shader.ts',join(fixture,'packages/gltf-pro/src/shader.ts'));
-  await copyFile('docs/react-integration.md',join(fixture,'docs/react-integration.md'));
-  execFileSync(process.execPath,['--experimental-test-module-mocks','--test',join(fixture,'packages/react/test/declarative.test.js'),join(fixture,'packages/react/tests/react.test.js')],{cwd:fixture,stdio:'inherit'});
+  for(const file of ['react-integration.md','react-r3f.md'])await copyFile('docs/'+file,join(fixture,'docs',file));
+  execFileSync(process.execPath,['--experimental-test-module-mocks','--test',...reactTests.map(file=>join(fixture,'packages/react',file))],{cwd:fixture,stdio:'inherit'});
   const aliases=[],browserExport=entry=>typeof entry==='string'?entry:browserExport(entry.browser??entry.import??entry.default);
   for(const name of [...packedNames.map(packageName),'react','react-dom']){
     const directory=join(fixture,'node_modules',name),manifest=JSON.parse(await readFile(join(directory,'package.json'),'utf8'));
