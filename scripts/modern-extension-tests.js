@@ -204,3 +204,4 @@ await (await import('./local-shadow-tests.js')).runLocalShadowBrowserTests();
 await (await import('./deformed-picking-tests.js')).runDeformedPickingTests();
 await (await import('./silent-geometry-tests.js')).runSilentGeometryTests();
 await (await import('./pbr-box-tests.js')).runPBRBoxTests();
+await (await import('./scene-helper-tests.js')).runSceneHelperTests();

@@ -5,6 +5,24 @@ import {Clustered,type LocalShadowOptions,type LocalLightShadow,type PointLight}
 import type {PBRModel} from '@margoengine/gltf-pro';
 import type {PBRPickingGeometry} from '@margoengine/gltf-pro';
 import type {PickingSource} from '@margoengine/selection';
+import {getSceneBounds, fitScene, gatherSceneBuffers, type SceneBuffers} from '@margoengine/gltf-pro/scene';
+
+export function mixedSceneHelpers(engine:import('@margoengine/core').EngineKernel, model:PBRModel, core:import('@margoengine/core').Mesh) {
+  const roots = [model.root, core];
+  const bounds:Float32Array = getSceneBounds(engine, roots, {visibleOnly:false});
+  fitScene(engine, roots, {duration:0, padding:1.2});
+  const buffers:SceneBuffers[]|null = gatherSceneBuffers(engine, roots);
+  for (const record of buffers ?? []) {
+    const format:'uint32' = record.indexFormat;
+    if (record.kind === 'core') {const stride:24=record.stride; void [stride,record.instance,record.geometry,format];}
+    else {const stride:80=record.stride; void [stride,record.primitive,record.alphaTexture,format];}
+  }
+  // @ts-expect-error Root selections must contain mesh handles, not whole models.
+  getSceneBounds(engine, [model]);
+  // @ts-expect-error Visibility selection is boolean.
+  gatherSceneBuffers(engine, roots, {visibleOnly:'all'});
+  return {bounds,buffers};
+}
 
 export async function deformedQueries(engine:import('@margoengine/core').EngineKernel,model:PBRModel) {
   const source:PickingSource=model,picking=module10.Picking.attach(engine,{capture:false});

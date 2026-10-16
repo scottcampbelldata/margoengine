@@ -111,6 +111,7 @@
     "modern:test:deformed-picking": "node scripts/deformed-picking-tests.js",
     "modern:test:silent-geometry": "node scripts/silent-geometry-tests.js",
     "modern:test:pbr-box": "node scripts/pbr-box-tests.js",
+    "modern:test:scene-helpers": "node scripts/scene-helper-tests.js",
     "modern:test:blender": "node scripts/modern-blender-tests.js",
     "modern:test:interop": "node --test packages/xr/tests/*.test.js packages/ifc/tests/*.test.js packages/loaders/tests/usdz.test.js packages/exporters/tests/usdz.test.js",
     "modern:test:xr:browser": "node scripts/modern-xr-tests.js",

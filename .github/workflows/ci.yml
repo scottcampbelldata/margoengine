@@ -136,6 +136,7 @@ jobs:
             test-results/deformed-picking-webgpu.json
             test-results/silent-geometry-webgpu.json
             test-results/pbr-box-webgpu.json
+            test-results/scene-helpers-webgpu.json
             test-results/modern-xr.json
             test-results/modern-usdz.json
             test-results/gltf-compression-browser/report.json
