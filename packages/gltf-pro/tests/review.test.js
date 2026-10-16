@@ -6,7 +6,8 @@ import {pbrShader} from '../src/shader.ts';
 import {prepareMaterialExtension,materialExtensionShader,materialExtensionAmbientShader} from '../src/material-extension.ts';
 
 test('named base lighting keeps all prior resources and optional lighting splice sites',async()=>{
-  const before=await readFile(new URL('./fixtures/pbr-before-naming.wgsl',import.meta.url),'utf8');
+  // Compare shader content independently of Git's Windows checkout line endings.
+  const before=(await readFile(new URL('./fixtures/pbr-before-naming.wgsl',import.meta.url),'utf8')).replaceAll('\r\n','\n');
   assert.equal(createHash('sha256').update(before).digest('hex'),'1920d3bb180dbf0fa32fe4d373a3c03bdfccbdc834fb02a26fcb1b8dfeeffa5b');
   assert.match(pbrShader,/fn direct_light\(s:Surface,v:vec3f,l:vec3f\)->vec3f/);assert.match(pbrShader,/let direct=direct_light\(s,v,l\)/);
   assert.match(pbrShader,/fn hemisphere_ambient\(s:Surface\)->vec3f/);assert.match(pbrShader,/fn ambient\(s:Surface\)->vec3f \{\n  return hemisphere_ambient\(s\);\n\}/);
