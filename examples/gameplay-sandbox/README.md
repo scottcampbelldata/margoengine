@@ -134,14 +134,14 @@ Vite and TypeScript resolve the packages through their public distribution expor
 without source aliases. Run `npm run build:packages` before standalone workspace
 builds/tests; `npm run dev:sandbox` builds the packages automatically. The example
 adds no features to core or stage. CI builds/tests this workspace and retains the
-existing core + stage gzip gate of 20,480 bytes.
+core + stage gzip gate of 20,000 bytes. The 20,480-byte ceiling named in earlier notes is retired.
 
 Before the shrub-spacing adjustment, the physical NVIDIA Ampere production run at 1440 × 900
 measured 60.03 / 60.07 / 60.00 FPS at 100k / 500k / 1M particles. The 600-frame
 capture measured 60.00 FPS, 59.64 FPS including GPU completion, and 5,428 bytes
 retained heap drift. It recorded six Minor GCs and no Major GC, so the existing
 strict GC gate still fails; retained heap stability does not prove zero allocation.
-The latest package build measured core + stage at 20,136 gzip bytes. Functional, offline-startup and device
+That package build measured core + stage at 20,136 gzip bytes. It is not the current measurement. Functional, offline-startup and device
 restoration checks passed without WebGPU errors. The report and traces are in
 `test-results/gameplay-sandbox/procedural-upgrade-verification.json`; allocation sampling adds overhead and should be
 run separately from the normal performance capture.
@@ -214,7 +214,6 @@ at all three tiers. Its 600-frame capture retained 3,708 bytes, with 5 Minor and
 `test-results/gameplay-sandbox-nvidia/surf-verification.json`.
 
 The optional water bundle increased from 6,393 to 10,181 gzip bytes for the surf,
-depth ordering and optics changes. Core + stage remains 20,053 gzip bytes, below
-the 20,480-byte ceiling. This is a compact shallow-water approximation with
+depth ordering and optics changes. That water pass recorded core + stage at 20,053 gzip bytes, under the older 20,480-byte ceiling. This is a compact shallow-water approximation with
 spray, not a volumetric overturning-wave simulation. The optics add GPU work;
 one million particles do not reach 60 FPS on this integrated AMD adapter.

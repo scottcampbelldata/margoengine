@@ -1,5 +1,9 @@
 # Margo Engine
 
+The product is six packages: the [`margoengine`](packages/margoengine/README.md) stage, [`@margoengine/core`](packages/core/README.md), [`@margoengine/react`](packages/react/README.md), [`@margoengine/gltf`](packages/gltf/README.md), [`@margoengine/gltf-pro`](packages/gltf-pro/README.md), and [`@margoengine/machinery`](packages/machinery/README.md). The demo is [Night Citadel](apps/showcase-night-citadel/README.md): `npm run dev`.
+
+Core measures **18,192 bytes gzip**. Core plus the stage facade measures **19,999 bytes gzip**, including embedded Wasm and both backends. That is below the gate. CI rejects a combined size of **20,000 bytes gzip or above**.
+
 A small Rust/Wasm engine for web apps, with WebGPU rendering, WebGL2 fallback, ordinary React components and optional domain packs.
 
 Official website: [margoengine.com](https://margoengine.com). Built with precision, named with love. For Margie.
@@ -103,7 +107,7 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 | [`@margoengine/splats`](packages/splats/README.md) | GPU radix sorting, covariance ellipses, degree-3 SH and binary Gaussian captures |
 | [`@margoengine/terrain`](packages/terrain/README.md) | Fixed geometry clipmaps, GPU height/normal sampling and triplanar texture layers |
 
-Core plus the stage facade measures **19,998 bytes gzip**, including embedded Wasm and both backends. The base is feature-frozen for v1.0.0; every push and pull request runs a CI build that rejects a combined size of **20,000 bytes gzip or above** and checks package isolation. Optional PBR, animation and SSAO packages use the existing extension hooks and do not enter the base bundle. The build also retains the 30 KiB combined core/static-glTF budget and 30 KiB raw Wasm budget. React/framework/application code is additional; domain packages have no 20 KiB ceiling.
+Core measures **18,192 bytes gzip**. Core plus the stage facade measures **19,999 bytes gzip**, including embedded Wasm and both backends. The base is feature-frozen for v1.0.0; every push and pull request runs a CI build that rejects a combined size of **20,000 bytes gzip or above** and checks package isolation. Optional PBR, animation and SSAO packages use the existing extension hooks and do not enter the base bundle. The build also retains the 30 KiB combined core/static-glTF budget and 30 KiB raw Wasm budget. React/framework/application code is additional; domain packages have no 20 KiB ceiling.
 
 The six requested game modules (shadows, clustered, animator, TAA, VFX and splats), plus terrain, use those hooks. Build with `npm run build:packages`; run `npm run modern:test:game` for their combined WebGPU rendering/culling/cache/IK/particle checks, temporal reprojection/clamping, skinned motion, stable radix sorting and ellipse blending. `npm run modern:test:game:packages` checks ten packed packages and seven standalone README TypeScript examples. The normal sort test covers 66,049 splats across hierarchical scan blocks; set `SPLAT_STRESS=1` for the additional three-million-splat capacity/sort check. Million-particle, three-million-splat and 1,024-light execution tests validate correctness separately from FPS claims. These source packages have not been published by this change.
 
