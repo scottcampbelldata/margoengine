@@ -6,6 +6,7 @@ import {pathToFileURL,fileURLToPath} from 'node:url';
 import {Geometry, box} from '@margoengine/core';
 import {Engine,TransformStore} from '@margoengine/core/extension';
 import {Physics, CharacterController, collisionGroups, eulerToQuat, geometryPositions} from '../dist/index.js';
+import {setMeshSource, clearMeshSource} from '../../shared/mesh-source.js';
 
 // Consumers keep Rapier optional; the monorepo installs it as a test dependency.
 const rapierDir = process.env.MARGOENGINE_RAPIER ? resolve(process.env.MARGOENGINE_RAPIER) : fileURLToPath(new URL('../../../node_modules/@dimforge/rapier3d-compat/',import.meta.url));
@@ -101,7 +102,7 @@ test('geometry positions reject fractional or nonfinite strides', () => {
 rtest('default bodies reject unsupported empty meshes and roll back, while intentional colliderless bodies remain supported', () => {
   const physics=create(),mesh=fakeMesh();
   try {
-    assert.throws(()=>physics.addBody(mesh),/needs a mesh with geometry/);
+    assert.throws(()=>physics.addBody(mesh),{message:'No geometry'});
     assert.equal(physics.bodyCount,0);
     assert.equal(physics.world.bodies.len(),0,'The failed default collider must release its native body');
     assert.equal(physics.bodyOf(mesh),undefined);
@@ -599,4 +600,88 @@ rtest('core transform synchronization reuses input buffers and bypasses allocati
  assert.equal(inputs.size,1);assert.ok(mesh.position.y<5);
  const id=mesh.id,q=body.pose.subarray(10,14);for(let i=0;i<4;i++)near(store.transforms[['qx','qy','qz','qw'][i]][id],q[i],0.01,'synchronized quaternion');
  physics.dispose();engine.dispose();
+});
+
+async function hierarchyEngine() {
+  return new Engine({width:1,height:1},await TransformStore.create(64),{backend:'webgl2',add(){},remove(){},render(){},dispose(){}},undefined,null);
+}
+function registerPBR(mesh,{geometry=box(2,4,6),skinned=false,morphed=false}={}) {
+  const vertices=new Float32Array(geometry.vertices.length/6*20);
+  for(let i=0;i<geometry.vertices.length/6;i++)vertices.set(geometry.vertices.subarray(i*6,i*6+3),i*20);
+  const source={model:{disposed:false},node:mesh,primitives:[{vertices,indices:geometry.indices}],skinned,morphed};
+  setMeshSource(mesh,source);return source;
+}
+function nearVec(actual,expected,label) {
+  for(let axis=0;axis<3;axis++)near(actual[['x','y','z'][axis]],expected[axis],1e-4,`${label} ${axis}`);
+}
+
+rtest('a geometry-free root fits descendant PBR triangles in its rigid frame with every hierarchy scale applied once',async()=>{
+  const engine=await hierarchyEngine(),physics=new Physics(engine,{rapier:RAPIER});
+  const root=engine.createMesh().setPosition([7,-3,9]).setRotation([0,0,Math.PI/2]).setScale([-2,3,0.5]);
+  const parent=engine.createMesh(root).setPosition([1,2,3]).setRotation([0,Math.PI/2,0]).setScale([2,1,4]);
+  const child=engine.createMesh(parent).setPosition([-2,1,1]).setScale([1,0.5,2]);
+  registerPBR(child);
+  try {
+    // Analytic authored transforms give body-frame x[-58,38],y[6,12],z[2.5,4.5].
+    // Removing root scale instead would incorrectly shrink this collider to x[-19,29],y[2,4],z[5,9].
+    const body=physics.addBody(root,{type:'fixed'}),collider=body.colliders[0];
+    assert.equal(body.colliders.length,1);
+    nearVec(collider.halfExtents(),[48,3,1],'half extents');
+    nearVec(collider.translation(),[-2,-13,12.5],'world center');
+    assert.equal(engine.store.parents[child.id],parent.id);assert.equal(engine.store.parents[parent.id],root.id);
+    for(const mesh of [root,parent,child])assert.equal(mesh.geometry,null);
+  } finally {clearMeshSource(child);engine.dispose();}
+});
+
+rtest('root fitting unions core and PBR descendants, including hidden geometry, without unrelated engine meshes',async()=>{
+  const engine=await hierarchyEngine(),physics=new Physics(engine,{rapier:RAPIER}),root=engine.createMesh();
+  const child=engine.createMesh(root).setPosition([-3,0,0]);registerPBR(child,{geometry:box(2,2,2)});
+  const core=engine.createMesh(root).setGeometry(box(4,2,6)).setPosition([4,2,1]);core.visible=false;
+  engine.createMesh().setGeometry(box(200,200,200)).setPosition([1000,1000,1000]);
+  try {
+    const body=physics.addBody(root,{type:'fixed'}),collider=body.colliders[0];
+    nearVec(collider.halfExtents(),[5,2,3],'mixed half extents');
+    nearVec(collider.translation(),[1,1,1],'mixed center');
+    assert.equal(body.colliders.length,1);assert.equal(child.geometry,null);assert.equal(root.geometry,null);
+  } finally {clearMeshSource(child);engine.dispose();}
+});
+
+rtest('direct node geometry retains its scale fitting and does not pull unrelated descendants into its collider',async()=>{
+  const engine=await hierarchyEngine(),physics=new Physics(engine,{rapier:RAPIER});
+  const core=engine.createMesh().setGeometry(box(2,4,6)).setScale([-2,3,0.5]);
+  engine.createMesh(core).setGeometry(box(200,200,200));
+  const pbr=engine.createMesh().setPosition([20,0,0]).setScale([-2,3,0.5]);registerPBR(pbr);
+  try {
+    nearVec(physics.addBody(core,{type:'fixed'}).colliders[0].halfExtents(),[2,6,1.5],'core direct');
+    nearVec(physics.addBody(pbr,{type:'fixed'}).colliders[0].halfExtents(),[2,6,1.5],'PBR direct');
+  } finally {clearMeshSource(pbr);engine.dispose();}
+});
+
+rtest('skinned and morphed nodes reject fitted colliders both directly and below a root, with explicit capsules unchanged',async()=>{
+  for(const flag of ['skinned','morphed'])for(const nested of [false,true]){
+    const engine=await hierarchyEngine(),physics=new Physics(engine,{rapier:RAPIER}),root=engine.createMesh();
+    const node=nested?engine.createMesh(root):root;registerPBR(node,{[flag]:true});
+    try {
+      assert.throws(()=>physics.addBody(root),{message:'Skinned mesh needs an explicit collider'});
+      assert.equal(physics.bodyCount,0);assert.equal(physics.world.bodies.len(),0);assert.equal(physics.bodyOf(root),undefined);
+      const body=physics.addBody(root,{colliders:{shape:'capsule',halfHeight:0.7,radius:0.3,offset:[1,2,3]}});
+      assert.equal(body.colliders.length,1);near(body.colliders[0].radius(),0.3,1e-6,'explicit capsule radius');
+      near(body.colliders[0].halfHeight(),0.7,1e-6,'explicit capsule height');nearVec(body.colliders[0].translation(),[1,2,3],'explicit capsule offset');
+    } finally {clearMeshSource(node);engine.dispose();}
+  }
+});
+
+rtest('empty, removed, invalid and foreign descendant fitting failures leave no native body or collider ownership',async()=>{
+  const engine=await hierarchyEngine(),foreign=await hierarchyEngine(),physics=new Physics(engine,{rapier:RAPIER}),root=engine.createMesh();
+  const child=engine.createMesh(root),source=registerPBR(child);
+  try {
+    assert.throws(()=>physics.addBody(foreign.createMesh().setGeometry(box())),/another engine/);
+    source.primitives[0].vertices[0]=NaN;
+    assert.throws(()=>physics.addBody(root,{colliders:[{shape:'sphere',radius:1},{shape:'box'}]}),/positions must be finite/);
+    assert.equal(physics.bodyCount,0);assert.equal(physics.world.bodies.len(),0);assert.equal(physics.world.colliders.len(),0);
+    assert.equal(physics.bodyOf(root),undefined);assert.equal(physics['byCollider'].size,0);
+    clearMeshSource(child);child.dispose();engine.createMesh().setGeometry(box());
+    assert.throws(()=>physics.addBody(root),{message:'No geometry'});assert.equal(physics.bodyCount,0);assert.equal(physics.world.bodies.len(),0);
+    root.dispose();assert.throws(()=>physics.addBody(root),{message:'Mesh disposed'});assert.equal(physics.bodyCount,0);
+  } finally {clearMeshSource(child);engine.dispose();foreign.dispose();}
 });

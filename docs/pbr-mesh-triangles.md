@@ -48,7 +48,7 @@ An empty collider list, a transform-only export, and `{parts: 0}` are failed tes
 
 | Caller | Result |
 | --- | --- |
-| `physics` | The default box uses bind-pose positions 0, 1, 2 of every primitive. Mesh scale still applies. This preserves the existing glTF/FBX collider behavior; animated collision shapes should use explicit `colliders`, such as capsules or hulls. |
+| `physics` | The default box fits static primitive positions, or a geometry-free root's descendants in its rigid body frame. Hierarchy transforms and scale apply once. Skinned or morphed sources throw `Skinned mesh needs an explicit collider`; explicit capsules, dimensions, and caller-supplied geometry remain supported. |
 | `exporters` | Write `GeometryData` from the table above. A skinned source also copies the joints and weights the data-scene writer already accepts. A node with no triangles throws. |
 | `usdz-export` | No separate change. It re-exports `exporters`. |
 | `machinery` | One part per source. The BVH uses the source indices and positions. |
@@ -65,7 +65,7 @@ Load the real `Box.glb` and `blender-rig.fbx` through `loadGLTF` and `loadFBX` o
 
 - `mesh.geometry` is still null, and `meshTriangles(mesh)` returns one nonempty PBR source.
 - Default `addBody` on the box creates one collider.
-- Default `addBody` on the rig preserves its bind-pose collider. An explicit collider still attaches.
+- Default `addBody` on the rig throws `Skinned mesh needs an explicit collider` and leaves no body. An explicit collider still attaches.
 - Default glTF export of each file writes one mesh. The rig export keeps the skin attributes.
 - CAD grouping counts one part for each file.
 - `shadows.add(mesh)` draws the source.
@@ -77,6 +77,6 @@ Load the real `Box.glb` and `blender-rig.fbx` through `loadGLTF` and `loadFBX` o
 
 ## Done when
 
-A loaded static glTF has one collider, one exported mesh, and one CAD part. A loaded skinned file exports and picks; its default collider uses the bind pose. Core never draws the PBR vertex.
+A loaded static glTF has one collider, one exported mesh, and one CAD part. A loaded skinned file exports and picks; physics requires an explicit collider. Core never draws the PBR vertex. The attached-root Box path is covered separately in `docs/fix-pbr-box.md`.
 
 The four original facade assertions remain executable TODO cases in `tests/modern-silent-facade-drops.test.js`: mixed `Stage.fit` and the internal `loadedModel.raw` adapter still read core geometry only. Fixing those APIs requires changing the frozen stage. The same file verifies the supported `PBRModel.bounds`/`raw` alternatives, explicit camera fitting, and registry disposal. The original failures remain visible; they are not reported as fixed.

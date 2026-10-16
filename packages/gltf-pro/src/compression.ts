@@ -18,7 +18,7 @@ const scales: Record<number, number> = {5120:127,5121:255,5122:32767,5123:65535}
 export function compressedIndices(asset:GLTFAsset, primitive:any):Float32Array|undefined {
   if (!primitive.extensions?.KHR_draco_mesh_compression) return;
   const indices = decoded.get(asset)?.get(primitive);
-  if (!indices) throw new Error('Draco primitives require loadGLTF or parseGLTFAsync');
+  if (!indices) throw new Error('Draco geometry requires parseGLTFAsync or loadGLTF');
   return indices;
 }
 
