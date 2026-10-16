@@ -2,6 +2,11 @@
 
 React 18/19 integration with a native canvas, pointer events, Suspense, stable mesh refs and frame callbacks. There is no custom reconciler.
 
+Optional scene helpers, post effects, physics and XR are available through the
+[`kit`, `post`, `physics` and `xr` subpaths](SCENE.md). The base entry retains its
+existing exports; importing a clickable cube does not load these subpaths or
+their optional peers.
+
 Package name: `@margoengine/react`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
 
 ```sh

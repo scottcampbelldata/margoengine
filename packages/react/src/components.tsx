@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useImperativeHandle, forwardRef, type ReactNode, type CSSProperties } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, useImperativeHandle, forwardRef, type ReactNode, type CSSProperties } from 'react';
 import { Engine, Mesh as EngineMesh, box, PbrMaterial as Material, type EngineOptions, type Vec3, type Geometry } from '@margoengine/core/extension';
 import type {EngineKernel,Mesh as MeshHandle,FrameCallback} from '@margoengine/core';
 import {Stage as StageFacade} from 'margoengine';
@@ -7,41 +7,18 @@ import type {PBRModel, LightingEffect} from '@margoengine/gltf-pro';
 import type {Shadows} from '@margoengine/shadows';
 import type {Environment as IBLEnvironment, EnvironmentBackground} from '@margoengine/environment';
 import type {OrbitControls as CameraControls} from '@margoengine/controls';
-import {createAssetCache,activateAssetCache,disposeAssetCache,modelAsset,environmentAsset,retainAsset,instantiateModel,type AssetCache} from './assets.js';
+import {createAssetCache,activateAssetCache,disposeAssetCache,environmentAsset,retainAsset} from './assets.js';
 export {preload} from './assets.js';
 
-interface Registry {
-  current: EngineMesh|null;
-  children: Set<EngineMesh>;
-  attachments: Set<(mesh: EngineMesh)=>void>;
-  register(mesh: EngineMesh): void;
-  unregister(mesh: EngineMesh): void;
-}
-interface Resources {models:Set<PBRModel>;lighting:Map<LightingEffect,Map<PBRModel,()=>void>>}
-export interface MargoPointerEvent {
-  nativeEvent:PointerEvent;object:MeshHandle;mesh:MeshHandle;target:MeshHandle;
-  clientX:number;clientY:number;x:number;y:number;
-}
-export interface PointerHandlers {
-  onClick?:(event:MargoPointerEvent)=>void;
-  onPointerOver?:(event:MargoPointerEvent)=>void;
-  onPointerOut?:(event:MargoPointerEvent)=>void;
-}
-interface Frames {elapsed:number;last:number|null;callbacks:Set<FrameCallback>}
-interface Scene {engine:Engine;registry:Registry|null;resources:Resources;shadows:Shadows|null;requestShadows:()=>()=>void;cameraOverrides:Set<()=>void>;pointerHandlers:Map<number,PointerHandlers>;frames:Frames;assetCache:AssetCache}
-const Context=createContext<Scene|null>(null);
+import {Context,useScene,useMesh,live,zero,one,useCommit,useResourceEffect,type Scene,type Registry,type Resources,type Frames,type PointerHandlers} from './internal.js';
+export type {MargoPointerEvent,PointerHandlers} from './internal.js';
+
 export interface MargoContextValue {
   stage:StageFacade|null;ready:boolean;canvas:HTMLCanvasElement|null;
   camera:EngineKernel['camera']|null;size:{width:number;height:number};gl:EngineKernel|null;readonly clock:number;invalidate():void;
 }
 export const MargoContext=createContext<MargoContextValue|null>(null);
 export function useMargo():MargoContextValue {const value=useContext(MargoContext);if(!value)throw new Error('useMargo requires <MargoCanvas>');return value;}
-function useScene():Scene {const scene=useContext(Context);if(!scene)throw new Error('Engine components require <Canvas>');return scene;}
-function useMesh(): Registry {const {registry}=useScene();if(!registry)throw new Error('Geometry and material require <Mesh>');return registry;}
-function live(registry:Registry):EngineMesh|null {const mesh=registry.current;return mesh&&!mesh.engine.disposed&&mesh.engine.meshes.get(mesh.id)===mesh?mesh:null;}
-const zero:Vec3=[0,0,0],one:Vec3=[1,1,1];
-const useCommit=typeof window==='undefined'?useEffect:useLayoutEffect;
-
 export interface CanvasProps extends EngineOptions {
   children?: ReactNode; style?:CSSProperties; className?:string; label?:string;
   shadows?:boolean;onCreated?:(stage:StageFacade)=>void; onError?:(error:unknown)=>void;
@@ -56,7 +33,7 @@ export function MargoCanvas({children,style,className,label='Interactive 3D scen
   const engine=stage?.engine as unknown as Engine|null;
   const cameraOverrides=useMemo(()=>new Set<()=>void>(),[engine]);
   const pointerHandlers=useMemo(()=>new Map<number,PointerHandlers>(),[engine]);
-  const frames=useMemo<Frames>(()=>({elapsed:0,last:null,callbacks:new Set()}),[engine]);
+  const frames=useMemo<Frames>(()=>({elapsed:0,last:null,mode:frameloop,callbacks:new Set()}),[engine]);frames.mode=frameloop;
   const assetCache=useMemo(()=>createAssetCache(engine as unknown as EngineKernel|null),[engine]);
   useEffect(()=>{if(engine)activateAssetCache(assetCache);return()=>disposeAssetCache(assetCache);},[engine,assetCache]);
   const cameraOptions=useRef(camera),frameloopOptions=useRef(frameloop),engineMode=useRef(frameloop);
@@ -241,97 +218,11 @@ export function useFrame(callback:FrameCallback):void {
   useCommit(()=>{const frame:FrameCallback=(state,delta)=>latest.current(state,delta);frames.callbacks.add(frame);return()=>{frames.callbacks.delete(frame);};},[frames]);
 }
 
-export interface MaterialOverride {
-  baseColor?:Vec3|readonly [number,number,number,number];roughness?:number;metalness?:number;
-  emissive?:Vec3;normalScale?:number;occlusionStrength?:number;alphaCutoff?:number;doubleSided?:boolean;
-}
-export interface ModelProps extends PointerHandlers {
-  src:string;position?:Vec3;rotation?:Vec3;scale?:Vec3;materials?:Record<string,MaterialOverride>;
-  castShadow?:boolean;receiveShadow?:boolean;onLoad?:(mesh:MeshHandle)=>void;onError?:(error:unknown)=>void;
-}
+export {Model} from './model.js';
+export type {ModelProps,MaterialOverride} from './model.js';
 interface Loading {src:string;pending:boolean;promise:Promise<void>}
-interface ResourceLease {active:boolean;closed:boolean;generation:number;keys:readonly unknown[];release:()=>void}
-// Suspense reveal replays effects in StrictMode. Keep the same committed lease
-// through that replay; actual removal releases it at the next microtask.
-function useResourceEffect(setup:(lease:ResourceLease)=>(()=>void)|undefined,keys:readonly unknown[]):void {
-  const saved=useRef<ResourceLease|null>(null);
-  useEffect(()=>{
-    let lease=saved.current;
-    if(!lease||lease.closed||keys.some((key,index)=>key!==lease!.keys[index])){
-      if(lease&&!lease.closed){lease.closed=true;lease.release();}
-      lease={active:true,closed:false,generation:0,keys,release:()=>{}};saved.current=lease;
-      lease.release=setup(lease)??(()=>{});
-    }else{lease.active=true;lease.generation++;}
-    const current=lease;
-    return()=>{current.active=false;const generation=++current.generation;queueMicrotask(()=>{if(!current.active&&!current.closed&&current.generation===generation){current.closed=true;current.release();}});};
-  },keys);
-}
 function values(value:readonly number[],size:number,label:string,min=0,max=1):void {
   if(!Array.isArray(value)||value.length!==size||value.some(v=>typeof v!=='number'||!Number.isFinite(Math.fround(v))||v<min||v>max))throw new RangeError('Invalid '+label);
-}
-function applyMaterials(originals:Map<object,any>,overrides:ModelProps['materials']):void {
-  for(const [material,original] of originals) {
-    const m=material as any,o=overrides?.[original.name];
-    Object.assign(m,original,{base:[...original.base],factors:[...original.factors],emission:[...original.emission],settings:[...original.settings]});
-    if(!o)continue;
-    if(o.baseColor){values(o.baseColor,o.baseColor.length===3?3:4,'base color');m.base.splice(0,o.baseColor.length,...o.baseColor);}
-    if(o.emissive){values(o.emissive,3,'emissive');m.emission=[...o.emissive];}
-    for(const [key,at,min,max] of [['roughness',0,0,1],['metalness',1,0,1],['normalScale',2,-Infinity,Infinity],['occlusionStrength',3,0,1]] as const) {
-      if(o[key]!==undefined){values([o[key]],1,key,min,max);m.factors[at]=o[key];}
-    }
-    if(o.alphaCutoff!==undefined){values([o.alphaCutoff],1,'alpha cutoff',0,Infinity);m.settings[1]=o.alphaCutoff;}
-    if(o.doubleSided!==undefined){if(typeof o.doubleSided!=='boolean')throw new TypeError('Invalid doubleSided');m.settings[2]=+o.doubleSided;}
-  }
-}
-export function Model({position=zero,rotation=zero,scale=one,castShadow=false,receiveShadow=false,...props}:ModelProps) {
-  const {engine,registry,resources,shadows,assetCache,pointerHandlers}=useScene(),[model,setModel]=useState<PBRModel|null>(null);
-  const [loading,setLoading]=useState<Loading|null>(null);
-  const latest=useRef({...props,position,rotation,scale}),originals=useRef(new Map<object,any>());
-  latest.current={...props,position,rotation,scale};
-  useResourceEffect(lease=>{
-    let current:PBRModel|undefined;
-    const asset=modelAsset(assetCache,props.src),releaseAsset=retainAsset(assetCache,props.src,asset,assetCache.models);
-    const handlers:PointerHandlers={get onClick(){return latest.current.onClick;},get onPointerOver(){return latest.current.onPointerOver;},get onPointerOut(){return latest.current.onPointerOut;}};
-    const ids=new Set<number>();
-    setModel(null);
-    const release=()=>{
-      if(!current)return;
-      for(const id of ids)if(pointerHandlers.get(id)===handlers)pointerHandlers.delete(id);ids.clear();
-      resources.models.delete(current);
-      for(const models of resources.lighting.values()){models.get(current)?.();models.delete(current);}
-      registry?.unregister(current.root);current.dispose();current=undefined;
-    };
-    const request:Loading={src:props.src,pending:asset.status==='pending',promise:Promise.resolve()};
-    request.promise=(async()=>{
-      await asset.promise;if(!lease.active||engine.disposed)return;
-      if(asset.status==='rejected')throw asset.error;
-      const loaded=await instantiateModel(asset.value!,engine as unknown as EngineKernel);
-      if(!lease.active||engine.disposed){loaded.dispose();return;}
-      current=loaded;
-      const saved=new Map<object,any>();for(const primitive of loaded.primitives)if(!saved.has(primitive.material))saved.set(primitive.material,{...primitive.material,base:[...primitive.material.base],factors:[...primitive.material.factors],emission:[...primitive.material.emission],settings:[...primitive.material.settings]});
-      originals.current=saved;
-      const p=latest.current;loaded.root.setPosition(p.position).setRotation(p.rotation).setScale(p.scale);applyMaterials(saved,p.materials);loaded.root.visible=true;
-      registry?.register(loaded.root);resources.models.add(loaded);
-      for(const [effect,models] of resources.lighting)models.set(loaded,loaded.addLighting(effect));
-      for(const node of [loaded.root,...loaded.nodes,...loaded.primitives.map(primitive=>primitive.node)])if(node){ids.add(node.id);pointerHandlers.set(node.id,handlers);}
-      setModel(loaded);p.onLoad?.(loaded.root);
-    })().catch(error=>{release();if(lease.active&&!engine.disposed){setModel(null);try{latest.current.onError?.(error);}finally{engine.onError(error);}}}).finally(()=>{request.pending=false;});
-    setLoading(request);
-    return()=>{releaseAsset();release();if(asset.users===0&&asset.value?.first){asset.value.first.dispose();asset.value.first=null;}};
-  },[engine,registry,resources,assetCache,pointerHandlers,props.src]);
-  useCommit(()=>{if(model&&!model.disposed){model.root.setPosition(position).setRotation(rotation).setScale(scale);}},[model,position[0],position[1],position[2],rotation[0],rotation[1],rotation[2],scale[0],scale[1],scale[2]]);
-  useCommit(()=>{if(model&&!model.disposed)applyMaterials(originals.current,props.materials);},[model,props.materials]);
-  useCommit(()=>{
-    if(!model||model.disposed||!shadows)return;
-    const removeCaster=castShadow?shadows.add({get shadowPrimitives(){return model.shadowPrimitives;},get disposed(){return model.disposed;}}):undefined;
-    let removeReceiver:(()=>void)|undefined;
-    try{if(receiveShadow)removeReceiver=model.addLighting(shadows);}catch(error){removeCaster?.();throw error;}
-    return()=>{removeCaster?.();removeReceiver?.();};
-  },[model,shadows,castShadow,receiveShadow]);
-  // Start after the first commit so even an initially hidden Suspense subtree
-  // has a passive unmount cleanup that can abort its outstanding request.
-  if(loading?.src===props.src&&loading.pending)throw loading.promise;
-  return null;
 }
 
 export interface EnvironmentProps {src?:string;exposure?:number;background?:boolean;onError?:(error:unknown)=>void}
