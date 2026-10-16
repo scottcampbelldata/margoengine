@@ -1,5 +1,5 @@
 {
-  "commit": "5f50496",
+  "commit": "d1ee09c",
   "dirty": false,
   "browser": "msedge 155.0.4283.45 headless",
   "adapter": "intel xe-2lpg",
@@ -11,8 +11,8 @@
       "encoding": "identity",
       "transferred": 808,
       "raw": 558,
-      "gzip": 369,
-      "brotli": 226
+      "gzip": 371,
+      "brotli": 230
     },
     {
       "path": "assets/geometry-CAWt7Gfm.js",
@@ -24,13 +24,13 @@
       "brotli": 938
     },
     {
-      "path": "assets/index-L9o2Feas.js",
+      "path": "assets/index--iYLu2cQ.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
       "transferred": 20946,
       "raw": 47732,
       "gzip": 20565,
-      "brotli": 18081
+      "brotli": 18066
     },
     {
       "path": "assets/extension-DuYhGmhk.js",
@@ -42,13 +42,13 @@
       "brotli": 44
     },
     {
-      "path": "assets/dist-CvQmXmLc.js",
+      "path": "assets/dist-Dz287_yT.js",
       "role": "@margoengine/gltf (app.load)",
       "encoding": "gzip",
-      "transferred": 4999,
-      "raw": 11128,
-      "gzip": 4627,
-      "brotli": 4164
+      "transferred": 5278,
+      "raw": 11856,
+      "gzip": 4906,
+      "brotli": 4419
     },
     {
       "path": "model.glb",
@@ -62,23 +62,23 @@
   ],
   "total": {
     "requests": 6,
-    "transferred": 30103,
-    "raw": 62826,
-    "gzip": 27085,
-    "brotli": 23812
+    "transferred": 30382,
+    "raw": 63554,
+    "gzip": 27366,
+    "brotli": 24056
   },
   "notFetched": [
     {
-      "path": "assets/cad-BTjuTllI-B--ZDA6k.js",
-      "raw": 15979
+      "path": "assets/cad-B1x1Zkz9-DqimD6f4.js",
+      "raw": 16515
     },
     {
-      "path": "assets/cad-CMUnZc3x.js",
+      "path": "assets/cad-IyHsh6fM.js",
       "raw": 53
     },
     {
-      "path": "assets/cad-runtime-BArR6b80.js",
-      "raw": 14544
+      "path": "assets/cad-runtime-IeQ9niCF.js",
+      "raw": 15178
     },
     {
       "path": "assets/dist-B7j0oayJ.js",
@@ -89,8 +89,8 @@
       "raw": 18444
     },
     {
-      "path": "assets/dist-DuZth1BD.js",
-      "raw": 61317
+      "path": "assets/dist-DN82uW8k.js",
+      "raw": 61656
     },
     {
       "path": "assets/dist-DV85z8TH.js",
@@ -105,8 +105,8 @@
       "raw": 7604031
     },
     {
-      "path": "assets/occt-import-js-DJfTYCMO.js",
-      "raw": 97826
+      "path": "assets/occt-import-js-Wz-Kjijs.js",
+      "raw": 97856
     },
     {
       "path": "assets/particles-ClULJ_3y.js",

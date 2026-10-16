@@ -92,6 +92,14 @@ function flat(positions: number[], progress?: (value: number) => void): Geometry
   // Core uses uint32 indices consistently across both GPU backends.
   return new Geometry(packed, normals, indices);
 }
+/** Strict UTF-8 text, or a named error instead of TextDecoder's own TypeError. */
+function utf8(data: Uint8Array, format: string): string {
+  try {
+    return new TextDecoder('utf8', { fatal: true }).decode(data);
+  } catch {
+    throw new TypeError(`Invalid ${format}: not UTF-8 text`);
+  }
+}
 function stl(
   input: string | Uint8Array,
   progress?: (value: number) => void,
@@ -109,7 +117,7 @@ function stl(
       return [{ name: 'STL body', geometry: flat(positions, progress) }];
     }
   }
-  const text = typeof input === 'string' ? input : new TextDecoder('utf8', { fatal: true }).decode(input);
+  const text = typeof input === 'string' ? input : utf8(input, 'STL');
   if (!/^\s*solid\b/.test(text) || !/\bendsolid\b/.test(text)) throw new TypeError('Invalid STL');
   const number = '[-+]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][-+]?\\d+)?',
     vertex = new RegExp(`vertex\\s+(${number})\\s+(${number})\\s+(${number})`, 'g');
@@ -202,7 +210,8 @@ function obj(
           if (++total > maxIndices) throw new RangeError('OBJ triangle limit');
         }
       }
-    } else if (!['vn', 'vt', 's', 'usemtl', 'mtllib'].includes(tag)) throw new Error(`Unsupported OBJ record ${tag}`);
+    } else if (!['vn', 'vt', 's', 'usemtl', 'mtllib'].includes(tag))
+      throw new TypeError(`Unsupported OBJ record ${tag.slice(0, 32)}`);
   }
   return parts
     .filter((part) => part.positions.length)
@@ -228,11 +237,7 @@ export function parseCADGeometry(
   const definitions =
     format === 'stl'
       ? stl(data, progress)
-      : obj(
-          typeof data === 'string' ? data : new TextDecoder('utf8', { fatal: true }).decode(data),
-          progress,
-          maxParts,
-        );
+      : obj(typeof data === 'string' ? data : utf8(data, 'OBJ'), progress, maxParts);
   if (!definitions.length) throw new Error('CAD contains no geometry');
   return definitions;
 }

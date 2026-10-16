@@ -49,12 +49,15 @@ export function parseOFF(input: BinaryInput, options: OFFOptions = {}): LoadedGe
   if (!fields || fields.length < 2) throw new LoaderError(F, 'header', 'missing vertex and face counts');
   const vertexCount = checkCount(Number(fields[0]), limit.maxVertices, F, 'vertex');
   const faceCount = checkCount(Number(fields[1]), limit.maxTriangles, F, 'face');
+  const minimum = 3 + (hasNormal ? 3 : 0) + (hasColor ? 3 : 0) + (hasUV ? 2 : 0);
+  // Budget before allocation: every value takes a digit and a separator, so a short file cannot claim millions.
+  if (vertexCount * minimum * 2 + faceCount * 2 - 1 > scanner.text.length - scanner.pos)
+    throw new LoaderError(F, 'truncated', 'file is too short for the declared vertex and face counts');
 
   const positions = new Float32Array(vertexCount * 3);
   const normals = hasNormal ? new Float32Array(vertexCount * 3) : undefined;
   const colors = hasColor ? new Float32Array(vertexCount * 3) : undefined;
   const uvs = hasUV ? new Float32Array(vertexCount * 2) : undefined;
-  const minimum = 3 + (hasNormal ? 3 : 0) + (hasColor ? 3 : 0) + (hasUV ? 2 : 0);
   for (let i = 0; i < vertexCount; i++) {
     const line = next();
     if (!line) throw new LoaderError(F, 'truncated', `file ends after ${i} of ${vertexCount} vertices`);

@@ -124,7 +124,8 @@ export const V = {
   specifier: (n) => ({ type: 42, inline: n }),
   dictionary: () => ({ type: 31, inline: 0 }),
 };
-export function writeCrate(specs) {
+/** `options.jumps` rewrites the path jump table (fuzzing: hostile jump tables). */
+export function writeCrate(specs, options = {}) {
   const tokens = [],
     tok = (s) => {
       let i = tokens.indexOf(s);
@@ -162,11 +163,12 @@ export function writeCrate(specs) {
       slash = p.lastIndexOf('/');
     return dot > slash ? -tok(p.slice(dot + 1)) : tok(p.slice(slash + 1));
   };
-  const jumps = order.map((p, i) => {
+  let jumps = order.map((p, i) => {
     const child = kids.get(p).length > 0,
       next = siblingsAfter(p)[0];
     return child && next ? order.indexOf(next) - i : child ? -1 : next ? 0 : -2;
   });
+  if (options.jumps) jumps = options.jumps(jumps);
   const rep = (v) => {
     const type = v.token !== undefined ? 11 : v.tokens ? 41 : v.pathList ? 34 : v.type;
     if (v.token !== undefined) return (1n << 62n) | (11n << 48n) | BigInt(tok(v.token));

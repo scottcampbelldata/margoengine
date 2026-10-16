@@ -132,7 +132,7 @@ export interface PointsToGeometryOptions {
 
 export const THREEMF_UNITS: Readonly<Record<string, number>>;
 
-export interface ThreeMFOptions extends ParseLimits, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes'> {
+export interface ThreeMFOptions extends ParseLimits, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
     units?: 'meters' | 'file';
     maxDepth?: number;
     signal?: AbortSignal;
@@ -204,6 +204,7 @@ export interface ZipEntry {
 export interface ZipOptions {
     maxEntries?: number;
     maxEntryBytes?: number;
+    maxRatio?: number;
     signal?: AbortSignal;
 }
 

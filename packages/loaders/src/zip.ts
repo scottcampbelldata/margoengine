@@ -20,6 +20,11 @@ export interface ZipOptions {
   maxEntries?: number;
   /** Maximum uncompressed size of one entry. Default 512 MiB. */
   maxEntryBytes?: number;
+  /**
+   * Maximum expansion of a deflated entry over 1 MiB, uncompressed : compressed. Default 200 (model XML and USD
+   * layers compress about 3-20x; a zip bomb reaches deflate's 1032x).
+   */
+  maxRatio?: number;
   signal?: AbortSignal;
 }
 
@@ -150,6 +155,15 @@ export async function readZipEntry(input: BinaryInput, entry: ZipEntry, options:
       F,
       'limit',
       `entry "${entry.name}" is ${entry.size} bytes, more than the limit of ${maxBytes}`,
+    );
+  // Checked before the output is allocated: a declared size the compressed bytes cannot plausibly produce is a bomb.
+  const maxRatio = options.maxRatio ?? 200;
+  if (!(maxRatio >= 1)) throw new LoaderError(F, 'range', 'maxRatio must be at least 1');
+  if (entry.method === 8 && entry.size > 1 << 20 && entry.size > entry.compressedSize * maxRatio)
+    throw new LoaderError(
+      F,
+      'limit',
+      `entry "${entry.name}" expands ${entry.compressedSize} bytes to ${entry.size}, more than ${maxRatio}x (raise maxRatio)`,
     );
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
     p = entry.headerOffset;

@@ -52,7 +52,7 @@ Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per
 | `maxVertices` | all parsers | 8,000,000 |
 | `maxTriangles` | all parsers | 16,000,000 |
 | `units` | `parse3MF` | `'meters'`; `'file'` keeps the model unit |
-| `maxEntries`, `maxEntryBytes` | `parse3MF` | 10,000 entries, 512 MiB per part |
+| `maxEntries`, `maxEntryBytes`, `maxRatio` | `parse3MF` | 10,000 entries, 512 MiB per part, a deflated part over 1 MiB may expand at most 200x (zip bombs reach 1,032x); a build expands to at most 100,000 object instances |
 | `maxDepth` | `parse3MF` | 32 nested components |
 | `signal` | `parse3MF`, `load` | none |
 | `keepInvalid` | `parsePCD` | `false` (NaN holes of organized clouds dropped) |

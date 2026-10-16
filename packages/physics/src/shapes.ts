@@ -176,6 +176,7 @@ export function createColliderDesc(
           ? geometryPositions(options.geometry, fit?.scale)
           : fitted();
       if (points.length < 12 || points.length % 3) throw new RangeError('A convex hull needs at least 4 points');
+      finite(points, 'Convex hull points');
       desc = R.ColliderDesc.convexHull(points);
       if (!desc) throw new RangeError('Convex hull computation failed (degenerate points)');
       break;
@@ -194,6 +195,7 @@ export function createColliderDesc(
       for (let i = 0; i < indexSource.length; i++)
         if (!Number.isInteger(indexSource[i]) || indexSource[i] < 0 || indexSource[i] >= vertices.length / 3)
           throw new RangeError('Trimesh index exceeds vertices');
+      finite(vertices, 'Trimesh vertices');
       const indices = Uint32Array.from(indexSource);
       desc = R.ColliderDesc.trimesh(vertices, indices);
       break;
@@ -205,13 +207,21 @@ export function createColliderDesc(
       if (heights.length !== (rows + 1) * (columns + 1))
         throw new RangeError(`Heightfield needs (rows + 1) * (columns + 1) = ${(rows + 1) * (columns + 1)} heights`);
       checkVec(scale, 'Heightfield scale');
-      desc = R.ColliderDesc.heightfield(rows, columns, Float32Array.from(heights), vec(scale));
+      const values = Float32Array.from(heights);
+      finite(values, 'Heightfield heights');
+      desc = R.ColliderDesc.heightfield(rows, columns, values, vec(scale));
       break;
     }
     default:
       throw new TypeError(`Unknown collider shape ${(options as { shape: string }).shape}`);
   }
   return { desc, center };
+}
+
+/** Rapier takes NaN and infinite coordinates silently (a convex hull of them fails inside Rapier with an internal error, a trimesh poisons the simulation): refuse them by name first. */
+function finite(values: Float32Array, label: string): void {
+  for (let i = 0; i < values.length; i++)
+    if (!Number.isFinite(values[i])) throw new RangeError(`${label} must be finite Float32 values`);
 }
 
 const combine = (R: RapierModule, rule: CombineRule): number => {

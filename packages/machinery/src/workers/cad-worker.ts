@@ -118,16 +118,34 @@ self.onmessage = async (event: MessageEvent) => {
         locateFile: (file) => (file.endsWith('.wasm') ? wasmURL : new URL(file, self.location.href).href),
       });
       progress(10);
-      const result =
-        format === 'step'
-          ? occt.ReadStepFile(new Uint8Array(buffer), { linearUnit: 'meter' })
-          : occt.ReadIgesFile(new Uint8Array(buffer), { linearUnit: 'meter' });
-      if (!result.success || !result.meshes.length) throw new Error('B-Rep import failed');
+      let result: Result;
+      try {
+        result =
+          format === 'step'
+            ? occt.ReadStepFile(new Uint8Array(buffer), { linearUnit: 'meter' })
+            : occt.ReadIgesFile(new Uint8Array(buffer), { linearUnit: 'meter' });
+      } catch (error) {
+        // A Wasm trap (unreachable, out-of-bounds access, abort) on a malformed file: report it by name. This
+        // worker is never reused (one per load), so the next file starts a fresh OpenCascade.
+        throw new RangeError(
+          `B-Rep import failed: OpenCascade ${error instanceof WebAssembly.RuntimeError ? 'trapped' : 'threw'} on this ${format.toUpperCase()} file`,
+        );
+      }
+      if (!result?.success || !Array.isArray(result.meshes) || !result.meshes.length)
+        throw new RangeError('B-Rep import failed');
       checkCount('Too many CAD parts', result.meshes.length, countLimit('maxParts', maxParts), 'maxParts');
       let total = 0;
       parts = result.meshes.map((mesh) => {
-        total += mesh.index.array.length;
+        const positions = mesh.attributes?.position?.array,
+          index = mesh.index?.array;
+        if (!positions || !index || positions.length % 3 || index.length % 3)
+          throw new RangeError('B-Rep import returned an invalid mesh');
+        total += index.length;
         if (total > 3_000_000) throw new RangeError('CAD triangle limit');
+        const vertexCount = positions.length / 3;
+        for (const i of index)
+          if (!(Number.isInteger(i) && i >= 0 && i < vertexCount))
+            throw new RangeError('B-Rep import returned an index outside its mesh');
         const normals = new Float32Array(mesh.attributes.position.array.length);
         for (let f = 0; f < mesh.index.array.length; f += 3) {
           const p = mesh.attributes.position.array,

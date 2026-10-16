@@ -51,6 +51,7 @@ export interface CADImportOptions {
     onProgress?: (percent: number) => void;
     smoothing?: boolean;
     maxParts?: number;
+    timeoutMs?: number;
 }
 
 export interface CADModel {

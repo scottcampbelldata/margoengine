@@ -137,9 +137,14 @@ function parseLayer(input: string | BinaryInput, options: USDOptions): Specs {
     if (data.length < 88) fail('truncated Crate bootstrap');
     const offset = new DataView(data.buffer, data.byteOffset, data.byteLength).getBigUint64(16, true);
     if (offset > BigInt(data.length - 8)) fail('Crate TOC outside layer');
-    specs = parseCrate(data, limits.maxBytes);
+    specs = parseCrate(data, limits.maxBytes, limits.maxDepth);
   } else {
-    const text = new TextDecoder('utf-8', { fatal: true }).decode(data);
+    let text = '';
+    try {
+      text = new TextDecoder('utf-8', { fatal: true }).decode(data);
+    } catch {
+      fail('USDA layer is not UTF-8 text');
+    }
     if (!text.startsWith('#usda 1.0')) fail('expected USDA or USDC');
     if (/\b(?:references|payload|subLayers|inherits|specializes|variantSet|timeSamples|instanceable)\b/.test(text))
       fail('composition and animation are unsupported');
@@ -153,8 +158,10 @@ function parseLayer(input: string | BinaryInput, options: USDOptions): Specs {
   return specs;
 }
 function compose(path: string, specs: Specs): number[] {
-  const order = specs[path + '.xformOpOrder']?.fields.default ?? specs[path]?.fields.xformOpOrder ?? [],
-    get = (name: string) => specs[path + '.' + name]?.fields.default;
+  const order = specs[path + '.xformOpOrder']?.fields.default ?? specs[path]?.fields.xformOpOrder ?? [];
+  // Field values are whatever the file stored: check the type before iterating (a Crate int is not an op list).
+  if (!Array.isArray(order) || order.some((op) => typeof op !== 'string')) fail('invalid xformOpOrder');
+  const get = (name: string) => specs[path + '.' + name]?.fields.default;
   let out = identity();
   for (const name of order) {
     const value = get(name),
@@ -286,7 +293,13 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
       scene: 0,
     };
   const attrs = (path: string, name: string) => specs[path + '.' + name]?.fields.default;
-  const connection = (path: string, name: string) => specs[path + '.' + name]?.fields.connectionPaths?.[0];
+  /** The first path of a relationship field, or undefined; any other stored type is malformed. */
+  const firstPath = (value: unknown): string | undefined => {
+    if (value === undefined) return;
+    if (!Array.isArray(value) || (value.length && typeof value[0] !== 'string')) fail('invalid relationship target');
+    return (value as string[])[0];
+  };
+  const connection = (path: string, name: string) => firstPath(specs[path + '.' + name]?.fields.connectionPaths);
   const texture = (path: string, name: string): { path: string; channel: number } | undefined => {
     const target = connection(path, name);
     if (!target) return;
@@ -310,7 +323,7 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
   function material(path: string): number {
     let binding: string | undefined;
     for (let owner = path; owner && !binding; owner = owner.slice(0, owner.lastIndexOf('/')))
-      binding = specs[owner + '.material:binding']?.fields.targetPaths?.[0];
+      binding = firstPath(specs[owner + '.material:binding']?.fields.targetPaths);
     const shader = binding ? connection(binding, 'outputs:surface')?.split('.outputs:')[0] : undefined;
     if (binding && !shader) fail('unresolved material binding');
     if (shader && attrs(shader, 'info:id') !== 'UsdPreviewSurface') fail('unsupported surface shader');
@@ -389,7 +402,8 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
   doc.nodes.push({ name: 'USD', matrix: base, children: [] });
   const nodeIds = new Map<string, number>([['/', 0]]);
   let totalVertices = 0,
-    totalTriangles = 0;
+    totalTriangles = 0,
+    polygonWork = 0;
   for (const [path, spec] of Object.entries(specs).sort(([a], [b]) => a.split('/').length - b.split('/').length))
     if (path !== '/' && spec.specType === 6) {
       options.signal?.throwIfAborted();
@@ -464,6 +478,8 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
         // shortcut: triangles and convex planar polygons, tessellate concave polygons before loading.
         if (count > 3) {
           if (count > 1024) fail('polygon exceeds validation limit');
+          // The convexity check is quadratic per polygon: bound its total work, not only each polygon.
+          if ((polygonWork += count * count) > 10_000_000) fail('polygon validation work exceeds limit');
           const a = faces[cursor] * 3,
             b = faces[cursor + 1] * 3,
             c = faces[cursor + 2] * 3,

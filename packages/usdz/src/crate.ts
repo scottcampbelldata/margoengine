@@ -38,7 +38,8 @@ function lz4(src: Uint8Array, out: Uint8Array, at: number): number {
 /** TfFastCompression: a chunk count byte, then one LZ4 block (count 0) or `count` size-prefixed blocks. */
 function inflate(src: Uint8Array, max: number): Uint8Array {
   if (!src.length) fail('empty compressed block');
-  const out = new Uint8Array(max),
+  // LZ4 expands at most 255x (one length byte per 255 output bytes): never allocate more than the input can produce.
+  const out = new Uint8Array(Math.min(max, src.length * 255 + 64)),
     chunks = src[0],
     view = new DataView(src.buffer, src.byteOffset, src.byteLength);
   if (!chunks) return out.subarray(0, lz4(src.subarray(1), out, 0));
@@ -57,11 +58,11 @@ function inflate(src: Uint8Array, max: number): Uint8Array {
 function decodeInts(data: Uint8Array, count: number, wide: boolean): number[] {
   const width = wide ? 8 : 4,
     view = new DataView(data.buffer, data.byteOffset, data.byteLength),
-    codes = width,
-    out = new Array<number>(count);
+    codes = width;
   let at = codes + ((count * 2 + 7) >> 3),
     previous = 0;
   if (at > data.length) fail('truncated integer codes');
+  const out = new Array<number>(count);
   const common = wide ? Number(view.getBigInt64(0, true)) : view.getInt32(0, true);
   for (let i = 0; i < count; i++) {
     const code = (data[codes + (i >> 2)] >> ((i & 3) * 2)) & 3,
@@ -112,7 +113,14 @@ const WIDTH: Record<string, number> = { u8: 1, f16: 2, i32: 4, u32: 4, f32: 4, i
 const UNSUPPORTED = new Set([35, 45, 46, 47, 55]),
   SKIPPED = new Set([31, 36, 37, 38, 39, 49, 51, 52, 53, 54]);
 
-export function parseCrate(data: Uint8Array, maxBytes: number): Specs {
+/** `count` items read one by one: each read is bounds checked, so a huge count fails before it allocates. */
+function repeat<T>(count: number, item: () => T): T[] {
+  const out: T[] = [];
+  for (let i = 0; i < count; i++) out.push(item());
+  return out;
+}
+
+export function parseCrate(data: Uint8Array, maxBytes: number, maxDepth = 64): Specs {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength),
     [major, minor] = [data[8], data[9]];
   if (major !== 0 || minor < 4 || minor > 12) fail('unsupported Crate version');
@@ -176,7 +184,7 @@ export function parseCrate(data: Uint8Array, maxBytes: number): Specs {
     return tokens[i];
   };
   section('STRINGS');
-  const strings = Array.from({ length: u64() }, () => u32()),
+  const strings = repeat(u64(), () => u32()),
     string = (i: number) => token(strings[i] ?? -1);
   section('FIELDS');
   const fieldCount = u64(),
@@ -192,16 +200,19 @@ export function parseCrate(data: Uint8Array, maxBytes: number): Specs {
     pathIndex = ints(encoded),
     elements = ints(encoded),
     jumps = ints(encoded),
-    paths = new Array<string>(pathCount);
+    paths: string[] = []; // filled sparsely by index: never preallocate a count read from the file
   const set = (i: number, path: string) => {
     if (!(pathIndex[i] >= 0 && pathIndex[i] < pathCount)) fail('path index outside table');
     paths[pathIndex[i]] = path;
   };
   // Each entry names its element; jumps say whether it has a child (next entry) and where its next sibling starts.
-  for (const stack: [number, string][] = encoded ? [[0, '']] : []; stack.length; ) {
-    let [index, parent] = stack.pop()!;
+  // A valid table visits every entry once; hostile jumps that revisit entries would walk subtrees exponentially often.
+  let visits = 0;
+  for (const stack: [number, string, number][] = encoded ? [[0, '', 0]] : []; stack.length; ) {
+    let [index, parent, depth] = stack.pop()!;
     for (let more = true; more; ) {
       if (index >= encoded) fail('path jump outside table');
+      if (++visits > encoded) fail('path jumps revisit entries');
       const here = index++,
         element = token(Math.abs(elements[here])),
         path = !parent
@@ -212,7 +223,9 @@ export function parseCrate(data: Uint8Array, maxBytes: number): Specs {
       set(here, path);
       const child = jumps[here] > 0 || jumps[here] === -1,
         sibling = jumps[here] >= 0;
-      if (child && sibling) stack.push([here + jumps[here], parent]);
+      if (child && sibling) stack.push([here + jumps[here], parent, depth]);
+      // Fail while walking: building ever deeper path strings first would cost quadratic time and memory.
+      if (child && ++depth > maxDepth + 2) fail('hierarchy exceeds depth limit');
       if (child) parent = path;
       more = child || sibling;
     }
@@ -250,12 +263,12 @@ export function parseCrate(data: Uint8Array, maxBytes: number): Specs {
     const header = data[take(1)],
       lists: any[][] = [];
     // Stored as explicit, added, prepended, appended, deleted, ordered; header bits 1, 2, 4, 32, 64, 8, 16.
-    for (const bit of [2, 4, 32, 64, 8, 16])
-      lists.push(header & bit ? Array.from({ length: u64() }, item) : (undefined as any));
-    const [explicit, added, prepended, appended, deleted] = lists;
+    for (const bit of [2, 4, 32, 64, 8, 16]) lists.push(header & bit ? repeat(u64(), item) : (undefined as any));
+    const [explicit, added, prepended, appended, deleted] = lists,
+      removed = new Set(deleted);
     return header & 1
       ? (explicit ?? [])
-      : [...(prepended ?? []), ...(appended ?? []), ...(added ?? [])].filter((v) => !deleted?.includes(v));
+      : [...(prepended ?? []), ...(appended ?? []), ...(added ?? [])].filter((v) => !removed.has(v));
   };
   function value(rep: bigint): any {
     const type = Number((rep >> 48n) & 0xffn),
@@ -287,9 +300,8 @@ export function parseCrate(data: Uint8Array, maxBytes: number): Specs {
       return payload;
     }
     seek(payload);
-    if (type === 40 || type === 41)
-      return Array.from({ length: u64() }, () => (type === 40 ? pathAt(u32()) : token(u32())));
-    if (type === 50) return Array.from({ length: u64() }, () => string(u32()));
+    if (type === 40 || type === 41) return repeat(u64(), () => (type === 40 ? pathAt(u32()) : token(u32())));
+    if (type === 50) return repeat(u64(), () => string(u32()));
     if (type === 48) return scalars('f64', u64());
     if (type === 34) return listOp(() => pathAt(u32()));
     if (type === 32) return listOp(() => token(u32()));
@@ -297,7 +309,7 @@ export function parseCrate(data: Uint8Array, maxBytes: number): Specs {
     if (type === 42 || type === 43 || type === 44) return u32();
     if (type === 10 || type === 11 || type === 12) {
       const count = array ? (minor < 7 ? u32() : u64()) : 1,
-        values = Array.from({ length: count }, () => u32()).map((i) => (type === 10 ? string(i) : token(i)));
+        values = repeat(count, () => u32()).map((i) => (type === 10 ? string(i) : token(i)));
       return array ? values : values[0];
     }
     const shape = SHAPES[type];

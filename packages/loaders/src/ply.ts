@@ -174,6 +174,18 @@ export function parsePLY(input: BinaryInput, options: PLYOptions = {}): LoadedGe
   if (faceElement) checkCount(faceElement.count, limit.maxTriangles, F, 'face');
   const elementLimit = Math.max(limit.maxVertices, limit.maxTriangles);
   for (const element of header.elements) checkCount(element.count, elementLimit, F, `"${element.name}" element`);
+  // Budget before allocation: the body must be able to hold the declared counts (an ASCII value takes at least a
+  // digit and a separator, a binary row at least its scalars and list counts), so a short file cannot claim millions.
+  const ascii = header.format === 'ascii';
+  let needed = ascii ? -1 : 0;
+  for (const element of header.elements)
+    needed +=
+      element.count *
+      (ascii
+        ? 2 * element.properties.length
+        : element.properties.reduce((sum, p) => sum + SIZES[p.list ? p.list.count : p.type], 0));
+  if (needed > bytes.length - header.bodyOffset)
+    throw new LoaderError(F, 'truncated', 'body is too short for the declared element counts');
 
   const props = vertexElement.properties;
   const px = find(props, ['x']),

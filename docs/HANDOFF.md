@@ -2347,6 +2347,81 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    (`examples/conveyor-simulator/src/main.js`).
    Noted for others (not security, not fixed here): bvh `transfer: true` + abort leaves the caller's buffers detached
    (`bvh/src/async.ts`); progressive glTF ignores the `fetch` option; decoder pool queues are not capped per worker.
+   Status 2026-10-15, 11a part 2 (asset parsers; gltf/gltf-pro/decoders/environment images/.margo are part 1):
+   `npm run fuzz` (scripts/fuzz/run.js + harness.js, no dependencies; targets in scripts/fuzz/targets-*.js, part 2's in
+   targets-assets.js) runs each target in its own Node child (`--jobs` at most 2), seeded and deterministic (input i of
+   seed s is fixed; `--dump=i` writes it, `--replay=`/`--minimize=` rerun or shrink one). Oracle: return or a named error
+   (the package's class, or a TypeError/RangeError whose message is the package's own, never V8/Wasm text such as
+   "Cannot read properties", "Offset is outside the bounds", "unreachable"), within the target's time limit, without
+   growing heap + ArrayBuffers by more than 64 MiB + 64x the input; a child that stops progressing is killed and its
+   seed/iteration reported. Mutations: bit/byte flips, interesting integers written into length/count/offset fields
+   (u8-u64, LE/BE, aligned), truncation (half the time inside the first 128 B), deletion, duplication, insertion,
+   splicing between seeds, text numbers replaced with huge counts / negative and out-of-range indices / NaN / Infinity,
+   line edits, deep nesting; generators per format: zip bombs (16-200 MiB of zeros), lying declared sizes, traversal and
+   65,535-byte entry names, 3MF component fan-out and cycles (also across p:path parts), deep XML/USDA/STEP lists, bad
+   string escapes, Crate files with revisiting path jump tables, FBX record trees with hostile values, int64 overflow,
+   cyclic connections, ASCII arrays of 8 M values, IFC reference cycles. Seeds: the repo fixtures (loaders, usdz, ifc,
+   bvh OBJs, triangle.fbx, the FBX and Crate test writers) and the occt-import-js test STEP/IGES/STL files. STEP/IGES
+   run through machinery's built CAD worker (OCCT compiled once, instantiated per file) and IFC through web-ifc, each in
+   a worker thread terminated at a deadline as loadCAD and parseIFCInWorker do. `test:release` runs `npm run fuzz --
+   --short` (4 s per target, seed 1). Clean run, seed 3, 90 s per target (180 s STEP): ply 11,311, pcd 14,804, xyz
+   14,577, off 13,041, vtk 11,739, 3mf 7,696, loaders usda 14,233, loaders usdz 17,134, stl 13,779, obj 8,394, iges
+   2,137, step 3,752, SurfacePhysics 12,157, fbx 1,235, usdz usda 14,569, usdc 2,983, usdz 14,740, ifc 5,932, net
+   snapshots 15,954, exporters round trip 10,333 inputs, 0 findings. Earlier runs (seed 1 at 120 s, seed 2 at 180 s on
+   STEP/IGES/IFC/USDC/FBX/3MF) found the last five below. Findings, all fixed with a regression in
+   tests/fuzz-regressions.test.js (reproducers in tests/fixtures/fuzz), packages/ifc/tests/worker.test.js or
+   packages/physics/tests/physics.test.js:
+   - PLY, PCD, OFF: a short file declaring millions of elements allocated first (PLY: 336 MiB for 314 B; PCD
+     binary_compressed: 183 MiB for 167 B via a declared LZF size). Now the body must be able to hold the declared counts
+     before any allocation (a digit and a separator per ASCII value, the row size in binary, LZF at most 88x).
+   - ZIP (3MF, USDZ): a deflated entry is allocated at its declared size (512 MiB allowed) and a 64 MiB bomb inflated
+     from 65 KB. New `maxRatio` (ZipOptions, parse3MF): an entry over 1 MiB may expand at most 200x (real 3MF: 9x;
+     deflate's limit is 1,032x), checked before allocating. Traversal names were harmless (entries are map keys; usdz
+     already refuses escaping asset paths) and are now generator cases.
+   - 3MF: components that reference the next level 64 times, 30 deep, never finished (hang). The build now expands to at
+     most 100,000 object instances (the per-file part cap); empty meshes skip per-instance work.
+   - USDA (loaders readUSDA, also used by usdz): `( """doc""" )` metadata and quoted prim names with bad escapes threw
+     JSON.parse's SyntaxError; now LoaderError `syntax`.
+   - STL/OBJ (machinery): non-UTF-8 text threw TextDecoder's TypeError, now `Invalid STL/OBJ: not UTF-8 text`; the
+     ASCII STL facet regex was quadratic (hang; the same linear scan also landed in 11b).
+   - STEP/IGES (CAD worker): OCCT's own "Maximum call stack size exceeded" (a 50,000-deep list) reached the caller raw.
+     OCCT failures and Wasm traps are now `B-Rep import failed: OpenCascade threw/trapped on this STEP file`, OCCT mesh
+     indices are bounds checked, and a dead worker rejects with `CAD worker failed: ...`; one worker per load, so the
+     next file starts a fresh OCCT (tested). A 4-byte change in Cube 10x10.igs keeps OCCT busy 135 s: new
+     `timeoutMs` (default 120,000) terminates the worker with `CAD import did not finish within ... ms`.
+   - IFC: web-ifc 0.0.78 loops forever inside its Wasm on malformed parameter lists (`#1e999`, `#11 x`, `.T.x`, `'a'b`,
+     `$x`, `#-1`): parseIFC now checks ISO 10303-21 statement syntax first (linear; all 56 occt-import-js STEP files and
+     wall.ifc pass) and reports LoaderError `syntax`. web-ifc's own TypeErrors (OpenModel without FILE_SCHEMA) and traps
+     are LoaderError `unsupported`. It also loops on syntactically valid but schema-invalid models (a string where a
+     set belongs, a missing attribute: fixtures/fuzz/ifc-arity-hang.ifc), which no check in front of it can rule out,
+     so untrusted IFC needs the new `@margoengine/ifc/worker` `parseIFCInWorker(bytes, {webIfc, wasmPath, timeoutMs})`:
+     a fresh worker loads the app's web-ifc-api-iife.js and is terminated at the deadline (LoaderError `limit`).
+     Tested in Node (worker script in-process, deadline with a stub Worker); not yet run in a browser.
+   - FBX: a truncated 'Y'/'C' property was read before its bounds check (DataView RangeError); corrupt zlib arrays threw
+     DecompressionStream's TypeError, unhandled when a later record failed first; ASCII arrays took 4.6 s for 16 MB
+     and had no decoded budget (now linear, 256 MiB as binary); a 100,000-corner polygon ran over 5 minutes (ear
+     clipping is quadratic) and 3,000,000 faces filled the corner lists before the vertex budget was checked. Now:
+     bounds before reads, `FBX: compressed array is corrupt...`, at most 4,096 corners per polygon and 10^8 corner^2
+     of triangulation work, the vertex budget checked per triangle.
+   - USD Crate (usdz): path jump tables that revisit entries walked subtrees 2^n times; deep paths were built before
+     the depth check (quadratic); list ops filtered deletions with includes (quadratic); 1,706-byte files allocated
+     128 MiB and 109 MiB from corrupt path/string counts and LZ4 sizes; an int xformOpOrder threw "n is not iterable";
+     an int connection reached String.split; a non-UTF-8 USDA layer threw TextDecoder's TypeError; the convex polygon
+     check took 6.3 s for 320 1,024-gons (1.3 MB). Now: each path entry visited once and depth checked while walking,
+     Set lookups, counts never preallocated, LZ4 output at most 255x its input, field types checked, `USD: USDA layer is
+     not UTF-8 text`, 10^7 polygon work (as loaders' USDA).
+   - SurfacePhysics: non-object parts, carriers, nodes or vectors threw "Cannot read properties of undefined"; now
+     `TypeError: Invalid surface part/carrier/vector`. Physics (Rapier): a NaN or infinite convex hull failed inside
+     Rapier ("expected instance of p"), a NaN trimesh or heightfield was accepted and poisoned the simulation; now
+     `RangeError: ... must be finite Float32 values` before Rapier.
+   Typed-array audit (every view/index read in these parsers checked against its buffer before access): fixed the FBX
+   'Y'/'C' reads, the PLY/PCD/OFF/Crate/LZ4/ZIP allocations sized by file counts, the OCCT index reads; checked and
+   left as they were: PLY binary rows, PCD binary/LZF, ZIP directory and local headers, VTK binary, Crate take/seek,
+   LZ4 byte reads, FBX arrays and `need`, binary STL, 3MF triangle and property indices, USD face/normal/UV indices,
+   FBX layer indices, IFC face indices. No findings: net snapshots (finite packets always sample finite), exporters
+   round trip (every exported STL/OBJ/PLY/USDZ re-imports or fails by name). Audio and video parse no containers
+   themselves (the browser's decodeAudioData / video element do), so they have no target. Open: parseIFCInWorker
+   browser check; navmesh (Recast) is part of the hygiene group and was not changed.
 
 Before launch, in addition to the work queue:
 - Demos smooth on first load on desktop and phones, including Android. The Galaxy S23 3-5 FPS island issue is shelved

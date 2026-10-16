@@ -155,6 +155,16 @@ export function parsePCD(input: BinaryInput, options: PCDOptions = {}): LoadedGe
     intensity = field('intensity');
   const hasNormals = !!(nx && ny && nz);
   if (rgb && rgb.size !== 4) throw new LoaderError(F, 'header', 'rgb field must be 4 bytes');
+  // Budget before allocation: the body must be able to hold POINTS (an ASCII point takes a digit and a line break; an
+  // LZF stream expands at most 88x: 3 input bytes per 264-byte back reference), so a short file cannot claim millions.
+  const available = bytes.length - header.bodyOffset;
+  const needed =
+    header.data === 'ascii'
+      ? count * 2 - 1
+      : header.data === 'binary'
+        ? count * header.rowSize
+        : (count * header.rowSize) / 88;
+  if (needed > available) throw new LoaderError(F, 'truncated', `body is too short for ${count} points`);
   const positions = new Float32Array(count * 3);
   const normals = hasNormals ? new Float32Array(count * 3) : undefined;
   const colors = rgb ? new Float32Array(count * 3) : undefined;
@@ -233,6 +243,8 @@ export function parsePCD(input: BinaryInput, options: PCDOptions = {}): LoadedGe
           'header',
           `uncompressed size ${uncompressed} does not match ${count} points of ${header.rowSize} bytes`,
         );
+      if (uncompressed > compressed * 88)
+        throw new LoaderError(F, 'range', `${compressed} LZF bytes cannot expand to ${uncompressed}`);
       if (header.bodyOffset + 8 + compressed > bytes.length)
         throw new LoaderError(
           F,
