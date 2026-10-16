@@ -1,6 +1,6 @@
 # Kinematics and robot allocation handoff
 
-Updated: 2026-10-16. This document records verified work, evidence locations, limits, and the next experiments. It is a checkpoint, not a completion claim. Gzip figures in this note are from the checkpoint. The 16 October 2026 core + stage measurement is 20,046 bytes gzip, and the gate rejects 20,000 or above.
+Updated: 2026-10-16. This document records verified work, evidence locations, limits, and the next experiments. It is a checkpoint, not a completion claim. Gzip figures in this note are from the checkpoint. The current build measures core at 18,192 bytes gzip and core plus stage at 19,999 bytes gzip. The gate rejects 20,000 or above.
 
 ## Active objective and current state
 

@@ -7,7 +7,7 @@ single matching core version. Installing an optional package does not mean its
 code must enter the initial browser download.
 
 Core and Stage remain feature-frozen. Their combined gzip gate rejects 20,000
-bytes and above. Gzip figures below are from this audit. The 16 October 2026 measurement is 20,046 bytes gzip, which fails that gate. Optional packages retain their existing root exports; narrower
+bytes and above. Gzip figures below are from this audit. The current build measures core at 18,192 bytes gzip and core plus stage at 19,999 bytes gzip. Optional packages retain their existing root exports; narrower
 entries provide the same implementations and constructor identities.
 
 ## Second deep pass (2026-10-12)

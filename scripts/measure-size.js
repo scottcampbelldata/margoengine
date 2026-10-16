@@ -22,5 +22,5 @@ export async function measureCoreStage() {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const {raw, gzip} = await measureCoreStage();
-  console.log(JSON.stringify({package: 'margoengine', raw, gzip, limit: CORE_STAGE_GZIP_LIMIT, baseline: 20_046, delta: gzip - 20_046}, null, 2));
+  console.log(JSON.stringify({package: 'margoengine', raw, gzip, limit: CORE_STAGE_GZIP_LIMIT, baseline: 19_999, delta: gzip - 19_999}, null, 2));
 }
