@@ -22,6 +22,16 @@ export interface AnimatorOptions {
   initial: string;
   parameters?: Record<string, number>;
   transitions?: readonly AnimatorTransition[];
+  /**
+   * Optional explicit rotation commit, captured once during construction.
+   * Receives a borrowed normal array for sampled/blended poses and FootIK.
+   * The synchronous writer must validate finite Float32/nonzero input,
+   * normalize and synchronize quaternion/Euler state without mutating or
+   * retaining the array. Cached unchanged rotations do not call the writer.
+   * Recursive onPreUpdate calls from the writer are rejected before mutation.
+   * Omit to preserve dynamic Mesh.setQuaternion dispatch.
+   */
+  writeRotation?: (node: Mesh, rotation: readonly number[]) => void;
 }
 export interface AdditiveLayer {
   clip: string;
@@ -99,6 +109,8 @@ export class Animator implements EnginePlugin {
   private disposed = false;
   private unsubscribe?: () => void;
   private previousPlaying: boolean;
+  private readonly writeRotation?: AnimatorOptions['writeRotation'];
+  private rotationWriteActive = false;
   constructor(
     readonly animation: Animation,
     readonly options: AnimatorOptions,
@@ -136,6 +148,10 @@ export class Animator implements EnginePlugin {
         (t.duration ?? 0.15) < 0
       )
         throw new TypeError('Invalid animator transition');
+    const writer = options.writeRotation;
+    if (writer !== undefined && typeof writer !== 'function')
+      throw new TypeError('Invalid animator rotation writer');
+    this.writeRotation = writer;
     const nodes = animation.model.nodes,
       t = animation.model.root.engine.store.transforms;
     this.rest = {
@@ -219,6 +235,7 @@ export class Animator implements EnginePlugin {
     this.unsubscribe = this.animation.model.onDispose(() => this.dispose());
   }
   onPreUpdate(delta: number): void {
+    if (this.rotationWriteActive) throw new Error('Animator rotation writer cannot reenter updates');
     if (this.disposed) return;
     if (this.engine && !this.engine.hasPlugin(this.animation.name)) {
       this.dispose();
@@ -376,7 +393,7 @@ export class Animator implements EnginePlugin {
       e[1] !== cache[24] ||
       e[2] !== cache[25]
     ) {
-      node.setQuaternion(q);
+      this.commitRotation(node, q);
       cache[6] = q[0];
       cache[7] = q[1];
       cache[8] = q[2];
@@ -388,6 +405,20 @@ export class Animator implements EnginePlugin {
       cache[23] = e[0];
       cache[24] = e[1];
       cache[25] = e[2];
+    }
+  }
+  private commitRotation(node: Mesh, rotation: readonly number[]): void {
+    const writer = this.writeRotation;
+    if (!writer) {
+      node.setQuaternion(rotation);
+      return;
+    }
+    if (this.rotationWriteActive) throw new Error('Animator rotation writer cannot reenter updates');
+    this.rotationWriteActive = true;
+    try {
+      writer(node, rotation);
+    } finally {
+      this.rotationWriteActive = false;
     }
   }
   private sample(name: string, time: number, loop = true, out?: Pose): Pose {
@@ -455,7 +486,7 @@ export class Animator implements EnginePlugin {
     const id = node.engine.store.parents[node.id],
       parent = id === -1 ? [0, 0, 0, 1] : this.worldRotation(node.engine.meshes.get(id)!),
       world = quaternionMultiply(delta, this.worldRotation(node));
-    node.setQuaternion(quaternionMultiply([-parent[0], -parent[1], -parent[2], parent[3]], world));
+    this.commitRotation(node, quaternionMultiply([-parent[0], -parent[1], -parent[2], parent[3]], world));
   }
   private foot(foot: FootIK): void {
     const nodes = this.animation.model.nodes,

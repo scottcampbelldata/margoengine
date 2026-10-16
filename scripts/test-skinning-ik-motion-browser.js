@@ -4,6 +4,24 @@ import { resolve } from 'node:path';
 import { openBrowser } from './browser.js';
 import { mapArmControl } from '../examples/skinning-ik/arm-controls.ts';
 
+// Optional standalone scene and artifact label; omission keeps the source demo
+// and the existing report/screenshot names.
+const argument = (name) => {
+  const matches = process.argv.slice(2).filter((value) => value.startsWith(`--${name}=`));
+  assert.ok(matches.length <= 1, `Specify --${name}= only once`);
+  return matches[0]?.slice(name.length + 3);
+};
+const sceneArgument = argument('scene-url'), label = argument('label');
+let sceneURL;
+if (sceneArgument !== undefined) {
+  sceneURL = new URL(sceneArgument);
+  assert.ok(sceneURL.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(sceneURL.hostname) &&
+    !sceneURL.username && !sceneURL.password && !sceneURL.hash,
+  '--scene-url must be an absolute local HTTP URL without credentials or a fragment');
+}
+if (label !== undefined) assert.match(label, /^[a-z0-9]+(?:-[a-z0-9]+)*$/, '--label must contain lowercase words or numbers separated by hyphens');
+const suffix = label ? `-${label}` : '';
+
 const app = await openBrowser({
   startPath: '/tests/modern.html',
   channel: 'msedge',
@@ -112,7 +130,9 @@ try {
   await page.route('**/@vite/client', (route) =>
     route.fulfill({ contentType: 'application/javascript', body: '// HMR disabled for motion regression' }),
   );
-  await page.goto(new URL('/examples/skinning-ik.html', page.url()).href);
+  await page.goto(sceneURL?.href ?? new URL('/examples/skinning-ik.html', page.url()).href);
+  if (sceneURL) report.sceneURL = page.url();
+  if (label) report.label = label;
   await page.waitForFunction(
     () => document.querySelector('#viewport').dataset.ready === 'true' || document.querySelector('#error').textContent,
   );
@@ -169,7 +189,7 @@ try {
     console.log(`Side endpoint settled with look ${tracking ? 'on' : 'off'}`);
     assert.ok(endpoint.orb[0] > 0.233 && Math.abs(endpoint.orb[1] - 1.16) < 0.002);
     await page.screenshot({
-      path: `test-results/skinning-ik-motion-look-${tracking ? 'on' : 'off'}.png`,
+      path: `test-results/skinning-ik-motion${suffix}-look-${tracking ? 'on' : 'off'}.png`,
       fullPage: true,
     });
     await captureStart();
@@ -290,7 +310,7 @@ try {
       ['x', 'y', 'z'].map((axis) => ({ axis, value: document.querySelector(`#target-${axis}`).valueAsNumber })),
     );
   } catch {}
-  await writeFile('test-results/skinning-ik-motion-browser.json', JSON.stringify(report, null, 2));
+  await writeFile(`test-results/skinning-ik-motion-browser${suffix}.json`, JSON.stringify(report, null, 2));
   await app.close();
 }
 console.log(
