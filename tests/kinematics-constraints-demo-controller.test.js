@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {readFileSync} from 'node:fs';
 import {createConstraintDemo} from '../examples/kinematics-constraints-controller.js';
 
 // Independent convex segment minimum: endpoints plus the interior stationary pair.
@@ -238,4 +239,104 @@ test('prospective pacing removes the mixed-scene catch-up jump before solve hist
   assert.equal(accepted,720); assert.ok(peak < .00626);
   const hand = [...d.currentHand]; d.setPaused(true); d.step(1/60);
   assert.deepEqual([...d.currentHand],hand); assert.equal(d.handStep,0); assert.equal(d.angleStep,0); assert.equal(d.solveCalls,0);
+});
+
+test('recorded 2250-frame contact gestures take validated useful detours and release the final hold', () => {
+  const fixture = JSON.parse(readFileSync(new URL('./fixtures/constraints-user-contact-20261016.json', import.meta.url), 'utf8'));
+  const bytes = Buffer.from(fixture.data, 'base64');
+  assert.equal(bytes.length, fixture.frames * 20);
+  const d = createConstraintDemo();
+  d.configure(fixture.settings);
+  d.solveOptions.swivelSpeedLimit = fixture.settings.swivelSpeedLimit;
+  d.solveOptions.searchBudget = fixture.settings.searchBudget;
+  d.setTarget(...fixture.warmup.target);
+  for (let i = 0; i < fixture.warmup.frames; i++) d.step(fixture.warmup.dtSeconds);
+  let held = 0, consecutive = 0, maxConsecutive = 0, detours = 0;
+  for (let frame = 0; frame < fixture.frames; frame++) {
+    const offset = frame * 20;
+    d.setTarget(bytes.readFloatLE(offset + 8), bytes.readFloatLE(offset + 12), bytes.readFloatLE(offset + 16));
+    const beforeHand = [...d.currentHand], beforeElbow = [...d.currentElbow], beforePole = d.acceptedPole;
+    const previousError = Math.hypot(...d.currentHand.map((v, axis) => v - d.rawTarget[axis]));
+    d.step(bytes.readDoubleLE(offset));
+    audit(d);
+    // Existing point-contact projection adds up to61um beyond prospective
+    // pacing in this recording. This is a measured regression envelope, not
+    // a general Cartesian speed guarantee from the package.
+    assert.ok(d.handStep <= 0.75 * d.dt + 0.000065, `frame ${frame}: hand step ${d.handStep}`);
+    assert.ok(Math.abs(d.acceptedPole - beforePole) <= d.solveOptions.swivelSpeedLimit * d.dt + 1e-12);
+    if (d.result.resolved) consecutive = 0;
+    else {
+      held++; maxConsecutive = Math.max(maxConsecutive, ++consecutive);
+      assert.deepEqual([...d.currentHand], beforeHand);
+      assert.deepEqual([...d.currentElbow], beforeElbow);
+      assert.equal(d.outwardDetour, false);
+    }
+    if (d.outwardDetour) {
+      detours++;
+      assert.equal(d.result.resolved, true);
+      assert.equal(d.chased, true);
+      assert.ok(d.handStep <= 0.75 * d.dt + 1e-6, `frame ${frame}: detour hand step`);
+      const error = Math.hypot(...d.currentHand.map((v, axis) => v - d.rawTarget[axis]));
+      assert.ok(error < previousError, `frame ${frame}: detour must reduce requested-target error`);
+    }
+  }
+  // Regression bounds for these captured gestures, not a claim that all targets
+  // admit a clear trajectory or that discrete checks certify a temporal sweep.
+  assert.equal(held, 0, `recorded baseline held ${fixture.recordedBaseline.held} frames`);
+  assert.equal(maxConsecutive, 0);
+  assert.ok(detours > 100, `${detours} outward detours`);
+  for (let frame = 0; frame < 240; frame++) {
+    d.step(1 / 60); audit(d);
+    assert.ok(d.handStep <= 0.75 / 60 + 0.000065);
+  }
+  assert.equal(d.result.resolved, true);
+  assert.ok(Math.hypot(...d.currentHand.map((v, axis) => v - d.rawTarget[axis])) < 1e-5,
+    'the final target must eventually be reached instead of drifting outward indefinitely');
+  d.step(0); assert.equal(d.outwardDetour, false);
+  d.setPaused(true); assert.equal(d.outwardDetour, false);
+});
+
+test('normal clearance reserve releases all55 reconstructed held contact snapshots without a pole jump', async () => {
+  const fixture = JSON.parse(readFileSync(new URL('./fixtures/constraints-contact-hold-55-20261016.json', import.meta.url), 'utf8'));
+  // The recording lost its earliest history. Recover a bend reference from the
+  // displayed elbow and pole in an isolated copy of the real controller module.
+  // This setup deliberately stays out of the production API; it is not an
+  // assertion that rounded snapshot data reproduces hidden state bit-for-bit.
+  let source = readFileSync(new URL('../examples/kinematics-constraints-controller.js', import.meta.url), 'utf8').replaceAll('\r\n', '\n');
+  const marker = '  configure({});\n  return {';
+  assert.ok(source.includes(marker));
+  source = source.replace('export function createConstraintDemo() {', 'export function createConstraintDemo(snapshot) {');
+  source = source.replace("'../packages/kinematics-constraints/dist/index.js'", JSON.stringify(new URL('../packages/kinematics-constraints/dist/index.js', import.meta.url).href));
+  source = source.replace(marker, `  configure({});
+  root.set(snapshot.root); currentHand.set(snapshot.hand); currentElbow.set(snapshot.elbow);
+  rawTarget.set(snapshot.target); acceptedPole = snapshot.pole;
+  const axis = snapshot.hand.map((v,i)=>v-snapshot.root[i]), axisLength = Math.hypot(...axis);
+  for(let i=0;i<3;i++) bendAxis[i]=axis[i]/axisLength;
+  const radial = snapshot.elbow.map((v,i)=>v-snapshot.root[i]);
+  const along = radial.reduce((sum,v,i)=>sum+v*bendAxis[i],0);
+  for(let i=0;i<3;i++) radial[i]-=along*bendAxis[i];
+  const radius = Math.hypot(...radial);
+  for(let i=0;i<3;i++) radial[i]/=radius;
+  const cross = [bendAxis[1]*radial[2]-bendAxis[2]*radial[1],bendAxis[2]*radial[0]-bendAxis[0]*radial[2],bendAxis[0]*radial[1]-bendAxis[1]*radial[0]];
+  for(let i=0;i<3;i++) bendReference[i]=radial[i]*Math.cos(snapshot.pole)-cross[i]*Math.sin(snapshot.pole);
+  hasBendFrame=true; avoidance.hasPole=true; avoidance.previousPole=snapshot.pole;
+  avoidance.poleArguments.accepted=snapshot.pole;
+  acceptedClearance=measurePose();
+  return {`);
+  const {createConstraintDemo: createSnapshotDemo} = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+  assert.equal(fixture.frames.length, 55);
+  for (const sample of fixture.frames) {
+    const d = createSnapshotDemo({...fixture.initialPose, target: sample.target});
+    const previousError = Math.hypot(...d.currentHand.map((v,axis)=>v-d.rawTarget[axis]));
+    d.step(sample.dt);
+    audit(d);
+    assert.equal(d.result.resolved, true, `frame ${sample.frame}`);
+    assert.equal(d.outwardDetour, true);
+    assert.equal(d.solveCalls, 6, 'first contact-normal waypoint must succeed');
+    assert.equal(d.angleStep, 0, 'the local escape must not need any swivel jump');
+    assert.ok(d.clearance >= 0.008 + 0.00004);
+    assert.ok(d.handStep > 0 && d.handStep <= 0.75 * d.dt + 1e-6);
+    const error = Math.hypot(...d.currentHand.map((v,axis)=>v-d.rawTarget[axis]));
+    assert.ok(previousError-error > 0.009, 'must make useful progress towards the requested target');
+  }
 });
