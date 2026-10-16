@@ -19,7 +19,7 @@ stage.dispose();
 
 Parses glTF skins, joint hierarchies and inverse bind matrices. Samples STEP, LINEAR (quaternion slerp), and CUBICSPLINE tracks. Animation advances in seconds before the engine updates world matrices. A compute pass blends position/normal/tangent morphs before skinning and writes the vertex draw buffer. Bone matrices use read-only storage buffers, bounded by the GPU's storage limits rather than a fixed bone count.
 
-Repeated renders reuse unchanged bone-palette and morph-weight uploads, including zero-delta renders for reflection captures. Every render still validates the inputs and encodes deformation into the same shared vertex buffer.
+Repeated renders reuse unchanged bone-palette and morph-weight uploads through the ordinary same-realm native GPU queue, including zero-delta renders for reflection captures. Custom, replaced or unknown upload methods retain their per-render calls because their copy behavior cannot be inferred from the input arrays. Every render still validates the inputs and encodes deformation into the same shared vertex buffer.
 
 Use `animation.setMorph(nodeIndex, targetIndex, weight)` for manual expressions. Play a clip by name/index; set `loop:false` for one-shot playback. Four influences per vertex are supported; additional influence sets reject explicitly. No blending between clips is included.
 

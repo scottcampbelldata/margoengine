@@ -17,6 +17,12 @@ export interface HeadClearance {
   chestPoints?: ArrayLike<number>;
   /** Additional posed-joint clearance in authored units, without changing the scene. */
   rotationClearance?: (rotation: readonly number[], out: Float64Array) => void;
+  /**
+   * Explicit demo-owned commit for this controller's reused normal-array rotations.
+   * Must synchronously validate and write the head quaternion and Euler state;
+   * must not mutate the rotation. Omit to call the current public Mesh setter.
+   */
+  writeRotation?: (rotation: readonly number[]) => void;
 }
 
 function point(value: Vec3, out?: Point): void {
@@ -76,6 +82,7 @@ export class HeadAim {
   private readonly cowlingMinY: number;
   private readonly chestPoints?: Float64Array;
   private readonly rotationClearance?: HeadClearance['rotationClearance'];
+  private readonly writeRotation?: HeadClearance['writeRotation'];
   private readonly clearanceRotation: Rotation = [0, 0, 0, 1];
   private readonly rotationDistance = new Float64Array(1);
   // Private handoffs: candidate angle, three scalar inputs, and scalar result.
@@ -121,6 +128,10 @@ export class HeadAim {
     this.radius = 0;
     this.cowlingMinY = 0;
     if (clearance) {
+      const writer = clearance.writeRotation;
+      if (writer !== undefined && typeof writer !== 'function')
+        throw new RangeError('Invalid head rotation writer');
+      this.writeRotation = writer;
       if (clearance.rotationClearance !== undefined && typeof clearance.rotationClearance !== 'function')
         throw new RangeError('Invalid head joint clearance callback');
       this.rotationClearance = clearance.rotationClearance;
@@ -615,7 +626,8 @@ export class HeadAim {
       !Object.is(euler[1], this.committedEuler[1]) ||
       !Object.is(euler[2], this.committedEuler[2])
     ) {
-      this.head.setQuaternion(rotation);
+      if (this.writeRotation) this.writeRotation(rotation);
+      else this.head.setQuaternion(rotation);
       for (let i = 0; i < 4; i++) this.previous[i] = rotation[i];
       this.committed[0] = t.qx[id];
       this.committed[1] = t.qy[id];

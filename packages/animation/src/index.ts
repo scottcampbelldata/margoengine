@@ -5,6 +5,7 @@ import { invertMatrixStable } from '@margoengine/math/mat4';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 import { sampleTrackInto, type Interpolation } from './sampling.js';
 import { deformationShader } from './shader.js';
+import { ordinaryWeightBuffer } from './weight-buffer.js';
 export { sampleTrack, sampleTrackInto, multiplyMatrices, type Interpolation } from './sampling.js';
 declare const GPUBufferUsage: { STORAGE: number; VERTEX: number; COPY_DST: number; COPY_SRC: number; UNIFORM: number };
 interface Track {
@@ -35,6 +36,9 @@ interface Deformation {
   uploadedWeights: Float32Array;
   bonesUploaded: boolean;
   weightsUploaded: boolean;
+  bonesQueue?: GPUQueue;
+  weightsQueue?: GPUQueue;
+  uploadArgs: [GPUBuffer, number, Float32Array<ArrayBuffer>];
   joints: number[];
   inverseBind: Float32Array[];
 }
@@ -43,6 +47,57 @@ export interface AnimationOptions {
   speed?: number;
 }
 const identity = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+// Only the ordinary same-realm native method has synchronous copy semantics
+// known here. Custom writers may change inputs during the copy and restore
+// them before returning, so comparing the input afterward cannot certify it.
+function captureNativeQueue(): { prototype: object; writer: GPUQueue['writeBuffer'] } | undefined {
+  try {
+    const constructor = globalThis.GPUQueue,
+      prototype = typeof constructor === 'function' ? constructor.prototype : undefined,
+      writer = prototype && Object.getOwnPropertyDescriptor(prototype, 'writeBuffer')?.value;
+    // A conservative host filter, not a security boundary for replaced intrinsics.
+    if (
+      prototype &&
+      typeof writer === 'function' &&
+      /^function writeBuffer\(\)\s*\{\s*\[native code\]\s*\}$/.test(Function.prototype.toString.call(writer))
+    )
+      return { prototype, writer };
+  } catch {
+    // Unknown host implementations keep the original unconditional upload path.
+  }
+}
+const nativeQueue = /* @__PURE__ */ captureNativeQueue();
+const lookupQueueGetter = Reflect.get(Object.prototype, '__lookupGetter__') as (
+  this: object,
+  property: string,
+) => unknown;
+function reusableWriter(queue: GPUQueue, writer: GPUQueue['writeBuffer']): boolean {
+  return (
+    !!nativeQueue &&
+    writer === nativeQueue.writer &&
+    Object.getPrototypeOf(queue) === nativeQueue.prototype &&
+    !Object.hasOwn(queue, 'writeBuffer') &&
+    typeof lookupQueueGetter === 'function' &&
+    lookupQueueGetter.call(queue, 'writeBuffer') === undefined
+  );
+}
+function writeInput(
+  queue: GPUQueue,
+  writer: GPUQueue['writeBuffer'],
+  r: Deformation,
+  buffer: GPUBuffer,
+  values: Float32Array<ArrayBuffer>,
+): void {
+  const args = r.uploadArgs;
+  args[0] = buffer;
+  args[2] = values;
+  try {
+    Reflect.apply(writer, queue, args);
+  } finally {
+    // A caller-owned morph view need not stay retained between renders.
+    args[2] = undefined!;
+  }
+}
 export class Animation implements EnginePlugin {
   readonly name: string;
   readonly clips: readonly Clip[];
@@ -234,6 +289,7 @@ export class Animation implements EnginePlugin {
           uploadedWeights: new Float32Array(p.weights.length),
           bonesUploaded: false,
           weightsUploaded: false,
+          uploadArgs: [undefined!, 0, undefined!],
           joints: [],
           inverseBind: [],
         };
@@ -374,34 +430,58 @@ export class Animation implements EnginePlugin {
         }
         for (let i = 0; i < r.palette.length; i++)
           if (!Number.isFinite(r.palette[i])) throw new RangeError('Skin matrix overflow');
-        let changed = !r.bonesUploaded;
+        const queue = context.device.queue,
+          writer = queue.writeBuffer,
+          reusable = reusableWriter(queue, writer);
+        let changed = !reusable || !r.bonesUploaded || r.bonesQueue !== queue;
         for (let i = 0; i < r.paletteBits.length; i++) if (r.paletteBits[i] !== r.uploadedPalette[i]) changed = true;
         if (changed) {
-          context.device.queue.writeBuffer(r.bones, 0, r.palette as Float32Array<ArrayBuffer>);
-          r.uploadedPalette.set(r.paletteBits);
-          r.bonesUploaded = true;
+          let uploaded = false;
+          r.bonesUploaded = false;
+          try {
+            writeInput(queue, writer, r, r.bones, r.palette as Float32Array<ArrayBuffer>);
+            if (reusable) {
+              r.uploadedPalette.set(r.paletteBits);
+              r.bonesQueue = queue;
+              uploaded = true;
+            }
+          } finally {
+            // A custom writer can reenter deformation; its outer call must not
+            // inherit an inner call's certification of this shared buffer.
+            r.bonesUploaded = uploaded;
+          }
         }
       }
       if (r.primitive.weights.length) {
-        const values = r.primitive.weights;
+        const values = r.primitive.weights,
+          queue = context.device.queue,
+          writer = queue.writeBuffer,
+          reusable = reusableWriter(queue, writer);
         if (
+          !reusable ||
           !(values instanceof Float32Array) ||
-          !(values.buffer instanceof ArrayBuffer) ||
+          !ordinaryWeightBuffer(values) ||
           values.length !== r.uploadedWeights.length
         ) {
           // Preserve native writeBuffer validation and partial-write behavior
           // when callers replace a weight view with a different shape or type.
           // Shared memory can change while native writeBuffer copies its input.
           r.weightsUploaded = false;
-          context.device.queue.writeBuffer(r.weights, 0, values as Float32Array<ArrayBuffer>);
+          try {
+            writeInput(queue, writer, r, r.weights, values as Float32Array<ArrayBuffer>);
+          } finally {
+            r.weightsUploaded = false;
+          }
         } else {
-          let changed = !r.weightsUploaded;
+          let changed = !r.weightsUploaded || r.weightsQueue !== queue;
           for (let i = 0; i < values.length; i++)
             // Finite Float32 values differ in bits exactly when SameValue differs.
             if (!Object.is(values[i], r.uploadedWeights[i])) changed = true;
           if (changed) {
-            context.device.queue.writeBuffer(r.weights, 0, values as Float32Array<ArrayBuffer>);
+            r.weightsUploaded = false;
+            writeInput(queue, writer, r, r.weights, values as Float32Array<ArrayBuffer>);
             r.uploadedWeights.set(values);
+            r.weightsQueue = queue;
             r.weightsUploaded = true;
           }
         }

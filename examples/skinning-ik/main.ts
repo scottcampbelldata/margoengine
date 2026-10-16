@@ -17,6 +17,7 @@ import { worldPosition, worldPositionInto, localPoint, gripPosition, holdObjectA
 import { attachWorkshopStats } from './performance-hud';
 import { BodyIK, type BodyIKResult } from './body-ik';
 import { HeadAim } from './head-aim';
+import { RigScratch } from './rig-scratch';
 import { ArmHeadClearance } from './arm-head-clearance';
 import { cowlingHull } from './head-aim-shape';
 import { TorsoAim } from './torso-aim';
@@ -155,6 +156,7 @@ try {
   teardown.push(() => torsoAim.dispose());
   const armHeadClearance = new ArmHeadClearance(torsoAim.frame, head, shoulder, elbow);
   const opticalLocal = localPoint(head, gripPosition(meshRuntime(model.root), [0, 1.34, -0.232]));
+  const headRotation = new RigScratch();
   const headAim = new HeadAim(head, opticalLocal, 1.3, {
     min: [-0.194, -0.039, -0.236],
     max: [0.194, 0.307, 0.134],
@@ -163,6 +165,7 @@ try {
     chestFloor: -0.032,
     chestPoints: cowlingHull,
     rotationClearance: (rotation, out) => armHeadClearance.evaluate(rotation, out),
+    writeRotation: (rotation) => headRotation.setQuaternion(head, rotation),
   });
   const bodyIK = new BodyIK({
     frame: torsoAim.frame,
