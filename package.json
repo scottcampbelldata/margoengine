@@ -134,7 +134,8 @@
     "release:check": "npm run test:all && npm run measure:size && npm run test:modules:packages && npm run modern:test:postfx:packages",
     "publish:packages": "npm run release:check && npm publish --workspace packages --ignore-scripts --access public",
     "catalog:build": "node scripts/build-catalog.js",
-    "build:site": "npm run catalog:build && node scripts/build-site.js"
+    "build:site": "npm run catalog:build && node scripts/build-site.js",
+    "modern:test:gltf-compression": "node scripts/gltf-compression-browser-tests.js"
   },
   "devDependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",

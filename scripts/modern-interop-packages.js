@@ -5,7 +5,7 @@ import {resolve,join} from 'node:path';
 const npm=process.env.npm_execpath;assert.ok(npm,'Run through npm run modern:test:interop:packages');
 const archives=resolve('test-results/interop-packages');await mkdir(archives,{recursive:true});
 const fixture=await mkdtemp(resolve('test-results/interop-consumer-'));
-const names=['core','geometry','gltf-pro','blender','loaders','exporters','ifc','xr','usdz'],dependencies={'web-ifc':'0.0.78'};
+const names=['core','geometry','decoders','gltf-pro','blender','loaders','exporters','ifc','xr','usdz'],dependencies={'web-ifc':'0.0.78'};
 for(const name of names) {
   const [pack]=JSON.parse(execFileSync(process.execPath,[npm,'pack','--workspace',`@margoengine/${name}`,'--ignore-scripts','--pack-destination',archives,'--json'],{encoding:'utf8'}));
   const files=new Set(pack.files.map(file=>file.path));for(const file of ['dist/index.js','dist/index.d.ts','README.md','LICENSE'])assert.ok(files.has(file),`${name}: missing ${file}`);

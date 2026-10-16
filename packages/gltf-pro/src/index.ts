@@ -6,8 +6,10 @@ import {Cleanup} from '../../shared/cleanup.js';
 import {GLTFAsset, container, loadAsset, entry, integer, assetLimit} from './asset.js';
 import {pbrShader} from './shader.js';
 import {mipShader} from './mip.js';
+import {compressedIndices, decompressPrimitives, type GLTFLoadOptions} from './compression.js';
 export {GLTFAsset} from './asset.js';
 export type {GLTFDocument} from './asset.js';
+export type {GLTFLoadOptions} from './compression.js';
 declare const GPUBufferUsage: {UNIFORM:number;STORAGE:number;VERTEX:number;INDEX:number;COPY_DST:number};
 declare const GPUTextureUsage: {TEXTURE_BINDING:number;COPY_DST:number;RENDER_ATTACHMENT:number};
 type Context = Extract<PassContext,{backend:'webgpu'}>;
@@ -54,13 +56,14 @@ function material(def:any = {}): any {
     maps:[p.baseColorTexture,p.metallicRoughnessTexture,def.normalTexture,def.occlusionTexture,def.emissiveTexture]};
 }
 function primitive(asset:GLTFAsset, p:any, node:Mesh, nodeIndex:number, mesh:any, materials:any[]):PBRPrimitive {
-  if ((p.mode??4)!==4 || p.extensions?.KHR_draco_mesh_compression) throw new Error('PBR requires uncompressed triangle primitives');
+  if ((p.mode??4)!==4) throw new Error('PBR requires triangle primitives');
+  const dracoIndices=compressedIndices(asset,p);
   const a=p.attributes??{}, positions=asset.accessor(a.POSITION,'VEC3'), count=positions.length/3;
   if(count<3)throw new RangeError('Expected bounded triangle geometry');
   for(const key of ['POSITION','NORMAL','TANGENT'])if(a[key]!==undefined){const def=entry(asset.doc.accessors,a[key],'attribute');if(def.componentType!==5126||def.normalized)throw new TypeError('Expected Float32 '+key);}
   for(const key of ['TEXCOORD_0','TEXCOORD_1','COLOR_0'])if(a[key]!==undefined){const def=entry(asset.doc.accessors,a[key],'attribute');if(![5126,5121,5123].includes(def.componentType)||def.componentType!==5126&&!def.normalized)throw new TypeError('Invalid normalized '+key);}
   let normals=a.NORMAL===undefined?new Float32Array(positions.length):asset.accessor(a.NORMAL,'VEC3');
-  const indexValues=p.indices===undefined?null:asset.accessor(p.indices,'SCALAR');
+  const indexValues=dracoIndices??(p.indices===undefined?null:asset.accessor(p.indices,'SCALAR'));
   if(indexValues?.some(i=>!Number.isInteger(i)||i<0||i>=count))throw new RangeError('Invalid glTF triangle indices');
   const indices=indexValues?Uint32Array.from(indexValues):Uint32Array.from({length:count},(_,i)=>i);
   if (!indices.length||indices.length%3||indices.some(i=>i>=count)) throw new RangeError('Invalid glTF triangle indices');
@@ -289,8 +292,16 @@ export function parsePreparedPBR(instance:EngineKernel,doc:GLTFAsset['doc'],geom
   const model=new PBRModel(instance,new GLTFAsset(doc,[]),images,geometry);
   try{engineRuntime(instance).use(model);return model;}catch(error){model.dispose();throw error;}
 }
-export async function loadGLTF(instance:EngineKernel,url:string|URL,{signal}:{signal?:AbortSignal}={}):Promise<PBRModel> {
-  const {asset,images}=await loadAsset(url,signal);let model:PBRModel|undefined;
+export async function parseGLTFAsync(instance:EngineKernel,input:string|object|ArrayBuffer|ArrayBufferView,buffers:Array<ArrayBuffer|ArrayBufferView>=[],images:readonly ImageBitmap[]=[],options:GLTFLoadOptions={}):Promise<PBRModel> {
+  options.signal?.throwIfAborted();
+  const {doc,binary}=container(input),asset=new GLTFAsset(doc,buffers,binary);
+  await decompressPrimitives(asset,options);
+  options.signal?.throwIfAborted();
+  const model=new PBRModel(instance,asset,images);
+  try{engineRuntime(instance).use(model);return model;}catch(error){model.dispose();throw error;}
+}
+export async function loadGLTF(instance:EngineKernel,url:string|URL,options:GLTFLoadOptions={}):Promise<PBRModel> {
+  const {signal}=options,{asset,images}=await loadAsset(url,signal,asset=>decompressPrimitives(asset,options));let model:PBRModel|undefined;
   try {signal?.throwIfAborted();model=new PBRModel(instance,asset,images);engineRuntime(instance).use(model);return model;}
   catch(error){if(model)model.dispose();else for(const image of images)image.close();throw error;}
 }

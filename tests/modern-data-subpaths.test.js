@@ -9,8 +9,8 @@ async function nativeClosure(specifier){
   const code=await readFile(new URL(url),'utf8');sources.push(code);
   for(const match of code.matchAll(/(?:\bfrom\s*|\bimport\s*)(['"])([^'"]+)\1/g)){
    const dependency=match[2];
-   assert.ok(dependency.startsWith('.'),'Data import unexpectedly requires a runtime package: '+dependency);
-   await visit(new URL(dependency,url).href);
+   assert.ok(dependency.startsWith('.')||dependency==='@margoengine/decoders/meshopt','Unexpected data dependency: '+dependency);
+   await visit(dependency.startsWith('.')?new URL(dependency,url).href:import.meta.resolve(dependency));
   }
  };
  await visit(import.meta.resolve(specifier));return sources.join('\n');

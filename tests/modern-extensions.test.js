@@ -14,7 +14,7 @@ test('glTF accessors enforce bounds, decode normalized data, and apply sparse de
   const asset=new GLTFAsset(doc,[bytes]);assert.deepEqual([...asset.accessor(1)],[0,255,0]);assert.ok(Math.abs(asset.accessor(0)[1]-127/255)<1e-7);
   doc.accessors[0].count=4;assert.throws(()=>new GLTFAsset(doc,[bytes]).accessor(0),/bounds/);
   doc.accessors[0].count=3;doc.bufferViews[1].byteStride=4;assert.throws(()=>new GLTFAsset(doc,[bytes]).accessor(1),/stride/);delete doc.bufferViews[1].byteStride;
-  doc.extensionsRequired=['KHR_draco_mesh_compression'];assert.throws(()=>new GLTFAsset(doc,[bytes]),/Required/);
+  doc.extensionsRequired=['UNKNOWN_required_extension'];assert.throws(()=>new GLTFAsset(doc,[bytes]),/Required/);
 });
 test('animation handles endpoint clamps, step, cubic tangents, and antipodal quaternions',()=>{
   const times=new Float32Array([0,1]),values=new Float32Array([0,2]);

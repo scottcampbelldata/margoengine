@@ -46,9 +46,20 @@ draco.dispose(); ktx2.dispose();
 
 `decode` and `transcode` also accept an `AbortSignal` as `signal`. The decoders evaluate the Emscripten wrappers inside the worker, so a strict Content Security Policy needs `'unsafe-eval'` in `worker-src`/`script-src` for the worker.
 
+Draco `decode` accepts `limits: {maxVertices, maxIndices, maxDecodedBytes, attributeWidths}`.
+Limits are validated before copying/transferring the input and are enforced again in
+the worker. All requested attribute widths, the actual vertex/index counts and the
+combined output size must pass before any output `_malloc`, attribute extraction,
+or typed-array copy. Defaults cap vertices at 16,777,216 and combined output at
+256 MiB; caller limits may lower these ceilings. `attributeWidths` maps requested
+semantics to their expected component counts. Limits include final Float32 storage
+for named channels. Draco's internal Wasm geometry decode still allocates before
+its actual counts are available; these are output extraction limits, not a cap on
+the decoder's internal Wasm heap.
+
 ## Limits
 
-KTX2 cube maps, texture arrays and HDR (UASTC HDR) files are rejected. Draco point clouds return no `indices`. The glTF loaders do not call these decoders yet; until they accept `draco` and `ktx2` hooks (`GLTFDecoderHooks`), use the decoders directly.
+KTX2 cube maps, texture arrays and HDR (UASTC HDR) files are rejected. Draco point clouds return no `indices`. `@margoengine/gltf-pro` automatically uses Draco and meshopt through `loadGLTF` and `parseGLTFAsync`; its synchronous parser also supports meshopt. These loaders accept an optional reusable `draco` hook. KTX2 remains a standalone decoder and is not wired into glTF texture loading. The basic `@margoengine/gltf` loader is unchanged.
 
 ## Tests
 
