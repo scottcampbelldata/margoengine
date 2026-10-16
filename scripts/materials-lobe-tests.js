@@ -11,7 +11,8 @@ export async function lobeBrowserChecks(page){
   const transform={offset:[0.61,0.17],rotation:0.37,scale:[0.59,0.73],texCoord:1},actual=textureQuad('base',transform),reference=textureQuad('base',transform,{bake:true});
   for(const value of [actual,reference])delete value.doc.materials[0].pbrMetallicRoughness.baseColorTexture;
   const serialize=value=>({doc:value.doc,buffers:value.buffers.map(buffer=>[...new Uint8Array(buffer.buffer,buffer.byteOffset,buffer.byteLength)])});
-  const filmSource=await readFile(new URL('../packages/materials/src/iridescence.ts',import.meta.url),'utf8');
+  // Template literals use LF at runtime, including when Git checks TypeScript out with CRLF.
+  const filmSource=(await readFile(new URL('../packages/materials/src/iridescence.ts',import.meta.url),'utf8')).replaceAll('\r\n','\n');
   const filmWGSL=/export const iridescenceWGSL=\/\* wgsl \*\/`([\s\S]*?)`;/.exec(filmSource)?.[1];assert.ok(filmWGSL,'Missing tested thin-film WGSL');
   const float=value=>{const text=String(Math.fround(value));return /[.eE]/.test(text)?text:text+'.0';};
   const filmProgram=iridescenceCases.map((value,index)=>`case ${index}u:{results[${index}]=vec4f(materialIridescenceFresnel(${float(value.cosTheta)},${float(value.outsideIor??1)},${float(value.filmIor)},${float(value.thicknessNm)},vec3f(${value.baseF0.map(float).join(',')})),1.0);}`).join('\n');
