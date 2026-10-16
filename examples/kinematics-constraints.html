@@ -248,11 +248,12 @@
         const held = paused || (chain ? !lastResult.resolved : !target.resolved);
         status.textContent = paused ? 'Paused · pose held' : !chain
           ? target.resolved ? 'Target projection accepted' : 'Target projection unresolved'
-          : controller.chased ? 'Following safe local step · request limited' : controller.clampActive && lastResult.resolved ? 'Sliding at obstacle clearance' : controller.paced && lastResult.resolved ? 'Following paced target' : names[displayStatus] ?? 'Pose held';
+          : controller.outwardDetour ? 'Sliding around contact · safe detour' : controller.chased ? 'Following safe local step · request limited' : controller.clampActive && lastResult.resolved ? 'Sliding at obstacle clearance' : controller.paced && lastResult.resolved ? 'Following paced target' : names[displayStatus] ?? 'Pose held';
         status.dataset.held = String(held); status.dataset.state = controller.state;
         const windowDegrees = Math.min(Math.PI, solveOptions.swivelSpeedLimit * controller.dt) * 180 / Math.PI;
         detail.textContent = paused ? 'Dragging still moves the orange request. Resume to evaluate constraints.' : !chain
           ? 'Only the green target sphere is checked. Reach, elbow, links and swivel are not evaluated.'
+          : controller.outwardDetour ? 'A straight approach crossed the link clearance boundary. A bounded tangent step with an outward contact-normal reserve passed the full-chain checks and the same swivel window.'
           : controller.chased ? 'The solve request was rejected. A smaller, independently validated step was accepted; this is demo controller recovery.'
           : displayStatus === 1 ? 'A clear sampled pose is outside ±' + windowDegrees.toFixed(2) + '°. Exact overshoot is not exposed by the package.'
           : controller.paced && lastResult.resolved ? 'The demo paces large target changes before solving. Every accepted shoulder and link capsule is still checked.'

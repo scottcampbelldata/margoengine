@@ -415,7 +415,7 @@ try {
   await app.page.locator('#yaw-assist').uncheck();
   await app.page.locator('#reset').click();
   await app.page.locator('summary').first().click();
-  await app.page.locator('#recording-panel summary').click();
+  await app.page.locator('#recording-panel > summary').click();
   await app.page.locator('#record-start').click();
   assert.equal(await app.page.locator('#recording-indicator').isVisible(), true);
   await app.page.locator('canvas').focus(); await app.page.keyboard.press('ArrowLeft');
@@ -430,7 +430,7 @@ try {
   assert.equal(await app.page.locator('#recording-indicator').isVisible(), false);
   assert.equal(await app.page.locator('#record-download').isEnabled(), true);
   await app.page.locator('#record-clear').click(); assert.equal(await app.page.locator('#interaction-recording-data').inputValue(),'');
-  await app.page.locator('#recording-panel summary').click();
+  await app.page.locator('#recording-panel > summary').click();
   await app.page.screenshot({path: 'test-results/kinematics-constraints-demo.png', fullPage: true});
   await app.page.setViewportSize({width: 390, height: 844});
   assert.equal(await app.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
