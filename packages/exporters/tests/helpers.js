@@ -33,7 +33,7 @@ export function readGLB(bytes) {
   return {json, bin, jsonLength};
 }
 
-const sizes = {SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4};
+const sizes = {SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16};
 export function accessor(json, bin, index) {
   const a = json.accessors[index], v = json.bufferViews[a.bufferView], n = a.count*sizes[a.type];
   const at = bin.byteOffset+(v.byteOffset ?? 0)+(a.byteOffset ?? 0);
