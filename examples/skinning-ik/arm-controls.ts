@@ -14,7 +14,7 @@ const tracks: Record<ArmControl, readonly Knot[]> = {
     [0.88, 0.12, 1.16, -0.42],
     // The torso assist turns the shoulder and its collision frame together
     // for this opposite-edge reach; the bone lengths remain unchanged.
-    [1, 0.235, 1.16, -0.3],
+    [1, 0.235, 1.16, -0.32],
   ],
   height: [
     [0, -0.36, 0.66, -0.02],

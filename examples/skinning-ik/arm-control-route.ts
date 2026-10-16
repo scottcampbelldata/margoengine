@@ -76,13 +76,16 @@ export class ArmControlRoute {
   }
 
   /** Advance only on a real solve, after the accepted orb reaches the waypoint. */
-  update(accepted: ArrayLike<number>, dt: number): Point {
+  update(accepted: ArrayLike<number>, dt: number, reachedTarget: ArrayLike<number> = this.position): Point {
     scenePoint(accepted);
+    scenePoint(reachedTarget);
     if (!Number.isFinite(dt) || dt < 0) throw new RangeError('Arm route dt must be finite and nonnegative');
     if (!this.active || dt === 0) return this.position;
-    const dx = accepted[0] - this.position[0],
-      dy = accepted[1] - this.position[1],
-      dz = accepted[2] - this.position[2];
+    // A demo workspace conditioner may move a raw waypoint. Measure arrival
+    // against that conditioned point without replacing the authored route.
+    const dx = accepted[0] - reachedTarget[0],
+      dy = accepted[1] - reachedTarget[1],
+      dz = accepted[2] - reachedTarget[2];
     this.settled = false;
     if (dx * dx + dy * dy + dz * dz <= 0.002 * 0.002) {
       if (this.cursor < this.count - 1) {
