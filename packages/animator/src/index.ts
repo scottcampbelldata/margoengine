@@ -58,6 +58,29 @@ const clone = (p: Pose): Pose => {
     weights,
   };
 };
+const copyVectors = (source: number[][], out: number[][]): void => {
+  out.length = source.length;
+  for (let i = 0; i < source.length; i++) {
+    const values = source[i];
+    if (!out[i] || out[i].length !== values.length) out[i] = values.slice();
+    else for (let j = 0; j < values.length; j++) out[i][j] = values[j];
+  }
+};
+const copyPose = (source: Pose, out: Pose, weightNodes: readonly number[]): Pose => {
+  copyVectors(source.position, out.position);
+  copyVectors(source.rotation, out.rotation);
+  copyVectors(source.scale, out.scale);
+  if (out.weights.size !== source.weights.size)
+    for (const id of out.weights.keys()) if (!source.weights.has(id)) out.weights.delete(id);
+  for (let i = 0; i < weightNodes.length; i++) {
+    const id = weightNodes[i],
+      values = source.weights.get(id)!;
+    const own = out.weights.get(id);
+    if (own?.length === values.length) own.set(values);
+    else out.weights.set(id, values.slice());
+  }
+  return out;
+};
 export class Animator implements EnginePlugin {
   readonly name: string;
   readonly parameters: Record<string, number>;
@@ -66,6 +89,9 @@ export class Animator implements EnginePlugin {
   private engine?: Engine;
   private readonly rest: Pose;
   private current: Pose;
+  private readonly singlePose: Pose;
+  private readonly weightNodes: number[];
+  private readonly applied: Float64Array[];
   private fade?: { pose: Pose; elapsed: number; duration: number };
   private layers = new Set<AdditiveLayer>();
   private readonly scratch = new Map<number, Float32Array>();
@@ -119,6 +145,9 @@ export class Animator implements EnginePlugin {
       weights: new Map(animation.model.primitives.map((p) => [p.nodeIndex, p.weights.slice()])),
     };
     this.current = clone(this.rest);
+    this.singlePose = clone(this.rest);
+    this.weightNodes = [...this.rest.weights.keys()];
+    this.applied = nodes.map(() => new Float64Array(26).fill(NaN));
     this.previousPlaying = animation.playing;
   }
   static attach(animation: Animation, options: AnimatorOptions): Animator {
@@ -127,9 +156,9 @@ export class Animator implements EnginePlugin {
     return animator;
   }
   private clip(name: string) {
-    const clip = this.animation.clips.find((c) => c.name === name);
-    if (!clip) throw new RangeError('Unknown animator clip: ' + name);
-    return clip;
+    const clips = this.animation.clips;
+    for (let i = 0; i < clips.length; i++) if (clips[i].name === name) return clips[i];
+    throw new RangeError('Unknown animator clip: ' + name);
   }
   transition(state: string, duration = 0.15): this {
     if (this.disposed || !Object.hasOwn(this.options.states, state) || !Number.isFinite(duration) || duration < 0)
@@ -199,39 +228,47 @@ export class Animator implements EnginePlugin {
     this.animation.playing = false;
     for (const v of Object.values(this.parameters))
       if (!Number.isFinite(v)) throw new RangeError('Invalid blend parameter');
-    for (const t of this.options.transitions ?? [])
-      if (t.from === this.state && t.when(this.parameters)) {
-        this.transition(t.to, t.duration);
-        break;
-      }
+    const transitions = this.options.transitions;
+    if (transitions)
+      for (const t of transitions)
+        if (t.from === this.state && t.when(this.parameters)) {
+          this.transition(t.to, t.duration);
+          break;
+        }
     this.time += delta;
     const tree = this.options.states[this.state];
-    let clips: string[], weights: Float32Array;
-    if (typeof tree === 'string') {
-      clips = [tree];
-      weights = new Float32Array([1]);
-    } else if ('parameter' in tree) {
-      clips = tree.samples.map((s) => s.clip);
-      weights = blend1D(
-        tree.samples.map((s) => s.value),
-        this.parameters[tree.parameter] ?? 0,
-      );
+    let pose: Pose | undefined;
+    // One unlayered clip needs one owned pose, not a deep clone of every node
+    // on every frame. Transition snapshots remain independent clones.
+    if (typeof tree === 'string' && !this.fade && this.layers.size === 0) {
+      pose = this.sample(tree, this.time, true, this.singlePose);
     } else {
-      clips = tree.samples.map((s) => s.clip);
-      weights = blend2D(
-        tree.samples.map((s) => s.value),
-        this.parameters[tree.parameters[0]] ?? 0,
-        this.parameters[tree.parameters[1]] ?? 0,
-      );
-    }
-    let pose: Pose | undefined,
-      total = 0;
-    for (let i = 0; i < clips.length; i++)
-      if (weights[i] > 0) {
-        const sampled = this.sample(clips[i], this.time);
-        total += weights[i];
-        pose = pose ? this.mix(pose, sampled, weights[i] / total) : sampled;
+      let clips: string[], weights: Float32Array;
+      if (typeof tree === 'string') {
+        clips = [tree];
+        weights = new Float32Array([1]);
+      } else if ('parameter' in tree) {
+        clips = tree.samples.map((s) => s.clip);
+        weights = blend1D(
+          tree.samples.map((s) => s.value),
+          this.parameters[tree.parameter] ?? 0,
+        );
+      } else {
+        clips = tree.samples.map((s) => s.clip);
+        weights = blend2D(
+          tree.samples.map((s) => s.value),
+          this.parameters[tree.parameters[0]] ?? 0,
+          this.parameters[tree.parameters[1]] ?? 0,
+        );
       }
+      let total = 0;
+      for (let i = 0; i < clips.length; i++)
+        if (weights[i] > 0) {
+          const sampled = this.sample(clips[i], this.time);
+          total += weights[i];
+          pose = pose ? this.mix(pose, sampled, weights[i] / total) : sampled;
+        }
+    }
     if (!pose) pose = clone(this.rest);
     if (this.fade) {
       const f = this.fade;
@@ -239,53 +276,127 @@ export class Animator implements EnginePlugin {
       pose = this.mix(clone(f.pose), pose, Math.min(1, f.elapsed / f.duration));
       if (f.elapsed >= f.duration) this.fade = undefined;
     }
-    for (const layer of this.layers) {
-      this.validateLayer(layer);
-      const sample = this.sample(layer.clip, this.time),
-        reference = this.sample(layer.clip, layer.referenceTime ?? 0, false);
-      for (const i of layer.mask) {
-        for (let c = 0; c < 3; c++) {
-          pose.position[i][c] += (sample.position[i][c] - reference.position[i][c]) * layer.weight;
-          pose.scale[i][c] *= 1 + (sample.scale[i][c] / reference.scale[i][c] - 1) * layer.weight;
+    if (this.layers.size)
+      for (const layer of this.layers) {
+        this.validateLayer(layer);
+        const sample = this.sample(layer.clip, this.time),
+          reference = this.sample(layer.clip, layer.referenceTime ?? 0, false);
+        for (const i of layer.mask) {
+          for (let c = 0; c < 3; c++) {
+            pose.position[i][c] += (sample.position[i][c] - reference.position[i][c]) * layer.weight;
+            pose.scale[i][c] *= 1 + (sample.scale[i][c] / reference.scale[i][c] - 1) * layer.weight;
+          }
+          const weights = pose.weights.get(i),
+            sampleWeights = sample.weights.get(i),
+            referenceWeights = reference.weights.get(i);
+          if (weights && sampleWeights && referenceWeights)
+            for (let j = 0; j < weights.length; j++)
+              weights[j] += (sampleWeights[j] - referenceWeights[j]) * layer.weight;
+          const inverse = [
+              -reference.rotation[i][0],
+              -reference.rotation[i][1],
+              -reference.rotation[i][2],
+              reference.rotation[i][3],
+            ],
+            difference = quaternionMultiply(inverse, sample.rotation[i]);
+          pose.rotation[i] = quaternionMultiply(
+            pose.rotation[i],
+            quaternionBlend([0, 0, 0, 1], difference, layer.weight),
+          );
         }
-        const weights = pose.weights.get(i),
-          sampleWeights = sample.weights.get(i),
-          referenceWeights = reference.weights.get(i);
-        if (weights && sampleWeights && referenceWeights)
-          for (let j = 0; j < weights.length; j++)
-            weights[j] += (sampleWeights[j] - referenceWeights[j]) * layer.weight;
-        const inverse = [
-            -reference.rotation[i][0],
-            -reference.rotation[i][1],
-            -reference.rotation[i][2],
-            reference.rotation[i][3],
-          ],
-          difference = quaternionMultiply(inverse, sample.rotation[i]);
-        pose.rotation[i] = quaternionMultiply(
-          pose.rotation[i],
-          quaternionBlend([0, 0, 0, 1], difference, layer.weight),
-        );
       }
-    }
     this.current = pose;
     const nodes = this.animation.model.nodes;
-    for (let i = 0; i < nodes.length; i++)
-      nodes[i]
-        .setPosition(pose.position[i] as [number, number, number])
-        .setScale(pose.scale[i] as [number, number, number])
-        .setQuaternion(pose.rotation[i]);
-    for (const p of this.animation.model.primitives) {
+    for (let i = 0; i < nodes.length; i++) this.applyNode(nodes[i], pose, i);
+    const primitives = this.animation.model.primitives;
+    for (let i = 0; i < primitives.length; i++) {
+      const p = primitives[i];
       const weights = pose.weights.get(p.nodeIndex);
       if (weights) p.weights.set(weights);
     }
-    for (const foot of this.feet) this.foot(foot);
+    if (this.feet.size) for (const foot of this.feet) this.foot(foot);
   }
-  private sample(name: string, time: number, loop = true): Pose {
+  // Compare both the requested values and the exact stored result. External
+  // edits (including Euler rotations and store growth) still force restoration;
+  // unchanged static nodes need no repeated normalization or setter temporaries.
+  private applyNode(node: Mesh, pose: Pose, index: number): void {
+    node.check();
+    const t = node.engine.store.transforms,
+      id = node.id,
+      cache = this.applied[index],
+      p = pose.position[index],
+      s = pose.scale[index],
+      q = pose.rotation[index],
+      e = node.euler;
+    if (
+      p.length !== 3 ||
+      p[0] !== cache[0] ||
+      p[1] !== cache[1] ||
+      p[2] !== cache[2] ||
+      t.x[id] !== cache[13] ||
+      t.y[id] !== cache[14] ||
+      t.z[id] !== cache[15]
+    ) {
+      node.setPosition(p as [number, number, number]);
+      cache[0] = p[0];
+      cache[1] = p[1];
+      cache[2] = p[2];
+      cache[13] = t.x[id];
+      cache[14] = t.y[id];
+      cache[15] = t.z[id];
+    }
+    if (
+      s.length !== 3 ||
+      s[0] !== cache[3] ||
+      s[1] !== cache[4] ||
+      s[2] !== cache[5] ||
+      t.sx[id] !== cache[16] ||
+      t.sy[id] !== cache[17] ||
+      t.sz[id] !== cache[18]
+    ) {
+      node.setScale(s as [number, number, number]);
+      cache[3] = s[0];
+      cache[4] = s[1];
+      cache[5] = s[2];
+      cache[16] = t.sx[id];
+      cache[17] = t.sy[id];
+      cache[18] = t.sz[id];
+    }
+    if (
+      q.length !== 4 ||
+      q[0] !== cache[6] ||
+      q[1] !== cache[7] ||
+      q[2] !== cache[8] ||
+      q[3] !== cache[9] ||
+      t.qx[id] !== cache[19] ||
+      t.qy[id] !== cache[20] ||
+      t.qz[id] !== cache[21] ||
+      t.qw[id] !== cache[22] ||
+      e[0] !== cache[23] ||
+      e[1] !== cache[24] ||
+      e[2] !== cache[25]
+    ) {
+      node.setQuaternion(q);
+      cache[6] = q[0];
+      cache[7] = q[1];
+      cache[8] = q[2];
+      cache[9] = q[3];
+      cache[19] = t.qx[id];
+      cache[20] = t.qy[id];
+      cache[21] = t.qz[id];
+      cache[22] = t.qw[id];
+      cache[23] = e[0];
+      cache[24] = e[1];
+      cache[25] = e[2];
+    }
+  }
+  private sample(name: string, time: number, loop = true, out?: Pose): Pose {
     const clip = this.clip(name),
-      pose = clone(this.rest),
+      pose = out ? copyPose(this.rest, out, this.weightNodes) : clone(this.rest),
       t = loop && clip.duration > 0 ? time % clip.duration : Math.min(time, clip.duration);
     // Sample into one scratch buffer per track width, then copy into the vectors this pose already owns.
-    for (const track of clip.tracks) {
+    for (let i = 0; i < clip.tracks.length; i++) {
+      const track = clip.tracks[i];
       const width = track.width;
       let scratch = this.scratch.get(width);
       if (!scratch) this.scratch.set(width, (scratch = new Float32Array(width)));

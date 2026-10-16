@@ -349,6 +349,46 @@ test('timestamp queries sum pass nanoseconds, skip frames during readback and re
   assert.throws(() => profiler.beginFrame(), /disposed/);
 });
 
+test('timestamp limbs exactly match unsigned 64-bit BigInt differences and sums', async (t) => {
+  const { device, resources } = gpu(t),
+    profiler = new GPUProfiler(device),
+    mask = (1n << 64n) - 1n;
+  let seed = 0x93745abf238116a1n;
+  const next = () => {
+    seed = (seed * 6364136223846793005n + 1442695040888963407n) & mask;
+    return seed;
+  };
+  const cases = [
+    [0n, 0n, 0n, 1n],
+    [0xffffffffn, 0x100000000n, 0x100000001n, 0x200000003n],
+    [mask - 4n, mask - 3n, mask - 1n, mask],
+    [0n, (1n << 53n) + 1n, (1n << 53n) + 3n, mask],
+  ];
+  for (let i = 0; i < 128; i++) cases.push([next(), next(), next(), next()].sort((a, b) => (a < b ? -1 : 1)));
+  cases.push([0n, ...Array.from({ length: 254 }, next).sort((a, b) => (a < b ? -1 : 1)), mask]);
+  const encoder = { resolveQuerySet() {}, copyBufferToBuffer() {} };
+  for (const values of cases) {
+    const timestamps = new BigUint64Array(values);
+    resources.at(-1).getMappedRange = () => timestamps.buffer;
+    assert.equal(profiler.beginFrame(), true);
+    for (let i = 0; i < values.length; i += 2) profiler.timestampWrites();
+    assert.equal(profiler.resolve(encoder), true);
+    let sum = 0n;
+    const expected = [];
+    for (let i = 0; i < values.length; i += 2) {
+      const duration = values[i + 1] - values[i];
+      sum += duration;
+      expected.push(Number(duration) / 1e6);
+    }
+    assert.equal(await profiler.read(), Number(sum) / 1e6);
+    assert.equal(profiler.elapsedMilliseconds, Number(values.at(-1) - values[0]) / 1e6);
+    assert.equal(profiler.passCount, expected.length);
+    assert.deepEqual([...profiler.passMilliseconds.slice(0, expected.length)], expected);
+    assert.ok(profiler.passMilliseconds.subarray(expected.length).every((value) => value === 0));
+  }
+  profiler.dispose();
+});
+
 test('default Stats creates no GPU profiling resources or writes on a timestamp-capable device', (t) => {
   const stats = overlay(t),
     { device, resources } = gpu(t);

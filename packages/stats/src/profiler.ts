@@ -1,6 +1,10 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 declare const GPUBufferUsage: { QUERY_RESOLVE: number; COPY_SRC: number; COPY_DST: number; MAP_READ: number };
 declare const GPUMapMode: { READ: number };
+// Match BigUint64Array's native byte order without creating BigInts per query.
+const lowWord = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1 ? 0 : 1,
+  highWord = 1 - lowWord,
+  wordRange = 0x100000000;
 
 /** Sums pass durations in milliseconds; one asynchronous readback can be in flight. */
 export class GPUProfiler {
@@ -82,20 +86,57 @@ export class GPUProfiler {
     try {
       await buffer.mapAsync(GPUMapMode.READ, 0, this.count * 16);
       if (this.disposed) return null;
-      const timestamps = new BigUint64Array(buffer.getMappedRange(0, this.count * 16));
-      let total = 0n;
-      for (let i = 0; i < timestamps.length; i += 2) {
-        if (timestamps[i + 1] < timestamps[i] || (i > 0 && timestamps[i] < timestamps[i - 1]))
+      const timestamps = new Uint32Array(buffer.getMappedRange(0, this.count * 16));
+      let totalLow = 0,
+        totalHigh = 0,
+        previousLow = 0,
+        previousHigh = 0;
+      for (let i = 0; i < timestamps.length; i += 4) {
+        const startLow = timestamps[i + lowWord],
+          startHigh = timestamps[i + highWord],
+          endLow = timestamps[i + 2 + lowWord],
+          endHigh = timestamps[i + 2 + highWord];
+        if (
+          endHigh < startHigh ||
+          (endHigh === startHigh && endLow < startLow) ||
+          (i > 0 && (startHigh < previousHigh || (startHigh === previousHigh && startLow < previousLow)))
+        )
           throw new Error('Invalid GPU timestamps');
-        total += timestamps[i + 1] - timestamps[i];
+        let low = endLow - startLow,
+          high = endHigh - startHigh;
+        if (low < 0) {
+          low += wordRange;
+          high--;
+        }
+        totalLow += low;
+        totalHigh += high;
+        if (totalLow >= wordRange) {
+          totalLow -= wordRange;
+          totalHigh++;
+        }
+        previousLow = endLow;
+        previousHigh = endHigh;
       }
       // Validate the whole readback before replacing a previously completed sample.
-      for (let i = 0; i < this.count; i++)
-        this.passMilliseconds[i] = Number(timestamps[i * 2 + 1] - timestamps[i * 2]) / 1e6;
+      for (let i = 0; i < this.count; i++) {
+        let low = timestamps[i * 4 + 2 + lowWord] - timestamps[i * 4 + lowWord],
+          high = timestamps[i * 4 + 2 + highWord] - timestamps[i * 4 + highWord];
+        if (low < 0) {
+          low += wordRange;
+          high--;
+        }
+        this.passMilliseconds[i] = (high * wordRange + low) / 1e6;
+      }
       this.passMilliseconds.fill(0, this.count);
       this.passCount = this.count;
-      this.elapsedMilliseconds = Number(timestamps[timestamps.length - 1] - timestamps[0]) / 1e6;
-      return (this.milliseconds = Number(total) / 1e6);
+      let elapsedLow = previousLow - timestamps[lowWord],
+        elapsedHigh = previousHigh - timestamps[highWord];
+      if (elapsedLow < 0) {
+        elapsedLow += wordRange;
+        elapsedHigh--;
+      }
+      this.elapsedMilliseconds = (elapsedHigh * wordRange + elapsedLow) / 1e6;
+      return (this.milliseconds = (totalHigh * wordRange + totalLow) / 1e6);
     } catch (error) {
       this.clearSample();
       if (!this.disposed) throw error;

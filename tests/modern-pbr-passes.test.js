@@ -39,7 +39,21 @@ async function scene(
   const encoder = {
     beginRenderPass(descriptor) {
       assert.equal(active, undefined, 'Nested render pass');
-      const record = { descriptor, draws: [], ended: false };
+      // WebGPU consumes descriptor dictionaries at beginRenderPass. Retain that
+      // snapshot while preserving the native texture-view resource identities.
+      const record = {
+        descriptor: {
+          ...descriptor,
+          colorAttachments: Array.from(descriptor.colorAttachments, (attachment) =>
+            attachment ? { ...attachment } : attachment,
+          ),
+          ...(descriptor.depthStencilAttachment
+            ? { depthStencilAttachment: { ...descriptor.depthStencilAttachment } }
+            : {}),
+        },
+        draws: [],
+        ended: false,
+      };
       passes.push(record);
       active = record;
       let pipeline, uniform, vertex, index;

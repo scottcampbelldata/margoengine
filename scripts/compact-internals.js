@@ -6,12 +6,13 @@ const reviewed = {
   Camera: 'fit view projection',
   CADCameraControls: 'pointer velocity previousTouchAction menu down move up wheel',
   VectorRef: 'mesh kind get validate write',
+  Mesh: 'current',
   Engine:
-    'batches checkedMaterials materialFrame free next revision materials seen slots callbacks raf last frameOptions disposing watchDevice collect frame update',
+    'batches checkedMaterials materialFrame free next revision materials seen slots callbacks raf last running frameOptions disposing watchDevice collect frame update',
   TransformStore: 'handle api bind',
   FrameGraph: 'passes owner executing',
   GPURenderer:
-    'frame targets views resolveTarget preserveMSAA passDescriptor passContext drawBatches commands draw bindings width height frameId lost deviceLost resources variants groups uniform bindGroup disposed picking canvas device context format pipeline descriptor renderFrame',
+    'frame targets views resolveTarget preserveMSAA passDescriptor passContext drawBatches commands draw bindings width height frameId lost deviceLost resources variants groups uniform bindGroup culledGroup culled disposed picking canvas device context format pipeline descriptor renderFrame',
   Stage: 'imports',
 };
 

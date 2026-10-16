@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { attachGPUAudit } from '../examples/skinning-ik/gpu-audit.ts';
 
-function fixture(t) {
+function fixture(t, report = () => ({ reflectionBusy: false, probeEncodeMs: 2, probeTotalMs: 8 })) {
   const dom = new JSDOM(
     '<body><div id="viewport"></div><input id="look" type="checkbox"><button id="view-back">Back</button></body>',
   );
@@ -56,7 +56,7 @@ function fixture(t) {
         };
       },
     },
-    report: () => ({ reflectionBusy: false, probeEncodeMs: 2, probeTotalMs: 8 }),
+    report,
   });
   t.after(() => {
     audit.dispose();
@@ -151,6 +151,73 @@ test('GPU audit counts equal-duration completions once, reports skipped IDs, and
   f.stats.gpuSampleEncodedAt = f.stats.gpuSampleReadAt = null;
   f.frame();
   assert.equal(f.audit.snapshot().observedSamples, 31, 'invalid or pending timing is not another sample');
+});
+
+test('pooled DOM publications do not mutate retained public snapshots, sample values, contexts or peak history', (t) => {
+  const f = fixture(t);
+  f.setTime(100);
+  f.audit.mark('first');
+  f.complete(1, 95, 9);
+  f.frame();
+  const first = f.audit.snapshot(),
+    retained = JSON.stringify(first),
+    values = first.latest.passesMs,
+    context = first.latest.contextObservedNow;
+  for (let id = 2; id <= 45; id++) {
+    f.setTime(id * 500);
+    f.audit.mark('later', id);
+    f.stats.drawCalls = 100 + id;
+    f.complete(id, id * 500 - 5, 2 + id / 100);
+    f.frame();
+  }
+  const last = f.audit.snapshot();
+  assert.equal(JSON.stringify(first), retained);
+  assert.equal(first.observedSamples, 1);
+  assert.equal(first.recentSamples.length, 1);
+  assert.equal(first.latest.currentCounters.drawCalls, 52);
+  assert.deepEqual(values, [0.5, 8.2, 0.3]);
+  assert.notEqual(last.latest.passesMs, values);
+  assert.notEqual(last.latest.contextObservedNow, context);
+  assert.notEqual(last.viewport, first.viewport);
+  assert.notEqual(last.recentSamples, first.recentSamples);
+  assert.notEqual(last.recentActions, first.recentActions);
+  assert.equal(last.peakObservedSinceAttach, first.latest);
+  assert.equal(last.latest.id, 45);
+  assert.equal(last.recentSamples.length, 20);
+  assert.deepEqual(JSON.parse(f.parent.dataset.gpuAudit), last);
+  first.recentSamples.length = first.recentActions.length = 0;
+  assert.equal(f.audit.snapshot().recentSamples.length, 20);
+});
+
+test('reused report bags and evicted history slots preserve exposed nested snapshots', (t) => {
+  const context = { frame: 0, optional: 1 },
+    f = fixture(t, () => context);
+  for (let id = 1; id <= 45; id++) {
+    context.frame = id;
+    f.setTime(id * 500);
+    f.complete(id, id * 500 - 5, id === 2 ? 12 : 2);
+    f.frame();
+  }
+  const first = f.audit.snapshot(),
+    retained = JSON.stringify(first);
+  assert.equal(first.latest.contextObservedNow.frame, 45);
+  assert.equal(first.peakObservedSinceAttach.contextObservedNow.frame, 2);
+  delete context.optional;
+  for (let id = 46; id <= 90; id++) {
+    context.frame = id;
+    f.setTime(id * 500);
+    f.complete(id, id * 500 - 5, 2);
+    f.frame();
+  }
+  const last = f.audit.snapshot();
+  assert.equal(JSON.stringify(first), retained);
+  assert.equal(last.latest.contextObservedNow.frame, 90);
+  assert.equal(Object.hasOwn(last.latest.contextObservedNow, 'optional'), false);
+  assert.equal(last.peakObservedSinceAttach, first.peakObservedSinceAttach);
+  assert.deepEqual(
+    last.recentSamples.map((sample) => sample.id),
+    Array.from({ length: 20 }, (_, i) => 71 + i),
+  );
 });
 
 test('GPU audit observes resize and pointer state, then removes all observers/listeners on disposal', (t) => {

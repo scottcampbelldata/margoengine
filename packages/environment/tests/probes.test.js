@@ -423,8 +423,13 @@ test('bounded GGX samples validate before rendering and do not leak into later d
     );
   assert.equal(
     log.filter((e) => e[0] === 'group' && e[2].entries.some((x) => x.binding === 2)).length,
+    3,
+    'resample and both rough dispatches reuse their face bind groups across bounces',
+  );
+  assert.equal(
+    log.filter((e) => e[0] === 'pass.setBindGroup').length,
     6,
-    'resample and both rough dispatches bind the captured faces',
+    'all three dispatches still bind their captured faces on both bounces',
   );
   assert.equal(probes.texels.length, 336 * 2, 'sampled radiance is snapshotted for device restore');
   const first = probes.texels;
@@ -440,7 +445,8 @@ test('bounded GGX samples validate before rendering and do not leak into later d
 test('probe bake pipelines are reused per device and filter mode, including changed sample counts', async () => {
   const engine = fakeEngine(mockGPU()),
     probes = new LightProbes({ reflections: [{ position: [0, 1, 0], ...room }], resolution: 16 });
-  let log = [];
+  let log = [],
+    shader = coreShader;
   const configure = (gpu) => {
     engine.gpu = device(gpu);
     const frame = context(gpu, { shader: coreShader }),
@@ -460,7 +466,7 @@ test('probe bake pipelines are reused per device and filter mode, including chan
       log.push(
         ...gpu.record(() => {
           frame.begin(0);
-          frame.c.shader = coreShader;
+          frame.c.shader = shader;
           passes(probes)(frame.c);
         }),
       );
@@ -479,15 +485,397 @@ test('probe bake pipelines are reused per device and filter mode, including chan
   await check({ samples: 64 }, 0);
   await check({ samples: 4096 }, 0);
   await check({}, 0);
-  const snapshot = probes.texels;
+  assert.equal(log.filter((e) => e[0] === 'module' && e[2].code.includes('margoMainFrame')).length, 0);
+  shader += '\n// changed capture shader';
+  await check({}, 0);
+  assert.equal(log.filter((e) => e[0] === 'module' && e[2].code.includes('margoMainFrame')).length, 1);
+  await check({}, 0);
+  assert.equal(log.filter((e) => e[0] === 'module' && e[2].code.includes('margoMainFrame')).length, 0);
+  shader = 'invalid shader';
+  await assert.rejects(probes.bake(), /standard core .*shader/);
+  shader = coreShader;
+  const snapshot = probes.texels,
+    captureResources = probes.captureResources;
   configure(mockGPU());
   probes.onDeviceRestored(engine);
+  assert.ok(
+    captureResources.owned.every((resource) => resource.destroyed),
+    'device restoration releases the old capture pool',
+  );
+  assert.equal(probes.captureResources, undefined);
   assert.equal(probes.texels, snapshot, 'restoration retains captured radiance');
   await check({}, 3);
   await check({ samples: 256 }, 3);
   await check({ samples: 128 }, 0);
   probes.dispose();
   await assert.rejects(probes.bake(), /not attached/);
+});
+
+function pooledProbes(options = {}) {
+  const gpu = mockGPU(),
+    engine = fakeEngine(gpu),
+    probes = new LightProbes({
+      volume: { ...room, counts: [2, 1, 1], resolution: 8 },
+      reflections: [{ position: [0, 1, 0], ...room }],
+      resolution: 16,
+      ...options,
+    }),
+    frame = context(gpu, { shader: coreShader }),
+    run = passes(probes),
+    created = [];
+  for (const name of ['createBuffer', 'createTexture']) {
+    const create = gpu.device[name];
+    gpu.device[name] = (descriptor) => {
+      const value = create(descriptor);
+      created.push(value);
+      if (name === 'createBuffer' && descriptor.usage & GPUBufferUsage.MAP_READ)
+        Object.assign(value, {
+          mapAsync: async () => undefined,
+          getMappedRange: () => new ArrayBuffer(probes.byteLength - 1088),
+          unmap() {},
+        });
+      return value;
+    };
+  }
+  let log = [],
+    frames = 0;
+  engine.render = () =>
+    log.push(
+      ...gpu.record(() => {
+        frame.begin(frames++);
+        run(frame.c);
+      }),
+    );
+  probes.setup(engine);
+  return {
+    gpu,
+    engine,
+    probes,
+    frame,
+    created,
+    takeLog() {
+      const previous = log;
+      log = [];
+      return previous;
+    },
+  };
+}
+
+test('probe capture reuses owned native resources, uniform slots, cameras and model context across repeated moving bakes', async () => {
+  const h = pooledProbes(),
+    { probes } = h;
+  await probes.bake({ samples: 64 });
+  const resources = probes.captureResources,
+    owned = [...resources.owned],
+    cameras = [...resources.cameras],
+    values = resources.values,
+    slots = resources.slots,
+    context = resources.view;
+  h.takeLog();
+  for (let index = 0; index < 10; index++) {
+    probes.setReflectionPosition(0, [index * 0.1, 1, -0.2]);
+    const previous = probes.texels;
+    await probes.bake({ samples: index % 2 ? 256 : 64, bounces: 2 });
+    assert.notStrictEqual(probes.texels, previous, 'public snapshots retain their fresh-result lifetime');
+  }
+  const log = h.takeLog();
+  for (const name of ['buffer', 'texture', 'view', 'sampler', 'group', 'renderPipeline', 'computePipeline'])
+    assert.equal(
+      log.filter((entry) => entry[0] === name).length,
+      0,
+      name + ' must not be recreated for unchanged layouts',
+    );
+  assert.equal(log.filter((entry) => entry[0] === 'pass.dispatchWorkgroups').length, 10 * 2 * 5);
+  assert.strictEqual(probes.captureResources, resources);
+  assert.strictEqual(resources.values, values);
+  assert.strictEqual(resources.slots, slots);
+  assert.strictEqual(resources.view, context);
+  assert.deepEqual(resources.cameras, cameras);
+  assert.ok(owned.every((resource) => !resource.destroyed));
+  probes.dispose();
+  assert.ok(
+    owned.every((resource) => resource.destroyed),
+    'dispose owns all retained native capture resources',
+  );
+});
+
+test('pooled probe groups invalidate on actual environment resources and filter mode, while capture shader changes keep the targets', async () => {
+  const h = pooledProbes(),
+    environment = fakeEnvironment(h.engine.gpu);
+  // Configure the environment before setup in the real API; this fixture isolates native binding identities.
+  h.probes.dispose();
+  const g = pooledProbes({ environment });
+  environment.device = g.engine.gpu;
+  await g.probes.bake();
+  const resources = g.probes.captureResources,
+    owned = [...resources.owned];
+  g.takeLog();
+  await g.probes.bake({ samples: 64 });
+  assert.equal(
+    g.takeLog().filter((entry) => entry[0] === 'group').length,
+    4,
+    'SH plus three sampled reflection groups',
+  );
+  await g.probes.bake();
+  assert.equal(
+    g.takeLog().filter((entry) => entry[0] === 'group').length,
+    0,
+    'exact convolution groups survive a sampled bake',
+  );
+  environment.specularView = { replacement: true };
+  environment.paramsBuffer = { replacement: true };
+  environment.version++;
+  await g.probes.bake();
+  const groups = g.takeLog().filter((entry) => entry[0] === 'group');
+  assert.equal(groups.length, 4);
+  assert.ok(
+    groups
+      .filter((entry) => entry[2].entries.some((binding) => binding.binding === 4))
+      .every((entry) => entry[2].entries.find((binding) => binding.binding === 4).resource.replacement),
+  );
+  g.frame.state.shader += '\n// refreshed source';
+  await g.probes.bake();
+  const shaderChange = g.takeLog();
+  assert.equal(shaderChange.filter((entry) => entry[0] === 'renderPipeline').length, 1);
+  assert.equal(shaderChange.filter((entry) => entry[0] === 'group').length, 0);
+  assert.strictEqual(g.probes.captureResources, resources);
+  assert.deepEqual(resources.owned, owned);
+  g.probes.dispose();
+});
+
+test('capture resource initialization rolls back each failed allocation and can retry without publishing partial state', async () => {
+  for (const [name, failAt] of [
+    ['createBuffer', 1],
+    ['createBuffer', 2],
+    ['createSampler', 1],
+    ['createTexture', 1],
+    ['createTexture', 2],
+    ['createTexture', 3],
+    ['createTexture', 4],
+  ]) {
+    const h = pooledProbes();
+    h.engine.render();
+    h.takeLog();
+    const before = h.created.length,
+      operation = h.gpu.device[name],
+      failure = new Error(name + ':' + failAt);
+    let calls = 0;
+    h.gpu.device[name] = (...args) => {
+      if (++calls === failAt) throw failure;
+      return operation(...args);
+    };
+    await assert.rejects(h.probes.bake(), (error) => error === failure);
+    assert.equal(h.probes.captureResources, undefined);
+    assert.ok(
+      h.created.slice(before).every((resource) => resource.destroyed),
+      failure.message + ' leaked a partial capture resource',
+    );
+    h.gpu.device[name] = operation;
+    await h.probes.bake();
+    assert.equal(h.probes.baked, true);
+    const owned = [...h.probes.captureResources.owned];
+    h.probes.dispose();
+    assert.ok(owned.every((resource) => resource.destroyed));
+  }
+});
+
+test('failed capture draw restores its host context and leaves owned resources available for retry and disposal', async () => {
+  const h = pooledProbes();
+  let scopes = 0;
+  h.gpu.device.pushErrorScope = () => {
+    scopes++;
+  };
+  h.gpu.device.popErrorScope = async () => {
+    scopes--;
+    return null;
+  };
+  h.engine.render();
+  const c = h.frame.c,
+    failure = new Error('draw failure'),
+    draw = c.draw,
+    encoder = c.encoder,
+    color = c.color,
+    depth = c.depth,
+    descriptor = c.descriptor;
+  const render = h.engine.render,
+    run = passes(h.probes);
+  h.engine.render = () => {
+    h.frame.begin(0);
+    c.draw = () => {
+      throw failure;
+    };
+    run(c);
+  };
+  await assert.rejects(h.probes.bake(), (error) => error === failure);
+  assert.equal(scopes, 0, 'a failed receiver cannot strand the native error scope');
+  assert.strictEqual(c.encoder, encoder);
+  assert.strictEqual(c.color, color);
+  assert.strictEqual(c.depth, depth);
+  assert.strictEqual(c.descriptor, descriptor);
+  const owned = [...h.probes.captureResources.owned];
+  c.draw = draw;
+  h.engine.render = render;
+  await h.probes.bake();
+  assert.equal(scopes, 0);
+  assert.ok(owned.every((resource) => !resource.destroyed));
+  h.probes.dispose();
+  assert.ok(owned.every((resource) => resource.destroyed));
+});
+
+test('reused capture contexts restore receiver-mutated frame fields and capture cameras before every face', async () => {
+  const h = pooledProbes(),
+    borrowed = new Set(),
+    cameras = new Set();
+  let faces = 0;
+  h.probes.add({
+    addLighting() {
+      return () => {};
+    },
+    draw(c) {
+      assert.ok(c.shader.includes('margoAmbient'));
+      assert.equal(c.camera.fov, 90);
+      assert.equal(c.removedKey, undefined);
+      assert.equal(c.width, faces % 18 < 12 ? 8 : 16);
+      const eye = [...c.camera.position],
+        aim = [...c.camera.target];
+      c.camera.advance(0.05);
+      assert.deepEqual(c.camera.position, eye, 'a previous receiver fit cannot advance the next capture camera');
+      assert.deepEqual(c.camera.target, aim);
+      borrowed.add(c);
+      cameras.add(c.camera);
+      faces++;
+      c.shader = 'receiver mutation';
+      c.camera.fov = 30;
+      c.camera.fitToBoundingBox([-0.1, 0, -0.1], [0.1, 0.2, 0.1], { duration: 1 });
+      c.removedKey = 'must not survive into the next face';
+    },
+  });
+  await h.probes.bake({ bounces: 2 });
+  assert.equal(faces, 36);
+  assert.equal(borrowed.size, 1);
+  assert.equal(cameras.size, 6);
+  h.probes.dispose();
+});
+
+test('disposal during readback rejects the bake without publishing a stale snapshot or leaking pooled buffers', async () => {
+  const h = pooledProbes();
+  await h.probes.bake();
+  const previous = h.probes.texels,
+    resources = h.probes.captureResources,
+    owned = [...resources.owned];
+  let release, reached;
+  const waiting = new Promise((resolve) => {
+    reached = resolve;
+  });
+  resources.read.mapAsync = () => {
+    reached();
+    return new Promise((resolve) => {
+      release = resolve;
+    });
+  };
+  const pending = h.probes.bake();
+  await waiting;
+  await assert.rejects(h.probes.bake(), /bake pending/);
+  h.probes.dispose();
+  release();
+  await assert.rejects(pending, /interrupted/);
+  assert.strictEqual(h.probes.texels, previous);
+  assert.ok(owned.every((resource) => resource.destroyed));
+});
+
+test('a readback failure preserves the previous public snapshot, unmaps completed reads, and can retry with the same owned buffer', async () => {
+  const h = pooledProbes();
+  await h.probes.bake();
+  const previous = h.probes.texels,
+    read = h.probes.captureResources.read,
+    failure = new Error('readback failure'),
+    mappedRange = read.getMappedRange;
+  let unmaps = 0;
+  read.unmap = () => {
+    unmaps++;
+  };
+  read.getMappedRange = () => {
+    throw failure;
+  };
+  await assert.rejects(h.probes.bake(), (error) => error === failure);
+  assert.strictEqual(h.probes.texels, previous);
+  assert.equal(unmaps, 1);
+  assert.equal(read.destroyed, undefined);
+  read.getMappedRange = mappedRange;
+  await h.probes.bake();
+  assert.strictEqual(h.probes.captureResources.read, read);
+  assert.equal(unmaps, 2);
+  assert.notStrictEqual(h.probes.texels, previous);
+  h.probes.dispose();
+  assert.equal(read.destroyed, true);
+});
+
+test('a restored device cannot publish an older device readback that completes after restoration', async () => {
+  const h = pooledProbes();
+  await h.probes.bake();
+  const previous = h.probes.texels,
+    resources = h.probes.captureResources,
+    owned = [...resources.owned];
+  let release, reached;
+  const waiting = new Promise((resolve) => {
+    reached = resolve;
+  });
+  resources.read.mapAsync = () => {
+    reached();
+    return new Promise((resolve) => {
+      release = resolve;
+    });
+  };
+  const pending = h.probes.bake();
+  await waiting;
+  h.engine.gpu = device(mockGPU());
+  h.probes.onDeviceRestored(h.engine);
+  assert.ok(owned.every((resource) => resource.destroyed));
+  release();
+  await assert.rejects(pending, /interrupted/);
+  assert.strictEqual(h.probes.texels, previous);
+  assert.equal(h.probes.captureResources, undefined);
+  h.probes.dispose();
+});
+
+test('unpublished probe readbacks reuse their bulk storage while every published texel snapshot remains stable', async () => {
+  const h = pooledProbes();
+  await h.probes.bake();
+  const initial = h.probes.snapshot,
+    read = h.probes.captureResources.read;
+  let value = 123;
+  read.getMappedRange = () => new Uint32Array(initial.length).fill(value).buffer;
+  await h.probes.bake();
+  assert.strictEqual(h.probes.snapshot, initial, 'a bake without a texels reader must reuse private bulk storage');
+  assert.ok(initial.every((word) => word === 123));
+  const retained = h.probes.texels;
+  assert.strictEqual(h.probes.texels, retained, 'repeated reads of one published bake retain identity');
+  value = 456;
+  await h.probes.bake();
+  const unobserved = h.probes.snapshot;
+  assert.notStrictEqual(unobserved, retained, 'publishing a previous bake requires a fresh destination');
+  assert.ok(retained.every((word) => word === 123));
+  assert.ok(unobserved.every((word) => word === 456));
+  value = 789;
+  await h.probes.bake();
+  assert.strictEqual(h.probes.snapshot, unobserved, 'the new unpublished destination becomes reusable');
+  assert.ok(unobserved.every((word) => word === 789));
+  assert.ok(
+    retained.every((word) => word === 123),
+    'later private reuse cannot mutate any published old snapshot',
+  );
+  const failure = new Error('readback before publication');
+  read.getMappedRange = () => {
+    throw failure;
+  };
+  await assert.rejects(h.probes.bake(), (error) => error === failure);
+  assert.strictEqual(h.probes.snapshot, unobserved);
+  assert.ok(
+    unobserved.every((word) => word === 789),
+    'a failed read cannot partially update reusable storage',
+  );
+  assert.ok(retained.every((word) => word === 123));
+  h.probes.dispose();
 });
 
 test('irradianceAt mirrors the shader: trilinear between probe centres, float16 SH', async () => {

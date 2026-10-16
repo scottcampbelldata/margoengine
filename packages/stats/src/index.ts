@@ -3,49 +3,55 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph } from '@margoengine/core/extension';
 import { GPUProfiler } from './profiler.js';
 export { GPUProfiler };
-const owner = Symbol('stats owner'),
-  rawDraw = Symbol('draw'),
-  rawIndexed = Symbol('indexed'),
-  rawIndirect = Symbol('indirect'),
-  rawIndexedIndirect = Symbol('indexed indirect'),
-  rawDispatch = Symbol('dispatch'),
-  rawDispatchIndirect = Symbol('dispatch indirect');
+const owner = Symbol('stats owner');
+type RenderMethods = {
+  readonly stats: Stats;
+  readonly draw: GPURenderPassEncoder['draw'];
+  readonly indexed: GPURenderPassEncoder['drawIndexed'];
+  readonly indirect: GPURenderPassEncoder['drawIndirect'];
+  readonly indexedIndirect: GPURenderPassEncoder['drawIndexedIndirect'];
+};
+type ComputeMethods = {
+  readonly stats: Stats;
+  readonly dispatch: GPUComputePassEncoder['dispatchWorkgroups'];
+  readonly indirect: GPUComputePassEncoder['dispatchWorkgroupsIndirect'];
+};
 type Render = GPURenderPassEncoder & {
-  [owner]: Stats;
-  [rawDraw]: GPURenderPassEncoder['draw'];
-  [rawIndexed]: GPURenderPassEncoder['drawIndexed'];
-  [rawIndirect]: GPURenderPassEncoder['drawIndirect'];
-  [rawIndexedIndirect]: GPURenderPassEncoder['drawIndexedIndirect'];
+  [owner]: RenderMethods;
 };
 type Compute = GPUComputePassEncoder & {
-  [owner]: Stats;
-  [rawDispatch]: GPUComputePassEncoder['dispatchWorkgroups'];
-  [rawDispatchIndirect]: GPUComputePassEncoder['dispatchWorkgroupsIndirect'];
+  [owner]: ComputeMethods;
 };
 // Shared wrappers preserve the native receiver without creating closures for every pass.
 function countDraw(this: Render, v: number, n = 1, first = 0, instance = 0): void {
-  this[owner].drawCalls++;
-  (this[rawDraw] ?? Object.getPrototypeOf(this).draw).call(this, v, n, first, instance);
+  const methods = this[owner];
+  methods.stats.drawCalls++;
+  methods.draw.call(this, v, n, first, instance);
 }
 function countIndexed(this: Render, v: number, n = 1, first = 0, base = 0, instance = 0): void {
-  this[owner].drawCalls++;
-  (this[rawIndexed] ?? Object.getPrototypeOf(this).drawIndexed).call(this, v, n, first, base, instance);
+  const methods = this[owner];
+  methods.stats.drawCalls++;
+  methods.indexed.call(this, v, n, first, base, instance);
 }
 function countIndirect(this: Render, buffer: GPUBuffer, offset: number): void {
-  this[owner].drawCalls++;
-  (this[rawIndirect] ?? Object.getPrototypeOf(this).drawIndirect).call(this, buffer, offset);
+  const methods = this[owner];
+  methods.stats.drawCalls++;
+  methods.indirect.call(this, buffer, offset);
 }
 function countIndexedIndirect(this: Render, buffer: GPUBuffer, offset: number): void {
-  this[owner].drawCalls++;
-  (this[rawIndexedIndirect] ?? Object.getPrototypeOf(this).drawIndexedIndirect).call(this, buffer, offset);
+  const methods = this[owner];
+  methods.stats.drawCalls++;
+  methods.indexedIndirect.call(this, buffer, offset);
 }
 function countDispatch(this: Compute, x: number, y = 1, z = 1): void {
-  this[owner].dispatches++;
-  (this[rawDispatch] ?? Object.getPrototypeOf(this).dispatchWorkgroups).call(this, x, y, z);
+  const methods = this[owner];
+  methods.stats.dispatches++;
+  methods.dispatch.call(this, x, y, z);
 }
 function countDispatchIndirect(this: Compute, buffer: GPUBuffer, offset: number): void {
-  this[owner].dispatches++;
-  (this[rawDispatchIndirect] ?? Object.getPrototypeOf(this).dispatchWorkgroupsIndirect).call(this, buffer, offset);
+  const methods = this[owner];
+  methods.stats.dispatches++;
+  methods.indirect.call(this, buffer, offset);
 }
 const emptyCompute: GPUComputePassDescriptor = {};
 const rawRender = Symbol('render pass'),
@@ -89,6 +95,8 @@ export class Stats implements EnginePlugin {
   private readonly text: HTMLElement;
   private readonly timer: ReturnType<typeof setInterval>;
   private readonly tracked = new WeakSet<GPUCommandEncoder>();
+  private readonly renderMethods = new WeakMap<GPURenderPassEncoder['draw'], RenderMethods>();
+  private readonly computeMethods = new WeakMap<GPUComputePassEncoder['dispatchWorkgroups'], ComputeMethods>();
   private disposed = false;
   private readonly profiling: boolean;
   private profileFrame = 0;
@@ -211,16 +219,26 @@ export class Stats implements EnginePlugin {
   private static beginRender(this: Encoder, descriptor: GPURenderPassDescriptor): GPURenderPassEncoder {
     const writes = descriptor.timestampWrites ? undefined : this[frameProfiler]?.timestampWrites();
     const pass = this[rawRender].call(this, writes ? { ...descriptor, timestampWrites: writes } : descriptor) as Render;
-    if (!pass[owner]) {
-      // Native methods already live on the prototype; retain only caller overrides.
-      const prototype = Object.getPrototypeOf(pass);
-      if (pass.draw !== prototype.draw) pass[rawDraw] = pass.draw;
-      if (pass.drawIndexed !== prototype.drawIndexed) pass[rawIndexed] = pass.drawIndexed;
-      if (pass.drawIndirect !== prototype.drawIndirect) pass[rawIndirect] = pass.drawIndirect;
-      if (pass.drawIndexedIndirect !== prototype.drawIndexedIndirect)
-        pass[rawIndexedIndirect] = pass.drawIndexedIndirect;
+    const stats = this[owner],
+      previous = pass[owner];
+    if (!previous || previous.stats !== stats) {
+      const draw = previous ? previous.draw : pass.draw,
+        indexed = previous ? previous.indexed : pass.drawIndexed,
+        indirect = previous ? previous.indirect : pass.drawIndirect,
+        indexedIndirect = previous ? previous.indexedIndirect : pass.drawIndexedIndirect;
+      let methods = stats.renderMethods.get(draw);
+      if (
+        !methods ||
+        methods.indexed !== indexed ||
+        methods.indirect !== indirect ||
+        methods.indexedIndirect !== indexedIndirect
+      ) {
+        // A retained record captures method identity without allocating for each native pass.
+        methods = { stats, draw, indexed, indirect, indexedIndirect };
+        if (typeof draw === 'function') stats.renderMethods.set(draw, methods);
+      }
+      pass[owner] = methods;
     }
-    pass[owner] = this[owner];
     pass.draw = countDraw;
     pass.drawIndexed = countIndexed;
     pass.drawIndirect = countIndirect;
@@ -236,13 +254,18 @@ export class Stats implements EnginePlugin {
       this,
       writes ? { ...descriptor, timestampWrites: writes } : descriptor,
     ) as Compute;
-    if (!pass[owner]) {
-      const prototype = Object.getPrototypeOf(pass);
-      if (pass.dispatchWorkgroups !== prototype.dispatchWorkgroups) pass[rawDispatch] = pass.dispatchWorkgroups;
-      if (pass.dispatchWorkgroupsIndirect !== prototype.dispatchWorkgroupsIndirect)
-        pass[rawDispatchIndirect] = pass.dispatchWorkgroupsIndirect;
+    const stats = this[owner],
+      previous = pass[owner];
+    if (!previous || previous.stats !== stats) {
+      const dispatch = previous ? previous.dispatch : pass.dispatchWorkgroups,
+        indirect = previous ? previous.indirect : pass.dispatchWorkgroupsIndirect;
+      let methods = stats.computeMethods.get(dispatch);
+      if (!methods || methods.indirect !== indirect) {
+        methods = { stats, dispatch, indirect };
+        if (typeof dispatch === 'function') stats.computeMethods.set(dispatch, methods);
+      }
+      pass[owner] = methods;
     }
-    pass[owner] = this[owner];
     pass.dispatchWorkgroups = countDispatch;
     pass.dispatchWorkgroupsIndirect = countDispatchIndirect;
     return pass;
@@ -257,29 +280,33 @@ export class Stats implements EnginePlugin {
       stats.gpuTime = null;
       stats.encodedGPUAt = stats.readGPUAt = null;
     }
-    if (resolved)
-      queueMicrotask(() => {
-        void profiler!.read().then(
-          (value) => {
-            if (!stats.disposed && stats.profiler === profiler) {
-              stats.gpuTime = value;
-              if (value !== null) {
-                stats.completedGPU++;
-                stats.encodedGPUAt = encodedAt;
-                stats.readGPUAt = performance.now();
-              } else stats.encodedGPUAt = stats.readGPUAt = null;
-            }
-          },
-          (error) => {
-            if (!stats.disposed && stats.profiler === profiler) {
-              stats.gpuTime = null;
-              stats.encodedGPUAt = stats.readGPUAt = null;
-            }
-            stats.engine?.onError(error);
-          },
-        );
-      });
+    if (resolved) Stats.readback(stats, profiler!, encodedAt!);
     return result;
+  }
+
+  // Keep the async captures on sampled frames; finish() runs for every encoder.
+  private static readback(stats: Stats, profiler: GPUProfiler, encodedAt: number): void {
+    queueMicrotask(() => {
+      void profiler.read().then(
+        (value) => {
+          if (!stats.disposed && stats.profiler === profiler) {
+            stats.gpuTime = value;
+            if (value !== null) {
+              stats.completedGPU++;
+              stats.encodedGPUAt = encodedAt;
+              stats.readGPUAt = performance.now();
+            } else stats.encodedGPUAt = stats.readGPUAt = null;
+          }
+        },
+        (error) => {
+          if (!stats.disposed && stats.profiler === profiler) {
+            stats.gpuTime = null;
+            stats.encodedGPUAt = stats.readGPUAt = null;
+          }
+          stats.engine?.onError(error);
+        },
+      );
+    });
   }
 
   setup(engine: Engine): void {

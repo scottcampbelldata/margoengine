@@ -113,7 +113,13 @@ export function attachWorkshopStats(engine: EngineKernel, parent: HTMLElement) {
     graph.append(path);
     block.append(title, graph);
     stats.element.append(block);
-    return { block, title, graph, path };
+    const points: DOMPoint[] = [];
+    for (let i = 0; i < capacity; i++) {
+      const point = graph.createSVGPoint();
+      point.x = Number(((i / (capacity - 1)) * 196).toFixed(1));
+      points.push(point);
+    }
+    return { block, title, graph, path, points, min: Infinity, max: -Infinity };
   };
   const gpuChart = sparkline('Recent measured GPU pass time in milliseconds', '#63d9b0'),
     heapChart = sparkline('Recent JavaScript heap usage in megabytes', '#68e2ef');
@@ -182,7 +188,7 @@ export function attachWorkshopStats(engine: EngineKernel, parent: HTMLElement) {
       });
   }
 
-  const draw = (values: Float64Array, count: number, index: number, path: SVGPolylineElement) => {
+  const draw = (values: Float64Array, count: number, index: number, chart: typeof heapChart) => {
     let min = Infinity,
       max = -Infinity;
     for (let i = 0; i < count; i++) {
@@ -190,14 +196,13 @@ export function attachWorkshopStats(engine: EngineKernel, parent: HTMLElement) {
       max = Math.max(max, values[i]);
     }
     const start = count === capacity ? index : 0,
-      range = Math.max(max - min, Math.abs(max) * 0.005, 0.01),
-      points: string[] = [];
-    for (let i = 0; i < count; i++)
-      points.push(
-        `${((i / (capacity - 1)) * 196).toFixed(1)},${(20 - ((values[(start + i) % capacity] - min) / range) * 18).toFixed(1)}`,
-      );
-    path.setAttribute('points', points.join(' '));
-    return { min, max };
+      range = Math.max(max - min, Math.abs(max) * 0.005, 0.01);
+    for (let i = 0; i < count; i++) {
+      if (i >= chart.path.points.numberOfItems) chart.points[i] = chart.path.points.appendItem(chart.points[i]);
+      chart.points[i].y = Math.round((20 - ((values[(start + i) % capacity] - min) / range) * 18) * 10) / 10;
+    }
+    chart.min = min;
+    chart.max = max;
   };
   const refresh = () => {
     if (disposed) return;
@@ -209,8 +214,8 @@ export function attachWorkshopStats(engine: EngineKernel, parent: HTMLElement) {
       heap[heapIndex] = megabytes;
       heapIndex = (heapIndex + 1) % capacity;
       heapCount = Math.min(capacity, heapCount + 1);
-      const { min, max } = draw(heap, heapCount, heapIndex, heapChart.path);
-      heapChart.title.textContent = `JS heap ${megabytes.toFixed(1)} MB\n${min.toFixed(1)}–${max.toFixed(1)} MB · rolling 60 s`;
+      draw(heap, heapCount, heapIndex, heapChart);
+      heapChart.title.textContent = `JS heap ${megabytes.toFixed(1)} MB\n${heapChart.min.toFixed(1)}–${heapChart.max.toFixed(1)} MB · rolling 60 s`;
       heapChart.graph.style.display = 'block';
     } else {
       heapChart.title.textContent = 'JS heap unavailable\nNot exposed by this browser';
@@ -222,8 +227,8 @@ export function attachWorkshopStats(engine: EngineKernel, parent: HTMLElement) {
       gpu[gpuIndex] = milliseconds;
       gpuIndex = (gpuIndex + 1) % capacity;
       gpuCount = Math.min(capacity, gpuCount + 1);
-      const { min, max } = draw(gpu, gpuCount, gpuIndex, gpuChart.path);
-      gpuChart.title.textContent = `GPU passes ${min.toFixed(2)}–${max.toFixed(2)} ms`;
+      draw(gpu, gpuCount, gpuIndex, gpuChart);
+      gpuChart.title.textContent = `GPU passes ${gpuChart.min.toFixed(2)}–${gpuChart.max.toFixed(2)} ms`;
       gpuChart.graph.style.display = 'block';
     } else {
       gpuChart.title.textContent =

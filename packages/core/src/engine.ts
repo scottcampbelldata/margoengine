@@ -258,7 +258,7 @@ export class Engine {
   private revision = 0;
   // Last full collection: revision, visibility, material values, and each entity's instance offset (-1 when not drawn).
   /** @internal Revision of the last full instance collection; -1 forces one. */ collected = -1;
-  private readonly materials = new Map<PbrMaterial, Float32Array>();
+  private readonly materials = new Set<[PbrMaterial, ...number[]]>();
   private seen: Uint8Array;
   private slots: Int32Array;
   private readonly callbacks = new Set<FrameCallback>();
@@ -466,7 +466,7 @@ export class Engine {
         if (material[3] !== 1 || material[4] < Math.fround(0.045) || (material[6] !== 0 && material[6] !== 1))
           throw new RangeError('Invalid material');
         this.checkedMaterials.set(mesh.material, this.materialFrame);
-        this.materials.set(mesh.material, material.slice());
+        this.materials.add([mesh.material, ...material]);
       }
       const batch = this.batches.get(mesh.geometry)!,
         offset = batch.count++ * 24;
@@ -509,8 +509,8 @@ export class Engine {
       seen = this.seen;
     let full = this.collected !== this.revision;
     for (let id = 0; !full && id < this.next; id++) full = visible[id] !== seen[id];
-    for (const [material, values] of this.materials)
-      for (let i = 0; !full && i < 8; i++) full = material.data[i] !== values[i];
+    for (const values of this.materials)
+      for (let i = 0; !full && i < 8; i++) full = values[0].data[i] !== values[i + 1];
     if (full) {
       for (const batch of this.batches.values()) batch.count = batch.mask = 0;
       this.stats.visible = 0;

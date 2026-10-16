@@ -36,6 +36,8 @@ export function attachGPUAudit(stats: Stats, parent: HTMLElement, { engine, repo
     now = () => view?.performance.now() ?? performance.now(),
     actions: Action[] = [],
     samples: Sample[] = [],
+    exposedSamples = new WeakSet<Sample>(),
+    emptyContext: Context = {},
     pointers = new Set<number>();
   let disposed = false,
     actionId = 0,
@@ -110,38 +112,74 @@ export function attachGPUAudit(stats: Stats, parent: HTMLElement, { engine, repo
     if (observed) missed += Math.max(0, id - lastId - 1);
     lastId = id;
     observed++;
-    const values = Array.from(passes.subarray(0, count));
+    // Unpublished history stays private and can reuse its evicted slot. A public
+    // snapshot pins its records, including their nested values, for their lifetime.
+    const evicted = samples.length === 20 ? samples.shift() : undefined,
+      sample: Sample =
+        evicted && evicted !== peak && !exposedSamples.has(evicted)
+          ? evicted
+          : {
+              id: 0,
+              observedAt: 0,
+              encodedAt: 0,
+              readAt: 0,
+              passSumMs: 0,
+              spanMs: null,
+              passCount: 0,
+              passesMs: [],
+              largestPass: { index: 0, milliseconds: 0 },
+              precedingAction: null,
+              currentCounters: { drawCalls: 0, dispatches: 0, cpuSampleIndex: 0 },
+              contextObservedNow: {},
+            },
+      values = sample.passesMs;
+    values.length = count;
     let largest = 0;
-    for (let i = 1; i < values.length; i++) if (values[i] > values[largest]) largest = i;
-    const preceding = [...actions].reverse().find((event) => event.at <= encodedAt);
-    let context: Context = {};
+    for (let i = 0; i < count; i++) {
+      values[i] = passes[i];
+      if (values[i] > values[largest]) largest = i;
+    }
+    let preceding: Action | undefined;
+    for (let i = actions.length - 1; i >= 0; i--)
+      if (actions[i].at <= encodedAt) {
+        preceding = actions[i];
+        break;
+      }
+    let context: Context = emptyContext;
     try {
-      context = report?.() ?? {};
+      context = report?.() ?? emptyContext;
     } catch {
       /* Diagnostics must not interrupt rendering. */
     }
-    const sample: Sample = {
-      id,
-      observedAt: now(),
-      encodedAt,
-      readAt,
-      passSumMs: duration,
-      spanMs: stats.gpuElapsedMilliseconds,
-      passCount: count,
-      passesMs: values,
-      largestPass: { index: largest, milliseconds: values[largest] },
-      precedingAction: preceding ? { ...preceding, ageAtEncodingMs: encodedAt - preceding.at } : null,
-      currentCounters: { drawCalls: stats.drawCalls, dispatches: stats.dispatches, cpuSampleIndex: stats.sampleIndex },
-      contextObservedNow: context,
-    };
+    sample.id = id;
+    sample.observedAt = now();
+    sample.encodedAt = encodedAt;
+    sample.readAt = readAt;
+    sample.passSumMs = duration;
+    sample.spanMs = stats.gpuElapsedMilliseconds;
+    sample.passCount = count;
+    sample.largestPass.index = largest;
+    sample.largestPass.milliseconds = values[largest];
+    if (preceding) {
+      const action = (sample.precedingAction ??= { id: 0, at: 0, type: '', target: '', ageAtEncodingMs: 0 });
+      action.id = preceding.id;
+      action.at = preceding.at;
+      action.type = preceding.type;
+      action.target = preceding.target;
+      if (preceding.detail === undefined) delete action.detail;
+      else action.detail = preceding.detail;
+      action.ageAtEncodingMs = encodedAt - preceding.at;
+    } else sample.precedingAction = null;
+    sample.currentCounters.drawCalls = stats.drawCalls;
+    sample.currentCounters.dispatches = stats.dispatches;
+    sample.currentCounters.cpuSampleIndex = stats.sampleIndex;
+    const ownContext = sample.contextObservedNow;
+    for (const key in ownContext) if (!Object.hasOwn(context, key)) delete ownContext[key];
+    for (const key in context) if (Object.hasOwn(context, key)) ownContext[key] = context[key];
     samples.push(sample);
-    if (samples.length > 20) samples.shift();
     if (!peak || duration > peak.passSumMs) peak = sample;
   };
-  const snapshot = () => {
-    capture();
-    const bounds = parent.getBoundingClientRect();
-    return {
+  const snapshotData = (recentSamples: Sample[], recentActions: Action[]) => ({
       version: 1,
       interpretation: 'Temporal correlation only; the preceding UI action is not proof of causation.',
       timingScope:
@@ -151,21 +189,42 @@ export function attachGPUAudit(stats: Stats, parent: HTMLElement, { engine, repo
       passMeaning:
         'Zero-based profiled pass indices; pass labels are unavailable. Current counters/context are observed later and are not attributed to that sampled encoder.',
       timeOrigin: view?.performance.timeOrigin ?? performance.timeOrigin,
-      observedAt: now(),
+      observedAt: 0,
       viewport: {
-        width: Math.round(bounds.width),
-        height: Math.round(bounds.height),
-        devicePixelRatio: view?.devicePixelRatio ?? 1,
+        width: 0,
+        height: 0,
+        devicePixelRatio: 1,
       },
-      activePointers: pointers.size,
-      currentAction: actions.at(-1) ?? null,
-      observedSamples: observed,
-      skippedSampleIds: missed,
-      latest: samples.at(-1) ?? null,
-      peakObservedSinceAttach: peak,
-      recentSamples: [...samples],
-      recentActions: [...actions],
-    };
+      activePointers: 0,
+      currentAction: null as Action | null,
+      observedSamples: 0,
+      skippedSampleIds: 0,
+      latest: null as Sample | null,
+      peakObservedSinceAttach: null as Sample | null,
+      recentSamples,
+      recentActions,
+    }),
+    // Only synchronous JSON publication reuses this bag; public snapshots own theirs.
+    publication = snapshotData(samples, actions);
+  const fillSnapshot = (data: ReturnType<typeof snapshotData>) => {
+    const bounds = parent.getBoundingClientRect();
+    data.observedAt = now();
+    data.viewport.width = Math.round(bounds.width);
+    data.viewport.height = Math.round(bounds.height);
+    data.viewport.devicePixelRatio = view?.devicePixelRatio ?? 1;
+    data.activePointers = pointers.size;
+    data.currentAction = actions.at(-1) ?? null;
+    data.observedSamples = observed;
+    data.skippedSampleIds = missed;
+    data.latest = samples.at(-1) ?? null;
+    data.peakObservedSinceAttach = peak;
+    return data;
+  };
+  const snapshot = () => {
+    capture();
+    for (let i = 0; i < samples.length; i++) exposedSamples.add(samples[i]);
+    if (peak) exposedSamples.add(peak);
+    return fillSnapshot(snapshotData([...samples], [...actions]));
   };
   const update = () => {
     if (disposed) return;
@@ -173,7 +232,7 @@ export function attachGPUAudit(stats: Stats, parent: HTMLElement, { engine, repo
     const at = now();
     if (at - publishedAt < 500) return;
     publishedAt = at;
-    parent.dataset.gpuAudit = JSON.stringify(snapshot());
+    parent.dataset.gpuAudit = JSON.stringify(fillSnapshot(publication));
   };
   const removeFrame = engine?.onFrame(update),
     timer = setInterval(update, 500);
