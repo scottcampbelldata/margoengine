@@ -83,6 +83,7 @@ export class Stats implements EnginePlugin {
   private total = 0;
   private last = 0;
   private engine?: Engine;
+  private removeFrameListener?: () => void;
   private profiler?: GPUProfiler;
   private readonly context: CanvasRenderingContext2D | null;
   private readonly text: HTMLElement;
@@ -91,6 +92,22 @@ export class Stats implements EnginePlugin {
   private disposed = false;
   private readonly profiling: boolean;
   private profileFrame = 0;
+  private completedGPU = 0;
+  private encodedGPUAt: number | null = null;
+  private readGPUAt: number | null = null;
+
+  /** Monotonic ordinal of valid completed GPU samples, including equal-duration samples. */
+  get gpuSampleId(): number {
+    return this.completedGPU;
+  }
+  /** CPU performance.now() when the sampled encoder finished; not a GPU execution timestamp. */
+  get gpuSampleEncodedAt(): number | null {
+    return this.disposed ? null : this.encodedGPUAt;
+  }
+  /** CPU performance.now() when that sample's asynchronous readback completed. */
+  get gpuSampleReadAt(): number | null {
+    return this.disposed ? null : this.readGPUAt;
+  }
 
   get gpuPassMilliseconds(): Float64Array | null {
     return !this.disposed && this.profiler?.supported ? this.profiler.passMilliseconds : null;
@@ -167,6 +184,7 @@ export class Stats implements EnginePlugin {
     this.profiler?.dispose();
     this.profiler = new GPUProfiler(device);
     this.gpuTime = null;
+    this.encodedGPUAt = this.readGPUAt = null;
     this.profileFrame = 0;
     return this.profiler.supported;
   }
@@ -233,16 +251,30 @@ export class Stats implements EnginePlugin {
     const stats = this[owner],
       profiler = this[frameProfiler],
       resolved = profiler?.resolve(this),
-      result = this[rawFinish].call(this, descriptor);
-    if (profiler && stats.profiler === profiler && !resolved && profiler.milliseconds === null) stats.gpuTime = null;
+      result = this[rawFinish].call(this, descriptor),
+      encodedAt = resolved ? performance.now() : null;
+    if (profiler && stats.profiler === profiler && !resolved && profiler.milliseconds === null) {
+      stats.gpuTime = null;
+      stats.encodedGPUAt = stats.readGPUAt = null;
+    }
     if (resolved)
       queueMicrotask(() => {
         void profiler!.read().then(
           (value) => {
-            if (!stats.disposed && stats.profiler === profiler) stats.gpuTime = value;
+            if (!stats.disposed && stats.profiler === profiler) {
+              stats.gpuTime = value;
+              if (value !== null) {
+                stats.completedGPU++;
+                stats.encodedGPUAt = encodedAt;
+                stats.readGPUAt = performance.now();
+              } else stats.encodedGPUAt = stats.readGPUAt = null;
+            }
           },
           (error) => {
-            if (!stats.disposed && stats.profiler === profiler) stats.gpuTime = null;
+            if (!stats.disposed && stats.profiler === profiler) {
+              stats.gpuTime = null;
+              stats.encodedGPUAt = stats.readGPUAt = null;
+            }
             stats.engine?.onError(error);
           },
         );
@@ -253,6 +285,11 @@ export class Stats implements EnginePlugin {
   setup(engine: Engine): void {
     if (this.disposed || this.engine) throw new Error('Stats is disposed or attached');
     this.engine = engine;
+    // Only the animation loop can identify a genuine restart. Probe captures
+    // render zero-delta frames too, and must not move the frame-time baseline.
+    this.removeFrameListener = engine.onFrame?.((_engine, delta) => {
+      if (delta === 0) this.last = 0;
+    });
     if (this.profiling && engine.gpu) this.enableGPUProfiling(engine.gpu);
   }
 
@@ -268,8 +305,9 @@ export class Stats implements EnginePlugin {
       name: 'stats:sample',
       order: Number.MAX_VALUE,
       execute: (context) => {
+        if (context.delta <= 0) return;
         const now = performance.now(),
-          milliseconds = context.delta > 0 ? (this.last ? now - this.last : context.delta * 1000) : 0;
+          milliseconds = this.last ? now - this.last : context.delta * 1000;
         this.last = now;
         if (milliseconds > 0)
           this.tick(
@@ -320,6 +358,7 @@ export class Stats implements EnginePlugin {
     this.profiler?.dispose();
     this.profiler = undefined;
     this.gpuTime = null;
+    this.encodedGPUAt = this.readGPUAt = null;
     this.last = 0;
     if (this.profiling && engine.gpu) this.enableGPUProfiling(engine.gpu);
   }
@@ -327,6 +366,8 @@ export class Stats implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.removeFrameListener?.();
+    this.removeFrameListener = undefined;
     this.engine?.removePlugin(this.name);
     this.engine = undefined;
     clearInterval(this.timer);

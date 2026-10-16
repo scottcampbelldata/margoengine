@@ -34,6 +34,7 @@ export class LightProbes extends ShaderEffect {
     constructor(options: LightProbeOptions);
     get byteLength(): number;
     get baked(): boolean;
+    setReflectionPosition(index: number, position: Vec3): void;
     protected get device(): GPUDevice | null | undefined;
     protected entries(): GPUBindGroupEntry[];
     protected patch(source: string, group: number): string;
@@ -55,6 +56,7 @@ export const PROBE_BINDING = 26;
 
 export interface ProbeBakeOptions {
     bounces?: number;
+    samples?: number;
 }
 
 export interface ReflectionProbe {

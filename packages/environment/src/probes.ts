@@ -12,6 +12,7 @@ import { IBL_WGSL, iblBindGroupEntries } from './ibl.js';
 import { IBL_BINDING, ShaderEffect, type LightingTarget, type PBRHooks } from './lighting.js';
 import { evaluateSH } from './sh.js';
 import { halfToFloat } from './half.js';
+import { common } from './shaders.js';
 
 declare const GPUBufferUsage: {
   UNIFORM: number;
@@ -23,6 +24,7 @@ declare const GPUBufferUsage: {
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
 declare const GPUMapMode: { READ: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+type BakePipelines = Record<'sh' | 'resample' | 'prefilter', GPUComputePipeline>;
 
 /** A box filled with a grid of irradiance probes, one at the centre of each cell. */
 export interface IrradianceVolume {
@@ -66,6 +68,8 @@ export interface LightProbeOptions {
 export interface ProbeBakeOptions {
   /** Captures in a row; each one sees the previous one's probe light (an extra bounce). Default 1. */
   bounces?: number;
+  /** Optional GGX importance samples per rough reflection texel (power of two, 64-4096). Omit for full-source convolution. Sharp level 0 and volume SH are unchanged. */
+  samples?: number;
 }
 
 /** Reflection probes per LightProbes. */
@@ -195,8 +199,9 @@ fn probeShade(p:vec3f,n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32,ambient:vec
 
 // Bake: radiance = capture (premultiplied over the environment where nothing was drawn, alpha < 1), projected to SH
 // (normalised cube texel solid angles), resampled to octahedral level 0 and GGX-convolved (n = v = r) into the rougher levels.
-const bakeWgsl = (environment: boolean) =>
+const bakeWgsl = (environment: boolean, sampled: boolean) =>
   dataWgsl('read_write', 0, 0) +
+  (sampled ? common : '') +
   /* wgsl */ `
 struct Bake {offset:u32,size:u32,source:u32,sourceSize:u32,roughness:f32,count:u32,pad0:u32,pad1:u32}
 @group(0) @binding(1) var<uniform> bake:Bake;
@@ -248,6 +253,20 @@ fn coefficientHalf(h:u32)->f32 {if(h>=bake.count*3u){return 0.0;}return coeffici
 }
 @compute @workgroup_size(8,8) fn prefilter(@builtin(global_invocation_id) id:vec3u) {
   let s=bake.size;if(id.x>=s||id.y>=s){return;}
+${
+  sampled
+    ? `
+  let n=normalize(octDecode((vec2f(id.xy)+0.5)/f32(s)));
+  let up=select(vec3f(1,0,0),vec3f(0,0,1),abs(n.z)<0.999);
+  let t=normalize(cross(up,n));let b=cross(n,t);let alpha=bake.roughness*bake.roughness;
+  var sum=vec4f(0);
+  for(var i=0u;i<bake.count;i++){
+    let hl=importanceGGX(hammersley(i,bake.count),alpha);
+    let h=t*hl.x+b*hl.y+n*hl.z;let l=2.0*hl.z*h-n;let nl=dot(n,l);
+    if(nl>0.0){sum+=vec4f(sampleFaces(l)*nl,nl);}
+  }
+`
+    : `
   let n=normalize(octDecode((vec2f(id.xy)+0.5)/f32(s)));let a=bake.roughness*bake.roughness;let a2=a*a;let m=bake.sourceSize;
   var sum=vec4f(0);
   for(var j=0u;j<m*m;j++){
@@ -255,6 +274,8 @@ fn coefficientHalf(h:u32)->f32 {if(h>=bake.count*3u){return 0.0;}return coeffici
     let nh=dot(n,normalize(n+l));let q=nh*nh*(a2-1.0)+1.0;let w=a2/(q*q)*nl/(r*r*r);
     sum+=vec4f(probeTexel(bake.source+j)*w,w);
   }
+`
+}
   store(bake.offset+id.y*s+id.x,sum.rgb/max(sum.a,1e-20));
 }
 `;
@@ -338,13 +359,17 @@ export class LightProbes extends ShaderEffect {
   private cached?: GPUBindGroupEntry[];
   private version = -1;
   private readonly header = new ArrayBuffer(HEADER_BYTES);
+  private headerBaked = false;
   private readonly texelCount: number;
   private readonly offsets: number[] = [];
   private readonly captured = new Set<CaptureModel>();
   private snapshot?: Uint32Array;
   private pending = false;
   private baking = false;
+  private bakeSamples = 0;
   private capture?: { key: string; pipeline: GPURenderPipeline };
+  private bakeDevice?: GPUDevice;
+  private readonly bakeCache = new Map<boolean, BakePipelines>();
 
   /** Same as `engine.use(new LightProbes(options))`; returns the LightProbes. */
   static attach(engine: EngineKernel, options: LightProbeOptions): LightProbes {
@@ -383,7 +408,14 @@ export class LightProbes extends ShaderEffect {
           'Invalid irradiance volume: min < max, 1-64 probes per axis (4,096 in total), sh 1 or 2, blend >= 0',
         );
       powerOfTwo(volume.resolution, 16, 8, 64, 'volume resolution');
-      this.volume = { ...volume, counts: [...counts] as [number, number, number], sh, blend };
+      this.volume = {
+        ...volume,
+        min: [...volume.min],
+        max: [...volume.max],
+        counts: [counts[0], counts[1], counts[2]],
+        sh,
+        blend,
+      };
       volume.min.forEach((v, i) => {
         view.setFloat32(i * 4, v, true);
         view.setFloat32(16 + i * 4, volume.max[i], true);
@@ -413,7 +445,7 @@ export class LightProbes extends ShaderEffect {
       view.setUint32(o + 56, levelCount(this.resolution), true);
       this.offsets.push(texels);
       texels += levelTexels(this.resolution);
-      return { ...probe, blend };
+      return { ...probe, position: [...probe.position], min: [...probe.min], max: [...probe.max], blend };
     });
     view.setUint32(48, this.reflections.length, true);
     this.environment = environment;
@@ -427,6 +459,19 @@ export class LightProbes extends ShaderEffect {
   /** True once a bake has finished (the probes then light receivers). */
   get baked(): boolean {
     return !!this.snapshot;
+  }
+  /** Moves a reflection probe's capture point inside its box. Call `bake()` again to capture the scene there. */
+  setReflectionPosition(index: number, position: Vec3): void {
+    if (!Number.isInteger(index) || index < 0 || index >= this.reflections.length)
+      throw new RangeError('Invalid reflection probe index');
+    const probe = this.reflections[index];
+    if (!vector(position) || position.some((v, i) => v < probe.min[i] || v > probe.max[i]))
+      throw new RangeError('Reflection probe position must be finite and inside the box');
+    (probe as ReflectionProbe).position = [...position];
+    const view = new DataView(this.header),
+      offset = 64 + index * 64;
+    position.forEach((v, i) => view.setFloat32(offset + i * 4, v, true));
+    if (this.gpu) this.writeHeader(this.headerBaked);
   }
   protected get device(): GPUDevice | null | undefined {
     if (!this.gpu || this.disposed) return null;
@@ -507,6 +552,7 @@ export class LightProbes extends ShaderEffect {
     this.writeHeader(!!this.snapshot);
   }
   private writeHeader(baked: boolean): void {
+    this.headerBaked = baked;
     const view = new DataView(this.header.slice(0));
     if (this.volume) view.setUint32(44, baked ? (this.volume.sh === 2 ? 4 : 2) : 0, true); // vec4u per probe; 0 = unbaked
     this.reflections.forEach((_, j) => view.setUint32(64 + j * 64 + 60, +baked, true));
@@ -517,6 +563,9 @@ export class LightProbes extends ShaderEffect {
     this.buffer = this.gpu = undefined;
     this.entry = [];
     this.cached = undefined;
+    this.capture = undefined;
+    this.bakeDevice = undefined;
+    this.bakeCache.clear();
   }
 
   override registerPasses(graph: FrameGraph): void {
@@ -544,11 +593,13 @@ export class LightProbes extends ShaderEffect {
     const bounces = options.bounces ?? 1;
     if (!Number.isInteger(bounces) || bounces < 1 || bounces > 8)
       throw new RangeError('Light probe bounces must be an integer from 1 to 8');
+    const samples = options.samples === undefined ? 0 : powerOfTwo(options.samples, 0, 64, 4096, 'bake samples');
     if (this.disposed || !this.engine || !this.gpu)
       throw new Error(`${this.name} is not attached: engine.use(probes) first`);
     if (this.baking) throw new Error('Light probe bake pending');
     if (this.environment?.device === null) throw new Error('Light probe environment is not ready');
     this.baking = true;
+    this.bakeSamples = samples;
     try {
       const engine = this.engine,
         device = this.gpu;
@@ -581,6 +632,7 @@ export class LightProbes extends ShaderEffect {
     } finally {
       this.pending = false;
       this.baking = false;
+      this.bakeSamples = 0;
     }
   }
 
@@ -756,7 +808,7 @@ export class LightProbes extends ShaderEffect {
               { binding: 0, resource: { buffer: this.buffer! } },
               { binding: 1, resource: { buffer: params, offset: slot * 256, size: 32 } },
             ];
-          if (entry !== 'prefilter')
+          if (entry !== 'prefilter' || this.bakeSamples > 0)
             all.push(
               { binding: 2, resource: faces.createView({ dimension: '2d-array' }) },
               { binding: 3, resource: sampler },
@@ -840,6 +892,7 @@ export class LightProbes extends ShaderEffect {
             size: this.resolution >> level,
             roughness: level / (levels - 1),
             source: base,
+            count: this.bakeSamples,
           });
         probe(r.position, this.resolution, run(jobs));
       });
@@ -853,11 +906,20 @@ export class LightProbes extends ShaderEffect {
       );
     }
   }
-  private bakePipelines(device: GPUDevice): Record<'sh' | 'resample' | 'prefilter', GPUComputePipeline> {
-    const module = device.createShaderModule({ code: bakeWgsl(!!this.environment) });
+  private bakePipelines(device: GPUDevice): BakePipelines {
+    if (this.bakeDevice !== device) {
+      this.bakeCache.clear();
+      this.bakeDevice = device;
+    }
+    const sampled = this.bakeSamples > 0,
+      cached = this.bakeCache.get(sampled);
+    if (cached) return cached;
+    const module = device.createShaderModule({ code: bakeWgsl(!!this.environment, sampled) });
     const make = (entryPoint: string) =>
       device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint } });
-    return { sh: make('sh'), resample: make('resample'), prefilter: make('prefilter') };
+    const pipelines = { sh: make('sh'), resample: make('resample'), prefilter: make('prefilter') };
+    this.bakeCache.set(sampled, pipelines);
+    return pipelines;
   }
   override dispose(): void {
     super.dispose();

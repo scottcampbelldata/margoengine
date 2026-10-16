@@ -23,6 +23,26 @@ engine.start();
 
 `distance` (default 500 m) caps the shadowed range. Left unset while every caster is a core mesh, the cascades instead span the bounding sphere of all core meshes (casters and receivers), with near and far rounded to quarter octaves so orbiting does not resize them: for the stage check's 1 m cube on a 6 m floor at resolution 1024, cascade texels are 0.35 / 0.66 / 1.1 / 1.8 cm instead of 13 / 25 / 42 / 98 cm, and the stair-stepped shadow edge is gone (`node scripts/stage-features-gpu-check.js`, `test-results/stage-features-shadows.png` vs `-shadows-500.png`). Any other caster (glTF-pro model, terrain, custom source) keeps the 500 m default, since its extent is not known; that walk over every core mesh runs each frame, so 100k-part scenes should pass `distance`.
 
+For a compact model or diorama, pass `bounds: {min: [-1.55, -0.35, -1.55], max: [1.55, 2, 1.6]}` to fit one
+directional map to a world-space box instead. Include every caster and receiver, including their animated extents.
+The box projects onto the light's right/up/depth axes, the right/up centre snaps to texels, and `casterMargin` expands
+its light-space depth. Camera orbit and zoom leave this map and its static cache unchanged; the directional light
+still moves it. This works with glTF-pro and custom sources as well as core meshes. All visible receivers use layer
+zero, so `distance` and `lambda` do not affect this mode. One depth layer is allocated, copied and rendered per map,
+using one quarter of the default map memory and caster draws (32 MiB at 2048 for both maps). Keep the bounds mode
+fixed after construction; the box coordinates may change, which refits the map and invalidates its static cache.
+
+For a rounded or tapered scene, add `bounds.points`, an array of at least four finite world-space `Vec3` support
+points inside `min`/`max`. The map fits these points instead of the box's empty corners. Include the complete
+caster/receiver convex envelope and all animated reach; the outer box only validates the supplied points in this
+mode. The fit keeps square world texels for PCSS, so a nonsquare projected scene still leaves some unused area.
+Changing support extents refits the map and refreshes its static cache; camera movement keeps it stable. Omit
+`points` to retain the existing box fit. Degenerate point sets with no light-space extent are rejected on rendering.
+
+`shadows.depthTexture` exposes the current combined `depth32float` texture array for diagnostics (one layer with
+`bounds`, four otherwise). It has `COPY_SRC` usage, so a diagnostic can copy an actual depth layer to a readback buffer.
+It is undefined before setup or after disposal, and its identity changes after device restoration.
+
 Core meshes receive shadows automatically. `shadows.add(pbrModel)` also adds the shadow term through gltf-pro's `direct` lighting hook (`shadows.pbr(group)`; core meshes and terrain still get a text patch of the `let linear=direct*` line, see docs/shader-contracts.md) and reads the current deformed vertex buffer after the animation compute pass, so skinned and morphed models cast and receive in their animated pose (real GPU: `examples/package-benchmarks/deformed-shadows/check.mjs`). `shadows.add(vatCrowd)` (`@margoengine/animation/vat`) draws a VAT crowd's posed instances into every cascade and shadows the crowd. Alpha-masked PBR casters honor their base map, vertex alpha, UV set and cutoff; blended casters are omitted. Instanced primitives (gltf-pro `PBRInstances`, materials `createInstancedMesh`) cast every drawn instance in one instanced depth draw, with each instance's atlas UV offset and tint alpha in the cut-out test; a static instanced source needs `invalidate()` after instance edits. `shadows.add(clipmapTerrain)` uses its GPU height sampling for depth and its lighting hook for reception. Custom sources can implement `drawShadow(ShadowContext)`.
 
 Static geometry renders into a cached depth array. Each frame copies that array and adds dynamic casters, so dynamic geometry cannot overwrite the cache. Cache invalidation occurs when snapped cascade matrices, clipmap origins, source membership, disposal or device change. Call `invalidate()` after moving/hiding a static mesh, editing its geometry/material, or changing a height texture. Moving the camera far enough to move a cascade rerenders static geometry. No fixed draw-call reduction is promised. `stats` reports static/dynamic primitive draws and cache hits; custom sources record their own draws.

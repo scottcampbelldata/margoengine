@@ -9,6 +9,7 @@ import {
   type FrameGraph,
   type PassContext,
   type Mesh,
+  type Vec3,
 } from '@margoengine/core/extension';
 import { viewMatrix } from '../../shared/view.js';
 import { preset } from '../../shared/preset.js';
@@ -32,6 +33,13 @@ export interface ShadowOptions {
   bias?: number;
   normalBias?: number;
   casterMargin?: number;
+  /** Fixed world-space caster/receiver bounds. Uses one camera-independent map instead of four camera cascades. */
+  bounds?: {
+    min: Vec3;
+    max: Vec3;
+    /** Optional world-space support hull of every caster/receiver; fits these points instead of empty box corners. */
+    points?: readonly Vec3[];
+  };
 }
 export interface ShadowContext {
   context: Context;
@@ -97,6 +105,7 @@ export class Shadows implements EnginePlugin {
   private pipelines = new Map<number, GPURenderPipeline>();
   private draws = new Map<Mesh, Map<GPUBuffer, Draw>>();
   private sources: Source[] = [];
+  private readonly cascadeCount: 1 | 4;
   private readonly values = new Float32Array(92);
   private readonly ranges = this.values.subarray(84, 88);
   private readonly previous = new Float32Array(64);
@@ -134,10 +143,16 @@ export class Shadows implements EnginePlugin {
   private readonly copySize = { width: 0, height: 0, depthOrArrayLayers: 4 };
   constructor(readonly options: ShadowOptions = {}) {
     this.options = preset('shadows', options);
+    this.cascadeCount = this.options.bounds ? 1 : 4;
+    this.copySize.depthOrArrayLayers = this.cascadeCount;
     this.validate();
   }
   get owner(): Engine | undefined {
     return this.engine;
+  }
+  /** Combined depth32float array for diagnostics; COPY_SRC permits readback. Undefined before setup or after disposal. */
+  get depthTexture(): GPUTexture | undefined {
+    return this.combined;
   }
   static attach(instance: EngineKernel, options: ShadowOptions = {}): Shadows {
     const effect = new Shadows(options);
@@ -146,6 +161,34 @@ export class Shadows implements EnginePlugin {
   }
   private validate(): void {
     const o = this.options;
+    if (
+      o.bounds !== undefined &&
+      (!o.bounds ||
+        !Array.isArray(o.bounds.min) ||
+        !Array.isArray(o.bounds.max) ||
+        o.bounds.min.length !== 3 ||
+        o.bounds.max.length !== 3 ||
+        !o.bounds.min.every(Number.isFinite) ||
+        !o.bounds.max.every(Number.isFinite) ||
+        o.bounds.min.some((value, axis) => value >= o.bounds!.max[axis]))
+    )
+      throw new RangeError('Invalid shadow bounds: finite world-space min < max required');
+    const points = o.bounds?.points;
+    if (
+      points !== undefined &&
+      (!Array.isArray(points) ||
+        points.length < 4 ||
+        points.some(
+          (point) =>
+            !Array.isArray(point) ||
+            point.length !== 3 ||
+            !point.every(Number.isFinite) ||
+            point.some((value, axis) => value < o.bounds!.min[axis] || value > o.bounds!.max[axis]),
+        ))
+    )
+      throw new RangeError('Invalid shadow bounds points: at least four finite Vec3 points inside min/max required');
+    if ((o.bounds ? 1 : 4) !== this.cascadeCount)
+      throw new RangeError('Shadow bounds mode cannot change after construction');
     if (
       !Number.isInteger(o.resolution ?? 2048) ||
       (o.resolution ?? 2048) < 16 ||
@@ -239,13 +282,13 @@ export class Shadows implements EnginePlugin {
     this.device = engine.gpu;
     this.validate();
     const size = this.options.resolution ?? 2048;
-    if (size > this.device.limits.maxTextureDimension2D || this.device.limits.maxTextureArrayLayers < 4)
+    if (size > this.device.limits.maxTextureDimension2D || this.device.limits.maxTextureArrayLayers < this.cascadeCount)
       throw new RangeError('Shadow map exceeds device limit');
     for (const r of this.sources)
       if ('id' in r.source && r.source.engine !== engine) throw new Error('Shadow mesh belongs to another engine');
     const texture = () =>
       this.device!.createTexture({
-        size: [size, size, 4],
+        size: [size, size, this.cascadeCount],
         format: 'depth32float',
         usage:
           GPUTextureUsage.RENDER_ATTACHMENT |
@@ -255,10 +298,10 @@ export class Shadows implements EnginePlugin {
       });
     this.cached = texture();
     this.combined = texture();
-    this.views = Array.from({ length: 4 }, (_, baseArrayLayer) =>
+    this.views = Array.from({ length: this.cascadeCount }, (_, baseArrayLayer) =>
       this.combined!.createView({ dimension: '2d', baseArrayLayer, arrayLayerCount: 1 }),
     );
-    this.cachedViews = Array.from({ length: 4 }, (_, baseArrayLayer) =>
+    this.cachedViews = Array.from({ length: this.cascadeCount }, (_, baseArrayLayer) =>
       this.cached!.createView({ dimension: '2d', baseArrayLayer, arrayLayerCount: 1 }),
     );
     this.uniform = this.device.createBuffer({ size: 368, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -358,20 +401,26 @@ export class Shadows implements EnginePlugin {
   }
   private render(c: Context): void {
     this.validate();
-    const camera = this.range(c.camera);
-    cascadeSplits(camera.near, camera.far, this.options.lambda ?? 0.5, this.splits);
     for (let i = 0; i < 3; i++) this.light[i] = this.engine!.lighting.direction[i];
-    fitCascades(
-      camera,
-      c.width / c.height,
-      this.light as unknown as [number, number, number],
-      this.options.resolution ?? 2048,
-      this.splits,
-      this.matrices,
-      this.ranges,
-      this.options.casterMargin ?? 100,
-      this.fitted,
-    );
+    if (this.options.bounds) {
+      this.fitBounds();
+      // All visible receivers select layer zero, including when the camera orbits outside the fixed box.
+      this.splits.fill(c.camera.far);
+    } else {
+      const camera = this.range(c.camera);
+      cascadeSplits(camera.near, camera.far, this.options.lambda ?? 0.5, this.splits);
+      fitCascades(
+        camera,
+        c.width / c.height,
+        this.light as unknown as [number, number, number],
+        this.options.resolution ?? 2048,
+        this.splits,
+        this.matrices,
+        this.ranges,
+        this.options.casterMargin ?? 100,
+        this.fitted,
+      );
+    }
     for (let i = 0; i < 64; i++) if (this.matrices[i] !== this.previous[i]) this.dirty = true;
     for (let i = this.sources.length - 1; i >= 0; i--) {
       const r = this.sources[i];
@@ -403,7 +452,7 @@ export class Shadows implements EnginePlugin {
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     this.stats.staticDraws = this.stats.dynamicDraws = 0;
     if (this.dirty) {
-      for (let cascade = 0; cascade < 4; cascade++) this.depth(c, cascade, true);
+      for (let cascade = 0; cascade < this.cascadeCount; cascade++) this.depth(c, cascade, true);
       this.previous.set(this.matrices);
       this.dirty = false;
     } else this.stats.cacheHits++;
@@ -411,7 +460,95 @@ export class Shadows implements EnginePlugin {
     this.copyDestination.texture = this.combined!;
     this.copySize.width = this.copySize.height = this.options.resolution ?? 2048;
     c.encoder.copyTextureToTexture(this.copySource, this.copyDestination, this.copySize);
-    if (dynamic) for (let cascade = 0; cascade < 4; cascade++) this.depth(c, cascade, false);
+    if (dynamic) for (let cascade = 0; cascade < this.cascadeCount; cascade++) this.depth(c, cascade, false);
+  }
+  private fitBounds(): void {
+    const { min, max, points } = this.options.bounds!,
+      length = Math.hypot(this.light[0], this.light[1], this.light[2]);
+    if (!length) throw new RangeError('Zero shadow direction');
+    const zx = -this.light[0] / length,
+      zy = -this.light[1] / length,
+      zz = -this.light[2] / length,
+      vertical = Math.abs(zy) > 0.99;
+    let xx = vertical ? -zy : zz,
+      xy = vertical ? zx : 0,
+      xz = vertical ? 0 : -zx;
+    const xl = Math.hypot(xx, xy, xz);
+    xx /= xl;
+    xy /= xl;
+    xz /= xl;
+    const yx = zy * xz - zz * xy,
+      yy = zz * xx - zx * xz,
+      yz = zx * xy - zy * xx;
+    let centerX: number, centerY: number, centerZ: number, halfX: number, halfY: number, halfZ: number;
+    if (points) {
+      let minX = Infinity,
+        minY = Infinity,
+        minZ = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity,
+        maxZ = -Infinity;
+      for (const p of points) {
+        const x = p[0] * xx + p[1] * xy + p[2] * xz,
+          y = p[0] * yx + p[1] * yy + p[2] * yz,
+          z = p[0] * zx + p[1] * zy + p[2] * zz;
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+        minZ = Math.min(minZ, z);
+        maxZ = Math.max(maxZ, z);
+      }
+      centerX = (minX + maxX) * 0.5;
+      centerY = (minY + maxY) * 0.5;
+      centerZ = (minZ + maxZ) * 0.5;
+      halfX = (maxX - minX) * 0.5;
+      halfY = (maxY - minY) * 0.5;
+      halfZ = (maxZ - minZ) * 0.5;
+    } else {
+      const cx = (min[0] + max[0]) * 0.5,
+        cy = (min[1] + max[1]) * 0.5,
+        cz = (min[2] + max[2]) * 0.5,
+        hx = (max[0] - min[0]) * 0.5,
+        hy = (max[1] - min[1]) * 0.5,
+        hz = (max[2] - min[2]) * 0.5;
+      centerX = cx * xx + cy * xy + cz * xz;
+      centerY = cx * yx + cy * yy + cz * yz;
+      centerZ = cx * zx + cy * zy + cz * zz;
+      halfX = Math.abs(xx) * hx + Math.abs(xy) * hy + Math.abs(xz) * hz;
+      halfY = Math.abs(yx) * hx + Math.abs(yy) * hy + Math.abs(yz) * hz;
+      halfZ = Math.abs(zx) * hx + Math.abs(zy) * hy + Math.abs(zz) * hz;
+    }
+    const resolution = this.options.resolution ?? 2048,
+      // Projecting the AABB half extents is equivalent to fitting all eight world-space corners.
+      // Keep square world texels: the established receiver-plane PCSS filter uses one XY texel scale.
+      radius = Math.max(halfX, halfY) * (1 + 2 / resolution),
+      rx = radius,
+      ry = radius,
+      depth = 2 * (halfZ + (this.options.casterMargin ?? 100)),
+      tx = (2 * rx) / resolution,
+      ty = (2 * ry) / resolution,
+      px = Math.round(centerX / tx) * tx,
+      py = Math.round(centerY / ty) * ty,
+      pz = centerZ,
+      m = this.matrices;
+    if (!(radius > 0) || !(depth > 0)) throw new RangeError('Shadow bounds points have no light-space extent');
+    m.fill(0);
+    m[0] = xx / rx;
+    m[4] = xy / rx;
+    m[8] = xz / rx;
+    m[1] = yx / ry;
+    m[5] = yy / ry;
+    m[9] = yz / ry;
+    m[2] = zx / depth;
+    m[6] = zy / depth;
+    m[10] = zz / depth;
+    m[12] = -px / rx;
+    m[13] = -py / ry;
+    m[14] = 0.5 - pz / depth;
+    m[15] = 1;
+    this.ranges.fill(depth);
+    for (let i = 0; i < 16; i++) if (!Number.isFinite(m[i])) throw new RangeError('Shadow bounds matrix overflow');
   }
   private depth(c: Context, cascade: number, cached: boolean): void {
     this.depthAttachment.view = (cached ? this.cachedViews : this.views)[cascade];

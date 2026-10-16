@@ -21,6 +21,11 @@ export interface ShadowOptions {
     bias?: number;
     normalBias?: number;
     casterMargin?: number;
+    bounds?: {
+        min: Vec3;
+        max: Vec3;
+        points?: readonly Vec3[];
+    };
 }
 
 export interface ShadowPrimitive {
@@ -60,6 +65,7 @@ export class Shadows implements EnginePlugin {
     };
     constructor(options?: ShadowOptions);
     get owner(): Engine | undefined;
+    get depthTexture(): GPUTexture | undefined;
     static attach(instance: EngineKernel, options?: ShadowOptions): Shadows;
     add(source: ShadowSource | MeshHandle, { static: cached }?: {
         static?: boolean;

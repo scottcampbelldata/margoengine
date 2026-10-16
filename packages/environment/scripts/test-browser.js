@@ -39,12 +39,22 @@ try {
     if (response.status() >= 400 && !response.url().endsWith('/favicon.ico'))
       errors.push(`${response.status()} ${response.url()}`);
   });
-  await page.goto(`${server.resolvedUrls.local[0]}tests/environment.html`);
-  await page.waitForFunction(() => typeof window.runEnvironmentTests === 'function');
-  const report = await page.evaluate(() => window.runEnvironmentTests());
+  const probeSamples = process.argv.includes('--probe-samples');
+  await page.goto(`${server.resolvedUrls.local[0]}tests/${probeSamples ? 'probe-samples' : 'environment'}.html`);
+  await page.waitForFunction(
+    (sampled) => typeof window[sampled ? 'runProbeSampleTests' : 'runEnvironmentTests'] === 'function',
+    probeSamples,
+  );
+  const report = await page.evaluate(
+    (sampled) => window[sampled ? 'runProbeSampleTests' : 'runEnvironmentTests'](),
+    probeSamples,
+  );
   report.browser = browser.version();
   assert.deepEqual(errors, []);
-  await writeFile(resolve(results, 'environment-browser.json'), JSON.stringify(report, null, 2));
+  await writeFile(
+    resolve(results, probeSamples ? 'probe-samples-browser.json' : 'environment-browser.json'),
+    JSON.stringify(report, null, 2),
+  );
   console.log(JSON.stringify(report, null, 2));
   console.log(`${report.checks.length} browser checks passed`);
 } finally {

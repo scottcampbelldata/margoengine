@@ -173,6 +173,50 @@ test('LightProbes replaces the ambient term on every core shader variant, with o
   assert.ok(engine.removed.includes('light-probes'));
 });
 
+test('moving a reflection probe validates and copies its point, updates the GPU box origin, and preserves its influence', () => {
+  const volume = { min: [-2, 0, -2], max: [2, 3, 2], counts: [1, 1, 1] },
+    reflection = { position: [0, 1, 0], min: [-2, 0, -2], max: [2, 3, 2] },
+    probes = new LightProbes({ volume, reflections: [reflection] }),
+    gpu = mockGPU(),
+    engine = fakeEngine(gpu);
+  volume.min[0] = volume.max[0] = reflection.min[0] = reflection.max[0] = 99;
+  volume.counts[0] = 64;
+  reflection.position[0] = 99;
+  assert.deepEqual(probes.volume.min, [-2, 0, -2]);
+  assert.deepEqual(probes.volume.max, [2, 3, 2]);
+  assert.deepEqual(probes.volume.counts, [1, 1, 1]);
+  assert.deepEqual(probes.reflections[0].position, [0, 1, 0]);
+  assert.deepEqual(probes.reflections[0].min, [-2, 0, -2]);
+  assert.deepEqual(probes.reflections[0].max, [2, 3, 2]);
+  for (const index of [-1, 1, 0.5, NaN, Infinity])
+    assert.throws(() => probes.setReflectionPosition(index, [0, 1, 0]), /probe index/);
+  for (const position of [[3, 1, 0], [0, -1, 0], [0, 1, Infinity], [NaN, 1, 0], [0, 1], null])
+    assert.throws(() => probes.setReflectionPosition(0, position), /finite and inside/);
+  const position = [-2, 3, 2];
+  probes.setReflectionPosition(0, position); // Faces of the influence box are valid, before engine setup too.
+  position[0] = 99;
+  assert.deepEqual(probes.reflections[0].position, [-2, 3, 2]);
+  probes.setup(engine);
+  const log = gpu.record(() => probes.setReflectionPosition(0, [1, 2, -1])),
+    write = log.find((e) => e[0] === 'writeBuffer'),
+    header = Buffer.from(write[3], 'hex');
+  assert.deepEqual(
+    [64, 68, 72].map((o) => header.readFloatLE(o)),
+    [1, 2, -1],
+  );
+  assert.deepEqual(
+    [80, 84, 88].map((o) => header.readFloatLE(o)),
+    [-2, 0, -2],
+  );
+  assert.deepEqual(
+    [96, 100, 104].map((o) => header.readFloatLE(o)),
+    [2, 3, 2],
+  );
+  assert.equal(header.readUInt32LE(124), 0, 'moving an unbaked probe leaves it inactive');
+  assert.equal(probes.baked, false);
+  probes.dispose();
+});
+
 async function gltfModel(engine) {
   const store = await TransformStore.create(16),
     canvas = { width: 128, height: 96, clientWidth: 128, clientHeight: 96 };
@@ -202,6 +246,7 @@ test('LightProbes reach gltf-pro models through the ambient hook and the bake ca
     resolution: 16,
   });
   probes.setup(engine);
+  probes.setReflectionPosition(0, [1, 2, -1]);
   const remove = probes.add(model);
   const frame = context(gpu, {
     shader:
@@ -300,9 +345,149 @@ test('LightProbes reach gltf-pro models through the ambient hook and the bake ca
   );
   assert.equal(probes.baked, true);
   assert.equal(probes.texels.length, (16 + 336) * 2);
+  const captures = log
+    .filter((e) => e[0] === 'writeBuffer' && e[2] === 0 && e[3].length === 112 * 2)
+    .map((e) => Buffer.from(e[3], 'hex'));
+  assert.equal(captures.length, 2 * probeCount * 6);
+  for (const values of [...captures.slice(12, 18), ...captures.slice(30, 36)])
+    assert.deepEqual(
+      [64, 68, 72].map((o) => values.readFloatLE(o)),
+      [1, 2, -1],
+      'all six faces use the moved point',
+    );
+  const bakedTexels = probes.texels,
+    move = gpu.record(() => probes.setReflectionPosition(0, [-1, 1, 1])),
+    movedHeader = Buffer.from(move.find((e) => e[0] === 'writeBuffer')[3], 'hex');
+  assert.deepEqual(
+    [64, 68, 72].map((o) => movedHeader.readFloatLE(o)),
+    [-1, 1, 1],
+  );
+  assert.equal(movedHeader.readUInt32LE(124), 1, 'last baked reflection remains active between captures');
+  assert.equal(probes.texels, bakedTexels, 'moving does not discard the previous radiance');
+  assert.equal(probes.baked, true);
   remove();
   probes.dispose();
   core.dispose();
+});
+
+test('bounded GGX samples validate before rendering and do not leak into later default bakes', async () => {
+  const gpu = mockGPU(),
+    engine = fakeEngine(gpu),
+    probes = new LightProbes({ reflections: [{ position: [0, 1, 0], ...room }], resolution: 16 });
+  probes.setup(engine);
+  let renders = 0,
+    log = [];
+  const frame = context(gpu, { shader: coreShader });
+  engine.render = () => {
+    renders++;
+    log.push(
+      ...gpu.record(() => {
+        frame.begin(renders);
+        frame.c.shader = coreShader;
+        passes(probes)(frame.c);
+      }),
+    );
+  };
+  const createBuffer = gpu.device.createBuffer;
+  gpu.device.createBuffer = (d) =>
+    Object.assign(
+      createBuffer(d),
+      d.usage & GPUBufferUsage.MAP_READ
+        ? {
+            mapAsync: async () => undefined,
+            getMappedRange: () => new ArrayBuffer(336 * 8),
+            unmap() {},
+          }
+        : {},
+    );
+  for (const samples of [null, 0, 32, 65, 64.5, 8192, NaN, Infinity])
+    await assert.rejects(probes.bake({ samples }), /bake samples must be a power of two/);
+  await assert.rejects(probes.bake({ samples: 256, bounces: 0 }), /bounces/);
+  assert.equal(renders, 0, 'invalid options are atomic');
+  assert.equal(probes.baked, false);
+  assert.equal(probes.texels, undefined);
+  const pending = probes.bake({ samples: 256, bounces: 2 });
+  await assert.rejects(probes.bake({ samples: 64 }), /bake pending/);
+  await pending;
+  const sampledCode = log.find((e) => e[0] === 'module' && e[2].code.includes('fn prefilter('))[2].code;
+  assert.match(sampledCode, /importanceGGX\(hammersley\(i,bake.count\),alpha\)/);
+  assert.doesNotMatch(sampledCode, /for\(var j=0u;j<m\*m;j\+\+\)/);
+  const uniforms = log
+    .filter((e) => e[0] === 'writeBuffer' && e[3].length === 3 * 256 * 2)
+    .map((e) => Buffer.from(e[3], 'hex'));
+  assert.equal(uniforms.length, 2);
+  for (const uniform of uniforms)
+    assert.deepEqual(
+      [0, 1, 2].map((slot) => uniform.readUInt32LE(slot * 256 + 20)),
+      [0, 256, 256],
+    );
+  assert.equal(
+    log.filter((e) => e[0] === 'group' && e[2].entries.some((x) => x.binding === 2)).length,
+    6,
+    'resample and both rough dispatches bind the captured faces',
+  );
+  assert.equal(probes.texels.length, 336 * 2, 'sampled radiance is snapshotted for device restore');
+  const first = probes.texels;
+  log = [];
+  await probes.bake();
+  const exactCode = log.find((e) => e[0] === 'module' && e[2].code.includes('fn prefilter('))[2].code;
+  assert.match(exactCode, /for\(var j=0u;j<m\*m;j\+\+\)/);
+  assert.doesNotMatch(exactCode, /fn importanceGGX/);
+  assert.notEqual(probes.texels, first);
+  probes.dispose();
+});
+
+test('probe bake pipelines are reused per device and filter mode, including changed sample counts', async () => {
+  const engine = fakeEngine(mockGPU()),
+    probes = new LightProbes({ reflections: [{ position: [0, 1, 0], ...room }], resolution: 16 });
+  let log = [];
+  const configure = (gpu) => {
+    engine.gpu = device(gpu);
+    const frame = context(gpu, { shader: coreShader }),
+      createBuffer = gpu.device.createBuffer;
+    gpu.device.createBuffer = (d) =>
+      Object.assign(
+        createBuffer(d),
+        d.usage & GPUBufferUsage.MAP_READ
+          ? {
+              mapAsync: async () => undefined,
+              getMappedRange: () => new ArrayBuffer(336 * 8),
+              unmap() {},
+            }
+          : {},
+      );
+    engine.render = () =>
+      log.push(
+        ...gpu.record(() => {
+          frame.begin(0);
+          frame.c.shader = coreShader;
+          passes(probes)(frame.c);
+        }),
+      );
+  };
+  configure(mockGPU());
+  probes.setup(engine);
+  const check = async (options, expected) => {
+    log = [];
+    await probes.bake(options);
+    assert.equal(log.filter((e) => e[0] === 'computePipeline').length, expected);
+    assert.equal(log.filter((e) => e[0] === 'module' && e[2].code.includes('fn prefilter(')).length, expected ? 1 : 0);
+  };
+  await check({}, 3);
+  await check({}, 0);
+  await check({ samples: 256 }, 3);
+  await check({ samples: 64 }, 0);
+  await check({ samples: 4096 }, 0);
+  await check({}, 0);
+  const snapshot = probes.texels;
+  configure(mockGPU());
+  probes.onDeviceRestored(engine);
+  assert.equal(probes.texels, snapshot, 'restoration retains captured radiance');
+  await check({}, 3);
+  await check({ samples: 256 }, 3);
+  await check({ samples: 128 }, 0);
+  probes.dispose();
+  await assert.rejects(probes.bake(), /not attached/);
 });
 
 test('irradianceAt mirrors the shader: trilinear between probe centres, float16 SH', async () => {

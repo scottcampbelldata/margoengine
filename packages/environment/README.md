@@ -76,7 +76,7 @@ Limits: the 4x composite is per sample (about 4x the 1x cost; a per-pixel varian
 
 ## Light probes: irradiance volumes and reflection probes
 
-`@margoengine/environment/probes` is a separate entry (10,845 B min+gzip; the root entry is byte-identical without it).
+`@margoengine/environment/probes` is a separate entry (11,750 B min+gzip; the root entry is byte-identical without it).
 It bakes the scene into light probes on the GPU and uses them as the ambient light of core meshes and of every model
 you `add` (gltf-pro and materials models, terrain), the receivers clustered lights reach:
 
@@ -93,6 +93,11 @@ const probes = LightProbes.attach(engine, {
 });
 // probes.add(model) for each gltf-pro / materials model or terrain; added models are also captured.
 await probes.bake();                                                      // at load, or again whenever the scene changes
+// For a moving mirror, keep the capture at its centre and refresh on demand:
+probes.setReflectionPosition(0, [1, 1.5, 0]);                              // must stay inside this probe's box
+await probes.bake();
+// For live updates, bound the rough-level GGX filter work; sharp reflection detail stays at the configured resolution.
+await probes.bake({samples: 256});
 ```
 
 - **Irradiance volume.** A box filled with a grid of probes (1-64 per axis, at most 4,096), one per cell centre. Each probe
@@ -106,7 +111,11 @@ await probes.bake();                                                      // at 
   intersected with the probe's box (box projection) and the radiance read trilinearly over the levels by roughness. The
   box is also the influence volume (its faces included, so a room box lights its own walls); the probe fades out over
   `blend` (default 10% of its smallest side) outside it, and
-  where boxes overlap the earlier probe in the list wins, so list nested boxes first.
+  where boxes overlap the earlier probe in the list wins, so list nested boxes first. `setReflectionPosition(index,
+  position)` moves the capture point and its box-projection origin together, keeping the last baked radiance until the
+  next `bake()`. It validates an integer probe index and a finite position inside the box; input vectors are copied.
+  For a mirror model that should receive reflections without appearing in its own capture, call
+  `model.addLighting(probes)` directly instead of `probes.add(model)`.
 - **Replacing the ambient term.** Probes replace the ambient light, named `margoAmbient` like `EnvironmentLighting`, so
   SSAO occludes it: diffuse from the volume and specular from the reflection probes, split-sum weighted as
   EnvironmentLighting; where a probe's weight is below 1 the rest comes from `environment` (its SH and prefiltered cube,
@@ -121,6 +130,14 @@ await probes.bake();                                                      // at 
   submit per face, then one compute pass per probe. `bounces: n` repeats the capture n times, each seeing the previous
   bake's probe light (one more bounce each). The result is also read back to the CPU: a device restore re-uploads it, and
   `irradianceAt(position, normal)` returns the volume's irradiance there, as the shaders compute it.
+- **Live reflection filtering.** `bake({samples: 256})` uses a deterministic Hammersley GGX importance filter for the rough
+  reflection levels, taking that many directional samples per output texel. `samples` must be a power of two from 64 to
+  4096; omit it to retain the full-source convolution. The sharp level 0 and volume SH are unchanged. This bounds filter
+  work independently of capture resolution: at 128 px, 256 samples reduce rough-level iterations from 89.4 million to
+  1.40 million. Samples read the captured cube faces and environment fallback directly, without source mip filtering;
+  tiny, very bright sources can require more samples. Invalid options fail before any rendering or probe mutation.
+  Bake shader modules and compute pipelines are cached per device and filter mode; changing the sample count uses a
+  uniform rather than compiling another shader. Device restoration rebuilds the pipelines from the new device.
 - **Bindings.** One storage buffer (header, then float16 RGB texels: 72 B per L2 probe, 21,840 texels per 128 px
   reflection probe) and no sampled texture; with an environment the same five IBL bindings EnvironmentLighting uses. So
   gltf-pro's physical material with shadows, LocalShadows and environment lighting stays at 16 sampled textures; storage
@@ -334,7 +351,7 @@ Two portability measures are deliberate: the specular prefilter samples the cube
 
 `npm test` in `packages/environment` runs Node checks: every binary16 value round trip; 20 EXR fixtures written by the reference OpenEXR library (NONE, RLE, ZIPS, ZIP and PIZ, each with HALF RGBA, FLOAT RGB, HALF Y and a mixed HALF/FLOAT/UINT layout) decoding bit-exactly; an independent in-test EXR writer (including raw-fallback chunks, decreasing Y and stored, fixed and dynamic deflate blocks); real files `BrightRings.exr` (ZIP) and `AllHalfValues.exr` (PIZ, every half value) from the OpenEXR test images and `spot1Lux.hdr` from the Three.js examples, matched against reference digests; HDR adaptive, flat and old-style runs in both orientations; truncation and random-corruption fuzzing; CPU SH; and SSR safety. `tests/scene.test.js` checks the scene pieces on a mock GPU: `EnvironmentLighting` and `Fog` patch core's shader as left by shadows, sky, clustered and the HDR captures, leave it untouched when not ready, on another device or disposed, follow device restores and rebuild bind entries on `environment.version`; a real glTF-pro model gets lit and fogged pipelines for opaque and blended primitives and returns to the unpatched pipelines when removed; `ColorBackground` writes exact sRGB or linear values, allocates nothing in steady frames or on resize and releases its uniform; and UltraHDR parsing (attribute and element metadata, corruption fuzzing) and gain-map math against the formula.
 
-`tests/probes.test.js` checks LightProbes on a mock GPU: validation and buffer layout, the ambient patch on core's shader variants (with and without an environment, terrain, clustered) and on a glTF-pro model, the bake's capture shader (rebound frame, linear output, no fog, every clustered light), its submits and dispatches, and the CPU irradiance mirror; the real-GPU checks are `examples/package-benchmarks/probes-gpu.mjs` (README section above).
+`tests/probes.test.js` checks LightProbes on a mock GPU: validation and buffer layout, the ambient patch on core's shader variants (with and without an environment, terrain, clustered) and on a glTF-pro model, the bake's capture shader (rebound frame, linear output, no fog, every clustered light), its submits and dispatches, the opt-in bounded filter's bindings and atomic validation, and the CPU irradiance mirror. `npm run test:probes:browser` checks the bounded filter on a real GPU: constant HDR energy, an independent spherical integral for a directional environment including every cube seam, a rendered colored room against full-source GGX, and byte-identical sharp level 0 / volume SH. It writes `test-results/probe-samples-browser.json`. The broader real-GPU checks are `examples/package-benchmarks/probes-gpu.mjs` (README section above).
 
 `npm run test:browser` (a real-GPU script, not in CI) runs Chromium WebGPU checks (set `BROWSER_CHANNEL`, `BROWSER_EXECUTABLE` and `BROWSER_ARGS` as in the repository brief): a constant environment gives constant values at every prefiltered mip and L0-only SH; a single bright direction gives SH matching both a CPU projection and the analytic delta projection, with no fireflies in the prefiltered mips; prefiltered mip 0 equals the source; the cube follows the documented face convention; GPU SH matches a CPU projection of the same cube texels; six `CubeFaces` give the same SH as the equirect; the BRDF LUT matches brute-force quadrature, the smooth-surface analytic limit and Karis's published mobile fit; the background renders the expected color in each direction (equirect, cube, rotation, exposure, blur, HDR and tone-mapped targets) and never draws over non-cleared depth; `IBL_WGSL` compiles against `iblLayoutEntries` and passes a white furnace test; a real `.hdr` goes through the whole pipeline; and in a real engine the background leaves every pixel of a core mesh untouched, matches core's tone mapping elsewhere, allocates nothing in steady frames and comes back after `engine.rebootDevice()`; in a real engine `ColorBackground` writes exact bytes on cleared depth only, `EnvironmentLighting` lights a core mesh and a glTF-pro triangle with direct and ambient light off, full `Fog` turns the whole frame (including the blended triangle) into its color, and removing all three restores the original frame byte for byte; and an UltraHDR file assembled from two browser-encoded JPEGs decodes through `createImageBitmap`. Every check runs under WebGPU error scopes with zero validation errors. `tests/fixtures/generate.py` regenerates the synthetic fixtures (`pip install OpenEXR numpy`).
 

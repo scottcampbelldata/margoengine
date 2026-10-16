@@ -54,4 +54,13 @@ entries. The array is replaced when a new device requires a new profiler; no cop
 or array allocation occurs when reading these getters. The overlay's GPU span
 includes the inter-pass work described above and is not a displayed-frame time.
 
+`gpuSampleId` increments after each valid completed GPU readback, even when its
+duration equals the previous sample. It stays monotonic through device replacement;
+unsampled frames, pending reads, and invalid samples do not increment it.
+`gpuSampleEncodedAt` records the CPU `performance.now()` at the sampled encoder's
+`finish()`, and `gpuSampleReadAt` records the CPU time when its readback completes.
+These timestamps describe host encoding/readback, not GPU execution on a host clock.
+They are null before a valid sample and when timing is cleared. They can correlate
+events with samples; temporal proximity alone does not establish a cause.
+
 `dispose()` removes the overlay, timer and plugin and destroys owned GPU resources.
