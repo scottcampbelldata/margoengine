@@ -2,9 +2,68 @@
 
 Published 2026-10-16 to [margoengine.com/demos/light-keeper/](https://margoengine.com/demos/light-keeper/), with a link from the homepage.
 
-## Current allocation checkpoint
+## Current diagnostics checkpoint
 
-Production is `f084db7e-b09c-4a8d-af0c-40c1102ef61a`
+Production is `26027a44-e044-4f68-b74b-be60c992cc44`
+([immutable URL](https://26027a44.margoengine.pages.dev/demos/light-keeper/)),
+preview `f8e27553-3349-4661-a5b7-1d9959a928ea`, source
+`221c1ad474bb2d915b2892392be1b98349103f82`, pushed on `codex/skinning-ik`.
+The direct-upload production branch label remains `main`; no Git merge or npm
+publication is implied. Eye/hand repairs and the previous explicit optional
+Animator/Stats paths remain active. The PBR cache stays reverted.
+
+The demo now produces pose/reflection diagnostic JSON on request through
+`viewport.readWorkshopDiagnostics('metrics' | 'reflection')`. The visible
+status, distance and Stats/heap/GPU HUD retain their update behavior.
+`?diagnostics=legacy` restores automatic hidden publication. This changes the
+demo inspection contract, not a public engine/package API or kinematic guard.
+The separate hidden GPU audit remains enabled.
+
+Exact snapshot: `test-results/light-keeper-diagnostics-live/site`, **196 files /
+194 public files**, manifest SHA256
+`f391f8c57bfab54814644e33bf4257b887c7373047b9dccce55105e87eeefda9`.
+Build-report SHA256:
+`246fba0553dc397fe9a692d0d36b9e82e9f7a9defbe29a1cc8e0809e541d5f43`.
+Only nested workshop HTML/report replace baseline content; one new entry is
+added and nothing is deleted. All 193 other baseline files (191 public plus two
+platform configurations), including all 26 former workshop assets, remain
+identical. Homepage and Tokyo remain unchanged. New entry:
+`assets/skinning-ik-C-PspDC5S0.js`, 527,149 bytes, SHA256
+`f01bb7769f2e4be0e283ba4d6ad6969cc0c9271fa7d88e926a262f62fa758f05`.
+
+Preview and production passed all 194 public HTTPS status/size/SHA256/MIME
+checks, canonical route, homepage/Tokyo references and missing-asset
+404/`no-store`; the independent audit and selected deployment metadata also
+pass. The hosted preview settled at full cross-body reach, and production and
+the local preview were reloaded in the in-app browser. Evidence is under
+`test-results/light-keeper-diagnostics-live/`, including
+`preview-cross-body.png`, `production-browser.png` and verification/audit JSON.
+
+Validation: 13 focused tests, API reports matching 166 entries / 1,548 exports,
+four diagnostic browser cases with bit-identical 21 transform-store views,
+eight motion cases / fourteen transitions / 639 samples, and thirteen broader
+interaction cases covering 63 slider samples and sixteen torso-drag samples.
+The eye test now distinguishes a moving Back-to-Home sample from settled gaze;
+the original `00f0afa` release reproduced the same transient, and strict settled
+Home/Front aim checks remain. No eye/motion guard was weakened. Native queue
+identity and all seventeen standalone executable hashes stayed unchanged
+during validation. These are sampled correctness checks, not CCD.
+
+The build is **708,879 raw / 239,411 gzip JS bytes**, 104 runtime modules,
+21,716,983 scene-asset bytes and **19,999 gzip core-plus-stage bytes**. A frozen
+endpoint-only diagnostic A/B/A observed drag allocation of 0.756456 MB/s versus
+0.887941 / 0.900433 MB/s and p95 RAF callback durations of 5.076 ms versus
+6.486 / 6.644 ms. Idle savings were inconsistent; frequent in-window diagnostic
+reads produced a mixed/worse first comparison. Reflection counts differed,
+and tracing/heap sampling remained active, so the entire difference cannot be
+assigned to serialization removal. Endpoint-only captures do not contain
+in-window pose checks. Both full comparisons and limitations are recorded in
+[KINEMATICS_ALLOCATION_HANDOFF.md](KINEMATICS_ALLOCATION_HANDOFF.md).
+**GC remains and the zero-GC objective remains active.**
+
+## Previous allocation checkpoint (superseded)
+
+The previous allocation production was `f084db7e-b09c-4a8d-af0c-40c1102ef61a`
 ([immutable URL](https://f084db7e.margoengine.pages.dev/demos/light-keeper/)),
 with preview `8de68f47-01ff-4d48-a689-7eb3caf8737d`. Both use source
 `00f0afac0a99fdf527e22d141a79b5cd01d21450`, pushed on `codex/skinning-ik`.

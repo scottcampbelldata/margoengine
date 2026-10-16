@@ -8,9 +8,9 @@ Fix the Light Keeper robot demo and its optional packages until sustained, warme
 
 The objective remains **active and incomplete**. The recorded constraints-demo stalls have been corrected for the tested trajectories. The robot still allocates and triggers GC in measured captures.
 
-The tested robot checkpoint is [live on margoengine.com](https://margoengine.com/demos/light-keeper/), production `f084db7e-b09c-4a8d-af0c-40c1102ef61a`, source `00f0afa`, preview `8de68f47`. It explicitly selects the verified optional Animator writer and Stats pass layout, retains the torso writer, near-face/cross-body eye fix and repaired hand, and keeps the PBR uniform cache reverted. All **193 public files** were verified, with 192 baseline files and all 25 old workshop assets preserved. See [LIGHT_KEEPER_DEPLOYMENT.md](LIGHT_KEEPER_DEPLOYMENT.md) for exact release identities and hashes. The earlier eye-only release `feeb64de` / `ca5194b` is historical evidence below.
+The tested robot checkpoint is [live on margoengine.com](https://margoengine.com/demos/light-keeper/), production `26027a44-e044-4f68-b74b-be60c992cc44`, source `221c1ad`, preview `f8e27553`. It retains the optional Animator/Stats paths, torso writer, eye fix and repaired hand, keeps the PBR cache reverted, and publishes pose/reflection diagnostics only on request by default. All **194 public files** and the independent audit pass; all 193 other baseline files and 26 old workshop assets are preserved. See [LIGHT_KEEPER_DEPLOYMENT.md](LIGHT_KEEPER_DEPLOYMENT.md) for current hashes/validation and the on-demand comparison below. The prior allocation `f084db7e` / `00f0afa` and eye-only `feeb64de` / `ca5194b` releases are historical evidence below.
 
-### Current deployed build and remaining allocation
+### Previous allocation build and remaining mapped sites
 
 The exact production snapshot is `test-results/light-keeper-allocation-live/site`,
 195 files / 193 public. Manifest SHA256 is
@@ -135,7 +135,7 @@ remain alongside them. Separately, the final MSAA-resolve descriptor remains an
 explicit core allocation, but retaining it has no proven compatibility/size
 fit under the frozen 20,000-byte gate; no core change was made.
 
-### On-demand pose/reflection diagnostics: retained, publication pending
+### On-demand pose/reflection diagnostics: retained and deployed
 
 The demo now exposes the private inspection method
 `viewport.readWorkshopDiagnostics('metrics' | 'reflection')`, returning an owning
@@ -223,7 +223,17 @@ proofs, `first-aba-summary.{json,md}` and `endpoint-aba-summary.{json,md}`; raw
 reports use `workshop-diag-*` labels. All 65 frozen input/executable fingerprints
 matched within each comparison, errors/source changes were empty, and the native
 queue writer was unchanged. These large local artifacts are ignored by Git.
-**The zero-GC objective remains open; this candidate is not yet deployed.**
+**The zero-GC objective remains open.** Source `221c1ad` is live as production
+`26027a44`; all 194 public files and the independent audit pass. Snapshot:
+`test-results/light-keeper-diagnostics-live/site` (196 files), manifest
+`f391f8c57bfab54814644e33bf4257b887c7373047b9dccce55105e87eeefda9`.
+The exact build-report SHA remains
+`246fba0553dc397fe9a692d0d36b9e82e9f7a9defbe29a1cc8e0809e541d5f43`.
+The hosted cross-body preview and actual production workshop were visually
+verified; `production-browser.png` is saved in that release folder. The CLI's
+dirty-directory warning came only from two untracked, experiment-owned V8 CFG
+files; they were preserved under the ignored IR folder, tracked source remained
+unchanged, and the deployment metadata identifies the correct source commit.
 
 Two different demos are involved:
 
@@ -961,7 +971,7 @@ Use fresh report labels for further captures. Keep source/dist frozen and avoid 
 
 The user requested an immediate commit/push checkpoint, followed by continued work, and then the rebuilt production drag allocation/GC results.
 
-Current source **00f0afa** is pushed and live as **f084db7e**, with the eye and hand repairs retained. The current 0.508865 / 0.730686 MB/s idle/drag observations still include GC. Default package setter/pass semantics remain intact; this demo explicitly selects the new optional Animator/Stats paths. Current tests, native buffer parity, sampled hardware motion, complete public-file deployment verification and remaining mapped stacks are recorded near the top. Stats descriptor batching and the target-only unused-norm experiment remain reverted. The constraints lab remains on contact-reach-3; both saved trajectories replay hold-free. Allocation-driven GC remains and the overall goal is active.
+Current source **221c1ad** is pushed and live as **26027a44**, with eye/hand repairs and on-demand pose/reflection diagnostics retained. Endpoint-only captures observed 0.601728 / 0.756456 MB/s idle/drag with GC remaining; idle savings were inconsistent and the frequent-reader comparison was mixed/worse. Both full comparisons and their observation/workload limits are recorded above. Default package setter/pass semantics remain intact; this demo explicitly selects optional Animator/Stats paths. Stats descriptor batching, target-only unused-norm and hidden-GPU-audit opt-out experiments remain reverted. The constraints lab remains on contact-reach-3; both saved trajectories replay hold-free. Current work is an isolated optional SSAO key-string candidate and a fixture-only probe readback ablation, neither yet a retained runtime/API change. Allocation-driven GC remains and the overall goal is active.
 
 The user explicitly requested an immediate commit/push checkpoint even with unfinished work, followed by continued testing. Preserve that incomplete allocation status; do not present the current release's pointer sample or reflection reuse count as a sustained allocation benchmark. Large raw traces and diagnostic harnesses remain in ignored local test-results folders.
 
