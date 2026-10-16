@@ -10,6 +10,11 @@ export interface CADImportOptions {
   smoothing?: boolean;
   /** Most parts (OBJ objects and groups, STEP/IGES meshes) the file may have, each one a core mesh (default 100,000; up to core's 8,388,608 entities). */
   maxParts?: number;
+  /**
+   * The worker is terminated and the import rejects after this many milliseconds (default 120,000). OpenCascade can
+   * spend minutes tessellating a malformed STEP or IGES file; a worker that never answers is never waited on.
+   */
+  timeoutMs?: number;
 }
 export function parseCADAsync(
   instance: EngineKernel,
@@ -25,6 +30,8 @@ export function parseCADAsync(
     !['stl', 'obj', 'step', 'iges'].includes(format)
   )
     throw new TypeError('Invalid CAD input');
+  const timeoutMs = options.timeoutMs ?? 120_000;
+  if (!(timeoutMs > 0 && timeoutMs <= 2 ** 31 - 1)) throw new RangeError('timeoutMs must be a positive number');
   const engine = engineRuntime(instance);
   if (engine.disposed) throw new Error('Engine is disposed');
   const workerURL = new URL('./workers/cad-runtime.js?no-inline', import.meta.url),
@@ -36,7 +43,12 @@ export function parseCADAsync(
       meshes: Mesh[] = [],
       material = new PbrMaterial({ color: '#a6b9c8', roughness: 0.4, metalness: 0.3 });
     let root: Mesh | undefined;
+    const timer = setTimeout(
+      () => fail(new RangeError(`CAD import did not finish within ${timeoutMs} ms (raise the timeoutMs option)`)),
+      timeoutMs,
+    );
     const cleanup = () => {
+        clearTimeout(timer);
         worker.onmessage = worker.onerror = worker.onmessageerror = null;
         worker.terminate();
         options.signal?.removeEventListener('abort', abort);
@@ -51,7 +63,11 @@ export function parseCADAsync(
       },
       abort = () => fail(options.signal?.reason ?? new DOMException('Aborted', 'AbortError'));
     options.signal?.addEventListener('abort', abort, { once: true });
-    worker.onerror = (event) => fail(new Error(event.message));
+    // A worker that died (out of memory, an uncaught error) is reported by name; the next load starts a new one.
+    worker.onerror = (event) => {
+      event.preventDefault?.();
+      fail(new Error(`CAD worker failed: ${event.message || 'unknown error'}`));
+    };
     worker.onmessageerror = () => fail(new Error('CAD worker message failed'));
     worker.onmessage = (event) => {
       const message = event.data;

@@ -29,9 +29,18 @@ const zero: Vec3 = [0, 0, 0],
   up: Vec3 = [0, 1, 0];
 const finite = (v: number) => typeof v === 'number' && Number.isFinite(Math.fround(v));
 function vector(v: Vec3): void {
-  if (v.length !== 3) throw new TypeError('Invalid surface vector');
+  if (typeof v !== 'object' || v === null || v.length !== 3) throw new TypeError('Invalid surface vector');
   for (let a = 0; a < 3; a++) if (!finite(v[a])) throw new TypeError('Invalid surface vector');
 }
+/** A live mesh handle, checked before use: parts and carriers come from app data that may be malformed. */
+function live(node: MeshHandle | undefined, what: string): void {
+  if (typeof (node as { check?: unknown } | null | undefined)?.check !== 'function')
+    throw new TypeError(`Invalid surface ${what}`);
+  node!.check();
+}
+const record = (value: unknown, what: string): void => {
+  if (typeof value !== 'object' || value === null) throw new TypeError(`Invalid surface ${what}`);
+};
 export class SurfacePhysics implements EnginePlugin {
   readonly name = 'surface-physics';
   private engine?: Engine;
@@ -59,7 +68,8 @@ export class SurfacePhysics implements EnginePlugin {
     carriers: readonly SurfaceCarrier[],
     options: SurfaceOptions = {},
   ): Promise<SurfacePhysics> {
-    const limit = countLimit('maxParts', options.maxParts);
+    if (!Array.isArray(parts) || !Array.isArray(carriers)) throw new TypeError('Invalid surface parts or carriers');
+    const limit = countLimit('maxParts', options?.maxParts);
     checkCount('Too many surface parts', parts.length, limit, 'maxParts');
     checkCount('Too many surface carriers', carriers.length, limit, 'maxParts');
     if (
@@ -84,13 +94,15 @@ export class SurfacePhysics implements EnginePlugin {
       axes = new Map<number, Vec3>(),
       n = this.parts.length;
     for (const carrier of this.carriers) {
-      carrier.node.check();
+      record(carrier, 'carrier');
+      live(carrier.node, 'carrier');
       if (meshRuntime(carrier.node).engine !== engine) throw new TypeError('Carrier belongs to another engine');
     }
     for (let i = 0; i < n; i++) {
-      const p = this.parts[i],
-        node = meshRuntime(p.node);
-      node.check();
+      const p = this.parts[i];
+      record(p, 'part');
+      live(p.node, 'part');
+      const node = meshRuntime(p.node);
       vector(p.axis);
       vector(p.contactNormal ?? up);
       if (

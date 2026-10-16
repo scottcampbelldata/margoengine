@@ -128,6 +128,15 @@ export function readUSDA(text: string, options: USDAReadOptions = {}): USDALayer
     cached = undefined;
     return value;
   };
+  // A quoted token: triple-quoted text as is, else JSON escapes; a bad escape is a named syntax error.
+  const string = (word: string): string => {
+    if (word.startsWith('"""')) return word.slice(3, -3);
+    try {
+      return JSON.parse(word);
+    } catch {
+      fail('syntax', 'invalid string escape');
+    }
+  };
   const expect = (word: string) => {
     if (take() !== word) fail('syntax', `expected ${word}`);
   };
@@ -179,14 +188,7 @@ export function readUSDA(text: string, options: USDAReadOptions = {}): USDALayer
       }
       return '';
     }
-    if (word.startsWith('"""')) return word.slice(3, -3);
-    if (word.startsWith('"')) {
-      try {
-        return JSON.parse(word);
-      } catch {
-        fail('syntax', 'invalid string escape');
-      }
-    }
+    if (word.startsWith('"')) return string(word);
     if (word.startsWith('<')) return { path: word.slice(1, -1) };
     if (word.startsWith('@')) {
       if (!options.assets) fail('unsupported', 'external assets and textures are unsupported');
@@ -205,7 +207,7 @@ export function readUSDA(text: string, options: USDAReadOptions = {}): USDALayer
       if (!key) fail('syntax', 'unterminated metadata');
       if (['prepend', 'append', 'add', 'delete', 'reorder'].includes(key)) key = take();
       if (key.startsWith('"')) {
-        out.set('doc', JSON.parse(key));
+        out.set('doc', string(key));
         continue;
       }
       if (
@@ -235,7 +237,7 @@ export function readUSDA(text: string, options: USDAReadOptions = {}): USDALayer
     if (specifier !== 'def' && !(options.skipOver && (specifier === 'over' || specifier === 'class')))
       fail('unsupported', 'only defined static prims are supported');
     let type = take();
-    const name = type.startsWith('"') ? JSON.parse(type) : value();
+    const name = type.startsWith('"') ? string(type) : value();
     if (type.startsWith('"')) type = 'Xform';
     if (typeof name !== 'string') fail('syntax', 'prim name must be a string');
     const path = `${parent}/${name}`,

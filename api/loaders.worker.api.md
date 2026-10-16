@@ -43,6 +43,7 @@ interface USDOptions extends ParseLimits, Pick<ZipOptions, 'maxEntries' | 'maxEn
 interface ZipOptions {
     maxEntries?: number;
     maxEntryBytes?: number;
+    maxRatio?: number;
     signal?: AbortSignal;
 }
 ```

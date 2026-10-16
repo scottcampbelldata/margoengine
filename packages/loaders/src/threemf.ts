@@ -5,6 +5,8 @@ import { decodeXML, readXML } from './xml.js';
 
 const F = '3MF';
 const NONE = 0xffffffff;
+// The per-file part cap shared by every loader that makes one mesh per part (docs/limits.md).
+const MAX_INSTANCES = 100_000;
 /** Meters per 3MF unit. */
 export const THREEMF_UNITS: Readonly<Record<string, number>> = {
   micron: 1e-6,
@@ -15,7 +17,7 @@ export const THREEMF_UNITS: Readonly<Record<string, number>> = {
   meter: 1,
 };
 
-export interface ThreeMFOptions extends ParseLimits, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes'> {
+export interface ThreeMFOptions extends ParseLimits, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
   /** `'meters'` (default) scales by the model unit; `'file'` keeps the file's own units. */
   units?: 'meters' | 'file';
   /** Component nesting limit. Default 32. */
@@ -348,6 +350,7 @@ export async function parse3MF(input: BinaryInput, options: ThreeMFOptions = {})
   const emitMesh = (model: Model, o: ObjectData, mesh: MeshData, m: Float64Array): void => {
     const vertexCount = mesh.vertices.length / 3,
       triangleCount = mesh.triangles.length / 3;
+    if (!vertexCount && !triangleCount) return; // an empty mesh adds nothing; skip the per-instance bookkeeping
     const tri = mesh.triangles.array,
       source = mesh.vertices.array;
     for (let i = 0; i < tri.length && i < triangleCount * 3; i++)
@@ -413,8 +416,13 @@ export async function parse3MF(input: BinaryInput, options: ThreeMFOptions = {})
     }
   };
   const visiting = new Set<ObjectData>();
+  // Components may reuse an object many times per level: bound the expanded instances, not just the depth, or
+  // fan-out^depth references to an empty object never finish (meshes are also bounded by the vertex limits).
+  let instances = 0;
   const emit = (model: Model, id: string, path: string | undefined, m: Float64Array, depth: number): void => {
     if (depth > maxDepth) throw new LoaderError(F, 'limit', `components nest deeper than ${maxDepth}`);
+    if (++instances > MAX_INSTANCES)
+      throw new LoaderError(F, 'limit', `the build expands to more than ${MAX_INSTANCES} object instances`);
     const [owner, o] = object(model, id, path);
     if (visiting.has(o))
       throw new LoaderError(F, 'syntax', `object ${id.slice(0, 32)} references itself through its components`);

@@ -539,7 +539,8 @@ export async function fbxToGLB(
     if (!(i >= 0 && (i + 1) * l.size <= l.data.length)) fail('layer element index outside its data');
     return i * l.size;
   };
-  let totalVertices = 0;
+  let totalVertices = 0,
+    polygonWork = 0;
   const meshIds = new Map<string, number>(),
     skinOf = new Map<string, string>(),
     morphNames = new Map<string, string[]>();
@@ -620,7 +621,7 @@ export async function fbxToGLB(
       const end = v < 0;
       if (end) v = ~v;
       if (!Number.isInteger(v) || v >= pointCount) fail('polygon vertex outside the vertex array');
-      face.push(c);
+      if (face.push(c) > 4096) fail('polygon has more than 4096 corners');
       if (perFace) materialIndex = Math.max(0, perFace.data[at(perFace, c, polygon, v)]);
       if (!end) continue;
       const vertex = (k: number) => {
@@ -630,6 +631,8 @@ export async function fbxToGLB(
         p = (k: number) => [0, 1, 2].map((d) => +points[vertex(k) * 3 + d]);
       let triangles = [[0, 1, 2]];
       if (face.length > 3) {
+        // Ear clipping is quadratic in the corner count: bound the total, not only each polygon.
+        if ((polygonWork += face.length * face.length) > 100_000_000) fail('polygon triangulation work exceeds limit');
         const ring = face.map((_, k) => p(k)),
           n = [0, 0, 0];
         ring.forEach((a, k) => {
@@ -653,6 +656,9 @@ export async function fbxToGLB(
         triangles = [];
         for (let k = 0; k < flat.length; k += 3) triangles.push([flat[k], flat[k + 1], flat[k + 2]]);
       } else if (face.length < 3) triangles = [];
+      // The vertex budget holds while corners accumulate, not only once the whole geometry is built.
+      if (totalVertices + corners.length + triangles.length * 3 > maxVertices)
+        throw new RangeError('FBX geometry budget exceeded');
       for (const tri of triangles) {
         for (const k of tri) {
           const c2 = face[k],

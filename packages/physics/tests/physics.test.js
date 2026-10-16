@@ -569,6 +569,15 @@ rtest('trimesh, convex hull and heightfield colliders support resting bodies', (
   );
   assert.deepEqual([...body.colliders[0].vertices()], [0, 0, 0, 2, 0, 0, 0, 3, 0]);
   assert.throws(() => physics.addBody(null, { colliders: { shape: 'trimesh' } }), /needs a mesh with geometry/);
+  // Launch gate 11a: NaN or infinite user geometry is refused by name before Rapier (a hull of it failed inside
+  // Rapier with "expected instance of ..."; a trimesh of it was accepted and poisoned the simulation).
+  const bad = [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, Number.NaN];
+  for (const colliders of [
+    { shape: 'convexHull', points: bad },
+    { shape: 'trimesh', vertices: bad, indices: [0, 1, 3] },
+    { shape: 'heightfield', rows: 1, columns: 1, heights: [0, Infinity, 0, 0], scale: [1, 1, 1] },
+  ])
+    assert.throws(() => physics.addBody(null, { colliders }), /must be finite Float32 values/);
   assert.throws(
     () =>
       physics.addBody(null, {

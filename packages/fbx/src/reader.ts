@@ -17,14 +17,20 @@ const text = (s: string) => {
 };
 const int64 = (v: bigint) => (v >= -9007199254740991n && v <= 9007199254740991n ? Number(v) : v);
 async function inflate(data: Uint8Array, size: number): Promise<Uint8Array> {
-  const out = await readResponse(
-    new Response(
-      new Blob([data as Uint8Array<ArrayBuffer>])
-        .stream()
-        .pipeThrough(new DecompressionStream('deflate') as unknown as ReadableWritablePair<Uint8Array, Uint8Array>),
-    ),
-    { maxBytes: size, label: 'FBX array' },
-  );
+  let out: Uint8Array;
+  try {
+    out = await readResponse(
+      new Response(
+        new Blob([data as Uint8Array<ArrayBuffer>])
+          .stream()
+          .pipeThrough(new DecompressionStream('deflate') as unknown as ReadableWritablePair<Uint8Array, Uint8Array>),
+      ),
+      { maxBytes: size, label: 'FBX array' },
+    );
+  } catch {
+    // DecompressionStream's own TypeError (bad zlib data) or the byte budget: either way this array is corrupt.
+    fail('compressed array is corrupt or longer than declared');
+  }
   if (out.length !== size) fail('compressed array has the wrong length');
   return out;
 }
@@ -70,8 +76,12 @@ function binary(bytes: Uint8Array): Promise<FBXNode[]> {
     if (encoding === 0) {
       if (length !== size) fail('array length mismatch');
       typed(raw);
-    } else if (encoding === 1) pending.push(inflate(raw, size).then(typed));
-    else fail('unknown array encoding ' + encoding);
+    } else if (encoding === 1) {
+      const done = inflate(raw, size).then(typed);
+      // A later record may fail synchronously before Promise.all: never leave this rejection unhandled.
+      done.catch(() => {});
+      pending.push(done);
+    } else fail('unknown array encoding ' + encoding);
     return end;
   }
   function record(p: number, depth: number): [FBXNode | null, number] {
@@ -87,15 +97,17 @@ function binary(bytes: Uint8Array): Promise<FBXNode[]> {
     const name = decoder.decode(bytes.subarray(p + head, need(p + head, nameLength)));
     let q = p + head + nameLength;
     for (let i = 0; i < count; i++) {
-      const code = String.fromCharCode(bytes[q]);
       need(q, 1);
+      const code = String.fromCharCode(bytes[q]);
       q++;
       if (code === 'Y') {
+        need(q, 2);
         props.push(view.getInt16(q, true));
-        q = need(q, 2);
+        q += 2;
       } else if (code === 'C') {
+        need(q, 1);
         props.push(bytes[q] & 1);
-        q = need(q, 1);
+        q += 1;
       } else if (code === 'I') {
         need(q, 4);
         props.push(view.getInt32(q, true));
@@ -161,6 +173,29 @@ function ascii(source: string): FBXNode[] {
     peeked = undefined;
     return t;
   };
+  let decoded = 0;
+  /** The comma-separated numbers in source[from, to), under the binary arrays' decoded budget, without a split. */
+  function values(from: number, to: number): Float64Array {
+    let count = 1,
+      empty = true;
+    for (let i = from; i < to; i++) {
+      const c = source.charCodeAt(i);
+      if (c === 44) count++;
+      else if (c > 32) empty = false;
+    }
+    if (empty && count === 1) return new Float64Array(0);
+    if ((decoded += count * 8) > maxDecoded) fail('decoded arrays exceed 256 MiB');
+    const out = new Float64Array(count);
+    for (let i = 0, start = from; i < count; i++) {
+      let end = source.indexOf(',', start);
+      if (end < 0 || end > to) end = to;
+      const v = Number(source.slice(start, end));
+      if (!Number.isFinite(v)) fail('invalid array value');
+      out[i] = v;
+      start = end + 1;
+    }
+    return out;
+  }
   function nodes(depth: number): FBXNode[] {
     if (depth > 32) fail('records nest too deeply');
     const out: FBXNode[] = [];
@@ -172,10 +207,7 @@ function ascii(source: string): FBXNode[] {
       if (node.name === 'a' && depth) {
         const close = source.indexOf('}', at);
         if (close < 0) fail('unterminated array');
-        const body = source.slice(at, close).trim(),
-          values = body ? body.split(',').map(Number) : [];
-        if (values.some((v) => !Number.isFinite(v))) fail('invalid array value');
-        node.props = [Float64Array.from(values)];
+        node.props = [values(at, close)];
         at = close;
         return [node];
       }
