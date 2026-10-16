@@ -70,10 +70,10 @@ Use the real `Box.glb` and `blender-rig.fbx` that produced the six failures. Loa
 - Disposing the model makes `meshSource(mesh)` return null, and a later `addBody` throws `No geometry`.
 - `npm run measure:size` stays under 20,000 bytes gzip.
 
-## Launch gaps that are not this bug
+## Launch documentation
 
-The unpublished install line is still in the root README. Keep the post on clone and `npm run modern:dev`, or publish `margoengine`, `@margoengine/core`, and `@margoengine/react` before telling anyone to `npm install` them.
+The root README now directs readers to clone the repository and run `npm run modern:dev`, or build local tarballs. It does not offer registry installation commands for the unpublished packages.
 
-The WebGPU limit belongs in the same paragraph as the quickstart. PBR, image-based lighting, and shadows require WebGPU. WebGL2 draws the basic mesh. The current opening sentence says "WebGL2 fallback" without that split.
+The quickstart paragraph states that PBR rendering, image-based lighting, and shadows require WebGPU, while WebGL2 supports basic meshes.
 
-Two items from the handoff are already done. Do not rebuild them. `gltf-pro` reads `KHR_texture_basisu` through `@margoengine/decoders`. `@margoengine/usdz` does not depend on Three.js. Its package peers are core, `gltf-pro`, and `loaders`.
+Two items from the handoff are already done. `gltf-pro` reads `KHR_texture_basisu` through `@margoengine/decoders`. `@margoengine/usdz` does not depend on Three.js. Its peers are core and `gltf-pro`; `loaders` is a direct dependency.
