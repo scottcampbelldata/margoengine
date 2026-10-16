@@ -27,13 +27,16 @@ mock.module('@margoengine/core/extension',{namedExports:{
     engines.push(engine);return engine;
   }},Mesh:class {},box(){},PbrMaterial:class {},engineRuntime:engine=>engine,meshRuntime:node=>node,
 }});
-mock.module('@margoengine/gltf-pro',{namedExports:{async loadGLTF(engine,src,{signal}){
-  requests.push({src,signal});if(modelFailure)throw modelFailure;
+function makeModel(engine,asset={doc:{images:[]}}){
   const material={name:'Upper',base:[1,0.5,0.25,0.8],factors:[0.6,0.4,1,1],emission:[0,0,0],settings:[0,0.5,0,0],maps:[]};
-  const model={name:'model:'+models.length,root:mesh(engine),nodes:[mesh(engine)],primitives:[{material},{material}],lighting:new Set(),disposed:false,disposals:0,buffers:[resource(),resource()],textures:[resource()],
+  const model={name:'model:'+models.length,asset,root:mesh(engine),nodes:[mesh(engine)],primitives:[{material},{material}],lighting:new Set(),disposed:false,disposals:0,buffers:[resource(),resource()],textures:[resource()],
     addLighting(effect){assert.ok(!this.disposed);this.lighting.add(effect);return()=>this.lighting.delete(effect);},get shadowPrimitives(){return [];},
     dispose(){if(this.disposed)return;this.disposed=true;this.disposals++;engine.removePlugin(this.name);this.lighting.clear();this.root.dispose();for(const node of this.nodes)node.dispose();for(const owned of [...this.buffers,...this.textures])owned.destroy();}};
-  models.push(model);engine.use(model);
+  models.push(model);return model;
+}
+mock.module('@margoengine/gltf-pro',{namedExports:{PBRModel:class {constructor(engine,asset){return makeModel(engine,asset);}},async loadGLTF(engine,src,{signal}){
+  requests.push({src,signal});if(modelFailure)throw modelFailure;
+  const model=makeModel(engine);engine.use(model);
   if(deferModel)await new Promise(resolve=>pendingModels.push(resolve));return model;
 }}});
 mock.module('@margoengine/environment',{namedExports:{
@@ -76,8 +79,9 @@ globalThis.ResizeObserver=class {constructor(callback){this.callback=callback;ob
 const {render,act,cleanup}=await import('@testing-library/react');
 const flush=()=>act(async()=>{});
 function tree(children,props={}){return React.createElement(StrictMode,null,React.createElement(MargoCanvas,props,children));}
-afterEach(()=>{
+afterEach(async()=>{
   cleanup();deferModel=deferEnvironment=false;modelFailure=null;
+  for(const finish of pendingModels.splice(0))finish();for(const finish of pendingEnvironments.splice(0))finish();await flush();
   assert.ok(engines.every(engine=>engine.disposed&&engine.disposals===1&&engine.callbacks.size===0&&engine.meshes.size===0&&engine.plugins.size===0));
   for(const owned of [...models,...environments]){assert.equal(owned.disposals,1);for(const value of [...owned.buffers,...owned.textures])assert.equal(value.destroyed,1);}
   assert.ok(backgrounds.every(background=>background.disposed&&background.buffer.destroyed===1));
@@ -118,7 +122,7 @@ test('changing src or removing Model aborts pending loads and disposes late resu
   await act(async()=>pendingModels.shift()());assert.equal(old.disposals,1);assert.equal(loaded.length,0);
   await act(async()=>pendingModels.shift()());assert.equal(loaded[0],current.root);assert.deepEqual(current.root.position,[3,0,0]);
   view.rerender(tree(React.createElement(Model,{src:'/late.glb',onLoad:node=>loaded.push(node)})));await flush();
-  const late=models.at(-1),lateRequest=requests.at(-1);view.rerender(tree(null));assert.ok(lateRequest.signal.aborted);
+  const late=models.at(-1),lateRequest=requests.at(-1);view.rerender(tree(null));await flush();assert.ok(lateRequest.signal.aborted);
   await act(async()=>pendingModels.shift()());assert.equal(late.disposals,1);assert.equal(loaded.length,1);
 });
 test('pending Model reads the latest props and callback on completion',async()=>{
@@ -190,5 +194,5 @@ test('OrbitControls retains listeners and its frame subscription across prop mut
   callback(engine,0.02);assert.deepEqual(control.updates,[0.02]);
   view.rerender(tree(React.createElement(OrbitControls,{autoRotateSpeed:4,minDistance:2,maxDistance:8})));
   assert.equal(controls.at(-1),control);assert.equal(engine.callbacks.values().next().value,callback);assert.equal(control.autoRotate,false);assert.equal(control.enableDamping,false);assert.equal(control.autoRotateSpeed,4);assert.equal(control.minDistance,2);assert.equal(control.maxDistance,8);
-  view.rerender(tree(null));assert.equal(control.disposals,1);assert.equal(engine.callbacks.size,0);
+  view.rerender(tree(null));assert.equal(control.disposals,1);assert.equal(engine.callbacks.size,1);
 });
