@@ -32,7 +32,7 @@ Crossfades, blend trees, and additive layers already live in `@margoengine/anima
 
 ## Verification of file items 1–4
 
-- 1,281 tests pass on Node 24, with no failures or skips. Four original frozen-stage facade audits remain executable TODOs, with passing model-bounds/raw alternatives. Strict typechecks and packed runtime imports cover all 63 packages.
+- 1,287 tests pass on Node 24, with no failures or skips. Four original frozen-stage facade audits remain executable TODOs, with passing model-bounds/raw alternatives. Strict typechecks and packed runtime imports cover all 63 packages.
 - `npm run modern:test:extensions` includes the original PBR/material regressions and the new `modern:test:gltf-parity` browser checks.
 - 82 texture captures verify PBR and optional material transforms against baked UVs. Transformed alpha-mask shadow depths match across all four directional cascades. Ordinary shader/frame hashes and identity-transform pixels remain exact.
 - Real ETC1S/UASTC textures upload all mips through RGBA fallback and native BC7 paths. A production Vite consumer emits and fetches Basis workers/Wasm, renders, and disposes every worker and texture.

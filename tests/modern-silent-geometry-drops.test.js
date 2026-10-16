@@ -7,6 +7,7 @@ import {exportGLTF} from '@margoengine/exporters';
 import {deduplicateParts} from '@margoengine/machinery/cad';
 import {accessor} from '../packages/exporters/tests/helpers.js';
 import {loadedPBRFixtures, loadedPBREngine, serveLoadedPBRFixtures, primitivePositions, positionBounds} from './support/loaded-pbr-fixtures.js';
+import {meshTriangles} from '../packages/shared/mesh-source.js';
 
 // Load both real files before registering consumer checks. A fixture failure aborts the suite,
 // instead of reporting consumer failures against an invented or incomplete replacement mesh.
@@ -45,6 +46,35 @@ for (const fixture of loadedPBRFixtures) {
         close(xyz(body.colliders[0].halfExtents()), max.map((value, axis) => (value - min[axis]) / 2), 'bind-pose collider half extents');
         close(xyz(body.colliders[0].translationWrtParent()), max.map((value, axis) => (value + min[axis]) / 2), 'bind-pose collider center');
         assert.equal(mesh.geometry, null, 'physics does not attach a second core Geometry');
+      } finally {physics.dispose();}
+    });
+  });
+
+  test(`${fixture.producer}: an explicit capsule attaches to the real ${fixture.asset} mesh`, async () => {
+    await withLoaded(fixture, ({engine, mesh}) => {
+      const physics = new Physics(engine, {rapier: RAPIER});
+      try {
+        mesh.setParent(null);
+        const body = physics.addBody(mesh, {colliders: {shape: 'capsule', halfHeight: 0.4, radius: 0.15}});
+        assert.equal(body.colliders.length, 1);
+        assert.equal(body.colliders[0].parent().handle, body.raw.handle, 'explicit collider belongs to the loaded mesh body');
+        close([body.colliders[0].halfHeight(), body.colliders[0].radius()], [0.4, 0.15], 'explicit capsule dimensions');
+        assert.equal(mesh.geometry, null, 'explicit collision does not attach a second core Geometry');
+      } finally {physics.dispose();}
+    });
+  });
+
+  test(`${fixture.producer}: PhysicsBody rejects the real ${fixture.asset} mesh after model disposal`, async () => {
+    await withLoaded(fixture, ({engine, model, mesh}) => {
+      const physics = new Physics(engine, {rapier: RAPIER});
+      try {
+        mesh.setParent(null);
+        assert.equal(meshTriangles(mesh)?.kind, 'pbr');
+        model.dispose();
+        assert.equal(meshTriangles(mesh), null, 'disposal clears the registered triangle source');
+        assert.throws(() => physics.addBody(mesh), {name: 'Error', message: 'Mesh disposed'});
+        assert.equal(physics.bodyCount, 0, 'a disposed loader mesh cannot retain an empty body');
+        assert.equal(mesh.geometry, null);
       } finally {physics.dispose();}
     });
   });

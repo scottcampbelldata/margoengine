@@ -1,5 +1,7 @@
 # One reader for PBR triangles
 
+The `6bcf85a` Khronos Box audit is specified in `docs/fix-pbr-box.md`. Follow that file. Registering the primitive node is required there, and it is not enough: `addBody(model.root)` on `packages/exporters/tests/fixtures/Box.glb` still sees no triangles, because the 24 vertices belong to the grandchild.
+
 Date: 2026-10-16. This replaces the caller-by-caller sketch in `docs/fix-silent-geometry.md`. `mesh.geometry` stays null on a PBR node. `setGeometry` puts that mesh into the core batch, and `packages/core/src/engine.ts` draws every visible mesh that has `geometry`. There is no flag for "stored here, drawn by `gltf-pro`." Core `Geometry` is also the wrong record. The PBR vertex is five `vec4`s, 20 floats, and a skinned primitive carries joints and morphs on top of that.
 
 Core plus stage is 19,999 bytes gzip. Do not edit `packages/core` or `packages/margoengine`. `Stage.fit(mesh)` and `worldBounds` keep reading core `Geometry` only. The fit for a loaded glTF or FBX is `model.bounds` on the `PBRModel`.
@@ -55,7 +57,7 @@ An empty collider list, a transform-only export, and `{parts: 0}` are failed tes
 | `shadows` | Draw the source GPU buffers at stride 80. This is the same record as `PBRModel.shadowPrimitives`. |
 | `taa`, `xr` | TAA consumes current stride-80 geometry with lazily owned history storage. Native XR owns replicas on its compatible GPU device and re-encodes skin/morph kernels using the current source pose. Caller-owned extension texture views need recreation for that device and reject explicitly. |
 | `bvh`, `selection` | Static synchronous queries use source CPU triangles. Synchronous raycasts and AssemblyBVH reject active GPU deformation with an explicit diagnostic; asynchronous `intersectModel` reads the current GPU pose. Selection and GPU picking discover loader-owned sources automatically. |
-| `PBRModel` | `bounds` and `raw` as above. The quickstart and the React `<Gltf>` helper fit `model.bounds`. They do not call `Stage.fit` on the root mesh. |
+| `PBRModel` | `bounds` and `raw` as above. The quickstart fits `model.bounds`; React bounds and centering helpers also read `model.bounds`. They do not call `Stage.fit` on the root mesh. |
 
 ## Tests
 
@@ -70,7 +72,7 @@ Load the real `Box.glb` and `blender-rig.fbx` through `loadGLTF` and `loadFBX` o
 - The BVH raycaster and `engine.pick` hit the box.
 - After one animation frame, the rig is hit from `readPickingGeometry`, not from a second core `Geometry`.
 - `model.bounds` is finite for both files. `Stage.fit(mesh)` still throws `No geometry`.
-- Disposing the model makes `meshTriangles(mesh)` return null, and a later `addBody` throws `No geometry`.
+- Disposing the model makes `meshTriangles(mesh)` return null, and a later `addBody` rejects the disposed mesh without creating a body.
 - `npm run measure:size` stays at or under 19,999 bytes gzip.
 
 ## Done when
