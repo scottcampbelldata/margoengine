@@ -1,0 +1,219 @@
+{
+ "label": "after-50k",
+ "date": "2026-10-14T11:53:58.954Z",
+ "acPowerAtStart": true,
+ "host": {
+  "cpu": "Intel(R) Core(TM) Ultra 7 258V",
+  "cores": 8,
+  "memoryGB": 31,
+  "node": "v24.15.0",
+  "browser": "155.0.4283.45"
+ },
+ "viewport": [
+  1432,
+  768
+ ],
+ "runs": [
+  {
+   "modules": 1852,
+   "crossOriginIsolated": true,
+   "msaa": 4,
+   "view": "overview",
+   "engineCreateMs": 119.57999999821186,
+   "buildMs": 138,
+   "parts": 50004,
+   "groups": 5615,
+   "entities": 55619,
+   "capacity": 55619,
+   "shapes": [
+    {
+     "name": "plate",
+     "triangles": 556,
+     "vertices": 1668
+    },
+    {
+     "name": "bracket",
+     "triangles": 20,
+     "vertices": 60
+    },
+    {
+     "name": "bolt",
+     "triangles": 88,
+     "vertices": 140
+    },
+    {
+     "name": "nut",
+     "triangles": 144,
+     "vertices": 432
+    },
+    {
+     "name": "washer",
+     "triangles": 128,
+     "vertices": 384
+    }
+   ],
+   "triangles": 6437552,
+   "firstFrameMs": 125.7800000011921,
+   "loadToFirstFrameMs": 383.35999999940395,
+   "kernel": {
+    "tickCullMs": {
+     "n": 60,
+     "median": 7.74,
+     "p95": 8.37,
+     "max": 9.17,
+     "mean": 7.8128
+    },
+    "tickNoCullMs": {
+     "n": 60,
+     "median": 7.76,
+     "p95": 8.61,
+     "max": 9.48,
+     "mean": 7.8172
+    },
+    "perPartNs": 139.2
+   },
+   "frame": {
+    "cpuMs": {
+     "n": 240,
+     "median": 20.895,
+     "p95": 31.49,
+     "max": 55.395,
+     "mean": 21.8904
+    },
+    "kernelMs": {
+     "n": 240,
+     "median": 11.045,
+     "p95": 13.965,
+     "max": 28.67,
+     "mean": 11.5035
+    },
+    "collectMs": {
+     "n": 240,
+     "median": 6.145,
+     "p95": 8.4,
+     "max": 38.57,
+     "mean": 6.548
+    },
+    "submitMs": {
+     "n": 240,
+     "median": 3.64,
+     "p95": 4.815,
+     "max": 17.195,
+     "mean": 3.8388
+    },
+    "intervalMs": {
+     "n": 240,
+     "median": 22.04,
+     "p95": 33.335,
+     "max": 59.505,
+     "mean": 23.2634
+    },
+    "fps": 45.4,
+    "gpuMs": {
+     "n": 17,
+     "median": 15.7942,
+     "p95": 16.9738,
+     "max": 16.9738,
+     "mean": 15.4279
+    },
+    "drawCalls": 5,
+    "visible": 46976,
+    "edgesCpuMs": null,
+    "gpuPassMedianMs": [
+     15.7942,
+     0
+    ]
+   },
+   "edgesFirstDrawMs": null,
+   "isolated": {
+    "cpuMs": {
+     "n": 30,
+     "median": 17.3,
+     "p95": 19.28,
+     "max": 19.59,
+     "mean": 17.1325
+    },
+    "gpuTailMs": {
+     "n": 30,
+     "median": 21.92,
+     "p95": 24,
+     "max": 24.195,
+     "mean": 21.9947
+    },
+    "frameMs": {
+     "n": 30,
+     "median": 38.865,
+     "p95": 42.185,
+     "max": 42.56,
+     "mean": 39.1272
+    }
+   },
+   "enginePick": {
+    "ms": {
+     "n": 10,
+     "median": 30.345,
+     "p95": 31.185,
+     "max": 31.185,
+     "mean": 30.171
+    },
+    "first": 85.91500000655651,
+    "hits": 5
+   },
+   "assemblyBVH": {
+    "createMs": 50.41500000655651,
+    "rebuildMs": 23.74499999980132,
+    "raycastMs": {
+     "n": 200,
+     "median": 0.335,
+     "p95": 0.44,
+     "max": 4.37,
+     "mean": 0.3731
+    },
+    "hits": 99
+   },
+   "explodedView": {
+    "setupMs": 18.15999999642372,
+    "animatingMs": {
+     "n": 40,
+     "median": 4.3,
+     "p95": 11,
+     "max": 22.12,
+     "mean": 4.9555
+    },
+    "unchangedMs": {
+     "n": 40,
+     "median": 0,
+     "p95": 0.005,
+     "max": 0.075,
+     "mean": 0.0025
+    },
+    "renderWhileAnimatingMs": {
+     "n": 30,
+     "median": 18.46,
+     "p95": 20.32,
+     "max": 26.085,
+     "mean": 18.6828
+    }
+   },
+   "memory": {
+    "jsHeapMB": 42.28,
+    "kernelWasmMB": 16.13,
+    "instanceStagingMB": 5.06,
+    "gpuInstanceMB": 5.06,
+    "geometryMB": 0.07,
+    "msaaTargetsMB": 37.76
+   },
+   "removeOneMeshMs": 1.8700000047683716,
+   "errors": [],
+   "size": "50000",
+   "pageErrors": []
+  }
+ ],
+ "adapter": {
+  "vendor": "intel",
+  "architecture": "xe-2lpg",
+  "description": "",
+  "timestamp": true
+ },
+ "acPowerAtEnd": true
+}

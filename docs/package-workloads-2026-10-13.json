@@ -1,0 +1,4730 @@
+{
+  "recordedAt": "2026-10-13T06:51:10.441Z",
+  "hardware": {
+    "webglRenderer": "ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (16GB) (0x000064A0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "intel",
+      "architecture": "xe-2lpg",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36 Edg/154.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "154.0.4258.62",
+    "requestedChannel": "msedge",
+    "launchArgs": [
+      "--start-maximized",
+      "--disable-features=CalculateNativeWinOcclusion",
+      "--disable-backgrounding-occluded-windows",
+      "--disable-renderer-backgrounding"
+    ],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": false
+  },
+  "launchArgs": [
+    "--start-maximized",
+    "--disable-features=CalculateNativeWinOcclusion",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-renderer-backgrounding"
+  ],
+  "duration": 2500,
+  "warmup": 750,
+  "interpretation": "Foreground-throughput render callbacks, not displayed frames. Android layout/DPR uses this same Intel laptop GPU. Local Vite startup is not a cold production or physical-phone result. Optional timing measures pass execution and includes profiler overhead.",
+  "cases": [
+    {
+      "profile": "native-windows-edge",
+      "package": "ecs",
+      "expectedActors": 10000,
+      "runs": [
+        {
+          "index": 0,
+          "timing": false,
+          "start": 4026,
+          "end": 6543.399999976158,
+          "summary": {
+            "callbacks": 301,
+            "measuredMilliseconds": 2508.4000000000005,
+            "callbackHz": 119.99681071599423,
+            "intervalMilliseconds": {
+              "mean": 8.333554817275749,
+              "median": 8.300000000000182,
+              "p95": 8.5,
+              "p99": 8.5,
+              "max": 8.600000000000364
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.8760797351697751,
+              "median": 0.8999999761581421,
+              "p95": 1.100000023841858,
+              "p99": 1.3000000715255737,
+              "max": 2.899999976158142
+            },
+            "renderCpuMilliseconds": {
+              "mean": 4.500332228369095,
+              "median": 4.5,
+              "p95": 5,
+              "p99": 5.700000047683716,
+              "max": 6.5
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/ecs",
+            "running": true,
+            "frames": 465,
+            "targetFps": 60,
+            "fps": 119.98800119701957,
+            "frameMilliseconds": 8.334166666865348,
+            "workloadCpuMilliseconds": 0.8733333379030228,
+            "renderCpuMilliseconds": 4.396666662891706,
+            "actors": 10000,
+            "visible": 10000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              1351,
+              476
+            ],
+            "gpuTimingEnabled": false,
+            "gpuTimingSupported": false,
+            "gpuPassMilliseconds": null,
+            "readiness": {
+              "loadStarted": 362.7999999523163,
+              "workloadConstructed": 634.3999999761581,
+              "engineCreated": 773.7999999523163,
+              "principalObjects": 10000,
+              "assembled": 825.1000000238419,
+              "principalSceneSubmitted": 836,
+              "principalSceneGpuComplete": 939.6000000238419,
+              "principalScenePresentedOpportunity": 954.3999999761581,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 1,
+            "capturedFrames": 465,
+            "captureTruncated": false,
+            "workload": {
+              "entities": 10000,
+              "queriedPerFrame": 10000,
+              "queries": 466
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": false,
+                "submits": 466,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 52.10000002384186,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 2,
+            "viewport": [
+              1432,
+              768
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 1,
+          "timing": true,
+          "start": 8143.600000023842,
+          "end": 10660.299999952316,
+          "summary": {
+            "callbacks": 301,
+            "measuredMilliseconds": 2508.300000000001,
+            "callbackHz": 120.00159470557743,
+            "intervalMilliseconds": {
+              "mean": 8.33322259136213,
+              "median": 8.300000000001091,
+              "p95": 8.400000000001455,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 1.0099667813690794,
+              "median": 1,
+              "p95": 1.2999999523162842,
+              "p99": 1.4000000953674316,
+              "max": 1.5
+            },
+            "renderCpuMilliseconds": {
+              "mean": 4.324252488605207,
+              "median": 4.299999952316284,
+              "p95": 4.799999952316284,
+              "p99": 5,
+              "max": 6.100000023841858
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/ecs",
+            "running": true,
+            "frames": 391,
+            "targetFps": 60,
+            "fps": 120.04801920481977,
+            "frameMilliseconds": 8.330000000198682,
+            "workloadCpuMilliseconds": 1.0199999998013178,
+            "renderCpuMilliseconds": 4.356666659315427,
+            "actors": 10000,
+            "visible": 10000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              1351,
+              476
+            ],
+            "gpuTimingEnabled": true,
+            "gpuTimingSupported": true,
+            "gpuPassMilliseconds": 2.097152,
+            "readiness": {
+              "loadStarted": 7189.299999952316,
+              "workloadConstructed": 7202,
+              "engineCreated": 7266.399999976158,
+              "principalObjects": 10000,
+              "assembled": 7291.699999928474,
+              "principalSceneSubmitted": 7296.100000023842,
+              "principalSceneGpuComplete": 7335.5,
+              "principalScenePresentedOpportunity": 7345.799999952316,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 2,
+            "capturedFrames": 391,
+            "captureTruncated": false,
+            "workload": {
+              "entities": 10000,
+              "queriedPerFrame": 10000,
+              "queries": 392
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 474,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 392,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 52.10000002384186,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 2,
+            "viewport": [
+              1432,
+              768
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 2,
+          "timing": true,
+          "start": 12142,
+          "end": 14661.600000023842,
+          "summary": {
+            "callbacks": 301,
+            "measuredMilliseconds": 2508.300000000001,
+            "callbackHz": 120.00159470557743,
+            "intervalMilliseconds": {
+              "mean": 8.33322259136213,
+              "median": 8.300000000001091,
+              "p95": 8.400000000001455,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.8352159439923359,
+              "median": 0.8000000715255737,
+              "p95": 1,
+              "p99": 1.100000023841858,
+              "max": 1.5
+            },
+            "renderCpuMilliseconds": {
+              "mean": 3.65382060101658,
+              "median": 3.600000023841858,
+              "p95": 4.099999904632568,
+              "p99": 4.200000047683716,
+              "max": 4.399999976158142
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/ecs",
+            "running": true,
+            "frames": 395,
+            "targetFps": 60,
+            "fps": 119.92804318552591,
+            "frameMilliseconds": 8.338333332538605,
+            "workloadCpuMilliseconds": 0.8066666603088379,
+            "renderCpuMilliseconds": 3.610833337903023,
+            "actors": 10000,
+            "visible": 10000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              1351,
+              476
+            ],
+            "gpuTimingEnabled": true,
+            "gpuTimingSupported": true,
+            "gpuPassMilliseconds": 3.801088,
+            "readiness": {
+              "loadStarted": 11240.399999976158,
+              "workloadConstructed": 11260.899999976158,
+              "engineCreated": 11279.100000023842,
+              "principalObjects": 10000,
+              "assembled": 11302.399999976158,
+              "principalSceneSubmitted": 11306.299999952316,
+              "principalSceneGpuComplete": 11333.399999976158,
+              "principalScenePresentedOpportunity": 11345.799999952316,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 3,
+            "capturedFrames": 395,
+            "captureTruncated": false,
+            "workload": {
+              "entities": 10000,
+              "queriedPerFrame": 10000,
+              "queries": 396
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 474,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 398,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 396,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 52.10000002384186,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 2,
+            "viewport": [
+              1432,
+              768
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 3,
+          "timing": false,
+          "start": 16125.699999928474,
+          "end": 18644.199999928474,
+          "summary": {
+            "callbacks": 301,
+            "measuredMilliseconds": 2508.3999999999996,
+            "callbackHz": 119.99681071599427,
+            "intervalMilliseconds": {
+              "mean": 8.333554817275747,
+              "median": 8.299999999999272,
+              "p95": 8.5,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.9186046527469673,
+              "median": 0.8999999761581421,
+              "p95": 1.100000023841858,
+              "p99": 1.2999999523162842,
+              "max": 1.4000000953674316
+            },
+            "renderCpuMilliseconds": {
+              "mean": 3.6906976767156605,
+              "median": 3.6999999284744263,
+              "p95": 4.100000023841858,
+              "p99": 4.399999976158142,
+              "max": 5.200000047683716
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/ecs",
+            "running": true,
+            "frames": 395,
+            "targetFps": 60,
+            "fps": 119.99999999999999,
+            "frameMilliseconds": 8.333333333333334,
+            "workloadCpuMilliseconds": 0.8958333363135655,
+            "renderCpuMilliseconds": 3.5408333371082943,
+            "actors": 10000,
+            "visible": 10000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              1351,
+              476
+            ],
+            "gpuTimingEnabled": false,
+            "gpuTimingSupported": false,
+            "gpuPassMilliseconds": null,
+            "readiness": {
+              "loadStarted": 15232,
+              "workloadConstructed": 15240.799999952316,
+              "engineCreated": 15267.199999928474,
+              "principalObjects": 10000,
+              "assembled": 15286.100000023842,
+              "principalSceneSubmitted": 15289.199999928474,
+              "principalSceneGpuComplete": 15313.699999928474,
+              "principalScenePresentedOpportunity": 15329.299999952316,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 4,
+            "capturedFrames": 395,
+            "captureTruncated": false,
+            "workload": {
+              "entities": 10000,
+              "queriedPerFrame": 10000,
+              "queries": 396
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 474,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 398,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 401,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 396,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 52.10000002384186,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 2,
+            "viewport": [
+              1432,
+              768
+            ],
+            "bodyOverflow": false
+          }
+        }
+      ],
+      "initialReadiness": {
+        "loadStarted": 362.7999999523163,
+        "workloadConstructed": 634.3999999761581,
+        "engineCreated": 773.7999999523163,
+        "principalObjects": 10000,
+        "assembled": 825.1000000238419,
+        "principalSceneSubmitted": 836,
+        "principalSceneGpuComplete": 939.6000000238419,
+        "principalScenePresentedOpportunity": 954.3999999761581,
+        "correlation": "identified-webgpu-submit"
+      },
+      "initialSceneWithin1000ms": true,
+      "initialScreenshot": {
+        "path": "test-results/package-native-windows-edge-ecs.png",
+        "width": 2702,
+        "height": 954,
+        "sampledColors": 486
+      },
+      "uiChecks": {
+        "keyboardRunPause": true,
+        "pausedFramesAndSubmitsStable": true,
+        "countRebuildAndOldDeviceDisposal": true,
+        "horizontalOverflow": false,
+        "terminalPagehideCleanup": true,
+        "resizeBackingAndRenderedActorContinuity": true
+      },
+      "errors": [],
+      "timingComparison": {
+        "offCallbackHz": 119.99681071599426,
+        "onCallbackHz": 120.00159470557743,
+        "offRenderCpuMilliseconds": 4.095514952542378,
+        "onRenderCpuMilliseconds": 3.9890365448108938,
+        "note": "Two runs per mode in OFF/ON/ON/OFF order; refresh-limited cadence and brief sampling cannot establish a universal overhead bound."
+      }
+    },
+    {
+      "profile": "native-windows-edge",
+      "package": "fsm",
+      "expectedActors": 1000,
+      "runs": [
+        {
+          "index": 0,
+          "timing": false,
+          "start": 1694.6999999284744,
+          "end": 4201.899999976158,
+          "summary": {
+            "callbacks": 300,
+            "measuredMilliseconds": 2499.9,
+            "callbackHz": 120.00480019200768,
+            "intervalMilliseconds": {
+              "mean": 8.333,
+              "median": 8.300000000000182,
+              "p95": 8.400000000000091,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.11533333420753479,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.2999999523162842,
+              "max": 0.5
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.6489999989668528,
+              "median": 0.6000000238418579,
+              "p95": 0.8999999761581421,
+              "p99": 1.100000023841858,
+              "max": 1.100000023841858
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/fsm",
+            "running": true,
+            "frames": 397,
+            "targetFps": 60,
+            "fps": 119.98800119701957,
+            "frameMilliseconds": 8.334166666865348,
+            "workloadCpuMilliseconds": 0.11416666209697723,
+            "renderCpuMilliseconds": 0.6941666682561238,
+            "actors": 1000,
+            "visible": 1000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              1351,
+              476
+            ],
+            "gpuTimingEnabled": false,
+            "gpuTimingSupported": false,
+            "gpuPassMilliseconds": null,
+            "readiness": {
+              "loadStarted": 174.29999995231628,
+              "workloadConstructed": 232,
+              "engineCreated": 307,
+              "principalObjects": 1000,
+              "assembled": 315.89999997615814,
+              "principalSceneSubmitted": 319.89999997615814,
+              "principalSceneGpuComplete": 355.1999999284744,
+              "principalScenePresentedOpportunity": 364.1999999284744,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 1,
+            "capturedFrames": 397,
+            "captureTruncated": false,
+            "workload": {
+              "machines": 1000,
+              "hierarchyUpdatesPerFrame": 2000,
+              "transitions": 3292,
+              "frames": 398
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": false,
+                "submits": 398,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 27.699999928474426,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 2,
+            "viewport": [
+              1432,
+              768
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 1,
+          "timing": true,
+          "start": 5353.5,
+          "end": 7862.5,
+          "summary": {
+            "callbacks": 299,
+            "measuredMilliseconds": 2500,
+            "callbackHz": 119.6,
+            "intervalMilliseconds": {
+              "mean": 8.361204013377927,
+              "median": 8.300000000000182,
+              "p95": 8.400000000000546,
+              "p99": 8.5,
+              "max": 16.600000000000364
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.13043478380477547,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.30000007152557373,
+              "max": 0.30000007152557373
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.6842809369332814,
+              "median": 0.6000000238418579,
+              "p95": 1,
+              "p99": 1.2999999523162842,
+              "max": 1.5
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/fsm",
+            "running": true,
+            "frames": 393,
+            "targetFps": 60,
+            "fps": 119.97600480761983,
+            "frameMilliseconds": 8.334999999403953,
+            "workloadCpuMilliseconds": 0.12750000059604644,
+            "renderCpuMilliseconds": 0.6958333363135656,
+            "actors": 1000,
+            "visible": 1000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              1351,
+              476
+            ],
+            "gpuTimingEnabled": true,
+            "gpuTimingSupported": true,
+            "gpuPassMilliseconds": 0.131072,
+            "readiness": {
+              "loadStarted": 4437.899999976158,
+              "workloadConstructed": 4442.799999952316,
+              "engineCreated": 4508.199999928474,
+              "principalObjects": 1000,
+              "assembled": 4512.099999904633,
+              "principalSceneSubmitted": 4512.899999976158,
+              "principalSceneGpuComplete": 4545.899999976158,
+              "principalScenePresentedOpportunity": 4555.799999952316,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 2,
+            "capturedFrames": 393,
+            "captureTruncated": false,
+            "workload": {
+              "machines": 1000,
+              "hierarchyUpdatesPerFrame": 2000,
+              "transitions": 3233,
+              "frames": 394
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 403,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 394,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 27.699999928474426,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 2,
+            "viewport": [
+              1432,
+              768
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 2,
+          "timing": true,
+          "start": 8954.399999976158,
+          "end": 11470.399999976158,
+          "summary": {
+            "callbacks": 301,
+            "measuredMilliseconds": 2508.4000000000015,
+            "callbackHz": 119.99681071599419,
+            "intervalMilliseconds": {
+              "mean": 8.333554817275752,
+              "median": 8.300000000001091,
+              "p95": 8.400000000001455,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.11561461817782583,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.20000004768371582,
+              "max": 0.30000007152557373
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.6418604648786526,
+              "median": 0.6000000238418579,
+              "p95": 0.8999999761581421,
+              "p99": 1.1999999284744263,
+              "max": 1.3000000715255737
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/fsm",
+            "running": true,
+            "frames": 394,
+            "targetFps": 60,
+            "fps": 120.02400480668452,
+            "frameMilliseconds": 8.331666666269303,
+            "workloadCpuMilliseconds": 0.10249999562899272,
+            "renderCpuMilliseconds": 0.6124999990065892,
+            "actors": 1000,
+            "visible": 1000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              1351,
+              476
+            ],
+            "gpuTimingEnabled": true,
+            "gpuTimingSupported": true,
+            "gpuPassMilliseconds": 0.196608,
+            "readiness": {
+              "loadStarted": 8085.399999976158,
+              "workloadConstructed": 8088.599999904633,
+              "engineCreated": 8121.899999976158,
+              "principalObjects": 1000,
+              "assembled": 8125.5,
+              "principalSceneSubmitted": 8126.199999928474,
+              "principalSceneGpuComplete": 8152.199999928474,
+              "principalScenePresentedOpportunity": 8164.099999904633,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 3,
+            "capturedFrames": 394,
+            "captureTruncated": false,
+            "workload": {
+              "machines": 1000,
+              "hierarchyUpdatesPerFrame": 2000,
+              "transitions": 3233,
+              "frames": 395
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 403,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 399,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 395,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 27.699999928474426,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 2,
+            "viewport": [
+              1432,
+              768
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 3,
+          "timing": false,
+          "start": 12585.699999928474,
+          "end": 15094.199999928474,
+          "summary": {
+            "callbacks": 300,
+            "measuredMilliseconds": 2499.8999999999996,
+            "callbackHz": 120.00480019200769,
+            "intervalMilliseconds": {
+              "mean": 8.332999999999998,
+              "median": 8.300000000001091,
+              "p95": 8.5,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.11733333269755046,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.2999999523162842,
+              "max": 0.2999999523162842
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.6503333310286205,
+              "median": 0.6000000238418579,
+              "p95": 0.9000000953674316,
+              "p99": 1.2000000476837158,
+              "max": 1.2000000476837158
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/fsm",
+            "running": true,
+            "frames": 393,
+            "targetFps": 60,
+            "fps": 120.01200120298161,
+            "frameMilliseconds": 8.332499999801318,
+            "workloadCpuMilliseconds": 0.10416666865348816,
+            "renderCpuMilliseconds": 0.6374999990065893,
+            "actors": 1000,
+            "visible": 1000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              1351,
+              476
+            ],
+            "gpuTimingEnabled": false,
+            "gpuTimingSupported": false,
+            "gpuPassMilliseconds": null,
+            "readiness": {
+              "loadStarted": 11732.599999904633,
+              "workloadConstructed": 11735.099999904633,
+              "engineCreated": 11760.699999928474,
+              "principalObjects": 1000,
+              "assembled": 11764.199999928474,
+              "principalSceneSubmitted": 11764.699999928474,
+              "principalSceneGpuComplete": 11785.299999952316,
+              "principalScenePresentedOpportunity": 11797.399999976158,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 4,
+            "capturedFrames": 393,
+            "captureTruncated": false,
+            "workload": {
+              "machines": 1000,
+              "hierarchyUpdatesPerFrame": 2000,
+              "transitions": 3233,
+              "frames": 394
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 403,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 399,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 402,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 394,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 27.699999928474426,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 2,
+            "viewport": [
+              1432,
+              768
+            ],
+            "bodyOverflow": false
+          }
+        }
+      ],
+      "initialReadiness": {
+        "loadStarted": 174.29999995231628,
+        "workloadConstructed": 232,
+        "engineCreated": 307,
+        "principalObjects": 1000,
+        "assembled": 315.89999997615814,
+        "principalSceneSubmitted": 319.89999997615814,
+        "principalSceneGpuComplete": 355.1999999284744,
+        "principalScenePresentedOpportunity": 364.1999999284744,
+        "correlation": "identified-webgpu-submit"
+      },
+      "initialSceneWithin1000ms": true,
+      "initialScreenshot": {
+        "path": "test-results/package-native-windows-edge-fsm.png",
+        "width": 2702,
+        "height": 954,
+        "sampledColors": 376
+      },
+      "uiChecks": {
+        "keyboardRunPause": true,
+        "pausedFramesAndSubmitsStable": true,
+        "countRebuildAndOldDeviceDisposal": true,
+        "horizontalOverflow": false,
+        "terminalPagehideCleanup": true,
+        "resizeBackingAndRenderedActorContinuity": true
+      },
+      "errors": [],
+      "timingComparison": {
+        "offCallbackHz": 120.00480019200768,
+        "onCallbackHz": 119.7984053579971,
+        "offRenderCpuMilliseconds": 0.6496666649977366,
+        "onRenderCpuMilliseconds": 0.663070700905967,
+        "note": "Two runs per mode in OFF/ON/ON/OFF order; refresh-limited cadence and brief sampling cannot establish a universal overhead bound."
+      }
+    },
+    {
+      "profile": "native-windows-edge",
+      "package": "tween",
+      "expectedActors": 1000,
+      "runs": [
+        {
+          "index": 0,
+          "timing": false,
+          "start": 1787.2000000476837,
+          "end": 4307.100000023842,
+          "summary": {
+            "callbacks": 301,
+            "measuredMilliseconds": 2508.3,
+            "callbackHz": 120.00159470557747,
+            "intervalMilliseconds": {
+              "mean": 8.333222591362127,
+              "median": 8.300000000000182,
+              "p95": 8.400000000000091,
+              "p99": 8.5,
+              "max": 8.599999999999909
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.10664451676745747,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.2999999523162842,
+              "max": 0.6999999284744263
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.6946843882335777,
+              "median": 0.6999999284744263,
+              "p95": 1,
+              "p99": 1.2999999523162842,
+              "max": 2
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/tween",
+            "running": true,
+            "frames": 395,
+            "targetFps": 60,
+            "fps": 120.0600300150075,
+            "frameMilliseconds": 8.329166666666667,
+            "workloadCpuMilliseconds": 0.11500000059604645,
+            "renderCpuMilliseconds": 0.6600000003973643,
+            "actors": 1000,
+            "visible": 1000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              1351,
+              476
+            ],
+            "gpuTimingEnabled": false,
+            "gpuTimingSupported": false,
+            "gpuPassMilliseconds": null,
+            "readiness": {
+              "loadStarted": 255.20000004768372,
+              "workloadConstructed": 311,
+              "engineCreated": 382.8000000715256,
+              "principalObjects": 1000,
+              "assembled": 391.10000002384186,
+              "principalSceneSubmitted": 396,
+              "principalSceneGpuComplete": 431.3000000715256,
+              "principalScenePresentedOpportunity": 442.8000000715256,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 1,
+            "capturedFrames": 395,
+            "captureTruncated": false,
+            "workload": {
+              "tracks": 1000,
+              "completions": 1905
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": false,
+                "submits": 396,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 47.300000071525574,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 2,
+            "viewport": [
+              1432,
+              768
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 1,
+          "timing": true,
+          "start": 5473.200000047684,
+          "end": 7983.300000071526,
+          "summary": {
+            "callbacks": 300,
+            "measuredMilliseconds": 2500,
+            "callbackHz": 120,
+            "intervalMilliseconds": {
+              "mean": 8.333333333333334,
+              "median": 8.300000000000182,
+              "p95": 8.400000000000546,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.09466666539510091,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.30000007152557373,
+              "max": 0.30000007152557373
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.6406666648387909,
+              "median": 0.6000000238418579,
+              "p95": 1,
+              "p99": 1.3000000715255737,
+              "max": 2
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/tween",
+            "running": true,
+            "frames": 392,
+            "targetFps": 60,
+            "fps": 120.03601079751549,
+            "frameMilliseconds": 8.330833333730698,
+            "workloadCpuMilliseconds": 0.10500000119209289,
+            "renderCpuMilliseconds": 0.6266666640837987,
+            "actors": 1000,
+            "visible": 1000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              1351,
+              476
+            ],
+            "gpuTimingEnabled": true,
+            "gpuTimingSupported": true,
+            "gpuPassMilliseconds": 0.131072,
+            "readiness": {
+              "loadStarted": 4573.900000095367,
+              "workloadConstructed": 4586.600000023842,
+              "engineCreated": 4640.600000023842,
+              "principalObjects": 1000,
+              "assembled": 4644,
+              "principalSceneSubmitted": 4644.900000095367,
+              "principalSceneGpuComplete": 4677.5,
+              "principalScenePresentedOpportunity": 4692.700000047684,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 2,
+            "capturedFrames": 392,
+            "captureTruncated": false,
+            "workload": {
+              "tracks": 1000,
+              "completions": 1865
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 404,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 393,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 47.300000071525574,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 2,
+            "viewport": [
+              1432,
+              768
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 2,
+          "timing": true,
+          "start": 9123.100000023842,
+          "end": 11684.400000095367,
+          "summary": {
+            "callbacks": 306,
+            "measuredMilliseconds": 2550.1000000000004,
+            "callbackHz": 119.9952943021842,
+            "intervalMilliseconds": {
+              "mean": 8.333660130718956,
+              "median": 8.300000000001091,
+              "p95": 8.5,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.09052287675196828,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.20000004768371582,
+              "max": 0.2999999523162842
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.752614382045721,
+              "median": 0.7000000476837158,
+              "p95": 1.100000023841858,
+              "p99": 1.2000000476837158,
+              "max": 1.4000000953674316
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/tween",
+            "running": true,
+            "frames": 407,
+            "targetFps": 60,
+            "fps": 119.97600479332043,
+            "frameMilliseconds": 8.335000000397365,
+            "workloadCpuMilliseconds": 0.0975000003973643,
+            "renderCpuMilliseconds": 0.7500000009934108,
+            "actors": 1000,
+            "visible": 1000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              1351,
+              476
+            ],
+            "gpuTimingEnabled": true,
+            "gpuTimingSupported": true,
+            "gpuPassMilliseconds": 0.196608,
+            "readiness": {
+              "loadStarted": 8202.100000023842,
+              "workloadConstructed": 8209.100000023842,
+              "engineCreated": 8231.5,
+              "principalObjects": 1000,
+              "assembled": 8234,
+              "principalSceneSubmitted": 8234.5,
+              "principalSceneGpuComplete": 8254.400000095367,
+              "principalScenePresentedOpportunity": 8267.600000023842,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 3,
+            "capturedFrames": 407,
+            "captureTruncated": false,
+            "workload": {
+              "tracks": 1000,
+              "completions": 2006
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 404,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 397,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 408,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 47.300000071525574,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 2,
+            "viewport": [
+              1432,
+              768
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 3,
+          "timing": false,
+          "start": 12807.200000047684,
+          "end": 15323.100000023842,
+          "summary": {
+            "callbacks": 301,
+            "measuredMilliseconds": 2508.2999999999993,
+            "callbackHz": 120.00159470557752,
+            "intervalMilliseconds": {
+              "mean": 8.333222591362123,
+              "median": 8.300000000001091,
+              "p95": 8.400000000001455,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.08504983317416372,
+              "median": 0.10000002384185791,
+              "p95": 0.19999992847442627,
+              "p99": 0.20000004768371582,
+              "max": 0.2999999523162842
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.7627906961694508,
+              "median": 0.7000000476837158,
+              "p95": 1,
+              "p99": 1.1999999284744263,
+              "max": 1.399999976158142
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/tween",
+            "running": true,
+            "frames": 395,
+            "targetFps": 60,
+            "fps": 120.03601079751549,
+            "frameMilliseconds": 8.330833333730698,
+            "workloadCpuMilliseconds": 0.08833333551883697,
+            "renderCpuMilliseconds": 0.7049999952316284,
+            "actors": 1000,
+            "visible": 1000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              1351,
+              476
+            ],
+            "gpuTimingEnabled": false,
+            "gpuTimingSupported": false,
+            "gpuPassMilliseconds": null,
+            "readiness": {
+              "loadStarted": 11936.800000071526,
+              "workloadConstructed": 11940.200000047684,
+              "engineCreated": 11971.700000047684,
+              "principalObjects": 1000,
+              "assembled": 11974.400000095367,
+              "principalSceneSubmitted": 11975.5,
+              "principalSceneGpuComplete": 11999.200000047684,
+              "principalScenePresentedOpportunity": 12009.400000095367,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 4,
+            "capturedFrames": 395,
+            "captureTruncated": false,
+            "workload": {
+              "tracks": 1000,
+              "completions": 1891
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 404,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 397,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 414,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 396,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 47.300000071525574,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 2,
+            "viewport": [
+              1432,
+              768
+            ],
+            "bodyOverflow": false
+          }
+        }
+      ],
+      "initialReadiness": {
+        "loadStarted": 255.20000004768372,
+        "workloadConstructed": 311,
+        "engineCreated": 382.8000000715256,
+        "principalObjects": 1000,
+        "assembled": 391.10000002384186,
+        "principalSceneSubmitted": 396,
+        "principalSceneGpuComplete": 431.3000000715256,
+        "principalScenePresentedOpportunity": 442.8000000715256,
+        "correlation": "identified-webgpu-submit"
+      },
+      "initialSceneWithin1000ms": true,
+      "initialScreenshot": {
+        "path": "test-results/package-native-windows-edge-tween.png",
+        "width": 2702,
+        "height": 954,
+        "sampledColors": 675
+      },
+      "uiChecks": {
+        "keyboardRunPause": true,
+        "pausedFramesAndSubmitsStable": true,
+        "countRebuildAndOldDeviceDisposal": true,
+        "horizontalOverflow": false,
+        "terminalPagehideCleanup": true,
+        "resizeBackingAndRenderedActorContinuity": true
+      },
+      "errors": [],
+      "timingComparison": {
+        "offCallbackHz": 120.0015947055775,
+        "onCallbackHz": 119.99764715109211,
+        "offRenderCpuMilliseconds": 0.7287375422015143,
+        "onRenderCpuMilliseconds": 0.6966405234422559,
+        "note": "Two runs per mode in OFF/ON/ON/OFF order; refresh-limited cadence and brief sampling cannot establish a universal overhead bound."
+      }
+    },
+    {
+      "profile": "native-windows-edge",
+      "package": "net",
+      "expectedActors": 256,
+      "runs": [
+        {
+          "index": 0,
+          "timing": false,
+          "start": 1804.8999999761581,
+          "end": 4319.100000023842,
+          "summary": {
+            "callbacks": 301,
+            "measuredMilliseconds": 2508.2999999999997,
+            "callbackHz": 120.00159470557749,
+            "intervalMilliseconds": {
+              "mean": 8.333222591362125,
+              "median": 8.300000000000182,
+              "p95": 8.400000000000546,
+              "p99": 8.5,
+              "max": 9
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.0853820583749055,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.2999999523162842,
+              "max": 0.30000007152557373
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.45116279212343335,
+              "median": 0.40000009536743164,
+              "p95": 0.7000000476837158,
+              "p99": 1,
+              "max": 1.3000000715255737
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/net",
+            "running": true,
+            "frames": 394,
+            "targetFps": 60,
+            "fps": 120.01200120298161,
+            "frameMilliseconds": 8.332499999801318,
+            "workloadCpuMilliseconds": 0.08916666905085245,
+            "renderCpuMilliseconds": 0.4558333307504654,
+            "actors": 256,
+            "visible": 256,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              1351,
+              476
+            ],
+            "gpuTimingEnabled": false,
+            "gpuTimingSupported": false,
+            "gpuPassMilliseconds": null,
+            "readiness": {
+              "loadStarted": 179.79999995231628,
+              "workloadConstructed": 222.69999992847443,
+              "engineCreated": 390.6999999284744,
+              "principalObjects": 256,
+              "assembled": 397.89999997615814,
+              "principalSceneSubmitted": 401.1999999284744,
+              "principalSceneGpuComplete": 434.89999997615814,
+              "principalScenePresentedOpportunity": 439.2999999523163,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 1,
+            "capturedFrames": 394,
+            "captureTruncated": false,
+            "workload": {
+              "remoteActors": 256,
+              "snapshotSlotsPerActor": 32,
+              "packetHz": 20,
+              "packets": 16864,
+              "dropped": 288
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": false,
+                "submits": 395,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 27.399999976158142,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 2,
+            "viewport": [
+              1432,
+              768
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 1,
+          "timing": true,
+          "start": 5456.899999976158,
+          "end": 7969.199999928474,
+          "summary": {
+            "callbacks": 299,
+            "measuredMilliseconds": 2500,
+            "callbackHz": 119.6,
+            "intervalMilliseconds": {
+              "mean": 8.361204013377927,
+              "median": 8.300000000000182,
+              "p95": 8.400000000000546,
+              "p99": 8.5,
+              "max": 16.899999999999636
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.1013377968682892,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.30000007152557373,
+              "max": 0.30000007152557373
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.4852842822122733,
+              "median": 0.5,
+              "p95": 0.8999999761581421,
+              "p99": 1.100000023841858,
+              "max": 1.3000000715255737
+            },
+            "intervalsAbove60HzBudget": 1
+          },
+          "measurements": {
+            "package": "@margoengine/net",
+            "running": true,
+            "frames": 392,
+            "targetFps": 60,
+            "fps": 119.98800119701957,
+            "frameMilliseconds": 8.334166666865348,
+            "workloadCpuMilliseconds": 0.09833333889643352,
+            "renderCpuMilliseconds": 0.47249999741713206,
+            "actors": 256,
+            "visible": 256,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              1351,
+              476
+            ],
+            "gpuTimingEnabled": true,
+            "gpuTimingSupported": true,
+            "gpuPassMilliseconds": 0.065536,
+            "readiness": {
+              "loadStarted": 4549.899999976158,
+              "workloadConstructed": 4552.899999976158,
+              "engineCreated": 4615.600000023842,
+              "principalObjects": 256,
+              "assembled": 4618.199999928474,
+              "principalSceneSubmitted": 4618.600000023842,
+              "principalSceneGpuComplete": 4650.699999928474,
+              "principalScenePresentedOpportunity": 4664.299999952316,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 2,
+            "capturedFrames": 392,
+            "captureTruncated": false,
+            "workload": {
+              "remoteActors": 256,
+              "snapshotSlotsPerActor": 32,
+              "packetHz": 20,
+              "packets": 16864,
+              "dropped": 288
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 399,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 393,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 27.399999976158142,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 2,
+            "viewport": [
+              1432,
+              768
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 2,
+          "timing": true,
+          "start": 9027.899999976158,
+          "end": 11537.799999952316,
+          "summary": {
+            "callbacks": 300,
+            "measuredMilliseconds": 2499.8999999999996,
+            "callbackHz": 120.00480019200769,
+            "intervalMilliseconds": {
+              "mean": 8.332999999999998,
+              "median": 8.300000000001091,
+              "p95": 8.400000000001455,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.09700000127156576,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.30000007152557373,
+              "max": 0.40000009536743164
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.42833332856496176,
+              "median": 0.3999999761581421,
+              "p95": 0.7000000476837158,
+              "p99": 1,
+              "max": 1.2000000476837158
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/net",
+            "running": true,
+            "frames": 393,
+            "targetFps": 60,
+            "fps": 120.02400479237369,
+            "frameMilliseconds": 8.331666667262713,
+            "workloadCpuMilliseconds": 0.09666666487852732,
+            "renderCpuMilliseconds": 0.38166666130224863,
+            "actors": 256,
+            "visible": 256,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              1351,
+              476
+            ],
+            "gpuTimingEnabled": true,
+            "gpuTimingSupported": true,
+            "gpuPassMilliseconds": 0.065536,
+            "readiness": {
+              "loadStarted": 8169.699999928474,
+              "workloadConstructed": 8173.699999928474,
+              "engineCreated": 8204.299999952316,
+              "principalObjects": 256,
+              "assembled": 8205.799999952316,
+              "principalSceneSubmitted": 8206.5,
+              "principalSceneGpuComplete": 8229.600000023842,
+              "principalScenePresentedOpportunity": 8239.299999952316,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 3,
+            "capturedFrames": 393,
+            "captureTruncated": false,
+            "workload": {
+              "remoteActors": 256,
+              "snapshotSlotsPerActor": 32,
+              "packetHz": 20,
+              "packets": 16864,
+              "dropped": 288
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 399,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 396,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 394,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 27.399999976158142,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 2,
+            "viewport": [
+              1432,
+              768
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 3,
+          "timing": false,
+          "start": 12601.100000023842,
+          "end": 15107.199999928474,
+          "summary": {
+            "callbacks": 300,
+            "measuredMilliseconds": 2500.1000000000004,
+            "callbackHz": 119.9952001919923,
+            "intervalMilliseconds": {
+              "mean": 8.333666666666668,
+              "median": 8.300000000001091,
+              "p95": 8.5,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.08733333071072896,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.2999999523162842,
+              "max": 0.3999999761581421
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.3883333365122477,
+              "median": 0.3999999761581421,
+              "p95": 0.7000000476837158,
+              "p99": 0.8000000715255737,
+              "max": 0.8999999761581421
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/net",
+            "running": true,
+            "frames": 392,
+            "targetFps": 60,
+            "fps": 119.96401078818306,
+            "frameMilliseconds": 8.33583333392938,
+            "workloadCpuMilliseconds": 0.09166665971279145,
+            "renderCpuMilliseconds": 0.35916667779286704,
+            "actors": 256,
+            "visible": 256,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              1351,
+              476
+            ],
+            "gpuTimingEnabled": false,
+            "gpuTimingSupported": false,
+            "gpuPassMilliseconds": null,
+            "readiness": {
+              "loadStarted": 11762.600000023842,
+              "workloadConstructed": 11766.799999952316,
+              "engineCreated": 11791.699999928474,
+              "principalObjects": 256,
+              "assembled": 11793.100000023842,
+              "principalSceneSubmitted": 11793.5,
+              "principalSceneGpuComplete": 11813,
+              "principalScenePresentedOpportunity": 11822.699999928474,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 4,
+            "capturedFrames": 392,
+            "captureTruncated": false,
+            "workload": {
+              "remoteActors": 256,
+              "snapshotSlotsPerActor": 32,
+              "packetHz": 20,
+              "packets": 16864,
+              "dropped": 288
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 399,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 396,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 399,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 393,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 27.399999976158142,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 2,
+            "viewport": [
+              1432,
+              768
+            ],
+            "bodyOverflow": false
+          }
+        }
+      ],
+      "initialReadiness": {
+        "loadStarted": 179.79999995231628,
+        "workloadConstructed": 222.69999992847443,
+        "engineCreated": 390.6999999284744,
+        "principalObjects": 256,
+        "assembled": 397.89999997615814,
+        "principalSceneSubmitted": 401.1999999284744,
+        "principalSceneGpuComplete": 434.89999997615814,
+        "principalScenePresentedOpportunity": 439.2999999523163,
+        "correlation": "identified-webgpu-submit"
+      },
+      "initialSceneWithin1000ms": true,
+      "initialScreenshot": {
+        "path": "test-results/package-native-windows-edge-net.png",
+        "width": 2702,
+        "height": 954,
+        "sampledColors": 459
+      },
+      "uiChecks": {
+        "keyboardRunPause": true,
+        "pausedFramesAndSubmitsStable": true,
+        "countRebuildAndOldDeviceDisposal": true,
+        "horizontalOverflow": false,
+        "terminalPagehideCleanup": true,
+        "resizeBackingAndRenderedActorContinuity": true
+      },
+      "errors": [],
+      "timingComparison": {
+        "offCallbackHz": 119.99839744878489,
+        "onCallbackHz": 119.80240009600385,
+        "offRenderCpuMilliseconds": 0.4197480643178405,
+        "onRenderCpuMilliseconds": 0.45680880538861757,
+        "note": "Two runs per mode in OFF/ON/ON/OFF order; refresh-limited cadence and brief sampling cannot establish a universal overhead bound."
+      }
+    },
+    {
+      "profile": "android-layout-emulation-on-intel",
+      "package": "ecs",
+      "expectedActors": 10000,
+      "runs": [
+        {
+          "index": 0,
+          "timing": false,
+          "start": 1533.3999999761581,
+          "end": 4051.399999976158,
+          "summary": {
+            "callbacks": 301,
+            "measuredMilliseconds": 2508.3,
+            "callbackHz": 120.00159470557747,
+            "intervalMilliseconds": {
+              "mean": 8.333222591362127,
+              "median": 8.300000000000182,
+              "p95": 8.400000000000091,
+              "p99": 8.5,
+              "max": 8.599999999999909
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.5285714306308582,
+              "median": 0.5,
+              "p95": 0.6000000238418579,
+              "p99": 0.7000000476837158,
+              "max": 0.7999999523162842
+            },
+            "renderCpuMilliseconds": {
+              "mean": 2.8215946850190528,
+              "median": 2.799999952316284,
+              "p95": 3.200000047683716,
+              "p99": 3.5,
+              "max": 3.600000023841858
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/ecs",
+            "running": true,
+            "frames": 397,
+            "targetFps": 60,
+            "fps": 119.98800119701957,
+            "frameMilliseconds": 8.334166666865348,
+            "workloadCpuMilliseconds": 0.49416666726271313,
+            "renderCpuMilliseconds": 2.7783333400885266,
+            "actors": 10000,
+            "visible": 10000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              712,
+              776
+            ],
+            "gpuTimingEnabled": false,
+            "gpuTimingSupported": false,
+            "gpuPassMilliseconds": null,
+            "readiness": {
+              "loadStarted": 141.19999992847443,
+              "workloadConstructed": 172,
+              "engineCreated": 362.89999997615814,
+              "principalObjects": 10000,
+              "assembled": 401.5,
+              "principalSceneSubmitted": 411.5,
+              "principalSceneGpuComplete": 439.7999999523163,
+              "principalScenePresentedOpportunity": 445.89999997615814,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 1,
+            "capturedFrames": 397,
+            "captureTruncated": false,
+            "workload": {
+              "entities": 10000,
+              "queriedPerFrame": 10000,
+              "queries": 398
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": false,
+                "submits": 398,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 23.5,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 3,
+            "viewport": [
+              390,
+              844
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 1,
+          "timing": true,
+          "start": 5392.699999928474,
+          "end": 7900.299999952316,
+          "summary": {
+            "callbacks": 300,
+            "measuredMilliseconds": 2499.8999999999996,
+            "callbackHz": 120.00480019200769,
+            "intervalMilliseconds": {
+              "mean": 8.332999999999998,
+              "median": 8.300000000000182,
+              "p95": 8.400000000000546,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.6190000009536744,
+              "median": 0.6000000238418579,
+              "p95": 0.7999999523162842,
+              "p99": 0.8000000715255737,
+              "max": 0.8999999761581421
+            },
+            "renderCpuMilliseconds": {
+              "mean": 3.091333338022232,
+              "median": 3.100000023841858,
+              "p95": 3.5,
+              "p99": 3.700000047683716,
+              "max": 4
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/ecs",
+            "running": true,
+            "frames": 392,
+            "targetFps": 60,
+            "fps": 119.94002998500748,
+            "frameMilliseconds": 8.3375,
+            "workloadCpuMilliseconds": 0.6066666642824808,
+            "renderCpuMilliseconds": 3.0700000087420145,
+            "actors": 10000,
+            "visible": 10000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              712,
+              776
+            ],
+            "gpuTimingEnabled": true,
+            "gpuTimingSupported": true,
+            "gpuPassMilliseconds": 0.589824,
+            "readiness": {
+              "loadStarted": 4489.199999928474,
+              "workloadConstructed": 4497.299999952316,
+              "engineCreated": 4547.599999904633,
+              "principalObjects": 10000,
+              "assembled": 4567.199999928474,
+              "principalSceneSubmitted": 4570.199999928474,
+              "principalSceneGpuComplete": 4595.599999904633,
+              "principalScenePresentedOpportunity": 4604.199999928474,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 2,
+            "capturedFrames": 392,
+            "captureTruncated": false,
+            "workload": {
+              "entities": 10000,
+              "queriedPerFrame": 10000,
+              "queries": 393
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 401,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 393,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 23.5,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 3,
+            "viewport": [
+              390,
+              844
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 2,
+          "timing": true,
+          "start": 9258.899999976158,
+          "end": 11776.299999952316,
+          "summary": {
+            "callbacks": 301,
+            "measuredMilliseconds": 2508.2999999999993,
+            "callbackHz": 120.00159470557752,
+            "intervalMilliseconds": {
+              "mean": 8.333222591362123,
+              "median": 8.300000000001091,
+              "p95": 8.400000000001455,
+              "p99": 8.5,
+              "max": 8.600000000000364
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.7358803966908756,
+              "median": 0.7000000476837158,
+              "p95": 0.9000000953674316,
+              "p99": 1.100000023841858,
+              "max": 1.5
+            },
+            "renderCpuMilliseconds": {
+              "mean": 4.0239202663351925,
+              "median": 4,
+              "p95": 5,
+              "p99": 5.5,
+              "max": 5.700000047683716
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/ecs",
+            "running": true,
+            "frames": 395,
+            "targetFps": 60,
+            "fps": 119.94002998500748,
+            "frameMilliseconds": 8.3375,
+            "workloadCpuMilliseconds": 0.7749999970197677,
+            "renderCpuMilliseconds": 4.426666670044264,
+            "actors": 10000,
+            "visible": 10000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              712,
+              776
+            ],
+            "gpuTimingEnabled": true,
+            "gpuTimingSupported": true,
+            "gpuPassMilliseconds": 0.589824,
+            "readiness": {
+              "loadStarted": 8371.399999976158,
+              "workloadConstructed": 8389.699999928474,
+              "engineCreated": 8408.899999976158,
+              "principalObjects": 10000,
+              "assembled": 8431.299999952316,
+              "principalSceneSubmitted": 8434.399999976158,
+              "principalSceneGpuComplete": 8450,
+              "principalScenePresentedOpportunity": 8462.599999904633,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 3,
+            "capturedFrames": 395,
+            "captureTruncated": false,
+            "workload": {
+              "entities": 10000,
+              "queriedPerFrame": 10000,
+              "queries": 396
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 401,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 396,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 396,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 23.5,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 3,
+            "viewport": [
+              390,
+              844
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 3,
+          "timing": false,
+          "start": 13303,
+          "end": 15819.699999928474,
+          "summary": {
+            "callbacks": 301,
+            "measuredMilliseconds": 2508.4000000000015,
+            "callbackHz": 119.99681071599419,
+            "intervalMilliseconds": {
+              "mean": 8.333554817275752,
+              "median": 8.300000000001091,
+              "p95": 8.400000000001455,
+              "p99": 8.5,
+              "max": 8.700000000000728
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.7710963451981149,
+              "median": 0.7999999523162842,
+              "p95": 1,
+              "p99": 1.2000000476837158,
+              "max": 1.3000000715255737
+            },
+            "renderCpuMilliseconds": {
+              "mean": 3.904651160256015,
+              "median": 3.8000000715255737,
+              "p95": 4.399999976158142,
+              "p99": 4.899999976158142,
+              "max": 5.400000095367432
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/ecs",
+            "running": true,
+            "frames": 394,
+            "targetFps": 60,
+            "fps": 119.90407673003978,
+            "frameMilliseconds": 8.340000000596046,
+            "workloadCpuMilliseconds": 0.7524999966224034,
+            "renderCpuMilliseconds": 3.798333327968915,
+            "actors": 10000,
+            "visible": 10000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              712,
+              776
+            ],
+            "gpuTimingEnabled": false,
+            "gpuTimingSupported": false,
+            "gpuPassMilliseconds": null,
+            "readiness": {
+              "loadStarted": 12421.399999976158,
+              "workloadConstructed": 12436,
+              "engineCreated": 12464.099999904633,
+              "principalObjects": 10000,
+              "assembled": 12486.899999976158,
+              "principalSceneSubmitted": 12490.399999976158,
+              "principalSceneGpuComplete": 12507,
+              "principalScenePresentedOpportunity": 12512.599999904633,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 4,
+            "capturedFrames": 394,
+            "captureTruncated": false,
+            "workload": {
+              "entities": 10000,
+              "queriedPerFrame": 10000,
+              "queries": 395
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 401,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 396,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 401,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 395,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 23.5,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 3,
+            "viewport": [
+              390,
+              844
+            ],
+            "bodyOverflow": false
+          }
+        }
+      ],
+      "initialReadiness": {
+        "loadStarted": 141.19999992847443,
+        "workloadConstructed": 172,
+        "engineCreated": 362.89999997615814,
+        "principalObjects": 10000,
+        "assembled": 401.5,
+        "principalSceneSubmitted": 411.5,
+        "principalSceneGpuComplete": 439.7999999523163,
+        "principalScenePresentedOpportunity": 445.89999997615814,
+        "correlation": "identified-webgpu-submit"
+      },
+      "initialSceneWithin1000ms": true,
+      "initialScreenshot": {
+        "path": "test-results/package-android-layout-emulation-on-intel-ecs.png",
+        "width": 1068,
+        "height": 1167,
+        "sampledColors": 234
+      },
+      "uiChecks": {
+        "keyboardRunPause": true,
+        "pausedFramesAndSubmitsStable": true,
+        "countRebuildAndOldDeviceDisposal": true,
+        "horizontalOverflow": false,
+        "terminalPagehideCleanup": true,
+        "resizeBackingAndRenderedActorContinuity": true
+      },
+      "errors": [],
+      "timingComparison": {
+        "offCallbackHz": 119.99920271078582,
+        "onCallbackHz": 120.0031974487926,
+        "offRenderCpuMilliseconds": 3.363122922637534,
+        "onRenderCpuMilliseconds": 3.5576268021787123,
+        "note": "Two runs per mode in OFF/ON/ON/OFF order; refresh-limited cadence and brief sampling cannot establish a universal overhead bound."
+      }
+    },
+    {
+      "profile": "android-layout-emulation-on-intel",
+      "package": "fsm",
+      "expectedActors": 1000,
+      "runs": [
+        {
+          "index": 0,
+          "timing": false,
+          "start": 1519.2000000476837,
+          "end": 4027.8000000715256,
+          "summary": {
+            "callbacks": 300,
+            "measuredMilliseconds": 2500,
+            "callbackHz": 120,
+            "intervalMilliseconds": {
+              "mean": 8.333333333333334,
+              "median": 8.300000000000182,
+              "p95": 8.400000000000091,
+              "p99": 8.5,
+              "max": 8.599999999999909
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.10633333881696065,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.2999999523162842,
+              "max": 0.5
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.6229999951521555,
+              "median": 0.6000000238418579,
+              "p95": 0.8999999761581421,
+              "p99": 1.2999999523162842,
+              "max": 1.2999999523162842
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/fsm",
+            "running": true,
+            "frames": 394,
+            "targetFps": 60,
+            "fps": 119.9880012113218,
+            "frameMilliseconds": 8.334166665871939,
+            "workloadCpuMilliseconds": 0.09333333671092987,
+            "renderCpuMilliseconds": 0.6308333277702332,
+            "actors": 1000,
+            "visible": 1000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              712,
+              776
+            ],
+            "gpuTimingEnabled": false,
+            "gpuTimingSupported": false,
+            "gpuPassMilliseconds": null,
+            "readiness": {
+              "loadStarted": 165.80000007152557,
+              "workloadConstructed": 189.30000007152557,
+              "engineCreated": 375.60000002384186,
+              "principalObjects": 1000,
+              "assembled": 385.7000000476837,
+              "principalSceneSubmitted": 389.8000000715256,
+              "principalSceneGpuComplete": 423.40000009536743,
+              "principalScenePresentedOpportunity": 438.7000000476837,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 1,
+            "capturedFrames": 394,
+            "captureTruncated": false,
+            "workload": {
+              "machines": 1000,
+              "hierarchyUpdatesPerFrame": 2000,
+              "transitions": 3233,
+              "frames": 395
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": false,
+                "submits": 395,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 26.40000009536743,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 3,
+            "viewport": [
+              390,
+              844
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 1,
+          "timing": true,
+          "start": 5123.600000023842,
+          "end": 7641.300000071526,
+          "summary": {
+            "callbacks": 301,
+            "measuredMilliseconds": 2508.2000000000007,
+            "callbackHz": 120.00637907662862,
+            "intervalMilliseconds": {
+              "mean": 8.332890365448508,
+              "median": 8.300000000000182,
+              "p95": 8.400000000000546,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.11926910845544252,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.2999999523162842,
+              "max": 0.30000007152557373
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.6129568074628761,
+              "median": 0.6000000238418579,
+              "p95": 0.8999999761581421,
+              "p99": 1.2000000476837158,
+              "max": 1.600000023841858
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/fsm",
+            "running": true,
+            "frames": 393,
+            "targetFps": 60,
+            "fps": 119.98800119701957,
+            "frameMilliseconds": 8.334166666865348,
+            "workloadCpuMilliseconds": 0.10000000496705373,
+            "renderCpuMilliseconds": 0.575833331545194,
+            "actors": 1000,
+            "visible": 1000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              712,
+              776
+            ],
+            "gpuTimingEnabled": true,
+            "gpuTimingSupported": true,
+            "gpuPassMilliseconds": 0.131072,
+            "readiness": {
+              "loadStarted": 4245.300000071526,
+              "workloadConstructed": 4249.5,
+              "engineCreated": 4303.5,
+              "principalObjects": 1000,
+              "assembled": 4307.200000047684,
+              "principalSceneSubmitted": 4307.900000095367,
+              "principalSceneGpuComplete": 4333.400000095367,
+              "principalScenePresentedOpportunity": 4347,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 2,
+            "capturedFrames": 393,
+            "captureTruncated": false,
+            "workload": {
+              "machines": 1000,
+              "hierarchyUpdatesPerFrame": 2000,
+              "transitions": 3233,
+              "frames": 394
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 398,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 394,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 26.40000009536743,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 3,
+            "viewport": [
+              390,
+              844
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 2,
+          "timing": true,
+          "start": 8686.900000095367,
+          "end": 11203.5,
+          "summary": {
+            "callbacks": 301,
+            "measuredMilliseconds": 2508.2999999999993,
+            "callbackHz": 120.00159470557752,
+            "intervalMilliseconds": {
+              "mean": 8.333222591362123,
+              "median": 8.300000000001091,
+              "p95": 8.400000000001455,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.08970099786587332,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.20000004768371582,
+              "max": 0.2999999523162842
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.4870431862796264,
+              "median": 0.5,
+              "p95": 0.7999999523162842,
+              "p99": 0.8999999761581421,
+              "max": 1
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/fsm",
+            "running": true,
+            "frames": 394,
+            "targetFps": 60,
+            "fps": 120.03601079751549,
+            "frameMilliseconds": 8.330833333730698,
+            "workloadCpuMilliseconds": 0.08250000278155009,
+            "renderCpuMilliseconds": 0.4708333283662796,
+            "actors": 1000,
+            "visible": 1000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              712,
+              776
+            ],
+            "gpuTimingEnabled": true,
+            "gpuTimingSupported": true,
+            "gpuPassMilliseconds": 0.131072,
+            "readiness": {
+              "loadStarted": 7842.700000047684,
+              "workloadConstructed": 7845.100000023842,
+              "engineCreated": 7867.800000071526,
+              "principalObjects": 1000,
+              "assembled": 7870.600000023842,
+              "principalSceneSubmitted": 7871.5,
+              "principalSceneGpuComplete": 7882.5,
+              "principalScenePresentedOpportunity": 7896.900000095367,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 3,
+            "capturedFrames": 394,
+            "captureTruncated": false,
+            "workload": {
+              "machines": 1000,
+              "hierarchyUpdatesPerFrame": 2000,
+              "transitions": 3233,
+              "frames": 395
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 398,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 396,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 395,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 26.40000009536743,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 3,
+            "viewport": [
+              390,
+              844
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 3,
+          "timing": false,
+          "start": 12218.800000071526,
+          "end": 14732.5,
+          "summary": {
+            "callbacks": 301,
+            "measuredMilliseconds": 2508.2999999999993,
+            "callbackHz": 120.00159470557752,
+            "intervalMilliseconds": {
+              "mean": 8.333222591362123,
+              "median": 8.300000000001091,
+              "p95": 8.400000000001455,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.10199335880849844,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.20000004768371582,
+              "max": 0.20000004768371582
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.6222591328858537,
+              "median": 0.6000000238418579,
+              "p95": 0.8999999761581421,
+              "p99": 1.0999999046325684,
+              "max": 1.7000000476837158
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/fsm",
+            "running": true,
+            "frames": 393,
+            "targetFps": 60,
+            "fps": 120.01200118867362,
+            "frameMilliseconds": 8.33250000079473,
+            "workloadCpuMilliseconds": 0.09666666388511658,
+            "renderCpuMilliseconds": 0.6300000011920929,
+            "actors": 1000,
+            "visible": 1000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              712,
+              776
+            ],
+            "gpuTimingEnabled": false,
+            "gpuTimingSupported": false,
+            "gpuPassMilliseconds": null,
+            "readiness": {
+              "loadStarted": 11394.5,
+              "workloadConstructed": 11398.900000095367,
+              "engineCreated": 11416.400000095367,
+              "principalObjects": 1000,
+              "assembled": 11418.800000071526,
+              "principalSceneSubmitted": 11419.100000023842,
+              "principalSceneGpuComplete": 11428,
+              "principalScenePresentedOpportunity": 11438.600000023842,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 4,
+            "capturedFrames": 393,
+            "captureTruncated": false,
+            "workload": {
+              "machines": 1000,
+              "hierarchyUpdatesPerFrame": 2000,
+              "transitions": 3233,
+              "frames": 394
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 398,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 396,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 397,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 394,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 26.40000009536743,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 3,
+            "viewport": [
+              390,
+              844
+            ],
+            "bodyOverflow": false
+          }
+        }
+      ],
+      "initialReadiness": {
+        "loadStarted": 165.80000007152557,
+        "workloadConstructed": 189.30000007152557,
+        "engineCreated": 375.60000002384186,
+        "principalObjects": 1000,
+        "assembled": 385.7000000476837,
+        "principalSceneSubmitted": 389.8000000715256,
+        "principalSceneGpuComplete": 423.40000009536743,
+        "principalScenePresentedOpportunity": 438.7000000476837,
+        "correlation": "identified-webgpu-submit"
+      },
+      "initialSceneWithin1000ms": true,
+      "initialScreenshot": {
+        "path": "test-results/package-android-layout-emulation-on-intel-fsm.png",
+        "width": 1068,
+        "height": 1167,
+        "sampledColors": 182
+      },
+      "uiChecks": {
+        "keyboardRunPause": true,
+        "pausedFramesAndSubmitsStable": true,
+        "countRebuildAndOldDeviceDisposal": true,
+        "horizontalOverflow": false,
+        "terminalPagehideCleanup": true,
+        "resizeBackingAndRenderedActorContinuity": true
+      },
+      "errors": [],
+      "timingComparison": {
+        "offCallbackHz": 120.00079735278877,
+        "onCallbackHz": 120.00398689110307,
+        "offRenderCpuMilliseconds": 0.6226295640190046,
+        "onRenderCpuMilliseconds": 0.5499999968712512,
+        "note": "Two runs per mode in OFF/ON/ON/OFF order; refresh-limited cadence and brief sampling cannot establish a universal overhead bound."
+      }
+    },
+    {
+      "profile": "android-layout-emulation-on-intel",
+      "package": "tween",
+      "expectedActors": 1000,
+      "runs": [
+        {
+          "index": 0,
+          "timing": false,
+          "start": 1443.8999999761581,
+          "end": 3955.2999999523163,
+          "summary": {
+            "callbacks": 301,
+            "measuredMilliseconds": 2508.3,
+            "callbackHz": 120.00159470557747,
+            "intervalMilliseconds": {
+              "mean": 8.333222591362127,
+              "median": 8.300000000000182,
+              "p95": 8.400000000000091,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.07342192421719877,
+              "median": 0.10000002384185791,
+              "p95": 0.19999992847442627,
+              "p99": 0.20000004768371582,
+              "max": 0.5
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.5189368780269179,
+              "median": 0.5,
+              "p95": 0.8999999761581421,
+              "p99": 1.100000023841858,
+              "max": 1.399999976158142
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/tween",
+            "running": true,
+            "frames": 394,
+            "targetFps": 60,
+            "fps": 119.99999999999999,
+            "frameMilliseconds": 8.333333333333334,
+            "workloadCpuMilliseconds": 0.0774999996026357,
+            "renderCpuMilliseconds": 0.5325000007947286,
+            "actors": 1000,
+            "visible": 1000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              712,
+              776
+            ],
+            "gpuTimingEnabled": false,
+            "gpuTimingSupported": false,
+            "gpuPassMilliseconds": null,
+            "readiness": {
+              "loadStarted": 142,
+              "workloadConstructed": 166.5,
+              "engineCreated": 334.60000002384186,
+              "principalObjects": 1000,
+              "assembled": 343,
+              "principalSceneSubmitted": 347.10000002384186,
+              "principalSceneGpuComplete": 372,
+              "principalScenePresentedOpportunity": 387.5,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 1,
+            "capturedFrames": 394,
+            "captureTruncated": false,
+            "workload": {
+              "tracks": 1000,
+              "completions": 1884
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": false,
+                "submits": 395,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 24.5,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 3,
+            "viewport": [
+              390,
+              844
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 1,
+          "timing": true,
+          "start": 5034.799999952316,
+          "end": 7545.100000023842,
+          "summary": {
+            "callbacks": 300,
+            "measuredMilliseconds": 2500.0999999999995,
+            "callbackHz": 119.99520019199235,
+            "intervalMilliseconds": {
+              "mean": 8.333666666666664,
+              "median": 8.300000000000182,
+              "p95": 8.399999999999636,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.08566667000452677,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.20000004768371582,
+              "max": 0.6999999284744263
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.5986666671435038,
+              "median": 0.6000000238418579,
+              "p95": 0.8999999761581421,
+              "p99": 1.100000023841858,
+              "max": 1.2999999523162842
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/tween",
+            "running": true,
+            "frames": 392,
+            "targetFps": 60,
+            "fps": 119.98800119701957,
+            "frameMilliseconds": 8.334166666865348,
+            "workloadCpuMilliseconds": 0.10000000099341075,
+            "renderCpuMilliseconds": 0.5966666668653489,
+            "actors": 1000,
+            "visible": 1000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              712,
+              776
+            ],
+            "gpuTimingEnabled": true,
+            "gpuTimingSupported": true,
+            "gpuPassMilliseconds": 0.131072,
+            "readiness": {
+              "loadStarted": 4166.299999952316,
+              "workloadConstructed": 4173.799999952316,
+              "engineCreated": 4216.100000023842,
+              "principalObjects": 1000,
+              "assembled": 4219.600000023842,
+              "principalSceneSubmitted": 4220.100000023842,
+              "principalSceneGpuComplete": 4243.600000023842,
+              "principalScenePresentedOpportunity": 4254.299999952316,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 2,
+            "capturedFrames": 392,
+            "captureTruncated": false,
+            "workload": {
+              "tracks": 1000,
+              "completions": 1865
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 397,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 393,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 24.5,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 3,
+            "viewport": [
+              390,
+              844
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 2,
+          "timing": true,
+          "start": 8590.299999952316,
+          "end": 11105.200000047684,
+          "summary": {
+            "callbacks": 301,
+            "measuredMilliseconds": 2508.3999999999996,
+            "callbackHz": 119.99681071599427,
+            "intervalMilliseconds": {
+              "mean": 8.333554817275747,
+              "median": 8.300000000001091,
+              "p95": 8.400000000001455,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.06013288886048073,
+              "median": 0.09999990463256836,
+              "p95": 0.19999992847442627,
+              "p99": 0.20000004768371582,
+              "max": 0.20000004768371582
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.5993355469054162,
+              "median": 0.6000000238418579,
+              "p95": 1,
+              "p99": 1.1999999284744263,
+              "max": 1.2999999523162842
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/tween",
+            "running": true,
+            "frames": 394,
+            "targetFps": 60,
+            "fps": 120.01200118867362,
+            "frameMilliseconds": 8.33250000079473,
+            "workloadCpuMilliseconds": 0.0650000015894572,
+            "renderCpuMilliseconds": 0.5933333317438761,
+            "actors": 1000,
+            "visible": 1000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              712,
+              776
+            ],
+            "gpuTimingEnabled": true,
+            "gpuTimingSupported": true,
+            "gpuPassMilliseconds": 0.131072,
+            "readiness": {
+              "loadStarted": 7747.899999976158,
+              "workloadConstructed": 7756.200000047684,
+              "engineCreated": 7777,
+              "principalObjects": 1000,
+              "assembled": 7779.399999976158,
+              "principalSceneSubmitted": 7780,
+              "principalSceneGpuComplete": 7792.799999952316,
+              "principalScenePresentedOpportunity": 7804.399999976158,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 3,
+            "capturedFrames": 394,
+            "captureTruncated": false,
+            "workload": {
+              "tracks": 1000,
+              "completions": 1884
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 397,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 396,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 395,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 24.5,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 3,
+            "viewport": [
+              390,
+              844
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 3,
+          "timing": false,
+          "start": 12122.899999976158,
+          "end": 14635.700000047684,
+          "summary": {
+            "callbacks": 300,
+            "measuredMilliseconds": 2500,
+            "callbackHz": 120,
+            "intervalMilliseconds": {
+              "mean": 8.333333333333334,
+              "median": 8.300000000001091,
+              "p95": 8.400000000001455,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.06666666587193806,
+              "median": 0.09999990463256836,
+              "p95": 0.20000004768371582,
+              "p99": 0.20000004768371582,
+              "max": 0.30000007152557373
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.595333327849706,
+              "median": 0.6000000238418579,
+              "p95": 0.8999999761581421,
+              "p99": 1.100000023841858,
+              "max": 2
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/tween",
+            "running": true,
+            "frames": 393,
+            "targetFps": 60,
+            "fps": 119.97600479332043,
+            "frameMilliseconds": 8.335000000397365,
+            "workloadCpuMilliseconds": 0.0725000003973643,
+            "renderCpuMilliseconds": 0.615833330154419,
+            "actors": 1000,
+            "visible": 1000,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              712,
+              776
+            ],
+            "gpuTimingEnabled": false,
+            "gpuTimingSupported": false,
+            "gpuPassMilliseconds": null,
+            "readiness": {
+              "loadStarted": 11294.600000023842,
+              "workloadConstructed": 11298.100000023842,
+              "engineCreated": 11316.299999952316,
+              "principalObjects": 1000,
+              "assembled": 11317.799999952316,
+              "principalSceneSubmitted": 11318.200000047684,
+              "principalSceneGpuComplete": 11327.600000023842,
+              "principalScenePresentedOpportunity": 11337.700000047684,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 4,
+            "capturedFrames": 393,
+            "captureTruncated": false,
+            "workload": {
+              "tracks": 1000,
+              "completions": 1872
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 397,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 396,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 396,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 394,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 24.5,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 3,
+            "viewport": [
+              390,
+              844
+            ],
+            "bodyOverflow": false
+          }
+        }
+      ],
+      "initialReadiness": {
+        "loadStarted": 142,
+        "workloadConstructed": 166.5,
+        "engineCreated": 334.60000002384186,
+        "principalObjects": 1000,
+        "assembled": 343,
+        "principalSceneSubmitted": 347.10000002384186,
+        "principalSceneGpuComplete": 372,
+        "principalScenePresentedOpportunity": 387.5,
+        "correlation": "identified-webgpu-submit"
+      },
+      "initialSceneWithin1000ms": true,
+      "initialScreenshot": {
+        "path": "test-results/package-android-layout-emulation-on-intel-tween.png",
+        "width": 1068,
+        "height": 1167,
+        "sampledColors": 388
+      },
+      "uiChecks": {
+        "keyboardRunPause": true,
+        "pausedFramesAndSubmitsStable": true,
+        "countRebuildAndOldDeviceDisposal": true,
+        "horizontalOverflow": false,
+        "terminalPagehideCleanup": true,
+        "resizeBackingAndRenderedActorContinuity": true
+      },
+      "errors": [],
+      "timingComparison": {
+        "offCallbackHz": 120.00079735278874,
+        "onCallbackHz": 119.99600545399332,
+        "offRenderCpuMilliseconds": 0.557135102938312,
+        "onRenderCpuMilliseconds": 0.5990011070244601,
+        "note": "Two runs per mode in OFF/ON/ON/OFF order; refresh-limited cadence and brief sampling cannot establish a universal overhead bound."
+      }
+    },
+    {
+      "profile": "android-layout-emulation-on-intel",
+      "package": "net",
+      "expectedActors": 256,
+      "runs": [
+        {
+          "index": 0,
+          "timing": false,
+          "start": 1412.8999999761581,
+          "end": 3930.2000000476837,
+          "summary": {
+            "callbacks": 301,
+            "measuredMilliseconds": 2508.4,
+            "callbackHz": 119.99681071599426,
+            "intervalMilliseconds": {
+              "mean": 8.333554817275747,
+              "median": 8.300000000000182,
+              "p95": 8.400000000000091,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.08205979567429553,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.2999999523162842,
+              "max": 0.3999999761581421
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.3853820657413267,
+              "median": 0.3999999761581421,
+              "p95": 0.6000000238418579,
+              "p99": 0.7999999523162842,
+              "max": 0.8999999761581421
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/net",
+            "running": true,
+            "frames": 396,
+            "targetFps": 60,
+            "fps": 119.96401080247958,
+            "frameMilliseconds": 8.33583333293597,
+            "workloadCpuMilliseconds": 0.09333332777023315,
+            "renderCpuMilliseconds": 0.40666667421658836,
+            "actors": 256,
+            "visible": 256,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              712,
+              776
+            ],
+            "gpuTimingEnabled": false,
+            "gpuTimingSupported": false,
+            "gpuPassMilliseconds": null,
+            "readiness": {
+              "loadStarted": 107.60000002384186,
+              "workloadConstructed": 158.39999997615814,
+              "engineCreated": 324,
+              "principalObjects": 256,
+              "assembled": 330.2999999523163,
+              "principalSceneSubmitted": 333.2999999523163,
+              "principalSceneGpuComplete": 357.7000000476837,
+              "principalScenePresentedOpportunity": 362.2999999523163,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 1,
+            "capturedFrames": 396,
+            "captureTruncated": false,
+            "workload": {
+              "remoteActors": 256,
+              "snapshotSlotsPerActor": 32,
+              "packetHz": 20,
+              "packets": 16864,
+              "dropped": 288
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": false,
+                "submits": 397,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 23.100000023841858,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 3,
+            "viewport": [
+              390,
+              844
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 1,
+          "timing": true,
+          "start": 5047.600000023842,
+          "end": 7557.399999976158,
+          "summary": {
+            "callbacks": 300,
+            "measuredMilliseconds": 2500,
+            "callbackHz": 120,
+            "intervalMilliseconds": {
+              "mean": 8.333333333333334,
+              "median": 8.300000000000182,
+              "p95": 8.400000000000546,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.08299999833106994,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.2999999523162842,
+              "max": 0.2999999523162842
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.445000003973643,
+              "median": 0.3999999761581421,
+              "p95": 0.8000000715255737,
+              "p99": 1,
+              "max": 1.100000023841858
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/net",
+            "running": true,
+            "frames": 393,
+            "targetFps": 60,
+            "fps": 119.99999999999999,
+            "frameMilliseconds": 8.333333333333334,
+            "workloadCpuMilliseconds": 0.08749999900658925,
+            "renderCpuMilliseconds": 0.43750000099341074,
+            "actors": 256,
+            "visible": 256,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              712,
+              776
+            ],
+            "gpuTimingEnabled": true,
+            "gpuTimingSupported": true,
+            "gpuPassMilliseconds": 0.065536,
+            "readiness": {
+              "loadStarted": 4148.5,
+              "workloadConstructed": 4151.899999976158,
+              "engineCreated": 4218.100000023842,
+              "principalObjects": 256,
+              "assembled": 4221.600000023842,
+              "principalSceneSubmitted": 4222.100000023842,
+              "principalSceneGpuComplete": 4246.299999952316,
+              "principalScenePresentedOpportunity": 4253.799999952316,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 2,
+            "capturedFrames": 393,
+            "captureTruncated": false,
+            "workload": {
+              "remoteActors": 256,
+              "snapshotSlotsPerActor": 32,
+              "packetHz": 20,
+              "packets": 16864,
+              "dropped": 288
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 400,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 394,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 23.100000023841858,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 3,
+            "viewport": [
+              390,
+              844
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 2,
+          "timing": true,
+          "start": 8590,
+          "end": 11095,
+          "summary": {
+            "callbacks": 299,
+            "measuredMilliseconds": 2491.5999999999985,
+            "callbackHz": 120.00321078824858,
+            "intervalMilliseconds": {
+              "mean": 8.333110367892973,
+              "median": 8.300000000001091,
+              "p95": 8.400000000001455,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.08963211045217355,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.30000007152557373,
+              "max": 0.30000007152557373
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.3849498316595786,
+              "median": 0.3999999761581421,
+              "p95": 0.7000000476837158,
+              "p99": 0.8000000715255737,
+              "max": 1
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/net",
+            "running": true,
+            "frames": 391,
+            "targetFps": 60,
+            "fps": 120.0600300150075,
+            "frameMilliseconds": 8.329166666666667,
+            "workloadCpuMilliseconds": 0.08583333293596904,
+            "renderCpuMilliseconds": 0.37166666984558105,
+            "actors": 256,
+            "visible": 256,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              712,
+              776
+            ],
+            "gpuTimingEnabled": true,
+            "gpuTimingSupported": true,
+            "gpuPassMilliseconds": 0.131072,
+            "readiness": {
+              "loadStarted": 7756.700000047684,
+              "workloadConstructed": 7759.700000047684,
+              "engineCreated": 7786.200000047684,
+              "principalObjects": 256,
+              "assembled": 7788.299999952316,
+              "principalSceneSubmitted": 7788.899999976158,
+              "principalSceneGpuComplete": 7803.399999976158,
+              "principalScenePresentedOpportunity": 7812.100000023842,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 3,
+            "capturedFrames": 391,
+            "captureTruncated": false,
+            "workload": {
+              "remoteActors": 256,
+              "snapshotSlotsPerActor": 32,
+              "packetHz": 20,
+              "packets": 16608,
+              "dropped": 288
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 400,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 396,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 392,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 23.100000023841858,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 3,
+            "viewport": [
+              390,
+              844
+            ],
+            "bodyOverflow": false
+          }
+        },
+        {
+          "index": 3,
+          "timing": false,
+          "start": 12119.600000023842,
+          "end": 14631.399999976158,
+          "summary": {
+            "callbacks": 301,
+            "measuredMilliseconds": 2508.3999999999996,
+            "callbackHz": 119.99681071599427,
+            "intervalMilliseconds": {
+              "mean": 8.333554817275747,
+              "median": 8.300000000001091,
+              "p95": 8.400000000001455,
+              "p99": 8.5,
+              "max": 8.5
+            },
+            "workloadCpuMilliseconds": {
+              "mean": 0.07674418731385291,
+              "median": 0.10000002384185791,
+              "p95": 0.20000004768371582,
+              "p99": 0.2999999523162842,
+              "max": 0.30000007152557373
+            },
+            "renderCpuMilliseconds": {
+              "mean": 0.35315614760516095,
+              "median": 0.30000007152557373,
+              "p95": 0.6000000238418579,
+              "p99": 0.7999999523162842,
+              "max": 0.8000000715255737
+            },
+            "intervalsAbove60HzBudget": 0
+          },
+          "measurements": {
+            "package": "@margoengine/net",
+            "running": true,
+            "frames": 393,
+            "targetFps": 60,
+            "fps": 120.02400480668452,
+            "frameMilliseconds": 8.331666666269303,
+            "workloadCpuMilliseconds": 0.08166667024294536,
+            "renderCpuMilliseconds": 0.36833332975705463,
+            "actors": 256,
+            "visible": 256,
+            "draws": 1,
+            "backend": "webgpu",
+            "canvas": [
+              712,
+              776
+            ],
+            "gpuTimingEnabled": false,
+            "gpuTimingSupported": false,
+            "gpuPassMilliseconds": null,
+            "readiness": {
+              "loadStarted": 11283.5,
+              "workloadConstructed": 11289.100000023842,
+              "engineCreated": 11309,
+              "principalObjects": 256,
+              "assembled": 11310.100000023842,
+              "principalSceneSubmitted": 11310.399999976158,
+              "principalSceneGpuComplete": 11322.399999976158,
+              "principalScenePresentedOpportunity": 11337.200000047684,
+              "correlation": "identified-webgpu-submit"
+            },
+            "generation": 4,
+            "capturedFrames": 393,
+            "captureTruncated": false,
+            "workload": {
+              "remoteActors": 256,
+              "snapshotSlotsPerActor": 32,
+              "packetHz": 20,
+              "packets": 16864,
+              "dropped": 288
+            }
+          },
+          "observation": {
+            "devices": [
+              {
+                "destroyed": true,
+                "submits": 400,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 396,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": true,
+                "submits": 394,
+                "features": [
+                  "core-features-and-limits",
+                  "depth32float-stencil8",
+                  "timestamp-query"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              },
+              {
+                "destroyed": false,
+                "submits": 394,
+                "features": [
+                  "depth32float-stencil8",
+                  "core-features-and-limits"
+                ],
+                "adapter": {
+                  "vendor": "intel",
+                  "architecture": "xe-2lpg",
+                  "device": "",
+                  "description": "",
+                  "fallback": false
+                }
+              }
+            ],
+            "errors": [],
+            "states": [
+              {
+                "at": 23.100000023841858,
+                "visibility": "visible",
+                "focus": true
+              }
+            ],
+            "hookRestored": true,
+            "visibility": "visible",
+            "focus": true,
+            "dpr": 3,
+            "viewport": [
+              390,
+              844
+            ],
+            "bodyOverflow": false
+          }
+        }
+      ],
+      "initialReadiness": {
+        "loadStarted": 107.60000002384186,
+        "workloadConstructed": 158.39999997615814,
+        "engineCreated": 324,
+        "principalObjects": 256,
+        "assembled": 330.2999999523163,
+        "principalSceneSubmitted": 333.2999999523163,
+        "principalSceneGpuComplete": 357.7000000476837,
+        "principalScenePresentedOpportunity": 362.2999999523163,
+        "correlation": "identified-webgpu-submit"
+      },
+      "initialSceneWithin1000ms": true,
+      "initialScreenshot": {
+        "path": "test-results/package-android-layout-emulation-on-intel-net.png",
+        "width": 1068,
+        "height": 1170,
+        "sampledColors": 449
+      },
+      "uiChecks": {
+        "keyboardRunPause": true,
+        "pausedFramesAndSubmitsStable": true,
+        "countRebuildAndOldDeviceDisposal": true,
+        "horizontalOverflow": false,
+        "terminalPagehideCleanup": true,
+        "resizeBackingAndRenderedActorContinuity": true
+      },
+      "errors": [],
+      "timingComparison": {
+        "offCallbackHz": 119.99681071599426,
+        "onCallbackHz": 120.00160539412428,
+        "offRenderCpuMilliseconds": 0.36926910667324386,
+        "onRenderCpuMilliseconds": 0.4149749178166108,
+        "note": "Two runs per mode in OFF/ON/ON/OFF order; refresh-limited cadence and brief sampling cannot establish a universal overhead bound."
+      }
+    }
+  ],
+  "completedAt": "2026-10-13T06:53:20.988Z",
+  "bytesSnapshotAt": "2026-10-13T06:58:23.570Z",
+  "bytes": [
+    {
+      "path": "packages/ecs/dist/index.js",
+      "bytes": 3647,
+      "gzipBytes": 1336,
+      "sha256": "1583cdcb3832980282ed32304e26e8e8739a7555c1af2674a7c309f842fe66e7",
+      "lastWritten": "2026-10-13T04:01:20.590Z",
+      "lastWrittenAfterMeasurement": false
+    },
+    {
+      "path": "examples/package-benchmarks/ecs.js",
+      "bytes": 1531,
+      "gzipBytes": 631,
+      "sha256": "232c4c3598443f866bfdc879c57ccce2f68ca3123ce86a830bc75ade8e6c9b50",
+      "lastWritten": "2026-10-13T05:36:22.449Z",
+      "lastWrittenAfterMeasurement": false
+    },
+    {
+      "path": "packages/fsm/dist/index.js",
+      "bytes": 2270,
+      "gzipBytes": 924,
+      "sha256": "25d0ffab0d35979a749a9284c2b73162163dada575410787cbc2dabe6e110b3d",
+      "lastWritten": "2026-10-13T04:01:21.254Z",
+      "lastWrittenAfterMeasurement": false
+    },
+    {
+      "path": "examples/package-benchmarks/fsm.js",
+      "bytes": 1913,
+      "gzipBytes": 833,
+      "sha256": "8553ac88052fe1d08346f99e78b7f88d4158a69b18f7d1737369fddd302bc948",
+      "lastWritten": "2026-10-13T05:36:22.451Z",
+      "lastWrittenAfterMeasurement": false
+    },
+    {
+      "path": "packages/tween/dist/index.js",
+      "bytes": 1990,
+      "gzipBytes": 870,
+      "sha256": "9cf73494cf11e0bcf783d8da006ae7c83bccf1785131ef34d25aa9606ac36c68",
+      "lastWritten": "2026-10-13T04:01:19.924Z",
+      "lastWrittenAfterMeasurement": false
+    },
+    {
+      "path": "examples/package-benchmarks/tween.js",
+      "bytes": 1047,
+      "gzipBytes": 548,
+      "sha256": "0005890eed053e3640a1c76714c133f3d66861321232ea4944a904076580204f",
+      "lastWritten": "2026-10-13T05:36:22.452Z",
+      "lastWrittenAfterMeasurement": false
+    },
+    {
+      "path": "packages/net/dist/index.js",
+      "bytes": 3480,
+      "gzipBytes": 1287,
+      "sha256": "5ffb05f83c57f653fec98bd116ce1a446d1caa6e17956d312cb929ca308a916d",
+      "lastWritten": "2026-10-13T06:55:25.696Z",
+      "lastWrittenAfterMeasurement": true
+    },
+    {
+      "path": "examples/package-benchmarks/net.js",
+      "bytes": 2131,
+      "gzipBytes": 904,
+      "sha256": "db5af624859e550aab5af750696ceb8e7cc3700322ea4a0e08000c8fd2cf5b07",
+      "lastWritten": "2026-10-13T05:36:22.452Z",
+      "lastWrittenAfterMeasurement": false
+    },
+    {
+      "path": "examples/package-benchmarks/main.js",
+      "bytes": 9949,
+      "gzipBytes": 3497,
+      "sha256": "dd62b5db2bf63addc9f0f0bd98ea8dc16c6361736ae20f1e5c198503af648c94",
+      "lastWritten": "2026-10-13T06:41:11.486Z",
+      "lastWrittenAfterMeasurement": false
+    },
+    {
+      "path": "examples/package-benchmarks/gpu-timing.js",
+      "bytes": 1549,
+      "gzipBytes": 672,
+      "sha256": "e8a59a749908b0d2b0877236255e72f7ca283902952e55951de0059fb7b3296c",
+      "lastWritten": "2026-10-13T05:52:28.604Z",
+      "lastWrittenAfterMeasurement": false
+    },
+    {
+      "path": "packages/shared/demo-frame.js",
+      "bytes": 2927,
+      "gzipBytes": 1065,
+      "sha256": "2476d6b1c1da5d7db0c595fbe2e0ac0264abb9f916c0db6ed3934dcc4725b675",
+      "lastWritten": "2026-10-13T06:41:11.483Z",
+      "lastWrittenAfterMeasurement": false
+    },
+    {
+      "path": "packages/stats/dist/index.js",
+      "bytes": 10528,
+      "gzipBytes": 3451,
+      "sha256": "5bac4b518ec46eaf5e02b43af16484757872e8b4e8ad01176325dca4a6a167aa",
+      "lastWritten": "2026-10-13T05:17:49.486Z",
+      "lastWrittenAfterMeasurement": false
+    }
+  ],
+  "bytesNote": "Raw/gzip built package entries and example source, read after measurement; not a production bundle or full dependency graph. Net was rebuilt afterward for the createSnapshot identity-array allocation change; that last initialization change is not covered by these browser runs."
+}

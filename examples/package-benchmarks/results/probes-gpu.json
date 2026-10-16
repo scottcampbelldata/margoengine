@@ -1,0 +1,469 @@
+{
+  "benchmark": "probes-gpu",
+  "recordedAt": "2026-10-15T16:41:21.265Z",
+  "resolution": [
+    1280,
+    720
+  ],
+  "powerOnline": {
+    "before": "True",
+    "after": "True"
+  },
+  "hardware": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+  "bakeMsDiagnostic": 382.1,
+  "volume": [
+    {
+      "probe": [
+        -1,
+        0.75,
+        -1
+      ],
+      "maxCoefficientErrorOfDC": 0.012
+    },
+    {
+      "probe": [
+        1,
+        0.75,
+        -1
+      ],
+      "maxCoefficientErrorOfDC": 0.0113
+    },
+    {
+      "probe": [
+        -1,
+        2.25,
+        -1
+      ],
+      "maxCoefficientErrorOfDC": 0.0071
+    },
+    {
+      "probe": [
+        1,
+        2.25,
+        -1
+      ],
+      "maxCoefficientErrorOfDC": 0.0083
+    },
+    {
+      "probe": [
+        -1,
+        0.75,
+        1
+      ],
+      "maxCoefficientErrorOfDC": 0.0171
+    },
+    {
+      "probe": [
+        1,
+        0.75,
+        1
+      ],
+      "maxCoefficientErrorOfDC": 0.0148
+    },
+    {
+      "probe": [
+        -1,
+        2.25,
+        1
+      ],
+      "maxCoefficientErrorOfDC": 0.0097
+    },
+    {
+      "probe": [
+        1,
+        2.25,
+        1
+      ],
+      "maxCoefficientErrorOfDC": 0.0079
+    }
+  ],
+  "reflection": [
+    {
+      "level": 0,
+      "size": 128,
+      "roughness": 0,
+      "samples": 16384,
+      "medianAbsError": 0.0002,
+      "p95AbsError": 0.0003,
+      "maxAbsError": 0.2159
+    },
+    {
+      "level": 1,
+      "size": 64,
+      "roughness": 0.2,
+      "samples": 256,
+      "medianAbsError": 0.0006,
+      "p95AbsError": 0.0083,
+      "maxAbsError": 0.0397
+    },
+    {
+      "level": 2,
+      "size": 32,
+      "roughness": 0.4,
+      "samples": 256,
+      "medianAbsError": 0.0009,
+      "p95AbsError": 0.0079,
+      "maxAbsError": 0.0101
+    },
+    {
+      "level": 3,
+      "size": 16,
+      "roughness": 0.6,
+      "samples": 256,
+      "medianAbsError": 0.0018,
+      "p95AbsError": 0.0042,
+      "maxAbsError": 0.0049
+    },
+    {
+      "level": 4,
+      "size": 8,
+      "roughness": 0.8,
+      "samples": 64,
+      "medianAbsError": 0.0018,
+      "p95AbsError": 0.003,
+      "maxAbsError": 0.0032
+    },
+    {
+      "level": 5,
+      "size": 4,
+      "roughness": 1,
+      "samples": 16,
+      "medianAbsError": 0.0017,
+      "p95AbsError": 0.0028,
+      "maxAbsError": 0.0028
+    }
+  ],
+  "shading": [
+    {
+      "floor": "diffuse",
+      "samples": 1353,
+      "diffVsCpuMirror": {
+        "median": 0,
+        "p95": 1,
+        "p99": 1,
+        "max": 1
+      },
+      "worstPixels": []
+    },
+    {
+      "floor": "mirror",
+      "samples": 4010,
+      "diffVsCpuMirror": {
+        "median": 1,
+        "p95": 2,
+        "p99": 3,
+        "max": 5
+      },
+      "boxProjectionSamples": 2657,
+      "diffVsWallSeenInMirror": {
+        "median": 1,
+        "p95": 2,
+        "p99": 4,
+        "max": 5
+      },
+      "skippedNearWallEdges": 2406,
+      "worstPixels": [
+        {
+          "pixel": [
+            292,
+            598
+          ],
+          "kind": "floor",
+          "got": [
+            90,
+            170,
+            87
+          ],
+          "want": [
+            85,
+            172,
+            85
+          ]
+        },
+        {
+          "pixel": [
+            286,
+            604
+          ],
+          "kind": "floor",
+          "got": [
+            89,
+            170,
+            87
+          ],
+          "want": [
+            85,
+            172,
+            85
+          ]
+        },
+        {
+          "pixel": [
+            292,
+            604
+          ],
+          "kind": "floor",
+          "got": [
+            90,
+            170,
+            86
+          ],
+          "want": [
+            85,
+            172,
+            85
+          ]
+        },
+        {
+          "pixel": [
+            988,
+            604
+          ],
+          "kind": "floor",
+          "got": [
+            176,
+            90,
+            86
+          ],
+          "want": [
+            178,
+            85,
+            85
+          ]
+        },
+        {
+          "pixel": [
+            280,
+            610
+          ],
+          "kind": "floor",
+          "got": [
+            89,
+            170,
+            87
+          ],
+          "want": [
+            85,
+            172,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "floor": "rough",
+      "samples": 6416,
+      "diffVsCpuMirror": {
+        "median": 0,
+        "p95": 0,
+        "p99": 1,
+        "max": 1
+      },
+      "worstPixels": []
+    }
+  ],
+  "ssr": {
+    "hitsAboveWallAndProbe": {
+      "samples": 5145,
+      "median": -14,
+      "p95": 0,
+      "p99": 0,
+      "max": 59
+    },
+    "hitsVsWallOnScreen": {
+      "samples": 5145,
+      "median": 2,
+      "p95": 39,
+      "p99": 43,
+      "max": 74
+    },
+    "missesVsProbesAlone": {
+      "samples": 4595,
+      "median": 0,
+      "p95": 0,
+      "p99": 1,
+      "max": 10
+    }
+  },
+  "unbaked": {
+    "coreMaxDiff": 0,
+    "gltfProMaxDiff": 0
+  },
+  "quietGate": {
+    "ac": true,
+    "cpuLoadPercent": 12,
+    "waitedSeconds": 94,
+    "checkedAt": "2026-10-15T16:43:21.545Z",
+    "topProcesses": [
+      {
+        "Name": "claude",
+        "Id": 13528,
+        "cpuSeconds": 5250
+      },
+      {
+        "Name": "claude",
+        "Id": 12156,
+        "cpuSeconds": 3829
+      },
+      {
+        "Name": "claude",
+        "Id": 15776,
+        "cpuSeconds": 2601
+      },
+      {
+        "Name": "chrome",
+        "Id": 1184,
+        "cpuSeconds": 2033
+      },
+      {
+        "Name": "SnagitEditor",
+        "Id": 28664,
+        "cpuSeconds": 1030
+      },
+      {
+        "Name": "claude",
+        "Id": 12224,
+        "cpuSeconds": 972
+      },
+      {
+        "Name": "SnagitCapture",
+        "Id": 23920,
+        "cpuSeconds": 671
+      },
+      {
+        "Name": "EpicGamesLauncher",
+        "Id": 19500,
+        "cpuSeconds": 632
+      }
+    ]
+  },
+  "cpuLoadAtStart": 6,
+  "timings": [
+    {
+      "on": false,
+      "variant": null,
+      "width": 1280,
+      "height": 720,
+      "gpuMs": 0.59,
+      "gpuSamples": 40,
+      "frameMs": 4.1
+    },
+    {
+      "on": true,
+      "variant": "both",
+      "width": 1280,
+      "height": 720,
+      "gpuMs": 3.801,
+      "gpuSamples": 40,
+      "frameMs": 8
+    },
+    {
+      "on": true,
+      "variant": "volume",
+      "width": 1280,
+      "height": 720,
+      "gpuMs": 2.49,
+      "gpuSamples": 40,
+      "frameMs": 6.9
+    },
+    {
+      "on": true,
+      "variant": "reflection",
+      "width": 1280,
+      "height": 720,
+      "gpuMs": 2.097,
+      "gpuSamples": 40,
+      "frameMs": 6.4
+    },
+    {
+      "on": false,
+      "variant": null,
+      "width": 1280,
+      "height": 720,
+      "gpuMs": 1.114,
+      "gpuSamples": 40,
+      "frameMs": 4.9
+    },
+    {
+      "on": true,
+      "variant": "both",
+      "width": 1280,
+      "height": 720,
+      "gpuMs": 3.867,
+      "gpuSamples": 40,
+      "frameMs": 8
+    },
+    {
+      "on": false,
+      "variant": null,
+      "width": 1920,
+      "height": 1080,
+      "gpuMs": 2.425,
+      "gpuSamples": 40,
+      "frameMs": 7.8
+    },
+    {
+      "on": true,
+      "variant": "both",
+      "width": 1920,
+      "height": 1080,
+      "gpuMs": 9.241,
+      "gpuSamples": 40,
+      "frameMs": 14.6
+    },
+    {
+      "on": true,
+      "variant": "volume",
+      "width": 1920,
+      "height": 1080,
+      "gpuMs": 5.636,
+      "gpuSamples": 40,
+      "frameMs": 11.4
+    },
+    {
+      "on": true,
+      "variant": "reflection",
+      "width": 1920,
+      "height": 1080,
+      "gpuMs": 4.915,
+      "gpuSamples": 40,
+      "frameMs": 10.9
+    },
+    {
+      "on": false,
+      "variant": null,
+      "width": 1920,
+      "height": 1080,
+      "gpuMs": 2.359,
+      "gpuSamples": 40,
+      "frameMs": 7.7
+    },
+    {
+      "on": true,
+      "variant": "both",
+      "width": 1920,
+      "height": 1080,
+      "gpuMs": 8.061,
+      "gpuSamples": 40,
+      "frameMs": 14.1
+    }
+  ],
+  "bakeTimings": [
+    114.7,
+    121.3,
+    113.6
+  ],
+  "environmentVolume": [
+    0.0005,
+    0.0005,
+    0.0005,
+    0.0005,
+    0.0005,
+    0.0005,
+    0.0005,
+    0.0005
+  ],
+  "environmentEquivalence": {
+    "maxDiffVsEnvironmentLighting": 1
+  }
+}

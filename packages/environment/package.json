@@ -1,9 +1,9 @@
 {
   "name": "@margoengine/environment",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "HDR/EXR loading, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT) and environment backgrounds for Margo Engine on WebGPU.",
+  "description": "HDR/EXR/UltraHDR loading, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT) applied to meshes and glTF models, environment and color backgrounds, and scene fog for Margo Engine on WebGPU.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
@@ -14,22 +14,34 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/environment.test.js",
+    "test": "npm run build && node --test tests/environment.test.js tests/scene.test.js tests/volumetric.test.js tests/probes.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:probes:browser": "npm run build && node scripts/test-browser.js --probe-samples"
   },
   "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./probes": {
+      "types": "./dist/probes.d.ts",
+      "import": "./dist/probes.js"
+    },
+    "./volumetric": {
+      "types": "./dist/volumetric.d.ts",
+      "import": "./dist/volumetric.js"
     }
   },
   "files": [
     "dist"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^0.1.0 || ^1.0.0"
+    "@margoengine/core": "^1.0.0"
   },
-  "homepage": "https://margoengine.com"
+  "homepage": "https://margoengine.com",
+  "devDependencies": {
+    "@margoengine/math": "^1.0.0"
+  }
 }

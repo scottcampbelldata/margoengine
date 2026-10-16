@@ -1,5 +1,7 @@
 # Three.js vs Margo conveyor benchmark
 
+**Read this as payload and GC counts only.** Vsync was on, so both engines sit at the 60 Hz cap (16.67 ms) and the table carries no speed information; three.js drew plain `Mesh` objects (no `InstancedMesh`) on WebGL2 while Margo used WebGPU; and it was captured at 7908ad3 on NVIDIA, before most of today's code. No same-machine speed comparison with three.js has been published yet.
+
 Captured 2026-10-11T23:05:58.666Z; Chromium 155.0.4283.45.
 
 Each scene renders exactly 1,200 frames: 200 warmup frames and 1,000 measured frames. Frame cadence uses the 999 intervals within the measured window. Actual duration depends on frame rate; 1,200 frames take 20 seconds only at 60 FPS.

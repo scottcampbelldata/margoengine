@@ -1,0 +1,320 @@
+{
+    "overrideAfter":  {
+                          "acPowerAtStart":  true,
+                          "date":  "2026-10-14T18:16:15.926Z",
+                          "browser":  "155.0.4283.45",
+                          "adapter":  "",
+                          "override":  {
+                                           "uniform":  {
+                                                           "n":  29,
+                                                           "median":  0.524
+                                                       },
+                                           "constants":  {
+                                                             "n":  28,
+                                                             "median":  0.59
+                                                         },
+                                           "errors":  [
+
+                                                      ],
+                                           "pageErrors":  [
+
+                                                          ]
+                                       },
+                          "acPowerAtEnd":  true
+                      },
+    "pixproof":  {
+                     "acPowerAtStart":  true,
+                     "before":  {
+                                    "gpuErrors":  [
+
+                                                  ],
+                                    "pageErrors":  [
+
+                                                   ]
+                                },
+                     "after":  {
+                                   "gpuErrors":  [
+
+                                                 ],
+                                   "pageErrors":  [
+
+                                                  ]
+                               },
+                     "beforeRepeatDiffers":  false,
+                     "diff":  {
+                                  "channels":  0,
+                                  "max":  0,
+                                  "of":  3686400,
+                                  "litPixels":  919802
+                              },
+                     "acPowerAtEnd":  true
+                 },
+    "override2":  {
+                      "acPowerAtStart":  true,
+                      "date":  "2026-10-14T18:10:50.984Z",
+                      "browser":  "155.0.4283.45",
+                      "adapter":  "",
+                      "override2":  {
+                                        "uniform":  {
+                                                        "n":  19,
+                                                        "median":  0.852
+                                                    },
+                                        "noDiscard":  {
+                                                          "n":  15,
+                                                          "median":  0.524
+                                                      },
+                                        "rest":  {
+                                                     "n":  23,
+                                                     "median":  0.721
+                                                 },
+                                        "errors":  [
+
+                                                   ],
+                                        "pageErrors":  [
+
+                                                       ]
+                                    },
+                      "override2Pixels":  {
+                                              "noDiscard":  {
+                                                                "channels":  0,
+                                                                "max":  0
+                                                            },
+                                              "rest":  {
+                                                           "channels":  0,
+                                                           "max":  0
+                                                       },
+                                              "pageErrors":  [
+
+                                                             ]
+                                          },
+                      "acPowerAtEnd":  true
+                  },
+    "toggle":  {
+                   "acPowerAtStart":  true,
+                   "date":  "2026-10-14T17:52:58.163Z",
+                   "stall":  [
+                                 {
+                                     "mode":  "add",
+                                     "steady":  59.4,
+                                     "sectionFrame":  287.6,
+                                     "sectionSpike":  228.2,
+                                     "between":  63.9,
+                                     "fogFrame":  326.2,
+                                     "fogSpike":  262.3,
+                                     "after":  64,
+                                     "sectionSetup":  0.5,
+                                     "errors":  [
+
+                                                ],
+                                     "pageErrors":  [
+
+                                                    ]
+                                 },
+                                 {
+                                     "mode":  "toggle",
+                                     "steady":  60.1,
+                                     "sectionFrame":  68,
+                                     "sectionSpike":  7.9,
+                                     "between":  64.2,
+                                     "fogFrame":  64.4,
+                                     "fogSpike":  0.2,
+                                     "after":  66.5,
+                                     "sectionSetup":  0,
+                                     "errors":  [
+
+                                                ],
+                                     "pageErrors":  [
+
+                                                    ]
+                                 },
+                                 {
+                                     "mode":  "toggle",
+                                     "steady":  57.8,
+                                     "sectionFrame":  67.7,
+                                     "sectionSpike":  9.9,
+                                     "between":  60.2,
+                                     "fogFrame":  52.6,
+                                     "fogSpike":  -7.6,
+                                     "after":  60,
+                                     "sectionSetup":  0,
+                                     "errors":  [
+
+                                                ],
+                                     "pageErrors":  [
+
+                                                    ]
+                                 },
+                                 {
+                                     "mode":  "add",
+                                     "steady":  60.5,
+                                     "sectionFrame":  238.1,
+                                     "sectionSpike":  177.6,
+                                     "between":  58.1,
+                                     "fogFrame":  168.5,
+                                     "fogSpike":  110.4,
+                                     "after":  62.7,
+                                     "sectionSetup":  0.7,
+                                     "errors":  [
+
+                                                ],
+                                     "pageErrors":  [
+
+                                                    ]
+                                 },
+                                 {
+                                     "mode":  "add",
+                                     "steady":  55.2,
+                                     "sectionFrame":  214.9,
+                                     "sectionSpike":  159.7,
+                                     "between":  61.7,
+                                     "fogFrame":  194.6,
+                                     "fogSpike":  132.9,
+                                     "after":  58.2,
+                                     "sectionSetup":  0.3,
+                                     "errors":  [
+
+                                                ],
+                                     "pageErrors":  [
+
+                                                    ]
+                                 },
+                                 {
+                                     "mode":  "toggle",
+                                     "steady":  54.9,
+                                     "sectionFrame":  68.2,
+                                     "sectionSpike":  13.3,
+                                     "between":  59.2,
+                                     "fogFrame":  58.8,
+                                     "fogSpike":  -0.4,
+                                     "after":  59.8,
+                                     "sectionSetup":  0,
+                                     "errors":  [
+
+                                                ],
+                                     "pageErrors":  [
+
+                                                    ]
+                                 },
+                                 {
+                                     "mode":  "toggle",
+                                     "steady":  56.6,
+                                     "sectionFrame":  54,
+                                     "sectionSpike":  -2.6,
+                                     "between":  55.4,
+                                     "fogFrame":  60,
+                                     "fogSpike":  4.6,
+                                     "after":  58.3,
+                                     "sectionSetup":  0,
+                                     "errors":  [
+
+                                                ],
+                                     "pageErrors":  [
+
+                                                    ]
+                                 },
+                                 {
+                                     "mode":  "add",
+                                     "steady":  55.5,
+                                     "sectionFrame":  201.3,
+                                     "sectionSpike":  145.8,
+                                     "between":  56,
+                                     "fogFrame":  177.3,
+                                     "fogSpike":  121.3,
+                                     "after":  59.2,
+                                     "sectionSetup":  0.5,
+                                     "errors":  [
+
+                                                ],
+                                     "pageErrors":  [
+
+                                                    ]
+                                 },
+                                 {
+                                     "mode":  "add",
+                                     "steady":  59.6,
+                                     "sectionFrame":  256.5,
+                                     "sectionSpike":  196.9,
+                                     "between":  60.3,
+                                     "fogFrame":  156.7,
+                                     "fogSpike":  96.4,
+                                     "after":  63.7,
+                                     "sectionSetup":  0.5,
+                                     "errors":  [
+
+                                                ],
+                                     "pageErrors":  [
+
+                                                    ]
+                                 },
+                                 {
+                                     "mode":  "toggle",
+                                     "steady":  54.7,
+                                     "sectionFrame":  63.3,
+                                     "sectionSpike":  8.6,
+                                     "between":  56.6,
+                                     "fogFrame":  54,
+                                     "fogSpike":  -2.6,
+                                     "after":  56.4,
+                                     "sectionSetup":  0.1,
+                                     "errors":  [
+
+                                                ],
+                                     "pageErrors":  [
+
+                                                    ]
+                                 }
+                             ],
+                   "browser":  "155.0.4283.45",
+                   "adapter":  "",
+                   "pixels":  {
+                                  "absentVsOff":  {
+                                                      "channels":  0,
+                                                      "max":  0
+                                                  },
+                                  "absentVsOn":  {
+                                                     "channels":  1524203,
+                                                     "max":  158
+                                                 },
+                                  "gpuErrors":  [
+
+                                                ],
+                                  "pageErrors":  [
+
+                                                 ]
+                              },
+                   "gpu":  {
+                               "absent":  {
+                                              "n":  24,
+                                              "median":  13.304
+                                          },
+                               "off":  {
+                                           "n":  24,
+                                           "median":  13.763
+                                       },
+                               "on":  {
+                                          "n":  19,
+                                          "median":  16.515
+                                      },
+                               "pageErrors":  [
+
+                                              ]
+                           },
+                   "override":  {
+                                    "uniform":  {
+                                                    "n":  21,
+                                                    "median":  0.852
+                                                },
+                                    "constants":  {
+                                                      "n":  20,
+                                                      "median":  0.524
+                                                  },
+                                    "errors":  [
+
+                                               ],
+                                    "pageErrors":  [
+
+                                                   ]
+                                },
+                   "acPowerAtEnd":  true
+               }
+}

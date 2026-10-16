@@ -1,0 +1,17 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Cameras browser check</title><style>body{margin:0}canvas{display:block;width:400px;height:400px}</style></head><body><canvas></canvas>
+<script type="module">
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {CameraProjection} from '/packages/cameras/dist/index.js';
+// Straight down: core alone throws 'Vertical camera' on the first render.
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,20,0],target:[0,0,0],near:0.1,far:100}}),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const projection=new CameraProjection({height:8});engine.use(projection);
+const meshes={};for(const [name,color,position] of [['red','#ff0000',[2,0,0]],['blue','#0000ff',[0,0,-2]],['green','#00ff00',[0,0,0]]])meshes[name]=engine.createMesh().setGeometry(box(1,1,1)).setMaterial(new PbrMaterial({color})).setPosition(position);
+const frame=async()=>{engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();};
+window.check={
+  async render(mode,height){projection.mode=mode;projection.height=height;device.pushErrorScope('validation');for(let i=0;i<4;i++)await frame();const e=await device.popErrorScope();return {error:e?.message??null,errors:errors.splice(0),position:[...engine.camera.position]};},
+  async pick(x,y){const m=await engine.pick(x,y);return Object.entries(meshes).find(([,v])=>v===m)?.[0]??null;},
+  async effects(){const [{Shadows},{TAA}]=await Promise.all([import('/packages/shadows/dist/index.js'),import('/packages/taa/dist/index.js')]);const shadows=Shadows.attach(engine);for(const m of Object.values(meshes))shadows.add?.(m);TAA.attach(engine);return window.check.render('orthographic',8);},
+};
+window.ready=true;
+</script></body></html>

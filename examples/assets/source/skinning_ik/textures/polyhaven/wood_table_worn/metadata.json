@@ -1,0 +1,61 @@
+{
+  "name": "Wood Table Worn",
+  "categories": [
+    "man made",
+    "wood",
+    "dirty",
+    "raw wood"
+  ],
+  "type": 1,
+  "tags": [
+    "rough",
+    "planks",
+    "table",
+    "worn",
+    "old",
+    "damaged",
+    "discolored",
+    "stained",
+    "brown",
+    "dry",
+    "furniture",
+    "grain",
+    "scratched"
+  ],
+  "authors": {
+    "Dimitrios Savva": "Photography",
+    "Rico Cilliers": "Processing"
+  },
+  "dimensions": [
+    549.9999523162842,
+    550.0000715255737
+  ],
+  "staging": null,
+  "date_published": 1657238400,
+  "prepaid": true,
+  "max_resolution": [
+    8192,
+    8192
+  ],
+  "sponsors": [
+    "4047949",
+    "77433244",
+    "4714267"
+  ],
+  "files_hash": "92fde8d58df92dd57a0a2854a6a6aeb79317b750",
+  "description": "Free 8K texture of a worn, stained brown wooden table: dry, scratched planks with visible grain, discoloration, rough and damaged surface.",
+  "category_id": "30ac2613-5076-5364-b4da-130117ad592d",
+  "category": "Wood/Boards & Planks/Weathered Planks",
+  "attributes": {
+    "surface_use": "object",
+    "condition": [
+      "worn",
+      "damaged",
+      "cracked"
+    ],
+    "origin": "man_made"
+  },
+  "img_version": "ba59696d",
+  "download_count": 416272,
+  "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wood_table_worn.png?width=256&height=256&format=webp&v=ba59696d"
+}

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Khronos gallery · Margo Engine</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#10151c;color:#edf2f6;font:14px/1.5 system-ui,sans-serif}
+    #viewport{height:100svh}body:not([data-model]) #viewport{height:50svh}
+    #caption{position:fixed;left:12px;top:8px;margin:0;font-size:13px;color:#bccbd7;pointer-events:none}
+    main{padding:16px}table{border-collapse:collapse;width:100%}td,th{text-align:left;vertical-align:top;padding:4px 8px;border-top:1px solid #2a3542}
+    a{color:#a8d9ff}.fail{color:#ffb6aa}.ok{color:#9be29b}code{font-size:12px}body[data-model] main{display:none}
+  </style>
+</head>
+<body>
+  <div id="viewport"></div>
+  <p id="caption" role="status">Loading…</p>
+  <main>
+    <h1>Khronos glTF sample assets</h1>
+    <p>Each model loaded with <code>@margoengine/gltf-pro</code>, environment lighting and a fitted camera. Open one with
+      <code>?model=Name</code> (the visual-regression view). Licences and credits: <a href="./assets/khronos/README.md">assets/khronos/README.md</a>.</p>
+    <table><thead><tr><th>Model</th><th>Result</th><th>Ignored extensions</th><th>GPU errors</th><th>Load / first frame</th></tr></thead><tbody id="rows"></tbody></table>
+  </main>
+  <script type="module" src="./khronos-gallery.js"></script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:margoengine:afterlight:trace-run-record:1",
+  "title": "Append-only Afterlight trace evidence record",
+  "type": "object",
+  "required": ["recordedAt", "recordSHA256", "record"],
+  "properties": {
+    "recordedAt": {"type": "string", "format": "date-time"},
+    "recordSHA256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "record": {
+      "type": "object",
+      "required": ["schemaVersion", "runId"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "runId": {"type": "string", "minLength": 1},
+        "recordType": {"enum": ["source-inventory", "gpu-profile-offline", "cdp-frame-correlation", "capture-failure", "diagnostic-ablation", "capture-confound", "gpu-correctness"]},
+        "conditions": {"type": "object"},
+        "artifacts": {"type": "array", "items": {"$ref": "#/$defs/artifact"}},
+        "raw": {"$ref": "#/$defs/artifact"},
+        "overhead": {"$ref": "#/$defs/overhead"},
+        "clock": {
+          "type": "object",
+          "properties": {
+            "offsetUs": {"type": "number"}, "spreadUs": {"type": "number", "minimum": 0},
+            "mainThread": {"type": "string"}, "method": {"type": "string"}
+          }
+        },
+        "frames": {"type": "array", "items": {"type": "object"}},
+        "gpuSamples": {"type": "array", "items": {"type": "object"}},
+        "windows": {"type": "array", "items": {"type": "object"}},
+        "completionFences": {"type": "array", "items": {"type": "object"}},
+        "presentation": {
+          "type": "object",
+          "properties": {"physicalPresentationMeasured": {"const": false}, "browserFeedback": {"type": "array"}}
+        },
+        "traceDiagnostics": {"type": "object"},
+        "limits": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object", "required": ["path", "sha256"],
+      "properties": {"path": {"type": "string"}, "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "bytes": {"type": "integer", "minimum": 0}},
+      "additionalProperties": true
+    },
+    "overhead": {
+      "type": "object",
+      "properties": {
+        "cdpTrace": {"type": "boolean"}, "timestampQuery": {"type": "boolean"},
+        "readbackMapping": {"type": "boolean"}, "stackCapture": {"type": "boolean"},
+        "profilerFeatureNegotiation": {"type": "boolean"}, "defaultCadenceComparison": {"type": ["string", "null"]}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

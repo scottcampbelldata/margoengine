@@ -8,7 +8,7 @@ import {transmissionQuads} from '../../../tests/support/transmission-fixture.js'
 import {optionalGPU} from '../../../tests/support/optional-gpu.js';
 
 const digest = value => createHash('sha256').update(value).digest('hex');
-const baselineShader = '469dd81676967dbfd22118fa85b1cf8b6ff37dc7593e7e7f8130e5626a29f508';
+const baselineShader = '45df766b2c73181edc3cbd8109a848f17851f03b7cc947dec8d987ff60c2dee5';
 const transmission = (factor = 1, extra = {}) => ({KHR_materials_transmission: {transmissionFactor: factor}, ...extra});
 
 async function scene(extensions, images = [], configure = () => {}) {

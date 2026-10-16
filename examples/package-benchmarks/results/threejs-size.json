@@ -1,0 +1,22 @@
+{
+  "commit": "80b4a1f",
+  "three": "0.186.1",
+  "method": "vite minify es2022 + compactOutput, gzip default level",
+  "rows": [
+    {
+      "app": "Margo core + stage",
+      "raw": 45616,
+      "gzip": 19577
+    },
+    {
+      "app": "three.js WebGLRenderer",
+      "raw": 530069,
+      "gzip": 129899
+    },
+    {
+      "app": "three.js WebGPURenderer",
+      "raw": 790857,
+      "gzip": 211584
+    }
+  ]
+}

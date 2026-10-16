@@ -1,0 +1,28 @@
+{
+  "package": "geometry-subdivide",
+  "baseline": "bdb7521",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T12:36:36.434Z",
+  "outputsIdentical": true,
+  "notes": "loopSubdivide only; the rest of geometry is covered by geometry.proof.js against f05414a.",
+  "cases": [
+    {
+      "case": "torus knot 64x8, two levels",
+      "baselineMs": 31.0271,
+      "candidateMs": 17.113,
+      "speedup": 1.813
+    },
+    {
+      "case": "sphere 48x32, two levels",
+      "baselineMs": 94.3936,
+      "candidateMs": 58.4305,
+      "speedup": 1.615
+    },
+    {
+      "case": "icosahedron detail 2, three levels",
+      "baselineMs": 20.9263,
+      "candidateMs": 12.0665,
+      "speedup": 1.734
+    }
+  ]
+}

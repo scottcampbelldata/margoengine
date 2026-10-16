@@ -1,0 +1,77 @@
+{
+  "package": "loaders",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:21:35.325Z",
+  "outputsIdentical": true,
+  "notes": "PLY and PCD body loops read through numeric type codes and precomputed offsets instead of closures and Map lookups; flat normals and point markers are written without per-item arrays; LZF literal runs copy in a loop; CRC-32 slices four bytes per step.",
+  "cases": [
+    {
+      "case": "PLY binary little endian",
+      "vertices": 50176,
+      "triangles": 99458,
+      "baselineMs": 85.46,
+      "candidateMs": 64.208,
+      "speedup": 1.331
+    },
+    {
+      "case": "PLY binary big endian",
+      "vertices": 50176,
+      "triangles": 99458,
+      "baselineMs": 62.6856,
+      "candidateMs": 42.1715,
+      "speedup": 1.486
+    },
+    {
+      "case": "PLY ASCII",
+      "vertices": 50176,
+      "triangles": 99458,
+      "baselineMs": 815.8639,
+      "candidateMs": 667.0636,
+      "speedup": 1.223
+    },
+    {
+      "case": "PCD binary",
+      "points": 300000,
+      "baselineMs": 165.7058,
+      "candidateMs": 130.5722,
+      "speedup": 1.269
+    },
+    {
+      "case": "PCD binary_compressed",
+      "points": 300000,
+      "baselineMs": 251.062,
+      "candidateMs": 178.3063,
+      "speedup": 1.408
+    },
+    {
+      "case": "crc32",
+      "bytes": 8388608,
+      "baselineMs": 52.7232,
+      "candidateMs": 23.0164,
+      "speedup": 2.291
+    },
+    {
+      "case": "decompressLZF",
+      "bytes": 9600000,
+      "baselineMs": 96.3401,
+      "candidateMs": 84.9883,
+      "speedup": 1.134
+    },
+    {
+      "case": "toGeometry flat",
+      "triangles": 100000,
+      "baselineMs": 38.0656,
+      "candidateMs": 27.9452,
+      "speedup": 1.362
+    },
+    {
+      "case": "pointsToGeometry",
+      "points": 200000,
+      "markers": 166666,
+      "baselineMs": 124.5181,
+      "candidateMs": 107.7225,
+      "speedup": 1.156
+    }
+  ]
+}

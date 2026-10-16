@@ -1,9 +1,9 @@
 {
   "name": "@margoengine/controls",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "Orbit, map, trackball, fly, first-person, pointer-lock and transform-gizmo camera controls for Margo Engine.",
+  "description": "Orbit, map, trackball, fly, first-person, pointer-lock and collision-aware walkthrough (/walk) camera controls, a transform gizmo and drag controls for Margo Engine.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
@@ -17,20 +17,29 @@
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "size": "npm run build && node scripts/size.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:browser:walk": "npm run build && node scripts/test-walk-browser.js"
   },
   "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./walk": {
+      "types": "./dist/walk.d.ts",
+      "import": "./dist/walk.js"
     }
   },
   "files": [
     "dist"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^0.1.0 || ^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/bvh": "^1.0.0"
   },
-  "homepage": "https://margoengine.com"
+  "homepage": "https://margoengine.com",
+  "devDependencies": {
+    "@margoengine/math": "^1.0.0"
+  }
 }

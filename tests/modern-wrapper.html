@@ -1,1 +1,1 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"/><title>Margo Engine wrapper checks</title></head><body><script type="module">import * as wrapper from '/packages/margoengine/dist/index.js'; window.wrapper = wrapper;</script></body></html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"/><title>Margo Engine wrapper checks</title></head><body><script type="module">import * as wrapper from '/packages/margoengine/dist/index.js'; import {webglRenderer} from '/packages/webgl/dist/index.js'; window.wrapper = {...wrapper, webglRenderer};</script></body></html>

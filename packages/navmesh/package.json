@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/navmesh",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "sideEffects": false,
@@ -18,7 +18,10 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^0.1.0 || ^1.0.0"
+    "@margoengine/core": "^1.0.0"
+  },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js navmesh",

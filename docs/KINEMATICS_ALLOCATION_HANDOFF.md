@@ -1,6 +1,6 @@
 # Kinematics and robot allocation handoff
 
-Updated: 2026-10-16. This document records verified work, evidence locations, limits, and the next experiments. It is a checkpoint, not a completion claim. Gzip figures in this note are from the checkpoint. The current build measures core at 18,192 bytes gzip and core plus stage at 19,999 bytes gzip. The gate rejects 20,000 or above.
+Updated: 2026-10-16. This document records verified work, evidence locations, limits, and the next experiments. It is a checkpoint, not a completion claim.
 
 ## Active objective and current state
 
@@ -8,7 +8,523 @@ Fix the Light Keeper robot demo and its optional packages until sustained, warme
 
 The objective remains **active and incomplete**. The recorded constraints-demo stalls have been corrected for the tested trajectories. The robot still allocates and triggers GC in measured captures.
 
-The tested robot checkpoint is now [live on margoengine.com](https://margoengine.com/demos/light-keeper/), deployment `8d0427c6`. All 189 public files were verified after publishing, with existing demos preserved. See [LIGHT_KEEPER_DEPLOYMENT.md](LIGHT_KEEPER_DEPLOYMENT.md) for the exact snapshot, release identity and future deployment procedure.
+The tested robot checkpoint is [live on margoengine.com](https://margoengine.com/demos/light-keeper/), production `26027a44-e044-4f68-b74b-be60c992cc44`, source `221c1ad`, preview `f8e27553`. It retains the optional Animator/Stats paths, torso writer, eye fix and repaired hand, keeps the PBR cache reverted, and publishes pose/reflection diagnostics only on request by default. All **194 public files** and the independent audit pass; all 193 other baseline files and 26 old workshop assets are preserved. See [LIGHT_KEEPER_DEPLOYMENT.md](LIGHT_KEEPER_DEPLOYMENT.md) for current hashes/validation and the on-demand comparison below. The prior allocation `f084db7e` / `00f0afa` and eye-only `feeb64de` / `ca5194b` releases are historical evidence below.
+
+### Closing functional work; zero-GC remains unachieved
+
+The user asked whether this can be called done. The recommended stopping point
+is the verified functional release, with remaining allocation work explicitly
+unfinished. Eye aiming, both hands, tested arm controls/contact recovery and
+the existing live release are retained. Neither a zero-allocation browser loop
+nor zero GC has been demonstrated. Do not recast this functional milestone as
+completion of the original allocation objective.
+
+The final publication-only experiment retained GPU audit collection, actions,
+bounded history, report calls, timers and the visible Stats/HUD in both modes.
+Only automatic hidden JSON/DOM publication was disabled; direct JSON reads used
+the private retained bag without public-snapshot pinning. Twenty focused tests,
+including collection/cadence/ownership/disposal checks, passed. The helper's
+default publication behavior and all public package defaults were preserved.
+An independent review found no actionable contract issue. A separate hidden-map
+build matched all 17 executable hashes exactly; its maps are diagnostic artifacts.
+
+Same-bundle fresh-page A/B/A used independent `gpuAudit=legacy` publication,
+automatic IK on, 30-second warmup and measured intervals, 938 trusted moves per
+drag and before/after-only JSON requests. Collection remained active, bounded
+histories advanced and reflection-pose reuse was complete in every phase.
+
+| Mode | Phase | Sampled MB/s | Minor / major GC | Maximum observed GC slice ms | p95 RAF callback ms | Reflection bakes | Reuse |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Baseline A | Idle | 0.512111 | 18 / 5 | 2.708 | 2.585 | 310 | 620 / 620 |
+| Candidate | Idle | 0.499111 | 19 / 4 | 2.802 | 2.524 | 371 | 744 / 744 |
+| Baseline B | Idle | 0.495666 | 19 / 2 | 1.176 | 1.897 | 446 | 890 / 890 |
+| Baseline A | Drag | 0.755668 | 25 / 4 | 4.444 | 6.509 | 315 | 630 / 630 |
+| Candidate | Drag | 0.676347 | 25 / 4 | 2.135 | 6.317 | 424 | 850 / 850 |
+| Baseline B | Drag | 0.721350 | 24 / 6 | 1.648 | 5.049 | 417 | 834 / 834 |
+
+**Reject this version as an inconclusive overall trade-off:** drag allocation
+was below both baselines, while idle allocation was within their range and
+callback p95 was slower than baseline B in both phases. Adaptive reflection work
+differs; the comparison does not isolate a cause for those timing differences.
+All measured phases still have GC. Source hashes stayed fixed, native queue
+identity and endpoint arm/grip safety passed, and no per-frame safety reads ran
+inside timing. The selected helper-only constructor result removed a large
+string row but increased HeapNumber bytes; overlapping type rows must not be
+summed or converted into a whole-scene claim.
+
+All five runtime/test files were archived and restored exactly to HEAD. The
+standalone rebuild returns to 708,879 raw / 239,411 gzip JS bytes, the same
+17 executable chunks as the verified live release, and core/stage 19,999 gzip
+bytes. The restored focused tests pass 11/11. A fresh full robot browser run
+passes all 13 cases, including sliders, eye aiming, trusted torso dragging and
+reflection reuse, with no page/resource errors. No new deployment or package
+publication is needed for this rejected experiment. The Raycaster scratch
+proposal remains ignored, untested and unlanded; no further experiment is being
+started as part of this wrap-up.
+
+Ignored evidence: `test-results/gpu-audit-publication-only/` contains the isolated
+constructor/history comparison; `test-results/gpu-audit-publication-candidate/`
+contains the exact candidate, same-bundle six-phase summary, raw reports and
+rejected runtime archive. `test-results/source-map-attribution/` contains the
+exact-executable hidden-map proof. Measurement is statistical and includes
+tracing/sampling/heap-polling overhead; trigger text does not identify allocation
+sources or establish retention.
+
+### Manual saved-pose restore experiment: rejected
+
+Actual-source branch counters isolated three public quaternion setter calls per
+manual frame with automatic IK off: 360 calls over 120 real updates. Automatic
+IK-on and IK-off controls made no such restores; ordinary zero-delta and guarded
+probe-fallback renders made three, while matching probe reuse made none. This
+branch does not explain allocation in the normal automatic-IK-on captures.
+
+A minimal demo-owned candidate used the existing guarded rotation writer for
+those private saved arrays and joints. It changed no package/public default
+setter. Actual-source controls confirmed 360 owned / zero public restores,
+native queue identity, reflection reuse and sampled arm/grip/eye invariants.
+The authored rig replay matched 20,000 frames and 1,196 scalar values per frame
+bit-for-bit; 32 relevant tests passed. Matched constructor attribution showed
+the selected structural shapes disappear, with no in-window GC in those census
+windows. Those isolated constructor counts are not a browser byte rate.
+
+Fresh-page manual-mode A/B/A used 30-second warmup and measured intervals,
+automatic IK off and IK enabled. Measured intervals advanced 1,832–1,848 real
+animation frames without a new solve; drag still used 938 trusted target
+pointer commands. This is held-pose restoration and target input, not automatic
+arm tracking. JSON requests were outside sampling; no per-frame safety reads
+were taken within the measured interval.
+
+| Mode | Phase | Sampled MB/s | Minor / major GC | Maximum observed GC slice ms | p95 RAF callback ms | Reflection bakes | Reuse |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Baseline A | Manual idle | 0.597597 | 22 / 2 | 1.823 | 2.580 | 319 | 638 / 638 |
+| Candidate | Manual idle | 0.572490 | 20 / 3 | 1.523 | 2.362 | 362 | 724 / 724 |
+| Baseline B | Manual idle | 0.691179 | 24 / 4 | 2.778 | 2.492 | 313 | 626 / 626 |
+| Baseline A | Manual target drag | 0.738937 | 24 / 5 | 1.635 | 2.342 | 382 | 764 / 764 |
+| Candidate | Manual target drag | 0.687960 | 22 / 5 | 4.386 | 3.050 | 342 | 684 / 684 |
+| Baseline B | Manual target drag | 0.789227 | 28 / 5 | 3.386 | 2.482 | 327 | 654 / 654 |
+
+**Reject this version:** sampled allocation was lower than both baselines, but
+drag callback p95 and maximum observed GC slice were higher than both. The
+reflection workload was adaptive and differs; this comparison does not isolate
+the cause of the timing change. No zero-GC or full-scene benefit is certified.
+The single main restore hunk was archived and restored exactly before starting
+the separate GPU-audit publication candidate. That later candidate does not
+include this restore change. Core/stage stayed at 19,999 gzip bytes.
+
+Ignored evidence: `test-results/manual-pose-restore/` contains the branch,
+constructor, parity and invariant reports. `test-results/manual-restore-robot-compare/`
+contains frozen executable manifests, six-phase summary, raw reports and the
+rejected source/patch. The dedicated manual runner preserves the ordinary
+automatic-IK-on profiler unchanged. No runtime or live-release change is kept
+from the manual restore experiment.
+
+### GC trigger audit and native API constructor evidence
+
+Historical profiler reports use the field name `naturalGC` for all observed
+`MinorGC` / `MajorGC` slices. **That name does not establish their trigger.**
+Future captures use `observedGC` schema 2, retaining raw counts and per-thread
+pause unions while adding contained-event counts, thread metadata and grouped
+raw `args.type` labels. Six synthetic overlap/thread/reason tests pass. Named
+non-profiler reasons and missing reasons are not relabeled as natural or
+attributed to an allocating subsystem. Trigger-group durations are nonadditive.
+
+An offline audit of all six valid SSAO comparison phases, six endpoint-only
+diagnostics phases and two existing GC-only phases found no explicit sampling
+profiler trigger. Their minors say `allocation failure`; majors say `finalize
+incremental marking via task`. Independent V8 collector text agrees, including
+`GC in old space requested`, which does not identify why the cycle began.
+All these slices occur on identified `CrRendererMain` threads with matching RAF
+activity. This neither proves retained growth nor attributes them to native
+resources. Original counts, hashes and captures remain unchanged. Evidence:
+`test-results/gc-reason-audit/report.json` and README.
+
+In a separate small native-only WebGPU fixture, each sampling phase's major
+explicitly says `sampling profiler`. That finding applies to that fixture,
+not to the audited robot captures. Its retained-constructor proof uses forced
+GC/snapshots and preallocated reference arrays separately from transient
+sampling. It creates **256 distinct canonical objects and 256 distinct new
+anchored snapshot IDs per class** for `GPUCommandEncoder`,
+`GPURenderPassEncoder`, `GPUComputePassEncoder` and `GPUCommandBuffer`; the
+matched reused-reference control adds zero IDs. Factories and the queue writer
+remain native/unmodified, with no Stats or engine imports and no GPU errors.
+Snapshot anchors are `native` nodes with 88-byte self metadata; those bytes are
+not a JS allocation rate and must not be summed with overlapping wrapper rows.
+
+Separate fresh-browser raw-work phases measured statistical sampled bytes per
+iteration of 1.549 for control, 33.105 encoder, 49.521 render, 46.602 compute,
+65.914 combined passes, and 33.828 repeated encoder. These totals include API,
+conversion and pacing overhead; they are not exact costs per wrapper or a
+production allocation floor. Evidence: `test-results/native-wrapper-proof/`
+contains `summary.json`, `retained-id-proof.json`, raw reports and README.
+This establishes fresh native API objects in that tested runtime, without
+explaining all remaining robot allocations or certifying zero-GC behavior.
+
+### Gaze waypoint request-buffer experiment: rejected
+
+The suspected `coordinates()` helper was already inlined with unboxed finite
+Float32 guards. It had no surviving numeric-tagging or young-allocation site in
+the completed diagnostic graphs, and its guards were left unchanged. A corrected
+replay fixture then reproduced main's changing `maxSpeed * dt` step argument:
+the non-inlined `waypoint()` call received an explicit 16-byte `HeapNumber` in
+its replay caller. This is compiler evidence for that fixture, not a browser
+bytes-per-frame certificate.
+
+A demo-only candidate retained the scalar `waypoint(number)` interface and
+introduced a caller-owned Float64 request with a shared private body. It captured
+the request before input getters and the local step before refresh reentry.
+Actual-source caller/callee traces removed that boxing site without migration;
+40,000 authored moving/transformed replay steps matched 848 output/transform
+values bit-for-bit. Seven isolated guard/alias/failure cases and **22/22 actual
+focused tests** passed. All twelve A/buffered/B control/kernel census windows
+had no in-window GC or structural excess. Waypoint excess HeapNumbers were
+17,204 / 11,060 / 13,320; full-chain excess was 7,457 / 7,207 / 7,218. The latter
+176-byte difference versus baseline B is not a meaningful whole-scene saving.
+
+The actual built candidate passed all **13 robot browser cases**, including 63
+slider samples, eye aiming, 16 trusted torso drag moves and reflection hold;
+page/resource errors were empty. It added 385 raw / 75 gzip JS bytes outside
+core/stage, which remained 19,999. Whole-scene fresh-page A/B/A used the corrected
+`observedGC` profiler, 30-second warmup and 30-second measured phases, with 938
+trusted moves per drag. JSON was read only outside the measured intervals.
+
+| Mode | Phase | Sampled MB/s | Minor / major GC | Maximum observed GC slice ms | p95 RAF callback ms | Reflection bakes | Reuse |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Baseline A | Idle | 0.556146 | 20 / 3 | 2.876 | 2.657 | 351 | 702 / 702 |
+| Candidate | Idle | 0.551749 | 20 / 2 | 1.716 | 2.634 | 371 | 744 / 744 |
+| Baseline B | Idle | 0.540784 | 20 / 4 | 2.235 | 2.399 | 365 | 728 / 728 |
+| Baseline A | Drag | 0.729299 | 24 / 5 | 4.015 | 6.486 | 297 | 594 / 594 |
+| Candidate | Drag | 0.796744 | 27 / 3 | 4.481 | 7.161 | 336 | 672 / 672 |
+| Baseline B | Drag | 0.697812 | 23 / 3 | 1.699 | 6.013 | 369 | 740 / 740 |
+
+**Reject the buffered path:** idle falls within the baseline range, while drag
+allocation and p95 callback time exceed both baselines. Reflection cadence
+differs and the comparison does not identify a cause. Recorded source hashes
+were fixed, native queue identity was preserved, and endpoint safety passed;
+no per-frame pose observations were taken during timing. Every run still has
+observed collections. Public package APIs were unchanged, and no runtime or
+live release change is retained from this experiment.
+
+Ignored evidence: `test-results/gaze-target-attribution/` holds the attribution,
+candidate census, actual-source parity/IR, tests and rejected source snapshot;
+`test-results/gaze-request-robot-compare/summary.{json,md}` holds the frozen sites,
+manifests and browser comparison. Further work should prioritize demonstrated
+recurring allocations over additional rewrites of these already-unboxed guards.
+
+Restoration is complete: all three source/test files match their original
+SHA256, baseline focused tests pass **18/18**, and the rebuilt preview's **17 JS
+chunks** match the frozen baseline bit-for-bit (708,879 raw / 239,411 gzip bytes,
+core/stage 19,999). See the rejected-candidate `restoration-proof.json` and
+`gaze-request-robot-compare/restored-standalone-proof.json`. The eye repair and
+live release remain unchanged.
+
+### Previous allocation build and remaining mapped sites
+
+The exact production snapshot is `test-results/light-keeper-allocation-live/site`,
+195 files / 193 public. Manifest SHA256 is
+`c1bdc9ebfcae40b230b2663c91610440925dd03775a49cf5eaea7bf2c971f5a4`;
+build-report SHA256 is
+`77644be41feca130533b6dbeae36d3735386615ac06ad6537945a8b1792fe5e7`.
+All public files, canonical route, homepage/Tokyo references, old assets and
+404/`no-store` behavior passed full verification and an independent audit.
+An immediate first probe saw the new entry return 404; the full repeat passed
+193/193, and the failed initial report remains archived. The actual hosted
+workshop was reloaded and checked in the in-app browser; screenshot is
+`production-browser.png` in the same folder.
+
+The final source passed 178/178 selected tests, API checks, 85-buffer/83,968-byte
+native GPU parity, and eight hardware motion cases / fourteen transitions /
+653 published samples with no reported arm/head safety failures, stalled chase
+or browser errors. Interrupted motion checks used conservative reflection
+fallbacks (532/928 reused), while sustained captures below achieved full reuse.
+The build is 707,441 raw / 238,909 gzip JS bytes; core plus stage remains 19,999.
+
+The exact deployed bytes were measured locally on Edge155 / RTX A6000 with
+30 seconds warmup and approximately 30 seconds measured per phase:
+
+| Phase | Sampled MB/s | Minor / major GC | Maximum observed GC slice ms | p95 RAF callback ms | Reflection reuse |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Idle | 0.508865 | 20 / 4 | 1.401 | 2.430 | 818 / 818 |
+| Continuous torso drag | 0.730686 | 27 / 3 | 1.735 | 6.181 | 762 / 762 |
+
+All named GC slices were on `CrRendererMain`; de-nesting did not change counts.
+The queue writer remained native, source hashes stayed fixed, measured drag
+issued 938 trusted commands, and no sampled pose failed safety checks. This is
+an observation of the final build, not an isolated causal comparison with older
+releases. RAF callback duration is not the complete CPU/GPU frame budget.
+Report: `skinning-ik-profile-stats-animator-final-production.json`; compact audit:
+`stats-animator-final-phase-summary.json`, both under ignored `test-results/`.
+**GC remains and the objective is not complete.**
+
+An isolated hidden-sourcemap rebuild matched all seventeen executed JS chunks
+byte-for-byte before mapping the current capture; ten code chunks have maps.
+Largest directly mapped idle/drag source groups in sampled bytes are Stats
+2,661,272/2,443,920; core renderer 2,099,548/1,906,292; core engine
+1,603,356/1,740,608; demo main 1,243,684/1,718,980; hidden GPU audit
+1,214,240/1,225,436; SSAO 739,288/792,632; and probes 549,092/544,608.
+Kinematics constraints accounts for 771,180 directly mapped drag bytes.
+6,351,628 drag bytes remain unmapped. These are source/function-stack weights,
+not object-type censuses or proof that unmapped bytes are browser-native.
+Evidence: `test-results/final-allocation-source-map/`, including
+`exact-hash-proof.json`, `allocation-source-attribution.json` and README.
+Next, inspect the measured hidden-audit publication and pass-tracking sites
+without weakening numerical guards, removing visible heap telemetry, or
+attributing all remaining pressure to native resources.
+
+### Hidden GPU-audit opt-out experiment: reverted
+
+The hidden audit serializes timestamp/history JSON into `data-gpu-audit`; the
+visible Stats and heap/GPU HUD do not read that attribute. A temporary
+`?gpuAudit=off` candidate skipped only this diagnostic while preserving the
+default audit-on behavior for a same-bundle A/B/A comparison. Its five helper
+tests and real-hardware on/off proof passed: 125 guard samples per mode, GPU
+sample IDs advanced in both, the off mode had no audit writes, and rendering,
+controls, reflections and the visible HUD remained active. The native queue
+writer was unchanged and page/GPU errors were empty.
+
+Fresh pages used 30 seconds of warmup and approximately 30 seconds measured per
+phase. Every drag measurement completed 938 trusted moves. Results:
+
+| Mode | Phase | Sampled MB/s | Minor / major GC | Maximum observed GC slice ms | p95 RAF callback ms | Reflection bakes |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Audit on, baseline A | Idle | 0.563456 | 20 / 4 | 1.781 | 2.578 | 332 |
+| Audit off, candidate | Idle | 0.472390 | 18 / 3 | 2.173 | 2.644 | 332 |
+| Audit on, baseline B | Idle | 0.639373 | 23 / 4 | 1.983 | 2.167 | 337 |
+| Audit on, baseline A | Drag | 0.727518 | 24 / 4 | 1.904 | 6.773 | 317 |
+| Audit off, candidate | Drag | 0.847692 | 26 / 4 | 5.669 | 7.430 | 333 |
+| Audit on, baseline B | Drag | 0.802214 | 28 / 4 | 4.239 | 6.374 | 324 |
+
+Idle sampled allocation fell, but the candidate's drag rate and p95 callback
+duration were higher than both baselines. Reflection cadence also differed;
+these observations do not establish why the drag run regressed. **Reject the
+experiment rather than retain it as a performance fix.** The main source and
+demo README were restored byte-for-byte, and the current live deployment is
+unchanged. The temporary built site is historical experiment output until the
+next rebuild, not evidence of the restored source's deployed bytes.
+
+Evidence remains in ignored `test-results/gpu-audit-optional/` and the three
+`skinning-ik-profile-gpu-audit-{default-a,off-candidate,default-b}` report groups.
+The visible heap graph stays enabled and GC remains unresolved. Next, test
+on-demand publication of the separate hidden pose/reflection telemetry; no
+visible UI or mathematical guard should be removed for that experiment.
+
+### Probe readback ablation: no allocation benefit established
+
+A fixture-only final-readback skip was compared against two fresh-page hardware
+baselines. Every measured run completed exactly 240 probe bakes, 960 normal
+renders, 1,440 captured faces and 1,440 probe `Engine.render` calls after 24 warm
+bakes. Both modes first completed a normal CPU-mirrored seed bake. The candidate
+deliberately left that CPU mirror stale; it is not a valid public GPU-only mode
+or device-restoration implementation.
+
+Sampled totals were **3,592,792 / 3,799,276 / 3,696,008 bytes** for baseline A /
+skip / baseline B. Each recorded two minor and one major GC. The candidate
+sampled more bytes than both baselines, so no production/API change is justified
+by this result. The approximately 1.18-second fixed-work intervals are short
+diagnostics, not a sustained rate, stable floor or isolated CPU-speed result.
+
+Outside the sampling interval, the full 175,808-byte GPU probe buffer (header
+and all texels) and rendered receiver image matched the baseline bit-for-bit.
+The queue writer remained native, errors were empty, and all ten captured
+source/package/generated-file fingerprints matched before/after. This hash set
+is not a complete transitive served-module map. Logical mapped texel volume is
+not measured JS allocation. The initial outside-window image-hash harness
+failure and the corrected full A/B/A are preserved in ignored
+`test-results/probe-readback-fixed-work/`; see `summary.json` and README. Package
+source and emission remain unchanged.
+
+### Optional SSAO stage-key cache: rejected after browser comparison
+
+The repeated stacked-output key `format + multisample.count + hdr` was isolated
+in the actual optional package emission. Two 10,000-call baseline census
+windows each added 20,000 sequential one-byte strings (640,000 bytes) and 10,000
+cons strings (320,000 bytes) beyond the matched control. A primitive-tuple cache
+removed that excess in its candidate window: **96 bytes per stable stage call**
+in this fixture. All five windows recorded zero natural GC. Separate optimized
+IR had two generic Add calls in the baseline and none on the cached-hit path.
+No browser stage frequency or total scene saving follows from those counts.
+
+The actual source candidate passed optional post build/types, **29/29 tests**,
+unchanged public API reports (166 entries / 1,548 exports), and the 19,999-byte
+core/stage gate. Tests and two independent reviews covered format/count/HDR
+changes, getter/coercion order, failed pipeline keys, release/rebuild behavior,
+and independent custom draw option snapshots. The standalone candidate grew
+by 407 raw / 163 gzip JS bytes, entirely outside the frozen core/stage budget.
+
+Fresh-page Edge155 / RTX A6000 runs used 30-second warmup and 30-second capture
+per idle/drag phase. Pose JSON was requested only before/after sampling; roughly
+250 ms heap-usage polling, tracing and statistical allocation sampling remained.
+All drag phases issued 938 trusted pointer commands.
+
+| Mode | Phase | Sampled MB/s | Minor / major GC | Maximum observed GC slice ms | p95 RAF callback ms | Reflection bakes | Reuse |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Baseline A | Idle | 0.545879 | 20 / 4 | 2.855 | 2.534 | 312 | 626 / 626 |
+| Candidate | Idle | 0.603904 | 23 / 4 | 2.427 | 2.432 | 313 | 626 / 626 |
+| Baseline B | Idle | 0.461292 | 17 / 4 | 1.875 | 2.364 | 392 | 786 / 786 |
+| Baseline A | Drag | 0.827396 | 28 / 4 | 3.620 | 5.392 | 326 | 654 / 654 |
+| Candidate | Drag | 0.871863 | 26 / 4 | 4.480 | 5.612 | 315 | 630 / 630 |
+| Baseline B | Drag | 0.665417 | 25 / 4 | 1.586 | 5.059 | 323 | 648 / 648 |
+
+The candidate sampled more bytes in both phases than either baseline and had
+slower drag callback p95. **Reject the cache despite its isolated string win.**
+Adaptive reflection work differed, and these captures do not establish the
+cause of the difference. Recorded source hashes stayed fixed, the queue writer
+remained native, page errors were empty, and endpoint pose safety passed. There
+were no in-window pose observations; endpoints are not per-frame safety proof.
+GC persists in every run.
+
+Evidence: ignored `test-results/ssao-stage-key-production/` contains the actual
+package census/IR, validation and rejected source snapshot;
+`test-results/ssao-robot-compare/summary.{json,md}` contains the browser comparison,
+frozen baseline/candidate sites and manifests. The first baseline-only attempt
+used an ignored server with an incorrect CSS MIME type and failed drag pickup
+on an unstyled page. It is preserved and excluded; all six table phases used
+the corrected server. No public API or live release change is retained.
+
+Restoration is verified: tracked post source/tests equal HEAD, the new test and
+all candidate files are archived, original post build/types and **23/23 tests**
+pass, and all **26** saved baseline package emission files match their SHA256.
+The standalone preview was rebuilt; all **17 JS chunks** match the baseline
+bit-for-bit (708,879 raw / 239,411 gzip JS bytes, core/stage 19,999). Proofs are
+`ssao-stage-key-production/restoration.json` and
+`ssao-robot-compare/restored-standalone-proof.json`. A live browser near/far eye
+sweep returned to `Held in hand` / `Grip secure`; the restored home view is
+`ssao-robot-compare/live-eye-check.png`. This is a visual smoke check, not a new
+continuous-collision or allocation guarantee.
+
+### Stats timestamp descriptor attribution: measured, no runtime change
+
+An isolated native WebGPU test compared cached complete descriptors against the
+exact Stats spread expression, using the same timestamp records, attachments,
+GPU work and bounded submissions. Each of seven warmed phases executed 8,192
+render/compute pairs, with 32 pairs per encoder. The initial cached complete
+descriptors were frozen while spread results were mutable, so a separate repeat
+matched integrity levels with ordinary mutable cached complete descriptors.
+Both original and corrected artifacts are retained.
+
+In that corrected fixture, cached complete timestamp descriptors sampled
+32.03–34.03 total bytes per pair versus 108.52–111.28 for fresh spread copies;
+the mean difference was 76.874 sampled bytes per pair. Cached encoding took
+16.2–17.0 ms versus 17.0–18.0 ms per 8,192 pairs; this small isolated experiment
+does not establish a production CPU improvement. Raw no-timestamp controls
+remained close to cached timestamp allocation. All 69,635 expected GPU
+dispatches, the rendered pixel, and 128 nonzero nondecreasing query timestamps
+passed; source changes and page/GPU errors were empty.
+
+This isolates descriptor-construction cost for these plain native fixtures.
+It does not attribute all production `beginRender`/`beginCompute` bytes to the
+spread expression. Production samples selected encoders and skips busy
+readbacks; the existing artifacts do not record the actual number of injected
+descriptor copies. No production byte-rate estimate was invented from the
+one-in-fifteen selection interval. Timestamp-write records are already pooled,
+and default/custom factory getter, identity, retention and failure semantics
+still constrain any replacement. **No package API or runtime cache was added.**
+
+Corrected report: `native-stats-timestamp-descriptor-plain-cache-control.json`;
+summary: `stats-timestamp-descriptor-attribution-summary.json`, under ignored
+`test-results/`. The initial frozen-cache report and all fourteen heap profiles
+remain alongside them. Separately, the final MSAA-resolve descriptor remains an
+explicit core allocation, but retaining it has no proven compatibility/size
+fit under the frozen 20,000-byte gate; no core change was made.
+
+### On-demand pose/reflection diagnostics: retained and deployed
+
+The demo now exposes the private inspection method
+`viewport.readWorkshopDiagnostics('metrics' | 'reflection')`, returning an owning
+JSON string only when requested. Default operation no longer publishes recurring
+`data-metrics` / `data-reflection` strings. The visible status, distance, Stats,
+heap/GPU graphs and their existing update cadence remain active. This is a
+demo diagnostic contract change, not a new kinematics capability or package API.
+`?diagnostics=legacy` retains automatic publication for compatibility/comparison.
+The separate hidden GPU audit remains enabled after its rejected experiment.
+
+The helper's default publication calls perform no provider, serialization or DOM
+publication work. Requests may allocate; parsed results cannot mutate live
+transforms. Disposal releases providers, disables retained readers and restores
+owned prior properties/attributes without deleting later external replacements.
+The three diagnostic browser scripts now request snapshots explicitly; the
+motion suite's test-owned RAF reader deduplicates by six-render group and real
+animation frame. Those test requests are excluded from unattended-allocation
+claims. The durable source profiler also fingerprints the new helper.
+
+Validation so far: 13 focused tests, four source/standalone × default/legacy
+browser cases, 202 synchronous requests per source mode with no ticks/renders,
+unchanged revisions and bit-identical 21 transform-store views, and eight
+standalone motion cases / fourteen transitions / 639 samples. API reports still
+match 166 entries / 1,548 exports. The build is 708,879 raw / 239,411 gzip JS
+bytes, 104 modules, unchanged scene assets and 19,999 gzip core-plus-stage bytes.
+The broader eye regression exposed a pre-existing test timing assumption:
+its final Home assertion ran eighteen real frames after Back, while routing was
+still active. Exact-prefix default and legacy reproductions, plus the original
+`00f0afa` standalone using the archived original-API script, all reproduced the
+limited transit state (about 1.1001 radians optical error) and then precise,
+unclamped settled gaze (roughly 6e-8–1.3e-7 radians) after another 55–60 reported
+real frames. The arm stayed safe and head clearance remained positive. All
+seventeen original executable hashes were verified. Those are observed sampled
+states, not every-frame or universal recovery guarantees. The test-only
+correction retains the five fixed-frame transient checks and separately requires
+bounded settled Home/Front precise, unclamped aim, using target/route/torso
+convergence rather than head error as the settling criterion. The full corrected
+suite passes thirteen browser cases, all 63 slider samples, five interrupted
+eye samples, two strict settled eye checks plus the stationary check, and sixteen
+trusted torso-drag samples. Manual hold and reflection checks pass, errors and
+resource errors are empty, and all seventeen standalone executable hashes remain
+unchanged. No runtime eye or motion guard was weakened. Reports and all three
+exact reproductions are preserved in `on-demand-diagnostics/`, including
+`final-validation-summary.json` and `constraints-browser-final.json`.
+
+Two fresh-page A/B/A comparisons used the same frozen executable within each
+comparison, 30 seconds warmup and approximately 30 seconds measured per phase.
+Every measured drag issued 938 trusted commands. The first comparison requested
+JSON about four times a second during measurement; legacy mode returned its
+cached attribute string, whereas on-demand mode regenerated a requested snapshot:
+
+| Mode | Idle MB/s | Idle p95 callback ms | Drag MB/s | Drag p95 callback ms |
+| --- | ---: | ---: | ---: | ---: |
+| Legacy A | 0.585973 | 2.590 | 0.704344 | 6.719 |
+| On-demand | 0.563871 | 3.113 | 0.839798 | 7.185 |
+| Legacy B | 0.508329 | 2.137 | 0.845495 | 5.392 |
+
+That mixed result is preserved; it is not evidence of a reliable whole-scene
+benefit for frequent diagnostic readers. The second comparison moved diagnostic
+requests outside sampling, before/after each phase. Heap polling, tracing and
+heap allocation sampling remained active; it is still an instrumented capture:
+
+| Mode | Phase | MB/s | Minor / major GC | Maximum observed GC slice ms | p95 RAF callback ms | Reflections |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Legacy A | Idle | 0.660748 | 23 / 3 | 2.666 | 2.650 | 375 |
+| On-demand | Idle | 0.601728 | 21 / 4 | 2.482 | 2.677 | 321 |
+| Legacy B | Idle | 0.586828 | 22 / 3 | 2.419 | 2.805 | 304 |
+| Legacy A | Drag | 0.887941 | 28 / 3 | 3.786 | 6.486 | 342 |
+| On-demand | Drag | 0.756456 | 20 / 4 | 3.006 | 5.076 | 321 |
+| Legacy B | Drag | 0.900433 | 28 / 4 | 3.428 | 6.644 | 344 |
+
+Retain the removal of unsolicited publication: endpoint-only drag allocation
+and p95 callback duration were below both baselines. Idle savings are not
+established, frequent readers still incur work, and GC remains. Adaptive bake
+cadence differed (321 candidate drag bakes versus 342/344), so the entire rate
+difference cannot be assigned to JSON removal. Candidate drag had 1,833 real
+pose updates versus 1,843/1,842. The second comparison observes pose safety only
+at before/after endpoints; it does not provide in-window pose samples. Separate
+motion checks retain their own scope and are not CCD. RAF callback duration is
+not a complete CPU/GPU frame budget. Legacy mode reproduces the old publication
+cadence within the new implementation, not byte-identical historical source.
+
+Evidence: `test-results/on-demand-diagnostics/` contains the helper/browser/native
+proofs, `first-aba-summary.{json,md}` and `endpoint-aba-summary.{json,md}`; raw
+reports use `workshop-diag-*` labels. All 65 frozen input/executable fingerprints
+matched within each comparison, errors/source changes were empty, and the native
+queue writer was unchanged. These large local artifacts are ignored by Git.
+**The zero-GC objective remains open.** Source `221c1ad` is live as production
+`26027a44`; all 194 public files and the independent audit pass. Snapshot:
+`test-results/light-keeper-diagnostics-live/site` (196 files), manifest
+`f391f8c57bfab54814644e33bf4257b887c7373047b9dccce55105e87eeefda9`.
+The exact build-report SHA remains
+`246fba0553dc397fe9a692d0d36b9e82e9f7a9defbe29a1cc8e0809e541d5f43`.
+The hosted cross-body preview and actual production workshop were visually
+verified; `production-browser.png` is saved in that release folder. The CLI's
+dirty-directory warning came only from two untracked, experiment-owned V8 CFG
+files; they were preserved under the ignored IR folder, tracked source remained
+unchanged, and the deployment metadata identifies the correct source commit.
 
 Two different demos are involved:
 
@@ -16,6 +532,47 @@ Two different demos are involved:
 - **Light Keeper robot:** http://127.0.0.1:5192/. Its robot adapter integrates the library through resolveTarget(), then retains its analytical arm solve, grip orientation, torso assist, and detailed mesh/contact checks. The constraints lab's new recovery controller is not part of this robot render loop.
 
 An allocation change in one demo does not establish the behavior of the other.
+
+The reported near-face eye bug is fixed for the tested reproductions and live release. Arm candidates previously remained acceptable when the head found a collision-free rotation looking away from the orb; the captured live pointer case reached **103.46 degrees** of optical error. The demo now conditions requested targets against a moving head-pivot gaze workspace and uses bounded waypoints to avoid inward chase chords and recovery latching. The existing demo `HeadAim`, public package API and numerical guards are unchanged; existing head/orb/armor checks remain active. This is a demo adapter policy, not a new public package capability.
+
+### Previous eye release: evidence and limits
+
+The exact deployed snapshot is `test-results/light-keeper-eye-live/site`: **194 files / 192 public**. Manifest SHA256: `f3d62c5867e43b67ed95f2bb5d40f5b704c4ac31802312d2e2d90a2c4faa2595`; final build-report SHA256: `1ea983041bcf3d3ac87d0ee073c252ce3bc4ed0a50a551d76ca87dd8af5e0778`. Only the nested workshop HTML/report replace baseline files; the new hashed entry script is added. Homepage, Tokyo, old assets and Cloudflare configuration remain intact. All public hashes/status/MIME, the canonical route and missing-asset 404/`no-store` behavior passed independent checks. Reports: `test-results/light-keeper-eye-live/production-verification.json`, `production-independent-audit.json` and `production-deployment-metadata.json`.
+
+The final build is **703,335 raw / 237,609 gzip JS bytes**, **103 modules**, and **21,716,983 scene-asset bytes**; core plus stage remains **19,999 gzip bytes**. The exact captured bad-eye replay now settles to approximately **4.55e-7 degrees** optical error. The actual live pointer sample in `production-browser-metrics.json` has `targetConditioned: true`, requested target `[0.137600377, 1.181730628, -0.326119065]`, held orb `[0.137600332, 1.181730628, -0.366465688]`, optical error **1.831486e-7 radians**, a safe arm, `limited: false`, and grip error approximately **1.3074e-8 m**. The head-clearance residual is **+0.001000026 m above the configured margin**, not the total surface gap. Its **650/650** reflection reuse count is an observed sample, not an allocation benchmark. Screenshot: `test-results/light-keeper-eye-live/production-browser.png`.
+
+Validation passed **135/135 full robot tests before the final workspace-only opt-in** and **35/35 affected tests after it**, including 120 bit-exact transformed cases. Nine full-rig integration cases cover the captured pointer target, a 300-frame Home/reversal sequence, conditioned route arrival, look toggling, moving roots and zero-delta/no-solve revalidation. The reversal sequence has zero gaze-away frames but a **14.657-degree maximum transient error**, not exact gaze throughout. A look-OFF to look-ON transition while already inside the workspace can initially be **91.76 degrees** away; the tested transition recovers in approximately **183 ms**. Eight hardware motion cases cover 14 transitions and 612 published samples; final native CPU/GPU checks match **85 buffers / 83,968 bytes** bit-for-bit. Provenance: `test-results/head-crossbody/implementation-verification.json`.
+
+The gaze workspace is a necessary proxy bound and retains posed mesh checks; it does not guarantee exact gaze for every travel-limited or behind-head target. Waypoint step limits exclude torso/base motion, and discrete poses/sampled chords are not actuator certification or swept-volume CCD.
+
+### Eye-release production-build baseline (historical)
+
+After the eye release, the exact **703,335 raw / 237,609 gzip JS-byte** production build was profiled on Edge 155 / NVIDIA RTX A6000, with 30 seconds of warmup and approximately 30 seconds of measurement per phase. Report: `test-results/skinning-ik-profile-gaze-repair-production-idle-drag.json`.
+
+| Phase | Sampled MB/s | Minor GC | Major GC | Peak observed GC pause ms | p95 RAF callback wall ms | Reflection reuse | Animation steps |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Idle defaults | 0.784223 | 28 | 3 | 2.759 | 2.655 | 344/344 | 1,828 |
+| Continuous torso drag | 1.067418 | 22 | 4 | 3.713 | 6.877 | 346/346 | 1,856 |
+
+Measured drag received 938 trusted pointer moves. Browser errors and source changes were empty. These are current baseline observations; different code, workloads and natural runtime variation prevent treating their difference from prior captures as an isolated improvement or regression. RAF callback wall time is not GPU completion time or a physical safety measure. These metrics do not identify allocation constructors or prove zero owned allocations. **GC remains, so the allocation objective is still active and incomplete.**
+
+### Retained torso writer: owned-path reduction, scene-wide benefit unproven
+
+The next demo-only change gives `TorsoAim` an explicit rotation writer, wired once at startup to its own retained `RigScratch`. Omitting it retains dynamic public `Mesh.setQuaternion()` dispatch, including overrides. Core, public packages, numerical checks, collision geometry and motion policy are unchanged. Failed writes do not advance the successful-commit cache. This change is retained in source but **is not included in production `feeb64de`**.
+
+Validation: **17/17 focused tests**, including **2,400 bit-exact authored-rig frames / 1,590 actual writes**, default setter overrides, restoration, transformed roots, store growth, zero-delta repeats, resets and invalid/disposed guards. Eight hardware motion cases with 14 transitions and **616 published samples** also passed, without browser errors or an unmoving chase. The candidate build is 703,549 raw / 237,677 gzip JS bytes; core plus stage remains 19,999 bytes.
+
+A controlled Node census of **10,000 actual commits** used separate matched default/opt-in control and kernel processes. All four measured windows had zero natural collections and unchanged sources; a separate parity run verified 10,000 bit-exact writes. After correcting the verified duplicate function-context row, the selected structural reduction is **5,278,560 bytes**; excess HeapNumbers fell from 161,817 to 20,363, a further **2,263,264 bytes**. These establish removal of the identified Node allocation shapes, not a browser byte-rate prediction.
+
+Fresh-page hardware captures used 30 seconds warmup and 30 seconds measurement for each phase. Baseline B served the exact archived original build; the queue writer remained native throughout.
+
+| Variant | Idle MB/s | Drag MB/s | Drag minor / major GC | Peak drag GC pause ms | Drag p95 RAF callback wall ms |
+| --- | ---: | ---: | --- | ---: | ---: |
+| Baseline A | 0.784223 | 1.067418 | 22 / 4 | 3.713 | 6.877 |
+| Torso writer | 0.640472 | 1.065740 | 18 / 4 | 3.752 | 5.066 |
+| Baseline B | 0.736045 | 1.046181 | 18 / 5 | 4.472 | 5.022 |
+
+The torso commit subtree sampled approximately **1.790 MB** in each baseline drag capture and zero in the candidate. Zero samples is not proof of zero actual bytes. The full-scene totals do **not** establish repeatable lower drag allocation or a CPU improvement. Retention is based on the independently verified owned structural reduction, bit-exact behavior and narrow explicit opt-in; do not attribute the large idle difference to torso writes. GC remains. Evidence: `test-results/torso-writer-ablation/{focused-tests.log,parity.json,census-comparison.json,fresh-aba-summary.json,motion-browser.log}` and the three `skinning-ik-profile-*.json` reports named in that summary.
 
 ## Workspaces, commits, and constraints
 
@@ -27,10 +584,10 @@ An allocation change in one demo does not establish the behavior of the other.
 | Generated-waypoint reach fix | Primary c8bb451; robot cherry-pick 8aff06f |
 | Prior robot performance checkpoint | f33e094 |
 | Core + stage freeze | No new features; combined gzip must remain strictly below 20,000 bytes |
-| Checkpoint core + stage size, not the 16 October measurement | **19,999 gzip bytes** |
-| Latest public API check | **166 entries / 1,548 exports unchanged** |
+| Latest verified core + stage size | **19,999 gzip bytes** |
+| Latest public API check | **166 entries / 1,548 exports; new optional Stats/Animator fields explicitly recorded** |
 
-The robot code/test checkpoint is committed and pushed as **6794863** on **codex/skinning-ik**. It includes the Animation native-writer/backing-store guards, environment output identity retention, explicit demo-owned head writer, and additional unconditional PBR writer regressions. The experimental PBR uniform cache was reverted. These changes do not establish zero-GC operation.
+The prior robot allocation code/test checkpoint is committed and pushed as **6794863** on **codex/skinning-ik**. It includes the Animation native-writer/backing-store guards, environment output identity retention, explicit demo-owned head writer, and additional unconditional PBR writer regressions. Current live source is **00f0afa**, including package commits **9d3ae37** (Stats) and **4d0316c** (Animator). The experimental PBR uniform cache remains reverted. These changes do not establish zero-GC operation.
 
 Preserve unrelated untracked documents, including docs/NEXT_DEMO_HANDOFF.md and docs/package-opinion.md. Large diagnostic recordings and reports live in ignored test-results folders. Only compact numerical regression fixtures are tracked.
 
@@ -156,11 +713,11 @@ Recorded fields include raw target, paced command, last solve input/root, accept
 
 There is no requested pole-angle input or exposed exact rate-limit overshoot. The recorder does not fabricate those values.
 
-## Robot upload fixes: correctness verified, allocation benefit still under study
+## Robot upload fixes and historical cache investigation
 
 ### PBR uniform reuse
 
-The optional gltf-pro change retains a per-resource Float32-bit snapshot and reuses an upload when its bytes are unchanged. Transforms, validation, lighting callbacks and actual draws still execute.
+The experimental optional gltf-pro change retained a per-resource Float32-bit snapshot and reused an upload when its bytes were unchanged. Transforms, validation, lighting callbacks and actual draws still executed. It was subsequently reverted after the comparisons below; the current PBR path uploads unconditionally.
 
 A concrete custom-writer bug was found during review:
 
@@ -169,7 +726,7 @@ A concrete custom-writer bug was found during review:
 3. A pre/post CPU comparison incorrectly certified the cache.
 4. The next unchanged draw skipped an upload and left the GPU at 0.37.
 
-The corrected policy permits reuse only for the captured ordinary same-realm native queue method. Custom, replaced, accessor and unknown writers retain unconditional calls and invalidate the cache across failure or reentry.
+The experiment's corrected policy permitted reuse only for the captured ordinary same-realm native queue method. Custom, replaced, accessor and unknown writers retained unconditional calls and invalidated the cache across failure or reentry.
 
 Native-source filtering runs once at module initialization, not per draw. It uses the intrinsic function-source operation rather than an arbitrary writer.toString property. This is a conservative compatibility filter, not a security boundary against replaced JavaScript intrinsics.
 
@@ -212,15 +769,15 @@ Other validation:
 - Broad selected robot/optional-package CPU batch: 300/300 passed, before the final demo-only reach regression was added.
 - Public API reports unchanged.
 - Standalone build: 697,912 raw JS bytes / 236,160 gzip bytes; core + stage 19,999 gzip; no Three.js runtime.
-- Latest standalone report: robot test-results/skinning-ik-site/build-report.json.
+- Report for that historical build: robot test-results/skinning-ik-site/build-report.json at capture time. That generated path is overwritten by later builds; the current exact release report is in the eye-release snapshot above.
 
-## Allocation captures: current measured results
+## Historical allocation captures and attribution
 
 All paths in the rest of this section are relative to the robot checkout's test-results directory.
 
 The captures use real hardware Edge, normal GC, explicit warmup, frozen source hashes, and sampled allocation stacks. Sampling and tracing can affect timing. Allocation estimates are statistical; heap range is not an allocation rate.
 
-### Latest rebuilt production preview
+### Earlier rebuilt production preview
 
 Report: skinning-ik-profile-native-cache-production.json. Each measured phase lasts approximately 12.2 seconds after 15 seconds of warmup.
 
@@ -301,7 +858,7 @@ The controlled public-setter versus RigScratch writer ablation has now completed
 
 The replacement removed the complete structural pattern (568 bytes/call in raw rows, 528 after context deduplication). Excess HeapNumbers fell from 184,460 to 16,440 instances across 10,000 calls, saving a further 268.832 bytes/call in this run. The selected-type reduction is approximately 798 bytes/call after the correction; the previously communicated approximately 838-byte raw-row sum overstated it. This establishes the actual normal-array HeadAim setter path as the source of the removed types; it does not imply all public setter inputs can use the same implementation or provide a direct Chromium allocation-rate measurement.
 
-All 2,400 moving/contact trajectory frames matched bit-for-bit across every authored node's quaternion, Euler and world matrix plus HeadAim optical/clearance outputs, including transform-store growth. Nine invalid-input cases and disposed-mesh guard precedence prevented mutation as expected. Three Float32Array probes differed in the combined state snapshot, so preserve the existing public setter's typed-array/map behavior. A demo-owned writer opt-in is being implemented; the default HeadAim path must continue dispatching through the current public method, including overrides.
+All 2,400 moving/contact trajectory frames matched bit-for-bit across every authored node's quaternion, Euler and world matrix plus HeadAim optical/clearance outputs, including transform-store growth. Nine invalid-input cases and disposed-mesh guard precedence prevented mutation as expected. Three Float32Array probes differed in the combined state snapshot, so preserve the existing public setter's typed-array/map behavior. This led to the demo-owned writer opt-in documented below; the default HeadAim path continues dispatching through the current public method, including overrides.
 
 The actual writeRotation opt-in is now implemented in the robot demo and verified separately, without replacing Mesh.setQuaternion. Reports: head-optin-actual-moving.json, head-default-current-moving.json and head-writer-optin-parity.json. Its 10,000-call census has 15,430 excess HeapNumbers (24.688 bytes/call) and no excess structural head types; the current default has 183,902 excess HeapNumbers (294.243 bytes/call) plus the same raw structural pattern. The callback did not relocate those structural allocations. All 2,400 authored trajectory frames, nine invalid cases, disposal precedence and public Float32/Float64 setter probes match. Twenty-one focused head/cache/writer/rig tests pass. This is a demo-specific explicit writer choice; omission preserves dynamic public setter dispatch, including pre-existing and later overrides.
 
@@ -382,7 +939,7 @@ The fixed-render ablation script and diagnostics remain available:
 
 The uncommitted PBR uniform cache has been removed from packages/gltf-pro/src/index.ts and its README because these comparisons did not establish a repeatable full-scene allocation benefit. Both files now match the committed unconditional-upload implementation. This preserves public behavior and removes the experimental comparison/guard bookkeeping. The rejected patch and original source/test are archived in ignored test-results/pbr-uniform-cache-rejected.patch, pbr-uniform-cache-rejected.ts and pbr-uniform-upload-reuse-rejected.test.js.
 
-Ten useful custom-writer, Float32-bit, failure, reentrancy and validation cases remain in tests/gltf-pro-uniform-writers.test.js. The rebuilt package passes all 27 focused PBR draw/pass/shadow/resource/writer tests. The separate Animation custom-writer correctness repair remains necessary and is retained. The standalone preview needs rebuilding after this rollback and the head-writer change; historical native-cache proof reports describe the earlier implementation, not the rolled-back PBR source.
+Ten useful custom-writer, Float32-bit, failure, reentrancy and validation cases remain in tests/gltf-pro-uniform-writers.test.js. The rebuilt package passed all 27 focused PBR draw/pass/shadow/resource/writer tests. The separate Animation custom-writer correctness repair remains necessary and is retained. The subsequent standalone production builds include this rollback and the head-writer change; historical native-cache proof reports describe the earlier implementation, not the current unconditional PBR source.
 
 ### Locked reflection work: retain the direct upload path
 
@@ -417,7 +974,230 @@ Use the bundled Node 24 executable listed below. To repeat the exact captured in
 
 ## Remaining investigation and rejected paths
 
-### Current checkpoint validation and production capture
+### Retained optional Stats pass layout
+
+`@margoengine/stats` now offers an **additive, opt-in API**,
+`lowAllocationPasses: true`; the default remains false. It replaces the five
+per-render-pass and three per-compute-pass own fields with frozen shared
+prototypes for eligible native WebGPU passes. This changes reflection and
+post-wrap extensibility semantics, explicitly documented in the package README.
+It is suitable for this demo's owned passes, not an implicit replacement for
+arbitrary application instrumentation. Core/stage and the existing public
+default behavior are unchanged.
+
+Eligibility retains native factory/receiver checks, all captured native-method
+checks, accessor/writability guards and ordinary fallback for custom or foreign
+passes. Review found an inherited-owner edge before the comparison completed;
+the helper now rejects existing own **or inherited** owners without reading an
+accessor. The first incomplete, unguarded baseline is excluded from evidence.
+
+Verification passed 26/26 focused CPU tests and eight actual-native hardware
+cases. The durable hardware regression is
+`scripts/test-stats-native-passes.mjs`, using
+`tests/browser/stats-native-passes.html`; it verifies actual GPU pixel and atomic
+dispatch output, timestamps, overrides, foreign realms, frozen prototypes and
+fallback getter/setter behavior. No fake native-positive fixture is substituted.
+The robot's separate instrumented proof observed 9,625 native render and 4,664
+compute fast-path hits, zero own fields on bounded pass samples, safe sampled
+arm poses and grip errors below 2e-8 m. This instrumentation is absent from the
+allocation runs. An overhead pose may remain head-travel-limited; this check
+does not promise exact gaze for every pose.
+
+Fresh production pages then ran default A, opt-in and default B against the
+**same frozen bundle**, changing only `?passLayout=prototype`. Animator's new
+writer remained omitted in every phase, so it did not affect this comparison.
+Every phase had 30 seconds of warmup and approximately 30 seconds measured;
+drag warmup and measurement each used the matched continuous pointer path.
+
+| Layout | Phase | Sampled MB/s | Minor / major GC | Peak pause ms | p95 RAF callback ms |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Default A | Idle | 0.741797 | 31 / 4 | 1.245 | 1.970 |
+| Opt-in | Idle | 0.621088 | 23 / 4 | 1.561 | 2.289 |
+| Default B | Idle | 0.812398 | 27 / 3 | 1.503 | 2.368 |
+| Default A | Drag | 1.009091 | 16 / 4 | 1.495 | 4.883 |
+| Opt-in | Drag | 0.906381 | 28 / 4 | 1.749 | 5.206 |
+| Default B | Drag | 1.156624 | 20 / 5 | 3.491 | 6.457 |
+
+**Retain the optional layout.** Sampled allocation is below both default runs,
+consistent with the isolated native-pass own-field reduction. Candidate callback
+p95 lies between the two baselines, so these captures do not establish a
+repeatable CPU improvement or penalty. Drag minor-GC count is higher in the
+candidate; no GC elimination or causal GC-pause improvement is established.
+Automatic reflection cadence differs: idle bakes A/opt-in/B are 462/435/445 and
+drag bakes 456/440/415. The candidate also stays below both baselines in bytes
+per ordinary animation frame; this remains a free-running scene comparison,
+not a fixed-bake workload experiment.
+
+All six measured phases retained 100% reflection pose reuse (922, 911, 870,
+878, 890 and 830 successful repeat attempts in execution order), with no source
+changes or browser errors. Every drag measured 938 trusted commands. The native
+queue writer identity remained unchanged. Host profiling/readback/pass wrappers
+still allocate, and natural GC remains; the overall objective is incomplete.
+
+The local summary is `test-results/stats-pass-prototype-fresh-aba-summary.json`;
+raw report labels are `stats-pass-prototype-guarded-baseline-a`,
+`stats-pass-prototype-guarded-candidate` and
+`stats-pass-prototype-guarded-baseline-b`. Native reports are
+`test-results/stats-native-passes.json` and
+`test-results/scene-stats-prototype-proof.json`. Raw traces, heap profiles and
+the production comparison harness remain ignored local artifacts. The API
+reports explicitly include the new option; unchanged export counts do not mean
+an unchanged API. This package change is not yet part of production feeb64de.
+
+### Retained optional Animator rotation writer
+
+`AnimatorOptions.writeRotation(node, rotation)` is a new explicit optional commit
+hook in the owning Animator package. Omission retains dynamic
+`Mesh.setQuaternion()` dispatch, including pre-import and later overrides.
+Both sampled/blended pose commits and FootIK corrections use the selected path.
+The hook is captured and validated once after the existing option validation;
+successful rotation caches update only after commit returns. Recursive updates
+from the hook reject before mutation, with the active flag cleared in `finally`.
+Failure/retry semantics, including a throw after restoring an already-cached
+state, are documented rather than promising unconditional callback reinvocation.
+
+The demo trial used one startup-owned callback over a dedicated `RigScratch`.
+Its reflection-reuse guard accepts only that selected identity and retains the
+existing node/method/track snapshots, plugin ordering, layers/FootIK/transitions
+invalidation and physical-pose checks. An arbitrary callback is not certified
+pure by this option. The temporary comparison URL used
+`?animatorWriter=owned`; the final demo explicitly selects this owned writer
+and the retained Stats layout without URL gates. Package defaults remain
+unchanged.
+
+Only Animator was rebuilt/type-checked. All 29 focused tests passed: ten new
+writer cases plus existing Animator allocation, game/FootIK and pose-reuse tests.
+The separate actual-authored-robot census preserved every checked bit across
+10,000 measured frames, 36 nodes, 76 primitives and 1,046 pose/morph scalars per
+frame. It used the original `Light keeper idle` clip and precomputed bounded
+external rotations forcing nine actual restoration commits per frame. These
+inputs are an attribution workload, not a collision-valid drag trajectory or
+an assertion that the live demo commits nine quaternions every frame.
+
+Separate parity counted 90,000 commits for both implementations; the measured
+default setter itself was never wrapped. All four matched kernel/control
+windows had zero natural GC and stable input/source hashes. The opt-in removed
+360,000 excess `JS_OBJECT_TYPE`, 90,000 `JS_FUNCTION_TYPE` and 90,000
+`JS_ARRAY_ITERATOR_TYPE` instances. Selected structural bytes fell by 46,588,800
+after deducting the verified overlapping context category; excess HeapNumbers
+fell by 1,332,107 instances / 21,313,712 bytes. These Node internal-type deltas
+establish removal of the targeted allocation shapes, not an exact browser
+bytes-per-frame result or zero-allocation guarantee. Other internal-type deltas
+remain.
+
+Evidence is in ignored `test-results/animator-writer-ablation/`, particularly
+`census-comparison.json`, its parity report and raw kernel/control logs.
+`tests/animator-rotation-writer.test.js` supplies the focused regressions;
+the new optional callback is represented explicitly in `api/animator.api.md`.
+
+The actual standalone hardware suite passed eight motion cases, fourteen
+cross-track transitions and 649 published samples with the owned writer and
+Stats prototype layout enabled. All reported arm/head clearance checks passed;
+maximum grip error was approximately 47.5 nm, with no measured unmoving chase or
+browser errors. The suite intentionally toggles controls and interrupts routes:
+final reflection counters were 522 reused / 900 attempted with 378 conservative
+fallbacks, not 100% reuse. Their individual causes were not classified.
+The runner now accepts optional local `--scene-url=` and path-safe `--label=`
+arguments while preserving its previous default source/report behavior.
+
+The warmed browser comparison retained the same frozen source/build hashes and
+Stats prototype setting throughout. Its first default-writer run is the earlier
+Stats opt-in capture; only `&animatorWriter=owned` changes for the candidate.
+Every idle and drag phase has 30 seconds warmup and approximately 30 seconds
+measured. Raw labels and results:
+
+| Writer | Phase | Sampled MB/s | Minor / major GC | Peak observed GC slice ms | p95 RAF callback ms |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Default A | Idle | 0.621088 | 23 / 4 | 1.561 | 2.289 |
+| Owned | Idle | 0.588493 | 23 / 3 | 1.566 | 2.110 |
+| Default B | Idle | 0.764308 | 31 / 3 | 2.391 | 1.825 |
+| Default A | Drag | 0.906381 | 28 / 4 | 1.749 | 5.206 |
+| Owned | Drag | 0.847987 | 24 / 6 | 4.619 | 5.676 |
+| Default B | Drag | 0.905832 | 32 / 4 | 2.926 | 4.871 |
+
+**Retain the explicit optional writer for the verified allocation-shape
+reduction.** Candidate sampled allocation is below both baselines, including
+bytes per ordinary animation frame, but its drag callback p95 and maximum
+observed GC slice are higher. These captures establish no CPU or GC-pause win;
+record that trade-off instead of calling the complete frame loop allocation-free
+or stutter-proof. Automatic reflection counts also differ (idle 435/441/448,
+drag 440/416/412). No fixed-bake workload equivalence is claimed. All six phases
+had zero browser/source errors and 100% reflection repeat reuse; the owned
+phases recorded 882/882 idle and 830/830 drag attempts. All drag phases issued
+938 trusted commands.
+
+Evidence: `test-results/animator-writer-ablation/fresh-browser-aba-summary.json`,
+with raw profile labels `stats-pass-prototype-guarded-candidate`,
+`animator-owned-stats-prototype-candidate` and
+`animator-owned-stats-prototype-baseline-b`. Motion evidence is
+`test-results/skinning-ik-motion-browser-stats-animator-owned.json` and its
+summary. An offline trace audit confirmed every named MinorGC/MajorGC span is
+on `CrRendererMain`, with no nested named duplicates changing the reported
+counts. Explicit marking triggers include global-limit and memory-reducer
+reasons, which do not establish whether pressure originates in engine code,
+the sampler or native browser resources.
+
+The sampling-disabled observer check used the exact same recorded frozen
+source/build hashes and 30/30-second protocol. It still recorded 20 minor/four
+major events at idle (1.497 ms maximum observed slice) and 24 minor/three major
+events during drag (1.945 ms maximum); all named spans were on
+`CrRendererMain`. This removes allocation sampling only: detailed tracing and
+250 ms polling remain. A single sampled/unsampled pair does not quantify a
+causal observer overhead, and GC persistence does not identify the remaining
+engine/native allocation sources. Evidence is in
+`test-results/gc-observer-off-vs-sampled-summary.json`. The original frozen
+comparison bundle and URL-gated demo sources are archived in ignored
+`test-results/stats-animator-frozen-ablation/`.
+
+The final no-query integration build is 707,441 raw / 238,909 gzip JS bytes,
+103 runtime modules, no Three.js runtime and 19,999 core/stage gzip bytes.
+All 178 selected package/robot tests passed with no skips; API reports match
+166 entries / 1,548 exports while explicitly listing both new optional fields.
+The current unconditional-upload hardware checker verified 85 buffers / 83,968
+bytes bit-for-bit; GPU SHA256 is
+`0afd8625a5b62f15124f8f07a989807771b2104376512fc17011b86b6964ac77`.
+The first attempted hardware run used the superseded cache-expectation harness
+and failed its removed-PBR-cache assertion; it is excluded, not a runtime
+regression or a reason to restore that cache. Final evidence:
+`stats-animator-final-tests.log`, `stats-animator-final-build.log` and
+`stats-animator-final-native-upload.json` under local `test-results/`.
+This source is not production feeb64de; allocation-driven GC remains unresolved.
+
+### Target-only projection boundary experiment: reverted
+
+The current robot uses `resolveTarget()` with damping and compliance disabled and
+one torso capsule. A fresh audit tested that exact entry path instead of borrowing
+the earlier full-`solve()` or mixed-collider compiler evidence. The ordinary Node
+census still observed boxed numbers, but the successfully optimized target,
+projection and internal capsule paths had no numeric tagging/allocation sites;
+`pointClearance` was inlined. A separate synchronous-recompilation diagnostic had
+no excess numeric allocation over its control. These results do not establish a
+permanent warmup duration or a universal allocation floor.
+
+The candidate skipped an unused reach norm for the unbounded target-only path.
+It preserved bit-exact outputs for 25,128 target calls, 4,800 full solves, 1,272
+alias calls and 24 invalid calls, with identical custom-collider and IK callback
+sequences across 223,132 collider calls. All 85 candidate tests passed. However,
+four isolated baseline/candidate excess-HeapNumber pairs were 89,812/80,272,
+75,502/81,172, 79,252/77,322 and 74,682/71,562. Timings were neutral and variation
+was larger than the apparent benefit. The candidate also added nine gzip bytes.
+
+**Revert the experiment.** The original source, declarations and package bundle
+were restored bit-for-bit; the bundle SHA256 is
+`64a16588de864218291da2943f4ca8ea917b3a80602fe073787b6dd60cb14d04`.
+The original 82/82 tests passed after restoration. An instrumented reduction from
+ten to nine square-root calls per query is not a production allocation result:
+that instrumentation changes compilation, and the optimized path already removes
+the dead norm. No public kinematics change remains from this experiment.
+
+Raw census, compiler, parity, candidate and restoration evidence is archived in
+the robot checkout's ignored `test-results/resolve-target-boundaries/`, including
+`README.md` and `final-report.json`; these large local artifacts are not supplied
+by a clean clone. Core plus stage remains 19,999 gzip bytes.
+
+### Prior allocation checkpoint validation and production capture
+
+This section records the warmed allocation checkpoint before the resting-hand and eye fixes. Its rates and GC counts are historical evidence for that source, not measurements of the current live release.
 
 After push, the rebuilt checkpoint passed **307/307** selected package/demo tests with no skips; public API reports match **166 entries / 1,548 exports**. The standalone build is **697,008 raw JS bytes / 235,782 gzip bytes**, with 102 modules, no Three.js runtime, and frozen core + stage at **19,999 gzip bytes**. Logs: allocation-checkpoint-tests.log, allocation-checkpoint-api.log and allocation-checkpoint-build.log.
 
@@ -448,10 +1228,10 @@ Known boundaries:
 
 - Generic Animator must preserve dynamic Mesh setter dispatch. A pre-import replacement can look canonical to a later method capture; bypassing it is not a safe generic optimization.
 - Animator already avoids unchanged static-node commits; do not propose that as new work without measuring a remaining duplicate path.
-- A demo-owned HeadAim scalar commit using the existing verified rig helper is a possible next experiment, not an implemented or measured win.
+- The demo-owned HeadAim scalar commit is implemented as an explicit opt-in using the verified rig helper. The default public path retains dynamic method dispatch; the prior checkpoint contains its parity and allocation evidence.
 - Stats already shares wrapper functions and retains method records. It still adds five own fields to fresh native render passes and creates sampled timestamp descriptor copies. That instrumentation can allocate; it is not all browser-native.
 - The previous Stats owner-WeakMap experiment showed no net allocation improvement and slower execution; it was rejected.
-- A retained descriptor-bag batching experiment for Stats remains only a proposal. Descriptor/accessor behavior and native allocation must be measured before changing production.
+- The retained descriptor-bag batching experiment for Stats was measured and rejected; its native comparison is recorded above. It is not pending production work.
 - Earlier core quaternion experiments exceeded the strict gzip gate or changed observable iteration/override behavior; they were rejected.
 - Do not infer Maglev/TurboFan causality, fresh-angle boxing, or a stable allocation floor without direct evidence.
 
@@ -471,7 +1251,7 @@ From the robot checkout:
 
     node scripts/api-report.js
     node scripts/build-skinning-ik.mjs
-    node test-results/verify-native-upload-caches.mjs --label=native-upload-cache-proof --port=5259 --frames=120
+    node test-results/verify-native-animation-upload.mjs --label=native-animation-upload-proof --port=5259 --frames=120
     node scripts/profile-skinning-ik.js --label=native-cache-production --scene-url=http://127.0.0.1:5192/ --phases=default,torso-pointer-drag --duration-ms=12000 --warmup-ms=15000
     node scripts/profile-skinning-ik.js --label=native-cache-source --phases=default,torso-pointer-drag --duration-ms=12000 --warmup-ms=15000
     node test-results/profile-native-upload-ablation.mjs
@@ -482,9 +1262,9 @@ Use fresh report labels for further captures. Keep source/dist frozen and avoid 
 
 The user requested an immediate commit/push checkpoint, followed by continued work, and then the rebuilt production drag allocation/GC results.
 
-The current code checkpoint is pushed and the rebuilt preview has passed CPU/API/size checks, native GPU byte verification, the hardware motion suite and a warmed production idle/drag capture. Descriptor batching in Stats was measured and rejected. The constraints lab remains on the committed contact-reach-3 controller; both saved complete trajectories replay hold-free. Allocation-driven GC remains and the overall goal is active.
+Current source **221c1ad** is pushed and live as **26027a44**, with eye/hand repairs and on-demand pose/reflection diagnostics retained. Endpoint-only captures observed 0.601728 / 0.756456 MB/s idle/drag with GC remaining; idle savings were inconsistent and the frequent-reader comparison was mixed/worse. Both full comparisons and their observation/workload limits are recorded above. Default package setter/pass semantics remain intact; this demo explicitly selects optional Animator/Stats paths. Stats descriptor batching, target-only unused-norm and hidden-GPU-audit opt-out experiments remain reverted. The constraints lab remains on contact-reach-3; both saved trajectories replay hold-free. The fixture-only probe readback ablation established no allocation benefit and produced no production/API change. SSAO key caching and the gaze step buffer removed isolated allocation sites but were rejected after worse full-scene drag captures. Future profiler reports distinguish observed GC triggers; native API constructor evidence does not explain all residual scene allocation. Next work should target proven recurring owned allocations while preserving history, visible telemetry and public contracts. GC remains and the overall goal is active.
 
-The user explicitly requested an immediate commit/push checkpoint even with unfinished work, followed by continued testing. Preserve that incomplete status in the checkpoint; do not present the pending live measurements as completed. Large raw traces and diagnostic harnesses remain in ignored local test-results folders.
+The user explicitly requested an immediate commit/push checkpoint even with unfinished work, followed by continued testing. Preserve that incomplete allocation status; do not present the current release's pointer sample or reflection reuse count as a sustained allocation benchmark. Large raw traces and diagnostic harnesses remain in ignored local test-results folders.
 
 Package/demo boundary: reusable runtime changes are made in the owning optional packages. The contact-gradient sliding and generated-waypoint reach conditioning currently remain in examples/kinematics-constraints-controller.js, not the public kinematics-constraints solver. Recorder/profiler code is diagnostic-only. Do not present those demo adapter behaviors as current public package capabilities.
 

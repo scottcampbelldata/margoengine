@@ -1,0 +1,76 @@
+{
+  "any": {
+    "packages/decoders/src/codec.ts": {
+      "count": 13,
+      "reason": "Emscripten Draco/Basis module objects and their factory globals have no published types (HANDOFF 1g.b: codec globals may stay)."
+    }
+  },
+  "errors": {
+    "packages/core/src/engine.ts": {
+      "count": 10,
+      "reason": "Frozen core (v1.0.0): core + stage is 19,999 of 20,000 gzip bytes, a typed error costs bytes; Scott's decision (HANDOFF 5k phase 2)."
+    },
+    "packages/core/src/kernel.ts": {
+      "count": 2,
+      "reason": "Frozen core (v1.0.0): core + stage is 19,999 of 20,000 gzip bytes, a typed error costs bytes; Scott's decision (HANDOFF 5k phase 2)."
+    },
+    "packages/core/src/plugin.ts": {
+      "count": 5,
+      "reason": "Frozen core (v1.0.0): core + stage is 19,999 of 20,000 gzip bytes, a typed error costs bytes; Scott's decision (HANDOFF 5k phase 2)."
+    },
+    "packages/core/src/renderer.ts": {
+      "count": 4,
+      "reason": "Frozen core (v1.0.0): core + stage is 19,999 of 20,000 gzip bytes, a typed error costs bytes; Scott's decision (HANDOFF 5k phase 2)."
+    },
+    "packages/margoengine/src/model.ts": {
+      "count": 2,
+      "reason": "Frozen stage facade, counted in the same 19,999 / 20,000 core + stage gzip budget as core; same reason as core's (HANDOFF 5k phase 2)."
+    }
+  },
+  "names": {
+    "add": {
+      "packages": ["math", "shader"],
+      "reason": "Same vocabulary, two domains: @margoengine/math/vec3 adds CPU [x, y, z] arrays, @margoengine/shader builds a GPU node (WGSL/TSL name). Decision in docs/conventions.md."
+    },
+    "sub": {
+      "packages": ["math", "shader"],
+      "reason": "Same vocabulary, two domains (CPU arrays in math/vec3, GPU nodes in shader). Decision in docs/conventions.md."
+    },
+    "cross": {
+      "packages": ["math", "shader"],
+      "reason": "Same vocabulary, two domains (CPU arrays in math/vec3, WGSL built-in node in shader). Decision in docs/conventions.md."
+    },
+    "dot": {
+      "packages": ["math", "shader"],
+      "reason": "Same vocabulary, two domains (CPU arrays in math/vec3, WGSL built-in node in shader). Decision in docs/conventions.md."
+    },
+    "length": {
+      "packages": ["math", "shader"],
+      "reason": "Same vocabulary, two domains (CPU arrays in math/vec3, WGSL built-in node in shader). Decision in docs/conventions.md."
+    },
+    "normalize": {
+      "packages": ["math", "shader"],
+      "reason": "Same vocabulary, two domains (CPU arrays in math/vec3, WGSL built-in node in shader). Decision in docs/conventions.md."
+    },
+    "clamp": {
+      "packages": ["math", "shader"],
+      "reason": "Same vocabulary, two domains (MathUtils.clamp on numbers, WGSL built-in node in shader). Decision in docs/conventions.md."
+    },
+    "smoothstep": {
+      "packages": ["math", "shader"],
+      "reason": "Same name, two domains and argument orders: MathUtils.smoothstep(x, min, max) as three.js, shader smoothstep(low, high, x) as WGSL; both documented. Decision in docs/conventions.md."
+    },
+    "fbm": {
+      "packages": ["procedural", "shader"],
+      "reason": "CPU noise in @margoengine/procedural and its GPU twin in @margoengine/shader/noise share names on purpose. Decision in docs/conventions.md."
+    },
+    "ridged": {
+      "packages": ["procedural", "shader"],
+      "reason": "CPU noise in @margoengine/procedural and its GPU twin in @margoengine/shader/noise share names on purpose. Decision in docs/conventions.md."
+    },
+    "domainWarp": {
+      "packages": ["procedural", "shader"],
+      "reason": "CPU noise in @margoengine/procedural and its GPU twin in @margoengine/shader/noise share names on purpose. Decision in docs/conventions.md."
+    }
+  }
+}

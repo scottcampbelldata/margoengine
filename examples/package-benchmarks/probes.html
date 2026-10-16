@@ -1,0 +1,92 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Light probes GPU check</title><style>body{margin:0}#host{width:1280px;height:720px}</style></head><body><div id="host"></div>
+<script type="module">
+// Driven by probes-gpu.mjs. ?scene=room: a closed 4 x 3 x 4 m room of six coloured core-mesh walls lit only by core's scalar
+// ambient (1.0; sun off), so every wall radiates exactly its linear colour toward any viewpoint, with an irradiance volume
+// (2 x 2 x 2, L2) and one reflection probe filling it. ?scene=env: no walls, a synthetic HDR environment as the only light.
+// Receivers: a white core sphere and a materials sphere (gltf-pro, lit through probes.add); hidden while baking.
+import {createStage} from '/packages/margoengine/dist/index.js';
+import {box,PbrMaterial,Geometry} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {invertMatrixStable} from '/packages/math/dist/mat4.js';
+import {sphereGeometry} from '/packages/geometry/dist/index.js';
+import {Material,createMesh} from '/packages/materials/dist/index.js';
+import {Environment,EnvironmentLighting} from '/packages/environment/dist/index.js';
+import {LightProbes} from '/packages/environment/dist/probes.js';
+import {Stats} from '/packages/stats/dist/index.js';
+import {SSR} from '/packages/post/dist/ssr.js';
+const scene=new URLSearchParams(location.search).get('scene')??'room';
+const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,features:['timestamp-query'],camera:{position:[0,1.6,1.7],target:[0,1.1,-1]}});
+const engine=stage.engine,device=engine.gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const lighting=engineRuntime(engine).lighting;lighting.direction[3]=0;lighting.radiance[3]=scene==='room'?1:0;
+const room={min:[-2,0,-2],max:[2,3,2]},walls={};
+if(scene==='room'){
+  // name: [colour, slab size, slab centre]; inner faces lie exactly on the room box.
+  const slabs={px:[[0.8,0.1,0.1],[0.2,3.4,4.4],[2.1,1.5,0]],nx:[[0.1,0.7,0.1],[0.2,3.4,4.4],[-2.1,1.5,0]],py:[[0.9,0.9,0.9],[4.4,0.2,4.4],[0,3.1,0]],
+    ny:[[0.5,0.5,0.5],[4.4,0.2,4.4],[0,-0.1,0]],pz:[[0.1,0.2,0.8],[4.4,3.4,0.2],[0,1.5,2.1]],nz:[[0.8,0.7,0.1],[4.4,3.4,0.2],[0,1.5,-2.1]]};
+  for(const [name,[color,size,centre]] of Object.entries(slabs)){const m=engine.createMesh().setGeometry(box(...size));m.setMaterial(new PbrMaterial({color,roughness:1,metalness:0}));m.position.set(...centre);walls[name]={mesh:m,color};}
+}
+const sphere=sphereGeometry(0.35,64,32),core=engine.createMesh().setGeometry(new Geometry(sphere.positions,sphere.normals,sphere.indices));
+core.setMaterial(new PbrMaterial({color:[1,1,1],roughness:1,metalness:0}));core.position.set(-0.55,1.1,-0.7);
+const materialSphere=createMesh(engine,sphere,new Material({color:[1,1,1],roughness:1,metalness:0}));materialSphere.root.setPosition([0.55,1.1,-0.7]);
+let environment=null,envLighting=null;
+if(scene==='env'){
+  // Synthetic sky: blue gradient above, brown ground below, a warm sun-like blob; RGBA float equirect 256 x 128.
+  const w=256,h=128,data=new Float32Array(w*h*4);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const t=Math.PI*(y+0.5)/h,p=2*Math.PI*((x+0.5)/w-0.5),d=[Math.sin(t)*Math.sin(p),Math.cos(t),-Math.sin(t)*Math.cos(p)];
+    const up=Math.max(d[1],0),sun=Math.max(0,d[0]*0.5+d[1]*0.7+d[2]*0.51)**64*8,o=(y*w+x)*4;
+    const c=d[1]>=0?[0.25+0.4*up+sun,0.35+0.4*up+sun*0.8,0.7+0.3*up+sun*0.6]:[0.22,0.15,0.08];data.set([...c,1],o);}
+  environment=await Environment.create(engine,{width:w,height:h,data});
+}
+const frame=async()=>{engine.render();await device.queue.onSubmittedWorkDone();};
+let probes=null;
+const inverse=new Float32Array(16),workspace=new Float64Array(52);
+const transform=(m,v)=>[0,1,2,3].map(r=>m[r]*v[0]+m[4+r]*v[1]+m[8+r]*v[2]+m[12+r]*v[3]);
+window.check={
+  // Builds and bakes the probes (spheres hidden). Returns the baked texels and layout for the runner's CPU references.
+  async bake({volume=true,reflection=true,sh=2,resolution=128,volumeResolution=16,bounces=1}={}){
+    device.pushErrorScope('validation');core.visible=false;materialSphere.root.visible=false;
+    probes?.dispose();envLighting?.dispose();envLighting=null;
+    probes=LightProbes.attach(engine,{environment:environment??undefined,volume:volume?{...room,counts:[2,2,2],sh,resolution:volumeResolution}:undefined,reflections:reflection?[{position:[0,1.5,0],...room,blend:0}]:[],resolution});
+    probes.add(materialSphere);
+    const t=performance.now();await probes.bake({bounces});const ms=performance.now()-t;
+    const e=await device.popErrorScope();
+    return {error:e?.message??null,errors:errors.splice(0),bakeMs:+ms.toFixed(1),texels:Array.from(probes.texels),offset:reflection?probes.reflectionOffset(0):0,
+      walls:Object.fromEntries(Object.entries(walls).map(([k,v])=>[k,v.color])),envSH:environment?Array.from(environment.sh.irradiance):null};
+  },
+  // floor: 'diffuse' | 'mirror' (white metal, roughness 0) | 'rough' (white metal, roughness 0.5); lighting: 'probes' | 'environment' | 'none'.
+  async render({floor='diffuse',lighting='probes',spheres=true,ssr=false,camera=[[0,1.6,1.7],[0,1.1,-1]]}){
+    engine.camera.position=camera[0];engine.camera.target=camera[1];
+    if(ssr&&!window.ssr){window.ssr=SSR.attach(engine,{maxRoughness:0.6});window.ssr.add(materialSphere);}if(!ssr&&window.ssr){window.ssr.dispose();window.ssr=null;}
+    device.pushErrorScope('validation');core.visible=spheres;materialSphere.root.visible=spheres;
+    if(walls.ny)walls.ny.mesh.setMaterial(floor==='diffuse'?new PbrMaterial({color:walls.ny.color,roughness:1,metalness:0}):new PbrMaterial({color:[1,1,1],roughness:floor==='mirror'?0:0.5,metalness:1}));
+    if(lighting!=='probes'&&probes){probes.dispose();probes=null;}
+    if(lighting==='unbaked'){probes=LightProbes.attach(engine,{volume:{...room,counts:[2,2,2]},reflections:[{position:[0,1.5,0],...room,blend:0}]});probes.add(materialSphere);}
+    if(lighting==='environment'&&!envLighting){envLighting=EnvironmentLighting.attach(engine,environment);envLighting.add(materialSphere);}
+    for(let i=0;i<3;i++)await frame();const e=await device.popErrorScope();return {error:e?.message??null,errors:errors.splice(0),eye:[...engine.camera.position]};
+  },
+  // Pixel centres -> world rays (origin = eye, unit direction) through the inverse view-projection.
+  rays(pixels){
+    const c=engine.canvas;invertMatrixStable(engine.camera.matrix,inverse,workspace);
+    return pixels.map(([x,y])=>{const ndc=[(x+0.5)/c.clientWidth*2-1,1-(y+0.5)/c.clientHeight*2];
+      const [a,b]=[0.9,0.1].map(z=>{const p=transform(inverse,[...ndc,z,1]);return p.slice(0,3).map(v=>v/p[3]);});
+      const d=b.map((v,i)=>v-a[i]),l=Math.hypot(...d);return d.map(v=>v/l);});
+  },
+  // World points -> CSS pixels (x, y) and clip w (> 0 in front of the camera).
+  project(points){const m=engine.camera.matrix,c=engine.canvas;return points.map(p=>{const q=transform(m,[...p,1]);return [(q[0]/q[3]+1)/2*c.clientWidth,(1-q[1]/q[3])/2*c.clientHeight,q[3]];});},
+  spheres:()=>({core:[-0.55,1.1,-0.7],materials:[0.55,1.1,-0.7],radius:0.35}),
+  // GPU pass time (timestamp queries) and frame time with the probes on or off, at the current canvas size.
+  async bench({on,width=1280,height=720,variant='both'}){
+    const host=document.querySelector('#host');host.style.width=width+'px';host.style.height=height+'px';await new Promise(r=>requestAnimationFrame(r));
+    engine.canvas.width=width;engine.canvas.height=height;core.visible=materialSphere.root.visible=true;
+    if(probes&&(!on||probes.variant!==variant)){probes.dispose();probes=null;}
+    if(on&&!probes){probes=LightProbes.attach(engine,{environment:environment??undefined,volume:variant!=='reflection'?{...room,counts:[4,2,4]}:undefined,reflections:variant!=='volume'?[{position:[0,1.5,0],...room}]:[],resolution:128});probes.variant=variant;probes.add(materialSphere);await probes.bake();}
+    const stats=window.stats??=Stats.attach(engine,{profiling:true});for(let i=0;i<20;i++)await frame();
+    const gpu=[],frames=[];
+    for(let i=0;i<600;i++){const t=performance.now();engine.render();await device.queue.onSubmittedWorkDone();frames.push(performance.now()-t);
+      if(i%15===14){await new Promise(r=>setTimeout(r,5));let sum=0;const ms=stats.gpuPassMilliseconds;for(let k=0;k<stats.gpuPassCount;k++)sum+=ms[k];if(stats.gpuPassCount)gpu.push(sum);}}
+    const med=a=>{const b=[...a].sort((x,y)=>x-y);return +b[b.length>>1].toFixed(3);};
+    return {on,variant:on?variant:null,width,height,gpuMs:gpu.length?med(gpu):null,gpuSamples:gpu.length,frameMs:med(frames),errors:errors.splice(0)};
+  },
+};
+window.ready=true;
+</script></body></html>

@@ -1,0 +1,75 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Texture binding limit GPU check</title><style>body{margin:0}#host{width:1280px;height:720px}</style></head><body><div id="host"></div>
+<script type="module">
+// Driven by binding-limit-gpu.mjs (HANDOFF 5c). A gltf-pro PHYSICAL-variant grid of spheres (roughness 0..1 across, dielectric
+// and metal rows, one clearcoat row) on a floor, lit by @margoengine/shadows, environment IBL + fog, clustered lights with a
+// LocalShadows point light: 16 sampled textures per fragment stage. Query: ?env=ref loads environment as of e017d50 (BRDF LUT
+// texture: 17 textures; the device is then created with the adapter's raised limits unless &limits=default);
+// ?brdf=karis swaps the buffer LUT for Karis's analytic mobile fit (measurement only).
+import {createStage} from '/packages/margoengine/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {sphereGeometry,planeGeometry} from '/packages/geometry/dist/index.js';
+import {parseGLTF} from '/packages/gltf-pro/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {Clustered} from '/packages/clustered/dist/index.js';
+import {LocalShadows} from '/packages/clustered/dist/shadows.js';
+const q=new URLSearchParams(location.search),ref=q.get('env')==='ref';
+const env=await import(ref?'/test-results/binding-limit-ref/environment.js':'/packages/environment/dist/index.js');
+if(ref&&q.get('limits')!=='default'){
+  const request=GPUAdapter.prototype.requestDevice;
+  GPUAdapter.prototype.requestDevice=function(d={}){return request.call(this,{...d,requiredLimits:{...d.requiredLimits,maxSampledTexturesPerShaderStage:this.limits.maxSampledTexturesPerShaderStage,maxSamplersPerShaderStage:this.limits.maxSamplersPerShaderStage}});};
+}
+const errors=[],stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,onError:e=>errors.push(e?.message??String(e)),camera:{position:[0,2.2,7.5],target:[0,0.9,0]}});
+const engine=stage.engine,device=engine.gpu;device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engineRuntime(engine).lighting.direction.set([0.4,1,0.6,1]);
+
+// glTF document: one sphere mesh per material, plus a floor.
+const buffers=[],bufferViews=[],accessors=[],add=(data,type,componentType=5126)=>{const id=buffers.length;buffers.push(data);bufferViews.push({buffer:id,byteLength:data.byteLength});
+  accessors.push({bufferView:id,componentType,count:data.length/{SCALAR:1,VEC2:2,VEC3:3}[type],type,...(type==='VEC3'&&componentType===5126?{min:[-9,-9,-9],max:[9,9,9]}:{})});return id;};
+const primitive=g=>({attributes:{POSITION:add(new Float32Array(g.positions),'VEC3'),NORMAL:add(new Float32Array(g.normals),'VEC3'),TEXCOORD_0:add(new Float32Array(g.uvs),'VEC2')},indices:add(new Uint32Array(g.indices),'SCALAR',5125)});
+const sphere=primitive(sphereGeometry(0.42,64,32)),floor=primitive(planeGeometry(14,8));
+const materials=[],meshes=[],nodes=[],spheres=[];
+const rows=[{metal:0,color:[0.8,0.2,0.15,1]},{metal:1,color:[0.95,0.75,0.4,1]},{metal:1,color:[0.9,0.9,0.92,1]},{metal:0,color:[0.1,0.3,0.8,1],coat:1}];
+rows.forEach((row,r)=>{for(let k=0;k<7;k++){const roughness=k/6,id=materials.length,position=[(k-3)*1.0,0.5+r*0.95,0];
+  materials.push({pbrMetallicRoughness:{baseColorFactor:row.color,metallicFactor:row.metal,roughnessFactor:roughness},extensions:{KHR_materials_clearcoat:{clearcoatFactor:row.coat??0,clearcoatRoughnessFactor:0.1}}});
+  meshes.push({primitives:[{...sphere,material:id}]});nodes.push({mesh:id,translation:position});spheres.push({position,radius:0.42,roughness,metal:row.metal,coat:row.coat??0});}});
+materials.push({pbrMetallicRoughness:{baseColorFactor:[0.6,0.6,0.6,1],metallicFactor:0,roughnessFactor:0.8},extensions:{KHR_materials_clearcoat:{clearcoatFactor:0}}});
+meshes.push({primitives:[{...floor,material:materials.length-1}]});nodes.push({mesh:meshes.length-1,rotation:[-Math.SQRT1_2,0,0,Math.SQRT1_2],translation:[0,0,0]});
+const doc={asset:{version:'2.0'},extensionsUsed:['KHR_materials_clearcoat'],buffers:buffers.map(b=>({byteLength:b.byteLength})),bufferViews,accessors,materials,meshes,nodes,scenes:[{nodes:nodes.map((_,i)=>i)}],scene:0};
+const model=parseGLTF(engine,doc,buffers);
+
+// Synthetic HDR sky: bright warm sun patch, blue sky gradient, dark ground, so reflections have structure at every roughness.
+const width=256,height=128,data=new Float32Array(width*height*4);
+for(let y=0;y<height;y++)for(let x=0;x<width;x++){const u=(x+0.5)/width,v=(y+0.5)/height,phi=2*Math.PI*(u-0.5),theta=Math.PI*v,d=[Math.sin(theta)*Math.sin(phi),Math.cos(theta),-Math.sin(theta)*Math.cos(phi)];
+  const sun=Math.max(0,d[0]*0.5+d[1]*0.6-d[2]*0.62)**200*60,sky=d[1]>0?[0.35+0.4*(1-d[1]),0.55+0.3*(1-d[1]),1.1]:[0.18,0.15,0.12];
+  data.set([sky[0]+sun,sky[1]+sun*0.9,sky[2]+sun*0.7,1],(y*width+x)*4);}
+const environment=await env.Environment.create(engine,{width,height,data});
+class KarisLighting extends env.EnvironmentLighting {
+  hooks(group){const h=super.hooks(group);return {...h,declarations:h.declarations.replace(/fn iblBrdfTerms\([\s\S]*?\n}\n/,`fn iblBrdfTerms(nv: f32, roughness: f32) -> vec2f {
+  _ = arrayLength(&iblBrdf);
+  let r = vec4f(-1.0, -0.0275, -0.572, 0.022) * roughness + vec4f(1.0, 0.0425, 1.04, -0.04);
+  let a004 = min(r.x * r.x, exp2(-9.28 * nv)) * r.x + r.y;
+  return vec2f(-1.04, 1.04) * a004 + r.zw;
+}
+`)};}
+}
+const ibl=q.get('brdf')==='karis'?new KarisLighting(environment):new env.EnvironmentLighting(environment);
+engineRuntime(engine).use(ibl);ibl.applyTo(model);
+const fog=new env.Fog({color:'#c8d4e0',near:6,far:60});engineRuntime(engine).use(fog);fog.applyTo(model);
+const shadows=Shadows.attach(engine,{resolution:1024});shadows.add(model);
+const lights=Clustered.attach(engine);lights.add(model);
+const local=LocalShadows.attach(engine,{lights,maxLights:1});local.add(model);
+lights.setLights([{position:[-2.5,3.5,2.5],range:12,intensity:12,color:[1,0.8,0.6],castShadow:true}]);
+
+const project=v=>{const m=engine.camera.matrix,w=m[3]*v[0]+m[7]*v[1]+m[11]*v[2]+m[15],c=engine.canvas;return [((m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12])/w+1)/2*c.clientWidth,(1-(m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13])/w)/2*c.clientHeight];};
+window.check={
+  async render(){
+    device.pushErrorScope('validation');let thrown=null;
+    try{for(let i=0;i<3;i++){engine.render();await device.queue.onSubmittedWorkDone();}}catch(e){thrown=e.message;}
+    const e=await device.popErrorScope();
+    return {error:e?.message??null,thrown,errors:errors.splice(0),limits:{sampledTextures:device.limits.maxSampledTexturesPerShaderStage,samplers:device.limits.maxSamplersPerShaderStage}};
+  },
+  // Screen disc of each sphere (centre and radius in CSS px, from the projected centre and a point on its silhouette).
+  spheres(){return spheres.map(s=>{const c=project(s.position),e=project([s.position[0]+s.radius,s.position[1],s.position[2]]);return {...s,centre:c,radiusPx:Math.hypot(e[0]-c[0],e[1]-c[1])};});},
+};
+window.ready=true;
+</script></body></html>

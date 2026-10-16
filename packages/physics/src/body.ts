@@ -51,6 +51,10 @@ export class PhysicsBody {
   readonly pose = new Float64Array(14);
   /** @internal */
   restWritten = false;
+  /** @internal Tracks the preceding physics sleep state. */
+  slept = false;
+  /** @internal World scale captured for a body attached to a child mesh. */
+  fitScale?: [number, number, number];
   /** @internal */
   dirty = true;
   private removed = false;

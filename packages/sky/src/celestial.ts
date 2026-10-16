@@ -1,4 +1,4 @@
-export const celestialShader = /* wgsl */`
+export const celestialShader = /* wgsl */ `
 const SUN_RADIUS=0.014;const MOON_RADIUS=0.018;
 fn celestialProfile(ray:vec3f,direction:vec3f,radius:f32,angularFootprint:f32)->vec2f {
  let angle=atan2(length(cross(ray,direction)),clamp(dot(ray,direction),-1.0,1.0));

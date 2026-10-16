@@ -1,0 +1,54 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/><title>Frame debugger GPU check</title><style>body{margin:0;background:#1d2127}#host{width:1440px;height:1100px}</style></head><body><div id="host"></div>
+<script type="module">
+// Driven by frame-debugger-gpu.mjs (HANDOFF 5h.d). DamagedHelmet (gltf-pro) on a floor with directional shadows, a
+// 20x20 grid of GPU-culled boxes (culling: compute + drawIndexedIndirect), a PostStack (SSAO, Bloom, FXAA), and the
+// frame debugger attached before anything loads so every pipeline, bind group and texture is described.
+import {createStage} from '/packages/margoengine/dist/index.js';
+import {box, PbrMaterial} from '/packages/core/dist/index.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {CulledInstances} from '/packages/culling/dist/index.js';
+import {PostStack} from '/packages/post/dist/stack.js';
+import {SSAO} from '/packages/post/dist/ssao.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {FXAA} from '/packages/post/dist/fxaa.js';
+import {Inspector} from '/packages/inspector/dist/index.js';
+import {FrameDebugger} from '/packages/inspector/dist/frame.js';
+const errors = [];
+const stage = await createStage('#host', {backend: 'webgpu', autoStart: false, controls: false, features: ['timestamp-query'], camera: {position: [0, 2.2, 5.5], target: [0, 0.3, 0]}});
+const engine = stage.engine, device = engine.gpu;
+device.addEventListener('uncapturederror', event => errors.push(event.error.message));
+const debug = FrameDebugger.attach(engine);
+Inspector.attach(engine);
+const floor = engine.createMesh().setGeometry(box(12, 0.1, 12)).setMaterial(new PbrMaterial({color: '#3d4a5a', roughness: 0.9}));
+floor.name = 'floor';
+floor.position.set(0, -1.05, 0);
+const helmet = await loadGLTF(engine, new URL('/examples/assets/damaged-helmet.glb', location.href));
+const shadows = Shadows.attach(engine, {resolution: 1024, distance: 12});
+shadows.add(floor, {static: true});
+shadows.add(helmet);
+const transforms = new Float32Array(400 * 16);
+for (let i = 0; i < 400; i++) transforms.set([0.15, 0, 0, 0, 0, 0.15, 0, 0, 0, 0, 0.15, 0, (i % 20) * 0.5 - 4.75, -0.9, Math.floor(i / 20) * 0.5 - 6, 1], i * 16);
+CulledInstances.attach(engine, [{geometry: box(), material: new PbrMaterial({color: '#c9a14a', metalness: 0.7, roughness: 0.4}), transforms}]);
+PostStack.attach(engine, [new SSAO(), new Bloom({strength: 0.5}), new FXAA()]);
+const frame = async () => {engine.render({delta: 1 / 60}); await device.queue.onSubmittedWorkDone();};
+window.check = {
+  async capture() {
+    for (let i = 0; i < 5; i++) await frame();
+    // The per-frame path must be the same functions before and after a capture (nothing left wrapped).
+    const path = () => [device.createCommandEncoder, device.queue.writeBuffer, device.queue.submit, GPUTexture.prototype.createView, GPUCommandEncoder.prototype.beginRenderPass,
+      Object.hasOwn(engine, 'render'), Object.hasOwn(engine.frameGraph, 'execute')];
+    const before = path(), report = await debug.capture({render: true});
+    await device.queue.onSubmittedWorkDone();
+    const restored = path().every((value, i) => value === before[i]);
+    await frame();
+    return {report, restored, errors: errors.splice(0)};
+  },
+  // Expand the panel's frame graph and the first culled/indirect pass for the screenshot.
+  expand() {
+    const root = document.querySelector('[data-margo-frame-debugger]').shadowRoot;
+    for (const node of root.querySelectorAll('details')) node.open = !/^(Pipelines|GPU memory)/.test(node.querySelector('summary').textContent);
+  },
+};
+window.ready = true;
+</script></body></html>

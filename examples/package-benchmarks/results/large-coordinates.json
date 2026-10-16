@@ -1,0 +1,198 @@
+{
+  "precision": [
+    {
+      "distance": 0,
+      "mode": "core",
+      "maxErrorPx": {
+        "kernel": 0.0003119723672525314,
+        "viewProjection": 0.0002575412176094615,
+        "worldPosition": 0.00024002238508213697,
+        "clip": 0.0000029716893654811034,
+        "all": 0.0010017980448643368
+      },
+      "jitterPx": 0.0008193858257829019,
+      "eyeAngleDeg": 0.0000359740444689538,
+      "rebases": 0
+    },
+    {
+      "distance": 1000,
+      "mode": "core",
+      "maxErrorPx": {
+        "kernel": 0.3675433135016893,
+        "viewProjection": 0.3077820412389141,
+        "worldPosition": 0.3314904459687802,
+        "clip": 0.0000029707900409806442,
+        "all": 0.8812488014024621
+      },
+      "jitterPx": 0.7055124804703851,
+      "eyeAngleDeg": 0.04555764472779475,
+      "rebases": 0
+    },
+    {
+      "distance": 100000,
+      "mode": "core",
+      "maxErrorPx": {
+        "kernel": 43.188778627765366,
+        "viewProjection": 29.24524831483481,
+        "worldPosition": 21.102238748036196,
+        "clip": 0.000002965146300051395,
+        "all": 99.10670881098179
+      },
+      "jitterPx": 60.35004946986838,
+      "eyeAngleDeg": 2.7739297833166496,
+      "rebases": 0
+    },
+    {
+      "distance": 6000000,
+      "mode": "core",
+      "maxErrorPx": {
+        "kernel": 544.5367176437168,
+        "viewProjection": 613351359.5241013,
+        "worldPosition": 1623.736872699745,
+        "clip": 0.0000033385176429874182,
+        "all": null
+      },
+      "jitterPx": null,
+      "eyeAngleDeg": 71.81942209672634,
+      "rebases": 0
+    },
+    {
+      "distance": 0,
+      "mode": "origin",
+      "maxErrorPx": {
+        "kernel": 0.0003119723672525314,
+        "viewProjection": 0.0002575412176094615,
+        "worldPosition": 0.00024002238508213697,
+        "clip": 0.0000029716893654811034,
+        "all": 0.0010017980448643368
+      },
+      "jitterPx": 0.0008193858257829019,
+      "eyeAngleDeg": 0.0000359740444689538,
+      "rebases": 0
+    },
+    {
+      "distance": 1000,
+      "mode": "origin",
+      "maxErrorPx": {
+        "kernel": 0.000016216918783168882,
+        "viewProjection": 0.000013245440380006358,
+        "worldPosition": 0.000018213694471102763,
+        "clip": 0.000002971667439168128,
+        "all": 0.00004092332028496608
+      },
+      "jitterPx": 0.000035698142223604804,
+      "eyeAngleDeg": 2.7360406107203753e-7,
+      "rebases": 1
+    },
+    {
+      "distance": 100000,
+      "mode": "origin",
+      "maxErrorPx": {
+        "kernel": 0.000016213057024139956,
+        "viewProjection": 0.000011272455988160953,
+        "worldPosition": 0.000018214230199382717,
+        "clip": 0.0000029727033817019928,
+        "all": 0.000040924195009827585
+      },
+      "jitterPx": 0.0000356968745010998,
+      "eyeAngleDeg": 2.746358562767913e-7,
+      "rebases": 1
+    },
+    {
+      "distance": 6000000,
+      "mode": "origin",
+      "maxErrorPx": {
+        "kernel": 0.000010112691045677173,
+        "viewProjection": 0.000011890831031083271,
+        "worldPosition": 0.000018101110466463605,
+        "clip": 0.000002959634694715032,
+        "all": 0.000036733375830041725
+      },
+      "jitterPx": 0.00003343444176725765,
+      "eyeAngleDeg": 0,
+      "rebases": 1
+    },
+    {
+      "distance": 0,
+      "mode": "origin-edge",
+      "maxErrorPx": {
+        "kernel": 0.02704993069427673,
+        "viewProjection": 0.013123904019811046,
+        "worldPosition": 0.01490597698240185,
+        "clip": 0.000002971730195566593,
+        "all": 0.05462395074321105
+      },
+      "jitterPx": 0.047460584688857936,
+      "eyeAngleDeg": 0.0020813809385635935,
+      "rebases": 1
+    },
+    {
+      "distance": 1000,
+      "mode": "origin-edge",
+      "maxErrorPx": {
+        "kernel": 0.027049930892121675,
+        "viewProjection": 0.013123904173396565,
+        "worldPosition": 0.014905977142944256,
+        "clip": 0.0000029716720947175894,
+        "all": 0.05462395069413995
+      },
+      "jitterPx": 0.04746058467305345,
+      "eyeAngleDeg": 0.0020813809839777273,
+      "rebases": 2
+    },
+    {
+      "distance": 100000,
+      "mode": "origin-edge",
+      "maxErrorPx": {
+        "kernel": 0.02704993520324163,
+        "viewProjection": 0.01312391369908711,
+        "worldPosition": 0.014905980674917172,
+        "clip": 0.0000029726883752148908,
+        "all": 0.05462395096959791
+      },
+      "jitterPx": 0.04746058439920252,
+      "eyeAngleDeg": 0.002081382178568093,
+      "rebases": 2
+    },
+    {
+      "distance": 6000000,
+      "mode": "origin-edge",
+      "maxErrorPx": {
+        "kernel": 0.027049640727878934,
+        "viewProjection": 0.013048183360757332,
+        "worldPosition": 0.014905738574436852,
+        "clip": 0.000002959642602125159,
+        "all": 0.054623947631994595
+      },
+      "jitterPx": 0.04902746665801153,
+      "eyeAngleDeg": 0.0020814796441185044,
+      "rebases": 2
+    }
+  ],
+  "cost": [
+    {
+      "parts": 10000,
+      "visible": 675,
+      "medianMs": {
+        "staticFrame": 0.345,
+        "rebaseCall": 0.771,
+        "rebaseFrame": 1.469,
+        "moveAllFrame": 1.979
+      },
+      "rebaseUploadBytes": 64880,
+      "moveUploadBytes": 64880
+    },
+    {
+      "parts": 50000,
+      "visible": 3500,
+      "medianMs": {
+        "staticFrame": 1.616,
+        "rebaseCall": 4.261,
+        "rebaseFrame": 7.127,
+        "moveAllFrame": 11.149
+      },
+      "rebaseUploadBytes": 336080,
+      "moveUploadBytes": 336080
+    }
+  ]
+}

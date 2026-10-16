@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>ViewCube browser check</title><style>body{margin:0}#host{width:400px;height:400px}canvas{display:block;width:400px;height:400px}</style></head><body><div id="host"><canvas></canvas></div>
+<script type="module">
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {CameraProjection} from '/packages/cameras/dist/index.js';
+import {OrbitControls} from '/packages/controls/dist/index.js';
+import {ViewCube} from '/packages/viewcube/dist/index.js';
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,10],target:[0,0,0],near:0.1,far:100}}),errors=[];
+engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+// Red at +X, blue at -Z, green at the origin: top view puts red right of centre and blue above it.
+for(const [color,position] of [['#ff0000',[2,0,0]],['#0000ff',[0,0,-2]],['#00ff00',[0,0,0]]])engine.createMesh().setGeometry(box(1,1,1)).setMaterial(new PbrMaterial({color})).setPosition(position);
+const projection=new CameraProjection({mode:'perspective'});engine.use(projection);
+const orbit=new OrbitControls(engine),cube=new ViewCube(engine,{projection,duration:0.25});
+engine.start();
+const direction=()=>{const c=engine.camera,d=c.position.map((v,i)=>v-c.target[i]),l=Math.hypot(...d);return d.map(v=>v/l);};
+window.check={
+  /** Centre of the visible cell for a view, and what the browser hit-tests there. */
+  cell(view){
+    for(const e of cube.element.querySelectorAll(`[data-view="${view}"]`)){const r=e.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;if(r.width>4&&document.elementFromPoint(x,y)===e)return {x,y};}
+    return null;
+  },
+  async settle(){await new Promise(r=>setTimeout(r,400));await engine.gpu.queue.onSubmittedWorkDone();return {direction:direction(),animating:cube.animating,errors:errors.splice(0),mode:projection.mode,ortho:!engine.camera.matrix[11]};},
+  focus(){const tabbable=[...cube.element.querySelectorAll('button[tabindex="0"]:not([data-projection])')].map(b=>b.getAttribute('aria-label'));cube.element.querySelector('[aria-label="Top view"]').focus();return {tabbable,active:document.activeElement.getAttribute('aria-label')};},
+  toggle(){const r=cube.element.querySelector('[data-projection]').getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};},
+};
+window.ready=true;
+</script></body></html>

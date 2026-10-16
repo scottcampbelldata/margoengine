@@ -1,4 +1,4 @@
-import type { XRInputSource, XRNativeFrame, XRSpace, XRPose } from "./types.js";
+import type { XRInputSource, XRNativeFrame, XRSpace, XRPose } from './types.js';
 
 /** Buffers are reused; read them during the frame callback or copy to retain a snapshot. */
 export class XRController {
@@ -15,24 +15,20 @@ export class XRController {
   private readonly joints: XRSpace[];
   constructor(readonly source: XRInputSource) {
     this.joints = source.hand ? Array.from(source.hand.values()) : [];
-    if (this.joints.length > 25)
-      throw new RangeError("XR hand exceeds 25 joints");
+    if (this.joints.length > 25) throw new RangeError('XR hand exceeds 25 joints');
   }
   update(frame: XRNativeFrame, space: XRSpace): void {
     this.targetRay = frame.getPose(this.source.targetRaySpace, space);
-    this.grip = this.source.gripSpace
-      ? frame.getPose(this.source.gripSpace, space)
-      : null;
+    this.grip = this.source.gripSpace ? frame.getPose(this.source.gripSpace, space) : null;
     this.targetRayMatrix.fill(0);
     this.gripMatrix.fill(0);
-    if (this.targetRay)
-      this.targetRayMatrix.set(this.targetRay.transform.matrix);
+    if (this.targetRay) this.targetRayMatrix.set(this.targetRay.transform.matrix);
     if (this.grip) this.gripMatrix.set(this.grip.transform.matrix);
     const gamepad = this.source.gamepad;
     this.buttonCount = gamepad?.buttons.length ?? 0;
     this.axisCount = gamepad?.axes.length ?? 0;
     if (this.buttonCount > 32 || this.axisCount > 16)
-      throw new RangeError("XR gamepad exceeds controller buffer capacity");
+      throw new RangeError('XR gamepad exceeds controller buffer capacity');
     this.buttons.fill(0);
     this.axes.fill(0);
     if (gamepad) {

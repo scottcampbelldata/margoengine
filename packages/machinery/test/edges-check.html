@@ -1,0 +1,25 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Feature edges check</title><style>body{margin:0}canvas{display:block;width:400px;height:400px}</style></head><body><canvas id="view"></canvas>
+<script type="module">
+import {Engine,box,PbrMaterial} from '/packages/core/dist/index.js';
+import {FeatureEdges} from '/packages/machinery/dist/edges.js';
+import {SectionPlanes} from '/packages/machinery/dist/section.js';
+import {ExplodedView} from '/packages/machinery/dist/exploded.js';
+import {CameraProjection} from '/packages/cameras/dist/index.js';
+const canvas=document.getElementById('view'),errors=[];let engine;
+const project=p=>{const m=engine.camera.matrix,x=m[0]*p[0]+m[4]*p[1]+m[8]*p[2]+m[12],y=m[1]*p[0]+m[5]*p[1]+m[9]*p[2]+m[13],w=m[3]*p[0]+m[7]*p[1]+m[11]*p[2]+m[15];return [Math.round((x/w*0.5+0.5)*canvas.clientWidth),Math.round((0.5-y/w*0.5)*canvas.clientHeight)];};
+// Visible box edges from the camera at (3,2.5,4): top-front, top-right and front-right; face centres for comparison.
+const samples=offset=>({edges:[[0,0.5,0.5],[0.5,0.5,0.1],[0.5,0.1,0.5],[-0.3,0.5,0.5],[0.3,0.5,0.5]].map(p=>project(p.map((v,i)=>v+offset[i]))),faces:[[0.15,0.5,0.15],[0.2,-0.1,0.5]].map(p=>project(p.map((v,i)=>v+offset[i])))});
+window.check={async run(name){
+  engine?.dispose();engine=await Engine.create(canvas,{camera:{position:[3,2.5,4],target:[0,0,0],fov:40}});engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+  const part=engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({color:'#9aa4ad',roughness:0.6}));let offset=[0,0,0];
+  if(name!=='plain')engine.use(new FeatureEdges({color:'#ff00ff',width:3}));
+  if(name==='ortho')engine.use(new CameraProjection({mode:'orthographic',height:2.6}));
+  if(name==='section')engine.use(new SectionPlanes({planes:[[1,0,0,0]],cap:false}));
+  if(name==='exploded'){offset=[0.4,0,-0.3];const view=new ExplodedView([{node:part,offset}]);engine.use(view);view.amount=1;}
+  if(name==='hidden')part.visible=false;
+  if(name==='tiny')part.setScale([0.02,0.02,0.02]);
+  engine.render();await engine.gpu.queue.onSubmittedWorkDone();await new Promise(r=>requestAnimationFrame(r));engine.render();await engine.gpu.queue.onSubmittedWorkDone();
+  return {errors,...samples(offset),stats:engine.plugins?.get?.('feature-edges')?.stats??null};
+}};
+window.ready=true;
+</script></body></html>

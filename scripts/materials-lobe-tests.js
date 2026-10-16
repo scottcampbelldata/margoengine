@@ -176,7 +176,7 @@ export async function lobeBrowserChecks(page){
       const textureRecords=[],createTexture=device.createTexture.bind(device);device.createTexture=descriptor=>{const value=createTexture(descriptor),record={descriptor,destroyed:false},destroy=value.destroy.bind(value);textureRecords.push(record);value.destroy=()=>{record.destroyed=true;destroy();};return value;};
       let ktxReport;
       try{
-        const ktxModel=await loadGLTF(engine,new URL('/test-results/materials-lobes-ktx.gltf',location.href)),installation=materials.install(ktxModel);
+        const ktxModel=await loadGLTF(engine,new URL('/test-results/materials-lobes-ktx.gltf',location.href),{allowedURLs:[new URL('/packages/decoders/tests/fixtures/',location.href).href]}),installation=materials.install(ktxModel);
         try{
           const uploads=textureRecords.filter(record=>record.descriptor.mipLevelCount===8);assert(uploads.some(record=>record.descriptor.format.endsWith('-srgb'))&&uploads.some(record=>!record.descriptor.format.endsWith('-srgb')),'KTX2 lobe maps did not create separate linear and sRGB mip views');
           const initial=await render(undefined,{},ktxModel),factors=ktxModel.primitives[0].material.extension.factors;ktxModel.onDeviceRestored(engine);installation.onDeviceRestored(engine);

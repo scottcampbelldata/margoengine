@@ -1,20 +1,216 @@
 import assert from 'node:assert/strict';
-import {writeFile} from 'node:fs/promises';
-import {openBrowser} from './browser.js';
-import {decodePNG} from '../tests/support/png.js';
-import {preview} from 'vite';
-const browser=await openBrowser({startPath:'/tests/modern.html'}),{page,hardware}=browser,errors=[],checks=[];
+import { writeFile } from 'node:fs/promises';
+import { openBrowser } from './browser.js';
+import { decodePNG } from '../tests/support/png.js';
+import { preview } from 'vite';
+const browser = await openBrowser({ startPath: '/tests/modern.html' }),
+  { page, hardware } = browser,
+  errors = [],
+  checks = [];
 let starter;
-page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error'||/Error while parsing|Invalid .*Pipeline|ValidationError/.test(message.text()))errors.push(message.text());});
+page.on('pageerror', (error) => errors.push(error.message));
+page.on('console', (message) => {
+  if (message.type() === 'error' || /Error while parsing|Invalid .*Pipeline|ValidationError/.test(message.text()))
+    errors.push(message.text());
+});
 try {
- await page.waitForFunction(()=>window.modern);await page.evaluate(()=>window.modern.core('webgpu'));
- const picking=await page.evaluate(async()=>{const e=window.modern.state.core,original=[...e.meshes.values()][0],front=e.createMesh().setGeometry(original.geometry).setPosition([0,0,1]);front.name='Front';const hit=await e.pick(160,120),blank=await e.pick(1,1);front.visible=false;const behind=await e.pick(160,120);front.visible=true;const {SectionPlanes}=await import('/packages/machinery/dist/index.js');e.use(new SectionPlanes({planes:[[0,0,-1,0]],cap:false}));const clipped=await e.pick(160,120);e.removePlugin('section-planes');const pending=e.pick(160,120);front.dispose();e.createMesh().setGeometry(original.geometry).setPosition([0,0,1]);const stale=await pending;await e.rebootDevice();const restored=await e.pick(160,120);return {front:hit===front,blank:blank===null,behind:behind===original,clipped:clipped===original,stale:stale===null,restored:restored!==null};});assert.ok(Object.values(picking).every(Boolean),JSON.stringify(picking));checks.push({name:'1x1 r32uint GPU picking: occlusion, misses, instance IDs, visibility, clipping, stale-slot reuse and reboot',...picking});
- await page.evaluate(async()=>{const e=window.modern.state.core;for(const m of [...e.meshes.values()])m.dispose();e.camera.position=[0,0,0];e.camera.target=[0,0,-1];e.camera.near=0.001;e.camera.far=10000;const {box,PbrMaterial}=await import('/packages/core/dist/index.js'),geometry=box();e.createMesh().setGeometry(geometry).setPosition([0,0,-500]).setScale([20,20,0.00001]).setMaterial(new PbrMaterial({color:'#00ff00'}));e.createMesh().setGeometry(geometry).setPosition([0,0,-500.0001]).setScale([20,20,0.00001]).setMaterial(new PbrMaterial({color:'#ff0000'}));e.render();await e.gpu.queue.onSubmittedWorkDone();});const precisionImage=await decodePNG(await page.locator('[data-core]').screenshot({path:'test-results/modern-depth-precision.png'})),precisionAt=(120*precisionImage.width+160)*4,precision=[...precisionImage.data.slice(precisionAt,precisionAt+3)];assert.ok(precision[1]>precision[0]+30,'Reversed float depth failed to separate surfaces 0.1 mm apart at 500 m: '+precision);checks.push({name:'GPU depth precision: near=1 mm, far=10 km, 0.1 mm surface separation at 500 m survives adverse draw order',pixel:precision});
- await page.evaluate(()=>window.modern.core('webgpu'));
- const caps=await page.evaluate(async()=>{const e=window.modern.state.core;for(const m of [...e.meshes.values()].slice(1))m.dispose();const {SectionPlanes,boxSection}=await import('/packages/machinery/dist/index.js');e.use(new SectionPlanes({planes:boxSection([-0.3,-0.3,-0.3],[0.3,0.3,0.3]),color:'#00ff00',hatch:0}));e.render();await e.gpu.queue.onSubmittedWorkDone();return e.gpu.features.has('depth32float-stencil8');});assert.ok(caps);const image=await decodePNG(await page.locator('[data-core]').screenshot({path:'test-results/modern-box-section.png'})),at=(120*image.width+160)*4,cap=[...image.data.slice(at,at+3)];assert.ok(cap[1]>cap[0]+30,`Six-plane intersection cap missing: ${cap}`);checks.push({name:'Six simultaneous planes intersect into a closed box with solid reversed-depth caps',pixel:cap});
- starter=await preview({root:'examples/vite',configFile:false,logLevel:'error',preview:{host:'127.0.0.1',port:5194,strictPort:true}});
- await page.goto('http://127.0.0.1:5194/');await page.waitForFunction(()=>document.querySelector('.badge')?.textContent?.includes('webgpu'));await page.getByText('Domain tools',{exact:true}).click();await page.getByRole('button',{name:'Load conveyor assembly',exact:true}).click();await page.getByRole('status').filter({hasText:'Conveyor:'}).waitFor();await page.getByLabel('Drive cover and bolts').uncheck();await page.getByLabel('Cover hinge (rad)').fill('0.7');await page.getByLabel('Carriage stroke (m)').fill('1.2');await page.getByLabel('Assembly explode',{exact:true}).fill('0.4');await page.getByRole('button',{name:'Measure conveyor span',exact:true}).click();await page.waitForFunction(()=>document.querySelector('svg[data-margoengine-annotations]')?.textContent?.includes('6000.0 mm'));await page.getByRole('button',{name:'Box section',exact:true}).click();await page.getByRole('button',{name:'Restore GPU device',exact:true}).click();await page.getByRole('status').filter({hasText:'GPU restored'}).waitFor();await page.screenshot({path:'test-results/modern-conveyor-ui.png'});assert.equal(await page.locator('vite-error-overlay').count(),0);checks.push({name:'Live conveyor UI: covers and bolts, revolute/prismatic sliders, explode, dimensions, six-plane cutaway and reboot'});
- await page.goto('http://127.0.0.1:5193/tests/modern.html');await page.waitForFunction(()=>window.modern);
- const stress=await page.evaluate(async()=>{const {Engine,box}=await import('/packages/core/dist/extension.js'),{createConveyor}=await import('/examples/vite/src/conveyor.ts'),{SectionPlanes,boxSection,EngineeringAnnotations}=await import('/packages/machinery/dist/index.js');const canvas=document.createElement('canvas');canvas.style.cssText='width:640px;height:400px';document.body.append(canvas);const e=await Engine.create(canvas,{backend:'webgpu',capacity:15000,camera:{position:[6,4,9],target:[0,0,0],near:0.001,far:10000}}),model=createConveyor(e,500),geometry=box();for(let i=0;i<10000;i++)e.createMesh(model.root).setGeometry(geometry).setScale([0.03,0.03,0.03]).setPosition([(i%100)*0.06-3,Math.floor(i/100)*0.01,0]);e.use(new SectionPlanes({planes:boxSection([-2.9,-0.6,-0.8],[2.9,1.2,0.8])}));e.use(new EngineeringAnnotations({dimensions:[{a:{node:model.root,point:[-3,0.9,0]},b:{node:model.root,point:[3,0.9,0]}}],unit:'mm',scale:1000}));const samples=[],gpu=[];for(let i=0;i<70;i++){model.cover.visible=i%2===0;model.joints.setValue(0,i/70);model.joints.setValue(1,Math.sin(i/10)*2);model.exploded.amount=(i%20)/20;const start=performance.now();e.render({delta:1/60});const end=performance.now();await e.gpu.queue.onSubmittedWorkDone();if(i>=10){samples.push(end-start);gpu.push(performance.now()-start);}}const start=performance.now();for(let i=0;i<10000;i++)model.query.setSubtreeVisible(model.cover,i%2===0);const toggle=(performance.now()-start)/10000;const percentile=(values,p)=>values.sort((a,b)=>a-b)[Math.ceil(values.length*p)-1],report={entities:e.meshes.size,visible:e.stats.visible,batches:e.stats.drawCalls,frames:samples.length,cpuMedianMs:percentile(samples,.5),cpuP95Ms:percentile(samples,.95),completedGpuMedianMs:percentile(gpu,.5),completedGpuP95Ms:percentile(gpu,.95),parentToggleMeanMs:toggle,memoryBytes:e.store.matrices.buffer.byteLength};await e.rebootDevice();e.render();await e.gpu.queue.onSubmittedWorkDone();model.dispose();e.dispose();canvas.remove();return report;});assert.ok(stress.entities>11000&&stress.frames===60&&stress.batches<10);checks.push({name:'Conveyor stress: 500 rollers, 10000 additional shared-geometry parts, hierarchy, joints, six caps, annotations and reboot',...stress});
- assert.deepEqual(errors,[]);await writeFile('test-results/modern-finalization.json',JSON.stringify({hardware,checks},null,2));console.log(JSON.stringify({hardware,checks},null,2));
-}finally{if(starter)await new Promise(resolve=>starter.httpServer.close(resolve));await browser.close();}
+  await page.waitForFunction(() => window.modern);
+  await page.evaluate(() => window.modern.core('webgpu'));
+  const picking = await page.evaluate(async () => {
+    const e = window.modern.state.core,
+      original = [...e.meshes.values()][0],
+      front = e.createMesh().setGeometry(original.geometry).setPosition([0, 0, 1]);
+    front.name = 'Front';
+    const hit = await e.pick(160, 120),
+      blank = await e.pick(1, 1);
+    front.visible = false;
+    const behind = await e.pick(160, 120);
+    front.visible = true;
+    const { SectionPlanes } = await import('/packages/machinery/dist/index.js');
+    e.use(new SectionPlanes({ planes: [[0, 0, -1, 0]], cap: false }));
+    const clipped = await e.pick(160, 120);
+    e.removePlugin('section-planes');
+    const pending = e.pick(160, 120);
+    front.dispose();
+    e.createMesh().setGeometry(original.geometry).setPosition([0, 0, 1]);
+    const stale = await pending;
+    await e.rebootDevice();
+    const restored = await e.pick(160, 120);
+    return {
+      front: hit === front,
+      blank: blank === null,
+      behind: behind === original,
+      clipped: clipped === original,
+      stale: stale === null,
+      restored: restored !== null,
+    };
+  });
+  assert.ok(Object.values(picking).every(Boolean), JSON.stringify(picking));
+  checks.push({
+    name: '1x1 r32uint GPU picking: occlusion, misses, instance IDs, visibility, clipping, stale-slot reuse and reboot',
+    ...picking,
+  });
+  await page.evaluate(async () => {
+    const e = window.modern.state.core;
+    for (const m of [...e.meshes.values()]) m.dispose();
+    e.camera.position = [0, 0, 0];
+    e.camera.target = [0, 0, -1];
+    e.camera.near = 0.001;
+    e.camera.far = 10000;
+    const { box, PbrMaterial } = await import('/packages/core/dist/index.js'),
+      geometry = box();
+    e.createMesh()
+      .setGeometry(geometry)
+      .setPosition([0, 0, -500])
+      .setScale([20, 20, 0.00001])
+      .setMaterial(new PbrMaterial({ color: '#00ff00' }));
+    e.createMesh()
+      .setGeometry(geometry)
+      .setPosition([0, 0, -500.0001])
+      .setScale([20, 20, 0.00001])
+      .setMaterial(new PbrMaterial({ color: '#ff0000' }));
+    e.render();
+    await e.gpu.queue.onSubmittedWorkDone();
+  });
+  const precisionImage = await decodePNG(
+      await page.locator('[data-core]').screenshot({ path: 'test-results/modern-depth-precision.png' }),
+    ),
+    precisionAt = (120 * precisionImage.width + 160) * 4,
+    precision = [...precisionImage.data.slice(precisionAt, precisionAt + 3)];
+  assert.ok(
+    precision[1] > precision[0] + 30,
+    'Reversed float depth failed to separate surfaces 0.1 mm apart at 500 m: ' + precision,
+  );
+  checks.push({
+    name: 'GPU depth precision: near=1 mm, far=10 km, 0.1 mm surface separation at 500 m survives adverse draw order',
+    pixel: precision,
+  });
+  await page.evaluate(() => window.modern.core('webgpu'));
+  const caps = await page.evaluate(async () => {
+    const e = window.modern.state.core;
+    for (const m of [...e.meshes.values()].slice(1)) m.dispose();
+    const { SectionPlanes, boxSection } = await import('/packages/machinery/dist/index.js');
+    e.use(new SectionPlanes({ planes: boxSection([-0.3, -0.3, -0.3], [0.3, 0.3, 0.3]), color: '#00ff00', hatch: 0 }));
+    e.render();
+    await e.gpu.queue.onSubmittedWorkDone();
+    return e.gpu.features.has('depth32float-stencil8');
+  });
+  assert.ok(caps);
+  const image = await decodePNG(
+      await page.locator('[data-core]').screenshot({ path: 'test-results/modern-box-section.png' }),
+    ),
+    at = (120 * image.width + 160) * 4,
+    cap = [...image.data.slice(at, at + 3)];
+  assert.ok(cap[1] > cap[0] + 30, `Six-plane intersection cap missing: ${cap}`);
+  checks.push({
+    name: 'Six simultaneous planes intersect into a closed box with solid reversed-depth caps',
+    pixel: cap,
+  });
+  starter = await preview({
+    root: 'examples/vite',
+    configFile: false,
+    logLevel: 'error',
+    preview: { host: '127.0.0.1', port: 5194, strictPort: true },
+  });
+  await page.goto('http://127.0.0.1:5194/');
+  await page.waitForFunction(() => document.querySelector('.badge')?.textContent?.includes('webgpu'));
+  await page.getByText('Domain tools', { exact: true }).click();
+  await page.getByRole('button', { name: 'Load conveyor assembly', exact: true }).click();
+  await page.getByRole('status').filter({ hasText: 'Conveyor:' }).waitFor();
+  await page.getByLabel('Drive cover and bolts').uncheck();
+  await page.getByLabel('Cover hinge (rad)').fill('0.7');
+  await page.getByLabel('Carriage stroke (m)').fill('1.2');
+  await page.getByLabel('Assembly explode', { exact: true }).fill('0.4');
+  await page.getByRole('button', { name: 'Measure conveyor span', exact: true }).click();
+  await page.waitForFunction(() =>
+    document.querySelector('svg[data-margoengine-annotations]')?.textContent?.includes('6000.0 mm'),
+  );
+  await page.getByRole('button', { name: 'Box section', exact: true }).click();
+  await page.getByRole('button', { name: 'Restore GPU device', exact: true }).click();
+  await page.getByRole('status').filter({ hasText: 'GPU restored' }).waitFor();
+  await page.screenshot({ path: 'test-results/modern-conveyor-ui.png' });
+  assert.equal(await page.locator('vite-error-overlay').count(), 0);
+  checks.push({
+    name: 'Live conveyor UI: covers and bolts, revolute/prismatic sliders, explode, dimensions, six-plane cutaway and reboot',
+  });
+  await page.goto('http://127.0.0.1:5193/tests/modern.html');
+  await page.waitForFunction(() => window.modern);
+  const stress = await page.evaluate(async () => {
+    const { Engine, box } = await import('/packages/core/dist/extension.js'),
+      { createConveyor } = await import('/examples/vite/src/conveyor.ts'),
+      { SectionPlanes, boxSection, EngineeringAnnotations } = await import('/packages/machinery/dist/index.js');
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'width:640px;height:400px';
+    document.body.append(canvas);
+    const e = await Engine.create(canvas, {
+        backend: 'webgpu',
+        capacity: 15000,
+        camera: { position: [6, 4, 9], target: [0, 0, 0], near: 0.001, far: 10000 },
+      }),
+      model = createConveyor(e, 500),
+      geometry = box();
+    for (let i = 0; i < 10000; i++)
+      e.createMesh(model.root)
+        .setGeometry(geometry)
+        .setScale([0.03, 0.03, 0.03])
+        .setPosition([(i % 100) * 0.06 - 3, Math.floor(i / 100) * 0.01, 0]);
+    e.use(new SectionPlanes({ planes: boxSection([-2.9, -0.6, -0.8], [2.9, 1.2, 0.8]) }));
+    e.use(
+      new EngineeringAnnotations({
+        dimensions: [{ a: { node: model.root, point: [-3, 0.9, 0] }, b: { node: model.root, point: [3, 0.9, 0] } }],
+        unit: 'mm',
+        scale: 1000,
+      }),
+    );
+    const samples = [],
+      gpu = [];
+    for (let i = 0; i < 70; i++) {
+      model.cover.visible = i % 2 === 0;
+      model.joints.setValue(0, i / 70);
+      model.joints.setValue(1, Math.sin(i / 10) * 2);
+      model.exploded.amount = (i % 20) / 20;
+      const start = performance.now();
+      e.render({ delta: 1 / 60 });
+      const end = performance.now();
+      await e.gpu.queue.onSubmittedWorkDone();
+      if (i >= 10) {
+        samples.push(end - start);
+        gpu.push(performance.now() - start);
+      }
+    }
+    const start = performance.now();
+    for (let i = 0; i < 10000; i++) model.query.setSubtreeVisible(model.cover, i % 2 === 0);
+    const toggle = (performance.now() - start) / 10000;
+    const percentile = (values, p) => values.sort((a, b) => a - b)[Math.ceil(values.length * p) - 1],
+      report = {
+        entities: e.meshes.size,
+        visible: e.stats.visible,
+        batches: e.stats.drawCalls,
+        frames: samples.length,
+        cpuMedianMs: percentile(samples, 0.5),
+        cpuP95Ms: percentile(samples, 0.95),
+        completedGpuMedianMs: percentile(gpu, 0.5),
+        completedGpuP95Ms: percentile(gpu, 0.95),
+        parentToggleMeanMs: toggle,
+        memoryBytes: e.store.matrices.buffer.byteLength,
+      };
+    await e.rebootDevice();
+    e.render();
+    await e.gpu.queue.onSubmittedWorkDone();
+    model.dispose();
+    e.dispose();
+    canvas.remove();
+    return report;
+  });
+  assert.ok(stress.entities > 11000 && stress.frames === 60 && stress.batches < 10);
+  checks.push({
+    name: 'Conveyor stress: 500 rollers, 10000 additional shared-geometry parts, hierarchy, joints, six caps, annotations and reboot',
+    ...stress,
+  });
+  assert.deepEqual(errors, []);
+  await writeFile('test-results/modern-finalization.json', JSON.stringify({ hardware, checks }, null, 2));
+  console.log(JSON.stringify({ hardware, checks }, null, 2));
+} finally {
+  if (starter) await new Promise((resolve) => starter.httpServer.close(resolve));
+  await browser.close();
+}

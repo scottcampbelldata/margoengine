@@ -1,0 +1,48 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Progressive glTF benchmark</title><style>body{margin:0;background:#000}canvas{width:960px;height:540px;display:block}</style></head><body><canvas width="960" height="540"></canvas>
+<script type="module">
+// Loads one model over the throttled server (run.mjs) with loadGLTF, loadGLTFInWorker or loadGLTFProgressive while the
+// engine renders every animation frame and the camera orbits the model, as a user would. Times are from the call.
+import {Engine} from '/packages/core/dist/index.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {loadGLTFInWorker} from '/packages/gltf-pro/dist/worker.js';
+import {loadGLTFProgressive} from '/packages/gltf-pro/dist/progressive.js';
+
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',capacity:8192,camera:{position:[0,3,8],target:[0,0,0],near:0.05,far:5000}});
+engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const once=p=>({ready:p,complete:p});
+const loaders={plain:url=>once(loadGLTF(engine,url)),worker:url=>once(loadGLTFInWorker(engine,url)),progressive:(url,onProgress)=>loadGLTFProgressive(engine,url,{onProgress})};
+const frame=()=>new Promise(r=>requestAnimationFrame(r));
+window.bench={
+  // hold: resolve at ready (+2 frames) and keep loading, for screenshots; window.bench.finish() completes it.
+  async run(url,mode,{hold=false}={}){
+    const frames=[],tasks=[],observer=new PerformanceObserver(l=>{for(const e of l.getEntries())tasks.push([e.startTime,e.duration]);});
+    let model,shownAt,readyAt,center,radius,angle=0,running=true,stages={};
+    // The camera orbits the bounds once a model is there: progressive re-prioritizes as it moves.
+    const loop=()=>{if(!running)return;if(model){if(!hold)angle+=0.01;const p=[center[0]+Math.sin(angle)*radius,center[1]+radius*0.45,center[2]+Math.cos(angle)*radius];engine.camera.position=p;engine.camera.target=center;}
+      engine.render();const now=performance.now();frames.push(now);if(model&&shownAt===undefined)shownAt=now;requestAnimationFrame(loop);};
+    for(let i=0;i<10;i++)await frame();
+    requestAnimationFrame(loop);await new Promise(r=>setTimeout(r,250));
+    observer.observe({type:'longtask'});
+    const start=performance.now(),load=loaders[mode](url,p=>{stages[p.stage]??=+(performance.now()-start).toFixed(1);stages.bytes=p.bytesLoaded;});
+    load.ready.then(m=>{readyAt=performance.now();const b=m.bounds;center=[(b[0]+b[3])/2,(b[1]+b[4])/2,(b[2]+b[5])/2];radius=Math.hypot(b[3]-b[0],b[4]-b[1],b[5]-b[2])*0.9;model=m;});
+    if(hold){
+      await load.ready;await frame();await frame();await engine.gpu.queue.onSubmittedWorkDone();angle=0;
+      window.bench.finish=async()=>{await load.complete;await frame();await frame();await engine.gpu.queue.onSubmittedWorkDone();};
+      window.bench.close=()=>{running=false;observer.disconnect();model.dispose();return errors.splice(0);};
+      return true;
+    }
+    await load.complete;const completeAt=performance.now();
+    await frame();await frame();await engine.gpu.queue.onSubmittedWorkDone();await new Promise(r=>setTimeout(r,200));
+    running=false;for(const e of observer.takeRecords())tasks.push([e.startTime,e.duration]);observer.disconnect();
+    // Frame gaps from the load call to the first frame after complete.
+    const end=frames.find(t=>t>=completeAt)??frames.at(-1),during=frames.filter(t=>t>=start&&t<=end);let gap=0,interactive=shownAt;
+    for(let i=1;i<during.length;i++){const d=during[i]-during[i-1];gap=Math.max(gap,d);if(d>50&&during[i]>shownAt)interactive=during[i];}
+    const inside=tasks.filter(([t])=>t>=start&&t<=end),triangles=model.primitives.reduce((s,p)=>s+p.indices.length/3,0),parts=model.primitives.length;model.dispose();
+    return {mode,url,firstVisibleMs:+(shownAt-start).toFixed(1),readyMs:+(readyAt-start).toFixed(1),interactiveMs:+(interactive-start).toFixed(1),completeMs:+(completeAt-start).toFixed(1),
+      maxFrameGapMs:+gap.toFixed(1),longTasks:inside.length,longestTaskMs:+Math.max(0,...inside.map(t=>t[1])).toFixed(1),totalBlockingTimeMs:+inside.reduce((s,t)=>s+Math.max(0,t[1]-50),0).toFixed(1),
+      frames:during.length,triangles,primitives:parts,stages,errors:errors.splice(0)};
+  },
+};
+window.ready=true;
+</script></body></html>

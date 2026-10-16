@@ -160,11 +160,18 @@ test('transformed real Box descendants retain rotated offsets and nonuniform roo
   }, doc);
 });
 
-test('Box primitive still fits directly when explicitly detached, and attached children retain the root-level guard', async () => {
+test('Box primitive fits both an attached child world pose and an explicitly detached mesh', async () => {
   await withBox(({engine, model, mesh, primitive}) => {
     const physics = new Physics(engine, {rapier: RAPIER});
     try {
-      assert.throws(() => physics.addBody(mesh), /Physics bodies need root-level meshes/);
+      const original = [...mesh.matrix], parent = engine.store.parents[mesh.id];
+      const attached = physics.addBody(mesh);
+      assert.equal(physics.bodyCount, 1);
+      assert.equal(attached.colliders.length, 1);
+      assertColliderBounds(attached.colliders[0], bodyFramePositions(transformed(primitivePositions(primitive), mesh.matrix), attached), 'attached primitive');
+      assert.equal(engine.store.parents[mesh.id], parent);
+      assert.deepEqual([...mesh.matrix], original);
+      physics.removeBody(attached);
       assert.equal(physics.bodyCount, 0);
       mesh.setParent(null).setScale([2, 3, 4]);
       const body = physics.addBody(mesh);
@@ -227,8 +234,23 @@ test('Box CAD and static AssemblyBVH consume only explicitly passed primitive no
     assert.throws(() => deduplicateParts([engine.createMesh()]), {message: 'CAD grouping contains no supported geometry'});
     const assembly = await AssemblyBVH.create(model.nodes);
     try {
-      assert.equal(assembly.count, 12, 'the real source contributes all 12 triangles');
       const world = transformed(primitivePositions(primitive), mesh.matrix), {min, max} = positionBounds(world);
+      // Exercise every real triangle through the public query rather than the old
+      // flat BVH's private count; the current BVH shares local geometry across parts.
+      const faces = new Set();
+      for (let at = 0; at < primitive.indices.length; at += 3) {
+        const [a, b, c] = [...primitive.indices.subarray(at, at + 3)].map(index => [...world.subarray(index * 3, index * 3 + 3)]);
+        const ab = b.map((v, axis) => v - a[axis]), ac = c.map((v, axis) => v - a[axis]);
+        const normal = [ab[1] * ac[2] - ab[2] * ac[1], ab[2] * ac[0] - ab[0] * ac[2], ab[0] * ac[1] - ab[1] * ac[0]];
+        const length = Math.hypot(...normal), direction = normal.map(v => v / length);
+        const center = a.map((v, axis) => (v + b[axis] + c[axis]) / 3);
+        const face = assembly.raycast(center.map((v, axis) => v + direction[axis] * 2), direction.map(v => -v));
+        assert.equal(face?.node, mesh);
+        assert.equal(face.triangle, at / 3);
+        close([face.distance], [2], 'actual triangle ray distance');
+        faces.add(face.triangle);
+      }
+      assert.equal(faces.size, 12, 'the real source contributes all 12 queryable triangles');
       const ray = [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, max[2] + 2];
       const hit = assembly.raycast(ray, [0, 0, -1]);
       assert.equal(hit?.node, mesh);

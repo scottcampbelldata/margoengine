@@ -1,4 +1,4 @@
-import {BLOCK, FAN} from './geometry.js';
+import { BLOCK, FAN } from './geometry.js';
 
 /** Fat line shader. The expansion mirrors `expandLine` in geometry.ts; keep the two in step. */
 export const lineShader: string = /* wgsl */ `

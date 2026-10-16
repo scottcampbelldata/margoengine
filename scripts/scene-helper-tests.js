@@ -7,6 +7,7 @@ import {openBrowser} from './browser.js';
 export async function sceneHelperBrowserChecks(page) {
   return page.evaluate(async () => {
     const {EngineKernel} = await import('/packages/core/dist/index.js');
+    const {webglRenderer} = await import('/packages/webgl/dist/index.js');
     const {engineRuntime} = await import('/packages/core/dist/extension.js');
     const {loadGLTF} = await import('/packages/gltf-pro/dist/index.js');
     const {loadGLTF: loadBasicGLTF} = await import('/packages/gltf/dist/index.js');
@@ -193,7 +194,7 @@ export async function sceneHelperBrowserChecks(page) {
       facadeChecks.push('reused empty handles inherit no buffers');
       basic.dispose(); basic = undefined; shared.dispose(); shared = undefined; group.dispose(); group = undefined; instance.dispose();
       webglCanvas = document.createElement('canvas'); webglCanvas.style.cssText = 'width:96px;height:96px'; document.body.append(webglCanvas);
-      webgl = await EngineKernel.create(webglCanvas, {backend: 'webgl2', capacity: 16}); webglBasic = await loadBasicGLTF(webgl, '/packages/exporters/tests/fixtures/Box.glb'); webglBasic.root.setPosition([12, 0, 0]);
+      webgl = await EngineKernel.create(webglCanvas, {backend: 'webgl2', fallback: webglRenderer, capacity: 16}); webglBasic = await loadBasicGLTF(webgl, '/packages/exporters/tests/fixtures/Box.glb'); webglBasic.root.setPosition([12, 0, 0]);
       const glExpected = reference(coreEntries(webglBasic.meshes), engineRuntime(webgl)); close(getSceneBounds(webgl, [webglBasic.root]), glExpected, 'WebGL2 core bounds'); check(gatherSceneBuffers(webgl, [webglBasic.root]) === null, 'WebGL2 raw gathering must return null');
       const glStage = new Stage(webgl); glStage.fit(webglBasic.meshes); webgl.camera.advance(1);
       close(webgl.camera.target, [0, 1, 2].map(axis => (glExpected[axis] + glExpected[axis + 3]) / 2), 'Stage.fit WebGL2 core center');

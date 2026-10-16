@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/water",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "sideEffects": false,
@@ -18,12 +18,12 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^0.1.0 || ^1.0.0"
+    "@margoengine/core": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js water",
     "test": "npm run build && node --test test/*.test.js",
-    "test:gpu": "npm run build && node test/flow.browser.mjs && node test/surface.browser.mjs && node test/coast.browser.mjs",
+    "test:gpu": "npm run build && node test/flow.browser.mjs && node test/surface.browser.mjs && node test/coast.browser.mjs && node test/stack.browser.mjs",
     "prepack": "npm run build"
   },
   "homepage": "https://margoengine.com",

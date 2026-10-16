@@ -83,7 +83,7 @@ test('external PNG and JPEG resolve relative paths and pass the abort signal to 
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     calls.push([String(url), options.signal]); return new Response(String(url).endsWith('.jpg') ? JPEG : PNG);
   });
-  const result = await convertFBX(fixture({textures: [{path: 'textures\\albedo.png'}, {path: '../normals/normal.jpg', slot: 'NormalMap'}]}), {resourcePath: 'https://assets.example/models/robot/', signal: controller.signal});
+  const result = await convertFBX(fixture({textures: [{path: 'textures\\albedo.png'}, {path: '../normals/normal.jpg', slot: 'NormalMap'}]}), {resourcePath: 'https://assets.example/models/robot/', allowedURLs: ['https://assets.example/models/normals/'], signal: controller.signal});
   assert.deepEqual(calls.map(([url]) => url), ['https://assets.example/models/robot/textures/albedo.png', 'https://assets.example/models/normals/normal.jpg']);
   assert.ok(calls.every(([, signal]) => signal === controller.signal));
   assert.equal(embeddedImage(result, 0).image.mimeType, 'image/png'); assert.deepEqual(embeddedImage(result, 0).bytes, new Uint8Array(PNG));
@@ -141,4 +141,14 @@ test('a later image decode failure closes earlier decoded native images', async 
   });
   await assert.rejects(parseFBX({}, fixture({textures: [{bytes: PNG}, {bytes: JPEG, slot: 'NormalMap'}]})), error => error === reason);
   assert.equal(decoded, 2); assert.equal(closed, 1);
+});
+
+
+test('model texture paths stay inside their directory unless explicitly allowed', async t => {
+  let requests=0; t.mock.method(globalThis,'fetch',async()=>{requests++;return new Response(PNG);});
+  const input=fixture({textures:[{path:'../private/image.png'}]});
+  await assert.rejects(convertFBX(input,{resourcePath:'https://assets.example/models/robot/'}),/allowedURLs/);
+  assert.equal(requests,0);
+  await convertFBX(input,{resourcePath:'https://assets.example/models/robot/',allowedURLs:['https://assets.example/models/private/']});
+  assert.equal(requests,1);
 });

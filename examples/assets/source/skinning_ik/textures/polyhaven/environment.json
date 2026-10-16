@@ -1,0 +1,112 @@
+{
+  "provider": "Poly Haven",
+  "asset_id": "artist_workshop",
+  "name": "Artist Workshop",
+  "source_page": "https://polyhaven.com/a/artist_workshop",
+  "license": "CC0-1.0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "provider_license_url": "https://polyhaven.com/license",
+  "authors": {
+    "Oliksiy Yakovlyev": "All"
+  },
+  "retrieved_at": "2026-10-16T04:15:27.738567+00:00",
+  "api_user_agent": "MargoEngineAssetPrep/1.0",
+  "metadata_endpoint": "https://api.polyhaven.com/info/artist_workshop",
+  "files_endpoint": "https://api.polyhaven.com/files/artist_workshop",
+  "format": "Radiance HDR",
+  "tier": "1k",
+  "download_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/artist_workshop_1k.hdr",
+  "local_path": "examples/assets/skinning-ik-workshop.hdr",
+  "size_bytes": 1719663,
+  "provider_md5": "924ec59bb3fc3f939e2d6824204f9118",
+  "sha256": "f6da9025acadb1149c973fe2bef53d55f4e7144285a87ec1a357520fbcad4767",
+  "environment": "indoor",
+  "light_type": "natural",
+  "contrast": "low",
+  "captured_dynamic_range_evs": 8,
+  "selection_rationale": "Warm artist workshop with daylight windows, canvas, furniture and clutter; detailed interior reflections suit the original Light Keeper workshop and replace procedural studio facets.",
+  "candidate_ids_reviewed": [
+    "artist_workshop",
+    "carpentry_shop_01",
+    "small_workshop"
+  ],
+  "asset_metadata": {
+    "date_published": 1548999925,
+    "sponsors": [
+      "3237733"
+    ],
+    "evs_cap": 8,
+    "files_hash": "88f58440c2f465140c91bb847a628e2f7b602e94",
+    "name": "Artist Workshop",
+    "old_id": 346,
+    "categories": [
+      "indoor",
+      "urban",
+      "midday",
+      "low contrast",
+      "natural light"
+    ],
+    "type": 0,
+    "date_taken": 1546773660,
+    "tags": [
+      "painting",
+      "canvas",
+      "window",
+      "art",
+      "atelier"
+    ],
+    "authors": {
+      "Oliksiy Yakovlyev": "All"
+    },
+    "max_resolution": [
+      17000,
+      8500
+    ],
+    "description": "Unclipped, free 17K HDRI with soft midday natural window light - low-contrast, diffuse illumination in a cluttered artist's painting studio, warm, calm mood.",
+    "category_id": "a6453c33-c7a0-501b-ac94-39b56e2cf219",
+    "category": "Interiors/Workshops & Garages/Domestic Garages & Studios",
+    "attributes": {
+      "light_type": "natural",
+      "contrast": "low",
+      "environment": "indoor",
+      "weather": "overcast"
+    },
+    "img_version": "33e6d773",
+    "download_count": 163042,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/artist_workshop.png?width=256&height=256&format=webp&v=33e6d773"
+  },
+  "decoded_dimensions": [
+    1024,
+    512
+  ],
+  "validation": {
+    "decoder": "@margoengine/environment parseHDR",
+    "provider_md5_verified": true,
+    "provider_file_size_verified": true,
+    "preview": "test-results/ik/workshop-environment-preview.png"
+  },
+  "integration_recommendation": {
+    "initial_intensity": 0.85,
+    "evaluation_range": [
+      0.65,
+      1.1
+    ],
+    "notes": "Unmodified source HDR. Retain the moving key light and live scene capture; use this only as the capture environment fallback so the orb still reflects the authored robot and furniture."
+  },
+  "radiance_statistics": {
+    "width": 1024,
+    "height": 512,
+    "exposure": 1,
+    "gamma": 1,
+    "weightedMeanLuminance": 0.3911402625107279,
+    "weightedMeanRGB": [
+      0.3800335136510977,
+      0.39241050853785686,
+      0.4112623518309098
+    ],
+    "p50": 0.1091337890625,
+    "p95": 0.57624921875,
+    "p99": 4.5006625,
+    "maxLuminance": 43.653999999999996
+  }
+}

@@ -41,6 +41,8 @@ export class DracoDecoder {
   /** Terminate the workers. Pending decodes reject. */
   dispose(): void {this.pool?.dispose(); this.pool = undefined;}
 
+  [Symbol.dispose](): void {this.dispose();}
+
   private urls(): {wrapperURL: string; wasmURL: string} {
     if (this.decoderPath !== undefined) {
       const base = new URL(this.decoderPath.endsWith('/') ? this.decoderPath : this.decoderPath + '/', globalThis.location?.href);

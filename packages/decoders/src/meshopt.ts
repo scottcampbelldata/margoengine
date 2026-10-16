@@ -1,5 +1,5 @@
-// EXT_meshopt_compression decoding: a pure TypeScript port of the meshoptimizer reference decoder
-// (vertex codec v0, index codec v0/v1, index sequence, OCTAHEDRAL/QUATERNION/EXPONENTIAL filters).
+// EXT_meshopt_compression / KHR_meshopt_compression decoding: a pure TypeScript port of the meshoptimizer reference decoder
+// (vertex codec v0/v1, index codec v0/v1, index sequence, OCTAHEDRAL/QUATERNION/EXPONENTIAL/COLOR filters).
 // Output matches the reference SIMD decoder bit for bit. Synchronous and dependency-free.
 
 function meshoptDecodeBytes(src: Uint8Array, pos: number, end: number, buffer: Uint8Array, size: number): number {
@@ -15,39 +15,147 @@ function meshoptDecodeBytes(src: Uint8Array, pos: number, end: number, buffer: U
       buffer.fill(0, i, i + 16);
     } else if (bits === 1) {
       let v = pos + 4;
-      for (let b = 0; b < 4; b++) {
-        const byte = src[pos + b];
-        for (let s = 6; s >= 0; s -= 2) {
-          const enc = (byte >> s) & 3;
-          if (enc === 3) buffer[i + b * 4 + ((6 - s) >> 1)] = src[v++];
-          else buffer[i + b * 4 + ((6 - s) >> 1)] = enc;
-        }
+      for (let b = 0, o = i; b < 4; b++, o += 4) {
+        // Four 2-bit codes per byte, high bits first; code 3 means the value follows as a whole byte.
+        const byte = src[pos + b],
+          e0 = byte >> 6,
+          e1 = (byte >> 4) & 3,
+          e2 = (byte >> 2) & 3,
+          e3 = byte & 3;
+        buffer[o] = e0 === 3 ? src[v++] : e0;
+        buffer[o + 1] = e1 === 3 ? src[v++] : e1;
+        buffer[o + 2] = e2 === 3 ? src[v++] : e2;
+        buffer[o + 3] = e3 === 3 ? src[v++] : e3;
       }
       pos = v;
     } else if (bits === 2) {
       let v = pos + 8;
       for (let b = 0; b < 8; b++) {
         const byte = src[pos + b];
-        const hi = byte >> 4, lo = byte & 15;
+        const hi = byte >> 4,
+          lo = byte & 15;
         buffer[i + b * 2] = hi === 15 ? src[v++] : hi;
         buffer[i + b * 2 + 1] = lo === 15 ? src[v++] : lo;
       }
       pos = v;
     } else {
-      buffer.set(src.subarray(pos, pos + 16), i);
+      for (let b = 0; b < 16; b++) buffer[i + b] = src[pos + b];
       pos += 16;
     }
   }
   return pos;
 }
 
-/** meshopt vertex codec, version 0 (the version EXT_meshopt_compression allows). */
+// Group widths in bits by header code: version 0, then version 1 under byte control modes 0 and 1.
+const V1_BITS = [
+  [0, 1, 2, 4],
+  [1, 2, 4, 8],
+];
+
+/**
+ * Vertex codec version 1 (KHR_meshopt_compression): per-byte control modes (zero, raw, or 1/2/4/8-bit groups) and
+ * per-4-byte channel modes (byte deltas, 16-bit deltas, rotated 32-bit XOR). Integer-only, so the port is exact.
+ */
+function meshoptDecodeVertexV1(target: Uint8Array, count: number, size: number, src: Uint8Array): void {
+  const tailSize = size + size / 4,
+    end = src.length - Math.max(tailSize, 24);
+  if (end < 1) throw new Error('EXT_meshopt_compression: truncated vertex stream');
+  const last = src.slice(src.length - tailSize, src.length - size / 4),
+    channels = src.subarray(src.length - size / 4);
+  for (const c of channels) if ((c & 3) === 3) throw new Error('EXT_meshopt_compression: invalid vertex channel mode');
+  const blockMax = Math.min((8192 / size) & ~15, 256),
+    deltas = new Uint8Array(blockMax * size);
+  let pos = 1;
+  for (let vo = 0; vo < count; vo += blockMax) {
+    const bc = Math.min(blockMax, count - vo),
+      groups = (bc + 15) >> 4,
+      headerSize = (groups + 3) >> 2,
+      control = pos;
+    pos += size / 4;
+    deltas.fill(0);
+    for (let k = 0; k < size; k++) {
+      const mode = (src[control + (k >> 2)] >> ((k & 3) << 1)) & 3,
+        base = k * bc;
+      if (mode === 2) continue;
+      if (mode === 3) {
+        deltas.set(src.subarray(pos, pos + bc), base);
+        pos += bc;
+        continue;
+      }
+      const header = pos;
+      pos += headerSize;
+      for (let g = 0; g < groups; g++) {
+        const bits = V1_BITS[mode][(src[header + (g >> 2)] >> ((g & 3) << 1)) & 3],
+          o = base + (g << 4),
+          n = Math.min(16, bc - (g << 4));
+        if (bits === 8) {
+          deltas.set(src.subarray(pos, pos + n), o);
+          pos += 16;
+          continue;
+        }
+        if (!bits) continue;
+        // Sentinel codes: the all-ones value means a whole byte follows. 1-bit codes are LSB first, 2- and 4-bit MSB first.
+        const width = bits << 1,
+          sentinel = (1 << bits) - 1,
+          codes = pos;
+        pos += width;
+        for (let m = 0; m < 16; m++) {
+          const shift = bits === 1 ? m & 7 : 8 - bits - (m & (8 / bits - 1)) * bits;
+          let d = (src[codes + Math.floor((m * bits) / 8)] >> shift) & sentinel;
+          if (d === sentinel) d = src[pos++];
+          if (m < n) deltas[o + m] = d;
+        }
+      }
+      if (pos > end) throw new Error('EXT_meshopt_compression: truncated vertex stream');
+    }
+    for (let i = 0; i < bc; i++) {
+      const out = (vo + i) * size;
+      for (let k = 0; k < size; k += 4) {
+        const channel = channels[k >> 2],
+          at = k * bc + i;
+        if ((channel & 3) === 0)
+          for (let j = 0; j < 4; j++) {
+            const v = deltas[at + j * bc];
+            last[k + j] = (last[k + j] + ((v >> 1) ^ -(v & 1))) & 255;
+          }
+        else if ((channel & 3) === 1)
+          for (let j = 0; j < 4; j += 2) {
+            const v = deltas[at + j * bc] | (deltas[at + (j + 1) * bc] << 8),
+              p = ((last[k + j] | (last[k + j + 1] << 8)) + ((v >> 1) ^ -(v & 1))) & 0xffff;
+            last[k + j] = p & 255;
+            last[k + j + 1] = p >> 8;
+          }
+        else {
+          const v =
+              (deltas[at] | (deltas[at + bc] << 8) | (deltas[at + 2 * bc] << 16) | (deltas[at + 3 * bc] << 24)) >>> 0,
+            rot = channel >> 4;
+          const p =
+            (last[k] | (last[k + 1] << 8) | (last[k + 2] << 16) | (last[k + 3] << 24)) ^
+            ((v >>> rot) | (v << (32 - rot)));
+          last[k] = p & 255;
+          last[k + 1] = (p >> 8) & 255;
+          last[k + 2] = (p >> 16) & 255;
+          last[k + 3] = p >>> 24;
+        }
+      }
+      target.set(last, out);
+    }
+  }
+  if (pos !== end) throw new Error('EXT_meshopt_compression: vertex stream has trailing or missing data');
+}
+
+/** meshopt vertex codec, versions 0 (EXT_meshopt_compression) and 1 (KHR_meshopt_compression). */
 export function meshoptDecodeVertexBuffer(target: Uint8Array, count: number, size: number, src: Uint8Array): void {
-  if (size <= 0 || size > 256 || size % 4 !== 0) throw new Error(`EXT_meshopt_compression: invalid ATTRIBUTES byteStride ${size}`);
+  if (size <= 0 || size > 256 || size % 4 !== 0)
+    throw new Error(`EXT_meshopt_compression: invalid ATTRIBUTES byteStride ${size}`);
   if (src.length < 1 + size) throw new Error('EXT_meshopt_compression: truncated vertex stream');
   const header = src[0];
   if ((header & 0xf0) !== 0xa0) throw new Error('EXT_meshopt_compression: bad vertex stream header');
-  if ((header & 0x0f) !== 0) throw new Error(`EXT_meshopt_compression: vertex codec version ${header & 0x0f} is not supported (only version 0)`);
+  if ((header & 0x0f) === 1) return meshoptDecodeVertexV1(target, count, size, src);
+  if ((header & 0x0f) !== 0)
+    throw new Error(
+      `EXT_meshopt_compression: vertex codec version ${header & 0x0f} is not supported (only versions 0 and 1)`,
+    );
   const end = src.length;
   const last = src.slice(end - size);
   let blockMax = Math.floor(8192 / size) & ~15;
@@ -97,7 +205,10 @@ export function meshoptDecodeIndexBuffer(out: Uint32Array | Uint16Array, count: 
   if (version > 1) throw new Error(`EXT_meshopt_compression: index codec version ${version} is not supported`);
   const edge = new Uint32Array(32).fill(0xffffffff);
   const vfifo = new Uint32Array(16).fill(0xffffffff);
-  let eo = 0, vo = 0, next = 0, last = 0;
+  let eo = 0,
+    vo = 0,
+    next = 0,
+    last = 0;
   const fecmax = version >= 1 ? 13 : 15;
   let code = 1;
   const st = { p: 1 + count / 3 };
@@ -110,24 +221,35 @@ export function meshoptDecodeIndexBuffer(out: Uint32Array | Uint16Array, count: 
     if (codetri < 0xf0) {
       const fe = codetri >> 4;
       const ei = ((eo - 1 - fe) & 15) * 2;
-      a = edge[ei]; b = edge[ei + 1];
+      a = edge[ei];
+      b = edge[ei + 1];
       const fec = codetri & 15;
       if (fec < fecmax) {
         c = fec === 0 ? next : vfifo[(vo - 1 - fec) & 15];
         const f0 = fec === 0 ? 1 : 0;
         next += f0;
-        vfifo[vo] = c; vo = (vo + f0) & 15;
+        vfifo[vo] = c;
+        vo = (vo + f0) & 15;
       } else {
         if (fec !== 15) c = (last + (fec - (fec ^ 3))) >>> 0;
-        else { const v = meshoptVByte(src, st); c = (last + ((v >>> 1) ^ -(v & 1))) >>> 0; }
+        else {
+          const v = meshoptVByte(src, st);
+          c = (last + ((v >>> 1) ^ -(v & 1))) >>> 0;
+        }
         last = c;
-        vfifo[vo] = c; vo = (vo + 1) & 15;
+        vfifo[vo] = c;
+        vo = (vo + 1) & 15;
       }
-      edge[eo * 2] = c; edge[eo * 2 + 1] = b; eo = (eo + 1) & 15;
-      edge[eo * 2] = a; edge[eo * 2 + 1] = c; eo = (eo + 1) & 15;
+      edge[eo * 2] = c;
+      edge[eo * 2 + 1] = b;
+      eo = (eo + 1) & 15;
+      edge[eo * 2] = a;
+      edge[eo * 2 + 1] = c;
+      eo = (eo + 1) & 15;
     } else if (codetri < 0xfe) {
       const codeaux = src[aux + (codetri & 15)];
-      const feb = codeaux >> 4, fec = codeaux & 15;
+      const feb = codeaux >> 4,
+        fec = codeaux & 15;
       a = next++;
       b = feb === 0 ? next : vfifo[(vo - feb) & 15];
       const fb0 = feb === 0 ? 1 : 0;
@@ -135,31 +257,61 @@ export function meshoptDecodeIndexBuffer(out: Uint32Array | Uint16Array, count: 
       c = fec === 0 ? next : vfifo[(vo - fec) & 15];
       const fc0 = fec === 0 ? 1 : 0;
       next += fc0;
-      vfifo[vo] = a; vo = (vo + 1) & 15;
-      vfifo[vo] = b; vo = (vo + fb0) & 15;
-      vfifo[vo] = c; vo = (vo + fc0) & 15;
-      edge[eo * 2] = b; edge[eo * 2 + 1] = a; eo = (eo + 1) & 15;
-      edge[eo * 2] = c; edge[eo * 2 + 1] = b; eo = (eo + 1) & 15;
-      edge[eo * 2] = a; edge[eo * 2 + 1] = c; eo = (eo + 1) & 15;
+      vfifo[vo] = a;
+      vo = (vo + 1) & 15;
+      vfifo[vo] = b;
+      vo = (vo + fb0) & 15;
+      vfifo[vo] = c;
+      vo = (vo + fc0) & 15;
+      edge[eo * 2] = b;
+      edge[eo * 2 + 1] = a;
+      eo = (eo + 1) & 15;
+      edge[eo * 2] = c;
+      edge[eo * 2 + 1] = b;
+      eo = (eo + 1) & 15;
+      edge[eo * 2] = a;
+      edge[eo * 2 + 1] = c;
+      eo = (eo + 1) & 15;
     } else {
       const codeaux = src[st.p++];
       const fea = codetri === 0xfe ? 0 : 15;
-      const feb = codeaux >> 4, fec = codeaux & 15;
+      const feb = codeaux >> 4,
+        fec = codeaux & 15;
       if (codeaux === 0) next = 0;
       a = fea === 0 ? next++ : 0;
       b = feb === 0 ? next++ : vfifo[(vo - feb) & 15];
       c = fec === 0 ? next++ : vfifo[(vo - fec) & 15];
-      if (fea === 15) { const v = meshoptVByte(src, st); last = a = (last + ((v >>> 1) ^ -(v & 1))) >>> 0; }
-      if (feb === 15) { const v = meshoptVByte(src, st); last = b = (last + ((v >>> 1) ^ -(v & 1))) >>> 0; }
-      if (fec === 15) { const v = meshoptVByte(src, st); last = c = (last + ((v >>> 1) ^ -(v & 1))) >>> 0; }
-      vfifo[vo] = a; vo = (vo + 1) & 15;
-      vfifo[vo] = b; vo = (vo + (feb === 0 || feb === 15 ? 1 : 0)) & 15;
-      vfifo[vo] = c; vo = (vo + (fec === 0 || fec === 15 ? 1 : 0)) & 15;
-      edge[eo * 2] = b; edge[eo * 2 + 1] = a; eo = (eo + 1) & 15;
-      edge[eo * 2] = c; edge[eo * 2 + 1] = b; eo = (eo + 1) & 15;
-      edge[eo * 2] = a; edge[eo * 2 + 1] = c; eo = (eo + 1) & 15;
+      if (fea === 15) {
+        const v = meshoptVByte(src, st);
+        last = a = (last + ((v >>> 1) ^ -(v & 1))) >>> 0;
+      }
+      if (feb === 15) {
+        const v = meshoptVByte(src, st);
+        last = b = (last + ((v >>> 1) ^ -(v & 1))) >>> 0;
+      }
+      if (fec === 15) {
+        const v = meshoptVByte(src, st);
+        last = c = (last + ((v >>> 1) ^ -(v & 1))) >>> 0;
+      }
+      vfifo[vo] = a;
+      vo = (vo + 1) & 15;
+      vfifo[vo] = b;
+      vo = (vo + (feb === 0 || feb === 15 ? 1 : 0)) & 15;
+      vfifo[vo] = c;
+      vo = (vo + (fec === 0 || fec === 15 ? 1 : 0)) & 15;
+      edge[eo * 2] = b;
+      edge[eo * 2 + 1] = a;
+      eo = (eo + 1) & 15;
+      edge[eo * 2] = c;
+      edge[eo * 2 + 1] = b;
+      eo = (eo + 1) & 15;
+      edge[eo * 2] = a;
+      edge[eo * 2 + 1] = c;
+      eo = (eo + 1) & 15;
     }
-    out[i] = a; out[i + 1] = b; out[i + 2] = c;
+    out[i] = a;
+    out[i + 1] = b;
+    out[i + 2] = c;
   }
   if (st.p !== safeEnd) throw new Error('EXT_meshopt_compression: index stream has trailing or missing data');
 }
@@ -172,14 +324,21 @@ export function meshoptDecodeIndexSequence(out: Uint32Array | Uint16Array, count
   if (version > 1) throw new Error(`EXT_meshopt_compression: index sequence version ${version} is not supported`);
   const safeEnd = src.length - 4;
   const st = { p: 1 };
-  let last0 = 0, last1 = 0;
+  let last0 = 0,
+    last1 = 0;
   for (let i = 0; i < count; i++) {
     if (st.p >= safeEnd) throw new Error('EXT_meshopt_compression: truncated index sequence');
     let v = meshoptVByte(src, st);
     const cur = v & 1;
     v >>>= 1;
     const d = (v >>> 1) ^ -(v & 1);
-    if (cur) { last1 = (last1 + d) >>> 0; out[i] = last1; } else { last0 = (last0 + d) >>> 0; out[i] = last0; }
+    if (cur) {
+      last1 = (last1 + d) >>> 0;
+      out[i] = last1;
+    } else {
+      last0 = (last0 + d) >>> 0;
+      out[i] = last0;
+    }
   }
   if (st.p !== safeEnd) throw new Error('EXT_meshopt_compression: index sequence has trailing or missing data');
 }
@@ -190,7 +349,8 @@ function meshoptFilterOct(data: Int8Array | Int16Array, count: number): void {
   // Same arithmetic order and rounding as the reference SIMD decoder (bit-identical output).
   const max = data instanceof Int8Array ? 127 : 32767;
   for (let i = 0; i < count; i++) {
-    let x = data[i * 4], y = data[i * 4 + 1];
+    let x = data[i * 4],
+      y = data[i * 4 + 1];
     const z = data[i * 4 + 2] - (Math.abs(x) + Math.abs(y)); // small integers: exact
     const t = z < 0 ? z : 0;
     x = x + (x < 0 ? -t : t);
@@ -217,7 +377,9 @@ function meshoptFilterQuat(data: Int16Array, count: number): void {
   for (let i = 0; i < count; i++) {
     const q3 = data[i * 4 + 3];
     const s = q3 | 3;
-    const x = data[i * 4], y = data[i * 4 + 1], z = data[i * 4 + 2];
+    const x = data[i * 4],
+      y = data[i * 4 + 1],
+      z = data[i * 4 + 2];
     const ws = fr(s * fr(s + s));
     const ww = fr(ws - fr(fr(x * x) + fr(fr(y * y) + fr(z * z))));
     const w = fr(Math.sqrt(ww >= 0 ? ww : 0));
@@ -230,6 +392,34 @@ function meshoptFilterQuat(data: Int16Array, count: number): void {
   }
 }
 
+// KHR_meshopt_compression COLOR: YCoCg plus alpha, whose highest set bit carries the precision. Same float32 arithmetic as the
+// SIMD reference decoder, which stores the low bits of (value + 3 << 22)'s float32 bit pattern: the value rounded to even
+// for valid data, and the same bits as the reference for out-of-range data too.
+function meshoptFilterColor(data: Uint8Array | Uint16Array, signed: Int8Array | Int16Array, count: number): void {
+  const max = data instanceof Uint8Array ? 255 : 65535,
+    float = new Float32Array(1),
+    bits = new Uint32Array(float.buffer);
+  const store = (at: number, value: number) => {
+    float[0] = fr(value) + SNAP;
+    data[at] = bits[0];
+  };
+  for (let i = 0; i < count * 4; i += 4) {
+    const y = data[i],
+      co = signed[i + 1],
+      cg = signed[i + 2],
+      alpha = data[i + 3];
+    let as = alpha | (alpha >> 1);
+    as |= as >> 2;
+    as |= as >> 4;
+    as |= as >> 8;
+    const ss = fr(max / as);
+    store(i, (y + co - cg) * ss);
+    store(i + 1, (y + cg) * ss);
+    store(i + 2, (y - co - cg) * ss);
+    store(i + 3, (((alpha << 1) & as) | (alpha & 1)) * ss);
+  }
+}
+
 function meshoptFilterExp(u32: Uint32Array, f32: Float32Array, count: number): void {
   for (let i = 0; i < count; i++) {
     const v = u32[i];
@@ -239,8 +429,14 @@ function meshoptFilterExp(u32: Uint32Array, f32: Float32Array, count: number): v
   }
 }
 
-/** Decode one EXT_meshopt_compression bufferView payload. */
-export function meshoptDecodeGltfBuffer(src: Uint8Array, count: number, stride: number, mode: string, filter = 'NONE'): Uint8Array {
+/** Decode one EXT_meshopt_compression or KHR_meshopt_compression bufferView payload. */
+export function meshoptDecodeGltfBuffer(
+  src: Uint8Array,
+  count: number,
+  stride: number,
+  mode: string,
+  filter = 'NONE',
+): Uint8Array {
   const out = new Uint8Array(count * stride);
   if (mode === 'ATTRIBUTES') {
     meshoptDecodeVertexBuffer(out, count, stride, src);
@@ -263,6 +459,10 @@ export function meshoptDecodeGltfBuffer(src: Uint8Array, count: number, stride: 
       meshoptFilterQuat(new Int16Array(out.buffer), count);
     } else if (filter === 'EXPONENTIAL') {
       meshoptFilterExp(new Uint32Array(out.buffer), new Float32Array(out.buffer), (count * stride) >> 2);
+    } else if (filter === 'COLOR') {
+      if (stride === 4) meshoptFilterColor(out, new Int8Array(out.buffer), count);
+      else if (stride === 8) meshoptFilterColor(new Uint16Array(out.buffer), new Int16Array(out.buffer), count);
+      else throw new Error('EXT_meshopt_compression: COLOR filter requires byteStride 4 or 8');
     } else {
       throw new Error(`EXT_meshopt_compression: unknown filter '${filter}'`);
     }
@@ -270,12 +470,18 @@ export function meshoptDecodeGltfBuffer(src: Uint8Array, count: number, stride: 
   return out;
 }
 
-
 /** Drop-in for three's `MeshoptDecoder` object, so glTF loaders written against that interface work unchanged. */
 export const MeshoptDecoder = {
   supported: true,
   ready: Promise.resolve(),
-  decodeGltfBuffer(target: Uint8Array, count: number, stride: number, source: Uint8Array, mode: string, filter?: string): void {
+  decodeGltfBuffer(
+    target: Uint8Array,
+    count: number,
+    stride: number,
+    source: Uint8Array,
+    mode: string,
+    filter?: string,
+  ): void {
     const out = meshoptDecodeGltfBuffer(source, count, stride, mode, filter);
     if (target.byteLength < out.byteLength) throw new RangeError('EXT_meshopt_compression: target buffer is too small');
     target.set(out);

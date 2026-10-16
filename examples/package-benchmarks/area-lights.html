@@ -1,0 +1,57 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Area lights GPU check</title><style>body{margin:0}#host{width:1280px;height:720px}</style></head><body><div id="host"></div>
+<script type="module">
+// Driven by area-lights-gpu.mjs. A large grey floor (a core mesh, or a materials plane lit through lights.add) under one
+// rectangle area light; the directional light and ambient are off, so every floor pixel is the area light's alone. The page
+// unprojects pixel centres to floor points for the runner's CPU reference; bench() times 0/1/4/16 lights at 1280x720.
+import {createStage} from '/packages/margoengine/dist/index.js';
+import {box,PbrMaterial} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {invertMatrixStable} from '/packages/math/dist/mat4.js';
+import {planeGeometry} from '/packages/geometry/dist/index.js';
+import {Material,createMesh} from '/packages/materials/dist/index.js';
+import {Clustered} from '/packages/clustered/dist/index.js';
+import {AreaLights} from '/packages/clustered/dist/area.js';
+import {Stats} from '/packages/stats/dist/index.js';
+const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,features:['timestamp-query'],camera:{position:[0,3,4],target:[0,0,-0.5]}});
+const engine=stage.engine,device=engine.gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const lighting=engineRuntime(engine).lighting;lighting.direction[3]=0;lighting.radiance[3]=0;
+const lights=Clustered.attach(engine);let area=null;
+const grey=[0.6,0.6,0.6],floors={};
+for(const roughness of [0.2,0.8]){
+  const core=engine.createMesh().setGeometry(box(200,0.02,200));core.setMaterial(new PbrMaterial({color:grey,roughness,metalness:0}));core.position.set(0,-0.01,0);
+  const plane=createMesh(engine,planeGeometry(200,200),new Material({color:grey,roughness,metalness:0}));plane.root.setQuaternion([-Math.SQRT1_2,0,0,Math.SQRT1_2]);lights.add(plane);
+  floors['core'+roughness]={show:v=>{core.visible=v;}};floors['materials'+roughness]={show:v=>{plane.root.visible=v;}};
+}
+const frame=async()=>{engine.render();await device.queue.onSubmittedWorkDone();};
+const attach=on=>{if(on&&!area)area=AreaLights.attach(engine,{lights});if(!on&&area){area.dispose();area=null;}};
+const inverse=new Float32Array(16),workspace=new Float64Array(52);
+const transform=(m,v)=>[0,1,2,3].map(r=>m[r]*v[0]+m[4+r]*v[1]+m[8+r]*v[2]+m[12+r]*v[3]);
+window.check={
+  // floor: core0.2 | core0.8 | materials0.2 | materials0.8; light: a RectAreaLight, 'empty' (AreaLights without lights) or null (none).
+  async render({floor,light}){
+    device.pushErrorScope('validation');for(const [k,f] of Object.entries(floors))f.show(k===floor);
+    attach(!!light);if(light)area.setLights(light==='empty'?[]:[light]);
+    for(let i=0;i<3;i++)await frame();const e=await device.popErrorScope();return {error:e?.message??null,errors:errors.splice(0),eye:[...engine.camera.position]};
+  },
+  // Pixel centres (CSS px of the 1280x720 canvas) -> floor points (y = 0), through the inverse view-projection.
+  unproject(pixels){
+    const c=engine.canvas;invertMatrixStable(engine.camera.matrix,inverse,workspace);
+    return pixels.map(([x,y])=>{const ndc=[(x+0.5)/c.clientWidth*2-1,1-(y+0.5)/c.clientHeight*2];
+      const [a,b]=[0.2,0.8].map(z=>{const p=transform(inverse,[...ndc,z,1]);return p.slice(0,3).map(v=>v/p[3]);});
+      const t=a[1]/(a[1]-b[1]);return [a[0]+(b[0]-a[0])*t,0,a[2]+(b[2]-a[2])*t];});
+  },
+  project(points){const m=engine.camera.matrix,c=engine.canvas;return points.map(p=>{const q=transform(m,[...p,1]);return [(q[0]/q[3]+1)/2*c.clientWidth,(1-q[1]/q[3])/2*c.clientHeight];});},
+  // GPU pass time (timestamp queries, Stats profiler) and submit-to-done time with `count` area lights (null: not attached).
+  async bench({count,floor='core0.8'}){
+    for(const [k,f] of Object.entries(floors))f.show(k===floor);attach(count!==null);
+    if(area)area.setLights(Array.from({length:count??0},(_,i)=>{const x=i%4,z=Math.floor(i/4);return {position:[(x-1.5)*1.6,1.5,-z*1.6],direction:[0,-1,0.2],width:1,height:0.5,intensity:6/Math.max(1,count)};}));
+    const stats=window.stats??=Stats.attach(engine,{profiling:true});for(let i=0;i<20;i++)await frame();
+    const gpu=[],frames=[];
+    for(let i=0;i<600;i++){const t=performance.now();engine.render();await device.queue.onSubmittedWorkDone();frames.push(performance.now()-t);
+      if(i%15===14){await new Promise(r=>setTimeout(r,5));let sum=0;const ms=stats.gpuPassMilliseconds;for(let k=0;k<stats.gpuPassCount;k++)sum+=ms[k];if(stats.gpuPassCount)gpu.push(sum);}}
+    const med=a=>{const b=[...a].sort((x,y)=>x-y);return +b[b.length>>1].toFixed(3);};
+    return {count,gpuMs:gpu.length?med(gpu):null,gpuSamples:gpu.length,frameMs:med(frames),errors:errors.splice(0)};
+  },
+};
+window.ready=true;
+</script></body></html>

@@ -1,0 +1,416 @@
+import assert from 'node:assert/strict';
+import { writeFile, appendFile, readFile } from 'node:fs/promises';
+import { openBrowser } from './browser.js';
+const previous = JSON.parse(await readFile('test-results/vfx-island-native-ab.json', 'utf8')),
+  camera = previous.cadence[0].timing.camera;
+const browser = await openBrowser({
+    startPath: '/tests/modern-game.html',
+    port: 5199,
+    headless: false,
+    args: ['--start-maximized'],
+  }),
+  errors = [];
+browser.page.on('pageerror', (e) => errors.push(e.message));
+browser.page.on('console', (m) => {
+  if (m.type() === 'error') errors.push(m.text());
+});
+try {
+  const result = await browser.page.evaluate(async (camera) => {
+    const assert = (value, message) => {
+        if (!value) throw Error(message);
+      },
+      classes = await Promise.all(['original', 'full'].map((name) => import(`/test-results/vfx-inplace-${name}.mjs`))),
+      { Camera } = await import('/packages/core/dist/extension.js');
+    const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+    assert(adapter && !adapter.info.isFallbackAdapter, 'Native adapter required');
+    const d = await adapter.requestDevice({ requiredFeatures: ['timestamp-query', 'depth32float-stencil8'] }),
+      resources = [],
+      modules = [],
+      uncaptured = [],
+      capacity = 1_000_000,
+      width = 1432,
+      height = 768,
+      chains = 20 + 10,
+      framesPerChain = 3,
+      frames = chains * framesPerChain;
+    d.addEventListener('uncapturederror', (e) => uncaptured.push(e.error.message));
+    d.pushErrorScope('validation');
+    let pendingScope = true;
+    const createShader = d.createShaderModule.bind(d);
+    d.createShaderModule = (desc) => {
+      const m = createShader(desc);
+      modules.push({ module: m, code: desc.code });
+      return m;
+    };
+    const buffer = (desc) => {
+        const b = d.createBuffer(desc);
+        resources.push(b);
+        return b;
+      },
+      texture = (desc) => {
+        const t = d.createTexture(desc);
+        resources.push(t);
+        return t;
+      };
+    const engine = { gpu: d, stats: { drawCalls: 0 }, removePlugin() {} },
+      options = {
+        capacity,
+        initialCount: 0,
+        rate: capacity / 20,
+        position: [0, 4, 0],
+        emissionExtent: [80, 3, 80],
+        velocity: [0, 0.03, 0],
+        gravity: [0, 0, 0],
+        spread: 0.08,
+        lifetime: [25, 45],
+        size: 0.01,
+        ground: 0.35,
+        turbulence: 0.035,
+        frequency: 0.22,
+        color: [1, 0.85, 0.4, 0.5],
+        intensity: 5,
+      },
+      effects = classes.map(({ VFX }) => {
+        const e = new VFX({ ...options });
+        e.setup(engine);
+        return e;
+      });
+    const cameraObject = new Camera({
+      position: camera.position,
+      target: camera.target,
+      fov: 58,
+      near: 0.15,
+      far: 300,
+    });
+    cameraObject.update(width / height, true);
+    const depth = texture({
+        size: [width, height],
+        format: 'depth32float-stencil8',
+        sampleCount: 4,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT,
+      }),
+      color = texture({
+        size: [width, height],
+        format: 'rgba16float',
+        sampleCount: 4,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT,
+      }),
+      resolved = texture({
+        size: [width, height],
+        format: 'rgba16float',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+      }),
+      depthView = depth.createView(),
+      colorView = color.createView();
+    const context = {
+      backend: 'webgpu',
+      device: d,
+      delta: 1 / 60,
+      camera: cameraObject,
+      width,
+      height,
+      format: 'rgba16float',
+      color: colorView,
+      depth: depthView,
+      descriptor: { multisample: { count: 4 }, depthStencil: { format: 'depth32float-stencil8' } },
+    };
+    const records = new Float32Array(capacity * 16),
+      ids = new Uint32Array(capacity);
+    for (let i = 0; i < capacity; i++) {
+      ids[i] = i;
+      const at = i * 16;
+      records.set(
+        [
+          ((i % 997) / 996 - 0.5) * 160,
+          0.4 + ((i % 47) / 46) * 6,
+          ((Math.floor(i / 997) % 1003) / 1002 - 0.5) * 160,
+          1000 + (i % 29),
+          0,
+          0.03,
+          0,
+          0.01,
+          5,
+          4.25,
+          2,
+          0.5,
+          (i % 31) * 0.19,
+          0,
+          1000 + (i % 29),
+          0,
+        ],
+        at,
+      );
+    }
+    for (const e of effects) for (const state of e.states ?? [e.particles]) d.queue.writeBuffer(state, 0, records);
+    const headers = new Float32Array(frames * 56),
+      noCompute = {
+        clearBuffer() {},
+        beginComputePass() {
+          return { setPipeline() {}, setBindGroup() {}, dispatchWorkgroups() {}, end() {} };
+        },
+      };
+    for (let frame = 0; frame < frames; frame++) {
+      effects[0].simulate({ ...context, encoder: noCompute });
+      headers.set(effects[0].values, frame * 56);
+    }
+    effects[0].front = 0;
+    const uniforms = buffer({ size: headers.byteLength, usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
+    d.queue.writeBuffer(uniforms, 0, headers);
+    const query = d.createQuerySet({ type: 'timestamp', count: 240 }),
+      resolve = buffer({ size: 1920, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC }),
+      read = buffer({ size: 1920, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    resources.push(query);
+    const clear = (encoder) =>
+      encoder
+        .beginRenderPass({
+          colorAttachments: [{ view: colorView, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }],
+        })
+        .end();
+    const chain = (encoder, variant, startFrame, queryOffset) => {
+      const e = effects[variant];
+      for (let frame = 0; frame < framesPerChain; frame++) {
+        encoder.copyBufferToBuffer(uniforms, (startFrame + frame) * 224, e.uniform, 0, 224);
+        encoder.clearBuffer(e.indirect, 4, 4);
+        encoder.clearBuffer(e.respawn, 0, 4);
+        const index = queryOffset === undefined ? undefined : queryOffset + frame * 4,
+          compute = encoder.beginComputePass(
+            index === undefined
+              ? {}
+              : {
+                  timestampWrites: {
+                    querySet: query,
+                    beginningOfPassWriteIndex: index,
+                    endOfPassWriteIndex: index + 1,
+                  },
+                },
+          );
+        compute.setPipeline(e.simulation);
+        compute.setBindGroup(0, variant ? e.computeGroup : e.computeGroups[e.front]);
+        compute.dispatchWorkgroups(Math.ceil(capacity / 256));
+        compute.end();
+        if (!variant) e.front = 1 - e.front;
+        clear(encoder);
+        const begin = encoder.beginRenderPass.bind(encoder);
+        encoder.beginRenderPass = (descriptor) =>
+          begin(
+            index === undefined
+              ? descriptor
+              : {
+                  ...descriptor,
+                  timestampWrites: {
+                    querySet: query,
+                    beginningOfPassWriteIndex: index + 2,
+                    endOfPassWriteIndex: index + 3,
+                  },
+                },
+          );
+        e.draw({ ...context, encoder });
+        encoder.beginRenderPass = begin;
+      }
+    };
+    try {
+      const warm = d.createCommandEncoder();
+      warm
+        .beginRenderPass({
+          colorAttachments: [],
+          depthStencilAttachment: {
+            view: depthView,
+            depthLoadOp: 'clear',
+            depthStoreOp: 'store',
+            depthClearValue: 0,
+            stencilLoadOp: 'clear',
+            stencilStoreOp: 'store',
+            stencilClearValue: 0,
+          },
+        })
+        .end();
+      for (let pair = 0; pair < 20; pair++)
+        for (const variant of pair % 2 ? [1, 0] : [0, 1]) chain(warm, variant, pair * 3);
+      d.queue.submit([warm.finish()]);
+      const encoder = d.createCommandEncoder(),
+        orders = [];
+      for (let pair = 0; pair < 10; pair++) {
+        const order = pair % 2 ? [1, 0] : [0, 1];
+        orders.push(order);
+        for (let position = 0; position < 2; position++)
+          chain(encoder, order[position], (20 + pair) * 3, (pair * 2 + position) * 12);
+      }
+      encoder.resolveQuerySet(query, 0, 240, resolve, 0);
+      encoder.copyBufferToBuffer(resolve, 0, read, 0, 1920);
+      d.queue.submit([encoder.finish()]);
+      await read.mapAsync(GPUMapMode.READ);
+      const times = new BigUint64Array(read.getMappedRange()).slice();
+      read.unmap();
+      const pairs = orders.map((order, pair) => {
+        const values = order.map((variant, position) => {
+          const at = (pair * 2 + position) * 12;
+          let compute = 0n,
+            draw = 0n;
+          for (let frame = 0; frame < 3; frame++) {
+            compute += times[at + frame * 4 + 1] - times[at + frame * 4];
+            draw += times[at + frame * 4 + 3] - times[at + frame * 4 + 2];
+          }
+          return {
+            variant,
+            computeMsPerFrame: Number(compute) / 3e6,
+            drawMsPerFrame: Number(draw) / 3e6,
+            combinedPassMsPerFrame: Number(compute + draw) / 3e6,
+            chainSpanMsPerFrame: Number(times[at + 11] - times[at]) / 3e6,
+          };
+        });
+        return {
+          pair,
+          order,
+          original: values.find((v) => v.variant === 0),
+          full: values.find((v) => v.variant === 1),
+        };
+      });
+      const metadata = buffer({ size: 48, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
+        states = buffer({ size: capacity * 64 * 2, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
+        pixels = buffer({
+          size: Math.ceil((width * 8) / 256) * 256 * height * 2,
+          usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+        }),
+        row = Math.ceil((width * 8) / 256) * 256,
+        stride = row * height;
+      const capture = d.createCommandEncoder();
+      for (let variant = 0; variant < 2; variant++) {
+        const e = effects[variant];
+        d.queue.writeBuffer(e.alive, 0, ids);
+        clear(capture);
+        e.draw({ ...context, encoder: capture });
+        capture
+          .beginRenderPass({
+            colorAttachments: [
+              { view: colorView, resolveTarget: resolved.createView(), loadOp: 'load', storeOp: 'store' },
+            ],
+          })
+          .end();
+        capture.copyTextureToBuffer(
+          { texture: resolved },
+          { buffer: pixels, offset: variant * stride, bytesPerRow: row },
+          [width, height],
+        );
+        capture.copyBufferToBuffer(e.gpuState.particles, 0, states, variant * capacity * 64, capacity * 64);
+        capture.copyBufferToBuffer(e.indirect, 0, metadata, variant * 24, 20);
+      }
+      d.queue.submit([capture.finish()]);
+      await Promise.all([
+        metadata.mapAsync(GPUMapMode.READ),
+        states.mapAsync(GPUMapMode.READ),
+        pixels.mapAsync(GPUMapMode.READ),
+      ]);
+      const args = new Uint32Array(metadata.getMappedRange()),
+        populations = [args[1], args[7]],
+        words = new Uint32Array(states.getMappedRange()),
+        images = new Uint16Array(pixels.getMappedRange());
+      let stateDiff = 0,
+        pixelDiff = 0,
+        visible = 0,
+        invalid = 0;
+      for (let word = 0; word < capacity * 16; word++) if (words[word] !== words[word + capacity * 16]) stateDiff++;
+      for (let y = 0; y < height; y++)
+        for (let x = 0; x < width; x++) {
+          const at = (y * row) / 2 + x * 4;
+          let changed = false;
+          if (images[at + 3]) visible++;
+          for (let c = 0; c < 4; c++) {
+            if (images[at + c] !== images[at + c + stride / 2]) changed = true;
+            if ((images[at + c] & 0x7c00) === 0x7c00) invalid++;
+          }
+          if (changed) pixelDiff++;
+        }
+      assert(
+        args[0] === 6 &&
+          args[1] === capacity &&
+          !args[2] &&
+          !args[3] &&
+          !args[4] &&
+          args[6] === 6 &&
+          args[7] === capacity &&
+          !args[8] &&
+          !args[9] &&
+          !args[10],
+        'Indirect live-population ABI differs',
+      );
+      assert(!stateDiff && !pixelDiff && !invalid && visible > 1000, 'Field/HDR parity absent or changed');
+      metadata.unmap();
+      states.unmap();
+      pixels.unmap();
+      const info = (await Promise.all(modules.map((m) => m.module.getCompilationInfo()))).flatMap((v) =>
+        v.messages.filter((m) => m.type === 'error').map((m) => m.message),
+      );
+      const validation = await d.popErrorScope();
+      pendingScope = false;
+      assert(
+        !validation && !info.length && !uncaptured.length,
+        JSON.stringify({ validation: validation?.message, info, uncaptured }),
+      );
+      const median = (values) => values.slice().sort((a, b) => a - b)[Math.floor(values.length / 2)],
+        fields = ['computeMsPerFrame', 'drawMsPerFrame', 'combinedPassMsPerFrame', 'chainSpanMsPerFrame'],
+        summary = Object.fromEntries(
+          fields.map((field) => [
+            field,
+            {
+              originalMedian: median(pairs.map((p) => p.original[field])),
+              fullMedian: median(pairs.map((p) => p.full[field])),
+              medianPairedSavingMs: median(pairs.map((p) => p.original[field] - p.full[field])),
+              wins: pairs.filter((p) => p.full[field] < p.original[field]).length,
+              ties: pairs.filter((p) => p.full[field] === p.original[field]).length,
+              losses: pairs.filter((p) => p.full[field] > p.original[field]).length,
+            },
+          ]),
+        );
+      return {
+        capacity,
+        width,
+        height,
+        samples: 4,
+        depthFormat: 'depth32float-stencil8',
+        framesPerChain,
+        warmMatchedUpdatesPerVariant: 60,
+        measuredMatchedUpdatesPerVariant: 30,
+        pairedCommandBuffer: true,
+        normalAtomicCompactionDuringTimings: true,
+        canonicalAliveOrderOnlyForPixels: true,
+        depthLimitation:
+          'Blank reversed-Z depth; actual Afterlight camera/field/options retained, all visible particles rendered without island occlusion.',
+        uniforms: 'Actual package CPU packing; per-frame headers copied between commands from one retained buffer.',
+        stateDiff,
+        pixelDiff,
+        visiblePixels: visible,
+        populations,
+        queriesAllocated: 1,
+        timestampBuffersAllocated: 2,
+        shaderSignatures: {
+          simulation: modules.filter((m) => m.code.includes('respawn.sequence') && m.code.includes('curlNoise')).length,
+          billboard: modules.filter(
+            (m) =>
+              m.code.includes('positionLife') && m.code.includes('f.right.xyz') && m.code.includes('let radius=dot'),
+          ).length,
+        },
+        summary,
+        pairs,
+        validationErrors: info,
+        uncaptured,
+      };
+    } finally {
+      if (pendingScope) await d.popErrorScope().catch(() => {});
+      for (const e of effects) e.dispose();
+      for (const r of resources) r.destroy();
+      d.destroy();
+    }
+  }, camera);
+  assert.deepEqual(errors, []);
+  const report = { recordedAt: new Date().toISOString(), hardware: browser.hardware, camera, ...result, errors };
+  await writeFile('test-results/vfx-render-chain-native.json', JSON.stringify(report, null, 2));
+  console.log(JSON.stringify(report));
+} catch (error) {
+  await appendFile(
+    'test-results/vfx-render-chain-failures.jsonl',
+    JSON.stringify({ recordedAt: new Date().toISOString(), message: error.message, stack: error.stack }) + '\n',
+  );
+  throw error;
+} finally {
+  await browser.close();
+}

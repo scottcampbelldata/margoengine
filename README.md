@@ -2,7 +2,9 @@
 
 The product is six packages: the [`margoengine`](packages/margoengine/README.md) stage, [`@margoengine/core`](packages/core/README.md), [`@margoengine/react`](packages/react/README.md), [`@margoengine/gltf`](packages/gltf/README.md), [`@margoengine/gltf-pro`](packages/gltf-pro/README.md), and [`@margoengine/machinery`](packages/machinery/README.md). The demo is [Night Citadel](apps/showcase-night-citadel/README.md): `npm run dev`.
 
-Core measures **18,244 bytes gzip**. Core plus the stage facade measures **20,215 bytes gzip**, including embedded Wasm and both backends. That is below the gate. CI rejects a combined size of **25,000 bytes gzip or above**.
+The current consolidated build measures **18,255 bytes gzip** for core and **20,282 bytes gzip** for core plus the stage facade, including embedded Wasm and both backends. That is below the gate. CI rejects a combined size of **25,000 bytes gzip or above**.
+
+The optional React entry measures **20,966 bytes gzip** on its own, with React and optional package peers external. It is additional to the base; an application bundle also includes the peers it uses. Measurements are recorded in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json).
 
 A small Rust/Wasm engine for web apps, with WebGPU rendering, WebGL2 fallback, ordinary React components and optional domain packs.
 
@@ -44,7 +46,7 @@ Open the localhost URL printed by Vite for the standalone [Night Citadel showcas
 npm test                      # builds packages and runs modern unit checks
 npm run test:kernel           # native kernel tests; requires the pinned Rust toolchain
 npm run build:packages        # builds workspace libraries with precompiled Wasm
-npm run typecheck             # strict checks for all 63 packages after build
+npm run typecheck             # strict checks for all 74 packages after build
 npm run measure:size          # verifies the combined core + stage gzip ceiling
 npm run build                 # builds packages, both starters and Night Citadel
 npm run pack:packages         # rebuilds and writes npm tarballs to test-results/
@@ -54,7 +56,7 @@ npm run modern:test:domains   # caps, sorting, FX and real GPU-loss recovery
 npm run modern:test:sky       # scenery phases, stars, depth and plugin lifecycle on WebGPU
 npm run modern:test:citadel   # showcase pixels, controls, pacing, resize and orbit heap profile
 npm run modern:test:packages  # frozen exports/types and React 18 lifecycle
-npm run test:modules:packages # all 63 packed exports and strict Bundler/NodeNext consumers
+npm run test:modules:packages # all 74 packed exports and strict Bundler/NodeNext consumers
 npm run modern:test:usdz      # USDA/USDC fixtures, archive integrity and limits
 npm run modern:test:gltf-compression # production Draco/Meshopt loading and decoder teardown
 npm run modern:test:wrapper   # five-line setup, loading, lazy packs and teardown
@@ -66,38 +68,139 @@ npm run dev --workspace @margoengine/starter-next
 
 ## Packages
 
-Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. The release contains 63 packages: most at `0.1.0`, with DOF and tonemapping at `1.0.0`. The [catalog](docs/README.md) lists every package, runtime export and npm publication status.
+Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. The workspace libraries use version `1.0.0`. The [catalog](docs/README.md) lists every package, runtime export and npm publication status.
 
-| Package | Includes |
+<!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
+
+74 packages in 10 layers, the same as the [catalog](https://margoengine.com/catalog/).
+
+### Start here (2)
+
+| Package | What it is |
 | --- | --- |
-| [`margoengine`](packages/margoengine/README.md) | Stage facade, canvas mounting, camera controls and lazy domain loading |
-| [`@margoengine/core`](packages/core/README.md) | Wasm transform memory, hierarchy/culling, reversed float depth, uint picking, CAD camera controls, instanced PBR, backends and plugin/pass lifecycle |
-| [`@margoengine/gltf`](packages/gltf/README.md) | Lazy static glTF/GLB loading, named nodes and shared primitive geometry |
-| [`@margoengine/react`](packages/react/README.md) | `MargoCanvas` (`Canvas` alias), `useMargoStage`, stable `useFrame`, mesh components and SSR |
-| [`@margoengine/xr`](packages/xr/README.md) | `XRManager`, `XRController`, inline input tracking and native WebGPU immersive stereo |
-| [`@margoengine/usdz`](packages/usdz/README.md) | Vendored USDA/USDC parsers, stored/Deflate containers and gltf-pro PreviewSurface PBR |
-| [`@margoengine/ifc`](packages/ifc/README.md) | IFC tessellation through web-ifc, world-space geometry, colors and BIM IDs |
-| [`@margoengine/loaders`](packages/loaders/README.md) | PLY/3MF/PCD/OFF/XYZ/VTK and static USDA/USDZ import; USDC is unsupported |
-| [`@margoengine/exporters`](packages/exporters/README.md) | glTF/GLB/STL/OBJ/PLY and static USDZ export for Quick Look |
-| [`@margoengine/machinery`](packages/machinery/README.md) | Revolute/prismatic joints, gear/piston couplings, bounded IK, sections/caps, dimensions, welded STL/OBJ, assembly queries/visibility, metrology and industrial presets |
-| [`@margoengine/kinematics-constraints`](packages/kinematics-constraints/README.md) | Standalone capsule/sphere target projection and two-bone pole clearance, with no engine dependency |
-| [`@margoengine/creative`](packages/creative/README.md) | Textured/sorted GPU particles, wind obstacles, sky/fog/scattering, toon, HDR and compute post-processing |
-| `@margoengine/scenery` | Independently loaded `SkyMoon` plugin and `SkyMoonPass`, procedural moonlit sky, lunar phases, stars and horizon haze |
-| [`@margoengine/gltf-pro`](packages/gltf-pro/README.md) | Optional metallic-roughness PBR, texture maps, normal mapping, mipmaps, alpha modes and Draco/Meshopt loading |
-| [`@margoengine/materials`](packages/materials/README.md) | Optional clearcoat, screen-space transmission, IOR, Beer-law volume and a closed TypeScript node graph |
-| [`@margoengine/decoders`](packages/decoders/README.md) | Lazy Draco workers, synchronous TypeScript Meshopt decoding and standalone KTX2/Basis transcoding |
-| [`@margoengine/blender`](packages/blender/README.md) | Offline Blender `.margo` export and prepacked WebGPU PBR ingestion |
-| `@margoengine/animation` | Optional storage-buffer skeletal skinning, compute morphs and glTF animation playback |
-| `@margoengine/post` | Optional frame-graph SSAO, view-space normal/depth extraction and bilateral blur |
-| [`@margoengine/shadows`](packages/shadows/README.md) | Four directional cascades, PCSS, cached static depth and dynamic casters |
-| [`@margoengine/clustered`](packages/clustered/README.md) | Compute frustum clusters and forward PBR for up to 1,024 point/spot lights, with optional local shadows |
-| [`@margoengine/vfx`](packages/vfx/README.md) | Up to 1,000,000 GPU particles, curl turbulence, collisions and indirect billboards |
-| [`@margoengine/animator`](packages/animator/README.md) | Gameplay states, 1D/2D blending, additive masks and analytical foot IK |
-| [`@margoengine/taa`](packages/taa/README.md) | Halton jitter, mesh/skinned velocity, depth-tested history and YCoCg clamping |
-| [`@margoengine/splats`](packages/splats/README.md) | GPU radix sorting, covariance ellipses, degree-3 SH and binary Gaussian captures |
-| [`@margoengine/terrain`](packages/terrain/README.md) | Fixed geometry clipmaps, GPU height/normal sampling and triplanar texture layers |
+| [`margoengine`](packages/margoengine/README.md) | Five-line setup for Margo Engine and its domain packs. |
+| [`@margoengine/core`](packages/core/README.md) | Lean WebGPU/WebGL2 rendering with a deterministic Rust/Wasm transform kernel. |
 
-Core measures **18,244 bytes gzip**. Core plus the stage facade measures **20,215 bytes gzip**, including embedded Wasm and both backends. The base is feature-frozen for v1.0.0; every push and pull request runs a CI build that rejects a combined size of **25,000 bytes gzip or above** and checks package isolation. Optional PBR, animation and SSAO packages use the existing extension hooks and do not enter the base bundle. The build also retains the 30 KiB combined core/static-glTF budget and 30 KiB raw Wasm budget. React/framework/application code is additional; domain packages have no separate 25 KiB ceiling.
+### Setup and diagnostics (5)
+
+| Package | What it is |
+| --- | --- |
+| [`@margoengine/math`](packages/math/README.md) | Vector, quaternion, matrix, Euler, color, bounds, ray, plane and frustum math with three.js-style names, one module per type. |
+| [`@margoengine/quality`](packages/quality/README.md) | Measured quality tiers: start light, time the GPU, remember full 4x quality only where it has headroom. |
+| [`@margoengine/webgl`](packages/webgl/README.md) | WebGL2 fallback renderer for browsers without WebGPU: flat-shaded PBR core meshes, opt in with Engine.create(canvas, {fallback: webglRenderer}). |
+| [`@margoengine/stats`](packages/stats/README.md) | Allocation-free frame samples, DOM performance overlay and optional WebGPU timestamp profiling. |
+| [`@margoengine/inspector`](packages/inspector/README.md) | Entity hierarchy, live properties, WebGPU wireframe, normal and bounding-box overlays, and a frame debugger. |
+
+### Loading and formats (12)
+
+| Package | What it is |
+| --- | --- |
+| [`@margoengine/gltf`](packages/gltf/README.md) | Lazy static glTF/GLB loading for Margo Engine. |
+| [`@margoengine/gltf-pro`](packages/gltf-pro/README.md) | Opt-in glTF 2.0 metallic-roughness rendering for Margo Engine WebGPU. |
+| [`@margoengine/loaders`](packages/loaders/README.md) | PLY, 3MF, PCD, OFF, XYZ, legacy VTK and static USDA/USDZ loaders for Margo Engine. |
+| [`@margoengine/decoders`](packages/decoders/README.md) | Worker-pooled Draco geometry and KTX2/Basis texture decoding for Margo Engine. |
+| [`@margoengine/fbx`](packages/fbx/README.md) | Binary and ASCII FBX conversion into the optional Margo glTF animation pipeline. |
+| [`@margoengine/usdz`](packages/usdz/README.md) | Optional static USDA, USDC and USDZ ingestion through Margo glTF PBR. |
+| [`@margoengine/usdz-export`](packages/usdz-export/README.md) | Static scene USDZ packaging for AR Quick Look. |
+| [`@margoengine/exporters`](packages/exporters/README.md) | glTF/GLB, STL, OBJ and PLY exporters for Margo Engine scenes and geometry data. |
+| [`@margoengine/ifc`](packages/ifc/README.md) | IFC geometry and BIM identifiers for Margo Engine, using an initialized web-ifc runtime. |
+| [`@margoengine/blender`](packages/blender/README.md) | Optional offline Blender .margo assets using Margo's WebGPU PBR renderer. |
+| [`@margoengine/cache`](packages/cache/README.md) | Opt-in offline asset cache: a fetch-compatible IndexedDB cache for GLB, .bin, textures and STEP files with ETag/Last-Modified revalidation, app versioning, range requests, a byte budget with LRU eviction and network fallback. |
+| [`@margoengine/splats`](packages/splats/README.md) | Optional Gaussian splats with GPU covariance projection and stable compute radix sorting. |
+
+### Rendering and lighting (18)
+
+| Package | What it is |
+| --- | --- |
+| [`@margoengine/materials`](packages/materials/README.md) | Optional glTF PBR material lobes, transmission, volume and typed node graphs through an isolated extension slot. |
+| [`@margoengine/shader`](packages/shader/README.md) | Typed shader nodes that compile to readable WGSL: node materials, node post effects and node compute passes. |
+| [`@margoengine/environment`](packages/environment/README.md) | HDR/EXR/UltraHDR loading, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT) applied to meshes and glTF models, environment and color backgrounds, and scene fog for Margo Engine on WebGPU. |
+| [`@margoengine/clustered`](packages/clustered/README.md) | WebGPU clustered forward point and spot lighting with optional local shadows. |
+| [`@margoengine/shadows`](packages/shadows/README.md) | Four-cascade cached directional shadows with PCSS. |
+| [`@margoengine/sky`](packages/sky/README.md) | Procedural atmospheric skies, clouds, sun, moon and stars. |
+| [`@margoengine/toon`](packages/toon/README.md) | Stepped diffuse shading and inverted-hull outlines. |
+| [`@margoengine/oit`](packages/oit/README.md) | Weighted blended order-independent transparency for gltf-pro BLEND primitives and materials transparent meshes: no popping between overlapping transparent parts. |
+| [`@margoengine/lod`](packages/lod/README.md) | Level of detail with hysteresis and screen-size switching for thousands of instances, plus GPU-baked octahedral imposters drawn in one instanced call per atlas. |
+| [`@margoengine/culling`](packages/culling/README.md) | GPU-driven static instances: frustum and Hi-Z occlusion culling in compute, order-preserving compaction and indirect draws, no per-part CPU work per frame. |
+| [`@margoengine/points`](packages/points/README.md) | Large point clouds (Points, PointsMaterial) and instanced sprites (Sprite, SpriteMaterial) for Margo Engine, WebGPU. |
+| [`@margoengine/lines`](packages/lines/README.md) | Fat lines (Line2, LineSegments2, LineMaterial) and debug helpers for Margo Engine, WebGPU. |
+| [`@margoengine/text`](packages/text/README.md) | GPU signed distance field text for Margo Engine: runtime glyph atlases from any browser font, wrapping, alignment, outlines and shadows, WebGPU. |
+| [`@margoengine/labels`](packages/labels/README.md) | HTML labels and CSS 3D objects positioned over a Margo Engine canvas (THREE.CSS2DRenderer and CSS3DRenderer counterparts). |
+| [`@margoengine/html`](packages/html/README.md) | World-space DOM anchors, CSS3D placement and scene-depth occlusion. |
+| [`@margoengine/video`](packages/video/README.md) | WebGPU external video textures and optional Web Audio sampling. |
+| [`@margoengine/xr`](packages/xr/README.md) | Optional WebGPU WebXR sessions, input poses and stereo rendering for Margo Engine. |
+| [`@margoengine/staging`](packages/staging/README.md) | Product-shot staging: soft ground contact shadows (shadow-catcher plane) for core meshes and glTF models. |
+
+### Post-processing (5)
+
+| Package | What it is |
+| --- | --- |
+| [`@margoengine/post`](packages/post/README.md) | HDR bloom, AgX tonemapping and frame-graph SSAO for Margo Engine WebGPU. |
+| [`@margoengine/tonemap`](packages/tonemap/README.md) | Optional AgX, ACES fitted and Khronos PBR Neutral color grading with 33-cube LUTs. |
+| [`@margoengine/dof`](packages/dof/README.md) | Optional two-pass WebGPU depth of field with circular bokeh. |
+| [`@margoengine/taa`](packages/taa/README.md) | Optional temporal anti-aliasing with motion vectors and YCoCg history clamping. |
+| [`@margoengine/transitions`](packages/transitions/README.md) | WebGPU scene wipes, noise dissolves and chromatic displacement. |
+
+### World and effects (10)
+
+| Package | What it is |
+| --- | --- |
+| [`@margoengine/terrain`](packages/terrain/README.md) | Geometry clipmaps and triplanar terrain layers. |
+| [`@margoengine/water`](packages/water/README.md) | Gerstner water surfaces, terrain-coupled shallow-water flow, foam and spray. |
+| [`@margoengine/scenery`](packages/scenery/README.md) | Procedural moonlit skies and scenery passes for Margo Engine. |
+| [`@margoengine/scatter`](packages/scatter/README.md) | Seeded instancing, distance-based LOD and procedural wind. |
+| [`@margoengine/road`](packages/road/README.md) | Arc-length spline road surfaces, raised curbs and tiled UVs. |
+| [`@margoengine/vfx`](packages/vfx/README.md) | GPU particle simulation and indirect billboards. |
+| [`@margoengine/creative`](packages/creative/README.md) | WebGPU particles, atmosphere, toon shading and post-processing for Margo Engine. |
+| [`@margoengine/procedural`](packages/procedural/README.md) | Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems and Voronoi fracture. |
+| [`@margoengine/wfc`](packages/wfc/README.md) | Seeded wave function collapse: 3D tile adjacency and the 2D overlapping (sample-based) model with backtracking. |
+| [`@margoengine/splines`](packages/splines/README.md) | 3D Catmull-Rom, Bezier and Hermite curves with arc-length lookup. |
+
+### Animation and interaction (12)
+
+| Package | What it is |
+| --- | --- |
+| [`@margoengine/animation`](packages/animation/README.md) | Storage-buffer skinning and compute morph targets for Margo Engine. |
+| [`@margoengine/animator`](packages/animator/README.md) | Blend trees, additive layers, animation states and foot IK. |
+| [`@margoengine/kinematics-constraints`](packages/kinematics-constraints/README.md) | Standalone analytical capsule and sphere constraints for IK target and arm clearance. |
+| [`@margoengine/tween`](packages/tween/README.md) | Allocation-free numeric tween updates and easing timelines. |
+| [`@margoengine/cinematic`](packages/cinematic/README.md) | Critically damped camera follow, look-at and screen shake. |
+| [`@margoengine/controls`](packages/controls/README.md) | Orbit, map, trackball, fly, first-person, pointer-lock and collision-aware walkthrough (/walk) camera controls, a transform gizmo and drag controls for Margo Engine. |
+| [`@margoengine/cameras`](packages/cameras/README.md) | Orthographic projection and exactly vertical (top-down) views for the core camera, with matching culling and picking. |
+| [`@margoengine/input`](packages/input/README.md) | Semantic keyboard, pointer, gamepad and touch actions with haptics. |
+| [`@margoengine/gizmo`](packages/gizmo/README.md) | Transform manipulators using the existing controls implementation. |
+| [`@margoengine/viewcube`](packages/viewcube/README.md) | CAD view cube: shows the camera orientation and animates to top, front, side and isometric views, with a perspective/orthographic toggle. |
+| [`@margoengine/selection`](packages/selection/README.md) | GPU picking and visible mesh selection outlines. |
+| [`@margoengine/audio`](packages/audio/README.md) | Web Audio listener, global and positional sounds and an analyser for Margo Engine (THREE.AudioListener, Audio, PositionalAudio and AudioAnalyser counterparts). |
+
+### Simulation and games (6)
+
+| Package | What it is |
+| --- | --- |
+| [`@margoengine/physics`](packages/physics/README.md) | Rigid-body physics for Margo Engine on Rapier: fixed-step engine plugin with interpolation, colliders, joints, queries, events and a character controller. |
+| [`@margoengine/navigation`](packages/navigation/README.md) | Optional Recast and Detour WebAssembly navigation. |
+| [`@margoengine/navmesh`](packages/navmesh/README.md) | Convex polygon navigation with A*, funnel paths and ORCA avoidance. |
+| [`@margoengine/ecs`](packages/ecs/README.md) | Typed-array packed sparse-set entity component storage. |
+| [`@margoengine/fsm`](packages/fsm/README.md) | Hierarchical state transitions with cross-fade progress. |
+| [`@margoengine/net`](packages/net/README.md) | Hermite and quaternion snapshot interpolation with bounded prediction. |
+
+### CAD and engineering (3)
+
+| Package | What it is |
+| --- | --- |
+| [`@margoengine/machinery`](packages/machinery/README.md) | Kinematics, polygonal CAD ingestion, sections and metrology for Margo Engine. |
+| [`@margoengine/bvh`](packages/bvh/README.md) | Triangle BVH, spatial queries and an engine Raycaster for Margo Engine (three-mesh-bvh and THREE.Raycaster counterparts). |
+| [`@margoengine/geometry`](packages/geometry/README.md) | Pure-CPU, tree-shakable geometry for Margo Engine: Three.js-compatible primitives, curves, shapes, extrusion, triangulation and mesh utilities. |
+
+### Frameworks (1)
+
+| Package | What it is |
+| --- | --- |
+| [`@margoengine/react`](packages/react/README.md) | React 18/19 components and stable mesh refs for Margo Engine. |
+
+<!-- /package-list -->
+
+The current consolidated build measures **18,255 bytes gzip** for core and **20,282 bytes gzip** for core plus the stage facade, including embedded Wasm and both backends. The base is feature-frozen for v1.0.0; every push and pull request runs a CI build that rejects a combined size of **25,000 bytes gzip or above** and checks package isolation. Optional PBR, animation and SSAO packages use the existing extension hooks and do not enter the base bundle. The build also retains the 30 KiB combined core/static-glTF budget and 30 KiB raw Wasm budget. React/framework/application code is additional; domain packages have no separate 25 KiB ceiling.
 
 The six requested game modules (shadows, clustered, animator, TAA, VFX and splats), plus terrain, use those hooks. Build with `npm run build:packages`; run `npm run modern:test:game` for their combined WebGPU rendering/culling/cache/IK/particle checks, temporal reprojection/clamping, skinned motion, stable radix sorting and ellipse blending. `npm run modern:test:game:packages` checks ten packed packages and seven standalone README TypeScript examples. The normal sort test covers 66,049 splats across hierarchical scan blocks; set `SPLAT_STRESS=1` for the additional three-million-splat capacity/sort check. Million-particle, three-million-splat and 1,024-light execution tests validate correctness separately from FPS claims. These source packages have not been published by this change.
 
@@ -169,19 +272,22 @@ Registered PBR models also support GPU picking and selection outlines through
 against a snapshot of that GPU pose. Core picking and ordinary PBR bindings stay
 unchanged; models opt in through registration.
 
-Verification on 16 October 2026 passed 1,189 Node 24 tests, strict TypeScript checks
-and packed imports across all 63 packages, the existing production browser
+Historical verification on 16 October 2026, before this consolidation, passed
+1,189 Node 24 tests, strict TypeScript checks and packed imports across the then
+63 packages, the existing production browser
 regressions, 42 node-material captures, 59 additional-lobe captures, 82 texture
 captures, complete Khronos material/KTX2/UV1 assets, and eight-influence character
 GPU readback, plus 45 local-shadow and 46 deformed-picking captures.
-`npm run measure:size` reports **48,638 bytes raw / 20,215 bytes gzip** for
-core + stage. The [release notes](CHANGELOG.md#unreleased) record the parser,
+These results describe that earlier checkout, not a rerun of its browser captures
+on the consolidated tree. The current `npm run measure:size` result is
+**47,486 bytes raw / 20,282 bytes gzip** for core + stage.
+The [release notes](CHANGELOG.md#unreleased) record the parser,
 normalization, index-boundary and lifecycle checks.
 
 ## Package catalog and release
 
-Run `npm run catalog` to preview the [searchable Margo catalog](docs/README.md). All 63 packages use their Margo names. `npm run catalog:build` refreshes the catalog from built runtime exports and checks exact-version availability on npm. [Release notes](CHANGELOG.md) describe source changes and their verification; an Unreleased entry does not indicate npm publication.
+Run `npm run catalog` to preview the [searchable Margo catalog](docs/README.md). All 74 packages use their Margo names. `npm run catalog:build` refreshes the catalog from built runtime exports and checks exact-version availability on npm. [Release notes](CHANGELOG.md) describe source changes and their verification; an Unreleased entry does not indicate npm publication.
 
-`npm run release:check` builds and tests the engine, enforces the 25,000-byte core + stage ceiling, and verifies every tarball's exports, TypeScript declarations and internal dependency versions. After signing into npm with access to the `@margoengine` scope, `npm run publish:packages` runs those checks and publishes the public library workspaces. Starter apps and showcases are private. Refresh the catalog after publishing and run `npm run build:site` to assemble the website.
+`npm run release:check` builds and tests the engine, enforces the 25,000-byte core + stage ceiling, and verifies every tarball's exports, TypeScript declarations and internal dependency versions. `npm run publish:dry-run` runs the local release and supply-chain checks and previews the workspace tarballs without publishing. Releases use the manual [Publish workflow](.github/workflows/publish.yml) from `main`; it defaults to a dry run and requires `NPM_PUBLISH_ENABLED=true` and the `npm-publish` environment. Follow the [release guide](docs/releasing.md) for approval, credentials and publishing the libraries and tools. Starter apps and showcases are private. Refresh the catalog after publishing and run `npm run build:site` to assemble the website.
 
 [Committed SwiftShader results](benchmarks/README.md#swiftshader-runs-no-gpu) include repeat commands and the [historical conveyor picking failure](benchmarks/swiftshader/conveyor-check-picking-failure.txt). Software-renderer timings do not establish physical GPU performance.

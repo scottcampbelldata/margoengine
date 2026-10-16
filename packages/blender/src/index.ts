@@ -1,3 +1,5 @@
+import {parseJSON} from '../../shared/json.js';
+import {checkCount,countLimit} from '../../shared/limits.js';
 import type {EngineKernel} from '@margoengine/core';
 import {parsePreparedPBR,validatePreparedGeometry,type GLTFDocument,type PBRModel,type PreparedGeometry} from '@margoengine/gltf-pro';
 import {readResponse} from '../../shared/loading.js';
@@ -26,9 +28,15 @@ export interface MargoAsset {
   readonly geometry:readonly (readonly PreparedGeometry[])[];
   readonly images:readonly Uint8Array<ArrayBuffer>[];
 }
+/** Resource limits shared by the .margo decoding and loading entrypoints. */
+export interface MargoOptions {
+  /** Maximum scene nodes (default 100,000). */
+  maxNodes?:number;
+}
 
 /** CAD vertices and uint16 indices expand once; other geometry retains the input buffer. */
-export function decodeMargo(input:ArrayBuffer|ArrayBufferView):MargoAsset {
+export function decodeMargo(input:ArrayBuffer|ArrayBufferView,{maxNodes=100_000}:MargoOptions={}):MargoAsset {
+  countLimit('maxNodes',maxNodes);
   if(!(input instanceof ArrayBuffer)&&!ArrayBuffer.isView(input))throw new TypeError('Expected .margo bytes');
   const buffer=input instanceof ArrayBuffer?input:input.buffer,base=input instanceof ArrayBuffer?0:input.byteOffset,length=input.byteLength;
   if(!(buffer instanceof ArrayBuffer)||base%4||!littleEndian)throw new TypeError('.margo requires aligned, little-endian ArrayBuffer storage');
@@ -46,8 +54,9 @@ export function decodeMargo(input:ArrayBuffer|ArrayBufferView):MargoAsset {
     sections.push({type,stride,bytes:new Uint8Array(buffer,base+offset,size)});end=(offset+size+3)&~3;
   }
   if(end!==length)throw new RangeError('Trailing/truncated .margo data');
-  const doc:MargoDocument|null=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(sections[0].bytes));
-  if(!doc||doc.asset?.version!=='2.0'||!Array.isArray(doc.meshes)||!doc.meshes.length||!Array.isArray(doc.nodes)||!doc.nodes.length||doc.nodes.length>100_000)throw new TypeError('Invalid .margo scene');
+  const doc:MargoDocument|null=parseJSON(new TextDecoder('utf-8',{fatal:true}).decode(sections[0].bytes));
+  if(!doc||doc.asset?.version!=='2.0'||!Array.isArray(doc.meshes)||!doc.meshes.length||!Array.isArray(doc.nodes)||!doc.nodes.length)throw new TypeError('Invalid .margo scene');
+  checkCount('Too many .margo nodes',doc.nodes.length,maxNodes,'maxNodes');
   for(const key of ['buffers','bufferViews','accessors','skins','animations','extensionsRequired'])if(doc[key]!==undefined)throw new TypeError('Unsupported .margo '+key);
   for(const key of ['materials','images','textures','samplers','scenes'])if(doc[key]!==undefined&&!Array.isArray(doc[key]))throw new TypeError('Invalid .margo '+key);
   const section=(id:unknown,type:number)=>{
@@ -92,8 +101,8 @@ export function decodeMargo(input:ArrayBuffer|ArrayBufferView):MargoAsset {
   return {document:doc,geometry,images};
 }
 
-export async function parseMargo(engine:EngineKernel,input:ArrayBuffer|ArrayBufferView,{signal}:{signal?:AbortSignal}={}):Promise<PBRModel> {
-  signal?.throwIfAborted();const asset=decodeMargo(input),images:ImageBitmap[]=[];
+export async function parseMargo(engine:EngineKernel,input:ArrayBuffer|ArrayBufferView,{signal,maxNodes}:MargoOptions&{signal?:AbortSignal}={}):Promise<PBRModel> {
+  signal?.throwIfAborted();const asset=decodeMargo(input,{maxNodes}),images:ImageBitmap[]=[];
   try{
     for(const bytes of asset.images){
       signal?.throwIfAborted();
@@ -101,13 +110,13 @@ export async function parseMargo(engine:EngineKernel,input:ArrayBuffer|ArrayBuff
       const png=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
       if(image.width!==png.getUint32(16)||image.height!==png.getUint32(20))throw new RangeError('Decoded .margo image size mismatch');
     }
-    signal?.throwIfAborted();return parsePreparedPBR(engine,asset.document,asset.geometry,images);
+    signal?.throwIfAborted();return parsePreparedPBR(engine,asset.document,asset.geometry,images,{maxNodes});
   }catch(error){for(const image of images)image.close();throw error;}
 }
 
-export async function loadMargo(engine:EngineKernel,url:string|URL,{signal}:{signal?:AbortSignal}={}):Promise<PBRModel> {
+export async function loadMargo(engine:EngineKernel,url:string|URL,{signal,maxNodes}:MargoOptions&{signal?:AbortSignal}={}):Promise<PBRModel> {
   signal?.throwIfAborted();const target=new URL(url,globalThis.location?.href);
   if(!['http:','https:'].includes(target.protocol))throw new TypeError('.margo URL must use HTTP(S)');
   const bytes=await readResponse(await fetch(target,{signal}),{maxBytes,signal,label:'.margo download'});
-  return parseMargo(engine,bytes,{signal});
+  return parseMargo(engine,bytes,{signal,maxNodes});
 }

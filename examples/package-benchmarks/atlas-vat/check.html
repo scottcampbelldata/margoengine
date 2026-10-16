@@ -1,0 +1,50 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Atlas and VAT check</title><style>body{margin:0;background:#000}canvas{width:960px;height:540px;display:block}</style></head><body><canvas></canvas>
+<script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {Animation} from '/packages/animation/dist/index.js';
+import {bakeVAT,VATCrowd} from '/packages/animation/dist/vat.js';
+import {boxGeometry,mergeGeometries,applyMatrix4} from '/packages/geometry/dist/index.js';
+import {Texture,Material,createMesh,packAtlas,transformUVs} from '/packages/materials/dist/index.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',capacity:8192,camera:{position:[0,2,6],target:[0,1.5,0],far:500}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const robot=await loadGLTF(engine,'/examples/assets/robot-expressive.glb'),animation=Animation.attach(robot);
+animation.play('Walking');animation.playing=false;
+let t0=performance.now();const vat=bakeVAT(animation,{fps:30,clips:['Walking']});const bakeMs=performance.now()-t0;
+// 4 solid tints in an atlas: crowd instances pick one each through their UV region.
+const solid=(r,g,b)=>({width:4,height:4,data:Uint8Array.from({length:64},(_,i)=>[r,g,b,255][i%4])});
+const tints=packAtlas([solid(230,180,60),solid(80,160,230),solid(220,90,90),solid(120,210,120)]),tintMap=new Texture(tints.image);
+// 64 boxes with their own 16x16 checker images, drawn separately or merged through one atlas.
+const checker=k=>({width:16,height:16,data:Uint8Array.from({length:1024},(_,i)=>{const p=i>>2,x=p%16,y=p>>4,c=i%4;return c===3?255:((x>>2)+(y>>2))%2?[40+k*3,200-k*2,90+k][c]:[250,250-k*3,40+k*2][c];})});
+const images=Array.from({length:64},(_,k)=>checker(k)),place=k=>[(k%8-3.5)*1.3,(Math.floor(k/8)-3.5)*1.3+1.5,0],box=boxGeometry(1,1,1);
+let current=[],crowd;
+const clear=()=>{for(const c of current)c.destroy?.();current=[];if(crowd){engine.removePlugin(crowd.name);crowd=undefined;}robot.root.visible=false;};
+const time=0.37,scenes={
+  gltf(){robot.root.visible=true;animation.seek(time);engine.camera.position=[0,2,6];engine.camera.target=[0,1.5,0];},
+  vat1(){crowd=new VATCrowd(vat,{map:tintMap});engine.use(crowd);crowd.add({offset:time,speed:0,uvTransform:tints.regions[0]});engine.camera.position=[0,2,6];engine.camera.target=[0,1.5,0];},
+  crowd(){
+    crowd=new VATCrowd(vat,{map:tintMap});engine.use(crowd);
+    for(let k=0;k<1024;k++){const a=k*2.4,x=(k%32-15.5)*1.6,z=-Math.floor(k/32)*1.6,c=Math.cos(a*0.1),s=Math.sin(a*0.1);crowd.add({matrix:[c,0,-s,0,0,1,0,0,s,0,c,0,x,0,z,1],offset:k*0.137,speed:0.8+(k%5)*0.1,uvTransform:tints.regions[k%4]});}
+    engine.camera.position=[0,14,22];engine.camera.target=[0,0,-14];
+  },
+  separate(){current=images.map((img,k)=>{const m=createMesh(engine,box,new Material({map:new Texture(img,{magFilter:'nearest'})}));m.root.setPosition(place(k)).setRotation([0.5,0.6,0]);return m;});engine.camera.position=[0,1.5,14];engine.camera.target=[0,1.5,0];},
+  merged(){
+    const atlas=packAtlas(images);
+    const parts=atlas.regions.map((region,k)=>{const helper=engine.createMesh().setPosition(place(k)).setRotation([0.5,0.6,0]);engine.store.tick(false);const m=[...helper.matrix];helper.dispose();return {...applyMatrix4(box,m),uvs:transformUVs(box.uvs,region)};});
+    current=[createMesh(engine,mergeGeometries(parts),new Material({map:new Texture(atlas.image,{magFilter:'nearest'})}))];engine.camera.position=[0,1.5,14];engine.camera.target=[0,1.5,0];
+  },
+};
+window.check={
+  info:()=>({bakeMs:+bakeMs.toFixed(1),vertices:vat.vertexCount,rows:vat.rows,textureMB:+(vat.texels.byteLength/1048576).toFixed(2),errors:errors.splice(0)}),
+  async mode(name){device.pushErrorScope('validation');clear();scenes[name]();engine.stats.drawCalls=0;engine.render();await device.queue.onSubmittedWorkDone();engine.stats.drawCalls=0;engine.render();await device.queue.onSubmittedWorkDone();
+    const e=await device.popErrorScope();return {error:e?.message??null,errors:errors.splice(0),drawCalls:engine.stats.drawCalls};},
+  async measure(frames=120){
+    const cpu=[],gpu=[];
+    for(let f=0;f<frames+20;f++){const a=performance.now();engine.render();const b=performance.now();await device.queue.onSubmittedWorkDone();const c=performance.now();if(f>=20){cpu.push(b-a);gpu.push(c-b);}}
+    const stat=a=>{a.sort((x,y)=>x-y);return {median:+a[a.length>>1].toFixed(2),p90:+a[Math.floor(a.length*0.9)].toFixed(2)};};
+    return {cpu:stat(cpu),gpu:stat(gpu),errors:errors.splice(0)};
+  },
+};
+window.ready=true;
+</script></body></html>

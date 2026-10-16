@@ -1,0 +1,17 @@
+{
+ "label": "package-tests",
+ "date": "2026-10-14T17:53:21.579Z",
+ "commit": "f9b2ad0",
+ "results": [
+  {
+   "script": "scripts/modern-package-tests.js",
+   "pass": false,
+   "exitCode": 1,
+   "seconds": 697.6,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "../../../../../../Users/SCOTTC~1/AppData/Local/Temp/margoengine-consumer-sEa55Q/sky-1-readme.tsx(4,7): error TS2451: Cannot redeclare block-scoped variable 'sky'.\n../../../../../../Users/SCOTTC~1/AppData/Local/Temp/margoengine-consumer-sEa55Q/sky-1-readme.tsx(4,24): error TS2304: Cannot find name 'engine'.\n../../../../../../Users/SCOTTC~1/AppData/Local/Temp/margoengine-consumer-sEa55Q/sky-1-readme.tsx(6,7): error TS2451: Cannot redeclare block-scoped variable 'sky'.\n../../../../../../Users/SCOTTC~1/AppData/Local/Temp/margoengine-consumer-sEa55Q/sky-1-readme.tsx(6,24): error TS2304: Cannot find name 'engine'.\n../../../../../../Users/SCOTTC~1/AppData/Local/Temp/margoengine-consumer-sEa55Q/sky-1-readme.tsx(13,33): error TS2304: Cannot find name 'water'.\n../../../../../../Users/SCOTTC~1/AppData/Local/Temp/margoengine-consumer-sEa55Q/sky-1-readme.tsx(15,12): error TS2304: Cannot find name 'engine'.\nnode:internal/errors:985\r\n  const err = new Error(message);\r\n              ^\r\n\r\nError: Command failed: C:\\Program Files\\nodejs\\node.exe C:\\Dev\\Projects\\margo-engine\\.claude\\worktrees\\agent-aaeb47dfc2c9520a2\\node_modules\\typescript\\bin\\tsc -p C:\\Users\\SCOTTC~1\\AppData\\Local\\Temp\\margoengine-consumer-sEa55Q\\tsconfig.json\r\n    at genericNodeError (node:internal/errors:985:15)\r\n    at wrappedFn (node:internal/errors:539:14)\r\n    at checkExecSyncError (node:child_process:925:11)\r\n    at execFileSync (node:child_process:961:15)\r\n    at file:///C:/Dev/Projects/margo-engine/.claude/worktrees/agent-aaeb47dfc2c9520a2/scripts/modern-package-tests.js:99:3 {\r\n  status: 2,\r\n  signal: null,\r\n  output: [ null, null, null ],\r\n  pid: 19572,\r\n  stdout: null,\r\n  stderr: null\r\n}\r\n\r\nNode.js v24.15.0"
+  }
+ ],
+ "discarded": 0
+}

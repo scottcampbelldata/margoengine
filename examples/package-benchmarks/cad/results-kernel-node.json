@@ -1,0 +1,35 @@
+{
+ "node": "v24.15.0",
+ "date": "2026-10-14T11:57:06.984Z",
+ "acPower": true,
+ "cases": [
+  {
+   "case": "CAD assembly, 5 levels",
+   "parts": 10017,
+   "entities": 11143,
+   "tickCullMs": 1.525,
+   "tickNoCullMs": 1.492
+  },
+  {
+   "case": "CAD assembly, 5 levels",
+   "parts": 50004,
+   "entities": 55619,
+   "tickCullMs": 7.977,
+   "tickNoCullMs": 8.087
+  },
+  {
+   "case": "CAD assembly, 5 levels",
+   "parts": 89883,
+   "entities": 99976,
+   "tickCullMs": 15.701,
+   "tickNoCullMs": 13.296
+  },
+  {
+   "case": "100,000 entities in 10-deep chains",
+   "entities": 100000,
+   "tickCullMs": 11.425,
+   "tickNoCullMs": 10.656
+  }
+ ],
+ "acPowerAtEnd": true
+}

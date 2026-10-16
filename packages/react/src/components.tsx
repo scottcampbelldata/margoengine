@@ -27,7 +27,7 @@ export interface CanvasProps extends EngineOptions {
   frameloop?:'always'|'demand';
 }
 export type MargoCanvasProps=CanvasProps;
-export function MargoCanvas({children,style,className,label='Interactive 3D scene',capacity=1024,backend='auto',camera,shadows=false,frameloop='always',onCreated,onError}:CanvasProps) {
+export function MargoCanvas({children,style,className,label='Interactive 3D scene',capacity=1024,backend='auto',camera,fallback,shadows=false,frameloop='always',onCreated,onError}:CanvasProps) {
   const canvas=useRef<HTMLCanvasElement>(null),queue=useRef<Promise<void>>(Promise.resolve()),created=useRef(onCreated),errorHandler=useRef(onError);
   const [stage,setStage]=useState<StageFacade|null>(null),[error,setError]=useState<unknown>(null),[shadow,setShadow]=useState<Shadows|null>(null);
   const [shadowRequests,setShadowRequests]=useState(0),enableShadows=shadows||shadowRequests>0;
@@ -53,7 +53,7 @@ export function MargoCanvas({children,style,className,label='Interactive 3D scen
     const report=(error:unknown)=>{if(!cancelled){setError(error);errorHandler.current?.(error);}};
     queue.current=queue.current.catch(()=>{}).then(async()=>{
       if(cancelled)return;
-      const instance=await Engine.create(element,{capacity,backend,camera:cameraOptions.current});
+      const instance=await Engine.create(element,{capacity,backend,camera:cameraOptions.current,fallback});
       if(cancelled){instance.dispose();return;}
       current=instance;instance.onError=report;
       try {
@@ -66,7 +66,7 @@ export function MargoCanvas({children,style,className,label='Interactive 3D scen
       }catch(error){observer?.disconnect();instance.dispose();setStage(null);throw error;}
     }).catch(report);
     return()=>{cancelled=true;observer?.disconnect();current?.dispose();};
-  },[capacity,backend]);
+  },[capacity,backend,fallback]);
   useCommit(()=>{if(engine)return engine.onFrame((_,delta)=>advance(delta));},[engine,advance]);
   useCommit(()=>{
     if(!engine||engine.disposed||engineMode.current===frameloop)return;

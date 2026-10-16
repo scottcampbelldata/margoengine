@@ -1,7 +1,7 @@
 # @margoengine/cinematic
 
-`rig.setOrbitOffset(yaw, pitch, distance, height = 0)` updates the retained camera
-offset from orbit angles without allocating a new vector. The sandbox uses this
+`rig.setOrbitOffset(yaw, pitch, distance, height = 0)` writes the retained camera
+offset in place from orbit angles (no new vector is created). The sandbox uses this
 public method after its shared locomotion step.
 
 A virtual camera with analytically integrated critically damped follow and look-at springs plus additive screen shake.
@@ -22,6 +22,22 @@ For a below-target orbit, it raises the rendered aim point with the camera so
 terrain clearance preserves upward look instead of forcing the view back down.
 Six samples along each arm suit broad terrain; narrow ridges and buildings need
 collision geometry. Heights must be finite. Ground handling is disabled by default.
+
+Walls and ceilings: set `collide: (origin, direction, distance) => hitDistance | null`. Each frame
+the rig asks for the first obstacle along the arm from the look-at point to the (damped, shaken,
+ground-lifted) camera; on a hit the camera moves in at once to `clearance` short of it, and once the
+arm is clear it eases back out at the follow damping. The spring state and your `offset` are
+unchanged. The arrays passed in are reused each frame. Any scene query fits, for example a sphere
+cast against the physics world (so the near plane does not clip into the wall):
+
+```ts
+const rig = Cinematic.attach(engine, {offset: [0, 3, 6], clearance: 0.3,
+  collide: (o, d, max) => physics.shapeCast({shape: 'sphere', radius: 0.2}, [o[0], o[1], o[2]], [0, 0, 0, 1], [d[0], d[1], d[2]], {maxDistance: max, excludeDynamic: true})?.distance});
+```
+
+or `@margoengine/bvh`'s Raycaster (`firstHitOnly`, `far = max`) over the level. Exclude the followed
+character from the query, and start it above the floor if the look-at point sits on it (the arm
+starts at the target, usually the character's feet).
 
 MIT. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

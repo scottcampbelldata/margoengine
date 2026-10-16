@@ -1,0 +1,42 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Worker parsing benchmark</title><style>body{margin:0;background:#000}canvas{width:960px;height:540px;display:block}</style></head><body><canvas></canvas>
+<script type="module">
+// Main-thread blocking while a model loads, main-thread parse vs the /worker entries (run.mjs drives it). The engine keeps
+// rendering every animation frame during the load, as an app would. Long tasks (>= 50 ms) come from the Long Tasks API;
+// the largest gap between animation frames also catches blocking split into shorter tasks.
+import {Engine} from '/packages/core/dist/index.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {loadGLTFInWorker} from '/packages/gltf-pro/dist/worker.js';
+import {loadFBX} from '/packages/fbx/dist/index.js';
+import {loadFBXInWorker} from '/packages/fbx/dist/worker.js';
+import {loadUSDZ} from '/packages/usdz/dist/index.js';
+import {loadUSDZInWorker} from '/packages/usdz/dist/worker.js';
+
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',capacity:4096,camera:{position:[0,3,8],target:[0,0,0],near:0.05,far:500}});
+engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const models={
+  'damaged-helmet.glb':{main:u=>loadGLTF(engine,u),worker:u=>loadGLTFInWorker(engine,u),url:'/examples/assets/damaged-helmet.glb'},
+  'generated-642k-vertices.glb':{main:u=>loadGLTF(engine,u),worker:u=>loadGLTFInWorker(engine,u),url:'/test-results/workers-big.glb'},
+  'grid-160k-quads.fbx':{main:u=>loadFBX(engine,u),worker:u=>loadFBXInWorker(engine,u),url:'/test-results/workers-grid.fbx'},
+  'knot-200k-triangles.usdz':{main:u=>loadUSDZ(engine,u),worker:u=>loadUSDZInWorker(engine,u),url:'/test-results/workers-knot.usdz'},
+};
+let rendering=false;const loop=()=>{if(!rendering)return;engine.render();requestAnimationFrame(loop);};
+window.bench={
+  names:Object.keys(models),
+  async warm(){for(const m of Object.values(models))await (await fetch(m.url)).arrayBuffer();},
+  async run(name,mode){
+    const tasks=[],observer=new PerformanceObserver(list=>{for(const e of list.getEntries())tasks.push(e.duration);});
+    rendering=true;requestAnimationFrame(loop);await new Promise(r=>setTimeout(r,300));
+    let gap=0,last=performance.now(),probing=true;const probe=t=>{gap=Math.max(gap,t-last);last=t;if(probing)requestAnimationFrame(probe);};requestAnimationFrame(probe);
+    observer.observe({type:'longtask'});
+    const start=performance.now(),model=await models[name][mode](models[name].url),loadMs=performance.now()-start;
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));await engine.gpu.queue.onSubmittedWorkDone();
+    await new Promise(r=>setTimeout(r,200));probing=false;
+    for(const e of observer.takeRecords())tasks.push(e.duration);observer.disconnect();rendering=false;
+    const triangles=model.primitives.reduce((sum,p)=>sum+p.indices.length/3,0);model.destroy();
+    return {name,mode,loadMs:+loadMs.toFixed(1),longestTaskMs:+Math.max(0,...tasks).toFixed(1),longTasks:tasks.length,blockedMs:+tasks.reduce((s,d)=>s+d,0).toFixed(1),
+      totalBlockingTimeMs:+tasks.reduce((s,d)=>s+Math.max(0,d-50),0).toFixed(1),maxFrameGapMs:+gap.toFixed(1),triangles,errors:errors.splice(0)};
+  },
+};
+window.ready=true;
+</script></body></html>

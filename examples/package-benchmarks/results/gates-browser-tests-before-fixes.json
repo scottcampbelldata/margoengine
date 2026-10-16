@@ -1,0 +1,359 @@
+{
+ "label": "all-browser-tests",
+ "date": "2026-10-14T16:08:49.672Z",
+ "commit": "2484971",
+ "results": [
+  {
+   "script": "scripts/modern-blender-tests.js",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 12.9,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "      \"device\": \"\",\n      \"description\": \"\",\n      \"fallback\": false\n    },\n    \"userAgent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0\",\n    \"browserName\": \"chromium\",\n    \"browserVersion\": \"155.0.4283.45\",\n    \"requestedChannel\": \"msedge\",\n    \"launchArgs\": [],\n    \"powerPreference\": \"high-performance\",\n    \"hostPlatform\": \"win32\",\n    \"headless\": true\n  },\n  \"results\": [\n    {\n      \"instances\": 2,\n      \"stageCleanupBuffers\": 4,\n      \"colorfulPixels\": 3700\n    },\n    {\n      \"instances\": 2,\n      \"colorfulPixels\": 4516\n    }\n  ]\n}"
+  },
+  {
+   "script": "scripts/modern-browser-tests.js",
+   "pass": false,
+   "exitCode": 1,
+   "seconds": 8,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\npage.evaluate: Error: WebGPU unavailable\r\n    at http://127.0.0.1:5193/packages/core/dist/engine.js:1:4747\r\n    at e.create (http://127.0.0.1:5193/packages/core/dist/engine.js:1:4777)\r\n    at async Object.core (http://127.0.0.1:5193/tests/modern-browser.tsx:125:18)\r\n    at async <anonymous>:396:30\r\n    at C:\\Dev\\Projects\\margo-engine\\.claude\\worktrees\\agent-aaeb47dfc2c9520a2\\scripts\\modern-browser-tests.js:16:29 {\r\n  log: []\r\n}\r\n\r\nNode.js v24.15.0"
+  },
+  {
+   "script": "scripts/modern-domain-tests.js",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 8.6,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "      \"state\": true,\n      \"recreated\": true\n    },\n    {\n      \"name\": \"Combined passes: post-submit destruction preserves RAF, Wasm and replaces buffers, textures, bind groups and pipelines\",\n      \"frames\": 20,\n      \"recoveryFrames\": 16,\n      \"errors\": [],\n      \"state\": true,\n      \"recreated\": true\n    },\n    {\n      \"name\": \"HDR grading, ACES, DOF, grain, fog/shafts, toon, sorted particles, combined packs, reboot and resize\",\n      \"hdr\": [\n        229,\n        200,\n        202\n      ],\n      \"restored\": {\n        \"newDevice\": true,\n        \"meshes\": 2\n      }\n    }\n  ]\n}"
+  },
+  {
+   "script": "scripts/modern-extension-tests.js",
+   "pass": false,
+   "exitCode": 1,
+   "seconds": 11,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: Expression 0 did not change the face during playback: 0\r\n    at file:///C:/Dev/Projects/margo-engine/.claude/worktrees/agent-aaeb47dfc2c9520a2/scripts/modern-extension-tests.js:121:16\r\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: false,\r\n  expected: true,\r\n  operator: '==',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
+  },
+  {
+   "script": "scripts/modern-finalization-tests.js",
+   "pass": false,
+   "exitCode": 1,
+   "seconds": 7.1,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\npage.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at http://127.0.0.1:5194/\r\nCall log:\r\n\u001b[2m  - navigating to \"http://127.0.0.1:5194/\", waiting until \"load\"\u001b[22m\r\n\r\n    at C:\\Dev\\Projects\\margo-engine\\.claude\\worktrees\\agent-aaeb47dfc2c9520a2\\scripts\\modern-finalization-tests.js:16:13 {\r\n  log: [\r\n    '  - navigating to \"http://127.0.0.1:5194/\", waiting until \"load\"'\r\n  ],\r\n  name: 'Error'\r\n}\r\n\r\nNode.js v24.15.0"
+  },
+  {
+   "script": "scripts/modern-game-package-tests.js",
+   "pass": false,
+   "exitCode": 1,
+   "seconds": 0.1,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: Run through npm run modern:test:game:packages\r\n    at file:///C:/Dev/Projects/margo-engine/.claude/worktrees/agent-aaeb47dfc2c9520a2/scripts/modern-game-package-tests.js:6:8\r\n    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)\r\n    at async node:internal/modules/esm/loader:639:26\r\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: undefined,\r\n  expected: true,\r\n  operator: '==',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
+  },
+  {
+   "script": "scripts/modern-game-tests.js",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 15.4,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "      \"device\": \"\",\n      \"description\": \"\",\n      \"fallback\": false\n    },\n    \"userAgent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0\",\n    \"browserName\": \"chromium\",\n    \"browserVersion\": \"155.0.4283.45\",\n    \"requestedChannel\": \"msedge\",\n    \"launchArgs\": [],\n    \"powerPreference\": \"high-performance\",\n    \"hostPlatform\": \"win32\",\n    \"headless\": true\n  },\n  \"movingPixels\": 264,\n  \"meshVelocity\": [\n    0.06787109375,\n    0.0026092529296875\n  ],\n  \"reprojectedColor\": 0.253173828125,\n  \"sortedSplats\": 66049,\n  \"ellipseAxisRatio\": 2.216754263184309,\n  \"stressSplats\": 0,\n  \"shaderModules\": 81,\n  \"splatPixels\": 770\n}"
+  },
+  {
+   "script": "scripts/modern-grass-tests.js",
+   "pass": false,
+   "exitCode": 1,
+   "seconds": 11,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: Desktop did not draw with 4× MSAA\r\n    at file:///C:/Dev/Projects/margo-engine/.claude/worktrees/agent-aaeb47dfc2c9520a2/scripts/modern-grass-tests.js:165:3 {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: false,\r\n  expected: true,\r\n  operator: '==',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
+  },
+  {
+   "script": "scripts/modern-hardware-gpu-tests.js",
+   "pass": false,
+   "exitCode": 1,
+   "seconds": 0.7,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: Select a physical GPU with GPU_VENDOR and BROWSER_ARGS\r\n    at file:///C:/Dev/Projects/margo-engine/.claude/worktrees/agent-aaeb47dfc2c9520a2/scripts/modern-hardware-gpu-tests.js:9:8\r\n    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)\r\n    at async node:internal/modules/esm/loader:639:26\r\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: false,\r\n  expected: true,\r\n  operator: '==',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
+  },
+  {
+   "script": "scripts/modern-machinery-runtime-tests.js",
+   "pass": false,
+   "exitCode": 1,
+   "seconds": 7.2,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\npage.evaluate: Error: WebGPU unavailable\r\n    at http://127.0.0.1:5193/packages/core/dist/engine.js:1:4747\r\n    at e.create (http://127.0.0.1:5193/packages/core/dist/engine.js:1:4777)\r\n    at async eval (eval at evaluate (:370:30), <anonymous>:1:21)\r\n    at async <anonymous>:396:30\r\n    at C:\\Dev\\Projects\\margo-engine\\.claude\\worktrees\\agent-aaeb47dfc2c9520a2\\scripts\\modern-machinery-runtime-tests.js:32:28 {\r\n  log: []\r\n}\r\n\r\nNode.js v24.15.0"
+  },
+  {
+   "script": "scripts/modern-night-citadel-tests.js",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 42.8,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "    },\n    {\n      \"width\": 932,\n      \"height\": 430\n    },\n    {\n      \"width\": 1024,\n      \"height\": 600\n    },\n    {\n      \"width\": 568,\n      \"height\": 270\n    }\n  ]\n}\nNative cadence {\n  frames: 122,\n  instances: 548,\n  batches: 10,\n  fps: 57.04169944925255,\n  delta: 17.531034482758624,\n  callbackRate: 57.04169944925255,\n  samples: 4,\n  note: '120 FPS target · browser supplies ~57 Hz. Rendering load or browser/display limits can reduce this cadence.'\n}"
+  },
+  {
+   "script": "scripts/modern-package-tests.js",
+   "pass": false,
+   "exitCode": 1,
+   "seconds": 0.7,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: Run this check through npm run modern:test:packages\r\n    at file:///C:/Dev/Projects/margo-engine/.claude/worktrees/agent-aaeb47dfc2c9520a2/scripts/modern-package-tests.js:10:8\r\n    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)\r\n    at async node:internal/modules/esm/loader:639:26\r\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: undefined,\r\n  expected: true,\r\n  operator: '==',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
+  },
+  {
+   "script": "scripts/modern-postfx-tests.js",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 9.8,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "      0.4044381082057953,\n      0.5563933849334717,\n      0.865041971206665,\n      1\n    ],\n    \"deterministic\": true\n  },\n  \"integration\": {\n    \"taa\": true,\n    \"resized\": true,\n    \"restored\": true\n  },\n  \"mobile\": {\n    \"textures\": 0,\n    \"pipelines\": 0,\n    \"resolves\": 0,\n    \"checked\": [\n      \"dof-tone-taa\",\n      \"ssao-taa\",\n      \"creative-taa\",\n      \"tonemap\",\n      \"bloom\"\n    ]\n  }\n}"
+  },
+  {
+   "script": "scripts/modern-sky-fog-tests.js",
+   "pass": false,
+   "exitCode": 1,
+   "seconds": 5.8,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\npage.evaluate: TypeError: Cannot read properties of undefined (reading '4')\r\n    at render (eval at evaluate (:370:30), <anonymous>:45:163)\r\n    at eval (eval at evaluate (:370:30), <anonymous>:55:93)\r\n    at async <anonymous>:396:30\r\n    at C:\\Dev\\Projects\\margo-engine\\.claude\\worktrees\\agent-aaeb47dfc2c9520a2\\scripts\\modern-sky-fog-tests.js:17:34 {\r\n  log: []\r\n}\r\n\r\nNode.js v24.15.0"
+  },
+  {
+   "script": "scripts/modern-stress-tests.js",
+   "pass": false,
+   "exitCode": 1,
+   "seconds": 51.4,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "    at e.create (http://127.0.0.1:61553/test-results/stress/seed-20261011-shard-0/harness/assets/modern-stress-CCYQph7F.js:24:6564)\n    at async A (http://127.0.0.1:61553/test-results/stress/seed-20261011-shard-0/harness/assets/modern-stress-CCYQph7F.js:24:22708)\n    at async window.runStress (http://127.0.0.1:61553/test-results/stress/seed-20261011-shard-0/harness/assets/modern-stress-CCYQph7F.js:650:24580)\n    at async <anonymous>:396:30\n22 sessions: 16 passed, 6 failed (50s)\nStress evidence: C:\\Dev\\Projects\\margo-engine\\.claude\\worktrees\\agent-aaeb47dfc2c9520a2\\test-results\\stress\\seed-20261011-shard-0/report.json\nnode:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: 6 stress sessions failed; see C:\\Dev\\Projects\\margo-engine\\.claude\\worktrees\\agent-aaeb47dfc2c9520a2\\test-results\\stress\\seed-20261011-shard-0/report.json\r\n\r\n6 !== 0\r\n\r\n    at file:///C:/Dev/Projects/margo-engine/.claude/worktrees/agent-aaeb47dfc2c9520a2/scripts/modern-stress-tests.js:90:8\r\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: 6,\r\n  expected: 0,\r\n  operator: 'strictEqual',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
+  },
+  {
+   "script": "scripts/modern-temporal-tests.js",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 8.2,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "      \"device\": \"\",\n      \"description\": \"\",\n      \"fallback\": false\n    },\n    \"userAgent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0\",\n    \"browserName\": \"chromium\",\n    \"browserVersion\": \"155.0.4283.45\",\n    \"requestedChannel\": \"msedge\",\n    \"launchArgs\": [],\n    \"powerPreference\": \"high-performance\",\n    \"hostPlatform\": \"win32\",\n    \"headless\": true\n  },\n  \"movingPixels\": 264,\n  \"meshVelocity\": [\n    0.06787109375,\n    0.0026092529296875\n  ],\n  \"reprojectedColor\": 0.253173828125,\n  \"sortedSplats\": 66049,\n  \"ellipseAxisRatio\": 2.216754263184309,\n  \"stressSplats\": 0,\n  \"shaderModules\": 81,\n  \"splatPixels\": 770\n}"
+  },
+  {
+   "script": "scripts/modern-usdz-tests.js",
+   "pass": false,
+   "exitCode": 1,
+   "seconds": 0.7,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "node:internal/fs/promises:640\r\n  return new FileHandle(await PromisePrototypeThen(\r\n                        ^\r\n\r\nError: ENOENT: no such file or directory, open 'C:\\Dev\\Projects\\margo-engine\\.claude\\worktrees\\agent-aaeb47dfc2c9520a2\\test-results\\usdz-textured.usdz'\r\n    at async open (node:internal/fs/promises:640:25)\r\n    at async readFile (node:internal/fs/promises:1287:14)\r\n    at async file:///C:/Dev/Projects/margo-engine/.claude/worktrees/agent-aaeb47dfc2c9520a2/scripts/modern-usdz-tests.js:5:25 {\r\n  errno: -4058,\r\n  code: 'ENOENT',\r\n  syscall: 'open',\r\n  path: 'C:\\\\Dev\\\\Projects\\\\margo-engine\\\\.claude\\\\worktrees\\\\agent-aaeb47dfc2c9520a2\\\\test-results\\\\usdz-textured.usdz'\r\n}\r\n\r\nNode.js v24.15.0"
+  },
+  {
+   "script": "scripts/modern-visual-parity-tests.js",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 6.2,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "      \"three\": [\n        220,\n        248,\n        207\n      ]\n    },\n    {\n      \"input\": [\n        100,\n        100,\n        100\n      ],\n      \"margo\": [\n        255,\n        255,\n        255\n      ],\n      \"three\": [\n        255,\n        255,\n        255\n      ]\n    }\n  ]\n}"
+  },
+  {
+   "script": "scripts/modern-wrapper-tests.js",
+   "pass": false,
+   "exitCode": 1,
+   "seconds": 4.8,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\npage.evaluate: Error: WebGPU unavailable\r\n    at http://127.0.0.1:5193/packages/core/dist/engine.js:1:4747\r\n    at e.create (http://127.0.0.1:5193/packages/core/dist/engine.js:1:4777)\r\n    at async Module.l (http://127.0.0.1:5193/packages/margoengine/dist/index.js:1:3751)\r\n    at async eval (eval at evaluate (:370:30), <anonymous>:3:19)\r\n    at async <anonymous>:396:30\r\n    at C:\\Dev\\Projects\\margo-engine\\.claude\\worktrees\\agent-aaeb47dfc2c9520a2\\scripts\\modern-wrapper-tests.js:26:16 {\r\n  log: []\r\n}\r\n\r\nNode.js v24.15.0"
+  },
+  {
+   "script": "scripts/modern-xr-tests.js",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 5.7,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "Real WebGPU stereo pixel readback and XR teardown passed [ 67.98936684388593, 59.01063315611407 ]"
+  },
+  {
+   "script": "packages/cameras/test/browser-check.mjs",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 6.7,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "adapter {\"vendor\":\"intel\",\"architecture\":\"xe-2lpg\",\"device\":\"\",\"description\":\"\",\"fallback\":false}\nok orthographic top-down + pick\nok perspective top-down, red right edge 244\nok shadows + taa [ 179, 36, 36 ] [ 32, 179, 32 ]\ncameras browser check passed"
+  },
+  {
+   "script": "packages/lod/test/browser-check.mjs",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 38.3,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "adapter {\"vendor\":\"intel\",\"architecture\":\"xe-2lpg\",\"device\":\"\",\"description\":\"\",\"fallback\":false}\nempty {\"cpu\":{\"median\":0.4,\"p90\":0.6},\"gpu\":{\"median\":3.2,\"p90\":4.8},\"levels\":[0,0,0,0],\"drawCalls\":0,\"visible\":0}\nlod {\"cpu\":{\"median\":0.7,\"p90\":1},\"gpu\":{\"median\":21,\"p90\":25.6},\"levels\":[0,122,435,1943],\"drawCalls\":2,\"visible\":417}\nfull {\"cpu\":{\"median\":0.7,\"p90\":1},\"gpu\":{\"median\":224.2,\"p90\":231},\"levels\":[0,0,0,0],\"drawCalls\":1,\"visible\":2228}\nimage {\"meanAbsDiff\":1.72,\"coverage\":0.99} scene {\"instances\":2500,\"triangles\":{\"high\":50000,\"mid\":3072,\"low\":576},\"bakeMs\":147}\nlod browser check passed"
+  },
+  {
+   "script": "packages/lod/test/imposter-check.mjs",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 75.2,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "bleed {\"shape\":\"knot\",\"rule\":\"old\",\"level\":4,\"tileTexels\":8,\"maxBleed\":0.4028,\"bleedingEdgeSamples\":0.2431}\nbleed {\"shape\":\"knot\",\"rule\":\"new\",\"level\":0,\"tileTexels\":128,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"knot\",\"rule\":\"new\",\"level\":1,\"tileTexels\":64,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"knot\",\"rule\":\"new\",\"level\":2,\"tileTexels\":32,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"knot\",\"rule\":\"new\",\"level\":3,\"tileTexels\":16,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"knot\",\"rule\":\"new\",\"level\":4,\"tileTexels\":8,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"disc\",\"rule\":\"old\",\"level\":0,\"tileTexels\":128,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"disc\",\"rule\":\"old\",\"level\":1,\"tileTexels\":64,\"maxBleed\":0.125,\"bleedingEdgeSamples\":0.0519}\nbleed {\"shape\":\"disc\",\"rule\":\"old\",\"level\":2,\"tileTexels\":32,\"maxBleed\":0.2813,\"bleedingEdgeSamples\":0.0968}\nbleed {\"shape\":\"disc\",\"rule\":\"old\",\"level\":3,\"tileTexels\":16,\"maxBleed\":0.3828,\"bleedingEdgeSamples\":0.1684}\nbleed {\"shape\":\"disc\",\"rule\":\"old\",\"level\":4,\"tileTexels\":8,\"maxBleed\":0.4266,\"bleedingEdgeSamples\":0.2899}\nbleed {\"shape\":\"disc\",\"rule\":\"new\",\"level\":0,\"tileTexels\":128,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"disc\",\"rule\":\"new\",\"level\":1,\"tileTexels\":64,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"disc\",\"rule\":\"new\",\"level\":2,\"tileTexels\":32,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"disc\",\"rule\":\"new\",\"level\":3,\"tileTexels\":16,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"disc\",\"rule\":\"new\",\"level\":4,\"tileTexels\":8,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nsweep {\"shape\":\"knot\",\"frames\":12,\"frameSize\":128,\"distance\":12,\"pitch\":20,\"steps\":181,\"cardPx\":177.7,\"refStep\":{\"median\":1.488,\"max\":2.132},\"impStep\":{\"median\":2.209,\"max\":5.778},\"excessMax\":4.48,\"errMean\":13.81,\"errMax\":18.443,\"ghostMean\":0.0124,\"ghostMax\":0.03269,\"snapRatio\":2.62,\"refRatio\":1.43}\nsweep {\"shape\":\"knot\",\"frames\":12,\"frameSize\":128,\"distance\":12,\"pitch\":-25,\"steps\":181,\"cardPx\":177.7,\"refStep\":{\"median\":1.454,\"max\":1.828},\"impStep\":{\"median\":2.137,\"max\":4.827},\"excessMax\":3.629,\"errMean\":12.746,\"errMax\":18.077,\"ghostMean\":0.01435,\"ghostMax\":0.0565,\"snapRatio\":2.26,\"refRatio\":1.26}\nsweep {\"shape\":\"knot\",\"frames\":12,\"frameSize\":128,\"distance\":12,\"pitch\":60,\"steps\":181,\"cardPx\":177.7,\"refStep\":{\"median\":1.52,\"max\":1.785},\"impStep\":{\"median\":2.431,\"max\":5.942},\"excessMax\":4.665,\"errMean\":19.75,\"errMax\":22.293,\"ghostMean\":0.01561,\"ghostMax\":0.03095,\"snapRatio\":2.44,\"refRatio\":1.17}\nsweep {\"shape\":\"disc\",\"frames\":12,\"frameSize\":128,\"distance\":12,\"pitch\":20,\"steps\":181,\"cardPx\":118.5,\"refStep\":{\"median\":0.049,\"max\":0.068},\"impStep\":{\"median\":0.736,\"max\":12.18},\"excessMax\":12.128,\"errMean\":12.534,\"errMax\":32.725,\"ghostMean\":0.00644,\"ghostMax\":0.01316,\"snapRatio\":16.55,\"refRatio\":1.39}\nsweep {\"shape\":\"knot\",\"frames\":12,\"frameSize\":128,\"distance\":40,\"pitch\":20,\"steps\":91,\"cardPx\":53.3,\"refStep\":{\"median\":2.619,\"max\":3.746},\"impStep\":{\"median\":3.696,\"max\":5.906},\"excessMax\":2.516,\"errMean\":8.661,\"errMax\":13.132,\"ghostMean\":0.00043,\"ghostMax\":0.00309,\"snapRatio\":1.6,\"refRatio\":1.43}\nsweep {\"shape\":\"knot\",\"frames\":12,\"frameSize\":128,\"distance\":80,\"pitch\":20,\"steps\":91,\"cardPx\":26.7,\"refStep\":{\"median\":2.473,\"max\":3.716},\"impStep\":{\"median\":3.507,\"max\":5.638},\"excessMax\":2.521,\"errMean\":9.319,\"errMax\":13.08,\"ghostMean\":0,\"ghostMax\":0,\"snapRatio\":1.61,\"refRatio\":1.5}\nsweep {\"shape\":\"disc\",\"frames\":12,\"frameSize\":128,\"distance\":40,\"pitch\":20,\"steps\":91,\"cardPx\":35.5,\"refStep\":{\"median\":0.085,\"max\":0.14},\"impStep\":{\"median\":1.127,\"max\":9.123},\"excessMax\":9.031,\"errMean\":9.078,\"errMax\":28.809,\"ghostMean\":0.00158,\"ghostMax\":0.00504,\"snapRatio\":8.09,\"refRatio\":1.65}\nsweep {\"shape\":\"disc\",\"frames\":12,\"frameSize\":128,\"distance\":80,\"pitch\":20,\"steps\":91,\"cardPx\":17.8,\"refStep\":{\"median\":0.034,\"max\":0.099},\"impStep\":{\"median\":0.883,\"max\":6.426},\"excessMax\":6.401,\"errMean\":10.414,\"errMax\":25.802,\"ghostMean\":0,\"ghostMax\":0,\"snapRatio\":7.28,\"refRatio\":2.91}\nimposter check finished"
+  },
+  {
+   "script": "packages/machinery/test/dimensions-check.mjs",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 6.9,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "      }\n    },\n    \"perspective-1\": {\n      \"label\": \"2000.0 mm\",\n      \"anchorY\": 137.13,\n      \"span\": 91.5,\n      \"lineRows\": [\n        96,\n        97,\n        103,\n        104,\n        105,\n        106,\n        112,\n        113\n      ],\n      \"offset\": 24.13,\n      \"ink\": {\n        \"width\": 69,\n        \"height\": 11\n      }\n    }\n  }\n}\ndimension callouts browser check passed"
+  },
+  {
+   "script": "packages/machinery/test/edges-check.mjs",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 8.8,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "adapter {\"vendor\":\"intel\",\"architecture\":\"xe-2lpg\",\"device\":\"\",\"description\":\"\",\"fallback\":false}\nok plain [[122,128,133],[126,132,138],[118,124,129],[126,132,138],[122,128,133]]\nok perspective [[255,0,255],[255,0,255],[255,0,255],[255,0,255],[255,0,255]]\nok ortho [[255,0,255],[237,18,239],[255,0,255],[255,0,255],[255,0,255]]\nok section [[255,0,255],[255,0,255],[255,0,255],[5,6,9],[255,0,255]]\nok exploded [[255,0,255],[255,0,255],[255,0,255],[255,0,255],[255,0,255]]\nok hidden [[5,6,9],[5,6,9],[5,6,9],[5,6,9],[5,6,9]]\nok tiny [[5,6,9],[5,6,9],[5,6,9],[5,6,9],[5,6,9]]\nfeature edges browser check passed"
+  },
+  {
+   "script": "packages/materials/test/browser-check.mjs",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 9.4,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "adapter {\"vendor\":\"intel\",\"architecture\":\"xe-2lpg\",\"device\":\"\",\"description\":\"\",\"fallback\":false}\nok loaded [ 255, 128, 0 ]\nok basic [ 0, 0, 255 ]\nok canvas [ 0, 255, 0 ]\nok flipTop [ 0, 0, 255 ]\nok normal [ 128, 127, 255 ]\nok standard [ 174, 0, 18 ]\nok matcap [ 255, 128, 0 ]\nok transparent [ 130, 3, 4 ]\nok additive [ 5, 194, 9 ]\nok mask [ 5, 6, 9 ]\nok effects [ 56, 90, 171 ]\nok video [ 255, 0, 255 ]\nmaterials browser check passed"
+  },
+  {
+   "script": "packages/scatter/test/lod.browser.mjs",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 7.3,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "          \"expected\": 1\n        },\n        {\n          \"center\": [\n            2.8,\n            0,\n            2.8\n          ],\n          \"scale\": 1,\n          \"expected\": 1\n        }\n      ]\n    },\n    {\n      \"lit\": false,\n      \"outgoing\": 2474,\n      \"incoming\": 2474\n    },\n    {\n      \"lit\": true,\n      \"outgoing\": 2474,\n      \"incoming\": 2474\n    }\n  ]\n}"
+  },
+  {
+   "script": "packages/selection/test/models.browser.mjs",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 13.4,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "    {\n      \"name\": \"Latency\",\n      \"gpuPickMs\": 3.92,\n      \"raycastMs\": 0.048\n    },\n    {\n      \"name\": \"GPU pick vs bvh Raycaster, orthographic\",\n      \"exact\": 590,\n      \"agree\": 600,\n      \"total\": 600,\n      \"modelPixels\": 100,\n      \"rate\": 1,\n      \"disagreements\": []\n    },\n    {\n      \"name\": \"Outline pixels (magenta)\",\n      \"none\": 0,\n      \"helmet\": 1271,\n      \"robot\": 2336,\n      \"plane\": 752,\n      \"occluded\": 0\n    }\n  ],\n  \"gpuErrors\": []\n}"
+  },
+  {
+   "script": "packages/selection/test/picking.browser.mjs",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 7.2,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "          \"copies\": 1\n        },\n        {\n          \"name\": \"Freshness, concurrent readback and stale slot guards\"\n        },\n        {\n          \"name\": \"3x3 center priority, orthogonal and diagonal edges, and bounded tolerance\"\n        },\n        {\n          \"name\": \"Clipped canvas corners, DPR conversion and ID-target resize\"\n        },\n        {\n          \"name\": \"Occlusion, mutable section clipping, mirrored/sheared transforms and outline integration\"\n        },\n        {\n          \"name\": \"Conveyor source shader composes with the MRT attachment\"\n        },\n        {\n          \"name\": \"Device restoration recreates micro targets and cached MRT\"\n        }\n      ],\n      \"gpuErrors\": []\n    }\n  ]\n}"
+  },
+  {
+   "script": "packages/selection/test/xray.browser.mjs",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 8.7,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "      }\n    ],\n    \"orthographic dashed\": [\n      {\n        \"count\": 337,\n        \"runs\": 9\n      },\n      {\n        \"count\": 336,\n        \"runs\": 12\n      }\n    ],\n    \"orthographic solid\": [\n      {\n        \"count\": 686,\n        \"runs\": 1\n      },\n      {\n        \"count\": 676,\n        \"runs\": 1\n      }\n    ]\n  }\n}\nselection x-ray browser check passed"
+  },
+  {
+   "script": "packages/shader/test/browser-check.mjs",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 8.9,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "adapter {\"vendor\":\"intel\",\"architecture\":\"xe-2lpg\",\"device\":\"\",\"description\":\"\",\"fallback\":false}\nok uniform [ 255, 128, 0 ]\nok gradient [ 255, 0, 0 ]\nok texture [ 0, 255, 0 ]\nok varying [ 188, 188, 255 ]\nok moved [ 5, 6, 9 ]\nok lit [ 181, 114, 177 ]\nok loop [ 0, 255, 255 ]\nok discard [ 255, 255, 255 ]\nok postDiscard [ 255, 255, 255 ]\natomics [1000,999,0,500]\nok atomics [ 5, 6, 9 ]\nok post [ 0, 127, 255 ]\nok compute [ 255, 188, 0 ]\nok variants\nshader browser check passed"
+  },
+  {
+   "script": "packages/sky/test/browser-check.mjs",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 11.2,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "adapter {\"vendor\":\"intel\",\"architecture\":\"xe-2lpg\",\"device\":\"\",\"description\":\"\",\"fallback\":false}\nok night-citadel 4x: 2 frames identical\nok stage-sky 4x: 2 frames identical\nok afterlight 4x: 4 frames identical\nok meadow 4x: 3 frames identical\nok preetham 4x: 3 frames identical\nok preetham-clouds-fog 4x: 2 frames identical\nok night-citadel 1x: 2 frames identical\nok stage-sky 1x: 2 frames identical\nok afterlight 1x: 4 frames identical\nok meadow 1x: 3 frames identical\nok preetham 1x: 3 frames identical\nok preetham-clouds-fog 1x: 2 frames identical\nsky entries browser check passed"
+  },
+  {
+   "script": "packages/staging/test/browser-check.mjs",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 25.1,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "{\"cubeContact\":{\"at\":[541,410],\"off\":[157,157,157],\"on\":[128,128,128],\"ratio\":0.815},\"sphereContact\":{\"at\":[740,413],\"off\":[158,158,158],\"on\":[127,127,127],\"ratio\":0.804},\"underFloating\":{\"at\":[640,325],\"off\":[158,158,158],\"on\":[158,158,158],\"ratio\":1},\"outside\":{\"at\":[292,431],\"off\":[157,157,157],\"on\":[157,157,157],\"ratio\":1},\"cubeTop\":{\"at\":[540,319],\"off\":[108,119,129],\"on\":[108,119,129],\"ratio\":1},\"floorReference\":{\"at\":[640,520],\"off\":[157,157,157],\"on\":[157,157,157],\"ratio\":1}}\nok pixels\n{\"frames\":65,\"static\":false,\"passesPerFrame\":6,\"updateMs\":0.24231550000000002,\"planeMs\":0.03263,\"totalMs\":0.27583250000000004,\"samples\":\"1280x720 4x MSAA\",\"resolution\":512,\"stats\":{\"updates\":71,\"cacheHits\":0}}\n{\"frames\":65,\"static\":true,\"passesPerFrame\":1,\"updateMs\":0,\"planeMs\":0.0267965,\"totalMs\":0.0267965,\"samples\":\"1280x720 4x MSAA\",\"resolution\":512,\"stats\":{\"updates\":71,\"cacheHits\":65}}\n{\"frames\":65,\"static\":false,\"passesPerFrame\":6,\"updateMs\":0.065651,\"planeMs\":0.0306765,\"totalMs\":0.096849,\"samples\":\"1280x720 4x MSAA\",\"resolution\":256,\"stats\":{\"updates\":65,\"cacheHits\":0}}\n{\"frames\":65,\"static\":true,\"passesPerFrame\":1,\"updateMs\":0,\"planeMs\":0.0257545,\"totalMs\":0.0257545,\"samples\":\"1280x720 4x MSAA\",\"resolution\":256,\"stats\":{\"updates\":65,\"cacheHits\":65}}\n{\"frames\":65,\"static\":false,\"passesPerFrame\":6,\"updateMs\":0.8667135,\"planeMs\":0.038281,\"totalMs\":0.9082224999999999,\"samples\":\"1280x720 4x MSAA\",\"resolution\":1024,\"stats\":{\"updates\":65,\"cacheHits\":0}}\n{\"frames\":65,\"static\":true,\"passesPerFrame\":1,\"updateMs\":0,\"planeMs\":0.0407815,\"totalMs\":0.0407815,\"samples\":\"1280x720 4x MSAA\",\"resolution\":1024,\"stats\":{\"updates\":65,\"cacheHits\":65}}\n{\"frames\":65,\"static\":false,\"passesPerFrame\":6,\"updateMs\":0.2429675,\"planeMs\":0.01776,\"totalMs\":0.26046749999999996,\"samples\":\"1280x720 1x MSAA\",\"resolution\":512,\"stats\":{\"updates\":65,\"cacheHits\":0}}\n{\"frames\":65,\"static\":true,\"passesPerFrame\":1,\"updateMs\":0,\"planeMs\":0.021016,\"totalMs\":0.021016,\"samples\":\"1280x720 1x MSAA\",\"resolution\":512,\"stats\":{\"updates\":65,\"cacheHits\":65}}\nstaging browser check passed"
+  },
+  {
+   "script": "packages/terrain/test/wetness.browser.mjs",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 5.8,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "{\"hardware\":{\"webglRenderer\":\"ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (16GB) (0x000064A0) Direct3D11 vs_5_0 ps_5_0, D3D11)\",\"webgpu\":{\"vendor\":\"intel\",\"architecture\":\"xe-2lpg\",\"device\":\"\",\"description\":\"\",\"fallback\":false},\"userAgent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0\",\"browserName\":\"chromium\",\"browserVersion\":\"155.0.4283.45\",\"requestedChannel\":\"msedge\",\"launchArgs\":[],\"powerPreference\":\"high-performance\",\"hostPlatform\":\"win32\",\"headless\":true},\"checks\":[\"Incoming depth darkens sand smoothly\",\"Grass/dirt heights and positions remain fixed\",\"Wetness stays inside the coastline map\"]}"
+  },
+  {
+   "script": "packages/viewcube/test/browser-check.mjs",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 9,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "adapter {\"vendor\":\"intel\",\"architecture\":\"xe-2lpg\",\"device\":\"\",\"description\":\"\",\"fallback\":false}\nok top view renders with X right and -Z up\nviewcube browser check passed"
+  },
+  {
+   "script": "packages/water/test/coast.browser.mjs",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 8.5,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "{\"vendor\":\"intel\",\"refractedPixels\":11264,\"checks\":[\"Four continuous coastal edges\",\"Depth-based shore blend normals\",\"Curved crests across the wind\",\"Analytical curved swell normals\",\"Ripple height-field gradients\",\"No folds near the accepted height limit\",\"Zero amplitude flattens the spectrum\",\"Ocean waves continue inside the map\",\"Coarse horizon waves filtered\",\"Sky rejected as seabed\",\"Submerged refraction retained\",\"Device restoration\",\"Fresnel roundoff remains finite\",\"Open-water reflection stays above the horizon\",\"Sun/moon reflection alignment through changing intensities\"]}"
+  },
+  {
+   "script": "packages/water/test/flow.browser.mjs",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 7.7,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "      \"basinSpray\": 1118\n    },\n    {\n      \"shoreDirections\": [\n        \"east\",\n        \"west\",\n        \"south\",\n        \"north\"\n      ],\n      \"peakDepths\": [\n        0.11189598590135574,\n        0.8589368462562561,\n        0.15037885308265686,\n        0.5417398810386658\n      ],\n      \"lowDepths\": [\n        0,\n        0,\n        0,\n        0\n      ]\n    }\n  ],\n  \"errors\": []\n}"
+  },
+  {
+   "script": "packages/water/test/surface.browser.mjs",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 6.1,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "{\"vendor\":\"intel\",\"changedPixels\":0}"
+  },
+  {
+   "script": "examples/gameplay-sandbox/test/shared.browser.mjs",
+   "pass": true,
+   "exitCode": 0,
+   "seconds": 29.9,
+   "acPowerBefore": true,
+   "acPowerAfter": true,
+   "tail": "{\"checks\":[\"Mobile shader failure keeps complete selectable, scrollable diagnostics visible\",\"iPhone UA at DPR 3 uses DPR 2 buffers, only 1x textures/pipelines, stored color and zero resolves\",\"Touch look stick tilts upward across the horizon\",\"Touch layout starts, changes all particle tiers and wireframe, exposes movement sticks and pauses\",\"Initial particle population: 1,000,000\",\"Off removes particle passes and GPU buffers, survives restoration, and allows particles to be re-enabled\",\"Initial shared lighting and atmosphere open at 17:34 golden hour\",\"Moon is visible without camera overrides; mouse drag looks up with terrain clearance\",\"Paused full-day slider reaches midnight and 23:59, labels sun/moon, and fades shared emission/local lights together\",\"Separate sun/moon glints share disc strength and stay off before sunset while PCSS retains its twilight blend\",\"Procedural cabin and trees cast into all four moonlight PCSS cascades\",\"Shared camera clearance preserves requested offset\",\"Restored particle population: 1,000,000 using package initialCount\",\"Porch point light populates GPU light lists before and after restoration\",\"Day/night cabin light switching survives device restoration\",\"Night, restored and all shore HDR targets remain finite with surf and fireflies\",\"Prominent sun/moon discs render through the shared HDR sky and bloom\",\"Closed cabin seams and ambient-only occlusion render in day/night with detail wind and restored shadows\",\"Day/golden/night GPU fog preserves nearby shores and sky, blends HDR smoothly and fades distant water into sky radiance\",\"All four offshore views render coastal blending and the ocean horizon at 100k particles\",\"Terrain/PBR/shadow shaders render without WebGPU errors\"],\"errors\":[],\"mobile\":{\"css\":[390,664],\"buffer\":[780,1328],\"dpr\":3,\"effectiveDpr\":2,\"multisampledTextures\":0,\"multisampledPipelines\":0,\"resolves\":0,\"discardedColors\":0},\"hardware\":{\"description\":\"\",\"vendor\":\"intel\",\"fallback\":false},\"clock\":[{\"hours\":0,\"night\":1,\"emission\":1,\"porch\":1},{\"hours\":12,\"night\":0,\"emission\":0,\"porch\":0},{\"hours\":18,\"night\":0.35199999809265137,\"emission\":0.35199999809265137,\"porch\":0.35199999809265137},{\"hours\":21,\"night\":1,\"emission\":1,\"porch\":1},{\"hours\":23.989999999999995,\"night\":1,\"emission\":1,\"porch\":1}],\"lighting\":[{\"hours\":12,\"sun\":[6.123234262925839e-17,1,0],\"moon\":[-0.28117313981056213,0.20619362592697144,-0.9372437596321106],\"light\":[6.123234262925839e-17,1,0,6],\"radiance\":[1,0.9700000286102295,0.9200000166893005,0.23999999463558197],\"waterLights\":[6.123234262925839e-17,1,0,6,1,0.9700000286102295,0.9200000166893005,0,-0.28117313981056213,0.20619362592697144,-0.9372437596321106,0,0.25,0.44999998807907104,0.75,0],\"moonStrength\":0},{\"hours\":17.816666666666666,\"sun\":[-0.9988483786582947,0.047978129237890244,0],\"moon\":[-0.28117313981056213,0.20619362592697144,-0.9372437596321106],\"light\":[-0.9890613555908203,0.073768749833107,-0.1277334988117218,0.3290865123271942],\"radiance\":[0.9060633182525635,0.659940242767334,0.4088470935821533,0.22969557344913483],\"waterLights\":[-0.9988483786582947,0.047978129237890244,0,0.28786876797676086,1,0.6899999976158142,0.36000001430511475,0,-0.28117313981056213,0.20619362592697144,-0.9372437596321106,0,0.25,0.44999998807907104,0.75,0],\"moonStrength\":0},{\"hours\":17.9,\"sun\":[-0.9996573328971863,0.026176948100328445,0],\"moon\":[-0.28117313981056213,0.20619362592697144,-0.9372437596321106],\"light\":[-0.8747872710227966,0.1223607063293457,-0.4688017964363098,0.2640349566936493],\"radiance\":[0.6961389183998108,0.5927644371986389,0.518007755279541,0.21325668692588806],\"waterLights\":[-0.9996573328971863,0.026176948100328445,0,0.15706169605255127,1,0.6899999976158142,0.36000001430511475,0,-0.28117313981056213,0.20619362592697144,-0.9372437596321106,0,0.25,0.44999998807907104,0.75,0],\"moonStrength\":0},{\"hours\":18,\"sun\":[-1,1.2246468525851679e-16,0],\"moon\":[-0.28117313981056213,0.20619362592697144,-0.9372437596321106],\"light\":[-0.28117313981056213,0.20619362592697144,-0.9372437596321106,0.21119999885559082],\"radiance\":[0.25,0.44999998807907104,0.75,0.18719999492168427],\"waterLights\":[-1,1.2246468525851679e-16,0,7.347881115511007e-16,1,0.6899999976158142,0.36000001430511475,0,-0.28117313981056213,0.20619362592697144,-0.9372437596321106,0,0.25,0.44999998807907104,0.75,0],\"moonStrength\":0},{\"hours\":18.2,\"sun\":[-0.9986295104026794,-0.0523359552025795,0],\"moon\":[-0.28117313981056213,0.20619362592697144,-0.9372437596321106],\"light\":[-0.28117313981056213,0.20619362592697144,-0.9372437596321106,0.4404401481151581],\"radiance\":[0.25,0.44999998807907104,0.75,0.12988996505737305],\"waterLights\":[-0.9986295104026794,-0.0523359552025795,0,0,1,0.6899999976158142,0.36000001430511475,0,-0.28117313981056213,0.20619362592697144,-0.9372437596321106,0.2428322732448578,0.25,0.44999998807907104,0.75,0],\"moonStrength\":0.2428322732448578},{\"hours\":18.466666666666665,\"sun\":[-0.9925461411476135,-0.12186934053897858,0],\"moon\":[-0.28117313981056213,0.20619362592697144,-0.9372437596321106],\"light\":[-0.28117313981056213,0.20619362592697144,-0.9372437596321106,0.6000000238418579],\"radiance\":[0.25,0.44999998807907104,0.75,0.09000000357627869],\"waterLights\":[-0.9925461411476135,-0.12186934053897858,0,0,1,0.6899999976158142,0.36000001430511475,0,-0.28117313981056213,0.20619362592697144,-0.9372437596321106,0.6000000238418579,0.25,0.44999998807907104,0.75,0],\"moonStrength\":0.6000000238418579},{\"hours\":21,\"sun\":[-0.7071067690849304,-0.7071067690849304,0],\"moon\":[-0.28117313981056213,0.20619362592697144,-0.9372437596321106],\"light\":[-0.28117313981056213,0.20619362592697144,-0.9372437596321106,0.6000000238418579],\"radiance\":[0.25,0.44999998807907104,0.75,0.09000000357627869],\"waterLights\":[-0.7071067690849304,-0.7071067690849304,0,0,1,0.6899999976158142,0.36000001430511475,0,-0.28117313981056213,0.20619362592697144,-0.9372437596321106,0.6000000238418579,0.25,0.44999998807907104,0.75,0],\"moonStrength\":0.6000000238418579},{\"hours\":0,\"sun\":[6.123234262925839e-17,-1,0],\"moon\":[-0.28117313981056213,0.20619362592697144,-0.9372437596321106],\"light\":[-0.28117313981056213,0.20619362592697144,-0.9372437596321106,0.6000000238418579],\"radiance\":[0.25,0.44999998807907104,0.75,0.09000000357627869],\"waterLights\":[6.123234262925839e-17,-1,0,0,1,0.6899999976158142,0.36000001430511475,0,-0.28117313981056213,0.20619362592697144,-0.9372437596321106,0.6000000238418579,0.25,0.44999998807907104,0.75,0],\"moonStrength\":0.6000000238418579},{\"hours\":6,\"sun\":[1,0,0],\"moon\":[-0.28117313981056213,0.20619362592697144,-0.9372437596321106],\"light\":[-0.28117313981056213,0.20619362592697144,-0.9372437596321106,0.21119999885559082],\"radiance\":[0.25,0.44999998807907104,0.75,0.18719999492168427],\"waterLights\":[1,0,0,0,1,0.6899999976158142,0.36000001430511475,0,-0.28117313981056213,0.20619362592697144,-0.9372437596321106,0,0.25,0.44999998807907104,0.75,0],\"moonStrength\":0}],\"fog\":[{\"hours\":12,\"samples\":[[[0.59130859375,0.89111328125,1.033203125],[0.46435546875,0.74462890625,0.931640625],[0.11773681640625,0.254638671875,0.4892578125],[0.08282470703125,0.261962890625,0.309814453125]],[[0.59130859375,0.89111328125,1.033203125],[0.63427734375,0.8876953125,0.98388671875],[0.2166748046875,0.375732421875,0.58349609375],[0.08282470703125,0.261962890625,0.309814453125]],[[0.59130859375,0.89111328125,1.033203125],[0.63623046875,0.88916015625,0.984375],[0.63623046875,0.88916015625,0.984375],[0.08282470703125,0.261962890625,0.309814453125]]]},{\"hours\":17.57,\"samples\":[[[0.481201171875,0.51708984375,0.294189453125],[0.37939453125,0.44580078125,0.283447265625],[0.0970458984375,0.164306640625,0.189697265625],[0.0279083251953125,0.062255859375,0.0772705078125]],[[0.481201171875,0.51708984375,0.294189453125],[0.50341796875,0.488037109375,0.26513671875],[0.1748046875,0.2261962890625,0.2041015625],[0.0279083251953125,0.062255859375,0.0772705078125]],[[0.481201171875,0.51708984375,0.294189453125],[0.50439453125,0.488525390625,0.264892578125],[0.50439453125,0.488525390625,0.264892578125],[0.0279083251953125,0.062255859375,0.0772705078125]]]},{\"hours\":0,\"samples\":[[[0.008331298828125,0.01334381103515625,0.02764892578125],[0.0078125,0.01261138916015625,0.026275634765625],[0.0034351348876953125,0.006389617919921875,0.015411376953125],[0.0020198822021484375,0.007080078125,0.01349639892578125]],[[0.008331298828125,0.01334381103515625,0.02764892578125],[0.0093231201171875,0.01477813720703125,0.029632568359375],[0.0045623779296875,0.00799560546875,0.01812744140625],[0.0020198822021484375,0.007080078125,0.01349639892578125]],[[0.008331298828125,0.01334381103515625,0.02764892578125],[0.00933837890625,0.014801025390625,0.0296630859375],[0.00933837890625,0.014801025390625,0.0296630859375],[0.0020198822021484375,0.007080078125,0.01349639892578125]]]}]}"
+  }
+ ],
+ "discarded": 0
+}

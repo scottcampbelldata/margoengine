@@ -1,0 +1,355 @@
+{
+  "label": "quiet",
+  "machine": {
+    "ac": true,
+    "cpuLoadPercent": 2,
+    "waitedSeconds": 755,
+    "checkedAt": "2026-10-15T04:18:09.144Z",
+    "topProcesses": [
+      {
+        "Name": "claude",
+        "Id": 33696,
+        "cpuSeconds": 21248
+      },
+      {
+        "Name": "claude",
+        "Id": 6516,
+        "cpuSeconds": 14109
+      },
+      {
+        "Name": "node",
+        "Id": 2940,
+        "cpuSeconds": 9325
+      },
+      {
+        "Name": "chrome",
+        "Id": 5460,
+        "cpuSeconds": 8612
+      },
+      {
+        "Name": "claude",
+        "Id": 48572,
+        "cpuSeconds": 7937
+      },
+      {
+        "Name": "Selkie",
+        "Id": 27788,
+        "cpuSeconds": 6079
+      },
+      {
+        "Name": "claude",
+        "Id": 44340,
+        "cpuSeconds": 5251
+      },
+      {
+        "Name": "msedgewebview2",
+        "Id": 23352,
+        "cpuSeconds": 4770
+      }
+    ]
+  },
+  "gpu": {
+    "vendor": "intel",
+    "architecture": "xe-2lpg",
+    "device": "",
+    "description": "",
+    "fallback": false
+  },
+  "browser": "chromium 155.0.4283.45",
+  "wifi": {
+    "offline": false,
+    "latency": 80,
+    "downloadThroughput": 2500000,
+    "uploadThroughput": 625000
+  },
+  "reps": 3,
+  "assets": [
+    {
+      "name": "DamagedHelmet",
+      "bytes": 3773916,
+      "sha256": "a1e3b04de97b11de564ce6e53b95f02954a297f0008183ac63a4f5974f6b32d8",
+      "profiles": {
+        "localhost": {
+          "medianMs": {
+            "baseline": 328,
+            "cold": 299.6,
+            "storedAfter": 299.6,
+            "warm": 273
+          },
+          "runsMs": {
+            "baseline": [
+              603.2,
+              328,
+              299
+            ],
+            "cold": [
+              348.1,
+              299.6,
+              285.6
+            ],
+            "storedAfter": [
+              348.1,
+              299.6,
+              285.6
+            ],
+            "warm": [
+              292.5,
+              273,
+              269.9
+            ]
+          },
+          "warmStats": {
+            "hits": 1,
+            "revalidated": 1,
+            "offline": 0,
+            "misses": 0,
+            "stored": 0,
+            "evicted": 0,
+            "errors": 0
+          },
+          "usage": {
+            "bytes": 3773916,
+            "files": 1,
+            "quota": 10741268480,
+            "usage": 3850240
+          },
+          "triangles": 15452,
+          "primitives": 1
+        },
+        "wifi 20 Mbit/s 80 ms": {
+          "medianMs": {
+            "baseline": 1903.7,
+            "cold": 1913.4,
+            "storedAfter": 1913.4,
+            "warm": 375.2
+          },
+          "runsMs": {
+            "baseline": [
+              1903.7,
+              1891.4,
+              1905
+            ],
+            "cold": [
+              1913.4,
+              1948.7,
+              1890.2
+            ],
+            "storedAfter": [
+              1913.4,
+              1948.7,
+              1890.2
+            ],
+            "warm": [
+              375.2,
+              458.2,
+              344.3
+            ]
+          },
+          "warmStats": {
+            "hits": 1,
+            "revalidated": 1,
+            "offline": 0,
+            "misses": 0,
+            "stored": 0,
+            "evicted": 0,
+            "errors": 0
+          },
+          "usage": {
+            "bytes": 3773916,
+            "files": 1,
+            "quota": 10741268480,
+            "usage": 3850240
+          },
+          "triangles": 15452,
+          "primitives": 1
+        }
+      },
+      "offline": {
+        "ms": 237.4,
+        "stats": {
+          "hits": 1,
+          "revalidated": 0,
+          "offline": 1,
+          "misses": 0,
+          "stored": 0,
+          "evicted": 0,
+          "errors": 0
+        },
+        "digestMatches": true,
+        "frameMatches": true,
+        "worker": {
+          "bytes": 3773916,
+          "sha256": "a1e3b04de97b11de564ce6e53b95f02954a297f0008183ac63a4f5974f6b32d8",
+          "stats": {
+            "hits": 1,
+            "revalidated": 0,
+            "offline": 1,
+            "misses": 0,
+            "stored": 0,
+            "evicted": 0,
+            "errors": 0
+          },
+          "onLine": false
+        }
+      },
+      "parseInWorker": {
+        "ms": 347.8,
+        "stats": {
+          "hits": 1,
+          "revalidated": 1,
+          "offline": 0,
+          "misses": 0,
+          "stored": 0,
+          "evicted": 0,
+          "errors": 0
+        },
+        "digest": "89a80c69d51466d6d44c1bc965416a1b123a6cb1f53f43d4129b3156fa8d01f1",
+        "errors": []
+      }
+    },
+    {
+      "name": "generated large GLB",
+      "bytes": 48129296,
+      "sha256": "ade588f93a8632c71f2dfe9562a02c09e7940c20c03c1568d04f80befd7e75bd",
+      "profiles": {
+        "localhost": {
+          "medianMs": {
+            "baseline": 766,
+            "cold": 655.6,
+            "storedAfter": 655.9,
+            "warm": 319.4
+          },
+          "runsMs": {
+            "baseline": [
+              781.8,
+              648.3,
+              766
+            ],
+            "cold": [
+              602.1,
+              655.6,
+              667.2
+            ],
+            "storedAfter": [
+              607.3,
+              655.9,
+              667.2
+            ],
+            "warm": [
+              318.7,
+              319.4,
+              323.3
+            ]
+          },
+          "warmStats": {
+            "hits": 1,
+            "revalidated": 1,
+            "offline": 0,
+            "misses": 0,
+            "stored": 0,
+            "evicted": 0,
+            "errors": 0
+          },
+          "usage": {
+            "bytes": 48129296,
+            "files": 1,
+            "quota": 10742738944,
+            "usage": 5320704
+          },
+          "triangles": 1920000,
+          "primitives": 6
+        },
+        "wifi 20 Mbit/s 80 ms": {
+          "medianMs": {
+            "baseline": 20102.1,
+            "cold": 20115,
+            "storedAfter": 20115,
+            "warm": 414.2
+          },
+          "runsMs": {
+            "baseline": [
+              20102.1,
+              20238.8,
+              19965.6
+            ],
+            "cold": [
+              20106.8,
+              21127.6,
+              20115
+            ],
+            "storedAfter": [
+              20106.8,
+              21127.6,
+              20115
+            ],
+            "warm": [
+              414.2,
+              470.2,
+              390.9
+            ]
+          },
+          "warmStats": {
+            "hits": 1,
+            "revalidated": 1,
+            "offline": 0,
+            "misses": 0,
+            "stored": 0,
+            "evicted": 0,
+            "errors": 0
+          },
+          "usage": {
+            "bytes": 48129296,
+            "files": 1,
+            "quota": 10742738944,
+            "usage": 5320704
+          },
+          "triangles": 1920000,
+          "primitives": 6
+        }
+      },
+      "offline": {
+        "ms": 274.1,
+        "stats": {
+          "hits": 1,
+          "revalidated": 0,
+          "offline": 1,
+          "misses": 0,
+          "stored": 0,
+          "evicted": 0,
+          "errors": 0
+        },
+        "digestMatches": true,
+        "frameMatches": true,
+        "worker": {
+          "bytes": 48129296,
+          "sha256": "ade588f93a8632c71f2dfe9562a02c09e7940c20c03c1568d04f80befd7e75bd",
+          "stats": {
+            "hits": 1,
+            "revalidated": 0,
+            "offline": 1,
+            "misses": 0,
+            "stored": 0,
+            "evicted": 0,
+            "errors": 0
+          },
+          "onLine": false
+        }
+      },
+      "parseInWorker": {
+        "ms": 378.8,
+        "stats": {
+          "hits": 1,
+          "revalidated": 1,
+          "offline": 0,
+          "misses": 0,
+          "stored": 0,
+          "evicted": 0,
+          "errors": 0
+        },
+        "digest": "5aaa546842a17056d860e0d9e786c0b82a0f7b959e74e0b812625dae6d6fdc4c",
+        "errors": []
+      }
+    }
+  ],
+  "acAfter": true
+}

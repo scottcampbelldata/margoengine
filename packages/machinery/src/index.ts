@@ -1,23 +1,38 @@
-export {Kinematics} from './kinematics.js';
-export type {Joint,GearCoupling,PistonCoupling,IKTarget,DistanceConstraint,KinematicOptions} from './kinematics.js';
-export {parseCAD,loadCAD,deduplicateParts,PartInstancer} from './cad.js';
-export type {CADModel} from './cad.js';
-export {parseCADAsync} from './cad-async.js';
-export type {CADFormat,CADImportOptions} from './cad-async.js';
-export {SurfacePhysics} from './surface.js';
-export type {SurfaceCarrier,ConveyingPart,SurfaceOptions} from './surface.js';
-export {TelemetryChannel} from './telemetry.js';
-export type {TelemetryOptions} from './telemetry.js';
-export {SectionPlanes,boxSection} from './section.js';
-export {AssemblyIndex} from './assembly.js';
-export {vertexAnchor,edgeAnchor,faceAnchor,holeAnchor,snapAnchor,measureDistance} from './metrology.js';
-export {AssemblyBVH} from './spatial.js';
-export type {RayHit} from './spatial.js';
-export {measureClearance} from './clearance.js';
-export type {Clearance} from './clearance.js';
-export {industrialMaterials,industrialMaterial} from './materials.js';
-export type {SectionOptions} from './section.js';
-export {EngineeringAnnotations,worldAnchor,projectAnnotation} from './overlays.js';
-export type {Anchor,Dimension,Callout,AnnotationOptions} from './overlays.js';
-export {ExplodedView} from './exploded.js';
-export type {ExplodedPart} from './exploded.js';
+export { Kinematics } from './kinematics.js';
+export type {
+  Joint,
+  GearCoupling,
+  PistonCoupling,
+  IKTarget,
+  DistanceConstraint,
+  KinematicOptions,
+} from './kinematics.js';
+export { parseCAD, loadCAD, deduplicateParts, PartInstancer } from './cad.js';
+export type { CADModel } from './cad.js';
+export { parseCADAsync } from './cad-async.js';
+export type { CADFormat, CADImportOptions } from './cad-async.js';
+export { SurfacePhysics } from './surface.js';
+export type { SurfaceCarrier, ConveyingPart, SurfaceOptions } from './surface.js';
+export { TelemetryChannel } from './telemetry.js';
+export type { TelemetryOptions } from './telemetry.js';
+export { SectionPlanes, boxSection } from './section.js';
+export { AssemblyIndex } from './assembly.js';
+export {
+  vertexAnchor,
+  edgeAnchor,
+  faceAnchor,
+  holeAnchor,
+  snapAnchor,
+  snapFeature,
+  measureDistance,
+} from './metrology.js';
+export { AssemblyBVH } from './spatial.js';
+export type { RayHit } from './spatial.js';
+export { measureClearance } from './clearance.js';
+export type { Clearance } from './clearance.js';
+export { industrialMaterials, industrialMaterial } from './materials.js';
+export type { SectionOptions } from './section.js';
+export { EngineeringAnnotations, worldAnchor, projectAnnotation } from './overlays.js';
+export type { Anchor, Dimension, Callout, AnnotationOptions } from './overlays.js';
+export { ExplodedView } from './exploded.js';
+export type { ExplodedPart } from './exploded.js';

@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import type {MaterialExtension, MaterialExtensionTexture, PBRModel, PBRPrimitive} from '@margoengine/gltf-pro';
 import type {Engine, EnginePlugin} from '@margoengine/core/extension';
 import type {MaterialGraph, NodeMaterialOptions} from './node-types.js';
@@ -153,6 +154,9 @@ export function nodeMaterial(graph:MaterialGraph,options:NodeMaterialOptions={})
 
 /** Applies one graph to a model; owns only its optional shared opaque capture. */
 export class NodeMaterialInstallation implements EnginePlugin {
+  static attach(model:PBRModel,graph:MaterialGraph):NodeMaterialInstallation {return installNodeMaterial(model,graph);}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
   readonly name:string;
   disposed=false;
   private readonly compiled:ReturnType<typeof compile>;

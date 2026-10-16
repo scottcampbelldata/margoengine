@@ -8,6 +8,8 @@ Step 4 was tested in isolation and rejected: `opt-level = "z"` reduced the measu
 
 Step 5 uses the allowed documentation alternative: unverified registry install commands were removed from the root and React READMEs. Source builds and local tarballs remain the documented installation path until publication is verified.
 
+Verification of the isolated change set: a clean build with no prior distribution files; 1,225 Node tests with no failures, skips, or TODOs; strict types and packed imports for all 63 packages; 34 fresh tarballs with 120 React 18 tests and a packaged browser lifecycle; Vite, Next.js, React viewer, and showcase production builds. RTX A6000 checks passed for the eight new React cases, 16 existing React cases, 20 exact shader comparisons across 40 captures, deformed picking, and visual parity. Core plus stage remains 19,999 bytes gzip; core, stage, and shipping kernel sources are unchanged.
+
 Clearcoat, transmission, volume, the node graph, KTX2, texture transforms, eight influences, and point and spot shadows are already in the engine. Do not rebuild them. The React layer should call them.
 
 Core plus stage is still **19,999 bytes gzip**. The gate fails at 20,000. None of the steps below edit `@margoengine/core` or the stage facade except step 4, and step 4 runs only if a size experiment frees bytes.

@@ -1,0 +1,24 @@
+{
+  "name": "margo-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@margoengine/bvh": "^1.0.0",
+    "@margoengine/controls": "^1.0.0",
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/environment": "^1.0.0",
+    "@margoengine/geometry": "^1.0.0",
+    "@margoengine/quality": "^1.0.0",
+    "@margoengine/stats": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4"
+  }
+}

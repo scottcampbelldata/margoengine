@@ -83,7 +83,7 @@ test('all new maps reject malformed texture interfaces and unsupported UV sets',
 test('unextended models retain the baseline shader and allocation path after installation',async()=>{
   const s=await scene();try{const before={...s.counts},installation=materials.install(s.model);s.draw();
     assert.equal(s.model.primitives[0].material.extension,undefined);assert.deepEqual([...s.draws[0].groups.keys()],[0,1]);
-    assert.equal(digest(s.draws[0].pipeline.vertex.module.code),'469dd81676967dbfd22118fa85b1cf8b6ff37dc7593e7e7f8130e5626a29f508');
+    assert.equal(digest(s.draws[0].pipeline.vertex.module.code),'45df766b2c73181edc3cbd8109a848f17851f03b7cc947dec8d987ff60c2dee5');
     assert.equal(s.counts.textures,before.textures);assert.equal(s.counts.buffers,before.buffers);installation.dispose();
   }finally{s.engine.dispose();}
 });

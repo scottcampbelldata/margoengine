@@ -1,0 +1,46 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>LOD browser check</title><style>body{margin:0;background:#000}canvas{width:1280px;height:720px;display:block}</style></head><body><canvas></canvas>
+<script type="module">
+import {Engine,PbrMaterial} from '/packages/core/dist/index.js';
+import {torusKnotGeometry,toGeometry} from '/packages/geometry/dist/index.js';
+import {LODSystem,Imposter} from '/packages/lod/dist/index.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',capacity:8192,camera:{position:[0,28,190],target:[0,0,0],far:2000}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+// One detailed part (50,000 triangles) and two reductions, as a CAD exporter would emit them.
+const knot=(t,r)=>toGeometry(torusKnotGeometry(1.6,0.45,t,r)),high=knot(500,50),mid=knot(128,12),low=knot(48,6);
+const material=new PbrMaterial({color:'#d08a3c',roughness:0.4,metalness:0.3}),side=50,spacing=6,anchors=[];
+for(let i=0;i<side*side;i++){
+  const m=engine.createMesh().setPosition([(i%side-(side-1)/2)*spacing,0,(Math.floor(i/side)-(side-1)/2)*spacing]).setRotation([0,(i*0.37)%6.283,0]).setMaterial(material);
+  anchors.push(m);
+}
+let lods,imposter,bakeMs=0;
+const triangles=g=>g.indices.length/3;
+window.check={
+  info:()=>({instances:anchors.length,triangles:{high:triangles(high),mid:triangles(mid),low:triangles(low)},bakeMs,errors:errors.splice(0)}),
+  async mode(name){
+    device.pushErrorScope('validation');
+    if(lods){engine.removePlugin(lods.name);lods=undefined;}
+    if(name!=='lod')for(const m of anchors){m.visible=name==='full';m.setGeometry(high);}
+    else {
+      if(!imposter){const t=performance.now();imposter=Imposter.bake(engine,high,{material,frames:12,frameSize:128});await device.queue.onSubmittedWorkDone();bakeMs=performance.now()-t;}
+      lods=new LODSystem();engine.use(lods);for(const m of anchors)m.visible=true;
+      for(const m of anchors)lods.add(m,[{object:high},{object:mid,distance:40},{object:low,distance:90},{object:imposter,distance:150}]);
+    }
+    engine.render();await device.queue.onSubmittedWorkDone();const e=await device.popErrorScope();return {error:e?.message??null,errors:errors.splice(0)};
+  },
+  /** Serialised frames: CPU = engine.render(), GPU = submit to onSubmittedWorkDone. */
+  async measure(frames=120){
+    const cpu=[],gpu=[],levels=[0,0,0,0];
+    for(let f=0;f<frames+20;f++){
+      const a=0.25*Math.sin(f/frames*Math.PI*2);engine.camera.position=[190*Math.sin(a),28,190*Math.cos(a)];
+      const t0=performance.now();engine.render();const t1=performance.now();await device.queue.onSubmittedWorkDone();const t2=performance.now();
+      if(f>=20){cpu.push(t1-t0);gpu.push(t2-t1);}
+    }
+    if(lods)for(const l of lods.handles)levels[l.level]++;
+    const stat=a=>{a.sort((x,y)=>x-y);return {median:+a[a.length>>1].toFixed(2),p90:+a[Math.floor(a.length*0.9)].toFixed(2)};};
+    engine.camera.position=[0,28,190];engine.render();await device.queue.onSubmittedWorkDone();
+    return {cpu:stat(cpu),gpu:stat(gpu),levels,drawCalls:engine.stats.drawCalls,visible:engine.stats.visible,errors:errors.splice(0)};
+  },
+};
+window.ready=true;
+</script></body></html>

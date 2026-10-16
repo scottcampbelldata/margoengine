@@ -1,15 +1,23 @@
 {
   "name": "@margoengine/kinematics-constraints",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "Standalone analytical capsule and sphere constraints for IK target and arm clearance.",
   "sideEffects": false,
   "exports": {
-    ".": {"types": "./dist/index.d.ts", "import": "./dist/index.js"}
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
-  "files": ["dist", "LICENSE"],
-  "publishConfig": {"access": "public"},
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "node ../../scripts/build-optional.js kinematics-constraints",
     "test": "npm run build && node --test tests/*.test.js",

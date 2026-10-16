@@ -1,0 +1,89 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Volumetric fog GPU check</title><style>body{margin:0}#host{width:1280px;height:720px}</style></head><body><div id="host"></div>
+<script type="module">
+// Driven by volumetric-gpu.mjs. `?samples=1` runs the 1x scene target (light tier), the default is 4x; `?size=WxH`.
+// Scenes (core meshes, Tonemap capture, VolumetricFog):
+//  shaft:   a 20 m wall at z=-2 with a 1.5 m vertical slit (`closed` plugs it), the sun behind it and above
+//           (toward [0, 0.5, -1]); the camera at x=6 looks across, so rays to the wall left of the slit cross the shaft.
+//  spot:    no sun, a clustered spot light pointing down at x=0 over a dark ground and far wall, optionally a box caster
+//           in the cone with LocalShadows.
+//  falloff: ambient light only and a black wall 30 m away, so a wall pixel shows only fog (ambient x opacity).
+import {createStage} from '/packages/margoengine/dist/index.js';
+import {box,PbrMaterial} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {Clustered} from '/packages/clustered/dist/index.js';
+import {LocalShadows} from '/packages/clustered/dist/shadows.js';
+import {Tonemap} from '/packages/tonemap/dist/index.js';
+import {Stats} from '/packages/stats/dist/index.js';
+import {VolumetricFog} from '/packages/environment/dist/volumetric.js';
+const params=new URLSearchParams(location.search);if(params.get('samples')==='1')globalThis.margoLow=1;
+const [width,height]=(params.get('size')??'1280x720').split('x').map(Number);const host=document.querySelector('#host');host.style.width=width+'px';host.style.height=height+'px';
+const stage=await createStage(host,{backend:'webgpu',autoStart:false,controls:false,features:['timestamp-query'],camera:{position:[6,2,12],target:[0,3,-2]}});
+const engine=stage.engine,device=engine.gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.camera.far=300;
+const lighting=engineRuntime(engine).lighting;
+Tonemap.attach(engine,{curve:'neutral'});
+const mesh=(size,position,color)=>{const m=engine.createMesh().setGeometry(box(...size));m.setMaterial(new PbrMaterial({color,roughness:0.95,metalness:0}));m.position.set(...position);return m;};
+const ground=mesh([80,0.1,80],[0,-0.05,-10],[0.25,0.25,0.25]);
+const sets={
+  shaft:[mesh([19.25,20,0.5],[-10.375,10,-2],[0.15,0.15,0.15]),mesh([19.25,20,0.5],[10.375,10,-2],[0.15,0.15,0.15])],
+  plug:[mesh([1.5,20,0.5],[0,10,-2],[0.15,0.15,0.15])],
+  spot:[mesh([80,30,0.5],[0,15,-20],[0.1,0.1,0.1])],
+  caster:[mesh([0.8,0.8,0.8],[0,4,-6],[0.4,0.4,0.4])],
+  falloff:[mesh([300,300,0.5],[0,0,-30],[0,0,0])],
+};
+const shadows=Shadows.attach(engine,{resolution:2048,distance:60});for(const m of [ground,...sets.shaft,...sets.plug])shadows.add(m,{static:true});
+const lights=Clustered.attach(engine);let local=null;
+// Counts encoder passes so bench() can name the fog's two (compute, composite): the passes begun before order 5.
+let passCount=0,fogPassIndex=-1;
+engineRuntime(engine).use({name:'pass-counter',setup(){},registerPasses(graph){
+  graph.add({name:'pass-counter:start',order:-1e6,execute(c){passCount=0;const e=c.encoder,render=e.beginRenderPass,compute=e.beginComputePass;e.beginRenderPass=function(d){passCount++;return render.call(this,d);};e.beginComputePass=function(d){passCount++;return compute.call(this,d);};}});
+  graph.add({name:'pass-counter:fog',order:4.999,execute(){fogPassIndex=passCount;}});
+}});
+let fog=null,stats=null;
+const show=names=>{ground.visible=!names.includes('falloff');for(const [k,list] of Object.entries(sets))for(const m of list)m.visible=names.includes(k);shadows.invalidate();};
+const orthographic=(half)=>(out,aspect)=>{const near=0.1,far=300;out.fill(0);out[0]=1/(half*aspect);out[5]=1/half;out[10]=1/(far-near);out[14]=far/(far-near);out[15]=1;};
+const views={shaft:{position:[6,2,12],target:[0,3,-2]},spot:{position:[0,3,6],target:[0,3,-6]},falloff:{position:[0,5,0],target:[0,5,-30]}};
+const frame=async()=>{engine.render();await device.queue.onSubmittedWorkDone();};
+const project=v=>{const m=engine.camera.matrix,w=m[3]*v[0]+m[7]*v[1]+m[11]*v[2]+m[15],c=engine.canvas;return [((m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12])/w+1)/2*c.clientWidth,(1-(m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13])/w)/2*c.clientHeight];};
+window.check={
+  /** Sets up a scene; `fog` options (null: detached; shadows/lights as booleans), renders `frames` frames. */
+  async render({scene,closed=false,fog:options=null,spotShadow=false,caster=false,ortho=false,frames=24}){
+    device.pushErrorScope('validation');
+    show([scene,...closed?['plug']:[],...caster?['caster']:[]]);
+    const view=views[scene];engine.camera.position=view.position;engine.camera.target=view.target;engine.camera.project=ortho?orthographic(7):undefined;
+    lighting.direction.set(scene==='shaft'?[0,0.4472,-0.8944,6]:[0,1,0,0]);lighting.radiance.set([1,0.95,0.88,scene==='falloff'?0.6:0.03]);
+    if(spotShadow&&!local){local=LocalShadows.attach(engine,{lights,maxLights:1});local.add(sets.caster[0]);}if(!spotShadow&&local){local.dispose();local=null;}
+    lights.setLights(scene==='spot'?[{position:[0,6,-6],range:12,direction:[0,-1,0],outerAngle:0.35,innerAngle:0.25,intensity:200,color:[1,0.9,0.7],castShadow:spotShadow}]:[]);
+    fog?.dispose();fog=null;
+    if(options)fog=VolumetricFog.attach(engine,{...options,shadows:options.shadows?shadows:undefined,lights:options.lights?lights:undefined});
+    for(let i=0;i<frames;i++)await frame();
+    const e=await device.popErrorScope();return {error:e?.message??null,errors:errors.splice(0)};
+  },
+  project:points=>points.map(project),
+  /** One more frame with the camera turned `degrees` about the y axis from the scene's view. */
+  async turn(degrees){const view=views.shaft,a=degrees*Math.PI/180,d=view.target.map((v,i)=>v-view.position[i]);engine.camera.target=[view.position[0]+d[0]*Math.cos(a)+d[2]*Math.sin(a),view.target[1],view.position[2]-d[0]*Math.sin(a)+d[2]*Math.cos(a)];await frame();},
+  /** Reads the integrated volume back: non-finite halves, negative values, optical depth range. */
+  async volume(){
+    const t=fog.texture,bytesPerRow=t.width*8,buffer=device.createBuffer({size:bytesPerRow*t.height*t.depthOrArrayLayers,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+    const encoder=device.createCommandEncoder();encoder.copyTextureToBuffer({texture:t},{buffer,bytesPerRow,rowsPerImage:t.height},[t.width,t.height,t.depthOrArrayLayers]);device.queue.submit([encoder.finish()]);
+    await buffer.mapAsync(GPUMapMode.READ);const h=new Uint16Array(buffer.getMappedRange());let nonFinite=0,negative=0,maxOptical=0,maxLight=0;
+    const half=x=>{const e=x>>10&31,f=x&1023,s=x>>15?-1:1;return e===0?s*f*2**-24:s*(1+f/1024)*2**(e-15);};
+    for(let i=0;i<h.length;i++){if((h[i]&0x7c00)===0x7c00){nonFinite++;continue;}const v=half(h[i]);if(v<0)negative++;if(i%4===3)maxOptical=Math.max(maxOptical,v);else maxLight=Math.max(maxLight,v);}
+    const texels=h.length/4;buffer.unmap();buffer.destroy();return {texels,nonFinite,negative,maxOptical,maxLight};
+  },
+  /** GPU pass time (timestamp queries, Stats profiler) of the shaft scene with `fog` options or none, and submit-to-done time. */
+  async bench({fog:options=null,pointLights=0,frames=300}){
+    await this.render({scene:'shaft',fog:options,frames:2});
+    lights.setLights(Array.from({length:pointLights},(_,i)=>{const a=i/pointLights*Math.PI*2;return {position:[Math.cos(a)*4,2,4+Math.sin(a)*4],range:8,intensity:10};}));
+    stats??=Stats.attach(engine,{profiling:true});for(let i=0;i<20;i++)await frame();
+    const gpu=[],times=[],froxels=[],composite=[];
+    for(let i=0;i<frames;i++){const t=performance.now();engine.render();await device.queue.onSubmittedWorkDone();times.push(performance.now()-t);
+      if(i%15===14){await new Promise(r=>setTimeout(r,5));let sum=0;const ms=stats.gpuPassMilliseconds;for(let k=0;k<stats.gpuPassCount;k++)sum+=ms[k];if(stats.gpuPassCount){gpu.push(sum);if(fog){froxels.push(ms[fogPassIndex]);composite.push(ms[fogPassIndex+1]);}}}}
+    const med=a=>{const b=[...a].sort((x,y)=>x-y);return +b[b.length>>1].toFixed(3);};lights.setLights([]);
+    return {gpuMs:gpu.length?med(gpu):null,froxelMs:froxels.length?med(froxels):null,compositeMs:composite.length?med(composite):null,gpuSamples:gpu.length,frameMs:med(times),errors:errors.splice(0)};
+  },
+  size:()=>[engine.canvas.width,engine.canvas.height],
+};
+window.ready=true;
+</script></body></html>

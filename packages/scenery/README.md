@@ -1,8 +1,12 @@
 # @margoengine/scenery
 
-Optional WebGPU scenery for Margo Engine, starting with a procedural moonlit sky, lunar phases, twinkling stars, corona glow and horizon haze. Load it independently on top of core, like the machinery package.
+A moonlit night sky for Margo Engine: twinkling stars, a phased moon with glow, and horizon haze. `SkyMoon` is a
+preset of `Sky` from `@margoengine/sky` (Margo's one sky implementation) held at midnight with its stylized
+`night` options. `stage.sky()` loads it.
 
-In this workspace, `npm run dev` opens the standalone Night Citadel showcase with moon, phase, haze, twinkle and glow controls. Run `npm run modern:dev` for the original starter and click **Toggle moonlit scenery** beside **Toggle GPU leaves**. The starter loads scenery on demand with the moon in view. It coordinates the sky/haze with the FX toggle and restores the FX atmosphere when scenery is removed.
+In this workspace, `npm run modern:dev` opens the starter; click **Toggle moonlit scenery**.
+
+Once the packages are on npm (not yet; build from source until then):
 
 ```sh
 npm install @margoengine/core @margoengine/scenery
@@ -14,29 +18,28 @@ import {Engine} from '@margoengine/core';
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
 const {SkyMoon} = await import('@margoengine/scenery/sky');
-engine.use(new SkyMoon({moonDirection: [0.45, 0, -1], moonPhase: 0.85}));
+const sky = SkyMoon.attach(engine, {moonDirection: [0.45, 0, -1], moonPhase: 0.85});
 engine.start();
+sky.config.moonPhase = 0.2; // read every frame
 ```
 
-`@margoengine/scenery/sky` exports the `SkyMoon` engine plugin and includes its low-level pass dependency. Use `@margoengine/scenery/sky-moon` for `SkyMoonPass` and `SkyMoonConfig` in custom rendering. Both subpaths support static imports and on-demand `import()`. Existing root exports remain available and can be tree-shaken by a bundler; `await stage.scenery()` intentionally loads the complete scenery pack namespace.
+`@margoengine/scenery/sky` and the root export `SkyMoon` and the `SkyMoonConfig` type (an alias of Sky's
+`SkyNightOptions`). `SkyMoon.attach(engine, config)` is `engine.use(new SkyMoon(config))`, and `new SkyMoon(config)` is `new Sky({hours: 0, timeScale: 0, night: config}, {night})` from
+`@margoengine/sky/base` with plugin name `sky-moon`: it loads only the stylized-night feature (about 6.6 kB min+gzip
+summed over this entry, Sky's base and Sky's night, against 10.2 kB for the full Sky;
+[entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so it is not an `instanceof` the root `Sky`, and options that need
+other features (fog, clouds, a day model) throw; build a `Sky` with those features instead. `config` (also
+`sky.options.night`) is read every frame, so change it in place for live controls. Remove it with
+`engine.removePlugin('sky-moon')` or `sky.dispose()`.
 
-`SkyMoon` registers a background pass after opaque geometry. It loads the color/depth attachments and tests at Reversed-Z depth 0 without writing depth. Canvas and HDR (`rgba16float`) pipelines are constructed during setup; frame recording reuses its uniform arrays, matrix inversion workspace and render-pass descriptor. Resize changes the attachment views without rebuilding resources. Core restores the plugin on device replacement and disposes it on `engine.dispose()`; remove it with `engine.removePlugin('sky-moon')`. Options are applied during setup; remove/re-add the plugin to change them. When combining with `PostProcessing`, leave `atmosphere.sky` disabled so the post stack does not replace this backdrop.
+The options, defaults and limits are Sky's stylized night (see the `@margoengine/sky` README): zenith and horizon
+colours, `hazeDensity`, moon direction, angular size, phase, colour and glow, star intensity and twinkle. The sky
+draws behind opaque geometry at reversed-Z depth 0, on canvas and HDR targets, with 1x or 4x sampling. Its
+colours are written as given on both.
 
-For custom rendering, use the low-level pass:
+The low-level `SkyMoonPass` (`@margoengine/scenery/sky-moon`) and the Night Citadel's `NightAtmosphere` were
+removed when the three sky implementations were merged into `@margoengine/sky`. Use `Sky` directly for custom
+night skies, and Sky's `fog` (`falloff: 'exp'`, `height`, `color`) for the citadel's height haze.
 
-```ts
-import {SkyMoonPass, type SkyMoonConfig} from '@margoengine/scenery/sky-moon';
-
-function createSky(device: GPUDevice, format: GPUTextureFormat) {
-  const sky = new SkyMoonPass(device, format, 'depth32float');
-  const config: SkyMoonConfig = {moonDirection: [0.4, 0.7, 0.5], moonPhase: 0.85};
-  sky.setConfig(config);
-  return sky;
-}
-```
-
-Retain the pass, inverse view-projection matrix, camera position and render-pass descriptor across frames. Call `sky.updateFrame(inverseViewProjection, cameraPosition, timeSeconds)` before `sky.record(passEncoder, sampleCount, depthFormat)`. The depth format defaults to the constructor's format; the engine plugin supplies its current scene format. Match the color format and sample count to the attachments: 4 for desktop scenes, 1 for phone scenes and resolved outputs. Clear Reversed-Z depth to 0. Omit the depth format only for a pass without a depth attachment. Pipelines for changed depth formats or 4× sampling are created on first use and retained; subsequent `updateFrame` and `record` calls reuse resources. Browser GPU command encoding may allocate internally.
-
-The uniforms occupy 160 bytes with 16-byte alignment. Colors are non-negative linear RGB. Moon direction must be finite and nonzero and is normalized on configuration; angular radius defaults to 0.038 radians and must be between 0 and PI / 2. Phase clamps to [-1, 1] (new, half, full), and glow/star intensities clamp to zero or above. `starTwinkleIntensity` defaults to 1; zero keeps stars steady. Stars fade in above 15° elevation. `hazeDensity` defaults to 1; zero removes the horizon haze gradient and larger values thicken it. Both controls clamp to zero or above and use existing uniform padding, keeping the 160-byte layout. Invalid inputs throw before changing the staged uniforms. The perspective ray reconstruction supports finite and infinite Reversed-Z projections, runs at the triangle's three vertices and interpolates across the screen. Lunar angular sine/cosine are computed only on configuration changes. Recreate a low-level pass when the device or attachment formats change, and call `sky.dispose()` on teardown.
-
-This ESM package includes strict TypeScript declarations, requires core 0.1.0 and supported WebGPU hardware on HTTPS or localhost, and is MIT licensed. It has no dependency on machinery or creative. `StylizedToonPass` is not implemented yet.
+This ESM package includes strict TypeScript declarations, requires core 1.0.0 and `@margoengine/sky`, and supported
+WebGPU hardware on HTTPS or localhost. MIT licensed.

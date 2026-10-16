@@ -130,6 +130,24 @@ test('worker pool grows to its limit, reuses idle workers and balances load', as
   await assert.rejects(pool.run({}, []), /disposed/);
 });
 
+test('aborted in-flight decoder work remains occupied until the worker replies', async () => {
+  FakeWorker.created=[];
+  const pool=new WorkerPool(2,()=>new FakeWorker(()=>{})),controller=new AbortController();
+  const first=pool.run({value:1},[],controller.signal);
+  controller.abort(new Error('cancel first'));await assert.rejects(first,/cancel first/);
+  const second=pool.run({value:2},[]);
+  try {
+    assert.equal(pool.size,2,'the canceled Wasm call still occupies its worker');
+    const [busy,idle]=FakeWorker.created;
+    idle.reply({id:idle.received[0].message.id,result:2});assert.equal(await second,2);
+    const third=pool.run({value:3},[]);
+    assert.equal(idle.received.length,2,'new work goes to the actually idle worker');
+    idle.reply({id:idle.received[1].message.id,result:3});assert.equal(await third,3);
+    busy.reply({id:busy.received[0].message.id,result:1});
+    assert.equal(pool.pending,0,'late canceled replies retire their occupancy');
+  }finally{second.catch(()=>{});pool.dispose();}
+});
+
 test('inputs and results move by transfer, never by copy', async () => {
   FakeWorker.created = [];
   const pool = new WorkerPool(1, () => new FakeWorker((worker, message) => {
@@ -453,7 +471,8 @@ test('real Basis transcoder decodes a Khronos UASTC + Zstandard texture into eac
 });
 
 test('meshopt decoding is bit-exact with the meshoptimizer reference decoder', async () => {
-  const vectors = JSON.parse(await fixture('meshopt-vectors.json')), bytes = b64 => new Uint8Array(Buffer.from(b64, 'base64'));
+  const vectors = JSON.parse(await fixture('meshopt-vectors.json')),
+    bytes = (b64) => new Uint8Array(Buffer.from(b64, 'base64'));
   for (const c of vectors.cases) {
     const decoded = decoders.decodeMeshoptBuffer(bytes(c.encoded), c.count, c.stride, c.mode, c.filter);
     assert.deepEqual(decoded, bytes(c.expected), c.name);
@@ -461,10 +480,39 @@ test('meshopt decoding is bit-exact with the meshoptimizer reference decoder', a
     decoders.MeshoptDecoder.decodeGltfBuffer(target, c.count, c.stride, bytes(c.encoded), c.mode, c.filter);
     assert.deepEqual(target, bytes(c.expected), `${c.name} via the three-compatible MeshoptDecoder`);
   }
-  assert.equal(vectors.cases.length, 8);
-  assert.throws(() => decoders.decodeMeshoptBuffer(bytes(vectors.vertexCodecV1), 300, 16, 'ATTRIBUTES'), /version 1 is not supported/);
-  const attributes = vectors.cases[0], encoded = bytes(attributes.encoded);
-  for (const cut of [1, 17, encoded.length - 1]) assert.throws(() => decoders.decodeMeshoptBuffer(encoded.subarray(0, cut), attributes.count, attributes.stride, 'ATTRIBUTES'), /truncated|trailing|missing/);
-  assert.throws(() => decoders.decodeMeshoptBuffer(encoded, attributes.count, attributes.stride, 'BOGUS'), /unknown mode/);
-  assert.throws(() => decoders.decodeMeshoptBuffer(encoded, attributes.count, attributes.stride, 'ATTRIBUTES', 'BOGUS'), /unknown filter/);
+  // 8 EXT_meshopt_compression cases plus KHR_meshopt_compression's vertex codec v1 and COLOR filter (8- and 16-bit, in and out of range).
+  assert.deepEqual(
+    vectors.cases.slice(8).map((c) => c.name),
+    ['attributesV1', 'color4V1', 'color8', 'color8Raw'],
+  );
+  const v1 = bytes(vectors.cases[8].encoded);
+  assert.equal(v1[0], 0xa1);
+  assert.throws(
+    () => decoders.decodeMeshoptBuffer(Uint8Array.of(0xa2, ...v1.subarray(1)), 300, 16, 'ATTRIBUTES'),
+    /version 2 is not supported/,
+  );
+  for (const cut of [2, 40, v1.length - 1])
+    assert.throws(
+      () => decoders.decodeMeshoptBuffer(v1.subarray(0, cut), 300, 16, 'ATTRIBUTES'),
+      /truncated|trailing|missing/,
+    );
+  assert.throws(
+    () => decoders.decodeMeshoptBuffer(bytes(vectors.cases[7].encoded), 200, 12, 'ATTRIBUTES', 'COLOR'),
+    /COLOR filter requires byteStride 4 or 8/,
+  );
+  const attributes = vectors.cases[0],
+    encoded = bytes(attributes.encoded);
+  for (const cut of [1, 17, encoded.length - 1])
+    assert.throws(
+      () => decoders.decodeMeshoptBuffer(encoded.subarray(0, cut), attributes.count, attributes.stride, 'ATTRIBUTES'),
+      /truncated|trailing|missing/,
+    );
+  assert.throws(
+    () => decoders.decodeMeshoptBuffer(encoded, attributes.count, attributes.stride, 'BOGUS'),
+    /unknown mode/,
+  );
+  assert.throws(
+    () => decoders.decodeMeshoptBuffer(encoded, attributes.count, attributes.stride, 'ATTRIBUTES', 'BOGUS'),
+    /unknown filter/,
+  );
 });

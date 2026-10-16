@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/clustered",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "WebGPU clustered forward point and spot lighting with optional local shadows.",
@@ -21,13 +21,24 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./shadows": {
+      "types": "./dist/shadows.d.ts",
+      "import": "./dist/shadows.js"
+    },
+    "./area": {
+      "types": "./dist/area.d.ts",
+      "import": "./dist/area.js"
     }
   },
   "files": [
     "dist"
   ],
   "peerDependencies": {
-    "@margoengine/core": "0.1.0"
+    "@margoengine/core": "^1.0.0"
   },
-  "homepage": "https://margoengine.com"
+  "homepage": "https://margoengine.com",
+  "devDependencies": {
+    "@margoengine/math": "^1.0.0"
+  }
 }

@@ -30,7 +30,8 @@ class Events {
   dispose(){if(this.disposals)return;this.disposals++;this.events.clear();}
 }
 mock.module('@margoengine/controls',{namedExports:{PointerLockControls:class extends Events {
-  constructor(engine,canvas){super();this.engine=engine;this.canvas=canvas;this.enabled=true;this.isLocked=false;this.updates=[];pointers.push(this);}
+  constructor(engine,canvas){super();this.engine=engine;this.canvas=canvas;this.enabled=true;this.isLocked=false;this.updates=[];pointers.push(this);if(engine.use){this.pluginName='test-pointer-'+pointers.length;engine.use({name:this.pluginName,onPreUpdate:delta=>this.update(delta),dispose:()=>this.dispose()});}}
+  dispose(){if(this.disposals)return;super.dispose();if(this.pluginName)this.engine.removePlugin(this.pluginName);}
   lock(){this.isLocked=true;this.emit('lock');}
   unlock(){this.isLocked=false;this.emit('unlock');}
   update(delta){this.updates.push(delta);}
@@ -84,7 +85,7 @@ function makeScene(){
   scenes.push(scene);return scene;
 }
 const tree=(scene,children)=>React.createElement(StrictMode,null,React.createElement(Context.Provider,{value:scene},children));
-async function frame(scene,delta=0.1){await act(async()=>{for(const callback of scene.frames.callbacks)callback(scene.engine,delta);});}
+async function frame(scene,delta=0.1){await act(async()=>{for(const plugin of scene.engine.plugins.values())plugin.onPreUpdate?.(delta);for(const callback of scene.frames.callbacks)callback(scene.engine,delta);});}
 afterEach(async()=>{
   cleanup();await flush();
   for(const scene of scenes){assert.equal(scene.frames.callbacks.size,0);assert.equal(scene.engine.meshes.size,0);assert.equal(scene.engine.plugins.size,0);assert.equal(scene.shadowUsers,0);assert.deepEqual(scene.engine.errors,[]);scene.engine.disposed=true;}

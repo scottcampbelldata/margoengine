@@ -1,0 +1,47 @@
+{
+  "type": 1,
+  "name": "Black Walnut Veneer 02",
+  "tags": [
+    "walnut",
+    "walnut wood",
+    "wood",
+    "veneer",
+    "natural grain",
+    "grain",
+    "natural wood",
+    "natural wood grain",
+    "wood grain"
+  ],
+  "authors": {
+    "Jenelle van Heerden": "All"
+  },
+  "max_resolution": [
+    8192,
+    8192
+  ],
+  "dimensions": [
+    1000,
+    1000
+  ],
+  "staging": null,
+  "files_hash": "32ab1e934a1c79adc646650aae9cf9636363b19e",
+  "description": "Free black walnut veneer PBR texture with smooth natural grain, subtle satin sheen and warm tones - ideal for furniture, cabinetry, interiors and props.",
+  "category_id": "11f97979-30ff-513c-97e0-916d1b9f37ac",
+  "category": "Wood/Veneer/Walnut Veneer",
+  "attributes": {
+    "surface_use": "object",
+    "origin": "man_made",
+    "condition": [
+      "clean"
+    ]
+  },
+  "date_published": 1786448942,
+  "categories": [
+    "wood",
+    "raw wood"
+  ],
+  "vault": "wood",
+  "img_version": "d510808f",
+  "download_count": 991,
+  "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/black_walnut_veneer_02.png?width=256&height=256&format=webp&v=d510808f"
+}

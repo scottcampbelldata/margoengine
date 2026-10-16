@@ -1,0 +1,34 @@
+{
+  "package": "machinery",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:22:20.039Z",
+  "outputsIdentical": true,
+  "notes": "CAD parser only (src/cad-parser.ts): welding compares the six rounded values as numbers in an open-addressed table instead of a Map keyed by a joined string; fingerprint and hash use indexed loops.",
+  "cases": [
+    {
+      "case": "parse binary STL, 131,072 triangles",
+      "baselineMs": 2775.6338,
+      "candidateMs": 445.0873,
+      "speedup": 6.236
+    },
+    {
+      "case": "parse binary STL, 8,192 triangles",
+      "baselineMs": 66.7705,
+      "candidateMs": 18.413,
+      "speedup": 3.626
+    },
+    {
+      "case": "fingerprint, 131,072 triangles",
+      "baselineMs": 175.0245,
+      "candidateMs": 88.3374,
+      "speedup": 1.981
+    },
+    {
+      "case": "hash, 131,072 triangle fingerprint",
+      "baselineMs": 173.8101,
+      "candidateMs": 47.0612,
+      "speedup": 3.693
+    }
+  ]
+}

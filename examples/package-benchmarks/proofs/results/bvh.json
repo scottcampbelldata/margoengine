@@ -1,0 +1,35 @@
+{
+  "package": "bvh",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:11:21.937Z",
+  "outputsIdentical": true,
+  "notes": "triangleTriangle and triangleBox keep their vertices and edges in module scratch arrays with hoisted axis helpers; closestPointToPoint stores each child box distance on the traversal stack instead of recomputing it when the node is popped.",
+  "cases": [
+    {
+      "case": "intersectsBVH, list every pair, 80 poses",
+      "pairs": 19460,
+      "baselineMs": 649.2644,
+      "candidateMs": 311.5341,
+      "speedup": 2.084
+    },
+    {
+      "case": "intersectsBVH, first hit only, 80 poses",
+      "baselineMs": 169.5028,
+      "candidateMs": 99.2467,
+      "speedup": 1.708
+    },
+    {
+      "case": "intersectsBox, 2,500 boxes",
+      "baselineMs": 54.3493,
+      "candidateMs": 48.7263,
+      "speedup": 1.115
+    },
+    {
+      "case": "closestPointToPoint, 5,000 points",
+      "baselineMs": 87.0586,
+      "candidateMs": 77.9982,
+      "speedup": 1.116
+    }
+  ]
+}

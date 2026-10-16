@@ -1,0 +1,38 @@
+{
+  "package": "animation",
+  "baseline": "59350fc",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:08:48.234Z",
+  "outputsIdentical": true,
+  "notes": "Animation.seek now samples into per-track buffers; sampleTrack still returns a fresh array.",
+  "cases": [
+    {
+      "case": "LINEAR width 3",
+      "samples": 200000,
+      "baselineMs": 103.2323,
+      "candidateMs": 52.8782,
+      "speedup": 1.952
+    },
+    {
+      "case": "LINEAR width 4",
+      "samples": 200000,
+      "baselineMs": 244.0195,
+      "candidateMs": 75.8148,
+      "speedup": 3.219
+    },
+    {
+      "case": "CUBICSPLINE width 3",
+      "samples": 200000,
+      "baselineMs": 116.2895,
+      "candidateMs": 50.5617,
+      "speedup": 2.3
+    },
+    {
+      "case": "STEP width 3",
+      "samples": 200000,
+      "baselineMs": 76.4681,
+      "candidateMs": 35.9037,
+      "speedup": 2.13
+    }
+  ]
+}

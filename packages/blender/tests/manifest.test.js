@@ -32,12 +32,17 @@ function rejects(document,message){
 test('manifest subset retains scene and optional-array validation',()=>{
   for(const value of [null,[],false,1,'scene',{},
     {...original,asset:{version:'1.0'}},{...original,meshes:[]},
-    {...original,meshes:{}},{...original,nodes:[]},{...original,nodes:{}},
-    {...original,nodes:Array(100_001).fill(null)}])rejects(value,'Invalid .margo scene');
+    {...original,meshes:{}},{...original,nodes:[]},{...original,nodes:{}}])rejects(value,'Invalid .margo scene');
   for(const key of ['buffers','bufferViews','accessors','skins','animations','extensionsRequired'])
     for(const value of [null,[],{}])rejects({...original,[key]:value},'Unsupported .margo '+key);
   for(const key of ['materials','images','textures','samplers','scenes'])
     for(const value of [null,{},false,1,'array'])rejects({...original,[key]:value},'Invalid .margo '+key);
+});
+
+test('manifest node count uses the configurable resource limit',()=>{
+  const bytes=manifest({...original,nodes:Array(100_001).fill({})});
+  assert.throws(()=>decodeMargo(bytes),{name:'RangeError',message:/Too many \.margo nodes.*maxNodes/});
+  assert.equal(decodeMargo(bytes,{maxNodes:100_001}).document.nodes.length,100_001);
 });
 
 test('manifest subset retains primitive shape and section-reference validation',()=>{

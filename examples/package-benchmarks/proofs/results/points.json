@@ -1,0 +1,31 @@
+{
+  "package": "points",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:25:07.001Z",
+  "outputsIdentical": true,
+  "notes": "pickPoint pre-rejects on squared distance with a 1e-9 relative slack before the exact Math.hypot comparisons; allocateBudget precomputes clamped weights and sort keys.",
+  "cases": [
+    {
+      "case": "pickPoint, 500k points, radius 6px",
+      "picks": 4,
+      "baselineMs": 860.8618,
+      "candidateMs": 537.754,
+      "speedup": 1.601
+    },
+    {
+      "case": "pickPoint, 500k points, radius 24px",
+      "picks": 4,
+      "baselineMs": 918.8848,
+      "candidateMs": 483.9824,
+      "speedup": 1.899
+    },
+    {
+      "case": "allocateBudget, 611 blocks over budget",
+      "frames": 300,
+      "baselineMs": 435.3145,
+      "candidateMs": 271.9952,
+      "speedup": 1.6
+    }
+  ]
+}

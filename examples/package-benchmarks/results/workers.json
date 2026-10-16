@@ -1,0 +1,959 @@
+{
+ "date": "2026-10-14T19:43:32.023Z",
+ "commit": "d38af09",
+ "acPowerBefore": true,
+ "offscreen": {
+  "msedge": {
+   "browser": "155.0.4283.45",
+   "adapter": {
+    "vendor": "intel",
+    "architecture": "xe-2lpg",
+    "device": "",
+    "description": "",
+    "fallback": false
+   },
+   "features": {
+    "Float16Array": true,
+    "float16Round": 1.3369140625,
+    "dataViewFloat16": true,
+    "symbolDispose": true,
+    "symbolAsyncDispose": true,
+    "DisposableStack": true,
+    "usingSyntax": true,
+    "transferControlToOffscreen": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0"
+   },
+   "steps": [
+    {
+     "name": "globals",
+     "ok": true,
+     "value": {
+      "window": "undefined",
+      "document": "undefined",
+      "devicePixelRatio": null,
+      "requestAnimationFrame": "function",
+      "gpu": true,
+      "ResizeObserver": "undefined"
+     }
+    },
+    {
+     "name": "Engine.create(OffscreenCanvas)",
+     "ok": true,
+     "value": {
+      "backend": "webgpu",
+      "width": 640,
+      "height": 360
+     }
+    },
+    {
+     "name": "mesh + render()",
+     "ok": true,
+     "value": {
+      "width": 640,
+      "height": 360
+     }
+    },
+    {
+     "name": "start() requestAnimationFrame loop",
+     "ok": true,
+     "value": {
+      "running": false
+     }
+    },
+    {
+     "name": "resize: set canvas.width/height (no clientWidth)",
+     "ok": true,
+     "value": {
+      "width": 800,
+      "height": 450
+     }
+    },
+    {
+     "name": "gltf-pro loadGLTF (fetch + createImageBitmap in a worker)",
+     "ok": true,
+     "value": {
+      "primitives": 1
+     }
+    },
+    {
+     "name": "gltf-pro loadGLTFInWorker (nested worker)",
+     "ok": true,
+     "value": {
+      "primitives": 1
+     }
+    },
+    {
+     "name": "decoders DracoDecoder (nested worker pool)",
+     "ok": true,
+     "value": {
+      "primitives": 1
+     }
+    },
+    {
+     "name": "post PostStack [Bloom, FXAA]",
+     "ok": true,
+     "value": {
+      "ok": true
+     }
+    },
+    {
+     "name": "core engine.pick (centre of the box)",
+     "ok": true,
+     "value": {
+      "hit": null
+     }
+    },
+    {
+     "name": "selection Picking",
+     "ok": true,
+     "value": {
+      "hit": true
+     }
+    },
+    {
+     "name": "GPU errors",
+     "ok": true,
+     "value": []
+    }
+   ],
+   "drawnFraction": 0.0602,
+   "pageErrors": []
+  },
+  "chrome": {
+   "browser": "155.0.8059.40",
+   "adapter": {
+    "vendor": "intel",
+    "architecture": "xe-2lpg",
+    "device": "",
+    "description": "",
+    "fallback": false
+   },
+   "features": {
+    "Float16Array": true,
+    "float16Round": 1.3369140625,
+    "dataViewFloat16": true,
+    "symbolDispose": true,
+    "symbolAsyncDispose": true,
+    "DisposableStack": true,
+    "usingSyntax": true,
+    "transferControlToOffscreen": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36"
+   },
+   "steps": [
+    {
+     "name": "globals",
+     "ok": true,
+     "value": {
+      "window": "undefined",
+      "document": "undefined",
+      "devicePixelRatio": null,
+      "requestAnimationFrame": "function",
+      "gpu": true,
+      "ResizeObserver": "undefined"
+     }
+    },
+    {
+     "name": "Engine.create(OffscreenCanvas)",
+     "ok": true,
+     "value": {
+      "backend": "webgpu",
+      "width": 640,
+      "height": 360
+     }
+    },
+    {
+     "name": "mesh + render()",
+     "ok": true,
+     "value": {
+      "width": 640,
+      "height": 360
+     }
+    },
+    {
+     "name": "start() requestAnimationFrame loop",
+     "ok": true,
+     "value": {
+      "running": false
+     }
+    },
+    {
+     "name": "resize: set canvas.width/height (no clientWidth)",
+     "ok": true,
+     "value": {
+      "width": 800,
+      "height": 450
+     }
+    },
+    {
+     "name": "gltf-pro loadGLTF (fetch + createImageBitmap in a worker)",
+     "ok": true,
+     "value": {
+      "primitives": 1
+     }
+    },
+    {
+     "name": "gltf-pro loadGLTFInWorker (nested worker)",
+     "ok": true,
+     "value": {
+      "primitives": 1
+     }
+    },
+    {
+     "name": "decoders DracoDecoder (nested worker pool)",
+     "ok": true,
+     "value": {
+      "primitives": 1
+     }
+    },
+    {
+     "name": "post PostStack [Bloom, FXAA]",
+     "ok": true,
+     "value": {
+      "ok": true
+     }
+    },
+    {
+     "name": "core engine.pick (centre of the box)",
+     "ok": true,
+     "value": {
+      "hit": null
+     }
+    },
+    {
+     "name": "selection Picking",
+     "ok": true,
+     "value": {
+      "hit": true
+     }
+    },
+    {
+     "name": "GPU errors",
+     "ok": true,
+     "value": []
+    }
+   ],
+   "drawnFraction": 0.0602,
+   "pageErrors": []
+  }
+ },
+ "parse": {
+  "runs": [
+   {
+    "name": "damaged-helmet.glb",
+    "mode": "main",
+    "loadMs": 580.7,
+    "longestTaskMs": 143,
+    "longTasks": 1,
+    "blockedMs": 143,
+    "totalBlockingTimeMs": 93,
+    "maxFrameGapMs": 422.7,
+    "triangles": 15452,
+    "errors": [],
+    "round": 0
+   },
+   {
+    "name": "damaged-helmet.glb",
+    "mode": "worker",
+    "loadMs": 474.2,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 50.1,
+    "triangles": 15452,
+    "errors": [],
+    "round": 0
+   },
+   {
+    "name": "generated-642k-vertices.glb",
+    "mode": "main",
+    "loadMs": 643.9,
+    "longestTaskMs": 308,
+    "longTasks": 1,
+    "blockedMs": 308,
+    "totalBlockingTimeMs": 258,
+    "maxFrameGapMs": 300,
+    "triangles": 1280000,
+    "errors": [],
+    "round": 0
+   },
+   {
+    "name": "generated-642k-vertices.glb",
+    "mode": "worker",
+    "loadMs": 699.1,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 41.7,
+    "triangles": 1280000,
+    "errors": [],
+    "round": 0
+   },
+   {
+    "name": "grid-160k-quads.fbx",
+    "mode": "main",
+    "loadMs": 1536.9,
+    "longestTaskMs": 1382,
+    "longTasks": 1,
+    "blockedMs": 1382,
+    "totalBlockingTimeMs": 1332,
+    "maxFrameGapMs": 1383.5,
+    "triangles": 320000,
+    "errors": [],
+    "round": 0
+   },
+   {
+    "name": "grid-160k-quads.fbx",
+    "mode": "worker",
+    "loadMs": 2250.4,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 74.9,
+    "triangles": 320000,
+    "errors": [],
+    "round": 0
+   },
+   {
+    "name": "knot-200k-triangles.usdz",
+    "mode": "main",
+    "loadMs": 1087,
+    "longestTaskMs": 837,
+    "longTasks": 1,
+    "blockedMs": 837,
+    "totalBlockingTimeMs": 787,
+    "maxFrameGapMs": 833.3,
+    "triangles": 200000,
+    "errors": [],
+    "round": 0
+   },
+   {
+    "name": "knot-200k-triangles.usdz",
+    "mode": "worker",
+    "loadMs": 1053.8,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 50.1,
+    "triangles": 200000,
+    "errors": [],
+    "round": 0
+   },
+   {
+    "name": "damaged-helmet.glb",
+    "mode": "worker",
+    "loadMs": 517.2,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 116.8,
+    "triangles": 15452,
+    "errors": [],
+    "round": 1
+   },
+   {
+    "name": "damaged-helmet.glb",
+    "mode": "main",
+    "loadMs": 416.6,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 49.9,
+    "triangles": 15452,
+    "errors": [],
+    "round": 1
+   },
+   {
+    "name": "generated-642k-vertices.glb",
+    "mode": "worker",
+    "loadMs": 895.2,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 100,
+    "triangles": 1280000,
+    "errors": [],
+    "round": 1
+   },
+   {
+    "name": "generated-642k-vertices.glb",
+    "mode": "main",
+    "loadMs": 466.8,
+    "longestTaskMs": 222,
+    "longTasks": 1,
+    "blockedMs": 222,
+    "totalBlockingTimeMs": 172,
+    "maxFrameGapMs": 216.6,
+    "triangles": 1280000,
+    "errors": [],
+    "round": 1
+   },
+   {
+    "name": "grid-160k-quads.fbx",
+    "mode": "worker",
+    "loadMs": 1619.4,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 224.9,
+    "triangles": 320000,
+    "errors": [],
+    "round": 1
+   },
+   {
+    "name": "grid-160k-quads.fbx",
+    "mode": "main",
+    "loadMs": 1295,
+    "longestTaskMs": 1068,
+    "longTasks": 1,
+    "blockedMs": 1068,
+    "totalBlockingTimeMs": 1018,
+    "maxFrameGapMs": 1108.3,
+    "triangles": 320000,
+    "errors": [],
+    "round": 1
+   },
+   {
+    "name": "knot-200k-triangles.usdz",
+    "mode": "worker",
+    "loadMs": 1035,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 41.8,
+    "triangles": 200000,
+    "errors": [],
+    "round": 1
+   },
+   {
+    "name": "knot-200k-triangles.usdz",
+    "mode": "main",
+    "loadMs": 812.3,
+    "longestTaskMs": 673,
+    "longTasks": 1,
+    "blockedMs": 673,
+    "totalBlockingTimeMs": 623,
+    "maxFrameGapMs": 666.7,
+    "triangles": 200000,
+    "errors": [],
+    "round": 1
+   },
+   {
+    "name": "damaged-helmet.glb",
+    "mode": "main",
+    "loadMs": 584.9,
+    "longestTaskMs": 50,
+    "longTasks": 1,
+    "blockedMs": 50,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 158.3,
+    "triangles": 15452,
+    "errors": [],
+    "round": 2
+   },
+   {
+    "name": "damaged-helmet.glb",
+    "mode": "worker",
+    "loadMs": 450.3,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 50.1,
+    "triangles": 15452,
+    "errors": [],
+    "round": 2
+   },
+   {
+    "name": "generated-642k-vertices.glb",
+    "mode": "main",
+    "loadMs": 601.7,
+    "longestTaskMs": 201,
+    "longTasks": 1,
+    "blockedMs": 201,
+    "totalBlockingTimeMs": 151,
+    "maxFrameGapMs": 191.6,
+    "triangles": 1280000,
+    "errors": [],
+    "round": 2
+   },
+   {
+    "name": "generated-642k-vertices.glb",
+    "mode": "worker",
+    "loadMs": 656.1,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 41.7,
+    "triangles": 1280000,
+    "errors": [],
+    "round": 2
+   },
+   {
+    "name": "grid-160k-quads.fbx",
+    "mode": "main",
+    "loadMs": 1288.4,
+    "longestTaskMs": 1162,
+    "longTasks": 1,
+    "blockedMs": 1162,
+    "totalBlockingTimeMs": 1112,
+    "maxFrameGapMs": 1166.6,
+    "triangles": 320000,
+    "errors": [],
+    "round": 2
+   },
+   {
+    "name": "grid-160k-quads.fbx",
+    "mode": "worker",
+    "loadMs": 1648.1,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 33.3,
+    "triangles": 320000,
+    "errors": [],
+    "round": 2
+   },
+   {
+    "name": "knot-200k-triangles.usdz",
+    "mode": "main",
+    "loadMs": 1392.4,
+    "longestTaskMs": 1296,
+    "longTasks": 1,
+    "blockedMs": 1296,
+    "totalBlockingTimeMs": 1246,
+    "maxFrameGapMs": 1291.5,
+    "triangles": 200000,
+    "errors": [],
+    "round": 2
+   },
+   {
+    "name": "knot-200k-triangles.usdz",
+    "mode": "worker",
+    "loadMs": 1016,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 75,
+    "triangles": 200000,
+    "errors": [],
+    "round": 2
+   },
+   {
+    "name": "damaged-helmet.glb",
+    "mode": "worker",
+    "loadMs": 598.3,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 158.4,
+    "triangles": 15452,
+    "errors": [],
+    "round": 3
+   },
+   {
+    "name": "damaged-helmet.glb",
+    "mode": "main",
+    "loadMs": 424.4,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 75,
+    "triangles": 15452,
+    "errors": [],
+    "round": 3
+   },
+   {
+    "name": "generated-642k-vertices.glb",
+    "mode": "worker",
+    "loadMs": 821.3,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 100,
+    "triangles": 1280000,
+    "errors": [],
+    "round": 3
+   },
+   {
+    "name": "generated-642k-vertices.glb",
+    "mode": "main",
+    "loadMs": 653.4,
+    "longestTaskMs": 268,
+    "longTasks": 1,
+    "blockedMs": 268,
+    "totalBlockingTimeMs": 218,
+    "maxFrameGapMs": 266.7,
+    "triangles": 1280000,
+    "errors": [],
+    "round": 3
+   },
+   {
+    "name": "grid-160k-quads.fbx",
+    "mode": "worker",
+    "loadMs": 1725.1,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 241.7,
+    "triangles": 320000,
+    "errors": [],
+    "round": 3
+   },
+   {
+    "name": "grid-160k-quads.fbx",
+    "mode": "main",
+    "loadMs": 1485.2,
+    "longestTaskMs": 1269,
+    "longTasks": 1,
+    "blockedMs": 1269,
+    "totalBlockingTimeMs": 1219,
+    "maxFrameGapMs": 1291.5,
+    "triangles": 320000,
+    "errors": [],
+    "round": 3
+   },
+   {
+    "name": "knot-200k-triangles.usdz",
+    "mode": "worker",
+    "loadMs": 1248,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 50,
+    "triangles": 200000,
+    "errors": [],
+    "round": 3
+   },
+   {
+    "name": "knot-200k-triangles.usdz",
+    "mode": "main",
+    "loadMs": 874,
+    "longestTaskMs": 770,
+    "longTasks": 1,
+    "blockedMs": 770,
+    "totalBlockingTimeMs": 720,
+    "maxFrameGapMs": 766.8,
+    "triangles": 200000,
+    "errors": [],
+    "round": 3
+   },
+   {
+    "name": "damaged-helmet.glb",
+    "mode": "main",
+    "loadMs": 503.3,
+    "longestTaskMs": 50,
+    "longTasks": 1,
+    "blockedMs": 50,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 108.4,
+    "triangles": 15452,
+    "errors": [],
+    "round": 4
+   },
+   {
+    "name": "damaged-helmet.glb",
+    "mode": "worker",
+    "loadMs": 572.5,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 50,
+    "triangles": 15452,
+    "errors": [],
+    "round": 4
+   },
+   {
+    "name": "generated-642k-vertices.glb",
+    "mode": "main",
+    "loadMs": 491.4,
+    "longestTaskMs": 222,
+    "longTasks": 1,
+    "blockedMs": 222,
+    "totalBlockingTimeMs": 172,
+    "maxFrameGapMs": 216.8,
+    "triangles": 1280000,
+    "errors": [],
+    "round": 4
+   },
+   {
+    "name": "generated-642k-vertices.glb",
+    "mode": "worker",
+    "loadMs": 675.2,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 33.2,
+    "triangles": 1280000,
+    "errors": [],
+    "round": 4
+   },
+   {
+    "name": "grid-160k-quads.fbx",
+    "mode": "main",
+    "loadMs": 1333.8,
+    "longestTaskMs": 1173,
+    "longTasks": 1,
+    "blockedMs": 1173,
+    "totalBlockingTimeMs": 1123,
+    "maxFrameGapMs": 1191.7,
+    "triangles": 320000,
+    "errors": [],
+    "round": 4
+   },
+   {
+    "name": "grid-160k-quads.fbx",
+    "mode": "worker",
+    "loadMs": 1658.9,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 33.3,
+    "triangles": 320000,
+    "errors": [],
+    "round": 4
+   },
+   {
+    "name": "knot-200k-triangles.usdz",
+    "mode": "main",
+    "loadMs": 766.6,
+    "longestTaskMs": 697,
+    "longTasks": 1,
+    "blockedMs": 697,
+    "totalBlockingTimeMs": 647,
+    "maxFrameGapMs": 691.6,
+    "triangles": 200000,
+    "errors": [],
+    "round": 4
+   },
+   {
+    "name": "knot-200k-triangles.usdz",
+    "mode": "worker",
+    "loadMs": 990.8,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 116.7,
+    "triangles": 200000,
+    "errors": [],
+    "round": 4
+   },
+   {
+    "name": "damaged-helmet.glb",
+    "mode": "worker",
+    "loadMs": 780.8,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 216.6,
+    "triangles": 15452,
+    "errors": [],
+    "round": 5
+   },
+   {
+    "name": "damaged-helmet.glb",
+    "mode": "main",
+    "loadMs": 506.5,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 50,
+    "triangles": 15452,
+    "errors": [],
+    "round": 5
+   },
+   {
+    "name": "generated-642k-vertices.glb",
+    "mode": "worker",
+    "loadMs": 660.6,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 58.3,
+    "triangles": 1280000,
+    "errors": [],
+    "round": 5
+   },
+   {
+    "name": "generated-642k-vertices.glb",
+    "mode": "main",
+    "loadMs": 696.5,
+    "longestTaskMs": 234,
+    "longTasks": 1,
+    "blockedMs": 234,
+    "totalBlockingTimeMs": 184,
+    "maxFrameGapMs": 225,
+    "triangles": 1280000,
+    "errors": [],
+    "round": 5
+   },
+   {
+    "name": "grid-160k-quads.fbx",
+    "mode": "worker",
+    "loadMs": 1686.5,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 216.8,
+    "triangles": 320000,
+    "errors": [],
+    "round": 5
+   },
+   {
+    "name": "grid-160k-quads.fbx",
+    "mode": "main",
+    "loadMs": 1357.8,
+    "longestTaskMs": 1151,
+    "longTasks": 1,
+    "blockedMs": 1151,
+    "totalBlockingTimeMs": 1101,
+    "maxFrameGapMs": 1166.8,
+    "triangles": 320000,
+    "errors": [],
+    "round": 5
+   },
+   {
+    "name": "knot-200k-triangles.usdz",
+    "mode": "worker",
+    "loadMs": 1068.2,
+    "longestTaskMs": 0,
+    "longTasks": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 49.9,
+    "triangles": 200000,
+    "errors": [],
+    "round": 5
+   },
+   {
+    "name": "knot-200k-triangles.usdz",
+    "mode": "main",
+    "loadMs": 834.9,
+    "longestTaskMs": 670,
+    "longTasks": 1,
+    "blockedMs": 670,
+    "totalBlockingTimeMs": 620,
+    "maxFrameGapMs": 666.7,
+    "triangles": 200000,
+    "errors": [],
+    "round": 5
+   }
+  ],
+  "medians": {
+   "damaged-helmet.glb main": {
+    "loadMs": 503.3,
+    "longestTaskMs": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 75,
+    "longTasks": 0
+   },
+   "damaged-helmet.glb worker": {
+    "loadMs": 572.5,
+    "longestTaskMs": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 116.8,
+    "longTasks": 0
+   },
+   "generated-642k-vertices.glb main": {
+    "loadMs": 601.7,
+    "longestTaskMs": 222,
+    "blockedMs": 222,
+    "totalBlockingTimeMs": 172,
+    "maxFrameGapMs": 216.8,
+    "longTasks": 1
+   },
+   "generated-642k-vertices.glb worker": {
+    "loadMs": 675.2,
+    "longestTaskMs": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 58.3,
+    "longTasks": 0
+   },
+   "grid-160k-quads.fbx main": {
+    "loadMs": 1333.8,
+    "longestTaskMs": 1162,
+    "blockedMs": 1162,
+    "totalBlockingTimeMs": 1112,
+    "maxFrameGapMs": 1166.8,
+    "longTasks": 1
+   },
+   "grid-160k-quads.fbx worker": {
+    "loadMs": 1658.9,
+    "longestTaskMs": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 216.8,
+    "longTasks": 0
+   },
+   "knot-200k-triangles.usdz main": {
+    "loadMs": 834.9,
+    "longestTaskMs": 697,
+    "blockedMs": 697,
+    "totalBlockingTimeMs": 647,
+    "maxFrameGapMs": 691.6,
+    "longTasks": 1
+   },
+   "knot-200k-triangles.usdz worker": {
+    "loadMs": 1035,
+    "longestTaskMs": 0,
+    "blockedMs": 0,
+    "totalBlockingTimeMs": 0,
+    "maxFrameGapMs": 50,
+    "longTasks": 0
+   }
+  },
+  "hardware": {
+   "webglRenderer": "ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (16GB) (0x000064A0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "webgpu": {
+    "vendor": "intel",
+    "architecture": "xe-2lpg",
+    "device": "",
+    "description": "",
+    "fallback": false
+   },
+   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+   "browserName": "chromium",
+   "browserVersion": "155.0.4283.45",
+   "requestedChannel": "msedge",
+   "launchArgs": [],
+   "powerPreference": "high-performance",
+   "hostPlatform": "win32",
+   "headless": true
+  },
+  "pageErrors": [],
+  "from": {
+   "date": "2026-10-14T19:41:25.623Z",
+   "commit": "d38af09",
+   "acPowerBefore": true,
+   "acPowerAfter": true
+  }
+ },
+ "acPowerAfter": true
+}

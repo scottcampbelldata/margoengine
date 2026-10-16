@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/materials",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT AND Apache-2.0",
   "description": "Optional glTF PBR material lobes, transmission, volume and typed node graphs through an isolated extension slot.",
@@ -22,6 +22,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./transmission": {
+      "types": "./dist/transmission.d.ts",
+      "import": "./dist/transmission.js"
     }
   },
   "files": [
@@ -29,8 +33,8 @@
     "THIRD_PARTY_NOTICES.md"
   ],
   "peerDependencies": {
-    "@margoengine/core": "0.1.0",
-    "@margoengine/gltf-pro": "0.1.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/gltf-pro": "^1.0.0"
   },
   "homepage": "https://margoengine.com"
 }

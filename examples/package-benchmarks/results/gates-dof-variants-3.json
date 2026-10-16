@@ -1,0 +1,371 @@
+{
+ "date": "2026-10-14T18:48:35.143Z",
+ "commit": "5b9dbbd",
+ "dirty": true,
+ "baseline": "5b9dbbd",
+ "acPowerBefore": true,
+ "rounds": 5,
+ "frames": 60,
+ "scenes": {
+  "gate": {
+   "focalDistance": 3.4,
+   "aperture": 1.4,
+   "maxRadius": 16
+  },
+  "near": {
+   "focalDistance": 1.6,
+   "aperture": 1.4,
+   "maxRadius": 16
+  },
+  "far": {
+   "focalDistance": 12,
+   "aperture": 1.4,
+   "maxRadius": 16
+  },
+  "wide": {
+   "focalDistance": 2,
+   "aperture": 0.35,
+   "maxRadius": 32
+  }
+ },
+ "scene": "DamagedHelmet + 11 core boxes, env IBL, PostStack [DOF, Tonemap neutral], DPR 1",
+ "quality": {
+  "gate": {
+   "oldVsOff": {
+    "meanAbsDiff": 0.1988,
+    "maxAbsDiff": 135,
+    "changedFraction": 0.00799
+   },
+   "newVsOld": {
+    "meanAbsDiff": 0.009,
+    "maxAbsDiff": 11,
+    "changedFraction": 0.00007
+   },
+   "tieredVsOld": {
+    "meanAbsDiff": 0.009,
+    "maxAbsDiff": 11,
+    "changedFraction": 0.00007
+   }
+  },
+  "near": {
+   "oldVsOff": {
+    "meanAbsDiff": 1.2219,
+    "maxAbsDiff": 251,
+    "changedFraction": 0.05222
+   },
+   "newVsOld": {
+    "meanAbsDiff": 0.1397,
+    "maxAbsDiff": 184,
+    "changedFraction": 0.00463
+   },
+   "tieredVsOld": {
+    "meanAbsDiff": 0.0197,
+    "maxAbsDiff": 43,
+    "changedFraction": 0.00051
+   }
+  },
+  "far": {
+   "oldVsOff": {
+    "meanAbsDiff": 0.9178,
+    "maxAbsDiff": 226,
+    "changedFraction": 0.03961
+   },
+   "newVsOld": {
+    "meanAbsDiff": 0,
+    "maxAbsDiff": 0,
+    "changedFraction": 0
+   },
+   "tieredVsOld": {
+    "meanAbsDiff": 0,
+    "maxAbsDiff": 0,
+    "changedFraction": 0
+   }
+  },
+  "wide": {
+   "oldVsOff": {
+    "meanAbsDiff": 2.6547,
+    "maxAbsDiff": 248,
+    "changedFraction": 0.09093
+   },
+   "newVsOld": {
+    "meanAbsDiff": 0.1309,
+    "maxAbsDiff": 175,
+    "changedFraction": 0.00376
+   },
+   "tieredVsOld": {
+    "meanAbsDiff": 0,
+    "maxAbsDiff": 1,
+    "changedFraction": 0
+   }
+  }
+ },
+ "flicker": {
+  "gate": {
+   "old": {
+    "meanFrameToFrame": 0.4201,
+    "maxFrameToFrame": 0.4235
+   },
+   "new": {
+    "meanFrameToFrame": 0.4201,
+    "maxFrameToFrame": 0.4235
+   },
+   "tiered": {
+    "meanFrameToFrame": 0.4201,
+    "maxFrameToFrame": 0.4235
+   }
+  },
+  "near": {
+   "old": {
+    "meanFrameToFrame": 0.1996,
+    "maxFrameToFrame": 0.2022
+   },
+   "new": {
+    "meanFrameToFrame": 0.1948,
+    "maxFrameToFrame": 0.1979
+   },
+   "tiered": {
+    "meanFrameToFrame": 0.1994,
+    "maxFrameToFrame": 0.2018
+   }
+  }
+ },
+ "timing": {
+  "gate 1280x720 4x": {
+   "old": {
+    "median": 3.553,
+    "min": 2.8,
+    "max": 4.476,
+    "rounds": [
+     3.8709,
+     3.553,
+     3.3869,
+     4.4765,
+     2.7996
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.064,
+     "dof:1": 3.478
+    }
+   },
+   "new": {
+    "median": 1.688,
+    "min": 1.237,
+    "max": 1.694,
+    "rounds": [
+     1.6937,
+     1.6882,
+     1.4017,
+     1.237,
+     1.6945
+    ],
+    "speedup": 2.1,
+    "passMedians": {
+     "dof:0": 0.136,
+     "dof:1": 1.013,
+     "dof:2": 0.526
+    }
+   },
+   "tiered": {
+    "median": 1.941,
+    "min": 1.673,
+    "max": 2.074,
+    "rounds": [
+     2.0735,
+     2.0228,
+     1.9407,
+     1.6726,
+     1.7705
+    ],
+    "speedup": 1.83,
+    "passMedians": {
+     "dof:0": 0.136,
+     "dof:1": 1.687
+    }
+   }
+  },
+  "near 1280x720 4x": {
+   "old": {
+    "median": 3.249,
+    "min": 3.149,
+    "max": 4.22,
+    "rounds": [
+     4.2196,
+     3.1877,
+     3.2487,
+     3.1486,
+     3.3346
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.055,
+     "dof:1": 3.128
+    }
+   },
+   "new": {
+    "median": 1.925,
+    "min": 1.653,
+    "max": 2.167,
+    "rounds": [
+     1.653,
+     1.9107,
+     1.9246,
+     2.1675,
+     2.0599
+    ],
+    "speedup": 1.69,
+    "passMedians": {
+     "dof:0": 0.111,
+     "dof:1": 1.227,
+     "dof:2": 0.423
+    }
+   },
+   "tiered": {
+    "median": 2.457,
+    "min": 1.906,
+    "max": 2.64,
+    "rounds": [
+     1.9056,
+     2.6397,
+     2.4567,
+     2.0381,
+     2.4945
+    ],
+    "speedup": 1.32,
+    "passMedians": {
+     "dof:0": 0.092,
+     "dof:1": 2.206
+    }
+   }
+  },
+  "far 1280x720 4x": {
+   "old": {
+    "median": 3.076,
+    "min": 2.749,
+    "max": 3.423,
+    "rounds": [
+     3.4228,
+     3.057,
+     2.7488,
+     3.0762,
+     3.0984
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.056,
+     "dof:1": 3.012
+    }
+   },
+   "new": {
+    "median": 0.886,
+    "min": 0.777,
+    "max": 1.008,
+    "rounds": [
+     0.8719,
+     0.886,
+     0.8965,
+     0.7766,
+     1.0079
+    ],
+    "speedup": 3.47,
+    "passMedians": {
+     "dof:0": 0.137,
+     "dof:1": 0.058,
+     "dof:2": 0.678
+    }
+   },
+   "tiered": {
+    "median": 0.806,
+    "min": 0.704,
+    "max": 0.981,
+    "rounds": [
+     0.8062,
+     0.9806,
+     0.8196,
+     0.736,
+     0.7037
+    ],
+    "speedup": 3.82,
+    "passMedians": {
+     "dof:0": 0.134,
+     "dof:1": 0.671
+    }
+   }
+  },
+  "wide 1280x720 4x": {
+   "old": {
+    "median": 4.297,
+    "min": 3.39,
+    "max": 4.675,
+    "rounds": [
+     4.2966,
+     4.3104,
+     3.3899,
+     3.8305,
+     4.6748
+    ],
+    "speedup": 1,
+    "passMedians": {
+     "dof:0": 0.06,
+     "dof:1": 4.176
+    }
+   },
+   "new": {
+    "median": 1.783,
+    "min": 1.627,
+    "max": 2.296,
+    "rounds": [
+     2.2961,
+     1.7538,
+     1.6267,
+     2.1702,
+     1.7827
+    ],
+    "speedup": 2.41,
+    "passMedians": {
+     "dof:0": 0.108,
+     "dof:1": 1.237,
+     "dof:2": 0.303
+    }
+   },
+   "tiered": {
+    "median": 2.472,
+    "min": 2.085,
+    "max": 2.781,
+    "rounds": [
+     2.472,
+     2.6208,
+     2.1665,
+     2.0846,
+     2.7806
+    ],
+    "speedup": 1.74,
+    "passMedians": {
+     "dof:0": 0.093,
+     "dof:1": 2.347
+    }
+   }
+  }
+ },
+ "hardware": {
+  "webglRenderer": "ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (16GB) (0x000064A0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "webgpu": {
+   "vendor": "intel",
+   "architecture": "xe-2lpg",
+   "device": "0x64a0",
+   "description": "Intel(R) Arc(TM) 140V GPU (16GB)",
+   "fallback": false
+  },
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+  "browserName": "chromium",
+  "browserVersion": "155.0.4283.45",
+  "requestedChannel": "msedge",
+  "launchArgs": [
+   "--enable-webgpu-developer-features"
+  ],
+  "powerPreference": "high-performance",
+  "hostPlatform": "win32",
+  "headless": true
+ },
+ "acPowerAfter": true
+}

@@ -8,7 +8,7 @@ import {textureQuad} from './support/texture-fixture.js';
 import {optionalGPU} from './support/optional-gpu.js';
 
 const digest=value=>createHash('sha256').update(value).digest('hex');
-const baselineShader='469dd81676967dbfd22118fa85b1cf8b6ff37dc7593e7e7f8130e5626a29f508';
+const baselineShader='45df766b2c73181edc3cbd8109a848f17851f03b7cc947dec8d987ff60c2dee5';
 async function scene(fixture=materialQuad(),image=true) {
   const harness=optionalGPU(),store=await TransformStore.create(16),device=harness.engine.gpu;
   device.limits.maxTextureDimension2D=8192;device.limits.maxUniformBufferBindingSize=65536;

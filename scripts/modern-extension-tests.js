@@ -15,7 +15,7 @@ const assets={};
 for(const [name,url] of Object.entries(urls)) {
   const path='test-results/'+name+'.glb';try{assets[name]=await readFile(path);}catch(error){if(error.code!=='ENOENT')throw error;const bytes=await readResponse(await fetch(url),{maxBytes:64*1024*1024,label:name+' asset'});assets[name]=Buffer.from(bytes);await writeFile(path,assets[name]);}
 }
-const demos={helmet:'damaged-helmet',robot:'robot-expressive',character:'character-animation'};
+const demos={helmet:'flight-helmet',robot:'robot-expressive',character:'character-animation'};
 async function assertRobotMobileLayout(page){
   const layout=await page.evaluate(()=>{
     const scene=document.querySelector('#viewport').getBoundingClientRect(),controls=document.querySelector('aside').getBoundingClientRect();
@@ -102,7 +102,8 @@ try {
   };
   await page.addInitScript(samplingAudit);
   for(const [name,demo] of Object.entries(demos)) {
-    await page.goto('http://127.0.0.1:5193/examples/'+demo+'.html');
+    // The fixed animation clock needs the uncapped desktop tier; this also pins the 4× MSAA fixture.
+    await page.goto('http://127.0.0.1:5193/examples/'+demo+'.html?quality=high');
     await page.waitForFunction(()=>document.querySelector('#viewport').dataset.ready==='true'||document.querySelector('#error').textContent.length>0);
     assert.equal(await page.locator('#error').innerText(),'');
     if(name==='helmet') {await page.locator('#ssao').uncheck();await page.locator('#ssao').check();}

@@ -1,0 +1,24 @@
+{
+  "package": "splats",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:25:39.158Z",
+  "outputsIdentical": true,
+  "notes": "Mock WebGPU device: identical call sequence, descriptors and buffer bytes over a 24-frame story (resize, projection/format changes, error, device restoration). Times are CPU-side JavaScript only; the GPU radix sort is not measured.",
+  "cases": [
+    {
+      "case": "100,000 splats with SH, 4x MSAA",
+      "frames": 2000,
+      "baselineMs": 8.2458,
+      "candidateMs": 3.5264,
+      "speedup": 2.338
+    },
+    {
+      "case": "20,000 splats, 1x",
+      "frames": 2000,
+      "baselineMs": 8.6001,
+      "candidateMs": 4.7761,
+      "speedup": 1.801
+    }
+  ]
+}

@@ -38,7 +38,7 @@ function makeModel(engine,asset={doc:{images:[]}},images=[]){
   const material={name:'Body',base:[1,1,1,1],factors:[0.5,0,1,1],emission:[0,0,0],settings:[0,0.5,0,0],maps:[]};
   const model={name:'model:'+models.length,asset,ownedImages:images,image:index=>images[index],root,nodes:[node],primitives:[{node,material}],lighting:new Set(),shadowPrimitives:[],disposed:false,disposals:0,
     addLighting(effect){this.lighting.add(effect);return()=>this.lighting.delete(effect);},
-    dispose(){if(this.disposed)return;this.disposed=true;this.disposals++;engine.removePlugin(this.name);this.root.dispose();for(const node of this.nodes)node.dispose();for(const image of images)image?.close();this.lighting.clear();}};
+    dispose(){if(this.disposed)return;this.disposed=true;this.disposals++;engine.removePlugin(this.name);this.root.dispose();for(const node of this.nodes)node.dispose();for(const image of images)image?.close?.();this.lighting.clear();}};
   models.push(model);return model;
 }
 mock.module('@margoengine/gltf-pro',{namedExports:{PBRModel:class {constructor(engine,asset,images){return makeModel(engine,asset,images);}},async loadGLTF(engine,src,{signal}){
@@ -217,15 +217,16 @@ test('preload infers HDR URLs and Environment remounts share the resolved image 
   view.rerender(tree(child(true)));await flush();assert.notEqual(environments.at(-1),first);assert.equal(environments.at(-1).disposed,false);assert.equal(imageRequests.length,beforeImages+1);
 });
 
-test('cached glTF bitmap and KTX2 sources retain independent image ownership through remounts',async()=>{
+test('cached glTF bitmap, KTX2 and compressed sources retain independent image ownership through remounts',async()=>{
   const bitmap={width:2,height:2,closes:0,close(){this.closes++;}},ktx2={ktx2:true,width:2,height:2,levels:[new Uint8Array([1,2,3,4])],closes:0,close(){this.closes++;}},copies=[];
   const previous=globalThis.createImageBitmap;globalThis.createImageBitmap=async source=>{const copy={width:source.width,height:source.height,source,closes:0,close(){this.closes++;}};copies.push(copy);return copy;};
-  sourceImages=[bitmap,ktx2];
+  const compressed={width:2,height:2,format:'rgba8unorm',mipmaps:[{width:2,height:2,data:new Uint8Array(16)}]};
+  sourceImages=[bitmap,ktx2,undefined,compressed];
   try {
     const before=modelRequests.length,child=show=>show&&suspense(React.createElement(Model,{src:'/textured-model.glb'}));const view=render(tree(child(true)));await flush();const first=models.at(-1);
-    assert.equal(first.ownedImages[0],bitmap);assert.equal(first.ownedImages[1],ktx2);assert.equal(copies.length,1);assert.equal(copies[0].closes,0);
+    assert.equal(first.ownedImages[0],bitmap);assert.equal(first.ownedImages[1],ktx2);assert.equal(first.ownedImages[3],compressed);assert.equal(copies.length,1);assert.equal(copies[0].closes,0);
     view.rerender(tree(child(false)));await flush();assert.equal(bitmap.closes,1);assert.equal(ktx2.closes,1);assert.equal(copies[0].closes,0,'the cache keeps its own decoded bitmap alive');
-    view.rerender(tree(child(true)));await flush();const second=models.at(-1);assert.notEqual(second,first);assert.equal(copies.length,2);assert.equal(second.ownedImages[0],copies[1]);assert.notEqual(second.ownedImages[1],ktx2);assert.equal(second.ownedImages[1].levels,ktx2.levels);
+    view.rerender(tree(child(true)));await flush();const second=models.at(-1);assert.notEqual(second,first);assert.equal(copies.length,2);assert.equal(second.ownedImages[0],copies[1]);assert.notEqual(second.ownedImages[1],ktx2);assert.equal(second.ownedImages[1].levels,ktx2.levels);assert.notEqual(second.ownedImages[3],compressed);assert.equal(second.ownedImages[3].mipmaps,compressed.mipmaps);assert.equal(second.ownedImages[2],undefined);
     assert.equal(modelRequests.length,before+1);view.unmount();await flush();assert.equal(bitmap.closes,1);assert.equal(ktx2.closes,1);assert.deepEqual(copies.map(copy=>copy.closes),[1,1]);
   } finally {if(previous===undefined)delete globalThis.createImageBitmap;else globalThis.createImageBitmap=previous;}
 });

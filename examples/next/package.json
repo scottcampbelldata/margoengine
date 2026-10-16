@@ -1,5 +1,18 @@
 {
-  "name": "@margoengine/starter-next", "version": "0.1.0", "private": true, "type": "module",
-  "scripts": {"dev": "next dev --hostname 127.0.0.1", "build": "next build --webpack", "start": "next start --hostname 127.0.0.1"},
-  "dependencies": {"@margoengine/core": "0.1.0", "@margoengine/react": "0.1.0", "next": "16.4.0", "react": "19.3.0", "react-dom": "19.3.0"}
+  "name": "@margoengine/starter-next",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "build": "next build --webpack",
+    "start": "next start --hostname 127.0.0.1"
+  },
+  "dependencies": {
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/react": "^1.0.0",
+    "next": "16.4.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  }
 }

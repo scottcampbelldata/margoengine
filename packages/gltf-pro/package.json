@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/gltf-pro",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "Opt-in glTF 2.0 metallic-roughness rendering for Margo Engine WebGPU.",
@@ -29,16 +29,39 @@
     "./scene": {
       "types": "./dist/scene.d.ts",
       "import": "./dist/scene.js"
+    },
+    "./extended": {
+      "types": "./dist/extended.d.ts",
+      "import": "./dist/extended.js"
+    },
+    "./instancing": {
+      "types": "./dist/instancing.d.ts",
+      "import": "./dist/instancing.js"
+    },
+    "./prepare": {
+      "types": "./dist/prepare.d.ts",
+      "import": "./dist/prepare.js"
+    },
+    "./progressive": {
+      "types": "./dist/progressive.d.ts",
+      "import": "./dist/progressive.js"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js"
     }
   },
   "files": [
     "dist"
   ],
   "dependencies": {
-    "@margoengine/decoders": "0.1.0"
+    "@margoengine/decoders": "^1.0.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "0.1.0"
+    "@margoengine/core": "^1.0.0"
   },
-  "homepage": "https://margoengine.com"
+  "homepage": "https://margoengine.com",
+  "devDependencies": {
+    "@margoengine/math": "^1.0.0"
+  }
 }

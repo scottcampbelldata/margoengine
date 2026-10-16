@@ -1,0 +1,119 @@
+{
+  "name": "@margoengine/math",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Vector, quaternion, matrix, Euler, color, bounds, ray, plane and frustum math with three.js-style names, one module per type.",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./vector2": {
+      "types": "./dist/vector2.d.ts",
+      "import": "./dist/vector2.js"
+    },
+    "./vector3": {
+      "types": "./dist/vector3.d.ts",
+      "import": "./dist/vector3.js"
+    },
+    "./vector4": {
+      "types": "./dist/vector4.d.ts",
+      "import": "./dist/vector4.js"
+    },
+    "./quaternion": {
+      "types": "./dist/quaternion.d.ts",
+      "import": "./dist/quaternion.js"
+    },
+    "./euler": {
+      "types": "./dist/euler.d.ts",
+      "import": "./dist/euler.js"
+    },
+    "./matrix3": {
+      "types": "./dist/matrix3.d.ts",
+      "import": "./dist/matrix3.js"
+    },
+    "./matrix4": {
+      "types": "./dist/matrix4.d.ts",
+      "import": "./dist/matrix4.js"
+    },
+    "./color": {
+      "types": "./dist/color.d.ts",
+      "import": "./dist/color.js"
+    },
+    "./box3": {
+      "types": "./dist/box3.d.ts",
+      "import": "./dist/box3.js"
+    },
+    "./sphere": {
+      "types": "./dist/sphere.d.ts",
+      "import": "./dist/sphere.js"
+    },
+    "./plane": {
+      "types": "./dist/plane.d.ts",
+      "import": "./dist/plane.js"
+    },
+    "./ray": {
+      "types": "./dist/ray.d.ts",
+      "import": "./dist/ray.js"
+    },
+    "./frustum": {
+      "types": "./dist/frustum.d.ts",
+      "import": "./dist/frustum.js"
+    },
+    "./spherical": {
+      "types": "./dist/spherical.d.ts",
+      "import": "./dist/spherical.js"
+    },
+    "./mathutils": {
+      "types": "./dist/mathutils.d.ts",
+      "import": "./dist/mathutils.js"
+    },
+    "./mat4": {
+      "types": "./dist/mat4.d.ts",
+      "import": "./dist/mat4.js"
+    },
+    "./validate": {
+      "types": "./dist/validate.d.ts",
+      "import": "./dist/validate.js"
+    },
+    "./quat": {
+      "types": "./dist/quat.d.ts",
+      "import": "./dist/quat.js"
+    },
+    "./vec3": {
+      "types": "./dist/vec3.d.ts",
+      "import": "./dist/vec3.js"
+    },
+    "./errors": {
+      "types": "./dist/errors.d.ts",
+      "import": "./dist/errors.js"
+    },
+    "./mesh": {
+      "types": "./dist/mesh.d.ts",
+      "import": "./dist/mesh.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "npm run build && node --test test/*.test.js",
+    "prepack": "npm run build"
+  },
+  "homepage": "https://margoengine.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/math"
+  }
+}

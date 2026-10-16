@@ -1,0 +1,244 @@
+{
+  "benchmark": "textured-instancing",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T19:50:46.041Z",
+  "scene": "N textured boxes (one 64x64 texture, one Material, standard shading), 4x MSAA bgra8unorm context, mock GPU",
+  "results": [
+    {
+      "count": 1000,
+      "case": "static",
+      "meshes": {
+        "draws": 1000,
+        "setPipeline": 1000,
+        "setBindGroup": 3000,
+        "setVertexBuffer": 1000,
+        "bufferWrites": 1000,
+        "bytesWritten": 880000,
+        "cpuMsPerFrame": 3.568,
+        "setupMs": 70.7
+      },
+      "instanced": {
+        "draws": 1,
+        "setPipeline": 1,
+        "setBindGroup": 3,
+        "setVertexBuffer": 2,
+        "bufferWrites": 1,
+        "bytesWritten": 880,
+        "cpuMsPerFrame": 0.028,
+        "setupMs": 2.4
+      },
+      "cpuSpeedup": 127.4
+    },
+    {
+      "count": 1000,
+      "case": "moving",
+      "meshes": {
+        "draws": 1000,
+        "setPipeline": 1000,
+        "setBindGroup": 3000,
+        "setVertexBuffer": 1000,
+        "bufferWrites": 1000,
+        "bytesWritten": 880000,
+        "cpuMsPerFrame": 3.569,
+        "setupMs": 44.1
+      },
+      "instanced": {
+        "draws": 1,
+        "setPipeline": 1,
+        "setBindGroup": 3,
+        "setVertexBuffer": 2,
+        "bufferWrites": 2,
+        "bytesWritten": 96880,
+        "cpuMsPerFrame": 0.098,
+        "setupMs": 0.6
+      },
+      "cpuSpeedup": 36.4
+    },
+    {
+      "count": 2500,
+      "case": "static",
+      "meshes": {
+        "draws": 2500,
+        "setPipeline": 2500,
+        "setBindGroup": 7500,
+        "setVertexBuffer": 2500,
+        "bufferWrites": 2500,
+        "bytesWritten": 2200000,
+        "cpuMsPerFrame": 10.458,
+        "setupMs": 131.9
+      },
+      "instanced": {
+        "draws": 1,
+        "setPipeline": 1,
+        "setBindGroup": 3,
+        "setVertexBuffer": 2,
+        "bufferWrites": 1,
+        "bytesWritten": 880,
+        "cpuMsPerFrame": 0.05,
+        "setupMs": 1
+      },
+      "cpuSpeedup": 209.2
+    },
+    {
+      "count": 2500,
+      "case": "moving",
+      "meshes": {
+        "draws": 2500,
+        "setPipeline": 2500,
+        "setBindGroup": 7500,
+        "setVertexBuffer": 2500,
+        "bufferWrites": 2500,
+        "bytesWritten": 2200000,
+        "cpuMsPerFrame": 10.999,
+        "setupMs": 107.2
+      },
+      "instanced": {
+        "draws": 1,
+        "setPipeline": 1,
+        "setBindGroup": 3,
+        "setVertexBuffer": 2,
+        "bufferWrites": 2,
+        "bytesWritten": 240880,
+        "cpuMsPerFrame": 0.322,
+        "setupMs": 0.8
+      },
+      "cpuSpeedup": 34.2
+    },
+    {
+      "count": 5000,
+      "case": "static",
+      "meshes": {
+        "draws": 5000,
+        "setPipeline": 5000,
+        "setBindGroup": 15000,
+        "setVertexBuffer": 5000,
+        "bufferWrites": 5000,
+        "bytesWritten": 4400000,
+        "cpuMsPerFrame": 21.258,
+        "setupMs": 249.7
+      },
+      "instanced": {
+        "draws": 1,
+        "setPipeline": 1,
+        "setBindGroup": 3,
+        "setVertexBuffer": 2,
+        "bufferWrites": 1,
+        "bytesWritten": 880,
+        "cpuMsPerFrame": 0.094,
+        "setupMs": 1
+      },
+      "cpuSpeedup": 226.1
+    },
+    {
+      "count": 5000,
+      "case": "moving",
+      "meshes": {
+        "draws": 5000,
+        "setPipeline": 5000,
+        "setBindGroup": 15000,
+        "setVertexBuffer": 5000,
+        "bufferWrites": 5000,
+        "bytesWritten": 4400000,
+        "cpuMsPerFrame": 24.852,
+        "setupMs": 265.9
+      },
+      "instanced": {
+        "draws": 1,
+        "setPipeline": 1,
+        "setBindGroup": 3,
+        "setVertexBuffer": 2,
+        "bufferWrites": 2,
+        "bytesWritten": 480880,
+        "cpuMsPerFrame": 0.423,
+        "setupMs": 2.4
+      },
+      "cpuSpeedup": 58.8
+    },
+    {
+      "count": 10000,
+      "case": "static",
+      "meshes": {
+        "draws": 10000,
+        "setPipeline": 10000,
+        "setBindGroup": 30000,
+        "setVertexBuffer": 10000,
+        "bufferWrites": 10000,
+        "bytesWritten": 8800000,
+        "cpuMsPerFrame": 42.667,
+        "setupMs": 487.3
+      },
+      "instanced": {
+        "draws": 1,
+        "setPipeline": 1,
+        "setBindGroup": 3,
+        "setVertexBuffer": 2,
+        "bufferWrites": 1,
+        "bytesWritten": 880,
+        "cpuMsPerFrame": 0.171,
+        "setupMs": 2.1
+      },
+      "cpuSpeedup": 249.5
+    },
+    {
+      "count": 10000,
+      "case": "moving",
+      "meshes": {
+        "draws": 10000,
+        "setPipeline": 10000,
+        "setBindGroup": 30000,
+        "setVertexBuffer": 10000,
+        "bufferWrites": 10000,
+        "bytesWritten": 8800000,
+        "cpuMsPerFrame": 38.942,
+        "setupMs": 459.3
+      },
+      "instanced": {
+        "draws": 1,
+        "setPipeline": 1,
+        "setBindGroup": 3,
+        "setVertexBuffer": 2,
+        "bufferWrites": 2,
+        "bytesWritten": 960880,
+        "cpuMsPerFrame": 0.812,
+        "setupMs": 1.7
+      },
+      "cpuSpeedup": 48
+    }
+  ],
+  "notes": "meshes = N createMesh calls (one gltf-pro draw each, the only way before PBRInstances); instanced = one createInstancedMesh of N. CPU ms is the median of 40 frames (transform tick + frame graph encode) on the silent mock GPU; GPU calls are one steady frame on the recording mock. Real-GPU frame equality and timings: textured-instancing-gpu.json.",
+  "sizes": {
+    "baseline": "6eeffab",
+    "method": "vite lib build of packages/<name>/src/index.ts, minified, gzip (as proofs/size.js)",
+    "packages": {
+      "gltf-pro": [
+        17438,
+        19380
+      ],
+      "materials": [
+        7601,
+        7680
+      ],
+      "shadows": [
+        6672,
+        6978
+      ],
+      "staging": [
+        4971,
+        5250
+      ],
+      "taa": [
+        8566,
+        8574
+      ],
+      "bvh": [
+        15265,
+        15572
+      ],
+      "selection": [
+        10336,
+        10716
+      ]
+    },
+    "coreStageGzip": 18681
+  }
+}

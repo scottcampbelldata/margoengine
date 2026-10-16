@@ -6,8 +6,9 @@ import {tmpdir} from 'node:os';
 import {openBrowser} from './browser.js';
 
 const names=['core','gltf','react','machinery','creative','scenery','gltf-pro','animation','post','shadows','clustered','vfx','animator','taa','splats','terrain','environment','controls','margoengine'],npm=process.env.npm_execpath;
-const packedNames=[...names,'decoders','geometry','html','labels','fbx','exporters','gizmo','sky','text','dof','tonemap','physics','xr','materials','selection'];
-const noticeFiles=new Map([['post','NOTICE.md'],['tonemap','NOTICE.md'],['materials','THIRD_PARTY_NOTICES.md']]);
+const packedNames=JSON.parse(await readFile('package.json','utf8')).workspaces.filter(path=>path.startsWith('packages/')).map(path=>path.slice('packages/'.length));
+const noticeFiles=new Map([['post','NOTICE.md'],['tonemap','NOTICE.md'],['materials','THIRD_PARTY_NOTICES.md'],['usdz','THIRD-PARTY-NOTICES.txt'],['text','NOTICE.md']]);
+const packageDocuments=new Map([...noticeFiles,['blender','FORMAT.md']]);
 const packageName=name=>name==='margoengine'?'margoengine':`@margoengine/${name}`;
 assert.ok(npm,'Run this check through npm run modern:test:packages');
 // Reuse a verified archive set while concurrent source edits are in progress.
@@ -35,20 +36,21 @@ for(const name of packedNames){
     manifest=JSON.parse(await readFile(`packages/${name}/package.json`,'utf8'));
   }
   const files=new Set(pack.files.map(file=>file.path));
-  const unexpected=pack.files.filter(file=>!['package.json','README.md','LICENSE',...(noticeFiles.has(name)?[noticeFiles.get(name)]:[])].includes(file.path)&&!file.path.startsWith('dist/')).map(file=>file.path);
+  const unexpected=pack.files.filter(file=>!['package.json','README.md','LICENSE',...(packageDocuments.has(name)?[packageDocuments.get(name)]:[])].includes(file.path)&&!file.path.startsWith('dist/')).map(file=>file.path);
   assert.deepEqual(unexpected,[],`${packageName(name)} contains unexpected packed files: ${unexpected.join(', ')}`);
   if(noticeFiles.has(name))assert.ok(files.has(noticeFiles.get(name)),`${packageName(name)} must retain its third-party notices`);
+  if(name==='blender')assert.ok(files.has('FORMAT.md'),'@margoengine/blender must retain its format specification');
   assert.ok(files.has('README.md')&&files.has('LICENSE'));assert.ok(!files.has('dist/__stale-package-test.js'));
   if(name==='machinery')for(const file of ['cad-runtime.js','occt-import-js.js','occt-import-js.wasm','OCCT-LICENSE.txt','OCCT-NOTICE.txt'])assert.ok(files.has('dist/workers/'+file),`Missing CAD worker asset: ${file}`);
   assert.notEqual(manifest.private,true);assert.equal(manifest.license,name==='materials'?'MIT AND Apache-2.0':'MIT');assert.equal(manifest.publishConfig.access,'public');
   for(const entry of Object.values(manifest.exports))for(const target of Object.values(entry))assert.ok(files.has(target.slice(2)),`Missing packed export: ${manifest.name} ${target}`);
   dependencies[packageName(name)]=`file:${join(archives,pack.filename).replaceAll('\\','/')}`;
 }
-const fixture=await mkdtemp(join(tmpdir(),'margoengine-consumer-'));let browser;
+const fixture=await mkdtemp(join(tmpdir(),'margoengine-consumer-'));let browser;const browserErrors=[];
 try{
   await writeFile(join(fixture,'package.json'),JSON.stringify({private:true,type:'module',dependencies}));
   execFileSync(process.execPath,[npm,'install','--ignore-scripts','--no-audit','--no-fund'],{cwd:fixture,stdio:'inherit'});
-  for(const [name,file] of noticeFiles)assert.equal(await readFile(join(fixture,`node_modules/${packageName(name)}/${file}`),'utf8'),await readFile(`packages/${name}/${file}`,'utf8'),`${packageName(name)} must preserve its installed notice verbatim`);
+  for(const [name,file] of packageDocuments)assert.equal(await readFile(join(fixture,`node_modules/${packageName(name)}/${file}`),'utf8'),await readFile(`packages/${name}/${file}`,'utf8'),`${packageName(name)} must preserve its installed ${file} verbatim`);
   for(const name of names){
     assert.equal(await readFile(join(fixture,`node_modules/${packageName(name)}/LICENSE`),'utf8'),await readFile('LICENSE','utf8'));
     const markdown=await readFile(join(fixture,`node_modules/${packageName(name)}/README.md`),'utf8');
@@ -67,7 +69,8 @@ import {loadGLTF} from '@margoengine/gltf';
 import {Canvas,Mesh,Box,BoxGeometry,PbrMaterial,MeshTransmissionMaterial,Gltf,Animation,Model,Environment,OrbitControls,useMargo,useMargoStage,type MeshRef} from '@margoengine/react';
 import {Kinematics,ExplodedView,SectionPlanes,EngineeringAnnotations,PartInstancer,parseCAD,parseCADAsync,loadCAD,deduplicateParts,SurfacePhysics,TelemetryChannel,AssemblyBVH,measureClearance} from '@margoengine/machinery';
 import {GPUParticles,PostProcessing,ToonShading,HDRRenderTarget} from '@margoengine/creative';
-import {SkyMoon,SkyMoonPass,type SkyMoonConfig} from '@margoengine/scenery';
+import {PostStack,Bloom} from '@margoengine/post';
+import {SkyMoon,type SkyMoonConfig} from '@margoengine/scenery';
 import {Stage,createStage,sphere,type LoadedModel} from 'margoengine';
 import {renderToString} from 'react-dom/server';
 const device=(pass:PassContext)=>pass.backend==='webgpu'?pass.device:null;
@@ -82,11 +85,10 @@ const afterScene=renderToString(<Canvas><Box color="#84d6bd"/><Mesh><BoxGeometry
 const declarative=renderToString(<Canvas shadows onCreated={stage=>stage.engine.camera.position=[1,2,5]}><Model src="/model.glb" materials={{Upper:{baseColor:[0.2,0.8,0.3]}}} onLoad={mesh=>mesh.setPosition([1,0,0])}/><Environment src="/studio.hdr" exposure={1} background/><OrbitControls enableDamping minDistance={1} maxDistance={10}/></Canvas>);
 if(!declarative.includes('<canvas')||typeof useMargo!=='function'||typeof useMargoStage!=='function')throw new Error('Declarative exports failed');
 if(!html.includes('<canvas')||typeof loadGLTF!=='function'||!Kinematics||!ExplodedView||new GPUParticles({count:32}).count!==32)throw new Error('Consumer failed');
-new SectionPlanes({planes:[[0,0,1,0]]});new EngineeringAnnotations();new PartInstancer();new ToonShading();new PostProcessing({atmosphere:{sky:true},bloom:0.5});
+new SectionPlanes({planes:[[0,0,1,0]]});new EngineeringAnnotations();new PartInstancer();new ToonShading();new PostStack([new Bloom({strength:0.5}),new PostProcessing({atmosphere:{density:0.01}})]);
 if(typeof parseCAD!=='function'||typeof loadCAD!=='function'||typeof deduplicateParts!=='function'||!HDRRenderTarget)throw new Error('Domain exports failed');
 if(typeof parseCADAsync!=='function'||typeof SurfacePhysics.create!=='function'||typeof TelemetryChannel.create!=='function'||typeof AssemblyBVH.create!=='function'||typeof measureClearance!=='function')throw new Error('Machinery runtime exports failed');
-if(!new SkyMoon({moonPhase:0.5})||typeof SkyMoonPass!=='function')throw new Error('Scenery exports failed');
-function skyPass(device:GPUDevice,encoder:GPURenderPassEncoder){const config:SkyMoonConfig={moonDirection:[0,1,0],moonPhase:1};const sky=new SkyMoonPass(device,'rgba8unorm','depth32float');sky.setConfig(config);sky.updateFrame(new Float32Array(16),[0,0,0],0);sky.record(encoder);sky.dispose();}
+const moonlit:SkyMoonConfig={moonDirection:[0,1,0],moonPhase:1};if(new SkyMoon(moonlit).config!==moonlit)throw new Error('Scenery exports failed');
 function refs(engine:import('@margoengine/core').EngineKernel,node:MeshRef){
 // @ts-expect-error useMargoStage uses the portable engine surface
 engine.frameGraph;
@@ -133,6 +135,8 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
   reactTests.sort();
   await mkdir(join(supportRoot,'@margoengine/gltf-pro/src'),{recursive:true});await mkdir(join(supportRoot,'docs'),{recursive:true});
   await copyFile('packages/gltf-pro/src/shader.ts',join(supportRoot,'@margoengine/gltf-pro/src/shader.ts'));
+  await mkdir(join(supportRoot,'@margoengine/shared'),{recursive:true});
+  await copyFile('packages/shared/aces.js',join(supportRoot,'@margoengine/shared/aces.js'));
   for(const file of ['react-integration.md','react-r3f.md'])await copyFile('docs/'+file,join(supportRoot,'docs',file));
   execFileSync(process.execPath,['--experimental-test-module-mocks','--test',...reactTests.map(file=>join(reactRoot,file))],{cwd:fixture,stdio:'inherit'});
   const aliases=[],browserExport=entry=>typeof entry==='string'?entry:browserExport(entry.browser??entry.import??entry.default);
@@ -143,7 +147,7 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
       aliases.push({find:new RegExp('^'+specifier.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$'),replacement:join(directory,browserExport(entry))});
     }
   }
-  browser=await openBrowser({startPath:'/tests/modern.html',aliases});const {page}=browser,errors=[];
+  browser=await openBrowser({startPath:'/tests/modern.html',aliases});const {page}=browser,errors=browserErrors;
   page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
   await page.waitForFunction(()=>window.modern);await page.evaluate(()=>window.modern.mount());
   await page.waitForFunction(()=>window.modern.state.react?.meshes.size===2&&window.modern.state.parent&&window.modern.state.child);
@@ -158,6 +162,12 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
   const react=JSON.parse(await readFile(join(fixture,'node_modules/react/package.json'),'utf8')).version;
   await writeFile('test-results/modern-packages.json',JSON.stringify({hardware:browser.hardware,packages:packedNames.map(packageName),archiveSource:reuseTarballs?'cached-tarballs':'prepack',archiveDirectory:archives,react,reactTests,checks:['standalone imports and Wasm','strict consumer declarations without workspace ambient types','React 18 SSR','React 18 declarative, kit, post, physics, XR and loader lifecycle unit tests','React 18 StrictMode, nested refs, props, RAF, Suspense and teardown']},null,2));
   console.log(`React ${react} packaged browser lifecycle passes`);
+}catch(error){
+  if(browser){
+    const state=await browser.page.evaluate(()=>{const state=window.modern?.state;return state?{errors:state.errors,meshes:state.react?.meshes.size,disposed:state.react?.disposed,frames:state.frames,parent:!!state.parent,child:!!state.child}:null;}).catch(()=>null);
+    console.error('Packed browser failure:',JSON.stringify({state,errors:browserErrors}));
+  }
+  throw error;
 }finally{
   await browser?.close();
   const target=await realpath(fixture);assert.equal(dirname(target).toLowerCase(),(await realpath(tmpdir())).toLowerCase());assert.ok(basename(target).startsWith('margoengine-consumer-'));

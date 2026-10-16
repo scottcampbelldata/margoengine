@@ -1,0 +1,83 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Physical material GPU check</title><style>body{margin:0;background:#000}canvas{display:block}</style></head><body>
+<script type="module">
+// Driven by physical-gpu.mjs. One unit sphere at the origin, as a materials mesh (createMesh + Material physical options)
+// or as the equivalent glTF (accessors + KHR_materials_* extensions, parseGLTF), optionally in front of a checkerboard
+// plane, with a PostStack([Tonemap]) HDR capture that readHDR() copies back (linear rgba16float as float32 values).
+// `lit` adds every lighting package to the sphere (shadows, IBL, fog, clustered lights with LocalShadows).
+import {Engine} from '/packages/core/dist/index.js';
+import {parseGLTF} from '/packages/gltf-pro/dist/index.js';
+import {Material,Texture,createMesh} from '/packages/materials/dist/index.js';
+import {Transmission} from '/packages/materials/dist/transmission.js';
+import {planeGeometry,sphereGeometry} from '/packages/geometry/dist/index.js';
+import {PostStack} from '/packages/post/dist/index.js';
+import {Tonemap} from '/packages/tonemap/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {Clustered} from '/packages/clustered/dist/index.js';
+import {LocalShadows} from '/packages/clustered/dist/shadows.js';
+import {Environment,EnvironmentLighting,Fog} from '/packages/environment/dist/index.js';
+// Same definitions as physical-gpu.mjs: Material options and the glTF material they correspond to.
+const presets={
+  glass:{options:{color:[0.9,1,0.85],roughness:0,metalness:0,transmission:1,ior:1.5,thickness:1,attenuationColor:[0.6,0.9,1],attenuationDistance:2},
+    gltf:{pbrMetallicRoughness:{baseColorFactor:[0.9,1,0.85,1],roughnessFactor:0,metallicFactor:0},extensions:{KHR_materials_transmission:{transmissionFactor:1},KHR_materials_ior:{ior:1.5},KHR_materials_volume:{thicknessFactor:1,attenuationColor:[0.6,0.9,1],attenuationDistance:2}}}},
+  carpaint:{options:{color:[0.55,0.02,0.03],roughness:0.45,metalness:0.6,clearcoat:1,clearcoatRoughness:0.05},
+    gltf:{pbrMetallicRoughness:{baseColorFactor:[0.55,0.02,0.03,1],roughnessFactor:0.45,metallicFactor:0.6},extensions:{KHR_materials_clearcoat:{clearcoatFactor:1,clearcoatRoughnessFactor:0.05}}}},
+  fabric:{options:{color:[0.1,0.12,0.35],roughness:0.9,metalness:0,sheenColor:[0.9,0.7,0.8],sheenRoughness:0.4,specularIntensity:0.6,specularColor:[1,0.9,0.9]},
+    gltf:{pbrMetallicRoughness:{baseColorFactor:[0.1,0.12,0.35,1],roughnessFactor:0.9,metallicFactor:0},extensions:{KHR_materials_sheen:{sheenColorFactor:[0.9,0.7,0.8],sheenRoughnessFactor:0.4},KHR_materials_specular:{specularFactor:0.6,specularColorFactor:[1,0.9,0.9]}}}},
+};
+const SEGMENTS=[128,64];
+function gltfSphere(material){
+  const g=sphereGeometry(1,...SEGMENTS),n=g.positions.length/3,f32=[g.positions,g.normals,g.uvs].map(a=>Float32Array.from(a)),index=Uint32Array.from(g.indices);
+  const parts=[...f32,index],offsets=[];let size=0;for(const p of parts){offsets.push(size);size+=p.byteLength;}
+  const bytes=new Uint8Array(size);parts.forEach((p,i)=>bytes.set(new Uint8Array(p.buffer,p.byteOffset,p.byteLength),offsets[i]));
+  const min=[0,1,2].map(k=>Math.min(...Array.from({length:n},(_,i)=>g.positions[i*3+k]))),max=[0,1,2].map(k=>Math.max(...Array.from({length:n},(_,i)=>g.positions[i*3+k])));
+  const doc={asset:{version:'2.0'},scene:0,scenes:[{nodes:[0]}],nodes:[{mesh:0}],materials:[material],extensionsUsed:Object.keys(material.extensions??{}),
+    meshes:[{primitives:[{attributes:{POSITION:0,NORMAL:1,TEXCOORD_0:2},indices:3,material:0}]}],buffers:[{byteLength:size}],
+    bufferViews:parts.map((p,i)=>({buffer:0,byteOffset:offsets[i],byteLength:p.byteLength,...(i<3?{target:34962}:{target:34963})})),
+    accessors:[{bufferView:0,componentType:5126,count:n,type:'VEC3',min,max},{bufferView:1,componentType:5126,count:n,type:'VEC3'},{bufferView:2,componentType:5126,count:n,type:'VEC2'},{bufferView:3,componentType:5125,count:index.length,type:'SCALAR'}]};
+  return parseGLTF(engine,doc,[bytes]);
+}
+function checker(){
+  const size=256,data=new Uint8Array(size*size*4);
+  for(let y=0;y<size;y++)for(let x=0;x<size;x++){const o=(y*size+x)*4,on=((x>>5)+(y>>5))&1;data.set(on?[235,235,235,255]:[25,60,160,255],o);}
+  return new Texture({data,width:size,height:size},{magFilter:'nearest',minFilter:'nearest',mipmaps:false});
+}
+let engine,canvas,stack,errors=[],sphere,plane,transmission;
+window.check={presets,
+  // {kind:'materials'|'gltf', preset, samples:1|4, width, height, checker:boolean, refraction:boolean, ambient:number}
+  async build(o){
+    errors=[];globalThis.margoLow=o.samples===1?1:undefined;
+    canvas=document.body.appendChild(document.createElement('canvas'));canvas.style.width=o.width+'px';canvas.style.height=o.height+'px';
+    engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,0,4],target:[0,0,0],near:0.1,far:100}});
+    engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+    engine.lighting.direction.set([0.4,0.7,0.6,3]);engine.lighting.radiance.set([1,1,1,o.ambient??0]);
+    stack=PostStack.attach(engine,[new Tonemap()]);
+    if(o.checker!==false){plane=createMesh(engine,planeGeometry(10,10),new Material({shading:'basic',map:checker()}));plane.root.setPosition([0,0,-3]);}
+    const preset=presets[o.preset];
+    sphere=o.kind==='gltf'?gltfSphere(preset.gltf):createMesh(engine,sphereGeometry(1,...SEGMENTS),new Material(preset.options));
+    if(o.refraction){transmission=Transmission.attach(engine);transmission.add(sphere);}
+    if(o.lit){
+      const width=64,height=32,data=new Float32Array(width*height*4);for(let i=0;i<width*height;i++)data.set(i<width*height/2?[0.6,0.8,1.2,1]:[0.2,0.18,0.15,1],i*4);
+      Shadows.attach(engine,{resolution:1024}).add(sphere);const lights=Clustered.attach(engine);lights.add(sphere);LocalShadows.attach(engine,{lights,maxLights:1}).add(sphere);
+      lights.setLights([{position:[-2.5,3.5,2.5],range:12,intensity:12,color:[1,0.8,0.6],castShadow:true}]);
+      const ibl=new EnvironmentLighting(await Environment.create(engine,{width,height,data}));engineRuntime(engine).use(ibl);ibl.applyTo(sphere);
+      const fog=new Fog({color:'#c8d4e0',near:6,far:60});engineRuntime(engine).use(fog);fog.applyTo(sphere);
+    }
+    return {width:canvas.width,height:canvas.height,samples:o.samples};
+  },
+  show({sphere:s=true,checker:c=true}={}){sphere.root.visible=s;if(plane)plane.root.visible=c;},
+  async frames(n=3){let thrown;engine.gpu.pushErrorScope('validation');for(let i=0;i<n&&!thrown;i++){try{engine.render({delta:1/60});}catch(error){thrown=error.message;}await engine.gpu.queue.onSubmittedWorkDone();}const e=await engine.gpu.popErrorScope();if(e)errors.push(e.message);
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return {errors:errors.splice(0),thrown};},
+  camera(){return {matrix:Array.from(engine.camera.matrix),position:Array.from(engine.camera.position)};},
+  async readHDR(){
+    const device=engine.gpu,t=stack.sceneTexture,w=t.width,h=t.height,row=Math.ceil(w*8/256)*256;
+    const buffer=device.createBuffer({size:row*h,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),encoder=device.createCommandEncoder();
+    encoder.copyTextureToBuffer({texture:t},{buffer,bytesPerRow:row},[w,h]);device.queue.submit([encoder.finish()]);await buffer.mapAsync(GPUMapMode.READ);
+    const half=new Uint16Array(buffer.getMappedRange()),out=new Array(w*h*4),f16=b=>{const e=(b>>10)&31,m=b&1023,s=b>>15?-1:1;return e===0?s*m*2**-24:e===31?(m?NaN:s*Infinity):s*(1+m/1024)*2**(e-15);};
+    for(let y=0;y<h;y++)for(let x=0;x<w*4;x++)out[y*w*4+x]=f16(half[y*row/2+x]);
+    buffer.unmap();buffer.destroy();return {width:w,height:h,data:out};
+  },
+  clear(){transmission?.dispose();transmission=undefined;engine.dispose();canvas.remove();sphere=plane=stack=undefined;},
+};
+window.ready=true;
+</script></body></html>

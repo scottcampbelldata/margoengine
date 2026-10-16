@@ -7,8 +7,7 @@ Build from source with `npm run build` in `packages/labels`.
 ```ts
 import {LabelRenderer} from '@margoengine/labels';
 
-const labels = new LabelRenderer();
-engine.use(labels);
+const labels = LabelRenderer.attach(engine);
 
 // A 2D label 0.8 units above a mesh origin (mesh-local offset, like a THREE child object).
 const name = document.createElement('div');
@@ -35,6 +34,7 @@ engine.removePlugin(labels.name); // or engine.dispose(): removes every element 
 - **Placement.** `transform: translate(x, y) [scale(s)] translate(-anchorX%, -anchorY%)` with `transform-origin: 0 0`, so the anchor point of the element sits exactly on the projected point, with or without distance scaling.
 - **Depth order.** Visible labels are sorted by distance to the camera every frame and get `z-index` 1..n, nearest on top. `sort: false` leaves a label's z-index alone.
 - **CSS 3D.** As in CSS3DRenderer, a viewer element gets `perspective: (height / 2) / tan(fov / 2)` and a `preserve-3d` camera element gets `translateZ(perspective) matrix3d(view with Y flipped) translate(width / 2, height / 2)`. Each object gets `translate(-50%, -50%) matrix3d(world * scale(pixelScale) with Y flipped)`. The view matrix is rebuilt from `camera.position` and `camera.target` with the same Y-up look-at the core camera uses. Objects whose origin is at or behind the near plane are hidden, since CSS cannot clip them.
+- **Orthographic cameras.** When `camera.matrix` has a constant clip w (for example with `CameraProjection` from `@margoengine/cameras`, which the package does not depend on), the viewer gets `perspective: none` and the camera element `orthographicCSSTransform(matrix, width, height, backend)`: the clip matrix scaled to CSS pixels around the viewport centre, Y flipped, with Z scaled like Y so CSS depth sorting follows the camera (as THREE.CSS3DRenderer does for an OrthographicCamera). Objects in front of the near plane are hidden. 2D labels need nothing special; `distanceScale` uses the distance at which a perspective camera with the same fov shows the same zoom, so labels grow when zooming in and do not change with depth. `isOrthographic(matrix)` is exported.
 - **Minimal DOM writes.** Every style property is cached per element and written only when its string changes; `renderer.writes` reports how many writes the last update made (0 on a static frame).
 - **Occlusion hook.** Depth-buffer occlusion is not built in. `occlude(label, {x, y, depth, distance, world})` on the renderer or a label returns true to hide that label this frame; the per-label hook overrides the renderer one.
 
@@ -46,7 +46,7 @@ engine.removePlugin(labels.name); // or engine.dispose(): removes every element 
 | `Label` | `element`, `visible`, `onScreen`, `screen` (x, y, depth, w), `world`, `distance`, `setMesh`, `setPosition`, `setOffset`, `anchor`, `distanceScale`, `frustumCulling`, `followVisibility`, `sort`, `occlude`, `remove()` |
 | `CSS3DObject` | `element`, `visible`, `onScreen`, `matrix`, `pixelScale`, `setMesh`, `setMatrix`, `setPose(position, quaternion)`, `remove()` |
 | `projectPoint` | World point to CSS pixels plus normalized depth and frustum flags, for either backend |
-| `lookAtView`, `cssPerspective`, `cameraCSSTransform`, `objectCSSTransform`, `cssPointToWorld`, `composeMatrix` | The CSS 3D math, exported for custom layouts and tests |
+| `lookAtView`, `cssPerspective`, `cameraCSSTransform`, `objectCSSTransform`, `cssPointToWorld`, `composeMatrix` | The CSS 3D math, exported for custom layouts and tests (`lookAtView(position, target, out?, up?)` takes core's `camera.up`, default +Y, so exact top-down views work) |
 
 ## Options
 
@@ -74,6 +74,6 @@ engine.removePlugin(labels.name); // or engine.dispose(): removes every element 
 
 ## Tests
 
-`npm test` in `packages/labels` runs 13 Node checks: `projectPoint` against hand-computed values on both clip spaces (near, far, behind, outside), `lookAtView` against the core camera matrix, a CSS transform-chain evaluator showing CSS 3D element corners land on the projected world corners, and the renderer on a fake DOM (overlay placement, mesh following, local and world offsets, anchors, frustum and visibility hiding, z-order, zero writes on a static frame, distance scaling, occlusion hooks, WebGL2, CSS 3D transforms, dispose). `npm run test:browser` runs a real engine in Chromium on WebGPU and then WebGL2: a label sits over its mesh's projected center within 1 px (with the mesh color read back under it), follows a moving mesh, hides behind the camera, passes pointer events through, z-orders by depth under hit testing and re-sorts when the camera moves, CSS 3D corner markers land within 2 px of the projected world corners, there are zero WebGPU validation errors, and removing the plugin leaves no overlay elements.
+`npm test` in `packages/labels` runs Node checks: `projectPoint` against hand-computed values on both clip spaces (near, far, behind, outside), `lookAtView` against the core camera matrix, a CSS transform-chain evaluator showing CSS 3D element corners land on the projected world corners, and the renderer on a fake DOM (overlay placement, mesh following, local and world offsets, anchors, frustum and visibility hiding, z-order, zero writes on a static frame, distance scaling, occlusion hooks, WebGL2, CSS 3D transforms, dispose), plus orthographic cameras from `@margoengine/cameras` (projection on both clip spaces, CSS 3D corners and depth order, `perspective: none`, near-plane hiding, zoom-based `distanceScale`). `npm run test:browser` (a real-GPU script, not in CI) runs a real engine in Chromium on WebGPU and then WebGL2: a label sits over its mesh's projected center within 1 px (with the mesh color read back under it), follows a moving mesh, hides behind the camera, passes pointer events through, z-orders by depth under hit testing and re-sorts when the camera moves, CSS 3D corner markers land within 2 px of the projected world corners, there are zero WebGPU validation errors, and removing the plugin leaves no overlay elements.
 
 MIT licensed.

@@ -1,0 +1,123 @@
+{
+ "recordedAt": "2026-10-15T18:59:13.439Z",
+ "adapter": {
+  "vendor": "intel",
+  "architecture": "xe-2lpg",
+  "device": "",
+  "description": "",
+  "fallback": false
+ },
+ "browser": "155.0.4283.45",
+ "acPower": true,
+ "skinned": {
+  "texels": {
+   "t1": 24864,
+   "t2": 25552,
+   "again": 24864,
+   "bind": 25956
+  },
+  "iou": {
+   "t1_t2": 0.8499,
+   "t1_again": 1,
+   "t1_bind": 0.6939
+  },
+  "errors": [],
+  "screenShadow": {
+   "pixels025": 8341,
+   "pixels075": 8896,
+   "iou": 0.7376
+  }
+ },
+ "crowdB": {
+  "errors": []
+ },
+ "crowdC": {
+  "errors": []
+ },
+ "crowdA": {
+  "silhouetteTexels": 305063,
+  "errors": []
+ },
+ "crowdD": {
+  "errors": []
+ },
+ "crowd": {
+  "crowdPixels": 48863,
+  "crowdLuma": {
+   "B": 182.22,
+   "A": 158.72,
+   "D": 152.01
+  },
+  "floorDarkenedByCrowd": 4056,
+  "crowdPixelsChangedByIbl": 36245
+ },
+ "timing": {
+  "crowdNoShadow": {
+   "median": 13.5,
+   "p90": 17.7
+  },
+  "crowdShadow": {
+   "median": 35.8,
+   "p90": 37.4
+  },
+  "robotNoShadow": {
+   "median": 8.6,
+   "p90": 12.6
+  },
+  "robotShadow": {
+   "median": 9.6,
+   "p90": 12.6
+  },
+  "errors": [],
+  "quiet": {
+   "ac": true,
+   "cpuLoadPercent": 4,
+   "waitedSeconds": 183,
+   "checkedAt": "2026-10-15T18:59:13.439Z",
+   "topProcesses": [
+    {
+     "Name": "claude",
+     "Id": 13528,
+     "cpuSeconds": 7343
+    },
+    {
+     "Name": "claude",
+     "Id": 12156,
+     "cpuSeconds": 5705
+    },
+    {
+     "Name": "claude",
+     "Id": 15776,
+     "cpuSeconds": 3133
+    },
+    {
+     "Name": "chrome",
+     "Id": 1184,
+     "cpuSeconds": 2035
+    },
+    {
+     "Name": "claude",
+     "Id": 12224,
+     "cpuSeconds": 1081
+    },
+    {
+     "Name": "SnagitEditor",
+     "Id": 28664,
+     "cpuSeconds": 1079
+    },
+    {
+     "Name": "SnagitCapture",
+     "Id": 23920,
+     "cpuSeconds": 914
+    },
+    {
+     "Name": "OLED Care Screensaver.scr",
+     "Id": 14324,
+     "cpuSeconds": 868
+    }
+   ]
+  },
+  "status": "quiet-gated",
+  "note": "Diagnostic: the quiet gate passed (AC, CPU <= 20%), but other agents' sessions were open. Frame time = render + onSubmittedWorkDone, 800x600, shadows resolution 1024."
+ }
+}
