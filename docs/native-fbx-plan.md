@@ -1,6 +1,6 @@
 # Native FBX implementation plan and progress
 
-Updated: 2026-10-16. Status: first native implementation verified; real-DCC/rendered compatibility gates remain open. Gzip figures in this note are from the checks recorded here. The 16 October 2026 core + stage measurement is 20,046 bytes gzip, against a gate that rejects 20,000 or above.
+Updated: 2026-10-16. Status: first native implementation verified; real-DCC/rendered compatibility gates remain open. Gzip figures in this note are from the checks recorded here. The current build measures core at 18,192 bytes gzip and core plus stage at 19,999 bytes gzip. The gate rejects 20,000 or above.
 
 Replace the Three.js bridge inside `@margoengine/fbx` with Margo-owned binary and ASCII readers, scene conversion, and the existing `@margoengine/exporters` glTF writer. Keep the public package and loading APIs. This file tracks the implementation and its verification; unchecked items remain outstanding.
 
