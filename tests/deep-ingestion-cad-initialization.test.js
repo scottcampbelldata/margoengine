@@ -1,11 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import {pathToFileURL} from 'node:url';
-import {stripTypeScriptTypes} from 'node:module';
+import {execFile} from 'node:child_process';
+import {tmpdir} from 'node:os';
+import {dirname,join,resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {promisify} from 'node:util';
 import {Camera} from '../packages/core/dist/camera.js';
-const sourceFile=process.env.DEEP_INGESTION_BASELINE?process.env.DEEP_INGESTION_BASELINE+'/packages/core/src/controls.ts':new URL('../packages/core/src/controls.ts',import.meta.url);
-let source=stripTypeScriptTypes(await fs.readFile(sourceFile,'utf8'),{mode:'transform'});
+const sourceFile=process.env.DEEP_INGESTION_BASELINE?resolve(process.env.DEEP_INGESTION_BASELINE,'packages/core/src/controls.ts'):fileURLToPath(new URL('../packages/core/src/controls.ts',import.meta.url));
+// Parameter properties need compilation; Node 26 only supports type stripping.
+const directory=await fs.mkdtemp(join(tmpdir(),'margo-cad-controls-'));
+let source;
+try{
+ const config=join(directory,'tsconfig.json');
+ await fs.writeFile(config,JSON.stringify({compilerOptions:{target:'ES2022',module:'ESNext',moduleResolution:'Bundler',rootDir:dirname(sourceFile),outDir:join(directory,'dist'),types:[],noCheck:true},files:[sourceFile]}));
+ await promisify(execFile)(process.execPath,[fileURLToPath(new URL('../node_modules/typescript/bin/tsc',import.meta.url)),'-p',config]);
+ source=await fs.readFile(join(directory,'dist/controls.js'),'utf8');
+}finally{
+ await fs.rm(directory,{recursive:true,force:true});
+}
 source=source.replace("'./camera.js'",JSON.stringify(new URL('../packages/core/dist/camera.js',import.meta.url).href));
 const {CADCameraControls}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 function element(failAt=Infinity){

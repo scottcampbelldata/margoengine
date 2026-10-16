@@ -13,6 +13,7 @@
     "access": "public"
   },
   "scripts": {
+    "test": "node --test ../../tests/modern.test.js ../../tests/deep-core*.test.js ../../tests/deep-ingestion-cad-initialization.test.js ../../tests/modern-frame-timing.test.js ../../tests/modern-msaa.test.js ../../tests/modern-quaternion.test.js ../../tests/modern-resolution.test.js",
     "prepack": "npm --prefix ../.. run build:packages"
   },
   "sideEffects": false,

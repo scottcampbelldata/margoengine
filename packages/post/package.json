@@ -13,6 +13,7 @@
     "access": "public"
   },
   "scripts": {
+    "test": "node --test test/*.test.js ../../tests/modern-scene-fade-lifecycle.test.js",
     "prepack": "npm --prefix ../.. run build:packages"
   },
   "sideEffects": false,

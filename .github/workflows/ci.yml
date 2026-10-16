@@ -1,6 +1,30 @@
 name: CI
 on: [push, pull_request]
 jobs:
+  kernel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the Rust toolchain pinned in rust-toolchain.toml
+        run: rustc --version
+      - name: Run native kernel unit tests
+        run: cargo test --locked --manifest-path packages/kernel/Cargo.toml
+  node-compatibility:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        node: ['22.12.0', '26']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: Compile core for the CAD lifecycle regression
+        run: node node_modules/typescript/bin/tsc -p packages/core/tsconfig.json
+      - name: Verify CAD initialization and disposal on supported Node versions
+        run: node --test tests/deep-ingestion-cad-initialization.test.js
   packages:
     runs-on: windows-latest
     steps:

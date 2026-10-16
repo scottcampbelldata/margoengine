@@ -13,6 +13,7 @@
     "access": "public"
   },
   "scripts": {
+    "test": "node --test tests/*.test.js ../../tests/modern-extensions.test.js ../../tests/modern-gltf*.test.js ../../tests/gltf-draco-limits.test.js ../../tests/deep-render-pbr-resources.test.js",
     "prepack": "npm --prefix ../.. run build:packages"
   },
   "sideEffects": false,

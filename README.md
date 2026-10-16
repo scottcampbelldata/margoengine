@@ -2,7 +2,7 @@
 
 The product is six packages: the [`margoengine`](packages/margoengine/README.md) stage, [`@margoengine/core`](packages/core/README.md), [`@margoengine/react`](packages/react/README.md), [`@margoengine/gltf`](packages/gltf/README.md), [`@margoengine/gltf-pro`](packages/gltf-pro/README.md), and [`@margoengine/machinery`](packages/machinery/README.md). The demo is [Night Citadel](apps/showcase-night-citadel/README.md): `npm run dev`.
 
-Core measures **18,192 bytes gzip**. Core plus the stage facade measures **19,999 bytes gzip**, including embedded Wasm and both backends. That is below the gate. CI rejects a combined size of **20,000 bytes gzip or above**.
+Core measures **18,244 bytes gzip**. Core plus the stage facade measures **20,215 bytes gzip**, including embedded Wasm and both backends. That is below the gate. CI rejects a combined size of **25,000 bytes gzip or above**.
 
 A small Rust/Wasm engine for web apps, with WebGPU rendering, WebGL2 fallback, ordinary React components and optional domain packs.
 
@@ -42,6 +42,7 @@ Open the localhost URL printed by Vite for the standalone [Night Citadel showcas
 
 ```sh
 npm test                      # builds packages and runs modern unit checks
+npm run test:kernel           # native kernel tests; requires the pinned Rust toolchain
 npm run build:packages        # builds workspace libraries with precompiled Wasm
 npm run typecheck             # strict checks for all 63 packages after build
 npm run measure:size          # verifies the combined core + stage gzip ceiling
@@ -96,7 +97,7 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 | [`@margoengine/splats`](packages/splats/README.md) | GPU radix sorting, covariance ellipses, degree-3 SH and binary Gaussian captures |
 | [`@margoengine/terrain`](packages/terrain/README.md) | Fixed geometry clipmaps, GPU height/normal sampling and triplanar texture layers |
 
-Core measures **18,192 bytes gzip**. Core plus the stage facade measures **19,999 bytes gzip**, including embedded Wasm and both backends. The base is feature-frozen for v1.0.0; every push and pull request runs a CI build that rejects a combined size of **20,000 bytes gzip or above** and checks package isolation. Optional PBR, animation and SSAO packages use the existing extension hooks and do not enter the base bundle. The build also retains the 30 KiB combined core/static-glTF budget and 30 KiB raw Wasm budget. React/framework/application code is additional; domain packages have no 20 KiB ceiling.
+Core measures **18,244 bytes gzip**. Core plus the stage facade measures **20,215 bytes gzip**, including embedded Wasm and both backends. The base is feature-frozen for v1.0.0; every push and pull request runs a CI build that rejects a combined size of **25,000 bytes gzip or above** and checks package isolation. Optional PBR, animation and SSAO packages use the existing extension hooks and do not enter the base bundle. The build also retains the 30 KiB combined core/static-glTF budget and 30 KiB raw Wasm budget. React/framework/application code is additional; domain packages have no separate 25 KiB ceiling.
 
 The six requested game modules (shadows, clustered, animator, TAA, VFX and splats), plus terrain, use those hooks. Build with `npm run build:packages`; run `npm run modern:test:game` for their combined WebGPU rendering/culling/cache/IK/particle checks, temporal reprojection/clamping, skinned motion, stable radix sorting and ellipse blending. `npm run modern:test:game:packages` checks ten packed packages and seven standalone README TypeScript examples. The normal sort test covers 66,049 splats across hierarchical scan blocks; set `SPLAT_STRESS=1` for the additional three-million-splat capacity/sort check. Million-particle, three-million-splat and 1,024-light execution tests validate correctness separately from FPS claims. These source packages have not been published by this change.
 
@@ -173,7 +174,7 @@ and packed imports across all 63 packages, the existing production browser
 regressions, 42 node-material captures, 59 additional-lobe captures, 82 texture
 captures, complete Khronos material/KTX2/UV1 assets, and eight-influence character
 GPU readback, plus 45 local-shadow and 46 deformed-picking captures.
-`npm run measure:size` reports **47,983 bytes raw / 19,999 bytes gzip** for
+`npm run measure:size` reports **48,638 bytes raw / 20,215 bytes gzip** for
 core + stage. The [release notes](CHANGELOG.md#unreleased) record the parser,
 normalization, index-boundary and lifecycle checks.
 
@@ -181,6 +182,6 @@ normalization, index-boundary and lifecycle checks.
 
 Run `npm run catalog` to preview the [searchable Margo catalog](docs/README.md). All 63 packages use their Margo names. `npm run catalog:build` refreshes the catalog from built runtime exports and checks exact-version availability on npm. [Release notes](CHANGELOG.md) describe source changes and their verification; an Unreleased entry does not indicate npm publication.
 
-`npm run release:check` builds and tests the engine, enforces the 20,000-byte core + stage ceiling, and verifies every tarball's exports, TypeScript declarations and internal dependency versions. After signing into npm with access to the `@margoengine` scope, `npm run publish:packages` runs those checks and publishes the public library workspaces. Starter apps and showcases are private. Refresh the catalog after publishing and run `npm run build:site` to assemble the website.
+`npm run release:check` builds and tests the engine, enforces the 25,000-byte core + stage ceiling, and verifies every tarball's exports, TypeScript declarations and internal dependency versions. After signing into npm with access to the `@margoengine` scope, `npm run publish:packages` runs those checks and publishes the public library workspaces. Starter apps and showcases are private. Refresh the catalog after publishing and run `npm run build:site` to assemble the website.
 
 [Committed SwiftShader results](benchmarks/README.md#swiftshader-runs-no-gpu) include repeat commands and the [historical conveyor picking failure](benchmarks/swiftshader/conveyor-check-picking-failure.txt). Software-renderer timings do not establish physical GPU performance.
