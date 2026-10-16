@@ -40,6 +40,24 @@ After the eye release, the exact **703,335 raw / 237,609 gzip JS-byte** producti
 
 Measured drag received 938 trusted pointer moves. Browser errors and source changes were empty. These are current baseline observations; different code, workloads and natural runtime variation prevent treating their difference from prior captures as an isolated improvement or regression. RAF callback wall time is not GPU completion time or a physical safety measure. These metrics do not identify allocation constructors or prove zero owned allocations. **GC remains, so the allocation objective is still active and incomplete.**
 
+### Retained torso writer: owned-path reduction, scene-wide benefit unproven
+
+The next demo-only change gives `TorsoAim` an explicit rotation writer, wired once at startup to its own retained `RigScratch`. Omitting it retains dynamic public `Mesh.setQuaternion()` dispatch, including overrides. Core, public packages, numerical checks, collision geometry and motion policy are unchanged. Failed writes do not advance the successful-commit cache. This change is retained in source but **is not included in production `feeb64de`**.
+
+Validation: **17/17 focused tests**, including **2,400 bit-exact authored-rig frames / 1,590 actual writes**, default setter overrides, restoration, transformed roots, store growth, zero-delta repeats, resets and invalid/disposed guards. Eight hardware motion cases with 14 transitions and **616 published samples** also passed, without browser errors or an unmoving chase. The candidate build is 703,549 raw / 237,677 gzip JS bytes; core plus stage remains 19,999 bytes.
+
+A controlled Node census of **10,000 actual commits** used separate matched default/opt-in control and kernel processes. All four measured windows had zero natural collections and unchanged sources; a separate parity run verified 10,000 bit-exact writes. After correcting the verified duplicate function-context row, the selected structural reduction is **5,278,560 bytes**; excess HeapNumbers fell from 161,817 to 20,363, a further **2,263,264 bytes**. These establish removal of the identified Node allocation shapes, not a browser byte-rate prediction.
+
+Fresh-page hardware captures used 30 seconds warmup and 30 seconds measurement for each phase. Baseline B served the exact archived original build; the queue writer remained native throughout.
+
+| Variant | Idle MB/s | Drag MB/s | Drag minor / major GC | Peak drag GC pause ms | Drag p95 RAF callback wall ms |
+| --- | ---: | ---: | --- | ---: | ---: |
+| Baseline A | 0.784223 | 1.067418 | 22 / 4 | 3.713 | 6.877 |
+| Torso writer | 0.640472 | 1.065740 | 18 / 4 | 3.752 | 5.066 |
+| Baseline B | 0.736045 | 1.046181 | 18 / 5 | 4.472 | 5.022 |
+
+The torso commit subtree sampled approximately **1.790 MB** in each baseline drag capture and zero in the candidate. Zero samples is not proof of zero actual bytes. The full-scene totals do **not** establish repeatable lower drag allocation or a CPU improvement. Retention is based on the independently verified owned structural reduction, bit-exact behavior and narrow explicit opt-in; do not attribute the large idle difference to torso writes. GC remains. Evidence: `test-results/torso-writer-ablation/{focused-tests.log,parity.json,census-comparison.json,fresh-aba-summary.json,motion-browser.log}` and the three `skinning-ik-profile-*.json` reports named in that summary.
+
 ## Workspaces, commits, and constraints
 
 | Item | Location / state |

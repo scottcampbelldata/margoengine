@@ -154,7 +154,10 @@ try {
     heldInverse = new Float64Array(16),
     pointWorkspace = new Float64Array(52);
   const keepOrbHeld = () => holdObjectAtGrip(meshRuntime(orb.root), wrist, localGrip, heldPosition, heldInverse);
-  const torsoAim = new TorsoAim(body, meshRuntime(model.root));
+  const torsoRotation = new RigScratch();
+  const torsoAim = new TorsoAim(body, meshRuntime(model.root), 0.85, (rotation) =>
+    torsoRotation.setQuaternion(body, rotation),
+  );
   const acceptedOrbTorso = localPoint(torsoAim.frame, home);
   teardown.push(() => torsoAim.dispose());
   const armHeadClearance = new ArmHeadClearance(torsoAim.frame, head, shoulder, elbow);

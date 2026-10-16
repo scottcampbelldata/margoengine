@@ -19,14 +19,23 @@ export class TorsoAim {
   private readonly previous: Rotation = [NaN, NaN, NaN, NaN];
   private readonly committed: Rotation = [NaN, NaN, NaN, NaN];
   private readonly committedEuler: [number, number, number] = [NaN, NaN, NaN];
+  private readonly writeRotation?: (rotation: readonly number[]) => void;
 
-  constructor(body: Mesh, root: Mesh, maxYaw = 0.85) {
+  /**
+   * Optional explicit demo-owned commit for reused normal-array rotations.
+   * It must synchronously validate, normalize and write quaternion/Euler state
+   * without mutating the rotation. Omit to call the current public Mesh setter.
+   */
+  constructor(body: Mesh, root: Mesh, maxYaw = 0.85, writeRotation?: (rotation: readonly number[]) => void) {
     body.check();
     root.check();
     if (body.engine !== root.engine || body === root) throw new Error('Torso must belong to the model hierarchy');
     if (!Number.isFinite(maxYaw) || maxYaw < 0 || maxYaw > 0.95) {
       throw new RangeError('Torso travel must be between zero and 0.95 radians');
     }
+    if (writeRotation !== undefined && typeof writeRotation !== 'function')
+      throw new RangeError('Invalid torso rotation writer');
+    this.writeRotation = writeRotation;
     const store = body.engine.store,
       t = store.transforms;
     let scale = 1,
@@ -162,7 +171,8 @@ export class TorsoAim {
       !Object.is(euler[1], this.committedEuler[1]) ||
       !Object.is(euler[2], this.committedEuler[2])
     ) {
-      this.body.setQuaternion(out);
+      if (this.writeRotation) this.writeRotation(out);
+      else this.body.setQuaternion(out);
       for (let i = 0; i < 4; i++) this.previous[i] = out[i];
       this.committed[0] = t.qx[id];
       this.committed[1] = t.qy[id];
