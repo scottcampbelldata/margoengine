@@ -13,9 +13,14 @@ without 'unsafe-eval'. The modified file remains under LGPL-2.1.
 
 Source: the modified glue is itself JavaScript source; the transformation is
 scripts/static-embind.js at https://github.com/scottcampbelldata/margoengine.
-The importer's C++ source, build scripts and the pinned OpenCascade revision:
-https://github.com/kovacsv/occt-import-js (release 0.0.23)
+The importer's C++ source, build scripts and the pinned OpenCascade revision,
+mirrored by the Margo Engine author (tag 0.0.23 = commit c2148e54b456):
+https://github.com/scottcampbelldata/occt-import-js/tree/0.0.23
+Upstream: https://github.com/kovacsv/occt-import-js (release 0.0.23),
 https://www.npmjs.com/package/occt-import-js/v/0.0.23
+OpenCascade source at the exact revision that release builds (submodule `occt`,
+commit d2abb6d844231cb8f29be6894440874a4700e4a5, OCCT 7.6.1):
+https://github.com/Open-Cascade-SAS/OCCT/tree/d2abb6d844231cb8f29be6894440874a4700e4a5
 
 The loader fetches these two files by URL at run time (never bundled into
 Margo Engine's code), so an application can replace them with its own
