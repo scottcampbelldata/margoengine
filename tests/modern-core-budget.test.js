@@ -10,4 +10,5 @@ test('core + stage gate rejects the ceiling and any excess', async () => {
   assert.ok(raw > gzip && gzip < 20_000);
   assert.ok(modules.some(path => path.includes('/packages/margoengine/')));
   assert.ok(modules.some(path => path.includes('/packages/core/')));
+  assert.ok(modules.every(path => !path.replaceAll('\\', '/').includes('/packages/kinematics-constraints/')), 'Kinematics constraints entered core + stage');
 });

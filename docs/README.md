@@ -2,7 +2,7 @@
 
 [Browse the searchable catalog](https://scottcampbelldata.github.io/margoengine/).
 
-Search all 61 packages by task, package name or public runtime export. Copy installation commands and imports, open each package guide, and try the five standalone HTML examples. The catalog marks exact versions available on npm; packages marked Source can be built from the repository until publication.
+Search all 62 packages by task, package name or public runtime export. Copy installation commands and imports, open each package guide, and try the five standalone HTML examples. The catalog marks exact versions available on npm; packages marked Source can be built from the repository until publication.
 
 To preview a checkout, use Node.js 22.12+ and run this command from the repository root:
 

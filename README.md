@@ -74,7 +74,7 @@ npm run dev --workspace @margoengine/starter-next
 
 ## Packages
 
-Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. The release contains 61 packages: most at `0.1.0`, with DOF and tonemapping at `1.0.0`. The [catalog](docs/README.md) lists every package, runtime export and npm publication status.
+Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. The release contains 62 packages: most at `0.1.0`, with DOF and tonemapping at `1.0.0`. The [catalog](docs/README.md) lists every package, runtime export and npm publication status.
 
 | Package | Includes |
 | --- | --- |
@@ -88,6 +88,7 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 | [`@margoengine/loaders`](packages/loaders/README.md) | PLY/3MF/PCD/OFF/XYZ/VTK and static USDA/USDZ import; USDC is unsupported |
 | [`@margoengine/exporters`](packages/exporters/README.md) | glTF/GLB/STL/OBJ/PLY and static USDZ export for Quick Look |
 | [`@margoengine/machinery`](packages/machinery/README.md) | Revolute/prismatic joints, gear/piston couplings, bounded IK, sections/caps, dimensions, welded STL/OBJ, assembly queries/visibility, metrology and industrial presets |
+| [`@margoengine/kinematics-constraints`](packages/kinematics-constraints/README.md) | Standalone capsule/sphere target projection and two-bone pole clearance, with no engine dependency |
 | [`@margoengine/creative`](packages/creative/README.md) | Textured/sorted GPU particles, wind obstacles, sky/fog/scattering, toon, HDR and compute post-processing |
 | `@margoengine/scenery` | Independently loaded `SkyMoon` plugin and `SkyMoonPass`, procedural moonlit sky, lunar phases, stars and horizon haze |
 | `@margoengine/gltf-pro` | Optional metallic-roughness PBR, all five texture maps, normal mapping, mipmaps and alpha modes |
