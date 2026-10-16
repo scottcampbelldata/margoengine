@@ -28,7 +28,7 @@ An allocation change in one demo does not establish the behavior of the other.
 | Latest verified core + stage size | **19,999 gzip bytes** |
 | Latest public API check | **166 entries / 1,548 exports unchanged** |
 
-The robot checkout has pending optional-package changes in animation, gltf-pro, and environment. Their native correctness and allocation evidence are described below. They are not all proven allocation wins.
+The robot code/test checkpoint is committed and pushed as **6794863** on **codex/skinning-ik**. It includes the Animation native-writer/backing-store guards, environment output identity retention, explicit demo-owned head writer, and additional unconditional PBR writer regressions. The experimental PBR uniform cache was reverted. These changes do not establish zero-GC operation.
 
 Preserve unrelated untracked documents, including docs/NEXT_DEMO_HANDOFF.md and docs/package-opinion.md. Large diagnostic recordings and reports live in ignored test-results folders. Only compact numerical regression fixtures are tracked.
 
@@ -384,7 +384,28 @@ Ten useful custom-writer, Float32-bit, failure, reentrancy and validation cases 
 
 ## Remaining investigation and rejected paths
 
-1. Complete and measure the demo-owned head writer, then rebuild the preview with the experimental PBR cache removed.
+### Current checkpoint validation and production capture
+
+After push, the rebuilt checkpoint passed **307/307** selected package/demo tests with no skips; public API reports match **166 entries / 1,548 exports**. The standalone build is **697,008 raw JS bytes / 235,782 gzip bytes**, with 102 modules, no Three.js runtime, and frozen core + stage at **19,999 gzip bytes**. Logs: allocation-checkpoint-tests.log, allocation-checkpoint-api.log and allocation-checkpoint-build.log.
+
+Hardware proof native-animation-checkpoint-proof.json verified the ordinary native queue and unconditional PBR writes, plus reuse of unchanged Animation inputs. All **85 buffers / 83,968 bytes** matched CPU expectations on the NVIDIA RTX A6000, including actual robot uniforms/bones and a supplemental real morph fixture. Matching CPU/GPU SHA256: 55f3f47c31c9f42444a79b1349fc54a754a7fd8235de18df9bde508abebf0f1c. Invalid morph, singular skin, signed-zero morph and changed-joint palette checks passed. Errors and source changes were empty. This is correctness evidence, not an allocation measurement.
+
+The hardware motion suite passed all eight cases and 14 transitions, with eyes enabled/disabled, full side/height/near-far routes and rapid reversals. It produced 652 published samples at approximately 100 ms intervals, not per-frame CCD evidence. No browser errors or measured unmoving-chase periods occurred. Latest report: skinning-ik-motion-browser.json; prior report preserved as skinning-ik-motion-browser-before-checkpoint.json. The in-app preview was reloaded and manually checked at full cross-body reach; screenshot robot-allocation-checkpoint-preview.png.
+
+The rebuilt **production** preview was then measured without implementation swaps, after 30 seconds of warmup per phase and approximately 30 seconds of measurement. Drag warmup itself used continuous trusted pointer input. Head tracking, auto IK and reflections were enabled during drag; idle animation and moving-light motion were disabled. Report: skinning-ik-profile-checkpoint-production-idle-drag.json.
+
+| Phase | Sampled MB/s | Minor GC | Major GC | Peak GC pause ms | p95 RAF callback execution ms | Reflection bakes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Idle defaults | 0.716 | 29 | 4 | 1.731 | 2.427 | 390 |
+| Active torso drag | 1.063 | 7 | 4 | 2.281 | 6.418 | 368 |
+
+Drag completed 938 trusted commands, with maximum scheduling lateness 15.62 ms. All sampled poses/grips passed and reflection pose reuse stayed at 100%. Source changes and browser errors were empty; native writer identity was unchanged. Max observed RAF callback wall duration was 12.528 ms during drag. These captures still contain GC and do not meet the active zero-GC objective. They are not a strictly workload-matched causal comparison against earlier reports with different controls, durations and reflection counts. A stable rolling heap envelope alone does not prove the absence of retained leaks, and GPU pass timing is not the complete frame budget.
+
+### Rejected native Stats descriptor batching
+
+The isolated actual-native-pass experiment native-stats-pass-layout-checkpoint.json retained identical native prototypes and final property descriptors, with 16,384 passes and 256 encoder/finish/submit operations per phase. Raw native writer-subtree sampling was 15.71 / 15.39 / 17.62 bytes/pass. Five sequential own assignments sampled 68.57 / 68.40 bytes/pass, whereas a retained Object.defineProperties bag sampled 243.25 / 251.89 bytes/pass. Batched CPU time was 30.7 / 27.8 ms versus sequential 14.7 / 14.7 ms. No GPU/page errors or source changes occurred. **Reject descriptor batching; no production Stats change was made.**
+
+1. Continue from the measured remaining allocation sites; do not revive rejected caches/layout changes without new evidence.
 2. Identify actual allocation types/IR consumers for BodyIK, target projection, HeadAim and the other drag hotspots.
 3. Reduce measured owned allocations, rerun numerical/mesh and interaction checks, and retain only improvements.
 4. Rebuild the standalone robot and repeat sustained warmed idle/drag profiles, including GC and actual skinned clearance.
@@ -426,9 +447,9 @@ Use fresh report labels for further captures. Keep source/dist frozen and avoid 
 
 ## Immediate handoff
 
-The latest user request is to compare the fresh-page repeat baseline and determine whether the candidate's added script work affects active interaction frame times.
+The user requested an immediate commit/push checkpoint, followed by continued work, and then the rebuilt production drag allocation/GC results.
 
-The warmed fixed-render rerun, isolated fresh-page idle/drag comparisons, separate Node type census and controlled HeadAim writer ablation have completed. The experimental PBR uniform cache was reverted and its numerical/writer regressions were preserved. The demo-owned head-writer opt-in is implemented and its 21 focused tests pass. The Animation shared-buffer guard now reads actual backing storage through the captured intrinsic typed-array buffer getter, preventing own/subclass buffer accessors from disguising SharedArrayBuffer; 21 focused animation/upload/sampling/resource tests pass, and the two spoof cases fail the previous guard in a diagnostic comparison. The constraints lab is running the committed contact-reach-3 controller; both saved complete trajectories replay hold-free. Allocation-driven GC remains; rebuilt-preview hardware verification and fresh allocation measurements are still pending.
+The current code checkpoint is pushed and the rebuilt preview has passed CPU/API/size checks, native GPU byte verification, the hardware motion suite and a warmed production idle/drag capture. Descriptor batching in Stats was measured and rejected. The constraints lab remains on the committed contact-reach-3 controller; both saved complete trajectories replay hold-free. Allocation-driven GC remains and the overall goal is active.
 
 The user explicitly requested an immediate commit/push checkpoint even with unfinished work, followed by continued testing. Preserve that incomplete status in the checkpoint; do not present the pending live measurements as completed. Large raw traces and diagnostic harnesses remain in ignored local test-results folders.
 
