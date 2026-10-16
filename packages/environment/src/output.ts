@@ -76,7 +76,9 @@ export class ColorOutput {
     module: GPUShaderModule;
     pipelines: Map<string, GPURenderPipeline>;
     group?: GPUBindGroup;
-    key?: unknown[];
+    groupPipeline?: GPURenderPipeline;
+    groupImage?: GPUTextureView;
+    groupExcess?: GPUTextureView;
   };
   private readonly frame: Frame = {
     peak: 1,
@@ -304,8 +306,8 @@ export class ColorOutput {
       c.encoder.beginRenderPass(this.resolveDescriptor).end();
     }
     const excess = this.used && this.excessTarget?.device === device ? this.excessTarget.view : image.view,
-      key = [pipeline, image.view, excess];
-    if (!state.group || state.key!.some((value, i) => value !== key[i])) {
+      view = image.view;
+    if (!state.group || state.groupPipeline !== pipeline || state.groupImage !== view || state.groupExcess !== excess) {
       state.group = device.createBindGroup({
         label: 'color output',
         layout: pipeline.getBindGroupLayout(0),
@@ -315,7 +317,9 @@ export class ColorOutput {
           { binding: 2, resource: { buffer: state.uniform } },
         ],
       });
-      state.key = key;
+      state.groupPipeline = pipeline;
+      state.groupImage = view;
+      state.groupExcess = excess;
     }
     const v = this.values;
     v[0] = this.extended ? this.peak : 1;

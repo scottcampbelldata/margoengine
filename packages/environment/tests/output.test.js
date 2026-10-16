@@ -14,7 +14,7 @@ function fakeGPU(t, { display = [], extended = true } = {}) {
       Object.getOwnPropertyDescriptor(globalThis, key),
     ]),
   );
-  const log = { configs: [], calls: [], uniforms: [], modules: [], canvasViews: 0 };
+  const log = { configs: [], calls: [], uniforms: [], modules: [], groups: [], canvasViews: 0 };
   let config = null;
   const canvasTexture = {
     width: 16,
@@ -77,7 +77,16 @@ function fakeGPU(t, { display = [], extended = true } = {}) {
       log.modules.push(d.code);
       return d;
     },
-    createBindGroup: () => ({}),
+    createBindGroup: (descriptor) => {
+      const group = {};
+      log.groups.push({
+        group,
+        label: descriptor.label,
+        layout: descriptor.layout,
+        entries: descriptor.entries.map(({ binding, resource }) => [binding, resource]),
+      });
+      return group;
+    },
     createBuffer: (d) => ({ size: d.size, label: d.label, destroy() {} }),
     createTexture: (d) => {
       log.calls.push(['createTexture', d.label, d.format]);
@@ -302,6 +311,76 @@ test('Tonemap under ColorOutput grades with the HDR/P3 shader and writes the exc
     assert.ok(passes.includes('color output excess'), "excess written to ColorOutput's target");
     assert.deepEqual(log.uniforms.at(-1), [3, 1, 1, 0], 'peak, P3, excess used, opaque');
     tonemap.dispose();
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('ColorOutput retains its group until image, excess, pipeline or device identity changes', async (t) => {
+  const { canvas, log } = fakeGPU(t, { display: [P3, HDR] }),
+    engine = await engineFor(canvas);
+  try {
+    const output = ColorOutput.attach(engine),
+      groups = () => log.groups.filter((group) => group.label === 'color output');
+    engine.render();
+    const first = groups()[0];
+    assert.equal(groups().length, 1);
+    assert.equal(first.entries[0][1], first.entries[1][1], 'unused excess samples the same image');
+    for (let i = 0; i < 40; i++) engine.render();
+    assert.equal(groups().length, 1, 'unchanged frames retain the group');
+
+    canvas.clientWidth = canvas.width = 32;
+    engine.render();
+    const resized = groups().at(-1);
+    assert.equal(groups().length, 2);
+    assert.notEqual(resized.entries[0][1], first.entries[0][1]);
+    assert.equal(resized.entries[0][1], resized.entries[1][1]);
+
+    const tonemap = Tonemap.attach(engine);
+    engine.render();
+    const withExcess = groups().at(-1);
+    assert.equal(groups().length, 3);
+    assert.equal(withExcess.entries[0][1], resized.entries[0][1]);
+    assert.notEqual(withExcess.entries[1][1], withExcess.entries[0][1]);
+    for (let i = 0; i < 40; i++) engine.render();
+    assert.equal(groups().length, 3, 'unchanged excess target retains the group');
+    tonemap.dispose();
+    engine.render();
+    assert.equal(groups().length, 4, 'removing excess invalidates its binding');
+    assert.equal(groups().at(-1).entries[0][1], groups().at(-1).entries[1][1]);
+
+    const device = log.configs.at(-1).device,
+      createGroup = device.createBindGroup;
+    // A new presentation format uses another pipeline and its own bind-group layout.
+    output.extended = false;
+    engine.render();
+    assert.equal(groups().length, 5);
+    assert.notEqual(groups().at(-1).layout, groups().at(-2).layout);
+    output.extended = true;
+    engine.render();
+    assert.equal(groups().length, 6, 'returning to the HDR pipeline rebinds it');
+
+    let failed = false;
+    device.createBindGroup = function (descriptor) {
+      if (!failed && descriptor.label === 'color output') {
+        failed = true;
+        throw new Error('output group failed');
+      }
+      return createGroup.call(this, descriptor);
+    };
+    canvas.clientHeight = canvas.height = 32;
+    assert.throws(() => engine.render(), /output group failed/);
+    assert.equal(groups().length, 6);
+    engine.render();
+    assert.equal(groups().length, 7, 'failed creation leaves the previous cache invalid');
+    device.createBindGroup = createGroup;
+
+    await engine.rebootDevice();
+    engine.render();
+    assert.notEqual(log.configs.at(-1).device, device);
+    assert.equal(groups().length, 8, 'restored device creates a fresh group');
+    for (let i = 0; i < 10; i++) engine.render();
+    assert.equal(groups().length, 8);
   } finally {
     engine.dispose();
   }

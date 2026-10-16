@@ -4,6 +4,43 @@ import { Animation } from '../packages/animation/dist/index.js';
 import { GLTFAsset } from '../packages/gltf-pro/dist/index.js';
 import { animatedTriangle } from './support/gltf-pro-fixture.js';
 import { optionalGPU } from './support/optional-gpu.js';
+import { readFile } from 'node:fs/promises';
+import { transformWithOxc } from 'vite';
+
+test('upload eligibility reads real typed-array backing stores despite own or subclass buffer getters', async () => {
+  // Fake GPU writers deliberately cannot enter the native-only reuse branch.
+  // Exercise the actual internal predicate with real typed arrays instead.
+  const source = await readFile(new URL('../packages/animation/src/weight-buffer.ts', import.meta.url), 'utf8'),
+    emitted = await transformWithOxc(source, 'weight-buffer.ts', { target: 'es2022' }),
+    { ordinaryWeightBuffer } = await import('data:text/javascript;base64,' + Buffer.from(emitted.code).toString('base64'));
+  let propertyReads = 0;
+  class DisguisedWeights extends Float32Array {
+    get buffer() {
+      propertyReads++;
+      return new ArrayBuffer(4);
+    }
+  }
+  for (const shared of [false, true]) {
+    const backing = shared ? new SharedArrayBuffer(4) : new ArrayBuffer(4),
+      own = new Float32Array(backing),
+      inherited = new DisguisedWeights(backing);
+    Object.defineProperty(own, 'buffer', {
+      get() {
+        propertyReads++;
+        return new ArrayBuffer(4);
+      },
+    });
+    assert.equal(ordinaryWeightBuffer(own), !shared);
+    assert.equal(ordinaryWeightBuffer(inherited), !shared);
+    own[0] = inherited[0] = 0.375;
+    assert.equal(ordinaryWeightBuffer(own), !shared, 'eligibility follows the actual backing after edits');
+    assert.equal(ordinaryWeightBuffer(inherited), !shared);
+  }
+  assert.equal(propertyReads, 0, 'eligibility does not invoke caller-owned accessors');
+  const ordinary = new Float32Array(1);
+  Object.defineProperty(ordinary, 'buffer', { get: () => { throw new Error('not the backing store'); } });
+  assert.equal(ordinaryWeightBuffer(ordinary), true);
+});
 
 const identity = () => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 function fixture(Type = Animation) {
@@ -61,18 +98,20 @@ function fixture(Type = Animation) {
   };
   return { ...h, animation, record, nodes, primitive, writes };
 }
-test('identical palettes and morph weights upload once while every render still dispatches', (t) => {
+test('custom writers receive palettes and morph weights on every render while deformation still dispatches', (t) => {
   const f = fixture();
   t.after(() => f.animation.dispose());
   const output = f.primitive.deformed;
   f.frame();
   assert.equal(f.writes.length, 2);
   for (let i = 0; i < 300; i++) f.frame();
-  assert.equal(f.writes.length, 2);
+  assert.equal(f.writes.length, 602);
+  assert.equal(f.record.bonesUploaded, false);
+  assert.equal(f.record.weightsUploaded, false);
   assert.equal(f.counts.compute, 301);
   assert.equal(f.primitive.deformed, output);
 });
-test('joint, mesh, replacement view and signed-zero weight edits invalidate exact GPU inputs', (t) => {
+test('joint, mesh, replacement view and signed-zero weight edits preserve exact GPU inputs through custom writers', (t) => {
   const f = fixture();
   t.after(() => f.animation.dispose());
   f.frame();
@@ -81,41 +120,43 @@ test('joint, mesh, replacement view and signed-zero weight edits invalidate exac
   f.frame();
   assert.deepEqual(
     f.writes.map((w) => w.buffer),
-    [f.record.bones],
+    [f.record.bones, f.record.weights],
   );
   f.writes.length = 0;
   f.nodes[0].matrix[13] = 0.125;
   f.frame();
   assert.deepEqual(
     f.writes.map((w) => w.buffer),
-    [f.record.bones],
+    [f.record.bones, f.record.weights],
   );
   f.writes.length = 0;
   f.primitive.weights[0] = -0;
   f.frame();
   assert.deepEqual(
     f.writes.map((w) => w.buffer),
-    [f.record.weights],
+    [f.record.bones, f.record.weights],
   );
   f.writes.length = 0;
   f.frame();
-  assert.equal(f.writes.length, 0);
+  assert.equal(f.writes.length, 2);
+  f.writes.length = 0;
   f.primitive.weights = new Float32Array([-0]);
   f.nodes[1].matrix = new Float32Array(f.nodes[1].matrix);
   f.frame();
-  assert.equal(f.writes.length, 0);
+  assert.equal(f.writes.length, 2);
+  f.writes.length = 0;
   f.primitive.weights[0] = 0;
   f.frame();
   assert.deepEqual(
     f.writes.map((w) => w.buffer),
-    [f.record.weights],
+    [f.record.bones, f.record.weights],
   );
   f.writes.length = 0;
   f.primitive.weights[0] = 0.5;
   f.frame();
   assert.deepEqual(
     f.writes.map((w) => w.buffer),
-    [f.record.weights],
+    [f.record.bones, f.record.weights],
   );
 });
 test('palette uploads distinguish signed-zero bit patterns', (t) => {
@@ -129,11 +170,11 @@ test('palette uploads distinguish signed-zero bit patterns', (t) => {
   f.frame();
   assert.deepEqual(
     f.writes.map((w) => w.buffer),
-    [f.record.bones],
+    [f.record.bones, f.record.weights],
   );
   assert.deepEqual(new Uint32Array(f.record.bones.data), f.record.paletteBits);
 });
-test('length-tracking weight views repair the normal cache after buffer growth and shrink', (t) => {
+test('custom writers receive length-tracking weight views after buffer growth and shrink', (t) => {
   const f = fixture();
   t.after(() => f.animation.dispose());
   const buffer = new ArrayBuffer(4, { maxByteLength: 16 });
@@ -142,19 +183,20 @@ test('length-tracking weight views repair the normal cache after buffer growth a
   f.frame();
   f.writes.length = 0;
   f.frame();
-  assert.equal(f.writes.length, 0);
+  assert.equal(f.writes.length, 2);
+  f.writes.length = 0;
   buffer.resize(8);
   f.primitive.weights[1] = 0.5;
   f.frame();
   f.frame();
-  assert.equal(f.writes.length, 2);
+  assert.equal(f.writes.length, 4);
   buffer.resize(4);
   f.writes.length = 0;
   f.frame();
-  assert.equal(f.writes.length, 1);
+  assert.equal(f.writes.length, 2);
   f.writes.length = 0;
   f.frame();
-  assert.equal(f.writes.length, 0);
+  assert.equal(f.writes.length, 2);
 });
 test('empty and detached weight views retain the original no-upload behavior', (t) => {
   const f = fixture();
@@ -164,13 +206,24 @@ test('empty and detached weight views retain the original no-upload behavior', (
   const original = f.primitive.weights;
   structuredClone(original.buffer, { transfer: [original.buffer] });
   f.frame();
-  assert.equal(f.writes.length, 0);
+  assert.deepEqual(
+    f.writes.map((w) => w.buffer),
+    [f.record.bones],
+  );
+  f.writes.length = 0;
   f.primitive.weights = new Float32Array();
   f.frame();
-  assert.equal(f.writes.length, 0);
+  assert.deepEqual(
+    f.writes.map((w) => w.buffer),
+    [f.record.bones],
+  );
+  f.writes.length = 0;
   f.primitive.weights = new Float32Array([0]);
   f.frame();
-  assert.equal(f.writes.length, 0);
+  assert.deepEqual(
+    f.writes.map((w) => w.buffer),
+    [f.record.bones, f.record.weights],
+  );
 });
 test('shared-memory weights always upload so concurrent edits cannot invalidate a cached snapshot', (t) => {
   const f = fixture();
@@ -181,27 +234,27 @@ test('shared-memory weights always upload so concurrent edits cannot invalidate 
   f.frame();
   assert.deepEqual(
     f.writes.map((w) => w.buffer),
-    [f.record.weights],
+    [f.record.bones, f.record.weights],
   );
   f.primitive.weights[0] = 0.5;
   f.writes.length = 0;
   f.frame();
   assert.deepEqual(
     f.writes.map((w) => w.buffer),
-    [f.record.weights],
+    [f.record.bones, f.record.weights],
   );
   f.primitive.weights = new Float32Array([0]);
   f.writes.length = 0;
   f.frame();
   assert.deepEqual(
     f.writes.map((w) => w.buffer),
-    [f.record.weights],
+    [f.record.bones, f.record.weights],
   );
   f.writes.length = 0;
   f.frame();
-  assert.equal(f.writes.length, 0);
+  assert.equal(f.writes.length, 2);
 });
-test('non-finite weights, singular meshes and Float32 palette overflow remain guarded on cache hits', (t) => {
+test('non-finite weights, singular meshes and Float32 palette overflow remain guarded before custom uploads', (t) => {
   const f = fixture();
   t.after(() => f.animation.dispose());
   f.frame();
@@ -226,9 +279,9 @@ test('non-finite weights, singular meshes and Float32 palette overflow remain gu
   f.record.inverseBind[0][0] = 1;
   f.frame();
   assert.equal(f.counts.compute, before + 1);
-  assert.equal(f.writes.length, 0);
+  assert.equal(f.writes.length, 2);
 });
-test('failed native uploads remain dirty and retry without suppressing the dispatch', (t) => {
+test('failed custom uploads retry without suppressing the dispatch', (t) => {
   const f = fixture();
   t.after(() => f.animation.dispose());
   f.frame();
@@ -262,10 +315,10 @@ test('failed native uploads remain dirty and retry without suppressing the dispa
     assert.equal(f.counts.compute, before + 1);
     f.writes.length = 0;
     f.frame();
-    assert.equal(f.writes.length, 0);
+    assert.equal(f.writes.length, 2);
   }
 });
-test('changed weight types and lengths preserve the original upload path and cannot leave a stale cache', (t) => {
+test('changed weight types and lengths preserve the original custom upload path', (t) => {
   const f = fixture();
   t.after(() => f.animation.dispose());
   f.frame();
@@ -274,8 +327,10 @@ test('changed weight types and lengths preserve the original upload path and can
     f.primitive.weights = values;
     f.frame();
     f.frame();
-    assert.equal(f.writes.length, 2);
-    assert.ok(f.writes.every((w) => w.buffer === f.record.weights));
+    assert.deepEqual(
+      f.writes.map((w) => w.buffer),
+      [f.record.bones, f.record.weights, f.record.bones, f.record.weights],
+    );
     f.writes.length = 0;
   }
   f.primitive.weights = [0.5];
@@ -285,11 +340,11 @@ test('changed weight types and lengths preserve the original upload path and can
   f.frame();
   assert.deepEqual(
     f.writes.map((w) => w.buffer),
-    [f.record.weights],
+    [f.record.bones, f.record.weights],
   );
   f.writes.length = 0;
   f.frame();
-  assert.equal(f.writes.length, 0);
+  assert.equal(f.writes.length, 2);
 });
 test('device restoration creates fresh upload state and disposal releases the shared output', (t) => {
   const f = fixture();
@@ -305,12 +360,12 @@ test('device restoration creates fresh upload state and disposal releases the sh
   assert.equal(f.writes.length, 2);
   f.writes.length = 0;
   f.frame();
-  assert.equal(f.writes.length, 0);
+  assert.equal(f.writes.length, 2);
   f.animation.dispose();
   assert.equal(f.primitive.deformed, undefined);
   assert.ok(f.resources.every((r) => r.destroyed));
 });
-test('queued uploads remain reusable after a later graph pass throws, while deformation is encoded again', (t) => {
+test('custom uploads and deformation both execute again after a later graph pass throws', (t) => {
   const f = fixture();
   t.after(() => f.animation.dispose());
   f.frame();
@@ -326,11 +381,11 @@ test('queued uploads remain reusable after a later graph pass throws, while defo
     before = f.counts.compute;
   assert.throws(() => f.frame(), /later pass/);
   assert.equal(f.counts.compute, before + 1);
-  assert.equal(f.writes.length, 1);
+  assert.equal(f.writes.length, 2);
   remove();
   f.writes.length = 0;
   f.frame();
-  assert.equal(f.writes.length, 0);
+  assert.equal(f.writes.length, 2);
   assert.equal(f.counts.compute, before + 2);
 });
 test('moving and held poses always leave GPU input bytes equal to the current palette and morph weights', (t) => {
@@ -350,5 +405,154 @@ test('moving and held poses always leave GPU input bytes equal to the current pa
     assert.deepEqual(new Float32Array(b.record.weights.data)[0], b.primitive.weights[0]);
   }
   assert.equal(b.counts.compute, 1000);
-  assert.ok(b.writes.length < 1000);
+  assert.equal(b.writes.length, 2000);
+});
+
+test('custom queue writers always run and temporary input mutation cannot certify stale GPU bytes', (t) => {
+  const f = fixture();
+  t.after(() => f.animation.dispose());
+  const queue = f.engine.gpu.queue,
+    write = queue.writeBuffer;
+  let mutate = true;
+  queue.writeBuffer = function (buffer, offset, values) {
+    assert.equal(this, queue);
+    const original = values[0];
+    if (mutate) values[0] = 0.375;
+    const result = write.call(this, buffer, offset, values);
+    values[0] = original;
+    if (buffer === f.record.weights) mutate = false;
+    return result;
+  };
+  f.frame();
+  assert.equal(new Float32Array(f.record.bones.data)[0], 0.375);
+  assert.equal(new Float32Array(f.record.weights.data)[0], 0.375);
+  f.frame();
+  assert.equal(f.writes.length, 4);
+  assert.deepEqual(new Uint8Array(f.record.bones.data), new Uint8Array(f.record.palette.buffer));
+  assert.equal(new Float32Array(f.record.weights.data)[0], f.primitive.weights[0]);
+});
+
+test('queue and writer replacements remain observable on otherwise identical animation frames', (t) => {
+  const f = fixture();
+  t.after(() => f.animation.dispose());
+  f.frame();
+  const queue = f.engine.gpu.queue,
+    write = queue.writeBuffer;
+  let writerCalls = 0,
+    queueCalls = 0;
+  queue.writeBuffer = function (...args) {
+    assert.equal(this, queue);
+    writerCalls++;
+    return write.apply(this, args);
+  };
+  f.frame();
+  assert.equal(writerCalls, 2);
+  const replacement = { ...queue };
+  replacement.writeBuffer = function (...args) {
+    assert.equal(this, replacement);
+    queueCalls++;
+    return write.apply(queue, args);
+  };
+  f.engine.gpu.queue = replacement;
+  f.frame();
+  assert.equal(queueCalls, 2);
+  f.frame();
+  assert.equal(queueCalls, 4);
+});
+
+test('post-copy custom morph edits are uploaded again instead of being stored as already queued', (t) => {
+  const f = fixture();
+  t.after(() => f.animation.dispose());
+  const write = f.engine.gpu.queue.writeBuffer;
+  let mutate = true;
+  f.engine.gpu.queue.writeBuffer = function (buffer, offset, values) {
+    const result = write.call(this, buffer, offset, values);
+    if (buffer === f.record.weights && mutate) {
+      values[0] = 0.5;
+      mutate = false;
+    }
+    return result;
+  };
+  f.frame();
+  assert.equal(new Float32Array(f.record.weights.data)[0], 0);
+  assert.equal(f.primitive.weights[0], 0.5);
+  f.frame();
+  assert.equal(new Float32Array(f.record.weights.data)[0], 0.5);
+});
+
+test('custom writers keep direct-call semantics even when their call property is overridden', (t) => {
+  const f = fixture();
+  t.after(() => f.animation.dispose());
+  const write = f.engine.gpu.queue.writeBuffer;
+  const writer = function (buffer, offset, values) {
+    return Reflect.apply(write, this, [buffer, offset, values]);
+  };
+  writer.call = () => assert.fail('writeBuffer.call is not the upload operation');
+  f.engine.gpu.queue.writeBuffer = writer;
+  f.frame();
+  f.frame();
+  assert.equal(f.writes.length, 4);
+});
+
+test('custom queue accessors and reentrant hooks retain every upload and cannot publish a reusable cache', (t) => {
+  const f = fixture();
+  t.after(() => f.animation.dispose());
+  const queue = f.engine.gpu.queue,
+    write = queue.writeBuffer,
+    inner = new f.engine.frameGraph.constructor();
+  f.animation.registerPasses(inner);
+  let nested = false,
+    reenter = true,
+    reads = 0;
+  const writer = function (...args) {
+    const result = Reflect.apply(write, this, args);
+    if (reenter && !nested) {
+      nested = true;
+      reenter = false;
+      inner.execute(f.context);
+      nested = false;
+    }
+    return result;
+  };
+  Object.defineProperty(queue, 'writeBuffer', {
+    configurable: true,
+    get() {
+      reads++;
+      return writer;
+    },
+  });
+  f.frame();
+  f.frame();
+  assert.equal(f.writes.length, 6);
+  assert.equal(reads, 6, 'read the queue method once per upload');
+  assert.equal(f.counts.compute, 3);
+  assert.equal(f.record.bonesUploaded, false);
+  assert.equal(f.record.weightsUploaded, false);
+});
+
+test('a JavaScript GPUQueue installed before import is not trusted by a spoofed own toString', async (t) => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'GPUQueue'),
+    writes = [];
+  class CustomQueue {
+    writeBuffer(buffer, offset, values) {
+      writes.push(buffer);
+      new Uint8Array(buffer.data).set(new Uint8Array(values.buffer, values.byteOffset, values.byteLength), offset);
+    }
+  }
+  CustomQueue.prototype.writeBuffer.toString = () => 'function writeBuffer() { [native code] }';
+  Object.defineProperty(globalThis, 'GPUQueue', { configurable: true, value: CustomQueue });
+  t.after(() => {
+    if (descriptor) Object.defineProperty(globalThis, 'GPUQueue', descriptor);
+    else delete globalThis.GPUQueue;
+  });
+  const { Animation: Imported } = await import('../packages/animation/dist/index.js?custom-preimport-queue'),
+    f = fixture(Imported);
+  t.after(() => f.animation.dispose());
+  Object.setPrototypeOf(f.engine.gpu.queue, CustomQueue.prototype);
+  delete f.engine.gpu.queue.writeBuffer;
+  f.frame();
+  f.frame();
+  assert.deepEqual(writes, [f.record.bones, f.record.weights, f.record.bones, f.record.weights]);
+  assert.equal(f.record.bonesUploaded, false);
+  assert.equal(f.record.weightsUploaded, false);
 });
