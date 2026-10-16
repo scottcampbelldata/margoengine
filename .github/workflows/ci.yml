@@ -98,9 +98,10 @@ jobs:
         env:
           BROWSER_CHANNEL: chromium
           BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
-      - name: Verify Margo module shaders, pixels, overlays and device restoration
+      - name: Verify Margo modules and required real FBX skin playback and seek pixels
         run: npm run test:modules:browser
         env:
+          MARGOENGINE_FBX_FIXTURE: /packages/fbx/test/fixtures/blender-rig.fbx
           BROWSER_CHANNEL: chromium
           BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
       - name: Verify MRT picking, micro-frustum culling, neighborhood resolve and device restoration
@@ -138,6 +139,7 @@ jobs:
             test-results/blender/render-*.png
             test-results/modern-postfx.json
             test-results/margo-modules.json
+            test-results/margo-fbx.png
             test-results/selection-picking.json
             test-results/margo-debug-mobile.png
             test-results/dof-demo.png
