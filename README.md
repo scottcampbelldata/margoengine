@@ -22,7 +22,7 @@ app.onTick(delta => {orb.rotation.z += delta;});
 window.addEventListener('pagehide', () => app.dispose(), {once: true});
 ```
 
-Provide a container such as `<div id="scene" style="height:400px"></div>` and call `app.dispose()` on unmount. Models, machinery, creative effects and scenery load on demand through the same wrapper. The new facade package is available locally and has not been published yet. Run `npm run modern:dev` and open `/quickstart.html` to try it.
+Provide a container such as `<div id="scene" style="height:400px"></div>` and call `app.dispose()` on unmount. Models, machinery, creative effects and scenery load on demand through the same wrapper. PBR rendering, image-based lighting, and shadows require WebGPU; WebGL2 supports basic meshes. The new facade package is available locally and has not been published yet. Run `npm run modern:dev` and open `/quickstart.html` to try it.
 
 Use the source setup below, or build local tarballs with `npm run pack:packages`.
 Registry installation commands will be added with a verified package release.
