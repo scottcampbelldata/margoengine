@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import type { Collider, EventQueue, PhysicsHooks, Ray, RigidBody, World } from './rapier-types.js';
 import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
 import { meshRuntime, Mesh as CoreMesh } from '@margoengine/core/extension';
 import { meshTriangles } from '../../shared/mesh-source.js';
@@ -49,8 +50,8 @@ export interface CollisionEvent {
   bodyB: PhysicsBody;
   meshA: Mesh | null;
   meshB: Mesh | null;
-  colliderA: any;
-  colliderB: any;
+  colliderA: Collider;
+  colliderB: Collider;
   /** True when either collider is a sensor (intersection events). */
   sensor: boolean;
 }
@@ -74,7 +75,7 @@ export interface QueryFilter {
   excludeKinematic?: boolean;
   excludeDynamic?: boolean;
   /** Return false to skip a body. */
-  predicate?: (body: PhysicsBody, collider: any) => boolean;
+  predicate?: (body: PhysicsBody, collider: Collider) => boolean;
 }
 export interface RaycastOptions extends QueryFilter {
   /** Default unbounded. */
@@ -85,7 +86,7 @@ export interface RaycastOptions extends QueryFilter {
 export interface Hit {
   body: PhysicsBody;
   mesh: Mesh | null;
-  collider: any;
+  collider: Collider;
 }
 export interface RaycastHit extends Hit {
   distance: number;
@@ -140,7 +141,7 @@ export interface ModelBodyOptions extends Omit<BodyOptions, 'colliders' | 'posit
 
 const noop = (): void => {};
 // Set.forEach with the event as thisArg calls listeners without allocating a closure or a snapshot array.
-function callListener(this: unknown, listener: (event: unknown) => void): void {
+function callListener(this: never, listener: (event: never) => void): void {
   listener(this);
 }
 const identityRotation: Quat = [0, 0, 0, 1];
@@ -159,9 +160,9 @@ export class Physics implements EnginePlugin, BodyOwner {
   paused: boolean;
   /** Fixed steps taken since creation. */
   stepCount = 0;
-  private worldRef: any;
-  private queue: any;
-  private hooks: any;
+  private worldRef: World | null;
+  private queue: EventQueue | null;
+  private hooks?: PhysicsHooks | null;
   private engine: EngineKernel | null = null;
   private accumulator = 0;
   private lastAlpha = 1;
@@ -171,7 +172,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   private readonly byCollider = new Map<number, PhysicsBody>();
   private readonly joints = new Set<PhysicsJoint>();
   private readonly controllers = new Set<CharacterController>();
-  private readonly listeners = new Map<keyof PhysicsEventMap, Set<(event: any) => void>>();
+  private readonly listeners = new Map<keyof PhysicsEventMap, Set<(event: never) => void>>();
   private readonly scratch = [0, 0, 0, 0];
   private readonly positionScratch: [number, number, number] = [0, 0, 0];
   private readonly parentScratch = new Float64Array(16);
@@ -186,7 +187,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     const bodyA = this.byCollider.get(h1),
       bodyB = this.byCollider.get(h2);
     if (!bodyA || !bodyB) return;
-    const world = this.worldRef,
+    const world = this.worldRef!,
       colliderA = world.getCollider(h1),
       colliderB = world.getCollider(h2);
     const sensor = !!(colliderA?.isSensor() || colliderB?.isSensor());
@@ -231,7 +232,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     try {
       this.queue = new R.EventQueue(true);
     } catch (error) {
-      this.worldRef.free();
+      this.worldRef!.free();
       throw error;
     }
     const filter = options.contactFilter;
@@ -256,9 +257,9 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
 
   /** The Rapier `World`. Use it for anything this wrapper does not cover. */
-  get world(): any {
+  get world(): World {
     if (this.disposed) throw new Error('Physics is disposed');
-    return this.worldRef;
+    return this.worldRef!;
   }
   get isDisposed(): boolean {
     return this.disposed;
@@ -324,12 +325,12 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.emit('beforestep', dt);
     if (this.disposed) return;
     world.timestep = dt;
-    world.step(this.queue, this.hooks);
+    world.step(this.queue!, this.hooks!);
     this.stepCount++;
     this.bodies.forEach(this.snapshotBody);
     const outer = this.dispatching,
       events = (this.collecting = outer ? [] : this.eventBuffer);
-    this.queue.drainCollisionEvents(this.collect);
+    this.queue!.drainCollisionEvents(this.collect);
     this.dispatching = true;
     try {
       for (let i = 0; i < events.length; i++) this.emit(events[i].type, events[i]);
@@ -447,7 +448,8 @@ export class Physics implements EnginePlugin, BodyOwner {
       runtime.euler[0] = Math.atan2(2 * (w * x - y * z), 1 - 2 * (x * x + y * y));
       runtime.euler[2] = Math.atan2(2 * (w * z - x * y), 1 - 2 * (y * y + z * z));
     } else {
-      if (parentOf(mesh) !== -1) throw new Error('Non-core physics bodies need root-level meshes; child meshes require core transform storage');
+      if (parentOf(mesh) !== -1)
+        throw new Error('Non-core physics bodies need root-level meshes; child meshes require core transform storage');
       mesh.setPosition(position).setQuaternion(out);
     }
     body.dirty = false;
@@ -504,17 +506,22 @@ export class Physics implements EnginePlugin, BodyOwner {
         throw new TypeError('Physics mesh belongs to another engine');
       if (this.byMesh.has(mesh)) throw new Error('This mesh already has a physics body');
       if (parentOf(mesh) !== -1) {
-        if (!(mesh instanceof CoreMesh)) throw new Error('Non-core physics bodies need root-level meshes; child meshes require core transform storage');
+        if (!(mesh instanceof CoreMesh))
+          throw new Error(
+            'Non-core physics bodies need root-level meshes; child meshes require core transform storage',
+          );
         const runtime = meshRuntime(mesh);
         worldPose = worldMatrix(runtime.engine.store, runtime.id, new Float64Array(16));
       }
     }
-    const factory = {
-      dynamic: 'dynamic',
-      fixed: 'fixed',
-      kinematicPosition: 'kinematicPositionBased',
-      kinematicVelocity: 'kinematicVelocityBased',
-    }[type];
+    const factory = (
+      {
+        dynamic: 'dynamic',
+        fixed: 'fixed',
+        kinematicPosition: 'kinematicPositionBased',
+        kinematicVelocity: 'kinematicVelocityBased',
+      } as const
+    )[type];
     if (!factory) throw new TypeError(`Unknown body type ${type}`);
     const desc = R.RigidBodyDesc[factory]();
     const position =
@@ -677,7 +684,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     return this.byMesh.get(mesh);
   }
   /** The body owning a Rapier collider or collider handle. */
-  bodyOfCollider(collider: any): PhysicsBody | undefined {
+  bodyOfCollider(collider: Collider | number): PhysicsBody | undefined {
     return this.byCollider.get(typeof collider === 'number' ? collider : collider?.handle);
   }
   getBodies(): PhysicsBody[] {
@@ -685,7 +692,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
 
   /** @internal use `body.addCollider`. */
-  addCollider(body: PhysicsBody, options: ColliderOptions): any {
+  addCollider(body: PhysicsBody, options: ColliderOptions): Collider {
     const R = this.rapier,
       mesh = body.mesh;
     const needsGeometry =
@@ -709,7 +716,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     return collider;
   }
   /** @internal use `body.removeCollider`. */
-  removeCollider(body: PhysicsBody, collider: any): void {
+  removeCollider(body: PhysicsBody, collider: Collider): void {
     const index = body.colliders.indexOf(collider);
     if (index < 0) throw new Error('Collider does not belong to this body');
     body.colliders.splice(index, 1);
@@ -761,7 +768,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   /** @internal use `controller.dispose`. */
   removeController(controller: CharacterController): void {
     if (!this.controllers.delete(controller)) return;
-    if (!this.disposed) this.worldRef.removeCharacterController(controller.raw);
+    if (!this.disposed) this.worldRef!.removeCharacterController(controller.raw);
   }
 
   /** Subscribes to collision or step events. Returns an unsubscribe function. */
@@ -782,7 +789,13 @@ export class Physics implements EnginePlugin, BodyOwner {
   // Scene queries. All positions and directions are world space.
   private filterArgs(
     filter: QueryFilter = {},
-  ): [number | undefined, number | undefined, undefined, any, ((collider: any) => boolean) | undefined] {
+  ): [
+    number | undefined,
+    number | undefined,
+    undefined,
+    RigidBody | undefined,
+    ((collider: Collider) => boolean) | undefined,
+  ] {
     const F = this.rapier.QueryFilterFlags;
     let flags = 0;
     if (filter.excludeSensors) flags |= F.EXCLUDE_SENSORS;
@@ -801,11 +814,11 @@ export class Physics implements EnginePlugin, BodyOwner {
       },
     ];
   }
-  private hit(collider: any): Hit | null {
+  private hit(collider: Collider): Hit | null {
     const body = this.byCollider.get(collider.handle);
     return body ? { body, mesh: body.mesh, collider } : null;
   }
-  private ray(origin: Vec3, direction: Vec3): { ray: any; dir: [number, number, number] } {
+  private ray(origin: Vec3, direction: Vec3): { ray: Ray; dir: [number, number, number] } {
     checkVec(origin, 'Ray origin');
     checkVec(direction, 'Ray direction');
     const length = Math.hypot(...direction);
@@ -844,7 +857,7 @@ export class Physics implements EnginePlugin, BodyOwner {
       ray,
       options.maxDistance ?? 1e30,
       options.solid ?? true,
-      (result: any) => {
+      (result) => {
         const base = this.hit(result.collider),
           t = result.timeOfImpact;
         if (base)
@@ -918,7 +931,7 @@ export class Physics implements EnginePlugin, BodyOwner {
       [flags, groups, , excludeBody, predicate] = this.filterArgs(options);
     this.world.intersectionsWithPoint(
       vec(point),
-      (collider: any) => {
+      (collider) => {
         const body = this.byCollider.get(collider.handle);
         if (body) found.add(body);
         return true;
@@ -947,7 +960,7 @@ export class Physics implements EnginePlugin, BodyOwner {
       vec(position),
       quat(rotation),
       query,
-      (collider: any) => {
+      (collider) => {
         const body = this.byCollider.get(collider.handle);
         if (body) found.add(body);
         return true;
@@ -971,7 +984,7 @@ export class Physics implements EnginePlugin, BodyOwner {
           continue;
         }
         let touching = false;
-        world.contactPair(ca, cb, (manifold: any) => {
+        world.contactPair(ca, cb, (manifold) => {
           if (manifold.numContacts() > 0) touching = true;
         });
         if (touching) return true;
@@ -1005,8 +1018,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     for (const joint of [...this.joints]) this.removeJoint(joint);
     for (const body of [...this.bodies]) this.removeBody(body);
     this.listeners.clear();
-    this.queue.free();
-    this.worldRef.free();
+    this.queue!.free();
+    this.worldRef!.free();
     this.disposed = true;
     this.engine = null;
     this.queue = this.worldRef = this.hooks = null;

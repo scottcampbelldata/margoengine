@@ -910,7 +910,7 @@ window.runEnvironmentTests = async () => {
     engine.use(background);
     engine.render();
     const colored = capture();
-    let bgPixels = 0,
+    let _bgPixels = 0,
       bgWorst = 0,
       sceneWorst = 0,
       scenePixels = 0;
@@ -919,7 +919,7 @@ window.runEnvironmentTests = async () => {
         y = Math.floor(i / 4 / width),
         corner = x < 3 && y < 3;
       if (corner) {
-        bgPixels++;
+        _bgPixels++;
         bgWorst = Math.max(
           bgWorst,
           Math.abs(colored[i] - 51),

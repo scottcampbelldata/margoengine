@@ -34,24 +34,34 @@ async function robot() {
   const store = await TransformStore.create(doc.nodes.length + 1),
     engine = new Engine({ width: 256, height: 256, clientWidth: 256, clientHeight: 256 }, store, {
       backend: 'webgl2',
-      add() {}, remove() {}, render() {}, dispose() {},
+      add() {},
+      remove() {},
+      render() {},
+      dispose() {},
     }),
     frame = engine.createMesh();
-  const nodes = doc.nodes.map((node) => engine.createMesh().setParent(frame)
-    .setPosition(node.translation ?? [0, 0, 0])
-    .setQuaternion(node.rotation ?? [0, 0, 0, 1])
-    .setScale(node.scale ?? [1, 1, 1]));
+  const nodes = doc.nodes.map((node) =>
+    engine
+      .createMesh()
+      .setParent(frame)
+      .setPosition(node.translation ?? [0, 0, 0])
+      .setQuaternion(node.rotation ?? [0, 0, 0, 1])
+      .setScale(node.scale ?? [1, 1, 1]),
+  );
   doc.nodes.forEach((node, i) => node.children?.forEach((child) => nodes[child].setParent(nodes[i])));
   store.tick(false);
   const named = (name) => nodes[doc.nodes.findIndex((node) => node.name === name)],
-    shoulder = named('UpperArm'), elbow = named('Forearm'), wrist = named('Hand'),
+    shoulder = named('UpperArm'),
+    elbow = named('Forearm'),
+    wrist = named('Hand'),
     start = worldPosition(wrist),
     localGrip = localPoint(wrist, [start[0], start[1] + 0.13, start[2]]),
     solver = new BodyIK({ frame, shoulder, elbow, wrist, localGrip });
-  const pose = () => [shoulder, elbow, wrist].map(({ id }) => {
-    const t = store.transforms;
-    return [t.qx[id], t.qy[id], t.qz[id], t.qw[id]];
-  });
+  const pose = () =>
+    [shoulder, elbow, wrist].map(({ id }) => {
+      const t = store.transforms;
+      return [t.qx[id], t.qy[id], t.qz[id], t.qw[id]];
+    });
   return { engine, store, frame, solver, pose };
 }
 

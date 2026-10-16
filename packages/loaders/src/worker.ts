@@ -3,7 +3,7 @@ import type { BinaryInput } from './util.js';
 import { parseUSDA, parseUSDZ, type USDOptions } from './usdz.js';
 import { canUseWorker, movable, runWorker } from '../../shared/worker.js';
 
-const workerURL = () => new URL('./workers/usd.js?no-inline', import.meta.url);
+const workerURL = () => new URL(/* @vite-ignore */ './workers/usd.js?no-inline', import.meta.url);
 const revive = (e: { name: string; message: string; [key: string]: unknown }) =>
   e.name === 'LoaderError'
     ? Object.assign(new LoaderError(e.format as string, e.code as LoaderError['code'], ''), { message: e.message })

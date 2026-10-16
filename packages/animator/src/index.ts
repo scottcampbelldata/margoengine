@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import { Animation, sampleTrackInto } from '@margoengine/animation';
+import { type Animation, sampleTrackInto } from '@margoengine/animation';
 import type { Engine, EnginePlugin, Mesh, Vec3 } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
 import { multiplyQuaternions as quaternionMultiply } from '@margoengine/math/quat';
@@ -150,8 +150,7 @@ export class Animator implements EnginePlugin {
       )
         throw new TypeError('Invalid animator transition');
     const writer = options.writeRotation;
-    if (writer !== undefined && typeof writer !== 'function')
-      throw new TypeError('Invalid animator rotation writer');
+    if (writer !== undefined && typeof writer !== 'function') throw new TypeError('Invalid animator rotation writer');
     this.writeRotation = writer;
     const nodes = animation.model.nodes,
       t = animation.model.root.engine.store.transforms;

@@ -1,9 +1,9 @@
 // Test-only renderer reference. Keep it outside the workspace dependency graph and
 // bundle the cached sources so benchmark payloads still use our local gzip server.
-import {createHash} from 'node:crypto';
-import {mkdir, readFile, writeFile} from 'node:fs/promises';
-import {dirname, resolve} from 'node:path';
-import {fileURLToPath} from 'node:url';
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const THREE_REFERENCE_VERSION = '0.186.1';
 export const THREE_REFERENCE_CDN = `https://cdn.jsdelivr.net/npm/three@${THREE_REFERENCE_VERSION}`;
@@ -22,27 +22,33 @@ const files = {
   'examples/jsm/shaders/OutputShader.js': '353479f77a8d7e2629d49ccac9fc2f5dbfdda5442e0adf867b00377a2fcb0cb2',
   LICENSE: '8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc',
 };
-const digest = bytes => createHash('sha256').update(bytes).digest('hex');
+const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
 export async function prepareThreeReference() {
   const root = resolve(repository, cachePath);
-  await Promise.all(Object.entries(files).map(async ([path, expected]) => {
-    const destination = resolve(root, path);
-    let bytes;
-    try { bytes = await readFile(destination); } catch (error) { if (error.code !== 'ENOENT') throw error; }
-    if (bytes && digest(bytes) === expected) return;
-    const response = await fetch(`${THREE_REFERENCE_CDN}/${path}`, {signal: AbortSignal.timeout(30000)});
-    if (!response.ok) throw new Error(`Three.js reference download failed: ${path} (${response.status})`);
-    bytes = new Uint8Array(await response.arrayBuffer());
-    if (digest(bytes) !== expected) throw new Error(`Three.js reference integrity mismatch: ${path}`);
-    await mkdir(dirname(destination), {recursive: true});
-    await writeFile(destination, bytes);
-  }));
+  await Promise.all(
+    Object.entries(files).map(async ([path, expected]) => {
+      const destination = resolve(root, path);
+      let bytes;
+      try {
+        bytes = await readFile(destination);
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+      }
+      if (bytes && digest(bytes) === expected) return;
+      const response = await fetch(`${THREE_REFERENCE_CDN}/${path}`, { signal: AbortSignal.timeout(30000) });
+      if (!response.ok) throw new Error(`Three.js reference download failed: ${path} (${response.status})`);
+      bytes = new Uint8Array(await response.arrayBuffer());
+      if (digest(bytes) !== expected) throw new Error(`Three.js reference integrity mismatch: ${path}`);
+      await mkdir(dirname(destination), { recursive: true });
+      await writeFile(destination, bytes);
+    }),
+  );
   return {
     moduleUrl: `/${cachePath}/build/three.module.js`,
     aliases: [
-      {find: THREE_REFERENCE_CDN, replacement: root},
-      {find: 'three', replacement: resolve(root, 'build/three.module.js')},
+      { find: THREE_REFERENCE_CDN, replacement: root },
+      { find: 'three', replacement: resolve(root, 'build/three.module.js') },
     ],
   };
 }

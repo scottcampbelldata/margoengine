@@ -385,7 +385,7 @@ function writeHDR({ width, height, pixels, mode, orientation = '-Y' }) {
           run++;
         x++;
         if (run > 0) {
-          for (let shift = 0, left = run; left > 0; shift += 8) {
+          for (let _shift = 0, left = run; left > 0; _shift += 8) {
             const count = left & 255;
             if (count || left > 255) out.push(1, 1, 1, count);
             left >>= 8;

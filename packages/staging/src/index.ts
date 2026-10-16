@@ -11,6 +11,7 @@ import {
   type Vec3,
 } from '@margoengine/core/extension';
 import { instanceLayout, instancedDepth } from '../../shared/instances.js';
+import { meshTriangles } from '../../shared/mesh-source.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -315,17 +316,21 @@ export class ContactShadows implements EnginePlugin {
     for (const r of this.sources) {
       let primitives: readonly ContactPrimitive[];
       if ('id' in r.source) {
-        const node = r.source;
-        if (!node.geometry) continue;
-        const buffers = engine.geometryBuffers(node.geometry);
-        if (!buffers) continue;
-        r.primitive ??= [{ node, vertex: buffers.vertex, index: buffers.index, count: 0, stride: 24 }];
-        Object.assign(r.primitive[0], {
-          vertex: buffers.vertex,
-          index: buffers.index,
-          count: node.geometry.indices.length,
-        });
-        primitives = r.primitive;
+        const node = r.source,
+          triangles = meshTriangles(node);
+        if (!triangles) continue;
+        if (triangles.kind === 'pbr') primitives = triangles.source.shadowPrimitives;
+        else {
+          const buffers = engine.geometryBuffers(triangles.geometry);
+          if (!buffers) continue;
+          r.primitive ??= [{ node, vertex: buffers.vertex, index: buffers.index, count: 0, stride: 24 }];
+          Object.assign(r.primitive[0], {
+            vertex: buffers.vertex,
+            index: buffers.index,
+            count: triangles.geometry.indices.length,
+          });
+          primitives = r.primitive;
+        }
       } else primitives = r.source.shadowPrimitives ?? [];
       for (const p of primitives) {
         const node = p.node;

@@ -31,8 +31,15 @@ test('SceneFade preserves borrowed output, completes normal and reduced-motion f
         getContext: (kind) =>
           kind === 'webgpu'
             ? {
-                getConfiguration: () => ({ device, format: output.format, alphaMode: 'premultiplied', colorSpace: 'display-p3', usage: GPUTextureUsage.RENDER_ATTACHMENT }),
-                configure: (options) => configurations.push(options), getCurrentTexture: () => output,
+                getConfiguration: () => ({
+                  device,
+                  format: output.format,
+                  alphaMode: 'premultiplied',
+                  colorSpace: 'display-p3',
+                  usage: GPUTextureUsage.RENDER_ATTACHMENT,
+                }),
+                configure: (options) => configurations.push(options),
+                getCurrentTexture: () => output,
               }
             : null,
       };

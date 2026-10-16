@@ -3,7 +3,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type FrameGraph, type PassContext } from '@margoengine/core/extension';
 import {
   LabelRenderer,
-  Label,
+  type Label,
   type CSS3DObject,
   type LabelRendererOptions,
   type LabelOptions,
@@ -187,7 +187,8 @@ export class HTML extends LabelRenderer {
           if (request && this.slots[i] === request.record)
             request.record.hidden =
               Math.abs(request.x - request.record.x) + Math.abs(request.y - request.record.y) < 4 &&
-              Math.abs(request.z - request.record.z) < 0.001 && !!result[i];
+              Math.abs(request.z - request.record.z) < 0.001 &&
+              !!result[i];
         }
       } catch {
         for (const record of this.records.values()) record.hidden = false;

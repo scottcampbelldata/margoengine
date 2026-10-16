@@ -132,7 +132,12 @@ export class Stats implements EnginePlugin {
     return this.profiler?.elapsedMilliseconds ?? null;
   }
 
-  constructor({ parent = document.body, samples = 120, profiling = false, lowAllocationPasses = false }: StatsOptions = {}) {
+  constructor({
+    parent = document.body,
+    samples = 120,
+    profiling = false,
+    lowAllocationPasses = false,
+  }: StatsOptions = {}) {
     if (!Number.isInteger(samples) || samples < 2 || samples > 4096)
       throw new RangeError('Sample count must be 2..4096');
     if (typeof profiling !== 'boolean') throw new TypeError('profiling must be boolean');
@@ -227,9 +232,16 @@ export class Stats implements EnginePlugin {
     const writes = descriptor.timestampWrites ? undefined : this[frameProfiler]?.timestampWrites();
     const pass = this[rawRender].call(this, writes ? { ...descriptor, timestampWrites: writes } : descriptor) as Render;
     const stats = this[owner];
-    if (stats.lowAllocationPasses && (stats.passPrototypes ??= new PassPrototypes(owner, stats,
-      [countDraw, countIndexed, countIndirect, countIndexedIndirect], [countDispatch, countDispatchIndirect]))
-      .render(pass, this, this[rawRender])) return pass;
+    if (
+      stats.lowAllocationPasses &&
+      (stats.passPrototypes ??= new PassPrototypes(
+        owner,
+        stats,
+        [countDraw, countIndexed, countIndirect, countIndexedIndirect],
+        [countDispatch, countDispatchIndirect],
+      )).render(pass, this, this[rawRender])
+    )
+      return pass;
     const previous = pass[owner];
     if (!previous || previous.stats !== stats) {
       const draw = previous ? previous.draw : pass.draw,
@@ -265,9 +277,16 @@ export class Stats implements EnginePlugin {
       writes ? { ...descriptor, timestampWrites: writes } : descriptor,
     ) as Compute;
     const stats = this[owner];
-    if (stats.lowAllocationPasses && (stats.passPrototypes ??= new PassPrototypes(owner, stats,
-      [countDraw, countIndexed, countIndirect, countIndexedIndirect], [countDispatch, countDispatchIndirect]))
-      .compute(pass, this, this[rawCompute])) return pass;
+    if (
+      stats.lowAllocationPasses &&
+      (stats.passPrototypes ??= new PassPrototypes(
+        owner,
+        stats,
+        [countDraw, countIndexed, countIndirect, countIndexedIndirect],
+        [countDispatch, countDispatchIndirect],
+      )).compute(pass, this, this[rawCompute])
+    )
+      return pass;
     const previous = pass[owner];
     if (!previous || previous.stats !== stats) {
       const dispatch = previous ? previous.dispatch : pass.dispatchWorkgroups,

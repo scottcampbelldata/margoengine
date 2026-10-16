@@ -1,5 +1,5 @@
 {
-  "commit": "24f8348",
+  "commit": "6b18548",
   "dirty": true,
   "browser": "msedge 155.0.4283.60 headless",
   "adapter": "nvidia ampere",
@@ -11,8 +11,17 @@
       "encoding": "identity",
       "transferred": 808,
       "raw": 558,
-      "gzip": 369,
-      "brotli": 228
+      "gzip": 372,
+      "brotli": 229
+    },
+    {
+      "path": "assets/index-Y9z5Rnuy.js",
+      "role": "Entry: core + stage + app",
+      "encoding": "gzip",
+      "transferred": 21214,
+      "raw": 48550,
+      "gzip": 20833,
+      "brotli": 18330
     },
     {
       "path": "assets/geometry-CAWt7Gfm.js",
@@ -24,13 +33,13 @@
       "brotli": 938
     },
     {
-      "path": "assets/index-4OdhxHko.js",
-      "role": "Entry: core + stage + app",
+      "path": "assets/dist-BuoSC44Y.js",
+      "role": "@margoengine/gltf (app.load)",
       "encoding": "gzip",
-      "transferred": 21210,
-      "raw": 48550,
-      "gzip": 20829,
-      "brotli": 18349
+      "transferred": 5284,
+      "raw": 11882,
+      "gzip": 4912,
+      "brotli": 4424
     },
     {
       "path": "assets/extension-DuYhGmhk.js",
@@ -40,15 +49,6 @@
       "raw": 40,
       "gzip": 54,
       "brotli": 44
-    },
-    {
-      "path": "assets/dist-BuoSC44Y.js",
-      "role": "@margoengine/gltf (app.load)",
-      "encoding": "gzip",
-      "transferred": 5284,
-      "raw": 11882,
-      "gzip": 4912,
-      "brotli": 4424
     },
     {
       "path": "model.glb",
@@ -62,18 +62,18 @@
   ],
   "total": {
     "requests": 6,
-    "transferred": 30652,
+    "transferred": 30656,
     "raw": 64398,
-    "gzip": 27634,
-    "brotli": 24342
+    "gzip": 27641,
+    "brotli": 24324
   },
   "notFetched": [
     {
-      "path": "assets/cad-DH1AME4--D4Y8_Ble.js",
+      "path": "assets/cad-802Ja4Wh-D4Y8_Ble.js",
       "raw": 17843
     },
     {
-      "path": "assets/cad-DPsFkvL0.js",
+      "path": "assets/cad-BbolcdCU.js",
       "raw": 53
     },
     {
@@ -85,16 +85,16 @@
       "raw": 44
     },
     {
-      "path": "assets/dist-B9Oxof5J.js",
-      "raw": 63300
-    },
-    {
       "path": "assets/dist-BSOpu6iN.js",
       "raw": 40045
     },
     {
       "path": "assets/dist-Cl0vl3JE.js",
       "raw": 23421
+    },
+    {
+      "path": "assets/dist-DnGFOsSt.js",
+      "raw": 63300
     },
     {
       "path": "assets/dist-kGK5YhPx.js",

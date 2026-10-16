@@ -145,7 +145,9 @@ try {
     await app.page.locator('#viewport').getAttribute('data-constraint-solver'),
     '@margoengine/kinematics-constraints',
   );
-  await app.page.waitForFunction(() => typeof document.querySelector('#viewport').readWorkshopDiagnostics === 'function');
+  await app.page.waitForFunction(
+    () => typeof document.querySelector('#viewport').readWorkshopDiagnostics === 'function',
+  );
   await app.page.locator('details.advanced > summary').click();
   for (const id of ['idle', 'moving-light', 'look', 'autopilot', 'follow']) await app.page.locator(`#${id}`).uncheck();
   const home = validate(await frames(12), 'home');
@@ -272,11 +274,19 @@ try {
   for (const pose of ['home', 'front']) {
     await app.page.locator(`[data-pose="${pose}"]`).click();
     const before = await metrics();
-    await app.page.waitForFunction((previousFrame) => {
-      const value = JSON.parse(document.querySelector('#viewport').readWorkshopDiagnostics('metrics'));
-      return value.animationFrames > previousFrame && value.targetMotion.settled && !value.targetMotion.routing &&
-        Math.abs(value.torso.yaw - value.torso.desiredYaw) < 5e-5;
-    }, before.animationFrames, { timeout: 6000 });
+    await app.page.waitForFunction(
+      (previousFrame) => {
+        const value = JSON.parse(document.querySelector('#viewport').readWorkshopDiagnostics('metrics'));
+        return (
+          value.animationFrames > previousFrame &&
+          value.targetMotion.settled &&
+          !value.targetMotion.routing &&
+          Math.abs(value.torso.yaw - value.torso.desiredYaw) < 5e-5
+        );
+      },
+      before.animationFrames,
+      { timeout: 6000 },
+    );
     const value = validate(await metrics(), `settled eye aim ${pose}`);
     settledEyes.push({
       pose,
@@ -418,7 +428,8 @@ try {
   await app.page.locator('#auto-ik').uncheck();
   const frozen = validate(await frames(6), 'manual pose before reflections');
   await app.page.waitForFunction(
-    (previous) => JSON.parse(document.querySelector('#viewport').readWorkshopDiagnostics('metrics')).reflections >= previous + 2,
+    (previous) =>
+      JSON.parse(document.querySelector('#viewport').readWorkshopDiagnostics('metrics')).reflections >= previous + 2,
     frozen.reflections,
   );
   const still = validate(await metrics(), 'manual pose after reflections');

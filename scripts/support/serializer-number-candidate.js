@@ -7,7 +7,9 @@ import { pathToFileURL } from 'node:url';
 // data: URL modules cannot resolve bare specifiers, so point the ones the exporter sources use at the built files.
 const resolveBare = (code) =>
   code
-    .replace(/'\.\.\/\.\.\/shared\/([^']+)'/g, (_, file) => JSON.stringify(pathToFileURL(resolve('packages/shared', file)).href))
+    .replace(/'\.\.\/\.\.\/shared\/([^']+)'/g, (_, file) =>
+      JSON.stringify(pathToFileURL(resolve('packages/shared', file)).href),
+    )
     .replaceAll(
       "'@margoengine/core/extension'",
       JSON.stringify(pathToFileURL(resolve('packages/core/dist/extension.js')).href),
@@ -19,7 +21,8 @@ const resolveBare = (code) =>
 /** Keeps the exact shortest-Float32 decimal search while converting its winning string once. */
 export async function serializerNumberSources() {
   const original = (await readFile('packages/exporters/src/scene.ts', 'utf8')).replace(/\r\n/g, '\n');
-  const pattern = /const text\s*=\s*f\.toPrecision\(digits\);\s*if\s*\(Math\.fround\(Number\(text\)\)\s*===\s*f\)\s*return String\(Number\(text\)\);/g;
+  const pattern =
+    /const text\s*=\s*f\.toPrecision\(digits\);\s*if\s*\(Math\.fround\(Number\(text\)\)\s*===\s*f\)\s*return String\(Number\(text\)\);/g;
   const matches = [...original.matchAll(pattern)];
   assert.equal(matches.length, 1, 'Exporter number-format source changed before comparison');
   const before = matches[0][0];

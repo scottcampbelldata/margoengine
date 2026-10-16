@@ -1,8 +1,18 @@
+import type { GLTFPrimitive, GLTFMaterial } from '../../shared/gltf.js';
 // Network and decode half of @margoengine/gltf-pro/progressive. Runs in dist/workers/progressive.js, or on the main
 // thread where Worker is unavailable. HTTP range requests fetch each primitive's accessor bytes in the priority order
 // the main thread sends; a server without range support streams the whole file and primitives decode as their bytes
 // arrive. Geometry first, then images, then the remaining bytes, so the final buffers equal a plain download.
-import { GLTFAsset, asyncCompression, assetLimit, componentSizes, components, embedded, entry, overBudget } from './asset.js';
+import {
+  GLTFAsset,
+  asyncCompression,
+  assetLimit,
+  componentSizes,
+  components,
+  embedded,
+  entry,
+  overBudget,
+} from './asset.js';
 import { decodeExtras, packPrimitive, primitiveDefs } from './pack.js';
 import { assetURL } from '../../shared/asset-url.js';
 import { readResponse } from '../../shared/loading.js';
@@ -70,8 +80,8 @@ function gaps(list: number[], lo: number, hi: number): [number, number][] {
   return out;
 }
 const covered = (list: number[], lo: number, hi: number) => !gaps(list, lo, hi).length;
-const error = (e: any): StreamError => ({
-  name: e?.name ?? 'Error',
+const error = (e: unknown): StreamError => ({
+  name: (e as { name?: string } | null)?.name ?? 'Error',
   message: e instanceof Error ? e.message : String(e),
 });
 
@@ -118,7 +128,15 @@ export class GLTFStream {
   async run(): Promise<void> {
     try {
       const doc = await this.head();
-      if(asyncCompression(doc) || doc.bufferViews?.some((view:any)=>view?.extensions?.EXT_meshopt_compression||view?.extensions?.KHR_meshopt_compression)){this.post({type:'fallback'});return;}
+      if (
+        asyncCompression(doc) ||
+        doc.bufferViews?.some(
+          (view) => view?.extensions?.EXT_meshopt_compression || view?.extensions?.KHR_meshopt_compression,
+        )
+      ) {
+        this.post({ type: 'fallback' });
+        return;
+      }
       this.post({ type: 'doc', doc });
       this.buffers(doc);
       while (!this.order) await this.next();
@@ -238,7 +256,7 @@ export class GLTFStream {
       this.loaded += text.length;
       if (text.length > this.limit) throw overBudget('glTF JSON exceeds byte budget', this.limit);
       this.sources.length = 0;
-      return parseJSON(new TextDecoder('utf-8', { fatal: true }).decode(text));
+      return parseJSON<GLTFDocument>(new TextDecoder('utf-8', { fatal: true }).decode(text));
     }
     const total = view.getUint32(8, true);
     if (view.getUint32(4, true) !== 2 || total < 20 || (range && +range[1] !== total))
@@ -278,7 +296,7 @@ export class GLTFStream {
       throw new TypeError('Invalid GLB chunk');
     if (s.ranged) for (const [a, b] of gaps(s.got, 0, need())) this.request(0, a, b);
     while (!covered(s.got, 0, need())) await this.next();
-    return parseJSON(new TextDecoder('utf-8', { fatal: true }).decode(s.data!.subarray(20, 20 + json())));
+    return parseJSON<GLTFDocument>(new TextDecoder('utf-8', { fatal: true }).decode(s.data!.subarray(20, 20 + json())));
   }
   // Maps each glTF buffer onto a source: the GLB's BIN chunk, an external file (range-probed on first use) or a data URI.
   private buffers(doc: GLTFDocument): void {
@@ -295,7 +313,7 @@ export class GLTFStream {
         binLength = Math.min(v.getUint32(at, true), d.length - binStart);
       }
     }
-    const views = (doc.buffers ?? []).map((def: any, i: number) => {
+    const views = (doc.buffers ?? []).map((def, i) => {
       if (def?.uri === undefined) {
         if (i === 0 && glb && binLength) {
           this.map.push({ source: 0, offset: binStart });
@@ -456,16 +474,19 @@ export class GLTFStream {
     const defs = primitiveDefs(doc),
       first: number[] = [],
       images = doc.images ?? [],
-      material = (p: any) => doc.materials?.[p?.material];
-    const textures = (m: any) =>
+      material = (p: GLTFPrimitive) => doc.materials?.[p?.material as number];
+    const textures = (m: GLTFMaterial | undefined) =>
       JSON.stringify(m ?? {})
         .match(/"index":\d+/g)
         ?.map((t) => +t.slice(8)) ?? [];
     for (const key of this.order!)
       for (const t of textures(material(defs[key]))) {
         const def = doc.textures?.[t];
-        for (const s of [def?.source, ...Object.values(def?.extensions ?? {}).map((e: any) => e?.source)])
-          if (Number.isInteger(s) && !first.includes(s)) first.push(s);
+        for (const s of [
+          def?.source,
+          ...Object.values(def?.extensions ?? {}).map((e) => (e as { source?: number } | null)?.source),
+        ])
+          if (Number.isInteger(s) && !first.includes(s!)) first.push(s!);
       }
     const queue = [
       ...first,

@@ -4,7 +4,7 @@ import { canUseWorker, movable, runWorker } from '../../shared/worker.js';
 import { GLTFAsset, loadAsset, closeImages, type AssetOptions, type GLTFDecoderHooks } from './asset.js';
 import { PBRModel, loadGLTF, parseGLTFAsync, type GLTFLoadOptions } from './index.js';
 import { packed } from './pack.js';
-import {prepareAsset, type PreparedGLTF} from './prepare.js';
+import { prepareAsset, type PreparedGLTF } from './prepare.js';
 export type { PreparedGLTF } from './prepare.js';
 // Draco, meshopt and KTX2 decode on this thread; the instancing reader only composes the worker-decoded accessors. A custom
 // fetch cannot move to the worker, so it keeps the load on this thread too.
@@ -24,7 +24,7 @@ export function modelFromPrepared(
   let model: PBRModel | undefined;
   try {
     signal?.throwIfAborted();
-    if(prepared.deferred) throw new Error('Compressed PreparedGLTF requires the asynchronous worker loader');
+    if (prepared.deferred) throw new Error('Compressed PreparedGLTF requires the asynchronous worker loader');
     const asset = new GLTFAsset(
       prepared.doc,
       prepared.buffers,
@@ -34,8 +34,8 @@ export function modelFromPrepared(
       prepared.maxNodes,
     );
     for (const [index, data] of prepared.accessors) asset['cache'].set(index, data);
-    prepared.doc.meshes?.forEach((mesh: any, i: number) =>
-      mesh?.primitives?.forEach((p: any, j: number) => {
+    prepared.doc.meshes?.forEach((mesh, i) =>
+      mesh?.primitives?.forEach((p, j) => {
         const g = prepared.geometry[i]?.[j];
         if (g && p && typeof p === 'object') packed.set(p, g);
       }),
@@ -49,14 +49,30 @@ export function modelFromPrepared(
     throw error;
   }
 }
-async function finishPrepared(instance:EngineKernel,prepared:PreparedGLTF,options:GLTFLoadOptions):Promise<PBRModel> {
-  if(prepared.deferred) {
-    const {asset,images}=await loadAsset(prepared.baseURL,{...options,buffers:prepared.buffers},prepared.doc,{device:engineRuntime(instance).gpu??undefined,ktx2:options.ktx2},false,prepared.downloadedBytes);
-    try {prepared=prepareAsset(asset,images);} catch(error) {closeImages(images);throw error;}
+async function finishPrepared(
+  instance: EngineKernel,
+  prepared: PreparedGLTF,
+  options: GLTFLoadOptions,
+): Promise<PBRModel> {
+  if (prepared.deferred) {
+    const { asset, images } = await loadAsset(
+      prepared.baseURL,
+      { ...options, buffers: prepared.buffers },
+      prepared.doc,
+      { device: engineRuntime(instance).gpu ?? undefined, ktx2: options.ktx2 },
+      false,
+      prepared.downloadedBytes,
+    );
+    try {
+      prepared = prepareAsset(asset, images);
+    } catch (error) {
+      closeImages(images);
+      throw error;
+    }
   }
-  return modelFromPrepared(instance,prepared,options.signal,options.decoders);
+  return modelFromPrepared(instance, prepared, options.signal, options.decoders);
 }
-const workerURL = () => new URL('./workers/gltf.js?no-inline', import.meta.url);
+const workerURL = () => new URL(/* @vite-ignore */ './workers/gltf.js?no-inline', import.meta.url);
 /**
  * loadGLTF with fetching, JSON parsing, accessor decoding, vertex packing and image decoding in a worker. Same model as
  * loadGLTF. Runs on this thread instead when Workers are unavailable or Draco, meshopt or KTX2 `decoders` or `fetch` are passed.
@@ -103,9 +119,5 @@ export async function parseGLTFInWorker(
     maxNodes: options.maxNodes,
     allowedURLs: options.allowedURLs,
   };
-  return finishPrepared(
-    instance,
-    await runWorker<PreparedGLTF>(workerURL(), message, options.signal),
-    options,
-  );
+  return finishPrepared(instance, await runWorker<PreparedGLTF>(workerURL(), message, options.signal), options);
 }

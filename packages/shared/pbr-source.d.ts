@@ -1,4 +1,5 @@
-import type {Mesh} from '@margoengine/core/extension';
+import type { Mesh } from '@margoengine/core/extension';
+import type { GLTFDocument, GLTFPrimitive, GLTFTextureInfo } from './gltf.js';
 
 /** Optional CPU geometry protocol on loader-owned nodes, keyed by
  * Symbol.for('margoengine.pbr-source.v1'). Never installed on core Geometry. */
@@ -7,7 +8,7 @@ export interface PBRSource {
   readonly nodes: readonly Mesh[];
   readonly primitives: readonly PBRSourcePrimitive[];
   readonly asset: {
-    readonly doc: Record<string, any>;
+    readonly doc: GLTFDocument;
     accessor(index: unknown, type?: string): Float32Array;
   };
 }
@@ -19,15 +20,17 @@ export interface PBRSourcePrimitive {
   readonly vertices: Float32Array;
   readonly indices: Uint32Array;
   readonly deformed?: GPUBuffer;
-  readonly definition: any;
+  readonly definition: GLTFPrimitive;
   readonly extension?: unknown;
   readonly material: {
+    readonly name?: string;
+    readonly alphaMode?: string;
     readonly base: number[];
     readonly factors: number[];
     readonly emission: number[];
     readonly settings: number[];
-    readonly maps: any[];
-    readonly [key: string]: any;
+    readonly maps: (GLTFTextureInfo | undefined)[];
+    readonly [key: string]: unknown;
   };
   readonly weights: Float32Array;
   readonly targetNames: readonly string[];

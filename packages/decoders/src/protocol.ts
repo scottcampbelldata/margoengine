@@ -44,28 +44,41 @@ export interface DracoDecodeLimits {
   attributeWidths?: Record<string, number>;
 }
 
-const dracoVertexLimit = 16_777_216, dracoByteLimit = 256 * 1024 * 1024;
+const dracoVertexLimit = 16_777_216,
+  dracoByteLimit = 256 * 1024 * 1024;
 
 /** Validate before copying or transferring input; repeat in the worker before touching Draco. */
-export function validatedDracoLimits(limits: DracoDecodeLimits | undefined): Required<Omit<DracoDecodeLimits, 'attributeWidths'>> & Pick<DracoDecodeLimits, 'attributeWidths'> {
-  if (limits !== undefined && (!limits || typeof limits !== 'object' || Array.isArray(limits))) throw new TypeError('Draco: limits must be an object');
-  const maximum = (name: 'maxVertices' | 'maxIndices' | 'maxDecodedBytes', ceiling: number, minimum: number): number => {
+export function validatedDracoLimits(
+  limits: DracoDecodeLimits | undefined,
+): Required<Omit<DracoDecodeLimits, 'attributeWidths'>> & Pick<DracoDecodeLimits, 'attributeWidths'> {
+  if (limits !== undefined && (!limits || typeof limits !== 'object' || Array.isArray(limits)))
+    throw new TypeError('Draco: limits must be an object');
+  const maximum = (
+    name: 'maxVertices' | 'maxIndices' | 'maxDecodedBytes',
+    ceiling: number,
+    minimum: number,
+  ): number => {
     const value = limits?.[name];
     if (value === undefined) return ceiling;
-    if (!Number.isSafeInteger(value) || value < minimum) throw new RangeError(`Draco: ${name} must be a safe integer >= ${minimum}`);
+    if (!Number.isSafeInteger(value) || value < minimum)
+      throw new RangeError(`Draco: ${name} must be a safe integer >= ${minimum}`);
     return Math.min(value, ceiling);
   };
-  const maxVertices = maximum('maxVertices', dracoVertexLimit, 1), maxIndices = maximum('maxIndices', dracoByteLimit / 2, 0), maxDecodedBytes = maximum('maxDecodedBytes', dracoByteLimit, 1);
+  const maxVertices = maximum('maxVertices', dracoVertexLimit, 1),
+    maxIndices = maximum('maxIndices', dracoByteLimit / 2, 0),
+    maxDecodedBytes = maximum('maxDecodedBytes', dracoByteLimit, 1);
   let attributeWidths: Record<string, number> | undefined;
   if (limits?.attributeWidths !== undefined) {
-    if (!limits.attributeWidths || typeof limits.attributeWidths !== 'object' || Array.isArray(limits.attributeWidths)) throw new TypeError('Draco: attributeWidths must be an object');
+    if (!limits.attributeWidths || typeof limits.attributeWidths !== 'object' || Array.isArray(limits.attributeWidths))
+      throw new TypeError('Draco: attributeWidths must be an object');
     attributeWidths = Object.create(null);
     for (const [semantic, width] of Object.entries(limits.attributeWidths)) {
-      if (!Number.isSafeInteger(width) || width < 1 || width > 16) throw new RangeError(`Draco: invalid ${semantic} width limit`);
+      if (!Number.isSafeInteger(width) || width < 1 || width > 16)
+        throw new RangeError(`Draco: invalid ${semantic} width limit`);
       attributeWidths![semantic] = width;
     }
   }
-  return {maxVertices, maxIndices, maxDecodedBytes, attributeWidths};
+  return { maxVertices, maxIndices, maxDecodedBytes, attributeWidths };
 }
 
 export interface KTX2Mip {
@@ -88,7 +101,9 @@ export interface TranscodedKTX2Result {
 }
 
 export type WorkerRequest =
-  | {id: number; type: 'draco'; buffer: ArrayBuffer; request: DracoRequest; wrapperURL: string; wasmURL: string}
-  | {id: number; type: 'ktx2'; buffer: ArrayBuffer; target: TranscodeTarget; transcoderURL: string; wasmURL: string};
+  | { id: number; type: 'draco'; buffer: ArrayBuffer; request: DracoRequest; wrapperURL: string; wasmURL: string }
+  | { id: number; type: 'ktx2'; buffer: ArrayBuffer; target: TranscodeTarget; transcoderURL: string; wasmURL: string };
 
-export type WorkerResponse = {id: number; result: unknown; error?: undefined} | {id: number; error: string; result?: undefined};
+export type WorkerResponse =
+  | { id: number; result: unknown; error?: undefined }
+  | { id: number; error: string; result?: undefined };

@@ -727,7 +727,7 @@ export class BodyIK {
       if (!Number.isFinite(dt) || dt <= 0) throw new RangeError('Body IK dt must be positive and finite');
       this.pointCursor = this.poseCursor = 0;
       const desired = this.point(),
-        { frame, shoulder, elbow, wrist } = this.options;
+        { frame, shoulder, elbow, wrist: _wrist } = this.options;
       for (let axis = 0; axis < 3; axis++) desired[axis] = desiredOrb[axis];
       frame.engine.store.tick(false);
       const frameValues = this.frameValues;

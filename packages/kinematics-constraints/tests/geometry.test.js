@@ -1,11 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import {
-  CapsuleVolume,
-  SphereVolume,
-  closestPointsBetweenSegments,
-  measureSegmentClearance,
-} from '../dist/index.js';
+import { CapsuleVolume, SphereVolume, closestPointsBetweenSegments, measureSegmentClearance } from '../dist/index.js';
 
 const EPS = 4e-6;
 const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
@@ -57,7 +52,11 @@ test('a zero-length capsule agrees with a sphere, including at its center', () =
   const sphere = new SphereVolume({ center: [1, 2, 3], radius: 0.7 });
   const sphereSurface = new Float32Array(3);
   const sphereNormal = new Float32Array(3);
-  for (const point of [[2, 3, 4], [1, 2, 3], [1, 2, 3.1]]) {
+  for (const point of [
+    [2, 3, 4],
+    [1, 2, 3],
+    [1, 2, 3.1],
+  ]) {
     near(capsule.evaluate(point, surface, normal), sphere.evaluate(point, sphereSurface, sphereNormal));
     near(Math.hypot(...normal), 1);
     near(sphere.evaluate(surface, sphereSurface, sphereNormal), 0);
@@ -98,8 +97,11 @@ test('closest segment points handle crossing, parallel, collinear, and degenerat
 
 test('closest segment output can be reused without replacing nested vectors', () => {
   const out = {
-    pointA: new Float32Array(3), pointB: new Float32Array(3),
-    distance: 0, parameterA: 0, parameterB: 0,
+    pointA: new Float32Array(3),
+    pointB: new Float32Array(3),
+    distance: 0,
+    parameterA: 0,
+    parameterB: 0,
   };
   const pointA = out.pointA;
   const pointB = out.pointB;
@@ -117,7 +119,11 @@ function referenceSegmentDistance(a, b, c, d) {
   const v = d.map((x, i) => x - c[i]);
   const w = a.map((x, i) => x - c[i]);
   const dot = (x, y) => x.reduce((sum, value, i) => sum + value * y[i], 0);
-  const uu = dot(u, u), vv = dot(v, v), uv = dot(u, v), uw = dot(u, w), vw = dot(v, w);
+  const uu = dot(u, u),
+    vv = dot(v, v),
+    uv = dot(u, v),
+    uw = dot(u, w),
+    vw = dot(v, w);
   const clamp = (x) => Math.max(0, Math.min(1, x));
   const candidates = [
     [0, vv ? clamp(vw / vv) : 0],
@@ -136,23 +142,36 @@ function referenceSegmentDistance(a, b, c, d) {
 
 test('random segment distances match an independent reference and remain symmetric', () => {
   let seed = 0x5f3759df;
-  const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 2 ** 32; };
+  const random = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 2 ** 32;
+  };
   const vec = () => [random() * 8 - 4, random() * 8 - 4, random() * 8 - 4];
   for (let i = 0; i < 400; i++) {
-    const a = vec(), b = vec(), c = vec(), d = vec();
+    const a = vec(),
+      b = vec(),
+      c = vec(),
+      d = vec();
     const result = closestPointsBetweenSegments(a, b, c, d);
     const reverse = closestPointsBetweenSegments(c, d, a, b);
     near(result.distance, referenceSegmentDistance(a, b, c, d));
     near(result.distance, reverse.distance);
     near(distance(result.pointA, result.pointB), result.distance);
-    vecNear(result.pointA, a.map((x, k) => x + (b[k] - x) * result.parameterA));
-    vecNear(result.pointB, c.map((x, k) => x + (d[k] - x) * result.parameterB));
+    vecNear(
+      result.pointA,
+      a.map((x, k) => x + (b[k] - x) * result.parameterA),
+    );
+    vecNear(
+      result.pointB,
+      c.map((x, k) => x + (d[k] - x) * result.parameterB),
+    );
   }
 });
 
 test('swept link clearance detects a collision between clear segment endpoints', () => {
   const sphere = new SphereVolume({ center: [0, 0, 0], radius: 0.2 });
-  const start = [-1, 0, 0], end = [1, 0, 0];
+  const start = [-1, 0, 0],
+    end = [1, 0, 0];
   assert.ok(sphere.evaluate(start, surface, normal) > 0);
   assert.ok(sphere.evaluate(end, surface, normal) > 0);
   near(sphere.segmentClearance(start, end, 0.1), -0.3);
@@ -165,7 +184,10 @@ test('swept link clearance detects a collision between clear segment endpoints',
 
 test('random sphere and capsule surface witnesses agree with their signed distances', () => {
   let seed = 48271;
-  const random = () => { seed = Math.imul(seed, 48271) >>> 0; return seed / 2 ** 32; };
+  const random = () => {
+    seed = Math.imul(seed, 48271) >>> 0;
+    return seed / 2 ** 32;
+  };
   const scratchSurface = new Float32Array(3);
   const scratchNormal = new Float32Array(3);
   const volumes = [
@@ -178,7 +200,10 @@ test('random sphere and capsule surface witnesses agree with their signed distan
       const signed = volume.evaluate(point, surface, normal);
       near(Math.hypot(...normal), 1);
       near(volume.evaluate(surface, scratchSurface, scratchNormal), 0);
-      vecNear(point, [...surface].map((value, k) => value + signed * normal[k]));
+      vecNear(
+        point,
+        [...surface].map((value, k) => value + signed * normal[k]),
+      );
     }
   }
 });
@@ -186,7 +211,10 @@ test('random sphere and capsule surface witnesses agree with their signed distan
 test('segment geometry retains crossing accuracy at small and large scales', () => {
   for (const scale of [1e-9, 1, 1e9]) {
     const result = closestPointsBetweenSegments(
-      [-scale, 0, 0], [scale, 0, 0], [0, -scale, scale * 0.2], [0, scale, scale * 0.2],
+      [-scale, 0, 0],
+      [scale, 0, 0],
+      [0, -scale, scale * 0.2],
+      [0, scale, scale * 0.2],
       { pointA: new Float64Array(3), pointB: new Float64Array(3), distance: 0, parameterA: 0, parameterB: 0 },
     );
     near(result.distance / scale, 0.2, 1e-10);
@@ -210,7 +238,8 @@ test('query inputs may alias output storage while simultaneous outputs must rema
   assert.throws(() => sphere.evaluate([2, 0, 0], point, point));
   const storage = new Float32Array(4);
   assert.throws(() => sphere.evaluate([2, 0, 0], storage.subarray(0, 3), storage.subarray(1, 4)));
-  const a = new Float64Array([0, 0, 0]), b = new Float64Array([2, 0, 0]);
+  const a = new Float64Array([0, 0, 0]),
+    b = new Float64Array([2, 0, 0]);
   const out = { pointA: a, pointB: b, distance: 0, parameterA: 0, parameterB: 0 };
   closestPointsBetweenSegments(a, b, [1, 1, 0], [1, 2, 0], out);
   vecNear(a, [1, 0, 0]);
@@ -223,7 +252,12 @@ test('invalid primitive configuration and queries fail explicitly', () => {
     assert.throws(() => new CapsuleVolume({ start: [0, 0, 0], end: [0, 1, 0], radius }));
   }
   const sphere = new SphereVolume({ center: [0, 0, 0], radius: 1 });
-  for (const point of [[NaN, 0, 0], [0, Infinity, 0], [0, 0], [0, 0, 0, 0]]) {
+  for (const point of [
+    [NaN, 0, 0],
+    [0, Infinity, 0],
+    [0, 0],
+    [0, 0, 0, 0],
+  ]) {
     assert.throws(() => sphere.evaluate(point, surface, normal));
   }
   assert.throws(() => sphere.segmentClearance([0, 0, 0], [1, 0, 0], -0.1));
@@ -231,7 +265,8 @@ test('invalid primitive configuration and queries fail explicitly', () => {
 
 test('subnormal sphere offsets retain unit normals and actual surface witnesses', () => {
   const sphere = new SphereVolume({ center: [0, 0, 0], radius: 1 });
-  const outSurface = new Float64Array(3), outNormal = new Float64Array(3);
+  const outSurface = new Float64Array(3),
+    outNormal = new Float64Array(3);
   sphere.evaluate([Number.MIN_VALUE, Number.MIN_VALUE, 0], outSurface, outNormal);
   near(Math.hypot(...outNormal), 1, 1e-15);
   near(outNormal[0], Math.SQRT1_2, 1e-15);
@@ -258,7 +293,8 @@ test('subnormal segment dimensions preserve fractional closest-point parameters'
 test('subnormal capsule axes retain unit radial and deterministic axial normals', () => {
   const tiny = Number.MIN_VALUE;
   const capsule = new CapsuleVolume({ start: [0, 0, 0], end: [tiny, tiny, 0], radius: 1 });
-  const outSurface = new Float64Array(3), outNormal = new Float64Array(3);
+  const outSurface = new Float64Array(3),
+    outNormal = new Float64Array(3);
   capsule.evaluate([tiny, 0, 0], outSurface, outNormal);
   near(outNormal[0], Math.SQRT1_2, 1e-15);
   near(outNormal[1], -Math.SQRT1_2, 1e-15);
@@ -270,9 +306,17 @@ test('subnormal capsule axes retain unit radial and deterministic axial normals'
 });
 
 test('segment Float32 overflow rejects both outputs atomically', () => {
-  const out = {pointA: new Float64Array([7, 8, 9]), pointB: new Float32Array([4, 5, 6]),
-    distance: 123, parameterA: 0.25, parameterB: 0.75};
-  assert.throws(() => closestPointsBetweenSegments([0, 0, 0], [1, 0, 0], [1e100, 0, 0], [1e100, 1, 0], out), /output precision/);
+  const out = {
+    pointA: new Float64Array([7, 8, 9]),
+    pointB: new Float32Array([4, 5, 6]),
+    distance: 123,
+    parameterA: 0.25,
+    parameterB: 0.75,
+  };
+  assert.throws(
+    () => closestPointsBetweenSegments([0, 0, 0], [1, 0, 0], [1e100, 0, 0], [1e100, 1, 0], out),
+    /output precision/,
+  );
   assert.deepEqual([...out.pointA], [7, 8, 9]);
   assert.deepEqual([...out.pointB], [4, 5, 6]);
   assert.equal(out.distance, 123);

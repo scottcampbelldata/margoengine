@@ -1,17 +1,18 @@
+import type { GLTFPrimitive } from '../../shared/gltf.js';
 import { compressedIndices } from './compression.js';
 import { entry, type GLTFAsset } from './asset.js';
 import type { PreparedGeometry } from './index.js';
 /** Geometry already packed by a parse worker, keyed by primitive definition; PBRModel then skips decoding it. */
 export const packed = new WeakMap<object, PreparedGeometry>();
 /** Decode one triangle primitive's accessors into gltf-pro's 80-byte vertices and uint32 indices (main thread or worker). */
-export function packPrimitive(asset: GLTFAsset, p: any): PreparedGeometry {
-  compressedIndices(asset,p);
+export function packPrimitive(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
+  compressedIndices(asset, p);
   try {
     return pack(asset, p);
   } catch (error) {
     // Name the mesh and primitive (searched only on this error path), keeping the error's class.
     const meshes = asset.doc.meshes ?? [],
-      i = meshes.findIndex((m: any) => m?.primitives?.includes?.(p));
+      i = meshes.findIndex((m) => m?.primitives?.includes?.(p));
     if (error instanceof Error && i >= 0)
       error.message = `glTF mesh ${i}${meshes[i].name ? ` "${meshes[i].name}"` : ''} primitive ${meshes[i].primitives.indexOf(p)}: ${error.message}`;
     throw error;
@@ -49,7 +50,7 @@ export function listIndices(v: Uint32Array, mode: number): Uint32Array {
   }
   return v;
 }
-function pack(asset: GLTFAsset, p: any): PreparedGeometry {
+function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
   const mode = p.mode ?? 4,
     per = mode === 0 ? 1 : mode < 4 ? 2 : 3;
   if (!Number.isInteger(mode) || mode < 0 || mode > 6) throw new TypeError('Invalid glTF primitive mode');
@@ -79,7 +80,8 @@ function pack(asset: GLTFAsset, p: any): PreparedGeometry {
         throw new TypeError('Invalid normalized ' + key);
     }
   const normals = a.NORMAL === undefined ? new Float32Array(positions.length) : read('NORMAL', a.NORMAL, 'VEC3');
-  const indexValues = compressedIndices(asset,p) ?? (p.indices === undefined ? null : read('indices', p.indices, 'SCALAR'));
+  const indexValues =
+    compressedIndices(asset, p) ?? (p.indices === undefined ? null : read('indices', p.indices, 'SCALAR'));
   if (indexValues)
     for (let i = 0; i < indexValues.length; i++) {
       const v = indexValues[i];
@@ -92,7 +94,7 @@ function pack(asset: GLTFAsset, p: any): PreparedGeometry {
   if (
     p.indices !== undefined &&
     (![5121, 5123, 5125].includes(entry(asset.doc.accessors, p.indices, 'indices').componentType) ||
-      asset.doc.accessors[p.indices].normalized)
+      asset.doc.accessors![p.indices].normalized)
   )
     throw new TypeError('Invalid index component type');
   if (a.NORMAL === undefined && per === 3)
@@ -207,5 +209,5 @@ export function decodeExtras(asset: GLTFAsset): [number, Float32Array][] {
   return out;
 }
 /** Primitive definitions mesh by mesh: @margoengine/gltf-pro/progressive and its worker key primitives by this list. */
-export const primitiveDefs = (doc: GLTFAsset['doc']): any[] =>
-  (doc.meshes ?? []).flatMap((m: any) => (Array.isArray(m?.primitives) ? m.primitives : []));
+export const primitiveDefs = (doc: GLTFAsset['doc']): GLTFPrimitive[] =>
+  (doc.meshes ?? []).flatMap((m) => (Array.isArray(m?.primitives) ? m.primitives : []));

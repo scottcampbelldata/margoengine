@@ -6,7 +6,7 @@ import { withGPUTiming } from '../gpu-timing.js';
 import { buildAssembly, ENTITIES_PER_MODULE } from './assembly.js';
 
 const now = () => performance.now(),
-  frame = () => new Promise((r) => requestAnimationFrame(r));
+  _frame = () => new Promise((r) => requestAnimationFrame(r));
 const stat = (values) => {
   const v = [...values].sort((a, b) => a - b),
     at = (q) => v[Math.min(v.length - 1, Math.floor(v.length * q))];

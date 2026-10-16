@@ -5,7 +5,15 @@ const neighborLists = (tile) => Array.from({ length: 6 }, () => [tile]);
 
 test('pins outside any grid axis reject before their linear indices can alias valid cells', () => {
   const wfc = new WFC([3, 2, 2], [{ neighbors: neighborLists(0) }]);
-  for (const position of [[3, 0, 0], [-1, 1, 0], [0, 2, 0], [0, -1, 1], [0, 0, 2], [0, 0, -1], [0.5, 0, 0]]) {
+  for (const position of [
+    [3, 0, 0],
+    [-1, 1, 0],
+    [0, 2, 0],
+    [0, -1, 1],
+    [0, 0, 2],
+    [0, 0, -1],
+    [0.5, 0, 0],
+  ]) {
     assert.throws(() => wfc.solve(1, [{ position, tile: 0 }]), /Invalid WFC pin/);
   }
   assert.deepEqual([...wfc.solve(1, [{ position: [2, 1, 1], tile: 0 }])], Array(12).fill(0));

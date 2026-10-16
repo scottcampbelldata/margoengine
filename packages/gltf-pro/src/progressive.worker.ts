@@ -3,22 +3,29 @@
 import { transferables } from '../../shared/worker.js';
 import { GLTFStream } from './stream.js';
 const scope = self as unknown as {
-  onmessage: (event: { data: any }) => void;
+  onmessage: (event: { data: unknown }) => void;
   postMessage(message: unknown, transfer: Transferable[]): void;
 };
 let stream: GLTFStream | undefined;
 // One {url} start, then {order} updates (integer primitive keys); anything else is ignored.
 scope.onmessage = ({ data }) => {
   if (!data || typeof data !== 'object') return;
-  if (Array.isArray(data.order)) {
-    if (data.order.every(Number.isSafeInteger)) stream?.setOrder(data.order);
-  } else if (!stream && typeof data.url === 'string')
+  const request = data as {
+    order?: unknown;
+    url?: unknown;
+    maxDownloadBytes?: number;
+    maxNodes?: number;
+    allowedURLs?: readonly string[];
+  };
+  if (Array.isArray(request.order)) {
+    if (request.order.every(Number.isSafeInteger)) stream?.setOrder(request.order);
+  } else if (!stream && typeof request.url === 'string')
     void (stream = new GLTFStream(
-      new URL(data.url),
+      new URL(request.url),
       (message) => scope.postMessage(message, [...transferables(message)]),
       new AbortController().signal,
-      data.maxDownloadBytes,
-      data.maxNodes,
-      data.allowedURLs,
+      request.maxDownloadBytes,
+      request.maxNodes,
+      request.allowedURLs,
     )).run();
 };

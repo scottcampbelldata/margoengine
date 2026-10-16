@@ -1,5 +1,11 @@
 import type { Camera, EngineKernel } from '@margoengine/core';
-import { Controls, documentOf, type ControlElement, type EventTargetLike } from './controls.js';
+import {
+  Controls,
+  documentOf,
+  type ControlElement,
+  type EventTargetLike,
+  type InputEventListener,
+} from './controls.js';
 import { EPS, madd, type V3 } from './math.js';
 import { add, cross, dot, sub } from '@margoengine/math/vec3';
 import { clamp } from '@margoengine/math/mathutils';
@@ -115,7 +121,7 @@ export class OrbitControls extends Controls {
       [element, 'wheel', this.onWheel, { passive: false }],
       [element, 'contextmenu', this.onMenu],
       [element, 'mousedown', this.onMouseDown],
-    ] as Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
+    ] as Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
   }
   protected override onDisconnect(): void {
     this.stopListenToKeyEvents();

@@ -39,37 +39,41 @@ export async function openBrowser({
       });
     const page = await browser.newPage({ viewport: { width: 1440, height: 1100 }, deviceScaleFactor: 1 });
     page.setDefaultTimeout(30000);
-    let reloads = 0, handledReloads = 0;
-    page.on('websocket', socket => socket.on('framereceived', ({ payload }) => {
-      try {
-        if (JSON.parse(String(payload)).type === 'full-reload') reloads++;
-      } catch {
-        // Other application sockets may send non-JSON messages.
-      }
-    }));
+    let reloads = 0,
+      handledReloads = 0;
+    page.on('websocket', (socket) =>
+      socket.on('framereceived', ({ payload }) => {
+        try {
+          if (JSON.parse(String(payload)).type === 'full-reload') reloads++;
+        } catch {
+          // Other application sockets may send non-JSON messages.
+        }
+      }),
+    );
     await page.goto(`http://127.0.0.1:${server.config.server.port}${startPath}`);
-    const probeHardware = () => page.evaluate(async (powerPreference) => {
-      const canvas = document.createElement('canvas'),
-        gl = canvas.getContext('webgl2', { powerPreference }),
-        ext = gl?.getExtension('WEBGL_debug_renderer_info');
-      const webgl = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl?.getParameter(gl.RENDERER);
-      gl?.getExtension('WEBGL_lose_context')?.loseContext();
-      const adapter = await navigator.gpu?.requestAdapter({ powerPreference });
-      const gpu = adapter?.info;
-      return {
-        webglRenderer: webgl,
-        webgpu: gpu
-          ? {
-              vendor: gpu.vendor,
-              architecture: gpu.architecture,
-              device: gpu.device,
-              description: gpu.description,
-              fallback: gpu.isFallbackAdapter ?? adapter.isFallbackAdapter ?? null,
-            }
-          : null,
-        userAgent: navigator.userAgent,
-      };
-    }, powerPreference);
+    const probeHardware = () =>
+      page.evaluate(async (powerPreference) => {
+        const canvas = document.createElement('canvas'),
+          gl = canvas.getContext('webgl2', { powerPreference }),
+          ext = gl?.getExtension('WEBGL_debug_renderer_info');
+        const webgl = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl?.getParameter(gl.RENDERER);
+        gl?.getExtension('WEBGL_lose_context')?.loseContext();
+        const adapter = await navigator.gpu?.requestAdapter({ powerPreference });
+        const gpu = adapter?.info;
+        return {
+          webglRenderer: webgl,
+          webgpu: gpu
+            ? {
+                vendor: gpu.vendor,
+                architecture: gpu.architecture,
+                device: gpu.device,
+                description: gpu.description,
+                fallback: gpu.isFallbackAdapter ?? adapter.isFallbackAdapter ?? null,
+              }
+            : null,
+          userAgent: navigator.userAgent,
+        };
+      }, powerPreference);
     let hardware;
     for (let attempt = 0; ; attempt++) {
       try {
@@ -78,7 +82,8 @@ export async function openBrowser({
       } catch (error) {
         // Vite may finish a newly discovered dependency batch after the initial load event.
         // Retry only that confirmed startup reload, never product navigation or adapter errors.
-        if (attempt >= 2 || reloads === handledReloads || !String(error).includes('Execution context was destroyed')) throw error;
+        if (attempt >= 2 || reloads === handledReloads || !String(error).includes('Execution context was destroyed'))
+          throw error;
         handledReloads = reloads;
         await page.waitForLoadState('load');
         await server.waitForRequestsIdle();

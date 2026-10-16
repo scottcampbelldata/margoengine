@@ -184,7 +184,8 @@ export function collect() {
     for (const field of need) if (manifest[field] === undefined) problems.push(`${name}: no "${field}"`);
     if (manifest.private) problems.push(`${name}: "private": true on a published package`);
     const expectedLicense = name === '@margoengine/materials' ? 'MIT AND Apache-2.0' : 'MIT';
-    if (manifest.license !== expectedLicense) problems.push(`${name}: license ${manifest.license}, expected ${expectedLicense}`);
+    if (manifest.license !== expectedLicense)
+      problems.push(`${name}: license ${manifest.license}, expected ${expectedLicense}`);
     if (manifest.publishConfig?.access !== 'public') problems.push(`${name}: publishConfig.access is not "public"`);
     if (manifest.repository?.url !== REPOSITORY || manifest.repository?.directory !== dir)
       problems.push(`${name}: repository must be ${REPOSITORY} with directory ${dir} (npm --provenance checks it)`);

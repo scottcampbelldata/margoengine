@@ -2,10 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { World } from '../dist/index.js';
 test('destroying a stale entity cannot duplicate its reusable slot', () => {
-  const world = new World(2), entity = world.create();
+  const world = new World(2),
+    entity = world.create();
   world.destroy(entity);
   assert.throws(() => world.destroy(entity), /stale/);
-  const first = world.create(), second = world.create();
+  const first = world.create(),
+    second = world.create();
   assert.notEqual(first, second);
   assert.equal(world.alive(first), true);
   assert.equal(world.alive(second), true);

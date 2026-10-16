@@ -1,10 +1,5 @@
 {
-  "any": {
-    "packages/decoders/src/codec.ts": {
-      "count": 13,
-      "reason": "Emscripten Draco/Basis module objects and their factory globals have no published types (HANDOFF 1g.b: codec globals may stay)."
-    }
-  },
+  "any": {},
   "errors": {
     "packages/core/src/engine.ts": {
       "count": 10,

@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { Geometry, PbrMaterial, type EngineKernel, type Mesh } from '@margoengine/core';
-import { engineRuntime, meshRuntime, type Engine } from '@margoengine/core/extension';
+import { engineRuntime, meshRuntime, type Engine, type PassContext } from '@margoengine/core/extension';
 import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro';
 import { acesShader } from '../../shared/aces.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; MAP_READ: number };
@@ -451,13 +451,15 @@ export class Imposter {
         shader: bakeShader,
         bindings: () => [{ binding: 96, resource: { buffer: modes[mode] } }],
       });
+      // The offscreen bake supplies fields read by PBRModel.draw without the
+      // engine frame's scene callback and presentation attachments.
       const camera = { matrix: new Float32Array(16), position: [0, 0, 1], target: [0, 0, 0] },
-        context: any = {
+        context = {
           backend: 'webgpu',
           device,
           camera,
           descriptor: { multisample: { count: 1 }, depthStencil: { format: 'depth32float' } },
-        };
+        } as unknown as Extract<PassContext, { backend: 'webgpu' }>;
       const clearDepth = { view: views[2], depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'store' } as const;
       for (let j = 0; j < n; j++)
         for (let i = 0; i < n; i++) {

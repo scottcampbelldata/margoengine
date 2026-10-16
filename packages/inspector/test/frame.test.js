@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
 import { EngineKernel, box } from '@margoengine/core';
 import { Stats } from '@margoengine/stats';
 import { FrameDebugger, textureBytes } from '../dist/frame.js';
+import { parseGLTF, parsePreparedPBR } from '@margoengine/gltf-pro';
+import { parseFBX } from '@margoengine/fbx';
 
 // Tracing fake WebGPU (tests/support/gpu-trace.js pattern): every command a pass encoder receives is appended to
 // `log`, so a report can be compared with exactly what reached the "GPU". Classes carry the native names the
@@ -496,6 +499,87 @@ test('capture waits for the next rendered frame and dispose restores every devic
   assert.equal(Object.hasOwn(engine, 'render'), false);
   assert.equal(engine.hasPlugin('frame-debugger'), false);
   await assert.rejects(debug.capture(), /not attached/);
+});
+
+for (const fixture of [
+  { name: 'gltf-pro', file: '../../exporters/tests/fixtures/Box.glb', parse: parseGLTF },
+  { name: 'FBX', file: '../../fbx/test/fixtures/blender-rig.fbx', parse: parseFBX },
+])
+  test(`capture names ${fixture.name} loader draws without core Geometry`, async (t) => {
+    const gpu = fakeGPU(t),
+      engine = await EngineKernel.create(gpu.canvas, { capacity: 64, backend: 'webgpu' });
+    t.after(() => engine.dispose());
+    const debug = FrameDebugger.attach(engine, { parent: null });
+    const bytes = await readFile(new URL(fixture.file, import.meta.url)),
+      model = await fixture.parse(engine, bytes),
+      mesh = model.primitives[0].node;
+    assert.equal(mesh.geometry, null);
+    const captureDraws = async () =>
+      (await debug.capture({ render: true })).graph
+        .filter((entry) => entry.owner === model.name)
+        .flatMap((entry) => entry.passes.flatMap((pass) => pass.commands));
+    assert.deepEqual(
+      (await captureDraws()).map((draw) => draw.entities),
+      [[mesh.id]],
+    );
+    const primitive = model.primitives[0],
+      deformed = engine.gpu.createBuffer({ size: primitive.vertices.byteLength, usage: usage.VERTEX });
+    primitive.deformed = deformed;
+    try {
+      assert.deepEqual(
+        (await captureDraws()).map((draw) => draw.entities),
+        [[mesh.id]],
+        'the report follows the current deformed vertex buffer',
+      );
+    } finally {
+      primitive.deformed = undefined;
+      deformed.destroy();
+    }
+  });
+
+test('capture names every PBR primitive and deduplicates mesh ownership of shared vertex buffers', async (t) => {
+  const gpu = fakeGPU(t),
+    engine = await EngineKernel.create(gpu.canvas, { capacity: 8, backend: 'webgpu' });
+  t.after(() => engine.dispose());
+  const debug = FrameDebugger.attach(engine, { parent: null }),
+    vertices = new Float32Array([
+      0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 1,
+      1, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1,
+    ]),
+    data = { vertices, indices: new Uint32Array([0, 1, 2]) },
+    other = { vertices: vertices.slice(), indices: data.indices },
+    model = parsePreparedPBR(
+      engine,
+      {
+        asset: { version: '2.0' },
+        scenes: [{ nodes: [0, 1] }],
+        nodes: [{ mesh: 0 }, { mesh: 0 }],
+        meshes: [{ primitives: [{ attributes: {} }, { attributes: {} }, { attributes: {} }] }],
+      },
+      [[data, data, other]],
+    ),
+    meshes = [...new Set(model.primitives.map((primitive) => primitive.node))];
+  assert.equal(meshes.length, 2);
+  assert.ok(meshes.every((mesh) => mesh.geometry === null));
+  const picking = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(model), 'pickingPrimitives').get;
+  let drawReads = 0;
+  Object.defineProperty(model, 'pickingPrimitives', {
+    get() {
+      drawReads++;
+      return picking.call(this);
+    },
+  });
+  const report = await debug.capture({ render: true }),
+    commands = report.graph
+      .filter((entry) => entry.owner === model.name)
+      .flatMap((entry) => entry.passes.flatMap((pass) => pass.commands));
+  assert.equal(commands.length, 6);
+  assert.equal(drawReads, 1, 'a model draw list is read once even when several mesh nodes share it');
+  assert.deepEqual(
+    commands.map((command) => command.entities),
+    Array.from({ length: 6 }, () => meshes.map((mesh) => mesh.id)),
+    'each mesh is listed once even when two primitives share its vertex buffer',
+  );
 });
 
 test("works under Stats (draw counts agree) and the panel lists passes and selects a draw's mesh", async (t) => {

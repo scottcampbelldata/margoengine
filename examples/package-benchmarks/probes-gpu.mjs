@@ -583,7 +583,7 @@ const report = {
   }
 }
 {
-  const { context, page, shot, bake, pageErrors } = await open('env');
+  const { context, page: _page, shot, bake, pageErrors } = await open('env');
   try {
     const b = await bake({ reflection: false, volumeResolution: 64 });
     const envSH = Array.from({ length: 9 }, (_, k) => [0, 1, 2].map((ch) => b.envSH[k * 3 + ch])),

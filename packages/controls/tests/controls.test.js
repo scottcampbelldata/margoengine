@@ -916,12 +916,29 @@ test('controls built from an engine update before each render and are disposed w
   assert.equal(canvas.listenerCount, 0, 'engine dispose disposes controls');
 });
 
-test('Fly Shift preserves configured speed and remains slow until both Shift keys release',()=>{
- const c=camera(),el=new FakeElement(),control=new FlyControls(c,el,{keyTarget:el});control.movementSpeed=2;control.movementSpeedMultiplier=3;
- try{
-  el.dispatch('keydown',{code:'KeyW'});control.update(1);close(c.position[2],4,1e-9);
-  el.dispatch('keydown',{code:'ShiftLeft'});el.dispatch('keydown',{code:'ShiftRight'});assert.equal(control.movementSpeedMultiplier,3);control.update(1);close(c.position[2],3.4,1e-9);
-  el.dispatch('keyup',{code:'ShiftLeft'});control.update(1);close(c.position[2],2.8,1e-9);
-  el.dispatch('keyup',{code:'ShiftRight'});control.update(0.1);close(c.position[2],2.2,1e-9);assert.equal(control.movementSpeedMultiplier,3);
- }finally{control.dispose();}
+test('Fly Shift preserves configured speed and remains slow until both Shift keys release', () => {
+  const c = camera(),
+    el = new FakeElement(),
+    control = new FlyControls(c, el, { keyTarget: el });
+  control.movementSpeed = 2;
+  control.movementSpeedMultiplier = 3;
+  try {
+    el.dispatch('keydown', { code: 'KeyW' });
+    control.update(1);
+    close(c.position[2], 4, 1e-9);
+    el.dispatch('keydown', { code: 'ShiftLeft' });
+    el.dispatch('keydown', { code: 'ShiftRight' });
+    assert.equal(control.movementSpeedMultiplier, 3);
+    control.update(1);
+    close(c.position[2], 3.4, 1e-9);
+    el.dispatch('keyup', { code: 'ShiftLeft' });
+    control.update(1);
+    close(c.position[2], 2.8, 1e-9);
+    el.dispatch('keyup', { code: 'ShiftRight' });
+    control.update(0.1);
+    close(c.position[2], 2.2, 1e-9);
+    assert.equal(control.movementSpeedMultiplier, 3);
+  } finally {
+    control.dispose();
+  }
 });

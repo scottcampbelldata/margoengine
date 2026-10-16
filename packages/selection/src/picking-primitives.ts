@@ -1,4 +1,4 @@
-import { type Engine, type Mesh, type PassContext } from '@margoengine/core/extension';
+import type { Engine, Mesh, PassContext } from '@margoengine/core/extension';
 import type { Mesh as MeshHandle } from '@margoengine/core';
 import { meshTriangles } from '../../shared/mesh-source.js';
 

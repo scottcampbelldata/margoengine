@@ -36,10 +36,13 @@ export async function textureBrowserChecks(page) {
     const doc = structuredClone(fixture.doc);
     // Affine interpolation and fragment transforms can straddle a nearest-texel boundary.
     // Use a continuous marker for strict UV parity; identity and alpha-caster probes retain nearest sampling.
-    if (continuous) for (const sampler of doc.samplers ?? []) Object.assign(sampler, { magFilter: 9729, minFilter: 9729 });
+    if (continuous)
+      for (const sampler of doc.samplers ?? []) Object.assign(sampler, { magFilter: 9729, minFilter: 9729 });
     return {
       doc,
-      buffers: fixture.buffers.map((buffer) => [...new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength)]),
+      buffers: fixture.buffers.map((buffer) => [
+        ...new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength),
+      ]),
     };
   };
   const ordinary = textureQuad(),

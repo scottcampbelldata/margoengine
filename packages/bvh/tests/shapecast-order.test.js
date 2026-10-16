@@ -109,16 +109,34 @@ test('shapecast preserves scored callback order, containment and callback-local 
 });
 
 test('intersectsBVH preserves pending pairs when callbacks issue nested BVH queries', () => {
-  const a = fourLeafTree(), b = fourLeafTree(), pairs = [];
-  assert.equal(a.intersectsBVH(b, undefined, (faceA, faceB) => {
-    pairs.push([faceA, faceB]);
-    assert.equal(a.raycastFirst({ origin: [-2.9, 0.1, 2], direction: [0, 0, -1] }).faceIndex, 0);
-    assert.equal(b.closestPointToPoint([3.1, 0.1, 2]).faceIndex, 3);
-    let nestedPairs = 0;
-    assert.equal(b.intersectsBVH(a, undefined, () => { nestedPairs++; }), true);
-    assert.equal(nestedPairs, 4);
-  }), true);
-  assert.deepEqual(pairs.sort((x, y) => x[0] - y[0]), [[0, 0], [1, 1], [2, 2], [3, 3]]);
+  const a = fourLeafTree(),
+    b = fourLeafTree(),
+    pairs = [];
+  assert.equal(
+    a.intersectsBVH(b, undefined, (faceA, faceB) => {
+      pairs.push([faceA, faceB]);
+      assert.equal(a.raycastFirst({ origin: [-2.9, 0.1, 2], direction: [0, 0, -1] }).faceIndex, 0);
+      assert.equal(b.closestPointToPoint([3.1, 0.1, 2]).faceIndex, 3);
+      let nestedPairs = 0;
+      assert.equal(
+        b.intersectsBVH(a, undefined, () => {
+          nestedPairs++;
+        }),
+        true,
+      );
+      assert.equal(nestedPairs, 4);
+    }),
+    true,
+  );
+  assert.deepEqual(
+    pairs.sort((x, y) => x[0] - y[0]),
+    [
+      [0, 0],
+      [1, 1],
+      [2, 2],
+      [3, 3],
+    ],
+  );
 });
 
 test('shapecast range and triangle stops preserve their first visited node and skip later callbacks', () => {

@@ -1,6 +1,6 @@
 // Native reader for USD Crate (.usdc) layers 0.4-0.12: TOC, tokens, strings, fields, field sets, paths and specs,
 // with TfFastCompression (chunked LZ4 blocks) and Usd integer coding. Output matches the USDA spec map shape.
-export type Specs = Record<string, { specType: number; fields: Record<string, any> }>;
+export type Specs = Record<string, { specType: number; fields: Record<string, unknown> }>;
 function fail(message: string): never {
   throw new Error('USD: ' + message);
 }
@@ -259,18 +259,18 @@ export function parseCrate(data: Uint8Array, maxBytes: number, maxDepth = 64): S
     }
     return out;
   }
-  const listOp = (item: () => any) => {
+  const listOp = <T>(item: () => T) => {
     const header = data[take(1)],
-      lists: any[][] = [];
+      lists: (T[] | undefined)[] = [];
     // Stored as explicit, added, prepended, appended, deleted, ordered; header bits 1, 2, 4, 32, 64, 8, 16.
-    for (const bit of [2, 4, 32, 64, 8, 16]) lists.push(header & bit ? repeat(u64(), item) : (undefined as any));
+    for (const bit of [2, 4, 32, 64, 8, 16]) lists.push(header & bit ? repeat(u64(), item) : undefined);
     const [explicit, added, prepended, appended, deleted] = lists,
       removed = new Set(deleted);
     return header & 1
       ? (explicit ?? [])
       : [...(prepended ?? []), ...(appended ?? []), ...(added ?? [])].filter((v) => !removed.has(v));
   };
-  function value(rep: bigint): any {
+  function value(rep: bigint): unknown {
     const type = Number((rep >> 48n) & 0xffn),
       array = !!((rep >> 63n) & 1n),
       inline = !!((rep >> 62n) & 1n),
@@ -351,7 +351,7 @@ export function parseCrate(data: Uint8Array, maxBytes: number, maxDepth = 64): S
   ];
   for (let i = 0; i < specCount; i++) {
     // Null prototype: field names are tokens from the file (a `__proto__` token swapped a plain object's prototype).
-    const fields: Record<string, any> = Object.create(null);
+    const fields: Record<string, unknown> = Object.create(null);
     for (let f = specSets[i]; ; f++) {
       if (!(f >= 0 && f < fieldSets.length)) fail('field set outside table');
       const field = fieldSets[f];

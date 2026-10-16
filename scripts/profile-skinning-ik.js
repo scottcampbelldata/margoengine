@@ -220,7 +220,8 @@ const metrics = async () =>
   JSON.parse(
     (
       await cdp.send('Runtime.evaluate', {
-        expression: "document.querySelector('#viewport').dataset.metrics ?? document.querySelector('#viewport').readWorkshopDiagnostics('metrics')",
+        expression:
+          "document.querySelector('#viewport').dataset.metrics ?? document.querySelector('#viewport').readWorkshopDiagnostics('metrics')",
         returnByValue: true,
       })
     ).result.value,
@@ -259,7 +260,9 @@ function allocationSummary(profile) {
         entry.estimatedInclusiveBytes += node.selfSize;
         ancestors.set(key, entry);
       }
-      const origin = stack.findLast((item) => /\/examples\/|\/packages\/|\/test-results\/|\/assets\/[^/]+\.js/.test(item.url));
+      const origin = stack.findLast((item) =>
+        /\/examples\/|\/packages\/|\/test-results\/|\/assets\/[^/]+\.js/.test(item.url),
+      );
       const path = origin ? new URL(origin.url).pathname : '(browser or profiling harness)';
       sources.set(path, (sources.get(path) ?? 0) + node.selfSize);
     }
@@ -575,9 +578,17 @@ try {
       end = project([0.08, 0.95, 0.025], dragBefore.camera, dragBefore.cameraTarget, bounds);
     await page.mouse.move(start.x, start.y);
     await page.mouse.down();
-    await page.waitForFunction(() => JSON.parse(document.querySelector('#viewport').dataset.metrics ?? document.querySelector('#viewport').readWorkshopDiagnostics('metrics')).dragging, null, {
-      timeout: 3000,
-    });
+    await page.waitForFunction(
+      () =>
+        JSON.parse(
+          document.querySelector('#viewport').dataset.metrics ??
+            document.querySelector('#viewport').readWorkshopDiagnostics('metrics'),
+        ).dragging,
+      null,
+      {
+        timeout: 3000,
+      },
+    );
     await phase(
       'torso-pointer-drag',
       'Actual trusted pointer drag from Behind through the torso and back; idle, moving light and head look off, reflections and auto IK on.',

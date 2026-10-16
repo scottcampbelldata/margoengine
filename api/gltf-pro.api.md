@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
-import { DracoDecoder, KTX2Decoder, TranscodedKTX2Result } from "@margoengine/decoders";
+import { DracoDecodeOptions, KTX2Decoder, TranscodedKTX2Result } from "@margoengine/decoders";
 
 export interface ExtendedPlan {
     readonly slots: readonly number[];
@@ -71,20 +71,7 @@ export interface GLTFCompressedImage {
 
 export interface GLTFDecoderHooks {
     draco?: {
-        decode(data: Uint8Array, options: {
-            attributeIds: Record<string, number>;
-            componentTypes: Record<string, number>;
-            signal?: AbortSignal;
-        }): Promise<{
-            positions?: ArrayLike<number>;
-            normals?: ArrayLike<number>;
-            uvs?: ArrayLike<number>;
-            colors?: ArrayLike<number>;
-            indices?: ArrayLike<number>;
-            attributes?: Record<string, {
-                array: ArrayLike<number>;
-            }>;
-        }>;
+        decode(data: Uint8Array, options: GLTFDracoDecodeOptions): Promise<GLTFDracoGeometry>;
     };
     meshopt?: {
         decodeGltfBuffer(target: Uint8Array, count: number, stride: number, source: Uint8Array, mode: string, filter?: string): void;
@@ -95,17 +82,35 @@ export interface GLTFDecoderHooks {
         }): Promise<GLTFCompressedImage>;
     };
     instancing?: {
-        read(asset: GLTFAsset, extension: any): PBRInstances;
+        read(asset: GLTFAsset, extension: GLTFInstancing): PBRInstances | undefined;
     };
     materials?: GLTFExtendedMaterials;
 }
 
-export type GLTFDocument = Record<string, any>;
+export interface GLTFDocument extends GLTFProperty {
+  asset?: { version: string; generator?: string; [key: string]: unknown };
+  buffers?: GLTFBuffer[];
+  bufferViews?: GLTFBufferView[];
+  accessors?: GLTFAccessor[];
+  meshes?: GLTFMesh[];
+  nodes?: GLTFNode[];
+  scenes?: (GLTFProperty & { nodes?: number[] })[];
+  scene?: number;
+  materials?: GLTFMaterial[];
+  textures?: GLTFTexture[];
+  images?: GLTFImageDefinition[];
+  samplers?: GLTFSampler[];
+  skins?: GLTFSkin[];
+  animations?: GLTFAnimation[];
+  cameras?: GLTFCameraDefinition[];
+  extensionsUsed?: string[];
+  extensionsRequired?: string[];
+}
 
 export interface GLTFExtendedMaterials {
-    parse(extensions: Record<string, any>): {
+    parse(extensions: GLTFExtensions): {
         features: Omit<ExtendedPlan, 'slots'>;
-        maps: unknown[];
+        maps: (GLTFTextureInfo | undefined)[];
         rows: number[];
     } | undefined;
     plan(maps: readonly ({
@@ -201,13 +206,19 @@ export interface PBRLighting {
     output?(color: string): string;
 }
 
-export interface PBRMaterial {
-    [key: string]: any;
+export interface PBRMaterial extends GLTFMaterial {
     base: number[];
     factors: number[];
     emission: number[];
     settings: number[];
-    maps: any[];
+    maps: (GLTFTextureInfo | undefined)[];
+    uvt?: number[];
+    ext?: number[];
+    physical?: number[];
+    extended?: Omit<ExtendedPlan, 'slots'>;
+    tint?: number[];
+    volume?: number[];
+    renderState?: PBRRenderState;
     extension?: MaterialExtension;
     extendedFrame?: boolean;
 }
@@ -313,7 +324,7 @@ export interface PBRPrimitive {
     nodeIndex: number;
     vertices: Float32Array;
     indices: Uint32Array;
-    definition: any;
+    definition: GLTFPrimitive;
     material: PBRMaterial;
     weights: Float32Array;
     targetNames: string[];
@@ -373,7 +384,7 @@ export function parseGLTFAsync(instance: EngineKernel, input: string | object | 
 
 export function parsePreparedPBR(instance: EngineKernel, doc: GLTFAsset['doc'], geometry: readonly (readonly PreparedGeometry[])[], images?: readonly GLTFImage[], { maxNodes }?: Pick<AssetOptions, 'maxNodes'>): PBRModel;
 
-export function textureCoordinates(info: any): {
+export function textureCoordinates(info: Pick<GLTFTextureInfo, 'texCoord' | 'extensions'>): {
     texCoord: 0 | 1;
     transform?: Float32Array;
 };
@@ -404,11 +415,249 @@ type Context = Extract<PassContext, {
     backend: 'webgpu';
 }>;
 
+interface GLTFAccessor extends GLTFProperty {
+  bufferView?: number;
+  byteOffset?: number;
+  componentType: number;
+  count: number;
+  type: string;
+  normalized?: boolean;
+  min?: number[];
+  max?: number[];
+  sparse?: {
+    count: number;
+    indices: { bufferView: number; byteOffset?: number; componentType: number };
+    values: { bufferView: number; byteOffset?: number };
+  };
+}
+
+interface GLTFAnimation extends GLTFProperty {
+  samplers: { input: number; output: number; interpolation?: string }[];
+  channels: { sampler: number; target: { node?: number; path: string } }[];
+}
+
+interface GLTFBuffer extends GLTFProperty<GLTFBufferExtensions> {
+  byteLength: number;
+  uri?: string;
+}
+
+interface GLTFBufferExtensions {
+  [key: string]: unknown;
+  EXT_meshopt_compression?: { fallback?: boolean };
+}
+
+interface GLTFBufferView extends GLTFProperty {
+  buffer: number;
+  byteLength: number;
+  byteOffset?: number;
+  byteStride?: number;
+  target?: number;
+}
+
+interface GLTFCameraDefinition extends GLTFProperty {
+  type: 'perspective' | 'orthographic';
+  perspective?: { yfov: number; znear: number; zfar?: number; aspectRatio?: number };
+  orthographic?: { xmag: number; ymag: number; znear: number; zfar: number };
+}
+
+interface GLTFDracoDecodeOptions extends DracoDecodeOptions {
+    attributeIds: Record<string, number>;
+    componentTypes: Record<string, number>;
+}
+
+interface GLTFDracoGeometry {
+    vertexCount?: number;
+    positions?: ArrayLike<number>;
+    normals?: ArrayLike<number>;
+    uvs?: ArrayLike<number>;
+    colors?: ArrayLike<number>;
+    indices?: ArrayLike<number>;
+    attributes?: Record<string, {
+        array: ArrayLike<number>;
+        itemSize?: number;
+        componentType?: number;
+    }>;
+}
+
+interface GLTFExtensions {
+  [key: string]: unknown;
+  KHR_draco_mesh_compression?: { bufferView: number; attributes: Record<string, number> };
+  EXT_meshopt_compression?: GLTFMeshopt;
+  KHR_meshopt_compression?: GLTFMeshopt;
+  KHR_texture_basisu?: { source: number };
+  EXT_texture_webp?: { source: number };
+  EXT_texture_avif?: { source: number };
+  KHR_texture_transform?: GLTFTextureTransform;
+  EXT_mesh_gpu_instancing?: GLTFInstancing;
+  KHR_lights_punctual?: { light?: number; lights?: GLTFLightDefinition[] };
+  KHR_materials_variants?: { variants?: { name: string }[]; mappings?: { material: number; variants: number[] }[] };
+  KHR_materials_unlit?: object;
+  KHR_materials_emissive_strength?: { emissiveStrength?: number };
+  KHR_materials_ior?: { ior?: number };
+  KHR_materials_clearcoat?: {
+    clearcoatFactor?: number;
+    clearcoatRoughnessFactor?: number;
+    clearcoatTexture?: GLTFTextureInfo;
+    clearcoatRoughnessTexture?: GLTFTextureInfo;
+    clearcoatNormalTexture?: GLTFTextureInfo;
+  };
+  KHR_materials_transmission?: { transmissionFactor?: number; transmissionTexture?: GLTFTextureInfo };
+  KHR_materials_volume?: {
+    thicknessFactor?: number;
+    thicknessTexture?: GLTFTextureInfo;
+    attenuationDistance?: number;
+    attenuationColor?: number[];
+  };
+  KHR_materials_sheen?: {
+    sheenColorFactor?: number[];
+    sheenRoughnessFactor?: number;
+    sheenColorTexture?: GLTFTextureInfo;
+    sheenRoughnessTexture?: GLTFTextureInfo;
+  };
+  KHR_materials_specular?: {
+    specularFactor?: number;
+    specularColorFactor?: number[];
+    specularTexture?: GLTFTextureInfo;
+    specularColorTexture?: GLTFTextureInfo;
+  };
+  KHR_materials_iridescence?: {
+    iridescenceFactor?: number;
+    iridescenceIor?: number;
+    iridescenceThicknessMinimum?: number;
+    iridescenceThicknessMaximum?: number;
+    iridescenceTexture?: GLTFTextureInfo;
+    iridescenceThicknessTexture?: GLTFTextureInfo;
+  };
+  KHR_materials_anisotropy?: {
+    anisotropyStrength?: number;
+    anisotropyRotation?: number;
+    anisotropyTexture?: GLTFTextureInfo;
+  };
+  KHR_materials_diffuse_transmission?: {
+    diffuseTransmissionFactor?: number;
+    diffuseTransmissionColorFactor?: number[];
+    diffuseTransmissionTexture?: GLTFTextureInfo;
+    diffuseTransmissionColorTexture?: GLTFTextureInfo;
+  };
+}
+
+interface GLTFImageDefinition extends GLTFProperty {
+  uri?: string;
+  mimeType?: string;
+  bufferView?: number;
+}
+
+interface GLTFInstancing {
+  attributes: Record<string, number>;
+}
+
+interface GLTFLightDefinition extends GLTFProperty {
+  type: 'directional' | 'point' | 'spot';
+  color?: number[];
+  intensity?: number;
+  range?: number;
+  spot?: { innerConeAngle?: number; outerConeAngle?: number };
+}
+
 // used as CompressionOptions
 interface GLTFLoadOptions {
     signal?: AbortSignal;
-    draco?: Pick<DracoDecoder, 'decode'>;
+    draco?: {
+        decode(data: Uint8Array, options: import('./asset.js').GLTFDracoDecodeOptions): Promise<import('./asset.js').GLTFDracoGeometry>;
+    };
     ktx2?: Pick<KTX2Decoder, 'transcode'>;
+}
+
+interface GLTFMaterial extends GLTFProperty {
+  pbrMetallicRoughness?: {
+    baseColorFactor?: number[];
+    metallicFactor?: number;
+    roughnessFactor?: number;
+    baseColorTexture?: GLTFTextureInfo;
+    metallicRoughnessTexture?: GLTFTextureInfo;
+  };
+  normalTexture?: GLTFTextureInfo;
+  occlusionTexture?: GLTFTextureInfo;
+  emissiveTexture?: GLTFTextureInfo;
+  emissiveFactor?: number[];
+  alphaMode?: string;
+  alphaCutoff?: number;
+  doubleSided?: boolean;
+}
+
+interface GLTFMesh extends GLTFProperty {
+  primitives: GLTFPrimitive[];
+  weights?: number[];
+}
+
+interface GLTFMeshopt {
+  fallback?: boolean;
+  buffer: number;
+  byteOffset?: number;
+  byteLength: number;
+  byteStride: number;
+  count: number;
+  mode: string;
+  filter?: string;
+}
+
+interface GLTFNode extends GLTFProperty {
+  mesh?: number;
+  skin?: number;
+  camera?: number;
+  children?: number[];
+  matrix?: number[];
+  translation?: number[];
+  rotation?: number[];
+  scale?: number[];
+  weights?: number[];
+}
+
+interface GLTFPrimitive extends GLTFProperty {
+  attributes?: Record<string, number>;
+  indices?: number;
+  material?: number;
+  mode?: number;
+  targets?: Record<string, number>[];
+}
+
+interface GLTFProperty<E extends Record<string, unknown> = GLTFExtensions> {
+  name?: string;
+  extras?: unknown;
+  extensions?: E;
+  [key: string]: unknown;
+}
+
+interface GLTFSampler extends GLTFProperty {
+  wrapS?: number;
+  wrapT?: number;
+  magFilter?: number;
+  minFilter?: number;
+}
+
+interface GLTFSkin extends GLTFProperty {
+  joints: number[];
+  inverseBindMatrices?: number;
+  skeleton?: number;
+}
+
+interface GLTFTexture extends GLTFProperty {
+  source?: number;
+  sampler?: number;
+}
+
+interface GLTFTextureInfo extends GLTFProperty {
+  index: number;
+  texCoord?: number;
+  scale?: number;
+  strength?: number;
+}
+
+interface GLTFTextureTransform {
+  offset?: readonly [number, number];
+  rotation?: number;
+  scale?: readonly [number, number];
+  texCoord?: number;
 }
 
 class PBRInstances {

@@ -11,7 +11,14 @@ function cell(recording, row, name) {
 
 test('recording is opt-in and disabled calls do not inspect controller or event-like inputs', () => {
   const recorder = new ConstraintsInteractionRecorder({ capacity: 3 });
-  const unreadable = new Proxy({}, { get() { throw new Error('Unexpected read'); } });
+  const unreadable = new Proxy(
+    {},
+    {
+      get() {
+        throw new Error('Unexpected read');
+      },
+    },
+  );
   assert.equal(recorder.recording, false);
   assert.equal(recorder.recordFrame(unreadable, NaN), false);
   assert.equal(recorder.mark(unreadable, unreadable, NaN), false);
@@ -70,7 +77,10 @@ test('actual controller trajectories and settings are copied without changing so
   assert.equal(json.overwrittenFrames, 0);
   for (let frame = 0; frame < 180; frame++) {
     assert.equal(json.frames[frame].length, json.columns.length);
-    assert.deepEqual(['handX', 'handY', 'handZ'].map(name => cell(json, frame, name)), expectedHand[frame]);
+    assert.deepEqual(
+      ['handX', 'handY', 'handZ'].map((name) => cell(json, frame, name)),
+      expectedHand[frame],
+    );
     assert.equal(cell(json, frame, 'status'), expectedStatus[frame]);
     assert.equal(cell(json, frame, 'scene'), frame >= 60 ? 1 : 0);
     assert.equal(cell(json, frame, 'clock'), frame >= 60 ? 2 : 0);
@@ -109,14 +119,26 @@ test('bounded rings preserve newest data in chronological order and disclose ove
   assert.equal(recorder.overwrittenFrames, 2);
   recorder.stop(550);
   const json = JSON.parse(recorder.serialize());
-  assert.deepEqual(json.frames.map(row => row[0]), [2, 3, 4]);
-  assert.deepEqual(json.frames.map(row => row[1]), [22, 32, 42]);
+  assert.deepEqual(
+    json.frames.map((row) => row[0]),
+    [2, 3, 4],
+  );
+  assert.deepEqual(
+    json.frames.map((row) => row[1]),
+    [22, 32, 42],
+  );
   assert.equal(json.totalFrames, 5);
   assert.equal(json.overwrittenFrames, 2);
   assert.equal(json.totalActions, 7);
   assert.equal(json.overwrittenActions, 4);
-  assert.deepEqual(json.actions.map(action => action.type), ['pointerdown', 'pointerdown', 'stop']);
-  assert.deepEqual(json.actions.map(action => action.value), [3, 4, 0]);
+  assert.deepEqual(
+    json.actions.map((action) => action.type),
+    ['pointerdown', 'pointerdown', 'stop'],
+  );
+  assert.deepEqual(
+    json.actions.map((action) => action.value),
+    [3, 4, 0],
+  );
   assert.equal(json.durationMs, 50);
 });
 
@@ -155,7 +177,10 @@ test('actions retain only bounded numeric values and fixed setting labels', () =
   assert.throws(() => recorder.mark('gap', Infinity, 5), TypeError);
   recorder.stop(6);
   const json = JSON.parse(recorder.serialize());
-  assert.deepEqual(json.actions.slice(1, -1).map(action => action.value), ['mixed', 'fixed60', true, 0.008]);
+  assert.deepEqual(
+    json.actions.slice(1, -1).map((action) => action.value),
+    ['mixed', 'fixed60', true, 0.008],
+  );
   assert.equal(json.totalActions, 6);
 });
 
@@ -183,7 +208,9 @@ test('capacity and timestamps are guarded without corrupting an active recording
     assert.throws(() => new ConstraintsInteractionRecorder({ capacity: invalid }), RangeError);
   assert.throws(() => new ConstraintsInteractionRecorder({ actionCapacity: 8193 }), RangeError);
   const recorder = new ConstraintsInteractionRecorder({ capacity: 3 });
-  assert.throws(() => { recorder.capacity = 1000; }, TypeError);
+  assert.throws(() => {
+    recorder.capacity = 1000;
+  }, TypeError);
   assert.throws(() => recorder.start(NaN), RangeError);
   recorder.start(20);
   assert.equal(recorder.start(100), false);

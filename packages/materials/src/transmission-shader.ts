@@ -1,48 +1,53 @@
-import type {MaterialExtension} from '@margoengine/gltf-pro';
-import type {ClearcoatTextureSlot} from './shader.js';
-import {coordinateExpression} from './coordinates.js';
+import type { MaterialExtension } from '@margoengine/gltf-pro';
+import type { ClearcoatTextureSlot } from './shader.js';
+import { coordinateExpression } from './coordinates.js';
 
 export interface TransmissionShaderTextures {
   /** Snapshot of the opaque scene, in the render attachment's original format. */
-  opaque:number;
-  factor?:ClearcoatTextureSlot;
-  thickness?:ClearcoatTextureSlot;
+  opaque: number;
+  factor?: ClearcoatTextureSlot;
+  thickness?: ClearcoatTextureSlot;
   /** [factor, IOR, thickness, inverse attenuation distance], then [attenuation RGB, 0]. */
-  factorsIndex?:number;
+  factorsIndex?: number;
 }
 /** Compiler-owned expressions evaluated in the extension's surface hook. */
 export interface TransmissionShaderValues {
-  factor:string;
-  ior:string;
-  thickness:string;
-  attenuation:string;
-  inverseDistance:string;
+  factor: string;
+  ior: string;
+  thickness: string;
+  attenuation: string;
+  inverseDistance: string;
 }
 
 /** The output hook composites after the baseline tone map, so the copy is never tone mapped twice. */
-export function transmissionShader(textures:TransmissionShaderTextures,values?:TransmissionShaderValues):Pick<MaterialExtension,'declarations'|'output'> {
-  const index=textures.factorsIndex??0,opaque=`materialTexture${textures.opaque}`;
-  const sample=(slot:ClearcoatTextureSlot)=>{
-    const texture=`materialTexture${slot.index}`,coords=coordinateExpression(slot);
-    if(slot.sampler)return `textureSampleLevel(${texture},materialSampler${slot.index},${coords},0.0)`;
-    const size=`vec2f(textureDimensions(${texture},0))`;
+export function transmissionShader(
+  textures: TransmissionShaderTextures,
+  values?: TransmissionShaderValues,
+): Pick<MaterialExtension, 'declarations' | 'output'> {
+  const index = textures.factorsIndex ?? 0,
+    opaque = `materialTexture${textures.opaque}`;
+  const sample = (slot: ClearcoatTextureSlot) => {
+    const texture = `materialTexture${slot.index}`,
+      coords = coordinateExpression(slot);
+    if (slot.sampler) return `textureSampleLevel(${texture},materialSampler${slot.index},${coords},0.0)`;
+    const size = `vec2f(textureDimensions(${texture},0))`;
     return `textureLoad(${texture},vec2i(clamp(${coords}*${size},vec2f(0),${size}-vec2f(1))),0)`;
   };
   return {
     // The zero-factor branch preserves the complete original return, including alpha.
-    output:`if(${values?values.factor:`materialFactors[${index}].x`}>0.0){return vec4f(materialTransmission(i,s,color,front${values?','+values.factor+','+values.ior+','+values.thickness+','+values.attenuation+','+values.inverseDistance:''}),1.0);}`,
-    declarations:/* wgsl */`
+    output: `if(${values ? values.factor : `materialFactors[${index}].x`}>0.0){return vec4f(materialTransmission(i,s,color,front${values ? ',' + values.factor + ',' + values.ior + ',' + values.thickness + ',' + values.attenuation + ',' + values.inverseDistance : ''}),1.0);}`,
+    declarations: /* wgsl */ `
 fn materialTransmissionLinear(value:vec3f)->vec3f {
   return select(value/12.92,pow((value+0.055)/1.055,vec3f(2.4)),value>vec3f(0.04045));
 }
 fn materialTransmissionEncoded(value:vec3f)->vec3f {
   return select(value*12.92,1.055*pow(max(value,vec3f(0)),vec3f(1.0/2.4))-0.055,value>=vec3f(0.0031308));
 }
-fn materialTransmission(i:Out,s:Surface,color:vec3f,front:bool${values?',materialTransmissionFactor:f32,materialTransmissionIor:f32,materialTransmissionThickness:f32,materialTransmissionAttenuation:vec3f,materialTransmissionInverseDistance:f32':''})->vec3f {
-${values?'  let factors=vec4f(materialTransmissionFactor,materialTransmissionIor,materialTransmissionThickness,materialTransmissionInverseDistance);':'  let factors=materialFactors['+index+'];'}
+fn materialTransmission(i:Out,s:Surface,color:vec3f,front:bool${values ? ',materialTransmissionFactor:f32,materialTransmissionIor:f32,materialTransmissionThickness:f32,materialTransmissionAttenuation:vec3f,materialTransmissionInverseDistance:f32' : ''})->vec3f {
+${values ? '  let factors=vec4f(materialTransmissionFactor,materialTransmissionIor,materialTransmissionThickness,materialTransmissionInverseDistance);' : '  let factors=materialFactors[' + index + '];'}
   // Explicit mip samples do not require derivatives in the beauty output hook.
-  let factor=clamp(factors.x${textures.factor?'*'+sample(textures.factor)+'.r':''},0.0,1.0);
-  let thickness=max(factors.z${textures.thickness?'*'+sample(textures.thickness)+'.g':''},0.0);
+  let factor=clamp(factors.x${textures.factor ? '*' + sample(textures.factor) + '.r' : ''},0.0,1.0);
+  let thickness=max(factors.z${textures.thickness ? '*' + sample(textures.thickness) + '.g' : ''},0.0);
   if(factor<=0.0){return color;}
   let size=vec2f(textureDimensions(${opaque},0));
   var pixel=i.clip.xy;
@@ -77,7 +82,7 @@ ${values?'  let factors=vec4f(materialTransmissionFactor,materialTransmissionIor
     }
   }
   var transmitted=textureLoad(${opaque},vec2i(clamp(pixel,vec2f(0),size-vec2f(1))),0).rgb;
-  let attenuation=${values?'materialTransmissionAttenuation':`materialFactors[${index+1}].rgb`};
+  let attenuation=${values ? 'materialTransmissionAttenuation' : `materialFactors[${index + 1}].rgb`};
   let attenuating=path>0.0&&factors.w>0.0;
   let tint=clamp(s.base.rgb,vec3f(0),vec3f(1));
   // Preserve captured values exactly for a colorless, unattenuated interface.
@@ -92,6 +97,6 @@ ${values?'  let factors=vec4f(materialTransmissionFactor,materialTransmissionIor
   }
   return mix(color,transmitted,factor);
 }
-`
+`,
   };
 }

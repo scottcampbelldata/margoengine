@@ -38,7 +38,7 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
   const need = (n: number) => {
     if (n < 0 || position + n > bytes.length) throw new Error('Invalid EXR: unexpected end of file');
   };
-  const u8 = () => {
+  const _u8 = () => {
     need(1);
     return bytes[position++];
   };

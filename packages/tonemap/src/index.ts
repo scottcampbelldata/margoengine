@@ -101,7 +101,10 @@ export class Tonemap implements EnginePlugin {
     if (
       !this.source &&
       !this.stacked &&
-      (engine.hasPlugin('dof') || engine.hasPlugin('ssao') || engine.hasPlugin('post-processing') || engine.hasPlugin('bloom'))
+      (engine.hasPlugin('dof') ||
+        engine.hasPlugin('ssao') ||
+        engine.hasPlugin('post-processing') ||
+        engine.hasPlugin('bloom'))
     )
       throw new Error('Tonemap needs an explicit HDR source when another effect owns scene capture');
     this.engine = engine;
@@ -163,7 +166,12 @@ export class Tonemap implements EnginePlugin {
   private capture(c: Context): void {
     this.validate();
     if (this.source) return;
-    if (this.engine!.hasPlugin('dof') || this.engine!.hasPlugin('ssao') || this.engine!.hasPlugin('post-processing') || this.engine!.hasPlugin('bloom'))
+    if (
+      this.engine!.hasPlugin('dof') ||
+      this.engine!.hasPlugin('ssao') ||
+      this.engine!.hasPlugin('post-processing') ||
+      this.engine!.hasPlugin('bloom')
+    )
       throw new Error('Tonemap cannot share scene capture without an HDR source');
     this.original = c.color;
     if (

@@ -1,5 +1,11 @@
 import type { Camera, EngineKernel } from '@margoengine/core';
-import { Controls, documentOf, type ControlElement, type EventTargetLike } from './controls.js';
+import {
+  Controls,
+  documentOf,
+  type ControlElement,
+  type EventTargetLike,
+  type InputEventListener,
+} from './controls.js';
 import { EPS, madd, rotateAxis, type V3 } from './math.js';
 import { add, scale } from '@margoengine/math/vec3';
 import { clamp } from '@margoengine/math/mathutils';
@@ -80,7 +86,7 @@ export class FlyControls extends Controls {
       [element, 'contextmenu', this.onMenu],
       [keys, 'keydown', this.onKeyDown],
       [keys, 'keyup', this.onKeyUp],
-    ] as Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
+    ] as Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
   }
   protected override onDisconnect(): void {
     for (const key of Object.keys(this.moveState)) this.moveState[key as keyof typeof this.moveState] = 0;

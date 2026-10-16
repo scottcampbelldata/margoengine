@@ -395,9 +395,7 @@ test('FBX: polygon corner count, triangulation work and the vertex budget bound 
       ),
     );
   };
-  await quick('FBX 4097-gon', () =>
-    assert.rejects(convertFBX(fbx(4097, 1)), /FBX geometry budget exceeded/),
-  );
+  await quick('FBX 4097-gon', () => assert.rejects(convertFBX(fbx(4097, 1)), /FBX geometry budget exceeded/));
   await quick('FBX n-gons', () => assert.rejects(convertFBX(fbx(4096, 30)), /FBX scene work budget exceeded/));
   await quick('FBX faces', () => assert.rejects(convertFBX(fbx(3, 400_000)), /FBX scene allocation budget exceeded/));
   assert.ok((await convertFBX(fbx(4096, 1))).byteLength > 0);

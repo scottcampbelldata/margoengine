@@ -7,14 +7,6 @@
 // bytes on disk are the bytes served; 'bundle' = the app's bundler builds it into its own chunk (a dynamic import, a
 // module worker, a peer package), so it is bundled and minified like entry-sizes' entries, with `external` left out.
 const core = [/^@margoengine\/core(\/|$)/];
-const parserDecoder = name => ({
-  package: `@margoengine/${name}`,
-  file: `packages/${name}/dist/workers/decoder.worker.js`,
-  label: 'workers/decoder.worker.js',
-  kind: 'Worker dependency',
-  measure: /** @type {'file'} */ ('file'),
-  when: 'Emitted with the parser worker bundle; normal parser jobs do not request it. Compressed glTF decoding is handed back to the owning thread and uses the decoder package worker.',
-});
 
 /** @type {{package: string, file: string, label: string, kind: string, measure: 'file' | 'bundle', external?: RegExp[], when: string}[]} */
 export const LAZY_FILES = [
@@ -149,7 +141,8 @@ export const LAZY_FILES = [
     when: 'With the Basis glue above',
   },
   // Parser workers: one per call, from each package's `/worker` entry (or progressive loading).
-  parserDecoder('gltf-pro'),
+  // Draco and KTX2 are not inside these scripts. A compressed file is handed back to the owning thread,
+  // which uses @margoengine/decoders' own worker and Wasm.
   {
     package: '@margoengine/gltf-pro',
     file: 'packages/gltf-pro/dist/workers/gltf.js',
@@ -167,18 +160,12 @@ export const LAZY_FILES = [
     when: 'Each `loadGLTFProgressive()` (`@margoengine/gltf-pro/progressive`) where `Worker` exists',
   },
   {
-    ...parserDecoder('fbx'),
-  },
-  {
     package: '@margoengine/fbx',
     file: 'packages/fbx/dist/workers/fbx.js',
     label: 'workers/fbx.js',
     kind: 'Worker',
     measure: 'file',
     when: 'Each `loadFBXInWorker()` / `parseFBXInWorker()` (`@margoengine/fbx/worker`)',
-  },
-  {
-    ...parserDecoder('usdz'),
   },
   {
     package: '@margoengine/usdz',

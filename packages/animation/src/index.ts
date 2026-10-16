@@ -138,8 +138,11 @@ export class Animation implements EnginePlugin {
     renderer.playing = false;
     try {
       renderer.setup(model.root.engine, device);
-      return {prepare: renderer.prepareDeformation, dispose: () => renderer.dispose()};
-    } catch (error) { renderer.dispose(); throw error; }
+      return { prepare: renderer.prepareDeformation, dispose: () => renderer.dispose() };
+    } catch (error) {
+      renderer.dispose();
+      throw error;
+    }
   };
   private readonly rest: Array<{
     position: [number, number, number];
@@ -221,7 +224,7 @@ export class Animation implements EnginePlugin {
     for (const primitive of this.model.primitives) {
       const width = widths.get(primitive.nodeIndex);
       if (width !== undefined && width !== primitive.weights.length)
-        throw new RangeError('Morph target counts must match across a node\'s primitives');
+        throw new RangeError("Morph target counts must match across a node's primitives");
       widths.set(primitive.nodeIndex, primitive.weights.length);
     }
     if (
@@ -558,7 +561,8 @@ export class Animation implements EnginePlugin {
     }
   }
   private release(): void {
-    if (this.model.createDeformationRenderer === this.createDeformationRenderer) this.model.createDeformationRenderer = undefined;
+    if (this.model.createDeformationRenderer === this.createDeformationRenderer)
+      this.model.createDeformationRenderer = undefined;
     if (this.model.prepareDeformation === this.prepareDeformation) this.model.prepareDeformation = undefined;
     for (const r of this.resources) {
       if (r.primitive.deformed === r.output) r.primitive.deformed = undefined;

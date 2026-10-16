@@ -34,9 +34,9 @@ export function parseCADAsync(
   if (!(timeoutMs > 0 && timeoutMs <= 2 ** 31 - 1)) throw new RangeError('timeoutMs must be a positive number');
   const engine = engineRuntime(instance);
   if (engine.disposed) throw new Error('Engine is disposed');
-  const workerURL = new URL('./workers/cad-runtime.js?no-inline', import.meta.url),
-    occtURL = new URL('./workers/occt-import-js.js?no-inline', import.meta.url),
-    wasmURL = new URL('./workers/occt-import-js.wasm?no-inline', import.meta.url);
+  const workerURL = new URL(/* @vite-ignore */ './workers/cad-runtime.js?no-inline', import.meta.url),
+    occtURL = new URL(/* @vite-ignore */ './workers/occt-import-js.js?no-inline', import.meta.url),
+    wasmURL = new URL(/* @vite-ignore */ './workers/occt-import-js.wasm?no-inline', import.meta.url);
   return new Promise((resolve, reject) => {
     const worker = new Worker(workerURL),
       created: Mesh[] = [],

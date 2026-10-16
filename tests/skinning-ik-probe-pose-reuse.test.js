@@ -287,7 +287,7 @@ test('actual Animator results match ordinary replay through control modes and su
       animatorCalls++;
       animator.onPreUpdate(0);
     });
-    const rotations = model.nodes.map(() => [0, 0, 0, 1]);
+    const _rotations = model.nodes.map(() => [0, 0, 0, 1]);
     function step(dt) {
       if (!reuse || !probe.skipAnimation(dt)) {
         animatorCalls++;

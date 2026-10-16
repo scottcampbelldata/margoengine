@@ -170,11 +170,11 @@ async function run() {
     engine.dispose();
     previousBinding
       ? Object.defineProperty(globalThis, 'XRGPUBinding', previousBinding)
-      : delete (globalThis as any).XRGPUBinding;
-    previousXR ? Object.defineProperty(navigator, 'xr', previousXR) : delete (navigator as any).xr;
+      : delete (globalThis as { XRGPUBinding?: unknown }).XRGPUBinding;
+    previousXR ? Object.defineProperty(navigator, 'xr', previousXR) : delete (navigator as { xr?: unknown }).xr;
   }
 }
-(globalThis as any).xrVerification = run().then(
+(globalThis as typeof globalThis & { xrVerification: Promise<unknown> }).xrVerification = run().then(
   (result) => ({ result }),
   (error) => ({ error: String(error) }),
 );

@@ -71,7 +71,7 @@ try {
         [-1.0, 0, 2],
         [1.8, 0, 2],
       ],
-      occluders = spots.map((p) =>
+      _occluders = spots.map((p) =>
         e.createMesh().setGeometry(box()).setMaterial(grey).setScale([1.4, 2.4, 0.2]).setPosition(p),
       );
     const selection = Selection.attach(e, { color: [1, 0, 1], width: 3 });

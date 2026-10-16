@@ -456,12 +456,32 @@ test('shelf packer: no overlaps, padding, new pages when full, null past the lim
 // --- SSR safety and object validation ------------------------------------------------------------
 
 test('preloaded faces become render-ready only after joining the canvas font set', async () => {
-  const previous = Object.getOwnPropertyDescriptor(globalThis, 'document'), faces = new Set();
-  let calls = 0, additions = 0;
-  const face = { family: 'Preloaded', weight: '400', style: 'normal', status: 'loaded', async load() { calls++; return this; } };
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: { fonts: {
-    has: value => faces.has(value), add(value) { additions++; faces.add(value); },
-  } } });
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'document'),
+    faces = new Set();
+  let calls = 0,
+    additions = 0;
+  const face = {
+    family: 'Preloaded',
+    weight: '400',
+    style: 'normal',
+    status: 'loaded',
+    async load() {
+      calls++;
+      return this;
+    },
+  };
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: {
+      fonts: {
+        has: (value) => faces.has(value),
+        add(value) {
+          additions++;
+          faces.add(value);
+        },
+      },
+    },
+  });
   try {
     const font = new Font({ face });
     assert.equal(font.loaded, false, 'TextRenderer must wait for registration before rasterizing');

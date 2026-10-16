@@ -1,15 +1,7 @@
 // Classic worker shared by DracoDecoder and KTX2Decoder, prebuilt as one self-contained script (scripts/build.js) so it
 // can load the Emscripten wrappers with importScripts: no eval, so a strict CSP without 'unsafe-eval' covers it. Each
 // Wasm module initializes on its first job.
-import {
-  decodeDraco,
-  dracoTransferables,
-  initBasis,
-  initDraco,
-  transcodeKTX2,
-  type ModuleBox,
-  type ScriptLoader,
-} from './codec.js';
+import { decodeDraco, dracoTransferables, initBasis, initDraco, transcodeKTX2, type ScriptLoader } from './codec.js';
 import type { WorkerRequest } from './protocol.js';
 
 declare const self: {
@@ -18,7 +10,7 @@ declare const self: {
   importScripts(...urls: string[]): void;
 };
 const load: ScriptLoader = async (url) => self.importScripts(url);
-let draco: Promise<ModuleBox> | undefined, basis: Promise<ModuleBox> | undefined;
+let draco: ReturnType<typeof initDraco> | undefined, basis: ReturnType<typeof initBasis> | undefined;
 
 self.onmessage = async ({ data }) => {
   // Jobs come only from this package's pool; anything that is not a job object is ignored.

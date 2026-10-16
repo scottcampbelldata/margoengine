@@ -12,8 +12,8 @@ export const AUTOCAD: NavigationProfile;
 export const BLENDER: NavigationProfile;
 
 export interface ControlElement {
-    addEventListener(type: string, listener: (event: any) => void, options?: AddEventListenerOptions | boolean): void;
-    removeEventListener(type: string, listener: (event: any) => void, options?: EventListenerOptions | boolean): void;
+    addEventListener(type: string, listener: InputEventListener, options?: AddEventListenerOptions | boolean): void;
+    removeEventListener(type: string, listener: InputEventListener, options?: EventListenerOptions | boolean): void;
     readonly clientWidth: number;
     readonly clientHeight: number;
     setPointerCapture?(pointerId: number): void;
@@ -26,7 +26,7 @@ export interface ControlElement {
     style?: {
         touchAction: string;
     };
-    ownerDocument?: any;
+    ownerDocument?: ControlDocument;
     requestPointerLock?(): unknown;
 }
 
@@ -47,7 +47,7 @@ export abstract class Controls extends EventDispatcher {
     constructor(source: Camera | EngineKernel, element?: ControlElement | null, autoUpdate?: boolean);
     protected init(): void;
     protected get kind(): string;
-    protected abstract bind(element: ControlElement): Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
+    protected abstract bind(element: ControlElement): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
     protected onDisconnect(): void;
     connect(element: ControlElement): void;
     disconnect(): void;
@@ -111,8 +111,8 @@ export class EventDispatcher {
 }
 
 export interface EventTargetLike {
-    addEventListener(type: string, listener: (event: any) => void, options?: AddEventListenerOptions | boolean): void;
-    removeEventListener(type: string, listener: (event: any) => void, options?: EventListenerOptions | boolean): void;
+    addEventListener(type: string, listener: InputEventListener, options?: AddEventListenerOptions | boolean): void;
+    removeEventListener(type: string, listener: InputEventListener, options?: EventListenerOptions | boolean): void;
 }
 
 export const FUSION: NavigationProfile;
@@ -145,7 +145,7 @@ export class FirstPersonControls extends Controls {
         keyTarget?: EventTargetLike | null;
     });
     protected get kind(): string;
-    protected bind(element: ControlElement): Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
+    protected bind(element: ControlElement): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
     protected onDisconnect(): void;
     lookAt(x: number | readonly number[], y?: number, z?: number): this;
     get latitude(): number;
@@ -175,7 +175,7 @@ export class FlyControls extends Controls {
         keyTarget?: EventTargetLike | null;
     });
     protected get kind(): string;
-    protected bind(element: ControlElement): Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
+    protected bind(element: ControlElement): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
     protected onDisconnect(): void;
     update(delta?: number): boolean;
 }
@@ -291,7 +291,7 @@ export class OrbitControls extends Controls {
     state: Action;
     constructor(source: Camera | EngineKernel, element?: ControlElement | null);
     protected get kind(): string;
-    protected bind(element: ControlElement): Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
+    protected bind(element: ControlElement): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
     protected onDisconnect(): void;
     listenToKeyEvents(target: EventTargetLike): void;
     stopListenToKeyEvents(): void;
@@ -345,7 +345,7 @@ export class PointerLockControls extends Controls {
         document?: EventTargetLike | null;
     });
     protected get kind(): string;
-    protected bind(element: ControlElement): Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
+    protected bind(element: ControlElement): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
     protected onDisconnect(): void;
     lock(unadjustedMovement?: boolean): void;
     unlock(): void;
@@ -394,7 +394,7 @@ export class TrackballControls extends Controls {
         keyTarget?: EventTargetLike | null;
     });
     protected get kind(): string;
-    protected bind(element: ControlElement): Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
+    protected bind(element: ControlElement): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
     protected onDisconnect(): void;
     saveState(): void;
     reset(): void;
@@ -482,6 +482,17 @@ interface Basis {
     tanHalf: number;
     ortho?: number;
 }
+
+interface ControlDocument extends EventTargetLike {
+    readonly pointerLockElement?: Element | ControlElement | null;
+    exitPointerLock?(): void;
+    createElement?: Document['createElement'];
+    readonly body?: Pick<HTMLElement, 'append'>;
+}
+
+type InputEventListener = {
+    handleEvent(event: Event): void;
+}['handleEvent'];
 
 interface LinePrim {
     kind: 'lines';

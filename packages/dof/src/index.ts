@@ -190,7 +190,11 @@ export class DOF implements EnginePlugin {
     }
     if (!Number.isFinite(v[6])) throw new RangeError('DOF lens scale exceeds float32');
     if (!this.host) {
-      if (this.engine!.hasPlugin('ssao') || this.engine!.hasPlugin('post-processing') || this.engine!.hasPlugin('bloom'))
+      if (
+        this.engine!.hasPlugin('ssao') ||
+        this.engine!.hasPlugin('post-processing') ||
+        this.engine!.hasPlugin('bloom')
+      )
         throw new Error('DOF cannot share scene capture with another post effect');
       this.resize(c);
       this.originalColor = c.color;

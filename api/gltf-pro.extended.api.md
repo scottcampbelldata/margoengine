@@ -11,9 +11,9 @@ export interface ExtendedPlan {
 }
 
 export interface GLTFExtendedMaterials {
-    parse(extensions: Record<string, any>): {
+    parse(extensions: GLTFExtensions): {
         features: Omit<ExtendedPlan, 'slots'>;
-        maps: unknown[];
+        maps: (GLTFTextureInfo | undefined)[];
         rows: number[];
     } | undefined;
     plan(maps: readonly ({
@@ -23,4 +23,112 @@ export interface GLTFExtendedMaterials {
 }
 
 export const extendedMaterials: GLTFExtendedMaterials;
+
+// Not exported from this entry, but used by the exports above:
+
+interface GLTFExtensions {
+  [key: string]: unknown;
+  KHR_draco_mesh_compression?: { bufferView: number; attributes: Record<string, number> };
+  EXT_meshopt_compression?: GLTFMeshopt;
+  KHR_meshopt_compression?: GLTFMeshopt;
+  KHR_texture_basisu?: { source: number };
+  EXT_texture_webp?: { source: number };
+  EXT_texture_avif?: { source: number };
+  KHR_texture_transform?: GLTFTextureTransform;
+  EXT_mesh_gpu_instancing?: GLTFInstancing;
+  KHR_lights_punctual?: { light?: number; lights?: GLTFLightDefinition[] };
+  KHR_materials_variants?: { variants?: { name: string }[]; mappings?: { material: number; variants: number[] }[] };
+  KHR_materials_unlit?: object;
+  KHR_materials_emissive_strength?: { emissiveStrength?: number };
+  KHR_materials_ior?: { ior?: number };
+  KHR_materials_clearcoat?: {
+    clearcoatFactor?: number;
+    clearcoatRoughnessFactor?: number;
+    clearcoatTexture?: GLTFTextureInfo;
+    clearcoatRoughnessTexture?: GLTFTextureInfo;
+    clearcoatNormalTexture?: GLTFTextureInfo;
+  };
+  KHR_materials_transmission?: { transmissionFactor?: number; transmissionTexture?: GLTFTextureInfo };
+  KHR_materials_volume?: {
+    thicknessFactor?: number;
+    thicknessTexture?: GLTFTextureInfo;
+    attenuationDistance?: number;
+    attenuationColor?: number[];
+  };
+  KHR_materials_sheen?: {
+    sheenColorFactor?: number[];
+    sheenRoughnessFactor?: number;
+    sheenColorTexture?: GLTFTextureInfo;
+    sheenRoughnessTexture?: GLTFTextureInfo;
+  };
+  KHR_materials_specular?: {
+    specularFactor?: number;
+    specularColorFactor?: number[];
+    specularTexture?: GLTFTextureInfo;
+    specularColorTexture?: GLTFTextureInfo;
+  };
+  KHR_materials_iridescence?: {
+    iridescenceFactor?: number;
+    iridescenceIor?: number;
+    iridescenceThicknessMinimum?: number;
+    iridescenceThicknessMaximum?: number;
+    iridescenceTexture?: GLTFTextureInfo;
+    iridescenceThicknessTexture?: GLTFTextureInfo;
+  };
+  KHR_materials_anisotropy?: {
+    anisotropyStrength?: number;
+    anisotropyRotation?: number;
+    anisotropyTexture?: GLTFTextureInfo;
+  };
+  KHR_materials_diffuse_transmission?: {
+    diffuseTransmissionFactor?: number;
+    diffuseTransmissionColorFactor?: number[];
+    diffuseTransmissionTexture?: GLTFTextureInfo;
+    diffuseTransmissionColorTexture?: GLTFTextureInfo;
+  };
+}
+
+interface GLTFInstancing {
+  attributes: Record<string, number>;
+}
+
+interface GLTFLightDefinition extends GLTFProperty {
+  type: 'directional' | 'point' | 'spot';
+  color?: number[];
+  intensity?: number;
+  range?: number;
+  spot?: { innerConeAngle?: number; outerConeAngle?: number };
+}
+
+interface GLTFMeshopt {
+  fallback?: boolean;
+  buffer: number;
+  byteOffset?: number;
+  byteLength: number;
+  byteStride: number;
+  count: number;
+  mode: string;
+  filter?: string;
+}
+
+interface GLTFProperty<E extends Record<string, unknown> = GLTFExtensions> {
+  name?: string;
+  extras?: unknown;
+  extensions?: E;
+  [key: string]: unknown;
+}
+
+interface GLTFTextureInfo extends GLTFProperty {
+  index: number;
+  texCoord?: number;
+  scale?: number;
+  strength?: number;
+}
+
+interface GLTFTextureTransform {
+  offset?: readonly [number, number];
+  rotation?: number;
+  scale?: readonly [number, number];
+  texCoord?: number;
+}
 ```

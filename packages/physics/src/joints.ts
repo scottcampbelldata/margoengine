@@ -1,3 +1,5 @@
+import type { ImpulseJoint, JointData, UnitImpulseJoint } from './rapier-types.js';
+import type { RapierModule } from './shapes.js';
 import type { PhysicsBody } from './body.js';
 import { checkVec, quat, vec, type Quat, type Vec3 } from './math.js';
 
@@ -39,8 +41,8 @@ export class PhysicsJoint {
   private removed = false;
   /** @internal */
   constructor(
-    private readonly owner: { readonly rapier: any; removeJoint(joint: PhysicsJoint): void },
-    readonly raw: any,
+    private readonly owner: { readonly rapier: RapierModule; removeJoint(joint: PhysicsJoint): void },
+    readonly raw: ImpulseJoint,
     readonly type: JointType,
     readonly bodyA: PhysicsBody,
     readonly bodyB: PhysicsBody,
@@ -52,11 +54,11 @@ export class PhysicsJoint {
   markRemoved(): void {
     this.removed = true;
   }
-  private unit(): any {
+  private unit(): UnitImpulseJoint {
     if (!this.valid) throw new Error('Joint was removed');
     if (this.type !== 'revolute' && this.type !== 'prismatic')
       throw new TypeError('Limits and motors need a revolute or prismatic joint');
-    return this.raw;
+    return this.raw as UnitImpulseJoint;
   }
   /** Angle (revolute, radians) or translation (prismatic) limits. */
   setLimits(min: number, max: number): this {
@@ -101,7 +103,7 @@ export class PhysicsJoint {
   }
 }
 
-export function createJointData(R: any, options: JointOptions): any {
+export function createJointData(R: RapierModule, options: JointOptions): JointData {
   const anchorA = options.anchorA ?? [0, 0, 0],
     anchorB = options.anchorB ?? [0, 0, 0];
   checkVec(anchorA, 'anchorA');

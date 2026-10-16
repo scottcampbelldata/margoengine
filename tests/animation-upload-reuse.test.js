@@ -12,7 +12,9 @@ test('upload eligibility reads real typed-array backing stores despite own or su
   // Exercise the actual internal predicate with real typed arrays instead.
   const source = await readFile(new URL('../packages/animation/src/weight-buffer.ts', import.meta.url), 'utf8'),
     emitted = await transformWithOxc(source, 'weight-buffer.ts', { target: 'es2022' }),
-    { ordinaryWeightBuffer } = await import('data:text/javascript;base64,' + Buffer.from(emitted.code).toString('base64'));
+    { ordinaryWeightBuffer } = await import(
+      'data:text/javascript;base64,' + Buffer.from(emitted.code).toString('base64')
+    );
   let propertyReads = 0;
   class DisguisedWeights extends Float32Array {
     get buffer() {
@@ -38,7 +40,11 @@ test('upload eligibility reads real typed-array backing stores despite own or su
   }
   assert.equal(propertyReads, 0, 'eligibility does not invoke caller-owned accessors');
   const ordinary = new Float32Array(1);
-  Object.defineProperty(ordinary, 'buffer', { get: () => { throw new Error('not the backing store'); } });
+  Object.defineProperty(ordinary, 'buffer', {
+    get: () => {
+      throw new Error('not the backing store');
+    },
+  });
   assert.equal(ordinaryWeightBuffer(ordinary), true);
 });
 

@@ -29,8 +29,8 @@ export function prepareAsset(asset: GLTFAsset, images: GLTFImage[]): PreparedGLT
         return null;
       }
     };
-  const geometry = (doc.meshes ?? []).map((mesh: any) =>
-    (Array.isArray(mesh?.primitives) ? mesh.primitives : []).map((p: any) => attempt(() => packPrimitive(asset, p))),
+  const geometry = (doc.meshes ?? []).map((mesh) =>
+    (Array.isArray(mesh?.primitives) ? mesh.primitives : []).map((p) => attempt(() => packPrimitive(asset, p))),
   );
   decodeExtras(asset);
   // GLTFAsset's accessor cache is private to the package; the worker entry seeds a fresh asset's cache with it.
@@ -53,7 +53,25 @@ export async function prepareGLTF(
   maxNodes?: number,
   allowedURLs?: readonly string[],
 ): Promise<PreparedGLTF> {
-  const { asset, images, deferred, baseURL, downloadedBytes } = await loadAsset(url, { buffers, maxDownloadBytes, maxNodes, allowedURLs }, input, {}, true);
-  if(deferred) return {doc:asset.doc,buffers:asset.buffers,images,geometry:[],accessors:[],maxDownloadBytes:asset.maxBytes,maxNodes:asset.maxNodes,deferred,baseURL,downloadedBytes};
+  const { asset, images, deferred, baseURL, downloadedBytes } = await loadAsset(
+    url,
+    { buffers, maxDownloadBytes, maxNodes, allowedURLs },
+    input,
+    {},
+    true,
+  );
+  if (deferred)
+    return {
+      doc: asset.doc,
+      buffers: asset.buffers,
+      images,
+      geometry: [],
+      accessors: [],
+      maxDownloadBytes: asset.maxBytes,
+      maxNodes: asset.maxNodes,
+      deferred,
+      baseURL,
+      downloadedBytes,
+    };
   return prepareAsset(asset, images);
 }

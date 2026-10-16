@@ -196,7 +196,9 @@ export function cylinderGeometry(
         theta = u * thetaLength + thetaStart,
         s = Math.sin(theta),
         c = Math.cos(theta);
-      row.push(b.vertexN(radius * s, -v * height + half, radius * c, s * radialNormal, slope, c * radialNormal, u, 1 - v));
+      row.push(
+        b.vertexN(radius * s, -v * height + half, radius * c, s * radialNormal, slope, c * radialNormal, u, 1 - v),
+      );
     }
     rows.push(row);
   }

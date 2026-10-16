@@ -1,5 +1,6 @@
 // The glTF container shared by the scene writer (gltf.ts) and the model writer (model.ts): one binary buffer of
 // 4-byte-aligned bufferViews, accessors with exact Float32 bounds, and GLB / .gltf packaging. No engine imports.
+import type { GLTFDocument } from '../../shared/gltf.js';
 
 export interface GLTFJsonResult {
   /** The glTF document object. */
@@ -54,11 +55,13 @@ const order = [
 export class Bin {
   readonly parts: Uint8Array[] = [];
   length = 0;
-  readonly json: Record<string, any> = {};
+  // Lists are installed by list() before they are read by the writer.
+  readonly json = {} as Required<GLTFDocument>;
 
   list(key: string, value: unknown): number {
-    (this.json[key] ??= []).push(value);
-    return this.json[key].length - 1;
+    const list = (this.json[key] ??= []) as unknown[];
+    list.push(value);
+    return list.length - 1;
   }
 
   /** Appends bytes on a 4-byte boundary and returns a bufferView index. */
@@ -104,7 +107,7 @@ export class Bin {
   /** Puts the top-level keys in a stable order and records the buffer length. */
   finish(): void {
     if (this.length) this.json.buffers = [{ byteLength: this.length }];
-    const sorted: Record<string, any> = {};
+    const sorted: Record<string, unknown> = {};
     for (const key of order) if (this.json[key] !== undefined) sorted[key] = this.json[key];
     for (const key of Object.keys(this.json)) delete this.json[key];
     Object.assign(this.json, sorted);

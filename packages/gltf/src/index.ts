@@ -7,13 +7,13 @@ import { parseJSON } from '../../shared/json.js';
 import { assetURL } from '../../shared/asset-url.js';
 
 const limit = 64 * 1024 * 1024;
-type Document = Record<string, any>;
+import type { GLTFDocument as Document, GLTFNode } from '../../shared/gltf.js';
 const integer = (value: unknown, label: string, min = 0): number => {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min)
     throw new TypeError(`Invalid glTF ${label}`);
   return value;
 };
-const entry = (array: any[], id: unknown, label: string): any => {
+const entry = <T>(array: readonly T[] | undefined, id: unknown, label: string): T => {
   const value = array?.[integer(id, label)];
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError(`Missing glTF ${label}`);
   return value;
@@ -27,7 +27,7 @@ function container(input: string | object | ArrayBuffer | ArrayBufferView): { do
   if (typeof input === 'string') {
     if (input.length > limit || new TextEncoder().encode(input).length > limit)
       throw new RangeError('glTF JSON exceeds 64 MiB');
-    return { doc: parseJSON(input) };
+    return { doc: parseJSON<Document>(input) };
   }
   if (!(input instanceof ArrayBuffer) && !ArrayBuffer.isView(input)) return { doc: input as Document };
   const data = bytes(input),
@@ -53,7 +53,7 @@ function container(input: string | object | ArrayBuffer | ArrayBufferView): { do
     if (offset === 20 && type !== 0x4e4f534a) throw new TypeError('GLB JSON must be first');
     if (type === 0x4e4f534a) {
       if (doc) throw new TypeError('Duplicate GLB JSON');
-      doc = parseJSON(new TextDecoder('utf-8', { fatal: true }).decode(chunk));
+      doc = parseJSON<Document>(new TextDecoder('utf-8', { fatal: true }).decode(chunk));
     } else if (type === 0x004e4942) {
       if (binary) throw new TypeError('Duplicate GLB binary');
       binary = chunk;
@@ -90,7 +90,7 @@ function validate(doc: Document, maxNodes?: number): void {
     );
   checkCount('Too many glTF nodes', doc.nodes?.length ?? 0, nodeLimit, 'maxNodes');
 }
-function transform(mesh: Mesh, node: any): void {
+function transform(mesh: Mesh, node: GLTFNode): void {
   if (node.matrix !== undefined) {
     if (
       node.translation !== undefined ||
@@ -136,8 +136,8 @@ function transform(mesh: Mesh, node: any): void {
     mesh.setPosition([m[12], m[13], m[14]]).setScale(scale).setQuaternion(q);
   } else {
     mesh
-      .setPosition(node.translation ?? [0, 0, 0])
-      .setScale(node.scale ?? [1, 1, 1])
+      .setPosition((node.translation ?? [0, 0, 0]) as [number, number, number])
+      .setScale((node.scale ?? [1, 1, 1]) as [number, number, number])
       .setQuaternion(node.rotation ?? [0, 0, 0, 1]);
   }
 }
@@ -169,7 +169,7 @@ export function parseGLTF(
   validate(doc, maxNodes);
   let total = 0,
     vertices = 0;
-  const buffers = (doc.buffers ?? []).map((def: any, i: number) => {
+  const buffers = (doc.buffers ?? []).map((def, i) => {
     const length = integer(def.byteLength, 'buffer length', 1);
     const data = suppliedBuffers[i]
       ? bytes(suppliedBuffers[i])
@@ -228,7 +228,7 @@ export function parseGLTF(
       }
     return out;
   };
-  const materials = (doc.materials ?? []).map((m: any) => {
+  const materials = (doc.materials ?? []).map((m) => {
     const p = m.pbrMetallicRoughness ?? {},
       color = p.baseColorFactor ?? [1, 1, 1, 1];
     if (
@@ -252,9 +252,9 @@ export function parseGLTF(
       doubleSided: m.doubleSided ?? false,
     });
   });
-  const definitions = (doc.meshes ?? []).map((mesh: any) => {
+  const definitions = (doc.meshes ?? []).map((mesh) => {
     if (!Array.isArray(mesh.primitives) || !mesh.primitives.length) throw new TypeError('Missing glTF primitives');
-    return mesh.primitives.map((p: any) => {
+    return mesh.primitives.map((p) => {
       if (
         (p.mode ?? 4) !== 4 ||
         p.targets ||
@@ -312,7 +312,7 @@ export function parseGLTF(
   });
   const nodes = doc.nodes ?? [],
     parents = new Int32Array(nodes.length).fill(-1);
-  nodes.forEach((node: any, id: number) => {
+  nodes.forEach((node: GLTFNode, id: number) => {
     if (!node || node.skin !== undefined || node.camera !== undefined || node.extensions)
       throw new Error('Unsupported glTF node');
     if (node.children !== undefined && !Array.isArray(node.children)) throw new TypeError('Invalid glTF children');
@@ -391,7 +391,8 @@ export async function loadGLTF(
     return data;
   }
   const data = await fetchBytes(base, true),
-    glb = data.length >= 4 && new DataView(data.buffer, data.byteOffset, data.byteLength).getUint32(0, true) === 0x46546c67,
+    glb =
+      data.length >= 4 && new DataView(data.buffer, data.byteOffset, data.byteLength).getUint32(0, true) === 0x46546c67,
     { doc, binary } = container(glb ? data : new TextDecoder('utf-8', { fatal: true }).decode(data));
   validate(doc, maxNodes);
   const buffers = [];

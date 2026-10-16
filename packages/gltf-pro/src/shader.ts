@@ -1,5 +1,5 @@
-import {acesShader} from '../../shared/aces.js';
-export const pbrShader = /* wgsl */`
+import { acesShader } from '../../shared/aces.js';
+export const pbrShader = /* wgsl */ `
 ${acesShader}
 struct Frame {
   camera:mat4x4f, model:mat4x4f, normalMatrix:mat4x4f, view:mat4x4f,

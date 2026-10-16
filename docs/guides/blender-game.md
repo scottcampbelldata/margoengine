@@ -193,7 +193,10 @@ const level = await loadGLTF(engine, '/assets/level.glb');
 
 // Static triangle colliders for the whole level in one call: a body per Blender object (hits then report that
 // object's node), every node, instance and scale transform applied, objects tagged collider = 0 left out.
-physics.addModel(level, {type: 'fixed', perNode: true, filter: primitive => level.asset.doc.nodes[primitive.nodeIndex].extras?.collider !== 0});
+physics.addModel(level, {type: 'fixed', perNode: true, filter: primitive => {
+  const extras = level.asset.doc.nodes?.[primitive.nodeIndex]?.extras;
+  return !(extras && typeof extras === 'object' && 'collider' in extras && extras.collider === 0);
+}});
 // A loose prop exported as its own file: dynamic, a convex hull per primitive, moving as one body.
 const crate = await loadGLTF(engine, '/assets/crate.glb');
 crate.root.setPosition([2, 3, 0]);

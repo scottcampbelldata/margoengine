@@ -466,8 +466,28 @@ test('orthographic: renderer drops CSS perspective, hides objects before the nea
   assert.equal(viewer.style.perspective, `${Math.round(cssPerspective(60, 400) * 100) / 100}px`, 'back to perspective');
 });
 
-test('LabelRenderer direct disposal unregisters its pass and allows a replacement',()=>{
- const engine=fakeEngine(Camera),plugins=new Map();engine.hasPlugin=name=>plugins.has(name);engine.removePlugin=name=>{const plugin=plugins.get(name);plugins.delete(name);engine.passes.length=0;plugin?.dispose();};
- const renderer=new LabelRenderer();renderer.setup(engine);renderer.registerPasses(engine.graph);plugins.set(renderer.name,renderer);renderer.dispose();
- assert.equal(plugins.size,0);assert.equal(engine.passes.length,0);const replacement=new LabelRenderer();replacement.setup(engine);replacement.registerPasses(engine.graph);plugins.set(replacement.name,replacement);engine.frame();replacement.dispose();assert.equal(plugins.size,0);
+test('LabelRenderer direct disposal unregisters its pass and allows a replacement', () => {
+  const engine = fakeEngine(Camera),
+    plugins = new Map();
+  engine.hasPlugin = (name) => plugins.has(name);
+  engine.removePlugin = (name) => {
+    const plugin = plugins.get(name);
+    plugins.delete(name);
+    engine.passes.length = 0;
+    plugin?.dispose();
+  };
+  const renderer = new LabelRenderer();
+  renderer.setup(engine);
+  renderer.registerPasses(engine.graph);
+  plugins.set(renderer.name, renderer);
+  renderer.dispose();
+  assert.equal(plugins.size, 0);
+  assert.equal(engine.passes.length, 0);
+  const replacement = new LabelRenderer();
+  replacement.setup(engine);
+  replacement.registerPasses(engine.graph);
+  plugins.set(replacement.name, replacement);
+  engine.frame();
+  replacement.dispose();
+  assert.equal(plugins.size, 0);
 });

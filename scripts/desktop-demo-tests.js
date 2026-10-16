@@ -225,7 +225,7 @@ async function canvasImage(page, path) {
 
 async function checkControls(page, demo) {
   if (demo.range) {
-    const [inputId, outputId] = demo.range;
+    const [_inputId, _outputId] = demo.range;
     const change = await page.evaluate(([inputId, outputId]) => {
       const input = document.getElementById(inputId),
         output = document.getElementById(outputId);

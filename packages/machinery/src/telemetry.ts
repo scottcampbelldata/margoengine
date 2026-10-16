@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin } from '@margoengine/core/extension';
-import { Kinematics } from './kinematics.js';
+import type { Kinematics } from './kinematics.js';
 import { machineryMemory } from './runtime.js';
 export interface TelemetryOptions {
   delay?: number;

@@ -75,11 +75,22 @@ function defaults(device: GPUDevice) {
   shared.set(device, d);
   return d;
 }
-const dimensions = (s: any): [number, number] => [
+interface ImageDimensions {
+  videoWidth?: number;
+  videoHeight?: number;
+  displayWidth?: number;
+  displayHeight?: number;
+  naturalWidth?: number;
+  naturalHeight?: number;
+  width?: number;
+  height?: number;
+}
+const dimensions = (s: ImageDimensions): [number, number] => [
   s.videoWidth ?? s.displayWidth ?? s.naturalWidth ?? s.width ?? 0,
   s.videoHeight ?? s.displayHeight ?? s.naturalHeight ?? s.height ?? 0,
 ];
-const raw = (s: any): s is RawImage => s?.data instanceof Uint8Array || s?.data instanceof Uint8ClampedArray;
+const raw = (s: unknown): s is RawImage =>
+  !!s && typeof s === 'object' && 'data' in s && (s.data instanceof Uint8Array || s.data instanceof Uint8ClampedArray);
 /** A shareable texture. GPU copies are made lazily per device; video sources re-upload whenever `currentTime` changes, other sources on `update()`. */
 export class Texture {
   private version = 0;
@@ -137,7 +148,7 @@ export class Texture {
   }
   /** @internal View and sampler for a material slot, or undefined while the source has no pixels (unloaded image or video). */
   bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined {
-    const s = this.source as any,
+    const s = this.source,
       o = this.options,
       [w, h] = dimensions(s),
       video = this.isVideo;
@@ -163,7 +174,8 @@ export class Texture {
       this.slots.set(device, slot);
       device.lost?.then(() => this.slots.delete(device));
     }
-    if (!w || !h || s.readyState < 2) return slot.texture ? [this.view(slot, srgb), slot.sampler] : undefined;
+    if (!w || !h || ('readyState' in s && s.readyState < 2))
+      return slot.texture ? [this.view(slot, srgb), slot.sampler] : undefined;
     if (w > device.limits.maxTextureDimension2D || h > device.limits.maxTextureDimension2D)
       throw new RangeError('Texture exceeds device limit');
     let t = slot.texture;
@@ -181,11 +193,12 @@ export class Texture {
       slot.views.clear();
       slot.version = -1;
     }
-    if (slot.version !== this.version || (video && s.currentTime !== slot.time)) {
+    const currentTime = 'currentTime' in s ? s.currentTime : undefined;
+    if (slot.version !== this.version || (video && currentTime !== slot.time)) {
       if (raw(s)) device.queue.writeTexture({ texture: t }, s.data, { bytesPerRow: w * 4 }, [w, h]);
       else device.queue.copyExternalImageToTexture({ source: s, flipY: o.flipY ?? true }, { texture: t }, [w, h]);
       slot.version = this.version;
-      slot.time = s.currentTime;
+      slot.time = currentTime;
       mipmaps(device, t);
     }
     return [this.view(slot, srgb), slot.sampler];
@@ -787,7 +800,14 @@ export function createMesh(
   };
   const model = new PBRModel(engine, new GLTFAsset(doc, []), [], [[packGeometry(geometry)]]);
   const g = model.primitives[0].material;
-  Object.assign(g, { extendedFrame: true, base: m.color, emission: m.emissive, factors: m.factors, settings: m.settings, uvt: m.uvt });
+  Object.assign(g, {
+    extendedFrame: true,
+    base: m.color,
+    emission: m.emissive,
+    factors: m.factors,
+    settings: m.settings,
+    uvt: m.uvt,
+  });
   // Physical: gltf-pro's factor-only variant (five maps), live arrays, and the tinted-blend constant read every frame.
   if (m.physical) {
     Object.assign(g, { physical: m.physical, ext: m.ext, volume: m.volume, maps: g.maps.slice(0, 5) });
