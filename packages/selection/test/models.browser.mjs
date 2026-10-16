@@ -27,7 +27,7 @@ const outlinePixels = async () => {
 try {
   await page.waitForFunction(() => window.modern);
   const report = await page.evaluate(async () => {
-    const { Engine, box, PbrMaterial } = await import('/packages/core/dist/extension.js'),
+    const { Engine, box, PbrMaterial: _PbrMaterial } = await import('/packages/core/dist/extension.js'),
       { Picking, Selection } = await import('/packages/selection/dist/index.js');
     const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js'),
       { Raycaster } = await import('/packages/bvh/dist/index.js'),

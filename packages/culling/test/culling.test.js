@@ -44,7 +44,7 @@ function harness() {
     },
   };
 }
-const buffer = (h, size, usage) => h.resources.find((r) => r.size === size && r.usage === usage);
+const _buffer = (h, size, usage) => h.resources.find((r) => r.size === size && r.usage === usage);
 
 test('uploads parts once and draws them with compute culling and indirect draws, in original order, without per-frame allocation', () => {
   const h = harness(),

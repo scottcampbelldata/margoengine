@@ -135,8 +135,7 @@ export function writeCrate(specs, options = {}) {
     data = [];
   let offset = 88;
   // Path tree in depth-first order; properties are leaves with negative element tokens.
-  const paths = ['/'],
-    kids = new Map([['/', []]]);
+  const kids = new Map([['/', []]]);
   for (const { path } of specs)
     if (path !== '/') {
       const dot = path.lastIndexOf('.'),

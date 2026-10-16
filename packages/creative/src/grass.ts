@@ -23,7 +23,6 @@ declare const GPUBufferUsage: {
   COPY_DST: number;
 };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
-type Context = Extract<PassContext, { backend: 'webgpu' }>;
 type Variant = {
   near: GPURenderPipeline;
   far: GPURenderPipeline;

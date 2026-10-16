@@ -145,7 +145,7 @@ const harness = {
     await e.gpu!.queue.onSubmittedWorkDone();
     return plane;
   },
-  creative(options: any) {
+  creative(options: ConstructorParameters<typeof PostProcessing>[0]) {
     const e = state.core!,
       post = new PostProcessing(options);
     e.use(post);
@@ -174,4 +174,4 @@ const harness = {
     return p;
   },
 };
-(window as any).modern = harness;
+(window as typeof window & { modern: typeof harness }).modern = harness;

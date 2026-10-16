@@ -66,38 +66,137 @@ test('worker errors keep their type; without Worker the entry falls back to the 
     assert.equal(model.primitives[0].vertices.length, 9 * 20);
   }));
 
-
 test('parser workers defer automatic Draco and KTX2 decoding with transferable source buffers', async () => {
   const compressed = {
-    asset: {version: '2.0'}, buffers: [{byteLength: 4}], bufferViews: [{buffer: 0, byteLength: 4}],
-    accessors: [{componentType: 5126, count: 3, type: 'VEC3'}],
-    meshes: [{primitives: [{attributes: {POSITION: 0}, extensions: {KHR_draco_mesh_compression: {bufferView: 0, attributes: {POSITION: 0}}}}]}], nodes: [{mesh: 0}],
+    asset: { version: '2.0' },
+    buffers: [{ byteLength: 4 }],
+    bufferViews: [{ buffer: 0, byteLength: 4 }],
+    accessors: [{ componentType: 5126, count: 3, type: 'VEC3' }],
+    meshes: [
+      {
+        primitives: [
+          {
+            attributes: { POSITION: 0 },
+            extensions: { KHR_draco_mesh_compression: { bufferView: 0, attributes: { POSITION: 0 } } },
+          },
+        ],
+      },
+    ],
+    nodes: [{ mesh: 0 }],
   };
-  for (const doc of [compressed, {...compressed, meshes: [], nodes: [], textures: [{extensions: {KHR_texture_basisu: {source: 0}}}], images: [{uri: 'normal.ktx2', mimeType: 'image/ktx2'}]}]) {
-    const prepared = await runParseWorker(worker, {url: 'https://example.test/models/model.gltf', input: doc, buffers: [new Uint8Array([1,2,3,4])]});
+  for (const doc of [
+    compressed,
+    {
+      ...compressed,
+      meshes: [],
+      nodes: [],
+      textures: [{ extensions: { KHR_texture_basisu: { source: 0 } } }],
+      images: [{ uri: 'normal.ktx2', mimeType: 'image/ktx2' }],
+    },
+  ]) {
+    const prepared = await runParseWorker(worker, {
+      url: 'https://example.test/models/model.gltf',
+      input: doc,
+      buffers: [new Uint8Array([1, 2, 3, 4])],
+    });
     assert.equal(prepared.deferred, true);
-    assertSameBytes(prepared.buffers[0], new Uint8Array([1,2,3,4]));
+    assertSameBytes(prepared.buffers[0], new Uint8Array([1, 2, 3, 4]));
     assert.equal(prepared.baseURL, 'https://example.test/models/model.gltf');
     assert.deepEqual(prepared.images, []);
   }
 });
 
-
-test('worker loader completes automatic codecs on the owning thread and preserves original buffers', () => headlessModels(async()=>{
-  const saved={Worker:globalThis.Worker,location:globalThis.location}, decode=DracoDecoder.prototype.decode,transcode=KTX2Decoder.prototype.transcode;
-  let parserJobs=0,dracoJobs=0,ktxJobs=0;
-  globalThis.location={href:'https://example.test/models/model.gltf'};
-  globalThis.Worker=class {postMessage(message){parserJobs++;runParseWorker(worker,message).then(result=>this.onmessage?.({data:{result}}),error=>this.onmessage?.({data:{error:{name:error.name,message:error.message}}}));}terminate(){}};
-  DracoDecoder.prototype.decode=async()=>{dracoJobs++;return {vertexCount:3,positions:new Float32Array([0,0,0,1,0,0,0,1,0]),indices:new Uint16Array([0,1,2])};};
-  KTX2Decoder.prototype.transcode=async()=>{ktxJobs++;return {target:'rgba8',format:'rgba8unorm',srgb:false,hasAlpha:false,width:4,height:4,mipmaps:[{width:4,height:4,data:new Uint8Array(64),byteLength:64}]};};
-  try {
-    const buffer=new Uint8Array(84),view=new DataView(buffer.buffer);
-    buffer.set([171,75,84,88,32,50,48,187,13,10,26,10],4);for(const [at,n] of [[20,4],[24,4],[36,1],[40,1]])view.setUint32(4+at,n,true);
-    const doc={asset:{version:'2.0'},buffers:[{byteLength:buffer.length}],bufferViews:[{buffer:0,byteLength:4},{buffer:0,byteOffset:4,byteLength:80}],accessors:[{componentType:5126,count:3,type:'VEC3'}],meshes:[{primitives:[{attributes:{POSITION:0},extensions:{KHR_draco_mesh_compression:{bufferView:0,attributes:{POSITION:0}}}}]}],nodes:[{mesh:0}],images:[{bufferView:1,mimeType:'image/ktx2'}]};
-    const model=await parseGLTFInWorker(await headless(),doc,{buffers:[buffer.slice()]});
-    assert.equal(parserJobs,1);assert.equal(dracoJobs,1);assert.equal(ktxJobs,1);
-    assert.deepEqual([...model.primitives[0].indices],[0,1,2]);assert.equal(model.images[0].ktx2.width,4);assertSameBytes(model.asset.buffers[0],buffer);
-    const caller=await parseGLTFInWorker(await headless(),doc,{buffers:[buffer.slice()],draco:{decode:DracoDecoder.prototype.decode},ktx2:{transcode:KTX2Decoder.prototype.transcode}});
-    assert.equal(parserJobs,1,'caller-owned codecs stay on the main thread');assert.deepEqual([...caller.primitives[0].indices],[0,1,2]);
-  }finally{DracoDecoder.prototype.decode=decode;KTX2Decoder.prototype.transcode=transcode;for(const [key,value] of Object.entries(saved)){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}}
-}));
+test('worker loader completes automatic codecs on the owning thread and preserves original buffers', () =>
+  headlessModels(async () => {
+    const saved = { Worker: globalThis.Worker, location: globalThis.location },
+      decode = DracoDecoder.prototype.decode,
+      transcode = KTX2Decoder.prototype.transcode;
+    let parserJobs = 0,
+      dracoJobs = 0,
+      ktxJobs = 0;
+    globalThis.location = { href: 'https://example.test/models/model.gltf' };
+    globalThis.Worker = class {
+      postMessage(message) {
+        parserJobs++;
+        runParseWorker(worker, message).then(
+          (result) => this.onmessage?.({ data: { result } }),
+          (error) => this.onmessage?.({ data: { error: { name: error.name, message: error.message } } }),
+        );
+      }
+      terminate() {}
+    };
+    DracoDecoder.prototype.decode = async () => {
+      dracoJobs++;
+      return {
+        vertexCount: 3,
+        positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+        indices: new Uint16Array([0, 1, 2]),
+      };
+    };
+    KTX2Decoder.prototype.transcode = async () => {
+      ktxJobs++;
+      return {
+        target: 'rgba8',
+        format: 'rgba8unorm',
+        srgb: false,
+        hasAlpha: false,
+        width: 4,
+        height: 4,
+        mipmaps: [{ width: 4, height: 4, data: new Uint8Array(64), byteLength: 64 }],
+      };
+    };
+    try {
+      const buffer = new Uint8Array(84),
+        view = new DataView(buffer.buffer);
+      buffer.set([171, 75, 84, 88, 32, 50, 48, 187, 13, 10, 26, 10], 4);
+      for (const [at, n] of [
+        [20, 4],
+        [24, 4],
+        [36, 1],
+        [40, 1],
+      ])
+        view.setUint32(4 + at, n, true);
+      const doc = {
+        asset: { version: '2.0' },
+        buffers: [{ byteLength: buffer.length }],
+        bufferViews: [
+          { buffer: 0, byteLength: 4 },
+          { buffer: 0, byteOffset: 4, byteLength: 80 },
+        ],
+        accessors: [{ componentType: 5126, count: 3, type: 'VEC3' }],
+        meshes: [
+          {
+            primitives: [
+              {
+                attributes: { POSITION: 0 },
+                extensions: { KHR_draco_mesh_compression: { bufferView: 0, attributes: { POSITION: 0 } } },
+              },
+            ],
+          },
+        ],
+        nodes: [{ mesh: 0 }],
+        images: [{ bufferView: 1, mimeType: 'image/ktx2' }],
+      };
+      const model = await parseGLTFInWorker(await headless(), doc, { buffers: [buffer.slice()] });
+      assert.equal(parserJobs, 1);
+      assert.equal(dracoJobs, 1);
+      assert.equal(ktxJobs, 1);
+      assert.deepEqual([...model.primitives[0].indices], [0, 1, 2]);
+      assert.equal(model.images[0].ktx2.width, 4);
+      assertSameBytes(model.asset.buffers[0], buffer);
+      const caller = await parseGLTFInWorker(await headless(), doc, {
+        buffers: [buffer.slice()],
+        draco: { decode: DracoDecoder.prototype.decode },
+        ktx2: { transcode: KTX2Decoder.prototype.transcode },
+      });
+      assert.equal(parserJobs, 1, 'caller-owned codecs stay on the main thread');
+      assert.deepEqual([...caller.primitives[0].indices], [0, 1, 2]);
+    } finally {
+      DracoDecoder.prototype.decode = decode;
+      KTX2Decoder.prototype.transcode = transcode;
+      for (const [key, value] of Object.entries(saved)) {
+        if (value === undefined) delete globalThis[key];
+        else globalThis[key] = value;
+      }
+    }
+  }));

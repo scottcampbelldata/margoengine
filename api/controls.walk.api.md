@@ -15,7 +15,7 @@ export abstract class Controls extends EventDispatcher {
     constructor(source: Camera | EngineKernel, element?: ControlElement | null, autoUpdate?: boolean);
     protected init(): void;
     protected get kind(): string;
-    protected abstract bind(element: ControlElement): Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
+    protected abstract bind(element: ControlElement): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
     protected onDisconnect(): void;
     connect(element: ControlElement): void;
     disconnect(): void;
@@ -71,7 +71,7 @@ export class OrbitControls extends Controls {
     state: Action;
     constructor(source: Camera | EngineKernel, element?: ControlElement | null);
     protected get kind(): string;
-    protected bind(element: ControlElement): Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
+    protected bind(element: ControlElement): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
     protected onDisconnect(): void;
     listenToKeyEvents(target: EventTargetLike): void;
     stopListenToKeyEvents(): void;
@@ -134,7 +134,7 @@ export class WalkControls extends Controls {
     readonly pressed: Set<string>;
     constructor(engine: EngineKernel, options?: WalkControlsOptions);
     protected get kind(): string;
-    protected bind(element: ControlElement): Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
+    protected bind(element: ControlElement): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
     protected onDisconnect(): void;
     dispose(): void;
     get mode(): WalkMode;
@@ -164,9 +164,16 @@ export type WalkMode = 'walk' | 'dollhouse';
 
 type Action = 'none' | 'rotate' | 'dolly' | 'pan' | 'touch-rotate' | 'touch-pan' | 'touch-dolly-pan' | 'touch-dolly-rotate';
 
+interface ControlDocument extends EventTargetLike {
+    readonly pointerLockElement?: Element | ControlElement | null;
+    exitPointerLock?(): void;
+    createElement?: Document['createElement'];
+    readonly body?: Pick<HTMLElement, 'append'>;
+}
+
 interface ControlElement {
-    addEventListener(type: string, listener: (event: any) => void, options?: AddEventListenerOptions | boolean): void;
-    removeEventListener(type: string, listener: (event: any) => void, options?: EventListenerOptions | boolean): void;
+    addEventListener(type: string, listener: InputEventListener, options?: AddEventListenerOptions | boolean): void;
+    removeEventListener(type: string, listener: InputEventListener, options?: EventListenerOptions | boolean): void;
     readonly clientWidth: number;
     readonly clientHeight: number;
     setPointerCapture?(pointerId: number): void;
@@ -179,7 +186,7 @@ interface ControlElement {
     style?: {
         touchAction: string;
     };
-    ownerDocument?: any;
+    ownerDocument?: ControlDocument;
     requestPointerLock?(): unknown;
 }
 
@@ -204,9 +211,13 @@ class EventDispatcher {
 }
 
 interface EventTargetLike {
-    addEventListener(type: string, listener: (event: any) => void, options?: AddEventListenerOptions | boolean): void;
-    removeEventListener(type: string, listener: (event: any) => void, options?: EventListenerOptions | boolean): void;
+    addEventListener(type: string, listener: InputEventListener, options?: AddEventListenerOptions | boolean): void;
+    removeEventListener(type: string, listener: InputEventListener, options?: EventListenerOptions | boolean): void;
 }
+
+type InputEventListener = {
+    handleEvent(event: Event): void;
+}['handleEvent'];
 
 type KeyAction = 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom' | 'iso' | 'fit' | 'projection';
 

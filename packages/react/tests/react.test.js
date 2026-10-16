@@ -1,10 +1,10 @@
-import test, { afterEach, mock } from "node:test";
-import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import { JSDOM } from "jsdom";
-import React, { StrictMode } from "react";
-import { renderToString } from "react-dom/server";
-import { transformWithOxc } from "vite";
+import test, { afterEach, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { JSDOM } from 'jsdom';
+import React, { StrictMode } from 'react';
+import { renderToString } from 'react-dom/server';
+import { transformWithOxc } from 'vite';
 
 const instances = [],
   pending = [],
@@ -82,7 +82,7 @@ class EngineMesh {
     this.engine.meshes.delete(this.id);
   }
 }
-mock.module("@margoengine/core/extension", {
+mock.module('@margoengine/core/extension', {
   namedExports: {
     Engine: {
       async create(canvas, options) {
@@ -144,13 +144,13 @@ mock.module("@margoengine/core/extension", {
     meshRuntime: (mesh) => mesh,
   },
 });
-mock.module("@margoengine/shadows", {
+mock.module('@margoengine/shadows', {
   namedExports: {
     Shadows: class {
       static attach(engine) {
         const effect = new this();
         effect.owner = engine;
-        effect.name = "shadows";
+        effect.name = 'shadows';
         effect.disposals = 0;
         engine.use(effect);
         shadows.push(effect);
@@ -164,27 +164,30 @@ mock.module("@margoengine/shadows", {
     },
   },
 });
-const { MargoCanvas, MargoContext, Canvas, Stage, Mesh, BoxGeometry, PbrMaterial,
-  mesh, boxGeometry, meshStandardMaterial, useMargo, useMargoStage, useFrame } =
-  await import("../dist/index.js");
-test("SSR renders an accessible native canvas without creating an engine", () => {
+const {
+  MargoCanvas,
+  MargoContext,
+  Canvas,
+  Stage,
+  Mesh,
+  BoxGeometry,
+  PbrMaterial,
+  mesh,
+  boxGeometry,
+  meshStandardMaterial,
+  useMargo,
+  useMargoStage,
+  useFrame,
+} = await import('../dist/index.js');
+test('SSR renders an accessible native canvas without creating an engine', () => {
   assert.equal(Canvas, MargoCanvas);
-  assert.match(
-    renderToString(React.createElement(MargoCanvas)),
-    /aria-label="Interactive 3D scene"/,
-  );
+  assert.match(renderToString(React.createElement(MargoCanvas)), /aria-label="Interactive 3D scene"/);
   assert.equal(instances.length, 0);
 });
-const dom = new JSDOM("<!doctype html><html><body></body></html>", {
-  url: "http://localhost",
+const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+  url: 'http://localhost',
 });
-for (const key of [
-  "window",
-  "document",
-  "HTMLElement",
-  "HTMLCanvasElement",
-  "navigator",
-])
+for (const key of ['window', 'document', 'HTMLElement', 'HTMLCanvasElement', 'navigator'])
   Object.defineProperty(globalThis, key, {
     configurable: true,
     value: dom.window[key],
@@ -204,7 +207,7 @@ globalThis.ResizeObserver = class {
     this.disconnected = true;
   }
 };
-const { render, act, cleanup } = await import("@testing-library/react");
+const { render, act, cleanup } = await import('@testing-library/react');
 afterEach(() => {
   cleanup();
   defer = false;
@@ -224,54 +227,57 @@ afterEach(() => {
   assert.ok(observers.every((observer) => observer.disconnected));
 });
 async function loadTsx(source) {
-  const { code } = await transformWithOxc(source, "react-example.tsx", {
-    jsx: { runtime: "automatic" },
+  const { code } = await transformWithOxc(source, 'react-example.tsx', {
+    jsx: { runtime: 'automatic' },
   });
   const resolved = code
-    .replaceAll("@margoengine/react", new URL("../dist/index.js", import.meta.url).href)
-    .replaceAll("react/jsx-runtime", import.meta.resolve("react/jsx-runtime"));
-  return import(`data:text/javascript;base64,${Buffer.from(resolved).toString("base64")}`);
+    .replaceAll('@margoengine/react', new URL('../dist/index.js', import.meta.url).href)
+    .replaceAll('react/jsx-runtime', import.meta.resolve('react/jsx-runtime'));
+  return import(`data:text/javascript;base64,${Buffer.from(resolved).toString('base64')}`);
 }
-test("lowercase exports are the existing React components", () => {
+test('lowercase exports are the existing React components', () => {
   assert.equal(mesh, Mesh);
   assert.equal(boxGeometry, BoxGeometry);
   assert.equal(meshStandardMaterial, PbrMaterial);
 });
-test("the exact integration-doc snippet mounts and disposes through repeated StrictMode cycles", async () => {
-  const documentation = await readFile(new URL("../../../docs/react-integration.md", import.meta.url), "utf8");
+test('the exact integration-doc snippet mounts and disposes through repeated StrictMode cycles', async () => {
+  const documentation = await readFile(new URL('../../../docs/react-integration.md', import.meta.url), 'utf8');
   const source = /```tsx\r?\n([\s\S]*?)```/.exec(documentation)?.[1];
-  assert.ok(source, "the integration guide must retain its executable TSX example");
+  assert.ok(source, 'the integration guide must retain its executable TSX example');
   const { App } = await loadTsx(source);
   for (let cycle = 0; cycle < 3; cycle++) {
-    const beforeEngines = instances.length, beforeShadows = shadows.length;
+    const beforeEngines = instances.length,
+      beforeShadows = shadows.length;
     const view = render(React.createElement(StrictMode, null, React.createElement(App)));
     await act(async () => {});
-    assert.equal(instances.length, beforeEngines + 1, "Stage must reuse the Canvas engine");
+    assert.equal(instances.length, beforeEngines + 1, 'Stage must reuse the Canvas engine');
     const engine = instances.at(-1);
     assert.equal(engine.starts, 1);
-    assert.equal(engine.createdMeshes.length, 2, "StrictMode replays the mesh mount effect");
+    assert.equal(engine.createdMeshes.length, 2, 'StrictMode replays the mesh mount effect');
     assert.equal(engine.createdMeshes[0].disposals, 1);
     assert.equal(engine.meshes.size, 1);
     const node = engine.meshes.values().next().value;
     assert.deepEqual(node.position, [0, 1, 0]);
     assert.deepEqual(node.geometry.args, [1, 1, 1]);
-    assert.equal(node.material.color, "#84d6bd");
+    assert.equal(node.material.color, '#84d6bd');
     assert.equal(engine.geometryReferences.get(node.geometry), 1);
     assert.deepEqual(engine.camera.position, [0, 2, 5]);
     assert.equal(shadows.length, beforeShadows + 1);
-    assert.equal(engine.plugins.get("shadows"), shadows.at(-1));
-    assert.equal(view.container.querySelectorAll("canvas").length, 1);
-    assert.equal(view.container.querySelectorAll("mesh, boxGeometry, meshStandardMaterial").length, 0);
+    assert.equal(engine.plugins.get('shadows'), shadows.at(-1));
+    assert.equal(view.container.querySelectorAll('canvas').length, 1);
+    assert.equal(view.container.querySelectorAll('mesh, boxGeometry, meshStandardMaterial').length, 0);
     view.unmount();
     assert.equal(engine.disposals, 1);
     assert.equal(engine.meshes.size, 0);
     assert.equal(engine.geometryReferences.size, 0);
     assert.equal(engine.plugins.size, 0);
-    assert.ok(engine.createdMeshes.every((mesh) => mesh.disposals === 1 && mesh.parent === null && mesh.children.size === 0));
+    assert.ok(
+      engine.createdMeshes.every((mesh) => mesh.disposals === 1 && mesh.parent === null && mesh.children.size === 0),
+    );
     assert.equal(view.container.childNodes.length, 0);
   }
 });
-test("namespace JSX aliases build the same nested scene and release it when Stage children are removed", async () => {
+test('namespace JSX aliases build the same nested scene and release it when Stage children are removed', async () => {
   const { App } = await loadTsx(`
     import * as Margo from '@margoengine/react';
     export function App({ show = true }) {
@@ -287,54 +293,70 @@ test("namespace JSX aliases build the same nested scene and release it when Stag
   const tree = (show) => React.createElement(StrictMode, null, React.createElement(App, { show }));
   const view = render(tree(true));
   await act(async () => {});
-  const engine = instances.at(-1), nodes = [...engine.meshes.values()];
+  const engine = instances.at(-1),
+    nodes = [...engine.meshes.values()];
   assert.equal(nodes.length, 2);
-  const parent = nodes.find((node) => node.geometry), child = nodes.find((node) => !node.geometry);
+  const parent = nodes.find((node) => node.geometry),
+    child = nodes.find((node) => !node.geometry);
   assert.deepEqual(parent.geometry.args, [2, 3, 4]);
-  assert.equal(parent.material.color, "#123456");
+  assert.equal(parent.material.color, '#123456');
   assert.equal(parent.material.roughness, 0.2);
   assert.equal(parent.material.metalness, 0.7);
   assert.equal(child.parent, parent);
   assert.deepEqual([...parent.children], [child]);
   view.rerender(tree(false));
   await act(async () => {});
-  assert.equal(engine.disposed, false, "removing Stage children keeps the Canvas engine alive");
+  assert.equal(engine.disposed, false, 'removing Stage children keeps the Canvas engine alive');
   assert.equal(engine.meshes.size, 0);
   assert.equal(engine.geometryReferences.size, 0);
-  assert.ok(engine.createdMeshes.every((node) => node.disposals === 1 && node.parent === null && node.children.size === 0));
+  assert.ok(
+    engine.createdMeshes.every((node) => node.disposals === 1 && node.parent === null && node.children.size === 0),
+  );
   view.unmount();
 });
-test("Stage waits for a ready, live context stage before rendering or configuring it", async () => {
-  const engine = { camera: {}, disposed: false }, stage = { engine };
-  const tree = (value) => React.createElement(MargoContext.Provider, { value },
-    React.createElement(Stage, { camera: { position: [1, 2, 3] } }, React.createElement("span", null, "ready")));
+test('Stage waits for a ready, live context stage before rendering or configuring it', async () => {
+  const engine = { camera: {}, disposed: false },
+    stage = { engine };
+  const tree = (value) =>
+    React.createElement(
+      MargoContext.Provider,
+      { value },
+      React.createElement(Stage, { camera: { position: [1, 2, 3] } }, React.createElement('span', null, 'ready')),
+    );
   const view = render(tree({ stage: null, ready: false, canvas: null }));
-  assert.equal(view.container.textContent, "");
+  assert.equal(view.container.textContent, '');
   view.rerender(tree({ stage, ready: false, canvas: null }));
-  assert.equal(view.container.textContent, "");
+  assert.equal(view.container.textContent, '');
   assert.deepEqual(engine.camera, {});
   view.rerender(tree({ stage: null, ready: true, canvas: null }));
-  assert.equal(view.container.textContent, "");
+  assert.equal(view.container.textContent, '');
   view.rerender(tree({ stage, ready: true, canvas: null }));
   await act(async () => {});
-  assert.equal(view.container.textContent, "ready");
+  assert.equal(view.container.textContent, 'ready');
   assert.deepEqual(engine.camera.position, [1, 2, 3]);
   engine.disposed = true;
   engine.camera.position = [7, 8, 9];
   view.rerender(tree({ stage, ready: true, canvas: null }));
-  assert.equal(view.container.textContent, "");
+  assert.equal(view.container.textContent, '');
   assert.deepEqual(engine.camera.position, [7, 8, 9]);
 });
-test("Stage camera props override Canvas defaults and update the existing engine", async () => {
+test('Stage camera props override Canvas defaults and update the existing engine', async () => {
   const before = instances.length;
   let received;
   function Child() {
     received = useMargo().stage;
     return null;
   }
-  const tree = (canvasCamera, camera) => React.createElement(StrictMode, null,
-    React.createElement(Canvas, { camera: canvasCamera },
-      React.createElement(Stage, { camera }, React.createElement(Child))));
+  const tree = (canvasCamera, camera) =>
+    React.createElement(
+      StrictMode,
+      null,
+      React.createElement(
+        Canvas,
+        { camera: canvasCamera },
+        React.createElement(Stage, { camera }, React.createElement(Child)),
+      ),
+    );
   const camera = { position: [1, 2, 3] };
   const view = render(tree({ position: [9, 9, 9], fov: 70 }, camera));
   await act(async () => {});
@@ -346,51 +368,72 @@ test("Stage camera props override Canvas defaults and update the existing engine
   await act(async () => {});
   assert.deepEqual(engine.camera.position, [1, 2, 3]);
   assert.equal(engine.camera.fov, 60);
-  view.rerender(tree({ fov: 60 }, {
-    position: [4, 5, 6], target: [0, 1, 0], fov: 42, near: 0.2, far: 200,
-  }));
+  view.rerender(
+    tree(
+      { fov: 60 },
+      {
+        position: [4, 5, 6],
+        target: [0, 1, 0],
+        fov: 42,
+        near: 0.2,
+        far: 200,
+      },
+    ),
+  );
   await act(async () => {});
   assert.deepEqual(engine.camera, {
-    position: [4, 5, 6], target: [0, 1, 0], fov: 42, near: 0.2, far: 200,
+    position: [4, 5, 6],
+    target: [0, 1, 0],
+    fov: 42,
+    near: 0.2,
+    far: 200,
   });
   assert.equal(instances.length, before + 1);
   assert.equal(engine.starts, 1);
   view.unmount();
 });
-test("Stage shadow requests share the Canvas effect and release the last request", async () => {
+test('Stage shadow requests share the Canvas effect and release the last request', async () => {
   const before = shadows.length;
-  const tree = (canvasShadows, first, second) => React.createElement(StrictMode, null,
-    React.createElement(Canvas, { shadows: canvasShadows },
-      React.createElement(Stage, { key: "first", shadows: first }),
-      React.createElement(Stage, { key: "second", shadows: second })));
+  const tree = (canvasShadows, first, second) =>
+    React.createElement(
+      StrictMode,
+      null,
+      React.createElement(
+        Canvas,
+        { shadows: canvasShadows },
+        React.createElement(Stage, { key: 'first', shadows: first }),
+        React.createElement(Stage, { key: 'second', shadows: second }),
+      ),
+    );
   const view = render(tree(false, true, true));
   await act(async () => {});
-  const engine = instances.at(-1), effect = shadows.at(-1);
+  const engine = instances.at(-1),
+    effect = shadows.at(-1);
   assert.equal(shadows.length, before + 1);
-  assert.equal(engine.plugins.get("shadows"), effect);
+  assert.equal(engine.plugins.get('shadows'), effect);
   view.rerender(tree(false, false, true));
   await act(async () => {});
-  assert.equal(engine.plugins.get("shadows"), effect);
+  assert.equal(engine.plugins.get('shadows'), effect);
   assert.equal(effect.disposals, 0);
   view.rerender(tree(true, false, false));
   await act(async () => {});
-  assert.equal(engine.plugins.get("shadows"), effect);
+  assert.equal(engine.plugins.get('shadows'), effect);
   view.rerender(tree(false, false, false));
   await act(async () => {});
   assert.equal(effect.disposals, 1);
-  assert.equal(engine.plugins.has("shadows"), false);
+  assert.equal(engine.plugins.has('shadows'), false);
   view.rerender(tree(true, true, false));
   await act(async () => {});
   assert.equal(shadows.length, before + 2);
   const current = shadows.at(-1);
   view.rerender(tree(false, true, false));
   await act(async () => {});
-  assert.equal(engine.plugins.get("shadows"), current);
+  assert.equal(engine.plugins.get('shadows'), current);
   assert.equal(current.disposals, 0);
   view.unmount();
   assert.equal(current.disposals, 1);
 });
-test("StrictMode, resize, stable frame callbacks and unmount release resources", async () => {
+test('StrictMode, resize, stable frame callbacks and unmount release resources', async () => {
   let received,
     first = 0,
     second = 0;
@@ -403,11 +446,7 @@ test("StrictMode, resize, stable frame callbacks and unmount release resources",
     React.createElement(
       StrictMode,
       null,
-      React.createElement(
-        MargoCanvas,
-        null,
-        React.createElement(Child, { callback }),
-      ),
+      React.createElement(MargoCanvas, null, React.createElement(Child, { callback })),
     );
   const view = render(tree(() => first++));
   await act(async () => {});
@@ -420,7 +459,7 @@ test("StrictMode, resize, stable frame callbacks and unmount release resources",
   callback(engine, 1 / 60);
   assert.equal(first, 0);
   assert.equal(second, 1);
-  const canvas = view.container.querySelector("canvas");
+  const canvas = view.container.querySelector('canvas');
   canvas.getBoundingClientRect = () => ({ width: 410, height: 220 });
   observers.at(-1).callback();
   assert.equal(canvas.width, 410);
@@ -430,16 +469,16 @@ test("StrictMode, resize, stable frame callbacks and unmount release resources",
   assert.equal(engine.callbacks.size, 0);
   assert.ok(observers.every((observer) => observer.disconnected));
 });
-test("Canvas forwards the WebGL fallback factory and recreates the engine when it changes", async () => {
-  const fallback = () => ({ backend: "webgl2" });
-  const view = render(React.createElement(Canvas, { backend: "webgl2", fallback }));
+test('Canvas forwards the WebGL fallback factory and recreates the engine when it changes', async () => {
+  const fallback = () => ({ backend: 'webgl2' });
+  const view = render(React.createElement(Canvas, { backend: 'webgl2', fallback }));
   await act(async () => {});
   const first = instances.at(-1);
-  assert.equal(first.options.backend, "webgl2");
+  assert.equal(first.options.backend, 'webgl2');
   assert.equal(first.options.fallback, fallback);
   assert.equal(first.starts, 1);
-  const replacement = () => ({ backend: "webgl2" });
-  view.rerender(React.createElement(Canvas, { backend: "webgl2", fallback: replacement }));
+  const replacement = () => ({ backend: 'webgl2' });
+  view.rerender(React.createElement(Canvas, { backend: 'webgl2', fallback: replacement }));
   await act(async () => {});
   const second = instances.at(-1);
   assert.notEqual(first, second);
@@ -448,7 +487,7 @@ test("Canvas forwards the WebGL fallback factory and recreates the engine when i
   assert.equal(second.starts, 1);
 });
 
-test("late async initialization after unmount is disposed and never started", async () => {
+test('late async initialization after unmount is disposed and never started', async () => {
   defer = true;
   const view = render(React.createElement(MargoCanvas));
   await act(async () => {});
@@ -459,7 +498,7 @@ test("late async initialization after unmount is disposed and never started", as
   assert.equal(engine.starts, 0);
   defer = false;
 });
-test("effect recreation serializes initialization and disposes superseded engines", async () => {
+test('effect recreation serializes initialization and disposes superseded engines', async () => {
   defer = true;
   const view = render(React.createElement(MargoCanvas, { capacity: 4 }));
   await act(async () => {});
@@ -475,18 +514,18 @@ test("effect recreation serializes initialization and disposes superseded engine
   assert.equal(current.disposals, 1);
   defer = false;
 });
-test("initialization errors are visible and dispose the engine", async () => {
+test('initialization errors are visible and dispose the engine', async () => {
   const errors = [],
     view = render(
       React.createElement(MargoCanvas, {
         onCreated() {
-          throw new Error("setup failed");
+          throw new Error('setup failed');
         },
         onError: (error) => errors.push(error),
       }),
     );
   await act(async () => {});
-  assert.match(view.getByRole("alert").textContent, /setup failed/);
+  assert.match(view.getByRole('alert').textContent, /setup failed/);
   assert.equal(instances.at(-1).disposals, 1);
   assert.equal(errors.length, 1);
   cleanup();

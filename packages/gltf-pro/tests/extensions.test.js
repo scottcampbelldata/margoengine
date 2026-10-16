@@ -165,8 +165,7 @@ test('only required extensions that are still unsupported are rejected, each lis
     'KHR_animation_pointer',
   );
   assert.throws(() => new GLTFAsset(doc, buffers), {
-    message:
-      'Required glTF extensions are unsupported: KHR_animation_pointer',
+    message: 'Required glTF extensions are unsupported: KHR_animation_pointer',
   });
   assert.throws(() => new GLTFAsset(doc, buffers, undefined, { draco: {}, meshopt: {}, ktx2: {} }), {
     message: 'Required glTF extensions are unsupported: KHR_animation_pointer',
@@ -252,7 +251,11 @@ test('EXT_meshopt_compression decodes through the meshopt hook with the real dec
     meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2 }] }],
     nodes: [{ mesh: 0 }],
   };
-  assert.deepEqual(new GLTFAsset(doc,[packed]).view(0),bytes(streams[0].expected),'built-in meshopt is available without a hook');
+  assert.deepEqual(
+    new GLTFAsset(doc, [packed]).view(0),
+    bytes(streams[0].expected),
+    'built-in meshopt is available without a hook',
+  );
   let decodes = 0;
   const meshopt = {
     decodeGltfBuffer(...args) {
@@ -311,7 +314,7 @@ test('KHR_draco_mesh_compression decodes the Khronos Box and Avocado through the
       const doc = JSON.parse(await fixture(`${name}.gltf`)),
         bin = await fixture(`${name}.bin`),
         p = doc.meshes[0].primitives[0];
-      assert.throws(()=>new PBRModel(engine,new GLTFAsset(doc,[bin])),/requires parseGLTFAsync or loadGLTF/);
+      assert.throws(() => new PBRModel(engine, new GLTFAsset(doc, [bin])), /requires parseGLTFAsync or loadGLTF/);
       const asset = new GLTFAsset(doc, [bin], undefined, { draco: hook });
       await asset.decode();
       assert.deepEqual(requests.at(-1).attributeIds, p.extensions.KHR_draco_mesh_compression.attributes);
@@ -349,7 +352,10 @@ test('KHR_draco_mesh_compression decodes the Khronos Box and Avocado through the
   await asset.decode();
   assert.deepEqual([...asset.accessor(0)], [0, 0, 0, 1, 0, 0, 0, 1, 0]);
   close(asset.accessor(3), [1, 0, 0, 1, 0.2, 0.4]);
-  await assert.rejects(fake({ positions: new Float32Array(6) }).decode(), /(?:Mismatched glTF Draco|Invalid glTF Draco|Invalid glTF Draco vertex)/);
+  await assert.rejects(
+    fake({ positions: new Float32Array(6) }).decode(),
+    /(?:Mismatched glTF Draco|Invalid glTF Draco|Invalid glTF Draco vertex)/,
+  );
   const aborted = new AbortController();
   aborted.abort();
   await assert.rejects(
@@ -371,7 +377,10 @@ test('parseGLTFAsync decodes Draco with the real Wasm; a KTX2 texture beats its 
     bin = await fixture('Box.bin');
   {
     const { engine } = await gpu();
-    await assert.rejects(parseGLTFAsync(engine, structuredClone(box), { buffers: [bin] }), /needs a browser with Web Workers/);
+    await assert.rejects(
+      parseGLTFAsync(engine, structuredClone(box), { buffers: [bin] }),
+      /needs a browser with Web Workers/,
+    );
     const model = await parseGLTFAsync(engine, structuredClone(box), {
       buffers: [bin],
       decoders: { draco: { decode: async (data, options) => decodeDraco(draco, data, options) } },
@@ -407,9 +416,12 @@ test('parseGLTFAsync decodes Draco with the real Wasm; a KTX2 texture beats its 
       };
       const model = await parseGLTFAsync(engine, structuredClone(doc), { buffers, decoders: { ktx2 } });
       const normal = textures.find((t) => t.size[0] > 1);
-      assert.deepEqual([normal.format,normal.mipLevelCount,...normal.size],['bc7-rgba-unorm',1,2048,2048,1]);
-      const [destination,data,layout,size]=uploads.find(u=>u[0].texture?.format==='bc7-rgba-unorm');
-      assert.deepEqual([destination.mipLevel,data.byteLength,layout.bytesPerRow,layout.rowsPerImage,...size],[0,512*512*16,512*16,2048,2048,2048,1]);
+      assert.deepEqual([normal.format, normal.mipLevelCount, ...normal.size], ['bc7-rgba-unorm', 1, 2048, 2048, 1]);
+      const [destination, data, layout, size] = uploads.find((u) => u[0].texture?.format === 'bc7-rgba-unorm');
+      assert.deepEqual(
+        [destination.mipLevel, data.byteLength, layout.bytesPerRow, layout.rowsPerImage, ...size],
+        [0, 512 * 512 * 16, 512 * 16, 2048, 2048, 2048, 1],
+      );
       model.dispose();
       engine.dispose();
     }
@@ -448,7 +460,9 @@ test('KHR_texture_transform, emissive strength and unlit reach the material unif
     assert.equal(uniform[107], 1, 'UV set in the first row');
     assert.deepEqual([...uniform.subarray(112, 120)], [1, 0, 0, 0, -0, 1, 0, 0], 'untransformed maps get the identity');
     assert.ok(extendedPBRShader.includes('if(f.ext.x>0.5){color=s.base.rgb;}'));
-    assert.ok(calls.find(c=>c[0]==='pipeline')[1].vertex.module.code.includes('if(f.ext.x>0.5){color=s.base.rgb;}'));
+    assert.ok(
+      calls.find((c) => c[0] === 'pipeline')[1].vertex.module.code.includes('if(f.ext.x>0.5){color=s.base.rgb;}'),
+    );
   } finally {
     model.dispose();
     engine.dispose();
@@ -535,7 +549,7 @@ test('physical extensions select the physical shader variant, its maps and the t
   doc.meshes.push({ primitives: [{ ...doc.meshes[0].primitives[0], material: 1 }] });
   doc.nodes.push({ mesh: 1 });
   doc.textures = [{ source: 0 }];
-  const model = parseGLTF(engine, doc, buffers, [bitmap()], {materials:extendedMaterials}),
+  const model = parseGLTF(engine, doc, buffers, [bitmap()], { materials: extendedMaterials }),
     [glass, plain] = model.primitives.map((p) => p.material);
   try {
     assert.equal(glass.maps.length, 13);

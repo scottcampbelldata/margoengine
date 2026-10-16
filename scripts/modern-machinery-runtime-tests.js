@@ -322,7 +322,9 @@ try {
       capacity: 2,
     });
     // Initial capacity grows automatically. Inject a host limit to exercise late rollback.
-    e.store.grow = () => { throw new RangeError('Test host capacity limit'); };
+    e.store.grow = () => {
+      throw new RangeError('Test host capacity limit');
+    };
     let streamed = false,
       failed = false;
     try {

@@ -2,8 +2,17 @@
 // of three.js GLTFExporter for PBR content. Writes the live node transforms, visibility, materials and morph weights,
 // with skins, morph targets, animation clips, EXT_mesh_gpu_instancing, textures and the KHR material extensions
 // gltf-pro renders. Accessors are re-written from the decoded data gltf-pro uses, so a re-import reads the same values.
-import type { PBRModel, PBRPrimitive as ModelPrimitive } from '@margoengine/gltf-pro';
-type PBRPrimitive = ModelPrimitive & {instances?: {count:number;data:Float32Array}};
+import type { PBRModel, PBRMaterial, PBRPrimitive as ModelPrimitive } from '@margoengine/gltf-pro';
+import type {
+  GLTFMesh,
+  GLTFSkin,
+  GLTFNode,
+  GLTFInstancing,
+  GLTFSampler,
+  GLTFImageDefinition,
+} from '../../shared/gltf.js';
+import type { PNGSource } from './png.js';
+type PBRPrimitive = ModelPrimitive & { instances?: { count: number; data: Float32Array } };
 import { Bin, ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER, FLOAT, type GLTFJsonResult } from './container.js';
 import { decompose } from './scene.js';
 export type { GLTFJsonResult } from './container.js';
@@ -45,21 +54,34 @@ export interface ModelExportOptions {
   binUri?: string;
 }
 
-type Json = Record<string, any>;
+type Json = Record<string, unknown>;
 const clean = <T extends Json>(o: T): T => {
   for (const k in o) if (o[k] === undefined) delete o[k];
   return o;
 };
 const scaled = (info: Json | undefined, key: string, value: number) =>
   info && value !== 1 ? { ...info, [key]: value } : info;
-const slots = ['map', 'metalRoughnessMap', 'normalMap', 'aoMap', 'emissiveMap'];
+const slots = ['map', 'metalRoughnessMap', 'normalMap', 'aoMap', 'emissiveMap'] as const;
+interface PixelTexture {
+  source: PNGSource;
+  isVideo?: boolean;
+  options?: {
+    mipmaps?: boolean;
+    minFilter?: string;
+    magFilter?: string;
+    wrapS?: string;
+    wrapT?: string;
+    flipY?: boolean;
+  };
+}
+type TextureOwner = Partial<Record<(typeof slots)[number], PixelTexture>> & { shading?: string };
 const wraps: Record<string, number> = { repeat: 10497, clamp: 33071, mirror: 33648 };
 
 class Writer extends Bin {
   readonly used = new Set<string>();
   readonly required = new Set<string>();
   /** Images (and their source and flipY) whose PNG bytes are encoded after the synchronous walk. */
-  readonly pending: [Json, unknown, boolean][] = [];
+  readonly pending: [GLTFImageDefinition, PNGSource, boolean][] = [];
   private readonly cache = new Map<unknown, number>();
   constructor(
     private readonly embedImages: boolean,
@@ -77,7 +99,7 @@ class Writer extends Bin {
   /** A source accessor as gltf-pro decodes it: floats, JOINTS as unsigned ints, WEIGHTS normalized per vertex. */
   private data(model: PBRModel, id: number, name: string): number {
     const values = model.asset.accessor(id),
-      type = model.asset.doc.accessors[id].type;
+      type = model.asset.doc.accessors![id].type;
     return this.memo(values, () => {
       if (name.startsWith('JOINTS_')) {
         let max = 0;
@@ -136,7 +158,7 @@ class Writer extends Bin {
     return out;
   }
 
-  mesh(model: PBRModel, docMesh: Json, primitives: PBRPrimitive[]): number {
+  mesh(model: PBRModel, docMesh: GLTFMesh, primitives: PBRPrimitive[]): number {
     return this.memo(docMesh, () =>
       this.list(
         'meshes',
@@ -150,9 +172,9 @@ class Writer extends Bin {
   }
 
   /** Live values from gltf-pro's material record (shared with an @margoengine/materials Material). */
-  private material(model: PBRModel, m: any): number {
+  private material(model: PBRModel, m: PBRMaterial): number {
     return this.memo(m, () => {
-      const owner = (model as { material?: any }).material,
+      const owner = (model as { material?: TextureOwner }).material,
         e = m.extensions ?? {},
         t = (i: number) => this.textureInfo(model, m, i, owner),
         P = m.physical,
@@ -162,8 +184,8 @@ class Writer extends Bin {
       // gltf-pro holds emissiveFactor * strength; factors above 1 move into KHR_materials_emissive_strength.
       const strength = Math.max(e.KHR_materials_emissive_strength?.emissiveStrength ?? 1, ...m.emission);
       if (strength !== 1) ext.KHR_materials_emissive_strength = { emissiveStrength: strength };
-      if (m.ext[0] || owner?.shading === 'basic') ext.KHR_materials_unlit = {};
-      if (e.KHR_materials_ior || m.ext[1] !== 1.5) ext.KHR_materials_ior = { ior: m.ext[1] };
+      if (m.ext![0] || owner?.shading === 'basic') ext.KHR_materials_unlit = {};
+      if (e.KHR_materials_ior || m.ext![1] !== 1.5) ext.KHR_materials_ior = { ior: m.ext![1] };
       if (P && e.KHR_materials_clearcoat)
         ext.KHR_materials_clearcoat = clean({
           clearcoatFactor: P[0],
@@ -222,14 +244,14 @@ class Writer extends Bin {
   }
 
   /** Texture info for map slot `i` (gltf-pro order), with its KHR_texture_transform taken back out of the material's UV rows. */
-  private textureInfo(model: PBRModel, m: any, i: number, owner: any): Json | undefined {
+  private textureInfo(model: PBRModel, m: PBRMaterial, i: number, owner: TextureOwner | undefined): Json | undefined {
     const map = m.maps[i],
       texture = i < 5 ? owner?.[slots[i]] : undefined;
     if (!map && !texture) return undefined;
-    const info: Json = { index: map ? this.docTexture(model, map.index) : this.pixelTexture(texture) };
+    const info: Json = { index: map ? this.docTexture(model, map.index) : this.pixelTexture(texture!) };
     if (map?.texCoord) info.texCoord = map.texCoord;
     // Rows: [cos*sx, sin*sy, offset x, uv set], [-sin*sx, cos*sy, offset y, 0].
-    const [a0, a1, x, , b0, b1, y] = m.uvt.slice(i * 8, i * 8 + 8);
+    const [a0, a1, x, , b0, b1, y] = m.uvt!.slice(i * 8, i * 8 + 8);
     if (a0 !== 1 || a1 || x || b0 || b1 !== 1 || y) {
       const r = Math.atan2(-b0, a0),
         c = Math.cos(r),
@@ -246,7 +268,7 @@ class Writer extends Bin {
     return info;
   }
 
-  private sampler(def: Json): number {
+  private sampler(def: GLTFSampler): number {
     const s = clean({ magFilter: def.magFilter, minFilter: def.minFilter, wrapS: def.wrapS, wrapT: def.wrapT });
     return this.memo(JSON.stringify(s), () => this.list('samplers', s));
   }
@@ -254,13 +276,13 @@ class Writer extends Bin {
   /** A texture of the loaded document, with its sampler and every image source it names. */
   private docTexture(model: PBRModel, index: number): number {
     const doc = model.asset.doc,
-      def = doc.textures[index];
+      def = doc.textures![index];
     return this.memo(def, () => {
       const out: Json = {},
         ext: Json = {};
-      if (def.sampler !== undefined) out.sampler = this.sampler(doc.samplers[def.sampler]);
+      if (def.sampler !== undefined) out.sampler = this.sampler(doc.samplers![def.sampler]);
       if (def.source !== undefined) out.source = this.docImage(model, def.source);
-      for (const name of ['KHR_texture_basisu', 'EXT_texture_webp', 'EXT_texture_avif']) {
+      for (const name of ['KHR_texture_basisu', 'EXT_texture_webp', 'EXT_texture_avif'] as const) {
         const source = def.extensions?.[name]?.source;
         if (source === undefined) continue;
         ext[name] = { source: this.docImage(model, source) };
@@ -274,8 +296,8 @@ class Writer extends Bin {
 
   /** The loaded image's encoded bytes as they are; re-encoded from the decoded image only to fit maxTextureSize or when no bytes were kept. */
   private docImage(model: PBRModel, index: number): number {
-    const def = model.asset.doc.images[index],
-      decoded: any = model['images'][index];
+    const def = model.asset.doc.images![index],
+      decoded = model['images'][index];
     return this.memo(def, () => {
       const out: Json = clean({ name: def.name }),
         uri = /^data:([^;,]*);base64,(.*)$/s.exec(def.uri ?? '');
@@ -290,14 +312,14 @@ class Writer extends Bin {
         out.mimeType = def.mimeType ?? (uri?.[1] || (bytes[0] === 0x89 ? 'image/png' : 'image/jpeg'));
         out.bufferView = this.view(bytes.slice());
       } else if (!bytes && !this.embedImages) out.uri = def.uri;
-      else if (decoded && !('mipmaps' in decoded)) this.encode(out, decoded, false);
+      else if (decoded && !('mipmaps' in decoded) && !('ktx2' in decoded)) this.encode(out, decoded, false);
       else throw new Error(`glTF image ${index} has neither encoded bytes nor decoded pixels to embed`);
       return this.list('images', out);
     });
   }
 
   /** An @margoengine/materials Texture: its sampler options and its pixels as PNG, flipped back to glTF's v-down rows. */
-  private pixelTexture(texture: any): number {
+  private pixelTexture(texture: PixelTexture): number {
     return this.memo(texture, () => {
       const o = texture.options ?? {},
         mips = o.mipmaps ?? !texture.isVideo,
@@ -314,12 +336,12 @@ class Writer extends Bin {
     });
   }
 
-  private encode(image: Json, source: any, flipY: boolean): void {
+  private encode(image: GLTFImageDefinition, source: PNGSource, flipY: boolean): void {
     image.mimeType = 'image/png';
     this.pending.push([image, source, flipY]);
   }
 
-  skin(model: PBRModel, def: Json, map: Int32Array): number {
+  skin(model: PBRModel, def: GLTFSkin, map: Int32Array): number {
     return this.memo(def, () => {
       const joints = def.joints.map((j: number) => {
         if (map[j] < 0) throw new RangeError('A skin joint is hidden; export with onlyVisible: false');
@@ -330,7 +352,7 @@ class Writer extends Bin {
         clean({
           name: def.name,
           joints,
-          skeleton: map[def.skeleton] >= 0 ? map[def.skeleton] : undefined,
+          skeleton: def.skeleton !== undefined && map[def.skeleton] >= 0 ? map[def.skeleton] : undefined,
           inverseBindMatrices:
             def.inverseBindMatrices === undefined
               ? undefined
@@ -341,7 +363,7 @@ class Writer extends Bin {
   }
 
   /** EXT_mesh_gpu_instancing: each drawn instance's node-space matrix as TRS, and its tint as `_COLOR_0` (three.js convention). */
-  instances(inst: NonNullable<PBRPrimitive['instances']>): Json {
+  instances(inst: NonNullable<PBRPrimitive['instances']>): GLTFInstancing {
     const n = inst.count,
       t = new Float32Array(n * 3),
       r = new Float32Array(n * 4),
@@ -359,7 +381,7 @@ class Writer extends Bin {
       r.set(parts.r, i * 4);
       s.set(parts.s, i * 3);
     }
-    const attributes: Json = {
+    const attributes: Record<string, number> = {
       TRANSLATION: this.accessor(t, 'VEC3'),
       ROTATION: this.accessor(r, 'VEC4'),
       SCALE: this.accessor(s, 'VEC3'),
@@ -432,7 +454,7 @@ export async function exportModel(
   json.asset = { version: '2.0', generator };
   for (const model of list) {
     const doc = model.asset.doc,
-      defs: Json[] = doc.nodes ?? [],
+      defs: GLTFNode[] = doc.nodes ?? [],
       map = new Int32Array(defs.length).fill(-1),
       store = model.root.engine.store;
     const hidden = (node: PBRModel['root']) => onlyVisible && !!store.hidden[node.id];
@@ -474,9 +496,9 @@ export async function exportModel(
         inst = (primitives[0] as PBRPrimitive | undefined)?.instances,
         out = json.nodes?.[map[i]];
       if (map[i] < 0 || !primitives.length || (inst && !inst.count)) continue;
-      out.mesh = w.mesh(model, doc.meshes[def.mesh], primitives);
+      out.mesh = w.mesh(model, doc.meshes![def.mesh!], primitives);
       if (primitives[0].weights.length) out.weights = Array.from(primitives[0].weights);
-      if (def.skin !== undefined) out.skin = w.skin(model, doc.skins[def.skin], map);
+      if (def.skin !== undefined) out.skin = w.skin(model, doc.skins![def.skin], map);
       if (inst) out.extensions = { EXT_mesh_gpu_instancing: w.instances(inst) };
     }
   }

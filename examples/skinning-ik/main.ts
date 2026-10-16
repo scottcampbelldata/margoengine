@@ -210,7 +210,9 @@ try {
   const animatedRotation = new RigScratch(),
     writeAnimatedRotation = (node: Mesh, rotation: readonly number[]) => animatedRotation.setQuaternion(node, rotation);
   const animator = new WorkshopAnimator(animation, {
-    initial: 'idle', states: { idle: animation.clips[0].name }, writeRotation: writeAnimatedRotation,
+    initial: 'idle',
+    states: { idle: animation.clips[0].name },
+    writeRotation: writeAnimatedRotation,
   });
 
   // Target manipulation owns pointer-down before orbit sees it. Both controls release on cancel/Escape.
@@ -478,7 +480,9 @@ try {
   const readMetrics = () => {
     metrics.residual = residual;
     metrics.gripError = Math.hypot(
-      heldPosition[0] - actualGrip[0], heldPosition[1] - actualGrip[1], heldPosition[2] - actualGrip[2],
+      heldPosition[0] - actualGrip[0],
+      heldPosition[1] - actualGrip[1],
+      heldPosition[2] - actualGrip[2],
     );
     metrics.targetMotion.settled = targetMotion.settled && (!controlRoute.active || controlRoute.settled);
     metrics.targetMotion.routing = controlRoute.active && !controlRoute.settled;
@@ -1045,7 +1049,9 @@ try {
     return reflectionMetrics;
   };
   const diagnostics = attachWorkshopDiagnostics(
-    $('viewport'), readMetrics, readReflection,
+    $('viewport'),
+    readMetrics,
+    readReflection,
     new URLSearchParams(location.search).get('diagnostics') === 'legacy',
   );
   diagnosticPublication = diagnostics;

@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import type { Collider, KinematicCharacterController, World } from './rapier-types.js';
 import type { PhysicsBody } from './body.js';
 import { checkVec, tuple, vec, type Vec3 } from './math.js';
 
@@ -36,13 +37,13 @@ export interface CharacterMoveResult {
  * Call `move(desired)` once per fixed step (for example from `physics.on('beforestep')`).
  */
 export class CharacterController {
-  readonly raw: any;
+  readonly raw: KinematicCharacterController;
   private disposed = false;
   private lastGrounded = false;
 
   /** @internal */
   constructor(
-    private readonly owner: { readonly world: any; removeController(controller: CharacterController): void },
+    private readonly owner: { readonly world: World; removeController(controller: CharacterController): void },
     readonly body: PhysicsBody,
     options: CharacterControllerOptions = {},
   ) {
@@ -83,7 +84,7 @@ export class CharacterController {
    */
   move(
     desired: Vec3,
-    filter?: { groups?: number; flags?: number; predicate?: (collider: any) => boolean },
+    filter?: { groups?: number; flags?: number; predicate?: (collider: Collider) => boolean },
   ): CharacterMoveResult {
     if (this.disposed) throw new Error('Character controller is disposed');
     if (!this.body.valid) throw new Error('Character body was removed');

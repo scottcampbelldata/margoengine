@@ -10,12 +10,14 @@ export interface Atlas {
   image: { data: Uint8Array; width: number; height: number };
   regions: TextureTransform[];
 }
-const raw = (s: any): s is Pixels => s?.data instanceof Uint8Array || s?.data instanceof Uint8ClampedArray;
+const raw = (s: unknown): s is Pixels =>
+  !!s && typeof s === 'object' && 'data' in s && (s.data instanceof Uint8Array || s.data instanceof Uint8ClampedArray);
 /** Decoded rows, flipped for drawable images so they keep `Texture`'s flipY orientation once stored as raw rows. */
 function pixels(s: Pixels | CanvasImageSource): [Pixels, boolean] {
   if (raw(s)) return [s, false];
-  const w = (s as any).naturalWidth ?? (s as any).width,
-    h = (s as any).naturalHeight ?? (s as any).height,
+  const dimensions = s as { naturalWidth?: number; naturalHeight?: number; width: number; height: number },
+    w = dimensions.naturalWidth ?? dimensions.width,
+    h = dimensions.naturalHeight ?? dimensions.height,
     c = new OffscreenCanvas(w, h).getContext('2d')!;
   c.drawImage(s, 0, 0);
   return [c.getImageData(0, 0, w, h), true];

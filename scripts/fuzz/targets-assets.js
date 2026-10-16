@@ -16,7 +16,7 @@ const root = resolve(import.meta.dirname, '../..'),
     readdirSync(join(root, dir))
       .filter((f) => pattern.test(f))
       .map((f) => file(join(dir, f))),
-  text = (bytes) => Buffer.from(bytes).toString('latin1');
+  _text = (bytes) => Buffer.from(bytes).toString('latin1');
 
 // --- builders shared by generators -----------------------------------------------------------------------------
 

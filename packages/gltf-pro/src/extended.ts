@@ -32,11 +32,11 @@ export const extendedMaterials: GLTFExtendedMaterials = {
       features: { iridescence: !!iridescence, anisotropy: !!anisotropy, diffuseTransmission: !!diffuse },
       // Slots 13-17; an extension whose factor is 0 binds nothing.
       maps: [
-        iridescence ? ir.iridescenceTexture : undefined,
-        iridescence ? ir.iridescenceThicknessTexture : undefined,
-        anisotropy ? an.anisotropyTexture : undefined,
-        diffuse ? dt.diffuseTransmissionTexture : undefined,
-        diffuse ? dt.diffuseTransmissionColorTexture : undefined,
+        iridescence ? ir!.iridescenceTexture : undefined,
+        iridescence ? ir!.iridescenceThicknessTexture : undefined,
+        anisotropy ? an!.anisotropyTexture : undefined,
+        diffuse ? dt!.diffuseTransmissionTexture : undefined,
+        diffuse ? dt!.diffuseTransmissionColorTexture : undefined,
       ],
       // Rows iri (factor, film IOR, thickness min, max in nm), aniso (strength, cos and sin of the rotation), dtr (factor, colour).
       rows: [

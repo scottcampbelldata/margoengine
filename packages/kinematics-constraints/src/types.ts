@@ -26,7 +26,9 @@ export function length3(x: number, y: number, z: number): number {
 function scaledLength3(x: number, y: number, z: number): number {
   const scale = Math.max(Math.abs(x), Math.abs(y), Math.abs(z));
   if (scale === 0) return 0;
-  x /= scale; y /= scale; z /= scale;
+  x /= scale;
+  y /= scale;
+  z /= scale;
   return scale * Math.sqrt(x * x + y * y + z * z);
 }
 
@@ -47,8 +49,7 @@ export function validatePositive(value: number, name = 'value'): void {
 }
 
 function isVector(value: unknown): value is Vec3View {
-  return (Array.isArray(value) || value instanceof Float32Array || value instanceof Float64Array)
-    && value.length === 3;
+  return (Array.isArray(value) || value instanceof Float32Array || value instanceof Float64Array) && value.length === 3;
 }
 
 export function validateVector(value: Vec3View, name = 'vector'): void {
@@ -66,15 +67,26 @@ export function validateOutputVector(value: MutableVec3View, name = 'output vect
 
 /** Reject impossible simultaneous outputs, including overlapping typed-array views. */
 export function validateDistinctOutputs(a: MutableVec3View, b: MutableVec3View): void {
-  if (a === b || (!Array.isArray(a) && !Array.isArray(b) && a.buffer === b.buffer
-    && a.byteOffset < b.byteOffset + b.byteLength && b.byteOffset < a.byteOffset + a.byteLength)) {
+  if (
+    a === b ||
+    (!Array.isArray(a) &&
+      !Array.isArray(b) &&
+      a.buffer === b.buffer &&
+      a.byteOffset < b.byteOffset + b.byteLength &&
+      b.byteOffset < a.byteOffset + a.byteLength)
+  ) {
     throw new TypeError('Output vectors must not overlap');
   }
 }
 
 export function validateOutputValues(out: MutableVec3View, x: number, y: number, z: number): void {
-  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)
-    || out instanceof Float32Array && (Math.abs(x) > FLOAT32_MAX || Math.abs(y) > FLOAT32_MAX || Math.abs(z) > FLOAT32_MAX)) {
+  if (
+    !Number.isFinite(x) ||
+    !Number.isFinite(y) ||
+    !Number.isFinite(z) ||
+    (out instanceof Float32Array &&
+      (Math.abs(x) > FLOAT32_MAX || Math.abs(y) > FLOAT32_MAX || Math.abs(z) > FLOAT32_MAX))
+  ) {
     throw new RangeError('Result exceeds output precision');
   }
 }

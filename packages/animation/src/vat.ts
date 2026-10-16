@@ -65,21 +65,21 @@ export function bakeVAT(animation: Animation, { fps = 30, clips }: VATBakeOption
     throw new RangeError('Invalid VAT fps or clips');
   const parts = model.primitives.map((p) => {
     const def = p.definition,
-      s = doc.nodes[p.nodeIndex].skin === undefined ? null : doc.skins[doc.nodes[p.nodeIndex].skin],
+      s = doc.nodes![p.nodeIndex].skin === undefined ? null : doc.skins![doc.nodes![p.nodeIndex].skin!],
       joints: number[] = s?.joints ?? [];
     return {
       p,
       count: p.vertices.length / 20,
       joints,
-      deltas: (def.targets ?? []).map((t: any) =>
+      deltas: (def.targets ?? []).map((t: Record<string, number>) =>
         [t.POSITION, t.NORMAL].map((a) => (a === undefined ? null : asset.accessor(a, 'VEC3'))),
       ),
       bind:
         s?.inverseBindMatrices === undefined
           ? new Float32Array(joints.length * 16).map((_, i) => +((i % 16) % 5 === 0))
           : asset.accessor(s.inverseBindMatrices, 'MAT4'),
-      ids: s ? asset.accessor(def.attributes.JOINTS_0, 'VEC4') : null,
-      weights: s ? asset.accessor(def.attributes.WEIGHTS_0, 'VEC4') : null,
+      ids: s ? asset.accessor(def.attributes!.JOINTS_0, 'VEC4') : null,
+      weights: s ? asset.accessor(def.attributes!.WEIGHTS_0, 'VEC4') : null,
       palette: new Float32Array(Math.max(1, joints.length) * 16),
     };
   });

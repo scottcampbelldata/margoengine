@@ -5,7 +5,7 @@ import { fetchBytes, type BinaryInput } from '@margoengine/loaders';
 import { canUseWorker, movable, runWorker } from '../../shared/worker.js';
 import { loadUSDZ, type USDOptions } from './index.js';
 import { parseUSD } from './any.js';
-const workerURL = () => new URL('./workers/usdz.js?no-inline', import.meta.url);
+const workerURL = () => new URL(/* @vite-ignore */ './workers/usdz.js?no-inline', import.meta.url);
 const job = ({ signal: _signal, fetch: _fetch, ...limits }: USDOptions) => limits;
 /**
  * parseUSDZ / parseUSDC / parseUSDA (by content: ZIP, Crate magic, else text) plus `create`, with parsing and texture

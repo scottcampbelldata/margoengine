@@ -1,10 +1,21 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { Camera, EngineKernel } from '@margoengine/core';
 
+/** Native handlers may specialize the event type, as in the DOM listener overloads. */
+export type InputEventListener = { handleEvent(event: Event): void }['handleEvent'];
+
+/** Document capabilities used for pointer lock and optional touch controls. */
+export interface ControlDocument extends EventTargetLike {
+  readonly pointerLockElement?: Element | ControlElement | null;
+  exitPointerLock?(): void;
+  createElement?: Document['createElement'];
+  readonly body?: Pick<HTMLElement, 'append'>;
+}
+
 /** The subset of an `HTMLElement` (normally the engine canvas) the controls use. Tests pass a plain object. */
 export interface ControlElement {
-  addEventListener(type: string, listener: (event: any) => void, options?: AddEventListenerOptions | boolean): void;
-  removeEventListener(type: string, listener: (event: any) => void, options?: EventListenerOptions | boolean): void;
+  addEventListener(type: string, listener: InputEventListener, options?: AddEventListenerOptions | boolean): void;
+  removeEventListener(type: string, listener: InputEventListener, options?: EventListenerOptions | boolean): void;
   readonly clientWidth: number;
   readonly clientHeight: number;
   setPointerCapture?(pointerId: number): void;
@@ -12,13 +23,13 @@ export interface ControlElement {
   hasPointerCapture?(pointerId: number): boolean;
   getBoundingClientRect?(): { left: number; top: number };
   style?: { touchAction: string };
-  ownerDocument?: any;
+  ownerDocument?: ControlDocument;
   requestPointerLock?(): unknown;
 }
 /** Anything keyboard or document events can be listened on: an element, `document` or `window`. */
 export interface EventTargetLike {
-  addEventListener(type: string, listener: (event: any) => void, options?: AddEventListenerOptions | boolean): void;
-  removeEventListener(type: string, listener: (event: any) => void, options?: EventListenerOptions | boolean): void;
+  addEventListener(type: string, listener: InputEventListener, options?: AddEventListenerOptions | boolean): void;
+  removeEventListener(type: string, listener: InputEventListener, options?: EventListenerOptions | boolean): void;
 }
 
 export interface ControlEvent {
@@ -50,7 +61,7 @@ export class EventDispatcher {
   }
 }
 
-type Binding = [EventTargetLike, string, (event: any) => void, AddEventListenerOptions | undefined];
+type Binding = [EventTargetLike, string, InputEventListener, AddEventListenerOptions | undefined];
 let pluginCounter = 0;
 
 const isEngine = (value: unknown): value is EngineKernel =>
@@ -138,7 +149,7 @@ export abstract class Controls extends EventDispatcher {
   /** Listeners to install on `connect`. Each control lists its own. */
   protected abstract bind(
     element: ControlElement,
-  ): Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
+  ): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
   protected onDisconnect(): void {}
 
   connect(element: ControlElement): void {

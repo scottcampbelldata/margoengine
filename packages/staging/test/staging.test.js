@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ContactShadows } from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+import { loadedPBRFixtures, serveLoadedPBRFixtures } from '../../../tests/support/loaded-pbr-fixtures.js';
 
 const identity = () => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 function scene() {
@@ -194,6 +195,83 @@ test('core meshes use the engine geometry buffers; disposed or foreign sources a
   } finally {
     contact.dispose();
   }
+});
+
+test('loaded gltf-pro and FBX mesh handles cast contact shadows from their current PBR buffers', async (t) => {
+  const assets = await serveLoadedPBRFixtures();
+  t.after(() => assets.close());
+  for (const fixture of loadedPBRFixtures)
+    await t.test(fixture.producer, async () => {
+      const loaded = await assets.load(fixture),
+        { engine, model, mesh, primitive } = loaded,
+        contact = ContactShadows.attach(engine, { static: true, resolution: 32 }),
+        draws = [];
+      let execute;
+      contact.registerPasses({
+        add(pass) {
+          execute = pass.execute;
+        },
+      });
+      const context = {
+        backend: 'webgpu',
+        device: engine.gpu,
+        camera: { matrix: identity(), position: [0, 2, 4] },
+        format: 'bgra8unorm',
+        descriptor: { multisample: { count: 4 }, depthStencil: { format: 'depth32float' } },
+        encoder: {
+          beginRenderPass() {
+            let vertex, pipeline;
+            return {
+              setPipeline(value) {
+                pipeline = value;
+              },
+              setBindGroup() {},
+              setVertexBuffer(_slot, value) {
+                vertex = value;
+              },
+              setIndexBuffer() {},
+              drawIndexed(count) {
+                draws.push({ vertex, count, stride: pipeline.vertex.buffers[0].arrayStride });
+              },
+              draw() {},
+              end() {},
+            };
+          },
+        },
+      };
+      const frame = () => {
+        draws.length = 0;
+        execute(context);
+        return draws;
+      };
+      try {
+        assert.equal(mesh.geometry, null);
+        contact.add(mesh);
+        const current = model.shadowPrimitives[0];
+        assert.deepEqual(frame(), [{ vertex: current.vertex, count: primitive.indices.length, stride: 80 }]);
+        assert.deepEqual(frame(), [], 'an unchanged static source reuses the contact texture');
+        const deformed = engine.gpu.createBuffer({ size: primitive.vertices.byteLength, usage: GPUBufferUsage.VERTEX });
+        primitive.deformed = deformed;
+        try {
+          assert.deepEqual(
+            frame(),
+            [{ vertex: deformed, count: primitive.indices.length, stride: 80 }],
+            'a changed draw buffer invalidates the cached contact texture',
+          );
+          model.root.visible = false;
+          assert.deepEqual(frame(), [], 'a hidden ancestor suppresses PBR contact draws');
+          model.root.visible = true;
+          assert.deepEqual(frame(), [{ vertex: deformed, count: primitive.indices.length, stride: 80 }]);
+        } finally {
+          primitive.deformed = undefined;
+          deformed.destroy();
+        }
+        model.dispose();
+        assert.deepEqual(frame(), [], 'disposed loader meshes no longer cast contact shadows');
+      } finally {
+        loaded.dispose();
+      }
+    });
 });
 
 test('fit centres the plane under model.bounds; options are validated', () => {

@@ -11,6 +11,7 @@ import {
   type BinaryInput,
 } from '@margoengine/loaders';
 import { parseCrate, type Specs } from './crate.js';
+import type { GLTFDocument, GLTFMaterial, GLTFNode } from '../../shared/gltf.js';
 
 export interface USDOptions {
   fetch?: typeof fetch;
@@ -35,6 +36,22 @@ type ImageSource = {
   roughnessValue?: number;
   metallicValue?: number;
 };
+type USDDocument = Required<
+  Pick<
+    GLTFDocument,
+    | 'asset'
+    | 'buffers'
+    | 'bufferViews'
+    | 'accessors'
+    | 'nodes'
+    | 'meshes'
+    | 'materials'
+    | 'images'
+    | 'textures'
+    | 'scenes'
+    | 'scene'
+  >
+>;
 const identity = () => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 function fail(message: string): never {
   throw new Error('USD: ' + message);
@@ -56,7 +73,7 @@ function bytes(input: BinaryInput): Uint8Array {
     ? new Uint8Array(input)
     : new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
 }
-function numeric(value: any, size?: number): ArrayLike<number> {
+function numeric(value: unknown, size?: number): ArrayLike<number> {
   if (!Array.isArray(value) && !ArrayBuffer.isView(value)) fail('expected numeric stream');
   const stream = value as ArrayLike<number>;
   if (size !== undefined && stream.length !== size) fail('invalid numeric stream length');
@@ -64,7 +81,7 @@ function numeric(value: any, size?: number): ArrayLike<number> {
     if (typeof stream[i] !== 'number' || !Number.isFinite(Math.fround(stream[i]))) fail('non-finite numeric stream');
   return stream;
 }
-function scalar(value: any, min = 0, max = 1): number {
+function scalar(value: unknown, min = 0, max = 1): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max)
     fail('invalid material factor');
   return value;
@@ -84,7 +101,7 @@ function pathName(name: string, base = ''): string {
 /** USDA prim tree (shared tokenizer from @margoengine/loaders) to the same spec map the Crate reader produces. */
 function asciiSpecs(text: string, maxDepth: number, signal?: AbortSignal): Specs {
   const layer = readUSDA(text, { maxDepth, signal, assets: true, skipOver: true });
-  const plain = (v: USDValue): any =>
+  const plain = (v: USDValue): unknown =>
     Array.isArray(v)
       ? v.every((e) => typeof e === 'number' || Array.isArray(e))
         ? (v as unknown[]).flat(Infinity)
@@ -209,7 +226,7 @@ function compose(path: string, specs: Specs): number[] {
 }
 export class USDAsset {
   constructor(
-    readonly document: Record<string, any>,
+    readonly document: GLTFDocument,
     readonly buffers: ArrayBufferView[],
     readonly meshes: USDMesh[],
     private readonly sources: ImageSource[],
@@ -283,7 +300,7 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
     buffers: ArrayBufferView[] = [],
     meshes: USDMesh[] = [],
     sources: ImageSource[] = [],
-    doc: any = {
+    doc: USDDocument = {
       asset: { version: '2.0' },
       buffers: [],
       bufferViews: [],
@@ -327,7 +344,7 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
     let binding: string | undefined;
     for (let owner = path; owner && !binding; owner = owner.slice(0, owner.lastIndexOf('/')))
       binding = firstPath(specs[owner + '.material:binding']?.fields.targetPaths);
-    let shader = binding ? connection(binding, 'outputs:surface')?.split('.outputs:')[0] : undefined;
+    const shader = binding ? connection(binding, 'outputs:surface')?.split('.outputs:')[0] : undefined;
     if (binding && !shader) fail('unresolved material binding');
     if (shader && attrs(shader, 'info:id') !== 'UsdPreviewSurface') fail('unsupported surface shader');
     const key = shader ?? '';
@@ -336,12 +353,12 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
       opacity = scalar(shader ? (attrs(shader, 'inputs:opacity') ?? 1) : 1),
       roughness = scalar(shader ? (attrs(shader, 'inputs:roughness') ?? 0.5) : 0.5),
       metallic = scalar(shader ? (attrs(shader, 'inputs:metallic') ?? 0) : 0);
-    const p: any = {
+    const p: NonNullable<GLTFMaterial['pbrMetallicRoughness']> = {
         baseColorFactor: [scalar(rgb[0]), scalar(rgb[1]), scalar(rgb[2]), opacity],
         roughnessFactor: roughness,
         metallicFactor: metallic,
       },
-      definition: any = {
+      definition: GLTFMaterial = {
         pbrMetallicRoughness: p,
         doubleSided: true,
         alphaMode: opacity < 1 ? 'BLEND' : 'OPAQUE',
@@ -392,7 +409,13 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
   const metadata = specs['/']?.fields ?? {},
     unit = metadata.metersPerUnit ?? 0.01,
     axis = metadata.upAxis ?? 'Y';
-  if (typeof unit !== 'number' || !Number.isFinite(unit) || unit <= 0 || !['Y', 'Z'].includes(axis))
+  if (
+    typeof unit !== 'number' ||
+    !Number.isFinite(unit) ||
+    unit <= 0 ||
+    typeof axis !== 'string' ||
+    !['Y', 'Z'].includes(axis)
+  )
     fail('invalid units or up axis');
   const base = identity();
   base[0] = unit;
@@ -414,17 +437,20 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
         parentId = nodeIds.get(parent);
       if (parentId === undefined) continue;
       if (spec.fields.active === false || attrs(path, 'visibility') === 'invisible') continue;
-      const node: any = {
+      const node: GLTFNode & { children: number[] } = {
           name: path.split('/').at(-1),
           matrix: compose(path, specs),
           children: [],
         },
         id = doc.nodes.length;
       doc.nodes.push(node);
-      doc.nodes[parentId].children.push(id);
+      doc.nodes[parentId].children!.push(id);
       nodeIds.set(path, id);
       if (spec.fields.typeName !== 'Mesh') continue;
-      if ((attrs(path, 'subdivisionScheme') ?? 'catmullClark') !== 'none' || attrs(path, 'holeIndices')?.length)
+      if (
+        (attrs(path, 'subdivisionScheme') ?? 'catmullClark') !== 'none' ||
+        (attrs(path, 'holeIndices') as ArrayLike<number> | undefined)?.length
+      )
         fail('subdivision and hole faces are unsupported');
       const points = numeric(attrs(path, 'points')),
         counts = numeric(attrs(path, 'faceVertexCounts')),
@@ -449,7 +475,7 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
         uvValue = attrs(path, 'primvars:st'),
         normal = normalValue === undefined ? undefined : numeric(normalValue),
         uv = uvValue === undefined ? undefined : numeric(uvValue),
-        uvIndices = attrs(path, 'primvars:st:indices'),
+        uvIndices = attrs(path, 'primvars:st:indices') as ArrayLike<number> | undefined,
         positions = new Float32Array(triangles * 9),
         normals = new Float32Array(triangles * 9),
         uvs = uv ? new Float32Array(triangles * 6) : undefined,
@@ -475,7 +501,8 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
       let cursor = 0,
         at = 0;
       const orientation = attrs(path, 'orientation') ?? 'rightHanded';
-      if (!['leftHanded', 'rightHanded'].includes(orientation)) fail('invalid orientation');
+      if (typeof orientation !== 'string' || !['leftHanded', 'rightHanded'].includes(orientation))
+        fail('invalid orientation');
       for (let f = 0; f < counts.length; f++) {
         const count = counts[f];
         // shortcut: triangles and convex planar polygons, tessellate concave polygons before loading.
@@ -532,7 +559,7 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
               for (let d = 0; d < 3; d++) normals[at * 3 + d] = normal[n * 3 + d];
             }
             if (uv && uvs) {
-              let u = uvIndices
+              const u = uvIndices
                 ? uvIndices[sample(uvIndices, 1, corner, vertex, f, 'primvars:st')]
                 : sample(uv, 2, corner, vertex, f, 'primvars:st');
               if (!Number.isSafeInteger(u) || u < 0 || u * 2 + 1 >= uv.length) fail('UV index outside stream');
@@ -546,7 +573,7 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
       }
       if (!normal) normals.set(computeVertexNormals(positions, indices));
       const materialId = material(path),
-        attributes: any = {
+        attributes: Record<string, number> = {
           POSITION: accessor(positions, 'VEC3'),
           NORMAL: accessor(normals, 'VEC3'),
         };

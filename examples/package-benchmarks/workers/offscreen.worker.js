@@ -26,7 +26,7 @@ const frames = (n) =>
   });
 self.onmessage = async ({ data }) => {
   const { canvas } = data;
-  let engine, picked;
+  let engine, _picked;
   await step('globals', () => ({
     window: typeof window,
     document: typeof document,
@@ -50,7 +50,7 @@ self.onmessage = async ({ data }) => {
   const errors = [];
   engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
   await step('mesh + render()', () => {
-    picked = engine
+    _picked = engine
       .createMesh()
       .setGeometry(box(1, 1, 1))
       .setPosition([-1.6, 0.5, 0]);

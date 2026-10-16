@@ -10,7 +10,7 @@ const quickstart = await readFile('examples/vite/src/quickstart.ts', 'utf8');
 const parsedQuickstart = parseSync('quickstart.ts', quickstart);
 assert.deepEqual(parsedQuickstart.errors, [], 'The orb quickstart must parse as TypeScript');
 assert.deepEqual(
-  parsedQuickstart.program.body.map(statement => statement.type),
+  parsedQuickstart.program.body.map((statement) => statement.type),
   ['ImportDeclaration', 'VariableDeclaration', 'VariableDeclaration', 'ExpressionStatement', 'ExpressionStatement'],
   'Keep five top-level quickstart steps: import, stage, orb, animation and cleanup',
 );

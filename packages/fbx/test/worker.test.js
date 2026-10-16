@@ -1,8 +1,8 @@
 // HANDOFF 1f.j: parseFBXInWorker's worker (dist/workers/fbx.js) + modelFromPrepared build the same model as parseFBX,
 // compared byte for byte (see tests/support/pbr-snapshot.js for what is compared).
 import test from 'node:test';
-import {readFileSync} from 'node:fs';
-import {rigFixture} from './native-scene-helper.js';
+import { readFileSync } from 'node:fs';
+import { rigFixture } from './native-scene-helper.js';
 import assert from 'node:assert/strict';
 import { parseFBX } from '../dist/index.js';
 import { modelFromPrepared } from '../../gltf-pro/dist/worker.js';
@@ -42,7 +42,12 @@ function textured() {
         [L(400 + i), 'Video::V' + i, 'Clip'],
         [
           ['RelativeFilename', ['tex' + i + '.png']],
-          ['Content', ['iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWP4////fwAJ+wP9CNHoHgAAAABJRU5ErkJggg==']],
+          [
+            'Content',
+            [
+              'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWP4////fwAJ+wP9CNHoHgAAAABJRU5ErkJggg==',
+            ],
+          ],
         ],
       ],
     );
@@ -62,11 +67,8 @@ function textured() {
   );
 }
 for (const [name, file] of [
-  [
-    'real Blender binary rig',
-    () => readFileSync(new URL('./fixtures/blender-rig.fbx',import.meta.url)),
-  ],
-  ['ASCII rig with skin, morph, geometric transform and animation',()=>new TextEncoder().encode(rigFixture())],
+  ['real Blender binary rig', () => readFileSync(new URL('./fixtures/blender-rig.fbx', import.meta.url))],
+  ['ASCII rig with skin, morph, geometric transform and animation', () => new TextEncoder().encode(rigFixture())],
   ['ASCII with embedded textures', textured],
   ['128 x 128 quad grid, binary', () => binary(grid(128), { compress: true })],
 ])
@@ -89,12 +91,20 @@ test('FBX worker errors keep their type and message', () =>
     );
   }));
 
-
-test('FBX worker preserves unsupported inheritance errors from the native parser',()=>headlessModels(async()=>{
-  const scene=rich({morphAnimation:true});
-  const properties=scene.find(([name])=>name==='GlobalSettings')[2].find(([name])=>name==='Properties70')[2];
-  properties.push(['P',['FrontAxis','int','Integer','',{I:1}]],['P',['FrontAxisSign','int','Integer','',{I:-1}]]);
-  const input=new Uint8Array(binary(scene,{compress:true}));
-  await assert.rejects(parseFBX(await headless(),input.slice()),/unsupported InheritType/);
-  await assert.rejects(runParseWorker(worker,{input:input.slice().buffer,resourcePath:'https://example.test/'}),/unsupported InheritType/);
-}));
+test('FBX worker preserves unsupported inheritance errors from the native parser', () =>
+  headlessModels(async () => {
+    const scene = rich({ morphAnimation: true });
+    const properties = scene
+      .find(([name]) => name === 'GlobalSettings')[2]
+      .find(([name]) => name === 'Properties70')[2];
+    properties.push(
+      ['P', ['FrontAxis', 'int', 'Integer', '', { I: 1 }]],
+      ['P', ['FrontAxisSign', 'int', 'Integer', '', { I: -1 }]],
+    );
+    const input = new Uint8Array(binary(scene, { compress: true }));
+    await assert.rejects(parseFBX(await headless(), input.slice()), /unsupported InheritType/);
+    await assert.rejects(
+      runParseWorker(worker, { input: input.slice().buffer, resourcePath: 'https://example.test/' }),
+      /unsupported InheritType/,
+    );
+  }));

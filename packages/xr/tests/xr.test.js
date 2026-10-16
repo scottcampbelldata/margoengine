@@ -610,11 +610,18 @@ test('device loss releases cached eye views and prevents reuse of the lost manag
   assert.ok(f.errors.some((error) => /test loss/.test(error.message)));
 });
 
-test('XR grows isolated instance storage after the core store expands',async t=>{
- const f=await fixture(t),xr=await XR.create(f.engine);await xr.requestSession();
- const viewer={...pose(0),views:[{eye:'left',projectionMatrix:identity(),transform:pose(0).transform}]};
- f.session.tick(100,viewer);const initial=f.buffers.find(buffer=>buffer.descriptor.size===4*24*4);
- for(let i=0;i<8;i++)f.engine.createMesh().setGeometry(f.mesh.geometry).setPosition([i,0,0]);
- f.session.tick(116,viewer);assert.deepEqual(f.errors,[]);assert.ok(f.writes.some(write=>write.data.length===9*24));assert.equal(initial.destroyed,1);
- await xr.end();assert.ok(f.buffers.every(buffer=>buffer.destroyed===1));
+test('XR grows isolated instance storage after the core store expands', async (t) => {
+  const f = await fixture(t),
+    xr = await XR.create(f.engine);
+  await xr.requestSession();
+  const viewer = { ...pose(0), views: [{ eye: 'left', projectionMatrix: identity(), transform: pose(0).transform }] };
+  f.session.tick(100, viewer);
+  const initial = f.buffers.find((buffer) => buffer.descriptor.size === 4 * 24 * 4);
+  for (let i = 0; i < 8; i++) f.engine.createMesh().setGeometry(f.mesh.geometry).setPosition([i, 0, 0]);
+  f.session.tick(116, viewer);
+  assert.deepEqual(f.errors, []);
+  assert.ok(f.writes.some((write) => write.data.length === 9 * 24));
+  assert.equal(initial.destroyed, 1);
+  await xr.end();
+  assert.ok(f.buffers.every((buffer) => buffer.destroyed === 1));
 });

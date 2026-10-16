@@ -79,11 +79,11 @@ export class WorkerPool {
         // Synchronous Wasm keeps running after cancellation. Retain its slot occupancy until the reply.
         reject(signal!.reason ?? new DOMException('Aborted', 'AbortError'));
       };
-      const settle = (fn: (value: any) => void) => (value: unknown) => {
+      const settle = (fn: (value: unknown) => void) => (value: unknown) => {
         signal?.removeEventListener('abort', abort);
         fn(value);
       };
-      slot.jobs.set(id, { resolve: settle(resolve), reject: settle(reject) });
+      slot.jobs.set(id, { resolve: settle((value) => resolve(value as T)), reject: settle(reject) });
       signal?.addEventListener('abort', abort, { once: true });
       try {
         slot.worker.postMessage({ ...message, id }, transfer);

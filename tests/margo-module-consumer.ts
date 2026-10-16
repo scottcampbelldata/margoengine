@@ -1,66 +1,125 @@
 import * as module0 from '@margoengine/input';
-import {materialLobes,sheen,specular,anisotropy,iridescence,type MaterialLobeOptions} from '@margoengine/materials';
-import type {MaterialExtension} from '@margoengine/gltf-pro';
-import {Clustered,type LocalShadowOptions,type LocalLightShadow,type PointLight} from '@margoengine/clustered';
-import type {PBRModel} from '@margoengine/gltf-pro';
-import type {PBRPickingGeometry} from '@margoengine/gltf-pro';
-import type {PickingSource} from '@margoengine/selection';
-import {getSceneBounds, fitScene, gatherSceneBuffers, type SceneBuffers} from '@margoengine/gltf-pro/scene';
+import {
+  materialLobes,
+  sheen,
+  specular,
+  anisotropy,
+  iridescence,
+  type MaterialLobeOptions,
+} from '@margoengine/materials';
+import type { MaterialExtension } from '@margoengine/gltf-pro';
+import { Clustered, type LocalShadowOptions, type LocalLightShadow, type PointLight } from '@margoengine/clustered';
+import type { PBRModel } from '@margoengine/gltf-pro';
+import type { PBRPickingGeometry } from '@margoengine/gltf-pro';
+import type { PickingSource } from '@margoengine/selection';
+import { getSceneBounds, fitScene, gatherSceneBuffers, type SceneBuffers } from '@margoengine/gltf-pro/scene';
 
-export function mixedSceneHelpers(engine:import('@margoengine/core').EngineKernel, model:PBRModel, core:import('@margoengine/core').Mesh) {
+export function mixedSceneHelpers(
+  engine: import('@margoengine/core').EngineKernel,
+  model: PBRModel,
+  core: import('@margoengine/core').Mesh,
+) {
   const roots = [model.root, core];
-  const bounds:Float32Array = getSceneBounds(engine, roots, {visibleOnly:false});
-  fitScene(engine, roots, {duration:0, padding:1.2});
-  const buffers:SceneBuffers[]|null = gatherSceneBuffers(engine, roots);
+  const bounds: Float32Array = getSceneBounds(engine, roots, { visibleOnly: false });
+  fitScene(engine, roots, { duration: 0, padding: 1.2 });
+  const buffers: SceneBuffers[] | null = gatherSceneBuffers(engine, roots);
   for (const record of buffers ?? []) {
-    const format:'uint32' = record.indexFormat;
-    if (record.kind === 'core') {const stride:24=record.stride; void [stride,record.instance,record.geometry,format];}
-    else {const stride:80=record.stride; void [stride,record.primitive,record.alphaTexture,format];}
+    const format: 'uint32' = record.indexFormat;
+    if (record.kind === 'core') {
+      const stride: 24 = record.stride;
+      void [stride, record.instance, record.geometry, format];
+    } else {
+      const stride: 80 = record.stride;
+      void [stride, record.primitive, record.alphaTexture, format];
+    }
   }
   // @ts-expect-error Root selections must contain mesh handles, not whole models.
   getSceneBounds(engine, [model]);
   // @ts-expect-error Visibility selection is boolean.
-  gatherSceneBuffers(engine, roots, {visibleOnly:'all'});
-  return {bounds,buffers};
+  gatherSceneBuffers(engine, roots, { visibleOnly: 'all' });
+  return { bounds, buffers };
 }
 
-export async function deformedQueries(engine:import('@margoengine/core').EngineKernel,model:PBRModel) {
-  const source:PickingSource=model,picking=module10.Picking.attach(engine,{capture:false});
-  const remove=picking.add(source),selection=module10.Selection.attach(engine),removeSelection=selection.add(model);
-  selection.set(model.primitives.map(primitive=>primitive.node));
-  const pose:readonly PBRPickingGeometry[]=await model.readPickingGeometry();
-  const hits=await new module24.Raycaster([0,0,4],[0,0,-1]).intersectModel(model);
-  remove();removeSelection();selection.dispose();picking.dispose();return {pose,hits};
+export async function deformedQueries(engine: import('@margoengine/core').EngineKernel, model: PBRModel) {
+  const source: PickingSource = model,
+    picking = module10.Picking.attach(engine, { capture: false });
+  const remove = picking.add(source),
+    selection = module10.Selection.attach(engine),
+    removeSelection = selection.add(model);
+  selection.set(model.primitives.map((primitive) => primitive.node));
+  const pose: readonly PBRPickingGeometry[] = await model.readPickingGeometry();
+  const hits = await new module24.Raycaster([0, 0, 4], [0, 0, -1]).intersectModel(model);
+  remove();
+  removeSelection();
+  selection.dispose();
+  picking.dispose();
+  return { pose, hits };
 }
-import {preload,Group,Html,type CanvasProps,type PointerHandlers,type MargoContextValue} from '@margoengine/react';
+import {
+  preload,
+  Group,
+  Html,
+  type CanvasProps,
+  type PointerHandlers,
+  type MargoContextValue,
+} from '@margoengine/react';
 
-export const demandCanvas:CanvasProps={frameloop:'demand'};
-export const clickHandlers:PointerHandlers={onClick:event=>event.mesh.setPosition([1,0,0])};
-export function reactCanvasContext(context:MargoContextValue):number {context.invalidate();const camera=context.camera,engine=context.gl;return context.size.width+context.size.height+context.clock+(camera&&engine?1:0);}
-export const optionalReactComponents=[Group,Html,preload];
+export const demandCanvas: CanvasProps = { frameloop: 'demand' };
+export const clickHandlers: PointerHandlers = { onClick: (event) => event.mesh.setPosition([1, 0, 0]) };
+export function reactCanvasContext(context: MargoContextValue): number {
+  context.invalidate();
+  const camera = context.camera,
+    engine = context.gl;
+  return context.size.width + context.size.height + context.clock + (camera && engine ? 1 : 0);
+}
+export const optionalReactComponents = [Group, Html, preload];
 // @ts-expect-error Canvas accepts only the two supported frame loops.
-export const invalidFrameLoop:CanvasProps={frameloop:'sometimes'};
+export const invalidFrameLoop: CanvasProps = { frameloop: 'sometimes' };
 
-export function localLightShadows(engine:import('@margoengine/core').EngineKernel,mesh:import('@margoengine/core').Mesh,model:PBRModel) {
-  const shadows:LocalShadowOptions={resolution:256,maxLights:2};
-  const shadow:LocalLightShadow={near:0.05,bias:0.0005,normalBias:0.01};
-  const point:PointLight={position:[0,3,0],range:12,shadow};
-  const lights=Clustered.attach(engine,{shadows});
-  lights.setLights([point,{position:[2,3,0],range:10,direction:[0,-1,0],outerAngle:0.6,shadow:true}]);
-  const remove=lights.addShadowCaster(mesh),removeModel=lights.addShadowCaster(model);lights.add(model);
+export function localLightShadows(
+  engine: import('@margoengine/core').EngineKernel,
+  mesh: import('@margoengine/core').Mesh,
+  model: PBRModel,
+) {
+  const shadows: LocalShadowOptions = { resolution: 256, maxLights: 2 };
+  const shadow: LocalLightShadow = { near: 0.05, bias: 0.0005, normalBias: 0.01 };
+  const point: PointLight = { position: [0, 3, 0], range: 12, shadow };
+  const lights = Clustered.attach(engine, { shadows });
+  lights.setLights([point, { position: [2, 3, 0], range: 10, direction: [0, -1, 0], outerAngle: 0.6, shadow: true }]);
+  const remove = lights.addShadowCaster(mesh),
+    removeModel = lights.addShadowCaster(model);
+  lights.add(model);
   // @ts-expect-error Shadow activation is boolean or numeric configuration.
-  lights.setLights([{position:[0,0,0],range:1,shadow:'yes'}]);
-  return ()=>{remove();removeModel();lights.dispose();};
+  lights.setLights([{ position: [0, 0, 0], range: 1, shadow: 'yes' }]);
+  return () => {
+    remove();
+    removeModel();
+    lights.dispose();
+  };
 }
 
-export function materialExtensions(view:GPUTextureView,sampler:GPUSampler):MaterialExtension {
-  const options:MaterialLobeOptions={ior:1.5,sheen:{colorFactor:[0.3,0.2,0.1],sheenColorTexture:{view,sampler,texCoord:1,transform:{offset:[0.2,0.1],rotation:0.3,scale:[0.5,0.75]}}},specular:{factor:0.8,colorFactor:[2,1,0.5]},anisotropy:{strength:0.5,rotation:0.2},iridescence:{factor:0.6,ior:1.3,thicknessMinimum:100,thicknessMaximum:400}};
-  const defaults=[sheen(),specular(),anisotropy(),iridescence()];
+export function materialExtensions(view: GPUTextureView, sampler: GPUSampler): MaterialExtension {
+  const options: MaterialLobeOptions = {
+    ior: 1.5,
+    sheen: {
+      colorFactor: [0.3, 0.2, 0.1],
+      sheenColorTexture: {
+        view,
+        sampler,
+        texCoord: 1,
+        transform: { offset: [0.2, 0.1], rotation: 0.3, scale: [0.5, 0.75] },
+      },
+    },
+    specular: { factor: 0.8, colorFactor: [2, 1, 0.5] },
+    anisotropy: { strength: 0.5, rotation: 0.2 },
+    iridescence: { factor: 0.6, ior: 1.3, thicknessMinimum: 100, thicknessMaximum: 400 },
+  };
+  const defaults = [sheen(), specular(), anisotropy(), iridescence()];
   // @ts-expect-error Factors are numeric, never WGSL source.
-  sheen({roughnessFactor:'0.5'});
+  sheen({ roughnessFactor: '0.5' });
   // @ts-expect-error Only the two fixed UV sets are exposed.
-  anisotropy({anisotropyTexture:{view,texCoord:2}});
-  return materialLobes(options,defaults[0]);
+  anisotropy({ anisotropyTexture: { view, texCoord: 2 } });
+  return materialLobes(options, defaults[0]);
 }
 import * as module1 from '@margoengine/ecs';
 import * as module2 from '@margoengine/fsm';
@@ -99,38 +158,101 @@ import * as module34 from '@margoengine/points';
 import * as module35 from '@margoengine/audio';
 import * as module36 from '@margoengine/physics';
 import * as module37 from '@margoengine/terrain';
-import {PbrMaterial, type EngineKernel} from '@margoengine/core';
-export const modules = [module0,module1,module2,module3,module4,module5,module6,module7,module8,module9,module10,module11,module12,module13,module14,module15,module16,module17,module18,module19,module20,module21,module22,module23,module24,module25,module26,module27,module28,module29,module30,module31,module32,module33,module34,module35,module36,module37];
-export function example(engine:EngineKernel){
- const world=new module1.World(64),position=world.component({x:Float32Array});
- position.add(world.create(),{x:1});
- const curve=new module5.Spline([[0,0,0],[0,0,10]]);
- const path=new module3.NavMesh([[0,0,0],[1,0,0],[0,0,1]],[[0,1,2]]).path([0.1,0,0.1],[0.2,0,0.2]);
- const input=new module0.Input({jump:[{type:'key',code:'Space'}]});
- const road=module13.road(curve);
- const height=module12.createIslandHeight(731),cabin=module12.generateCabinMesh(height,[-10,23]),grass=module12.generateGrassMesh(3);
- const ground=module37.heightfieldGeometry(height,{size:[160,160],resolution:32});
- module37.TerrainHeightmap.attach(engine,height,{size:[160,160],resolution:256});
- const material=new PbrMaterial(),rig=module12.createHumanoid(engine,[material,material,material]);
- module12.poseHumanoid(rig,new Float32Array([0,0,0]),0,0,0);
- const camera=module4.Cinematic.attach(engine);camera.setOrbitOffset(0,0.3,14,0.8);
- const tree=module12.generateTreeMesh('conifer'),shrub=module12.generateShrubMesh();
- const layout=new module14.PlacementLayout([[-3,-4,3,4]]);
- const bushes=layout.place([[5,0,1,0],[7,0,0.7,1]],0.85);
- module6.Transitions.attach(engine).start('radial',1);
- module7.Toon.attach(engine);
- module8.Water.attach(engine,{waves:[{direction:[1,0],amplitude:0.1,wavelength:10}]});
- module9.Sky.attach(engine,{model:'bruneton',clouds:{coverage:0.45,speed:8,height:1500}});
- module14.Scatter.attach(engine,module27.toGeometry(grass),{wind:[1,0.35,0.2]});
- const selected=module10.Selection.attach(engine);selected.set([engine.createMesh().setGeometry(road.geometry)]);
- module10.Picking.attach(engine);
- module15.HTML.attach(engine).add(document.createElement('span'),{position:[0,1,0]});
- const snapshot=module17.createSnapshot();new module17.SnapshotBuffer().sample(1,snapshot);
- return {world,path,input,tree,shrub,bushes,cabin,grass,ground};
+import { PbrMaterial, type EngineKernel } from '@margoengine/core';
+export const modules = [
+  module0,
+  module1,
+  module2,
+  module3,
+  module4,
+  module5,
+  module6,
+  module7,
+  module8,
+  module9,
+  module10,
+  module11,
+  module12,
+  module13,
+  module14,
+  module15,
+  module16,
+  module17,
+  module18,
+  module19,
+  module20,
+  module21,
+  module22,
+  module23,
+  module24,
+  module25,
+  module26,
+  module27,
+  module28,
+  module29,
+  module30,
+  module31,
+  module32,
+  module33,
+  module34,
+  module35,
+  module36,
+  module37,
+];
+export function example(engine: EngineKernel) {
+  const world = new module1.World(64),
+    position = world.component({ x: Float32Array });
+  position.add(world.create(), { x: 1 });
+  const curve = new module5.Spline([
+    [0, 0, 0],
+    [0, 0, 10],
+  ]);
+  const path = new module3.NavMesh(
+    [
+      [0, 0, 0],
+      [1, 0, 0],
+      [0, 0, 1],
+    ],
+    [[0, 1, 2]],
+  ).path([0.1, 0, 0.1], [0.2, 0, 0.2]);
+  const input = new module0.Input({ jump: [{ type: 'key', code: 'Space' }] });
+  const road = module13.road(curve);
+  const height = module12.createIslandHeight(731),
+    cabin = module12.generateCabinMesh(height, [-10, 23]),
+    grass = module12.generateGrassMesh(3);
+  const ground = module37.heightfieldGeometry(height, { size: [160, 160], resolution: 32 });
+  module37.TerrainHeightmap.attach(engine, height, { size: [160, 160], resolution: 256 });
+  const material = new PbrMaterial(),
+    rig = module12.createHumanoid(engine, [material, material, material]);
+  module12.poseHumanoid(rig, new Float32Array([0, 0, 0]), 0, 0, 0);
+  const camera = module4.Cinematic.attach(engine);
+  camera.setOrbitOffset(0, 0.3, 14, 0.8);
+  const tree = module12.generateTreeMesh('conifer'),
+    shrub = module12.generateShrubMesh();
+  const layout = new module14.PlacementLayout([[-3, -4, 3, 4]]);
+  const bushes = layout.place(
+    [
+      [5, 0, 1, 0],
+      [7, 0, 0.7, 1],
+    ],
+    0.85,
+  );
+  module6.Transitions.attach(engine).start('radial', 1);
+  module7.Toon.attach(engine);
+  module8.Water.attach(engine, { waves: [{ direction: [1, 0], amplitude: 0.1, wavelength: 10 }] });
+  module9.Sky.attach(engine, { model: 'bruneton', clouds: { coverage: 0.45, speed: 8, height: 1500 } });
+  module14.Scatter.attach(engine, module27.toGeometry(grass), { wind: [1, 0.35, 0.2] });
+  const selected = module10.Selection.attach(engine);
+  selected.set([engine.createMesh().setGeometry(road.geometry)]);
+  module10.Picking.attach(engine);
+  module15.HTML.attach(engine).add(document.createElement('span'), { position: [0, 1, 0] });
+  const snapshot = module17.createSnapshot();
+  new module17.SnapshotBuffer().sample(1, snapshot);
+  return { world, path, input, tree, shrub, bushes, cabin, grass, ground };
 }
-export async function navigation(){
- const nav=await module20.Navigation.create([0,0,0,1,0,0,0,0,1],[0,2,1]);
- const points=nav.path({x:0,y:0,z:0},{x:1,y:0,z:1});
- nav.dispose();return points;
+export async function navigation() {
+  const nav = await module20.Navigation.create([0, 0, 0, 1, 0, 0, 0, 0, 1], [0, 2, 1]);
+  const points = nav.path({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 1 });
+  nav.dispose();
+  return points;
 }
-

@@ -11,7 +11,7 @@ export interface IFCWorkerOptions extends IFCOptions {
   timeoutMs?: number;
 }
 
-const workerURL = () => new URL('./workers/ifc.js?no-inline', import.meta.url);
+const workerURL = () => new URL(/* @vite-ignore */ './workers/ifc.js?no-inline', import.meta.url);
 const revive = (e: { name: string; message: string; [key: string]: unknown }) =>
   e.name === 'LoaderError'
     ? Object.assign(new LoaderError(e.format as string, e.code as LoaderError['code'], ''), { message: e.message })

@@ -1,44 +1,67 @@
-import type {MaterialExtension} from '@margoengine/gltf-pro';
-import type {ClearcoatTextureSlot} from './shader.js';
-import {coordinateExpression,coordinateWGSL} from './coordinates.js';
-import {iridescenceWGSL} from './iridescence.js';
+import type { MaterialExtension } from '@margoengine/gltf-pro';
+import type { ClearcoatTextureSlot } from './shader.js';
+import { coordinateExpression, coordinateWGSL } from './coordinates.js';
+import { iridescenceWGSL } from './iridescence.js';
 
 export interface LobeShaderConfig {
   /** [linear color RGB, roughness]. */
-  sheen?:{index:number;color?:ClearcoatTextureSlot;roughness?:ClearcoatTextureSlot};
+  sheen?: { index: number; color?: ClearcoatTextureSlot; roughness?: ClearcoatTextureSlot };
   /** [linear F0 color RGB, dielectric specular strength]. Identity is white/1. */
-  specular?:{index:number;color?:ClearcoatTextureSlot;factor?:ClearcoatTextureSlot};
+  specular?: { index: number; color?: ClearcoatTextureSlot; factor?: ClearcoatTextureSlot };
   /** [strength, rotation radians, 0, 0]. */
-  anisotropy?:{index:number;texture?:ClearcoatTextureSlot};
+  anisotropy?: { index: number; texture?: ClearcoatTextureSlot };
   /** [factor, film IOR, minimum thickness nm, maximum thickness nm]. */
-  iridescence?:{index:number;factor?:ClearcoatTextureSlot;thickness?:ClearcoatTextureSlot};
-  ior?:number;
+  iridescence?: { index: number; factor?: ClearcoatTextureSlot; thickness?: ClearcoatTextureSlot };
+  ior?: number;
   /** False when an earlier extension already declares materialUV. */
-  coordinateHelper?:boolean;
+  coordinateHelper?: boolean;
 }
 
 /** Optional lobes replace only the existing directional BRDF and hemisphere approximation. */
-export function lobeShader(config:LobeShaderConfig):Pick<MaterialExtension,'wgsl'|'declarations'|'direct'|'ambient'> {
-  const {sheen,specular,anisotropy,iridescence}=config,ior=config.ior??1.5;
-  if(!Number.isFinite(Math.fround(ior))||ior<1)throw new RangeError('Invalid lobe IOR');
-  const dielectricF0=ior===1.5?'0.04':String(((ior-1)/(ior+1))**2)+(Number.isInteger(((ior-1)/(ior+1))**2)?'.0':'');
-  const sample=(slot:ClearcoatTextureSlot)=>{
-    const texture=`materialTexture${slot.index}`,coords=coordinateExpression(slot);
-    if(slot.sampler)return `textureSample(${texture},materialSampler${slot.index},${coords})`;
-    const size=`vec2f(textureDimensions(${texture},0))`;
+export function lobeShader(
+  config: LobeShaderConfig,
+): Pick<MaterialExtension, 'wgsl' | 'declarations' | 'direct' | 'ambient'> {
+  const { sheen, specular, anisotropy, iridescence } = config,
+    ior = config.ior ?? 1.5;
+  if (!Number.isFinite(Math.fround(ior)) || ior < 1) throw new RangeError('Invalid lobe IOR');
+  const dielectricF0 =
+    ior === 1.5
+      ? '0.04'
+      : String(((ior - 1) / (ior + 1)) ** 2) + (Number.isInteger(((ior - 1) / (ior + 1)) ** 2) ? '.0' : '');
+  const sample = (slot: ClearcoatTextureSlot) => {
+    const texture = `materialTexture${slot.index}`,
+      coords = coordinateExpression(slot);
+    if (slot.sampler) return `textureSample(${texture},materialSampler${slot.index},${coords})`;
+    const size = `vec2f(textureDimensions(${texture},0))`;
     return `textureLoad(${texture},vec2i(clamp(${coords}*${size},vec2f(0),${size}-vec2f(1))),0)`;
   };
-  const slots=[sheen?.color,sheen?.roughness,specular?.color,specular?.factor,anisotropy?.texture,iridescence?.factor,iridescence?.thickness];
-  const helper=config.coordinateHelper!==false&&slots.some(slot=>slot?.transformIndex!==undefined)?coordinateWGSL:'';
-  const sheenInputs=sheen?`let materialSheen=materialFactors[${sheen.index}];
-  material.sheen=vec4f(clamp(materialSheen.rgb${sheen.color?'*'+sample(sheen.color)+'.rgb':''},vec3f(0),vec3f(1)),clamp(materialSheen.a${sheen.roughness?'*'+sample(sheen.roughness)+'.a':''},0.0,1.0));`:'material.sheen=vec4f(0);';
-  const specularInputs=specular?`let materialSpecular=materialFactors[${specular.index}];
-  material.specular=vec4f(max(materialSpecular.rgb${specular.color?'*'+sample(specular.color)+'.rgb':''},vec3f(0)),clamp(materialSpecular.a${specular.factor?'*'+sample(specular.factor)+'.a':''},0.0,1.0));`:'material.specular=vec4f(1);';
-  const iridescenceInputs=iridescence?`let materialFilm=materialFactors[${iridescence.index}];
-  material.iridescence=vec4f(clamp(materialFilm.x${iridescence.factor?'*'+sample(iridescence.factor)+'.r':''},0.0,1.0),materialFilm.y,${iridescence.thickness?'mix(materialFilm.z,materialFilm.w,'+sample(iridescence.thickness)+'.g)':'materialFilm.w'},0);`:'material.iridescence=vec4f(0,1.3,0,0);';
-  const anisotropyInputs=anisotropy?/* wgsl */`
+  const slots = [
+    sheen?.color,
+    sheen?.roughness,
+    specular?.color,
+    specular?.factor,
+    anisotropy?.texture,
+    iridescence?.factor,
+    iridescence?.thickness,
+  ];
+  const helper =
+    config.coordinateHelper !== false && slots.some((slot) => slot?.transformIndex !== undefined) ? coordinateWGSL : '';
+  const sheenInputs = sheen
+    ? `let materialSheen=materialFactors[${sheen.index}];
+  material.sheen=vec4f(clamp(materialSheen.rgb${sheen.color ? '*' + sample(sheen.color) + '.rgb' : ''},vec3f(0),vec3f(1)),clamp(materialSheen.a${sheen.roughness ? '*' + sample(sheen.roughness) + '.a' : ''},0.0,1.0));`
+    : 'material.sheen=vec4f(0);';
+  const specularInputs = specular
+    ? `let materialSpecular=materialFactors[${specular.index}];
+  material.specular=vec4f(max(materialSpecular.rgb${specular.color ? '*' + sample(specular.color) + '.rgb' : ''},vec3f(0)),clamp(materialSpecular.a${specular.factor ? '*' + sample(specular.factor) + '.a' : ''},0.0,1.0));`
+    : 'material.specular=vec4f(1);';
+  const iridescenceInputs = iridescence
+    ? `let materialFilm=materialFactors[${iridescence.index}];
+  material.iridescence=vec4f(clamp(materialFilm.x${iridescence.factor ? '*' + sample(iridescence.factor) + '.r' : ''},0.0,1.0),materialFilm.y,${iridescence.thickness ? 'mix(materialFilm.z,materialFilm.w,' + sample(iridescence.thickness) + '.g)' : 'materialFilm.w'},0);`
+    : 'material.iridescence=vec4f(0,1.3,0,0);';
+  const anisotropyInputs = anisotropy
+    ? /* wgsl */ `
   let materialAnisotropy=materialFactors[${anisotropy.index}];
-  let materialDirectionSample=${anisotropy.texture?sample(anisotropy.texture)+'.rgb':'vec3f(1,0.5,1)'};
+  let materialDirectionSample=${anisotropy.texture ? sample(anisotropy.texture) + '.rgb' : 'vec3f(1,0.5,1)'};
   let materialDirectionRaw=materialDirectionSample.xy*2-1;
   let materialDirectionLength=length(materialDirectionRaw);
   let materialDirection=select(vec2f(1,0),materialDirectionRaw/max(materialDirectionLength,0.000001),materialDirectionLength>0.000001);
@@ -49,8 +72,8 @@ export function lobeShader(config:LobeShaderConfig):Pick<MaterialExtension,'wgsl
   var materialT=i.tangent.xyz-materialNormal*dot(materialNormal,i.tangent.xyz);
   var materialB=cross(materialNormal,materialT)*i.tangent.w;
   let materialDP1=dpdx(i.position);let materialDP2=dpdy(i.position);
-  let materialDUV1=dpdx(${anisotropy.texture?coordinateExpression(anisotropy.texture):'uv(i,0.0)'});let materialDUV2=dpdy(${anisotropy.texture?coordinateExpression(anisotropy.texture):'uv(i,0.0)'});
-  if(abs(i.tangent.w)<0.5${anisotropy.texture&&(anisotropy.texture.texCoord===1||anisotropy.texture.transformIndex!==undefined)?'||true':''}){
+  let materialDUV1=dpdx(${anisotropy.texture ? coordinateExpression(anisotropy.texture) : 'uv(i,0.0)'});let materialDUV2=dpdy(${anisotropy.texture ? coordinateExpression(anisotropy.texture) : 'uv(i,0.0)'});
+  if(abs(i.tangent.w)<0.5${anisotropy.texture && (anisotropy.texture.texCoord === 1 || anisotropy.texture.transformIndex !== undefined) ? '||true' : ''}){
     let materialP1=cross(materialNormal,materialDP1);let materialP2=cross(materialDP2,materialNormal);
     materialT=materialP2*materialDUV1.x+materialP1*materialDUV2.x;materialB=materialP2*materialDUV1.y+materialP1*materialDUV2.y;
   }
@@ -61,12 +84,16 @@ export function lobeShader(config:LobeShaderConfig):Pick<MaterialExtension,'wgsl
   materialB=cross(materialNormal,materialT)*materialSign;
   material.tangent=normalize(materialT*materialRotated.x+materialB*materialRotated.y);
   material.bitangent=cross(materialNormal,material.tangent);
-`:'material.anisotropy=0;material.tangent=vec3f(1,0,0);material.bitangent=vec3f(0,1,0);';
+`
+    : 'material.anisotropy=0;material.tangent=vec3f(1,0,0);material.bitangent=vec3f(0,1,0);';
   return {
-    wgsl:'let materialLobeInputs=materialLobesInputs(i,s,front);',
-    direct:'direct=materialLobesDirect(i,s,direct,materialLobeInputs);',
-    ambient:'materialAmbient=materialLobesAmbient(s,materialAmbient,materialLobeInputs);',
-    declarations:helper+(iridescence?iridescenceWGSL:'')+/* wgsl */`
+    wgsl: 'let materialLobeInputs=materialLobesInputs(i,s,front);',
+    direct: 'direct=materialLobesDirect(i,s,direct,materialLobeInputs);',
+    ambient: 'materialAmbient=materialLobesAmbient(s,materialAmbient,materialLobeInputs);',
+    declarations:
+      helper +
+      (iridescence ? iridescenceWGSL : '') +
+      /* wgsl */ `
 struct MaterialLobeInputs {sheen:vec4f,specular:vec4f,iridescence:vec4f,anisotropy:f32,tangent:vec3f,bitangent:vec3f,viewCos:f32}
 fn materialLobesInputs(i:Out,s:Surface,front:bool)->MaterialLobeInputs {
   var material:MaterialLobeInputs;
@@ -81,7 +108,7 @@ fn materialLobesInputs(i:Out,s:Surface,front:bool)->MaterialLobeInputs {
 }
 fn materialLobesMax(value:vec3f)->f32 {return max(max(value.x,value.y),value.z);}
 fn materialLobesSpecularActive(s:Surface,material:MaterialLobeInputs)->bool {
-  return s.metal<1.0&&(${ior!==1.5?'true||':''}material.specular.a!=1.0||any(material.specular.rgb!=vec3f(1)));
+  return s.metal<1.0&&(${ior !== 1.5 ? 'true||' : ''}material.specular.a!=1.0||any(material.specular.rgb!=vec3f(1)));
 }
 fn materialLobesFilmActive(material:MaterialLobeInputs)->bool {
   return material.iridescence.x>0.0&&material.iridescence.z>0.0&&material.iridescence.y!=1.0;
@@ -141,10 +168,14 @@ fn materialLobesDirect(i:Out,s:Surface,baseline:vec3f,material:MaterialLobeInput
       let materialDielectricF0=materialLobesDielectricF0(material);
       var materialDielectric=(materialDielectricF0+(1-materialDielectricF0)*materialWeight)*material.specular.a;
       var materialMetal=s.base.rgb+(1-s.base.rgb)*materialWeight;
-      ${iridescence?`if(materialFilmActive){
+      ${
+        iridescence
+          ? `if(materialFilmActive){
         materialDielectric=mix(materialDielectric,materialIridescenceFresnel(materialVH,1.0,material.iridescence.y,material.iridescence.z,materialDielectricF0)*material.specular.a,material.iridescence.x);
         materialMetal=mix(materialMetal,materialIridescenceFresnel(materialVH,1.0,material.iridescence.y,material.iridescence.z,s.base.rgb),material.iridescence.x);
-      }`:''}
+      }`
+          : ''
+      }
       materialFresnel=mix(materialDielectric,materialMetal,s.metal);
       materialDiffuse=(1.0-materialLobesMax(materialDielectric))*(1.0-s.metal)*s.base.rgb/3.14159265;
     }
@@ -164,15 +195,19 @@ fn materialLobesAmbient(s:Surface,baseline:vec3f,material:MaterialLobeInputs)->v
   let materialHemisphere=mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w*s.occlusion;
   if(materialSpecularActive||materialFilmActive){
     let materialDielectricF0=materialLobesDielectricF0(material);var materialDielectric=materialDielectricF0*material.specular.a;var materialMetal=s.base.rgb;
-    ${iridescence?`if(materialFilmActive){
+    ${
+      iridescence
+        ? `if(materialFilmActive){
       materialDielectric=mix(materialDielectric,materialIridescenceFresnel(1.0,1.0,material.iridescence.y,material.iridescence.z,materialDielectricF0)*material.specular.a,material.iridescence.x);
       materialMetal=mix(materialMetal,materialIridescenceFresnel(1.0,1.0,material.iridescence.y,material.iridescence.z,s.base.rgb),material.iridescence.x);
-    }`:''}
+    }`
+        : ''
+    }
     materialResult=(s.base.rgb*(1-s.metal)+mix(materialDielectric,materialMetal,s.metal)*0.5)*materialHemisphere;
   }
   if(materialSheenActive){let materialEnergy=materialLobesSheenAlbedo(material.viewCos,material.sheen.a);materialResult=materialResult*max(0.0,1.0-materialLobesMax(material.sheen.rgb)*materialEnergy)+material.sheen.rgb*materialEnergy*materialHemisphere;}
   return materialResult;
 }
-`
+`,
   };
 }

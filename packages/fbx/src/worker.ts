@@ -3,7 +3,7 @@ import type { PBRModel } from '@margoengine/gltf-pro';
 import { modelFromPrepared, type PreparedGLTF } from '@margoengine/gltf-pro/worker';
 import { canUseWorker, movable, runWorker } from '../../shared/worker.js';
 import { loadFBX, parseFBX, type FBXOptions } from './index.js';
-const workerURL = () => new URL('./workers/fbx.js?no-inline', import.meta.url);
+const workerURL = () => new URL(/* @vite-ignore */ './workers/fbx.js?no-inline', import.meta.url);
 // Texture paths resolve against the page here, so the worker gets them absolute ('' is the page's folder).
 const absolute = (path: string | undefined) =>
   path === undefined ? undefined : new URL(path || '.', globalThis.location.href).href;

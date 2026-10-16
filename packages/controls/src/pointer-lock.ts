@@ -1,6 +1,13 @@
 import type { Camera, EngineKernel } from '@margoengine/core';
-import { Controls, documentOf, type ControlElement, type EventTargetLike } from './controls.js';
-import { type V3 } from './math.js';
+import {
+  Controls,
+  documentOf,
+  type ControlElement,
+  type EventTargetLike,
+  type InputEventListener,
+  type ControlDocument,
+} from './controls.js';
+import type { V3 } from './math.js';
 import { cross, normalize, scale } from '@margoengine/math/vec3';
 import { clamp } from '@margoengine/math/mathutils';
 import { basis } from './view.js';
@@ -30,7 +37,7 @@ export class PointerLockControls extends Controls {
   };
   readonly pressed = new Set<string>();
   private readonly keyTarget: EventTargetLike | null;
-  private doc: any = null;
+  private doc: ControlDocument | null = null;
 
   constructor(
     source: Camera | EngineKernel,
@@ -55,7 +62,7 @@ export class PointerLockControls extends Controls {
       [doc, 'pointerlockerror', this.onLockError],
       [keys, 'keydown', this.onKeyDown],
       [keys, 'keyup', this.onKeyUp],
-    ] as Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
+    ] as Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
   }
   protected override onDisconnect(): void {
     this.pressed.clear();

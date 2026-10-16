@@ -31,16 +31,16 @@ export type BodyType = 'dynamic' | 'fixed' | 'kinematicPosition' | 'kinematicVel
 
 export class CharacterController {
     readonly body: PhysicsBody;
-    readonly raw: any;
+    readonly raw: KinematicCharacterController;
     constructor(owner: {
-        readonly world: any;
+        readonly world: World;
         removeController(controller: CharacterController): void;
     }, body: PhysicsBody, options?: CharacterControllerOptions);
     get grounded(): boolean;
     move(desired: Vec3, filter?: {
         groups?: number;
         flags?: number;
-        predicate?: (collider: any) => boolean;
+        predicate?: (collider: Collider) => boolean;
     }): CharacterMoveResult;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -92,8 +92,8 @@ export interface CollisionEvent {
     bodyB: PhysicsBody;
     meshA: Mesh | null;
     meshB: Mesh | null;
-    colliderA: any;
-    colliderB: any;
+    colliderA: Collider;
+    colliderB: Collider;
     sensor: boolean;
 }
 
@@ -110,7 +110,7 @@ export type GeometryLike = Geometry | {
 export interface Hit {
     body: PhysicsBody;
     mesh: Mesh | null;
-    collider: any;
+    collider: Collider;
 }
 
 export type JointOptions = (JointBase & {
@@ -170,7 +170,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     stepCount: number;
     static attach(engine: EngineKernel, options: PhysicsOptions): Physics;
     constructor(engine: EngineKernel | null, options: PhysicsOptions);
-    get world(): any;
+    get world(): World;
     get isDisposed(): boolean;
     get gravity(): [number, number, number];
     set gravity(value: Vec3);
@@ -185,10 +185,10 @@ export class Physics implements EnginePlugin, BodyOwner {
     addBody(mesh: Mesh | null, options?: BodyOptions): PhysicsBody;
     addModel(model: ModelLike, options?: ModelBodyOptions): PhysicsBody[];
     bodyOf(mesh: Mesh): PhysicsBody | undefined;
-    bodyOfCollider(collider: any): PhysicsBody | undefined;
+    bodyOfCollider(collider: Collider | number): PhysicsBody | undefined;
     getBodies(): PhysicsBody[];
-    addCollider(body: PhysicsBody, options: ColliderOptions): any;
-    removeCollider(body: PhysicsBody, collider: any): void;
+    addCollider(body: PhysicsBody, options: ColliderOptions): Collider;
+    removeCollider(body: PhysicsBody, collider: Collider): void;
     removeBody(body: PhysicsBody): void;
     addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: JointOptions): PhysicsJoint;
     removeJoint(joint: PhysicsJoint): void;
@@ -217,17 +217,17 @@ export class Physics implements EnginePlugin, BodyOwner {
 }
 
 export class PhysicsBody {
-    readonly raw: any;
+    readonly raw: RigidBody;
     readonly mesh: Mesh | null;
     readonly type: BodyType;
-    readonly colliders: any[];
+    readonly colliders: Collider[];
     userData: unknown;
     readonly pose: Float64Array<ArrayBuffer>;
     restWritten: boolean;
     slept: boolean;
     fitScale?: [number, number, number];
     dirty: boolean;
-    constructor(owner: BodyOwner, raw: any, mesh: Mesh | null, type: BodyType);
+    constructor(owner: BodyOwner, raw: RigidBody, mesh: Mesh | null, type: BodyType);
     get valid(): boolean;
     markRemoved(): void;
     snapshot(reset?: boolean): void;
@@ -258,8 +258,8 @@ export class PhysicsBody {
     set enabled(value: boolean);
     lockRotations(locked?: boolean): this;
     lockTranslations(locked?: boolean): this;
-    addCollider(options: ColliderOptions): any;
-    removeCollider(collider: any): void;
+    addCollider(options: ColliderOptions): Collider;
+    removeCollider(collider: Collider): void;
     remove(): void;
 }
 
@@ -273,14 +273,14 @@ export interface PhysicsEventMap {
 }
 
 export class PhysicsJoint {
-    readonly raw: any;
+    readonly raw: ImpulseJoint;
     readonly type: JointType;
     readonly bodyA: PhysicsBody;
     readonly bodyB: PhysicsBody;
     constructor(owner: {
-        readonly rapier: any;
+        readonly rapier: RapierModule;
         removeJoint(joint: PhysicsJoint): void;
-    }, raw: any, type: JointType, bodyA: PhysicsBody, bodyB: PhysicsBody);
+    }, raw: ImpulseJoint, type: JointType, bodyA: PhysicsBody, bodyB: PhysicsBody);
     get valid(): boolean;
     markRemoved(): void;
     setLimits(min: number, max: number): this;
@@ -320,16 +320,48 @@ export interface QueryFilter {
     excludeFixed?: boolean;
     excludeKinematic?: boolean;
     excludeDynamic?: boolean;
-    predicate?: (body: PhysicsBody, collider: any) => boolean;
+    predicate?: (body: PhysicsBody, collider: Collider) => boolean;
 }
 
 export interface RapierModule {
-    World: new (gravity: {
-        x: number;
-        y: number;
-        z: number;
-    }) => any;
-    [name: string]: any;
+    World: new (gravity: Vector) => World;
+    EventQueue: new (autoDrain: boolean) => EventQueue;
+    Ray: new (origin: Vector, direction: Vector) => Ray;
+    ColliderDesc: {
+        cuboid(x: number, y: number, z: number): ColliderDesc;
+        ball(radius: number): ColliderDesc;
+        capsule(halfHeight: number, radius: number): ColliderDesc;
+        cylinder(halfHeight: number, radius: number): ColliderDesc;
+        cone(halfHeight: number, radius: number): ColliderDesc;
+        convexHull(points: Float32Array): ColliderDesc | null;
+        trimesh(vertices: Float32Array, indices: Uint32Array): ColliderDesc;
+        heightfield(rows: number, columns: number, heights: Float32Array, scale: Vector): ColliderDesc;
+    };
+    RigidBodyDesc: {
+        dynamic(): RigidBodyDesc;
+        fixed(): RigidBodyDesc;
+        kinematicPositionBased(): RigidBodyDesc;
+        kinematicVelocityBased(): RigidBodyDesc;
+    };
+    JointData: {
+        fixed(anchorA: Vector, frameA: Rotation, anchorB: Vector, frameB: Rotation): JointData;
+        spherical(anchorA: Vector, anchorB: Vector): JointData;
+        revolute(anchorA: Vector, anchorB: Vector, axis: Vector): JointData;
+        prismatic(anchorA: Vector, anchorB: Vector, axis: Vector): JointData;
+    };
+    QueryFilterFlags: Record<'EXCLUDE_SENSORS' | 'EXCLUDE_FIXED' | 'EXCLUDE_KINEMATIC' | 'EXCLUDE_DYNAMIC', number>;
+    SolverFlags: {
+        COMPUTE_IMPULSE: number;
+    };
+    MotorModel: Record<'ForceBased' | 'AccelerationBased', number>;
+    CoefficientCombineRule: Record<'Average' | 'Min' | 'Multiply' | 'Max', number>;
+    ActiveCollisionTypes: {
+        ALL: number;
+    };
+    ActiveEvents: {
+        COLLISION_EVENTS: number;
+    };
+    ActiveHooks: Record<'FILTER_CONTACT_PAIRS' | 'FILTER_INTERSECTION_PAIRS', number>;
 }
 
 export interface RaycastHit extends Hit {
@@ -395,16 +427,242 @@ export function geometryPositions(source: GeometryLike, scale?: Vec3): Float32Ar
 // Not exported from this entry, but used by the exports above:
 
 interface BodyOwner {
-    readonly rapier: any;
-    readonly world: any;
-    addCollider(body: PhysicsBody, options: ColliderOptions): any;
-    removeCollider(body: PhysicsBody, collider: any): void;
+    readonly rapier: RapierModule;
+    readonly world: World;
+    addCollider(body: PhysicsBody, options: ColliderOptions): Collider;
+    removeCollider(body: PhysicsBody, collider: Collider): void;
     removeBody(body: PhysicsBody): void;
+}
+
+interface Collider {
+    readonly handle: number;
+    readonly shape: Shape;
+    isValid(): boolean;
+    isSensor(): boolean;
+    setSensor(sensor: boolean): void;
+    isEnabled(): boolean;
+    setEnabled(enabled: boolean): void;
+    parent(): RigidBody | null;
+    translation(): Vector;
+    translationWrtParent(): Vector | null;
+    rotation(): Rotation;
+    rotationWrtParent(): Rotation | null;
+    setTranslation(position: Vector): void;
+    setRotation(rotation: Rotation): void;
+    shapeType(): number;
+    halfExtents(): Vector | null;
+    radius(): number;
+    halfHeight(): number;
+    vertices(): Float32Array;
+    indices(): Uint32Array | undefined;
+    density(): number;
+    mass(): number;
+    friction(): number;
+    restitution(): number;
+    setFriction(friction: number): void;
+    setRestitution(restitution: number): void;
+    setCollisionGroups(groups: number): void;
+    setSolverGroups(groups: number): void;
+}
+
+interface ColliderDesc {
+    shape: Shape;
+    setTranslation(x: number, y: number, z: number): ColliderDesc;
+    setRotation(rotation: Rotation): ColliderDesc;
+    setFriction(value: number): ColliderDesc;
+    setRestitution(value: number): ColliderDesc;
+    setFrictionCombineRule(rule: number): ColliderDesc;
+    setRestitutionCombineRule(rule: number): ColliderDesc;
+    setMass(mass: number): ColliderDesc;
+    setDensity(density: number): ColliderDesc;
+    setSensor(sensor: boolean): ColliderDesc;
+    setActiveCollisionTypes(types: number): ColliderDesc;
+    setCollisionGroups(groups: number): ColliderDesc;
+    setSolverGroups(groups: number): ColliderDesc;
+    setActiveEvents(events: number): ColliderDesc;
+    setActiveHooks(hooks: number): ColliderDesc;
+    setEnabled(enabled: boolean): ColliderDesc;
+}
+
+interface ColliderShapeCastHit {
+    collider: Collider;
+    time_of_impact: number;
+    witness1: Vector;
+    normal1: Vector;
+}
+
+interface EventQueue {
+    drainCollisionEvents(callback: (colliderA: number, colliderB: number, started: boolean) => void): void;
+    free(): void;
+}
+
+interface ImpulseJoint {
+    readonly handle: number;
+    isValid(): boolean;
+    contactsEnabled(): boolean;
+    setContactsEnabled(enabled: boolean): void;
 }
 
 interface JointBase {
     anchorA?: Vec3;
     anchorB?: Vec3;
     contactsEnabled?: boolean;
+}
+
+interface JointData {
+    jointType: number;
+}
+
+interface KinematicCharacterController {
+    setUp(up: Vector): void;
+    setMaxSlopeClimbAngle(angle: number): void;
+    setMinSlopeSlideAngle(angle: number): void;
+    enableAutostep(maxHeight: number, minWidth: number, includeDynamicBodies: boolean): void;
+    enableSnapToGround(distance: number): void;
+    setSlideEnabled(enabled: boolean): void;
+    setApplyImpulsesToDynamicBodies(enabled: boolean): void;
+    setCharacterMass(mass: number): void;
+    computeColliderMovement(collider: Collider, desired: Vector, flags?: number, groups?: number, predicate?: (collider: Collider) => boolean): void;
+    computedMovement(): Vector;
+    computedGrounded(): boolean;
+    numComputedCollisions(): number;
+}
+
+interface PhysicsHooks {
+    filterContactPair(colliderA: number, colliderB: number, bodyA: number, bodyB: number): number | null;
+    filterIntersectionPair(colliderA: number, colliderB: number, bodyA: number, bodyB: number): boolean;
+}
+
+interface PointColliderProjection {
+    collider: Collider;
+    point: Vector;
+    isInside: boolean;
+}
+
+type QueryArgs = [
+    flags?: number,
+    groups?: number,
+    excludeCollider?: Collider,
+    excludeBody?: RigidBody,
+    predicate?: (collider: Collider) => boolean
+];
+
+interface Ray {
+    origin: Vector;
+    dir: Vector;
+    pointAt(distance: number): Vector;
+}
+
+interface RayColliderIntersection {
+    collider: Collider;
+    timeOfImpact: number;
+    normal: Vector;
+}
+
+interface RigidBody {
+    readonly handle: number;
+    userData?: unknown;
+    isValid(): boolean;
+    translation(): Vector;
+    rotation(): Rotation;
+    linvel(): Vector;
+    angvel(): Vector;
+    setTranslation(position: Vector, wakeUp: boolean): void;
+    setRotation(rotation: Rotation, wakeUp: boolean): void;
+    setNextKinematicTranslation(position: Vector): void;
+    setNextKinematicRotation(rotation: Rotation): void;
+    setLinvel(velocity: Vector, wakeUp: boolean): void;
+    setAngvel(velocity: Vector, wakeUp: boolean): void;
+    addForce(force: Vector, wakeUp: boolean): void;
+    addForceAtPoint(force: Vector, point: Vector, wakeUp: boolean): void;
+    applyImpulse(impulse: Vector, wakeUp: boolean): void;
+    applyImpulseAtPoint(impulse: Vector, point: Vector, wakeUp: boolean): void;
+    addTorque(torque: Vector, wakeUp: boolean): void;
+    applyTorqueImpulse(torque: Vector, wakeUp: boolean): void;
+    resetForces(wakeUp: boolean): void;
+    resetTorques(wakeUp: boolean): void;
+    isSleeping(): boolean;
+    sleep(): void;
+    wakeUp(): void;
+    mass(): number;
+    gravityScale(): number;
+    setGravityScale(scale: number, wakeUp: boolean): void;
+    isCcdEnabled(): boolean;
+    enableCcd(enabled: boolean): void;
+    isEnabled(): boolean;
+    setEnabled(enabled: boolean): void;
+    lockRotations(locked: boolean, wakeUp: boolean): void;
+    lockTranslations(locked: boolean, wakeUp: boolean): void;
+}
+
+interface RigidBodyDesc {
+    setTranslation(x: number, y: number, z: number): RigidBodyDesc;
+    setRotation(rotation: Rotation): RigidBodyDesc;
+    setLinvel(x: number, y: number, z: number): RigidBodyDesc;
+    setAngvel(velocity: Vector): RigidBodyDesc;
+    setLinearDamping(damping: number): RigidBodyDesc;
+    setAngularDamping(damping: number): RigidBodyDesc;
+    setGravityScale(scale: number): RigidBodyDesc;
+    setCcdEnabled(enabled: boolean): RigidBodyDesc;
+    setCanSleep(enabled: boolean): RigidBodyDesc;
+    setSleeping(sleeping: boolean): RigidBodyDesc;
+    setDominanceGroup(group: number): RigidBodyDesc;
+    setAdditionalMass(mass: number): RigidBodyDesc;
+    lockRotations(): RigidBodyDesc;
+    lockTranslations(): RigidBodyDesc;
+    enabledRotations(x: boolean, y: boolean, z: boolean): RigidBodyDesc;
+    enabledTranslations(x: boolean, y: boolean, z: boolean): RigidBodyDesc;
+}
+
+interface Rotation extends Vector {
+    w: number;
+}
+
+interface Shape {
+    readonly type: number;
+}
+
+interface Vector {
+    x: number;
+    y: number;
+    z: number;
+}
+
+interface World {
+    gravity: Vector;
+    timestep: number;
+    numSolverIterations: number;
+    readonly bodies: {
+        len(): number;
+    };
+    readonly colliders: {
+        len(): number;
+    };
+    step(queue?: EventQueue, hooks?: PhysicsHooks): void;
+    free(): void;
+    getRigidBody(handle: number): RigidBody;
+    getCollider(handle: number): Collider;
+    createRigidBody(desc: RigidBodyDesc): RigidBody;
+    removeRigidBody(body: RigidBody): void;
+    createCollider(desc: ColliderDesc, body?: RigidBody): Collider;
+    removeCollider(collider: Collider, wakeUp: boolean): void;
+    createImpulseJoint(desc: JointData, bodyA: RigidBody, bodyB: RigidBody, wakeUp: boolean): ImpulseJoint;
+    removeImpulseJoint(joint: ImpulseJoint, wakeUp: boolean): void;
+    createCharacterController(offset: number): KinematicCharacterController;
+    removeCharacterController(controller: KinematicCharacterController): void;
+    castRayAndGetNormal(ray: Ray, maxDistance: number, solid: boolean, ...filter: QueryArgs): RayColliderIntersection | null;
+    intersectionsWithRay(ray: Ray, maxDistance: number, solid: boolean, callback: (result: RayColliderIntersection) => boolean, ...filter: QueryArgs): void;
+    castShape(position: Vector, rotation: Rotation, velocity: Vector, shape: Shape, targetDistance: number, maxDistance: number, stopAtPenetration: boolean, ...filter: QueryArgs): ColliderShapeCastHit | null;
+    projectPoint(point: Vector, solid: boolean, ...filter: QueryArgs): PointColliderProjection | null;
+    intersectionsWithPoint(point: Vector, callback: (collider: Collider) => boolean, ...filter: QueryArgs): void;
+    intersectionsWithShape(position: Vector, rotation: Rotation, shape: Shape, callback: (collider: Collider) => boolean, ...filter: QueryArgs): void;
+    intersectionPair(colliderA: Collider, colliderB: Collider): boolean;
+    contactPair(colliderA: Collider, colliderB: Collider, callback: (manifold: {
+        numContacts(): number;
+    }, flipped: boolean) => void): void;
+    debugRender(): {
+        vertices: Float32Array;
+        colors: Float32Array;
+    };
 }
 ```

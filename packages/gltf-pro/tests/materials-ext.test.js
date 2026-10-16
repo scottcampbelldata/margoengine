@@ -91,15 +91,22 @@ async function scene(materials, extra = {}) {
 for (const variant of ['physical', 'extended', 'factors']) {
   test(`${variant} clearcoat without a normal map retains the geometric normal`, async () => {
     for (const mapped of variant === 'factors' ? [false] : [false, true]) {
-      const extensions = { KHR_materials_clearcoat: {
-        clearcoatFactor: 1,
-        ...(mapped ? { clearcoatNormalTexture: { index: 0, scale: 1.75 } } : {}),
-      } };
+      const extensions = {
+        KHR_materials_clearcoat: {
+          clearcoatFactor: 1,
+          ...(mapped ? { clearcoatNormalTexture: { index: 0, scale: 1.75 } } : {}),
+        },
+      };
       if (variant === 'extended') extensions.KHR_materials_iridescence = { iridescenceFactor: 0.4 };
-      const { gpu, engine, model, view } = await scene([{ extensions }], mapped ? {
-        doc: { textures: [{ source: 0 }], images: [{}] },
-        images: [{ width: 1, height: 1, close() {} }],
-      } : {});
+      const { gpu, engine, model, view } = await scene(
+        [{ extensions }],
+        mapped
+          ? {
+              doc: { textures: [{ source: 0 }], images: [{}] },
+              images: [{ width: 1, height: 1, close() {} }],
+            }
+          : {},
+      );
       try {
         const material = model.primitives[0].material;
         if (variant === 'factors') material.maps.length = 5;
@@ -107,11 +114,13 @@ for (const variant of ['physical', 'extended', 'factors']) {
         const authoredScale = material.physical[2],
           log = gpu.record(() => model.draw(view.c, 'beauty', view.c.color, view.c.depth)),
           uniform = model['resources'][0].uniform,
-          write = log.find(event => event[0] === 'writeBuffer' && event[1] === gpu.snap(uniform)),
+          write = log.find((event) => event[0] === 'writeBuffer' && event[1] === gpu.snap(uniform)),
           frame = floatsOf(write[3]);
         assert.equal(frame[variant === 'extended' ? 250 : 210], mapped ? 1.75 : 0);
         assert.equal(material.physical[2], authoredScale, 'Rendering must not mutate authored normal scale');
-      } finally { engine.dispose(); }
+      } finally {
+        engine.dispose();
+      }
     }
   });
 }

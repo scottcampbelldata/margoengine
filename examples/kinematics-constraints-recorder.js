@@ -1,40 +1,110 @@
 // Temporary, opt-in diagnostics for the constraints example. No package API changes.
 const COLUMNS = Object.freeze([
-  'frame', 'timeMs', 'dtSeconds',
-  'rawTargetX', 'rawTargetY', 'rawTargetZ',
-  'rootX', 'rootY', 'rootZ',
-  'elbowX', 'elbowY', 'elbowZ',
-  'handX', 'handY', 'handZ',
-  'projectedTargetX', 'projectedTargetY', 'projectedTargetZ',
-  'candidateTargetX', 'candidateTargetY', 'candidateTargetZ',
-  'candidateElbowX', 'candidateElbowY', 'candidateElbowZ',
-  'commandTargetX', 'commandTargetY', 'commandTargetZ',
-  'lastSolveTargetX', 'lastSolveTargetY', 'lastSolveTargetZ',
-  'lastSolveRootX', 'lastSolveRootY', 'lastSolveRootZ',
-  'acceptedPoleRadians', 'acceptedPoleStepRadians', 'acceptedHandStepMeters',
-  'candidatePoleRadians', 'allowedPoleStepRadians',
-  'rawStatus', 'status', 'resolved', 'targetResolved',
-  'acceptedClearanceMeters', 'candidateClearanceMeters', 'targetClearanceMeters',
-  'targetQueryResolved', 'targetQueryClearanceMeters',
-  'requiredClearanceMeters', 'complianceMarginMeters', 'dampingSeconds',
-  'toleranceMeters', 'swivelSpeedLimitRadiansPerSecond', 'reachMarginMeters',
-  'foldMarginMeters', 'searchBudget', 'iterations', 'solveCalls',
-  'yawRadians', 'yawAssist', 'scene', 'mode', 'clock',
-  'chased', 'clampActive', 'paced', 'paused', 'nominalHandSpeedMetersPerSecond', 'state',
-  'upperLengthMeters', 'lowerLengthMeters', 'elbowRadiusMeters', 'forearmRadiusMeters',
+  'frame',
+  'timeMs',
+  'dtSeconds',
+  'rawTargetX',
+  'rawTargetY',
+  'rawTargetZ',
+  'rootX',
+  'rootY',
+  'rootZ',
+  'elbowX',
+  'elbowY',
+  'elbowZ',
+  'handX',
+  'handY',
+  'handZ',
+  'projectedTargetX',
+  'projectedTargetY',
+  'projectedTargetZ',
+  'candidateTargetX',
+  'candidateTargetY',
+  'candidateTargetZ',
+  'candidateElbowX',
+  'candidateElbowY',
+  'candidateElbowZ',
+  'commandTargetX',
+  'commandTargetY',
+  'commandTargetZ',
+  'lastSolveTargetX',
+  'lastSolveTargetY',
+  'lastSolveTargetZ',
+  'lastSolveRootX',
+  'lastSolveRootY',
+  'lastSolveRootZ',
+  'acceptedPoleRadians',
+  'acceptedPoleStepRadians',
+  'acceptedHandStepMeters',
+  'candidatePoleRadians',
+  'allowedPoleStepRadians',
+  'rawStatus',
+  'status',
+  'resolved',
+  'targetResolved',
+  'acceptedClearanceMeters',
+  'candidateClearanceMeters',
+  'targetClearanceMeters',
+  'targetQueryResolved',
+  'targetQueryClearanceMeters',
+  'requiredClearanceMeters',
+  'complianceMarginMeters',
+  'dampingSeconds',
+  'toleranceMeters',
+  'swivelSpeedLimitRadiansPerSecond',
+  'reachMarginMeters',
+  'foldMarginMeters',
+  'searchBudget',
+  'iterations',
+  'solveCalls',
+  'yawRadians',
+  'yawAssist',
+  'scene',
+  'mode',
+  'clock',
+  'chased',
+  'clampActive',
+  'paced',
+  'paused',
+  'nominalHandSpeedMetersPerSecond',
+  'state',
+  'upperLengthMeters',
+  'lowerLengthMeters',
+  'elbowRadiusMeters',
+  'forearmRadiusMeters',
   'outwardDetour',
 ]);
 const ACTION_TYPES = Object.freeze([
-  'start', 'stop', 'scene', 'gap', 'speed', 'clock', 'damping', 'budget',
-  'yaw', 'query', 'pause', 'reset', 'sweep', 'pointerdown', 'pointerup',
-  'pointercancel', 'visibility',
+  'start',
+  'stop',
+  'scene',
+  'gap',
+  'speed',
+  'clock',
+  'damping',
+  'budget',
+  'yaw',
+  'query',
+  'pause',
+  'reset',
+  'sweep',
+  'pointerdown',
+  'pointerup',
+  'pointercancel',
+  'visibility',
 ]);
-const ACTION_LABELS = Object.freeze([
-  'torso', 'mixed', 'chain', 'target', 'live', 'fixed60', 'fixed120',
-]);
+const ACTION_LABELS = Object.freeze(['torso', 'mixed', 'chain', 'target', 'live', 'fixed60', 'fixed120']);
 const STATES = Object.freeze([
-  'paused', 'target-accepted', 'target-held', 'recovering', 'sliding',
-  'paced', 'following', 'swivel-held', 'singular-held', 'occluded-held',
+  'paused',
+  'target-accepted',
+  'target-held',
+  'recovering',
+  'sliding',
+  'paced',
+  'following',
+  'swivel-held',
+  'singular-held',
+  'occluded-held',
 ]);
 const STRIDE = COLUMNS.length;
 const ACTION_STRIDE = 5;
@@ -48,8 +118,7 @@ function number(value) {
   return typeof value === 'number' ? value : NaN;
 }
 function vector(value) {
-  return value != null && typeof value[0] === 'number' &&
-    typeof value[1] === 'number' && typeof value[2] === 'number';
+  return value != null && typeof value[0] === 'number' && typeof value[1] === 'number' && typeof value[2] === 'number';
 }
 function writeVector(out, offset, value) {
   out[offset] = value[0];
@@ -95,17 +164,39 @@ export class ConstraintsInteractionRecorder {
     this.#actionCapacity = capacity(actionCapacity, 8192, 'Action capacity');
   }
 
-  get capacity() { return this.#capacity; }
-  get actionCapacity() { return this.#actionCapacity; }
-  get recording() { return this.#recording; }
-  get frameCount() { return Math.min(this.#totalFrames, this.capacity); }
-  get totalFrames() { return this.#totalFrames; }
-  get overwrittenFrames() { return Math.max(0, this.#totalFrames - this.capacity); }
-  get actionCount() { return Math.min(this.#totalActions, this.actionCapacity); }
-  get overwrittenActions() { return Math.max(0, this.#totalActions - this.actionCapacity); }
-  get invalidFrames() { return this.#invalidFrames; }
-  get full() { return this.#totalFrames >= this.capacity; }
-  get durationMs() { return (this.#recording ? this.#last : this.#ended) - this.#started; }
+  get capacity() {
+    return this.#capacity;
+  }
+  get actionCapacity() {
+    return this.#actionCapacity;
+  }
+  get recording() {
+    return this.#recording;
+  }
+  get frameCount() {
+    return Math.min(this.#totalFrames, this.capacity);
+  }
+  get totalFrames() {
+    return this.#totalFrames;
+  }
+  get overwrittenFrames() {
+    return Math.max(0, this.#totalFrames - this.capacity);
+  }
+  get actionCount() {
+    return Math.min(this.#totalActions, this.actionCapacity);
+  }
+  get overwrittenActions() {
+    return Math.max(0, this.#totalActions - this.actionCapacity);
+  }
+  get invalidFrames() {
+    return this.#invalidFrames;
+  }
+  get full() {
+    return this.#totalFrames >= this.capacity;
+  }
+  get durationMs() {
+    return (this.#recording ? this.#last : this.#ended) - this.#started;
+  }
 
   start(wallTimeMs = 0) {
     if (this.#recording) return false;
@@ -147,9 +238,16 @@ export class ConstraintsInteractionRecorder {
     if (!this.#recording) return false;
     this.#checkTime(wallTimeMs);
     const result = controller?.result;
-    if (!result || !vector(controller.root) || !vector(controller.rawTarget) ||
-      !vector(controller.currentElbow) || !vector(controller.currentHand) ||
-      !vector(controller.projectedTarget) || !vector(result.target) || !vector(result.elbow)) {
+    if (
+      !result ||
+      !vector(controller.root) ||
+      !vector(controller.rawTarget) ||
+      !vector(controller.currentElbow) ||
+      !vector(controller.currentHand) ||
+      !vector(controller.projectedTarget) ||
+      !vector(result.target) ||
+      !vector(result.elbow)
+    ) {
       this.#invalidFrames++;
       this.#last = wallTimeMs;
       return false;
@@ -200,7 +298,8 @@ export class ConstraintsInteractionRecorder {
     out[offset++] = controller.yawAssist ? 1 : 0;
     out[offset++] = controller.scene === 'torso' ? 0 : controller.scene === 'mixed' ? 1 : -1;
     out[offset++] = controller.mode === 'chain' ? 0 : controller.mode === 'target' ? 1 : -1;
-    out[offset++] = controller.clock === 'live' ? 0 : controller.clock === 'fixed60' ? 1 : controller.clock === 'fixed120' ? 2 : -1;
+    out[offset++] =
+      controller.clock === 'live' ? 0 : controller.clock === 'fixed60' ? 1 : controller.clock === 'fixed120' ? 2 : -1;
     out[offset++] = controller.chased ? 1 : 0;
     out[offset++] = controller.clampActive ? 1 : 0;
     out[offset++] = controller.paced ? 1 : 0;
@@ -255,8 +354,7 @@ export class ConstraintsInteractionRecorder {
     for (let index = firstFrame; index < this.#totalFrames; index++) {
       const row = [];
       const offset = (index % this.capacity) * STRIDE;
-      for (let component = 0; component < STRIDE; component++)
-        row.push(exportNumber(this.#frames[offset + component]));
+      for (let component = 0; component < STRIDE; component++) row.push(exportNumber(this.#frames[offset + component]));
       frames.push(row);
     }
     const actions = [];
@@ -272,41 +370,58 @@ export class ConstraintsInteractionRecorder {
         value: kind === 1 ? encoded === 1 : kind === 2 ? ACTION_LABELS[encoded] : encoded,
       });
     }
-    return JSON.stringify({
-      format: 'margo-constraints-interaction',
-      version: 1,
-      controllerRevision: 'contact-reach-3',
-      temporaryDiagnostics: true,
-      durationMs: this.durationMs,
-      frameCapacity: this.capacity,
-      totalFrames: this.#totalFrames,
-      overwrittenFrames: this.overwrittenFrames,
-      invalidFrames: this.#invalidFrames,
-      actionCapacity: this.actionCapacity,
-      totalActions: this.#totalActions,
-      overwrittenActions: this.overwrittenActions,
-      units: { position: 'meters', angle: 'radians', dt: 'seconds', time: 'milliseconds since Start' },
-      semantics: {
-        clearance: 'Static proxy clearance at sampled instants only; not continuous swept-volume certification or physical robot safety.',
-        result: 'Candidate fields describe the last evaluated solve; accepted hand/elbow fields retain the displayed pose on failure.',
-        rawStatus: 'Status of the controller initial request before local recovery retries; input pacing may condition that request.',
-        outwardDetour: 'Demo controller accepted a bounded contact-tangent waypoint with an outward reserve along the estimated full-chain clearance gradient after the original request and smaller straight retries failed. Generated solver inputs are conditioned within the existing reach band. The full-chain package guards remain active.',
-        requestedPoleAngle: 'Not supplied by this demo. The caller supplies a Cartesian target and an IK callback, not a requested swivel angle; no unreturned overshoot is inferred.',
-        absentNumbers: 'NaN, Infinity, -Infinity and -0 are explicit strings; no numeric coercion is performed.',
-        droppedData: 'Ring overwrites retain the newest frames/actions in chronological order; overwritten and invalid counts are explicit.',
-        privacy: 'Local in-memory recording only. Nothing is uploaded or persisted automatically.',
-        replay: 'Frames store sampled inputs, settings and poses; this is diagnostic playback data, not a guarantee of deterministic re-simulation from a truncated recording.',
-        coverage: 'One snapshot per recordFrame call (the demo calls it once per rendered frame); not every browser pointer event is captured. Pointer down/up and control changes are separate bounded actions.',
-        actionUnits: 'speed actions use UI degrees/second; gap actions use meters; damping actions use seconds. Frame columns always use their explicit unit suffixes.',
+    return JSON.stringify(
+      {
+        format: 'margo-constraints-interaction',
+        version: 1,
+        controllerRevision: 'contact-reach-3',
+        temporaryDiagnostics: true,
+        durationMs: this.durationMs,
+        frameCapacity: this.capacity,
+        totalFrames: this.#totalFrames,
+        overwrittenFrames: this.overwrittenFrames,
+        invalidFrames: this.#invalidFrames,
+        actionCapacity: this.actionCapacity,
+        totalActions: this.#totalActions,
+        overwrittenActions: this.overwrittenActions,
+        units: { position: 'meters', angle: 'radians', dt: 'seconds', time: 'milliseconds since Start' },
+        semantics: {
+          clearance:
+            'Static proxy clearance at sampled instants only; not continuous swept-volume certification or physical robot safety.',
+          result:
+            'Candidate fields describe the last evaluated solve; accepted hand/elbow fields retain the displayed pose on failure.',
+          rawStatus:
+            'Status of the controller initial request before local recovery retries; input pacing may condition that request.',
+          outwardDetour:
+            'Demo controller accepted a bounded contact-tangent waypoint with an outward reserve along the estimated full-chain clearance gradient after the original request and smaller straight retries failed. Generated solver inputs are conditioned within the existing reach band. The full-chain package guards remain active.',
+          requestedPoleAngle:
+            'Not supplied by this demo. The caller supplies a Cartesian target and an IK callback, not a requested swivel angle; no unreturned overshoot is inferred.',
+          absentNumbers: 'NaN, Infinity, -Infinity and -0 are explicit strings; no numeric coercion is performed.',
+          droppedData:
+            'Ring overwrites retain the newest frames/actions in chronological order; overwritten and invalid counts are explicit.',
+          privacy: 'Local in-memory recording only. Nothing is uploaded or persisted automatically.',
+          replay:
+            'Frames store sampled inputs, settings and poses; this is diagnostic playback data, not a guarantee of deterministic re-simulation from a truncated recording.',
+          coverage:
+            'One snapshot per recordFrame call (the demo calls it once per rendered frame); not every browser pointer event is captured. Pointer down/up and control changes are separate bounded actions.',
+          actionUnits:
+            'speed actions use UI degrees/second; gap actions use meters; damping actions use seconds. Frame columns always use their explicit unit suffixes.',
+        },
+        codes: {
+          status: ['Success', 'SwivelRateLimitExceeded', 'SingularDeadZone', 'ObstacleOccluded'],
+          scene: ['torso', 'mixed'],
+          mode: ['chain', 'target'],
+          clock: ['live', 'fixed60', 'fixed120'],
+          state: STATES,
+          booleans: '0=false, 1=true',
+          unknownEnum: -1,
+        },
+        columns: COLUMNS,
+        frames,
+        actions,
       },
-      codes: {
-        status: ['Success', 'SwivelRateLimitExceeded', 'SingularDeadZone', 'ObstacleOccluded'],
-        scene: ['torso', 'mixed'], mode: ['chain', 'target'], clock: ['live', 'fixed60', 'fixed120'], state: STATES,
-        booleans: '0=false, 1=true', unknownEnum: -1,
-      },
-      columns: COLUMNS,
-      frames,
-      actions,
-    }, null, 2);
+      null,
+      2,
+    );
   }
 }

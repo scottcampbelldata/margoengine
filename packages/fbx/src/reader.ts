@@ -2,7 +2,7 @@ import { readResponse } from '../../shared/loading.js';
 /** One FBX record: binary and ASCII files share this shape. Array payloads (`*N { a: ... }` in ASCII) are props[0] as a typed array. */
 export interface FBXNode {
   name: string;
-  props: any[];
+  props: (string | number | bigint | Float32Array | Float64Array | Int32Array | Uint8Array | undefined)[];
   nodes: FBXNode[];
 }
 const MAGIC = 'Kaydara FBX Binary  \0',
@@ -48,7 +48,7 @@ function binary(bytes: Uint8Array): Promise<FBXNode[]> {
     if (n < 0 || p + n > bytes.length) fail('truncated record');
     return p + n;
   };
-  function array(code: string, p: number, props: any[]): number {
+  function array(code: string, p: number, props: FBXNode['props']): number {
     need(p, 12);
     const count = view.getUint32(p, true),
       encoding = view.getUint32(p + 4, true),
@@ -91,7 +91,7 @@ function binary(bytes: Uint8Array): Promise<FBXNode[]> {
     if (depth > 32) fail('records nest too deeply');
     const count = u(p + (wide ? 8 : 4)),
       nameLength = bytes[p + head - 1],
-      props: any[] = [],
+      props: FBXNode['props'] = [],
       nodes: FBXNode[] = [];
     if (end <= p || end > bytes.length) fail('record end outside file');
     const name = decoder.decode(bytes.subarray(p + head, need(p + head, nameLength)));

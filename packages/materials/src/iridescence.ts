@@ -5,7 +5,7 @@
  * https://github.com/KhronosGroup/glTF-Sample-Renderer/blob/main/source/Renderer/shaders/iridescence.glsl
  * The returned linear RGB value replaces a Fresnel term, not the whole BRDF.
  */
-export const iridescenceWGSL=/* wgsl */`
+export const iridescenceWGSL = /* wgsl */ `
 fn materialIridescenceSensitivity(pathNm:f32,shift:vec3f)->vec3f {
   let phase=pathNm*0.000000006283185307179586;
   let variance=vec3f(4.3278e9,9.3046e9,6.6121e9);

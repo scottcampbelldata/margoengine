@@ -13,7 +13,14 @@ import {
 } from '@margoengine/bvh';
 import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
 import { clamp } from '@margoengine/math/mathutils';
-import { Controls, documentOf, type ControlElement, type EventTargetLike } from './controls.js';
+import {
+  Controls,
+  documentOf,
+  type ControlElement,
+  type EventTargetLike,
+  type InputEventListener,
+  type ControlDocument,
+} from './controls.js';
 import { OrbitControls } from './orbit.js';
 import { MAX_PITCH, turn } from './fly.js';
 import { basis } from './view.js';
@@ -150,7 +157,7 @@ export class WalkControls extends Controls {
   private readonly pointers = new Map<number, { stick: boolean; x: number; y: number; x0: number; y0: number }>();
   private stickView: HTMLDivElement | null = null;
   private readonly keyTarget: EventTargetLike | null;
-  private doc: any = null;
+  private doc: ControlDocument | null = null;
   private previousTouchAction = '';
   private readonly unsubscribe: (() => void) | null;
   private readonly pool: Candidate[] = [];
@@ -204,7 +211,7 @@ export class WalkControls extends Controls {
       [doc, 'pointerlockchange', this.onLockChange],
       [keys, 'keydown', this.onKeyDown],
       [keys, 'keyup', this.onKeyUp],
-    ] as Array<[EventTargetLike, string, (event: any) => void, AddEventListenerOptions?]>;
+    ] as Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
   }
   protected override onDisconnect(): void {
     this.pressed.clear();
@@ -815,7 +822,7 @@ export class WalkControls extends Controls {
       knob.style.cssText =
         'position:absolute;left:30px;top:30px;width:36px;height:36px;border-radius:50%;background:#fffc';
       ring.append(knob);
-      doc.body.append(ring);
+      doc.body!.append(ring);
     }
     const rect = this.element?.getBoundingClientRect?.() ?? { left: 0, top: 0 },
       [sx, sy] = this.stick(),

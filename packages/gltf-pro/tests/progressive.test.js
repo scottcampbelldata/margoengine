@@ -344,12 +344,43 @@ test('maxDownloadBytes bounds loadGLTF and progressive loads (main thread and wo
   });
 });
 
-
-for(const useWorker of [false,true])test(`automatic compressed progressive input falls back before publishing a placeholder (${useWorker?'worker':'main'})`,()=>withGlobals(useWorker,async()=>{
-  const decode=DracoDecoder.prototype.decode;
-  DracoDecoder.prototype.decode=async()=>({vertexCount:3,positions:new Float32Array([0,0,0,1,0,0,0,1,0]),indices:new Uint16Array([0,1,2])});
-  const doc={asset:{version:'2.0'},buffers:[{byteLength:4,uri:'data:application/octet-stream;base64,AQIDBA=='}],bufferViews:[{buffer:0,byteLength:4}],accessors:[{componentType:5126,count:3,type:'VEC3'}],meshes:[{primitives:[{attributes:{POSITION:0},extensions:{KHR_draco_mesh_compression:{bufferView:0,attributes:{POSITION:0}}}}]}],nodes:[{mesh:0}]};
-  files['/compressed.gltf']=Buffer.from(JSON.stringify(doc));const {engine}=await gpuEngine();
-  try {const loading=loadGLTFProgressive(engine,base+'/compressed.gltf');const model=await loading.ready;assert.equal(await loading.complete,model);assert.equal(model.primitives[0].vertices.length,60);assert.deepEqual([...model.primitives[0].indices],[0,1,2]);}
-  finally{engine.dispose();DracoDecoder.prototype.decode=decode;delete files['/compressed.gltf'];}
-}));
+for (const useWorker of [false, true])
+  test(`automatic compressed progressive input falls back before publishing a placeholder (${useWorker ? 'worker' : 'main'})`, () =>
+    withGlobals(useWorker, async () => {
+      const decode = DracoDecoder.prototype.decode;
+      DracoDecoder.prototype.decode = async () => ({
+        vertexCount: 3,
+        positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+        indices: new Uint16Array([0, 1, 2]),
+      });
+      const doc = {
+        asset: { version: '2.0' },
+        buffers: [{ byteLength: 4, uri: 'data:application/octet-stream;base64,AQIDBA==' }],
+        bufferViews: [{ buffer: 0, byteLength: 4 }],
+        accessors: [{ componentType: 5126, count: 3, type: 'VEC3' }],
+        meshes: [
+          {
+            primitives: [
+              {
+                attributes: { POSITION: 0 },
+                extensions: { KHR_draco_mesh_compression: { bufferView: 0, attributes: { POSITION: 0 } } },
+              },
+            ],
+          },
+        ],
+        nodes: [{ mesh: 0 }],
+      };
+      files['/compressed.gltf'] = Buffer.from(JSON.stringify(doc));
+      const { engine } = await gpuEngine();
+      try {
+        const loading = loadGLTFProgressive(engine, base + '/compressed.gltf');
+        const model = await loading.ready;
+        assert.equal(await loading.complete, model);
+        assert.equal(model.primitives[0].vertices.length, 60);
+        assert.deepEqual([...model.primitives[0].indices], [0, 1, 2]);
+      } finally {
+        engine.dispose();
+        DracoDecoder.prototype.decode = decode;
+        delete files['/compressed.gltf'];
+      }
+    }));

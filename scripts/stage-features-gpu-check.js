@@ -176,7 +176,7 @@ try {
   };
 
   result.dispose = await page.evaluate(async () => {
-    const { app, lighting, shadows, gpuErrors } = window.stage;
+    const { app, lighting, shadows: _shadows, gpuErrors } = window.stage;
     app.dispose();
     const disposed = {
       engine: app.engine.disposed,

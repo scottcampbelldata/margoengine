@@ -10,7 +10,7 @@ function fixture(t) {
   return parent;
 }
 
-test('default diagnostics do no recurring provider, JSON or DOM publication work', t => {
+test('default diagnostics do no recurring provider, JSON or DOM publication work', (t) => {
   const parent = fixture(t),
     source = { frames: 0, sampleIndex: 0, position: [1, 2, 3], safe: true },
     metrics = t.mock.fn(() => source),
@@ -52,7 +52,7 @@ test('default diagnostics do no recurring provider, JSON or DOM publication work
   assert.equal(reflection.mock.callCount(), 1);
 });
 
-test('kind and provider failures do not publish partial snapshots, and requests can recover', t => {
+test('kind and provider failures do not publish partial snapshots, and requests can recover', (t) => {
   const parent = fixture(t),
     before = { frames: 1 },
     metrics = t.mock.fn(() => before),
@@ -63,7 +63,9 @@ test('kind and provider failures do not publish partial snapshots, and requests 
   assert.equal(metrics.mock.callCount(), 0);
   diagnostics.publishMetrics();
   assert.equal(parent.dataset.metrics, '{"frames":1}');
-  metrics.mock.mockImplementation(() => { throw new Error('provider failed'); });
+  metrics.mock.mockImplementation(() => {
+    throw new Error('provider failed');
+  });
   assert.throws(diagnostics.publishMetrics, /provider failed/);
   assert.equal(parent.dataset.metrics, '{"frames":1}');
   assert.throws(diagnostics.publishReflection, /must produce JSON/);
@@ -78,7 +80,7 @@ test('kind and provider failures do not publish partial snapshots, and requests 
   assert.equal(parent.dataset.metrics, '{"frames":2}');
 });
 
-test('legacy publication is explicit, owning and limited to the caller’s existing cadence', t => {
+test('legacy publication is explicit, owning and limited to the caller’s existing cadence', (t) => {
   const parent = fixture(t),
     source = { frames: 6, sampleIndex: 1, position: [1, 2, 3] },
     metrics = t.mock.fn(() => source),
@@ -102,10 +104,15 @@ test('legacy publication is explicit, owning and limited to the caller’s exist
   assert.equal(reflection.mock.callCount(), 1);
 });
 
-test('dispose restores owned previous properties/attributes and disables retained readers', t => {
+test('dispose restores owned previous properties/attributes and disables retained readers', (t) => {
   const parent = fixture(t),
     previous = () => 'previous';
-  Object.defineProperty(parent, 'readWorkshopDiagnostics', { configurable: true, enumerable: true, writable: true, value: previous });
+  Object.defineProperty(parent, 'readWorkshopDiagnostics', {
+    configurable: true,
+    enumerable: true,
+    writable: true,
+    value: previous,
+  });
   const descriptor = Object.getOwnPropertyDescriptor(parent, 'readWorkshopDiagnostics');
   parent.dataset.metrics = 'old metrics';
   parent.dataset.reflection = 'old reflection';
@@ -125,7 +132,7 @@ test('dispose restores owned previous properties/attributes and disables retaine
   assert.equal(metrics.mock.callCount(), 1);
 });
 
-test('cleanup preserves later external replacements and tolerates a permanent reader', t => {
+test('cleanup preserves later external replacements and tolerates a permanent reader', (t) => {
   const parent = fixture(t),
     metrics = t.mock.fn(() => ({ frames: 4 })),
     first = attachWorkshopDiagnostics(parent, metrics, () => null, true);
@@ -143,16 +150,21 @@ test('cleanup preserves later external replacements and tolerates a permanent re
   assert.equal(metrics.mock.callCount(), 1, 'failed property removal must not leave a live provider');
 });
 
-test('invalid installation and disposal during a provider cannot leave a live publication', t => {
+test('invalid installation and disposal during a provider cannot leave a live publication', (t) => {
   const parent = fixture(t),
     provider = t.mock.fn(() => null);
   assert.throws(() => attachWorkshopDiagnostics(parent, null, provider), /providers must be functions/);
   assert.equal(Object.hasOwn(parent, 'readWorkshopDiagnostics'), false);
   let diagnostics;
-  diagnostics = attachWorkshopDiagnostics(parent, () => {
-    diagnostics.dispose();
-    return { frames: 1 };
-  }, provider, true);
+  diagnostics = attachWorkshopDiagnostics(
+    parent,
+    () => {
+      diagnostics.dispose();
+      return { frames: 1 };
+    },
+    provider,
+    true,
+  );
   diagnostics.publishMetrics();
   assert.equal(parent.hasAttribute('data-metrics'), false);
   assert.equal(Object.hasOwn(parent, 'readWorkshopDiagnostics'), false);

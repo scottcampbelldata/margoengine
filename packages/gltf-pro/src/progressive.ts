@@ -1,8 +1,18 @@
+import type { PBRInstances } from './instancing.js';
+import type { GLTFPrimitive } from '../../shared/gltf.js';
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { canUseWorker } from '../../shared/worker.js';
-import { GLTFAsset, assetLimit, downloadLimit, overBudget, type GLTFDocument, type GLTFImage } from './asset.js';
-import { PBRModel, loadGLTF, type GLTFLoadOptions } from './index.js';
+import {
+  GLTFAsset,
+  assetLimit,
+  downloadLimit,
+  overBudget,
+  type GLTFDocument,
+  type GLTFImage,
+  type GLTFDecoderHooks,
+} from './asset.js';
+import { PBRModel, loadGLTF, type GLTFLoadOptions, type PBRMaterial } from './index.js';
 import { packed, primitiveDefs } from './pack.js';
 import type { GLTFStream, StreamMessage } from './stream.js';
 declare const GPUBufferUsage: { STORAGE: number; VERTEX: number; INDEX: number; COPY_DST: number };
@@ -33,22 +43,25 @@ export interface ProgressiveGLTF {
 }
 
 // Kept out of `new Worker(...)` so bundlers copy the prebuilt script as an asset instead of rebuilding it (as /worker).
-const workerURL = () => new URL('./workers/progressive.js?no-inline', import.meta.url);
+const workerURL = () => new URL(/* @vite-ignore */ './workers/progressive.js?no-inline', import.meta.url);
 const CHUNK = 1 << 20,
-  sourceKeys = ['KHR_texture_basisu', 'EXT_texture_webp', 'EXT_texture_avif'];
+  sourceKeys = ['KHR_texture_basisu', 'EXT_texture_webp', 'EXT_texture_avif'] as const;
 const errors: Record<string, ErrorConstructor> = { TypeError, RangeError, SyntaxError };
 const revive = (e: { name: string; message: string } | undefined) =>
   new (Object.hasOwn(errors, e?.name ?? '') ? errors[e!.name] : Error)(
     typeof e?.message === 'string' ? e.message : 'Progressive glTF worker sent an invalid message',
   );
 // A primitive's stand-in until its data arrives: the box of its POSITION accessor's min/max, in gltf-pro's 80-byte layout.
-function box(doc: GLTFDocument, p: any): { vertices: Float32Array; indices: Uint32Array; lo: number[]; hi: number[] } {
-  const a = doc.accessors?.[p?.attributes?.POSITION],
-    ok = (v: any) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
+function box(
+  doc: GLTFDocument,
+  p: GLTFPrimitive,
+): { vertices: Float32Array; indices: Uint32Array; lo: number[]; hi: number[] } {
+  const a = doc.accessors?.[p?.attributes?.POSITION!],
+    ok = (v: unknown): v is number[] => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
   const scale = a?.normalized
     ? (({ 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 } as Record<number, number>)[a.componentType] ?? 1)
     : 1;
-  const read = (v: any) => (ok(v) ? v.map((x: number) => (scale > 1 ? Math.max(-1, x / scale) : x)) : [0, 0, 0]),
+  const read = (v: unknown) => (ok(v) ? v.map((x: number) => (scale > 1 ? Math.max(-1, x / scale) : x)) : [0, 0, 0]),
     lo = read(a?.min),
     hi = read(a?.max);
   const vertices = new Float32Array(24 * 20),
@@ -141,7 +154,7 @@ export function loadGLTFProgressive(
     finished = false;
   let images: GLTFImage[] = [],
     settled: boolean[] = [],
-    real: any[] = [],
+    real: PBRMaterial[] = [],
     bare = new Set<number>(),
     keys: number[] = [],
     byKey: number[][] = [],
@@ -149,7 +162,7 @@ export function loadGLTFProgressive(
   const received = new Set<number>(),
     pending = new Set<GPUBuffer>(),
     jobs: Array<() => boolean> = [],
-    hooks: any = {};
+    hooks: GLTFDecoderHooks = {};
   let geometryBytes = 0,
     lastView = '',
     lastSent = -Infinity,
@@ -205,7 +218,7 @@ export function loadGLTFProgressive(
   };
   // Re-run gltf-pro's own setup for some primitives (sharing the model's GPU cache) and swap their draw resources in place.
   const setup = (primitives: object[]) => {
-    const out: any[] = [];
+    const out: PBRModel['resources'] = [];
     try {
       PBRModel.prototype.setup.call(
         Object.create(model!, { primitives: { value: primitives }, resources: { value: out } }),
@@ -250,9 +263,11 @@ export function loadGLTFProgressive(
   // Primitives whose every candidate image (fallback and extension sources) has settled can take their real material.
   const texturesReady = (all = false) => {
     for (const i of bare) {
-      const sources = real[i].maps.flatMap((map: any) => {
+      const sources = real[i].maps.flatMap((map) => {
         const t = map && doc.textures?.[map.index];
-        return t ? [t.source, ...sourceKeys.map((k) => t.extensions?.[k]?.source)].filter(Number.isSafeInteger) : [];
+        return t
+          ? ([t.source, ...sourceKeys.map((k) => t.extensions?.[k]?.source)].filter(Number.isSafeInteger) as number[])
+          : [];
       });
       if (all || sources.every((s: number) => settled[s])) {
         bare.delete(i);
@@ -289,10 +304,10 @@ export function loadGLTFProgressive(
         u.at = end;
         return false;
       }
-      const cache = model!['gpuCache'] as Map<unknown, any>,
+      const cache = model!['gpuCache'],
         old = new Set<object>();
       for (const { data, buffer } of uploads) {
-        cache.set(data, buffer);
+        cache.set(data, buffer!);
         pending.delete(buffer!);
       }
       for (const i of byKey[key]) {
@@ -304,7 +319,7 @@ export function loadGLTFProgressive(
       }
       rebuild(byKey[key]);
       for (const data of old) {
-        cache.get(data)?.destroy();
+        (cache.get(data) as GPUBuffer | undefined)?.destroy();
         cache.delete(data);
       }
       progress.primitivesLoaded++;
@@ -320,9 +335,9 @@ export function loadGLTFProgressive(
     // EXT_mesh_gpu_instancing reads its accessors, so it applies now (one PBRInstances per node, as PBRModel's constructor).
     if (decoders.instancing) {
       hooks.instancing = decoders.instancing;
-      const made = new Map<number, any>();
+      const made = new Map<number, PBRInstances | undefined>();
       for (const p of model!.primitives) {
-        const ext = doc.nodes[p.nodeIndex]?.extensions?.EXT_mesh_gpu_instancing;
+        const ext = doc.nodes![p.nodeIndex]?.extensions?.EXT_mesh_gpu_instancing;
         if (ext) {
           if (!made.has(p.nodeIndex)) made.set(p.nodeIndex, decoders.instancing.read(asset, ext));
           p.instances = made.get(p.nodeIndex);
@@ -330,16 +345,16 @@ export function loadGLTFProgressive(
       }
     }
     // Default 1x1 maps that only stood in for textures are freed, so the model holds what loadGLTF's holds.
-    const cache = model!['gpuCache'] as Map<unknown, any>,
+    const cache = model!['gpuCache'],
       textures: GPUTexture[] = model!['textures'];
     const used = new Set(
       model!.primitives.flatMap((p) => p.material.maps.map((m: unknown, i: number) => (m ? -1 : i))),
     );
     for (const [key, t] of cache)
       if (typeof key === 'string' && key.startsWith('default:') && !used.has(+key.slice(8))) {
-        t.destroy();
+        (t as GPUTexture).destroy();
         cache.delete(key);
-        textures.splice(textures.indexOf(t), 1);
+        textures.splice(textures.indexOf(t as GPUTexture), 1);
       }
     finished = true;
     worker?.terminate();
@@ -395,7 +410,7 @@ export function loadGLTFProgressive(
     asset = new GLTFAsset(
       doc,
       (doc.buffers ?? []).map(
-        (b: any) => new Uint8Array(Number.isSafeInteger(b?.byteLength) && b.byteLength > 0 ? b.byteLength : 0),
+        (b) => new Uint8Array(Number.isSafeInteger(b?.byteLength) && b.byteLength > 0 ? b.byteLength : 0),
       ),
       undefined,
       hooks,
@@ -414,12 +429,12 @@ export function loadGLTFProgressive(
     });
     progress.primitives = byKey.filter((list) => list.length).length;
     // Until its images arrive a primitive draws with its material's factors only.
-    const stripped = new Map<object, any>();
+    const stripped = new Map<object, PBRMaterial>();
     real = model.primitives.map((p, i) => {
       const m = p.material;
       if (!m.maps.some(Boolean)) return m;
       if (!stripped.has(m)) stripped.set(m, { ...m, maps: m.maps.map(() => undefined) });
-      p.material = stripped.get(m);
+      p.material = stripped.get(m)!;
       bare.add(i);
       return m;
     });
@@ -436,12 +451,20 @@ export function loadGLTFProgressive(
       return;
     }
     try {
-      if(m.type==='fallback') {
-        worker?.terminate();worker=undefined;
-        void loadGLTF(instance,url,{...options,signal:controller.signal}).then(loaded=>{
-          if(finished){loaded.dispose();return;}
-          model=loaded;finished=true;emit('complete');resolveReady(loaded);resolveComplete(loaded);
-        },fail);
+      if (m.type === 'fallback') {
+        worker?.terminate();
+        worker = undefined;
+        void loadGLTF(instance, url, { ...options, signal: controller.signal }).then((loaded) => {
+          if (finished) {
+            loaded.dispose();
+            return;
+          }
+          model = loaded;
+          finished = true;
+          emit('complete');
+          resolveReady(loaded);
+          resolveComplete(loaded);
+        }, fail);
       } else if (m.type === 'doc') build(m.doc);
       else if (m.type === 'geometry') {
         if (m.error) throw revive(m.error);

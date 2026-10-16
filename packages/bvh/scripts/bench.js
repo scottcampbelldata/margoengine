@@ -117,9 +117,9 @@ for (const [name, mesh] of [
   const [firstMs] = time(() => {
     for (const ray of queries) if (bvh.raycastFirst(ray)) hits++;
   });
-  let allHits = 0;
+  let _allHits = 0;
   const [allMs] = time(() => {
-    for (let i = 0; i < 50000; i++) allHits += bvh.raycast(queries[i]).length;
+    for (let i = 0; i < 50000; i++) _allHits += bvh.raycast(queries[i]).length;
   });
   const [closestMs] = time(() => {
     for (let i = 0; i < 50000; i++) bvh.closestPointToPoint(queries[i].origin);

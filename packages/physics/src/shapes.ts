@@ -1,11 +1,7 @@
+import type { ColliderDesc, RapierModule } from './rapier-types.js';
+export type { RapierModule } from './rapier-types.js';
 import type { Geometry } from '@margoengine/core';
 import { checkVec, quat, vec, type Quat, type Vec3 } from './math.js';
-
-/** The initialized `@dimforge/rapier3d-compat` module (after `await RAPIER.init()`). Typed loosely so Rapier stays optional. */
-export interface RapierModule {
-  World: new (gravity: { x: number; y: number; z: number }) => any;
-  [name: string]: any;
-}
 
 /** Geometry-like source: a core `Geometry` (stride-6 interleaved vertices) or raw arrays. */
 export type GeometryLike =
@@ -111,14 +107,14 @@ export function createColliderDesc(
   R: RapierModule,
   options: ShapeOptions,
   fit?: { geometry: GeometryLike | null; scale: Vec3 },
-): { desc: any; center: [number, number, number] } {
+): { desc: ColliderDesc; center: [number, number, number] } {
   const center: [number, number, number] = [0, 0, 0];
   const fitted = (): Float32Array => {
     if (!fit?.geometry)
       throw new TypeError(`A ${options.shape} collider without explicit size needs a mesh with geometry`);
     return geometryPositions(fit.geometry, fit.scale);
   };
-  let desc: any;
+  let desc: ColliderDesc | null;
   switch (options.shape) {
     case 'box': {
       let half = options.halfExtents;
@@ -238,11 +234,11 @@ const combine = (R: RapierModule, rule: CombineRule): number => {
 /** Applies material, mass, sensor, group and offset settings to a ColliderDesc. */
 export function configureCollider(
   R: RapierModule,
-  desc: any,
+  desc: ColliderDesc,
   options: ColliderOptions,
   center: Vec3,
   hooks: boolean,
-): any {
+): ColliderDesc {
   const offset = options.offset ?? [0, 0, 0];
   checkVec(offset, 'Collider offset');
   desc.setTranslation(offset[0] + center[0], offset[1] + center[1], offset[2] + center[2]);

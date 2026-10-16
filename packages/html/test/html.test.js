@@ -121,13 +121,41 @@ test('HTML depth uploads avoid temporary arrays over 120 frames and clear remove
   assert.ok(h.resources.every((r) => r.destroyed));
 });
 
-test('HTML clears stale occlusion while an anchor moves before depth readback',async()=>{
- const h=optionalGPU(),dom=new JSDOM('<body><canvas width="128" height="96"></canvas></body>');h.engine.canvas=dom.window.document.querySelector('canvas');
- const overlay=new HTML({capacity:1});h.engine.use(overlay);const label=overlay.add(dom.window.document.createElement('span'),{position:[0,0,0.5]});
- try{
-  new Uint32Array(overlay.output.data)[0]=1;h.frame();await new Promise(resolve=>setImmediate(resolve));h.frame();await new Promise(resolve=>setImmediate(resolve));assert.equal(label.onScreen,false);
-  let finish;overlay.read.mapAsync=()=>new Promise(resolve=>{finish=()=>{overlay.read.mapState='mapped';resolve();};});
-  h.frame();await Promise.resolve();label.position[0]=0.5;h.frame();finish();await new Promise(resolve=>setImmediate(resolve));h.frame();assert.equal(label.onScreen,true,'A moving anchor must not retain its previous hidden result');
-  await Promise.resolve();finish();await new Promise(resolve=>setImmediate(resolve));
- }finally{overlay.dispose();dom.window.close();}
+test('HTML clears stale occlusion while an anchor moves before depth readback', async () => {
+  const h = optionalGPU(),
+    dom = new JSDOM('<body><canvas width="128" height="96"></canvas></body>');
+  h.engine.canvas = dom.window.document.querySelector('canvas');
+  const overlay = new HTML({ capacity: 1 });
+  h.engine.use(overlay);
+  const label = overlay.add(dom.window.document.createElement('span'), { position: [0, 0, 0.5] });
+  try {
+    new Uint32Array(overlay.output.data)[0] = 1;
+    h.frame();
+    await new Promise((resolve) => setImmediate(resolve));
+    h.frame();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(label.onScreen, false);
+    let finish;
+    overlay.read.mapAsync = () =>
+      new Promise((resolve) => {
+        finish = () => {
+          overlay.read.mapState = 'mapped';
+          resolve();
+        };
+      });
+    h.frame();
+    await Promise.resolve();
+    label.position[0] = 0.5;
+    h.frame();
+    finish();
+    await new Promise((resolve) => setImmediate(resolve));
+    h.frame();
+    assert.equal(label.onScreen, true, 'A moving anchor must not retain its previous hidden result');
+    await Promise.resolve();
+    finish();
+    await new Promise((resolve) => setImmediate(resolve));
+  } finally {
+    overlay.dispose();
+    dom.window.close();
+  }
 });

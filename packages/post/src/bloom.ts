@@ -130,7 +130,13 @@ export class Bloom implements EnginePlugin {
   }
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu) throw new Error('Bloom requires WebGPU and a live effect');
-    if (!this.host && (engine.hasPlugin('ssao') || engine.hasPlugin('post-processing') || engine.hasPlugin('tonemap') || engine.hasPlugin('dof')))
+    if (
+      !this.host &&
+      (engine.hasPlugin('ssao') ||
+        engine.hasPlugin('post-processing') ||
+        engine.hasPlugin('tonemap') ||
+        engine.hasPlugin('dof'))
+    )
       throw new Error('Bloom owns the output target; remove the other post effect first');
     this.engine = engine;
     const device = engine.gpu;

@@ -129,8 +129,7 @@ export class HeadAim {
     this.cowlingMinY = 0;
     if (clearance) {
       const writer = clearance.writeRotation;
-      if (writer !== undefined && typeof writer !== 'function')
-        throw new RangeError('Invalid head rotation writer');
+      if (writer !== undefined && typeof writer !== 'function') throw new RangeError('Invalid head rotation writer');
       this.writeRotation = writer;
       if (clearance.rotationClearance !== undefined && typeof clearance.rotationClearance !== 'function')
         throw new RangeError('Invalid head joint clearance callback');

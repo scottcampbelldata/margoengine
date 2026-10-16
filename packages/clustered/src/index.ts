@@ -1,13 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
-import {
-  engineRuntime,
-  type Engine,
-  type EnginePlugin,
-  type FrameGraph,
-  type PassContext,
-  type Vec3,
-} from '@margoengine/core/extension';
+import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type Vec3 } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
 import { viewMatrix } from '../../shared/view.js';
 import { orthographic } from '../../shared/projection.js';

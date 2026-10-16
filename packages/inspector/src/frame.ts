@@ -10,6 +10,7 @@ import {
 } from '@margoengine/core/extension';
 import { GPUProfiler } from '@margoengine/stats';
 import { FramePanel } from './frame-panel.js';
+import { meshTriangles, type MeshSourceOwner } from '../../shared/mesh-source.js';
 
 declare const GPUBufferUsage: { COPY_SRC: number; COPY_DST: number; MAP_READ: number };
 declare const GPUMapMode: { READ: number };
@@ -88,7 +89,7 @@ export type CommandKind =
 
 /**
  * One draw, dispatch or bundle execution. Indirect counts are read back after the frame when the arguments buffer has
- * COPY_SRC usage, else null. `entities` are core mesh ids whose geometry owns this draw's vertex buffer.
+ * COPY_SRC usage, else null. `entities` are core or PBR mesh ids that own this draw's current vertex buffer.
  */
 export interface CommandReport {
   kind: CommandKind;
@@ -1242,19 +1243,37 @@ export class FrameDebugger implements EnginePlugin {
       }
       return report;
     };
-    // Core geometry vertex buffer -> mesh ids, so a draw can name the objects it drew.
+    // Current core and PBR vertex buffers -> mesh ids, so a draw can name the objects it drew.
     let owners: Map<GPUBuffer, number[]> | undefined;
     const entities = (vertex: GPUBuffer | undefined): number[] => {
       if (!vertex) return [];
       if (!owners) {
         owners = new Map();
+        const modelBuffers = new Map<MeshSourceOwner, Map<MeshHandle, GPUBuffer[]>>();
         for (const mesh of engine.meshes.values()) {
-          if (!mesh.geometry) continue;
           try {
-            const buffer = engine.geometryBuffers(mesh.geometry)?.vertex;
-            if (buffer) owners.set(buffer, [...(owners.get(buffer) ?? []), mesh.id].slice(0, 64));
+            const triangles = meshTriangles(mesh);
+            if (!triangles) continue;
+            let buffers: (GPUBuffer | undefined)[];
+            if (triangles.kind === 'core') buffers = [engine.geometryBuffers(triangles.geometry)?.vertex];
+            else {
+              const model = triangles.source.model;
+              let nodes = modelBuffers.get(model);
+              if (!nodes) {
+                nodes = new Map();
+                for (const draw of model.pickingPrimitives) {
+                  const vertices = nodes.get(draw.node);
+                  if (vertices) vertices.push(draw.vertex);
+                  else nodes.set(draw.node, [draw.vertex]);
+                }
+                modelBuffers.set(model, nodes);
+              }
+              buffers = nodes.get(mesh) ?? [];
+            }
+            for (const buffer of new Set(buffers))
+              if (buffer) owners.set(buffer, [...(owners.get(buffer) ?? []), mesh.id].slice(0, 64));
           } catch {
-            // Geometry not on the GPU (device recovery): no owner.
+            // Draw buffers not on the GPU (device recovery): no owner.
           }
         }
       }

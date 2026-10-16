@@ -298,7 +298,7 @@ try {
       ? +(s.length % 2 ? s[s.length >> 1] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2).toFixed(2)
       : null;
   };
-  for (const [name, byVariant] of Object.entries(report.results)) {
+  for (const [_name, byVariant] of Object.entries(report.results)) {
     const ref = byVariant.margo?.png && (await decodePNG(byVariant.margo.png));
     for (const slot of Object.values(byVariant)) {
       const ok = slot.runs.filter((r) => !r.error),

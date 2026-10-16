@@ -4,46 +4,12 @@ import { build } from 'vite';
 import { resolve, dirname } from 'node:path';
 import assert from 'node:assert/strict';
 import { gzipSync, deflateRawSync, inflateRawSync } from 'node:zlib';
-import { compactInternals } from './compact-internals.js';
+import { compactPackage } from './compact-package.js';
 import { compactOutput, external, measureCoreStage } from './measure-size.js';
 import { packageOrder } from './package-order.js';
-import { buildWorkers } from './build-workers.js';
+import { buildWorkers, restoreWorkerUrls } from './build-workers.js';
 import { staticEmbind } from './static-embind.js';
-async function compactPackage(name) {
-  const root = `packages/${name}/dist`,
-    files = (await readdir(root)).filter((file) => file.endsWith('.js'));
-  for (const file of files)
-    await writeFile(
-      `${root}/${file}`,
-      compactInternals(
-        await readFile(`packages/${name}/src/${file.replace(/\.js$/, '.ts')}`, 'utf8'),
-        await readFile(`${root}/${file}`, 'utf8'),
-      ),
-    );
-  // Keep module paths and identities intact, including the extension entry point.
-  const output = await build({
-    configFile: false,
-    publicDir: false,
-    logLevel: 'warn',
-    build: {
-      write: false,
-      minify: true,
-      target: 'es2022',
-      lib: {
-        entry: Object.fromEntries(files.map((file) => [file.slice(0, -3), `${root}/${file}`])),
-        formats: ['es'],
-        fileName: (_, name) => `${name}.js`,
-      },
-      rollupOptions: { external: (id, importer) => !!importer && (name !== 'margoengine' || resolve(dirname(importer), id) !== resolve('packages/shared/mesh-source.js')), output: compactOutput },
-    },
-  });
-  for (const chunk of output[0].output) {
-    assert.equal(chunk.type, 'chunk');
-    assert.ok(files.includes(chunk.fileName), 'Unexpected library chunk');
-    await writeFile(`${root}/${chunk.fileName}`, chunk.code);
-  }
-}
-
+import { packageDeclarations } from './package-declarations.js';
 const precompiled = process.argv.includes('--precompiled');
 const wasmPath = 'packages/kernel/target/wasm32-unknown-unknown/release/margoengine_kernel.wasm',
   optimizedPath = wasmPath.replace('.wasm', '.optimized.wasm');
@@ -147,10 +113,12 @@ if (!precompiled) {
 // Build every workspace package in dependency order (scripts/package-order.js reads package.json; a package that needs
 // another's dist at build time must declare it). A package with its own `build` script runs it; the rest use the
 // pipeline below: tsc + compaction for core and the stage facade, tsc for react, a Vite library build + tsc otherwise.
-const tsc = (name) =>
+const tsc = async (name) => {
   execFileSync(process.execPath, ['node_modules/typescript/bin/tsc', '-p', `packages/${name}/tsconfig.json`], {
     stdio: 'inherit',
   });
+  await packageDeclarations(resolve(`packages/${name}`));
+};
 const manifests = new Map();
 for (const dir of JSON.parse(await readFile('package.json', 'utf8')).workspaces.filter((dir) =>
   dir.startsWith('packages/'),
@@ -160,6 +128,7 @@ for (const name of packageOrder(manifests)) {
   const manifest = manifests.get(name);
   if (manifest.scripts?.build) {
     execSync(manifest.scripts.build, { cwd: `packages/${name}`, stdio: 'inherit' });
+    await packageDeclarations(resolve(`packages/${name}`));
     continue;
   }
   const output = resolve(`packages/${name}/dist`);
@@ -167,12 +136,12 @@ for (const name of packageOrder(manifests)) {
   await rm(output, { recursive: true, force: true });
   await copyFile('LICENSE', `packages/${name}/LICENSE`);
   if (name === 'core' || name === 'margoengine') {
-    tsc(name);
+    await tsc(name);
     await compactPackage(name);
     continue;
   }
   if (name === 'react') {
-    tsc(name);
+    await tsc(name);
     continue;
   }
   const entry = Object.fromEntries(
@@ -250,7 +219,8 @@ for (const name of packageOrder(manifests)) {
     await copyFile('packages/machinery/src/workers/OCCT-NOTICE.txt', resolve(output, 'workers/OCCT-NOTICE.txt'));
   }
   await buildWorkers(resolve(`packages/${name}`));
-  tsc(name);
+  await tsc(name);
+  await restoreWorkerUrls(output);
 }
 // Size records and leak checks only; build order comes from package.json above.
 const featurePackages = [

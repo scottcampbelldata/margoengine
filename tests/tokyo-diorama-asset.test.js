@@ -125,8 +125,18 @@ test('textured: baked atlases and a sign atlas with original lettering', () => {
 
 test('all atlas images are embedded and textured primitives have valid UV sets', () => {
   for (const name of [
-    'b1_atlas', 'b2_atlas', 'b3_atlas', 'b4_atlas', 'b5_atlas', 'cats_atlas',
-    'foliage_sprites', 'ground_atlas', 'props_atlas', 'signs_atlas', 'tanuki_atlas', 'tram_atlas',
+    'b1_atlas',
+    'b2_atlas',
+    'b3_atlas',
+    'b4_atlas',
+    'b5_atlas',
+    'cats_atlas',
+    'foliage_sprites',
+    'ground_atlas',
+    'props_atlas',
+    'signs_atlas',
+    'tanuki_atlas',
+    'tram_atlas',
   ]) {
     const image = doc.images.find((image) => image.name === name);
     assert.ok(image && Number.isInteger(image.bufferView), `${name} is not embedded`);
@@ -138,17 +148,24 @@ test('all atlas images are embedded and textured primitives have valid UV sets',
       const maps = [
         material.pbrMetallicRoughness?.baseColorTexture,
         material.pbrMetallicRoughness?.metallicRoughnessTexture,
-        material.normalTexture, material.occlusionTexture, material.emissiveTexture,
+        material.normalTexture,
+        material.occlusionTexture,
+        material.emissiveTexture,
       ].filter(Boolean);
       for (const map of maps) {
         const set = map.texCoord ?? 0;
-        assert.ok(Number.isInteger(set) && set >= 0 && set <= 1,
-          `${mesh.name}/${material.name} has invalid texture coordinate ${set}`);
+        assert.ok(
+          Number.isInteger(set) && set >= 0 && set <= 1,
+          `${mesh.name}/${material.name} has invalid texture coordinate ${set}`,
+        );
         const accessor = doc.accessors[primitive.attributes[`TEXCOORD_${set}`]];
         assert.ok(accessor, `${mesh.name}/${material.name} has no TEXCOORD_${set}`);
         assert.equal(accessor.type, 'VEC2', `${mesh.name}/${material.name} UV type`);
-        assert.equal(accessor.count, doc.accessors[primitive.attributes.POSITION].count,
-          `${mesh.name}/${material.name} UV count`);
+        assert.equal(
+          accessor.count,
+          doc.accessors[primitive.attributes.POSITION].count,
+          `${mesh.name}/${material.name} UV count`,
+        );
       }
     }
   }
@@ -160,12 +177,23 @@ test('underside dedication is baked into the existing base and ground atlas', ()
   assert.ok(index >= 0, 'missing baked underside material');
   const material = doc.materials[index];
   const color = material.pbrMetallicRoughness.baseColorTexture;
-  const imageFor = (map) => doc.textures[map.index].extensions?.EXT_texture_webp?.source ?? doc.textures[map.index].source;
-  assert.equal(imageFor(material.emissiveTexture), imageFor(color), 'underside must reuse its color atlas for emission');
-  assert.ok(material.emissiveFactor.every((value) => value > 0 && value <= 1), 'underside needs a readable glow');
+  const imageFor = (map) =>
+    doc.textures[map.index].extensions?.EXT_texture_webp?.source ?? doc.textures[map.index].source;
+  assert.equal(
+    imageFor(material.emissiveTexture),
+    imageFor(color),
+    'underside must reuse its color atlas for emission',
+  );
+  assert.ok(
+    material.emissiveFactor.every((value) => value > 0 && value <= 1),
+    'underside needs a readable glow',
+  );
   assert.equal(doc.images[imageFor(color)].name, 'ground_atlas', 'dedication must reuse GroundAtlas');
   const base = doc.nodes[nodeIndex('Slab_Base')];
-  assert.ok(doc.meshes[base.mesh].primitives.some((primitive) => primitive.material === index), 'dedication must be on Slab_Base');
+  assert.ok(
+    doc.meshes[base.mesh].primitives.some((primitive) => primitive.material === index),
+    'dedication must be on Slab_Base',
+  );
 });
 
 test('hero tram: baked weathering atlas, see-through glass, real detail', () => {

@@ -1,3 +1,4 @@
+import type { GLTFInstancing } from '../../shared/gltf.js';
 /// <reference lib="esnext.disposable" preserve="true" />
 // @margoengine/gltf-pro/instancing: PBRInstances, its vertex-stage patch and the EXT_mesh_gpu_instancing reader. The root
 // entry only draws what a primitive's `instances` hands it, so apps that never instance do not load this module.
@@ -41,7 +42,10 @@ export class PBRInstances {
     return this.source?.count ?? this.drawn;
   }
   set count(n: number) {
-    if (this.source) { this.source.count = n; return; }
+    if (this.source) {
+      this.source.count = n;
+      return;
+    }
     if (!Number.isInteger(n) || n < 0 || n > this.capacity) throw new RangeError('Invalid instance count');
     this.drawn = n;
     this.stale = true;
@@ -51,7 +55,10 @@ export class PBRInstances {
     return this.source ? !this.gpu || this.revision !== this.source.revision : this.high > this.low;
   }
   set needsUpdate(v: boolean) {
-    if (this.source) { this.source.needsUpdate = v; return; }
+    if (this.source) {
+      this.source.needsUpdate = v;
+      return;
+    }
     if (v) {
       this.low = 0;
       this.high = this.capacity;
@@ -64,7 +71,10 @@ export class PBRInstances {
     return i * 24;
   }
   private row(i: number, at: number, values: ArrayLike<number>, n: number, min = -Infinity): this {
-    if (this.source) { this.source.row(i, at, values, n, min); return this; }
+    if (this.source) {
+      this.source.row(i, at, values, n, min);
+      return this;
+    }
     const o = this.index(i) + at;
     for (let k = 0; k < n; k++)
       if (!Number.isFinite(Math.fround(values[k])) || values[k] < min) throw new RangeError('Invalid instance value');
@@ -141,8 +151,12 @@ export class PBRInstances {
   createProjection(): PBRInstances {
     const source = this.source ?? this;
     return Object.assign(Object.create(PBRInstances.prototype) as PBRInstances, {
-      data: source.data, capacity: source.capacity, source, revision: -1,
-      low: 0, high: source.capacity,
+      data: source.data,
+      capacity: source.capacity,
+      source,
+      revision: -1,
+      low: 0,
+      high: source.capacity,
     });
   }
   private scan(): void {
@@ -203,7 +217,7 @@ export class PBRInstances {
  */
 export const instancing = {
   /** TRANSLATION/ROTATION/SCALE accessors as node-space instance matrices (T*R*S). */
-  read(asset: GLTFAsset, ext: any): PBRInstances {
+  read(asset: GLTFAsset, ext: GLTFInstancing): PBRInstances {
     const a = ext?.attributes ?? {},
       read = (key: string, type: string) => (a[key] === undefined ? null : asset.accessor(a[key], type));
     const t = read('TRANSLATION', 'VEC3'),

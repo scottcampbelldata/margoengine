@@ -59,7 +59,9 @@ export class LOD {
     readonly levels: readonly LODLevel[],
   ) {
     this.model =
-      (levels.find((l) => (l.object as any)?.root && (l.object as any).primitives)?.object as { root: Mesh }) ?? null;
+      (levels.find(
+        (l) => (l.object as { root?: Mesh } | null)?.root && (l.object as { primitives?: unknown }).primitives,
+      )?.object as { root: Mesh }) ?? null;
   }
   get level(): number {
     return this.system.levelOf(this);
@@ -211,8 +213,10 @@ export class LODSystem implements EnginePlugin {
     }
     const sized = levels.find(
       (l) =>
-        l.object instanceof Geometry || l.object instanceof Imposter || (l.object as any)?.geometry instanceof Geometry,
-    )?.object as any;
+        l.object instanceof Geometry ||
+        l.object instanceof Imposter ||
+        (l.object as { geometry?: Geometry } | null)?.geometry instanceof Geometry,
+    )?.object as Geometry | Imposter | { geometry?: Geometry } | undefined;
     const r =
       radius ??
       (sized instanceof Imposter
@@ -282,7 +286,7 @@ export class LODSystem implements EnginePlugin {
   }
   private grow(size: number): void {
     const copy = <T extends Int32Array | Uint8Array | Int8Array | Float32Array | Int16Array>(a: T, stride = 1): T => {
-      const out = new (a.constructor as any)(size * stride);
+      const out = new (a.constructor as { new (length: number): T })(size * stride);
       out.set(a);
       return out;
     };

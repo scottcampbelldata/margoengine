@@ -22,7 +22,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/cameras | `.` 3, `./origin` 3 |  |  | 1,674 |
 | @margoengine/cinematic | `.` 3 |  |  | 1,820 |
 | @margoengine/clustered | `.` 12, `./shadows` 4, `./area` 4 | 22 |  | 9,665 |
-| @margoengine/controls | `.` 44, `./walk` 6 | 19 | 19 | 18,382 |
+| @margoengine/controls | `.` 44, `./walk` 6 | 23 |  | 18,382 |
 | @margoengine/core | `.` 15, `./extension` 23 | 14 |  | 18,255 |
 | @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 17,247 |
 | @margoengine/culling | `.` 6 |  |  | 8,656 |
@@ -36,7 +36,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/geometry | `.` 62 |  |  | 15,327 |
 | @margoengine/gizmo | `.` 12 |  |  | 108 |
 | @margoengine/gltf | `.` 4 |  |  | 4,924 |
-| @margoengine/gltf-pro | `.` 40, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./worker` 4 | 98 | 30 | 29,645 |
+| @margoengine/gltf-pro | `.` 40, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./worker` 4 | 245 |  | 29,835 |
 | @margoengine/html | `.` 8 |  |  | 4,279 |
 | @margoengine/ifc | `.` 4, `./worker` 2 | 3 |  | 2,563 |
 | @margoengine/input | `.` 4 |  |  | 2,297 |
@@ -54,12 +54,12 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/navmesh | `.` 4 |  |  | 3,140 |
 | @margoengine/net | `.` 3 |  |  | 1,115 |
 | @margoengine/oit | `.` 2 |  |  | 2,210 |
-| @margoengine/physics | `.` 35 | 2 | 25 | 11,384 |
+| @margoengine/physics | `.` 35 | 20 |  | 11,384 |
 | @margoengine/points | `.` 42 | 3 |  | 15,196 |
 | @margoengine/post | `.` 12, `./bloom` 2, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4 | 4 |  | 17,233 |
 | @margoengine/procedural | `.` 26, `./noise` 10, `./lsystem` 12, `./voronoi` 15 |  |  | 6,776 |
 | @margoengine/quality | `.` 17, `./warm` 3 | 1 |  | 1,564 |
-| @margoengine/react | `.` 102, `./kit` 29, `./post` 12, `./physics` 16, `./xr` 12 | 31 |  | 20,951 |
+| @margoengine/react | `.` 102, `./kit` 29, `./post` 12, `./physics` 16, `./xr` 12 | 31 |  | 20,966 |
 | @margoengine/road | `.` 3 |  |  | 915 |
 | @margoengine/scatter | `.` 17 | 1 |  | 9,115 |
 | @margoengine/scenery | `.` 2, `./sky` 2 |  |  | 218 |
@@ -69,7 +69,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/sky | `.` 8, `./base` 9, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1 | 94 |  | 10,191 |
 | @margoengine/splats | `.` 4, `./data` 3 |  |  | 6,342 |
 | @margoengine/splines | `.` 3 |  |  | 1,299 |
-| @margoengine/staging | `.` 4 |  |  | 4,579 |
+| @margoengine/staging | `.` 4 |  |  | 4,757 |
 | @margoengine/stats | `.` 3 |  |  | 4,678 |
 | @margoengine/taa | `.` 6 |  |  | 8,241 |
 | @margoengine/terrain | `.` 12 | 3 |  | 7,391 |
@@ -78,7 +78,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/toon | `.` 3 |  |  | 1,332 |
 | @margoengine/transitions | `.` 2 |  |  | 3,294 |
 | @margoengine/tween | `.` 6 |  |  | 800 |
-| @margoengine/usdz | `.` 7, `./worker` 2 | 2 | 2 | 7,975 |
+| @margoengine/usdz | `.` 7, `./worker` 2 | 24 |  | 7,975 |
 | @margoengine/usdz-export | `.` 9 |  |  | 64 |
 | @margoengine/vfx | `.` 5, `./base` 5, `./obstacles` 1, `./wrap` 1, `./sort` 1, `./texture` 1 | 19 |  | 7,278 |
 | @margoengine/video | `.` 2 |  |  | 1,902 |

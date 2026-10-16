@@ -11,15 +11,26 @@ const argument = (name) => {
   assert.ok(matches.length <= 1, `Specify --${name}= only once`);
   return matches[0]?.slice(name.length + 3);
 };
-const sceneArgument = argument('scene-url'), label = argument('label');
+const sceneArgument = argument('scene-url'),
+  label = argument('label');
 let sceneURL;
 if (sceneArgument !== undefined) {
   sceneURL = new URL(sceneArgument);
-  assert.ok(sceneURL.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(sceneURL.hostname) &&
-    !sceneURL.username && !sceneURL.password && !sceneURL.hash,
-  '--scene-url must be an absolute local HTTP URL without credentials or a fragment');
+  assert.ok(
+    sceneURL.protocol === 'http:' &&
+      ['127.0.0.1', 'localhost', '[::1]'].includes(sceneURL.hostname) &&
+      !sceneURL.username &&
+      !sceneURL.password &&
+      !sceneURL.hash,
+    '--scene-url must be an absolute local HTTP URL without credentials or a fragment',
+  );
 }
-if (label !== undefined) assert.match(label, /^[a-z0-9]+(?:-[a-z0-9]+)*$/, '--label must contain lowercase words or numbers separated by hyphens');
+if (label !== undefined)
+  assert.match(
+    label,
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+    '--label must contain lowercase words or numbers separated by hyphens',
+  );
 const suffix = label ? `-${label}` : '';
 
 const app = await openBrowser({
@@ -41,7 +52,8 @@ const errors = [],
 app.page.on('pageerror', (error) => errors.push(error.stack ?? error.message));
 const page = app.page,
   distance = (a, b) => Math.hypot(...a.map((value, i) => value - b[i]));
-const metrics = () => page.evaluate(() => JSON.parse(document.querySelector('#viewport').readWorkshopDiagnostics('metrics')));
+const metrics = () =>
+  page.evaluate(() => JSON.parse(document.querySelector('#viewport').readWorkshopDiagnostics('metrics')));
 async function settle(expected) {
   await page.waitForFunction(
     (expected) => {
@@ -62,7 +74,8 @@ async function captureStart() {
   await page.evaluate(() => {
     const viewport = document.querySelector('#viewport');
     globalThis.__motion = [];
-    let frame = -1, sampleIndex = -1;
+    let frame = -1,
+      sampleIndex = -1;
     const sample = () => {
       const value = JSON.parse(viewport.readWorkshopDiagnostics('metrics'));
       if (value.sampleIndex !== sampleIndex && value.animationFrames !== frame) {

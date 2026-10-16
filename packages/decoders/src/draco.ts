@@ -1,6 +1,6 @@
-import {WorkerPool, payload, requireWorkers, workerLimit} from './pool.js';
-import type {DecodedDracoGeometry, DracoRequest} from './protocol.js';
-import {validatedDracoLimits} from './protocol.js';
+import { WorkerPool, payload, requireWorkers, workerLimit } from './pool.js';
+import type { DecodedDracoGeometry, DracoRequest } from './protocol.js';
+import { validatedDracoLimits } from './protocol.js';
 
 export interface DracoOptions {
   /** Folder holding draco_wasm_wrapper.js and draco_decoder.wasm, e.g. 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/'. Defaults to the copy bundled with this package. */
@@ -32,22 +32,43 @@ export class DracoDecoder {
       requireWorkers('DracoDecoder');
       if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('Aborted', 'AbortError');
       const limits = validatedDracoLimits(options.limits);
-      const buffer = payload(data, options.transfer ?? false), {attributeIds, componentTypes} = options;
+      const buffer = payload(data, options.transfer ?? false),
+        { attributeIds, componentTypes } = options;
       this.pool ??= new WorkerPool(this.workerLimit);
-      return this.pool.run<DecodedDracoGeometry>({type: 'draco', buffer, request: {attributeIds, componentTypes, limits}, ...this.urls()}, [buffer], options.signal);
-    } catch (error) {return Promise.reject(error);}
+      return this.pool.run<DecodedDracoGeometry>(
+        { type: 'draco', buffer, request: { attributeIds, componentTypes, limits }, ...this.urls() },
+        [buffer],
+        options.signal,
+      );
+    } catch (error) {
+      return Promise.reject(error);
+    }
   }
 
   /** Terminate the workers. Pending decodes reject. */
-  dispose(): void {this.pool?.dispose(); this.pool = undefined;}
+  dispose(): void {
+    this.pool?.dispose();
+    this.pool = undefined;
+  }
 
-  [Symbol.dispose](): void {this.dispose();}
+  [Symbol.dispose](): void {
+    this.dispose();
+  }
 
-  private urls(): {wrapperURL: string; wasmURL: string} {
+  private urls(): { wrapperURL: string; wasmURL: string } {
     if (this.decoderPath !== undefined) {
-      const base = new URL(this.decoderPath.endsWith('/') ? this.decoderPath : this.decoderPath + '/', globalThis.location?.href);
-      return {wrapperURL: new URL('draco_wasm_wrapper.js', base).href, wasmURL: new URL('draco_decoder.wasm', base).href};
+      const base = new URL(
+        this.decoderPath.endsWith('/') ? this.decoderPath : this.decoderPath + '/',
+        globalThis.location?.href,
+      );
+      return {
+        wrapperURL: new URL('draco_wasm_wrapper.js', base).href,
+        wasmURL: new URL('draco_decoder.wasm', base).href,
+      };
     }
-    return {wrapperURL: new URL('./draco/draco_wasm_wrapper.js', import.meta.url).href, wasmURL: new URL('./draco/draco_decoder.wasm', import.meta.url).href};
+    return {
+      wrapperURL: new URL('./draco/draco_wasm_wrapper.js', import.meta.url).href,
+      wasmURL: new URL('./draco/draco_decoder.wasm', import.meta.url).href,
+    };
   }
 }

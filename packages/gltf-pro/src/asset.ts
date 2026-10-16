@@ -2,11 +2,19 @@ import { parseJSON } from '../../shared/json.js';
 import { assetURL } from '../../shared/asset-url.js';
 import { readResponse } from '../../shared/loading.js';
 import { meshoptDecodeGltfBuffer } from '@margoengine/decoders/meshopt';
-import type { KTX2Decoder, TranscodedKTX2Result } from '@margoengine/decoders';
+import type { DracoDecodeOptions, KTX2Decoder, TranscodedKTX2Result } from '@margoengine/decoders';
 import { checkCount, countLimit } from '../../shared/limits.js';
 import type { PBRInstances } from './instancing.js';
 import type { ExtendedPlan } from './shader.js';
-export type GLTFDocument = Record<string, any>;
+import type {
+  GLTFDocument,
+  GLTFBufferView,
+  GLTFTexture,
+  GLTFInstancing,
+  GLTFExtensions,
+  GLTFTextureInfo,
+} from '../../shared/gltf.js';
+export type { GLTFDocument } from '../../shared/gltf.js';
 /** Retained mip bytes let compressed textures upload again after device restoration. */
 export interface KTX2Image {
   readonly ktx2: TranscodedKTX2Result;
@@ -18,13 +26,18 @@ export type GLTFImage = ImageBitmap | KTX2Image | GLTFCompressedImage | undefine
 export interface GLTFImageOptions {
   signal?: AbortSignal;
   device?: GPUDevice;
-  ktx2?: Pick<KTX2Decoder, 'transcode'>;
+  ktx2?: {
+    transcode(
+      data: Uint8Array,
+      options?: { signal?: AbortSignal },
+    ): Promise<GLTFCompressedImage | TranscodedKTX2Result>;
+  };
 }
 /** Async codecs stay on the owning thread; meshopt is synchronous and can be packed in a parser worker. */
 export const asyncCompression = (doc: GLTFDocument): boolean =>
-  !!doc.meshes?.some((mesh:any)=>mesh?.primitives?.some((p:any)=>p?.extensions?.KHR_draco_mesh_compression)) ||
-  !!doc.textures?.some((texture:any)=>texture?.extensions?.KHR_texture_basisu) ||
-  !!doc.images?.some((image:any)=>image?.mimeType==='image/ktx2');
+  !!doc.meshes?.some((mesh) => mesh?.primitives?.some((p) => p?.extensions?.KHR_draco_mesh_compression)) ||
+  !!doc.textures?.some((texture) => texture?.extensions?.KHR_texture_basisu) ||
+  !!doc.images?.some((image) => image?.mimeType === 'image/ktx2');
 export const assetLimit = 64 * 1024 * 1024;
 /** A byte budget derived from `maxDownloadBytes` was exceeded: the error names the option to raise. */
 export const overBudget = (message: string, bytes: number): RangeError =>
@@ -46,17 +59,7 @@ export interface GLTFCompressedImage {
 /** Optional decoders. Structurally matches @margoengine/decoders (DracoDecoder, MeshoptDecoder, KTX2Decoder) without importing it. */
 export interface GLTFDecoderHooks {
   draco?: {
-    decode(
-      data: Uint8Array,
-      options: { attributeIds: Record<string, number>; componentTypes: Record<string, number>; signal?: AbortSignal },
-    ): Promise<{
-      positions?: ArrayLike<number>;
-      normals?: ArrayLike<number>;
-      uvs?: ArrayLike<number>;
-      colors?: ArrayLike<number>;
-      indices?: ArrayLike<number>;
-      attributes?: Record<string, { array: ArrayLike<number> }>;
-    }>;
+    decode(data: Uint8Array, options: GLTFDracoDecodeOptions): Promise<GLTFDracoGeometry>;
   };
   meshopt?: {
     decodeGltfBuffer(
@@ -70,9 +73,23 @@ export interface GLTFDecoderHooks {
   };
   ktx2?: { transcode(data: Uint8Array, options?: { signal?: AbortSignal }): Promise<GLTFCompressedImage> };
   /** EXT_mesh_gpu_instancing: `instancing` from @margoengine/gltf-pro/instancing. */
-  instancing?: { read(asset: GLTFAsset, extension: any): PBRInstances };
+  instancing?: { read(asset: GLTFAsset, extension: GLTFInstancing): PBRInstances | undefined };
   /** KHR_materials_iridescence, anisotropy and diffuse_transmission: `extendedMaterials` from @margoengine/gltf-pro/extended. */
   materials?: GLTFExtendedMaterials;
+}
+/** Structural decoder boundary; supplied hooks may omit metadata derived from accessor declarations. */
+export interface GLTFDracoDecodeOptions extends DracoDecodeOptions {
+  attributeIds: Record<string, number>;
+  componentTypes: Record<string, number>;
+}
+export interface GLTFDracoGeometry {
+  vertexCount?: number;
+  positions?: ArrayLike<number>;
+  normals?: ArrayLike<number>;
+  uvs?: ArrayLike<number>;
+  colors?: ArrayLike<number>;
+  indices?: ArrayLike<number>;
+  attributes?: Record<string, { array: ArrayLike<number>; itemSize?: number; componentType?: number }>;
 }
 /** What gltf-pro needs to shade extended materials (`extendedMaterials` from @margoengine/gltf-pro/extended implements it). */
 export interface GLTFExtendedMaterials {
@@ -81,8 +98,8 @@ export interface GLTFExtendedMaterials {
    * in use (every factor 0): the features, map slots 13-17 (texture infos) and 12 uniform floats (rows iri, aniso, dtr).
    */
   parse(
-    extensions: Record<string, any>,
-  ): { features: Omit<ExtendedPlan, 'slots'>; maps: unknown[]; rows: number[] } | undefined;
+    extensions: GLTFExtensions,
+  ): { features: Omit<ExtendedPlan, 'slots'>; maps: (GLTFTextureInfo | undefined)[]; rows: number[] } | undefined;
   /** The binding plan for a material's 18 map slots (`extendedPlan`). */
   plan(maps: readonly ({ index: number } | undefined)[], features: Omit<ExtendedPlan, 'slots'>): ExtendedPlan;
   /** The extended physical shader for a plan (`extendedShader`). */
@@ -114,13 +131,14 @@ const hookFor: Record<string, keyof GLTFDecoderHooks> = {
   KHR_materials_anisotropy: 'materials',
   KHR_materials_diffuse_transmission: 'materials',
 };
-const meshopt = (def: any) => def?.extensions?.EXT_meshopt_compression ?? def?.extensions?.KHR_meshopt_compression;
+const meshopt = (def: GLTFBufferView) =>
+  def?.extensions?.EXT_meshopt_compression ?? def?.extensions?.KHR_meshopt_compression;
 export function integer(value: unknown, label: string, min = 0): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min)
     throw new TypeError('Invalid glTF ' + label);
   return value;
 }
-export function entry(array: any[], id: unknown, label: string): any {
+export function entry<T>(array: readonly T[] | undefined, id: unknown, label: string): T {
   const value = array?.[integer(id, label)];
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('Missing glTF ' + label);
   return value;
@@ -131,7 +149,7 @@ export function container(
 ): { doc: GLTFDocument; binary?: Uint8Array } {
   if (typeof input === 'string') {
     if (new TextEncoder().encode(input).length > limit) throw overBudget('glTF JSON exceeds byte budget', limit);
-    return { doc: parseJSON(input) };
+    return { doc: parseJSON<GLTFDocument>(input) };
   }
   if (!(input instanceof ArrayBuffer) && !ArrayBuffer.isView(input)) return { doc: input as GLTFDocument };
   const data =
@@ -160,7 +178,7 @@ export function container(
     if (offset === 20 && type !== 0x4e4f534a) throw new TypeError('GLB JSON must be first');
     if (type === 0x4e4f534a) {
       if (doc) throw new TypeError('Duplicate GLB JSON');
-      doc = parseJSON(new TextDecoder('utf-8', { fatal: true }).decode(chunk));
+      doc = parseJSON<GLTFDocument>(new TextDecoder('utf-8', { fatal: true }).decode(chunk));
     } else if (type === 0x004e4942) {
       if (binary) throw new TypeError('Duplicate GLB binary');
       binary = chunk;
@@ -182,7 +200,7 @@ const meshoptExtension = 'EXT_meshopt_compression',
   dracoExtension = 'KHR_draco_mesh_compression',
   basisuExtension = 'KHR_texture_basisu';
 /** Basis Universal replaces the ordinary PNG/JPEG source, including optional fallbacks. */
-export function textureSource(def: any): number {
+export function textureSource(def: GLTFTexture): number {
   const extension = def.extensions?.[basisuExtension];
   if (extension !== undefined && (!extension || typeof extension !== 'object' || Array.isArray(extension)))
     throw new TypeError('Invalid glTF KHR_texture_basisu');
@@ -201,7 +219,9 @@ function accessorLayout(doc: GLTFDocument, id: unknown, type?: string) {
     (def.normalized !== undefined && typeof def.normalized !== 'boolean') ||
     (def.normalized && [5125, 5126].includes(def.componentType))
   )
-    throw new TypeError(`Unsupported glTF accessor ${index} (componentType ${def.componentType}, type ${def.type}${def.normalized ? ', normalized' : ''})`);
+    throw new TypeError(
+      `Unsupported glTF accessor ${index} (componentType ${def.componentType}, type ${def.type}${def.normalized ? ', normalized' : ''})`,
+    );
   return { index, def, size, width, count };
 }
 const normalizers: Record<number, number> = { 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 };
@@ -264,7 +284,10 @@ export class GLTFAsset {
     ])
       if (doc[key] !== undefined && !Array.isArray(doc[key])) throw new TypeError('Invalid glTF ' + key);
     const missing = (doc.extensionsRequired ?? []).filter(
-      (name: string) => !supported.has(name) && ![dracoExtension,meshoptExtension,'KHR_meshopt_compression',basisuExtension].includes(name) && !hooks[hookFor[name]],
+      (name: string) =>
+        !supported.has(name) &&
+        ![dracoExtension, meshoptExtension, 'KHR_meshopt_compression', basisuExtension].includes(name) &&
+        !hooks[hookFor[name]],
     );
     if (missing.length)
       throw new Error(
@@ -275,7 +298,7 @@ export class GLTFAsset {
       );
     checkCount('Too many glTF nodes', doc.nodes?.length ?? 0, maxNodes, 'maxNodes');
     let total = 0;
-    this.buffers = (doc.buffers ?? []).map((def: any, i: number) => {
+    this.buffers = (doc.buffers ?? []).map((def, i) => {
       if (!def || typeof def !== 'object' || Array.isArray(def)) throw new TypeError('Invalid glTF buffer');
       const length = integer(def.byteLength, 'buffer length', 1);
       const fallback = def.extensions?.[meshoptExtension]?.fallback;
@@ -283,11 +306,11 @@ export class GLTFAsset {
       const input = buffers[i],
         placeholder = (!input || input.byteLength === 0) && !def.uri && (i !== 0 || !binary);
       if (fallback === true || (placeholder && doc.extensionsRequired?.includes(meshoptExtension))) {
-        const views = (doc.bufferViews ?? []).filter((view: any) => view?.buffer === i);
+        const views = (doc.bufferViews ?? []).filter((view) => view?.buffer === i);
         if (
           !views.length ||
-          views.some((view: any) => !view.extensions?.[meshoptExtension]) ||
-          doc.bufferViews?.some((view: any) => view?.extensions?.[meshoptExtension]?.buffer === i)
+          views.some((view) => !view.extensions?.[meshoptExtension]) ||
+          doc.bufferViews?.some((view) => view?.extensions?.[meshoptExtension]?.buffer === i)
         )
           throw new TypeError('Invalid glTF meshopt fallback references');
         return new Uint8Array();
@@ -297,7 +320,7 @@ export class GLTFAsset {
           ? new Uint8Array(input)
           : new Uint8Array(input.buffer, input.byteOffset, input.byteLength)
         : def.uri
-          ? embedded(def.uri,maxBytes)
+          ? embedded(def.uri, maxBytes)
           : i === 0
             ? binary
             : undefined;
@@ -349,16 +372,18 @@ export class GLTFAsset {
       if (
         !['NONE', 'OCTAHEDRAL', 'QUATERNION', 'EXPONENTIAL', 'COLOR'].includes(filter) ||
         (filter !== 'NONE' && mode !== 'ATTRIBUTES') ||
-        (['OCTAHEDRAL','COLOR'].includes(filter) && ![4, 8].includes(stride)) ||
+        (['OCTAHEDRAL', 'COLOR'].includes(filter) && ![4, 8].includes(stride)) ||
         (filter === 'QUATERNION' && stride !== 8) ||
         (filter === 'EXPONENTIAL' && stride % 4 !== 0)
       )
         throw new TypeError('Invalid glTF meshopt filter');
       if (this.decoded + length > this.maxBytes * 4) throw new RangeError('Decoded glTF exceeds byte budget');
       const sourceBytes = source.subarray(sourceOffset, sourceOffset + sourceLength);
-      let bytes:Uint8Array;
-      if(this.hooks.meshopt){bytes=new Uint8Array(length);this.hooks.meshopt.decodeGltfBuffer(bytes,count,stride,sourceBytes,mode,filter);}
-      else bytes=meshoptDecodeGltfBuffer(sourceBytes,count,stride,mode,filter);
+      let bytes: Uint8Array;
+      if (this.hooks.meshopt) {
+        bytes = new Uint8Array(length);
+        this.hooks.meshopt.decodeGltfBuffer(bytes, count, stride, sourceBytes, mode, filter);
+      } else bytes = meshoptDecodeGltfBuffer(sourceBytes, count, stride, mode, filter);
       this.reserveDecodedBytes(bytes.byteLength);
       this.viewCache.set(index, bytes);
       return bytes;
@@ -382,18 +407,43 @@ export class GLTFAsset {
     this.cache.set(index, values);
   }
   async decode(signal?: AbortSignal): Promise<void> {
-    const {decompressPrimitives} = await import('./compression.js');
-    const hook=this.hooks.draco;
+    const { decompressPrimitives } = await import('./compression.js');
+    const hook = this.hooks.draco;
     // The retained structural hook permits omitted derived metadata; the built-in decoder's strict contract remains unchanged.
-    const draco=hook?{decode:async(data:Uint8Array,options:any)=>{
-      const result:any=await hook.decode(data,options),vertexCount=result.vertexCount??result.positions?.length/3;
-      const attributes=result.attributes&&Object.fromEntries(Object.entries(result.attributes).map(([name,value])=>{
-        const attribute=value as {array:ArrayLike<number>;itemSize?:number;componentType?:number};
-        return [name,{...attribute,itemSize:attribute.itemSize??attribute.array.length/vertexCount,componentType:attribute.componentType??options.componentTypes[name]}];
-      }));
-      return {...result,vertexCount,attributes,indices:result.indices??(Number.isSafeInteger(vertexCount)&&vertexCount>=3&&vertexCount<=1_000_000?Uint32Array.from({length:vertexCount},(_,i)=>i):undefined)};
-    }}:undefined;
-    await decompressPrimitives(this,{signal,draco:draco as any});
+    const draco = hook
+      ? {
+          decode: async (data: Uint8Array, options: GLTFDracoDecodeOptions) => {
+            const result = await hook.decode(data, options),
+              vertexCount = result.vertexCount ?? (result.positions?.length as number) / 3;
+            const attributes =
+              result.attributes &&
+              Object.fromEntries(
+                Object.entries(result.attributes).map(([name, value]) => {
+                  const attribute = value as { array: ArrayLike<number>; itemSize?: number; componentType?: number };
+                  return [
+                    name,
+                    {
+                      ...attribute,
+                      itemSize: attribute.itemSize ?? attribute.array.length / vertexCount,
+                      componentType: attribute.componentType ?? options.componentTypes[name],
+                    },
+                  ];
+                }),
+              );
+            return {
+              ...result,
+              vertexCount,
+              attributes,
+              indices:
+                result.indices ??
+                (Number.isSafeInteger(vertexCount) && vertexCount >= 3 && vertexCount <= 1_000_000
+                  ? Uint32Array.from({ length: vertexCount }, (_, i) => i)
+                  : undefined),
+            };
+          },
+        }
+      : undefined;
+    await decompressPrimitives(this, { signal, draco });
   }
   accessor(id: unknown, type?: string): Float32Array {
     const { index, def, size, width, count } = accessorLayout(this.doc, id, type);
@@ -426,9 +476,9 @@ export class GLTFAsset {
       read(this.view(def.bufferView), integer(def.byteOffset ?? 0, 'accessor offset'), stride, count);
     } else if (!def.sparse || def.byteOffset) {
       if (
-        this.doc.meshes?.some((mesh: any) =>
+        this.doc.meshes?.some((mesh) =>
           mesh?.primitives?.some(
-            (primitive: any) =>
+            (primitive) =>
               primitive?.extensions?.[dracoExtension] &&
               (primitive.indices === index ||
                 Object.keys(primitive.extensions[dracoExtension].attributes ?? {}).some(
@@ -486,7 +536,7 @@ function ktxSources(doc: GLTFDocument): Set<number> {
         throw new TypeError('KHR_texture_basisu requires image/ktx2');
       sources.add(source);
     }
-  for (let i = 0; i < (doc.images?.length ?? 0); i++) if (doc.images[i]?.mimeType === 'image/ktx2') sources.add(i);
+  for (let i = 0; i < (doc.images?.length ?? 0); i++) if (doc.images![i]?.mimeType === 'image/ktx2') sources.add(i);
   return sources;
 }
 function unusedBasisuFallbacks(doc: GLTFDocument): Set<number> {
@@ -495,8 +545,8 @@ function unusedBasisuFallbacks(doc: GLTFDocument): Set<number> {
   for (const texture of doc.textures ?? []) {
     if (texture?.extensions?.[basisuExtension] !== undefined) {
       selected.add(textureSource(texture));
-      if (Number.isSafeInteger(texture.source) && texture.source >= 0) fallbacks.add(texture.source);
-    } else if (Number.isSafeInteger(texture?.source) && texture.source >= 0) selected.add(texture.source);
+      if (Number.isSafeInteger(texture.source) && texture.source! >= 0) fallbacks.add(texture.source!);
+    } else if (Number.isSafeInteger(texture?.source) && texture.source! >= 0) selected.add(texture.source!);
   }
   for (const source of selected) fallbacks.delete(source);
   return fallbacks;
@@ -585,7 +635,7 @@ function ktxDecoder(asset: GLTFAsset, options: GLTFImageOptions) {
         options.signal?.throwIfAborted();
         decoder = owned = new KTX2Decoder({ device: options.device });
       }
-      const result = await decoder.transcode(data, { signal: options.signal });
+      const result = (await decoder.transcode(data, { signal: options.signal })) as TranscodedKTX2Result;
       options.signal?.throwIfAborted();
       return validateKTX2(result, header, asset);
     },
@@ -616,7 +666,7 @@ export async function decodeKTX2Images(
         def.bufferView !== undefined
           ? asset.view(def.bufferView)
           : typeof def.uri === 'string' && def.uri.startsWith('data:')
-            ? embedded(def.uri,asset.maxBytes)
+            ? embedded(def.uri, asset.maxBytes)
             : undefined;
       if (!data) throw new Error('External KTX2 images require loadGLTF');
       decoded[source] = await decoder.decode(data);
@@ -645,16 +695,24 @@ export interface AssetOptions {
 export async function loadAsset(
   url: string | URL | undefined,
   options: AssetOptions | AbortSignal = {},
-  inputOrPrepare?: string | object | ArrayBuffer | ArrayBufferView | ((asset:GLTFAsset)=>Promise<void>),
+  inputOrPrepare?: string | object | ArrayBuffer | ArrayBufferView | ((asset: GLTFAsset) => Promise<void>),
   imageOptions: GLTFImageOptions = {},
   deferCompression = false,
   downloadedBytes = 0,
-): Promise<{asset:GLTFAsset;images:GLTFImage[];deferred?:boolean;baseURL?:string;downloadedBytes?:number}> {
-  const config:AssetOptions = 'aborted' in options ? {signal:options as AbortSignal} : options as AssetOptions;
-  const {signal,decoders={},buffers:provided=[],fetch:get=globalThis.fetch,maxDownloadBytes,maxNodes,allowedURLs}=config;
-  const prepare=typeof inputOrPrepare==='function'?inputOrPrepare:undefined;
-  const input=typeof inputOrPrepare==='function'?undefined:inputOrPrepare;
-  const limit=downloadLimit(maxDownloadBytes);
+): Promise<{ asset: GLTFAsset; images: GLTFImage[]; deferred?: boolean; baseURL?: string; downloadedBytes?: number }> {
+  const config: AssetOptions = 'aborted' in options ? { signal: options as AbortSignal } : (options as AssetOptions);
+  const {
+    signal,
+    decoders = {},
+    buffers: provided = [],
+    fetch: get = globalThis.fetch,
+    maxDownloadBytes,
+    maxNodes,
+    allowedURLs,
+  } = config;
+  const prepare = typeof inputOrPrepare === 'function' ? inputOrPrepare : undefined;
+  const input = typeof inputOrPrepare === 'function' ? undefined : inputOrPrepare;
+  const limit = downloadLimit(maxDownloadBytes);
   signal?.throwIfAborted();
   let base = url === undefined ? undefined : new URL(url, globalThis.location?.href),
     total = downloadedBytes;
@@ -670,28 +728,36 @@ export async function loadAsset(
     total += bytes.length;
     return bytes;
   };
-  const resolve = (uri:string) => assetURL(uri,base ?? globalThis.location?.href,allowedURLs,'glTF resource');
+  const resolve = (uri: string) => assetURL(uri, base ?? globalThis.location?.href, allowedURLs, 'glTF resource');
   const { doc, binary } = container(input ?? (await fetchBytes(base!, true)), limit),
     buffers: Uint8Array[] = [],
     images: GLTFImage[] = [];
   for (let i = 0; i < (doc.buffers?.length ?? 0); i++) {
     const def = entry(doc.buffers, i, 'buffer');
-    if (provided[i]) { const given=provided[i]; buffers[i]=given instanceof ArrayBuffer?new Uint8Array(given):new Uint8Array(given.buffer,given.byteOffset,given.byteLength); continue; }
+    if (provided[i]) {
+      const given = provided[i];
+      buffers[i] =
+        given instanceof ArrayBuffer
+          ? new Uint8Array(given)
+          : new Uint8Array(given.buffer, given.byteOffset, given.byteLength);
+      continue;
+    }
     if (def.extensions?.[meshoptExtension]?.fallback === true) continue;
     if (!def.uri) {
       if (i === 0 && binary) buffers[i] = binary;
     } else if (def.uri.startsWith('data:')) {
-      const b = embedded(def.uri,limit);
+      const b = embedded(def.uri, limit);
       total += b.length;
       if (total > limit) throw new RangeError('glTF exceeds download budget');
       buffers[i] = b;
     } else buffers[i] = await fetchBytes(resolve(def.uri));
   }
-  const asset = new GLTFAsset(doc,buffers,binary,decoders,limit,maxNodes);
-  if (deferCompression && asyncCompression(doc)) return {asset, images, deferred:true, baseURL:base?.href,downloadedBytes:total};
+  const asset = new GLTFAsset(doc, buffers, binary, decoders, limit, maxNodes);
+  if (deferCompression && asyncCompression(doc))
+    return { asset, images, deferred: true, baseURL: base?.href, downloadedBytes: total };
   const sources = ktxSources(doc),
     fallbacks = unusedBasisuFallbacks(doc),
-    decoder = ktxDecoder(asset, { ...imageOptions, ktx2:imageOptions.ktx2 ?? decoders.ktx2 as any, signal });
+    decoder = ktxDecoder(asset, { ...imageOptions, ktx2: imageOptions.ktx2 ?? decoders.ktx2, signal });
   let decodedImages = 0;
   await asset.decode(signal);
   try {

@@ -34,7 +34,8 @@ test('replaying during a delayed stop or fade releases the previous buffer sourc
       listener = new AudioListener({ context }),
       sound = new Audio(listener).setBuffer(buffer()).play();
     try {
-      const old = context.bufferSources.at(-1), ended = old.onended;
+      const old = context.bufferSources.at(-1),
+        ended = old.onended;
       sound[method](5);
       assert.equal(old.outputs.size, 1, `${method} should finish its delayed playback`);
       sound.play();
