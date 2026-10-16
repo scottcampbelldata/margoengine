@@ -15,6 +15,9 @@ export function createConstraintDemo() {
   const projectedTarget = new Float32Array(rawTarget),
     chaseTarget = new Float32Array(3);
   const paceTarget = new Float32Array(3);
+  const detourTarget = new Float32Array(3);
+  const contactTarget = new Float32Array(3), contactElbow = new Float32Array(3);
+  const contactGradient = new Float64Array(3);
   const commandTarget = new Float32Array(3), lastSolveTarget = new Float32Array(3), lastSolveRoot = new Float32Array(3);
   const upperLength = 0.55,
     lowerLength = 0.52,
@@ -61,6 +64,7 @@ export function createConstraintDemo() {
     rawStatus = 0,
     dt = 1 / 60;
   let paced = false, paused = false;
+  let outwardDetour = false;
   let acceptedPole = 0,
     iterations = 0,
     solveCalls = 0,
@@ -149,17 +153,20 @@ export function createConstraintDemo() {
     out[1] = shoulder[1] + ay * along + height * (by * cosine + cy * sine);
     out[2] = shoulder[2] + az * along + height * (bz * cosine + cz * sine);
   }
-  function measurePose() {
+  function measurePoseAt(hand, elbow) {
     let gap = Infinity;
     const active = scene === 'mixed' ? mixedVolumes : volumes;
     for (let i = 0; i < active.length; i++) {
       gap = Math.min(
         gap,
-        active[i].segmentClearance(root, currentElbow, elbowRadius),
-        active[i].segmentClearance(currentElbow, currentHand, forearmRadius),
+        active[i].segmentClearance(root, elbow, elbowRadius),
+        active[i].segmentClearance(elbow, hand, forearmRadius),
       );
     }
     return gap;
+  }
+  function measurePose() {
+    return measurePoseAt(currentHand, currentElbow);
   }
   function measureTarget(point) {
     let gap = Infinity;
@@ -205,6 +212,7 @@ export function createConstraintDemo() {
     hasBendFrame = false;
     yaw = 0;
     chased = false;
+    outwardDetour = false;
     paced = false;
     handStep = 0;
     clampActive = false;
@@ -252,7 +260,7 @@ export function createConstraintDemo() {
   function step(seconds) {
     if (!Number.isFinite(seconds) || seconds < 0)
       throw new RangeError('Frame delta must be finite and nonnegative');
-    if (seconds === 0) return result;
+    if (seconds === 0) { outwardDetour = false; return result; }
     dt =
       clock === 'fixed60'
         ? 1 / 60
@@ -260,6 +268,7 @@ export function createConstraintDemo() {
           ? 1 / 120
           : Math.min(seconds, 1 / 20);
     chased = false;
+    outwardDetour = false;
     paced = false;
     angleStep = 0;
     handStep = 0;
@@ -312,6 +321,7 @@ export function createConstraintDemo() {
       request = paceTarget; paced = true;
     }
     commandTarget.set(request); result = solve(request);
+    detourTarget.set(result.target);
     rawStatus = result.status;
     // Bounded local recovery is a controller policy. Failed calls retain solver
     // history; each retry uses the same dt and must satisfy every package guard.
@@ -338,6 +348,75 @@ export function createConstraintDemo() {
         if (result.resolved) {
           chased = true;
           break;
+        }
+      }
+      // Front-view demo policy: a straight local chord can cut through the
+      // forearm's contact envelope even when its far endpoint is reachable.
+      // Try a contact-tangent waypoint with a small clearance reserve before
+      // holding. Account for damping to bound the prospective hand step.
+      // Every waypoint goes through the unchanged full-chain solve and pole
+      // window; failures never advance the accepted pose or solver history.
+      if (
+        !result.resolved &&
+        rawStatus === SolveStatus.ObstacleOccluded &&
+        currentHand[2] >= root[2] &&
+        request[2] >= root[2]
+      ) {
+        // Leave a small reserve for Float32 output and the target contact band.
+        const limit = 0.75 * dt * 0.99;
+        const blend = damping > 0 ? -Math.expm1(-dt / damping) : 1;
+        const angle = result.poleAngle;
+        // Estimate the local full-link contact gradient around the rejected
+        // bounded pose. This includes elbow motion induced by the two-bone
+        // geometry, rather than assuming the hand's point normal is enough.
+        contactTarget.set(result.target);
+        const contactReach = length3(contactTarget[0] - root[0], contactTarget[1] - root[1], contactTarget[2] - root[2]);
+        const difference = Math.min(0.0001, Math.max(0,
+          Math.min(contactReach - Math.abs(upperLength - lowerLength), upperLength + lowerLength - contactReach) * 0.25));
+        for (let axis = 0; axis < 3; axis++) {
+          const center = contactTarget[axis];
+          contactTarget[axis] = center + difference;
+          const high = contactTarget[axis];
+          evaluateElbowIK(root, contactTarget, angle, contactElbow);
+          const highGap = measurePoseAt(contactTarget, contactElbow);
+          contactTarget[axis] = center - difference;
+          const low = contactTarget[axis];
+          evaluateElbowIK(root, contactTarget, angle, contactElbow);
+          const lowGap = measurePoseAt(contactTarget, contactElbow);
+          contactGradient[axis] = high !== low ? (highGap - lowGap) / (high - low) : 0;
+          contactTarget[axis] = center;
+        }
+        const gx = contactGradient[0], gy = contactGradient[1], gz = contactGradient[2];
+        const gradientSquared = gx * gx + gy * gy + gz * gz;
+        const dx = detourTarget[0] - currentHand[0],
+          dy = detourTarget[1] - currentHand[1],
+          dz = detourTarget[2] - currentHand[2];
+        const inward = gradientSquared > 1e-12
+          ? Math.min(0, (dx * gx + dy * gy + dz * gz) / gradientSquared)
+          : 0;
+        for (let reserve = 0.01; reserve <= 0.16; reserve *= 2) {
+          if (!(limit > 0) || !(blend > 0)) break;
+          const bias = gradientSquared > 1e-12 ? limit * reserve / Math.sqrt(gradientSquared) : 0;
+          const x = dx - gx * inward + gx * bias, y = dy - gy * inward + gy * bias;
+          const z = dz - gz * inward + gz * bias;
+          const length = length3(x, y, z);
+          const scale = length > limit ? limit / length : 1;
+          const xStep = x * scale, yStep = y * scale, zStep = z * scale;
+          // Do not replace a blocked gesture with unconstrained outward drift.
+          // A waypoint must also reduce distance to the user's actual target.
+          const progress =
+            2 * (xStep * (rawTarget[0] - currentHand[0]) +
+              yStep * (rawTarget[1] - currentHand[1]) +
+              zStep * (rawTarget[2] - currentHand[2]));
+          if (progress <= xStep * xStep + yStep * yStep + zStep * zStep) continue;
+          detourTarget[0] = currentHand[0] + xStep / blend;
+          detourTarget[1] = currentHand[1] + yStep / blend;
+          detourTarget[2] = currentHand[2] + zStep / blend;
+          result = solve(detourTarget);
+          if (result.resolved) {
+            chased = outwardDetour = true;
+            break;
+          }
         }
       }
     }
@@ -433,6 +512,9 @@ export function createConstraintDemo() {
     get chased() {
       return chased;
     },
+    get outwardDetour() {
+      return outwardDetour;
+    },
     get rawStatus() {
       return rawStatus;
     },
@@ -477,7 +559,7 @@ export function createConstraintDemo() {
     get clampActive() {
       return clampActive;
     },
-    setPaused(value) { paused = Boolean(value); if (paused) { handStep = 0; angleStep = 0; iterations = 0; solveCalls = 0; } },
+    setPaused(value) { paused = Boolean(value); if (paused) { outwardDetour = false; handStep = 0; angleStep = 0; iterations = 0; solveCalls = 0; } },
     setMode(value) {
       if (value !== 'chain' && value !== 'target')
         throw new RangeError('Unknown query');
