@@ -123,6 +123,11 @@ the model retains ownership and closes them when disposed.
 return, after tone mapping/output encoding. `lighting: false` omits optional
 lighting shaders and bindings for a caller-managed surface. The material package
 uses these hooks for transmission while retaining the baseline factor-zero path.
+The optional `ambient` statements can mutate `materialAmbient` after hemisphere
+lighting in beauty and ambient-only passes. They are applied after lighting
+effects have matched the standard PBR source. Materials uses this hook for sheen,
+specular color and thin-film reflection; primitives without a hook retain their
+original shader and bindings.
 `PBRModel.beginOpaquePass(context)` defers blended beauty draws across models;
 `PBRModel.endOpaquePass(context)` flushes them after a caller-owned scene copy,
 and `cancelOpaquePass(context)` releases an interrupted phase. Calls to `draw()`

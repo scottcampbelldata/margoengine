@@ -42,7 +42,7 @@ export function coordinateExtension(maps:readonly any[],source?:MaterialExtensio
   const extension=cached.extension,factors=extension.factors!;
   // Hooks, factors and views remain editable after installation.
   Object.assign(extension,source);extension.factors=factors;
-  for(const key of ['wgsl','direct','output','lighting','declarations','textures'] as const)if(source?.[key]===undefined)delete extension[key];
+  for(const key of ['wgsl','direct','ambient','output','lighting','declarations','textures'] as const)if(source?.[key]===undefined)delete extension[key];
   if(source?.factors)factors.set(source.factors);
   let at=length;for(const transform of transforms)if(transform){factors.set(transform,at);at+=8;}
   cached.transforms=transforms;return cached;

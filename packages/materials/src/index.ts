@@ -6,6 +6,9 @@ import {clearcoatShader, type ClearcoatShaderTextures} from './shader.js';
 import {MaterialTextures, validateTextureInfo, type TextureInfo} from './textures.js';
 import {createTransmission, validateTransmission, type TransmissionOptions, type VolumeOptions} from './transmission.js';
 import {acquireOpaqueColor} from './opaque-color.js';
+import {materialLobes,validateLobes,lobeMaps,type MaterialLobeOptions} from './lobes.js';
+export {materialLobes,sheen,specular,anisotropy,iridescence} from './lobes.js';
+export type {MaterialLobeOptions,SheenOptions,SpecularOptions,AnisotropyOptions,IridescenceOptions} from './lobes.js';
 export {transmission, type TransmissionOptions, type VolumeOptions} from './transmission.js';
 export {nodeMaterial, installNodeMaterial, NodeMaterialInstallation} from './nodes.js';
 export type * from './node-types.js';
@@ -45,7 +48,7 @@ export function clearcoat(options:ClearcoatOptions={}):MaterialExtension {
 }
 
 type CoatMap='clearcoatTexture'|'clearcoatRoughnessTexture'|'clearcoatNormalTexture';
-type MapField=CoatMap|'transmissionTexture'|'thicknessTexture';
+type MapField=CoatMap|'transmissionTexture'|'thicknessTexture'|(typeof lobeMaps)[keyof typeof lobeMaps][number];
 interface Plan {
   material:PBRMaterial;
   coat:boolean;
@@ -55,6 +58,7 @@ interface Plan {
   previous?:MaterialExtension;
   extension?:MaterialExtension;
   transmission?:TransmissionOptions;
+  lobes?:MaterialLobeOptions;
   opaqueIndex?:number;
   previousMode?:number;
 }
@@ -80,16 +84,33 @@ export class MaterialInstallation implements EnginePlugin {
       const normalizedTransmission=material.transmission!==undefined;
       const transmit=definition(normalizedTransmission?material.transmission:material.extensions?.KHR_materials_transmission,'KHR_materials_transmission');
       const volume=definition(material.volume!==undefined?material.volume:transmit?.volume!==undefined?transmit.volume:material.extensions?.KHR_materials_volume,'KHR_materials_volume');
-      if(def===undefined&&transmit===undefined&&volume===undefined)continue;
+      const lobeOptions:MaterialLobeOptions={},lobeTextures:Partial<Record<MapField,any>>={};
+      for(const key of Object.keys(lobeMaps) as (keyof typeof lobeMaps)[]){
+        const normalized=material[key]!==undefined,value=definition(normalized?material[key]:material.extensions?.['KHR_materials_'+key],'KHR_materials_'+key);
+        if(value===undefined)continue;
+        if(key==='sheen')lobeOptions.sheen={colorFactor:normalized?value.colorFactor:value.sheenColorFactor,roughnessFactor:normalized?value.roughnessFactor:value.sheenRoughnessFactor};
+        else if(key==='specular')lobeOptions.specular={factor:normalized?value.factor:value.specularFactor,colorFactor:normalized?value.colorFactor:value.specularColorFactor};
+        else if(key==='anisotropy')lobeOptions.anisotropy={strength:normalized?value.strength:value.anisotropyStrength,rotation:normalized?value.rotation:value.anisotropyRotation};
+        else lobeOptions.iridescence={factor:normalized?value.factor:value.iridescenceFactor,ior:normalized?value.ior:value.iridescenceIor,thicknessMinimum:normalized?value.thicknessMinimum:value.iridescenceThicknessMinimum,thicknessMaximum:normalized?value.thicknessMaximum:value.iridescenceThicknessMaximum};
+        for(const field of lobeMaps[key])if(value[field]!==undefined)lobeTextures[field]=value[field];
+      }
+      const hasLobes=Object.keys(lobeOptions).length>0;
+      if(def===undefined&&transmit===undefined&&volume===undefined&&!hasLobes)continue;
       const iorDef=definition(material.extensions?.KHR_materials_ior,'KHR_materials_ior');
+      if(hasLobes){
+        if(material.extensions?.KHR_materials_unlit!==undefined||material.extensions?.KHR_materials_pbrSpecularGlossiness!==undefined)throw new Error('Material lobes require metallic-roughness lighting');
+        lobeOptions.ior=transmit?.ior??material.ior??iorDef?.ior;
+        validateLobes(lobeOptions);
+      }
       const transmissionOptions:TransmissionOptions={factor:transmit?(normalizedTransmission?transmit.factor:transmit.transmissionFactor):0,ior:transmit?.ior??material.ior??iorDef?.ior,
         ...(volume!==undefined?{volume:{thicknessFactor:volume.thicknessFactor,attenuationColor:volume.attenuationColor,attenuationDistance:volume.attenuationDistance}}:{})};
       const transmitted=validateTransmission(transmissionOptions);
-      if(def===undefined&&transmitted.factor===0)continue;
+      if(def===undefined&&transmitted.factor===0&&!hasLobes)continue;
       const primitives=model.primitives.filter(p=>p.material===material);
       const plan:Plan={material,coat:def!==undefined,factor:scalar(normalized?def?.factor:def?.clearcoatFactor,0,'factor',0,1),roughnessFactor:scalar(normalized?def?.roughnessFactor:def?.clearcoatRoughnessFactor,0,'roughness',0,1),maps:{},previous:material.extension,
+        ...(hasLobes?{lobes:lobeOptions}:{}),
         ...(transmitted.factor>0?{transmission:transmissionOptions,previousMode:material.settings[0]}:{})};
-      const maps:Partial<Record<MapField,any>>={};
+      const maps:Partial<Record<MapField,any>>={...lobeTextures};
       for(const field of mapFields)if(def?.[field]!==undefined)maps[field]=def[field];
       if(plan.transmission){maps.transmissionTexture=transmit?.transmissionTexture;maps.thicknessTexture=volume?.thicknessTexture;}
       for(const field of Object.keys(maps) as MapField[])if(maps[field]!==undefined){
@@ -112,9 +133,17 @@ export class MaterialInstallation implements EnginePlugin {
       const ready=this.plans.filter(plan=>!plan.extension||plan.material.extension===plan.extension).map(plan=>{
         const options:ClearcoatOptions={factor:plan.factor,roughnessFactor:plan.roughnessFactor};
         const resolved:Partial<Record<MapField,ClearcoatTexture>>={};
-        for(const field of Object.keys(plan.maps) as MapField[]){const map=plan.maps[field];if(map)resolved[field]='view' in map?map:textures.resolve(map);}
+        for(const field of Object.keys(plan.maps) as MapField[]){const map=plan.maps[field];if(map)resolved[field]='view' in map?map:textures.resolve(map,field==='sheenColorTexture'||field==='specularColorTexture');}
         for(const field of mapFields)options[field]=resolved[field];
-        const coat=plan.coat?clearcoat(options):undefined;
+        let coat=plan.coat?clearcoat(options):undefined;
+        if(plan.lobes){
+          const lobes:MaterialLobeOptions={...plan.lobes};
+          for(const key of Object.keys(lobeMaps) as (keyof typeof lobeMaps)[])if(lobes[key]){
+            const value={...lobes[key]};for(const field of lobeMaps[key])if(resolved[field])Object.assign(value,{[field]:resolved[field]});
+            Object.assign(lobes,{[key]:value});
+          }
+          coat=materialLobes(lobes,coat);
+        }
         plan.opaqueIndex=plan.transmission?(coat?.textures?.length??0):undefined;
         const extension=plan.transmission?createTransmission({...plan.transmission,opaqueColor:this.capture!.view,transmissionTexture:resolved.transmissionTexture,
           ...(plan.transmission.volume?{volume:{...plan.transmission.volume,thicknessTexture:resolved.thicknessTexture}}:{})},coat):coat!;
@@ -137,7 +166,7 @@ export class MaterialInstallation implements EnginePlugin {
   destroy():void {this.dispose();}
 }
 
-/** Explicit opt-in after loadGLTF/parseGLTF; absent clearcoat metadata allocates nothing. */
+/** Explicit opt-in after loadGLTF/parseGLTF; absent material metadata allocates nothing. */
 export function install(model:PBRModel):MaterialInstallation {
   const installation=new MaterialInstallation(model);model.root.engine.use(installation);return installation;
 }

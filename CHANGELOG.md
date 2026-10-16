@@ -36,14 +36,35 @@ does not announce an npm publication or a package version change.
   Decoded counts, attribute widths, index ranges and output-byte budgets are
   checked before GPU construction; output preflight does not cap Draco's
   internal Wasm geometry allocations.
-- The basic `@margoengine/gltf` subset is unchanged. KTX2/Basis transcoding remains
-  available separately; KTX2 textures in glTF remain unsupported.
+- The basic `@margoengine/gltf` subset is unchanged. `gltf-pro` also loads
+  `KHR_texture_basisu` textures lazily, uploads complete GPU-ready mip chains,
+  and releases loader-owned transcoder workers.
+
+### Optional material and asset extensions
+
+- `@margoengine/materials` adds clearcoat, transmission, IOR, volume and a closed
+  TypeScript node graph through the isolated group 3 material slot. It now also
+  supports sheen, specular color, anisotropy and iridescence through caller
+  factories or explicit installation of optional Khronos material metadata.
+  Color textures decode sRGB; data textures remain linear. The new lobes affect
+  directional and fixed hemisphere lighting; clustered and environment lighting
+  retain the base PBR response.
+- Zero sheen, anisotropy and iridescence and neutral specular preserve baseline
+  pixels exactly. Specular factor zero removes dielectric reflection, as glTF
+  requires. Core, stage and the baseline PBR shader remain unchanged.
+- `KHR_texture_transform` and UV1 use the existing vertex layout and optional
+  group 3 factors. Standard UV0 primitives retain their original bindings.
+  `@margoengine/animation` supports four or eight normalized joint influences,
+  with separate kernels and unchanged single-clip allocation behavior.
+- The React package adds its declarative `Stage` wrapper and lowercase element
+  aliases. The FBX suite includes a reproducible CC0 Blender rig and required
+  real-file skinning, playback, seek and restoration checks.
 
 ### Verification and footprint
 
-- The workspace build passes. The full Node 24 suite passes **931 tests**, with
+- The workspace build passes. The full Node 24 suite passes **1,057 tests**, with
   zero failures or skips. Strict TypeScript checks and packed exports/imports
-  pass across **all 62 packages**, including strict Bundler and NodeNext consumers.
+  pass across **all 63 packages**, including strict Bundler and NodeNext consumers.
 - Regression coverage includes real normalized Draco UV/color data, index
   extraction at 65,535 / 65,536 / 65,537 vertices, Meshopt fallback buffers,
   interleaving, offsets, all supported modes/filters and malformed layouts.
@@ -52,6 +73,10 @@ does not announce an npm publication or a package version change.
   without decoder workers or Wasm requests. Draco worker assets resolve,
   temporary workers terminate, and tested model disposal leaves no meshes or
   WebGPU validation errors.
+- The combined extension browser suite also passes 42 node-material, 59 new-lobe
+  and 82 texture-coordinate captures, complete Khronos material/KTX2/UV1 assets,
+  and independent eight-influence GPU deformation readback. New-lobe assets
+  restore bit for bit and release every tracked GPU resource and decoder worker.
 - `npm run measure:size` reports **47,983 bytes raw / 19,999 bytes gzip** for
   core + stage, including embedded Wasm and both backends. Core and stage remain
   feature-frozen. CI rejects **20,000 gzip bytes or above** and checks package
@@ -61,7 +86,8 @@ does not announce an npm publication or a package version change.
 
 Repeat the checks from a built checkout with `npm run typecheck`,
 `npm run test:modules:packages`, `npm run modern:test:usdz`,
-`npm run modern:test:gltf-compression` and `npm run measure:size`.
+`npm run modern:test:gltf-compression`, `npm run modern:test:extensions` and
+`npm run measure:size`.
 `npm run test:all` rebuilds the workspace and runs the full suite; use Node 24
 to match CI. See the [USDZ](packages/usdz/README.md),
 [glTF Pro](packages/gltf-pro/README.md) and [decoder](packages/decoders/README.md)

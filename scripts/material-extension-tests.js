@@ -5,6 +5,7 @@ import {animatedTriangle} from '../tests/support/gltf-pro-fixture.js';
 import {clearcoatBrowserChecks} from './materials-clearcoat-tests.js';
 import {transmissionBrowserChecks} from './materials-transmission-tests.js';
 import {nodeBrowserChecks} from './materials-node-tests.js';
+import {lobeBrowserChecks} from './materials-lobe-tests.js';
 
 const browser=await openBrowser({startPath:'/tests/modern-extension.html',port:5197}),errors=[];
 browser.page.on('pageerror',e=>errors.push(e.message));
@@ -52,5 +53,7 @@ try {
   const clearcoat=await clearcoatBrowserChecks(browser.page);
   const transmission=await transmissionBrowserChecks(browser.page);
   const nodes=await nodeBrowserChecks(browser.page);
-  assert.deepEqual(errors,[]);const report={hardware:browser.hardware,...checks,clearcoat,transmission,nodes,errors};await writeFile('test-results/material-extensions-webgpu.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
+  const lobes=await lobeBrowserChecks(browser.page);
+  assert.deepEqual(errors,[]);const report={hardware:browser.hardware,...checks,clearcoat,transmission,nodes,lobes,errors};await writeFile('test-results/material-extensions-webgpu.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 } finally {await browser.close();}
+await import('./materials-lobe-assets-tests.js');

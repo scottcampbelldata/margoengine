@@ -2,8 +2,8 @@
   "name": "@margoengine/materials",
   "version": "0.1.0",
   "type": "module",
-  "license": "MIT",
-  "description": "Opt-in glTF clearcoat, transmission, IOR and volume for Margo Engine's PBR extension slot.",
+  "license": "MIT AND Apache-2.0",
+  "description": "Optional glTF PBR material lobes, transmission, volume and typed node graphs through an isolated extension slot.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
@@ -25,7 +25,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "peerDependencies": {
     "@margoengine/core": "0.1.0",
