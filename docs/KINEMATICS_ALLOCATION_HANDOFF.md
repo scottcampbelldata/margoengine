@@ -8,6 +8,8 @@ Fix the Light Keeper robot demo and its optional packages until sustained, warme
 
 The objective remains **active and incomplete**. The recorded constraints-demo stalls have been corrected for the tested trajectories. The robot still allocates and triggers GC in measured captures.
 
+The tested robot checkpoint is now [live on margoengine.com](https://margoengine.com/demos/light-keeper/), deployment `8d0427c6`. All 189 public files were verified after publishing, with existing demos preserved. See [LIGHT_KEEPER_DEPLOYMENT.md](LIGHT_KEEPER_DEPLOYMENT.md) for the exact snapshot, release identity and future deployment procedure.
+
 Two different demos are involved:
 
 - **Constraints lab:** http://127.0.0.1:5173/examples/kinematics-constraints.html. Its demo controller performs full-chain solve, pacing, contact recovery, and reach conditioning.
@@ -381,6 +383,37 @@ The fixed-render ablation script and diagnostics remain available:
 The uncommitted PBR uniform cache has been removed from packages/gltf-pro/src/index.ts and its README because these comparisons did not establish a repeatable full-scene allocation benefit. Both files now match the committed unconditional-upload implementation. This preserves public behavior and removes the experimental comparison/guard bookkeeping. The rejected patch and original source/test are archived in ignored test-results/pbr-uniform-cache-rejected.patch, pbr-uniform-cache-rejected.ts and pbr-uniform-upload-reuse-rejected.test.js.
 
 Ten useful custom-writer, Float32-bit, failure, reentrancy and validation cases remain in tests/gltf-pro-uniform-writers.test.js. The rebuilt package passes all 27 focused PBR draw/pass/shadow/resource/writer tests. The separate Animation custom-writer correctness repair remains necessary and is retained. The standalone preview needs rebuilding after this rollback and the head-writer change; historical native-cache proof reports describe the earlier implementation, not the rolled-back PBR source.
+
+### Locked reflection work: retain the direct upload path
+
+The requested fixed-work comparison completed on 2026-10-16. **Keep the experimental PBR uniform cache reverted.** Its mean sampled allocation was only **0.21% lower**, smaller than the **0.46% spread between the two direct runs**, and both cache phases had higher normal-render callback mean and p95 times. These four captures establish no useful repeatable allocation benefit to justify restoring the extra state.
+
+Evidence: [pbr-locked-drag-results.json](pbr-locked-drag-results.json). Harness: [profile-pbr-locked-drag.mjs](../scripts/profile-pbr-locked-drag.mjs). The selected raw report is `test-results/pbr-locked-drag-quiet-abba-20261016/report.json` in the robot checkout. The earlier `pbr-locked-drag-abba-20261016` series is excluded: another hardware benchmark overlapped its first two phases. Its raw artifacts are retained locally. The quiet repeat used the exact same frozen bundles; all 34 executed JavaScript chunk hashes were checked against the report.
+
+| Phase, in execution order | Sampled bytes / normal frame | Sampled MB/s | Minor / major GC | Peak GC pause ms | Normal callback mean / p95 ms | Bake completion p95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Direct A | 20,696.65 | 0.828 | 43 / 4 | 2.299 | 3.591 / 6.1 | 18.5 |
+| Cache A | 20,592.83 | 0.822 | 44 / 5 | 3.016 | 3.959 / 6.5 | 21.3 |
+| Cache B | 20,621.31 | 0.817 | 43 / 5 | 3.122 | 4.172 / 6.6 | 26.0 |
+| Direct B | 20,602.51 | 0.813 | 44 / 4 | 2.530 | 3.651 / 6.4 | 26.4 |
+
+Each fresh page received 1,800 normal warmup frames and 450 real reflection bakes, then the same measured workload: **1,800 normal frames, 450 awaited six-face bakes (2,700 faces), 2,700 total renders, 18,900 PBR draw calls and 2,700 deforms**. PBR mode counts were identical: 8,100 beauty, 5,400 gbuffer and 5,400 ambient calls. The 413,100 primitive draws are beauty draws only. All 900 reflection pose-reuse attempts succeeded with zero fallbacks; no unsafe samples or browser errors were recorded. Each window used 900 trusted screen-space pointer moves along the same path. Ending transform hashes, command hashes and one representative primitive's 220 GPU uniform words matched across every phase; this does not verify every intermediate transform or every primitive's GPU buffer.
+
+The diagnostic snapshot disables automatic RAF and adaptive/final reflection scheduling, preserves the registered frame callbacks, renders with delta 1/60, and awaits a bake every four normal frames. Each bake adds two zero-delta renders. Thus each window covers **30 simulated seconds**, taking **45.0–45.6 wall-clock seconds** for measured work. Head tracking and auto IK remain enabled; idle animation and moving-light motion are disabled. Both variants use otherwise identical frozen source inputs in a single hardware Edge 155 browser with an NVIDIA Ampere adapter. The native queue writer is never wrapped, and no forced GC or JIT flags are used.
+
+Bytes per normal frame amortize an identical ratio of normal and reflection work; they are not an isolated reflection allocation cost. MB/s uses the separately recorded sampler window, including its small handshake overhead. The normal callback timings cover registered frame callbacks plus the normal render body, excluding reflection encode/readback completion, scheduling and harness overhead. They therefore differ from the earlier free-running trace's complete RAF callback timings. Bake p95 is reported separately; its order-dependent drift does not establish a cache-specific GPU effect.
+
+Mean sampled allocation was 20,649.58 bytes/normal frame for direct and 20,607.07 for cache, a difference of 42.51 bytes versus 94.14 bytes between direct repeats. Mean normal callback time was 3.621 ms for direct and 4.066 ms for cache. The table preserves individual run p95s; no pooled p95 is inferred. Sampling includes browser/harness attribution and background timers, and natural GC varies between runs. This is a full-scene decision under the stated workload, not proof of allocation types, retention behavior, universal GPU performance or zero GC.
+
+After capture, Node 24.19.0 passed all **20/20** focused PBR writer/pass/resource/hook and core-budget tests, with no skips. Core plus stage remains **19,999 gzip bytes**. This comparison changes diagnostic files and documentation only; the direct PBR implementation and the separate Animation writer repair remain in place.
+
+Reproduce from the primary checkout with the robot checkout's archived `test-results/pbr-uniform-cache-rejected.ts` present:
+
+```powershell
+node scripts/profile-pbr-locked-drag.mjs --root=C:/Users/ScottCampbell/.codex/worktrees/skinning-ik/margoengine --label=pbr-locked-drag-new --frames=1800 --warmup-frames=1800 --order=direct,cache,cache,direct
+```
+
+Use the bundled Node 24 executable listed below. To repeat the exact captured inputs, also pass `--reuse-snapshot=pbr-locked-drag-quiet-abba-20261016` while that ignored local snapshot is available. A new build from later live sources is a new experiment. Raw bundles, source snapshots, heap profiles and traces remain in ignored local `test-results`; the committed evidence file records their provenance and the executed chunk/source hashes. The archived candidate and raw snapshots are prerequisites, not files supplied by a clean clone.
 
 ## Remaining investigation and rejected paths
 
