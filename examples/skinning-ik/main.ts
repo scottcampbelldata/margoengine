@@ -206,7 +206,11 @@ try {
   $('viewport').dataset.constraintSolver = '@margoengine/kinematics-constraints';
   const animation = Animation.attach(model);
   if (!animation.clips.length) throw new Error('The robot is missing its Blender-authored idle animation');
-  const animator = new WorkshopAnimator(animation, { initial: 'idle', states: { idle: animation.clips[0].name } });
+  const animatedRotation = new RigScratch(),
+    writeAnimatedRotation = (node: Mesh, rotation: readonly number[]) => animatedRotation.setQuaternion(node, rotation);
+  const animator = new WorkshopAnimator(animation, {
+    initial: 'idle', states: { idle: animation.clips[0].name }, writeRotation: writeAnimatedRotation,
+  });
 
   // Target manipulation owns pointer-down before orbit sees it. Both controls release on cancel/Escape.
   const transform = TransformControls.attach(stage.engine, { mode: 'translate', space: 'world', size: 0.55 });
@@ -712,7 +716,7 @@ try {
 
   // This demo intentionally omits redundant setter calls during an unchanged,
   // validated repeat capture. Every ordinary or changed-input frame still uses
-  // the public Animator and Mesh paths, including their guards and overrides.
+  // Animator and its explicitly selected commit path, including their guards.
   const modelNodeCount = model.nodes.length,
     orbNodeCount = orb.nodes.length,
     poseNodes = [
@@ -775,6 +779,7 @@ try {
       animator.options.initial !== 'idle' ||
       animator.options.states.idle !== poseClips[0].name ||
       animator.options.transitions !== undefined ||
+      animator.options.writeRotation !== writeAnimatedRotation ||
       animation.playing ||
       model.nodes.length !== modelNodeCount ||
       orb.nodes.length !== orbNodeCount ||

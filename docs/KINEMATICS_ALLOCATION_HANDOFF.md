@@ -540,12 +540,14 @@ from the hook reject before mutation, with the active flag cleared in `finally`.
 Failure/retry semantics, including a throw after restoring an already-cached
 state, are documented rather than promising unconditional callback reinvocation.
 
-The demo trial uses one startup-owned callback over a dedicated `RigScratch`.
+The demo trial used one startup-owned callback over a dedicated `RigScratch`.
 Its reflection-reuse guard accepts only that selected identity and retains the
 existing node/method/track snapshots, plugin ordering, layers/FootIK/transitions
 invalidation and physical-pose checks. An arbitrary callback is not certified
-pure by this option. Default behavior remains selected unless the temporary
-comparison URL includes `?animatorWriter=owned`.
+pure by this option. The temporary comparison URL used
+`?animatorWriter=owned`; the final demo explicitly selects this owned writer
+and the retained Stats layout without URL gates. Package defaults remain
+unchanged.
 
 Only Animator was rebuilt/type-checked. All 29 focused tests passed: ten new
 writer cases plus existing Animator allocation, game/FootIK and pose-reuse tests.
@@ -617,8 +619,33 @@ summary. An offline trace audit confirmed every named MinorGC/MajorGC span is
 on `CrRendererMain`, with no nested named duplicates changing the reported
 counts. Explicit marking triggers include global-limit and memory-reducer
 reasons, which do not establish whether pressure originates in engine code,
-the sampler or native browser resources. The sampling-disabled observer check
-is pending at this checkpoint. This source is not production feeb64de.
+the sampler or native browser resources.
+
+The sampling-disabled observer check used the exact same recorded frozen
+source/build hashes and 30/30-second protocol. It still recorded 20 minor/four
+major events at idle (1.497 ms maximum observed slice) and 24 minor/three major
+events during drag (1.945 ms maximum); all named spans were on
+`CrRendererMain`. This removes allocation sampling only: detailed tracing and
+250 ms polling remain. A single sampled/unsampled pair does not quantify a
+causal observer overhead, and GC persistence does not identify the remaining
+engine/native allocation sources. Evidence is in
+`test-results/gc-observer-off-vs-sampled-summary.json`. The original frozen
+comparison bundle and URL-gated demo sources are archived in ignored
+`test-results/stats-animator-frozen-ablation/`.
+
+The final no-query integration build is 707,441 raw / 238,909 gzip JS bytes,
+103 runtime modules, no Three.js runtime and 19,999 core/stage gzip bytes.
+All 178 selected package/robot tests passed with no skips; API reports match
+166 entries / 1,548 exports while explicitly listing both new optional fields.
+The current unconditional-upload hardware checker verified 85 buffers / 83,968
+bytes bit-for-bit; GPU SHA256 is
+`0afd8625a5b62f15124f8f07a989807771b2104376512fc17011b86b6964ac77`.
+The first attempted hardware run used the superseded cache-expectation harness
+and failed its removed-PBR-cache assertion; it is excluded, not a runtime
+regression or a reason to restore that cache. Final evidence:
+`stats-animator-final-tests.log`, `stats-animator-final-build.log` and
+`stats-animator-final-native-upload.json` under local `test-results/`.
+This source is not production feeb64de; allocation-driven GC remains unresolved.
 
 ### Target-only projection boundary experiment: reverted
 
