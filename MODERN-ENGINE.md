@@ -332,7 +332,7 @@ XR and asset interop are optional packages. `@margoengine/xr` implements WebGPU 
 | --- | --- |
 | Machinery | Original B-Rep topology/materials/UVs, generalized rigid-body/contact dynamics, automatic contact/feature recognition and triangle-chunk streaming within single bodies. Worker STEP/IGES tessellation, 1D transport, telemetry and assembly BVH picking are implemented above. The listed minimal domain features are implemented above. |
 | Creative | Mesh/fluid wind solvers, physical volumetric scattering, HDR environment-map import, optical bokeh and continuity of GPU-only particle state after device loss. The listed minimal domain features are implemented above. |
-| Renderer/assets | Additional material extensions, IBL, KTX2 integration in glTF, renderer spatial culling, dynamic geometry and measured memory budgets across hardware. Implemented optional rendering and Draco/Meshopt features are documented in their package guides. |
+| Renderer/assets | Additional material extensions, KTX2 integration in glTF, renderer spatial culling, dynamic geometry and measured memory budgets across hardware. Implemented optional rendering and Draco/Meshopt features are documented in their package guides. |
 | Distribution/validation | Release policy, wider browser/GPU/React version coverage, performance comparisons with matched workloads and image quality. |
 
 The remaining rows describe future work; current domain features have working implementations and bounded limits documented above. Linear sphere culling and cached hierarchy composition are intentional minimal implementations; optimize against measured scenes. This delivery makes no universal performance, full parity or commercial-readiness claim.
