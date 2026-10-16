@@ -33,10 +33,13 @@ Use Node.js 22.12+ or 24+ and a browser with WebGL2. TypeScript consumers need T
 ```sh
 npm ci
 npm run dev                           # new Vite starter; compiles packages first
-npm test                              # compiles packages; runs 40 focused unit checks
-npm run build:packages                # all seven libraries; precompiled Wasm, no Rust
+npm test                              # compiles packages; runs modern unit checks
+npm run build:packages                # all workspace libraries; precompiled Wasm, no Rust
+npm run typecheck                     # strict checks for all 62 packages after build
 npm run build                         # builds packages and both production starters
-npm run pack:packages                 # rebuilds and packs only the seven libraries
+npm run pack:packages                 # rebuilds and packs the public library workspaces
+npm run test:modules:packages          # all 62 packed exports, imports and strict consumers
+npm run modern:test:gltf-compression   # production Draco/Meshopt glTF/GLB browser checks
 npm run modern:test:browser            # after build: real GPU + both production starters
 npm run modern:test:domains            # caps, FX, sorting, depth readback and loss races
 npm run modern:test:sky                # scenery phases, depth, stars and plugin lifecycle
@@ -134,6 +137,44 @@ export default function App() {
 These are ordinary PascalCase components. Only the canvas/error message reaches the DOM. Pure render-time registries allow child effects to register upward before a parent entity exists; entity allocation happens after commit. Strict Mode replay, abandoned Suspense renders, live prop changes and teardown have browser coverage. `useFrame` subscribes to RAF through a latest callback ref; it does not trigger React state updates. Use one geometry and material component per mesh.
 
 The package declares React 18/19 peers; browser verification used React 19.3.0 and React 18.3.1. The React 18 check installs the actual package tarballs in an isolated fixture, checks strict consumer declarations without workspace ambient types, and verifies SSR plus Strict Mode/nesting/live props/RAF/Suspense/teardown in the browser. It preserves its `use client` directive for Next.js, and the starter page is a client component. No custom reconciler or `*.wasm` bundler plugin is needed.
+
+## Compressed glTF and USDZ
+
+`@margoengine/gltf-pro` depends on `@margoengine/decoders` and accepts required
+`KHR_draco_mesh_compression` and `EXT_meshopt_compression` extensions. Other
+unsupported required extensions still reject. `loadGLTF(engine, url, options)`
+handles compressed JSON glTF and GLB, fetching external buffers as needed.
+
+| Entry point | Uncompressed | Meshopt | Draco |
+| --- | --- | --- | --- |
+| `parseGLTF(engine, input, buffers, images)` | Synchronous | Synchronous | Rejects with guidance to use the async API |
+| `parseGLTFAsync(engine, input, buffers, images, options)` | Promise | Promise | Promise |
+| `loadGLTF(engine, url, options)` | Promise | Promise | Promise |
+
+Meshopt uses the synchronous TypeScript decoder at the buffer-view boundary.
+Decoded views are cached and pass through ordinary accessors, including
+interleaved, normalized, skin, morph and animation data. It starts no workers and
+fetches no decoder Wasm. Draco decodes primitives before PBR geometry construction,
+using accessor component types so integer UVs and colors normalize once. Triangle
+extraction uses Uint32 at 65,536 vertices and above. The default Draco worker and
+Wasm assets are bundled by the consuming application and loaded lazily. Temporary
+workers are disposed after decoding; an optional `{draco}` hook remains owned by
+its caller. Both async entry points accept `{signal}`. Decoder output preflight
+checks counts, widths and remaining decoded-byte limits before extracting arrays;
+Draco's internal Wasm geometry decode still has its own allocations.
+
+`@margoengine/usdz` is an ancillary optional package outside the six core launch
+packages. It supports static USDA, binary USDC and USDZ archives through vendored
+standalone Three.js 0.186.1 grammar/file parsers. The parsers use plain data and
+typed arrays, and ship their MIT notice in `THIRD-PARTY-NOTICES.txt`. Builds and
+runtime imports need no `three` or `@types/three` dependency. Benchmark and parity
+tools retain a pinned reference through `scripts/three-reference.js`.
+
+`parseUSDA` and `parseUSDC` are synchronous; `parseUSDZ`, `USDAsset.create` and
+`loadUSDZ` are asynchronous. The basic `@margoengine/gltf` and the USDA-only
+`@margoengine/loaders` path retain their existing subsets. KTX2 textures in glTF
+and composed USD stages remain unsupported. See the [glTF Pro](packages/gltf-pro/README.md),
+[USDZ](packages/usdz/README.md) and [decoder](packages/decoders/README.md) guides.
 
 ## glTF and machinery
 
@@ -242,7 +283,9 @@ Wasm memory, mesh refs, hierarchy, materials and CPU controllers remain intact. 
 
 ## Size and verification
 
-Measurements locked on 11 October 2026. They are not the current build. The current build measures core at **18,192 bytes gzip** and core plus stage at **19,999 bytes gzip**, below the 20,000-byte gate. The table below is that October lock, generated from minified ES library bundles:
+`npm run measure:size` verified core plus stage at **47,983 bytes raw / 19,999 bytes gzip** on 16 October 2026, including embedded Wasm and both rendering backends. CI rejects **20,000 bytes gzip and above** on pushes and pull requests. Core and stage remain feature-frozen; USDZ, PBR and decoder implementations stay in optional packages. The [release notes](CHANGELOG.md#unreleased) record the 931-test Node 24 verification, strict checks and packed imports across all 62 packages, and production compression browser checks.
+
+The table below is the historical 11 October 2026 lock, generated from minified ES library bundles. Its core-only measurements and headroom are separate from the current combined core + stage gate:
 
 | Artifact | Raw bytes | Gzip bytes |
 | --- | ---: | ---: |
@@ -283,13 +326,13 @@ AMD Radeon integrated graphics (RDNA 2, device 13C0, driver 32.0.21043.5001) als
 
 XR and asset interop are optional packages. `@margoengine/xr` implements WebGPU session negotiation, target/grip poses and stereo core-mesh rendering on a separate compatible device. `@margoengine/ifc` uses web-ifc for native geometry, placement, units and BIM identifiers. Loaders accept static USDA-backed USDZ; exporters write aligned static USDZ with PreviewSurface materials. That pass recorded core and stage at 20,053 bytes gzip, under an older 20,480-byte ceiling. The current gate is 20,000. The current build measures core at 18,192 bytes gzip and core plus stage at 19,999 bytes gzip.
 
-`npm run modern:test:interop` checks sessions, poses, cleanup, a native IFC4 fixture and USDZ round trips. `npm run modern:test:xr:browser` verifies stereo pixel readback with simulated sessions and a real WebGPU device. Official OpenUSD validation is available through `packages/exporters/tests/validate-usdz.py`. Physical XR sessions and Apple Quick Look presentation remain unverified. Binary USDC, composed USD stages and XR rendering of advanced effects/textured/skinned extension meshes remain unsupported; see the package READMEs.
+`npm run modern:test:interop` checks sessions, poses, cleanup, a native IFC4 fixture and USDZ round trips. `npm run modern:test:usdz` also covers static binary USDC through the dedicated USDZ package. `npm run modern:test:xr:browser` verifies stereo pixel readback with simulated sessions and a real WebGPU device. Official OpenUSD validation is available through `packages/exporters/tests/validate-usdz.py`. Physical XR sessions and Apple Quick Look presentation remain unverified. Composed USD stages and XR rendering of advanced effects/textured/skinned extension meshes remain unsupported; see the package READMEs.
 
 | Area | Remaining work |
 | --- | --- |
 | Machinery | Original B-Rep topology/materials/UVs, generalized rigid-body/contact dynamics, automatic contact/feature recognition and triangle-chunk streaming within single bodies. Worker STEP/IGES tessellation, 1D transport, telemetry and assembly BVH picking are implemented above. The listed minimal domain features are implemented above. |
 | Creative | Mesh/fluid wind solvers, physical volumetric scattering, HDR environment-map import, optical bokeh and continuity of GPU-only particle state after device loss. The listed minimal domain features are implemented above. |
-| Renderer/assets | Clustered Forward+ multi-light shading, shadows/IBL/textures, GPU culling/skinning, animation/morphs/compression, renderer spatial culling, dynamic geometry and measured memory budgets across hardware. |
+| Renderer/assets | Additional material extensions, IBL, KTX2 integration in glTF, renderer spatial culling, dynamic geometry and measured memory budgets across hardware. Implemented optional rendering and Draco/Meshopt features are documented in their package guides. |
 | Distribution/validation | Release policy, wider browser/GPU/React version coverage, performance comparisons with matched workloads and image quality. |
 
 The remaining rows describe future work; current domain features have working implementations and bounded limits documented above. Linear sphere culling and cached hierarchy composition are intentional minimal implementations; optimize against measured scenes. This delivery makes no universal performance, full parity or commercial-readiness claim.

@@ -82,6 +82,7 @@
     "dev:sandbox": "vite examples/gameplay-sandbox",
     "build:packages": "node scripts/build-modern.js --precompiled && npm run build --workspace packages --if-present",
     "measure:size": "node scripts/measure-size.js",
+    "typecheck": "node scripts/typecheck.js",
     "pack:packages": "npm run build:packages && npm pack --workspace packages --ignore-scripts --pack-destination test-results",
     "package:blender": "python tools/blender-addon/package_addon.py",
     "modern:build": "node scripts/build-modern.js",
@@ -102,6 +103,7 @@
     "modern:test:stress:aggregate": "node scripts/aggregate-stress.js",
     "test:release": "npm run test:all && npm run measure:size && npm run modern:build:starters && npm run modern:build:showcase && npm run test:modules:packages && npm run modern:test:game:packages && npm run modern:test:interop:packages && npm run modern:test:postfx:packages && npm run modern:test:browser && npm run modern:test:wrapper && npm run modern:test:domains && npm run modern:test:game && npm run modern:test:extensions && npm run modern:test:postfx:browser && npm run modern:test:xr:browser && npm run modern:test:usdz:browser && npm run test:modules:browser && npm run modern:test:stress -- --sessions=500 --frames=120",
     "modern:test:extensions": "node scripts/modern-extension-tests.js",
+    "modern:test:gltf-compression": "node scripts/gltf-compression-browser-tests.js",
     "modern:test:blender": "node scripts/modern-blender-tests.js",
     "modern:test:interop": "node --test packages/xr/tests/*.test.js packages/ifc/tests/*.test.js packages/loaders/tests/usdz.test.js packages/exporters/tests/usdz.test.js",
     "modern:test:xr:browser": "node scripts/modern-xr-tests.js",
@@ -134,8 +136,7 @@
     "release:check": "npm run test:all && npm run measure:size && npm run test:modules:packages && npm run modern:test:postfx:packages",
     "publish:packages": "npm run release:check && npm publish --workspace packages --ignore-scripts --access public",
     "catalog:build": "node scripts/build-catalog.js",
-    "build:site": "npm run catalog:build && node scripts/build-site.js",
-    "modern:test:gltf-compression": "node scripts/gltf-compression-browser-tests.js"
+    "build:site": "npm run catalog:build && node scripts/build-site.js"
   },
   "devDependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",
@@ -144,12 +145,10 @@
     "@types/node": "24.19.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "@types/three": "0.186.0",
     "binaryen": "132.0.0",
     "gltf-validator": "^2.0.0-dev.3.10",
     "jsdom": "26.1.0",
     "occt-import-js": "0.0.23",
-    "three": "0.186.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
     "web-ifc": "0.0.78"
