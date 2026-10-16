@@ -111,6 +111,7 @@ const prefix = `test-results/skinning-ik-profile-${label}${sampleAllocations ? '
 const sourceSHA256 = {};
 for (const path of [
   'examples/skinning-ik/main.ts',
+  'examples/skinning-ik/diagnostics.ts',
   'examples/skinning-ik/body-ik.ts',
   'examples/skinning-ik/performance-hud.ts',
   'examples/skinning-ik/arm-controls.ts',
@@ -213,13 +214,13 @@ const report = {
   method:
     'Normal running scene, no forced garbage collection. Heap sampling includes objects later collected by minor/major GC. Sampled bytes are statistical allocation estimates; heap range is not an allocation rate. Tracing and sampling can affect timing. Matched one-toggle phases reset to defaults; drag explicitly disables idle/light/look motion.',
 };
-// Return the already-published string. Playwright's recursive object serializer
-// otherwise creates a second tree of arrays/objects inside the measured page.
+// Serialize only on demand. Legacy comparison mode reuses its published string;
+// Playwright's recursive object serializer would otherwise create another tree.
 const metrics = async () =>
   JSON.parse(
     (
       await cdp.send('Runtime.evaluate', {
-        expression: "document.querySelector('#viewport').dataset.metrics",
+        expression: "document.querySelector('#viewport').dataset.metrics ?? document.querySelector('#viewport').readWorkshopDiagnostics('metrics')",
         returnByValue: true,
       })
     ).result.value,
@@ -233,7 +234,7 @@ async function readyScene() {
     await page.locator('#viewport').getAttribute('data-constraint-solver'),
     '@margoengine/kinematics-constraints',
   );
-  await page.waitForFunction(() => document.querySelector('#viewport').dataset.metrics);
+  await page.waitForFunction(() => typeof document.querySelector('#viewport').readWorkshopDiagnostics === 'function');
 }
 
 function allocationSummary(profile) {
@@ -574,7 +575,7 @@ try {
       end = project([0.08, 0.95, 0.025], dragBefore.camera, dragBefore.cameraTarget, bounds);
     await page.mouse.move(start.x, start.y);
     await page.mouse.down();
-    await page.waitForFunction(() => JSON.parse(document.querySelector('#viewport').dataset.metrics).dragging, null, {
+    await page.waitForFunction(() => JSON.parse(document.querySelector('#viewport').dataset.metrics ?? document.querySelector('#viewport').readWorkshopDiagnostics('metrics')).dragging, null, {
       timeout: 3000,
     });
     await phase(

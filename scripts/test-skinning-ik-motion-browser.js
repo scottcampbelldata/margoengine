@@ -36,16 +36,16 @@ const errors = [],
     cases: [],
     transitions: [],
     method:
-      'Real scene with hardware Edge. Continuous ranges dispatch input events from RAF; abrupt reversals use trusted keyboard Home/End. Samples are published demo metrics (every six renders), not every simulation step or CCD.',
+      'Real scene with hardware Edge. Continuous ranges dispatch input events from RAF; abrupt reversals use trusted keyboard Home/End. On-demand JSON snapshots are requested by the test on RAF and deduplicated by the former six-render sample group and animation frame. These requests allocate in the test harness; samples are not every simulation step or CCD.',
   };
 app.page.on('pageerror', (error) => errors.push(error.stack ?? error.message));
 const page = app.page,
   distance = (a, b) => Math.hypot(...a.map((value, i) => value - b[i]));
-const metrics = () => page.evaluate(() => JSON.parse(document.querySelector('#viewport').dataset.metrics));
+const metrics = () => page.evaluate(() => JSON.parse(document.querySelector('#viewport').readWorkshopDiagnostics('metrics')));
 async function settle(expected) {
   await page.waitForFunction(
     (expected) => {
-      const value = JSON.parse(document.querySelector('#viewport').dataset.metrics);
+      const value = JSON.parse(document.querySelector('#viewport').readWorkshopDiagnostics('metrics'));
       return (
         value.residual < 0.002 &&
         value.targetMotion.settled &&
@@ -62,22 +62,25 @@ async function captureStart() {
   await page.evaluate(() => {
     const viewport = document.querySelector('#viewport');
     globalThis.__motion = [];
-    let frame = -1;
-    globalThis.__motionObserver = new MutationObserver(() => {
-      const value = JSON.parse(viewport.dataset.metrics);
-      if (value.animationFrames === frame) return;
-      frame = value.animationFrames;
-      globalThis.__motion.push({ at: performance.now(), ...value });
-    });
-    globalThis.__motionObserver.observe(viewport, { attributes: true, attributeFilter: ['data-metrics'] });
+    let frame = -1, sampleIndex = -1;
+    const sample = () => {
+      const value = JSON.parse(viewport.readWorkshopDiagnostics('metrics'));
+      if (value.sampleIndex !== sampleIndex && value.animationFrames !== frame) {
+        frame = value.animationFrames;
+        sampleIndex = value.sampleIndex;
+        globalThis.__motion.push({ at: performance.now(), ...value });
+      }
+      globalThis.__motionFrame = requestAnimationFrame(sample);
+    };
+    globalThis.__motionFrame = requestAnimationFrame(sample);
   });
 }
 const captureStop = () =>
   page.evaluate(() => {
-    globalThis.__motionObserver.disconnect();
+    cancelAnimationFrame(globalThis.__motionFrame);
     const samples = globalThis.__motion;
     delete globalThis.__motion;
-    delete globalThis.__motionObserver;
+    delete globalThis.__motionFrame;
     return samples;
   });
 function summarize(samples, lengths) {
@@ -259,11 +262,11 @@ try {
     console.log(`Unchanged pointer thumb selected near track with look ${tracking ? 'on' : 'off'}`);
   }
   await page.locator('#auto-ik').uncheck();
-  // Telemetry is published every six renders. Flush a publication after the
-  // checkbox event before comparing the otherwise held simulation history.
+  // Wait for a presented frame after the checkbox event before comparing the
+  // otherwise held simulation history; reading diagnostics never advances it.
   const pausedPublication = (await metrics()).frames;
   await page.waitForFunction(
-    (before) => JSON.parse(document.querySelector('#viewport').dataset.metrics).frames > before,
+    (before) => JSON.parse(document.querySelector('#viewport').readWorkshopDiagnostics('metrics')).frames > before,
     pausedPublication,
   );
   const held = await metrics();
@@ -274,7 +277,7 @@ try {
   assert.ok(distance(paused.orb, held.orb) < 2e-6);
   await page.locator('#solve-once').click();
   await page.waitForFunction(
-    (before) => JSON.parse(document.querySelector('#viewport').dataset.metrics).poseUpdates > before,
+    (before) => JSON.parse(document.querySelector('#viewport').readWorkshopDiagnostics('metrics')).poseUpdates > before,
     paused.poseUpdates,
   );
   await page.waitForTimeout(400);
