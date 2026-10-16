@@ -151,6 +151,10 @@
       "Model",
       "OrbitControls",
       "PbrMaterial",
+      "Stage",
+      "boxGeometry",
+      "mesh",
+      "meshStandardMaterial",
       "useFrame",
       "useMargo",
       "useMargoStage"

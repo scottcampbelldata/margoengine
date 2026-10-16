@@ -15,6 +15,7 @@
     button { font: inherit; min-height: 44px; padding: 8px 20px; background: #dceaff; color: #17395f; border: 1px solid #a8cffd; border-radius: 6px; cursor: pointer; touch-action: manipulation; }
     button:hover { background: white; } button:disabled { opacity: .6; cursor: wait; } :focus-visible { outline: 3px solid #8fc4ff; outline-offset: 4px; }
     #status { min-height: 26px; overflow-wrap: anywhere; } footer { font-size: 13px; color: #b1c2d8; margin-top: 24px; }
+    pre { overflow-x: auto; padding: 16px; border: 1px solid #42536b; border-radius: 8px; background: #0b1422; line-height: 1.5; }
   </style>
   <script type="importmap">{
   "imports": {
@@ -34,10 +35,27 @@
 </head>
 <body>
   <h1>A React cube</h1>
-  <p>Canvas and useFrame with React 19; no JSX build step needed.</p>
+  <p>Canvas, Stage and useFrame with React 19; no JSX build step needed for this preview.</p>
   <div id="scene"></div>
   <p id="status" role="status">Loading published packages…</p>
   <button id="play" type="button" disabled>Pause</button>
+  <h2>Use Stage in JSX</h2>
+  <p>Stage configures the stage already owned by Canvas. Install the optional <code>@margoengine/shadows</code> peer to enable the shadows prop shown here; the animated preview keeps the WebGL fallback available.</p>
+  <pre><code>import { Canvas, Stage, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
+
+export function App() {
+  return (
+    &lt;Canvas style={{ height: 400 }}&gt;
+      &lt;Stage camera={{ position: [0, 2, 5] }} shadows&gt;
+        &lt;Mesh position={[0, 1, 0]}&gt;
+          &lt;BoxGeometry args={[1, 1, 1]} /&gt;
+          &lt;PbrMaterial color="#84d6bd" /&gt;
+        &lt;/Mesh&gt;
+      &lt;/Stage&gt;
+    &lt;/Canvas&gt;
+  );
+}</code></pre>
+  <p>The aliases <code>mesh</code>, <code>boxGeometry</code> and <code>meshStandardMaterial</code> are the same components as <code>Mesh</code>, <code>BoxGeometry</code> and <code>PbrMaterial</code>. With <code>import * as Margo from '@margoengine/react'</code>, use <code>&lt;Margo.mesh&gt;</code>, <code>&lt;Margo.boxGeometry /&gt;</code> and <code>&lt;Margo.meshStandardMaterial /&gt;</code>. React treats bare lowercase JSX tags as DOM elements even when imported.</p>
   <footer>Published packages · 0.1.0 · <a href="https://margoengine.com/catalog/#react">Module catalog</a></footer>
   <script>
 let current, cleanup = () => {}, playing = false;
@@ -73,20 +91,20 @@ addEventListener('pagehide', () => { try { cleanup(); } finally { current?.dispo
   <script type="module">
 import React, { useRef } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Canvas, Mesh, BoxGeometry, PbrMaterial, useFrame } from '@margoengine/react';
+import * as Margo from '@margoengine/react';
 
 function Cube() {
   const mesh = useRef(null);
-  useFrame((_, delta) => { if (mesh.current) mesh.current.rotation.y += delta; });
-  return React.createElement(Mesh, { ref: mesh },
-    React.createElement(BoxGeometry),
-    React.createElement(PbrMaterial, { color: '#84d6bd', roughness: 0.3 }));
+  Margo.useFrame((_, delta) => { if (mesh.current) mesh.current.rotation.y += delta; });
+  return React.createElement(Margo.mesh, { ref: mesh, position: [0, 1, 0] },
+    React.createElement(Margo.boxGeometry, { args: [1, 1, 1] }),
+    React.createElement(Margo.meshStandardMaterial, { color: '#84d6bd', roughness: 0.3 }));
 }
 const root = createRoot(document.querySelector('#scene'));
-root.render(React.createElement(Canvas, {
+root.render(React.createElement(Margo.Canvas, {
   label: 'A rotating mint cube', style: { height: '100%' }, onError: report,
-  onCreated: engine => requestAnimationFrame(() => attach(engine, () => root.unmount())),
-}, React.createElement(Cube)));
+  onCreated: stage => requestAnimationFrame(() => attach(stage.engine, () => root.unmount())),
+}, React.createElement(Margo.Stage, { camera: { position: [0, 2, 5] } }, React.createElement(Cube))));
   </script>
 </body>
 </html>

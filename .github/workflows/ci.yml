@@ -102,7 +102,7 @@ jobs:
         run: npm run test:modules:browser
         env:
           MARGOENGINE_FBX_FIXTURE: /packages/fbx/test/fixtures/blender-rig.fbx
-          BROWSER_CHANNEL: chromium
+          BROWSER_CHANNEL: bundled
           BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
       - name: Verify MRT picking, micro-frustum culling, neighborhood resolve and device restoration
         run: npm run test:browser --workspace @margoengine/selection

@@ -33,9 +33,9 @@ Array decompression requires platform `DecompressionStream('deflate')`. Image de
 
 ## Verification and progress
 
-Run `npm test --workspace @margoengine/fbx`. Tests use first-party synthetic binary/ASCII fixtures, malformed streams, numeric geometry and bind references, Khronos GLB validation, and real `PBRModel`/`Animation` attachment and seek checks in a headless engine. They do not require Three.js or a test-only decompressor.
+Run `npm test --workspace @margoengine/fbx`. The 53 tests include the original 52 synthetic binary/ASCII, malformed-stream, numeric geometry/bind, and loading regressions, plus a [CC0 Blender-exported rig](test/fixtures/README.md). Its headless test pins three joints, all sixteen inverse-bind values, the clip name, quaternion endpoints, and the runtime bind pose. Tests also use Khronos GLB validation and real `PBRModel`/`Animation` attachment and seek checks. They do not require Three.js or a test-only decompressor.
 
-Real DCC compatibility and rendered skinning remain separate gates. Set `MARGOENGINE_FBX_FIXTURE` to a Vite-served skinned asset before `npm run test:modules:browser` to check skin/clip retention and changing rendered pixels. The checked-in synthetic rig does not certify every Blender/Maya/Max export convention.
+`npm run test:modules:browser` requires the checked-in Blender rig by default; the primary CI job explicitly selects that same file. It checks retained skin attributes/deformation buffers, clip playback, changed pixels after playback and seek, and a repeatable first frame. `MARGOENGINE_FBX_FIXTURE` can override its Vite-served URL. The asset's documented export settings exercise the existing subset and do not certify every Blender/Maya/Max convention.
 
 See [the implementation plan and progress](../../docs/native-fbx-plan.md) for completed checks and remaining compatibility work.
 

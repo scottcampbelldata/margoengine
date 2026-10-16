@@ -1,6 +1,6 @@
 # Overall package opinion
 
-Date: 2026-10-16. This is a reading review of the packages in this checkout. The suite was not re-run for this note.
+Date: 2026-10-16. This is a reading review of the packages in this checkout. The suite was not re-run for this note. Package counts were refreshed to 63 after the optional materials package landed; the review and recommendations remain a historical assessment.
 
 The engine is a small kernel with a wide, carefully labeled shelf around it. The kernel is the part that is genuinely distinctive. The shelf is real code, and a lot of it is honest about its limits, but the catalog is now broader than the product.
 
@@ -18,7 +18,7 @@ The packages that match that idea are the ones with a narrow job and a hard edge
 
 ## The part that is wide
 
-There are 62 public packages and about 29,000 lines of package source, plus shared GPU helpers that are not a package. The October module sweep filled the shelf: `ecs`, `fsm`, `input`, `tween`, `splines`, `net`, `wfc`, `road`, `cinematic`, `navmesh`, `navigation`, `stats`, `inspector`, `selection`, `html`, `video`, and others. Those are bounded and tested. `ecs` is a fixed-capacity sparse set. `navigation` is a thin Recast wrapper. `fsm` is a small hierarchical state machine. They are correct kernels of those features.
+There are 63 public packages and about 29,000 lines of package source, plus shared GPU helpers that are not a package. The October module sweep filled the shelf: `ecs`, `fsm`, `input`, `tween`, `splines`, `net`, `wfc`, `road`, `cinematic`, `navmesh`, `navigation`, `stats`, `inspector`, `selection`, `html`, `video`, and others. Those are bounded and tested. `ecs` is a fixed-capacity sparse set. `navigation` is a thin Recast wrapper. `fsm` is a small hierarchical state machine. They are correct kernels of those features.
 
 Taken together they read like a full game engine. A new user cannot tell `machinery` from `road`, or `kinematics-constraints` from `tween`, by the package list alone. A few entries are facades: `gizmo` re-exports `controls`, `usdz-export` re-exports `exporters`, and `toon` is a thin layer over `creative`.
 
@@ -40,7 +40,7 @@ Several jobs are also split across packages that a caller has to reconcile:
 
 The engineering habit is strong. READMEs state units, capacity, and what is not guaranteed. Peer dependencies stay on core. `sideEffects: false` is consistent. The size gate is still doing its job. A package in this repo is more likely to mean what it says than a typical engine module of the same length.
 
-The product risk is the shelf. Maintenance, docs, and the public story now scale with 61 names. The thing worth protecting is the kernel, the stage, and the few packs that make Margo different: small WebGPU runtime, CAD and machinery, and constraint-aware motion. The rest is a well-built optional library, and it should stay optional in the way people are told to approach it.
+The product risk is the shelf. Maintenance, docs, and the public story now scale with 63 names. The thing worth protecting is the kernel, the stage, and the few packs that make Margo different: small WebGPU runtime, CAD and machinery, and constraint-aware motion. The rest is a well-built optional library, and it should stay optional in the way people are told to approach it.
 
 Line counts are authored `.ts`, `.tsx`, `.js`, `.wgsl`, and `.rs` under each package, excluding `dist` and `vendor`. Tests that live outside a package directory are not included in those ratios.
 
@@ -50,7 +50,7 @@ This is aimed at a Show HN of the engine. I would leave the solvers, skies, part
 
 **Make the first click true.** The catalog marks the packages unpublished. The README still opens with `npm install @margoengine/core@0.1.0`, `@margoengine/react@0.1.0`, `gltf`, `machinery`, and `creative`. Someone from the thread will run that and get a 404, and that comment will outrank the architecture. I would publish the stage, `core`, and `react` before the post, or I would delete those install blocks and lead with clone, `npm ci`, and `npm run modern:dev`. The live site at [margoengine.com](https://margoengine.com) should be the first link in the post. The post itself can be three sentences: a WebGPU engine with a WebGL2 fallback, core and stage held under 20 KB gzip, and optional packs that stay out of that download.
 
-**Open the README on the kernel, and put the catalog below.** Sixty-two package names on the first screen will be read as a Three.js checklist. The interesting claim is the size, the Rust kernel, and the industrial packs. I would keep the full catalog linked. I would not make a stranger scroll through `wfc`, `road`, and `tween` before they see a canvas.
+**Open the README on the kernel, and put the catalog below.** Sixty-three package names on the first screen will be read as a Three.js checklist. The interesting claim is the size, the Rust kernel, and the industrial packs. I would keep the full catalog linked. I would not make a stranger scroll through `wfc`, `road`, and `tween` before they see a canvas.
 
 **Say what the engine is for, in the post.** A small embeddable stage, CAD and machinery, and constraint-aware motion. The thread will ask why this exists next to Three.js. The answer is the 20 KB core and the packs that do not enter it. A feature-count answer loses.
 
@@ -58,11 +58,11 @@ This is aimed at a Show HN of the engine. I would leave the solvers, skies, part
 
 **Call it 0.1.0.** Core and the stage package are `0.1.0`. The size freeze is the v1 discipline, and it is not a 1.0 release. `dof` and `tonemap` are already `1.0.0`, which looks like a different product. I would not claim 1.0 in the title.
 
-The native FBX importer is in. `npm test --workspace @margoengine/fbx` passed 52 tests, and `npm test --workspace @margoengine/exporters` passed 17. I would not spend the launch week on another package or on cubic FBX curves. A working quickstart, a demo that renders, and a README that matches npm are still the changes a reader can check. The open FBX gate is a real DCC file rendered in WebGPU, recorded in `docs/native-fbx-plan.md`.
+The native FBX importer is in, and the code-grade fixture gate is closed. A CC0 Blender file has headless bind and clip checks plus a required browser playback and seek check. `docs/code-to-nine.md` records 53 FBX tests and a 939-test Node 24 run. I would not spend the launch week on another package or on cubic FBX curves. A working quickstart, a demo that renders, and a README that matches npm are still the changes a reader can check.
 
 The rest can wait until after the post.
 
-**Tier the catalog.** `docs/README.md` and the searchable catalog treat all 62 packages as one list. I would mark a short product set and leave everything else as a library module. The product set is the stage, `core`, `react`, `gltf`, `gltf-pro`, `machinery`, `kinematics-constraints`, `blender`, and the rendering packs the current demos actually load. `ecs`, `fsm`, `tween`, `road`, `wfc`, and the other October modules stay installable and searchable, with a library label so a new reader can tell a CAD kernel from a spline helper.
+**Tier the catalog.** `docs/README.md` and the searchable catalog treat all 63 packages as one list. I would mark a short product set and leave everything else as a library module. The product set is the stage, `core`, `react`, `gltf`, `gltf-pro`, `machinery`, `kinematics-constraints`, `blender`, and the rendering packs the current demos actually load. `ecs`, `fsm`, `tween`, `road`, `wfc`, and the other October modules stay installable and searchable, with a library label so a new reader can tell a CAD kernel from a spline helper.
 
 **Put the overlap table in the catalog as a choice, one short paragraph each.**
 
@@ -88,7 +88,7 @@ The rest can wait until after the post.
 
 The 7 is the kernel, the 20 KB ceiling, and the packs that stay narrow and say what they refuse to guarantee. `kinematics-constraints`, `machinery`, and the frame-graph extensions are real work. The README habit of stating units and limits is better than most engines of this size.
 
-The 5 is the public surface. The catalog marks the packages unpublished while the README opens with `npm install`. The first screen lists 62 packages, so the project reads as a finished platform. Core is `0.1.0`. A reader who stays on the site and the demos will see the 7. A reader who runs the install command will see the 5.
+The 5 is the public surface. The catalog marks the packages unpublished while the README opens with `npm install`. The first screen lists 63 packages, so the project reads as a finished platform. Core is `0.1.0`. A reader who stays on the site and the demos will see the 7. A reader who runs the install command will see the 5.
 
 A 9 is the same engine with a smaller public claim that a stranger can install and check. More packages would push the score down.
 
@@ -106,6 +106,6 @@ Add a CI job that starts from an empty directory, installs the published package
 
 Pick one demo as the front door and link only that in the post. The night citadel, the machinery conveyor, or the constraints arm. That demo has to be the thing the first paragraph claims: a small WebGPU stage, CAD and machinery, or constraint-aware motion.
 
-Name about six packages as the product: stage, `core`, `react`, `gltf`, `gltf-pro`, and `machinery`. Leave the other fifty-six in the catalog as a library, with the choice notes for the two skies, the two particle systems, and the three IK paths.
+Name about six packages as the product: stage, `core`, `react`, `gltf`, `gltf-pro`, and `machinery`. Leave the other fifty-seven in the catalog as a library, with the choice notes for the two skies, the two particle systems, and the three IK paths.
 
-That is the whole gap. The kernel is already good enough for a 9. The 7 is the unpublished install and a front page that claims 62 products. Keep the verified release size distinct from historical benchmark measurements.
+That is the whole gap. The kernel is already good enough for a 9. The 7 is the unpublished install and a front page that claims 63 products. Keep the verified release size distinct from historical benchmark measurements.
