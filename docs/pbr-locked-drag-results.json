@@ -1,0 +1,628 @@
+{
+  "schemaVersion": 1,
+  "decision": "Keep experimental PBR uniform cache reverted; retain direct uploads.",
+  "reason": "Mean allocation reduction is below direct-repeat spread, with higher normal-render callback mean and p95 in both cache phases.",
+  "startedAt": "2026-10-16T14:56:50.299Z",
+  "completedAt": "2026-10-16T15:03:08.243Z",
+  "hardware": {
+    "info": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0"
+  },
+  "nodeVersion": "v24.19.0",
+  "method": "Frozen static bundles, fresh document per phase in one hardware browser, counterbalanced order. Trusted screen-space pointer command every two normal renders; exact fixed delta1/60; callbacks preserved; one awaited real six-face reflection bake every N normal renders (two extra zero-delta renders). Automatic engine RAF/reflection cadence/final refresh disabled only in diagnostic snapshot. Native GPUQueue.writeBuffer never wrapped. No forced GC/JIT flags. Heap sampling includes collected objects; sampler-handshake window and controlled work wall time are distinct. Callback time excludes reflection encoding/readback, reported separately. Allocation bytes/frame amortize the same fixed main/reflection workload and are not an isolated reflection cost.",
+  "dimensions": {
+    "normalFrames": 1800,
+    "warmupNormalFrames": 1800,
+    "reflectionStride": 4,
+    "pointerStride": 2,
+    "fixedDeltaSeconds": 0.016666666666666666,
+    "simulatedSecondsPerWindow": 30,
+    "order": [
+      "direct",
+      "cache",
+      "cache",
+      "direct"
+    ]
+  },
+  "identicalMeasuredWork": {
+    "frames": 2700,
+    "animationFrames": 1800,
+    "poseUpdates": 1800,
+    "reflections": 450,
+    "attempts": 900,
+    "reused": 900,
+    "fallback": 0,
+    "pbrDraws": 18900,
+    "beauty": 8100,
+    "gbuffer": 5400,
+    "ambient": 5400,
+    "transparent": 0,
+    "transmission": 0,
+    "capture": 0,
+    "deforms": 2700,
+    "unsafe": 0,
+    "reflectionFaces": 2700,
+    "beautyPrimitiveDraws": 413100,
+    "trustedPointerMoves": 900
+  },
+  "correctness": {
+    "identicalWork": true,
+    "endingTransformsSHA256": "f3d76343a8be9cdb47227ea62e0a7fc730f8dd7cea25c3439bb99f4756b02574",
+    "trustedCommandSequenceSHA256": "9a05312180d54d7c006a5dc3f5bbf0c23601ba8533fe31c390803fddd40f2f95",
+    "representativePrimitiveUniform": {
+      "words": 220,
+      "hash": "f3058ac7316965a71ff629d74209143e1ed486919a4b4ab7f549af93c61cb268",
+      "exact": true,
+      "nativeWriter": true
+    },
+    "browserErrors": []
+  },
+  "phases": [
+    {
+      "name": "1-direct",
+      "variant": "direct",
+      "workMs": 44999.125,
+      "samplingWindowMs": 45014.896499999995,
+      "allocation": {
+        "estimatedBytes": 37253964,
+        "sources": [
+          {
+            "url": "http://127.0.0.1:5263/direct/assets/skinning-ik.js",
+            "bytes": 29286704
+          },
+          {
+            "url": "(browser/harness)",
+            "bytes": 7032696
+          },
+          {
+            "url": "http://127.0.0.1:5263/direct/assets/dist-BNaDjm_K.js",
+            "bytes": 638592
+          },
+          {
+            "url": "http://127.0.0.1:5263/direct/assets/dist-CQ-Sse50.js",
+            "bytes": 295972
+          }
+        ],
+        "MBps": 0.8275919061593312,
+        "bytesPerNormalFrame": 20696.646666666667
+      },
+      "gc": {
+        "counts": {
+          "MinorGC": 43,
+          "MajorGC": 4
+        },
+        "pauseMs": 31.172000000000008,
+        "maximumPauseMs": 2.299
+      },
+      "normalCallbackMs": {
+        "count": 1800,
+        "mean": 3.591111111024188,
+        "p50": 3.600000001490116,
+        "p95": 6.100000001490116,
+        "p99": 8.5,
+        "maximum": 12.700000002980232
+      },
+      "bakeCompletionMs": {
+        "count": 450,
+        "mean": 12.521111110945542,
+        "p50": 11.299999997019768,
+        "p95": 18.5,
+        "p99": 20.399999998509884,
+        "maximum": 25.30000000447035
+      }
+    },
+    {
+      "name": "2-cache",
+      "variant": "cache",
+      "workMs": 45070.61919999999,
+      "samplingWindowMs": 45090.130000000005,
+      "allocation": {
+        "estimatedBytes": 37067088,
+        "sources": [
+          {
+            "url": "http://127.0.0.1:5263/cache/assets/skinning-ik.js",
+            "bytes": 29145552
+          },
+          {
+            "url": "(browser/harness)",
+            "bytes": 6966156
+          },
+          {
+            "url": "http://127.0.0.1:5263/cache/assets/dist-BNaDjm_K.js",
+            "bytes": 614172
+          },
+          {
+            "url": "http://127.0.0.1:5263/cache/assets/dist-CQ-Sse50.js",
+            "bytes": 341208
+          }
+        ],
+        "MBps": 0.8220665586903385,
+        "bytesPerNormalFrame": 20592.826666666668
+      },
+      "gc": {
+        "counts": {
+          "MinorGC": 44,
+          "MajorGC": 5
+        },
+        "pauseMs": 35.040000000000006,
+        "maximumPauseMs": 3.016
+      },
+      "normalCallbackMs": {
+        "count": 1800,
+        "mean": 3.9594444442705976,
+        "p50": 4,
+        "p95": 6.5,
+        "p99": 9.800000004470348,
+        "maximum": 12.899999998509884
+      },
+      "bakeCompletionMs": {
+        "count": 450,
+        "mean": 13.50844444465306,
+        "p50": 12.199999995529652,
+        "p95": 21.299999997019768,
+        "p99": 23.700000002980232,
+        "maximum": 25.899999998509884
+      }
+    },
+    {
+      "name": "3-cache",
+      "variant": "cache",
+      "workMs": 45393.092000000004,
+      "samplingWindowMs": 45413.02470000001,
+      "allocation": {
+        "estimatedBytes": 37118356,
+        "sources": [
+          {
+            "url": "http://127.0.0.1:5263/cache/assets/skinning-ik.js",
+            "bytes": 28898008
+          },
+          {
+            "url": "(browser/harness)",
+            "bytes": 7124592
+          },
+          {
+            "url": "http://127.0.0.1:5263/cache/assets/dist-BNaDjm_K.js",
+            "bytes": 708872
+          },
+          {
+            "url": "http://127.0.0.1:5263/cache/assets/dist-CQ-Sse50.js",
+            "bytes": 386884
+          }
+        ],
+        "MBps": 0.8173504461595572,
+        "bytesPerNormalFrame": 20621.30888888889
+      },
+      "gc": {
+        "counts": {
+          "MinorGC": 43,
+          "MajorGC": 5
+        },
+        "pauseMs": 34.238,
+        "maximumPauseMs": 3.122
+      },
+      "normalCallbackMs": {
+        "count": 1800,
+        "mean": 4.172000000013245,
+        "p50": 4.399999998509884,
+        "p95": 6.600000001490116,
+        "p99": 9.899999998509884,
+        "maximum": 12.899999998509884
+      },
+      "bakeCompletionMs": {
+        "count": 450,
+        "mean": 15.932444444348414,
+        "p50": 14.100000001490116,
+        "p95": 26,
+        "p99": 28.700000002980232,
+        "maximum": 30.900000005960464
+      }
+    },
+    {
+      "name": "4-direct",
+      "variant": "direct",
+      "workMs": 45600.402,
+      "samplingWindowMs": 45615.447199999995,
+      "allocation": {
+        "estimatedBytes": 37084520,
+        "sources": [
+          {
+            "url": "http://127.0.0.1:5263/direct/assets/skinning-ik.js",
+            "bytes": 29128996
+          },
+          {
+            "url": "(browser/harness)",
+            "bytes": 7020544
+          },
+          {
+            "url": "http://127.0.0.1:5263/direct/assets/dist-BNaDjm_K.js",
+            "bytes": 626492
+          },
+          {
+            "url": "http://127.0.0.1:5263/direct/assets/dist-CQ-Sse50.js",
+            "bytes": 308488
+          }
+        ],
+        "MBps": 0.8129816164555767,
+        "bytesPerNormalFrame": 20602.51111111111
+      },
+      "gc": {
+        "counts": {
+          "MinorGC": 44,
+          "MajorGC": 4
+        },
+        "pauseMs": 34.709,
+        "maximumPauseMs": 2.53
+      },
+      "normalCallbackMs": {
+        "count": 1800,
+        "mean": 3.6513888886612325,
+        "p50": 3.6999999955296516,
+        "p95": 6.399999998509884,
+        "p99": 8.799999997019768,
+        "maximum": 12.700000002980232
+      },
+      "bakeCompletionMs": {
+        "count": 450,
+        "mean": 16.270444444500736,
+        "p50": 14.599999994039536,
+        "p95": 26.399999998509884,
+        "p99": 29.30000000447035,
+        "maximum": 34
+      }
+    }
+  ],
+  "aggregate": {
+    "direct": {
+      "sampledBytesPerNormalFrame": 20649.57888888889,
+      "normalCallbackMeanMs": 3.62124999984271
+    },
+    "cache": {
+      "sampledBytesPerNormalFrame": 20607.06777777778,
+      "normalCallbackMeanMs": 4.065722222141922
+    },
+    "allocationReductionBytesPerNormalFrame": 42.51111111111095,
+    "allocationReductionPercent": 0.2058691430941728,
+    "directRepeatSpreadBytesPerNormalFrame": 94.1355555555565,
+    "directRepeatSpreadPercent": 0.4558715509990806
+  },
+  "provenance": {
+    "rawReport": "C:/Users/ScottCampbell/.codex/worktrees/skinning-ik/margoengine/test-results/pbr-locked-drag-quiet-abba-20261016/report.json",
+    "rawReportSHA256": "c7b94622c61425f2d5382839b61b04e9a638034eb78b30b2c9ff06cadab3ffde",
+    "snapshotReusedFrom": "C:\\Users\\ScottCampbell\\.codex\\worktrees\\skinning-ik\\margoengine\\test-results\\pbr-locked-drag-abba-20261016",
+    "directPBRSourceSHA256": "55cb5e31707d0781304924fd104bec7d33d86f73c9f6aa574c119b70b621ea07",
+    "cachePBRSourceSHA256": "5049ab13c91f5658dce2d96a26637218b3fb615643d0aa878c65b0cb18d4a146",
+    "diagnosticMainSHA256": "b84ffefc6fe5a277ce577a444fa3a243a0901203a97009e7c07d92776cd37691",
+    "harness": "scripts/profile-pbr-locked-drag.mjs",
+    "harnessSHA256": "2761345e36f7f27124a8ea8b4716823ea46f56666668db48414e4444094f7973",
+    "verifiedExecutedChunkHashes": 34,
+    "sourceManifest": {
+      "examples/skinning-ik/main.ts": "b84ffefc6fe5a277ce577a444fa3a243a0901203a97009e7c07d92776cd37691",
+      "packages/core/dist/extension.js": "7bf8086bf16ef62e52e560292249ebeac826a18fe18399a25dcdc3890335745b",
+      "packages/animation/dist/index.js": "b61e468198c4b6515c34ab04486599036f853171c84aa2fdd349a1387b4eb029",
+      "packages/animator/dist/index.js": "ddd4a1062469b2cf77fa080736d3a8d54b7c47579b337ae0178eb2ea2fd5d26f",
+      "packages/environment/dist/index.js": "de1cde677f5562a741b3c49d20a3b537d0762fd38484a31ec20e95431edd7bda",
+      "packages/controls/dist/index.js": "c2abd6bf5c485d0834b6ae568c13d32767ab6dcfdd59c3fb7d97a3f09665621f",
+      "packages/environment/dist/probes.js": "5a476e7ec8704411b144981d174fd6eaf77eeb780b9825b7de45bd7fca4ab66c",
+      "packages/shadows/dist/index.js": "2ef54f276d767bc06e86741e2b87f7441e4d80436a86570202aac70fbb2ed560",
+      "packages/tonemap/dist/index.js": "75fa0bea94e2be2c2f0ac4752c6a37bd27c2ece594faa0b3cb94135166343837",
+      "packages/math/dist/color.js": "bb22ef95274ea04ffd4128d099cb388db4f88bf5df8c1caf85d8fee25b4f2993",
+      "packages/post/dist/bloom.js": "0d3e15452f8aff01cc70baf08969b5b57ea23d32e9a8bb6f1a8ed9b9b70fd7bb",
+      "packages/lines/dist/index.js": "b2b7bddbbc9670fdb6c588c357469cbf2f4229974061af201b65199d9a5dcb22",
+      "packages/post/dist/stack.js": "4efeb99e02ee56b113d04e1446e3b5e01290364ad6bca3f0db0e4b65c83f3db3",
+      "examples/skinning-ik/performance-hud.ts": "6ead12fd98a54d438134fb8e8864e24408e2b89d5c5c5acf9cf520b09269388d",
+      "examples/skinning-ik/rig-ik.ts": "b72c28955327da811ae6389d9dba22904462f5fd81ccdf942ab89d19c1e16af9",
+      "examples/skinning-ik/rig-scratch.ts": "8b6c7d7f2afdb021bddee53b9f3b016dea5e0d176d043739cc7c0af4d8a0a985",
+      "examples/skinning-ik/body-ik.ts": "72c8899eab366aed2375a7964ad8b964b12e3472f5a6490a97fe2572995b964c",
+      "examples/skinning-ik/head-aim.ts": "283e7599b8fbdb62625ee540af3846bb4eb10b22e47525cc7a73f293dec53ad9",
+      "examples/skinning-ik/target-motion.ts": "1abeac604154d11bbe1b2bffe9fcb7dbfa266c16a47f360718fc84ab8c923381",
+      "examples/skinning-ik/head-aim-shape.ts": "6b384dbe99d348f0cf67516382e3cd7462aa9a0661f8c9e6d2a1f611be48090e",
+      "examples/skinning-ik/torso-aim.ts": "0f14466ae5e9083cf9665b360f771251c6122c2ce2b6ff7d9b39a8e4c0c04d0c",
+      "packages/margoengine/dist/index.js": "41171af49612b1d27999ca4b97cadeec9a391db2007d4771657f5b6a491885ae",
+      "examples/skinning-ik/arm-control-route.ts": "d01179deac54f119d9e72fac6f467a3141c00651ce0bd7c4f9f6d3b1e1df0de4",
+      "examples/skinning-ik/arm-head-clearance.ts": "cc01d9d296e75bd67ed5814cb0a765d3af54a22e9af2ad6139daa1c89b13240d",
+      "examples/skinning-ik/probe-pose-reuse.ts": "61e4f6f96e5ae7fa61609a8f5f7670c5dad3db5a3d0b4786616c92f1ac7233d3",
+      "examples/skinning-ik/arm-controls.ts": "af39cc62b072b8d9b173da85e55fea90f0b3a6e469917679947f3b9eb40e3065",
+      "examples/skinning-ik/shadow-debug.ts": "c0f9aa55ecbb9f6272235a0386220015f8a1d379bcae86ea2670c6ae5d96b74c",
+      "examples/skinning-ik/gpu-audit.ts": "0f6087102fc9f13ef8a9cfff45ca899c5a47ed29ce8cd81b775c8dd4dd9c5835",
+      "examples/skinning-ik/shadow-bounds.ts": "08488bb4ad8cb8ce3722d07e5277ccdc759851cb8b4330c8c3f6380eec4d68d3",
+      "packages/post/dist/ssao.js": "11f8ba68c3ea85b681b874667f94ea3f4b481b7f9bc34f1005072e55200916be",
+      "examples/skinning-ik/workshop.css": "314ac400e617c2136998648d93733e911b6e8bbc05fd96886962cb7c98b743c2",
+      "packages/core/dist/plugin.js": "642634853357d406f4eb96326dba0a7339a6122928751b902c4022433368da50",
+      "packages/core/dist/engine.js": "028b87b3815340a29f3a73b774c9b3dd53f82b10a2467da2997d017905ed75e5",
+      "packages/core/dist/geometry.js": "c75239793b47db77cfb17ff782b556b4d242bf50791e625f1a7b4cd0dfabf796",
+      "packages/core/dist/kernel.js": "c052091a1c6f864d3f327056c3b94e8c08b7f07f6f6cce2ab0ae872cdc4a19ca",
+      "packages/core/dist/camera.js": "c68f83c3d65552c04f541ef7624e7b4248718aca134f44ce8723dc0d37827f3d",
+      "packages/environment/dist/mat4-Bfz6_XYG.js": "96e52c4d6d2e7d8656b47c0f33461ded1b13ae22b7d0efbb35adccadafac82d1",
+      "packages/animation/dist/mat4-DJQpY4SK.js": "15fb52e625d71f0560be1a3042513e72d7af3439c681d7d82600ace24671a964",
+      "packages/post/dist/bloom-BJJu3Nky.js": "efe72008a965081bad38e354a1a325338733888c7436106ffa563eff17902621",
+      "packages/post/dist/ssao-frPJ5Z60.js": "35b53c344c415181c8f4ad29666e6b75cc6f6d82cf8feb6ab940fb633dca7d27",
+      "packages/environment/dist/lighting-CzK8cWsx.js": "2939e210b5b8707686c60c1fa3221658812415582cf92fb5cda21a5b50746543",
+      "packages/post/dist/msaa-BmLPAQw6.js": "26d83eca2cc3d916a8408517d67a1581ca26037f9e2857a4f229bfe8dd1f9c19",
+      "packages/core/dist/wasm.js": "3c53dc66cd0b27cbe5c6720b9be257f436065dbf5e3ccaa543b2c0f5c32265fb",
+      "packages/math/dist/quat.js": "696ec1d4bb105e33fcd127f3ec3310bcb6aabdf7f717b4d6515f9c7414166867",
+      "packages/math/dist/mat4.js": "a7b117426ce74f3444f47ced8c45fc9e2a9381e00813c5c7eafe3e7654bb99e3",
+      "packages/math/dist/quaternion.js": "d2a91627420014de02a683926312df22bedd9082f218a0e694a47e3a5075c3a3",
+      "examples/skinning-ik/norm.ts": "124f22122b4a2428016e42baab5c45d0c04c6fc10037be7316d7288ef320815a",
+      "packages/math/dist/validate.js": "a51a1a40891713b257fdc3482d05580188afcb4fa6c203c92b5fbae8aa5a4d58",
+      "packages/core/dist/quality.js": "a1f7791b76e8bedbb1811249194567030fcbf9618626ee96e6670774c4498cac",
+      "packages/core/dist/renderer.js": "0c69f4a4a53afb88c52f03db6542169495d3dbb31b7e1af33224022cbc32583e",
+      "examples/skinning-ik/body-head-shape.ts": "ea16f76200d7d9baccd0d01128b48a18ba076bf6c93e48bdc18fa57a1e92e9e0",
+      "packages/stats/dist/index.js": "053de725cec3b929c1ad6292341ef0a40d4b542b308be611ca504a67b482c25a",
+      "examples/skinning-ik/body-distance.ts": "4fe8ca4ba85a77d6a517953957aaf68f0b095679eb9867f7e4a7462da9a974cc",
+      "examples/skinning-ik/arm-head-shape.ts": "1be9679595dc8fb288c8e3b43357c5f6686d440f669d8f858543c847434f7889",
+      "packages/post/dist/gpu-CkbGp6Ld.js": "c5273d0a5ff61358cd9ea535903b423d26f88260f06f778d407b8c30a50068f1",
+      "packages/post/dist/preset-Czkwunbj.js": "2fded51a2a12c86a9d6dfe5a5a68fa1974241f775f6cc7ba503384904d564a1e",
+      "packages/post/dist/mat4-6lYnUMDr.js": "88e5643ccad2b3f627a0c07de4ab478aa9eb760c561e167b14faf5acb56b25d5",
+      "packages/controls/dist/fly-DWzZuMnB.js": "0886fc52d114d2110a1ec60039b13eb884f91f3a99175e12386c0c8692b0e8da",
+      "packages/bvh/dist/index.js": "6ec2360aa5318804ce16b3c3cc9cbaf86a469b294bd4618d71c8eff22b607632",
+      "packages/core/dist/shaders.js": "460f023e68a97547adb81a6d26dfc73295cba5a9479b116b290bb1c49e628fe3",
+      "examples/skinning-ik/body-ik-shapes.ts": "93c387783f9f56ee911b22201efd02e4909663db1da8c5d424adbd9dcba53867",
+      "packages/kinematics-constraints/dist/index.js": "64a16588de864218291da2943f4ca8ea917b3a80602fe073787b6dd60cb14d04",
+      "packages/margoengine/dist/model.js": "b0090b4953946536f305d9e79631d24c81a585e446c2ea40f545a6fe019f1734",
+      "packages/core/dist/index.js": "748ce3b923ed5a5861965bfb585020e9a868f5e663ba3c38d4d402b14752596a",
+      "packages/creative/dist/index.js": "77e2f6d851dff0e7678cd5d144d115fa8aaaa7e1bb24793c3ea374ef1a9ad6bb",
+      "packages/gltf/dist/index.js": "ee64c07e8284acc35231851f388ac4ebfcf85d744243fa63d1dc46b18c7dcfba",
+      "packages/scenery/dist/sky.js": "fa568e712497e8c3efdc5f186f2e7286a241cedfa977717c4bb879169d080b3b",
+      "packages/creative/dist/post.js": "957df6b3b6ed3ba9da7c77d29f9b4ed24062c526432103fcc33a304384cda22e",
+      "packages/scenery/dist/index.js": "d7a15f9defcaf00a03b5f0d84cd6583e3c5e2af4f0daaa0d54b91af15a44f92f",
+      "packages/creative/dist/particles.js": "e6a2d28dcafe2e78af3a5e1a40ed2f6918d5e32c768271ffd1c1a381db8a2b19",
+      "packages/gltf-pro/src/asset.ts": "535bd4e1e121fd4ec0b78603beff1d444139b02d5f4f44d80c0a04201b97ccff",
+      "packages/shared/cleanup.js": "94a922e6dabef7faa6f868f2ec3e90fb1340ab7eb4c8538be3450d0336dae60c",
+      "packages/shared/shadow-source.js": "3f63e9290f4845598364ff678a09627f8c1c7e24c3bfaac150ab392263118efb",
+      "packages/shared/pbr-hooks.js": "4784eb5ca8db4c988b8b33d569d3e0a0ca49fc83435094900fba94b4c5ab8b4a",
+      "packages/shared/view.js": "479c42539b97b1e52a9c51f038385bee258678aa46fadaaaff8528245d172eec",
+      "packages/gltf-pro/src/shader.ts": "c50df4dde23217c5aab516a06adee03c89c73a6f1471e271cd869cd17aea7492",
+      "packages/bvh/dist/bvh.js": "f10b6178b2a07f0d9b96a6a3997b3c99bd28788a3104246c8d1db463c6dce088",
+      "packages/gltf-pro/src/mip.ts": "4fba28f627cc746b6272c9e9a07623593c0a1956baead9ae688b7fc49d1e29df",
+      "packages/gltf-pro/src/pack.ts": "4d964a7f08bef299bfe3929c46f9bc90d886143a0c728021e8fd2247d4fec3eb",
+      "packages/bvh/dist/build.js": "02b2dd0e8038211f6c71a9c67a38ee18318c766b9bc0e117a1e6fbc736c35974",
+      "packages/bvh/dist/math.js": "a6476089cf4d7f1a8c4d5a37a72317c62f83e3690ebffac584a74bc3912db881",
+      "packages/bvh/dist/async.js": "826275b945daad8a49cfde70262000e3b07e4a9fa21d46e8ef277c884cc6eafe",
+      "packages/bvh/dist/raycaster.js": "45facc9abc75fb92b31e3064ff4238baabc8baa5d3372659bf13aab35abbda1d",
+      "packages/bvh/dist/triangles.js": "96698843feea51fde4aad33a3a8c7269209374264459dce4af0e1d850e967c2d",
+      "packages/core/dist/controls.js": "e7cb69fd0986330f681108baa48ff6ed2800e97666ed1a78f3ba6f44b46bac98",
+      "packages/core/dist/api.js": "5b4d5a3cd949df7e4b53b12a256c2fa134862b98427be8788f43cecd81fab5fb",
+      "packages/shared/errors.js": "0c1559f8918efbabb13e52e192774fd8183ae9ac589f5b8ff69869e065b8e587",
+      "packages/creative/dist/mat4-L6V57l5v.js": "df4cbccfddb04fffc8e8e8c8097fe32e834b64e694378012a2aa387c5c9c2b9d",
+      "packages/creative/dist/targets-BYyaqyiN.js": "e7129ee5460476fa37b1a8a11a124b08071a5663018ddaf8281ea590551045f4",
+      "packages/creative/dist/stars-CaK6R-oL.js": "6311815cb751e0c8c8435ec2eff3b7ef47fa34656409700b98cebb5d6a2e3edd",
+      "packages/creative/dist/planet-WSx-9zRM.js": "d3e074e4e087408b07eb94bf920aeb09d443b1b2d99c0552617cd9fad942548b",
+      "packages/creative/dist/toon.js": "f1f5da1f959c74cbad92910d431d91c79211164a3d4f41546ec4a88b3d3ad21b",
+      "packages/creative/dist/grass-ZGqTGTCq.js": "aac13dbb27794ae3f20de78c4b93c51d72f774a0b88d7a71a4800903d470dee3",
+      "packages/vfx/dist/index.js": "1f7b3e3fd09e00ba0db9d7238713a88c31b6f73d4718d7f8cc758811e5b3ec84",
+      "packages/sky/dist/night.js": "c4399c5ccbc24a2d76d2a928c5334971f3aeb22174485ff75602a1b9b7f1ce70",
+      "packages/sky/dist/base.js": "2b93a485c21cd4285443a51fef44a4e87120123b1db493d5a84d9939daa102fe",
+      "packages/shared/aces.js": "760d755ef83f7c522e959fc69065658c1157d824012add4dd369eef7f28be4da",
+      "packages/shared/limits.js": "0e5f2b22b7efb62579755ceafa731ccc8e727b8c45eb41ffcc8e69c644233868",
+      "packages/shared/loading.js": "9ad6628d17032e07a8e3cb1bb81ff5da709b22448aec710f62f98ce89e9069f4",
+      "packages/sky/dist/validate-C3gBfDV9.js": "65300ad24538c3897e3b7bc012b51db3b9a4fe1323ce31d158ae8e87ddfa1875",
+      "packages/sky/dist/base-Bp_82I-M.js": "ade4db9039d6c177c573f68705471ac7aa8bdb7fd4158e57c4c4889671083b30",
+      "packages/creative/dist/quality-DJmt1uG9.js": "5d865c4215314acf4f727206ef1be64799d206090fe2ac51d78ba8945202da7e",
+      "packages/vfx/dist/base-Wt7aJJbd.js": "7aaf03aea86177c3d47a45a874e6aca3a73eeb915e0c56afdb68c4208dd019be",
+      "packages/vfx/dist/obstacles.js": "aec182c93c73269be21d10d8e33a857fc06c0e51a556d201a5007d14afe65c08",
+      "packages/vfx/dist/wrap.js": "9ab2536734a4ac53420214fa71e425b9ef991bdbd6bdc9071b831c93cc119299",
+      "packages/vfx/dist/texture.js": "f7d95df7522662f8d44da66a95cbe468aa4e083e039f703891d3659883232f0f",
+      "packages/vfx/dist/sort.js": "e9552292e960f0b9871034478336fcb5c1e19abbb0f71519b1dee340d3ec15d2",
+      "packages/vfx/dist/shader-DfjrHasq.js": "ce084bda4be2a2b2b15529faa32f796d99a4ccad8a430a6441ccd58caba4f6e0",
+      "packages/creative/dist/validate-C3gBfDV9.js": "65300ad24538c3897e3b7bc012b51db3b9a4fe1323ce31d158ae8e87ddfa1875",
+      "packages/vfx/dist/extra-BoYr2fb2.js": "d6fbc09b64ae45bb3f3494aeb3341475397f6d621c995acd38e621bb136e6a4a",
+      "packages/vfx/dist/validate-ChuY9rdH.js": "13677cbfafdd3ee86422306d4150983b55ab7ef6b50cdde112445fc21eea47a9",
+      "packages/sky/dist/atmosphere-B7whDKu2.js": "3aedc34cc1f382013a3caa948e374eb9bcbbdb99d44557c7b57176fc534e6764",
+      "packages/sky/dist/gpu-B2vnAQXQ.js": "78ac1feef668a0cd56ddc1df816b5684c80cac979a960b4ea01daaa04fa2ac89"
+    },
+    "bundles": {
+      "direct": {
+        "moduleCount": 109,
+        "files": [
+          {
+            "name": "assets/skinning-ik.js",
+            "bytes": 747892,
+            "sha256": "949567e78996ec9c1f0c148531db786c096ddc925692dd4d330f5e833327d537"
+          },
+          {
+            "name": "assets/_locked-no-cad-DP21Hxv7.js",
+            "bytes": 96,
+            "sha256": "30950071d71627845c775f9f09f52bbf830e32f29c4f3c3911104d632e598648"
+          },
+          {
+            "name": "assets/dist-BKCFmSqS.js",
+            "bytes": 47976,
+            "sha256": "e7849f114404a7a0299a96e9b9ac175b35801b84f6fb0d578f58df4b3dab477b"
+          },
+          {
+            "name": "assets/dist-BNaDjm_K.js",
+            "bytes": 27331,
+            "sha256": "61c40b6ab350f7d8329e8b12a4c60563988d7ec443e3a5c9b839a09c544f7df3"
+          },
+          {
+            "name": "assets/dist-CQ-Sse50.js",
+            "bytes": 65562,
+            "sha256": "3068b3ccb390366a1aee602c9a63a44aaf9f4e164080adc59ca13945574330b3"
+          },
+          {
+            "name": "assets/dist-CuGx-tSy.js",
+            "bytes": 63,
+            "sha256": "50f2b86b0be18e48a38a9cf6e70ac8675a10caee54b69a0cd354d2846beadbe6"
+          },
+          {
+            "name": "assets/dist-DwKcKT9i.js",
+            "bytes": 14151,
+            "sha256": "59f2a469b66e23e775e946233438adc94fea4bee0b0d794e97d35ec4d5b29b8f"
+          },
+          {
+            "name": "assets/dist-DzCz9-SG.js",
+            "bytes": 50,
+            "sha256": "97c1ff3c84cbce8284a6fd6a74498a4df1c3aa630103fd4f6957dd8f00caea6e"
+          },
+          {
+            "name": "assets/dist-oODlnKtC.js",
+            "bytes": 51,
+            "sha256": "9cab8da7f4c307a3caa478daa10642edfcf6275b8b84e3b111d6a1c614f58d17"
+          },
+          {
+            "name": "assets/extension-GwfUtZB7.js",
+            "bytes": 188,
+            "sha256": "6d75f999e7bf6cffdf37d19bb3562a9d3460f124ea47339d8e1923f811540a64"
+          },
+          {
+            "name": "assets/geometry-L7BD3Uke.js",
+            "bytes": 2898,
+            "sha256": "db51862ab917a6fea7d7e857e4d66cbcfacf0b61238aef6fe2d8c48b326c3824"
+          },
+          {
+            "name": "assets/particles-BOXxxbHq.js",
+            "bytes": 61,
+            "sha256": "60eea00e1e96224a5b5da51b79b45db1c020affa3835adec6f582fdbae1e2745"
+          },
+          {
+            "name": "assets/particles-CTZhg8LF.js",
+            "bytes": 26413,
+            "sha256": "0acfe670d56908408c3fa3cbde1c5f0a860210a1036fdc381caddb22c1386140"
+          },
+          {
+            "name": "assets/post-Cng8bIZJ.js",
+            "bytes": 58,
+            "sha256": "dbdd599937306ddf24bcc73177bca10b03d6a4ccefce632071edcfd7e48a6c52"
+          },
+          {
+            "name": "assets/post-DTYedIki.js",
+            "bytes": 20461,
+            "sha256": "13daf0b1a7e076c1bf1e789179e927788ce079a0c493e4ebdd1edcef3b912b90"
+          },
+          {
+            "name": "assets/sky-CBhVhNJJ.js",
+            "bytes": 19151,
+            "sha256": "d02b9c85f7a775eb5431568ac6ef7ffe9e809291889cae230255f2e48fbe9c9b"
+          },
+          {
+            "name": "assets/sky-DzCz9-SG.js",
+            "bytes": 50,
+            "sha256": "97c1ff3c84cbce8284a6fd6a74498a4df1c3aa630103fd4f6957dd8f00caea6e"
+          }
+        ]
+      },
+      "cache": {
+        "moduleCount": 109,
+        "files": [
+          {
+            "name": "assets/skinning-ik.js",
+            "bytes": 750007,
+            "sha256": "d57705bd7398b1d1682200ae16038aff336a9428db895f595cd856a6c8cd4a1c"
+          },
+          {
+            "name": "assets/_locked-no-cad-DP21Hxv7.js",
+            "bytes": 96,
+            "sha256": "30950071d71627845c775f9f09f52bbf830e32f29c4f3c3911104d632e598648"
+          },
+          {
+            "name": "assets/dist-BKCFmSqS.js",
+            "bytes": 47976,
+            "sha256": "e7849f114404a7a0299a96e9b9ac175b35801b84f6fb0d578f58df4b3dab477b"
+          },
+          {
+            "name": "assets/dist-BNaDjm_K.js",
+            "bytes": 27331,
+            "sha256": "61c40b6ab350f7d8329e8b12a4c60563988d7ec443e3a5c9b839a09c544f7df3"
+          },
+          {
+            "name": "assets/dist-CQ-Sse50.js",
+            "bytes": 65562,
+            "sha256": "3068b3ccb390366a1aee602c9a63a44aaf9f4e164080adc59ca13945574330b3"
+          },
+          {
+            "name": "assets/dist-CuGx-tSy.js",
+            "bytes": 63,
+            "sha256": "50f2b86b0be18e48a38a9cf6e70ac8675a10caee54b69a0cd354d2846beadbe6"
+          },
+          {
+            "name": "assets/dist-DwKcKT9i.js",
+            "bytes": 14151,
+            "sha256": "59f2a469b66e23e775e946233438adc94fea4bee0b0d794e97d35ec4d5b29b8f"
+          },
+          {
+            "name": "assets/dist-DzCz9-SG.js",
+            "bytes": 50,
+            "sha256": "97c1ff3c84cbce8284a6fd6a74498a4df1c3aa630103fd4f6957dd8f00caea6e"
+          },
+          {
+            "name": "assets/dist-oODlnKtC.js",
+            "bytes": 51,
+            "sha256": "9cab8da7f4c307a3caa478daa10642edfcf6275b8b84e3b111d6a1c614f58d17"
+          },
+          {
+            "name": "assets/extension-GwfUtZB7.js",
+            "bytes": 188,
+            "sha256": "6d75f999e7bf6cffdf37d19bb3562a9d3460f124ea47339d8e1923f811540a64"
+          },
+          {
+            "name": "assets/geometry-L7BD3Uke.js",
+            "bytes": 2898,
+            "sha256": "db51862ab917a6fea7d7e857e4d66cbcfacf0b61238aef6fe2d8c48b326c3824"
+          },
+          {
+            "name": "assets/particles-BOXxxbHq.js",
+            "bytes": 61,
+            "sha256": "60eea00e1e96224a5b5da51b79b45db1c020affa3835adec6f582fdbae1e2745"
+          },
+          {
+            "name": "assets/particles-CTZhg8LF.js",
+            "bytes": 26413,
+            "sha256": "0acfe670d56908408c3fa3cbde1c5f0a860210a1036fdc381caddb22c1386140"
+          },
+          {
+            "name": "assets/post-Cng8bIZJ.js",
+            "bytes": 58,
+            "sha256": "dbdd599937306ddf24bcc73177bca10b03d6a4ccefce632071edcfd7e48a6c52"
+          },
+          {
+            "name": "assets/post-DTYedIki.js",
+            "bytes": 20461,
+            "sha256": "13daf0b1a7e076c1bf1e789179e927788ce079a0c493e4ebdd1edcef3b912b90"
+          },
+          {
+            "name": "assets/sky-CBhVhNJJ.js",
+            "bytes": 19151,
+            "sha256": "d02b9c85f7a775eb5431568ac6ef7ffe9e809291889cae230255f2e48fbe9c9b"
+          },
+          {
+            "name": "assets/sky-DzCz9-SG.js",
+            "bytes": 50,
+            "sha256": "97c1ff3c84cbce8284a6fd6a74498a4df1c3aa630103fd4f6957dd8f00caea6e"
+          }
+        ]
+      }
+    }
+  },
+  "excludedCapture": {
+    "label": "pbr-locked-drag-abba-20261016",
+    "reason": "Concurrent external production/Stats hardware captures overlapped its first two phases; excluded from the decision.",
+    "externalHardwareWindowUTC": [
+      "2026-10-16T14:47:11Z",
+      "2026-10-16T14:50:50Z"
+    ]
+  },
+  "validation": {
+    "focusedTests": {
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0,
+      "node": "24.19.0",
+      "localLog": "C:/Users/ScottCampbell/.codex/worktrees/skinning-ik/margoengine/test-results/pbr-locked-drag-final-tests.log"
+    },
+    "coreStageGzipBytes": 19999,
+    "runtimeChangesForThisComparison": false
+  },
+  "limits": [
+    "Four full-scene empirical captures; no statistical significance or universal performance claim.",
+    "Sampled allocation includes browser/harness overhead and background timers; natural GC remains variable.",
+    "Bytes per normal frame amortize the same fixed ratio of normal/reflection work; not isolated reflection allocation.",
+    "Normal callback timings exclude reflection encode/readback, scheduling and harness overhead; not equivalent to earlier whole-RAF trace durations.",
+    "Ending transforms and one representative 220-word GPU uniform validated; not all intermediate transforms or all primitive buffers.",
+    "Bake completion drift across order is not evidence of a cache-specific GPU effect.",
+    "Raw sources/bundles/profiles/traces and rejected candidate remain ignored local artifacts; clean-clone reproduction requires those archived inputs."
+  ]
+}
