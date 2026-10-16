@@ -4,6 +4,23 @@ import {readResponse} from '../../shared/loading.js';
 
 const maxBytes=256*1024*1024;
 const littleEndian=new Uint8Array(new Uint32Array([1]).buffer)[0]===1;
+// The prepared glTF subset inspected below; scene and material fields remain
+// unknown here because parsePreparedPBR owns their validation.
+interface MargoPrimitive {
+  vertices?:unknown;
+  indices?:unknown;
+  attributes?:unknown;
+  targets?:unknown;
+  extensions?:unknown;
+}
+interface MargoMesh {primitives?:MargoPrimitive[]}
+interface MargoImage {mimeType?:unknown;uri?:unknown;section?:unknown}
+interface MargoDocument extends Record<string,unknown> {
+  asset?:{version?:unknown};
+  meshes?:MargoMesh[];
+  nodes?:unknown[];
+  images?:MargoImage[];
+}
 export interface MargoAsset {
   readonly document:GLTFDocument;
   readonly geometry:readonly (readonly PreparedGeometry[])[];
@@ -29,7 +46,7 @@ export function decodeMargo(input:ArrayBuffer|ArrayBufferView):MargoAsset {
     sections.push({type,stride,bytes:new Uint8Array(buffer,base+offset,size)});end=(offset+size+3)&~3;
   }
   if(end!==length)throw new RangeError('Trailing/truncated .margo data');
-  const doc=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(sections[0].bytes));
+  const doc:MargoDocument|null=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(sections[0].bytes));
   if(!doc||doc.asset?.version!=='2.0'||!Array.isArray(doc.meshes)||!doc.meshes.length||!Array.isArray(doc.nodes)||!doc.nodes.length||doc.nodes.length>100_000)throw new TypeError('Invalid .margo scene');
   for(const key of ['buffers','bufferViews','accessors','skins','animations','extensionsRequired'])if(doc[key]!==undefined)throw new TypeError('Unsupported .margo '+key);
   for(const key of ['materials','images','textures','samplers','scenes'])if(doc[key]!==undefined&&!Array.isArray(doc[key]))throw new TypeError('Invalid .margo '+key);
@@ -38,12 +55,12 @@ export function decodeMargo(input:ArrayBuffer|ArrayBufferView):MargoAsset {
     return sections[id];
   };
   const shared=new Map<string,PreparedGeometry>();let geometryBytes=0;
-  const geometry=doc.meshes.map((mesh:any)=>{
+  const geometry=doc.meshes.map(mesh=>{
     if(!mesh||!Array.isArray(mesh.primitives)||!mesh.primitives.length)throw new TypeError('Invalid .margo primitives');
-    return mesh.primitives.map((p:any)=>{
+    return mesh.primitives.map(p=>{
       if(!p||p.attributes||p.targets||p.extensions)throw new TypeError('Unsupported .margo primitive');
       const {bytes:vertices,stride}=section(p.vertices,2),{bytes:indices,stride:indexStride}=section(p.indices,3);
-      const key=p.vertices+':'+p.indices;
+      const key=`${p.vertices}:${p.indices}`;
       let geometry=shared.get(key);
       if(!geometry){
         const count=vertices.byteLength/stride;geometryBytes+=count*80+indices.byteLength/indexStride*4;
@@ -64,7 +81,7 @@ export function decodeMargo(input:ArrayBuffer|ArrayBufferView):MargoAsset {
     });
   });
   let decoded=0;
-  const images=(doc.images??[]).map((image:any)=>{
+  const images=(doc.images??[]).map(image=>{
     if(!image||image.mimeType!=='image/png'||image.uri!==undefined)throw new TypeError('.margo images must be embedded PNG');
     const {bytes}=section(image.section,4),png=new DataView(buffer,bytes.byteOffset,bytes.byteLength);
     if(bytes.length<33||png.getUint32(0)!==0x89504e47||png.getUint32(4)!==0x0d0a1a0a||png.getUint32(8)!==13||png.getUint32(12)!==0x49484452||bytes[24]!==8||bytes[25]!==6||bytes[26]||bytes[27]||bytes[28])throw new TypeError('Invalid .margo RGBA8 PNG');

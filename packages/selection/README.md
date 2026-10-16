@@ -1,6 +1,6 @@
 # @margoengine/selection
 
-Visible core and registered PBR selection outlines using Jump Flood Algorithm distance fields or circular morphological dilation.
+Visible core and PBR selection outlines using Jump Flood Algorithm distance fields or circular morphological dilation. `Selection.set` discovers glTF Pro/FBX buffers from their loader-owned mesh nodes; no separate outline registration is required.
 
 ```ts
 import {Selection} from '@margoengine/selection';
@@ -24,7 +24,9 @@ The center wins. For an empty center, orthogonal neighbors win before diagonals,
 
 ## Skinned, morphed and static PBR models
 
-Register a glTF Pro model explicitly with both effects when needed:
+Loader-owned PBR nodes are discovered automatically. Explicit `add(model)` registration remains available for custom providers and is deduplicated with discovered sources:
+
+Removing an explicit registration does not disable discovery of a loaded model. Hide its mesh nodes, remove the model, or dispose the picking effect to stop picking it. Unregistering a custom provider still removes that provider's draws.
 
 ```ts
 import {Picking, Selection} from '@margoengine/selection';

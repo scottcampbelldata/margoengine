@@ -2,20 +2,17 @@
 
 React 18/19 integration with a native canvas, pointer events, Suspense, stable mesh refs and frame callbacks. There is no custom reconciler.
 
-Optional scene helpers, post effects, physics and XR are available through the
-[`kit`, `post`, `physics` and `xr` subpaths](SCENE.md). The base entry retains its
-existing exports; importing a clickable cube does not load these subpaths or
-their optional peers.
+Scene helpers, post effects, physics and XR are available from one
+`@margoengine/react` import. The [`kit`, `post`, `physics` and `xr` subpaths](SCENE.md)
+remain available. Unused bindings are tree-shaken, and optional native peers
+load only when their components need them.
 
 Package name: `@margoengine/react`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
 
-```sh
-npm install margoengine@0.1.0 @margoengine/core@0.1.0 @margoengine/react@0.1.0 react@^19 react-dom@^19
-# Install the optional packages used by your JSX:
-npm install @margoengine/gltf-pro@0.1.0 @margoengine/environment@0.1.0 @margoengine/controls@0.1.0 @margoengine/shadows@0.1.0
-# Html also uses these optional peers:
-npm install @margoengine/html@0.1.0 react-dom@^19
-```
+From a repository checkout, run `npm ci` and `npm run build:packages`.
+`npm run pack:packages` creates local tarballs in `test-results/` for use outside
+the workspace. See [SCENE.md](SCENE.md) for the optional peers each component
+uses. Registry installation commands will accompany a verified release.
 
 ```tsx
 import { Suspense } from 'react';

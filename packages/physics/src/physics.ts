@@ -1,6 +1,6 @@
 import type {EngineKernel, EnginePlugin, Mesh} from '@margoengine/core';
 import {meshRuntime,Mesh as CoreMesh} from '@margoengine/core/extension';
-import type {PBRSource} from '../../shared/pbr-source.js';
+import {meshTriangles} from '../../shared/mesh-source.js';
 import {PhysicsBody, type BodyOptions, type BodyOwner, type BodyType} from './body.js';
 import {CharacterController, type CharacterControllerOptions} from './character.js';
 import {PhysicsJoint, createJointData, type JointOptions} from './joints.js';
@@ -300,7 +300,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   addCollider(body: PhysicsBody, options: ColliderOptions): any {
     const R = this.rapier, mesh = body.mesh;
     const needsGeometry = options.shape === 'box' && !options.halfExtents || options.shape === 'sphere' && options.radius === undefined || options.shape === 'convexHull' && !options.points && !options.geometry || options.shape === 'trimesh' && !options.vertices && !options.geometry;
-    const fit = {geometry: mesh ? mesh.geometry ?? (needsGeometry ? primitiveGeometry(mesh) : null) : null, scale: mesh ? [mesh.scale.x, mesh.scale.y, mesh.scale.z] as const : [1, 1, 1] as const};
+    const fit = {geometry: mesh && needsGeometry ? primitiveGeometry(mesh) : null, scale: mesh ? [mesh.scale.x, mesh.scale.y, mesh.scale.z] as const : [1, 1, 1] as const};
     const {desc, center} = createColliderDesc(R, options, fit);
     configureCollider(R, desc, options, center, !!this.hooks);
     const collider = this.world.createCollider(desc, body.raw);
@@ -510,9 +510,10 @@ function parentOf(mesh: Mesh): number {
 
 /** Bind-pose triangle data from optional PBR loaders; never attach a second core draw geometry. */
 function primitiveGeometry(mesh: Mesh): GeometryLike | null {
-  const source = (mesh as unknown as {[key: symbol]: PBRSource | undefined})[Symbol.for('margoengine.pbr-source.v1')];
-  if (!source) return null;
-  const primitives = source.primitives.filter(primitive => primitive.node === mesh);
+  const triangles = meshTriangles(meshRuntime(mesh));
+  if (!triangles) return null;
+  if (triangles.kind === 'core') return triangles.geometry;
+  const {primitives} = triangles.source;
   if (!primitives.length) return null;
   let vertexCount = 0, indexCount = 0;
   for (const primitive of primitives) {

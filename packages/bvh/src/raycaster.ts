@@ -3,6 +3,7 @@ import {buildAsync, type AsyncBuildOptions} from './async.js';
 import type {BVHBuildOptions} from './build.js';
 import {MeshBVH, type GeometryLike, type Vec3} from './bvh.js';
 import {invert, transformPoint, type Side} from './math.js';
+import {meshTriangles} from '../../shared/mesh-source.js';
 
 // Structural views of the engine internals that `engineRuntime(engine)` exposes. Types only: this module never
 // imports core at runtime, so it stays usable from workers and Node.
@@ -82,6 +83,22 @@ export interface DeformedPickingSource {
 }
 interface PoseBVH {node: Mesh; vertices: Float32Array; indices: Uint32Array; bvh: MeshBVH}
 const poseCache = new WeakMap<DeformedPickingSource, PoseBVH[]>();
+interface StaticPrimitive {vertices: Float32Array; indices: Uint32Array; material: {settings: number[]}}
+interface StaticGeometry extends GeometryLike {bounds: Float64Array}
+const staticCache = new WeakMap<object, {source: Float32Array; indices: Uint32Array; geometry: StaticGeometry}>();
+function staticGeometry(primitive: StaticPrimitive): StaticGeometry {
+  let cached = staticCache.get(primitive);
+  if (cached?.source === primitive.vertices && cached.indices === primitive.indices) return cached.geometry;
+  const vertices = new Float32Array(primitive.vertices.length / 20 * 6);
+  packPose(primitive.vertices, vertices);
+  const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+  for (let at = 0; at < vertices.length; at += 6) for (let axis = 0; axis < 3; axis++) {min[axis] = Math.min(min[axis], vertices[at + axis]); max[axis] = Math.max(max[axis], vertices[at + axis]);}
+  const bounds = new Float64Array([(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2, 0]);
+  for (let at = 0; at < vertices.length; at += 6) bounds[3] = Math.max(bounds[3], Math.hypot(vertices[at] - bounds[0], vertices[at + 1] - bounds[1], vertices[at + 2] - bounds[2]));
+  const geometry = {vertices, indices: primitive.indices, bounds};
+  staticCache.set(primitive, {source: primitive.vertices, indices: primitive.indices, geometry});
+  return geometry;
+}
 
 /**
  * CPU picking against engine meshes, the Margo Engine counterpart of THREE.Raycaster. Each geometry gets a cached MeshBVH,
@@ -222,12 +239,19 @@ export class Raycaster {
     const store = runtime.store;
     if (refresh) store.tick(false);
     const ox = this.origin[0], oy = this.origin[1], oz = this.origin[2], dx = this.direction[0], dy = this.direction[1], dz = this.direction[2];
-    const candidates: Array<{mesh: RuntimeMesh; entry: number}> = [];
+    const candidates: Array<{mesh: RuntimeMesh; geometry: GeometryLike; doubleSided: boolean; entry: number}> = [];
     for (const handle of meshes) {
-      const mesh = handle as unknown as RuntimeMesh, geometry = mesh.geometry;
-      if (!geometry || runtime.meshes.get(mesh.id) !== mesh || hiddenInHierarchy(store, mesh.id)) continue;
+      const mesh = handle as unknown as RuntimeMesh;
+      if (runtime.meshes.get(mesh.id) !== mesh || hiddenInHierarchy(store, mesh.id)) continue;
       if (!(getMeshLayers(handle) & this.layers)) continue;
       if (this.filter && !this.filter(handle)) continue;
+      if (runtime.disposed) throw new Error('Engine is disposed');
+      if (runtime.meshes.get(mesh.id) !== mesh || hiddenInHierarchy(store, mesh.id)) continue;
+      const triangles = meshTriangles(handle);
+      if (!triangles) continue;
+      if (triangles.kind === 'pbr' && triangles.source.primitives.some(primitive => primitive.deformed)) throw new Error('Deformed PBR mesh requires async Raycaster.intersectModel(model)');
+      const records = triangles.kind === 'core' ? [{geometry: triangles.geometry, doubleSided: mesh.material.data[6] >= 0.5}] : triangles.source.primitives.map(primitive => ({geometry: staticGeometry(primitive), doubleSided: primitive.material.settings[2] >= 0.5}));
+      for (const {geometry, doubleSided} of records) {
       const m = store.matrices, o = mesh.id * 16, b = geometry.bounds;
       // World bounding sphere: the absolute row-sum bound of M^T M also covers hierarchy shear.
       const cx = m[o] * b[0] + m[o + 4] * b[1] + m[o + 8] * b[2] + m[o + 12] - ox;
@@ -241,12 +265,13 @@ export class Raycaster {
       if (offAxis > radius * radius) continue;
       const half = Math.sqrt(radius * radius - Math.max(0, offAxis));
       if (along + half < this.near || along - half > this.far) continue;
-      candidates.push({mesh, entry: Math.max(0, along - half)});
+      candidates.push({mesh, geometry, doubleSided, entry: Math.max(0, along - half)});
+      }
     }
     if (this.firstHitOnly) candidates.sort((a, b) => a.entry - b.entry);
     const hits: RaycasterHit[] = [], inverse = new Float64Array(16), matrix = new Float64Array(16);
     let best = this.far;
-    for (const {mesh, entry} of candidates) {
+    for (const {mesh, geometry, doubleSided, entry} of candidates) {
       if (this.firstHitOnly && entry > best) break;
       matrix.set(store.matrices.subarray(mesh.id * 16, mesh.id * 16 + 16));
       if (!invert(matrix, inverse)) continue;
@@ -255,8 +280,8 @@ export class Raycaster {
       const lx = inverse[0] * dx + inverse[4] * dy + inverse[8] * dz, ly = inverse[1] * dx + inverse[5] * dy + inverse[9] * dz, lz = inverse[2] * dx + inverse[6] * dy + inverse[10] * dz;
       // Sides follow the local winding, as the renderer does: a mirrored world matrix keeps the mesh's front side.
       const length = Math.hypot(lx, ly, lz);
-      const side: Side = this.side === 'material' ? mesh.material.data[6] >= 0.5 ? 'double' : 'front' : this.side;
-      const bvh = getGeometryBVH(mesh.geometry!, this.bvhOptions), ray = {origin: local, direction: [lx, ly, lz]};
+      const side: Side = this.side === 'material' ? doubleSided ? 'double' : 'front' : this.side;
+      const bvh = getGeometryBVH(geometry, this.bvhOptions), ray = {origin: local, direction: [lx, ly, lz]};
       const options = {near: this.near * length, far: (this.firstHitOnly ? best : this.far) * length, side};
       const found = this.firstHitOnly ? [bvh.raycastFirst(ray, options)] : bvh.raycast(ray, options);
       for (const hit of found) {

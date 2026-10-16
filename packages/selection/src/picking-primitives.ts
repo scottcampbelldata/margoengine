@@ -1,4 +1,6 @@
 import {type Engine,type Mesh,type PassContext} from '@margoengine/core/extension';
+import type {Mesh as MeshHandle} from '@margoengine/core';
+import {meshTriangles} from '../../shared/mesh-source.js';
 
 declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number};
 declare const GPUTextureUsage:{TEXTURE_BINDING:number;COPY_DST:number};
@@ -22,16 +24,23 @@ const budget=65536;
 /** GPU-buffer sources shared by picking and selection without a dependency on a model loader. */
 export class PickingPrimitives {
  private engine?:Engine;private device?:GPUDevice;private disposed=false;
- private readonly sources=new Set<PickingSource>();private readonly pipelines=new Map<string,GPURenderPipeline>();private draws:Draw[]=[];
+ private readonly sources=new Set<PickingSource>();private readonly discovered=new Set<PickingSource>();private readonly pipelines=new Map<string,GPURenderPipeline>();private draws:Draw[]=[];
  private white?:GPUTexture;private whiteView?:GPUTextureView;private sampler?:GPUSampler;
- get hasSources():boolean{return this.sources.size>0;}
+ get hasSources():boolean{return this.sources.size>0||this.discovered.size>0;}
+ /** Discover loader-owned nodes without requiring callers to register their model separately. */
+ discover(meshes:Iterable<MeshHandle>):void {
+  if(this.disposed)throw new Error('Picking is disposed');const next=new Set<PickingSource>();let count=this.sources.size;
+  for(const mesh of meshes){const triangles=meshTriangles(mesh);if(triangles?.kind!=='pbr')continue;const source=triangles.source.model as PickingSource;if(source.disposed||next.has(source))continue;if(!this.sources.has(source)&&++count>4096)throw new RangeError('Picking source budget exceeded');next.add(source);}
+  if(next.size!==this.discovered.size||[...next].some(source=>!this.discovered.has(source)))this.clearDraws();this.discovered.clear();for(const source of next)this.discovered.add(source);
+ }
+ private allSources():Set<PickingSource>{return new Set([...this.sources,...this.discovered]);}
  add(source:PickingSource):()=>void {
   if(this.disposed)throw new Error('Picking is disposed');this.validateSource(source);
-  if(this.sources.has(source))throw new Error('Duplicate picking source');if(this.sources.size>=4096)throw new RangeError('Picking source budget exceeded');this.sources.add(source);
+  if(this.sources.has(source))throw new Error('Duplicate picking source');if(!this.discovered.has(source)&&this.allSources().size>=4096)throw new RangeError('Picking source budget exceeded');this.sources.add(source);
   return()=>{if(this.sources.delete(source))this.clearDraws();};
  }
  setup(engine:Engine):void {
-  if(this.disposed||!engine.gpu)throw new Error('Picking requires WebGPU');for(const source of this.sources){if(source.disposed||source.root?.engine===engine&&engine.meshes.get(source.root.id)!==source.root){this.sources.delete(source);continue;}this.validateSource(source,engine);}
+  if(this.disposed||!engine.gpu)throw new Error('Picking requires WebGPU');for(const source of this.allSources()){if(source.disposed||source.root?.engine===engine&&engine.meshes.get(source.root.id)!==source.root){this.sources.delete(source);this.discovered.delete(source);continue;}this.validateSource(source,engine);}
   this.engine=engine;this.device=engine.gpu;
  }
  private validateSource(source:PickingSource,engine=this.engine):void {
@@ -54,16 +63,16 @@ export class PickingPrimitives {
  /** Encode current-pose deformation before opening any picking render pass. */
  prepare(c:{backend:'webgpu';device:GPUDevice;encoder:GPUCommandEncoder}):void {
   if(this.disposed||!this.device||c.device!==this.device)throw new Error('Picking is not attached to this device');
-  for(const source of this.sources){if(!this.live(source)){this.sources.delete(source);this.clearDraws();continue;}source.prepareDeformation?.(c);}
+  for(const source of this.allSources()){if(!this.live(source)){this.sources.delete(source);this.discovered.delete(source);this.clearDraws();continue;}source.prepareDeformation?.(c);}
  }
  contains(source:PickingSource,node:Mesh):boolean {
-  return this.sources.has(source)&&this.live(source)&&source.pickingPrimitives.some(primitive=>primitive.node===node);
+  return (this.sources.has(source)||this.discovered.has(source))&&this.live(source)&&source.pickingPrimitives.some(primitive=>primitive.node===node);
  }
  /** Load existing depth so optional primitives compete with core meshes at the same pixel. */
  draw(c:Context,matrix:Float32Array,options:DrawOptions):Map<Mesh,PickingSource[]> {
   if(this.disposed||!this.device||c.device!==this.device)throw new Error('Picking is not attached to this device');
   const candidates=new Map<Mesh,PickingSource[]>(),primitives:PickingPrimitive[]=[];
-  for(const source of this.sources){if(!this.live(source)){this.sources.delete(source);continue;}
+  for(const source of this.allSources()){if(!this.live(source)){this.sources.delete(source);this.discovered.delete(source);continue;}
    const values=source.pickingPrimitives;if(!Array.isArray(values))throw new TypeError('Picking requires pickingPrimitives');
    for(const p of values){if(!p?.node)throw new TypeError('Invalid picking primitive');const node=p.node;
     if(node.engine!==this.engine)throw new Error('Picking source belongs to another engine');if(this.engine!.meshes.get(node.id)!==node)continue;this.validatePrimitive(p);
@@ -97,7 +106,7 @@ export class PickingPrimitives {
  }
  private clearDraws():void {for(const record of this.draws)record.uniform.destroy();this.draws=[];}
  release():void {this.clearDraws();this.white?.destroy();this.white=undefined;this.whiteView=undefined;this.sampler=undefined;this.pipelines.clear();this.device=undefined;}
- dispose():void {if(this.disposed)return;this.disposed=true;this.release();this.sources.clear();this.engine=undefined;}
+ dispose():void {if(this.disposed)return;this.disposed=true;this.release();this.sources.clear();this.discovered.clear();this.engine=undefined;}
 }
 
 function shader(mask:boolean):string {return /* wgsl */`

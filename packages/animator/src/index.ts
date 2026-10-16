@@ -40,7 +40,7 @@ export class Animator implements EnginePlugin {
     this.time+=delta;const tree=this.options.states[this.state];let clips:string[],weights:Float32Array;
     if(typeof tree==='string'){clips=[tree];weights=new Float32Array([1]);}else if('parameter' in tree){clips=tree.samples.map(s=>s.clip);weights=blend1D(tree.samples.map(s=>s.value),this.parameters[tree.parameter]??0);}else{clips=tree.samples.map(s=>s.clip);weights=blend2D(tree.samples.map(s=>s.value),this.parameters[tree.parameters[0]]??0,this.parameters[tree.parameters[1]]??0);}
     let pose:Pose|undefined,total=0;
-    for(let i=0;i<clips.length;i++)if(weights[i]>0){const sampled=this.sample(clips[i],this.time);total+=weights[i];pose=pose?this.mix(pose,sampled,weights[i]/total):sampled;}
+    for(let i=0;i<clips.length;i++)if(weights[i]>0){const sampled=this.sample(clips[i],this.time,this.animation.options.loop??true);total+=weights[i];pose=pose?this.mix(pose,sampled,weights[i]/total):sampled;}
     if(!pose)pose=clone(this.rest);
     if(this.fade){const f=this.fade;f.elapsed+=delta;pose=this.mix(clone(f.pose),pose,Math.min(1,f.elapsed/f.duration));if(f.elapsed>=f.duration)this.fade=undefined;}
     for(const layer of this.layers){this.validateLayer(layer);const sample=this.sample(layer.clip,this.time),reference=this.sample(layer.clip,layer.referenceTime??0,false);

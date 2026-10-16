@@ -4,6 +4,7 @@ import {invert} from '../../shared/math.js';
 import {viewMatrix} from '../../shared/view.js';
 import {Cleanup} from '../../shared/cleanup.js';
 import type {PBRSource} from '../../shared/pbr-source.js';
+import {setMeshSource,clearMeshSource,type MeshSource} from '../../shared/mesh-source.js';
 import {GLTFAsset, container, loadAsset, entry, integer, assetLimit, textureSource, decodeKTX2Images, type GLTFImage} from './asset.js';
 import {createKTX2Texture} from '@margoengine/decoders';
 import {pbrShader} from './shader.js';
@@ -11,6 +12,8 @@ import {mipShader} from './mip.js';
 import {prepareMaterialExtension, materialExtensionShader, materialExtensionAmbientShader, bindMaterialExtension, type MaterialExtension, type MaterialExtensionResource} from './material-extension.js';
 import {compressedIndices, decompressPrimitives, type GLTFLoadOptions} from './compression.js';
 import {textureCoordinates, coordinateExtension, coordinateShader, type CoordinateExtension} from './texture-coordinates.js';
+import {deviceRenderer,type PBRDeviceRenderer,type PBRDeformationRenderer} from './replica.js';
+export type {PBRDeviceRenderer,PBRDeformationRenderer} from './replica.js';
 export {GLTFAsset} from './asset.js';
 export type {GLTFDocument} from './asset.js';
 export type {GLTFImage, KTX2Image} from './asset.js';
@@ -147,6 +150,8 @@ export class PBRModel implements EnginePlugin {
   readonly root:Mesh;readonly nodes:Mesh[]=[];readonly primitives:PBRPrimitive[]=[];
   /** Installed by optional deformation packages; does not advance animation time. */
   prepareDeformation?: (context:PBRDeformationContext)=>void;
+  /** Optional isolated deformation kernels for another rendering device. */
+  createDeformationRenderer?: (model:PBRModel,device:GPUDevice)=>PBRDeformationRenderer;
   disposed=false;private readonly created:Mesh[]=[];private resources:DrawResource[]=[];private textures:GPUTexture[]=[];
   private pipelines=new Map<string,GPURenderPipeline>();private readonly inverse=new Float32Array(16);private readonly workspace=new Float64Array(52);private readonly view=new Float32Array(16);
   private engine:Engine;private readonly cleanupCallbacks=new Set<()=>void>();
@@ -177,12 +182,33 @@ export class PBRModel implements EnginePlugin {
       if(!this.primitives.length)throw new Error('glTF contains no renderable meshes');
       const source:PBRSource=this;
       for(const node of this.created)Object.defineProperty(node,cpuSource,{value:source,configurable:true});
-    } catch(error) {for(const node of this.created.reverse()){Reflect.deleteProperty(node,cpuSource);node.dispose();}throw error;}
+      for(const node of new Set(this.primitives.map(p=>p.node))){
+        const model=this,primitives=this.primitives.filter(p=>p.node===node);
+        const source:MeshSource={model,node,primitives,stride:80,
+          skinned:primitives.some(p=>doc.nodes?.[p.nodeIndex]?.skin!==undefined),morphed:primitives.some(p=>!!p.definition.targets?.length),
+          get bounds(){const out=new Float32Array([Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity]);for(const p of primitives)for(let i=0;i<p.vertices.length;i+=20)for(let axis=0;axis<3;axis++){out[axis]=Math.min(out[axis],p.vertices[i+axis]);out[axis+3]=Math.max(out[axis+3],p.vertices[i+axis]);}return out;},
+          get draws(){return model.pickingPrimitives.filter(p=>p.node===node);},
+          get shadowPrimitives(){return model.shadowPrimitives.filter(p=>p.node===node);},
+          prepareDeformation(context){model.prepareDeformation?.(context);},
+          async readPickingGeometry(){return (await model.readPickingGeometry()).filter(p=>p.node===node);}
+        };setMeshSource(node,source);
+      }
+    } catch(error) {for(const node of this.created.reverse()){clearMeshSource(node);Reflect.deleteProperty(node,cpuSource);node.dispose();}throw error;}
   }
-  setup(engine:Engine):void {
+  /** Current node transforms applied to bind-pose CPU positions. Does not perform GPU readback. */
+  get bounds():Float32Array {
+    if(this.disposed)throw new Error('PBRModel is disposed');this.engine.store.tick(false);
+    const out=new Float32Array([Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity]);
+    for(const p of this.primitives){if(this.engine.meshes.get(p.node.id)!==p.node)continue;const m=p.node.matrix,v=p.vertices;
+      for(let i=0;i<v.length;i+=20)for(let axis=0;axis<3;axis++){const n=m[axis]*v[i]+m[axis+4]*v[i+1]+m[axis+8]*v[i+2]+m[axis+12];out[axis]=Math.min(out[axis],n);out[axis+3]=Math.max(out[axis+3],n);}
+    }
+    if(!Number.isFinite(out[0]))throw new Error('No geometry');return out;
+  }
+  /** Borrowed GPU buffers, preserving one record per primitive and current deformation. */
+  get raw(){return this.pickingPrimitives.filter(p=>this.engine.meshes.get(p.node.id)===p.node);}
+  setup(engine:Engine,device=engine.gpu):void {
     if(engine!==this.engine||this.disposed)throw new Error('PBRModel belongs to another engine or is disposed');
-    if(!engine.gpu)throw new Error('PBRModel requires WebGPU');
-    const device=engine.gpu;
+    if(!device)throw new Error('PBRModel requires WebGPU');
     const mipPipelines=new Map<GPUTextureFormat,GPURenderPipeline>(),mipSampler=device.createSampler({minFilter:'linear',magFilter:'linear'});
     const imageTextures=new Map<string,GPUTexture>();
     const geometryBuffers=new Map<Float32Array|Uint32Array,GPUBuffer>();
@@ -254,14 +280,14 @@ export class PBRModel implements EnginePlugin {
     this.lighting.add(effect);return()=>this.lighting.delete(effect);
   }
   get shadowPrimitives() {
-    return this.resources.filter(r=>r.primitive.material.settings[0]!==2).map(r=>({node:r.primitive.node,vertex:r.primitive.deformed??r.vertex,index:r.index,count:r.primitive.indices.length,stride:80,
+    return this.resources.filter(r=>r.primitive.material.settings[0]!==2).map(r=>({primitive:r.primitive,node:r.primitive.node,vertex:r.primitive.deformed??r.vertex,index:r.index,count:r.primitive.indices.length,stride:80,
       alphaTexture:r.views[0],alphaSampler:r.samplers[0],alpha:r.primitive.material.base[3],cutoff:r.primitive.material.settings[0]===1?r.primitive.material.settings[1]:0,texCoord:r.primitive.material.maps[0]?textureCoordinates(r.primitive.material.maps[0]).texCoord:0,
       ...(r.primitive.material.maps[0]?.extensions?.KHR_texture_transform?{alphaTransform:textureCoordinates(r.primitive.material.maps[0]).transform}:{})}));
   }
   /** Borrowed current draw buffers; picking never substitutes bind-pose geometry. */
   get pickingPrimitives() {
     if(this.disposed)return [];
-    return this.resources.map(r=>({node:r.primitive.node,vertex:r.primitive.deformed??r.vertex,index:r.index,count:r.primitive.indices.length,stride:80 as const,
+    return this.resources.map(r=>({primitive:r.primitive,node:r.primitive.node,vertex:r.primitive.deformed??r.vertex,index:r.index,count:r.primitive.indices.length,stride:80 as const,
       alphaTexture:r.views[0],alphaSampler:r.samplers[0],alpha:r.primitive.material.base[3],cutoff:r.primitive.material.settings[0]===1?r.primitive.material.settings[1]:r.primitive.material.settings[0]===2?0.001:0,
       doubleSided:r.primitive.material.settings[2]>=0.5,texCoord:(r.primitive.material.maps[0]?textureCoordinates(r.primitive.material.maps[0]).texCoord:0) as 0|1,
       ...(r.primitive.material.maps[0]?.extensions?.KHR_texture_transform?{alphaTransform:textureCoordinates(r.primitive.material.maps[0]).transform}:{})}));
@@ -288,18 +314,18 @@ export class PBRModel implements EnginePlugin {
     }catch(error){if(this.disposed||this.engine.disposed||this.engine.gpu!==device||revision!==this.gpuRevision||records.some(record=>record.primitive.deformed!==record.deformed))return [];throw error;}
     finally{for(const {read} of records)if(read){if(read.mapState==='mapped')read.unmap();read.destroy();}}
   }
-  draw(c:Context,mode:'beauty'|'gbuffer'|'ambient',color:GPUTextureView,depth:GPUTextureView,phase:'all'|'opaque'|'blend'='all'):void {
+  draw(c:Context,mode:'beauty'|'gbuffer'|'ambient',color:GPUTextureView,depth:GPUTextureView,phase:'all'|'opaque'|'blend'='all',external?:{pass:GPURenderPassEncoder;view:ArrayLike<number>;depthCompare:GPUCompareFunction}):void {
     if(this.disposed)return;
     const pending=mode==='beauty'&&phase==='all'?opaquePasses.get(c):undefined;
     if(pending){pending.add(this);phase='opaque';}
-    viewMatrix(this.view,c.camera);
+    if(external)this.view.set(external.view);else viewMatrix(this.view,c.camera);
     const resources=(phase==='all'?[...this.resources]:this.resources.filter(r=>(r.primitive.material.settings[0]===2)===(phase==='blend'))).sort((a,b)=>{
       const blendA=a.primitive.material.settings[0]===2,blendB=b.primitive.material.settings[0]===2;
       if(blendA!==blendB)return +blendA-+blendB;
       const distance=(r:DrawResource)=>Math.hypot(...c.camera.position.map((v,i)=>v-r.primitive.node.matrix[12+i]));
       return blendA?distance(b)-distance(a):0;
     });
-    let pass:GPURenderPassEncoder|undefined;
+    let pass:GPURenderPassEncoder|undefined=external?.pass;
     try {for(const r of resources) {
       const p=r.primitive,m=p.material,node=p.node;node.check();let visible=true;
       for(let id=node.id;id!==-1;id=this.engine.store.parents[id])if(this.engine.store.hidden[id])visible=false;
@@ -321,13 +347,13 @@ export class PBRModel implements EnginePlugin {
       const lighting=mode==='beauty'&&extension?.lighting!==false&&this.lighting.size>0;
       if(lighting)for(const effect of this.lighting)code=effect.shader(code,2);
       if(extension?.ambient)code=materialExtensionAmbientShader(code,extension);
-      const blend=m.settings[0]===2,key=mode+':'+c.format+':'+blend+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+(extension?':material-extension:':'')+code;
+      const blend=m.settings[0]===2,key=mode+':'+c.format+':'+blend+':'+c.descriptor.multisample?.count+':'+c.descriptor.depthStencil!.format+(extension?':material-extension:':'')+(external?':'+external.depthCompare:'')+code;
       let pipeline=this.pipelines.get(key);
       if(!pipeline) {
         const module=c.device.createShaderModule({code}),format=mode==='beauty'?c.format:'rgba16float';
         pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:80,attributes:Array.from({length:5},(_,i)=>({shaderLocation:i,offset:i*16,format:'float32x4' as const}))}]},
           fragment:{module,entryPoint:mode==='beauty'?'fragment':mode==='gbuffer'?'gbuffer':'ambientFragment',targets:[{format,blend:blend&&mode!=='gbuffer'?{color:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]},
-          multisample:c.descriptor.multisample,primitive:{topology:'triangle-list',cullMode:'none'},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:mode==='beauty'&&!blend,depthCompare:mode==='beauty'?'greater-equal':'equal'}});
+          multisample:c.descriptor.multisample,primitive:{topology:'triangle-list',cullMode:'none'},depthStencil:{format:c.descriptor.depthStencil!.format,depthWriteEnabled:mode==='beauty'&&!blend,depthCompare:mode==='beauty'?(external?.depthCompare??'greater-equal'):'equal'}});
         this.pipelines.set(key,pipeline);
       }
       let groups=r.groups.get(pipeline);
@@ -337,7 +363,7 @@ export class PBRModel implements EnginePlugin {
         r.groups.set(pipeline,groups);
       }
       // Retain transparent pass boundaries so attachment-store rounding stays unchanged.
-      if(blend&&mode!=='gbuffer'){pass?.end();pass=undefined;}
+      if(!external&&blend&&mode!=='gbuffer'){pass?.end();pass=undefined;}
       pass??=c.encoder.beginRenderPass({colorAttachments:[{view:color,loadOp:'load',storeOp:'store'}],depthStencilAttachment:{view:depth,depthLoadOp:'load',depthStoreOp:'store',...(c.descriptor.depthStencil!.format.includes('stencil')?{stencilLoadOp:'load',stencilStoreOp:'store'}:{})}});
       pass.setPipeline(pipeline);pass.setBindGroup(0,groups[0]);pass.setBindGroup(1,groups[1]);
       if(lighting){
@@ -353,24 +379,40 @@ export class PBRModel implements EnginePlugin {
       }
       if(extension)bindMaterialExtension(c.device,pass,pipeline,r.extension!,lighting);
       pass.setVertexBuffer(0,p.deformed??r.vertex);pass.setIndexBuffer(r.index,'uint32');pass.drawIndexed(p.indices.length);
-      if(blend&&mode!=='gbuffer'){pass.end();pass=undefined;}
-      if(mode==='beauty'){this.engine.stats.visible++;this.engine.stats.drawCalls++;}
-    }}catch(error){try{pass?.end();}catch{}throw error;}
-    pass?.end();
+      if(!external&&blend&&mode!=='gbuffer'){pass.end();pass=undefined;}
+      if(mode==='beauty'&&!external){this.engine.stats.visible++;this.engine.stats.drawCalls++;}
+    }}catch(error){if(!external)try{pass?.end();}catch{}throw error;}
+    if(!external)pass?.end();
   }
-  get bounds():Float32Array {
-    this.engine.store.tick(false);const out=new Float32Array([Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity]);
-    for(const p of this.primitives)for(let i=0;i<p.vertices.length;i+=20)for(let r=0;r<3;r++){
-      const m=p.node.matrix,v=m[r]*p.vertices[i]+m[4+r]*p.vertices[i+1]+m[8+r]*p.vertices[i+2]+m[12+r];out[r]=Math.min(out[r],v);out[r+3]=Math.max(out[r+3],v);
-    }
-    return out;
+  /** Isolated GPU resources for stereo eyes or another caller-owned WebGPU device. */
+  createRenderer(device:GPUDevice):PBRDeviceRenderer {
+    if(this.disposed||this.engine.disposed)throw new Error('PBRModel is disposed');
+    // GPU texture views supplied by callers cannot cross devices. Fail explicitly
+    // rather than drawing a bind pose or silently omitting an extended surface.
+    for(const primitive of this.primitives)if((primitive.extension??primitive.material.extension)?.textures?.length)throw new Error('Cross-device PBR rendering requires recreating caller-owned material extension textures');
+    const replica=Object.create(PBRModel.prototype) as PBRModel;
+    Object.assign(replica,{name:this.name+':device:'+modelId++,root:this.root,nodes:this.nodes,primitives:this.primitives.map(primitive=>({...primitive,deformed:undefined})),asset:this.asset,images:this.images,
+      disposed:false,created:[],resources:[],textures:[],pipelines:new Map(),inverse:new Float32Array(16),workspace:new Float64Array(52),view:new Float32Array(16),engine:this.engine,cleanupCallbacks:new Set(),lighting:new Set(),lightingGroups:new Map(),gpuRevision:0});
+    let deformation:PBRDeformationRenderer|undefined,factory=this.createDeformationRenderer;
+    const release=()=>{if(replica.disposed)return;replica.disposed=true;const cleanup=new Cleanup();cleanup.run(()=>deformation?.dispose()).run(()=>replica.releaseGPU());cleanup.finish();};
+    try {
+      replica.setup(this.engine,device);
+      if(factory)deformation=factory(replica,device);
+      else if(this.primitives.some(primitive=>primitive.deformed))throw new Error('Cross-device deformed PBR rendering requires an isolated deformation renderer');
+      return deviceRenderer(device,context=>{
+        for(let i=0;i<this.primitives.length;i++){const source=this.primitives[i],copy=replica.primitives[i];if((source.extension??source.material.extension)?.textures?.length)throw new Error('Cross-device PBR rendering requires recreating caller-owned material extension textures');copy.extension=source.extension;copy.material=source.material;copy.weights=source.weights;}
+        if(factory!==this.createDeformationRenderer||factory&&!deformation){deformation?.dispose();deformation=undefined;const next=this.createDeformationRenderer;factory=undefined;if(next)deformation=next(replica,device);factory=next;}
+        if(!factory&&this.primitives.some(primitive=>primitive.deformed))throw new Error('Cross-device deformed PBR rendering requires an isolated deformation renderer');
+        deformation?.prepare(context);
+      },(context,pass,view)=>replica.draw(context,'beauty',context.color,context.depth,'all',{pass,view,depthCompare:'less-equal'}),release,callback=>this.onDispose(callback));
+    }catch(error){release();throw error;}
   }
   onDispose(callback:()=>void):()=>void {if(typeof callback!=='function')throw new TypeError('Expected cleanup callback');if(this.disposed){callback();return()=>{};}this.cleanupCallbacks.add(callback);return()=>this.cleanupCallbacks.delete(callback);}
   private releaseGPU():void {this.gpuRevision++;const cleanup=new Cleanup(),buffers=new Set<GPUBuffer>();for(const r of this.resources)for(const b of [r.vertex,r.index,r.uniform,r.extension?.uniform])if(b)buffers.add(b);for(const b of buffers)cleanup.run(()=>b.destroy());for(const t of this.textures)cleanup.run(()=>t.destroy());this.resources=[];this.textures=[];this.pipelines.clear();this.lightingGroups.clear();cleanup.finish();}
   onDeviceRestored(engine:Engine):void {this.releaseGPU();for(const p of this.primitives)p.deformed=undefined;this.setup(engine);}
   dispose():void {
     if(this.disposed)return;this.disposed=true;const cleanup=new Cleanup();
-    for(const node of this.created)Reflect.deleteProperty(node,cpuSource);
+    for(const node of this.created){clearMeshSource(node);Reflect.deleteProperty(node,cpuSource);}
     this.lighting.clear();
     cleanup.run(()=>this.engine.removePlugin(this.name)).run(()=>this.engine.frameGraph.removeOwner(this.name));
     for(const callback of this.cleanupCallbacks)cleanup.run(callback);this.cleanupCallbacks.clear();cleanup.run(()=>this.releaseGPU());

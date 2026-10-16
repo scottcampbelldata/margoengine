@@ -1,6 +1,7 @@
 import type {EngineKernel, Mesh as MeshHandle} from '@margoengine/core';
-import {engineRuntime, meshRuntime, type Engine, type EnginePlugin, type FrameGraph, type Geometry, type Mesh} from '@margoengine/core/extension';
-import {Lines, Line, BoxHelper, VertexNormalsHelper} from '@margoengine/lines';
+import {engineRuntime, meshRuntime, type Engine, type EnginePlugin, type FrameGraph, type Mesh} from '@margoengine/core/extension';
+import {Lines, Line, BoxHelper, VertexNormalsHelper, meshWorldMatrix} from '@margoengine/lines';
+import {meshTriangles} from '../../shared/mesh-source.js';
 
 export interface InspectorOptions {
   parent?: HTMLElement;
@@ -8,20 +9,41 @@ export interface InspectorOptions {
   effects?: {exposure?: number; bloom?: number};
 }
 type Mode = 'wireframe' | 'normals' | 'bounds';
-interface DebugLines {geometry: Geometry; wireframe?: Line; normals?: Line; bounds?: Line}
-const wirePositions = new WeakMap<Geometry, Float32Array>();
+interface DebugLines {geometry: object; wireframe?: Line; normals?: Line; bounds?: Line}
+const wirePositions = new WeakMap<object, Float32Array>();
+interface MeshData {identity: object; pbr: boolean; parts: {vertices: Float32Array; indices: Uint32Array; stride: number}[]; radius: number}
+const debugData = new WeakMap<object, MeshData>();
+
+function meshData(mesh: Mesh) {
+  const triangles = meshTriangles(mesh);
+  if (!triangles) return null;
+  const identity = triangles.kind === 'core' ? triangles.geometry : triangles.source;
+  let data = debugData.get(identity);
+  if (!data) {
+    if (triangles.kind === 'core') data = {identity, pbr: false, parts: [{vertices: triangles.geometry.vertices, indices: triangles.geometry.indices, stride: 6}], radius: triangles.geometry.bounds[3]};
+    else {
+      const b = triangles.source.bounds;
+      data = {identity, pbr: true, parts: triangles.source.primitives.map(p => ({vertices: p.vertices, indices: p.indices, stride: 20})), radius: Math.hypot(b[3] - b[0], b[4] - b[1], b[5] - b[2]) / 2};
+    }
+    debugData.set(identity, data);
+  }
+  return data;
+}
 
 function wireframe(mesh: Mesh): Line {
-  const geometry = mesh.geometry!;
-  let positions = wirePositions.get(geometry);
+  const source = meshData(mesh)!;
+  let positions = wirePositions.get(source.identity);
   if (!positions) {
-    const indices = geometry.indices, vertices = geometry.vertices, count = vertices.length / 6, seen = new Set<number>(), data: number[] = [];
-    for (let i = 0; i < indices.length; i += 3) for (let edge = 0; edge < 3; edge++) {
-      const a = indices[i + edge], b = indices[i + (edge + 1) % 3], key = Math.min(a, b) * count + Math.max(a, b);
-      if (seen.has(key)) continue;
-      seen.add(key); data.push(vertices[a * 6], vertices[a * 6 + 1], vertices[a * 6 + 2], vertices[b * 6], vertices[b * 6 + 1], vertices[b * 6 + 2]);
+    const data: number[] = [];
+    for (const {indices, vertices, stride} of source.parts) {
+      const count = vertices.length / stride, seen = new Set<number>();
+      for (let i = 0; i < indices.length; i += 3) for (let edge = 0; edge < 3; edge++) {
+        const a = indices[i + edge], b = indices[i + (edge + 1) % 3], key = Math.min(a, b) * count + Math.max(a, b);
+        if (seen.has(key)) continue;
+        seen.add(key); data.push(vertices[a * stride], vertices[a * stride + 1], vertices[a * stride + 2], vertices[b * stride], vertices[b * stride + 1], vertices[b * stride + 2]);
+      }
     }
-    positions = new Float32Array(data); wirePositions.set(geometry, positions);
+    positions = new Float32Array(data); wirePositions.set(source.identity, positions);
   }
   return new Line({mesh, positions, mode: 'segments', color: '#72e8cc', onTop: true, cap: 'butt', join: 'miter'});
 }
@@ -141,19 +163,22 @@ export class Inspector implements EnginePlugin {
   private syncDebug(): void {
     const engine = this.engine!;
     if (!this.helpers.size && !this.debug.wireframe && !this.debug.normals && !this.debug.bounds) return;
-    for (const [mesh, helpers] of this.helpers) if (engine.meshes.get(mesh.id) !== mesh || mesh.geometry !== helpers.geometry) {
+    for (const [mesh, helpers] of this.helpers) if (engine.meshes.get(mesh.id) !== mesh || meshData(mesh)?.identity !== helpers.geometry) {
       helpers.wireframe?.dispose(); helpers.normals?.dispose(); helpers.bounds?.dispose(); this.helpers.delete(mesh);
     }
     if (engine.backend !== 'webgpu') return;
     for (const mesh of engine.meshes.values()) {
-      if (!mesh.geometry) continue;
+      const source = meshData(mesh);
+      if (!source) continue;
       let helpers = this.helpers.get(mesh);
-      if (!helpers && (this.debug.wireframe || this.debug.normals || this.debug.bounds)) {helpers = {geometry: mesh.geometry}; this.helpers.set(mesh, helpers);}
+      if (!helpers && (this.debug.wireframe || this.debug.normals || this.debug.bounds)) {helpers = {geometry: source.identity}; this.helpers.set(mesh, helpers);}
       if (!helpers) continue;
       for (const mode of ['wireframe', 'normals', 'bounds'] as const) {
         if (this.debug[mode] && !helpers[mode]) helpers[mode] = this.lines.add(mode === 'wireframe' ? wireframe(mesh) : mode === 'normals' ?
-          new VertexNormalsHelper(mesh, {size: mesh.geometry.bounds[3] * 0.15, color: '#ed6b86', onTop: true}) : new BoxHelper(mesh, {color: '#e4ba31', onTop: true}));
-        if (helpers[mode]) helpers[mode]!.visible = this.debug[mode] && !!engine.store.visible[mesh.id];
+          new VertexNormalsHelper(mesh, {size: source.radius * 0.15, color: '#ed6b86', onTop: true}) : new BoxHelper(mesh, {color: '#e4ba31', onTop: true}));
+        // Core's culling sphere is empty on a loader-owned PBR node. Its origin
+        // can be outside the frustum while the primitive still crosses the edge.
+        if (helpers[mode]) helpers[mode]!.visible = this.debug[mode] && (source.pbr ? meshWorldMatrix(engine, mesh) !== null : !!engine.store.visible[mesh.id]);
       }
     }
   }

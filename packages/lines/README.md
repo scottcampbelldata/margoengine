@@ -77,6 +77,12 @@ dashed.dashOffset += 0.01;
 
 Helpers are `Line` subclasses and take the material options too (they default to butt caps and miter joins): `GridHelper({size, divisions, color1, color2})`, `PolarGridHelper({radius, sectors, rings, divisions, color1, color2})`, `AxesHelper({size})`, `Box3Helper(min, max, {color})`, `BoxHelper(mesh, {color})` (world bounds every frame), `ArrowHelper({direction, origin, length, color, headLength, headWidth})`, `CameraHelper(camera, {aspect})` (unprojects `camera.matrix`), `PlaneHelper({normal, constant, size, color})` and `VertexNormalsHelper(mesh, {size, color})` (world space with the normal matrix).
 
+`BoxHelper` and `VertexNormalsHelper` also accept loader-owned glTF/FBX PBR nodes.
+They combine all primitives on the node and use retained CPU bind-pose positions
+and normals, transformed by the current world matrix. They perform no GPU readback
+and create no core `Geometry`. Hidden ancestors and disposed models suppress the
+helper; animation deformation is not reflected in these synchronous helpers.
+
 ## Limits
 
 - WebGPU only. On the WebGL2 backend the plugin warns once and draws nothing.

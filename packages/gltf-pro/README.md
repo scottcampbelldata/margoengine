@@ -1,8 +1,9 @@
 # Margo Engine glTF Pro
 
-Optional picking registers a model with `Picking.attach(engine).add(model)` from
-`@margoengine/selection`. Selection outlines use a separate `selection.add(model)`
-registration and select primitive nodes. Both consume `model.pickingPrimitives`,
+`Picking.attach(engine)` from `@margoengine/selection` discovers loader-owned
+primitive nodes automatically. `selection.set([primitive.node])` also discovers
+their model; explicit `add(model)` remains supported and is deduplicated.
+Custom buffer providers still register explicitly. Both consume `model.pickingPrimitives`,
 which borrows the current static or GPU-deformed buffers and alpha metadata.
 Registration changes no beauty shader, vertex layout or material bindings.
 
@@ -83,7 +84,14 @@ the loader also validates returned data before constructing GPU resources.
 
 Attach animation with the separate animation package. Register this model with `ssao.add(model)` to include its mapped normals and ambient lighting in SSAO. Neither extension is imported by this package. Disposal and device restoration retain CPU asset blueprints.
 
-Physics, CAD grouping, and exporters can read the model's original CPU primitive data through an optional node protocol. `mesh.geometry` remains null, so the core renderer never receives a second drawable. Physics uses bind-pose geometry; glTF export retains supported skin/morph attributes. This bridge is removed when the model is disposed and adds no loader dependency to those consumers.
+Optional consumers use one weak triangle-source registry across separately bundled packages. Inspector and line helpers use bind-pose positions/normals with current transforms; static spatial queries and shadow mesh registrations also retain loader-owned primitives. `mesh.geometry` remains null, so core does not receive a second drawable. Physics preserves bind-pose collider behavior; glTF export retains supported skin/morph attributes. Disposal clears registry entries, and reused mesh slots cannot inherit them.
+
+`model.raw` borrows one live GPU record per primitive (`vertex`, `index`, `count`,
+`stride: 80`, node and alpha metadata), including current deformation. `bounds`
+scans bind-pose CPU positions through current node matrices. Fit these bounds
+through `camera.fitToBoundingBox`; the frozen stage's `fit(meshes)` and internal
+raw adapter continue to support core geometry only. Active deformation requires
+the asynchronous pose snapshot for accurate CPU raycasts.
 
 Register with `shadows.add(model)` and `clustered.add(model)` for optional directional shadows and local PBR lights, including the current skinned vertex buffer. `addLighting()` accepts an optional shader/binding hook without importing these packages. `shadowPrimitives` exposes current opaque/masked GPU geometry to depth consumers; blended materials are omitted.
 
@@ -161,7 +169,7 @@ material lobes, passes or attributes.
 Run `node scripts/material-extension-tests.js` for the material slot's WebGPU
 checks, also included in `npm run modern:test:extensions`.
 
-Limits: triangle primitives; at most eight skin influences in the animation package; UV sets 0/1. Unknown required extensions still reject. Ambient fill uses fixed sky/ground colors; image-based lighting is a separate optional package. Bounds describe the original mesh; custom rendered models are outside core GPU picking.
+Limits: triangle primitives; at most eight skin influences in the animation package; UV sets 0/1. Unknown required extensions still reject. Ambient fill uses fixed sky/ground colors; image-based lighting is a separate optional package. Bounds describe the bind pose with current node transforms; GPU picking requires the optional selection package.
 
 `npm run modern:test:gltf-parity` checks texture-coordinate and alpha-shadow pixel
 parity, KTX2 mip upload and worker disposal in a production Vite build, complete

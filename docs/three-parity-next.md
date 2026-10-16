@@ -32,7 +32,7 @@ Crossfades, blend trees, and additive layers already live in `@margoengine/anima
 
 ## Verification of file items 1–4
 
-- 1,189 tests pass on Node 24, with no failures or skips. Strict typechecks and packed runtime imports cover all 63 packages.
+- 1,281 tests pass on Node 24, with no failures or skips. Four original frozen-stage facade audits remain executable TODOs, with passing model-bounds/raw alternatives. Strict typechecks and packed runtime imports cover all 63 packages.
 - `npm run modern:test:extensions` includes the original PBR/material regressions and the new `modern:test:gltf-parity` browser checks.
 - 82 texture captures verify PBR and optional material transforms against baked UVs. Transformed alpha-mask shadow depths match across all four directional cascades. Ordinary shader/frame hashes and identity-transform pixels remain exact.
 - Real ETC1S/UASTC textures upload all mips through RGBA fallback and native BC7 paths. A production Vite consumer emits and fetches Basis workers/Wasm, renders, and disposes every worker and texture.
@@ -54,7 +54,7 @@ Fixture sources, pinned hashes and attribution are recorded in [the production a
 
 ## Verification of deformed picking
 
-- `npm run modern:test:deformed-picking` passes 46 real frame captures on both an NVIDIA RTX A6000 and bundled Chromium/SwiftShader, across 4× MSAA and single sampling. All 96 shader modules compile, with no validation errors; all 590 tracked GPU resources are destroyed per adapter.
+- `npm run modern:test:deformed-picking` passes 46 real frame captures on both an NVIDIA RTX A6000 and bundled Chromium/SwiftShader, across 4× MSAA and single sampling. All shader modules compile without validation errors and every tracked GPU resource is destroyed.
 - Skin, morph, combined poses and eight influences pick correctly outside bind-pose bounds, including seeks and direct weight edits without an intervening beauty frame. CPU BVH hits and GPU positions match independent analytic references.
 - Core/PBR depth competition, both outline algorithms, mirrored winding, UV1 alpha transforms and implicit mip filtering pass. A minified-alpha reference catches the incorrect forced-LOD-0 path. Unregistered beauty output stays bit exact.
 - Pending readbacks, source removal, reused slots, animation disposal, restoration and failed maps release resources and reject stale results. Ordinary core MRT/culling and unextended PBR shader/frame regression checks remain in place.

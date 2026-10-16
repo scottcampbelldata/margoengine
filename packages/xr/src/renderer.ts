@@ -1,9 +1,11 @@
 import type {Engine, Geometry, PassContext} from '@margoengine/core/extension';
 import type {XRBinding, XRProjectionLayer, XRViewerPose} from './types.js';
+import {meshTriangles,type MeshSourceOwner} from '../../shared/mesh-source.js';
 declare const GPUBufferUsage:{VERTEX:number;INDEX:number;UNIFORM:number;COPY_DST:number};
 declare const GPUTextureUsage:{RENDER_ATTACHMENT:number;TEXTURE_BINDING:number};
 
 type Resource={vertex:GPUBuffer;index:GPUBuffer;instance:GPUBuffer;data:Float32Array;count:number};
+type DeviceRenderer={prepare(context:Pick<Extract<PassContext,{backend:'webgpu'}>,'backend'|'device'|'encoder'>):void;draw(context:Extract<PassContext,{backend:'webgpu'}>,pass:GPURenderPassEncoder,view:ArrayLike<number>):void;dispose():void};
 
 export class StereoRenderer {
   private pipeline?:GPURenderPipeline;
@@ -11,9 +13,12 @@ export class StereoRenderer {
   private readonly resources=new Map<Geometry,Resource>();
   private readonly eyes:Array<{uniform:GPUBuffer;group:GPUBindGroup;data:Float32Array;color?:GPUTexture;depth?:GPUTexture;colorView?:GPUTextureView;depthView?:GPUTextureView;depthGroup?:GPUBindGroup}>=[];
   private readonly used=new Set<Geometry>();
+  private readonly pbr=new Map<MeshSourceOwner,DeviceRenderer[]>();
+  private context?:Extract<PassContext,{backend:'webgpu'}>;
   constructor(private readonly device:GPUDevice){}
   configure(context:Extract<PassContext,{backend:'webgpu'}>,format:GPUTextureFormat):void {
     this.dispose();
+    this.context=context;
     const module=this.device.createShaderModule({code:context.shader});
     this.pipeline=this.device.createRenderPipeline({...context.descriptor,multisample:{count:4},vertex:{...context.descriptor.vertex,module},fragment:{module,entryPoint:'fragment',targets:[{format}]},depthStencil:{format:'depth24plus',depthWriteEnabled:true,depthCompare:'less-equal'}});
     const depthModule=this.device.createShaderModule({code:`@group(0) @binding(0) var depth:texture_depth_multisampled_2d;
@@ -23,6 +28,10 @@ export class StereoRenderer {
   }
   render(engine:Engine,binding:XRBinding,layer:XRProjectionLayer,viewer:XRViewerPose,transparent:boolean):void {
     const device=this.device,pipeline=this.pipeline!;
+    const models=new Set<MeshSourceOwner>();
+    for(const mesh of engine.meshes.values()){const triangles=meshTriangles(mesh);if(triangles?.kind==='pbr')models.add(triangles.source.model);}
+    for(const [model,renderers] of this.pbr)if(!models.has(model)||model.disposed){for(const renderer of renderers)renderer.dispose();this.pbr.delete(model);}
+    for(const model of models)if(!model.disposed&&!this.pbr.has(model))this.pbr.set(model,[]);
     const used=this.used;used.clear();
     for(const resource of this.resources.values())resource.count=0;
     for(const mesh of engine.meshes.values())if(mesh.geometry&&engine.store.visible[mesh.id]) {
@@ -66,12 +75,15 @@ export class StereoRenderer {
         try{frame.color=device.createTexture({size:[image.colorTexture.width,image.colorTexture.height],format:image.colorTexture.format,sampleCount:4,usage:GPUTextureUsage.RENDER_ATTACHMENT});frame.depth=device.createTexture({size:[image.colorTexture.width,image.colorTexture.height],format:'depth24plus',sampleCount:4,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});frame.colorView=frame.color.createView();frame.depthView=frame.depth.createView();frame.depthGroup=device.createBindGroup({layout:this.depthPipeline!.getBindGroupLayout(0),entries:[{binding:0,resource:frame.depthView}]});}
         catch(error){frame.color?.destroy();frame.depth?.destroy();frame.color=frame.depth=undefined;frame.colorView=frame.depthView=frame.depthGroup=undefined;throw error;}
       }
+      const context={...this.context!,backend:'webgpu' as const,device,encoder,width:image.colorTexture.width,height:image.colorTexture.height,format:image.colorTexture.format,color:frame.colorView!,depth:frame.depthView!,camera:Object.assign(Object.create(engine.camera),{matrix:data.subarray(0,16),position:[position.x,position.y,position.z]}),descriptor:{...this.context!.descriptor,multisample:{count:4},depthStencil:{format:'depth24plus' as GPUTextureFormat,depthWriteEnabled:true,depthCompare:'less-equal' as GPUCompareFunction}}};
+      for(const [model,renderers] of this.pbr){let renderer=renderers[eye];if(!renderer){renderer=model.createRenderer(device);renderers[eye]=renderer;}renderer.prepare(context);}
       const pass=encoder.beginRenderPass({colorAttachments:[{view:frame.colorView!,resolveTarget:image.colorTexture.createView(descriptor),loadOp:'clear',storeOp:'discard',clearValue:{r:0,g:0,b:0,a:transparent?0:1}}],depthStencilAttachment:{view:frame.depthView!,depthLoadOp:'clear',depthStoreOp:'store',depthClearValue:1}});
       const viewport=image.viewport;pass.setViewport(viewport.x,viewport.y,viewport.width,viewport.height,0,1);
       pass.setPipeline(pipeline);pass.setBindGroup(0,frame.group);
       for(const [geometry,resource] of this.resources)if(resource.count) {
         pass.setVertexBuffer(0,resource.vertex);pass.setVertexBuffer(1,resource.instance);pass.setIndexBuffer(resource.index,'uint32');pass.drawIndexed(geometry.indices.length,resource.count);
       }
+      for(const renderers of this.pbr.values())renderers[eye].draw(context,pass,view.transform.inverse.matrix);
       pass.end();
       // XR projection matrices use forward Z; populate the compositor's 1x depth layer.
       const depthPass=encoder.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:image.depthStencilTexture.createView(descriptor),depthLoadOp:'clear',depthStoreOp:'store',depthClearValue:1}});
@@ -81,6 +93,7 @@ export class StereoRenderer {
     device.queue.submit([encoder.finish()]);
   }
   dispose():void {
+    for(const renderers of this.pbr.values())for(const renderer of renderers)renderer.dispose();this.pbr.clear();this.context=undefined;
     for(const resource of this.resources.values()){resource.vertex.destroy();resource.index.destroy();resource.instance.destroy();}
     this.resources.clear();for(const eye of this.eyes){eye.uniform.destroy();eye.color?.destroy();eye.depth?.destroy();}this.eyes.length=0;this.pipeline=this.depthPipeline=undefined;
   }

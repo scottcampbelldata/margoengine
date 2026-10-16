@@ -3,6 +3,7 @@
 import {engineRuntime, meshRuntime} from '@margoengine/core/extension';
 import type {EngineKernel, Mesh, Geometry, PbrMaterial} from '@margoengine/core';
 import type {PBRSource} from '../../shared/pbr-source.js';
+import {meshTriangles} from '../../shared/mesh-source.js';
 
 /** Plain geometry with optional UVs, tangents and vertex colors, for data that core `Geometry` cannot hold. */
 export interface GeometryData {
@@ -379,10 +380,8 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
     return mat;
   };
   const pbrSkins = new Map<PBRSource, Map<number, SkinData>>();
-  const pbr = (handle: Mesh, node: Node): void => {
-    const source = (handle as unknown as {[key: symbol]: PBRSource|undefined})[Symbol.for('margoengine.pbr-source.v1')];
-    if (!source) return;
-    const primitives = source.primitives.filter(primitive => primitive.node === handle);
+  const pbr = (triangles: Extract<ReturnType<typeof meshTriangles>, {kind: 'pbr'}>, node: Node): void => {
+    const {model: source, primitives} = triangles.source;
     if (!primitives.length) return;
     node.primitives = primitives.map(primitive => {
       const {vertices, indices, definition, material: mat} = primitive, count = vertices.length/20;
@@ -456,8 +455,9 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
       if (onlyVisible && store.hidden[id]) return null;
       const node = makeNode(mesh.name, [t.x[id], t.y[id], t.z[id]], unitQuaternion([t.qx[id], t.qy[id], t.qz[id], t.qw[id]]), [t.sx[id], t.sy[id], t.sz[id]], parent);
       node.source = handle as unknown as ExportNode;
-      if (mesh.geometry) {node.geometry = geometry(mesh.geometry); node.material = material(mesh.material);}
-      else pbr(handle, node);
+      const triangles = meshTriangles(mesh);
+      if (triangles?.kind === 'core') {node.geometry = geometry(triangles.geometry); node.material = material(mesh.material);}
+      else if (triangles?.kind === 'pbr') pbr(triangles, node);
       for (const child of children.get(id) ?? []) {const out = visit(child, node.world, depth+1); if (out) node.children.push(out);}
       return node;
     };

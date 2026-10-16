@@ -1,4 +1,5 @@
 import type {EngineKernel} from '@margoengine/core';
+import {optionalPeer} from './optional.js';
 import type {GLTFAsset, GLTFImage, PBRModel} from '@margoengine/gltf-pro';
 
 type EnvironmentAPI = typeof import('@margoengine/environment');
@@ -30,8 +31,8 @@ async function copyImages(images:readonly GLTFImage[]):Promise<GLTFImage[]> {
 }
 function disposeSource(source:ModelSource):void {source.first?.dispose();source.first=null;for(const image of source.images)image?.close();source.images=[];}
 async function loadModel(cache:AssetCache,src:string,signal:AbortSignal,format:ModelFormat):Promise<ModelSource> {
-  const api=await import('@margoengine/gltf-pro');signal.throwIfAborted();
-  const loader=format==='fbx'?(await import('@margoengine/fbx')).loadFBX:api.loadGLTF;
+  const api=await optionalPeer('@margoengine/gltf-pro',()=>import('@margoengine/gltf-pro'));signal.throwIfAborted();
+  const loader=format==='fbx'?(await optionalPeer('@margoengine/fbx',()=>import('@margoengine/fbx'))).loadFBX:api.loadGLTF;
   signal.throwIfAborted();const model=await loader(cache.engine!,src,{signal});
   model.root.visible=false;
   let copies:GLTFImage[]=[];
@@ -67,7 +68,7 @@ export function modelAsset(cache:AssetCache,src:string,format:ModelFormat='model
   return entry(cache,format==='fbx'?cache.fbx:cache.models,src,signal=>loadModel(cache,src,signal,format),disposeSource);
 }
 export function environmentAsset(cache:AssetCache,src:string):AssetEntry<EnvironmentSource> {
-  return entry(cache,cache.environments,src,async signal=>{const api=await import('@margoengine/environment');signal.throwIfAborted();const image=await api.loadEnvironmentImage(src,{signal});signal.throwIfAborted();return {api,image};});
+  return entry(cache,cache.environments,src,async signal=>{const api=await optionalPeer('@margoengine/environment',()=>import('@margoengine/environment'));signal.throwIfAborted();const image=await api.loadEnvironmentImage(src,{signal});signal.throwIfAborted();return {api,image};});
 }
 export function retainAsset<T>(cache:AssetCache,src:string,asset:AssetEntry<T>,map:Map<string,AssetEntry<T>>):()=>void {
   asset.users++;

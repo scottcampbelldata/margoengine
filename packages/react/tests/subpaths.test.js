@@ -17,7 +17,7 @@ const expected={
   './physics':['Physics','RigidBody','CuboidCollider','BallCollider','usePhysics'],
   './xr':['XR','Controller','useXR'],
 };
-const optionalPeers=['@margoengine/gltf-pro','@margoengine/fbx','@margoengine/environment','@margoengine/html','@margoengine/text','@margoengine/gizmo','@margoengine/sky','@margoengine/shadows','@margoengine/controls','@margoengine/geometry','@margoengine/post','@margoengine/dof','@margoengine/tonemap','@margoengine/taa','@margoengine/physics','@dimforge/rapier3d-compat','@margoengine/xr'];
+const optionalPeers=['@margoengine/gltf-pro','@margoengine/fbx','@margoengine/environment','@margoengine/html','@margoengine/text','@margoengine/gizmo','@margoengine/sky','@margoengine/shadows','@margoengine/controls','@margoengine/geometry','@margoengine/post','@margoengine/dof','@margoengine/tonemap','@margoengine/taa','@margoengine/physics','@dimforge/rapier3d-compat','@margoengine/xr','@margoengine/materials','@margoengine/animation','@margoengine/animator','@margoengine/selection'];
 async function temporary(run) {
   const directory=await mkdtemp(join(testsRoot,'.subpaths-'));
   try{return await run(directory);}finally{
@@ -48,8 +48,12 @@ test('package exports preserve independent public runtime and declaration paths 
   for(const peer of optionalPeers){assert.ok(manifest.peerDependencies[peer],peer+' is a declared peer');assert.equal(manifest.peerDependenciesMeta[peer]?.optional,true,peer+' is optional');}
   for(const peer of ['@margoengine/core','margoengine','react'])assert.ok(manifest.peerDependencies[peer]);
   for(const group of ['dependencies','peerDependencies','optionalDependencies'])for(const name of Object.keys(manifest[group]??{}))assert.equal(name==='three'||name==='react-reconciler',false);
-  const base=await readFile(join(packageRoot,'dist/index.js'),'utf8');
-  assert.equal(/(?:kit|post|physics|xr)\.js/.test(base),false,'The base entry does not re-export optional subpaths');
+  const base=await import(specifier('.'));
+  for(const [subpath,names] of Object.entries(expected)) {
+    const subpathApi=await import(specifier(subpath));
+    for(const name of names)assert.equal(base[name],subpathApi[name],name+' is available from one root import');
+  }
+  assert.equal(typeof base.Animation,'function');assert.equal(typeof base.MeshTransmissionMaterial,'function');
 });
 
 test('server imports and canonical JSX evaluate no optional peers; a mounted Bloom loads only its own peer',async()=>temporary(async directory=>{
@@ -97,11 +101,7 @@ const baseConsumer=`import {createElement as h} from 'react';
   import {Canvas,Stage,Mesh,BoxGeometry,PbrMaterial} from '@margoengine/react';
   export const PickingCube=()=>h(Canvas,{frameloop:'demand'},h(Stage,null,h(Mesh,{onClick:event=>console.log(event.object.name)},h(BoxGeometry),h(PbrMaterial,{color:'#84d6bd'}))));`;
 const optionalConsumer=`import {createElement as h} from 'react';
-  import {Canvas} from '@margoengine/react';
-  import {Box,Text,Gltf} from '@margoengine/react/kit';
-  import {EffectComposer,Bloom} from '@margoengine/react/post';
-  import {Physics,RigidBody} from '@margoengine/react/physics';
-  import {XR,Controller} from '@margoengine/react/xr';
+  import {Canvas,Box,Text,Gltf,EffectComposer,Bloom,Physics,RigidBody,XR,Controller} from '@margoengine/react';
   export const OptionalScene=()=>h(Canvas,null,h(Box),h(Text,null,'Margo'),h(Gltf,{src:'/model.glb'}),h(EffectComposer,null,h(Bloom)),h(Physics,null,h(RigidBody,null,h(Box))),h(XR,null,h(Controller)));`;
 function staticChunks(outputs) {
   const chunks=new Map(outputs.filter(item=>item.type==='chunk').map(chunk=>[chunk.fileName,chunk])),seen=new Set();
@@ -136,17 +136,18 @@ test('Vite optional entry includes requested bindings while keeping their native
 
 test('strict TypeScript consumers compile every public React subpath, callbacks and canonical scene snippets',async()=>temporary(async directory=>{
   await writeFile(join(directory,'consumer.tsx'),`import React,{Suspense,useRef} from 'react';
-    import {Canvas,Stage,Mesh,Group,Model,useFrame,useMargo,type MeshRef} from '@margoengine/react';
+    import {Canvas,Stage,Mesh,Group,Model,BoxGeometry,Animation,MeshTransmissionMaterial,useFrame,useMargo,type MeshRef} from '@margoengine/react';
     import {Gltf,Fbx,preload,Box,Sphere,Plane,Sky,ContactShadows,Center,PointerLock,TransformControls,Text,Html,Environment,OrbitControls,type GltfProps,type FbxProps,type BoxProps,type TextProps} from '@margoengine/react/kit';
     import {EffectComposer,Bloom,SSAO,DepthOfField,Tonemap,TAA,type BloomProps,type DepthOfFieldProps,type EffectComposerProps,type TonemapProps,type TAAProps} from '@margoengine/react/post';
     import {Physics,RigidBody,CuboidCollider,BallCollider,usePhysics,type PhysicsProps,type RigidBodyProps,type PhysicsBody} from '@margoengine/react/physics';
     import {XR,Controller,useXR,type XRProps,type ControllerProps,type XRContextValue} from '@margoengine/react/xr';
     function Hooks(){const state=useMargo(),world=usePhysics(),xr:XRContextValue=useXR();state.invalidate();state.camera?.position;state.size.width;state.gl?.canvas;state.clock.toFixed(2);world?.raycast([0,0,0],[0,-1,0]);void xr.ready;useFrame((engine,delta)=>{engine.camera.fov+=delta;});return null;}
-    const loader:GltfProps={src:'/model.glb'},fbx:FbxProps={src:'/model.fbx'},box:BoxProps={args:[1,1,1]},text:TextProps={text:'Margo'};
+    const loader:GltfProps={src:'/model.glb'},fbx:FbxProps={src:'/model.fbx'},box:BoxProps={args:[1,1,1],color:'#84d6bd',roughness:0.25},text:TextProps={text:'Margo'};
     const bloom:BloomProps={strength:1,onReady:effect=>{effect.options.strength=0.5;}},dof:DepthOfFieldProps={focalDistance:8},tone:TonemapProps={curve:'agx'},taa:TAAProps={historyWeight:0.9},composer:EffectComposerProps={enabled:true};
     const physics:PhysicsProps={gravity:[0,-9.81,0]},body:RigidBodyProps={type:'dynamic',onReady:(value:PhysicsBody)=>value.wakeUp()},xr:XRProps={mode:'immersive-vr'},controller:ControllerProps={handedness:'left',onSelect:event=>event.controller.source};
     export function App(){const ref=useRef<MeshRef>(null);return <Canvas frameloop="demand"><Stage><Mesh ref={ref} onClick={event=>{event.object.name;}}/><Group><Center><Box {...box}/><Sphere/><Plane/></Center></Group><Suspense fallback={<span>Loading</span>}><Gltf {...loader}/><Model src="/second.glb"/><Fbx {...fbx}/><Environment src="/studio.hdr"/></Suspense><Sky/><ContactShadows/><PointerLock/><TransformControls object={ref}/><Text {...text}/><Html>Label</Html><OrbitControls/><EffectComposer {...composer}><Bloom {...bloom}/><SSAO/><DepthOfField {...dof}/><Tonemap {...tone}/><TAA {...taa}/></EffectComposer><Physics {...physics}><RigidBody {...body}><Mesh/></RigidBody></Physics><XR {...xr}><Controller {...controller}/></XR></Stage></Canvas>;}
     void preload('/model.glb');void preload('/model.fbx','fbx');void Hooks;
+    export const materialAndClip=<Canvas><Mesh><BoxGeometry/><MeshTransmissionMaterial factor={0.8} ior={1.5} volume={{thicknessFactor:0.5}}/></Mesh><Gltf src="/character.glb" onClick={event=>event.object.name}><Animation clip="Walk" playing loop blend={0.2}/></Gltf></Canvas>;
     export const assetBodies=<Physics><RigidBody colliders="cuboid"><Fbx src="/asset.fbx"/></RigidBody><RigidBody colliders="hull"><Gltf src="/asset.glb"/></RigidBody><RigidBody colliders="trimesh"><Box/></RigidBody><RigidBody colliders={false}><CuboidCollider args={[0.5,1,0.5]}/><BallCollider args={[0.25]}/><Fbx src="/asset.fbx"/></RigidBody></Physics>;
     // @ts-expect-error Automatic collider modes are explicit and bounded.
     export const invalidCollider:RigidBodyProps={colliders:'gpu-mesh'};

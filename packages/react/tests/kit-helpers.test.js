@@ -5,7 +5,7 @@ import {JSDOM} from 'jsdom';
 
 const scenes=[],geometries=[],skies=[],pointers=[],gizmos=[],renderers=[],texts=[];
 const identity=()=>Float32Array.from([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);
-class Material {}
+class Material {constructor(options={}){this.options=options;}}
 class Node {
   constructor(engine){this.engine=engine;this.id=engine.next++;this.position={x:0,y:0,z:0};this.rotation={x:0,y:0,z:0};this.scale={x:1,y:1,z:1};this.matrix=identity();this.visible=true;this.geometry=null;engine.meshes.set(this.id,this);engine.store.parents[this.id]=-1;}
   check(){assert.equal(this.engine.meshes.get(this.id),this);}
@@ -99,6 +99,13 @@ test('kit shapes use optional geometry factories, preserve children and replace 
   assert.equal(sphere.current.geometry.kind,'sphere');assert.deepEqual(sphere.current.geometry.args,[2,12,6]);assert.equal(plane.current.geometry.kind,'plane');
   const first=box.current.geometry;view.rerender(tree(scene,content([5,6,7])));await flush();assert.notEqual(box.current.geometry,first);assert.deepEqual(box.current.geometry.args,[5,6,7]);
   view.unmount();assert.equal(scene.pointerHandlers.size,0);
+});
+
+test('shape color, roughness and metalness props reach the attached material and update in place',async()=>{
+  const scene=makeScene(),ref=createRef(),content=color=>React.createElement(Box,{ref,color,roughness:0.25,metalness:0.6});
+  const view=render(tree(scene,content('#84d6bd')));await flush();const mesh=ref.current;
+  assert.deepEqual(mesh.material.options,{color:'#84d6bd',roughness:0.25,metalness:0.6});
+  view.rerender(tree(scene,content('#ff0000')));await flush();assert.equal(ref.current,mesh);assert.equal(mesh.material.options.color,'#ff0000');
 });
 
 test('Sky dynamically owns one plugin in StrictMode and updates its options without reattaching',async()=>{

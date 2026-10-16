@@ -68,10 +68,13 @@ export async function deformedPickingBrowserChecks(page){
     };
     try{
       const baseline=load(payload.fixtures[0].data),animation=Animation.attach(baseline,{loop:false});animation.playing=false;animation.seek(0);
-      const before=await render('beauty:baseline'),shaderCount=modules.length;picker=Picking.attach(instance,{capture:false});let remove=picker.add(baseline);
+      const before=await render('beauty:baseline'),shaderCount=modules.length;picker=Picking.attach(instance,{capture:false});let remove=()=>{};
       report.beautyParity=exact(before,await render('beauty:picker-attached'),'Attaching micro picking changed beauty pixels');assert(modules.length===shaderCount,'Idle picking compiled or replaced a beauty shader');
-      await hit([0,-0.2,0],baseline.primitives[0].node,'skin:bind');animation.seek(1);
-      await hit([2,-0.2,0],baseline.primitives[0].node,'skin:seek-without-render');await hit([0,-0.2,0],null,'skin:old-position-misses');
+      await hit([0,-0.2,0],baseline.primitives[0].node,'skin:auto-discovered-bind');animation.seek(1);
+      await hit([2,-0.2,0],baseline.primitives[0].node,'skin:auto-discovered-seek-without-render');await hit([0,-0.2,0],null,'skin:old-position-misses');
+      const originalPrepare=baseline.prepareDeformation;let prepareCalls=0;baseline.prepareDeformation=context=>{prepareCalls++;originalPrepare?.(context);};remove=picker.add(baseline);
+      await hit([2,-0.2,0],baseline.primitives[0].node,'skin:explicit-plus-discovered');assert(prepareCalls===1,'Explicit and discovered registration prepared the same model twice');remove();remove=()=>{};
+      await hit([2,-0.2,0],baseline.primitives[0].node,'skin:explicit-unregistered-auto-remains');assert(prepareCalls===2,'Removing explicit registration disabled or duplicated loader discovery');baseline.prepareDeformation=originalPrepare;report.autoDiscovery=true;
       const expected=[[-0.6+2,-0.6,0],[0.6+2,-0.6,0],[2,0.6,0]],actual=await readPositions(baseline.primitives[0]);assert(actual.every((p,i)=>p.every((value,c)=>Math.abs(value-expected[i][c])<2e-6)),'Skin GPU positions disagree with independent translation');
       poses.push({kind:'skin',translation:2,gpu:actual,bvh:await bvh(baseline,2,'skin')});
       const withoutCapture=await render('capture:disabled');remove();picker.dispose();picker=Picking.attach(instance);remove=picker.add(baseline);report.defaultCaptureParity=exact(withoutCapture,await render('capture:enabled'),'Default ID capture changed PBR beauty');await hit([2,-0.2,0],baseline.primitives[0].node,'capture:current-pose');animation.seek(0);await hit([0,-0.2,0],baseline.primitives[0].node,'capture:stale-frame-after-seek');await hit([2,-0.2,0],null,'capture:stale-pose-misses');remove();baseline.destroy();picker.dispose();picker=Picking.attach(instance,{capture:false});
@@ -99,7 +102,7 @@ export async function deformedPickingBrowserChecks(page){
       await hit([3.5,-0.2,0],node,'shared-depth:nearest-pbr');rear.root.setPosition([1.5,0,1]);await hit([3.5,-0.2,0],rear.primitives[0].node,'shared-depth:second-pbr-in-front');removeRear();rear.destroy();report.sharedDepth=true;
       const outlines=[];
       for(const algorithm of ['jfa','morphological']){
-        selection=Selection.attach(instance,{algorithm,width:4,color:[0,1,0]});const removeSelection=selection.add(model);selection.set([]);const plain=await render('selection:'+algorithm+':plain');selection.set([node]);const outlined=await render('selection:'+algorithm+':deformed'),delta=difference(plain,outlined),expected=project([3.5,-0.2,0]);
+        selection=Selection.attach(instance,{algorithm,width:4,color:[0,1,0]});const removeSelection=algorithm==='jfa'?()=>{}:selection.add(model);selection.set([]);const plain=await render('selection:'+algorithm+':plain');selection.set([node]);const outlined=await render('selection:'+algorithm+':deformed'),delta=difference(plain,outlined),expected=project([3.5,-0.2,0]);
         assert(delta.changed>60&&Math.abs(delta.centroid[0]-expected[0])<12,'Selection outline did not follow the deformed triangle: '+JSON.stringify({algorithm,delta,expected}));
         occluder.visible=true;occluder.setPosition([3.5,0,1]);selection.set([]);const covered=await render('selection:'+algorithm+':occluded-plain');selection.set([node]);exact(covered,await render('selection:'+algorithm+':occluded-outline'),'Selection outlined an occluded PBR primitive');occluder.visible=false;
         model.root.visible=false;selection.set([]);const hidden=await render('selection:'+algorithm+':hidden-plain');selection.set([node]);exact(hidden,await render('selection:'+algorithm+':hidden-outline'),'Selection outlined a hidden ancestor');model.root.visible=true;
