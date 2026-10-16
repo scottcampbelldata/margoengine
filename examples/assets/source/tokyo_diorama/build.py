@@ -19,6 +19,7 @@ import city  # noqa: E402
 import facade  # noqa: E402
 import kit  # noqa: E402
 import merge  # noqa: E402
+import makersmark  # noqa: E402
 import foliage  # noqa: E402
 import polyhaven  # noqa: E402
 import signs  # noqa: E402
@@ -26,7 +27,7 @@ import streetlife  # noqa: E402
 import tanuki  # noqa: E402
 import tram  # noqa: E402
 
-HELPERS = [kit, polyhaven, bake, signs, foliage, tram, merge]
+HELPERS = [kit, polyhaven, bake, signs, foliage, tram, merge, makersmark]
 MODULES = [city, facade, tanuki, streetlife, cats]
 for module in HELPERS + MODULES:  # pick up edits when re-run inside a live Blender session
     importlib.reload(module)
@@ -41,7 +42,9 @@ def build():
     for module in MODULES:
         module.build(root)
     movers = [o for name in ('Tram', 'Cats') for o in [kit.SCENE.objects[name]] + list(kit.SCENE.objects[name].children_recursive)]
-    bake.bake_all(hide=movers)  # after everything exists, so baked AO includes neighbours but not things that move away
+    bake.bake_all(hide=movers + [kit.SCENE.objects[makersmark.NAME]])  # the authoring ink must not cast baked AO
+    if not bake.FAST:
+        makersmark.bake_into_base(kit.SCENE)
     merge.build(root)  # one mesh per group after baking: thousands of draw calls down to a few hundred
     kit.SCENE.frame_set(kit.FRAME_START)
     return root

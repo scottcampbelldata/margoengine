@@ -154,6 +154,20 @@ test('all atlas images are embedded and textured primitives have valid UV sets',
   }
 });
 
+test('underside dedication is baked into the existing base and ground atlas', () => {
+  assert.equal(named('Makers_Mark').length, 0, 'authoring lettering must not ship as geometry');
+  const index = doc.materials.findIndex((material) => material.name === 'TD_makers_mark_baked');
+  assert.ok(index >= 0, 'missing baked underside material');
+  const material = doc.materials[index];
+  const color = material.pbrMetallicRoughness.baseColorTexture;
+  const imageFor = (map) => doc.textures[map.index].extensions?.EXT_texture_webp?.source ?? doc.textures[map.index].source;
+  assert.equal(imageFor(material.emissiveTexture), imageFor(color), 'underside must reuse its color atlas for emission');
+  assert.ok(material.emissiveFactor.every((value) => value > 0 && value <= 1), 'underside needs a readable glow');
+  assert.equal(doc.images[imageFor(color)].name, 'ground_atlas', 'dedication must reuse GroundAtlas');
+  const base = doc.nodes[nodeIndex('Slab_Base')];
+  assert.ok(doc.meshes[base.mesh].primitives.some((primitive) => primitive.material === index), 'dedication must be on Slab_Base');
+});
+
 test('hero tram: baked weathering atlas, see-through glass, real detail', () => {
   const subtree = [nodeIndex('Tram')];
   for (let i = 0; i < subtree.length; i++) subtree.push(...(doc.nodes[subtree[i]].children ?? []));
