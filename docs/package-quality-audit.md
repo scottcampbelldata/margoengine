@@ -2,7 +2,7 @@
 
 Date: 2026-10-12. Target: the existing lightweight, procedural engine, with optional
 packages carrying additional rendering capabilities. The core and stage facade
-remain feature-frozen for v1.0.0.
+remain feature-frozen for v1.0.0. Gzip figures in this note are from 12 October 2026. The 16 October 2026 measurement is 20,046 bytes gzip, and the gate rejects 20,000 or above.
 
 ## Coverage
 

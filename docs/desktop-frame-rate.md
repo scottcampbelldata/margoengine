@@ -3,7 +3,7 @@
 The earlier sections record successive historical checks. Current results are
 in [Second deep package pass](#second-deep-package-pass); the shared
 `test-results/deployed-bundle-integrity.json` is replaced on deployment and
-now verifies only the current build.
+now verifies only the current build. Gzip figures in this note are from these checks, not the 16 October 2026 measurement of 20,046 bytes gzip. The gate rejects 20,000 bytes or above.
 
 The user reported approximately 60 FPS on mobile and 19–30 FPS on multiple
 desktop PCs and browsers after loading-time work. The screenshot's measured
