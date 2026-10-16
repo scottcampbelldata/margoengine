@@ -39,7 +39,7 @@ export class Stats implements EnginePlugin {
     get gpuPassMilliseconds(): Float64Array | null;
     get gpuPassCount(): number;
     get gpuElapsedMilliseconds(): number | null;
-    constructor({ parent, samples, profiling }?: StatsOptions);
+    constructor({ parent, samples, profiling, lowAllocationPasses }?: StatsOptions);
     static attach(engine: EngineKernel, options?: StatsOptions): Stats;
     tick(milliseconds: number, drawCalls?: number, dispatches?: number): void;
     enableGPUProfiling(device: GPUDevice): boolean;
@@ -56,5 +56,6 @@ export interface StatsOptions {
     parent?: HTMLElement;
     samples?: number;
     profiling?: boolean;
+    lowAllocationPasses?: boolean;
 }
 ```

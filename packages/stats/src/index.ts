@@ -2,6 +2,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph } from '@margoengine/core/extension';
 import { GPUProfiler } from './profiler.js';
+import { PassPrototypes } from './pass-prototypes.js';
 export { GPUProfiler };
 const owner = Symbol('stats owner');
 type RenderMethods = {
@@ -72,6 +73,8 @@ export interface StatsOptions {
   samples?: number;
   /** Profile passes when timestamp-query is already enabled on the device. */
   profiling?: boolean;
+  /** Opt into shared native-pass prototypes; changes reflective pass behavior. Default false. */
+  lowAllocationPasses?: boolean;
 }
 
 export class Stats implements EnginePlugin {
@@ -99,6 +102,8 @@ export class Stats implements EnginePlugin {
   private readonly computeMethods = new WeakMap<GPUComputePassEncoder['dispatchWorkgroups'], ComputeMethods>();
   private disposed = false;
   private readonly profiling: boolean;
+  private readonly lowAllocationPasses: boolean;
+  private passPrototypes?: PassPrototypes;
   private profileFrame = 0;
   private completedGPU = 0;
   private encodedGPUAt: number | null = null;
@@ -127,11 +132,13 @@ export class Stats implements EnginePlugin {
     return this.profiler?.elapsedMilliseconds ?? null;
   }
 
-  constructor({ parent = document.body, samples = 120, profiling = false }: StatsOptions = {}) {
+  constructor({ parent = document.body, samples = 120, profiling = false, lowAllocationPasses = false }: StatsOptions = {}) {
     if (!Number.isInteger(samples) || samples < 2 || samples > 4096)
       throw new RangeError('Sample count must be 2..4096');
     if (typeof profiling !== 'boolean') throw new TypeError('profiling must be boolean');
+    if (typeof lowAllocationPasses !== 'boolean') throw new TypeError('lowAllocationPasses must be boolean');
     this.profiling = profiling;
+    this.lowAllocationPasses = lowAllocationPasses;
     this.samples = new Float64Array(samples);
     const doc = parent.ownerDocument;
     this.element = doc.createElement('div');
@@ -219,8 +226,11 @@ export class Stats implements EnginePlugin {
   private static beginRender(this: Encoder, descriptor: GPURenderPassDescriptor): GPURenderPassEncoder {
     const writes = descriptor.timestampWrites ? undefined : this[frameProfiler]?.timestampWrites();
     const pass = this[rawRender].call(this, writes ? { ...descriptor, timestampWrites: writes } : descriptor) as Render;
-    const stats = this[owner],
-      previous = pass[owner];
+    const stats = this[owner];
+    if (stats.lowAllocationPasses && (stats.passPrototypes ??= new PassPrototypes(owner, stats,
+      [countDraw, countIndexed, countIndirect, countIndexedIndirect], [countDispatch, countDispatchIndirect]))
+      .render(pass, this, this[rawRender])) return pass;
+    const previous = pass[owner];
     if (!previous || previous.stats !== stats) {
       const draw = previous ? previous.draw : pass.draw,
         indexed = previous ? previous.indexed : pass.drawIndexed,
@@ -254,8 +264,11 @@ export class Stats implements EnginePlugin {
       this,
       writes ? { ...descriptor, timestampWrites: writes } : descriptor,
     ) as Compute;
-    const stats = this[owner],
-      previous = pass[owner];
+    const stats = this[owner];
+    if (stats.lowAllocationPasses && (stats.passPrototypes ??= new PassPrototypes(owner, stats,
+      [countDraw, countIndexed, countIndirect, countIndexedIndirect], [countDispatch, countDispatchIndirect]))
+      .compute(pass, this, this[rawCompute])) return pass;
+    const previous = pass[owner];
     if (!previous || previous.stats !== stats) {
       const dispatch = previous ? previous.dispatch : pass.dispatchWorkgroups,
         indirect = previous ? previous.indirect : pass.dispatchWorkgroupsIndirect;

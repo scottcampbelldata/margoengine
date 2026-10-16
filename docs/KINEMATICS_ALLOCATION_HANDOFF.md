@@ -458,6 +458,108 @@ Use the bundled Node 24 executable listed below. To repeat the exact captured in
 
 ## Remaining investigation and rejected paths
 
+### Retained optional Stats pass layout
+
+`@margoengine/stats` now offers an **additive, opt-in API**,
+`lowAllocationPasses: true`; the default remains false. It replaces the five
+per-render-pass and three per-compute-pass own fields with frozen shared
+prototypes for eligible native WebGPU passes. This changes reflection and
+post-wrap extensibility semantics, explicitly documented in the package README.
+It is suitable for this demo's owned passes, not an implicit replacement for
+arbitrary application instrumentation. Core/stage and the existing public
+default behavior are unchanged.
+
+Eligibility retains native factory/receiver checks, all captured native-method
+checks, accessor/writability guards and ordinary fallback for custom or foreign
+passes. Review found an inherited-owner edge before the comparison completed;
+the helper now rejects existing own **or inherited** owners without reading an
+accessor. The first incomplete, unguarded baseline is excluded from evidence.
+
+Verification passed 26/26 focused CPU tests and eight actual-native hardware
+cases. The durable hardware regression is
+`scripts/test-stats-native-passes.mjs`, using
+`tests/browser/stats-native-passes.html`; it verifies actual GPU pixel and atomic
+dispatch output, timestamps, overrides, foreign realms, frozen prototypes and
+fallback getter/setter behavior. No fake native-positive fixture is substituted.
+The robot's separate instrumented proof observed 9,625 native render and 4,664
+compute fast-path hits, zero own fields on bounded pass samples, safe sampled
+arm poses and grip errors below 2e-8 m. This instrumentation is absent from the
+allocation runs. An overhead pose may remain head-travel-limited; this check
+does not promise exact gaze for every pose.
+
+Fresh production pages then ran default A, opt-in and default B against the
+**same frozen bundle**, changing only `?passLayout=prototype`. Animator's new
+writer remained omitted in every phase, so it did not affect this comparison.
+Every phase had 30 seconds of warmup and approximately 30 seconds measured;
+drag warmup and measurement each used the matched continuous pointer path.
+
+| Layout | Phase | Sampled MB/s | Minor / major GC | Peak pause ms | p95 RAF callback ms |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Default A | Idle | 0.741797 | 31 / 4 | 1.245 | 1.970 |
+| Opt-in | Idle | 0.621088 | 23 / 4 | 1.561 | 2.289 |
+| Default B | Idle | 0.812398 | 27 / 3 | 1.503 | 2.368 |
+| Default A | Drag | 1.009091 | 16 / 4 | 1.495 | 4.883 |
+| Opt-in | Drag | 0.906381 | 28 / 4 | 1.749 | 5.206 |
+| Default B | Drag | 1.156624 | 20 / 5 | 3.491 | 6.457 |
+
+**Retain the optional layout.** Sampled allocation is below both default runs,
+consistent with the isolated native-pass own-field reduction. Candidate callback
+p95 lies between the two baselines, so these captures do not establish a
+repeatable CPU improvement or penalty. Drag minor-GC count is higher in the
+candidate; no GC elimination or causal GC-pause improvement is established.
+Automatic reflection cadence differs: idle bakes A/opt-in/B are 462/435/445 and
+drag bakes 456/440/415. The candidate also stays below both baselines in bytes
+per ordinary animation frame; this remains a free-running scene comparison,
+not a fixed-bake workload experiment.
+
+All six measured phases retained 100% reflection pose reuse (922, 911, 870,
+878, 890 and 830 successful repeat attempts in execution order), with no source
+changes or browser errors. Every drag measured 938 trusted commands. The native
+queue writer identity remained unchanged. Host profiling/readback/pass wrappers
+still allocate, and natural GC remains; the overall objective is incomplete.
+
+The local summary is `test-results/stats-pass-prototype-fresh-aba-summary.json`;
+raw report labels are `stats-pass-prototype-guarded-baseline-a`,
+`stats-pass-prototype-guarded-candidate` and
+`stats-pass-prototype-guarded-baseline-b`. Native reports are
+`test-results/stats-native-passes.json` and
+`test-results/scene-stats-prototype-proof.json`. Raw traces, heap profiles and
+the production comparison harness remain ignored local artifacts. The API
+reports explicitly include the new option; unchanged export counts do not mean
+an unchanged API. This package change is not yet part of production feeb64de.
+
+### Target-only projection boundary experiment: reverted
+
+The current robot uses `resolveTarget()` with damping and compliance disabled and
+one torso capsule. A fresh audit tested that exact entry path instead of borrowing
+the earlier full-`solve()` or mixed-collider compiler evidence. The ordinary Node
+census still observed boxed numbers, but the successfully optimized target,
+projection and internal capsule paths had no numeric tagging/allocation sites;
+`pointClearance` was inlined. A separate synchronous-recompilation diagnostic had
+no excess numeric allocation over its control. These results do not establish a
+permanent warmup duration or a universal allocation floor.
+
+The candidate skipped an unused reach norm for the unbounded target-only path.
+It preserved bit-exact outputs for 25,128 target calls, 4,800 full solves, 1,272
+alias calls and 24 invalid calls, with identical custom-collider and IK callback
+sequences across 223,132 collider calls. All 85 candidate tests passed. However,
+four isolated baseline/candidate excess-HeapNumber pairs were 89,812/80,272,
+75,502/81,172, 79,252/77,322 and 74,682/71,562. Timings were neutral and variation
+was larger than the apparent benefit. The candidate also added nine gzip bytes.
+
+**Revert the experiment.** The original source, declarations and package bundle
+were restored bit-for-bit; the bundle SHA256 is
+`64a16588de864218291da2943f4ca8ea917b3a80602fe073787b6dd60cb14d04`.
+The original 82/82 tests passed after restoration. An instrumented reduction from
+ten to nine square-root calls per query is not a production allocation result:
+that instrumentation changes compilation, and the optimized path already removes
+the dead norm. No public kinematics change remains from this experiment.
+
+Raw census, compiler, parity, candidate and restoration evidence is archived in
+the robot checkout's ignored `test-results/resolve-target-boundaries/`, including
+`README.md` and `final-report.json`; these large local artifacts are not supplied
+by a clean clone. Core plus stage remains 19,999 gzip bytes.
+
 ### Prior allocation checkpoint validation and production capture
 
 This section records the warmed allocation checkpoint before the resting-hand and eye fixes. Its rates and GC counts are historical evidence for that source, not measurements of the current live release.
