@@ -293,9 +293,17 @@ The head pattern per occurrence is four JS_OBJECT, two FIXED_ARRAY, two FUNCTION
 
 Reports in the robot checkout: test-results/robot-type-census/reports/warm10k-moving.json and warm10k-moving-summary.json. The earlier 1,000-warmup census produced substantially more HeapNumbers, demonstrating that warmup/optimization state matters. Separate kernel workloads are not additive costs. Node counts do not certify Chromium allocation behavior or identify the browser upload cache's allocation types.
 
-Next evidence should connect these types to a controlled source-path ablation or optimized-IR consumers. Static heap snapshots alone can miss short-lived allocations collected between snapshots.
+### Controlled head-setter attribution
 
-## Upload-cache comparison and unresolved regression
+The controlled public-setter versus RigScratch writer ablation has now completed: test-results/robot-type-census/reports/head-writer-ablation.json, with parity in head-writer-parity.json. Both variants executed exactly 10,000 setter calls after 10,000 warmup calls, with identical inputs, checksums and acceptance counters. All four measured census windows were free of natural GC and source fingerprints stayed unchanged.
+
+The replacement removed the complete 568-byte structural pattern per call. Excess HeapNumbers fell from 184,460 to 16,440 instances across 10,000 calls, saving a further 268.832 bytes/call in this run. This establishes the actual normal-array HeadAim setter path as the source of the removed types; it does not imply all public setter inputs can use the same implementation.
+
+All 2,400 moving/contact trajectory frames matched bit-for-bit across every authored node's quaternion, Euler and world matrix plus HeadAim optical/clearance outputs, including transform-store growth. Nine invalid-input cases and disposed-mesh guard precedence prevented mutation as expected. Three Float32Array probes differed in the combined state snapshot, so preserve the existing public setter's typed-array/map behavior. A demo-owned writer opt-in is being implemented; the default HeadAim path must continue dispatching through the current public method, including overrides.
+
+Static heap snapshots alone can miss short-lived allocations collected between snapshots.
+
+## Upload-cache comparison and rollback decision
 
 Matched method-swap capture: skinning-ik-profile-native-uniform-pair.json.
 
@@ -344,6 +352,20 @@ The candidate also used 0.425–0.557 ms more aggregate script time per animatio
 
 GC counts alone do not identify temporary metadata, retained growth or allocation types. A matched active interaction comparison and concrete allocation attribution remain necessary before the final keep/revise decision.
 
+### Fresh-page continuous drag, 30-second warmup and measurement
+
+Report: skinning-ik-profile-native-uniform-fresh-drag-30s.json. Three fresh pages each ran 30 seconds of active warmup followed by 30 seconds of measured trusted pointer dragging. Head tracking, auto IK and reflections were enabled; idle animation and moving-light motion were disabled. Every warmup and measured phase received the same 938 screen-space commands at nominal 32 ms spacing. The diagnostic report's inherited generic method string still says the older drag phase disables head look; the actual per-phase conditions and controls in this comparison enable it.
+
+| Phase | Sampled MB/s | Minor GC | Major GC | Peak GC pause ms | p95 RAF callback execution ms | Reflection bakes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Baseline A | 1.301 | 22 | 4 | 5.684 | 6.210 | 416 |
+| Cache candidate | 1.207 | 22 | 4 | 3.376 | 6.007 | 443 |
+| Baseline B | 1.090 | 15 | 3 | 2.514 | 7.333 | 393 |
+
+All sampled poses passed safety and grip checks; browser errors and source changes were empty. Native queue writer identity was preserved. Measured animation ticks were 1,838 / 1,848 / 1,840. Command scheduling was not exact wall-clock lockstep: maximum lateness was 15.6 / 23.5 / 52.4 ms. RAF callback wall execution is not GPU completion time or total frame CPU budget.
+
+The candidate is between the two baselines on allocation and below both on p95 callback execution. The 393–443 reflection-bake spread is a material workload difference. This is not a clean isolated allocation win and does not establish that staging savings caused the callback difference. Neither matching major-GC counts nor pause maxima prove retained growth, promotion rate or an eventual stutter guarantee. Prefer a concrete source-path improvement over further claiming a cache benefit from these mixed results.
+
 The fixed-render ablation script and diagnostics remain available:
 
 - Script: test-results/profile-native-upload-ablation.mjs.
@@ -352,11 +374,15 @@ The fixed-render ablation script and diagnostics remain available:
 - Preserve native writer, work counts, buffer bits and source hashes.
 - A zero revision delta in an unconditional baseline means no revision change, not zero uploads. The corrected diagnostic field is beautyNoRevisionChange.
 
-Keep or revise the PBR cache only after a controlled benefit is established. Preserve the independently required custom-writer correctness fixes.
+### Decision: experimental PBR uniform cache reverted
+
+The uncommitted PBR uniform cache has been removed from packages/gltf-pro/src/index.ts and its README because these comparisons did not establish a repeatable full-scene allocation benefit. Both files now match the committed unconditional-upload implementation. This preserves public behavior and removes the experimental comparison/guard bookkeeping. The rejected patch and original source/test are archived in ignored test-results/pbr-uniform-cache-rejected.patch, pbr-uniform-cache-rejected.ts and pbr-uniform-upload-reuse-rejected.test.js.
+
+Ten useful custom-writer, Float32-bit, failure, reentrancy and validation cases remain in tests/gltf-pro-uniform-writers.test.js. The rebuilt package passes all 27 focused PBR draw/pass/shadow/resource/writer tests. The separate Animation custom-writer correctness repair remains necessary and is retained. The standalone preview needs rebuilding after this rollback and the head-writer change; historical native-cache proof reports describe the earlier implementation, not the rolled-back PBR source.
 
 ## Remaining investigation and rejected paths
 
-1. Follow the completed warmed and fresh-page comparisons with active-interaction CPU/frame evidence, then make the cache keep/revise decision.
+1. Complete and measure the demo-owned head writer, then rebuild the preview with the experimental PBR cache removed.
 2. Identify actual allocation types/IR consumers for BodyIK, target projection, HeadAim and the other drag hotspots.
 3. Reduce measured owned allocations, rerun numerical/mesh and interaction checks, and retain only improvements.
 4. Rebuild the standalone robot and repeat sustained warmed idle/drag profiles, including GC and actual skinned clearance.
@@ -400,7 +426,7 @@ Use fresh report labels for further captures. Keep source/dist frozen and avoid 
 
 The latest user request is to compare the fresh-page repeat baseline and determine whether the candidate's added script work affects active interaction frame times.
 
-The warmed fixed-render rerun, isolated fresh-page idle comparison and separate Node type census have completed. A fresh-page continuous-drag comparison and controlled HeadAim ablation are being prepared. The constraints lab is running the committed contact-reach-3 controller; both saved complete trajectories replay hold-free. The robot preview has been rebuilt, but allocation-driven GC remains and the pending upload changes still need their final controlled performance decision.
+The warmed fixed-render rerun, isolated fresh-page idle/drag comparisons, separate Node type census and controlled HeadAim writer ablation have completed. The experimental PBR uniform cache was reverted and its numerical/writer regressions were preserved. A demo-owned head-writer opt-in is being implemented from the measured result. The constraints lab is running the committed contact-reach-3 controller; both saved complete trajectories replay hold-free. Allocation-driven GC remains; rebuild and remeasure the preview after the current changes.
 
 Package/demo boundary: reusable runtime changes are made in the owning optional packages. The contact-gradient sliding and generated-waypoint reach conditioning currently remain in examples/kinematics-constraints-controller.js, not the public kinematics-constraints solver. Recorder/profiler code is diagnostic-only. Do not present those demo adapter behaviors as current public package capabilities.
 
