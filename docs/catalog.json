@@ -571,6 +571,7 @@
       "PBRModel",
       "loadGLTF",
       "parseGLTF",
+      "parseGLTFAsync",
       "parsePreparedPBR",
       "validatePreparedGeometry"
     ]
