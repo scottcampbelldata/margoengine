@@ -2,7 +2,7 @@
 
 Date: 2026-10-16. Updated after the first native importer landed. Core and the stage facade stay frozen. No new package name was added.
 
-The first implementation is in the tree. `@margoengine/exporters` writes skins, morphs, and clips on a data scene, and engine-scene export stays static. `@margoengine/fbx` parses binary and ASCII FBX itself and calls `exportGLB`. `convertFBX`, `parseFBX`, and `loadFBX` are unchanged. The package has no Three.js runtime dependency. The root `three` devDependency is also removed in the working tree. Benchmarks that still compare against Three.js download a pinned 0.186.1 build through `scripts/three-reference.js`. They do not import it from this package.
+The first implementation is in the tree. `@margoengine/exporters` writes skins, morphs, and clips on a data scene, and engine-scene export stays static. `@margoengine/fbx` parses binary and ASCII FBX itself and calls `exportGLB`. `convertFBX`, `parseFBX`, and `loadFBX` are unchanged. The package has no Three.js runtime dependency. The root `three` and `@types/three` development dependencies are removed. Benchmarks that still compare against Three.js download a pinned 0.186.1 build through `scripts/three-reference.js`. They do not import it from this package.
 
 `npm test --workspace @margoengine/fbx` passed 52 tests on 2026-10-16, with zero failures. `npm test --workspace @margoengine/exporters` passed 17 tests. `npm run measure:size` reported core plus stage at 19,999 bytes gzip, under the 20,000-byte gate. The supported subset and the still-open real-DCC render gate are in `packages/fbx/README.md` and `docs/native-fbx-plan.md`. This file keeps the design. Where the implementation disagreed with the first draft, the notes below follow the code.
 

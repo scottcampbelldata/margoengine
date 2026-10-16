@@ -42,14 +42,24 @@ const harness={
  async frame(delta=0.1){engine.gpu!.pushErrorScope('validation');engine.render({delta});await engine.gpu!.queue.onSubmittedWorkDone();const error=await engine.gpu!.popErrorScope();if(error)throw new Error(error.message);},
  async restore(){await engine.rebootDevice();await this.frame();},
  async fbx(url:string){
-  await this.setup('baseline',512);engine.gpu!.pushErrorScope('validation');
+  engine?.dispose();videoFrame?.close();videoFrame=undefined;stats=undefined;
+  engine=await Engine.create(canvas,{backend:'webgpu',capacity:512,camera:{position:[5,3,7],target:[0,0,0]}});
+  engine.gpu!.addEventListener('uncapturederror',event=>errors.push(event.error.message));engine.gpu!.pushErrorScope('validation');
   const {loadFBX}=await import('@margoengine/fbx'),{Animation}=await import('@margoengine/animation'),model=await loadFBX(engine,url),animation=Animation.attach(model);
-  model.root.setScale([0.01,0.01,0.01]);animation.play(0);animation.playing=false;animation.seek(0);await this.frame(0);
+  animation.play(0);animation.playing=false;await this.frame(0);
+  // Frame only the imported asset, so a seek can change pixels only through its animation.
+  const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
+  for(const primitive of model.primitives){const m=primitive.node.matrix;for(let at=0;at<primitive.vertices.length;at+=20){const v=primitive.vertices;for(let axis=0;axis<3;axis++){const value=m[axis]*v[at]+m[axis+4]*v[at+1]+m[axis+8]*v[at+2]+m[axis+12];min[axis]=Math.min(min[axis],value);max[axis]=Math.max(max[axis],value);}}}
+  const size=max.map((value,axis)=>value-min[axis]),scale=4/Math.max(...size),center=min.map((value,axis)=>(value+max[axis])/2);
+  model.root.setScale([scale,scale,scale]).setPosition(center.map(value=>-value*scale) as [number,number,number]);
+  engine.camera.fitToBoundingBox(size.map(value=>-value*scale/2) as [number,number,number],size.map(value=>value*scale/2) as [number,number,number],{aspect:canvas.clientWidth/canvas.clientHeight,duration:0,padding:1.4});
+  await this.frame(0);
   effect=animation;const doc=model.asset.doc;
   const error=await engine.gpu!.popErrorScope();if(error)throw new Error(error.message);
-  return {primitives:model.primitives.length,skins:doc.skins?.length??0,joints:doc.skins?.reduce((n:number,skin:{joints:number[]})=>n+skin.joints.length,0)??0,clips:animation.clips.length,channels:doc.animations?.reduce((n:number,clip:{channels:unknown[]})=>n+clip.channels.length,0)??0};
+  return {primitives:model.primitives.length,skins:doc.skins?.length??0,joints:doc.skins?.reduce((n:number,skin:{joints:number[]})=>n+skin.joints.length,0)??0,skinnedPrimitives:model.primitives.filter(primitive=>doc.nodes[primitive.nodeIndex].skin!==undefined&&primitive.definition.attributes.JOINTS_0!==undefined&&primitive.definition.attributes.WEIGHTS_0!==undefined&&primitive.deformed).length,clips:animation.clips.length,clipName:animation.clips[0]?.name,duration:animation.clips[0]?.duration??0,channels:doc.animations?.reduce((n:number,clip:{channels:unknown[]})=>n+clip.channels.length,0)??0};
  },
- async seek(time:number){effect.seek(time);await this.frame(0);},
+ async seek(time:number){effect.seek(time);await this.frame(0);return {time:effect.time,playing:effect.playing};},
+ async playback(delta:number){effect.play(0);await this.frame(delta);const state={time:effect.time,playing:effect.playing};effect.playing=false;return state;},
  async timestamps(){
   const adapter=await navigator.gpu.requestAdapter();if(!adapter?.features.has('timestamp-query'))return {supported:false};
   const device=await adapter.requestDevice({requiredFeatures:['timestamp-query']}),profiler=new GPUProfiler(device),buffer=device.createBuffer({size:65536*4,usage:GPUBufferUsage.STORAGE});
