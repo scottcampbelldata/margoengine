@@ -33,6 +33,9 @@ export class Stats implements EnginePlugin {
     gpuTime: number | null;
     sampleCount: number;
     sampleIndex: number;
+    get gpuSampleId(): number;
+    get gpuSampleEncodedAt(): number | null;
+    get gpuSampleReadAt(): number | null;
     get gpuPassMilliseconds(): Float64Array | null;
     get gpuPassCount(): number;
     get gpuElapsedMilliseconds(): number | null;

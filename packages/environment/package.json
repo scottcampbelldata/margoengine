@@ -16,6 +16,7 @@
     "build": "node scripts/build.js",
     "test": "npm run build && node --test tests/environment.test.js tests/scene.test.js tests/volumetric.test.js tests/probes.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
+    "test:probes:browser": "npm run build && node scripts/test-browser.js --probe-samples",
     "prepack": "npm run build"
   },
   "sideEffects": false,

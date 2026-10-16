@@ -55,7 +55,15 @@ test('DOM refresh is scheduled at 150 ms and numeric sampling stays independent'
 test('a zero-delta restart excludes paused time from rolling frame samples', (t) => {
   const stats = overlay(t);
   let now = 16,
-    sample;
+    sample,
+    frame;
+  stats.setup({
+    onFrame(callback) {
+      frame = callback;
+      return () => {};
+    },
+    removePlugin() {},
+  });
   t.mock.method(performance, 'now', () => now);
   stats.registerPasses({
     add(pass) {
@@ -69,12 +77,35 @@ test('a zero-delta restart excludes paused time from rolling frame samples', (t)
   const count = stats.sampleCount;
   now = 10000;
   context.delta = 0;
+  frame({}, 0); // A true animation-loop restart, unlike a manual probe render.
   sample(context);
   assert.equal(stats.sampleCount, count);
   now = 10016;
   context.delta = 0.016;
   sample(context);
   assert.equal(stats.frameTime, 16);
+});
+
+test('manual zero-delta probe renders do not shorten the next animation-frame interval', (t) => {
+  const stats = overlay(t);
+  let now = 16,
+    sample;
+  t.mock.method(performance, 'now', () => now);
+  stats.registerPasses({
+    add(pass) {
+      if (pass.name === 'stats:sample') sample = pass.execute;
+    },
+  });
+  sample({ backend: 'webgpu', delta: 0.016 });
+  now = 28;
+  sample({ backend: 'webgpu', delta: 0 });
+  now = 30;
+  sample({ backend: 'webgpu', delta: 0 });
+  assert.equal(stats.sampleCount, 1);
+  now = 32;
+  sample({ backend: 'webgpu', delta: 0.016 });
+  assert.equal(stats.frameTime, 16);
+  assert.equal(stats.fps, 62.5);
 });
 
 test('rolling samples wrap, reject bad input atomically and tick never touches the DOM', (t) => {
@@ -357,6 +388,11 @@ test('Stats getters reuse completed pass data and HUD distinguishes warmup, unav
   stats.setup(engine);
   const storage = stats.gpuPassMilliseconds;
   assert.equal(storage.length, 128);
+  assert.equal(stats.gpuSampleId, 0);
+  assert.equal(stats.gpuSampleEncodedAt, null);
+  assert.equal(stats.gpuSampleReadAt, null);
+  let hostNow = 100;
+  t.mock.method(performance, 'now', () => hostNow);
   stats.refresh();
   assert.match(stats.element.textContent, /GPU timing warming up/);
   const frame = () => {
@@ -375,22 +411,40 @@ test('Stats getters reuse completed pass data and HUD distinguishes warmup, unav
     encoder.finish();
   };
   for (let i = 0; i < 15; i++) frame();
+  hostNow = 112;
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(stats.gpuTime, 5);
   assert.equal(stats.gpuPassCount, 2);
   assert.equal(stats.gpuElapsedMilliseconds, 10);
+  assert.equal(stats.gpuSampleId, 1);
+  assert.equal(stats.gpuSampleEncodedAt, 100);
+  assert.equal(stats.gpuSampleReadAt, 112);
   assert.deepEqual([...storage.slice(0, 3)], [2, 3, 0]);
   for (let i = 0; i < 100; i++) assert.equal(stats.gpuPassMilliseconds, storage);
   assert.equal(resources.length, 3);
   stats.refresh();
   assert.match(stats.element.textContent, /GPU timing 5\.00 ms passes/);
   assert.match(stats.element.textContent, /GPU span 10\.00 ms/);
+  // Equal GPU durations still represent distinct completed samples; CPU frames are not GPU sample IDs.
+  hostNow = 200;
+  for (let i = 0; i < 14; i++) frame();
+  assert.equal(stats.gpuSampleId, 1);
+  frame();
+  hostNow = 213;
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(stats.gpuTime, 5);
+  assert.equal(stats.gpuSampleId, 2);
+  assert.equal(stats.gpuSampleEncodedAt, 200);
+  assert.equal(stats.gpuSampleReadAt, 213);
   timestamps[3] = 0n;
   for (let i = 0; i < 15; i++) frame();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(stats.gpuTime, null);
   assert.equal(stats.gpuPassCount, 0);
   assert.equal(stats.gpuElapsedMilliseconds, null);
+  assert.equal(stats.gpuSampleId, 2, 'invalid readback is not a completed timing sample');
+  assert.equal(stats.gpuSampleEncodedAt, null);
+  assert.equal(stats.gpuSampleReadAt, null);
   assert.ok(storage.every((value) => value === 0));
   const unsupported = {
     gpu: {
@@ -410,12 +464,17 @@ test('Stats getters reuse completed pass data and HUD distinguishes warmup, unav
   stats.onDeviceRestored(engine);
   assert.notEqual(stats.gpuPassMilliseconds, storage);
   assert.equal(stats.gpuPassCount, 0);
+  assert.equal(stats.gpuSampleId, 2, 'device replacement must not reuse a completed sample ordinal');
+  assert.equal(stats.gpuSampleEncodedAt, null);
+  assert.equal(stats.gpuSampleReadAt, null);
   stats.refresh();
   assert.match(stats.element.textContent, /GPU timing warming up/);
   stats.dispose();
   assert.equal(stats.gpuPassMilliseconds, null);
   assert.equal(stats.gpuPassCount, 0);
   assert.equal(stats.gpuElapsedMilliseconds, null);
+  assert.equal(stats.gpuSampleEncodedAt, null);
+  assert.equal(stats.gpuSampleReadAt, null);
   assert.ok(resources.every((resource) => resource.destroyed));
 });
 
