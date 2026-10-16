@@ -47,9 +47,10 @@ export function localPoint(
   point: Vec3,
   out: Point = [0, 0, 0],
   inverse: Float64Array = new Float64Array(16),
+  workspace?: Float64Array,
 ): Point {
   mesh.check();
-  if (!invertMatrixStable(mesh.matrix, inverse)) throw new Error('Singular grip transform');
+  if (!invertMatrixStable(mesh.matrix, inverse, workspace)) throw new Error('Singular grip transform');
   return transformPoint(inverse, point, out);
 }
 

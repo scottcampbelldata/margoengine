@@ -17,6 +17,7 @@ import { worldPosition, worldPositionInto, localPoint, gripPosition, holdObjectA
 import { attachWorkshopStats } from './performance-hud';
 import { BodyIK, type BodyIKResult } from './body-ik';
 import { HeadAim } from './head-aim';
+import { GazeTarget } from './gaze-target';
 import { RigScratch } from './rig-scratch';
 import { ArmHeadClearance } from './arm-head-clearance';
 import { cowlingHull } from './head-aim-shape';
@@ -150,9 +151,11 @@ try {
   const solved: BodyIKResult = { safe: true, limited: false, blocked: false, orb: [0, 0, 0], collision: null };
   const enforced: BodyIKResult = { safe: true, limited: false, blocked: false, orb: [0, 0, 0], collision: null };
   const heldPosition: Point = [0, 0, 0],
-    heldInverse = new Float64Array(16);
+    heldInverse = new Float64Array(16),
+    pointWorkspace = new Float64Array(52);
   const keepOrbHeld = () => holdObjectAtGrip(meshRuntime(orb.root), wrist, localGrip, heldPosition, heldInverse);
   const torsoAim = new TorsoAim(body, meshRuntime(model.root));
+  const acceptedOrbTorso = localPoint(torsoAim.frame, home);
   teardown.push(() => torsoAim.dispose());
   const armHeadClearance = new ArmHeadClearance(torsoAim.frame, head, shoulder, elbow);
   const opticalLocal = localPoint(head, gripPosition(meshRuntime(model.root), [0, 1.34, -0.232]));
@@ -167,6 +170,18 @@ try {
     rotationClearance: (rotation, out) => armHeadClearance.evaluate(rotation, out),
     writeRotation: (rotation) => headRotation.setQuaternion(head, rotation),
   });
+  const gazeTarget = new GazeTarget(head, meshRuntime(model.root), opticalLocal, {
+      front: -0.236,
+      targetRadius: 0.10465342044830322,
+      margin: 0.003,
+    }),
+    gazeGoal: Point = [0, 0, 0],
+    gazeRoute: Point = [0, 0, 0],
+    gazeHeld: Point = [0, 0, 0],
+    gazeWaypoint: Point = [0, 0, 0],
+    gazeClearance = new Float64Array(1);
+  let gazeConstraintEnabled = false,
+    gazeConditioned = false;
   const bodyIK = new BodyIK({
     frame: torsoAim.frame,
     armHeadClearance,
@@ -179,6 +194,10 @@ try {
       if (checkbox('look').checked) headAim.update(orb);
       else headAim.reset(orb);
       out[0] = headAim.headClearance;
+      if (checkbox('look').checked && gazeConstraintEnabled) {
+        gazeTarget.clearance(orb, gazeClearance);
+        out[0] = Math.min(out[0], gazeClearance[0]);
+      }
     },
   });
   $('viewport').dataset.constraintSolver = '@margoengine/kinematics-constraints';
@@ -442,6 +461,8 @@ try {
       rayDistance: 0,
       clearanceResolved: true,
       headClearance: Infinity,
+      targetConditioned: false,
+      minimumTargetRadius: gazeTarget.minimumRadius,
     },
     performance: { frameMs: 0, p95Ms: 0, probeEncodeMs: 0, probeTotalMs: 0 },
   };
@@ -452,6 +473,7 @@ try {
       worldPositionInto(targetHandle, sliderWorld),
       sliderLocal,
       sliderInverse,
+      pointWorkspace,
     );
     controlAxes.forEach((axis, i) => {
       const input = checkbox('target-' + axis),
@@ -532,6 +554,7 @@ try {
       const reusePose = probePoseReuse.reusePose(dt);
       if (!reusePose) {
         torsoAim.applyHeld();
+        if (!checkbox('look').checked) gazeConstraintEnabled = gazeConditioned = false;
         if (dt > 0 || !savedPose) bodyContact = false;
         if (checkbox('ik-enabled').checked) {
           // Probe captures render zero-delta frames. Reuse the presented pose so
@@ -545,11 +568,31 @@ try {
             if (controlRoute.active) {
               // Animator has already restored its inputs. Route from the final
               // accepted pose presented last frame, in the moving model's frame.
-              const waypoint = controlRoute.update(acceptedOrbLocal, step);
+              const reached = checkbox('look').checked
+                ? gazeTarget.projectLocal(controlRoute.position, gazeRoute)
+                : controlRoute.position;
+              const waypoint = controlRoute.update(acceptedOrbLocal, step, reached);
               goal = gripPosition(meshRuntime(model.root), waypoint, eventPosition);
             }
-            const command = targetMotion.update(goal, step);
-            torsoAim.update(localPoint(meshRuntime(model.root), command, localTarget, targetInverse), step);
+            // Keep raw targets visible. Only the command enters the viewable
+            // workspace, before damping and the existing linear speed bound.
+            if (checkbox('look').checked) {
+              goal = gazeTarget.project(goal, gazeGoal);
+              gazeConditioned = gazeTarget.projected;
+            }
+            let command = targetMotion.update(goal, step);
+            torsoAim.update(
+              localPoint(meshRuntime(model.root), command, localTarget, targetInverse, pointWorkspace),
+              step,
+            );
+            if (checkbox('look').checked) {
+              // Animator has restored the arm inputs. Transport the actual
+              // last presented grip with Body, not the temporary rest wrist.
+              gripPosition(torsoAim.frame, acceptedOrbTorso, gazeHeld);
+              gazeTarget.beginStep(gazeHeld);
+              gazeConstraintEnabled = true;
+              command = gazeTarget.waypoint(gazeHeld, command, targetMotion.maxSpeed * step, gazeWaypoint);
+            }
             bodyContact = bodyIK.solve(command, step, solved).blocked;
             manual = false;
           } else for (let i = 0; i < armNodes.length; i++) armNodes[i].setQuaternion(savedPose![i]);
@@ -570,7 +613,8 @@ try {
         }
         runtime.store.tick(false);
         const heldOrb = keepOrbHeld();
-        localPoint(meshRuntime(model.root), heldOrb, acceptedOrbLocal, targetInverse);
+        localPoint(meshRuntime(model.root), heldOrb, acceptedOrbLocal, targetInverse, pointWorkspace);
+        localPoint(torsoAim.frame, heldOrb, acceptedOrbTorso, targetInverse, pointWorkspace);
         // The accepted head pose was checked with the arm. Refresh diagnostics
         // against the float32-held center without changing that accepted rotation.
         headAim.checkClearance(heldOrb);
@@ -613,9 +657,11 @@ try {
             ? 'Held pose · solve one step'
             : bodyContact
               ? 'At body surface'
-              : residual > 0.012
-                ? 'At arm’s reach'
-                : 'Held in hand';
+              : gazeConditioned
+                ? 'Keeping light in view'
+                : residual > 0.012
+                  ? 'At arm’s reach'
+                  : 'Held in hand';
         if (state.textContent !== stateText) state.textContent = stateText;
         const distanceText = residual > 0.012 ? (residual * 100).toFixed(1) + ' cm to target' : 'Grip secure';
         if (distance.value !== distanceText) distance.value = distanceText;
@@ -649,6 +695,7 @@ try {
         metrics.head.rayDistance = headAim.rayDistance;
         metrics.head.clearanceResolved = headAim.clearanceResolved;
         metrics.head.headClearance = headAim.headClearance;
+        metrics.head.targetConditioned = gazeConditioned;
         metrics.performance.frameMs = frameMs;
         metrics.performance.p95Ms = p95Ms;
         metrics.performance.probeEncodeMs = probeEncodeMs;
@@ -900,7 +947,8 @@ try {
     torsoAim.reset();
     bodyIK.reset();
     headAim.reset();
-    localPoint(meshRuntime(model.root), keepOrbHeld(), acceptedOrbLocal, targetInverse);
+    localPoint(meshRuntime(model.root), keepOrbHeld(), acceptedOrbLocal, targetInverse, pointWorkspace);
+    localPoint(torsoAim.frame, heldPosition, acceptedOrbTorso, targetInverse, pointWorkspace);
     moveOrb(home);
     view(homeEye, homeLook);
     orbit.enabled = true;

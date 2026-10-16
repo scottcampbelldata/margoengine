@@ -38,6 +38,61 @@ async function rig() {
   return { engine, store, root, shoulder, elbow, wrist };
 }
 
+test('borrowed local-point inversion workspace preserves exact results, aliases and matrix operations', async (t) => {
+  const r = await rig();
+  t.after(() => r.engine.dispose());
+  const workspace = new Float64Array(52),
+    coldInverse = new Float64Array(16),
+    hotInverse = new Float64Array(16),
+    cold = [0, 0, 0],
+    hot = [0, 0, 0];
+  for (let i = 0; i < 120; i++) {
+    const angle = i * 0.037,
+      scale = i % 3 === 0 ? 0.001 : i % 3 === 1 ? 1.7 : 1000;
+    r.root
+      .setPosition([Math.sin(angle) * 3, -0.25, Math.cos(angle)])
+      .setRotation([angle * 0.3, -angle, angle * 0.13])
+      .setScale([scale, scale, scale]);
+    r.elbow.setRotation([-0.2, angle * 0.1, 0.4]);
+    r.store.tick(false);
+    const requested = [Math.sin(angle), Math.cos(angle) * 0.7, -0.25],
+      alias = [...requested];
+    workspace.fill(NaN);
+    localPoint(r.wrist, requested, cold, coldInverse);
+    assert.equal(localPoint(r.wrist, requested, hot, hotInverse, workspace), hot);
+    assert.deepEqual(hot, cold);
+    assert.deepEqual(hotInverse, coldInverse);
+    assert.equal(localPoint(r.wrist, alias, alias, hotInverse, workspace), alias);
+    assert.deepEqual(alias, cold);
+  }
+});
+
+test('borrowed inversion scratch retains singular, alias and disposed guards before output writes', async () => {
+  const r = await rig(),
+    out = [4, 5, 6],
+    inverse = new Float64Array(16).fill(7),
+    workspace = new Float64Array(52);
+  try {
+    for (const invalid of [new Float64Array(51), inverse, r.wrist.matrix]) {
+      assert.throws(() => localPoint(r.wrist, [0, 0, 0], out, inverse, invalid), /Singular/);
+      assert.deepEqual(out, [4, 5, 6]);
+      assert.deepEqual([...inverse], new Array(16).fill(7));
+    }
+    // Model a corrupted/singular world transform at the read-only inversion
+    // boundary; the public scale setter correctly rejects zero before this.
+    r.wrist.matrix.fill(0);
+    for (const scratch of [undefined, workspace]) {
+      assert.throws(() => localPoint(r.wrist, [0, 0, 0], out, inverse, scratch), /Singular/);
+      assert.deepEqual(out, [4, 5, 6]);
+      assert.deepEqual([...inverse], new Array(16).fill(7));
+    }
+  } finally {
+    r.engine.dispose();
+  }
+  assert.throws(() => localPoint(r.wrist, [0, 0, 0], out, inverse, workspace));
+  assert.deepEqual(out, [4, 5, 6]);
+});
+
 test('arm IK reaches a world-space target under translated, rotated and scaled ancestors', async () => {
   const r = await rig();
   try {

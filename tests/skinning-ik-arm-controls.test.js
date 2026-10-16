@@ -131,7 +131,7 @@ test('independent arm tracks share authored home and preserve normalized paramet
   assert.ok(mapArmControl('height', 0)[1] < 0.67 && mapArmControl('height', 1)[1] > 1.68);
   assert.ok(mapArmControl('side', 0)[0] < -0.75 && mapArmControl('side', 1)[0] >= 0.235);
   assert.equal(mapArmControl('side', 1)[1], 1.16, 'cross-body movement stays at chest height');
-  assert.equal(mapArmControl('side', 1)[2], -0.3, 'cross-body movement stays in front of the body');
+  assert.equal(mapArmControl('side', 1)[2], -0.32, 'cross-body movement leaves room for the head to see the orb');
   assert.ok(mapArmControl('nearFar', 0)[2] > 0.19 && mapArmControl('nearFar', 1)[2] < -0.49);
   for (const parameter of [NaN, Infinity, -Infinity]) {
     out.set([1, 2, 3]);

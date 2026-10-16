@@ -37,6 +37,26 @@ function remaining(route) {
   return points;
 }
 
+test('conditioned waypoint arrival advances a raw route without replacing or prematurely consuming it', () => {
+  const route = new ArmControlRoute();
+  route.request('side', 0.97, home);
+  while (route.position[0] < 0.12) route.update([...route.position], 1 / 60);
+  const raw = [...route.position],
+    conditioned = [raw[0], raw[1], raw[2] - 0.02];
+  route.update(conditioned, 0, conditioned);
+  assert.deepEqual(route.position, raw);
+  assert.equal(route.settled, false);
+  route.update(conditioned, 1 / 60, conditioned);
+  assert.notDeepEqual(route.position, raw);
+  const finalRaw = [...route.position],
+    finalConditioned = [finalRaw[0], finalRaw[1], finalRaw[2] - 0.02];
+  route.update(finalConditioned, 1 / 60);
+  assert.equal(route.settled, false, 'raw residual remains visible without a workspace-aware arrival point');
+  route.update(finalConditioned, 1 / 60, finalConditioned);
+  assert.equal(route.settled, true);
+  assert.deepEqual(route.position, finalRaw);
+});
+
 test('control routing preserves every authored bend and uses shared Home when changing tracks', () => {
   const route = new ArmControlRoute(),
     output = route.position;
