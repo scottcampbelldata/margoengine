@@ -10,7 +10,7 @@ The verified core + stage bundle remains **19,999 bytes gzip**; CI rejects 20,00
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF, type MaterialExtension} from '@margoengine/gltf-pro';
 const stage = await createStage('#viewport', {backend:'webgpu'});
 const model = await loadGLTF(stage.engine, '/DamagedHelmet.glb');
 const b = model.bounds;
@@ -51,6 +51,75 @@ the loader also validates returned data before constructing GPU resources.
 Attach animation with the separate animation package. Register this model with `ssao.add(model)` to include its mapped normals and ambient lighting in SSAO. Neither extension is imported by this package. Disposal and device restoration retain CPU asset blueprints.
 
 Register with `shadows.add(model)` and `clustered.add(model)` for optional directional shadows and local PBR lights, including the current skinned vertex buffer. `addLighting()` accepts an optional shader/binding hook without importing these packages. `shadowPrimitives` exposes current opaque/masked GPU geometry to depth consumers; blended materials are omitted.
+
+### Optional material extension slot
+
+Attach a `MaterialExtension` to `primitive.extension`, or to the shared
+`primitive.material.extension`, after `parseGLTF` or `loadGLTF` returns. The
+primitive slot takes precedence. No material package is imported or discovered
+by the loader. `parseGLTF` stays synchronous; `loadGLTF` retains its existing
+Promise-based loading API.
+
+```ts
+const tint: MaterialExtension = {
+  factors: new Float32Array([1, 0.5, 0.25, 1]),
+  wgsl: 's.base *= materialFactors[0];'
+};
+model.primitives[0].extension = tint;
+```
+
+Bind groups are permanently allocated as follows: group 0 is the original
+400-byte frame buffer, group 1 is the original five texture/sampler pairs,
+group 2 is lighting, and **group 3 is the optional material extension**.
+Unextended primitives use exactly the original shader, pipeline descriptors,
+uniform uploads and bindings. Extension GPU resources are created lazily during
+`draw()`, including when an extension is attached after model setup.
+
+`factors` is an optional, nonempty `Float32Array` of finite values whose length
+is a multiple of four. It becomes `materialFactors: array<vec4f, N>` at group 3,
+binding 0. Mutations upload on the next visible draw; changing its length
+reallocates only the secondary buffer. `textures` optionally supplies
+`{view: GPUTextureView, sampler?: GPUSampler}` entries for filterable 2D textures.
+Entry N exposes `materialTextureN` at binding `1 + 2*N` and, if supplied,
+`materialSamplerN` at binding `2 + 2*N`. Missing factors, textures and samplers
+allocate no corresponding resources. Texture views and samplers stay owned by
+the caller; replace them after device restoration before drawing again.
+
+`wgsl` contains statements inserted immediately after `surface(i, front)` in
+beauty, g-buffer and ambient fragment entry points. It can mutate `s: Surface`
+and read `i`, `front`, the original frame `f`, and the generated extension
+resources. `declarations` optionally supplies module-scope WGSL helpers. Callers
+must supply valid WGSL for all three entry points and leave bind group allocation
+to the slot. Generated phony assignments retain declared resources in each
+entry point's interface without sampling them. A resource-bearing extension
+without lighting also binds the empty group 2 required by the pipeline layout.
+
+`direct` optionally supplies beauty-only statements after the directional
+lighting calculation. It may update `direct` before the existing lighting effects
+apply, so additional lobes share directional shadow visibility. It does not run
+in g-buffer or ambient entry points. Unextended shader strings stay unchanged.
+Optional material packages can borrow decoded images with `model.image(index)`;
+the model retains ownership and closes them when disposed.
+
+`output` optionally supplies beauty-only WGSL immediately before the final
+return, after tone mapping/output encoding. `lighting: false` omits optional
+lighting shaders and bindings for a caller-managed surface. The material package
+uses these hooks for transmission while retaining the baseline factor-zero path.
+`PBRModel.beginOpaquePass(context)` defers blended beauty draws across models;
+`PBRModel.endOpaquePass(context)` flushes them after a caller-owned scene copy,
+and `cancelOpaquePass(context)` releases an interrupted phase. Calls to `draw()`
+outside that optional phase retain their existing order and bindings.
+
+Full generated WGSL, including the injection and resource layout, distinguishes
+pipeline cache entries. Even an empty extension cannot share the baseline
+pipeline. Removing an extension releases its secondary buffer on the next
+visible draw and restores the baseline path. Model disposal and device
+restoration release all owned secondary buffers. Extensions that require
+blending use the existing `material.settings[0] = 2` path. This slot adds no new
+material lobes, passes or attributes.
+
+Run `node scripts/material-extension-tests.js` for the material slot's WebGPU
+checks, also included in `npm run modern:test:extensions`.
 
 Limits: triangle primitives; four skin influences in the animation package; KTX2 textures, texture transforms, additional UV sets and other required extensions are rejected or require a future extension. Ambient fill uses fixed sky/ground colors, without image-based lighting. Bounds describe the original mesh; custom rendered models are outside core GPU picking.
 

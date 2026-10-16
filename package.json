@@ -12,6 +12,7 @@
     "packages/core",
     "packages/gltf",
     "packages/gltf-pro",
+    "packages/materials",
     "packages/blender",
     "packages/animation",
     "packages/post",

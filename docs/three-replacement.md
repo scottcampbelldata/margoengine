@@ -12,6 +12,7 @@ A typical Three scene is a camera, a mesh, orbit controls, a glTF, metallic-roug
 | --- | --- |
 | Stage, camera, mesh, dispose | `margoengine` and `@margoengine/core` |
 | Metallic-roughness glTF | `@margoengine/gltf-pro` |
+| Clearcoat, transmission, IOR, volume, and authored node materials | [`@margoengine/materials`](../packages/materials/README.md), installed explicitly through the optional material extension slot |
 | HDR environment and image-based lighting | `@margoengine/environment` |
 | Orbit controls | `@margoengine/controls` |
 | One skin and morph clip, four influences | `@margoengine/animation` |
@@ -51,10 +52,10 @@ These are the gaps a porter will find. They are not a build list.
 | Three.js | This repo |
 | --- | --- |
 | KTX2 textures on a glTF | `@margoengine/decoders` has a standalone KTX2 decoder, but glTF texture loading does not call it. Draco and meshopt geometry loading is resolved above. |
-| Transmission, volume, clearcoat, sheen, iridescence, anisotropy | Not in `gltf-pro`. The Blender loader rejects the same set: transmission, variable IOR, coat, sheen, subsurface. |
+| Extended PBR materials | [`@margoengine/materials`](../packages/materials/README.md) adds clearcoat, transmission, IOR, and Beer-law volume through the optional group 3 slot. Refraction samples the opaque screen color once; there is no ray tracing or participating media. Sheen, iridescence, anisotropy, and specular-color remain unsupported. The Blender loader still rejects extended materials. |
 | Shadowed point and spot lights, rect-area lights, IES profiles | Clustered lights do not cast shadows. Shadows are directional cascades. |
 | `AnimationMixer` on the same object as the skin | `@margoengine/animation` plays one clip, with four influences, and does not crossfade. Crossfades, 1D and 2D blend trees, and masked additive layers are in `@margoengine/animator`. |
-| `ShaderMaterial` and the node material graph | Custom draws go through the core extension API. There is no material graph. |
+| `ShaderMaterial` and node materials | `materials.nodeMaterial()` compiles a closed TypeScript graph to `MaterialExtension`; it accepts no arbitrary WGSL, node-graph file format, or Three.js TSL. Custom WGSL uses `MaterialExtension` directly, and custom draws use the core extension API. |
 | `EffectComposer` with SSR, SSGI, GTAO, SMAA, outline | The post packages are bloom, AgX, SSAO, depth of field, and TAA. They are separate packages, not one composer stack. |
 | `Raycaster` against skinned and morphed meshes | `engine.pick` is a GPU id buffer. `@margoengine/selection` covers core mesh geometry and excludes skinned draws. `@margoengine/bvh` is triangles. |
 | `THREE.LOD`, `BatchedMesh`, CSS3D, `KHR_texture_transform`, more than four joint influences | Not on the core path. `@margoengine/scatter` has its own GPU LOD. The animation package rejects `JOINTS_1` and `WEIGHTS_1`. |
@@ -63,7 +64,7 @@ The native FBX importer has landed. `docs/native-fbx.md` and `packages/fbx/READM
 
 ## What has to be true before launch
 
-Five things. None of them is transmission, a node graph, point-light shadows, cubic FBX curves, or a rendered DCC certification.
+Five launch requirements remain separate from optional materials, point-light shadows, cubic FBX curves, and broader DCC certification.
 
 1. **The install command is true.** `npm install margoengine` works, or the root README does not tell people to run it. The catalog still marks the packages unpublished while the README shows `npm install @margoengine/core@0.1.0` and the matching React, glTF, machinery, and creative lines.
 
@@ -73,17 +74,17 @@ Five things. None of them is transmission, a node graph, point-light shadows, cu
 
 4. **A real glTF loads — compression hook resolved.** `loadGLTF` and `parseGLTFAsync` automatically decode Draco and meshopt, with real-fixture and production browser coverage. `parseGLTF` remains synchronous for uncompressed and meshopt input. Say that KTX2 textures are still rejected, and name the loader path used by the launch demo.
 
-5. **A short replacement map sits above the catalog.** One row each for camera, mesh, orbit, glTF, environment, one animation clip, and dispose, with the import that does it. Beside that map, three sentences for what this version does not do: transmission and the other extended PBR materials, shadows from point and spot lights, and `ShaderMaterial`. `@margoengine/animator` is named as the place clip crossfades live, so the base animation package is not mistaken for a missing mixer.
+5. **A short replacement map sits above the catalog.** One row each for camera, mesh, orbit, glTF, environment, one animation clip, and dispose, with the import that does it. Beside that map, state the material limits: screen-space refraction, no participating media or node-graph file format, and transmissive surfaces do not cast shadows or receive cascaded shadows. Also name unsupported point/spot-light shadows and Three.js `ShaderMaterial` source/TSL. `@margoengine/animator` is named as the place clip crossfades live, so the base animation package is not mistaken for a missing mixer.
 
 ## What can wait
 
 Do not hold the launch for these. Document them as absent.
 
-- Transmission, clearcoat, sheen, iridescence, anisotropy, and volume.
+- Sheen, iridescence, anisotropy, and specular-color; ray-traced or multi-bounce transmission and participating media.
 - Rect-area lights, IES profiles, and shadows from point or spot lights.
-- A node material graph, SSR, SSGI, GTAO, and a single EffectComposer clone.
+- Three.js TSL and node-graph file formats, SSR, SSGI, GTAO, and a single EffectComposer clone.
 - A CPU raycaster that hits skinned and morphed vertices.
 - Cubic FBX curves, extra inheritance modes, progressive morphs, and a rendered real-DCC fixture. The native reader is already the runtime. Three.js is no longer an FBX dependency.
 - `THREE.LOD`, `BatchedMesh`, CSS3D, texture transforms, and more than four joint influences.
 
-KTX2 on glTF textures is the compression gap that is still open. Draco and meshopt loading is implemented and tested; keep those checks passing before adding materials.
+KTX2 on glTF textures is the compression gap that is still open. Draco and meshopt loading and the optional materials slot are implemented; keep their regression checks passing. Core and the stage remain frozen at **19,999 bytes gzip**. See the [materials implementation record](materials-extensions.md) for the supported lobes and verification.

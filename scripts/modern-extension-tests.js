@@ -197,3 +197,5 @@ try {
   await writeFile('test-results/modern-extensions.json',JSON.stringify({hardware,...result,ssaoChangedPixels:changed,ssaoDarkening:darker,phoneExpressionPixels},null,2));
   console.log(JSON.stringify({...result,ssaoChangedPixels:changed,hardware},null,2));
 } finally {await browser.close();}
+// The material slot shares PBR entry points and must retain valid GPU layouts.
+await import('./material-extension-tests.js');

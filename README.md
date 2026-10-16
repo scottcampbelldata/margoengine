@@ -60,7 +60,7 @@ Open the localhost URL printed by Vite for the standalone [Night Citadel showcas
 ```sh
 npm test                      # builds packages and runs modern unit checks
 npm run build:packages        # builds workspace libraries with precompiled Wasm
-npm run typecheck             # strict checks for all 62 packages after build
+npm run typecheck             # strict checks for all 63 packages after build
 npm run measure:size          # verifies the combined core + stage gzip ceiling
 npm run build                 # builds packages, both starters and Night Citadel
 npm run pack:packages         # rebuilds and writes npm tarballs to test-results/
@@ -70,7 +70,7 @@ npm run modern:test:domains   # caps, sorting, FX and real GPU-loss recovery
 npm run modern:test:sky       # scenery phases, stars, depth and plugin lifecycle on WebGPU
 npm run modern:test:citadel   # showcase pixels, controls, pacing, resize and orbit heap profile
 npm run modern:test:packages  # frozen exports/types and React 18 lifecycle
-npm run test:modules:packages # all 62 packed exports and strict Bundler/NodeNext consumers
+npm run test:modules:packages # all 63 packed exports and strict Bundler/NodeNext consumers
 npm run modern:test:usdz      # USDA/USDC fixtures, archive integrity and limits
 npm run modern:test:gltf-compression # production Draco/Meshopt loading and decoder teardown
 npm run modern:test:wrapper   # five-line setup, loading, lazy packs and teardown
@@ -82,7 +82,7 @@ npm run dev --workspace @margoengine/starter-next
 
 ## Packages
 
-Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. The release contains 62 packages: most at `0.1.0`, with DOF and tonemapping at `1.0.0`. The [catalog](docs/README.md) lists every package, runtime export and npm publication status.
+Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. The release contains 63 packages: most at `0.1.0`, with DOF and tonemapping at `1.0.0`. The [catalog](docs/README.md) lists every package, runtime export and npm publication status.
 
 | Package | Includes |
 | --- | --- |
@@ -100,6 +100,7 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 | [`@margoengine/creative`](packages/creative/README.md) | Textured/sorted GPU particles, wind obstacles, sky/fog/scattering, toon, HDR and compute post-processing |
 | `@margoengine/scenery` | Independently loaded `SkyMoon` plugin and `SkyMoonPass`, procedural moonlit sky, lunar phases, stars and horizon haze |
 | [`@margoengine/gltf-pro`](packages/gltf-pro/README.md) | Optional metallic-roughness PBR, texture maps, normal mapping, mipmaps, alpha modes and Draco/Meshopt loading |
+| [`@margoengine/materials`](packages/materials/README.md) | Optional clearcoat, screen-space transmission, IOR, Beer-law volume and a closed TypeScript node graph |
 | [`@margoengine/decoders`](packages/decoders/README.md) | Lazy Draco workers, synchronous TypeScript Meshopt decoding and standalone KTX2/Basis transcoding |
 | [`@margoengine/blender`](packages/blender/README.md) | Offline Blender `.margo` export and prepacked WebGPU PBR ingestion |
 | `@margoengine/animation` | Optional storage-buffer skeletal skinning, compute morphs and glTF animation playback |
@@ -164,15 +165,25 @@ needed and releases temporary workers after success, failure or cancellation.
 Caller-supplied decoders remain caller-owned. KTX2 textures remain unsupported in
 glTF loading; standalone KTX2 transcoding is available in `@margoengine/decoders`.
 
-Verification on 16 October 2026 passed 931 Node 24 tests, strict TypeScript checks
-and packed imports across all 62 packages, and the production compression browser
-checks. `npm run measure:size` reports **47,983 bytes raw / 19,999 bytes gzip** for
+[`@margoengine/materials`](packages/materials/README.md) adds clearcoat,
+transmission, IOR, volume, and a closed TypeScript node graph through the optional
+material extension slot. Install optional glTF metadata explicitly with
+`materials.install(model)`, or compile an authored graph with `nodeMaterial()`.
+Refraction samples the opaque screen color once; there is no ray-traced or
+multi-bounce transmission, participating media, or node-graph file format.
+Transmissive surfaces do not cast shadows or receive cascaded shadows. Sheen,
+iridescence, anisotropy, specular-color, and Three.js TSL remain unsupported.
+These features stay outside the frozen core and stage bundle.
+
+Verification on 16 October 2026 passed 994 Node 24 tests, strict TypeScript checks
+and packed imports across all 63 packages, the existing production browser
+regressions, and 42 node-material GPU captures. `npm run measure:size` reports **47,983 bytes raw / 19,999 bytes gzip** for
 core + stage. The [release notes](CHANGELOG.md#unreleased) record the parser,
 normalization, index-boundary and lifecycle checks.
 
 ## Package catalog and release
 
-Run `npm run catalog` to preview the [searchable Margo catalog](docs/README.md). All 62 packages use their Margo names. `npm run catalog:build` refreshes the catalog from built runtime exports and checks exact-version availability on npm. [Release notes](CHANGELOG.md) describe source changes and their verification; an Unreleased entry does not indicate npm publication.
+Run `npm run catalog` to preview the [searchable Margo catalog](docs/README.md). All 63 packages use their Margo names. `npm run catalog:build` refreshes the catalog from built runtime exports and checks exact-version availability on npm. [Release notes](CHANGELOG.md) describe source changes and their verification; an Unreleased entry does not indicate npm publication.
 
 `npm run release:check` builds and tests the engine, enforces the 20,000-byte core + stage ceiling, and verifies every tarball's exports, TypeScript declarations and internal dependency versions. After signing into npm with access to the `@margoengine` scope, `npm run publish:packages` runs those checks and publishes the public library workspaces. Starter apps and showcases are private. Refresh the catalog after publishing and run `npm run build:site` to assemble the website.
 
