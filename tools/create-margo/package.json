@@ -1,0 +1,26 @@
+{
+  "name": "create-margo",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Start a Margo Engine app: npm create margo@latest my-app",
+  "bin": {
+    "create-margo": "index.js"
+  },
+  "files": [
+    "index.js",
+    "template"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "homepage": "https://margoengine.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "tools/create-margo"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

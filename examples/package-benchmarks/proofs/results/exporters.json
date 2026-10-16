@@ -1,0 +1,90 @@
+{
+  "package": "exporters",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:14:44.894Z",
+  "outputsIdentical": true,
+  "notes": "num() finds the shortest Float32 decimal with exact integer arithmetic (string search kept as the fallback); writers stream values instead of building per-vertex arrays; base64 encodes bytes; USDZ CRC uses a table.",
+  "cases": [
+    {
+      "case": "STL binary",
+      "triangles": 99458,
+      "bytes": 4997184,
+      "baselineMs": 96.8987,
+      "candidateMs": 35.0857,
+      "speedup": 2.762
+    },
+    {
+      "case": "STL ASCII",
+      "triangles": 99458,
+      "bytes": 21834826,
+      "baselineMs": 3854.9568,
+      "candidateMs": 945.4829,
+      "speedup": 4.077
+    },
+    {
+      "case": "OBJ with UVs and MTL",
+      "triangles": 99458,
+      "bytes": 10119016,
+      "baselineMs": 1344.2537,
+      "candidateMs": 473.9999,
+      "speedup": 2.836
+    },
+    {
+      "case": "OBJ with vertex colors",
+      "triangles": 99458,
+      "bytes": 11704668,
+      "baselineMs": 1163.5779,
+      "candidateMs": 335.6583,
+      "speedup": 3.467
+    },
+    {
+      "case": "PLY ASCII",
+      "triangles": 99458,
+      "bytes": 5179837,
+      "baselineMs": 802.3249,
+      "candidateMs": 197.6193,
+      "speedup": 4.06
+    },
+    {
+      "case": "PLY ASCII with colors",
+      "triangles": 99458,
+      "bytes": 5745529,
+      "baselineMs": 601.8192,
+      "candidateMs": 182.379,
+      "speedup": 3.3
+    },
+    {
+      "case": "PLY binary with colors",
+      "triangles": 99458,
+      "bytes": 2662098,
+      "baselineMs": 34.4388,
+      "candidateMs": 28.1842,
+      "speedup": 1.222
+    },
+    {
+      "case": "PLY binary",
+      "triangles": 99458,
+      "bytes": 2510646,
+      "baselineMs": 11.4277,
+      "candidateMs": 9.7205,
+      "speedup": 1.176
+    },
+    {
+      "case": "glTF JSON with embedded base64",
+      "triangles": 99458,
+      "bytes": 4820594,
+      "baselineMs": 416.9188,
+      "candidateMs": 59.2177,
+      "speedup": 7.04
+    },
+    {
+      "case": "USDZ",
+      "triangles": 99458,
+      "bytes": 6083062,
+      "baselineMs": 746.0321,
+      "candidateMs": 175.9344,
+      "speedup": 4.24
+    }
+  ]
+}

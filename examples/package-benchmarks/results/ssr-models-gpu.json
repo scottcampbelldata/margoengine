@@ -1,0 +1,427 @@
+{
+ "date": "2026-10-15T04:45:03.873Z",
+ "commit": "fcd604e",
+ "acPowerBefore": true,
+ "checks": {
+  "core-mirror-4x": {
+   "mirrorBounds": [
+    220,
+    313,
+    292,
+    406
+   ],
+   "mirroredCenter": [
+    256,
+    357
+   ],
+   "redPixels": 6159,
+   "redBounds": [
+    219,
+    319,
+    292,
+    404
+   ],
+   "redOutsideMirror": 0,
+   "blackIntroduced": 0,
+   "maxDiff": 124,
+   "centerOn": [
+    192,
+    41,
+    41
+   ],
+   "centerOff": [
+    165,
+    165,
+    165
+   ]
+  },
+  "gltf-mirror-4x": {
+   "mirrorBounds": [
+    220,
+    313,
+    292,
+    406
+   ],
+   "mirroredCenter": [
+    256,
+    357
+   ],
+   "redPixels": 6184,
+   "redBounds": [
+    219,
+    319,
+    292,
+    405
+   ],
+   "redOutsideMirror": 0,
+   "blackIntroduced": 0,
+   "maxDiff": 124,
+   "centerOn": [
+    192,
+    41,
+    41
+   ],
+   "centerOff": [
+    165,
+    165,
+    165
+   ]
+  },
+  "gltf-mirror-1x": {
+   "mirrorBounds": [
+    220,
+    313,
+    292,
+    406
+   ],
+   "mirroredCenter": [
+    256,
+    357
+   ],
+   "redPixels": 6249,
+   "redBounds": [
+    219,
+    319,
+    292,
+    405
+   ],
+   "redOutsideMirror": 0,
+   "blackIntroduced": 0,
+   "maxDiff": 124,
+   "centerOn": [
+    192,
+    41,
+    41
+   ],
+   "centerOff": [
+    165,
+    165,
+    165
+   ]
+  },
+  "materials-mirror-4x": {
+   "mirrorBounds": [
+    220,
+    313,
+    292,
+    406
+   ],
+   "mirroredCenter": [
+    256,
+    357
+   ],
+   "redPixels": 6184,
+   "redBounds": [
+    219,
+    319,
+    292,
+    405
+   ],
+   "redOutsideMirror": 0,
+   "blackIntroduced": 0,
+   "maxDiff": 124,
+   "centerOn": [
+    192,
+    41,
+    41
+   ],
+   "centerOff": [
+    165,
+    165,
+    165
+   ]
+  },
+  "gltf-not-added": {
+   "mirrorBounds": [
+    220,
+    313,
+    292,
+    406
+   ],
+   "mirroredCenter": [
+    256,
+    357
+   ],
+   "redPixels": 0,
+   "redBounds": null,
+   "redOutsideMirror": 0,
+   "blackIntroduced": 0,
+   "maxDiff": 0,
+   "centerOn": [
+    165,
+    165,
+    165
+   ],
+   "centerOff": [
+    165,
+    165,
+    165
+   ]
+  },
+  "gltf-map-0.3": {
+   "mirrorBounds": [
+    220,
+    313,
+    292,
+    406
+   ],
+   "mirroredCenter": [
+    256,
+    357
+   ],
+   "redPixels": 3436,
+   "redBounds": [
+    226,
+    346,
+    285,
+    405
+   ],
+   "redOutsideMirror": 0,
+   "blackIntroduced": 0,
+   "maxDiff": 114,
+   "centerOn": [
+    189,
+    85,
+    85
+   ],
+   "centerOff": [
+    164,
+    164,
+    164
+   ]
+  },
+  "gltf-map-0.8": {
+   "mirrorBounds": [
+    220,
+    313,
+    292,
+    406
+   ],
+   "mirroredCenter": [
+    256,
+    357
+   ],
+   "redPixels": 0,
+   "redBounds": null,
+   "redOutsideMirror": 0,
+   "blackIntroduced": 0,
+   "maxDiff": 0,
+   "centerOn": [
+    165,
+    165,
+    165
+   ],
+   "centerOff": [
+    165,
+    165,
+    165
+   ]
+  },
+  "helmet-4x": {
+   "mirrorBounds": [
+    284,
+    313,
+    356,
+    406
+   ],
+   "mirroredCenter": [
+    320,
+    357
+   ],
+   "redPixels": 344,
+   "redBounds": [
+    338,
+    248,
+    379,
+    334
+   ],
+   "redOutsideMirror": 255,
+   "blackIntroduced": 0,
+   "maxDiff": 160,
+   "centerOn": [
+    98,
+    87,
+    48
+   ],
+   "centerOff": [
+    104,
+    93,
+    53
+   ],
+   "helmetBounds": [
+    241,
+    206,
+    398,
+    368
+   ],
+   "helmetChanged": 3142,
+   "helmetRedder": 1015
+  },
+  "blur": {
+   "mirrorEdge": {
+    "width": 0,
+    "contrast": 151
+   },
+   "map03Edge": {
+    "width": 17,
+    "contrast": 104
+   }
+  }
+ },
+ "timing": {
+  "glTF floor 1280x720 4x added": {
+   "frameGpuMs": 3.111,
+   "ssrOwnMs": 2.179,
+   "captureMs": 0.194,
+   "gbufferMs": 0.133,
+   "traceMs": 1.858,
+   "sceneMs": 0.429,
+   "zeroFrames": 0
+  },
+  "glTF floor 1280x720 4x not added": {
+   "frameGpuMs": 1.854,
+   "ssrOwnMs": 0.673,
+   "captureMs": 0,
+   "gbufferMs": 0.144,
+   "traceMs": 0.527,
+   "sceneMs": 0.578,
+   "zeroFrames": 0
+  },
+  "helmet 1280x720 4x added": {
+   "frameGpuMs": 1.834,
+   "ssrOwnMs": 0.672,
+   "captureMs": 0.048,
+   "gbufferMs": 0.277,
+   "traceMs": 0.353,
+   "sceneMs": 0.734,
+   "zeroFrames": 0
+  },
+  "helmet 1280x720 4x not added": {
+   "frameGpuMs": 1.842,
+   "ssrOwnMs": 0.539,
+   "captureMs": 0,
+   "gbufferMs": 0.3,
+   "traceMs": 0.267,
+   "sceneMs": 0.787,
+   "zeroFrames": 0
+  },
+  "glTF floor 1280x720 1x added": {
+   "frameGpuMs": 2.863,
+   "ssrOwnMs": 2.384,
+   "captureMs": 0.21,
+   "gbufferMs": 0.135,
+   "traceMs": 2.031,
+   "sceneMs": 0.471,
+   "zeroFrames": 0
+  },
+  "glTF floor 1280x720 1x not added": {
+   "frameGpuMs": 1.186,
+   "ssrOwnMs": 0.62,
+   "captureMs": 0,
+   "gbufferMs": 0.115,
+   "traceMs": 0.5,
+   "sceneMs": 0.563,
+   "zeroFrames": 0
+  },
+  "helmet 1280x720 1x added": {
+   "frameGpuMs": 1.494,
+   "ssrOwnMs": 0.703,
+   "captureMs": 0.052,
+   "gbufferMs": 0.253,
+   "traceMs": 0.398,
+   "sceneMs": 0.77,
+   "zeroFrames": 0
+  },
+  "helmet 1280x720 1x not added": {
+   "frameGpuMs": 1.251,
+   "ssrOwnMs": 0.483,
+   "captureMs": 0,
+   "gbufferMs": 0.244,
+   "traceMs": 0.239,
+   "sceneMs": 0.771,
+   "zeroFrames": 0
+  },
+  "glTF floor 1920x1080 4x added": {
+   "frameGpuMs": 8.234,
+   "ssrOwnMs": 5.504,
+   "captureMs": 0.462,
+   "gbufferMs": 0.231,
+   "traceMs": 4.813,
+   "sceneMs": 1.013,
+   "zeroFrames": 0
+  },
+  "glTF floor 1920x1080 4x not added": {
+   "frameGpuMs": 3.516,
+   "ssrOwnMs": 1.147,
+   "captureMs": 0,
+   "gbufferMs": 0.204,
+   "traceMs": 0.943,
+   "sceneMs": 0.914,
+   "zeroFrames": 0
+  },
+  "helmet 1920x1080 4x added": {
+   "frameGpuMs": 4.924,
+   "ssrOwnMs": 1.695,
+   "captureMs": 0.073,
+   "gbufferMs": 0.72,
+   "traceMs": 0.904,
+   "sceneMs": 1.709,
+   "zeroFrames": 0
+  },
+  "helmet 1920x1080 4x not added": {
+   "frameGpuMs": 4.481,
+   "ssrOwnMs": 1.385,
+   "captureMs": 0,
+   "gbufferMs": 0.686,
+   "traceMs": 0.699,
+   "sceneMs": 1.65,
+   "zeroFrames": 0
+  },
+  "glTF floor 1920x1080 1x added": {
+   "frameGpuMs": 6.125,
+   "ssrOwnMs": 5.158,
+   "captureMs": 0.438,
+   "gbufferMs": 0.202,
+   "traceMs": 4.518,
+   "sceneMs": 0.942,
+   "zeroFrames": 0
+  },
+  "glTF floor 1920x1080 1x not added": {
+   "frameGpuMs": 2.425,
+   "ssrOwnMs": 1.214,
+   "captureMs": 0,
+   "gbufferMs": 0.222,
+   "traceMs": 0.992,
+   "sceneMs": 1.209,
+   "zeroFrames": 0
+  },
+  "helmet 1920x1080 1x added": {
+   "frameGpuMs": 2.48,
+   "ssrOwnMs": 1.204,
+   "captureMs": 0.057,
+   "gbufferMs": 0.447,
+   "traceMs": 0.726,
+   "sceneMs": 1.178,
+   "zeroFrames": 0
+  },
+  "helmet 1920x1080 1x not added": {
+   "frameGpuMs": 2.62,
+   "ssrOwnMs": 1.011,
+   "captureMs": 0,
+   "gbufferMs": 0.509,
+   "traceMs": 0.502,
+   "sceneMs": 1.597,
+   "zeroFrames": 0
+  }
+ },
+ "timingLabel": "diagnostic (machine not quiet-gated)",
+ "gpu": {
+  "vendor": "intel",
+  "architecture": "xe-2lpg",
+  "device": "0x64a0",
+  "description": "Intel(R) Arc(TM) 140V GPU (16GB)",
+  "fallback": false
+ },
+ "browser": "chromium 155.0.4283.45",
+ "acPowerAfter": true
+}

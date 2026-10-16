@@ -5,7 +5,7 @@ distribution at `examples/jsm/loaders/usd/`. Their only local changes are the
 provenance headers. Both parsers operate on plain data and typed arrays and have
 no imports or renderer dependencies.
 
-The adjacent declarations describe the internal surface used by Margo's bounded
-adapters in `../index.ts`. Keep those adapters outside the upstream files so
-parser updates remain easy to compare. When updating, preserve the MIT license
-in `../../THIRD-PARTY-NOTICES.txt` and run the USDZ fixture and browser tests.
+These files are retained as upstream reference material. The package runtime uses
+`@margoengine/loaders`' bounded `readUSDA` tokenizer and `../crate.ts`'s native
+Crate decoder. Neither vendored parser is imported or bundled. Keep the source
+provenance headers and MIT attribution with these reference files.

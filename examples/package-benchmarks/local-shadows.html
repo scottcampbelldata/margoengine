@@ -1,0 +1,73 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Local shadows GPU check</title><style>body{margin:0}#host{width:1280px;height:720px}</style></head><body><div id="host"></div>
+<script type="module">
+// Driven by local-shadows-gpu.mjs. A floor (core mesh or materials plane, both casters too) and three 0.5 m boxes resting
+// on it: a core mesh, a materials mesh and an instance of createInstancedMesh. One point or one spot light above and behind them, the
+// directional light off and a dim ambient, so the floor is lit by the local light. The runner compares screenshots with
+// castShadow on and off at floor points the page projects. bench() times 1/4/8 shadowed point lights at 1280x720.
+import {createStage} from '/packages/margoengine/dist/index.js';
+import {box,PbrMaterial} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {boxGeometry,planeGeometry} from '/packages/geometry/dist/index.js';
+import {Material,createMesh,createInstancedMesh} from '/packages/materials/dist/index.js';
+import {Clustered} from '/packages/clustered/dist/index.js';
+import {LocalShadows} from '/packages/clustered/dist/shadows.js';
+import {Stats} from '/packages/stats/dist/index.js';
+const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,features:['timestamp-query'],camera:{position:[0,4.5,5.5],target:[0,0,0.3]}});
+const engine=stage.engine,device=engine.gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const lighting=engineRuntime(engine).lighting;lighting.direction[3]=0;lighting.radiance[3]=0.08;
+const lights=Clustered.attach(engine);let shadows=null;
+const grey=[0.7,0.7,0.7],coreFloor=engine.createMesh().setGeometry(box(8,0.02,8));coreFloor.setMaterial(new PbrMaterial({color:grey,roughness:0.9}));coreFloor.position.set(0,-0.01,0);
+const plane=createMesh(engine,planeGeometry(8,8),new Material({color:grey,roughness:0.9}));plane.root.setQuaternion([-Math.SQRT1_2,0,0,Math.SQRT1_2]);
+const centers=[[-1.2,0.25,-0.6],[0,0.25,-0.6],[1.2,0.25,-0.6]];
+const coreBox=engine.createMesh().setGeometry(box(0.5,0.5,0.5));coreBox.setMaterial(new PbrMaterial({color:[0.8,0.3,0.2]}));coreBox.position.set(...centers[0]);
+const materialBox=createMesh(engine,boxGeometry(0.5,0.5,0.5),new Material({color:[0.2,0.6,0.3]}));materialBox.root.setPosition(centers[1]);
+const instanced=createInstancedMesh(engine,boxGeometry(0.5,0.5,0.5),new Material({color:[0.2,0.3,0.8]}),2);
+instanced.instances.setMatrixAt(0,[1,0,0,0,0,1,0,0,0,0,1,0,...centers[2],1]).setMatrixAt(1,[1,0,0,0,0,1,0,0,0,0,1,0,0,0.25,-6,1]);
+for(const model of [plane,materialBox,instanced])lights.add(model);
+// The floors cast too, so a receiver that is also in the map is checked for acne.
+const casters=[coreBox,materialBox,instanced,coreFloor,plane];
+const modes={
+  point:{position:[0,2.2,-2.2],range:12,intensity:22},
+  spot:{position:[0,3,-2.5],range:12,intensity:40,direction:[0,-3,2.5],outerAngle:0.75,innerAngle:0.6},
+};
+let mode='point';
+const attach=(on,maxLights=4)=>{if(on&&!shadows){shadows=LocalShadows.attach(engine,{lights,maxLights});for(const c of casters)shadows.add(c);}if(!on&&shadows){shadows.dispose();shadows=null;}};
+const frame=async()=>{engine.render();await device.queue.onSubmittedWorkDone();};
+// Clip-space projection of a world point to CSS pixels of the canvas.
+const project=v=>{const m=engine.camera.matrix,w=m[3]*v[0]+m[7]*v[1]+m[11]*v[2]+m[15],c=engine.canvas;return [((m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12])/w+1)/2*c.clientWidth,(1-(m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13])/w)/2*c.clientHeight];};
+// Segment a-b against a box of half size h around c (slab test).
+const hits=(a,b,c,h)=>{let t0=0,t1=1;for(let k=0;k<3;k++){const d=b[k]-a[k],lo=c[k]-h-a[k],hi=c[k]+h-a[k];if(Math.abs(d)<1e-9){if(lo>0||hi<0)return false;continue;}let u=lo/d,v=hi/d;if(u>v)[u,v]=[v,u];t0=Math.max(t0,u);t1=Math.min(t1,v);if(t0>t1)return false;}return true;};
+window.check={
+  async render({floor='core',shadow='on'}){
+    device.pushErrorScope('validation');coreFloor.visible=floor==='core';plane.root.visible=floor==='materials';
+    attach(shadow!=='detached');lights.setLights([{...modes[mode],castShadow:shadow==='on'}]);
+    for(let i=0;i<3;i++)await frame();const e=await device.popErrorScope();return {error:e?.message??null,errors:errors.splice(0),stats:shadows?{...shadows.stats}:null};
+  },
+  setMode(m){mode=m;},
+  // Floor points: where each box's top centre shadows the floor; a grid of lit floor away from boxes and shadows (acne);
+  // and, per box, a walk from its base edge away from the light (contact gap).
+  points(){
+    const L=modes[mode].position,eye=engine.camera.position,s=L[1]/(L[1]-0.5),inCone=p=>{if(mode==='point')return true;const d=modes.spot.direction,n=Math.hypot(...d),v=p.map((x,k)=>x-L[k]),l=Math.hypot(...v);return (v[0]*d[0]+v[1]*d[1]+v[2]*d[2])/(n*l)>Math.cos(0.55);};
+    const shadowCentres=centers.map(c=>{const t=[c[0],0.5,c[2]];return project(t.map((x,k)=>L[k]+s*(x-L[k])).map((x,k)=>k===1?0:x));});
+    const grid=[];for(let x=-3;x<=3.001;x+=0.1)for(let z=-2.5;z<=2.5;z+=0.1){const p=[x,0,z];if(!inCone(p))continue;
+      if(centers.some(c=>hits(p,L,c,0.25+0.15)||hits(p,eye,c,0.3)||Math.abs(p[0]-c[0])<0.4&&Math.abs(p[2]-c[2])<0.4))continue;grid.push(project(p));}
+    const walks=centers.map(c=>{const d=[c[0]-L[0],c[2]-L[2]],n=Math.hypot(...d);d[0]/=n;d[1]/=n;const e=0.25/Math.max(Math.abs(d[0]),Math.abs(d[1]));
+      return Array.from({length:161},(_,i)=>{const r=e+i*0.0025;return project([c[0]+d[0]*r,0,c[2]+d[1]*r]);});});
+    return {shadowCentres,grid,walks};
+  },
+  // GPU pass time (timestamp queries, Stats profiler) and submit-to-done time with `count` of 8 point lights shadowed.
+  async bench({count,dynamic,attached=true,spot=false}){
+    const ring=Array.from({length:8},(_,i)=>{const a=i/8*Math.PI*2,p=[Math.cos(a)*2.6,2,Math.sin(a)*2.6];return spot?{position:p,range:8,intensity:10,direction:[-p[0],-2,-p[2]],outerAngle:0.7,castShadow:i<count}:{position:p,range:8,intensity:10,castShadow:i<count};});
+    coreFloor.visible=true;plane.root.visible=false;attach(attached,8);lights.setLights(ring);
+    const extra=[];for(let i=0;i<16;i++){const m=engine.createMesh().setGeometry(box(0.3,0.6,0.3));const a=i/16*Math.PI*2;m.position.set(Math.cos(a)*1.6,0.3,Math.sin(a)*1.6);extra.push(m);if(shadows)shadows.add(m,{dynamic:dynamic&&i===0});}
+    const stats=window.stats??=Stats.attach(engine,{profiling:true});for(let i=0;i<20;i++)await frame();
+    const gpu=[],frames=[];
+    for(let i=0;i<600;i++){const t=performance.now();engine.render();await device.queue.onSubmittedWorkDone();frames.push(performance.now()-t);
+      if(i%15===14){await new Promise(r=>setTimeout(r,5));let sum=0;const ms=stats.gpuPassMilliseconds;for(let k=0;k<stats.gpuPassCount;k++)sum+=ms[k];if(stats.gpuPassCount)gpu.push(sum);}}
+    const med=a=>{const b=[...a].sort((x,y)=>x-y);return +b[b.length>>1].toFixed(3);},layers=shadows?.stats.layers??0;
+    extra.forEach(m=>m.dispose());attach(false);await frame();
+    return {count,dynamic,spot,attached,gpuMs:gpu.length?med(gpu):null,gpuSamples:gpu.length,frameMs:med(frames),layersPerFrame:layers,errors:errors.splice(0)};
+  },
+};
+window.ready=true;
+</script></body></html>

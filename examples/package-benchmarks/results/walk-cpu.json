@@ -1,0 +1,127 @@
+{
+  "machine": {
+    "ac": true,
+    "cpuLoadPercent": 20,
+    "waitedSeconds": 360,
+    "checkedAt": "2026-10-15T11:36:04.700Z",
+    "topProcesses": [
+      {
+        "Name": "claude",
+        "Id": 13528,
+        "cpuSeconds": 1023
+      },
+      {
+        "Name": "claude",
+        "Id": 12156,
+        "cpuSeconds": 1021
+      },
+      {
+        "Name": "SnagitEditor",
+        "Id": 28664,
+        "cpuSeconds": 817
+      },
+      {
+        "Name": "claude",
+        "Id": 15776,
+        "cpuSeconds": 804
+      },
+      {
+        "Name": "ChatGPT",
+        "Id": 21032,
+        "cpuSeconds": 755
+      },
+      {
+        "Name": "ChatGPT",
+        "Id": 18852,
+        "cpuSeconds": 543
+      },
+      {
+        "Name": "ChatGPT",
+        "Id": 4960,
+        "cpuSeconds": 421
+      },
+      {
+        "Name": "claude",
+        "Id": 12224,
+        "cpuSeconds": 403
+      }
+    ]
+  },
+  "node": "v24.15.0",
+  "date": "2026-10-15T11:36:05.574Z",
+  "scenes": {
+    "house": {
+      "meshes": 57,
+      "triangles": 684,
+      "warm": {
+        "frames": 1071,
+        "waypoints": "8/8",
+        "meanTrianglesTested": 6.4,
+        "medianMs": 0.0098,
+        "p95Ms": 0.0482,
+        "p99Ms": 0.1676,
+        "maxMs": 0.499,
+        "meanMs": 0.0179,
+        "worstFrame": {
+          "candidates": 6,
+          "triangles": 28,
+          "rays": 9,
+          "substeps": 1
+        }
+      },
+      "coldMaxMs": 5.867
+    },
+    "houseBlock": {
+      "houses": 16,
+      "meshes": 912,
+      "warm": {
+        "frames": 1071,
+        "waypoints": "8/8",
+        "meanTrianglesTested": 6.4,
+        "medianMs": 0.0333,
+        "p95Ms": 0.1167,
+        "p99Ms": 0.2098,
+        "maxMs": 0.654,
+        "meanMs": 0.0471,
+        "worstFrame": {
+          "candidates": 6,
+          "triangles": 28,
+          "rays": 9,
+          "substeps": 1
+        }
+      },
+      "coldMaxMs": 1.155
+    },
+    "conveyor": {
+      "primitives": 570,
+      "waypointParts": 8,
+      "triangles": 2445355,
+      "parseMs": 505,
+      "bounds": [
+        -39.66,
+        -1,
+        -1.19,
+        39.66,
+        35.17,
+        101.18
+      ],
+      "warm": {
+        "frames": 4808,
+        "waypoints": "0/8",
+        "meanTrianglesTested": 41.1,
+        "medianMs": 0.0325,
+        "p95Ms": 0.1108,
+        "p99Ms": 0.2308,
+        "maxMs": 0.898,
+        "meanMs": 0.0443,
+        "worstFrame": {
+          "candidates": 3,
+          "triangles": 186,
+          "rays": 9,
+          "substeps": 1
+        }
+      },
+      "coldMaxMs": 57.117
+    }
+  }
+}

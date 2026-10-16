@@ -1,1 +1,1 @@
-export default {transpilePackages:['@margoengine/core','@margoengine/react']};
+export default { transpilePackages: ['@margoengine/core', '@margoengine/react'] };

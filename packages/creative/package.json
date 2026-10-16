@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/creative",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "WebGPU particles, atmosphere, toon shading and post-processing for Margo Engine.",
@@ -14,7 +14,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/planet.test.js",
+    "test": "npm run build && node --test tests/planet.test.js tests/particles.test.js ../../tests/modern-grass.test.js ../../tests/deep-render-creative.test.js ../../tests/audit-rendering-composition.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "dev": "vite --config vite.config.js",
     "prepack": "npm run build"
@@ -48,13 +48,23 @@
     "./planet": {
       "types": "./dist/planet.d.ts",
       "import": "./dist/planet.js"
+    },
+    "./stars": {
+      "types": "./dist/stars.d.ts",
+      "import": "./dist/stars.js"
     }
   },
   "files": [
     "dist"
   ],
   "peerDependencies": {
-    "@margoengine/core": "0.1.0"
+    "@margoengine/core": "^1.0.0"
   },
-  "homepage": "https://margoengine.com"
+  "dependencies": {
+    "@margoengine/vfx": "^1.0.0"
+  },
+  "homepage": "https://margoengine.com",
+  "devDependencies": {
+    "@margoengine/math": "^1.0.0"
+  }
 }

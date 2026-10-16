@@ -50,6 +50,12 @@ export class StereoRenderer {
           this.resources.set(geometry,resource);
         }catch(error){for(const buffer of allocated)buffer.destroy();throw error;}
       }
+      if(resource.data.length<engine.store.capacity*24){
+        const data=new Float32Array(engine.store.capacity*24);
+        if(data.byteLength>device.limits.maxBufferSize)throw new RangeError('XR buffer exceeds device limit');
+        const instance=device.createBuffer({size:data.byteLength,usage:GPUBufferUsage.VERTEX|GPUBufferUsage.COPY_DST});
+        resource.instance.destroy();resource.instance=instance;resource.data=data;
+      }
       const offset=resource.count++*24;resource.data.set(mesh.matrix,offset);resource.data.set(mesh.material.data,offset+16);
     }
     for(const [geometry,resource] of this.resources) {

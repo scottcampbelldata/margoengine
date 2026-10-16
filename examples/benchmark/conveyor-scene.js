@@ -4,7 +4,7 @@ export const ROLLERS = 3000,
 export function conveyorScene() {
   const nodes = [
       {
-        name: "Conveyor_Assembly",
+        name: 'Conveyor_Assembly',
         parent: -1,
         position: [0, 0, 0],
         scale: [1, 1, 1],
@@ -17,51 +17,22 @@ export function conveyorScene() {
     return id;
   };
   for (const z of [-1.1, 1.1]) {
-    add("Rail_" + z, [0, 0.55, z], [6.5, 0.3, 0.15], "box", 1);
-    for (const x of [-2.6, 2.6])
-      add("Support_" + x + "_" + z, [x, -0.1, z], [0.2, 1.4, 0.2], "box", 1);
+    add('Rail_' + z, [0, 0.55, z], [6.5, 0.3, 0.15], 'box', 1);
+    for (const x of [-2.6, 2.6]) add('Support_' + x + '_' + z, [x, -0.1, z], [0.2, 1.4, 0.2], 'box', 1);
   }
   for (let i = 0; i < ROLLERS; i++) {
-    const assembly = add(
-      "Roller_Assembly_" + i,
-      [-3 + (6 * i) / (ROLLERS - 1), 0.65, 0],
-      [1, 1, 1],
-    );
-    shafts.push(
-      add("Roller_" + i, [0, 0, 0], [0.18, 0.18, 2.1], "cylinder", 0, assembly),
-    );
+    const assembly = add('Roller_Assembly_' + i, [-3 + (6 * i) / (ROLLERS - 1), 0.65, 0], [1, 1, 1]);
+    shafts.push(add('Roller_' + i, [0, 0, 0], [0.18, 0.18, 2.1], 'cylinder', 0, assembly));
     for (const z of [-1.17, 1.17])
-      add(
-        "Mount_Bolt_" + i + "_" + z,
-        [0, 0, z],
-        [0.06, 0.06, 0.12],
-        "cylinder",
-        0,
-        assembly,
-      );
+      add('Mount_Bolt_' + i + '_' + z, [0, 0, z], [0.06, 0.06, 0.12], 'cylinder', 0, assembly);
   }
-  add("Conveyor_Belt", [0, 0.84, 0], [6.2, 0.06, 2.08], "box", 2);
-  const cover = add("Drive_Cover_Assembly", [-2.5, 0.8, 1.35], [1, 1, 1]);
-  add("Drive_Cover", [0, 0, 0], [0.95, 0.65, 0.25], "box", 1, cover);
-  for (const x of [-0.38, 0.38])
-    add(
-      "Cover_Bolt_" + x,
-      [x, 0.2, 0.16],
-      [0.05, 0.05, 0.08],
-      "cylinder",
-      0,
-      cover,
-    );
-  add("Linear_Carriage", [0, 1.1, 0], [0.7, 0.25, 0.6], "box", 1);
-  const motor = add(
-    "Motor",
-    [-2.5, 0.45, 1.45],
-    [0.28, 0.28, 0.8],
-    "cylinder",
-    0,
-  );
-  if (nodes.length !== ENTITY_COUNT)
-    throw new Error("Conveyor entity count changed");
+  add('Conveyor_Belt', [0, 0.84, 0], [6.2, 0.06, 2.08], 'box', 2);
+  const cover = add('Drive_Cover_Assembly', [-2.5, 0.8, 1.35], [1, 1, 1]);
+  add('Drive_Cover', [0, 0, 0], [0.95, 0.65, 0.25], 'box', 1, cover);
+  for (const x of [-0.38, 0.38]) add('Cover_Bolt_' + x, [x, 0.2, 0.16], [0.05, 0.05, 0.08], 'cylinder', 0, cover);
+  add('Linear_Carriage', [0, 1.1, 0], [0.7, 0.25, 0.6], 'box', 1);
+  const motor = add('Motor', [-2.5, 0.45, 1.45], [0.28, 0.28, 0.8], 'cylinder', 0);
+  if (nodes.length !== ENTITY_COUNT) throw new Error('Conveyor entity count changed');
   const positions = [],
     normals = [],
     indices = [];

@@ -66,10 +66,10 @@ import { Engine } from '@margoengine/core';
 import { GPUParticles } from '@margoengine/creative';
 
 const engine = await Engine.create(document.querySelector('canvas'), { backend: 'webgpu' });
-engine.use(new GPUParticles({
+GPUParticles.attach(engine, {
   count: 2000, size: 0.035, sort: true, curl: 0.2,
   gravity: [0, -0.3, 0], wind: [0.1, 0, 0.1],
-}));
+});
 attach(engine);
   </script>
 </body>

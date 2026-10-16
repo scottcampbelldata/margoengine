@@ -22,7 +22,7 @@ constructor; `GLTFDocument` is available as a type from either entry.
 
 Optional WebGPU glTF 2.0 metallic-roughness rendering, separate from the frozen core and stage. The public npm name follows this repository's scope: `@margoengine/gltf-pro`.
 
-The verified core + stage bundle remains **19,999 bytes gzip**; CI rejects 20,000 bytes and above. Optional loaders, decoder code, workers and Wasm stay outside that measurement.
+Core + stage must remain below **25,000 bytes gzip**; CI rejects 25,000 bytes and above. Optional loaders, decoder code, workers and Wasm stay outside that measurement.
 
 ```ts
 import {createStage} from 'margoengine';
@@ -73,6 +73,10 @@ Optional material maps support the same transform through `materials.install()`.
 `textureCoordinates(info)` exposes the validated UV selection and packed affine rows;
 caller-owned clearcoat/transmission textures accept a glTF-style `transform` option.
 
+Imported clearcoat, transmission, IOR, volume, sheen and specular metadata remain available for explicit `@margoengine/materials` installation. To use the retained physical renderer directly, import `extendedMaterials` from `@margoengine/gltf-pro/extended` and pass `{decoders: {materials: extendedMaterials}}` to `loadGLTF` or `parseGLTFAsync`. For synchronous parsing, pass `{materials: extendedMaterials}` as `parseGLTF`'s fifth argument. This route also enables iridescence, anisotropy and diffuse transmission. Constructed `@margoengine/materials` meshes retain their live material and UV-transform layout automatically.
+
+The optional `/worker` entry exposes `loadGLTFInWorker` and `parseGLTFInWorker`. Ordinary assets parse and pack in a worker. Automatic Draco/KTX2 inputs transfer their source buffers back before codec work, then decode on the GPU-owning thread; custom decoders or `fetch` keep the entire load there. The `/progressive` loader exposes `ready` and `complete`; compressed assets use the normal async loader before publishing a model. `maxDownloadBytes`, `maxNodes`, allowed resource URLs and abort signals remain enforced.
+
 The loader passes declared vertex/index counts, accessor widths and the remaining
 256 MiB decoded-data budget into Draco. The default decoder rejects oversized
 actual geometry before allocating output arrays, including topology without an
@@ -99,8 +103,14 @@ Import the optional `@margoengine/gltf-pro/scene` entry for camera fitting and
 raw GPU records across core geometry and loaded glTF/FBX models:
 
 ```ts
+import {createStage} from 'margoengine';
+import {box} from '@margoengine/core';
+import {loadGLTF, type MaterialExtension} from '@margoengine/gltf-pro';
 import {getSceneBounds, fitScene, gatherSceneBuffers} from '@margoengine/gltf-pro/scene';
 
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const model = await loadGLTF(stage.engine, '/DamagedHelmet.glb');
+const coreMesh = stage.engine.createMesh().setGeometry(box());
 const roots = [model.root, coreMesh];
 fitScene(stage.engine, roots, {duration: 0.3, padding: 1.1});
 const bounds = getSceneBounds(stage.engine, roots);

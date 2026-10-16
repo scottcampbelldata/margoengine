@@ -1,24 +1,40 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {SkyMoon} from '../packages/scenery/dist/index.js';
-import {optionalGPU} from './support/optional-gpu.js';
+import { SkyMoon } from '../packages/scenery/dist/index.js';
+import { Sky } from '../packages/sky/dist/base.js';
+import { optionalGPU } from './support/optional-gpu.js';
 
-test('SkyMoon follows depth/sample changes, reuses warmed pipelines and retries a failed variant',()=>{
- const h=optionalGPU(),d=h.engine.gpu;globalThis.GPUShaderStage={VERTEX:1,FRAGMENT:2};d.createBindGroupLayout=x=>x;d.createPipelineLayout=x=>x;
- const navigatorDescriptor=Object.getOwnPropertyDescriptor(globalThis,'navigator');Object.defineProperty(globalThis,'navigator',{configurable:true,value:{gpu:{getPreferredCanvasFormat:()=>h.context.format}}});
- let bound,ended=0;const begin=h.context.encoder.beginRenderPass;
- h.context.encoder.beginRenderPass=descriptor=>({...begin(descriptor),end(){ended++;},setPipeline(pipeline){bound=pipeline;assert.equal(pipeline.depthStencil.format,h.context.descriptor.depthStencil.format);assert.equal(pipeline.multisample?.count??1,h.context.descriptor.multisample?.count??1);}});
- const sky=new SkyMoon({moonPhase:0.7});
- try{
-  h.engine.use(sky);h.frame();const desktop=bound,initial={...h.counts},pipelines=h.pipelines.length;
-  for(let i=0;i<120;i++)h.frame();assert.equal(h.pipelines.length,pipelines);for(const key of ['buffers','textures','groups','views'])assert.equal(h.counts[key],initial[key]);
-  h.context.descriptor={...h.context.descriptor,depthStencil:{format:'depth24plus'}};h.frame();const changed=bound;assert.notEqual(changed,desktop);
-  h.context.descriptor={...h.context.descriptor,multisample:{count:1}};h.frame();const single=bound;assert.notEqual(single,changed);
-  const create=d.createRenderPipeline,failure=new Error('Sky variant failed'),previousEnds=ended;h.context.descriptor={...h.context.descriptor,depthStencil:{format:'depth24plus-stencil8'}};d.createRenderPipeline=()=>{throw failure;};assert.throws(h.frame,error=>error===failure);d.createRenderPipeline=create;assert.equal(ended,previousEnds+1,'Failed variant must close the open pass');
-  h.frame();assert.equal(bound.depthStencil.format,'depth24plus-stencil8');
-  h.context.descriptor={...h.context.descriptor,depthStencil:{format:'depth24plus'}};h.frame();assert.equal(bound,single);
-  h.context.descriptor={...h.context.descriptor,depthStencil:{format:'depth32float'},multisample:{count:4}};h.frame();assert.equal(bound,desktop);
-  const warmed=h.pipelines.length;for(let i=0;i<120;i++)h.frame();assert.equal(h.pipelines.length,warmed);assert.equal(h.counts.buffers,initial.buffers);assert.equal(h.counts.groups,initial.groups);
-  sky.onDeviceRestored(h.engine);h.frame();assert.notEqual(bound,desktop);
- }finally{sky.dispose();if(navigatorDescriptor)Object.defineProperty(globalThis,'navigator',navigatorDescriptor);else delete globalThis.navigator;assert.ok(h.resources.every(r=>r.destroyed));}
+test('SkyMoon is a midnight Sky (base entry, stylized night only) whose config is read every frame', () => {
+  const h = optionalGPU();
+  globalThis.GPUTextureUsage ??= { STORAGE_BINDING: 8, TEXTURE_BINDING: 4 };
+  const sky = new SkyMoon({ moonPhase: 0.7, moonDirection: [0, 2, 0], moonSize: 0.05 });
+  assert.ok(sky instanceof Sky);
+  assert.equal(sky.name, 'sky-moon');
+  try {
+    h.engine.use(sky);
+    h.frame();
+    const values = () => new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 256).data);
+    let v = values();
+    assert.equal(sky.nightFactor, 1, 'held at night');
+    assert.equal(v[60], 1, 'stylized night enabled');
+    assert.deepEqual([v[48], v[49], v[50]], [0, 1, 0], 'moon direction normalized');
+    assert.ok(Math.abs(v[51] - Math.cos(0.05)) < 1e-6 && Math.abs(v[55] - Math.sin(0.05)) < 1e-6);
+    assert.ok(Math.abs(v[56] - 0.7) < 1e-6);
+    const clock = v[59];
+    assert.ok(clock > 0, 'twinkle clock follows frame time');
+    sky.config.moonPhase = -3;
+    h.frame();
+    v = values();
+    assert.equal(v[56], -1, 'phase clamps');
+    assert.ok(v[59] > clock);
+    assert.equal(sky.options.hours, 0);
+    sky.config.moonSize = 2;
+    assert.throws(() => sky.onPreUpdate(0), /Moon size/);
+    sky.config.moonSize = 0.05;
+    sky.onDeviceRestored(h.engine);
+    h.frame();
+  } finally {
+    sky.dispose();
+    assert.ok(h.resources.every((r) => r.destroyed));
+  }
 });

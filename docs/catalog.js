@@ -13,6 +13,7 @@ function filter() {
     element.hidden = !terms.every(term => text.includes(term));
     if (!element.hidden) visible++;
   }
+  for (const layer of modules.querySelectorAll('.layer')) layer.hidden = !layer.querySelector('.module:not([hidden])');
   count.textContent = `${visible} of ${cards.length} packages`;
   document.querySelector('#empty').hidden = visible !== 0;
   const url = new URL(location.href);
@@ -73,10 +74,23 @@ async function load() {
     document.querySelector('#publication-note').textContent = published === entries.length
       ? 'All packages are available on npm.'
       : `${entries.length - published} packages await npm publication. Build packages marked Source from the repository; their install commands and CDN examples will work after publication.`;
+    // catalog.json lists packages layer by layer (scripts/build-catalog.js); each layer gets its own headed section.
+    const layers = new Map();
     for (const entry of entries) {
+      if (!layers.has(entry.category)) {
+        const section = document.createElement('section'), heading = document.createElement('h2'), grid = document.createElement('div');
+        section.className = 'layer';
+        heading.id = `layer-${layers.size + 1}`;
+        heading.textContent = entry.category;
+        section.setAttribute('aria-labelledby', heading.id);
+        grid.className = 'layer-grid';
+        section.append(heading, grid);
+        modules.append(section);
+        layers.set(entry.category, grid);
+      }
       const card = document.querySelector('#module-template').content.firstElementChild.cloneNode(true);
       card.id = entry.id;
-      card.querySelector('h2').textContent = entry.title;
+      card.querySelector('h3').textContent = entry.title;
       card.querySelector('.badge').textContent = `${entry.published ? 'npm' : 'Source'} · ${entry.version}`;
       card.querySelector('.install-heading').textContent = entry.published ? 'Install' : 'Install after publication';
       card.querySelector('.package').textContent = entry.package;
@@ -88,6 +102,7 @@ async function load() {
         card.querySelector('.example-title').textContent = entry.exampleTitle;
         card.querySelector('.example-note').textContent = entry.exampleNote;
         card.querySelector('.run').href = entry.example;
+        if (entry.exampleSource === false) card.querySelector('.source').hidden = true;
       } else {
         for (const selector of ['.example-heading', '.example-note', '.source']) card.querySelector(selector).hidden = true;
       }
@@ -121,9 +136,9 @@ async function load() {
         catch { feedback.textContent = 'Could not copy the example. Use Run example to open the file.'; }
         finally { copyExample.disabled = false; }
       });
-      const text = [entry.title, entry.package, entry.description, entry.requirements, entry.keywords, ...entry.exports].join(' ').toLowerCase();
+      const text = [entry.title, entry.category, entry.package, entry.description, entry.requirements, entry.keywords, ...entry.exports].join(' ').toLowerCase();
       cards.push({ element: card, text });
-      modules.append(card);
+      layers.get(entry.category).append(card);
     }
     search.disabled = false;
     search.value = new URL(location.href).searchParams.get('q') || '';

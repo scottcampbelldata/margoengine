@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Margo · L-system plants</title>
+<style>:root{color-scheme:dark;font:16px system-ui;background:#10141c;color:#edf2fa}body{margin:0;padding:16px;max-width:1100px;margin-inline:auto}h1{font-size:24px;margin:0 0 6px}p{color:#b4c2d6;margin:0 0 12px}canvas{display:block;width:100%;height:65vh;min-height:300px;border-radius:12px;background:#080c12}label{display:inline-grid;gap:6px;margin:14px 20px 0 0}input{accent-color:#75c5ff}</style></head>
+<body>
+<h1>L-system plants</h1><p>@margoengine/procedural/lsystem · a seeded stochastic grammar, interpreted by a 3D turtle and meshed as tubes.</p>
+<canvas id="viewport" aria-label="Three procedural plants grown from an L-system"></canvas>
+<label for="seed">Seed <input id="seed" type="number" min="1" max="9999" value="7"></label>
+<label for="depth">Iterations <input id="depth" type="range" min="2" max="6" value="5"></label>
+<p id="status" role="status">Starting WebGPU…</p>
+<script type="module">
+import {createStage} from 'margoengine';
+import {expand, interpret, tubes} from '../dist/lsystem.js';
+const status = document.querySelector('#status');
+try {
+  const stage = await createStage('#viewport', {backend: 'webgpu', camera: {position: [0, 3, 9], target: [0, 2.6, 0]}});
+  stage.box({size: [12, 0.1, 6], position: [0, -0.05, 0], color: [0.12, 0.14, 0.1], roughness: 0.9});
+  // X grows branches; F doubles each generation. Two weighted choices for X make each seed a different plant.
+  const rules = {X: [{successor: 'F[+X][-X]&[^X]!FX', weight: 3}, {successor: 'F[/X][\\X]!F[&X]X', weight: 2}, {successor: 'F!X', weight: 1}], F: 'FF'};
+  let meshes = [];
+  const grow = () => {
+    for (const mesh of meshes) mesh.dispose();
+    const seed = Math.max(1, document.querySelector('#seed').valueAsNumber | 0), depth = document.querySelector('#depth').valueAsNumber;
+    meshes = [-3.5, 0, 3.5].map((x, k) => {
+      const branches = interpret(expand('X', rules, depth, {seed: seed * 3 + k}), {angle: 24, step: 4 / 2 ** depth, radius: 0.09, radiusScale: 0.72, origin: [x, 0, 0]});
+      return stage.mesh(tubes(branches, {radialSegments: 6}), {color: [0.36, 0.25 + 0.08 * k, 0.15], roughness: 0.8});
+    });
+    status.textContent = `WebGPU ready · ${meshes.length} plants`;
+  };
+  for (const id of ['seed', 'depth']) document.querySelector('#' + id).addEventListener('input', grow);
+  grow();
+} catch (error) {status.textContent = `Unable to start: ${String(error)}`;}
+</script>
+</body></html>

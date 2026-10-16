@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/machinery",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "Kinematics, polygonal CAD ingestion, sections and metrology for Margo Engine.",
@@ -73,13 +73,29 @@
     "./exploded": {
       "types": "./dist/exploded.d.ts",
       "import": "./dist/exploded.js"
+    },
+    "./edges": {
+      "types": "./dist/edges.d.ts",
+      "import": "./dist/edges.js"
+    },
+    "./dimensions": {
+      "types": "./dist/dimensions.d.ts",
+      "import": "./dist/dimensions.js"
     }
   },
   "files": [
     "dist"
   ],
   "peerDependencies": {
-    "@margoengine/core": "0.1.0"
+    "@margoengine/core": "^1.0.0"
   },
-  "homepage": "https://margoengine.com"
+  "homepage": "https://margoengine.com",
+  "dependencies": {
+    "@margoengine/geometry": "^1.0.0",
+    "@margoengine/lines": "^1.0.0",
+    "@margoengine/text": "^1.0.0"
+  },
+  "devDependencies": {
+    "@margoengine/math": "^1.0.0"
+  }
 }

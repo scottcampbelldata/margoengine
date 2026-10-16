@@ -1,0 +1,236 @@
+{
+  "provider": "Poly Haven",
+  "downloadedAt": "2026-10-16T04:00:58.031218+00:00",
+  "apiUserAgent": "MargoEngineAssetPrep/1.0",
+  "apiDocumentation": "https://polyhaven.com/our-api",
+  "license": "CC0-1.0",
+  "licenseUrl": "https://polyhaven.com/license",
+  "normalConvention": "OpenGL (+Y)",
+  "mapUsage": "Diffuse is sRGB; OpenGL normal and roughness are Non-Color. Do not feed AO or displacement into roughness.",
+  "selectionNotes": {
+    "wood_table_worn": "Metadata identifies a table/plank source. Visually inspected diffuse shows dense worn brown grain and cloudy discoloration without a regular full-board seam pattern; useful for the aged tabletop. Use varied UV offsets on separate boards.",
+    "black_walnut_veneer_02": "Natural walnut grain without a whole plank assembly; useful on individual boards with varied UV origins and longitudinal grain orientation. Add procedural wear if needed.",
+    "concrete_floor_worn_001": "Worn indoor concrete with stains and subtle chips. Approximately 3 metres per repeat; tint slightly warm for the workshop mockup."
+  },
+  "assets": [
+    {
+      "id": "wood_table_worn",
+      "name": "Wood Table Worn",
+      "assetUrl": "https://polyhaven.com/a/wood_table_worn",
+      "metadataUrl": "https://api.polyhaven.com/info/wood_table_worn",
+      "filesUrl": "https://api.polyhaven.com/files/wood_table_worn",
+      "authors": {
+        "Dimitrios Savva": "Photography",
+        "Rico Cilliers": "Processing"
+      },
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "sourceDimensionsMillimeters": [
+        549.9999523162842,
+        550.0000715255737
+      ],
+      "sourceTileSizeMeters": [
+        0.5499999523162842,
+        0.5500000715255737
+      ],
+      "description": "Free 8K texture of a worn, stained brown wooden table: dry, scratched planks with visible grain, discoloration, rough and damaged surface.",
+      "filesHash": "92fde8d58df92dd57a0a2854a6a6aeb79317b750",
+      "maps": [
+        {
+          "map": "baseColor",
+          "colorSpace": "sRGB",
+          "resolution": "1k",
+          "format": "jpg",
+          "file": "wood_table_worn/wood_table_worn_diff_1k.jpg",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_table_worn/wood_table_worn_diff_1k.jpg",
+          "bytes": 761543,
+          "apiBytes": 761543,
+          "md5": "8c71f701f70fef34b87fb7c8742ad0a5",
+          "sha256": "092ab3465a6a24b24d092ea86865f332c3bd239b8eb2fd664b70357082031a3f",
+          "pixelDimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "map": "normalOpenGL",
+          "colorSpace": "Non-Color",
+          "resolution": "1k",
+          "format": "jpg",
+          "file": "wood_table_worn/wood_table_worn_nor_gl_1k.jpg",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_table_worn/wood_table_worn_nor_gl_1k.jpg",
+          "bytes": 747433,
+          "apiBytes": 747433,
+          "md5": "d8e76d135e94e32bc81eedb3342c7614",
+          "sha256": "0d494f3fe08320a05f0f966a7a3ca3c4cd6e3f7cde5b176b9bc167b5593fd00d",
+          "pixelDimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "map": "roughness",
+          "colorSpace": "Non-Color",
+          "resolution": "1k",
+          "format": "jpg",
+          "file": "wood_table_worn/wood_table_worn_rough_1k.jpg",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_table_worn/wood_table_worn_rough_1k.jpg",
+          "bytes": 655232,
+          "apiBytes": 655232,
+          "md5": "1e068051a440933d9d054dc6614f950f",
+          "sha256": "ebc4a15d7d3495ee1b67ba18f67bffcefac3f93881d1394fa3e22a25f9fe5c72",
+          "pixelDimensions": [
+            1024,
+            1024
+          ]
+        }
+      ]
+    },
+    {
+      "id": "black_walnut_veneer_02",
+      "name": "Black Walnut Veneer 02",
+      "assetUrl": "https://polyhaven.com/a/black_walnut_veneer_02",
+      "metadataUrl": "https://api.polyhaven.com/info/black_walnut_veneer_02",
+      "filesUrl": "https://api.polyhaven.com/files/black_walnut_veneer_02",
+      "authors": {
+        "Jenelle van Heerden": "All"
+      },
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "sourceDimensionsMillimeters": [
+        1000,
+        1000
+      ],
+      "sourceTileSizeMeters": [
+        1.0,
+        1.0
+      ],
+      "description": "Free black walnut veneer PBR texture with smooth natural grain, subtle satin sheen and warm tones - ideal for furniture, cabinetry, interiors and props.",
+      "filesHash": "32ab1e934a1c79adc646650aae9cf9636363b19e",
+      "maps": [
+        {
+          "map": "baseColor",
+          "colorSpace": "sRGB",
+          "resolution": "1k",
+          "format": "jpg",
+          "file": "black_walnut_veneer_02/black_walnut_veneer_02_diff_1k.jpg",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/black_walnut_veneer_02/black_walnut_veneer_02_diff_1k.jpg",
+          "bytes": 578708,
+          "apiBytes": 578708,
+          "md5": "c3a69027cf0e76bd7c3b70307e5a69e7",
+          "sha256": "fb123dbccd477791ff911511f1483d0fa87b424f05da852d4c75b3dc19c92b45",
+          "pixelDimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "map": "normalOpenGL",
+          "colorSpace": "Non-Color",
+          "resolution": "1k",
+          "format": "jpg",
+          "file": "black_walnut_veneer_02/black_walnut_veneer_02_nor_gl_1k.jpg",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/black_walnut_veneer_02/black_walnut_veneer_02_nor_gl_1k.jpg",
+          "bytes": 401633,
+          "apiBytes": 401633,
+          "md5": "c0c6e98576374b8aae8d2a270de7725f",
+          "sha256": "34c8eb00bfbe8fcac0535f20c0150165be0212bb08715e9f556aec9f34795e1e",
+          "pixelDimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "map": "roughness",
+          "colorSpace": "Non-Color",
+          "resolution": "1k",
+          "format": "jpg",
+          "file": "black_walnut_veneer_02/black_walnut_veneer_02_rough_1k.jpg",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/black_walnut_veneer_02/black_walnut_veneer_02_rough_1k.jpg",
+          "bytes": 647234,
+          "apiBytes": 647234,
+          "md5": "f538862668397a49212484812b1a0653",
+          "sha256": "ca3ee4961085c842250600b1a13978f2537d3410f00f1ff44e8523c419422fb6",
+          "pixelDimensions": [
+            1024,
+            1024
+          ]
+        }
+      ]
+    },
+    {
+      "id": "concrete_floor_worn_001",
+      "name": "Concrete Floor Worn 001",
+      "assetUrl": "https://polyhaven.com/a/concrete_floor_worn_001",
+      "metadataUrl": "https://api.polyhaven.com/info/concrete_floor_worn_001",
+      "filesUrl": "https://api.polyhaven.com/files/concrete_floor_worn_001",
+      "authors": {
+        "Dimitrios Savva": "Photography",
+        "Rico Cilliers": "Processing"
+      },
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "sourceDimensionsMillimeters": [
+        3000,
+        3000.000238418579
+      ],
+      "sourceTileSizeMeters": [
+        3.0,
+        3.000000238418579
+      ],
+      "description": "Free 16K concrete floor texture, worn grey slab with fine scratches, chips, stains and subtle roughness and discoloration.",
+      "filesHash": "e3d93fd423c3db5bbc000a930cc8b9d770187ce4",
+      "maps": [
+        {
+          "map": "baseColor",
+          "colorSpace": "sRGB",
+          "resolution": "1k",
+          "format": "jpg",
+          "file": "concrete_floor_worn_001/concrete_floor_worn_001_diff_1k.jpg",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_worn_001/concrete_floor_worn_001_diff_1k.jpg",
+          "bytes": 118806,
+          "apiBytes": 118806,
+          "md5": "e35597cca586150b1ab2aa9a331a39c5",
+          "sha256": "6e40c0fc908f4d66431836f5abe203f3a4eb064e88824378a91a46a26e2f464c",
+          "pixelDimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "map": "normalOpenGL",
+          "colorSpace": "Non-Color",
+          "resolution": "1k",
+          "format": "jpg",
+          "file": "concrete_floor_worn_001/concrete_floor_worn_001_nor_gl_1k.jpg",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_worn_001/concrete_floor_worn_001_nor_gl_1k.jpg",
+          "bytes": 110906,
+          "apiBytes": 110906,
+          "md5": "9de6626758f8793b71182b892c110827",
+          "sha256": "523bd94a1be5dd2f11c2ae2b7d7c77445cf5bd9e41604db515a7c8364dcba067",
+          "pixelDimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "map": "roughness",
+          "colorSpace": "Non-Color",
+          "resolution": "1k",
+          "format": "jpg",
+          "file": "concrete_floor_worn_001/concrete_floor_worn_001_rough_1k.jpg",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_worn_001/concrete_floor_worn_001_rough_1k.jpg",
+          "bytes": 181942,
+          "apiBytes": 181942,
+          "md5": "b158eae73029ac6a849481274a0e1b35",
+          "sha256": "069efe4ca018e0ef61fd8cc9964395ba8272284ae239da68d7f87988e2e9f488",
+          "pixelDimensions": [
+            1024,
+            1024
+          ]
+        }
+      ]
+    }
+  ],
+  "dimensionUnitsSource": "https://api.polyhaven.com/api-docs/swagger.json#/components/schemas/texture/properties/dimensions"
+}

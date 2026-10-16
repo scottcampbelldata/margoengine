@@ -1,0 +1,24 @@
+{
+  "package": "ecs",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:11:56.524Z",
+  "outputsIdentical": true,
+  "notes": "World.query hoists the per-entity liveness test out of the per-component loop; Component.add/remove iterate a column list cached at construction.",
+  "cases": [
+    {
+      "case": "query 3 components over 10,000 entities",
+      "queries": 600,
+      "baselineMs": 149.2101,
+      "candidateMs": 84.1841,
+      "speedup": 1.772
+    },
+    {
+      "case": "spawn and despawn 1,000 entities with 3 components",
+      "rounds": 20,
+      "baselineMs": 48.9518,
+      "candidateMs": 22.2649,
+      "speedup": 2.199
+    }
+  ]
+}

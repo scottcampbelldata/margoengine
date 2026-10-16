@@ -7,9 +7,10 @@ import {animatedTriangle} from './support/gltf-pro-fixture.js';
 import {optionalGPU} from './support/optional-gpu.js';
 
 const digest = value => createHash('sha256').update(value).digest('hex');
-// Named base-light functions preserve the prior pixels bit for bit; see the shader-review GPU proof.
-const baselineShader = '469dd81676967dbfd22118fa85b1cf8b6ff37dc7593e7e7f8130e5626a29f508';
-const baselineFrame = 'c6666b8c89280b7915c001d0a92c33ed027dfea50b9c4df247f1c43010fcb313';
+// Degenerate tangent frames use a finite orthogonal basis; ordinary UV paths retain this shared shader.
+const baselineShader = '45df766b2c73181edc3cbd8109a848f17851f03b7cc947dec8d987ff60c2dee5';
+// The missing normal-map factor is zero; Camera.up-aware view math also preserves its signed-zero lanes.
+const baselineFrame = '0abd32314fbc275319398c26b44726992318ed9a3dce2870d43ae10efa40bf01';
 
 async function scene(primitiveCount = 1) {
   const harness = optionalGPU(), store = await TransformStore.create(16), device = harness.engine.gpu;
@@ -50,6 +51,10 @@ test('unextended PBR retains the exact baseline shader, frame bytes, pipeline an
       const draw = s.draws.at(-1), pipeline = draw.pipeline, frame = draw.groups.get(0).entries[0].resource.buffer;
       assert.equal(digest(pipeline.vertex.module.code), baselineShader);
       assert.equal(digest(new Uint8Array(frame.data)), baselineFrame);
+      const priorNormalFactor = new Float32Array(frame.data.slice(0));
+      assert.equal(priorNormalFactor[82], 0);
+      priorNormalFactor[82] = 1;
+      assert.equal(digest(new Uint8Array(priorNormalFactor.buffer)), '4cb2947198324e7f284d979fc29c0930898f8bd11408b656a9d44cfdf1aee2a0', 'Only the absent normal-map factor changes from the preceding frame baseline');
       assert.equal(s.uploads.length, before + 1, 'Only the packed frame is uploaded');
       assert.deepEqual([...draw.groups.keys()], [0, 1]);
       assert.deepEqual(draw.groups.get(0).entries.map(entry => entry.binding), [0]);

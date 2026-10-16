@@ -1,3 +1,4 @@
+import {buildWorkers} from './build-workers.js';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {copyFile, readFile} from 'node:fs/promises';
@@ -28,4 +29,5 @@ await build({root, configFile: false, publicDir: false, logLevel: 'warn', build:
   lib: {entry: entries, formats: ['es'], fileName: (_format,name)=>name+'.js'},
   rollupOptions: {external: id => peers.some(peer => id === peer || id.startsWith(peer + '/'))},
 }});
+await buildWorkers(root);
 execFileSync(process.execPath, [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', resolve(root, 'tsconfig.json')], {stdio: 'inherit'});

@@ -12,21 +12,22 @@
     "verify": "node verify.mjs"
   },
   "dependencies": {
-    "@margoengine/core": "0.1.0",
-    "@margoengine/sky": "0.1.0",
-    "@margoengine/clustered": "0.1.0",
-    "@margoengine/shadows": "0.1.0",
-    "@margoengine/geometry": "0.1.0",
-    "@margoengine/procedural": "0.1.0",
-    "@margoengine/scatter": "0.1.0",
-    "@margoengine/water": "0.1.0",
-    "@margoengine/vfx": "0.1.0",
-    "@margoengine/input": "0.1.0",
-    "@margoengine/cinematic": "0.1.0",
-    "@margoengine/controls": "0.1.0",
-    "@margoengine/terrain": "0.1.0",
-    "@margoengine/post": "0.1.0",
-    "@margoengine/stats": "0.1.0",
-    "@margoengine/lines": "0.1.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/sky": "^1.0.0",
+    "@margoengine/clustered": "^1.0.0",
+    "@margoengine/shadows": "^1.0.0",
+    "@margoengine/geometry": "^1.0.0",
+    "@margoengine/procedural": "^1.0.0",
+    "@margoengine/scatter": "^1.0.0",
+    "@margoengine/water": "^1.0.0",
+    "@margoengine/vfx": "^1.0.0",
+    "@margoengine/input": "^1.0.0",
+    "@margoengine/cinematic": "^1.0.0",
+    "@margoengine/controls": "^1.0.0",
+    "@margoengine/terrain": "^1.0.0",
+    "@margoengine/post": "^1.0.0",
+    "@margoengine/stats": "^1.0.0",
+    "@margoengine/lines": "^1.0.0",
+    "@margoengine/quality": "^1.0.0"
   }
 }

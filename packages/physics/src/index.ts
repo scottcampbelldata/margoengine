@@ -1,12 +1,33 @@
-export {Physics} from './physics.js';
-export type {PhysicsOptions, PhysicsEventMap, CollisionEvent, CollisionEventType, QueryFilter, RaycastOptions, Hit, RaycastHit, ShapeCastHit, PointProjection} from './physics.js';
-export {PhysicsBody} from './body.js';
-export type {BodyOptions, BodyType} from './body.js';
-export {PhysicsJoint} from './joints.js';
-export type {JointOptions, JointType, MotorOptions} from './joints.js';
-export {CharacterController} from './character.js';
-export type {CharacterControllerOptions, CharacterMoveResult} from './character.js';
-export {collisionGroups, geometryPositions} from './shapes.js';
-export type {RapierModule, ShapeOptions, ColliderOptions, CombineRule, GeometryLike} from './shapes.js';
-export {eulerToQuat} from './math.js';
-export type {Vec3, Quat} from './math.js';
+export { Physics } from './physics.js';
+export type {
+  PhysicsOptions,
+  PhysicsEventMap,
+  CollisionEvent,
+  CollisionEventType,
+  QueryFilter,
+  RaycastOptions,
+  Hit,
+  RaycastHit,
+  ShapeCastHit,
+  PointProjection,
+  ModelLike,
+  ModelPrimitiveLike,
+  ModelBodyOptions,
+} from './physics.js';
+export { PhysicsBody } from './body.js';
+export type { BodyOptions, BodyType } from './body.js';
+export { PhysicsJoint } from './joints.js';
+export type { JointOptions, JointType, MotorOptions } from './joints.js';
+export { CharacterController } from './character.js';
+export type { CharacterControllerOptions, CharacterMoveResult } from './character.js';
+export { collisionGroups, geometryPositions } from './shapes.js';
+export type {
+  RapierModule,
+  ShapeOptions,
+  ColliderOptions,
+  ColliderSettings,
+  CombineRule,
+  GeometryLike,
+} from './shapes.js';
+export { eulerToQuat } from './math.js';
+export type { Vec3, Quat } from './math.js';

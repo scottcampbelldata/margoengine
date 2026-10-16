@@ -71,11 +71,11 @@ export class MaterialTextures {
       const image=this.model.image(source),size=[image.width,image.height];
       if(size.some(n=>!Number.isSafeInteger(n)||n<1||n>this.device.limits.maxTextureDimension2D))throw new RangeError('Clearcoat image exceeds device limit');
       // Reserve all levels so different samplers can share one image without replacing its view.
-      const compressed='ktx2' in image,levels=compressed?image.ktx2.mipmaps.length:Math.floor(Math.log2(Math.max(...size)))+1;
+      const compressed='ktx2' in image||'mipmaps' in image,levels='ktx2' in image?image.ktx2.mipmaps.length:'mipmaps' in image?image.mipmaps.length:Math.floor(Math.log2(Math.max(...size)))+1;
       const texture=compressed?this.model.uploadImage(source,this.device,srgb):this.device.createTexture({size,format,mipLevelCount:levels,
         usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST|GPUTextureUsage.RENDER_ATTACHMENT});
       this.owned.add(texture);
-      if(!compressed)this.device.queue.copyExternalImageToTexture({source:image},{texture},size);
+      if(!('ktx2' in image)&&!('mipmaps' in image))this.device.queue.copyExternalImageToTexture({source:image},{texture},size);
       imageTexture={texture,view:texture.createView(),levels,mipsReady:compressed||levels===1,format};
       this.images.set(key,imageTexture);
     }

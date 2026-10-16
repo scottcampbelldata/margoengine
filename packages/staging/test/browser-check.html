@@ -1,0 +1,42 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Contact shadows browser check</title><style>body{margin:0}canvas{display:block;width:1280px;height:720px}</style></head><body><canvas></canvas>
+<script type="module">
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {ContactShadows} from '/packages/staging/dist/index.js';
+import {createMesh,Material} from '/packages/materials/dist/index.js';
+import {sphereGeometry} from '/packages/geometry/dist/index.js';
+const query=new URLSearchParams(location.search);if(query.get('low')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',features:['timestamp-query'],camera:{position:[0,4,7],target:[0,0.4,0],near:0.1,far:100}}),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const floor=engine.createMesh().setGeometry(box(12,0.1,12)).setMaterial(new PbrMaterial({color:'#d0d0d0',roughness:0.9})).setPosition([0,-0.05,0]);
+const cube=engine.createMesh().setGeometry(box(1,1,1)).setMaterial(new PbrMaterial({color:'#8090a0'})).setPosition([-1.2,0.5,0]);
+const floating=engine.createMesh().setGeometry(box(0.6,0.6,0.6)).setMaterial(new PbrMaterial({color:'#8090a0'})).setPosition([0,2.2,-2]);
+// A materials mesh is a gltf-pro PBRModel: the 80-byte vertex path.
+const sphere=createMesh(engine,sphereGeometry(0.6,48,24),new Material({color:'#a08070',roughness:0.5}));sphere.root.setPosition([1.2,0.6,0]);
+const contact=ContactShadows.attach(engine,{size:6,height:1.5,blur:0.15,opacity:0.8,resolution:+(query.get('res')??512)});
+for(const source of [cube,floating,sphere])contact.add(source);
+// GPU timing: every contact-shadow render pass gets timestamps (occluders + 4 blur steps, then the plane).
+const set=device.features.has('timestamp-query')?device.createQuerySet({type:'timestamp',count:12}):null,resolve=set&&device.createBuffer({size:96,usage:GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC});
+const render=contact.render.bind(contact);let timed=false,passes=0;
+contact.render=c=>{if(!timed)return render(c);passes=0;const encoder=c.encoder;
+  render({...c,encoder:{beginRenderPass:d=>{const at=passes++*2;return encoder.beginRenderPass({...d,timestampWrites:{querySet:set,beginningOfPassWriteIndex:at,endOfPassWriteIndex:at+1}});}}});};
+const frame=async()=>{engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();};
+const median=v=>{const x=v.slice().sort((a,b)=>a-b),m=x.length>>1;return x.length%2?x[m]:(x[m-1]+x[m])/2;};
+window.check={
+  async render(opacity){contact.options.opacity=opacity;device.pushErrorScope('validation');for(let i=0;i<3;i++)await frame();const e=await device.popErrorScope();return {error:e?.message??null,errors:errors.splice(0)};},
+  points(){engine.camera.update(engine.canvas.width/engine.canvas.height,true);const m=engine.camera.matrix,W=engine.canvas.clientWidth,H=engine.canvas.clientHeight;
+    const at=p=>{const c=[0,1,2,3].map(r=>m[r]*p[0]+m[4+r]*p[1]+m[8+r]*p[2]+m[12+r]);return [Math.round((c[0]/c[3]+1)/2*W),Math.round((1-c[1]/c[3])/2*H)];};
+    return {cubeContact:at([-1.2,0,0.56]),sphereContact:at([1.2,0,0.62]),underFloating:at([0,0,-2]),outside:at([-4,0,1]),cubeTop:at([-1.2,1,0.1]),floorReference:at([0,0,2.5])};},
+  async timing(frames,isStatic){
+    if(!set)return null;contact.options.static=isStatic;contact.options.opacity=0.8;timed=true;const update=[],plane=[],counts=[];
+    try{for(let f=0;f<frames;f++){
+      engine.render({delta:1/60});const read=device.createBuffer({size:96,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),encoder=device.createCommandEncoder();
+      encoder.resolveQuerySet(set,0,passes*2,resolve,0);encoder.copyBufferToBuffer(resolve,0,read,0,passes*16);device.queue.submit([encoder.finish()]);await read.mapAsync(GPUMapMode.READ);
+      const t=new BigUint64Array(read.getMappedRange().slice(0,passes*16)),ms=k=>Number(t[k*2+1]-t[k*2])/1e6;read.destroy();
+      counts.push(passes);plane.push(ms(passes-1));update.push(passes>1?[...Array(passes-1).keys()].reduce((s,k)=>s+ms(k),0):0);
+    }}finally{timed=false;contact.options.static=false;}
+    return {frames,static:isStatic,passesPerFrame:median(counts),updateMs:median(update.slice(5)),planeMs:median(plane.slice(5)),totalMs:median(update.slice(5).map((u,i)=>u+plane[i+5])),
+      samples:engine.canvas.width+'x'+engine.canvas.height+' '+(globalThis.margoLow?1:4)+'x MSAA',resolution:contact.options.resolution,stats:{...contact.stats}};
+  },
+};
+window.ready=true;
+</script></body></html>

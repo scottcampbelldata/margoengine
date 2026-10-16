@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/vfx",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "GPU particle simulation and indirect billboards.",
@@ -22,13 +22,36 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./base": {
+      "types": "./dist/base.d.ts",
+      "import": "./dist/base.js"
+    },
+    "./obstacles": {
+      "types": "./dist/obstacles.d.ts",
+      "import": "./dist/obstacles.js"
+    },
+    "./wrap": {
+      "types": "./dist/wrap.d.ts",
+      "import": "./dist/wrap.js"
+    },
+    "./sort": {
+      "types": "./dist/sort.d.ts",
+      "import": "./dist/sort.js"
+    },
+    "./texture": {
+      "types": "./dist/texture.d.ts",
+      "import": "./dist/texture.js"
     }
   },
   "files": [
     "dist"
   ],
   "peerDependencies": {
-    "@margoengine/core": "0.1.0"
+    "@margoengine/core": "^1.0.0"
   },
-  "homepage": "https://margoengine.com"
+  "homepage": "https://margoengine.com",
+  "devDependencies": {
+    "@margoengine/math": "^1.0.0"
+  }
 }

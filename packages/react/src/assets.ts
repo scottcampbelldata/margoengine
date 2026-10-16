@@ -19,17 +19,18 @@ type AssetKind=ModelFormat|'environment';
 const queued=new Map<string,{src:string;kind:AssetKind;promise:Promise<void>;resolve:()=>void;reject:(error:unknown)=>void}>();
 export function createAssetCache(engine:EngineKernel|null):AssetCache {return {engine,disposed:false,models:new Map(),fbx:new Map(),environments:new Map()};}
 
+function closeImages(images:readonly GLTFImage[]):void {for(const image of images)if(image&&'close' in image)image.close();}
 async function copyImages(images:readonly GLTFImage[]):Promise<GLTFImage[]> {
   const copies:GLTFImage[]=[];
   try {
-    for(let i=0;i<images.length;i++)if(images[i]){
-      const image=images[i];
-      copies[i]='ktx2' in image?{...image,close(){}}:await createImageBitmap(image,{colorSpaceConversion:'none',premultiplyAlpha:'none'});
+    for(let i=0;i<images.length;i++){
+      const image=images[i];if(!image)continue;
+      copies[i]='ktx2' in image?{...image,close(){}}:'mipmaps' in image?{...image}:await createImageBitmap(image,{colorSpaceConversion:'none',premultiplyAlpha:'none'});
     }
     return copies;
-  }catch(error){for(const image of copies)image?.close();throw error;}
+  }catch(error){closeImages(copies);throw error;}
 }
-function disposeSource(source:ModelSource):void {source.first?.dispose();source.first=null;for(const image of source.images)image?.close();source.images=[];}
+function disposeSource(source:ModelSource):void {source.first?.dispose();source.first=null;closeImages(source.images);source.images=[];}
 async function loadModel(cache:AssetCache,src:string,signal:AbortSignal,format:ModelFormat):Promise<ModelSource> {
   const api=await optionalPeer('@margoengine/gltf-pro',()=>import('@margoengine/gltf-pro'));signal.throwIfAborted();
   const loader=format==='fbx'?(await optionalPeer('@margoengine/fbx',()=>import('@margoengine/fbx'))).loadFBX:api.loadGLTF;
@@ -46,13 +47,13 @@ async function loadModel(cache:AssetCache,src:string,signal:AbortSignal,format:M
     }
     copies=await copyImages(images);signal.throwIfAborted();
     return {api,asset:model.asset,images:copies,first:model};
-  }catch(error){for(const image of copies)image?.close();model.dispose();throw error;}
+  }catch(error){closeImages(copies);model.dispose();throw error;}
 }
 export async function instantiateModel(source:ModelSource,engine:EngineKernel):Promise<PBRModel> {
   if(source.first){const model=source.first;source.first=null;return model;}
   const images=await copyImages(source.images);let model:PBRModel|undefined;
   try{model=new source.api.PBRModel(engine,source.asset,images);engine.use(model);return model;}
-  catch(error){if(model)model.dispose();else for(const image of images)image?.close();throw error;}
+  catch(error){if(model)model.dispose();else closeImages(images);throw error;}
 }
 function entry<T>(cache:AssetCache,map:Map<string,AssetEntry<T>>,src:string,load:(signal:AbortSignal)=>Promise<T>,dispose?:(value:T)=>void):AssetEntry<T> {
   const cached=map.get(src);if(cached)return cached;

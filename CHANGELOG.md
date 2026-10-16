@@ -5,6 +5,34 @@
 Verified on 16 October 2026. These changes are available in source; this entry
 does not announce an npm publication or a package version change.
 
+### Public API migrations retained during consolidation
+
+The optional-package hygiene changes remain in place. Shared shapes and error
+codes follow [the package conventions](docs/conventions.md); update imports as
+follows when moving an earlier checkout to the consolidated tree:
+
+| Earlier API | Current API |
+| --- | --- |
+| Geometry `Vec2` / `Vec3` | `MutableVec2` / `MutableVec3` from `@margoengine/math` (same tuple shapes) |
+| Navigation `Vector3` | `Vec3Like` from `@margoengine/math` (same object shape) |
+| Lines `ExpandOptions` | `ExpandLineOptions` |
+| Points `projectPoint`, `PickHit`, `Blending`, `TextureSource` | `projectToPixels`, `PointsPickHit`, `PointsBlending`, `PointsTextureSource` |
+| Procedural `SurfaceOptions` | `MarchingCubesOptions` |
+| Tween `smoothstep` | `easeSmoothstep` |
+| Shader `Input`, `Stage`, `TextureSource` | `NodeInput`, `ShaderStage`, `BindableTexture` |
+
+Math is the shared home for vector, quaternion, matrix, color and geometric
+shape types. Core's `Vec3` remains available and is re-exported by math. Lines,
+points and text continue to re-export their color and mesh-world helpers from
+math. Optional packages use `MargoError` with a stable `code`; core and stage
+retain their frozen error contract. Shader operations carry typed result nodes
+instead of public `Node<any>` results.
+
+The scenery `sky-moon` implementation was deliberately replaced by the
+`SkyMoon` preset over `@margoengine/sky`. Keep that single implementation rather
+than restoring `SkyMoonPass`. The [consolidation record](docs/repository-consolidation-2026-10-16.md)
+lists all 74 public packages, preserved optional entries and audit decisions.
+
 ### USDZ dependency cleanup
 
 - `@margoengine/usdz` vendors the standalone USDA and USDC parsers from Three.js

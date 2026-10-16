@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/labels",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "HTML labels and CSS 3D objects positioned over a Margo Engine canvas (THREE.CSS2DRenderer and CSS3DRenderer counterparts).",
@@ -29,7 +29,10 @@
     "dist"
   ],
   "peerDependencies": {
-    "@margoengine/core": "0.1.0"
+    "@margoengine/core": "^1.0.0"
   },
-  "homepage": "https://margoengine.com"
+  "homepage": "https://margoengine.com",
+  "devDependencies": {
+    "@margoengine/math": "^1.0.0"
+  }
 }

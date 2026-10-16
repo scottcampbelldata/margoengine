@@ -1,17 +1,59 @@
-import {resolveMSAA,sceneTarget} from '../../shared/msaa.js';
-import type {EngineKernel} from '@margoengine/core';
-import {engineRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext} from '@margoengine/core/extension';
-import {acquireDepth,group} from '../../shared/gpu.js';
-import {CoastalFlow,waterFrame,oceanWaves} from './coastal.js';
-import {Spray} from './spray.js';
-declare const GPUBufferUsage:{VERTEX:number;INDEX:number;UNIFORM:number;COPY_DST:number;STORAGE:number};
-declare const GPUTextureUsage:{COPY_SRC:number;COPY_DST:number;RENDER_ATTACHMENT:number;TEXTURE_BINDING:number};
-type Context=Extract<PassContext,{backend:'webgpu'}>;
-export interface Wave {direction:readonly [number,number];amplitude:number;wavelength:number;steepness?:number;phase?:number}
-export interface WaterTerrain {heightmap:()=>GPUTexture|undefined;origin:readonly [number,number];size:readonly [number,number]}
-export interface WaterLight {direction:ArrayLike<number>;radiance:ArrayLike<number>}
-export interface WaterOptions {size?:readonly [number,number];segments?:number;height?:number;waves?:readonly Wave[];color?:readonly [number,number,number];foamDistance?:number;depth?:()=>GPUTexture|undefined;terrain?:WaterTerrain;reflection?:()=>GPUTexture|undefined;sceneColor?:()=>GPUTexture|undefined;lights?:readonly WaterLight[];spray?:boolean;horizon?:boolean}
-const shader=waterFrame+oceanWaves+`
+/// <reference lib="esnext.disposable" preserve="true" />
+import { resolveMSAA, sceneTarget } from '../../shared/msaa.js';
+import type { EngineKernel } from '@margoengine/core';
+import {
+  engineRuntime,
+  type Engine,
+  type EnginePlugin,
+  type FrameGraph,
+  type PassContext,
+} from '@margoengine/core/extension';
+import { acquireDepth, group } from '../../shared/gpu.js';
+import { CoastalFlow, waterFrame, oceanWaves } from './coastal.js';
+import { Spray } from './spray.js';
+declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number; STORAGE: number };
+declare const GPUTextureUsage: {
+  COPY_SRC: number;
+  COPY_DST: number;
+  RENDER_ATTACHMENT: number;
+  TEXTURE_BINDING: number;
+};
+type Context = Extract<PassContext, { backend: 'webgpu' }>;
+export interface Wave {
+  direction: readonly [number, number];
+  amplitude: number;
+  wavelength: number;
+  steepness?: number;
+  phase?: number;
+}
+export interface WaterTerrain {
+  heightmap: () => GPUTexture | undefined;
+  origin: readonly [number, number];
+  size: readonly [number, number];
+}
+export interface WaterLight {
+  direction: ArrayLike<number>;
+  radiance: ArrayLike<number>;
+}
+export interface WaterOptions {
+  size?: readonly [number, number];
+  segments?: number;
+  height?: number;
+  waves?: readonly Wave[];
+  color?: readonly [number, number, number];
+  foamDistance?: number;
+  depth?: () => GPUTexture | undefined;
+  terrain?: WaterTerrain;
+  reflection?: () => GPUTexture | undefined;
+  sceneColor?: () => GPUTexture | undefined;
+  lights?: readonly WaterLight[];
+  spray?: boolean;
+  horizon?: boolean;
+}
+const shader =
+  waterFrame +
+  oceanWaves +
+  `
 const HORIZON=false;
 @group(0) @binding(1) var depth:texture_depth_2d;
 @group(0) @binding(2) var history:texture_2d<f32>;
@@ -138,123 +180,608 @@ struct Result {@location(0) color:vec4f,@location(1) foam:vec4f}
  if(frame.cameraData.w<0.5){color=pow(color/(vec3f(1)+color),vec3f(1.0/2.2));}
  return Result(vec4f(color,1),vec4f(foam,0,0,1));
 }`;
-const depthCopy=`
+const depthCopy = `
 @group(0) @binding(0) var sceneDepth:texture_depth_2d;
 @vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {
  let p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));return vec4f(p[i],0,1);
 }
 @fragment fn fragment(@builtin(position) p:vec4f)->@builtin(frag_depth) f32 {return textureLoad(sceneDepth,vec2i(p.xy),0);}
 `;
-let instances=0;
+let instances = 0;
 export class Water implements EnginePlugin {
- private readonly attachment:GPURenderPassColorAttachment={view:undefined!,loadOp:'load',storeOp:'store'};
- private readonly foamAttachment:GPURenderPassColorAttachment={view:undefined!,loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:0}};
- private readonly depthAttachment:GPURenderPassDepthStencilAttachment={view:undefined!,depthLoadOp:'load',depthStoreOp:'store',stencilReadOnly:true};
- private readonly presentation:GPURenderPassDescriptor={colorAttachments:[this.attachment,this.foamAttachment],depthStencilAttachment:this.depthAttachment};
- private readonly copiedDepth:GPURenderPassDepthStencilAttachment={view:undefined!,depthClearValue:0,depthLoadOp:'clear',depthStoreOp:'store',stencilReadOnly:true};
- private readonly depthPresentation:GPURenderPassDescriptor={colorAttachments:[],depthStencilAttachment:this.copiedDepth};
- private foamMSAA?:GPUTexture;private foamMSAAView?:GPUTextureView;
- private surfaceDepth?:GPUTexture;private surfaceView?:GPUTextureView;private copyPipeline?:GPURenderPipeline;private copyGroup?:GPUBindGroup;
- private reflected?:GPUTexture;private captured?:GPUTexture;private capturedView?:GPUTextureView;private skySampler?:GPUSampler;
- private spray?:Spray;
- private readonly colorSource:GPUTexelCopyTextureInfo={texture:undefined!};private readonly colorTarget:GPUTexelCopyTextureInfo={texture:undefined!};private readonly colorSize:GPUExtent3DDict={width:1,height:1,depthOrArrayLayers:1};
- private foamViews:GPUTextureView[]=[];private groups:GPUBindGroup[]=[];private sampledDepth?:GPUTexture;private coastal?:CoastalFlow;
- readonly name='water:'+ ++instances;private engine?:Engine;private source?:()=>GPUTexture|undefined;private shared?:ReturnType<typeof acquireDepth>;private uniform?:GPUBuffer;private vertices?:GPUBuffer;private indices?:GPUBuffer;
- private count=0;private pipeline?:GPURenderPipeline;private format='';private foam:GPUTexture[]=[];private current=0;private time=0;private readonly values=new Float32Array(128);private readonly waveHeights=new Float32Array(8);private maxWaveHeight=0;private disposed=false;private readonly positions:Float32Array;private readonly triangles:Uint32Array;private readonly horizon:boolean;
- constructor(readonly options:WaterOptions={}){
-  const {size=[100,100],segments=128,height=0,color=[0.01,0.18,0.25],foamDistance=1,waves=[{direction:[1,0.3],amplitude:0.3,wavelength:12.73,phase:0.43},{direction:[1,0.6],amplitude:0.15,wavelength:7.19,phase:2.17}]}=options;
-  if(size.length!==2||size.some(v=>!Number.isFinite(Math.fround(v))||v<=0||v>100000)||!Number.isInteger(segments)||segments<1||segments>512||!Number.isFinite(Math.fround(height))||!Number.isFinite(foamDistance)||foamDistance<=0||foamDistance>100||color.length!==3||color.some(v=>!Number.isFinite(v)||v<0||v>1)||waves.length<1||waves.length>8||options.depth!==undefined&&typeof options.depth!=='function')throw new RangeError('Invalid water options');
-  this.values.set([0,height,foamDistance,waves.length],20);this.values.set(color,24);
-  this.values.set([0.6,0.8,0,3,1,0.9,0.75,0],104);
-  if(options.reflection!==undefined&&typeof options.reflection!=='function'||options.sceneColor!==undefined&&typeof options.sceneColor!=='function'||options.spray!==undefined&&typeof options.spray!=='boolean'||options.spray&&!options.terrain||options.horizon!==undefined&&typeof options.horizon!=='boolean')throw new TypeError('Invalid water optics or spray options');
-  this.validateLights();
-  this.horizon=options.horizon??false;
-  this.values[98]=this.values[99]=1;
-  const terrain=options.terrain;
-  if(terrain){if(typeof terrain.heightmap!=='function'||terrain.origin.length!==2||terrain.origin.some(v=>!Number.isFinite(Math.fround(v)))||terrain.size.length!==2||terrain.size.some(v=>!Number.isFinite(Math.fround(v))||v<=0||v>100000))throw new RangeError('Invalid water terrain');this.values.set(terrain.origin,96);this.values.set(terrain.size,98);this.values[103]=1;}
-  const edge=Math.hypot(size[0]/segments,size[1]/segments);
-  for(let i=0;i<waves.length;i++){const w=waves[i],length=Math.hypot(...w.direction),q=w.steepness??0.5;
-   if(w.direction.length!==2||w.direction.some(v=>!Number.isFinite(v))||!length||!Number.isFinite(w.amplitude)||w.amplitude<0||w.amplitude>100||!Number.isFinite(w.wavelength)||w.wavelength<=0||w.wavelength>100000||!Number.isFinite(q)||q<0||q>1||!Number.isFinite(w.phase??0))throw new RangeError('Invalid Gerstner wave');
-   const k=2*Math.PI/w.wavelength;if(q*w.amplitude*k>1/waves.length)throw new RangeError('Wave steepness would fold the surface');
-   // Fade waves shorter than four triangle edges to prevent mesh sampling artifacts.
-   const t=Math.max(0,Math.min(1,(w.wavelength/edge-2)/2));
-   this.values.set([w.direction[0]/length,w.direction[1]/length,w.amplitude,k,q,Math.sqrt(9.81*k),w.phase??0,t*t*(3-2*t)],32+i*8);
-   this.waveHeights[i]=w.amplitude;this.maxWaveHeight=Math.max(this.maxWaveHeight,w.amplitude);
+  private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
+  private readonly foamAttachment: GPURenderPassColorAttachment = {
+    view: undefined!,
+    loadOp: 'clear',
+    storeOp: 'store',
+    clearValue: { r: 0, g: 0, b: 0, a: 0 },
+  };
+  private readonly depthAttachment: GPURenderPassDepthStencilAttachment = {
+    view: undefined!,
+    depthLoadOp: 'load',
+    depthStoreOp: 'store',
+    stencilReadOnly: true,
+  };
+  private readonly presentation: GPURenderPassDescriptor = {
+    colorAttachments: [this.attachment, this.foamAttachment],
+    depthStencilAttachment: this.depthAttachment,
+  };
+  private readonly copiedDepth: GPURenderPassDepthStencilAttachment = {
+    view: undefined!,
+    depthClearValue: 0,
+    depthLoadOp: 'clear',
+    depthStoreOp: 'store',
+    stencilReadOnly: true,
+  };
+  private readonly depthPresentation: GPURenderPassDescriptor = {
+    colorAttachments: [],
+    depthStencilAttachment: this.copiedDepth,
+  };
+  private foamMSAA?: GPUTexture;
+  private foamMSAAView?: GPUTextureView;
+  private surfaceDepth?: GPUTexture;
+  private surfaceView?: GPUTextureView;
+  private copyPipeline?: GPURenderPipeline;
+  private copyGroup?: GPUBindGroup;
+  private reflected?: GPUTexture;
+  private captured?: GPUTexture;
+  private capturedView?: GPUTextureView;
+  private skySampler?: GPUSampler;
+  private spray?: Spray;
+  private readonly colorSource: GPUTexelCopyTextureInfo = { texture: undefined! };
+  private readonly colorTarget: GPUTexelCopyTextureInfo = { texture: undefined! };
+  private readonly colorSize: GPUExtent3DDict = { width: 1, height: 1, depthOrArrayLayers: 1 };
+  private foamViews: GPUTextureView[] = [];
+  private groups: GPUBindGroup[] = [];
+  private sampledDepth?: GPUTexture;
+  private coastal?: CoastalFlow;
+  readonly name = 'water:' + ++instances;
+  private engine?: Engine;
+  private source?: () => GPUTexture | undefined;
+  private shared?: ReturnType<typeof acquireDepth>;
+  private uniform?: GPUBuffer;
+  private vertices?: GPUBuffer;
+  private indices?: GPUBuffer;
+  private count = 0;
+  private pipeline?: GPURenderPipeline;
+  private format = '';
+  private foam: GPUTexture[] = [];
+  private current = 0;
+  private time = 0;
+  private readonly values = new Float32Array(128);
+  private readonly waveHeights = new Float32Array(8);
+  private maxWaveHeight = 0;
+  private disposed = false;
+  private readonly positions: Float32Array;
+  private readonly triangles: Uint32Array;
+  private readonly horizon: boolean;
+  constructor(readonly options: WaterOptions = {}) {
+    const {
+      size = [100, 100],
+      segments = 128,
+      height = 0,
+      color = [0.01, 0.18, 0.25],
+      foamDistance = 1,
+      waves = [
+        { direction: [1, 0.3], amplitude: 0.3, wavelength: 12.73, phase: 0.43 },
+        { direction: [1, 0.6], amplitude: 0.15, wavelength: 7.19, phase: 2.17 },
+      ],
+    } = options;
+    if (
+      size.length !== 2 ||
+      size.some((v) => !Number.isFinite(Math.fround(v)) || v <= 0 || v > 100000) ||
+      !Number.isInteger(segments) ||
+      segments < 1 ||
+      segments > 512 ||
+      !Number.isFinite(Math.fround(height)) ||
+      !Number.isFinite(foamDistance) ||
+      foamDistance <= 0 ||
+      foamDistance > 100 ||
+      color.length !== 3 ||
+      color.some((v) => !Number.isFinite(v) || v < 0 || v > 1) ||
+      waves.length < 1 ||
+      waves.length > 8 ||
+      (options.depth !== undefined && typeof options.depth !== 'function')
+    )
+      throw new RangeError('Invalid water options');
+    this.values.set([0, height, foamDistance, waves.length], 20);
+    this.values.set(color, 24);
+    this.values.set([0.6, 0.8, 0, 3, 1, 0.9, 0.75, 0], 104);
+    if (
+      (options.reflection !== undefined && typeof options.reflection !== 'function') ||
+      (options.sceneColor !== undefined && typeof options.sceneColor !== 'function') ||
+      (options.spray !== undefined && typeof options.spray !== 'boolean') ||
+      (options.spray && !options.terrain) ||
+      (options.horizon !== undefined && typeof options.horizon !== 'boolean')
+    )
+      throw new TypeError('Invalid water optics or spray options');
+    this.validateLights();
+    this.horizon = options.horizon ?? false;
+    this.values[98] = this.values[99] = 1;
+    const terrain = options.terrain;
+    if (terrain) {
+      if (
+        typeof terrain.heightmap !== 'function' ||
+        terrain.origin.length !== 2 ||
+        terrain.origin.some((v) => !Number.isFinite(Math.fround(v))) ||
+        terrain.size.length !== 2 ||
+        terrain.size.some((v) => !Number.isFinite(Math.fround(v)) || v <= 0 || v > 100000)
+      )
+        throw new RangeError('Invalid water terrain');
+      this.values.set(terrain.origin, 96);
+      this.values.set(terrain.size, 98);
+      this.values[103] = 1;
+    }
+    const edge = Math.hypot(size[0] / segments, size[1] / segments);
+    for (let i = 0; i < waves.length; i++) {
+      const w = waves[i],
+        length = Math.hypot(...w.direction),
+        q = w.steepness ?? 0.5;
+      if (
+        w.direction.length !== 2 ||
+        w.direction.some((v) => !Number.isFinite(v)) ||
+        !length ||
+        !Number.isFinite(w.amplitude) ||
+        w.amplitude < 0 ||
+        w.amplitude > 100 ||
+        !Number.isFinite(w.wavelength) ||
+        w.wavelength <= 0 ||
+        w.wavelength > 100000 ||
+        !Number.isFinite(q) ||
+        q < 0 ||
+        q > 1 ||
+        !Number.isFinite(w.phase ?? 0)
+      )
+        throw new RangeError('Invalid Gerstner wave');
+      const k = (2 * Math.PI) / w.wavelength;
+      if (q * w.amplitude * k > 1 / waves.length) throw new RangeError('Wave steepness would fold the surface');
+      // Fade waves shorter than four triangle edges to prevent mesh sampling artifacts.
+      const t = Math.max(0, Math.min(1, (w.wavelength / edge - 2) / 2));
+      this.values.set(
+        [
+          w.direction[0] / length,
+          w.direction[1] / length,
+          w.amplitude,
+          k,
+          q,
+          Math.sqrt(9.81 * k),
+          w.phase ?? 0,
+          t * t * (3 - 2 * t),
+        ],
+        32 + i * 8,
+      );
+      this.waveHeights[i] = w.amplitude;
+      this.maxWaveHeight = Math.max(this.maxWaveHeight, w.amplitude);
+    }
+    this.positions = new Float32Array((segments + 1) ** 2 * 3);
+    this.triangles = new Uint32Array(segments ** 2 * 6);
+    // shortcut: a fixed 10 km extension suits local worlds; use camera-centered ocean rings for large travel ranges.
+    const coordinate = (i: number, axis: number) => {
+      const u = i / segments - 0.5;
+      return (
+        u * size[axis] + (this.horizon ? Math.sign(u) * 10000 * Math.max(0, (Math.abs(u) - 0.375) / 0.125) ** 3 : 0)
+      );
+    };
+    const step = (i: number, axis: number) =>
+      Math.max(
+        coordinate(Math.min(segments, i + 1), axis) - coordinate(i, axis),
+        coordinate(i, axis) - coordinate(Math.max(0, i - 1), axis),
+      );
+    for (let z = 0; z <= segments; z++)
+      for (let x = 0; x <= segments; x++) {
+        const o = (z * (segments + 1) + x) * 3;
+        this.positions[o] = coordinate(x, 0);
+        this.positions[o + 1] = coordinate(z, 1);
+        this.positions[o + 2] = Math.hypot(step(x, 0), step(z, 1));
+        if (x < segments && z < segments) {
+          const a = o / 3,
+            b = a + segments + 1;
+          this.triangles.set([a, b, a + 1, a + 1, b, b + 1], (z * segments + x) * 6);
+        }
+      }
+    this.count = this.triangles.length;
   }
-  this.positions=new Float32Array((segments+1)**2*3);this.triangles=new Uint32Array(segments**2*6);
-  // shortcut: a fixed 10 km extension suits local worlds; use camera-centered ocean rings for large travel ranges.
-  const coordinate=(i:number,axis:number)=>{const u=i/segments-0.5;return u*size[axis]+(this.horizon?Math.sign(u)*10000*Math.max(0,(Math.abs(u)-0.375)/0.125)**3:0);};
-  const step=(i:number,axis:number)=>Math.max(coordinate(Math.min(segments,i+1),axis)-coordinate(i,axis),coordinate(i,axis)-coordinate(Math.max(0,i-1),axis));
-  for(let z=0;z<=segments;z++)for(let x=0;x<=segments;x++){const o=(z*(segments+1)+x)*3;this.positions[o]=coordinate(x,0);this.positions[o+1]=coordinate(z,1);this.positions[o+2]=Math.hypot(step(x,0),step(z,1));if(x<segments&&z<segments){const a=o/3,b=a+segments+1;this.triangles.set([a,b,a+1,a+1,b,b+1],(z*segments+x)*6);}}
-  this.count=this.triangles.length;
- }
- static attach(engine:EngineKernel,options:WaterOptions={}):Water {const effect=new Water(options);engineRuntime(engine).use(effect);return effect;}
- /** Borrowed coastal state; R is water depth in meters. Undefined before simulation or after restoration. */
- get coastalDepthTexture():GPUTexture|undefined {return this.coastal?.states[this.coastal.current];}
- /** Borrowed scene depth including the water surface; changes on resize/restoration. */
- get depthTexture():GPUTexture|undefined {return this.surfaceDepth;}
- /** Scales the wave spectrum so its largest configured train has this amplitude in meters. */
- setWaveHeight(height:number):this {
-  if(this.disposed||!Number.isFinite(height)||height<0||height>100||!this.maxWaveHeight&&height>0)throw new RangeError('Invalid water wave height');
-  for(let i=0;i<this.values[23];i++){const o=32+i*8,amplitude=this.maxWaveHeight?height*this.waveHeights[i]/this.maxWaveHeight:0;if(this.values[o+4]*amplitude*this.values[o+3]>1/this.values[23])throw new RangeError('Wave steepness would fold the surface');}
-  for(let i=0;i<this.values[23];i++)this.values[34+i*8]=this.maxWaveHeight?height*this.waveHeights[i]/this.maxWaveHeight:0;
-  return this;
- }
- setup(engine:Engine):void {
-  if(this.disposed||!engine.gpu)throw new Error('Water requires WebGPU');this.engine=engine;
-  this.shared=this.options.depth?undefined:acquireDepth(engine);this.source=this.options.depth??this.shared!.texture;
-  // The uniform supplies the unused connectivity binding when there is no terrain.
-  this.uniform=engine.gpu.createBuffer({size:this.values.byteLength,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST});
-  this.skySampler=engine.gpu.createSampler({addressModeU:'repeat',addressModeV:'clamp-to-edge',minFilter:'linear',magFilter:'linear'});
-  this.vertices=engine.gpu.createBuffer({size:this.positions.byteLength,usage:GPUBufferUsage.VERTEX|GPUBufferUsage.COPY_DST});engine.gpu.queue.writeBuffer(this.vertices,0,this.positions as Float32Array<ArrayBuffer>);
-  this.indices=engine.gpu.createBuffer({size:this.triangles.byteLength,usage:GPUBufferUsage.INDEX|GPUBufferUsage.COPY_DST});engine.gpu.queue.writeBuffer(this.indices,0,this.triangles as Uint32Array<ArrayBuffer>);
- }
- registerPasses(graph:FrameGraph):void {graph.add({name:this.name+':draw',order:4,execute:c=>{if(c.backend==='webgpu')this.draw(c);}});}
- private validateLights():void {
-  const lights=this.options.lights;if(lights===undefined)return;
-  if(!Array.isArray(lights)||lights.length>2)throw new RangeError('Water accepts up to two directional lights');
-  for(const light of lights){
-   if(!light||light.direction?.length!==4||light.radiance?.length!==3)throw new RangeError('Invalid water light');
-   for(let i=0;i<4;i++)if(!Number.isFinite(Math.fround(light.direction[i]))||i<3&&(!Number.isFinite(Math.fround(light.radiance[i]))||light.radiance[i]<0))throw new RangeError('Invalid water light');
-   if(light.direction[3]<0||!Math.hypot(Math.fround(light.direction[0]),Math.fround(light.direction[1]),Math.fround(light.direction[2])))throw new RangeError('Invalid water light');
+  static attach(engine: EngineKernel, options: WaterOptions = {}): Water {
+    const effect = new Water(options);
+    engineRuntime(engine).use(effect);
+    return effect;
   }
- }
- private draw(c:Context):void {
-  resolveMSAA(c);const samples=c.descriptor.multisample?.count??1;
-  const depth=this.source!();if(!depth||depth.width!==c.width||depth.height!==c.height||!depth.format.startsWith('depth')||!(depth.usage&GPUTextureUsage.TEXTURE_BINDING))throw new Error('Water needs viewport-sized sampleable scene depth');
-  const reflection=this.options.reflection?.();if(this.options.reflection&&(!reflection||reflection.dimension!=='2d'||reflection.sampleCount!==1||reflection.depthOrArrayLayers>1||reflection.format!=='rgba16float'||!(reflection.usage&GPUTextureUsage.TEXTURE_BINDING)))throw new Error('Water reflection needs a sampleable rgba16float sky texture');
-  if(this.reflected!==reflection){this.reflected=reflection;this.groups=[];}this.values[27]=+!!reflection;
-  const scene=this.options.sceneColor?.();this.values[111]=+!!scene;
-  if(this.options.sceneColor){
-   if(!scene||scene.dimension!=='2d'||scene.sampleCount!==1||scene.depthOrArrayLayers>1||scene.width!==c.width||scene.height!==c.height||scene.format!=='rgba16float'||scene.format!==c.format||!(scene.usage&GPUTextureUsage.COPY_SRC))throw new Error('Water scene color needs a viewport-sized copyable HDR color texture');
-   if(this.captured?.width!==c.width||this.captured?.height!==c.height||this.captured?.format!==c.format){this.captured?.destroy();this.captured=c.device.createTexture({size:[c.width,c.height],format:c.format,usage:GPUTextureUsage.COPY_DST|GPUTextureUsage.TEXTURE_BINDING});this.capturedView=this.captured.createView();this.colorTarget.texture=this.captured;this.colorSize.width=c.width;this.colorSize.height=c.height;this.groups=[];}
-   this.colorSource.texture=scene;c.encoder.copyTextureToTexture(this.colorSource,this.colorTarget,this.colorSize);
+  /** Borrowed coastal state; R is water depth in meters. Undefined before simulation or after restoration. */
+  get coastalDepthTexture(): GPUTexture | undefined {
+    return this.coastal?.states[this.coastal.current];
   }
-  if(this.surfaceDepth?.width!==c.width||this.surfaceDepth?.height!==c.height||this.surfaceDepth?.format!==depth.format||this.surfaceDepth?.sampleCount!==samples){
-   const changed=this.surfaceDepth?.format!==depth.format||this.surfaceDepth?.sampleCount!==samples;this.surfaceDepth?.destroy();this.surfaceDepth=c.device.createTexture({size:[c.width,c.height],format:depth.format,sampleCount:samples,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});this.surfaceView=this.surfaceDepth.createView();this.copiedDepth.view=this.surfaceView;this.groups=[];
-   if(changed){const module=c.device.createShaderModule({code:depthCopy});this.copyPipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[]},depthStencil:{format:depth.format,depthWriteEnabled:true,depthCompare:'always'},multisample:{count:samples}});this.format='';}
+  /** Borrowed scene depth including the water surface; changes on resize/restoration. */
+  get depthTexture(): GPUTexture | undefined {
+    return this.surfaceDepth;
   }
-  if(this.foam[0]?.width!==c.width||this.foam[0]?.height!==c.height||(this.foamMSAA?.sampleCount??1)!==samples){this.foamMSAA?.destroy();this.foamMSAA=undefined;this.foamMSAAView=undefined;if(samples===4){this.foamMSAA=c.device.createTexture({size:[c.width,c.height],format:'r8unorm',sampleCount:4,usage:GPUTextureUsage.RENDER_ATTACHMENT});this.foamMSAAView=this.foamMSAA.createView();}for(const t of this.foam)t.destroy();this.foam=[];for(let i=0;i<2;i++)this.foam.push(c.device.createTexture({size:[c.width,c.height],format:'r8unorm',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.RENDER_ATTACHMENT}));this.foamViews=this.foam.map(texture=>texture.createView());this.groups=[];this.current=0;}
-  const format=c.format+':'+samples+':'+depth.format;if(this.format!==format){const module=c.device.createShaderModule({code:shader.replace('const HORIZON=false;',`const HORIZON=${this.horizon};`)});this.pipeline=c.device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:12,attributes:[{shaderLocation:0,offset:0,format:'float32x2'},{shaderLocation:1,offset:8,format:'float32'}]}]},fragment:{module,entryPoint:'fragment',targets:[{format:c.format},{format:'r8unorm'}]},primitive:{cullMode:'none'},depthStencil:{format:depth.format,depthCompare:'greater-equal',depthWriteEnabled:true},multisample:{count:samples}});this.format=format;this.groups=[];}
-  this.time+=c.delta;this.values.set(c.camera.matrix);this.values.set(c.camera.position,16);this.values[20]=this.time;this.values[28]=c.camera.near;this.values[29]=c.camera.far;this.values[30]=c.delta;this.values[31]=+(c.format==='rgba16float');
-  const lighting=this.engine!.lighting;this.values[19]=lighting?.radiance[3]??0.15;if(lighting){this.values.set(lighting.direction,104);this.values[108]=lighting.radiance[0];this.values[109]=lighting.radiance[1];this.values[110]=lighting.radiance[2];}
-  this.validateLights();this.values.fill(0,112);
-  if(this.options.lights){for(let i=0;i<this.options.lights.length;i++){const light=this.options.lights[i],length=Math.hypot(light.direction[0],light.direction[1],light.direction[2]);for(let j=0;j<3;j++)this.values[112+i*8+j]=light.direction[j]/length;this.values[115+i*8]=light.direction[3];this.values.set(light.radiance,116+i*8);}}
-  else{this.values.copyWithin(112,104,108);this.values.copyWithin(116,108,111);}
-  if(this.options.terrain){
-   const terrain=this.options.terrain.heightmap();if(!terrain||terrain.dimension!=='2d'||terrain.sampleCount!==1||terrain.depthOrArrayLayers>1||terrain.width<2||terrain.height<2||terrain.width>512||terrain.height>512||terrain.format!=='r32float'||!(terrain.usage&GPUTextureUsage.TEXTURE_BINDING))throw new Error('Water terrain needs a sampleable 2D r32float heightmap, 2..512 cells per side');
-   if(this.coastal?.terrain!==terrain){this.spray?.dispose();this.spray=undefined;this.coastal?.dispose();this.coastal=new CoastalFlow(c.device,this.uniform!,terrain);if(this.options.spray)this.spray=new Spray(c.device,this.uniform!,this.coastal);this.values[101]=this.values[98]/terrain.width;this.values[102]=this.values[99]/terrain.height;this.groups=[];}
-   this.values[100]=Math.min(Math.max(c.delta,0),1/15)/3;
+  /** Scales the wave spectrum so its largest configured train has this amplitude in meters. */
+  setWaveHeight(height: number): this {
+    if (this.disposed || !Number.isFinite(height) || height < 0 || height > 100 || (!this.maxWaveHeight && height > 0))
+      throw new RangeError('Invalid water wave height');
+    for (let i = 0; i < this.values[23]; i++) {
+      const o = 32 + i * 8,
+        amplitude = this.maxWaveHeight ? (height * this.waveHeights[i]) / this.maxWaveHeight : 0;
+      if (this.values[o + 4] * amplitude * this.values[o + 3] > 1 / this.values[23])
+        throw new RangeError('Wave steepness would fold the surface');
+    }
+    for (let i = 0; i < this.values[23]; i++)
+      this.values[34 + i * 8] = this.maxWaveHeight ? (height * this.waveHeights[i]) / this.maxWaveHeight : 0;
+    return this;
   }
-  c.device.queue.writeBuffer(this.uniform!,0,this.values as Float32Array<ArrayBuffer>);this.coastal?.step(c.encoder);this.spray?.step(c.encoder);
-  if(this.sampledDepth!==depth||!this.groups.length){const view=depth.createView({aspect:'depth-only'});this.copyGroup=group(c.device,this.copyPipeline!,[view]);this.groups=[];for(let i=0;i<2;i++)for(let j=0;j<(this.coastal?2:1);j++)this.groups.push(group(c.device,this.pipeline!,[{buffer:this.uniform!},view,this.foamViews[i],this.coastal?.views[j]??this.foamViews[i],reflection?.createView()??this.foamViews[i],this.skySampler!,this.capturedView??this.foamViews[i],{buffer:this.coastal?.connected??this.uniform!}]));this.sampledDepth=depth;}
-  const target=sceneTarget(c);if(target&&samples===4)target.copyDepth(c.encoder,this.surfaceView!,4);else{const copy=c.encoder.beginRenderPass(this.depthPresentation);copy.setPipeline(this.copyPipeline!);copy.setBindGroup(0,this.copyGroup!);copy.draw(3);copy.end();}
-  const bind=this.groups[this.current*(this.coastal?2:1)+(this.coastal?.current??0)];this.current=1-this.current;
-  this.attachment.view=c.color;this.foamAttachment.view=samples===4?this.foamMSAAView!:this.foamViews[this.current];this.foamAttachment.resolveTarget=samples===4?this.foamViews[this.current]:undefined;this.foamAttachment.storeOp=samples===4?'discard':'store';this.depthAttachment.view=this.surfaceView!;const pass=c.encoder.beginRenderPass(this.presentation);
-  pass.setPipeline(this.pipeline!);pass.setBindGroup(0,bind);pass.setVertexBuffer(0,this.vertices!);pass.setIndexBuffer(this.indices!,'uint32');pass.drawIndexed(this.count);pass.end();
-  this.spray?.draw(c,this.surfaceDepth!,this.surfaceView!);
- }
- private release():void {this.foamMSAA?.destroy();this.foamMSAA=undefined;this.foamMSAAView=undefined;this.shared?.release();this.shared=undefined;this.spray?.dispose();this.spray=undefined;this.coastal?.dispose();this.coastal=undefined;this.surfaceDepth?.destroy();this.surfaceDepth=undefined;this.surfaceView=undefined;this.copyPipeline=undefined;this.copyGroup=undefined;this.captured?.destroy();this.captured=undefined;this.capturedView=undefined;this.reflected=undefined;this.skySampler=undefined;this.uniform?.destroy();this.vertices?.destroy();this.indices?.destroy();for(const t of this.foam)t.destroy();this.foam=[];this.foamViews=[];this.groups=[];this.sampledDepth=undefined;this.uniform=this.vertices=this.indices=undefined;this.pipeline=undefined;this.format='';}
- onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
- dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.engine=undefined;}
+  setup(engine: Engine): void {
+    if (this.disposed || !engine.gpu) throw new Error('Water requires WebGPU');
+    this.engine = engine;
+    this.shared = this.options.depth ? undefined : acquireDepth(engine);
+    this.source = this.options.depth ?? this.shared!.texture;
+    // The uniform supplies the unused connectivity binding when there is no terrain.
+    this.uniform = engine.gpu.createBuffer({
+      size: this.values.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+    this.skySampler = engine.gpu.createSampler({
+      addressModeU: 'repeat',
+      addressModeV: 'clamp-to-edge',
+      minFilter: 'linear',
+      magFilter: 'linear',
+    });
+    this.vertices = engine.gpu.createBuffer({
+      size: this.positions.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    engine.gpu.queue.writeBuffer(this.vertices, 0, this.positions as Float32Array<ArrayBuffer>);
+    this.indices = engine.gpu.createBuffer({
+      size: this.triangles.byteLength,
+      usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+    });
+    engine.gpu.queue.writeBuffer(this.indices, 0, this.triangles as Uint32Array<ArrayBuffer>);
+  }
+  registerPasses(graph: FrameGraph): void {
+    graph.add({
+      name: this.name + ':draw',
+      order: 4,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.draw(c);
+      },
+    });
+  }
+  private validateLights(): void {
+    const lights = this.options.lights;
+    if (lights === undefined) return;
+    if (!Array.isArray(lights) || lights.length > 2) throw new RangeError('Water accepts up to two directional lights');
+    for (const light of lights) {
+      if (!light || light.direction?.length !== 4 || light.radiance?.length !== 3)
+        throw new RangeError('Invalid water light');
+      for (let i = 0; i < 4; i++)
+        if (
+          !Number.isFinite(Math.fround(light.direction[i])) ||
+          (i < 3 && (!Number.isFinite(Math.fround(light.radiance[i])) || light.radiance[i] < 0))
+        )
+          throw new RangeError('Invalid water light');
+      if (
+        light.direction[3] < 0 ||
+        !Math.hypot(Math.fround(light.direction[0]), Math.fround(light.direction[1]), Math.fround(light.direction[2]))
+      )
+        throw new RangeError('Invalid water light');
+    }
+  }
+  private draw(c: Context): void {
+    resolveMSAA(c);
+    const samples = c.descriptor.multisample?.count ?? 1;
+    const depth = this.source!();
+    if (
+      !depth ||
+      depth.width !== c.width ||
+      depth.height !== c.height ||
+      !depth.format.startsWith('depth') ||
+      !(depth.usage & GPUTextureUsage.TEXTURE_BINDING)
+    )
+      throw new Error('Water needs viewport-sized sampleable scene depth');
+    const reflection = this.options.reflection?.();
+    if (
+      this.options.reflection &&
+      (!reflection ||
+        reflection.dimension !== '2d' ||
+        reflection.sampleCount !== 1 ||
+        reflection.depthOrArrayLayers > 1 ||
+        reflection.format !== 'rgba16float' ||
+        !(reflection.usage & GPUTextureUsage.TEXTURE_BINDING))
+    )
+      throw new Error('Water reflection needs a sampleable rgba16float sky texture');
+    if (this.reflected !== reflection) {
+      this.reflected = reflection;
+      this.groups = [];
+    }
+    this.values[27] = +!!reflection;
+    const scene = this.options.sceneColor?.();
+    this.values[111] = +!!scene;
+    if (this.options.sceneColor) {
+      if (
+        !scene ||
+        scene.dimension !== '2d' ||
+        scene.sampleCount !== 1 ||
+        scene.depthOrArrayLayers > 1 ||
+        scene.width !== c.width ||
+        scene.height !== c.height ||
+        scene.format !== 'rgba16float' ||
+        scene.format !== c.format ||
+        !(scene.usage & GPUTextureUsage.COPY_SRC)
+      )
+        throw new Error('Water scene color needs a viewport-sized copyable HDR color texture');
+      const target = sceneTarget(c);
+      // The 1x opaque resolve is separate from our 4x color attachment and stays unchanged during this pass.
+      if (
+        samples === 4 &&
+        target?.samples === 4 &&
+        scene === target.resolvedColor &&
+        scene.usage & GPUTextureUsage.TEXTURE_BINDING
+      ) {
+        if (this.colorSource.texture !== scene || !this.capturedView || this.captured) {
+          this.captured?.destroy();
+          this.captured = undefined;
+          this.capturedView = scene.createView();
+          this.groups = [];
+        }
+        this.colorSource.texture = scene;
+      } else {
+        if (
+          this.captured?.width !== c.width ||
+          this.captured?.height !== c.height ||
+          this.captured?.format !== c.format
+        ) {
+          this.captured?.destroy();
+          this.captured = c.device.createTexture({
+            size: [c.width, c.height],
+            format: c.format,
+            usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING,
+          });
+          this.capturedView = this.captured.createView();
+          this.colorTarget.texture = this.captured;
+          this.colorSize.width = c.width;
+          this.colorSize.height = c.height;
+          this.groups = [];
+        }
+        this.colorSource.texture = scene;
+        c.encoder.copyTextureToTexture(this.colorSource, this.colorTarget, this.colorSize);
+      }
+    }
+    if (
+      this.surfaceDepth?.width !== c.width ||
+      this.surfaceDepth?.height !== c.height ||
+      this.surfaceDepth?.format !== depth.format ||
+      this.surfaceDepth?.sampleCount !== samples
+    ) {
+      const changed = this.surfaceDepth?.format !== depth.format || this.surfaceDepth?.sampleCount !== samples;
+      this.surfaceDepth?.destroy();
+      this.surfaceDepth = c.device.createTexture({
+        size: [c.width, c.height],
+        format: depth.format,
+        sampleCount: samples,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      });
+      this.surfaceView = this.surfaceDepth.createView();
+      this.copiedDepth.view = this.surfaceView;
+      this.groups = [];
+      if (changed) {
+        const module = c.device.createShaderModule({ code: depthCopy });
+        this.copyPipeline = c.device.createRenderPipeline({
+          layout: 'auto',
+          vertex: { module, entryPoint: 'vertex' },
+          fragment: { module, entryPoint: 'fragment', targets: [] },
+          depthStencil: { format: depth.format, depthWriteEnabled: true, depthCompare: 'always' },
+          multisample: { count: samples },
+        });
+        this.format = '';
+      }
+    }
+    if (
+      this.foam[0]?.width !== c.width ||
+      this.foam[0]?.height !== c.height ||
+      (this.foamMSAA?.sampleCount ?? 1) !== samples
+    ) {
+      this.foamMSAA?.destroy();
+      this.foamMSAA = undefined;
+      this.foamMSAAView = undefined;
+      if (samples === 4) {
+        this.foamMSAA = c.device.createTexture({
+          size: [c.width, c.height],
+          format: 'r8unorm',
+          sampleCount: 4,
+          usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+        this.foamMSAAView = this.foamMSAA.createView();
+      }
+      for (const t of this.foam) t.destroy();
+      this.foam = [];
+      for (let i = 0; i < 2; i++)
+        this.foam.push(
+          c.device.createTexture({
+            size: [c.width, c.height],
+            format: 'r8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+          }),
+        );
+      this.foamViews = this.foam.map((texture) => texture.createView());
+      this.groups = [];
+      this.current = 0;
+    }
+    const format = c.format + ':' + samples + ':' + depth.format;
+    if (this.format !== format) {
+      const module = c.device.createShaderModule({
+        code: shader.replace('const HORIZON=false;', `const HORIZON=${this.horizon};`),
+      });
+      this.pipeline = c.device.createRenderPipeline({
+        layout: 'auto',
+        vertex: {
+          module,
+          entryPoint: 'vertex',
+          buffers: [
+            {
+              arrayStride: 12,
+              attributes: [
+                { shaderLocation: 0, offset: 0, format: 'float32x2' },
+                { shaderLocation: 1, offset: 8, format: 'float32' },
+              ],
+            },
+          ],
+        },
+        fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format }, { format: 'r8unorm' }] },
+        primitive: { cullMode: 'none' },
+        depthStencil: { format: depth.format, depthCompare: 'greater-equal', depthWriteEnabled: true },
+        multisample: { count: samples },
+      });
+      this.format = format;
+      this.groups = [];
+    }
+    this.time += c.delta;
+    this.values.set(c.camera.matrix);
+    this.values.set(c.camera.position, 16);
+    this.values[20] = this.time;
+    this.values[28] = c.camera.near;
+    this.values[29] = c.camera.far;
+    this.values[30] = c.delta;
+    this.values[31] = +(c.format === 'rgba16float');
+    const lighting = this.engine!.lighting;
+    this.values[19] = lighting?.radiance[3] ?? 0.15;
+    if (lighting) {
+      this.values.set(lighting.direction, 104);
+      this.values[108] = lighting.radiance[0];
+      this.values[109] = lighting.radiance[1];
+      this.values[110] = lighting.radiance[2];
+    }
+    this.validateLights();
+    this.values.fill(0, 112);
+    if (this.options.lights) {
+      for (let i = 0; i < this.options.lights.length; i++) {
+        const light = this.options.lights[i],
+          length = Math.hypot(light.direction[0], light.direction[1], light.direction[2]);
+        for (let j = 0; j < 3; j++) this.values[112 + i * 8 + j] = light.direction[j] / length;
+        this.values[115 + i * 8] = light.direction[3];
+        this.values.set(light.radiance, 116 + i * 8);
+      }
+    } else {
+      this.values.copyWithin(112, 104, 108);
+      this.values.copyWithin(116, 108, 111);
+    }
+    if (this.options.terrain) {
+      const terrain = this.options.terrain.heightmap();
+      if (
+        !terrain ||
+        terrain.dimension !== '2d' ||
+        terrain.sampleCount !== 1 ||
+        terrain.depthOrArrayLayers > 1 ||
+        terrain.width < 2 ||
+        terrain.height < 2 ||
+        terrain.width > 512 ||
+        terrain.height > 512 ||
+        terrain.format !== 'r32float' ||
+        !(terrain.usage & GPUTextureUsage.TEXTURE_BINDING)
+      )
+        throw new Error('Water terrain needs a sampleable 2D r32float heightmap, 2..512 cells per side');
+      if (this.coastal?.terrain !== terrain) {
+        this.spray?.dispose();
+        this.spray = undefined;
+        this.coastal?.dispose();
+        this.coastal = new CoastalFlow(c.device, this.uniform!, terrain);
+        if (this.options.spray) this.spray = new Spray(c.device, this.uniform!, this.coastal);
+        this.values[101] = this.values[98] / terrain.width;
+        this.values[102] = this.values[99] / terrain.height;
+        this.groups = [];
+      }
+      this.values[100] = Math.min(Math.max(c.delta, 0), 1 / 15) / 3;
+    }
+    c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
+    this.coastal?.step(c.encoder);
+    this.spray?.step(c.encoder);
+    if (this.sampledDepth !== depth || !this.groups.length) {
+      const view = depth.createView({ aspect: 'depth-only' });
+      this.copyGroup = group(c.device, this.copyPipeline!, [view]);
+      this.groups = [];
+      for (let i = 0; i < 2; i++)
+        for (let j = 0; j < (this.coastal ? 2 : 1); j++)
+          this.groups.push(
+            group(c.device, this.pipeline!, [
+              { buffer: this.uniform! },
+              view,
+              this.foamViews[i],
+              this.coastal?.views[j] ?? this.foamViews[i],
+              reflection?.createView() ?? this.foamViews[i],
+              this.skySampler!,
+              this.capturedView ?? this.foamViews[i],
+              { buffer: this.coastal?.connected ?? this.uniform! },
+            ]),
+          );
+      this.sampledDepth = depth;
+    }
+    const target = sceneTarget(c);
+    if (target && samples === 4) target.copyDepth(c.encoder, this.surfaceView!, 4);
+    else {
+      const copy = c.encoder.beginRenderPass(this.depthPresentation);
+      copy.setPipeline(this.copyPipeline!);
+      copy.setBindGroup(0, this.copyGroup!);
+      copy.draw(3);
+      copy.end();
+    }
+    const bind = this.groups[this.current * (this.coastal ? 2 : 1) + (this.coastal?.current ?? 0)];
+    this.current = 1 - this.current;
+    this.attachment.view = c.color;
+    this.foamAttachment.view = samples === 4 ? this.foamMSAAView! : this.foamViews[this.current];
+    this.foamAttachment.resolveTarget = samples === 4 ? this.foamViews[this.current] : undefined;
+    this.foamAttachment.storeOp = samples === 4 ? 'discard' : 'store';
+    this.depthAttachment.view = this.surfaceView!;
+    const pass = c.encoder.beginRenderPass(this.presentation);
+    pass.setPipeline(this.pipeline!);
+    pass.setBindGroup(0, bind);
+    pass.setVertexBuffer(0, this.vertices!);
+    pass.setIndexBuffer(this.indices!, 'uint32');
+    pass.drawIndexed(this.count);
+    pass.end();
+    this.spray?.draw(c, this.surfaceDepth!, this.surfaceView!);
+  }
+  private release(): void {
+    this.foamMSAA?.destroy();
+    this.foamMSAA = undefined;
+    this.foamMSAAView = undefined;
+    this.shared?.release();
+    this.shared = undefined;
+    this.spray?.dispose();
+    this.spray = undefined;
+    this.coastal?.dispose();
+    this.coastal = undefined;
+    this.surfaceDepth?.destroy();
+    this.surfaceDepth = undefined;
+    this.surfaceView = undefined;
+    this.copyPipeline = undefined;
+    this.copyGroup = undefined;
+    this.captured?.destroy();
+    this.captured = undefined;
+    this.capturedView = undefined;
+    this.reflected = undefined;
+    this.skySampler = undefined;
+    this.uniform?.destroy();
+    this.vertices?.destroy();
+    this.indices?.destroy();
+    for (const t of this.foam) t.destroy();
+    this.foam = [];
+    this.foamViews = [];
+    this.groups = [];
+    this.sampledDepth = undefined;
+    this.uniform = this.vertices = this.indices = undefined;
+    this.pipeline = undefined;
+    this.format = '';
+  }
+  onDeviceRestored(engine: Engine): void {
+    this.release();
+    this.setup(engine);
+  }
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.engine?.removePlugin(this.name);
+    this.release();
+    this.engine = undefined;
+  }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 }

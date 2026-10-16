@@ -3,6 +3,8 @@ export interface MaterialExtensionTexture {view:GPUTextureView;sampler?:GPUSampl
 
 /** Optional material slot. Group 3 is permanently reserved; lighting stays in group 2. */
 export interface MaterialExtension {
+  /** The extension supplies physical lobes in place of imported built-in physical shading. */
+  replacesPhysical?:boolean;
   /** Statements after surface(i,front), in every fragment entry point. May mutate s. */
   wgsl?:string;
   /** Beauty-only statements after directional direct lighting, before lighting effects. */

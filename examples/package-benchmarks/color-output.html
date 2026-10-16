@@ -1,0 +1,78 @@
+﻿<!doctype html><html><head><meta charset="utf-8"/><title>Color output GPU check</title><style>body{margin:0;background:#000}canvas{width:96px;height:48px;display:block}</style></head><body>
+<script type="module">
+// Driven by color-output-gpu.mjs. Each scenario builds a fresh engine whose Tonemap ('neutral') grades an external
+// linear Rec.709 HDR source with three patches: left, Display P3 green x0.5 (outside sRGB: negative red/blue); top right,
+// a grey highlight at 3x SDR white; bottom right, an in-gamut colour. 'core' scenarios draw a lit box with no Tonemap.
+// It returns the canvas configuration, ColorOutput's state, the raw canvas texture at each patch (read back through
+// WebGPU: bgra8unorm bytes or float16 values) and the browser's own reading of the canvas into a Display P3 2D canvas.
+import {Engine,box,PbrMaterial} from '/packages/core/dist/index.js';
+import {Tonemap} from '/packages/tonemap/dist/index.js';
+import {ColorOutput,TransparentCanvas,floatToHalf,halfToFloat} from '/packages/environment/dist/index.js';
+import {PostStack,FXAA,Bloom} from '/packages/post/dist/index.js';
+
+const queries=['(color-gamut: srgb)','(color-gamut: p3)','(color-gamut: rec2020)','(dynamic-range: high)','(video-dynamic-range: high)'];
+window.display={media:Object.fromEntries(queries.map(q=>[q,matchMedia(q).matches])),devicePixelRatio,userAgent:navigator.userAgent};
+const patches={p3:[0.25,0.5],highlight:[0.75,0.25],plain:[0.75,0.75],center:[0.5,0.5]};
+const p3Green=[-0.11247009,0.52102848,-0.03931802],highlight=[3,3,3],plain=[0.2,0.1,0.05];
+let source;
+function sourceTexture(device,width,height){
+  if(source?.width===width&&source.height===height&&source.device===device)return source.texture;
+  source?.texture.destroy();const texture=device.createTexture({size:[width,height],format:'rgba16float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});
+  const data=new Uint16Array(width*height*4);
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++){const c=x<width/2?p3Green:y<height/2?highlight:plain,i=(y*width+x)*4;for(let k=0;k<3;k++)data[i+k]=floatToHalf(c[k]);data[i+3]=floatToHalf(1);}
+  device.queue.writeTexture({texture},data,{bytesPerRow:width*8},[width,height]);source={texture,width,height,device};return texture;
+}
+function readCanvas(engine,canvas){
+  // The real canvas texture (ColorOutput patches getCurrentTexture for core only), copied in the same task as the render.
+  const context=canvas.getContext('webgpu'),texture=GPUCanvasContext.prototype.getCurrentTexture.call(context),device=engine.gpu;
+  const bytes=texture.format==='rgba16float'?8:4,row=Math.ceil(texture.width*bytes/256)*256,buffer=device.createBuffer({size:row*texture.height,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+  const encoder=device.createCommandEncoder();encoder.copyTextureToBuffer({texture},{buffer,bytesPerRow:row},[texture.width,texture.height]);device.queue.submit([encoder.finish()]);
+  return buffer.mapAsync(GPUMapMode.READ).then(()=>{const raw=buffer.getMappedRange().slice(0);buffer.destroy();
+  const at=([u,v])=>{const x=Math.floor(u*texture.width),y=Math.floor(v*texture.height),o=y*row+x*bytes;
+    if(bytes===8){const h=new Uint16Array(raw,o,4);return Array.from(h,b=>+halfToFloat(b).toFixed(4));}
+    const b=new Uint8Array(raw,o,4);return texture.format==='bgra8unorm'?[b[2],b[1],b[0],b[3]]:Array.from(b);};
+  return {format:texture.format,size:[texture.width,texture.height],values:Object.fromEntries(Object.entries(patches).map(([k,p])=>[k,at(p)]))};});
+}
+function readP3(canvas){
+  // What the browser shows, converted into Display P3 by the browser itself (8-bit, and float16 where supported).
+  const out={};
+  for(const float of [false,true]){
+    try{
+      const c=document.createElement('canvas');c.width=canvas.width;c.height=canvas.height;
+      const g=c.getContext('2d',float?{colorSpace:'display-p3',colorType:'float16'}:{colorSpace:'display-p3'});
+      if(float&&g.getContextAttributes?.().colorType!=='float16'){out.float16='unsupported';continue;}
+      g.drawImage(canvas,0,0);const image=g.getImageData(0,0,c.width,c.height,float?{colorSpace:'display-p3',pixelFormat:'rgba-float16'}:{colorSpace:'display-p3'});
+      out[float?'float16':'unorm8']={colorSpace:image.colorSpace,values:Object.fromEntries(Object.entries(patches).map(([k,[u,v]])=>{const i=(Math.floor(v*c.height)*c.width+Math.floor(u*c.width))*4;
+        return [k,Array.from(image.data.slice(i,i+4),x=>float&&typeof x==='number'?+x.toFixed(4):x)];}))};
+    }catch(error){out[float?'float16':'unorm8']=String(error);}
+  }
+  return out;
+}
+let engine,canvas;
+window.check={
+  // scenario: {output?: ColorOutput options | null, tonemap: 'alone'|'stack'|null, transparent?, restore?, usage?}
+  async run(s){
+    const errors=[];canvas=document.body.appendChild(document.createElement('canvas'));
+    engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[2.2,1.6,2.6],target:[0,0,0]}});
+    engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+    const context=canvas.getContext('webgpu');context.configure({...context.getConfiguration(),usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});
+    if(s.tonemap===null)engine.createMesh().setGeometry(box(1.2,1.2,1.2)).setMaterial(new PbrMaterial({color:'#e05a1e',roughness:0.6}));
+    if(s.transparent)TransparentCanvas.attach(engine);
+    const output=s.output?ColorOutput.attach(engine,s.output):undefined;
+    const tonemap=()=>new Tonemap({curve:'neutral',...(s.tonemap==='alone'?{source:()=>sourceTexture(engine.gpu,canvas.width,canvas.height)}:{})});
+    if(s.tonemap==='alone')engine.use(tonemap());
+    // A stack grades the scene (a lit box) instead of the external patches.
+    if(s.tonemap==='stack'){engine.createMesh().setGeometry(box(1.2,1.2,1.2)).setMaterial(new PbrMaterial({color:'#ffffff',roughness:0.2}));PostStack.attach(engine,[new Bloom({strength:0.3}),tonemap(),new FXAA()]);}
+    if(s.restore){engine.render({delta:1/60});await engine.rebootDevice();engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+      context.configure({...context.getConfiguration(),usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});}
+    for(let i=0;i<3;i++){engine.render({delta:1/60});await engine.gpu.queue.onSubmittedWorkDone();}
+    // Same task as the render: the canvas texture is still the frame's (not yet presented).
+    engine.render({delta:1/60});const reading=readCanvas(engine,canvas),p3=readP3(canvas),raw=await reading;
+    const config=context.getConfiguration();
+    return {errors,config:{format:config.format,colorSpace:config.colorSpace,toneMapping:config.toneMapping?.mode,alphaMode:config.alphaMode},
+      output:output&&{gamut:output.gamut,hdr:output.hdr,peak:output.peak},raw,p3};
+  },
+  clear(){engine.dispose();canvas.remove();source?.texture.destroy();source=undefined;},
+};
+window.ready=true;
+</script></body></html>

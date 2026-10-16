@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flight helmet · Margo Engine</title>
+  <link rel="stylesheet" href="./extension-demo.css">
+  <link rel="preload" as="fetch" href="./assets/flight-helmet-mobile.glb" crossorigin>
+</head>
+<body data-demo="helmet">
+  <main id="viewport" aria-label="Textured PBR flight helmet on a wooden stand"></main>
+  <aside aria-label="Scene controls">
+    <h1>Flight helmet</h1>
+    <p>Leather, rubber, brass and glass on a wooden stand. Drag to orbit; scroll to zoom.</p>
+    <label class="check"><input id="ssao" type="checkbox" checked disabled> Ambient occlusion</label>
+    <p id="status" role="status">Loading model…</p><p id="error" role="alert"></p>
+    <small>Focus the scene: arrow keys orbit, + / − zoom.</small>
+    <small>Flight Helmet from the Khronos glTF Sample Assets, CC0 (glTF conversion by Gary Hsu). <a href="https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/FlightHelmet">Asset source</a>.</small>
+  </aside>
+  <script type="module" src="./extension-demo.ts"></script>
+</body>
+</html>

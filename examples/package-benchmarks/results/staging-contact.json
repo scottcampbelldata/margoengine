@@ -1,0 +1,244 @@
+{
+ "recordedAt": "2026-10-14T14:47:17.760Z",
+ "commit": "46f9484",
+ "acPowerBefore": true,
+ "pixels": {
+  "cubeContact": {
+   "at": [
+    541,
+    410
+   ],
+   "off": [
+    157,
+    157,
+    157
+   ],
+   "on": [
+    128,
+    128,
+    128
+   ],
+   "ratio": 0.815
+  },
+  "sphereContact": {
+   "at": [
+    740,
+    413
+   ],
+   "off": [
+    158,
+    158,
+    158
+   ],
+   "on": [
+    127,
+    127,
+    127
+   ],
+   "ratio": 0.804
+  },
+  "underFloating": {
+   "at": [
+    640,
+    325
+   ],
+   "off": [
+    158,
+    158,
+    158
+   ],
+   "on": [
+    158,
+    158,
+    158
+   ],
+   "ratio": 1
+  },
+  "outside": {
+   "at": [
+    292,
+    431
+   ],
+   "off": [
+    157,
+    157,
+    157
+   ],
+   "on": [
+    157,
+    157,
+    157
+   ],
+   "ratio": 1
+  },
+  "cubeTop": {
+   "at": [
+    540,
+    319
+   ],
+   "off": [
+    108,
+    119,
+    129
+   ],
+   "on": [
+    108,
+    119,
+    129
+   ],
+   "ratio": 1
+  },
+  "floorReference": {
+   "at": [
+    640,
+    520
+   ],
+   "off": [
+    157,
+    157,
+    157
+   ],
+   "on": [
+    157,
+    157,
+    157
+   ],
+   "ratio": 1
+  }
+ },
+ "timing": [
+  {
+   "frames": 65,
+   "static": false,
+   "passesPerFrame": 6,
+   "updateMs": 0.24531150000000002,
+   "planeMs": 0.037422,
+   "totalMs": 0.2824455,
+   "samples": "1280x720 4x MSAA",
+   "resolution": 512,
+   "stats": {
+    "updates": 71,
+    "cacheHits": 0
+   }
+  },
+  {
+   "frames": 65,
+   "static": true,
+   "passesPerFrame": 1,
+   "updateMs": 0,
+   "planeMs": 0.041639999999999996,
+   "totalMs": 0.041639999999999996,
+   "samples": "1280x720 4x MSAA",
+   "resolution": 512,
+   "stats": {
+    "updates": 71,
+    "cacheHits": 65
+   }
+  },
+  {
+   "frames": 65,
+   "static": false,
+   "passesPerFrame": 6,
+   "updateMs": 0.048827499999999996,
+   "planeMs": 0.028775500000000002,
+   "totalMs": 0.07651,
+   "samples": "1280x720 4x MSAA",
+   "resolution": 256,
+   "stats": {
+    "updates": 65,
+    "cacheHits": 0
+   }
+  },
+  {
+   "frames": 65,
+   "static": true,
+   "passesPerFrame": 1,
+   "updateMs": 0,
+   "planeMs": 0.03401,
+   "totalMs": 0.03401,
+   "samples": "1280x720 4x MSAA",
+   "resolution": 256,
+   "stats": {
+    "updates": 65,
+    "cacheHits": 65
+   }
+  },
+  {
+   "frames": 65,
+   "static": false,
+   "passesPerFrame": 6,
+   "updateMs": 0.869266,
+   "planeMs": 0.0391925,
+   "totalMs": 0.9104635,
+   "samples": "1280x720 4x MSAA",
+   "resolution": 1024,
+   "stats": {
+    "updates": 65,
+    "cacheHits": 0
+   }
+  },
+  {
+   "frames": 65,
+   "static": true,
+   "passesPerFrame": 1,
+   "updateMs": 0,
+   "planeMs": 0.038724,
+   "totalMs": 0.038724,
+   "samples": "1280x720 4x MSAA",
+   "resolution": 1024,
+   "stats": {
+    "updates": 65,
+    "cacheHits": 65
+   }
+  },
+  {
+   "frames": 65,
+   "static": false,
+   "passesPerFrame": 6,
+   "updateMs": 0.24494649999999998,
+   "planeMs": 0.015754999999999998,
+   "totalMs": 0.2611445,
+   "samples": "1280x720 1x MSAA",
+   "resolution": 512,
+   "stats": {
+    "updates": 65,
+    "cacheHits": 0
+   }
+  },
+  {
+   "frames": 65,
+   "static": true,
+   "passesPerFrame": 1,
+   "updateMs": 0,
+   "planeMs": 0.018854,
+   "totalMs": 0.018854,
+   "samples": "1280x720 1x MSAA",
+   "resolution": 512,
+   "stats": {
+    "updates": 65,
+    "cacheHits": 65
+   }
+  }
+ ],
+ "hardware": {
+  "webglRenderer": "ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (16GB) (0x000064A0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "webgpu": {
+   "vendor": "intel",
+   "architecture": "xe-2lpg",
+   "device": "0x64a0",
+   "description": "Intel(R) Arc(TM) 140V GPU (16GB)",
+   "fallback": false
+  },
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+  "browserName": "chromium",
+  "browserVersion": "155.0.4283.45",
+  "requestedChannel": "msedge",
+  "launchArgs": [
+   "--enable-webgpu-developer-features"
+  ],
+  "powerPreference": "high-performance",
+  "hostPlatform": "win32",
+  "headless": true
+ },
+ "acPowerAfter": true
+}

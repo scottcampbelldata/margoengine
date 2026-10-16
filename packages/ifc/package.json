@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/ifc",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "IFC geometry and BIM identifiers for Margo Engine, using an initialized web-ifc runtime.",
@@ -17,13 +17,17 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js"
     }
   },
   "files": [
     "dist"
   ],
   "peerDependencies": {
-    "@margoengine/loaders": "0.1.0",
+    "@margoengine/loaders": "^1.0.0",
     "web-ifc": "^0.0.78"
   },
   "homepage": "https://margoengine.com",

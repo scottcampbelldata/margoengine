@@ -136,7 +136,7 @@ export const PointerLock=forwardRef<PointerControls,PointerLockProps>(function P
     let active=true,current:PointerControls|undefined,release=()=>{};
     optionalPeer('@margoengine/controls',()=>import('@margoengine/controls')).then(({PointerLockControls})=>{
       if(!active||scene.engine.disposed)return;
-      current=new PointerLockControls(scene.engine as unknown as EngineKernel,scene.engine.canvas);
+      current=new PointerLockControls(scene.engine.camera,scene.engine.canvas);
       const control=current,frame:FrameCallback=(_,delta)=>{control.update(delta);};
       const click=()=>{if(latest.current.lockOnClick!==false&&control.enabled)control.lock();};
       const lock=(event:ControlEvent)=>latest.current.onLock?.(event),unlock=(event:ControlEvent)=>latest.current.onUnlock?.(event),change=(event:ControlEvent)=>latest.current.onChange?.(event);

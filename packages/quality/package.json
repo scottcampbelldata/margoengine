@@ -1,0 +1,39 @@
+{
+  "name": "@margoengine/quality",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Measured quality tiers: start light, time the GPU, remember full 4x quality only where it has headroom.",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./warm": {
+      "types": "./dist/warm.d.ts",
+      "import": "./dist/warm.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js quality",
+    "test": "npm run build && node --test test/*.test.js",
+    "prepack": "npm run build"
+  },
+  "homepage": "https://margoengine.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/quality"
+  }
+}

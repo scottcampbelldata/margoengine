@@ -31,6 +31,16 @@ test('kit Gltf keeps the existing Model identity and native FBX loader suspends 
   assert.equal(view.getByText('Loading').tagName,'P');assert.equal(requests.length,before+1);assert.equal(requests.at(-1).kind,'fbx');
   await act(async()=>requests.at(-1).resolve());await flush();assert.equal(view.queryByText('Loading'),null);assert.equal(loaded.length,1);assert.deepEqual(loaded[0].position,[1,2,3]);
 });
+test('an empty Model still completes its load callback with the transformed root',async()=>{
+  const loaded=[];
+  render(tree(React.createElement(Model,{src:'/empty-audit.glb',position:[2,3,4],onLoad:node=>loaded.push(node)})));
+  await flush();
+  assert.equal(models.at(-1).primitives.length,0);
+  assert.equal(loaded.length,1);
+  assert.equal(loaded[0],models.at(-1).root);
+  assert.deepEqual(loaded[0].position,[2,3,4]);
+});
+
 test('FBX preload and independent remounts share the native URL cache',async()=>{
   const before=requests.length;const view=render(tree(null));await flush();await act(async()=>preload('/preloaded.FBX?version=1'));
   assert.equal(requests.length,before+1);assert.equal(requests.at(-1).kind,'fbx');assert.ok(models.at(-1).disposed,'preloading must not display an attached model');

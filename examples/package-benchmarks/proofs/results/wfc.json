@@ -1,0 +1,31 @@
+{
+  "package": "wfc",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:29:13.778Z",
+  "outputsIdentical": true,
+  "notes": "Seeded solutions are byte-identical; the random stream is consumed in the same order.",
+  "cases": [
+    {
+      "case": "32x1x32 map, 4 tiles",
+      "solves": 6,
+      "baselineMs": 222.8519,
+      "candidateMs": 75.3182,
+      "speedup": 2.959
+    },
+    {
+      "case": "48x1x48 map, 12 tiles",
+      "solves": 3,
+      "baselineMs": 732.8651,
+      "candidateMs": 193.8965,
+      "speedup": 3.78
+    },
+    {
+      "case": "16x8x16 volume, 8 tiles",
+      "solves": 2,
+      "baselineMs": 184.4915,
+      "candidateMs": 51.0149,
+      "speedup": 3.616
+    }
+  ]
+}

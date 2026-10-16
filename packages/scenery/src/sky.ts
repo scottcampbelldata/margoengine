@@ -1,49 +1,21 @@
-import type {Engine, EnginePlugin, FrameGraph, PassContext} from '@margoengine/core/extension';
-import {invert} from '../../shared/math.js';
-import {SkyMoonPass, type SkyMoonConfig} from './sky-moon.js';
-
-export class SkyMoon implements EnginePlugin {
-  readonly name = 'sky-moon';
-  private sky?: SkyMoonPass;
-  private hdr?: SkyMoonPass;
-  private format?: GPUTextureFormat;
-  private time = 0;
-  private readonly inverse = new Float32Array(16);
-  private readonly inverseWorkspace = new Float64Array(52);
-  private readonly color: GPURenderPassColorAttachment = {view: undefined!, loadOp: 'load', storeOp: 'store'};
-  private readonly depth: GPURenderPassDepthStencilAttachment = {view: undefined!, depthReadOnly: true, stencilReadOnly: true};
-  private readonly descriptor: GPURenderPassDescriptor = {colorAttachments: [this.color], depthStencilAttachment: this.depth};
-
-  constructor(readonly options: SkyMoonConfig = {}) {}
-
-  setup(engine: Engine): void {
-    if (!engine.gpu) throw new Error('SkyMoon requires WebGPU');
-    this.format = navigator.gpu.getPreferredCanvasFormat();
-    const depthFormat = engine.gpu.features.has('depth32float-stencil8') ? 'depth32float-stencil8' : 'depth32float';
-    this.sky = new SkyMoonPass(engine.gpu, this.format, depthFormat);
-    this.sky.setConfig(this.options);
-    this.hdr = new SkyMoonPass(engine.gpu, 'rgba16float', depthFormat);
-    this.hdr.setConfig(this.options);
+import type { EngineKernel } from '@margoengine/core';
+import { Sky } from '@margoengine/sky/base';
+import { night } from '@margoengine/sky/night';
+import type { SkyNightOptions, SkyOptions } from '@margoengine/sky/base';
+export type SkyMoonConfig = SkyNightOptions;
+/** Moonlit night sky with stars and a phased moon: a `Sky` from `@margoengine/sky` held at midnight, loading only its stylized-night feature. `config` is read every frame. */
+export class SkyMoon extends Sky {
+  override readonly name = 'sky-moon';
+  /**
+   * Same as `engine.use(new SkyMoon(config))`; returns the SkyMoon (Sky.attach would add a plain Sky). `config` is the
+   * moon config; the `SkyOptions` in its type only keeps the signature compatible with `Sky.attach`.
+   */
+  static override attach(engine: EngineKernel, config?: SkyMoonConfig | SkyOptions): SkyMoon {
+    const value = new SkyMoon(config as SkyMoonConfig);
+    engine.use(value);
+    return value;
   }
-
-  registerPasses(graph: FrameGraph): void {
-    graph.add({name: 'scenery:sky-moon', order: 1, execute: this.execute});
+  constructor(readonly config: SkyMoonConfig = {}) {
+    super({ hours: 0, timeScale: 0, night: config }, { night });
   }
-
-  private readonly execute = (context: PassContext): void => {
-    if (context.backend !== 'webgpu') return;
-    if (context.format !== this.format && context.format !== 'rgba16float') throw new Error('Unsupported SkyMoon target format');
-    if (!invert(this.inverse, context.camera.matrix, 0, this.inverseWorkspace)) throw new Error('Invalid sky camera');
-    this.time += context.delta;
-    const sky = context.format === 'rgba16float' ? this.hdr! : this.sky!;
-    sky.updateFrame(this.inverse, context.camera.position, this.time);
-    this.color.view = context.color; this.depth.view = context.depth;
-    const pass = context.encoder.beginRenderPass(this.descriptor);
-    try {sky.record(pass, context.descriptor.multisample?.count, context.descriptor.depthStencil?.format);}
-    catch (error) {try {pass.end();} catch {} throw error;}
-    pass.end();
-  };
-
-  onDeviceRestored(engine: Engine): void {this.dispose(); this.setup(engine);}
-  dispose(): void {this.sky?.dispose(); this.hdr?.dispose(); this.sky = this.hdr = undefined;}
 }

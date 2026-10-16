@@ -1,0 +1,24 @@
+{
+  "package": "labels",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:19:21.945Z",
+  "outputsIdentical": true,
+  "notes": "The gain is on frames where labels keep their pixel position. With the camera orbiting every transform is rewritten and six runs of that case measured 0.77x to 1.13x (median about 1.0), so it is not recorded as a case.",
+  "cases": [
+    {
+      "case": "300 labels, camera at rest",
+      "frames": 120,
+      "baselineMs": 84.9744,
+      "candidateMs": 22.6391,
+      "speedup": 3.753
+    },
+    {
+      "case": "300 labels, 12 following moving meshes",
+      "frames": 120,
+      "baselineMs": 102.5097,
+      "candidateMs": 42.4365,
+      "speedup": 2.416
+    }
+  ]
+}

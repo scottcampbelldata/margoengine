@@ -1,0 +1,18 @@
+{
+  "package": "gltf",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:19:10.087Z",
+  "outputsIdentical": true,
+  "notes": "Flat normals are expanded with indexed writes instead of a subarray and an array per triangle.",
+  "cases": [
+    {
+      "case": "GLB without normals (flat normals computed)",
+      "vertices": 50176,
+      "triangles": 99458,
+      "baselineMs": 167.9974,
+      "candidateMs": 86.3131,
+      "speedup": 1.946
+    }
+  ]
+}

@@ -1,10 +1,11 @@
 import type {MaterialData, TextureData} from '@margoengine/exporters';
 import {readResponse} from '../../shared/loading.js';
+import {assetURL} from '../../shared/asset-url.js';
 import {findChild,id,property,objectName,type FBXNode} from './document.js';
 import {children,type SceneContext} from './scene.js';
 
 const limit=64*1024*1024;
-export async function attachMaterials(ctx:SceneContext,resourcePath:string):Promise<void>{
+export async function attachMaterials(ctx:SceneContext,resourcePath:string,options:{fetch?:typeof fetch;allowedURLs?:readonly string[]}={}):Promise<void>{
   const textures=new Map<bigint,Promise<TextureData>>(),materials=new Map<bigint,Promise<MaterialData>>();let bytes=0;
   const content=(node:FBXNode|undefined):Uint8Array|undefined=>{
     const value=node&&findChild(node,'Content')?.properties[0];
@@ -18,9 +19,12 @@ export async function attachMaterials(ctx:SceneContext,resourcePath:string):Prom
     if(!image){
       const raw=String(findChild(source,'RelativeFilename')?.properties[0]??findChild(video??source,'RelativeFilename')?.properties[0]??findChild(source,'FileName')?.properties[0]??findChild(video??source,'Filename')?.properties[0]??'');
       if(!raw)throw new TypeError('Missing FBX texture image');
-      let url:URL;try{url=new URL(raw.replace(/\\/g,'/'),resourcePath||globalThis.location?.href);}catch{throw new TypeError('FBX texture needs an HTTP(S) resourcePath');}
+      const path=raw.replace(/\\/g,'/'),base=resourcePath||globalThis.location?.href;
+      let target:URL;try{target=new URL(path,base);}catch{throw new TypeError('FBX texture needs an HTTP(S) resourcePath');}
+      if(!['http:','https:'].includes(target.protocol))throw new TypeError('FBX resources need HTTP(S)');
+      const url=assetURL(path,base,options.allowedURLs,'FBX texture');
       if(!['http:','https:'].includes(url.protocol))throw new TypeError('FBX resources need HTTP(S)');
-      const response=await fetch(url,{signal:ctx.signal});image=await readResponse(response,{maxBytes:limit-bytes,signal:ctx.signal,label:'FBX texture'});
+      const response=await (options.fetch??fetch)(url,{signal:ctx.signal});image=await readResponse(response,{maxBytes:limit-bytes,signal:ctx.signal,label:'FBX texture'});
     }
     bytes+=image.byteLength;if(bytes>limit)throw new RangeError('FBX texture byte budget exceeded');
     const png=image.length>8&&image[0]===137&&image[1]===80&&image[2]===78&&image[3]===71,jpeg=image.length>3&&image[0]===255&&image[1]===216&&image[2]===255;

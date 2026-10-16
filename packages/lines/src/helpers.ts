@@ -1,10 +1,11 @@
+import {invertMatrix} from '@margoengine/math/mat4';
 import type {Camera, EngineKernel, Geometry, Mesh, Vec3} from '@margoengine/core';
 import {meshRuntime} from '@margoengine/core/extension';
 import {meshTriangles} from '../../shared/mesh-source.js';
 import {parseColor, type ColorInput} from './color.js';
 import {Line, type LineMaterialOptions} from './line.js';
-import {meshWorldMatrix} from './lines.js';
-import {copyIfChanged, finiteArray, invert, transformPoint} from './math.js';
+import {meshWorldMatrix} from '@margoengine/math/mesh';
+import {copyIfChanged, finiteArray, transformPoint} from './math.js';
 
 /** Material options shared by every helper. Helpers default to 1 pixel, butt caps and miter joins. */
 export type HelperOptions = Omit<LineMaterialOptions, 'color'>;
@@ -65,7 +66,7 @@ export class AxesHelper extends Line {
     super({...helperStyle(options), mode: 'segments', positions: [0, 0, 0, size, 0, 0, 0, 0, 0, 0, size, 0, 0, 0, 0, 0, 0, size],
       colors: [1, 0, 0, 1, 0.6, 0, 0, 1, 0, 0.6, 1, 0, 0, 0, 1, 0, 0.6, 1]});
   }
-  setColors(x: ColorInput | ArrayLike<number> | null, y?: ColorInput, z?: ColorInput): this {
+  override setColors(x: ColorInput | ArrayLike<number> | null, y?: ColorInput, z?: ColorInput): this {
     if (y === undefined || z === undefined || x === null || (typeof x === 'object' && x.length !== 3)) return super.setColors(x as ArrayLike<number> | null);
     const a = rgb(x as ColorInput), b = rgb(y), c = rgb(z);
     return super.setColors([...a, ...a, ...b, ...b, ...c, ...c]);
@@ -135,7 +136,7 @@ export class BoxHelper extends Line {
     this.source = mesh; mesh.check();
   }
   setFromMesh(mesh: Mesh): this {mesh.check(); this.source = mesh; this.seen.fill(NaN); return this;}
-  update(engine: EngineKernel): boolean {
+  override update(engine: EngineKernel): boolean {
     const matrix = meshWorldMatrix(engine, this.source), data = meshData(this.source);
     if (!matrix || !data || !matrix.every(Number.isFinite) || !data.bounds.every(Number.isFinite)) return false;
     const moved = copyIfChanged(this.seen, matrix), resized = copyIfChanged(this.boundsSeen, data.bounds);
@@ -209,10 +210,10 @@ export class CameraHelper extends Line {
     super({...helperStyle(options), mode: 'segments', positions: new Array(cameraPairs.length * 6).fill(0), colors});
     this.aspect = aspect;
   }
-  update(engine: EngineKernel): boolean {
+  override update(engine: EngineKernel): boolean {
     const camera = this.camera;
     if (camera !== engine.camera) camera.update(this.aspect ?? engine.canvas.width / Math.max(1, engine.canvas.height), true);
-    if (!copyIfChanged(this.seen, camera.matrix) || !invert(this.inverse, camera.matrix)) return true;
+    if (!copyIfChanged(this.seen, camera.matrix) || !invertMatrix(camera.matrix, this.inverse)) return true;
     const out = this.positions; out.length = 0;
     const point = [0, 0, 0];
     for (const [a, b] of cameraPairs) for (const name of [a, b]) {
@@ -246,22 +247,25 @@ export class VertexNormalsHelper extends Line {
   private readonly seen = new Float32Array(16).fill(NaN);
   private geometry: object | null = null;
   private seenSize = NaN;
+  private valid = false;
   private scratch = new Float32Array(0);
   constructor(readonly mesh: Mesh, {size = 1, color = '#ff0000', ...options}: {size?: number; color?: ColorInput} & HelperOptions = {}) {
     super({...helperStyle(options), color, mode: 'segments'});
     mesh.check(); this.size = size;
   }
-  update(engine: EngineKernel): boolean {
+  override update(engine: EngineKernel): boolean {
     const m = meshWorldMatrix(engine, this.mesh), data = meshData(this.mesh);
     if (!m || !data || !m.every(Number.isFinite)) return false;
     if (!Number.isFinite(this.size)) throw new RangeError('Normal size must be finite');
-    if (!copyIfChanged(this.seen, m) && data.identity === this.geometry && this.size === this.seenSize) return true;
+    if (!copyIfChanged(this.seen, m) && data.identity === this.geometry && this.size === this.seenSize) return this.valid;
+    this.valid = false;
     this.geometry = data.identity; this.seenSize = this.size;
     // Normal matrix: inverse transpose of the upper 3x3, from the cofactors.
     const c0 = [m[5] * m[10] - m[6] * m[9], m[6] * m[8] - m[4] * m[10], m[4] * m[9] - m[5] * m[8]];
     const c1 = [m[2] * m[9] - m[1] * m[10], m[0] * m[10] - m[2] * m[8], m[1] * m[8] - m[0] * m[9]];
     const c2 = [m[1] * m[6] - m[2] * m[5], m[2] * m[4] - m[0] * m[6], m[0] * m[5] - m[1] * m[4]];
     const det = m[0] * c0[0] + m[1] * c0[1] + m[2] * c0[2], count = data.parts.reduce((n, part) => n + part.vertices.length / part.stride, 0);
+    if (!det || !Number.isFinite(det)) return false;
     if (this.scratch.length !== count * 6) this.scratch = new Float32Array(count * 6);
     const out = this.scratch;
     let o = 0;
@@ -273,6 +277,7 @@ export class VertexNormalsHelper extends Line {
       out[o + 3] = out[o] + nx * s; out[o + 4] = out[o + 1] + ny * s; out[o + 5] = out[o + 2] + nz * s;
     }
     this.setPositions(out);
+    this.valid = true;
     return true;
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/exporters",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "glTF/GLB, STL, OBJ and PLY exporters for Margo Engine scenes and geometry data.",
@@ -27,13 +27,26 @@
     "./usdz": {
       "types": "./dist/usdz.d.ts",
       "import": "./dist/usdz.js"
+    },
+    "./model": {
+      "types": "./dist/model.d.ts",
+      "import": "./dist/model.js"
     }
   },
   "files": [
     "dist"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^0.1.0 || ^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/gltf-pro": "^1.0.0"
   },
-  "homepage": "https://margoengine.com"
+  "peerDependenciesMeta": {
+    "@margoengine/gltf-pro": {
+      "optional": true
+    }
+  },
+  "homepage": "https://margoengine.com",
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  }
 }

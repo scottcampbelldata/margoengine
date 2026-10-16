@@ -1,0 +1,374 @@
+{
+ "date": "2026-10-15T03:15:58.274Z",
+ "commit": "7c47a09",
+ "acPowerBefore": true,
+ "checks": {
+  "mirror-4x": {
+   "mirrorBounds": [
+    220,
+    313,
+    292,
+    406
+   ],
+   "mirroredCenter": [
+    256,
+    357
+   ],
+   "redPixels": 6159,
+   "redBounds": [
+    219,
+    319,
+    292,
+    404
+   ],
+   "redOutsideMirror": 0,
+   "blackIntroduced": 0,
+   "maxDiff": 124,
+   "centerOn": [
+    192,
+    41,
+    41
+   ],
+   "centerOff": [
+    165,
+    165,
+    165
+   ]
+  },
+  "mirror-1x": {
+   "mirrorBounds": [
+    220,
+    313,
+    292,
+    406
+   ],
+   "mirroredCenter": [
+    256,
+    357
+   ],
+   "redPixels": 6225,
+   "redBounds": [
+    219,
+    319,
+    292,
+    404
+   ],
+   "redOutsideMirror": 0,
+   "blackIntroduced": 0,
+   "maxDiff": 124,
+   "centerOn": [
+    192,
+    41,
+    41
+   ],
+   "centerOff": [
+    165,
+    165,
+    165
+   ]
+  },
+  "ortho-4x": {
+   "mirrorBounds": [
+    213,
+    334,
+    299,
+    440
+   ],
+   "mirroredCenter": [
+    256,
+    387
+   ],
+   "redPixels": 8982,
+   "redBounds": [
+    213,
+    334,
+    298,
+    438
+   ],
+   "redOutsideMirror": 0,
+   "blackIntroduced": 0,
+   "maxDiff": 124,
+   "centerOn": [
+    192,
+    42,
+    42
+   ],
+   "centerOff": [
+    165,
+    165,
+    165
+   ]
+  },
+  "rough-0.3": {
+   "mirrorBounds": [
+    220,
+    313,
+    292,
+    406
+   ],
+   "mirroredCenter": [
+    256,
+    357
+   ],
+   "redPixels": 3403,
+   "redBounds": [
+    226,
+    346,
+    285,
+    404
+   ],
+   "redOutsideMirror": 0,
+   "blackIntroduced": 0,
+   "maxDiff": 114,
+   "centerOn": [
+    189,
+    83,
+    83
+   ],
+   "centerOff": [
+    164,
+    164,
+    164
+   ]
+  },
+  "rough-0.45": {
+   "mirrorBounds": [
+    220,
+    313,
+    292,
+    406
+   ],
+   "mirroredCenter": [
+    256,
+    357
+   ],
+   "redPixels": 0,
+   "redBounds": null,
+   "redOutsideMirror": 0,
+   "blackIntroduced": 0,
+   "maxDiff": 28,
+   "centerOn": [
+    176,
+    143,
+    143
+   ],
+   "centerOff": [
+    163,
+    163,
+    163
+   ]
+  },
+  "rough-0.8": {
+   "mirrorBounds": [
+    220,
+    313,
+    292,
+    406
+   ],
+   "mirroredCenter": [
+    256,
+    357
+   ],
+   "redPixels": 0,
+   "redBounds": null,
+   "redOutsideMirror": 0,
+   "blackIntroduced": 0,
+   "maxDiff": 0,
+   "centerOn": [
+    165,
+    165,
+    165
+   ],
+   "centerOff": [
+    165,
+    165,
+    165
+   ]
+  },
+  "offscreen": {
+   "mirrorBounds": [
+    194,
+    80,
+    318,
+    221
+   ],
+   "mirroredCenter": [
+    256,
+    149
+   ],
+   "redPixels": 0,
+   "redBounds": null,
+   "redOutsideMirror": 0,
+   "blackIntroduced": 0,
+   "maxDiff": 0,
+   "centerOn": [
+    165,
+    165,
+    165
+   ],
+   "centerOff": [
+    165,
+    165,
+    165
+   ]
+  },
+  "taa": {
+   "mirrorBounds": [
+    220,
+    313,
+    292,
+    406
+   ],
+   "mirroredCenter": [
+    256,
+    357
+   ],
+   "redPixels": 6146,
+   "redBounds": [
+    214,
+    170,
+    294,
+    404
+   ],
+   "redOutsideMirror": 92,
+   "blackIntroduced": 0,
+   "maxDiff": 132,
+   "centerOn": [
+    192,
+    41,
+    41
+   ],
+   "centerOff": [
+    165,
+    165,
+    165
+   ]
+  },
+  "ssao+ssr": {
+   "mirrorBounds": [
+    220,
+    313,
+    292,
+    406
+   ],
+   "mirroredCenter": [
+    256,
+    357
+   ],
+   "redPixels": 6159,
+   "redBounds": [
+    219,
+    319,
+    292,
+    404
+   ],
+   "redOutsideMirror": 0,
+   "blackIntroduced": 0,
+   "maxDiff": 124,
+   "centerOn": [
+    192,
+    41,
+    41
+   ],
+   "centerOff": [
+    165,
+    165,
+    165
+   ]
+  },
+  "blur": {
+   "mirrorEdge": {
+    "width": 1,
+    "contrast": 151
+   },
+   "rough03Edge": {
+    "width": 18,
+    "contrast": 106
+   }
+  }
+ },
+ "timing": {
+  "1280x720 4x ssr": {
+   "frameGpuMs": 3.708,
+   "ssrOwnMs": 2.297,
+   "gbufferMs": 0.717,
+   "traceMs": 1.58,
+   "stackMs": 0.595,
+   "sceneMs": 0.752,
+   "zeroFrames": 0
+  },
+  "1280x720 4x off": {
+   "frameGpuMs": 1.715,
+   "ssrOwnMs": 0.376,
+   "gbufferMs": 0,
+   "traceMs": 0.376,
+   "stackMs": 0.64,
+   "sceneMs": 0.68,
+   "zeroFrames": 0
+  },
+  "1280x720 1x ssr": {
+   "frameGpuMs": 2.705,
+   "ssrOwnMs": 2.219,
+   "gbufferMs": 0.471,
+   "traceMs": 1.739,
+   "stackMs": 0,
+   "sceneMs": 0.496,
+   "zeroFrames": 0
+  },
+  "1280x720 1x off": {
+   "frameGpuMs": 1.003,
+   "ssrOwnMs": 0.241,
+   "gbufferMs": 0,
+   "traceMs": 0.241,
+   "stackMs": 0,
+   "sceneMs": 0.76,
+   "zeroFrames": 0
+  },
+  "1920x1080 4x ssr": {
+   "frameGpuMs": 9.54,
+   "ssrOwnMs": 5.822,
+   "gbufferMs": 1.649,
+   "traceMs": 4.173,
+   "stackMs": 1.605,
+   "sceneMs": 2.041,
+   "zeroFrames": 0
+  },
+  "1920x1080 4x off": {
+   "frameGpuMs": 4.657,
+   "ssrOwnMs": 1.004,
+   "gbufferMs": 0,
+   "traceMs": 1.004,
+   "stackMs": 1.59,
+   "sceneMs": 2.027,
+   "zeroFrames": 0
+  },
+  "1920x1080 1x ssr": {
+   "frameGpuMs": 7.267,
+   "ssrOwnMs": 5.927,
+   "gbufferMs": 1.051,
+   "traceMs": 4.876,
+   "stackMs": 0,
+   "sceneMs": 1.328,
+   "zeroFrames": 0
+  },
+  "1920x1080 1x off": {
+   "frameGpuMs": 1.589,
+   "ssrOwnMs": 0.382,
+   "gbufferMs": 0,
+   "traceMs": 0.382,
+   "stackMs": 0,
+   "sceneMs": 1.206,
+   "zeroFrames": 0
+  }
+ },
+ "timingLabel": "after scripts/quiet-gate.mjs",
+ "gpu": {
+  "vendor": "intel",
+  "architecture": "xe-2lpg",
+  "device": "0x64a0",
+  "description": "Intel(R) Arc(TM) 140V GPU (16GB)",
+  "fallback": false
+ },
+ "browser": "chromium 155.0.4283.45",
+ "acPowerAfter": true
+}

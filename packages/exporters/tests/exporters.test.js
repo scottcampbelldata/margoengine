@@ -75,7 +75,7 @@ async function buildScene() {
 }
 
 test('public API exposes exporter functions and module evaluation is SSR-safe', () => {
-  assert.deepEqual(Object.keys(exporters).sort(), ['exportGLB', 'exportGLTF', 'exportOBJ', 'exportPLY', 'exportSTL', 'exportUSDZ']);
+  assert.deepEqual(Object.keys(exporters).sort(), ['exportGLB', 'exportGLTF', 'exportModel', 'exportOBJ', 'exportPLY', 'exportSTL', 'exportUSDZ']);
   // A fresh process where touching any browser or GPU global throws, then import and export.
   const script = `for (const name of ['window', 'document', 'navigator', 'Worker', 'GPUBufferUsage', 'requestAnimationFrame']) Object.defineProperty(globalThis, name, {get() {throw new Error('touched ' + name);}, configurable: true});
     const m = await import(${JSON.stringify(new URL('../dist/index.js', import.meta.url).href)});

@@ -1,0 +1,618 @@
+{
+ "label": "before2-orbit",
+ "date": "2026-10-14T23:12:53.389Z",
+ "acPowerAtStart": true,
+ "host": {
+  "cpu": "Intel(R) Core(TM) Ultra 7 258V",
+  "cores": 8,
+  "memoryGB": 31,
+  "node": "v24.15.0",
+  "browser": "155.0.4283.45"
+ },
+ "viewport": [
+  1432,
+  768
+ ],
+ "conditions": "quiet machine: every other agent, build and benchmark stopped by Scott (~18:47 local), ChatGPT closed; this benchmark the only workload; GPU lock held",
+ "core": "261f1d4",
+ "runs": [
+  {
+   "modules": 371,
+   "crossOriginIsolated": true,
+   "msaa": 4,
+   "view": "overview",
+   "still": false,
+   "move": 0,
+   "engineCreateMs": 82.96500000357628,
+   "buildMs": 50.12000000476837,
+   "parts": 10017,
+   "groups": 1126,
+   "entities": 11143,
+   "capacity": 11143,
+   "shapes": [
+    {
+     "name": "plate",
+     "triangles": 556,
+     "vertices": 1668
+    },
+    {
+     "name": "bracket",
+     "triangles": 20,
+     "vertices": 60
+    },
+    {
+     "name": "bolt",
+     "triangles": 88,
+     "vertices": 140
+    },
+    {
+     "name": "nut",
+     "triangles": 144,
+     "vertices": 432
+    },
+    {
+     "name": "washer",
+     "triangles": 128,
+     "vertices": 384
+    }
+   ],
+   "triangles": 1289596,
+   "firstFrameMs": 64.3200000077486,
+   "loadToFirstFrameMs": 197.40500001609325,
+   "kernel": {
+    "tickCullMs": {
+     "n": 60,
+     "median": 1.51,
+     "p95": 2.17,
+     "max": 2.325,
+     "mean": 1.5917
+    },
+    "tickNoCullMs": {
+     "n": 60,
+     "median": 1.49,
+     "p95": 1.845,
+     "max": 2.14,
+     "mean": 1.5465
+    },
+    "perPartNs": 135.5
+   },
+   "movers": 0,
+   "frame": {
+    "cpuMs": {
+     "n": 394,
+     "median": 4.635,
+     "p95": 6.435,
+     "max": 13.095,
+     "mean": 4.8381
+    },
+    "kernelMs": {
+     "n": 394,
+     "median": 2.12,
+     "p95": 2.605,
+     "max": 2.995,
+     "mean": 2.1396
+    },
+    "collectMs": {
+     "n": 394,
+     "median": 1.135,
+     "p95": 1.6,
+     "max": 2.67,
+     "mean": 1.1654
+    },
+    "submitMs": {
+     "n": 394,
+     "median": 1.17,
+     "p95": 3.055,
+     "max": 9.68,
+     "mean": 1.533
+    },
+    "intervalMs": {
+     "n": 394,
+     "median": 5.55,
+     "p95": 7.54,
+     "max": 13.985,
+     "mean": 5.7174
+    },
+    "fps": 180.2,
+    "gpuMs": {
+     "n": 12,
+     "median": 4.522,
+     "p95": 5.5706,
+     "max": 5.5706,
+     "mean": 4.38
+    },
+    "drawCalls": 5,
+    "visible": 9649,
+    "edgesCpuMs": null,
+    "gpuPassMedianMs": [
+     4.522,
+     0
+    ]
+   },
+   "edgesFirstDrawMs": null,
+   "isolated": {
+    "cpuMs": {
+     "n": 30,
+     "median": 4.485,
+     "p95": 5.28,
+     "max": 5.335,
+     "mean": 4.4885
+    },
+    "gpuTailMs": {
+     "n": 30,
+     "median": 8.94,
+     "p95": 10.625,
+     "max": 216.145,
+     "mean": 15.979
+    },
+    "frameMs": {
+     "n": 30,
+     "median": 13.505,
+     "p95": 15.195,
+     "max": 221.275,
+     "mean": 20.4675
+    }
+   },
+   "enginePick": {
+    "ms": {
+     "n": 10,
+     "median": 9.965,
+     "p95": 10.68,
+     "max": 10.68,
+     "mean": 9.8665
+    },
+    "first": 67.82500000298023,
+    "hits": 4
+   },
+   "assemblyBVH": {
+    "createMs": 18.62000000476837,
+    "rebuildMs": 4.94666666785876,
+    "raycastMs": {
+     "n": 200,
+     "median": 0.11,
+     "p95": 0.23,
+     "max": 2.03,
+     "mean": 0.1293
+    },
+    "hits": 96
+   },
+   "explodedView": {
+    "setupMs": 3.594999998807907,
+    "animatingMs": {
+     "n": 40,
+     "median": 0.555,
+     "p95": 3.03,
+     "max": 3.265,
+     "mean": 0.727
+    },
+    "unchangedMs": {
+     "n": 40,
+     "median": 0,
+     "p95": 0.005,
+     "max": 0.05,
+     "mean": 0.0016
+    },
+    "renderWhileAnimatingMs": {
+     "n": 30,
+     "median": 4.18,
+     "p95": 4.795,
+     "max": 4.85,
+     "mean": 4.2443
+    }
+   },
+   "memory": {
+    "jsHeapMB": 15.84,
+    "kernelWasmMB": 4.06,
+    "instanceStagingMB": 1.26,
+    "gpuInstanceMB": 1.26,
+    "geometryMB": 0.07,
+    "msaaTargetsMB": 37.76
+   },
+   "removeOneMeshMs": 0.9300000071525574,
+   "errors": [],
+   "size": "10000",
+   "pageErrors": []
+  },
+  {
+   "modules": 1852,
+   "crossOriginIsolated": true,
+   "msaa": 4,
+   "view": "overview",
+   "still": false,
+   "move": 0,
+   "engineCreateMs": 363.55000001192093,
+   "buildMs": 137.83999998867512,
+   "parts": 50004,
+   "groups": 5615,
+   "entities": 55619,
+   "capacity": 55619,
+   "shapes": [
+    {
+     "name": "plate",
+     "triangles": 556,
+     "vertices": 1668
+    },
+    {
+     "name": "bracket",
+     "triangles": 20,
+     "vertices": 60
+    },
+    {
+     "name": "bolt",
+     "triangles": 88,
+     "vertices": 140
+    },
+    {
+     "name": "nut",
+     "triangles": 144,
+     "vertices": 432
+    },
+    {
+     "name": "washer",
+     "triangles": 128,
+     "vertices": 384
+    }
+   ],
+   "triangles": 6437552,
+   "firstFrameMs": 100.8049999922514,
+   "loadToFirstFrameMs": 602.1949999928474,
+   "kernel": {
+    "tickCullMs": {
+     "n": 60,
+     "median": 6.855,
+     "p95": 7.44,
+     "max": 7.805,
+     "mean": 6.8745
+    },
+    "tickNoCullMs": {
+     "n": 60,
+     "median": 6.755,
+     "p95": 7.18,
+     "max": 7.615,
+     "mean": 6.75
+    },
+    "perPartNs": 123.2
+   },
+   "movers": 0,
+   "frame": {
+    "cpuMs": {
+     "n": 240,
+     "median": 18.395,
+     "p95": 19.66,
+     "max": 21.21,
+     "mean": 18.4772
+    },
+    "kernelMs": {
+     "n": 240,
+     "median": 10.01,
+     "p95": 10.835,
+     "max": 12.085,
+     "mean": 10.0489
+    },
+    "collectMs": {
+     "n": 240,
+     "median": 4.9,
+     "p95": 5.54,
+     "max": 6.74,
+     "mean": 4.9266
+    },
+    "submitMs": {
+     "n": 240,
+     "median": 3.46,
+     "p95": 4.035,
+     "max": 4.32,
+     "mean": 3.5017
+    },
+    "intervalMs": {
+     "n": 240,
+     "median": 19.065,
+     "p95": 20.81,
+     "max": 21.955,
+     "mean": 19.219
+    },
+    "fps": 52.5,
+    "gpuMs": {
+     "n": 17,
+     "median": 16.384,
+     "p95": 17.3015,
+     "max": 17.3015,
+     "mean": 15.293
+    },
+    "drawCalls": 5,
+    "visible": 48011,
+    "edgesCpuMs": null,
+    "gpuPassMedianMs": [
+     16.384,
+     0
+    ]
+   },
+   "edgesFirstDrawMs": null,
+   "isolated": {
+    "cpuMs": {
+     "n": 30,
+     "median": 15.16,
+     "p95": 17.79,
+     "max": 18.03,
+     "mean": 15.3547
+    },
+    "gpuTailMs": {
+     "n": 30,
+     "median": 21.405,
+     "p95": 23.57,
+     "max": 30.155,
+     "mean": 21.6163
+    },
+    "frameMs": {
+     "n": 30,
+     "median": 36.755,
+     "p95": 38.9,
+     "max": 48.185,
+     "mean": 36.971
+    }
+   },
+   "enginePick": {
+    "ms": {
+     "n": 10,
+     "median": 28.015,
+     "p95": 29.51,
+     "max": 29.51,
+     "mean": 28.275
+    },
+    "first": 70.20999999344349,
+    "hits": 5
+   },
+   "assemblyBVH": {
+    "createMs": 33.39000000059605,
+    "rebuildMs": 17.289999996622402,
+    "raycastMs": {
+     "n": 200,
+     "median": 0.265,
+     "p95": 0.46,
+     "max": 3.535,
+     "mean": 0.311
+    },
+    "hits": 95
+   },
+   "explodedView": {
+    "setupMs": 12.090000003576279,
+    "animatingMs": {
+     "n": 40,
+     "median": 2.49,
+     "p95": 4.43,
+     "max": 5.175,
+     "mean": 2.6864
+    },
+    "unchangedMs": {
+     "n": 40,
+     "median": 0,
+     "p95": 0.005,
+     "max": 0.04,
+     "mean": 0.0013
+    },
+    "renderWhileAnimatingMs": {
+     "n": 30,
+     "median": 16.115,
+     "p95": 17.485,
+     "max": 18.585,
+     "mean": 16.242
+    }
+   },
+   "memory": {
+    "jsHeapMB": 46.32,
+    "kernelWasmMB": 16.13,
+    "instanceStagingMB": 5.06,
+    "gpuInstanceMB": 5.06,
+    "geometryMB": 0.07,
+    "msaaTargetsMB": 37.76
+   },
+   "removeOneMeshMs": 1.6700000017881393,
+   "errors": [],
+   "size": "50000",
+   "pageErrors": []
+  },
+  {
+   "modules": 3329,
+   "crossOriginIsolated": true,
+   "msaa": 4,
+   "view": "overview",
+   "still": false,
+   "move": 0,
+   "engineCreateMs": 327.5,
+   "buildMs": 218.42499999701977,
+   "parts": 89883,
+   "groups": 10093,
+   "entities": 99976,
+   "capacity": 99976,
+   "shapes": [
+    {
+     "name": "plate",
+     "triangles": 556,
+     "vertices": 1668
+    },
+    {
+     "name": "bracket",
+     "triangles": 20,
+     "vertices": 60
+    },
+    {
+     "name": "bolt",
+     "triangles": 88,
+     "vertices": 140
+    },
+    {
+     "name": "nut",
+     "triangles": 144,
+     "vertices": 432
+    },
+    {
+     "name": "washer",
+     "triangles": 128,
+     "vertices": 384
+    }
+   ],
+   "triangles": 11571604,
+   "firstFrameMs": 123.4050000011921,
+   "loadToFirstFrameMs": 669.3299999982119,
+   "kernel": {
+    "tickCullMs": {
+     "n": 60,
+     "median": 11.685,
+     "p95": 12.29,
+     "max": 12.525,
+     "mean": 11.6487
+    },
+    "tickNoCullMs": {
+     "n": 60,
+     "median": 11.48,
+     "p95": 12.48,
+     "max": 12.54,
+     "mean": 11.5137
+    },
+    "perPartNs": 116.9
+   },
+   "movers": 0,
+   "frame": {
+    "cpuMs": {
+     "n": 240,
+     "median": 26.71,
+     "p95": 30.315,
+     "max": 55.995,
+     "mean": 27.0642
+    },
+    "kernelMs": {
+     "n": 240,
+     "median": 13.975,
+     "p95": 15.31,
+     "max": 16.925,
+     "mean": 14.0917
+    },
+    "collectMs": {
+     "n": 240,
+     "median": 7.335,
+     "p95": 8.145,
+     "max": 8.71,
+     "mean": 7.3611
+    },
+    "submitMs": {
+     "n": 240,
+     "median": 4.87,
+     "p95": 9.09,
+     "max": 33.81,
+     "mean": 5.6114
+    },
+    "intervalMs": {
+     "n": 240,
+     "median": 27.285,
+     "p95": 30.795,
+     "max": 56.66,
+     "mean": 27.6322
+    },
+    "fps": 36.7,
+    "gpuMs": {
+     "n": 17,
+     "median": 25.2969,
+     "p95": 26.9353,
+     "max": 26.9353,
+     "mean": 24.3871
+    },
+    "drawCalls": 5,
+    "visible": 81698,
+    "edgesCpuMs": null,
+    "gpuPassMedianMs": [
+     25.2969,
+     0
+    ]
+   },
+   "edgesFirstDrawMs": null,
+   "isolated": {
+    "cpuMs": {
+     "n": 30,
+     "median": 20.605,
+     "p95": 24.645,
+     "max": 28.39,
+     "mean": 21.1308
+    },
+    "gpuTailMs": {
+     "n": 30,
+     "median": 31.89,
+     "p95": 33.405,
+     "max": 136.275,
+     "mean": 34.9923
+    },
+    "frameMs": {
+     "n": 30,
+     "median": 52.42,
+     "p95": 55.005,
+     "max": 164.665,
+     "mean": 56.1232
+    }
+   },
+   "enginePick": {
+    "ms": {
+     "n": 10,
+     "median": 41.4,
+     "p95": 43.57,
+     "max": 43.57,
+     "mean": 40.9835
+    },
+    "first": 75.33000001311302,
+    "hits": 7
+   },
+   "assemblyBVH": {
+    "createMs": 43.8999999910593,
+    "rebuildMs": 25.57999999821186,
+    "raycastMs": {
+     "n": 200,
+     "median": 0.355,
+     "p95": 0.735,
+     "max": 3.83,
+     "mean": 0.4277
+    },
+    "hits": 107
+   },
+   "explodedView": {
+    "setupMs": 13.269999995827675,
+    "animatingMs": {
+     "n": 40,
+     "median": 3.885,
+     "p95": 5.21,
+     "max": 6.17,
+     "mean": 4.0355
+    },
+    "unchangedMs": {
+     "n": 40,
+     "median": 0,
+     "p95": 0.005,
+     "max": 0.04,
+     "mean": 0.0012
+    },
+    "renderWhileAnimatingMs": {
+     "n": 30,
+     "median": 22.83,
+     "p95": 24.415,
+     "max": 24.865,
+     "mean": 22.7865
+    }
+   },
+   "memory": {
+    "jsHeapMB": 73.49,
+    "kernelWasmMB": 28.19,
+    "instanceStagingMB": 10.12,
+    "gpuInstanceMB": 10.12,
+    "geometryMB": 0.07,
+    "msaaTargetsMB": 37.76
+   },
+   "removeOneMeshMs": 1.9350000023841858,
+   "errors": [],
+   "size": "max",
+   "pageErrors": []
+  }
+ ],
+ "adapter": {
+  "vendor": "intel",
+  "architecture": "xe-2lpg",
+  "description": "",
+  "timestamp": true
+ },
+ "acPowerAtEnd": true
+}

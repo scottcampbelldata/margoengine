@@ -4,15 +4,14 @@ Crisp GPU text for Margo Engine: signed distance field glyphs generated at runti
 
 Build from source with `npm run build` in `packages/text`.
 
-Replaces troika-three-text's `Text` and the label and signage use cases of the three.js `TextGeometry` add-on.
+Covers troika-three-text's `Text` for Latin, Greek, Cyrillic, CJK, Hebrew and emoji (no Arabic or Indic shaping and no ligatures; see Limits), and the label and signage use cases of the three.js `TextGeometry` add-on. CAD dimension callouts with constant-pixel labels are built on it in `@margoengine/machinery/dimensions`.
 
 ```ts
 import {Engine, box} from '@margoengine/core';
 import {TextRenderer, Text, Font} from '@margoengine/text';
 
 const engine = await Engine.create(canvas);
-const text = new TextRenderer();
-engine.use(text);
+const text = TextRenderer.attach(engine);
 
 // Any font the browser can render: a CSS family, or a FontFace that is loaded and registered for you.
 const inter = new Font({family: 'Inter, sans-serif', weight: 600});
@@ -89,6 +88,6 @@ title.layout.bounds;                  // {left, right, top, bottom}
 
 `npm test` in `packages/text` runs Node checks with a deterministic mock measurer: grapheme clusters, advances, kerning, letter spacing, font size and line metrics, wrapping (spaces, hanging spaces, long words, ideographs, `nowrap`), paragraphs, all four alignments including justify, every anchor, right-to-left reordering with numbers, bracket pairs and mirroring, hit testing and carets, option validation, the distance transform and `alphaToSdf` against brute-force references on random binary, sampled and antialiased bitmaps, shelf packing without overlaps, and SSR-safe construction.
 
-`npm run test:browser` uses a real engine in Chromium (or Edge with `BROWSER_CHANNEL`): ink position and area within 2.5 px of the layout for all 12 anchor combinations, fill, outline and shadow colors, opacity, overlapping glyphs keeping their fills under outlines, depth against a mesh with `onTop`, billboards after orbiting, mesh attachment and visibility, buffer reuse on string updates with one draw call per block, emoji in color, atlas growth with 2,000 CJK glyphs (Latin, Greek and Cyrillic when no CJK font is installed) with earlier glyphs unchanged, device restore, disposal, the WebGL2 no-op, and zero validation errors. It saves `test-results/text-gallery.png`.
+`npm run test:browser` (a real-GPU script, not in CI) uses a real engine in Chromium (or Edge with `BROWSER_CHANNEL`): ink position and area within 2.5 px of the layout for all 12 anchor combinations, fill, outline and shadow colors, opacity, overlapping glyphs keeping their fills under outlines, depth against a mesh with `onTop`, billboards after orbiting, mesh attachment and visibility, buffer reuse on string updates with one draw call per block, emoji in color, atlas growth with 2,000 CJK glyphs (Latin, Greek and Cyrillic when no CJK font is installed) with earlier glyphs unchanged, device restore, disposal, the WebGL2 no-op, and zero validation errors. It saves `test-results/text-gallery.png`.
 
 MIT licensed.

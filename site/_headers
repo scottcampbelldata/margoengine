@@ -1,0 +1,16 @@
+# Security headers for every page and worker; docs/deploying.md explains each directive. Checked with scripts/csp-check.mjs.
+# No file needs a rule of its own: the decoder worker (Tokyo corner's Draco) runs without eval, and the demo builds
+# ship no CAD worker or OCCT (scripts/build-site.js).
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Cache-Control: no-cache
+
+# The catalog examples run inline scripts against packages on jsDelivr and esm.sh, so they keep no CSP.
+/catalog/examples/*
+  ! Content-Security-Policy
+
+# Cache-Control: no-cache above: browsers check every file each visit (an unchanged file costs a 304, nothing is
+# re-downloaded), so a bad copy never sticks. It also overrides the zone's 4-hour Browser Cache TTL on margoengine.com.
+# Missing files get site/404.html with no-store; scripts/site-check.mjs checks all of this after each deploy.

@@ -1,0 +1,106 @@
+{
+  "package": "geometry",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:17:40.750Z",
+  "outputsIdentical": true,
+  "notes": "All outputs are bit-identical, including degenerate triangles, non-finite vertices and out-of-range indices. Measured and reverted for missing the 1.10x bar: scalar computeBoundingBox (1.03-1.07x on computeBoundingSphere) and a loopSubdivide edge-point rewrite (about 1.08x). tubeGeometry as a whole is unchanged within noise; only its frame and curve sampling got faster.",
+  "cases": [
+    {
+      "case": "computeVertexNormals, 192x192 heightfield (73,728 triangles) x 4",
+      "baselineMs": 110.0356,
+      "candidateMs": 60.0769,
+      "speedup": 1.832
+    },
+    {
+      "case": "computeTangents, 192x192 heightfield x 4",
+      "baselineMs": 285.8314,
+      "candidateMs": 121.9311,
+      "speedup": 2.344
+    },
+    {
+      "case": "computeTangents, 128x64 sphere (8,385 vertices) x 20",
+      "baselineMs": 323.3071,
+      "candidateMs": 131.1835,
+      "speedup": 2.465
+    },
+    {
+      "case": "applyMatrix4 with tangents, 128x64 sphere x 100",
+      "baselineMs": 312.071,
+      "candidateMs": 83.2161,
+      "speedup": 3.75
+    },
+    {
+      "case": "mergeVertices positionOnly, icosahedron detail 4 x 5",
+      "baselineMs": 26.7149,
+      "candidateMs": 3.6056,
+      "speedup": 7.409
+    },
+    {
+      "case": "mergeVertices all attributes, 192x192 heightfield x 2",
+      "baselineMs": 1751.9159,
+      "candidateMs": 193.0203,
+      "speedup": 9.076
+    },
+    {
+      "case": "toNonIndexed with tangents, 128x64 sphere x 20",
+      "baselineMs": 325.8933,
+      "candidateMs": 55.0803,
+      "speedup": 5.917
+    },
+    {
+      "case": "edgesGeometry, 128x64 sphere x 5",
+      "baselineMs": 669.7346,
+      "candidateMs": 147.8126,
+      "speedup": 4.531
+    },
+    {
+      "case": "pbrVertexStream with occlusion, 128x64 sphere x 50",
+      "baselineMs": 296.6883,
+      "candidateMs": 94.3457,
+      "speedup": 3.145
+    },
+    {
+      "case": "icosahedronGeometry detail 3 x 15",
+      "baselineMs": 24.6705,
+      "candidateMs": 14.9304,
+      "speedup": 1.652
+    },
+    {
+      "case": "icosahedronGeometry detail 5 x 2",
+      "baselineMs": 5.564,
+      "candidateMs": 3.1031,
+      "speedup": 1.793
+    },
+    {
+      "case": "extrudeGeometry, beveled gear with hole x 20",
+      "baselineMs": 159.5559,
+      "candidateMs": 79.9104,
+      "speedup": 1.997
+    },
+    {
+      "case": "computeFrenetFrames(256), 20-knot Catmull-Rom x 20",
+      "baselineMs": 36.6149,
+      "candidateMs": 21.5198,
+      "speedup": 1.701
+    },
+    {
+      "case": "getSpacedPoints(2000), 20-knot Catmull-Rom x 20",
+      "baselineMs": 49.4819,
+      "candidateMs": 45.2813,
+      "speedup": 1.093
+    },
+    {
+      "case": "Shape.extractPoints, 60 glyph outlines x 10",
+      "baselineMs": 49.2593,
+      "candidateMs": 25.1493,
+      "speedup": 1.959
+    },
+    {
+      "case": "CubicBezierCurve3.getSpacedPoints(64), fresh curve x 50",
+      "baselineMs": 8.2568,
+      "candidateMs": 3.3939,
+      "speedup": 2.433
+    }
+  ]
+}

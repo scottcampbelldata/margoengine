@@ -1,0 +1,685 @@
+{
+ "recordedAt": "2026-10-14T13:32:13.115Z",
+ "commit": "a5f1e94",
+ "config": {
+  "a": "test-results/vfx-base",
+  "b": "test-results/vfx-base",
+  "label": "aa-baseline",
+  "capacities": [
+   100000,
+   1000000
+  ],
+  "samples": [
+   1,
+   4
+  ],
+  "rounds": 8,
+  "frames": 10,
+  "size": [
+   1432,
+   768
+  ],
+  "parityOnly": false
+ },
+ "acPowerBefore": true,
+ "hardware": {
+  "webglRenderer": "ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (16GB) (0x000064A0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "webgpu": {
+   "vendor": "intel",
+   "architecture": "xe-2lpg",
+   "device": "",
+   "description": "",
+   "fallback": false
+  },
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+  "browserName": "chromium",
+  "browserVersion": "155.0.4283.45",
+  "requestedChannel": "msedge",
+  "launchArgs": [],
+  "powerPreference": "high-performance",
+  "hostPlatform": "win32",
+  "headless": false
+ },
+ "parity": {
+  "capacity": 200000,
+  "width": 1432,
+  "height": 768,
+  "samples": 1,
+  "canonicalOrder": {
+   "AA": {
+    "changedStateWords": 0,
+    "changedPixels": 0,
+    "coveredPixels": 369620,
+    "invalidChannels": 0,
+    "maxChannelDelta": 0,
+    "meanDeltaPerChangedPixel": 0,
+    "instanceCounts": [
+     200000,
+     200000
+    ]
+   },
+   "AB": {
+    "changedStateWords": 0,
+    "changedPixels": 0,
+    "coveredPixels": 369620,
+    "invalidChannels": 0,
+    "maxChannelDelta": 0,
+    "meanDeltaPerChangedPixel": 0,
+    "instanceCounts": [
+     200000,
+     200000
+    ]
+   }
+  },
+  "atomicOrder": {
+   "AA": {
+    "changedStateWords": 0,
+    "changedPixels": 63480,
+    "coveredPixels": 369620,
+    "invalidChannels": 0,
+    "maxChannelDelta": 0.0615234375,
+    "meanDeltaPerChangedPixel": 0.0026160955795268255,
+    "instanceCounts": [
+     200000,
+     200000
+    ]
+   },
+   "AB": {
+    "changedStateWords": 0,
+    "changedPixels": 62919,
+    "coveredPixels": 369620,
+    "invalidChannels": 0,
+    "maxChannelDelta": 0.10009765625,
+    "meanDeltaPerChangedPixel": 0.002559815290899975,
+    "instanceCounts": [
+     200000,
+     200000
+    ]
+   }
+  },
+  "errors": []
+ },
+ "timing": [
+  {
+   "capacity": 100000,
+   "samples": 1,
+   "width": 1432,
+   "height": 768,
+   "framesPerBlock": 10,
+   "live": [
+    100000,
+    100000
+   ],
+   "summary": {
+    "compute": {
+     "A": {
+      "median": 0.065536,
+      "min": 0.065536,
+      "max": 0.131072
+     },
+     "B": {
+      "median": 0.098304,
+      "min": 0.065536,
+      "max": 0.131072
+     },
+     "pairedSavingMs": -0.016384000000000003,
+     "bFasterRounds": 1,
+     "rounds": 8
+    },
+    "draw": {
+     "A": {
+      "median": 0.196608,
+      "min": 0.196608,
+      "max": 0.196608
+     },
+     "B": {
+      "median": 0.196608,
+      "min": 0.196608,
+      "max": 0.196608
+     },
+     "pairedSavingMs": 0,
+     "bFasterRounds": 0,
+     "rounds": 8
+    },
+    "total": {
+     "A": {
+      "median": 0.262144,
+      "min": 0.262144,
+      "max": 0.32767999999999997
+     },
+     "B": {
+      "median": 0.31129599999999996,
+      "min": 0.262144,
+      "max": 0.32767999999999997
+     },
+     "pairedSavingMs": -0.016383999999999982,
+     "bFasterRounds": 1,
+     "rounds": 8
+    }
+   },
+   "blocks": [
+    [
+     {
+      "compute": 0.065536,
+      "draw": 0.196608,
+      "total": 0.262144
+     },
+     {
+      "compute": 0.098304,
+      "draw": 0.196608,
+      "total": 0.32767999999999997
+     },
+     {
+      "compute": 0.065536,
+      "draw": 0.196608,
+      "total": 0.262144
+     },
+     {
+      "compute": 0.065536,
+      "draw": 0.196608,
+      "total": 0.262144
+     },
+     {
+      "compute": 0.065536,
+      "draw": 0.196608,
+      "total": 0.262144
+     },
+     {
+      "compute": 0.065536,
+      "draw": 0.196608,
+      "total": 0.262144
+     },
+     {
+      "compute": 0.131072,
+      "draw": 0.196608,
+      "total": 0.32767999999999997
+     },
+     {
+      "compute": 0.065536,
+      "draw": 0.196608,
+      "total": 0.262144
+     }
+    ],
+    [
+     {
+      "compute": 0.098304,
+      "draw": 0.196608,
+      "total": 0.32767999999999997
+     },
+     {
+      "compute": 0.065536,
+      "draw": 0.196608,
+      "total": 0.262144
+     },
+     {
+      "compute": 0.065536,
+      "draw": 0.196608,
+      "total": 0.262144
+     },
+     {
+      "compute": 0.065536,
+      "draw": 0.196608,
+      "total": 0.262144
+     },
+     {
+      "compute": 0.098304,
+      "draw": 0.196608,
+      "total": 0.29491199999999995
+     },
+     {
+      "compute": 0.098304,
+      "draw": 0.196608,
+      "total": 0.32767999999999997
+     },
+     {
+      "compute": 0.131072,
+      "draw": 0.196608,
+      "total": 0.32767999999999997
+     },
+     {
+      "compute": 0.098304,
+      "draw": 0.196608,
+      "total": 0.32767999999999997
+     }
+    ]
+   ],
+   "errors": []
+  },
+  {
+   "capacity": 100000,
+   "samples": 4,
+   "width": 1432,
+   "height": 768,
+   "framesPerBlock": 10,
+   "live": [
+    100000,
+    100000
+   ],
+   "summary": {
+    "compute": {
+     "A": {
+      "median": 0.098304,
+      "min": 0.065536,
+      "max": 0.131072
+     },
+     "B": {
+      "median": 0.098304,
+      "min": 0.065536,
+      "max": 0.131072
+     },
+     "pairedSavingMs": 0,
+     "bFasterRounds": 2,
+     "rounds": 8
+    },
+    "draw": {
+     "A": {
+      "median": 0.196608,
+      "min": 0.196608,
+      "max": 0.262144
+     },
+     "B": {
+      "median": 0.196608,
+      "min": 0.196608,
+      "max": 0.262144
+     },
+     "pairedSavingMs": 0,
+     "bFasterRounds": 1,
+     "rounds": 8
+    },
+    "total": {
+     "A": {
+      "median": 0.32767999999999997,
+      "min": 0.262144,
+      "max": 0.32767999999999997
+     },
+     "B": {
+      "median": 0.32767999999999997,
+      "min": 0.262144,
+      "max": 0.393216
+     },
+     "pairedSavingMs": 0,
+     "bFasterRounds": 3,
+     "rounds": 8
+    }
+   },
+   "blocks": [
+    [
+     {
+      "compute": 0.065536,
+      "draw": 0.196608,
+      "total": 0.262144
+     },
+     {
+      "compute": 0.131072,
+      "draw": 0.196608,
+      "total": 0.32767999999999997
+     },
+     {
+      "compute": 0.098304,
+      "draw": 0.196608,
+      "total": 0.32767999999999997
+     },
+     {
+      "compute": 0.131072,
+      "draw": 0.196608,
+      "total": 0.32767999999999997
+     },
+     {
+      "compute": 0.065536,
+      "draw": 0.196608,
+      "total": 0.32767999999999997
+     },
+     {
+      "compute": 0.065536,
+      "draw": 0.196608,
+      "total": 0.29491199999999995
+     },
+     {
+      "compute": 0.098304,
+      "draw": 0.196608,
+      "total": 0.32767999999999997
+     },
+     {
+      "compute": 0.098304,
+      "draw": 0.262144,
+      "total": 0.32767999999999997
+     }
+    ],
+    [
+     {
+      "compute": 0.098304,
+      "draw": 0.196608,
+      "total": 0.32767999999999997
+     },
+     {
+      "compute": 0.065536,
+      "draw": 0.196608,
+      "total": 0.29491199999999995
+     },
+     {
+      "compute": 0.098304,
+      "draw": 0.196608,
+      "total": 0.29491199999999995
+     },
+     {
+      "compute": 0.131072,
+      "draw": 0.196608,
+      "total": 0.32767999999999997
+     },
+     {
+      "compute": 0.131072,
+      "draw": 0.196608,
+      "total": 0.32767999999999997
+     },
+     {
+      "compute": 0.131072,
+      "draw": 0.262144,
+      "total": 0.393216
+     },
+     {
+      "compute": 0.098304,
+      "draw": 0.196608,
+      "total": 0.32767999999999997
+     },
+     {
+      "compute": 0.065536,
+      "draw": 0.196608,
+      "total": 0.262144
+     }
+    ]
+   ],
+   "errors": []
+  },
+  {
+   "capacity": 1000000,
+   "samples": 1,
+   "width": 1432,
+   "height": 768,
+   "framesPerBlock": 10,
+   "live": [
+    1000000,
+    1000000
+   ],
+   "summary": {
+    "compute": {
+     "A": {
+      "median": 1.703936,
+      "min": 1.6384,
+      "max": 2.29376
+     },
+     "B": {
+      "median": 1.703936,
+      "min": 1.671168,
+      "max": 2.260992
+     },
+     "pairedSavingMs": -0.016383999999999954,
+     "bFasterRounds": 1,
+     "rounds": 8
+    },
+    "draw": {
+     "A": {
+      "median": 2.4412160000000003,
+      "min": 2.228224,
+      "max": 2.752512
+     },
+     "B": {
+      "median": 2.70336,
+      "min": 2.523136,
+      "max": 3.244032
+     },
+     "pairedSavingMs": -0.29491200000000006,
+     "bFasterRounds": 0,
+     "rounds": 8
+    },
+    "total": {
+     "A": {
+      "median": 4.276224,
+      "min": 3.93216,
+      "max": 5.144576
+     },
+     "B": {
+      "median": 4.472832,
+      "min": 4.325376,
+      "max": 5.40672
+     },
+     "pairedSavingMs": -0.32767999999999997,
+     "bFasterRounds": 0,
+     "rounds": 8
+    }
+   },
+   "blocks": [
+    [
+     {
+      "compute": 1.6384,
+      "draw": 2.4576000000000002,
+      "total": 4.325376
+     },
+     {
+      "compute": 1.736704,
+      "draw": 2.228224,
+      "total": 3.93216
+     },
+     {
+      "compute": 1.703936,
+      "draw": 2.424832,
+      "total": 4.227072
+     },
+     {
+      "compute": 1.6384,
+      "draw": 2.4248320000000003,
+      "total": 4.161536
+     },
+     {
+      "compute": 1.671168,
+      "draw": 2.4248320000000003,
+      "total": 4.096
+     },
+     {
+      "compute": 1.703936,
+      "draw": 2.752512,
+      "total": 4.521984
+     },
+     {
+      "compute": 2.29376,
+      "draw": 2.719744,
+      "total": 5.144576
+     },
+     {
+      "compute": 2.162688,
+      "draw": 2.686976,
+      "total": 5.013504
+     }
+    ],
+    [
+     {
+      "compute": 1.671168,
+      "draw": 2.588672,
+      "total": 4.325376
+     },
+     {
+      "compute": 1.736704,
+      "draw": 2.523136,
+      "total": 4.456448
+     },
+     {
+      "compute": 1.703936,
+      "draw": 2.719744,
+      "total": 4.456448
+     },
+     {
+      "compute": 1.703936,
+      "draw": 2.523136,
+      "total": 4.325376
+     },
+     {
+      "compute": 1.703936,
+      "draw": 2.686976,
+      "total": 4.489216
+     },
+     {
+      "compute": 1.703936,
+      "draw": 3.244032,
+      "total": 4.980736
+     },
+     {
+      "compute": 2.260992,
+      "draw": 3.145728,
+      "total": 5.40672
+     },
+     {
+      "compute": 2.260992,
+      "draw": 2.981888,
+      "total": 5.40672
+     }
+    ]
+   ],
+   "errors": []
+  },
+  {
+   "capacity": 1000000,
+   "samples": 4,
+   "width": 1432,
+   "height": 768,
+   "framesPerBlock": 10,
+   "live": [
+    1000000,
+    1000000
+   ],
+   "summary": {
+    "compute": {
+     "A": {
+      "median": 2.228224,
+      "min": 2.064384,
+      "max": 2.29376
+     },
+     "B": {
+      "median": 2.228224,
+      "min": 2.1299200000000003,
+      "max": 2.392064
+     },
+     "pairedSavingMs": -0.016383999999999954,
+     "bFasterRounds": 2,
+     "rounds": 8
+    },
+    "draw": {
+     "A": {
+      "median": 3.211264,
+      "min": 3.0474240000000004,
+      "max": 3.375104
+     },
+     "B": {
+      "median": 3.244032,
+      "min": 2.94912,
+      "max": 3.407872
+     },
+     "pairedSavingMs": 0.04915199999999986,
+     "bFasterRounds": 5,
+     "rounds": 8
+    },
+    "total": {
+     "A": {
+      "median": 5.505024000000001,
+      "min": 5.2756479999999994,
+      "max": 5.668864
+     },
+     "B": {
+      "median": 5.5377920000000005,
+      "min": 5.341184,
+      "max": 5.701632
+     },
+     "pairedSavingMs": -0.04915199999999986,
+     "bFasterRounds": 1,
+     "rounds": 8
+    }
+   },
+   "blocks": [
+    [
+     {
+      "compute": 2.064384,
+      "draw": 3.244032,
+      "total": 5.2756479999999994
+     },
+     {
+      "compute": 2.162688,
+      "draw": 3.0474240000000004,
+      "total": 5.341184
+     },
+     {
+      "compute": 2.195456,
+      "draw": 3.11296,
+      "total": 5.505024000000001
+     },
+     {
+      "compute": 2.228224,
+      "draw": 3.178496,
+      "total": 5.439488000000001
+     },
+     {
+      "compute": 2.260992,
+      "draw": 3.178496,
+      "total": 5.505024000000001
+     },
+     {
+      "compute": 2.228224,
+      "draw": 3.342336,
+      "total": 5.505024000000001
+     },
+     {
+      "compute": 2.29376,
+      "draw": 3.342336,
+      "total": 5.668864
+     },
+     {
+      "compute": 2.260992,
+      "draw": 3.375104,
+      "total": 5.603328
+     }
+    ],
+    [
+     {
+      "compute": 2.1299200000000003,
+      "draw": 3.211264,
+      "total": 5.341184
+     },
+     {
+      "compute": 2.29376,
+      "draw": 2.94912,
+      "total": 5.472256
+     },
+     {
+      "compute": 2.195456,
+      "draw": 2.94912,
+      "total": 5.439488000000001
+     },
+     {
+      "compute": 2.260992,
+      "draw": 3.11296,
+      "total": 5.668864
+     },
+     {
+      "compute": 2.392064,
+      "draw": 3.2768,
+      "total": 5.505024000000001
+     },
+     {
+      "compute": 2.228224,
+      "draw": 3.2767999999999997,
+      "total": 5.57056
+     },
+     {
+      "compute": 2.228224,
+      "draw": 3.407872,
+      "total": 5.701632
+     },
+     {
+      "compute": 2.162688,
+      "draw": 3.375104,
+      "total": 5.603328
+     }
+    ]
+   ],
+   "errors": []
+  }
+ ],
+ "acPowerAfter": true
+}

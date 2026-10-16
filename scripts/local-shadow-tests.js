@@ -117,15 +117,16 @@ export async function localShadowBrowserChecks(page){
         report.pointFaces=faces;read.unmap();
         const output=device.createBuffer({size:48,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),visibilityRead=device.createBuffer({size:48,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
         try{
+          // Read the renderer's light buffer so the probes do not duplicate its shadow-index packing.
           const samples=axes.flatMap((axis,i)=>[axis.map(value=>value*(distances[i]-0.4)),axis.map(value=>value*(distances[i]+0.3))]);
           const program=clusteredSampling(0,true)+`\n@group(0) @binding(19) var<storage,read_write> localVisibility:array<f32>;
             @compute @workgroup_size(1) fn sampleVisibility(@builtin(global_invocation_id) id:vec3u){
               let positions=array<vec3f,12>(${samples.map(position=>'vec3f('+position.join(',')+')').join(',')});
-              let light=ClusterLight(vec4f(0,0,0,6),vec4f(1),vec4f(0),vec4f(0,0,1,0));
+              let light=clusterLights[0];
               localVisibility[id.x]=clusterShadowVisibility(light,positions[id.x],vec3f(0));
             }`;
           const module=device.createShaderModule({code:program}),pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'sampleVisibility'}});
-          const group=device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[...clustered.bindings().filter(entry=>entry.binding>=16),{binding:19,resource:{buffer:output}}]});
+          const group=device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[...clustered.bindings().filter(entry=>entry.binding===5||entry.binding>=28),{binding:19,resource:{buffer:output}}]});
           const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.dispatchWorkgroups(12);pass.end();encoder.copyBufferToBuffer(output,0,visibilityRead,0,48);device.queue.submit([encoder.finish()]);
           await visibilityRead.mapAsync(GPUMapMode.READ);const values=[...new Float32Array(visibilityRead.getMappedRange())];visibilityRead.unmap();
           assert(values.every((value,i)=>value===(i%2===0?1:0)),'Point shadow sampling selected the wrong cube face: '+JSON.stringify(values));report.pointFaceVisibility=values;
@@ -144,11 +145,11 @@ export async function localShadowBrowserChecks(page){
             if(legacy){const before=source;source=source.replace('clusterShadowFace(receiver-light.positionRange.xyz)','clusterShadowFace(position-light.positionRange.xyz)');assert(source!==before,'Seam regression must replace the current point-face selection');}
             const module=device.createShaderModule({code:source+`\n@group(0) @binding(19) var<storage,read_write> seamVisibility:array<f32>;
               @compute @workgroup_size(1) fn sampleSeam(){
-                let light=ClusterLight(vec4f(0,0,0,8),vec4f(1),vec4f(0),vec4f(0,0,1,0));
+                let light=clusterLights[0];
                 seamVisibility[0]=clusterShadowVisibility(light,vec3f(1,0,1),vec3f(0,0,1));
                 seamVisibility[1]=clusterShadowVisibility(light,vec3f(4,0,4),vec3f(0,0,1));
               }`}),pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'sampleSeam'}});
-            const group=device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[...clustered.bindings().filter(entry=>entry.binding>=16),{binding:19,resource:{buffer:output}}]}),encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();
+            const group=device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[...clustered.bindings().filter(entry=>entry.binding===5||entry.binding>=28),{binding:19,resource:{buffer:output}}]}),encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();
             pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.dispatchWorkgroups(1);pass.end();encoder.copyBufferToBuffer(output,0,readback,0,8);device.queue.submit([encoder.finish()]);await readback.mapAsync(GPUMapMode.READ);const result=[...new Float32Array(readback.getMappedRange())];readback.unmap();return result;
           }finally{output.destroy();readback.destroy();}
         };

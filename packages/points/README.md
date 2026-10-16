@@ -1,6 +1,6 @@
 # @margoengine/points
 
-Large point clouds and instanced sprites for Margo Engine, WebGPU: the counterparts of Three.js `Points`, `PointsMaterial`, `Sprite` and `SpriteMaterial`, built for millions of points.
+Large point clouds and instanced sprites for Margo Engine, WebGPU: the counterparts of Three.js `Points`, `PointsMaterial`, `Sprite` and `SpriteMaterial`, built for big scans: the browser test culls and draws a 2,000,000-point cloud under a 500,000-point budget.
 
 Build from source with `npm run build` in `packages/points`.
 
@@ -9,8 +9,7 @@ import {Engine} from '@margoengine/core';
 import {PointsPlugin, PointCloud, SpriteBatch, atlasRect} from '@margoengine/points';
 
 const engine = await Engine.create(canvas);
-const points = new PointsPlugin({pointBudget: 2_000_000});
-engine.use(points);
+const points = PointsPlugin.attach(engine, {pointBudget: 2_000_000});
 
 // Any {positions, colors?, normals?} works, including the point-cloud output of @margoengine/loaders.
 const cloud = points.add(new PointCloud({
@@ -36,11 +35,12 @@ canvas.addEventListener('click', event => {
 
 ## How it works
 
-- **Blocks.** `new PointCloud()` splits the points into spatially compact blocks of at most `blockSize` points (median splits along the longest axis, like a kd-tree) and records each block's bounds. Each frame the plugin transforms every block's bounds by the model matrix and frustum-culls it on the CPU against `camera.planes`. 2,000,000 points chunk in about 0.4 to 0.8 s.
+- **Blocks.** `new PointCloud()` splits the points into spatially compact blocks of at most `blockSize` points (median splits along the longest axis, like a kd-tree) and records each block's bounds. Each frame the plugin transforms every block's bounds by the model matrix and frustum-culls it on the CPU against `camera.planes`.
 - **Point budget and level of detail.** The points inside each block are shuffled once with a seeded PRNG, so the first `k` slots of a block are an even random sample of it. Visible blocks share `pointBudget` in proportion to their projected screen area, and blocks that need less than their share give the rest to the others. Each block then draws a prefix of its slots: one `draw(4, k, 0, firstSlot)` call per visible block. This is the progressive subsampling Potree uses, without its octree files.
 - **GPU data.** Positions (f32 xyz), packed RGBA8 colors, optional f32 sizes and the shuffled slot order live in storage buffers; the vertex shader expands each point into a quad (a 4-vertex triangle strip per instance). The arrays stay in your order, so `updatePositions`, `updateColors` and `updateSizes` call `writeBuffer` on exactly the changed byte range. Position updates also grow the affected blocks' bounds.
 - **Shapes and shading.** Square points cover exactly `size x size` pixels. Round points are an antialiased disc with an extra pixel of quad. A `map` (any `GPUTexture`, or an `ImageBitmap`, canvas, image, video or `ImageData` that the plugin uploads as `rgba8unorm-srgb`) is sampled across the point, with `alphaTest` or blending. `shading: 'sphere'` lights each point as a sphere impostor and writes its curved depth with `frag_depth`. `edl: true` adds eye-dome lighting: points also write their view depth into an `r32float` target and a full-screen pass multiplies the color by `exp(-300 * strength * mean(max(0, log2 d - log2 d_neighbor)))` over 8 neighbors.
 - **Depth.** Points test against the scene with reversed-Z `greater-equal` and opaque points write depth, so they hide behind meshes and occlude each other. Transparent materials blend without writing depth.
+- **Orthographic cameras.** Everything is read from `camera.matrix`, so any projection whose clip w is constant (such as `CameraProjection` from `@margoengine/cameras`) works without a dependency on it: world-unit sizes use the matrix's pixels per world unit and stay the same at every depth, sphere impostors write linear depth, eye-dome lighting shades linear depth steps (scaled like the log steps a perspective camera with the same zoom would give), block budgets ignore distance, and picking breaks ties by distance from the near plane (`depth` is then measured from the near plane).
 - **Sprites.** A `SpriteBatch` keeps 16 floats per sprite (position, rotation, size, pivot, atlas UV rectangle, color) in one storage buffer and draws every sprite with one instanced call. Quads face the camera using the camera's right and up vectors; with `sizeUnits: 'pixels'` (Three.js `sizeAttenuation: false`) they are expanded in screen space instead.
 - **Colors.** Material and sprite colors take `'#rrggbb'` (sRGB) or linear `[r, g, b]`, like `PbrMaterial`. Per-point colors are sRGB by default, which matches the loaders package and 8-bit scanner data; set `colorSpace: 'linear'` otherwise. Output is sRGB-encoded in the shader on non `-srgb` canvas formats, the same way core does it.
 - **Device loss.** `onDeviceRestored` rebuilds every buffer, pipeline and uploaded texture from the CPU copies. `dispose` (and `engine.removePlugin`) destroys them all. Clouds and batches stay registered, so a plugin can be reused.
@@ -106,8 +106,8 @@ Sprites: `add({position, size, rotation, center, color, opacity, uv})`, `set(ind
 
 ## Tests
 
-`npm test` in `packages/points` runs Node checks: chunking (coverage, block sizes, bounds, determinism, non-finite points) on random data and the real PCL `bunny.pcd` scan, even subsampling of shuffled prefixes, bounds growth, frustum culling against core `Camera.planes` with a randomized no-false-negative check, screen area, budget water-filling invariants, projection and picking against brute force, color packing, ranges, atlas cells, `PointCloud` and `SpriteBatch` bookkeeping, materials, SSR safety and the WebGL2 warning.
+`npm test` in `packages/points` runs Node checks: chunking (coverage, block sizes, bounds, determinism, non-finite points) on random data and the real PCL `bunny.pcd` scan, even subsampling of shuffled prefixes, bounds growth, frustum culling against core `Camera.planes` with a randomized no-false-negative check, screen area, budget water-filling invariants, projection and picking against brute force, orthographic screen area and picking, color packing, ranges, atlas cells, `PointCloud` and `SpriteBatch` bookkeeping, materials, SSR safety and the WebGL2 warning.
 
-`npm run test:browser` renders with a real engine in Chromium (or Edge via `BROWSER_CHANNEL`): exact square coverage at 2 to 16 px, round coverage within 4% of the disc area with empty corners, per-point byte and float colors, depth against a core mesh and between points, attachment to a mesh, size attenuation, a 2,000,000 point cloud culled and drawn within a 500,000 point budget, subrange updates that issue exactly one `writeBuffer` per changed range, sprites that stay square after an orbit with the right atlas cell, rotation, pivot and pixel size, 5000 sprites in one draw call, textured points with alpha test, sphere shading, eye-dome lighting, CPU picking, zero WebGPU validation errors, device restore and dispose. It saves `test-results/points-gallery.png` and `test-results/points-browser.json`.
+`npm run test:browser` (a real-GPU script, not in CI) renders with a real engine in Chromium (or Edge via `BROWSER_CHANNEL`): exact square coverage at 2 to 16 px, round coverage within 4% of the disc area with empty corners, per-point byte and float colors, depth against a core mesh and between points, attachment to a mesh, size attenuation, a 2,000,000 point cloud culled and drawn within a 500,000 point budget, subrange updates that issue exactly one `writeBuffer` per changed range, sprites that stay square after an orbit with the right atlas cell, rotation, pivot and pixel size, 5000 sprites in one draw call, textured points with alpha test, sphere shading, eye-dome lighting, CPU picking, an orthographic camera (world sizes equal at two depths, sphere impostor depth against a box, EDL at a depth step, nearer-point picking), zero WebGPU validation errors, device restore and dispose. It saves `test-results/points-gallery.png` and `test-results/points-browser.json`.
 
 MIT licensed.

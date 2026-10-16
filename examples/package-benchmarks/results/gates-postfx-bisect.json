@@ -1,0 +1,12 @@
+{
+ "what": "scripts/modern-postfx-tests.js first DOF check 'Near CoC sign/clamp', bisected on the Arc 140V, AC power before and after every run, GPU lock held; detached worktree per commit",
+ "date": "2026-10-14",
+ "runs": [
+  {"commit": "9c761d5", "subject": "Packages use the core hooks; gltf-pro gains a renderState pipeline hook", "acPower": [true, true], "result": "FAIL Near CoC sign/clamp"},
+  {"commit": "5cf148e", "subject": "Orthographic cameras in points, labels, clustered, splats and DOF", "acPower": [true, true], "result": "FAIL Near CoC sign/clamp"},
+  {"commit": "116676c (5cf148e~1)", "subject": "Handoff: ViewCube camera.up follow-up", "acPower": [true, true], "result": "shader checks PASS (later integration step needs package dist, not built in the bisect tree)"},
+  {"commit": "2484971 + test fix", "acPower": [true, true], "result": "PASS (examples/package-benchmarks/results/gates-gate4-fixed.json)"}
+ ],
+ "cause": "5cf148e grew the DOF uniform from 32 to 48 bytes (Params {lens, frame, ortho}); the test still bound a 32-byte buffer, so bind-group creation failed validation inside the test's error scope, the CoC pass never ran and the CoC texture read back as zeros. Stale test, not a DOF regression, and it predates SSAO ortho (a281ad2).",
+ "fix": "Test binds a 48-byte uniform with ortho = 0 (perspective)."
+}

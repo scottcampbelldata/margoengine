@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/fbx",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "Binary and ASCII FBX conversion into the optional Margo glTF animation pipeline.",
@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js"
     }
   },
   "files": [
@@ -19,11 +23,12 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/exporters": "0.1.0",
-    "@margoengine/gltf-pro": "0.1.0"
+    "@margoengine/exporters": "^1.0.0",
+    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/geometry": "^1.0.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^0.1.0 || ^1.0.0"
+    "@margoengine/core": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js fbx",

@@ -88,6 +88,7 @@ mock.module("@margoengine/core/extension", {
       async create(canvas, options) {
         const engine = {
           canvas,
+          options,
           camera: { ...options.camera },
           meshes: new Map(),
           createdMeshes: [],
@@ -429,6 +430,24 @@ test("StrictMode, resize, stable frame callbacks and unmount release resources",
   assert.equal(engine.callbacks.size, 0);
   assert.ok(observers.every((observer) => observer.disconnected));
 });
+test("Canvas forwards the WebGL fallback factory and recreates the engine when it changes", async () => {
+  const fallback = () => ({ backend: "webgl2" });
+  const view = render(React.createElement(Canvas, { backend: "webgl2", fallback }));
+  await act(async () => {});
+  const first = instances.at(-1);
+  assert.equal(first.options.backend, "webgl2");
+  assert.equal(first.options.fallback, fallback);
+  assert.equal(first.starts, 1);
+  const replacement = () => ({ backend: "webgl2" });
+  view.rerender(React.createElement(Canvas, { backend: "webgl2", fallback: replacement }));
+  await act(async () => {});
+  const second = instances.at(-1);
+  assert.notEqual(first, second);
+  assert.equal(first.disposals, 1);
+  assert.equal(second.options.fallback, replacement);
+  assert.equal(second.starts, 1);
+});
+
 test("late async initialization after unmount is disposed and never started", async () => {
   defer = true;
   const view = render(React.createElement(MargoCanvas));

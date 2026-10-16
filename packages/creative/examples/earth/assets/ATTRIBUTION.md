@@ -33,6 +33,14 @@ No endorsement by NASA is implied.
 
 The procedural stars contain no external image assets.
 
+Desktop views retain the full 2048 × 1024 maps. `earth-night.webp` and
+`earth-clouds.webp` use WebP quality 95 (44.27 and 45.62 dB PSNR against the
+decoded source JPEGs). `earth-normal.webp` and `earth-specular.webp` use lossless
+WebP with identical decoded RGBA pixels. The day map keeps its original JPEG,
+which is smaller than its tested WebP alternatives. Together the desktop maps
+total 1,712,222 bytes, 24.7% below the original five maps. All original maps,
+source credits and licenses are retained.
+
 Phone views use the five `earth-*-mobile.webp` derivatives, resized to 1024 × 512
 with Lanczos. Day, night and cloud images use WebP quality 85; the normal and
 specular/roughness maps use lossless WebP after resizing. Together they total

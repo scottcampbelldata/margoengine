@@ -1,0 +1,35 @@
+{
+  "name": "@margoengine/staging",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Product-shot staging: soft ground contact shadows (shadow-catcher plane) for core meshes and glTF models.",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js staging",
+    "test": "npm run build && node --test test/*.test.js",
+    "prepack": "npm run build"
+  },
+  "homepage": "https://margoengine.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/staging"
+  }
+}

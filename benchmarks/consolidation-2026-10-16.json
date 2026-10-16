@@ -1,0 +1,460 @@
+{
+  "date": "2026-10-16",
+  "scope": "Local verification of the consolidated working tree before its merge commit; this is not a registry release or GitHub Actions result.",
+  "sourceHeads": {
+    "main": "24f8348bf38986c245c94b380727ce094a3646f1",
+    "skinning": "fedf9a44ddce88c4d4183aecaccc061b3bfcb8bf",
+    "performance": "849ff5160255ba0bb9257cda8b023a7ea3e1e93c",
+    "react": "4b5235b848ea1977f430866cc367df122a31c9d8"
+  },
+  "packages": {
+    "public": 74,
+    "supportDirectories": [
+      "kernel",
+      "shared"
+    ],
+    "privateAppsAndStarters": 5,
+    "missingFromSourceDirectoryUnion": [],
+    "allPackagesBuilt": true,
+    "strictTypecheck": true,
+    "packedExportsAndStrictConsumers": true,
+    "apiEntries": 173,
+    "apiExports": 1777
+  },
+  "unit": {
+    "fullSuite": {
+      "passed": 2215,
+      "failed": 0,
+      "skipped": 0,
+      "log": "test-results/consolidation-final-all-tests.log"
+    },
+    "addedBrowserStartupRegressions": {
+      "passed": 3,
+      "failed": 0,
+      "log": "test-results/consolidation-browser-startup.log"
+    },
+    "rustKernel": 5,
+    "blenderPython": 8,
+    "packedReact18Lifecycle": 122
+  },
+  "fuzz": {
+    "short": true,
+    "targets": 20,
+    "iterations": 43895,
+    "findings": 0
+  },
+  "builds": [
+    "all 74 packages",
+    "Vite and Next starters",
+    "Night Citadel",
+    "gameplay sandbox",
+    "74-package catalog",
+    "complete site",
+    "Blender add-on ZIP"
+  ],
+  "coreStage": {
+    "raw": 47486,
+    "gzip": 20282,
+    "exclusiveLimit": 25000
+  },
+  "coreGzip": 18255,
+  "reactEntryGzip": 20966,
+  "browser": {
+    "passed": 33,
+    "failed": 0,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "155.0.4283.60",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": false
+    },
+    "groups": [
+      {
+        "name": "wrapper",
+        "status": "passed",
+        "log": "test-results/consolidation-browser-retry/wrapper.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:wrapper"
+        ]
+      },
+      {
+        "name": "domains",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/domains.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:domains"
+        ]
+      },
+      {
+        "name": "sky",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/sky.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:sky"
+        ]
+      },
+      {
+        "name": "modern-browser",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/modern-browser.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:browser"
+        ]
+      },
+      {
+        "name": "citadel",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/citadel.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:citadel"
+        ]
+      },
+      {
+        "name": "xr",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/xr.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:xr:browser"
+        ]
+      },
+      {
+        "name": "usdz",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/usdz.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:usdz:browser"
+        ]
+      },
+      {
+        "name": "extensions",
+        "status": "passed",
+        "log": "test-results/assets-extensions-final.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:extensions"
+        ]
+      },
+      {
+        "name": "gltf-compression",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/gltf-compression.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:gltf-compression"
+        ]
+      },
+      {
+        "name": "blender",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/blender.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:blender"
+        ]
+      },
+      {
+        "name": "game",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/game.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:game"
+        ]
+      },
+      {
+        "name": "constraints",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/constraints.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "test:browser",
+          "--workspace",
+          "@margoengine/kinematics-constraints"
+        ]
+      },
+      {
+        "name": "postfx",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/postfx.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:postfx:browser"
+        ]
+      },
+      {
+        "name": "modules",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/modules.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "test:modules:browser"
+        ]
+      },
+      {
+        "name": "selection",
+        "status": "passed",
+        "log": "test-results/consolidation-browser-final/selection.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "test:browser",
+          "--workspace",
+          "@margoengine/selection"
+        ]
+      },
+      {
+        "name": "nature",
+        "status": "passed",
+        "log": "test-results/consolidation-browser-retry/nature.log",
+        "command": [
+          "tests/nature.browser.mjs"
+        ]
+      },
+      {
+        "name": "physics",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/physics.log",
+        "command": [
+          "packages/physics/scripts/test-browser.js"
+        ]
+      },
+      {
+        "name": "stress",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/stress.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:stress",
+          "--",
+          "--sessions=22",
+          "--frames=120",
+          "--cycles=10"
+        ]
+      },
+      {
+        "name": "production-audit",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/production-audit.log",
+        "command": [
+          "scripts/demo-subject-tests.js",
+          "--audit-only"
+        ]
+      },
+      {
+        "name": "materials",
+        "status": "passed",
+        "log": "test-results/consolidation-browser-retry/materials.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:materials"
+        ]
+      },
+      {
+        "name": "gltf-parity",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/gltf-parity.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:gltf-parity"
+        ]
+      },
+      {
+        "name": "local-shadows",
+        "status": "passed",
+        "log": "test-results/audit-local-shadows-gpu.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:local-shadows"
+        ]
+      },
+      {
+        "name": "deformed-picking",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/deformed-picking.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:deformed-picking"
+        ]
+      },
+      {
+        "name": "silent-geometry",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/silent-geometry.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:silent-geometry"
+        ]
+      },
+      {
+        "name": "pbr-box",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/pbr-box.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:pbr-box"
+        ]
+      },
+      {
+        "name": "scene-helpers",
+        "status": "passed",
+        "log": "test-results/consolidation-browser-retry/scene-helpers.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:scene-helpers"
+        ]
+      },
+      {
+        "name": "machinery",
+        "status": "passed",
+        "log": "test-results/consolidation-browser-final/machinery.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:machinery"
+        ]
+      },
+      {
+        "name": "finalization",
+        "status": "passed",
+        "log": "test-results/consolidation-browser-final/finalization.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "modern:test:finalization"
+        ]
+      },
+      {
+        "name": "catalog",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/catalog.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "test:catalog:browser"
+        ]
+      },
+      {
+        "name": "tokyo",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/tokyo.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "test:tokyo"
+        ]
+      },
+      {
+        "name": "basic-scene",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/basic-scene.log",
+        "command": [
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "test:basic-scene"
+        ]
+      },
+      {
+        "name": "audit-composition",
+        "status": "passed",
+        "log": "test-results/consolidation-browser/audit-composition.log",
+        "command": [
+          "scripts/audit-rendering-composition-gpu.mjs"
+        ]
+      },
+      {
+        "name": "hardware",
+        "status": "passed",
+        "log": "test-results/consolidation-hardware-final.log",
+        "command": [
+          "npm",
+          "run",
+          "modern:test:hardware"
+        ]
+      }
+    ],
+    "stress": {
+      "sessions": 22,
+      "passed": 22,
+      "options": {
+        "sessions": 22,
+        "frames": 120,
+        "seed": 20261011,
+        "shard": 0,
+        "shards": 1,
+        "timeout": 120000,
+        "entities": 12014,
+        "splats": 4096,
+        "cycles": 10
+      }
+    },
+    "headedProfiles": [
+      {
+        "backend": "webgpu",
+        "frames": 1811,
+        "effectiveFramesPerSecond": 59.9985414719378,
+        "gapsOver25Ms": 0,
+        "gcSweeps": 4,
+        "heapRangeBytes": 920772,
+        "hiddenFrames": 0
+      },
+      {
+        "backend": "webgl2",
+        "frames": 1810,
+        "effectiveFramesPerSecond": 59.99860699750988,
+        "gapsOver25Ms": 0,
+        "gcSweeps": 3,
+        "heapRangeBytes": 910720,
+        "hiddenFrames": 0
+      }
+    ]
+  },
+  "limits": [
+    "NVIDIA RTX A6000 and Edge 155 on Windows; AMD and other browser engines were not repeated.",
+    "XR sessions were simulated; no physical headset.",
+    "Checked-in Blender browser fixtures and Python add-on tests passed; native Blender export/install round-trip was not configured.",
+    "Stress used 22 sessions, 120 frames and 10 cycles; the 500-session release campaign and optional 3M-splat branch were not repeated.",
+    "The production audit used --audit-only.",
+    "Headed cadence is callback timing, not compositor presentation; GC and non-flat heap were observed."
+  ]
+}

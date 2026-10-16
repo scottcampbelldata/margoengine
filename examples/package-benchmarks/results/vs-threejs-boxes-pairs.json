@@ -1,0 +1,7782 @@
+{
+ "date": "2026-10-15T03:27:14.616Z",
+ "commit": "ef2fb0c",
+ "three": "0.186.1",
+ "acPowerBefore": true,
+ "rounds": 2,
+ "frames": 120,
+ "canvas": [
+  1280,
+  720
+ ],
+ "dpr": 1,
+ "note": "DIAGNOSTIC, BUSY MACHINE, NOT FOR PUBLICATION",
+ "host": {
+  "cpu": "Intel(R) Core(TM) Ultra 7 258V",
+  "cores": 8,
+  "memoryGB": 31,
+  "os": "win32",
+  "node": "v24.15.0"
+ },
+ "bundles": {
+  "margo": {
+   "assembly-BplcVpdq.js": {
+    "raw": 1869,
+    "gzip": 754
+   },
+   "dist-Bh6aelxo.js": {
+    "raw": 22546,
+    "gzip": 7689
+   },
+   "dist-BHOvwrmz.js": {
+    "raw": 21282,
+    "gzip": 7492
+   },
+   "dist-BI3rR_eN.js": {
+    "raw": 17451,
+    "gzip": 4645
+   },
+   "dist-BpP0j_r7.js": {
+    "raw": 57841,
+    "gzip": 18297
+   },
+   "dist-C-ivQgGq.js": {
+    "raw": 27380,
+    "gzip": 8558
+   },
+   "dist-C_2XS5Tu.js": {
+    "raw": 77305,
+    "gzip": 23223
+   },
+   "dist-DaUa8e53.js": {
+    "raw": 21138,
+    "gzip": 7029
+   },
+   "extension-u_Gf_dRz.js": {
+    "raw": 114,
+    "gzip": 111
+   },
+   "geometry-BL61i5RB.js": {
+    "raw": 2828,
+    "gzip": 1220
+   },
+   "margo.js": {
+    "raw": 62961,
+    "gzip": 23976
+   }
+  },
+  "three-webgl": {
+   "assembly-obeYrKT_.js": {
+    "raw": 27812,
+    "gzip": 8626
+   },
+   "GLTFLoader-h2M76VeG.js": {
+    "raw": 55877,
+    "gzip": 14703
+   },
+   "three-webgl.js": {
+    "raw": 419012,
+    "gzip": 94816
+   },
+   "three.core-Cjzwey6Y.js": {
+    "raw": 267142,
+    "gzip": 60734
+   }
+  },
+  "three-webgpu": {
+   "assembly-obeYrKT_.js": {
+    "raw": 27812,
+    "gzip": 8626
+   },
+   "GLTFLoader-CPEt_WJ8.js": {
+    "raw": 55890,
+    "gzip": 14708
+   },
+   "three-webgpu.js": {
+    "raw": 725430,
+    "gzip": 179907
+   },
+   "three.core-C5oodLkF.js": {
+    "raw": 282703,
+    "gzip": 63061
+   }
+  }
+ },
+ "results": {
+  "boxes-1000": {
+   "margo": {
+    "runs": [
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 1000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 196.7,
+      "errors": [],
+      "createMs": 409.6,
+      "buildMs": 8.8,
+      "firstFrameMs": 44.9,
+      "loadMs": 663.4,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.355,
+        "p95": 0.595,
+        "min": 0.185,
+        "max": 0.855,
+        "mean": 0.374
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 1.14,
+        "p95": 1.48,
+        "min": 0.625,
+        "max": 4.015,
+        "mean": 1.155
+       },
+       "fps": 635.1,
+       "rafFps": 877.2
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 0.547,
+        "p95": 0.553,
+        "min": 0.523,
+        "max": 0.567,
+        "mean": 0.546
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 0.547,
+        "p95": 0.553,
+        "min": 0.523,
+        "max": 0.567,
+        "mean": 0.546
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 0.547,
+         "p95": 0.553,
+         "min": 0.523,
+         "max": 0.567,
+         "mean": 0.546
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        1
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 5.2,
+       "p95": 7.47,
+       "min": 4.38,
+       "max": 7.495,
+       "mean": 5.479
+      },
+      "jsHeapMB": 2.37,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "core batches only (gltf-pro, IBL, shadow passes not counted)"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 25307,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 21,
+       "checkedAt": "2026-10-15T03:27:18.682Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 1000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 101.1,
+      "errors": [],
+      "createMs": 204.5,
+      "buildMs": 4.8,
+      "firstFrameMs": 28.7,
+      "loadMs": 340.4,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.23,
+        "p95": 0.475,
+        "min": 0.085,
+        "max": 0.76,
+        "mean": 0.251
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 0.755,
+        "p95": 1.19,
+        "min": 0.35,
+        "max": 1.495,
+        "mean": 0.75
+       },
+       "fps": 940.3,
+       "rafFps": 1324.5
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 0.364,
+        "p95": 0.378,
+        "min": 0.351,
+        "max": 0.4,
+        "mean": 0.364
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 0.364,
+        "p95": 0.378,
+        "min": 0.351,
+        "max": 0.4,
+        "mean": 0.364
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 0.364,
+         "p95": 0.378,
+         "min": 0.351,
+         "max": 0.4,
+         "mean": 0.364
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        1
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 4.55,
+       "p95": 6,
+       "min": 3.54,
+       "max": 6.455,
+       "mean": 4.641
+      },
+      "jsHeapMB": 2.21,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "core batches only (gltf-pro, IBL, shadow passes not counted)"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 25307,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 13,
+       "checkedAt": "2026-10-15T03:34:37.748Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 501.9,
+     "createMs": 307.05,
+     "buildMs": 6.8,
+     "firstFrameMs": 36.8,
+     "fps": 787.7,
+     "cpuMs": 0.29,
+     "gpuMs": 0.46,
+     "gpuSpanMs": 0.46,
+     "passMs": [
+      0.46
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/discard"
+     ],
+     "serialFrameMs": 4.88,
+     "jsHeapMB": 2.29,
+     "jsGzipBytes": 25307,
+     "drawCalls": 1,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 0,
+      "over16Fraction": 0
+     }
+    }
+   },
+   "margo+nocull": {
+    "runs": [
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 1000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [
+        "nocull"
+       ],
+       "dump": false
+      },
+      "scriptStartMs": 240.4,
+      "errors": [],
+      "createMs": 353.7,
+      "buildMs": 9.9,
+      "firstFrameMs": 42.2,
+      "loadMs": 648.5,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.34,
+        "p95": 0.57,
+        "min": 0.155,
+        "max": 0.68,
+        "mean": 0.34
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 1.02,
+        "p95": 1.33,
+        "min": 0.595,
+        "max": 1.635,
+        "mean": 1.013
+       },
+       "fps": 436.7,
+       "rafFps": 980.4
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 1.685,
+        "p95": 1.892,
+        "min": 1.541,
+        "max": 2.183,
+        "mean": 1.679
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 1.685,
+        "p95": 1.892,
+        "min": 1.541,
+        "max": 2.183,
+        "mean": 1.679
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 1.685,
+         "p95": 1.892,
+         "min": 1.541,
+         "max": 2.183,
+         "mean": 1.679
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        1
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 6.51,
+       "p95": 8.13,
+       "min": 5.935,
+       "max": 8.26,
+       "mean": 6.79
+      },
+      "jsHeapMB": 2.21,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "core batches only (gltf-pro, IBL, shadow passes not counted)"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 25307,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 32,
+       "checkedAt": "2026-10-15T03:27:25.965Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 1000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [
+        "nocull"
+       ],
+       "dump": false
+      },
+      "scriptStartMs": 164.8,
+      "errors": [],
+      "createMs": 303.4,
+      "buildMs": 8.5,
+      "firstFrameMs": 41.4,
+      "loadMs": 520.3,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.245,
+        "p95": 0.545,
+        "min": 0.105,
+        "max": 0.745,
+        "mean": 0.269
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 0.8,
+        "p95": 1.315,
+        "min": 0.38,
+        "max": 1.475,
+        "mean": 0.821
+       },
+       "fps": 459.1,
+       "rafFps": 1250
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 1.586,
+        "p95": 1.86,
+        "min": 1.446,
+        "max": 1.971,
+        "mean": 1.593
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 1.586,
+        "p95": 1.86,
+        "min": 1.446,
+        "max": 1.971,
+        "mean": 1.593
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 1.586,
+         "p95": 1.86,
+         "min": 1.446,
+         "max": 1.971,
+         "mean": 1.593
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        1
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 6.47,
+       "p95": 8.225,
+       "min": 4.835,
+       "max": 8.47,
+       "mean": 6.534
+      },
+      "jsHeapMB": 2.21,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "core batches only (gltf-pro, IBL, shadow passes not counted)"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 25307,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 15,
+       "checkedAt": "2026-10-15T03:33:50.062Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 584.4,
+     "createMs": 328.55,
+     "buildMs": 9.2,
+     "firstFrameMs": 41.8,
+     "fps": 447.9,
+     "cpuMs": 0.29,
+     "gpuMs": 1.64,
+     "gpuSpanMs": 1.64,
+     "passMs": [
+      1.64
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/discard"
+     ],
+     "serialFrameMs": 6.49,
+     "jsHeapMB": 2.21,
+     "jsGzipBytes": 25307,
+     "drawCalls": 1,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 0,
+      "over16Fraction": 0
+     }
+    }
+   },
+   "margo-instanced": {
+    "runs": [
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 1000,
+       "mode": "instanced",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 171.1,
+      "errors": [],
+      "createMs": 349.9,
+      "buildMs": 30.8,
+      "firstFrameMs": 133.9,
+      "loadMs": 688.7,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.335,
+        "p95": 0.585,
+        "min": 0.145,
+        "max": 0.77,
+        "mean": 0.351
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 0.97,
+        "p95": 1.36,
+        "min": 0.53,
+        "max": 1.645,
+        "mean": 0.978
+       },
+       "fps": 461.9,
+       "rafFps": 1030.9
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 1.209,
+        "p95": 1.279,
+        "min": 1.154,
+        "max": 1.47,
+        "mean": 1.22
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 1.362,
+        "p95": 1.64,
+        "min": 1.299,
+        "max": 1.873,
+        "mean": 1.39
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        },
+        {
+         "n": 60,
+         "median": 1.209,
+         "p95": 1.279,
+         "min": 1.154,
+         "max": 1.47,
+         "mean": 1.219
+        },
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store",
+        "Render  +depth +resolve load/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        3
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 6.15,
+       "p95": 8.04,
+       "min": 5.275,
+       "max": 8.395,
+       "mean": 6.433
+      },
+      "jsHeapMB": 2.73,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "1 instanced draws, not counted by core"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 64299,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 11,
+       "checkedAt": "2026-10-15T03:27:32.232Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 1000,
+       "mode": "instanced",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 152.4,
+      "errors": [],
+      "createMs": 307.6,
+      "buildMs": 28.5,
+      "firstFrameMs": 118.3,
+      "loadMs": 609.5,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.36,
+        "p95": 0.625,
+        "min": 0.16,
+        "max": 0.835,
+        "mean": 0.359
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 1.01,
+        "p95": 1.46,
+        "min": 0.53,
+        "max": 1.705,
+        "mean": 1.009
+       },
+       "fps": 518.7,
+       "rafFps": 990.1
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 1.152,
+        "p95": 1.166,
+        "min": 1.109,
+        "max": 1.168,
+        "mean": 1.14
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 1.297,
+        "p95": 1.324,
+        "min": 1.246,
+        "max": 1.53,
+        "mean": 1.29
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        },
+        {
+         "n": 60,
+         "median": 1.152,
+         "p95": 1.166,
+         "min": 1.109,
+         "max": 1.168,
+         "mean": 1.14
+        },
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store",
+        "Render  +depth +resolve load/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        3
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 6.965,
+       "p95": 8.13,
+       "min": 5.2,
+       "max": 8.14,
+       "mean": 6.72
+      },
+      "jsHeapMB": 2.73,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "1 instanced draws, not counted by core"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 64299,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 1,
+       "checkedAt": "2026-10-15T03:33:54.993Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 649.1,
+     "createMs": 328.75,
+     "buildMs": 29.65,
+     "firstFrameMs": 126.1,
+     "fps": 490.3,
+     "cpuMs": 0.35,
+     "gpuMs": 1.18,
+     "gpuSpanMs": 1.33,
+     "passMs": [
+      0,
+      1.18,
+      0
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/store",
+      "Render  +depth load/store",
+      "Render  +depth +resolve load/discard"
+     ],
+     "serialFrameMs": 6.56,
+     "jsHeapMB": 2.73,
+     "jsGzipBytes": 64299,
+     "drawCalls": 1,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 19.49,
+      "over16Fraction": 0.6199
+     }
+    }
+   },
+   "margo-culled": {
+    "runs": [
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 1000,
+       "mode": "culled",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 257.9,
+      "errors": [],
+      "createMs": 362,
+      "buildMs": 27,
+      "firstFrameMs": 280.4,
+      "loadMs": 930,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.345,
+        "p95": 0.435,
+        "min": 0.135,
+        "max": 0.59,
+        "mean": 0.332
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 1,
+        "p95": 1.315,
+        "min": 0.475,
+        "max": 1.505,
+        "mean": 0.994
+       },
+       "fps": 391.1,
+       "rafFps": 1000
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 1.026,
+        "p95": 1.07,
+        "min": 0.998,
+        "max": 1.076,
+        "mean": 1.028
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 1.188,
+        "p95": 1.249,
+        "min": 1.159,
+        "max": 1.424,
+        "mean": 1.195
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        },
+        {
+         "n": 60,
+         "median": 0.03,
+         "p95": 0.036,
+         "min": 0.028,
+         "max": 0.045,
+         "mean": 0.031
+        },
+        {
+         "n": 60,
+         "median": 0.995,
+         "p95": 1.039,
+         "min": 0.968,
+         "max": 1.045,
+         "mean": 0.997
+        },
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Compute ",
+        "Render  +depth load/store",
+        "Render  +depth +resolve load/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        4
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 6.35,
+       "p95": 7.58,
+       "min": 5.315,
+       "max": 8.035,
+       "mean": 6.454
+      },
+      "jsHeapMB": 2.49,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 16,
+       "note": "16 instanced draws, not counted by core"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 46199,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 29,
+       "checkedAt": "2026-10-15T03:27:39.269Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 1000,
+       "mode": "culled",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 137.5,
+      "errors": [],
+      "createMs": 303.6,
+      "buildMs": 22,
+      "firstFrameMs": 238.4,
+      "loadMs": 703.6,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.27,
+        "p95": 0.425,
+        "min": 0.105,
+        "max": 0.6,
+        "mean": 0.268
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 0.815,
+        "p95": 1.145,
+        "min": 0.395,
+        "max": 1.455,
+        "mean": 0.795
+       },
+       "fps": 386.2,
+       "rafFps": 1227
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 0.98,
+        "p95": 1.242,
+        "min": 0.921,
+        "max": 1.283,
+        "mean": 1.004
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 1.14,
+        "p95": 1.438,
+        "min": 1.076,
+        "max": 1.503,
+        "mean": 1.169
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        },
+        {
+         "n": 60,
+         "median": 0.032,
+         "p95": 0.038,
+         "min": 0.028,
+         "max": 0.054,
+         "mean": 0.033
+        },
+        {
+         "n": 60,
+         "median": 0.949,
+         "p95": 1.2,
+         "min": 0.891,
+         "max": 1.247,
+         "mean": 0.972
+        },
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Compute ",
+        "Render  +depth load/store",
+        "Render  +depth +resolve load/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        4
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 6.54,
+       "p95": 7.985,
+       "min": 4.53,
+       "max": 8.12,
+       "mean": 6.538
+      },
+      "jsHeapMB": 2.49,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 16,
+       "note": "16 instanced draws, not counted by core"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 46199,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 5,
+       "checkedAt": "2026-10-15T03:33:59.890Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 816.8,
+     "createMs": 332.8,
+     "buildMs": 24.5,
+     "firstFrameMs": 259.4,
+     "fps": 388.65,
+     "cpuMs": 0.31,
+     "gpuMs": 1,
+     "gpuSpanMs": 1.16,
+     "passMs": [
+      0,
+      0.03,
+      0.97,
+      0
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/store",
+      "Compute ",
+      "Render  +depth load/store",
+      "Render  +depth +resolve load/discard"
+     ],
+     "serialFrameMs": 6.45,
+     "jsHeapMB": 2.49,
+     "jsGzipBytes": 46199,
+     "drawCalls": 16,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 0,
+      "over16Fraction": 0
+     }
+    }
+   },
+   "three-webgl": {
+    "runs": [
+     {
+      "params": {
+       "engine": "three-webgl",
+       "scene": "boxes",
+       "n": 1000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 203.6,
+      "errors": [],
+      "createMs": 14.8,
+      "buildMs": 9.5,
+      "firstFrameMs": 67.1,
+      "loadMs": 298.6,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 2.13,
+        "p95": 2.875,
+        "min": 1.265,
+        "max": 3.32,
+        "mean": 2.172
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 2.535,
+        "p95": 3.49,
+        "min": 1.55,
+        "max": 3.965,
+        "mean": 2.569
+       },
+       "fps": 368.8,
+       "rafFps": 394.5
+      },
+      "gpu": {
+       "method": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+       "gpuMs": {
+        "n": 60,
+        "median": 1.629,
+        "p95": 1.798,
+        "min": 0.969,
+        "max": 1.825,
+        "mean": 1.559
+       },
+       "disjoint": false
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 5.815,
+       "p95": 7.43,
+       "min": 5.32,
+       "max": 7.675,
+       "mean": 5.993
+      },
+      "jsHeapMB": 5.44,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 982,
+       "triangles": 11784
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 155550,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 0,
+       "checkedAt": "2026-10-15T03:27:45.315Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "three-webgl",
+       "scene": "boxes",
+       "n": 1000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 147.6,
+      "errors": [],
+      "createMs": 14.3,
+      "buildMs": 10.3,
+      "firstFrameMs": 61.2,
+      "loadMs": 237.5,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 2.055,
+        "p95": 2.695,
+        "min": 1.255,
+        "max": 3.285,
+        "mean": 2.075
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 2.435,
+        "p95": 3.33,
+        "min": 1.625,
+        "max": 5.63,
+        "mean": 2.514
+       },
+       "fps": 381.5,
+       "rafFps": 410.7
+      },
+      "gpu": {
+       "method": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+       "gpuMs": {
+        "n": 60,
+        "median": 1.634,
+        "p95": 1.776,
+        "min": 0.784,
+        "max": 1.825,
+        "mean": 1.459
+       },
+       "disjoint": false
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 5.43,
+       "p95": 6.1,
+       "min": 5.015,
+       "max": 6.995,
+       "mean": 5.483
+      },
+      "jsHeapMB": 5.44,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 982,
+       "triangles": 11784
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 155550,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 1,
+       "checkedAt": "2026-10-15T03:34:05.168Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 268.05,
+     "createMs": 14.55,
+     "buildMs": 9.9,
+     "firstFrameMs": 64.15,
+     "fps": 375.15,
+     "cpuMs": 2.09,
+     "gpuMs": 1.63,
+     "gpuSpanMs": null,
+     "serialFrameMs": 5.62,
+     "jsHeapMB": 5.44,
+     "jsGzipBytes": 155550,
+     "drawCalls": 982,
+     "samples": 4,
+     "gpuMethod": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 1.28,
+      "over16Fraction": 0.0103
+     }
+    }
+   },
+   "three-webgpu": {
+    "runs": [
+     {
+      "params": {
+       "engine": "three-webgpu",
+       "scene": "boxes",
+       "n": 1000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 224.3,
+      "errors": [],
+      "createMs": 294.4,
+      "buildMs": 11.7,
+      "firstFrameMs": 357.3,
+      "loadMs": 890.6,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 3.66,
+        "p95": 5.36,
+        "min": 2.98,
+        "max": 6.255,
+        "mean": 3.836
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 4.555,
+        "p95": 5.885,
+        "min": 3.655,
+        "max": 7.025,
+        "mean": 4.628
+       },
+       "fps": 208.1,
+       "rafFps": 219.5
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 1.078,
+        "p95": 1.148,
+        "min": 0.679,
+        "max": 1.378,
+        "mean": 1.035
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 1.87,
+        "p95": 1.995,
+        "min": 1.154,
+        "max": 2.162,
+        "mean": 1.796
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 0.553,
+         "p95": 0.598,
+         "min": 0.424,
+         "max": 0.61,
+         "mean": 0.544
+        },
+        {
+         "n": 60,
+         "median": 0.525,
+         "p95": 0.555,
+         "min": 0.206,
+         "max": 0.815,
+         "mean": 0.491
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        2
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 9.99,
+       "p95": 11.76,
+       "min": 8.945,
+       "max": 12.32,
+       "mean": 10.184
+      },
+      "jsHeapMB": 10.51,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 983,
+       "triangles": 11785
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 242968,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 40,
+       "checkedAt": "2026-10-15T03:27:50.564Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "three-webgpu",
+       "scene": "boxes",
+       "n": 1000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 167.7,
+      "errors": [],
+      "createMs": 255,
+      "buildMs": 9.8,
+      "firstFrameMs": 307.8,
+      "loadMs": 742.3,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 3.13,
+        "p95": 5.145,
+        "min": 2.235,
+        "max": 6.215,
+        "mean": 3.259
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 3.835,
+        "p95": 6.025,
+        "min": 2.865,
+        "max": 7.13,
+        "mean": 4.019
+       },
+       "fps": 238.5,
+       "rafFps": 260.8
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 1.098,
+        "p95": 1.14,
+        "min": 0.675,
+        "max": 1.167,
+        "mean": 1.038
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 1.854,
+        "p95": 2.042,
+        "min": 1.139,
+        "max": 2.261,
+        "mean": 1.782
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 0.561,
+         "p95": 0.579,
+         "min": 0.428,
+         "max": 0.592,
+         "mean": 0.544
+        },
+        {
+         "n": 60,
+         "median": 0.537,
+         "p95": 0.575,
+         "min": 0.208,
+         "max": 0.58,
+         "mean": 0.495
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        2
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 9.49,
+       "p95": 11.87,
+       "min": 8.02,
+       "max": 11.935,
+       "mean": 9.827
+      },
+      "jsHeapMB": 10.51,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 983,
+       "triangles": 11785
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 242968,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 4,
+       "checkedAt": "2026-10-15T03:34:09.912Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 816.45,
+     "createMs": 274.7,
+     "buildMs": 10.75,
+     "firstFrameMs": 332.55,
+     "fps": 223.3,
+     "cpuMs": 3.4,
+     "gpuMs": 1.09,
+     "gpuSpanMs": 1.86,
+     "passMs": [
+      0.56,
+      0.53
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/store",
+      "Render  +depth load/store"
+     ],
+     "serialFrameMs": 9.74,
+     "jsHeapMB": 10.51,
+     "jsGzipBytes": 242968,
+     "drawCalls": 983,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 1.5,
+      "over16Fraction": 0.0111
+     }
+    }
+   },
+   "three-webgl-instanced": {
+    "runs": [
+     {
+      "params": {
+       "engine": "three-webgl",
+       "scene": "boxes",
+       "n": 1000,
+       "mode": "instanced",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 241.3,
+      "errors": [],
+      "createMs": 20.6,
+      "buildMs": 6.4,
+      "firstFrameMs": 72.2,
+      "loadMs": 345.3,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.16,
+        "p95": 0.37,
+        "min": 0.06,
+        "max": 0.42,
+        "mean": 0.186
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 0.45,
+        "p95": 1.1,
+        "min": 0.085,
+        "max": 11.155,
+        "mean": 0.578
+       },
+       "fps": 843.5,
+       "rafFps": 2222.2
+      },
+      "gpu": {
+       "method": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+       "gpuMs": {
+        "n": 60,
+        "median": 0.766,
+        "p95": 1.326,
+        "min": 0.685,
+        "max": 1.339,
+        "mean": 0.862
+       },
+       "disjoint": false
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 4.97,
+       "p95": 5.42,
+       "min": 4.715,
+       "max": 5.945,
+       "mean": 5.031
+      },
+      "jsHeapMB": 3.84,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "triangles": 12000
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 155550,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 74,
+       "checkedAt": "2026-10-15T03:27:57.303Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "three-webgl",
+       "scene": "boxes",
+       "n": 1000,
+       "mode": "instanced",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 174.3,
+      "errors": [],
+      "createMs": 15.7,
+      "buildMs": 5.2,
+      "firstFrameMs": 57.1,
+      "loadMs": 256,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.135,
+        "p95": 0.315,
+        "min": 0.05,
+        "max": 0.51,
+        "mean": 0.16
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 0.385,
+        "p95": 0.855,
+        "min": 0.08,
+        "max": 8.23,
+        "mean": 0.491
+       },
+       "fps": 938,
+       "rafFps": 2597.4
+      },
+      "gpu": {
+       "method": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+       "gpuMs": {
+        "n": 60,
+        "median": 0.693,
+        "p95": 1.269,
+        "min": 0.591,
+        "max": 1.277,
+        "mean": 0.781
+       },
+       "disjoint": false
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 4.615,
+       "p95": 5.335,
+       "min": 4.2,
+       "max": 5.995,
+       "mean": 4.634
+      },
+      "jsHeapMB": 3.84,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "triangles": 12000
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 155550,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 12,
+       "checkedAt": "2026-10-15T03:34:15.567Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 300.65,
+     "createMs": 18.15,
+     "buildMs": 5.8,
+     "firstFrameMs": 64.65,
+     "fps": 890.75,
+     "cpuMs": 0.15,
+     "gpuMs": 0.73,
+     "gpuSpanMs": null,
+     "serialFrameMs": 4.79,
+     "jsHeapMB": 3.84,
+     "jsGzipBytes": 155550,
+     "drawCalls": 1,
+     "samples": 4,
+     "gpuMethod": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 1.28,
+      "over16Fraction": 0.0103
+     }
+    }
+   },
+   "three-webgpu-instanced": {
+    "runs": [
+     {
+      "params": {
+       "engine": "three-webgpu",
+       "scene": "boxes",
+       "n": 1000,
+       "mode": "instanced",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 189.5,
+      "errors": [],
+      "createMs": 250.5,
+      "buildMs": 5.3,
+      "firstFrameMs": 189.7,
+      "loadMs": 637.3,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.585,
+        "p95": 0.935,
+        "min": 0.32,
+        "max": 1.07,
+        "mean": 0.603
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 1.185,
+        "p95": 1.68,
+        "min": 0.675,
+        "max": 2.08,
+        "mean": 1.202
+       },
+       "fps": 595,
+       "rafFps": 843.9
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 0.821,
+        "p95": 0.846,
+        "min": 0.772,
+        "max": 0.86,
+        "mean": 0.819
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 1.105,
+        "p95": 1.135,
+        "min": 1.049,
+        "max": 1.684,
+        "mean": 1.112
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 0.669,
+         "p95": 0.695,
+         "min": 0.631,
+         "max": 0.707,
+         "mean": 0.668
+        },
+        {
+         "n": 60,
+         "median": 0.151,
+         "p95": 0.157,
+         "min": 0.139,
+         "max": 0.158,
+         "mean": 0.151
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        2
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 6.14,
+       "p95": 7.86,
+       "min": 4.985,
+       "max": 8.435,
+       "mean": 6.327
+      },
+      "jsHeapMB": 6.14,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 2,
+       "triangles": 12001
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 242968,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 0,
+       "checkedAt": "2026-10-15T03:28:16.457Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "three-webgpu",
+       "scene": "boxes",
+       "n": 1000,
+       "mode": "instanced",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 121.3,
+      "errors": [],
+      "createMs": 168.5,
+      "buildMs": 3.4,
+      "firstFrameMs": 126.4,
+      "loadMs": 421,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.25,
+        "p95": 0.695,
+        "min": 0.165,
+        "max": 1.015,
+        "mean": 0.307
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 0.585,
+        "p95": 1.275,
+        "min": 0.365,
+        "max": 2.815,
+        "mean": 0.704
+       },
+       "fps": 713.8,
+       "rafFps": 1709.4
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 0.615,
+        "p95": 0.665,
+        "min": 0.589,
+        "max": 0.782,
+        "mean": 0.618
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 0.827,
+        "p95": 0.878,
+        "min": 0.802,
+        "max": 1.465,
+        "mean": 0.845
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 0.497,
+         "p95": 0.524,
+         "min": 0.473,
+         "max": 0.556,
+         "mean": 0.497
+        },
+        {
+         "n": 60,
+         "median": 0.117,
+         "p95": 0.126,
+         "min": 0.109,
+         "max": 0.305,
+         "mean": 0.121
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        2
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 5.05,
+       "p95": 7.38,
+       "min": 3.96,
+       "max": 7.52,
+       "mean": 5.213
+      },
+      "jsHeapMB": 6.14,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 2,
+       "triangles": 12001
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 242968,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 1,
+       "checkedAt": "2026-10-15T03:34:33.859Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 529.15,
+     "createMs": 209.5,
+     "buildMs": 4.35,
+     "firstFrameMs": 158.05,
+     "fps": 654.4,
+     "cpuMs": 0.42,
+     "gpuMs": 0.72,
+     "gpuSpanMs": 0.97,
+     "passMs": [
+      0.58,
+      0.13
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/store",
+      "Render  +depth load/store"
+     ],
+     "serialFrameMs": 5.59,
+     "jsHeapMB": 6.14,
+     "jsGzipBytes": 242968,
+     "drawCalls": 2,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 1.5,
+      "over16Fraction": 0.0111
+     }
+    }
+   }
+  },
+  "boxes-10000": {
+   "margo": {
+    "runs": [
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 289.2,
+      "errors": [],
+      "createMs": 386,
+      "buildMs": 36.3,
+      "firstFrameMs": 49.9,
+      "loadMs": 768.1,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 2.275,
+        "p95": 3.265,
+        "min": 0.655,
+        "max": 3.925,
+        "mean": 2.073
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 3.195,
+        "p95": 4.115,
+        "min": 1.23,
+        "max": 5.205,
+        "mean": 2.991
+       },
+       "fps": 293.3,
+       "rafFps": 313
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 1.985,
+        "p95": 2.171,
+        "min": 1.801,
+        "max": 2.2,
+        "mean": 2.011
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 1.985,
+        "p95": 2.171,
+        "min": 1.801,
+        "max": 2.2,
+        "mean": 2.011
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 1.985,
+         "p95": 2.171,
+         "min": 1.801,
+         "max": 2.2,
+         "mean": 2.011
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        1
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 9.315,
+       "p95": 11.865,
+       "min": 6.28,
+       "max": 13.165,
+       "mean": 9.435
+      },
+      "jsHeapMB": 6.95,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "core batches only (gltf-pro, IBL, shadow passes not counted)"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 25307,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 68,
+       "checkedAt": "2026-10-15T03:28:21.413Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 130.9,
+      "errors": [],
+      "createMs": 287.4,
+      "buildMs": 24.6,
+      "firstFrameMs": 38.7,
+      "loadMs": 486.9,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 1.965,
+        "p95": 2.655,
+        "min": 0.535,
+        "max": 4.335,
+        "mean": 1.79
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 2.665,
+        "p95": 3.56,
+        "min": 0.965,
+        "max": 5.045,
+        "mean": 2.517
+       },
+       "fps": 359,
+       "rafFps": 375.2
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 1.617,
+        "p95": 1.741,
+        "min": 1.506,
+        "max": 1.768,
+        "mean": 1.63
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 1.617,
+        "p95": 1.741,
+        "min": 1.506,
+        "max": 1.768,
+        "mean": 1.63
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 1.617,
+         "p95": 1.741,
+         "min": 1.506,
+         "max": 1.768,
+         "mean": 1.63
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        1
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 9.01,
+       "p95": 11.265,
+       "min": 6.955,
+       "max": 14.885,
+       "mean": 9.114
+      },
+      "jsHeapMB": 6.95,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "core batches only (gltf-pro, IBL, shadow passes not counted)"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 25307,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 0,
+       "checkedAt": "2026-10-15T03:35:30.497Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 627.5,
+     "createMs": 336.7,
+     "buildMs": 30.45,
+     "firstFrameMs": 44.3,
+     "fps": 326.15,
+     "cpuMs": 2.12,
+     "gpuMs": 1.8,
+     "gpuSpanMs": 1.8,
+     "passMs": [
+      1.8
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/discard"
+     ],
+     "serialFrameMs": 9.16,
+     "jsHeapMB": 6.95,
+     "jsGzipBytes": 25307,
+     "drawCalls": 1,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 0,
+      "over16Fraction": 0
+     }
+    }
+   },
+   "margo+nocull": {
+    "runs": [
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [
+        "nocull"
+       ],
+       "dump": false
+      },
+      "scriptStartMs": 184.6,
+      "errors": [],
+      "createMs": 294.8,
+      "buildMs": 26.5,
+      "firstFrameMs": 44.5,
+      "loadMs": 556,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 2.085,
+        "p95": 6.955,
+        "min": 0.525,
+        "max": 11.38,
+        "mean": 2.378
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 2.82,
+        "p95": 7.665,
+        "min": 1.015,
+        "max": 12.48,
+        "mean": 3.138
+       },
+       "fps": 193.3,
+       "rafFps": 354.6
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 5,
+        "p95": 5.669,
+        "min": 4.516,
+        "max": 5.696,
+        "mean": 5.128
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 5,
+        "p95": 5.669,
+        "min": 4.516,
+        "max": 5.696,
+        "mean": 5.128
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 5,
+         "p95": 5.669,
+         "min": 4.516,
+         "max": 5.696,
+         "mean": 5.128
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        1
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 12.12,
+       "p95": 14.555,
+       "min": 9.145,
+       "max": 17.21,
+       "mean": 12.056
+      },
+      "jsHeapMB": 6.95,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "core batches only (gltf-pro, IBL, shadow passes not counted)"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 25307,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 3,
+       "checkedAt": "2026-10-15T03:28:27.989Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [
+        "nocull"
+       ],
+       "dump": false
+      },
+      "scriptStartMs": 174.3,
+      "errors": [],
+      "createMs": 309.6,
+      "buildMs": 26.6,
+      "firstFrameMs": 45.4,
+      "loadMs": 561.8,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 2.14,
+        "p95": 8.53,
+        "min": 0.61,
+        "max": 14.635,
+        "mean": 2.591
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 2.965,
+        "p95": 9.345,
+        "min": 1.115,
+        "max": 15.48,
+        "mean": 3.421
+       },
+       "fps": 184.9,
+       "rafFps": 337.3
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": null,
+       "spanMs": null,
+       "passMs": [],
+       "passes": [],
+       "zeroFrames": 60,
+       "passesPerFrame": [
+        1
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 13.09,
+       "p95": 15.325,
+       "min": 10.435,
+       "max": 17.99,
+       "mean": 12.985
+      },
+      "jsHeapMB": 6.95,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "core batches only (gltf-pro, IBL, shadow passes not counted)"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 25307,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 10,
+       "checkedAt": "2026-10-15T03:34:41.779Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 558.9,
+     "createMs": 302.2,
+     "buildMs": 26.55,
+     "firstFrameMs": 44.95,
+     "fps": 189.1,
+     "cpuMs": 2.11,
+     "gpuMs": 5,
+     "gpuSpanMs": 5,
+     "passMs": [
+      5
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/discard"
+     ],
+     "serialFrameMs": 12.61,
+     "jsHeapMB": 6.95,
+     "jsGzipBytes": 25307,
+     "drawCalls": 1,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 0,
+      "over16Fraction": 0
+     }
+    }
+   },
+   "margo-instanced": {
+    "runs": [
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "instanced",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 266.1,
+      "errors": [],
+      "createMs": 350.6,
+      "buildMs": 54.2,
+      "firstFrameMs": 131,
+      "loadMs": 808.3,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.295,
+        "p95": 0.585,
+        "min": 0.15,
+        "max": 1.015,
+        "mean": 0.334
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 0.99,
+        "p95": 1.515,
+        "min": 0.515,
+        "max": 1.7,
+        "mean": 1.035
+       },
+       "fps": 218.9,
+       "rafFps": 1010.1
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": null,
+       "spanMs": null,
+       "passMs": [],
+       "passes": [],
+       "zeroFrames": 60,
+       "passesPerFrame": [
+        3
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 8.96,
+       "p95": 10.215,
+       "min": 7.265,
+       "max": 10.545,
+       "mean": 8.808
+      },
+      "jsHeapMB": 7.6,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "1 instanced draws, not counted by core"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 64299,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 19,
+       "checkedAt": "2026-10-15T03:28:34.374Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "instanced",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 142.5,
+      "errors": [],
+      "createMs": 315.4,
+      "buildMs": 52.5,
+      "firstFrameMs": 127.5,
+      "loadMs": 644.1,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.35,
+        "p95": 0.605,
+        "min": 0.155,
+        "max": 0.71,
+        "mean": 0.369
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 1.085,
+        "p95": 1.54,
+        "min": 0.495,
+        "max": 1.86,
+        "mean": 1.087
+       },
+       "fps": 205.5,
+       "rafFps": 921.7
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": null,
+       "spanMs": null,
+       "passMs": [],
+       "passes": [],
+       "zeroFrames": 60,
+       "passesPerFrame": [
+        3
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 11.625,
+       "p95": 17.25,
+       "min": 8.535,
+       "max": 18.16,
+       "mean": 12.184
+      },
+      "jsHeapMB": 7.6,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "1 instanced draws, not counted by core"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 64299,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 7,
+       "checkedAt": "2026-10-15T03:34:48.126Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 726.2,
+     "createMs": 333,
+     "buildMs": 53.35,
+     "firstFrameMs": 129.25,
+     "fps": 212.2,
+     "cpuMs": 0.32,
+     "gpuMs": null,
+     "gpuSpanMs": null,
+     "passMs": [],
+     "passes": [],
+     "serialFrameMs": 10.29,
+     "jsHeapMB": 7.6,
+     "jsGzipBytes": 64299,
+     "drawCalls": 1,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 19.68,
+      "over16Fraction": 0.6352
+     }
+    }
+   },
+   "margo-culled": {
+    "runs": [
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "culled",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 177.4,
+      "errors": [],
+      "createMs": 350.3,
+      "buildMs": 477.5,
+      "firstFrameMs": 278,
+      "loadMs": 1290.6,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.155,
+        "p95": 0.34,
+        "min": 0.085,
+        "max": 0.405,
+        "mean": 0.176
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 0.49,
+        "p95": 1.015,
+        "min": 0.31,
+        "max": 1.135,
+        "mean": 0.577
+       },
+       "fps": 278.6,
+       "rafFps": 2040.8
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 2.298,
+        "p95": 2.717,
+        "min": 1.953,
+        "max": 2.888,
+        "mean": 2.352
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 2.523,
+        "p95": 2.885,
+        "min": 2.091,
+        "max": 3.06,
+        "mean": 2.51
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        },
+        {
+         "n": 60,
+         "median": 0.05,
+         "p95": 0.071,
+         "min": 0.032,
+         "max": 0.079,
+         "mean": 0.048
+        },
+        {
+         "n": 60,
+         "median": 2.219,
+         "p95": 2.657,
+         "min": 1.92,
+         "max": 2.831,
+         "mean": 2.304
+        },
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Compute ",
+        "Render  +depth load/store",
+        "Render  +depth +resolve load/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        4
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 7.435,
+       "p95": 9.02,
+       "min": 6.16,
+       "max": 9.05,
+       "mean": 7.483
+      },
+      "jsHeapMB": 7.67,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 16,
+       "note": "16 instanced draws, not counted by core"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 46199,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 18,
+       "checkedAt": "2026-10-15T03:28:40.495Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "culled",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 182.6,
+      "errors": [],
+      "createMs": 362.6,
+      "buildMs": 45.3,
+      "firstFrameMs": 273.7,
+      "loadMs": 870.9,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.365,
+        "p95": 0.555,
+        "min": 0.155,
+        "max": 0.925,
+        "mean": 0.358
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 1.09,
+        "p95": 1.56,
+        "min": 0.565,
+        "max": 1.93,
+        "mean": 1.072
+       },
+       "fps": 260.6,
+       "rafFps": 917.4
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 2.429,
+        "p95": 2.821,
+        "min": 2.264,
+        "max": 2.867,
+        "mean": 2.526
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 2.602,
+        "p95": 3.025,
+        "min": 2.426,
+        "max": 3.08,
+        "mean": 2.718
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        },
+        {
+         "n": 60,
+         "median": 0.053,
+         "p95": 0.073,
+         "min": 0.044,
+         "max": 0.084,
+         "mean": 0.057
+        },
+        {
+         "n": 60,
+         "median": 2.378,
+         "p95": 2.755,
+         "min": 2.219,
+         "max": 2.797,
+         "mean": 2.469
+        },
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Compute ",
+        "Render  +depth load/store",
+        "Render  +depth +resolve load/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        4
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 7.97,
+       "p95": 9.225,
+       "min": 7,
+       "max": 10.05,
+       "mean": 7.902
+      },
+      "jsHeapMB": 7.67,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 16,
+       "note": "16 instanced draws, not counted by core"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 46199,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 60,
+       "checkedAt": "2026-10-15T03:34:54.791Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 1080.75,
+     "createMs": 356.45,
+     "buildMs": 261.4,
+     "firstFrameMs": 275.85,
+     "fps": 269.6,
+     "cpuMs": 0.26,
+     "gpuMs": 2.36,
+     "gpuSpanMs": 2.56,
+     "passMs": [
+      0,
+      0.05,
+      2.3,
+      0
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/store",
+      "Compute ",
+      "Render  +depth load/store",
+      "Render  +depth +resolve load/discard"
+     ],
+     "serialFrameMs": 7.7,
+     "jsHeapMB": 7.67,
+     "jsGzipBytes": 46199,
+     "drawCalls": 16,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 0,
+      "over16Fraction": 0
+     }
+    }
+   },
+   "three-webgl": {
+    "runs": [
+     {
+      "params": {
+       "engine": "three-webgl",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 226.4,
+      "errors": [],
+      "createMs": 16.9,
+      "buildMs": 45.7,
+      "firstFrameMs": 104.4,
+      "loadMs": 397.4,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 15.315,
+        "p95": 19.65,
+        "min": 12.17,
+        "max": 23.91,
+        "mean": 15.807
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 15.495,
+        "p95": 34.045,
+        "min": 0.455,
+        "max": 34.715,
+        "mean": 16.172
+       },
+       "fps": 61.6,
+       "rafFps": 64.5
+      },
+      "gpu": {
+       "method": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+       "gpuMs": {
+        "n": 60,
+        "median": 10.243,
+        "p95": 15.899,
+        "min": 8.466,
+        "max": 16.682,
+        "mean": 11.189
+       },
+       "disjoint": false
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 20.875,
+       "p95": 25.17,
+       "min": 16.95,
+       "max": 27.34,
+       "mean": 20.658
+      },
+      "jsHeapMB": 18.48,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 9810,
+       "triangles": 117720
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 155550,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 14,
+       "checkedAt": "2026-10-15T03:28:46.614Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "three-webgl",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 149.9,
+      "errors": [],
+      "createMs": 18.8,
+      "buildMs": 38.5,
+      "firstFrameMs": 82.3,
+      "loadMs": 293.7,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 16.59,
+        "p95": 20.685,
+        "min": 13.91,
+        "max": 24.225,
+        "mean": 16.926
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 16.605,
+        "p95": 33.985,
+        "min": 0.57,
+        "max": 35.9,
+        "mean": 17.298
+       },
+       "fps": 57.6,
+       "rafFps": 60.2
+      },
+      "gpu": {
+       "method": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+       "gpuMs": {
+        "n": 60,
+        "median": 10.274,
+        "p95": 16.659,
+        "min": 9.161,
+        "max": 17.25,
+        "mean": 10.941
+       },
+       "disjoint": false
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 16.445,
+       "p95": 19.16,
+       "min": 14.885,
+       "max": 20.585,
+       "mean": 16.668
+      },
+      "jsHeapMB": 18.49,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 9810,
+       "triangles": 117720
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 155550,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 2,
+       "checkedAt": "2026-10-15T03:35:00.465Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 345.55,
+     "createMs": 17.85,
+     "buildMs": 42.1,
+     "firstFrameMs": 93.35,
+     "fps": 59.6,
+     "cpuMs": 15.95,
+     "gpuMs": 10.26,
+     "gpuSpanMs": null,
+     "serialFrameMs": 18.66,
+     "jsHeapMB": 18.48,
+     "jsGzipBytes": 155550,
+     "drawCalls": 9810,
+     "samples": 4,
+     "gpuMethod": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 1.64,
+      "over16Fraction": 0.0222
+     }
+    }
+   },
+   "three-webgpu": {
+    "runs": [
+     {
+      "params": {
+       "engine": "three-webgpu",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 184,
+      "errors": [],
+      "createMs": 230.6,
+      "buildMs": 37.8,
+      "firstFrameMs": 962.7,
+      "loadMs": 1416.8,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 28.515,
+        "p95": 44.7,
+        "min": 24,
+        "max": 54.63,
+        "mean": 30.359
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 28.885,
+        "p95": 50.295,
+        "min": 17.235,
+        "max": 56.49,
+        "mean": 30.647
+       },
+       "fps": 32.4,
+       "rafFps": 34.6
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": null,
+       "spanMs": null,
+       "passMs": [],
+       "passes": [],
+       "zeroFrames": 60,
+       "passesPerFrame": [
+        2
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 46.825,
+       "p95": 74.14,
+       "min": 40.59,
+       "max": 75.91,
+       "mean": 50.654
+      },
+      "jsHeapMB": 48.97,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 9811,
+       "triangles": 117721
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 242968,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 4,
+       "checkedAt": "2026-10-15T03:28:55.452Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "three-webgpu",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 162.2,
+      "errors": [],
+      "createMs": 227.2,
+      "buildMs": 37.5,
+      "firstFrameMs": 875.8,
+      "loadMs": 1304.7,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 29.845,
+        "p95": 42.125,
+        "min": 25.34,
+        "max": 54.225,
+        "mean": 31.24
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 29.62,
+        "p95": 49.775,
+        "min": 17.57,
+        "max": 52.1,
+        "mean": 31.476
+       },
+       "fps": 31.5,
+       "rafFps": 33.8
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 1.994,
+        "p95": 2.053,
+        "min": 1.658,
+        "max": 2.085,
+        "mean": 1.989
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 2.935,
+        "p95": 3.013,
+        "min": 2.842,
+        "max": 3.284,
+        "mean": 2.936
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 1.402,
+         "p95": 1.46,
+         "min": 1.342,
+         "max": 1.477,
+         "mean": 1.403
+        },
+        {
+         "n": 60,
+         "median": 0.589,
+         "p95": 0.613,
+         "min": 0.25,
+         "max": 0.65,
+         "mean": 0.586
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        2
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 40.01,
+       "p95": 41.965,
+       "min": 37.235,
+       "max": 44.295,
+       "mean": 39.903
+      },
+      "jsHeapMB": 48.98,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 9811,
+       "triangles": 117721
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 242968,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 2,
+       "checkedAt": "2026-10-15T03:35:08.484Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 1360.75,
+     "createMs": 228.9,
+     "buildMs": 37.65,
+     "firstFrameMs": 919.25,
+     "fps": 31.95,
+     "cpuMs": 29.18,
+     "gpuMs": 1.99,
+     "gpuSpanMs": 2.94,
+     "passMs": [],
+     "passes": [],
+     "serialFrameMs": 43.42,
+     "jsHeapMB": 48.97,
+     "jsGzipBytes": 242968,
+     "drawCalls": 9811,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 2.04,
+      "over16Fraction": 0.0223
+     }
+    }
+   },
+   "three-webgl-instanced": {
+    "runs": [
+     {
+      "params": {
+       "engine": "three-webgl",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "instanced",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 135.5,
+      "errors": [],
+      "createMs": 13.5,
+      "buildMs": 12.7,
+      "firstFrameMs": 53.9,
+      "loadMs": 219.3,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.13,
+        "p95": 0.3,
+        "min": 0.035,
+        "max": 0.36,
+        "mean": 0.146
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 0.38,
+        "p95": 0.845,
+        "min": 0.075,
+        "max": 7.19,
+        "mean": 0.459
+       },
+       "fps": 645.8,
+       "rafFps": 2631.6
+      },
+      "gpu": {
+       "method": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+       "gpuMs": {
+        "n": 60,
+        "median": 1.395,
+        "p95": 1.828,
+        "min": 1.279,
+        "max": 1.864,
+        "mean": 1.445
+       },
+       "disjoint": false
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 5.82,
+       "p95": 6.35,
+       "min": 5.265,
+       "max": 6.715,
+       "mean": 5.841
+      },
+      "jsHeapMB": 5.56,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "triangles": 120000
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 155550,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 1,
+       "checkedAt": "2026-10-15T03:29:09.411Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "three-webgl",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "instanced",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 127.8,
+      "errors": [],
+      "createMs": 12.8,
+      "buildMs": 12.1,
+      "firstFrameMs": 54.2,
+      "loadMs": 210.7,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.13,
+        "p95": 0.27,
+        "min": 0.045,
+        "max": 0.37,
+        "mean": 0.144
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 0.34,
+        "p95": 0.92,
+        "min": 0.07,
+        "max": 7.79,
+        "mean": 0.46
+       },
+       "fps": 645.1,
+       "rafFps": 2941.2
+      },
+      "gpu": {
+       "method": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+       "gpuMs": {
+        "n": 60,
+        "median": 1.398,
+        "p95": 1.874,
+        "min": 1.27,
+        "max": 1.905,
+        "mean": 1.466
+       },
+       "disjoint": false
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 5.75,
+       "p95": 6.675,
+       "min": 4.55,
+       "max": 6.855,
+       "mean": 5.738
+      },
+      "jsHeapMB": 5.56,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "triangles": 120000
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 155550,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 0,
+       "checkedAt": "2026-10-15T03:35:21.478Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 215,
+     "createMs": 13.15,
+     "buildMs": 12.4,
+     "firstFrameMs": 54.05,
+     "fps": 645.45,
+     "cpuMs": 0.13,
+     "gpuMs": 1.4,
+     "gpuSpanMs": null,
+     "serialFrameMs": 5.79,
+     "jsHeapMB": 5.56,
+     "jsGzipBytes": 155550,
+     "drawCalls": 1,
+     "samples": 4,
+     "gpuMethod": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 1.64,
+      "over16Fraction": 0.0222
+     }
+    }
+   },
+   "three-webgpu-instanced": {
+    "runs": [
+     {
+      "params": {
+       "engine": "three-webgpu",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "instanced",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 169.3,
+      "errors": [],
+      "createMs": 241.8,
+      "buildMs": 13.8,
+      "firstFrameMs": 178.7,
+      "loadMs": 605.5,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.46,
+        "p95": 0.92,
+        "min": 0.24,
+        "max": 1.31,
+        "mean": 0.508
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 1.045,
+        "p95": 1.77,
+        "min": 0.56,
+        "max": 2.735,
+        "mean": 1.094
+       },
+       "fps": 352.1,
+       "rafFps": 956.9
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 2.44,
+        "p95": 2.797,
+        "min": 2.23,
+        "max": 3.216,
+        "mean": 2.453
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 2.774,
+        "p95": 3.215,
+        "min": 2.549,
+        "max": 3.612,
+        "mean": 2.798
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 2.272,
+         "p95": 2.605,
+         "min": 2.07,
+         "max": 2.998,
+         "mean": 2.279
+        },
+        {
+         "n": 60,
+         "median": 0.172,
+         "p95": 0.19,
+         "min": 0.16,
+         "max": 0.219,
+         "mean": 0.174
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        2
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 8.04,
+       "p95": 9.36,
+       "min": 6.99,
+       "max": 9.65,
+       "mean": 8.181
+      },
+      "jsHeapMB": 7.86,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 2,
+       "triangles": 120001
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 242968,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 11,
+       "checkedAt": "2026-10-15T03:29:13.906Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "three-webgpu",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "instanced",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 163.6,
+      "errors": [],
+      "createMs": 233.7,
+      "buildMs": 13.8,
+      "firstFrameMs": 180.2,
+      "loadMs": 593.4,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.425,
+        "p95": 0.935,
+        "min": 0.285,
+        "max": 1.16,
+        "mean": 0.488
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 0.91,
+        "p95": 1.61,
+        "min": 0.64,
+        "max": 1.875,
+        "mean": 1.016
+       },
+       "fps": 375.8,
+       "rafFps": 1098.9
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 2.35,
+        "p95": 2.575,
+        "min": 2.15,
+        "max": 3.482,
+        "mean": 2.351
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 2.67,
+        "p95": 3.566,
+        "min": 2.459,
+        "max": 4.078,
+        "mean": 2.688
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 2.18,
+         "p95": 2.414,
+         "min": 1.982,
+         "max": 3.092,
+         "mean": 2.177
+        },
+        {
+         "n": 60,
+         "median": 0.167,
+         "p95": 0.18,
+         "min": 0.158,
+         "max": 0.391,
+         "mean": 0.174
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        2
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 8.825,
+       "p95": 10.085,
+       "min": 6.92,
+       "max": 12.865,
+       "mean": 8.7
+      },
+      "jsHeapMB": 7.86,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 2,
+       "triangles": 120001
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 242968,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 0,
+       "checkedAt": "2026-10-15T03:35:25.492Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 599.45,
+     "createMs": 237.75,
+     "buildMs": 13.8,
+     "firstFrameMs": 179.45,
+     "fps": 363.95,
+     "cpuMs": 0.44,
+     "gpuMs": 2.4,
+     "gpuSpanMs": 2.72,
+     "passMs": [
+      2.23,
+      0.17
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/store",
+      "Render  +depth load/store"
+     ],
+     "serialFrameMs": 8.43,
+     "jsHeapMB": 7.86,
+     "jsGzipBytes": 242968,
+     "drawCalls": 2,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 2.04,
+      "over16Fraction": 0.0223
+     }
+    }
+   }
+  },
+  "boxes-50000": {
+   "margo": {
+    "runs": [
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 50000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 151.5,
+      "errors": [],
+      "createMs": 309.9,
+      "buildMs": 99.6,
+      "firstFrameMs": 53.6,
+      "loadMs": 626.7,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 8.175,
+        "p95": 9.12,
+        "min": 6.955,
+        "max": 10.135,
+        "mean": 8.094
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 9.065,
+        "p95": 10.235,
+        "min": 7.745,
+        "max": 11.305,
+        "mean": 9.032
+       },
+       "fps": 108.6,
+       "rafFps": 110.3
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 6.03,
+        "p95": 6.69,
+        "min": 5.789,
+        "max": 6.811,
+        "mean": 6.089
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 6.03,
+        "p95": 6.69,
+        "min": 5.789,
+        "max": 6.811,
+        "mean": 6.089
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 6.03,
+         "p95": 6.69,
+         "min": 5.789,
+         "max": 6.811,
+         "mean": 6.089
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        1
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 19.125,
+       "p95": 23.195,
+       "min": 15.685,
+       "max": 25.965,
+       "mean": 18.831
+      },
+      "jsHeapMB": 26.03,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "core batches only (gltf-pro, IBL, shadow passes not counted)"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 25307,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 3,
+       "checkedAt": "2026-10-15T03:29:19.131Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 50000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 374.9,
+      "errors": [],
+      "createMs": 505.9,
+      "buildMs": 183.8,
+      "firstFrameMs": 75.9,
+      "loadMs": 1161.9,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 9.12,
+        "p95": 11.1,
+        "min": 7.29,
+        "max": 13.055,
+        "mean": 9.287
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 10.26,
+        "p95": 12.605,
+        "min": 8.085,
+        "max": 14.05,
+        "mean": 10.499
+       },
+       "fps": 93.6,
+       "rafFps": 97.5
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 5.96,
+        "p95": 6.402,
+        "min": 5.778,
+        "max": 6.472,
+        "mean": 6.013
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 5.96,
+        "p95": 6.402,
+        "min": 5.778,
+        "max": 6.472,
+        "mean": 6.013
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 5.96,
+         "p95": 6.402,
+         "min": 5.778,
+         "max": 6.472,
+         "mean": 6.013
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        1
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 21.2,
+       "p95": 39.965,
+       "min": 19.035,
+       "max": 42.44,
+       "mean": 22.919
+      },
+      "jsHeapMB": 26.03,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "core batches only (gltf-pro, IBL, shadow passes not counted)"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 25307,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 72,
+       "checkedAt": "2026-10-15T03:39:31.711Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 894.3,
+     "createMs": 407.9,
+     "buildMs": 141.7,
+     "firstFrameMs": 64.75,
+     "fps": 101.1,
+     "cpuMs": 8.65,
+     "gpuMs": 6,
+     "gpuSpanMs": 6,
+     "passMs": [
+      6
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/discard"
+     ],
+     "serialFrameMs": 20.16,
+     "jsHeapMB": 26.03,
+     "jsGzipBytes": 25307,
+     "drawCalls": 1,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 0,
+      "over16Fraction": 0
+     }
+    }
+   },
+   "margo+nocull": {
+    "runs": [
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 50000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [
+        "nocull"
+       ],
+       "dump": false
+      },
+      "scriptStartMs": 134,
+      "errors": [],
+      "createMs": 292.5,
+      "buildMs": 97.5,
+      "firstFrameMs": 59.9,
+      "loadMs": 594.7,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 7.875,
+        "p95": 12.97,
+        "min": 6.885,
+        "max": 15.145,
+        "mean": 8.47
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 8.77,
+        "p95": 14.05,
+        "min": 7.54,
+        "max": 16.24,
+        "mean": 9.354
+       },
+       "fps": 75.4,
+       "rafFps": 114
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 10.388,
+        "p95": 12.254,
+        "min": 9.862,
+        "max": 13.326,
+        "mean": 10.65
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 10.388,
+        "p95": 12.254,
+        "min": 9.862,
+        "max": 13.326,
+        "mean": 10.65
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 10.388,
+         "p95": 12.254,
+         "min": 9.862,
+         "max": 13.326,
+         "mean": 10.65
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        1
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 23.735,
+       "p95": 28.41,
+       "min": 21.97,
+       "max": 31.9,
+       "mean": 24.353
+      },
+      "jsHeapMB": 26.03,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "core batches only (gltf-pro, IBL, shadow passes not counted)"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 25307,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 5,
+       "checkedAt": "2026-10-15T03:29:26.084Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 50000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [
+        "nocull"
+       ],
+       "dump": false
+      },
+      "scriptStartMs": 123.7,
+      "errors": [],
+      "createMs": 278.5,
+      "buildMs": 89.2,
+      "firstFrameMs": 57.6,
+      "loadMs": 559.9,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 7.495,
+        "p95": 12.955,
+        "min": 6.445,
+        "max": 13.555,
+        "mean": 8.197
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 8.31,
+        "p95": 13.72,
+        "min": 7.18,
+        "max": 14.54,
+        "mean": 9.051
+       },
+       "fps": 74.8,
+       "rafFps": 120.3
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 11.352,
+        "p95": 14.607,
+        "min": 10.317,
+        "max": 15.294,
+        "mean": 11.836
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 11.352,
+        "p95": 14.607,
+        "min": 10.317,
+        "max": 15.294,
+        "mean": 11.836
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 11.352,
+         "p95": 14.607,
+         "min": 10.317,
+         "max": 15.294,
+         "mean": 11.836
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        1
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 25.04,
+       "p95": 31.705,
+       "min": 22.12,
+       "max": 34.115,
+       "mean": 25.779
+      },
+      "jsHeapMB": 26.03,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "core batches only (gltf-pro, IBL, shadow passes not counted)"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 25307,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 0,
+       "checkedAt": "2026-10-15T03:35:35.359Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 577.3,
+     "createMs": 285.5,
+     "buildMs": 93.35,
+     "firstFrameMs": 58.75,
+     "fps": 75.1,
+     "cpuMs": 7.69,
+     "gpuMs": 10.87,
+     "gpuSpanMs": 10.87,
+     "passMs": [
+      10.87
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/discard"
+     ],
+     "serialFrameMs": 24.39,
+     "jsHeapMB": 26.03,
+     "jsGzipBytes": 25307,
+     "drawCalls": 1,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 0,
+      "over16Fraction": 0
+     }
+    }
+   },
+   "margo-instanced": {
+    "runs": [
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 50000,
+       "mode": "instanced",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 150.7,
+      "errors": [],
+      "createMs": 287.4,
+      "buildMs": 119.3,
+      "firstFrameMs": 126.5,
+      "loadMs": 692.3,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.25,
+        "p95": 0.52,
+        "min": 0.135,
+        "max": 0.855,
+        "mean": 0.299
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 0.865,
+        "p95": 1.4,
+        "min": 0.48,
+        "max": 1.97,
+        "mean": 0.908
+       },
+       "fps": 95,
+       "rafFps": 1156.1
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 10.221,
+        "p95": 10.815,
+        "min": 9.713,
+        "max": 10.833,
+        "mean": 10.183
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 10.407,
+        "p95": 11.015,
+        "min": 9.891,
+        "max": 11.033,
+        "mean": 10.371
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        },
+        {
+         "n": 60,
+         "median": 10.221,
+         "p95": 10.814,
+         "min": 9.712,
+         "max": 10.833,
+         "mean": 10.183
+        },
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store",
+        "Render  +depth +resolve load/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        3
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 15.17,
+       "p95": 18.1,
+       "min": 13.815,
+       "max": 18.12,
+       "mean": 15.652
+      },
+      "jsHeapMB": 28.7,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "1 instanced draws, not counted by core"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 64299,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 1,
+       "checkedAt": "2026-10-15T03:29:33.962Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 50000,
+       "mode": "instanced",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 130,
+      "errors": [],
+      "createMs": 319.1,
+      "buildMs": 126,
+      "firstFrameMs": 141.9,
+      "loadMs": 727.5,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.33,
+        "p95": 0.585,
+        "min": 0.17,
+        "max": 0.77,
+        "mean": 0.37
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 1.07,
+        "p95": 1.575,
+        "min": 0.565,
+        "max": 1.74,
+        "mean": 1.115
+       },
+       "fps": 92.6,
+       "rafFps": 934.6
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": null,
+       "spanMs": null,
+       "passMs": [],
+       "passes": [],
+       "zeroFrames": 60,
+       "passesPerFrame": [
+        3
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 16.58,
+       "p95": 18.235,
+       "min": 14.175,
+       "max": 18.665,
+       "mean": 16.4
+      },
+      "jsHeapMB": 28.7,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "1 instanced draws, not counted by core"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 64299,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 6,
+       "checkedAt": "2026-10-15T03:35:43.245Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 709.9,
+     "createMs": 303.25,
+     "buildMs": 122.65,
+     "firstFrameMs": 134.2,
+     "fps": 93.8,
+     "cpuMs": 0.29,
+     "gpuMs": 10.22,
+     "gpuSpanMs": 10.41,
+     "passMs": [
+      0,
+      10.22,
+      0
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/store",
+      "Render  +depth load/store",
+      "Render  +depth +resolve load/discard"
+     ],
+     "serialFrameMs": 15.88,
+     "jsHeapMB": 28.7,
+     "jsGzipBytes": 64299,
+     "drawCalls": 1,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 21.19,
+      "over16Fraction": 0.6837
+     }
+    }
+   },
+   "margo-culled": {
+    "runs": [
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 50000,
+       "mode": "culled",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 152.6,
+      "errors": [],
+      "createMs": 323.6,
+      "buildMs": 108.5,
+      "firstFrameMs": 268,
+      "loadMs": 863.1,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.275,
+        "p95": 0.605,
+        "min": 0.135,
+        "max": 0.785,
+        "mean": 0.322
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 0.955,
+        "p95": 1.565,
+        "min": 0.515,
+        "max": 2.24,
+        "mean": 1.013
+       },
+       "fps": 149.1,
+       "rafFps": 1047.1
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 5.951,
+        "p95": 6.194,
+        "min": 4.554,
+        "max": 6.196,
+        "mean": 5.608
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 6.143,
+        "p95": 6.386,
+        "min": 4.718,
+        "max": 6.392,
+        "mean": 5.796
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        },
+        {
+         "n": 60,
+         "median": 0.321,
+         "p95": 0.342,
+         "min": 0.127,
+         "max": 0.354,
+         "mean": 0.276
+        },
+        {
+         "n": 60,
+         "median": 5.638,
+         "p95": 5.862,
+         "min": 4.408,
+         "max": 5.867,
+         "mean": 5.332
+        },
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Compute ",
+        "Render  +depth load/store",
+        "Render  +depth +resolve load/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        4
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 11.325,
+       "p95": 13.65,
+       "min": 9.125,
+       "max": 14.185,
+       "mean": 11.596
+      },
+      "jsHeapMB": 30.08,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 16,
+       "note": "16 instanced draws, not counted by core"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 46199,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 9,
+       "checkedAt": "2026-10-15T03:29:41.368Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 50000,
+       "mode": "culled",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 124.2,
+      "errors": [],
+      "createMs": 290.6,
+      "buildMs": 101.9,
+      "firstFrameMs": 248.9,
+      "loadMs": 774.7,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.15,
+        "p95": 0.41,
+        "min": 0.085,
+        "max": 0.55,
+        "mean": 0.186
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 0.535,
+        "p95": 0.98,
+        "min": 0.33,
+        "max": 1.33,
+        "mean": 0.593
+       },
+       "fps": 176.3,
+       "rafFps": 1869.2
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 5.08,
+        "p95": 6.302,
+        "min": 4.439,
+        "max": 6.493,
+        "mean": 5.273
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 5.257,
+        "p95": 6.499,
+        "min": 4.592,
+        "max": 7.171,
+        "mean": 5.458
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        },
+        {
+         "n": 60,
+         "median": 0.195,
+         "p95": 0.361,
+         "min": 0.12,
+         "max": 0.464,
+         "mean": 0.223
+        },
+        {
+         "n": 60,
+         "median": 4.891,
+         "p95": 6,
+         "min": 4.318,
+         "max": 6.093,
+         "mean": 5.05
+        },
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Compute ",
+        "Render  +depth load/store",
+        "Render  +depth +resolve load/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        4
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 12.04,
+       "p95": 13.69,
+       "min": 9.1,
+       "max": 13.97,
+       "mean": 12.042
+      },
+      "jsHeapMB": 30.08,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 16,
+       "note": "16 instanced draws, not counted by core"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 46199,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 9,
+       "checkedAt": "2026-10-15T03:35:50.373Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 818.9,
+     "createMs": 307.1,
+     "buildMs": 105.2,
+     "firstFrameMs": 258.45,
+     "fps": 162.7,
+     "cpuMs": 0.21,
+     "gpuMs": 5.52,
+     "gpuSpanMs": 5.7,
+     "passMs": [
+      0,
+      0.26,
+      5.26,
+      0
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/store",
+      "Compute ",
+      "Render  +depth load/store",
+      "Render  +depth +resolve load/discard"
+     ],
+     "serialFrameMs": 11.68,
+     "jsHeapMB": 30.08,
+     "jsGzipBytes": 46199,
+     "drawCalls": 16,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 0,
+      "over16Fraction": 0
+     }
+    }
+   },
+   "three-webgl": {
+    "runs": [
+     {
+      "params": {
+       "engine": "three-webgl",
+       "scene": "boxes",
+       "n": 50000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 146.1,
+      "errors": [],
+      "createMs": 18,
+      "buildMs": 171.2,
+      "firstFrameMs": 225.1,
+      "loadMs": 564.5,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 97.51,
+        "p95": 119.535,
+        "min": 83.845,
+        "max": 135.615,
+        "mean": 99.162
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 98.495,
+        "p95": 119.63,
+        "min": 72.1,
+        "max": 136.215,
+        "mean": 99.45
+       },
+       "fps": 10,
+       "rafFps": 10.2
+      },
+      "gpu": {
+       "method": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+       "gpuMs": {
+        "n": 60,
+        "median": 77.213,
+        "p95": 97.834,
+        "min": 67.98,
+        "max": 98.815,
+        "mean": 79.422
+       },
+       "disjoint": false
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 104.92,
+       "p95": 132.085,
+       "min": 88,
+       "max": 135.82,
+       "mean": 106.981
+      },
+      "jsHeapMB": 75.81,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 48503,
+       "triangles": 582036
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 155550,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 5,
+       "checkedAt": "2026-10-15T03:29:47.712Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "three-webgl",
+       "scene": "boxes",
+       "n": 50000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 151.3,
+      "errors": [],
+      "createMs": 15.1,
+      "buildMs": 173.5,
+      "firstFrameMs": 229.9,
+      "loadMs": 573.9,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 93.45,
+        "p95": 113.045,
+        "min": 82.85,
+        "max": 141.065,
+        "mean": 95.341
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 96.19,
+        "p95": 116.74,
+        "min": 70.225,
+        "max": 154.965,
+        "mean": 95.536
+       },
+       "fps": 10.4,
+       "rafFps": 10.4
+      },
+      "gpu": {
+       "method": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+       "gpuMs": {
+        "n": 60,
+        "median": 70.72,
+        "p95": 81.078,
+        "min": 64.147,
+        "max": 88.779,
+        "mean": 71.296
+       },
+       "disjoint": false
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 104.07,
+       "p95": 121.405,
+       "min": 95.43,
+       "max": 124.43,
+       "mean": 105.67
+      },
+      "jsHeapMB": 75.81,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 48503,
+       "triangles": 582036
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 155550,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 9,
+       "checkedAt": "2026-10-15T03:35:56.469Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 569.2,
+     "createMs": 16.55,
+     "buildMs": 172.35,
+     "firstFrameMs": 227.5,
+     "fps": 10.2,
+     "cpuMs": 95.48,
+     "gpuMs": 73.97,
+     "gpuSpanMs": null,
+     "serialFrameMs": 104.5,
+     "jsHeapMB": 75.81,
+     "jsGzipBytes": 155550,
+     "drawCalls": 48503,
+     "samples": 4,
+     "gpuMethod": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 2.18,
+      "over16Fraction": 0.038
+     }
+    }
+   },
+   "three-webgpu": {
+    "runs": [
+     {
+      "params": {
+       "engine": "three-webgpu",
+       "scene": "boxes",
+       "n": 50000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 169.3,
+      "errors": [],
+      "createMs": 245.4,
+      "buildMs": 177.3,
+      "firstFrameMs": 4454.1,
+      "loadMs": 5048.4,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 91,
+       "cpuMs": {
+        "n": 91,
+        "median": 204.485,
+        "p95": 305.62,
+        "min": 169.05,
+        "max": 328.625,
+        "mean": 221.222
+       },
+       "intervalMs": {
+        "n": 90,
+        "median": 205.215,
+        "p95": 308.4,
+        "min": 155.99,
+        "max": 327.49,
+        "mean": 220.725
+       },
+       "fps": 4.5,
+       "rafFps": 4.9
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 4.301,
+        "p95": 4.639,
+        "min": 4.167,
+        "max": 5.058,
+        "mean": 4.342
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 5.25,
+        "p95": 7.439,
+        "min": 5.127,
+        "max": 9.88,
+        "mean": 5.566
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 4.018,
+         "p95": 4.228,
+         "min": 3.9,
+         "max": 4.798,
+         "mean": 4.042
+        },
+        {
+         "n": 60,
+         "median": 0.267,
+         "p95": 0.501,
+         "min": 0.244,
+         "max": 0.52,
+         "mean": 0.3
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        2
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 264.05,
+       "p95": 353.63,
+       "min": 237.615,
+       "max": 371.84,
+       "mean": 277.536
+      },
+      "jsHeapMB": 222.78,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 48505,
+       "triangles": 582049
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 242968,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 5,
+       "checkedAt": "2026-10-15T03:30:19.661Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "three-webgpu",
+       "scene": "boxes",
+       "n": 50000,
+       "mode": "mesh",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 173.4,
+      "errors": [],
+      "createMs": 243.2,
+      "buildMs": 173.3,
+      "firstFrameMs": 4018.2,
+      "loadMs": 4610.1,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 94,
+       "cpuMs": {
+        "n": 94,
+        "median": 207.685,
+        "p95": 280.955,
+        "min": 167.735,
+        "max": 323.215,
+        "mean": 212.795
+       },
+       "intervalMs": {
+        "n": 93,
+        "median": 208.325,
+        "p95": 279.83,
+        "min": 158.005,
+        "max": 321.905,
+        "mean": 212.987
+       },
+       "fps": 4.7,
+       "rafFps": 4.8
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 4.446,
+        "p95": 4.733,
+        "min": 4.35,
+        "max": 4.827,
+        "mean": 4.483
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 5.374,
+        "p95": 7.967,
+        "min": 5.269,
+        "max": 9.648,
+        "mean": 5.626
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 4.184,
+         "p95": 4.342,
+         "min": 4.086,
+         "max": 4.576,
+         "mean": 4.2
+        },
+        {
+         "n": 60,
+         "median": 0.256,
+         "p95": 0.506,
+         "min": 0.231,
+         "max": 0.514,
+         "mean": 0.282
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        2
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 246.555,
+       "p95": 261.13,
+       "min": 228.135,
+       "max": 280.655,
+       "mean": 246.634
+      },
+      "jsHeapMB": 222.8,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 48504,
+       "triangles": 582037
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 242968,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 9,
+       "checkedAt": "2026-10-15T03:36:27.471Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 4829.25,
+     "createMs": 244.3,
+     "buildMs": 175.3,
+     "firstFrameMs": 4236.15,
+     "fps": 4.6,
+     "cpuMs": 206.09,
+     "gpuMs": 4.37,
+     "gpuSpanMs": 5.31,
+     "passMs": [
+      4.1,
+      0.26
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/store",
+      "Render  +depth load/store"
+     ],
+     "serialFrameMs": 255.3,
+     "jsHeapMB": 222.79,
+     "jsGzipBytes": 242968,
+     "drawCalls": 48505,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 2.72,
+      "over16Fraction": 0.0334
+     }
+    }
+   },
+   "three-webgl-instanced": {
+    "runs": [
+     {
+      "params": {
+       "engine": "three-webgl",
+       "scene": "boxes",
+       "n": 50000,
+       "mode": "instanced",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 155.5,
+      "errors": [],
+      "createMs": 15.5,
+      "buildMs": 34.2,
+      "firstFrameMs": 64.3,
+      "loadMs": 272.9,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.12,
+        "p95": 0.325,
+        "min": 0.045,
+        "max": 0.395,
+        "mean": 0.144
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 0.33,
+        "p95": 0.945,
+        "min": 0.065,
+        "max": 10.16,
+        "mean": 0.457
+       },
+       "fps": 276.3,
+       "rafFps": 3030.3
+      },
+      "gpu": {
+       "method": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+       "gpuMs": {
+        "n": 60,
+        "median": 5.15,
+        "p95": 7.022,
+        "min": 3.95,
+        "max": 7.408,
+        "mean": 5.154
+       },
+       "disjoint": false
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 14.74,
+       "p95": 20,
+       "min": 9.72,
+       "max": 27.195,
+       "mean": 14.917
+      },
+      "jsHeapMB": 12.62,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "triangles": 600000
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 155550,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 3,
+       "checkedAt": "2026-10-15T03:31:28.477Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "three-webgl",
+       "scene": "boxes",
+       "n": 50000,
+       "mode": "instanced",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 753.7,
+      "errors": [],
+      "createMs": 29.7,
+      "buildMs": 67.1,
+      "firstFrameMs": 106.6,
+      "loadMs": 965.1,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.255,
+        "p95": 0.61,
+        "min": 0.085,
+        "max": 2.065,
+        "mean": 0.302
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 0.735,
+        "p95": 2.055,
+        "min": 0.12,
+        "max": 8.485,
+        "mean": 0.93
+       },
+       "fps": 164.1,
+       "rafFps": 1360.5
+      },
+      "gpu": {
+       "method": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+       "gpuMs": {
+        "n": 60,
+        "median": 5.42,
+        "p95": 6.092,
+        "min": 4.649,
+        "max": 6.406,
+        "mean": 5.412
+       },
+       "disjoint": false
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 11.005,
+       "p95": 11.695,
+       "min": 9.555,
+       "max": 13.005,
+       "mean": 10.983
+      },
+      "jsHeapMB": 12.62,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "triangles": 600000
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 155550,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 67,
+       "checkedAt": "2026-10-15T03:37:33.726Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 619,
+     "createMs": 22.6,
+     "buildMs": 50.65,
+     "firstFrameMs": 85.45,
+     "fps": 220.2,
+     "cpuMs": 0.19,
+     "gpuMs": 5.29,
+     "gpuSpanMs": null,
+     "serialFrameMs": 12.87,
+     "jsHeapMB": 12.62,
+     "jsGzipBytes": 155550,
+     "drawCalls": 1,
+     "samples": 4,
+     "gpuMethod": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 2.18,
+      "over16Fraction": 0.038
+     }
+    }
+   },
+   "three-webgpu-instanced": {
+    "runs": [
+     {
+      "params": {
+       "engine": "three-webgpu",
+       "scene": "boxes",
+       "n": 50000,
+       "mode": "instanced",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 163.8,
+      "errors": [],
+      "createMs": 258.3,
+      "buildMs": 42.2,
+      "firstFrameMs": 208.9,
+      "loadMs": 675.7,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 0.78,
+        "p95": 1.295,
+        "min": 0.39,
+        "max": 1.55,
+        "mean": 0.793
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 1.505,
+        "p95": 2.3,
+        "min": 0.81,
+        "max": 2.98,
+        "mean": 1.56
+       },
+       "fps": 130.7,
+       "rafFps": 664.5
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 8.28,
+        "p95": 8.883,
+        "min": 7.762,
+        "max": 8.908,
+        "mean": 8.299
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 8.762,
+        "p95": 9.359,
+        "min": 8.241,
+        "max": 9.695,
+        "mean": 8.797
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 8.034,
+         "p95": 8.582,
+         "min": 7.516,
+         "max": 8.653,
+         "mean": 8.05
+        },
+        {
+         "n": 60,
+         "median": 0.243,
+         "p95": 0.262,
+         "min": 0.226,
+         "max": 0.534,
+         "mean": 0.248
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        2
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 14.565,
+       "p95": 16.02,
+       "min": 13.055,
+       "max": 16.385,
+       "mean": 14.458
+      },
+      "jsHeapMB": 14.93,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 2,
+       "triangles": 600001
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 242968,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 6,
+       "checkedAt": "2026-10-15T03:31:33.924Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "three-webgpu",
+       "scene": "boxes",
+       "n": 50000,
+       "mode": "instanced",
+       "move": 0,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 2378.3,
+      "errors": [],
+      "createMs": 344.9,
+      "buildMs": 212.1,
+      "firstFrameMs": 440,
+      "loadMs": 3378.4,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 1.18,
+        "p95": 2.31,
+        "min": 0.79,
+        "max": 6.785,
+        "mean": 1.356
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 2.55,
+        "p95": 5.185,
+        "min": 1.9,
+        "max": 10.355,
+        "mean": 2.859
+       },
+       "fps": 94.8,
+       "rafFps": 392.2
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 8.28,
+        "p95": 9.04,
+        "min": 7.84,
+        "max": 10.488,
+        "mean": 8.359
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 8.719,
+        "p95": 10.023,
+        "min": 8.286,
+        "max": 11.292,
+        "mean": 8.852
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 8.027,
+         "p95": 8.801,
+         "min": 7.608,
+         "max": 9.975,
+         "mean": 8.101
+        },
+        {
+         "n": 60,
+         "median": 0.242,
+         "p95": 0.512,
+         "min": 0.224,
+         "max": 0.564,
+         "mean": 0.258
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        2
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 15.22,
+       "p95": 17.8,
+       "min": 14.015,
+       "max": 19.49,
+       "mean": 15.542
+      },
+      "jsHeapMB": 15.06,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 2,
+       "triangles": 600001
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 242968,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 90,
+       "checkedAt": "2026-10-15T03:37:58.409Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 2027.05,
+     "createMs": 301.6,
+     "buildMs": 127.15,
+     "firstFrameMs": 324.45,
+     "fps": 112.75,
+     "cpuMs": 0.98,
+     "gpuMs": 8.28,
+     "gpuSpanMs": 8.74,
+     "passMs": [
+      8.03,
+      0.24
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/store",
+      "Render  +depth load/store"
+     ],
+     "serialFrameMs": 14.89,
+     "jsHeapMB": 15,
+     "jsGzipBytes": 242968,
+     "drawCalls": 2,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 2.72,
+      "over16Fraction": 0.0335
+     }
+    }
+   }
+  },
+  "boxes-10000-moving": {
+   "margo": {
+    "runs": [
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "mesh",
+       "move": 1,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 246,
+      "errors": [],
+      "createMs": 365.4,
+      "buildMs": 31.2,
+      "firstFrameMs": 48.2,
+      "loadMs": 697.7,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 5.695,
+        "p95": 6.4,
+        "min": 4.855,
+        "max": 8.34,
+        "mean": 5.727
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 6.61,
+        "p95": 7.43,
+        "min": 5.7,
+        "max": 9.675,
+        "mean": 6.646
+       },
+       "fps": 147.2,
+       "rafFps": 151.3
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 1.826,
+        "p95": 1.943,
+        "min": 1.787,
+        "max": 1.949,
+        "mean": 1.849
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 1.826,
+        "p95": 1.943,
+        "min": 1.787,
+        "max": 1.949,
+        "mean": 1.849
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 1.826,
+         "p95": 1.943,
+         "min": 1.787,
+         "max": 1.949,
+         "mean": 1.849
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        1
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 12.285,
+       "p95": 13.065,
+       "min": 11.355,
+       "max": 19.26,
+       "mean": 12.477
+      },
+      "jsHeapMB": 6.97,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "core batches only (gltf-pro, IBL, shadow passes not counted)"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 25307,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 11,
+       "checkedAt": "2026-10-15T03:31:41.128Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "mesh",
+       "move": 1,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 139.6,
+      "errors": [],
+      "createMs": 303.1,
+      "buildMs": 26.6,
+      "firstFrameMs": 40.9,
+      "loadMs": 516.3,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 5.155,
+        "p95": 6.095,
+        "min": 4.1,
+        "max": 6.525,
+        "mean": 5.142
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 5.995,
+        "p95": 7.21,
+        "min": 4.7,
+        "max": 7.73,
+        "mean": 6.003
+       },
+       "fps": 162.4,
+       "rafFps": 166.8
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 1.76,
+        "p95": 2.233,
+        "min": 1.681,
+        "max": 2.345,
+        "mean": 1.796
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 1.76,
+        "p95": 2.233,
+        "min": 1.681,
+        "max": 2.345,
+        "mean": 1.796
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 1.76,
+         "p95": 2.233,
+         "min": 1.681,
+         "max": 2.345,
+         "mean": 1.796
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        1
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 12.045,
+       "p95": 15.055,
+       "min": 10.065,
+       "max": 17.58,
+       "mean": 12.14
+      },
+      "jsHeapMB": 6.97,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "core batches only (gltf-pro, IBL, shadow passes not counted)"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 25307,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 15,
+       "checkedAt": "2026-10-15T03:42:34.547Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 607,
+     "createMs": 334.25,
+     "buildMs": 28.9,
+     "firstFrameMs": 44.55,
+     "fps": 154.8,
+     "cpuMs": 5.43,
+     "gpuMs": 1.79,
+     "gpuSpanMs": 1.79,
+     "passMs": [
+      1.79
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/discard"
+     ],
+     "serialFrameMs": 12.16,
+     "jsHeapMB": 6.97,
+     "jsGzipBytes": 25307,
+     "drawCalls": 1,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 0,
+      "over16Fraction": 0
+     }
+    }
+   },
+   "margo+nocull": {
+    "runs": [
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "mesh",
+       "move": 1,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [
+        "nocull"
+       ],
+       "dump": false
+      },
+      "scriptStartMs": 199.9,
+      "errors": [],
+      "createMs": 349.7,
+      "buildMs": 32.2,
+      "firstFrameMs": 51,
+      "loadMs": 642,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 5.455,
+        "p95": 6.345,
+        "min": 4.44,
+        "max": 8.06,
+        "mean": 5.528
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 6.47,
+        "p95": 7.565,
+        "min": 5.21,
+        "max": 8.985,
+        "mean": 6.534
+       },
+       "fps": 148.8,
+       "rafFps": 154.6
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 5.482,
+        "p95": 5.831,
+        "min": 4.901,
+        "max": 7.007,
+        "mean": 5.427
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 5.482,
+        "p95": 5.831,
+        "min": 4.901,
+        "max": 7.007,
+        "mean": 5.427
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 5.482,
+         "p95": 5.831,
+         "min": 4.901,
+         "max": 7.007,
+         "mean": 5.427
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        1
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 16.18,
+       "p95": 19.085,
+       "min": 14.595,
+       "max": 28.905,
+       "mean": 16.628
+      },
+      "jsHeapMB": 6.97,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "core batches only (gltf-pro, IBL, shadow passes not counted)"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 25307,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 50,
+       "checkedAt": "2026-10-15T03:31:48.292Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "mesh",
+       "move": 1,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [
+        "nocull"
+       ],
+       "dump": false
+      },
+      "scriptStartMs": 345.9,
+      "errors": [],
+      "createMs": 349.4,
+      "buildMs": 31.1,
+      "firstFrameMs": 59.6,
+      "loadMs": 792.4,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 5.77,
+        "p95": 6.99,
+        "min": 4.64,
+        "max": 9.015,
+        "mean": 5.776
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 6.935,
+        "p95": 8.275,
+        "min": 5.545,
+        "max": 10.505,
+        "mean": 6.913
+       },
+       "fps": 141.1,
+       "rafFps": 144.2
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 5.123,
+        "p95": 5.475,
+        "min": 4.705,
+        "max": 5.51,
+        "mean": 5.127
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 5.123,
+        "p95": 5.475,
+        "min": 4.705,
+        "max": 5.51,
+        "mean": 5.127
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 5.123,
+         "p95": 5.475,
+         "min": 4.705,
+         "max": 5.51,
+         "mean": 5.127
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        1
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 17.045,
+       "p95": 19.075,
+       "min": 15.005,
+       "max": 24.2,
+       "mean": 17.192
+      },
+      "jsHeapMB": 6.97,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "core batches only (gltf-pro, IBL, shadow passes not counted)"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 25307,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 56,
+       "checkedAt": "2026-10-15T03:39:47.267Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 717.2,
+     "createMs": 349.55,
+     "buildMs": 31.65,
+     "firstFrameMs": 55.3,
+     "fps": 144.95,
+     "cpuMs": 5.61,
+     "gpuMs": 5.3,
+     "gpuSpanMs": 5.3,
+     "passMs": [
+      5.3
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/discard"
+     ],
+     "serialFrameMs": 16.61,
+     "jsHeapMB": 6.97,
+     "jsGzipBytes": 25307,
+     "drawCalls": 1,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 0,
+      "over16Fraction": 0
+     }
+    }
+   },
+   "margo-instanced": {
+    "runs": [
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "instanced",
+       "move": 1,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 175.3,
+      "errors": [],
+      "createMs": 373.2,
+      "buildMs": 56.5,
+      "firstFrameMs": 136.9,
+      "loadMs": 749.5,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 5.82,
+        "p95": 6.99,
+        "min": 4.795,
+        "max": 7.655,
+        "mean": 5.849
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 6.86,
+        "p95": 8.235,
+        "min": 5.435,
+        "max": 8.585,
+        "mean": 6.951
+       },
+       "fps": 140.9,
+       "rafFps": 145.8
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 4.318,
+        "p95": 4.816,
+        "min": 4.026,
+        "max": 4.982,
+        "mean": 4.444
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 4.79,
+        "p95": 5.339,
+        "min": 4.238,
+        "max": 5.359,
+        "mean": 4.757
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        },
+        {
+         "n": 60,
+         "median": 4.317,
+         "p95": 4.816,
+         "min": 4.026,
+         "max": 4.981,
+         "mean": 4.444
+        },
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store",
+        "Render  +depth +resolve load/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        3
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 15.725,
+       "p95": 18.4,
+       "min": 13.68,
+       "max": 24.37,
+       "mean": 16.086
+      },
+      "jsHeapMB": 7.63,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "1 instanced draws, not counted by core"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 64299,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 20,
+       "checkedAt": "2026-10-15T03:31:55.573Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "instanced",
+       "move": 1,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 204.6,
+      "errors": [],
+      "createMs": 408.7,
+      "buildMs": 702.6,
+      "firstFrameMs": 151.6,
+      "loadMs": 1475.2,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 6.17,
+        "p95": 8.15,
+        "min": 4.775,
+        "max": 9.86,
+        "mean": 6.317
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 7.41,
+        "p95": 9.39,
+        "min": 5.805,
+        "max": 11.565,
+        "mean": 7.588
+       },
+       "fps": 129.1,
+       "rafFps": 135
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 4.743,
+        "p95": 5.232,
+        "min": 4.475,
+        "max": 5.43,
+        "mean": 4.721
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 5.097,
+        "p95": 5.847,
+        "min": 4.682,
+        "max": 6.022,
+        "mean": 5.151
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        },
+        {
+         "n": 60,
+         "median": 4.742,
+         "p95": 5.232,
+         "min": 4.475,
+         "max": 5.43,
+         "mean": 4.721
+        },
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store",
+        "Render  +depth +resolve load/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        3
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 17.1,
+       "p95": 19.105,
+       "min": 15.11,
+       "max": 43.105,
+       "mean": 17.776
+      },
+      "jsHeapMB": 7.63,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "note": "1 instanced draws, not counted by core"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 64299,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 87,
+       "checkedAt": "2026-10-15T03:39:58.610Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 1112.35,
+     "createMs": 390.95,
+     "buildMs": 379.55,
+     "firstFrameMs": 144.25,
+     "fps": 135,
+     "cpuMs": 6,
+     "gpuMs": 4.53,
+     "gpuSpanMs": 4.94,
+     "passMs": [
+      0,
+      4.53,
+      0
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/store",
+      "Render  +depth load/store",
+      "Render  +depth +resolve load/discard"
+     ],
+     "serialFrameMs": 16.41,
+     "jsHeapMB": 7.63,
+     "jsGzipBytes": 64299,
+     "drawCalls": 1,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 19.68,
+      "over16Fraction": 0.6352
+     }
+    }
+   },
+   "margo-culled": {
+    "runs": [
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "culled",
+       "move": 1,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 142.7,
+      "errors": [],
+      "createMs": 309.7,
+      "buildMs": 40.7,
+      "firstFrameMs": 470.9,
+      "loadMs": 970.1,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 170.055,
+        "p95": 262.385,
+        "min": 14.035,
+        "max": 283.615,
+        "mean": 157.37
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 167.405,
+        "p95": 273.715,
+        "min": 11.09,
+        "max": 283.53,
+        "mean": 159.791
+       },
+       "fps": 5.7,
+       "rafFps": 6
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": null,
+       "spanMs": null,
+       "passMs": [],
+       "passes": [],
+       "zeroFrames": 60,
+       "passesPerFrame": [
+        4
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 212.545,
+       "p95": 225.595,
+       "min": 201.465,
+       "max": 280.545,
+       "mean": 215.662
+      },
+      "jsHeapMB": 7.74,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 16,
+       "note": "16 instanced draws, not counted by core"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 46199,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 9,
+       "checkedAt": "2026-10-15T03:32:02.362Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "margo",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "culled",
+       "move": 1,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 155.6,
+      "errors": [],
+      "createMs": 363.4,
+      "buildMs": 77.9,
+      "firstFrameMs": 512.9,
+      "loadMs": 1116.8,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 105,
+       "cpuMs": {
+        "n": 105,
+        "median": 204.575,
+        "p95": 317.755,
+        "min": 17.245,
+        "max": 535.68,
+        "mean": 187.845
+       },
+       "intervalMs": {
+        "n": 104,
+        "median": 204.655,
+        "p95": 311.56,
+        "min": 17.38,
+        "max": 526.62,
+        "mean": 191.529
+       },
+       "fps": 4.7,
+       "rafFps": 4.9
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 4.136,
+        "p95": 8.483,
+        "min": 3.625,
+        "max": 10.817,
+        "mean": 4.634
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 4.846,
+        "p95": 9.213,
+        "min": 4.341,
+        "max": 11.567,
+        "mean": 5.362
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        },
+        {
+         "n": 60,
+         "median": 0.482,
+         "p95": 4.887,
+         "min": 0.1,
+         "max": 6.567,
+         "mean": 0.823
+        },
+        {
+         "n": 60,
+         "median": 3.596,
+         "p95": 5.198,
+         "min": 3.515,
+         "max": 7.046,
+         "mean": 3.81
+        },
+        {
+         "n": 60,
+         "median": 0,
+         "p95": 0,
+         "min": 0,
+         "max": 0,
+         "mean": 0
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Compute ",
+        "Render  +depth load/store",
+        "Render  +depth +resolve load/discard"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        4
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 359.8,
+       "p95": 423.74,
+       "min": 312.38,
+       "max": 527.06,
+       "mean": 365.262
+      },
+      "jsHeapMB": 7.73,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 16,
+       "note": "16 instanced draws, not counted by core"
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 46199,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 16,
+       "checkedAt": "2026-10-15T03:40:08.608Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 1043.45,
+     "createMs": 336.55,
+     "buildMs": 59.3,
+     "firstFrameMs": 491.9,
+     "fps": 5.2,
+     "cpuMs": 187.31,
+     "gpuMs": 4.14,
+     "gpuSpanMs": 4.85,
+     "passMs": [],
+     "passes": [],
+     "serialFrameMs": 286.17,
+     "jsHeapMB": 7.74,
+     "jsGzipBytes": 46199,
+     "drawCalls": 16,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 0,
+      "over16Fraction": 0
+     }
+    }
+   },
+   "three-webgl": {
+    "runs": [
+     {
+      "params": {
+       "engine": "three-webgl",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "mesh",
+       "move": 1,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 246.8,
+      "errors": [],
+      "createMs": 19,
+      "buildMs": 47,
+      "firstFrameMs": 106.8,
+      "loadMs": 424.7,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 17.96,
+        "p95": 22.04,
+        "min": 15.88,
+        "max": 27.795,
+        "mean": 18.437
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 18.86,
+        "p95": 35.085,
+        "min": 0.375,
+        "max": 36.9,
+        "mean": 18.868
+       },
+       "fps": 53,
+       "rafFps": 53
+      },
+      "gpu": {
+       "method": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+       "gpuMs": {
+        "n": 60,
+        "median": 11.694,
+        "p95": 14.515,
+        "min": 10.054,
+        "max": 15.8,
+        "mean": 11.89
+       },
+       "disjoint": false
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 23.735,
+       "p95": 30.045,
+       "min": 19.245,
+       "max": 30.335,
+       "mean": 23.624
+      },
+      "jsHeapMB": 18.53,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 9810,
+       "triangles": 117720
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 155550,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 16,
+       "checkedAt": "2026-10-15T03:32:56.341Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "three-webgl",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "mesh",
+       "move": 1,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 210.6,
+      "errors": [],
+      "createMs": 21.9,
+      "buildMs": 54,
+      "firstFrameMs": 137.8,
+      "loadMs": 428.5,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 35.04,
+        "p95": 56.58,
+        "min": 27.495,
+        "max": 103.605,
+        "mean": 37.472
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 36.005,
+        "p95": 56.525,
+        "min": 18.095,
+        "max": 114.175,
+        "mean": 38.243
+       },
+       "fps": 26.1,
+       "rafFps": 27.8
+      },
+      "gpu": {
+       "method": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+       "gpuMs": {
+        "n": 60,
+        "median": 20.315,
+        "p95": 25.04,
+        "min": 17.909,
+        "max": 26.428,
+        "mean": 20.729
+       },
+       "disjoint": false
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 33.935,
+       "p95": 40.135,
+       "min": 29.03,
+       "max": 40.135,
+       "mean": 34.198
+      },
+      "jsHeapMB": 18.53,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 9810,
+       "triangles": 117720
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 155550,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 16,
+       "checkedAt": "2026-10-15T03:41:17.203Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 426.6,
+     "createMs": 20.45,
+     "buildMs": 50.5,
+     "firstFrameMs": 122.3,
+     "fps": 39.55,
+     "cpuMs": 26.5,
+     "gpuMs": 16,
+     "gpuSpanMs": null,
+     "serialFrameMs": 28.84,
+     "jsHeapMB": 18.53,
+     "jsGzipBytes": 155550,
+     "drawCalls": 9810,
+     "samples": 4,
+     "gpuMethod": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 1.64,
+      "over16Fraction": 0.0222
+     }
+    }
+   },
+   "three-webgpu": {
+    "runs": [
+     {
+      "params": {
+       "engine": "three-webgpu",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "mesh",
+       "move": 1,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 178.4,
+      "errors": [],
+      "createMs": 247.7,
+      "buildMs": 40.3,
+      "firstFrameMs": 982.9,
+      "loadMs": 1451.3,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 90.905,
+        "p95": 122.23,
+        "min": 65.88,
+        "max": 124.465,
+        "mean": 91.967
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 87.72,
+        "p95": 124.89,
+        "min": 55.995,
+        "max": 137,
+        "mean": 92.307
+       },
+       "fps": 10.6,
+       "rafFps": 11.4
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 1.935,
+        "p95": 2.013,
+        "min": 1.713,
+        "max": 2.101,
+        "mean": 1.911
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 2.791,
+        "p95": 2.958,
+        "min": 2.508,
+        "max": 3.302,
+        "mean": 2.769
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 1.391,
+         "p95": 1.459,
+         "min": 1.279,
+         "max": 1.504,
+         "mean": 1.374
+        },
+        {
+         "n": 60,
+         "median": 0.538,
+         "p95": 0.599,
+         "min": 0.254,
+         "max": 0.616,
+         "mean": 0.537
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        2
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 159.715,
+       "p95": 185.23,
+       "min": 125.795,
+       "max": 190.71,
+       "mean": 158.691
+      },
+      "jsHeapMB": 49.06,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 9811,
+       "triangles": 117721
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 242968,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 12,
+       "checkedAt": "2026-10-15T03:33:05.988Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "three-webgpu",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "mesh",
+       "move": 1,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 182.7,
+      "errors": [],
+      "createMs": 285.8,
+      "buildMs": 58.3,
+      "firstFrameMs": 1213.3,
+      "loadMs": 1743.5,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 137.5,
+        "p95": 187.98,
+        "min": 120.68,
+        "max": 257.475,
+        "mean": 144.236
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 137.48,
+        "p95": 186.04,
+        "min": 107.78,
+        "max": 268.565,
+        "mean": 145.174
+       },
+       "fps": 6.8,
+       "rafFps": 7.3
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 1.988,
+        "p95": 2.857,
+        "min": 1.463,
+        "max": 3.146,
+        "mean": 2.057
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 2.914,
+        "p95": 3.937,
+        "min": 2.152,
+        "max": 4.136,
+        "mean": 3.009
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 1.363,
+         "p95": 2.25,
+         "min": 1.018,
+         "max": 2.528,
+         "mean": 1.439
+        },
+        {
+         "n": 60,
+         "median": 0.62,
+         "p95": 0.711,
+         "min": 0.197,
+         "max": 0.757,
+         "mean": 0.618
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        2
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 297.205,
+       "p95": 412.155,
+       "min": 241.265,
+       "max": 429.475,
+       "mean": 310.225
+      },
+      "jsHeapMB": 49.08,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 9811,
+       "triangles": 117721
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 242968,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 7,
+       "checkedAt": "2026-10-15T03:41:31.338Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 1597.4,
+     "createMs": 266.75,
+     "buildMs": 49.3,
+     "firstFrameMs": 1098.1,
+     "fps": 8.7,
+     "cpuMs": 114.2,
+     "gpuMs": 1.96,
+     "gpuSpanMs": 2.85,
+     "passMs": [
+      1.38,
+      0.58
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/store",
+      "Render  +depth load/store"
+     ],
+     "serialFrameMs": 228.46,
+     "jsHeapMB": 49.07,
+     "jsGzipBytes": 242968,
+     "drawCalls": 9811,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 2.04,
+      "over16Fraction": 0.0223
+     }
+    }
+   },
+   "three-webgl-instanced": {
+    "runs": [
+     {
+      "params": {
+       "engine": "three-webgl",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "instanced",
+       "move": 1,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 184.5,
+      "errors": [],
+      "createMs": 15.5,
+      "buildMs": 14.4,
+      "firstFrameMs": 65.5,
+      "loadMs": 284,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 3.175,
+        "p95": 3.84,
+        "min": 2.265,
+        "max": 4.135,
+        "mean": 3.176
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 3.64,
+        "p95": 4.43,
+        "min": 2.78,
+        "max": 15.475,
+        "mean": 3.733
+       },
+       "fps": 266.4,
+       "rafFps": 274.7
+      },
+      "gpu": {
+       "method": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+       "gpuMs": {
+        "n": 60,
+        "median": 2.92,
+        "p95": 4.19,
+        "min": 1.944,
+        "max": 5.147,
+        "mean": 3.043
+       },
+       "disjoint": false
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 9.615,
+       "p95": 10.74,
+       "min": 9.13,
+       "max": 10.935,
+       "mean": 9.718
+      },
+      "jsHeapMB": 5.58,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "triangles": 120000
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 155550,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 4,
+       "checkedAt": "2026-10-15T03:33:37.940Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "three-webgl",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "instanced",
+       "move": 1,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 203.7,
+      "errors": [],
+      "createMs": 16.7,
+      "buildMs": 17.3,
+      "firstFrameMs": 81.7,
+      "loadMs": 324,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 3.435,
+        "p95": 4.145,
+        "min": 2.49,
+        "max": 4.89,
+        "mean": 3.446
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 3.915,
+        "p95": 4.85,
+        "min": 2.545,
+        "max": 16.83,
+        "mean": 4.046
+       },
+       "fps": 244.9,
+       "rafFps": 255.4
+      },
+      "gpu": {
+       "method": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+       "gpuMs": {
+        "n": 60,
+        "median": 3.375,
+        "p95": 4.251,
+        "min": 1.931,
+        "max": 7.792,
+        "mean": 3.322
+       },
+       "disjoint": false
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 10.395,
+       "p95": 11.5,
+       "min": 9.33,
+       "max": 11.895,
+       "mean": 10.323
+      },
+      "jsHeapMB": 5.58,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 1,
+       "triangles": 120000
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 155550,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 16,
+       "checkedAt": "2026-10-15T03:42:22.725Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 304,
+     "createMs": 16.1,
+     "buildMs": 15.85,
+     "firstFrameMs": 73.6,
+     "fps": 255.65,
+     "cpuMs": 3.3,
+     "gpuMs": 3.15,
+     "gpuSpanMs": null,
+     "serialFrameMs": 10,
+     "jsHeapMB": 5.58,
+     "jsGzipBytes": 155550,
+     "drawCalls": 1,
+     "samples": 4,
+     "gpuMethod": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 1.64,
+      "over16Fraction": 0.0222
+     }
+    }
+   },
+   "three-webgpu-instanced": {
+    "runs": [
+     {
+      "params": {
+       "engine": "three-webgpu",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "instanced",
+       "move": 1,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 202.4,
+      "errors": [],
+      "createMs": 279.9,
+      "buildMs": 16.8,
+      "firstFrameMs": 225.6,
+      "loadMs": 727.1,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 3.995,
+        "p95": 5.32,
+        "min": 3.385,
+        "max": 5.55,
+        "mean": 4.146
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 5.175,
+        "p95": 6.9,
+        "min": 4.13,
+        "max": 7.27,
+        "mean": 5.327
+       },
+       "fps": 181.6,
+       "rafFps": 193.2
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 3.403,
+        "p95": 3.713,
+        "min": 2.886,
+        "max": 4.191,
+        "mean": 3.39
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 4.157,
+        "p95": 4.544,
+        "min": 3.299,
+        "max": 4.927,
+        "mean": 4.033
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 2.995,
+         "p95": 3.182,
+         "min": 2.683,
+         "max": 3.699,
+         "mean": 2.994
+        },
+        {
+         "n": 60,
+         "median": 0.495,
+         "p95": 0.534,
+         "min": 0.188,
+         "max": 0.545,
+         "mean": 0.396
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        2
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 12.875,
+       "p95": 14.585,
+       "min": 10.17,
+       "max": 15.835,
+       "mean": 12.622
+      },
+      "jsHeapMB": 7.9,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 2,
+       "triangles": 120001
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 242968,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 5,
+       "checkedAt": "2026-10-15T03:33:43.481Z"
+      }
+     },
+     {
+      "params": {
+       "engine": "three-webgpu",
+       "scene": "boxes",
+       "n": 10000,
+       "mode": "instanced",
+       "move": 1,
+       "warmup": 60,
+       "frames": 120,
+       "gpuFrames": 60,
+       "serialFrames": 30,
+       "maxPhaseMs": 20000,
+       "diag": [],
+       "dump": false
+      },
+      "scriptStartMs": 187.6,
+      "errors": [],
+      "createMs": 262.3,
+      "buildMs": 15,
+      "firstFrameMs": 201.8,
+      "loadMs": 668.7,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "throughput": {
+       "frames": 120,
+       "cpuMs": {
+        "n": 120,
+        "median": 3.66,
+        "p95": 4.805,
+        "min": 3.04,
+        "max": 6.025,
+        "mean": 3.803
+       },
+       "intervalMs": {
+        "n": 119,
+        "median": 4.65,
+        "p95": 6.29,
+        "min": 3.81,
+        "max": 7.28,
+        "mean": 4.896
+       },
+       "fps": 197.6,
+       "rafFps": 215.1
+      },
+      "gpu": {
+       "method": "timestamp-query, sum of pass durations",
+       "gpuMs": {
+        "n": 60,
+        "median": 3.141,
+        "p95": 3.531,
+        "min": 2.414,
+        "max": 3.932,
+        "mean": 3.082
+       },
+       "spanMs": {
+        "n": 60,
+        "median": 3.58,
+        "p95": 4.332,
+        "min": 2.748,
+        "max": 4.644,
+        "mean": 3.659
+       },
+       "passMs": [
+        {
+         "n": 60,
+         "median": 2.834,
+         "p95": 3.098,
+         "min": 2.236,
+         "max": 3.444,
+         "mean": 2.724
+        },
+        {
+         "n": 60,
+         "median": 0.433,
+         "p95": 0.523,
+         "min": 0.173,
+         "max": 0.528,
+         "mean": 0.358
+        }
+       ],
+       "passes": [
+        "Render  +depth +resolve clear/store",
+        "Render  +depth load/store"
+       ],
+       "zeroFrames": 0,
+       "passesPerFrame": [
+        2
+       ]
+      },
+      "serialFrameMs": {
+       "n": 30,
+       "median": 11.94,
+       "p95": 13.535,
+       "min": 9.855,
+       "max": 15.595,
+       "mean": 11.822
+      },
+      "jsHeapMB": 7.9,
+      "gcExposed": true,
+      "info": {
+       "drawCalls": 2,
+       "triangles": 120001
+      },
+      "pageErrors": [],
+      "jsGzipBytes": 242968,
+      "quiet": {
+       "gate": false,
+       "cpuLoadPercent": 3,
+       "checkedAt": "2026-10-15T03:42:28.506Z"
+      }
+     }
+    ],
+    "summary": {
+     "runs": 2,
+     "failed": 0,
+     "loadMs": 697.9,
+     "createMs": 271.1,
+     "buildMs": 15.9,
+     "firstFrameMs": 213.7,
+     "fps": 189.6,
+     "cpuMs": 3.83,
+     "gpuMs": 3.27,
+     "gpuSpanMs": 3.87,
+     "passMs": [
+      2.91,
+      0.46
+     ],
+     "passes": [
+      "Render  +depth +resolve clear/store",
+      "Render  +depth load/store"
+     ],
+     "serialFrameMs": 12.41,
+     "jsHeapMB": 7.9,
+     "jsGzipBytes": 242968,
+     "drawCalls": 2,
+     "samples": 4,
+     "gpuMethod": "timestamp-query, sum of pass durations",
+     "errors": [],
+     "vsMargoImage": {
+      "meanMaxChannelDiff": 2.04,
+      "over16Fraction": 0.0223
+     }
+    }
+   }
+  }
+ },
+ "hardware": {
+  "browser": "155.0.4283.45",
+  "webgpu": {
+   "vendor": "intel",
+   "architecture": "xe-2lpg",
+   "description": "Intel(R) Arc(TM) 140V GPU (16GB)"
+  },
+  "webgl": "ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (16GB) (0x000064A0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0"
+ },
+ "acPowerAfter": true
+}

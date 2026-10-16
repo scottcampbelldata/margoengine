@@ -1,0 +1,227 @@
+{
+  "benchmark": "decals-gpu",
+  "recordedAt": "2026-10-15T16:44:46.352Z",
+  "resolution": [
+    1280,
+    720
+  ],
+  "powerOnline": {
+    "before": "True",
+    "after": "True"
+  },
+  "runs": [
+    {
+      "samples": 4,
+      "emptyEqualsNone": true,
+      "multiply-floor": {
+        "case": "multiply-floor",
+        "untouchedSamples": 14151,
+        "untouchedMaxDiff": 0,
+        "testedSamples": 106,
+        "failures": 0,
+        "firstFailures": []
+      },
+      "angleSideFace": {
+        "samples": 73,
+        "maxDiff": 0
+      },
+      "angle-top": {
+        "case": "angle-top",
+        "untouchedSamples": 14170,
+        "untouchedMaxDiff": 0,
+        "testedSamples": 105,
+        "failures": 0,
+        "firstFailures": []
+      },
+      "atlas-over": {
+        "case": "atlas-over",
+        "untouchedSamples": 14227,
+        "untouchedMaxDiff": 0,
+        "testedSamples": 70,
+        "failures": 0,
+        "firstFailures": []
+      },
+      "camera-inside": {
+        "case": "camera-inside",
+        "untouchedSamples": 7839,
+        "untouchedMaxDiff": 0,
+        "testedSamples": 3855,
+        "failures": 0,
+        "firstFailures": []
+      },
+      "cameraInsideBox": true
+    },
+    {
+      "samples": 1,
+      "emptyEqualsNone": true,
+      "multiply-floor": {
+        "case": "multiply-floor",
+        "untouchedSamples": 14151,
+        "untouchedMaxDiff": 0,
+        "testedSamples": 106,
+        "failures": 0,
+        "firstFailures": []
+      },
+      "angleSideFace": {
+        "samples": 73,
+        "maxDiff": 0
+      },
+      "angle-top": {
+        "case": "angle-top",
+        "untouchedSamples": 14170,
+        "untouchedMaxDiff": 0,
+        "testedSamples": 105,
+        "failures": 0,
+        "firstFailures": []
+      },
+      "atlas-over": {
+        "case": "atlas-over",
+        "untouchedSamples": 14227,
+        "untouchedMaxDiff": 0,
+        "testedSamples": 70,
+        "failures": 0,
+        "firstFailures": []
+      },
+      "camera-inside": {
+        "case": "camera-inside",
+        "untouchedSamples": 7839,
+        "untouchedMaxDiff": 0,
+        "testedSamples": 3855,
+        "failures": 0,
+        "firstFailures": []
+      },
+      "cameraInsideBox": true
+    }
+  ],
+  "hardware": {
+    "vendor": "intel",
+    "architecture": "xe-2lpg",
+    "device": "",
+    "description": "",
+    "fallback": false
+  },
+  "browser": "chromium 155.0.4283.45",
+  "quietGate": {
+    "ac": true,
+    "cpuLoadPercent": 6,
+    "waitedSeconds": 34,
+    "checkedAt": "2026-10-15T16:45:29.919Z",
+    "topProcesses": [
+      {
+        "Name": "claude",
+        "Id": 13528,
+        "cpuSeconds": 5285
+      },
+      {
+        "Name": "claude",
+        "Id": 12156,
+        "cpuSeconds": 3850
+      },
+      {
+        "Name": "claude",
+        "Id": 15776,
+        "cpuSeconds": 2612
+      },
+      {
+        "Name": "chrome",
+        "Id": 1184,
+        "cpuSeconds": 2033
+      },
+      {
+        "Name": "SnagitEditor",
+        "Id": 28664,
+        "cpuSeconds": 1030
+      },
+      {
+        "Name": "claude",
+        "Id": 12224,
+        "cpuSeconds": 974
+      },
+      {
+        "Name": "SnagitCapture",
+        "Id": 23920,
+        "cpuSeconds": 675
+      },
+      {
+        "Name": "EpicGamesLauncher",
+        "Id": 19500,
+        "cpuSeconds": 636
+      }
+    ]
+  },
+  "cpuLoadAtStart": 5,
+  "timings": [
+    {
+      "count": null,
+      "size": 1,
+      "width": 1280,
+      "height": 720,
+      "gpuMs": 1.638,
+      "gpuSamples": 40,
+      "frameMs": 5.9
+    },
+    {
+      "count": 1,
+      "size": 1,
+      "width": 1280,
+      "height": 720,
+      "gpuMs": 1.638,
+      "gpuSamples": 40,
+      "frameMs": 6.2
+    },
+    {
+      "count": 16,
+      "size": 1,
+      "width": 1280,
+      "height": 720,
+      "gpuMs": 1.966,
+      "gpuSamples": 40,
+      "frameMs": 6.5
+    },
+    {
+      "count": 256,
+      "size": 1,
+      "width": 1280,
+      "height": 720,
+      "gpuMs": 6.357,
+      "gpuSamples": 40,
+      "frameMs": 11.5
+    },
+    {
+      "count": null,
+      "size": 1,
+      "width": 1920,
+      "height": 1080,
+      "gpuMs": 3.67,
+      "gpuSamples": 40,
+      "frameMs": 10
+    },
+    {
+      "count": 1,
+      "size": 1,
+      "width": 1920,
+      "height": 1080,
+      "gpuMs": 3.932,
+      "gpuSamples": 40,
+      "frameMs": 10
+    },
+    {
+      "count": 16,
+      "size": 1,
+      "width": 1920,
+      "height": 1080,
+      "gpuMs": 4.325,
+      "gpuSamples": 40,
+      "frameMs": 10.7
+    },
+    {
+      "count": 256,
+      "size": 1,
+      "width": 1920,
+      "height": 1080,
+      "gpuMs": 14.025,
+      "gpuSamples": 40,
+      "frameMs": 23
+    }
+  ]
+}

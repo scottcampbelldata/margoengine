@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import {engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext} from '@margoengine/core/extension';
 import type {EngineKernel} from '@margoengine/core';
 import {StereoRenderer} from './renderer.js';
@@ -39,6 +40,7 @@ export class XR implements EnginePlugin {
     return system()!.isSessionSupported(mode);
   }
   /** Prepare before the click handler so requestSession preserves the browser's user activation. */
+  static attach(engine:EngineKernel):Promise<XR> {return XR.create(engine);}
   static async create(engine:EngineKernel):Promise<XR> {
     const runtime=engineRuntime(engine);
     if(runtime.disposed||runtime.backend!=='webgpu'||runtime.hasPlugin('xr'))throw new Error('XR requires a live WebGPU engine without an XR plugin');
@@ -125,6 +127,8 @@ export class XR implements EnginePlugin {
     if(session)void session.end().catch(error=>this.engine.onError(error));
     if(this.engine?.hasPlugin(this.name))this.engine.removePlugin(this.name);
   }
+  declare [Symbol.dispose]:()=>void;
+  [(Symbol.dispose??Symbol()) as symbol]():void {this.dispose();}
 }
 export {XR as XRManager};
 /** Request using a manager prepared before the user gesture. The caller owns manager disposal. */

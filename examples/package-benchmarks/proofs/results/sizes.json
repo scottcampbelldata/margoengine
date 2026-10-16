@@ -1,0 +1,258 @@
+{
+  "baseline": "f05414a",
+  "packages": {
+    "animation": {
+      "before": {
+        "raw": 17192,
+        "gzip": 5587
+      },
+      "after": {
+        "raw": 17192,
+        "gzip": 5587
+      },
+      "gzipDelta": 0
+    },
+    "animator": {
+      "before": {
+        "raw": 13057,
+        "gzip": 4219
+      },
+      "after": {
+        "raw": 13662,
+        "gzip": 4422
+      },
+      "gzipDelta": 203
+    },
+    "bvh": {
+      "before": {
+        "raw": 45105,
+        "gzip": 14106
+      },
+      "after": {
+        "raw": 45853,
+        "gzip": 14297
+      },
+      "gzipDelta": 191
+    },
+    "creative": {
+      "before": {
+        "raw": 81056,
+        "gzip": 21883
+      },
+      "after": {
+        "raw": 81196,
+        "gzip": 21921
+      },
+      "gzipDelta": 38
+    },
+    "decoders": {
+      "before": {
+        "raw": 15583,
+        "gzip": 5008
+      },
+      "after": {
+        "raw": 15658,
+        "gzip": 5025
+      },
+      "gzipDelta": 17
+    },
+    "ecs": {
+      "before": {
+        "raw": 3660,
+        "gzip": 1345
+      },
+      "after": {
+        "raw": 3960,
+        "gzip": 1463
+      },
+      "gzipDelta": 118
+    },
+    "exporters": {
+      "before": {
+        "raw": 32954,
+        "gzip": 10489
+      },
+      "after": {
+        "raw": 34772,
+        "gzip": 11392
+      },
+      "gzipDelta": 903
+    },
+    "geometry": {
+      "before": {
+        "raw": 55438,
+        "gzip": 16147
+      },
+      "after": {
+        "raw": 57746,
+        "gzip": 16970
+      },
+      "gzipDelta": 823
+    },
+    "gltf-pro": {
+      "before": {
+        "raw": 42633,
+        "gzip": 13606
+      },
+      "after": {
+        "raw": 42949,
+        "gzip": 13705
+      },
+      "gzipDelta": 99
+    },
+    "gltf": {
+      "before": {
+        "raw": 13590,
+        "gzip": 5005
+      },
+      "after": {
+        "raw": 13691,
+        "gzip": 5048
+      },
+      "gzipDelta": 43
+    },
+    "labels": {
+      "before": {
+        "raw": 13083,
+        "gzip": 4396
+      },
+      "after": {
+        "raw": 13399,
+        "gzip": 4527
+      },
+      "gzipDelta": 131
+    },
+    "loaders": {
+      "before": {
+        "raw": 75498,
+        "gzip": 23211
+      },
+      "after": {
+        "raw": 76808,
+        "gzip": 23687
+      },
+      "gzipDelta": 476
+    },
+    "machinery": {
+      "before": {
+        "raw": 84327,
+        "gzip": 34389
+      },
+      "after": {
+        "raw": 85302,
+        "gzip": 34720
+      },
+      "gzipDelta": 331
+    },
+    "navmesh": {
+      "before": {
+        "raw": 8703,
+        "gzip": 3062
+      },
+      "after": {
+        "raw": 10355,
+        "gzip": 3660
+      },
+      "gzipDelta": 598
+    },
+    "points": {
+      "before": {
+        "raw": 53492,
+        "gzip": 15839
+      },
+      "after": {
+        "raw": 53705,
+        "gzip": 15924
+      },
+      "gzipDelta": 85
+    },
+    "post": {
+      "before": {
+        "raw": 39822,
+        "gzip": 10244
+      },
+      "after": {
+        "raw": 40539,
+        "gzip": 10385
+      },
+      "gzipDelta": 141
+    },
+    "road": {
+      "before": {
+        "raw": 2384,
+        "gzip": 1075
+      },
+      "after": {
+        "raw": 2413,
+        "gzip": 1096
+      },
+      "gzipDelta": 21
+    },
+    "splats": {
+      "before": {
+        "raw": 19338,
+        "gzip": 6245
+      },
+      "after": {
+        "raw": 20086,
+        "gzip": 6448
+      },
+      "gzipDelta": 203
+    },
+    "splines": {
+      "before": {
+        "raw": 3953,
+        "gzip": 1387
+      },
+      "after": {
+        "raw": 3984,
+        "gzip": 1494
+      },
+      "gzipDelta": 107
+    },
+    "taa": {
+      "before": {
+        "raw": 30574,
+        "gzip": 8548
+      },
+      "after": {
+        "raw": 32295,
+        "gzip": 8981
+      },
+      "gzipDelta": 433
+    },
+    "terrain": {
+      "before": {
+        "raw": 26122,
+        "gzip": 7993
+      },
+      "after": {
+        "raw": 26530,
+        "gzip": 8181
+      },
+      "gzipDelta": 188
+    },
+    "text": {
+      "before": {
+        "raw": 43469,
+        "gzip": 14835
+      },
+      "after": {
+        "raw": 43942,
+        "gzip": 14984
+      },
+      "gzipDelta": 149
+    },
+    "wfc": {
+      "before": {
+        "raw": 4421,
+        "gzip": 1630
+      },
+      "after": {
+        "raw": 4946,
+        "gzip": 1830
+      },
+      "gzipDelta": 200
+    }
+  }
+}

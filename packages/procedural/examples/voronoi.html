@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Margo · Voronoi fracture</title>
+<style>:root{color-scheme:dark;font:16px system-ui;background:#10141c;color:#edf2fa}body{margin:0;padding:16px;max-width:1100px;margin-inline:auto}h1{font-size:24px;margin:0 0 6px}p{color:#b4c2d6;margin:0 0 12px}canvas{display:block;width:100%;height:65vh;min-height:300px;border-radius:12px;background:#080c12}label{display:inline-grid;gap:6px;margin:14px 20px 0 0}input{accent-color:#75c5ff}</style></head>
+<body>
+<h1>Voronoi fracture</h1><p>@margoengine/procedural/voronoi · a closed mesh split along 3D Voronoi cells into capped chunks.</p>
+<canvas id="viewport" aria-label="A sphere broken into Voronoi chunks that drift apart"></canvas>
+<label for="pieces">Pieces <input id="pieces" type="range" min="2" max="40" value="16"></label>
+<label for="spread">Spread <input id="spread" type="range" min="0" max="1" step="0.01" value="0.35"></label>
+<p id="status" role="status">Starting WebGPU…</p>
+<script type="module">
+import {createStage} from 'margoengine';
+import {icosahedronGeometry, toGeometry} from '@margoengine/geometry';
+import {fractureMesh} from '../dist/voronoi.js';
+const status = document.querySelector('#status');
+try {
+  const stage = await createStage('#viewport', {backend: 'webgpu', camera: {position: [0, 1.5, 5], target: [0, 0, 0]}});
+  const ball = toGeometry(icosahedronGeometry(1, 4));
+  let chunks = [];
+  const place = () => {const spread = document.querySelector('#spread').valueAsNumber; for (const {mesh, center} of chunks) mesh.setPosition(center.map(v => v * spread));};
+  const split = () => {
+    for (const {mesh} of chunks) mesh.dispose();
+    const started = performance.now(), pieces = fractureMesh(ball, document.querySelector('#pieces').valueAsNumber, {seed: 3}), ms = performance.now() - started;
+    chunks = pieces.map(({geometry, center}, k) => ({center, mesh: stage.mesh(geometry, {color: [0.55 + 0.4 * (k % 3 === 0), 0.45 + 0.1 * (k % 2), 0.35 + 0.5 * (k % 3 === 2)], roughness: 0.55})}));
+    place(); status.textContent = `${chunks.length} chunks in ${ms.toFixed(0)} ms (CPU)`;
+  };
+  document.querySelector('#pieces').addEventListener('change', split);
+  document.querySelector('#spread').addEventListener('input', place);
+  split();
+} catch (error) {status.textContent = `Unable to start: ${String(error)}`;}
+</script>
+</body></html>

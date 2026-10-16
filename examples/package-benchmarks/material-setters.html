@@ -1,0 +1,15 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Material setters GPU check</title><style>body{margin:0}canvas{width:256px;height:256px;display:block}</style></head><body><canvas></canvas>
+<script type="module">
+// Driven by material-setters-gpu.mjs: one core box, recoloured with PbrMaterial.set between two frames.
+import {Engine,box,PbrMaterial} from '/packages/core/dist/index.js';
+const canvas=document.querySelector('canvas'),engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,0,3],target:[0,0,0]}});
+const device=engine.gpu,errors=[],created={pipelines:0,groups:0};device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+for(const name of ['createRenderPipeline','createRenderPipelineAsync','createBindGroup']){const original=device[name].bind(device);device[name]=(...args)=>{created[name==='createBindGroup'?'groups':'pipelines']++;return original(...args);};}
+const material=new PbrMaterial({color:'#ff0000',roughness:1});engine.createMesh().setGeometry(box(1.5,1.5,1.5)).setMaterial(material);
+const frame=async()=>{engine.render();await device.queue.onSubmittedWorkDone();};
+window.check={
+  async before(){await frame();await frame();return {created:{...created},errors};},
+  async after(){material.set({color:[0,0,1]});await frame();return {created:{...created},errors};},
+};
+window.ready=true;
+</script></body></html>

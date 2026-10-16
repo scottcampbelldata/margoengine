@@ -1,0 +1,2 @@
+# Cloudflare Pages redirects: old public URLs.
+/demos/damaged-helmet.html /demos/flight-helmet.html 301

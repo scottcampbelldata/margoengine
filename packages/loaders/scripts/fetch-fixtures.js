@@ -1,8 +1,8 @@
 // Downloads the small real-world fixtures used by tests/loaders.test.js. Files that 404 are skipped
 // (the tests skip their checks when a fixture is missing). Run with `npm run fixtures`.
-import {mkdir, writeFile} from 'node:fs/promises';
-import {fileURLToPath} from 'node:url';
-import {resolve} from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 
 const three = 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models';
 const sources = {
@@ -22,12 +22,18 @@ const sources = {
   'polyEx.vtk': 'https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/polyEx.vtk',
 };
 const folder = fileURLToPath(new URL('../tests/fixtures/', import.meta.url));
-await mkdir(folder, {recursive: true});
+await mkdir(folder, { recursive: true });
 for (const [name, url] of Object.entries(sources)) {
   const response = await fetch(url);
-  if (!response.ok) {console.warn(`skip ${name}: HTTP ${response.status}`); continue;}
+  if (!response.ok) {
+    console.warn(`skip ${name}: HTTP ${response.status}`);
+    continue;
+  }
   const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.length > 1 << 20) {console.warn(`skip ${name}: ${bytes.length} bytes is over 1 MB`); continue;}
+  if (bytes.length > 1 << 20) {
+    console.warn(`skip ${name}: ${bytes.length} bytes is over 1 MB`);
+    continue;
+  }
   await writeFile(resolve(folder, name), bytes);
   console.log(`${name} ${bytes.length} bytes`);
 }

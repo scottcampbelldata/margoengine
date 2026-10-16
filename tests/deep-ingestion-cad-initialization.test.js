@@ -36,3 +36,19 @@ test('Core CAD controls retain ordinary navigation and complete listener/pointer
  const before=camera.position.slice();target.listeners.get('pointerdown')({button:0,pointerId:7,clientX:10,clientY:10});assert.ok(target.captures.has(7));target.listeners.get('pointermove')({pointerId:7,clientX:20,clientY:15});assert.notDeepEqual(camera.position,before);assert.ok(camera.position.every(Number.isFinite));
  controls.dispose();assert.equal(target.listeners.size,0);assert.equal(target.captures.size,0);assert.equal(target.style.touchAction,'pan-x');controls.dispose();assert.equal(target.listeners.size,0);
 });
+
+test('CAD pole pans stay finite and preserve eye-to-target distance',()=>{
+ for(const sign of [-1,1]){
+  const camera=new Camera({position:[0,sign*5,0],target:[0,0,0],up:[0,0,-sign]}),controls=new CADCameraControls(camera,element());
+  controls.pan(0.2,0.3);assert.ok([...camera.position,...camera.target].every(Number.isFinite));assert.ok(Math.abs(Math.hypot(...camera.position.map((v,i)=>v-camera.target[i]))-5)<1e-10);assert.notDeepEqual(camera.target,[0,0,0]);controls.dispose();
+ }
+});
+test('CAD orbit rejects a coincident eye atomically',()=>{
+ const target=element(),camera=new Camera(),controls=new CADCameraControls(camera,target);
+ camera.position=[...camera.target];const before=[...camera.position];assert.throws(()=>controls.orbit(0.1,0.1),RangeError);assert.deepEqual(camera.position,before);
+ controls.dispose();
+});
+test('CAD capture failure leaves the next pointer usable',()=>{
+ const target=element(),camera=new Camera({position:[0,0,5]}),controls=new CADCameraControls(camera,target);const capture=target.setPointerCapture;target.setPointerCapture=()=>{throw new Error('capture failed');};assert.throws(()=>target.listeners.get('pointerdown')({button:0,pointerId:1,clientX:0,clientY:0}),/capture failed/);
+ target.setPointerCapture=capture;target.listeners.get('pointerdown')({button:0,pointerId:2,clientX:0,clientY:0});assert.ok(target.captures.has(2));target.listeners.get('pointermove')({pointerId:2,clientX:10,clientY:0});assert.notDeepEqual(camera.position,[0,0,5]);controls.dispose();
+});

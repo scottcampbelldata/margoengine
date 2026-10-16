@@ -1,0 +1,1089 @@
+{
+  "gpu": {
+    "vendor": "intel",
+    "architecture": "xe-2lpg",
+    "device": "",
+    "description": "",
+    "fallback": false
+  },
+  "browser": "chromium 155.0.8059.40",
+  "headless": false,
+  "recordedAt": "2026-10-15T04:42:35.120Z",
+  "scenarios": {
+    "off": {
+      "errors": [],
+      "config": {
+        "format": "bgra8unorm",
+        "colorSpace": "srgb",
+        "toneMapping": "standard",
+        "alphaMode": "opaque"
+      },
+      "raw": {
+        "format": "bgra8unorm",
+        "size": [
+          96,
+          48
+        ],
+        "values": {
+          "p3": [
+            0,
+            191,
+            0,
+            255
+          ],
+          "highlight": [
+            252,
+            252,
+            252,
+            255
+          ],
+          "plain": [
+            113,
+            72,
+            34,
+            255
+          ],
+          "center": [
+            113,
+            72,
+            34,
+            255
+          ]
+        }
+      },
+      "p3": {
+        "unorm8": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              86,
+              188,
+              55,
+              255
+            ],
+            "highlight": [
+              252,
+              252,
+              252,
+              255
+            ],
+            "plain": [
+              107,
+              74,
+              41,
+              255
+            ],
+            "center": [
+              107,
+              74,
+              41,
+              255
+            ]
+          }
+        },
+        "float16": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              0.3364,
+              0.7378,
+              0.2142,
+              1
+            ],
+            "highlight": [
+              0.9883,
+              0.9883,
+              0.9878,
+              1
+            ],
+            "plain": [
+              0.4199,
+              0.2893,
+              0.1604,
+              1
+            ],
+            "center": [
+              0.4199,
+              0.2893,
+              0.1604,
+              1
+            ]
+          }
+        }
+      }
+    },
+    "p3": {
+      "errors": [],
+      "config": {
+        "format": "bgra8unorm",
+        "colorSpace": "display-p3",
+        "toneMapping": "standard",
+        "alphaMode": "opaque"
+      },
+      "output": {
+        "gamut": "p3",
+        "hdr": false,
+        "peak": 4
+      },
+      "raw": {
+        "format": "bgra8unorm",
+        "size": [
+          96,
+          48
+        ],
+        "values": {
+          "p3": [
+            0,
+            188,
+            0,
+            255
+          ],
+          "highlight": [
+            252,
+            252,
+            252,
+            255
+          ],
+          "plain": [
+            107,
+            74,
+            41,
+            255
+          ],
+          "center": [
+            107,
+            74,
+            41,
+            255
+          ]
+        }
+      },
+      "p3": {
+        "unorm8": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              0,
+              188,
+              0,
+              255
+            ],
+            "highlight": [
+              252,
+              252,
+              252,
+              255
+            ],
+            "plain": [
+              107,
+              74,
+              41,
+              255
+            ],
+            "center": [
+              107,
+              74,
+              41,
+              255
+            ]
+          }
+        },
+        "float16": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              0,
+              0.7368,
+              0,
+              1
+            ],
+            "highlight": [
+              0.9878,
+              0.9878,
+              0.9878,
+              1
+            ],
+            "plain": [
+              0.4194,
+              0.29,
+              0.1608,
+              1
+            ],
+            "center": [
+              0.4194,
+              0.29,
+              0.1608,
+              1
+            ]
+          }
+        }
+      }
+    },
+    "hdr": {
+      "errors": [],
+      "config": {
+        "format": "rgba16float",
+        "colorSpace": "srgb",
+        "toneMapping": "extended",
+        "alphaMode": "opaque"
+      },
+      "output": {
+        "gamut": "srgb",
+        "hdr": true,
+        "peak": 4
+      },
+      "raw": {
+        "format": "rgba16float",
+        "size": [
+          96,
+          48
+        ],
+        "values": {
+          "p3": [
+            0,
+            0.7485,
+            0,
+            1
+          ],
+          "highlight": [
+            1.373,
+            1.373,
+            1.373,
+            1
+          ],
+          "plain": [
+            0.4431,
+            0.2822,
+            0.1333,
+            1
+          ],
+          "center": [
+            0.4431,
+            0.2822,
+            0.1333,
+            1
+          ]
+        }
+      },
+      "p3": {
+        "unorm8": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              86,
+              188,
+              55,
+              255
+            ],
+            "highlight": [
+              255,
+              255,
+              255,
+              255
+            ],
+            "plain": [
+              107,
+              74,
+              41,
+              255
+            ],
+            "center": [
+              107,
+              74,
+              41,
+              255
+            ]
+          }
+        },
+        "float16": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              0.3362,
+              0.7373,
+              0.214,
+              1
+            ],
+            "highlight": [
+              1.373,
+              1.373,
+              1.373,
+              1
+            ],
+            "plain": [
+              0.4199,
+              0.2893,
+              0.1603,
+              1
+            ],
+            "center": [
+              0.4199,
+              0.2893,
+              0.1603,
+              1
+            ]
+          }
+        }
+      }
+    },
+    "p3+hdr": {
+      "errors": [],
+      "config": {
+        "format": "rgba16float",
+        "colorSpace": "display-p3",
+        "toneMapping": "extended",
+        "alphaMode": "opaque"
+      },
+      "output": {
+        "gamut": "p3",
+        "hdr": true,
+        "peak": 4
+      },
+      "raw": {
+        "format": "rgba16float",
+        "size": [
+          96,
+          48
+        ],
+        "values": {
+          "p3": [
+            0.0004,
+            0.7349,
+            0.0001,
+            1
+          ],
+          "highlight": [
+            1.373,
+            1.373,
+            1.373,
+            1
+          ],
+          "plain": [
+            0.4199,
+            0.2893,
+            0.1603,
+            1
+          ],
+          "center": [
+            0.4199,
+            0.2893,
+            0.1603,
+            1
+          ]
+        }
+      },
+      "p3": {
+        "unorm8": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              0,
+              187,
+              0,
+              255
+            ],
+            "highlight": [
+              255,
+              255,
+              255,
+              255
+            ],
+            "plain": [
+              107,
+              74,
+              41,
+              255
+            ],
+            "center": [
+              107,
+              74,
+              41,
+              255
+            ]
+          }
+        },
+        "float16": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              0.0004,
+              0.7349,
+              0.0001,
+              1
+            ],
+            "highlight": [
+              1.373,
+              1.373,
+              1.373,
+              1
+            ],
+            "plain": [
+              0.4199,
+              0.2893,
+              0.1603,
+              1
+            ],
+            "center": [
+              0.4199,
+              0.2893,
+              0.1603,
+              1
+            ]
+          }
+        }
+      }
+    },
+    "p3+hdr restored": {
+      "errors": [],
+      "config": {
+        "format": "rgba16float",
+        "colorSpace": "display-p3",
+        "toneMapping": "extended",
+        "alphaMode": "opaque"
+      },
+      "output": {
+        "gamut": "p3",
+        "hdr": true,
+        "peak": 4
+      },
+      "raw": {
+        "format": "rgba16float",
+        "size": [
+          96,
+          48
+        ],
+        "values": {
+          "p3": [
+            0.0004,
+            0.7349,
+            0.0001,
+            1
+          ],
+          "highlight": [
+            1.373,
+            1.373,
+            1.373,
+            1
+          ],
+          "plain": [
+            0.4199,
+            0.2893,
+            0.1603,
+            1
+          ],
+          "center": [
+            0.4199,
+            0.2893,
+            0.1603,
+            1
+          ]
+        }
+      },
+      "p3": {
+        "unorm8": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              0,
+              187,
+              0,
+              255
+            ],
+            "highlight": [
+              255,
+              255,
+              255,
+              255
+            ],
+            "plain": [
+              107,
+              74,
+              41,
+              255
+            ],
+            "center": [
+              107,
+              74,
+              41,
+              255
+            ]
+          }
+        },
+        "float16": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              0.0004,
+              0.7349,
+              0.0001,
+              1
+            ],
+            "highlight": [
+              1.373,
+              1.373,
+              1.373,
+              1
+            ],
+            "plain": [
+              0.4199,
+              0.2893,
+              0.1603,
+              1
+            ],
+            "center": [
+              0.4199,
+              0.2893,
+              0.1603,
+              1
+            ]
+          }
+        }
+      }
+    },
+    "p3+hdr transparent": {
+      "errors": [],
+      "config": {
+        "format": "rgba16float",
+        "colorSpace": "display-p3",
+        "toneMapping": "extended",
+        "alphaMode": "premultiplied"
+      },
+      "output": {
+        "gamut": "p3",
+        "hdr": true,
+        "peak": 4
+      },
+      "raw": {
+        "format": "rgba16float",
+        "size": [
+          96,
+          48
+        ],
+        "values": {
+          "p3": [
+            0.0004,
+            0.7349,
+            0.0001,
+            1
+          ],
+          "highlight": [
+            1.373,
+            1.373,
+            1.373,
+            1
+          ],
+          "plain": [
+            0.4199,
+            0.2893,
+            0.1603,
+            1
+          ],
+          "center": [
+            0.4199,
+            0.2893,
+            0.1603,
+            1
+          ]
+        }
+      },
+      "p3": {
+        "unorm8": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              0,
+              187,
+              0,
+              255
+            ],
+            "highlight": [
+              255,
+              255,
+              255,
+              255
+            ],
+            "plain": [
+              107,
+              74,
+              41,
+              255
+            ],
+            "center": [
+              107,
+              74,
+              41,
+              255
+            ]
+          }
+        },
+        "float16": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              0.0004,
+              0.7349,
+              0.0001,
+              1
+            ],
+            "highlight": [
+              1.373,
+              1.373,
+              1.373,
+              1
+            ],
+            "plain": [
+              0.4199,
+              0.2893,
+              0.1603,
+              1
+            ],
+            "center": [
+              0.4199,
+              0.2893,
+              0.1603,
+              1
+            ]
+          }
+        }
+      }
+    },
+    "p3+hdr stack": {
+      "errors": [],
+      "config": {
+        "format": "rgba16float",
+        "colorSpace": "display-p3",
+        "toneMapping": "extended",
+        "alphaMode": "opaque"
+      },
+      "output": {
+        "gamut": "p3",
+        "hdr": true,
+        "peak": 4
+      },
+      "raw": {
+        "format": "rgba16float",
+        "size": [
+          96,
+          48
+        ],
+        "values": {
+          "p3": [
+            0.0386,
+            0.0771,
+            0.1437,
+            1
+          ],
+          "highlight": [
+            0.0386,
+            0.0771,
+            0.1437,
+            1
+          ],
+          "plain": [
+            0.0386,
+            0.0771,
+            0.1437,
+            1
+          ],
+          "center": [
+            0.8154,
+            0.8154,
+            0.8154,
+            1
+          ]
+        }
+      },
+      "p3": {
+        "unorm8": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              10,
+              20,
+              37,
+              255
+            ],
+            "highlight": [
+              10,
+              20,
+              37,
+              255
+            ],
+            "plain": [
+              10,
+              20,
+              37,
+              255
+            ],
+            "center": [
+              208,
+              208,
+              208,
+              255
+            ]
+          }
+        },
+        "float16": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              0.0386,
+              0.0771,
+              0.1437,
+              1
+            ],
+            "highlight": [
+              0.0386,
+              0.0771,
+              0.1437,
+              1
+            ],
+            "plain": [
+              0.0386,
+              0.0771,
+              0.1437,
+              1
+            ],
+            "center": [
+              0.8154,
+              0.8154,
+              0.8154,
+              1
+            ]
+          }
+        }
+      }
+    },
+    "auto (media queries)": {
+      "errors": [],
+      "config": {
+        "format": "bgra8unorm",
+        "colorSpace": "srgb",
+        "toneMapping": "standard",
+        "alphaMode": "opaque"
+      },
+      "output": {
+        "gamut": "srgb",
+        "hdr": false,
+        "peak": 4
+      },
+      "raw": {
+        "format": "bgra8unorm",
+        "size": [
+          96,
+          48
+        ],
+        "values": {
+          "p3": [
+            0,
+            191,
+            0,
+            255
+          ],
+          "highlight": [
+            252,
+            252,
+            252,
+            255
+          ],
+          "plain": [
+            113,
+            72,
+            34,
+            255
+          ],
+          "center": [
+            113,
+            72,
+            34,
+            255
+          ]
+        }
+      },
+      "p3": {
+        "unorm8": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              86,
+              188,
+              55,
+              255
+            ],
+            "highlight": [
+              252,
+              252,
+              252,
+              255
+            ],
+            "plain": [
+              107,
+              74,
+              41,
+              255
+            ],
+            "center": [
+              107,
+              74,
+              41,
+              255
+            ]
+          }
+        },
+        "float16": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              0.3364,
+              0.7378,
+              0.2142,
+              1
+            ],
+            "highlight": [
+              0.9883,
+              0.9883,
+              0.9878,
+              1
+            ],
+            "plain": [
+              0.4199,
+              0.2893,
+              0.1604,
+              1
+            ],
+            "center": [
+              0.4199,
+              0.2893,
+              0.1604,
+              1
+            ]
+          }
+        }
+      }
+    },
+    "core off": {
+      "errors": [],
+      "config": {
+        "format": "bgra8unorm",
+        "colorSpace": "srgb",
+        "toneMapping": "standard",
+        "alphaMode": "opaque"
+      },
+      "raw": {
+        "format": "bgra8unorm",
+        "size": [
+          96,
+          48
+        ],
+        "values": {
+          "p3": [
+            5,
+            6,
+            9,
+            255
+          ],
+          "highlight": [
+            5,
+            6,
+            9,
+            255
+          ],
+          "plain": [
+            5,
+            6,
+            9,
+            255
+          ],
+          "center": [
+            156,
+            73,
+            29,
+            255
+          ]
+        }
+      },
+      "p3": {
+        "unorm8": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              5,
+              6,
+              9,
+              255
+            ],
+            "highlight": [
+              5,
+              6,
+              9,
+              255
+            ],
+            "plain": [
+              5,
+              6,
+              9,
+              255
+            ],
+            "center": [
+              146,
+              78,
+              40,
+              255
+            ]
+          }
+        },
+        "float16": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              0.0203,
+              0.0234,
+              0.0341,
+              1
+            ],
+            "highlight": [
+              0.0203,
+              0.0234,
+              0.0341,
+              1
+            ],
+            "plain": [
+              0.0203,
+              0.0234,
+              0.0341,
+              1
+            ],
+            "center": [
+              0.5703,
+              0.3044,
+              0.1588,
+              1
+            ]
+          }
+        }
+      }
+    },
+    "core p3": {
+      "errors": [],
+      "config": {
+        "format": "bgra8unorm",
+        "colorSpace": "display-p3",
+        "toneMapping": "standard",
+        "alphaMode": "opaque"
+      },
+      "output": {
+        "gamut": "p3",
+        "hdr": false,
+        "peak": 4
+      },
+      "raw": {
+        "format": "bgra8unorm",
+        "size": [
+          96,
+          48
+        ],
+        "values": {
+          "p3": [
+            5,
+            6,
+            9,
+            255
+          ],
+          "highlight": [
+            5,
+            6,
+            9,
+            255
+          ],
+          "plain": [
+            5,
+            6,
+            9,
+            255
+          ],
+          "center": [
+            145,
+            78,
+            40,
+            255
+          ]
+        }
+      },
+      "p3": {
+        "unorm8": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              5,
+              6,
+              9,
+              255
+            ],
+            "highlight": [
+              5,
+              6,
+              9,
+              255
+            ],
+            "plain": [
+              5,
+              6,
+              9,
+              255
+            ],
+            "center": [
+              145,
+              78,
+              40,
+              255
+            ]
+          }
+        },
+        "float16": {
+          "colorSpace": "display-p3",
+          "values": {
+            "p3": [
+              0.0196,
+              0.0235,
+              0.0353,
+              1
+            ],
+            "highlight": [
+              0.0196,
+              0.0235,
+              0.0353,
+              1
+            ],
+            "plain": [
+              0.0196,
+              0.0235,
+              0.0353,
+              1
+            ],
+            "center": [
+              0.5684,
+              0.3057,
+              0.1569,
+              1
+            ]
+          }
+        }
+      }
+    }
+  },
+  "display": {
+    "media": {
+      "(color-gamut: srgb)": true,
+      "(color-gamut: p3)": false,
+      "(color-gamut: rec2020)": false,
+      "(dynamic-range: high)": false,
+      "(video-dynamic-range: high)": false
+    },
+    "devicePixelRatio": 1,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36"
+  },
+  "identical": {
+    "plainPatch": 0,
+    "coreBox": 1
+  }
+}

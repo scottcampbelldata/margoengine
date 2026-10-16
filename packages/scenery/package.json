@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/scenery",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "Procedural moonlit skies and scenery passes for Margo Engine.",
@@ -13,7 +13,7 @@
     "access": "public"
   },
   "scripts": {
-    "test": "node --test ../../tests/modern-sky-moon.test.js ../../tests/deep-render-scenery.test.js",
+    "test": "node --test ../../tests/deep-render-scenery.test.js",
     "prepack": "npm --prefix ../.. run build:packages"
   },
   "sideEffects": false,
@@ -25,17 +25,16 @@
     "./sky": {
       "types": "./dist/sky.d.ts",
       "import": "./dist/sky.js"
-    },
-    "./sky-moon": {
-      "types": "./dist/sky-moon.d.ts",
-      "import": "./dist/sky-moon.js"
     }
   },
   "files": [
     "dist"
   ],
   "peerDependencies": {
-    "@margoengine/core": "0.1.0"
+    "@margoengine/core": "^1.0.0"
   },
-  "homepage": "https://margoengine.com"
+  "homepage": "https://margoengine.com",
+  "dependencies": {
+    "@margoengine/sky": "^1.0.0"
+  }
 }

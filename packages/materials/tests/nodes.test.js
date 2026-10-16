@@ -145,7 +145,7 @@ test('transmission graph validates volume requirements and glTF-compatible atten
 test('compiled and baseline materials have isolated pipelines and mutable factor buffers',async()=>{
   const s=await scene();
   try{
-    s.draw();const baseline=s.draws.at(-1);assert.equal(digest(baseline.pipeline.vertex.module.code),'469dd81676967dbfd22118fa85b1cf8b6ff37dc7593e7e7f8130e5626a29f508');
+    s.draw();const baseline=s.draws.at(-1);assert.equal(digest(baseline.pipeline.vertex.module.code),'45df766b2c73181edc3cbd8109a848f17851f03b7cc947dec8d987ff60c2dee5');
     const extension=nodeMaterial(graph());s.model.primitives[0].extension=extension;s.draw();const extended=s.draws.at(-1);
     assert.notEqual(extended.pipeline,baseline.pipeline);assert.deepEqual([...baseline.groups.keys()],[0,1]);assert.ok(extended.groups.has(3));
     const count=s.pipelines.length;extension.factors[0]=0.75;s.draw();assert.equal(s.pipelines.length,count);

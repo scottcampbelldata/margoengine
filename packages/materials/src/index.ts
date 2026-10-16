@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import {textureCoordinates, type TextureTransform, type MaterialExtension, type MaterialExtensionTexture, type PBRMaterial, type PBRModel} from '@margoengine/gltf-pro';
 import {coordinateSlot} from './coordinates.js';
 import type {Engine, EnginePlugin} from '@margoengine/core/extension';
@@ -70,6 +71,9 @@ function definition(value:any,label:string):any {
 
 /** Owns textures installed from glTF metadata. The model retains its image blueprints. */
 export class MaterialInstallation implements EnginePlugin {
+  static attach(model:PBRModel):MaterialInstallation {return install(model);}
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
   readonly name:string;
   disposed=false;
   private readonly plans:Plan[]=[];
@@ -83,7 +87,9 @@ export class MaterialInstallation implements EnginePlugin {
       const normalized=material.clearcoat!==undefined,def=definition(normalized?material.clearcoat:material.extensions?.KHR_materials_clearcoat,'KHR_materials_clearcoat');
       const normalizedTransmission=material.transmission!==undefined;
       const transmit=definition(normalizedTransmission?material.transmission:material.extensions?.KHR_materials_transmission,'KHR_materials_transmission');
-      const volume=definition(material.volume!==undefined?material.volume:transmit?.volume!==undefined?transmit.volume:material.extensions?.KHR_materials_volume,'KHR_materials_volume');
+      // The built-in physical renderer stores packed attenuation in volume; normalized extension metadata stays an object.
+      const normalizedVolume=material.physical&&Array.isArray(material.volume)?undefined:material.volume;
+      const volume=definition(normalizedVolume!==undefined?normalizedVolume:transmit?.volume!==undefined?transmit.volume:material.extensions?.KHR_materials_volume,'KHR_materials_volume');
       const lobeOptions:MaterialLobeOptions={},lobeTextures:Partial<Record<MapField,any>>={};
       for(const key of Object.keys(lobeMaps) as (keyof typeof lobeMaps)[]){
         const normalized=material[key]!==undefined,value=definition(normalized?material[key]:material.extensions?.['KHR_materials_'+key],'KHR_materials_'+key);
@@ -150,7 +156,7 @@ export class MaterialInstallation implements EnginePlugin {
         if(plan.extension?.factors)extension.factors=plan.extension.factors;
         return {plan,extension};
       });
-      for(const {plan,extension} of ready){plan.extension=extension;plan.material.extension=extension;if(plan.transmission)plan.material.settings[0]=2;}
+      for(const {plan,extension} of ready){extension.replacesPhysical=true;plan.extension=extension;plan.material.extension=extension;if(plan.transmission)plan.material.settings[0]=2;}
       this.textures=textures;
       this.unsubscribe??=this.model.onDispose(()=>this.destroy());
     }catch(error){const cleanup=new Cleanup(error);cleanup.run(()=>textures.dispose()).run(()=>this.capture?.release());this.capture=undefined;cleanup.finish();}
@@ -170,3 +176,6 @@ export class MaterialInstallation implements EnginePlugin {
 export function install(model:PBRModel):MaterialInstallation {
   const installation=new MaterialInstallation(model);model.root.engine.use(installation);return installation;
 }
+
+// Mesh materials and imported glTF extensions share the same PBR renderer.
+export * from './built-material.js';

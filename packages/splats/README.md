@@ -4,7 +4,7 @@ Use `@margoengine/splats/data` for `parseSplat`, `validateSplats` and the
 `SplatData` type without loading GPU rendering or radix-sort shaders. Root
 exports retain the same functions for applications that also render splats.
 
-Optional WebGPU Gaussian rendering for 1–3,000,000 world-space splats, subject to adapter storage/memory limits. Compute projects each positive-definite 3D covariance through the camera Jacobian into a 2D ellipse with a 0.3-pixel variance floor. Instanced quads cover three standard deviations; the fragment shader evaluates Gaussian opacity and blends far to near against read-only reversed scene depth.
+Optional WebGPU Gaussian rendering that accepts 1–3,000,000 world-space splats (an input cap, not a frame-rate promise: adapter storage/memory limits may allow fewer, and frame time at the cap depends on the GPU). Compute projects each positive-definite 3D covariance through the camera Jacobian into a 2D ellipse with a 0.3-pixel variance floor. Instanced quads cover three standard deviations; the fragment shader evaluates Gaussian opacity and blends far to near against read-only reversed scene depth.
 
 ```ts
 import {EngineKernel} from '@margoengine/core';
@@ -20,6 +20,8 @@ engine.start();
 For generated data, supply `SplatData`: `positions` has three Float32 values per splat; `covariances` has six (xx, xy, xz, yy, yz, zz); `colors` has four (linear RGB and opacity, each 0..1). Construction validates lengths, finite values and positive-definite covariance, then copies the data for ownership/device recovery. Colors are converted to sRGB for ordinary display targets and remain linear in HDR targets.
 
 Optional `sphericalHarmonics` contains 4, 9 or 16 coefficients per splat, with RGB interleaved for each coefficient. Evaluation uses the real SH basis through degree 3, the camera-to-splat direction, and the usual 0.5 offset. SH replaces RGB; `colors` still supplies opacity. Large SH buffers can exceed an adapter's storage binding limit even when the base cloud fits; attachment rejects before allocating. `parseSplat()` decodes the common 32-byte binary layout (xyz, positive xyz scales, byte RGBA, byte quaternion in wxyz order), converts byte sRGB to linear, normalizes quaternions and derives covariance. PLY, compressed SPZ and training are outside this package.
+
+Orthographic cameras (any `camera.matrix` with a constant clip w, such as `CameraProjection` from `@margoengine/cameras`) use the affine Jacobian: a splat's pixel size depends only on the zoom, not its depth. The depth range is the projection's own near/far, which may lie behind the eye, sort keys are measured from the near plane, and spherical harmonics use the fixed viewing direction. The package reads only the clip matrix and does not depend on the cameras package.
 
 Each frame creates sortable unsigned depth keys on the GPU. Eight stable 4-bit LSD radix passes run per-workgroup histograms, hierarchical exclusive prefix scans, a scan of block totals, and scatter. Workgroup bit masks and population counts preserve input order within equal digits; equal-depth splats retain source order. Off-frustum, transparent and out-of-range centers sort to the end and render no fragments. The runtime performs no CPU sorting, per-splat frame allocation or GPU readback.
 

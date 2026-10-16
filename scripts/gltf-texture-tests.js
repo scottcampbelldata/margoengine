@@ -18,6 +18,15 @@ export async function textureBrowserChecks(page) {
     actual:textureQuad('normal',transform,{required:true,tangents:false}),reference:textureQuad('normal',transform,{bake:true,tangents:false}),baseline:textureQuad('normal',undefined,{tangents:false})});
   const serialize=fixture=>({doc:fixture.doc,buffers:fixture.buffers.map(buffer=>[...new Uint8Array(buffer.buffer,buffer.byteOffset,buffer.byteLength)])});
   const ordinary=textureQuad(),identity=textureQuad('base',{offset:[0,0],rotation:0,scale:[1,1]});
+  const normalCases=[];
+  for(const extended of [false,true])for(const tangent of [[0,0,0,1],[0,0,1,1],[0,0,-1,-1]]){
+    const actual=textureQuad('normal'),reference=textureQuad('normal');
+    for(const [fixture,frame] of [[actual,tangent],[reference,[0,1,0,tangent[3]]]]){
+      const index=fixture.doc.meshes[0].primitives[0].attributes.TANGENT;
+      for(let i=0;i<4;i++)fixture.buffers[index].set(frame,i*4);
+    }
+    normalCases.push({name:`${extended?'extended':'compact'}:${tangent.join(',')}`,actual:{...serialize(actual),extended},reference:{...serialize(reference),extended}});
+  }
   const materialCases=[];
   for(const name of ['coatFactor','coatRoughness','coatNormal','transmissionFactor','volumeThickness']){
     const channel=name==='coatNormal'?'normal':'base',actual=textureQuad(channel,transforms[3]),reference=textureQuad(channel,transforms[3],{bake:true});
@@ -83,6 +92,7 @@ export async function textureBrowserChecks(page) {
       const image=await createImageBitmap(imageCanvas,{colorSpaceConversion:'none',premultiplyAlpha:'none'});
       const model=parseGLTF(engine,structuredClone(fixture.doc),fixture.buffers.map(buffer=>new Uint8Array(buffer)),[image]);
       try{
+        if(fixture.extended)model.primitives[0].material.extendedFrame=true;
         assert(model.primitives[0].vertices.length===80,'PBR vertices widened beyond 20 floats');
         if(coat===true)model.primitives[0].extension=materials.clearcoat({factor:0.6,roughnessFactor:0.2});
         else if(typeof coat==='function')model.primitives[0].extension=coat(model.primitives[0]);
@@ -97,9 +107,17 @@ export async function textureBrowserChecks(page) {
       const ordinary=await render(payload.ordinary),identity=await render(payload.identity);
       const baselineDifference=difference(ordinary.beauty,identity.beauty);assert(baselineDifference.changed===0,'Identity transform changed ordinary PBR pixels');
       const hash=async value=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(byte=>byte.toString(16).padStart(2,'0')).join('');
-      assert(await hash(ordinary.pipeline.code)==='469dd81676967dbfd22118fa85b1cf8b6ff37dc7593e7e7f8130e5626a29f508','Ordinary PBR shader changed');
+      assert(await hash(ordinary.pipeline.code)==='45df766b2c73181edc3cbd8109a848f17851f03b7cc947dec8d987ff60c2dee5','Ordinary PBR shader changed');
       assert(ordinary.pipeline.code===identity.pipeline.code,'Identity transform changed the PBR shader');
       const results=[];
+      for(const item of payload.normalCases){
+        const actual=await render(item.actual),reference=await render(item.reference);
+        const beauty=difference(actual.beauty,reference.beauty),normals=normalDifference(actual.normals,reference.normals);
+        assert(beauty.max<=1,`${item.name} degenerate tangent changed lighting: ${JSON.stringify(beauty)}`);
+        assert(Number.isFinite(normals)&&normals<=0.002,`${item.name} produced nonfinite or incorrect normals: ${normals}`);
+        assert(actual.beauty.some((byte,index)=>index%4<3&&byte>0),`${item.name} rendered no visible surface`);
+        results.push({name:'degenerate-normal:'+item.name,beauty,normals});
+      }
       for(const item of payload.cases){
         const actual=await render(item.actual),reference=await render(item.reference),baseline=await render(item.baseline);
         const beauty=difference(actual.beauty,reference.beauty),normals=normalDifference(actual.normals,reference.normals);
@@ -152,7 +170,7 @@ export async function textureBrowserChecks(page) {
       assert(shadowCovered>0,'Transformed alpha caster produced no shadow-map samples');
       assert(shadowDifference.changed===0,'Transformed alpha caster shadow differs from independently baked UVs');
 
-      const before=textures.length,ktx=await loadGLTF(engine,new URL('/test-results/gltf-textures/basis-quad.gltf',location.href));
+      const before=textures.length,ktx=await loadGLTF(engine,new URL('/test-results/gltf-textures/basis-quad.gltf',location.href),{allowedURLs:[new URL('/packages/decoders/tests/fixtures/',location.href).href]});
       let ktxReport;
       try{
         assert(workers.length>0,'Automatic KTX2 loading did not create its lazy decoder worker');
@@ -174,7 +192,7 @@ export async function textureBrowserChecks(page) {
       return {pixelsPerCapture:width*height,captures,compression,identity:baselineDifference,transforms:results,composedClearcoat:composedDifference,materialTransforms:materialResults,
         maskedShadows:{difference:shadowDifference,coveredSamples:shadowCovered,cascades:4},ktx2:ktxReport,shaderModules:modules.size,compilationErrors};
     }finally{window.Worker=NativeWorker;engine.dispose();for(const resource of owned)resource.destroy();canvas.remove();}
-  },{ordinary:serialize(ordinary),identity:serialize(identity),cases:cases.map(item=>({...item,actual:serialize(item.actual),reference:serialize(item.reference),baseline:serialize(item.baseline)})),materialCases,
+  },{ordinary:serialize(ordinary),identity:serialize(identity),cases:cases.map(item=>({...item,actual:serialize(item.actual),reference:serialize(item.reference),baseline:serialize(item.baseline)})),materialCases,normalCases,
     shadowActual:serialize(shadowActual),shadowReference:serialize(shadowReference),pixels:[...texturePixels]});
 }
 

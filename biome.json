@@ -1,0 +1,54 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "includes": [
+      "packages/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
+      "tests/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
+      "scripts/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
+      "examples/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
+      "apps/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
+      "tools/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
+      "!**/dist",
+      "!**/vendor",
+      "!packages/clustered/src/ltc.ts",
+      "!packages/core/src/wasm.ts",
+      "!packages/machinery/src/wasm.ts"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120,
+    "lineEnding": "auto"
+  },
+  "javascript": {
+    "jsxRuntime": "reactClassic",
+    "formatter": {
+      "quoteStyle": "single",
+      "quoteProperties": "preserve",
+      "semicolons": "always",
+      "trailingCommas": "all"
+    }
+  },
+  "assist": { "enabled": false },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "none",
+      "correctness": {
+        "noUnusedVariables": "warn",
+        "noUnusedImports": "warn"
+      },
+      "style": {
+        "useConst": "warn",
+        "useImportType": "warn"
+      },
+      "suspicious": {
+        "noVar": "warn",
+        "noExplicitAny": "warn"
+      }
+    }
+  }
+}

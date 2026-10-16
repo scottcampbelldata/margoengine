@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/post",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "description": "HDR bloom, AgX tonemapping and frame-graph SSAO for Margo Engine WebGPU.",
@@ -33,6 +33,22 @@
     "./scene-fade": {
       "types": "./dist/scene-fade.d.ts",
       "import": "./dist/scene-fade.js"
+    },
+    "./stack": {
+      "types": "./dist/stack.d.ts",
+      "import": "./dist/stack.js"
+    },
+    "./fxaa": {
+      "types": "./dist/fxaa.d.ts",
+      "import": "./dist/fxaa.js"
+    },
+    "./decals": {
+      "types": "./dist/decals.d.ts",
+      "import": "./dist/decals.js"
+    },
+    "./ssr": {
+      "types": "./dist/ssr.d.ts",
+      "import": "./dist/ssr.js"
     }
   },
   "files": [
@@ -40,7 +56,10 @@
     "NOTICE.md"
   ],
   "peerDependencies": {
-    "@margoengine/core": "0.1.0"
+    "@margoengine/core": "^1.0.0"
   },
-  "homepage": "https://margoengine.com"
+  "homepage": "https://margoengine.com",
+  "devDependencies": {
+    "@margoengine/math": "^1.0.0"
+  }
 }

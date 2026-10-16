@@ -1,3 +1,5 @@
+import type {TransmissionPassOptions} from './transmission-pass.js';
+export {Transmission, type TransmissionPassOptions} from './transmission-pass.js';
 import {textureCoordinates, type MaterialExtension} from '@margoengine/gltf-pro';
 import {coordinateSlot,coordinateWGSL} from './coordinates.js';
 import type {ClearcoatTexture} from './index.js';
@@ -9,7 +11,7 @@ export interface VolumeOptions {
   attenuationColor?:readonly [number,number,number];
   attenuationDistance?:number;
 }
-export interface TransmissionOptions {
+export interface TransmissionOptions extends TransmissionPassOptions {
   factor?:number;
   ior?:number;
   opaqueColor?:GPUTextureView;

@@ -1,4 +1,4 @@
-export const terrainVertex=/* wgsl */`
+export const terrainVertex = /* wgsl */ `
 struct Frame {camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,grid:vec4f,offset:vec4f,map:vec4f,heights:vec4f}
 struct Layer {heightSlope:vec4f,params:vec4f}
 @group(0) @binding(0) var<uniform> frame:Frame;
@@ -23,7 +23,7 @@ struct Output {@builtin(position) clip:vec4f,@location(0) position:vec3f,@locati
   var o:Output;o.position=position;o.clip=frame.camera*vec4f(position,1);o.normal=normal;o.color=vec3f(1);o.material=vec4f(0.9,0,1,1);return o;
 }
 `;
-export const terrainFragment=/* wgsl */`
+export const terrainFragment = /* wgsl */ `
 fn terrainColor(position:vec3f,normal:vec3f)->vec3f {
   let slope=1-clamp(normal.y,0.0,1.0);let axes=pow(abs(normal),vec3f(8));let projection=axes/max(axes.x+axes.y+axes.z,0.00001);let dx=dpdx(position);let dy=dpdy(position);var color=vec3f(0);var total=0.0;var fallback=vec3f(0);
   for(var layer=0u;layer<u32(frame.heights.z);layer++){

@@ -1,0 +1,142 @@
+{
+  "benchmark": "binding-limit-gpu",
+  "baseline": "e017d50",
+  "recordedAt": "2026-10-15T00:28:58.976Z",
+  "hardware": {
+    "vendor": "intel",
+    "architecture": "xe-2lpg",
+    "device": "",
+    "description": "",
+    "fallback": false
+  },
+  "browser": "chromium 155.0.4283.45",
+  "resolution": [
+    1280,
+    720
+  ],
+  "powerOnline": {
+    "before": "True",
+    "after": "True"
+  },
+  "referenceAtDefaultLimits": {
+    "error": null,
+    "thrown": "gltf-pro: physical material + environment:lighting + fog + shadows + clustered + clustered:shadows needs 17 sampled textures per shader stage; this device allows 16",
+    "errors": [],
+    "limits": {
+      "sampledTextures": 16,
+      "samplers": 16
+    }
+  },
+  "reference": {
+    "error": null,
+    "thrown": null,
+    "errors": [],
+    "limits": {
+      "sampledTextures": 48,
+      "samplers": 16
+    }
+  },
+  "candidate": {
+    "error": null,
+    "thrown": null,
+    "errors": [],
+    "limits": {
+      "sampledTextures": 16,
+      "samplers": 16
+    }
+  },
+  "candidateVsReference": {
+    "frame": {
+      "pixels": 921600,
+      "meanAbsDiff": 0,
+      "maxDiff": 1,
+      "fractionOver2": 0,
+      "fractionOver8": 0
+    },
+    "worstCentre": {
+      "roughness": 0.833,
+      "metal": 1,
+      "coat": 0,
+      "centre": {
+        "pixels": 2446,
+        "meanAbsDiff": 0.0015,
+        "maxDiff": 1,
+        "fractionOver2": 0,
+        "fractionOver8": 0
+      },
+      "rim": {
+        "pixels": 1215,
+        "meanAbsDiff": 0.0005,
+        "maxDiff": 1,
+        "fractionOver2": 0,
+        "fractionOver8": 0
+      }
+    },
+    "worstRim": {
+      "roughness": 0.833,
+      "metal": 1,
+      "coat": 0,
+      "centre": {
+        "pixels": 2553,
+        "meanAbsDiff": 0.001,
+        "maxDiff": 1,
+        "fractionOver2": 0,
+        "fractionOver8": 0
+      },
+      "rim": {
+        "pixels": 1267,
+        "meanAbsDiff": 0.0008,
+        "maxDiff": 1,
+        "fractionOver2": 0,
+        "fractionOver8": 0
+      }
+    }
+  },
+  "karisVsReference": {
+    "frame": {
+      "pixels": 921600,
+      "meanAbsDiff": 0.4622,
+      "maxDiff": 21,
+      "fractionOver2": 0.05331,
+      "fractionOver8": 0.01921
+    },
+    "worstCentre": {
+      "roughness": 1,
+      "metal": 1,
+      "coat": 0,
+      "centre": {
+        "pixels": 2551,
+        "meanAbsDiff": 14.2076,
+        "maxDiff": 21,
+        "fractionOver2": 1,
+        "fractionOver8": 0.96433
+      },
+      "rim": {
+        "pixels": 1271,
+        "meanAbsDiff": 5.1762,
+        "maxDiff": 13,
+        "fractionOver2": 0.81904,
+        "fractionOver8": 0.15421
+      }
+    },
+    "worstRim": {
+      "roughness": 0.333,
+      "metal": 1,
+      "coat": 0,
+      "centre": {
+        "pixels": 2443,
+        "meanAbsDiff": 8.4736,
+        "maxDiff": 13,
+        "fractionOver2": 0.94965,
+        "fractionOver8": 0.76136
+      },
+      "rim": {
+        "pixels": 1218,
+        "meanAbsDiff": 8.0862,
+        "maxDiff": 13,
+        "fractionOver2": 0.99754,
+        "fractionOver8": 0.71921
+      }
+    }
+  }
+}

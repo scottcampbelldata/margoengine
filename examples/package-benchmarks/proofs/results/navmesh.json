@@ -1,0 +1,59 @@
+{
+  "package": "navmesh",
+  "baseline": "f05414a",
+  "node": "v24.15.0",
+  "recordedAt": "2026-10-14T03:22:43.746Z",
+  "outputsIdentical": true,
+  "notes": "NavMesh.path uses a (cost, index) binary heap, link costs computed once at construction and per-search cached heuristics; NavMesh.locate reads flat edge arrays; avoid reuses its half-plane records between calls.",
+  "cases": [
+    {
+      "case": "path on 73 polygons",
+      "paths": 400,
+      "baselineMs": 5.2314,
+      "candidateMs": 2.5112,
+      "speedup": 2.083
+    },
+    {
+      "case": "locate on 73 polygons",
+      "lookups": 400,
+      "baselineMs": 1.0151,
+      "candidateMs": 0.5253,
+      "speedup": 1.932
+    },
+    {
+      "case": "path on 1154 polygons",
+      "paths": 100,
+      "baselineMs": 94.8988,
+      "candidateMs": 18.1576,
+      "speedup": 5.226
+    },
+    {
+      "case": "locate on 1154 polygons",
+      "lookups": 400,
+      "baselineMs": 43.1655,
+      "candidateMs": 9.2007,
+      "speedup": 4.692
+    },
+    {
+      "case": "path on 3549 polygons",
+      "paths": 100,
+      "baselineMs": 283.6839,
+      "candidateMs": 49.4611,
+      "speedup": 5.735
+    },
+    {
+      "case": "locate on 3549 polygons",
+      "lookups": 400,
+      "baselineMs": 82.4165,
+      "candidateMs": 22.241,
+      "speedup": 3.706
+    },
+    {
+      "case": "avoid, 200 agents with up to 12 neighbours",
+      "calls": 6000,
+      "baselineMs": 12.9587,
+      "candidateMs": 11.5146,
+      "speedup": 1.125
+    }
+  ]
+}

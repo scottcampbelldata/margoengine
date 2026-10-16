@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Margo Engine · Package workloads</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main>
+    <header><p class="eyebrow">MARGO ENGINE / PACKAGE BENCHMARKS</p><h1>Package workloads</h1>
+      <p>See actual package operations and interactions on a rendered scene. Choose a workload and press Run to measure it.</p></header>
+    <form class="controls" onsubmit="return false">
+      <label>Package<select id="package"><option value="ecs">@margoengine/ecs</option><option value="fsm">@margoengine/fsm</option><option value="tween">@margoengine/tween</option><option value="net">@margoengine/net</option><option value="bvh">@margoengine/bvh</option><option value="splines">@margoengine/splines</option><option value="navmesh">@margoengine/navmesh</option><option value="wfc">@margoengine/wfc</option><option value="navigation">@margoengine/navigation</option><option value="physics">@margoengine/physics</option><option value="road">@margoengine/road</option><option value="gizmo">@margoengine/gizmo</option><option value="inspector">@margoengine/inspector</option><option value="labels">@margoengine/labels</option><option value="html">@margoengine/html</option><option value="loaders">@margoengine/loaders</option><option value="exporters">@margoengine/exporters</option><option value="usdz-export">@margoengine/usdz-export</option><option value="decoders">@margoengine/decoders</option><option value="ifc">@margoengine/ifc</option><option value="fbx">@margoengine/fbx</option><option value="points">@margoengine/points</option><option value="toon">@margoengine/toon</option><option value="transitions">@margoengine/transitions</option><option value="animator">@margoengine/animator</option><option value="taa">@margoengine/taa</option><option value="text">@margoengine/text</option><option value="splats">@margoengine/splats</option><option value="audio">@margoengine/audio</option><option value="video">@margoengine/video</option><option value="blender">@margoengine/blender</option></select></label>
+      <label><span id="count-label">Workload size</span><select id="count"></select></label>
+      <label class="profiling"><input id="gpu-timing" type="checkbox"><span>GPU timing<small>Sample one frame in 15</small></span></label>
+      <button id="run" type="button" disabled aria-pressed="false">Run</button>
+      <span class="target">60 FPS target<br><strong>16.67 ms per frame</strong></span>
+    </form>
+    <p id="description"></p>
+    <section class="metrics" aria-label="Performance measurements">
+      <div id="stats" class="card"><p id="fps-placeholder">Frame cadence<br>Press Run to measure FPS.</p></div>
+      <div class="card"><span>Workload CPU</span><strong id="workload-cpu">—</strong><small>Package calls and pose generation</small></div>
+      <div class="card"><span>Render CPU</span><strong id="render-cpu">—</strong><small>Mesh updates and command encoding</small></div>
+      <div class="card"><span>Rendered actors</span><strong id="visible">—</strong><small id="backend">Waiting for the engine</small></div>
+    </section>
+    <div class="stage"><canvas id="scene" aria-label="Live package workload visualization"></canvas></div>
+    <section id="package-ui" class="package-ui" aria-label="Package interaction controls" hidden></section>
+    <p id="status" role="status" aria-live="polite">Loading the selected package…</p>
+    <p id="gpu-status">GPU timing is off. FPS is measured without timestamp queries.</p>
+    <p id="counts" class="counts"></p>
+    <footer>CPU times are rolling means of synchronous JavaScript. FPS includes the whole scene, browser and GPU. Optional GPU timing samples pass execution and adds instrumentation overhead; leave it off for the FPS baseline. Keep this page visible while measuring. <a href="./README.md">Workload details</a></footer>
+  </main>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
