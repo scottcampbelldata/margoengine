@@ -56,7 +56,7 @@ These are the gaps a porter will find. They are not a build list.
 | `AnimationMixer` on the same object as the skin | `@margoengine/animation` plays one clip, with four or eight influences, and does not crossfade. Crossfades, 1D and 2D blend trees, and masked additive layers are in `@margoengine/animator`. |
 | `ShaderMaterial` and node materials | `materials.nodeMaterial()` compiles a closed TypeScript graph to `MaterialExtension`; it accepts no arbitrary WGSL, node-graph file format, or Three.js TSL. Custom WGSL uses `MaterialExtension` directly, and custom draws use the core extension API. |
 | `EffectComposer` with SSR, SSGI, GTAO, SMAA, outline | The post packages are bloom, AgX, SSAO, depth of field, and TAA. They are separate packages, not one composer stack. |
-| `Raycaster` against skinned and morphed meshes | `engine.pick` is a GPU id buffer. `@margoengine/selection` covers core mesh geometry and excludes skinned draws. `@margoengine/bvh` is triangles. |
+| `Raycaster` against skinned and morphed meshes | Explicit picking/selection registrations use current PBR deformation buffers. `engine.pick` combines visible core/PBR depth; asynchronous `Raycaster.intersectModel()` reads that GPU pose for geometric CPU triangle queries. |
 | `THREE.LOD`, `BatchedMesh`, CSS3D, more than eight joint influences | `@margoengine/scatter` has its own GPU LOD. The animation package bounds influences at eight. |
 
 The native FBX importer has landed. `docs/native-fbx.md` and `packages/fbx/README.md` describe it. `@margoengine/fbx` has no Three.js runtime dependency. A CC0 Blender rig now has headless numeric checks and a required rendered playback and seek check, recorded in `docs/code-to-nine.md`. Broader DCC certification is still separate. The file a stranger tries first is still a glTF. A compressed glTF now has a path through `loadGLTF`. KTX2 textures, texture transforms and eight-influence character meshes now have that path too.
@@ -82,7 +82,7 @@ Do not hold the launch for these. Document them as absent.
 - Ray-traced or multi-bounce transmission and participating media; extended lobes in clustered or environment lighting.
 - Rect-area lights, IES profiles, area-light penumbrae, and custom-only clipmap terrain casters for local lights.
 - Three.js TSL and node-graph file formats, SSR, SSGI, GTAO, and a single EffectComposer clone.
-- A CPU raycaster that hits skinned and morphed vertices.
+- Arbitrary vertex WGSL and PBR section clipping in GPU picking; alpha-texture rejection in CPU triangle raycasts.
 - Cubic FBX curves, extra inheritance modes, progressive morphs, and broader DCC certification beyond the checked-in Blender rig. The native reader is already the runtime. Three.js is no longer an FBX dependency.
 - `THREE.LOD`, `BatchedMesh`, CSS3D, and more than eight joint influences.
 

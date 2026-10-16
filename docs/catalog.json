@@ -251,9 +251,9 @@
     "package": "@margoengine/bvh",
     "version": "0.1.0",
     "published": false,
-    "description": "Triangle BVH, spatial queries and an engine Raycaster for Margo Engine (three-mesh-bvh and THREE.Raycaster counterparts).",
+    "description": "Triangle BVH and engine Raycaster, with asynchronous current-pose queries for deformed PBR models.",
     "requirements": "Core ^0.1.0 || ^1.0.0 · see the package guide for browser and backend requirements",
-    "keywords": "bvh",
+    "keywords": "bvh raycaster raycast skin morph deformation",
     "install": "npm install @margoengine/core@0.1.0 @margoengine/bvh@0.1.0",
     "imports": "import { CONTAINED } from '@margoengine/bvh';",
     "exports": [
@@ -1007,9 +1007,9 @@
     "package": "@margoengine/selection",
     "version": "0.1.0",
     "published": false,
-    "description": "GPU picking and visible mesh selection outlines.",
+    "description": "GPU picking and visible core/PBR selection outlines, including skin and morph deformation.",
     "requirements": "Core ^0.1.0 || ^1.0.0 · see the package guide for browser and backend requirements",
-    "keywords": "selection",
+    "keywords": "selection picking outlines skinned morph deformed",
     "install": "npm install @margoengine/core@0.1.0 @margoengine/selection@0.1.0",
     "imports": "import { Picking } from '@margoengine/selection';",
     "exports": [

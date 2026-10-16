@@ -22,7 +22,7 @@ These are smaller than the four file gaps.
 
 5. **Done: Shadows from point and spot lights.** Opt-in `ClusteredOptions.shadows` adds bounded depth-array maps and `shadow:true` or per-light near/bias settings. Point lights render six perspective faces; spots render their cone. Explicit caster registration supports core and glTF Pro geometry, alpha masks, transformed UV1 and deformed vertex buffers. Core, PBR and terrain receive the shadows. Lighting bindings 16–18 avoid TAA/sky/terrain resources and leave the material slot at group 3. Directional cascades in `@margoengine/shadows` remain unchanged.
 
-6. **Picking on a skinned or morphed mesh.** `engine.pick` and `@margoengine/bvh` miss those draws. `@margoengine/selection` excludes them. The pick has to use the deformed vertex buffer the animation package already writes.
+6. **Done: Picking on a skinned or morphed mesh.** Explicit `Picking.add(model)` and `Selection.add(model)` registrations consume glTF Pro's current draw buffers. Picks encode fresh skin/morph deformation, then combine core and PBR IDs in one micro-frustum depth target. Outlines replay the current geometry against scene depth. `Raycaster.intersectModel(model)` asynchronously snapshots the same GPU output and refits a CPU BVH. Bind-pose bounds cannot reject deformed geometry; core and stage remain frozen.
 
 ## Leave out of this push
 
@@ -32,7 +32,7 @@ Crossfades, blend trees, and additive layers already live in `@margoengine/anima
 
 ## Verification of file items 1–4
 
-- 1,094 tests pass on Node 24, with no failures or skips. Strict typechecks and packed runtime imports cover all 63 packages.
+- 1,189 tests pass on Node 24, with no failures or skips. Strict typechecks and packed runtime imports cover all 63 packages.
 - `npm run modern:test:extensions` includes the original PBR/material regressions and the new `modern:test:gltf-parity` browser checks.
 - 82 texture captures verify PBR and optional material transforms against baked UVs. Transformed alpha-mask shadow depths match across all four directional cascades. Ordinary shader/frame hashes and identity-transform pixels remain exact.
 - Real ETC1S/UASTC textures upload all mips through RGBA fallback and native BC7 paths. A production Vite consumer emits and fetches Basis workers/Wasm, renders, and disposes every worker and texture.
@@ -52,9 +52,17 @@ Fixture sources, pinned hashes and attribution are recorded in [the production a
 - Clustered unit regressions retain the original unshadowed shader hashes and bindings. Steady shadow frames reuse buffers, bind groups, pipelines, shaders and typed-array views. Limits, invalid replacements, setup/draw failures and restoration have cleanup checks.
 - Directional shadow sources and frozen core/stage sources are unchanged. Local shadows use a fixed comparison filter; custom-only terrain casters and area-light penumbrae remain outside this implementation. Terrain receives shadows.
 
+## Verification of deformed picking
+
+- `npm run modern:test:deformed-picking` passes 46 real frame captures on both an NVIDIA RTX A6000 and bundled Chromium/SwiftShader, across 4× MSAA and single sampling. All 96 shader modules compile, with no validation errors; all 590 tracked GPU resources are destroyed per adapter.
+- Skin, morph, combined poses and eight influences pick correctly outside bind-pose bounds, including seeks and direct weight edits without an intervening beauty frame. CPU BVH hits and GPU positions match independent analytic references.
+- Core/PBR depth competition, both outline algorithms, mirrored winding, UV1 alpha transforms and implicit mip filtering pass. A minified-alpha reference catches the incorrect forced-LOD-0 path. Unregistered beauty output stays bit exact.
+- Pending readbacks, source removal, reused slots, animation disposal, restoration and failed maps release resources and reject stale results. Ordinary core MRT/culling and unextended PBR shader/frame regression checks remain in place.
+- Registration is explicit. GPU picking handles rendered alpha and occlusion; asynchronous CPU BVH queries test triangles. Arbitrary vertex WGSL, PBR section clipping and TAA-jittered outline matching remain outside the replay.
+
 ## Done when
 
-File items 1–4 and local-light shadows in item 5 are implemented. Picking in item 6 remains separate work.
+All six items are implemented. The limits above remain explicit.
 
 - A glTF with a KTX2 texture, a texture transform, and eight influences loads through `loadGLTF` and `@margoengine/animation`.
 - Sheen, specular, anisotropy, and iridescence attach through group 3. Zero sheen/aniso/iridescence and neutral specular match baseline pixels exactly; glTF specular factor 0 correctly removes dielectric reflection instead.

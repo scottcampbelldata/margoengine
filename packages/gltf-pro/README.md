@@ -1,5 +1,20 @@
 # Margo Engine glTF Pro
 
+Optional picking registers a model with `Picking.attach(engine).add(model)` from
+`@margoengine/selection`. Selection outlines use a separate `selection.add(model)`
+registration and select primitive nodes. Both consume `model.pickingPrimitives`,
+which borrows the current static or GPU-deformed buffers and alpha metadata.
+Registration changes no beauty shader, vertex layout or material bindings.
+
+`model.readPickingGeometry()` returns an asynchronous, independently owned CPU
+snapshot for `Raycaster.intersectModel(model)` in `@margoengine/bvh`. Static
+geometry uses CPU copies; animated geometry is copied from the actual GPU output.
+The optional `prepareDeformation` hook encodes the latest pose before reading,
+without advancing animation time. Snapshots include world matrices, indices and
+material sides captured with the query. Restoration, disposal or replacement of
+an in-flight deformation output invalidates the result and releases staging
+buffers. Caller-provided deformation buffers need `COPY_SRC` for CPU snapshots.
+
 Use `import {GLTFAsset} from '@margoengine/gltf-pro/asset'` for accessor decoding
 without loading PBR rendering or its shaders. The root export retains the same
 constructor; `GLTFDocument` is available as a type from either entry.
@@ -67,6 +82,8 @@ the loader also validates returned data before constructing GPU resources.
 `parsePreparedPBR(engine, document, geometry, images)` accepts a static glTF-style scene/material document and per-mesh arrays of `PreparedGeometry` (`vertices: Float32Array`, `indices: Uint32Array`). Vertices use the existing 80-byte layout: position4, normal4, tangent4, UV0+UV1, color4. Arrays are validated and retained without repacking; keep them immutable until destruction. This path has no accessors, skins or animations and is used by the separate `@margoengine/blender` loader. Existing glTF loading and animation APIs are unchanged.
 
 Attach animation with the separate animation package. Register this model with `ssao.add(model)` to include its mapped normals and ambient lighting in SSAO. Neither extension is imported by this package. Disposal and device restoration retain CPU asset blueprints.
+
+Physics, CAD grouping, and exporters can read the model's original CPU primitive data through an optional node protocol. `mesh.geometry` remains null, so the core renderer never receives a second drawable. Physics uses bind-pose geometry; glTF export retains supported skin/morph attributes. This bridge is removed when the model is disposed and adds no loader dependency to those consumers.
 
 Register with `shadows.add(model)` and `clustered.add(model)` for optional directional shadows and local PBR lights, including the current skinned vertex buffer. `addLighting()` accepts an optional shader/binding hook without importing these packages. `shadowPrimitives` exposes current opaque/masked GPU geometry to depth consumers; blended materials are omitted.
 

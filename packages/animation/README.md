@@ -27,6 +27,13 @@ Single-clip playback reuses sample buffers, quaternion arrays, palette matrices,
 
 The separate `@margoengine/animator` package adds gameplay states, blend trees, additive masks and foot IK while reusing this pass's palette buffers. `sampleTrack()` and `multiplyMatrices()` are exported for animation consumers.
 
+Animation installs an optional `model.prepareDeformation` encoding hook. GPU
+picking and explicit CPU snapshots use it to update the same skin/morph output
+after a seek, bone edit or weight change without needing a beauty frame. Queries
+do not advance playback time. The hook survives device restoration; disposal
+removes only the animation instance's own hook. No CPU skinning copy is added to
+the playback path.
+
 Run the character demo at `/examples/robot-expressive.html` (also `character-animation.html`). RobotExpressive comes from the Three.js sample assets, by Tomás Laulhé with morphs by Don McCurdy, [CC0 credits](https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/RobotExpressive/README.md). It is not a Khronos sample.
 
 The demo leaves facial weights under the sliders' control by removing weight tracks from its clips. Expressions persist while playing, pausing and switching clips. Presets include a neutral reset; playback speed and a reset-view button accompany touch-enabled orbit controls. The studio floor uses the optional shadows and tone-mapping packages.

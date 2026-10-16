@@ -33,6 +33,8 @@ Call `engine.dispose()` on teardown. `loadCAD` uses a worker in browsers; `parse
 
 Use `@margoengine/machinery/cad` for `loadCAD`, `parseCAD`, `deduplicateParts` and `PartInstancer`, or `@margoengine/machinery/cad-async` for `parseCADAsync` and its option types. These entries exclude unrelated machinery systems and share module identity with the existing package root. CAD worker assets remain in `dist/workers` and resolve relative to the shipped JavaScript; retain that directory when copying the package directly.
 
+CAD grouping also counts nodes loaded by `@margoengine/gltf-pro` and `@margoengine/fbx`. It compares static bind-pose triangles and normals across all primitives without replacing PBR buffers or attaching core geometry. Skinned and morphing parts remain distinct. Hierarchy-only nodes are skipped; an input with no supported geometry throws.
+
 Import individual systems from these subpaths to keep unrelated code out of direct browser imports and lazy-loaded modules. Each entry includes its associated TypeScript types. Existing imports from `@margoengine/machinery` remain supported and use the same classes and functions.
 
 | Subpath | Public system |

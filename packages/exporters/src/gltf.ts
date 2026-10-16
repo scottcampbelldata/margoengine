@@ -82,6 +82,7 @@ class Writer {
     const attributes: Record<string, number> = {POSITION: this.floatAccessor(geo.positions, 3, 'VEC3', true), NORMAL: this.floatAccessor(geo.normals, 3, 'VEC3')};
     if (geo.tangents) attributes.TANGENT = this.floatAccessor(geo.tangents, 4, 'VEC4');
     if (geo.uvs) attributes.TEXCOORD_0 = this.floatAccessor(geo.uvs, 2, 'VEC2');
+    if (geo.uvs1) attributes.TEXCOORD_1 = this.floatAccessor(geo.uvs1, 2, 'VEC2');
     if (geo.colors) attributes.COLOR_0 = this.floatAccessor(geo.colors, geo.colorSize, geo.colorSize === 3 ? 'VEC3' : 'VEC4');
     if (geo.joints) {
       const data = geo.joints;
@@ -143,15 +144,22 @@ class Writer {
     if (!byMaterial) this.meshCache.set(geo, byMaterial = new Map());
     let index = byMaterial.get(mat ?? null);
     if (index !== undefined) return index;
-    const {attributes, indices, targets} = this.primitive(geo), primitive: Record<string, unknown> = {attributes, indices, mode: 4};
-    if (targets) primitive.targets = targets;
-    if (mat) primitive.material = this.material(mat);
-    const mesh: Record<string, unknown> = {primitives: [primitive]};
-    if (geo.morphs?.some(morph => morph.name !== undefined)) mesh.extras = {targetNames: geo.morphs.map((morph, i) => morph.name ?? 'Target '+i)};
-    if (name) mesh.name = name;
-    index = this.list('meshes', mesh);
+    index = this.meshPrimitives([{geometry: geo, material: mat}], name);
     byMaterial.set(mat ?? null, index);
     return index;
+  }
+
+  meshPrimitives(items: {geometry: Geo; material?: Mat}[], name: string|undefined): number {
+    const primitives = items.map(({geometry, material}) => {
+      const {attributes, indices, targets} = this.primitive(geometry), primitive: Record<string, unknown> = {attributes, indices, mode: 4};
+      if (targets) primitive.targets = targets;
+      if (material) primitive.material = this.material(material);
+      return primitive;
+    });
+    const mesh: Record<string, unknown> = {primitives}, geo = items[0].geometry;
+    if (geo.morphs?.some(morph => morph.name !== undefined)) mesh.extras = {targetNames: geo.morphs.map((morph, i) => morph.name ?? 'Target '+i)};
+    if (name) mesh.name = name;
+    return this.list('meshes', mesh);
   }
 
   node(name: string|undefined, t: number[], r: number[], s: number[], mesh?: number): Record<string, unknown> {
@@ -275,9 +283,11 @@ function document(source: ExportSource, options: GLTFOptions): Writer {
     }
   } else {
     const visit = (node: Node): number => {
-      if (node.geometry?.joints && !node.skin) throw new TypeError('Joint attributes need a skin on the same node');
-      if (node.skin && !node.geometry?.joints) throw new TypeError('Skinned geometry needs joint indices and weights');
-      const out = writer.node(node.name, node.t, node.r, node.s, node.geometry ? writer.mesh(node.geometry, node.material, node.name) : undefined);
+      const geometries = node.primitives?.map(primitive => primitive.geometry) ?? (node.geometry ? [node.geometry] : []);
+      if (geometries.some(geometry => geometry.joints) && !node.skin) throw new TypeError('Joint attributes need a skin on the same node');
+      if (node.skin && (!geometries.length || geometries.some(geometry => !geometry.joints))) throw new TypeError('Skinned geometry needs joint indices and weights');
+      const mesh = node.primitives ? writer.meshPrimitives(node.primitives, node.name) : node.geometry ? writer.mesh(node.geometry, node.material, node.name) : undefined;
+      const out = writer.node(node.name, node.t, node.r, node.s, mesh);
       const index = (json.nodes ??= []).push(out)-1;
       if (node.source) {nodeIndices.set(node.source, index); nodeData.set(node.source, node);}
       if (node.morphWeights) out.weights = Array.from(node.morphWeights);
@@ -289,7 +299,8 @@ function document(source: ExportSource, options: GLTFOptions): Writer {
       if (node.skin) {
         if (!node.geometry?.joints) throw new TypeError('Skinned geometry needs joint indices and weights');
         const skin = writer.skin(node.skin, resolve);
-        if (node.geometry.joints.some(joint => joint >= node.skin!.joints.length)) throw new RangeError('Joint index exceeds skin joints');
+        const geometries = node.primitives?.map(primitive => primitive.geometry) ?? [node.geometry];
+        if (geometries.some(geometry => geometry.joints!.some(joint => joint >= node.skin!.joints.length))) throw new RangeError('Joint index exceeds skin joints');
         json.nodes[resolve(sourceNode)].skin = skin;
       } else if (node.geometry?.joints) throw new TypeError('Joint attributes need a skin on the same node');
     }

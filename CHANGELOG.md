@@ -79,9 +79,37 @@ does not announce an npm publication or a package version change.
   clock and invalidation; `Group`/`group`, demand rendering and optional `Html`
   stay in `@margoengine/react`. All 45 React lifecycle tests pass on Node 24.
 
+### Optional React scene components
+
+- `@margoengine/react/kit`, `/post`, `/physics` and `/xr` expose native scene
+  helpers, FBX loading, effects, Rapier bodies and XR controllers through lazy
+  optional peers. Loaded-model colliders support bounds fallbacks and explicit
+  cuboid/ball children with live transform updates. Conflicting post-effect
+  capture owners report an error. React 18 packed consumers pass 103 behavioral
+  tests; the React 19 workspace suite passes 108 tests.
+
+### Loaded PBR geometry consumers
+
+- Physics, glTF export and CAD grouping read loader-owned bind-pose primitives
+  through an optional CPU geometry bridge. Loaded glTF/FBX meshes retain their
+  original core geometry slots and hierarchy. Unsupported export data and
+  operations without usable triangles report explicit errors. Ten real-loader
+  regressions and twelve WebGPU audit checks pass.
+
+### Picking on skinned and morphed meshes
+
+- Registered PBR models support current-pose GPU picking and selection outlines
+  through `@margoengine/selection`; the existing core hook serves `engine.pick`.
+  Four/eight-influence skinning, morphs, alpha/UV1 transforms, mip filtering,
+  shared depth and both outline algorithms pass hardware and SwiftShader checks.
+  `Raycaster.intersectModel()` snapshots the same GPU output for CPU triangle
+  queries, with BVH refitting and coherent world transforms. Pending reads,
+  replacement, disposal and restoration invalidate stale results and release
+  staging resources. Core, stage and baseline PBR shader/bindings are unchanged.
+
 ### Verification and footprint
 
-- The workspace build passes. The full Node 24 suite passes **1,094 tests**, with
+- The workspace build passes. The full Node 24 suite passes **1,189 tests**, with
   zero failures or skips. Strict TypeScript checks and packed exports/imports
   pass across **all 63 packages**, including strict Bundler and NodeNext consumers.
 - Regression coverage includes real normalized Draco UV/color data, index

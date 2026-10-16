@@ -2,6 +2,7 @@
 // normalizes geometry and materials, and computes local and world transforms in double precision.
 import {engineRuntime, meshRuntime} from '@margoengine/core/extension';
 import type {EngineKernel, Mesh, Geometry, PbrMaterial} from '@margoengine/core';
+import type {PBRSource} from '../../shared/pbr-source.js';
 
 /** Plain geometry with optional UVs, tangents and vertex colors, for data that core `Geometry` cannot hold. */
 export interface GeometryData {
@@ -11,6 +12,8 @@ export interface GeometryData {
   normals: ArrayLike<number>;
   /** uv per vertex (glTF convention, v down). */
   uvs?: ArrayLike<number>;
+  /** Optional second UV set. */
+  uvs1?: ArrayLike<number>;
   /** xyzw per vertex, w is the bitangent sign (+1 or -1). */
   tangents?: ArrayLike<number>;
   /** Linear rgb or rgba per vertex, each in [0, 1]. */
@@ -111,7 +114,7 @@ export interface SceneOptions {
 
 /** @internal Normalized geometry. */
 export interface Geo {
-  positions: Float32Array; normals: Float32Array; uvs?: Float32Array; tangents?: Float32Array; colors?: Float32Array; colorSize: 3|4;
+  positions: Float32Array; normals: Float32Array; uvs?: Float32Array; uvs1?: Float32Array; tangents?: Float32Array; colors?: Float32Array; colorSize: 3|4;
   indices: Uint32Array; count: number;
   joints?: Uint16Array; weights?: Float32Array;
   morphs?: {name?: string; positions: Float32Array; normals?: Float32Array; tangents?: Float32Array}[];
@@ -127,6 +130,8 @@ export interface Node {
   name?: string; t: number[]; r: number[]; s: number[]; local: Float64Array; world: Float64Array;
   geometry?: Geo; material?: Mat; children: Node[];
   source?: ExportNode; skin?: SkinData; morphWeights?: Float32Array;
+  /** Optional-package primitives retained on their original scene node. */
+  primitives?: {geometry: Geo; material: Mat}[];
 }
 
 const fail = (message: string): never => {throw new TypeError(message);};
@@ -193,6 +198,7 @@ export function normalizeGeometry(data: Geometry|GeometryData): Geo {
   }
   const geo: Geo = {positions, normals, indices, count, colorSize: 4};
   if (data.uvs !== undefined) geo.uvs = floats(data.uvs, count*2, 'UVs');
+  if (data.uvs1 !== undefined) geo.uvs1 = floats(data.uvs1, count*2, 'UVs 1');
   if (data.tangents !== undefined) {
     const tangents = floats(data.tangents, count*4, 'Tangents');
     for (let i = 0; i < count; i++) {
@@ -372,6 +378,63 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
     if (!mat) {mat = normalizeMaterial((isCoreMaterial(value) && options.materialData?.get(value)) || value); materials.set(value, mat);}
     return mat;
   };
+  const pbrSkins = new Map<PBRSource, Map<number, SkinData>>();
+  const pbr = (handle: Mesh, node: Node): void => {
+    const source = (handle as unknown as {[key: symbol]: PBRSource|undefined})[Symbol.for('margoengine.pbr-source.v1')];
+    if (!source) return;
+    const primitives = source.primitives.filter(primitive => primitive.node === handle);
+    if (!primitives.length) return;
+    node.primitives = primitives.map(primitive => {
+      const {vertices, indices, definition, material: mat} = primitive, count = vertices.length/20;
+      if (!Number.isInteger(count) || !count) fail('Invalid PBR primitive vertices');
+      if (mat.maps.some((map: unknown) => map) || mat.extension || primitive.extension || Object.keys(mat.extensions ?? {}).length) fail('PBR texture and material extension export is unsupported');
+      const attribute = (offset: number, width: number): Float32Array => {
+        const out = new Float32Array(count*width);
+        for (let i = 0; i < count; i++) for (let c = 0; c < width; c++) out[i*width+c] = vertices[i*20+offset+c];
+        return out;
+      };
+      const data: GeometryData = {positions: attribute(0, 3), normals: attribute(4, 3), indices};
+      const attrs = definition.attributes ?? {};
+      if (attrs.TANGENT !== undefined) data.tangents = attribute(8, 4);
+      if (attrs.TEXCOORD_0 !== undefined) data.uvs = attribute(12, 2);
+      if (attrs.TEXCOORD_1 !== undefined) data.uvs1 = attribute(14, 2);
+      if (attrs.COLOR_0 !== undefined) data.colors = attribute(16, 4);
+      if (attrs.JOINTS_1 !== undefined || attrs.WEIGHTS_1 !== undefined) fail('Export supports at most four skin influences per vertex');
+      if (attrs.JOINTS_0 !== undefined) data.joints = source.asset.accessor(attrs.JOINTS_0, 'VEC4');
+      if (attrs.WEIGHTS_0 !== undefined) data.weights = source.asset.accessor(attrs.WEIGHTS_0, 'VEC4');
+      if (definition.targets?.length) data.morphs = definition.targets.map((target: Record<string, number>, i: number) => ({
+        name: primitive.targetNames[i],
+        positions: target.POSITION === undefined ? new Float32Array(count*3) : source.asset.accessor(target.POSITION, 'VEC3'),
+        normals: target.NORMAL === undefined ? undefined : source.asset.accessor(target.NORMAL, 'VEC3'),
+        tangents: target.TANGENT === undefined ? undefined : source.asset.accessor(target.TANGENT, 'VEC3'),
+      }));
+      const geometry = normalizeGeometry(data);
+      const material = normalizeMaterial({name: mat.name, color: mat.base, roughness: mat.factors[0], metalness: mat.factors[1], emissive: mat.emission,
+        doubleSided: !!mat.settings[2], alphaMode: mat.alphaMode ?? 'OPAQUE', alphaCutoff: mat.alphaMode === 'MASK' ? mat.settings[1] : undefined});
+      return {geometry, material};
+    });
+    node.geometry = node.primitives[0].geometry;
+    node.material = node.primitives[0].material;
+    const count = node.geometry.morphs?.length ?? 0;
+    if (node.primitives.some(primitive => (primitive.geometry.morphs?.length ?? 0) !== count)) fail('PBR mesh primitives need matching morph targets');
+    if (count) node.morphWeights = floats(primitives[0].weights, count, 'Morph weights');
+    const skinIndex = source.asset.doc.nodes?.[primitives[0].nodeIndex]?.skin;
+    if (skinIndex !== undefined) {
+      let skins = pbrSkins.get(source);
+      if (!skins) pbrSkins.set(source, skins = new Map());
+      let skin = skins.get(skinIndex);
+      if (!skin) {
+        const definition = source.asset.doc.skins?.[skinIndex];
+        if (!definition || !Array.isArray(definition.joints)) fail('Missing PBR skin');
+        const joints = definition.joints.map((index: number) => source.nodes[index] as unknown as ExportNode);
+        skin = {name: definition.name, joints, inverseBindMatrices: definition.inverseBindMatrices === undefined
+          ? Float32Array.from({length: joints.length*16}, (_, i) => i%16%5 === 0 ? 1 : 0)
+          : source.asset.accessor(definition.inverseBindMatrices, 'MAT4')};
+        skins.set(skinIndex, skin);
+      }
+      node.skin = skin;
+    }
+  };
 
   if (isEngine(source)) {
     const engine = engineRuntime(source);
@@ -392,7 +455,9 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
       if (depth > 64) throw new RangeError('Hierarchy is too deep');
       if (onlyVisible && store.hidden[id]) return null;
       const node = makeNode(mesh.name, [t.x[id], t.y[id], t.z[id]], unitQuaternion([t.qx[id], t.qy[id], t.qz[id], t.qw[id]]), [t.sx[id], t.sy[id], t.sz[id]], parent);
+      node.source = handle as unknown as ExportNode;
       if (mesh.geometry) {node.geometry = geometry(mesh.geometry); node.material = material(mesh.material);}
+      else pbr(handle, node);
       for (const child of children.get(id) ?? []) {const out = visit(child, node.world, depth+1); if (out) node.children.push(out);}
       return node;
     };
@@ -409,7 +474,9 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
         base = base ? multiply(base, local) : local;
       }
     }
-    return roots.map(mesh => visit(mesh, base, 0)).filter((node): node is Node => node !== null);
+    const collected = roots.map(mesh => visit(mesh, base, 0)).filter((node): node is Node => node !== null);
+    if (collected.length && !drawables(collected).length) fail('Engine export has no supported mesh geometry');
+    return collected;
   }
 
   if (!isObject(source) || !Array.isArray((source as ExportScene).nodes)) fail('Expected a Margo Engine engine or {nodes: [...]}');
@@ -447,7 +514,8 @@ export interface Drawable {name?: string; geometry: Geo; material?: Mat; world: 
 export function drawables(nodes: Node[]): Drawable[] {
   const out: Drawable[] = [];
   const walk = (node: Node) => {
-    if (node.geometry) out.push({name: node.name, geometry: node.geometry, material: node.material, world: node.world});
+    if (node.primitives) for (const primitive of node.primitives) out.push({name: node.name, geometry: primitive.geometry, material: primitive.material, world: node.world});
+    else if (node.geometry) out.push({name: node.name, geometry: node.geometry, material: node.material, world: node.world});
     node.children.forEach(walk);
   };
   nodes.forEach(walk);

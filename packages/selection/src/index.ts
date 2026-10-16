@@ -1,5 +1,7 @@
 import type {EngineKernel,Mesh} from '@margoengine/core';
 export {Picking} from './picking.js';
+export type {PickingSource,PickingPrimitive} from './picking.js';
+import {PickingPrimitives,type PickingSource} from './picking-primitives.js';
 import {engineRuntime,meshRuntime,type Engine,type EnginePlugin,type FrameGraph,type PassContext,type DrawOptions} from '@margoengine/core/extension';
 import {fullscreen,meshVertex,group,compute,render,dispatch,draw} from '../../shared/gpu.js';
 declare const GPUBufferUsage:{STORAGE:number;UNIFORM:number;COPY_DST:number};
@@ -30,12 +32,15 @@ const composite=fullscreen+`
  if(!hit){discard;}return vec4f(settings[1].rgb,1);
 }`;
 export class Selection implements EnginePlugin {
+ private readonly primitives=new PickingPrimitives();
  readonly name='selection';private engine?:Engine;private selected=new Set<Mesh>();private flags=new Uint32Array(0);private buffer?:GPUBuffer;private uniform?:GPUBuffer;
  private mask?:GPUTexture;private msaaMask?:GPUTexture;private sampleCount=1;private fields:GPUTexture[]=[];private steps:GPUBuffer[]=[];private jumps:GPUBindGroup[]=[];private seed?:GPUComputePipeline;private jump?:GPUComputePipeline;private seedGroup?:GPUBindGroup;
  private maskView?:GPUTextureView;private msaaMaskView?:GPUTextureView;private readonly maskDraw:DrawOptions={clear:false};
  private maskPipeline?:GPURenderPipeline;private composite?:GPURenderPipeline;private bind?:GPUBindGroup;private format='';private depthFormat='';private readonly values=new Float32Array(8);private disposed=false;
  constructor(readonly options:SelectionOptions={}){this.validate();}
  static attach(engine:EngineKernel,options:SelectionOptions={}):Selection {const effect=new Selection(options);engineRuntime(engine).use(effect);return effect;}
+ /** Register optional PBR buffers; select their primitive nodes with set(). */
+ add(source:PickingSource):()=>void {if(this.disposed)throw new Error('Selection is disposed');return this.primitives.add(source);}
  set(meshes:Iterable<Mesh>):void {
   if(this.disposed)throw new Error('Selection is disposed');const values=new Set(meshes);if(values.size>4096)throw new RangeError('Selection budget exceeded');
   if(this.engine)for(const mesh of values)if(this.engine.meshes.get(meshRuntime(mesh).id)!==mesh)throw new TypeError('Foreign or disposed selection mesh');this.selected=values;
@@ -46,6 +51,7 @@ export class Selection implements EnginePlugin {
   this.flags=new Uint32Array(engine.store.capacity);this.buffer=engine.gpu.createBuffer({size:this.flags.byteLength,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST});
   this.maskDraw.bindings=[{binding:1,resource:{buffer:this.buffer}}];
   this.uniform=engine.gpu.createBuffer({size:32,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});this.seed=compute(engine.gpu,seedCode);this.jump=compute(engine.gpu,jumpCode);
+  this.primitives.setup(engine);
  }
  registerPasses(graph:FrameGraph):void {graph.add({name:'selection:outline',order:40,execute:c=>{if(c.backend==='webgpu')this.draw(c);}});}
  private resize(c:Context):void {
@@ -72,14 +78,16 @@ export class Selection implements EnginePlugin {
   this.validate();this.resize(c);this.flags.fill(0);for(const mesh of this.selected){const id=meshRuntime(mesh).id;if(this.engine!.meshes.get(id)===mesh)this.flags[id]=1;}
   c.device.queue.writeBuffer(this.buffer!,0,this.flags as Uint32Array<ArrayBuffer>);this.values[0]=this.options.width??3;this.values[1]=+(this.options.algorithm==='morphological');this.values.set(this.options.color??[1,0.5,0],4);c.device.queue.writeBuffer(this.uniform!,0,this.values as Float32Array<ArrayBuffer>);
   const color=c.color;c.color=(this.msaaMaskView??this.maskView)!;
-  try{const clear=c.encoder.beginRenderPass({colorAttachments:[{view:c.color,clearValue:{r:0,g:0,b:0,a:0},loadOp:'clear',storeOp:'store'}]});clear.end();c.draw(this.maskDraw);}
+  try{const clear=c.encoder.beginRenderPass({colorAttachments:[{view:c.color,clearValue:{r:0,g:0,b:0,a:0},loadOp:'clear',storeOp:'store'}]});clear.end();c.draw(this.maskDraw);
+   if(this.primitives.hasSources)this.primitives.draw(c,c.camera.matrix,{format:'r8unorm',depthFormat:c.descriptor.depthStencil!.format,sampleCount:this.sampleCount,mask:node=>this.flags[node.id]===1,depthCompare:'equal'});
+  }
   finally{c.color=color;}
   if(this.msaaMaskView)c.encoder.beginRenderPass({colorAttachments:[{view:this.msaaMaskView,resolveTarget:this.maskView!,loadOp:'load',storeOp:'discard'}]}).end();
   if(this.options.algorithm!=='morphological'){dispatch(c,this.seed!,this.seedGroup!,Math.ceil(c.width/8),Math.ceil(c.height/8));for(const bind of this.jumps)dispatch(c,this.jump!,bind,Math.ceil(c.width/8),Math.ceil(c.height/8));}
   draw(c,this.composite!,this.bind!);
  }
  private releaseTargets():void {this.mask?.destroy();this.msaaMask?.destroy();this.msaaMask=undefined;this.maskView=this.msaaMaskView=undefined;for(const t of this.fields)t.destroy();for(const b of this.steps)b.destroy();this.mask=undefined;this.fields=[];this.steps=[];this.jumps=[];this.bind=this.seedGroup=undefined;this.maskPipeline=this.composite=this.maskDraw.pipeline=undefined;}
- private release():void {this.releaseTargets();this.buffer?.destroy();this.uniform?.destroy();this.buffer=this.uniform=undefined;this.maskDraw.bindings=undefined;this.seed=this.jump=undefined;}
+ private release():void {this.primitives.release();this.releaseTargets();this.buffer?.destroy();this.uniform?.destroy();this.buffer=this.uniform=undefined;this.maskDraw.bindings=undefined;this.seed=this.jump=undefined;}
  onDeviceRestored(engine:Engine):void {this.release();this.setup(engine);}
- dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.release();this.selected.clear();this.engine=undefined;}
+ dispose():void {if(this.disposed)return;this.disposed=true;this.engine?.removePlugin(this.name);this.primitives.dispose();this.release();this.selected.clear();this.engine=undefined;}
 }
