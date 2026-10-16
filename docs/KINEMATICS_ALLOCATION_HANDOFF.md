@@ -100,6 +100,90 @@ The visible heap graph stays enabled and GC remains unresolved. Next, test
 on-demand publication of the separate hidden pose/reflection telemetry; no
 visible UI or mathematical guard should be removed for that experiment.
 
+### Probe readback ablation: no allocation benefit established
+
+A fixture-only final-readback skip was compared against two fresh-page hardware
+baselines. Every measured run completed exactly 240 probe bakes, 960 normal
+renders, 1,440 captured faces and 1,440 probe `Engine.render` calls after 24 warm
+bakes. Both modes first completed a normal CPU-mirrored seed bake. The candidate
+deliberately left that CPU mirror stale; it is not a valid public GPU-only mode
+or device-restoration implementation.
+
+Sampled totals were **3,592,792 / 3,799,276 / 3,696,008 bytes** for baseline A /
+skip / baseline B. Each recorded two minor and one major GC. The candidate
+sampled more bytes than both baselines, so no production/API change is justified
+by this result. The approximately 1.18-second fixed-work intervals are short
+diagnostics, not a sustained rate, stable floor or isolated CPU-speed result.
+
+Outside the sampling interval, the full 175,808-byte GPU probe buffer (header
+and all texels) and rendered receiver image matched the baseline bit-for-bit.
+The queue writer remained native, errors were empty, and all ten captured
+source/package/generated-file fingerprints matched before/after. This hash set
+is not a complete transitive served-module map. Logical mapped texel volume is
+not measured JS allocation. The initial outside-window image-hash harness
+failure and the corrected full A/B/A are preserved in ignored
+`test-results/probe-readback-fixed-work/`; see `summary.json` and README. Package
+source and emission remain unchanged.
+
+### Optional SSAO stage-key cache: rejected after browser comparison
+
+The repeated stacked-output key `format + multisample.count + hdr` was isolated
+in the actual optional package emission. Two 10,000-call baseline census
+windows each added 20,000 sequential one-byte strings (640,000 bytes) and 10,000
+cons strings (320,000 bytes) beyond the matched control. A primitive-tuple cache
+removed that excess in its candidate window: **96 bytes per stable stage call**
+in this fixture. All five windows recorded zero natural GC. Separate optimized
+IR had two generic Add calls in the baseline and none on the cached-hit path.
+No browser stage frequency or total scene saving follows from those counts.
+
+The actual source candidate passed optional post build/types, **29/29 tests**,
+unchanged public API reports (166 entries / 1,548 exports), and the 19,999-byte
+core/stage gate. Tests and two independent reviews covered format/count/HDR
+changes, getter/coercion order, failed pipeline keys, release/rebuild behavior,
+and independent custom draw option snapshots. The standalone candidate grew
+by 407 raw / 163 gzip JS bytes, entirely outside the frozen core/stage budget.
+
+Fresh-page Edge155 / RTX A6000 runs used 30-second warmup and 30-second capture
+per idle/drag phase. Pose JSON was requested only before/after sampling; roughly
+250 ms heap-usage polling, tracing and statistical allocation sampling remained.
+All drag phases issued 938 trusted pointer commands.
+
+| Mode | Phase | Sampled MB/s | Minor / major GC | Maximum observed GC slice ms | p95 RAF callback ms | Reflection bakes | Reuse |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Baseline A | Idle | 0.545879 | 20 / 4 | 2.855 | 2.534 | 312 | 626 / 626 |
+| Candidate | Idle | 0.603904 | 23 / 4 | 2.427 | 2.432 | 313 | 626 / 626 |
+| Baseline B | Idle | 0.461292 | 17 / 4 | 1.875 | 2.364 | 392 | 786 / 786 |
+| Baseline A | Drag | 0.827396 | 28 / 4 | 3.620 | 5.392 | 326 | 654 / 654 |
+| Candidate | Drag | 0.871863 | 26 / 4 | 4.480 | 5.612 | 315 | 630 / 630 |
+| Baseline B | Drag | 0.665417 | 25 / 4 | 1.586 | 5.059 | 323 | 648 / 648 |
+
+The candidate sampled more bytes in both phases than either baseline and had
+slower drag callback p95. **Reject the cache despite its isolated string win.**
+Adaptive reflection work differed, and these captures do not establish the
+cause of the difference. Recorded source hashes stayed fixed, the queue writer
+remained native, page errors were empty, and endpoint pose safety passed. There
+were no in-window pose observations; endpoints are not per-frame safety proof.
+GC persists in every run.
+
+Evidence: ignored `test-results/ssao-stage-key-production/` contains the actual
+package census/IR, validation and rejected source snapshot;
+`test-results/ssao-robot-compare/summary.{json,md}` contains the browser comparison,
+frozen baseline/candidate sites and manifests. The first baseline-only attempt
+used an ignored server with an incorrect CSS MIME type and failed drag pickup
+on an unstyled page. It is preserved and excluded; all six table phases used
+the corrected server. No public API or live release change is retained.
+
+Restoration is verified: tracked post source/tests equal HEAD, the new test and
+all candidate files are archived, original post build/types and **23/23 tests**
+pass, and all **26** saved baseline package emission files match their SHA256.
+The standalone preview was rebuilt; all **17 JS chunks** match the baseline
+bit-for-bit (708,879 raw / 239,411 gzip JS bytes, core/stage 19,999). Proofs are
+`ssao-stage-key-production/restoration.json` and
+`ssao-robot-compare/restored-standalone-proof.json`. A live browser near/far eye
+sweep returned to `Held in hand` / `Grip secure`; the restored home view is
+`ssao-robot-compare/live-eye-check.png`. This is a visual smoke check, not a new
+continuous-collision or allocation guarantee.
+
 ### Stats timestamp descriptor attribution: measured, no runtime change
 
 An isolated native WebGPU test compared cached complete descriptors against the
@@ -971,7 +1055,7 @@ Use fresh report labels for further captures. Keep source/dist frozen and avoid 
 
 The user requested an immediate commit/push checkpoint, followed by continued work, and then the rebuilt production drag allocation/GC results.
 
-Current source **221c1ad** is pushed and live as **26027a44**, with eye/hand repairs and on-demand pose/reflection diagnostics retained. Endpoint-only captures observed 0.601728 / 0.756456 MB/s idle/drag with GC remaining; idle savings were inconsistent and the frequent-reader comparison was mixed/worse. Both full comparisons and their observation/workload limits are recorded above. Default package setter/pass semantics remain intact; this demo explicitly selects optional Animator/Stats paths. Stats descriptor batching, target-only unused-norm and hidden-GPU-audit opt-out experiments remain reverted. The constraints lab remains on contact-reach-3; both saved trajectories replay hold-free. Current work is an isolated optional SSAO key-string candidate and a fixture-only probe readback ablation, neither yet a retained runtime/API change. Allocation-driven GC remains and the overall goal is active.
+Current source **221c1ad** is pushed and live as **26027a44**, with eye/hand repairs and on-demand pose/reflection diagnostics retained. Endpoint-only captures observed 0.601728 / 0.756456 MB/s idle/drag with GC remaining; idle savings were inconsistent and the frequent-reader comparison was mixed/worse. Both full comparisons and their observation/workload limits are recorded above. Default package setter/pass semantics remain intact; this demo explicitly selects optional Animator/Stats paths. Stats descriptor batching, target-only unused-norm and hidden-GPU-audit opt-out experiments remain reverted. The constraints lab remains on contact-reach-3; both saved trajectories replay hold-free. The fixture-only probe readback ablation established no allocation benefit and produced no production/API change. The optional SSAO key-string cache removed its isolated strings but was rejected after worse full-scene allocation in both phases. Current work is constructor/IR attribution of the gaze-workspace validation boundary before considering another change. Allocation-driven GC remains and the overall goal is active.
 
 The user explicitly requested an immediate commit/push checkpoint even with unfinished work, followed by continued testing. Preserve that incomplete allocation status; do not present the current release's pointer sample or reflection reuse count as a sustained allocation benchmark. Large raw traces and diagnostic harnesses remain in ignored local test-results folders.
 
