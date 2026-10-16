@@ -1286,6 +1286,27 @@
     "category": "Animation and interaction"
   },
   {
+    "id": "kinematics-constraints",
+    "title": "Kinematics constraints",
+    "package": "@margoengine/kinematics-constraints",
+    "version": "0.1.0",
+    "published": false,
+    "description": "Standalone analytical capsule and sphere constraints for IK target and arm clearance.",
+    "requirements": "ES2022 JavaScript; no engine, renderer or physics dependency",
+    "keywords": "kinematics constraints inverse kinematics IK avoidance capsule sphere torso elbow pole clearance",
+    "install": "npm install @margoengine/kinematics-constraints@0.1.0",
+    "imports": "import { CapsuleVolume, AvoidanceSolver } from '@margoengine/kinematics-constraints';",
+    "exports": [
+      "AvoidanceSolver",
+      "CapsuleVolume",
+      "SolveStatus",
+      "SphereVolume",
+      "closestPointsBetweenSegments",
+      "measureSegmentClearance"
+    ],
+    "category": "Animation and interaction"
+  },
+  {
     "id": "tween",
     "title": "Tween",
     "package": "@margoengine/tween",

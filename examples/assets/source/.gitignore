@@ -1,1 +1,4 @@
 textures/
+!skinning_ik/textures/
+skinning_ik/textures/*
+!skinning_ik/textures/polyhaven/

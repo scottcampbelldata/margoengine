@@ -18,7 +18,7 @@ Search every package by task, package name or public runtime export. Copy instal
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-73 packages in 10 layers, the same as the [catalog](https://margoengine.com/catalog/).
+74 packages in 10 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (2)
 
@@ -102,12 +102,13 @@ Search every package by task, package name or public runtime export. Copy instal
 | [`@margoengine/wfc`](../packages/wfc/README.md) | Seeded wave function collapse: 3D tile adjacency and the 2D overlapping (sample-based) model with backtracking. |
 | [`@margoengine/splines`](../packages/splines/README.md) | 3D Catmull-Rom, Bezier and Hermite curves with arc-length lookup. |
 
-### Animation and interaction (11)
+### Animation and interaction (12)
 
 | Package | What it is |
 | --- | --- |
 | [`@margoengine/animation`](../packages/animation/README.md) | Storage-buffer skinning, compute morph targets and vertex animation texture crowds for Margo Engine. |
 | [`@margoengine/animator`](../packages/animator/README.md) | Blend trees, additive layers, animation states and foot IK. |
+| [`@margoengine/kinematics-constraints`](../packages/kinematics-constraints/README.md) | Standalone analytical capsule and sphere constraints for IK target and arm clearance. |
 | [`@margoengine/tween`](../packages/tween/README.md) | Allocation-free numeric tween updates and easing timelines. |
 | [`@margoengine/cinematic`](../packages/cinematic/README.md) | Critically damped camera follow, look-at and screen shake. |
 | [`@margoengine/controls`](../packages/controls/README.md) | Orbit, map, trackball, fly, first-person, pointer-lock and collision-aware walkthrough (/walk) camera controls, a transform gizmo and drag controls for Margo Engine. |

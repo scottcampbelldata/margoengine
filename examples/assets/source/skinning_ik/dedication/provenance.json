@@ -1,0 +1,28 @@
+{
+  "text": "Margo Engine ♡\nMade for Margie",
+  "object": "Workshop / fitted tool cases",
+  "faceCount": 2,
+  "backPlaneGltfZ": 0.225,
+  "backFaceGltfBounds": {
+    "min": [
+      0.668,
+      0.248,
+      0.225
+    ],
+    "max": [
+      1.172,
+      0.452,
+      0.225
+    ]
+  },
+  "font": "C:\\Windows\\Fonts\\segoeprb.ttf",
+  "heart": "Original outline Bezier stroke, U+2661 appearance",
+  "image": "lk_instrument_case_back_dedication",
+  "imageSize": [
+    1024,
+    512
+  ],
+  "imageSha256": "9638c0f2bba601e0015db372cb55e6e583031a149adddeccd9687826af5528aa",
+  "geometry": "Existing case rear polygons only; material and UV changes; no added lettering geometry",
+  "copyright": "Copyright 2026 Scott Campbell. Original Margo Engine asset. MIT."
+}
