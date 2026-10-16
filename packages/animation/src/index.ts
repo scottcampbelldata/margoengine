@@ -3,6 +3,7 @@ import type {Engine,EnginePlugin,FrameGraph,PassContext} from '@margoengine/core
 import {invert} from '../../shared/math.js';
 import {sampleTrack,multiplyMatrices,type Interpolation} from './sampling.js';
 import {deformationShader,deformationShader8} from './shader.js';
+import {animationDocument,animationDefinition,animationChannel,animationSampler,animationNode,animationAccessor,animationIndex,animationPath,animationInterpolation,skinDefinition,morphDefinition} from './gltf.js';
 export {sampleTrack,multiplyMatrices,type Interpolation} from './sampling.js';
 declare const GPUBufferUsage:{STORAGE:number;VERTEX:number;COPY_DST:number;COPY_SRC:number;UNIFORM:number};
 interface Track {node:number;path:'translation'|'rotation'|'scale'|'weights';times:Float32Array;values:Float32Array;width:number;interpolation:Interpolation;sample:Float32Array;rotation?:number[]}
@@ -23,17 +24,17 @@ export class Animation implements EnginePlugin {
   constructor(readonly model:PBRModel,readonly options:AnimationOptions={}) {
     this.name='animation:'+model.name;this.validate();
     this.rest=model.nodes.map(node=>{const t=node.engine.store.transforms,id=node.id;return {position:[t.x[id],t.y[id],t.z[id]],scale:[t.sx[id],t.sy[id],t.sz[id]],rotation:[t.qx[id],t.qy[id],t.qz[id],t.qw[id]]};});
-    const doc=model.asset.doc,index=(n:any,length:number,label:string)=>{if(!Number.isInteger(n)||n<0||n>=length)throw new TypeError('Invalid animation '+label);return n;};
-    this.clips=(doc.animations??[]).map((def:any,id:number)=>{
-      if(!Array.isArray(def.channels)||!Array.isArray(def.samplers))throw new TypeError('Invalid glTF animation');
+    const doc=animationDocument(model.asset.doc);
+    this.clips=doc.animations.map((value,id)=>{
+      const def=animationDefinition(value);
       const destinations=new Set<string>();
-      const tracks:Track[]=def.channels.map((channel:any)=>{
-        const node=index(channel.target?.node,model.nodes.length,'node'),path=channel.target?.path;
-        if(!['translation','rotation','scale','weights'].includes(path)||doc.nodes[node].matrix)throw new TypeError('Invalid animation target');
+      const tracks:Track[]=def.channels.map(value=>{
+        const channel=animationChannel(value),node=animationIndex(channel.target.node,model.nodes.length,'node'),path=animationPath(channel.target.path);
+        if(animationNode(doc.nodes[node]).matrix)throw new TypeError('Invalid animation target');
         const key=node+':'+path;if(destinations.has(key))throw new Error('Duplicate animation target');destinations.add(key);
-        const sampler=def.samplers[index(channel.sampler,def.samplers.length,'sampler')],times=model.asset.accessor(sampler.input,'SCALAR'),interpolation=sampler.interpolation??'LINEAR';
-        if(!['STEP','LINEAR','CUBICSPLINE'].includes(interpolation)||times.some((v,i)=>v<0||i>0&&v<=times[i-1]))throw new RangeError('Invalid animation time/interpolation');
-        if(doc.accessors[sampler.input].componentType!==5126||doc.accessors[sampler.output]?.componentType!==5126)throw new TypeError('Animation accessors must be Float32');
+        const sampler=animationSampler(def.samplers[animationIndex(channel.sampler,def.samplers.length,'sampler')]),times=model.asset.accessor(sampler.input,'SCALAR'),interpolation=animationInterpolation(sampler.interpolation);
+        if(times.some((v,i)=>v<0||i>0&&v<=times[i-1]))throw new RangeError('Invalid animation time/interpolation');
+        if(animationAccessor(doc,sampler.input)?.componentType!==5126||animationAccessor(doc,sampler.output)?.componentType!==5126)throw new TypeError('Animation accessors must be Float32');
         const weights=model.primitives.find(p=>p.nodeIndex===node)?.weights.length;
         const width=path==='rotation'?4:path==='weights'?weights??0:3;
         if(!width)throw new TypeError('Animation target has no morph weights');
@@ -77,11 +78,12 @@ export class Animation implements EnginePlugin {
     if(!engine.gpu)throw new Error('Animation requires WebGPU');this.device=engine.gpu;
     this.unsubscribe?.();this.unsubscribe=this.model.onDispose(()=>this.destroy());
     this.pipeline=this.device.createComputePipeline({layout:'auto',compute:{module:this.device.createShaderModule({code:deformationShader}),entryPoint:'main'}});
-    const doc=this.model.asset.doc;
+    const doc=animationDocument(this.model.asset.doc);
     for(const p of this.model.primitives) {
-      const targets=p.definition.targets??[],skinId=doc.nodes[p.nodeIndex].skin,skin=skinId===undefined?null:doc.skins?.[skinId];
-      if(skinId!==undefined&&(!Number.isInteger(skinId)||skinId<0||!skin))throw new TypeError('Missing glTF skin');
-      if(!targets.length&&!skin)continue;
+      const definition=morphDefinition(p.definition),targets=definition.targets,skinId=animationNode(doc.nodes[p.nodeIndex]).skin;
+      const skinValue=typeof skinId==='number'?doc.skins[skinId]:undefined;
+      if(skinId!==undefined&&(typeof skinId!=='number'||!Number.isInteger(skinId)||skinId<0||!skinValue))throw new TypeError('Missing glTF skin');
+      if(!targets.length&&skinId===undefined)continue;
       const count=p.vertices.length/20,buffers:GPUBuffer[]=[],record:Deformation={primitive:p,buffers,group:undefined!,output:undefined!,weights:undefined!,bones:undefined!,palette:new Float32Array(),joints:[],inverseBind:[],pipeline:this.pipeline};
       this.resources.push(record);
       const upload=(data:Float32Array|Uint32Array,usage=GPUBufferUsage.STORAGE)=>{
@@ -91,18 +93,18 @@ export class Animation implements EnginePlugin {
       };
       if(count*targets.length*48>this.device.limits.maxStorageBufferBindingSize)throw new RangeError('Morph deltas exceed device limit');
       const deltas=new Float32Array(Math.max(12,count*targets.length*12));
-      targets.forEach((target:any,t:number)=>{for(const [name,at] of [['POSITION',0],['NORMAL',4],['TANGENT',8]] as const)if(target[name]!==undefined){
+      targets.forEach((target,t)=>{for(const [name,at] of [['POSITION',0],['NORMAL',4],['TANGENT',8]] as const)if(target[name]!==undefined){
         const data=this.model.asset.accessor(target[name],'VEC3');if(data.length!==count*3)throw new RangeError('Morph target count mismatch');
         for(let i=0;i<count;i++)deltas.set(data.subarray(i*3,i*3+3),(t*count+i)*12+at);
       }});
       let inverseBind:Float32Array=new Float32Array(identity),joints:number[]=[];
-      const attributes=p.definition.attributes,extra=skin&&(attributes.JOINTS_1!==undefined||attributes.WEIGHTS_1!==undefined),stride=extra?16:8;
+      const attributes=definition.attributes,extra=skinId!==undefined&&(attributes.JOINTS_1!==undefined||attributes.WEIGHTS_1!==undefined),stride=extra?16:8;
       const influenceBytes=new ArrayBuffer(Math.max(32,count*stride*4)),jointIds=new Uint32Array(influenceBytes),influenceFloats=new Float32Array(influenceBytes);
-      if(skin) {
-        if(!Array.isArray(skin.joints)||!skin.joints.length||new Set(skin.joints).size!==skin.joints.length||skin.joints.some((i:any)=>!Number.isInteger(i)||i<0||i>=this.model.nodes.length))throw new TypeError('Invalid skin joints');
+      if(skinId!==undefined) {
+        const skin=skinDefinition(skinValue,this.model.nodes.length);
         joints=skin.joints;
         inverseBind=skin.inverseBindMatrices===undefined?Float32Array.from(joints.flatMap(()=>Array.from(identity))):this.model.asset.accessor(skin.inverseBindMatrices,'MAT4');
-        if(skin.inverseBindMatrices!==undefined&&doc.accessors[skin.inverseBindMatrices].componentType!==5126)throw new TypeError('Inverse bind matrices must be Float32');
+        if(skin.inverseBindMatrices!==undefined&&animationAccessor(doc,skin.inverseBindMatrices)?.componentType!==5126)throw new TypeError('Inverse bind matrices must be Float32');
         if(inverseBind.length!==joints.length*16)throw new RangeError('Inverse bind matrix count mismatch');
         for(const name of Object.keys(attributes))if(/^(JOINTS|WEIGHTS)_/.test(name)&&!/^(JOINTS|WEIGHTS)_[01]$/.test(name))throw new Error('More than eight joint influences are unsupported');
         const sets:Array<{ids:Float32Array;weights:Float32Array}>=[];
@@ -110,8 +112,9 @@ export class Animation implements EnginePlugin {
           const jointIndex=attributes['JOINTS_'+set],weightIndex=attributes['WEIGHTS_'+set];
           if(jointIndex===undefined||weightIndex===undefined)throw new TypeError('Skin attributes require paired JOINTS_'+set+' and WEIGHTS_'+set);
           const ids=this.model.asset.accessor(jointIndex,'VEC4'),weights=this.model.asset.accessor(weightIndex,'VEC4');
-          if(ids.length!==count*4||weights.length!==count*4||![5121,5123].includes(doc.accessors[jointIndex].componentType)||doc.accessors[jointIndex].normalized)throw new TypeError('Invalid skin attributes');
-          const weightAccessor=doc.accessors[weightIndex];if(![5126,5121,5123].includes(weightAccessor.componentType)||weightAccessor.componentType!==5126&&!weightAccessor.normalized)throw new TypeError('Invalid skin weight component type');
+          const jointAccessor=animationAccessor(doc,jointIndex);
+          if(ids.length!==count*4||weights.length!==count*4||jointAccessor?.componentType!==5121&&jointAccessor?.componentType!==5123||jointAccessor?.normalized)throw new TypeError('Invalid skin attributes');
+          const weightAccessor=animationAccessor(doc,weightIndex);if(!weightAccessor||weightAccessor.componentType!==5126&&weightAccessor.componentType!==5121&&weightAccessor.componentType!==5123||weightAccessor.componentType!==5126&&!weightAccessor.normalized)throw new TypeError('Invalid skin weight component type');
           sets.push({ids,weights});
         }
         for(let i=0;i<count;i++) {

@@ -7,8 +7,8 @@ import {animatedTriangle} from './support/gltf-pro-fixture.js';
 import {optionalGPU} from './support/optional-gpu.js';
 
 const digest = value => createHash('sha256').update(value).digest('hex');
-// Recorded before the extension slot was introduced, including whitespace and packed frame bytes.
-const baselineShader = '1920d3bb180dbf0fa32fe4d373a3c03bdfccbdc834fb02a26fcb1b8dfeeffa5b';
+// Named base-light functions preserve the prior pixels bit for bit; see the shader-review GPU proof.
+const baselineShader = '469dd81676967dbfd22118fa85b1cf8b6ff37dc7593e7e7f8130e5626a29f508';
 const baselineFrame = 'c6666b8c89280b7915c001d0a92c33ed027dfea50b9c4df247f1c43010fcb313';
 
 async function scene(primitiveCount = 1) {

@@ -6,6 +6,7 @@ import type {Physics as PhysicsWorld,PhysicsOptions,PhysicsBody,BodyOptions,Rapi
 import {Mesh,type MeshProps} from './components.js';
 import {useScene,useCommit,useResourceEffect,type Scene,type Registry} from './internal.js';
 import {descendants,rotate,worldPose,setWorldPose,type Triple,type Quaternion} from './scene-transform.js';
+import {optionalPeer} from './optional.js';
 
 interface PhysicsState {world:PhysicsWorld|null;sync:Set<()=>void>}
 const Context=createContext<PhysicsState|null>(null);
@@ -18,7 +19,7 @@ export interface PhysicsProps extends Omit<PhysicsOptions,'rapier'> {
 }
 let defaultRapier:Promise<RapierModule>|undefined;
 function loadRapier():Promise<RapierModule> {
-  return defaultRapier??=(async()=>{const module=await import('@dimforge/rapier3d-compat');const api=module.default??module;await api.init();return api as unknown as RapierModule;})().catch(error=>{defaultRapier=undefined;throw error;});
+  return defaultRapier??=(async()=>{const module=await optionalPeer('@dimforge/rapier3d-compat',()=>import('@dimforge/rapier3d-compat'));const api=module.default??module;await api.init();return api as unknown as RapierModule;})().catch(error=>{defaultRapier=undefined;throw error;});
 }
 
 /** Own one optional Rapier world, stepped by the engine in always and demand modes. */
@@ -28,7 +29,7 @@ export function Physics({children,rapier,onReady,onError,gravity,paused=false,ti
   useResourceEffect(lease=>{
     let current:PhysicsWorld|undefined;
     setWorld(null);
-    void Promise.all([import('@margoengine/physics'),rapier??loadRapier()]).then(([api,R])=>{
+    void Promise.all([optionalPeer('@margoengine/physics',()=>import('@margoengine/physics')),rapier??loadRapier()]).then(([api,R])=>{
       if(!lease.active||engine.disposed)return;
       current=new api.Physics(null,{...options,...latest.current,rapier:R});
       const instance=current;

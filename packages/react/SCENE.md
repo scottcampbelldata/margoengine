@@ -1,12 +1,14 @@
 # Optional React scene layer
 
-The existing `@margoengine/react` entry stays compatible. Add only the subpaths
-and optional peers used by your scene. Every native package is imported lazily;
+The existing `@margoengine/react` entry exports all scene components; the four
+subpaths remain available for focused imports. Install only the optional peers
+used by your scene. Every native package is imported lazily;
 importing these components or rendering a Canvas on the server creates no GPU,
 physics world, pointer lock or XR session. `sideEffects` remains `false`.
 
 | Entry | Components and hooks | Optional peers |
 | --- | --- | --- |
+| `@margoengine/react` | All bindings below, plus `MeshTransmissionMaterial` and `Animation` | Material uses `@margoengine/materials`/`gltf-pro`; animation uses `animation` and optionally `animator`; loaded-model events use `selection`. |
 | `@margoengine/react/kit` | `Gltf`, `Fbx`, `preload`, `Environment`, `Sky`, `ContactShadows`, `Center`, `OrbitControls`, `PointerLock`, `TransformControls`, `Html`, `Text`, `Box`, `Sphere`, `Plane` | Install the corresponding `@margoengine/gltf-pro`, `fbx`, `environment`, `sky`, `shadows`, `controls`, `gizmo`, `html`, `text` or `geometry` package. `Html` also uses `react-dom`. |
 | `@margoengine/react/post` | `EffectComposer`, `Bloom`, `SSAO`, `DepthOfField`, `Tonemap`, `TAA` | `@margoengine/post`, `dof`, `tonemap`, `taa`, according to the effects used |
 | `@margoengine/react/physics` | `Physics`, `RigidBody`, `CuboidCollider`, `BallCollider`, `usePhysics` | `@margoengine/physics`, `@dimforge/rapier3d-compat` |
@@ -21,13 +23,11 @@ bare lowercase JSX still denotes DOM elements.
 
 ```tsx
 import {Suspense} from 'react';
-import {Canvas, PbrMaterial} from '@margoengine/react';
-import {Box, Center, ContactShadows, Fbx, Html, OrbitControls, Text} from '@margoengine/react/kit';
+import {Canvas, Box, Center, ContactShadows, Fbx, Html, OrbitControls, Text} from '@margoengine/react';
 
 export function Scene() {
   return <Canvas backend="webgpu" style={{height:400}}>
-    <Box args={[1,1,1]} position={[0,1,0]} castShadow onClick={()=>{}}>
-      <PbrMaterial color="#84d6bd"/>
+    <Box args={[1,1,1]} color="#84d6bd" position={[0,1,0]} castShadow onClick={()=>{}}>
       <Html position={[0,1,0]}>A clickable cube</Html>
     </Box>
     <ContactShadows width={10} height={10}/>
@@ -48,11 +48,16 @@ from `.hdr`/`.exr`, and glTF otherwise; an explicit second argument can be
 `'fbx'`, `'environment'` or `'model'`. Before Canvas is ready it queues until an
 engine exists. Mount Canvas before awaiting such a preload.
 
-Model events use the active engine picking plugin and its source registration.
-The wrappers do not add another raycaster or synthesize deformation hits.
+Model events call `engine.pick` through the native `@margoengine/selection`
+GPU picker, registering loaded draws automatically on the first pointer event.
+Skinning and morph targets use animation's current GPU buffer. React shares a
+single picker per Canvas, borrows a configured native picker when present, and
+releases only its own registrations. Custom picking plugins manage their own
+model sources. There is no additional raycaster or BVH traversal.
 
-`Box`, `Sphere` and `Plane` accept Mesh props, a native geometry argument tuple
-in `args`, `castShadow`, and a mesh ref. They use `@margoengine/geometry`.
+`Box`, `Sphere` and `Plane` accept Mesh props, `color`, `roughness`, `metalness`,
+a native geometry argument tuple in `args`, `castShadow`, and a mesh ref. They
+use `@margoengine/geometry`; Canvas supplies the engine's default lighting.
 `ContactShadows` requests the shared directional shadow map and renders a
 transparent ground showing only its occlusion. Its props are Mesh transforms,
 `width`, `height`, `opacity` and linear RGB `color`; add casters explicitly with
@@ -75,6 +80,45 @@ axis visibility and control-event callbacks. Both release listeners on unmount.
 native text ref. Text blocks share one renderer per Canvas and track their
 parent mesh. `Html`, `Environment` and `OrbitControls` retain their existing
 [base-package contracts](README.md).
+
+## Materials and animation
+
+```tsx
+import {Suspense} from 'react';
+import {Canvas, Mesh, BoxGeometry, MeshTransmissionMaterial, Gltf, Animation} from '@margoengine/react';
+
+<Canvas backend="webgpu">
+  <Mesh position={[2,0,0]} onClick={()=>{}}>
+    <BoxGeometry/>
+    <MeshTransmissionMaterial color="#d4eaff" factor={0.9} ior={1.5}
+      volume={{thicknessFactor:0.5,attenuationColor:[0.8,0.9,1],attenuationDistance:2}}/>
+  </Mesh>
+  <Suspense fallback={<span>Loading character…</span>}>
+    <Gltf src="/character.glb" onClick={()=>{}}>
+      <Animation clip="Walk" playing loop blend={0.2}/>
+    </Gltf>
+  </Suspense>
+</Canvas>;
+```
+
+`MeshTransmissionMaterial` attaches to procedural Mesh geometry and calls the
+existing `@margoengine/materials` transmission/volume installation. Positive
+`factor` requires WebGPU and `@margoengine/gltf-pro`; it preserves the original
+Mesh's transform, ref and event ID. `factor={0}` is exactly `PbrMaterial` and
+does not load those peers. Native single-sample, screen-space transmission
+limits still apply. Transmitted surfaces follow the native blended shadow
+behavior. The procedural geometry returns when the material unmounts.
+
+`Animation` is a child of `Gltf`, `Model` or `Fbx`. It selects a clip by name
+and forwards `playing` and `loop` to the native playback path. Changing `clip`
+with a positive `blend` crossfades over that many seconds through
+`@margoengine/animator`; otherwise only `@margoengine/animation` loads. Each
+model instance owns its playback, and unmount removes its plugins. The native
+packages are optional peers; the React file imports only the components.
+
+Optional-peer import failures name the package to install. Component `onError`
+callbacks retain native error details, and Canvas displays initialization and
+resource failures in its alert.
 
 ## Post effects
 
@@ -196,7 +240,9 @@ demand mode. Unmount detaches events and disposes the manager/session.
 Run `npm run build:packages`, `npm run modern:test:react`, `npm run typecheck`,
 `npm run test:modules:packages`, and `npm run measure:size` from the workspace.
 `npm run test:browser --workspace @margoengine/react` exercises the scene
-components with real WebGPU and Rapier. Unit tests cover StrictMode, Suspense,
+components with real WebGPU and Rapier.
+`npm run test:after-scene --workspace @margoengine/react` checks lit shape colors, transmission, animated picking and
+crossfades on WebGPU. Unit tests cover StrictMode, Suspense,
 optional imports, source ownership, parent transforms, post limits and mocked
 XR sessions. Packaging tests exercise strict public subpath consumers and prove
 the base bundle's static dependency graph excludes optional scene subpaths.

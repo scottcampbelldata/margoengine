@@ -8,6 +8,7 @@ declare const GPUBufferUsage:{UNIFORM:number;COPY_DST:number;MAP_READ:number};
 declare const GPUTextureUsage:{RENDER_ATTACHMENT:number;COPY_SRC:number};
 declare const GPUMapMode:{READ:number};
 type Context=Extract<PassContext,{backend:'webgpu'}>;
+const attachedPickers=new WeakMap<Engine,Picking>();
 type Snapshot={geometry:Geometry|null;values:Float32Array;visible:number};
 const buffers:GPUVertexBufferLayout[]=[
  {arrayStride:24,attributes:[{shaderLocation:0,offset:0,format:'float32x3'},{shaderLocation:1,offset:12,format:'float32x3'}]},
@@ -52,6 +53,8 @@ export class Picking implements EnginePlugin {
  /** `capture:false` skips the per-frame ID target and snapshot; every pick then uses the culled 3x3 pass. */
  constructor(readonly options:{capture?:boolean}={}){}
  static attach(engine:EngineKernel,options:{capture?:boolean}={}):Picking {const picking=new Picking(options);engineRuntime(engine).use(picking);return picking;}
+ /** Return the configured picker without attaching another plugin or taking its ownership. */
+ static forEngine(engine:EngineKernel):Picking|undefined {return attachedPickers.get(engineRuntime(engine));}
  /** Register an optional model's GPU vertices, including its current skin and morph deformation. */
  add(source:PickingSource):()=>void {if(this.disposed)throw new Error('Picking is disposed');return this.primitives.add(source);}
  setup(engine:Engine):void {
@@ -62,6 +65,7 @@ export class Picking implements EnginePlugin {
   this.read=this.device.createBuffer({size:768,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
   this.micro=this.device.createTexture({size:[3,3],format:'r32uint',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});
   this.depth=this.device.createTexture({size:[3,3],format:'depth32float',usage:GPUTextureUsage.RENDER_ATTACHMENT});
+  attachedPickers.set(engine,this);
  }
  registerPasses(graph:FrameGraph):void {
   if(this.options.capture===false)return;
@@ -155,6 +159,7 @@ export class Picking implements EnginePlugin {
   if(this.primitives.hasSources)return this.primitives.draw(c,matrix,{format:'r32uint',depthFormat:'depth32float'});
  }
  private release():void {
+  if(this.engine&&attachedPickers.get(this.engine)===this)attachedPickers.delete(this.engine);
   this.primitives.release();
   for(const resource of [this.ids,this.micro,this.depth,this.uniform,this.read])resource?.destroy();
   this.ids=this.micro=this.depth=undefined;this.idsView=undefined;this.uniform=this.read=undefined;this.pipelines.clear();this.groups.clear();this.snapshot.clear();this.captured=false;this.context=undefined;

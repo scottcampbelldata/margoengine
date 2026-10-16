@@ -1,5 +1,5 @@
 import {createContext,useContext,useEffect,useLayoutEffect,useRef} from 'react';
-import type {Engine,Mesh as EngineMesh,Vec3} from '@margoengine/core/extension';
+import type {Engine,Mesh as EngineMesh,Vec3,Geometry} from '@margoengine/core/extension';
 import type {FrameCallback,Mesh as MeshHandle} from '@margoengine/core';
 import type {PBRModel,LightingEffect} from '@margoengine/gltf-pro';
 import type {Shadows} from '@margoengine/shadows';
@@ -8,6 +8,8 @@ import type {AssetCache} from './assets.js';
 export interface Registry {
   current:EngineMesh|null;children:Set<EngineMesh>;attachments:Set<(mesh:EngineMesh)=>void>;
   register(mesh:EngineMesh):void;unregister(mesh:EngineMesh):void;
+  geometry?:Geometry|null;
+  geometryOverride?:(mesh:EngineMesh,geometry:Geometry|null)=>void;
 }
 export interface Resources {models:Set<PBRModel>;lighting:Map<LightingEffect,Map<PBRModel,()=>void>>}
 export interface MargoPointerEvent {
@@ -27,6 +29,10 @@ export const Context=createContext<Scene|null>(null);
 export function useScene():Scene {const scene=useContext(Context);if(!scene)throw new Error('Engine components require <Canvas>');return scene;}
 export function useMesh():Registry {const {registry}=useScene();if(!registry)throw new Error('Geometry and material require <Mesh>');return registry;}
 export function live(registry:Registry):EngineMesh|null {const mesh=registry.current;return mesh&&!mesh.engine.disposed&&mesh.engine.meshes.get(mesh.id)===mesh?mesh:null;}
+export function setGeometry(registry:Registry,mesh:EngineMesh,geometry:Geometry|null):void {
+  registry.geometry=geometry;
+  if(registry.geometryOverride)registry.geometryOverride(mesh,geometry);else mesh.setGeometry(geometry);
+}
 export const zero:Vec3=[0,0,0],one:Vec3=[1,1,1];
 export const useCommit=typeof window==='undefined'?useEffect:useLayoutEffect;
 export interface ResourceLease {active:boolean;closed:boolean;generation:number;keys:readonly unknown[];release:()=>void}
