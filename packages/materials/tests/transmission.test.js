@@ -110,7 +110,8 @@ test('invalid transmission, IOR and volume metadata fail before installing resou
 });
 
 test('transmission and thickness metadata validate texture references and required UV sets before upload', async () => {
-  for (const field of ['transmissionTexture','thicknessTexture']) for (const map of [{index:9},{index:0,texCoord:2},{index:0,texCoord:1},{index:0,extensions:{KHR_texture_transform:{offset:[0.5,0]}}}]) {
+  const malformed=[null,{offset:[0.5]},{offset:[0,NaN]},{scale:Array(2)},{rotation:null},{texCoord:2}];
+  for (const field of ['transmissionTexture','thicknessTexture']) for (const map of [{index:9},{index:0,texCoord:2},{index:0,texCoord:1},...malformed.map(transform=>({index:0,extensions:{KHR_texture_transform:transform}}))]) {
     const extensions = transmission(1,field==='thicknessTexture'?{KHR_materials_volume:{thicknessFactor:1,[field]:map}}:{});
     if(field==='transmissionTexture')extensions.KHR_materials_transmission[field]=map;
     const image = {width:1,height:1,close(){}}, s = await scene(extensions,[image],doc => {
@@ -120,6 +121,38 @@ test('transmission and thickness metadata validate texture references and requir
       const before={...s.counts}; assert.throws(()=>install(s.model),/texture|TEXCOORD|coordinate|transform/i);
       assert.equal(s.model.primitives[1].material.extension,undefined); assert.equal(s.counts.textures,before.textures);
     } finally {s.engine.dispose();}
+  }
+});
+
+test('transmission and thickness glTF texture transforms append affine rows and select UV1',async()=>{
+  for(const field of ['transmissionTexture','thicknessTexture']){
+    const map={index:0,texCoord:0,extensions:{KHR_texture_transform:{offset:[0.25,0.125],scale:[0.5,0.75],texCoord:1}}};
+    const definitions=transmission(1,field==='thicknessTexture'?{KHR_materials_volume:{thicknessFactor:1,[field]:map}}:{});
+    if(field==='transmissionTexture')definitions.KHR_materials_transmission[field]=map;
+    const image={width:1,height:1,close(){}},s=await scene(definitions,[image],doc=>{
+      doc.images=[{uri:'decoded.png'}];doc.textures=[{source:0}];doc.extensionsRequired=['KHR_texture_transform'];
+    });
+    try{
+      const installation=install(s.model),extension=s.model.primitives[1].material.extension;
+      assert.equal(extension.factors.length,16);assert.deepEqual([...extension.factors.slice(8)],[0.5,0,0.25,0,-0,0.75,0.125,0]);
+      assert.equal(extension.textures.length,2);assert.match(extension.declarations,/materialUV\(uv\(i,1\.0\)/);
+      s.frame();assert.ok(s.draws.at(-1).groups.has(3));installation.dispose();
+    }finally{s.engine.dispose();}
+    assert.ok(s.resources.every(resource=>resource.destroyed));
+  }
+});
+
+test('caller-owned transmission and thickness maps validate transform-selected UV1 before allocating capture resources',async()=>{
+  for(const field of ['transmissionTexture','thicknessTexture']){
+    const s=await scene(transmission(1),[],doc=>{delete doc.meshes[1].primitives[0].attributes.TEXCOORD_1;});
+    try{
+      const material=s.model.primitives[1].material,map={view:{},texCoord:0,transform:{texCoord:1}};
+      material.transmission={factor:1,...(field==='transmissionTexture'?{transmissionTexture:map}:{})};
+      if(field==='thicknessTexture')material.volume={thicknessFactor:1,thicknessTexture:map};
+      const before={...s.counts};assert.throws(()=>install(s.model),/UV|TEXCOORD|coordinate/i);
+      assert.equal(material.extension,undefined);assert.equal(s.counts.textures,before.textures);assert.equal(s.counts.buffers,before.buffers);
+      assert.equal(s.engine.hasPlugin('materials:opaque-color'),false);
+    }finally{s.engine.dispose();}
   }
 });
 

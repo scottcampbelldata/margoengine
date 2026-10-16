@@ -28,3 +28,8 @@ struct Influence {joints:vec4u,weights:vec4f}
   v.normal=vec4f(normalize(v.normal.xyz),0);output[id.x]=v;
 }
 `;
+
+/** The four-influence shader and its 32-byte storage stride remain unchanged. */
+export const deformationShader8=deformationShader
+  .replace('struct Influence {joints:vec4u,weights:vec4f}', 'struct Influence {joints:vec4u,weights:vec4f,jointsExtra:vec4u,weightsExtra:vec4f}')
+  .replace('boneMatrices[inf.joints.w]*inf.weights.w;', 'boneMatrices[inf.joints.w]*inf.weights.w+boneMatrices[inf.jointsExtra.x]*inf.weightsExtra.x+boneMatrices[inf.jointsExtra.y]*inf.weightsExtra.y+boneMatrices[inf.jointsExtra.z]*inf.weightsExtra.z+boneMatrices[inf.jointsExtra.w]*inf.weightsExtra.w;');

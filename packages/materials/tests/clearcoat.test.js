@@ -182,8 +182,32 @@ test('model disposal removes the installation and releases its texture resources
   assert.ok(s.resources.every(resource => resource.destroyed));
 });
 
+test('glTF coat texture transforms install through the shared affine block and select UV1',async()=>{
+  const transform={offset:[0.25,0.125],scale:[0.5,0.75],texCoord:1},image={width:1,height:1,close(){}};
+  const s=await scene({clearcoatFactor:1,clearcoatTexture:{index:0,texCoord:0,extensions:{KHR_texture_transform:transform}}},[image],doc=>{
+    doc.images=[{uri:'decoded.png'}];doc.textures=[{source:0}];doc.extensionsRequired=['KHR_texture_transform'];
+  });
+  try{
+    const installation=install(s.model),extension=s.model.primitives[0].material.extension;
+    assert.equal(extension.factors.length,12);assert.deepEqual([...extension.factors.slice(4)],[0.5,0,0.25,0,-0,0.75,0.125,0]);
+    assert.equal(extension.textures.length,1);assert.match(extension.declarations,/materialUV\(uv\(i,1\.0\)/);
+    s.draw();assert.ok(s.draws.at(-1).groups.has(3));installation.dispose();
+  }finally{s.engine.dispose();}
+  assert.ok(s.resources.every(resource=>resource.destroyed));
+});
+
+test('a caller-owned clearcoat map validates the UV set selected by its transform',async()=>{
+  const s=await scene(undefined,[],doc=>{delete doc.meshes[0].primitives[0].attributes.TEXCOORD_1;});
+  try{
+    s.model.primitives[0].material.clearcoat={factor:1,clearcoatTexture:{view:{},texCoord:0,transform:{texCoord:1}}};
+    const before={...s.counts};assert.throws(()=>install(s.model),/UV|TEXCOORD|coordinate/i);
+    assert.equal(s.model.primitives[0].material.extension,undefined);assert.equal(s.counts.textures,before.textures);assert.equal(s.counts.buffers,before.buffers);
+  }finally{s.engine.dispose();}
+});
+
 test('invalid glTF coat texture references and missing UV sets fail before allocating resources', async () => {
-  for (const map of [{index: 9},{index: 0,texCoord: 2},{index: 0,texCoord: 1},{index: 0,extensions: {KHR_texture_transform: {offset: [0.5,0]}}}]) {
+  const malformed=[null,{offset:[0.5]},{offset:[0,NaN]},{scale:Array(2)},{rotation:null},{texCoord:2}];
+  for (const map of [{index: 9},{index: 0,texCoord: 2},{index: 0,texCoord: 1},...malformed.map(transform=>({index:0,extensions:{KHR_texture_transform:transform}}))]) {
     const image = {width: 1,height: 1,close() {}}, s = await scene({clearcoatFactor: 1,clearcoatTexture: map}, [image], doc => {
       doc.images = [{uri: 'decoded.png'}]; doc.textures = [{source: 0}];
       delete doc.meshes[0].primitives[0].attributes.TEXCOORD_1;

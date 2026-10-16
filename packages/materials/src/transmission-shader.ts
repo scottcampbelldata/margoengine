@@ -1,5 +1,6 @@
 import type {MaterialExtension} from '@margoengine/gltf-pro';
 import type {ClearcoatTextureSlot} from './shader.js';
+import {coordinateExpression} from './coordinates.js';
 
 export interface TransmissionShaderTextures {
   /** Snapshot of the opaque scene, in the render attachment's original format. */
@@ -22,7 +23,7 @@ export interface TransmissionShaderValues {
 export function transmissionShader(textures:TransmissionShaderTextures,values?:TransmissionShaderValues):Pick<MaterialExtension,'declarations'|'output'> {
   const index=textures.factorsIndex??0,opaque=`materialTexture${textures.opaque}`;
   const sample=(slot:ClearcoatTextureSlot)=>{
-    const texture=`materialTexture${slot.index}`,coords=`uv(i,${slot.texCoord}.0)`;
+    const texture=`materialTexture${slot.index}`,coords=coordinateExpression(slot);
     if(slot.sampler)return `textureSampleLevel(${texture},materialSampler${slot.index},${coords},0.0)`;
     const size=`vec2f(textureDimensions(${texture},0))`;
     return `textureLoad(${texture},vec2i(clamp(${coords}*${size},vec2f(0),${size}-vec2f(1))),0)`;

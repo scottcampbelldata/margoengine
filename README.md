@@ -159,11 +159,14 @@ Benchmark and visual-parity tools use a separately cached, pinned Three.js
 
 `@margoengine/gltf-pro` automatically loads Draco and Meshopt glTF/GLB through
 `loadGLTF`. In-memory `parseGLTF` remains synchronous for uncompressed and Meshopt
-data; use `parseGLTFAsync` for Draco. Meshopt decodes at the buffer-view boundary
+data; use `parseGLTFAsync` for Draco or embedded KTX2. Meshopt decodes at the buffer-view boundary
 without workers or Wasm. Draco starts its bundled worker/Wasm decoder only when
 needed and releases temporary workers after success, failure or cancellation.
-Caller-supplied decoders remain caller-owned. KTX2 textures remain unsupported in
-glTF loading; standalone KTX2 transcoding is available in `@margoengine/decoders`.
+Caller-supplied decoders remain caller-owned. KTX2/BasisU glTF textures transcode
+to enabled GPU compression formats, retain their mip chains, and release their
+temporary workers. Texture transforms and UV1 keep the fixed vertex layout;
+nonidentity transforms use the optional group 3 uniform slot. Animation supports
+four or eight normalized joint influences per vertex.
 
 [`@margoengine/materials`](packages/materials/README.md) adds clearcoat,
 transmission, IOR, volume, and a closed TypeScript node graph through the optional
@@ -175,9 +178,10 @@ Transmissive surfaces do not cast shadows or receive cascaded shadows. Sheen,
 iridescence, anisotropy, specular-color, and Three.js TSL remain unsupported.
 These features stay outside the frozen core and stage bundle.
 
-Verification on 16 October 2026 passed 994 Node 24 tests, strict TypeScript checks
+Verification on 16 October 2026 passed 1,035 Node 24 tests, strict TypeScript checks
 and packed imports across all 63 packages, the existing production browser
-regressions, and 42 node-material GPU captures. `npm run measure:size` reports **47,983 bytes raw / 19,999 bytes gzip** for
+regressions, 42 node-material captures, 82 texture captures, production KTX2/UV1
+assets, and eight-influence character GPU readback. `npm run measure:size` reports **47,983 bytes raw / 19,999 bytes gzip** for
 core + stage. The [release notes](CHANGELOG.md#unreleased) record the parser,
 normalization, index-boundary and lifecycle checks.
 

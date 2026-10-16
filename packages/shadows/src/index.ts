@@ -9,7 +9,7 @@ declare const GPUTextureUsage:{RENDER_ATTACHMENT:number;TEXTURE_BINDING:number;C
 type Context=Extract<PassContext,{backend:'webgpu'}>;
 export interface ShadowOptions {resolution?:number;distance?:number;lambda?:number;lightSize?:number;bias?:number;normalBias?:number;casterMargin?:number}
 export interface ShadowContext {context:Context;pass:GPURenderPassEncoder;matrix:Float32Array;cascade:number}
-export interface ShadowPrimitive {node:Mesh;vertex:GPUBuffer;index:GPUBuffer;count:number;stride:number;alphaTexture?:GPUTextureView;alphaSampler?:GPUSampler;alpha?:number;cutoff?:number;texCoord?:number}
+export interface ShadowPrimitive {node:Mesh;vertex:GPUBuffer;index:GPUBuffer;count:number;stride:number;alphaTexture?:GPUTextureView;alphaSampler?:GPUSampler;alpha?:number;cutoff?:number;texCoord?:number;/** Two packed vec4 affine rows applied after UV selection. */alphaTransform?:Float32Array}
 export interface ShadowSource {shadowPrimitives?:readonly ShadowPrimitive[];shadowVersion?:number;drawShadow?(context:ShadowContext):void;addLighting?(effect:Shadows):()=>void;disposed?:boolean}
 interface Source {source:ShadowSource|Mesh;static:boolean;version:number;removeLighting?:()=>void;meshPrimitive?:ShadowPrimitive[]}
 interface Draw {uniforms:GPUBuffer[];groups:GPUBindGroup[];values:Float32Array;vertex:GPUBuffer;index:GPUBuffer;pipeline:GPURenderPipeline;alpha?:GPUTextureView;sampler?:GPUSampler}
@@ -96,20 +96,23 @@ export class Shadows implements EnginePlugin {
     }}catch(error){try{pass.end();}catch{}throw error;}pass.end();
   }
   private draw(pass:GPURenderPassEncoder,p:ShadowPrimitive,matrix:Float32Array,cascade:number):void {
-    let pipeline=this.pipelines.get(p.stride);
-    if(!pipeline){if(![24,80].includes(p.stride))throw new RangeError('Unsupported shadow vertex stride');const module=this.device!.createShaderModule({code:shadowDepth(p.stride===80)});pipeline=this.device!.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:p.stride,attributes:p.stride===80?[{shaderLocation:0,offset:0,format:'float32x4'},{shaderLocation:3,offset:48,format:'float32x4'},{shaderLocation:4,offset:64,format:'float32x4'}]:[{shaderLocation:0,offset:0,format:'float32x3'}]}]},fragment:{module,entryPoint:'fragment',targets:[]},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'less-equal'}});this.pipelines.set(p.stride,pipeline);}
+    if(p.stride!==24&&p.stride!==80)throw new RangeError('Unsupported shadow vertex stride');
+    const transform=p.alphaTransform;
+    if(transform!==undefined&&(!(transform instanceof Float32Array)||transform.length!==8||transform.some(v=>!Number.isFinite(v))||p.stride!==80))throw new TypeError('Shadow alpha transform requires finite affine rows and PBR vertices');
+    const key=p.stride+(transform?1:0);let pipeline=this.pipelines.get(key);
+    if(!pipeline){const module=this.device!.createShaderModule({code:shadowDepth(p.stride===80,!!transform)});pipeline=this.device!.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:p.stride,attributes:p.stride===80?[{shaderLocation:0,offset:0,format:'float32x4'},{shaderLocation:3,offset:48,format:'float32x4'},{shaderLocation:4,offset:64,format:'float32x4'}]:[{shaderLocation:0,offset:0,format:'float32x3'}]}]},fragment:{module,entryPoint:'fragment',targets:[]},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'less-equal'}});this.pipelines.set(key,pipeline);}
     // Primitives sharing a node can have different alpha maps and geometry.
     let records=this.draws.get(p.node);if(!records){records=new Map();this.draws.set(p.node,records);}let record=records.get(p.index);
     if(!record||record.vertex!==p.vertex||record.pipeline!==pipeline||record.alpha!==p.alphaTexture||record.sampler!==p.alphaSampler){
       if(record)for(const b of record.uniforms)b.destroy();records.delete(p.index);
       const uniforms:GPUBuffer[]=[],groups:GPUBindGroup[]=[];
       try{for(let i=0;i<4;i++){
-        const buffer=this.device!.createBuffer({size:144,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});uniforms.push(buffer);
+        const buffer=this.device!.createBuffer({size:transform?176:144,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});uniforms.push(buffer);
         groups.push(this.device!.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer}},{binding:1,resource:p.alphaTexture??this.whiteView!},{binding:2,resource:p.alphaSampler??this.alphaSampler!}]}));
       }}catch(error){for(const buffer of uniforms)buffer.destroy();throw error;}
-      record={uniforms,groups,values:new Float32Array(36),vertex:p.vertex,index:p.index,pipeline,alpha:p.alphaTexture,sampler:p.alphaSampler};records.set(p.index,record);
+      record={uniforms,groups,values:new Float32Array(transform?44:36),vertex:p.vertex,index:p.index,pipeline,alpha:p.alphaTexture,sampler:p.alphaSampler};records.set(p.index,record);
     }
-    record.values.set(matrix);record.values.set(p.node.matrix,16);record.values[32]=p.alpha??1;record.values[33]=p.cutoff??0;record.values[34]=p.texCoord??0;this.device!.queue.writeBuffer(record.uniforms[cascade],0,record.values as Float32Array<ArrayBuffer>);
+    record.values.set(matrix);record.values.set(p.node.matrix,16);record.values[32]=p.alpha??1;record.values[33]=p.cutoff??0;record.values[34]=p.texCoord??0;if(transform)record.values.set(transform,36);this.device!.queue.writeBuffer(record.uniforms[cascade],0,record.values as Float32Array<ArrayBuffer>);
     pass.setPipeline(pipeline);pass.setBindGroup(0,record.groups[cascade]);pass.setVertexBuffer(0,p.vertex);pass.setIndexBuffer(p.index,'uint32');pass.drawIndexed(p.count);
   }
   private clearDraws():void {for(const records of this.draws.values())for(const r of records.values())for(const b of r.uniforms)b.destroy();this.draws.clear();}

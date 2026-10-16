@@ -21,23 +21,41 @@ stage.engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]]);
 Supports base color/alpha, metallic-roughness (G/B), normal maps, occlusion (R), emissive, vertex colors, UV sets 0/1, tangents or derivative tangent frames, alpha masking/blending, double-sided materials, GLB/external buffers/images, normalized and sparse accessors. GGX, Smith, and Schlick implement analytical direct lighting with hemispherical ambient fill. Canvas output uses Three.js-compatible ACES Filmic tone mapping and sRGB encoding; HDR captures remain linear. Color/emissive textures decode sRGB; other maps remain linear. Images have generated mip chains and honor glTF filtering and wrapping.
 
 `loadGLTF` automatically decodes `KHR_draco_mesh_compression` primitives and
-`EXT_meshopt_compression` buffer views using `@margoengine/decoders`, installed as
+`EXT_meshopt_compression` buffer views and `KHR_texture_basisu` textures using `@margoengine/decoders`, installed as
 a dependency. Draco workers and Wasm start only when compressed primitives are
 encountered and are released after decoding, including on failure or cancellation.
 Meshopt decoding is synchronous and cached per buffer view, including views used
 by skin, morph and animation accessors. Unknown required extensions still fail.
 
 For in-memory JSON or GLB bytes, use
-`await parseGLTFAsync(engine, input, buffers, images, {signal, draco})`.
+`await parseGLTFAsync(engine, input, buffers, images, {signal, draco, ktx2})`.
 The existing `parseGLTF(engine, input, buffers, images)` remains synchronous for
 uncompressed and meshopt assets; Draco input directs callers to the async API.
-Both async APIs accept `{signal}` and an optional reusable `draco` decoder with a
-`decode` method. A supplied decoder stays owned by its caller. The default Draco
+Both async APIs accept `{signal}`, an optional reusable `draco` decoder with a
+`decode` method, and an optional `ktx2` decoder with a `transcode` method. A supplied decoder stays owned by its caller. The default Draco
 decoder requires browser module workers; server callers can supply a decoder.
 Draco attributes and indices populate the original accessors, preserving skin and
 morph data and leaving attributes outside the compression map on the usual path.
 Normalized integer UVs, colors and extra channels are converted once according to
 their accessor metadata; decoding leaves the caller's glTF document unchanged.
+
+KTX2 transcodes are lazy, preserve every mip level, and choose BC7, ASTC, ETC2 or
+RGBA8 from the device's enabled features. Color/emissive roles use sRGB formats;
+data maps use linear formats. Loader-owned workers terminate after decoding,
+including failure and abort. Retained mip bytes support device restoration without
+another transcode. `KHR_texture_basisu.source` takes precedence over a PNG fallback.
+`parseGLTFAsync` decodes embedded/data-URI KTX2; external images use `loadGLTF`.
+Synchronous `parseGLTF` also accepts already decoded `GLTFImage` blueprints.
+
+`KHR_texture_transform` supports offset, rotation, scale, and the overriding UV set
+on all five PBR maps. UV0 and UV1 already share the fixed 80-byte vertex layout.
+Nonidentity transforms append affine rows to group 3 alongside any caller material
+factors. Identity transforms and ordinary UV0 materials retain the exact original
+shader, 400-byte frame, and groups 0/1. Normal maps derive their tangent frame from
+transformed or secondary UVs; alpha-masked directional shadows use the same mapping.
+Optional material maps support the same transform through `materials.install()`.
+`textureCoordinates(info)` exposes the validated UV selection and packed affine rows;
+caller-owned clearcoat/transmission textures accept a glTF-style `transform` option.
 
 The loader passes declared vertex/index counts, accessor widths and the remaining
 256 MiB decoded-data budget into Draco. The default decoder rejects oversized
@@ -121,6 +139,11 @@ material lobes, passes or attributes.
 Run `node scripts/material-extension-tests.js` for the material slot's WebGPU
 checks, also included in `npm run modern:test:extensions`.
 
-Limits: triangle primitives; four skin influences in the animation package; KTX2 textures, texture transforms, additional UV sets and other required extensions are rejected or require a future extension. Ambient fill uses fixed sky/ground colors, without image-based lighting. Bounds describe the original mesh; custom rendered models are outside core GPU picking.
+Limits: triangle primitives; at most eight skin influences in the animation package; UV sets 0/1. Unknown required extensions still reject. Ambient fill uses fixed sky/ground colors; image-based lighting is a separate optional package. Bounds describe the original mesh; custom rendered models are outside core GPU picking.
+
+`npm run modern:test:gltf-parity` checks texture-coordinate and alpha-shadow pixel
+parity, KTX2 mip upload and worker disposal in a production Vite build, complete
+Khronos assets, and eight-influence character deformation against a CPU reference.
+These checks are also part of `npm run modern:test:extensions`.
 
 The demo at `/examples/damaged-helmet.html` downloads the [Khronos Damaged Helmet](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/DamagedHelmet). Its credits/licenses remain with the original asset.
