@@ -14,6 +14,8 @@ jobs:
       - run: npm ci
       - name: Build Margo Engine packages and enforce core + stage gzip ceiling
         run: npm run build:packages
+      - name: Strict TypeScript checks for all packages
+        run: npm run typecheck
       - name: Build and test the offline gameplay sandbox
         run: |
           npm run build --workspace examples/gameplay-sandbox

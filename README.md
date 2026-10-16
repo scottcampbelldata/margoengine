@@ -60,6 +60,7 @@ Open the localhost URL printed by Vite for the standalone [Night Citadel showcas
 ```sh
 npm test                      # builds packages and runs modern unit checks
 npm run build:packages        # builds workspace libraries with precompiled Wasm
+npm run typecheck             # strict checks for all 62 packages after build
 npm run measure:size          # verifies the combined core + stage gzip ceiling
 npm run build                 # builds packages, both starters and Night Citadel
 npm run pack:packages         # rebuilds and writes npm tarballs to test-results/
@@ -69,6 +70,9 @@ npm run modern:test:domains   # caps, sorting, FX and real GPU-loss recovery
 npm run modern:test:sky       # scenery phases, stars, depth and plugin lifecycle on WebGPU
 npm run modern:test:citadel   # showcase pixels, controls, pacing, resize and orbit heap profile
 npm run modern:test:packages  # frozen exports/types and React 18 lifecycle
+npm run test:modules:packages # all 62 packed exports and strict Bundler/NodeNext consumers
+npm run modern:test:usdz      # USDA/USDC fixtures, archive integrity and limits
+npm run modern:test:gltf-compression # production Draco/Meshopt loading and decoder teardown
 npm run modern:test:wrapper   # five-line setup, loading, lazy packs and teardown
 npm run modern:test:finalization # picking, industrial depth and conveyor stress; dev server required
 npm run modern:check:conveyor     # live UI, motor timing and 15s Chrome GC trace; dev server required
@@ -87,7 +91,7 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 | [`@margoengine/gltf`](packages/gltf/README.md) | Lazy static glTF/GLB loading, named nodes and shared primitive geometry |
 | [`@margoengine/react`](packages/react/README.md) | `MargoCanvas` (`Canvas` alias), `useMargoStage`, stable `useFrame`, mesh components and SSR |
 | [`@margoengine/xr`](packages/xr/README.md) | `XRManager`, `XRController`, inline input tracking and native WebGPU immersive stereo |
-| [`@margoengine/usdz`](packages/usdz/README.md) | Static USDA/USDC hierarchies, stored/Deflate containers and gltf-pro PreviewSurface PBR |
+| [`@margoengine/usdz`](packages/usdz/README.md) | Vendored USDA/USDC parsers, stored/Deflate containers and gltf-pro PreviewSurface PBR |
 | [`@margoengine/ifc`](packages/ifc/README.md) | IFC tessellation through web-ifc, world-space geometry, colors and BIM IDs |
 | [`@margoengine/loaders`](packages/loaders/README.md) | PLY/3MF/PCD/OFF/XYZ/VTK and static USDA/USDZ import; USDC is unsupported |
 | [`@margoengine/exporters`](packages/exporters/README.md) | glTF/GLB/STL/OBJ/PLY and static USDZ export for Quick Look |
@@ -95,7 +99,8 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 | [`@margoengine/kinematics-constraints`](packages/kinematics-constraints/README.md) | Standalone capsule/sphere target projection and two-bone pole clearance, with no engine dependency |
 | [`@margoengine/creative`](packages/creative/README.md) | Textured/sorted GPU particles, wind obstacles, sky/fog/scattering, toon, HDR and compute post-processing |
 | `@margoengine/scenery` | Independently loaded `SkyMoon` plugin and `SkyMoonPass`, procedural moonlit sky, lunar phases, stars and horizon haze |
-| `@margoengine/gltf-pro` | Optional metallic-roughness PBR, all five texture maps, normal mapping, mipmaps and alpha modes |
+| [`@margoengine/gltf-pro`](packages/gltf-pro/README.md) | Optional metallic-roughness PBR, texture maps, normal mapping, mipmaps, alpha modes and Draco/Meshopt loading |
+| [`@margoengine/decoders`](packages/decoders/README.md) | Lazy Draco workers, synchronous TypeScript Meshopt decoding and standalone KTX2/Basis transcoding |
 | [`@margoengine/blender`](packages/blender/README.md) | Offline Blender `.margo` export and prepacked WebGPU PBR ingestion |
 | `@margoengine/animation` | Optional storage-buffer skeletal skinning, compute morphs and glTF animation playback |
 | `@margoengine/post` | Optional frame-graph SSAO, view-space normal/depth extraction and bilateral blur |
@@ -142,9 +147,32 @@ Run `npm run modern:dev:extensions`, then open `/examples/damaged-helmet.html` f
 
 
 
+## Asset loading and release verification
+
+The six core launch packages are the stage facade, `core`, `react`, `gltf`,
+`gltf-pro` and `machinery`. USDZ remains an ancillary optional format outside
+that launch set. Its USDA/USDC parsers are vendored with MIT attribution; the
+root and package manifests require neither `three` nor `@types/three`.
+Benchmark and visual-parity tools use a separately cached, pinned Three.js
+0.186.1 reference.
+
+`@margoengine/gltf-pro` automatically loads Draco and Meshopt glTF/GLB through
+`loadGLTF`. In-memory `parseGLTF` remains synchronous for uncompressed and Meshopt
+data; use `parseGLTFAsync` for Draco. Meshopt decodes at the buffer-view boundary
+without workers or Wasm. Draco starts its bundled worker/Wasm decoder only when
+needed and releases temporary workers after success, failure or cancellation.
+Caller-supplied decoders remain caller-owned. KTX2 textures remain unsupported in
+glTF loading; standalone KTX2 transcoding is available in `@margoengine/decoders`.
+
+Verification on 16 October 2026 passed 931 Node 24 tests, strict TypeScript checks
+and packed imports across all 62 packages, and the production compression browser
+checks. `npm run measure:size` reports **47,983 bytes raw / 19,999 bytes gzip** for
+core + stage. The [release notes](CHANGELOG.md#unreleased) record the parser,
+normalization, index-boundary and lifecycle checks.
+
 ## Package catalog and release
 
-Run `npm run catalog` to preview the [searchable Margo catalog](docs/README.md). All 61 packages use their Margo names. `npm run catalog:build` refreshes the catalog from built runtime exports and checks exact-version availability on npm.
+Run `npm run catalog` to preview the [searchable Margo catalog](docs/README.md). All 62 packages use their Margo names. `npm run catalog:build` refreshes the catalog from built runtime exports and checks exact-version availability on npm. [Release notes](CHANGELOG.md) describe source changes and their verification; an Unreleased entry does not indicate npm publication.
 
 `npm run release:check` builds and tests the engine, enforces the 20,000-byte core + stage ceiling, and verifies every tarball's exports, TypeScript declarations and internal dependency versions. After signing into npm with access to the `@margoengine` scope, `npm run publish:packages` runs those checks and publishes the public library workspaces. Starter apps and showcases are private. Refresh the catalog after publishing and run `npm run build:site` to assemble the website.
 

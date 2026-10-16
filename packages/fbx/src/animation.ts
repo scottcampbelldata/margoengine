@@ -39,6 +39,28 @@ function commonTimes(curves:Curve[]):number[]{
 }
 type Axes=(Curve|undefined)[];
 type Parts=ReturnType<typeof localParts>;
+function createLocalSampler(ctx:SceneContext,model:FBXNode,tracks:Map<string,Axes>,beforeSample:()=>void):(time:number)=>Parts {
+  const defaults={translation:property(model,'Lcl Translation',[0,0,0]),rotation:property(model,'Lcl Rotation',[0,0,0]),scale:property(model,'Lcl Scaling',[1,1,1])};
+  const hasModelChildren=children(ctx,id(model.properties[0])).some(n=>n.name==='Model');let samples=0;
+  return function sampleLocal(time:number):Parts {
+    beforeSample();
+    if((++samples&255)===0)ctx.signal?.throwIfAborted();
+    const override:{translation?:number[];rotation?:number[];scale?:number[]}={};
+    for(const [name,path] of [['Lcl Translation','translation'],['Lcl Rotation','rotation'],['Lcl Scaling','scale']] as const){
+      const axes=tracks.get(name);
+      if(axes)override[path]=[0,1,2].map(k=>axes[k]?sample(axes[k]!,time):defaults[path][k]);
+    }
+    if(hasModelChildren&&override.scale&&(Math.abs(override.scale[0]-override.scale[1])>1e-7||Math.abs(override.scale[1]-override.scale[2])>1e-7))throw new TypeError('Unsupported FBX animated nonuniform parent scale');
+    return localParts(ctx,model,override);
+  };
+}
+
+function keepQuaternionHemisphere(previous:Float32Array,next:Float32Array):void {
+  let dot=0;for(let k=0;k<4;k++)dot+=previous[k]*next[k];
+  // q and -q describe the same rotation; matching signs selects the short arc.
+  if(dot<0)for(let k=0;k<4;k++)next[k]*=-1;
+}
+
 function refineTimes(seed:number[],evaluate:(time:number)=>Parts,rotation:Axes|undefined):number[]{
   const out=[seed[0]];let work=0;
   const acceptable=(a:Parts,b:Parts,p:Parts,alpha:number)=>{
@@ -98,21 +120,14 @@ export function buildAnimations(ctx:SceneContext,morphs:MorphBinding[]):Animatio
     }
     for(const [key,tracks] of models){
       const model=ctx.models.get(key)!,node=ctx.nodes.get(key)!,all=[...tracks.values()].flat().filter((c):c is Curve=>!!c),interpolation=all[0].interpolation;
-      const defaults={translation:property(model,'Lcl Translation',[0,0,0]),rotation:property(model,'Lcl Rotation',[0,0,0]),scale:property(model,'Lcl Scaling',[1,1,1])};
-      const hasModelChildren=children(ctx,key).some(n=>n.name==='Model');let samples=0;
-      const evaluate=(time:number):Parts=>{
+      const sampleLocal=createLocalSampler(ctx,model,tracks,()=>{
         if(++bakingSamples>100_000)throw new RangeError('FBX animation sampling work budget exceeded');
-        if((++samples&255)===0)ctx.signal?.throwIfAborted();
-        const override:{translation?:number[];rotation?:number[];scale?:number[]}={};
-        for(const [name,path] of [['Lcl Translation','translation'],['Lcl Rotation','rotation'],['Lcl Scaling','scale']] as const){const a=tracks.get(name);if(a)override[path]=[0,1,2].map(k=>a[k]?sample(a[k]!,time):defaults[path][k]);}
-        if(hasModelChildren&&override.scale&&(Math.abs(override.scale[0]-override.scale[1])>1e-7||Math.abs(override.scale[1]-override.scale[2])>1e-7))throw new TypeError('Unsupported FBX animated nonuniform parent scale');
-        return localParts(ctx,model,override);
-      };
-      const seed=commonTimes(all),times=interpolation==='LINEAR'?refineTimes(seed,evaluate,tracks.get('Lcl Rotation')):seed;
+      });
+      const seed=commonTimes(all),times=interpolation==='LINEAR'?refineTimes(seed,sampleLocal,tracks.get('Lcl Rotation')):seed;
       reserve(times.length*11);const outputs={translation:new Float32Array(times.length*3),rotation:new Float32Array(times.length*4),scale:new Float32Array(times.length*3)};
       for(let i=0;i<times.length;i++){
-        const value=evaluate(times[i]);outputs.translation.set(value.translation,i*3);outputs.rotation.set(value.rotation,i*4);outputs.scale.set(value.scale,i*3);
-        if(i){let dot=0;for(let k=0;k<4;k++)dot+=outputs.rotation[(i-1)*4+k]*outputs.rotation[i*4+k];if(dot<0)for(let k=0;k<4;k++)outputs.rotation[i*4+k]*=-1;}
+        const value=sampleLocal(times[i]);outputs.translation.set(value.translation,i*3);outputs.rotation.set(value.rotation,i*4);outputs.scale.set(value.scale,i*3);
+        if(i)keepQuaternionHemisphere(outputs.rotation.subarray((i-1)*4,i*4),outputs.rotation.subarray(i*4,i*4+4));
       }
       for(const [name,path,width] of [['Lcl Translation','translation',3],['Lcl Rotation','rotation',4],['Lcl Scaling','scale',3]] as const){
         const rest=node[path]??(path==='rotation'?[0,0,0,1]:path==='scale'?[1,1,1]:[0,0,0]);

@@ -6,6 +6,18 @@ import {children, convertedMatrix, type SceneContext, type MeshBinding} from './
 interface PreparedSkin {name:string;cpCount:number;jointIds:Uint16Array;weights:Float64Array;joints:SkinData['joints'];binds:Float32Array}
 const prepared=new WeakMap<SceneContext,Map<object,PreparedSkin|null>>();
 
+function insertInfluence(jointIds:Uint16Array,weights:Float64Array,controlPoint:number,joint:number,weight:number):void {
+  const start=controlPoint*4;
+  for(let slot=0;slot<4;slot++){
+    const at=start+slot;
+    // Strict comparison keeps earlier joints first when weights tie. Inserting
+    // shifts weaker influences down and drops the smallest of the five.
+    if(weight<=weights[at])continue;
+    for(let k=3;k>slot;k--){weights[start+k]=weights[start+k-1];jointIds[start+k]=jointIds[start+k-1];}
+    weights[at]=weight;jointIds[at]=joint;return;
+  }
+}
+
 function prepare(ctx:SceneContext,mesh:MeshBinding):PreparedSkin|null {
   const skins=children(ctx,id(mesh.source.properties[0])).filter(n=>n.name==='Deformer'&&n.properties[2]==='Skin');
   if(skins.length>1)throw new TypeError('Multiple FBX skins on geometry');if(!skins.length)return null;
@@ -41,7 +53,7 @@ function prepare(ctx:SceneContext,mesh:MeshBinding):PreparedSkin|null {
       const cp=indices[i],weight=values[i];
       if(!Number.isInteger(cp)||cp<0||cp>=cpCount||used[cp]===jointIndex+1||!Number.isFinite(weight)||weight<0)throw new RangeError(`Invalid FBX cluster weight: ${label}`);used[cp]=jointIndex+1;
       if(!weight)continue;
-      for(let slot=0;slot<4;slot++){const at=cp*4+slot;if(weight>weights[at]){for(let k=3;k>slot;k--){weights[cp*4+k]=weights[cp*4+k-1];jointIds[cp*4+k]=jointIds[cp*4+k-1];}weights[at]=weight;jointIds[at]=jointIndex;break;}}
+      insertInfluence(jointIds,weights,cp,jointIndex,weight);
     }
   }
   return {name:objectName(source),cpCount,jointIds,weights,joints,binds};

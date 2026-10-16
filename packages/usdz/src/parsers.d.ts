@@ -1,2 +1,0 @@
-declare module 'three/addons/loaders/usd/USDCParser.js' {export class USDCParser { [key:string]:any;parseData(buffer:ArrayBuffer):any;_readBootstrap():void;_readTOC():void;_readArrayValue(rep:any):any;_readValue(rep:any):any;}}
-declare module 'three/addons/loaders/usd/USDAParser.js' {export class USDAParser {[key:string]:any;parseData(text:string):any;_parseAttributeValue(type:string,value:unknown):any;_extractPrimData(data:any,path:string,fields:any,specs:any,types:any):void;}}

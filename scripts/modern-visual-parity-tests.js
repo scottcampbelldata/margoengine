@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import {openBrowser} from './browser.js';
+import {prepareThreeReference, THREE_REFERENCE_VERSION} from './three-reference.js';
 
+const reference = await prepareThreeReference();
 const browser = await openBrowser({startPath: '/tests/modern-extension.html'}), errors = [];
 browser.page.on('pageerror', e => errors.push(e.message));
 try {
-  const result = await browser.page.evaluate(async () => {
-    const THREE = await import('/node_modules/three/build/three.module.js');
+  const result = await browser.page.evaluate(async referenceModule => {
+    const THREE = await import(referenceModule);
     const {acesShader} = await import('/packages/shared/aces.js');
     const {pbrShader} = await import('/packages/gltf-pro/src/shader.ts');
     const {Engine} = await import('/packages/core/dist/index.js');
@@ -73,7 +75,7 @@ try {
     }
     material.dispose(); plane.dispose(); reference.dispose(); uniform.destroy(); output.destroy(); read.destroy(); engine.dispose(); canvas.remove();
     return matches;
-  });
+  }, reference.moduleUrl);
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({hardware: browser.hardware, checks: ['MSAA CAD + resize', 'points + EDL', 'lines', 'selection', 'SSAO', 'Bloom + restore', 'DOF', 'Tonemap', 'hemisphere fill'], aces: result}, null, 2));
+  console.log(JSON.stringify({hardware: browser.hardware, reference: {three: THREE_REFERENCE_VERSION}, checks: ['MSAA CAD + resize', 'points + EDL', 'lines', 'selection', 'SSAO', 'Bloom + restore', 'DOF', 'Tonemap', 'hemisphere fill'], aces: result}, null, 2));
 } finally {await browser.close();}

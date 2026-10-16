@@ -11,10 +11,10 @@ import {
   MeshStandardMaterial,
   DirectionalLight,
   AmbientLight,
-} from "three";
-import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
-import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
-import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
+} from 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
+import {EffectComposer} from 'https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/postprocessing/EffectComposer.js';
+import {RenderPass} from 'https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/postprocessing/RenderPass.js';
+import {OutputPass} from 'https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/postprocessing/OutputPass.js';
 import { conveyorScene } from "./conveyor-scene.js";
 import { installBenchmark } from "./frame-runner.js";
 import {sceneSamples} from '../../packages/shared/quality.js';

@@ -46,6 +46,8 @@ draco.dispose(); ktx2.dispose();
 
 `decode` and `transcode` also accept an `AbortSignal` as `signal`. The decoders evaluate the Emscripten wrappers inside the worker, so a strict Content Security Policy needs `'unsafe-eval'` in `worker-src`/`script-src` for the worker.
 
+Draco `attributeIds` selects unique attribute IDs; `componentTypes` specifies the glTF accessor type for each requested channel. Named positions, normals, UVs and colors return `Float32Array` values. Requested integer UVs retain their encoded values for the loader's accessor normalization, while colors are normalized once by the decoder. Extra channels retain their requested typed-array type. Triangle indices use `Uint16Array` below 65,536 vertices and `Uint32Array` at or above that boundary.
+
 Draco `decode` accepts `limits: {maxVertices, maxIndices, maxDecodedBytes, attributeWidths}`.
 Limits are validated before copying/transferring the input and are enforced again in
 the worker. All requested attribute widths, the actual vertex/index counts and the
@@ -59,11 +61,11 @@ the decoder's internal Wasm heap.
 
 ## Limits
 
-KTX2 cube maps, texture arrays and HDR (UASTC HDR) files are rejected. Draco point clouds return no `indices`. `@margoengine/gltf-pro` automatically uses Draco and meshopt through `loadGLTF` and `parseGLTFAsync`; its synchronous parser also supports meshopt. These loaders accept an optional reusable `draco` hook. KTX2 remains a standalone decoder and is not wired into glTF texture loading. The basic `@margoengine/gltf` loader is unchanged.
+KTX2 cube maps, texture arrays and HDR (UASTC HDR) files are rejected. Draco point clouds return no `indices`. `@margoengine/gltf-pro` automatically uses Draco and meshopt through `loadGLTF` and `parseGLTFAsync`; `parseGLTF` stays synchronous for uncompressed and meshopt assets. Its async loaders dispose their temporary Draco decoder after success, failure or cancellation. A supplied reusable `draco` hook remains owned by its caller. KTX2 remains a standalone decoder and is not wired into glTF texture loading. The basic `@margoengine/gltf` loader is unchanged.
 
 ## Tests
 
-`npm test` in `packages/decoders` runs Node checks with mock and real Wasm: SSR safety, target negotiation, row pitch, mip upload, pool limits and recovery, transfer instead of copy, handle and heap release, the Khronos Box, Avocado and AnisotropyBarnLamp assets, and meshopt vectors produced by the meshoptimizer 1.1.1 reference encoder and decoder. `npm run test:browser` adds module workers in Chromium, a 64-decode burst, a compressed upload with no validation errors, byte-identical RGBA8 GPU readback, and a production Vite consumer build that must emit the worker and decoders as assets.
+`npm test` in `packages/decoders` runs Node checks with mock and real Wasm: SSR safety, target negotiation, row pitch, mip upload, pool limits and recovery, transfer instead of copy, handle and heap release, the Khronos Box, Avocado and AnisotropyBarnLamp assets, and meshopt vectors produced by the meshoptimizer 1.1.1 reference encoder and decoder. It also covers a real normalized UV/color triangle and index promotion at 65,535, 65,536 and 65,537 vertices. The triangle was generated with pinned `draco3d@1.5.7`; `tests/generate-normalized-fixture.mjs` regenerates it from an external encoder installation without adding a runtime dependency. `npm run test:browser` adds module workers in Chromium, a 64-decode burst, a compressed upload with no validation errors, byte-identical RGBA8 GPU readback, and a production Vite consumer build that must emit the worker and decoders as assets.
 
 The Draco and Basis Universal binaries are Apache-2.0. See `vendor/NOTICE.md`.
 

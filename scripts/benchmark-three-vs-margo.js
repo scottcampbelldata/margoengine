@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import { gzipSync } from "node:zlib";
 import { build, createServer } from "vite";
 import { chromium } from "@playwright/test";
+import {prepareThreeReference, THREE_REFERENCE_VERSION} from './three-reference.js';
 
 export function summarize(timestamps) {
   assert.ok(timestamps.length > 1);
@@ -25,14 +26,12 @@ export function summarize(timestamps) {
 export async function runBenchmark() {
   const output = resolve("test-results/benchmark-three-vs-margo");
   await mkdir(output, { recursive: true });
-  const version = JSON.parse(
-    await readFile("node_modules/three/package.json", "utf8"),
-  ).version;
-  assert.equal(version, "0.186.1");
+  const reference = await prepareThreeReference();
   await build({
     configFile: false,
     publicDir: false,
     logLevel: "warn",
+    resolve: {alias: reference.aliases},
     build: {
       outDir: output,
       emptyOutDir: true,
@@ -281,7 +280,7 @@ export async function runBenchmark() {
     const lines = [
       "# Three.js vs Margo conveyor benchmark",
       "",
-      `Captured ${new Date().toISOString()}; Chromium ${browser.version()}.`,
+      `Captured ${new Date().toISOString()}; Chromium ${browser.version()}; Three.js ${THREE_REFERENCE_VERSION}.`,
       "",
       "Each scene renders exactly 1,200 frames: 200 warmup frames and 1,000 measured frames. Frame cadence uses the 999 intervals within the measured window. Actual duration depends on frame rate; 1,200 frames take 20 seconds only at 60 FPS.",
       "",

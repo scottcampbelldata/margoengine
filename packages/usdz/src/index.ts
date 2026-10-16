@@ -7,8 +7,8 @@ import {
   computeVertexNormals,
   type BinaryInput,
 } from "@margoengine/loaders";
-import { USDCParser } from "three/addons/loaders/usd/USDCParser.js";
-import { USDAParser } from "three/addons/loaders/usd/USDAParser.js";
+import { USDCParser } from "./vendor/USDCParser.js";
+import { USDAParser } from "./vendor/USDAParser.js";
 
 export interface USDOptions {
   maxBytes?: number;

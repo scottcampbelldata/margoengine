@@ -1,15 +1,23 @@
 # Native FBX loader and glTF skin export
 
-Date: 2026-10-16. This is the project note for replacing the Three.js bridge in `@margoengine/fbx`. It is not a launch plan. Core and the stage facade stay frozen. No new package name is required.
+Date: 2026-10-16. Updated after the first native importer landed. Core and the stage facade stay frozen. No new package name was added.
 
-The static glTF writer already exists. `@margoengine/exporters` writes glTF 2.0 and GLB for meshes, hierarchy, PBR materials, and PNG or JPEG images. The Khronos validator is part of its tests. That writer stops where the FBX bridge needs it: no skins, no clips, no morph targets. `@margoengine/fbx` parses with Three's `FBXLoader`, converts legacy materials to `MeshStandardMaterial`, and writes the GLB with Three's `GLTFExporter`. `parseFBX` then hands that GLB to `parseGLTF` from `@margoengine/gltf-pro`.
+The first implementation is in the tree. `@margoengine/exporters` writes skins, morphs, and clips on a data scene, and engine-scene export stays static. `@margoengine/fbx` parses binary and ASCII FBX itself and calls `exportGLB`. `convertFBX`, `parseFBX`, and `loadFBX` are unchanged. The package has no Three.js runtime dependency. The root `three` devDependency is also removed in the working tree. Benchmarks that still compare against Three.js download a pinned 0.186.1 build through `scripts/three-reference.js`. They do not import it from this package.
 
-The work is two pieces in this order:
+`npm test --workspace @margoengine/fbx` passed 52 tests on 2026-10-16, with zero failures. `npm test --workspace @margoengine/exporters` passed 17 tests. `npm run measure:size` reported core plus stage at 19,999 bytes gzip, under the 20,000-byte gate. The supported subset and the still-open real-DCC render gate are in `packages/fbx/README.md` and `docs/native-fbx-plan.md`. This file keeps the design. Where the implementation disagreed with the first draft, the notes below follow the code.
 
-1. Teach the existing exporter to write the skin, clip, and morph data that `@margoengine/animation` already reads.
-2. Replace `FBXLoader` and `GLTFExporter` with a parser in `@margoengine/fbx` that builds that data and calls `exportGLB`.
+Corrections that the code made to this design:
 
-A second glTF writer would duplicate `packages/exporters/src/gltf.ts`. `three` leaves only `@margoengine/fbx`. It never enters core, the stage, or the other packs.
+- Version 7500 widens node end offset, property count, and property-list length to `uint64`. Array count, encoding, and payload length stay `uint32` in every supported version. The null record is 25 bytes from 7500 and 13 bytes before that. The binary prefix is 23 bytes, and the version is the `uint32` at bytes 23–26.
+- All six fixed-axis Euler orders are accepted. Spherical rotation order throws. `InheritType` other than 0 still throws.
+- Concave polygons are triangulated with a work bound. A self-intersecting polygon throws. The first draft's triangle fan is not the implementation.
+- Cubic, mixed, and constant-next curves throw. They are not relabeled `LINEAR`. `LINEAR` transform tracks are adaptively baked, including full turns and moving pivots.
+- Each animation stack becomes one glTF clip, with one layer. A second layer, or a layer that is not full weight, throws.
+- Several materials on one mesh become child mesh nodes under the original model transform, because the data-scene writer has one geometry and one material per node.
+- Blender's all-100 `FullWeights` convention is accepted. Progressive shapes still throw.
+- Missing `GlobalSettings` preserves raw coordinates. A present Y-up file with `FrontAxisSign` +1 stays Y-up. Blender Z-up converts `(x, y, z)` to `(x, z, -y)`.
+- Array inflate uses platform `DecompressionStream('deflate')` only. There is no test-only inflater.
+- `convertFBX` may return a GLB up to 128 MiB. `parseFBX` still goes through the glTF runtime, which accepts at most 64 MiB. A result between those two limits can be saved and cannot be attached.
 
 ## Public API that stays
 
@@ -104,11 +112,11 @@ Static export of an engine scene never writes `skins` or `animations`. A data sc
 
 ## FBX document model
 
-The parser accepts FBX 7.4 and 7.5 binary, and the ASCII form used by the existing unit fixture (`FBX 7.4.0`). Binary versions in the header from 7400 through 7700 use the same node record. Array counts and the null-node sentinel change at 7500.
+The parser accepts binary versions 7400 through 7700, and the ASCII form used by the triangle fixture (`FBX 7.4.0`). At version 7500 the node end offset, property count, and property-list length widen to `uint64`, and the null record grows from 13 bytes to 25. Array headers do not widen.
 
 ### Binary header and nodes
 
-The magic is the 21 bytes `Kaydara FBX Binary  \0`, then the byte `0x1A`, then a little-endian `uint32` version. The existing fixture writes version 7400 at offset 23 and `0x1A` at offset 21.
+The binary prefix is 23 bytes, including the `Kaydara FBX Binary` magic and the `0x1A` byte. The little-endian `uint32` version occupies bytes 23–26. The triangle fixture writes version 7400 there.
 
 A node is:
 
@@ -139,9 +147,9 @@ Property type codes:
 | `R` | Same as `S`. Raw bytes. |
 | `f` `d` `i` `l` `b` | Array. Header below. |
 
-An array header is encoding `uint32` and compressed byte length, then the payload. Below version 7500 the element count is `uint32`. At 7500 and above the element count and the compressed length are `uint64`. Encoding `0` is raw little-endian elements. Encoding `1` is zlib deflate. Any other encoding throws. Element widths are 4, 8, 4, 8, and 1 for `f`, `d`, `i`, `l`, and `b`. The existing fixture writes `d` and `i` arrays with a 12-byte header (`uint32` count, `uint32` encoding, `uint32` byte length) and encoding 0. That fixture must keep parsing.
+An array header is `uint32` element count, `uint32` encoding, and `uint32` payload length in every supported version, including 7500 and above. Encoding `0` is raw little-endian elements. Encoding `1` is zlib deflate. Any other encoding throws. Element widths are 4, 8, 4, 8, and 1 for `f`, `d`, `i`, `l`, and `b`. The triangle fixture writes `d` and `i` arrays with that 12-byte header and encoding 0.
 
-Decompression uses `DecompressionStream` when it exists, and a small inflate implementation in the package tests so Node can parse encoding `1` without a browser. A decoded array longer than the declared count throws. The decoded byte length is capped by the 64 MiB input budget. The parser does not expand an array into a JavaScript number per element when a typed array will do. `Vertices` stays `Float64Array`. `PolygonVertexIndex` stays `Int32Array`.
+Decompression uses platform `DecompressionStream('deflate')`. A platform without that API throws. A decoded array longer than the declared count throws. Cumulative decoded arrays are capped at 64 MiB, with a separate 128 MiB allocation account. `Vertices` stays `Float64Array`. `PolygonVertexIndex` stays `Int32Array`.
 
 ### ASCII
 
@@ -220,7 +228,7 @@ FBX evaluates, in order:
 3. Scaling offset, then scaling pivot, then local scale, then the inverse scaling pivot.
 4. Geometric translation, rotation, and scale. These apply to the mesh vertices and not to children.
 
-The properties are `Lcl Translation`, `Lcl Rotation`, `Lcl Scaling`, `RotationOffset`, `RotationPivot`, `PreRotation`, `PostRotation`, `ScalingOffset`, `ScalingPivot`, `GeometricTranslation`, `GeometricRotation`, `GeometricScaling`. Missing vectors are zero, except scale, which is `(1, 1, 1)`. Euler angles are degrees. `RotationOrder` `0` is XYZ and is the only order the first slice accepts. Any other order throws a typed error that names the node, so the failure is obvious. A later slice can add the other five orders.
+The properties are `Lcl Translation`, `Lcl Rotation`, `Lcl Scaling`, `RotationOffset`, `RotationPivot`, `PreRotation`, `PostRotation`, `ScalingOffset`, `ScalingPivot`, `GeometricTranslation`, `GeometricRotation`, `GeometricScaling`. Missing vectors are zero, except scale, which is `(1, 1, 1)`. Euler angles are degrees. All six fixed-axis `RotationOrder` values are accepted. Spherical order throws a typed error that names the node.
 
 `InheritType` `0` (local) is accepted. `InheritType` `1` (parent scale ignored on rotation) and `2` (segment scale compensate) throw in the first slice. Those modes are real on Maya rigs and are called out here so they are not silently dropped.
 
@@ -235,7 +243,7 @@ Geometric transform is applied to the mesh's positions and normals, not to the n
 - `Vertices`, a double array, three per control point.
 - `PolygonVertexIndex`, an int array. A negative value ends a polygon. The control-point index is `value` when `value >= 0`, and `(-value) - 1` when `value < 0`. The fixture `0, 1, -3` is the triangle `(0, 1, 2)`.
 
-Polygons with more than three vertices are fanned from the first vertex. A polygon with fewer than three vertices throws. The resulting triangle list is the glTF index buffer. Export still uses 16-bit indices at or below 65535 vertices and 32-bit above, because 65535 is the primitive restart value. That rule already lives in the writer.
+Polygons with more than three vertices are triangulated, including concave faces, with a work bound. A polygon that crosses itself throws. A polygon with fewer than three vertices throws. The resulting triangle list is the glTF index buffer. Export still uses 16-bit indices at or below 65535 vertices and 32-bit above, because 65535 is the primitive restart value. That rule already lives in the writer.
 
 Normals and UVs use layer elements. The builder reads the first `LayerElementNormal` and the first `LayerElementUV`. Later UV sets are ignored, and a comment in the reader says so. `MappingInformationType` and `ReferenceInformationType`:
 
@@ -250,7 +258,7 @@ Any other mapping throws. After triangulation, values are stored per exported ve
 
 Missing normals are generated from the triangle faces, area-weighted, then normalized. A zero-length generated normal throws, which matches `gltf-pro`.
 
-`LayerElementMaterial` with `AllSame` uses one material index. `ByPolygon` uses one material index per polygon, and the builder splits the mesh into one glTF primitive per material. The first slice writes one primitive per material on one glTF mesh. `gltf-pro` already loads multiple primitives.
+`LayerElementMaterial` with `AllSame` uses one material index. `ByPolygon` uses one material index per polygon. Each material group becomes its own child mesh node under the original model transform, because the data-scene writer stores one geometry and one material on a node.
 
 Vertex colors from the first `LayerElementColor` are written as linear `COLOR_0`. FBX colors are treated as linear. A file that stored sRGB colors will look wrong, and the README will say that, because guessing the space is worse.
 
@@ -306,9 +314,9 @@ Tangents are not reconstructed for morphs in the first slice. The base mesh stil
 
 ### Animation
 
-The builder reads one `AnimationStack` as one glTF animation. The stack's name after `::` is the clip name. The fixture's stack is `AnimStack::Move` and the glTF clip name is `Move`.
+Each `AnimationStack` becomes one glTF animation. The stack's name after `::` is the clip name. The fixture's stack is `AnimStack::Move` and the glTF clip name is `Move`.
 
-Inside the stack, each `AnimationLayer` connected by `OO` is merged into that one clip. The first slice does not blend layers. A second layer that animates the same node and property throws `Duplicate animation target`, which is the same error the animation package throws for two channels of one path.
+A stack accepts one `AnimationLayer` at full weight, unmuted, blend mode 0. A second layer, or a layer that is not that rest state, throws. The implementation does not blend layers.
 
 An `AnimationCurveNode` connects to a model property through `OP`. The property names that map to glTF are:
 
@@ -323,17 +331,19 @@ An `AnimationCurveNode` connects to a model property through `OP`. The property 
 
 `KeyTime` is in FBX ticks. One second is `46186158000` ticks. Seconds are `keyTime / 46186158000`. The result is stored as Float32, which is what the animation package requires.
 
-`KeyValueFloat` is one float per key. Translation and scale values are converted with the same unit scale as the node. Rotation values are degrees on that Euler axis and are combined with the other axes at each distinct time, using `RotationOrder` 0. The sampled Euler is converted to a quaternion. Keys on X, Y, and Z that do not share times are unioned, and a missing axis holds its previous value.
+`KeyValueFloat` is one float per key. Translation and scale values are converted with the same unit scale as the node. Scale animation values are not unit-scaled. Rotation values are degrees on that Euler axis and are combined with the other axes at each distinct time, using the node's fixed-axis `RotationOrder`. The sampled Euler is converted to a quaternion. Keys on X, Y, and Z that do not share times are unioned, and each axis is interpolated at the other axis's times. An axis with no curve stays at its rest value.
 
 `KeyAttrFlags` selects interpolation. The flag constants from the FBX SDK curve definition:
 
 | Flag | Meaning | glTF |
 | --- | --- | --- |
 | `0x00000002` | Constant | `STEP` |
-| `0x00000004` | Linear | `LINEAR` |
-| `0x00000008` | Cubic | `LINEAR` at the key values, tangents dropped |
+| `0x00000004` | Linear | `LINEAR`, then adaptive baking for Euler motion and moving pivots |
+| `0x00000008` | Cubic | Throws. Tangents are not read. |
+| `0x100` on a constant curve | Constant-next | Throws. |
+| Mixed modes on one curve or across axes | Mixed | Throws. |
 
-A curve with no flags is linear. A curve that mixes constant and linear per key span uses `LINEAR` for the whole channel in the first slice, which is a known loss, and the channel is still accepted. Cubic tangents in `KeyAttrDataFloat` are not read yet. A comment on that branch names the deferred `CUBICSPLINE` work.
+A curve with no flags is linear. `LINEAR` baking uses sampled translation and scale tolerance `1e-5 * max(1, magnitude)` and angular tolerance `1e-4` radians. Those are sampling criteria, not a proof of the continuous error. Rotation segments are subdivided so a full turn is kept.
 
 Weight curves write one glTF `weights` channel for the mesh node. The output is a scalar stream of all target weights, target-major within each key, which is the glTF layout. Targets with no curve hold `DeformPercent / 100`.
 
@@ -355,18 +365,20 @@ Channels that would target a node using a baked `matrix` are not emitted that wa
 | `src/animation.ts` | Stacks, curves, ticks, Euler to quaternion. |
 | `src/convert.ts` | Builds the `ExportScene` and calls `exportGLB`. |
 
-`package.json` drops `three`. It gains a dependency on `@margoengine/exporters`. `@margoengine/gltf-pro` and the core peer stay. The package remains `sideEffects: false`.
+`package.json` depends on `@margoengine/exporters` and `@margoengine/gltf-pro`, and peers on core. It does not depend on `three`. The package remains `sideEffects: false`.
 
 ## Tests
 
-The current file `packages/fbx/test/fbx.test.js` is the regression contract. These assertions stay, and they must pass with no `three` import in the package or the test:
+On 2026-10-16, `npm test --workspace @margoengine/fbx` passed 52 tests and `npm test --workspace @margoengine/exporters` passed 17. The FBX run covers `fbx.test.js`, `geometry.test.js`, `readers.test.js`, `native-scene.test.js`, `loading-materials.test.js`, and `scene-budget.test.js`. None of those files import `three`.
+
+The original regression contract is still in `packages/fbx/test/fbx.test.js`:
 
 - The ASCII triangle and the hand-built binary triangle both produce a GLB whose first bytes are the glTF magic `0x46546c67`, one mesh, and a position accessor of count 3.
 - The Khronos validator reports zero errors on both.
 - The animated ASCII fixture produces one animation named `Move`, a translation channel, input times `[0, 1]`, and output values `[0, 0, 0, 2, 0, 0]`. Validator errors stay zero.
 - Inputs shorter than 32 bytes or claiming a `file:` resource path throw. An already-aborted signal throws `AbortError`.
 
-The texture test that patches `FBXLoader.prototype.parse` and `GLTFExporter.prototype.parseAsync` is rewritten. It builds a binary FBX with one embedded 1×1 PNG, or it calls the image accounting path with a GLB the native converter produced. The assertions stay: 12 images are decoded once, width and height are read once each, and every bitmap is closed when the caller aborts.
+The texture tests use first-party fixtures. They assert that 12 images are decoded once, width and height are read once each, and every bitmap is closed when the caller aborts. Embedded PNG and JPEG bytes are checked exactly. External fetches receive the abort signal.
 
 New tests, each with a binary and an ASCII case where the builder is shared:
 
@@ -396,17 +408,7 @@ The browser fixture behind `MARGOENGINE_FBX_FIXTURE` stays. It loads a real skin
 
 ## Order of work
 
-1. **Data-scene types and static writer behavior.** Add the optional fields. Do not write them yet. Existing exporter tests pass.
-2. **Skin and morph accessors.** One data-scene test. Validator clean. No FBX yet.
-3. **Animation accessors.** The `Move` channel, written from a data scene, not from FBX. Float32, strictly increasing times, TRS nodes.
-4. **Binary and ASCII front ends.** Parse the existing triangle fixtures into the generic node tree. No glTF yet. Assert object ids, the vertex array, and the connection list.
-5. **Mesh conversion.** `convertFBX` on the triangle fixtures returns the same GLB shape the tests already assert, through `exportGLB`.
-6. **The `Move` clip.** Ticks, one axis, rest values on Y and Z.
-7. **Materials, units, axes, pre-rotation.**
-8. **Skin reduction and morphs.**
-9. **Delete the Three imports, the Three devDependency usage in this package, and the prototype-patching test.** `npm test --workspace @margoengine/fbx` and `npm test --workspace @margoengine/exporters` both pass.
-
-Each step is reviewable on its own. Steps 1–3 land in `@margoengine/exporters`. Steps 4–9 land in `@margoengine/fbx` and can start once step 3's writer API is merged.
+Steps 1 through 9 are in the tree: the exporter data-scene fields, the binary and ASCII readers, mesh conversion, the `Move` clip, materials, units, axes, skin reduction, morphs, and the removal of the Three.js imports from this package. The open follow-up is a licensed DCC file rendered in WebGPU, plus the rejected features listed above if a later slice takes them on. `docs/native-fbx-plan.md` records the checked boxes.
 
 ## Explicit non-goals
 
@@ -416,13 +418,13 @@ These are real FBX features. They are out of this project, and the parser throws
 | --- | --- |
 | NURBS, patches, curves as renderable geometry | Ignored |
 | Cameras and lights | Ignored |
-| `RotationOrder` other than XYZ | Throws |
+| `RotationOrder` other than the six fixed-axis orders | Throws. The six fixed-axis orders are implemented. |
 | `InheritType` other than 0 | Throws |
 | More than four joint influences | Reduced to four, renormalized |
 | `JOINTS_1` | Never written |
-| Cubic curve tangents as `CUBICSPLINE` | Keys kept as `LINEAR` |
+| Cubic curve tangents as `CUBICSPLINE` | Throws. The exporter can write `CUBICSPLINE` from a data scene. The FBX reader does not produce it. |
 | Layer blending | Second layer on the same property throws |
-| Multiple animation stacks | Each stack is its own glTF animation. The first slice can do this once one stack works. |
+| Multiple animation stacks | Implemented. One glTF clip per stack, one layer per stack. |
 | Texture transforms, layered textures, procedural maps | Ignored |
 | Metalness from specular | Not inferred. Metalness stays 0. |
 | sRGB vertex colors | Written as linear, documented |
@@ -442,4 +444,4 @@ Float32 animation times cannot tell `46186158000` ticks from the next tick. Keys
 
 Vertex splitting changes indexes. Weights and morph deltas are applied by control-point id before the split, then copied. A test that shares one control point across two UV islands locks that order.
 
-`DecompressionStream` and the test inflate must accept the same deflate wrapper. The deflate test uses one vector checked against a known uncompressed `Vertices` array, not a round trip through a different library's defaults.
+The deflate test checks a known uncompressed `Vertices` array through `DecompressionStream('deflate')`. There is no second inflater.

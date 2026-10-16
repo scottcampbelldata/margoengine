@@ -6,6 +6,8 @@ constructor; `GLTFDocument` is available as a type from either entry.
 
 Optional WebGPU glTF 2.0 metallic-roughness rendering, separate from the frozen core and stage. The public npm name follows this repository's scope: `@margoengine/gltf-pro`.
 
+The verified core + stage bundle remains **19,999 bytes gzip**; CI rejects 20,000 bytes and above. Optional loaders, decoder code, workers and Wasm stay outside that measurement.
+
 ```ts
 import {createStage} from 'margoengine';
 import {loadGLTF} from '@margoengine/gltf-pro';
@@ -34,6 +36,8 @@ Both async APIs accept `{signal}` and an optional reusable `draco` decoder with 
 decoder requires browser module workers; server callers can supply a decoder.
 Draco attributes and indices populate the original accessors, preserving skin and
 morph data and leaving attributes outside the compression map on the usual path.
+Normalized integer UVs, colors and extra channels are converted once according to
+their accessor metadata; decoding leaves the caller's glTF document unchanged.
 
 The loader passes declared vertex/index counts, accessor widths and the remaining
 256 MiB decoded-data budget into Draco. The default decoder rejects oversized
