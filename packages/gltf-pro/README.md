@@ -93,6 +93,43 @@ through `camera.fitToBoundingBox`; the frozen stage's `fit(meshes)` and internal
 raw adapter continue to support core geometry only. Active deformation requires
 the asynchronous pose snapshot for accurate CPU raycasts.
 
+### Mixed core/PBR scene helpers
+
+Import the optional `@margoengine/gltf-pro/scene` entry for camera fitting and
+raw GPU records across core geometry and loaded glTF/FBX models:
+
+```ts
+import {getSceneBounds, fitScene, gatherSceneBuffers} from '@margoengine/gltf-pro/scene';
+
+const roots = [model.root, coreMesh];
+fitScene(stage.engine, roots, {duration: 0.3, padding: 1.1});
+const bounds = getSceneBounds(stage.engine, roots);
+const buffers = gatherSceneBuffers(stage.engine, roots);
+```
+
+Each selected root includes its descendants. Overlapping selections visit each
+node once. Hidden meshes and meshes under hidden ancestors are excluded by
+default; `{visibleOnly: false}` includes them. Frustum culling does not affect
+selection. Bounds scan actual CPU positions under current world transforms;
+skinned/morphed positions remain the bind pose. Empty bounds throw `No geometry`.
+`fitScene` returns the bounds used and accepts `aspect`, `duration`, and `padding`;
+aspect defaults to the displayed canvas dimensions, falling back to its size.
+
+`gatherSceneBuffers` returns one record per core node or PBR primitive, preserving
+distinct nodes/primitives even when they share GPU buffers. Records include
+`kind`, `node`, a borrowed world `matrix`, `vertex`, `index`, index `count`, and
+`indexFormat: 'uint32'`. Core records have `stride: 24`, `geometry`, and the shared
+batch `instance` buffer. That instance buffer reflects the last render and does
+not provide a stable instance offset for an individual node. PBR records have
+`stride: 80`, primitive identity, and alpha/UV metadata.
+
+These records borrow existing resources: do not destroy their buffers or modify
+their matrices. Requery after animation or device restoration to obtain current
+buffers; gathering does not encode animation, upload geometry, or read back the
+GPU. An empty selection returns `[]`; WebGL2 returns `null`. Foreign/disposed
+roots and unavailable GPU resources report errors. The frozen `Stage.fit` and
+internal facade adapter retain their original contracts.
+
 Register with `shadows.add(model)` and `clustered.add(model)` for optional directional shadows and local PBR lights, including the current skinned vertex buffer. `addLighting()` accepts an optional shader/binding hook without importing these packages. `shadowPrimitives` exposes current opaque/masked GPU geometry to depth consumers; blended materials are omitted.
 
 ### Optional material extension slot

@@ -121,6 +121,21 @@ does not announce an npm publication or a package version change.
   The native GPU gate also loads complete Draco Avocado with all three original
   textures, verifies the exact synchronous diagnostic, and releases its worker.
 
+### Optional mixed scene helpers
+
+- `@margoengine/gltf-pro/scene` exposes `getSceneBounds`, `fitScene`, and
+  `gatherSceneBuffers` for selected core/PBR mesh roots and their descendants.
+  Mixed bounds use actual CPU vertices under current world transforms; camera
+  fitting includes offscreen geometry and filters hidden ancestors by default.
+- GPU records borrow existing core/PBR buffers with explicit 24/80-byte strides,
+  world matrices, index counts and primitive metadata. Overlapping selections
+  do not duplicate nodes; shared buffers retain distinct node/primitive records.
+  Fresh queries follow animation and device restoration without uploading or
+  owning geometry. WebGL2 bounds/fitting work; GPU gathering returns `null`.
+- Both real Box and FBX assets have helper regressions. The four original
+  frozen-facade TODOs remain unchanged: callers opt into the new entry instead
+  of replacing `Stage.fit` or its internal raw adapter.
+
 ### Picking on skinned and morphed meshes
 
 - Registered PBR models support current-pose GPU picking and selection outlines
@@ -135,7 +150,7 @@ does not announce an npm publication or a package version change.
 
 ### Verification and footprint
 
-- The workspace build passes. The full Node 24 suite passes **1,303 tests**, with
+- The workspace build passes. The full Node 24 suite passes **1,318 tests**, with
   zero failures or skips and **four known frozen-stage TODO audits** that retain
   their original failing assertions. Strict TypeScript checks and packed exports/imports
   pass across **all 63 packages**, including strict Bundler and NodeNext consumers.
@@ -160,6 +175,11 @@ does not announce an npm publication or a package version change.
   released, one decoder worker terminated, and no GPU/page errors. Attaching
   physics preserves Box pixels bit for bit; local export and world geometry
   survive reimport.
+- Mixed scene helpers pass on RTX A6000 and SwiftShader with both real Box/FBX
+  assets and core geometry. Each adapter checks six captures and eight shaders,
+  releases all 64 tracked GPU resources across device restoration, and reports
+  zero GPU/page errors. Helper queries perform no GPU work; query and restoration
+  frames preserve pixels exactly. Fifteen new Node regressions also pass.
 - `npm run measure:size` reports **47,983 bytes raw / 19,999 bytes gzip** for
   core + stage, including embedded Wasm and both backends. Core and stage remain
   feature-frozen. CI rejects **20,000 gzip bytes or above** and checks package
