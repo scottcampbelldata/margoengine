@@ -6,7 +6,10 @@ import { VFX as Base } from '../dist/base.js';
 import { trace, configs } from './traces.js';
 const entries = Object.fromEntries(
   await Promise.all(
-    ['obstacles', 'wrap', 'sort', 'texture'].map(async (name) => [name, (await import(`../dist/${name}.js`))[name]]),
+    ['obstacles', 'wrap', 'sort', 'texture'].map(async (name) => [
+      name,
+      (await import(`../dist/${name}.js`))[name === 'texture' ? 'textureFeature' : name],
+    ]),
   ),
 );
 const fixtures = JSON.parse(await readFile(new URL('./fixtures/traces.json', import.meta.url), 'utf8'));

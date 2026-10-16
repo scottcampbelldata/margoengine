@@ -7,6 +7,7 @@ export interface FloatImage {
   data: Float32Array;
 }
 
+/** A decoded Radiance `.hdr` image: linear float RGBA plus the header's informational exposure and gamma. */
 export interface HDRImage extends FloatImage {
   /** Value of the EXPOSURE header lines multiplied together (1 when absent). Not applied to `data`. */
   exposure: number;

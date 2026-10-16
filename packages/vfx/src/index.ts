@@ -4,9 +4,9 @@ import { VFX as VFXBase, type VFXOptions } from './base.js';
 import { obstacles } from './obstacles.js';
 import { wrap } from './wrap.js';
 import { sort } from './sort.js';
-import { texture } from './texture.js';
+import { textureFeature } from './texture.js';
 export type { VFXOptions, VFXObstacle, VFXTexture, VFXFeatures } from './base.js';
-const features = { obstacles, wrap, sort, texture };
+const features = { obstacles, wrap, sort, texture: textureFeature };
 /**
  * GPU particles with every optional feature (obstacles, wrap, sort, texture). Effects that use none of them load
  * less with `VFX` from `@margoengine/vfx/base`, adding only the feature entries they use.

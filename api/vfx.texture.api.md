@@ -5,11 +5,11 @@
 ```ts
 import { Vec3 } from "@margoengine/core";
 
-export const texture: NonNullable<VFXFeatures['texture']>;
+export const textureFeature: NonNullable<VFXFeatures['texture']>;
 
 // Not exported from this entry, but used by the exports above:
 
-type Owned = {
+type OwnedResources = {
     destroy(): void;
 }[];
 
@@ -22,14 +22,14 @@ interface VFXFeatures {
         patch(simulation: string): string;
     };
     sort?: {
-        create(device: GPUDevice, particles: GPUBuffer, alive: GPUBuffer, indirect: GPUBuffer, extra: GPUBuffer, size: number, owned: Owned): {
+        create(device: GPUDevice, particles: GPUBuffer, alive: GPUBuffer, indirect: GPUBuffer, extra: GPUBuffer, size: number, owned: OwnedResources): {
             run(pass: GPUComputePassEncoder): void;
         };
     };
     texture?: {
         copy(texture: VFXTexture): VFXTexture;
         patch(billboard: string): string;
-        create(device: GPUDevice, texture: VFXTexture, owned: Owned): GPUBindGroupEntry[];
+        create(device: GPUDevice, texture: VFXTexture, owned: OwnedResources): GPUBindGroupEntry[];
     };
 }
 

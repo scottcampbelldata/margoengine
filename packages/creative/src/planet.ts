@@ -4,9 +4,16 @@ import type { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from '@margo
 import { readResponse } from '../../shared/loading.js';
 import { finiteVector } from '@margoengine/math/validate';
 import { PlanetPass, type PlanetImages, type PlanetPassConfig } from './planet-pass.js';
+import { MargoError } from '@margoengine/math/errors';
 
+/**
+ * `Planet.attach` / `Planet.create` settings. Maps are equirectangular URLs (north at the top), at most 32 MiB each
+ * and 256 MiB decoded in total. Invalid values reject with TypeError or RangeError.
+ */
 export interface PlanetOptions {
+  /** sRGB surface colour map (required). */
   dayMap: string | URL;
+  /** sRGB city lights, boosted 3x and faded in across twilight. Omitted: none. */
   nightMap?: string | URL;
   /** Linear map: red = ocean specular strength, green = roughness. */
   specularRoughnessMap?: string | URL;
@@ -14,11 +21,15 @@ export interface PlanetOptions {
   normalMap?: string | URL;
   /** Linear grayscale cloud coverage. */
   clouds?: string | URL;
+  /** Sphere radius in world units, > 0; clouds and glow sit at 1.01x. Default 1. */
   radius?: number;
   /** Axial tilt in degrees. Default: 23.4. Rotation accessors use radians. */
   tilt?: number;
+  /** World direction towards the sun (nonzero, normalised); also `setSunDirection`. Default [-1, 0.2, 0.5]. */
   sunDirection?: Vec3;
+  /** Rim glow: linear RGB `color` (default [0.3, 0.6, 1]) and `intensity` >= 0 (default 1.2). */
   atmosphere?: { color?: Vec3; intensity?: number };
+  /** Cancels loading and attachment. */
   signal?: AbortSignal;
 }
 
@@ -125,15 +136,17 @@ export class Planet implements EnginePlugin {
 
   get rotation(): VectorRef {
     this.check();
-    if (!this.spin) throw new Error('Planet is not attached');
+    if (!this.spin) throw new MargoError('state', 'Planet is not attached; await Planet.attach(engine) first');
     return this.spin.rotation;
   }
 
   /** Replace the complete map set after loading/validation; the current planet stays visible on failure. */
   async updateMaps(options: MapOptions): Promise<void> {
     this.check();
-    if (!this.pass || !this.engine) throw new Error('Planet is not ready');
-    if (this.upgrading) throw new Error('Planet map update is already pending');
+    if (!this.pass || !this.engine)
+      throw new MargoError('state', 'Planet is not ready; await Planet.attach(engine) first');
+    if (this.upgrading)
+      throw new MargoError('state', 'Planet map update is already pending; await the running update first');
     const sources = mapSources(options),
       controller = new AbortController();
     this.upgrading = controller;
@@ -177,7 +190,7 @@ export class Planet implements EnginePlugin {
           pass = undefined;
           continue;
         }
-        if (error) throw new Error(`Planet GPU initialization failed: ${error.message}`);
+        if (error) throw new MargoError('failed', `Planet GPU initialization failed: ${error.message}`);
         const previousPass = this.pass;
         for (const name of Object.keys(this.images) as Array<keyof PlanetImages>) delete this.images[name];
         Object.assign(this.images, next);
@@ -208,13 +221,13 @@ export class Planet implements EnginePlugin {
   }
 
   private check(): void {
-    if (this.disposed) throw new Error('Planet is disposed');
+    if (this.disposed) throw new MargoError('disposed', 'Planet is disposed; create a new Planet');
   }
 
   setup(engine: Engine): void {
     this.check();
-    if (this.engine) throw new Error('Planet is already attached');
-    if (!engine.gpu) throw new Error('Planet requires WebGPU');
+    if (this.engine) throw new MargoError('attached', 'Planet is already attached; create a new Planet');
+    if (!engine.gpu) throw new MargoError('unsupported', 'Planet requires WebGPU; use a WebGPU engine');
     this.engine = engine;
     this.parent = engine.createMesh();
     this.parent.rotation.z = this.tilt;
@@ -243,7 +256,7 @@ export class Planet implements EnginePlugin {
       const error = await device.popErrorScope();
       signal.throwIfAborted();
       this.check();
-      if (error) throw new Error(`Planet GPU initialization failed: ${error.message}`);
+      if (error) throw new MargoError('failed', `Planet GPU initialization failed: ${error.message}`);
       if (this.engine!.gpu === device) this.pass = pass;
       else if (!this.pass) this.pass = this.createPass();
     } finally {
@@ -323,7 +336,8 @@ export class Planet implements EnginePlugin {
 
   onDeviceRestored(engine: Engine): void {
     this.check();
-    if (engine !== this.engine) throw new Error('Planet belongs to another engine');
+    if (engine !== this.engine)
+      throw new MargoError('attached', 'Planet belongs to another engine; use objects created by the same engine');
     this.pass?.dispose();
     this.pass = undefined;
     if (this.sources.every(([name]) => !!this.images[name])) this.pass = this.createPass();

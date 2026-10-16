@@ -12,10 +12,18 @@ import { orthographic } from '../../shared/projection.js';
 import { validateSplats, type SplatData } from './data.js';
 import { project, render } from './shader.js';
 import { histogram, scan, scanTotals, scatter } from './sort.js';
+import { MargoError } from '@margoengine/math/errors';
 export { parseSplat, validateSplats, type SplatData } from './data.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number; INDEX: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 let nextId = 0;
+/**
+ * A Gaussian splat cloud: GPU projection to screen ellipses, an 8-pass radix depth sort and far-to-near blending
+ * against the scene depth, every frame with no CPU sorting. `Splats.attach(engine, data)`; WebGPU only.
+ * @throws TypeError / RangeError from the constructor when `data` is invalid (see `validateSplats`).
+ * @throws MargoError `'unsupported'` on a WebGL engine or `'disposed'` after `dispose()` when attaching; RangeError
+ * when the cloud exceeds the adapter's storage limits.
+ */
 export class Splats implements EnginePlugin {
   readonly name = 'splats:' + nextId++;
   readonly count: number;
@@ -74,7 +82,11 @@ export class Splats implements EnginePlugin {
     return effect;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Splats require WebGPU and a live cloud');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Splats require WebGPU and a live cloud; attach a new Splats to a WebGPU engine',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     const d = this.device,
@@ -287,7 +299,8 @@ export class Splats implements EnginePlugin {
     this.engine!.stats.drawCalls++;
   }
   get gpuState(): { sorted: GPUBuffer; ellipses: GPUBuffer; colors: GPUBuffer } {
-    if (!this.projected || !this.evaluated || !this.keys.length) throw new Error('Splats are not attached');
+    if (!this.projected || !this.evaluated || !this.keys.length)
+      throw new MargoError('state', 'Splats are not attached; attach them to an engine first');
     return { sorted: this.keys[0], ellipses: this.projected, colors: this.evaluated };
   }
   private release(): void {

@@ -7,7 +7,7 @@ import { Camera, EngineKernel, Mesh, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 
 export interface ShadowContext {
-    context: Context;
+    context: ShadowPassContext;
     pass: GPURenderPassEncoder;
     matrix: Float32Array;
     cascade: number;
@@ -91,7 +91,7 @@ export function fitCascades(camera: Camera, aspect: number, direction: Vec3, res
 
 // Not exported from this entry, but used by the exports above:
 
-type Context = Extract<PassContext, {
+type ShadowPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
 ```

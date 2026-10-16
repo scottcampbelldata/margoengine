@@ -3,12 +3,22 @@ import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph } from '@margoengine/core/extension';
 import { ToonShading, type ToonOptions } from '@margoengine/creative/toon';
 import { meshVertex } from '../../shared/gpu.js';
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 export { ToonShading };
+/** `ToonShading`'s ramp options plus the inverted-hull outline. */
 export interface ToonPipelineOptions extends ToonOptions {
+  /** Outline thickness in world units, 0-10 (0 hides it). Default 0.025. */
   outline?: number;
+  /** Outline colour, linear RGB 0..1. Default [0.015, 0.015, 0.015]. */
   color?: readonly [number, number, number];
 }
+/**
+ * Toon look for core meshes: `ToonShading`'s stepped diffuse ramp plus a front-culled inverted-hull pass for
+ * silhouette outlines. `Toon.attach(engine, options)`; WebGPU only.
+ * @throws RangeError when `outline` or `color` is out of range (and ToonShading's own option errors).
+ * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`.
+ */
 export class Toon implements EnginePlugin {
   readonly name = 'toon';
   private readonly shading: ToonShading;
@@ -36,7 +46,11 @@ export class Toon implements EnginePlugin {
     return effect;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Toon requires WebGPU');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Toon requires WebGPU; attach a new Toon to a WebGPU engine',
+      );
     this.engine = engine;
     this.shading.setup(engine);
     this.buffer = engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });

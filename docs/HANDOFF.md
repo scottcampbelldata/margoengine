@@ -1203,11 +1203,8 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
         `ExportGeometryData`) or accept geometry's; loaders `computeVertexNormals(positions, indices)` and
         `toGeometry(loaded)` (different from geometry's) -> rename; plus B's own `loadGLTF`/`parseGLTF` (gltf vs
         gltf-pro) and `parseUSDA`/`parseUSDZ`/`USDOptions` (loaders vs usdz).
-     C: lod `Vec3` (mutable) -> math `MutableVec3`; environment `ColorInput` (`readonly [n, n, n]` arrays only) ->
-        math `ColorInput` (keep the 3-component runtime check); sky local `type Color` (9 entries) and terrain local
-        `type Color` -> math `Vec3`; terrain `HeightField` -> re-export math's; vfx exported `texture` feature
-        object clashes with shader's `texture()` node -> rename vfx's (e.g. `textureFeature`) or allowlist with a
-        reason.
+     C: [DONE, group C below] lod `Vec3` (mutable) -> math `MutableVec3`; environment `ColorInput` -> math's; sky and
+        terrain local `type Color` -> math `Vec3`; terrain `HeightField` -> math's; vfx `texture` -> `textureFeature`.
      D: bvh `Vec3` (mutable) -> math `MutableVec3`, bvh `Ray` interface -> rename `BVHRay` (math `Ray` is the
         class); labels `Vec3` -> math `Vec3`, labels `composeMatrix(position, quaternion?, scale?, out?)` -> rename
         (e.g. `composeTransform`) or use math's `composeMatrix(t, q, s, out)`; physics `Vec3`, `Quat` -> math's;
@@ -1215,6 +1212,52 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
         components vs core's classes -> rename or allowlist (core is frozen); react tsconfig needs the two strict
         flags. Non-math duplicates in the scorecard (`Context`, `GeometryLike`, `ModelLike`, `PickProxy`, ...) are the
         owning group's own.
+   GROUP C [DONE 2026-10-15, one commit rebased on 08f7eb5; `npm run check:merge` passed: 1,337/1,337 node tests,
+   15/15 proofs --current, api:check, build:site, visual:check 55/55]. Environment, post, creative, clustered,
+   tonemap, shadows, taa, sky, water, terrain, dof, oit, toon, transitions, splats, vfx, scatter, lod, webgl, culling.
+   API changes: CHANGELOG.md; rules: docs/conventions.md.
+   - Types (gate 5): the C duplicates above switched to math (lod `Vec3` export removed, `octWGSL` un-exported).
+     Private `type Context = Extract<PassContext, {backend: 'webgpu'}>` aliases that leak into a published .d.ts got
+     package names (`PostPassContext`, `ScatterPassContext`, `ShadowPassContext`, `SkyPassContext`,
+     `TerrainPassContext`); vfx's `Owned` -> `OwnedResources` (sky keeps `Owned`). `Environment` (environment class
+     vs react component) allowlisted in `names`. Type-only imports: 0 runtime bytes.
+   - TSDoc (gate 6): all 104 undocumented C exports documented from the code (units, ranges, defaults, throws).
+   - any (gate 3): lod's 6 internal `any` typed (one `as unknown as Parameters<PBRModel['draw']>[0]` for the bake's
+     partial pass context, with its reason); 0 public.
+   - Errors (gate 7): 183 bare Errors converted (MargoError with code; TypeError/RangeError for malformed .cube text,
+     unrecognised environment images and invalid TAA velocity primitives; "requires WebGPU and a live effect" throws
+     `code` `this.disposed ? 'disposed' : 'unsupported'`); old text kept as the prefix, fix appended. NOT converted:
+     the 95 bare Errors of environment's EXR/HDR/UltraHDR decoders and inflate.ts (gate-11 security work owns those
+     files right now; docs/types only there). Convert them (malformed input: TypeError/RangeError) after that merge.
+   - Lint, dead (gates 2, 9): unused test bindings and creative's unused alias removed, taa/splats shader `frame` and
+     environment `HALF_MAX` un-exported. Left, same decoder reason: exr.ts unused `u8` (lint) and inflate.ts unused
+     export `inflateRaw` (dead).
+   - Manifests: math under `dependencies` where `build-optional` externalizes it or the .d.ts uses math types
+     (environment, sky, water, terrain, oit, toon, transitions, vfx, scatter, lod, webgl, culling); `devDependencies`
+     where the build inlines it and the .d.ts has no math type (post, clustered, shadows, taa, splats, creative
+     unchanged; dof and tonemap added; their tests pin "no dependencies"). package-lock.json updated.
+   - Bytes: core + stage 19,999 B gzip, raw 46,652 B, unchanged; core and margoengine dist byte-identical; no WGSL
+     change. Dist: 539 of 659 files identical; .d.ts changes are the work above; every JS change is the error
+     convention or math externalized. Entry min+gzip (`node examples/package-benchmarks/entry-sizes.mjs` on 1b2162c and on
+     this change; the committed entry-sizes.json record stays at 5f50496, as after group A) before -> after: clustered 4590 -> 4750,
+     /shadows 5299 -> 5470, /area 8881 -> 9017; creative 17242 -> 17503, /toon 866 -> 960, /post 5838 -> 5971, /grass
+     5417 -> 5545, /planet 6553 -> 6740, /stars 2217 -> 2343; culling 8656 -> 8740; dof 6100 -> 6249; environment
+     23188 -> 23408, /probes 10841 -> 11062, /volumetric 6720 -> 6830; lod 10301 -> 10383; oit 2210 -> 2273; post
+     17008 -> 17381, /bloom 4768 -> 4924, /ssao 7541 -> 7719, /scene-fade 2540 -> 2699, /stack 3187 -> 3316, /fxaa
+     3599 -> 3712, /decals 4118 -> 4227, /ssr 8529 -> 8725; scatter 9081 -> 9157; shadows 6872 -> 7061; sky 10191 ->
+     9911, /base 5041 -> 4801, /night 1302 -> 1216, /fog 1729 -> 1642, /lighting 1012 -> 985 (math now external);
+     splats 6164 -> 6286; taa 8033 -> 8202; terrain 7421 -> 7447; tonemap 6326 -> 6495; toon 1332 -> 1382; transitions
+     3215 -> 3274; vfx 7102 -> 7099, /base 5313 -> 5295, /obstacles 1218 -> 1129, /texture 645 -> 649; water 14004 ->
+     14092; webgl 2156 -> 2282. Every other entry unchanged. README size claims and the size record need a refresh
+     at a clean commit (sky's README table now overstates by up to 0.3 kB, the C packages' others understate).
+   - Scorecard (`npm run hygiene`), group C (20 packages) before -> after: format 0/166 10.0 -> 0/166 10.0; lint 7/166
+     5.8 -> 1/166 9.4; any 2/364 9.5 -> 0/359 10.0; strict 0/60 10.0 -> 0/60 10.0; types 14/239 4.1 -> 0/234 10.0;
+     tsdoc 104/226 0.0 -> 0/223 10.0; errors 278/533 0.0 -> 95/533 0.0 (0/434 outside the four decoder files); dead
+     5/527 9.1 -> 1/521 9.8; group C mean 6.1 -> 8.7. Every C package 10.0 except environment 5.7 -> 8.2 (the
+     decoder remainder). Overall (1b2162c -> this change on 1b2162c): lint 4.1 -> 4.6 (63 -> 57 files); any 6.3 -> 6.4
+     (71 -> 69); types 4.3 -> 5.6 (79 -> 60); tsdoc 0.0 -> 0.0 (369 -> 265); errors 0.0 -> 0.0 (478 -> 295); dead 8.9
+     -> 9.0 (33 -> 29); hygiene 5.3 -> 5.6. Rebased on 08f7eb5 (security 11b/11c files added): lint 58/1070, errors
+     295/1853, dead 29/2886, hygiene 5.6.
 5l. Raise CAD performance and general 3D rendering to 9/10 (Scott, 2026-10-14 night). Measurable targets (Intel Arc
    laptop, quiet PC):
    CAD: 100k parts + feature edges orbit >= 60 FPS; 1M parts >= 30 FPS; pick < 10 ms at 100k; 100k-part model

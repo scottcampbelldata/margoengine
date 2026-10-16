@@ -12,6 +12,7 @@ import { IBL_WGSL, iblBindGroupEntries } from './ibl.js';
 import { IBL_BINDING, ShaderEffect, type LightingTarget, type PBRHooks } from './lighting.js';
 import { evaluateSH } from './sh.js';
 import { halfToFloat } from './half.js';
+import { MargoError } from '@margoengine/math/errors';
 
 declare const GPUBufferUsage: {
   UNIFORM: number;
@@ -275,7 +276,10 @@ const captureCore = (shader: string): string => {
     !code.includes('_=margoMainFrame') ||
     !code.includes('return vec4f(linear,1);')
   )
-    throw new Error('Light probe capture requires the standard core lighting shader');
+    throw new MargoError(
+      'unsupported',
+      "Light probe capture requires the standard core lighting shader; remove the plugin that replaced core's shader",
+    );
   return captureLights(code);
 };
 const captureLights = (code: string): string => {
@@ -297,7 +301,10 @@ const captureLights = (code: string): string => {
       ).length !== 3 ||
       out.includes('clusterLights[clusterIndices')
     )
-      throw new Error('Light probe capture does not recognise the clustered lighting shader');
+      throw new MargoError(
+        'unsupported',
+        'Light probe capture does not recognise the clustered lighting shader; use matching @margoengine/clustered and @margoengine/environment versions',
+      );
   }
   return out;
 };
@@ -442,7 +449,8 @@ export class LightProbes extends ShaderEffect {
   }
   protected patch(source: string, group: number): string {
     if (source.includes('let margoAmbient='))
-      throw new Error(
+      throw new MargoError(
+        'state',
         `${this.name} replaces EnvironmentLighting: pass {environment} to LightProbes instead of attaching both`,
       );
     const base = source.includes('let base=terrainColor') ? 'base' : 'i.color',
@@ -478,7 +486,11 @@ export class LightProbes extends ShaderEffect {
   override setup(engine: EngineKernel): void {
     super.setup(engine);
     const device = engineRuntime(engine).gpu;
-    if (!device) throw new Error('LightProbes require the WebGPU backend');
+    if (!device)
+      throw new MargoError(
+        'unsupported',
+        'LightProbes require the WebGPU backend; use an engine on the WebGPU backend',
+      );
     this.allocate(device);
   }
   onDeviceRestored(engine: EngineKernel): void {
@@ -545,9 +557,13 @@ export class LightProbes extends ShaderEffect {
     if (!Number.isInteger(bounces) || bounces < 1 || bounces > 8)
       throw new RangeError('Light probe bounces must be an integer from 1 to 8');
     if (this.disposed || !this.engine || !this.gpu)
-      throw new Error(`${this.name} is not attached: engine.use(probes) first`);
-    if (this.baking) throw new Error('Light probe bake pending');
-    if (this.environment?.device === null) throw new Error('Light probe environment is not ready');
+      throw new MargoError('state', `${this.name} is not attached: engine.use(probes) first`);
+    if (this.baking) throw new MargoError('state', 'Light probe bake pending; await the running bake() first');
+    if (this.environment?.device === null)
+      throw new MargoError(
+        'state',
+        'Light probe environment is not ready; wait until the Environment has processed its source',
+      );
     this.baking = true;
     try {
       const engine = this.engine,
@@ -559,9 +575,10 @@ export class LightProbes extends ShaderEffect {
         device.pushErrorScope('validation');
         engine.render({ culling: false });
         const error = await device.popErrorScope();
-        if (error) throw new Error(`Light probe bake failed: ${error.message}`);
-        if (this.pending) throw new Error('Light probe capture did not run (the engine did not render)');
-        if (this.disposed || this.gpu !== device) throw new Error('Light probe bake interrupted');
+        if (error) throw new MargoError('failed', `Light probe bake failed: ${error.message}`);
+        if (this.pending) throw new MargoError('failed', 'Light probe capture did not run (the engine did not render)');
+        if (this.disposed || this.gpu !== device)
+          throw new MargoError('state', 'Light probe bake interrupted; bake again on the live engine');
         this.writeHeader(true);
       }
       const read = device.createBuffer({

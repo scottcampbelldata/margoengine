@@ -5,25 +5,39 @@ import { finiteVector } from '@margoengine/math/validate';
 import { viewMatrix } from '../../shared/view.js';
 import { orthographic } from '../../shared/projection.js';
 import { cullingShader, clusteredSampling } from './shader.js';
+import { MargoError } from '@margoengine/math/errors';
 export { clusteredSampling } from './shader.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number; COPY_SRC: number };
+/** A local point light for `setLights`. Invalid values throw RangeError (the list is unchanged). */
 export interface PointLight {
+  /** World position. */
   position: Vec3;
+  /** Distance in world units where the light fades to zero, > 0. */
   range: number;
+  /** Linear RGB, each >= 0. Default [1, 1, 1]. */
   color?: Vec3;
+  /** Radiance multiplier with inverse-square falloff, >= 0. Default 1. */
   intensity?: number;
   /** Casts shadows when \LocalShadows\ (\@margoengine/clustered/shadows\) is attached; the first \maxLights\ such lights get maps. */
   castShadow?: boolean;
 }
+/** A local spot light: a point light limited to a cone. */
 export interface SpotLight extends PointLight {
+  /** World direction the cone points along (nonzero). */
   direction: Vec3;
+  /** Cone half-angle where light reaches zero, radians, 0 < angle < PI / 2. */
   outerAngle: number;
+  /** Half-angle of the full-intensity core, radians, 0..outerAngle. Default 0. */
   innerAngle?: number;
 }
+/** `Clustered` settings, fixed at construction. */
 export interface ClusteredOptions {
+  /** Clusters along screen X, Y and log depth, each an integer 1-128, product <= 32,768. Default [16, 9, 24]. */
   grid?: readonly [number, number, number];
 }
+/** A renderer that can receive clustered lights in its own shader (gltf-pro models, `Terrain`); see `lights.add`. */
 export interface ClusteredReceiver {
+  /** Patches the receiver's shader with `effect`'s light loop; returns the remover. */
   addLighting(effect: Clustered): () => void;
 }
 /** Per-light shadow term composed into the light loop (\LocalShadows\ from \@margoengine/clustered/shadows\). */
@@ -37,6 +51,14 @@ export interface ClusteredArea {
   declarations(group: number): string;
   bindings(): GPUBindGroupEntry[];
 }
+/**
+ * Clustered forward GGX lighting for up to 1,024 point and spot lights: a compute pass bins lights into view-space
+ * clusters, fragments evaluate only their cluster's list. Core meshes receive it automatically; add gltf-pro models or
+ * terrain with `lights.add(receiver)`. `Clustered.attach(engine, options)`, then `lights.setLights([...])`. WebGPU only.
+ * @throws RangeError for an invalid grid or light.
+ * @throws MargoError `'unsupported'` on a WebGL engine or when another plugin replaced the core PBR shader,
+ * `'disposed'` after `dispose()`, `'state'` when used before attaching.
+ */
 export class Clustered implements EnginePlugin {
   readonly name = 'clustered';
   readonly grid: readonly [number, number, number];
@@ -170,7 +192,8 @@ export class Clustered implements EnginePlugin {
     };
   }
   bindings(): GPUBindGroupEntry[] {
-    if (!this.uniform || this.disposed) throw new Error('Clustered lighting is not attached');
+    if (!this.uniform || this.disposed)
+      throw new MargoError('state', 'Clustered lighting is not attached; attach it to an engine first');
     const shadow = this.shadowHook?.bindings(),
       area = this.areaHook?.bindings();
     if (!shadow && !area) return this.entries;
@@ -188,7 +211,11 @@ export class Clustered implements EnginePlugin {
       /let linear=([^;]+);/,
       `let linear=$1+clusterLighting(i.clip.xy,i.position,n,frame.eye.xyz,${base},i.material.x,i.material.y);`,
     );
-    if (code === source) throw new Error('Clustered lighting requires the standard PBR shader');
+    if (code === source)
+      throw new MargoError(
+        'unsupported',
+        "Clustered lighting requires the standard PBR shader; remove the plugin that replaced core's shader",
+      );
     const output = clusteredSampling(group, this.shadowHook, this.areaHook) + code;
     if (!cache) {
       cache = new Map();
@@ -211,7 +238,11 @@ export class Clustered implements EnginePlugin {
     return hooks;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Clustered lighting requires WebGPU and a live effect');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Clustered lighting requires WebGPU and a live effect; attach a new Clustered to a WebGPU engine',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     const count = this.grid[0] * this.grid[1] * this.grid[2],
@@ -302,7 +333,8 @@ export class Clustered implements EnginePlugin {
   }
   /** GPU buffers for diagnostics and custom forward materials; no production readback. */
   get lightLists(): { counts: GPUBuffer; indices: GPUBuffer } {
-    if (!this.counts || !this.indices) throw new Error('Clustered lighting is not attached');
+    if (!this.counts || !this.indices)
+      throw new MargoError('state', 'Clustered lighting is not attached; attach it to an engine first');
     return { counts: this.counts, indices: this.indices };
   }
   private release(): void {

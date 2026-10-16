@@ -4,6 +4,7 @@ import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type Ve
 import { finiteVector } from '@margoengine/math/validate';
 import type { Clustered, ClusteredArea } from './index.js';
 import { ltcSize, ltcTable } from './ltc.js';
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUBufferUsage: { STORAGE: number; COPY_DST: number };
 /** A rectangular area light (three.js `RectAreaLight`). It emits from one face, toward `direction`, unless `twoSided`. */
 export interface RectAreaLight {
@@ -159,11 +160,16 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
   }
   /** @internal ClusteredArea: binding 17 of the lit shader's group. */
   bindings(): GPUBindGroupEntry[] {
-    if (!this.buffer || this.disposed) throw new Error('Area lights are not attached');
+    if (!this.buffer || this.disposed)
+      throw new MargoError('state', 'Area lights are not attached; attach them to an engine first');
     return this.entries;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Area lights require WebGPU and a live effect');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Area lights require WebGPU and a live effect; attach a new AreaLights to a WebGPU engine',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     this.dirty = true;

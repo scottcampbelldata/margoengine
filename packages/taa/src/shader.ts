@@ -1,4 +1,4 @@
-export const frame = `struct Temporal {current:mat4x4f,previous:mat4x4f,inverse:mat4x4f,settings:vec4f}
+const frame = `struct Temporal {current:mat4x4f,previous:mat4x4f,inverse:mat4x4f,settings:vec4f}
 @group(0) @binding(0) var<uniform> temporal:Temporal;`;
 export const fullscreen = `struct Fullscreen {@builtin(position) clip:vec4f}
 @vertex fn vertex(@builtin(vertex_index) i:u32)->Fullscreen {let p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));var o:Fullscreen;o.clip=vec4f(p[i],0,1);return o;}`;

@@ -12,6 +12,7 @@ import { render, group, compute } from '../../shared/gpu.js';
 import { orthographic } from '../../shared/projection.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { cocShader, coarseShader, bokehShader, presentShader } from './shaders.js';
+import { MargoError } from '@margoengine/math/errors';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: {
@@ -22,6 +23,7 @@ declare const GPUTextureUsage: {
 };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
+/** Lens settings, read from `dof.options` every frame. */
 export interface DOFOptions {
   /** Scene units, measured along the camera's viewing axis. Default 5. */
   focalDistance?: number;
@@ -31,9 +33,18 @@ export interface DOFOptions {
   aperture?: number;
   /** Maximum disk radius in pixels, 1–32. Default 16. */
   maxRadius?: number;
+  /** False skips the blur and presents the scene sharp. Default true; also settable as `dof.enabled`. */
   enabled?: boolean;
 }
 
+/**
+ * Depth of field: thin-lens circle of confusion from reversed-Z depth, near and far bokeh gathered separately; reads
+ * `dof.options` each frame. `DOF.attach(engine, options)` alone, or inside a `PostStack` to combine it with SSAO,
+ * Bloom, Tonemap or FXAA. WebGPU only.
+ * @throws RangeError when an option is out of range; TypeError when `enabled` is not a boolean.
+ * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`, `'attached'` when attached
+ * twice, `'state'` when SSAO or PostProcessing owns the scene capture.
+ */
 export class DOF implements EnginePlugin {
   readonly name = 'dof';
   private engine?: Engine;
@@ -92,7 +103,8 @@ export class DOF implements EnginePlugin {
     this.options.enabled = value;
   }
   private joinStack(host: StackHost): StackStage {
-    if (this.engine || this.host || this.disposed) throw new Error('DOF is already attached');
+    if (this.engine || this.host || this.disposed)
+      throw new MargoError('attached', 'DOF is already attached; create a new DOF');
     this.host = host;
     return { kind: 'hdr', render: (c, input, output) => this.stage(c, input, output) };
   }
@@ -117,14 +129,18 @@ export class DOF implements EnginePlugin {
       throw new RangeError('Invalid DOF options');
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('DOF requires WebGPU and a live effect');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'DOF requires WebGPU and a live effect; attach a new DOF to a WebGPU engine',
+      );
     if (
       !this.host &&
       (engine.hasPlugin('ssao') ||
         engine.hasPlugin('post-processing') ||
         (engine.hasPlugin('tonemap') && !engine.hasPlugin(this.name)))
     )
-      throw new Error('DOF owns scene capture; attach it before Tonemap, without SSAO or PostProcessing');
+      throw new MargoError('state', 'DOF owns scene capture; attach it before Tonemap, without SSAO or PostProcessing');
     this.engine = engine;
     this.uniform = engine.gpu.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.cocPipeline = engine.gpu.createComputePipeline({
@@ -169,14 +185,21 @@ export class DOF implements EnginePlugin {
     this.validate();
     if (!this.host) {
       if (this.engine!.hasPlugin('ssao') || this.engine!.hasPlugin('post-processing'))
-        throw new Error('DOF cannot share scene capture with SSAO or PostProcessing');
+        throw new MargoError(
+          'state',
+          'DOF cannot share scene capture with SSAO or PostProcessing; remove SSAO or PostProcessing',
+        );
       this.resize(c);
       this.originalColor = c.color;
       this.originalDepth = c.depth;
       let shader = this.shaders.get(c.shader);
       if (shader === undefined) {
         shader = c.shader.replace(/let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');
-        if (shader === c.shader) throw new Error('DOF requires the standard core lighting shader');
+        if (shader === c.shader)
+          throw new MargoError(
+            'unsupported',
+            "DOF requires the standard core lighting shader; remove the plugin that replaced core's shader",
+          );
         this.shaders.set(c.shader, shader);
       }
       c.shader = shader;

@@ -1,6 +1,10 @@
+/** A ground candidate: world XZ, uniform scale and yaw (radians about +Y); Y comes from a height sampler later. */
 export type GroundPlacement = readonly [x: number, z: number, scale: number, yaw: number];
+/** A world XZ rectangle, min corner then max corner (exclusions, placement bounds). */
 export type GroundBounds = readonly [minX: number, minZ: number, maxX: number, maxZ: number];
+/** A world XZ circle exclusion: centre and radius. */
 export type GroundCircle = readonly [x: number, z: number, radius: number];
+/** A placed instance: world position, uniform scale and yaw (radians about +Y), packed by `instanceTransforms`. */
 export type Placement = readonly [x: number, y: number, z: number, scale: number, yaw: number];
 
 export function validateExclusions(exclusions: readonly GroundBounds[]): void {

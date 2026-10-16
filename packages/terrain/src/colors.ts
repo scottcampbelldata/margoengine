@@ -7,21 +7,40 @@ import {
   type EnginePlugin,
   type FrameGraph,
 } from '@margoengine/core/extension';
+import type { Vec3 } from '@margoengine/math';
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; COPY_SRC: number };
 
-type Color = readonly [number, number, number];
 type Range = readonly [number, number];
+/**
+ * `TerrainColors` settings, captured at attachment. Colours are linear RGB 0..1; heights are world Y; every range is
+ * increasing.
+ */
 export interface TerrainColorOptions {
-  sand: Color;
-  meadow: readonly [Color, Color];
-  stone: Color;
+  /** Beach colour below the shore band. */
+  sand: Vec3;
+  /** Low and high grass colours, blended across `meadowHeight`. */
+  meadow: readonly [Vec3, Vec3];
+  /** Rock colour on steep or high ground. */
+  stone: Vec3;
+  /** Height band where sand blends into the meadow/stone colour. */
   shore: Range;
+  /** Height band of the low-to-high meadow blend. */
   meadowHeight: Range;
+  /** Height band where ground turns to stone. */
   stoneHeight: Range;
+  /** Normal Y band (0..1, 1 = flat): ground flatter than its top stays meadow, steeper than its bottom is stone. */
   stoneNormal: Range;
+  /** Height band where sand dries: below it the colour is multiplied by `wetDarkening`. */
   wetHeight: Range;
+  /** Brightness kept by the wettest sand, 0..1 (lower is darker). */
   wetDarkening: number;
+  /** Amplitude of a gentle sinusoidal brightness variation across XZ, 0..1. Default 0. */
   variation?: number;
+  /**
+   * Moving wet band from water depth (red channel, metres) in a borrowed single-layer `r32float`, `rgba32float` or
+   * `rgba16float` texture with COPY_SRC, e.g. `water.coastalDepthTexture`, covering `origin`..`origin + size` in XZ.
+   */
   wetness?: { texture: () => GPUTexture | undefined; origin: Range; size: Range };
 }
 let serial = 0;
@@ -85,7 +104,7 @@ export class TerrainColors implements EnginePlugin {
     )
       throw new RangeError('Invalid terrain wetness map');
     this.wetness = wetness;
-    const rgb = (color: Color) => `vec3f(${color.join(',')})`;
+    const rgb = (color: Vec3) => `vec3f(${color.join(',')})`;
     const variation = options.variation ?? 0;
     this.colorCode = `
       let h=p.y;let slope=normalize(o.normal).y;
@@ -120,10 +139,13 @@ fn terrainWet(position:vec3f)->f32 {
     const mesh = meshRuntime(this.mesh);
     mesh.check();
     if (this.engine || this.disposed || mesh.engine !== engine)
-      throw new Error('Terrain color mesh belongs to another engine or is already attached');
+      throw new MargoError(
+        'attached',
+        'Terrain color mesh belongs to another engine or is already attached; use one TerrainColors per mesh, on the mesh engine',
+      );
     this.engine = engine;
     if (this.wetness) {
-      if (!engine.gpu) throw new Error('Terrain wetness requires WebGPU');
+      if (!engine.gpu) throw new MargoError('unsupported', 'Terrain wetness requires WebGPU; use a WebGPU engine');
       this.dry = engine.gpu.createTexture({
         size: [1, 1],
         format: 'r32float',

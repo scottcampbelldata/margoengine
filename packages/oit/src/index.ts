@@ -10,11 +10,13 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import type { PBRModel, PBRTransparency } from '@margoengine/gltf-pro';
+import { MargoError } from '@margoengine/math/errors';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
+/** Weighted blended OIT settings, fixed at construction. */
 export interface OITOptions {
   /** Frame graph order of the transparent and composite passes: after the scene and its overlays (edges 6), before SSAO (10), TAA (9) and post composites (30). Default 8. */
   order?: number;
@@ -106,7 +108,10 @@ export class OIT implements EnginePlugin, PBRTransparency {
   /** Draws a gltf-pro model's BLEND primitives (or a transparent materials mesh) order-independently. Returns a remover. */
   add(model: PBRModel): () => void {
     if (this.disposed || !this.engine)
-      throw new Error(this.disposed ? 'OIT is disposed' : 'OIT.add needs OIT.attach(engine) first');
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'state',
+        this.disposed ? 'OIT is disposed; create a new OIT' : 'OIT.add needs OIT.attach(engine) first',
+      );
     let release = this.models.get(model);
     if (!release) {
       const restore = model.setTransparency(this),
@@ -123,8 +128,8 @@ export class OIT implements EnginePlugin, PBRTransparency {
     return release;
   }
   setup(engine: Engine): void {
-    if (this.disposed) throw new Error('OIT is disposed');
-    if (!engine.gpu) throw new Error('OIT requires WebGPU');
+    if (this.disposed) throw new MargoError('disposed', 'OIT is disposed; create a new OIT');
+    if (!engine.gpu) throw new MargoError('unsupported', 'OIT requires WebGPU; use a WebGPU engine');
     this.engine = engine;
     this.uniform = engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   }

@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { Geometry, PbrMaterial, type EngineKernel } from '@margoengine/core';
+import { MargoError } from '@margoengine/math/errors';
 export { ScatterInstances, type ScatterBatch } from './instances.js';
 export { randomPlacements, radialPlacements } from './candidates.js';
 export {
@@ -35,24 +36,41 @@ declare const GPUBufferUsage: {
   COPY_DST: number;
 };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
-type Context = Extract<PassContext, { backend: 'webgpu' }>;
+type ScatterPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 const heightFormats = ['r32float', 'r16float', 'rgba32float', 'rgba16float', 'r8unorm'];
+/** GPU scatter rules, fixed at construction (out of range throws RangeError). Distances are world units. */
 export interface ScatterOptions {
+  /** Candidate instances on a stratified grid, an integer 1-1,000,000 (GPU memory: three buffers of this many). Default 10,000. */
   count?: number;
+  /** XZ extent covered around `center`, each 0-100,000 (exclusive of 0). Default [50, 50]. */
   area?: readonly [number, number];
+  /** World centre of the area; its Y is added to the heightmap. Default [0, 0, 0]. */
   center?: readonly [number, number, number];
+  /** Fraction of candidates kept, 0..1. Default 1. */
   density?: number;
+  /** Lowest world height that gets instances. Default -10,000. */
   minHeight?: number;
+  /** Highest world height that gets instances, >= `minHeight`. Default 10,000. */
   maxHeight?: number;
+  /** Steepest ground slope that gets instances, degrees 0-90. Default 45. */
   maxSlope?: number;
+  /** Random uniform scale range [min, max], 0 < min <= max <= 100. Default [0.7, 1.3]. */
   scale?: readonly [number, number];
+  /** Increasing distances where the near, middle and far meshes end; the third is the culling distance. Default [25, 60, 120]. */
   lod?: readonly [number, number, number];
+  /** Width of the dithered cross-fade around the first two LOD distances, 0-100,000 (0 = hard switch). Default 2. */
   lodFade?: number;
+  /** Placement seed, an integer 0..2^32-1. Default 1. */
   seed?: number;
+  /** Diffuse colour (linear RGB 0..1) when no `material` is given. Default [0.12, 0.35, 0.08]. */
   color?: readonly [number, number, number];
+  /** Shade instances with core's PBR shader (and receive PCSS shadows) instead of the simple diffuse colour. */
   material?: PbrMaterial;
+  /** World XZ rectangles `[minX, minZ, maxX, maxZ]` kept free of instances (up to 1,000,000). */
   exclusions?: readonly GroundBounds[];
+  /** Red-channel height texture covering `area` around `center` (r32float, r16float, rgba32float, rgba16float or r8unorm). Default: flat ground. */
   heightmap?: () => GPUTexture | undefined;
+  /** Rooted wind bend `[directionX, directionZ, strength]`. Omitted: static. */
   wind?: ScatterWind;
 }
 const frame = `
@@ -137,6 +155,14 @@ struct ScatterInstance {position:vec4f,rotation:vec4f}
 }
 `;
 let serial = 0;
+/**
+ * GPU-distributed ground cover: seeded, stratified placement under density, height and slope rules, compute-culled
+ * every frame into three distance LOD rings drawn with indexed indirect draws. Pass one Geometry or one per ring
+ * (near, middle, far). `Scatter.attach(engine, geometry, options)`; WebGPU only.
+ * @throws RangeError from the constructor when an option is out of range or the buffers exceed device limits.
+ * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`, `'state'` during a frame when
+ * the heightmap is not a sampleable floating-point height texture.
+ */
 export class Scatter implements EnginePlugin {
   readonly name = 'scatter:' + ++serial;
   private engine?: Engine;
@@ -277,7 +303,11 @@ export class Scatter implements EnginePlugin {
     return effect;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Scatter requires WebGPU');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Scatter requires WebGPU; attach a new Scatter to a WebGPU engine',
+      );
     const d = engine.gpu;
     this.engine = engine;
     if (
@@ -340,7 +370,10 @@ export class Scatter implements EnginePlugin {
         if (c.backend !== 'webgpu') return;
         const terrain = this.options.heightmap?.() ?? this.fallback!;
         if (!heightFormats.includes(terrain.format) || !(terrain.usage & GPUTextureUsage.TEXTURE_BINDING))
-          throw new Error('Scatter needs a sampleable floating-height texture');
+          throw new MargoError(
+            'state',
+            'Scatter needs a sampleable floating-height texture; return one from options.heightmap',
+          );
         this.values.fill(0, 68, 71);
         if (this.options.wind) {
           const wind = this.options.wind,
@@ -377,7 +410,7 @@ export class Scatter implements EnginePlugin {
       },
     });
   }
-  private draw(c: Context): void {
+  private draw(c: ScatterPassContext): void {
     const lit = !!this.options.material;
     if (lit) {
       this.materialValues.set(this.options.material!.data);

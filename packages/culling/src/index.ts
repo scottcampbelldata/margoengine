@@ -3,6 +3,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { Geometry, PbrMaterial } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { computeShader, depthShader } from './shaders.js';
+import { MargoError } from '@margoengine/math/errors';
 export { CulledMeshes } from './meshes.js';
 export type { CulledMeshesOptions } from './meshes.js';
 
@@ -22,13 +23,18 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
 /** `frustum` (default): bounding spheres against the view frustum. `occlusion`: frustum + Hi-Z occlusion (dense or enclosed assemblies). `none`: draw everything. */
 export type CullingMode = 'none' | 'frustum' | 'occlusion';
+/** One (geometry, material) group of static parts; uploaded once at attach. */
 export interface CulledBatch {
+  /** Shared by every part of the batch. */
   geometry: Geometry;
+  /** Shared by every part of the batch. */
   material: PbrMaterial;
   /** Column-major affine world matrices, 16 floats per instance. */
   transforms: Float32Array;
 }
+/** `CulledInstances` settings. */
 export interface CulledInstancesOptions {
+  /** Culling test; also settable later as `parts.culling`. Default `'frustum'`. */
   culling?: CullingMode;
   /** Parts whose bounding sphere spans at least this many pixels in radius become occluders for the next frame (default 8). */
   occluderSize?: number;
@@ -189,7 +195,7 @@ export class CulledInstances implements EnginePlugin {
   /** Reads back how many parts of each batch were drawn in the latest submitted frame (for tests and benchmarks). */
   async readCounts(): Promise<number[]> {
     const d = this.device;
-    if (!d) throw new Error('CulledInstances is not attached');
+    if (!d) throw new MargoError('state', 'CulledInstances is not attached; attach it to an engine first');
     const size = this.args.byteLength,
       read = d.createBuffer({ size, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
     try {
@@ -206,7 +212,11 @@ export class CulledInstances implements EnginePlugin {
   }
 
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('CulledInstances requires WebGPU');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'CulledInstances requires WebGPU; attach a new CulledInstances to a WebGPU engine',
+      );
     this.engine = engine;
     const d = (this.device = engine.gpu);
     const n = this.count,

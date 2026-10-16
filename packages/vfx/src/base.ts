@@ -12,6 +12,7 @@ import { finiteVector } from '@margoengine/math/validate';
 import { viewMatrix } from '../../shared/view.js';
 import { preset } from '../../shared/preset.js';
 import { simulationShader, billboardShader, multisampled } from './shader.js';
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUBufferUsage: {
   UNIFORM: number;
   STORAGE: number;
@@ -25,23 +26,45 @@ const defaultPosition: Vec3 = [0, 1, 0],
   defaultGravity: Vec3 = [0, -9.81, 0],
   defaultColor: readonly [number, number, number, number] = [1, 0.5, 0.1, 1],
   defaultLife: readonly [number, number] = [1, 3];
+/**
+ * Particle emitter settings. Everything except `capacity` and the four feature options (`obstacles`, `wrap`, `sort`,
+ * `texture`) may change between frames; validation runs before GPU commands and throws RangeError when a value is out
+ * of range.
+ */
 export interface VFXOptions {
+  /** Particle slots, an integer 1-1,000,000 (64 bytes each). Fixed at construction. Default 1,000,000 (or the quality preset's). */
   capacity?: number;
+  /** Births queued on attach and after device restoration, an integer 0..capacity. Default 0. */
   initialCount?: number;
+  /** Births per second, >= 0. Default capacity / 2. */
   rate?: number;
+  /** Emitter centre in world units. Default [0, 1, 0]. */
   position?: Vec3;
+  /** Initial velocity in world units per second. Default [0, 3, 0]. */
   velocity?: Vec3;
+  /** Random velocity added at birth, world units per second, >= 0. Default 1. */
   spread?: number;
+  /** Acceleration in world units per second squared. Default [0, -9.81, 0]. */
   gravity?: Vec3;
+  /** Linear RGBA at birth, each 0..1; alpha fades out over the life. Default [1, 0.5, 0.1, 1]. */
   color?: readonly [number, number, number, number];
+  /** Billboard radius in world units, > 0. Default 0.1. */
   size?: number;
+  /** Random life [min, max] in seconds, 0 < min <= max. Default [1, 3]. */
   lifetime?: readonly [number, number];
+  /** Height (world y) of the collision plane. Default 0. */
   ground?: number;
+  /** Fraction of speed kept when bouncing off the ground or an obstacle, 0..1. Default 0.3. */
   bounce?: number;
+  /** Curl-noise acceleration strength, >= 0 (0 turns it off). Default 0.5. */
   turbulence?: number;
+  /** Spatial frequency of the curl field, per world unit, >= 0. Default 1. */
   frequency?: number;
+  /** Billboard spin in radians per second (each particle gets a random birth angle). Default 0. */
   angularVelocity?: number;
+  /** Half extents of the box births are spread over, around `position`, each >= 0. Default [0, 0, 0] (a point). */
   emissionExtent?: Vec3;
+  /** RGB multiplier for HDR emission, 0-16. Default 1. */
   intensity?: number;
   /** Up to 64 spheres/boxes that the flow bends around and particles bounce off. Contents are read each frame; pass an array (even `[]`) before attaching. */
   obstacles?: readonly VFXObstacle[];
@@ -52,16 +75,24 @@ export interface VFXOptions {
   /** RGBA8 sRGB sprite multiplied by the particle colour, instead of the soft disc. Read at construction. */
   texture?: VFXTexture;
 }
+/**
+ * A sphere or axis-aligned box (world units) the curl flow bends around within one unit and particles bounce off with
+ * `bounce`. Up to 64 per effect; needs the `obstacles` feature.
+ */
 export type VFXObstacle =
   | { kind: 'sphere'; center: Vec3; radius: number }
   | { kind: 'box'; center: Vec3; halfSize: Vec3 };
+/** A particle sprite: RGBA8 sRGB texels, row-major from the top-left. Copied at construction; needs the `texture` feature. */
 export interface VFXTexture {
+  /** Pixels, an integer 1-4096. */
   width: number;
+  /** Pixels, an integer 1-4096. */
   height: number;
+  /** `width * height * 4` bytes; RGB multiplies the particle colour, alpha its opacity. */
   data: Uint8Array | Uint8ClampedArray;
 }
 /** Features add each GPU object they create here at once, so a setup that fails part-way still releases it. */
-type Owned = { destroy(): void }[];
+type OwnedResources = { destroy(): void }[];
 /**
  * The optional parts of a particle effect. Pass the exports of the feature entries, for example `{sort}` from
  * `@margoengine/vfx/sort`; the shapes are internal. Effects without a feature compile the same WGSL as before.
@@ -77,13 +108,13 @@ export interface VFXFeatures {
       indirect: GPUBuffer,
       extra: GPUBuffer,
       size: number,
-      owned: Owned,
+      owned: OwnedResources,
     ): { run(pass: GPUComputePassEncoder): void };
   };
   texture?: {
     copy(texture: VFXTexture): VFXTexture;
     patch(billboard: string): string;
-    create(device: GPUDevice, texture: VFXTexture, owned: Owned): GPUBindGroupEntry[];
+    create(device: GPUDevice, texture: VFXTexture, owned: OwnedResources): GPUBindGroupEntry[];
   };
 }
 let nextId = 0;
@@ -118,7 +149,7 @@ export class VFX implements EnginePlugin {
   private sprite?: VFXTexture;
   private spriteEntries: GPUBindGroupEntry[] = [];
   private sorter?: ReturnType<NonNullable<VFXFeatures['sort']>['create']>;
-  private owned: Owned = [];
+  private owned: OwnedResources = [];
   private readonly values = new Float32Array(56);
   private readonly ints = new Uint32Array(this.values.buffer);
   private readonly view = new Float32Array(16);
@@ -137,7 +168,10 @@ export class VFX implements EnginePlugin {
     this.validate();
     const t = options.texture;
     if (t) {
-      if (!features.texture) throw new TypeError('VFX texture needs texture from @margoengine/vfx/texture');
+      if (!features.texture)
+        throw new TypeError(
+          'VFX texture needs textureFeature from @margoengine/vfx/texture: pass {texture: textureFeature}',
+        );
       this.sprite = features.texture.copy(t);
     }
   }
@@ -203,7 +237,11 @@ export class VFX implements EnginePlugin {
     return this;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('VFX requires WebGPU and a live effect');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'VFX requires WebGPU and a live effect; attach a new VFX to a WebGPU engine',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     if (
@@ -389,7 +427,8 @@ export class VFX implements EnginePlugin {
     this.engine!.stats.drawCalls++;
   }
   get gpuState(): { particles: GPUBuffer; indirect: GPUBuffer; alive: GPUBuffer; visible: GPUBuffer } {
-    if (!this.indirect || !this.particles || !this.alive || !this.visible) throw new Error('VFX is not attached');
+    if (!this.indirect || !this.particles || !this.alive || !this.visible)
+      throw new MargoError('state', 'VFX is not attached; attach it to an engine first');
     return { particles: this.particles, indirect: this.indirect, alive: this.alive, visible: this.visible };
   }
   private release(): void {

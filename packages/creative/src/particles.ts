@@ -1,16 +1,27 @@
 import type { EngineKernel } from '@margoengine/core';
 import type { Vec3 } from '@margoengine/core/extension';
 import { VFX, type VFXObstacle, type VFXTexture } from '@margoengine/vfx';
+/** A sphere or box the leaves flow around and bounce off: `@margoengine/vfx`'s `VFXObstacle`. */
 export type WindObstacle = VFXObstacle;
+/** A leaf sprite (RGBA8 sRGB, up to 4096 px per side): `@margoengine/vfx`'s `VFXTexture`. */
 export type ParticleTexture = VFXTexture;
+/** `GPUParticles` settings, fixed at construction; invalid values throw RangeError. */
 export interface ParticleOptions {
+  /** Particles kept alive in the 6 m cube (the VFX capacity). Default 5000. */
   count?: number;
+  /** Acceleration in metres per second squared, added to `wind`. Default [0, -0.5, 0]. */
   gravity?: Vec3;
+  /** Steady drift acceleration in metres per second squared. Default [0.4, 0, 0]. */
   wind?: Vec3;
+  /** Leaf radius in metres. Default 0.035. */
   size?: number;
+  /** Curl-noise turbulence strength, 0-10. Default 0. */
   curl?: number;
+  /** Up to 64 obstacles. */
   obstacles?: readonly WindObstacle[];
+  /** Draw back to front. Default false. */
   sort?: boolean;
+  /** Sprite instead of the soft disc. */
   texture?: ParticleTexture;
 }
 /** A drifting leaf/weather field: a `@margoengine/vfx` preset that keeps `count` particles wrapping inside a 6 m cube. */

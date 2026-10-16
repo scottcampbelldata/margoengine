@@ -10,15 +10,30 @@ import {
 import { sceneSamples } from '../../shared/quality.js';
 import { fullscreen } from '../../shared/gpu.js';
 import { afterPresented as presented, submitPrincipalScene as submit } from '../../shared/demo-frame.js';
+import { MargoError } from '@margoengine/math/errors';
+/**
+ * Resolves once the queue's submitted work is done and the browser has had a presentation opportunity (two animation
+ * frames later): use it before revealing a scene. Rejects with `signal.reason` when aborted, or the queue's error.
+ */
 export const afterPresented: (queue: Pick<GPUQueue, 'onSubmittedWorkDone'>, signal: AbortSignal) => Promise<void> =
   presented;
 // Spelled out (not re-exported) so the published .d.ts never points into ../../shared.
+/** Timestamps (from `options.now`, default `performance.now()`) of the principal scene render; null when not reached. */
 export interface PrincipalSceneReadiness {
+  /** When the render's last GPU submit happened (WebGPU). */
   principalSceneSubmitted: number | null;
+  /** When that submitted work completed on the GPU. */
   principalSceneGpuComplete: number | null;
+  /** The first presentation opportunity after completion (two animation frames). */
   principalScenePresentedOpportunity: number | null;
+  /** How the render was identified: a wrapped WebGPU `queue.submit`, or WebGL's synchronous render return. */
   correlation: 'identified-webgpu-submit' | 'webgl-render-return';
 }
+/**
+ * Runs `render` once and reports when its GPU work was submitted, completed and could be presented, for load-time
+ * metrics. With a WebGPU `queue` it wraps `queue.submit` during the call; without one (WebGL) it times the return.
+ * @throws MargoError `'failed'` when `render` submitted no GPU work; rejects with the abort reason when `signal` aborts.
+ */
 export const submitPrincipalScene: (
   render: () => void,
   queue?: Pick<GPUQueue, 'submit' | 'onSubmittedWorkDone'>,
@@ -79,11 +94,19 @@ export class SceneFade implements EnginePlugin {
     return fade;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('SceneFade requires WebGPU and a live effect');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'SceneFade requires WebGPU and a live effect; attach a new SceneFade to a WebGPU engine',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     const context = engine.canvas.getContext('webgpu') as GPUCanvasContext | null;
-    if (!context) throw new Error('SceneFade requires a WebGPU canvas');
+    if (!context)
+      throw new MargoError(
+        'unsupported',
+        'SceneFade requires a WebGPU canvas; attach it to an engine that draws to a canvas',
+      );
     this.context = context;
     this.context.configure({
       device: this.device,
@@ -98,7 +121,10 @@ export class SceneFade implements EnginePlugin {
   }
   capture(): void {
     if (this.disposed || !this.device || this.pipeline)
-      throw new Error('SceneFade must capture a live scene before warming');
+      throw new MargoError(
+        'state',
+        'SceneFade must capture a live scene before warming; call capture() once, on a live SceneFade, before warm()',
+      );
     const source = this.context!.getCurrentTexture(),
       device = this.device;
     if (!this.snapshot || this.snapshot.width !== source.width || this.snapshot.height !== source.height) {
@@ -114,7 +140,8 @@ export class SceneFade implements EnginePlugin {
     device.queue.submit([encoder.finish()]);
   }
   async warm(): Promise<void> {
-    if (this.disposed || !this.snapshot) throw new Error('Capture a scene before warming its fade');
+    if (this.disposed || !this.snapshot)
+      throw new MargoError('state', 'Capture a scene before warming its fade; call capture() first');
     const device = this.device!,
       module = device.createShaderModule({ code: shader });
     const pipeline = await device.createRenderPipelineAsync({
@@ -135,7 +162,7 @@ export class SceneFade implements EnginePlugin {
       },
       multisample: { count: sceneSamples() },
     });
-    if (this.disposed) throw new Error('SceneFade was disposed while warming');
+    if (this.disposed) throw new MargoError('disposed', 'SceneFade was disposed while warming; create a new SceneFade');
     this.pipeline = pipeline;
     this.group = device.createBindGroup({
       layout: pipeline.getBindGroupLayout(0),
@@ -146,7 +173,8 @@ export class SceneFade implements EnginePlugin {
     });
   }
   start(): void {
-    if (this.disposed || !this.pipeline) throw new Error('Warm a live SceneFade before starting');
+    if (this.disposed || !this.pipeline)
+      throw new MargoError('state', 'Warm a live SceneFade before starting; await warm() first');
     this.started ??= performance.now();
   }
   registerPasses(graph: FrameGraph): void {

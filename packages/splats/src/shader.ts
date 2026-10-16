@@ -1,4 +1,4 @@
-export const frame = `struct Frame {camera:mat4x4f,view:mat4x4f,eye:vec4f,viewport:vec4f,settings:vec4f,counts:vec4u}
+const frame = `struct Frame {camera:mat4x4f,view:mat4x4f,eye:vec4f,viewport:vec4f,settings:vec4f,counts:vec4u}
 @group(0) @binding(0) var<uniform> f:Frame;
 struct Ellipse {center:vec4f,axes:vec4f}`;
 // Orthographic cameras (settings.w): the projection is affine, so the Jacobian is the constant pixel scale, sort keys

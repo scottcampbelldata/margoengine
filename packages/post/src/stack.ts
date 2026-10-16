@@ -9,6 +9,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_SRC: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 const owners = ['bloom', 'ssao', 'dof', 'tonemap', 'post-processing'],
@@ -70,9 +71,14 @@ export class PostStack implements EnginePlugin {
     return this.color?.format === 'rgba16float' ? this.color : undefined;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('PostStack requires WebGPU and a live stack');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'PostStack requires WebGPU and a live stack; attach a new PostStack to a WebGPU engine',
+      );
     for (const name of owners)
-      if (engine.hasPlugin(name)) throw new Error(`Add ${name} to the PostStack instead of attaching it alone`);
+      if (engine.hasPlugin(name))
+        throw new MargoError('attached', `Add ${name} to the PostStack instead of attaching it alone`);
     this.engine = engine;
     for (const effect of this.effects) {
       engine.use(effect);
@@ -106,7 +112,11 @@ export class PostStack implements EnginePlugin {
     if (!this.count) return;
     if (hdr && this.source !== c.shader) {
       const linear = c.shader.replace(/let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');
-      if (linear === c.shader) throw new Error('PostStack requires the standard core lighting shader');
+      if (linear === c.shader)
+        throw new MargoError(
+          'unsupported',
+          "PostStack requires the standard core lighting shader; remove the plugin that replaced core's shader",
+        );
       this.source = c.shader;
       this.linear = linear;
     }

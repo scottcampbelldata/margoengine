@@ -1,6 +1,11 @@
 import type { Camera, Vec3 } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
 
+/**
+ * Far distances of four cascades between `near` and `far` (camera depth, world units): `lambda` blends logarithmic
+ * (1) and uniform (0) spacing, the practical split scheme. Writes into `out` (4 elements) and returns it.
+ * @throws RangeError unless 0 < near < far, both finite, `lambda` is 0..1 and `out` has 4 elements.
+ */
 export function cascadeSplits(near: number, far: number, lambda = 0.5, out = new Float32Array(4)): Float32Array {
   if (
     !Number.isFinite(near) ||
@@ -19,6 +24,14 @@ export function cascadeSplits(near: number, far: number, lambda = 0.5, out = new
   }
   return out;
 }
+/**
+ * Light-space view-projection matrices of the four cascades (16 floats each, column-major, into `matrices`) and each
+ * cascade's depth extent (into `ranges`) for a camera, viewport `aspect`, light travel `direction` and a square shadow
+ * map of `resolution` texels. Each cascade bounds a stable sphere around its split of the view frustum, snapped to
+ * whole texels, and extends `margin` world units towards the light for off-screen casters. Returns `result` (or a new
+ * object) holding the two arrays.
+ * @throws RangeError when an argument is out of range, an array has the wrong length, or `direction` is zero.
+ */
 export function fitCascades(
   camera: Camera,
   aspect: number,

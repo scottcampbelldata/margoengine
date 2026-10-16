@@ -3,10 +3,16 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import shader from './shaders/stars.wgsl?raw';
+import { MargoError } from '@margoengine/math/errors';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number };
 
+/**
+ * A procedural starfield drawn behind the scene (only where depth is clear), for the Earth/planet demos.
+ * `Stars.attach(engine)`; toggle with `stars.enabled`. WebGPU only.
+ * @throws MargoError `'unsupported'` on a WebGL engine, `'state'` when the camera matrix is not invertible.
+ */
 export class Stars implements EnginePlugin {
   /** Same as `engine.use(new Stars(...))`; returns the Stars. */
   static attach(engine: EngineKernel): Stars {
@@ -38,7 +44,7 @@ export class Stars implements EnginePlugin {
 
   setup(engine: Engine): void {
     const device = engine.gpu;
-    if (!device) throw new Error('The Earth starfield requires WebGPU');
+    if (!device) throw new MargoError('unsupported', 'The Earth starfield requires WebGPU; use a WebGPU engine');
     this.depthFormat = device.features.has('depth32float-stencil8') ? 'depth32float-stencil8' : 'depth32float';
     this.buffer = device.createBuffer({
       size: this.data.byteLength,
@@ -66,7 +72,7 @@ export class Stars implements EnginePlugin {
   private readonly execute = (context: PassContext): void => {
     if (context.backend !== 'webgpu' || !this.enabled) return;
     if (!invertMatrixStable(context.camera.matrix, this.inverse, this.workspace))
-      throw new Error('Invalid starfield camera');
+      throw new MargoError('state', 'Invalid starfield camera; give the camera a finite, invertible projection');
     let pipeline = this.pipelines.get(context.format + ':' + context.descriptor.multisample?.count);
     if (!pipeline) {
       pipeline = context.device.createRenderPipeline({

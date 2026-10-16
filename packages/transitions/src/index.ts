@@ -3,6 +3,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph } from '@margoengine/core/extension';
 import { fullscreen, group, render, draw } from '../../shared/gpu.js';
 import { SceneTarget } from '../../shared/msaa.js';
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
@@ -10,6 +11,10 @@ declare const GPUTextureUsage: {
   COPY_SRC: number;
   COPY_DST: number;
 };
+/**
+ * How `start()` reveals the new scene over the frozen frame: `'wipe'` left to right, `'dissolve'` per-pixel random,
+ * `'radial'` a clockwise sweep around the centre, `'chromatic'` a cross-fade with red/blue split by `displacement`.
+ */
 export type TransitionKind = 'wipe' | 'dissolve' | 'radial' | 'chromatic';
 const kinds = ['wipe', 'dissolve', 'radial', 'chromatic'];
 const shader =
@@ -54,7 +59,7 @@ export class Transitions implements EnginePlugin {
     return Math.min(1, this.elapsed / this.duration);
   }
   start(kind: TransitionKind = 'wipe', seconds = 1, displacement = 0.02): void {
-    if (this.disposed) throw new Error('Transitions is disposed');
+    if (this.disposed) throw new MargoError('disposed', 'Transitions is disposed; create a new Transitions');
     if (
       !kinds.includes(kind) ||
       !Number.isFinite(seconds) ||
@@ -72,7 +77,11 @@ export class Transitions implements EnginePlugin {
     this.request = true;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Transitions requires WebGPU');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Transitions requires WebGPU; attach a new Transitions to a WebGPU engine',
+      );
     this.engine = engine;
     this.uniform = engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   }

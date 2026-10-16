@@ -1,3 +1,9 @@
+/**
+ * The fixed clipmap grid `Terrain` draws: `(resolution + 1)²` XZ vertices centred on the origin (one unit apart), the
+ * triangle indices of the centre block (`center`, drawn by level 0) and of the ring around it (`ring`, the outer three
+ * quarters, drawn by every coarser level).
+ * @throws RangeError unless `resolution` is a multiple of 4 from 8 to 256.
+ */
 export function clipmapGrid(resolution: number): { vertices: Float32Array; center: Uint32Array; ring: Uint32Array } {
   if (!Number.isInteger(resolution) || resolution < 8 || resolution > 256 || resolution % 4)
     throw new RangeError('Clipmap resolution must be a multiple of four in 8..256');

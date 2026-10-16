@@ -9,6 +9,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { Imposter, imposterShader } from './imposter.js';
+import { MargoError } from '@margoengine/math/errors';
 export {
   Imposter,
   octEncode,
@@ -20,10 +21,13 @@ export {
   type ImposterData,
   type ImposterOptions,
   type ImposterSource,
-  type Vec3,
 } from './imposter.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+/** A level object read structurally (gltf-pro models have `root` + `primitives`, meshes `geometry`). */
+type LooseLevel = { root?: unknown; primitives?: unknown; geometry?: unknown } | null;
+/** The level that gives a LOD its default radius. */
+type SizedLevel = Geometry | Imposter | { readonly geometry?: Geometry | null } | null | undefined;
 
 /** What a level shows: a core Mesh or a model with a `root` Mesh (gltf-pro, materials), toggled through `visible`; a core Geometry swapped onto the anchor; an Imposter; or null (nothing). */
 export type LODObject = Mesh | { readonly root: Mesh } | Geometry | Imposter | null;
@@ -35,9 +39,11 @@ export interface LODLevel {
   /** Fraction the switch distance shrinks by while this level is shown (three.js LOD semantics). */
   hysteresis?: number;
 }
+/** Per-object settings of `LODSystem.add`. */
 export interface LODOptions {
   /** Local bounding radius for `screen` levels and imposter culling. Default: from a Geometry, Mesh or Imposter level. */ radius?: number;
 }
+/** `LODSystem` settings shared by every object it manages. */
 export interface LODSystemOptions {
   /** Default hysteresis per level. Default 0.1. */ hysteresis?: number;
   /** Multiplies every evaluated distance: above 1 switches to coarser levels sooner (a quality knob). Default 1. */
@@ -59,7 +65,9 @@ export class LOD {
     readonly levels: readonly LODLevel[],
   ) {
     this.model =
-      (levels.find((l) => (l.object as any)?.root && (l.object as any).primitives)?.object as { root: Mesh }) ?? null;
+      (levels.find((l) => (l.object as LooseLevel)?.root && (l.object as LooseLevel)!.primitives)?.object as {
+        root: Mesh;
+      }) ?? null;
   }
   get level(): number {
     return this.system.levelOf(this);
@@ -162,7 +170,7 @@ export class LODSystem implements EnginePlugin {
   /** Registers an object. `anchor` gives the world transform (and receives Geometry levels); level objects are usually its children. */
   add(anchor: Mesh, levels: readonly LODLevel[], { radius }: LODOptions = {}): LOD {
     const e = this.engine;
-    if (!e) throw new Error('Use the LOD system on an engine first');
+    if (!e) throw new MargoError('state', 'Use the LOD system on an engine first');
     const mesh = meshRuntime(anchor);
     mesh.check();
     if (mesh.engine !== e) throw new TypeError('Anchor belongs to another engine');
@@ -211,8 +219,10 @@ export class LODSystem implements EnginePlugin {
     }
     const sized = levels.find(
       (l) =>
-        l.object instanceof Geometry || l.object instanceof Imposter || (l.object as any)?.geometry instanceof Geometry,
-    )?.object as any;
+        l.object instanceof Geometry ||
+        l.object instanceof Imposter ||
+        (l.object as LooseLevel)?.geometry instanceof Geometry,
+    )?.object as SizedLevel;
     const r =
       radius ??
       (sized instanceof Imposter
@@ -282,7 +292,7 @@ export class LODSystem implements EnginePlugin {
   }
   private grow(size: number): void {
     const copy = <T extends Int32Array | Uint8Array | Int8Array | Float32Array | Int16Array>(a: T, stride = 1): T => {
-      const out = new (a.constructor as any)(size * stride);
+      const out = new (a.constructor as new (length: number) => T)(size * stride);
       out.set(a);
       return out;
     };

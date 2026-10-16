@@ -1,10 +1,21 @@
 import { SRGBToLinear as linear } from '@margoengine/math/color';
+/** A Gaussian splat cloud of 1-3,000,000 splats in world space. */
 export interface SplatData {
+  /** Centres, 3 floats (x, y, z) per splat, world units. */
   positions: Float32Array;
+  /** Positive-definite 3D covariances, 6 floats per splat (xx, xy, xz, yy, yz, zz), world units squared. */
   covariances: Float32Array;
+  /** Linear RGB and opacity, 4 floats per splat, each 0..1. */
   colors: Float32Array;
+  /** Optional view-dependent colour: 4, 9 or 16 SH coefficients per splat, RGB interleaved; replaces `colors`' RGB. */
   sphericalHarmonics?: Float32Array;
 }
+/**
+ * Checks a cloud and returns its splat count.
+ * @throws TypeError when an attribute is not a Float32Array.
+ * @throws RangeError on a wrong count or length, a non-finite value, a covariance that is not positive definite, or a
+ * colour outside 0..1.
+ */
 export function validateSplats(data: SplatData): number {
   if (
     !data ||
@@ -42,6 +53,12 @@ export function validateSplats(data: SplatData): number {
   }
   return count;
 }
+/**
+ * Decodes the common 32-byte `.splat` layout (xyz, positive xyz scales, byte sRGB RGBA, byte wxyz quaternion) into
+ * {@link SplatData}: sRGB to linear, normalised quaternions, covariance from scale and rotation.
+ * @throws TypeError when `input` is not bytes; RangeError when the length is not 32 bytes x 1-3,000,000 splats, a
+ * scale is not finite and positive, or a quaternion is zero.
+ */
 export function parseSplat(input: ArrayBuffer | ArrayBufferView): SplatData {
   if (!(input instanceof ArrayBuffer) && !ArrayBuffer.isView(input)) throw new TypeError('Expected .splat bytes');
   const bytes =

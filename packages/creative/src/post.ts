@@ -4,6 +4,7 @@ import type { Engine, EnginePlugin, FrameGraph, PassContext, Vec3 } from '@margo
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { HDRRenderTarget } from './targets.js';
 import type { StackHost, StackStage } from '../../shared/stack.js';
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; STORAGE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -61,6 +62,15 @@ export interface PostOptions {
   grain?: number;
   atmosphere?: AtmosphereOptions;
 }
+/**
+ * Grades the HDR scene: exponential height fog, screen-space god rays, a depth-of-field focus blur,
+ * exposure/contrast/saturation/gain/lift, ACES and grain; reads `post.options` each frame. Alone it owns the scene
+ * capture; in a `PostStack` it is the display effect (put `Bloom` before it for bloom). WebGPU only.
+ * @throws RangeError when an option is out of range; TypeError for removed options (`bloom`, `threshold`,
+ * `atmosphere.sky`), naming the replacement.
+ * @throws MargoError `'unsupported'` on a WebGL engine, `'attached'` when attached twice, `'state'` when the camera
+ * matrix is not invertible.
+ */
 export class PostProcessing implements EnginePlugin {
   readonly name = 'post-processing';
   target?: HDRRenderTarget;
@@ -96,7 +106,8 @@ export class PostProcessing implements EnginePlugin {
   }
   /** In a PostStack, grades (fog, focus blur, ACES, grain) the stack's HDR result as its display effect. */
   private joinStack(host: StackHost): StackStage {
-    if (this.device || this.host) throw new Error('PostProcessing is already attached');
+    if (this.device || this.host)
+      throw new MargoError('attached', 'PostProcessing is already attached; create a new PostProcessing');
     this.host = host;
     return {
       kind: 'display',
@@ -149,7 +160,7 @@ export class PostProcessing implements EnginePlugin {
     if (!Math.hypot(...s)) throw new RangeError('Sun direction must be nonzero');
   }
   setup(engine: Engine): void {
-    if (!engine.gpu) throw new Error('PostProcessing requires WebGPU');
+    if (!engine.gpu) throw new MargoError('unsupported', 'PostProcessing requires WebGPU; use a WebGPU engine');
     this.device = engine.gpu;
     this.uniform = this.device.createBuffer({ size: 272, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.resolve = this.device.createComputePipeline({
@@ -258,7 +269,7 @@ export class PostProcessing implements EnginePlugin {
       a = o.atmosphere ?? atmosphere,
       v = this.values;
     if (!invertMatrixStable(c.camera.matrix, this.inverse, this.inverseWorkspace))
-      throw new Error('Invalid post camera');
+      throw new MargoError('state', 'Invalid post camera; give the camera a finite, invertible projection');
     this.time += c.delta;
     v.set(c.camera.position, 16);
     v.set(a.sun ?? sun, 20);

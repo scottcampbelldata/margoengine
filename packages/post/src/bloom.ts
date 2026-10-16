@@ -12,6 +12,7 @@ import {
 import { agxShader } from '../../shared/agx.js';
 import { render, group } from '../../shared/gpu.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: {
   COPY_SRC: number;
@@ -21,9 +22,13 @@ declare const GPUTextureUsage: {
 };
 
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+/** Bloom settings, read every frame from `bloom.options`; out of range throws RangeError. */
 export interface BloomOptions {
+  /** Glow added on top of the scene, 0-4. Default 0.8. */
   strength?: number;
+  /** Linear HDR luminance above which pixels glow, 0-100. Default 1. */
   threshold?: number;
+  /** Exposure in stops before the AgX presentation, -10..10. Default 0. */
   exposure?: number;
 }
 const filter = `
@@ -108,7 +113,8 @@ export class Bloom implements EnginePlugin {
     return this.host ? undefined : this.textures[0];
   }
   private joinStack(host: StackHost): StackStage {
-    if (this.engine || this.host || this.disposed) throw new Error('Bloom is already attached');
+    if (this.engine || this.host || this.disposed)
+      throw new MargoError('attached', 'Bloom is already attached; create a new Bloom');
     this.host = host;
     return { kind: 'hdr', render: (c, input, output) => this.stage(c, input, output) };
   }
@@ -129,9 +135,13 @@ export class Bloom implements EnginePlugin {
       throw new RangeError('Invalid bloom options');
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Bloom requires WebGPU and a live effect');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Bloom requires WebGPU and a live effect; attach a new Bloom to a WebGPU engine',
+      );
     if (!this.host && (engine.hasPlugin('ssao') || engine.hasPlugin('post-processing') || engine.hasPlugin('tonemap')))
-      throw new Error('Bloom owns the output target; remove the other post effect first');
+      throw new MargoError('state', 'Bloom owns the output target; remove the other post effect first');
     this.engine = engine;
     const device = engine.gpu;
     this.uniform = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -158,7 +168,10 @@ export class Bloom implements EnginePlugin {
           this.engine!.hasPlugin('post-processing') ||
           this.engine!.hasPlugin('tonemap')
         )
-          throw new Error('Bloom cannot share its output target');
+          throw new MargoError(
+            'state',
+            'Bloom cannot share its output target; give it its own output target or use a PostStack',
+          );
         this.resize(c);
         this.original = c.color;
         this.originalDepth = c.depth;
@@ -170,7 +183,11 @@ export class Bloom implements EnginePlugin {
             /let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/,
             'return vec4f(linear,1);',
           );
-          if (this.linearShader === c.shader) throw new Error('Bloom requires the standard core lighting shader');
+          if (this.linearShader === c.shader)
+            throw new MargoError(
+              'unsupported',
+              "Bloom requires the standard core lighting shader; remove the plugin that replaced core's shader",
+            );
         }
         c.shader = this.linearShader;
       },

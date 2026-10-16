@@ -2,7 +2,9 @@
 import { Geometry, PbrMaterial, type EngineKernel, type Mesh } from '@margoengine/core';
 import { engineRuntime, meshRuntime, type Engine } from '@margoengine/core/extension';
 import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro';
+import type { MutableVec3, Vec3 } from '@margoengine/math';
 import { acesShader } from '../../shared/aces.js';
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; MAP_READ: number };
 declare const GPUTextureUsage: {
   TEXTURE_BINDING: number;
@@ -11,13 +13,13 @@ declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
 };
 declare const GPUMapMode: { READ: number };
-export type Vec3 = [number, number, number];
 /**
  * A core Geometry (with `material`), a core Mesh, or a gltf-pro model (loaded glTF or `@margoengine/materials` mesh), baked in its
  * root's local space. A Mesh with child meshes bakes its whole visible subtree as it is at bake time (a CAD subassembly), each
  * part with its own material.
  */
 export type ImposterSource = Geometry | Mesh | PBRModel;
+/** How an `Imposter` bakes its atlas: `frames²` views of `frameSize²` pixels each. */
 export interface ImposterOptions {
   /** Views per side of the octahedral grid, 4-32. Default 12 (144 views). */ frames?: number;
   /** Pixels per view, a power of two 16-1024. Default 128. */
@@ -29,7 +31,7 @@ export interface ImposterOptions {
 export interface ImposterData {
   frames: number;
   frameSize: number;
-  center: Vec3;
+  center: MutableVec3;
   radius: number;
   shading: 'core' | 'gltf';
   color: Uint8Array;
@@ -37,20 +39,29 @@ export interface ImposterData {
 }
 
 // Octahedral directions with +y at the grid centre and -y at the corners; the sign helper keeps zero on the positive side.
-export const octWGSL = `fn lod_sgn(v:vec2f)->vec2f {return select(vec2f(-1.0),vec2f(1.0),v>=vec2f(0.0));}
+const octWGSL = `fn lod_sgn(v:vec2f)->vec2f {return select(vec2f(-1.0),vec2f(1.0),v>=vec2f(0.0));}
 fn lod_decode(e:vec2f)->vec3f {var n=vec3f(e.x,1.0-abs(e.x)-abs(e.y),e.y);if(n.y<0.0){let f=(1.0-abs(e.yx))*lod_sgn(e);n=vec3f(f.x,n.y,f.y);}return normalize(n);}
 fn lod_encode(n:vec3f)->vec2f {let p=n.xz/(abs(n.x)+abs(n.y)+abs(n.z));return select(p,(1.0-abs(p.yx))*lod_sgn(p),n.y<0.0);}
 fn lod_basis(d:vec3f)->mat3x3f {let r=normalize(cross(select(vec3f(0.0,1.0,0.0),vec3f(0.0,0.0,1.0),abs(d.y)>0.999),d));return mat3x3f(r,cross(d,r),d);}`;
 const sgn = (v: number) => (v >= 0 ? 1 : -1),
-  cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
-  unit = (v: Vec3): Vec3 => {
+  cross = (a: Vec3, b: Vec3): MutableVec3 => [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ],
+  unit = (v: Vec3): MutableVec3 => {
     const l = Math.hypot(...v);
     return [v[0] / l, v[1] / l, v[2] / l];
   };
-export function octDecode(x: number, y: number): Vec3 {
+/**
+ * Unit direction of octahedral coordinates (x, y), each -1..1: +y at the centre (0, 0), -y at the corners. Inverse of
+ * {@link octEncode}; matches the WGSL `lod_decode`.
+ */
+export function octDecode(x: number, y: number): MutableVec3 {
   const h = 1 - Math.abs(x) - Math.abs(y);
   return unit(h < 0 ? [(1 - Math.abs(y)) * sgn(x), h, (1 - Math.abs(x)) * sgn(y)] : [x, h, y]);
 }
+/** Octahedral coordinates, each -1..1, of a nonzero direction `d` (any length). Inverse of {@link octDecode}. */
 export function octEncode(d: Vec3): [number, number] {
   const s = Math.abs(d[0]) + Math.abs(d[1]) + Math.abs(d[2]),
     x = d[0] / s,
@@ -58,10 +69,10 @@ export function octEncode(d: Vec3): [number, number] {
   return d[1] < 0 ? [(1 - Math.abs(y)) * sgn(x), (1 - Math.abs(x)) * sgn(y)] : [x, y];
 }
 /** View direction (object centre towards the camera) of atlas tile column i, row j on an n×n grid. */
-export const frameDirection = (i: number, j: number, n: number): Vec3 =>
+export const frameDirection = (i: number, j: number, n: number): MutableVec3 =>
   octDecode((i / (n - 1)) * 2 - 1, (j / (n - 1)) * 2 - 1);
 /** Screen right and up of a view; matches the WGSL `lod_basis`. */
-export function frameBasis(d: Vec3): [Vec3, Vec3] {
+export function frameBasis(d: Vec3): [MutableVec3, MutableVec3] {
   const r = unit(cross(Math.abs(d[1]) > 0.999 ? [0, 0, 1] : [0, 1, 0], d));
   return [r, cross(d, r)];
 }
@@ -88,7 +99,11 @@ export function bakeShader(code: string, group: number): string {
     found = true;
     return head + '\n  if(lod_bake.x<2.0){return lod_bake_out(s,i.clip.z);}';
   });
-  if (!found) throw new Error('Imposter baking requires the gltf-pro PBR shader');
+  if (!found)
+    throw new MargoError(
+      'unsupported',
+      'Imposter baking requires the gltf-pro PBR shader; bake a gltf-pro model or a source drawn with its PBR shader',
+    );
   return (
     `@group(${group}) @binding(96) var<uniform> lod_bake:vec4f;\n${octWGSL}\nfn lod_bake_out(s:Surface,z:f32)->vec4f {if(lod_bake.x<0.5){return vec4f(s.base.rgb,1.0);}return vec4f(lod_encode(normalize(s.n)),z*2.0-1.0,round(s.roughness*31.0)*32.0+round(s.metal*31.0));}\n` +
     out
@@ -269,7 +284,7 @@ function subtree(e: Engine, root: Mesh, material: PbrMaterial | undefined): Part
 export class Imposter {
   readonly frames: number;
   readonly frameSize: number;
-  readonly center: Vec3 = [0, 0, 0];
+  readonly center: MutableVec3 = [0, 0, 0];
   radius = 1;
   readonly shading: 'core' | 'gltf';
   disposed = false;
@@ -452,12 +467,13 @@ export class Imposter {
         bindings: () => [{ binding: 96, resource: { buffer: modes[mode] } }],
       });
       const camera = { matrix: new Float32Array(16), position: [0, 0, 1], target: [0, 0, 0] },
-        context: any = {
+        // A partial pass context: PBRModel.draw reads only backend, device, camera, descriptor, encoder and format here.
+        context = {
           backend: 'webgpu',
           device,
           camera,
           descriptor: { multisample: { count: 1 }, depthStencil: { format: 'depth32float' } },
-        };
+        } as unknown as Parameters<PBRModel['draw']>[0];
       const clearDepth = { view: views[2], depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'store' } as const;
       for (let j = 0; j < n; j++)
         for (let i = 0; i < n; i++) {
@@ -502,7 +518,7 @@ export class Imposter {
   }
   /** Reads the atlas back for caching (IndexedDB, a file); `Imposter.fromData` restores it without baking. */
   async export(): Promise<ImposterData> {
-    if (!this.ready()) throw new Error('Imposter has no atlas');
+    if (!this.ready()) throw new MargoError('state', 'Imposter has no atlas; bake it or load data first');
     const device = this.device!,
       size = this.size;
     const read = async (texture: GPUTexture, bytes: number) => {

@@ -6,6 +6,7 @@ import type { FloatImage } from './hdr.js';
 import { sanitizeLighting, toHalfLighting } from './half.js';
 import { evaluateSH } from './sh.js';
 import * as wgsl from './shaders.js';
+import { MargoError } from '@margoengine/math/errors';
 
 declare const GPUBufferUsage: {
   MAP_READ: number;
@@ -31,6 +32,7 @@ export interface CubeFaces {
 /** An equirectangular FloatImage (from parseHDR or parseEXR) or six cube faces. */
 export type EnvironmentSource = FloatImage | CubeFaces;
 
+/** How an `Environment` processes its source; invalid values throw RangeError. Sizes are texels per edge. */
 export interface EnvironmentOptions {
   /** Edge of the source cube map (power of two). Default: equirect width / 4 rounded down to a power of two, clamped to 16..1024. */
   size?: number;
@@ -126,7 +128,8 @@ const isDevice = (target: GPUDevice | EngineKernel): target is GPUDevice =>
 function deviceOf(target: GPUDevice | EngineKernel): GPUDevice {
   if (isDevice(target)) return target;
   const device = engineRuntime(target).gpu;
-  if (!device) throw new Error('Environment requires the WebGPU backend');
+  if (!device)
+    throw new MargoError('unsupported', 'Environment requires the WebGPU backend; use an engine on the WebGPU backend');
   return device;
 }
 
@@ -221,7 +224,7 @@ async function guarded(device: GPUDevice, encode: () => void): Promise<void> {
     memory = device.popErrorScope();
   const failure = (await validation.catch(() => null)) ?? (await memory.catch(() => null));
   if (thrown) throw thrown;
-  if (failure) throw new Error(`Environment processing failed: ${failure.message}`);
+  if (failure) throw new MargoError('failed', `Environment processing failed: ${failure.message}`);
 }
 
 async function build(
@@ -504,7 +507,11 @@ async function build(
         irradiance[k * 3 + c] = values[k * 4 + c];
         radiance[k * 3 + c] = values[64 + k * 4 + c];
       }
-    if (!radiance.every(Number.isFinite)) throw new Error('Environment processing produced non-finite SH');
+    if (!radiance.every(Number.isFinite))
+      throw new MargoError(
+        'failed',
+        'Environment processing produced non-finite SH; check the source image for NaN or infinite texels',
+      );
     return {
       device,
       cube,
@@ -605,8 +612,9 @@ export class Environment implements EnginePlugin {
   }
 
   private get live(): Resources {
-    if (this.disposed) throw new Error('Environment is disposed');
-    if (!this.resources) throw new Error('Environment is being restored');
+    if (this.disposed) throw new MargoError('disposed', 'Environment is disposed; create a new Environment');
+    if (!this.resources)
+      throw new MargoError('state', 'Environment is being restored; wait for the device restore to finish');
     return this.resources;
   }
   /** The device the current resources belong to, or null while restoring or after dispose. */
@@ -761,9 +769,13 @@ export class Environment implements EnginePlugin {
   }
 
   setup(engine: EngineKernel): void {
-    if (this.disposed) throw new Error('Environment is disposed');
+    if (this.disposed) throw new MargoError('disposed', 'Environment is disposed; create a new Environment');
     const device = engineRuntime(engine).gpu;
-    if (!device) throw new Error('Environment requires the WebGPU backend');
+    if (!device)
+      throw new MargoError(
+        'unsupported',
+        'Environment requires the WebGPU backend; use an engine on the WebGPU backend',
+      );
     if (device !== this.resources?.device) this.restore(device).catch((error) => engine.onError(error));
   }
   onDeviceRestored(engine: EngineKernel): void {

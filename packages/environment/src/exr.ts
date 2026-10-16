@@ -4,20 +4,30 @@ import { halfToFloat } from './half.js';
 import { inflateZlib } from './inflate.js';
 import { MAX_PIXELS, toBytes, type FloatImage } from './hdr.js';
 
+/** OpenEXR compressions `parseEXR` decodes (PXR24, B44 and DWA are rejected). */
 export type EXRCompression = 'NONE' | 'RLE' | 'ZIPS' | 'ZIP' | 'PIZ';
+/** One channel of an OpenEXR file, as listed in its header. */
 export interface EXRChannel {
+  /** Channel name, e.g. 'R', 'G', 'B', 'A', 'Y'. */
   name: string;
+  /** Sample type in the file. */
   type: 'UINT' | 'HALF' | 'FLOAT';
+  /** Horizontal subsampling (only 1 is decoded). */
   xSampling: number;
+  /** Vertical subsampling (only 1 is decoded). */
   ySampling: number;
 }
+/** A decoded single-part scanline OpenEXR image: linear float RGBA plus its header facts. */
 export interface EXRImage extends FloatImage {
+  /** Compression of the file's scanline blocks. */
   compression: EXRCompression;
   /** All channels in the file, in file (alphabetical) order. */
   channels: EXRChannel[];
   /** Which source channels filled RGBA: 'RGBA', 'RGB' or 'Y' (luminance replicated to RGB). */
   layout: 'RGBA' | 'RGB' | 'Y';
+  /** Pixel bounds of the stored data, inclusive: [xMin, yMin, xMax, yMax]. */
   dataWindow: [number, number, number, number];
+  /** Pixel bounds of the intended display area, inclusive: [xMin, yMin, xMax, yMax]. */
   displayWindow: [number, number, number, number];
 }
 

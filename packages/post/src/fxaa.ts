@@ -10,6 +10,7 @@ import {
 } from '@margoengine/core/extension';
 import { fullscreen, render, group } from '../../shared/gpu.js';
 import type { StackStage } from '../../shared/stack.js';
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 // FXAA 3.11-style edge walk (after Timothy Lottes) on display-encoded colour, so luma is already perceptual.
@@ -71,7 +72,8 @@ export class FXAA implements EnginePlugin {
     return effect;
   }
   private joinStack(): StackStage {
-    if (this.engine || this.stacked || this.disposed) throw new Error('FXAA is already attached');
+    if (this.engine || this.stacked || this.disposed)
+      throw new MargoError('attached', 'FXAA is already attached; create a new FXAA');
     this.stacked = true;
     return {
       kind: 'ldr',
@@ -79,7 +81,11 @@ export class FXAA implements EnginePlugin {
     };
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('FXAA requires WebGPU and a live effect');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'FXAA requires WebGPU and a live effect; attach a new FXAA to a WebGPU engine',
+      );
     this.engine = engine;
     this.sampler = engine.gpu.createSampler({ magFilter: 'linear', minFilter: 'linear' });
   }

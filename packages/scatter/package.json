@@ -20,6 +20,9 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
   },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
   "scripts": {
     "build": "node ../../scripts/build-optional.js scatter",
     "test": "npm run build && node --test test/*.test.js",
@@ -32,8 +35,5 @@
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/scatter"
   },
-  "description": "Seeded instancing, distance-based LOD and procedural wind.",
-  "devDependencies": {
-    "@margoengine/math": "^1.0.0"
-  }
+  "description": "Seeded instancing, distance-based LOD and procedural wind."
 }

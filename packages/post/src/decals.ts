@@ -10,6 +10,7 @@ import {
 } from '@margoengine/core/extension';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { sceneTarget } from '../../shared/msaa.js';
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -212,7 +213,11 @@ export class Decals implements EnginePlugin {
     return this.counts[0] + this.counts[1];
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Decals require WebGPU and a live effect');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Decals require WebGPU and a live effect; attach a new Decals to a WebGPU engine',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     this.uniform = this.device.createBuffer({
@@ -250,7 +255,10 @@ export class Decals implements EnginePlugin {
     const device = c.device,
       target = sceneTarget(c);
     if (!target)
-      throw new Error('Decals need scene depth: attach a post capture (Tonemap, Bloom, PostStack, SSAO, TAA) first');
+      throw new MargoError(
+        'state',
+        'Decals need scene depth: attach a post capture (Tonemap, Bloom, PostStack, SSAO, TAA) first',
+      );
     const multisampled = target.samples > 1,
       depth = multisampled ? target.depthSource : this.depthView(target.resolvedDepth);
     if (this.dirty || !this.storage) {

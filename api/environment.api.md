@@ -32,7 +32,7 @@ export interface ColorBackgroundOptions {
     name?: string;
 }
 
-export type ColorInput = string | number | readonly [number, number, number];
+export { ColorInput } from "@margoengine/math";
 
 export class ColorOutput {
     readonly options: Readonly<ColorOutputOptions>;

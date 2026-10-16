@@ -1,6 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import type { Batch, Engine, EnginePlugin, FrameGraph, Geometry, PassContext } from '@margoengine/core/extension';
+import { MargoError } from '@margoengine/math/errors';
 
 declare const GPUBufferUsage: {
   COPY_DST: number;
@@ -14,6 +15,7 @@ declare const GPUBufferUsage: {
 declare const GPUMapMode: { READ: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
+/** `CulledMeshes` settings, fixed at construction. */
 export interface CulledMeshesOptions {
   /** Also drop parts whose bounding sphere spans fewer than this many CSS pixels in radius (default 0: frustum only, same pixels as core). */
   minRadius?: number;
@@ -118,7 +120,11 @@ export class CulledMeshes implements EnginePlugin {
   }
 
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('CulledMeshes requires WebGPU');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'CulledMeshes requires WebGPU; attach a new CulledMeshes to a WebGPU engine',
+      );
     this.engine = engine;
     this.device = engine.gpu;
   }
@@ -135,7 +141,7 @@ export class CulledMeshes implements EnginePlugin {
   /** Instances drawn per redirected batch in the latest submitted frame, keyed by geometry (a GPU readback; for tests and tools). */
   async readCounts(): Promise<Map<Geometry, number>> {
     const d = this.device;
-    if (!d) throw new Error('CulledMeshes is not attached');
+    if (!d) throw new MargoError('state', 'CulledMeshes is not attached; attach it to an engine first');
     const entries = [...this.slots].filter(([, s]) => s.args),
       read = d.createBuffer({
         size: Math.max(4, entries.length * 4),

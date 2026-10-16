@@ -64,7 +64,8 @@ span from 15.7 to 13.5 ms. Same particle state and pixels within the old rendere
 
 `VFX` from `@margoengine/vfx` (about 7.0 kB min+gzip) carries all four features. An effect that uses none of them can
 import the same class from `@margoengine/vfx/base` (about 5.2 kB); add features as a second argument from their own
-entries: `/obstacles` (1.2 kB alone), `/wrap` (0.4 kB), `/sort` (1.1 kB), `/texture` (0.6 kB). Sizes are vite library
+entries: `/obstacles` (1.2 kB alone), `/wrap` (0.4 kB), `/sort` (1.1 kB), `/texture` (0.6 kB; it exports
+`textureFeature`, passed as `{texture: textureFeature}`). Sizes are vite library
 builds with bare imports external, each entry compressed on its own
 ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so a bundle that combines them adds
 less: the whole root is 7.0 kB. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles

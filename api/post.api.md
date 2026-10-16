@@ -76,7 +76,7 @@ export interface SSAOOptions {
 }
 
 export interface SSAOSource {
-    draw(context: Context, mode: 'gbuffer' | 'ambient', color: GPUTextureView, depth: GPUTextureView): void;
+    draw(context: PostPassContext, mode: 'gbuffer' | 'ambient', color: GPUTextureView, depth: GPUTextureView): void;
 }
 
 export class SSR implements EnginePlugin {
@@ -103,7 +103,7 @@ export interface SSRCapture {
 export interface SSRModel {
     setCapture(hook: SSRCapture): () => void;
     onDispose(callback: () => void): () => void;
-    draw(context: Context, mode: 'capture', color: GPUTextureView, depth: GPUTextureView): void;
+    draw(context: PostPassContext, mode: 'capture', color: GPUTextureView, depth: GPUTextureView): void;
 }
 
 export interface SSROptions {
@@ -132,11 +132,11 @@ export class SceneFade implements EnginePlugin {
 
 // Not exported from this entry, but used by the exports above:
 
-type Context = Extract<PassContext, {
+type PostPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
 
-type Context = Extract<PassContext, {
+type PostPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
 ```

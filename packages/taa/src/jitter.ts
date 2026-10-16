@@ -1,3 +1,7 @@
+/**
+ * Element `index` of the Halton low-discrepancy sequence in `base` (radical inverse), in [0, 1).
+ * @throws RangeError unless `index` is a safe integer >= 0 and `base` a safe integer >= 2.
+ */
 export function halton(index: number, base: number): number {
   if (!Number.isSafeInteger(index) || index < 0 || !Number.isSafeInteger(base) || base < 2)
     throw new RangeError('Invalid Halton sequence');
@@ -10,6 +14,12 @@ export function halton(index: number, base: number): number {
   }
   return value;
 }
+/**
+ * Copies the column-major clip matrix `matrix` into `out` with TAA's sub-pixel offset for `frame` (Halton 2,3, an
+ * 8-frame cycle) applied in clip space, for a `width` x `height` pixel viewport. Returns `out`.
+ * @throws RangeError when `out` or `matrix` is not 16 finite numbers, or `frame`, `width`, `height` are not safe
+ * integers (frame >= 0, sizes > 0).
+ */
 export function jitterProjection(
   out: Float32Array,
   matrix: ArrayLike<number>,

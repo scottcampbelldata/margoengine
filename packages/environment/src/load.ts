@@ -1,6 +1,7 @@
 import { parseHDR, toBytes, type FloatImage } from './hdr.js';
 import { parseEXR } from './exr.js';
 import { decodeUltraHDR, type UltraHDROptions } from './ultrahdr.js';
+import { MargoError } from '@margoengine/math/errors';
 
 const isJPEG = (bytes: Uint8Array) => bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
 
@@ -11,8 +12,8 @@ export function parseEnvironmentImage(source: ArrayBuffer | ArrayBufferView): Fl
     return parseEXR(bytes);
   if (bytes.length >= 2 && bytes[0] === 0x23 && bytes[1] === 0x3f) return parseHDR(bytes);
   if (isJPEG(bytes))
-    throw new Error('UltraHDR JPEGs decode asynchronously: use decodeUltraHDR or loadEnvironmentImage');
-  throw new Error('Unrecognized environment image (expected Radiance .hdr or OpenEXR)');
+    throw new TypeError('UltraHDR JPEGs decode asynchronously: use decodeUltraHDR or loadEnvironmentImage');
+  throw new TypeError('Unrecognized environment image (expected Radiance .hdr or OpenEXR)');
 }
 
 /** Fetches and decodes an `.hdr`, `.exr` or UltraHDR (gain-map) `.jpg` file, picked by signature. */
@@ -21,7 +22,7 @@ export async function loadEnvironmentImage(
   { signal, ...options }: { signal?: AbortSignal } & UltraHDROptions = {},
 ): Promise<FloatImage> {
   const response = await fetch(url, { signal });
-  if (!response.ok) throw new Error(`Failed to load ${url}: HTTP ${response.status}`);
+  if (!response.ok) throw new MargoError('failed', `Failed to load ${url}: HTTP ${response.status}`);
   const bytes = new Uint8Array(await response.arrayBuffer());
   return isJPEG(bytes) ? decodeUltraHDR(bytes, options) : parseEnvironmentImage(bytes);
 }

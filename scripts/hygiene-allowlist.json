@@ -71,6 +71,10 @@
     "domainWarp": {
       "packages": ["procedural", "shader"],
       "reason": "CPU noise in @margoengine/procedural and its GPU twin in @margoengine/shader/noise share names on purpose. Decision in docs/conventions.md."
+    },
+    "Environment": {
+      "packages": ["environment", "react"],
+      "reason": "One thing, two forms: @margoengine/environment's Environment class and @margoengine/react's <Environment> JSX component that creates it (React names components after what they render). Decision in docs/conventions.md."
     }
   }
 }

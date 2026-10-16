@@ -2,12 +2,18 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin } from '@margoengine/core/extension';
 import { planeGeometry, computeVertexNormals, type GeometryData } from '@margoengine/geometry';
+import type { HeightField } from '@margoengine/math';
+import { MargoError } from '@margoengine/math/errors';
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
-export type HeightField = (x: number, z: number) => number;
+export type { HeightField };
+/** Area and sampling of `heightfieldGeometry` and `TerrainHeightmap`. */
 export interface HeightfieldOptions {
+  /** World XZ extent, each 0-100,000 (exclusive of 0). */
   size: readonly [number, number];
+  /** Minimum world XZ corner. Default: centred on the origin (`-size / 2`). */
   origin?: readonly [number, number];
+  /** Segments (mesh) or texels (heightmap) per side, an integer 1-1024. Default 192 (mesh) / 256 (heightmap). */
   resolution?: number;
 }
 
@@ -77,7 +83,11 @@ export class TerrainHeightmap implements EnginePlugin {
     return map;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Terrain heightmap requires WebGPU');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Terrain heightmap requires WebGPU; attach a new TerrainHeightmap to a WebGPU engine',
+      );
     const device = engine.gpu,
       { size, resolution = 256, origin = [-size[0] / 2, -size[1] / 2] } = this.options;
     if (resolution > device.limits.maxTextureDimension2D) throw new RangeError('Heightmap exceeds GPU texture limit');

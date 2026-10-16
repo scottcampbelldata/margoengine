@@ -3,11 +3,12 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type FrameGraph, type PassContext } from '@margoengine/core/extension';
 import { SRGBToLinear as srgbToLinear } from '@margoengine/math/color';
+import type { ColorInput } from '@margoengine/math';
+import { MargoError } from '@margoengine/math/errors';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 
-/** `'#rgb'`, `'#rrggbb'`, `0xrrggbb` or sRGB components `[r, g, b]` in 0..1. */
-export type ColorInput = string | number | readonly [number, number, number];
+export type { ColorInput };
 type GPUContext = Extract<PassContext, { backend: 'webgpu' }>;
 
 /** sRGB components 0..1 of a ColorInput; throws TypeError on anything else. */
@@ -36,6 +37,7 @@ struct Out {@builtin(position) position:vec4f, @location(0) y:f32}
 }
 @fragment fn fragmentMain(i:Out)->@location(0) vec4f {return mix(colors.bottom,colors.top,clamp(i.y,0.0,1.0));}`;
 
+/** `ColorBackground` settings. Colours are sRGB (`'#rrggbb'`, `0xrrggbb` or `[r, g, b]` in 0..1). */
 export interface ColorBackgroundOptions {
   /** Background color (top of the viewport when `bottom` is set). Default '#000000'. */
   color?: ColorInput;
@@ -110,8 +112,12 @@ export class ColorBackground {
   }
 
   setup(engine: EngineKernel): void {
-    if (this.disposed) throw new Error('ColorBackground is disposed');
-    if (engine.backend === 'webgl2') throw new Error('ColorBackground requires the WebGPU backend');
+    if (this.disposed) throw new MargoError('disposed', 'ColorBackground is disposed; create a new ColorBackground');
+    if (engine.backend === 'webgl2')
+      throw new MargoError(
+        'unsupported',
+        'ColorBackground requires the WebGPU backend; use an engine on the WebGPU backend',
+      );
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -226,7 +232,8 @@ export class TransparentCanvas extends ColorBackground {
     this.alpha = 0;
   }
   override setup(engine: EngineKernel): void {
-    if (this.disposed) throw new Error('TransparentCanvas is disposed');
+    if (this.disposed)
+      throw new MargoError('disposed', 'TransparentCanvas is disposed; create a new TransparentCanvas');
     this.engine = engine;
     this.configure('premultiplied');
   }

@@ -2,6 +2,7 @@
 // Display P3 and HDR (extended-range) canvas output without a core change.
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type FrameGraph, type PassContext } from '@margoengine/core/extension';
+import { MargoError } from '@margoengine/math/errors';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_SRC: number };
@@ -19,6 +20,7 @@ interface Frame {
 }
 const OUTPUT = Symbol.for('margoengine.color-output');
 
+/** `ColorOutput` settings: which wide-gamut and HDR canvas modes to request. */
 export interface ColorOutputOptions {
   /** 'p3' (default): Display P3 canvas where the display reports `(color-gamut: p3)`. 'srgb': keep the sRGB canvas. */
   gamut?: 'srgb' | 'p3';
@@ -141,7 +143,7 @@ export class ColorOutput {
   }
 
   setup(engine: EngineKernel): void {
-    if (this.disposed) throw new Error('ColorOutput is disposed');
+    if (this.disposed) throw new MargoError('disposed', 'ColorOutput is disposed; create a new ColorOutput');
     this.engine = engine;
     if (engine.backend !== 'webgpu') return;
     const { gamut = 'p3', hdr = true, force } = this.options,

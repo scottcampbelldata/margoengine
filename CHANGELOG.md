@@ -2,6 +2,43 @@
 
 ## Unreleased (1.0.0)
 
+### Code hygiene phase 2, group C (HANDOFF 5k)
+
+Lighting, post and environment packages follow [docs/conventions.md](docs/conventions.md). No behaviour change, no
+WGSL change; every converted message keeps its old text and appends the fix.
+
+Public API changes:
+
+- `@margoengine/lod`: the `Vec3` type export is removed. `octDecode`, `frameDirection`, `frameBasis`,
+  `Imposter.center` and `ImposterData.center` use math's `MutableVec3` (same shape); `octEncode`, `frameBasis` and
+  `frameMatrix` take math's read-only `Vec3`, so read-only tuples are accepted too. `octWGSL` is no longer exported
+  (it was internal).
+- `@margoengine/environment`: `ColorInput` is math's, re-exported (`string | number | readonly number[]`, wider than
+  the old 3-tuple); `srgbColor` still accepts only 3-component arrays at runtime. `HALF_MAX` was never exported from
+  an entry and is now module-private.
+- `@margoengine/sky`: colour options (`lighting.color`, `sunset`, `moon.color`, `ambient`, `fog.color`, the `night`
+  colours and `moonDirection`) are typed as math's `Vec3` (same shape as the old local `Color`).
+- `@margoengine/terrain`: `TerrainColorOptions` colours are math's `Vec3`; `HeightField` is math's, re-exported.
+- `@margoengine/vfx/texture`: the feature export `texture` is renamed `textureFeature` (it clashed with
+  `@margoengine/shader`'s `texture()` node). Pass it as `new VFX(options, {texture: textureFeature})`; the
+  `VFXFeatures` key stays `texture`. The missing-feature TypeError now names `textureFeature`.
+- Private aliases that appear in the published `.d.ts` were renamed per package (`PostPassContext`,
+  `ScatterPassContext`, `ShadowPassContext`, `SkyPassContext`, `TerrainPassContext`, vfx `OwnedResources`); type-only.
+- Errors that were bare `Error` are now `MargoError` with a `code` (`disposed`, `attached`, `state`, `unsupported`,
+  `failed`), or `TypeError`/`RangeError` for malformed input (tonemap `.cube` parsing, environment
+  `parseEnvironmentImage` format detection, TAA velocity primitives), in environment (outside the EXR/HDR/UltraHDR
+  decoders and inflate, deferred until the gate-11 security work lands), post, creative, clustered, tonemap, shadows,
+  taa, sky, water, terrain, dof, oit, toon, transitions, splats, vfx, scatter, lod, webgl and culling. A WebGPU
+  requirement thrown by a disposed effect reports `code` `'disposed'`.
+- `@margoengine/math` is now a `dependencies` entry of environment, sky, water, terrain, oit, toon, transitions, vfx,
+  scatter, lod, webgl and culling (their types or runtime `MargoError` import come from it; `build-optional`
+  externalizes it, so sky, terrain, vfx and scatter no longer inline the math helpers they use). dof and tonemap list
+  it under `devDependencies` (their builds inline `MargoError`), like post, clustered, shadows, taa, splats and
+  creative already did.
+- TSDoc on every public export of these packages (purpose, units, ranges, defaults, errors thrown).
+
+Tooling: `scripts/hygiene-allowlist.json` `names` gains `Environment` (environment's class and react's component).
+
 ### Code hygiene phase 2, group A (HANDOFF 5k)
 
 Shared types, errors and names follow [docs/conventions.md](docs/conventions.md). No behaviour change; every message

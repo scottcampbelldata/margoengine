@@ -24,6 +24,7 @@ export interface RGBA8Image {
   height: number;
   data: Uint8Array | Uint8ClampedArray;
 }
+/** How `decodeUltraHDR` decodes the JPEGs and applies the gain map. */
 export interface UltraHDROptions {
   /** JPEG decoder; default uses createImageBitmap and OffscreenCanvas (browsers and workers). Supply one in Node. */
   decode?: (jpeg: Uint8Array) => Promise<RGBA8Image> | RGBA8Image;

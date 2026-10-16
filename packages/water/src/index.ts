@@ -11,6 +11,7 @@ import {
 import { acquireDepth, group } from '../../shared/gpu.js';
 import { CoastalFlow, waterFrame, oceanWaves } from './coastal.js';
 import { Spray } from './spray.js';
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: {
   COPY_SRC: number;
@@ -19,35 +20,62 @@ declare const GPUTextureUsage: {
   TEXTURE_BINDING: number;
 };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+/** One swell train: three Gerstner components around this direction and wavelength whose amplitudes sum to `amplitude`. */
 export interface Wave {
+  /** Travel direction in the XZ plane (any nonzero length). */
   direction: readonly [number, number];
+  /** Height in world units. */
   amplitude: number;
+  /** Crest spacing in world units, > 0. */
   wavelength: number;
+  /** Gerstner crest sharpness; rejected (RangeError) when it would fold the surface. Default 0.5. */
   steepness?: number;
+  /** Phase offset in radians. Default 0. */
   phase?: number;
 }
+/** Terrain coupling: a borrowed heightmap the shallow-water flow, foam and spray run on. */
 export interface WaterTerrain {
+  /** World-space Y heights in a sampleable `r32float` 2D texture, 2-512 cells per side. */
   heightmap: () => GPUTexture | undefined;
+  /** World XZ of the heightmap's first texel corner. */
   origin: readonly [number, number];
+  /** World XZ extent the heightmap covers. */
   size: readonly [number, number];
 }
+/** A directional light record for glints and foam, such as an entry of `sky.lights`. */
 export interface WaterLight {
+  /** XYZ towards the light (nonzero, normalised here) plus intensity (>= 0) in the fourth element. */
   direction: ArrayLike<number>;
+  /** Linear RGB radiance, each >= 0. */
   radiance: ArrayLike<number>;
 }
+/** Water settings, read at construction unless noted. Invalid values throw RangeError or TypeError. */
 export interface WaterOptions {
+  /** Grid extent in world units (X, Z), each 0-100,000. Default [100, 100]. */
   size?: readonly [number, number];
+  /** Grid cells per side, an integer 1-512. Default 128. */
   segments?: number;
+  /** Mean sea level, world Y. Default 0. */
   height?: number;
+  /** 1-8 swell trains. Default two trains along [1, 0.3] and [1, 0.6]. */
   waves?: readonly Wave[];
+  /** Deep-water colour, linear RGB 0..1. Default [0.01, 0.18, 0.25]. */
   color?: readonly [number, number, number];
+  /** Shoreline foam width in world units, 0-100 (exclusive of 0). Default 1. */
   foamDistance?: number;
+  /** Scene depth provider; pass `() => effect.depthTexture` when Bloom, SSAO or DOF owns the capture. Default: Water's own. */
   depth?: () => GPUTexture | undefined;
+  /** Shallow-water coupling with a terrain heightmap. Omitted: open water only. */
   terrain?: WaterTerrain;
+  /** Borrowed sky texture (sampleable `rgba16float`), e.g. `() => sky.reflectionTexture`. Omitted: a sky gradient. */
   reflection?: () => GPUTexture | undefined;
+  /** Borrowed viewport-sized `rgba16float` scene colour with COPY_SRC, for refraction. Omitted: an approximate seabed. */
   sceneColor?: () => GPUTexture | undefined;
+  /** Up to two directional lights for glints, e.g. `sky.lights`; read every frame. Default: the engine light. */
   lights?: readonly WaterLight[];
+  /** A 2,048-droplet GPU spray pool; needs `terrain`. Default false. */
   spray?: boolean;
+  /** Stretch the outer grid rows to a 10 km horizon for open ocean. Default false. */
   horizon?: boolean;
 }
 const shader =
@@ -188,6 +216,14 @@ const depthCopy = `
 @fragment fn fragment(@builtin(position) p:vec4f)->@builtin(frag_depth) f32 {return textureLoad(sceneDepth,vec2i(p.xy),0);}
 `;
 let instances = 0;
+/**
+ * An opaque, Y-up water surface: up to eight Gerstner swell trains with analytic normals, Fresnel reflection, glints,
+ * absorption and shoreline foam, with optional terrain-coupled shallow-water flow and spray. `Water.attach(engine,
+ * options)`; WebGPU only.
+ * @throws RangeError / TypeError from the constructor when an option is invalid (including folding wave steepness).
+ * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`, `'state'` during a frame when a
+ * borrowed texture (depth, reflection, scene colour, terrain heightmap) does not have the required size or format.
+ */
 export class Water implements EnginePlugin {
   private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
   private readonly foamAttachment: GPURenderPassColorAttachment = {
@@ -409,7 +445,11 @@ export class Water implements EnginePlugin {
     return this;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Water requires WebGPU');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Water requires WebGPU; attach a new Water to a WebGPU engine',
+      );
     this.engine = engine;
     this.shared = this.options.depth ? undefined : acquireDepth(engine);
     this.source = this.options.depth ?? this.shared!.texture;
@@ -475,7 +515,7 @@ export class Water implements EnginePlugin {
       !depth.format.startsWith('depth') ||
       !(depth.usage & GPUTextureUsage.TEXTURE_BINDING)
     )
-      throw new Error('Water needs viewport-sized sampleable scene depth');
+      throw new MargoError('state', 'Water needs viewport-sized sampleable scene depth; return one from options.depth');
     const reflection = this.options.reflection?.();
     if (
       this.options.reflection &&
@@ -486,7 +526,10 @@ export class Water implements EnginePlugin {
         reflection.format !== 'rgba16float' ||
         !(reflection.usage & GPUTextureUsage.TEXTURE_BINDING))
     )
-      throw new Error('Water reflection needs a sampleable rgba16float sky texture');
+      throw new MargoError(
+        'state',
+        'Water reflection needs a sampleable rgba16float sky texture; return one from options.reflection',
+      );
     if (this.reflected !== reflection) {
       this.reflected = reflection;
       this.groups = [];
@@ -506,7 +549,10 @@ export class Water implements EnginePlugin {
         scene.format !== c.format ||
         !(scene.usage & GPUTextureUsage.COPY_SRC)
       )
-        throw new Error('Water scene color needs a viewport-sized copyable HDR color texture');
+        throw new MargoError(
+          'state',
+          'Water scene color needs a viewport-sized copyable HDR color texture; return one in the pass format (rgba16float) from options.sceneColor',
+        );
       const target = sceneTarget(c);
       // The 1x opaque resolve is separate from our 4x color attachment and stays unchanged during this pass.
       if (
@@ -676,7 +722,10 @@ export class Water implements EnginePlugin {
         terrain.format !== 'r32float' ||
         !(terrain.usage & GPUTextureUsage.TEXTURE_BINDING)
       )
-        throw new Error('Water terrain needs a sampleable 2D r32float heightmap, 2..512 cells per side');
+        throw new MargoError(
+          'state',
+          'Water terrain needs a sampleable 2D r32float heightmap, 2..512 cells per side; return one from options.terrain',
+        );
       if (this.coastal?.terrain !== terrain) {
         this.spray?.dispose();
         this.spray = undefined;

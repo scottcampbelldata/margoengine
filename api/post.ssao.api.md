@@ -31,12 +31,12 @@ export interface SSAOOptions {
 }
 
 export interface SSAOSource {
-    draw(context: Context, mode: 'gbuffer' | 'ambient', color: GPUTextureView, depth: GPUTextureView): void;
+    draw(context: PostPassContext, mode: 'gbuffer' | 'ambient', color: GPUTextureView, depth: GPUTextureView): void;
 }
 
 // Not exported from this entry, but used by the exports above:
 
-type Context = Extract<PassContext, {
+type PostPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
 ```

@@ -1,5 +1,6 @@
 import { finiteVector } from '@margoengine/math/validate';
 import type { SkyFeatures } from './base.js';
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 // Same default as the sky's moon colour.
 const moonColor = [0.25, 0.45, 0.75] as const;
@@ -62,7 +63,11 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
       pass(c) {
         if (source !== c.shader) {
           const patched = c.shader.replace('frame.radiance.w', 'skyAmbient.rgb');
-          if (patched === c.shader) throw new Error('Sky ambient requires the standard PBR shader');
+          if (patched === c.shader)
+            throw new MargoError(
+              'unsupported',
+              "Sky ambient requires the standard PBR shader; remove the plugin that replaced core's shader",
+            );
           source = c.shader;
           shader = '@group(0) @binding(8) var<uniform> skyAmbient:vec4f;\n' + patched;
         }

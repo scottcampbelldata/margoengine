@@ -7,9 +7,11 @@ import { render, compute, group as bind } from '../../shared/gpu.js';
 import { preset } from '../../shared/preset.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { PostStack } from './stack.js';
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; STORAGE_BINDING: number };
-type Context = Extract<PassContext, { backend: 'webgpu' }>;
+type PostPassContext = Extract<PassContext, { backend: 'webgpu' }>;
+/** SSR settings, read every frame from `ssr.options`; out of range throws RangeError. */
 export interface SSROptions {
   /** Surfaces rougher than this (perceptual, 0..1) get no screen-space reflection; fades out from half of it. Default 0.6. */
   maxRoughness?: number;
@@ -19,6 +21,7 @@ export interface SSROptions {
   maxDistance?: number;
   /** Hierarchical-depth march iterations per pixel (1-256). Default 64. */
   steps?: number;
+  /** False skips the reflection passes. Default true. */
   enabled?: boolean;
 }
 /** gltf-pro's capture hook (its `PBRCapture`, declared here so post does not import gltf-pro). */
@@ -31,7 +34,7 @@ export interface SSRCapture {
 export interface SSRModel {
   setCapture(hook: SSRCapture): () => void;
   onDispose(callback: () => void): () => void;
-  draw(context: Context, mode: 'capture', color: GPUTextureView, depth: GPUTextureView): void;
+  draw(context: PostPassContext, mode: 'capture', color: GPUTextureView, depth: GPUTextureView): void;
 }
 
 const vertex =
@@ -208,7 +211,7 @@ export class SSR implements EnginePlugin {
   private readonly compositePass: GPURenderPassDescriptor = { colorAttachments: [this.compositeAttachment] };
   private readonly models = new Map<SSRModel, () => void>();
   private readonly modelCode = new Map<string, string>();
-  private context?: Context;
+  private context?: PostPassContext;
   private pass?: GPURenderPassEncoder;
   // gltf-pro capture hook: model materials into the same three targets, after the core replay.
   private readonly hook: SSRCapture = {
@@ -249,7 +252,7 @@ export class SSR implements EnginePlugin {
   /** Makes a gltf-pro model or materials mesh reflect: its own materials (maps, alpha mask, instances, skinning) are drawn
    * into SSR's material targets. Returns a remover; models not added are still reflected but do not reflect. */
   add(model: SSRModel): () => void {
-    if (this.disposed) throw new Error('SSR is disposed');
+    if (this.disposed) throw new MargoError('disposed', 'SSR is disposed; create a new SSR');
     let release = this.models.get(model);
     if (!release) {
       const restore = model.setCapture(this.hook),
@@ -273,7 +276,8 @@ export class SSR implements EnginePlugin {
     this.options.enabled = value;
   }
   private joinStack(host: StackHost): StackStage {
-    if (this.engine || this.host || this.disposed) throw new Error('SSR is already attached');
+    if (this.engine || this.host || this.disposed)
+      throw new MargoError('attached', 'SSR is already attached; create a new SSR');
     this.host = host;
     return { kind: 'hdr', render: (c, input, output) => this.stage(c, input, output) };
   }
@@ -295,10 +299,13 @@ export class SSR implements EnginePlugin {
       throw new RangeError('Invalid SSR options');
   }
   setup(engine: Engine): void {
-    if (this.disposed) throw new Error('SSR is disposed');
+    if (this.disposed) throw new MargoError('disposed', 'SSR is disposed; create a new SSR');
     if (!this.host)
-      throw new Error('SSR runs in a PostStack: SSR.attach(engine) or PostStack.attach(engine, [..., new SSR(), ...])');
-    if (!engine.gpu) throw new Error('SSR requires WebGPU');
+      throw new MargoError(
+        'state',
+        'SSR runs in a PostStack: SSR.attach(engine) or PostStack.attach(engine, [..., new SSR(), ...])',
+      );
+    if (!engine.gpu) throw new MargoError('unsupported', 'SSR requires WebGPU; use a WebGPU engine');
     this.engine = engine;
     const device = engine.gpu;
     this.uniform = device.createBuffer({ size: 160, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -317,13 +324,14 @@ export class SSR implements EnginePlugin {
       },
     });
   }
-  private prepare(c: Context): void {
+  private prepare(c: PostPassContext): void {
     this.validate();
     this.resize(c);
     const v = this.values,
       o = this.options,
       own = this.ownDepth;
-    if (!invertMatrixStable(c.camera.matrix, this.inverse, this.workspace)) throw new Error('Invalid SSR camera');
+    if (!invertMatrixStable(c.camera.matrix, this.inverse, this.workspace))
+      throw new MargoError('state', 'Invalid SSR camera; give the camera a finite, invertible projection');
     v.set(c.camera.matrix, 16);
     v[32] = c.width;
     v[33] = c.height;
@@ -358,7 +366,10 @@ export class SSR implements EnginePlugin {
             : 'if(false){$1_=$2;}return margoSSR(n,v,i.color,i.material.y,i.material.x);',
         );
       if (!code.includes('->MargoSSR') || !code.includes('return margoSSR('))
-        throw new Error('SSR requires the standard core lighting shader');
+        throw new MargoError(
+          'unsupported',
+          "SSR requires the standard core lighting shader; remove the plugin that replaced core's shader",
+        );
       const module = c.device.createShaderModule({ code: code + replayTail(code) });
       this.replay = c.device.createRenderPipeline({
         ...this.single!,
@@ -398,7 +409,7 @@ export class SSR implements EnginePlugin {
     }
     pass.end();
   }
-  private stage(c: Context, input: GPUTextureView, output: StageOutput): void {
+  private stage(c: PostPassContext, input: GPUTextureView, output: StageOutput): void {
     const models = this.models.size > 0,
       key = output.format + output.multisample.count + output.hdr + models,
       code = output.hdr ? linearComposite : compositeShader;
@@ -437,7 +448,7 @@ export class SSR implements EnginePlugin {
     pass.draw(3);
     pass.end();
   }
-  private resize(c: Context): void {
+  private resize(c: PostPassContext): void {
     const target = this.host!.target!;
     if (this.width === c.width && this.height === c.height && this.target === target) return;
     this.release();
