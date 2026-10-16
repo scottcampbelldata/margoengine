@@ -5,7 +5,7 @@
 ```ts
 import { Animation } from "@margoengine/animation";
 import { Vec3 } from "@margoengine/core";
-import { Engine, EnginePlugin } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, Mesh } from "@margoengine/core/extension";
 
 export interface AdditiveLayer {
     clip: string;
@@ -39,6 +39,7 @@ export interface AnimatorOptions {
     initial: string;
     parameters?: Record<string, number>;
     transitions?: readonly AnimatorTransition[];
+    writeRotation?: (node: Mesh, rotation: readonly number[]) => void;
 }
 
 export interface AnimatorTransition {

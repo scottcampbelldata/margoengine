@@ -528,6 +528,98 @@ the production comparison harness remain ignored local artifacts. The API
 reports explicitly include the new option; unchanged export counts do not mean
 an unchanged API. This package change is not yet part of production feeb64de.
 
+### Retained optional Animator rotation writer
+
+`AnimatorOptions.writeRotation(node, rotation)` is a new explicit optional commit
+hook in the owning Animator package. Omission retains dynamic
+`Mesh.setQuaternion()` dispatch, including pre-import and later overrides.
+Both sampled/blended pose commits and FootIK corrections use the selected path.
+The hook is captured and validated once after the existing option validation;
+successful rotation caches update only after commit returns. Recursive updates
+from the hook reject before mutation, with the active flag cleared in `finally`.
+Failure/retry semantics, including a throw after restoring an already-cached
+state, are documented rather than promising unconditional callback reinvocation.
+
+The demo trial uses one startup-owned callback over a dedicated `RigScratch`.
+Its reflection-reuse guard accepts only that selected identity and retains the
+existing node/method/track snapshots, plugin ordering, layers/FootIK/transitions
+invalidation and physical-pose checks. An arbitrary callback is not certified
+pure by this option. Default behavior remains selected unless the temporary
+comparison URL includes `?animatorWriter=owned`.
+
+Only Animator was rebuilt/type-checked. All 29 focused tests passed: ten new
+writer cases plus existing Animator allocation, game/FootIK and pose-reuse tests.
+The separate actual-authored-robot census preserved every checked bit across
+10,000 measured frames, 36 nodes, 76 primitives and 1,046 pose/morph scalars per
+frame. It used the original `Light keeper idle` clip and precomputed bounded
+external rotations forcing nine actual restoration commits per frame. These
+inputs are an attribution workload, not a collision-valid drag trajectory or
+an assertion that the live demo commits nine quaternions every frame.
+
+Separate parity counted 90,000 commits for both implementations; the measured
+default setter itself was never wrapped. All four matched kernel/control
+windows had zero natural GC and stable input/source hashes. The opt-in removed
+360,000 excess `JS_OBJECT_TYPE`, 90,000 `JS_FUNCTION_TYPE` and 90,000
+`JS_ARRAY_ITERATOR_TYPE` instances. Selected structural bytes fell by 46,588,800
+after deducting the verified overlapping context category; excess HeapNumbers
+fell by 1,332,107 instances / 21,313,712 bytes. These Node internal-type deltas
+establish removal of the targeted allocation shapes, not an exact browser
+bytes-per-frame result or zero-allocation guarantee. Other internal-type deltas
+remain.
+
+Evidence is in ignored `test-results/animator-writer-ablation/`, particularly
+`census-comparison.json`, its parity report and raw kernel/control logs.
+`tests/animator-rotation-writer.test.js` supplies the focused regressions;
+the new optional callback is represented explicitly in `api/animator.api.md`.
+
+The actual standalone hardware suite passed eight motion cases, fourteen
+cross-track transitions and 649 published samples with the owned writer and
+Stats prototype layout enabled. All reported arm/head clearance checks passed;
+maximum grip error was approximately 47.5 nm, with no measured unmoving chase or
+browser errors. The suite intentionally toggles controls and interrupts routes:
+final reflection counters were 522 reused / 900 attempted with 378 conservative
+fallbacks, not 100% reuse. Their individual causes were not classified.
+The runner now accepts optional local `--scene-url=` and path-safe `--label=`
+arguments while preserving its previous default source/report behavior.
+
+The warmed browser comparison retained the same frozen source/build hashes and
+Stats prototype setting throughout. Its first default-writer run is the earlier
+Stats opt-in capture; only `&animatorWriter=owned` changes for the candidate.
+Every idle and drag phase has 30 seconds warmup and approximately 30 seconds
+measured. Raw labels and results:
+
+| Writer | Phase | Sampled MB/s | Minor / major GC | Peak observed GC slice ms | p95 RAF callback ms |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Default A | Idle | 0.621088 | 23 / 4 | 1.561 | 2.289 |
+| Owned | Idle | 0.588493 | 23 / 3 | 1.566 | 2.110 |
+| Default B | Idle | 0.764308 | 31 / 3 | 2.391 | 1.825 |
+| Default A | Drag | 0.906381 | 28 / 4 | 1.749 | 5.206 |
+| Owned | Drag | 0.847987 | 24 / 6 | 4.619 | 5.676 |
+| Default B | Drag | 0.905832 | 32 / 4 | 2.926 | 4.871 |
+
+**Retain the explicit optional writer for the verified allocation-shape
+reduction.** Candidate sampled allocation is below both baselines, including
+bytes per ordinary animation frame, but its drag callback p95 and maximum
+observed GC slice are higher. These captures establish no CPU or GC-pause win;
+record that trade-off instead of calling the complete frame loop allocation-free
+or stutter-proof. Automatic reflection counts also differ (idle 435/441/448,
+drag 440/416/412). No fixed-bake workload equivalence is claimed. All six phases
+had zero browser/source errors and 100% reflection repeat reuse; the owned
+phases recorded 882/882 idle and 830/830 drag attempts. All drag phases issued
+938 trusted commands.
+
+Evidence: `test-results/animator-writer-ablation/fresh-browser-aba-summary.json`,
+with raw profile labels `stats-pass-prototype-guarded-candidate`,
+`animator-owned-stats-prototype-candidate` and
+`animator-owned-stats-prototype-baseline-b`. Motion evidence is
+`test-results/skinning-ik-motion-browser-stats-animator-owned.json` and its
+summary. An offline trace audit confirmed every named MinorGC/MajorGC span is
+on `CrRendererMain`, with no nested named duplicates changing the reported
+counts. Explicit marking triggers include global-limit and memory-reducer
+reasons, which do not establish whether pressure originates in engine code,
+the sampler or native browser resources. The sampling-disabled observer check
+is pending at this checkpoint. This source is not production feeb64de.
+
 ### Target-only projection boundary experiment: reverted
 
 The current robot uses `resolveTarget()` with damping and compliance disabled and
