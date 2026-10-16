@@ -297,9 +297,9 @@
     "package": "@margoengine/clustered",
     "version": "0.1.0",
     "published": false,
-    "description": "WebGPU clustered forward point and spot lighting.",
+    "description": "WebGPU clustered forward point and spot lighting with optional local shadows.",
     "requirements": "Core 0.1.0 · see the package guide for browser and backend requirements",
-    "keywords": "clustered",
+    "keywords": "clustered point spot lights shadows depth maps",
     "install": "npm install @margoengine/core@0.1.0 @margoengine/clustered@0.1.0",
     "imports": "import { Clustered } from '@margoengine/clustered';",
     "exports": [

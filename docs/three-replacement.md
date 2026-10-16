@@ -18,14 +18,14 @@ A typical Three scene is a camera, a mesh, orbit controls, a glTF, metallic-roug
 | One skin and morph clip, four or eight influences | `@margoengine/animation` |
 | Crossfades, blend trees, additive layers | `@margoengine/animator` |
 | Directional cascaded shadows | `@margoengine/shadows` |
-| Up to 1,024 point and spot lights | `@margoengine/clustered` |
+| Up to 1,024 point and spot lights, with opt-in local shadows | `@margoengine/clustered` |
 | Bloom, AgX, SSAO | `@margoengine/post` |
 | Depth of field, tone mapping, TAA | `@margoengine/dof`, `@margoengine/tonemap`, `@margoengine/taa` |
 | React bindings | `@margoengine/react` |
 | Triangle BVH | `@margoengine/bvh` |
 | Draco, meshopt and KTX2 inside glTF | `@margoengine/gltf-pro` calls `@margoengine/decoders` automatically, retaining texture mips and releasing temporary workers. |
 
-`clustered` states that local lights do not cast shadows. Shadows are the directional cascades in `@margoengine/shadows`.
+`clustered` supports opt-in point and spot shadow maps for registered core and PBR casters, with core/PBR/terrain receivers. A bounded atlas and fixed comparison filter stay separate from the directional cascades in `@margoengine/shadows`. Custom-only clipmap terrain casters and area-light penumbrae remain unsupported.
 
 The React README already says PBR models, HDR image-based lighting, and shadows require WebGPU. Legacy meshes and neutral studio lighting support the WebGL2 fallback.
 
@@ -52,7 +52,7 @@ These are the gaps a porter will find. They are not a build list.
 | Three.js | This repo |
 | --- | --- |
 | Extended PBR materials | [`@margoengine/materials`](../packages/materials/README.md) adds clearcoat, sheen, specular color, anisotropy, iridescence, transmission, IOR, and Beer-law volume through group 3. The lobes affect directional lighting and fixed hemispherical ambient; clustered and environment lighting retain their base response. Refraction samples the opaque screen color once; there is no ray tracing or participating media. The Blender loader still rejects extended materials. |
-| Shadowed point and spot lights, rect-area lights, IES profiles | Clustered lights do not cast shadows. Shadows are directional cascades. |
+| Shadowed point and spot lights, rect-area lights, IES profiles | Point and spot shadows are optional in `@margoengine/clustered`; rect-area lights and IES profiles remain unsupported. |
 | `AnimationMixer` on the same object as the skin | `@margoengine/animation` plays one clip, with four or eight influences, and does not crossfade. Crossfades, 1D and 2D blend trees, and masked additive layers are in `@margoengine/animator`. |
 | `ShaderMaterial` and node materials | `materials.nodeMaterial()` compiles a closed TypeScript graph to `MaterialExtension`; it accepts no arbitrary WGSL, node-graph file format, or Three.js TSL. Custom WGSL uses `MaterialExtension` directly, and custom draws use the core extension API. |
 | `EffectComposer` with SSR, SSGI, GTAO, SMAA, outline | The post packages are bloom, AgX, SSAO, depth of field, and TAA. They are separate packages, not one composer stack. |
@@ -63,7 +63,7 @@ The native FBX importer has landed. `docs/native-fbx.md` and `packages/fbx/READM
 
 ## What has to be true before launch
 
-Five launch requirements remain separate from optional materials, point-light shadows, cubic FBX curves, and broader DCC certification.
+Five launch requirements remain separate from the implemented optional materials and local-light shadows, cubic FBX curves, and broader DCC certification.
 
 1. **The install command is true.** `npm install margoengine` works, or the root README does not tell people to run it. The catalog still marks the packages unpublished while the README shows `npm install @margoengine/core@0.1.0` and the matching React, glTF, machinery, and creative lines.
 
@@ -73,14 +73,14 @@ Five launch requirements remain separate from optional materials, point-light sh
 
 4. **A real glTF loads — compression hook resolved.** `loadGLTF` and `parseGLTFAsync` automatically decode Draco, meshopt and KTX2, with real-fixture and production browser coverage. `parseGLTF` remains synchronous for uncompressed and meshopt input. Name the loader path used by the launch demo and retain the texture-transform and eight-influence regression checks.
 
-5. **A short replacement map sits above the catalog.** One row each for camera, mesh, orbit, glTF, environment, one animation clip, and dispose, with the import that does it. Beside that map, state the material limits: screen-space refraction, no participating media or node-graph file format, and transmissive surfaces do not cast shadows or receive cascaded shadows. Also name unsupported point/spot-light shadows and Three.js `ShaderMaterial` source/TSL. `@margoengine/animator` is named as the place clip crossfades live, so the base animation package is not mistaken for a missing mixer.
+5. **A short replacement map sits above the catalog.** One row each for camera, mesh, orbit, glTF, environment, one animation clip, and dispose, with the import that does it. Beside that map, state the material limits: screen-space refraction, no participating media or node-graph file format, and transmissive surfaces do not cast shadows or receive cascaded shadows. Name the explicit opt-in and caster registration for local-light shadows, along with unsupported rect-area lights, IES profiles and Three.js `ShaderMaterial` source/TSL. `@margoengine/animator` is named as the place clip crossfades live, so the base animation package is not mistaken for a missing mixer.
 
 ## What can wait
 
 Do not hold the launch for these. Document them as absent.
 
 - Ray-traced or multi-bounce transmission and participating media; extended lobes in clustered or environment lighting.
-- Rect-area lights, IES profiles, and shadows from point or spot lights.
+- Rect-area lights, IES profiles, area-light penumbrae, and custom-only clipmap terrain casters for local lights.
 - Three.js TSL and node-graph file formats, SSR, SSGI, GTAO, and a single EffectComposer clone.
 - A CPU raycaster that hits skinned and morphed vertices.
 - Cubic FBX curves, extra inheritance modes, progressive morphs, and broader DCC certification beyond the checked-in Blender rig. The native reader is already the runtime. Three.js is no longer an FBX dependency.
