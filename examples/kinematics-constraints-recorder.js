@@ -22,6 +22,7 @@ const COLUMNS = Object.freeze([
   'yawRadians', 'yawAssist', 'scene', 'mode', 'clock',
   'chased', 'clampActive', 'paced', 'paused', 'nominalHandSpeedMetersPerSecond', 'state',
   'upperLengthMeters', 'lowerLengthMeters', 'elbowRadiusMeters', 'forearmRadiusMeters',
+  'outwardDetour',
 ]);
 const ACTION_TYPES = Object.freeze([
   'start', 'stop', 'scene', 'gap', 'speed', 'clock', 'damping', 'budget',
@@ -209,7 +210,8 @@ export class ConstraintsInteractionRecorder {
     out[offset++] = number(controller.upperLength);
     out[offset++] = number(controller.lowerLength);
     out[offset++] = number(controller.elbowRadius);
-    out[offset] = number(controller.forearmRadius);
+    out[offset++] = number(controller.forearmRadius);
+    out[offset] = controller.outwardDetour ? 1 : 0;
     this.#totalFrames++;
     this.#last = wallTimeMs;
     return true;
@@ -273,6 +275,7 @@ export class ConstraintsInteractionRecorder {
     return JSON.stringify({
       format: 'margo-constraints-interaction',
       version: 1,
+      controllerRevision: 'contact-normal-2',
       temporaryDiagnostics: true,
       durationMs: this.durationMs,
       frameCapacity: this.capacity,
@@ -287,6 +290,7 @@ export class ConstraintsInteractionRecorder {
         clearance: 'Static proxy clearance at sampled instants only; not continuous swept-volume certification or physical robot safety.',
         result: 'Candidate fields describe the last evaluated solve; accepted hand/elbow fields retain the displayed pose on failure.',
         rawStatus: 'Status of the controller initial request before local recovery retries; input pacing may condition that request.',
+        outwardDetour: 'Demo controller accepted a bounded contact-tangent waypoint with an outward reserve along the estimated full-chain clearance gradient after the original request and smaller straight retries failed. The full-chain package guards remain active.',
         requestedPoleAngle: 'Not supplied by this demo. The caller supplies a Cartesian target and an IK callback, not a requested swivel angle; no unreturned overshoot is inferred.',
         absentNumbers: 'NaN, Infinity, -Infinity and -0 are explicit strings; no numeric coercion is performed.',
         droppedData: 'Ring overwrites retain the newest frames/actions in chronological order; overwritten and invalid counts are explicit.',

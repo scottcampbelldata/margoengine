@@ -22,6 +22,8 @@ test('recording is opt-in and disabled calls do not inspect controller or event-
   assert.deepEqual(json.actions, []);
   assert.match(json.semantics.clearance, /not continuous/);
   assert.match(json.semantics.coverage, /not every browser pointer event/);
+  assert.equal(json.controllerRevision, 'contact-normal-2');
+  assert.match(json.semantics.outwardDetour, /full-chain package guards/);
 });
 
 test('actual controller trajectories and settings are copied without changing solver results', () => {
@@ -88,6 +90,7 @@ test('actual controller trajectories and settings are copied without changing so
   assert.equal(cell(json, 150, 'acceptedPoleStepRadians'), 0);
   assert.ok(json.columns.includes('lastSolveRootX'));
   assert.ok(json.columns.includes('commandTargetX'));
+  assert.equal(cell(json, 150, 'outwardDetour'), 0);
   assert.match(json.semantics.requestedPoleAngle, /Not supplied/);
 });
 
