@@ -67,7 +67,7 @@ Use the real `Box.glb` and `blender-rig.fbx` that produced the six failures. Loa
 - `shadows.add(mesh)` draws that source.
 - `engine.pick` and the BVH raycaster hit the box.
 - The skinned rig is hit from the deformed buffer after one animation frame, not from a second core `Geometry`.
-- Disposing the model makes `meshSource(mesh)` return null, and a later `addBody` throws `No geometry`.
+- Disposing the model removes its registered source, and a later `addBody` rejects the disposed mesh without creating a body.
 - `npm run measure:size` stays under 20,000 bytes gzip.
 
 ## Launch documentation

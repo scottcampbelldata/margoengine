@@ -122,7 +122,7 @@ does not announce an npm publication or a package version change.
 
 ### Verification and footprint
 
-- The workspace build passes. The full Node 24 suite passes **1,281 tests**, with
+- The workspace build passes. The full Node 24 suite passes **1,287 tests**, with
   zero failures or skips and **four known frozen-stage TODO audits** that retain
   their original failing assertions. Strict TypeScript checks and packed exports/imports
   pass across **all 63 packages**, including strict Bundler and NodeNext consumers.
