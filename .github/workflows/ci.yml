@@ -81,6 +81,11 @@ jobs:
         env:
           BROWSER_CHANNEL: chromium
           BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
+      - name: Verify arm constraints and dragging through torso proxies
+        run: npm run test:browser --workspace @margoengine/kinematics-constraints
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
       - name: Verify DOF and tonemapping pixels, LUTs and device restoration
         run: npm run modern:test:postfx:browser
         env:
@@ -131,3 +136,8 @@ jobs:
             test-results/tonemap-demo.png
             test-results/nature-*.json
             test-results/temporal-splats.png
+            test-results/kinematics-constraints-demo.json
+            test-results/kinematics-constraints-demo.png
+            test-results/kinematics-constraints-interactions.json
+            test-results/kinematics-constraints-waist.png
+            test-results/kinematics-constraints-overhead.png

@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10191f">
+  <title>Arm clearance · Margo Engine</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #10191f; color: #e7eeed; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; min-height: 100svh; }
+    #view { position: relative; min-height: 620px; overflow: hidden; background: radial-gradient(ellipse at 50% 40%, #24343d, #10191f 75%); }
+    #viewport { position: absolute; inset: 0; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+    canvas:focus-visible { outline: 2px solid #9be1cf; outline-offset: -4px; }
+    .brand, .hint, .legend, #raw-cursor { position: absolute; z-index: 1; pointer-events: none; }
+    .brand { top: 28px; left: 32px; color: #aabfc4; font-size: 11px; letter-spacing: .17em; text-transform: uppercase; }
+    .hint { left: 32px; bottom: 32px; max-width: 320px; line-height: 1.65; font-size: 13px; color: #c2cfce; }
+    .hint strong { display: block; color: #f2f5f1; font-weight: 500; }
+    .legend { right: 25px; bottom: 32px; display: grid; gap: 8px; color: #c2cfce; font-size: 11px; }
+    .legend span::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--dot); }
+    #raw-cursor { width: 19px; height: 19px; border: 1px solid #ffad75; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 3px #ffad7517; }
+    #raw-cursor::after { content: ''; position: absolute; inset: 6px; border-radius: 50%; background: #ffad75; }
+    aside { padding: 44px 28px 28px; background: #152128; border-left: 1px solid #2d3d43; }
+    .eyebrow { margin: 0 0 18px; color: #9be1cf; text-transform: uppercase; letter-spacing: .14em; font-size: 10px; font-weight: 650; }
+    h1 { margin: 0 0 18px; max-width: 240px; font-size: 32px; line-height: 1.18; letter-spacing: -.035em; font-weight: 500; }
+    .intro { color: #aabbbc; font-size: 13px; line-height: 1.7; margin-bottom: 28px; }
+    .readout { padding: 18px 0; border-top: 1px solid #324047; border-bottom: 1px solid #324047; }
+    #status { display: flex; gap: 9px; align-items: baseline; margin: 0; font-size: 13px; line-height: 1.6; }
+    #status::before { content: ''; flex: 0 0 6px; height: 6px; border-radius: 50%; background: #9be1cf; }
+    #status[data-held="true"]::before { background: #ffad75; }
+    #status-detail { color: #90a4a8; font-size: 11px; line-height: 1.6; margin: 8px 0 0 15px; min-height: 34px; }
+    dl { display: grid; grid-template-columns: 1fr auto; margin: 18px 0 0; gap: 9px; font-size: 11px; }
+    dt { color: #90a4a8; } dd { margin: 0; font-variant-numeric: tabular-nums; }
+    .controls { display: grid; gap: 12px; padding-top: 24px; }
+    button, input { font: inherit; }
+    button { padding: 12px 14px; text-align: left; border: 1px solid #405057; border-radius: 5px; color: #e7eeed; background: #1b2b32; font-size: 12px; cursor: pointer; min-height: 43px; }
+    button:hover { background: #263b43; border-color: #7a9b9c; }
+    button:disabled { opacity: .45; cursor: wait; }
+    button.primary { color: #102a26; background: #a0dcca; border-color: #a0dcca; }
+    button.primary:hover { background: #b8ebdc; }
+    .button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    label { color: #b8c8c8; font-size: 12px; line-height: 1.5; }
+    .checkbox { display: flex; gap: 9px; align-items: center; margin: 5px 0; }
+    input[type="checkbox"] { accent-color: #9be1cf; width: 15px; height: 15px; }
+    input[type="range"] { accent-color: #9be1cf; width: 100%; margin: 7px 0 5px; }
+    .range-label { display: flex; justify-content: space-between; }
+    .note { margin-top: 27px; font-size: 11px; line-height: 1.7; color: #8da4a8; }
+    code { font-family: ui-monospace, monospace; color: #b4cecb; font-size: 10px; }
+    a { color: #b4cecb; text-underline-offset: 3px; }
+    #error { color: #ffb58b; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+    @media (max-width: 760px) { main { grid-template-columns: 1fr; } #view { min-height: 65svh; } aside { border-left: 0; border-top: 1px solid #2d3d43; padding: 28px; } h1 { max-width: none; } .brand { left: 20px; top: 20px; } .hint { left: 20px; bottom: 20px; max-width: 200px; font-size: 11px; } .legend { right: 16px; bottom: 20px; font-size: 10px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <section id="view" aria-label="Interactive arm clearance scene">
+      <div class="brand">Margo Engine / Kinematics lab</div>
+      <div id="viewport"></div><div id="raw-cursor" aria-hidden="true" hidden></div>
+      <div class="hint"><strong>Drag through the torso.</strong>The green hand follows a safe target. The elbow swivels to keep both sleeves clear.</div>
+      <div class="legend"><span style="--dot:#ffad75">Requested target</span><span style="--dot:#9be1cf">Accepted hand</span><span style="--dot:#84a6c8">Collision envelopes</span></div>
+    </section>
+    <aside aria-label="Arm clearance controls">
+      <p class="eyebrow">Optional package / 0.1.0</p>
+      <h1>Keep the sleeve clear.</h1>
+      <p class="intro">Analytical capsule constraints around a two-bone arm. Drag the orange target across the chest and watch the shoulder find a clear bend plane.</p>
+      <div class="readout">
+        <p id="status" role="status">Preparing scene…</p>
+        <p id="status-detail">Loading the local engine and constraint package.</p>
+        <dl><dt>Minimum link clearance</dt><dd id="clearance">—</dd><dt>Shoulder swivel</dt><dd id="swivel">—</dd><dt>Render backend</dt><dd id="backend">—</dd></dl>
+      </div>
+      <div class="controls">
+        <button id="sweep" class="primary" type="button" aria-pressed="false" disabled>Play torso sweep</button>
+        <div class="button-row"><button id="pause" type="button" aria-pressed="false" disabled>Pause solver</button><button id="reset" type="button" disabled>Reset pose</button></div>
+        <button id="dead-zone" type="button" disabled>Try the shoulder dead zone</button>
+        <label class="checkbox"><input id="proxies" type="checkbox" checked disabled>Show collision envelopes</label>
+        <label class="range-label" for="speed"><span>Maximum swivel speed</span><output id="speed-value" for="speed">180°/s</output></label>
+        <input id="speed" type="range" min="15" max="360" value="180" step="15" disabled>
+      </div>
+      <p class="note">Drag overhead to raise the arm. Pointer and arrow-key requests stop just short of full extension, leaving a small elbow bend. When clearance cannot be resolved, the last accepted pose holds. Shift + arrow keys makes smaller moves.</p>
+      <p class="note">This is a position-based two-bone demonstration using an analytical elbow callback. It does not skin a character or run CCD. All collision proxies use the same world frame and dimensions as the visible envelopes.</p>
+      <p class="note"><code>@margoengine/kinematics-constraints</code><br><a href="../packages/kinematics-constraints/README.md">Package guide</a></p>
+      <p id="error" role="alert"></p>
+    </aside>
+  </main>
+  <script type="module">
+    import {createStage, Geometry, sphere} from 'margoengine';
+    import {AvoidanceSolver, CapsuleVolume, SolveStatus} from '@margoengine/kinematics-constraints';
+
+    // Run from the repository: npm run modern:dev:extensions
+    // Open http://127.0.0.1:5173/examples/kinematics-constraints.html
+    const $ = selector => document.querySelector(selector);
+    const status = $('#status'), detail = $('#status-detail'), error = $('#error');
+    const sweepButton = $('#sweep'), pauseButton = $('#pause'), cursor = $('#raw-cursor');
+    const clearanceReadout = $('#clearance'), swivelReadout = $('#swivel');
+    let stage;
+    function report(reason) {
+      error.textContent = 'Could not run the example: ' + (reason?.message ?? String(reason));
+      stage?.engine.stop();
+    }
+    try {
+      stage = await createStage('#viewport', {
+        controls: false, autoStart: false, capacity: 512, backend: 'auto',
+        label: 'Drag a two-bone arm target through the capsule torso',
+        camera: {position: [2.6, 2.1, 4.2], target: [0.1, 1.2, 0], fov: 38, near: 0.05, far: 30},
+        onError: report,
+      });
+      const engine = stage.engine, canvas = stage.canvas;
+      canvas.tabIndex = 0;
+      $('#backend').textContent = engine.backend;
+
+      const root = new Float32Array([0.48, 1.25, 0]);
+      const rawTarget = new Float32Array([0.9, 0.7, 0.14]);
+      const currentHand = new Float32Array(rawTarget), currentElbow = new Float32Array(3);
+      const initialTarget = new Float32Array(rawTarget);
+      const upperLength = 0.55, lowerLength = 0.52, elbowRadius = 0.065, forearmRadius = 0.055;
+      const torso = new CapsuleVolume({start: [0, 0.45, 0], end: [0, 1.2, 0], radius: 0.32});
+      const avoidance = new AvoidanceSolver([torso], {
+        minClearance: 0.008, complianceMargin: 0.003, targetRadius: forearmRadius, damping: 0.12, maxIterations: 24,
+      });
+      const solveOptions = {swivelSpeedLimit: Math.PI, reachMargin: 0.001, foldMargin: 0.015, searchBudget: 128};
+      const dragDepth = 0;
+      // This demo stays in a bounded metre-scale scene. Fixed-arity scalar math
+      // avoids the Math.hypot allocation sites observed in the browser profile.
+      function vectorLength(x, y, z = 0) { return Math.sqrt(x * x + y * y + z * z); }
+
+      const bendAxis = new Float64Array(3), bendReference = new Float64Array(3), bendScratch = new Float64Array(3);
+      let hasBendFrame = false;
+      // Parallel transport the last accepted zero-angle reference by the shortest
+      // rotation between reach axes. Every candidate reads the same history;
+      // only a committed successful pose advances it. Thus overhead and cross-
+      // body reaching share one convention without switching global axes.
+      function transportBendFrame(ax, ay, az, out) {
+        let bx, by, bz;
+        if (hasBendFrame) {
+          bx = bendReference[0]; by = bendReference[1]; bz = bendReference[2];
+          const vx = bendAxis[1] * az - bendAxis[2] * ay;
+          const vy = bendAxis[2] * ax - bendAxis[0] * az;
+          const vz = bendAxis[0] * ay - bendAxis[1] * ax;
+          const cosine = Math.max(-1, Math.min(1, bendAxis[0] * ax + bendAxis[1] * ay + bendAxis[2] * az));
+          if (cosine > -1 + 1e-8) {
+            const cx = vy * bz - vz * by, cy = vz * bx - vx * bz, cz = vx * by - vy * bx;
+            const inverse = 1 / (1 + cosine);
+            bx += cx + (vy * cz - vz * cy) * inverse;
+            by += cy + (vz * cx - vx * cz) * inverse;
+            bz += cz + (vx * cy - vy * cx) * inverse;
+          }
+          // At an antipodal teleport the shortest rotation is not unique. Use
+          // the previous bend reference as the deterministic half-turn axis.
+        } else {
+          // Seed once, not per frame. Explicit Reset pose may reseed the frame.
+          bx = 0; by = Math.abs(ay) < 0.9 ? -1 : 0; bz = Math.abs(ay) < 0.9 ? 0 : 1;
+        }
+        const along = bx * ax + by * ay + bz * az;
+        bx -= along * ax; by -= along * ay; bz -= along * az;
+        const length = vectorLength(bx, by, bz);
+        out[0] = bx / length; out[1] = by / length; out[2] = bz / length;
+      }
+      function commitBendFrame(target) {
+        const ax = target[0] - root[0], ay = target[1] - root[1], az = target[2] - root[2];
+        const length = vectorLength(ax, ay, az);
+        transportBendFrame(ax / length, ay / length, az / length, bendScratch);
+        bendReference.set(bendScratch);
+        bendAxis[0] = ax / length; bendAxis[1] = ay / length; bendAxis[2] = az / length;
+        hasBendFrame = true;
+      }
+      function evaluateElbowIK(shoulder, target, poleAngle, out) {
+        const upper = upperLength, lower = lowerLength;
+        let ax = target[0] - shoulder[0], ay = target[1] - shoulder[1], az = target[2] - shoulder[2];
+        const distance = vectorLength(ax, ay, az);
+        if (!(distance > 0)) throw new RangeError('Two-bone target has zero reach');
+        ax /= distance; ay /= distance; az /= distance;
+        transportBendFrame(ax, ay, az, bendScratch);
+        const bx = bendScratch[0], by = bendScratch[1], bz = bendScratch[2];
+        const cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
+        const along = (upper * upper + distance * distance - lower * lower) / (2 * distance);
+        const heightSquared = upper * upper - along * along;
+        if (heightSquared < -1e-8) throw new RangeError('Two-bone target exceeds reach');
+        const height = Math.sqrt(Math.max(0, heightSquared)), cosine = Math.cos(poleAngle), sine = Math.sin(poleAngle);
+        out[0] = shoulder[0] + ax * along + height * (bx * cosine + cx * sine);
+        out[1] = shoulder[1] + ay * along + height * (by * cosine + cy * sine);
+        out[2] = shoulder[2] + az * along + height * (bz * cosine + cz * sine);
+      }
+      evaluateElbowIK(root, currentHand, 0, currentElbow);
+
+      // Both links use a reusable unit cylinder and sphere geometry. Transform
+      // setters update existing vector storage instead of rebuilding geometry.
+      function cylinderGeometry(segments = 20) {
+        const positions = [], normals = [], indices = [];
+        for (let i = 0; i <= segments; i++) {
+          const angle = i / segments * Math.PI * 2, x = Math.cos(angle), z = Math.sin(angle);
+          positions.push(x, -0.5, z, x, 0.5, z); normals.push(x, 0, z, x, 0, z);
+          if (i < segments) { const a = i * 2; indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+        }
+        return new Geometry(positions, normals, indices);
+      }
+      const cylinder = cylinderGeometry(), ball = sphere(1, 20);
+      const mesh = (geometry, color, scale, position = [0, 0, 0]) => stage.mesh(geometry, {color, scale, position, roughness: 0.68});
+      function rod(a, b, radius, color) {
+        const item = mesh(cylinder, color, [radius, 1, radius]);
+        updateRod(item, a, b, radius);
+        return item;
+      }
+      function updateRod(item, a, b, radius) {
+        const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], length = vectorLength(dx, dy, dz);
+        item.position.set((a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5, (a[2] + b[2]) * 0.5);
+        item.scale.set(radius, Math.max(length, 1e-6), radius);
+        item.rotation.set(Math.atan2(dz, dy), 0, -Math.asin(Math.max(-1, Math.min(1, dx / Math.max(length, 1e-6)))));
+      }
+      function capsule(a, b, radius, color) {
+        return {shaft: rod(a, b, radius, color), start: mesh(ball, color, [radius, radius, radius], a), end: mesh(ball, color, [radius, radius, radius], b), radius};
+      }
+      function updateCapsule(parts, a, b) {
+        updateRod(parts.shaft, a, b, parts.radius);
+        parts.start.position.set(a[0], a[1], a[2]); parts.end.position.set(b[0], b[1], b[2]);
+      }
+      function showCapsule(parts, visible) { parts.shaft.visible = visible; parts.start.visible = visible; parts.end.visible = visible; }
+      capsule([0, 0.45, 0], [0, 1.2, 0], 0.30, '#344b59');
+      stage.box({size: [3.7, 0.08, 2.5], position: [0.1, 0.02, 0], color: '#23343c', roughness: 1});
+      const torsoWires = [];
+      // Thin 3D rings mark the actual torso capsule surface, including its caps.
+      const rings = [[0.45 - 0.32 * Math.sin(Math.PI / 3), 0.16], [0.45 - 0.16, 0.32 * Math.cos(Math.PI / 6)], [0.45, 0.32], [0.7, 0.32], [0.95, 0.32], [1.2, 0.32], [1.36, 0.32 * Math.cos(Math.PI / 6)], [1.2 + 0.32 * Math.sin(Math.PI / 3), 0.16]];
+      for (const [y, radius] of rings) for (let i = 0; i < 24; i++) {
+        const a = i / 24 * Math.PI * 2, b = (i + 1) / 24 * Math.PI * 2;
+        torsoWires.push(rod([Math.cos(a) * radius, y, Math.sin(a) * radius], [Math.cos(b) * radius, y, Math.sin(b) * radius], 0.0025, '#84a6c8'));
+      }
+      const upperCore = capsule(root, currentElbow, 0.024, '#e7e3d6');
+      const lowerCore = capsule(currentElbow, currentHand, 0.021, '#e7e3d6');
+      const upperProxy = capsule(root, currentElbow, elbowRadius, '#84a6c8');
+      const lowerProxy = capsule(currentElbow, currentHand, forearmRadius, '#84a6c8');
+      mesh(ball, '#dfd3ba', [0.082, 0.082, 0.082], root);
+      const elbowMarker = mesh(ball, '#e7e3d6', [0.065, 0.065, 0.065], currentElbow);
+      const handMarker = mesh(ball, '#9be1cf', [0.055, 0.055, 0.055], currentHand);
+      upperProxy.end.setMaterial(elbowMarker.material);
+      lowerProxy.end.setMaterial(handMarker.material);
+      const rawMarker = mesh(ball, '#ffad75', [0.025, 0.025, 0.025], rawTarget);
+
+      let paused = false, sweeping = false, sweepTime = 0, lastResult, readoutTime = 1, pointerId = null;
+      let acceptedClearance = Math.min(torso.segmentClearance(root, currentElbow, elbowRadius), torso.segmentClearance(currentElbow, currentHand, forearmRadius));
+      const names = ['Following safe target', 'Swivel speed limit · pose held', 'Shoulder dead zone · pose held', 'Obstacle occluded · pose held'];
+      const explanations = ['Both arm capsules satisfy the requested torso clearance.', 'Move more slowly, increase the speed limit, or move back toward the accepted hand.', 'The requested target is too close to a folded or straight arm singularity.', 'No clear bend plane was found within this call’s search budget.'];
+      function setSweep(value) { sweeping = value; sweepButton.textContent = value ? 'Stop torso sweep' : 'Play torso sweep'; sweepButton.setAttribute('aria-pressed', String(value)); }
+      function updatePose() {
+        updateCapsule(upperCore, root, currentElbow); updateCapsule(lowerCore, currentElbow, currentHand);
+        updateCapsule(upperProxy, root, currentElbow); updateCapsule(lowerProxy, currentElbow, currentHand);
+        elbowMarker.position.set(currentElbow[0], currentElbow[1], currentElbow[2]);
+        handMarker.position.set(currentHand[0], currentHand[1], currentHand[2]);
+      }
+      function projectCursor() {
+        const m = engine.camera.matrix, x = rawTarget[0], y = rawTarget[1], z = rawTarget[2];
+        const w = m[3] * x + m[7] * y + m[11] * z + m[15];
+        if (!(w > 0)) { cursor.hidden = true; return; }
+        cursor.hidden = false;
+        cursor.style.left = ((m[0] * x + m[4] * y + m[8] * z + m[12]) / w * 0.5 + 0.5) * canvas.clientWidth + 'px';
+        cursor.style.top = (0.5 - (m[1] * x + m[5] * y + m[9] * z + m[13]) / w * 0.5) * canvas.clientHeight + 'px';
+      }
+      function drawReadout() {
+        if (!lastResult) return;
+        status.textContent = paused ? 'Paused · pose held' : names[lastResult.status] ?? 'Pose held';
+        status.dataset.held = String(paused || !lastResult.resolved);
+        detail.textContent = paused ? 'Dragging still moves the orange request. Resume to evaluate constraints.' : explanations[lastResult.status] ?? '';
+        const clearanceText = Number.isFinite(acceptedClearance) ? (acceptedClearance * 1000).toFixed(1) + ' mm' : '—';
+        const swivelText = (lastResult.poleAngle * 180 / Math.PI).toFixed(1) + '°';
+        if (clearanceReadout.textContent !== clearanceText) clearanceReadout.textContent = clearanceText;
+        if (swivelReadout.textContent !== swivelText) swivelReadout.textContent = swivelText;
+      }
+      function step(dt) {
+        // dt is explicit seconds. Inactive tabs and long pauses never grant an
+        // unbounded angular jump on their first frame back.
+        const seconds = Math.max(0, Math.min(dt, 1 / 20));
+        if (sweeping && !paused) {
+          sweepTime += seconds;
+          setInteractiveTarget(0.3 + 0.67 * Math.cos(sweepTime * 0.7), 0.85 + 0.23 * Math.sin(sweepTime * 0.7));
+        }
+        if (!paused && seconds > 0) {
+          lastResult = avoidance.solve(root, currentHand, rawTarget, upperLength, lowerLength, elbowRadius, forearmRadius, seconds, evaluateElbowIK, solveOptions);
+          // The result buffers are solver-owned and reused. Commit only accepted
+          // outputs into the demo's persistent pose, then render that pose.
+          if (lastResult.status === SolveStatus.Success && lastResult.resolved) {
+            currentHand.set(lastResult.target); currentElbow.set(lastResult.elbow); commitBendFrame(currentHand); updatePose();
+            acceptedClearance = Math.min(torso.segmentClearance(root, currentElbow, elbowRadius), torso.segmentClearance(currentElbow, currentHand, forearmRadius));
+          }
+        }
+        rawMarker.position.set(rawTarget[0], rawTarget[1], rawTarget[2]);
+        readoutTime += seconds;
+        if (readoutTime > 0.1) { drawReadout(); projectCursor(); readoutTime = 0; }
+        return lastResult;
+      }
+      function setTarget(x, y, z = dragDepth) { rawTarget[0] = x; rawTarget[1] = y; rawTarget[2] = z; }
+      function setInteractiveTarget(x, y) {
+        // The controller maps out-of-reach input onto the operational boundary.
+        // Keep a Float32 rounding inset; the solver still checks its own strict
+        // reach band and reports SingularDeadZone for unfiltered test requests.
+        const maximum = upperLength + lowerLength - solveOptions.reachMargin - 2e-6;
+        const shell = torso.radius + forearmRadius + avoidance.minClearance + avoidance.complianceMargin + 0.001;
+        let z = dragDepth;
+        for (let i = 0; i < 12; i++) {
+          // At torso heights, the drag surface lies in front of its capsule.
+          // Continue that depth across the waist so a rapid cross-body request
+          // doesn't ask for a shortcut through the torso. Above it, return to
+          // the shoulder plane so an overhead arm can be almost vertical.
+          const dyTorso = y - Math.max(torso.start[1], Math.min(torso.end[1], y));
+          z = Math.sqrt(Math.max(0, shell * shell - dyTorso * dyTorso));
+          const dx = x - root[0], dy = y - root[1], dz = z - root[2];
+          const distance = vectorLength(dx, dy, dz);
+          if (distance <= maximum) break;
+          const scale = maximum / distance;
+          x = root[0] + dx * scale; y = root[1] + dy * scale; z = root[2] + dz * scale;
+        }
+        setTarget(x, y, z);
+      }
+      let canvasRect = canvas.getBoundingClientRect();
+      const refreshCanvasRect = () => { canvasRect = canvas.getBoundingClientRect(); };
+      const canvasResize = new ResizeObserver(refreshCanvasRect);
+      canvasResize.observe(canvas);
+      addEventListener('scroll', refreshCanvasRect, {passive: true, capture: true});
+      function intersectDragSurface(cameraY, cameraZ, rayY, rayZ, planeDistance) {
+        const shell = torso.radius + forearmRadius + avoidance.minClearance + avoidance.complianceMargin + 0.001;
+        let nearest = planeDistance;
+        const front = (shell - cameraZ) / rayZ, frontY = cameraY + rayY * front;
+        if (front > 0 && front < nearest && frontY >= torso.start[1] && frontY <= torso.end[1]) nearest = front;
+        // The front drag surface is the torso's padded YZ capsule profile,
+        // extended across X. Intersect its round caps on the same pointer ray.
+        // This keeps the cursor and requested hand aligned when depth changes.
+        const quadratic = rayY * rayY + rayZ * rayZ;
+        for (let cap = 0; cap < 2; cap++) {
+          const centerY = cap === 0 ? torso.start[1] : torso.end[1], offsetY = cameraY - centerY;
+          const linear = offsetY * rayY + cameraZ * rayZ;
+          const constant = offsetY * offsetY + cameraZ * cameraZ - shell * shell;
+          const discriminant = linear * linear - quadratic * constant;
+          if (discriminant < 0) continue;
+          const squareRoot = Math.sqrt(discriminant);
+          for (let side = -1; side <= 1; side += 2) {
+            const distance = (-linear + side * squareRoot) / quadratic;
+            const y = cameraY + rayY * distance, z = cameraZ + rayZ * distance;
+            if (distance > 0 && distance < nearest && z >= 0 && (cap === 0 ? y <= centerY : y >= centerY)) nearest = distance;
+          }
+        }
+        return nearest;
+      }
+      function pointerTarget(event) {
+        const rect = canvasRect, camera = engine.camera;
+        const nx = (event.clientX - rect.left) / rect.width * 2 - 1, ny = 1 - (event.clientY - rect.top) / rect.height * 2;
+        let fx = camera.target[0] - camera.position[0], fy = camera.target[1] - camera.position[1], fz = camera.target[2] - camera.position[2];
+        const f = vectorLength(fx, fy, fz); fx /= f; fy /= f; fz /= f;
+        const r = vectorLength(fx, fz), rx = -fz / r, rz = fx / r;
+        const ux = -rz * fy, uy = rz * fx - rx * fz, uz = rx * fy;
+        const tangent = Math.tan(camera.fov * Math.PI / 360), horizontal = nx * tangent * rect.width / rect.height, vertical = ny * tangent;
+        const dx = fx + rx * horizontal + ux * vertical, dy = fy + uy * vertical, dz = fz + rz * horizontal + uz * vertical;
+        const planeDistance = (dragDepth - camera.position[2]) / dz;
+        const distance = intersectDragSurface(camera.position[1], camera.position[2], dy, dz, planeDistance);
+        if (distance > 0) setInteractiveTarget(camera.position[0] + dx * distance, camera.position[1] + dy * distance);
+      }
+      canvas.addEventListener('pointerdown', event => { if (event.button !== 0) return; pointerId = event.pointerId; canvas.setPointerCapture(pointerId); canvas.focus(); refreshCanvasRect(); setSweep(false); pointerTarget(event); });
+      canvas.addEventListener('pointermove', event => { if (event.pointerId === pointerId) pointerTarget(event); });
+      const release = event => { if (event.pointerId === pointerId) pointerId = null; };
+      canvas.addEventListener('pointerup', release); canvas.addEventListener('pointercancel', release);
+      canvas.addEventListener('keydown', event => {
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+        event.preventDefault(); setSweep(false); const distance = event.shiftKey ? 0.01 : 0.04;
+        setInteractiveTarget(rawTarget[0] + (event.key === 'ArrowLeft' ? -distance : event.key === 'ArrowRight' ? distance : 0), rawTarget[1] + (event.key === 'ArrowDown' ? -distance : event.key === 'ArrowUp' ? distance : 0));
+      });
+      sweepButton.addEventListener('click', () => setSweep(!sweeping));
+      pauseButton.addEventListener('click', () => { paused = !paused; pauseButton.textContent = paused ? 'Resume solver' : 'Pause solver'; pauseButton.setAttribute('aria-pressed', String(paused)); drawReadout(); });
+      $('#reset').addEventListener('click', () => {
+        setSweep(false); rawTarget.set(initialTarget); avoidance.reset(); hasBendFrame = false;
+        lastResult = avoidance.solve(root, initialTarget, initialTarget, upperLength, lowerLength, elbowRadius, forearmRadius, 1 / 60, evaluateElbowIK, solveOptions);
+        if (lastResult.status === SolveStatus.Success && lastResult.resolved) {
+          currentHand.set(lastResult.target); currentElbow.set(lastResult.elbow); commitBendFrame(currentHand); updatePose();
+        }
+        acceptedClearance = Math.min(torso.segmentClearance(root, currentElbow, elbowRadius), torso.segmentClearance(currentElbow, currentHand, forearmRadius));
+        readoutTime = 1; drawReadout();
+      });
+      $('#dead-zone').addEventListener('click', () => { setSweep(false); setTarget(root[0], root[1], root[2]); });
+      $('#proxies').addEventListener('change', event => { const visible = event.target.checked; for (const wire of torsoWires) wire.visible = visible; showCapsule(upperProxy, visible); showCapsule(lowerProxy, visible); });
+      $('#speed').addEventListener('input', event => { solveOptions.swivelSpeedLimit = event.target.valueAsNumber * Math.PI / 180; $('#speed-value').value = event.target.value + '°/s'; });
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+      reduced.addEventListener('change', () => { if (reduced.matches) setSweep(false); });
+      for (const control of document.querySelectorAll('button, input')) control.disabled = false;
+      engine.onFrame((_, dt) => step(dt));
+      step(1 / 60); engine.render(); projectCursor(); engine.start();
+      // Inspectable state for consumer-level interaction tests; all vectors and
+      // the elbow evaluator above are reused between animation frames.
+      window.kinematicsDemo = {root, rawTarget, currentHand, currentElbow, avoidance, setTarget, step, get result() { return lastResult; }, get clearance() { return acceptedClearance; }};
+      addEventListener('pagehide', () => { canvasResize.disconnect(); removeEventListener('scroll', refreshCanvasRect, true); stage.dispose(); }, {once: true});
+    } catch (reason) { report(reason); }
+  </script>
+</body>
+</html>

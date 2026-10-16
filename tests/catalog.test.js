@@ -58,6 +58,8 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
     const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
     const page = await context.newPage();
     const clipboard = async () => (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');
+    const waitForClipboard = expected => page.waitForFunction(async expected =>
+      (await navigator.clipboard.readText()).replace(/\r\n/g, '\n') === expected, expected);
     const errors = [];
     const requests = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -81,22 +83,27 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
     for (const card of await page.locator('.module').all()) {
       for (const kind of ['install', 'imports']) {
         await card.locator(`[data-copy="${kind}"]`).click();
+        await waitForClipboard(await card.locator(`.${kind}`).textContent());
         assert.equal(await clipboard(), await card.locator(`.${kind}`).textContent());
       }
       if (!await card.locator('.source').isVisible()) continue;
       await card.locator('.source summary').click();
       await card.locator('[data-copy="example"]').click();
-      const example = await clipboard();
       const response = await fetch(new URL(await card.locator('.run').getAttribute('href'), url));
-      assert.equal(example, (await response.text()).replace(/\r\n/g, '\n'));
+      const expectedExample = (await response.text()).replace(/\r\n/g, '\n');
+      await waitForClipboard(expectedExample);
+      const example = await clipboard();
+      assert.equal(example, expectedExample);
       assert.match(example, /^<!doctype html>/);
       await card.locator('.source summary').click();
     }
     await page.locator('#machinery .exports summary').click();
     await page.getByRole('button', { name: 'Copy import for Kinematics', exact: true }).click();
+    await waitForClipboard("import { Kinematics } from '@margoengine/machinery';");
     assert.equal(await clipboard(), "import { Kinematics } from '@margoengine/machinery';");
     await page.evaluate(() => { navigator.clipboard.writeText = async () => { throw new Error('Denied'); }; });
     await page.getByRole('button', { name: 'Copy import for SectionPlanes', exact: true }).click();
+    await page.waitForFunction(() => window.getSelection().toString() === "import { SectionPlanes } from '@margoengine/machinery';");
     assert.equal(await page.evaluate(() => window.getSelection().toString()), "import { SectionPlanes } from '@margoengine/machinery';");
     assert.match(await page.locator('#copy-status').textContent(), /Ctrl\+C/);
     for (const width of [375, 1440]) {
