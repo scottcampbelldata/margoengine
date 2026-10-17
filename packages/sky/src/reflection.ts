@@ -9,25 +9,39 @@ const reflectSky = `
  // Texels are about 0.1 rad wide.
  textureStore(reflectionMap,vec2i(id.xy),vec4f(skyEnvironment(environmentDirection((vec2f(id.xy)+0.5)/vec2f(64,32)),0.1),1));
 }`;
-/** 64x32 linear HDR environment of the sky (`reflectionTexture`), refreshed every frame once read. */
+/**
+ * 64x32 linear HDR environment of the sky (`reflectionTexture`), refreshed every frame once read. Built when first read,
+ * so a sky with the feature that never hands out its reflection allocates and compiles nothing for it.
+ */
 export const reflection: NonNullable<SkyFeatures['reflection']> = {
   create(d, code, entries, owned) {
-    const texture = d.createTexture({
-      size: [64, 32],
-      format: 'rgba16float',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
-    });
-    owned.push(texture);
-    const pipeline = compute(d, code + environment + reflectSky, 'reflectSky');
-    const group = d.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [...entries, { binding: 3, resource: texture.createView() }],
-      }),
-      descriptor: GPUComputePassDescriptor = {};
+    const descriptor: GPUComputePassDescriptor = {};
+    let built: { texture: GPUTexture; pipeline: GPUComputePipeline; group: GPUBindGroup } | undefined;
+    const build = () => {
+      if (built) return built;
+      const texture = d.createTexture({
+        size: [64, 32],
+        format: 'rgba16float',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+      });
+      owned.push(texture);
+      const pipeline = compute(d, code + environment + reflectSky, 'reflectSky');
+      return (built = {
+        texture,
+        pipeline,
+        group: d.createBindGroup({
+          layout: pipeline.getBindGroupLayout(0),
+          entries: [...entries, { binding: 3, resource: texture.createView() }],
+        }),
+      });
+    };
     return {
-      texture,
+      get texture() {
+        return build().texture;
+      },
       run(c) {
-        const pass = c.encoder.beginComputePass(descriptor);
+        const { pipeline, group } = build(),
+          pass = c.encoder.beginComputePass(descriptor);
         pass.setPipeline(pipeline);
         pass.setBindGroup(0, group);
         pass.dispatchWorkgroups(8, 4);
