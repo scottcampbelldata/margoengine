@@ -7,13 +7,14 @@
 //    and its bindings left on the pass context, and the frames before attach and after dispose are identical to the
 //    story without it. Its own pass makes one compute pass and one composite draw per frame.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/environment-volumetric.proof.js [ref] [pin] [--current]
-// Pinned: 7c47a09 against 366ebff, the commit that made this claim. --current: 7c47a09 against the working tree.
+// Pinned: 7c47a09 against 366ebff, the commit that made this claim. --current: c14ec02 against the working tree;
+// 679f87c intentionally made Fog patch core's PBR Neutral display line (claims.md).
 import assert from 'node:assert/strict';
 import { refs, versions, entryAt, save } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
-const { ref, pin } = refs('7c47a09', '366ebff', '7c47a09');
+const { ref, pin } = refs('7c47a09', '366ebff', 'c14ec02');
 // 1. Root entry at ref vs the candidate (the pin, or the working tree).
 const { baseline, candidate } = await versions('environment', ref, undefined, pin);
 // 2. runs on the candidate's packages.

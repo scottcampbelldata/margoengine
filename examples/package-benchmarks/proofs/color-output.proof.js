@@ -4,13 +4,14 @@
 // do too. ColorOutput itself on an sRGB/SDR display is covered by packages/environment/tests/output.test.js (identical
 // configuration and GPU calls to an engine without it).
 // Run: node examples/package-benchmarks/proofs/color-output.proof.js [ref] [pin] [--current]
-// Pinned: 7dcc958 against 225b1d6, the commit that made this claim. --current: 7dcc958 against the working tree.
+// Pinned: 7dcc958 against 225b1d6, the commit that made this claim. --current: c14ec02 against the working tree;
+// 679f87c intentionally unified PBR Neutral output and made Tonemap's default curve neutral (claims.md).
 import assert from 'node:assert/strict';
 import { refs, versions, ignoreAgx, entryAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
-const { ref, pin } = refs('7dcc958', '225b1d6', '7dcc958'),
+const { ref, pin } = refs('7dcc958', '225b1d6', 'c14ec02'),
   { PostStack, FXAA, Bloom } = await entryAt('post', 'src/index.ts', pin); // the stack around the effects
 const tonemap = await versions('tonemap', ref, undefined, pin),
   dof = await versions('dof', ref, undefined, pin),

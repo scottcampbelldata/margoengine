@@ -114,9 +114,9 @@ before the core speed-ups (`0ed56b9`) re-run faster than recorded.
 | selection-xray-off | PKG-068 | `46f9484` -> `80d4cfb`: 10,586 calls | `b3ed8ac` |
 | clustered-local-shadows | PKG-096, PKG-097 | `0ed56b9` -> `590278e`: 482 calls, 8 params.z writes | `0ed56b9` |
 | clustered-area-lights | – | `67e0172` -> `dab9633`: 482 calls | `67e0172` |
-| color-output | – | `7dcc958` -> `225b1d6`: 6,174 calls | `7dcc958` |
-| deformed-shadows | – | `38d448e` -> `282e751` | `b3ed8ac` |
-| environment-volumetric | – | `7c47a09` -> `366ebff` | `7c47a09` |
+| color-output | – | `7dcc958` -> `225b1d6`: 6,174 calls | `c14ec02`: 7,734 calls |
+| deformed-shadows | – | `38d448e` -> `282e751` | `c14ec02` |
+| environment-volumetric | – | `7c47a09` -> `366ebff` | `c14ec02`: 70 root calls; 344/533 isolated calls |
 | oit-detached | – | `b803d56` -> `0e02ead`: 2,864 calls (2,964 until 5w.f replaced the story's transmission material with a plain BLEND one: transmission now draws twice by design) | `b3ed8ac` |
 | post-ssr | – | `7c47a09` -> `3cf1453`: 9,269 calls | `b3ed8ac` (AgX normalised for older refs, see below) |
 | post-ssr-models | LIM-016 | `3cf1453` -> `838ae6e`: 30,858 calls | `b3ed8ac` |
@@ -141,6 +141,13 @@ lighting, transparency and texture-transform stories. `b326518` changed the text
 orientation and topology descriptors, and `95b4eae` added back-side-only model culling and its selection data. The
 texture-transform harness now inlines lazy decoder imports into its single comparison module so modern lazy loading
 does not prevent that proof from running.
+
+Three current references were advanced to the rendered-source snapshot `c14ec02` on 2026-10-17 after inspecting the
+complete changed calls; historical baseline/claim pins and every assertion remain unchanged:
+
+- **color-output:** `679f87c` (with `963358d`/`66c0c72`) unified PBR Neutral display/capture shaders and changed an implicit Tonemap curve from AgX to neutral (uniform float at byte 8: 0 -> 2); 7,734 calls across ten stories now match `c14ec02`.
+- **deformed-shadows:** `679f87c` changed VAT's three shader modules to PBR Neutral; the phone-shadow commits `5550cb3`/`ae9750e` replaced fixed PCSS tables with a noise-rotated spiral, dithered cascade transitions and wrote the pixel scale at shadow-uniform byte 364; every other call and byte is unchanged (147 VAT calls and 319/351/391 shadow calls).
+- **environment-volumetric:** `679f87c` changed Fog's mapped core line from Reinhard to PBR Neutral; the root's 70 calls differ only in that shader text, and VolumetricFog still leaves 344/533 external calls identical at 1x/4x with its original pass-count assertions.
 
 These current checks still compare every recorded call, descriptor, shader and buffer write exactly against the
 committed reference, without normalizing away render-state changes. Pinned baseline/claim pairs are unchanged.
