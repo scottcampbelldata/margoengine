@@ -4,7 +4,7 @@ You are the Claude taking over Margo Engine from the Claude that ran on Scott's 
 until 2026-10-17. This file is everything that Claude knew that is not obvious from the code. Read it fully before
 doing anything.
 
-**Reading order:** `AGENTS.md`, then this file, then `docs/HANDOFF.md` (the long running log; the LAUNCH GATES
+**Reading order:** `AGENTS.md`, then this file, then `docs/selection-children-decision.md`, then `docs/HANDOFF.md` (the long running log; the LAUNCH GATES
 section and 5k are the parts you need), then `docs/repository-consolidation-2026-10-16.md` (Codex's 74-package
 inventory). The handoff's opening "Where things are" section is stale (it still names `perf/auto-quality`).
 
@@ -138,10 +138,9 @@ that doc change into main):**
   (hypothesis, verify on GPU by comparing BoomBox/Corset/Lantern with tangents stripped vs with tangents).
 - Intended (A), baselines may be updated together: the 10 Khronos models off by 1 level (8f710eb3 sets normal scale 0
   without a normal map). Not yet updated.
-- **OPEN QUESTION FOR SCOTT - ask him first thing on the new PC:** selecting a plain core mesh now also outlines all its
-  children (a side effect of Codex's consolidation 8f710eb3; before, only the selected mesh was outlined; loader-owned
-  PBR models already selected their descendants by design). Is that what he wants? If not, restrict the descendant
-  flagging to loader-owned models in `@margoengine/selection` and re-pin selection-xray-off.
+- **DECIDED by Scott (2026-10-17): keep it.** Selecting a parent outlines that mesh and everything under it, for a plain
+  core mesh and for a loaded model; a child pick stays child-only. Do not revert, do not re-pin the old proof. Full
+  note: `docs/selection-children-decision.md`.
 - Not done: pinned `npm run proofs` (all 46), the flight-helmet lens comparison, Night Citadel.
 | `claude/wip-gate9-deterministic-visual` | Gate 9: make sandbox capture deterministic, find the Night Citadel stall | WIP from 08f7eb5 base, merges cleanly onto main. Finish it: root-cause the Night Citadel load stall, then prove visual:check and verify 5x in a row under bounded load |
 | `claude/wip-fuzz-gltf-textures` | Gate 11a part 1: fuzz gltf/gltf-pro/decoders (KTX2/Basis/Draco/meshopt)/environment images (EXR/HDR/UltraHDR)/.margo | WIP, conflicts with main (12 files). Redo on main, reusing its harness ideas; the shared harness is `scripts/fuzz/` (from 849ff51). ALSO fuzz Codex's new KTX2 path in `gltf` and the new native FBX importer (6bd2042 replaced the importer that 849ff51 fuzzed) |
@@ -194,7 +193,6 @@ that doc change into main):**
 
 ## 8. Scott's own to-dos (remind him; you cannot do these)
 
-- **Decide:** should selecting a plain mesh also outline its children? (see section 5, triage results)
 
 - Create the `security@margoengine.com` mailbox (or forwarding).
 - GitHub: enable private vulnerability reporting; "Keep my email addresses private"; 2FA. npm: 2FA.
