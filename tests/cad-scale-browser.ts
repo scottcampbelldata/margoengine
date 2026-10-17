@@ -1,6 +1,9 @@
 // One CAD load measured in a real browser; scripts/cad-scale-tests.js drives it. It reports load to first frame, orbit
 // frame times, pick latency, frame times with a capped section plane, draws, JS heap, and exact part and triangle
 // counts. Every time is this page's own clock around a frame that ends at GPU completion (queue.onSubmittedWorkDone).
+// Orbit and section frames also report `encode`: the time engine.render() itself takes (culling and command encoding
+// on this thread). The rest of a frame is the browser's GPU process and the GPU; a frame that is mostly encode is
+// limited by per-part CPU work, not by triangles.
 // Query: url (file under the dev server), format (obj, stl, step, iges, glb, gltf), frames (orbit frames, default 120),
 // smoothing ('false' for flat CAD normals) and, for generated assemblies, the known bounds (minx..maxz).
 import { Engine } from '../packages/core/dist/extension.js';
@@ -54,9 +57,11 @@ async function run() {
   engine.stop();
   engine.onError = (error) => errors.push(String(error));
   device.addEventListener('uncapturederror', (event) => errors.push((event as GPUUncapturedErrorEvent).error.message));
+  let encodeMs = 0;
   const frame = async () => {
     const start = performance.now();
     engine.render();
+    encodeMs = performance.now() - start;
     await device.queue.onSubmittedWorkDone();
     return performance.now() - start;
   };
@@ -159,10 +164,12 @@ async function run() {
     packs = instancer ? { ...instancer.stats } : null;
 
   stage = 'orbit';
-  const orbit: number[] = [];
+  const orbit: number[] = [],
+    orbitEncode: number[] = [];
   for (let i = 0; i < frames; i++) {
     view(35 + (360 * i) / frames);
     orbit.push(await frame());
+    orbitEncode.push(encodeMs);
   }
 
   stage = 'pick';
@@ -182,10 +189,12 @@ async function run() {
 
   stage = 'section';
   const sections = SectionPlanes.attach(engine, { planes: [[0, 1, 0, -center[1]]], cap: true, hatch: 0 });
-  const section: number[] = [];
+  const section: number[] = [],
+    sectionEncode: number[] = [];
   for (let i = 0; i < 30; i++) {
     view(35 + 12 * i);
     section.push(await frame());
+    sectionEncode.push(encodeMs);
   }
 
   // The screenshots: the whole model (shading), then cut at its middle height (caps).
@@ -207,9 +216,9 @@ async function run() {
     loadMs,
     draws,
     packs,
-    orbit: stats(orbit),
+    orbit: { ...stats(orbit), encode: stats(orbitEncode) },
     pick: { ...stats(pickTimes), hits },
-    section: stats(section),
+    section: { ...stats(section), encode: stats(sectionEncode) },
     heapBytes: memory?.usedJSHeapSize ?? null,
     errors,
   };
