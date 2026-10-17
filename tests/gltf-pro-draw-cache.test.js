@@ -6,7 +6,7 @@ import { PBRInstances } from '../packages/gltf-pro/dist/instancing.js';
 import { animatedTriangle } from './support/gltf-pro-fixture.js';
 import { optionalGPU } from './support/optional-gpu.js';
 
-async function scene(count = 1) {
+async function scene(count = 1, shareMaterial = false) {
   const h = optionalGPU(),
     device = h.engine.gpu,
     store = await TransformStore.create(16);
@@ -22,6 +22,13 @@ async function scene(count = 1) {
   fixture.doc.materials[0].doubleSided = false;
   delete fixture.doc.skins;
   delete fixture.doc.animations;
+  if (shareMaterial) {
+    const primitive = fixture.doc.meshes[0].primitives[0];
+    delete primitive.attributes.JOINTS_0;
+    delete primitive.attributes.WEIGHTS_0;
+    delete primitive.targets;
+    delete fixture.doc.meshes[0].weights;
+  }
   const model = parseGLTF(engine, fixture.doc, fixture.buffers);
   engine.camera.update(4 / 3, true);
   store.tick(false);
@@ -380,4 +387,17 @@ test('PBR pooled invocation state recovers after a lighting callback throws', as
   fail = false;
   assert.equal(f.frame().length, 2);
   assert.equal(f.frame().length, 2);
+});
+
+test('static primitives that share a material draw once until one hides or moves', async (t) => {
+  const f = await scene(3, true);
+  t.after(() => f.engine.dispose());
+  assert.equal(f.frame().length, 1);
+  f.model.primitives[1].node.visible = false;
+  assert.equal(f.frame().length, 2);
+  f.model.primitives[1].node.visible = true;
+  assert.equal(f.frame().length, 1);
+  f.model.primitives[0].node.setPosition([1, 0, 0]);
+  f.engine.store.tick(false);
+  assert.equal(f.frame().length, 3);
 });

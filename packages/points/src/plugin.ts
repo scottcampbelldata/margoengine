@@ -45,6 +45,25 @@ interface CloudGpu {
   pipeline: GPURenderPipeline | null;
   transparent: boolean;
 }
+interface CloudDraw {
+  cloud: PointCloud;
+  r: CloudGpu;
+  view: GPUTextureView;
+  first: number;
+  end: number;
+}
+interface SpriteDraw {
+  batch: SpriteBatch;
+  group: GPUBindGroup;
+}
+function sortCount<T>(items: T[], count: number, scratch: T[], compare: (a: T, b: T) => number): void {
+  if (count < 2) return;
+  for (let i = 0; i < count; i++) scratch[i] = items[i];
+  scratch.length = count;
+  scratch.sort(compare);
+  for (let i = 0; i < count; i++) items[i] = scratch[i];
+  scratch.length = 0;
+}
 interface BatchGpu {
   structure: number;
   capacity: number;
@@ -179,6 +198,32 @@ export class PointsPlugin implements EnginePlugin {
   private lastSize: [number, number] = [0, 0];
   private hasFrame = false;
   private readonly box = new Float64Array(6);
+  private readonly pickMvp = new Float64Array(16);
+  private readonly pickRanges: PickRange[] = [];
+  private readonly pickWindow: PickRange[] = [];
+  private readonly entryBlock: number[] = [];
+  private readonly entryCount: number[] = [];
+  private readonly entryWeight: number[] = [];
+  private readonly entryDistance: number[] = [];
+  private blockAllotment = new Uint32Array(0);
+  private readonly blockOrder: number[] = [];
+  private readonly cloudDraws: CloudDraw[] = [];
+  private readonly cloudDrawScratch: CloudDraw[] = [];
+  private readonly spriteDraws: SpriteDraw[] = [];
+  private readonly spriteDrawScratch: SpriteDraw[] = [];
+  private readonly pointColor: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
+  private readonly pointColors: GPURenderPassColorAttachment[] = [this.pointColor];
+  private readonly edlColor: GPURenderPassColorAttachment = {
+    view: undefined!,
+    loadOp: 'clear',
+    storeOp: 'store',
+    clearValue: { r: 0, g: 0, b: 0, a: 0 },
+  };
+  private readonly sceneDepth: GPURenderPassDepthStencilAttachment = {
+    view: undefined!,
+    depthLoadOp: 'load',
+    depthStoreOp: 'store',
+  };
 
   /** Same as `engine.use(new PointsPlugin(...))`; returns the PointsPlugin. */
   static attach(engine: EngineKernel, options?: PointsPluginOptions): PointsPlugin {
@@ -346,7 +391,7 @@ export class PointsPlugin implements EnginePlugin {
    * frame's camera, transforms and level of detail. Meshes do not occlude picks.
    */
   pick(x: number, y: number, options: PointsPickOptions = {}): PointsPickResult | null {
-    if (![x, y].every(Number.isFinite)) throw new RangeError('Invalid pick coordinates');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) throw new RangeError('Invalid pick coordinates');
     const radius = options.radius ?? 6;
     if (!(radius >= 0)) throw new RangeError('radius must be non-negative');
     const engine = this.engine as unknown as EngineKernel | undefined;
@@ -360,24 +405,32 @@ export class PointsPlugin implements EnginePlugin {
     let best: PointsPickResult | null = null,
       bestDistance = Infinity,
       bestDepth = Infinity;
-    const mvp = new Float64Array(16);
+    const mvp = this.pickMvp,
+      ranges = this.pickRanges,
+      window = this.pickWindow;
     for (const cloud of this.clouds) {
       const gpu = this.cloudGpu.get(cloud);
       if (!gpu || !gpu.drawn.length) continue;
       multiply(this.lastViewProj, gpu.model, mvp);
-      const ranges: PickRange[] = [];
+      let rangeCount = 0;
       for (let i = 0; i < gpu.drawn.length; i += 2) {
         const block = gpu.drawn[i];
         worldBox(cloud.blocks.bounds, block, gpu.model, this.box);
         const rect = boxScreenRect(this.box, this.lastViewProj, width, height);
         if (rect && (px < rect[0] - r - 1 || px > rect[2] + r + 1 || py < rect[1] - r - 1 || py > rect[3] + r + 1))
           continue;
-        ranges.push({ start: cloud.blocks.starts[block], count: gpu.drawn[i + 1] });
+        let range = ranges[rangeCount];
+        if (!range) ranges[rangeCount] = range = { start: 0, count: 0 };
+        range.start = cloud.blocks.starts[block];
+        range.count = gpu.drawn[i + 1];
+        window[rangeCount] = range;
+        rangeCount++;
       }
+      window.length = rangeCount;
       const hit = pickPoint(
         cloud.positions,
         cloud.direct ? null : cloud.blocks.order,
-        ranges,
+        window,
         mvp,
         width,
         height,
@@ -411,6 +464,7 @@ export class PointsPlugin implements EnginePlugin {
         bestDepth = hit.depth;
       }
     }
+    window.length = 0;
     return best;
   }
 
@@ -815,10 +869,22 @@ export class PointsPlugin implements EnginePlugin {
     }
     // Camera basis (right, up, back), matching Camera.update including camera.up.
     const v = viewMatrix(this.view, camera);
-    f.set([v[0], v[4], v[8], 0, v[1], v[5], v[9], 0, v[2], v[6], v[10], 0], 24);
+    f[24] = v[0];
+    f[25] = v[4];
+    f[26] = v[8];
+    f[27] = 0;
+    f[28] = v[1];
+    f[29] = v[5];
+    f[30] = v[9];
+    f[31] = 0;
+    f[32] = v[2];
+    f[33] = v[6];
+    f[34] = v[10];
+    f[35] = 0;
     this.device!.queue.writeBuffer(this.gpu!.frame, 0, f);
     this.lastViewProj.set(camera.matrix);
-    this.lastSize = [context.width, context.height];
+    this.lastSize[0] = context.width;
+    this.lastSize[1] = context.height;
     this.hasFrame = true;
   }
 
@@ -915,11 +981,15 @@ export class PointsPlugin implements EnginePlugin {
     const projScale = this.frameData[18];
 
     // 1. Upload changes, cull blocks and collect candidates.
-    const active: Array<{ cloud: PointCloud; r: CloudGpu; view: GPUTextureView; first: number; end: number }> = [];
-    const entryBlock: number[] = [],
-      entryCount: number[] = [],
-      entryWeight: number[] = [],
-      entryDistance: number[] = [];
+    const entryBlock = this.entryBlock,
+      entryCount = this.entryCount,
+      entryWeight = this.entryWeight,
+      entryDistance = this.entryDistance;
+    entryBlock.length = 0;
+    entryCount.length = 0;
+    entryWeight.length = 0;
+    entryDistance.length = 0;
+    let cloudDrawCount = 0;
     for (const cloud of this.clouds) {
       cloud.stats.blocksVisible = cloud.stats.pointsVisible = cloud.stats.pointsDrawn = 0;
       const prior = this.cloudGpu.get(cloud);
@@ -954,51 +1024,64 @@ export class PointsPlugin implements EnginePlugin {
       }
       s.blocksVisible += cloud.stats.blocksVisible;
       s.pointsVisible += cloud.stats.pointsVisible;
-      if (entryBlock.length > first)
-        active.push({ cloud, r, view: view ?? gpu.whiteView, first, end: entryBlock.length });
+      if (entryBlock.length > first) {
+        let draw = this.cloudDraws[cloudDrawCount];
+        const drawnView = view ?? gpu.whiteView,
+          end = entryBlock.length;
+        if (!draw) this.cloudDraws[cloudDrawCount] = draw = { cloud, r, view: drawnView, first, end };
+        else {
+          draw.cloud = cloud;
+          draw.r = r;
+          draw.view = drawnView;
+          draw.first = first;
+          draw.end = end;
+        }
+        cloudDrawCount++;
+      }
     }
 
     // 2. Share the point budget across every visible block.
-    const allotment = new Uint32Array(entryBlock.length);
+    let allotment = this.blockAllotment;
+    if (allotment.length < entryBlock.length)
+      this.blockAllotment = allotment = new Uint32Array(Math.max(16, entryBlock.length, allotment.length * 2));
     s.pointsDrawn = allocateBudget(entryCount, entryWeight, entryBlock.length, this.pointBudget, allotment);
 
     // 3. Draw: opaque clouds front to back, then transparent clouds back to front.
-    const edlUsed = active.some((a) => a.cloud.material.edl);
-    for (const a of active) {
+    const draws = this.cloudDraws;
+    let edlUsed = false;
+    for (let i = 0; i < cloudDrawCount; i++) if (draws[i].cloud.material.edl) edlUsed = true;
+    for (let i = 0; i < cloudDrawCount; i++) {
+      const a = draws[i];
       a.r.transparent = a.cloud.material.transparent;
       a.r.pipeline = this.pointPipeline(context as GpuContext, a.cloud.material, edlUsed);
     }
-    active.sort((a, b) => +a.r.transparent - +b.r.transparent);
-    if (active.length) {
+    sortCount(draws, cloudDrawCount, this.cloudDrawScratch, (a, b) => +a.r.transparent - +b.r.transparent);
+    if (cloudDrawCount) {
       const depthFormat = context.descriptor.depthStencil!.format;
-      const colorAttachments: GPURenderPassColorAttachment[] = [
-        { view: context.color, loadOp: 'load', storeOp: 'store' },
-      ];
+      const colorAttachments = this.pointColors;
+      this.pointColor.view = context.color;
       if (edlUsed) {
         const count = context.descriptor.multisample?.count ?? 1;
         const target = this.edlTarget(context.width, context.height, count, this.edlPipeline(context.format, count));
-        colorAttachments.push({
-          view: target.view,
-          loadOp: 'clear',
-          storeOp: 'store',
-          clearValue: { r: 0, g: 0, b: 0, a: 0 },
-        });
-      }
-      const depthAttachment: GPURenderPassDepthStencilAttachment = {
-        view: context.depth,
-        depthLoadOp: 'load',
-        depthStoreOp: 'store',
-      };
+        this.edlColor.view = target.view;
+        colorAttachments[1] = this.edlColor;
+        colorAttachments.length = 2;
+      } else colorAttachments.length = 1;
+      const depthAttachment = this.sceneDepth;
+      depthAttachment.view = context.depth;
       if (depthFormat.includes('stencil')) depthAttachment.stencilReadOnly = true;
+      else delete depthAttachment.stencilReadOnly;
       const pass = context.encoder.beginRenderPass({ colorAttachments, depthStencilAttachment: depthAttachment });
       pass.setBindGroup(0, gpu.frameGroup);
-      for (const a of active) {
-        const { cloud, r } = a,
+      const order = this.blockOrder;
+      for (let i = 0; i < cloudDrawCount; i++) {
+        const a = draws[i],
+          { cloud, r } = a,
           blocks = cloud.blocks;
         const sampler = cloud.material.mapFilter === 'nearest' ? gpu.nearest : gpu.linear;
         pass.setPipeline(r.pipeline!);
         pass.setBindGroup(1, this.cloudGroup(r, a.view, sampler));
-        const order: number[] = [];
+        order.length = 0;
         for (let e = a.first; e < a.end; e++) if (allotment[e]) order.push(e);
         order.sort((x, y) =>
           r.transparent ? entryDistance[y] - entryDistance[x] : entryDistance[x] - entryDistance[y],
@@ -1022,9 +1105,8 @@ export class PointsPlugin implements EnginePlugin {
           ? ((this.frameData[18] * 2) / context.height) * Math.tan((camera.fov * Math.PI) / 360) * Math.LOG2E
           : 0;
         device.queue.writeBuffer(gpu.edlParams, 0, this.edlData);
-        const edlPass = context.encoder.beginRenderPass({
-          colorAttachments: [{ view: context.color, loadOp: 'load', storeOp: 'store' }],
-        });
+        this.pointColors.length = 1;
+        const edlPass = context.encoder.beginRenderPass({ colorAttachments: this.pointColors });
         edlPass.setPipeline(this.edlPipeline(context.format, context.descriptor.multisample?.count ?? 1));
         edlPass.setBindGroup(0, this.edl.group);
         edlPass.draw(3);
@@ -1034,7 +1116,7 @@ export class PointsPlugin implements EnginePlugin {
     }
 
     // 4. Sprites, one instanced draw per batch.
-    const drawBatches: Array<[SpriteBatch, BatchGpu, GPUBindGroup]> = [];
+    let spriteCount = 0;
     for (const batch of this.batches) {
       if (!batch.visible || !batch.count) continue;
       const mesh = batch.attachedMesh,
@@ -1078,22 +1160,35 @@ export class PointsPlugin implements EnginePlugin {
         device.queue.writeBuffer(r.uniform, 0, f);
         r.written.set(f);
       }
-      drawBatches.push([batch, r, this.batchGroup(r, view, m.mapFilter === 'nearest' ? gpu.nearest : gpu.linear)]);
+      let sprite = this.spriteDraws[spriteCount];
+      const group = this.batchGroup(r, view, m.mapFilter === 'nearest' ? gpu.nearest : gpu.linear);
+      if (!sprite) this.spriteDraws[spriteCount] = sprite = { batch, group };
+      else {
+        sprite.batch = batch;
+        sprite.group = group;
+      }
+      spriteCount++;
     }
-    if (drawBatches.length) {
-      drawBatches.sort((a, b) => +a[0].material.transparent - +b[0].material.transparent);
-      const depthAttachment: GPURenderPassDepthStencilAttachment = {
-        view: context.depth,
-        depthLoadOp: 'load',
-        depthStoreOp: 'store',
-      };
+    if (spriteCount) {
+      sortCount(
+        this.spriteDraws,
+        spriteCount,
+        this.spriteDrawScratch,
+        (a, b) => +a.batch.material.transparent - +b.batch.material.transparent,
+      );
+      const depthAttachment = this.sceneDepth;
+      depthAttachment.view = context.depth;
       if (context.descriptor.depthStencil!.format.includes('stencil')) depthAttachment.stencilReadOnly = true;
+      else delete depthAttachment.stencilReadOnly;
+      this.pointColor.view = context.color;
+      this.pointColors.length = 1;
       const pass = context.encoder.beginRenderPass({
-        colorAttachments: [{ view: context.color, loadOp: 'load', storeOp: 'store' }],
+        colorAttachments: this.pointColors,
         depthStencilAttachment: depthAttachment,
       });
       pass.setBindGroup(0, gpu.frameGroup);
-      for (const [batch, , group] of drawBatches) {
+      for (let i = 0; i < spriteCount; i++) {
+        const { batch, group } = this.spriteDraws[i];
         pass.setPipeline(this.spritePipeline(context as GpuContext, batch.material));
         pass.setBindGroup(1, group);
         pass.draw(4, batch.count);

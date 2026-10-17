@@ -580,21 +580,7 @@ class PBRModel implements EnginePlugin {
     setCapture(hook: PBRCapture): () => void;
     setTransmission(hook: PBRTransmission): () => void;
     selectVariant(variant?: string | number): void;
-    get shadowPrimitives(): {
-        primitive: PBRPrimitive;
-        node: Mesh;
-        vertex: GPUBuffer;
-        index: GPUBuffer;
-        count: number;
-        stride: number;
-        alphaTexture: GPUTextureView;
-        alphaSampler: GPUSampler;
-        alpha: number;
-        cutoff: number;
-        texCoord: 0 | 1;
-        alphaTransform?: Float32Array<ArrayBufferLike> | undefined;
-        instances: PBRInstances | undefined;
-    }[];
+    get shadowPrimitives(): ShadowCasterRecord[];
     get pickingPrimitives(): {
         primitive: PBRPrimitive;
         node: Mesh;
@@ -611,7 +597,7 @@ class PBRModel implements EnginePlugin {
         alphaTransform?: Float32Array<ArrayBufferLike> | undefined;
     }[];
     readPickingGeometry(): Promise<readonly PBRPickingGeometry[]>;
-    draw(c: Context, mode: 'beauty' | 'gbuffer' | 'ambient' | 'transparent' | 'transmission' | 'capture', color: GPUTextureView, depth: GPUTextureView, phase?: 'all' | 'opaque' | 'blend', external?: {
+    draw(c: Context, mode: 'beauty' | 'gbuffer' | 'ambient' | 'transparent' | 'transmission' | 'capture' | 'occlusion', color: GPUTextureView, depth: GPUTextureView, phase?: 'all' | 'opaque' | 'blend', external?: {
         pass: GPURenderPassEncoder;
         view: ArrayLike<number>;
         depthCompare: GPUCompareFunction;
@@ -677,6 +663,23 @@ interface PreparedGeometry {
     vertices: Float32Array;
     indices: Uint32Array;
     topology?: 'point-list' | 'line-list';
+}
+
+interface ShadowCasterRecord {
+    primitive: PBRPrimitive;
+    node: Mesh;
+    vertex: GPUBuffer;
+    index: GPUBuffer;
+    count: number;
+    stride: number;
+    alphaTexture: GPUTextureView;
+    alphaSampler: GPUSampler;
+    alpha: number;
+    cutoff: number;
+    texCoord: 0 | 1;
+    alphaTransform?: Float32Array;
+    instances?: PBRInstances;
+    dynamic: boolean;
 }
 
 interface TextureTransform {

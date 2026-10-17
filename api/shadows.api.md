@@ -45,6 +45,7 @@ export interface ShadowPrimitive {
         readonly count: number;
         upload(device: GPUDevice): GPUBuffer;
     };
+    dynamic?: boolean;
 }
 
 export interface ShadowSource {

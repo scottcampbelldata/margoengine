@@ -76,7 +76,11 @@ export interface SSAOOptions {
 }
 
 export interface SSAOSource {
-    draw(context: Context, mode: 'gbuffer' | 'ambient', color: GPUTextureView, depth: GPUTextureView): void;
+    draw(context: Context, mode: 'gbuffer' | 'ambient' | 'occlusion', color: GPUTextureView, depth: GPUTextureView, phase?: 'all' | 'opaque' | 'blend', external?: {
+        pass: GPURenderPassEncoder;
+        view: ArrayLike<number>;
+        depthCompare: GPUCompareFunction;
+    }): void;
 }
 
 export class SSR implements EnginePlugin {

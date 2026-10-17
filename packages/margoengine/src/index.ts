@@ -11,12 +11,7 @@ import {
   type Vec3,
 } from '@margoengine/core';
 import type { Engine as RuntimeEngine } from '@margoengine/core/extension';
-import type { CADFormat, CADImportOptions } from '@margoengine/machinery';
-import type { ParticleOptions, PostOptions } from '@margoengine/creative';
-import type { SkyMoonConfig } from '@margoengine/scenery';
-import type { EnvironmentLighting, EnvironmentLoadOptions, EnvironmentSource } from '@margoengine/environment';
-import type { ShadowOptions, Shadows } from '@margoengine/shadows';
-import { loadedModel, worldBounds, type LoadedModel } from './model.js';
+import { loadedModel, worldBounds, type LoadedModel, type StageModel } from './model.js';
 
 export * from '@margoengine/core';
 export type { LoadedModel } from './model.js';
@@ -44,12 +39,39 @@ export type MeshOptions = NonNullable<ConstructorParameters<typeof PbrMaterial>[
   /** Default ''. */
   name?: string;
 };
-/** Options for `Stage.load`: CAD import options plus format and framing. */
-export interface LoadOptions extends CADImportOptions {
+/** Options for `Stage.load`. Format and framing belong to the stage; the rest are forwarded to a CAD import. */
+export interface LoadOptions {
+  signal?: AbortSignal;
+  onProgress?: (percent: number) => void;
+  smoothing?: boolean;
+  /** Most parts (OBJ objects and groups, STEP/IGES meshes) the file may have, each one a core mesh (default 100,000; up to core's 8,388,608 entities). */
+  maxParts?: number;
+  /**
+   * The worker is terminated and the import rejects after this many milliseconds (default 120,000). OpenCascade can
+   * spend minutes tessellating a malformed STEP or IGES file; a worker that never answers is never waited on.
+   */
+  timeoutMs?: number;
   /** File format; default from the URL extension ('stp' is STEP, 'igs' IGES). An unknown format rejects with a TypeError. */
-  format?: 'gltf' | 'glb' | CADFormat;
+  format?: 'gltf' | 'glb' | 'stl' | 'obj' | 'step' | 'iges';
   /** Fit the camera to the loaded model. Default true. */
   fit?: boolean;
+}
+
+/** Rewrites a missing optional package into `Install <name>`. Every other failure, including AbortError, is rethrown. */
+function missingInstall(error: unknown, name: string): never {
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error ? String((error as { code?: unknown }).code) : '';
+  const message = error instanceof Error ? error.message : '';
+  if (
+    code === 'ERR_MODULE_NOT_FOUND' ||
+    /Cannot find (module|package)|Failed to resolve|dynamically imported module/i.test(message)
+  )
+    throw new Error(`Install ${name}`);
+  throw error instanceof Error ? error : new Error(message);
+}
+
+function loadPackage<T>(name: string, load: () => Promise<T>): Promise<T> {
+  return load().catch((error: unknown) => missingInstall(error, name));
 }
 
 /**
@@ -88,6 +110,8 @@ export function sphere(radius = 1, segments = 32): Geometry {
 /**
  * Small facade over an engine for quick scenes: meshes with PBR materials, model loading with camera
  * fitting, and lazy access to the optional packages. Create one with `createStage`.
+ * A missing optional peer rejects with `Install @margoengine/<name>`: gltf, machinery, creative (particles and
+ * effects), scenery (sky), environment, or shadows.
  */
 export class Stage {
   private readonly imports = new AbortController();
@@ -152,10 +176,16 @@ export class Stage {
     abort.throwIfAborted();
     const model =
       kind === 'gltf' || kind === 'glb'
-        ? await (await this.gltf()).loadGLTF(this.engine, target, { signal: abort })
-        : await (await import('@margoengine/machinery/cad')).loadCAD(this.engine, target, {
+        ? await (
+            (await this.gltf()) as {
+              loadGLTF(engine: EngineKernel, url: URL, options: { signal?: AbortSignal }): Promise<StageModel>;
+            }
+          ).loadGLTF(this.engine, target, { signal: abort })
+        : await (
+            await loadPackage('@margoengine/machinery', () => import('@margoengine/machinery/cad'))
+          ).loadCAD(this.engine, target, {
             ...options,
-            format: kind as CADFormat,
+            format: kind as 'stl' | 'obj' | 'step' | 'iges',
             signal: abort,
           });
     try {
@@ -168,53 +198,52 @@ export class Stage {
     }
   }
 
-  gltf(): Promise<typeof import('@margoengine/gltf')> {
-    return import('@margoengine/gltf');
+  gltf(): Promise<object> {
+    return loadPackage('@margoengine/gltf', () => import('@margoengine/gltf'));
   }
-  machinery(): Promise<typeof import('@margoengine/machinery')> {
-    return import('@margoengine/machinery');
+  machinery(): Promise<object> {
+    return loadPackage('@margoengine/machinery', () => import('@margoengine/machinery'));
   }
-  creative(): Promise<typeof import('@margoengine/creative')> {
-    return import('@margoengine/creative');
+  creative(): Promise<object> {
+    return loadPackage('@margoengine/creative', () => import('@margoengine/creative'));
   }
-  scenery(): Promise<typeof import('@margoengine/scenery')> {
-    return import('@margoengine/scenery');
+  scenery(): Promise<object> {
+    return loadPackage('@margoengine/scenery', () => import('@margoengine/scenery'));
   }
 
-  async sky(options: SkyMoonConfig = {}) {
-    const { SkyMoon } = await import('@margoengine/scenery/sky');
+  async sky(options: object = {}): Promise<object> {
+    const { SkyMoon } = await loadPackage('@margoengine/scenery', () => import('@margoengine/scenery/sky'));
     this.imports.signal.throwIfAborted();
-    return this.use(new SkyMoon(options));
+    return this.use(new SkyMoon(options as never));
   }
-  async particles(options: ParticleOptions = {}) {
-    const { GPUParticles } = await import('@margoengine/creative/particles');
+  async particles(options: object = {}): Promise<object> {
+    const { GPUParticles } = await loadPackage('@margoengine/creative', () => import('@margoengine/creative/particles'));
     this.imports.signal.throwIfAborted();
-    return this.use(new GPUParticles(options));
+    return this.use(new GPUParticles(options as never));
   }
-  async effects(options: PostOptions = {}) {
-    const { PostProcessing } = await import('@margoengine/creative/post');
+  async effects(options: object = {}): Promise<object> {
+    const { PostProcessing } = await loadPackage('@margoengine/creative', () => import('@margoengine/creative/post'));
     this.imports.signal.throwIfAborted();
-    return this.use(new PostProcessing(options));
+    return this.use(new PostProcessing(options as never));
   }
   /**
    * Loads `@margoengine/environment` and lights every mesh with image-based lighting from an `.hdr`, `.exr` or
    * UltraHDR `.jpg` URL (or a decoded source). Rejects with `AbortError`, attaching nothing, if the stage is disposed first.
+   * A missing package rejects with `Install @margoengine/environment`.
    */
-  async environment(
-    source: string | URL | EnvironmentSource,
-    options?: EnvironmentLoadOptions,
-  ): Promise<EnvironmentLighting> {
-    const { EnvironmentLighting } = await import('@margoengine/environment');
-    return EnvironmentLighting.load(this.engine, source, options);
+  async environment(source: string | URL | object, options?: object): Promise<object> {
+    const { EnvironmentLighting } = await loadPackage('@margoengine/environment', () => import('@margoengine/environment'));
+    return EnvironmentLighting.load(this.engine, source as never, options as never);
   }
   /**
    * Loads `@margoengine/shadows` and attaches cascaded shadows for the stage's directional light. Meshes present now
    * cast; add later ones with `shadows.add(mesh)`. Rejects with `AbortError` if the stage is disposed first.
+   * A missing package rejects with `Install @margoengine/shadows`.
    */
-  async shadows(options: ShadowOptions = {}): Promise<Shadows> {
-    const { Shadows } = await import('@margoengine/shadows');
+  async shadows(options: object = {}): Promise<object> {
+    const { Shadows } = await loadPackage('@margoengine/shadows', () => import('@margoengine/shadows'));
     this.imports.signal.throwIfAborted();
-    const shadows = this.use(new Shadows(options));
+    const shadows = this.use(new Shadows(options as never));
     for (const mesh of (this.engine as unknown as RuntimeEngine).meshes.values()) shadows.add(mesh);
     return shadows;
   }

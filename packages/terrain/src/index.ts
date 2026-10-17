@@ -75,6 +75,8 @@ export class Terrain implements EnginePlugin {
   private pipelines = new Map<string, GPURenderPipeline>();
   private lightingGroups = new Map<GPURenderPipeline, LightingGroup>();
   private lighting = new Set<TerrainLighting>();
+  /** Bind-group entries for the current draw. Lighting providers may return fresh wrappers; the group cache compares them. */
+  private readonly lightingEntries: GPUBindGroupEntry[] = [];
   private centerCount = 0;
   private ringCount = 0;
   constructor(readonly options: TerrainOptions) {
@@ -266,32 +268,45 @@ export class Terrain implements EnginePlugin {
     });
   }
   private prepare(c: Context): void {
+    const origin = this.options.origin,
+      size = this.options.size,
+      resolution = this.options.resolution ?? 64,
+      heightScale = this.options.heightScale ?? 100,
+      heightOffset = this.options.heightOffset ?? 0,
+      layers = this.options.layers.length,
+      cell = this.options.cellSize ?? 1,
+      hdr = +(c.format === 'rgba16float'),
+      normal = +!!this.textures!.normalmap;
     let previousX = 0,
-      previousZ = 0;
-    let changed = false;
+      previousZ = 0,
+      changed = false;
     for (let i = 0; i < this.rings.length; i++) {
-      const r = this.rings[i],
-        spacing = (this.options.cellSize ?? 1) * 2 ** i,
+      const values = this.rings[i].values,
+        spacing = cell * 2 ** i,
         x = Math.floor(c.camera.position[0] / spacing) * spacing,
         z = Math.floor(c.camera.position[2] / spacing) * spacing;
-      if (r.values[28] !== x || r.values[29] !== z) changed = true;
-      r.values.set(c.camera.matrix);
-      r.values.set(c.camera.position, 16);
-      r.values.set(this.engine!.lighting.direction, 20);
-      r.values.set(this.engine!.lighting.radiance, 24);
-      r.values.set([x, z, spacing, this.options.resolution ?? 64], 28);
-      r.values.set([i ? previousX - x : 0, i ? previousZ - z : 0, i, +!!this.textures!.normalmap], 32);
-      r.values.set([...(this.options.origin ?? [0, 0]), ...this.options.size], 36);
-      r.values.set(
-        [
-          this.options.heightScale ?? 100,
-          this.options.heightOffset ?? 0,
-          this.options.layers.length,
-          +(c.format === 'rgba16float'),
-        ],
-        40,
-      );
-      c.device.queue.writeBuffer(r.uniform, 0, r.values as Float32Array<ArrayBuffer>);
+      if (values[28] !== x || values[29] !== z) changed = true;
+      values.set(c.camera.matrix);
+      values.set(c.camera.position, 16);
+      values.set(this.engine!.lighting.direction, 20);
+      values.set(this.engine!.lighting.radiance, 24);
+      values[28] = x;
+      values[29] = z;
+      values[30] = spacing;
+      values[31] = resolution;
+      values[32] = i ? previousX - x : 0;
+      values[33] = i ? previousZ - z : 0;
+      values[34] = i;
+      values[35] = normal;
+      values[36] = origin?.[0] ?? 0;
+      values[37] = origin?.[1] ?? 0;
+      values[38] = size[0];
+      values[39] = size[1];
+      values[40] = heightScale;
+      values[41] = heightOffset;
+      values[42] = layers;
+      values[43] = hdr;
+      c.device.queue.writeBuffer(this.rings[i].uniform, 0, values as Float32Array<ArrayBuffer>);
       previousX = x;
       previousZ = z;
     }
@@ -302,7 +317,12 @@ export class Terrain implements EnginePlugin {
     for (const effect of this.lighting) code = effect.shader(code, 1);
     const key = c.descriptor.multisample?.count + ':' + c.format + ':' + c.descriptor.depthStencil!.format + code;
     let pipeline = this.pipelines.get(key);
-    const entries = [...this.lighting].flatMap((effect) => effect.bindings());
+    const entries = this.lightingEntries;
+    entries.length = 0;
+    for (const effect of this.lighting) {
+      const bound = effect.bindings();
+      for (let i = 0; i < bound.length; i++) entries.push(bound[i]);
+    }
     if (!pipeline) {
       const module = c.device.createShaderModule({ code }),
         layouts = [this.layout!];

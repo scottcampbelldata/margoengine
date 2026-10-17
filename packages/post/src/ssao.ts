@@ -31,7 +31,14 @@ export interface SSAOOptions {
   enabled?: boolean;
 }
 export interface SSAOSource {
-  draw(context: Context, mode: 'gbuffer' | 'ambient', color: GPUTextureView, depth: GPUTextureView): void;
+  draw(
+    context: Context,
+    mode: 'gbuffer' | 'ambient' | 'occlusion',
+    color: GPUTextureView,
+    depth: GPUTextureView,
+    phase?: 'all' | 'opaque' | 'blend',
+    external?: { pass: GPURenderPassEncoder; view: ArrayLike<number>; depthCompare: GPUCompareFunction },
+  ): void;
 }
 function kernel(): Float32Array {
   const values = new Float32Array(128);
@@ -94,6 +101,25 @@ export class SSAO implements EnginePlugin {
   private replayPass?: GPURenderPassDescriptor;
   private clearPass?: GPURenderPassDescriptor;
   private resolvePass?: GPURenderPassDescriptor;
+  private readonly geometryColors: GPURenderPassColorAttachment[] = [
+    { view: undefined!, loadOp: 'load', storeOp: 'store' },
+    {
+      view: undefined!,
+      loadOp: 'clear',
+      storeOp: 'store',
+      clearValue: { r: 0, g: 0, b: 0, a: 0 },
+    },
+  ];
+  private readonly geometryDepth: GPURenderPassDepthStencilAttachment = {
+    view: undefined!,
+    depthLoadOp: 'load',
+    depthStoreOp: 'store',
+  };
+  private readonly geometryPass: GPURenderPassDescriptor = {
+    colorAttachments: this.geometryColors,
+    depthStencilAttachment: this.geometryDepth,
+  };
+  private readonly drawView = new Float32Array(16);
   private readonly values = new Float32Array(56);
   private readonly inverseWorkspace = new Float64Array(52);
   private readonly inverse = this.values.subarray(0, 16);
@@ -442,6 +468,8 @@ export class SSAO implements EnginePlugin {
         storeOp: 'discard',
       })),
     };
+    this.geometryColors[0].view = this.replayViews[0] ?? this.gbuffer!;
+    this.geometryColors[1].view = this.replayViews[1] ?? this.ambient!;
   }
   private dispatch(c: Context, pipeline: GPUComputePipeline, group: GPUBindGroup): void {
     const pass = c.encoder.beginComputePass();
@@ -463,9 +491,23 @@ export class SSAO implements EnginePlugin {
       pass.draw(3);
       pass.end();
     }
-    for (const source of this.sources) source.draw(c, 'gbuffer', gbuffer, c.depth);
-    const clear = c.encoder.beginRenderPass(this.clearPass!);
-    clear.end();
+    if (this.sources.size) {
+      this.geometryDepth.view = c.depth;
+      const stencil = c.descriptor.depthStencil!.format.includes('stencil');
+      this.geometryDepth.stencilLoadOp = stencil ? 'load' : undefined;
+      this.geometryDepth.stencilStoreOp = stencil ? 'store' : undefined;
+      const pass = c.encoder.beginRenderPass(this.geometryPass);
+      try {
+        for (const source of this.sources)
+          source.draw(c, 'occlusion', gbuffer, c.depth, 'all', {
+            pass,
+            view: viewMatrix(this.drawView, c.camera),
+            depthCompare: 'equal',
+          });
+      } finally {
+        pass.end();
+      }
+    } else c.encoder.beginRenderPass(this.clearPass!).end();
     // Convention: a plugin that replaces the ambient light (environment IBL) names it `let margoAmbient=`. Then the replay keeps the
     // whole shader and only returns margoAmbient (`_=` keeps every binding statically used, so all of c.bindings fit the layout).
     if (this.ambientSource !== c.shader) {
@@ -509,7 +551,6 @@ export class SSAO implements EnginePlugin {
     } finally {
       c.color = color;
     }
-    for (const source of this.sources) source.draw(c, 'ambient', ambient, c.depth);
     if (this.replayViews.length) c.encoder.beginRenderPass(this.resolvePass!).end();
     // A PostStack resolves its shared capture once, after every effect has replayed into it.
     if (!this.host) this.captureTarget!.resolve(c.encoder, true);
@@ -538,6 +579,8 @@ export class SSAO implements EnginePlugin {
     this.replayCopy = undefined;
     this.replayGroup = undefined;
     this.replayPass = this.clearPass = this.resolvePass = undefined;
+    this.geometryColors[0].view = this.geometryColors[1].view = this.geometryDepth.view = undefined!;
+    this.geometryDepth.stencilLoadOp = this.geometryDepth.stencilStoreOp = undefined;
     this.compositeAttachment.view = undefined!;
   }
   onDeviceRestored(engine: Engine): void {

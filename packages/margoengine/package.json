@@ -28,12 +28,34 @@
     "dist"
   ],
   "dependencies": {
-    "@margoengine/core": "^1.0.0",
+    "@margoengine/core": "^1.0.0"
+  },
+  "peerDependencies": {
     "@margoengine/gltf": "^1.0.0",
     "@margoengine/machinery": "^1.0.0",
     "@margoengine/creative": "^1.0.0",
     "@margoengine/scenery": "^1.0.0",
     "@margoengine/environment": "^1.0.0",
     "@margoengine/shadows": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/gltf": {
+      "optional": true
+    },
+    "@margoengine/machinery": {
+      "optional": true
+    },
+    "@margoengine/creative": {
+      "optional": true
+    },
+    "@margoengine/scenery": {
+      "optional": true
+    },
+    "@margoengine/environment": {
+      "optional": true
+    },
+    "@margoengine/shadows": {
+      "optional": true
+    }
   }
 }

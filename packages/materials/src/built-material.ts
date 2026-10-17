@@ -1177,6 +1177,13 @@ interface Entry {
   model: PBRModel;
   materials: readonly Material[];
   order: number;
+  opaque: boolean;
+  blend: boolean;
+}
+interface Phase {
+  entry: Entry;
+  blend: boolean;
+  phase: 'all' | 'opaque' | 'blend';
 }
 const blends: Record<Blending, GPUBlendState | null | undefined> = {
   normal: undefined,
@@ -1184,16 +1191,41 @@ const blends: Record<Blending, GPUBlendState | null | undefined> = {
   additive: { color: { srcFactor: 'src-alpha', dstFactor: 'one' }, alpha: { srcFactor: 'one', dstFactor: 'one' } },
   multiply: { color: { srcFactor: 'zero', dstFactor: 'src' }, alpha: { srcFactor: 'zero', dstFactor: 'src-alpha' } },
 };
-const queues = new WeakMap<Engine, Set<Entry>>(),
+interface MaterialDraws {
+  add(entry: Entry): void;
+  delete(entry: Entry): void;
+}
+const queues = new WeakMap<Engine, MaterialDraws>(),
   late = (m: Material) => m.transparent || m.transmissive;
 let serial = 0;
 /** One pass per engine draws every material mesh: opaque then transparent, each by renderOrder; transparent meshes back to front. */
-function queue(runtime: Engine): Set<Entry> {
-  let set = queues.get(runtime);
-  if (set) return set;
-  const entries = (set = new Set<Entry>()),
-    name = 'materials:' + serial++,
-    distance = new Map<Entry, number>();
+function queue(runtime: Engine): MaterialDraws {
+  let draws = queues.get(runtime);
+  if (draws) return draws;
+  const members: Entry[] = [],
+    phases: Phase[] = [],
+    tail: Phase[] = [],
+    distance = new Map<Entry, number>(),
+    name = 'materials:' + serial++;
+  let opaqueEnd = 0,
+    arranged = false;
+  // Opaque order is stable until membership or a transparent flag changes. Distance sorts only the late phase.
+  const arrange = () => {
+    phases.length = 0;
+    for (let i = 0; i < members.length; i++) {
+      const entry = members[i],
+        opaque = entry.materials.some((m) => !late(m)),
+        blend = entry.materials.some(late);
+      entry.opaque = opaque;
+      entry.blend = blend;
+      if (opaque) phases.push({ entry, blend: false, phase: blend ? 'opaque' : 'all' });
+      if (blend) phases.push({ entry, blend: true, phase: opaque ? 'blend' : 'all' });
+    }
+    phases.sort((a, b) => +a.blend - +b.blend || a.entry.order - b.entry.order);
+    opaqueEnd = 0;
+    while (opaqueEnd < phases.length && !phases[opaqueEnd].blend) opaqueEnd++;
+    arranged = true;
+  };
   runtime.use({
     name,
     setup() {},
@@ -1206,34 +1238,54 @@ function queue(runtime: Engine): Set<Entry> {
         order: 1,
         execute: (c) => {
           if (c.backend !== 'webgpu') return;
-          const eye = c.camera.position;
-          for (const e of entries) {
-            const m = e.model.primitives[0].node.matrix;
-            distance.set(e, Math.hypot(eye[0] - m[12], eye[1] - m[13], eye[2] - m[14]));
-          }
-          const list = [...entries]
-            .flatMap((entry) => {
-              const opaque = entry.materials.some((m) => !late(m)),
-                blend = entry.materials.some(late),
-                phases: { entry: Entry; blend: boolean; phase: 'all' | 'opaque' | 'blend' }[] = [];
-              if (opaque) phases.push({ entry, blend: false, phase: blend ? 'opaque' : 'all' });
-              if (blend) phases.push({ entry, blend: true, phase: opaque ? 'blend' : 'all' });
-              return phases;
-            })
-            .sort(
-              (a, b) =>
-                +a.blend - +b.blend ||
-                a.entry.order - b.entry.order ||
-                (a.blend ? distance.get(b.entry)! - distance.get(a.entry)! : 0),
-            );
+          let stale = !arranged;
+          if (!stale)
+            for (let i = 0; i < members.length; i++) {
+              const entry = members[i],
+                opaque = entry.materials.some((m) => !late(m)),
+                blend = entry.materials.some(late);
+              if (opaque !== entry.opaque || blend !== entry.blend) {
+                stale = true;
+                break;
+              }
+            }
+          if (stale) arrange();
           distance.clear();
-          for (const { entry: e, phase } of list) e.model.draw(c, 'beauty', c.color, c.depth, phase);
+          if (opaqueEnd < phases.length) {
+            const eye = c.camera.position;
+            for (let i = opaqueEnd; i < phases.length; i++) {
+              const entry = phases[i].entry;
+              if (distance.has(entry)) continue;
+              const matrix = entry.model.primitives[0].node.matrix;
+              distance.set(entry, Math.hypot(eye[0] - matrix[12], eye[1] - matrix[13], eye[2] - matrix[14]));
+            }
+            const count = phases.length - opaqueEnd;
+            for (let i = 0; i < count; i++) tail[i] = phases[opaqueEnd + i];
+            tail.length = count;
+            tail.sort((a, b) => a.entry.order - b.entry.order || distance.get(b.entry)! - distance.get(a.entry)!);
+            for (let i = 0; i < count; i++) phases[opaqueEnd + i] = tail[i];
+          }
+          for (let i = 0; i < phases.length; i++) {
+            const item = phases[i];
+            item.entry.model.draw(c, 'beauty', c.color, c.depth, item.phase);
+          }
         },
       });
     },
   });
-  queues.set(runtime, set);
-  return set;
+  draws = {
+    add(entry) {
+      members.push(entry);
+      arranged = false;
+    },
+    delete(entry) {
+      const index = members.indexOf(entry);
+      if (index >= 0) members.splice(index, 1);
+      arranged = false;
+    },
+  };
+  queues.set(runtime, draws);
+  return draws;
 }
 /** A materials mesh: the gltf-pro model plus the live `material` it draws with (read by @margoengine/exporters `exportModel`). */
 export type MaterialMesh<M extends Material | readonly Material[] = Material> = PBRModel & {
@@ -1343,11 +1395,17 @@ export function createMesh<M extends Material | readonly Material[]>(
       get texturedTint() {
         return mapped(m) && m.transmissive;
       },
-      shader: (code, group) => m.shader(code, group),
+      shader: (code: string, group: number) => m.shader(code, group),
       bindings: () => m.bindings(runtime.gpu!, runtime),
     };
   }
-  const entry: Entry = { model, materials: groups.map((g) => materials[g.materialIndex]), order: renderOrder };
+  const entry: Entry = {
+    model,
+    materials: groups.map((g) => materials[g.materialIndex]),
+    order: renderOrder,
+    opaque: false,
+    blend: false,
+  };
   model.registerPasses = () => {};
   try {
     runtime.use(model);

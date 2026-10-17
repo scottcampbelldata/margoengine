@@ -94,6 +94,8 @@ export class Transmission implements EnginePlugin, PBRTransmission {
   private pipelines?: { level0: GPURenderPipeline; reduce: GPURenderPipeline };
   private context?: Context;
   private pass?: GPURenderPassEncoder;
+  /** Reused back-to-front list. Filled from the model map each frame so equal distances stay in insertion order. */
+  private readonly ordered: PBRModel[] = [];
 
   static attach(engine: EngineKernel, options?: TransmissionPassOptions): Transmission {
     const value = new Transmission(options);
@@ -238,13 +240,17 @@ export class Transmission implements EnginePlugin, PBRTransmission {
       };
     this.context = c;
     this.pass = undefined;
+    const ordered = this.ordered;
+    ordered.length = 0;
+    for (const model of this.models.keys()) ordered.push(model);
+    ordered.sort((a, b) => distance(b) - distance(a));
     try {
-      for (const model of [...this.models.keys()].sort((a, b) => distance(b) - distance(a)))
-        model.draw(c, 'transmission', c.color, c.depth);
+      for (let i = 0; i < ordered.length; i++) ordered[i].draw(c, 'transmission', c.color, c.depth);
     } finally {
       this.context = undefined;
       (this.pass as GPURenderPassEncoder | undefined)?.end();
       this.pass = undefined;
+      ordered.length = 0;
     }
   }
   private release(): void {

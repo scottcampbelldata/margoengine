@@ -198,27 +198,31 @@ export class Splats implements EnginePlugin {
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     const groups = Math.ceil(this.count / 256),
       blocks = Math.ceil(groups / 256);
-    this.dispatch(e, this.projection!, this.projectionGroup!, groups, 1);
-    for (let pass = 0; pass < 8; pass++) {
-      const binds = this.sortGroups[pass];
-      this.dispatch(e, this.sortPipelines[0], binds[0], groups, 1);
-      this.dispatch(e, this.sortPipelines[1], binds[1], blocks, 16);
-      this.dispatch(e, this.sortPipelines[2], binds[2], 1, 1);
-      this.dispatch(e, this.sortPipelines[3], binds[3], groups, 1);
+    // Storage writes are visible to later dispatches in the same compute pass, so the radix stages share one pass.
+    const pass = e.beginComputePass();
+    try {
+      this.dispatch(pass, this.projection!, this.projectionGroup!, groups, 1);
+      for (let stage = 0; stage < 8; stage++) {
+        const binds = this.sortGroups[stage];
+        this.dispatch(pass, this.sortPipelines[0], binds[0], groups, 1);
+        this.dispatch(pass, this.sortPipelines[1], binds[1], blocks, 16);
+        this.dispatch(pass, this.sortPipelines[2], binds[2], 1, 1);
+        this.dispatch(pass, this.sortPipelines[3], binds[3], groups, 1);
+      }
+    } finally {
+      pass.end();
     }
   }
   private dispatch(
-    encoder: GPUCommandEncoder,
+    pass: GPUComputePassEncoder,
     pipeline: GPUComputePipeline,
     group: GPUBindGroup,
     x: number,
     y: number,
   ): void {
-    const pass = encoder.beginComputePass();
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, group);
     pass.dispatchWorkgroups(x, y);
-    pass.end();
   }
   private draw(c: Context): void {
     const samples = c.descriptor.multisample?.count,

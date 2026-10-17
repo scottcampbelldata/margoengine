@@ -54,6 +54,8 @@ export class HTML extends LabelRenderer {
   private disposed = false;
   private sampledDepth?: GPUTexture;
   private depthGroup?: GPUBindGroup;
+  /** Snapshot of the slots submitted with the current depth read. The next sample waits until that read finishes. */
+  private readonly depthRequests: ({ record: Record; x: number; y: number; z: number } | undefined)[] = [];
   constructor(private readonly settings: HTMLOptions = {}) {
     super({ ...settings, name: settings.name ?? 'html', order: 1000 });
     const capacity = settings.capacity ?? 1024,
@@ -174,7 +176,21 @@ export class HTML extends LabelRenderer {
     dispatch(c, this.pipeline!, this.depthGroup, Math.ceil(this.capacity / 64));
     const read = this.read!,
       generation = this.generation,
-      requests = this.slots.map((record) => (record ? { record, x: record.x, y: record.y, z: record.z } : undefined));
+      requests = this.depthRequests;
+    for (let i = 0; i < this.capacity; i++) {
+      const record = this.slots[i];
+      if (!record) {
+        requests[i] = undefined;
+        continue;
+      }
+      let request = requests[i];
+      if (!request) requests[i] = request = { record, x: 0, y: 0, z: 0 };
+      request.record = record;
+      request.x = record.x;
+      request.y = record.y;
+      request.z = record.z;
+    }
+    requests.length = this.capacity;
     c.encoder.copyBufferToBuffer(this.output!, 0, read, 0, this.capacity * 4);
     this.pending = true;
     queueMicrotask(async () => {
