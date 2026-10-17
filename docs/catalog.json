@@ -1656,6 +1656,29 @@
     "category": "CAD and engineering"
   },
   {
+    "id": "brep",
+    "title": "B-rep CAD kernel",
+    "category": "CAD and engineering",
+    "package": "@margoengine/brep",
+    "version": "1.0.0",
+    "published": false,
+    "description": "Margo's own CAD kernel: STEP (ISO 10303-21) reading, product structure, units and colours; exact B-rep geometry and tessellation follow.",
+    "requirements": "See the package guide for requirements",
+    "keywords": "brep b-rep cad kernel step stp ap203 ap214 ap242 iso 10303 assembly product structure units colours",
+    "install": "npm install @margoengine/brep@1.0.0",
+    "imports": "import { parseSTEP } from '@margoengine/brep';",
+    "exports": [
+      "DERIVED",
+      "Enum",
+      "Ref",
+      "STEPFile",
+      "Typed",
+      "parseSTEP",
+      "readStructure",
+      "stepText"
+    ]
+  },
+  {
     "id": "bvh",
     "title": "Bvh",
     "package": "@margoengine/bvh",

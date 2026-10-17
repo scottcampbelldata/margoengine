@@ -155,6 +155,7 @@ node --test tests/catalog.test.js
 | Package | What it is |
 | --- | --- |
 | [`@margoengine/machinery`](../packages/machinery/README.md) | Kinematics, polygonal CAD ingestion, sections and metrology for Margo Engine. |
+| [`@margoengine/brep`](../packages/brep/README.md) | Margo's own CAD kernel: STEP (ISO 10303-21) reading, product structure, units and colours; exact B-rep geometry and tessellation follow. |
 | [`@margoengine/bvh`](../packages/bvh/README.md) | Triangle BVH, spatial queries and an engine Raycaster for Margo Engine (three-mesh-bvh and THREE.Raycaster counterparts). |
 | [`@margoengine/geometry`](../packages/geometry/README.md) | Pure-CPU, tree-shakable geometry for Margo Engine: Three.js-compatible primitives, curves, shapes, extrusion, triangulation and mesh utilities. |
 

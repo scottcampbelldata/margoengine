@@ -1,0 +1,32 @@
+{
+  "name": "@margoengine/brep",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Margo's own CAD kernel: STEP (ISO 10303-21) reading, product structure, units and colours; exact B-rep geometry and tessellation follow.",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js brep",
+    "test": "npm run build && node --test tests/*.test.js",
+    "prepack": "npm run build"
+  },
+  "homepage": "https://margoengine.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/brep"
+  }
+}
