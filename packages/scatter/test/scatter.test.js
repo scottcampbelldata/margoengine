@@ -64,12 +64,12 @@ test('alignToGround and sink fit instances to the ground in the cull and both ve
     assert.match(
       render,
       lit
-        ? /scatterPose\(p,n,data\.position,data\.rotation,material\[3\],material\[2\]\)/
-        : /frame\.ground,frame\.wind\)/,
+        ? /scatterPose\(p,n,data\.position,data\.rotation,material\[3\],material\[4\],frame\.eye\.xyz,material\[2\]\)/
+        : /frame\.ground,frame\.blade,frame\.eye\.xyz,frame\.wind\)/,
     );
     if (lit) {
-      assert.match(render, /var<uniform> material:array<vec4f,4>/);
-      assert.equal(effect.materialUniform.size, 64);
+      assert.match(render, /var<uniform> material:array<vec4f,5>/);
+      assert.equal(effect.materialUniform.size, 80);
       assert.deepEqual(Array.from(new Float32Array(effect.materialUniform.data).subarray(12, 14)), [
         0.5,
         Math.fround(0.1),
