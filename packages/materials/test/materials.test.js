@@ -534,3 +534,254 @@ class ImageDataLike {
     this.data = Uint8ClampedArray.from({ length: w * h * 4 }, (_, i) => (i * seed + 1) % 253);
   }
 }
+
+test('packGeometry retains independent UV1 values and falls back to UV0 only when omitted', () => {
+  const g = { ...triangle, uvs1: [0.75, 0.25, 0.5, 0.125, 0.25, 0.75] },
+    p = packGeometry(g);
+  assert.deepEqual([...p.vertices.slice(12, 16)], [0, 0, 0.75, 0.25]);
+  assert.deepEqual([...p.vertices.slice(32, 36)], [1, 0, 0.5, 0.125]);
+  assert.equal(packGeometry(g), p, 'packing remains cached by geometry identity');
+  const fallback = packGeometry({ ...triangle });
+  assert.deepEqual([...fallback.vertices.slice(32, 36)], [1, 0, 1, 0]);
+  const onlySecond = packGeometry({ ...triangle, uvs: undefined, uvs1: g.uvs1 });
+  assert.deepEqual([...onlySecond.vertices.slice(32, 36)], [0, 0, 0.5, 0.125]);
+  for (const uvs1 of [
+    [0, 1],
+    [0, 0, 1, 0, NaN, 1],
+    [0, 0, 1, 0, Infinity, 1],
+  ])
+    assert.throws(() => packGeometry({ ...triangle, uvs1 }), RangeError);
+});
+
+test('UV selection stays live per map slot and invalid UV sets do not alter existing transforms', async () => {
+  const m = new Material({ uvTransform: { texCoord: 1 } });
+  assert.deepEqual(
+    [3, 11, 19, 27, 35].map((i) => m.uvt[i]),
+    [1, 1, 1, 1, 1],
+  );
+  m.setUVTransform({ texCoord: 0, offset: [0.25, 0.5] }, 'aoMap');
+  assert.deepEqual(m.uvt.slice(24, 32), [1, 0, 0.25, 0, -0, 1, 0.5, 0]);
+  const before = [...m.uvt];
+  assert.throws(() => m.setUVTransform({ texCoord: 2 }), RangeError);
+  assert.deepEqual(m.uvt, before);
+  m.setUVTransform(null);
+  assert.deepEqual(
+    [3, 11, 19, 27, 35].map((i) => m.uvt[i]),
+    [0, 0, 0, 0, 0],
+  );
+});
+
+const groupedQuad = () => ({
+  positions: [-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0],
+  normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+  uvs: [0, 0, 1, 0, 1, 1, 0, 1],
+  indices: [0, 1, 2, 0, 2, 3],
+  groups: [
+    { start: 0, count: 3, materialIndex: 1 },
+    { start: 3, count: 3, materialIndex: 0 },
+  ],
+});
+
+test('grouped meshes share vertices and a node while keeping each group material live and isolated', async () => {
+  const s = await scene();
+  try {
+    const a = new Material({ color: [1, 0, 0], shading: 'basic' }),
+      b = new Material({ color: [0, 0, 1], shading: 'normal', depthWrite: false }),
+      materials = [a, b],
+      model = createMesh(s.engine, groupedQuad(), materials);
+    assert.equal(model.primitives.length, 2);
+    assert.equal(model.primitives[0].vertices, model.primitives[1].vertices);
+    assert.equal(model.primitives[0].node, model.primitives[1].node);
+    assert.deepEqual(
+      model.primitives.map((p) => [...p.indices]),
+      [
+        [0, 1, 2],
+        [0, 2, 3],
+      ],
+    );
+    assert.equal(model.primitives[0].material.base, b.color);
+    assert.equal(model.primitives[1].material.base, a.color);
+    assert.equal(model.primitives[0].material.renderState.depthWrite, false);
+    assert.ok(Object.isFrozen(model.material));
+    materials[0] = new Material();
+    assert.equal(model.material[0], a, 'material slots are snapshotted without copying materials');
+    a.color[1] = 0.5;
+    s.frame();
+    assert.equal(model.primitives[1].material.base[1], 0.5);
+    assert.equal(model.primitives[0].buffers.vertex, model.primitives[1].buffers.vertex);
+    const uniforms = s.h.resources.filter((r) => r.size === 880);
+    assert.deepEqual(
+      uniforms.map((r) => [...new Float32Array(r.data, 76 * 4, 4)]),
+      [
+        [0, 0, 1, 1],
+        [1, 0.5, 0, 1],
+      ],
+    );
+    const vertex = model.primitives[0].buffers.vertex;
+    model.destroy();
+    assert.equal(vertex.destroyed, true);
+  } finally {
+    s.close();
+  }
+});
+
+test('group ranges select nonindexed triangles and single materials keep drawing the whole geometry', async () => {
+  const s = await scene();
+  try {
+    const g = {
+        positions: [...triangle.positions, ...triangle.positions],
+        normals: [...triangle.normals, ...triangle.normals],
+        groups: [{ start: 3, count: 3, materialIndex: 0 }],
+      },
+      m = new Material(),
+      grouped = createMesh(s.engine, g, [m]),
+      scalar = createMesh(s.engine, g, m);
+    assert.deepEqual([...grouped.primitives[0].indices], [3, 4, 5]);
+    assert.deepEqual([...scalar.primitives[0].indices], [0, 1, 2, 3, 4, 5]);
+    assert.equal(scalar.material, m);
+  } finally {
+    s.close();
+  }
+});
+
+test('invalid group ranges and material slots fail before allocating GPU resources', async () => {
+  const s = await scene();
+  try {
+    const m = new Material(),
+      before = s.h.resources.length;
+    for (const group of [
+      { start: -3, count: 3, materialIndex: 0 },
+      { start: 1, count: 3, materialIndex: 0 },
+      { start: 0, count: 2, materialIndex: 0 },
+      { start: 0, count: 0, materialIndex: 0 },
+      { start: 3, count: 6, materialIndex: 0 },
+      { start: 0, count: 3, materialIndex: 1 },
+      { start: 0, count: 3, materialIndex: 0.5 },
+      { start: NaN, count: 3, materialIndex: 0 },
+    ])
+      assert.throws(() => createMesh(s.engine, { ...groupedQuad(), groups: [group] }, [m]), RangeError);
+    assert.throws(() => createMesh(s.engine, { ...groupedQuad(), groups: [] }, [m]), RangeError);
+    assert.throws(() => createMesh(s.engine, groupedQuad(), []), TypeError);
+    assert.throws(() => createMesh(s.engine, groupedQuad(), [m, {}]), TypeError);
+    assert.throws(
+      () =>
+        createMesh(
+          s.engine,
+          {
+            ...groupedQuad(),
+            groups: [
+              { start: 0, count: 6, materialIndex: 0 },
+              { start: 3, count: 3, materialIndex: 0 },
+            ],
+          },
+          [m],
+        ),
+      RangeError,
+    );
+    assert.equal(s.h.resources.length, before);
+  } finally {
+    s.close();
+  }
+});
+
+test('grouped instancing draws every range with the same live instance buffer', async () => {
+  const s = await scene(),
+    draws = [],
+    begin = s.h.context.encoder.beginRenderPass;
+  s.h.context.encoder.beginRenderPass = (d) => ({ ...begin(d), drawIndexed: (...args) => draws.push(args) });
+  try {
+    const mesh = createInstancedMesh(s.engine, groupedQuad(), [new Material(), new Material()], 4);
+    mesh.instances.count = 2;
+    assert.ok(mesh.primitives.every((p) => p.instances === mesh.instances));
+    s.frame();
+    assert.deepEqual(draws, [
+      [3, 2],
+      [3, 2],
+    ]);
+    mesh.destroy();
+  } finally {
+    s.close();
+  }
+});
+
+test('mixed group meshes join global opaque and back-to-front transparent phases', async () => {
+  const s = await scene(),
+    calls = [];
+  try {
+    const glass = new Material({ transparent: true }),
+      solid = new Material(),
+      mixed = createMesh(s.engine, groupedQuad(), [glass, solid]),
+      opaque = createMesh(s.engine, triangle, solid),
+      near = createMesh(s.engine, triangle, glass);
+    mixed.root.setPosition([0, 0, -2]);
+    near.root.setPosition([0, 0, 2]);
+    for (const [label, model] of [
+      ['mixed', mixed],
+      ['opaque', opaque],
+      ['near', near],
+    ]) {
+      const draw = model.draw.bind(model);
+      model.draw = (context, ...args) => {
+        calls.push([label, args[3] ?? 'all']);
+        return draw(context, ...args);
+      };
+    }
+    s.frame();
+    assert.deepEqual(calls, [
+      ['mixed', 'opaque'],
+      ['opaque', 'all'],
+      ['mixed', 'blend'],
+      ['near', 'all'],
+    ]);
+  } finally {
+    s.close();
+  }
+});
+
+test('the missing normal map uploads an exactly neutral tangent-space normal', async () => {
+  const s = await scene(),
+    writes = [],
+    original = s.device.queue.writeTexture;
+  s.device.queue.writeTexture = (destination, data, ...args) => {
+    writes.push({ texture: destination.texture, data: data.slice() });
+    return original(destination, data, ...args);
+  };
+  try {
+    createMesh(s.engine, triangle, new Material());
+    s.frame();
+    const normal = s
+        .lighting()
+        .at(-1)
+        .entries.find((e) => e.binding === 36).resource.texture,
+      upload = writes.find((w) => w.texture === normal),
+      values =
+        normal.format === 'rgba8unorm'
+          ? [...upload.data].map((v) => v / 255)
+          : [...new Uint16Array(upload.data.buffer, upload.data.byteOffset, 4)].map((v) => {
+              const exponent = (v >> 10) & 31,
+                mantissa = v & 1023;
+              return (1 + mantissa / 1024) * 2 ** (exponent - 15);
+            });
+    assert.deepEqual(values, [0.5, 0.5, 1, 1]);
+  } finally {
+    s.close();
+  }
+});
+
+test('failed materials queue registration leaves no live model nodes', async () => {
+  const s = await scene(),
+    original = s.engine.use,
+    live = () => s.engine.store.active.reduce((count, active) => count + +!!active, 0),
+    before = live();
+  s.engine.use = function (plugin) {
+    if (plugin.name.startsWith('materials:')) throw new Error('Queue registration failed');
+    return original.call(this, plugin);
+  };
+  try {
+    assert.throws(() => createMesh(s.engine, groupedQuad(), [new Material(), new Material()]), /Queue registration/);
+    assert.equal(live(), before);
+  } finally {
+    s.engine.use = original;
+    s.close();
+  }
+});

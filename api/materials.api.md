@@ -73,7 +73,7 @@ export interface EmitNode {
 
 export type Filter = 'linear' | 'nearest';
 
-export type InstancedMesh = MaterialMesh & {
+export type InstancedMesh<M extends Material | readonly Material[] = Material> = MaterialMesh<M> & {
     readonly instances: PBRInstances;
 };
 
@@ -180,8 +180,8 @@ export interface MaterialLobeOptions {
     iridescence?: IridescenceOptions;
 }
 
-export type MaterialMesh = PBRModel & {
-    readonly material: Material;
+export type MaterialMesh<M extends Material | readonly Material[] = Material> = PBRModel & {
+    readonly material: M extends Material ? Material : readonly Material[];
 };
 
 export type MaterialNode = ValueNode | NormalMapNode | MetalRoughNode | ClearcoatNode | TransmissionNode | EmitNode;
@@ -214,9 +214,15 @@ export interface MeshGeometry {
     positions: ArrayLike<number>;
     normals: ArrayLike<number>;
     uvs?: ArrayLike<number>;
+    uvs1?: ArrayLike<number>;
     indices?: ArrayLike<number>;
     tangents?: ArrayLike<number>;
     colors?: ArrayLike<number>;
+    groups?: readonly {
+        start: number;
+        count: number;
+        materialIndex: number;
+    }[];
 }
 
 export interface MetalRoughNode {
@@ -375,13 +381,13 @@ export function anisotropy(options?: AnisotropyOptions, base?: MaterialExtension
 
 export function clearcoat(options?: ClearcoatOptions): MaterialExtension;
 
-export function createInstancedMesh(engine: EngineKernel, geometry: MeshGeometry, material: Material, capacity: number, options?: {
+export function createInstancedMesh<M extends Material | readonly Material[]>(engine: EngineKernel, geometry: MeshGeometry, material: M, capacity: number, options?: {
     renderOrder?: number;
-}): InstancedMesh;
+}): InstancedMesh<M>;
 
-export function createMesh(engine: EngineKernel, geometry: MeshGeometry, material: Material, { renderOrder }?: {
+export function createMesh<M extends Material | readonly Material[]>(engine: EngineKernel, geometry: MeshGeometry, material: M, { renderOrder }?: {
     renderOrder?: number;
-}): MaterialMesh;
+}): MaterialMesh<M>;
 
 export function install(model: PBRModel): MaterialInstallation;
 

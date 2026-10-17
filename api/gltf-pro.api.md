@@ -220,6 +220,7 @@ export interface PBRMaterial extends GLTFMaterial {
     volume?: number[];
     renderState?: PBRRenderState;
     extension?: MaterialExtension;
+    shading?: LightingEffect;
     extendedFrame?: boolean;
 }
 

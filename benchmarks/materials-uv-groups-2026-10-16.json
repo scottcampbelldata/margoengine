@@ -1,0 +1,152 @@
+{
+  "date": "2026-10-16",
+  "branch": "codex/materials-uv1-groups",
+  "sourceBase": "6a57389d907e9118340da07aab75e253812b2321",
+  "workingTreeDirty": true,
+  "scope": "Independent UV1 and grouped materials/instancing/export in optional packages; core and stage unchanged",
+  "sourceSha256": {
+    "packages/materials/src/built-material.ts": "0666b6ee1bad622253ee1b96c78e6c883be7dbf5f2a42296568a5f8fd9ef87fa",
+    "packages/gltf-pro/src/index.ts": "40701ecf6766d3d3b8de1266a44dce248ec8331fb688301ed7c18c2aea23a5f1",
+    "packages/gltf-pro/src/shader.ts": "10ecb4fbf6dc59b0b2450b75222467e176c68c2601fcb5f02d5559b33ca731a1",
+    "packages/exporters/src/model.ts": "4a5d6ae55b88fa919cd504b7d62b9f96be3b92a633b0325ce676c04fc40448b8",
+    "tests/materials-uv-groups-browser.ts": "e2b1007c489ae3bcd63df565d97af76c96fee169d4ede26881a2b68ed3687370",
+    "scripts/materials-uv-groups-gpu-check.js": "7bdfec3fc369b5a285ef470f96aed89a0a1a5a5b8c2dd4f002cc849b9b1b90ec"
+  },
+  "coreStage": {
+    "raw": 48783,
+    "gzip": 20641,
+    "addedGzip": 0,
+    "exclusiveLimit": 25000,
+    "usableHeadroom": 4358
+  },
+  "validation": {
+    "packageBuild": true,
+    "node": {
+      "passed": 2291,
+      "failed": 0,
+      "skipped": 0,
+      "todo": 0,
+      "log": "test-results/materials-uv-groups-full-suite-final.log"
+    },
+    "strictTypecheckedPackages": 74,
+    "api": {
+      "entries": 173,
+      "exports": 1777,
+      "match": true
+    },
+    "gpu": {
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "nvidia",
+          "architecture": "ampere",
+          "device": "",
+          "description": "",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "155.0.4283.60",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true
+      },
+      "checks": [
+        "distinct UV1",
+        "UV0 fallback",
+        "AO UV selection",
+        "mixed grouped shaders and textures",
+        "both group picks",
+        "root transform",
+        "device restoration",
+        "opaque and blended ordering",
+        "shared grouped instances",
+        "instance count",
+        "matcap and SSAO auxiliary bindings",
+        "normal scale",
+        "UV1 normal tangent orientation",
+        "disposal and caller-owned texture"
+      ],
+      "captures": 17,
+      "picks": {
+        "hits": [
+          true,
+          true
+        ],
+        "sharedNode": true
+      },
+      "changedRestoredChannels": 0,
+      "samples": [
+        {
+          "label": "uv0",
+          "center": [
+            255,
+            0,
+            0
+          ]
+        },
+        {
+          "label": "uv1",
+          "center": [
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "label": "normal-zero",
+          "center": [
+            127,
+            127,
+            255
+          ]
+        },
+        {
+          "label": "normal-uv0",
+          "center": [
+            128,
+            218,
+            218
+          ]
+        },
+        {
+          "label": "normal-uv1",
+          "center": [
+            128,
+            37,
+            218
+          ]
+        }
+      ],
+      "allPassed": true,
+      "sharedGpuLockReleased": true
+    },
+    "helmet": {
+      "cases": 5,
+      "allPassed": true,
+      "parity": {
+        "mode": "full-detail-parity",
+        "aoOff": true,
+        "aoOn": true,
+        "changedChannels": 0
+      }
+    },
+    "independentReview": "No remaining actionable findings"
+  },
+  "matrix": {
+    "covered": 95,
+    "partial": 39,
+    "missing": 25,
+    "total": 159
+  },
+  "limits": [
+    "Arbitrary named vertex attributes remain absent.",
+    "Groups require nonoverlapping complete-triangle ranges; gaps are omitted; scalar materials ignore groups.",
+    "Bounds include all shared vertices; transparent ordering uses node distance.",
+    "Picking returns a shared mesh node; prior texture-alpha picking/shadow limits remain.",
+    "Cross-device local material shading requires rebuilding resources; same-engine restoration is supported.",
+    "Packed geometry caches attribute data by object identity."
+  ]
+}

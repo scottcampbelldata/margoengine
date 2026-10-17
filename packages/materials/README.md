@@ -200,3 +200,49 @@ installation.dispose();
 ```
 
 The installation restores replaced extensions and blend modes when disposed and releases its capture reference. For direct compilation of a transmissive graph, pass `nodeMaterial(graph, {opaqueColor})`, render the opaque snapshot before drawing, and set the material's `settings[0]` to `2`, as with `transmission()`. A constant zero transmission factor does not acquire a capture; compile a new graph to activate transmission after changing that constant. Screen-space refraction, volume, shadow, and device-restoration limits above apply equally to node materials. A caller needing custom WGSL can write a `MaterialExtension` directly.
+
+## Meshes with two UV sets and material groups
+
+`createMesh(engine, geometry, material)` draws CPU geometry through glTF-pro's PBR renderer. `MeshGeometry` accepts
+`positions`, `normals`, optional `indices`, `uvs` (UV0), `uvs1` (UV1), `tangents` and RGB/RGBA `colors`. Both UV arrays
+contain two finite values per vertex. UV0 defaults to zero; omitted UV1 copies UV0. The vertex layout remains 80 bytes.
+
+```ts
+import {Material, createMesh, loadTexture} from '@margoengine/materials';
+
+const surface = new Material({aoMap: await loadTexture('/occlusion.png')});
+surface.setUVTransform({texCoord: 1}, 'aoMap');
+const mesh = createMesh(engine, {
+  positions: [-1,-1,0, 1,-1,0, 1,1,0, -1,1,0],
+  normals: [0,0,1, 0,0,1, 0,0,1, 0,0,1],
+  uvs: [0,0, 1,0, 1,1, 0,1],
+  uvs1: [0.25,0.25, 0.75,0.25, 0.75,0.75, 0.25,0.75],
+  indices: [0,1,2, 0,2,3],
+  groups: [
+    {start: 0, count: 3, materialIndex: 0},
+    {start: 3, count: 3, materialIndex: 1},
+  ],
+}, [surface, new Material({color: '#4488ff'})]);
+mesh.root.setPosition([0, 1, 0]);
+```
+
+`setUVTransform(transform, slot?)` selects UV0 or UV1 with `texCoord` as well as offset, scale and rotation. Without a
+slot it updates every standard map; `null` restores UV0 and the identity transform. Updates take effect next frame.
+Normal maps selected from UV1 or transformed UVs derive their tangent frame from those coordinates.
+
+A material array requires at least one group. Each group has a nonnegative integer `materialIndex` into that array,
+and triangle-aligned `start` and positive `count` in index units, or vertex units without indices. Ranges must fit and
+must not overlap; gaps are omitted. A single material keeps drawing the whole geometry and ignores groups.
+`mesh.material` is that single material, or a frozen snapshot of the supplied array; the materials themselves stay live.
+
+Groups become primitives of one `PBRModel`, share packed vertices and GPU vertex buffers, and move with one root.
+`createInstancedMesh(engine, geometry, materials, capacity)` uses the same groups and shares one live `instances`
+object across every primitive. Opaque groups draw before blended groups across the materials queue; transparent
+ordering still uses the model's node distance, not individual triangles. Group bounds conservatively include all vertices.
+Picking either group returns the shared mesh node. The existing shadows, lighting, SSAO and exporter adapters accept
+the model; existing texture-alpha picking/shadow limitations remain. Export preserves group materials and UV1.
+
+Packing is cached by geometry identity: finish editing attributes before the first call to `packGeometry` or mesh
+creation, and use a new geometry object for changed attributes. `mesh.dispose()` releases model resources; textures
+remain caller-owned. Device restoration rebuilds the model and texture bindings. Constructed material shading cannot
+be copied to another GPU device without rebuilding its material resources. Core and the stage facade are unchanged.

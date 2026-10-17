@@ -198,6 +198,8 @@ export interface PBRMaterial extends GLTFMaterial {
   volume?: number[];
   renderState?: PBRRenderState;
   extension?: MaterialExtension;
+  /** Per-material surface shader and bindings, composed before model-wide lighting effects. */
+  shading?: LightingEffect;
   /** Use the retained UV-transform frame layout for constructed optional materials. */
   extendedFrame?: boolean;
 }
@@ -1449,9 +1451,12 @@ export class PBRModel implements EnginePlugin {
       hook = this.capture,
       capture = mode === 'capture';
     if (this.disposed || (through && !oit) || (capture && !hook)) return;
-    const pending = mode === 'beauty' && phase === 'all' ? opaquePasses.get(c) : undefined;
+    const pending = mode === 'beauty' ? opaquePasses.get(c) : undefined;
     if (pending) {
+      // Explicit blend calls carry the queue's back-to-front order, independently of the earlier opaque phase.
+      if (phase === 'blend') pending.delete(this);
       pending.add(this);
+      if (phase === 'blend') return;
       phase = 'opaque';
     }
     if (external) this.view.set(external.view);
@@ -1515,7 +1520,7 @@ export class PBRModel implements EnginePlugin {
         v.set(this.engine.lighting.radiance, 72);
         v.set(m.base, 76);
         v.set(m.factors, 80);
-        if (!m.maps[2]) v[82] = 0;
+        if (!m.maps[2] && !m.extendedFrame) v[82] = 0;
         v.set(m.emission, 84);
         v.set(m.settings, 88);
         v[91] = +(c.format === 'rgba16float');
@@ -1586,8 +1591,17 @@ export class PBRModel implements EnginePlugin {
           r.coordinates = coordinateExtension(m.maps, source, r.coordinates);
           code = coordinateShader(code, r.coordinates, !!m.maps[2] && v[94] === 1);
         } else if (
-          m.maps[2] &&
-          (textureCoordinates(m.maps[2]).texCoord === 1 || textureCoordinates(m.maps[2]).transform)
+          m.maps[2]
+            ? textureCoordinates(m.maps[2]).texCoord === 1 || textureCoordinates(m.maps[2]).transform
+            : m.extendedFrame &&
+              // Constructed material maps use the retained normal-slot affine rows, not glTF texture definitions.
+              (v[123] > 0.5 ||
+                v[120] !== 1 ||
+                v[121] !== 0 ||
+                v[122] !== 0 ||
+                v[124] !== 0 ||
+                v[125] !== 1 ||
+                v[126] !== 0)
         )
           code = code.replace('if(abs(i.tangent.w)<0.5)', 'if(true)');
         const extension = compact ? (r.coordinates?.extension ?? source) : source;
@@ -1598,18 +1612,21 @@ export class PBRModel implements EnginePlugin {
           r.extension.uniform?.destroy();
           r.extension = undefined;
         }
-        const lighting = extension?.lighting !== false;
-        if (mode !== 'gbuffer' && lighting && this.lighting.size) {
+        const lighting = extension?.lighting !== false,
+          shading = m.shading;
+        if (shading || (mode !== 'gbuffer' && lighting && this.lighting.size)) {
           scratch.code = code;
           scratch.ambient = false;
+          if (shading) patchDrawLighting.call(scratch, shading);
+          const surface = scratch.code;
           // Effects with `pbr` hooks compose at gltf-pro's hook points; others (materials, LOD baking) still patch the text.
-          this.lighting.forEach(patchDrawLighting, scratch);
+          if (mode !== 'gbuffer' && lighting) this.lighting.forEach(patchDrawLighting, scratch);
           const patched = scratch.code,
             ambient = scratch.ambient;
           // An `ambient` hook (environment IBL) is what SSAO's ambient replay returns from the lit fragment, `_=color` keeping every
           // lighting binding in the layout. Unlit materials have no ambient.
           if (lit) code = patched;
-          else if (ambient) {
+          else if (mode === 'ambient' && ambient) {
             let replay = this.replays.get(patched);
             if (replay === undefined) {
               if (this.replays.size >= 64) this.replays.clear();
@@ -1626,7 +1643,7 @@ export class PBRModel implements EnginePlugin {
             code = replay;
             entry = 'fragment';
             lit = true;
-          }
+          } else code = surface;
         }
         if (extension?.ambient) code = materialExtensionAmbientShader(code, extension);
         if (transmission) code = transmissionPBR(code, oit!.declarations(2));
@@ -1861,12 +1878,14 @@ export class PBRModel implements EnginePlugin {
         target.setPipeline(pipeline);
         target.setBindGroup(0, groups[0]);
         target.setBindGroup(1, groups[1]);
-        if (lit && ((lighting && this.lighting.size) || through)) {
+        const effectBindings = !!shading || (lit && ((lighting && this.lighting.size > 0) || through));
+        if (effectBindings) {
           const entries = scratch.entries,
             effects = scratch.effects;
           let entryCount = 0;
           scratch.effectCount = 0;
-          if (lighting) this.lighting.forEach(snapshotDrawLighting, scratch);
+          if (shading) snapshotDrawLighting.call(scratch, shading);
+          if (lit && lighting) this.lighting.forEach(snapshotDrawLighting, scratch);
           effects.length = scratch.effectCount;
           for (let i = 0; i < effects.length; i++) {
             const bindings = effects[i].bindings();
@@ -1909,8 +1928,7 @@ export class PBRModel implements EnginePlugin {
           }
           target.setBindGroup(2, cached!.group);
         }
-        if (extension)
-          bindMaterialExtension(c.device, target, pipeline, r.extension!, lit && lighting && this.lighting.size > 0);
+        if (extension) bindMaterialExtension(c.device, target, pipeline, r.extension!, effectBindings);
         target.setVertexBuffer(0, p.deformed ?? r.vertex);
         if (instances) target.setVertexBuffer(1, instances);
         target.setIndexBuffer(r.index, 'uint32');
@@ -1947,9 +1965,12 @@ export class PBRModel implements EnginePlugin {
     if (this.disposed || this.engine.disposed) throw new Error('PBRModel is disposed');
     // GPU texture views supplied by callers cannot cross devices. Fail explicitly
     // rather than drawing a bind pose or silently omitting an extended surface.
-    for (const primitive of [...this.primitives, ...this.pointsAndLines])
+    for (const primitive of [...this.primitives, ...this.pointsAndLines]) {
+      if (primitive.material.shading && device !== this.engine.gpu)
+        throw new Error('Cross-device PBR rendering requires recreating local material shading');
       if ((primitive.extension ?? primitive.material.extension)?.textures?.length)
         throw new Error('Cross-device PBR rendering requires recreating caller-owned material extension textures');
+    }
     const replica = Object.create(PBRModel.prototype) as PBRModel;
     Object.assign(replica, {
       name: this.name + ':device:' + modelId++,
@@ -1997,6 +2018,8 @@ export class PBRModel implements EnginePlugin {
       for (let i = 0; i < sources.length; i++) {
         const source = sources[i],
           copy = copies[i];
+        if (source.material.shading && device !== this.engine.gpu)
+          throw new Error('Cross-device PBR rendering requires recreating local material shading');
         if ((source.extension ?? source.material.extension)?.textures?.length)
           throw new Error('Cross-device PBR rendering requires recreating caller-owned material extension textures');
         copy.extension = source.extension;

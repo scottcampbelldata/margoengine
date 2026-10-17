@@ -142,6 +142,17 @@ internal facade adapter retain their original contracts.
 
 Register with `shadows.add(model)` and `clustered.add(model)` for optional directional shadows and local PBR lights, including the current skinned vertex buffer. `addLighting()` accepts an optional shader/binding hook without importing these packages. `shadowPrimitives` exposes current opaque/masked GPU geometry to depth consumers; blended materials are omitted.
 
+`primitive.material.shading` accepts one `LightingEffect` for that material's
+surface shader and group 2 bindings. Constructed materials use it so geometry
+groups can share a model while retaining separate textures and shading. It
+composes before `addLighting()` effects and applies to beauty, g-buffer,
+ambient and capture draws; its resources must remain in the selected entry
+point's static resource interface. `extension.lighting: false` suppresses
+scene lighting while retaining the material's own shading. Callbacks own their
+resources and must recreate them after device restoration. Cross-device
+renderers reject local shading until the caller recreates it for that device;
+same-device renderers can reuse it.
+
 ### Optional material extension slot
 
 Attach a `MaterialExtension` to `primitive.extension`, or to the shared
@@ -160,7 +171,7 @@ model.primitives[0].extension = tint;
 
 Bind groups are permanently allocated as follows: group 0 is the original
 400-byte frame buffer, group 1 is the original five texture/sampler pairs,
-group 2 is lighting, and **group 3 is the optional material extension**.
+group 2 is lighting and local material shading, and **group 3 is the optional material extension**.
 Unextended primitives use exactly the original shader, pipeline descriptors,
 uniform uploads and bindings. Extension GPU resources are created lazily during
 `draw()`, including when an extension is attached after model setup.
@@ -203,7 +214,9 @@ original shader and bindings.
 `PBRModel.beginOpaquePass(context)` defers blended beauty draws across models;
 `PBRModel.endOpaquePass(context)` flushes them after a caller-owned scene copy,
 and `cancelOpaquePass(context)` releases an interrupted phase. Calls to `draw()`
-outside that optional phase retain their existing order and bindings.
+with an explicit `opaque` or `blend` phase participate in the same deferral:
+opaque primitives draw immediately and blended primitives flush once per model.
+Calls outside that optional phase retain their existing order and bindings.
 
 Full generated WGSL, including the injection and resource layout, distinguishes
 pipeline cache entries. Even an empty extension cannot share the baseline

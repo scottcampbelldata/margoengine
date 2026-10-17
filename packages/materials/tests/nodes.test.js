@@ -1,3 +1,4 @@
+// Compact PBR fingerprint includes the GPU-verified WebGPU derivative tangent correction.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -276,7 +277,7 @@ test('compiled and baseline materials have isolated pipelines and mutable factor
     const baseline = s.draws.at(-1);
     assert.equal(
       digest(baseline.pipeline.vertex.module.code),
-      '45df766b2c73181edc3cbd8109a848f17851f03b7cc947dec8d987ff60c2dee5',
+      '0b7dcd50cea837c6c983f1487b23b0a7991a11e8a56d441c6a936b867169bb5d',
     );
     const extension = nodeMaterial(graph());
     s.model.primitives[0].extension = extension;

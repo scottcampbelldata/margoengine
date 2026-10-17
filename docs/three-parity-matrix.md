@@ -73,7 +73,7 @@ These partials are narrower APIs that already have a Margo path. They are limits
 - MeshPhysicalMaterial has the lobes above as factors. Dispersion is absent. Clearcoat and sheen use the key light and the hemisphere fill.
 - glTF reads the extensions listed on that row. A file that requires `KHR_animation_pointer` or dispersion throws and names the extension. Export writes no cameras or lights.
 - KTX2 works for `KHR_texture_basisu` on a glTF. A standalone `.ktx2` is a raw `GPUTexture` that materials cannot take. Cube maps, arrays, and UASTC HDR are rejected.
-- The second UV set on meshes you build is a copy of the first. Geometry groups are ignored.
+- Materials meshes accept independent `uvs1` coordinates and geometry groups with material arrays, including instancing and glTF export. UV1 falls back to UV0 when omitted. Arbitrary named vertex attributes remain absent, so the combined geometry-attributes row stays PARTIAL and the counts remain 95 / 39 / 25.
 - Toon shading applies to every core mesh at once, not to a glTF-pro or skinned material.
 - Contact shadows are a ground-plane helper, not a shadow-catcher material.
 - SSR reflects core meshes and models registered with `ssr.add`. Water and terrain are reflected and do not reflect.

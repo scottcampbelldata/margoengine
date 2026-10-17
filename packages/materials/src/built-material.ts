@@ -5,6 +5,7 @@ import {
   GLTFAsset,
   PBRModel,
   textureTransform,
+  textureCoordinates,
   type PreparedGeometry,
   type PBRRenderState,
   type TextureTransform,
@@ -57,18 +58,20 @@ const shared = new WeakMap<
 function defaults(device: GPUDevice) {
   let d = shared.get(device);
   if (d) return d;
-  const pixel = (rgba: number[]) => {
+  const pixel = (rgba: number[], format: 'rgba8unorm' | 'rgba16float' = 'rgba8unorm') => {
+    const data = format === 'rgba16float' ? new Uint16Array(rgba) : new Uint8Array(rgba);
     const texture = device.createTexture({
       size: [1, 1],
-      format: 'rgba8unorm',
+      format,
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
-    device.queue.writeTexture({ texture }, new Uint8Array(rgba), { bytesPerRow: 4 }, [1, 1]);
+    device.queue.writeTexture({ texture }, data, { bytesPerRow: data.byteLength }, [1, 1]);
     return texture.createView();
   };
   d = {
     white: pixel([255, 255, 255, 255]),
-    normal: pixel([128, 128, 255, 255]),
+    // Binary16 stores 0.5 exactly, so an absent normal map cannot tilt the surface.
+    normal: pixel([0x3800, 0x3800, 0x3c00, 0x3c00], 'rgba16float'),
     sampler: device.createSampler({ magFilter: 'linear', minFilter: 'linear' }),
     pipelines: new Map(),
   };
@@ -393,6 +396,9 @@ export function materialShader(source: string, group: number, shading: Shading):
       count++;
       return `${head}\n  let alpha=select(1.0,s.base.a,f.settings.x>1.5);\n  if(f.coordsB.w<0.5){${outputs[shading]}}`;
     });
+  if (shading === 'matcap')
+    // Auxiliary entries call surface() but not the beauty fragment. Retain the same bind group layout there.
+    code = code.replace('fn surface(i:Out,front:bool)->Surface {', '$&\n  _=mat_matcap;_=mat_matcapS;');
   if (count !== (shading === 'standard' ? 5 : 6)) throw new Error('Materials require the standard gltf-pro PBR shader');
   const declarations = names
     .slice(0, shading === 'matcap' ? 6 : 5)
@@ -636,7 +642,8 @@ export class Material {
   setUVTransform(t: TextureTransform | null, slot?: MapSlot): this {
     const i = slot === undefined ? -1 : slots.indexOf(slot);
     if (i > 4 || (slot !== undefined && i < 0)) throw new TypeError('Invalid UV transform slot');
-    const rows = textureTransform(t ?? {});
+    const { texCoord } = textureCoordinates({ extensions: { KHR_texture_transform: t ?? {} } }),
+      rows = textureTransform(t ?? {}, texCoord);
     for (let k = 0; k < 5; k++) if (i < 0 || k === i) this.uvt.splice(k * 8, 8, ...rows);
     return this;
   }
@@ -668,16 +675,20 @@ export interface MeshGeometry {
   positions: ArrayLike<number>;
   normals: ArrayLike<number>;
   uvs?: ArrayLike<number>;
+  /** Independent UV1 coordinates. Omitted UV1 duplicates UV0 for compatibility. */
+  uvs1?: ArrayLike<number>;
   indices?: ArrayLike<number>;
   tangents?: ArrayLike<number>;
   colors?: ArrayLike<number>;
+  /** Triangle ranges in index units (vertex units without indices). Used with a material array. */
+  groups?: readonly { start: number; count: number; materialIndex: number }[];
 }
 const packed = new WeakMap<object, PreparedGeometry>();
-/** Packs once per geometry object into gltf-pro's 80-byte vertex (position, normal, tangent, UV0=UV1, color). Later edits to the object are not seen. */
+/** Packs once per geometry object into gltf-pro's 80-byte vertex (position, normal, tangent, UV0, UV1, color). Later edits to the object are not seen. */
 export function packGeometry(g: MeshGeometry): PreparedGeometry {
   let out = packed.get(g);
   if (out) return out;
-  const { positions: p, normals: n, uvs, tangents: t, colors: c } = g ?? ({} as MeshGeometry),
+  const { positions: p, normals: n, uvs, uvs1, tangents: t, colors: c } = g ?? ({} as MeshGeometry),
     count = p?.length / 3,
     width = c ? c.length / count : 0,
     scale = c instanceof Uint8Array || c instanceof Uint8ClampedArray ? 1 / 255 : 1;
@@ -687,6 +698,7 @@ export function packGeometry(g: MeshGeometry): PreparedGeometry {
     count > 1_000_000 ||
     n?.length !== count * 3 ||
     (uvs && uvs.length !== count * 2) ||
+    (uvs1 && uvs1.length !== count * 2) ||
     (t && t.length !== count * 4) ||
     (c && width !== 3 && width !== 4)
   )
@@ -704,11 +716,24 @@ export function packGeometry(g: MeshGeometry): PreparedGeometry {
     v[o + 3] = 1;
     if (tl) v[o + 11] = t![i * 4 + 3] < 0 ? -1 : 1;
     if (uvs) {
-      v[o + 12] = v[o + 14] = uvs[i * 2];
-      v[o + 13] = v[o + 15] = uvs[i * 2 + 1];
+      v[o + 12] = uvs[i * 2];
+      v[o + 13] = uvs[i * 2 + 1];
+    }
+    const second = uvs1 ?? uvs;
+    if (second) {
+      v[o + 14] = second[i * 2];
+      v[o + 15] = second[i * 2 + 1];
     }
     for (let k = 0; k < 4; k++) v[o + 16 + k] = c && k < width ? c[i * width + k] * scale : 1;
   }
+  if (v.some((value) => !Number.isFinite(value))) throw new RangeError('Non-finite mesh geometry attribute');
+  const indexCount = g.indices?.length ?? count;
+  if (!Number.isSafeInteger(indexCount) || indexCount < 3 || indexCount % 3)
+    throw new RangeError('Mesh indices must contain complete triangles');
+  if (g.indices)
+    for (let i = 0; i < indexCount; i++)
+      if (!Number.isSafeInteger(g.indices[i]) || g.indices[i] < 0 || g.indices[i] >= count)
+        throw new RangeError('Invalid mesh geometry index');
   out = {
     vertices: v,
     indices: g.indices ? Uint32Array.from(g.indices) : Uint32Array.from({ length: count }, (_, i) => i),
@@ -718,7 +743,7 @@ export function packGeometry(g: MeshGeometry): PreparedGeometry {
 }
 interface Entry {
   model: PBRModel;
-  material: Material;
+  materials: readonly Material[];
   order: number;
 }
 const blends: Record<Blending, GPUBlendState | null | undefined> = {
@@ -754,12 +779,23 @@ function queue(runtime: Engine): Set<Entry> {
             const m = e.model.primitives[0].node.matrix;
             distance.set(e, Math.hypot(eye[0] - m[12], eye[1] - m[13], eye[2] - m[14]));
           }
-          const list = [...entries].sort((a, b) => {
-            const t = +late(a.material) - +late(b.material);
-            return t || a.order - b.order || (late(a.material) ? distance.get(b)! - distance.get(a)! : 0);
-          });
+          const list = [...entries]
+            .flatMap((entry) => {
+              const opaque = entry.materials.some((m) => !late(m)),
+                blend = entry.materials.some(late),
+                phases: { entry: Entry; blend: boolean; phase: 'all' | 'opaque' | 'blend' }[] = [];
+              if (opaque) phases.push({ entry, blend: false, phase: blend ? 'opaque' : 'all' });
+              if (blend) phases.push({ entry, blend: true, phase: opaque ? 'blend' : 'all' });
+              return phases;
+            })
+            .sort(
+              (a, b) =>
+                +a.blend - +b.blend ||
+                a.entry.order - b.entry.order ||
+                (a.blend ? distance.get(b.entry)! - distance.get(a.entry)! : 0),
+            );
           distance.clear();
-          for (const e of list) e.model.draw(c, 'beauty', c.color, c.depth);
+          for (const { entry: e, phase } of list) e.model.draw(c, 'beauty', c.color, c.depth, phase);
         },
       });
     },
@@ -768,62 +804,97 @@ function queue(runtime: Engine): Set<Entry> {
   return set;
 }
 /** A materials mesh: the gltf-pro model plus the live `material` it draws with (read by @margoengine/exporters `exportModel`). */
-export type MaterialMesh = PBRModel & { readonly material: Material };
+export type MaterialMesh<M extends Material | readonly Material[] = Material> = PBRModel & {
+  readonly material: M extends Material ? Material : readonly Material[];
+};
 /**
- * Creates a gltf-pro `PBRModel` for one geometry and material. Move it with `model.root`, remove it with `model.destroy()`.
+ * Creates one gltf-pro `PBRModel`. A material array draws the geometry's nonempty, nonoverlapping triangle groups;
+ * uncovered indices are omitted. A scalar material draws the entire geometry, ignoring groups.
+ * Move it with `model.root`, remove it with `model.destroy()`.
  * It works with `shadows.add`, `clustered.add` and `ssao.add` like a loaded glTF. Textures are not disposed with the model.
  */
-export function createMesh(
+export function createMesh<M extends Material | readonly Material[]>(
   engine: EngineKernel,
   geometry: MeshGeometry,
-  material: Material,
+  material: M,
   { renderOrder = 0 }: { renderOrder?: number } = {},
-): MaterialMesh {
-  if (!(material instanceof Material) || !Number.isFinite(renderOrder)) throw new TypeError('Invalid material mesh');
+): MaterialMesh<M> {
+  const materials: readonly Material[] = Array.isArray(material)
+    ? Object.freeze([...material])
+    : [material as Material];
+  if (!materials.length || materials.some((m) => !(m instanceof Material)) || !Number.isFinite(renderOrder))
+    throw new TypeError('Invalid material mesh');
+  const data = packGeometry(geometry),
+    groups = Array.isArray(material) ? geometry.groups : [{ start: 0, count: data.indices.length, materialIndex: 0 }];
+  if (!Array.isArray(groups) || !groups.length) throw new RangeError('Material arrays require geometry groups');
+  for (const g of groups)
+    if (
+      !g ||
+      !Number.isSafeInteger(g.start) ||
+      !Number.isSafeInteger(g.count) ||
+      !Number.isSafeInteger(g.materialIndex) ||
+      g.start < 0 ||
+      g.count <= 0 ||
+      g.start % 3 ||
+      g.count % 3 ||
+      g.start + g.count > data.indices.length ||
+      g.materialIndex < 0 ||
+      g.materialIndex >= materials.length
+    )
+      throw new RangeError('Invalid mesh geometry group');
+  const ranges = [...groups].sort((a, b) => a.start - b.start);
+  for (let i = 1; i < ranges.length; i++)
+    if (ranges[i].start < ranges[i - 1].start + ranges[i - 1].count)
+      throw new RangeError('Mesh geometry groups must not overlap');
+  const prepared = groups.map((g) => ({
+    vertices: data.vertices,
+    indices:
+      g.start === 0 && g.count === data.indices.length ? data.indices : data.indices.slice(g.start, g.start + g.count),
+  }));
   const runtime = engineRuntime(engine),
-    m = material,
     set = queue(runtime);
   const doc = {
     asset: { version: '2.0' },
     nodes: [{ mesh: 0 }],
-    meshes: [{ primitives: [{ material: 0 }] }],
-    materials: [
-      {
-        pbrMetallicRoughness: { baseColorFactor: m.color, roughnessFactor: m.factors[0], metallicFactor: m.factors[1] },
-        emissiveFactor: m.emissive,
-        alphaMode: ['OPAQUE', 'MASK', 'BLEND'][m.settings[0]],
-        alphaCutoff: m.settings[1],
-        doubleSided: m.doubleSided,
-        ...(m.physical && { extensions: Object.fromEntries(m.extensions.map((e) => ['KHR_materials_' + e, {}])) }),
-      },
-    ],
+    meshes: [{ primitives: groups.map((g) => ({ material: g.materialIndex })) }],
+    materials: materials.map((m) => ({
+      pbrMetallicRoughness: { baseColorFactor: m.color, roughnessFactor: m.factors[0], metallicFactor: m.factors[1] },
+      emissiveFactor: m.emissive,
+      alphaMode: ['OPAQUE', 'MASK', 'BLEND'][m.settings[0]],
+      alphaCutoff: m.settings[1],
+      doubleSided: m.doubleSided,
+      ...(m.physical && { extensions: Object.fromEntries(m.extensions.map((e) => ['KHR_materials_' + e, {}])) }),
+    })),
   };
-  const model = new PBRModel(engine, new GLTFAsset(doc, []), [], [[packGeometry(geometry)]]);
-  const g = model.primitives[0].material;
-  Object.assign(g, {
-    extendedFrame: true,
-    base: m.color,
-    emission: m.emissive,
-    factors: m.factors,
-    settings: m.settings,
-    uvt: m.uvt,
-  });
-  // Physical: gltf-pro's factor-only variant (five maps), live arrays, and the tinted-blend constant read every frame.
-  if (m.physical) {
-    Object.assign(g, { physical: m.physical, ext: m.ext, volume: m.volume, maps: g.maps.slice(0, 5) });
-    Object.defineProperty(g, 'tint', { get: () => m.tint });
+  const model = new PBRModel(engine, new GLTFAsset(doc, []), [], [prepared]);
+  for (const primitive of model.primitives) {
+    const m = materials[primitive.definition.material!],
+      g = primitive.material;
+    Object.assign(g, {
+      extendedFrame: true,
+      base: m.color,
+      emission: m.emissive,
+      factors: m.factors,
+      settings: m.settings,
+      uvt: m.uvt,
+    });
+    // Physical: gltf-pro's factor-only variant (five maps), live arrays, and the tinted-blend constant read every frame.
+    if (m.physical) {
+      Object.assign(g, { physical: m.physical, ext: m.ext, volume: m.volume, maps: g.maps.slice(0, 5) });
+      Object.defineProperty(g, 'tint', { get: () => m.tint });
+    }
+    if (m.customState)
+      g.renderState = {
+        blend: blends[m.blending],
+        depthWrite: m.depthWrite,
+        depthCompare: m.depthTest ? undefined : 'always',
+      } satisfies PBRRenderState;
+    g.shading = {
+      shader: (code, group) => m.shader(code, group),
+      bindings: () => m.bindings(runtime.gpu!, runtime),
+    };
   }
-  if (m.customState)
-    g.renderState = {
-      blend: blends[m.blending],
-      depthWrite: m.depthWrite,
-      depthCompare: m.depthTest ? undefined : 'always',
-    } satisfies PBRRenderState;
-  model.addLighting({
-    shader: (code, group) => m.shader(code, group),
-    bindings: () => m.bindings(runtime.gpu!, runtime),
-  });
-  const entry: Entry = { model, material: m, order: renderOrder };
+  const entry: Entry = { model, materials: groups.map((g) => materials[g.materialIndex]), order: renderOrder };
   model.registerPasses = () => {};
   try {
     runtime.use(model);
@@ -833,23 +904,27 @@ export function createMesh(
   }
   set.add(entry);
   model.onDispose(() => set.delete(entry));
-  return Object.defineProperty(model, 'material', { value: m }) as MaterialMesh;
+  return Object.defineProperty(model, 'material', {
+    value: Array.isArray(material) ? materials : material,
+  }) as MaterialMesh<M>;
 }
 /** A materials mesh drawn as `instances.count` instances in one draw call (three.js InstancedMesh); `instances` holds each one's matrix, tint and UV transform. */
-export type InstancedMesh = MaterialMesh & { readonly instances: PBRInstances };
+export type InstancedMesh<M extends Material | readonly Material[] = Material> = MaterialMesh<M> & {
+  readonly instances: PBRInstances;
+};
 /**
  * `createMesh` for `capacity` copies in one instanced draw: `mesh.instances.setMatrixAt(i, m)`, `setColorAt`, `setUVTransformAt`
  * (an atlas region), `count`. Instance matrices are relative to `mesh.root`. Works with shadows, clustered, IBL, fog and SSAO.
  */
-export function createInstancedMesh(
+export function createInstancedMesh<M extends Material | readonly Material[]>(
   engine: EngineKernel,
   geometry: MeshGeometry,
-  material: Material,
+  material: M,
   capacity: number,
   options: { renderOrder?: number } = {},
-): InstancedMesh {
+): InstancedMesh<M> {
   const instances = new PBRInstances(capacity),
     model = createMesh(engine, geometry, material, options);
-  model.primitives[0].instances = instances;
-  return Object.defineProperty(model, 'instances', { value: instances }) as InstancedMesh;
+  for (const primitive of model.primitives) primitive.instances = instances;
+  return Object.defineProperty(model, 'instances', { value: instances }) as InstancedMesh<M>;
 }
