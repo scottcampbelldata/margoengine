@@ -70,7 +70,7 @@ These limits remain after the three hooks:
 These partials are narrower APIs that already have a Margo path. They are limits to state, not missing packages:
 
 - Node materials compile typed WGSL. They are not three.js TSL, and there is no raw shader material with its own vertex layout.
-- glTF reads the extensions listed on that row. A file that requires `KHR_animation_pointer` throws and names the extension. Export writes no cameras or lights.
+- glTF reads the extensions listed on that row. A file that requires `KHR_animation_pointer` throws and names the extension. Optional exporters `exportModel` writes loaded glTF-pro perspective/orthographic cameras and existing directional/point/spot lights in GLB/JSON, including live values and node attachments; camera/light-free scenes still export. The engine/data-scene `exportGLTF` and `exportGLB` entrypoints omit those attachments.
 - KTX2 works for `KHR_texture_basisu` on a glTF. A standalone `.ktx2` is a raw `GPUTexture` that materials cannot take. Cube maps, arrays, and UASTC HDR are rejected.
 - Materials meshes accept independent `uvs1` coordinates and geometry groups with material arrays, including instancing and glTF export. UV1 falls back to UV0 when omitted. Arbitrary named vertex attributes remain absent, so the combined geometry-attributes row stays PARTIAL and the counts remain 99 / 35 / 25.
 - Toon shading applies to every core mesh at once, not to a glTF-pro or skinned material.

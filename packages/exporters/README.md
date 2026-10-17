@@ -27,7 +27,7 @@ const textured = exportGLB({nodes: [{
 }]});
 ```
 
-## Materials model export
+## Loaded and materials model export
 
 Use `exportModel` from `@margoengine/exporters/model` to save loaded glTF models or meshes made by `@margoengine/materials`, including their live textures:
 
@@ -37,6 +37,11 @@ import {exportModel} from '@margoengine/exporters/model';
 const glb = await exportModel(mesh, {binary: true});
 const {text, bin} = await exportModel(mesh, {embed: false});
 ```
+
+Loaded glTF-pro models retain their scene cameras and existing directional, point and spot lights in GLB and JSON
+output. `exportModel` writes live perspective/orthographic projections, light color/intensity/range and spot cones,
+with node attachments, hierarchy and live transforms. Hidden nodes follow `onlyVisible`; a model with no cameras or
+lights exports without camera arrays or punctual-light declarations. No additional light type is introduced.
 
 Geometry groups remain primitives under one mesh node, with each group's material, textures and index range. Independent UV1 coordinates are written as `TEXCOORD_1`; referenced UV sets are retained even when every coordinate is zero. Texture UV selection and affine transforms use the live material rows, including changes made with `material.setUVTransform({texCoord: 1}, 'aoMap')`. An unused UV1 copy of UV0 is omitted.
 
@@ -104,9 +109,21 @@ Load these GLBs with `@margoengine/gltf-pro` and attach `@margoengine/animation`
 
 ## Limits
 
-No cameras, lights, instancing extensions, KHR material extensions, Draco or meshopt compression, sparse accessors or interleaved buffers. Skins support four influences per vertex. Texture samplers are fixed (linear, mipmapped, repeat). `exportGLTF` puts images in the buffer rather than separate image files. OBJ and PLY write `vn`/normals per vertex rather than deduplicating them. Node names are not made unique. The existing `@margoengine/gltf` loader accepts what these exporters write from an engine, but data-scene exports with deformation, vertex colors or textures need the optional packages described above.
+The engine/data-scene `exportGLTF` and `exportGLB` entrypoints do not write cameras, lights, instancing extensions or
+KHR material extensions; use `exportModel` for loaded glTF-pro camera/light attachments and PBR metadata. Export does
+not produce Draco or meshopt compression, sparse accessors or interleaved buffers. Engine/data-scene skins support
+four influences per vertex, and their texture samplers are fixed (linear, mipmapped, repeat). `exportGLTF` puts images
+in the buffer rather than separate image files. OBJ and PLY write `vn`/normals per vertex rather than deduplicating
+them. Node names are not made unique. The existing `@margoengine/gltf` loader accepts what these exporters write from
+an engine, but data-scene exports with deformation, vertex colors or textures need the optional packages described above.
 
 ## Tests
+
+`node --test packages/exporters/tests/scene-camera-lights*.test.js` from the repository root tests actual loaded
+DirectionalLight, Cameras, PointLightIntensityTest and Box assets in GLB and JSON. It compares exported definitions,
+node references and reloaded transforms; checks live edits, hidden nodes, multiple models and camera/light-free
+scenes; and rejects invalid live metadata. With the official validator installed, every round trip requires zero
+validator errors. GPU operations and PNG decoding use Node boundary shims; the loader and PBR model setup run unchanged.
 
 `npm test` in `packages/exporters` runs Node checks against a real Margo Engine `Engine` and Wasm transform kernel with a no-op renderer: every glTF and GLB is run through the official Khronos `gltf-validator` and must have zero errors and zero warnings; GLBs are re-imported with `@margoengine/gltf` and the kernel's world matrices, vertex data and materials are compared; deduplication, min/max and 4-byte alignment are checked; the Khronos Box and BoxTextured assets are round-tripped (BoxTextured with its PNG, UVs, tangents and colors); STL binary is checked byte by byte (80-byte header, count, 50-byte records) and ASCII STL, OBJ/MTL and both PLY encodings are parsed back by small reference parsers. The validator is not a repository dependency: install it with `npm install gltf-validator` in a scratch folder and point `MARGOENGINE_EXPORTERS_TOOLS` at it (default `/tmp/claude-0/exporters-tools`); without it the validator tests are skipped.
 

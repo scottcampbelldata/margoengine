@@ -1,6 +1,6 @@
 {
-  "commit": "686d8d2",
-  "dirty": true,
+  "commit": "f93ad38",
+  "dirty": false,
   "browser": "msedge 155.0.4283.60 headless",
   "adapter": "nvidia ampere",
   "method": "Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults",
@@ -11,8 +11,8 @@
       "encoding": "identity",
       "transferred": 808,
       "raw": 558,
-      "gzip": 370,
-      "brotli": 227
+      "gzip": 369,
+      "brotli": 226
     },
     {
       "path": "assets/geometry-CAWt7Gfm.js",
@@ -24,13 +24,13 @@
       "brotli": 938
     },
     {
-      "path": "assets/index-cDoxHMJ6.js",
+      "path": "assets/index-BDyVfnfb.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 21965,
+      "transferred": 21966,
       "raw": 50889,
-      "gzip": 21584,
-      "brotli": 19027
+      "gzip": 21585,
+      "brotli": 19025
     },
     {
       "path": "assets/extension-DuYhGmhk.js",
@@ -42,13 +42,13 @@
       "brotli": 44
     },
     {
-      "path": "assets/dist-BuoSC44Y.js",
+      "path": "assets/dist-CoxE7TLT.js",
       "role": "@margoengine/gltf (app.load)",
       "encoding": "gzip",
-      "transferred": 5284,
-      "raw": 11882,
-      "gzip": 4912,
-      "brotli": 4424
+      "transferred": 5407,
+      "raw": 12388,
+      "gzip": 5035,
+      "brotli": 4535
     },
     {
       "path": "model.glb",
@@ -62,10 +62,10 @@
   ],
   "total": {
     "requests": 6,
-    "transferred": 31407,
-    "raw": 66737,
-    "gzip": 28390,
-    "brotli": 25019
+    "transferred": 31531,
+    "raw": 67243,
+    "gzip": 28513,
+    "brotli": 25127
   },
   "notFetched": [
     {
@@ -93,12 +93,12 @@
       "raw": 26731
     },
     {
-      "path": "assets/dist-CRraD2Og.js",
-      "raw": 69030
-    },
-    {
       "path": "assets/dist-DnGFOsSt.js",
       "raw": 63300
+    },
+    {
+      "path": "assets/dist-i7T6mlU8.js",
+      "raw": 69784
     },
     {
       "path": "assets/occt-import-js-BhHfLpto.wasm",

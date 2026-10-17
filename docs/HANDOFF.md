@@ -27,8 +27,10 @@ and adapter audit is retained beside the profile. Evidence: `docs/materials-wire
 `docs/tonemap-lut-sizes-verification.md`.
 
 The standalone shared depth proposal was canceled before any commit: its API, loose tests and docs were removed.
-PostStack's existing depthTexture and its consumers are unchanged. The current request is limited to the selection
-README example and its loaded-assembly pixel proof. Export is explicitly deferred; do not start it or any MISSING row.
+PostStack's existing depthTexture and its consumers are unchanged. Selection's README fix and loaded-assembly pixel
+proof are complete. The authorized loaded glTF-pro scene camera/light export in optional exporters is also complete;
+no further parity work is authorized. Do not start any MISSING row or change core, stage, wireframe, picking or the
+outline renderer.
 Section clipping now reuses the existing machinery
 uniform in optional glTF-pro and directional shadow shaders; core, stage and the machinery core-shader patch are unchanged.
 Physical GPU Box.glb tests pass 15 checks at actual 1x/4x, including removal/retention of beauty and cast shadow.
@@ -44,9 +46,25 @@ picks FridgeDoor and outlines only its subtree, (207,144) picks the drawable Fri
 and (2,2) misses and restores the exact unselected frame. Root-to-child also restores the exact child-only frame.
 All eight physical GPU checks pass at actual 1x/4x; the old README fails those checks. Five loaded-asset Node checks
 and all 31 selection Node tests pass. The corrected README example compiles under strict TypeScript.
-Core + stage remains exactly 21,094 bytes gzip. Core, stage, wireframe and exporters are unchanged; export is deferred.
+Core + stage remains exactly 21,094 bytes gzip. Selection changed no core, stage, wireframe or exporters source.
 Selection verification passes `npm run verify`: 2,523 Node tests and all 15 current proofs. Selection hygiene gates
 have no new violations. This change updates documentation and tests only; no picking or outline shader is changed.
+
+Optional exporters `exportModel` now writes loaded scene perspective/orthographic cameras and existing
+directional/point/spot lights in GLB and JSON. Live projections, colors, intensities, ranges and cones retain their
+node attachments, hierarchy and transforms; hidden nodes follow `onlyVisible`. Empty camera/light metadata stays
+absent, and node punctual-light extensions coexist with instancing. No new light type or public entrypoint is added;
+engine/data-scene `exportGLTF` and `exportGLB` retain their previous camera/light limits.
+`node --test packages/exporters/tests/scene-camera-lights.test.js packages/exporters/tests/scene-camera-lights-validation.test.js`
+passes 20 tests on actual loaded DirectionalLight, Cameras, PointLightIntensityTest and Box assets, including
+round trips with zero official glTF validator errors. The old writer failed the metadata assertions; the no-camera,
+no-light Box baseline already passed. Sparse, invalid or non-finite live metadata rejects before JSON serialization.
+`npm run verify` passes 2,567 Node tests after rebasing onto upstream parser hardening (`666cb4e`), the gameplay
+sandbox checks and all 15 current proofs; API reports remain
+173 entries / 1,782 exports. Core + stage remains exactly 21,094 bytes gzip. Core, stage, wireframe, picking and the
+outline renderer are unchanged. Exporters hygiene has no additional violations. Refreshed optional entry measurements
+record `exporters/model` at 8,464 bytes gzip (+854) and the root at 19,425 (+841), with bare imports external.
+The paired basic-scene network record was regenerated under the shared GPU lock; all six size-page tests pass.
 
 ## Goal
 
@@ -2674,7 +2692,8 @@ are the source's). Time/size (`examples/package-benchmarks/exporters-model.mjs`,
 robot 464 -> 451 kB in 3.6 ms, 2 x 500 instanced grids 2.6 ms. Gzip (min, bare external): scene glTF path 7,079 ->
 7,157, usdz 5,911 -> 5,915, `/model` eager 6,859 (entry 5,175 + shared container 1,684), lazy chunks: clip writer 539,
 PNG encoder 1,026. `node packages/exporters/tests/png-browser.mjs` checks the canvas paths (flipY, maxTextureSize, passed on
-Edge 155). Left: cameras/lights, Draco/meshopt output, materials normal/matcap shading and custom blending.
+Edge 155). Cameras/lights were added to `exportModel` on 2026-10-17 (see current scope above). Left: Draco/meshopt
+output, materials normal/matcap shading and custom blending.
 
 Point and spot light shadows (gap 4, done 2026-10-14, core untouched): `LocalShadows` in the new entry
 `@margoengine/clustered/shadows` (`packages/clustered/src/shadows.ts`). `castShadow: true` on a clustered light gives it a

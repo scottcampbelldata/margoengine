@@ -16,6 +16,7 @@ import type { PNGSource } from './png.js';
 type PBRPrimitive = ModelPrimitive & { instances?: { count: number; data: Float32Array } };
 import { Bin, ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER, FLOAT, type GLTFJsonResult } from './container.js';
 import { decompose } from './scene.js';
+import { writeSceneMetadata } from './scene-metadata.js';
 export type { GLTFJsonResult } from './container.js';
 
 /** One animation channel. `node` indexes `model.nodes`; `values` holds one value per key (three per key for CUBICSPLINE). */
@@ -541,7 +542,8 @@ function trs(node: PBRModel['root']): Json {
 
 /**
  * Exports gltf-pro models (from loadGLTF/parseGLTF, or @margoengine/materials `createMesh`) as glTF 2.0: the hierarchy
- * with live transforms, meshes, materials and textures, skins, morph targets and weights, instancing, and `animations`.
+ * with live transforms, cameras, punctual lights, meshes, materials and textures, skins, morph targets and weights,
+ * instancing, and `animations`.
  * `binary: true` resolves to GLB bytes, otherwise to the `.gltf` result. Async because textures without encoded bytes
  * are PNG-encoded. The clip writer and the PNG encoder load with import() only when needed.
  */
@@ -632,6 +634,10 @@ export async function exportModel(
       if (primitives[0].weights.length) out.weights = Array.from(primitives[0].weights);
       if (def.skin !== undefined) out.skin = w.skin(model, doc.skins![def.skin], map);
       if (inst) out.extensions = { EXT_mesh_gpu_instancing: w.instances(inst) };
+    }
+    if (writeSceneMetadata(w, model, map)) {
+      w.used.add('KHR_lights_punctual');
+      if (doc.extensionsRequired?.includes('KHR_lights_punctual')) w.required.add('KHR_lights_punctual');
     }
   }
   if (animations.some((a) => !maps.has(a?.model)))
