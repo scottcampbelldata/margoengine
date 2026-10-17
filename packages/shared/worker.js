@@ -2,19 +2,20 @@
 // worker. ArrayBuffers and ImageBitmaps move in both directions without copies.
 
 /** Every ArrayBuffer (behind typed arrays too) and ImageBitmap reachable from value, once each. */
-export function transferables(value, out = new Set(), seen = new Set()) {
-  if (!value || typeof value !== 'object' || seen.has(value)) return out;
-  seen.add(value);
-  if (ArrayBuffer.isView(value)) {
-    if (value.buffer instanceof ArrayBuffer) out.add(value.buffer);
-  } else if (value instanceof ArrayBuffer) out.add(value);
-  else if (typeof ImageBitmap !== 'undefined' && value instanceof ImageBitmap) out.add(value);
-  else if (value instanceof Map)
-    for (const [k, v] of value) {
-      transferables(k, out, seen);
-      transferables(v, out, seen);
-    }
-  else for (const key in value) transferables(value[key], out, seen);
+export function transferables(root, out = new Set(), seen = new Set()) {
+  // An explicit stack, not recursion: a parsed file's JSON (a glTF's extras) can nest deeper than the call stack.
+  const stack = [root];
+  while (stack.length) {
+    const value = stack.pop();
+    if (!value || typeof value !== 'object' || seen.has(value)) continue;
+    seen.add(value);
+    if (ArrayBuffer.isView(value)) {
+      if (value.buffer instanceof ArrayBuffer) out.add(value.buffer);
+    } else if (value instanceof ArrayBuffer) out.add(value);
+    else if (typeof ImageBitmap !== 'undefined' && value instanceof ImageBitmap) out.add(value);
+    else if (value instanceof Map) for (const [k, v] of value) stack.push(k, v);
+    else for (const key in value) stack.push(value[key]);
+  }
   return out;
 }
 
@@ -86,13 +87,12 @@ export function serve(job) {
       const result = await job(data);
       self.postMessage({ result }, [...transferables(result)]);
     } catch (error) {
-      self.postMessage({
-        error: {
-          ...error,
-          name: error?.name ?? 'Error',
-          message: error instanceof Error ? error.message : String(error),
-        },
-      });
+      const reply = { name: error?.name ?? 'Error', message: error instanceof Error ? error.message : String(error) };
+      try {
+        self.postMessage({ error: { ...error, ...reply } });
+      } catch {
+        self.postMessage({ error: reply }); // a property that cannot be cloned must not leave the caller waiting
+      }
     }
   };
 }

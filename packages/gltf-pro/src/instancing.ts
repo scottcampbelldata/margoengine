@@ -226,6 +226,9 @@ export const instancing = {
       n = t ? t.length / 3 : r ? r.length / 4 : s ? s.length / 3 : 0;
     if (!n || (t && t.length !== n * 3) || (r && r.length !== n * 4) || (s && s.length !== n * 3))
       throw new TypeError('Invalid EXT_mesh_gpu_instancing attributes');
+    // 96 bytes per instance (per node) count toward the decoded budget (4x maxDownloadBytes) before allocating: a
+    // 12-byte TRANSLATION per instance would otherwise expand 8x past it, once for every node that uses the accessors.
+    asset.reserveDecodedBytes(n * 96);
     const out = new PBRInstances(n),
       q = [0, 0, 0, 1];
     for (let i = 0; i < n; i++) {

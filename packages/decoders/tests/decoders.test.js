@@ -7,7 +7,7 @@ import { extname, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import * as decoders from '../dist/index.js';
 import { WorkerPool, payload } from '../dist/pool.js';
-import { decodeDraco, dracoTransferables, initBasis, initDraco, transcodeKTX2 } from '../dist/codec.js';
+import { decodeDraco, dracoTransferables, initBasis, initDraco, isDecoderCrash, transcodeKTX2 } from '../dist/codec.js';
 
 // Emscripten detects Node and reaches for CommonJS `require` while initializing.
 globalThis.require ??= createRequire(import.meta.url);
@@ -324,6 +324,40 @@ test('worker errors, crashes, aborts and disposal reject only the affected jobs'
   assert.equal(pool.pending, 0);
 });
 
+test('a job past its time limit restarts its worker; an aborted job keeps its worker busy until it ends', async () => {
+  FakeWorker.created = [];
+  const pool = new WorkerPool(
+    1,
+    () =>
+      new FakeWorker((worker, message) => {
+        // 'hang' never replies (a decode stuck on corrupt data); 'ok' replies at once.
+        if (message.mode === 'ok') worker.reply({ id: message.id, result: 'fine' });
+      }),
+  );
+  const stuck = pool.run({ mode: 'hang' }, [], undefined, 20, 'Draco decode'),
+    queued = pool.run({ mode: 'hang' }, [], undefined, 20, 'Draco decode'); // waits behind it in the worker
+  await assert.rejects(
+    stuck,
+    /^MargoError: Draco decode timed out after 20 ms \(corrupt data\?\); the decoder worker was restarted$/,
+  );
+  await assert.rejects(queued, /timed out/, 'jobs queued behind it on that worker reject too');
+  assert.ok(FakeWorker.created[0].terminated, 'the stuck worker is terminated');
+  assert.equal(await pool.run({ mode: 'ok' }, [], undefined, 20), 'fine', 'a fresh worker takes the next file');
+  // Abort a stuck job: the promise rejects at once, and the worker counts as busy until the time limit replaces it.
+  const controller = new AbortController(),
+    aborted = pool.run({ mode: 'hang' }, [], controller.signal, 30);
+  controller.abort(new Error('user cancelled'));
+  await assert.rejects(aborted, /user cancelled/);
+  assert.equal(pool.pending, 1, 'the aborted job still occupies its worker');
+  await new Promise((done) => setTimeout(done, 60));
+  assert.equal(pool.pending, 0);
+  assert.equal(await pool.run({ mode: 'ok' }, []), 'fine');
+  assert.throws(() => new decoders.DracoDecoder({ timeout: 0 }), /timeout must be a positive number/);
+  pool.dispose();
+});
+
+// A Draco header that passes decodeDraco's own check ("DRACO", version 2.2, mesh, edgebreaker, no flags); the mock decodes it.
+const dracoHeader = Uint8Array.from([0x44, 0x52, 0x41, 0x43, 0x4f, 2, 2, 1, 1, 0, 0]);
 /** Records every Draco handle and allocation so release can be asserted. */
 function mockDraco({
   kind = 1,
@@ -433,7 +467,7 @@ function mockDraco({
 
 test('mock decode returns owned typed arrays and releases every Draco handle and allocation', () => {
   const { draco, log } = mockDraco({ attributes: { POSITION: 3, NORMAL: 3 } });
-  const result = decodeDraco(draco, new Uint8Array(8));
+  const result = decodeDraco(draco, dracoHeader);
   assert.equal(result.vertexCount, 4);
   assert.ok(result.positions instanceof Float32Array && result.positions.length === 12);
   assert.ok(result.normals instanceof Float32Array);
@@ -454,7 +488,7 @@ test('mock decode releases memory on every failure path', () => {
     [{ attributes: { NORMAL: 3 } }, {}, /no POSITION/],
   ]) {
     const { draco, log } = mockDraco(options);
-    assert.throws(() => decodeDraco(draco, new Uint8Array(8), request), pattern);
+    assert.throws(() => decodeDraco(draco, dracoHeader, request), pattern);
     assert.deepEqual(new Set(log.destroyed), new Set(log.created));
     assert.deepEqual([...log.free].sort(), [...log.malloc].sort());
   }
@@ -470,7 +504,7 @@ test('Draco named channels honor accessor component types and normalize colors o
     values: { TEXCOORD_0: [0, 255], COLOR_0: [255, 128, 0, 255] },
   };
   const { draco } = mockDraco(config);
-  const result = decodeDraco(draco, new Uint8Array(8), {
+  const result = decodeDraco(draco, dracoHeader, {
     attributeIds: { POSITION: 0, TEXCOORD_0: 1, COLOR_0: 2 },
     componentTypes: { POSITION: 5126, TEXCOORD_0: 5121, COLOR_0: 5121 },
   });
@@ -480,7 +514,7 @@ test('Draco named channels honor accessor component types and normalize colors o
   );
   assert.deepEqual([...result.uvs], [0, 255, 0, 255, 0, 255], 'integer UVs remain raw for accessor normalization');
   assert.deepEqual([...result.colors.slice(0, 4)], [1, Math.fround(128 / 255), 0, 1]);
-  const defaults = decodeDraco(draco, new Uint8Array(8));
+  const defaults = decodeDraco(draco, dracoHeader);
   assert.deepEqual(
     [...defaults.uvs],
     [0, 1, 0, 1, 0, 1],
@@ -493,7 +527,7 @@ test('Draco named channels honor accessor component types and normalize colors o
   );
   const unnormalized = mockDraco({ ...config, normalized: [] }).draco;
   assert.deepEqual(
-    [...decodeDraco(unnormalized, new Uint8Array(8)).colors.slice(0, 4)],
+    [...decodeDraco(unnormalized, dracoHeader).colors.slice(0, 4)],
     [1, Math.fround(128 / 255), 0, 1],
     'default integer colors retain normalized output',
   );
@@ -521,7 +555,7 @@ test('Draco chooses triangle extraction below, at and above the native 65,536-ve
       };
       return decoder;
     };
-    const result = decodeDraco(draco, new Uint8Array(8), { attributeIds: {} });
+    const result = decodeDraco(draco, dracoHeader, { attributeIds: {} });
     assert.ok(result.indices instanceof IndexArray, `${points} vertices use ${IndexArray.name}`);
     assert.deepEqual([...result.indices], expected, 'the highest vertex index never wraps');
   }
@@ -566,7 +600,7 @@ test('Draco preflights every count, width and combined output budget before allo
   ];
   for (const [options, request, pattern] of cases) {
     const { draco, log } = mockDraco(options);
-    assert.throws(() => decodeDraco(draco, new Uint8Array(8), request), pattern);
+    assert.throws(() => decodeDraco(draco, dracoHeader, request), pattern);
     assert.deepEqual(log.malloc, [], 'all descriptors are checked before the first output malloc');
     assert.deepEqual(log.reads, [], 'invalid output metadata never reaches Draco extraction');
     assert.deepEqual(
@@ -579,7 +613,7 @@ test('Draco preflights every count, width and combined output budget before allo
 
 test('Draco output limits accept exact boundaries and account for final float32 named channels', () => {
   const { draco, log } = mockDraco({ attributes: { POSITION: 3, NORMAL: 3 } });
-  const result = decodeDraco(draco, new Uint8Array(8), {
+  const result = decodeDraco(draco, dracoHeader, {
     limits: { maxVertices: 4, maxIndices: 6, maxDecodedBytes: 108, attributeWidths: { POSITION: 3, NORMAL: 3 } },
   });
   assert.equal(result.positions.byteLength + result.normals.byteLength + result.indices.byteLength, 108);
@@ -588,7 +622,7 @@ test('Draco output limits accept exact boundaries and account for final float32 
   const integer = mockDraco();
   assert.throws(
     () =>
-      decodeDraco(integer.draco, new Uint8Array(8), {
+      decodeDraco(integer.draco, dracoHeader, {
         componentTypes: { POSITION: 5121 },
         limits: { maxDecodedBytes: 59 },
       }),
@@ -602,7 +636,7 @@ test('Draco output limits accept exact boundaries and account for final float32 
   assert.deepEqual(integer.log.reads, []);
   const cloud = mockDraco({ kind: 2 });
   assert.equal(
-    decodeDraco(cloud.draco, new Uint8Array(8), { limits: { maxIndices: 0, maxDecodedBytes: 48 } }).indices,
+    decodeDraco(cloud.draco, dracoHeader, { limits: { maxIndices: 0, maxDecodedBytes: 48 } }).indices,
     undefined,
   );
 });
@@ -643,7 +677,7 @@ test('invalid Draco limits reject before handles, payload copies, input transfer
   try {
     for (const limits of invalid) {
       const { draco, log } = mockDraco();
-      assert.throws(() => decodeDraco(draco, new Uint8Array(8), { limits }), /Draco:/);
+      assert.throws(() => decodeDraco(draco, dracoHeader, { limits }), /Draco:/);
       assert.deepEqual(log.created, [], 'invalid requests never initialize Draco handles');
       for (const transfer of [false, true])
         await assert.rejects(decoder.decode(source, { limits, transfer }), /Draco:/);
@@ -678,7 +712,7 @@ test('DracoDecoder carries validated output limits to the worker without changin
     assert.deepEqual(request.limits, limits);
     assert.deepEqual(request.attributeIds, { POSITION: 0, NORMAL: 1 });
     const { draco, log } = mockDraco({ points: 5, attributes: { POSITION: 3, NORMAL: 3 } });
-    assert.throws(() => decodeDraco(draco, new Uint8Array(8), request), /vertex/);
+    assert.throws(() => decodeDraco(draco, dracoHeader, request), /vertex/);
     assert.deepEqual(log.malloc, []);
     assert.deepEqual(log.reads, []);
   } finally {
@@ -718,7 +752,7 @@ test('mock transcode closes and deletes the KTX2 file on success and failure', (
       };
     },
   });
-  const result = transcodeKTX2(basis(true), new Uint8Array(4), 'bc7');
+  const result = transcodeKTX2(basis(true), ktx2Header(6, 6, 2), 'bc7');
   assert.equal(result.target, 'rgba8', '6x6 is not block aligned, so the compressed target falls back');
   assert.equal(result.format, 'rgba8unorm-srgb');
   assert.deepEqual(
@@ -731,8 +765,112 @@ test('mock transcode closes and deletes the KTX2 file on success and failure', (
   assert.equal(result.mipmaps[0].data.buffer, result.mipmaps[1].data.buffer, 'mips share one transferable buffer');
   assert.deepEqual(calls.slice(-2), ['close', 'delete']);
   calls.length = 0;
-  assert.throws(() => transcodeKTX2(basis(false), new Uint8Array(4), 'bc7'), /invalid/);
+  assert.throws(() => transcodeKTX2(basis(false), ktx2Header(6, 6, 2), 'bc7'), /invalid/);
   assert.deepEqual(calls, ['close', 'delete']);
+});
+
+/** A KTX 2.0 header (identifier, size, level count) with an in-bounds level index and `extra` data bytes. */
+function ktx2Header(width, height, levels, extra = 64) {
+  const bytes = new Uint8Array(80 + levels * 24 + extra),
+    view = new DataView(bytes.buffer);
+  bytes.set([0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a]);
+  view.setUint32(20, width, true);
+  view.setUint32(24, height, true);
+  view.setUint32(36, 1, true);
+  view.setUint32(40, levels, true);
+  for (let i = 0; i < levels; i++) {
+    view.setUint32(80 + i * 24, 80 + levels * 24, true);
+    view.setUint32(88 + i * 24, extra, true);
+  }
+  return bytes;
+}
+
+test('KTX2 header and level index are bounds-checked before the transcoder sees the file', () => {
+  let constructed = 0;
+  const basis = {
+    KTX2File: function () {
+      constructed++;
+      throw new Error('transcoder must not run');
+    },
+  };
+  const valid = ktx2Header(8, 8, 2),
+    view = (bytes) => new DataView(bytes.buffer);
+  const cases = [
+    ['truncated header', valid.subarray(0, 79)],
+    ['not KTX 2.0', Uint8Array.from(valid, (b, i) => (i === 5 ? 0x31 : b))],
+    [
+      'level count',
+      (() => {
+        const b = valid.slice();
+        view(b).setUint32(40, 5, true); // an 8x8 image has at most 4 levels
+        return b;
+      })(),
+    ],
+    ['truncated level index', ktx2Header(8, 8, 4).subarray(0, 100)],
+    [
+      'level 1 out of bounds',
+      (() => {
+        const b = valid.slice();
+        view(b).setUint32(24 + 88, 1 << 30, true); // level 1 byteLength
+        return b;
+      })(),
+    ],
+    [
+      'level 0 out of bounds',
+      (() => {
+        const b = valid.slice();
+        view(b).setUint32(84, 1, true); // level 0 byteOffset high word: past 4 GiB
+        return b;
+      })(),
+    ],
+    [
+      'index out of bounds',
+      (() => {
+        const b = valid.slice();
+        view(b).setUint32(48, b.length, true); // dfdByteOffset at the end, dfdByteLength 1
+        view(b).setUint32(52, 1, true);
+        return b;
+      })(),
+    ],
+  ];
+  for (const [what, bytes] of cases)
+    assert.throws(() => transcodeKTX2(basis, bytes, 'rgba8'), { message: `KTX2: invalid file (${what})` }, what);
+  assert.equal(constructed, 0);
+});
+
+test('a Wasm trap inside a decoder becomes the package error, with the trap as its cause', () => {
+  const trap = () => {
+    throw new WebAssembly.RuntimeError('memory access out of bounds');
+  };
+  const calls = [];
+  const basis = {
+    KTX2File: function () {
+      return { isValid: trap, close: trap, delete: () => calls.push('delete') };
+    },
+  };
+  assert.throws(
+    () => transcodeKTX2(basis, ktx2Header(8, 8, 1), 'rgba8'),
+    (error) =>
+      error.name === 'MargoError' &&
+      error.code === 'failed' &&
+      error.message === 'KTX2: corrupt or unsupported data stopped the decoder (memory access out of bounds)' &&
+      error.cause instanceof WebAssembly.RuntimeError &&
+      isDecoderCrash(error),
+  );
+  const draco = {
+    Decoder: function () {
+      return { GetEncodedGeometryType: trap };
+    },
+    DecoderBuffer: function () {
+      return { Init() {} };
+    },
+    destroy: trap, // a second trap while releasing does not hide the first
+  };
+  assert.throws(
+    () => decodeDraco(draco, dracoHeader),
+    (error) => /^Draco: corrupt/.test(error.message) && isDecoderCrash(error),
+  );
+  assert.equal(isDecoderCrash(new Error('Draco: unknown geometry type')), false);
 });
 
 test('real Draco Wasm decodes the Khronos Box and Avocado and does not grow its heap across repeated decodes', async () => {

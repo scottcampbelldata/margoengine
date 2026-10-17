@@ -2510,6 +2510,50 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    round trip (every exported STL/OBJ/PLY/USDZ re-imports or fails by name). Audio and video parse no containers
    themselves (the browser's decodeAudioData / video element do), so they have no target. Open: parseIFCInWorker
    browser check; navmesh (Recast) is part of the hygiene group and was not changed.
+   Status 2026-10-17, 11a part 1 (glTF, gltf-pro with its parse worker, KHR_texture_basisu path and progressive stream,
+   `.margo`, meshopt, Draco, KTX2, HDR, EXR, UltraHDR; and the native FBX importer again, now through gltf-pro): the
+   work of branch `claude/wip-fuzz-gltf-textures` (written against 849ff51, stopped by a usage limit, conflicting with
+   main in 12 files) moved onto the shared harness instead of its second runner. Targets: `scripts/fuzz/targets-formats.js`;
+   helpers in `scripts/fuzz/formats.js` (seeds from the repo's Khronos models with textures swapped for a 1x1 PNG, the
+   package fixtures and synthetic HDR/UltraHDR files; GLB packing; structure-aware glTF JSON mutations; corruption of
+   known GLB, KTX2, EXR and .margo length/offset/count fields; options such as meshopt count/stride or the progressive
+   server's range behaviour ride in an 8-byte prefix, so saved inputs replay). Harness changes (`harness.js`): a load
+   that never settles is a `hang` finding (it used to end the child with exit 13), each parser gets a copy of its input,
+   output checks throw `GARBAGE: ...` (index out of range, non-finite vertex, a meshopt read past its stream, a result
+   that changes with the bytes around the input: every fourth input also runs at offset 8 of a junk-filled buffer), a
+   DOMException is a finding, JSON.parse SyntaxErrors count as one class, and a target's `own` pattern names its messages
+   that quote engine words ("Invalid glTF JSON: <parser detail>"). `npm run fuzz -- --short` in test:release covers the
+   12 new targets. The fbx target now runs `parseFBX` (converter, then gltf-pro on the GLB it wrote) and seeds the CC0
+   Blender rig. Each finding class was re-found on main before its fix was ported (re-applied where the file had not
+   changed since 849ff51; merged by hand in gltf, blender, the decoders codec/pool/Draco/worker and gltf-pro
+   asset/stream/progressive/prepare/instancing/index): unguarded JSON.parse and TextDecoder (gltf, gltf-pro, .margo,
+   progressive), null or non-object list entries (`checkDocument` at every gltf-pro trust boundary, incl.
+   parsePreparedPBR; the light loader checks its lists), atob's DOMException on bad base64, createImageBitmap's
+   DOMException (named TypeError; UltraHDR MargoError 'failed'), JSON nested 100,000 deep (256-level limit; the worker
+   transfer walk is iterative), uncounted packed geometry in the parse worker (344 MiB from a 337 KB input at an 8 MiB
+   budget) and uncounted GPU-instancing data, progressive loads that never settled (short or misplaced range replies,
+   views past their buffer) or allocated declared buffer sizes first, meshopt reads past the stream and 1-2 GiB outputs
+   for 27-byte inputs, the Basis transcoder's `memory access out of bounds` (KTX2 level index checked first; a trap
+   becomes MargoError 'failed' with the trap as `cause` and the worker drops that Wasm instance), Draco data without a
+   Draco header, HDR/EXR images allocated before the file could hold them, EXR attribute edge cases. Draco and KTX2
+   decodes now have a per-job time limit (`timeout`, default 10 s plus 4 s per MiB; API report updated).
+   New on main: a primitive without NORMAL whose coordinates pass about 1e19 overflowed the summed face normals to
+   Infinity in Float32, and -Infinity / Infinity left NaN in the packed normal (all four gltf-pro targets, seed
+   20261017). `pack.ts` now sends a non-finite length down the zero-length path: +Z for a derived normal, RangeError
+   'Zero or non-finite glTF normal' for a supplied one (a NaN in the file is refused earlier by the accessor read; a
+   parse worker's reply reaches the packer, tested). Positions are not clamped. The regression fails on 59ef1b8 and
+   passes after.
+   Final campaign (seed 20261017, 120 s per target, two children at a time, this PC, Codex sessions running): fbx
+   28,523 inputs, gltf 27,330, gltf-pro 24,328, gltf-pro/worker 27,670, gltf-pro/ktx2 33,985, gltf-pro/progressive
+   10,306, margo 37,324, decoders/meshopt 72,447, decoders/draco 27,104, decoders/ktx2 48,253, environment/hdr 50,653,
+   environment/exr 54,407, environment/ultrahdr 69,905: no findings except the derived-normal class above, which every
+   gltf-pro target hit. After the fix, the four saved inputs pass and the four gltf-pro targets re-run on the same seed:
+   gltf-pro 25,934 inputs, gltf-pro/worker 32,082, gltf-pro/ktx2 39,878, gltf-pro/progressive 11,147, 0 findings (each
+   past the input that had failed). Regressions (all in verify): `tests/fuzz-formats-regressions.test.js` (17 tests,
+   fixtures in tests/fixtures/fuzz/), `packages/decoders/tests/decoders.test.js` (KTX2 index checks, trap conversion, pool time
+   limit), `packages/gltf-pro/tests/progressive.test.js` (4 stream hangs). Limits: docs/limits.md "Malformed and hostile
+   files" (claims LIM-030). Not measured: decode times of large valid Draco and KTX2 files. Not covered: real-browser
+   Worker runs (Node runs the worker jobs in-process; the pool time limit is unit-tested with a fake worker).
 
 Before launch, in addition to the work queue:
 - Demos smooth on first load on desktop and phones, including Android. The Galaxy S23 3-5 FPS island issue is shelved

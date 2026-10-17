@@ -1,4 +1,5 @@
 // Worker-side decode functions. Kept free of worker globals so unit tests can drive them with real or mock modules.
+import { decodeFailed } from './errors.js';
 import { transcodeFormats } from './formats.js';
 import type { DecodedDracoGeometry, DracoRequest, KTX2Mip, TranscodeTarget, TranscodedKTX2Result } from './protocol.js';
 import { validatedDracoLimits } from './protocol.js';
@@ -90,16 +91,53 @@ const integerRange: Record<string, number> = {
   DT_INT32: 2147483647,
   DT_UINT32: 4294967295,
 };
+const dracoMagic = [0x44, 0x52, 0x41, 0x43, 0x4f];
+
+/**
+ * True for the error a Wasm trap or Emscripten abort inside a decoder leaves (`unreachable`, `memory access out of
+ * bounds`, `Aborted(OOM)`), directly or as the `cause` of the decoder's own error. The module's state is undefined
+ * afterwards, so the decoder worker drops it and instantiates a fresh one for the next file.
+ */
+export const isDecoderCrash = (error: unknown): boolean =>
+  error instanceof WebAssembly.RuntimeError ||
+  (error instanceof Error && error.cause instanceof WebAssembly.RuntimeError);
+// A trap becomes the decoder's own error (trap as its cause); anything else passes through.
+const trapped = (label: string, error: unknown): unknown =>
+  error instanceof WebAssembly.RuntimeError
+    ? decodeFailed(`${label}: corrupt or unsupported data stopped the decoder (${error.message})`, error)
+    : error;
+// Runs `make` (a constructor that copies input into the Wasm heap) with a trap turned into the decoder's own error.
+function guard<T>(label: string, make: () => T): T {
+  try {
+    return make();
+  } catch (error) {
+    throw trapped(label, error);
+  }
+}
+// Releases handles after a decode; after a trap the module is discarded, so a second trap here is dropped.
+function release(failure: unknown, cleanup: () => void): void {
+  try {
+    cleanup();
+  } catch (error) {
+    if (!isDecoderCrash(failure)) throw trapped('Decoder', error);
+  }
+}
 
 /**
  * Decode one Draco buffer. Every Draco handle and heap allocation is released before returning, including on error,
- * and every output array is a copy that owns its own buffer so it can be transferred.
+ * and every output array is a copy that owns its own buffer so it can be transferred. A Wasm trap on corrupt data
+ * throws `Error('Draco: ...')` with the trap as its cause (isDecoderCrash).
  */
 export function decodeDraco(draco: DracoModule, bytes: Uint8Array, request: DracoRequest = {}): DecodedDracoGeometry {
   const limits = validatedDracoLimits(request.limits);
-  const decoder = new draco.Decoder(),
-    buffer = new draco.DecoderBuffer();
-  let geometry: DracoGeometry | null = null;
+  // The 11-byte Draco header ("DRACO", version, geometry type 0 or 1, method, flags) is checked here: for a header it
+  // cannot parse, GetEncodedGeometryType returns an uninitialized value, so the outcome would depend on Wasm memory.
+  if (bytes.length < 11 || dracoMagic.some((b, i) => bytes[i] !== b) || bytes[7] > 1)
+    throw new TypeError('Draco: invalid header');
+  const decoder = guard('Draco', () => new draco.Decoder()),
+    buffer = guard('Draco', () => new draco.DecoderBuffer());
+  let geometry: DracoGeometry | null = null,
+    failure: unknown;
   try {
     buffer.Init(new Int8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength), bytes.byteLength);
     const kind = decoder.GetEncodedGeometryType(buffer);
@@ -252,10 +290,14 @@ export function decodeDraco(draco: DracoModule, bytes: Uint8Array, request: Drac
       }
     }
     return result;
+  } catch (error) {
+    throw (failure = trapped('Draco', error));
   } finally {
-    if (geometry) draco.destroy(geometry);
-    draco.destroy(buffer);
-    draco.destroy(decoder);
+    release(failure, () => {
+      if (geometry) draco.destroy(geometry);
+      draco.destroy(buffer);
+      draco.destroy(decoder);
+    });
   }
 }
 
@@ -274,10 +316,53 @@ export function dracoTransferables(result: DecodedDracoGeometry): ArrayBuffer[] 
 
 const transferSRGB = 2;
 
-/** Transcode every mip level of a 2D KTX2 file into one buffer. The Basis file handle is closed and deleted on every path. */
+const ktx2Identifier = [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a];
+/**
+ * KTX 2.0 header and index checks (KTX 2.0 specification, section 3) before the transcoder reads the file: the level
+ * count fits the size, and every byte range the index declares (levels, DFD, key/value data, supercompression global
+ * data) lies inside the file. A truncated or corrupted file throws `Error('KTX2: invalid file (...)')` here.
+ */
+function checkKTX2(bytes: Uint8Array): void {
+  const fail = (what: string) => {
+    throw new TypeError(`KTX2: invalid file (${what})`);
+  };
+  if (bytes.length < 80) fail('truncated header');
+  if (ktx2Identifier.some((b, i) => bytes[i] !== b)) fail('not KTX 2.0');
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
+    u32 = (at: number) => view.getUint32(at, true),
+    // 64-bit offsets and lengths: a high word means past 4 GiB, outside any file this can be given.
+    u64 = (at: number) => (u32(at + 4) ? Number.POSITIVE_INFINITY : u32(at)),
+    inside = (offset: number, length: number) => offset + length <= bytes.length;
+  const levels = Math.max(1, u32(40)),
+    size = Math.max(u32(20), u32(24), 1);
+  if (levels > 1 + Math.floor(Math.log2(size))) fail('level count');
+  if (!inside(80, levels * 24)) fail('truncated level index');
+  for (let i = 0; i < levels; i++) if (!inside(u64(80 + i * 24), u64(88 + i * 24))) fail(`level ${i} out of bounds`);
+  // Zstandard-supercompressed levels (UASTC) inflate to the level's 16-byte 4x4 blocks: a larger declared size made the
+  // transcoder read past its buffer (a Wasm trap, or stale memory read as texels).
+  if (u32(44) === 2)
+    for (let i = 0; i < levels; i++) {
+      const blocks =
+        Math.ceil(Math.max(1, u32(20) >> i) / 4) *
+        Math.ceil(Math.max(1, u32(24) >> i) / 4) *
+        Math.max(1, u32(28) >> i) *
+        Math.max(1, u32(32)) *
+        u32(36);
+      if (u64(96 + i * 24) > blocks * 16) fail(`level ${i} size`);
+    }
+  if (!inside(u32(48), u32(52)) || !inside(u32(56), u32(60)) || !inside(u64(64), u64(72))) fail('index out of bounds');
+}
+
+/**
+ * Transcode every mip level of a 2D KTX2 file into one buffer. The Basis file handle is closed and deleted on every path.
+ * The header and level index are checked first (checkKTX2); a Wasm trap on corrupt data throws `Error('KTX2: ...')`
+ * with the trap as its cause (isDecoderCrash).
+ */
 export function transcodeKTX2(basis: BasisModule, bytes: Uint8Array, target: TranscodeTarget): TranscodedKTX2Result {
   if (!transcodeFormats[target]) throw new TypeError(`Unknown transcode target ${target}`);
-  const file = new basis.KTX2File(bytes);
+  checkKTX2(bytes);
+  const file = guard('KTX2', () => new basis.KTX2File(bytes));
+  let failure: unknown;
   try {
     if (!file.isValid()) throw new Error('KTX2: invalid or unsupported file');
     if (file.isHDR?.()) throw new Error('KTX2: HDR textures are not supported');
@@ -317,8 +402,12 @@ export function transcodeKTX2(basis: BasisModule, bytes: Uint8Array, target: Tra
       hasAlpha: !!file.getHasAlpha(),
       srgb,
     };
+  } catch (error) {
+    throw (failure = trapped('KTX2', error));
   } finally {
-    file.close();
-    file.delete();
+    release(failure, () => {
+      file.close();
+      file.delete();
+    });
   }
 }

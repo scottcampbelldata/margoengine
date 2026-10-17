@@ -1,4 +1,4 @@
-import { WorkerPool, payload, requireWorkers, workerLimit } from './pool.js';
+import { WorkerPool, jobTimeout, payload, requireWorkers, timeLimit, workerLimit } from './pool.js';
 import type { DecodedDracoGeometry, DracoRequest } from './protocol.js';
 import { validatedDracoLimits } from './protocol.js';
 
@@ -7,6 +7,11 @@ export interface DracoOptions {
   decoderPath?: string;
   /** Maximum workers. Default: hardware threads capped at 4. */
   workerLimit?: number;
+  /**
+   * Most milliseconds one decode may take before its worker is restarted and the decode rejects. Default: 10 s plus
+   * 4 s per MiB of input; Infinity disables the limit.
+   */
+  timeout?: number;
 }
 
 export interface DracoDecodeOptions extends DracoRequest {
@@ -19,11 +24,13 @@ export interface DracoDecodeOptions extends DracoRequest {
 export class DracoDecoder {
   readonly workerLimit: number;
   private readonly decoderPath?: string;
+  private readonly timeout?: number;
   private pool?: WorkerPool;
 
   constructor(options: DracoOptions = {}) {
     this.workerLimit = workerLimit(options.workerLimit);
     this.decoderPath = options.decoderPath;
+    this.timeout = timeLimit(options.timeout);
   }
 
   /** Decode a Draco buffer, such as a KHR_draco_mesh_compression bufferView, into transferable typed arrays. */
@@ -39,6 +46,8 @@ export class DracoDecoder {
         { type: 'draco', buffer, request: { attributeIds, componentTypes, limits }, ...this.urls() },
         [buffer],
         options.signal,
+        this.timeout ?? jobTimeout(buffer.byteLength),
+        'Draco decode',
       );
     } catch (error) {
       return Promise.reject(error);

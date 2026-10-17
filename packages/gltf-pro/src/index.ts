@@ -17,6 +17,7 @@ import { setMeshSource, clearMeshSource, type MeshSource } from '../../shared/me
 import { shadowPrimitivesInto } from '../../shared/shadow-source.js';
 import {
   GLTFAsset,
+  checkDocument,
   container,
   loadAsset,
   closeImages,
@@ -2607,6 +2608,7 @@ export function parsePreparedPBR(
   images: readonly GLTFImage[] = [],
   { maxNodes }: Pick<AssetOptions, 'maxNodes'> = {},
 ): PBRModel {
+  checkDocument(doc);
   if (
     doc.buffers?.length ||
     doc.skins?.length ||

@@ -1,6 +1,7 @@
 // UltraHDR (gain-map JPEG, Adobe/Google hdrgm XMP) decoding: the Three.js UltraHDRLoader equivalent.
 import { MAX_PIXELS, toBytes, type FloatImage } from './hdr.js';
 import { SRGBToLinear as srgbToLinear } from '@margoengine/math/color';
+import { MargoError } from '@margoengine/math/errors';
 
 /** Gain-map metadata from the hdrgm XMP, per RGB channel where the format allows it. Min, max and capacities are log2. */
 export interface GainMapMetadata {
@@ -183,6 +184,12 @@ async function decodeJPEG(jpeg: Uint8Array): Promise<RGBA8Image> {
   const bitmap = await createImageBitmap(new Blob([jpeg as Uint8Array<ArrayBuffer>], { type: 'image/jpeg' }), {
     colorSpaceConversion: 'none',
     premultiplyAlpha: 'none',
+  }).catch((error) => {
+    // The browser rejects undecodable bytes with a DOMException: report it as the decoder's own error.
+    throw new MargoError(
+      'failed',
+      `UltraHDR: the JPEG could not be decoded (${error?.message ?? error}); check the file`,
+    );
   });
   try {
     const context = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d');

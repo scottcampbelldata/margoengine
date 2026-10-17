@@ -418,11 +418,14 @@ export function loadGLTFProgressive(
     });
     if (decoders.instancing) hooks.instancing = { read: () => undefined };
     if (decoders.materials) hooks.materials = decoders.materials;
+    // Placeholder buffers at their declared sizes: checked against the budget before they are allocated.
+    const sizes = (doc.buffers ?? []).map((b) =>
+      Number.isSafeInteger(b?.byteLength) && b.byteLength > 0 ? b.byteLength : 0,
+    );
+    if (sizes.reduce((sum, n) => sum + n, 0) > limit) throw overBudget('glTF buffers exceed byte budget', limit);
     asset = new GLTFAsset(
       doc,
-      (doc.buffers ?? []).map(
-        (b) => new Uint8Array(Number.isSafeInteger(b?.byteLength) && b.byteLength > 0 ? b.byteLength : 0),
-      ),
+      sizes.map((n) => new Uint8Array(n)),
       undefined,
       hooks,
       limit,

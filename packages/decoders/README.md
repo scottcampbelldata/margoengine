@@ -43,6 +43,7 @@ draco.dispose(); ktx2.dispose();
 | `workerLimit` | both | Hardware threads, capped at 4 (allowed range 1 to 16) |
 | `device` | KTX2 | None. Picks the target and is required by `createTexture` |
 | `target` | KTX2 | Negotiated from `device`. Set `'rgba8'` for CPU access to texels |
+| `timeout` | both | 10 s plus 4 s per MiB of input. Most milliseconds one decode may run; past it the worker is restarted and the decode rejects (`Draco decode timed out after ... ms`). `Infinity` disables it |
 
 `decode` and `transcode` also accept an `AbortSignal` as `signal`. The decoders evaluate the Emscripten wrappers inside the worker, so a strict Content Security Policy needs `'unsafe-eval'` in `worker-src`/`script-src` for the worker.
 
@@ -58,6 +59,17 @@ semantics to their expected component counts. Limits include final Float32 stora
 for named channels. Draco's internal Wasm geometry decode still allocates before
 its actual counts are available; these are output extraction limits, not a cap on
 the decoder's internal Wasm heap.
+
+## Corrupt and hostile files
+
+Every decode ends in a result or a named error: a `TypeError` or `RangeError` whose message starts with `Draco:`,
+`KTX2:` or `EXT_meshopt_compression:`, or a `MargoError` with code `'failed'` (launch gate 11a; `npm run fuzz`
+exercises all three). The KTX2 header and level index are bounds-checked before the transcoder sees the file, and a
+Draco buffer must start with a Draco header. A Wasm trap inside Draco or Basis (`unreachable`, `memory access out of
+bounds`) becomes `MargoError('failed', 'Draco: corrupt or unsupported data stopped the decoder (...)')` with the trap
+as its `cause`; the worker then drops that Wasm instance and the next file gets a fresh one. `timeout` bounds a decode that
+corrupt data keeps busy. An aborted decode keeps its worker busy
+until it ends or times out, so no new decode queues behind it unknowingly.
 
 ## Limits
 

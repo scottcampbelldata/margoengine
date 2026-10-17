@@ -43,6 +43,7 @@ export class DracoDecoder {
 export interface DracoOptions {
     decoderPath?: string;
     workerLimit?: number;
+    timeout?: number;
 }
 
 export interface DracoRequest {
@@ -84,6 +85,7 @@ export interface KTX2Options {
     target?: TranscodeTarget;
     transcoderPath?: string;
     workerLimit?: number;
+    timeout?: number;
 }
 
 export interface KTX2TextureOptions {

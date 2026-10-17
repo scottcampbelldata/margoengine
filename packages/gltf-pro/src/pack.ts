@@ -147,9 +147,10 @@ function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
     vertices[o + 2] = positions[p + 2];
     vertices[o + 3] = 1;
     // Without NORMAL, a vertex no triangle shades (unreferenced, only in degenerate triangles, or in points and lines,
-    // which draw unlit) gets +Z; a zero normal the file supplies is an error.
-    if (!length) {
-      if (a.NORMAL !== undefined) throw new RangeError('Zero glTF normal');
+    // which draw unlit) gets +Z, and so does one whose summed face normals overflow Float32 (coordinates past about
+    // 1e19: Infinity / Infinity would be NaN); a zero or non-finite normal the file supplies is an error.
+    if (!length || !Number.isFinite(length)) {
+      if (a.NORMAL !== undefined) throw new RangeError('Zero or non-finite glTF normal');
       vertices[o + 6] = 1;
     } else {
       vertices[o + 4] = nx / length;

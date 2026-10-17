@@ -158,22 +158,31 @@ export async function input(target, context, seed, iteration) {
 
 // Messages V8 and Wasm produce on their own: if one escapes a parser, the parser did not validate first.
 const ENGINE =
-  /Cannot read propert|Cannot set propert|is not a function|is not iterable|is not defined|is not a constructor|Invalid array length|Invalid typed array length|Array buffer allocation failed|Maximum call stack|out of memory|Offset is outside the bounds|outside the bounds of the DataView|Start offset .* is outside|should be a multiple of|Invalid DataView length|Unexpected (token|end of JSON|non-whitespace)|in JSON at position|Cannot convert|Cannot mix BigInt|unreachable|memory access out of bounds|Aborted\(|RangeError: Invalid string length|Invalid string length|Reduce of empty array|undefined is not|null is not|Converting circular|The encoded data was not valid|incorrect header check|invalid (stored|distance|code|block)|unexpected end of file|Decompression failed|The compressed data/i;
+  /Cannot read propert|Cannot set propert|is not a function|is not iterable|is not defined|is not a constructor|Invalid array length|Invalid typed array length|Array buffer allocation failed|Maximum call stack|out of memory|Offset is outside the bounds|outside the bounds of the DataView|Start offset .* is outside|should be a multiple of|Invalid DataView length|Unexpected (token|end of JSON|non-whitespace)|in JSON at position|Cannot convert|Cannot mix BigInt|unreachable|memory access out of bounds|Aborted\(|RangeError: Invalid string length|Invalid string length|Reduce of empty array|undefined is not|null is not|Converting circular|The encoded data was not valid|incorrect header check|invalid (stored|distance|code|block)|unexpected end of file|Decompression failed|The compressed data|offset is out of bounds|Cannot create property|Cannot assign to read only|must be an ArrayBuffer|was not valid for encoding|Source is too large|circular structure|Invalid count value|Invalid code point|Invalid time value/i;
 
-/** Default oracle: native errors are named only when their message is the package's own, not the engine's. */
+/**
+ * Default oracle: native errors are named only when their message is the package's own, not the engine's. A target's
+ * output check throws `GARBAGE: ...` for a result that parsed but is malformed; a DOMException (other than an abort) is
+ * a browser API's own error that the parser let through.
+ */
 export function isNamed(error, target) {
   if (!(error instanceof Error)) return false;
   if (typeof WebAssembly !== 'undefined' && error instanceof WebAssembly.RuntimeError) return false;
+  if (error.message.startsWith('GARBAGE:')) return false;
+  if (error instanceof DOMException && error.name !== 'AbortError') return false;
   // A package error class (LoaderError, ...) is named even when it quotes the engine message it wraps.
   if (!['Error', 'TypeError', 'RangeError', 'SyntaxError', 'ReferenceError'].includes(error.name))
     return target.named ? target.named(error) : true;
   if (error.name === 'SyntaxError' && !target.namedSyntax) return false;
+  // A package's own message that happens to use engine words ("Invalid EXR: unexpected end of file").
+  if (target.own?.test(error.message)) return target.named ? target.named(error) : true;
   if (ENGINE.test(error.message)) return false;
   return target.named ? target.named(error) : true;
 }
 
+// JSON.parse's SyntaxError names the token and position, so every input would be a new finding: one class instead.
 const signature = (kind, error) =>
-  `${kind}:${error?.name ?? ''}:${String(error?.message ?? error)
+  `${kind}:${error?.name ?? ''}:${String(error?.name === 'SyntaxError' ? 'SyntaxError' : (error?.message ?? error))
     .replace(/\d+/g, 'N')
     .replace(/"[^"]*"/g, '"S"')
     .slice(0, 120)}`;
@@ -184,12 +193,27 @@ export async function check(target, bytes) {
   const before = process.memoryUsage(),
     start = performance.now();
   let error = null,
-    threw = false;
+    threw = false,
+    timer;
+  // A load that waits for something that never comes (bytes a server will not send) never settles; with nothing else
+  // scheduled Node would just exit. Past 4x the time limit it is reported as a hang and the next input runs.
+  const hung = Symbol('hang'),
+    deadline = new Promise((resolve) => {
+      timer = setTimeout(() => resolve(hung), 4 * (target.timeMs ?? 2000));
+    });
   try {
-    await target.run(bytes);
+    // A copy: a parser may transfer (detach) or write to its input, and the seeds must survive for the next input.
+    if ((await Promise.race([target.run(bytes.slice()), deadline])) === hung)
+      return {
+        kind: 'hang',
+        signature: 'hang:async',
+        message: `never settled within ${4 * (target.timeMs ?? 2000)} ms`,
+      };
   } catch (e) {
     error = e;
     threw = true;
+  } finally {
+    clearTimeout(timer);
   }
   const elapsed = performance.now() - start,
     after = process.memoryUsage(),

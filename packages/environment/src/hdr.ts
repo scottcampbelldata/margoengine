@@ -67,6 +67,9 @@ export function parseHDR(source: ArrayBuffer | ArrayBufferView): HDRImage {
     bottomUp = resolution[1] === '+';
   if (!(width > 0 && height > 0) || width * height > MAX_PIXELS) throw new Error(`Invalid HDR size ${width}x${height}`);
 
+  // Every scanline takes at least 4 bytes: a header claiming more rows than the file can hold fails before the
+  // image is allocated (up to 1 GiB).
+  if (bytes.length - position < height * 4) throw new RangeError('Invalid HDR: truncated pixel data');
   const data = new Float32Array(width * height * 4);
   const scanline = new Uint8Array(width * 4);
   for (let row = 0; row < height; row++) {

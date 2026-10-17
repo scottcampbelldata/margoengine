@@ -1,4 +1,4 @@
-import type { GLTFPrimitive, GLTFMaterial } from '../../shared/gltf.js';
+import type { GLTFPrimitive } from '../../shared/gltf.js';
 // Network and decode half of @margoengine/gltf-pro/progressive. Runs in dist/workers/progressive.js, or on the main
 // thread where Worker is unavailable. HTTP range requests fetch each primitive's accessor bytes in the priority order
 // the main thread sends; a server without range support streams the whole file and primitives decode as their bytes
@@ -7,16 +7,18 @@ import {
   GLTFAsset,
   asyncCompression,
   assetLimit,
+  checkDocument,
   componentSizes,
+  decodeImage,
   components,
   embedded,
   entry,
   overBudget,
+  parseJSON,
 } from './asset.js';
 import { decodeExtras, packPrimitive, primitiveDefs } from './pack.js';
 import { assetURL } from '../../shared/asset-url.js';
 import { readResponse } from '../../shared/loading.js';
-import { parseJSON } from '../../shared/json.js';
 import type { GLTFDocument } from './asset.js';
 
 export type StreamError = { name: string; message: string };
@@ -128,6 +130,7 @@ export class GLTFStream {
   async run(): Promise<void> {
     try {
       const doc = await this.head();
+      checkDocument(doc); // before the main thread (or the fallback test) reads it
       if (
         asyncCompression(doc) ||
         doc.bufferViews?.some(
@@ -256,7 +259,7 @@ export class GLTFStream {
       this.loaded += text.length;
       if (text.length > this.limit) throw overBudget('glTF JSON exceeds byte budget', this.limit);
       this.sources.length = 0;
-      return parseJSON<GLTFDocument>(new TextDecoder('utf-8', { fatal: true }).decode(text));
+      return parseJSON(text);
     }
     const total = view.getUint32(8, true);
     if (view.getUint32(4, true) !== 2 || total < 20 || (range && +range[1] !== total))
@@ -287,7 +290,12 @@ export class GLTFStream {
       }
     })();
     add(s.asked, 0, s.ranged ? Math.min(65536, total) : total);
-    if (s.ranged) await body;
+    if (s.ranged) {
+      await body;
+      // A short first reply: what it claimed is marked as asked, so the gap would never be requested again.
+      if (!this.failure && !covered(s.got, 0, Math.min(65536, total)))
+        throw new RangeError('Truncated glTF range response');
+    }
     // Header, JSON chunk and BIN chunk header.
     const json = () => new DataView(s.data!.buffer).getUint32(12, true),
       need = () => Math.min(total, 28 + json());
@@ -296,7 +304,7 @@ export class GLTFStream {
       throw new TypeError('Invalid GLB chunk');
     if (s.ranged) for (const [a, b] of gaps(s.got, 0, need())) this.request(0, a, b);
     while (!covered(s.got, 0, need())) await this.next();
-    return parseJSON<GLTFDocument>(new TextDecoder('utf-8', { fatal: true }).decode(s.data!.subarray(20, 20 + json())));
+    return parseJSON(s.data!.subarray(20, 20 + json()));
   }
   // Maps each glTF buffer onto a source: the GLB's BIN chunk, an external file (range-probed on first use) or a data URI.
   private buffers(doc: GLTFDocument): void {
@@ -366,8 +374,12 @@ export class GLTFStream {
         b = this.map[v.buffer],
         lo = (v.byteOffset ?? 0) + offset,
         end = (v.byteOffset ?? 0) + v.byteLength;
-      if (!b || !Number.isSafeInteger(lo) || !Number.isSafeInteger(end) || !(length > 0)) throw new TypeError('range');
-      if (b.source >= 0) out.push([b.source, b.offset + lo, b.offset + Math.min(lo + length, end)]);
+      if (!b || !Number.isSafeInteger(lo) || lo < 0 || !Number.isSafeInteger(end) || !(length > 0))
+        throw new TypeError('range');
+      // Clipped to the glTF buffer: bytes past its end never arrive, so waiting for them would never finish (the
+      // accessor read then reports the bounds error).
+      const hi = Math.min(lo + length, end, this.asset!.buffers[v.buffer].length);
+      if (b.source >= 0 && lo < hi) out.push([b.source, b.offset + lo, b.offset + hi]);
     };
     if (a.bufferView !== undefined)
       span(
@@ -399,6 +411,8 @@ export class GLTFStream {
         if (s.ranged === undefined && +range[2] < s.data!.length) throw new RangeError('Truncated glTF buffer');
         s.ranged = true;
         await this.read(s, response, lo, request);
+        // A short 206 reply would leave its gap unfilled and every waiter on it waiting forever.
+        if (!covered(s.got, lo, Math.min(hi, s.data!.length))) throw new RangeError('Truncated glTF range response');
       } else {
         // No range support: this reply is the whole file; take it from the start.
         s.ranged = false;
@@ -475,10 +489,16 @@ export class GLTFStream {
       first: number[] = [],
       images = doc.images ?? [],
       material = (p: GLTFPrimitive) => doc.materials?.[p?.material as number];
-    const textures = (m: GLTFMaterial | undefined) =>
-      JSON.stringify(m ?? {})
-        .match(/"index":\d+/g)
-        ?.map((t) => +t.slice(8)) ?? [];
+    // Every texture index in a material, in document order; depth-bounded (a deeply nested `extras` would overflow
+    // the stack of a full walk or JSON.stringify).
+    const textures = (m: unknown, out: number[] = [], depth = 0): number[] => {
+      if (m && typeof m === 'object' && depth < 8) {
+        const index = (m as { index?: unknown }).index;
+        if (typeof index === 'number' && Number.isSafeInteger(index) && index >= 0) out.push(index);
+        for (const value of Object.values(m)) textures(value, out, depth + 1);
+      }
+      return out;
+    };
     for (const key of this.order!)
       for (const t of textures(material(defs[key]))) {
         const def = doc.textures?.[t];
@@ -502,6 +522,8 @@ export class GLTFStream {
       }
       let data: Uint8Array;
       if (def.bufferView !== undefined) {
+        // Bounds first (a named error): a view outside its buffer would otherwise wait for bytes that never arrive.
+        this.asset!.view(def.bufferView);
         const v = entry(doc.bufferViews, def.bufferView, 'bufferView'),
           b = this.map[v.buffer];
         if (b?.source >= 0) {
@@ -530,10 +552,7 @@ export class GLTFStream {
         });
         this.loaded += data.length;
       } else throw new TypeError('Invalid glTF image');
-      const image = await createImageBitmap(new Blob([new Uint8Array(data)], { type: def.mimeType }), {
-        colorSpaceConversion: 'none',
-        premultiplyAlpha: 'none',
-      });
+      const image = await decodeImage(data, def.mimeType, index);
       decoded += image.width * image.height * 4;
       if (image.width * image.height > 16_777_216) {
         image.close?.();

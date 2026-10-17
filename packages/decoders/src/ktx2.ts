@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { transcodeFormats } from './formats.js';
-import { WorkerPool, payload, requireWorkers, workerLimit } from './pool.js';
+import { WorkerPool, jobTimeout, payload, requireWorkers, timeLimit, workerLimit } from './pool.js';
 import type { TranscodeTarget, TranscodedKTX2Result } from './protocol.js';
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
@@ -72,6 +72,11 @@ export interface KTX2Options {
   transcoderPath?: string;
   /** Maximum workers. Default: hardware threads capped at 4. */
   workerLimit?: number;
+  /**
+   * Most milliseconds one transcode may take before its worker is restarted and the transcode rejects. Default: 10 s plus
+   * 4 s per MiB of input; Infinity disables the limit.
+   */
+  timeout?: number;
 }
 
 export interface KTX2DecodeOptions {
@@ -86,6 +91,7 @@ export class KTX2Decoder {
   readonly target: TranscodeTarget;
   readonly device?: GPUDevice;
   private readonly transcoderPath?: string;
+  private readonly timeout?: number;
   private pool?: WorkerPool;
 
   constructor(options: KTX2Options = {}) {
@@ -94,6 +100,7 @@ export class KTX2Decoder {
     this.target = options.target ?? getSupportedTranscodeFormat(options.device);
     if (!transcodeFormats[this.target]) throw new TypeError(`Unknown transcode target ${this.target}`);
     this.transcoderPath = options.transcoderPath;
+    this.timeout = timeLimit(options.timeout);
   }
 
   /** Transcode every mip level in a worker. Mip data arrives as views of one transferred buffer. */
@@ -107,6 +114,8 @@ export class KTX2Decoder {
         { type: 'ktx2', buffer, target: this.target, ...this.urls() },
         [buffer],
         options.signal,
+        this.timeout ?? jobTimeout(buffer.byteLength),
+        'KTX2 transcode',
       );
     } catch (error) {
       return Promise.reject(error);

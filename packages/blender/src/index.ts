@@ -100,7 +100,13 @@ export function decodeMargo(
     end = (offset + size + 3) & ~3;
   }
   if (end !== length) throw new RangeError('Trailing/truncated .margo data');
-  const doc: MargoDocument | null = parseJSON(new TextDecoder('utf-8', { fatal: true }).decode(sections[0].bytes));
+  let doc: MargoDocument | null;
+  try {
+    doc = parseJSON(new TextDecoder('utf-8', { fatal: true }).decode(sections[0].bytes));
+  } catch {
+    // Malformed UTF-8 or JSON: a named error, not TextDecoder's TypeError or JSON.parse's SyntaxError.
+    throw new TypeError('Invalid .margo scene JSON');
+  }
   if (
     !doc ||
     doc.asset?.version !== '2.0' ||
@@ -204,6 +210,9 @@ export async function parseMargo(
       const image = await createImageBitmap(new Blob([bytes], { type: 'image/png' }), {
         colorSpaceConversion: 'none',
         premultiplyAlpha: 'none',
+      }).catch((error) => {
+        // The browser rejects undecodable bytes with a DOMException: report it as the loader's own error.
+        throw new TypeError(`.margo image ${images.length} could not be decoded (${error?.message ?? error})`);
       });
       images.push(image);
       const png = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
