@@ -381,20 +381,22 @@ try {
       await frame();
       const running = await decodePNG(await page.locator('canvas').screenshot());
       assert.equal(await page.locator('#speed-value').innerText(), '0.5×');
+      // Clips cross-fade through the animator (re-selecting one does not restart it), so speed is read on its clock.
+      const clock = () => page.evaluate(() => window.extensionDemo.animator.time);
+      const before = await clock();
       await page.evaluate(() => (window.demoTime += 100));
       await frame();
       const halfSpeed = await decodePNG(await page.locator('canvas').screenshot());
       assert.ok(!halfSpeed.data.every((value, i) => value === running.data[i]), 'Playback did not advance');
-      await page.locator('#clip').selectOption({ label: 'Running' });
+      const half = (await clock()) - before;
+      assert.ok(Math.abs(half - 0.05) < 1e-3, 'Half speed did not advance 0.05 s in 100 ms: ' + half);
       await speed.fill('1');
       await frame();
+      const resumed = await clock();
       await page.evaluate(() => (window.demoTime += 50));
       await frame();
-      assert.equal(
-        Buffer.compare((await decodePNG(await page.locator('canvas').screenshot())).data, halfSpeed.data),
-        0,
-        'Playback speed did not scale animation time',
-      );
+      const full = (await clock()) - resumed;
+      assert.ok(Math.abs(full - 0.05) < 1e-3, 'Playback speed did not scale animation time: ' + full);
       await page.emulateMedia({ reducedMotion: 'reduce' });
       await frame();
       await page.locator('#clip').selectOption({ label: 'Walking' });

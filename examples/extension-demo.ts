@@ -10,6 +10,23 @@ const status = document.querySelector<HTMLElement>('#status')!,
   error = document.querySelector<HTMLElement>('#error')!,
   robot = document.body.dataset.demo === 'robot';
 const abort = new AbortController();
+/** A soft photo-studio environment (equirectangular, linear HDR): a bright key softbox, a dimmer fill and a gradient
+ * from a light ceiling to a darker floor, so metals and glossy plastics show reflections and every side gets light. */
+function studio(width = 128, height = 64) {
+  const data = new Float32Array(width * height * 4),
+    softbox = (u: number, v: number, cu: number, cv: number, r: number) =>
+      Math.exp(-(((u - cu) * 2) ** 2 + (v - cv) ** 2) / (r * r));
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const u = (x + 0.5) / width,
+        v = (y + 0.5) / height,
+        room = v < 0.5 ? 0.5 + 0.5 * (0.5 - v) * 2 : 0.5 - 0.3 * (v - 0.5) * 2,
+        key = 7 * softbox(u, v, 0.32, 0.26, 0.09),
+        fill = 2.5 * softbox(u, v, 0.78, 0.34, 0.12);
+      data.set([room + key + fill * 0.9, room + key + fill * 0.95, room + key * 0.96 + fill, 1], (y * width + x) * 4);
+    }
+  return { width, height, data };
+}
 let dispose: (() => void) | undefined;
 addEventListener(
   'pagehide',
@@ -26,8 +43,15 @@ try {
         import('@margoengine/shadows'),
         import('@margoengine/tonemap'),
         import('@margoengine/core/extension'),
+        import('@margoengine/animator'),
+        import('@margoengine/environment'),
       ])
-    : import('@margoengine/post/ssao').then(({ SSAO }) => ({ SSAO }));
+    : Promise.all([
+        import('@margoengine/post/stack'),
+        import('@margoengine/post/ssao'),
+        import('@margoengine/tonemap'),
+        import('@margoengine/environment'),
+      ]);
   // Imports overlap engine startup; the scene's catch reports a later import failure.
   extras.catch(() => {});
   const stage = await createStage('#viewport', {
@@ -82,11 +106,20 @@ try {
   });
   controls.saveState();
   if (robot) {
-    const [{ Animation }, { Shadows }, { Tonemap }, { engineRuntime }] = (await extras) as [
+    const [
+        { Animation },
+        { Shadows },
+        { Tonemap },
+        { engineRuntime },
+        { Animator },
+        { Environment, EnvironmentLighting },
+      ] = (await extras) as [
         typeof import('@margoengine/animation'),
         typeof import('@margoengine/shadows'),
         typeof import('@margoengine/tonemap'),
         typeof import('@margoengine/core/extension'),
+        typeof import('@margoengine/animator'),
+        typeof import('@margoengine/environment'),
       ],
       animation = Animation.attach(model);
     // The sample's clips also key the face; the expression controls own those weights here.
@@ -111,33 +144,57 @@ try {
     shadows.add(floor, { static: true });
     shadows.add(model);
     Tonemap.attach(stage.engine, { curve: 'agx', exposure: 0.35 });
+    // Studio light: reflections on the metal and plastic, and soft light from every side instead of a flat ambient.
+    const environment = await Environment.attach(stage.engine, studio(), { intensity: 0.6 });
+    model.onDispose(EnvironmentLighting.attach(stage.engine, environment).add(model));
+    // Clips cross-fade through the animator. Idle, Walking, Running and Dance loop; Death and Sitting hold their last
+    // frame; every other clip (Jump, Wave, Yes...) plays once and fades back to the last looping clip.
+    const names = animation.clips.map((clip) => clip.name),
+      durations = new Map(animation.clips.map((clip) => [clip.name, clip.duration])),
+      looping = /^(idle|walking|running|dance)$/i,
+      holding = /^(death|sitting)$/i,
+      walking = names.find((name) => /walking/i.test(name)) ?? names[0],
+      animator = Animator.attach(animation, {
+        states: Object.fromEntries(names.map((name) => [name, name])),
+        initial: walking,
+      });
+    Object.assign(demo, { animator });
+    let lastLoop = walking;
     const select = document.querySelector<HTMLSelectElement>('#clip')!,
-      button = document.querySelector<HTMLButtonElement>('#pause')!;
-    for (const [id, clip] of animation.clips.entries()) select.add(new Option(clip.name, String(id)));
-    const walking = animation.clips.findIndex((c) => /walking/i.test(c.name));
-    animation.play(Math.max(0, walking));
-    select.value = String(animation.clip);
+      button = document.querySelector<HTMLButtonElement>('#pause')!,
+      choose = (name: string) => {
+        animation.options.loop = looping.test(name);
+        if (looping.test(name)) lastLoop = name;
+        animator.transition(name, 0.3);
+        select.value = name;
+      };
+    for (const name of names) select.add(new Option(name, name));
+    choose(walking);
     select.disabled = false;
-    select.addEventListener('change', () => {
-      const playing = animation.playing;
-      animation.play(select.selectedIndex);
-      animation.playing = playing;
-      update();
+    select.addEventListener('change', () => choose(select.value));
+    stage.use({
+      name: 'demo-clips',
+      setup() {},
+      onPreUpdate() {
+        const name = animator.state;
+        if (!looping.test(name) && !holding.test(name) && animator.time >= (durations.get(name) ?? Infinity))
+          choose(lastLoop);
+      },
     });
     const reduced = matchMedia('(prefers-reduced-motion: reduce)'),
       update = () => {
-        button.textContent = animation.playing ? 'Pause animation' : 'Resume animation';
-        button.setAttribute('aria-pressed', String(!animation.playing));
+        button.textContent = animator.playing ? 'Pause animation' : 'Resume animation';
+        button.setAttribute('aria-pressed', String(!animator.playing));
       };
-    animation.playing = !reduced.matches;
+    animator.playing = !reduced.matches;
     button.disabled = false;
     update();
     button.addEventListener('click', () => {
-      animation.playing = !animation.playing;
+      animator.playing = !animator.playing;
       update();
     });
     const motion = () => {
-      animation.playing = !reduced.matches;
+      animator.playing = !reduced.matches;
       update();
     };
     reduced.addEventListener('change', motion);
@@ -196,9 +253,19 @@ try {
     demo.readiness = await submitPrincipalScene(() => stage.engine.render(), engineRuntime(stage.engine).gpu!.queue, {
       signal: abort.signal,
     });
-    const { SSAO } = (await extras) as typeof import('@margoengine/post/ssao'),
-      ssao = SSAO.attach(stage.engine, { radius: 0.25, bias: 0.01, samples: 32 });
+    const [{ PostStack }, { SSAO }, { Tonemap }, { Environment, EnvironmentLighting }] = (await extras) as [
+        typeof import('@margoengine/post/stack'),
+        typeof import('@margoengine/post/ssao'),
+        typeof import('@margoengine/tonemap'),
+        typeof import('@margoengine/environment'),
+      ],
+      ssao = new SSAO({ radius: 0.25, bias: 0.01, samples: 32 });
+    // SSAO then Khronos PBR Neutral, which keeps the helmet's authored colours (SSAO alone ends in Reinhard, which
+    // greys the highlights); studio IBL lights the brass, leather and lenses from every side, with reflections.
+    PostStack.attach(stage.engine, [ssao, new Tonemap({ curve: 'neutral' })]);
+    const lighting = EnvironmentLighting.attach(stage.engine, await Environment.attach(stage.engine, studio()));
     model.onDispose(ssao.add(model));
+    model.onDispose(lighting.add(model));
     const toggle = document.querySelector<HTMLInputElement>('#ssao')!;
     toggle.disabled = false;
     toggle.addEventListener('change', () => {
@@ -214,6 +281,7 @@ try {
           return;
         }
         full.onDispose(ssao.add(full));
+        full.onDispose(lighting.add(full));
         model.dispose();
         model = full;
         demo.quality = 'full';
