@@ -423,7 +423,8 @@ try {
   assert(report.desktopDensity.multisampledTextures > 0, 'Desktop lost its 4x MSAA attachments');
   await desktop.evaluate(() => nightCitadel.dispose());
   assert.equal(await desktop.evaluate(() => gpuAudit.live.size), 0, 'HiDPI desktop leaked GPU buffers/textures');
-  // The light tier every desktop opens on: single-sampled at DPR 1 even on a HiDPI screen, held to about 60 FPS.
+  // The light tier every desktop opens on: single-sampled, held to about 60 FPS; this scene raises the tier's pixel
+  // ratio cap to 1.5 (main.ts) so a HiDPI first visit is not soft and jagged.
   const lightPage = await desktopContext.newPage();
   lightPage.on('pageerror', (e) => errors.push(e.message));
   await lightPage.addInitScript(instrument);
@@ -439,7 +440,7 @@ try {
   }));
   assert.deepEqual(
     report.lightTier,
-    { margoLow: 1, effectiveDpr: 1, samples: 1, multisampledTextures: 0, multisampledPipelines: 0 },
+    { margoLow: 1.5, effectiveDpr: 1.5, samples: 1, multisampledTextures: 0, multisampledPipelines: 0 },
     'Light tier: ' + JSON.stringify(report.lightTier),
   );
   report.waveHeights.light = await waveHeights(lightPage);

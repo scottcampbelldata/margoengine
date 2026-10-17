@@ -239,17 +239,28 @@ export function createCitadel() {
       rock,
     );
   }
+  // A continuous mountain ring on the horizon: the inner slope of one range, from below the water to a crest whose
+  // height and distance follow a smooth periodic profile (four sine octaves around the ring), so it reads as distant
+  // mountains in the fog rather than separate spikes standing in the sea. Only the slope facing the island is built.
+  const octaves = [1, 3, 7, 13].map((frequency, k) => ({ frequency, phase: random() * Math.PI * 2, weight: 0.5 ** k })),
+    profile = (angle, shift) =>
+      octaves.reduce((sum, o) => sum + o.weight * Math.sin(o.frequency * angle + o.phase + shift), 0) / 1.875;
   const ridges = triangles((add) => {
-    for (let i = 0; i < 55; i++) {
-      const a = (i * Math.PI * 2) / 55,
-        b = ((i + 1) * Math.PI * 2) / 55,
-        r = 150 + random() * 75,
-        h = -18 + random() * 25;
-      add(
-        [Math.cos(a) * r, -75, Math.sin(a) * r],
-        [Math.cos(b) * r, -75, Math.sin(b) * r],
-        [Math.cos((a + b) / 2) * r, h, Math.sin((a + b) / 2) * r],
-      );
+    const segments = 120,
+      inner = 150,
+      ring = (angle) => {
+        const crest = 185 + 20 * profile(angle, 1.3),
+          height = -12 + 13 * profile(angle, 0);
+        return {
+          base: [Math.cos(angle) * inner, -40, Math.sin(angle) * inner],
+          crest: [Math.cos(angle) * crest, height, Math.sin(angle) * crest],
+        };
+      };
+    for (let i = 0; i < segments; i++) {
+      const p = ring((i * Math.PI * 2) / segments),
+        q = ring(((i + 1) * Math.PI * 2) / segments);
+      add(p.base, q.base, p.crest);
+      add(q.base, q.crest, p.crest);
     }
   });
   geometries.push(ridges);

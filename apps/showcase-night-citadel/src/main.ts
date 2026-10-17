@@ -9,7 +9,11 @@ import { Water } from '@margoengine/water';
 import { VFX } from '@margoengine/vfx/base';
 import { sceneSamples } from '../../../packages/shared/quality.js';
 import { applyQualityTier, watchQuality } from '@margoengine/quality';
-applyQualityTier();
+import { warmUp, type WarmUpReport } from '@margoengine/quality/warm';
+// This scene is light enough for the light tier to render at up to 1.5 device pixels per CSS pixel (core reads
+// margoLow as that tier's pixel-ratio cap): at 1 a first visit on a HiDPI screen looked soft and jagged. ?scale= wins.
+if (applyQualityTier() === 'light' && !new URLSearchParams(location.search).has('scale'))
+  (globalThis as { margoLow?: number }).margoLow = Math.min(1.5, Math.max(1, devicePixelRatio));
 import { createCitadelPBR, moonDirection } from './scene.js';
 import { frameDue, frameStatus } from '@margoengine/quality';
 import { Sky } from '@margoengine/sky/base';
@@ -53,6 +57,13 @@ export class NightCitadel {
   readonly pointers = new Float64Array([-1, 0, 0, -1, 0, 0, 0]);
   readonly stats = { frames: 0, instances: 0, batches: 0, fps: 0, delta: 0, callbackRate: 0, samples: sceneSamples() };
   readiness: Awaited<ReturnType<typeof submitPrincipalScene>> | undefined;
+  /** Pipelines compiled before the first visible frame (boot). */
+  warm: WarmUpReport | undefined;
+  private markReady!: () => void;
+  /** Resolves once the first frame has rendered (readiness is set). */
+  readonly ready = new Promise<void>((resolve) => {
+    this.markReady = resolve;
+  });
   readonly post: Bloom;
   readonly shadows: Shadows;
   readonly instances: ScatterInstances;
@@ -117,17 +128,22 @@ export class NightCitadel {
       },
       { night, fog },
     );
+    // One fixed map around the island and castle (spire tips at about 39 m, water at -27 m): the scene is static,
+    // so the map is drawn once and redrawn only when the moon moves, instead of following the orbiting camera and
+    // redrawing every frame with 0.2-0.8 m texels; 1024 texels over about 60 m is about 6 cm.
     this.shadows = Shadows.attach(engine, {
-      resolution: this.stats.samples === 4 ? 1024 : 512,
+      resolution: this.stats.samples === 4 ? 2048 : 1024,
+      bounds: { min: [-21, -30, -19], max: [21, 40, 19] },
       distance: 180,
       lightSize: 0.02,
       normalBias: 0.055,
       casterMargin: 70,
     });
     this.lights = Clustered.attach(engine, { grid: [8, 4, 16] });
-    this.instances = ScatterInstances.attach(engine, () => createCitadelPBR().batches);
+    const citadel = createCitadelPBR();
+    this.instances = ScatterInstances.attach(engine, () => citadel.batches);
     this.shadows.add(this.instances, { static: true });
-    this.lights.setLights(createCitadelPBR().lights);
+    this.lights.setLights(citadel.lights);
     this.stats.instances = this.instances.batches.reduce((sum, b) => sum + b.instances, 0);
     this.stats.batches = this.instances.batches.length;
     element('draws').textContent = String(this.stats.batches);
@@ -141,7 +157,7 @@ export class NightCitadel {
     // Resolve the nearby swells on both grids; horizon:true extends the distant ocean.
     this.water = Water.attach(engine, {
       size: [160, 160],
-      segments: this.stats.samples === 4 ? 128 : 64,
+      segments: 128,
       height: -27,
       horizon: true,
       depth: () => this.post.depthTexture,
@@ -216,7 +232,6 @@ export class NightCitadel {
       options,
     );
     engine.onError = (error) => this.fail(error instanceof Error ? error : new Error(String(error)));
-    this.start();
   }
   private readonly updateSky = (): void => {
     moonDirection(this.moon, controls[0].valueAsNumber, controls[1].valueAsNumber);
@@ -280,6 +295,7 @@ export class NightCitadel {
         }).then(
           (value) => {
             this.readiness = value;
+            this.markReady();
           },
           (error) => {
             if (!this.disposed) this.fail(error instanceof Error ? error : new Error(String(error)));
@@ -459,12 +475,40 @@ async function boot(): Promise<void> {
   try {
     if (!navigator.gpu)
       throw new Error('This showcase needs WebGPU. Open it in a WebGPU-enabled browser on localhost or HTTPS.');
-    engine = await EngineKernel.create(canvas, {
+    // A GPU that never answers (a driver reset, a busy or sleeping device) must not leave "Preparing the citadel"
+    // up forever: give up after 20 s with what to do, and dispose an engine that arrives later.
+    const created = EngineKernel.create(canvas, {
       backend: 'webgpu',
       capacity: 1,
       camera: { position: [0, 12, 82], target: [0, 12, 0], fov: 58, near: 0.3, far: 500 },
     });
-    window.nightCitadel = new NightCitadel(engine);
+    let timer = 0,
+      expired = false;
+    created.then(
+      (late) => {
+        if (expired) late.dispose();
+      },
+      () => {},
+    );
+    engine = await Promise.race([
+      created,
+      new Promise<never>((_, reject) => {
+        timer = window.setTimeout(() => {
+          expired = true;
+          reject(
+            new Error(
+              'The graphics device did not respond within 20 seconds. Close other GPU-heavy tabs or apps, then reload.',
+            ),
+          );
+        }, 20_000);
+      }),
+    ]).finally(() => clearTimeout(timer));
+    const citadel = (window.nightCitadel = new NightCitadel(engine));
+    // Compile every pipeline before the first visible frame (asynchronously, so the page stays responsive; the first
+    // frame used to compile about ten shaders in one blocking call), and keep the status up until that frame rendered.
+    citadel.warm = await warmUp(engine);
+    citadel.start();
+    await citadel.ready;
     watchQuality();
     status.hidden = true;
   } catch (error) {
