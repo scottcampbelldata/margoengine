@@ -231,6 +231,21 @@ export interface PBRTransparency {
   /** This frame's transparent pass: the scene depth read-only and these targets; begun on the first draw, ended by the owner. */
   begin(): GPURenderPassEncoder;
 }
+/**
+ * `code` with its face and alpha tests behind pipeline constants (margoFaceTest, margoAlphaTest): a pipeline that sets
+ * both false compiles without a discard and keeps early depth testing. Every compact-path pipeline sets them.
+ */
+export function compactTests(code: string): string {
+  return (
+    'override margoFaceTest:bool=true;\noverride margoAlphaTest:bool=true;\n' +
+    code
+      .replace('if(!facing&&f.settings.z<0.5)', 'if(margoFaceTest&&!facing&&f.settings.z<0.5)')
+      .replace(
+        'if(f.settings.x>0.5&&f.settings.x<1.5&&s.base.a<f.settings.y)',
+        'if(margoAlphaTest&&f.settings.x>0.5&&f.settings.x<1.5&&s.base.a<f.settings.y)',
+      )
+  );
+}
 const head = '@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {',
   through = new Map<string, Map<string, string>>();
 /** `code` (the lit PBR shader) with a `transparent` entry point returning `margoTransparent(<beauty colour>, i)`. */

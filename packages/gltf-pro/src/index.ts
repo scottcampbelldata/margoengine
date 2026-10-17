@@ -42,6 +42,7 @@ import {
   capturePBR,
   transmissionPBR,
   texturedTintPBR,
+  compactTests,
   type ExtendedPlan,
   type PBRLighting,
   type PBRTransparency,
@@ -1917,15 +1918,7 @@ export class PBRModel implements EnginePlugin {
         // Every pipeline sets the face and alpha tests as constants (face, mask below), so plain opaque and blended
         // materials compile without a discard and keep early depth testing (HANDOFF 1e.f). The compact path had lost
         // this outside instancing and MASK in the consolidation (8f710eb3).
-        if (compact)
-          code =
-            'override margoFaceTest:bool=true;\noverride margoAlphaTest:bool=true;\n' +
-            code
-              .replace('if(!facing&&f.settings.z<0.5)', 'if(margoFaceTest&&!facing&&f.settings.z<0.5)')
-              .replace(
-                'if(f.settings.x>0.5&&f.settings.x<1.5&&s.base.a<f.settings.y)',
-                'if(margoAlphaTest&&f.settings.x>0.5&&f.settings.x<1.5&&s.base.a<f.settings.y)',
-              );
+        if (compact) code = compactTests(code);
         const source = p.extension ?? m.extension;
         if (compact) {
           r.coordinates = coordinateExtension(m.maps, source, r.coordinates);

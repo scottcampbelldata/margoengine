@@ -9,6 +9,7 @@ import { extendedMaterials } from '../dist/extended.js';
 import { GLTFAsset, PBRModel, parseGLTF, parseGLTFAsync } from '../dist/index.js';
 import {
   pbrShader,
+  compactTests,
   extendedPBRShader,
   physicalShader as physical,
   transmissiveShader,
@@ -563,8 +564,8 @@ test('physical extensions select the physical shader variant, its maps and the t
       groups = calls.filter((c) => c[0] === 'group' && c[1] === 1).map((c) => c[2].entries.length);
     assert.equal(
       pipelines[0].vertex.module.code,
-      pbrShader,
-      'opaque plain material draws first with the unchanged base shader',
+      compactTests(pbrShader),
+      'opaque plain material draws first with the base shader, its tests behind constants',
     );
     // Transmission (5w.f): the transmissive physical variant, drawn twice: the background times the tint, then the lit surface added.
     assert.equal(pipelines[1].vertex.module.code, transmissiveShader());
@@ -634,7 +635,7 @@ test('lighting hooks (contract v1): every hook point occurs once in both variant
   assert.match(body, /fn ambient\(s:Surface\)->vec3f \{return vec3f\(0\);\}/);
   assert.match(
     body,
-    /color=mix\(select\(color,aces\(max\(color,vec3f\(0\)\)\/0\.6\),f\.settings\.w<0\.5\),vec3f\(1\),0\.5\);if\(f\.settings\.w<0\.5\) \{/,
+    /color=mix\(select\(color,pbrNeutral\(max\(color,vec3f\(0\)\)\),f\.settings\.w<0\.5\),vec3f\(1\),0\.5\);if\(f\.settings\.w<0\.5\) \{/,
   );
   assert.throws(
     () => lightPBR(lightPBR(pbrShader, ibl), { declarations: '', ambient: 'vec3f(1)' }),

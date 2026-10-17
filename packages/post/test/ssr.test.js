@@ -117,7 +117,7 @@ for (const samples of [4, 1])
     );
     // Composite: one fullscreen pass into the frame target (SSR is the stack's last effect, so it tone maps).
     const composite = modules(log).find((code) => code.includes('fn closest('));
-    assert.match(composite, /c=c\/\(1\+c\);/);
+    assert.match(composite, /return vec4f\(toDisplay\(c\),s\.a\);/);
     // Steady frames create no GPU objects.
     const steady = h.gpu.record(() => h.frame([taa, env]));
     assert.deepEqual(
@@ -272,13 +272,17 @@ for (const samples of [4, 1])
       [0, 1, 0, 0],
       'MASK alpha-tests',
     );
-    assert.equal(pipelines[0][2].fragment.constants, undefined, 'compact opaque shaders need no specialization');
+    assert.deepEqual(
+      pipelines[0][2].fragment.constants,
+      { margoFaceTest: 0, margoAlphaTest: 0 },
+      'compact opaque shaders compile their face and alpha tests out',
+    );
     const code = log
       .filter((e) => e[0] === 'module' && e[2].code.includes('@fragment fn capture('))
       .map((e) => e[2].code);
     assert.match(
       code[0],
-      /if\(f\.settings\.x>0\.5&&f\.settings\.x<1\.5&&s\.base\.a<f\.settings\.y\)\{discard;\}/,
+      /if\(margoAlphaTest&&f\.settings\.x>0\.5&&f\.settings\.x<1\.5&&s\.base\.a<f\.settings\.y\)\{discard;\}/,
       'the compact shader retains its material-controlled alpha guard',
     );
     // IBL on the model: the replaced specular is environment's split-sum term times occlusion (and clearcoat/sheen's k).

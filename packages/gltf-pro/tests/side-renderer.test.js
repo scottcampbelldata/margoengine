@@ -6,7 +6,7 @@ import { loadGLTFProgressive } from '../dist/progressive.js';
 import { PBRInstances } from '../dist/instancing.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
-import { pbrShader } from '../src/shader.ts';
+import { compactTests, pbrShader } from '../src/shader.ts';
 import { backSideShader } from '../src/side-shader.ts';
 import { instancedShader } from '../src/instancing.ts';
 
@@ -159,7 +159,7 @@ test('occlusion preserves back culling and logical face guards through mirrored 
     assert.equal(single.primitive.cullMode, cull);
     assert.equal(single.fragment.entryPoint, 'margoOcclusion');
     assert.equal(single.fragment.targets.length, 2);
-    assert.match(single.fragment.module.code, /if\(facing\)\{discard;\}/);
+    assert.match(single.fragment.module.code, /if\(margoFaceTest&&facing\)\{discard;\}/);
     assert.match(single.fragment.module.code, /fn margoOcclusion[^]*let s=surface\(i,front\);/);
     assert.equal(f.draws[0].values[90], 2);
     const instances = new PBRInstances(2);
@@ -306,9 +306,12 @@ test('front and double draws retain the default shader source while back changes
   const f = await fixture(t),
     material = f.model.primitives[0].material;
   const front = f.frame().vertex.module.code;
-  assert.equal(front, pbrShader);
+  assert.equal(front, compactTests(pbrShader));
   material.side = 'double';
   assert.equal(f.frame().vertex.module.code, front);
   material.side = 'back';
-  assert.equal(f.frame().vertex.module.code, front.replace('if(!facing&&f.settings.z<0.5)', 'if(facing)'));
+  assert.equal(
+    f.frame().vertex.module.code,
+    front.replace('if(margoFaceTest&&!facing&&f.settings.z<0.5)', 'if(margoFaceTest&&facing)'),
+  );
 });
