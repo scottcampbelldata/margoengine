@@ -26,13 +26,6 @@ export interface BodyMeshFace {
 
 export const DERIVED: unique symbol;
 
-export interface Entity {
-    readonly id: number;
-    readonly type: string;
-    readonly args: readonly Value[];
-    readonly parts?: ReadonlyMap<string, readonly Value[]>;
-}
-
 export class Enum {
     readonly name: string;
     constructor(name: string);
@@ -56,6 +49,13 @@ export interface STEPBody {
 
 export type STEPColor = readonly [number, number, number, number];
 
+export interface STEPEntity {
+    readonly id: number;
+    readonly type: string;
+    readonly args: readonly STEPValue[];
+    readonly parts?: ReadonlyMap<string, readonly STEPValue[]>;
+}
+
 export class STEPFile {
     readonly header: STEPHeader;
     constructor(text: string);
@@ -63,8 +63,8 @@ export class STEPFile {
     has(id: number): boolean;
     ids(type: string): readonly number[];
     census(): Map<string, number>;
-    get(id: number): Entity;
-    args(id: number, type?: string): readonly Value[];
+    get(id: number): STEPEntity;
+    args(id: number, type?: string): readonly STEPValue[];
     is(id: number, type: string): boolean;
     typeName(id: number): string;
 }
@@ -117,6 +117,8 @@ export interface STEPStructureOptions {
     readonly maxInstances?: number;
 }
 
+export type STEPValue = number | string | null | Ref | Enum | Typed | typeof DERIVED | STEPValue[];
+
 export interface TessellationOptions {
     readonly relativeDeflection?: number;
     readonly deflection?: number;
@@ -134,11 +136,9 @@ export class Tessellator {
 
 export class Typed {
     readonly type: string;
-    readonly value: Value;
-    constructor(type: string, value: Value);
+    readonly value: STEPValue;
+    constructor(type: string, value: STEPValue);
 }
-
-export type Value = number | string | null | Ref | Enum | Typed | typeof DERIVED | Value[];
 
 export function parseSTEP(input: string | ArrayBuffer | ArrayBufferView, options?: STEPOptions): STEPModel;
 
