@@ -18,6 +18,20 @@ attachment: `sand`, two `meadow` colors, `stone`, height ranges `shore`,
 `wetDarkening` (0..1), and optional `variation` (0..1, default 0). Ranges must be
 increasing; colors are linear RGB in 0..1. Other meshes keep their materials.
 
+Colors are worked out per pixel from the interpolated world height and normal, so
+band borders follow the true height and slope instead of the mesh's triangles.
+`variation` darkens colors by up to twice its value with two octaves of smooth
+value noise (14 m and 1.1 m cells, the fine one rotated 37° and faded out between
+20 and 60 m from the camera so it cannot shimmer). The noise is hashed per lattice
+cell and never repeats, so there is no tile to hide. The patch flags the mesh in a
+flat varying (location 6), then wraps the rest of core's fragment after its
+shading-normal line in a block whose `i` and `n` are the terrain's own copies:
+shadows, clustered lights, sky ambient, IBL and post replays shade the per-pixel
+albedo, roughness and normal without changing their own patches. Without core's
+standard shader the patch does nothing and the mesh keeps its material color.
+Cost: one flat compare on every core-mesh pixel; on terrain pixels about 40 ALU
+operations for the bands, plus about 60 per noise octave with `variation`.
+
 For a moving wet-sand band, add `wetness: {texture: () => water.coastalDepthTexture,
 origin: [-80,-80], size: [160,160]}` using the same world bounds as water's terrain.
 The borrowed texture's red channel contains water depth in meters; it must be a
@@ -27,11 +41,12 @@ The module keeps a stable GPU snapshot so flow ping-pong does not rebuild scene
 or vegetation bindings each frame. A 256 × 256 `rgba32float` snapshot costs 1 MiB
 and one GPU copy per frame. Terrain owns that snapshot, not the provider texture.
 
-Wetness samples world XZ per fragment and darkens only the sand portion below
-`wetHeight[1]`. Meadow/stone blends and geometry stay fixed to terrain height and
+Wetness samples world XZ per fragment and darkens only the sand albedo below
+`wetHeight[1]`; fully wet sand is also 40% smoother, so it catches a soft sheen
+toward the sun. Meadow/stone blends and geometry stay fixed to terrain height and
 slope. The mask follows current water depth; it does not simulate erosion or
-retain a drying history after recession. It uses group 0 binding 9 and flat output
-location 6 in the standard PBR shader. No core changes are required.
+retain a drying history after recession. It uses a group 0 binding from 40 up and
+flat output location 6 in the standard PBR shader. No core changes are required.
 Physical WebGPU regression: `node packages/terrain/test/wetness.browser.mjs` from
 the repository root after building the packages.
 

@@ -11,29 +11,59 @@ declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; COPY
 
 type Color = readonly [number, number, number];
 type Range = readonly [number, number];
+/** Height/slope material bands for {@link TerrainColors}. Colors are linear RGB in 0..1; ranges increase. */
 export interface TerrainColorOptions {
+  /** Beach color below `shore`. */
   sand: Color;
+  /** Low and high meadow colors, blended over `meadowHeight`. */
   meadow: readonly [Color, Color];
+  /** Rock color above `stoneHeight` and on steep slopes. */
   stone: Color;
+  /** World heights over which sand gives way to meadow and stone. */
   shore: Range;
+  /** World heights over which the low meadow color gives way to the high one. */
   meadowHeight: Range;
+  /** World heights over which meadow gives way to stone. */
   stoneHeight: Range;
+  /** Surface normal Y (0 vertical, 1 flat) over which steep stone gives way to meadow. */
   stoneNormal: Range;
+  /** World heights over which the wet band dries. */
   wetHeight: Range;
+  /** Albedo multiplier of fully wet ground, 0..1. Wet ground is also up to 40% smoother. */
   wetDarkening: number;
+  /** Brightness variation, 0..1 (default 0): two scales of smooth noise darken colors by up to twice this. */
   variation?: number;
+  /** Moving wet band from a borrowed water-depth texture (red channel, meters) over world XZ `origin`/`size`. */
   wetness?: { texture: () => GPUTexture | undefined; origin: Range; size: Range };
 }
 let serial = 0;
 
-/** Height/slope colors on one ordinary mesh, preserving the scene's PBR and shadow shader. */
+// Core's fragment computes its shading normal on this line (tests/shader-contracts). Terrain colors open a block after
+// it whose `i` and `n` are per-pixel copies and close it with the fragment, so every later lighting patch (shadows,
+// clustered, IBL, SSAO, SSR, scatter) keeps its text and shades the terrain's own albedo, roughness and normal.
+const normalLine = 'let n=normalize(i.normal)*select(-1.0,1.0,facing);';
+const block = 'let terrainSource=i;let terrainNormal=n;{var i=terrainSource;var n=terrainNormal;';
+const surfaceStruct = 'struct TerrainSurface {color:vec3f,normal:vec3f,rough:f32}\n';
+// Value noise on an integer lattice hashed with lowbias32 (C. Wellons, "Prospecting for Hash Functions"). It is not
+// periodic, so no pattern repeats; smoothstep interpolation keeps it free of the lattice's creases.
+const noiseCode = `
+fn terrainHash(seed:u32)->f32 {
+ var h=seed;h^=h>>16u;h*=0x7feb352du;h^=h>>15u;h*=0x846ca68bu;h^=h>>16u;return f32(h>>8u)*5.9604645e-8;
+}
+fn terrainNoise(p:vec2f)->f32 {
+ let c=floor(p);let f=p-c;let u=f*f*(3.0-2.0*f);let k=(bitcast<u32>(i32(c.x))*0x8da6b343u)+(bitcast<u32>(i32(c.y))*0xd8163841u);
+ return mix(mix(terrainHash(k),terrainHash(k+0x8da6b343u),u.x),mix(terrainHash(k+0xd8163841u),terrainHash(k+0x65bceb84u),u.x),u.y);
+}
+`;
+
+/** Height/slope colors on one ordinary mesh, shaded per pixel inside the scene's PBR and shadow shader. */
 export class TerrainColors implements EnginePlugin {
   readonly name = 'terrain:colors:' + ++serial;
   private engine?: Engine;
   private source = '';
   private shader = '';
   private disposed = false;
-  private readonly colorCode: string;
+  private readonly surfaceCode: string;
   private readonly wetCode: string;
   private readonly wetness?: TerrainColorOptions['wetness'];
   private dry?: GPUTexture;
@@ -87,14 +117,26 @@ export class TerrainColors implements EnginePlugin {
       throw new RangeError('Invalid terrain wetness map');
     this.wetness = wetness;
     const rgb = (color: Color) => `vec3f(${color.join(',')})`;
-    const variation = options.variation ?? 0;
-    this.colorCode = `
-      let h=p.y;let slope=normalize(o.normal).y;
-      let variation=${1 - variation}+${variation}*sin(p.x*0.8)*cos(p.z*0.6);
-      let meadow=mix(${rgb(options.meadow[0])},${rgb(options.meadow[1])},smoothstep(${options.meadowHeight.join(',')},h));
-      let stone=mix(meadow,${rgb(options.stone)},max(smoothstep(${options.stoneHeight.join(',')},h),1.0-smoothstep(${options.stoneNormal.join(',')},slope)));
-      let wet=mix(${options.wetDarkening},1.0,smoothstep(${options.wetHeight.join(',')},h));
-      o.color=mix(${rgb(options.sand)},stone,smoothstep(${options.shore.join(',')},h))*variation${wetness ? '' : '*wet'};`;
+    const variation = options.variation ?? 0,
+      dark = options.wetDarkening;
+    // Per pixel: bands follow the interpolated height and normal, not the triangles. Variation mixes a 14 m and a
+    // 1.1 m octave (rotated 37° so the lattices do not align); the fine one fades out by 60 m, before it can alias.
+    this.surfaceCode = `
+fn terrainSurface(p:vec3f,n:vec3f)->TerrainSurface {
+ var s:TerrainSurface;let h=p.y;${
+   variation
+     ? `let fade=1.0-smoothstep(20.0,60.0,distance(frame.eye.xyz,p));
+ let large=terrainNoise(p.xz*0.07)-0.5;var fine=0.0;
+ if(fade>0.0){fine=(terrainNoise(mat2x2f(0.8,0.6,-0.6,0.8)*p.xz*0.9)-0.5)*fade;}`
+     : ''
+ }
+ let meadow=mix(${rgb(options.meadow[0])},${rgb(options.meadow[1])},smoothstep(${options.meadowHeight.join(',')},h));
+ let stone=mix(meadow,${rgb(options.stone)},max(smoothstep(${options.stoneHeight.join(',')},h),1.0-smoothstep(${options.stoneNormal.join(',')},n.y)));
+ let wet=${wetness ? 'terrainWet(p)' : `mix(${dark},1.0,smoothstep(${options.wetHeight.join(',')},h))`};
+ s.color=mix(${rgb(options.sand)},stone,smoothstep(${options.shore.join(',')},h))*wet${variation ? `*(${1 - variation}+${2 * variation}*(0.65*large+0.35*fine))` : ''};
+ s.normal=n;s.rough=${dark < 1 ? `0.6+${0.4 / (1 - dark)}*(wet-${dark})` : '1.0'};return s;
+}
+`;
     this.wetCode = wetness
       ? `
 @group(0) @binding(9) var terrainWater:texture_2d<f32>;
@@ -134,6 +176,43 @@ fn terrainWet(position:vec3f)->f32 {
       this.dryEntry = { binding: 9, resource: this.dry.createView() };
     }
   }
+  /** Adds the mesh-ID varying once, then this mesh's surface call inside the shared per-pixel block. */
+  private patch(source: string, id: number): string {
+    let code = source;
+    if (!code.includes('terrainId:f32'))
+      code = code
+        .replace(/struct Output \{[^}]+\}/, (output) =>
+          output.replace('}', ',@location(6) @interpolate(flat) terrainId:f32 }'),
+        )
+        .replace('o.color=i.color.rgb;', 'o.terrainId=i.factors.w+1.0;o.color=i.color.rgb;');
+    // Silent like the other optional core patches: without the standard shader the mesh keeps its material color.
+    if (!code.includes('terrainId:f32') || !code.includes('o.terrainId=')) return source;
+    let at = code.indexOf(block);
+    if (at < 0) {
+      at = code.indexOf(normalLine);
+      if (at < 0) return source;
+      at += normalLine.length;
+      let end = at;
+      for (let depth = 1; end < code.length; end++)
+        if (code[end] === '{') depth++;
+        else if (code[end] === '}' && --depth === 0) break;
+      code = code.slice(0, at) + block + code.slice(at, end) + '}' + code.slice(end);
+    }
+    at += block.length;
+    const suffix = '_' + id;
+    const own = (this.wetCode.replace('@binding(9)', `@binding(${this.wetBinding})`) + this.surfaceCode).replace(
+      /terrainSurface|terrainWater|terrainWet/g,
+      (name) => name + suffix,
+    );
+    return (
+      (code.includes('struct TerrainSurface ') ? '' : surfaceStruct) +
+      (this.surfaceCode.includes('terrainNoise(') && !code.includes('fn terrainNoise(') ? noiseCode : '') +
+      own +
+      code.slice(0, at) +
+      `if(i.terrainId==${id + 1}.0){let s=terrainSurface${suffix}(i.position,n);i.color=s.color;i.material.x*=s.rough;n=s.normal;}` +
+      code.slice(at)
+    );
+  }
   registerPasses(graph: FrameGraph): void {
     graph.add({
       name: this.name,
@@ -144,29 +223,11 @@ fn terrainWet(position:vec3f)->f32 {
         mesh.check();
         if (this.source !== c.shader) {
           this.source = c.shader;
-          this.shader = c.shader.replace(
-            'o.color=i.color.rgb;',
-            `o.color=i.color.rgb;if(i.factors.w==${mesh.id}.0){${this.colorCode}}`,
-          );
           if (this.wetness) {
             this.wetBinding = 40;
             while (c.bindings.some((entry) => entry.binding === this.wetBinding)) this.wetBinding++;
-            const suffix = '_' + mesh.id;
-            if (!this.shader.includes('terrainId:f32'))
-              this.shader = this.shader
-                .replace(/struct Output \{[^}]+\}/, (output) =>
-                  output.replace('}', ',@location(6) @interpolate(flat) terrainId:f32 }'),
-                )
-                .replace('o.color=i.color.rgb;', 'o.terrainId=i.factors.w+1.0;o.color=i.color.rgb;');
-            this.shader =
-              this.wetCode
-                .replace('@binding(9)', `@binding(${this.wetBinding})`)
-                .replace(/terrainWater|terrainWet/g, (name) => name + suffix) +
-              this.shader.replace(
-                /let linear=([^;]+);/,
-                `var terrainScale${suffix}=1.0;if(i.terrainId==${mesh.id + 1}.0){terrainScale${suffix}=terrainWet${suffix}(i.position);}let linear=($1)*terrainScale${suffix};`,
-              );
           }
+          this.shader = this.patch(c.shader, mesh.id);
         }
         if (this.wetness) {
           const texture = this.wetness.texture();
