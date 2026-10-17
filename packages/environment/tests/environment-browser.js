@@ -581,11 +581,12 @@ window.runEnvironmentTests = async () => {
 @group(0) @binding(2) var<storage, read> iblBrdf: array<u32>;
 @group(0) @binding(3) var<uniform> iblSh: array<vec4f, 9>;
 @group(0) @binding(4) var<uniform> iblParams: vec4f;
-@group(0) @binding(5) var<storage, read_write> out: array<vec4f, 3>;
+@group(0) @binding(5) var<storage, read_write> out: array<vec4f, 4>;
 @compute @workgroup_size(1) fn main() {
   out[0] = vec4f(iblShade(iblSpecular, iblSampler, iblSh, iblParams, vec3f(0.0, 1.0, 0.0), vec3f(0.0, 1.0, 0.0), vec3f(1.0), 0.0, 1.0), 1.0);
   out[1] = vec4f(iblShade(iblSpecular, iblSampler, iblSh, iblParams, vec3f(0.0, 1.0, 0.0), vec3f(0.0, 1.0, 0.0), vec3f(1.0), 1.0, 0.0), 1.0);
   out[2] = vec4f(iblIrradiance(iblSh, vec3f(0.0, 1.0, 0.0)), 1.0);
+  out[3] = vec4f(iblShade(iblSpecular, iblSampler, iblSh, iblParams, vec3f(0.0, 1.0, 0.0), vec3f(0.0, 1.0, 0.0), vec3f(1.0), 1.0, 1.0), 1.0);
 }`,
     });
     const c = [0.5, 1.25, 3],
@@ -604,8 +605,8 @@ window.runEnvironmentTests = async () => {
       layout: device.createPipelineLayout({ bindGroupLayouts: [layout] }),
       compute: { module, entryPoint: 'main' },
     });
-    const out = device.createBuffer({ size: 48, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }),
-      read = device.createBuffer({ size: 48, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const out = device.createBuffer({ size: 64, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }),
+      read = device.createBuffer({ size: 64, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const encoder = device.createCommandEncoder(),
       pass = encoder.beginComputePass();
     pass.setPipeline(pipeline);
@@ -618,20 +619,26 @@ window.runEnvironmentTests = async () => {
     );
     pass.dispatchWorkgroups(1);
     pass.end();
-    encoder.copyBufferToBuffer(out, 0, read, 0, 48);
+    encoder.copyBufferToBuffer(out, 0, read, 0, 64);
     device.queue.submit([encoder.finish()]);
     await read.mapAsync(GPUMapMode.READ);
     const values = new Float32Array(read.getMappedRange().slice(0));
     read.unmap();
     read.destroy();
     out.destroy();
-    // A white furnace: a rough white dielectric and a smooth white metal both return close to the environment radiance.
+    // A white furnace: a rough white dielectric, a smooth white metal and (with multiple scattering) a rough white metal
+    // all return close to the environment radiance.
     for (let k = 0; k < 3; k++) {
+      assert(Math.abs(values[12 + k] - c[k]) < 0.03 * c[k], `rough metal furnace ${values[12 + k]} vs ${c[k]}`);
       assert(Math.abs(values[8 + k] - c[k]) < 0.01 * c[k], `iblIrradiance ${values[8 + k]} vs ${c[k]}`);
       assert(Math.abs(values[4 + k] - c[k]) < 0.03 * c[k], `smooth metal furnace ${values[4 + k]} vs ${c[k]}`);
       assert(values[k] > 0.85 * c[k] && values[k] < 1.02 * c[k], `rough dielectric furnace ${values[k]} vs ${c[k]}`);
     }
-    report.furnace = { roughDielectric: [...values.slice(0, 3)], smoothMetal: [...values.slice(4, 7)] };
+    report.furnace = {
+      roughDielectric: [...values.slice(0, 3)],
+      smoothMetal: [...values.slice(4, 7)],
+      roughMetal: [...values.slice(12, 15)],
+    };
     environment.dispose();
     report.checks.push('IBL_WGSL compiles with iblLayoutEntries/iblBindGroupEntries and passes a white furnace test');
   }

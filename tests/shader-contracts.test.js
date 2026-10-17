@@ -128,8 +128,9 @@ test("SSR replays the IBL specular with environment's own split-sum helpers", ()
   for (const signature of [
     'fn iblBrdfTerms(nv: f32, roughness: f32) -> vec2f',
     'fn iblPrefiltered(specular: texture_cube<f32>, s: sampler, params: vec4f, r: vec3f, roughness: f32) -> vec3f',
-    'let specularWeight = f0 * ab.x + ab.y;',
-    'radiance * specularWeight) * params.w',
+    // The specular split sum SSR replaces; multiple scattering adds to the irradiance side only.
+    'let single = f0 * ab.x + ab.y;',
+    'return (radiance * single + (multiple + diffuse) * irradiance) * params.w;',
   ])
     assert.ok(ibl.includes(signature), `environment ibl.ts changed: ${signature}`);
   for (const call of [
