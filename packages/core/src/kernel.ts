@@ -21,7 +21,28 @@ export function syncStoredRotation(store: TransformStore, id: number): void {
   slot.api.kernel_sync_rotation(slot.handle, id);
 }
 let compiled: Promise<WebAssembly.Module> | undefined;
-const keys = ['x', 'y', 'z', 'qx', 'qy', 'qz', 'qw', 'sx', 'sy', 'sz'] as const;
+// Same columns as packages/kernel/src/lib.rs. `flags[id]` there is ACTIVE.
+const X = 0;
+const Y = 1;
+const Z = 2;
+const QX = 3;
+const QY = 4;
+const QZ = 5;
+const QW = 6;
+const SX = 7;
+const SY = 8;
+const SZ = 9;
+const PARENTS = 10;
+const WORLD_MATRIX = 11;
+const LOCAL_SPHERE = 27;
+const PLANES = 35;
+const LIMITS = 38;
+const TAIL = 24;
+const ACTIVE = 0;
+const VISIBLE = 1;
+const CONSTRAINED = 2;
+const HIDDEN = 3;
+const CHANGED = 6;
 
 /** Column views into the kernel's Wasm memory. `grow` replaces every view (old ones are detached or alias the new layout): re-read them (and `Mesh.matrix`) after creating meshes, never keep them. */
 export class TransformStore {
@@ -81,18 +102,29 @@ export class TransformStore {
     if (slot) slot.handle = handle;
     Object.assign(this, {
       capacity,
-      transforms: Object.fromEntries(keys.map((key, field) => [key, floats(field * capacity)])),
-      parents: floats(10 * capacity),
-      matrices: floats(11 * capacity, 16 * capacity),
-      bounds: floats(27 * capacity, 4 * capacity),
-      planes: floats(35 * capacity, 24),
-      rotations: floats(35 * capacity + 24, 3 * capacity),
-      limits: floats(38 * capacity + 24, 12 * capacity),
-      active: bytes(0),
-      visible: bytes(1),
-      constrained: bytes(2),
-      hidden: bytes(3),
-      changed: bytes(6),
+      transforms: {
+        x: floats(X * capacity),
+        y: floats(Y * capacity),
+        z: floats(Z * capacity),
+        qx: floats(QX * capacity),
+        qy: floats(QY * capacity),
+        qz: floats(QZ * capacity),
+        qw: floats(QW * capacity),
+        sx: floats(SX * capacity),
+        sy: floats(SY * capacity),
+        sz: floats(SZ * capacity),
+      },
+      parents: floats(PARENTS * capacity),
+      matrices: floats(WORLD_MATRIX * capacity, 16 * capacity),
+      bounds: floats(LOCAL_SPHERE * capacity, 4 * capacity),
+      planes: floats(PLANES * capacity, TAIL),
+      rotations: floats(PLANES * capacity + TAIL, 3 * capacity),
+      limits: floats(LIMITS * capacity + TAIL, 12 * capacity),
+      active: bytes(ACTIVE),
+      visible: bytes(VISIBLE),
+      constrained: bytes(CONSTRAINED),
+      hidden: bytes(HIDDEN),
+      changed: bytes(CHANGED),
     });
   }
 
