@@ -62,6 +62,8 @@ export interface ColorNode {
     value: readonly [number, number, number, number];
 }
 
+export type DepthPacking = 'basic' | 'rgba';
+
 export interface EmitNode {
     type: 'emit';
     color: ValueNode;
@@ -133,6 +135,14 @@ export class Material {
     readonly volume?: number[];
     readonly extensions: readonly string[];
     constructor(o?: MaterialOptions);
+    get depthPacking(): DepthPacking;
+    set depthPacking(v: DepthPacking);
+    get referencePosition(): readonly [number, number, number];
+    set referencePosition(v: readonly [number, number, number]);
+    get nearDistance(): number;
+    set nearDistance(v: number);
+    get farDistance(): number;
+    set farDistance(v: number);
     get clearcoat(): number;
     set clearcoat(v: number);
     get clearcoatRoughness(): number;
@@ -226,6 +236,10 @@ export type MaterialNode = ValueNode | NormalMapNode | MetalRoughNode | Clearcoa
 
 export interface MaterialOptions extends PhysicalOptions {
     shading?: Shading;
+    depthPacking?: DepthPacking;
+    referencePosition?: readonly [number, number, number];
+    nearDistance?: number;
+    farDistance?: number;
     color?: Color;
     opacity?: number;
     roughness?: number;
@@ -358,7 +372,7 @@ export interface ScalarNode {
     value: number;
 }
 
-export type Shading = 'standard' | 'basic' | 'normal' | 'matcap';
+export type Shading = 'standard' | 'basic' | 'normal' | 'matcap' | 'depth' | 'distance';
 
 export interface SheenOptions {
     colorFactor?: readonly [number, number, number];
