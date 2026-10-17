@@ -83,3 +83,14 @@ fn linearOutput(pos:vec4f)->vec4f {
 }
 @fragment fn excess(@builtin(position) pos:vec4f)->@location(0) vec4f {let o=linearOutput(pos);return vec4f(o.rgb-clamp(o.rgb,vec3f(0),vec3f(1)),0);}
 `;
+
+/** Select the texture's actual cube extent while retaining the original 33³ shader bytes for legacy inputs. */
+export function sizedLUTShader(code: string): string {
+  return code
+    .replace(
+      'fn sampleLUT(color:vec3f)->vec3f {',
+      'fn sampleLUT(color:vec3f)->vec3f {\n  let edge=i32(textureDimensions(lut).x)-1;',
+    )
+    .replace('vec3f(1))*32.0;', 'vec3f(1))*f32(edge);')
+    .replace('min(lo+1,vec3i(32))', 'min(lo+1,vec3i(edge))');
+}

@@ -1,5 +1,5 @@
 {
-  "commit": "2185c7d",
+  "commit": "6be169b",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -768,8 +768,8 @@
     },
     "@margoengine/tonemap": {
       ".": {
-        "raw": 18961,
-        "gzip": 6338
+        "raw": 20822,
+        "gzip": 6967
       }
     },
     "@margoengine/toon": {

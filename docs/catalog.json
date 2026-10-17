@@ -991,7 +991,7 @@
     "package": "@margoengine/tonemap",
     "version": "1.0.0",
     "published": false,
-    "description": "Optional AgX, ACES fitted and Khronos PBR Neutral color grading with 33-cube LUTs.",
+    "description": "Optional AgX, ACES fitted and Khronos PBR Neutral color grading with 2-65 cube LUTs.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "tonemap",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/tonemap@1.0.0",

@@ -5,13 +5,13 @@
   :root{color-scheme:dark;font:16px system-ui;background:#10141c;color:#edf2fa}body{margin:0;padding:24px;max-width:1100px;margin-inline:auto}h1{font-size:28px;margin:0 0 8px}p{color:#b4c2d6}canvas{display:block;width:100%;height:60vh;min-height:300px;border-radius:12px;background:#080c12}fieldset{display:flex;flex-wrap:wrap;gap:24px;border:1px solid #394963;border-radius:12px;margin-top:20px;padding:18px}label{display:grid;gap:8px}input{accent-color:#75c5ff}select,button{font:inherit;padding:8px;background:#263449;color:white;border:1px solid #62718b;border-radius:6px}input[type=range]{width:220px}:focus-visible{outline:3px solid #ffd885;outline-offset:4px}output{font-variant-numeric:tabular-nums}#status{min-height:24px}
 </style></head>
 <body>
-<h1>Highlights and color</h1><p>@margoengine/tonemap · Compare three display transforms under bright illumination. Exposure is measured in stops; a 33³ .cube LUT grades display-linear color.</p>
+<h1>Highlights and color</h1><p>@margoengine/tonemap · Compare three display transforms under bright illumination. Exposure is measured in stops; a 2³–65³ .cube LUT grades display-linear color.</p>
 <canvas id="viewport" aria-label="Bright colored spheres demonstrating highlight rolloff and color grading"></canvas>
 <fieldset><legend>Color grading</legend>
 <label for="curve">Display transform<select id="curve"><option value="agx">AgX</option><option value="acescg">ACES fitted / ACEScg</option><option value="neutral">Khronos PBR Neutral</option></select></label>
 <label for="exposure">Exposure <output id="exposure-value">0 stops</output><input id="exposure" type="range" min="-6" max="6" step="0.1" value="0"></label>
 <label for="contrast">Contrast <output id="contrast-value">1</output><input id="contrast" type="range" min="0" max="3" step="0.05" value="1"></label>
-<label for="lut">33³ .cube LUT<input id="lut" type="file" accept=".cube,text/plain"></label><button id="clear-lut" type="button">Clear LUT</button>
+<label for="lut">.cube LUT (2–65 samples per axis)<input id="lut" type="file" accept=".cube,text/plain"></label><button id="clear-lut" type="button">Clear LUT</button>
 </fieldset><p id="status" role="status">Starting WebGPU…</p>
 <script type="module" src="./main.ts"></script>
 </body></html>
