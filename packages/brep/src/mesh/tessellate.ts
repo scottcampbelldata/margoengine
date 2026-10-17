@@ -101,6 +101,8 @@ export class Tessellator {
   private readonly curves = new Map<number, Curve>();
   private readonly surfaces = new Map<number, Surface>();
   private readonly edges = new Map<number, V3[]>();
+  /** Curve parameters an edge must be sampled at: where it passes through a pole of a surface it bounds. */
+  private readonly through = new Map<number, number[]>();
   private readonly turn: number;
   private readonly maxFaceVertices: number;
 
@@ -176,7 +178,18 @@ export class Tessellator {
         }
       } else t2 = c.parameter(p2);
       if (t2 !== undefined && t1 !== t2) {
-        out = c.sample(t1, t2, deflection, this.turn).map((t) => c.at(t).slice(0, 3) as V3);
+        const samples = c.sample(t1, t2, deflection, this.turn),
+          lo = Math.min(t1, t2),
+          hi = Math.max(t1, t2);
+        for (const pole of this.through.get(id) ?? [])
+          for (let k = -1; k <= 1; k++) {
+            const t = pole + k * c.period;
+            if (t <= lo || t >= hi || (k && !c.period)) continue;
+            // Inside the edge: inserted in order, unless a sample already sits on it.
+            const at = samples.findIndex((x) => (t2 > t1 ? x >= t : x <= t));
+            if (at > 0 && Math.abs(samples[at] - t) > 1e-12 * (hi - lo)) samples.splice(at, 0, t);
+          }
+        out = samples.map((t) => c.at(t).slice(0, 3) as V3);
         out[0] = p1;
         out[out.length - 1] = p2;
       }
@@ -266,9 +279,10 @@ export class Tessellator {
           let nextU = nearest(r.u, u, s.uPeriod);
           const nextV = nearest(r.v, v, s.vPeriod),
             previous = out[out.length - 1];
-          // A bound that passes over a pole between two samples (a great circle through the poles) jumps about half a
-          // turn in u: walk it along the pole line, the way that keeps the face on its side, like a pole vertex.
-          if (previous && s.uPeriod && Math.abs(nextU - u) > 1) {
+          // A bound that passes over a pole between two samples (a great circle through the poles) jumps half a turn in u: walk it along the pole line, the way that keeps the face on its side, like a pole vertex.
+          // Only an exact half turn is a crossing: a curve that merely passes near a pole turns the short way, which
+          // nearest() already took.
+          if (previous && s.uPeriod && Math.abs(Math.abs(nextU - u) - s.uPeriod / 2) < 1e-3) {
             const side = (nextV + v > 0 ? 1 : -1) as 1 | -1,
               poleV = s.pole(side);
             if (poleV !== undefined) {
@@ -382,9 +396,16 @@ export class Tessellator {
           reversed = pts.map((_, i) => ({ ...pts[pts.length - 1 - i], line: pts[(pts.length - i) % pts.length].line }));
         wraps[1] = { points: reversed, ku: -wraps[1].ku, kv: -wraps[1].kv };
       }
-      const second = open(wraps[1], A(first.run[0])),
+      // The second bound is cut at its own sample nearest the first cut, never between samples: an interpolated point
+      // would be a T-junction with the neighbouring face, which only has the samples. The cut lines then lean slightly.
+      const at = A(first.run[0]),
+        closest = wraps[1].points.reduce((best, q) =>
+          Math.abs(nearest(A(q), at, period) - at) < Math.abs(nearest(A(best), at, period) - at) ? q : best,
+        ),
+        second = open(wraps[1], A(closest)),
         end = first.run[first.run.length - 1],
-        shift = A(end) - A(second.run[0]),
+        // Whole periods only, so every point keeps the (u, v) of its position.
+        shift = Math.round((A(end) - A(second.run[0])) / period) * period,
         across = transposed ? s.uPeriod : s.vPeriod;
       let moved = second.run.map((q) => make(q.p, A(q) + shift, B(q), q.line));
       // Across a closed direction (a torus) two bands share these bounds: the one wound the way the face's orientation
@@ -467,13 +488,33 @@ export class Tessellator {
       loopIndices: number[][] = [],
       // A cut appears on both sides of its seam, walked opposite ways: both use one set of points, so they weld exactly.
       lines = new Map<string, V3[]>(),
-      canon = (q: LoopPoint) => `${Math.round(wrapU(q.u) * 1e8)},${Math.round(wrapV(q.v) * 1e8)}`;
+      canon = (q: LoopPoint) => `${Math.round(wrapU(q.u) * 1e8)},${Math.round(wrapV(q.v) * 1e8)}`,
+      // A point this face makes up (a pole, a cut end, a corner) that lands on one of its bounds' samples takes that
+      // sample's exact position: the neighbouring face has the sample, and an ulp apart is an open seam.
+      cell = Math.max(gap, 1e-300) * 4,
+      samples = new Map<string, V3[]>(),
+      cellOf = (p: readonly number[]) => p.map((c) => Math.floor(c / cell)),
+      snap = (p: V3): V3 => {
+        const [x, y, z] = cellOf(p);
+        for (let i = -1; i <= 1; i++)
+          for (let j = -1; j <= 1; j++)
+            for (let k = -1; k <= 1; k++)
+              for (const q of samples.get(`${x + i},${y + j},${z + k}`) ?? []) if (distance(p, q) <= gap) return q;
+        return p;
+      };
+    for (const b of bounds)
+      for (const p of b.points) {
+        const key = cellOf(p).join(','),
+          list = samples.get(key);
+        if (list) list.push(p);
+        else samples.set(key, [p]);
+      }
     for (const loop of domain) {
       const indices: number[] = [],
         put = (p: V3, u: number, v: number) => {
           indices.push(uv.length / 2);
           uv.push(u, v);
-          xyz.push(p);
+          xyz.push(snap(p));
         };
       loop.forEach((q, i) => {
         put(q.p, q.u, q.v);
@@ -637,6 +678,48 @@ export class Tessellator {
   }
 
   /** Tessellates a body. Faces that fail are listed in `failures`; the rest form the mesh. */
+  /**
+   * Before a body is meshed: an edge whose curve runs through a pole of a surface it bounds (a great circle over a
+   * sphere's poles) is sampled at the pole, so the face whose bound crosses the pole and its neighbour share that point.
+   */
+  private findPoleCrossings(body: STEPBody, tolerance: number): void {
+    for (const face of body.faces) {
+      const geometry = ref(this.file.get(face).args[2]);
+      if (geometry === undefined) continue;
+      let s: Surface;
+      try {
+        s = this.surface(geometry, body.angleUnit);
+      } catch {
+        continue;
+      }
+      const poles: V3[] = [];
+      for (const side of [1, -1] as const) {
+        const v = s.pole(side);
+        if (v !== undefined) poles.push(s.at(s.uDomain[0], v).slice(0, 3) as V3);
+      }
+      if (!poles.length) continue;
+      for (const b of list(this.file.get(face).args[1])) {
+        const loop = ref(this.file.get(ref(b) ?? -1).args[1]);
+        if (loop === undefined || this.file.get(loop).type !== 'EDGE_LOOP') continue;
+        for (const oriented of list(this.file.args(loop, 'EDGE_LOOP')[1])) {
+          const edge = ref(this.file.args(ref(oriented) ?? -1, 'ORIENTED_EDGE')[3]),
+            curve = edge === undefined ? undefined : ref(this.file.args(edge, 'EDGE_CURVE')[3]);
+          if (edge === undefined || curve === undefined || this.edges.has(edge)) continue;
+          let c: Curve;
+          try {
+            c = this.curve(curve);
+          } catch {
+            continue;
+          }
+          for (const pole of poles) {
+            const t = c.parameter(pole);
+            if (distance(c.at(t), pole) <= tolerance) this.through.set(edge, [...(this.through.get(edge) ?? []), t]);
+          }
+        }
+      }
+    }
+  }
+
   body(body: STEPBody): BodyMesh {
     const tol = this.tolerances(body),
       positions: number[] = [],
@@ -644,6 +727,7 @@ export class Tessellator {
       indices: number[] = [],
       faces: BodyMeshFace[] = [],
       failures: { id: number; reason: string }[] = [];
+    this.findPoleCrossings(body, tol.edge * 1e-3);
     for (const id of body.faces) {
       let mesh: FaceMesh;
       try {
