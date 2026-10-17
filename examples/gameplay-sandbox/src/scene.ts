@@ -30,6 +30,9 @@ export function createLandscape(engine: EngineKernel, shadows: Shadows, wetDepth
     wetHeight: [0, 0.65],
     wetDarkening: 0.55,
     variation: 0.06,
+    // Phones keep the per-pixel bands without the height-blend and cliff noise (about 200-380 more ALU operations per
+    // terrain pixel by the shader's count): the island is already GPU-bound on some phones.
+    detail: mobile ? 0 : 1,
     wetness: wetDepth ? { texture: wetDepth, origin: [-80, -80], size: [ISLAND_SIZE, ISLAND_SIZE] } : undefined,
   });
   const map = TerrainHeightmap.attach(engine, terrainHeight, {
