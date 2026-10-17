@@ -9,8 +9,20 @@
 //   generation stops once the file passes `limitBytes` (the CAD loader's 64 MiB input cap), and `oversize` says so.
 // - GLB: one mesh per distinct geometry; a geometry used more than once is one node with EXT_mesh_gpu_instancing
 //   (what a STEP-to-GLB converter writes); a geometry used once is a node with its own translation and rotation.
+//   Four PBR materials, one per part family (plate, bracket, shaft, fastener), as a converter carries CAD colours over.
 
 export const PARTS_PER_MODULE = 50;
+/** Bump when what this file writes changes, so cached assemblies are rewritten. */
+export const GENERATOR = 2;
+
+// glTF materials by geometry key prefix: base colour (linear), metallic, roughness. Moderate metalness, because the
+// benchmarks light the parts without an environment map (a fully metallic part would show only its specular lobe).
+const MATERIALS = [
+  { name: 'painted plate', prefix: 'plate-', color: [0.3, 0.33, 0.36], metallic: 0.3, roughness: 0.55 },
+  { name: 'blue bracket', prefix: 'bracket-', color: [0.08, 0.2, 0.42], metallic: 0.1, roughness: 0.45 },
+  { name: 'steel shaft', prefix: 'shaft-', color: [0.62, 0.63, 0.65], metallic: 0.7, roughness: 0.3 },
+  { name: 'zinc fastener', prefix: '', color: [0.7, 0.68, 0.6], metallic: 0.8, roughness: 0.35 },
+];
 
 // --- geometry --------------------------------------------------------------------------------------------------------
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -380,7 +392,10 @@ export async function writeOBJ({ parts, geometry }, write, { limitBytes = Infini
   return { bytes, oversize: bytes > limitBytes };
 }
 
-/** GLB bytes: one mesh per distinct geometry; repeated geometries as EXT_mesh_gpu_instancing nodes. */
+/**
+ * GLB bytes: one mesh per distinct geometry; repeated geometries as EXT_mesh_gpu_instancing nodes; one material per
+ * part family.
+ */
 export function writeGLB({ parts, geometry, keys }) {
   const chunks = [],
     views = [],
@@ -429,6 +444,7 @@ export function writeGLB({ parts, geometry, keys }) {
             NORMAL: accessor(Float32Array.from(g.normals), 'VEC3', 5126),
           },
           indices: accessor(indices, 'SCALAR', wide ? 5125 : 5123),
+          material: MATERIALS.findIndex((m) => key.startsWith(m.prefix)),
         },
       ],
     });
@@ -465,6 +481,14 @@ export function writeGLB({ parts, geometry, keys }) {
       scenes: [{ nodes: nodes.map((_, i) => i) }],
       nodes,
       meshes,
+      materials: MATERIALS.map((m) => ({
+        name: m.name,
+        pbrMetallicRoughness: {
+          baseColorFactor: [...m.color, 1],
+          metallicFactor: m.metallic,
+          roughnessFactor: m.roughness,
+        },
+      })),
       accessors,
       bufferViews: views,
       buffers: [{ byteLength: length }],

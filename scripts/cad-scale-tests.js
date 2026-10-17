@@ -23,7 +23,7 @@ import { once } from 'node:events';
 import { openBrowser } from './browser.js';
 import { acquire } from './gpu-lock.mjs';
 import { waitForQuiet } from './quiet-gate.mjs';
-import { assembly, summary, writeGLB, writeOBJ } from './cad-scale/assembly.mjs';
+import { GENERATOR, assembly, summary, writeGLB, writeOBJ } from './cad-scale/assembly.mjs';
 
 // Pass limits per machine class (proposed; Scott confirms). Frame times include GPU completion.
 export const CLASSES = {
@@ -38,7 +38,6 @@ export const CLASSES = {
   entry: { loadMs: 30_000, orbitMedianMs: 1000 / 30, orbitP95Ms: 1000 / 15, pickMs: 250, sectionMedianMs: 1000 / 15 },
 };
 const CAD_MAX_BYTES = 64 * 1024 * 1024, // parseCADAsync's input cap (packages/machinery/src/cad-parser.ts maxBytes)
-  GENERATOR = 1, // bump when assembly.mjs changes what it writes
   OUT = 'test-results/cad-scale',
   PORT = 5233;
 
