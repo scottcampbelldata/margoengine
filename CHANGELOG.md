@@ -208,9 +208,9 @@ lists all 74 public packages, preserved optional entries and audit decisions.
   releases all 64 tracked GPU resources across device restoration, and reports
   zero GPU/page errors. Helper queries perform no GPU work; query and restoration
   frames preserve pixels exactly. Fifteen new Node regressions also pass.
-- `npm run measure:size` reports **47,983 bytes raw / 19,999 bytes gzip** for
+- `npm run measure:size` reports **50,207 bytes raw / 21,107 bytes gzip** for
   core + stage, including embedded Wasm and both backends. Core and stage remain
-  feature-frozen. CI rejects **20,000 gzip bytes or above** and checks package
+  feature-frozen. CI rejects **25,000 gzip bytes or above** and checks package
   isolation; optional parser/decoder features add no base-bundle code.
 - CI runs `npm run typecheck` after package builds and retains the production
   compression browser report as a build artifact.

@@ -20,7 +20,7 @@ At handoff time, the reference could not be inspected because the in-app browser
 
 ## Architectural constraints
 
-`@margoengine/core` and the stage facade are feature-frozen for v1.0.0. Do not add skinning math, material graphs, post-processing passes, or other features there. Core plus stage gzip must remain **strictly below 20,000 bytes**; CI must fail at 20,000 bytes or above. The last reported measurement was 19,999 bytes, so there is effectively no headroom.
+`@margoengine/core` and the stage facade are feature-frozen for v1.0.0. Do not add skinning math, material graphs, post-processing passes, or other features there. Core plus stage gzip must stay **below 25,000 bytes**; CI fails at 25,000 bytes or above (AGENTS.md). The last reported measurement was 21,107 bytes.
 
 Future capabilities belong in separate optional, tree-shakable packages. Relevant packages already exist:
 

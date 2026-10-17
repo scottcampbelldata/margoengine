@@ -2,13 +2,13 @@
 
 Date: 2026-10-16. Margo is for developers who are tired of Three.js and want a place to do the same job. It does not have to absorb every Three.js example. It does have to be a complete, predictable engine for the scenes those developers actually ship.
 
-The last measured core plus stage gzip is 19,999 bytes. CI fails at 25,000. A result from 22,000 through 24,999 is inside the allowed band. Optional packages stay out of that file. A feature that needs a new core API does not land.
+The last measured core plus stage gzip is 21,107 bytes. CI fails at 25,000. A result from 22,000 through 24,999 is inside the allowed band. Optional packages stay out of that file. A feature that needs a new core API does not land.
 
 ## What they are tired of
 
 | Three.js habit | What Margo has to do instead |
 | --- | --- |
-| A large runtime before the first triangle | Core plus stage stays at or under 19,999 bytes gzip. |
+| A large runtime before the first triangle | Core plus stage measures 21,107 bytes gzip; the build fails at 25,000. |
 | Disposal that depends on remembering `dispose()` on every texture and geometry | Unmount and `model.dispose()` release the GPU buffers. A test fails if they remain. |
 | React Three Fiber's reconciler and a bare `<mesh>` tag | `<Mesh>` and `<Margo.mesh>` are ordinary React components. A bare `<mesh>` stays HTML. |
 | A loaded glTF that renders, then silently exports or simulates as empty | `docs/pbr-mesh-triangles.md`. A static model gets a collider, an export, and a CAD part. A skinned model throws on a default collider. |

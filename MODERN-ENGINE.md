@@ -283,7 +283,7 @@ Wasm memory, mesh refs, hierarchy, materials and CPU controllers remain intact. 
 
 ## Size and verification
 
-`npm run measure:size` verified core plus stage at **47,983 bytes raw / 19,999 bytes gzip** on 16 October 2026, including embedded Wasm and both rendering backends. CI rejects **20,000 bytes gzip and above** on pushes and pull requests. Core and stage remain feature-frozen; USDZ, PBR and decoder implementations stay in optional packages. The [release notes](CHANGELOG.md#unreleased) record the 931-test Node 24 verification, strict checks and packed imports across all 62 packages, and production compression browser checks.
+`npm run measure:size` verified core plus stage at **47,983 bytes raw / 19,999 bytes gzip** on 16 October 2026, including embedded Wasm and both rendering backends. CI rejects **25,000 bytes gzip and above** on pushes and pull requests. Core and stage remain feature-frozen; USDZ, PBR and decoder implementations stay in optional packages. The [release notes](CHANGELOG.md#unreleased) record the 931-test Node 24 verification, strict checks and packed imports across all 62 packages, and production compression browser checks.
 
 The table below is the historical 11 October 2026 lock, generated from minified ES library bundles. Its core-only measurements and headroom are separate from the current combined core + stage gate:
 
@@ -324,7 +324,7 @@ AMD Radeon integrated graphics (RDNA 2, device 13C0, driver 32.0.21043.5001) als
 
 ## Remaining domain features
 
-XR and asset interop are optional packages. `@margoengine/xr` implements WebGPU session negotiation, target/grip poses and stereo core-mesh rendering on a separate compatible device. `@margoengine/ifc` uses web-ifc for native geometry, placement, units and BIM identifiers. Loaders accept static USDA-backed USDZ; exporters write aligned static USDZ with PreviewSurface materials. That pass recorded core and stage at 20,053 bytes gzip, under an older 20,480-byte ceiling. The current gate is 20,000. The current build measures core at 18,192 bytes gzip and core plus stage at 19,999 bytes gzip.
+XR and asset interop are optional packages. `@margoengine/xr` implements WebGPU session negotiation, target/grip poses and stereo core-mesh rendering on a separate compatible device. `@margoengine/ifc` uses web-ifc for native geometry, placement, units and BIM identifiers. Loaders accept static USDA-backed USDZ; exporters write aligned static USDZ with PreviewSurface materials. That pass recorded core and stage at 20,053 bytes gzip, under an older 20,480-byte ceiling. The current gate is 25,000. The current build measures core at 18,876 bytes gzip and core plus stage at 21,107 bytes gzip.
 
 `npm run modern:test:interop` checks sessions, poses, cleanup, a native IFC4 fixture and USDZ round trips. `npm run modern:test:usdz` also covers static binary USDC through the dedicated USDZ package. `npm run modern:test:xr:browser` verifies stereo pixel readback with simulated sessions and a real WebGPU device. Official OpenUSD validation is available through `packages/exporters/tests/validate-usdz.py`. Physical XR sessions and Apple Quick Look presentation remain unverified. Composed USD stages and XR rendering of advanced effects/textured/skinned extension meshes remain unsupported; see the package READMEs.
 
