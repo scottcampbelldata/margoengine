@@ -193,6 +193,34 @@ function obj(
         v = (axis + 2) % 3;
       if (face.some((p) => Math.abs(normal.reduce((sum, n, i) => sum + n * (p[i] - a[i]), 0)) / length > 1e-5))
         throw new RangeError('Nonplanar OBJ face');
+      // Triangles and quads keep their own corners and winding without contour triangulation, so they spend none of
+      // its work budget. A quad splits along the diagonal inside it; a zero-area half (a straight corner) is dropped.
+      if (face.length < 5) {
+        const triangles = [[a, b, c]];
+        if (face.length === 4) {
+          const d = face[3],
+            turn = (p: number[], q: number[], r: number[]) =>
+              normal[0] * ((q[1] - p[1]) * (r[2] - q[2]) - (q[2] - p[2]) * (r[1] - q[1])) +
+              normal[1] * ((q[2] - p[2]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[2] - q[2])) +
+              normal[2] * ((q[0] - p[0]) * (r[1] - q[1]) - (q[1] - p[1]) * (r[0] - q[0])),
+            reflex = [turn(d, a, b), turn(b, c, d), turn(c, d, a)].filter((t) => t < 0).length;
+          if (reflex > 1) throw new RangeError('OBJ quad crosses itself; split it into two triangles');
+          triangles[0] = turn(c, d, a) < 0 ? [a, b, d] : [a, b, c];
+          triangles.push(turn(c, d, a) < 0 ? [b, c, d] : [a, c, d]);
+        }
+        for (const [p, q, r] of triangles) {
+          const ux = q[0] - p[0],
+            uy = q[1] - p[1],
+            uz = q[2] - p[2],
+            vx = r[0] - p[0],
+            vy = r[1] - p[1],
+            vz = r[2] - p[2];
+          if (!(uy * vz - uz * vy) && !(uz * vx - ux * vz) && !(ux * vy - uy * vx)) continue;
+          current.positions.push(...p, ...q, ...r);
+          if ((total += 3) > maxIndices) throw new RangeError('OBJ triangle limit');
+        }
+        continue;
+      }
       const result = triangulatePolygon(
         face.map((p) => [p[u], p[v]]),
         [],

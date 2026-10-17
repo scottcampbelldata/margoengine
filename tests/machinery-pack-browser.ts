@@ -215,7 +215,58 @@ async function step() {
   return { direct, load };
 }
 
+/** The 50,000-box OBJ through the worker import, then packed; times are wall-clock milliseconds on this page. */
+async function large() {
+  engine.camera.project = undefined;
+  Object.assign(engine.camera, { position: [150, 220, 330], target: [150, 0, 120], near: 1, far: 2000 });
+  const started = performance.now(),
+    buffer = await (await fetch('/test-results/cad-pack-50000/parts-50000.obj')).arrayBuffer(),
+    bytes = buffer.byteLength,
+    fetched = performance.now(),
+    model = await parseCADAsync(engine, buffer, 'obj'),
+    loaded = performance.now();
+  const times = async (count: number) => {
+    const samples: number[] = [];
+    let last = await frame();
+    for (let i = 0; i < count; i++) {
+      const start = performance.now();
+      last = await frame();
+      samples.push(performance.now() - start);
+    }
+    samples.sort((a, b) => a - b);
+    return { median: samples[samples.length >> 1], min: samples[0], max: samples.at(-1)!, last };
+  };
+  return {
+    bytes,
+    parts: model.meshes.length,
+    unique: new Set(model.meshes.map((mesh) => mesh.geometry)).size,
+    fetchMs: fetched - started,
+    parseMs: loaded - fetched,
+    async run() {
+      const unpacked = await times(5),
+        attachStart = performance.now(),
+        instancer = PartInstancer.attach(engine),
+        attachMs = performance.now() - attachStart,
+        buildStart = performance.now(),
+        build = await frame(),
+        buildMs = performance.now() - buildStart,
+        packed = await times(9);
+      return { unpacked, attachMs, buildMs, build, packed, stats: { ...instancer.stats } };
+    },
+    dispose() {
+      engine.dispose();
+    },
+  };
+}
+
 Object.assign(window, {
-  machineryPack: scenario === 'gltf' ? await gltf() : scenario === 'step' ? await step() : await cad(),
+  machineryPack:
+    scenario === 'gltf'
+      ? await gltf()
+      : scenario === 'step'
+        ? await step()
+        : scenario === 'large'
+          ? await large()
+          : await cad(),
   machineryPackErrors: errors,
 });
