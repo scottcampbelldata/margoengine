@@ -126,7 +126,8 @@ struct Output {@builtin(position) clip:vec4f,@location(0) normal:vec3f,@location
 fn linear(d:f32)->f32 {return frame.cameraData.x*frame.cameraData.y/(frame.cameraData.x+d*(frame.cameraData.y-frame.cameraData.x));}
 fn hash(p:vec2i)->f32 {var x=bitcast<u32>(p.x)*1664525u+bitcast<u32>(p.y)*1013904223u;x=(x^(x>>16u))*2246822519u;return f32(x^(x>>13u))/4294967295.0;}
 fn cornerGradient(cell:vec2i)->vec2f {let angle=hash(cell)*6.2831853;return vec2f(cos(angle),sin(angle));}
-// Gradient noise (Perlin 2002: random unit corner gradients, quintic fade) with analytic derivatives: value, d/dx, d/dy.
+// Gradient noise over random unit corner gradients, with the quintic fade of Perlin 2002 and analytic derivatives:
+// value, d/dx, d/dy. Random angles rather than a fixed gradient set keep it free of axis bias.
 // Value noise has zero slope along every cell edge, which lit ripples as flat strips; here each edge keeps its gradients.
 fn noise(p:vec2f)->vec3f {
  let cell=vec2i(floor(p));let f=fract(p);let u=f*f*f*(f*(f*6.0-15.0)+10.0);let du=30.0*f*f*(f*(f-2.0)+1.0);
