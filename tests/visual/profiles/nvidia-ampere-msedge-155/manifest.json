@@ -495,7 +495,7 @@
   "dof-phone": {
    "url": "demos/dof/",
    "size": "195x422",
-   "runs": 4,
+   "runs": 1,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -511,12 +511,25 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
+    "date": "2026-10-17T23:23:34.574Z",
+    "commit": "d41a218bbbe2400a89a42c9d23fbf2486cfc6d1d",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
+   },
+   "noiseEnvironment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
     "date": "2026-10-17T08:04:14.158Z",
     "commit": "c5ba426105253a553e9b9408ad5fc47385c59b72",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
-   }
+   },
+   "noiseRuns": 4,
+   "recordReason": "PBR Neutral display/default relative to exact per-view reference c5ba426105253a553e9b9408ad5fc47385c59b72; full active-dependency and before/after audit. Existing measured noise and tolerance retained unchanged."
   },
   "tonemap-high": {
    "url": "demos/tonemap/?quality=high",
@@ -547,7 +560,7 @@
   "tonemap-phone": {
    "url": "demos/tonemap/",
    "size": "195x422",
-   "runs": 4,
+   "runs": 1,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -563,12 +576,25 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
+    "date": "2026-10-17T23:23:34.574Z",
+    "commit": "d41a218bbbe2400a89a42c9d23fbf2486cfc6d1d",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
+   },
+   "noiseEnvironment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
     "date": "2026-10-17T06:41:53.501Z",
     "commit": "6be169bec988c460a75b381bf8774db7d7ebbbf1",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
-   }
+   },
+   "noiseRuns": 4,
+   "recordReason": "PBR Neutral display/default relative to exact per-view reference 6be169bec988c460a75b381bf8774db7d7ebbbf1; full active-dependency and before/after audit. Existing measured noise and tolerance retained unchanged."
   },
   "khronos-MetalRoughSpheres-model": {
    "url": "examples/khronos-gallery.html?model=MetalRoughSpheres",
