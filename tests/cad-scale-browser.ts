@@ -5,8 +5,10 @@
 // on this thread). The rest of a frame is the browser's GPU process and the GPU; a frame that is mostly encode is
 // limited by per-part CPU work, not by triangles.
 // Query: url (file under the dev server), format (obj, stl, step, iges, glb, gltf), frames (orbit frames, default 120),
-// smoothing ('false' for flat CAD normals) and, for generated assemblies, the known bounds (minx..maxz).
-import { Engine } from '../packages/core/dist/extension.js';
+// smoothing ('false' for flat CAD normals), kernel ('margo' reads STEP with our own kernel, @margoengine/brep, on this
+// thread, instead of OpenCascade in a worker) and, for generated assemblies, the known bounds (minx..maxz).
+import { Engine, Geometry, PbrMaterial, type Mesh } from '../packages/core/dist/extension.js';
+import { parseSTEP, tessellateSTEP } from '../packages/brep/dist/index.js';
 import { parseCADAsync, PartInstancer, SectionPlanes } from '../packages/machinery/dist/index.js';
 import { loadGLTF } from '../packages/gltf-pro/dist/index.js';
 import { instancing } from '../packages/gltf-pro/dist/instancing.js';
@@ -26,6 +28,7 @@ const query = new URLSearchParams(location.search),
   format = (query.get('format') ?? '').toLowerCase(),
   frames = Math.max(10, Number(query.get('frames') ?? 120)),
   smoothing = query.get('smoothing') !== 'false',
+  kernel = query.get('kernel') === 'margo' ? 'margo' : 'occt',
   known = ['minx', 'miny', 'minz', 'maxx', 'maxy', 'maxz'].map((k) =>
     query.has(k) ? Number(query.get(k)) : Number.NaN,
   ),
@@ -33,6 +36,38 @@ const query = new URLSearchParams(location.search),
 let stage = 'start';
 addEventListener('error', (event) => errors.push(String(event.message)));
 addEventListener('unhandledrejection', (event) => errors.push(String(event.reason)));
+
+/** Position, rotation quaternion [x, y, z, w] and scale of a column-major placement matrix. */
+function decompose(m: ArrayLike<number>) {
+  const column = (c: number) => [m[c * 4], m[c * 4 + 1], m[c * 4 + 2]],
+    [c0, c1, c2] = [column(0), column(1), column(2)],
+    det =
+      c0[0] * (c1[1] * c2[2] - c1[2] * c2[1]) -
+      c1[0] * (c0[1] * c2[2] - c0[2] * c2[1]) +
+      c2[0] * (c0[1] * c1[2] - c0[2] * c1[1]),
+    scale = [Math.hypot(...c0) * Math.sign(det || 1), Math.hypot(...c1), Math.hypot(...c2)],
+    [r0, r1, r2] = [c0.map((v) => v / scale[0]), c1.map((v) => v / scale[1]), c2.map((v) => v / scale[2])],
+    trace = r0[0] + r1[1] + r2[2];
+  let q: number[];
+  if (trace > 0) {
+    const s = 0.5 / Math.sqrt(trace + 1);
+    q = [(r1[2] - r2[1]) * s, (r2[0] - r0[2]) * s, (r0[1] - r1[0]) * s, 0.25 / s];
+  } else if (r0[0] > r1[1] && r0[0] > r2[2]) {
+    const s = 2 * Math.sqrt(1 + r0[0] - r1[1] - r2[2]);
+    q = [0.25 * s, (r1[0] + r0[1]) / s, (r2[0] + r0[2]) / s, (r1[2] - r2[1]) / s];
+  } else if (r1[1] > r2[2]) {
+    const s = 2 * Math.sqrt(1 + r1[1] - r0[0] - r2[2]);
+    q = [(r1[0] + r0[1]) / s, 0.25 * s, (r2[1] + r1[2]) / s, (r2[0] - r0[2]) / s];
+  } else {
+    const s = 2 * Math.sqrt(1 + r2[2] - r0[0] - r1[1]);
+    q = [(r2[0] + r0[2]) / s, (r2[1] + r1[2]) / s, 0.25 * s, (r0[1] - r1[0]) / s];
+  }
+  return {
+    position: [m[12], m[13], m[14]] as [number, number, number],
+    quaternion: q,
+    scale: scale as [number, number, number],
+  };
+}
 
 function stats(samples: number[]) {
   const sorted = [...samples].sort((a, b) => a - b),
@@ -72,6 +107,7 @@ async function run() {
     roots: Roots = [],
     fetchMs = 0,
     instancer: PartInstancer | undefined,
+    failedFaces = 0,
     widen = (_bounds: number[]) => {};
   stage = 'load';
   if (format === 'glb' || format === 'gltf') {
@@ -119,6 +155,40 @@ async function run() {
           }
       }
     };
+  } else if (format === 'step' && kernel === 'margo') {
+    // Our kernel: one geometry per body (in metres), one part per placed body.
+    const buffer = await (await fetch(url)).arrayBuffer();
+    fetchMs = performance.now() - start;
+    const model = parseSTEP(buffer),
+      meshes = tessellateSTEP(model),
+      material = new PbrMaterial({ color: '#a6b9c8', roughness: 0.4, metalness: 0.3 }),
+      geometries = meshes.map((m) => {
+        failedFaces += m.failures.length;
+        if (!m.indices.length) return null;
+        const positions = new Float32Array(m.positions.length);
+        for (let i = 0; i < positions.length; i++) positions[i] = m.positions[i] * m.unit;
+        return new Geometry(positions, m.normals, m.indices);
+      }),
+      root = engine.createMesh(),
+      placed: Mesh[] = [];
+    for (const instance of model.instances) {
+      const geometry = geometries[instance.body];
+      if (!geometry) continue;
+      const { position, quaternion, scale } = decompose(instance.matrix);
+      placed.push(
+        engine
+          .createMesh(root)
+          .setGeometry(geometry)
+          .setMaterial(material)
+          .setPosition(position)
+          .setQuaternion(quaternion)
+          .setScale(scale),
+      );
+      triangles += geometry.indices.length / 3;
+    }
+    parts = placed.length;
+    roots = placed;
+    instancer = PartInstancer.attach(engine);
   } else if (['obj', 'stl', 'step', 'iges'].includes(format)) {
     const buffer = await (await fetch(url)).arrayBuffer();
     fetchMs = performance.now() - start;
@@ -208,6 +278,8 @@ async function run() {
     ok: true,
     format,
     smoothing,
+    kernel,
+    failedFaces,
     parts,
     triangles,
     fetchMs,
