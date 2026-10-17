@@ -2,12 +2,11 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://margoengine.com/</loc></url>
   <url><loc>https://margoengine.com/catalog/</loc></url>
-  <url><loc>https://margoengine.com/sizes.html</loc></url>
   <url><loc>https://margoengine.com/night-citadel/</loc></url>
   <url><loc>https://margoengine.com/gameplay-sandbox/</loc></url>
-  <url><loc>https://margoengine.com/demos/flight-helmet.html</loc></url>
-  <url><loc>https://margoengine.com/demos/character-animation.html</loc></url>
-  <url><loc>https://margoengine.com/demos/windy-meadow.html</loc></url>
+  <url><loc>https://margoengine.com/demos/flight-helmet</loc></url>
+  <url><loc>https://margoengine.com/demos/character-animation</loc></url>
+  <url><loc>https://margoengine.com/demos/windy-meadow</loc></url>
   <url><loc>https://margoengine.com/demos/earth/</loc></url>
-  <url><loc>https://margoengine.com/demos/tokyo-diorama.html</loc></url>
+  <url><loc>https://margoengine.com/demos/tokyo-diorama</loc></url>
 </urlset>
