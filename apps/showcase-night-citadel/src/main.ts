@@ -19,6 +19,7 @@ import { frameDue, frameStatus } from '@margoengine/quality';
 import { Sky } from '@margoengine/sky/base';
 import { night } from '@margoengine/sky/night';
 import { fog } from '@margoengine/sky/fog';
+import { reflection } from '@margoengine/sky/reflection';
 import './style.css';
 
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -103,7 +104,8 @@ export class NightCitadel {
           },
         }),
     });
-    // Midnight sky with stars and a phased moon; height haze in the horizon colour over masonry and water.
+    // Midnight sky with stars and a phased moon; height haze in the horizon colour over masonry and water. Its
+    // reflection environment gives the water the same night (horizon colour, moon glow) instead of a day gradient.
     this.atmosphere = Sky.attach(
       engine,
       {
@@ -126,7 +128,7 @@ export class NightCitadel {
           density: 0,
         },
       },
-      { night, fog },
+      { night, fog, reflection },
     );
     // One fixed map around the island and castle (spire tips at about 39 m, water at -27 m): the scene is static,
     // so the map is drawn once and redrawn only when the moon moves, instead of following the orbiting camera and
@@ -162,6 +164,7 @@ export class NightCitadel {
       horizon: true,
       depth: () => this.post.depthTexture,
       sceneColor: () => this.post.sceneTexture,
+      reflection: () => this.atmosphere.reflectionTexture,
       lights: [{ direction: runtime.lighting.direction, radiance: runtime.lighting.radiance.subarray(0, 3) }],
       color: [0.004, 0.009, 0.022],
       foamDistance: 1.2,
@@ -170,6 +173,8 @@ export class NightCitadel {
         { direction: [0.87, 0.55], amplitude: 0.18, wavelength: 11.19, steepness: 0.3, phase: 2.17 },
       ],
     });
+    // Arm the sky's reflection pass before the first water draw samples it.
+    void this.atmosphere.reflectionTexture;
     const capacity = this.stats.samples === 4 ? 2048 : 512;
     this.particles = VFX.attach(engine, {
       capacity,
