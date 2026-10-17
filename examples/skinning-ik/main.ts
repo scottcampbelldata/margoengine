@@ -1075,12 +1075,13 @@ try {
       return;
     }
     const now = performance.now();
+    // Idle motion is not in this list: its only channel is a 1.3 degree head yaw that head aiming rewrites from rest on
+    // every pose check, so it changes nothing the mirror shows, and it held the mirror at 20 captures a second.
     const moving =
       drag.dragging ||
       transform.dragging ||
       orbitInteracting ||
       now - lastInteraction < 250 ||
-      checkbox('idle').checked ||
       checkbox('moving-light').checked ||
       checkbox('autopilot').checked;
     // Keep the mirror live during interaction. Spread measured capture work over
