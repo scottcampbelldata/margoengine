@@ -14,7 +14,12 @@ interface OCCT {
 }
 interface Result {
   success: boolean;
-  meshes: Array<{ name: string; attributes: { position: { array: number[] } }; index: { array: number[] } }>;
+  meshes: Array<{
+    name: string;
+    /** `normal`: OpenCascade's surface normal per vertex (each B-rep face has its own vertices). */
+    attributes: { position: { array: number[] }; normal?: { array: number[] } };
+    index: { array: number[] };
+  }>;
 }
 function smooth(geometry: Geometry, progress: (percent: number) => void): Geometry {
   const vertices = geometry.vertices,
@@ -161,28 +166,78 @@ self.onmessage = async (event: MessageEvent) => {
         for (const i of index)
           if (!(Number.isInteger(i) && i >= 0 && i < vertexCount))
             throw new RangeError('B-Rep import returned an index outside its mesh');
-        const normals = new Float32Array(mesh.attributes.position.array.length);
-        for (let f = 0; f < mesh.index.array.length; f += 3) {
-          const p = mesh.attributes.position.array,
-            [a, b, c] = mesh.index.array.slice(f, f + 3).map((i) => i * 3),
-            u = [p[b] - p[a], p[b + 1] - p[a + 1], p[b + 2] - p[a + 2]],
-            v = [p[c] - p[a], p[c + 1] - p[a + 1], p[c + 2] - p[a + 2]],
-            n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]],
-            length = Math.hypot(...n);
-          // A zero-area triangle (repeated corners) stays as OpenCascade emitted it and sets no normal.
+        const p = positions,
+          normals = new Float32Array(p.length),
+          // Area-weighted triangle normals per vertex. OpenCascade gives every B-rep face its own vertices, so this is a
+          // normal of that face alone: the fallback where OpenCascade's own normal is missing or unusable.
+          faces = new Float64Array(p.length),
+          given = mesh.attributes.normal?.array,
+          surface = smoothing && given?.length === p.length ? given : undefined;
+        for (let f = 0; f < index.length; f += 3) {
+          const a = index[f] * 3,
+            b = index[f + 1] * 3,
+            c = index[f + 2] * 3,
+            ux = p[b] - p[a],
+            uy = p[b + 1] - p[a + 1],
+            uz = p[b + 2] - p[a + 2],
+            vx = p[c] - p[a],
+            vy = p[c + 1] - p[a + 1],
+            vz = p[c + 2] - p[a + 2],
+            nx = uy * vz - uz * vy,
+            ny = uz * vx - ux * vz,
+            nz = ux * vy - uy * vx,
+            length = Math.hypot(nx, ny, nz);
+          // A zero-area triangle (repeated corners) stays as OpenCascade emitted it and adds no normal.
           if (!length) continue;
-          for (const id of [a, b, c]) for (let axis = 0; axis < 3; axis++) normals[id + axis] = n[axis] / length;
+          for (const id of [a, b, c]) {
+            faces[id] += nx;
+            faces[id + 1] += ny;
+            faces[id + 2] += nz;
+            // { smoothing: false }: one flat normal per triangle (the last triangle at a vertex wins).
+            if (!smoothing) {
+              normals[id] = nx / length;
+              normals[id + 1] = ny / length;
+              normals[id + 2] = nz / length;
+            }
+          }
         }
-        for (let i = 0; i < normals.length; i += 3)
-          if (!normals[i] && !normals[i + 1] && !normals[i + 2]) normals[i + 2] = 1;
-        return { name: mesh.name, geometry: new Geometry(mesh.attributes.position.array, normals, mesh.index.array) };
+        for (let i = 0; i < p.length; i += 3) {
+          if (!smoothing && (normals[i] || normals[i + 1] || normals[i + 2])) continue;
+          const fx = faces[i],
+            fy = faces[i + 1],
+            fz = faces[i + 2],
+            face = Math.hypot(fx, fy, fz);
+          if (surface) {
+            // OpenCascade's surface normal: smooth across a curved face, hard at every B-rep edge. Used unless it is
+            // missing, zero or not finite, or faces away from the triangles that use the vertex.
+            const ox = surface[i],
+              oy = surface[i + 1],
+              oz = surface[i + 2],
+              size = Math.hypot(ox, oy, oz);
+            if (size > 0 && Number.isFinite(size) && !(face > 0 && ox * fx + oy * fy + oz * fz <= 0)) {
+              normals[i] = ox / size;
+              normals[i + 1] = oy / size;
+              normals[i + 2] = oz / size;
+              continue;
+            }
+          }
+          if (smoothing && face > 0) {
+            normals[i] = fx / face;
+            normals[i + 1] = fy / face;
+            normals[i + 2] = fz / face;
+          } else normals[i + 2] = 1; // a corner only zero-area triangles use: it draws nothing
+        }
+        return { name: mesh.name, geometry: new Geometry(p, normals, index) };
       });
       progress(50);
     }
     const seen = new Map<string, Array<{ data: Float32Array; index: number }>>();
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
-      if (smoothing) part.geometry = smooth(part.geometry, (p) => progress(50 + (49 * (i + p)) / parts.length));
+      // STL/OBJ carry no surface normals: weld and smooth them. STEP/IGES already have OpenCascade's (above); welding
+      // across B-rep faces would round off every hard edge.
+      if (smoothing && (format === 'stl' || format === 'obj'))
+        part.geometry = smooth(part.geometry, (p) => progress(50 + (49 * (i + p)) / parts.length));
       const g = part.geometry,
         data = fingerprint(g),
         key = `${data.length}:${hash(data)}`,

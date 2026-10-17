@@ -7,6 +7,11 @@ export type CADFormat = 'stl' | 'obj' | 'step' | 'iges';
 export interface CADImportOptions {
   signal?: AbortSignal;
   onProgress?: (percent: number) => void;
+  /**
+   * Shading normals (default true). STEP/IGES: OpenCascade's own surface normals, smooth across each curved face and
+   * hard at every B-rep edge. STL/OBJ: corners at the same point are welded and their normals averaged (area times
+   * corner angle). `false`: one flat normal per triangle.
+   */
   smoothing?: boolean;
   /** Most parts (OBJ objects and groups, STEP/IGES meshes) the file may have, each one a core mesh (default 100,000; up to core's 8,388,608 entities). */
   maxParts?: number;

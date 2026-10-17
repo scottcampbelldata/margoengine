@@ -29,7 +29,7 @@ engine.onFrame((_, delta) => {
 engine.start();
 ```
 
-Call `engine.dispose()` on teardown. `loadCAD` uses a worker in browsers; `parseCADAsync` transfers and detaches an owned ArrayBuffer. Both support STL/OBJ/STEP/IGES. Synchronous `parseCAD` retains STL/OBJ support. STEP/IGES tessellation loads separate OpenCascade assets only when needed and returns meters; STL/OBJ retain their input units. Worker imports smooth welded normals by default; use `{ smoothing: false }` to retain hard faces.
+Call `engine.dispose()` on teardown. `loadCAD` uses a worker in browsers; `parseCADAsync` transfers and detaches an owned ArrayBuffer. Both support STL/OBJ/STEP/IGES. Synchronous `parseCAD` retains STL/OBJ support. STEP/IGES tessellation loads separate OpenCascade assets only when needed and returns meters; STL/OBJ retain their input units. STEP/IGES shade with OpenCascade's own surface normals by default: smooth across each curved face, hard at every B-rep edge. STL/OBJ worker imports weld corners at the same point and smooth their normals by default. `{ smoothing: false }` gives one flat normal per triangle.
 
 OBJ triangles and quads become triangles directly (a quad splits along its inside diagonal); faces with five or more corners go through contour triangulation, whose 10,000,000-step work budget still bounds them. `node scripts/machinery-cad-large-tests.js` loads a 50,000-part OBJ through `parseCADAsync` on a real GPU and packs it.
 
