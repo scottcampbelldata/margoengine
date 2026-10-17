@@ -16,7 +16,7 @@ Current parity work (2026-10-17): dispersion, depth/distance materials and back-
 Material wireframe is on main (`80de63c`) in optional materials/gltf-pro and directional/local/contact shadows.
 Variable-size `.cube` LUTs are implemented in optional tonemap with the legacy 33³/no-LUT rendering retained;
 no core or stage feature is added. The matrix now counts 101 covered / 33 partial /
-25 missing of 159 rows. Core + stage measures 21,094 bytes gzip after upstream kernel and Euler lane-view
+25 missing of 159 rows. Core + stage measured 21,094 bytes gzip after upstream kernel and Euler lane-view
 maintenance, below the strict 25,000-byte ceiling in AGENTS.md. Wireframe adds no core or stage source changes.
 Nine stale current-proof references were reconciled against clean upstream `b3ed8ac`; all 15 current proofs and all
 nine affected historical proofs pass. The exact comparisons remain in place; evidence and intentional prior changes
@@ -43,7 +43,7 @@ outline renderer.
 Section clipping now reuses the existing machinery
 uniform in optional glTF-pro and directional shadow shaders; core, stage and the machinery core-shader patch are unchanged.
 Physical GPU Box.glb tests pass 15 checks at actual 1x/4x, including removal/retention of beauty and cast shadow.
-Stencil caps for loaded models remain a gap. Core + stage remains exactly 21,094 bytes gzip.
+Stencil caps for loaded models remain a gap. Core + stage stayed exactly 21,094 bytes gzip.
 Section verification passes `npm run check:merge`: 2,518 Node tests, 15 current proofs and all 55 visual views,
 with no reference-image changes. All seven additional package/interop checks pass. Touched glTF-pro/shadows
 hygiene gates have no new violations. Reproduce the loaded-asset pixels with `node scripts/section-loaded-asset-tests.js`.
@@ -55,7 +55,7 @@ picks FridgeDoor and outlines only its subtree, (207,144) picks the drawable Fri
 and (2,2) misses and restores the exact unselected frame. Root-to-child also restores the exact child-only frame.
 All eight physical GPU checks pass at actual 1x/4x; the old README fails those checks. Five loaded-asset Node checks
 and all 31 selection Node tests pass. The corrected README example compiles under strict TypeScript.
-Core + stage remains exactly 21,094 bytes gzip. Selection changed no core, stage, wireframe or exporters source.
+Core + stage stayed exactly 21,094 bytes gzip. Selection changed no core, stage, wireframe or exporters source.
 Selection verification passes `npm run verify`: 2,523 Node tests and all 15 current proofs. Selection hygiene gates
 have no new violations. This change updates documentation and tests only; no picking or outline shader is changed.
 
@@ -70,7 +70,7 @@ round trips with zero official glTF validator errors. The old writer failed the 
 no-light Box baseline already passed. Sparse, invalid or non-finite live metadata rejects before JSON serialization.
 `npm run verify` passes 2,567 Node tests after rebasing onto upstream parser hardening (`666cb4e`), the gameplay
 sandbox checks and all 15 current proofs; API reports remain
-173 entries / 1,782 exports. Core + stage remains exactly 21,094 bytes gzip. Core, stage, wireframe, picking and the
+173 entries / 1,782 exports. Core + stage stayed exactly 21,094 bytes gzip. Core, stage, wireframe, picking and the
 outline renderer are unchanged. Exporters hygiene has no additional violations. Refreshed optional entry measurements
 record `exporters/model` at 8,464 bytes gzip (+854) and the root at 19,425 (+841), with bare imports external.
 The paired basic-scene network record was regenerated under the shared GPU lock; all six size-page tests pass.

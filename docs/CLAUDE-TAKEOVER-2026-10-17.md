@@ -117,6 +117,13 @@ fixture, kinematics constraints + IK example, Light Keeper demo (already deploye
 correctness B+ (pending triage), tests B-, hygiene C+, docs/claims C, git history C (27 docs-only commits, 10 duplicate
 messages, 5 self-merges).
 
+**On `main` since this file was written (2026-10-17):**
+- The pack: `ccdcf62` (entry sizes recorded in `ac0ffc6`). `@margoengine/machinery` `PartInstancer` packs small static
+  CAD parts into shared GPU buffers; core gains one hook, `Batch.claimed`. `entry-sizes.json` at `ccdcf62`: core +
+  stage 21,107 B gzip, core 18,876.
+- The phone-quality change: `fb01fb1`, the phone tier caps phone pixels and turns SSAO and fog off.
+- The selection question is closed: Scott kept descendant outlining (`docs/selection-children-decision.md`, section 5).
+
 ## 5. In-flight and parked work (branches on origin)
 
 | Branch | What | State / what to do |
