@@ -11,6 +11,15 @@ Measured on this PC (NVIDIA Ampere): 1,000 distinct small boxes from a loaded OB
 3 draws instead of 1,002); 39/39 real-GPU checks (`node scripts/machinery-pack-tests.js`). Core + stage measures
 21,107 bytes gzip (+13), core 18,876. No stage, wireframe, exporters or SectionPlanes change.
 
+CAD triangles (2026-10-17): NIST_MTC_CRADA_ASSEMBLY_REV-D.STP failed to load. OpenCascade emits zero-area triangles
+(32 here: box 24, cover 8; two corners at the identical point), which threw "Degenerate CAD triangle"; and the weld keyed
+corners on a 1e-5 grid, 10 um in metres, which merged 23 distinct screw corners 1 nm-10 um apart and collapsed 46 real
+triangles ("Triangle collapses at CAD welding tolerance"). Corners now weld only at the same Float32 point (OpenCascade's
+shared-edge copies are bit-identical) and zero-area triangles stay, adding no normal weight; no triangle is left out.
+The earlier branch `claude/degenerate-triangles` (6daa7bf, 49660e4, d0d09f1), which dropped those triangles, is
+superseded and must not be merged. Through the built worker in Node: 36 parts, 158,370 of 158,370 triangles, all
+finite; regression `tests/cad-triangles.test.js`. Browser load and frame time with PartInstancer: not yet measured.
+
 Current parity work (2026-10-17): dispersion, depth/distance materials and back-side-only rendering are on main
 (`aa2150c`, `e8befe7`, `95b4eae`). Polygon offset, stencil and color-write controls are on main (`156c4b8`).
 Material wireframe is on main (`80de63c`) in optional materials/gltf-pro and directional/local/contact shadows.

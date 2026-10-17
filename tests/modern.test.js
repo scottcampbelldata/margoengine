@@ -625,6 +625,21 @@ test('CAD welding preserves hard normals, binary STL imports, OBJ concave groups
     assert.deepEqual(deduplicateParts(assembly.meshes), { parts: 2, unique: 1 });
     assert.equal(assembly.meshes[0].geometry.indices.length, 12);
     assembly.dispose();
+    // A real triangle with two corners 1 um apart keeps three corners; a 1e-5 rounding weld used to collapse it.
+    const tiny = parseCAD(
+      engine,
+      asciiSTL([
+        [
+          [0, 0, 0],
+          [0.000001, 0, 0],
+          [0, 1, 0],
+        ],
+      ]),
+      'stl',
+    );
+    assert.equal(tiny.meshes[0].geometry.vertices.length / 6, 3);
+    assert.equal(tiny.meshes[0].geometry.indices.length, 3);
+    tiny.dispose();
     for (const [input, format] of [
       ['v 0 0 0\nf 1 2 3', 'obj'],
       [
@@ -633,16 +648,6 @@ test('CAD welding preserves hard normals, binary STL imports, OBJ concave groups
             [0, 0, 0],
             [0, 0, 0],
             [1, 0, 0],
-          ],
-        ]),
-        'stl',
-      ],
-      [
-        asciiSTL([
-          [
-            [0, 0, 0],
-            [0.000001, 0, 0],
-            [0, 1, 0],
           ],
         ]),
         'stl',

@@ -37,7 +37,10 @@ function smooth(geometry: Geometry, progress: (percent: number) => void): Geomet
       vz = vertices[c + 2] - vertices[a + 2],
       nx = uy * vz - uz * vy,
       ny = uz * vx - ux * vz,
-      nz = ux * vy - uy * vx;
+      nz = ux * vy - uy * vx,
+      // OpenCascade emits zero-area triangles (repeated corners, e.g. along a degenerate edge); they stay as emitted and
+      // add no normal weight (their corner angles are undefined).
+      zeroArea = !nx && !ny && !nz;
     for (let j = 0; j < 3; j++) {
       const at = ids[j],
         next = ids[(j + 1) % 3],
@@ -45,7 +48,9 @@ function smooth(geometry: Geometry, progress: (percent: number) => void): Geomet
         x = vertices[at],
         y = vertices[at + 1],
         z = vertices[at + 2],
-        key = `${Math.round(x * 100_000)},${Math.round(y * 100_000)},${Math.round(z * 100_000)}`;
+        // Corners weld only at the same Float32 point (the stored values; -0 prints as 0). OpenCascade's copies of a
+        // shared edge are bit-identical; a 1e-5 grid also merged distinct corners micrometres apart.
+        key = `${x},${y},${z}`;
       let id = seen.get(key);
       if (id === undefined) {
         id = positions.length / 3;
@@ -55,6 +60,7 @@ function smooth(geometry: Geometry, progress: (percent: number) => void): Geomet
         fallback.push(nx, ny, nz);
       }
       packed[f + j] = id;
+      if (zeroArea) continue;
       const ex = vertices[next] - x,
         ey = vertices[next + 1] - y,
         ez = vertices[next + 2] - z,
@@ -68,8 +74,6 @@ function smooth(geometry: Geometry, progress: (percent: number) => void): Geomet
       normals[id * 3 + 1] += ny * angle;
       normals[id * 3 + 2] += nz * angle;
     }
-    if (packed[f] === packed[f + 1] || packed[f] === packed[f + 2] || packed[f + 1] === packed[f + 2])
-      throw new RangeError('Triangle collapses at CAD welding tolerance');
     if (f % 30_000 === 0) progress(f / indices.length);
   }
   for (let i = 0; i < normals.length; i += 3) {
@@ -77,6 +81,11 @@ function smooth(geometry: Geometry, progress: (percent: number) => void): Geomet
     if (!length) {
       for (let a = 0; a < 3; a++) normals[i + a] = fallback[i + a];
       length = Math.hypot(normals[i], normals[i + 1], normals[i + 2]);
+    }
+    // A corner only zero-area triangles use: +Z, as it draws nothing.
+    if (!length) {
+      normals[i + 2] = 1;
+      length = 1;
     }
     for (let a = 0; a < 3; a++) normals[i + a] /= length;
   }
@@ -160,9 +169,12 @@ self.onmessage = async (event: MessageEvent) => {
             v = [p[c] - p[a], p[c + 1] - p[a + 1], p[c + 2] - p[a + 2]],
             n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]],
             length = Math.hypot(...n);
-          if (!length) throw new RangeError('Degenerate CAD triangle');
+          // A zero-area triangle (repeated corners) stays as OpenCascade emitted it and sets no normal.
+          if (!length) continue;
           for (const id of [a, b, c]) for (let axis = 0; axis < 3; axis++) normals[id + axis] = n[axis] / length;
         }
+        for (let i = 0; i < normals.length; i += 3)
+          if (!normals[i] && !normals[i + 1] && !normals[i + 2]) normals[i + 2] = 1;
         return { name: mesh.name, geometry: new Geometry(mesh.attributes.position.array, normals, mesh.index.array) };
       });
       progress(50);

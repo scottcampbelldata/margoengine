@@ -4,7 +4,15 @@ import { checkCount, countLimit } from '../../shared/limits.js';
 export const maxBytes = 64 * 1024 * 1024,
   maxVertices = 1_000_000,
   maxIndices = 3_000_000;
-/** FNV-style mix of the six rounded weld values stored at `offset`. */
+// A corner welds only with the same Float32 point, the value Geometry stores: its key is the Float32 bit pattern, with
+// -0 folded into 0. A rounding grid (1e-5) merged distinct corners a few micrometres apart and collapsed real triangles.
+const f32 = new Float32Array(1),
+  f32Bits = new Int32Array(f32.buffer);
+function exactKey(value: number): number {
+  f32[0] = value === 0 ? 0 : value;
+  return f32Bits[0];
+}
+/** FNV-style mix of the six weld values stored at `offset`. */
 function weldHash(keys: number[], offset: number): number {
   let h = 0x811c9dc5;
   for (let i = 0; i < 6; i++) h = Math.imul(h ^ (keys[offset + i] | 0), 0x01000193);
@@ -18,7 +26,8 @@ function flat(positions: number[], progress?: (value: number) => void): Geometry
     !positions.every((v) => Number.isFinite(Math.fround(v)))
   )
     throw new RangeError('CAD requires bounded finite triangles');
-  // Welding keys are six values rounded to 1e-5, kept as numbers (six per unique vertex) behind an open-addressed table of vertex ids.
+  // Welding keys are six numbers per unique vertex (the exact Float32 position, the normal rounded to 1e-5), behind an
+  // open-addressed table of vertex ids.
   const packed: number[] = [],
     normals: number[] = [],
     indices: number[] = [],
@@ -35,10 +44,11 @@ function flat(positions: number[], progress?: (value: number) => void): Geometry
       cy = uz * vx - ux * vz,
       cz = ux * vy - uy * vx,
       length = Math.hypot(cx, cy, cz);
-    if (!length) throw new RangeError('Degenerate CAD triangle');
-    const nx = cx / length,
-      ny = cy / length,
-      nz = cz / length,
+    // A zero-area triangle (repeated corners: exporters and OpenCascade emit them) stays as given; it draws nothing, so
+    // its corners take +Z.
+    const nx = length ? cx / length : 0,
+      ny = length ? cy / length : 0,
+      nz = length ? cz / length : 1,
       r3 = Math.round(nx * 100_000),
       r4 = Math.round(ny * 100_000),
       r5 = Math.round(nz * 100_000);
@@ -47,7 +57,7 @@ function flat(positions: number[], progress?: (value: number) => void): Geometry
         y = positions[o + 1],
         z = positions[o + 2],
         at = keys.length;
-      keys.push(Math.round(x * 100_000), Math.round(y * 100_000), Math.round(z * 100_000), r3, r4, r5);
+      keys.push(exactKey(x), exactKey(y), exactKey(z), r3, r4, r5);
       let slot = weldHash(keys, at) & (table.length - 1),
         id = table[slot];
       while (id !== -1) {
@@ -84,10 +94,6 @@ function flat(positions: number[], progress?: (value: number) => void): Geometry
       indices.push(id);
     }
     if (i % 90_000 === 0) progress?.(0.5 + (0.5 * i) / positions.length);
-    const a = indices[indices.length - 3],
-      b = indices[indices.length - 2],
-      c = indices[indices.length - 1];
-    if (a === b || b === c || a === c) throw new RangeError('Triangle collapses at CAD welding tolerance');
   }
   // Core uses uint32 indices consistently across both GPU backends.
   return new Geometry(packed, normals, indices);
