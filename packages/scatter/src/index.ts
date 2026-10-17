@@ -26,6 +26,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { group, compute, dispatch } from '../../shared/gpu.js';
+import { preset } from '../../shared/preset.js';
 declare const GPUBufferUsage: {
   VERTEX: number;
   INDEX: number;
@@ -47,6 +48,11 @@ export interface ScatterOptions {
   maxSlope?: number;
   scale?: readonly [number, number];
   lod?: readonly [number, number, number];
+  /**
+   * Width of the dithered cross-fade between LOD meshes, in world units (default 2). 0 switches hard and compiles the
+   * shaders without the fade's `discard`, which keeps early depth rejection on tile-based phone GPUs; one shared
+   * Geometry for all rings does the same.
+   */
   lodFade?: number;
   seed?: number;
   color?: readonly [number, number, number];
@@ -122,6 +128,13 @@ struct Output {@builtin(position) clip:vec4f,@location(0) normal:vec3f,@location
 }
 @fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->@location(0) vec4f {if(!lodVisible(i.clip.xy,i.lodFade)){discard;}var color=frame.color.rgb*(0.25+max(0.0,dot(normalize(i.normal)*select(-1.0,1.0,front),normalize(vec3f(1,2,1))))*0.75);if(frame.color.w<0.5){color=pow(color/(1.0+color),vec3f(1.0/2.2));}return vec4f(color,1);}
 `;
+// Without a LOD fade no instance is ever dithered out, yet any `discard` in a fragment shader stops tile-based (phone)
+// GPUs from rejecting hidden fragments before shading. This variant has no fade varying, no mask and no discard.
+const solidCode = renderCode
+  .replace(fadeCode, '')
+  .replace(',@location(1) @interpolate(flat) lodFade:vec2f', '')
+  .replace(',data.rotation.zw);', ');')
+  .replace('if(!lodVisible(i.clip.xy,i.lodFade)){discard;}', '');
 const pbrVertex =
   windShader +
   `
@@ -177,10 +190,12 @@ export class Scatter implements EnginePlugin {
     colorAttachments: [this.attachment],
     depthStencilAttachment: this.depthAttachment,
   };
-  constructor(
-    geometry: Geometry | readonly [Geometry, Geometry, Geometry],
-    private readonly options: ScatterOptions = {},
-  ) {
+  private readonly options: ScatterOptions;
+  /** Whether any instance can fade between LOD meshes: shaders keep the dither `discard` only then. */
+  private readonly fade: boolean;
+  constructor(geometry: Geometry | readonly [Geometry, Geometry, Geometry], input: ScatterOptions = {}) {
+    this.options = preset('scatter', input);
+    const options = this.options;
     this.geometries = geometry instanceof Geometry ? [geometry, geometry, geometry] : [...geometry];
     const {
       count = 10000,
@@ -266,6 +281,8 @@ export class Scatter implements EnginePlugin {
       36,
     );
     this.values.set(color, 40);
+    // Compute emits fading instances only for a nonzero width between rings that use different meshes.
+    this.fade = this.values[31] > 0 && this.meta[39] !== 0;
   }
   static attach(
     engine: EngineKernel,
@@ -401,24 +418,40 @@ export class Scatter implements EnginePlugin {
       if (this.engine!.lighting.ambient) this.pbrValues.set(this.engine!.lighting.ambient, 28);
       c.device.queue.writeBuffer(this.pbrUniform!, 0, this.pbrValues as Float32Array<ArrayBuffer>);
     }
-    const key = c.format + ':' + c.descriptor.multisample?.count + ':' + c.descriptor.depthStencil!.format;
+    // Without the fade, the lit shader also drops core's back-face discard: override C=1 removes it at pipeline
+    // creation (as core's culled pipeline does), and single-sided materials cull back faces in the rasterizer
+    // instead. Toggling `doubleSided` later picks the other cached pipeline.
+    const solid = lit && !this.fade && c.shader.includes('override C='),
+      culled = solid && this.options.material!.data[6] < 0.5;
+    const key =
+      c.format +
+      ':' +
+      c.descriptor.multisample?.count +
+      ':' +
+      c.descriptor.depthStencil!.format +
+      (culled ? ':culled' : '');
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      const code = lit
-        ? c.shader
-            .replace(/struct Input \{[^}]+\}/, '')
-            .replace(
-              '@location(3) material:vec4f',
-              '@location(3) material:vec4f,@location(4) @interpolate(flat) lodFade:vec2f',
-            )
-            .replace(
-              /@vertex fn vertex\([\s\S]*?(?=@fragment)/,
-              c.shader.includes('var<uniform> taaCamera:')
-                ? pbrVertex.replace('o.clip=frame.camera*', 'o.clip=taaCamera*')
-                : pbrVertex,
-            )
-            .replace(/(@fragment fn fragment[^{]+\{)/, '$1\n if(!lodVisible(i.clip.xy,i.lodFade)){discard;}') + fadeCode
-        : renderCode;
+      const vertex = c.shader.includes('var<uniform> taaCamera:')
+        ? pbrVertex.replace('o.clip=frame.camera*', 'o.clip=taaCamera*')
+        : pbrVertex;
+      const code = !lit
+        ? this.fade
+          ? renderCode
+          : solidCode
+        : this.fade
+          ? c.shader
+              .replace(/struct Input \{[^}]+\}/, '')
+              .replace(
+                '@location(3) material:vec4f',
+                '@location(3) material:vec4f,@location(4) @interpolate(flat) lodFade:vec2f',
+              )
+              .replace(/@vertex fn vertex\([\s\S]*?(?=@fragment)/, vertex)
+              .replace(/(@fragment fn fragment[^{]+\{)/, '$1\n if(!lodVisible(i.clip.xy,i.lodFade)){discard;}') +
+            fadeCode
+          : c.shader
+              .replace(/struct Input \{[^}]+\}/, '')
+              .replace(/@vertex fn vertex\([\s\S]*?(?=@fragment)/, vertex.replace('o.lodFade=data.rotation.zw;', ''));
       const module = c.device.createShaderModule({ code });
       pipeline = c.device.createRenderPipeline({
         layout: 'auto',
@@ -435,7 +468,13 @@ export class Scatter implements EnginePlugin {
             },
           ],
         },
-        fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format }] },
+        fragment: {
+          module,
+          entryPoint: 'fragment',
+          targets: [{ format: c.format }],
+          ...(solid ? { constants: { C: 1 } } : {}),
+        },
+        ...(culled ? { primitive: { cullMode: 'back' as const } } : {}),
         multisample: c.descriptor.multisample,
         depthStencil: {
           format: c.descriptor.depthStencil!.format,

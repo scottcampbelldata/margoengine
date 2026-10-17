@@ -106,7 +106,9 @@ test('PBR scatter reuses standard lighting and shadow bindings without rebuildin
   assert.match(code, /@group\(1\) @binding\(0\)/);
   assert.match(code, /let linear=direct\*0\.75\*/);
   assert.doesNotMatch(code, /i\.m0/);
-  assert.match(code, /if\(!lodVisible\(i\.clip\.xy,i\.lodFade\)\)\{discard;\}/);
+  assert.doesNotMatch(code, /lodVisible|lodFade/, 'one shared mesh never fades: no dither discard');
+  assert.deepEqual(render.fragment.constants, { C: 1 }, "core's back-face discard is compiled out");
+  assert.equal(render.primitive, undefined, 'double-sided: nothing culled');
   assert.ok(h.groups.some((g) => g.entries.some((e) => e.resource === h.context.bindings[0].resource)));
   const created = { ...h.counts };
   for (let i = 0; i < 600; i++) h.engine.frameGraph.execute(h.context);
@@ -118,4 +120,66 @@ test('PBR scatter reuses standard lighting and shadow bindings without rebuildin
   effect.dispose();
   assert.ok(h.resources.every((r) => r.destroyed));
   assert.throws(() => new Scatter(box(), { material: {} }), /material/);
+});
+
+// Any discard in a fragment shader stops tile-based phone GPUs from rejecting hidden fragments before shading.
+test('the LOD dither discard is compiled only when instances can fade', () => {
+  const near = box(),
+    middle = box(0.5),
+    far = box(0.25);
+  const build = (geometry, options) => {
+    const h = optionalGPU();
+    h.engine.lighting = {
+      direction: new Float32Array([-1, 0.13, 0, 1]),
+      radiance: new Float32Array([1, 0.8, 0.54, 0.18]),
+    };
+    h.context.shader = wgsl;
+    h.context.bindings = [];
+    const effect = new Scatter(geometry, { count: 64, ...options });
+    h.engine.use(effect);
+    h.engine.frameGraph.execute(h.context);
+    const pipeline = h.pipelines.find((p) => p.fragment);
+    effect.dispose();
+    return pipeline;
+  };
+  const discard = 'if(!lodVisible(i.clip.xy,i.lodFade)){discard;}';
+  for (const lit of [false, true]) {
+    const material = () => (lit ? { material: new PbrMaterial({ doubleSided: false }) } : {}),
+      fading = build([near, middle, far], material());
+    assert.ok(fading.vertex.module.code.includes(discard), `${lit}: three meshes and the default fade keep the dither`);
+    assert.equal(fading.fragment.constants, undefined, `${lit}: the fading pipeline is unchanged`);
+    assert.equal(fading.primitive, undefined);
+    for (const [geometry, options, why] of [
+      [[near, middle, far], { lodFade: 0 }, 'lodFade 0'],
+      [near, {}, 'one shared mesh'],
+      [[near, near, near], {}, 'three references to one mesh'],
+    ]) {
+      const solid = build(geometry, { ...material(), ...options }),
+        code = solid.vertex.module.code;
+      assert.doesNotMatch(code, /lodVisible|lodFade|bayer/, `${lit}: ${why}`);
+      if (lit) {
+        assert.deepEqual(solid.fragment.constants, { C: 1 }, `${why}: core's back-face discard is compiled out`);
+        assert.deepEqual(solid.primitive, { cullMode: 'back' }, `${why}: single-sided culls in the rasterizer`);
+      } else {
+        assert.doesNotMatch(code, /discard/, why);
+        assert.equal(solid.fragment.constants, undefined);
+      }
+    }
+  }
+});
+
+test('Scatter reads lodFade from the tier preset (margoPreset.scatter) only when the app left it unset', () => {
+  const geometries = [box(), box(0.5), box(0.25)],
+    options = {};
+  assert.equal(new Scatter(geometries, options).options, options, 'no preset: the app object is used as is');
+  globalThis.margoPreset = { scatter: { lodFade: 0 } };
+  try {
+    const preset = new Scatter(geometries, options);
+    assert.equal(preset.values[31], 0);
+    assert.notEqual(preset.options, options);
+    assert.deepEqual(options, {}, 'the app object is not changed');
+    assert.equal(new Scatter(geometries, { lodFade: 2 }).values[31], 2, 'explicit options win');
+  } finally {
+    delete globalThis.margoPreset;
+  }
 });
