@@ -162,8 +162,9 @@ test('advanced physical maps use independent anisotropy and iridescence texture 
   for (const k of [13, 14, 15]) assert.match(code, new RegExp(`margoPhysicalUV\\(i,${k}\\)`));
   assert.match(code, /margoPhysicalFrame\(i,n,15\)/);
   assert.doesNotMatch(code, /margoAnisotropy\(s\.n,t,b,/);
-  assert.match(code, /orientation=sign\(dot\(cross\(dp1,dp2\),n\)\)/);
-  assert.match(code, /if\(largest>0\)/);
+  // The shared cotangent frame (shared/tangent-frame.js), declared once by the gltf-pro host shader.
+  assert.match(code, /return margoCotangentFrame\(n,dp1,dp2,duv1,duv2\);/);
+  assert.match(code, /fn margoCotangentFrame\(/);
 });
 
 test('removing the anisotropy map restores the authored tangent frame', async () => {

@@ -75,8 +75,7 @@ fn materialNodeNormal(i:Out,front:bool,sample:vec4f,scale:f32,coord:f32)->vec3f 
   var t=i.tangent.xyz-n*dot(n,i.tangent.xyz);var b=cross(n,t)*i.tangent.w;
   let dp1=dpdx(i.position);let dp2=dpdy(i.position);let duv1=dpdx(uv(i,coord));let duv2=dpdy(uv(i,coord));
   if(abs(i.tangent.w)<0.5||f.coordsA.z!=coord){
-    let p1=cross(n,dp1);let p2=cross(dp2,n);t=p2*duv1.x+p1*duv2.x;b=p2*duv1.y+p1*duv2.y;
-    let k=inverseSqrt(max(max(dot(t,t),dot(b,b)),0.000001));t*=k;b*=k;
+    let frame=margoCotangentFrame(n,dp1,dp2,duv1,duv2);t=frame[0];b=frame[1];
   }else{t/=max(length(t),0.000001);b=cross(n,t);b=b/max(length(b),0.000001)*i.tangent.w;}
   let sampled=sample.xyz*2-1;let magnitude=max(abs(scale),1.0);
   let mapped=t*sampled.x*(scale/magnitude)+b*sampled.y*(scale/magnitude)+n*(sampled.z/magnitude);

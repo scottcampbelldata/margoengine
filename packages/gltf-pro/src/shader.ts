@@ -1,6 +1,8 @@
 import { acesShader } from '../../shared/aces.js';
+import { cotangentFrameShader } from '../../shared/tangent-frame.js';
 export const pbrShader = /* wgsl */ `
 ${acesShader}
+${cotangentFrameShader}
 struct Frame {
   camera:mat4x4f, model:mat4x4f, normalMatrix:mat4x4f, view:mat4x4f,
   eye:vec4f, light:vec4f, radiance:vec4f, base:vec4f, factors:vec4f, emissive:vec4f,
@@ -47,13 +49,8 @@ fn surface(i:Out,front:bool)->Surface {
   var b=cross(n,t)*i.tangent.w;
   let dp1=dpdx(i.position); let dp2=dpdy(i.position); let duv1=dpdx(uv(i,f.coordsA.z)); let duv2=dpdy(uv(i,f.coordsA.z));
   if(abs(i.tangent.w)<0.5) {
-    let p1=cross(n,dp1); let p2=cross(dp2,n);
-    t=p2*duv1.x+p1*duv2.x; b=p2*duv1.y+p1*duv2.y;
-    // WebGPU's screen Y points down. Correct the projected frame orientation, including mirrored surfaces.
-    let orientation=sign(dot(cross(dp1,dp2),n));
-    // Scale by a component first: a fixed squared-length floor weakens normal maps as pixel derivatives shrink.
-    let largest=max(max(max(abs(t.x),abs(t.y)),abs(t.z)),max(max(abs(b.x),abs(b.y)),abs(b.z)));
-    if(largest>0) {t/=largest; b/=largest; let scale=orientation*inverseSqrt(max(dot(t,t),dot(b,b))); t*=scale; b*=scale;}
+    // No glTF tangents: the per-pixel cotangent frame (shared/tangent-frame.js; B points up the image).
+    let frame=margoCotangentFrame(n,dp1,dp2,duv1,duv2); t=frame[0]; b=frame[1];
   } else {
     if(dot(t,t)<0.000000000001){t=cross(n,select(vec3f(1,0,0),vec3f(0,1,0),abs(n.x)>0.9));}
     t=normalize(t); b=cross(n,t)*i.tangent.w;
@@ -100,6 +97,7 @@ fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {
 // (0.85 -> 0.52 ms GPU, full-screen DamagedHelmet, Arc 140V).
 export const extendedPBRShader = /* wgsl */ `
 ${acesShader}
+${cotangentFrameShader}
 struct Frame {
   camera:mat4x4f, model:mat4x4f, normalMatrix:mat4x4f, view:mat4x4f,
   eye:vec4f, light:vec4f, radiance:vec4f, base:vec4f, factors:vec4f, emissive:vec4f,
@@ -148,13 +146,8 @@ fn surface(i:Out,front:bool)->Surface {
   var b=cross(n,t)*i.tangent.w;
   let dp1=dpdx(i.position); let dp2=dpdy(i.position); let duv1=dpdx(uv(i,f.coordsA.z)); let duv2=dpdy(uv(i,f.coordsA.z));
   if(abs(i.tangent.w)<0.5) {
-    let p1=cross(n,dp1); let p2=cross(dp2,n);
-    t=p2*duv1.x+p1*duv2.x; b=p2*duv1.y+p1*duv2.y;
-    // WebGPU's screen Y points down. Correct the projected frame orientation, including mirrored surfaces.
-    let orientation=sign(dot(cross(dp1,dp2),n));
-    // Scale by a component first: a fixed squared-length floor weakens normal maps as pixel derivatives shrink.
-    let largest=max(max(max(abs(t.x),abs(t.y)),abs(t.z)),max(max(abs(b.x),abs(b.y)),abs(b.z)));
-    if(largest>0) {t/=largest; b/=largest; let scale=orientation*inverseSqrt(max(dot(t,t),dot(b,b))); t*=scale; b*=scale;}
+    // No glTF tangents: the per-pixel cotangent frame (shared/tangent-frame.js; B points up the image).
+    let frame=margoCotangentFrame(n,dp1,dp2,duv1,duv2); t=frame[0]; b=frame[1];
   } else {
     if(dot(t,t)<0.000000000001){t=cross(n,select(vec3f(1,0,0),vec3f(0,1,0),abs(n.x)>0.9));}
     t=normalize(t); b=cross(n,t)*i.tangent.w;

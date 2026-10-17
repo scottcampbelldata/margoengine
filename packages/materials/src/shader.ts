@@ -44,9 +44,7 @@ export function clearcoatShader(
   let duv1=dpdx(${coordinateExpression(normal)}); let duv2=dpdy(${coordinateExpression(normal)});
   // A coat UV set different from the base normal map needs its own tangent frame.
   if(abs(i.tangent.w)<0.5||f.coordsA.z!=${normal.texCoord}.0${normal.transformIndex !== undefined || normal.texCoord === 1 ? '||true' : ''}) {
-    let p1=cross(n,dp1); let p2=cross(dp2,n);
-    t=p2*duv1.x+p1*duv2.x; b=p2*duv1.y+p1*duv2.y;
-    let scale=inverseSqrt(max(max(dot(t,t),dot(b,b)),0.000001)); t*=scale; b*=scale;
+    let frame=margoCotangentFrame(n,dp1,dp2,duv1,duv2); t=frame[0]; b=frame[1];
   } else {t/=max(length(t),0.000001); b=cross(n,t); b=b/max(length(b),0.000001)*i.tangent.w;}
   // A common scale leaves the final direction unchanged and bounds finite normal scales.
   let normalMagnitude=max(abs(factors.z),1.0);

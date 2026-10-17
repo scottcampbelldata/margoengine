@@ -74,8 +74,8 @@ export function lobeShader(
   let materialDP1=dpdx(i.position);let materialDP2=dpdy(i.position);
   let materialDUV1=dpdx(${anisotropy.texture ? coordinateExpression(anisotropy.texture) : 'uv(i,0.0)'});let materialDUV2=dpdy(${anisotropy.texture ? coordinateExpression(anisotropy.texture) : 'uv(i,0.0)'});
   if(abs(i.tangent.w)<0.5${anisotropy.texture && (anisotropy.texture.texCoord === 1 || anisotropy.texture.transformIndex !== undefined) ? '||true' : ''}){
-    let materialP1=cross(materialNormal,materialDP1);let materialP2=cross(materialDP2,materialNormal);
-    materialT=materialP2*materialDUV1.x+materialP1*materialDUV2.x;materialB=materialP2*materialDUV1.y+materialP1*materialDUV2.y;
+    let materialFrame=margoCotangentFrame(materialNormal,materialDP1,materialDP2,materialDUV1,materialDUV2);
+    materialT=materialFrame[0];materialB=materialFrame[1];
   }
   let materialAxis=select(vec3f(0,0,1),vec3f(0,1,0),abs(materialNormal.z)>0.9);
   let materialFallback=normalize(cross(materialAxis,materialNormal));

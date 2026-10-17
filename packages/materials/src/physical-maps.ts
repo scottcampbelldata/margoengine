@@ -39,14 +39,8 @@ fn margoPhysicalUV(i:Out,k:u32)->vec2f {
 fn margoPhysicalFrame(i:Out,n:vec3f,k:u32)->mat3x3f {
   let dp1=dpdx(i.position); let dp2=dpdy(i.position);
   let duv1=dpdx(margoPhysicalUV(i,k)); let duv2=dpdy(margoPhysicalUV(i,k));
-  let p1=cross(n,dp1); let p2=cross(dp2,n);
-  var t=p2*duv1.x+p1*duv2.x; var b=p2*duv1.y+p1*duv2.y;
-  // WebGPU's screen Y points down; normalize before squaring to retain subpixel derivatives.
-  let orientation=sign(dot(cross(dp1,dp2),n));
-  let largest=max(max(max(abs(t.x),abs(t.y)),abs(t.z)),max(max(abs(b.x),abs(b.y)),abs(b.z)));
-  if(largest>0) {t/=largest; b/=largest; let scale=orientation*inverseSqrt(max(dot(t,t),dot(b,b))); t*=scale; b*=scale;}
-  else {t=normalize(cross(n,select(vec3f(1,0,0),vec3f(0,1,0),abs(n.x)>0.9))); b=cross(n,t);}
-  return mat3x3f(t,b,n);
+  // gltf-pro's shared cotangent frame (shared/tangent-frame.js): B points up the image, as glTF normal maps expect.
+  return margoCotangentFrame(n,dp1,dp2,duv1,duv2);
 }
 `;
   let code = source.replace(/@group\(1\) @binding\(\d+\) var \w+:[^;]+;\n?/g, '');
