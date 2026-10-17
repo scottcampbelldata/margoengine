@@ -137,7 +137,8 @@ try {
         ? 'DIAGNOSTIC, BUSY MACHINE, NOT FOR PUBLICATION'
         : picked.some((v) => v.diag)
           ? 'DIAGNOSTIC (patched variants), NOT FOR PUBLICATION'
-          : rounds >= 5 && frames >= 300 && !only && !picked.length
+          : // Full: default rounds and frames, every variant of whole scenes (--only=cadfile counts, cadfile:10000 not).
+            rounds >= 5 && frames >= 300 && !only.includes(':') && !picked.length
             ? process.env.BENCH_QUIET === '1'
               ? 'full run, operator confirmed a quiet machine'
               : 'full run; set BENCH_QUIET=1 once the machine is confirmed quiet'

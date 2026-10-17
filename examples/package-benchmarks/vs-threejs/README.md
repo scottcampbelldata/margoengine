@@ -14,7 +14,8 @@ Writes `examples/package-benchmarks/results/vs-threejs.json` (or `--out=`) and o
 (`scripts/quiet-gate.mjs`; `--quietMax=40` loosens it, `--busy` skips it and records the CPU load; both label the JSON
 as not for publication). Diagnosis: `--variants=margo,margo-culled,margo+nocull,three-webgpu-instanced+double` picks variants and
 patches (`?diag=`, listed in `margo.js` and `three-scenes.js`), `--dump` records every shader and pipeline. Only a default run (5 rounds x 300
-frames, all scenes) on a machine confirmed quiet (`BENCH_QUIET=1`) is publishable; anything shorter is labelled
+frames, every variant of all scenes or of whole scenes named in `--only`, such as `--only=cadfile`) on a machine
+confirmed quiet (`BENCH_QUIET=1`) is publishable; anything shorter (or one size, such as `cadfile:50000`) is labelled
 `"SMOKE TEST, NOT FOR PUBLICATION"` in the JSON's `note`. No publishable run exists yet (see
 `docs/whitepaper/reproduce.md`).
 
