@@ -15,6 +15,7 @@ import type {
   GLTFTextureInfo,
 } from '../../shared/gltf.js';
 export type { GLTFDocument } from '../../shared/gltf.js';
+import { withMaterials } from './default-materials.js';
 /** Retained mip bytes let compressed textures upload again after device restoration. */
 export interface KTX2Image {
   readonly ktx2: TranscodedKTX2Result;
@@ -74,8 +75,13 @@ export interface GLTFDecoderHooks {
   ktx2?: { transcode(data: Uint8Array, options?: { signal?: AbortSignal }): Promise<GLTFCompressedImage> };
   /** EXT_mesh_gpu_instancing: `instancing` from @margoengine/gltf-pro/instancing. */
   instancing?: { read(asset: GLTFAsset, extension: GLTFInstancing): PBRInstances | undefined };
-  /** KHR_materials_iridescence, anisotropy and diffuse_transmission: `extendedMaterials` from @margoengine/gltf-pro/extended. */
-  materials?: GLTFExtendedMaterials;
+  /**
+   * The physical material shader (`extendedMaterials` from @margoengine/gltf-pro/extended): clearcoat, sheen,
+   * transmission, volume, IOR, specular, dispersion, iridescence, anisotropy and diffuse transmission. `loadGLTF` and
+   * `parseGLTFAsync` import it on their own when a file uses one of those extensions; `false` keeps the base shader
+   * (the extensions are then ignored, as glTF allows). Synchronous `parseGLTF` uses it only when passed.
+   */
+  materials?: GLTFExtendedMaterials | false;
 }
 /** Structural decoder boundary; supplied hooks may omit metadata derived from accessor declarations. */
 export interface GLTFDracoDecodeOptions extends DracoDecodeOptions {
@@ -804,7 +810,7 @@ export async function loadAsset(
       buffers[i] = b;
     } else buffers[i] = await fetchBytes(resolve(def.uri));
   }
-  const asset = new GLTFAsset(doc, buffers, binary, decoders, limit, maxNodes);
+  const asset = new GLTFAsset(doc, buffers, binary, await withMaterials(doc, decoders), limit, maxNodes);
   if (deferCompression && asyncCompression(doc))
     return { asset, images, deferred: true, baseURL: base?.href, downloadedBytes: total };
   const sources = ktxSources(doc),

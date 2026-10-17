@@ -84,7 +84,7 @@ export interface GLTFDecoderHooks {
     instancing?: {
         read(asset: GLTFAsset, extension: GLTFInstancing): PBRInstances | undefined;
     };
-    materials?: GLTFExtendedMaterials;
+    materials?: GLTFExtendedMaterials | false;
 }
 
 export interface GLTFDocument extends GLTFProperty {

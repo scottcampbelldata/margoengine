@@ -31,6 +31,7 @@ import {
   type GLTFDecoderHooks,
   type GLTFExtendedMaterials,
 } from './asset.js';
+import { withMaterials } from './default-materials.js';
 import {
   pbrShader,
   extendedPBRShader,
@@ -941,7 +942,9 @@ export class PBRModel implements EnginePlugin {
     const doc = asset.doc,
       defs = doc.nodes ?? [],
       parents = new Int32Array(defs.length).fill(-1),
-      materials = (this.materials = (doc.materials ?? []).map((def) => material(def, asset.hooks.materials)));
+      materials = (this.materials = (doc.materials ?? []).map((def) =>
+        material(def, asset.hooks.materials || undefined),
+      ));
     const variants = doc.extensions?.KHR_materials_variants?.variants ?? [];
     if (!Array.isArray(variants) || variants.some((v) => typeof v?.name !== 'string'))
       throw new TypeError('Invalid glTF material variants');
@@ -2732,7 +2735,14 @@ export async function parseGLTFAsync(
   }
   options.signal?.throwIfAborted();
   const { doc, binary } = container(input, downloadLimit(options.maxDownloadBytes)),
-    asset = new GLTFAsset(doc, buffersOrOptions, binary, options.decoders, options.maxDownloadBytes, options.maxNodes);
+    asset = new GLTFAsset(
+      doc,
+      buffersOrOptions,
+      binary,
+      await withMaterials(doc, options.decoders),
+      options.maxDownloadBytes,
+      options.maxNodes,
+    );
   await decompressPrimitives(asset, { ...options, draco: options.draco ?? options.decoders?.draco });
   images = await decodeKTX2Images(asset, images, {
     ...options,
