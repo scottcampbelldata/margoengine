@@ -69,6 +69,30 @@ test('the shared XYZ quaternion table matches immediate Mesh.setRotation and a c
   }
 });
 
+test('an Euler index write matches setRotation and setQuaternion keeps the quaternion it stored', async () => {
+  const engine = await engineFor(1),
+    mesh = engine.createMesh(),
+    read = () => lanes.map((lane) => engine.store.transforms[lane][mesh.id]);
+  try {
+    assert.equal(mesh.euler.length, 3);
+    assert.equal(mesh.euler.buffer, engine.store.rotations.buffer);
+    mesh.euler[0] = 0.3;
+    mesh.euler[2] = -0.2;
+    const viaIndex = read();
+    mesh.setRotation([0.3, 0, -0.2]);
+    assert.deepEqual(read(), viaIndex);
+    const exact = [0.2, 0.4, 0.1, 1],
+      length = Math.hypot(...exact);
+    mesh.setQuaternion(exact);
+    assert.deepEqual(
+      read(),
+      exact.map((value) => Math.fround(value / length)),
+    );
+  } finally {
+    engine.dispose();
+  }
+});
+
 test('fixed kernel layout publishes hierarchy matrices into the existing JavaScript views', async () => {
   const engine = await engineFor(2),
     store = engine.store,

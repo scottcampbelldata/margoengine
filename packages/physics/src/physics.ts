@@ -444,9 +444,11 @@ export class Physics implements EnginePlugin, BodyOwner {
       t.qy[id] = y;
       t.qz[id] = z;
       t.qw[id] = w;
-      runtime.euler[1] = Math.asin(Math.max(-1, Math.min(1, 2 * (x * z + w * y))));
-      runtime.euler[0] = Math.atan2(2 * (w * x - y * z), 1 - 2 * (x * x + y * y));
-      runtime.euler[2] = Math.atan2(2 * (w * z - x * y), 1 - 2 * (y * y + z * z));
+      const lanes = store.rotations,
+        at = id * 3;
+      lanes[at + 1] = Math.asin(Math.max(-1, Math.min(1, 2 * (x * z + w * y))));
+      lanes[at] = Math.atan2(2 * (w * x - y * z), 1 - 2 * (x * x + y * y));
+      lanes[at + 2] = Math.atan2(2 * (w * z - x * y), 1 - 2 * (y * y + z * z));
     } else {
       if (parentOf(mesh) !== -1)
         throw new Error('Non-core physics bodies need root-level meshes; child meshes require core transform storage');

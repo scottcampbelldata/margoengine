@@ -74,7 +74,7 @@ export class Kinematics implements EnginePlugin {
   private readonly damping: number;
   private readonly joints: readonly (Omit<Joint, 'node'> & { node: Mesh })[];
   private readonly previous: Float64Array;
-  private values: Float32Array[] = [];
+  private values: { [index: number]: number }[] = [];
   private readonly offsets: Int32Array;
   /** Same as `engine.use(new Kinematics(...))`; returns the Kinematics. */
   static attach(engine: EngineKernel, joints: readonly Joint[], options?: KinematicOptions): Kinematics {

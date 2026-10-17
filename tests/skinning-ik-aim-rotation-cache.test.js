@@ -71,7 +71,7 @@ test('unchanged head requests repair all presented Euler fields before reusing d
     expected = snapshot(f),
     diagnostics = t.mock.method(f.aim, 'diagnostics');
   for (let axis = 0; axis < 3; axis++) {
-    f.head.euler[axis] += 0.25;
+    f.store.rotations[f.head.id * 3 + axis] += 0.25;
     f.aim.update(target);
     assert.deepEqual(snapshot(f), expected, `repair head Euler axis ${axis}`);
   }
@@ -86,13 +86,13 @@ test('zero-delta torso holds and head cache restore Euler writes through store g
     expected = snapshot(b);
   for (const f of [a, b]) for (let i = 0; i < 40; i++) f.engine.createMesh();
   for (let axis = 0; axis < 3; axis++) {
-    a.body.euler[axis] += 0.25;
-    a.head.euler[axis] -= 0.25;
+    a.store.rotations[a.body.id * 3 + axis] += 0.25;
+    a.store.rotations[a.head.id * 3 + axis] -= 0.25;
   }
   a.torso.update(torsoTarget, 0);
   a.aim.update(target);
   assert.deepEqual(snapshot(a), expected);
-  a.body.euler[0] = -0;
+  a.store.rotations[a.body.id * 3] = -0;
   a.torso.applyHeld();
   assert.equal(Object.is(a.body.euler[0], b.body.euler[0]), true, 'held Euler signed zero is restored too');
   // Component setters consume all three Euler fields: stale fields would change this quaternion.
@@ -112,14 +112,14 @@ test('zero-delta torso holds and head cache restore Euler writes through store g
 test('aim reset repairs stale Euler fields and rejected input still leaves the pose untouched', async (t) => {
   const a = await fixture(t),
     b = await fixture(t);
-  a.head.euler[1] = NaN;
+  a.store.rotations[a.head.id * 3 + 1] = NaN;
   const q = rotation(a.head).q;
   assert.throws(() => a.aim.update([NaN, 1, 0]), /finite/);
   assert.equal(Number.isNaN(a.head.euler[1]), true);
   assert.deepEqual(rotation(a.head).q, q);
   a.aim.reset(target);
   b.aim.reset(target);
-  a.body.euler[0] = NaN;
+  a.store.rotations[a.body.id * 3] = NaN;
   assert.throws(() => a.torso.update(torsoTarget, -1), /dt/);
   assert.equal(Number.isNaN(a.body.euler[0]), true);
   a.torso.reset();
@@ -127,7 +127,7 @@ test('aim reset repairs stale Euler fields and rejected input still leaves the p
   a.aim.reset(target);
   b.aim.reset(target);
   assert.deepEqual(snapshot(a), snapshot(b));
-  a.head.euler[0] += 0.25;
+  a.store.rotations[a.head.id * 3] += 0.25;
   a.store.transforms.sx[a.root.id] = 0;
   const rejectedEuler = [...a.head.euler];
   assert.throws(() => a.aim.update(target), /positive uniform/);
