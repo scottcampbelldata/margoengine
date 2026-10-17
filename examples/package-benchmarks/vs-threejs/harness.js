@@ -16,6 +16,9 @@ export const params = {
   maxPhaseMs: +(q.get('maxPhaseMs') ?? 20_000),
   diag: (q.get('diag') ?? '').split('+').filter(Boolean),
   dump: q.has('dump'),
+  // cadfile scene: the GLB's URL and its world bounds (minx,miny,minz,maxx,maxy,maxz), written by run.mjs.
+  url: q.get('url'),
+  bounds: (q.get('bounds') ?? '').split(',').filter(Boolean).map(Number),
 };
 const scriptMs = performance.now();
 
@@ -39,6 +42,8 @@ const raf = () => new Promise((r) => requestAnimationFrame(r));
 // any engine begins gets begin/end timestamp writes. GPU time of a frame = sum of its pass durations. Same code path
 // for Margo and three.js WebGPURenderer, so neither engine's own profiler is trusted.
 let device;
+/** The last WebGPU device any engine on the page created (for an engine that does not expose its own). */
+export const webgpuDevice = () => device;
 const ts = { on: false, n: 0, cap: 2048, desc: [] };
 if (globalThis.GPUAdapter) {
   const request = GPUAdapter.prototype.requestDevice;

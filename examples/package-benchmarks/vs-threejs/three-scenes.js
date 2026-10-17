@@ -2,7 +2,9 @@
 // to 'three/webgpu' (run.mjs), as three's docs recommend, so both renderers draw the same scene objects.
 // Best practice on three's side (see README "Fairness"): shared geometries and materials, static objects with
 // matrixAutoUpdate off and scene.matrixWorldAutoUpdate off, and an InstancedMesh variant ('instanced') next to the
-// one-Mesh-per-object variant ('mesh') that most three.js code uses.
+// one-Mesh-per-object variant ('mesh') that most three.js code uses. The cadfile scene loads the CAD GLB with
+// GLTFLoader ('mesh': as loaded, matrices frozen) and adds a 'tuned' variant (BatchedMesh, see below). Its code is in
+// the cadfile builds only (CADFILE_BUILD, run.mjs), so BatchedMesh never adds bytes to the other scenes' pages.
 import {
   Scene,
   PerspectiveCamera,
@@ -10,6 +12,7 @@ import {
   Mesh,
   InstancedMesh,
   BoxGeometry,
+  BatchedMesh,
   BufferGeometry,
   BufferAttribute,
   MeshStandardMaterial,
@@ -31,11 +34,17 @@ import {
   ACESFilmicToneMapping,
   SRGBColorSpace,
 } from 'three';
-import { LIGHT, CLEAR, PALETTE, CAD_MATERIALS, CANVAS, boxes, cad, HELMET, sky } from './scenes.js';
+import { LIGHT, CLEAR, PALETTE, CAD_MATERIALS, CANVAS, boxes, cad, cadFile, HELMET, sky } from './scenes.js';
 
 // Diagnostics only (?diag=a+b): flat = MeshBasicMaterial (vertex + raster cost), double = side DoubleSide (as Margo's
 // default doubleSided material), msaa1 = antialias off (the entry files).
-export async function threeScene(canvas, { scene: name, n, mode, move, diag = [] }, marks, renderer, backend) {
+export async function threeScene(
+  canvas,
+  { scene: name, n, mode, move, diag = [], url, bounds },
+  marks,
+  renderer,
+  backend,
+) {
   const side = diag.includes('double') ? { side: DoubleSide } : {},
     material = (o) =>
       diag.includes('flat')
@@ -43,7 +52,8 @@ export async function threeScene(canvas, { scene: name, n, mode, move, diag = []
         : new MeshStandardMaterial({ ...o, ...side });
   renderer.setPixelRatio(1);
   renderer.setSize(CANVAS[0], CANVAS[1], false);
-  renderer.toneMapping = name === 'helmet' ? ACESFilmicToneMapping : ReinhardToneMapping; // gltf-pro maps with ACES(x/0.6), core with Reinhard x/(1+x)
+  // gltf-pro (helmet, cadfile) maps with ACES(x/0.6), core with Reinhard x/(1+x)
+  renderer.toneMapping = name === 'helmet' || name === 'cadfile' ? ACESFilmicToneMapping : ReinhardToneMapping;
   renderer.outputColorSpace = SRGBColorSpace;
   const scene = new Scene(),
     sun = new DirectionalLight(0xffffff, LIGHT.intensity);
@@ -139,6 +149,40 @@ export async function threeScene(canvas, { scene: name, n, mode, move, diag = []
         const mesh = new InstancedMesh(geometries[shape], materials[shape], list.length);
         list.forEach((w, i) => mesh.setMatrixAt(i, w));
         scene.add(mesh);
+      }
+    }
+    freeze();
+  } else if (CADFILE_BUILD && name === 'cadfile') {
+    // GLTFLoader turns the EXT_mesh_gpu_instancing parts into InstancedMesh. mode=tuned adds three's own advice for a
+    // big static scene: every other part moves into one BatchedMesh per material (one multi-draw per material, with
+    // BatchedMesh's defaults: per-part frustum culling and front-to-back sorting).
+    def = cadFile(bounds);
+    const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+    const gltf = await new GLTFLoader().loadAsync(url);
+    scene.add(gltf.scene);
+    if (mode === 'tuned') {
+      scene.updateMatrixWorld(true);
+      const byMaterial = new Map();
+      gltf.scene.traverse((o) => {
+        if (!o.isMesh || o.isInstancedMesh) return;
+        if (!byMaterial.has(o.material)) byMaterial.set(o.material, []);
+        byMaterial.get(o.material).push(o);
+      });
+      for (const [material, list] of byMaterial) {
+        const geometries = [...new Set(list.map((o) => o.geometry))],
+          sum = (count) => geometries.reduce((total, g) => total + count(g), 0),
+          batch = new BatchedMesh(
+            list.length,
+            sum((g) => g.attributes.position.count),
+            sum((g) => g.index.count),
+            material,
+          ),
+          ids = new Map(geometries.map((g) => [g, batch.addGeometry(g)]));
+        for (const o of list) {
+          batch.setMatrixAt(batch.addInstance(ids.get(o.geometry)), o.matrixWorld);
+          o.removeFromParent();
+        }
+        scene.add(batch);
       }
     }
     freeze();

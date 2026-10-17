@@ -1,9 +1,13 @@
-# Margo vs three.js: same machine, same scenes
+# Margo vs three.js and Babylon.js: same machine, same scenes
 
 ```sh
 npm run build:packages
 npm run bench:threejs            # = node examples/package-benchmarks/vs-threejs/run.mjs [--rounds=5] [--only=boxes,cad:50000] [--frames=300]
+npm run bench:threejs -- --only=cadfile --out=examples/package-benchmarks/results/vs-engines-cadfile.json
 ```
+
+Babylon.js runs the `cadfile` scene only (a CAD file each engine opens with its own glTF loader); the box, CAD and
+helmet scenes compare Margo with three.js.
 
 Writes `examples/package-benchmarks/results/vs-threejs.json` (or `--out=`) and one screenshot per scene and engine to
 `test-results/vs-threejs/`. Takes the GPU lock, refuses to start on battery, and waits for a quiet CPU before every run
@@ -51,6 +55,28 @@ Scenes (`scenes.js`, the same data for every engine):
   per module, 5 levels deep), 10,000 / 50,000 parts, static, camera orbiting.
 - `helmet`: Khronos DamagedHelmet (`examples/assets/damaged-helmet.glb`) on a floor slab, image-based lighting from
   the same procedural HDR sky as `gates/post-stack.html`, directional light with a 2048 shadow map.
+- `cadfile-<n>`: n = 10,000 / 25,000 / 50,000 parts of the machinery assembly of `scripts/cad-scale/assembly.mjs`
+  (the CAD scale ladder's file), written once as a GLB under `test-results/vs-threejs/assemblies/`: each module's
+  plate, brackets and shaft as their own nodes, the repeated screws, washers and nuts as `EXT_mesh_gpu_instancing`
+  nodes (what a STEP-to-GLB converter writes), 4 PBR materials. 50,000 parts = 10,228,000 triangles, about 95 MB.
+  Every engine opens the file with its own glTF loader, so `loadMs` covers download, parsing and GPU upload, and
+  `jsGzipBytes` covers the loader. Static, camera orbiting the whole assembly.
+
+### cadfile variants
+
+| Variant | Engine | Setup |
+| --- | --- | --- |
+| `margo` | Margo core + `@margoengine/gltf-pro` (WebGPU) | `loadGLTF` with the `EXT_mesh_gpu_instancing` reader, as `tests/cad-scale-browser.ts`. Margo's default load is its only variant |
+| `three-webgl`, `three-webgpu` | three.js `WebGLRenderer` / `WebGPURenderer` | `GLTFLoader` as loaded (instanced nodes become `InstancedMesh`), matrices frozen |
+| `three-webgl-tuned`, `three-webgpu-tuned` | the same | plus every other part moved into one `BatchedMesh` per material (multi-draw; per-part culling and sorting are `BatchedMesh` defaults) |
+| `babylon-webgl`, `babylon-webgpu` | Babylon.js `Engine` (WebGL2) / `WebGPUEngine` | `ImportMeshAsync` as loaded (instanced nodes become thin instances), world matrices frozen |
+| `babylon-webgl-tuned`, `babylon-webgpu-tuned` | the same | plus Babylon's documented static-scene settings: materials frozen, `freezeActiveMeshes`, pointer-move picking off, material dirty checks blocked; on WebGPU also snapshot rendering (FAST mode through `SnapshotRenderingHelper`: render bundles recorded once, replayed every frame) |
+
+The tuned setups run before the first frame, so they count toward that engine's `loadMs`. Babylon is imported the
+way its ES6 guide recommends (one deep import per class; `registerBuiltInLoaders()` imports the glTF loader and each
+extension only when a file needs it). Babylon's WebGPU shaders are WGSL, so the page never downloads its GLSL
+compilers. The cadfile scene has its own production builds (`dist/<engine>-cadfile`), so code only it uses (three's
+`BatchedMesh`) adds nothing to the other scenes' pages.
 
 Particles (100k / 1M) are not in the harness yet: three.js has no built-in GPU particle system, so a fair version
 needs a hand-written TSL compute simulation (three's `webgpu_compute_particles` example is the model) that matches
@@ -127,9 +153,16 @@ Known asymmetries (they are in the results, not hidden):
   terms): its fragment shader does more work per pixel even when those inputs are unused.
 - Margo's CAD hierarchy is a real scene graph in both the `margo` and three `Mesh` variants; three's instanced CAD
   variant drops the hierarchy (baked matrices), which is fine for a static viewer but loses per-part transforms.
-- Draw counts are reported as each engine counts them (Margo: core batches only; three: `renderer.info`).
+- Draw counts are reported as each engine counts them (Margo: core batches only, gltf-pro's draws included in
+  cadfile; three: `renderer.info`; Babylon: its engine draw counter, which a replayed snapshot also feeds).
+- cadfile lighting is matched by intent, not proven pixel for pixel: the same directional light and ambient level and
+  ACES tone mapping on every engine (Babylon: a hemisphere light with equal sky and ground colours as the ambient).
+  `vsMargoImage` stays a sanity check that every engine drew the whole assembly.
+- cadfile measures only what each engine does with a file; picking and section planes (Margo `@margoengine/selection`
+  and `@margoengine/machinery`) are measured by `scripts/cad-scale-tests.js`, which has no three.js or Babylon pages.
 
 ## Pinned versions
 
-three 0.186.1 (`node_modules/three`), Margo at the commit in the JSON, browser version, adapter and driver strings in
-the JSON's `hardware`.
+three 0.186.1 (`node_modules/three`), Babylon.js 9.29.0 (`@babylonjs/core`, `@babylonjs/loaders`,
+`babylonjs-gltf2interface`; dev dependencies only, never shipped), Margo at the commit in the JSON, browser version,
+adapter and driver strings in the JSON's `hardware`.

@@ -6,7 +6,7 @@
 import { Engine, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { run, params } from './harness.js';
-import { LIGHT, PALETTE, CAD_MATERIALS, boxes, cad, HELMET, sky } from './scenes.js';
+import { LIGHT, PALETTE, CAD_MATERIALS, boxes, cad, cadFile, HELMET, sky } from './scenes.js';
 
 // Box and CAD materials are single-sided (doubleSided:false), like three's default FrontSide: the parts are closed
 // solids, and core's default double-sided material would shade back faces three never draws (a fairness fix; see
@@ -117,7 +117,10 @@ const app = (engine, update, extra = {}) => ({
   info: () =>
     extra.draws
       ? { drawCalls: extra.draws, note: `${extra.draws} instanced draws, not counted by core` }
-      : { drawCalls: engine.stats.drawCalls, note: 'core batches only (gltf-pro, IBL, shadow passes not counted)' },
+      : {
+          drawCalls: engine.stats.drawCalls,
+          note: extra.note ?? 'core batches only (gltf-pro, IBL, shadow passes not counted)',
+        },
 });
 const linear = (hex) =>
   [1, 3, 5].map((i) => {
@@ -164,7 +167,22 @@ async function instanced(engine, mode, shapes) {
   return { set: (shape, i, m) => parts.setTransform(shape, i, m.elements), draws: shapes.length };
 }
 
-run(async (canvas, { scene, n, move, mode }, marks) => {
+run(async (canvas, { scene, n, move, mode, url, bounds }, marks) => {
+  if (scene === 'cadfile') {
+    // The CAD file through gltf-pro, as an app opens a STEP-converted GLB (tests/cad-scale-browser.ts does the same):
+    // repeated parts arrive as GPU instances through the EXT_mesh_gpu_instancing reader. One variant: Margo's default
+    // load is also its fastest path. The download budget is raised past the 50,000-part file (95 MB).
+    const def = cadFile(bounds),
+      engine = await engineFor(canvas, def.camera, undefined, marks),
+      s = performance.now();
+    const [{ loadGLTF }, { instancing }] = await Promise.all([
+      import('@margoengine/gltf-pro'),
+      import('@margoengine/gltf-pro/instancing'),
+    ]);
+    await loadGLTF(engine, url, { decoders: { instancing }, maxDownloadBytes: 2 ** 30, maxNodes: 1_000_000 });
+    marks.buildMs = +(performance.now() - s).toFixed(1);
+    return app(engine, () => {}, { camera: def.camera, note: 'engine.stats.drawCalls (gltf-pro draws included)' });
+  }
   if (scene !== 'helmet' && mode !== 'mesh') {
     const def = scene === 'boxes' ? boxes(n) : await cad(n),
       engine = await engineFor(canvas, def.camera, 64, marks),

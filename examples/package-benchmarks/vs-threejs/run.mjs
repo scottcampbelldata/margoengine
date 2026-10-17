@@ -1,7 +1,10 @@
-// Margo vs three.js on the same machine, same scenes, same canvas. From the repository root after `npm run build:packages`:
+// Margo vs three.js and Babylon.js on the same machine, same scenes, same canvas. From the repository root after
+// `npm run build:packages`:
 //   node examples/package-benchmarks/vs-threejs/run.mjs [--rounds=5] [--only=boxes] [--frames=300] [--out=path.json]
 // 1. Builds one minified production bundle per engine with Vite (Margo; three.js WebGLRenderer; three.js WebGPURenderer
-//    with 'three' aliased to 'three/webgpu'), per-scene code split into lazy chunks.
+//    with 'three' aliased to 'three/webgpu'), per-scene code split into lazy chunks. The cadfile scene (a CAD GLB that
+//    every engine opens with its own glTF loader) has its own builds, which add Babylon.js (WebGL2 Engine and
+//    WebGPUEngine): code only that scene uses (three's BatchedMesh) never adds bytes to the other scenes' pages.
 // 2. Serves the repository over plain HTTP (no compression, no cache, cross-origin isolated for 5 µs timers).
 // 3. Each run is a fresh headless browser (cold shader cache, fresh profile) with vsync and the frame-rate cap off, at
 //    1280x720 CSS px and DPR 1. Engines alternate within each round and the order rotates every round.
@@ -11,13 +14,14 @@ import { chromium } from '@playwright/test';
 import { build } from 'vite';
 import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, extname, join, resolve, sep } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { cpus, totalmem } from 'node:os';
 import { acPower } from '../cad/power.mjs';
 import { waitForQuiet, cpuLoad } from '../../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
+import { GENERATOR, assembly, summary, writeGLB } from '../../../scripts/cad-scale/assembly.mjs';
 
 const arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
 // The quiet gate (scripts/quiet-gate.mjs) runs before every run. --quietMax: CPU % it accepts (above 20 the run is
@@ -33,7 +37,8 @@ const root = process.cwd(),
   here = 'examples/package-benchmarks/vs-threejs',
   dist = 'test-results/vs-threejs/dist';
 const git = (...a) => execFileSync('git', a, { encoding: 'utf8' }).trim();
-const three = JSON.parse(readFileSync('node_modules/three/package.json', 'utf8')).version;
+const three = JSON.parse(readFileSync('node_modules/three/package.json', 'utf8')).version,
+  babylon = JSON.parse(readFileSync('node_modules/@babylonjs/core/package.json', 'utf8')).version;
 
 const configs = [
   { scene: 'boxes', n: 1000 },
@@ -42,42 +47,55 @@ const configs = [
   { scene: 'boxes', n: 10000, move: 1 },
   { scene: 'cad', n: 10000 },
   { scene: 'cad', n: 50000 },
+  { scene: 'cadfile', n: 10000 },
+  { scene: 'cadfile', n: 25000 },
+  { scene: 'cadfile', n: 50000 },
   { scene: 'helmet' },
 ].filter(
   (c) => !only || only.split(',').some((o) => o === c.scene || o === `${c.scene}:${c.n}${c.move ? ':moving' : ''}`),
 ); // --only=boxes, boxes:1000 or boxes:10000:moving (exact)
-// --variants=margo,margo-instanced,margo-culled+nocull,three-webgpu-instanced+msaa1 picks variants (engine, then -instanced or
-// -culled for an instanced mode, mesh otherwise) and adds diagnostic patches (?diag=, see
+// --variants=margo,margo-instanced,margo-culled+nocull,three-webgpu-instanced+msaa1 picks variants (engine, then
+// -instanced, -culled or -tuned for that mode, mesh otherwise) and adds diagnostic patches (?diag=, see
 // margo.js / three-scenes.js; diagnostic runs are never publishable). --dump records shaders and pipeline state.
+const modes = /-(instanced|culled|tuned)$/;
 const picked = arg('variants', '')
   .split(',')
   .filter(Boolean)
   .map((s) => {
     const [base, ...diag] = s.split('+');
-    return {
-      engine: base.replace(/-(instanced|culled)$/, ''),
-      mode: base.match(/-(instanced|culled)$/)?.[1] ?? 'mesh',
-      diag: diag.join('+'),
-    };
+    return { engine: base.replace(modes, ''), mode: base.match(modes)?.[1] ?? 'mesh', diag: diag.join('+') };
   });
 // Pairs (README): mesh <-> mesh (Margo core meshes, three Mesh per object) and instanced <-> instanced (Margo materials
 // createInstancedMesh and culling CulledInstances, three InstancedMesh). The helmet has one variant per engine.
+// cadfile: each engine's glTF loader as loaded (mesh), and three's and Babylon's documented big-static-scene settings
+// (tuned: three BatchedMesh; Babylon frozen scene + WebGPU snapshot rendering). Margo's default load is its only variant.
+const engines = ['margo', 'three-webgl', 'three-webgpu'],
+  cadEngines = [...engines, 'babylon-webgl', 'babylon-webgpu'];
 const variants = (c) =>
   picked.length
     ? picked
-    : [
-        { engine: 'margo', mode: 'mesh' },
-        { engine: 'three-webgl', mode: 'mesh' },
-        { engine: 'three-webgpu', mode: 'mesh' },
-        ...(c.scene === 'helmet'
-          ? []
-          : [
-              { engine: 'margo', mode: 'instanced' },
-              { engine: 'margo', mode: 'culled' },
-              { engine: 'three-webgl', mode: 'instanced' },
-              { engine: 'three-webgpu', mode: 'instanced' },
-            ]),
-      ];
+    : c.scene === 'cadfile'
+      ? cadEngines.flatMap((engine) =>
+          engine === 'margo'
+            ? [{ engine, mode: 'mesh' }]
+            : [
+                { engine, mode: 'mesh' },
+                { engine, mode: 'tuned' },
+              ],
+        )
+      : [
+          { engine: 'margo', mode: 'mesh' },
+          { engine: 'three-webgl', mode: 'mesh' },
+          { engine: 'three-webgpu', mode: 'mesh' },
+          ...(c.scene === 'helmet'
+            ? []
+            : [
+                { engine: 'margo', mode: 'instanced' },
+                { engine: 'margo', mode: 'culled' },
+                { engine: 'three-webgl', mode: 'instanced' },
+                { engine: 'three-webgpu', mode: 'instanced' },
+              ]),
+        ];
 const key = (c) => `${c.scene}${c.n ? `-${c.n}` : ''}${c.move ? '-moving' : ''}`,
   vkey = (v) => `${v.engine}${v.mode && v.mode !== 'mesh' ? `-${v.mode}` : ''}${v.diag ? `+${v.diag}` : ''}`;
 
@@ -107,6 +125,7 @@ try {
     date: new Date().toISOString(),
     commit: git('rev-parse', '--short', 'HEAD'),
     three,
+    babylon,
     acPowerBefore: acPower(),
     rounds,
     frames,
@@ -136,15 +155,22 @@ try {
   if (report.acPowerBefore === false && process.env.BENCH_ALLOW_BATTERY !== '1')
     throw new Error('On battery: plug in (BENCH_ALLOW_BATTERY=1 records anyway).');
 
-  // 1. Production bundles.
-  for (const engine of ['margo', 'three-webgl', 'three-webgpu']) {
+  // 1. Production bundles: per engine a main build (box, CAD and helmet scenes) and a cadfile build (CADFILE_BUILD;
+  // Babylon has only this one), each only when a selected scene loads it.
+  const builds = [
+    ...(configs.some((c) => c.scene !== 'cadfile') ? engines.map((engine) => ({ engine, cadfile: false })) : []),
+    ...(configs.some((c) => c.scene === 'cadfile') ? cadEngines.map((engine) => ({ engine, cadfile: true })) : []),
+  ];
+  for (const { engine, cadfile } of builds) {
+    const name = cadfile ? `${engine}-cadfile` : engine;
     await build({
       configFile: false,
       publicDir: false,
       logLevel: 'warn',
+      define: { CADFILE_BUILD: String(cadfile) },
       resolve: { alias: engine === 'three-webgpu' ? [{ find: /^three$/, replacement: 'three/webgpu' }] : [] },
       build: {
-        outDir: `${dist}/${engine}`,
+        outDir: `${dist}/${name}`,
         emptyOutDir: true,
         minify: true,
         target: 'es2022',
@@ -152,17 +178,40 @@ try {
         lib: { entry: `${here}/${engine}.js`, formats: ['es'], fileName: engine },
       },
     });
-    report.bundles[engine] = Object.fromEntries(
-      readdirSync(`${dist}/${engine}`).map((f) => {
-        const b = readFileSync(`${dist}/${engine}/${f}`);
-        return [f, { raw: b.length, gzip: gzipSync(b, { level: 9 }).length }];
-      }),
+    report.bundles[name] = Object.fromEntries(
+      readdirSync(`${dist}/${name}`, { recursive: true, withFileTypes: true })
+        .filter((f) => f.isFile())
+        .map((f) => {
+          const path = join(f.parentPath, f.name),
+            b = readFileSync(path);
+          return [
+            relative(`${dist}/${name}`, path).replaceAll(sep, '/'),
+            { raw: b.length, gzip: gzipSync(b, { level: 9 }).length },
+          ];
+        }),
     );
   }
+  // A loaded file's gzip size, from its URL path /<dist>/<build>/<file in that build>.
   const gzipOf = (path) => {
-    const [engine, file] = path.split('/').slice(-2);
-    return report.bundles[engine]?.[file]?.gzip ?? 0;
+    const [build, ...file] = path.slice(dist.length + 2).split('/');
+    return report.bundles[build]?.[file.join('/')]?.gzip ?? 0;
   };
+
+  // The cadfile scene's GLBs (scripts/cad-scale/assembly.mjs, normal detail), written once per generator version.
+  report.assets = {};
+  for (const c of configs.filter((c) => c.scene === 'cadfile')) {
+    const base = `test-results/vs-threejs/assemblies/assembly-${c.n}`;
+    let info = existsSync(`${base}.json`) ? JSON.parse(readFileSync(`${base}.json`, 'utf8')) : null;
+    if (info?.generator !== GENERATOR) {
+      mkdirSync(dirname(base), { recursive: true });
+      const parts = assembly(c.n),
+        glb = writeGLB(parts);
+      writeFileSync(`${base}.glb`, glb);
+      info = { generator: GENERATOR, url: `/${base}.glb`, bytes: glb.length, ...summary(parts) };
+      writeFileSync(`${base}.json`, `${JSON.stringify(info, null, 1)}\n`);
+    }
+    report.assets[key(c)] = info;
+  }
 
   // 2. Static server.
   const types = {
@@ -220,6 +269,11 @@ try {
         move: config.move ?? 0,
         mode: variant.mode ?? 'mesh',
         frames,
+        ...(config.scene === 'cadfile'
+          ? (({ url, bounds }) => ({ url, bounds: [...bounds.min, ...bounds.max].join(',') }))(
+              report.assets[key(config)],
+            )
+          : {}),
         ...(variant.diag ? { diag: variant.diag } : {}),
         ...(process.argv.includes('--dump') ? { dump: 1 } : {}),
       });

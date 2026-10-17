@@ -89,6 +89,18 @@ export async function cad(parts) {
   };
 }
 
+/**
+ * A CAD file every engine opens with its own glTF loader: the machinery assembly of scripts/cad-scale/assembly.mjs
+ * written as one GLB (unique parts as nodes, repeated fasteners as EXT_mesh_gpu_instancing, 4 PBR materials, units
+ * millimetres). run.mjs writes the file and passes its URL and world bounds [minx, miny, minz, maxx, maxy, maxz]; the
+ * camera circles the bounds' centre, framing the whole assembly as the box and CAD scenes do.
+ */
+export function cadFile(bounds) {
+  const center = [0, 1, 2].map((a) => (bounds[a] + bounds[a + 3]) / 2),
+    extent = Math.max(bounds[3] - bounds[0], bounds[5] - bounds[2]);
+  return { camera: orbit(extent * 0.75, extent * 0.75 * 0.65, extent * 4, extent * 0.02, center) };
+}
+
 /** DamagedHelmet on a floor slab, lit by a procedural HDR sky (IBL) and the directional light with shadows. */
 export const HELMET = {
   url: '/examples/assets/damaged-helmet.glb',
@@ -113,13 +125,13 @@ export function sky(width = 256, height = 128) {
   return { width, height, data };
 }
 
-/** Camera circling the origin at `radius`/`height`; `at(t)` gives position for t seconds (0.3 rad/s). */
-function orbit(radius, height, far, near = 0.1) {
+/** Camera circling `target` at `radius`/`height` above it; `at(t)` gives position for t seconds (0.3 rad/s). */
+function orbit(radius, height, far, near = 0.1, target = [0, 0, 0]) {
   return {
     fov: 45,
     near,
     far,
-    target: [0, 0, 0],
-    at: (t) => [Math.cos(t * 0.3) * radius, height, Math.sin(t * 0.3) * radius],
+    target,
+    at: (t) => [target[0] + Math.cos(t * 0.3) * radius, target[1] + height, target[2] + Math.sin(t * 0.3) * radius],
   };
 }
