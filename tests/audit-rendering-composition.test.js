@@ -4,7 +4,7 @@ import { optionalGPU } from './support/optional-gpu.js';
 import { wgsl } from '../packages/core/src/shaders.ts';
 import { box, PbrMaterial } from '../packages/core/dist/index.js';
 import { TAA } from '../packages/taa/dist/index.js';
-import { lighting } from '../packages/sky/src/lighting.ts';
+import { lighting } from '../packages/sky/dist/lighting.js';
 import { Scatter } from '../packages/scatter/dist/index.js';
 import { ToonShading } from '../packages/creative/dist/toon.js';
 import { Shadows } from '../packages/shadows/dist/index.js';

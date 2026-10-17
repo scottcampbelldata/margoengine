@@ -156,7 +156,7 @@ test('EnvironmentLighting and Fog compose with every known core shader variant a
     else
       assert.match(
         fragment(both),
-        /let mapped=mix\(linear\/\(1\.0\+linear\),margoFog\.color\.rgb,fogAmount\(i\.position,frame\.eye\.xyz\)\);/,
+        /let mapped=mix\(pbrNeutral\(max\(linear,vec3f\(0\)\)\),margoFog\.color\.rgb,fogAmount\(i\.position,frame\.eye\.xyz\)\);/,
         name,
       );
     if (name === 'sky') assert.match(fragment(lit), /skyAmbient\.rgb\+margoAmbient;/, 'sky ambient stays and IBL adds');
@@ -324,7 +324,7 @@ test('glTF-pro models: applyTo lights and fogs opaque and blended primitives in 
       );
       assert.match(
         code,
-        /color=mix\(select\(color,aces\(max\(color,vec3f\(0\)\)\/0\.6\),f\.settings\.w<0\.5\),margoFog\.color\.rgb,fogAmount\(i\.position,f\.eye\.xyz\)\);if\(f\.settings\.w<0\.5\) \{/,
+        /color=mix\(select\(color,pbrNeutral\(max\(color,vec3f\(0\)\)\),f\.settings\.w<0\.5\),margoFog\.color\.rgb,fogAmount\(i\.position,f\.eye\.xyz\)\);if\(f\.settings\.w<0\.5\) \{/,
       );
     }
     assert.ok(

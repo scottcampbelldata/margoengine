@@ -5,7 +5,7 @@ import { GPURenderer } from '../packages/core/dist/renderer.js';
 import { GLRenderer } from '../packages/webgl/dist/index.js';
 import { wgsl } from '../packages/core/src/shaders.ts';
 import { SSAO } from '../packages/post/dist/index.js';
-import { lighting as skyLighting } from '../packages/sky/src/lighting.ts';
+import { lighting as skyLighting } from '../packages/sky/dist/lighting.js';
 import { optionalGPU } from './support/optional-gpu.js';
 import { glDrawHarness } from './support/core-draw-gpu.js';
 
