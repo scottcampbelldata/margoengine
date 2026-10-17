@@ -87,6 +87,8 @@ export interface ScatterOptions {
     exclusions?: readonly GroundBounds[];
     heightmap?: () => GPUTexture | undefined;
     wind?: ScatterWind;
+    alignToGround?: number;
+    sink?: number;
 }
 
 export type ScatterWind = readonly [number, number, number];

@@ -15,6 +15,7 @@ export {
   type Placement,
 } from './placement.js';
 import { windShader, validateWind, type ScatterWind } from './wind.js';
+import { poseShader } from './pose.js';
 import { sameBindings, snapshotBindings } from './bindings.js';
 export type { ScatterWind } from './wind.js';
 import { validateExclusions, type GroundBounds } from './placement.js';
@@ -60,9 +61,19 @@ export interface ScatterOptions {
   exclusions?: readonly GroundBounds[];
   heightmap?: () => GPUTexture | undefined;
   wind?: ScatterWind;
+  /**
+   * How far each instance's up axis tilts from world +Y toward the ground normal, 0-1 (default 0, upright). 1 lays
+   * stones and debris along the slope; grass and trees usually stay upright.
+   */
+  alignToGround?: number;
+  /**
+   * Lowers each instance by `sink * scale * (1 + tan(slope))` world units (default 0), so roots and stone bases stay
+   * buried on the downhill side of steeper ground. The heightmap gives the slope.
+   */
+  sink?: number;
 }
 const frame = `
-struct Frame {camera:mat4x4f,eye:vec4f,area:vec4f,rules:vec4f,scale:vec4f,lod:vec4f,ids:vec4u,color:vec4f,planes:array<vec4f,6>,wind:vec4f}
+struct Frame {camera:mat4x4f,eye:vec4f,area:vec4f,rules:vec4f,scale:vec4f,lod:vec4f,ids:vec4u,color:vec4f,planes:array<vec4f,6>,wind:vec4f,ground:vec4f}
 struct Instance {position:vec4f,rotation:vec4f}
 @group(0) @binding(0) var<uniform> frame:Frame;
 `;
@@ -93,15 +104,17 @@ fn emit(ring:u32,instance:Instance){
  let h=mix(mix(h00,h10,f.x),mix(h01,h11,f.x),f.y)+frame.scale.z;
  let normal=normalize(vec3f(-mix(h10-h00,h11-h01,f.y)*f32(size.x)/frame.area.x,1.0,-mix(h01-h00,h11-h10,f.x)*f32(size.y)/frame.area.y));
  if(h<frame.rules.x||h>frame.rules.y||normal.y<frame.rules.z){return;}
- let p=vec3f((uv.x-0.5)*frame.area.x+frame.area.z,h,(uv.y-0.5)*frame.area.y+frame.area.w);
  let scale=mix(frame.scale.x,frame.scale.y,hash(i*7u+4u));let radius=frame.lod.w*scale;
+ // Sink deeper on slopes: tan(slope) is how far the ground falls per unit of footprint.
+ let p=vec3f((uv.x-0.5)*frame.area.x+frame.area.z,h-frame.ground.y*scale*(1.0+length(normal.xz)/max(normal.y,0.2)),(uv.y-0.5)*frame.area.y+frame.area.w);
  for(var j=0u;j<u32(frame.eye.w);j++){
   let bounds=exclusions[j];let offset=p.xz-clamp(p.xz,bounds.xy,bounds.zw);
   if(dot(offset,offset)<=radius*radius){return;}
  }
  for(var j=0u;j<6u;j++){if(dot(frame.planes[j].xyz,p)+frame.planes[j].w < -radius){return;}}
  let d=distance(p,frame.eye.xyz);if(d>frame.lod.z){return;}
- let angle=hash(i*7u+5u)*6.2831853;var instance=Instance(vec4f(p,scale),vec4f(cos(angle),sin(angle),0,0));
+ let angle=hash(i*7u+5u)*6.2831853;let q=round((normal.xz*0.5+0.5)*4095.0);
+ var instance=Instance(vec4f(p,scale),vec4f(angle,q.x+q.y*4096.0,0,0));
  for(var ring=0u;ring<2u;ring++){
   if((frame.ids.w&(1u<<ring))!=0u&&frame.scale.w>0.0&&abs(d-frame.lod[ring])<frame.scale.w*0.5){
    instance.rotation.z=(d-frame.lod[ring])/frame.scale.w+0.5;instance.rotation.w=1.0;emit(ring,instance);
@@ -122,13 +135,13 @@ const renderCode =
   frame +
   fadeCode +
   windShader +
+  poseShader +
   `
 @group(0) @binding(1) var<storage,read> instances:array<Instance>;
 struct Output {@builtin(position) clip:vec4f,@location(0) normal:vec3f,@location(1) @interpolate(flat) lodFade:vec2f}
 @vertex fn vertex(@location(0) p:vec3f,@location(1) n:vec3f,@builtin(instance_index) index:u32)->Output{
- let data=instances[index];let c=data.rotation.x;let s=data.rotation.y;
- var world=vec3f(c*p.x+s*p.z,p.y,-s*p.x+c*p.z)*data.position.w+data.position.xyz;let bend=windBend(world.y-data.position.y,data.position.xz,frame.wind);world+=vec3f(bend.x,0,bend.y);
- return Output(frame.camera*vec4f(world,1),windNormal(vec3f(c*n.x+s*n.z,n.y,-s*n.x+c*n.z),bend,frame.wind),data.rotation.zw);
+ let data=instances[index];let pose=scatterPose(p,n,data.position,data.rotation,frame.ground,frame.wind);
+ return Output(frame.camera*vec4f(pose.world,1),pose.normal,data.rotation.zw);
 }
 @fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->@location(0) vec4f {if(!lodVisible(i.clip.xy,i.lodFade)){discard;}var color=frame.color.rgb*(0.25+max(0.0,dot(normalize(i.normal)*select(-1.0,1.0,front),normalize(vec3f(1,2,1))))*0.75);if(frame.color.w<0.5){color=pow(color/(1.0+color),vec3f(1.0/2.2));}return vec4f(color,1);}
 `;
@@ -141,15 +154,14 @@ const solidCode = renderCode
   .replace('if(!lodVisible(i.clip.xy,i.lodFade)){discard;}', '');
 const pbrVertex =
   windShader +
+  poseShader +
   `
 struct ScatterInstance {position:vec4f,rotation:vec4f}
 @group(1) @binding(0) var<storage,read> instances:array<ScatterInstance>;
-@group(1) @binding(1) var<uniform> material:array<vec4f,3>;
+@group(1) @binding(1) var<uniform> material:array<vec4f,4>;
 @vertex fn vertex(@location(0) p:vec3f,@location(1) n:vec3f,@builtin(instance_index) index:u32)->Output {
- let data=instances[index];let c=data.rotation.x;let s=data.rotation.y;
- var o:Output;o.position=vec3f(c*p.x+s*p.z,p.y,-s*p.x+c*p.z)*data.position.w+data.position.xyz;
- let bend=windBend(o.position.y-data.position.y,data.position.xz,material[2]);o.position+=vec3f(bend.x,0,bend.y);
- o.clip=frame.camera*vec4f(o.position,1);o.normal=windNormal(vec3f(c*n.x+s*n.z,n.y,-s*n.x+c*n.z),bend,material[2]);
+ let data=instances[index];let pose=scatterPose(p,n,data.position,data.rotation,material[3],material[2]);
+ var o:Output;o.position=pose.world;o.clip=frame.camera*vec4f(o.position,1);o.normal=pose.normal;
  o.color=material[0].rgb;o.material=vec4f(material[1].xyz,1);o.lodFade=data.rotation.zw;return o;
 }
 `;
@@ -165,12 +177,12 @@ export class Scatter implements EnginePlugin {
   private fallback?: GPUTexture;
   private compute?: GPUComputePipeline;
   private pipelines = new Map<string, GPURenderPipeline>();
-  private readonly values = new Float32Array(72);
+  private readonly values = new Float32Array(76);
   private readonly meta = new Uint32Array(this.values.buffer);
   private readonly geometries: readonly Geometry[];
   private disposed = false;
   readonly count: number;
-  private readonly materialValues = new Float32Array(12);
+  private readonly materialValues = new Float32Array(16);
   private time = 0;
   private terrain?: GPUTexture;
   private computeGroup?: GPUBindGroup;
@@ -214,6 +226,8 @@ export class Scatter implements EnginePlugin {
       lodFade = 2,
       seed = 1,
       color = [0.12, 0.35, 0.08],
+      alignToGround = 0,
+      sink = 0,
     } = options;
     if (
       this.geometries.length !== 3 ||
@@ -247,6 +261,14 @@ export class Scatter implements EnginePlugin {
     if (options.material !== undefined && !(options.material instanceof PbrMaterial))
       throw new TypeError('Expected a PBR scatter material');
     if (!Number.isFinite(lodFade) || lodFade < 0 || lodFade > 100000) throw new RangeError('Invalid scatter LOD fade');
+    if (
+      ![alignToGround, sink].every(Number.isFinite) ||
+      alignToGround < 0 ||
+      alignToGround > 1 ||
+      sink < 0 ||
+      sink > 100000
+    )
+      throw new RangeError('Scatter alignToGround must be 0-1 and sink a distance from 0 to 100000');
     if (options.wind) validateWind(options.wind);
     const exclusions = options.exclusions ?? [];
     validateExclusions(exclusions);
@@ -285,6 +307,8 @@ export class Scatter implements EnginePlugin {
       36,
     );
     this.values.set(color, 40);
+    this.values[72] = alignToGround;
+    this.values[73] = sink;
     // Compute emits fading instances only for a nonzero width between rings that use different meshes.
     this.fade = this.values[31] > 0 && this.meta[39] !== 0;
   }
@@ -318,7 +342,7 @@ export class Scatter implements EnginePlugin {
     d.queue.writeBuffer(this.exclusionBuffer, 0, this.exclusionValues as Float32Array<ArrayBuffer>);
     if (this.options.material) {
       this.pbrUniform = d.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-      this.materialUniform = d.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      this.materialUniform = d.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
       this.materialValues.set(this.options.material.data);
     }
     this.commands = d.createBuffer({
@@ -402,7 +426,7 @@ export class Scatter implements EnginePlugin {
     const lit = !!this.options.material;
     if (lit) {
       this.materialValues.set(this.options.material!.data);
-      this.materialValues.set(this.values.subarray(68, 72), 8);
+      this.materialValues.set(this.values.subarray(68, 76), 8); // wind, then ground fit
       c.device.queue.writeBuffer(this.materialUniform!, 0, this.materialValues as Float32Array<ArrayBuffer>);
       if (this.pbrShader !== c.shader) {
         this.pipelines.clear();

@@ -32,13 +32,60 @@ test('scatter interpolates the four cell-centre heights around each instance and
   effect.dispose();
 });
 
+test('alignToGround and sink fit instances to the ground in the cull and both vertex shaders', () => {
+  const plain = new Scatter(box());
+  assert.deepEqual(Array.from(plain.values.slice(72, 74)), [0, 0], 'defaults: upright, not sunk');
+  const fitted = new Scatter(box(), { alignToGround: 1, sink: 0.25 });
+  assert.deepEqual(Array.from(fitted.values.slice(72, 74)), [1, 0.25]);
+  for (const options of [{ alignToGround: 1.5 }, { alignToGround: -0.1 }, { alignToGround: NaN }, { sink: -1 }])
+    assert.throws(() => new Scatter(box(), options), { name: 'RangeError', message: /alignToGround must be 0-1/ });
+  for (const lit of [false, true]) {
+    const h = optionalGPU();
+    h.engine.lighting = {
+      direction: new Float32Array([-1, 0.13, 0, 1]),
+      radiance: new Float32Array([1, 0.8, 0.54, 0.18]),
+    };
+    h.context.shader = wgsl;
+    h.context.bindings = [];
+    const effect = new Scatter([box(), box(0.5), box(0.25)], {
+      count: 4,
+      alignToGround: 0.5,
+      sink: 0.1,
+      ...(lit ? { material: new PbrMaterial() } : {}),
+    });
+    h.engine.use(effect);
+    h.engine.frameGraph.execute(h.context);
+    const cull = h.pipelines.find((p) => p.compute).compute.module.code,
+      render = h.pipelines.find((p) => p.fragment).vertex.module.code;
+    // Sink scales with tan(slope); the ground normal's X and Z are packed beside the yaw.
+    assert.match(cull, /h-frame\.ground\.y\*scale\*\(1\.0\+length\(normal\.xz\)\/max\(normal\.y,0\.2\)\)/);
+    assert.match(cull, /vec4f\(angle,q\.x\+q\.y\*4096\.0,0,0\)/);
+    assert.match(render, /fn scatterTurn\(/);
+    assert.match(
+      render,
+      lit
+        ? /scatterPose\(p,n,data\.position,data\.rotation,material\[3\],material\[2\]\)/
+        : /frame\.ground,frame\.wind\)/,
+    );
+    if (lit) {
+      assert.match(render, /var<uniform> material:array<vec4f,4>/);
+      assert.equal(effect.materialUniform.size, 64);
+      assert.deepEqual(Array.from(new Float32Array(effect.materialUniform.data).subarray(12, 14)), [
+        0.5,
+        Math.fround(0.1),
+      ]);
+    }
+    effect.dispose();
+  }
+});
+
 test('scatter frustum bounds include geometry displaced from its local origin', () => {
   const h = optionalGPU(),
     geometry = new Geometry([10, 0, 0, 11, 0, 0, 10, 1, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2]),
     effect = new Scatter(geometry, { count: 1 });
   h.engine.use(effect);
   h.frame();
-  const uniform = h.resources.find((r) => r.data?.byteLength === 72 * 4),
+  const uniform = h.resources.find((r) => r.data?.byteLength === effect.values.byteLength),
     radius = new Float32Array(uniform.data)[35];
   assert.ok(radius >= 10.5 + geometry.bounds[3]);
   effect.dispose();

@@ -48,6 +48,8 @@ export function createLandscapeDetails(
       lod: [18, 42, 105],
       material: new PbrMaterial({ color: [0.19, 0.28, 0.09], roughness: 0.95, doubleSided: true }),
       wind: [1, 0.35, 0.2],
+      // Blades stay upright; a 2 cm sink hides roots on small bumps between heightmap texels.
+      sink: 0.02,
       seed: 37,
       exclusions: CABIN_EXCLUSIONS,
       heightmap,
@@ -62,6 +64,9 @@ export function createLandscapeDetails(
     scale: [0.3, 1.6],
     lod: [24, 55, 130],
     material: new PbrMaterial(MATERIALS.foundation),
+    // Stones lie along the slope and sink deeper where it is steep, so no downhill edge floats.
+    alignToGround: 1,
+    sink: 0.1,
     seed: 9,
     exclusions,
     heightmap,

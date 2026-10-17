@@ -41,6 +41,14 @@ rasterizer instead). A shader without `discard` keeps early depth rejection on
 tile-based phone GPUs, so hidden grass blades are not shaded. The phone tier of
 `@margoengine/quality` sets `lodFade: 0` when the app leaves it unset.
 
+`alignToGround` (0-1, default 0) tilts each instance's up axis from world +Y
+toward the ground normal: 1 lays stones and debris along the slope, while grass
+and trees usually stay upright. `sink` (world units, default 0) lowers each
+instance by `sink * scale * (1 + tan(slope))`, so stone bases and roots stay
+buried on the downhill side of steep ground. Both read the same bilinear patch
+of the heightmap as placement. Each instance keeps 32 bytes: position and scale,
+then yaw, the ground normal's X and Z packed into one float, and the LOD fade.
+
 LOD meshes must use matching origins, scale and shading. For procedural rocks,
 pass `true` as the third argument to `icosahedronGeometry(radius, detail, true)`
 from `@margoengine/geometry`, including at detail 0, and keep the same radius in
