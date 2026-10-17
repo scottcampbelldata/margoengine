@@ -188,11 +188,19 @@ for (const fixture of loadedPBRFixtures) {
     await withLoaded(fixture, ({ engine, model, mesh, primitive }, h) => {
       const shadows = Shadows.attach(engine),
         removeModel = shadows.add(model, { static: true }),
-        removeMesh = shadows.add(mesh);
+        removeMesh = shadows.add(mesh),
+        staticBox = fixture.asset === 'Box.glb';
       h.frame();
-      assert.equal(h.depthDraws().length, 4, 'dynamic registration supersedes the same cached primitive');
+      assert.equal(h.depthDraws().length, 4, 'overlapping registrations submit each primitive once per cascade');
+      // The undeformed Box is cached automatically; the skinned FBX registration stays dynamic and takes precedence.
+      assert.equal(shadows.stats.staticDraws, staticBox ? 4 : 0);
+      assert.equal(shadows.stats.dynamicDraws, staticBox ? 0 : 4);
+      const cacheHits = shadows.stats.cacheHits;
+      h.frame();
+      assert.equal(h.depthDraws().length, staticBox ? 0 : 4, 'unchanged geometry reuses the cached atlas');
       assert.equal(shadows.stats.staticDraws, 0);
-      assert.equal(shadows.stats.dynamicDraws, 4);
+      assert.equal(shadows.stats.dynamicDraws, staticBox ? 0 : 4);
+      assert.equal(shadows.stats.cacheHits, cacheHits + 1);
       removeMesh();
       h.frame();
       assert.equal(h.depthDraws().length, 4, 'remaining cached source still renders');

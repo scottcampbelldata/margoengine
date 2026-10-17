@@ -1,6 +1,6 @@
 # Reading the three.js parity counts
 
-Date: 2026-10-17. The table in [threejs-parity.md](threejs-parity.md) was recounted after the approved core hooks and optional dispersion and depth/distance material modes: **159 features, 97 COVERED, 37 PARTIAL, 25 MISSING**. Viewport/scissor moved from MISSING to PARTIAL because it now works per core draw, while optional native passes and picking retain their own behavior. The camera and ambient hooks improve existing PARTIAL rows. Core + stage measures 20,641 bytes gzip, 359 above the 20,282-byte baseline, with 4,358 usable bytes below the strict 25,000-byte ceiling. [The matrix](threejs-parity.md#what-is-missing-or-partial-and-what-to-do) separates the implemented hooks from the remaining package work.
+Date: 2026-10-17. The table in [threejs-parity.md](threejs-parity.md) was recounted after the approved core hooks and optional dispersion, depth/distance material modes and back-side rendering: **159 features, 98 COVERED, 36 PARTIAL, 25 MISSING**. Viewport/scissor moved from MISSING to PARTIAL because it now works per core draw, while optional native passes and picking retain their own behavior. The camera and ambient hooks improve existing PARTIAL rows. Core + stage currently measures 20,850 bytes gzip after the separate performance update on main, with 4,149 usable bytes below the strict 25,000-byte ceiling. The back-side change adds no core or stage bytes. [The matrix](threejs-parity.md#what-is-missing-or-partial-and-what-to-do) separates the implemented hooks from the remaining package work.
 
 COVERED can still name a limit. PARTIAL means one common three.js use is absent. MISSING means no package `src/` implements that three.js name. A Margo feature with a different name can exist beside a MISSING row. SDF text does not make `TextGeometry` covered.
 
@@ -54,7 +54,7 @@ The row stays PARTIAL because three.js's WebGLRenderer draws the whole scene. Cl
 
 The three-hook change does not implement these 25 missing rows. The optional add-ons and loaders remain separate package work; the specific core exception does not authorize more core features or relax the gzip gate.
 
-## What the 37 PARTIAL rows are
+## What the 36 PARTIAL rows are
 
 One of them is the WebGL2 row above. It stays partial on purpose.
 
@@ -72,7 +72,7 @@ These partials are narrower APIs that already have a Margo path. They are limits
 - Node materials compile typed WGSL. They are not three.js TSL, and there is no raw shader material with its own vertex layout.
 - glTF reads the extensions listed on that row. A file that requires `KHR_animation_pointer` throws and names the extension. Export writes no cameras or lights.
 - KTX2 works for `KHR_texture_basisu` on a glTF. A standalone `.ktx2` is a raw `GPUTexture` that materials cannot take. Cube maps, arrays, and UASTC HDR are rejected.
-- Materials meshes accept independent `uvs1` coordinates and geometry groups with material arrays, including instancing and glTF export. UV1 falls back to UV0 when omitted. Arbitrary named vertex attributes remain absent, so the combined geometry-attributes row stays PARTIAL and the counts remain 97 / 37 / 25.
+- Materials meshes accept independent `uvs1` coordinates and geometry groups with material arrays, including instancing and glTF export. UV1 falls back to UV0 when omitted. Arbitrary named vertex attributes remain absent, so the combined geometry-attributes row stays PARTIAL and the counts remain 98 / 36 / 25.
 - Toon shading applies to every core mesh at once, not to a glTF-pro or skinned material.
 - Contact shadows are a ground-plane helper, not a shadow-catcher material.
 - SSR reflects core meshes and models registered with `ssr.add`. Water and terrain are reflected and do not reflect.
@@ -84,8 +84,8 @@ The remaining partials are the same kind of limit, spelled out on each row: core
 
 ## Sentence that was behind the table
 
-The summary used to say physical materials had no iridescence or anisotropy. The MeshPhysicalMaterial row already said glTF loads both through `@margoengine/gltf-pro/extended`, and `@margoengine/materials` now takes those factors and their maps on meshes you build. The 12 physical map properties cover clearcoat, sheen, specular, transmission, volume, anisotropy and iridescence. Dispersion now works on constructed meshes, native glTF transmission and installed/caller transmission, and survives export. The physical-material and normal/depth/distance rows now both qualify as COVERED, giving 97 / 37 / 25; screen-space and lighting limits remain documented. This change adds no core or stage features.
+The summary used to say physical materials had no iridescence or anisotropy. The MeshPhysicalMaterial row already said glTF loads both through `@margoengine/gltf-pro/extended`, and `@margoengine/materials` now takes those factors and their maps on meshes you build. The 12 physical map properties cover clearcoat, sheen, specular, transmission, volume, anisotropy and iridescence. Dispersion now works on constructed meshes, native glTF transmission and installed/caller transmission, and survives export. The physical-material, normal/depth/distance and front/back/double-side rows now qualify as COVERED, giving 98 / 36 / 25; screen-space and lighting limits remain documented. This change adds no core or stage features.
 
 ## What to say when someone cites 95 / 38 / 26
 
-Those counts predate the three core hooks. Margo now covers 97 of 159 three.js r186 features in the stated form, with 37 narrower implementations and 25 missing names. The camera, ambient RGB and draw-rectangle hooks fit below the same core + stage ceiling. WebGL2 remains the optional flat preview of core meshes. CubeCamera, mirror helpers and the optional-package backlog have not been implemented by this change.
+Those counts predate the three core hooks. Margo now covers 98 of 159 three.js r186 features in the stated form, with 36 narrower implementations and 25 missing names. The camera, ambient RGB and draw-rectangle hooks fit below the same core + stage ceiling. WebGL2 remains the optional flat preview of core meshes. CubeCamera, mirror helpers and the optional-package backlog have not been implemented by this change.

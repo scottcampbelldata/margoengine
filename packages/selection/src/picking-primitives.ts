@@ -18,6 +18,7 @@ export interface PickingPrimitive {
   texCoord?: 0 | 1;
   alphaTransform?: Float32Array;
   doubleSided?: boolean;
+  side?: 'front' | 'back' | 'double';
 }
 export interface PickingSource {
   readonly pickingPrimitives: readonly PickingPrimitive[];
@@ -139,7 +140,8 @@ export class PickingPrimitives {
       !Number.isFinite(Math.fround(p.cutoff ?? 0)) ||
       (p.alpha ?? 1) < 0 ||
       (p.cutoff ?? 0) < 0 ||
-      (p.doubleSided !== undefined && typeof p.doubleSided !== 'boolean')
+      (p.doubleSided !== undefined && typeof p.doubleSided !== 'boolean') ||
+      (p.side !== undefined && !['front', 'back', 'double'].includes(p.side))
     )
       throw new RangeError('Invalid picking primitive');
     if (
@@ -333,7 +335,7 @@ export class PickingPrimitives {
       );
       values.set(p.alphaTransform ?? identityUV, 36);
       values[44] = ids[index];
-      values[45] = +(p.doubleSided ?? false);
+      values[45] = p.side === 'back' ? 2 : p.side === 'double' ? 1 : p.side === 'front' ? 0 : +(p.doubleSided ?? false);
       this.device.queue.writeBuffer(record.uniform, 0, values as Float32Array<ArrayBuffer>);
     }
     for (const record of draws.splice(primitives.length)) record.uniform.destroy();
@@ -394,6 +396,6 @@ struct PickOutput {@builtin(position) position:vec4f,@location(0) uv:vec2f,@loca
 @vertex fn vertex(i:PickInput)->PickOutput {var o:PickOutput;let p=f.model*vec4f(i.position.xyz,1);o.position=f.camera*p;o.uv=select(i.uv.xy,i.uv.zw,f.settings.z>0.5);o.alpha=i.color.a;return o;}
 @fragment fn fragment(i:PickOutput,@builtin(front_facing) front:bool)->@location(0) ${mask ? 'vec4f' : 'u32'} {
  let uv=vec2f(dot(f.uv0.xy,i.uv)+f.uv0.z,dot(f.uv1.xy,i.uv)+f.uv1.z);let alpha=textureSample(alphaMap,alphaSampler,uv).a*f.settings.x*i.alpha;
- if((front!=(f.settings.w>0.0)&&f.info.y<0.5)||alpha<f.settings.y){discard;}return ${mask ? 'vec4f(1,0,0,1)' : 'u32(f.info.x)'};
+ let facing=front==(f.settings.w>0.0);if((!facing&&f.info.y<0.5)||(facing&&f.info.y>1.5)||alpha<f.settings.y){discard;}return ${mask ? 'vec4f(1,0,0,1)' : 'u32(f.info.x)'};
 }`;
 }

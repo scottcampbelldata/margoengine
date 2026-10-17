@@ -247,6 +247,18 @@ creation, and use a new geometry object for changed attributes. `mesh.dispose()`
 remain caller-owned. Device restoration rebuilds the model and texture bindings. Constructed material shading cannot
 be copied to another GPU device without rebuilding its material resources. Core and the stage facade are unchanged.
 
+## Front, back and double sides
+
+`new Material({side: 'back'})` draws only the triangle's back side. `side` accepts `front` (default), `back` or
+`double` and stays live, including shared materials, groups and instances. Explicit `side` wins over the legacy
+`doubleSided` constructor option. Reading `doubleSided` is true only for `double`; assigning it selects `double`
+or `front`. Mirrored transforms preserve the triangle's local front side. Normals on visible back faces follow
+the same orientation as double-sided rendering, including normal maps and diagnostic shading.
+
+GPU picking and CPU BVH queries follow the same side. Shadow casting retains the existing two-sided caster
+policy. Export bakes back-only triangles by reversing their winding and normals because glTF has no back-side
+material flag. Core materials keep their existing API.
+
 ## Depth and distance materials
 
 `Material({shading: 'depth'})` writes projected depth, while `Material({shading: 'distance'})` writes world-space

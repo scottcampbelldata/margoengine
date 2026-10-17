@@ -52,7 +52,7 @@ require a beauty render. Animation time is not advanced by the query. Deformed
 draws are not rejected by their bind-pose bounds.
 
 The returned mesh is the primitive's node. Picking and outlines honor hidden
-ancestors, mirrored winding, double-sided materials, alpha masks, vertex alpha,
+ancestors, mirrored winding, front/back/double-sided materials, alpha masks, vertex alpha,
 UV1, texture transforms and implicit mip filtering. Blended PBR surfaces are
 pickable when their sampled alpha is at least 0.001. GPU picking chooses the
 nearest visible surface; CPU BVH queries remain geometric triangle queries.

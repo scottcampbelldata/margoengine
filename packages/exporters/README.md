@@ -44,9 +44,13 @@ Physical `Material` maps are saved to the matching glTF extensions: clearcoat fa
 
 Live physical `Material.dispersion` and loaded native dispersion values are saved as `KHR_materials_dispersion`, including values above one. Explicit zero dispersion extensions remain present, and optional loaded dispersion metadata is retained when its material decoder is absent.
 
+Live `side: 'back'` triangle materials are saved as ordinary front-only glTF materials with reversed triangle winding, negated base normals and negated morph normal deltas. Tangents and their handedness, UVs, morph position/tangent deltas, skins, node transforms and instance transforms are retained. Shared front/back geometry receives separate normal and index accessors; source arrays are unchanged. glTF has no back-only material flag, so reimported geometry keeps the visible surface through this bake. `side: 'double'` writes `doubleSided: true`; front-only and double-sided geometry follow their existing export path. Point and line geometry does not receive the triangle bake.
+
 ## How it works
 
 Engine exports recognize primitives loaded by `@margoengine/gltf-pro` and `@margoengine/fbx`, without attaching core geometry. glTF/GLB retain all primitives on each node and their bind-pose skin/morph data; other formats write base geometry. Automatic export of PBR textures, material extensions, and more than four skin influences throws explicitly. An engine forest containing no supported mesh geometry also throws; visibility filtering and intentionally empty data scenes remain supported.
+
+Engine export entrypoints also bake back-only optional PBR triangles by reversing winding and negating base and morph normals. This preserves their visible side in glTF, GLB, USDZ, OBJ, PLY and STL, including mirrored world transforms. Front-only and double-sided materials retain their existing geometry behavior.
 
 - **Scene walk.** An engine source is walked through `engineRuntime(engine)`: `meshes`, `store.parents`, `store.hidden` and the local transforms in `store.transforms` (translation, quaternion, scale). World matrices are recomputed in double precision from the parent chain, so export does not depend on a `render()` having run. Hidden meshes hide their descendants, as in the kernel.
 - **Every Margo Engine mesh is a glTF node.** Transform-only meshes become empty nodes, so the hierarchy survives. With `flatten`, each drawable mesh is a root node with its world transform; when a parent chain with non-uniform scale produces shear, which glTF TRS cannot hold, that mesh's world transform is baked into its vertices (and winding is flipped for mirrors).

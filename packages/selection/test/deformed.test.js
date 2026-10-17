@@ -126,6 +126,7 @@ test('Picking.add validates ownership, disposal and bounded PBR metadata before 
     { alphaTransform: new Float32Array(4) },
     { alphaTransform: new Float32Array([1, 0, Infinity, 0, 0, 1, 0, 0]) },
     { doubleSided: 1 },
+    { side: 'invalid' },
   ])
     assert.throws(() => h.picking.add({ pickingPrimitives: [{ ...p, ...field }] }), /Invalid picking|affine rows/);
   assert.throws(() => h.picking.add({ pickingPrimitives: [p], prepareDeformation: 1 }), /callback/);
@@ -135,6 +136,29 @@ test('Picking.add validates ownership, disposal and bounded PBR metadata before 
   h.picking.add(source)();
   h.picking.dispose();
   assert.throws(() => h.picking.add(source), /disposed/);
+  h.cleanup();
+});
+
+test('Picking uploads live front, back and double side metadata without reallocating uniforms', async () => {
+  const h = harness(),
+    mesh = h.node(0),
+    p = h.primitive(mesh, { side: 'back', doubleSided: true });
+  h.picking.add({ pickingPrimitives: [p] });
+  for (const [side, expected] of [
+    ['back', 2],
+    ['front', 0],
+    ['double', 1],
+  ]) {
+    p.side = side;
+    await h.picking.onPick(64, 48);
+    const uniform = h.passes.at(-1).groups.at(-1)[1].entries[0].resource.buffer;
+    assert.equal(new Float32Array(uniform.data)[45], expected);
+  }
+  const allocated = h.counts.buffers;
+  p.side = 'back';
+  await h.picking.onPick(64, 48);
+  assert.equal(h.counts.buffers, allocated);
+  h.picking.dispose();
   h.cleanup();
 });
 

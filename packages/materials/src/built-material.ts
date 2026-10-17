@@ -9,13 +9,14 @@ import {
   type PreparedGeometry,
   type PBRRenderState,
   type TextureTransform,
+  type MaterialSide,
 } from '@margoengine/gltf-pro';
 import { PBRInstances } from '@margoengine/gltf-pro/instancing';
 import { extendedMaterials } from '@margoengine/gltf-pro/extended';
 import { physicalMapsShader } from './physical-maps.js';
 import { depthDistanceShader } from './depth-distance.js';
 import { readResponse } from '../../shared/loading.js';
-export type { TextureTransform } from '@margoengine/gltf-pro';
+export type { TextureTransform, MaterialSide } from '@margoengine/gltf-pro';
 export { packAtlas, transformUVs, type Atlas, type AtlasOptions } from './atlas.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -382,6 +383,8 @@ export interface MaterialOptions extends PhysicalOptions {
   matcap?: Texture | null;
   transparent?: boolean;
   alphaTest?: number;
+  /** Faces drawn by triangle meshes. Explicit side takes precedence over doubleSided. */
+  side?: MaterialSide;
   doubleSided?: boolean;
   blending?: Blending;
   depthWrite?: boolean;
@@ -604,7 +607,7 @@ export class Material {
   readonly blending: Blending;
   readonly depthWrite?: boolean;
   readonly depthTest: boolean;
-  /** gltf-pro layout: [roughness, metalness, normalScale, aoMapIntensity] and [alphaMode, alphaTest, doubleSided, 0]. */
+  /** gltf-pro layout: [roughness, metalness, normalScale, aoMapIntensity] and [alphaMode, alphaTest, side (front 0, double 1, back 2), 0]. */
   readonly factors: number[];
   readonly settings: number[];
   private blend: boolean;
@@ -721,6 +724,7 @@ export class Material {
     if (
       !['standard', 'basic', 'normal', 'matcap', 'depth', 'distance'].includes(shading) ||
       !['normal', 'additive', 'multiply', 'none'].includes(blending) ||
+      (o.side !== undefined && !['front', 'back', 'double'].includes(o.side)) ||
       [o.transparent, o.doubleSided, o.depthWrite, o.depthTest].some(
         (v) => v !== undefined && typeof v !== 'boolean',
       ) ||
@@ -752,6 +756,7 @@ export class Material {
       unit(o.aoMapIntensity ?? 1, 'aoMapIntensity'),
     ];
     this.settings = [0, unit(o.alphaTest ?? 0, 'alphaTest'), +(o.doubleSided ?? false), 0];
+    if (o.side !== undefined) this.side = o.side;
     this.sync();
     this.setUVTransform(o.uvTransform ?? null);
     this.map = o.map ?? null;
@@ -1028,6 +1033,13 @@ export class Material {
   set transparent(v: boolean) {
     this.blend = !!v;
     this.sync();
+  }
+  get side(): MaterialSide {
+    return this.settings[2] === 1 ? 'double' : this.settings[2] === 2 ? 'back' : 'front';
+  }
+  set side(v: MaterialSide) {
+    if (!['front', 'back', 'double'].includes(v)) throw new TypeError('Invalid material side');
+    this.settings[2] = v === 'double' ? 1 : v === 'back' ? 2 : 0;
   }
   get doubleSided(): boolean {
     return this.settings[2] === 1;

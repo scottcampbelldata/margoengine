@@ -7,7 +7,7 @@ export interface ModelPrimitive {
   readonly node: Mesh;
   readonly vertices: Float32Array;
   readonly indices: Uint32Array;
-  readonly material: { readonly settings: ArrayLike<number> };
+  readonly material: { readonly settings: ArrayLike<number>; readonly side?: 'front' | 'back' | 'double' };
   readonly buffers?: { vertex: GPUBuffer; index: GPUBuffer };
   readonly deformed?: GPUBuffer;
   /** gltf-pro PBRInstances: drawn once per instance (24 floats each, node-space matrix first). */
@@ -97,14 +97,14 @@ export function sphere(p: ModelPrimitive): Float64Array {
   return s;
 }
 
-/** Same world and clip transform as gltf-pro's vertex shader, so equal-depth tests against its depth hold. info: id, doubleSided, front sign. */
+/** Same world and clip transform as gltf-pro's vertex shader. info: id, side (front 0, double 1, back 2), front sign. */
 export const modelCode = (fragment: string) => `
 struct Draw {model:mat4x4f,info:vec4u}
 @group(0) @binding(0) var<uniform> camera:mat4x4f;
 @group(0) @binding(1) var<storage,read> draws:array<Draw>;
 struct Out {@builtin(position) clip:vec4f,@location(0) @interpolate(flat) info:vec4u}
 @vertex fn vertex(@location(0) position:vec4f,@builtin(instance_index) slot:u32)->Out {let d=draws[slot];let p=d.model*vec4f(position.xyz,1);return Out(camera*p,d.info);}
-fn culled(i:Out,front:bool)->bool {return i.info.y==0u&&front!=(i.info.z==1u);}
+fn culled(i:Out,front:bool)->bool {let facing=front==(i.info.z==1u);return (i.info.y==0u&&!facing)||(i.info.y==2u&&facing);}
 ${fragment}`;
 export function modelPipeline(
   device: GPUDevice,
@@ -153,7 +153,16 @@ export class ModelDraws {
     }
     this.data.set(m, o);
     this.words[o + 16] = id;
-    this.words[o + 17] = +(p.material.settings[2] >= 0.5);
+    this.words[o + 17] =
+      p.material.side === 'back'
+        ? 2
+        : p.material.side === 'double'
+          ? 1
+          : p.material.side === 'front'
+            ? 0
+            : p.material.settings[2] === 2
+              ? 2
+              : +(p.material.settings[2] >= 0.5);
     this.words[o + 18] = +(
       m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]) >
       0

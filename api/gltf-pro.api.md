@@ -179,6 +179,8 @@ export interface MaterialExtensionTexture {
     sampler?: GPUSampler;
 }
 
+export type MaterialSide = 'front' | 'back' | 'double';
+
 export interface PBRCapture {
     declarations(code: string): string;
     readonly targets: readonly GPUColorTargetState[];
@@ -211,6 +213,7 @@ export interface PBRMaterial extends GLTFMaterial {
     factors: number[];
     emission: number[];
     settings: number[];
+    side?: MaterialSide;
     maps: (GLTFTextureInfo | undefined)[];
     uvt?: number[];
     ext?: number[];
@@ -259,6 +262,7 @@ export class PBRModel implements EnginePlugin {
         alphaSampler: GPUSampler;
         alpha: number;
         cutoff: number;
+        side: MaterialSide;
         doubleSided: boolean;
         texCoord: 0 | 1;
         alphaTransform?: Float32Array<ArrayBufferLike> | undefined;
@@ -284,6 +288,7 @@ export class PBRModel implements EnginePlugin {
         alphaSampler: GPUSampler;
         alpha: number;
         cutoff: number;
+        side: MaterialSide;
         doubleSided: boolean;
         texCoord: 0 | 1;
         alphaTransform?: Float32Array<ArrayBufferLike> | undefined;
@@ -309,6 +314,7 @@ export interface PBRPickingGeometry {
     vertices: Float32Array;
     indices: Uint32Array;
     doubleSided: boolean;
+    side?: MaterialSide;
     matrix: Float32Array;
 }
 

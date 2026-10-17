@@ -8,8 +8,8 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 97 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
-| PARTIAL | 37 | Some of it exists, but a common use case is missing. The notes say what. |
+| COVERED | 98 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| PARTIAL | 36 | Some of it exists, but a common use case is missing. The notes say what. |
 | MISSING | 25 | No implementation was found in any package's `src/`. |
 
 Overall: Margo is strong where three.js relies on third-party libraries or examples. That includes cascaded PCSS shadows, clustered lighting, TAA, Gaussian splats, BVH queries, physics, navigation, terrain, water and sky. The day-one basics the first version of this matrix found missing (textures and materials on meshes you build, glTF extensions and compression, an orthographic camera, picking loaded models, image-based lighting outside React, combinable effects, FXAA, a math library) now exist as optional packages. What remains:
@@ -96,7 +96,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | Transparency, alpha blending, alphaTest | COVERED | materials `transparent`, `opacity`, `alphaTest`; gltf-pro `MASK` and `BLEND` | All material meshes draw in one pass: opaque, then transparent back to front, each by `renderOrder`. Shadows ignore `map` alpha cut-outs on materials meshes. Core meshes are opaque only. |
 | Order-independent transparency (three.js has none built in; its examples sort per object) | COVERED † | oit `OIT` (`packages/oit/src/index.ts`) through gltf-pro's transparency hook | Weighted blended OIT for gltf-pro BLEND primitives and materials transparent meshes (`oit.add(model)`): no popping between overlapping transparent parts; MSAA 1x/4x, PostStack, TransparentCanvas, orthographic. An approximation, exact for one layer (errors per layer count in `packages/oit/README.md`). Transmission and custom blending stay sorted. WebGPU only. |
 | Vertex colors | COVERED | materials geometry `colors` (RGB or RGBA, floats or bytes); gltf-pro `COLOR_0` | Always multiply the base colour (no `vertexColors` switch). Not available on core meshes. |
-| `side` (Front, Back, Double) | PARTIAL | `doubleSided` on `PbrMaterial`, materials `Material` and glTF | No back-side-only rendering. |
+| `side` (Front, Back, Double) | COVERED | materials `Material.side`, gltf-pro `PBRMaterial.side` (`packages/materials/src/built-material.ts`, `packages/gltf-pro/src/index.ts`, `side-shader.ts`; `scripts/material-back-side-gpu-check.js`) | Live front/back/double selection, including mirrored nodes, mixed mirrored instances, groups, alpha masks, material shading, auxiliary/capture/transmission paths and GPU/CPU picking. `doubleSided` remains an alias on constructed materials. Core materials retain front/double only. Shadow casting keeps its existing two-sided policy. glTF export bakes back-only winding and normals. |
 | Wireframe | PARTIAL | inspector overlay; geometry `wireframe` drawn with lines | No material flag. |
 | Per-material blending modes, depthTest, depthWrite, polygonOffset, renderOrder, stencil | PARTIAL | materials `blending` (`'normal'`, `'additive'`, `'multiply'`, `'none'`), `depthWrite`, `depthTest`, `createMesh(…, {renderOrder})`; gltf-pro `material.renderState` | Fixed at construction. No custom blend equations, `polygonOffset` or stencil state. Core meshes have none of these. |
 

@@ -81,7 +81,7 @@ export interface ModelPrimitiveLike {
   readonly node: Mesh;
   readonly vertices: Float32Array;
   readonly indices: Uint32Array;
-  readonly material: { readonly settings: ArrayLike<number> };
+  readonly material: { readonly settings: ArrayLike<number>; readonly side?: Side };
   readonly nodeIndex?: number;
   /** gltf-pro `PBRInstances`: the primitive is tested once per drawn instance (24 floats each, node-space matrix first). */
   readonly instances?: { readonly count: number; readonly data: Float32Array };
@@ -240,6 +240,7 @@ export interface PickingGeometry {
   readonly vertices: Float32Array;
   readonly indices: Uint32Array;
   readonly doubleSided: boolean;
+  readonly side?: Side;
   /** Local-to-world matrix captured with the vertex snapshot, before any asynchronous GPU readback. */
   readonly matrix: Float32Array;
 }
@@ -266,7 +267,7 @@ export class Raycaster {
   readonly direction = new Float64Array([0, 0, -1]);
   near = 0;
   far = Infinity;
-  /** 'material' (default) follows each material's doubleSided flag like the renderer does; or force 'front', 'back' or 'double'. */
+  /** 'material' (default) follows each material's side, falling back to doubleSided; or force 'front', 'back' or 'double'. */
   side: RaycasterSide = 'material';
   /** Return only the nearest hit. Much faster with many overlapping meshes. */
   firstHitOnly = false;
@@ -397,7 +398,12 @@ export class Raycaster {
         indices.length % 3
       )
         throw new RangeError('Invalid stride-20 picking geometry');
-      if (typeof doubleSided !== 'boolean' || !(matrix instanceof Float32Array) || matrix.length !== 16)
+      if (
+        typeof doubleSided !== 'boolean' ||
+        (snapshot.side !== undefined && !['front', 'back', 'double'].includes(snapshot.side)) ||
+        !(matrix instanceof Float32Array) ||
+        matrix.length !== 16
+      )
         throw new TypeError('Invalid picking material or world matrix');
       if (vertices.some((v) => !Number.isFinite(v)) || matrix.some((v) => !Number.isFinite(v)))
         throw new RangeError('Picking geometry must be finite');
@@ -439,7 +445,8 @@ export class Raycaster {
         options = {
           near: near * length,
           far: (firstHitOnly ? best : far) * length,
-          side: side === 'material' ? (doubleSided ? ('double' as const) : ('front' as const)) : side,
+          side:
+            side === 'material' ? (snapshot.side ?? (doubleSided ? ('double' as const) : ('front' as const))) : side,
         };
       const found = firstHitOnly ? [cached.bvh.raycastFirst(ray, options)] : cached.bvh.raycast(ray, options);
       for (const hit of found) {
@@ -625,8 +632,17 @@ export class Raycaster {
       }
       // Sides follow the local winding, as the renderers do: a mirrored world matrix keeps the mesh's front side.
       const length = Math.hypot(direction[0], direction[1], direction[2]),
-        doubleSided = primitive ? primitive.material.settings[2] >= 0.5 : node.material.data[6] >= 0.5;
-      const side: Side = this.side === 'material' ? (doubleSided ? 'double' : 'front') : this.side;
+        materialSide: Side = primitive
+          ? (primitive.material.side ??
+            (primitive.material.settings[2] === 2
+              ? 'back'
+              : primitive.material.settings[2] >= 0.5
+                ? 'double'
+                : 'front'))
+          : node.material.data[6] >= 0.5
+            ? 'double'
+            : 'front';
+      const side: Side = this.side === 'material' ? materialSide : this.side;
       const bvh = primitive
         ? getPrimitiveBVH(primitive, this.bvhOptions)
         : getGeometryBVH(node.geometry!, this.bvhOptions);
