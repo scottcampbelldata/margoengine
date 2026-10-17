@@ -54,8 +54,13 @@ test('each pixel turns the spiral by interleaved gradient noise of its screen po
       'let eye=shadowFrame.view*vec4f(position,1);let pixel=eye.xy/max(-eye.z,0.000001)*shadowFrame.settings.w;',
     ),
   );
-  assert.ok(source.includes('return fract(52.9829189*fract(dot(pixel,vec2f(0.06711056,0.00583715))));'));
-  assert.ok(source.includes('let angle=shadowNoise(position)*6.2831853;let turn=vec2f(cos(angle),sin(angle));'));
+  assert.ok(
+    source.includes(
+      'let magic=vec2f(0.06711056,0.00583715);\n  return fract(52.9829189*fract(vec2f(dot(pixel,magic),dot(pixel.yx,magic))));',
+    ),
+  );
+  assert.ok(source.includes('let noise=shadowNoise(position);'));
+  assert.ok(source.includes('let angle=noise.x*6.2831853;let turn=vec2f(cos(angle),sin(angle));'));
   assert.ok(
     source.includes('var blockers=0.0;var sum=0.0;var direction=turn;'),
     'the blocker search starts at the turn',
@@ -71,6 +76,28 @@ test('each pixel turns the spiral by interleaved gradient noise of its screen po
     const bins = new Array(8).fill(0);
     for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) bins[Math.floor(ign(ox + x, oy + y) * 8)]++;
     assert.ok(Math.min(...bins) >= 6, `IGN spread ${bins}`);
+    // noise.y (the transposed pixel) dithers cascades; it must not track the rotation angle (noise.x).
+    const quadrants = [0, 0, 0, 0];
+    let n = 0,
+      sx = 0,
+      sy = 0,
+      sxy = 0,
+      sxx = 0,
+      syy = 0;
+    for (let y = 0; y < 16; y++)
+      for (let x = 0; x < 16; x++) {
+        const a = ign(ox + x, oy + y),
+          b = ign(oy + y, ox + x);
+        quadrants[(a < 0.5) * 2 + (b < 0.5)]++;
+        n++;
+        sx += a;
+        sy += b;
+        sxy += a * b;
+        sxx += a * a;
+        syy += b * b;
+      }
+    const r = (sxy / n - (sx / n) * (sy / n)) / Math.sqrt((sxx / n - (sx / n) ** 2) * (syy / n - (sy / n) ** 2));
+    assert.ok(Math.abs(r) < 0.15 && Math.min(...quadrants) >= 52, `correlation ${r}, quadrants ${quadrants}`);
   }
 });
 

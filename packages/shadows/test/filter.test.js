@@ -57,7 +57,7 @@ test("'soft' stays the default; 'pcf' and 'hard' skip the blocker search and the
   assert.equal(pcf.match(/textureSampleCompareLevel\(/g).length, 4, 'four hardware 2x2 comparison taps');
   assert.equal(hard.match(/textureSampleCompareLevel\(/g).length, 1, 'one hardware 2x2 comparison tap');
   // Half a texel each way on both axes: every tap's comparison depth follows the receiver plane.
-  assert.ok(pcf.includes('let h=texel*0.5;let tapLayer=i32(cascade);let a=vec2f(h.x,-h.y);'));
+  assert.ok(pcf.includes('let h=texel*0.5;let tapLayer=i32(layer);let a=vec2f(h.x,-h.y);'));
   for (const tap of [
     'uv-h,tapLayer,reference-dot(h,slope)',
     'uv+h,tapLayer,reference+dot(h,slope)',
@@ -66,7 +66,7 @@ test("'soft' stays the default; 'pcf' and 'hard' skip the blocker search and the
   ])
     assert.ok(pcf.includes(`textureSampleCompareLevel(shadowMap,shadowSampler,${tap})`), tap);
   assert.ok(pcf.includes(')*0.25;'));
-  assert.ok(hard.includes('return textureSampleCompareLevel(shadowMap,shadowSampler,uv,i32(cascade),reference);'));
+  assert.ok(hard.includes('return textureSampleCompareLevel(shadowMap,shadowSampler,uv,i32(layer),reference);'));
   // Two bilinear taps half a texel apart weigh texels 1:2:1 at a texel centre: a smooth three-texel edge.
   const bilinear = (p) => {
     const left = Math.floor(p - 0.5),
@@ -209,4 +209,45 @@ test('cascadeSplits and fitCascades take a cascade count; four is unchanged', ()
     () => fitCascades(camera, 1.5, [1, -2, 0.5], 512, splits, undefined, undefined, 100, undefined, 0),
     /fit/,
   );
+});
+
+test('the last tenth of each cascade dithers into the next; the last cascade and fixed bounds never switch', () => {
+  const dither = [
+    'let noise=shadowNoise(position);let split=shadowFrame.splits[cascade];',
+    'let band=0.1*(split-select(0.0,shadowFrame.splits[max(cascade,1u)-1u],cascade>0u));',
+    'let layer=cascade+u32(split<shadowFrame.splits.w&&depth>split-band*(1.0-noise.y));',
+    'let projected=shadowFrame.matrices[layer]*',
+    'let matrix=shadowFrame.matrices[layer];',
+  ];
+  for (const filter of ['soft', 'pcf', 'hard']) {
+    const source = shadowSampling(0, filter);
+    for (const line of dither) assert.ok(source.includes(line), `${filter}: ${line}`);
+    const body = source.slice(source.indexOf('let projected='));
+    assert.doesNotMatch(body, /\[cascade\]|i32\(cascade\)/, `${filter}: every lookup after the dither uses layer`);
+  }
+  // The same rule on the CPU, over a ramp of noise values.
+  const layerOf = (splits, depth, noise) => {
+      const cascade = +(depth > splits[0]) + +(depth > splits[1]) + +(depth > splits[2]),
+        split = splits[cascade],
+        band = 0.1 * (split - (cascade > 0 ? splits[cascade - 1] : 0));
+      return cascade + +(split < splits[3] && depth > split - band * (1 - noise));
+    },
+    share = (splits, depth, from) => {
+      let next = 0;
+      for (let i = 0; i < 100; i++) {
+        const layer = layerOf(splits, depth, i / 100);
+        assert.ok(layer === from || layer === from + 1);
+        next += layer - from;
+      }
+      return next / 100;
+    };
+  const four = [10, 30, 60, 100];
+  assert.equal(share(four, 25, 1), 0, 'before the band');
+  assert.ok(Math.abs(share(four, 29, 1) - 0.5) <= 0.02, 'half way through the band');
+  assert.equal(share(four, 30, 1), 1, 'at the split');
+  assert.ok(Math.abs(share(four, 9.5, 0) - 0.5) <= 0.02, 'cascade 0 measures its band from zero');
+  assert.equal(share(four, 99.9, 3), 0, 'the last cascade never switches');
+  assert.ok(Math.abs(share([50, 100, 100, 100], 49, 0) - 0.8) <= 0.02, 'two cascades');
+  assert.equal(share([50, 100, 100, 100], 99.9, 1), 0, 'unused cascades are never selected');
+  assert.equal(share([40, 40, 40, 40], 39.9, 0), 0, 'bounds mode keeps layer zero');
 });

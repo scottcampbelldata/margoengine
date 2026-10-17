@@ -5,7 +5,7 @@
  * 2x2 bilinear comparison), the cheapest edge.
  */
 export type ShadowFilter = 'soft' | 'pcf' | 'hard';
-// Each filter's last step, after the cascade lookup and receiver-plane bias shared by all three.
+// Each filter's last step, after the cascade lookup (layer) and receiver-plane bias shared by all three.
 const filters: Record<ShadowFilter, string> = {
   // Taps follow a golden-angle (Vogel) spiral computed in the loop: tap j sits at radius sqrt((j+0.5)/n), turned one
   // golden angle (2.39996323 rad, shadowGolden) from tap j-1. No constant tables: drivers can place indexed constant
@@ -13,57 +13,65 @@ const filters: Record<ShadowFilter, string> = {
   // from interleaved gradient noise of its screen position (Jimenez 2014), so a penumbra shows fine noise instead of
   // the steps of one pattern shared by every pixel. No time term: the same view renders the same pixels every frame.
   soft: /* wgsl */ `
-  let angle=shadowNoise(position)*6.2831853;let turn=vec2f(cos(angle),sin(angle));
-  let search=max(texel.x,shadowFrame.settings.x*reference*shadowFrame.ranges[cascade]*length(rowX)*0.5);
+  let angle=noise.x*6.2831853;let turn=vec2f(cos(angle),sin(angle));
+  let search=max(texel.x,shadowFrame.settings.x*reference*shadowFrame.ranges[layer]*length(rowX)*0.5);
   var blockers=0.0;var sum=0.0;var direction=turn;
   for(var j=0u;j<16u;j++){
     let offset=direction*sqrt((f32(j)+0.5)/16.0)*search;direction=shadowGolden*direction;
     let coord=vec2i((uv+offset)*dimensions);
     if(any(coord<vec2i(0))||any(coord>=vec2i(dimensions))){continue;}
-    let d=textureLoad(shadowMap,coord,i32(cascade),0);
+    let d=textureLoad(shadowMap,coord,i32(layer),0);
     let receiverOffset=(vec2f(coord)+0.5)*texel-uv;
     if(d<reference+dot(receiverOffset,slope)){sum+=d-dot(receiverOffset,slope);blockers+=1;}
   }
   if(blockers==0){return 1;}
   let blocker=sum/blockers;
-  let penumbra=shadowFrame.settings.x*(reference-blocker)*shadowFrame.ranges[cascade]*length(rowX)*0.5;
+  let penumbra=shadowFrame.settings.x*(reference-blocker)*shadowFrame.ranges[layer]*length(rowX)*0.5;
   let radius=clamp(penumbra,texel.x,0.1);var visibility=0.0;direction=turn;
   for(var j=0u;j<32u;j++){
     let offset=direction*sqrt((f32(j)+0.5)/32.0)*radius;direction=shadowGolden*direction;
     let coord=uv+offset;
-    if(any(coord<vec2f(0))||any(coord>vec2f(1))){visibility+=1;}else{visibility+=textureSampleCompareLevel(shadowMap,shadowSampler,coord,i32(cascade),reference+dot(offset,slope));}
+    if(any(coord<vec2f(0))||any(coord>vec2f(1))){visibility+=1;}else{visibility+=textureSampleCompareLevel(shadowMap,shadowSampler,coord,i32(layer),reference+dot(offset,slope));}
   }
   return visibility/32.0;`,
   // Each tap is the sampler's 2x2 bilinear comparison; four of them half a texel apart add up to a 3x3-texel
   // quadratic B-spline. Written out, not looped: no arrays, no blocker search, no transcendental per tap.
   pcf: /* wgsl */ `
-  let h=texel*0.5;let tapLayer=i32(cascade);let a=vec2f(h.x,-h.y);
+  let h=texel*0.5;let tapLayer=i32(layer);let a=vec2f(h.x,-h.y);
   return (textureSampleCompareLevel(shadowMap,shadowSampler,uv-h,tapLayer,reference-dot(h,slope))+textureSampleCompareLevel(shadowMap,shadowSampler,uv+h,tapLayer,reference+dot(h,slope))+textureSampleCompareLevel(shadowMap,shadowSampler,uv-a,tapLayer,reference-dot(a,slope))+textureSampleCompareLevel(shadowMap,shadowSampler,uv+a,tapLayer,reference+dot(a,slope)))*0.25;`,
   hard: /* wgsl */ `
-  return textureSampleCompareLevel(shadowMap,shadowSampler,uv,i32(cascade),reference);`,
+  return textureSampleCompareLevel(shadowMap,shadowSampler,uv,i32(layer),reference);`,
 };
 // Compare on the receiver plane; cover comparison-sampler subtexel footprints.
 // Directional lights use angular size and orthographic depth separation.
+// shadowNoise rebuilds the fragment's screen pixel from the camera view and settings.w (pixels per unit at depth 1), so
+// it needs no fragment input: x is interleaved gradient noise of the pixel, y of the transposed pixel (a second pattern,
+// uncorrelated with x). The last tenth of each cascade's depth range dithers into the next cascade (noise.y threshold):
+// no hard seam where texel size changes, still one map lookup per tap; the next cascade's sphere holds the band. The
+// last cascade (its split equals splits.w) and unused ones never switch. Comments stay out of the WGSL: they would ship.
 export function shadowSampling(group: number, filter: ShadowFilter = 'soft'): string {
   return /* wgsl */ `
 struct ShadowFrame {matrices:array<mat4x4f,4>,view:mat4x4f,splits:vec4f,ranges:vec4f,settings:vec4f}
 @group(${group}) @binding(1) var<uniform> shadowFrame:ShadowFrame;
 @group(${group}) @binding(2) var shadowMap:texture_depth_2d_array;
 @group(${group}) @binding(3) var shadowSampler:sampler_comparison;
-${filter === 'soft' ? 'const shadowGolden=mat2x2f(-0.737368878,0.675490294,-0.675490294,-0.737368878);\n' : ''}// The screen pixel is rebuilt from the camera view and settings.w (pixels per unit at depth 1): no fragment input needed.
-fn shadowNoise(position:vec3f)->f32 {
+${filter === 'soft' ? 'const shadowGolden=mat2x2f(-0.737368878,0.675490294,-0.675490294,-0.737368878);\n' : ''}fn shadowNoise(position:vec3f)->vec2f {
   let eye=shadowFrame.view*vec4f(position,1);let pixel=eye.xy/max(-eye.z,0.000001)*shadowFrame.settings.w;
-  return fract(52.9829189*fract(dot(pixel,vec2f(0.06711056,0.00583715))));
+  let magic=vec2f(0.06711056,0.00583715);
+  return fract(52.9829189*fract(vec2f(dot(pixel,magic),dot(pixel.yx,magic))));
 }
 fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {
   let depth=-(shadowFrame.view*vec4f(position,1)).z;
   if(depth>shadowFrame.splits.w){return 1;}
   let cascade=u32(depth>shadowFrame.splits.x)+u32(depth>shadowFrame.splits.y)+u32(depth>shadowFrame.splits.z);
-  let projected=shadowFrame.matrices[cascade]*vec4f(position+normalize(normal)*shadowFrame.settings.z,1);
+  let noise=shadowNoise(position);let split=shadowFrame.splits[cascade];
+  let band=0.1*(split-select(0.0,shadowFrame.splits[max(cascade,1u)-1u],cascade>0u));
+  let layer=cascade+u32(split<shadowFrame.splits.w&&depth>split-band*(1.0-noise.y));
+  let projected=shadowFrame.matrices[layer]*vec4f(position+normalize(normal)*shadowFrame.settings.z,1);
   let uv=projected.xy*vec2f(0.5,-0.5)+0.5;var reference=projected.z-shadowFrame.settings.y;
   if(any(uv<vec2f(0))||any(uv>vec2f(1))||reference<=0||reference>=1){return 1;}
   let dimensions=vec2f(textureDimensions(shadowMap));let texel=1.0/dimensions;
-  let matrix=shadowFrame.matrices[cascade];let rowX=vec3f(matrix[0].x,matrix[1].x,matrix[2].x);let rowY=vec3f(matrix[0].y,matrix[1].y,matrix[2].y);let rowZ=vec3f(matrix[0].z,matrix[1].z,matrix[2].z);
+  let matrix=shadowFrame.matrices[layer];let rowX=vec3f(matrix[0].x,matrix[1].x,matrix[2].x);let rowY=vec3f(matrix[0].y,matrix[1].y,matrix[2].y);let rowZ=vec3f(matrix[0].z,matrix[1].z,matrix[2].z);
   let lightNormal=vec3f(dot(normal,normalize(rowX)),dot(normal,normalize(rowY)),dot(normal,normalize(rowZ)));var slope=vec2f(0);
   if(abs(lightNormal.z)>0.001){slope=clamp(vec2f(-lightNormal.x,lightNormal.y)*2*length(rowZ)/(length(rowX)*lightNormal.z),vec2f(-2),vec2f(2));}
   reference-=dot(abs(slope),texel)*0.5;${filters[filter]}
