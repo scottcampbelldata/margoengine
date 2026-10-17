@@ -358,6 +358,7 @@ self.onmessage = async (event: MessageEvent) => {
     progress(100);
     self.postMessage({ done: true });
   } catch (error) {
-    self.postMessage({ error: error instanceof Error ? error.message : String(error) });
+    // The class travels with the message, so a cap or an invalid file still reaches the caller as RangeError or TypeError.
+    self.postMessage({ error: error instanceof Error ? error.message : String(error), kind: (error as Error)?.name });
   }
 };

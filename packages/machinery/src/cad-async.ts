@@ -101,7 +101,11 @@ export function parseCADAsync(
         return;
       }
       if (message.error) {
-        fail(new Error(message.error));
+        fail(
+          new (message.kind === 'RangeError' ? RangeError : message.kind === 'TypeError' ? TypeError : Error)(
+            message.error,
+          ),
+        );
         return;
       }
       if (typeof message.progress === 'number') {
