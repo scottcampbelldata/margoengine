@@ -26,6 +26,7 @@ export type {
 export { transmission, type TransmissionOptions, type VolumeOptions } from './transmission.js';
 export { nodeMaterial, installNodeMaterial, NodeMaterialInstallation } from './nodes.js';
 export type * from './node-types.js';
+export { StencilBuffer } from './stencil-buffer.js';
 
 export interface ClearcoatTexture extends MaterialExtensionTexture {
   texCoord?: 0 | 1;

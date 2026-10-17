@@ -8,8 +8,8 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 98 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
-| PARTIAL | 36 | Some of it exists, but a common use case is missing. The notes say what. |
+| COVERED | 99 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| PARTIAL | 35 | Some of it exists, but a common use case is missing. The notes say what. |
 | MISSING | 25 | No implementation was found in any package's `src/`. |
 
 Overall: Margo is strong where three.js relies on third-party libraries or examples. That includes cascaded PCSS shadows, clustered lighting, TAA, Gaussian splats, BVH queries, physics, navigation, terrain, water and sky. The day-one basics the first version of this matrix found missing (textures and materials on meshes you build, glTF extensions and compression, an orthographic camera, picking loaded models, image-based lighting outside React, combinable effects, FXAA, a math library) now exist as optional packages. What remains:
@@ -98,7 +98,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | Vertex colors | COVERED | materials geometry `colors` (RGB or RGBA, floats or bytes); gltf-pro `COLOR_0` | Always multiply the base colour (no `vertexColors` switch). Not available on core meshes. |
 | `side` (Front, Back, Double) | COVERED | materials `Material.side`, gltf-pro `PBRMaterial.side` (`packages/materials/src/built-material.ts`, `packages/gltf-pro/src/index.ts`, `side-shader.ts`; `scripts/material-back-side-gpu-check.js`) | Live front/back/double selection, including mirrored nodes, mixed mirrored instances, groups, alpha masks, material shading, auxiliary/capture/transmission paths and GPU/CPU picking. `doubleSided` remains an alias on constructed materials. Core materials retain front/double only. Shadow casting keeps its existing two-sided policy. glTF export bakes back-only winding and normals. |
 | Wireframe | PARTIAL | inspector overlay; geometry `wireframe` drawn with lines | No material flag. |
-| Per-material blending modes, depthTest, depthWrite, polygonOffset, renderOrder, stencil | PARTIAL | materials `blending` (`'normal'`, `'additive'`, `'multiply'`, `'none'`), `depthWrite`, `depthTest`, `createMesh(…, {renderOrder})`; gltf-pro `material.renderState` | Fixed at construction. No custom blend equations, `polygonOffset` or stencil state. Core meshes have none of these. |
+| Per-material blending modes, depthTest, depthWrite, polygonOffset, renderOrder, stencil | COVERED | materials `Material`, `StencilBuffer`, `createMesh(…, {renderOrder})` (`packages/materials/src/built-material.ts`, `stencil-buffer.ts`); gltf-pro `PBRRenderState` (`packages/gltf-pro/src/render-state.ts`; `scripts/material-render-state-gpu-check.js`) | Material presets and native custom WebGPU blend equations; depth test/write, polygon units/slope/clamp, color-write suppression and stencil comparisons/ops/masks/reference. Material controls are fixed at construction; native references stay live. Positive Material offsets recede in reverse-Z and forward-Z views. Optional StencilBuffer supplies a portable scene stencil attachment; stencil does not cross capture/resolve target boundaries. Controls affect beauty; auxiliary replays, picking and shadows keep their existing behavior. Custom state uses sorted beauty/transmission tint fallback. Core material APIs are unchanged. |
 
 ### 6. Textures
 
@@ -281,7 +281,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 
 ## What is missing or partial, and what to do
 
-Recounted from the rows: 37 PARTIAL, 25 MISSING. COVERED rows stay in the matrix above. The three approved core hooks below measure **20,641 bytes gzip**, against a clean 20,282-byte baseline: +359 bytes, with 4,358 usable bytes below the exclusive 25,000-byte ceiling. Reproduce with `npm run measure:size`; build and GPU evidence is recorded in [the verification note](core-parity-hooks-verification.md).
+Recounted from the rows: 35 PARTIAL, 25 MISSING. COVERED rows stay in the matrix above. At the approved core-hook commit (`6a57389`), core + stage measured **20,641 bytes gzip**, against a clean 20,282-byte baseline: +359 bytes, with 4,358 usable bytes below the exclusive 25,000-byte ceiling. `npm run measure:size` prints the current size; build and GPU evidence for those hooks is recorded in [the verification note](core-parity-hooks-verification.md).
 
 The user approved these three hooks as a specific exception to the core freeze. Their larger features stay in optional packages.
 
@@ -298,29 +298,32 @@ Other core changes, including a second directional light, BatchedMesh and anothe
 These are separate package tasks. The three core hooks do not implement this backlog.
 Independent UV1 and geometry groups have since been implemented in materials and exporters, with
 [build, test and GPU evidence](materials-uv-groups-verification.md). The combined attributes row stays PARTIAL
-because arbitrary named vertex attributes remain absent. Dispersion and depth/distance material modes are now implemented, moving their two material rows to COVERED: 97 / 37 / 25.
+because arbitrary named vertex attributes remain absent. Physical maps and dispersion, depth/distance material modes,
+front/back/double-side rendering, and material blend/depth/polygon-offset/stencil controls are implemented in optional
+packages. Their four material rows are COVERED, giving the current totals: 99 / 35 / 25. Wireframe remains outstanding.
+
+Complete actionable PARTIAL rows before starting MISSING rows. Wireframe is next; the table lists the other partial
+work before the missing features. Closed core and v1 limits remain in the following section rather than becoming
+implementation tasks.
 
 | Row | What is missing | What to do |
 | --- | --- | --- |
-| WebGL2 fallback | PARTIAL. Flat core meshes, one light, no textures, no glTF-pro, no pick. | Leave the preview. A GL path per rendering package is its own project, outside this 4 KB. |
+| Wireframe | PARTIAL. Inspector overlay, or `wireframe` drawn with lines. | A materials flag that uses that line path. |
 | ShaderMaterial, RawShaderMaterial | PARTIAL. WGSL per pass and `Material.shader()`, no raw material with its own vertex layout. | Add that material in `@margoengine/shader`. |
 | Node materials / TSL | PARTIAL. Typed WGSL nodes. No statement-level `If`, workgroup memory, or light nodes. | Extend `@margoengine/shader`. Shadows and SSAO reading `positionNode` is part of that package. |
 | Render targets | PARTIAL. Sequential camera captures are possible; one implicit scene. | Add a dedicated multi-view capture helper in `@margoengine/creative` or `@margoengine/environment` if needed. |
+| Multiple viewports / scissor | PARTIAL. Per-core-draw rectangles are implemented. | Add explicit rectangle handling to optional native passes and picking without changing core's draw API. |
 | Multiple render targets | PARTIAL. `DrawOptions.colorAttachments` only. | Add MRT outputs on a `NodeMaterial` in `@margoengine/shader`. |
 | Clipping planes | PARTIAL. Six capped planes on core meshes. Node discard does not cap and does not clip shadows. | Teach `@margoengine/machinery` `SectionPlanes` to clip glTF-pro primitives and cap the cut. |
-| ArrayCamera | PARTIAL. Stereo exists inside XR only. | Leave it there. A general array camera can build on the sequential camera option, but is not implemented. |
 | Custom attributes, second UV, groups | PARTIAL. Independent UV1, material groups, tangents and color are implemented in materials; arbitrary named attributes remain absent. | Use `uvs1`, `setUVTransform({texCoord: 1}, slot)` and `createMesh`/`createInstancedMesh` with material arrays. Named attributes remain a future glTF-pro vertex-layout option. |
 | MeshToonMaterial | PARTIAL. One toon look for every core mesh. | A per-material toon in `@margoengine/toon` or `@margoengine/materials`, including glTF-pro meshes. |
 | ShadowMaterial | PARTIAL. `ContactShadows` is a ground-plane contact shadow. | A materials mode, or `@margoengine/shadows`, that samples the directional cascades. |
-| `side` | PARTIAL. Double-sided exists. Back-side-only does not. | Add back-side-only on `Material` and glTF materials. |
-| Wireframe | PARTIAL. Inspector overlay, or `wireframe` drawn with lines. | A materials flag that uses that line path. |
-| Blending, depth, polygonOffset, stencil | PARTIAL. Blend mode, depth test and depth write are fixed at construction. | Add polygonOffset and stencil on materials render state. Core meshes stay without them. |
 | CubeTexture | PARTIAL. Environment and skybox only. | Let a `Material` sample that cube in `@margoengine/materials`. |
 | DataTexture, 3D and array textures | PARTIAL. 2D RGBA8 only. | Add float, single-channel, 3D and array formats on `Texture`. |
 | CompressedTexture, KTX2Loader | PARTIAL. glTF `KHR_texture_basisu` works. A standalone `.ktx2` cannot go on a material. Cubes, arrays and UASTC HDR are rejected. | Accept a decoders `GPUTexture` on `Texture`. Keep rejecting cubes, arrays and HDR until that API exists. |
 | DepthTexture | PARTIAL. Borrowed from SSAO, Bloom or DOF. | A small helper in `@margoengine/post` that owns the depth target when no effect does. |
+| AmbientLight | PARTIAL. Core diffuse ambient has RGB multipliers; optional material shaders keep independent lighting models. | Extend optional environment lighting hooks for configurable ambient fill on those models. Core's existing ambient API stays unchanged. |
 | HemisphereLight | PARTIAL. A fixed gradient inside glTF-pro. | A configurable sky/ground gradient belongs in `@margoengine/environment` through its lighting hooks; core's new RGB is flat. |
-| DirectionalLight | PARTIAL. One per engine. | Keep one. Point, spot and area lights are `@margoengine/clustered`. A second directional does not fit in the 4 KB. |
 | Color management | PARTIAL. sRGB in and out. `ColorOutput` covers a P3 or HDR canvas. | P3 input colors are a `@margoengine/environment` change. Leave core's working space linear sRGB. |
 | glTF extensions | PARTIAL. `KHR_animation_pointer` is rejected when required. Export writes no cameras or lights. | Pointer in `@margoengine/animation`. Cameras and lights in `@margoengine/exporters`. |
 | OBJLoader, MTLLoader | PARTIAL geometry, MISSING materials. `vt`, `usemtl` and `mtllib` are skipped. | Parse those in `@margoengine/loaders` and build a `Material`. |
@@ -331,9 +334,10 @@ because arbitrary named vertex attributes remain absent. Dispersion and depth/di
 | KeyframeTrack, PropertyBinding | PARTIAL. Clips come from glTF. `sampleTrack` exists. | An authoring helper in `@margoengine/animation` for node TRS and weights. |
 | IK | PARTIAL. Two-bone and foot IK. | CCD chains in `@margoengine/animator` when a rig needs more than two bones. |
 | SSRPass | PARTIAL. Core and models passed to `ssr.add`. Water and terrain do not reflect. | Give water and terrain the same capture hook `ssr.add` already uses. |
-| Screen effects, SMAA | PARTIAL. FXAA exists. Vignette and the rest are a `NodePass`. SMAA is absent. | Ship the common looks as `NodePass` presets in `@margoengine/shader`. Add SMAA in `@margoengine/post` when a shot needs it. |
+| Screen effects | PARTIAL. Vignette and the other common looks can be built with `NodePass`; no presets are built in. | Ship those looks as `NodePass` presets in `@margoengine/shader`. |
 | WebXR VR | PARTIAL. Core meshes, WebGPU, no headset test. | Draw glTF-pro in `@margoengine/xr`, then test on a headset before adding effects. |
 | WebXR AR | PARTIAL. Session mode only. | Hit testing in `@margoengine/xr` after that headset test. |
+| SMAA (within the covered FXAA/SMAA row) | Not provided; that row is covered by FXAA. | Defer SMAA in `@margoengine/post` until actionable partials are complete. |
 | SVGLoader | MISSING. | A loader that feeds `Shape` and `extrudeGeometry`. |
 | TextGeometry, FontLoader, TTFLoader | MISSING. | Use `@margoengine/text`. Add font-to-`Shape` in `@margoengine/geometry` only for an extruded logo. |
 | RoundedBoxGeometry | MISSING, grouped with the other extra geometries. | Add it in `@margoengine/geometry` when a mesh needs it. |
@@ -352,10 +356,12 @@ These rows stay MISSING or PARTIAL. The action is the sentence a caller can rely
 
 | Row | What is missing | What to do |
 | --- | --- | --- |
+| WebGL2 fallback | PARTIAL. Flat core meshes, one light, no textures, no glTF-pro, no pick. | Leave the preview; expanding WebGL rendering packages is a closed v1 decision. |
 | Scene object, multiple scenes | PARTIAL. One engine, one canvas. | A second scene is a second `Engine`. |
 | Layers | PARTIAL. Raycasts only, via bvh. | Render layers are outside the three-hook exception. Raycasts remain the layer API. |
+| ArrayCamera | PARTIAL. Stereo exists inside XR only. | Leave it there. A general array camera can build on the sequential camera option, but is not implemented. |
+| DirectionalLight | PARTIAL. One per engine. | Keep one. Point, spot and area lights are `@margoengine/clustered`; a second core directional light is outside the approved exception. |
 | CubeCamera | MISSING. | Its camera prerequisite is available; a dynamic environment capture helper still belongs in `@margoengine/environment`. |
-| Multiple viewports / scissor | PARTIAL. Per-core-draw rectangles are implemented. | Optional native passes and picking need their own handling before claiming general viewport parity. |
 | StereoCamera, AnaglyphEffect, ParallaxBarrierEffect | MISSING. | Use `@margoengine/xr` for stereo. Do not add anaglyph. |
 | MeshLambertMaterial, MeshPhongMaterial | MISSING. | FBX import converts both to PBR. Do not add the old shaders. |
 | ConvexGeometry, DecalGeometry, ParametricGeometry | MISSING. Screen-space decals and physics hulls exist. | Do not add mesh decals, a public convex mesh, or parametric surfaces until a file needs one. |

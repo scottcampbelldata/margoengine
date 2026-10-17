@@ -1,14 +1,30 @@
 # Margo Engine handoff
 
-Last updated 2026-10-13. Read this first when starting a new session. Update it whenever work lands.
+Last updated 2026-10-17. Read this first when starting a new session. Update it whenever work lands.
+
+Current parity work (2026-10-17): dispersion, depth/distance materials and back-side-only rendering are on main
+(`aa2150c`, `e8befe7`, `95b4eae`). Polygon offset, stencil and color-write controls are implemented and verified in
+optional materials/gltf-pro; no core or stage feature is added. The matrix now counts 99 covered / 35 partial /
+25 missing of 159 rows. Core + stage measures 20,935 bytes gzip after upstream kernel maintenance, below the strict 25,000-byte ceiling in AGENTS.md.
+Nine stale current-proof references were reconciled against clean upstream `b3ed8ac`; all 15 current proofs and all
+nine affected historical proofs pass. The exact comparisons remain in place; evidence and intentional prior changes
+are recorded in `docs/whitepaper/claims.md`. Earlier dated measurements below remain historical.
+
+Current launch-gate verification: `npm run check:merge` passes, including the site build and all 55 NVIDIA/Ampere
+visual comparisons. A fresh full Node suite after the final harness guards passes 2,466 tests; the material render-state
+fixture passes 648 real-GPU checks at actual 1x/4x MSAA. All seven additional package/interop checks pass, including
+strict consumers of all 74 packaged modules. Touched materials/gltf-pro hygiene gates have no new violations.
+The Windows desktop power probe records actual AC power, and hardware-specific visual profiles preserve the original
+Intel references. The NVIDIA reference uses clean `b3ed8ac` rendered sources with four captures per view; its source
+and adapter audit is retained beside the profile. Finish actionable PARTIAL rows before MISSING rows; wireframe is next.
 
 ## Goal
 
 Sell Margo as a modern replacement for three.js: looks good, runs smooth on PCs and phones, small, and
 modular (load only the packages you use). Rules that follow from that:
 
-- Core + stage (`@margoengine/core`, `margoengine`) stay feature-frozen and under 20,000 gzip bytes (CI gate).
-  Scott wants core firmly under 20k; optional packages may grow moderately ("not massive").
+- Core + stage (`@margoengine/core`, `margoengine`) stay feature-frozen and strictly below 25,000 gzip bytes (CI gate).
+  Scott approved the three core hooks under that ceiling; optional packages may grow moderately ("not massive").
 - New capability goes in separate, optional, tree-shakable packages.
 - Every optimization needs a saved proof (same output, measurably faster) and its byte cost recorded.
 
@@ -2500,7 +2516,7 @@ particles, post, `app.environment()`, `app.shadows()`), so a spinning model cost
 
 ## Feature gaps versus three.js (after optimization; each as an optional package)
 
-Verified matrix: `docs/threejs-parity.md`, recounted 2026-10-15 (after light probes and decals, 5l.e/5l.h): 159 rows, 95 covered / 38 partial / 26 missing.
+Verified matrix: `docs/threejs-parity.md`, recounted 2026-10-17 after the approved core hooks and optional material parity work: 159 rows, 99 covered / 35 partial / 25 missing.
 Earlier: re-tallied 2026-10-14 against 2c53227 (156 three.js features: 85 covered,
 39 partial, 32 missing after textured instancing (InstancedMesh PARTIAL -> COVERED) and glTF export (GLTFExporter PARTIAL -> COVERED); ShadowMaterial became partial with staging's ContactShadows; was 65 / 43 / 45 in its stale summary; read from source, not run). The first audit's top gaps
 (materials, glTF extensions/decoders, picking models, IBL, background colour, post stack, ortho camera, math, FXAA) are

@@ -67,6 +67,13 @@ import {
 } from './texture-coordinates.js';
 import { deviceRenderer, type PBRDeviceRenderer, type PBRDeformationRenderer } from './replica.js';
 import { backSideShader } from './side-shader.js';
+import {
+  validateRenderState,
+  renderStateKey,
+  pipelineDepthState,
+  applyStencilReference,
+  asymmetricStencilFaces,
+} from './render-state.js';
 export type { PBRDeviceRenderer, PBRDeformationRenderer } from './replica.js';
 // Type only: PBRInstances and the EXT_mesh_gpu_instancing reader load with @margoengine/gltf-pro/instancing.
 import type { PBRInstances } from './instancing.js';
@@ -255,6 +262,21 @@ export interface PBRRenderState {
   blend?: GPUBlendState | null;
   depthWrite?: boolean;
   depthCompare?: GPUCompareFunction;
+  /** Native WebGPU polygon bias, applied before the reverse-Z depth test. Ignored for points and lines. */
+  depthBias?: number;
+  depthBiasSlopeScale?: number;
+  depthBiasClamp?: number;
+  /** Native preserves literal WebGPU bias. Away makes positive bias recede in reverse-Z and forward-Z device views. */
+  depthBiasMode?: 'native' | 'away';
+  /** Native raster front/back faces, including reflected winding, as defined by WebGPU. */
+  stencilFront?: GPUStencilFaceState;
+  stencilBack?: GPUStencilFaceState;
+  stencilReadMask?: number;
+  stencilWriteMask?: number;
+  /** Live per-draw reference; changing only this value preserves the pipeline. */
+  stencilReference?: number;
+  /** False disables color writes while depth and stencil still run. */
+  colorWrite?: boolean;
 }
 export function validatePreparedGeometry(data: PreparedGeometry): void {
   const { vertices, indices } = data,
@@ -1481,29 +1503,33 @@ export class PBRModel implements EnginePlugin {
   /** Borrowed current draw buffers; picking never substitutes bind-pose geometry. */
   get pickingPrimitives() {
     if (this.disposed) return [];
-    return this.resources.filter((r) => !r.batch).map((r) => ({
-      primitive: r.primitive,
-      node: r.primitive.node,
-      vertex: r.primitive.deformed ?? r.vertex,
-      index: r.index,
-      count: r.primitive.indices.length,
-      stride: 80 as const,
-      alphaTexture: r.views[0],
-      alphaSampler: r.samplers[0],
-      alpha: r.primitive.material.base[3],
-      cutoff:
-        r.primitive.material.settings[0] === 1
-          ? r.primitive.material.settings[1]
-          : r.primitive.material.settings[0] === 2
-            ? 0.001
-            : 0,
-      side: sideOf(r.primitive.material),
-      doubleSided: sideOf(r.primitive.material) === 'double',
-      texCoord: (r.primitive.material.maps[0] ? textureCoordinates(r.primitive.material.maps[0]).texCoord : 0) as 0 | 1,
-      ...(r.primitive.material.maps[0]?.extensions?.KHR_texture_transform
-        ? { alphaTransform: textureCoordinates(r.primitive.material.maps[0]).transform }
-        : {}),
-    }));
+    return this.resources
+      .filter((r) => !r.batch)
+      .map((r) => ({
+        primitive: r.primitive,
+        node: r.primitive.node,
+        vertex: r.primitive.deformed ?? r.vertex,
+        index: r.index,
+        count: r.primitive.indices.length,
+        stride: 80 as const,
+        alphaTexture: r.views[0],
+        alphaSampler: r.samplers[0],
+        alpha: r.primitive.material.base[3],
+        cutoff:
+          r.primitive.material.settings[0] === 1
+            ? r.primitive.material.settings[1]
+            : r.primitive.material.settings[0] === 2
+              ? 0.001
+              : 0,
+        side: sideOf(r.primitive.material),
+        doubleSided: sideOf(r.primitive.material) === 'double',
+        texCoord: (r.primitive.material.maps[0] ? textureCoordinates(r.primitive.material.maps[0]).texCoord : 0) as
+          | 0
+          | 1,
+        ...(r.primitive.material.maps[0]?.extensions?.KHR_texture_transform
+          ? { alphaTransform: textureCoordinates(r.primitive.material.maps[0]).transform }
+          : {}),
+      }));
   }
   /** Explicit CPU-query snapshot. Only deformed geometry incurs GPU readback. */
   async readPickingGeometry(): Promise<readonly PBRPickingGeometry[]> {
@@ -1511,17 +1537,19 @@ export class PBRModel implements EnginePlugin {
       revision = this.gpuRevision;
     if (this.disposed || this.engine.disposed || !device) return [];
     this.engine.store.tick(false);
-    const records = this.resources.filter((resource) => !resource.batch).map((resource) => ({
-      resource,
-      primitive: resource.primitive,
-      deformed: resource.primitive.deformed,
-      matrix: resource.primitive.node.matrix.slice(),
-      vertices: resource.primitive.deformed ? undefined : resource.primitive.vertices.slice(),
-      indices: resource.primitive.indices.slice(),
-      side: sideOf(resource.primitive.material),
-      doubleSided: sideOf(resource.primitive.material) === 'double',
-      read: undefined as GPUBuffer | undefined,
-    }));
+    const records = this.resources
+      .filter((resource) => !resource.batch)
+      .map((resource) => ({
+        resource,
+        primitive: resource.primitive,
+        deformed: resource.primitive.deformed,
+        matrix: resource.primitive.node.matrix.slice(),
+        vertices: resource.primitive.deformed ? undefined : resource.primitive.vertices.slice(),
+        indices: resource.primitive.indices.slice(),
+        side: sideOf(resource.primitive.material),
+        doubleSided: sideOf(resource.primitive.material) === 'double',
+        read: undefined as GPUBuffer | undefined,
+      }));
     try {
       if (this.prepareDeformation || records.some((record) => record.deformed)) {
         const encoder = device.createCommandEncoder();
@@ -1670,7 +1698,11 @@ export class PBRModel implements EnginePlugin {
       liveBatches.clear();
       const batchLive = (batch: StaticBatch) => {
         let value = liveBatches.get(batch);
-        if (value === undefined) liveBatches.set(batch, (value = this.pose(batch)));
+        if (value === undefined)
+          liveBatches.set(
+            batch,
+            (value = (mode !== 'beauty' || !asymmetricStencilFaces(batch.material.renderState)) && this.pose(batch)),
+          );
         return value;
       };
       for (let resourceIndex = 0; resourceIndex < resources.length; resourceIndex++) {
@@ -1860,6 +1892,7 @@ export class PBRModel implements EnginePlugin {
         const face = +(!p.topology && !!inst?.mirrored && flag !== 1),
           cull: GPUCullMode = flag !== 1 && !face ? (v[97] > 0 === (side === 'front') ? 'back' : 'front') : 'none';
         const state: PBRRenderState | undefined = mode === 'beauty' ? m.renderState : undefined;
+        if (state) validateRenderState(state, c.descriptor.depthStencil!.format);
         // Shader text enters the key as a small id: the code strings are cached objects, so the lookup hashes them once.
         // Discard only where it can happen: back faces are culled by the pipeline and only MASK materials alpha-test.
         const mask = +(m.settings[0] === 1);
@@ -1871,8 +1904,7 @@ export class PBRModel implements EnginePlugin {
         const transmit = !compact && !!m.tint,
           blend = m.settings[0] === 2 || transmit,
           tinted = transmit && (mode === 'beauty' || mode === 'ambient') && state?.blend === undefined,
-          stateKey =
-            (state ? JSON.stringify(state) : '') + (external?.depthCompare ?? '') + (extension ? ':extension' : ''),
+          stateKey = renderStateKey(state) + (external?.depthCompare ?? '') + (extension ? ':extension' : ''),
           samples = c.descriptor.multisample?.count,
           depthFormat = c.descriptor.depthStencil!.format;
         const states = r.pipelineHistories?.get(mode);
@@ -1974,6 +2006,7 @@ export class PBRModel implements EnginePlugin {
                     : [
                         {
                           format,
+                          ...(state?.colorWrite === false ? { writeMask: 0 } : {}),
                           blend:
                             state?.blend !== undefined
                               ? (state.blend ?? undefined)
@@ -1991,6 +2024,11 @@ export class PBRModel implements EnginePlugin {
             multisample: c.descriptor.multisample,
             primitive: p.topology ? { topology: p.topology } : { topology: 'triangle-list', cullMode: cull },
             depthStencil: {
+              ...pipelineDepthState(
+                state,
+                !p.topology,
+                external?.depthCompare === 'less' || external?.depthCompare === 'less-equal',
+              ),
               format: c.descriptor.depthStencil!.format,
               depthWriteEnabled: state?.depthWrite ?? ((mode === 'beauty' || capture) && !blend),
               depthCompare:
@@ -2007,6 +2045,12 @@ export class PBRModel implements EnginePlugin {
               key + ':tint',
               c.device.createRenderPipeline({
                 ...descriptor,
+                // The tint only reads depth and stencil; the lit draw performs each requested write once.
+                depthStencil: {
+                  ...descriptor.depthStencil!,
+                  depthWriteEnabled: false,
+                  ...(state && depthFormat.includes('stencil') ? { stencilWriteMask: 0 } : {}),
+                },
                 fragment: {
                   module,
                   entryPoint: 'margoTint',
@@ -2015,6 +2059,7 @@ export class PBRModel implements EnginePlugin {
                   targets: [
                     {
                       format,
+                      ...(state?.colorWrite === false ? { writeMask: 0 } : {}),
                       blend: {
                         color: { srcFactor: 'zero', dstFactor: 'src' },
                         alpha: { srcFactor: 'zero', dstFactor: 'one' },
@@ -2078,8 +2123,7 @@ export class PBRModel implements EnginePlugin {
           if (!data || data.length !== source.length) r.volumeData = data = new Float32Array(source.length);
           // Compare rounded values. A JS number such as 0.1 is not bit-identical to its float32 store.
           let changed = r.volumeWritten !== r.volume;
-          if (!changed)
-            for (let i = 0; i < source.length; i++) if (data[i] !== Math.fround(source[i])) changed = true;
+          if (!changed) for (let i = 0; i < source.length; i++) if (data[i] !== Math.fround(source[i])) changed = true;
           if (changed) {
             data.set(source);
             c.device.queue.writeBuffer(r.volume!, 0, data);
@@ -2174,6 +2218,7 @@ export class PBRModel implements EnginePlugin {
           target.setVertexBuffer(0, p.deformed ?? r.vertex);
           if (instances) target.setVertexBuffer(1, instances);
           target.setIndexBuffer(r.index, 'uint32');
+          applyStencilReference(target, state);
           if (inst) target.drawIndexed(p.indices.length, inst.count);
           else target.drawIndexed(p.indices.length);
         }
@@ -2185,6 +2230,8 @@ export class PBRModel implements EnginePlugin {
         target.setVertexBuffer(0, p.deformed ?? r.vertex);
         if (instances) target.setVertexBuffer(1, instances);
         target.setIndexBuffer(r.index, 'uint32');
+        // A preceding material may have changed the reference on this shared pass.
+        applyStencilReference(target, state);
         if (inst) target.drawIndexed(p.indices.length, inst.count);
         else target.drawIndexed(p.indices.length);
         if (!external && blend && mode !== 'gbuffer' && !through && !capture) {
