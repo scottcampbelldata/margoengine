@@ -73,7 +73,10 @@ export class NightCitadel {
   readonly particles: VFX;
   readonly atmosphere: Sky;
   readonly camera;
-  readonly device;
+  /** The engine's current device: warmUp reboots it when a stopped warm frame left a feature half set up. */
+  get device(): GPUDevice {
+    return engineRuntime(this.engine).gpu!;
+  }
   private readonly events = new AbortController();
   private readonly horizon: [number, number, number] = [0, 0, 0];
   private readonly baseHorizon = new PbrMaterial({ color: '#11162b' }).data;
@@ -86,7 +89,6 @@ export class NightCitadel {
     const runtime = engineRuntime(engine);
     this.camera = engine.camera;
     this.camera.position = this.eye;
-    this.device = runtime.gpu!;
     this.post = Bloom.attach(engine, { strength: 0.25, threshold: 1, exposure: 0.3 });
     const zenith = new PbrMaterial({ color: '#020512' }).data,
       lunar = new PbrMaterial({ color: '#e2eeff' }).data;
@@ -233,12 +235,14 @@ export class NightCitadel {
     element('reset').addEventListener('click', this.reset, options);
     document.addEventListener('visibilitychange', this.visibility, options);
     window.addEventListener('pagehide', this.dispose, options);
-    this.device.addEventListener(
-      'uncapturederror',
-      (event) => this.fail((event as GPUUncapturedErrorEvent).error),
-      options,
-    );
+    this.watchDevice();
     engine.onError = (error) => this.fail(error instanceof Error ? error : new Error(String(error)));
+  }
+  /** Reports the current device's uncaptured errors; called again after warmUp replaced the device. */
+  watchDevice(): void {
+    this.device.addEventListener('uncapturederror', (event) => this.fail((event as GPUUncapturedErrorEvent).error), {
+      signal: this.events.signal,
+    });
   }
   private readonly updateSky = (): void => {
     moonDirection(this.moon, controls[0].valueAsNumber, controls[1].valueAsNumber);
@@ -514,6 +518,8 @@ async function boot(): Promise<void> {
     // Compile every pipeline before the first visible frame (asynchronously, so the page stays responsive; the first
     // frame used to compile about ten shaders in one blocking call), and keep the status up until that frame rendered.
     citadel.warm = await warmUp(engine);
+    // A rebooted device has none of the first one's listeners, and the first frame must watch the new queue.
+    if (citadel.warm.rebooted) citadel.watchDevice();
     citadel.start();
     await citadel.ready;
     watchQuality();
