@@ -18,8 +18,9 @@ import { viewMatrix } from '../../shared/view.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { sectionState, sectionShader } from '../../shared/section.js';
 import { cascadeSplits, fitCascades } from './cascades.js';
-import { shadowSampling, shadowDepth } from './shader.js';
+import { shadowSampling, shadowDepth, type ShadowFilter } from './shader.js';
 export { cascadeSplits, fitCascades } from './cascades.js';
+export type { ShadowFilter } from './shader.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
@@ -38,6 +39,18 @@ export interface ShadowOptions {
   casterMargin?: number;
   /** Fixed world-space caster and receiver bounds, rendered in one camera-independent map. */
   bounds?: { min: Vec3; max: Vec3; points?: readonly Vec3[] };
+  /**
+   * Edge filter (default `'soft'`). `'soft'` is PCSS: penumbrae widen with blocker distance and `lightSize`, 16
+   * blocker reads and 32 comparison taps per lit pixel. `'pcf'` takes four hardware comparison taps (an edge about
+   * three texels wide, `lightSize` unused): the light and phone quality tiers use it. `'hard'` takes one. Read when
+   * receiver shaders are built.
+   */
+  filter?: ShadowFilter;
+  /**
+   * Cascades, 1 to 4 (default 4). Fewer cascades render fewer depth passes per frame and cover `distance` with coarser
+   * texels; the phone quality tier uses 2. Ignored with `bounds` (always one map). Fixed at construction.
+   */
+  cascades?: number;
 }
 export interface ShadowContext {
   context: Context;
@@ -116,7 +129,7 @@ export class Shadows implements EnginePlugin {
     owners: Map<Mesh, Map<object, boolean>>;
     submitted: Map<Mesh, Set<object>>;
   }[] = [];
-  private readonly cascadeCount: 1 | 4;
+  private readonly cascadeCount: number;
   private readonly fitCamera = {
     position: [0, 0, 0],
     target: [0, 0, 0],
@@ -124,7 +137,7 @@ export class Shadows implements EnginePlugin {
     near: 0.1,
     far: 500,
   } as unknown as Camera;
-  private readonly hooks = new Map<number, { declarations: string; direct(direct: string): string }>();
+  private readonly hooks = new Map<string, { declarations: string; direct(direct: string): string }>();
   private readonly lightingOwners = new Map<ShadowSource, { remove: () => void; count: number }>();
   private readonly values = new Float32Array(92);
   private readonly ranges = this.values.subarray(84, 88);
@@ -145,7 +158,7 @@ export class Shadows implements EnginePlugin {
   private readonly shadowContexts = this.cascadeMatrices.map(
     (matrix, cascade) => ({ context: undefined!, pass: undefined!, matrix, cascade }) as ShadowContext,
   );
-  private readonly shaders = new Map<number, Map<string, string>>();
+  private readonly shaders = new Map<string, Map<string, string>>();
   private readonly depthAttachment: GPURenderPassDepthStencilAttachment = {
     view: undefined!,
     depthClearValue: 1,
@@ -161,7 +174,7 @@ export class Shadows implements EnginePlugin {
   private readonly copySize = { width: 0, height: 0, depthOrArrayLayers: 4 };
   constructor(readonly options: ShadowOptions = {}) {
     this.options = preset('shadows', options);
-    this.cascadeCount = this.options.bounds ? 1 : 4;
+    this.cascadeCount = this.options.bounds ? 1 : (this.options.cascades ?? 4);
     this.copySize.depthOrArrayLayers = this.cascadeCount;
     this.validate();
   }
@@ -210,8 +223,16 @@ export class Shadows implements EnginePlugin {
     }
     if (!validPoints)
       throw new RangeError('Invalid shadow bounds points: at least four finite Vec3 points inside min/max required');
-    if ((o.bounds ? 1 : 4) !== this.cascadeCount)
-      throw new RangeError('Shadow bounds mode cannot change after construction');
+    const cascades = o.cascades ?? 4;
+    if (!Number.isInteger(cascades) || cascades < 1 || cascades > 4)
+      throw new RangeError('Invalid shadow cascades: use an integer from 1 to 4');
+    if ((o.bounds ? 1 : cascades) !== this.cascadeCount)
+      throw new RangeError(
+        'Shadow bounds mode and cascade count cannot change after construction; create a new Shadows instead',
+      );
+    const filter = o.filter ?? 'soft';
+    if (filter !== 'soft' && filter !== 'pcf' && filter !== 'hard')
+      throw new RangeError(`Invalid shadow filter '${String(filter)}': use 'soft', 'pcf' or 'hard'`);
     if (
       !Number.isInteger(o.resolution ?? 2048) ||
       (o.resolution ?? 2048) < 16 ||
@@ -288,26 +309,30 @@ export class Shadows implements EnginePlugin {
     return this.entries;
   }
   shader(source: string, group = 0): string {
-    let cache = this.shaders.get(group);
+    const filter = this.options.filter ?? 'soft',
+      key = filter + group;
+    let cache = this.shaders.get(key);
     const cached = cache?.get(source);
     if (cached) return cached;
     let code = source.replace('let linear=direct*', 'let linear=shadowLit(direct,i.position,i.normal)*');
     if (code === source) code = source.replace('direct+ambient(s)', 'shadowLit(direct,i.position,s.n)+ambient(s)');
     if (code === source) throw new Error('Shadows require the standard PBR lighting shader');
-    const output = shadowSampling(group) + code;
+    const output = shadowSampling(group, filter) + code;
     if (!cache) {
       cache = new Map();
-      this.shaders.set(group, cache);
+      this.shaders.set(key, cache);
     }
     cache.set(source, output);
     return output;
   }
   pbr(group: number): { declarations: string; direct(direct: string): string } {
-    let hooks = this.hooks.get(group);
+    const filter = this.options.filter ?? 'soft',
+      key = filter + group;
+    let hooks = this.hooks.get(key);
     if (!hooks)
       this.hooks.set(
-        group,
-        (hooks = { declarations: shadowSampling(group), direct: (d) => `shadowLit(${d},i.position,s.n)` }),
+        key,
+        (hooks = { declarations: shadowSampling(group, filter), direct: (d) => `shadowLit(${d},i.position,s.n)` }),
       );
     return hooks;
   }
@@ -459,7 +484,8 @@ export class Shadows implements EnginePlugin {
       this.splits.fill(c.camera.far);
     } else {
       const camera = this.range(c.camera);
-      cascadeSplits(camera.near, camera.far, this.options.lambda ?? 0.5, this.splits);
+      // Splits past the last cascade repeat the far distance, so receivers never select an unrendered layer.
+      cascadeSplits(camera.near, camera.far, this.options.lambda ?? 0.5, this.splits, this.cascadeCount);
       fitCascades(
         camera,
         c.width / c.height,
@@ -470,6 +496,7 @@ export class Shadows implements EnginePlugin {
         this.ranges,
         this.options.casterMargin ?? 100,
         this.fitted,
+        this.cascadeCount,
       );
     }
     for (let i = 0; i < 64; i++) if (this.matrices[i] !== this.previous[i]) this.dirty = true;

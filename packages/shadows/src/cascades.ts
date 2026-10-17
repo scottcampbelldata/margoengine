@@ -1,7 +1,18 @@
 import type { Camera, Vec3 } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
 
-export function cascadeSplits(near: number, far: number, lambda = 0.5, out = new Float32Array(4)): Float32Array {
+/**
+ * Far distance of each cascade, blending logarithmic (`lambda` 1) and uniform (`lambda` 0) splits of [near, far].
+ * With `count` below 4 the first `count` entries split the range and the rest repeat `far`, so a shader that selects
+ * a cascade by comparing view depth against the splits never picks an unused one.
+ */
+export function cascadeSplits(
+  near: number,
+  far: number,
+  lambda = 0.5,
+  out = new Float32Array(4),
+  count = 4,
+): Float32Array {
   if (
     !Number.isFinite(near) ||
     !Number.isFinite(far) ||
@@ -10,15 +21,23 @@ export function cascadeSplits(near: number, far: number, lambda = 0.5, out = new
     far <= near ||
     lambda < 0 ||
     lambda > 1 ||
-    out.length !== 4
+    out.length !== 4 ||
+    !Number.isInteger(count) ||
+    count < 1 ||
+    count > 4
   )
     throw new RangeError('Invalid cascade splits');
   for (let i = 0; i < 4; i++) {
-    const t = (i + 1) / 4;
+    const t = Math.min(1, (i + 1) / count);
     out[i] = lambda * near * (far / near) ** t + (1 - lambda) * (near + (far - near) * t);
   }
   return out;
 }
+/**
+ * Fits one light-space orthographic matrix per cascade (16 floats each in `matrices`) around a bounding sphere of
+ * the camera slice between consecutive `splits`, snapped to whole texels. `ranges` receives each cascade's depth
+ * extent. Only the first `count` cascades are fitted; the rest of `matrices` and `ranges` is zeroed.
+ */
 export function fitCascades(
   camera: Camera,
   aspect: number,
@@ -29,6 +48,7 @@ export function fitCascades(
   ranges = new Float32Array(4),
   margin = 100,
   result?: { matrices: Float32Array; ranges: Float32Array },
+  count = 4,
 ): { matrices: Float32Array; ranges: Float32Array } {
   finiteVector(direction, 3, 'Shadow direction');
   if (
@@ -40,7 +60,10 @@ export function fitCascades(
     matrices.length !== 64 ||
     ranges.length !== 4 ||
     !Number.isFinite(margin) ||
-    margin < 0
+    margin < 0 ||
+    !Number.isInteger(count) ||
+    count < 1 ||
+    count > 4
   )
     throw new RangeError('Invalid cascade fit');
   const length = Math.hypot(direction[0], direction[1], direction[2]);
@@ -66,7 +89,9 @@ export function fitCascades(
   if (!fl) throw new RangeError('Invalid shadow camera');
   const tan = Math.tan((camera.fov * Math.PI) / 360);
   let start = camera.near;
-  for (let i = 0; i < 4; i++) {
+  matrices.fill(0, count * 16);
+  ranges.fill(0, count);
+  for (let i = 0; i < count; i++) {
     const end = splits[i];
     if (!Number.isFinite(end) || end <= start) throw new RangeError('Unordered cascade splits');
     const mid = (start + end) / 2,
