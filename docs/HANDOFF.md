@@ -2239,6 +2239,33 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    timeout (high/light views; phone took 53 s) while three agents built and tested in parallel; alone it loads in 4-7 s
    and passes (twice). No page errors logged. Before launch: reproduce under a bounded load (half the cores) and find
    what the load event waits on (preview server starved vs the app's own init); a visitor's busy laptop must not hang.
+   [DONE 2026-10-16 for the visual suite; three causes, none fixed by widening a tolerance]
+   (a) Night Citadel stall = the harness, not the app. The load event covers only the HTML, one JS and one CSS file;
+   the app asks for the GPU adapter after it (timeline under load: load 0.2-1.1 s, adapter +0.5 s, device +15 ms,
+   scene built +0.1 s, first GPU frame done +1.3 s), so its init cannot hold `load`. What held it: visual-regression.js
+   ran the Khronos Vite dev server in the same Node process as the `vite preview` server, and the dev server's file
+   watcher crawls its root on start. Measured with a probe (dev server + preview in one process, fetching the citadel
+   JS every 5 s): the event loop blocked up to 33 s with the worktree as root, and the fetch took 142 s with the main
+   checkout as root (it also crawls every agent worktree under `.claude/`); Night Citadel is the first view, so it
+   took the hit. Fix: `server.watch: null` (HMR was already off); the same probe then fetches in 16-734 ms, as
+   with no dev server at all (16-727 ms; other agents were busy). Not reproduced in the app: 10 fresh-browser launches under the bounded load, and 6
+   more while a pinned `npm run verify` ran, were all ready in 2.3-3.7 s. Other scripts start watching dev servers
+   the same way (`scripts/browser.js` for ~31 GPU tests, some benchmarks): spun off as its own task.
+   (b) Sandbox load flake = VFX respawn seeds: `hash(atomicAdd(respawn.sequence) + slot)` handed out tickets in
+   whatever order the GPU ran the threads, so every capture scattered the particles (and their bloom) differently,
+   more so under load (phone changed 0.072 vs limit 0.047). Seeds are now slot + simulated frame number
+   (`control.z`); the respawn buffer is 4 bytes. Paused views render at delta 0 only, so nothing else depended on
+   time. visual:update (4 runs each): every sandbox and citadel view is bit-identical run to run (noise was changed
+   0.0133-0.0518 sandbox, 0.000026-0.00376 citadel), so their tolerances fell to the bit-exact allowance (sandbox
+   phone 0.047 -> 0.0005); all 55 views now have zero noise. vfx `traces.json` re-recorded for the new WGSL.
+   (c) Under load a screenshot can catch the browser mid-raster: a band of CSS gradient / backdrop blur 1-4 levels off
+   that is gone half a second later (probe: 3 of 48 phone screenshots, 1.5 s apart in pairs; each time the other shot of the pair matched the
+   reference). capture()
+   now shoots until two consecutive screenshots are byte-identical (500 ms apart, at most 7), like Playwright's
+   toHaveScreenshot. Left within the allowance: a few DOM edge pixels of the sandbox's control panel (changed
+   <= 0.0000521, max 8).
+   Proof, load = `node load.mjs 4` (4 busy JS worker threads = half the 8 logical cores, started before and stopped
+   after each run, 60 s rest between; other agents were also running): RESULTS_PLACEHOLDER
 10. **claims.md:** 0 OVERCLAIM and 0 UNPROVEN rows for anything on public pages.
    Status 2026-10-15 (proofs): every row resting on a proof now cites the proof and its pinned commits (claims.md
    "Proofs": one table of all 46 with baseline -> pin and the --current ref). H-04 (STALE) became PROVEN: `npm run

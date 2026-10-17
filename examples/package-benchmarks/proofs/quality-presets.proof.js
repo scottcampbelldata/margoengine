@@ -53,6 +53,18 @@ const cases = {
   vfx: ['vfx', 'src/index.ts', (m, o) => [new m.VFX(o)], { rate: 1000, initialCount: 50_000 }, { capacity: 1_000_000 }],
 };
 
+// Gate 9 (2026-10-16) made VFX respawn seeds the slot + simulated frame number instead of an atomic ticket: new WGSL, a
+// 4-byte respawn buffer and the frame number in uniform word 54. Intended, so the vfx calls are compared with that
+// change applied to the older baseline (and word 54 blanked on both sides).
+const vfxSeeds = (calls) =>
+  JSON.parse(
+    JSON.stringify(calls)
+      .replaceAll('struct Respawn {count:atomic<u32>,sequence:atomic<u32>}', 'struct Respawn {count:atomic<u32>}')
+      .replaceAll('hash(atomicAdd(&respawn.sequence,1u)+id.x)', 'hash(id.x+hash(f.control.z))')
+      .replace(/(\["buffer","[^"]+",\{"size":)8(,"usage":136\}\])/g, '$14$2')
+      .replace(/("writeBuffer","[^"]+",0,"[0-9a-f]{432})[0-9a-f]{8}(?=[0-9a-f]{8}")/g, '$100000000'),
+  );
+
 async function story(make, samples, preset) {
   const gpu = mockGPU(),
     store = await TransformStore.create(32),
@@ -114,9 +126,10 @@ for (const [key, [name, entry, make, base, explicit]] of Object.entries(cases)) 
       defaults.length > 30 && !defaults.some((e) => e[0] === 'throw'),
       `${key} story must exercise the GPU without errors`,
     );
+    const same = key === 'vfx' ? vfxSeeds : (calls) => calls;
     assert.deepEqual(
-      await run(candidate, base),
-      defaults,
+      same(await run(candidate, base)),
+      same(defaults),
       `${key}: GPU calls without a preset differ from ${ref} at ${samples}x`,
     );
     const filled = await run(candidate, base, light);
