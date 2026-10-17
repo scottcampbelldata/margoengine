@@ -11,6 +11,8 @@ import {
 import { Engine } from '../../core/dist/engine.js';
 import { TransformStore } from '../../core/dist/kernel.js';
 import { sceneSamples } from '../../core/dist/quality.js';
+import { SSAO } from '../../post/dist/index.js';
+import { VolumetricFog } from '../../environment/dist/volumetric.js';
 
 const memory = (values = {}) => ({
   values,
@@ -20,9 +22,10 @@ const memory = (values = {}) => ({
   },
 });
 const desktop = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/155',
-  phone = 'Mozilla/5.0 (iPhone; CPU iPhone OS 27_2 like Mac OS X) Mobile';
+  phone = 'Mozilla/5.0 (iPhone; CPU iPhone OS 27_2 like Mac OS X) Mobile',
+  android = 'Mozilla/5.0 (Linux; Android 16; Pixel 9) AppleWebKit/537.36 Chrome/155 Mobile Safari/537.36';
 
-test('desktops start light unless a measured or forced tier says otherwise; phones keep their own path', () => {
+test('desktops start light unless a measured or forced tier says otherwise', () => {
   try {
     assert.equal(applyQualityTier({ search: '', storage: memory(), userAgent: desktop }), 'light');
     assert.equal(globalThis.margoLow, 1);
@@ -42,11 +45,69 @@ test('desktops start light unless a measured or forced tier says otherwise; phon
       'light',
       'older key still means low',
     );
-    assert.equal(applyQualityTier({ search: '', storage: memory(), userAgent: phone }), 'phone');
-    assert.equal(globalThis.margoLow, undefined);
   } finally {
     delete globalThis.margoLow;
   }
+});
+
+for (const [device, userAgent] of [
+  ['Android', android],
+  ['iPhone', phone],
+  ['iPhone without Mobile', 'Mozilla/5.0 (iPhone; CPU iPhone OS 27_2 like Mac OS X)'],
+]) {
+  test(`${device} user agents select 1x pixels with SSAO and volumetric fog disabled`, () => {
+    try {
+      for (const search of ['', '?quality=high&scale=2']) {
+        globalThis.margoLow = 1.5;
+        assert.equal(applyQualityTier({ search, storage: memory({ margoQuality: 'high' }), userAgent }), 'phone');
+        assert.equal(globalThis.margoLow, 1);
+        assert.equal(globalThis.margoPreset, QUALITY_PRESETS.phone);
+        assert.equal(qualityPreset(), QUALITY_PRESETS.phone);
+        assert.equal(qualityPreset().ssao.enabled, false);
+        assert.equal(qualityPreset().volumetric.enabled, false);
+        assert.equal(new SSAO().enabled, false);
+        const passes = [];
+        new VolumetricFog().registerPasses({ add: (pass) => passes.push(pass) });
+        assert.deepEqual(passes, []);
+      }
+    } finally {
+      delete globalThis.margoLow;
+      delete globalThis.margoPreset;
+    }
+  });
+}
+
+test('desktop user agents keep light scaling and high defaults after a phone tier', () => {
+  try {
+    for (const userAgent of [desktop, 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) Safari/605.1.15']) {
+      applyQualityTier({ search: '', storage: memory(), userAgent: phone });
+      assert.equal(applyQualityTier({ search: '?scale=1.5', storage: memory(), userAgent }), 'light');
+      assert.equal(globalThis.margoLow, 1.5);
+      assert.equal(globalThis.margoPreset, QUALITY_PRESETS.light);
+      assert.equal(globalThis.margoPreset.ssao.enabled, undefined);
+      assert.equal(globalThis.margoPreset.volumetric.enabled, undefined);
+      assert.equal(applyQualityTier({ search: '?quality=high', storage: memory(), userAgent }), 'high');
+      assert.equal(Object.hasOwn(globalThis, 'margoLow'), false);
+      assert.deepEqual(globalThis.margoPreset, {});
+    }
+  } finally {
+    delete globalThis.margoLow;
+    delete globalThis.margoPreset;
+  }
+});
+
+test('VolumetricFog with enabled false registers no passes', () => {
+  const passes = [];
+  new VolumetricFog({ enabled: false }).registerPasses({ add: (pass) => passes.push(pass) });
+  assert.deepEqual(passes, []);
+});
+
+test('VolumetricFog without enabled still registers its pass', () => {
+  const passes = [];
+  new VolumetricFog().registerPasses({ add: (pass) => passes.push(pass) });
+  assert.equal(passes.length, 1);
+  assert.equal(passes[0].name, 'volumetric-fog');
+  assert.equal(typeof passes[0].execute, 'function');
 });
 
 // Contract with the feature packages (readers: packages/shared/preset.js, tests/quality-presets.test.js): the tier's preset
@@ -65,7 +126,8 @@ test('applyQualityTier publishes the tier preset as globalThis.margoPreset; the 
       vfx: { capacity: 100_000 },
     });
     applyQualityTier({ search: '', storage: memory(), userAgent: phone });
-    assert.equal(globalThis.margoPreset, QUALITY_PRESETS.light, 'phones share the light preset');
+    assert.equal(globalThis.margoPreset, QUALITY_PRESETS.phone);
+    assert.notEqual(QUALITY_PRESETS.phone, QUALITY_PRESETS.light);
     applyQualityTier({ search: '', storage: memory({ margoQuality: 'high' }), userAgent: desktop });
     assert.deepEqual(globalThis.margoPreset, {});
     assert.deepEqual(qualityPreset(), {});

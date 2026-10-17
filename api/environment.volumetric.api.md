@@ -20,6 +20,7 @@ export class VolumetricFog implements EnginePlugin {
 }
 
 export interface VolumetricFogOptions {
+    enabled?: boolean;
     density?: number;
     heightFalloff?: number;
     height?: number;

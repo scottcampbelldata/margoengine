@@ -27,6 +27,8 @@ export interface VolumetricLightSource {
 }
 
 export interface VolumetricFogOptions {
+  /** Whether to register the fog pass (default true). Set false to skip volumetric fog. */
+  enabled?: boolean;
   /** Extinction per metre at and below `height` (default 0.02). */
   density?: number;
   /** Height fog: density times `exp(-heightFalloff * (y - height))` above `height` (default 0 = uniform). */
@@ -289,6 +291,7 @@ export class VolumetricFog implements EnginePlugin {
   }
   // After opaque meshes (0), sky (2) and water (4), where sky fog would run; before VFX (6) and post (10+).
   registerPasses(graph: FrameGraph): void {
+    if (this.options.enabled === false) return;
     graph.add({
       name: this.name,
       order: 5,
