@@ -2167,6 +2167,30 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    proofs; the 96edc75 rewrite only changed its message, which is what geometry.proof.js caught); it now throws a named
    RangeError (test in packages/geometry). Pinned runs still use today's @margoengine/core (frozen), proof scripts and
    fixtures, so mock-GPU timings recorded before the core speed-ups (0ed56b9) re-run faster; those READMEs date them.
+   **Triage 2026-10-17 (main, after Codex's 84+3 commits; branch `claude/proof-triage`).** `npm run proofs -- --current`
+   was 6 pass / 9 fail on 95b4eae6. 849ff51 (old perf/auto-quality tip) is NOT an ancestor of the main line before
+   8f710eb3: its content entered main only through the consolidation commit 8f710eb3 (parents 24f8348b, 79c9f4f2; the
+   octopus b4c3e4ba only records history). So "first failing commit" below is on main's first-parent chain
+   8f710eb3..95b4eae6, found by running each proof pinned (`node <proof> <ref> <commit>`, no checkouts) and diffing the
+   recorded calls (entries renumbered per handle kind, then line-diffed). Classes: A = intended change, B = regression.
+   | Proof | First failing | Class | Evidence (first differing calls) | Action | Now |
+   | --- | --- | --- | --- | --- | --- |
+   | post-stack, post-ssr, post-ssr-models, quality-presets | 6a57389d (core ambient RGB hook, Scott-approved freeze exception) | A | SSAO ambient replay module: `return vec4f(i.color*(1.0-i.material.y)*frame.radiance.w,1)` -> `...*frame.radiance.w*frame.ambient.rgb,1)` (packages/post/src/ssao.ts:478); core Frame gained `ambient:vec4f` (default white, so pixel-identical) | --current ref -> 6a57389d; post-ssr/post-ssr-models' "baseline has no SSR / no ssr.add" checks now run only pinned | PASS |
+   | deformed-shadows | 8f710eb3 (from 8efcf5b0), then 2091f12d | A | 8f710eb3: same multiset of calls, a mesh's `geometryBuffers` fetched before the depth pipeline exists (depth() first collects every source's primitives to de-duplicate shared PBR primitives). 2091f12d: still non-static casters cached in the static atlas (hash of matrix/buffers/alpha/hidden): distance500 335 -> 319 calls (24 fewer per-frame dynamic depth passes), customSource +4 static re-renders when the cube moves | --current ref -> 2091f12d; fitted-cascade check pinned-only | PASS |
+   | selection-xray-off | 8f710eb3, 6a57389d, 95b4eae6 | A | 8f710eb3: mask-flag write words 7,8 = 1 (a selected mesh/model now flags its descendants; written in the consolidation for loader-owned PBR outlines; matches the documented "nodes select descendants"; side effect: children of a selected plain core mesh are now outlined too - Scott to confirm). 6a57389d: shared `meshVertex` Frame gains `ambient:vec4f`. 95b4eae6: model mask `culled()` adds the BackSide case (`i.info.y==2u&&facing`), a few ALU ops per mask fragment when unused | --current ref -> 95b4eae6; x-ray-on check pinned-only | PASS |
+   | oit-detached, gltf-pro-lighting-hooks, materials-uv-transform | 8f710eb3 | **B** (plus A parts) | **B:** the consolidation's new "compact" gltf-pro path (plain materials: no extension, no physical, no texture transform) compiles opaque and BLEND non-instanced materials WITHOUT the 1e.f pipeline constants: their fragment shaders keep `if(!facing&&f.settings.z<0.5){discard;}` and the alpha-test discard as runtime branches, `constants` undefined (only MASK/instanced/non-compact get `override margoFaceTest/margoAlphaTest`). 1e.f (7f1c9c6) measured 0.852 -> 0.524 ms GPU on DamagedHelmet from removing exactly these discards (early-Z). Still on main: packages/gltf-pro/src/index.ts:1776 `const specialized = !compact \|\| !!inst \|\| m.settings[0] === 1;` and :1955 `constants: specialized ? {...} : undefined`. Fix (Codex, not done here: package code): always prefix the overrides for compact code and always pass `{margoFaceTest: face, margoAlphaTest: mask}`. **A parts at 8f710eb3:** compact Frame 880 -> 400 B (uvt/coat/specular/sheen rows only for materials that use them), 8 fewer 1x1 default textures/samplers, explicit `topology:'triangle-list'`, normal scale `v[82]=0` without a normal map, degenerate-tangent fallback; b326518e: derivative tangent-frame text (but see gate 5: that change is a rendering regression); da0eacc6: empty group-2 bind group created later (order only); materials-uv-transform also needed a harness fix (gltf-pro's lazy `import('./compression.js')`/decoders since d6c8feab made the bundle 3 chunks: `inlineDynamicImports`) | refs left unchanged (b803d56 / f8a36ca / 7f1c9c6) so the proofs keep failing until the discard fix lands; after the fix, re-pin --current to the fix commit (pinned da0eacc6 -> 95b4eae6 already passes all three, so nothing after da0eacc6 changes their calls) | FAIL (by design) |
+   **Superseded on main while this ran:** d3629be1 ("restore current proofs", pushed during the triage) re-pinned every
+   one of these 9 proofs' --current ref to `b3ed8ac` and fixed materials-uv-transform's bundling (`codeSplitting:
+   false`). The rebase kept main's proof files and claims.md; the "Action" column above is what this triage did before
+   the rebase (re-pins for the A rows; the B row left failing). With b3ed8ac as ref, oit-detached,
+   gltf-pro-lighting-hooks and materials-uv-transform pass on main BUT their baseline now contains the 8f710eb3
+   discard regression, so the "unchanged when unused" guarantee no longer covers 1e.f. After Codex fixes it, re-pin those
+   three to the fix commit and check the stories' opaque/BLEND pipelines carry `margoFaceTest:0, margoAlphaTest:0`.
+   Unchanged and passing: clustered-area-lights, clustered-local-shadows, color-output, environment-volumetric,
+   lines-perspective, math-consolidation. With this triage's own refs `--current` was 12 pass, 3 fail (the B row); on
+   main, with d3629be1's `b3ed8ac` refs, all 15 pass (rechecked at 80de63c). Pinned `npm run proofs` (all 46):
+   NOT RUN in this pass (stopped on request); the edited proofs keep their pinned defaults, and materials-uv-transform
+   pinned (1970fda -> 700838e) was re-checked after its harness fix: PASS. Run it next.
 2. **First 60 seconds bulletproof.** `npm create margo@latest` and the quickstart HTML work on clean environments:
    Windows (this laptop), Linux (WSL or a container), macOS + Safari and iPhone Safari + Android Chrome (Scott's devices,
    or listed as untested). No black canvas ever: WebGPU missing, adapter/device request rejected, or shader errors
@@ -2251,6 +2275,15 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    was never established as the cause. Results: `test-results/helmet-streaming.json`. csp-check was not re-run; run
    `node scripts/gpu-lock.mjs run --owner=<id> -- node scripts/csp-check.mjs` on AC. How to read this note, including
    what 5w.f already fixed in the gallery: `docs/flight-helmet-transmission.md`.
+   **Visual triage 2026-10-17 (main 95b4eae6, branch `claude/proof-triage`).** `npm run visual:check -- --no-build
+   --only=khronos` (Edge, GPU lock) reproduced 14 Khronos failures; each candidate commit was checked out, built with
+   `npm run build:packages` and re-run. Baselines were NOT updated in this pass.
+   | Item | First bad commit | Class | Evidence | Action | Now |
+   | --- | --- | --- | --- | --- | --- |
+   | ToyCar (62% changed, max 122), SheenChair (11%, 43), MaterialsVariantsShoe (9%, 78), DiffuseTransmissionTeacup (4.6%, 98) | b326518e "Add UV1 and geometry groups" ("correct WebGPU derivative tangent frames"); all four pass at 6a57389d (max 1) | **B** | All four are exactly the models whose normal-mapped primitives have no TANGENT attribute (every passing normal-mapped model has tangents), so they use the derivative tangent frame, which b326518e changed in packages/gltf-pro/src/shader.ts:49-56 and :150-157 (new `orientation=sign(dot(cross(dp1,dp2),n))` multiplying both T and B, plus component pre-scaling). Test: BoomBox, Corset and Lantern rendered with their TANGENTs stripped (derivative path) vs with tangents: difference grows at b326518e+ (mean / max: BoomBox 0.774/222 -> 0.853/163, Corset 0.499/100 -> 0.658/100, Lantern 0.168/95 -> 0.207/95), i.e. the new frame is further from the glTF tangent frame on all three. ToyCar's sheen cloth gets dark blotches absent from the Khronos screenshot and the old baseline. Likely cause (analysis, not yet proven on GPU): glTF's bitangent is cross(N,T) = -dP/dv; Schueler's derivative frame without the 1/det term gives T=det*dP/du, B=det*dP/dv, and WebGPU's y-down makes det<0 for front faces. Before b326518e T was inverted and B right; multiplying both by sign(det) makes T right and B inverted. Suggested fix (Codex, package code): T*=orientation, B*=-orientation (or the sample viewer's frame: T from the UV-determinant solve, B=cross(N,T)); accept it when the stripped-tangent renders match the tangent renders | report only; keep baselines | FAIL (regression) |
+   | MetalRoughSpheres, AlphaBlendModeTest, TextureTransformTest, NegativeScaleTest, MorphStressTest, Fox, MeshoptCubeTest, NodePerformanceTest, IridescenceLamp, CommercialRefrigerator (max 1 level) | 8f710eb3 (same numbers at 8f710eb3 and 95b4eae6; not 6a57389d) | A | All have materials without a normal map. Consolidation added `if (!m.maps[2]) v[82] = 0` (normal scale 0 without a normal map; gltf-pro index.ts, dist `C.maps[2]\|\|(O[82]=0)`): the 1x1 flat-normal texel 0x8080ff decodes to (0.0039, 0.0039, 1), a 1/255 tilt that is now gone. Proof: at 8f710eb3 with only that statement removed from the built dist, all 10 pass (9 at 0 changed pixels, CommercialRefrigerator 0.00005) | intended and more correct: update these 10 baselines together (`npm run visual:update -- --no-build --only=<ids>`); not done in this pass | FAIL until baselines updated |
+   | flight-helmet-high/light/phone (goggle lenses, max 159) | NOT TRIAGED | - | - | compare with docs/flight-helmet-transmission.md | - |
+   | Night Citadel load timeouts | known, NOT TRIAGED here | - | - | - | - |
 6. **Code hygiene >= 9** (5k), including zero `any` in public APIs and TSDoc on every export (autocomplete with docs).
 7. **Docs + playground** (item 8): quickstart, three.js migration, two flagship tutorials, cookbook, generated API
    reference, live-editable examples.
@@ -2267,6 +2300,13 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    "Proofs": one table of all 46 with baseline -> pin and the --current ref). H-04 (STALE) became PROVEN: `npm run
    proofs` reproduces every kept optimization proof; the summary is recounted (212 PROVEN, 6 STALE). Mock-GPU timings
    that predate the core speed-ups (PKG-055, the VAT numbers) are dated to `700838e` in the READMEs.
+   Triage 2026-10-17 (table under gate 1): claims.md "Proofs" names main's --current refs (`b3ed8ac` for all nine, from
+   d3629be1); the rows PKG-035, PKG-054, PKG-065, PKG-068 and LIM-016 still name the older --current refs (fix with this
+   gate's STALE rows). Claims that changed:
+   PKG-035 / PKG-054 and oit-detached ("feature off: identical GPU calls" for gltf-pro) do NOT hold on main until the
+   compact-path discard regression (8f710eb3) is fixed; 1e.f's early-Z win (7f1c9c6, 0.852 -> 0.524 ms) is lost for plain
+   opaque/BLEND glTF materials on main. Selection outlines now include descendants of a selected plain core mesh
+   (8f710eb3; Scott deferred deciding whether to keep that, 2026-10-17); BackSide support costs selection's model mask a few ALU ops when unused (95b4eae6).
 11. **Security (Scott, 2026-10-15):** 0 open findings, each fixed with a regression test. (a) Every parser of untrusted
    input (glTF/GLB, OBJ, STL, PLY, 3MF, PCD, XYZ, OFF, VTK, FBX, USD/USDZ, IFC, STEP/IGES, KTX2/Basis, Draco, meshopt,
    EXR, HDR, UltraHDR, .margo, audio/video metadata, net snapshots) has a seeded fuzzer: malformed and hostile inputs
