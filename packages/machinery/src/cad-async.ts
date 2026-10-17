@@ -2,7 +2,7 @@ import { engineRuntime, Geometry, PbrMaterial } from '@margoengine/core/extensio
 import type { EngineKernel } from '@margoengine/core';
 import type { Mesh } from '@margoengine/core/extension';
 import type { CADModel } from './cad.js';
-import { maxBytes } from './cad-parser.js';
+import { capError, maxBytes } from './cad-parser.js';
 export type CADFormat = 'stl' | 'obj' | 'step' | 'iges';
 export interface CADImportOptions {
   signal?: AbortSignal;
@@ -34,13 +34,10 @@ export function parseCADAsync(
   options: CADImportOptions = {},
 ): Promise<CADModel> {
   options.signal?.throwIfAborted();
-  if (
-    !(buffer instanceof ArrayBuffer) ||
-    !buffer.byteLength ||
-    buffer.byteLength > maxBytes ||
-    !['stl', 'obj', 'step', 'iges'].includes(format)
-  )
+  if (!(buffer instanceof ArrayBuffer) || !buffer.byteLength || !['stl', 'obj', 'step', 'iges'].includes(format))
     throw new TypeError('Invalid CAD input');
+  if (buffer.byteLength > maxBytes)
+    throw capError(`CAD exceeds 64 MiB (${buffer.byteLength} > ${maxBytes} bytes)`, format);
   const timeoutMs = options.timeoutMs ?? 120_000;
   if (!(timeoutMs > 0 && timeoutMs <= 2 ** 31 - 1)) throw new RangeError('timeoutMs must be a positive number');
   const { linearDeflection } = options;

@@ -4,6 +4,12 @@ import { checkCount, countLimit } from '../../shared/limits.js';
 export const maxBytes = 64 * 1024 * 1024,
   maxVertices = 1_000_000,
   maxIndices = 3_000_000;
+/** RangeError for a file over a CAD cap (docs/limits.md). The message names the cap and the way past it: a GLB, which
+ * @margoengine/gltf-pro loads without these caps (STEP and IGES convert offline with margo-convert). */
+export function capError(limit: string, format: string): RangeError {
+  const way = format === 'step' || format === 'iges' ? 'convert it to GLB with margo-convert' : 'export it as GLB';
+  return new RangeError(`${limit}; ${way} and load it with @margoengine/gltf-pro`);
+}
 // A corner welds only with the same Float32 point, the value Geometry stores: its key is the Float32 bit pattern, with
 // -0 folded into 0. A rounding grid (1e-5) merged distinct corners a few micrometres apart and collapsed real triangles.
 const f32 = new Float32Array(1),
@@ -77,7 +83,7 @@ function flat(positions: number[], progress?: (value: number) => void): Geometry
       if (id !== -1) keys.length = at;
       else {
         id = packed.length / 3;
-        if (id >= maxVertices) throw new RangeError('CAD unique vertex limit');
+        if (id >= maxVertices) throw capError(`CAD unique vertex limit (over ${maxVertices} in one part)`, 'obj');
         table[slot] = id;
         packed.push(x, y, z);
         normals.push(nx, ny, nz);
@@ -115,7 +121,8 @@ function stl(
     const view = new DataView(input.buffer, input.byteOffset, input.byteLength),
       count = view.getUint32(80, true);
     if (84 + count * 50 === input.length) {
-      if (count * 3 > maxIndices || !count) throw new RangeError('STL triangle limit');
+      if (count * 3 > maxIndices) throw capError(`STL triangle limit (${count} > ${maxIndices / 3})`, 'stl');
+      if (!count) throw new RangeError('STL triangle limit');
       for (let face = 0; face < count; face++) {
         for (let i = 0; i < 9; i++) positions.push(view.getFloat32(84 + face * 50 + 12 + i * 4, true));
         if (face % 10_000 === 0) progress?.((0.5 * face) / count);
@@ -137,7 +144,9 @@ function stl(
     facets.push(text.slice(match.index, end + 8));
     start.lastIndex = end + 8;
   }
-  if (facets.length * 3 > maxIndices || !facets.length) throw new RangeError('STL triangle limit');
+  if (facets.length * 3 > maxIndices)
+    throw capError(`STL triangle limit (${facets.length} > ${maxIndices / 3})`, 'stl');
+  if (!facets.length) throw new RangeError('STL triangle limit');
   let face = 0;
   for (const facet of facets) {
     if (face++ % 10_000 === 0) progress?.((0.5 * face) / facets.length);
@@ -168,8 +177,10 @@ function obj(
     const [tag, ...fields] = line.split(/\s+/);
     if (tag === 'v') {
       const p = fields.map(Number);
-      if (p.length !== 3 || !p.every((v) => Number.isFinite(Math.fround(v))) || vertices.length >= maxVertices)
+      if (p.length !== 3 || !p.every((v) => Number.isFinite(Math.fround(v))))
         throw new RangeError('Invalid OBJ vertex');
+      // A well-formed vertex past the cap is a file too large, not an invalid one.
+      if (vertices.length >= maxVertices) throw capError(`OBJ vertex limit (over ${maxVertices})`, 'obj');
       vertices.push(p);
     } else if (tag === 'o' || tag === 'g') {
       checkCount('OBJ part limit', parts.length + 1, partLimit, 'maxParts');
@@ -223,7 +234,7 @@ function obj(
             vz = r[2] - p[2];
           if (!(uy * vz - uz * vy) && !(uz * vx - ux * vz) && !(ux * vy - uy * vx)) continue;
           current.positions.push(...p, ...q, ...r);
-          if ((total += 3) > maxIndices) throw new RangeError('OBJ triangle limit');
+          if ((total += 3) > maxIndices) throw capError(`OBJ triangle limit (over ${maxIndices / 3})`, 'obj');
         }
         continue;
       }
@@ -241,7 +252,7 @@ function obj(
           p[v] = result.positions[index * 2 + 1];
           p[axis] = a[axis] - (normal[u] * (p[u] - a[u]) + normal[v] * (p[v] - a[v])) / normal[axis];
           current.positions.push(...p);
-          if (++total > maxIndices) throw new RangeError('OBJ triangle limit');
+          if (++total > maxIndices) throw capError(`OBJ triangle limit (over ${maxIndices / 3})`, 'obj');
         }
       }
     } else if (!['vn', 'vt', 's', 'usemtl', 'mtllib'].includes(tag))
@@ -267,8 +278,8 @@ export function parseCADGeometry(
       : input instanceof ArrayBuffer
         ? new Uint8Array(input)
         : new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
-  if ((typeof data === 'string' ? new TextEncoder().encode(data).length : data.length) > maxBytes)
-    throw new RangeError('CAD exceeds 64 MiB');
+  const bytes = typeof data === 'string' ? new TextEncoder().encode(data).length : data.length;
+  if (bytes > maxBytes) throw capError(`CAD exceeds 64 MiB (${bytes} > ${maxBytes} bytes)`, format);
   const definitions =
     format === 'stl'
       ? stl(data, progress)

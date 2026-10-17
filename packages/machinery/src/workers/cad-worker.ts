@@ -1,4 +1,4 @@
-import { parseCADGeometry, maxBytes, fingerprint, hash } from '../cad-parser.js';
+import { parseCADGeometry, capError, maxBytes, maxIndices, fingerprint, hash } from '../cad-parser.js';
 import { checkCount, countLimit } from '../../../shared/limits.js';
 import { Geometry } from '@margoengine/core';
 declare const self: {
@@ -161,7 +161,7 @@ self.onmessage = async (event: MessageEvent) => {
         if (!positions || !index || positions.length % 3 || index.length % 3)
           throw new RangeError('B-Rep import returned an invalid mesh');
         total += index.length;
-        if (total > 3_000_000) throw new RangeError('CAD triangle limit');
+        if (total > maxIndices) throw capError(`CAD triangle limit (over ${maxIndices / 3})`, format);
         const vertexCount = positions.length / 3;
         for (const i of index)
           if (!(Number.isInteger(i) && i >= 0 && i < vertexCount))
