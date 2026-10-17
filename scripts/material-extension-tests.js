@@ -126,7 +126,8 @@ try {
             const validation = await device.popErrorScope();
             remove();
             if (validation) throw new Error(name + '/' + lightingEnabled + ': ' + validation.message);
-            if ([...modes].sort().join(',') !== 'ambient,beauty,gbuffer')
+            // SSAO replays the model once, in its occlusion mode (normals and ambient together, 2091f12).
+            if ([...modes].sort().join(',') !== 'beauty,occlusion')
               throw new Error('Missing pass modes: ' + [...modes]);
             checks.push({ extension: name, lighting: lightingEnabled, modes: [...modes], cachedRedraw: true });
           }
