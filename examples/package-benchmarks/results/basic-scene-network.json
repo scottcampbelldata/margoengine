@@ -1,5 +1,5 @@
 {
-  "commit": "6b18548",
+  "commit": "ac2fdfa",
   "dirty": true,
   "browser": "msedge 155.0.4283.60 headless",
   "adapter": "nvidia ampere",
@@ -11,17 +11,17 @@
       "encoding": "identity",
       "transferred": 808,
       "raw": 558,
-      "gzip": 372,
-      "brotli": 229
+      "gzip": 370,
+      "brotli": 226
     },
     {
-      "path": "assets/index-Y9z5Rnuy.js",
+      "path": "assets/index-sVzDh6uG.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 21214,
-      "raw": 48550,
-      "gzip": 20833,
-      "brotli": 18330
+      "transferred": 21809,
+      "raw": 50306,
+      "gzip": 21428,
+      "brotli": 18894
     },
     {
       "path": "assets/geometry-CAWt7Gfm.js",
@@ -33,15 +33,6 @@
       "brotli": 938
     },
     {
-      "path": "assets/dist-BuoSC44Y.js",
-      "role": "@margoengine/gltf (app.load)",
-      "encoding": "gzip",
-      "transferred": 5284,
-      "raw": 11882,
-      "gzip": 4912,
-      "brotli": 4424
-    },
-    {
       "path": "assets/extension-DuYhGmhk.js",
       "role": "Shared chunk",
       "encoding": "identity",
@@ -49,6 +40,15 @@
       "raw": 40,
       "gzip": 54,
       "brotli": 44
+    },
+    {
+      "path": "assets/dist-BuoSC44Y.js",
+      "role": "@margoengine/gltf (app.load)",
+      "encoding": "gzip",
+      "transferred": 5284,
+      "raw": 11882,
+      "gzip": 4912,
+      "brotli": 4424
     },
     {
       "path": "model.glb",
@@ -62,10 +62,10 @@
   ],
   "total": {
     "requests": 6,
-    "transferred": 30656,
-    "raw": 64398,
-    "gzip": 27641,
-    "brotli": 24324
+    "transferred": 31251,
+    "raw": 66154,
+    "gzip": 28234,
+    "brotli": 24885
   },
   "notFetched": [
     {
@@ -73,8 +73,8 @@
       "raw": 17843
     },
     {
-      "path": "assets/cad-BbolcdCU.js",
-      "raw": 53
+      "path": "assets/cad-Bv3u_66c.js",
+      "raw": 108
     },
     {
       "path": "assets/cad-runtime-BlaJwAjO.js",
@@ -85,20 +85,20 @@
       "raw": 44
     },
     {
+      "path": "assets/dist-Bh35LVR5.js",
+      "raw": 24916
+    },
+    {
       "path": "assets/dist-BSOpu6iN.js",
       "raw": 40045
     },
     {
-      "path": "assets/dist-Cl0vl3JE.js",
-      "raw": 23421
+      "path": "assets/dist-CRraD2Og.js",
+      "raw": 69030
     },
     {
       "path": "assets/dist-DnGFOsSt.js",
       "raw": 63300
-    },
-    {
-      "path": "assets/dist-kGK5YhPx.js",
-      "raw": 47987
     },
     {
       "path": "assets/occt-import-js-BhHfLpto.wasm",

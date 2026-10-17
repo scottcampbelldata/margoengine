@@ -341,6 +341,16 @@ export interface PBRRenderState {
     blend?: GPUBlendState | null;
     depthWrite?: boolean;
     depthCompare?: GPUCompareFunction;
+    depthBias?: number;
+    depthBiasSlopeScale?: number;
+    depthBiasClamp?: number;
+    depthBiasMode?: 'native' | 'away';
+    stencilFront?: GPUStencilFaceState;
+    stencilBack?: GPUStencilFaceState;
+    stencilReadMask?: number;
+    stencilWriteMask?: number;
+    stencilReference?: number;
+    colorWrite?: boolean;
 }
 
 export interface PBRTransmission {

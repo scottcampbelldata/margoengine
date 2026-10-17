@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
-import { Engine, EnginePlugin } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 import { MaterialExtension, MaterialExtensionTexture, PBRModel, PreparedGeometry } from "@margoengine/gltf-pro";
 import { PBRInstances } from "@margoengine/gltf-pro/instancing";
 
@@ -97,6 +97,19 @@ export class Material {
     readonly blending: Blending;
     readonly depthWrite?: boolean;
     readonly depthTest: boolean;
+    readonly colorWrite: boolean;
+    readonly polygonOffset: boolean;
+    readonly polygonOffsetFactor: number;
+    readonly polygonOffsetUnits: number;
+    readonly polygonOffsetClamp: number;
+    readonly stencilWrite: boolean;
+    readonly stencilRef: number;
+    readonly stencilReadMask: number;
+    readonly stencilWriteMask: number;
+    readonly stencilFunc: GPUCompareFunction;
+    readonly stencilFail: GPUStencilOperation;
+    readonly stencilZFail: GPUStencilOperation;
+    readonly stencilZPass: GPUStencilOperation;
     readonly factors: number[];
     readonly settings: number[];
     readonly uvt: number[];
@@ -262,6 +275,19 @@ export interface MaterialOptions extends PhysicalOptions {
     blending?: Blending;
     depthWrite?: boolean;
     depthTest?: boolean;
+    colorWrite?: boolean;
+    polygonOffset?: boolean;
+    polygonOffsetFactor?: number;
+    polygonOffsetUnits?: number;
+    polygonOffsetClamp?: number;
+    stencilWrite?: boolean;
+    stencilRef?: number;
+    stencilReadMask?: number;
+    stencilWriteMask?: number;
+    stencilFunc?: GPUCompareFunction;
+    stencilFail?: GPUStencilOperation;
+    stencilZFail?: GPUStencilOperation;
+    stencilZPass?: GPUStencilOperation;
     uvTransform?: TextureTransform;
 }
 
@@ -391,6 +417,16 @@ export interface SpecularOptions {
     colorFactor?: readonly [number, number, number];
     specularTexture?: ClearcoatTexture;
     specularColorTexture?: ClearcoatTexture;
+}
+
+export class StencilBuffer implements EnginePlugin {
+    readonly name = "materials:stencil-buffer";
+    static attach(engine: EngineKernel): StencilBuffer;
+    setup(engine: Engine): void;
+    registerPasses(graph: FrameGraph): void;
+    onDeviceRestored(engine: Engine): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export class Texture {

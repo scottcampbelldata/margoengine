@@ -158,7 +158,9 @@ app.box({size: [1, 1, 1], color: '#84d6bd'});
 - `engine.backend` is `'webgpu'` or `'webgl2'`; `engine.fallbackReason` says why WebGPU was not used.
 - `capacity` (default 1,024) is the initial number of meshes and transform nodes an engine holds; `createMesh` doubles it
   when full, up to 8,388,608. Set it for big scenes to skip the doublings: `Engine.create(canvas, {capacity: 50_000})`.
-- Several scenes or viewports per canvas are not available.
+- Each engine owns one implicit scene. `engine.render({camera})` supports sequential alternate-camera captures, and
+  `core/extension` exposes per-core-draw viewport/scissor rectangles. Optional native passes and picking do not inherit
+  those rectangles.
 
 A transparent canvas over HTML and CSS, like `new THREE.WebGLRenderer({alpha: true})` with `setClearColor(0x000000, 0)`:
 
@@ -1114,16 +1116,25 @@ engine recreates the device and every plugin rebuilds its GPU state; no reload i
 
 ## Not yet
 
-From [`docs/threejs-parity.md`](threejs-parity.md). Each would be an optional package or needs a core change.
+Remaining gaps and documented limits from [`docs/threejs-parity.md`](threejs-parity.md). The optional-package backlog
+does not reopen the core freeze or the closed v1 limits listed there. Complete actionable PARTIAL rows before MISSING
+rows, starting with the wireframe material flag.
+
+Materials already support physical factors and maps, iridescence, anisotropy, dispersion, normal/depth/distance modes,
+and front/back/double sides. Blend/depth controls, polygon offset, color-write suppression and stencil are available
+through `Material` and gltf-pro render state, with optional `StencilBuffer` for a scene stencil attachment. These
+features add no core or stage functionality.
 
 | three.js | Status in Margo |
 | --- | --- |
-| Several scenes or viewports, render to texture from a second camera, `CubeCamera` | Missing; needs core changes |
-| WebGL2 for optional packages | Missing: core meshes, controls, labels, viewcube, bvh, LOD distance levels and the small glTF loader run on WebGL2; the rest needs WebGPU |
-| More than one directional light, coloured ambient, configurable `HemisphereLight`, IES lights | Missing; point, spot and rectangle area lights via clustered, a fixed hemisphere fill in glTF-pro |
+| Multiple scenes, general multi-view rendering, `CubeCamera` | One implicit scene per engine. `Engine.render({camera})` supports sequential second-camera captures; dynamic cube captures, nested rendering and independent temporal histories remain absent |
+| General viewport/scissor support | Core draws accept viewport/scissor rectangles; optional native passes and picking do not inherit them, and camera aspect remains caller-controlled |
+| WebGL2 for optional packages | Closed v1 limit: core meshes, controls, labels, viewcube, bvh, LOD distance levels and the small glTF loader run on WebGL2; the rest needs WebGPU |
+| More than one directional light, configurable `HemisphereLight`, IES lights | One directional light; core diffuse ambient has RGB multipliers. Point, spot and rectangle area lights use clustered; glTF-pro keeps a fixed hemisphere fill |
 | `ShadowMaterial` on any mesh | Missing (`@margoengine/staging` ContactShadows is a ground shadow catcher for product shots) |
-| Lambert, Phong, depth materials, physical maps, iridescence, anisotropy, dispersion on your own meshes | Missing (physical factors and refracting transmission exist: materials physical options, `@margoengine/materials/transmission`) |
-| glTF `KHR_animation_pointer`, dispersion | Missing (files that require them are rejected); iridescence, anisotropy and diffuse transmission (`@margoengine/gltf-pro/extended`), material variants (`selectVariant`) and glTF cameras (`viewGLTFCamera`) are supported |
+| Lambert and Phong materials | Closed v1 limit: FBX import converts them to PBR; dedicated legacy shaders remain absent |
+| Wireframe material flag | Missing; inspector overlays and geometry `wireframe` drawn with lines are available |
+| glTF `KHR_animation_pointer` | Files that require it are rejected. Dispersion, iridescence, anisotropy and diffuse transmission use the documented `@margoengine/gltf-pro/extended` material path; material variants (`selectVariant`) and glTF cameras (`viewGLTFCamera`) are supported |
 | Custom attributes on your own meshes | Arbitrary named attributes remain missing; independent `uvs1` and geometry groups with material arrays are supported by materials, including instancing and glTF export |
 | Standalone KTX2 or float/3D/array data textures on your own meshes | Missing (KTX2 works inside glTF; materials takes RGBA8 data) |
 | SMAA, GTAO, SSGI, motion blur, lens flare, glitch, afterimage | Missing (FXAA, TAA, SSAO, SSR, bloom, DOF are there) |

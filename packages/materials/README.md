@@ -259,6 +259,54 @@ GPU picking and CPU BVH queries follow the same side. Shadow casting retains the
 policy. Export bakes back-only triangles by reversing their winding and normals because glTF has no back-side
 material flag. Core materials keep their existing API.
 
+## Polygon offset and stencil
+
+`polygonOffset`, `polygonOffsetFactor`, `polygonOffsetUnits` and `polygonOffsetClamp` are fixed at construction.
+Positive factors and units push polygons away from the camera; negative values pull them forward. Signs are
+converted for reverse-Z. Units must be integers within ±2147483647; factor and clamp must be finite as float32.
+Clamp defaults to zero (unclamped). Points and lines ignore polygon offset.
+
+Enable `stencilWrite` to apply stencil comparison and operations. `stencilFunc` defaults to `always`;
+`stencilFail`, `stencilZFail` and `stencilZPass` default to `keep`. These use WebGPU comparison/operation names.
+`stencilRef` defaults to zero; `stencilReadMask` and `stencilWriteMask` default to `0xff`. Masks and references
+accept unsigned 32-bit integers; the attachment's eight stencil bits determine the effective value.
+Use `stencilWriteMask: 0` for comparison without changing stencil. These properties are fixed at construction.
+
+```ts
+import {Material, StencilBuffer, createMesh} from '@margoengine/materials';
+
+StencilBuffer.attach(engine);
+const mask = new Material({
+  colorWrite: false, depthWrite: false, depthTest: false,
+  stencilWrite: true, stencilRef: 1, stencilZPass: 'replace',
+});
+const clipped = new Material({
+  color: '#4488ff', stencilWrite: true, stencilRef: 1,
+  stencilFunc: 'equal', stencilWriteMask: 0,
+});
+createMesh(engine, maskGeometry, mask, {renderOrder: -1});
+createMesh(engine, geometry, clipped);
+```
+
+`colorWrite: false` suppresses color while retaining depth/stencil processing. `StencilBuffer` borrows a scene
+stencil attachment or provides portable `depth24plus-stencil8` at the current size and 1x/4x sampling. Resources
+are reused and handle resize, device restoration and disposal. The main scene clears stencil to zero each frame.
+Stencil belongs to its attachment: captures and MSAA resolves copy depth, so masks do not cross target boundaries.
+Explicit XR, probe and other offscreen renderers must provide their own stencil attachment; incompatible targets throw.
+
+These controls affect beauty draws. G-buffer, ambient, occlusion/capture replays, picking and shadows retain their
+existing behavior and do not reproduce stencil masks or polygon bias. Custom state uses the sorted beauty path,
+including native transmission's two-pass tint fallback, instead of OIT or screen-space transmission hooks. The tint
+tests stencil without writing; the lit draw performs each operation once. Exporters retain underlying materials and
+geometry because glTF has no corresponding stencil or polygon-offset state.
+
+Native `primitive.material.renderState` accepts WebGPU `depthBias`, `depthBiasSlopeScale`, `depthBiasClamp`,
+`stencilFront`, `stencilBack`, `stencilReadMask`, `stencilWriteMask`, `stencilReference` and `colorWrite`.
+Native bias keeps WebGPU's sign by default. `depthBiasMode: 'away'` interprets positive bias as away from the camera
+on both the main reverse-Z renderer and forward-Z offscreen renderers; constructed materials use this mode.
+Native stencil faces follow raster winding, including mirrored transforms.
+The reference stays live per draw, resets to zero for draws without one, and reuses the pipeline.
+
 ## Depth and distance materials
 
 `Material({shading: 'depth'})` writes projected depth, while `Material({shading: 'distance'})` writes world-space

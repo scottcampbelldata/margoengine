@@ -389,6 +389,21 @@ export interface MaterialOptions extends PhysicalOptions {
   blending?: Blending;
   depthWrite?: boolean;
   depthTest?: boolean;
+  colorWrite?: boolean;
+  /** Positive factors/units push polygons away from the camera, including the reverse-Z renderer. */
+  polygonOffset?: boolean;
+  polygonOffsetFactor?: number;
+  polygonOffsetUnits?: number;
+  polygonOffsetClamp?: number;
+  /** Enables stencil comparison and operations. Other stencil options are inactive when false. */
+  stencilWrite?: boolean;
+  stencilRef?: number;
+  stencilReadMask?: number;
+  stencilWriteMask?: number;
+  stencilFunc?: GPUCompareFunction;
+  stencilFail?: GPUStencilOperation;
+  stencilZFail?: GPUStencilOperation;
+  stencilZPass?: GPUStencilOperation;
   /** UV offset/scale/rotation for every map but `matcap` (KHR_texture_transform semantics), e.g. an atlas region. */
   uvTransform?: TextureTransform;
 }
@@ -418,6 +433,39 @@ const unit = (v: unknown, label: string) => {
   if (typeof v !== 'number' || !(v >= 0 && v <= 1)) throw new RangeError('Material ' + label + ' must be in [0, 1]');
   return v;
 };
+const rasterMask = (v: number, label: string): number => {
+  if (typeof v !== 'number')
+    throw new TypeError('Material ' + label + ' must be a number; set an unsigned 32-bit integer');
+  if (!Number.isInteger(v) || v < 0 || v > 0xffffffff)
+    throw new RangeError('Material ' + label + ' is out of range; set an integer from 0 through 4294967295');
+  return v;
+};
+const rasterFloat = (v: number, label: string): number => {
+  if (typeof v !== 'number') throw new TypeError('Material ' + label + ' must be a number; set a finite float32 value');
+  if (!Number.isFinite(Math.fround(v)))
+    throw new RangeError('Material ' + label + ' is not finite as float32; set a finite float32 value');
+  return v;
+};
+const stencilFunctions: readonly string[] = [
+  'never',
+  'less',
+  'equal',
+  'less-equal',
+  'greater',
+  'not-equal',
+  'greater-equal',
+  'always',
+];
+const stencilOperations: readonly string[] = [
+  'keep',
+  'zero',
+  'replace',
+  'invert',
+  'increment-clamp',
+  'decrement-clamp',
+  'increment-wrap',
+  'decrement-wrap',
+];
 const finiteFloat = (v: unknown, label: string): number => {
   if (typeof v !== 'number' || !Number.isFinite(Math.fround(v)))
     throw new RangeError('Material ' + label + ' must be finite as float32');
@@ -607,6 +655,19 @@ export class Material {
   readonly blending: Blending;
   readonly depthWrite?: boolean;
   readonly depthTest: boolean;
+  readonly colorWrite: boolean;
+  readonly polygonOffset: boolean;
+  readonly polygonOffsetFactor: number;
+  readonly polygonOffsetUnits: number;
+  readonly polygonOffsetClamp: number;
+  readonly stencilWrite: boolean;
+  readonly stencilRef: number;
+  readonly stencilReadMask: number;
+  readonly stencilWriteMask: number;
+  readonly stencilFunc: GPUCompareFunction;
+  readonly stencilFail: GPUStencilOperation;
+  readonly stencilZFail: GPUStencilOperation;
+  readonly stencilZPass: GPUStencilOperation;
   /** gltf-pro layout: [roughness, metalness, normalScale, aoMapIntensity] and [alphaMode, alphaTest, side (front 0, double 1, back 2), 0]. */
   readonly factors: number[];
   readonly settings: number[];
@@ -721,6 +782,9 @@ export class Material {
   constructor(o: MaterialOptions = {}) {
     const shading = o.shading ?? 'standard',
       blending = o.blending ?? 'normal';
+    for (const key of ['colorWrite', 'polygonOffset', 'stencilWrite'] as const)
+      if (o[key] !== undefined && typeof o[key] !== 'boolean')
+        throw new TypeError('Material ' + key + ' must be a boolean; set true or false');
     if (
       !['standard', 'basic', 'normal', 'matcap', 'depth', 'distance'].includes(shading) ||
       !['normal', 'additive', 'multiply', 'none'].includes(blending) ||
@@ -745,6 +809,41 @@ export class Material {
     this.blending = blending;
     this.depthWrite = o.depthWrite;
     this.depthTest = o.depthTest ?? true;
+    this.colorWrite = o.colorWrite ?? true;
+    this.polygonOffset = o.polygonOffset ?? false;
+    this.polygonOffsetFactor = rasterFloat(
+      o.polygonOffsetFactor === undefined ? 0 : o.polygonOffsetFactor,
+      'polygonOffsetFactor',
+    );
+    this.polygonOffsetClamp = rasterFloat(
+      o.polygonOffsetClamp === undefined ? 0 : o.polygonOffsetClamp,
+      'polygonOffsetClamp',
+    );
+    const units = o.polygonOffsetUnits === undefined ? 0 : o.polygonOffsetUnits;
+    if (typeof units !== 'number')
+      throw new TypeError(
+        'Material polygonOffsetUnits must be a number; set an integer between -2147483647 and 2147483647',
+      );
+    if (!Number.isInteger(units) || Math.abs(units) > 0x7fffffff)
+      throw new RangeError(
+        'Material polygonOffsetUnits is out of range; set an integer between -2147483647 and 2147483647',
+      );
+    this.polygonOffsetUnits = units;
+    this.stencilWrite = o.stencilWrite ?? false;
+    this.stencilRef = rasterMask(o.stencilRef === undefined ? 0 : o.stencilRef, 'stencilRef');
+    this.stencilReadMask = rasterMask(o.stencilReadMask === undefined ? 255 : o.stencilReadMask, 'stencilReadMask');
+    this.stencilWriteMask = rasterMask(o.stencilWriteMask === undefined ? 255 : o.stencilWriteMask, 'stencilWriteMask');
+    this.stencilFunc = o.stencilFunc === undefined ? 'always' : o.stencilFunc;
+    this.stencilFail = o.stencilFail === undefined ? 'keep' : o.stencilFail;
+    this.stencilZFail = o.stencilZFail === undefined ? 'keep' : o.stencilZFail;
+    this.stencilZPass = o.stencilZPass === undefined ? 'keep' : o.stencilZPass;
+    if (
+      !stencilFunctions.includes(this.stencilFunc) ||
+      [this.stencilFail, this.stencilZFail, this.stencilZPass].some((value) => !stencilOperations.includes(value))
+    )
+      throw new TypeError(
+        'Material stencil function or operation is invalid; use a WebGPU comparison and stencil operation name',
+      );
     this.blend = o.transparent ?? false;
     this.color = linear(o.color ?? [1, 1, 1], 'color');
     if (this.color.length === 3) this.color.push(unit(o.opacity ?? 1, 'opacity'));
@@ -1058,9 +1157,16 @@ export class Material {
     for (let k = 0; k < this.uvt.length / 8; k++) if (i < 0 || k === i) this.uvt.splice(k * 8, 8, ...rows);
     return this;
   }
-  /** True when the beauty pipeline needs blending or depth overrides. */
+  /** True when the beauty pipeline needs explicit render controls. */
   get customState(): boolean {
-    return this.blending !== 'normal' || this.depthWrite !== undefined || !this.depthTest;
+    return (
+      this.blending !== 'normal' ||
+      this.depthWrite !== undefined ||
+      !this.depthTest ||
+      !this.colorWrite ||
+      this.polygonOffset ||
+      this.stencilWrite
+    );
   }
   private sync(): void {
     this.settings[0] = this.blend ? 2 : this.settings[1] > 0 ? 1 : 0;
@@ -1399,6 +1505,34 @@ export function createMesh<M extends Material | readonly Material[]>(
         blend: blends[m.blending],
         depthWrite: m.depthWrite,
         depthCompare: m.depthTest ? undefined : 'always',
+        ...(m.colorWrite ? {} : { colorWrite: false }),
+        ...(m.polygonOffset
+          ? {
+              depthBiasMode: 'away' as const,
+              depthBias: m.polygonOffsetUnits,
+              depthBiasSlopeScale: m.polygonOffsetFactor,
+              depthBiasClamp: m.polygonOffsetClamp,
+            }
+          : {}),
+        ...(m.stencilWrite
+          ? {
+              stencilFront: {
+                compare: m.stencilFunc,
+                failOp: m.stencilFail,
+                depthFailOp: m.stencilZFail,
+                passOp: m.stencilZPass,
+              },
+              stencilBack: {
+                compare: m.stencilFunc,
+                failOp: m.stencilFail,
+                depthFailOp: m.stencilZFail,
+                passOp: m.stencilZPass,
+              },
+              stencilReference: m.stencilRef,
+              stencilReadMask: m.stencilReadMask,
+              stencilWriteMask: m.stencilWriteMask,
+            }
+          : {}),
       } satisfies PBRRenderState;
     g.shading = {
       get replacesTextures() {

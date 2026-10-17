@@ -433,6 +433,7 @@
       "Material",
       "MaterialInstallation",
       "NodeMaterialInstallation",
+      "StencilBuffer",
       "Texture",
       "anisotropy",
       "clearcoat",

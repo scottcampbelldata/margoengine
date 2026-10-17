@@ -42,6 +42,16 @@ nodes and mixed mirrored instances retain local winding. Picking and beauty/auxi
 points and lines ignore triangle sides. Shadow casters retain their existing two-sided policy. `exportModel`
 in `@margoengine/exporters` bakes back-only winding and normals into glTF-compatible geometry.
 
+`primitive.material.renderState` supplies beauty-only blend/depth overrides, polygon bias, stencil face states,
+masks/reference, and `colorWrite`. Bias defaults to literal WebGPU values; `depthBiasMode: 'away'` keeps positive
+offsets away from the camera across main reverse-Z and forward-Z device views. `stencilReference` is live per draw
+and reuses pipelines. Native front/back stencil states follow raster winding. Different face operations temporarily
+use the original primitives instead of winding-normalized static batches; symmetric state restores batching.
+Stencil requires a stencil attachment;
+`StencilBuffer` from `@margoengine/materials` supplies one for the scene when needed. Auxiliary/capture replays,
+picking and shadows retain their existing behavior. See the [material controls](../materials/README.md#polygon-offset-and-stencil)
+for constructor options, target boundaries and transmission behavior. glTF export omits these render controls.
+
 `loadGLTF` automatically decodes `KHR_draco_mesh_compression` primitives and
 `EXT_meshopt_compression` buffer views and `KHR_texture_basisu` textures using `@margoengine/decoders`, installed as
 a dependency. Draco workers and Wasm start only when compressed primitives are
