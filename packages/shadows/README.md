@@ -4,7 +4,7 @@ Cascade descriptors, attachments and matrix views are retained between frames.
 Custom `drawShadow` callbacks receive a borrowed context reused for that cascade;
 consume it synchronously rather than retaining it after the pass.
 
-Optional WebGPU directional shadows. Four practical/logarithmic frustum splits render to a `depth32float` 2D texture array. Stable spherical extents and world-space texel snapping limit edge swimming. PCSS searches 16 blockers and filters 32 comparison samples using directional-light angular size and blocker/receiver separation.
+Optional WebGPU directional shadows. Four practical/logarithmic frustum splits render to a `depth32float` 2D texture array. Stable spherical extents and world-space texel snapping limit edge swimming. PCSS searches 16 blockers and filters 32 comparison samples using directional-light angular size and blocker/receiver separation. The samples follow a golden-angle spiral that each pixel turns by interleaved gradient noise of its screen position, so penumbrae show fine noise instead of steps; there is no time term, so a still view renders the same pixels every frame.
 
 ```ts
 import {EngineKernel,box} from '@margoengine/core';

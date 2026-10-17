@@ -1,25 +1,22 @@
-const f32 = Math.fround;
-// Preserve the shader's Float32 spiral; generate direction/radius once, not per shaded pixel.
-const shadowOffsets = [16, 32]
-  .map((count) => {
-    const values = Array.from({ length: count }, (_, j) => {
-      const angle = f32(j * f32(2.39996323)),
-        radius = f32(Math.sqrt((j + 0.5) / count));
-      return `vec2f(${f32(f32(Math.cos(angle)) * radius)},${f32(f32(Math.sin(angle)) * radius)})`;
-    });
-    return `const shadowDisk${count}=array<vec2f,${count}>(${values.join(',')});\n`;
-  })
-  .join('');
 // Compare on the receiver plane; cover comparison-sampler subtexel footprints.
 // Directional lights use angular size and orthographic depth separation.
+// Taps follow a golden-angle (Vogel) spiral computed in the loop: tap j sits at radius sqrt((j+0.5)/n), turned one
+// golden angle (2.39996323 rad, shadowGolden) from tap j-1. No constant tables: drivers can place indexed constant
+// arrays in per-pixel scratch memory, which phone GPUs handle badly. Each pixel starts the spiral at its own angle from
+// interleaved gradient noise of its screen position (Jimenez 2014), so a penumbra shows fine noise instead of the steps
+// of one pattern shared by every pixel. No time term: the same view renders the same pixels every frame.
 export function shadowSampling(group: number): string {
-  return (
-    shadowOffsets +
-    /* wgsl */ `
+  return /* wgsl */ `
 struct ShadowFrame {matrices:array<mat4x4f,4>,view:mat4x4f,splits:vec4f,ranges:vec4f,settings:vec4f}
 @group(${group}) @binding(1) var<uniform> shadowFrame:ShadowFrame;
 @group(${group}) @binding(2) var shadowMap:texture_depth_2d_array;
 @group(${group}) @binding(3) var shadowSampler:sampler_comparison;
+const shadowGolden=mat2x2f(-0.737368878,0.675490294,-0.675490294,-0.737368878);
+// The screen pixel is rebuilt from the camera view and settings.w (pixels per unit at depth 1): no fragment input needed.
+fn shadowNoise(position:vec3f)->f32 {
+  let eye=shadowFrame.view*vec4f(position,1);let pixel=eye.xy/max(-eye.z,0.000001)*shadowFrame.settings.w;
+  return fract(52.9829189*fract(dot(pixel,vec2f(0.06711056,0.00583715))));
+}
 fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {
   let depth=-(shadowFrame.view*vec4f(position,1)).z;
   if(depth>shadowFrame.splits.w){return 1;}
@@ -32,10 +29,11 @@ fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {
   let lightNormal=vec3f(dot(normal,normalize(rowX)),dot(normal,normalize(rowY)),dot(normal,normalize(rowZ)));var slope=vec2f(0);
   if(abs(lightNormal.z)>0.001){slope=clamp(vec2f(-lightNormal.x,lightNormal.y)*2*length(rowZ)/(length(rowX)*lightNormal.z),vec2f(-2),vec2f(2));}
   reference-=dot(abs(slope),texel)*0.5;
+  let angle=shadowNoise(position)*6.2831853;let turn=vec2f(cos(angle),sin(angle));
   let search=max(texel.x,shadowFrame.settings.x*reference*shadowFrame.ranges[cascade]*length(rowX)*0.5);
-  var blockers=0.0;var sum=0.0;
+  var blockers=0.0;var sum=0.0;var direction=turn;
   for(var j=0u;j<16u;j++){
-    let offset=shadowDisk16[j]*search;
+    let offset=direction*sqrt((f32(j)+0.5)/16.0)*search;direction=shadowGolden*direction;
     let coord=vec2i((uv+offset)*dimensions);
     if(any(coord<vec2i(0))||any(coord>=vec2i(dimensions))){continue;}
     let d=textureLoad(shadowMap,coord,i32(cascade),0);
@@ -45,17 +43,16 @@ fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {
   if(blockers==0){return 1;}
   let blocker=sum/blockers;
   let penumbra=shadowFrame.settings.x*(reference-blocker)*shadowFrame.ranges[cascade]*length(rowX)*0.5;
-  let radius=clamp(penumbra,texel.x,0.1);var visibility=0.0;
+  let radius=clamp(penumbra,texel.x,0.1);var visibility=0.0;direction=turn;
   for(var j=0u;j<32u;j++){
-    let offset=shadowDisk32[j]*radius;
+    let offset=direction*sqrt((f32(j)+0.5)/32.0)*radius;direction=shadowGolden*direction;
     let coord=uv+offset;
     if(any(coord<vec2f(0))||any(coord>vec2f(1))){visibility+=1;}else{visibility+=textureSampleCompareLevel(shadowMap,shadowSampler,coord,i32(cascade),reference+dot(offset,slope));}
   }
   return visibility/32.0;
 }
 fn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {if(all(direct==vec3f(0))){return direct;}return direct*shadowVisibility(position,normal);}
-`
-  );
+`;
 }
 export function shadowDepth(pbr: boolean, transformed = false): string {
   return /* wgsl */ `

@@ -520,6 +520,8 @@ export class Shadows implements EnginePlugin {
     this.values[88] = this.options.lightSize ?? 0.02;
     this.values[89] = this.options.bias ?? 0.0005;
     this.values[90] = this.options.normalBias ?? 0.02;
+    // Pixels per unit at view depth 1: the sampler rebuilds each fragment's screen pixel for its per-pixel noise.
+    this.values[91] = c.height / (2 * Math.tan((c.camera.fov * Math.PI) / 360));
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     this.stats.staticDraws = this.stats.dynamicDraws = 0;
     if (this.dirty) {
