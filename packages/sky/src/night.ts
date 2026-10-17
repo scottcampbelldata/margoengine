@@ -3,9 +3,11 @@ import type { SkyFeatures } from './base.js';
 /** Stylized night (`night` option): gradient, twinkling stars and a phased moon with glow. */
 export const night: NonNullable<SkyFeatures['night']> = {
   wgsl: `fn hash21(p:vec2f)->f32 {var q=fract(p.xyx*0.1031);q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
-fn stylizedNight(r:vec3f)->vec3f {
+fn stylizedNight(r:vec3f,footprint:f32)->vec3f {
  let haze=frame.nightHorizon.w;let moon=frame.nightMoon;let params=frame.nightParams;
  var color=mix(frame.nightZenith.rgb,frame.nightHorizon.rgb,pow(1.0-clamp(r.y,0.0,1.0),2.5/max(haze,0.01))*min(haze,1.0));
+ // Fog asks with a zero footprint for the gradient alone: stars and the moon belong to the sky, not to the haze.
+ if(footprint<=0.0){return color;}
  let cosine=clamp(dot(r,moon.xyz),-1.0,1.0);
  if(r.y>0.258819){
   let cell=r.xz/(r.y+0.15)*250.0;let random=hash21(floor(cell));

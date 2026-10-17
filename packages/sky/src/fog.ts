@@ -11,7 +11,8 @@ const fragment = `
  let distance=length(offset);let optical=max(0.0,distance-fog[0].y)*fog[0].x*(1.0+max(-world.y,0.0)*fog[0].w);if(optical<=0.0){discard;}
  let opacity=1.0-exp(-select(optical*optical,optical,fog[0].z>0.5));
  // shortcut: homogeneous distance haze, use volumetric scattering for local weather and light shafts.
- let ray=offset/max(distance,0.0001);var color=fog[1].rgb;if(fog[1].w<0.5){color=skyRadiance(normalize(vec3f(ray.x,max(0.0001,ray.y),ray.z)))*exp2(frame.settings.y);}
+ // A zero footprint takes the sky's gradient without the stylized night's stars and moon.
+ let ray=offset/max(distance,0.0001);var color=fog[1].rgb;if(fog[1].w<0.5){color=skyRadiance(normalize(vec3f(ray.x,max(0.0001,ray.y),ray.z)),0.0)*exp2(frame.settings.y);}
  if(frame.settings.w<0.5&&frame.nightOn.x<0.5){color=pow(color/(1.0+color),vec3f(1.0/2.2));}return vec4f(color,opacity);
 }`;
 /** Distance and height fog over the scene depth (`fog` option), in the sky's colour or a fixed one. */

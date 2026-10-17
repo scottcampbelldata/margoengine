@@ -129,6 +129,7 @@ meters (default 0.01, range 0–1). Visibility is
 `exp(-((max(0, distance - start) * density) ** 2))`; zero density disables the pass.
 Fog uses the sky model's direction-dependent radiance, exposure and night fade,
 with the same horizon sampling as the background and borrowed water environment.
+With a stylized night it takes the gradient alone, never the stars or the moon.
 It composites after opaque surfaces and water, before VFX and tone mapping,
 without another colour target or blur. Clear sky pixels are untouched, preserving
 sun/moon discs. Both 1x and 4x depth work; multisampled depth must match the scene's

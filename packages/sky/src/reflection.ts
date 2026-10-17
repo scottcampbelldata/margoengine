@@ -9,7 +9,7 @@ const reflectSky = `
  let w=vec3f(sin(theta)*cos(phi),cos(theta),sin(theta)*sin(phi));let s=frame.sun.xyz;
  let ray=normalize(vec3f(w.x,max(0.001,w.y),w.z));var color=daySky(ray);
  color=mix(vec3f(0.015,0.018,0.012),color,smoothstep(-0.2,0.02,w.y));
- color=mix(color,nightSky(w),frame.sun.w);
+ color=mix(color,nightSky(w,0.1),frame.sun.w);
  color+=frame.moonColor.rgb*frame.moon.w*moonRadiance(w,frame.moon.xyz,0.1);
  color=cloudSky(color,w,0.1);
  textureStore(reflectionMap,vec2i(id.xy),vec4f(color*exp2(frame.settings.y),1));
