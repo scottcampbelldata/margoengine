@@ -32,7 +32,7 @@
   <main id="main">
     <section class="hero">
       <div class="hero-copy">
-        <h1>A 3D engine for the web that starts under 20&nbsp;kB gzipped.</h1>
+        <h1>A 3D engine for the web that starts at about 21&nbsp;kB gzipped.</h1>
         <p class="lede">A TypeScript engine with a Rust kernel compiled to WebAssembly, WebGPU rendering, an optional WebGL2 fallback, and optional packs.</p>
         <p class="actions">
           <a class="button primary" href="#start">Get started</a>
@@ -72,7 +72,7 @@ npm run dev</code></pre>
     <section class="core">
       <h2>What the core gives you</h2>
       <dl>
-        <div><dt>Under 20 kB gzip</dt><dd>Core plus the stage facade, with the embedded Wasm kernel and the WebGPU backend. The build fails at 20,000 bytes gzip or above; <code>npm run measure:size</code> prints the current figure, and the <a href="./sizes.html">sizes page</a> lists every package entry from the same build. The WebGL2 fallback is the optional <code>@margoengine/webgl</code> (2.2 kB gzip).</dd></div>
+        <div><dt>About 21 kB gzip</dt><dd>Core plus the stage facade, with the embedded Wasm kernel and the WebGPU backend. The build fails at 25,000 bytes gzip or above; <code>npm run measure:size</code> prints the current figure, and the <a href="./sizes.html">sizes page</a> lists every package entry from the same build. The WebGL2 fallback is the optional <code>@margoengine/webgl</code> (2.2 kB gzip).</dd></div>
         <div><dt>Transforms in Wasm memory</dt><dd>Hierarchy, culling and world matrices run in a Rust kernel over flat typed arrays. An engine starts with 1,024 entity slots and doubles them on demand, up to 8,388,608.</dd></div>
         <div><dt>Instancing by default</dt><dd>Visible meshes sharing a geometry instance render in one instanced draw call per scene pass, with per-instance material values.</dd></div>
         <div><dt>WebGPU first, WebGL2 fallback</dt><dd>Reversed float depth, GPU picking and automatic device-loss recovery on WebGPU. Basic scenes (core meshes, flat PBR, one light) also render on WebGL2 with the optional <code>@margoengine/webgl</code> package.</dd></div>
