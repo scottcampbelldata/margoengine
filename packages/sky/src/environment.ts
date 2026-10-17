@@ -7,8 +7,8 @@ fn skyEnvironment(w:vec3f,footprint:f32)->vec3f {
  let ray=normalize(vec3f(w.x,max(0.001,w.y),w.z));var color=daySky(ray);
  color=mix(vec3f(0.015,0.018,0.012),color,smoothstep(-0.2,0.02,w.y));
  color=mix(color,nightSky(w,footprint),frame.sun.w);
- color+=frame.moonColor.rgb*frame.moon.w*moonRadiance(w,frame.moon.xyz,footprint);
- return cloudSky(color,w,footprint)*exp2(frame.settings.y);
+ let sky=color;color+=frame.moonColor.rgb*frame.moon.w*moonRadiance(w,frame.moon.xyz,footprint);
+ return cloudSky(color,sky,w,footprint)*exp2(frame.settings.y);
 }
 // Equirectangular layout shared with Water: u turns around +Y from -X, v runs from the zenith down.
 fn environmentDirection(uv:vec2f)->vec3f {

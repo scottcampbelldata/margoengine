@@ -55,12 +55,21 @@ described below; caller exposure and bloom strength still affect its glow.
 Set `clouds: {coverage: 0.45, speed: 8, height: 1500}` for an optional animated
 procedural cloud layer. Coverage is 0–1, speed is signed world meters per second
 along a fixed XZ wind direction, and height is 100–10,000 world meters. Defaults
-are 0.45, 8 and 1500; omitting `clouds` disables the layer. Four filtered noise
-octaves shade the sheet with daylight or moonlight. The visible sky and water's
-borrowed reflection use the same cloud field and clock, with filtering matched
-to each target's resolution. No textures, ray marching or CPU cloud geometry are
-required. Distant clouds fade into clear horizon haze instead of stretching down
-to the sea. This sheet has no cloud shadows or volumetric flight-through rendering.
+are 0.45, 8 and 1500; omitting `clouds` disables the layer. The layer is a curved
+shell at that height around the planet (radius 6,360 km), so clouds reach the
+horizon and only the ground hides them; they fade by distance into the haze (half
+strength at 28 km), not by angle. Four octaves of value noise on an integer hash
+(pcg2d, Jarzynski and Olano 2020: no precision loss on phone GPUs), each turned 37°,
+give the shape; coverage remaps it (Schneider 2015) and the fine octaves erode the
+edges. Fine octaves fade to their mean once a pixel covers them. Three samples
+toward the sun through the layer give Beer-Lambert self-shadowing with a powder
+term, lit by the sun's transmittance colour with a two-lobe Henyey-Greenstein phase
+(Hillaire 2016); the surrounding sky lights them as ambient, and the lighting moon
+by night. A sky pixel evaluates at most ten noise lookups (four for the shape and
+erosion, six for the sun samples), two where the sky is clear, and no
+texture reads. The visible sky, water's reflection and the lighting environment use
+the same cloud field and clock, with filtering matched to each target's resolution.
+This layer has no cloud shadows on the ground or volumetric flight-through rendering.
 
 timeScale is clock hours per real second. Sun direction is exposed in the reused sun buffer. The sky draws only where the reversed-Z scene depth is clear. Bruneton precomputation includes transmittance, single scattering, scattering density and orders 2..4, cached until turbidity changes. Tables interpolate four dimensions (radius, view zenith, sun zenith, view/sun angle), with 8 x 32 x 16 x 8 samples; angular and ray integration use 32 samples. Camera Y is meters above Earth; atmosphere math is kilometers.
 

@@ -159,11 +159,12 @@ try {
         cloudShader +
         `
    @group(0) @binding(1) var<storage,read_write> result:array<vec4f>;
-   @compute @workgroup_size(64) fn probe(@builtin(global_invocation_id) id:vec3u){if(id.x>=128u){return;}let angle=f32(id.x)*0.1;let ray=normalize(vec3f(cos(angle),0.3+f32(id.x%8u)*0.08,sin(angle)));result[id.x]=vec4f(cloudSky(vec3f(0.1,0.2,0.4),ray,0.001),1);}`;
+   @compute @workgroup_size(64) fn probe(@builtin(global_invocation_id) id:vec3u){if(id.x>=128u){return;}let angle=f32(id.x)*0.1;let ray=normalize(vec3f(cos(angle),0.3+f32(id.x%8u)*0.08,sin(angle)));result[id.x]=vec4f(cloudSky(vec3f(0.1,0.2,0.4),vec3f(0.1,0.2,0.4),ray,0.001),1);}`;
       const clouds = await probe(skyCode, skyFrame, 128);
       skyFrame[37] = 80;
       const moved = await probe(skyCode, skyFrame, 128);
       skyFrame[23] = 1;
+      skyFrame.fill(0, 60, 63);
       const night = await probe(skyCode, skyFrame, 128);
       skyFrame[36] = 0;
       const clear = await probe(skyCode, skyFrame, 128);
@@ -173,7 +174,7 @@ try {
           cloudShader +
           `
    @group(0) @binding(1) var<storage,read_write> result:array<vec4f>;
-   @compute @workgroup_size(64) fn probe(@builtin(global_invocation_id) id:vec3u){if(id.x>=128u){return;}let angle=f32(id.x)*0.1;let y=-0.05+f32(id.x%8u)*0.014;let ray=vec3f(cos(angle)*sqrt(1.0-y*y),y,sin(angle)*sqrt(1.0-y*y));result[id.x]=vec4f(cloudSky(vec3f(0.1,0.2,0.4),ray,0.001),1);}`,
+   @compute @workgroup_size(64) fn probe(@builtin(global_invocation_id) id:vec3u){if(id.x>=128u){return;}let angle=f32(id.x)*0.1;let y=-0.05+f32(id.x%8u)*0.006;let ray=vec3f(cos(angle)*sqrt(1.0-y*y),y,sin(angle)*sqrt(1.0-y*y));result[id.x]=vec4f(cloudSky(vec3f(0.1,0.2,0.4),vec3f(0.1,0.2,0.4),ray,0.001),1);}`,
         skyFrame,
         128,
       );
@@ -332,7 +333,7 @@ try {
   };
   report.checks.push(
     'Planet terminator uses ordered smoothstep edges',
-    'Clouds preserve the clear horizon and cameras above the layer',
+    'Clouds leave the ground below the horizon and cameras above the layer untouched',
     'Prominent sun/moon discs, antialiased edges, halos and filtered reflection coverage',
     'Moon keeps a bright antialiased limb with bounded radiance and a tight halo',
     'Branch/foliage detail with analytic normals, anchored roots and bounded nonfolding deformation',

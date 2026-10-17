@@ -23,5 +23,6 @@ test('nature cloud probes bind the complete current Sky frame, including disable
     1500,
     0,
   ]);
-  assert.deepEqual(Array.from(frame.slice(offsets.get('nightZenith'))), new Array(24).fill(0));
+  assert.deepEqual(Array.from(frame.slice(offsets.get('nightZenith'), offsets.get('sunlight'))), new Array(20).fill(0));
+  assert.deepEqual(Array.from(frame.slice(offsets.get('sunlight'))), [1, 1, 1, 0], 'White noon sun, no stylized night');
 });

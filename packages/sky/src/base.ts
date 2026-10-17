@@ -146,7 +146,7 @@ function compose(f: SkyFeatures): [string, string] {
       atmosphere +
       (f.clouds?.wgsl ??
         `
-fn cloudSky(color:vec3f,ray:vec3f,angularFootprint:f32)->vec3f {return color;}
+fn cloudSky(color:vec3f,backdrop:vec3f,ray:vec3f,angularFootprint:f32)->vec3f {return color;}
 `) +
       celestialShader +
       `
@@ -158,7 +158,7 @@ fn cloudSky(color:vec3f,ray:vec3f,angularFootprint:f32)->vec3f {return color;}
 fn nightSky(w:vec3f,footprint:f32)->vec3f {
 ` +
       (f.night
-        ? ` if(frame.nightOn.x>0.5){return stylizedNight(w,footprint);}
+        ? ` if(frame.sunlight.w>0.5){return stylizedNight(w,footprint);}
 `
         : '') +
       ` return mix(vec3f(0.012,0.019,0.038),vec3f(0.003,0.006,0.02),sqrt(max(0.0,w.y)));
@@ -179,11 +179,11 @@ fn nightSky(w:vec3f,footprint:f32)->vec3f {
 fn skyRadiance(w:vec3f,footprint:f32)->vec3f {if(frame.sun.w>=1.0){return nightSky(w,footprint);}return mix(daySky(w),nightSky(w,footprint),frame.sun.w);}
 @fragment fn fragment(i:Vertex)->@location(0) vec4f {
  let p=frame.inverse*vec4f(i.uv.x*2.0-1.0,1.0-i.uv.y*2.0,0.000001,1);let w=normalize(p.xyz/p.w-frame.eye.xyz);let s=frame.sun.xyz;
- let footprint=max(length(dpdx(w)),length(dpdy(w)));var color=skyRadiance(w,footprint);
+ let footprint=max(length(dpdx(w)),length(dpdy(w)));let sky=skyRadiance(w,footprint);var color=sky;
  let sun=celestialProfile(w,s,SUN_RADIUS,footprint);
  color+=(sun.x*60.0+sun.y*0.8)*trans(transmission,R+clamp(frame.eye.w,0.001,99.9),s.y)*(1.0-frame.sun.w);
  color+=frame.moonColor.rgb*frame.moon.w*moonRadiance(w,frame.moon.xyz,footprint);
- color=cloudSky(color,w,footprint);color*=exp2(frame.settings.y);if(frame.settings.w<0.5&&frame.nightOn.x<0.5){color=pow(color/(1.0+color),vec3f(1.0/2.2));}return vec4f(color,1);
+ color=cloudSky(color,sky,w,footprint);color*=exp2(frame.settings.y);if(frame.settings.w<0.5&&frame.sunlight.w<0.5){color=pow(color/(1.0+color),vec3f(1.0/2.2));}return vec4f(color,1);
 }`,
   ];
 }
@@ -356,6 +356,7 @@ export class Sky implements EnginePlugin {
     // Surfaces add their own N.L, so no further elevation factor: the low sun is dimmed and warmed once, by the air.
     const s = sunlight(this.sun[1], this.values[19] || 0.001, this.options.turbidity ?? 2, this.sunColor),
       peak = Math.max(s[0], s[1], s[2]);
+    this.values.set(s, 60);
     this.lights[0].direction.set(this.sun);
     this.lights[0].direction[3] = l ? (l.intensity ?? 1) * peak : 0;
     for (let i = 0; i < 3; i++) this.lights[0].radiance[i] = (l?.color?.[i] ?? 1) * (peak > 0 ? s[i] / peak : 1);
@@ -378,9 +379,9 @@ export class Sky implements EnginePlugin {
     this.values[37] = this.cloudTime;
     this.values[38] = this.options.clouds?.height ?? 1500;
     this.values[27] = +(c.format === 'rgba16float');
-    // Uniform layout of SkyNightOptions: zenith+twinkle, horizon+haze, moon direction+cos(size), moon colour+sin(size), phase/glow/stars/time, enabled.
+    // Uniform layout of SkyNightOptions: zenith+twinkle, horizon+haze, moon direction+cos(size), moon colour+sin(size), phase/glow/stars/time; then the sun colour (60-62, set before update) and the enabled flag (63).
     const n = this.options.night;
-    this.values[60] = +!!n;
+    this.values[63] = +!!n;
     if (n) this.features.night!.write(this.values, n, this.time);
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     const turbidity = this.options.turbidity ?? 2;

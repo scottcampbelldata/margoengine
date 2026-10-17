@@ -422,7 +422,7 @@ test('fog takes the night gradient alone; the sky and its reflection pass their 
   assert.ok(early > 0 && early < night.indexOf('let cosine='), 'A zero footprint returns before stars and moon');
   assert.match(
     sky,
-    /let footprint=max\(length\(dpdx\(w\)\),length\(dpdy\(w\)\)\);var color=skyRadiance\(w,footprint\);/,
+    /let footprint=max\(length\(dpdx\(w\)\),length\(dpdy\(w\)\)\);let sky=skyRadiance\(w,footprint\);var color=sky;/,
   );
   assert.match(
     reflection,
@@ -538,6 +538,24 @@ test('optional procedural clouds share retained frame data and night sky works w
   assert.equal(values()[23], 1);
   assert.equal(values()[36], Math.fround(0.45));
   assert.equal(values()[38], 1500);
+  assert.deepEqual([...values().subarray(60, 63)], [0, 0, 0], 'Midnight: the sun lights no cloud');
+  const code = h.pipelines.find((p) => p.fragment?.entryPoint === 'fragment').fragment.module.code,
+    cloud = code.slice(code.indexOf('fn cloudHash('));
+  // Integer hash, curved shell, distance fade, three sun samples with phase and powder; no sin hash or angle cutoff.
+  assert.match(cloud, /bitcast<vec2u>\(p\)\*1664525u\+1013904223u/);
+  assert.doesNotMatch(cloud, /fract\(sin\(/);
+  assert.match(cloud, /let t=-r\*mu\+sqrt\(r\*r\*\(mu\*mu-1\.0\)\+shell\*shell\);/);
+  assert.match(cloud, /let haze=exp\(-t\/40\.0\);/);
+  assert.doesNotMatch(cloud, /ray\.y<=0\.05|smoothstep\(0\.05,0\.18,ray\.y\)/);
+  assert.match(cloud, /for\(var k=1;k<=3;k\+\+\)/);
+  assert.match(cloud, /frame\.sunlight\.rgb\*1\.6\*\(exp\(-tau\)\*powder\*cloudPhase\(nu\)/);
+  assert.match(code, /color=cloudSky\(color,sky,w,footprint\);/, 'The sky without discs lights the clouds');
+  sky.options.hours = 17 + 34 / 60;
+  sky.onPreUpdate(0);
+  h.frame();
+  const sunlit = values().subarray(60, 63);
+  assert.ok(sunlit[0] > sunlit[1] && sunlit[1] > sunlit[2] && sunlit[2] > 0, 'Golden hour lights clouds amber');
+  sky.options.hours = 0;
   const created = { ...h.counts };
   for (let i = 0; i < 60; i++) h.frame();
   assert.ok(values()[37] > first);
