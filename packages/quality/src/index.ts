@@ -19,8 +19,11 @@ export type QualityTier = 'phone' | 'light' | 'high';
  * are the packages' option names.
  */
 export interface QualityPreset {
-  /** `Shadows` (@margoengine/shadows): texels per cascade (default 2048). */
-  shadows?: { resolution?: number };
+  /** `Shadows` (@margoengine/shadows): texels per cascade (default 2048), edge filter (default 'soft', PCSS) and
+   * cascades (default 4). */
+  shadows?: { resolution?: number; filter?: 'soft' | 'pcf' | 'hard'; cascades?: number };
+  /** `Scatter` (@margoengine/scatter): LOD cross-fade width (default 2); 0 compiles out the fade's `discard`. */
+  scatter?: { lodFade?: number };
   /** `SSAO` (@margoengine/post/ssao): on/off (default on) and kernel samples, 1-32 (default 32). */
   ssao?: { enabled?: boolean; samples?: number };
   /** `SSR` (@margoengine/post/ssr): on/off (default on) and Hi-Z march steps (default 64). */
@@ -32,22 +35,27 @@ export interface QualityPreset {
   /** `VFX` (@margoengine/vfx): particle capacity (default 1,000,000). */
   vfx?: { capacity?: number };
 }
+// Light and phone shadows: four hardware comparison taps instead of PCSS's 16 blocker reads and 32 taps per lit pixel.
 const light: QualityPreset = {
-  shadows: { resolution: 1024 },
+  shadows: { resolution: 1024, filter: 'pcf' },
   ssao: { samples: 16 },
   ssr: { enabled: false, steps: 32 },
   volumetric: { grid: [80, 45, 32] },
   localShadows: { resolution: 256 },
   vfx: { capacity: 100_000 },
 };
-/** The preset per tier. The full tier keeps package defaults; phones use light defaults with SSAO and volumetric fog off. */
+/** The preset per tier. The full tier keeps package defaults; phones use light defaults with SSAO and volumetric fog
+ * off, two shadow cascades instead of four, and no scatter LOD fade (a fragment `discard` turns off early depth
+ * rejection on tile-based phone GPUs). */
 export const QUALITY_PRESETS: Readonly<Record<QualityTier, QualityPreset>> = {
   high: {},
   light,
   phone: {
     ...light,
+    shadows: { ...light.shadows, cascades: 2 },
     ssao: { enabled: false },
     volumetric: { enabled: false },
+    scatter: { lodFade: 0 },
   },
 };
 /** This page's preset (calls `applyQualityTier()` first if nothing has). */

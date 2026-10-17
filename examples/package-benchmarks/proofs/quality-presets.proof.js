@@ -24,7 +24,13 @@ const point = { position: [0, 2, 1], range: 6, intensity: 9, castShadow: true },
   spot = { position: [1, 3, 0], range: 8, direction: [0, -1, 0.2], outerAngle: 0.6, intensity: 20, castShadow: true };
 // key: [package, entry, make(module, options) -> effects (the measured one last), base options, explicit values for every preset key]
 const cases = {
-  shadows: ['shadows', 'src/index.ts', (m, o) => [new m.Shadows(o)], { distance: 80 }, { resolution: 2048 }],
+  shadows: [
+    'shadows',
+    'src/index.ts',
+    (m, o) => [new m.Shadows(o)],
+    { distance: 80 },
+    { resolution: 2048, filter: 'soft' },
+  ],
   ssao: ['post', 'src/index.ts', (m, o) => [new m.SSAO(o)], { radius: 0.4 }, { samples: 32 }],
   ssr: [
     'post',

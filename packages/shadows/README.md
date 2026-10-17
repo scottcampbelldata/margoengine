@@ -19,7 +19,7 @@ engine.start();
 // removeCharacter() when unloading; engine.dispose() releases attached plugins.
 ```
 
-`filter` picks the edge: `'soft'` (default) is the PCSS above; `'pcf'` takes four hardware comparison taps half a texel apart (each is the sampler's own 2x2 bilinear comparison, together a smooth edge about three texels wide) with no blocker search and no spiral, for phones and light tiers; `'hard'` takes one tap. `cascades` (1-4, default 4) renders fewer layers: fewer depth passes per frame, coarser texels over the same `distance`; `bounds` always uses one map.
+`filter` picks the edge: `'soft'` (default) is the PCSS above; `'pcf'` takes four hardware comparison taps half a texel apart (each is the sampler's own 2x2 bilinear comparison, together a smooth edge about three texels wide) with no blocker search and no spiral, for phones and light tiers; `'hard'` takes one tap. `cascades` (1-4, default 4) renders fewer layers: fewer depth passes per frame, coarser texels over the same `distance`; `bounds` always uses one map. `@margoengine/quality` sets `filter:'pcf'` on its light and phone tiers and `cascades:2` on phones when the app leaves them unset.
 
 `lambda:0` gives uniform splits; `lambda:1` gives logarithmic splits. `lightSize` is the tangent of the sun's angular radius; `bias` is normalized depth and `normalBias` is world distance. `casterMargin` extends the depth bounds to include casters outside the camera slice. Shadows follow the engine's directional light.
 

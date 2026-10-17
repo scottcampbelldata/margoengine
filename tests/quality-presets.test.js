@@ -11,6 +11,8 @@ import { VolumetricFog } from '../packages/environment/dist/volumetric.js';
 import { Clustered } from '../packages/clustered/dist/index.js';
 import { LocalShadows } from '../packages/clustered/dist/shadows.js';
 import { VFX } from '../packages/vfx/dist/index.js';
+import { Scatter } from '../packages/scatter/dist/index.js';
+import { box } from '@margoengine/core';
 
 const lights = new Clustered();
 const readers = {
@@ -20,8 +22,23 @@ const readers = {
   volumetric: (o) => new VolumetricFog(o),
   localShadows: (o) => new LocalShadows({ ...o, lights }),
   vfx: (o) => new VFX(o),
+  scatter: (o) => new Scatter([box(), box(0.5), box(0.25)], o),
 };
-const light = QUALITY_PRESETS.light;
+const light = QUALITY_PRESETS.light,
+  phone = QUALITY_PRESETS.phone;
+// A non-default value for every preset key: passed explicitly, it must win over any tier.
+const explicitValues = {
+  resolution: 2048,
+  filter: 'soft',
+  cascades: 4,
+  samples: 32,
+  enabled: true,
+  steps: 64,
+  grid: [160, 90, 64],
+  maxLights: 3,
+  capacity: 1_000_000,
+  lodFade: 2,
+};
 const withPreset = (value, work) => {
   globalThis.margoPreset = value;
   try {
@@ -55,29 +72,28 @@ test('every reader keeps the app options object untouched when no preset is set'
 });
 
 test('with a preset every reader takes the preset values it was not given, and explicit options win', () => {
+  for (const tier of [light, phone])
+    withPreset(tier, () => {
+      for (const [key, make] of Object.entries(readers)) {
+        const filled = make({});
+        for (const [name, value] of Object.entries(tier[key] ?? {}))
+          assert.deepEqual(filled.options[name], value, `${key}.${name} from the preset`);
+        const explicit = Object.fromEntries(Object.keys(tier[key] ?? {}).map((name) => [name, explicitValues[name]]));
+        for (const [name, value] of Object.entries(explicit))
+          assert.notEqual(value, undefined, `${key}.${name} needs an explicit test value`);
+        const kept = make(explicit);
+        for (const [name, value] of Object.entries(explicit))
+          assert.deepEqual(kept.options[name], value, `${key}.${name} explicit`);
+      }
+    });
+  withPreset(phone, () => {
+    assert.equal(new Scatter([box(), box(0.5), box(0.25)], {}).values[31], 0, 'phones: no scatter LOD fade');
+    // Fixed-bounds shadows ignore the phone preset's cascade count (one map) instead of throwing.
+    const fixed = new Shadows({ bounds: { min: [-1, -1, -1], max: [1, 1, 1] } });
+    assert.equal(fixed.options.cascades, 2);
+    fixed.dispose();
+  });
   withPreset(light, () => {
-    for (const [key, make] of Object.entries(readers)) {
-      const filled = make({});
-      for (const [name, value] of Object.entries(light[key]))
-        assert.deepEqual(filled.options[name], value, `${key}.${name} from the preset`);
-      const explicit = Object.fromEntries(
-        Object.keys(light[key]).map((name) => [
-          name,
-          {
-            resolution: 2048,
-            samples: 32,
-            enabled: true,
-            steps: 64,
-            grid: [160, 90, 64],
-            maxLights: 3,
-            capacity: 1_000_000,
-          }[name],
-        ]),
-      );
-      const kept = make(explicit);
-      for (const [name, value] of Object.entries(explicit))
-        assert.deepEqual(kept.options[name], value, `${key}.${name} explicit`);
-    }
     assert.equal(new VFX({}).capacity, 100_000);
     assert.equal(
       new VFX({ initialCount: 500_000 }).capacity,

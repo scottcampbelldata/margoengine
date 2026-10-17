@@ -41,15 +41,22 @@ packages never import this package: the global is the whole contract, so an app 
 
 | Key | Package, class | Option | Full tier (package default) | Light tier | Phone tier |
 | --- | --- | --- | --- | --- | --- |
-| `shadows` | `@margoengine/shadows` `Shadows` | `resolution` | 2048 (two 4-layer maps, 128 MiB) | 1024 (32 MiB) | 1024 (32 MiB) |
+| `shadows` | `@margoengine/shadows` `Shadows` | `resolution`, `filter`, `cascades` | 2048 (two 4-layer maps, 128 MiB), `'soft'` (PCSS), 4 | 1024 (32 MiB), `'pcf'`, 4 | 1024 (16 MiB), `'pcf'`, 2 |
 | `ssao` | `@margoengine/post/ssao` `SSAO` | `enabled`, `samples` | on, 32 | on, 16 | off |
 | `ssr` | `@margoengine/post/ssr` `SSR` | `enabled`, `steps` | on, 64 | off, 32 | off, 32 |
 | `volumetric` | `@margoengine/environment/volumetric` `VolumetricFog` | `enabled`, `grid` | on, [160, 90, 64] | on, [80, 45, 32] | off |
 | `localShadows` | `@margoengine/clustered/shadows` `LocalShadows` | `resolution` | 512 | 256 | 256 |
 | `vfx` | `@margoengine/vfx` `VFX` | `capacity` | 1,000,000 | 100,000 | 100,000 |
+| `scatter` | `@margoengine/scatter` `Scatter` | `lodFade` | 2 | 2 | 0 |
 
 The phone preset publishes `ssao: { enabled: false }` and `volumetric: { enabled: false }`. Disabled `VolumetricFog`
 registers no passes; omitting `enabled` keeps it on. Explicit feature options still win over preset defaults.
+
+Shadows on the light and phone tiers use `filter: 'pcf'`: four hardware comparison taps per lit pixel instead of PCSS's
+16 blocker reads and 32 taps (a fixed edge about three texels wide instead of contact-hardening penumbrae). Phones also
+render two cascades instead of four (half the depth passes) and set scatter's `lodFade: 0`, which compiles its shaders
+without `discard`: tile-based phone GPUs then keep early depth rejection under dense grass. Pass `filter: 'soft'`,
+`cascades: 4` or `lodFade: 2` to keep those on every tier.
 
 ```ts
 import {applyQualityTier, qualityPreset} from '@margoengine/quality';

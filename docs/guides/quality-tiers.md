@@ -16,7 +16,7 @@ const tier = applyQualityTier();             // 'light' | 'high' | 'phone'; befo
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
 paceEngine(engine);                          // light tier: a steady ~60 FPS instead of 120/40 swings
 
-Shadows.attach(engine, {distance: 150});     // resolution from the tier: 1024 light/phone, 2048 full
+Shadows.attach(engine, {distance: 150});     // from the tier: 1024 + PCF light/phone (2 cascades on phones), 2048 + PCSS full
 SSAO.attach(engine, {radius: 0.5});          // samples from the tier: 16 light/phone, 32 full
 engine.start();
 watchQuality();                              // measures the light tier; a fast GPU gets the full tier next load
@@ -26,11 +26,12 @@ console.log(tier);
 What each tier does:
 
 - **Light** (desktops until measured fast; `?quality=low` forces it): 1x MSAA, pixel ratio 1, paced to ~60 FPS, and the
-  light preset (smaller shadow maps, half the SSAO samples, SSR off, a coarser fog grid, smaller local shadow maps,
-  100,000 particles by default). The full table is in the
+  light preset (smaller shadow maps with four-tap PCF edges instead of PCSS, half the SSAO samples, SSR off, a coarser
+  fog grid, smaller local shadow maps, 100,000 particles by default). The full table is in the
   [`@margoengine/quality` README](../../packages/quality/README.md#tier-presets).
 - **Full** (`'high'`; `?quality=high` forces it): 4x MSAA and every package's own defaults.
-- **Phone** (user agent): 1x MSAA, pixel ratio up to 2, the light preset.
+- **Phone** (user agent): 1x MSAA, pixel ratio up to 2, the light preset with SSAO and volumetric fog off, two shadow
+  cascades instead of four, and no scatter LOD fade (its `discard` turns off early depth rejection on phone GPUs).
 
 Keep a value on every tier by passing it:
 

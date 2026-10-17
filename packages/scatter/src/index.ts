@@ -51,7 +51,7 @@ export interface ScatterOptions {
   /**
    * Width of the dithered cross-fade between LOD meshes, in world units (default 2). 0 switches hard and compiles the
    * shaders without the fade's `discard`, which keeps early depth rejection on tile-based phone GPUs; one shared
-   * Geometry for all rings does the same.
+   * Geometry for all rings does the same. The phone quality tier sets 0 when the app leaves it unset.
    */
   lodFade?: number;
   seed?: number;

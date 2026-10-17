@@ -118,7 +118,7 @@ test('applyQualityTier publishes the tier preset as globalThis.margoPreset; the 
     assert.equal(globalThis.margoPreset, QUALITY_PRESETS.light);
     assert.equal(qualityPreset(), QUALITY_PRESETS.light);
     assert.deepEqual(QUALITY_PRESETS.light, {
-      shadows: { resolution: 1024 },
+      shadows: { resolution: 1024, filter: 'pcf' },
       ssao: { samples: 16 },
       ssr: { enabled: false, steps: 32 },
       volumetric: { grid: [80, 45, 32] },
@@ -128,6 +128,17 @@ test('applyQualityTier publishes the tier preset as globalThis.margoPreset; the 
     applyQualityTier({ search: '', storage: memory(), userAgent: phone });
     assert.equal(globalThis.margoPreset, QUALITY_PRESETS.phone);
     assert.notEqual(QUALITY_PRESETS.phone, QUALITY_PRESETS.light);
+    // Phones: PCF shadows on two cascades, and no scatter LOD fade (its discard defeats early depth rejection).
+    assert.deepEqual(QUALITY_PRESETS.phone, {
+      shadows: { resolution: 1024, filter: 'pcf', cascades: 2 },
+      ssao: { enabled: false },
+      ssr: { enabled: false, steps: 32 },
+      volumetric: { enabled: false },
+      localShadows: { resolution: 256 },
+      vfx: { capacity: 100_000 },
+      scatter: { lodFade: 0 },
+    });
+    assert.deepEqual(QUALITY_PRESETS.light.shadows, { resolution: 1024, filter: 'pcf' }, 'light keeps four cascades');
     applyQualityTier({ search: '', storage: memory({ margoQuality: 'high' }), userAgent: desktop });
     assert.deepEqual(globalThis.margoPreset, {});
     assert.deepEqual(qualityPreset(), {});

@@ -38,7 +38,8 @@ With `lodFade: 0`, or one Geometry for every ring, no instance can fade, so the
 shaders are compiled without the fade's `discard`; lit scatter also compiles out
 core's back-face `discard` (single-sided materials cull back faces in the
 rasterizer instead). A shader without `discard` keeps early depth rejection on
-tile-based phone GPUs, so hidden grass blades are not shaded.
+tile-based phone GPUs, so hidden grass blades are not shaded. The phone tier of
+`@margoengine/quality` sets `lodFade: 0` when the app leaves it unset.
 
 LOD meshes must use matching origins, scale and shading. For procedural rocks,
 pass `true` as the third argument to `icosahedronGeometry(radius, detail, true)`
