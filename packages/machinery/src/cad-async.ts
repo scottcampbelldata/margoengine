@@ -9,10 +9,18 @@ export interface CADImportOptions {
   onProgress?: (percent: number) => void;
   /**
    * Shading normals (default true). STEP/IGES: OpenCascade's own surface normals, smooth across each curved face and
-   * hard at every B-rep edge. STL/OBJ: corners at the same point are welded and their normals averaged (area times
-   * corner angle). `false`: one flat normal per triangle.
+   * hard at every B-rep edge. STL/OBJ: corners at the same point are welded, and each corner averages the normals of
+   * the triangles there that meet its own within `creaseAngle` (weighted by area times corner angle). `false`: one flat
+   * normal per triangle.
    */
   smoothing?: boolean;
+  /**
+   * STL and OBJ with smoothing: the largest angle, in degrees from 0 to 180, at which two triangles at a point share a
+   * smooth normal (default 40). Sharper edges stay hard, as in the CAD model: a box keeps its 90 degree edges and a hex
+   * nut its 60 degree corners, while a cylinder cut into 9 or more sides shades round. 180 averages every triangle at a
+   * point, as earlier versions did. STEP and IGES ignore it: OpenCascade's surface normals already know every edge.
+   */
+  creaseAngle?: number;
   /** Most parts (OBJ objects and groups, STEP/IGES meshes) the file may have, each one a core mesh (default 100,000; up to core's 8,388,608 entities). */
   maxParts?: number;
   /**
@@ -46,6 +54,9 @@ export function parseCADAsync(
     !(typeof linearDeflection === 'number' && linearDeflection > 0 && linearDeflection < Infinity)
   )
     throw new RangeError('linearDeflection must be a positive finite number of meters');
+  const { creaseAngle = 40 } = options;
+  if (!(typeof creaseAngle === 'number' && creaseAngle >= 0 && creaseAngle <= 180))
+    throw new RangeError('creaseAngle must be a number of degrees from 0 to 180');
   const engine = engineRuntime(instance);
   if (engine.disposed) throw new Error('Engine is disposed');
   const workerURL = new URL(/* @vite-ignore */ './workers/cad-runtime.js?no-inline', import.meta.url),
@@ -147,6 +158,7 @@ export function parseCADAsync(
           buffer,
           format,
           smoothing: options.smoothing ?? true,
+          creaseAngle,
           maxParts: options.maxParts,
           linearDeflection,
           occtURL: occtURL.href,
