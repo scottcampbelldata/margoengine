@@ -140,13 +140,51 @@ test('the per-pixel block keeps the anchors later core patches use and survives 
   const ambient = code.replace(/let direct=[\s\S]*return vec4f\([^\n]+\);/, 'return vec4f(i.color,1);');
   assert.ok(balanced(ambient));
   assert.ok(ambient.indexOf('return vec4f(i.color,1);') > ambient.indexOf('i.color=s.color;'));
-  // Without variation there is no noise to evaluate.
-  const plain = await webgl();
-  plain.use(new TerrainColors(plain.createMesh(), options));
-  c.shader = wgsl;
-  plain.frameGraph.execute(c);
-  assert.doesNotMatch(c.shader, /terrainNoise/);
-  plain.dispose();
+  engine.dispose();
+});
+
+test('detail adds noisy borders, height-blended materials and triplanar stone, and 0 removes them', async () => {
+  const shader = async (extra) => {
+    const engine = await webgl(),
+      mesh = engine.createMesh();
+    engine.use(new TerrainColors(mesh, { ...options, ...extra }));
+    const c = { backend: 'webgpu', shader: wgsl, bindings: [], draw() {} };
+    engine.frameGraph.execute(c);
+    const id = meshRuntime(mesh).id;
+    engine.dispose();
+    const start = c.shader.indexOf(`fn terrainSurface_${id}(`);
+    return { code: c.shader, surface: c.shader.slice(start, c.shader.indexOf('\n}', start)) };
+  };
+  // Default detail 1: band borders move with the 14 m noise, both blends use material heights, stone is triplanar.
+  const full = await shader({});
+  assert.match(full.surface, /smoothstep\(1,10,h\+large\*5\.4\)/);
+  assert.match(full.surface, /let stoneT=terrainBlend\(steep,grass,/);
+  assert.match(full.surface, /let sandT=terrainBlend\(shore,/);
+  assert.equal(full.surface.match(/terrainNoise\(/g)?.length, 5);
+  assert.match(full.surface, /if\(steep>0\.004&&fade>0\.0\)/);
+  assert.match(full.surface, /s\.normal=normalize\(n-\(grad-n\*dot\(n,grad\)\)\*\(0\.15\*stoneT\*sandT\)\);/);
+  assert.equal(full.code.match(/fn terrainBlend\(/g)?.length, 1);
+  assert.ok(balanced(full.code));
+  // Partial detail mixes the plain bands with the height blend and scales the bump.
+  const half = await shader({ detail: 0.5 });
+  assert.match(half.surface, /let stoneT=mix\(steep,terrainBlend\(steep,grass,[^;]+\),0\.5\);/);
+  assert.match(half.surface, /\(0\.075\*stoneT\*sandT\)/);
+  // Detail 0 keeps smooth per-pixel bands: no noise, blend or bump unless variation asks for noise.
+  const plain = await shader({ detail: 0 });
+  assert.doesNotMatch(plain.code, /terrainNoise|terrainBlend|grad/);
+  assert.match(plain.surface, /let stoneT=steep;let sandT=shore;/);
+  assert.match(plain.surface, /s\.normal=n;/);
+  const varied = await shader({ detail: 0, variation: 0.2 });
+  assert.equal(varied.surface.match(/terrainNoise\(/g)?.length, 2);
+  assert.match(varied.surface, /\*\(0\.8\+0\.4\*\(0\.65\*large\+0\.35\*fine\)\)/);
+  assert.doesNotMatch(varied.code, /terrainBlend\(/);
+  const engine = await webgl(),
+    mesh = engine.createMesh();
+  for (const detail of [-0.1, 1.5, Number.NaN, '1'])
+    assert.throws(() => new TerrainColors(mesh, { ...options, detail }), {
+      name: 'RangeError',
+      message: 'Terrain detail must be a number in 0..1',
+    });
   engine.dispose();
 });
 

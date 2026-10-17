@@ -33,6 +33,13 @@ export interface TerrainColorOptions {
   wetDarkening: number;
   /** Brightness variation, 0..1 (default 0): two scales of smooth noise darken colors by up to twice this. */
   variation?: number;
+  /**
+   * Per-pixel material detail, 0..1 (default 1). Noise moves each band border by up to 30% of its range; sand, meadow
+   * and stone blend by procedural height maps, so sand settles between grass tufts and grass between rock bumps; steep
+   * stone gets triplanar strata with a small normal perturbation. Fine detail fades out between 20 and 60 m from the
+   * camera. 0 removes all of it from the shader.
+   */
+  detail?: number;
   /** Moving wet band from a borrowed water-depth texture (red channel, meters) over world XZ `origin`/`size`. */
   wetness?: { texture: () => GPUTexture | undefined; origin: Range; size: Range };
 }
@@ -44,17 +51,26 @@ let serial = 0;
 const normalLine = 'let n=normalize(i.normal)*select(-1.0,1.0,facing);';
 const block = 'let terrainSource=i;let terrainNormal=n;{var i=terrainSource;var n=terrainNormal;';
 const surfaceStruct = 'struct TerrainSurface {color:vec3f,normal:vec3f,rough:f32}\n';
-// Value noise on an integer lattice hashed with lowbias32 (C. Wellons, "Prospecting for Hash Functions"). It is not
-// periodic, so no pattern repeats; smoothstep interpolation keeps it free of the lattice's creases.
+// Value noise on an integer lattice hashed with lowbias32 (C. Wellons, "Prospecting for Hash Functions"), returned with
+// its analytic derivatives (value 0..1, d/dx, d/dy). It is not periodic, so no pattern repeats and no tile needs hiding.
 const noiseCode = `
 fn terrainHash(seed:u32)->f32 {
  var h=seed;h^=h>>16u;h*=0x7feb352du;h^=h>>15u;h*=0x846ca68bu;h^=h>>16u;return f32(h>>8u)*5.9604645e-8;
 }
-fn terrainNoise(p:vec2f)->f32 {
+fn terrainNoise(p:vec2f)->vec3f {
  let c=floor(p);let f=p-c;let u=f*f*(3.0-2.0*f);let k=(bitcast<u32>(i32(c.x))*0x8da6b343u)+(bitcast<u32>(i32(c.y))*0xd8163841u);
- return mix(mix(terrainHash(k),terrainHash(k+0x8da6b343u),u.x),mix(terrainHash(k+0xd8163841u),terrainHash(k+0x65bceb84u),u.x),u.y);
+ let a=terrainHash(k);let b=terrainHash(k+0x8da6b343u);let d=terrainHash(k+0xd8163841u);let m=a-b-d+terrainHash(k+0x65bceb84u);
+ return vec3f(a+(b-a)*u.x+(d-a)*u.y+m*u.x*u.y,6.0*f*(1.0-f)*(vec2f(b-a,d-a)+m*u.yx));
 }
 `;
+// Height-based blending (A. Mishkinis, "Advanced Terrain Texture Splatting", 2013): near a transition the higher surface
+// wins within a 0.2 depth. Material heights stay in 0..0.5, so a material at weight 0 never shows through.
+const blendCode = `
+fn terrainBlend(t:f32,ha:f32,hb:f32)->f32 {
+ let a=ha+1.0-t;let b=hb+t;let m=max(a,b)-0.2;let x=max(a-m,0.0);let y=max(b-m,0.0);return y/(x+y);
+}
+`;
+const num = (value: number) => String(Math.round(value * 1e6) / 1e6);
 
 /** Height/slope colors on one ordinary mesh, shaded per pixel inside the scene's PBR and shadow shader. */
 export class TerrainColors implements EnginePlugin {
@@ -102,6 +118,9 @@ export class TerrainColors implements EnginePlugin {
       (options.variation ?? 0) > 1
     )
       throw new RangeError('Invalid terrain wetness or variation');
+    const detail = options.detail ?? 1;
+    if (typeof detail !== 'number' || !(detail >= 0 && detail <= 1))
+      throw new RangeError('Terrain detail must be a number in 0..1');
     const wetness = options.wetness;
     if (
       wetness !== undefined &&
@@ -119,22 +138,46 @@ export class TerrainColors implements EnginePlugin {
     const rgb = (color: Color) => `vec3f(${color.join(',')})`;
     const variation = options.variation ?? 0,
       dark = options.wetDarkening;
-    // Per pixel: bands follow the interpolated height and normal, not the triangles. Variation mixes a 14 m and a
-    // 1.1 m octave (rotated 37° so the lattices do not align); the fine one fades out by 60 m, before it can alias.
+    // Noise moves a band's border by up to 30% of its range at the 14 m scale, so borders wander like real ones.
+    const band = (range: Range, at: string) =>
+        `smoothstep(${range.join(',')},${at}${detail ? `+large*${num(0.6 * detail * (range[1] - range[0]))}` : ''})`,
+      blend = (t: string, heights: string) =>
+        detail === 1 ? `terrainBlend(${t},${heights})` : `mix(${t},terrainBlend(${t},${heights}),${detail})`;
+    // Per pixel: bands follow the interpolated height and normal, not the triangles. Noise has a 14 m and a 1.1 m
+    // octave (rotated 37° so the lattices do not align); the fine one fades out by 60 m, before it can alias.
+    // Detail: grass tufts (fine noise), sand in their hollows and rock bumps are the height maps of the blend. Rock is
+    // triplanar where stone shows: anisotropic noise on the two vertical projections reads as horizontal strata, so
+    // cliffs never stretch a top-down pattern; its analytic gradient tilts the normal (surface-gradient bump mapping).
     this.surfaceCode = `
 fn terrainSurface(p:vec3f,n:vec3f)->TerrainSurface {
  var s:TerrainSurface;let h=p.y;${
-   variation
+   variation || detail
      ? `let fade=1.0-smoothstep(20.0,60.0,distance(frame.eye.xyz,p));
- let large=terrainNoise(p.xz*0.07)-0.5;var fine=0.0;
- if(fade>0.0){fine=(terrainNoise(mat2x2f(0.8,0.6,-0.6,0.8)*p.xz*0.9)-0.5)*fade;}`
+ let large=terrainNoise(p.xz*0.07).x-0.5;var fine=0.0;
+ if(fade>0.0){fine=(terrainNoise(mat2x2f(0.8,0.6,-0.6,0.8)*p.xz*0.9).x-0.5)*fade;}`
      : ''
  }
- let meadow=mix(${rgb(options.meadow[0])},${rgb(options.meadow[1])},smoothstep(${options.meadowHeight.join(',')},h));
- let stone=mix(meadow,${rgb(options.stone)},max(smoothstep(${options.stoneHeight.join(',')},h),1.0-smoothstep(${options.stoneNormal.join(',')},n.y)));
+ let meadow=mix(${rgb(options.meadow[0])},${rgb(options.meadow[1])},${band(options.meadowHeight, 'h')});
+ let shore=${band(options.shore, 'h')};
+ let steep=max(${band(options.stoneHeight, 'h')},1.0-${band(options.stoneNormal, 'n.y')});${
+   detail
+     ? `
+ var rock=large;var grad=vec3f(0.0);
+ if(steep>0.004&&fade>0.0){
+  let a=n*n;var w=a*a;w/=w.x+w.y+w.z;
+  let zy=terrainNoise(vec2f(p.z*0.35,p.y*1.4)+vec2f(17.0,0.0));let xz=terrainNoise(p.xz*0.6);let xy=terrainNoise(vec2f(p.x*0.35,p.y*1.4)+vec2f(0.0,29.0));
+  rock=mix(large,w.x*zy.x+w.y*xz.x+w.z*xy.x-0.5,fade);
+  grad=fade*(w.x*vec3f(0.0,zy.z*1.4,zy.y*0.35)+w.y*vec3f(xz.y*0.6,0.0,xz.z*0.6)+w.z*vec3f(xy.y*0.35,xy.z*1.4,0.0));
+ }
+ let grass=0.275+0.35*fine;let stoneT=${blend('steep', 'grass,0.25+0.5*rock')};
+ let sandT=${blend('shore', '0.15-0.3*fine,mix(grass,0.25+0.5*rock,stoneT)')};`
+     : `
+ let stoneT=steep;let sandT=shore;`
+ }
  let wet=${wetness ? 'terrainWet(p)' : `mix(${dark},1.0,smoothstep(${options.wetHeight.join(',')},h))`};
- s.color=mix(${rgb(options.sand)},stone,smoothstep(${options.shore.join(',')},h))*wet${variation ? `*(${1 - variation}+${2 * variation}*(0.65*large+0.35*fine))` : ''};
- s.normal=n;s.rough=${dark < 1 ? `0.6+${0.4 / (1 - dark)}*(wet-${dark})` : '1.0'};return s;
+ s.color=mix(${rgb(options.sand)}${detail ? `*(1.0+${num(0.2 * detail)}*fine)` : ''},mix(meadow,${rgb(options.stone)}${detail ? `*(1.0+${num(0.6 * detail)}*rock)` : ''},stoneT),sandT)*wet${variation ? `*(${num(1 - variation)}+${num(2 * variation)}*(0.65*large+0.35*fine))` : ''};
+ s.normal=${detail ? `normalize(n-(grad-n*dot(n,grad))*(${num(0.15 * detail)}*stoneT*sandT))` : 'n'};
+ s.rough=${dark < 1 ? `0.6+${num(0.4 / (1 - dark))}*(wet-${dark})` : '1.0'};return s;
 }
 `;
     this.wetCode = wetness
@@ -207,6 +250,7 @@ fn terrainWet(position:vec3f)->f32 {
     return (
       (code.includes('struct TerrainSurface ') ? '' : surfaceStruct) +
       (this.surfaceCode.includes('terrainNoise(') && !code.includes('fn terrainNoise(') ? noiseCode : '') +
+      (this.surfaceCode.includes('terrainBlend(') && !code.includes('fn terrainBlend(') ? blendCode : '') +
       own +
       code.slice(0, at) +
       `if(i.terrainId==${id + 1}.0){let s=terrainSurface${suffix}(i.position,n);i.color=s.color;i.material.x*=s.rough;n=s.normal;}` +

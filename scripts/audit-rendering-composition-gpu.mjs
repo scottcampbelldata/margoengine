@@ -71,9 +71,11 @@ try {
           wetHeight: [0, 0.6],
           wetDarkening: 0.55,
         };
+        // First terrain: full detail (noise, height blend, triplanar stone). Second: smooth bands with variation.
         for (const [index, target] of [mesh, instance.createMesh().setGeometry(box()).setPosition([2, 0, 0])].entries())
           TerrainColors.attach(instance, target, {
             ...options,
+            ...(index ? { detail: 0, variation: 0.1 } : {}),
             wetness: { texture: () => undefined, origin: [index * 4, 0], size: [4, 4] },
           });
       }

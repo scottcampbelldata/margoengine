@@ -49,6 +49,7 @@ export interface TerrainColorOptions {
     wetHeight: Range;
     wetDarkening: number;
     variation?: number;
+    detail?: number;
     wetness?: {
         texture: () => GPUTexture | undefined;
         origin: Range;

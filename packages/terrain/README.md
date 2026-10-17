@@ -15,8 +15,9 @@ shoreline darkening to one ordinary terrain mesh using its mesh ID. It preserves
 the existing PBR/shadow shader and caches the patch. Options are captured at
 attachment: `sand`, two `meadow` colors, `stone`, height ranges `shore`,
 `meadowHeight`, `stoneHeight`, `wetHeight`, plus `stoneNormal` (normal Y in 0..1),
-`wetDarkening` (0..1), and optional `variation` (0..1, default 0). Ranges must be
-increasing; colors are linear RGB in 0..1. Other meshes keep their materials.
+`wetDarkening` (0..1), and optional `variation` (0..1, default 0) and `detail`
+(0..1, default 1). Ranges must be increasing; colors are linear RGB in 0..1.
+Other meshes keep their materials.
 
 Colors are worked out per pixel from the interpolated world height and normal, so
 band borders follow the true height and slope instead of the mesh's triangles.
@@ -29,8 +30,29 @@ shading-normal line in a block whose `i` and `n` are the terrain's own copies:
 shadows, clustered lights, sky ambient, IBL and post replays shade the per-pixel
 albedo, roughness and normal without changing their own patches. Without core's
 standard shader the patch does nothing and the mesh keeps its material color.
-Cost: one flat compare on every core-mesh pixel; on terrain pixels about 40 ALU
-operations for the bands, plus about 60 per noise octave with `variation`.
+
+`detail` makes the bands read as materials. The 14 m noise moves every border by
+up to 30% of its range, so beaches, meadow patches and the stone line wander.
+Sand, meadow and stone then blend by procedural height maps, the height-based
+blending of Mishkinis's "Advanced Terrain Texture Splatting" (2013): grass tufts
+from the fine noise, sand settling in their hollows, rock bumps from the stone
+pattern, so the higher surface wins near each transition instead of a smooth
+crossfade. Where stone shows, its pattern is triplanar: anisotropic noise on the
+two vertical projections reads as horizontal strata, the top projection as
+lumps, so cliffs never stretch a top-down pattern. The noise's analytic gradient
+tilts the normal by up to about 17° (surface-gradient bump mapping), lighting the
+strata; the geometric normal still drives shadow bias. Stone brightness follows
+the bumps (±30%), sand grain the fine noise (±10%). Fine detail fades out between
+20 and 60 m. `detail: 0` removes all of it from the shader and keeps smooth
+per-pixel bands; values in between scale it.
+
+Cost: one flat compare on every core-mesh pixel. On terrain pixels about 40 ALU
+operations for the bands; with `variation` or `detail`, about 60 per noise
+octave: two octaves everywhere (one beyond 60 m) and three more triplanar ones
+where stone shows within 60 m, plus about 30 for the blends and the bump. That is
+roughly 200 operations on meadow and sand and 380 on near stone (counted from the
+WGSL, not timed). There are no texture fetches and no derivatives, so it runs
+inside the mesh-ID branch without uniformity limits.
 
 For a moving wet-sand band, add `wetness: {texture: () => water.coastalDepthTexture,
 origin: [-80,-80], size: [160,160]}` using the same world bounds as water's terrain.
