@@ -8,8 +8,8 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 96 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
-| PARTIAL | 38 | Some of it exists, but a common use case is missing. The notes say what. |
+| COVERED | 97 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| PARTIAL | 37 | Some of it exists, but a common use case is missing. The notes say what. |
 | MISSING | 25 | No implementation was found in any package's `src/`. |
 
 Overall: Margo is strong where three.js relies on third-party libraries or examples. That includes cascaded PCSS shadows, clustered lighting, TAA, Gaussian splats, BVH queries, physics, navigation, terrain, water and sky. The day-one basics the first version of this matrix found missing (textures and materials on meshes you build, glTF extensions and compression, an orthographic camera, picking loaded models, image-based lighting outside React, combinable effects, FXAA, a math library) now exist as optional packages. What remains:
@@ -17,7 +17,7 @@ Overall: Margo is strong where three.js relies on third-party libraries or examp
 - **WebGL2 reaches core meshes only.** The fallback is the optional `@margoengine/webgl` package and draws core meshes flat-shaded with one light. Textures, glTF-pro models, shadows, post-processing, lines, points, text and most other rendering packages need WebGPU.
 - **Lighting is thin outside clustered point and spot lights.** One directional light per engine; core diffuse ambient has RGB multipliers, while glTF-pro keeps its fixed hemisphere fill. Point and spot lights cast shadows through `@margoengine/clustered/shadows` (up to 16 shadowed lights). Rectangle area lights (`@margoengine/clustered/area`) are unshadowed.
 - **Core owns one canvas, one primary camera and one pass graph.** `Engine.render({camera})` supports a sequential alternate view and restores primary culling. Core draw calls accept viewport/scissor rectangles. CubeCamera, mirror helpers, independent temporal histories and general multi-scene rendering remain absent. The implemented hooks and remaining package work are listed [below](#what-is-missing-or-partial-and-what-to-do).
-- **Materials on meshes you build are standard, physical, basic, normal and matcap.** Physical factors cover clearcoat, sheen, specular, IOR, transmission with screen-space refraction through `@margoengine/materials/transmission`, volume, anisotropy, iridescence and dispersion. glTF loads the same lobes, with iridescence, anisotropy and diffuse transmission through `@margoengine/gltf-pro/extended`. Lambert, Phong, depth and shadow-catcher materials are absent. Materials meshes now accept independent UV1 coordinates and geometry groups with material arrays.
+- **Materials on meshes you build are standard, physical, basic, normal, matcap, depth and distance.** Physical factors cover clearcoat, sheen, specular, IOR, transmission with screen-space refraction through `@margoengine/materials/transmission`, volume, anisotropy, iridescence and dispersion. glTF loads the same lobes, with iridescence, anisotropy and diffuse transmission through `@margoengine/gltf-pro/extended`. Lambert, Phong and shadow-catcher materials are absent. Materials meshes now accept independent UV1 coordinates and geometry groups with material arrays.
 - **glTF coverage has gaps.** `KHR_animation_pointer` is rejected when required (iridescence, anisotropy and diffuse transmission through `@margoengine/gltf-pro/extended`, and material variants, are supported since HANDOFF 5w.e). Export writes no cameras or lights.
 - **Post-processing lacks GI.** No GTAO, SSGI, motion blur, SMAA or lens flare; screen-space reflections (`SSR`) cover core meshes and added glTF-pro/materials models, not water or terrain, and no built-in screen effects (a shader `NodePass` makes one in a few lines).
 
@@ -89,7 +89,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | MeshLambertMaterial, MeshPhongMaterial | MISSING | — | fbx converts Lambert and Phong materials to PBR on import. |
 | MeshToonMaterial | PARTIAL | toon `Toon`, creative `ToonShading` (`packages/toon/src/index.ts`) | Applies to every core mesh at once, not per material. The README says it does not apply to glTF-pro or skinned meshes. |
 | MeshMatcapMaterial | COVERED | materials `Material({shading: 'matcap', matcap})` | Skips tone mapping, like basic. |
-| MeshNormalMaterial, MeshDepthMaterial, MeshDistanceMaterial | PARTIAL | materials `Material({shading: 'normal'})` | View-space normals as colour. No depth or distance material. |
+| MeshNormalMaterial, MeshDepthMaterial, MeshDistanceMaterial | COVERED | materials `Material` with `shading: 'normal'`, `'depth'` or `'distance'` (`packages/materials/src/built-material.ts`, `depth-distance.ts`; `scripts/material-depth-distance-gpu-check.js`) | View-space normals, basic or RGBA-packed projected depth, and normalized world-space distance from a live reference point/range. Depth basic displays reverse-Z (near white); packed depth stores forward depth (near 0), and distance stores near 0/far 1. Alpha masking, UV1, groups, instancing and restoration work. Packed values need opaque/replacement blending and an alpha-preserving data target; use 1x sampling when decoding geometry edges. Data output bypasses material lighting and colour transfer. |
 | ShadowMaterial (shadow catcher) | PARTIAL | staging `ContactShadows` (`packages/staging/src/index.ts`) | The product-shot case: a soft contact shadow on a ground plane over whatever is there (three.js's ContactShadows example), from core meshes, glTF-pro and materials meshes. Not a material: it catches no directional-light (cascade) shadows and only on a Y-up plane. WebGPU only. |
 | PointsMaterial, SpriteMaterial | COVERED † | points `PointsMaterial`, `SpriteMaterial` (`packages/points/src/material.ts`) | WebGPU only. |
 | LineBasicMaterial, LineDashedMaterial, Line2's LineMaterial | COVERED † | lines `LineMaterial` (`packages/lines/src/line.ts`) | Width, joins, caps and dashes. WebGPU only. |
@@ -281,7 +281,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 
 ## What is missing or partial, and what to do
 
-Recounted from the rows: 38 PARTIAL, 25 MISSING. COVERED rows stay in the matrix above. The three approved core hooks below measure **20,641 bytes gzip**, against a clean 20,282-byte baseline: +359 bytes, with 4,358 usable bytes below the exclusive 25,000-byte ceiling. Reproduce with `npm run measure:size`; build and GPU evidence is recorded in [the verification note](core-parity-hooks-verification.md).
+Recounted from the rows: 37 PARTIAL, 25 MISSING. COVERED rows stay in the matrix above. The three approved core hooks below measure **20,641 bytes gzip**, against a clean 20,282-byte baseline: +359 bytes, with 4,358 usable bytes below the exclusive 25,000-byte ceiling. Reproduce with `npm run measure:size`; build and GPU evidence is recorded in [the verification note](core-parity-hooks-verification.md).
 
 The user approved these three hooks as a specific exception to the core freeze. Their larger features stay in optional packages.
 
@@ -298,7 +298,7 @@ Other core changes, including a second directional light, BatchedMesh and anothe
 These are separate package tasks. The three core hooks do not implement this backlog.
 Independent UV1 and geometry groups have since been implemented in materials and exporters, with
 [build, test and GPU evidence](materials-uv-groups-verification.md). The combined attributes row stays PARTIAL
-because arbitrary named vertex attributes remain absent. Dispersion is now implemented in materials/glTF-pro and export, moving the physical-material row to COVERED: 96 / 38 / 25.
+because arbitrary named vertex attributes remain absent. Dispersion and depth/distance material modes are now implemented, moving their two material rows to COVERED: 97 / 37 / 25.
 
 | Row | What is missing | What to do |
 | --- | --- | --- |
@@ -311,7 +311,6 @@ because arbitrary named vertex attributes remain absent. Dispersion is now imple
 | ArrayCamera | PARTIAL. Stereo exists inside XR only. | Leave it there. A general array camera can build on the sequential camera option, but is not implemented. |
 | Custom attributes, second UV, groups | PARTIAL. Independent UV1, material groups, tangents and color are implemented in materials; arbitrary named attributes remain absent. | Use `uvs1`, `setUVTransform({texCoord: 1}, slot)` and `createMesh`/`createInstancedMesh` with material arrays. Named attributes remain a future glTF-pro vertex-layout option. |
 | MeshToonMaterial | PARTIAL. One toon look for every core mesh. | A per-material toon in `@margoengine/toon` or `@margoengine/materials`, including glTF-pro meshes. |
-| Normal, depth, distance materials | PARTIAL. View-normal shading exists. | Add depth and distance shading modes in `@margoengine/materials`. |
 | ShadowMaterial | PARTIAL. `ContactShadows` is a ground-plane contact shadow. | A materials mode, or `@margoengine/shadows`, that samples the directional cascades. |
 | `side` | PARTIAL. Double-sided exists. Back-side-only does not. | Add back-side-only on `Material` and glTF materials. |
 | Wireframe | PARTIAL. Inspector overlay, or `wireframe` drawn with lines. | A materials flag that uses that line path. |

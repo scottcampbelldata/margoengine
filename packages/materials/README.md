@@ -247,6 +247,44 @@ creation, and use a new geometry object for changed attributes. `mesh.dispose()`
 remain caller-owned. Device restoration rebuilds the model and texture bindings. Constructed material shading cannot
 be copied to another GPU device without rebuilding its material resources. Core and the stage facade are unchanged.
 
+## Depth and distance materials
+
+`Material({shading: 'depth'})` writes projected depth, while `Material({shading: 'distance'})` writes world-space
+distance from a reference point. Shading is fixed at construction; physical options require `standard` shading.
+
+```ts
+const depth = new Material({shading: 'depth'}); // basic: near white, far black
+const distance = new Material({
+  shading: 'distance', // rgba packing by default
+  referencePosition: [0, 0, 0], nearDistance: 1, farDistance: 1000,
+});
+distance.referencePosition = [2, 0, 0];
+distance.farDistance = 2000;
+distance.depthPacking = 'basic';
+```
+
+`depthPacking` accepts `basic` or `rgba` and stays live. Basic depth uses the renderer's reverse-Z value, near 1
+and far 0. RGBA depth packs forward depth (`1 - reverseZ`), near 0 and far 1; perspective depth remains nonlinear.
+Distance normalizes `length(worldPosition - referencePosition)` with `(distance - nearDistance) /
+(farDistance - nearDistance)`, clamped to [0, 1]. Its default RGBA packing stores that value; basic distance writes
+the same value as grayscale, near black and far white. RGBA packing uses base 256 with R most significant, and
+preserves exact zero and one endpoints. Its alpha channel contains packed data; basic outputs retain blend opacity.
+
+Keep packed output opaque, or set `blending: 'none'` when `transparent` is enabled: encoded alpha must not become
+blend coverage. Read all four channels from a render target that preserves alpha, before colour/post effects.
+Use 1x sampling when decoding boundary pixels; an MSAA resolve averages packed bytes at geometry edges.
+
+`referencePosition`, `nearDistance` and `farDistance` also stay live. The position defaults to `[0, 0, 0]` and is
+copied on assignment and read; assign a new three-component tuple to move it. Components and distance bounds must
+be finite as float32. Bounds default to 1 and 1000 and must satisfy `0 <= nearDistance < farDistance` after float32
+conversion; constructor bounds are validated together, and each live edit must preserve that range.
+
+These outputs bypass material lighting and gamma encoding. Textures affect alpha coverage through the existing
+alpha test and UV transforms; texture RGB does not tint the depth or distance value. Geometry groups and instancing
+use the same modes, with distance measured after world and instance transforms. Device restoration rebuilds their
+bindings. One 32-byte uniform is shared by meshes using a material in an engine, reused across frames, and released
+when the last mesh is disposed. Textures remain caller-owned.
+
 ## Physical maps on constructed materials
 
 `Material` accepts these optional `Texture | null` properties alongside its physical factors:

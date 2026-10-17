@@ -13,6 +13,7 @@ import {
 import { PBRInstances } from '@margoengine/gltf-pro/instancing';
 import { extendedMaterials } from '@margoengine/gltf-pro/extended';
 import { physicalMapsShader } from './physical-maps.js';
+import { depthDistanceShader } from './depth-distance.js';
 import { readResponse } from '../../shared/loading.js';
 export type { TextureTransform } from '@margoengine/gltf-pro';
 export { packAtlas, transformUVs, type Atlas, type AtlasOptions } from './atlas.js';
@@ -302,7 +303,8 @@ export async function loadTexture(
   }
 }
 
-export type Shading = 'standard' | 'basic' | 'normal' | 'matcap';
+export type Shading = 'standard' | 'basic' | 'normal' | 'matcap' | 'depth' | 'distance';
+export type DepthPacking = 'basic' | 'rgba';
 export type Blending = 'normal' | 'additive' | 'multiply' | 'none';
 type Color = string | readonly number[];
 /**
@@ -358,6 +360,13 @@ export interface PhysicalOptions {
 }
 export interface MaterialOptions extends PhysicalOptions {
   shading?: Shading;
+  /** Depth/distance output: grayscale or RGBA-packed normalized depth. Defaults to basic for depth, rgba for distance. */
+  depthPacking?: DepthPacking;
+  /** World-space origin for distance shading. Copied on assignment; default [0, 0, 0]. */
+  referencePosition?: readonly [number, number, number];
+  /** Distance normalization bounds, finite as float32: 0 <= nearDistance < farDistance. Defaults to 1 and 1000. */
+  nearDistance?: number;
+  farDistance?: number;
   color?: Color;
   opacity?: number;
   roughness?: number;
@@ -406,6 +415,17 @@ const unit = (v: unknown, label: string) => {
   if (typeof v !== 'number' || !(v >= 0 && v <= 1)) throw new RangeError('Material ' + label + ' must be in [0, 1]');
   return v;
 };
+const finiteFloat = (v: unknown, label: string): number => {
+  if (typeof v !== 'number' || !Number.isFinite(Math.fround(v)))
+    throw new RangeError('Material ' + label + ' must be finite as float32');
+  return v;
+};
+function distanceRange(near: number, far: number): void {
+  finiteFloat(near, 'nearDistance');
+  finiteFloat(far, 'farDistance');
+  if (near < 0 || Math.fround(far) <= Math.fround(near))
+    throw new RangeError('Material distance bounds must satisfy 0 <= nearDistance < farDistance as float32');
+}
 // glTF extension of each physical option (the exported material names them).
 const extensions: Record<keyof PhysicalOptions, string> = {
   clearcoat: 'clearcoat',
@@ -455,7 +475,7 @@ const linear = (c: Color, label: string): number[] => {
   v.forEach((x) => unit(x, label));
   return v;
 };
-const outputs: Record<Exclude<Shading, 'standard'>, string> = {
+const outputs: Record<Exclude<Shading, 'standard' | 'depth' | 'distance'>, string> = {
   basic: 'return vec4f(mat_out(s.base.rgb+s.emissive),alpha);',
   normal: 'return vec4f(normalize((f.view*vec4f(s.n,0)).xyz)*0.5+0.5,alpha);',
   matcap:
@@ -464,7 +484,7 @@ const outputs: Record<Exclude<Shading, 'standard'>, string> = {
 const encode =
   'fn mat_out(c:vec3f)->vec3f {if(f.settings.w>0.5){return c;}let x=clamp(c,vec3f(0),vec3f(1));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}';
 const patched = new Map<string, Map<string, string>>();
-type MapState = { refs: number; device?: GPUDevice; buffer?: GPUBuffer };
+type MapState = { refs: number; device?: GPUDevice; buffer?: GPUBuffer; values?: Float32Array };
 const mapStates = new WeakMap<Material, Map<object, MapState>>();
 function mapState(m: Material, owner: object): MapState {
   let states = mapStates.get(m);
@@ -481,6 +501,22 @@ function retainMaps(m: Material, engine: Engine): () => void {
     state.buffer?.destroy();
     mapStates.get(m)?.delete(engine);
   };
+}
+function materialBuffer(m: Material, device: GPUDevice, owner: object, size: number): GPUBuffer {
+  const state = mapState(m, owner);
+  if (state.device !== device || !state.buffer) {
+    state.buffer?.destroy();
+    state.device = device;
+    state.buffer = device.createBuffer({ size, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    const buffer = state.buffer;
+    device.lost?.then(() => {
+      if (state.buffer === buffer) {
+        buffer.destroy();
+        state.buffer = undefined;
+      }
+    });
+  }
+  return state.buffer;
 }
 function mapped(m: Material): boolean {
   return !!m.physical && (m.physical.length > 12 || mapSlots.slice(5).some((k) => m[k] != null));
@@ -517,6 +553,11 @@ export function materialShader(source: string, group: number, shading: Shading):
   const key = shading + group,
     cached = cache?.get(key);
   if (cached) return cached;
+  if (shading === 'depth' || shading === 'distance') {
+    const output = depthDistanceShader(materialShader(source, group, 'standard'), group, shading);
+    patched.get(source)!.set(key, output);
+    return output;
+  }
   let count = 0;
   let code = source
     .replace(
@@ -554,6 +595,10 @@ export function materialShader(source: string, group: number, shading: Shading):
 /** Live values: color/emissive arrays, scalar setters and map assignments apply on the next frame to every mesh using the material. Shading and render state are fixed. */
 export class Material {
   readonly shading: Shading;
+  private packing: DepthPacking = 'basic';
+  private reference: readonly [number, number, number] = [0, 0, 0];
+  private near = 1;
+  private far = 1000;
   readonly color: number[];
   readonly emissive: number[];
   readonly blending: Blending;
@@ -674,7 +719,7 @@ export class Material {
     const shading = o.shading ?? 'standard',
       blending = o.blending ?? 'normal';
     if (
-      !['standard', 'basic', 'normal', 'matcap'].includes(shading) ||
+      !['standard', 'basic', 'normal', 'matcap', 'depth', 'distance'].includes(shading) ||
       !['normal', 'additive', 'multiply', 'none'].includes(blending) ||
       [o.transparent, o.doubleSided, o.depthWrite, o.depthTest].some(
         (v) => v !== undefined && typeof v !== 'boolean',
@@ -686,6 +731,13 @@ export class Material {
       if (o[slot] != null && !(o[slot] instanceof Texture))
         throw new TypeError('Material ' + slot + ' must be a Texture');
     this.shading = shading;
+    this.depthPacking = o.depthPacking === undefined ? (shading === 'distance' ? 'rgba' : 'basic') : o.depthPacking;
+    if (o.referencePosition !== undefined) this.referencePosition = o.referencePosition;
+    const near = o.nearDistance === undefined ? 1 : o.nearDistance,
+      far = o.farDistance === undefined ? 1000 : o.farDistance;
+    distanceRange(near, far);
+    this.near = near;
+    this.far = far;
     this.blending = blending;
     this.depthWrite = o.depthWrite;
     this.depthTest = o.depthTest ?? true;
@@ -738,6 +790,38 @@ export class Material {
     if (o.transmission !== undefined || o.transmissionMap != null || o.thicknessMap != null) this.volume = [0, 1, 1, 1];
     if (mapped(this)) while (this.uvt.length < mapSlots.length * 8) this.uvt.push(...this.uvDefault);
     Object.assign(this, Object.fromEntries(used.map((k) => [k, o[k]])));
+  }
+  get depthPacking(): DepthPacking {
+    return this.packing;
+  }
+  set depthPacking(v: DepthPacking) {
+    if (v !== 'basic' && v !== 'rgba') throw new TypeError('Invalid material depthPacking');
+    this.packing = v;
+  }
+  get referencePosition(): readonly [number, number, number] {
+    return [...this.reference];
+  }
+  set referencePosition(v: readonly [number, number, number]) {
+    if (!Array.isArray(v) || v.length !== 3)
+      throw new RangeError('Material referencePosition must have three finite float32 components');
+    const x = finiteFloat(v[0], 'referencePosition'),
+      y = finiteFloat(v[1], 'referencePosition'),
+      z = finiteFloat(v[2], 'referencePosition');
+    this.reference = [x, y, z];
+  }
+  get nearDistance(): number {
+    return this.near;
+  }
+  set nearDistance(v: number) {
+    distanceRange(v, this.far);
+    this.near = v;
+  }
+  get farDistance(): number {
+    return this.far;
+  }
+  set farDistance(v: number) {
+    distanceRange(this.near, v);
+    this.far = v;
   }
   private set(i: number, v: number, label: string): void {
     if (!this.physical) throw new TypeError(`Material ${label} needs a physical option at construction`);
@@ -978,25 +1062,13 @@ export class Material {
   bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[] {
     if (mapped(this)) {
       const plan = mapPlan(this),
-        state = mapState(this, engine ?? device);
-      if (state.device !== device || !state.buffer) {
-        state.buffer?.destroy();
-        state.device = device;
-        state.buffer = device.createBuffer({ size: 560, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-        const buffer = state.buffer;
-        device.lost?.then(() => {
-          if (state.buffer === buffer) {
-            buffer.destroy();
-            state.buffer = undefined;
-          }
-        });
-      }
+        buffer = materialBuffer(this, device, engine ?? device, 560);
       const values = new Float32Array(140);
       for (let k = 0; k < mapSlots.length; k++)
         values.set(this.uvt.length > k * 8 ? this.uvt.slice(k * 8, k * 8 + 8) : this.uvDefault, k * 8);
       values.set(this.volume ?? [0, 1, 1, 1], 136);
-      device.queue.writeBuffer(state.buffer, 0, values);
-      const entries: GPUBindGroupEntry[] = [{ binding: 200, resource: { buffer: state.buffer } }];
+      device.queue.writeBuffer(buffer, 0, values);
+      const entries: GPUBindGroupEntry[] = [{ binding: 200, resource: { buffer } }];
       const bound = plan.textures.map(({ texture, srgb, fallback: role }) => {
         const pair = texture.bind(device, srgb);
         if (pair) return pair;
@@ -1013,6 +1085,18 @@ export class Material {
     for (let i = 0; i < (this.shading === 'matcap' ? 6 : 5); i++) {
       const bound = this[slots[i]]?.bind(device, i === 0 || i >= 4) ?? [i === 2 ? d.normal : d.white, d.sampler];
       entries.push({ binding: 32 + i * 2, resource: bound[0] }, { binding: 33 + i * 2, resource: bound[1] });
+    }
+    if (this.shading === 'depth' || this.shading === 'distance') {
+      const owner = engine ?? device,
+        state = mapState(this, owner),
+        buffer = materialBuffer(this, device, owner, 32),
+        values = (state.values ??= new Float32Array(8));
+      values.set(this.reference, 0);
+      values[4] = this.near;
+      values[5] = this.far;
+      values[6] = +(this.packing === 'rgba');
+      device.queue.writeBuffer(buffer, 0, values);
+      entries.push({ binding: 196, resource: { buffer } });
     }
     return entries;
   }
