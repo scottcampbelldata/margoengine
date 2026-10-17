@@ -138,7 +138,7 @@ test('PostStack runs effects in array order with one capture, ping-pong targets 
     [1, 1, 1, 1, 1, 4],
   );
   assert.equal(log.at(-1).view, before.color, 'last effect writes the frame target');
-  assert.ok(!log[0].shader.includes('let mapped=linear/'), 'HDR members get the linear scene shader');
+  assert.ok(!log[0].shader.includes('let mapped=pbrNeutral('), 'HDR members get the linear scene shader');
   // A disposed member drops out; the last HDR effect becomes the display output when no display effect is live.
   log.length = 0;
   h.engine.removePlugin('d');

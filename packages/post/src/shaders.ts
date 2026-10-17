@@ -1,4 +1,5 @@
 // The gbuffer's w is the signed view depth -z (negative behind an orthographic eye); exactly 0 marks no surface.
+import { displayShader } from '../../shared/display.js';
 const frame = /* wgsl */ `
 struct Frame {inverse:mat4x4f,view:mat4x4f,projection:mat4x4f,params:vec4f,size:vec4f}
 @group(0) @binding(0) var<uniform> f:Frame;
@@ -82,8 +83,9 @@ struct Out {@builtin(position) clip:vec4f}
 @group(0) @binding(0) var scene:texture_2d<f32>;
 @group(0) @binding(1) var ambient:texture_2d<f32>;
 @group(0) @binding(2) var ao:texture_2d<f32>;
+${displayShader}
 @fragment fn fragment(i:Out)->@location(0) vec4f {
   let p=vec2i(i.clip.xy);let s=textureLoad(scene,p,0);var c=max(vec3f(0),s.rgb-textureLoad(ambient,p,0).rgb*(1-textureLoad(ao,p,0).r));
-  c=c/(1+c);c=select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.055,c>=vec3f(0.0031308));return vec4f(c,s.a);
+  return vec4f(toDisplay(c),s.a);
 }
 `;

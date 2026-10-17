@@ -15,6 +15,7 @@ import {
 import { invertMatrix } from '@margoengine/math/mat4';
 import { sceneTarget } from '../../shared/msaa.js';
 import { preset } from '../../shared/preset.js';
+import { displayShader } from '../../shared/display.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; STORAGE_BINDING: number; COPY_SRC: number };
@@ -177,12 +178,13 @@ const composite =
 @group(0) @binding(2) var linearSampler:sampler;
 @group(0) @binding(3) var sceneDepth:texture_depth_2d;
 @vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);}
+${displayShader}
 @fragment fn fragment(@builtin(position) position:vec4f)->@location(0) vec4f {
   let depth=textureLoad(sceneDepth,vec2i(position.xy),0);let uv=position.xy/volume.screen.xy;var t=volume.shape.x;
   if(depth>0.0){let p=volume.inverse*vec4f(uv.x*2-1,1-uv.y*2,depth,1);t=clamp(dot(volume.plane,vec4f(p.xyz/p.w,1)),0.0,t);}
   let s=textureSampleLevel(fogVolume,linearSampler,vec3f(uv,(sqrt(t/volume.shape.x)*volume.grid.z-0.5)/volume.grid.z),0);
   let opacity=1.0-exp(-s.a);var light=s.rgb;
-  if(volume.wind.w<0.5&&opacity>0.0){let c=s.rgb/opacity;light=pow(c/(1.0+c),vec3f(1.0/2.2))*opacity;}
+  if(volume.wind.w<0.5&&opacity>0.0){let c=s.rgb/opacity;light=toDisplay(c)*opacity;}
   return vec4f(light,opacity);
 }`;
 

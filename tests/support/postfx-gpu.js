@@ -117,7 +117,7 @@ export function gpuHarness() {
     };
   const originalColor = {},
     originalDepth = {},
-    shader = 'let linear=vec3f(1);\nlet mapped=linear/(1.0+linear); return vec4f(mapped,1);';
+    shader = 'let linear=vec3f(1);\nlet mapped=pbrNeutral(max(linear,vec3f(0))); return vec4f(mapped,1);';
   const context = {
     backend: 'webgpu',
     device,

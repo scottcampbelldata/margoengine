@@ -1,4 +1,6 @@
-// GGX/Smith/Schlick direct lighting follows the existing engine's PBR equations.
+// GGX/Smith/Schlick direct lighting follows the existing engine's PBR equations. The display curve is Khronos PBR
+// Neutral (the Khronos Group's published specification), then the exact sRGB encoding; packages/shared/display.js holds
+// the same curve for every other package.
 // Optional shader hooks depend on these WGSL names and line breaks.
 export const wgsl = `
 struct Frame { camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,ambient:vec4f }
@@ -12,6 +14,7 @@ var o:Output;o.clip=frame.camera*p;o.position=p.xyz;
 o.normal=mat3x3f(cross(i.m1.xyz,i.m2.xyz),cross(i.m2.xyz,i.m0.xyz),cross(i.m0.xyz,i.m1.xyz))*i.normal*sign(dot(i.m0.xyz,cross(i.m1.xyz,i.m2.xyz)));
 o.color=i.color.rgb;o.material=vec4f(i.factors.xyz,sign(dot(i.m0.xyz,cross(i.m1.xyz,i.m2.xyz))));return o;
 }
+fn pbrNeutral(input:vec3f)->vec3f {let x=min(input.r,min(input.g,input.b));let offset=select(0.04,x-6.25*x*x,x<0.08);var color=input-offset;let peak=max(color.r,max(color.g,color.b));if(peak<0.76){return color;}let newPeak=1.0-0.24*0.24/(peak+0.24-0.76);color*=newPeak/peak;return mix(color,vec3f(newPeak),1.0-1.0/(0.15*(peak-newPeak)+1.0));}
 @fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->@location(0) vec4f {
 let facing=front==(i.material.w>0.0);if(!C&&!facing&&i.material.z<0.5){discard;}
 let n=normalize(i.normal)*select(-1.0,1.0,facing);let v=normalize(frame.eye.xyz-i.position);let l=normalize(frame.light.xyz);let h=(v+l)/max(length(v+l),0.0001);
@@ -21,5 +24,5 @@ let g=2.0*nv/(nv+sqrt(a2+(1.0-a2)*nv*nv))*2.0*nl/max(nl+sqrt(a2+(1.0-a2)*nl*nl),
 let f0=mix(vec3f(0.04),i.color,i.material.y);let f=f0+(1.0-f0)*pow(1.0-vh,5.0);
 let direct=((1.0-f)*(1.0-i.material.y)*i.color/3.14159265+d*g*f/max(4.0*nl*nv,0.0001))*nl;
 let linear=direct*frame.radiance.xyz*frame.light.w+i.color*(1.0-i.material.y)*frame.radiance.w*frame.ambient.rgb;
-let mapped=linear/(1.0+linear);return vec4f(select(mapped*12.92,1.055*pow(mapped,vec3f(1.0/2.4))-0.055,mapped>=vec3f(0.0031308)),1);
+let mapped=pbrNeutral(max(linear,vec3f(0)));return vec4f(select(mapped*12.92,1.055*pow(mapped,vec3f(1.0/2.4))-0.055,mapped>=vec3f(0.0031308)),1);
 }`;

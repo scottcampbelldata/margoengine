@@ -230,7 +230,7 @@ test('extended shaders: hook points once, only used features compiled, worst cas
   const points = [
     'direct+ambient(s)',
     'var color=',
-    'if(f.settings.w<0.5) {color=aces(max(color,vec3f(0))/0.6);',
+    'if(f.settings.w<0.5) {color=pbrNeutral(max(color,vec3f(0)));',
     'return vec4f(color,',
     '@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {',
   ];

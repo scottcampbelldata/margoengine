@@ -28,6 +28,7 @@ import {
 } from '@margoengine/core/extension';
 import { group, compute, dispatch } from '../../shared/gpu.js';
 import { preset } from '../../shared/preset.js';
+import { displayShader } from '../../shared/display.js';
 declare const GPUBufferUsage: {
   VERTEX: number;
   INDEX: number;
@@ -168,7 +169,8 @@ struct Output {@builtin(position) clip:vec4f,@location(0) normal:vec3f,@location
  let data=instances[index];let pose=scatterPose(p,n,data.position,data.rotation,frame.ground,frame.blade,frame.eye.xyz,frame.wind);
  return Output(frame.camera*vec4f(pose.world,1),pose.normal,data.rotation.zw,pose.ground,pose.shade);
 }
-@fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->@location(0) vec4f {if(!lodVisible(i.clip.xy,i.lodFade)){discard;}let n=normalize(mix(normalize(i.normal)*select(-1.0,1.0,front),i.ground.xyz,i.ground.w));var color=frame.color.rgb*i.shade*(0.25+max(0.0,dot(n,normalize(vec3f(1,2,1))))*0.75);if(frame.color.w<0.5){color=pow(color/(1.0+color),vec3f(1.0/2.2));}return vec4f(color,1);}
+${displayShader}
+@fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->@location(0) vec4f {if(!lodVisible(i.clip.xy,i.lodFade)){discard;}let n=normalize(mix(normalize(i.normal)*select(-1.0,1.0,front),i.ground.xyz,i.ground.w));var color=frame.color.rgb*i.shade*(0.25+max(0.0,dot(n,normalize(vec3f(1,2,1))))*0.75);if(frame.color.w<0.5){color=toDisplay(color);}return vec4f(color,1);}
 `;
 // Without a LOD fade no instance is ever dithered out, yet any `discard` in a fragment shader stops tile-based (phone)
 // GPUs from rejecting hidden fragments before shading. This variant has no fade varying, no mask and no discard.

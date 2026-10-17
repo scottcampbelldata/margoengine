@@ -2,7 +2,7 @@
 import { Geometry, PbrMaterial, type EngineKernel, type Mesh } from '@margoengine/core';
 import { engineRuntime, meshRuntime, type Engine, type PassContext } from '@margoengine/core/extension';
 import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro';
-import { acesShader } from '../../shared/aces.js';
+import { neutralShader } from '../../shared/display.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; MAP_READ: number };
 declare const GPUTextureUsage: {
   TEXTURE_BINDING: number;
@@ -555,7 +555,7 @@ export class Imposter {
 }
 
 /** Draws one atlas: camera-facing quads that reproject the three nearest views (one depth parallax step each), blend them, relight and write per-pixel depth. */
-export const imposterShader = `${acesShader}
+export const imposterShader = `${neutralShader}
 ${octWGSL}
 struct Frame {camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,options:vec4f}
 struct Atlas {center:vec4f,grid:vec4f}
@@ -614,7 +614,7 @@ fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12
  let direct=((1.0-fresnel)*(1.0-metal)*albedo/3.14159265+d*g*fresnel/max(4.0*nl*nv,0.0001))*nl*frame.radiance.rgb*frame.light.w;
  var color:vec3f;
  // Match the source's renderer: gltf-pro (hemisphere fill, ACES) or core (flat ambient, Reinhard).
- if(atlas.grid.z>0.5){color=direct+(albedo*(1.0-metal)+f0*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1.0),clamp(nn.y*0.5+0.5,0.0,1.0))*frame.radiance.w;if(frame.options.x<0.5){color=srgb(aces(max(color,vec3f(0.0))/0.6));}}
- else{color=direct+albedo*(1.0-metal)*frame.radiance.w;if(frame.options.x<0.5){color=srgb(color/(1.0+color));}}
+ if(atlas.grid.z>0.5){color=direct+(albedo*(1.0-metal)+f0*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1.0),clamp(nn.y*0.5+0.5,0.0,1.0))*frame.radiance.w;if(frame.options.x<0.5){color=srgb(pbrNeutral(max(color,vec3f(0.0))));}}
+ else{color=direct+albedo*(1.0-metal)*frame.radiance.w;if(frame.options.x<0.5){color=srgb(pbrNeutral(max(color,vec3f(0.0))));}}
  return Pixel(vec4f(color,coverage),clamp(clip.z/clip.w,0.0,1.0));
 }`;

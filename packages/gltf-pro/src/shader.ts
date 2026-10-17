@@ -1,7 +1,7 @@
-import { acesShader } from '../../shared/aces.js';
+import { neutralShader } from '../../shared/display.js';
 import { cotangentFrameShader } from '../../shared/tangent-frame.js';
 export const pbrShader = /* wgsl */ `
-${acesShader}
+${neutralShader}
 ${cotangentFrameShader}
 struct Frame {
   camera:mat4x4f, model:mat4x4f, normalMatrix:mat4x4f, view:mat4x4f,
@@ -81,7 +81,7 @@ fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {
   let s=surface(i,front); let v=normalize(f.eye.xyz-i.position); let l=normalize(f.light.xyz);
   let direct=direct_light(s,v,l);
   var color=direct+ambient(s)+s.emissive;
-  if(f.settings.w<0.5) {color=aces(max(color,vec3f(0))/0.6); color=select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308));}
+  if(f.settings.w<0.5) {color=pbrNeutral(max(color,vec3f(0))); color=select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308));}
   return vec4f(color,select(1.0,s.base.a,f.settings.x>1.5));
 }
 @fragment fn gbuffer(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
@@ -96,7 +96,7 @@ fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {
 // (back faces are culled; only MASK materials alpha-test), because any discard in the shader costs early depth testing
 // (0.85 -> 0.52 ms GPU, full-screen DamagedHelmet, Arc 140V).
 export const extendedPBRShader = /* wgsl */ `
-${acesShader}
+${neutralShader}
 ${cotangentFrameShader}
 struct Frame {
   camera:mat4x4f, model:mat4x4f, normalMatrix:mat4x4f, view:mat4x4f,
@@ -179,7 +179,7 @@ fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {
   let direct=direct_light(s,v,l);
   var color=direct+ambient(s)+s.emissive;
   if(f.ext.x>0.5){color=s.base.rgb;}
-  if(f.settings.w<0.5) {color=aces(max(color,vec3f(0))/0.6); color=select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308));}
+  if(f.settings.w<0.5) {color=pbrNeutral(max(color,vec3f(0))); color=select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308));}
   return vec4f(color,select(1.0,s.base.a,f.settings.x>1.5));
 }
 @fragment fn gbuffer(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {

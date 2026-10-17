@@ -32,8 +32,7 @@ struct VertexOutput {
 
 fn encodeColor(linear: vec3f) -> vec3f {
     if (outputHdr) {return linear;}
-    let mapped = linear / (vec3f(1.0) + linear);
-    return select(mapped * 12.92, 1.055 * pow(mapped, vec3f(1.0 / 2.4)) - 0.055, mapped >= vec3f(0.0031308));
+    return toDisplay(linear);
 }
 
 @fragment fn fs_main(input: VertexOutput) -> @location(0) vec4f {

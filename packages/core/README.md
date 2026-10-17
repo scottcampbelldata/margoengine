@@ -50,6 +50,8 @@ lighting.ambient.set([0.4, 0.6, 1]); // linear RGB multiplier; white by default
 
 The three components must be finite and nonnegative; values above one are allowed. Core meshes and packages drawing core's shader use this color. Independent material shaders, including glTF-pro's hemisphere model, retain their existing lighting APIs. Environment IBL replaces core ambient; Sky's explicit ambient color supplies its own absolute floor. This is a flat RGB hook, not a HemisphereLight.
 
+Core's display curve is Khronos PBR Neutral, then the exact sRGB encoding: base colours under neutral light come out as authored, and highlights roll off to white. glTF-pro, terrain, sky, water, scatter, foliage and the post effects end with the same curve, so one colour looks the same whichever package draws it; `@margoengine/tonemap` defaults to it and adds AgX, ACES and LUT grading.
+
 For packages supplying `Lighting` directly to a renderer, omitted `ambient` means white. The canonical WGSL `Frame` is now 128 bytes: its original 112-byte prefix is unchanged and an `ambient:vec4f` follows it (RGB at floats 28–30). Packages allocating that uniform must supply the full layout; append their own fields after it.
 
 ## Viewport and scissor per core draw

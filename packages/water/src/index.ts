@@ -11,6 +11,7 @@ import {
 import { acquireDepth, group } from '../../shared/gpu.js';
 import { CoastalFlow, waterFrame, oceanWaves } from './coastal.js';
 import { Spray } from './spray.js';
+import { displayShader } from '../../shared/display.js';
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: {
   COPY_SRC: number;
@@ -159,6 +160,7 @@ fn skyColor(direction:vec3f,rough:f32)->vec3f {
  return mix(vec3f(0.18,0.27,0.32),vec3f(0.035,0.10,0.20),sqrt(max(0.0,r.y)))*frame.radiance.rgb*(0.015+min(1.0,frame.sun.w*0.15));
 }
 struct Result {@location(0) color:vec4f,@location(1) foam:vec4f}
+${displayShader}
 @fragment fn fragment(i:Output)->Result{
  let pixel=vec2i(i.clip.xy);let waterDistance=linear(i.clip.z);let sceneDepth=textureLoad(depth,pixel,0);
  var gap=50.0;if(sceneDepth>0){gap=max(0.0,linear(sceneDepth)-waterDistance)*abs(frame.eye.y-i.world.y)/max(0.0001,waterDistance);}
@@ -203,7 +205,7 @@ struct Result {@location(0) color:vec4f,@location(1) foam:vec4f}
  // Foam is a rough white scatterer: N.L direct light over the water's ambient, Lambert-normalized (albedo/pi) like the
  // scene's diffuse surfaces, so it no longer glows at full light strength on the side away from the moon.
  color=mix(color,vec3f(0.72,0.77,0.74)*(frame.eye.w+frame.radiance.rgb*nl*frame.sun.w*shade/3.14159265),foam*0.95);
- if(frame.cameraData.w<0.5){color=pow(color/(vec3f(1)+color),vec3f(1.0/2.2));}
+ if(frame.cameraData.w<0.5){color=toDisplay(color);}
  return Result(vec4f(color,1),vec4f(foam,0,0,1));
 }`;
 // With a shadow source its own filtered visibility (bind group 1) shades the surface; without one the light is unblocked.

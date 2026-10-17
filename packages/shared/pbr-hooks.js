@@ -58,8 +58,8 @@ function composeLightPBR(code, hooks, cache) {
       );
   if (hooks.output)
     edit(
-      'if(f.settings.w<0.5) {color=aces(max(color,vec3f(0))/0.6);',
-      `color=${hooks.output('select(color,aces(max(color,vec3f(0))/0.6),f.settings.w<0.5)')};if(f.settings.w<0.5) {`,
+      'if(f.settings.w<0.5) {color=pbrNeutral(max(color,vec3f(0)));',
+      `color=${hooks.output('select(color,pbrNeutral(max(color,vec3f(0))),f.settings.w<0.5)')};if(f.settings.w<0.5) {`,
     );
   out = hooks.declarations + out;
   if (!cache) lit.set(hooks, (cache = new Map()));

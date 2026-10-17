@@ -105,7 +105,10 @@ export class PostStack implements EnginePlugin {
       }
     if (!this.count) return;
     if (hdr && this.source !== c.shader) {
-      const linear = c.shader.replace(/let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');
+      const linear = c.shader.replace(
+        /let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/,
+        'return vec4f(linear,1);',
+      );
       if (linear === c.shader) throw new Error('PostStack requires the standard core lighting shader');
       this.source = c.shader;
       this.linear = linear;

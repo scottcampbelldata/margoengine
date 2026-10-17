@@ -6,16 +6,16 @@ Optional WebGPU HDR presentation and color grading, separate from core and stage
 import {createStage} from 'margoengine';
 import {Tonemap} from '@margoengine/tonemap';
 const stage = await createStage('#viewport', {backend:'webgpu'});
-const tonemap = Tonemap.attach(stage.engine, {curve:'agx', exposure:0, contrast:1});
+const tonemap = Tonemap.attach(stage.engine, {curve:'neutral', exposure:0, contrast:1});
 tonemap.options.exposure = 1;
-tonemap.options.curve = 'neutral';
+tonemap.options.curve = 'agx';
 tonemap.setLUT(await (await fetch('/grade.cube')).text());
 tonemap.setLUT(null);
 tonemap.dispose();
 stage.dispose();
 ```
 
-`agx` uses the Rec.2020 AgX inset/outset matrices and an analytic sigmoid approximation. `acescg` selects an ACES fitted RRT/ODT display transform, with AP1 color handling; it is not the full ACES reference pipeline. ACEScg itself is a working color space. Core's default input is `linear-srgb`; use `inputColorSpace:'acescg'` only with an external AP1/D60 HDR `source`. `neutral` implements Khronos PBR Neutral. See [references](NOTICE.md).
+`agx` uses the Rec.2020 AgX inset/outset matrices and an analytic sigmoid approximation. `acescg` selects an ACES fitted RRT/ODT display transform, with AP1 color handling; it is not the full ACES reference pipeline. ACEScg itself is a working color space. Core's default input is `linear-srgb`; use `inputColorSpace:'acescg'` only with an external AP1/D60 HDR `source`. `neutral`, the default, implements Khronos PBR Neutral: Margo's display curve, the one core and every package end with, so attaching Tonemap with no options changes nothing until you grade. See [references](NOTICE.md).
 
 Order: input color conversion → exposure in stops (−16 to 16) → selected curve → contrast around linear 18% gray (0 to 4) → optional LUT → clamp and exact sRGB transfer. The LUT operates on display-linear RGB after the curve; provide a LUT authored for that domain. It is not an automatic OCIO transform or a log/sRGB-encoded LUT decoder.
 

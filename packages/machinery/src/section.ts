@@ -13,6 +13,7 @@ import {
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { declaration } from './section-uniform.js';
 import { featureEdges } from './edges.js';
+import { displayShader } from '../../shared/display.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; INDIRECT: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
 type GPUContext = Extract<PassContext, { backend: 'webgpu' }>;
@@ -31,13 +32,14 @@ const capShader =
 struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f}
 @vertex fn vertex(@builtin(vertex_index) i:u32)->Out {let p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));var o:Out;o.clip=vec4f(p[i],0,1);o.uv=p[i];return o;}
 struct Pixel {@location(0) color:vec4f,@builtin(frag_depth) depth:f32}
+${displayShader}
 @fragment fn fragment(i:Out)->Pixel {
  let near=section.inverse*vec4f(i.uv,0,1);let far=section.inverse*vec4f(i.uv,1,1);let origin=near.xyz/near.w;let ray=far.xyz/far.w-origin;
  let plane=section.planes[u32(section.settings.y)];let denom=dot(plane.xyz,ray);if(abs(denom)<0.000001){discard;}
  let t=-(dot(plane.xyz,origin)+plane.w)/denom;if(t<0||t>1){discard;}let world=origin+ray*t;
  for(var p=0u;p<u32(section.settings.x);p++){if(p!=u32(section.settings.y)&&dot(section.planes[p].xyz,world)+section.planes[p].w < -0.00001){discard;}}
  let tangent=normalize(cross(plane.xyz,select(vec3f(0,0,1),vec3f(0,1,0),abs(plane.z)>0.8)));let hatch=select(1.0,0.55,fract(dot(world,tangent)*section.settings.w)<0.2&&section.settings.w>0);
- let linear=section.color.xyz*hatch;let mapped=linear/(1+linear);var o:Pixel;o.color=vec4f(select(pow(mapped,vec3f(1.0/2.2)),linear,section.settings.z>0),1);let clip=section.camera*vec4f(world,1);o.depth=clip.z/clip.w;return o;
+ let linear=section.color.xyz*hatch;var o:Pixel;o.color=vec4f(select(toDisplay(linear),linear,section.settings.z>0),1);let clip=section.camera*vec4f(world,1);o.depth=clip.z/clip.w;return o;
 }`;
 const maskedCapShader = capShader
   .replace(declaration(0), declaration(0) + '@group(0) @binding(1) var capMask:texture_2d<f32>;\n')
@@ -225,7 +227,7 @@ export class SectionPlanes implements EnginePlugin {
     const module = device.createShaderModule({ code: capShader }),
       maskModule = device.createShaderModule({
         code: capShader.replace(
-          'o.color=vec4f(select(pow(mapped,vec3f(1.0/2.2)),linear,section.settings.z>0),1)',
+          'o.color=vec4f(select(toDisplay(linear),linear,section.settings.z>0),1)',
           'o.color=vec4f(1)',
         ),
       }),

@@ -3,6 +3,7 @@ import { finiteVector } from '@margoengine/math/validate';
 import { sceneSamples } from '../../shared/quality.js';
 import surfaceSource from './shaders/planet_surface.wgsl?raw';
 import atmosphereSource from './shaders/planet_atmosphere.wgsl?raw';
+import { displayShader } from '../../shared/display.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; VERTEX: number; INDEX: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
@@ -167,8 +168,8 @@ export class PlanetPass {
         minFilter: 'linear',
         magFilter: 'linear',
       });
-      this.surfaceModule = device.createShaderModule({ code: surfaceSource });
-      this.shellModule = device.createShaderModule({ code: atmosphereSource });
+      this.surfaceModule = device.createShaderModule({ code: displayShader + surfaceSource });
+      this.shellModule = device.createShaderModule({ code: displayShader + atmosphereSource });
       this.variant(format, this.samples, depthFormat);
     } catch (error) {
       this.dispose();

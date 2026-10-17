@@ -155,7 +155,7 @@ test('SSAO retains frame upload arrays, updates radius and restores owned resour
     h.context.format = 'bgra8unorm';
     h.context.bindings.length = 0;
     h.context.shader =
-      'let direct=vec3f(1);let linear=direct*vec3f(1);\nlet mapped=linear/(1.0+linear); return vec4f(mapped,1);';
+      'let direct=vec3f(1);let linear=direct*vec3f(1);\nlet mapped=pbrNeutral(max(linear,vec3f(0))); return vec4f(mapped,1);';
     h.engine.frameGraph.execute(h.context);
   };
   try {

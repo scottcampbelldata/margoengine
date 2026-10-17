@@ -388,8 +388,8 @@ export class Fog extends ShaderEffect {
   }
   protected patch(source: string, group: number): string {
     let code = source.replace(
-      'let mapped=linear/(1.0+linear);',
-      `let mapped=${fogMix('linear/(1.0+linear)', 'frame.eye.xyz')};`,
+      'let mapped=pbrNeutral(max(linear,vec3f(0)));',
+      `let mapped=${fogMix('pbrNeutral(max(linear,vec3f(0)))', 'frame.eye.xyz')};`,
     );
     if (code === source)
       code = source.replace('return vec4f(linear,1);', `return vec4f(${fogMix('linear', 'frame.eye.xyz')},1);`);

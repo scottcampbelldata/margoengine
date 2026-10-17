@@ -201,7 +201,7 @@ export class DOF implements EnginePlugin {
       this.originalDepth = c.depth;
       let shader = this.shaders.get(c.shader);
       if (shader === undefined) {
-        shader = c.shader.replace(/let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');
+        shader = c.shader.replace(/let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');
         if (shader === c.shader) throw new Error('DOF requires the standard core lighting shader');
         this.shaders.set(c.shader, shader);
       }

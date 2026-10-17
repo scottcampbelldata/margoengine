@@ -11,6 +11,7 @@ import { fullscreen, group, compute, dispatch } from '../../shared/gpu.js';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { celestialShader } from './celestial.js';
 import { head, mid, transmittance, sunlight } from './atmosphere.js';
+import { displayShader } from '../../shared/display.js';
 export { sunlight } from './atmosphere.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { STORAGE_BINDING: number; TEXTURE_BINDING: number };
@@ -177,13 +178,14 @@ fn nightSky(w:vec3f,footprint:f32)->vec3f {
  return color;
 }
 fn skyRadiance(w:vec3f,footprint:f32)->vec3f {if(frame.sun.w>=1.0){return nightSky(w,footprint);}return mix(daySky(w),nightSky(w,footprint),frame.sun.w);}
+${displayShader}
 @fragment fn fragment(i:Vertex)->@location(0) vec4f {
  let p=frame.inverse*vec4f(i.uv.x*2.0-1.0,1.0-i.uv.y*2.0,0.000001,1);let w=normalize(p.xyz/p.w-frame.eye.xyz);let s=frame.sun.xyz;
  let footprint=max(length(dpdx(w)),length(dpdy(w)));let sky=skyRadiance(w,footprint);var color=sky;
  let sun=celestialProfile(w,s,SUN_RADIUS,footprint);
  color+=(sun.x*60.0+sun.y*0.8)*trans(transmission,R+clamp(frame.eye.w,0.001,99.9),s.y)*(1.0-frame.sun.w);
  color+=frame.moonColor.rgb*frame.moon.w*moonRadiance(w,frame.moon.xyz,footprint);
- color=cloudSky(color,sky,w,footprint);color*=exp2(frame.settings.y);if(frame.settings.w<0.5&&frame.sunlight.w<0.5){color=pow(color/(1.0+color),vec3f(1.0/2.2));}return vec4f(color,1);
+ color=cloudSky(color,sky,w,footprint);color*=exp2(frame.settings.y);if(frame.settings.w<0.5&&frame.sunlight.w<0.5){color=toDisplay(color);}return vec4f(color,1);
 }`,
   ];
 }

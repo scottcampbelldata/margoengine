@@ -62,7 +62,7 @@ test('compacted WGSL preserves the optional shader injection boundaries', () => 
     /@vertex fn vertex\([\s\S]*?(?=@fragment)/,
     /(@fragment fn fragment[^{]+\{)/,
     /let linear=([^;]+);/,
-    /let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/,
+    /let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/,
     /let direct=[\s\S]*return vec4f\([^\n]+\);/,
     /let v=normalize\(frame.eye.xyz-i.position\);[\s\S]*?let linear=[^;]+;/,
     /let n=normalize\(i.normal\)[\s\S]*$/,

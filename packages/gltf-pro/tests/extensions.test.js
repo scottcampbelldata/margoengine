@@ -601,7 +601,7 @@ test('lighting hooks (contract v1): every hook point occurs once in both variant
   const points = [
     'direct+ambient(s)',
     'var color=',
-    'if(f.settings.w<0.5) {color=aces(max(color,vec3f(0))/0.6);',
+    'if(f.settings.w<0.5) {color=pbrNeutral(max(color,vec3f(0)));',
     'return vec4f(color,',
   ];
   for (const source of [pbrShader, physicalShader]) {

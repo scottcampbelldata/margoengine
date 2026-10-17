@@ -17,7 +17,7 @@ import {FXAA} from '@margoengine/post/fxaa';
 import {DOF} from '@margoengine/dof';
 import {Tonemap} from '@margoengine/tonemap';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
-const stack = PostStack.attach(stage.engine, [new SSAO(), new DOF({focalDistance: 6}), new Bloom({strength: 0.6}), new Tonemap({curve: 'agx'}), new FXAA()]);
+const stack = PostStack.attach(stage.engine, [new SSAO(), new DOF({focalDistance: 6}), new Bloom({strength: 0.6}), new Tonemap({curve: 'neutral'}), new FXAA()]);
 // TAA wraps the stack: TAA.attach(stage.engine, {depth: () => stack.depthTexture});
 stack.dispose(); // also disposes its effects
 ```
@@ -26,7 +26,7 @@ stack.dispose(); // also disposes its effects
   creative `PostProcessing`), then LDR effects (`FXAA`). Anything else throws. Put SSAO first: it
   darkens the captured ambient light. Put SSR before DOF and Bloom so reflections are blurred and glow too.
 - HDR effects hand linear light to the next effect. Without a display effect, the last HDR effect
-  tonemaps exactly as it does alone (Bloom AgX, SSAO and DOF Reinhard).
+  tonemaps exactly as it does alone, with Margo's display curve (Khronos PBR Neutral, then sRGB), as core does.
 - The stack attaches its effects; keep references to change their options. Effects given to a stack
   belong to it and cannot also be attached alone. Disposing one effect drops it from the chain.
 - Standalone Bloom, SSAO, DOF, Tonemap or PostProcessing on the same engine are refused.
@@ -207,7 +207,7 @@ temporary texture and uniform are released on disposal or device restoration.
 `Bloom.attach(engine, {strength: 0.8, threshold: 1, exposure: 0})` captures linear HDR,
 spreads the light above `threshold` through a chain of up to six levels (1/2 to 1/64 of the viewport: 13-tap bilinear
 downsamples, the first one Karis-weighted so single bright pixels do not flicker, then tent upsamples added back level
-by level) and presents with the analytic AgX transform shared with `@margoengine/tonemap`, dithered by up to one step
+by level) and presents with Margo's display curve (Khronos PBR Neutral, then sRGB: the same as core and Tonemap's default), dithered by up to one step
 before 8-bit output so dark gradients do not band. `strength` is the share of that light spread back as glow (the
 levels are averaged). Exposure is in stops. `depthTexture` exposes its
 viewport-sized scene depth for water. `sceneTexture` exposes the borrowed linear
@@ -215,8 +215,7 @@ HDR scene color, with `COPY_SRC` usage for water refraction. Both change on
 resize/restoration and remain owned by Bloom. Alone it owns scene capture and cannot share it with
 SSAO, Creative PostProcessing or standalone Tonemap; combine them in a `PostStack` (in a stack,
 `sceneTexture` is undefined and `depthTexture` is the stack's). Buffers, bind groups and pass
-descriptors are retained until resize or device restoration. The AgX approximation
-and its primary sources are listed in `NOTICE.md`.
+descriptors are retained until resize or device restoration. The curve references are listed in `NOTICE.md`.
 
 ```ts
 import {createStage} from 'margoengine';

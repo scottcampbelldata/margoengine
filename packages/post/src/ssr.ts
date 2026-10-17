@@ -7,6 +7,7 @@ import { render, compute, group as bind } from '../../shared/gpu.js';
 import { preset } from '../../shared/preset.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { PostStack } from './stack.js';
+import { displayShader } from '../../shared/display.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; STORAGE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -108,6 +109,7 @@ fn closest(cell:vec2i,level:i32)->f32 {
 if(level==0){return textureLoad(depth,cell,0);}
 return textureLoad(hiz,min(cell,vec2i(textureDimensions(hiz,level-1))-1),level-1).r;
 }
+${displayShader}
 @fragment fn fragment(@builtin(position) frag:vec4f)->@location(0) vec4f {
 let q=vec2i(frag.xy);let s=textureLoad(scene,q,0);var c=s.rgb;
 let m=textureLoad(weight,q,0);let e=textureLoad(specular,q,0);let rough=e.a;let d=textureLoad(depth,q,0);
@@ -147,7 +149,7 @@ let lod=log2(max(t*len*rough*rough*2.0,1.0));var reflected=textureLoad(scene,hq,
 if(lod>0.0){reflected=mix(reflected,textureSampleLevel(blurred,bilinear,h.xy/u.a.xy,min(lod-1.0,f32(textureNumLevels(blurred)-1))).rgb,min(lod,1.0));}
 c=max(vec3f(0),c+f*(m.rgb*reflected-e.rgb));
 }}}}
-c=c/(1+c);c=select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.055,c>=vec3f(0.0031308));return vec4f(c,s.a);
+return vec4f(toDisplay(c),s.a);
 }`;
 const linearComposite = compositeShader.replace(/c=c\/\(1\+c\);[^\n]+/, 'return vec4f(c,s.a);');
 // With models added, never remove more IBL specular than the pixel holds: at 4x a silhouette pixel is the resolve of both

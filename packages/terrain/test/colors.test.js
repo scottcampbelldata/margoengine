@@ -124,7 +124,7 @@ test('the per-pixel block keeps the anchors later core patches use and survives 
     'let v=normalize(frame.eye.xyz-i.position)',
     'let linear=direct*',
     'i.color*(1.0-i.material.y)*frame.radiance.w',
-    'let mapped=linear/(1.0+linear);',
+    'let mapped=pbrNeutral(max(linear,vec3f(0)));',
   ])
     assert.equal(code.split(anchor).length - 1, 1, anchor);
   assert.equal(code.match(/fn terrainNoise\(/g)?.length, 1);
@@ -135,7 +135,7 @@ test('the per-pixel block keeps the anchors later core patches use and survives 
   assert.ok(balanced(pick));
   assert.doesNotMatch(pick, /terrainSource/);
   // HDR capture (bloom, post stack) and the SSAO/SSR replays rewrite the tail inside the block, after the terrain call.
-  const hdr = code.replace(/let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');
+  const hdr = code.replace(/let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');
   assert.ok(hdr !== code && balanced(hdr));
   const ambient = code.replace(/let direct=[\s\S]*return vec4f\([^\n]+\);/, 'return vec4f(i.color,1);');
   assert.ok(balanced(ambient));

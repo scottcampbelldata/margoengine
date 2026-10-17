@@ -22,6 +22,10 @@ const OUTPUT = Symbol.for('margoengine.color-output');
 type Output = { peak: number; p3: boolean; excess?: (width: number, height: number) => GPUTextureView };
 export type TonemapCurve = 'agx' | 'acescg' | 'neutral';
 export interface TonemapOptions {
+  /**
+   * Display curve: 'neutral' (default; Khronos PBR Neutral, the curve core and every package end with, so attaching
+   * Tonemap without options keeps the scene's look), 'agx', or 'acescg' (ACES fitted).
+   */
   curve?: TonemapCurve;
   /** Exposure in stops, -16–16; default 0. */
   exposure?: number;
@@ -222,7 +226,7 @@ export class Tonemap implements EnginePlugin {
     }
     let shader = this.shaders.get(c.shader);
     if (shader === undefined) {
-      shader = c.shader.replace(/let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');
+      shader = c.shader.replace(/let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');
       if (shader === c.shader) throw new Error('Tonemap requires the standard core lighting shader');
       this.shaders.set(c.shader, shader);
     }
@@ -301,7 +305,7 @@ export class Tonemap implements EnginePlugin {
       o = this.options;
     v[0] = o.exposure ?? 0;
     v[1] = o.contrast ?? 1;
-    v[2] = o.curve === 'acescg' ? 1 : o.curve === 'neutral' ? 2 : 0;
+    v[2] = o.curve === 'acescg' ? 1 : o.curve === 'agx' ? 0 : 2;
     v[3] = +!!this.lut;
     for (let i = 0; i < 3; i++) {
       v[4 + i] = this.lut?.domainMin[i] ?? 0;

@@ -23,6 +23,5 @@ fn gust(root: vec2f) -> f32 {
 }
 fn displayColor(linear: vec3f) -> vec3f {
   if (frame.settings.z > 0.5) { return linear; }
-  let mapped = linear / (linear + 1.0);
-  return pow(mapped, vec3f(1.0 / 2.2));
+  return toDisplay(linear);
 }

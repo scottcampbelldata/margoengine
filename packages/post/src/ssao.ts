@@ -230,7 +230,7 @@ export class SSAO implements EnginePlugin {
           if (this.captureSource !== c.shader) {
             this.captureSource = c.shader;
             this.captureShader = c.shader.replace(
-              /let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/,
+              /let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/,
               'return vec4f(linear,1);',
             );
           }

@@ -9,7 +9,7 @@ import {
   type PassContext,
   type DrawOptions,
 } from '@margoengine/core/extension';
-import { agxShader } from '../../shared/agx.js';
+import { displayShader } from '../../shared/display.js';
 import { render } from '../../shared/gpu.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -82,7 +82,7 @@ fn downsample(id:vec2u,top:bool){
 // also stays within each channel's distance to 0 and 1, so black stays black, nothing clips (no bias) and a
 // transparent pixel stays transparent.
 const composite =
-  agxShader +
+  displayShader +
   tent +
   `
 @group(0) @binding(0) var scene:texture_2d<f32>;
@@ -98,8 +98,7 @@ fn dither(p:vec2f)->f32{
 }
 @fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f{
  let s=textureLoad(scene,vec2i(p.xy),0);let hdr=s.rgb+tent(bloom,bilinear,p.xy/vec2f(textureDimensions(scene)))*settings.x;
- let c=agx(max(hdr,vec3f(0))*exp2(settings.y));
- let o=select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.055,c>=vec3f(0.0031308));let a=max(s.a,max(o.r,max(o.g,o.b)));return vec4f(min(o+dither(p.xy)*min(vec3f(settings.z),min(o,1-o)),vec3f(a)),a);
+ let o=toDisplay(hdr*exp2(settings.y));let a=max(s.a,max(o.r,max(o.g,o.b)));return vec4f(min(o+dither(p.xy)*min(vec3f(settings.z),min(o,1-o)),vec3f(a)),a);
 }`;
 // Alpha: scene coverage (premultiplied), raised to the glow's brightest channel so glow over a transparent canvas stays valid.
 // In a PostStack, a non-final Bloom hands linear light (with its exposure) to the next effect.
@@ -228,7 +227,7 @@ export class Bloom implements EnginePlugin {
         this.originalFormat = c.format;
         if (this.sourceShader !== c.shader) {
           const linearShader = c.shader.replace(
-            /let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/,
+            /let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/,
             'return vec4f(linear,1);',
           );
           if (linearShader === c.shader) throw new Error('Bloom requires the standard core lighting shader');

@@ -13,6 +13,7 @@ import { sceneSamples } from '../../shared/quality.js';
 import frameShader from './shaders/grass-frame.wgsl?raw';
 import cullShader from './shaders/grass-cull.wgsl?raw';
 import grassShader from './shaders/grass.wgsl?raw';
+import { displayShader } from '../../shared/display.js';
 
 declare const GPUBufferUsage: {
   STORAGE: number;
@@ -259,7 +260,10 @@ export class GrassField implements EnginePlugin {
         1,
       ]),
     );
-    const computeModule = device.createShaderModule({ label: 'grass:cull', code: frameShader + cullShader });
+    const computeModule = device.createShaderModule({
+      label: 'grass:cull',
+      code: displayShader + frameShader + cullShader,
+    });
     this.compute = device.createComputePipeline({
       layout: 'auto',
       compute: { module: computeModule, entryPoint: 'cull' },
@@ -273,7 +277,7 @@ export class GrassField implements EnginePlugin {
       layout: this.compute.getBindGroupLayout(0),
       entries: [...entries, { binding: 3, resource: { buffer: this.indirect } }],
     });
-    this.module = device.createShaderModule({ label: 'grass:render', code: frameShader + grassShader });
+    this.module = device.createShaderModule({ label: 'grass:render', code: displayShader + frameShader + grassShader });
     this.canvasFormat = navigator.gpu.getPreferredCanvasFormat();
     // Explicit shared layout lets all LOD variants reuse one bind group.
     const layout = device.createBindGroupLayout({

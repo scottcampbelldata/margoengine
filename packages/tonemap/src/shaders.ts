@@ -1,6 +1,7 @@
 // Color transforms from the references in ../NOTICE.md.
 import { agxShader } from '../../shared/agx.js';
 import { acesShader } from '../../shared/aces.js';
+import { neutralShader } from '../../shared/display.js';
 const common = `
 struct Params {grade:vec4f,domainMin:vec4f,domainMax:vec4f,settings:vec4f}
 @group(0) @binding(0) var<uniform> p:Params;
@@ -11,13 +12,7 @@ fn acescgToSRGB(v:vec3f)->vec3f {
 }
 ${acesShader}
 ${agxShader}
-fn neutral(input:vec3f)->vec3f {
-  let x=min(input.r,min(input.g,input.b));let offset=select(0.04,x-6.25*x*x,x<0.08);var color=input-offset;
-  let peak=max(color.r,max(color.g,color.b));if(peak<0.76){return color;}
-  let newPeak=1.0-0.24*0.24/(peak+0.24-0.76);color*=newPeak/peak;
-  let desaturation=1.0-1.0/(0.15*(peak-newPeak)+1.0);return mix(color,vec3f(newPeak),desaturation);
-}
-fn sampleLUT(color:vec3f)->vec3f {
+${neutralShader}fn sampleLUT(color:vec3f)->vec3f {
   let uv=clamp((color-p.domainMin.xyz)/(p.domainMax.xyz-p.domainMin.xyz),vec3f(0),vec3f(1))*32.0;
   let lo=vec3i(floor(uv));let hi=min(lo+1,vec3i(32));let t=fract(uv);
   let z0=mix(mix(textureLoad(lut,lo,0).rgb,textureLoad(lut,vec3i(hi.x,lo.y,lo.z),0).rgb,t.x),
@@ -36,7 +31,7 @@ export const tonemapShader =
   let source=textureLoad(scene,vec2i(pos.xy),0);var hdr=source.rgb;
   if(p.settings.x==1.0){hdr=acescgToSRGB(hdr);}
   hdr=max(hdr,vec3f(0))*exp2(p.grade.x);
-  var color=agx(hdr);if(p.grade.z==1.0){color=aces(hdr);}else if(p.grade.z==2.0){color=neutral(hdr);}
+  var color=agx(hdr);if(p.grade.z==1.0){color=aces(hdr);}else if(p.grade.z==2.0){color=pbrNeutral(hdr);}
   color=clamp((color-0.18)*p.grade.y+0.18,vec3f(0),vec3f(1));
   if(p.grade.w==1.0){color=sampleLUT(color);}
   color=clamp(color,vec3f(0),vec3f(1));

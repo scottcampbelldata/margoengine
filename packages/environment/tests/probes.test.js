@@ -252,8 +252,8 @@ test('LightProbes reach gltf-pro models through the ambient hook and the bake ca
   const frame = context(gpu, {
     shader:
       clusteredShader.replace(
-        'let mapped=linear/(1.0+linear);',
-        'let mapped=mix(linear/(1.0+linear),margoFog.color.rgb,fogAmount(i.position,frame.eye.xyz));',
+        'let mapped=pbrNeutral(max(linear,vec3f(0)));',
+        'let mapped=mix(pbrNeutral(max(linear,vec3f(0))),margoFog.color.rgb,fogAmount(i.position,frame.eye.xyz));',
       ) + '\nfn fogAmount(p:vec3f,eye:vec3f)->f32 {return 0.0;}',
     samples: 4,
   });

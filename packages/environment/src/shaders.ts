@@ -3,6 +3,7 @@
 // and v grows down the texel rows, both in -1..1.
 // Equirect convention: u = 0.5 + atan2(d.x, -d.z) / 2PI (image center faces -Z, +X is right of center),
 // v = acos(d.y) / PI (row 0 is straight up, +Y).
+import { displayShader } from '../../shared/display.js';
 
 export const common = /* wgsl */ `
 const PI = 3.141592653589793;
@@ -228,6 +229,7 @@ struct Varyings { @builtin(position) position: vec4f, @location(0) ndc: vec2f }
   out.ndc = p;
   return out;
 }
+${displayShader}
 @fragment fn fragmentMain(v: Varyings) -> @location(0) vec4f {
   let world = u.inverseViewProjection * vec4f(v.ndc, 0.5, 1.0);
   let ray = normalize(world.xyz / world.w - u.eye.xyz);
@@ -244,7 +246,6 @@ struct Varyings { @builtin(position) position: vec4f, @location(0) ndc: vec2f }
   }
   color *= u.params.x;
   if (outputHdr) { return vec4f(color, 1.0); }
-  let mapped = color / (1.0 + color);
-  return vec4f(select(mapped * 12.92, 1.055 * pow(mapped, vec3f(1.0 / 2.4)) - 0.055, mapped >= vec3f(0.0031308)), 1.0);
+  return vec4f(toDisplay(color), 1.0);
 }
 `;

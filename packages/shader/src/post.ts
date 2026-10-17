@@ -3,7 +3,7 @@ import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, PassContext } from '@margoengine/core/extension';
 import { fullscreen, render } from '../../shared/gpu.js';
-import { acesShader } from '../../shared/aces.js';
+import { neutralShader } from '../../shared/display.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import {
   Node,
@@ -96,12 +96,12 @@ export class NodePass implements EnginePlugin {
     this.body = s.lines.map((l) => '  ' + l + '\n').join('');
     this.value = node.type === 'vec3f' ? `vec4f(${s.values[0]}, 1.0)` : s.values[0];
   }
-  /** The pass WGSL; `encode` adds ACES and sRGB encoding (an HDR pass that ends the chain). */
+  /** The pass WGSL; `encode` adds the display curve (PBR Neutral) and sRGB encoding (an HDR pass that ends the chain). */
   code(encode = false): string {
     const out = encode
-      ? `let c = ${this.value};\n  let x = aces(max(c.rgb, vec3f(0.0)) / 0.6);\n  return vec4f(select(x * 12.92, 1.055 * pow(x, vec3f(1.0 / 2.4)) - 0.055, x >= vec3f(0.0031308)), c.a);`
+      ? `let c = ${this.value};\n  let x = pbrNeutral(max(c.rgb, vec3f(0.0)));\n  return vec4f(select(x * 12.92, 1.055 * pow(x, vec3f(1.0 / 2.4)) - 0.055, x >= vec3f(0.0031308)), c.a);`
       : `return ${this.value};`;
-    return `${fullscreen}\n${this.program.declare(0)}\n${encode ? acesShader + '\n' : ''}@fragment fn fragment(v:Vertex)->@location(0) vec4f {\n${this.body}  ${out}\n}\n`;
+    return `${fullscreen}\n${this.program.declare(0)}\n${encode ? neutralShader : ''}@fragment fn fragment(v:Vertex)->@location(0) vec4f {\n${this.body}  ${out}\n}\n`;
   }
   private joinStack(host: StackHost): StackStage {
     if (this.host || this.disposed)

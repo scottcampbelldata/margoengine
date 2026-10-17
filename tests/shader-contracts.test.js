@@ -10,9 +10,9 @@ import { meshVertex } from '../packages/shared/gpu.js';
 import { pbrShader, extendedPBRShader } from '../packages/gltf-pro/src/shader.ts';
 import { terrainFragment } from '../packages/terrain/src/shader.ts';
 
-const hdr = core.replace(/let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');
+const hdr = core.replace(/let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');
 const targets = { core, hdr, meshVertex, gltf: pbrShader, gltfExtended: extendedPBRShader, terrain: terrainFragment };
-const linearBlock = /let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/;
+const linearBlock = /let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/;
 // [package source file, target shader, anchor]; strings must occur in the target, regexes must match it.
 const contracts = [
   ['machinery/src/section.ts', 'core', 'let facing='],
@@ -23,7 +23,7 @@ const contracts = [
   ['clustered/src/index.ts', 'terrain', 'let base=terrainColor'],
   ['environment/src/lighting.ts', 'core', /let linear=([^;]+);/],
   ['environment/src/lighting.ts', 'core', 'frame.radiance.w'],
-  ['environment/src/lighting.ts', 'core', 'let mapped=linear/(1.0+linear);'],
+  ['environment/src/lighting.ts', 'core', 'let mapped=pbrNeutral(max(linear,vec3f(0)));'],
   ['environment/src/lighting.ts', 'hdr', 'return vec4f(linear,1);'],
   ['sky/src/lighting.ts', 'core', 'frame.radiance.w'],
   ['taa/src/index.ts', 'core', 'o.clip=frame.camera*p'],

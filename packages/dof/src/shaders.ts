@@ -1,3 +1,4 @@
+import { displayShader } from '../../shared/display.js';
 const params = `struct Params {lens:vec4f,frame:vec4f,ortho:vec4f}
 @group(0) @binding(0) var<uniform> p:Params;`;
 
@@ -119,7 +120,7 @@ export const presentShader = `
 @vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {
   let xy=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));return vec4f(xy[i],0,1);
 }
+${displayShader}
 @fragment fn fragment(@builtin(position) pos:vec4f)->@location(0) vec4f {
-  let c=textureLoad(scene,vec2i(pos.xy),0);let v=max(c.rgb,vec3f(0));let mapped=v/(1.0+v);
-  return vec4f(select(mapped*12.92,1.055*pow(mapped,vec3f(1.0/2.4))-0.055,mapped>=vec3f(0.0031308)),c.a);
+  let c=textureLoad(scene,vec2i(pos.xy),0);return vec4f(toDisplay(c.rgb),c.a);
 }`;

@@ -34,7 +34,7 @@ const variants = {
     /let linear=([^;]+);/,
     'let linear=$1+clusterLighting(i.clip.xy,i.position,n,frame.eye.xyz,i.color,i.material.x,i.material.y);',
   ),
-  hdr: coreShader.replace(/let mapped=linear\/[\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);'),
+  hdr: coreShader.replace(/let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);'),
 };
 const fakeEngine = (device) => ({
   backend: 'webgpu',

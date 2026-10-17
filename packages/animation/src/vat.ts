@@ -3,7 +3,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import type { Animation } from './index.js';
 import { invertMatrixStable } from '@margoengine/math/mat4';
-import { acesShader } from '../../shared/aces.js';
+import { neutralShader } from '../../shared/display.js';
 import { lightPBR } from '../../shared/pbr-hooks.js';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; VERTEX: number; INDEX: number; COPY_DST: number };
@@ -270,7 +270,7 @@ fn texel(row:u32,v:u32,k:u32)->vec4f {let i=(row*u32(f.vat.x)+v)*2u+k;let w=u32(
 `,
   srgbShader =
     'fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}\n';
-export const vatShader = `${acesShader}${vatVertex}${srgbShader}// gltf-pro's lighting: GGX key light, hemisphere fill, ACES + sRGB unless the target is HDR.
+export const vatShader = `${neutralShader}${vatVertex}${srgbShader}// gltf-pro's lighting: GGX key light, hemisphere fill, PBR Neutral + sRGB unless the target is HDR.
 @fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
  let albedo=(f.base*textureSample(map,mapSampler,i.uv)).rgb;let rough=f.options.z;let metal=f.options.w;
  let nn=normalize(i.normal)*select(-1.0,1.0,front);let v=normalize(f.eye.xyz-i.position);let l=normalize(f.light.xyz);let h=(v+l)/max(length(v+l),0.0001);
@@ -279,14 +279,14 @@ export const vatShader = `${acesShader}${vatVertex}${srgbShader}// gltf-pro's li
  let f0=mix(vec3f(0.04),albedo,metal);let fresnel=f0+(1.0-f0)*pow(1.0-vh,5.0);
  var color=((1.0-fresnel)*(1.0-metal)*albedo/3.14159265+d*g*fresnel/max(4.0*nl*nv,0.0001))*nl*f.radiance.rgb*f.light.w
   +(albedo*(1.0-metal)+f0*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1.0),clamp(nn.y*0.5+0.5,0.0,1.0))*f.radiance.w;
- if(f.vat.z<0.5){color=srgb(aces(max(color,vec3f(0.0))/0.6));}
+ if(f.vat.z<0.5){color=srgb(pbrNeutral(max(color,vec3f(0.0))));}
  return vec4f(color,1.0);
 }`;
 let lit: string | undefined;
 // The same lighting with gltf-pro's Surface and hook points, so `lightPBR` composes effects into it. Built only once an
 // effect is added; the HDR flag is then also written to the last Frame float, renamed `settings` where the fog hook reads `.w`.
 const litShader = () =>
-  (lit ??= `${acesShader}${vatVertex.replace('vat:vec4f}', 'settings:vec4f}').replaceAll('f.vat.', 'f.settings.')}${srgbShader}
+  (lit ??= `${neutralShader}${vatVertex.replace('vat:vec4f}', 'settings:vec4f}').replaceAll('f.vat.', 'f.settings.')}${srgbShader}
 struct Surface {base:vec4f,n:vec3f,roughness:f32,metal:f32,occlusion:f32,emissive:vec3f}
 fn ambient(s:Surface)->vec3f {let f0=mix(vec3f(0.04),s.base.rgb,s.metal);return (s.base.rgb*(1.0-s.metal)+f0*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1.0),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w*s.occlusion;}
 @fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
@@ -297,7 +297,7 @@ fn ambient(s:Surface)->vec3f {let f0=mix(vec3f(0.04),s.base.rgb,s.metal);return 
  let f0=mix(vec3f(0.04),s.base.rgb,s.metal);let fresnel=f0+(1.0-f0)*pow(1.0-vh,5.0);
  let direct=((1.0-fresnel)*(1.0-s.metal)*s.base.rgb/3.14159265+d*g*fresnel/max(4.0*nl*nv,0.0001))*nl*f.radiance.rgb*f.light.w;
  var color=direct+ambient(s)+s.emissive;
- if(f.settings.w<0.5) {color=aces(max(color,vec3f(0))/0.6); color=srgb(color);}
+ if(f.settings.w<0.5) {color=pbrNeutral(max(color,vec3f(0))); color=srgb(color);}
  return vec4f(color,1.0);
 }`);
 let serial = 0;
