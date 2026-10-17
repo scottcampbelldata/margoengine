@@ -1,0 +1,57 @@
+{
+  "command": "npm run visual:update -- --runs=4 --no-build",
+  "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+  "sourceTree": "2e39698c150453e1783f1e127062061999c684e4",
+  "sourceFiles": 2367,
+  "packagesDirty": false,
+  "renderedSourceDirty": false,
+  "approvedNonRenderingDifferences": [
+    "examples/package-benchmarks/cad/power.mjs",
+    "examples/package-benchmarks/results/basic-scene-network.json",
+    "examples/package-benchmarks/results/entry-sizes.json"
+  ],
+  "verifiedLFSAssets": 607,
+  "lfsAssetManifestSha256": "55cb3ed9291bf884833a7af45fb30feee9b4d80bfc1fa924f6a3d7edc2767e64",
+  "unchangedLegacyBaselineFiles": 56,
+  "legacyBaselineManifestSha256": "a5089e7a1421c8772d19cd8ede635e3f19a70b06cdd747f1070fe354093c8e19",
+  "adapterIdentityDuringCapture": {
+    "date": "2026-10-17T06:00:52.083Z",
+    "browser": "msedge 155.0.4283.60",
+    "default": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "isFallbackAdapter": false
+    },
+    "highPerformance": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "isFallbackAdapter": false
+    }
+  },
+  "adapterIdentityAfterCapture": {
+    "date": "2026-10-17T06:06:01.601Z",
+    "browser": "msedge 155.0.4283.60",
+    "default": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "isFallbackAdapter": false
+    },
+    "highPerformance": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "isFallbackAdapter": false
+    }
+  },
+  "completeViews": 55,
+  "runs": 4,
+  "successfulCaptures": 220,
+  "completedAt": "2026-10-17T06:05:33.873Z"
+}

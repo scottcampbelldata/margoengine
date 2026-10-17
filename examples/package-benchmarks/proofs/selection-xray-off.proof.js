@@ -4,12 +4,13 @@
 // matches the package at `ref`, byte for byte, at 1x and 4x MSAA, with `xray` absent, false and deleted mid-story.
 // The same story with x-ray on must differ (so the comparison can see the feature).
 // Run: node examples/package-benchmarks/proofs/selection-xray-off.proof.js [ref] [pin] [--current]
-// Pinned: 46f9484 against 80d4cfb, the commit that made this claim. --current: 46f9484 against the working tree.
+// Pinned: 46f9484 against 80d4cfb, the commit that made this claim. --current: b3ed8ac against the working tree;
+// 6a57389 added the approved ambient uniform and 95b4eae added back-side-only model culling (claims.md).
 import assert from 'node:assert/strict';
-import { refs, versions } from './compare.js';
+import { refs, versions, current } from './compare.js';
 import { mockGPU, passes, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('46f9484', '80d4cfb', '46f9484'),
+const { ref, pin } = refs('46f9484', '80d4cfb', 'b3ed8ac'),
   { baseline, candidate } = await versions('selection', ref, undefined, pin);
 
 function story(module, samples, xray) {
@@ -95,7 +96,9 @@ for (const samples of [1, 4])
     assert.deepEqual(actual, expected, `selection GPU calls differ at ${samples}x with xray ${xray}`);
     entries += expected.length;
   }
-assert.notDeepEqual(story(candidate, 4, true), story(baseline, 4, true), 'x-ray on must change the GPU calls');
+assert.notDeepEqual(story(candidate, 4, true), story(candidate, 4, false), 'x-ray on must change the GPU calls');
+if (!current)
+  assert.notDeepEqual(story(candidate, 4, true), story(baseline, 4, true), 'x-ray was added after the baseline');
 console.log(
   JSON.stringify({
     package: 'selection',

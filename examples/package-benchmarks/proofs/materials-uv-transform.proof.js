@@ -4,8 +4,8 @@
 // @margoengine/materials + @margoengine/gltf-pro built from `ref` and from the candidate.
 // Run: node examples/package-benchmarks/proofs/materials-uv-transform.proof.js [ref] [pin] [--current]
 // Pinned: 1970fda (before the transforms) against 700838e, the commit that added them and made this claim. --current:
-// 7f1c9c6 against the working tree; 7f1c9c6 is the last intentional change to the story's output (gltf-pro's discard tests
-// became pipeline constants, 1e.f), so its parent and older refs differ from later trees.
+// b3ed8ac against the working tree, including the intentional normal-frame, topology, uniform and draw batching changes
+// through b326518/2091f12 (claims.md).
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -19,7 +19,7 @@ import { mockGPU, context } from './gpu-recorder.js';
 
 const root = resolve(import.meta.dirname, '../../..'),
   slash = (value) => value.replaceAll('\\', '/'),
-  { ref, pin } = refs('1970fda', '700838e', '7f1c9c6');
+  { ref, pin } = refs('1970fda', '700838e', 'b3ed8ac');
 const sources = ['materials/src', 'gltf-pro/src', 'shared'].map((name) => slash(resolve(root, 'packages', name)) + '/');
 const show = (from, file) => {
   try {
@@ -67,7 +67,10 @@ async function load(from) {
       minify: false,
       target: 'es2022',
       lib: { entry: resolve(root, 'packages/materials/src/index.ts'), formats: ['es'] },
-      rollupOptions: { external: (id) => id.startsWith('@margoengine/core') },
+      rollupOptions: {
+        external: (id) => id.startsWith('@margoengine/core'),
+        output: { codeSplitting: false },
+      },
     },
   });
   const chunks = result[0].output.filter((item) => item.type === 'chunk');

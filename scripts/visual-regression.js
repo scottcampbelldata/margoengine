@@ -1,5 +1,5 @@
 // Visual regression for the site demos (HANDOFF 1h.f). Needs a real GPU, so it is not part of `npm run verify`.
-//   npm run visual:check  [-- --only=earth,dof-high] [--runs=N] [--no-build]   compare against tests/visual baselines
+//   npm run visual:check  [-- --only=earth,dof-high] [--runs=N] [--no-build]   compare against matching hardware baselines
 //   npm run visual:update [-- --only=...] [--runs=3] [--no-build]             re-capture baselines and noise tolerances
 //   npm run visual:device-loss [-- --only=...] [--no-build]                     device loss in every site demo (5i.d)
 // Run `npm run build:packages` first; the script builds the site (scripts/build-site.js) and serves site/dist.
@@ -28,10 +28,26 @@ import { resolve, dirname } from 'node:path';
 import { deflateSync, crc32 } from 'node:zlib';
 import { decodePNG } from '../tests/support/png.js';
 import { acPower } from '../examples/package-benchmarks/cad/power.mjs';
+import { margoError } from '../packages/shared/errors.js';
+import {
+  selectBaselineProfile,
+  assertBaselineIdentity,
+  assertCaptureEnvironment,
+  assertProfileCreationCoverage,
+  renderedInputChanges,
+} from './support/visual-baselines.js';
 
 const root = resolve(import.meta.dirname, '..'),
-  baselines = resolve(root, 'tests/visual'),
+  baselineRoot = resolve(root, 'tests/visual'),
   out = resolve(root, 'test-results/visual');
+function changedRenderedInputs() {
+  const paths = ['packages', 'examples', 'site', 'apps'],
+    options = { cwd: root, encoding: 'utf8' };
+  return renderedInputChanges(
+    execFileSync('git', ['diff', '--name-only', '--no-renames', '-z', 'HEAD', '--', ...paths], options),
+    execFileSync('git', ['ls-files', '--others', '--exclude-standard', '-z', '--', ...paths], options),
+  );
+}
 const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
 const update = process.argv.includes('--update'),
   loss = process.argv.includes('--device-loss') && !update,
@@ -108,12 +124,12 @@ const demos = [
       views: ['model'],
     })),
 ];
-const cases = demos
-  .filter((demo) => (loss ? !demo.dev : !demo.lossOnly))
-  .flatMap((demo) =>
-    (demo.views ?? ['high', 'light', 'phone']).map((view) => ({ id: `${demo.id}-${view}`, demo, view: views[view] })),
-  )
-  .filter((c) => !only.length || only.some((o) => c.id.includes(o)));
+const allCases = demos
+    .filter((demo) => (loss ? !demo.dev : !demo.lossOnly))
+    .flatMap((demo) =>
+      (demo.views ?? ['high', 'light', 'phone']).map((view) => ({ id: `${demo.id}-${view}`, demo, view: views[view] })),
+    ),
+  cases = allCases.filter((c) => !only.length || only.some((o) => c.id.includes(o)));
 
 // PNG: 8-bit RGB, per-row filter chosen by the minimum-sum heuristic.
 function encodePNG({ width, height, data }) {
@@ -306,7 +322,8 @@ let server,
 try {
   await rm(out, { recursive: true, force: true });
   await mkdir(out, { recursive: true });
-  const powerBefore = acPower();
+  const powerBefore = acPower(),
+    sourceChangesBefore = changedRenderedInputs();
   if (cases.some((c) => !c.demo.dev))
     server = await preview({
       configFile: false,
@@ -334,7 +351,7 @@ try {
       args: ['--enable-unsafe-webgpu'],
     });
     try {
-      environment.browser = `${process.env.BROWSER_CHANNEL ?? 'msedge'} ${browser.version()}`;
+      const browserVersion = `${process.env.BROWSER_CHANNEL ?? 'msedge'} ${browser.version()}`;
       for (const { id, demo, view } of cases) {
         const { factor, query, ...options } = view,
           result = results.get(id),
@@ -355,6 +372,15 @@ try {
                 }),
             ),
           );
+          const currentEnvironment = {
+            browser: browserVersion,
+            gpu: await page.evaluate(async () => {
+              const i = (await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' })).info;
+              return [i.vendor, i.architecture, i.description].filter(Boolean).join(' ');
+            }),
+          };
+          assertCaptureEnvironment(environment.gpu ? environment : currentEnvironment, currentEnvironment);
+          if (!environment.gpu) environment = currentEnvironment;
           return downsample(
             await decodePNG(
               await page.screenshot({ animations: 'disabled', mask: (demo.mask ?? []).map((s) => page.locator(s)) }),
@@ -370,10 +396,6 @@ try {
           // 90 s: Night Citadel's first load took over 30 s while other agents built packages (gate 9: no load-flaky checks).
           await page.goto((demo.dev ? devOrigin : origin) + '/' + demo.path + query, { timeout: 90_000 });
           await page.waitForFunction(demo.ready, null, { timeout: 120_000 });
-          environment.gpu ??= await page.evaluate(async () => {
-            const i = (await navigator.gpu.requestAdapter()).info;
-            return [i.vendor, i.architecture, i.description].filter(Boolean).join(' ');
-          });
           if (loss) {
             result.before = await capture();
             result.loss = await page.evaluate(() => {
@@ -394,6 +416,7 @@ try {
           }
           result.captures.push(await capture());
         } catch (error) {
+          if (error.name === 'MargoError' && error.code === 'state') throw error;
           result.errors.push(`capture: ${String(error.message ?? error).split('\n')[0]}`);
           await page.screenshot({ path: resolve(out, `${id}.failed.png`) }).catch(() => {});
         } finally {
@@ -408,18 +431,61 @@ try {
       await Promise.race([browser.close(), new Promise((r) => setTimeout(r, 15_000))]);
     }
   }
-  const powerAfter = acPower();
+  const powerAfter = acPower(),
+    sourceChanges = [...new Set([...sourceChangesBefore, ...changedRenderedInputs()])];
   environment = {
     ...environment,
     acPowerBefore: powerBefore,
     acPowerAfter: powerAfter,
     date: new Date().toISOString(),
-    commit: execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
+    commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
+    packagesDirty: sourceChanges.some((path) => /^packages\//i.test(path)),
+    renderedInputsDirty: sourceChanges.length > 0,
+    renderedInputChanges: sourceChanges,
   };
   if (powerAfter === false) throw new Error('AC power was lost during the run: results discarded. Plug in and retry.');
 
-  const manifestPath = resolve(baselines, 'manifest.json');
-  const manifest = JSON.parse(await readFile(manifestPath, 'utf8').catch(() => '{"views":{}}'));
+  const legacyManifest = JSON.parse(await readFile(resolve(baselineRoot, 'manifest.json'), 'utf8')),
+    profile = selectBaselineProfile(environment, legacyManifest.environment),
+    baselines = resolve(baselineRoot, profile.directory),
+    manifestPath = resolve(baselines, 'manifest.json');
+  let manifest =
+    profile.id === 'legacy'
+      ? legacyManifest
+      : await readFile(manifestPath, 'utf8')
+          .then((text) => JSON.parse(text))
+          .catch((error) => {
+            if (error.code === 'ENOENT') return undefined;
+            throw error;
+          });
+  console.log(
+    `visual baseline profile ${profile.id}: ${baselines}; reference ${JSON.stringify(manifest?.environment ?? {})}`,
+  );
+  if (manifest) assertBaselineIdentity(manifest.environment, environment);
+  else if (!update && !loss)
+    throw margoError(
+      'state',
+      `No visual baseline for hardware profile ${profile.id}; capture the full committed product reference on this hardware before checking changes`,
+    );
+  if (update && !manifest) {
+    assertProfileCreationCoverage(
+      cases.map((c) => c.id),
+      allCases.map((c) => c.id),
+      environment.renderedInputsDirty,
+    );
+    if (runs < 2) throw new RangeError('A new visual profile needs repeated captures; use --runs=4');
+    if (
+      [...results.values()].some(
+        (r) => r.captures.length < runs || r.errors.some((e) => e.startsWith('pageerror') || e.startsWith('capture')),
+      )
+    )
+      throw margoError(
+        'failed',
+        'Visual profile capture is incomplete; fix the failed captures and retry the full view set',
+      );
+  }
+  manifest ??= { views: {} };
+  if (update) for (const entry of Object.values(manifest.views)) entry.environment ??= manifest.environment;
   const rows = [];
   for (const r of results.values()) {
     const failed =
@@ -444,9 +510,16 @@ try {
         runs,
         noise: floor,
         tolerance,
+        environment: { ...environment },
       };
       console.log(`updated ${r.id}: noise ${JSON.stringify(floor)} -> tolerance ${JSON.stringify(tolerance)}`);
-      rows.push({ ...r, status: 'updated', noise: manifest.views[r.id].noise, tolerance });
+      rows.push({
+        ...r,
+        status: 'updated',
+        noise: manifest.views[r.id].noise,
+        tolerance,
+        baselineEnvironment: manifest.views[r.id].environment,
+      });
       continue;
     }
     // Device loss: the capture before the loss is the baseline, with the view's tolerance (bit-exact allowance if none).
@@ -487,10 +560,12 @@ try {
       metrics,
       noise: entry.noise,
       tolerance: entry.tolerance,
+      baselineEnvironment: entry.environment ?? manifest.environment,
       images: true,
     });
   }
   if (update) {
+    manifest.profile = profile.id;
     manifest.environment = environment;
     manifest.method = { hot: HOT, margin: MARGIN, allowance: ALLOWANCE };
     await writeFile(manifestPath, JSON.stringify(manifest, null, 1) + '\n');
@@ -508,8 +583,8 @@ try {
     `<!doctype html><meta charset="utf-8"><title>Visual ${update ? 'update' : loss ? 'device loss' : 'check'}</title>
 <style>body{font:14px system-ui;margin:16px;background:#111;color:#ddd}td{vertical-align:top;padding:6px;border-top:1px solid #333}img{max-width:420px;display:block}.FAIL{color:#f66}.pass{color:#6c6}pre{white-space:pre-wrap;max-width:420px;font-size:12px}</style>
 <h1>Visual ${update ? 'update' : loss ? 'device loss' : 'check'}: ${rows.filter((r) => r.status === 'pass' || r.status === 'updated').length}/${rows.length} ok</h1>
-<p>${esc(JSON.stringify(environment))}<br>baselines: ${esc(JSON.stringify(manifest.environment ?? {}))}<br>${runs} run(s), ${seconds} s. d = max RGB difference per pixel; hot = share of pixels with d &gt; ${HOT}.</p>
-<table>${rows.map((r) => `<tr><td><b class="${r.status.split(' ')[0]}">${r.status}</b> ${esc(r.id)}<br><code>/${esc(r.url)}</code><pre>${esc(JSON.stringify({ loss: r.loss, metrics: r.metrics, noise: r.noise, tolerance: r.tolerance, why: r.why }, null, 1))}\n${esc(r.errors.slice(0, 8).join('\n'))}</pre></td>${r.images ? ['baseline', 'actual', 'diff'].map((k) => `<td>${k}<img src="${r.id}.${k}.png"></td>`).join('') : ''}</tr>`).join('\n')}</table>`,
+<p>profile: ${esc(profile.id)} (${esc(baselines)})<br>${esc(JSON.stringify(environment))}<br>baselines: ${esc(JSON.stringify(manifest.environment ?? {}))}<br>${runs} run(s), ${seconds} s. d = max RGB difference per pixel; hot = share of pixels with d &gt; ${HOT}.</p>
+<table>${rows.map((r) => `<tr><td><b class="${r.status.split(' ')[0]}">${r.status}</b> ${esc(r.id)}<br><code>/${esc(r.url)}</code><pre>${esc(JSON.stringify({ loss: r.loss, metrics: r.metrics, noise: r.noise, tolerance: r.tolerance, baselineEnvironment: r.baselineEnvironment, why: r.why }, null, 1))}\n${esc(r.errors.slice(0, 8).join('\n'))}</pre></td>${r.images ? ['baseline', 'actual', 'diff'].map((k) => `<td>${k}<img src="${r.id}.${k}.png"></td>`).join('') : ''}</tr>`).join('\n')}</table>`,
   );
   console.log(
     `${update ? 'updated' : 'checked'} ${rows.length} views in ${seconds} s; report test-results/visual/index.html`,

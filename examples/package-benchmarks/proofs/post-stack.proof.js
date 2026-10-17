@@ -2,9 +2,8 @@
 // creative PostProcessing) makes exactly the GPU calls it made before, over a story of resizes, option edits, format
 // and sample-count changes, a rejected frame, device restoration and disposal at 1x and 4x.
 // Run: node examples/package-benchmarks/proofs/post-stack.proof.js [ref] [pin] [--current]
-// Pinned: 5b1fe66^ against 5b1fe66, the commit that added PostStack and made this claim. --current: e2cc4c5 against the
-// working tree. e2cc4c5 (Bloom, FXAA and SSAO keep the canvas alpha for TransparentCanvas) is the last intentional change
-// to a single effect's output; before it, e12fc9c (the DOF rewrite) and a281ad2/9702e57 (SSAO).
+// Pinned: 5b1fe66^ against 5b1fe66, the commit that added PostStack and made this claim. --current: b3ed8ac against the
+// working tree; 6a57389 intentionally made SSAO preserve the approved core ambient RGB hook (claims.md).
 // creative's PostProcessing is always 5b1fe66^ against 3319317: it lost bloom and the sky backdrop after 3319317.
 import assert from 'node:assert/strict';
 import { refs, versions, ignoreAgx } from './compare.js';
@@ -12,7 +11,7 @@ import { mockGPU, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
 const before = '5b1fe66^',
-  { ref, pin } = refs(before, '5b1fe66', 'e2cc4c5');
+  { ref, pin } = refs(before, '5b1fe66', 'b3ed8ac');
 const post = await versions('post', ref, undefined, pin),
   dof = await versions('dof', ref, undefined, pin),
   tonemap = await versions('tonemap', ref, undefined, pin);

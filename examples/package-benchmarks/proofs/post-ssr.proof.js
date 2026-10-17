@@ -2,13 +2,14 @@
 // over a story of resizes, option edits, depth-format, sample-count and canvas-format changes, a rejected frame, device
 // restoration and disposal at 1x and 4x, for several effect lists. (The single-effect stories are post-stack.proof.js.)
 // Run: node examples/package-benchmarks/proofs/post-ssr.proof.js [ref] [pin] [--current]   (ref: the commit before SSR, default 7c47a09)
-// Pinned: 7c47a09 against 3cf1453, the commit that made this claim. --current: 7c47a09 against the working tree.
+// Pinned: 7c47a09 against 3cf1453, the commit that made this claim. --current: b3ed8ac against the working tree;
+// 6a57389 intentionally made SSAO preserve the approved core ambient RGB hook (claims.md).
 import assert from 'node:assert/strict';
-import { refs, versions, ignoreAgx } from './compare.js';
+import { refs, versions, ignoreAgx, current } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
-const { ref, pin } = refs('7c47a09', '3cf1453', '7c47a09'),
+const { ref, pin } = refs('7c47a09', '3cf1453', 'b3ed8ac'),
   post = await versions('post', ref, undefined, pin);
 
 function story(m, make, samples) {
@@ -81,7 +82,8 @@ for (const [label, make] of Object.entries(lists))
     assert.deepEqual(actual, expected, `PostStack [${label}] GPU calls differ at ${samples}x`);
     calls += expected.length;
   }
-assert.ok(post.candidate.SSR && !post.baseline.SSR, 'candidate has SSR, baseline does not');
+assert.ok(post.candidate.SSR, 'candidate has SSR');
+if (!current) assert.ok(!post.baseline.SSR, 'baseline does not have SSR');
 console.log(
   `PostStack without SSR: GPU call sequences identical to ${ref}: ${calls} recorded calls across ${Object.keys(lists).length * 2} stories.`,
 );

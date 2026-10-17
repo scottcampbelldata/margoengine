@@ -1,0 +1,1342 @@
+{
+ "views": {
+  "night-citadel-high": {
+   "url": "night-citadel/?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0.000026,
+    "hot": 0.00000434,
+    "mean": 0.0002,
+    "max": 26
+   },
+   "tolerance": {
+    "changed": 0.000578,
+    "hot": 0.000213
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "night-citadel-light": {
+   "url": "night-citadel/?quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0.00089,
+    "hot": 0.0000521,
+    "mean": 0.00664,
+    "max": 68
+   },
+   "tolerance": {
+    "changed": 0.00317,
+    "hot": 0.000356
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "night-citadel-phone": {
+   "url": "night-citadel/",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0.0044,
+    "hot": 0.0000729,
+    "mean": 0.019,
+    "max": 35
+   },
+   "tolerance": {
+    "changed": 0.0137,
+    "hot": 0.000419
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "gameplay-sandbox-high": {
+   "url": "gameplay-sandbox/?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0.0512,
+    "hot": 0.00319,
+    "mean": 0.332,
+    "max": 201
+   },
+   "tolerance": {
+    "changed": 0.154,
+    "hot": 0.00977
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "gameplay-sandbox-light": {
+   "url": "gameplay-sandbox/?quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0.0126,
+    "hot": 0.000651,
+    "mean": 0.08,
+    "max": 179
+   },
+   "tolerance": {
+    "changed": 0.0383,
+    "hot": 0.00215
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "gameplay-sandbox-phone": {
+   "url": "gameplay-sandbox/",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0.0129,
+    "hot": 0.000328,
+    "mean": 0.0618,
+    "max": 130
+   },
+   "tolerance": {
+    "changed": 0.0392,
+    "hot": 0.00118
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "character-animation-high": {
+   "url": "demos/character-animation.html?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "character-animation-light": {
+   "url": "demos/character-animation.html?quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "character-animation-phone": {
+   "url": "demos/character-animation.html",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "flight-helmet-high": {
+   "url": "demos/flight-helmet.html?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "flight-helmet-light": {
+   "url": "demos/flight-helmet.html?quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "flight-helmet-phone": {
+   "url": "demos/flight-helmet.html",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "windy-meadow-high": {
+   "url": "demos/windy-meadow.html?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "windy-meadow-light": {
+   "url": "demos/windy-meadow.html?quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "windy-meadow-phone": {
+   "url": "demos/windy-meadow.html",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "earth-high": {
+   "url": "demos/earth/?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0.00000434,
+    "hot": 0,
+    "mean": 0.00000434,
+    "max": 1
+   },
+   "tolerance": {
+    "changed": 0.000513,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "earth-light": {
+   "url": "demos/earth/?quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "earth-phone": {
+   "url": "demos/earth/",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "dof-high": {
+   "url": "demos/dof/?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "dof-light": {
+   "url": "demos/dof/?quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "dof-phone": {
+   "url": "demos/dof/",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "tonemap-high": {
+   "url": "demos/tonemap/?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "tonemap-phone": {
+   "url": "demos/tonemap/",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-MetalRoughSpheres-model": {
+   "url": "examples/khronos-gallery.html?model=MetalRoughSpheres",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-AlphaBlendModeTest-model": {
+   "url": "examples/khronos-gallery.html?model=AlphaBlendModeTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-NormalTangentMirrorTest-model": {
+   "url": "examples/khronos-gallery.html?model=NormalTangentMirrorTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-TextureTransformTest-model": {
+   "url": "examples/khronos-gallery.html?model=TextureTransformTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-OrientationTest-model": {
+   "url": "examples/khronos-gallery.html?model=OrientationTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-NegativeScaleTest-model": {
+   "url": "examples/khronos-gallery.html?model=NegativeScaleTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-MeshPrimitiveModes-model": {
+   "url": "examples/khronos-gallery.html?model=MeshPrimitiveModes",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-BoxVertexColors-model": {
+   "url": "examples/khronos-gallery.html?model=BoxVertexColors",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-InterpolationTest-model": {
+   "url": "examples/khronos-gallery.html?model=InterpolationTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-MorphStressTest-model": {
+   "url": "examples/khronos-gallery.html?model=MorphStressTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-RiggedFigure-model": {
+   "url": "examples/khronos-gallery.html?model=RiggedFigure",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-Fox-model": {
+   "url": "examples/khronos-gallery.html?model=Fox",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-MultipleScenes-model": {
+   "url": "examples/khronos-gallery.html?model=MultipleScenes",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-Cameras-model": {
+   "url": "examples/khronos-gallery.html?model=Cameras",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-DirectionalLight-model": {
+   "url": "examples/khronos-gallery.html?model=DirectionalLight",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-PointLightIntensityTest-model": {
+   "url": "examples/khronos-gallery.html?model=PointLightIntensityTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-LightsPunctualLamp-model": {
+   "url": "examples/khronos-gallery.html?model=LightsPunctualLamp",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-MeshoptCubeTest-model": {
+   "url": "examples/khronos-gallery.html?model=MeshoptCubeTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-NodePerformanceTest-model": {
+   "url": "examples/khronos-gallery.html?model=NodePerformanceTest",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-SciFiHelmet-model": {
+   "url": "examples/khronos-gallery.html?model=SciFiHelmet",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-ToyCar-model": {
+   "url": "examples/khronos-gallery.html?model=ToyCar",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0.000495,
+    "hot": 0,
+    "mean": 0.000495,
+    "max": 1
+   },
+   "tolerance": {
+    "changed": 0.00198,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-SheenChair-model": {
+   "url": "examples/khronos-gallery.html?model=SheenChair",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-ABeautifulGame-model": {
+   "url": "examples/khronos-gallery.html?model=ABeautifulGame",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-MaterialsVariantsShoe-model": {
+   "url": "examples/khronos-gallery.html?model=MaterialsVariantsShoe",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-IridescenceLamp-model": {
+   "url": "examples/khronos-gallery.html?model=IridescenceLamp",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-AnisotropyBarnLamp-model": {
+   "url": "examples/khronos-gallery.html?model=AnisotropyBarnLamp",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-DiffuseTransmissionTeacup-model": {
+   "url": "examples/khronos-gallery.html?model=DiffuseTransmissionTeacup",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-CommercialRefrigerator-model": {
+   "url": "examples/khronos-gallery.html?model=CommercialRefrigerator",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-Lantern-model": {
+   "url": "examples/khronos-gallery.html?model=Lantern",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-BoomBox-model": {
+   "url": "examples/khronos-gallery.html?model=BoomBox",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-Corset-model": {
+   "url": "examples/khronos-gallery.html?model=Corset",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  },
+  "khronos-FlightHelmet-model": {
+   "url": "examples/khronos-gallery.html?model=FlightHelmet",
+   "size": "320x240",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.60",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-17T06:05:33.873Z",
+    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+    "packagesDirty": false
+   }
+  }
+ },
+ "profile": "nvidia-ampere-msedge-155",
+ "environment": {
+  "browser": "msedge 155.0.4283.60",
+  "gpu": "nvidia ampere",
+  "acPowerBefore": true,
+  "acPowerAfter": true,
+  "date": "2026-10-17T06:05:33.873Z",
+  "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+  "packagesDirty": false
+ },
+ "method": {
+  "hot": 24,
+  "margin": 3,
+  "allowance": {
+   "changed": 0.0005,
+   "hot": 0.0002
+  }
+ }
+}

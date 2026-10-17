@@ -8,14 +8,15 @@
 // Skinned and morphed gltf-pro casters needed no change (Shadows reads `primitive.deformed`); gltf-pro-lighting-hooks.proof.js
 // still records gltf-pro + shadows identical, and gltf-pro now takes lightPBR from packages/shared.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/deformed-shadows.proof.js [ref] [pin] [--current]
-// Pinned: 38d448e against 282e751, the commit that made this claim. --current: 38d448e against the working tree.
+// Pinned: 38d448e against 282e751, the commit that made this claim. --current: b3ed8ac against the working tree;
+// 2091f12 intentionally reuses shadow draw scratch data and changes upload ordering (claims.md).
 import assert from 'node:assert/strict';
-import { refs, versions } from './compare.js';
+import { refs, versions, current } from './compare.js';
 import { mockGPU, context, passes } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { box } from '../../../packages/core/dist/index.js';
 
-const { ref, pin } = refs('38d448e', '282e751', '38d448e'); // 38d448e: the commit before 5l.j
+const { ref, pin } = refs('38d448e', '282e751', 'b3ed8ac'); // 38d448e: the commit before 5l.j
 async function rig() {
   const gpu = mockGPU(),
     store = await TransformStore.create(32),
@@ -169,7 +170,7 @@ const lastSplit = (log) =>
     );
 const before = await shadowStory(shadowsModule.baseline, {}, false),
   after = await shadowStory(shadowsModule.candidate, {}, false);
-assert.notDeepEqual(after, before, 'core meshes without distance: cascades are fitted');
+if (!current) assert.notDeepEqual(after, before, 'core meshes without distance: cascades are fitted');
 result.fitted = { lastSplitBefore: lastSplit(before), lastSplitAfter: lastSplit(after) };
 assert.ok(
   result.fitted.lastSplitAfter.every((v) => v < 50),
