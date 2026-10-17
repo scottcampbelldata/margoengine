@@ -40,6 +40,14 @@ export interface WaterOptions {
     lights?: readonly WaterLight[];
     spray?: boolean;
     horizon?: boolean;
+    shadows?: WaterShadowSource;
+}
+
+export interface WaterShadowSource {
+    pbr(group: number): {
+        readonly declarations: string;
+    };
+    bindings(): GPUBindGroupEntry[];
 }
 
 export interface WaterTerrain {

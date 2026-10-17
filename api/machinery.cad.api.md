@@ -67,6 +67,7 @@ interface CADImportOptions {
     signal?: AbortSignal;
     onProgress?: (percent: number) => void;
     smoothing?: boolean;
+    creaseAngle?: number;
     maxParts?: number;
     timeoutMs?: number;
     linearDeflection?: number;

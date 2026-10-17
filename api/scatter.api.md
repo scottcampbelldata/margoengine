@@ -23,7 +23,7 @@ export class PlacementLayout {
 export class Scatter implements EnginePlugin {
     readonly name: string;
     readonly count: number;
-    constructor(geometry: Geometry | readonly [Geometry, Geometry, Geometry], options?: ScatterOptions);
+    constructor(geometry: Geometry | readonly [Geometry, Geometry, Geometry], input?: ScatterOptions);
     static attach(engine: EngineKernel, geometry: Geometry | readonly [Geometry, Geometry, Geometry], options?: ScatterOptions): Scatter;
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;

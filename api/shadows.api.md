@@ -13,6 +13,8 @@ export interface ShadowContext {
     cascade: number;
 }
 
+export type ShadowFilter = 'soft' | 'pcf' | 'hard';
+
 export interface ShadowOptions {
     resolution?: number;
     distance?: number;
@@ -26,6 +28,8 @@ export interface ShadowOptions {
         max: Vec3;
         points?: readonly Vec3[];
     };
+    filter?: ShadowFilter;
+    cascades?: number;
 }
 
 export interface ShadowPrimitive {
@@ -89,12 +93,12 @@ export class Shadows implements EnginePlugin {
     destroy(): void;
 }
 
-export function cascadeSplits(near: number, far: number, lambda?: number, out?: Float32Array<ArrayBuffer>): Float32Array;
+export function cascadeSplits(near: number, far: number, lambda?: number, out?: Float32Array<ArrayBuffer>, count?: number): Float32Array;
 
 export function fitCascades(camera: Camera, aspect: number, direction: Vec3, resolution: number, splits: Float32Array, matrices?: Float32Array<ArrayBuffer>, ranges?: Float32Array<ArrayBuffer>, margin?: number, result?: {
     matrices: Float32Array;
     ranges: Float32Array;
-}): {
+}, count?: number): {
     matrices: Float32Array;
     ranges: Float32Array;
 };

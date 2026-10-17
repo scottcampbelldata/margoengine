@@ -88,8 +88,8 @@ interface SkyFeatures {
     };
     lighting?: {
         validate(lighting: SkyLightingOptions): void;
-        create(device: GPUDevice, owned: Owned): {
-            update(target: Lights, sky: Sky, lighting: SkyLightingOptions, moonIntensity: number, night: number): void;
+        create(device: GPUDevice, code: string, entries: GPUBindGroupEntry[], owned: Owned): {
+            update(target: Lights, sky: Sky, lighting: SkyLightingOptions, night: number): void;
             pass(c: Context): void;
         };
     };

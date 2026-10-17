@@ -50,8 +50,8 @@ export interface SkyFeatures {
     };
     lighting?: {
         validate(lighting: SkyLightingOptions): void;
-        create(device: GPUDevice, owned: Owned): {
-            update(target: Lights, sky: Sky, lighting: SkyLightingOptions, moonIntensity: number, night: number): void;
+        create(device: GPUDevice, code: string, entries: GPUBindGroupEntry[], owned: Owned): {
+            update(target: Lights, sky: Sky, lighting: SkyLightingOptions, night: number): void;
             pass(c: Context): void;
         };
     };
@@ -107,6 +107,8 @@ export interface SkyOptions {
 }
 
 export function sunDirection(hours: number, out?: Float32Array<ArrayBuffer>): Float32Array;
+
+export function sunlight(mu: number, altitude: number, turbidity: number, out?: Float32Array<ArrayBuffer>): Float32Array;
 
 // Not exported from this entry, but used by the exports above:
 

@@ -25,6 +25,11 @@ export interface QualityOptions {
 export interface QualityPreset {
     shadows?: {
         resolution?: number;
+        filter?: 'soft' | 'pcf' | 'hard';
+        cascades?: number;
+    };
+    scatter?: {
+        lodFade?: number;
     };
     ssao?: {
         enabled?: boolean;
