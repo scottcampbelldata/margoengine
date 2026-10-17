@@ -174,10 +174,20 @@ PCSS shadows use one light, the stronger of sun and moon: the sun fades out thro
 its transmittance as its disc sets before the moon fades in, so the light changes
 direction once, below 1% of noon strength, instead of sweeping across the sky. The
 atmospheric background has its own earlier twilight fade. This is a visual preset, with no lunar orbit
-or phase calculation. RGB ambient patches the standard scene shader (including
-scatter and mesh terrain) at group 0, binding 8, and composes with shadows and
-clustered lights. Custom renderers using their own shaders need their own ambient
-integration. The background fades to night even when scene moon lighting is omitted.
+or phase calculation. The background fades to night even when scene moon lighting is omitted.
+
+With `ambient`, the sky lights the scene itself. Each frame it renders a 64 × 32
+environment (the same sky water reflects, clouds and moon included, the sun's disc
+left to the engine light) with three box-filtered mips, projects it onto nine
+spherical harmonics (Ramamoorthi and Hanrahan 2001) on the GPU, and patches the
+standard scene shader (including scatter and mesh terrain) at group 0, bindings 8,
+10 and 11. Surfaces get directional diffuse light from the harmonics, never below
+the `ambient` floor for the time of day, plus split-sum sky reflections (Karis 2013):
+the environment blurred through its mips by roughness, times Karis's analytic
+environment BRDF. Glass and glossy paint now reflect the sky by day. The term is
+named `margoAmbient`, so SSAO occludes it; `EnvironmentLighting` uses the same name, so
+use one or the other. It composes with shadows and clustered lights; custom
+renderers using their own shaders need their own ambient integration.
 
 `sky.nightFactor` exposes the same dusk/dawn blend: 0 in daylight and 1 at night.
 It updates before rendering, including paused manual renders. To switch local

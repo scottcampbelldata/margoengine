@@ -1,7 +1,69 @@
 import { finiteVector } from '@margoengine/math/validate';
+import { compute, group } from '../../shared/gpu.js';
 import type { SkyFeatures } from './base.js';
-declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
-/** Drives the engine's directional light (sun and moon) and, with `ambient`, the PBR ambient colour (`lighting` option). */
+import { environment } from './environment.js';
+declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
+declare const GPUTextureUsage: { STORAGE_BINDING: number; TEXTURE_BINDING: number };
+// The sky's light as the scene receives it: a 64 x 32 environment rendered each frame, three box-filtered mips for
+// rougher reflections, and nine spherical-harmonic coefficients for diffuse light.
+const renderLight = `
+@group(0) @binding(3) var lightTarget:texture_storage_2d<rgba16float,write>;
+@compute @workgroup_size(8,8) fn renderLight(@builtin(global_invocation_id) id:vec3u){
+ if(any(id.xy>=vec2u(64,32))){return;}
+ textureStore(lightTarget,vec2i(id.xy),vec4f(skyEnvironment(environmentDirection((vec2f(id.xy)+0.5)/vec2f(64,32)),0.1),1));
+}`;
+const downsample = `
+@group(0) @binding(0) var finer:texture_2d<f32>;
+@group(0) @binding(1) var coarser:texture_storage_2d<rgba16float,write>;
+@compute @workgroup_size(8,4) fn main(@builtin(global_invocation_id) id:vec3u){
+ if(any(id.xy>=textureDimensions(coarser))){return;}let p=vec2i(id.xy)*2;
+ textureStore(coarser,vec2i(id.xy),(textureLoad(finer,p,0)+textureLoad(finer,p+vec2i(1,0),0)+textureLoad(finer,p+vec2i(0,1),0)+textureLoad(finer,p+vec2i(1),0))*0.25);
+}`;
+// Projection onto nine spherical harmonics (Ramamoorthi and Hanrahan 2001) from the 32 x 16 mip, one workgroup.
+// Each coefficient is pre-scaled by its basis constant squared and the clamped-cosine factor over pi (1, 2/3, 1/4), so
+// a shader gets irradiance over pi as a plain polynomial in the normal: 1, y, z, x, xy, yz, 3z^2-1, xz, x^2-y^2.
+const project = `
+@group(0) @binding(0) var level:texture_2d<f32>;
+@group(0) @binding(1) var<storage,read_write> light:array<vec4f,10>;
+var<workgroup> sums:array<array<vec3f,9>,64>;
+@compute @workgroup_size(64) fn main(@builtin(local_invocation_index) t:u32){
+ var c=array<vec3f,9>();
+ for(var k=t;k<512u;k+=64u){
+  let x=k%32u;let y=k/32u;let phi=((f32(x)+0.5)/32.0-0.5)*6.2831853;let theta=(f32(y)+0.5)/16.0*3.14159265;
+  let w=vec3f(sin(theta)*cos(phi),cos(theta),sin(theta)*sin(phi));
+  // Radiance times the texel's solid angle, (2 pi / 32)(pi / 16) sin(theta).
+  let l=textureLoad(level,vec2i(i32(x),i32(y)),0).rgb*sin(theta)*0.0385531;
+  c[0]+=l;c[1]+=l*w.y;c[2]+=l*w.z;c[3]+=l*w.x;c[4]+=l*(w.x*w.y);c[5]+=l*(w.y*w.z);c[6]+=l*(3.0*w.z*w.z-1.0);c[7]+=l*(w.x*w.z);c[8]+=l*(w.x*w.x-w.y*w.y);
+ }
+ sums[t]=c;
+ for(var s=32u;s>0u;s=s>>1u){workgroupBarrier();if(t<s){for(var i=0u;i<9u;i++){sums[t][i]+=sums[t+s][i];}}}
+ workgroupBarrier();
+ var scale=array<f32,9>(0.0795775,0.1591549,0.1591549,0.1591549,0.2984155,0.2984155,0.0248680,0.2984155,0.0746039);
+ if(t<9u){light[t]=vec4f(sums[0][t]*scale[t],0);}
+}`;
+// Patched into the scene shader as margoAmbient, the name SSAO looks for to occlude ambient light.
+const declarations = `@group(0) @binding(8) var<uniform> skyLight:array<vec4f,10>;
+@group(0) @binding(10) var skyLightMap:texture_2d<f32>;
+@group(0) @binding(11) var skyLightSampler:sampler;
+// Irradiance over pi for a unit normal: the sky's nine coefficients, never below the ambient floor.
+fn skyIrradiance(n:vec3f)->vec3f {
+ return max(skyLight[0].rgb+skyLight[1].rgb*n.y+skyLight[2].rgb*n.z+skyLight[3].rgb*n.x+skyLight[4].rgb*(n.x*n.y)+skyLight[5].rgb*(n.y*n.z)+skyLight[6].rgb*(3.0*n.z*n.z-1.0)+skyLight[7].rgb*(n.x*n.z)+skyLight[8].rgb*(n.x*n.x-n.y*n.y),skyLight[9].rgb);
+}
+// Diffuse sky light plus split-sum specular (Karis 2013): the sky map blurred through its mips by roughness, times
+// Karis's analytic environment BRDF (2014) instead of a lookup table.
+fn skyLighting(n:vec3f,v:vec3f,base:vec3f,metal:f32,roughness:f32)->vec3f {
+ let rough=clamp(roughness,0.0,1.0);let nv=clamp(dot(n,v),0.0001,1.0);let r=reflect(-v,n);
+ let k=rough*vec4f(-1.0,-0.0275,-0.572,0.022)+vec4f(1.0,0.0425,1.04,-0.04);
+ let a=min(k.x*k.x,exp2(-9.28*nv))*k.x+k.y;let ab=vec2f(-1.04,1.04)*a+k.zw;
+ let specular=mix(vec3f(0.04),base,metal)*ab.x+ab.y;
+ let uv=vec2f(atan2(r.z,r.x)/6.2831853+0.5,acos(clamp(r.y,-1.0,1.0))/3.14159265);
+ return (vec3f(1.0)-specular)*(1.0-metal)*base*skyIrradiance(n)+textureSampleLevel(skyLightMap,skyLightSampler,uv,rough*3.0).rgb*specular;
+}
+`;
+/**
+ * Drives the engine's directional light (sun or moon) and, with `ambient`, lights core's PBR shader from the sky
+ * itself: directional diffuse from nine spherical harmonics and sky reflections, above the ambient floor (`lighting`).
+ */
 export const lighting: NonNullable<SkyFeatures['lighting']> = {
   validate(l) {
     if (
@@ -29,13 +91,59 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
       }
     if (l.ambient && (!l.ambient.day || !l.ambient.night)) throw new RangeError('Invalid sky ambient colors');
   },
-  create(d, owned) {
-    const buffer = d.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    owned.push(buffer);
-    const entry = { binding: 8, resource: { buffer } },
-      ambient = new Float32Array(4);
+  create(d, code, entries, owned) {
+    const floor = new Float32Array(4),
+      descriptor: GPUComputePassDescriptor = {},
+      sizes = [8, 4, 4, 4, 2, 2, 1, 1, 1, 1];
     let source = '',
       shader = '';
+    // Built on the first ambient frame, so a sky that only drives the light allocates nothing for it.
+    const build = () => {
+      const buffer = d.createBuffer({
+          size: 160,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        }),
+        map = d.createTexture({
+          size: [64, 32],
+          format: 'rgba16float',
+          mipLevelCount: 4,
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+        });
+      owned.push(buffer, map);
+      const level = (i: number) => map.createView({ baseMipLevel: i, mipLevelCount: 1 }),
+        render = compute(d, code + environment + renderLight, 'renderLight'),
+        down = compute(d, downsample),
+        reduce = compute(d, project);
+      return {
+        buffer,
+        pipelines: [render, down, down, down, reduce],
+        groups: [
+          d.createBindGroup({
+            layout: render.getBindGroupLayout(0),
+            entries: [...entries, { binding: 3, resource: level(0) }],
+          }),
+          group(d, down, [level(0), level(1)]),
+          group(d, down, [level(1), level(2)]),
+          group(d, down, [level(2), level(3)]),
+          group(d, reduce, [level(1), { buffer }]),
+        ],
+        bindings: [
+          { binding: 8, resource: { buffer, offset: 0, size: 160 } },
+          { binding: 10, resource: map.createView() },
+          {
+            binding: 11,
+            resource: d.createSampler({
+              addressModeU: 'repeat',
+              addressModeV: 'clamp-to-edge',
+              magFilter: 'linear',
+              minFilter: 'linear',
+              mipmapFilter: 'linear',
+            }),
+          },
+        ],
+      };
+    };
+    let gpu: ReturnType<typeof build> | undefined;
     return {
       update({ direction, radiance }, sky, l, night) {
         // shortcut: one directional source shares PCSS, use separate shadow maps for simultaneous sun/moon shadows.
@@ -44,27 +152,38 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
         // (a cross-fade) instead of sweeping through blended directions across the sky.
         const sun = sky.lights[0],
           moon = sky.lights[1],
-          source = l.moon && moon.direction[3] > sun.direction[3] ? moon : sun;
+          body = l.moon && moon.direction[3] > sun.direction[3] ? moon : sun;
         for (let i = 0; i < 3; i++) {
-          direction[i] = source.direction[i];
-          radiance[i] = source.radiance[i];
+          direction[i] = body.direction[i];
+          radiance[i] = body.radiance[i];
         }
-        direction[3] = Math.max(l.minimum ?? 0, source.direction[3]);
+        direction[3] = Math.max(l.minimum ?? 0, body.direction[3]);
         if (l.ambient) {
-          for (let i = 0; i < 3; i++) ambient[i] = l.ambient.day[i] * (1 - night) + l.ambient.night[i] * night;
-          radiance[3] = Math.max(...ambient);
+          for (let i = 0; i < 3; i++) floor[i] = l.ambient.day[i] * (1 - night) + l.ambient.night[i] * night;
+          radiance[3] = Math.max(floor[0], floor[1], floor[2]);
         }
       },
       pass(c) {
-        if (source !== c.shader) {
-          const patched = c.shader.replace('frame.radiance.w*frame.ambient.rgb', 'skyAmbient.rgb');
-          if (patched === c.shader) throw new Error('Sky ambient requires the standard PBR shader');
-          source = c.shader;
-          shader = '@group(0) @binding(8) var<uniform> skyAmbient:vec4f;\n' + patched;
+        const g = (gpu ??= build()),
+          encoder = c.encoder.beginComputePass(descriptor);
+        for (let i = 0; i < 5; i++) {
+          encoder.setPipeline(g.pipelines[i]);
+          encoder.setBindGroup(0, g.groups[i]);
+          encoder.dispatchWorkgroups(sizes[i * 2], sizes[i * 2 + 1]);
         }
-        c.device.queue.writeBuffer(buffer, 0, ambient as Float32Array<ArrayBuffer>);
+        encoder.end();
+        c.device.queue.writeBuffer(g.buffer, 144, floor as Float32Array<ArrayBuffer>);
+        if (source !== c.shader) {
+          const anchor = /let linear=([^;]+);/.exec(c.shader);
+          if (!anchor?.[1].includes('frame.radiance.w'))
+            throw new Error('Sky ambient requires the standard PBR shader');
+          // Core's constant ambient term drops out; margoAmbient carries the sky's diffuse and specular light.
+          const linear = `let margoAmbient=skyLighting(n,v,i.color,i.material.y,i.material.x);let linear=${anchor[1].replace('frame.radiance.w', '0.0')}+margoAmbient;`;
+          source = c.shader;
+          shader = declarations + c.shader.replace(anchor[0], () => linear);
+        }
         c.shader = shader;
-        c.bindings.push(entry);
+        c.bindings.push(...g.bindings);
       },
     };
   },

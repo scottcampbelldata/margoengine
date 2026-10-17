@@ -22,7 +22,7 @@ test('TAA jitter and sky ambient use distinct live bindings', () => {
   const h = harness(),
     taa = new TAA(),
     owned = [];
-  const sky = lighting.create(h.engine.gpu, owned);
+  const sky = lighting.create(h.engine.gpu, '', [], owned);
   h.engine.use(taa);
   h.engine.frameGraph.add({ name: 'audit:sky', order: -6, execute: (c) => sky.pass(c) });
   try {
@@ -32,7 +32,7 @@ test('TAA jitter and sky ambient use distinct live bindings', () => {
     const declarations = [...h.context.shader.matchAll(/@group\(0\) @binding\((\d+)\)/g)].map((m) => +m[1]);
     assert.equal(new Set(declarations).size, declarations.length);
     assert.match(h.context.shader, /o.clip=taaCamera\*p/);
-    assert.match(h.context.shader, /skyAmbient.rgb/);
+    assert.match(h.context.shader, /let margoAmbient=skyLighting\(/);
   } finally {
     taa.dispose();
     for (const resource of owned) resource.destroy();

@@ -321,13 +321,22 @@ test('moonlight, ambient color and the reflected night sky share a continuous cl
     h.engine.frameGraph.execute(h.context);
   };
   h.frame();
-  const ambient = () => h.resources.find((r) => !r.destroyed && r.size === 16),
-    values = () => new Float32Array(ambient().data);
+  // Nine SH coefficients (GPU-written) then the ambient floor at vec4 9 (CPU-written).
+  const ambient = () => h.resources.find((r) => !r.destroyed && r.size === 160),
+    values = () => new Float32Array(ambient().data).subarray(36);
   assert.equal(sky.nightFactor, 0);
   assert.equal(h.engine.lighting.direction[3], 6);
   assert.deepEqual(Array.from(values().subarray(0, 3)), options.lighting.ambient.day.map(Math.fround));
-  assert.match(h.context.shader, /skyAmbient.rgb/);
+  assert.match(h.context.shader, /let margoAmbient=skyLighting\(n,v,i\.color,i\.material\.y,i\.material\.x\);/);
+  assert.match(h.context.shader, /\*0\.0\*frame\.ambient\.rgb\+margoAmbient;/, 'The constant ambient gives way');
   assert.ok(h.context.bindings.some((e) => e.binding === 8 && e.resource.buffer === ambient()));
+  const map = h.context.bindings.find((e) => e.binding === 10).resource,
+    lightPasses = h.pipelines.filter((p) => ['renderLight', 'main'].includes(p.compute?.entryPoint));
+  assert.ok(map && h.context.bindings.some((e) => e.binding === 11), 'Sky map and its sampler for reflections');
+  assert.ok(
+    lightPasses.some((p) => p.compute.module.code.includes('workgroupBarrier()')),
+    'SH projection',
+  );
   options.hours = 0;
   h.frame();
   assert.deepEqual(h.engine.lighting.direction.slice(0, 3), sky.moon);
@@ -415,7 +424,12 @@ test('fog takes the night gradient alone; the sky and its reflection pass their 
     sky,
     /let footprint=max\(length\(dpdx\(w\)\),length\(dpdy\(w\)\)\);var color=skyRadiance\(w,footprint\);/,
   );
-  assert.match(reflection, /nightSky\(w,0\.1\)/, 'The 64 x 32 reflection passes its texel size');
+  assert.match(
+    reflection,
+    /skyEnvironment\(environmentDirection\([^;]*\),0\.1\)/,
+    'The 64 x 32 reflection passes its texel size',
+  );
+  assert.match(reflection, /color=mix\(color,nightSky\(w,footprint\),frame\.sun\.w\);/);
 });
 
 test('stars keep a 0.7 px minimum radius and their energy on square stereographic cells', () => {

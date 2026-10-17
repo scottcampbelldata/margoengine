@@ -27,7 +27,10 @@ export interface SkyLightingOptions {
   /** @deprecated Ignored: the atmosphere's transmittance now colours the low sun. Still validated. */
   sunset?: Color;
   moon?: { intensity?: number; color?: Color };
-  /** RGB ambient by day and by night, blended by `nightFactor`. */
+  /**
+   * Lights core's PBR meshes from the sky itself (directional diffuse from spherical harmonics and sky reflections),
+   * with this RGB floor by day and by night, blended by `nightFactor`, as the least diffuse light any side receives.
+   */
   ambient?: { day: Color; night: Color };
 }
 export interface SkyCloudOptions {
@@ -123,6 +126,8 @@ export interface SkyFeatures {
     validate(lighting: SkyLightingOptions): void;
     create(
       device: GPUDevice,
+      code: string,
+      entries: GPUBindGroupEntry[],
       owned: Owned,
     ): {
       update(target: Lights, sky: Sky, lighting: SkyLightingOptions, night: number): void;
@@ -285,7 +290,6 @@ export class Sky implements EnginePlugin {
       f = this.features;
     this.uniform = d.createBuffer({ size: 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const u = { buffer: this.uniform };
-    this.lit = f.lighting?.create(d, this.owned);
     this.transmission = d.createTexture({
       size: [128, 32],
       format: 'rgba16float',
@@ -297,6 +301,7 @@ export class Sky implements EnginePlugin {
     this.pipeline = compute(d, this.atmosphere + transmittance);
     this.group = group(d, this.pipeline, [u, t]);
     this.reflection = f.reflection?.create(d, this.code, this.entries, this.owned);
+    this.lit = f.lighting?.create(d, this.code, this.entries, this.owned);
   }
   registerPasses(graph: FrameGraph): void {
     if (this.features.lighting)
@@ -304,7 +309,11 @@ export class Sky implements EnginePlugin {
         name: 'sky:lighting',
         order: -6,
         execute: (c) => {
-          if (c.backend === 'webgpu' && this.options.lighting?.ambient) this.lit!.pass(c);
+          // The scene's ambient light is the sky of this frame: upload it first, then render and project it.
+          if (c.backend === 'webgpu' && this.options.lighting?.ambient) {
+            this.prepare(c);
+            this.lit!.pass(c);
+          }
         },
       });
     graph.add({
@@ -355,7 +364,8 @@ export class Sky implements EnginePlugin {
     this.lights[1].radiance.set(l?.moon?.color ?? moonColor);
     if (l && this.lit) this.lit.update(this.engine!.lighting, this, l, night);
   }
-  private draw(c: Context): void {
+  /** Uploads this frame's uniform and refreshes the tables; idempotent within a frame (lighting runs it earlier). */
+  private prepare(c: Context): void {
     this.validate();
     if (!invertMatrixStable(c.camera.matrix, this.inverse, this.scratch)) throw new Error('Invalid sky camera');
     this.values.set(c.camera.position, 16);
@@ -380,6 +390,9 @@ export class Sky implements EnginePlugin {
       this.scatteringT = turbidity;
     }
     this.computedT = turbidity;
+  }
+  private draw(c: Context): void {
+    this.prepare(c);
     if (this.reflectionRequested) this.reflection?.run(c);
     const format = c.format + ':' + c.descriptor.multisample?.count + ':' + c.descriptor.depthStencil!.format;
     if (this.format !== format) {

@@ -95,11 +95,11 @@ test('engine defaults ambient to white and rejects malformed RGB before renderin
   assert.equal(renders, 1);
 });
 
-test('SSAO replays the RGB ambient and Sky replaces its whole absolute-color multiplier', () => {
+test('SSAO replays the RGB ambient and Sky replaces the constant ambient with its own light', () => {
   const h = optionalGPU(),
     ssao = new SSAO(),
     owned = [],
-    sky = skyLighting.create(h.engine.gpu, owned);
+    sky = skyLighting.create(h.engine.gpu, '', [], owned);
   h.context.shader = wgsl;
   h.engine.use(ssao);
   try {
@@ -112,8 +112,11 @@ test('SSAO replays the RGB ambient and Sky replaces its whole absolute-color mul
     assert.ok(ambient, 'SSAO must replay the same RGB ambient that beauty receives');
     h.context.shader = wgsl;
     sky.pass(h.context);
-    assert.match(h.context.shader, /i.color\*\(1.0-i.material.y\)\*skyAmbient.rgb;/);
-    assert.ok(!h.context.shader.includes('skyAmbient.rgb*frame.ambient.rgb'), 'Sky colors are absolute');
+    // The engine's constant ambient term drops to zero; margoAmbient (SH diffuse plus sky reflections) replaces it.
+    assert.match(
+      h.context.shader,
+      /let margoAmbient=skyLighting\(n,v,i\.color,i\.material\.y,i\.material\.x\);let linear=[^;]*i\.color\*\(1\.0-i\.material\.y\)\*0\.0\*frame\.ambient\.rgb\+margoAmbient;/,
+    );
   } finally {
     ssao.dispose();
     for (const resource of owned) resource.destroy();
@@ -143,26 +146,26 @@ test('WebGL uploads RGB ambient and resets omitted lighting to white', (t) => {
   assert.deepEqual(values.filter(([name]) => name === 'ambient').at(-1), ['ambient', 1, 1, 1]);
 });
 
-test('SSAO retains Sky absolute ambient RGB and its live uniform binding', () => {
+test('SSAO occludes the Sky light (margoAmbient) and keeps its live bindings', () => {
   const h = optionalGPU(),
     ssao = new SSAO(),
     owned = [],
-    sky = skyLighting.create(h.engine.gpu, owned),
+    sky = skyLighting.create(h.engine.gpu, '', [], owned),
     replays = [];
   h.context.shader = wgsl;
   h.context.draw = (options) => {
-    if (options?.pipeline?.fragment.module.code.includes('return vec4f(i.color*(1.0-i.material.y)*skyAmbient.rgb,1);'))
-      replays.push(options);
+    if (options?.pipeline?.fragment.module.code.includes('return vec4f(margoAmbient,1);')) replays.push(options);
   };
   h.engine.frameGraph.add({ name: 'test:sky', order: -6, execute: (c) => sky.pass(c) });
   h.engine.use(ssao);
   try {
     h.engine.frameGraph.execute(h.context);
-    assert.equal(replays.length, 1, 'the ambient replay must use Sky colors, rather than the engine scalar');
-    assert.ok(
-      replays[0].bindings.some((entry) => entry.binding === 8),
-      'Sky ambient must remain bound during replay',
-    );
+    assert.equal(replays.length, 1, 'the ambient replay must return the Sky light, rather than the engine scalar');
+    for (const binding of [8, 10, 11])
+      assert.ok(
+        replays[0].bindings.some((entry) => entry.binding === binding),
+        `Sky light binding ${binding} must remain bound during replay`,
+      );
   } finally {
     ssao.dispose();
     for (const resource of owned) resource.destroy();
