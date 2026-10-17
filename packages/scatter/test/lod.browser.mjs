@@ -153,6 +153,30 @@ try {
       const commands = new Uint32Array(await read(same.commands));
       check(commands[1] + commands[6] + commands[11] === 1, 'Identical geometries were duplicated');
       same.dispose();
+      // edgeShrink 4 before the cull distance 20: full size up to 16, half at 18, a quarter at 19.
+      const shrinking = Scatter.attach(engine, shared, {
+        count: 1,
+        area: [0.001, 0.001],
+        scale: [1, 1],
+        lod: [3, 10, 20],
+        edgeShrink: 4,
+      });
+      await frame();
+      const root = new Float32Array(await read(shrinking.instances[0])).slice(0, 3);
+      for (const [distance, expected] of [
+        [12, 1],
+        [18, 0.5],
+        [19, 0.25],
+      ]) {
+        engine.camera.position = [root[0], root[1], root[2] + distance];
+        engine.camera.target = Array.from(root);
+        await frame();
+        const scale = new Float32Array(await read(shrinking.instances[2]))[3];
+        check(Math.abs(scale - expected) < 1e-3, `Edge shrink ${scale} at ${distance}, expected ${expected}`);
+      }
+      shrinking.dispose();
+      engine.camera.position = [0, 0, 3];
+      engine.camera.target = [0, 0, 0];
       // Bilinear ground: a 4x4 r32float ramp rising 0.5 per texel along X, one texel per world unit, so texel centres sit
       // at world x = -1.5..1.5 and the interpolated height at x is 0.5 * clamp(x + 1.5, 0, 3). A nearest read is off by
       // up to 0.25.

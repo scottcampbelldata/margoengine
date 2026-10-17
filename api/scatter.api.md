@@ -89,6 +89,7 @@ export interface ScatterOptions {
     wind?: ScatterWind;
     alignToGround?: number;
     sink?: number;
+    edgeShrink?: number;
 }
 
 export type ScatterWind = readonly [number, number, number];

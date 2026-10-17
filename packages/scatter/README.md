@@ -32,7 +32,10 @@ adjacent meshes inside that band; complementary 4x4 Bayer masks cross-fade them
 in both diffuse and PBR rendering, without alpha blending or per-frame history.
 The width is clamped to prevent overlapping bands. Identical adjacent Geometry
 objects skip the extra draw instances. Set `lodFade: 0` for hard switches.
-The third distance remains the culling boundary.
+The third distance remains the culling boundary. `edgeShrink` (world units,
+default 0) scales instances down to zero over that last stretch instead of
+cutting them at it, so the far edge of a grass field recedes without popping;
+it needs no fade mask or `discard`, so it also suits the phone tier.
 
 With `lodFade: 0`, or one Geometry for every ring, no instance can fade, so the
 shaders are compiled without the fade's `discard`; lit scatter also compiles out

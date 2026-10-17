@@ -79,6 +79,27 @@ test('alignToGround and sink fit instances to the ground in the cull and both ve
   }
 });
 
+test('edgeShrink scales instances to zero over the last stretch before the cull distance instead of cutting them', () => {
+  assert.equal(new Scatter(box()).values[74], 0, 'default: cut at the last LOD distance');
+  assert.equal(new Scatter(box(), { lod: [10, 20, 40], edgeShrink: 8 }).values[74], 8);
+  assert.equal(new Scatter(box(), { lod: [10, 20, 40], edgeShrink: 500 }).values[74], 40, 'clamped to the distance');
+  for (const edgeShrink of [-1, NaN, Infinity])
+    assert.throws(() => new Scatter(box(), { edgeShrink }), { name: 'RangeError', message: /edgeShrink must be/ });
+  const h = optionalGPU(),
+    effect = new Scatter([box(), box(0.5), box(0.25)], { count: 1, lodFade: 0, edgeShrink: 8 });
+  h.engine.use(effect);
+  h.frame();
+  const cull = h.pipelines.find((p) => p.compute).compute.module.code,
+    render = h.pipelines.find((p) => p.fragment).vertex.module.code;
+  assert.match(
+    cull,
+    /let shrink=select\(1\.0,clamp\(\(frame\.lod\.z-d\)\/frame\.ground\.z,0\.0,1\.0\),frame\.ground\.z>0\.0\);/,
+  );
+  assert.match(cull, /Instance\(vec4f\(p,scale\*shrink\),/);
+  assert.doesNotMatch(render, /discard/, 'shrinking needs no discard');
+  effect.dispose();
+});
+
 test('scatter frustum bounds include geometry displaced from its local origin', () => {
   const h = optionalGPU(),
     geometry = new Geometry([10, 0, 0, 11, 0, 0, 10, 1, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2]),

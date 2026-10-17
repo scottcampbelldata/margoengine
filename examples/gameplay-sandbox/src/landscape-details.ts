@@ -46,6 +46,8 @@ export function createLandscapeDetails(
       density: 0.86,
       scale: [0.6, 1.3],
       lod: [18, 42, 105],
+      // Blades shrink to nothing over the last 25 m instead of vanishing at 105 m.
+      edgeShrink: 25,
       material: new PbrMaterial({ color: [0.19, 0.28, 0.09], roughness: 0.95, doubleSided: true }),
       wind: [1, 0.35, 0.2],
       // Blades stay upright; a 2 cm sink hides roots on small bumps between heightmap texels.
@@ -63,6 +65,7 @@ export function createLandscapeDetails(
     maxSlope: 55,
     scale: [0.3, 1.6],
     lod: [24, 55, 130],
+    edgeShrink: 20,
     material: new PbrMaterial(MATERIALS.foundation),
     // Stones lie along the slope and sink deeper where it is steep, so no downhill edge floats.
     alignToGround: 1,

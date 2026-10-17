@@ -71,6 +71,12 @@ export interface ScatterOptions {
    * buried on the downhill side of steeper ground. The heightmap gives the slope.
    */
   sink?: number;
+  /**
+   * World units before the last LOD distance over which instances scale down to zero (default 0: cut at that
+   * distance). Shrinking instead of cutting keeps the edge of a grass field from popping, without a fragment
+   * `discard`; widths past the last distance are clamped to it.
+   */
+  edgeShrink?: number;
 }
 const frame = `
 struct Frame {camera:mat4x4f,eye:vec4f,area:vec4f,rules:vec4f,scale:vec4f,lod:vec4f,ids:vec4u,color:vec4f,planes:array<vec4f,6>,wind:vec4f,ground:vec4f}
@@ -113,8 +119,10 @@ fn emit(ring:u32,instance:Instance){
  }
  for(var j=0u;j<6u;j++){if(dot(frame.planes[j].xyz,p)+frame.planes[j].w < -radius){return;}}
  let d=distance(p,frame.eye.xyz);if(d>frame.lod.z){return;}
+ // edgeShrink: scale toward zero approaching the cull distance instead of cutting there.
+ let shrink=select(1.0,clamp((frame.lod.z-d)/frame.ground.z,0.0,1.0),frame.ground.z>0.0);
  let angle=hash(i*7u+5u)*6.2831853;let q=round((normal.xz*0.5+0.5)*4095.0);
- var instance=Instance(vec4f(p,scale),vec4f(angle,q.x+q.y*4096.0,0,0));
+ var instance=Instance(vec4f(p,scale*shrink),vec4f(angle,q.x+q.y*4096.0,0,0));
  for(var ring=0u;ring<2u;ring++){
   if((frame.ids.w&(1u<<ring))!=0u&&frame.scale.w>0.0&&abs(d-frame.lod[ring])<frame.scale.w*0.5){
    instance.rotation.z=(d-frame.lod[ring])/frame.scale.w+0.5;instance.rotation.w=1.0;emit(ring,instance);
@@ -228,6 +236,7 @@ export class Scatter implements EnginePlugin {
       color = [0.12, 0.35, 0.08],
       alignToGround = 0,
       sink = 0,
+      edgeShrink = 0,
     } = options;
     if (
       this.geometries.length !== 3 ||
@@ -269,6 +278,8 @@ export class Scatter implements EnginePlugin {
       sink > 100000
     )
       throw new RangeError('Scatter alignToGround must be 0-1 and sink a distance from 0 to 100000');
+    if (!Number.isFinite(edgeShrink) || edgeShrink < 0 || edgeShrink > 100000)
+      throw new RangeError('Scatter edgeShrink must be a distance from 0 to 100000');
     if (options.wind) validateWind(options.wind);
     const exclusions = options.exclusions ?? [];
     validateExclusions(exclusions);
@@ -309,6 +320,7 @@ export class Scatter implements EnginePlugin {
     this.values.set(color, 40);
     this.values[72] = alignToGround;
     this.values[73] = sink;
+    this.values[74] = Math.min(edgeShrink, lod[2]);
     // Compute emits fading instances only for a nonzero width between rings that use different meshes.
     this.fade = this.values[31] > 0 && this.meta[39] !== 0;
   }
