@@ -34,7 +34,10 @@ function validateRectangle(rectangle: DrawOptions['viewport'], width: number, he
  * own pass draw the batch with its back-culled pipeline (absent counts as 0).
  * `redirect`: set by a GPU-culling package for the frame (core never sets it): every core draw of the batch reads instances
  * from `instances` and its drawIndexedIndirect arguments from `args` (offset 0) instead of core's instance buffer and
- * `count`; core still uploads the batch into its own buffer, which stays the source the package reads. */
+ * `count`; core still uploads the batch into its own buffer, which stays the source the package reads.
+ * `claimed`: set by a package that draws these instances itself (core never sets it, and it persists until the package
+ * clears it): core's draws neither bind nor encode the batch and `engine.stats.drawCalls` leaves it out. Pick passes
+ * still draw it. */
 export interface Batch {
   geometry: Geometry;
   instances: Float32Array;
@@ -43,6 +46,7 @@ export interface Batch {
   end?: number;
   mask?: number;
   redirect?: { instances: GPUBuffer; args: GPUBuffer };
+  claimed?: boolean;
 }
 /**
  * The single directional light. `direction`: xyz toward the light (non-zero), w intensity (>= 0); default [3, 5, 4, 3].
@@ -401,7 +405,7 @@ export class GPURenderer implements Renderer {
         if (options.scissor) pass.setScissorRect(...options.scissor);
         let current: GPURenderPipeline | undefined;
         for (const batch of drawBatches)
-          if (batch.count) {
+          if (batch.count && !batch.claimed) {
             const p = pipeline === this.pipeline && !bindings.length && !batch.mask ? this.culled : pipeline;
             if (p !== current) {
               current = p;

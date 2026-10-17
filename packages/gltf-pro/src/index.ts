@@ -912,6 +912,8 @@ export class PBRModel implements EnginePlugin {
   private readonly view = new Float32Array(16);
   /** Material batches baked once. Device restore uploads them again and keeps the same nodes. */
   private staticBatches?: StaticBatch[];
+  /** Primitives drawn from another primitive's buffer pair (see `shareBuffers`), each mapped to the pair's owner. */
+  private readonly bufferSources = new Map<PBRPrimitive, PBRPrimitive>();
   private relative?: Float32Array;
   private engine: Engine;
   private readonly cleanupCallbacks = new Set<() => void>();
@@ -1167,12 +1169,62 @@ export class PBRModel implements EnginePlugin {
         samplers: [],
       };
       this.resources.push(r);
-      r.vertex = upload(p.vertices, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE);
-      r.index = upload(p.indices, GPUBufferUsage.INDEX);
+      // A shared primitive uploads its source's arrays, so the cache hands both the same pair again after a restore.
+      const from = this.bufferSources?.get(p) ?? p;
+      r.vertex = upload(from.vertices, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE);
+      r.index = upload(from.indices, GPUBufferUsage.INDEX);
       p.buffers = { vertex: r.vertex, index: r.index };
       this.bindMaterial(r, device, mipSampler);
     }
     this.installBatches(device, mipSampler, upload);
+  }
+  /**
+   * Points `target` at `source`'s vertex and index GPU buffers and frees the pair `target` used, so identical shapes
+   * draw from one pair (machinery's `deduplicateParts` calls it). Both must be triangle primitives of this model with
+   * equal vertices and indices, neither skinned nor morphed; their CPU arrays, materials and nodes stay separate, and
+   * the sharing survives a device restore. Returns false, changing nothing, when they do not qualify or the model is
+   * still streaming.
+   */
+  shareBuffers(target: PBRPrimitive, source: PBRPrimitive): boolean {
+    const host = this.asset as GLTFAsset & { [deferStaticBatches]?: StaticBatchDeferral };
+    if (this.disposed || target === source || host[deferStaticBatches]) return false;
+    for (const p of [target, source])
+      if (
+        !this.primitives.includes(p) ||
+        p.topology ||
+        p.deformed ||
+        p.definition.targets?.length ||
+        p.definition.attributes?.JOINTS_0 !== undefined ||
+        this.asset.doc.nodes?.[p.nodeIndex]?.skin !== undefined
+      )
+        return false;
+    const a = target.vertices,
+      b = source.vertices,
+      i = target.indices,
+      j = source.indices;
+    if (a.length !== b.length || i.length !== j.length) return false;
+    for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) return false;
+    for (let k = 0; k < i.length; k++) if (i[k] !== j[k]) return false;
+    const root = this.bufferSources.get(source) ?? source;
+    if (root === target) return false;
+    for (const [shared, from] of this.bufferSources) if (from === target) this.bufferSources.set(shared, root);
+    this.bufferSources.set(target, root);
+    const from = this.resources.find((r) => r.primitive === root && !r.batch),
+      to = this.resources.find((r) => r.primitive === target && !r.batch);
+    if (!from || !to || to.vertex === from.vertex) return true;
+    const old = [to.vertex, to.index];
+    for (const r of this.resources)
+      if (!r.batch && r.vertex === old[0]) {
+        r.vertex = from.vertex;
+        r.index = from.index;
+        r.primitive.buffers = { vertex: from.vertex, index: from.index };
+      }
+    for (const buffer of old)
+      if (!this.resources.some((r) => r.vertex === buffer || r.index === buffer)) {
+        for (const [key, value] of this.gpuCache) if (value === buffer) this.gpuCache.delete(key);
+        buffer.destroy();
+      }
+    return true;
   }
   /** Bakes static same-material triangles once the asset's geometry and instances are final. */
   private commitStaticBatches(): void {

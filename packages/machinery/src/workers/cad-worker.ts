@@ -84,11 +84,12 @@ function smooth(geometry: Geometry, progress: (percent: number) => void): Geomet
 }
 self.onmessage = async (event: MessageEvent) => {
   try {
-    const { buffer, format, smoothing, maxParts, occtURL, wasmURL } = event.data as {
+    const { buffer, format, smoothing, maxParts, linearDeflection, occtURL, wasmURL } = event.data as {
       buffer: ArrayBuffer;
       format: string;
       smoothing: boolean;
       maxParts?: number;
+      linearDeflection?: number;
       occtURL: string;
       wasmURL: string;
     };
@@ -119,11 +120,16 @@ self.onmessage = async (event: MessageEvent) => {
       });
       progress(10);
       let result: Result;
+      // Without linearDeflection these are the exact parameters of earlier releases (OpenCascade's own tessellation).
+      const parameters =
+        linearDeflection === undefined
+          ? { linearUnit: 'meter' }
+          : { linearUnit: 'meter', linearDeflectionType: 'absolute_value', linearDeflection };
       try {
         result =
           format === 'step'
-            ? occt.ReadStepFile(new Uint8Array(buffer), { linearUnit: 'meter' })
-            : occt.ReadIgesFile(new Uint8Array(buffer), { linearUnit: 'meter' });
+            ? occt.ReadStepFile(new Uint8Array(buffer), parameters)
+            : occt.ReadIgesFile(new Uint8Array(buffer), parameters);
       } catch (error) {
         // A Wasm trap (unreachable, out-of-bounds access, abort) on a malformed file: report it by name. This
         // worker is never reused (one per load), so the next file starts a fresh OpenCascade.

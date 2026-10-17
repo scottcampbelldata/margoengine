@@ -301,6 +301,7 @@ export class Picking implements EnginePlugin {
       original({
         ...options,
         pipeline: this.pipeline(c, mrtShader(c.shader), true),
+        partIds: true,
         colorAttachments: [
           { view: this.idsView!, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } },
         ],

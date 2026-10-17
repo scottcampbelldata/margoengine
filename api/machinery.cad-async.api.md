@@ -13,6 +13,7 @@ export interface CADImportOptions {
     smoothing?: boolean;
     maxParts?: number;
     timeoutMs?: number;
+    linearDeflection?: number;
 }
 
 export function parseCADAsync(instance: EngineKernel, buffer: ArrayBuffer, format: CADFormat, options?: CADImportOptions): Promise<CADModel>;
