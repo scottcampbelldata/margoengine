@@ -79,7 +79,7 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 | Package | What it is |
 | --- | --- |
 | [`margoengine`](packages/margoengine/README.md) | Five-line setup for Margo Engine and its domain packs. |
-| [`@margoengine/core`](packages/core/README.md) | Lean WebGPU/WebGL2 rendering with a deterministic Rust/Wasm transform kernel. |
+| [`@margoengine/core`](packages/core/README.md) | WebGPU rendering and a Wasm transform kernel. WebGL2 is the optional @margoengine/webgl package. |
 
 ### Setup and diagnostics (5)
 

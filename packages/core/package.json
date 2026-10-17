@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/core",
   "version": "1.0.0",
-  "description": "Lean WebGPU/WebGL2 rendering with a deterministic Rust/Wasm transform kernel.",
+  "description": "WebGPU rendering and a Wasm transform kernel. WebGL2 is the optional @margoengine/webgl package.",
   "type": "module",
   "license": "MIT",
   "repository": {

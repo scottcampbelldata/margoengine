@@ -116,8 +116,12 @@ export class Mesh {
   readonly position = new VectorRef(this, 'position');
   readonly rotation = new VectorRef(this, 'rotation');
   readonly scale = new VectorRef(this, 'scale');
-  /** Views into the store; createMesh replaces them when it grows the store, so read them, never keep them. */
+  /**
+   * Store view of Euler XYZ radians. Index writes do not update the quaternion; use `rotation` or `setRotation`.
+   * `createMesh` replaces this view when the store grows, so read it, never keep it.
+   */
   declare readonly euler: Float32Array;
+  /** World matrix view into the store. `createMesh` replaces it when the store grows, so read it, never keep it. */
   declare readonly matrix: Float32Array;
   geometry: Geometry | null = null;
   private current = new PbrMaterial();

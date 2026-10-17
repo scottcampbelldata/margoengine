@@ -28,7 +28,7 @@
     "id": "core",
     "title": "Scenes & rendering",
     "package": "@margoengine/core",
-    "description": "Lean WebGPU/WebGL2 rendering with a deterministic Rust/Wasm transform kernel.",
+    "description": "WebGPU rendering and a Wasm transform kernel. WebGL2 is the optional @margoengine/webgl package.",
     "requirements": "See the package guide for requirements",
     "keywords": "base engine cube box geometry pbr instancing picking orbit camera controls transforms hierarchy",
     "install": "npm install @margoengine/core@1.0.0",
