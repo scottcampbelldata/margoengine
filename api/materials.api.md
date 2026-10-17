@@ -161,6 +161,8 @@ export class Material {
     set sheenRoughness(v: number);
     get ior(): number;
     set ior(v: number);
+    get dispersion(): number;
+    set dispersion(v: number);
     get thickness(): number;
     set thickness(v: number);
     get attenuationColor(): number[];
@@ -336,6 +338,7 @@ export interface PhysicalOptions {
     iridescenceMap?: Texture | null;
     iridescenceThicknessMap?: Texture | null;
     ior?: number;
+    dispersion?: number;
     transmission?: number;
     transmissionMap?: Texture | null;
     thicknessMap?: Texture | null;
@@ -415,6 +418,7 @@ export interface TransmissionNode {
 export interface TransmissionOptions extends TransmissionPassOptions {
     factor?: number;
     ior?: number;
+    dispersion?: number;
     opaqueColor?: GPUTextureView;
     transmissionTexture?: ClearcoatTexture;
     volume?: VolumeOptions;

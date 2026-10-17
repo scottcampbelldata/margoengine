@@ -273,7 +273,7 @@ glass.setUVTransform({texCoord: 1}, 'thicknessMap');
 Maps multiply their corresponding factors; existing factor defaults remain unchanged. Clearcoat normals use
 `clearcoatNormalScale` (default 1). Anisotropy uses `anisotropy` (default 0) and `anisotropyRotation` (radians,
 default 0). Iridescence uses `iridescence` (default 0), `iridescenceIOR` (default 1.3) and
-`iridescenceThicknessRange` (nanometres, default `[100, 400]`). Dispersion remains unsupported.
+`iridescenceThicknessRange` (nanometres, default `[100, 400]`).
 
 Physical and transmissive capabilities are fixed at construction. A non-null map reserves its lobe, and a
 transmission or thickness map also reserves transmissive rendering even when its factor is zero. To add
@@ -289,3 +289,18 @@ or share packed textures. `Texture.options.colorSpace` overrides the defaults in
 These maps work with geometry groups, instancing, glTF export and device restoration. Glass uses the maps in both
 the tinted-background path and the optional `Transmission` refraction pass. Disposing the last mesh using a
 material releases its map uniform buffers; textures remain caller-owned.
+
+## Dispersion
+
+`Material({transmission: 1, thickness: 0.8, dispersion: 0.3})` adds wavelength-dependent refraction through the
+`Transmission` pass. `dispersion` defaults to 0, accepts finite nonnegative values (including values above 1), and
+stays live. It uses `KHR_materials_dispersion`'s 20/Abbe-number convention. Red, green and blue sample the opaque
+scene along separate refracted rays; red's IOR is clamped to at least 1. Zero preserves the existing refraction.
+The effect needs nonzero volume thickness; IOR 1 leaves all three channels together. Without a refraction capture,
+the existing tinted-background path remains unchanged.
+
+glTF parsing and export preserve `KHR_materials_dispersion`. The retained glTF renderer uses the existing
+`extendedMaterials` decoder opt-in; `install(model)` and caller-owned `transmission({dispersion, ...})` also support
+the extension. For imported `KHR_materials_volume.thicknessTexture`, use `install(model)`; native glTF transmission
+uses scalar thickness. Constructed meshes support their live `thicknessMap` through `Transmission`.
+The screen-space volume approximation and existing transmission limitations still apply.

@@ -344,6 +344,8 @@ export interface PhysicalOptions {
   iridescenceThicknessMap?: Texture | null;
   /** KHR_materials_ior: index of refraction, >= 1 (default 1.5). */
   ior?: number;
+  /** KHR_materials_dispersion: chromatic refraction strength, finite and >= 0 (default 0). Needs transmission and volume thickness for a visible effect. */
+  dispersion?: number;
   /** KHR_materials_transmission: share of light passing through, 0-1. Refracts the scene with `@margoengine/materials/transmission`; otherwise the background shows through tinted. */
   transmission?: number;
   /** Linear R transmission and G volume thickness. Either reserves transmissive rendering at construction. */
@@ -429,6 +431,7 @@ const extensions: Record<keyof PhysicalOptions, string> = {
   iridescenceMap: 'iridescence',
   iridescenceThicknessMap: 'iridescence',
   ior: 'ior',
+  dispersion: 'dispersion',
   transmission: 'transmission',
   transmissionMap: 'transmission',
   thicknessMap: 'volume',
@@ -658,7 +661,7 @@ export class Material {
     this.setMap(11, v);
   }
   private rotation = 0;
-  /** Physical materials only, gltf-pro layout: [clearcoat, clearcoatRoughness, 1, transmission, specularColor rgb, specularIntensity, sheenColor rgb, sheenRoughness], and [0, ior, 0, 0]. */
+  /** Physical materials only, gltf-pro layout: [clearcoat, clearcoatRoughness, 1, transmission, specularColor rgb, specularIntensity, sheenColor rgb, sheenRoughness], and [0, ior, 0, dispersion]. */
   readonly physical?: number[];
   readonly ext?: number[];
   /** Transmissive materials only, gltf-pro layout: [thickness, transmittance per world unit rgb]. */
@@ -718,6 +721,11 @@ export class Material {
     this.iridescenceMap = o.iridescenceMap ?? null;
     this.iridescenceThicknessMap = o.iridescenceThicknessMap ?? null;
     const used = (Object.keys(extensions) as (keyof PhysicalOptions)[]).filter((k) => o[k] != null);
+    if (
+      o.dispersion !== undefined &&
+      (typeof o.dispersion !== 'number' || !Number.isFinite(Math.fround(o.dispersion)) || o.dispersion < 0)
+    )
+      throw new RangeError('Material dispersion must be a finite number >= 0');
     this.extensions = [
       ...new Set([...used.map((k) => extensions[k]), ...(o.thicknessMap != null ? ['transmission'] : [])]),
     ];
@@ -852,6 +860,15 @@ export class Material {
     if (!this.ext) throw new TypeError('Material ior needs a physical option at construction');
     if (!(v >= 1 && v < Infinity)) throw new RangeError('Material ior must be a finite number >= 1');
     this.ext[1] = v;
+  }
+  get dispersion(): number {
+    return this.ext?.[3] ?? 0;
+  }
+  set dispersion(v: number) {
+    if (!this.ext) throw new TypeError('Material dispersion needs a physical option at construction');
+    if (typeof v !== 'number' || !Number.isFinite(Math.fround(v)) || v < 0)
+      throw new RangeError('Material dispersion must be a finite number >= 0');
+    this.ext[3] = v;
   }
   get thickness(): number {
     return this.volume?.[0] ?? 0;
@@ -1220,6 +1237,7 @@ export function createMesh<M extends Material | readonly Material[]>(
     // Physical: gltf-pro's factor-only variant (five maps), live arrays, and the tinted-blend constant read every frame.
     if (m.physical) {
       Object.assign(g, { physical: m.physical, ext: m.ext, volume: m.volume, maps: g.maps.slice(0, 5) });
+      Object.defineProperty(g, 'dispersion', { get: () => m.dispersion });
       Object.defineProperty(g, 'tint', { get: () => m.tint });
       if (m.physical.length > 12)
         g.extended = {

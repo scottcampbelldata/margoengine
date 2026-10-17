@@ -33,9 +33,23 @@ const declarations = (group: number) => /* wgsl */ `
 fn margoTransmission(s:Surface,v:vec3f,i:Out)->vec3f {
   let ior=max(f.ext.y,1.0); let r=refract(-v,s.n,1/ior);
   let path=margoVolume.x*s.th*(length(f.model[0].xyz)+length(f.model[1].xyz)+length(f.model[2].xyz))/3;
-  let clip=f.camera*vec4f(i.position+r*(path/max(length(r),1e-4)),1); let uv=clip.xy/clip.w*vec2f(0.5,-0.5)+0.5;
-  let lod=log2(f32(textureDimensions(margoScene).x))*s.roughness*clamp(ior*2-2,0.0,1.0);
-  let behind=textureSampleLevel(margoScene,margoSceneSampler,uv,lod).rgb;
+  var behind:vec3f;
+  if(f.ext.w>0&&path>0){
+    // KHR_materials_dispersion stores 20/Abbe: red has the smallest IOR, blue the largest.
+    let halfSpread=(ior-1)*0.025*f.ext.w;
+    let iors=max(vec3f(ior-halfSpread,ior,ior+halfSpread),vec3f(1));
+    for(var channel=0u;channel<3u;channel++){
+      let ray=refract(-v,s.n,1/iors[channel]);
+      let clip=f.camera*vec4f(i.position+ray*(path/max(length(ray),1e-4)),1);
+      let uv=clip.xy/clip.w*vec2f(0.5,-0.5)+0.5;
+      let lod=log2(f32(textureDimensions(margoScene).x))*s.roughness*clamp(iors[channel]*2-2,0.0,1.0);
+      behind[channel]=textureSampleLevel(margoScene,margoSceneSampler,uv,lod)[channel];
+    }
+  }else{
+    let clip=f.camera*vec4f(i.position+r*(path/max(length(r),1e-4)),1); let uv=clip.xy/clip.w*vec2f(0.5,-0.5)+0.5;
+    let lod=log2(f32(textureDimensions(margoScene).x))*s.roughness*clamp(ior*2-2,0.0,1.0);
+    behind=textureSampleLevel(margoScene,margoSceneSampler,uv,lod).rgb;
+  }
   let volume=select(pow(margoVolume.yzw,vec3f(path)),vec3f(1),path<=0);
   let f0=mix(s.f0,s.base.rgb,s.metal); let fresnel=f0+(1-f0)*pow(1-clamp(dot(s.n,v),0.0,1.0),5.0);
   return (1-s.metal)*s.tr*(1-fresnel)*s.base.rgb*volume*behind;

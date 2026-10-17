@@ -27,6 +27,7 @@ export class Transmission implements EnginePlugin, PBRTransmission {
 export interface TransmissionOptions extends TransmissionPassOptions {
     factor?: number;
     ior?: number;
+    dispersion?: number;
     opaqueColor?: GPUTextureView;
     transmissionTexture?: ClearcoatTexture;
     volume?: VolumeOptions;
@@ -52,6 +53,7 @@ export function transmissionScalar(value: unknown, fallback: number, label: stri
 export function validateTransmission(options: TransmissionOptions): {
     factor: number;
     ior: number;
+    dispersion: number;
     thickness: number;
     inverseDistance: number;
     color: readonly number[];

@@ -7,7 +7,7 @@ export interface TransmissionShaderTextures {
   opaque: number;
   factor?: ClearcoatTextureSlot;
   thickness?: ClearcoatTextureSlot;
-  /** [factor, IOR, thickness, inverse attenuation distance], then [attenuation RGB, 0]. */
+  /** [factor, IOR, thickness, inverse attenuation distance], then [attenuation RGB, dispersion]. */
   factorsIndex?: number;
 }
 /** Compiler-owned expressions evaluated in the extension's surface hook. */
@@ -17,6 +17,7 @@ export interface TransmissionShaderValues {
   thickness: string;
   attenuation: string;
   inverseDistance: string;
+  dispersion?: string;
 }
 
 /** The output hook composites after the baseline tone map, so the copy is never tone mapped twice. */
@@ -35,7 +36,7 @@ export function transmissionShader(
   };
   return {
     // The zero-factor branch preserves the complete original return, including alpha.
-    output: `if(${values ? values.factor : `materialFactors[${index}].x`}>0.0){return vec4f(materialTransmission(i,s,color,front${values ? ',' + values.factor + ',' + values.ior + ',' + values.thickness + ',' + values.attenuation + ',' + values.inverseDistance : ''}),1.0);}`,
+    output: `if(${values ? values.factor : `materialFactors[${index}].x`}>0.0){return vec4f(materialTransmission(i,s,color,front${values ? ',' + values.factor + ',' + values.ior + ',' + values.thickness + ',' + values.attenuation + ',' + values.inverseDistance + ',' + (values.dispersion ?? '0.0') : ''}),1.0);}`,
     declarations: /* wgsl */ `
 fn materialTransmissionLinear(value:vec3f)->vec3f {
   return select(value/12.92,pow((value+0.055)/1.055,vec3f(2.4)),value>vec3f(0.04045));
@@ -43,7 +44,7 @@ fn materialTransmissionLinear(value:vec3f)->vec3f {
 fn materialTransmissionEncoded(value:vec3f)->vec3f {
   return select(value*12.92,1.055*pow(max(value,vec3f(0)),vec3f(1.0/2.4))-0.055,value>=vec3f(0.0031308));
 }
-fn materialTransmission(i:Out,s:Surface,color:vec3f,front:bool${values ? ',materialTransmissionFactor:f32,materialTransmissionIor:f32,materialTransmissionThickness:f32,materialTransmissionAttenuation:vec3f,materialTransmissionInverseDistance:f32' : ''})->vec3f {
+fn materialTransmission(i:Out,s:Surface,color:vec3f,front:bool${values ? ',materialTransmissionFactor:f32,materialTransmissionIor:f32,materialTransmissionThickness:f32,materialTransmissionAttenuation:vec3f,materialTransmissionInverseDistance:f32,materialTransmissionDispersion:f32' : ''})->vec3f {
 ${values ? '  let factors=vec4f(materialTransmissionFactor,materialTransmissionIor,materialTransmissionThickness,materialTransmissionInverseDistance);' : '  let factors=materialFactors[' + index + '];'}
   // Explicit mip samples do not require derivatives in the beauty output hook.
   let factor=clamp(factors.x${textures.factor ? '*' + sample(textures.factor) + '.r' : ''},0.0,1.0);
@@ -56,6 +57,45 @@ ${values ? '  let factors=vec4f(materialTransmissionFactor,materialTransmissionI
   let v=select(vec3f(0,0,1),view/max(viewDistance,0.000001),viewDistance>0.000001);
   let normalLength=length(s.n);
   let n=select(vec3f(0,0,1),s.n/max(normalLength,0.000001),normalLength>0.000001);
+  let dispersion=${values ? 'materialTransmissionDispersion' : `materialFactors[${index + 1}].w`};
+  if(dispersion>0.0&&thickness>0.0&&factors.y!=1.0){
+    let halfSpread=(factors.y-1.0)*0.025*dispersion;
+    let iors=max(vec3f(1),vec3f(factors.y-halfSpread,factors.y,factors.y+halfSpread));
+    let entering=front==(f.coordsB.y>0);
+    let localNormalRaw=(transpose(f.model)*vec4f(n,0)).xyz;
+    let localNormal=localNormalRaw/max(length(localNormalRaw),0.000001);
+    let attenuation=${values ? 'materialTransmissionAttenuation' : `materialFactors[${index + 1}].rgb`};
+    let tint=clamp(s.base.rgb,vec3f(0),vec3f(1));
+    var dispersed=color;
+    for(var channel=0u;channel<3u;channel++){
+      let ior=iors[channel];
+      var ray=refract(-v,n,select(ior,1.0/ior,entering));
+      let rayLength=length(ray);
+      if(rayLength>0.000001){
+        ray/=rayLength;
+        let localRay=(transpose(f.normalMatrix)*vec4f(ray,0)).xyz;
+        let path=thickness/max(abs(dot(localRay,localNormal)),0.0001);
+        var channelPixel=i.clip.xy;
+        if(ior!=1.0){
+          let bent=f.camera*vec4f(i.position+ray*path,1);
+          let straight=f.camera*vec4f(i.position-v*path,1);
+          if(bent.w>0.000001&&straight.w>0.000001){
+            channelPixel+=(bent.xy/bent.w-straight.xy/straight.w)*vec2f(0.5,-0.5)*size;
+          }
+        }
+        var received=vec3f(textureLoad(${opaque},vec2i(clamp(channelPixel,vec2f(0),size-vec2f(1))),0)[channel]);
+        let attenuating=path>0.0&&factors.w>0.0;
+        if(attenuating||tint[channel]!=1.0){
+          if(f.settings.w<0.5){received=materialTransmissionLinear(received);}
+          received*=tint[channel];
+          if(attenuating){received*=pow(attenuation[channel],path*factors.w);}
+          if(f.settings.w<0.5){received=materialTransmissionEncoded(received);}
+        }
+        dispersed[channel]=received.x;
+      }
+    }
+    return mix(color,dispersed,factor);
+  }
   var ray=-v;
   // In particular, IOR 1 never projects or rounds a different screen pixel.
   if(factors.y!=1.0){

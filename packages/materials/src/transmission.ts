@@ -14,6 +14,8 @@ export interface VolumeOptions {
 export interface TransmissionOptions extends TransmissionPassOptions {
   factor?: number;
   ior?: number;
+  /** Nonnegative chromatic dispersion strength (20 / Abbe number), default zero. */
+  dispersion?: number;
   opaqueColor?: GPUTextureView;
   transmissionTexture?: ClearcoatTexture;
   volume?: VolumeOptions;
@@ -27,6 +29,7 @@ export function transmissionScalar(value: unknown, fallback: number, label: stri
 export function validateTransmission(options: TransmissionOptions): {
   factor: number;
   ior: number;
+  dispersion: number;
   thickness: number;
   inverseDistance: number;
   color: readonly number[];
@@ -34,7 +37,8 @@ export function validateTransmission(options: TransmissionOptions): {
   if (!options || typeof options !== 'object' || Array.isArray(options))
     throw new TypeError('Invalid transmission options');
   const factor = transmissionScalar(options.factor, 0, 'factor', 0, 1),
-    ior = transmissionScalar(options.ior, 1.5, 'IOR', 1);
+    ior = transmissionScalar(options.ior, 1.5, 'IOR', 1),
+    dispersion = transmissionScalar(options.dispersion, 0, 'dispersion');
   const volume = options.volume;
   if (volume !== undefined && (!volume || typeof volume !== 'object' || Array.isArray(volume)))
     throw new TypeError('Invalid KHR_materials_volume');
@@ -52,7 +56,7 @@ export function validateTransmission(options: TransmissionOptions): {
     throw new RangeError('Invalid volume attenuation distance');
   const inverseDistance = distance === Infinity ? 0 : 1 / distance;
   if (!Number.isFinite(Math.fround(inverseDistance))) throw new RangeError('Volume attenuation distance is too small');
-  return { factor, ior, thickness, inverseDistance, color };
+  return { factor, ior, dispersion, thickness, inverseDistance, color };
 }
 function validateMap(map: ClearcoatTexture): void {
   if (
@@ -83,7 +87,7 @@ export function createTransmission(options: TransmissionOptions = {}, base?: Mat
     values.thickness,
     values.inverseDistance,
     ...values.color,
-    0,
+    values.dispersion,
   ];
   textures.push({ view: options.opaqueColor });
   const slot = (map?: ClearcoatTexture) => {
