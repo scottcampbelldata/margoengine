@@ -11,6 +11,8 @@ struct Frame {camera:mat4x4f,right:vec4f,up:vec4f,gravityDelta:vec4f,emitterTime
  * triangle can reach the screen. That test bounds the triangle by a sphere of radius size (its circumradius) and checks it
  * against the four side planes in clip space, with row-norm margins that bound any offset of that length (1% and a
  * w-relative slack cover rounding); the side planes together also reject everything behind the eye.
+ * A respawn's seed is its slot and the simulated frame number (control.z), never an atomic ticket, so the same frames
+ * give the same particles whatever order the GPU runs the threads in (visual checks were load-dependent before).
  */
 export const simulationShader =
   frame +
@@ -20,7 +22,7 @@ export const simulationShader =
 struct Indirect {vertexCount:u32,instanceCount:atomic<u32>,rest:array<u32,3>}
 @group(0) @binding(4) var<storage,read_write> indirect:Indirect;
 @group(0) @binding(2) var<storage,read_write> drawn:Indirect;
-struct Respawn {count:atomic<u32>,sequence:atomic<u32>}
+struct Respawn {count:atomic<u32>}
 @group(0) @binding(5) var<storage,read_write> respawn:Respawn;
 fn hash(v:u32)->u32 {var x=v;x=(x^(x>>16u))*0x7feb352du;x=(x^(x>>15u))*0x846ca68bu;return x^(x>>16u);}
 fn random(seed:u32)->f32{return f32(hash(seed)>>8u)/16777216.0;}
@@ -41,7 +43,7 @@ fn curlNoise(p:vec3f)->vec3f {
   if(p.positionLife.w<=0){
     let ticket=atomicAdd(&respawn.count,1u);
     if(ticket>=f.control.y){particles[at].w=0;return;}
-    let seed=hash(atomicAdd(&respawn.sequence,1u)+id.x);
+    let seed=hash(id.x+hash(f.control.z));
     let life=mix(f.shape.y,f.shape.z,random(seed));
     let origin=f.emitterTime.xyz+(vec3f(random(seed+5u),random(seed+6u),random(seed+7u))*2-1)*f.emissionExtent.xyz;
     p.positionLife=vec4f(origin,max(0.0,life-dt));
