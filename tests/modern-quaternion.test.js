@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
 
-// One table exercises both existing quaternion writers: immediate JavaScript
-// rotation setters and the Rust tick after clamping the same stored XYZ angles.
+// One table exercises both callers of Kernel::sync_rotation: immediate setRotation
+// and the Rust tick after clamping the same stored XYZ angles.
 const rotations = [
   ['identity', [0, 0, 0]],
   ['positive X quarter turn', [Math.PI / 2, 0, 0]],
@@ -54,7 +54,7 @@ test('the shared XYZ quaternion table matches immediate Mesh.setRotation and a c
       for (let lane = 0; lane < 4; lane++)
         assert.ok(
           Math.abs(store.transforms[lanes[lane]][clamped.id] - beforeTick[lane]) <= 1e-7,
-          label + ' ' + lanes[lane] + ' differs between the JavaScript and Rust writers',
+          label + ' ' + lanes[lane] + ' differs between setRotation and the constrained tick',
         );
       assert.deepEqual(
         lanes.map((lane) => store.transforms[lane][immediate.id]),

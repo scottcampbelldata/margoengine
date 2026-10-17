@@ -58,6 +58,8 @@ export interface ShadowPrimitive {
   texCoord?: number /** Two packed vec4 affine rows applied after UV selection. */;
   alphaTransform?: Float32Array;
   instances?: { readonly count: number; upload(device: GPUDevice): GPUBuffer };
+  /** Skinned, morphed, instanced, or deformed casters redraw every frame. Unset casters are cached while they stay put. */
+  dynamic?: boolean;
 }
 export interface ShadowSource {
   shadowPrimitives?: readonly ShadowPrimitive[];
@@ -125,6 +127,11 @@ export class Shadows implements EnginePlugin {
   private readonly previous = new Float32Array(64);
   private readonly view = this.values.subarray(64, 80);
   private dirty = true;
+  private stillHash = 0;
+  private readonly hashWord = new Uint32Array(1);
+  private readonly hashFloat = new Float32Array(this.hashWord.buffer);
+  private readonly objectIds = new WeakMap<object, number>();
+  private objectSerial = 0;
   private disposed = false;
   private whiteView?: GPUTextureView;
   private readonly light = new Float32Array(3);
@@ -456,14 +463,34 @@ export class Shadows implements EnginePlugin {
         this.dirty = true;
       }
     }
-    let dynamic = false;
+    let moving = false;
+    let hash = 2166136261;
     for (let i = 0; i < this.sources.length; i++) {
       const r = this.sources[i];
-      if (!r.static) dynamic = true;
-      else if ('shadowVersion' in r.source && r.version !== r.source.shadowVersion) {
-        r.version = r.source.shadowVersion ?? 0;
-        this.dirty = true;
+      if (r.static) {
+        if ('shadowVersion' in r.source && r.version !== r.source.shadowVersion) {
+          r.version = r.source.shadowVersion ?? 0;
+          this.dirty = true;
+        }
+        continue;
       }
+      if ('drawShadow' in r.source && r.source.drawShadow) {
+        moving = true;
+        continue;
+      }
+      const primitives = this.casters(r, this.primitiveDepth);
+      for (let j = 0; j < primitives.length; j++) {
+        const primitive = primitives[j];
+        if (primitive.dynamic || primitive.instances) {
+          moving = true;
+          continue;
+        }
+        hash = this.mixStill(hash, primitive);
+      }
+    }
+    if (hash !== this.stillHash) {
+      this.stillHash = hash;
+      this.dirty = true;
     }
     this.values.set(this.matrices);
     viewMatrix(this.view, c.camera);
@@ -482,7 +509,7 @@ export class Shadows implements EnginePlugin {
     this.copyDestination.texture = this.combined!;
     this.copySize.width = this.copySize.height = this.options.resolution ?? 2048;
     c.encoder.copyTextureToTexture(this.copySource, this.copyDestination, this.copySize);
-    if (dynamic) for (let cascade = 0; cascade < this.cascadeCount; cascade++) this.depth(c, cascade, false);
+    if (moving) for (let cascade = 0; cascade < this.cascadeCount; cascade++) this.depth(c, cascade, false);
   }
   private fitBounds(): void {
     const { min, max, points } = this.options.bounds!,
@@ -573,6 +600,73 @@ export class Shadows implements EnginePlugin {
     this.ranges.fill(depth);
     for (let i = 0; i < 16; i++) if (!Number.isFinite(m[i])) throw new RangeError('Shadow bounds matrix overflow');
   }
+  private identity(object: object): number {
+    let id = this.objectIds.get(object);
+    if (id === undefined) this.objectIds.set(object, (id = ++this.objectSerial));
+    return id;
+  }
+  private mixFloat(hash: number, value: number): number {
+    this.hashFloat[0] = value;
+    return Math.imul(hash, 16777619) ^ this.hashWord[0];
+  }
+  /** Still-caster identity. A changed matrix, buffer, alpha map, or hidden bit redraws the whole cached atlas. */
+  private mixStill(hash: number, primitive: ShadowPrimitive): number {
+    hash = Math.imul(hash, 16777619) ^ this.identity(primitive.vertex);
+    hash = Math.imul(hash, 16777619) ^ this.identity(primitive.index);
+    hash = Math.imul(hash, 16777619) ^ primitive.count;
+    hash = Math.imul(hash, 16777619) ^ primitive.stride;
+    hash = Math.imul(hash, 16777619) ^ (primitive.node.id + 1);
+    hash = Math.imul(hash, 16777619) ^ (primitive.alphaTexture ? this.identity(primitive.alphaTexture) : 0);
+    hash = Math.imul(hash, 16777619) ^ (primitive.alphaSampler ? this.identity(primitive.alphaSampler) : 0);
+    hash = this.mixFloat(hash, primitive.alpha ?? 1);
+    hash = this.mixFloat(hash, primitive.cutoff ?? 0);
+    hash = this.mixFloat(hash, primitive.texCoord ?? 0);
+    const transform = primitive.alphaTransform;
+    hash = Math.imul(hash, 16777619) ^ (transform?.length ?? 0);
+    if (transform) for (let i = 0; i < transform.length; i++) hash = this.mixFloat(hash, transform[i]);
+    const matrix = primitive.node.matrix;
+    for (let i = 0; i < 16; i++) hash = this.mixFloat(hash, matrix[i]);
+    let hidden = 0;
+    const store = this.engine?.store;
+    if (store)
+      for (let id = primitive.node.id; id !== -1; id = store.parents[id]) {
+        if (store.hidden[id]) hidden = 1;
+        if (id === store.parents[id]) break;
+      }
+    return Math.imul(hash, 16777619) ^ hidden;
+  }
+  private casters(record: Source, level: number): readonly ShadowPrimitive[] {
+    const source = record.source;
+    if ('drawShadow' in source && source.drawShadow) return emptyPrimitives;
+    if ('id' in source) {
+      const triangles = meshTriangles(source);
+      if (!triangles) return emptyPrimitives;
+      if (triangles.kind === 'pbr') return triangles.source.shadowPrimitives ?? emptyPrimitives;
+      const geometry = triangles.geometry,
+        buffers = this.engine!.geometryBuffers(geometry);
+      if (!buffers) return emptyPrimitives;
+      record.meshPrimitive ??= [
+        {
+          node: source,
+          vertex: buffers.vertex,
+          index: buffers.index,
+          count: geometry.indices.length,
+          stride: 24,
+        },
+      ];
+      Object.assign(record.meshPrimitive[0], buffers, { count: geometry.indices.length });
+      return record.meshPrimitive;
+    }
+    const writer = (source as ShadowSource & { [shadowPrimitivesInto]?: (out: ShadowPrimitive[]) => boolean })[
+      shadowPrimitivesInto
+    ];
+    if (writer) {
+      const buffers = (record.primitiveBuffers ??= []),
+        buffer = (buffers[level] ??= []);
+      return writer.call(source, buffer) ? buffer : (source.shadowPrimitives ?? emptyPrimitives);
+    }
+    return source.shadowPrimitives ?? emptyPrimitives;
+  }
   private depth(c: Context, cascade: number, cached: boolean): void {
     this.depthAttachment.view = (cached ? this.cachedViews : this.views)[cascade];
     this.depthAttachment.depthLoadOp = cached ? 'clear' : 'load';
@@ -586,59 +680,33 @@ export class Shadows implements EnginePlugin {
       frame.owners.clear();
       frame.submitted.clear();
       for (const record of this.sources) {
-        const source = record.source;
-        if ('drawShadow' in source && source.drawShadow) continue;
-        let primitives: readonly ShadowPrimitive[];
-        if ('id' in source) {
-          const triangles = meshTriangles(source);
-          if (!triangles) continue;
-          if (triangles.kind === 'pbr') primitives = triangles.source.shadowPrimitives;
-          else {
-            const geometry = triangles.geometry,
-              buffers = this.engine!.geometryBuffers(geometry);
-            if (!buffers) continue;
-            record.meshPrimitive ??= [
-              {
-                node: source,
-                vertex: buffers.vertex,
-                index: buffers.index,
-                count: geometry.indices.length,
-                stride: 24,
-              },
-            ];
-            Object.assign(record.meshPrimitive[0], buffers, { count: geometry.indices.length });
-            primitives = record.meshPrimitive;
-          }
-        } else {
-          const writer = (source as ShadowSource & { [shadowPrimitivesInto]?: (out: ShadowPrimitive[]) => boolean })[
-            shadowPrimitivesInto
-          ];
-          if (writer) {
-            const buffers = (record.primitiveBuffers ??= []),
-              buffer = (buffers[level] ??= []);
-            primitives = writer.call(source, buffer) ? buffer : (source.shadowPrimitives ?? emptyPrimitives);
-          } else primitives = source.shadowPrimitives ?? emptyPrimitives;
-        }
+        const primitives = this.casters(record, level);
         frame.primitives.set(record, primitives);
-        for (const primitive of primitives) {
+        for (let i = 0; i < primitives.length; i++) {
+          const primitive = primitives[i];
           let owners = frame.owners.get(primitive.node);
           if (!owners) {
             owners = new Map();
             frame.owners.set(primitive.node, owners);
           }
           const key = primitive.primitive ?? primitive.index;
-          if (owners.get(key) !== false) owners.set(key, record.static);
+          const still = record.static || !(primitive.dynamic || primitive.instances);
+          if (owners.get(key) !== false) owners.set(key, still);
         }
       }
 
       for (let i = 0; i < this.sources.length; i++) {
         const r = this.sources[i];
-        if (r.static !== cached || ('disposed' in r.source && r.source.disposed)) continue;
-        if ('drawShadow' in r.source && r.source.drawShadow) {
+        const callback = 'drawShadow' in r.source ? r.source.drawShadow : undefined;
+        if ('disposed' in r.source && r.source.disposed) continue;
+        // Explicit static sources and drawShadow callbacks stay on one pass. Other sources carry both.
+        if ((r.static || callback) && r.static !== cached) continue;
+        if (callback) {
           const shadow = this.shadowContexts[cascade];
           shadow.context = c;
           shadow.pass = pass;
-          r.source.drawShadow(shadow);
+          // The function is a method on the source. Terrain, VAT and scatter read `this` inside it.
+          callback.call(r.source, shadow);
           continue;
         }
         const primitives = frame.primitives.get(r) ?? emptyPrimitives;

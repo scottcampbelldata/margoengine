@@ -9,7 +9,7 @@ import {
   type PassContext,
   type Mesh,
 } from '@margoengine/core/extension';
-import { invertMatrixStable } from '@margoengine/math/mat4';
+import { invertMatrixStable, multiplyMatrices } from '@margoengine/math/mat4';
 import { viewMatrix } from '../../shared/view.js';
 import { Cleanup } from '../../shared/cleanup.js';
 import type { PBRSource } from '../../shared/pbr-source.js';
@@ -70,6 +70,13 @@ export type { PBRDeviceRenderer, PBRDeformationRenderer } from './replica.js';
 // Type only: PBRInstances and the EXT_mesh_gpu_instancing reader load with @margoengine/gltf-pro/instancing.
 import type { PBRInstances } from './instancing.js';
 import { packed, packPrimitive } from './pack.js';
+import { buildStaticBatches, type StaticBatch } from './coalesce.js';
+// Progressive sets this on the asset until real vertices and instances replace the placeholder boxes.
+const deferStaticBatches = Symbol.for('margoengine.gltf-pro.defer-static-batches');
+interface StaticBatchDeferral {
+  commit?: () => void;
+}
+import { occlusionShader } from './occlusion.js';
 export { GLTFAsset } from './asset.js';
 export type { GLTFDocument } from './asset.js';
 export type { GLTFImage, KTX2Image } from './asset.js';
@@ -312,6 +319,10 @@ interface DrawResource {
   index: GPUBuffer;
   uniform: GPUBuffer;
   volume?: GPUBuffer;
+  /** Float32 copy of `material.volume`, reused so a transmission draw does not allocate. */
+  volumeData?: Float32Array;
+  /** Buffer that `volumeData` was last written to. A new buffer uploads again. */
+  volumeWritten?: GPUBuffer;
   values: Float32Array;
   groups: Map<GPURenderPipeline, GPUBindGroup[]>;
   views: GPUTextureView[];
@@ -320,6 +331,51 @@ interface DrawResource {
   extension?: MaterialExtensionResource;
   coordinates?: CoordinateExtension;
   pipelineHistories?: Map<string, DrawPipelineState[]>;
+  /** Set on a static part while its material batch can replace it. */
+  mergedInto?: DrawResource;
+  /** Set on the one resource that draws a material batch. */
+  batch?: StaticBatch;
+}
+interface ShadowCasterRecord {
+  primitive: PBRPrimitive;
+  node: Mesh;
+  vertex: GPUBuffer;
+  index: GPUBuffer;
+  count: number;
+  stride: number;
+  alphaTexture: GPUTextureView;
+  alphaSampler: GPUSampler;
+  alpha: number;
+  cutoff: number;
+  texCoord: 0 | 1;
+  alphaTransform?: Float32Array;
+  instances?: PBRInstances;
+  dynamic: boolean;
+}
+function fillShadow(r: DrawResource, value: ShadowCasterRecord): void {
+  const p = r.primitive,
+    m = p.material,
+    coordinates = m.maps[0] ? textureCoordinates(m.maps[0]) : undefined;
+  value.primitive = p;
+  value.node = p.node;
+  value.vertex = p.deformed ?? r.vertex;
+  value.index = r.index;
+  value.count = p.indices.length;
+  value.stride = 80;
+  value.alphaTexture = r.views[0];
+  value.alphaSampler = r.samplers[0];
+  value.alpha = m.base[3];
+  value.cutoff = m.settings[0] === 1 ? m.settings[1] : 0;
+  value.texCoord = m.maps[0] ? textureCoordinates(m.maps[0]).texCoord : 0;
+  if (m.maps[0]?.extensions?.KHR_texture_transform) value.alphaTransform = coordinates?.transform;
+  else delete value.alphaTransform;
+  value.instances = p.instances;
+  value.dynamic =
+    !r.batch &&
+    (p.definition.attributes?.JOINTS_0 !== undefined ||
+      !!p.definition.targets?.length ||
+      !!p.instances ||
+      !!p.deformed);
 }
 // Remember the complete existing pipeline key per draw mode. The shader and
 // every mutable state field are still read each draw, but unchanged materials
@@ -414,6 +470,8 @@ interface DrawScratch {
   code: string;
   ambient: boolean;
   effectCount: number;
+  liveBatches: Map<StaticBatch, boolean>;
+  blendDistance: Map<DrawResource, number>;
 }
 function createDrawScratch(color: GPUTextureView, depth: GPUTextureView): DrawScratch {
   const attachment: GPURenderPassColorAttachment = { view: color, loadOp: 'load', storeOp: 'store' };
@@ -431,19 +489,16 @@ function createDrawScratch(color: GPUTextureView, depth: GPUTextureView): DrawSc
     code: '',
     ambient: false,
     effectCount: 0,
+    liveBatches: new Map(),
+    blendDistance: new Map(),
     descriptor: { colorAttachments: [attachment], depthStencilAttachment: depthAttachment },
     compare(a, b) {
       const blendA = blended(a.primitive.material),
         blendB = blended(b.primitive.material);
       if (blendA !== blendB) return +blendA - +blendB;
       if (!blendA) return 0;
-      const position = scratch.context!.camera.position,
-        am = a.primitive.node.matrix,
-        bm = b.primitive.node.matrix;
-      return (
-        Math.hypot(position[0] - bm[12], position[1] - bm[13], position[2] - bm[14]) -
-        Math.hypot(position[0] - am[12], position[1] - am[13], position[2] - am[14])
-      );
+      const distances = scratch.blendDistance;
+      return distances.get(b)! - distances.get(a)!;
     },
   };
   return scratch;
@@ -769,6 +824,9 @@ export class PBRModel implements EnginePlugin {
   private readonly inverse = new Float32Array(16);
   private readonly workspace = new Float64Array(52);
   private readonly view = new Float32Array(16);
+  /** Material batches baked once. Device restore uploads them again and keeps the same nodes. */
+  private staticBatches?: StaticBatch[];
+  private relative?: Float32Array;
   private engine: Engine;
   private readonly cleanupCallbacks = new Set<() => void>();
   private readonly lighting = new Set<LightingEffect>();
@@ -779,6 +837,8 @@ export class PBRModel implements EnginePlugin {
   private gpuRevision = 0;
   private readonly drawScratch: DrawScratch[] = [];
   private drawDepth = 0;
+  /** Pose answers for one shadow-primitive write. Draw calls keep their own map on the scratch. */
+  private shadowBatchLive?: Map<StaticBatch, boolean>;
   private transparency?: PBRTransparency;
   private capture?: PBRCapture;
   private transmission?: PBRTransmission;
@@ -937,7 +997,7 @@ export class PBRModel implements EnginePlugin {
             return model.pickingPrimitives.filter((p) => p.node === node);
           },
           get shadowPrimitives() {
-            return model.shadowPrimitives.filter((p) => p.node === node);
+            return model.nodeShadowPrimitives(node);
           },
           prepareDeformation(context) {
             model.prepareDeformation?.(context);
@@ -948,6 +1008,8 @@ export class PBRModel implements EnginePlugin {
         };
         setMeshSource(node, source);
       }
+      const deferral = (asset as GLTFAsset & { [deferStaticBatches]?: StaticBatchDeferral })[deferStaticBatches];
+      if (deferral) deferral.commit = () => this.commitStaticBatches();
     } catch (error) {
       for (const node of this.created.reverse()) {
         clearMeshSource(node);
@@ -984,12 +1046,9 @@ export class PBRModel implements EnginePlugin {
   get raw() {
     return this.pickingPrimitives.filter((p) => this.engine.meshes.get(p.node.id) === p.node);
   }
-  setup(engine: Engine, device = engine.gpu): void {
-    if (engine !== this.engine || this.disposed) throw new Error('PBRModel belongs to another engine or is disposed');
-    if (!device) throw new Error('PBRModel requires WebGPU');
-    const cache = this.gpuCache,
-      mipSampler = device.createSampler({ minFilter: 'linear', magFilter: 'linear' });
-    const upload = (data: Float32Array | Uint32Array, usage: number) => {
+  private bufferUpload(device: GPUDevice): (data: Float32Array | Uint32Array, usage: number) => GPUBuffer {
+    const cache = this.gpuCache;
+    return (data, usage) => {
       const existing = cache.get(data) as GPUBuffer | undefined;
       if (existing) return existing;
       if (data.byteLength > device.limits.maxBufferSize) throw new RangeError('PBR buffer exceeds device limit');
@@ -1003,6 +1062,12 @@ export class PBRModel implements EnginePlugin {
       cache.set(data, b);
       return b;
     };
+  }
+  setup(engine: Engine, device = engine.gpu): void {
+    if (engine !== this.engine || this.disposed) throw new Error('PBRModel belongs to another engine or is disposed');
+    if (!device) throw new Error('PBRModel requires WebGPU');
+    const mipSampler = device.createSampler({ minFilter: 'linear', magFilter: 'linear' });
+    const upload = this.bufferUpload(device);
     for (const p of this.pointsAndLines.length ? [...this.primitives, ...this.pointsAndLines] : this.primitives) {
       const r: DrawResource = {
         primitive: p,
@@ -1020,6 +1085,102 @@ export class PBRModel implements EnginePlugin {
       p.buffers = { vertex: r.vertex, index: r.index };
       this.bindMaterial(r, device, mipSampler);
     }
+    this.installBatches(device, mipSampler, upload);
+  }
+  /** Bakes static same-material triangles once the asset's geometry and instances are final. */
+  private commitStaticBatches(): void {
+    const host = this.asset as GLTFAsset & { [deferStaticBatches]?: StaticBatchDeferral };
+    delete host[deferStaticBatches];
+    if (this.disposed || this.staticBatches !== undefined) return;
+    const device = this.engine.gpu;
+    if (!device) throw new Error('PBRModel requires WebGPU');
+    this.installBatches(
+      device,
+      device.createSampler({ minFilter: 'linear', magFilter: 'linear' }),
+      this.bufferUpload(device),
+    );
+  }
+  /** Bakes static same-material triangles once, after world matrices exist, and uploads that mesh on each device. */
+  private installBatches(
+    device: GPUDevice,
+    mipSampler: GPUSampler,
+    upload: (data: Float32Array | Uint32Array, usage: number) => GPUBuffer,
+  ): void {
+    // Streaming setup runs on placeholder boxes, and each arrived chunk borrows this model as its prototype.
+    const host = this.asset as GLTFAsset & { [deferStaticBatches]?: StaticBatchDeferral };
+    if (host[deferStaticBatches] || !Object.hasOwn(this, 'engine')) return;
+    if (this.staticBatches === undefined) {
+      this.engine.store.tick(false);
+      this.staticBatches = buildStaticBatches(this.primitives, this.root, () => {
+        const node = this.engine.createMesh(this.root);
+        this.created.push(node);
+        return node;
+      });
+      this.engine.store.tick(false);
+    }
+    if (this.resources.some((r) => r.batch)) return;
+    const byPrimitive = new Map(this.resources.map((r) => [r.primitive, r]));
+    for (const batch of this.staticBatches) {
+      const p = batch.primitive,
+        r: DrawResource = {
+          primitive: p,
+          vertex: undefined!,
+          index: undefined!,
+          uniform: undefined!,
+          values: undefined!,
+          groups: new Map(),
+          views: [],
+          samplers: [],
+          batch,
+        };
+      this.resources.push(r);
+      r.vertex = upload(p.vertices, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE);
+      r.index = upload(p.indices, GPUBufferUsage.INDEX);
+      p.buffers = { vertex: r.vertex, index: r.index };
+      this.bindMaterial(r, device, mipSampler);
+      for (const part of batch.parts) {
+        const held = byPrimitive.get(part.primitive);
+        if (held) held.mergedInto = r;
+      }
+    }
+  }
+  /** True while every baked part still has the captured root-relative pose, material, and visibility. */
+  private pose(batch: StaticBatch): boolean {
+    this.relative ??= new Float32Array(16);
+    if (!invertMatrixStable(this.root.matrix, this.inverse, this.workspace)) return false;
+    const relative = this.relative,
+      store = this.engine.store;
+    for (let i = 0; i < batch.parts.length; i++) {
+      const part = batch.parts[i],
+        primitive = part.primitive;
+      if (
+        primitive.material !== batch.material ||
+        primitive.deformed ||
+        primitive.instances ||
+        primitive.topology ||
+        primitive.vertices !== part.vertices ||
+        primitive.indices !== part.indices
+      )
+        return false;
+      for (let id = primitive.node.id; id !== -1; id = store.parents[id]) if (store.hidden[id]) return false;
+      multiplyMatrices(this.inverse, primitive.node.matrix, relative);
+      const stamp = part.stamp;
+      for (let c = 0; c < 16; c++) if (relative[c] !== stamp[c]) return false;
+    }
+    return true;
+  }
+  /** Per-node casters stay individual so `shadows.add(node)` still finds that node's triangles. */
+  private nodeShadowPrimitives(node: Mesh): ShadowCasterRecord[] {
+    const out: ShadowCasterRecord[] = [];
+    for (let i = 0; i < this.resources.length; i++) {
+      const r = this.resources[i];
+      if (r.batch || r.primitive.node !== node || r.primitive.material.settings[0] === 2 || r.primitive.topology)
+        continue;
+      const value = {} as ShadowCasterRecord;
+      fillShadow(r, value);
+      out.push(value);
+    }
+    return out;
   }
   // The material's uniform buffer (880 bytes, 1088 for extended materials), textures and samplers; again after a variant switch.
   private bindMaterial(r: DrawResource, device: GPUDevice, mipSampler: GPUSampler): void {
@@ -1295,31 +1456,15 @@ export class PBRModel implements EnginePlugin {
         );
     }
   }
-  get shadowPrimitives() {
-    return this.resources
-      .filter((r) => r.primitive.material.settings[0] !== 2 && !r.primitive.topology)
-      .map((r) => ({
-        primitive: r.primitive,
-        node: r.primitive.node,
-        vertex: r.primitive.deformed ?? r.vertex,
-        index: r.index,
-        count: r.primitive.indices.length,
-        stride: 80,
-        alphaTexture: r.views[0],
-        alphaSampler: r.samplers[0],
-        alpha: r.primitive.material.base[3],
-        cutoff: r.primitive.material.settings[0] === 1 ? r.primitive.material.settings[1] : 0,
-        texCoord: r.primitive.material.maps[0] ? textureCoordinates(r.primitive.material.maps[0]).texCoord : 0,
-        ...(r.primitive.material.maps[0]?.extensions?.KHR_texture_transform
-          ? { alphaTransform: textureCoordinates(r.primitive.material.maps[0]).transform }
-          : {}),
-        instances: r.primitive.instances,
-      }));
+  get shadowPrimitives(): ShadowCasterRecord[] {
+    const out: ShadowCasterRecord[] = [];
+    this.writeShadowPrimitives(out);
+    return out;
   }
   /** Borrowed current draw buffers; picking never substitutes bind-pose geometry. */
   get pickingPrimitives() {
     if (this.disposed) return [];
-    return this.resources.map((r) => ({
+    return this.resources.filter((r) => !r.batch).map((r) => ({
       primitive: r.primitive,
       node: r.primitive.node,
       vertex: r.primitive.deformed ?? r.vertex,
@@ -1348,7 +1493,7 @@ export class PBRModel implements EnginePlugin {
       revision = this.gpuRevision;
     if (this.disposed || this.engine.disposed || !device) return [];
     this.engine.store.tick(false);
-    const records = this.resources.map((resource) => ({
+    const records = this.resources.filter((resource) => !resource.batch).map((resource) => ({
       resource,
       primitive: resource.primitive,
       deformed: resource.primitive.deformed,
@@ -1418,30 +1563,22 @@ export class PBRModel implements EnginePlugin {
   }
   // The public getter remains a fresh snapshot. Shadows owns this writer's
   // storage and never exposes it to callers or another shadow renderer.
-  private writeShadowPrimitives(out: PBRModel['shadowPrimitives']): boolean {
+  private writeShadowPrimitives(out: ShadowCasterRecord[]): boolean {
     if (lookupShadowGetter.call(this, 'shadowPrimitives') !== publicShadowGetter) return false;
+    const live = (this.shadowBatchLive ??= new Map<StaticBatch, boolean>());
+    live.clear();
+    const shown = (batch: StaticBatch) => {
+      let value = live.get(batch);
+      if (value === undefined) live.set(batch, (value = this.pose(batch)));
+      return value;
+    };
     let count = 0;
     for (let i = 0; i < this.resources.length; i++) {
       const r = this.resources[i],
-        p = r.primitive,
-        m = p.material;
-      if (m.settings[0] === 2 || p.topology) continue;
-      const value = (out[count] ??= {} as PBRModel['shadowPrimitives'][number]);
-      value.primitive = p;
-      value.node = p.node;
-      value.vertex = p.deformed ?? r.vertex;
-      value.index = r.index;
-      value.count = p.indices.length;
-      value.stride = 80;
-      value.alphaTexture = r.views[0];
-      value.alphaSampler = r.samplers[0];
-      value.alpha = m.base[3];
-      value.cutoff = m.settings[0] === 1 ? m.settings[1] : 0;
-      const coordinates = m.maps[0] ? textureCoordinates(m.maps[0]) : undefined;
-      value.texCoord = coordinates?.texCoord ?? 0;
-      if (m.maps[0]?.extensions?.KHR_texture_transform) value.alphaTransform = coordinates?.transform;
-      else delete value.alphaTransform;
-      value.instances = p.instances;
+        p = r.primitive;
+      if (p.material.settings[0] === 2 || p.topology) continue;
+      if (r.batch ? !shown(r.batch) : !!(r.mergedInto?.batch && shown(r.mergedInto.batch))) continue;
+      fillShadow(r, (out[count] ??= {} as ShadowCasterRecord));
       count++;
     }
     out.length = count;
@@ -1452,7 +1589,7 @@ export class PBRModel implements EnginePlugin {
    * (`setCapture`); for these `color`/`depth` are unused. */
   draw(
     c: Context,
-    mode: 'beauty' | 'gbuffer' | 'ambient' | 'transparent' | 'transmission' | 'capture',
+    mode: 'beauty' | 'gbuffer' | 'ambient' | 'transparent' | 'transmission' | 'capture' | 'occlusion',
     color: GPUTextureView,
     depth: GPUTextureView,
     phase: 'all' | 'opaque' | 'blend' = 'all',
@@ -1492,10 +1629,33 @@ export class PBRModel implements EnginePlugin {
         resources.length = source.length;
         // Sorting an all-opaque list only returns the original stable order.
         // Preserve a snapshot for hooks while avoiding V8's sort workspace.
-        if (sort) resources.sort(scratch.compare);
+        // Distances are filled once; the comparator used to call hypot twice per pair.
+        if (sort) {
+          const position = c.camera.position,
+            distances = scratch.blendDistance;
+          distances.clear();
+          for (let i = 0; i < resources.length; i++) {
+            const resource = resources[i];
+            if (!blended(resource.primitive.material)) continue;
+            const matrix = resource.primitive.node.matrix;
+            distances.set(
+              resource,
+              Math.hypot(position[0] - matrix[12], position[1] - matrix[13], position[2] - matrix[14]),
+            );
+          }
+          resources.sort(scratch.compare);
+        }
       }
+      const liveBatches = scratch.liveBatches;
+      liveBatches.clear();
+      const batchLive = (batch: StaticBatch) => {
+        let value = liveBatches.get(batch);
+        if (value === undefined) liveBatches.set(batch, (value = this.pose(batch)));
+        return value;
+      };
       for (let resourceIndex = 0; resourceIndex < resources.length; resourceIndex++) {
         const r = resources[resourceIndex];
+        if (r.batch ? !batchLive(r.batch) : !!(r.mergedInto?.batch && batchLive(r.mergedInto.batch))) continue;
         const p = r.primitive,
           m = p.material,
           node = p.node,
@@ -1666,6 +1826,11 @@ export class PBRModel implements EnginePlugin {
         // Instancing patches the vertex stage last, so text-patching effects (shader NodeMaterial vertex nodes) keep their anchors.
         if (inst) code = inst.shader(code);
         if (m.shading?.texturedTint) code = texturedTintPBR(code);
+        if (mode === 'occlusion') {
+          const rewritten = occlusionShader(code);
+          code = rewritten.code;
+          entry = rewritten.entry;
+        }
         // Keep the shader's original front-facing convention, including mirrored transforms.
         // Mirrored instances flip winding per instance: no culling, the shader's face test discards back faces instead.
         const face = +(!!inst?.mirrored && m.settings[2] < 0.5),
@@ -1767,22 +1932,37 @@ export class PBRModel implements EnginePlugin {
               targets:
                 through || capture
                   ? ((through ? oit! : hook!).targets as GPUColorTargetState[])
-                  : [
-                      {
-                        format,
-                        blend:
-                          state?.blend !== undefined
-                            ? (state.blend ?? undefined)
-                            : blend && mode !== 'gbuffer'
-                              ? {
-                                  color: transmit
-                                    ? { srcFactor: 'one', dstFactor: 'one' }
-                                    : { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
-                                  alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
-                                }
-                              : undefined,
-                      },
-                    ],
+                  : mode === 'occlusion'
+                    ? [
+                        { format },
+                        {
+                          format,
+                          blend: blend
+                            ? {
+                                color: transmit
+                                  ? { srcFactor: 'one', dstFactor: 'one' }
+                                  : { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
+                                alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+                              }
+                            : undefined,
+                        },
+                      ]
+                    : [
+                        {
+                          format,
+                          blend:
+                            state?.blend !== undefined
+                              ? (state.blend ?? undefined)
+                              : blend && mode !== 'gbuffer'
+                                ? {
+                                    color: transmit
+                                      ? { srcFactor: 'one', dstFactor: 'one' }
+                                      : { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
+                                    alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+                                  }
+                                : undefined,
+                        },
+                      ],
             },
             multisample: c.descriptor.multisample,
             primitive: p.topology ? { topology: p.topology } : { topology: 'triangle-list', cullMode: cull },
@@ -1868,7 +2048,20 @@ export class PBRModel implements EnginePlugin {
           }
           target = pass;
         }
-        if (transmission) c.device.queue.writeBuffer(r.volume!, 0, new Float32Array(m.volume!));
+        if (transmission) {
+          const source = m.volume!;
+          let data = r.volumeData;
+          if (!data || data.length !== source.length) r.volumeData = data = new Float32Array(source.length);
+          // Compare rounded values. A JS number such as 0.1 is not bit-identical to its float32 store.
+          let changed = r.volumeWritten !== r.volume;
+          if (!changed)
+            for (let i = 0; i < source.length; i++) if (data[i] !== Math.fround(source[i])) changed = true;
+          if (changed) {
+            data.set(source);
+            c.device.queue.writeBuffer(r.volume!, 0, data);
+            r.volumeWritten = r.volume;
+          }
+        }
         let effectGroup: GPUBindGroup | undefined;
         const effectBindings = !!shading || (lit && ((lighting && this.lighting.size > 0) || through));
         if (effectBindings) {
@@ -1993,6 +2186,8 @@ export class PBRModel implements EnginePlugin {
       for (let i = 0; i < scratch.effects.length; i++) scratch.effects[i] = undefined!;
       for (let i = 0; i < scratch.entries.length; i++) scratch.entries[i] = undefined!;
       scratch.color.view = scratch.depth.view = undefined!;
+      scratch.liveBatches.clear();
+      scratch.blendDistance.clear();
     }
     if (!external) pass?.end();
   }
@@ -2098,7 +2293,12 @@ export class PBRModel implements EnginePlugin {
       if (replica.disposed) return;
       replica.disposed = true;
       const cleanup = new Cleanup();
-      cleanup.run(() => deformation?.dispose()).run(() => replica.releaseGPU());
+      cleanup
+        .run(() => deformation?.dispose())
+        .run(() => replica.releaseGPU())
+        .run(() => {
+          for (let i = replica.created.length - 1; i >= 0; i--) replica.created[i].dispose();
+        });
       for (const projection of projections.values()) cleanup.run(() => projection.dispose());
       projections.clear();
       cleanup.finish();

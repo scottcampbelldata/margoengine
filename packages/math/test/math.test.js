@@ -205,7 +205,7 @@ test('Euler: every order round-trips through quaternions and matrices and matche
 });
 
 test('Euler XYZ matches core mesh rotation (qX * qY * qZ)', () => {
-  // packages/core/src/engine.ts syncRotation, written out for (0.3, -0.4, 1.1).
+  // Kernel::sync_rotation (qX * qY * qZ), written out for (0.3, -0.4, 1.1).
   const [x, y, z] = [0.3, -0.4, 1.1],
     sx = Math.sin(x / 2),
     cx = Math.cos(x / 2),

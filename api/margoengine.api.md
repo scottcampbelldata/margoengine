@@ -4,11 +4,6 @@
 
 ```ts
 import { GeometryBuffers } from "@margoengine/core/extension";
-import { ParticleOptions, PostOptions } from "@margoengine/creative";
-import { EnvironmentLighting, EnvironmentLoadOptions, EnvironmentSource } from "@margoengine/environment";
-import { CADFormat, CADImportOptions } from "@margoengine/machinery";
-import { SkyMoonConfig } from "@margoengine/scenery";
-import { ShadowOptions, Shadows } from "@margoengine/shadows";
 
 export { CADCameraControls } from "@margoengine/core";
 
@@ -28,8 +23,13 @@ export { FrameCallback } from "@margoengine/core";
 
 export { Geometry } from "@margoengine/core";
 
-export interface LoadOptions extends CADImportOptions {
-    format?: 'gltf' | 'glb' | CADFormat;
+export interface LoadOptions {
+    signal?: AbortSignal;
+    onProgress?: (percent: number) => void;
+    smoothing?: boolean;
+    maxParts?: number;
+    timeoutMs?: number;
+    format?: 'gltf' | 'glb' | 'stl' | 'obj' | 'step' | 'iges';
     fit?: boolean;
 }
 
@@ -73,15 +73,15 @@ export class Stage {
     }): Mesh;
     fit(meshes?: Iterable<Mesh>): void;
     load(url: string | URL, { format, fit, signal, ...options }?: LoadOptions): Promise<LoadedModel>;
-    gltf(): Promise<typeof import('@margoengine/gltf')>;
-    machinery(): Promise<typeof import('@margoengine/machinery')>;
-    creative(): Promise<typeof import('@margoengine/creative')>;
-    scenery(): Promise<typeof import('@margoengine/scenery')>;
-    sky(options?: SkyMoonConfig): Promise<import("@margoengine/scenery").SkyMoon>;
-    particles(options?: ParticleOptions): Promise<import("@margoengine/creative").GPUParticles>;
-    effects(options?: PostOptions): Promise<import("@margoengine/creative").PostProcessing>;
-    environment(source: string | URL | EnvironmentSource, options?: EnvironmentLoadOptions): Promise<EnvironmentLighting>;
-    shadows(options?: ShadowOptions): Promise<Shadows>;
+    gltf(): Promise<object>;
+    machinery(): Promise<object>;
+    creative(): Promise<object>;
+    scenery(): Promise<object>;
+    sky(options?: object): Promise<object>;
+    particles(options?: object): Promise<object>;
+    effects(options?: object): Promise<object>;
+    environment(source: string | URL | object, options?: object): Promise<object>;
+    shadows(options?: object): Promise<object>;
 }
 
 export interface StageOptions extends EngineOptions {

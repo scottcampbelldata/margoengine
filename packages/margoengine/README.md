@@ -2,7 +2,7 @@
 
 High-level setup for Margo Engine. Mount a canvas, enable orbit/pan/zoom, start rendering and create a spinning orb in five lines. Core selects WebGPU with WebGL2 fallback, handles resize and automatically recovers WebGPU device loss. WebGL2 context loss reports through `onError` and stops rendering; dispose and recreate the stage to resume.
 
-This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and the matching engine packages. Dependencies install the packs together, while dynamic imports keep their runtime code out of the initial scene.
+This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/machinery`, `@margoengine/creative`, `@margoengine/scenery`, `@margoengine/environment`, and `@margoengine/shadows` are optional peers. `load`, `sky`, `particles`, `effects`, `environment`, and `shadows` import them on use and reject with `Install <package>` when they are absent. Dynamic imports keep that runtime code out of the initial scene.
 
 Apps using Stage load this facade and its shared core, then only the feature entries they use and those features' required dependencies. Apps using the Engine API directly can load core without Stage. Choose specific feature imports and load heavier features on demand; keep one matching core version across the app.
 

@@ -6,7 +6,19 @@ interface Exports extends WebAssembly.Exports {
   kernel_data(handle: number): number;
   kernel_flags(handle: number): number;
   kernel_tick(handle: number, culling: number): number;
+  kernel_sync_rotation(handle: number, id: number): void;
   kernel_drop(handle: number): void;
+}
+interface RotationSlot {
+  handle: number;
+  api: Exports;
+}
+const rotationSlots = new WeakMap<TransformStore, RotationSlot>();
+/** Writes `qx, qy, qz, qw` from slot `id`'s Euler XYZ lanes through `Kernel::sync_rotation`. */
+export function syncStoredRotation(store: TransformStore, id: number): void {
+  const slot = rotationSlots.get(store);
+  if (!slot?.handle) throw new Error('Transforms disposed');
+  slot.api.kernel_sync_rotation(slot.handle, id);
 }
 let compiled: Promise<WebAssembly.Module> | undefined;
 const keys = ['x', 'y', 'z', 'qx', 'qy', 'qz', 'qw', 'sx', 'sy', 'sz'] as const;
@@ -49,6 +61,7 @@ export class TransformStore {
     private readonly api: Exports,
     capacity: number,
   ) {
+    rotationSlots.set(this, { handle: 0, api });
     this.bind(capacity);
   }
 
@@ -64,6 +77,8 @@ export class TransformStore {
     const floats = (at: number, length = capacity) => new Float32Array(buffer, offset + at * 4, length),
       bytes = (column: number) => new Uint8Array(buffer, flags + column * capacity, capacity);
     this.handle = handle;
+    const slot = rotationSlots.get(this);
+    if (slot) slot.handle = handle;
     Object.assign(this, {
       capacity,
       transforms: Object.fromEntries(keys.map((key, field) => [key, floats(field * capacity)])),
@@ -112,6 +127,8 @@ export class TransformStore {
   }
 
   dispose(): void {
+    const slot = rotationSlots.get(this);
+    if (slot) slot.handle = 0;
     if (this.handle) {
       this.api.kernel_drop(this.handle);
       this.handle = 0;

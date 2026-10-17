@@ -276,7 +276,7 @@ test('failed shadow draw allocation releases partial buffers and closes its pass
   };
   try {
     assert.throws(frame, (error) => error === failure);
-    assert.equal(ends, 5, 'Four static clears and the failed dynamic cascade pass are ended');
+    assert.equal(ends, 1, 'The still caster fails inside the first static cascade pass');
     assert.ok(
       h.resources.filter((r) => r.size === 144).every((r) => r.destroyed),
       'Partial draw buffers were leaked',
@@ -289,6 +289,46 @@ test('failed shadow draw allocation releases partial buffers and closes its pass
   } finally {
     engine.gpu.createBuffer = create;
     h.context.encoder.beginRenderPass = begin;
+    shadows.dispose();
+    vertex.destroy();
+    index.destroy();
+    assert.ok(h.resources.every((r) => r.destroyed));
+  }
+});
+
+test('unmarked casters stay cached until their matrix or dynamic flag changes', () => {
+  const h = optionalGPU(),
+    engine = h.engine;
+  engine.gpu.limits.maxTextureDimension2D = 8192;
+  engine.gpu.limits.maxTextureArrayLayers = 256;
+  engine.lighting = { direction: new Float32Array([1, 2, 3, 3]) };
+  const vertex = engine.gpu.createBuffer({ size: 240, usage: GPUBufferUsage.VERTEX }),
+    index = engine.gpu.createBuffer({ size: 12, usage: GPUBufferUsage.INDEX }),
+    node = { id: 0, engine, matrix: new Float32Array(h.context.camera.matrix), check() {} },
+    primitive = { node, vertex, index, count: 3, stride: 80 },
+    shadows = new Shadows({ resolution: 64 });
+  const frame = () => {
+    h.context.shader = 'let linear=direct*vec3f(1);';
+    h.context.bindings = [];
+    engine.frameGraph.execute(h.context);
+  };
+  try {
+    engine.use(shadows);
+    shadows.add({ shadowPrimitives: [primitive] });
+    frame();
+    assert.equal(shadows.stats.staticDraws, 4);
+    assert.equal(shadows.stats.dynamicDraws, 0);
+    frame();
+    assert.equal(shadows.stats.staticDraws, 0);
+    assert.equal(shadows.stats.cacheHits, 1);
+    node.matrix[12] = 1;
+    frame();
+    assert.equal(shadows.stats.staticDraws, 4);
+    primitive.dynamic = true;
+    frame();
+    assert.equal(shadows.stats.dynamicDraws, 4);
+    assert.equal(shadows.stats.staticDraws, 0);
+  } finally {
     shadows.dispose();
     vertex.destroy();
     index.destroy();

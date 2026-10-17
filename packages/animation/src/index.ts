@@ -553,10 +553,17 @@ export class Animation implements EnginePlugin {
           }
         }
       }
-      const pass = context.encoder.beginComputePass();
-      pass.setPipeline(r.pipeline);
-      pass.setBindGroup(0, r.group);
-      pass.dispatchWorkgroups(Math.ceil(r.primitive.vertices.length / 20 / 64));
+    }
+    if (!this.resources.length) return;
+    // One pass for every skinned or morphed primitive. Each dispatch writes its own output buffer.
+    const pass = context.encoder.beginComputePass();
+    try {
+      for (const r of this.resources) {
+        pass.setPipeline(r.pipeline);
+        pass.setBindGroup(0, r.group);
+        pass.dispatchWorkgroups(Math.ceil(r.primitive.vertices.length / 20 / 64));
+      }
+    } finally {
       pass.end();
     }
   }

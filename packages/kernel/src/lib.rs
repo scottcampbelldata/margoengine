@@ -125,6 +125,16 @@ impl Kernel {
         Some(())
     }
 
+    // The only XYZ (qX * qY * qZ) expansion. Tick calls this after clamping; JS calls kernel_sync_rotation.
+    #[inline(never)]
+    fn sync_rotation(&mut self, id: usize) {
+        let n=self.capacity;
+        let angle=&self.data[35*n+24+id*3..35*n+27+id*3];
+        let pair=|a:f32|if a==0.0 {(0.0,1.0)}else{(sin(a as f64/2.0),sin(a as f64/2.0+core::f64::consts::FRAC_PI_2))};
+        let ((sx,cx),(sy,cy),(sz,cz))=(pair(angle[0]),pair(angle[1]),pair(angle[2]));
+        self.data[3*n+id]=(sx*cy*cz+cx*sy*sz) as f32;self.data[4*n+id]=(cx*sy*cz-sx*cy*sz) as f32;self.data[5*n+id]=(cx*cy*sz+sx*sy*cz) as f32;self.data[6*n+id]=(cx*cy*cz-sx*sy*sz) as f32;
+    }
+
     fn tick(&mut self, culling: bool) -> usize {
         let n = self.capacity;
         if culling && self.data[35*n..35*n+24].iter().any(|v| !v.is_finite()) { return n+1; }
@@ -140,12 +150,7 @@ impl Kernel {
         }
         for id in 0..n { let mask=self.flags[2*n+id]; if self.flags[id]==0 || mask==0 {continue;}
             for axis in 0..6 { if mask & (1 << axis) != 0 { let at=if axis<3 {axis*n+id}else{35*n+24+id*3+axis-3};let limits=38*n+24+id*12+axis*2;self.data[at]=self.data[at].max(self.data[limits]).min(self.data[limits+1]); } }
-            if mask & 56 != 0 {
-                let angle=&self.data[35*n+24+id*3..35*n+27+id*3];
-                let pair=|a:f32|if a==0.0 {(0.0,1.0)}else{(sin(a as f64/2.0),sin(a as f64/2.0+core::f64::consts::FRAC_PI_2))};
-                let ((sx,cx),(sy,cy),(sz,cz))=(pair(angle[0]),pair(angle[1]),pair(angle[2]));
-                self.data[3*n+id]=(sx*cy*cz+cx*sy*sz) as f32;self.data[4*n+id]=(cx*sy*cz-sx*cy*sz) as f32;self.data[5*n+id]=(cx*cy*sz+sx*sy*cz) as f32;self.data[6*n+id]=(cx*cy*cz-sx*sy*sz) as f32;
-            }
+            if mask & 56 != 0 { self.sync_rotation(id); }
         }
         // Scratch is fixed at creation; publish only after the entire hierarchy validates.
         // Only entities whose inputs or ancestors changed are recomputed; a failed tick recomputes everything next time.
@@ -247,6 +252,10 @@ pub unsafe extern "C" fn kernel_flags(kernel: *mut Kernel) -> *mut u8 { unsafe {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn kernel_tick(kernel: *mut Kernel, culling: u32) -> usize { unsafe { (*kernel).tick(culling != 0) } }
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn kernel_sync_rotation(kernel: *mut Kernel, id: usize) {
+    unsafe { if !kernel.is_null() && id < (*kernel).capacity { (*kernel).sync_rotation(id); } }
+}
+#[unsafe(no_mangle)]
 #[cfg(not(target_arch = "wasm32"))]
 pub unsafe extern "C" fn kernel_drop(kernel: *mut Kernel) { if !kernel.is_null() { unsafe { drop(Box::from_raw(kernel)); } } }
 
@@ -322,5 +331,27 @@ mod tests {
         let published=k.data[11*n..27*n].to_vec();
         k.data[2]=f32::NAN;assert_eq!(k.tick(false),2);assert_eq!(&k.data[11*n..27*n],published.as_slice());assert_eq!(changed(&mut k),[]);
         k.data[2]=5.0;assert_eq!(k.tick(false),0);assert_eq!(changed(&mut k),[0,1,2]);assert_eq!(&k.data[11*n..27*n],published.as_slice());
+    }
+    #[test]
+    fn sync_rotation_matches_a_constrained_tick_and_ignores_a_bad_id() {
+        let mut direct=Kernel::new(1);
+        direct.sync_rotation(0);
+        assert_eq!([direct.data[3],direct.data[4],direct.data[5],direct.data[6]],[0.0,0.0,0.0,1.0]);
+        let angles=[0.3f32,-0.4,1.1];
+        let mut clamped=Kernel::new(1);
+        clamped.flags[0]=1;clamped.flags[2]=56;
+        for field in 6..10 {clamped.data[field]=1.0;}
+        for axis in 0..3 {
+            direct.data[59+axis]=angles[axis];
+            clamped.data[59+axis]=angles[axis];
+            clamped.data[68+axis*2]=angles[axis];
+            clamped.data[69+axis*2]=angles[axis];
+        }
+        direct.sync_rotation(0);
+        assert_eq!(clamped.tick(false),0);
+        assert_eq!(&direct.data[3..7],&clamped.data[3..7]);
+        let saved=direct.data[3];
+        unsafe { kernel_sync_rotation(&mut direct, 1); }
+        assert_eq!(direct.data[3],saved);
     }
 }

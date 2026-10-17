@@ -1,8 +1,13 @@
 import type { EngineKernel, Mesh } from '@margoengine/core';
 import type { Engine as RuntimeEngine, Mesh as RuntimeMesh, GeometryBuffers } from '@margoengine/core/extension';
-import type { Model } from '@margoengine/gltf';
-import type { CADModel } from '@margoengine/machinery';
 import { meshTriangles } from '../../shared/mesh-source.js';
+
+/** Root, meshes, and dispose. `loadedModel` reads only these fields. */
+export interface StageModel {
+  readonly root: Mesh;
+  readonly meshes: readonly Mesh[];
+  dispose(): void;
+}
 
 type RawBuffers = Omit<GeometryBuffers, 'instance'> & Partial<Pick<GeometryBuffers, 'instance'>>;
 
@@ -53,7 +58,7 @@ export function worldBounds(
   return output;
 }
 
-export function loadedModel(engine: EngineKernel, model: Model | CADModel): LoadedModel {
+export function loadedModel(engine: EngineKernel, model: StageModel): LoadedModel {
   const bounds = new Float32Array(6);
   return {
     root: model.root,

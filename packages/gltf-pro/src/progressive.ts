@@ -16,6 +16,11 @@ import { PBRModel, loadGLTF, type GLTFLoadOptions, type PBRMaterial } from './in
 import { packed, primitiveDefs } from './pack.js';
 import type { GLTFStream, StreamMessage } from './stream.js';
 declare const GPUBufferUsage: { STORAGE: number; VERTEX: number; INDEX: number; COPY_DST: number };
+// Same symbol PBRModel reads. Set until finish(), so setup does not bake the placeholder boxes.
+const deferStaticBatches = Symbol.for('margoengine.gltf-pro.defer-static-batches');
+interface StaticBatchDeferral {
+  commit?: () => void;
+}
 
 export interface ProgressiveGLTFProgress {
   /** `ready`: placeholders drawn; `geometry`/`textures`: streaming; `complete`: equal to a plain `loadGLTF` model. */
@@ -356,6 +361,8 @@ export function loadGLTFProgressive(
         cache.delete(key);
         textures.splice(textures.indexOf(t as GPUTexture), 1);
       }
+    // Instances and final vertices are in place, so the baked batches match a direct loadGLTF.
+    (asset as GLTFAsset & { [deferStaticBatches]?: StaticBatchDeferral })[deferStaticBatches]?.commit?.();
     finished = true;
     worker?.terminate();
     emit('complete');
@@ -417,6 +424,7 @@ export function loadGLTFProgressive(
       limit,
       options.maxNodes,
     );
+    (asset as GLTFAsset & { [deferStaticBatches]?: StaticBatchDeferral })[deferStaticBatches] = {};
     images = Array.from(doc.images ?? [], () => undefined);
     settled = images.map(() => false);
     progress.images = images.length;

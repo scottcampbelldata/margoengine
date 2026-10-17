@@ -6,8 +6,8 @@ Search all 74 packages by task, package name or public runtime export. Copy inst
 
 The [release notes](../CHANGELOG.md#unreleased) cover standalone USDZ parsing,
 Draco/Meshopt support in glTF Pro and synchronous parsing behavior. The current
-consolidated build measures **18,255 bytes gzip** for core and **47,486 bytes raw /
-20,282 bytes gzip** for core + stage, below the 25,000-byte combined gzip ceiling.
+consolidated build measures **18,626 bytes gzip** for core and **49,361 bytes raw /
+20,827 bytes gzip** for core + stage, below the 25,000-byte combined gzip ceiling.
 Package versions and npm availability remain independent of these source changes.
 The optional React entry measures **20,966 bytes gzip**, with React and optional package peers external; those peers and application code are additional. See the [entry measurements](../examples/package-benchmarks/results/entry-sizes.json) and [74-package consolidation record](repository-consolidation-2026-10-16.md).
 

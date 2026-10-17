@@ -1,4 +1,4 @@
-import { TransformStore } from './kernel.js';
+import { TransformStore, syncStoredRotation } from './kernel.js';
 import { Camera, type CameraOptions, type Vec3 } from './camera.js';
 import { Geometry, PbrMaterial, finite } from './geometry.js';
 import { GPURenderer, type Renderer, type Batch, type GeometryBuffers } from './renderer.js';
@@ -167,18 +167,7 @@ export class Mesh {
     return this;
   }
   syncRotation(): void {
-    const sx = Math.sin(this.euler[0] / 2),
-      cx = Math.cos(this.euler[0] / 2),
-      sy = Math.sin(this.euler[1] / 2),
-      cy = Math.cos(this.euler[1] / 2),
-      sz = Math.sin(this.euler[2] / 2),
-      cz = Math.cos(this.euler[2] / 2),
-      t = this.engine.store.transforms,
-      id = this.id;
-    t.qx[id] = sx * cy * cz + cx * sy * sz;
-    t.qy[id] = cx * sy * cz - sx * cy * sz;
-    t.qz[id] = cx * cy * sz + sx * sy * cz;
-    t.qw[id] = cx * cy * cz - sx * sy * sz;
+    syncStoredRotation(this.engine.store, this.id);
   }
   setQuaternion(value: readonly number[]): this {
     this.check();

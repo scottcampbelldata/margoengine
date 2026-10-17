@@ -152,6 +152,7 @@ test(
 
 // HANDOFF 5l.r: the main-thread path packs a mesh once and its nodes share the arrays, so PBRModel.setup (whose upload
 // cache is keyed by array) creates one vertex and one index buffer per mesh primitive, like the worker path.
+// Two of these nodes are static and share a material, so setup also uploads one baked batch pair.
 test('nodes sharing a mesh share its packed arrays and GPU buffers; uploads equal the worker-packed bytes', () =>
   headlessModels(async () => {
     const { doc, buffers } = instancedGLTF([{ t: [0, 0, 0] }, { t: [2, 0, 0] }]);
@@ -205,9 +206,12 @@ test('nodes sharing a mesh share its packed arrays and GPU buffers; uploads equa
     });
     realSetup.call(model, model['engine']);
     const resources = model['resources'],
+      shared = resources.filter((r) => !r.batch),
       geometry = created.filter((buffer) => buffer.usage & (GPUBufferUsage.VERTEX | GPUBufferUsage.INDEX));
-    assert.equal(geometry.length, 2);
-    assert.ok(resources.every((r) => r.vertex === resources[0].vertex && r.index === resources[0].index));
+    assert.equal(shared.length, 3);
+    assert.equal(resources.filter((r) => r.batch).length, 1);
+    assert.equal(geometry.length, 4);
+    assert.ok(shared.every((r) => r.vertex === resources[0].vertex && r.index === resources[0].index));
     const prepared = await runParseWorker(worker, { url: 'https://example.test/', input: doc, buffers });
     assertSameBytes(
       [resources[0].vertex.data, resources[0].index.data],

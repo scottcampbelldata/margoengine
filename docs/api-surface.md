@@ -36,7 +36,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/geometry | `.` 62 |  |  | 15,327 |
 | @margoengine/gizmo | `.` 12 |  |  | 108 |
 | @margoengine/gltf | `.` 4 |  |  | 4,924 |
-| @margoengine/gltf-pro | `.` 41, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./worker` 4 | 247 |  | 29,835 |
+| @margoengine/gltf-pro | `.` 41, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./worker` 4 | 250 |  | 29,835 |
 | @margoengine/html | `.` 8 |  |  | 4,279 |
 | @margoengine/ifc | `.` 4, `./worker` 2 | 3 |  | 2,563 |
 | @margoengine/input | `.` 4 |  |  | 2,297 |
