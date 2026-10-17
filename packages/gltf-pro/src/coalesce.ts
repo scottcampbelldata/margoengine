@@ -25,11 +25,7 @@ export interface StaticBatch {
 const stride = 20;
 
 function determinant(m: ArrayLike<number>): number {
-  return (
-    m[0] * (m[5] * m[10] - m[6] * m[9]) -
-    m[4] * (m[1] * m[10] - m[2] * m[9]) +
-    m[8] * (m[1] * m[6] - m[2] * m[5])
-  );
+  return m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
 }
 
 function eligible(p: PBRPrimitive): boolean {
@@ -126,7 +122,14 @@ export function buildStaticBatches(
       invertMatrixStable(relative, partInverse, workspace);
       const source = part.vertices;
       for (let v = 0; v < source.length; v += stride)
-        bakeVertex(source.subarray(v, v + stride) as Float32Array, baked, vertexBase * stride + v, relative, partInverse, mirror);
+        bakeVertex(
+          source.subarray(v, v + stride) as Float32Array,
+          baked,
+          vertexBase * stride + v,
+          relative,
+          partInverse,
+          mirror,
+        );
       const index = part.indices;
       for (let k = 0; k < index.length; k += 3) {
         const a = vertexBase + index[k],
