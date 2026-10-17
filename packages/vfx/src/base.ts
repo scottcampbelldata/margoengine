@@ -291,6 +291,12 @@ export class VFX implements EnginePlugin {
       this.values[20 + i] = this.view[i * 4 + 1];
       this.values[48 + i] = o.emissionExtent?.[i] ?? 0;
     }
+    // up.w: pixels per world unit at clip w = 1, the clip-space length of the camera's up axis times half the viewport
+    // height, so the billboard can keep far particles at least 1.5 px across.
+    const m = this.values,
+      x = m[0] * m[20] + m[4] * m[21] + m[8] * m[22],
+      y = m[1] * m[20] + m[5] * m[21] + m[9] * m[22];
+    m[23] = Math.sqrt(x * x + y * y) * c.height * 0.5;
     this.values.set(o.gravity ?? defaultGravity, 24);
     this.values[27] = c.delta;
     this.values.set(o.position ?? defaultPosition, 28);

@@ -1,3 +1,4 @@
+/** right and up: the camera's axes; up.w: pixels per world unit at clip w = 1 (for the billboard's minimum size). */
 export const frame = /* wgsl */ `
 struct Particle {positionLife:vec4f,velocitySize:vec4f,color:vec4f,rotation:vec4f}
 struct Frame {camera:mat4x4f,right:vec4f,up:vec4f,gravityDelta:vec4f,emitterTime:vec4f,velocitySpread:vec4f,color:vec4f,shape:vec4f,physics:vec4f,emissionExtent:vec4f,control:vec4u}
@@ -10,7 +11,8 @@ struct Frame {camera:mat4x4f,right:vec4f,up:vec4f,gravityDelta:vec4f,emitterTime
  * indirect counts every live particle; drawn (the draw's arguments) counts those listed in live: the ones whose
  * triangle can reach the screen. That test bounds the triangle by a sphere of radius size (its circumradius) and checks it
  * against the four side planes in clip space, with row-norm margins that bound any offset of that length (1% and a
- * w-relative slack cover rounding); the side planes together also reject everything behind the eye.
+ * w-relative slack cover rounding); the side planes together also reject everything behind the eye. (The test uses the
+ * true size, so a far particle the billboard grows to its 1.5 px minimum can be culled up to a pixel early at an edge.)
  * A respawn's seed is its slot and the simulated frame number (control.z), never an atomic ticket, so the same frames
  * give the same particles whatever order the GPU runs the threads in (visual checks were load-dependent before).
  */
@@ -71,8 +73,11 @@ struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) col
 @vertex fn vertex(@builtin(vertex_index) vertex:u32,@builtin(instance_index) instance:u32)->Out {
   let corners=array<vec2f,3>(vec2f(-1.7320509,-1),vec2f(1.7320509,-1),vec2f(0,2));let corner=corners[vertex];let at=alive[instance]*2;let cold=f.control.x*2+at;let p=Particle(particles[at],particles[at+1],particles[cold],particles[cold+1]);
   let angle=p.rotation.x+p.rotation.y*(p.rotation.z-p.positionLife.w);let cs=cos(angle);let sn=sin(angle);let rotated=vec2f(corner.x*cs-corner.y*sn,corner.x*sn+corner.y*cs);
-  let position=p.positionLife.xyz+(f.right.xyz*rotated.x+f.up.xyz*rotated.y)*p.velocitySize.w*0.5;
-  var o:Out;o.clip=f.camera*vec4f(position,1);o.uv=corner;o.color=vec4f(p.color.rgb,p.color.a*clamp(p.positionLife.w/p.rotation.z,0.0,1.0));return o;
+  // At least 1.5 px across: a smaller (far) particle is drawn at that size with its alpha scaled by the area it gained,
+  // so it keeps its average light instead of popping in and out as it crosses pixel centres or MSAA samples.
+  let pixels=p.velocitySize.w*f.up.w/max(abs((f.camera*vec4f(p.positionLife.xyz,1)).w),1e-6);let grow=select(1.0,max(1.0,1.5/pixels),pixels>0);
+  let position=p.positionLife.xyz+(f.right.xyz*rotated.x+f.up.xyz*rotated.y)*p.velocitySize.w*0.5*grow;
+  var o:Out;o.clip=f.camera*vec4f(position,1);o.uv=corner;o.color=vec4f(p.color.rgb,p.color.a*clamp(p.positionLife.w/p.rotation.z,0.0,1.0)/(grow*grow));return o;
 }
 @fragment fn fragment(i:Out)->@location(0) vec4f {
   let radius=dot(i.uv,i.uv);if(radius>1){discard;}return vec4f(i.color.rgb,i.color.a*(1-radius)*(1-radius));
